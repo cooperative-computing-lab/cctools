@@ -2521,13 +2521,20 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 
 int main(int argc, char *argv[])
 {
-	/* Shared */
+	typedef enum {MAKEFLOW_RUN, MAKEFLOW_UTIL} runtime_mode;
+
 	int c;
 	random_init();
 	makeflow_exe = argv[0];
 	debug_config(makeflow_exe);
 
-	/* Util */
+	runtime_mode modus_operandi = MAKEFLOW_RUN;
+	if(!strncmp("makeflow_util", makeflow_exe, 13)) modus_operandi = MAKEFLOW_UTIL;
+
+	cctools_version_debug(D_DEBUG, makeflow_exe);
+	const char *dagfile;
+
+	/* Util variables */
 	char *bundle_directory = NULL;
 	int display_mode = 0;
 	int condense_display = 0;
@@ -2537,93 +2544,7 @@ int main(int argc, char *argv[])
 	char *ppm_option = NULL;
 	int syntax_check = 0;
 
-	struct option long_options_util[] = {
-		{"bundle-dir", required_argument, 0, 'b'},
-		{"display-mode", required_argument, 0, 'D'},
-		{"help", no_argument, 0, 'h'},
-		{"analyze-exec", no_argument, 0, 'i'},
-		{"show-input", no_argument, 0, 'I'},
-		{"dot-merge-similar", no_argument, 0,  LONG_OPT_DOT_CONDENSE},
-		{"dot-proportional",  no_argument, 0,  LONG_OPT_DOT_PROPORTIONAL},
-		{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
-		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
-		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
-		{"ppm-show-levels", no_argument, 0, LONG_OPT_PPM_LEVELS},
-		{"export-as-dax", no_argument, 0, 'e'},
-		{"syntax-check", no_argument, 0, 'k'},
-		{"version", no_argument, 0, 'v'},
-		{0, 0, 0, 0}
-	};
-	const char *option_string_util = "b:D:ehiIkv";
-
-	while((c = getopt_long(argc, argv, option_string_util, long_options_util, NULL)) >= 0) {
-		switch (c) {
-		case 'b':
-			bundle_directory = xxstrdup(optarg);
-			break;
-		case 'D':
-			if(strcasecmp(optarg, "dot") == 0)
-				display_mode = SHOW_DAG_DOT;
-			else if (strcasecmp(optarg, "ppm") == 0)
-				display_mode = SHOW_DAG_PPM;
-			else
-				fatal("Unknown display option: %s\n", optarg);
-			break;
-		case LONG_OPT_DOT_CONDENSE:
-			display_mode = SHOW_DAG_DOT;
-			condense_display = 1;
-			break;
-		case LONG_OPT_DOT_PROPORTIONAL:
-			display_mode = SHOW_DAG_DOT;
-			change_size = 1;
-			break;
-		case LONG_OPT_PPM_EXE:
-			display_mode = SHOW_DAG_PPM;
-			ppm_option = optarg;
-			ppm_mode = 2;
-			break;
-		case LONG_OPT_PPM_FILE:
-			display_mode = SHOW_DAG_PPM;
-			ppm_option = optarg;
-			ppm_mode = 3;
-			break;
-		case LONG_OPT_PPM_ROW:
-			display_mode = SHOW_DAG_PPM;
-			ppm_option = optarg;
-			ppm_mode = 4;
-			break;
-		case LONG_OPT_PPM_LEVELS:
-			display_mode = SHOW_DAG_PPM;
-			ppm_mode = 5;
-			break;
-		case 'e':
-			export_as_dax = 1;
-			break;
-		case 'h':
-			show_help_util(makeflow_exe);
-			return 0;
-		case 'i':
-			display_mode = SHOW_MAKEFLOW_ANALYSIS;
-			break;
-		case 'I':
-			display_mode = SHOW_INPUT_FILES;
-			break;
-		case 'k':
-			syntax_check = 1;
-			break;
-		case 'O':
-			display_mode = SHOW_OUTPUT_FILES;
-			break;
-		case 'v':
-			cctools_version_print(stdout, makeflow_exe);
-			return 0;
-		default:
-			show_help_util(makeflow_exe);
-			return 1;
-		}
-	}
-
-	/* Run */
+	/* Run variables */
 	char *batchlogfilename = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	char *catalog_host;
@@ -2643,266 +2564,348 @@ int main(int argc, char *argv[])
 	int work_queue_keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	char *write_summary_to = NULL;
-
 	char *s;
 
-	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
-	if(s) {
-		batch_queue_type = batch_queue_type_from_string(s);
-		if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
-			fprintf(stderr, "makeflow: unknown batch queue type: %s (from $MAKEFLOW_BATCH_QUEUE_TYPE)\n", s);
-			return 1;
+	switch(modus_operandi) {
+	case MAKEFLOW_UTIL:
+	{
+		struct option long_options_util[] = {
+			{"bundle-dir", required_argument, 0, 'b'},
+			{"display-mode", required_argument, 0, 'D'},
+			{"help", no_argument, 0, 'h'},
+			{"analyze-exec", no_argument, 0, 'i'},
+			{"show-input", no_argument, 0, 'I'},
+			{"dot-merge-similar", no_argument, 0,  LONG_OPT_DOT_CONDENSE},
+			{"dot-proportional",  no_argument, 0,  LONG_OPT_DOT_PROPORTIONAL},
+			{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
+			{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
+			{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
+			{"ppm-show-levels", no_argument, 0, LONG_OPT_PPM_LEVELS},
+			{"export-as-dax", no_argument, 0, 'e'},
+			{"syntax-check", no_argument, 0, 'k'},
+			{"version", no_argument, 0, 'v'},
+			{0, 0, 0, 0}
+		};
+		const char *option_string_util = "b:D:ehiIkv";
+
+		while((c = getopt_long(argc, argv, option_string_util, long_options_util, NULL)) >= 0) {
+			switch (c) {
+			case 'b':
+				bundle_directory = xxstrdup(optarg);
+				break;
+			case 'D':
+				if(strcasecmp(optarg, "dot") == 0)
+					display_mode = SHOW_DAG_DOT;
+				else if (strcasecmp(optarg, "ppm") == 0)
+					display_mode = SHOW_DAG_PPM;
+				else
+					fatal("Unknown display option: %s\n", optarg);
+				break;
+			case LONG_OPT_DOT_CONDENSE:
+				display_mode = SHOW_DAG_DOT;
+				condense_display = 1;
+				break;
+			case LONG_OPT_DOT_PROPORTIONAL:
+				display_mode = SHOW_DAG_DOT;
+				change_size = 1;
+				break;
+			case LONG_OPT_PPM_EXE:
+				display_mode = SHOW_DAG_PPM;
+				ppm_option = optarg;
+				ppm_mode = 2;
+				break;
+			case LONG_OPT_PPM_FILE:
+				display_mode = SHOW_DAG_PPM;
+				ppm_option = optarg;
+				ppm_mode = 3;
+				break;
+			case LONG_OPT_PPM_ROW:
+				display_mode = SHOW_DAG_PPM;
+				ppm_option = optarg;
+				ppm_mode = 4;
+				break;
+			case LONG_OPT_PPM_LEVELS:
+				display_mode = SHOW_DAG_PPM;
+				ppm_mode = 5;
+				break;
+			case 'e':
+				export_as_dax = 1;
+				break;
+			case 'h':
+				show_help_util(makeflow_exe);
+				return 0;
+			case 'i':
+				display_mode = SHOW_MAKEFLOW_ANALYSIS;
+				break;
+			case 'I':
+				display_mode = SHOW_INPUT_FILES;
+				break;
+			case 'k':
+				syntax_check = 1;
+				break;
+			case 'O':
+				display_mode = SHOW_OUTPUT_FILES;
+				break;
+			case 'v':
+				cctools_version_print(stdout, makeflow_exe);
+				return 0;
+			default:
+				show_help_util(makeflow_exe);
+				return 1;
+			}
 		}
+		break;
 	}
-	s = getenv("WORK_QUEUE_MASTER_MODE");
-	if(s) {
-		work_queue_master_mode = atoi(s);
-	}
-	s = getenv("WORK_QUEUE_NAME");
-	if(s) {
-		project = xxstrdup(s);
-	}
-	s = getenv("WORK_QUEUE_FAST_ABORT_MULTIPLIER");
-	if(s) {
-		wq_option_fast_abort_multiplier = atof(s);
-	}
-
-	struct option long_options_run[] = {
-		{"advertise", no_argument, 0, 'a'},
-		{"disable-afs-check", no_argument, 0, 'A'},
-		{"batch-options", required_argument, 0, 'B'},
-		{"clean", no_argument, 0, 'c'},
-		{"catalog-server", required_argument, 0, 'C'},
-		{"debug", required_argument, 0, 'd'},
-		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
-		{"wq-estimate-capacity", no_argument, 0, 'E'},
-		{"summary-log", no_argument, 0, 'f'},
-		{"wq-fast-abort", required_argument, 0, 'F'},
-		{"help", no_argument, 0, 'h'},
-		{"max-local", required_argument, 0, 'j'},
-		{"max-remote", required_argument, 0, 'J'},
-		{"preserve-links", no_argument, 0, 'K'},
-		{"makeflow-log", required_argument, 0, 'l'},
-		{"batch-log", required_argument, 0, 'L'},
-		{"email", required_argument, 0, 'm'},
-		{"monitor", required_argument, 0, 'M'},
-		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
-		{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
-		{"monitor-limits", required_argument,   0, LONG_OPT_MONITOR_LIMITS},
-		{"monitor-with-time-series",  no_argument, 0, LONG_OPT_MONITOR_TIME_SERIES},
-		{"monitor-with-opened-files", no_argument, 0, LONG_OPT_MONITOR_OPENED_FILES},
-		{"project-name", required_argument, 0, 'N'},
-		{"debug-output", required_argument, 0, 'o'}, /* deprecated alias for --debug-file */
-		{"debug-file", required_argument, 0, 'o'},
-		{"show-output", no_argument, 0, 'O'},
-		{"port", required_argument, 0, 'p'},
-		{"priority", required_argument, 0, 'P'},
-		{"retry-count", required_argument, 0, 'r'},
-		{"retry", no_argument, 0, 'R'},
-		{"submission-timeout", required_argument, 0, 'S'},
-		{"wq-keepalive-timeout", required_argument, 0, 't'},
-		{"batch-type", required_argument, 0, 'T'},
-		{"wq-keepalive-interval", required_argument, 0, 'u'},
-		{"verbose", no_argument, 0, LONG_OPT_VERBOSE_PARSING},
-		{"version", no_argument, 0, 'v'},
-		{"wq-schedule", required_argument, 0, 'W'},
-		{"zero-length-error", no_argument, 0, 'z'},
-		{"port-file", required_argument, 0, 'Z'},
-		{"password", required_argument, 0, LONG_OPT_PASSWORD},
-		{0, 0, 0, 0}
-	};
-	const char *option_string_run = "aAB:cC:d:EfF:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:";
-
-	while((c = getopt_long(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
-		switch (c) {
-		case 'a':
-			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
-			break;
-		case 'A':
-			skip_afs_check = 1;
-			break;
-		case 'B':
-			batch_submit_options = optarg;
-			break;
-		case 'c':
-			clean_mode = 1;
-			break;
-		case 'C':
-			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr, "makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
-				exit(1);
-			}
-			setenv("CATALOG_HOST", catalog_host, 1);
-
-			char *value = string_format("%d", catalog_port);
-			setenv("CATALOG_PORT", value, 1);
-			free(value);
-			break;
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'E':
-			// This option is deprecated. Capacity estimation is now on by default.
-			break;
-		case 'f':
-			write_summary_to = xxstrdup(optarg);
-			break;
-		case 'F':
-			wq_option_fast_abort_multiplier = atof(optarg);
-			break;
-		case 'g':
-			if(strcasecmp(optarg, "none") == 0) {
-				dag_gc_method = DAG_GC_NONE;
-			} else if(strcasecmp(optarg, "ref_count") == 0) {
-				dag_gc_method = DAG_GC_REF_COUNT;
-				if(dag_gc_param < 0)
-					dag_gc_param = 16;	/* Try to collect at most 16 files. */
-			} else if(strcasecmp(optarg, "on_demand") == 0) {
-				dag_gc_method = DAG_GC_ON_DEMAND;
-				if(dag_gc_param < 0)
-					dag_gc_param = 1 << 14;	/* Inode threshold of 2^14. */
-			} else {
-				fprintf(stderr, "makeflow: invalid garbage collection method: %s\n", optarg);
-				exit(1);
-			}
-			break;
-		case 'G':
-			dag_gc_param = atoi(optarg);
-			break;
-		case 'h':
-			show_help_run(makeflow_exe);
-			return 0;
-		case 'j':
-			explicit_local_jobs_max = atoi(optarg);
-			break;
-		case 'J':
-			explicit_remote_jobs_max = atoi(optarg);
-			break;
-		case 'K':
-			preserve_symlinks = 1;
-			break;
-		case 'l':
-			logfilename = xxstrdup(optarg);
-			break;
-		case 'L':
-			batchlogfilename = xxstrdup(optarg);
-			break;
-		case 'm':
-			email_summary_to = xxstrdup(optarg);
-			break;
-		case 'M':
-			monitor_mode = 1;
-			if(monitor_log_dir)
-				free(monitor_log_dir);
-			monitor_log_dir = xxstrdup(optarg);
-			break;
-		case LONG_OPT_MONITOR_LIMITS:
-			monitor_mode = 1;
-			if(monitor_limits_name)
-				free(monitor_limits_name);
-			monitor_limits_name = xxstrdup(optarg);
-			break;
-		case LONG_OPT_MONITOR_INTERVAL:
-			monitor_mode = 1;
-			monitor_interval = atoi(optarg);
-			break;
-		case LONG_OPT_MONITOR_TIME_SERIES:
-			monitor_mode = 1;
-			monitor_enable_time_series = 1;
-			break;
-		case LONG_OPT_MONITOR_OPENED_FILES:
-			monitor_mode = 1;
-			monitor_enable_list_files = 1;
-			break;
-		case LONG_OPT_MONITOR_LOG_NAME:
-			monitor_mode = 1;
-			if(monitor_log_format)
-				free(monitor_log_format);
-			monitor_log_format = xxstrdup(optarg);
-			break;
-		case 'N':
-			free(project);
-			project = xxstrdup(optarg);
-			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
-			break;
-		case 'o':
-			debug_config_file(optarg);
-			break;
-		case 'p':
-			port_set = 1;
-			port = atoi(optarg);
-			break;
-		case 'P':
-			priority = atoi(optarg);
-			break;
-		case 'r':
-			dag_retry_flag = 1;
-			dag_retry_max = atoi(optarg);
-			break;
-		case 'R':
-			dag_retry_flag = 1;
-			break;
-		case 'S':
-			dag_submit_timeout = atoi(optarg);
-			break;
-		case 't':
-			work_queue_keepalive_timeout = atoi(optarg);
-			break;
-		case 'T':
-			batch_queue_type = batch_queue_type_from_string(optarg);
+	case MAKEFLOW_RUN:
+		s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
+		if(s) {
+			batch_queue_type = batch_queue_type_from_string(s);
 			if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
-				fprintf(stderr, "makeflow: unknown batch queue type: %s\n", optarg);
+				fprintf(stderr, "makeflow: unknown batch queue type: %s (from $MAKEFLOW_BATCH_QUEUE_TYPE)\n", s);
 				return 1;
 			}
-			break;
-		case 'u':
-			work_queue_keepalive_interval = atoi(optarg);
-			break;
-		case 'v':
-			cctools_version_print(stdout, makeflow_exe);
-			return 0;
-		case LONG_OPT_VERBOSE_PARSING:
-			verbose_parsing = 1;
-			break;
-		case 'W':
-			if(!strcmp(optarg, "files")) {
-				wq_option_scheduler = WORK_QUEUE_SCHEDULE_FILES;
-			} else if(!strcmp(optarg, "time")) {
-				wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
-			} else if(!strcmp(optarg, "fcfs")) {
-				wq_option_scheduler = WORK_QUEUE_SCHEDULE_FCFS;
-			} else {
-				fprintf(stderr, "makeflow: unknown scheduling mode %s\n", optarg);
-				return 1;
-			}
-			break;
-		case 'z':
-			output_len_check = 1;
-			break;
-		case 'Z':
-			port_file = optarg;
-			port = 0;
-			port_set = 1;	//WQ is going to set the port, so we continue as if already set.
-			break;
-		case LONG_OPT_PASSWORD:
-			if(copy_file_to_buffer(optarg, &wq_password) < 0) {
-				fprintf(stderr, "makeflow: couldn't open %s: %s\n", optarg, strerror(errno));
-				return 1;
-			}
-			break;
-		case LONG_OPT_DISABLE_BATCH_CACHE:
-			cache_mode = 0;
-			break;
-		default:
-			show_help_run(makeflow_exe);
-			return 1;
 		}
+		s = getenv("WORK_QUEUE_MASTER_MODE");
+		if(s) {
+			work_queue_master_mode = atoi(s);
+		}
+		s = getenv("WORK_QUEUE_NAME");
+		if(s) {
+			project = xxstrdup(s);
+		}
+		s = getenv("WORK_QUEUE_FAST_ABORT_MULTIPLIER");
+		if(s) {
+			wq_option_fast_abort_multiplier = atof(s);
+		}
+
+		struct option long_options_run[] = {
+			{"advertise", no_argument, 0, 'a'},
+			{"disable-afs-check", no_argument, 0, 'A'},
+			{"batch-options", required_argument, 0, 'B'},
+			{"clean", no_argument, 0, 'c'},
+			{"catalog-server", required_argument, 0, 'C'},
+			{"debug", required_argument, 0, 'd'},
+			{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
+			{"wq-estimate-capacity", no_argument, 0, 'E'},
+			{"summary-log", no_argument, 0, 'f'},
+			{"wq-fast-abort", required_argument, 0, 'F'},
+			{"help", no_argument, 0, 'h'},
+			{"max-local", required_argument, 0, 'j'},
+			{"max-remote", required_argument, 0, 'J'},
+			{"preserve-links", no_argument, 0, 'K'},
+			{"makeflow-log", required_argument, 0, 'l'},
+			{"batch-log", required_argument, 0, 'L'},
+			{"email", required_argument, 0, 'm'},
+			{"monitor", required_argument, 0, 'M'},
+			{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
+			{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
+			{"monitor-limits", required_argument,   0, LONG_OPT_MONITOR_LIMITS},
+			{"monitor-with-time-series",  no_argument, 0, LONG_OPT_MONITOR_TIME_SERIES},
+			{"monitor-with-opened-files", no_argument, 0, LONG_OPT_MONITOR_OPENED_FILES},
+			{"project-name", required_argument, 0, 'N'},
+			{"debug-output", required_argument, 0, 'o'},
+			{"show-output", no_argument, 0, 'O'},
+			{"port", required_argument, 0, 'p'},
+			{"priority", required_argument, 0, 'P'},
+			{"retry-count", required_argument, 0, 'r'},
+			{"retry", no_argument, 0, 'R'},
+			{"submission-timeout", required_argument, 0, 'S'},
+			{"wq-keepalive-timeout", required_argument, 0, 't'},
+			{"batch-type", required_argument, 0, 'T'},
+			{"wq-keepalive-interval", required_argument, 0, 'u'},
+			{"version", no_argument, 0, 'v'},
+			{"wq-schedule", required_argument, 0, 'W'},
+			{"zero-length-error", no_argument, 0, 'z'},
+			{"port-file", required_argument, 0, 'Z'},
+			{"password", required_argument, 0, LONG_OPT_PASSWORD},
+			{0, 0, 0, 0}
+		};
+		const char *option_string_run = "aAB:cC:d:EfF:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:";
+
+		while((c = getopt_long(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
+			switch (c) {
+			case 'a':
+				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+				break;
+			case 'A':
+				skip_afs_check = 1;
+				break;
+			case 'B':
+				batch_submit_options = optarg;
+				break;
+			case 'c':
+				clean_mode = 1;
+				break;
+			case 'C':
+				if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
+					fprintf(stderr, "makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
+					exit(1);
+				}
+				setenv("CATALOG_HOST", catalog_host, 1);
+
+				char *value = string_format("%d", catalog_port);
+				setenv("CATALOG_PORT", value, 1);
+				free(value);
+				break;
+			case 'd':
+				debug_flags_set(optarg);
+				break;
+			case 'E':
+				// This option is deprecated. Capacity estimation is now on by default.
+				break;
+			case 'f':
+				write_summary_to = xxstrdup(optarg);
+				break;
+			case 'F':
+				wq_option_fast_abort_multiplier = atof(optarg);
+				break;
+			case 'g':
+				if(strcasecmp(optarg, "none") == 0) {
+					dag_gc_method = DAG_GC_NONE;
+				} else if(strcasecmp(optarg, "ref_count") == 0) {
+					dag_gc_method = DAG_GC_REF_COUNT;
+					if(dag_gc_param < 0)
+						dag_gc_param = 16;	/* Try to collect at most 16 files. */
+				} else if(strcasecmp(optarg, "on_demand") == 0) {
+					dag_gc_method = DAG_GC_ON_DEMAND;
+					if(dag_gc_param < 0)
+						dag_gc_param = 1 << 14;	/* Inode threshold of 2^14. */
+				} else {
+					fprintf(stderr, "makeflow: invalid garbage collection method: %s\n", optarg);
+					exit(1);
+				}
+				break;
+			case 'G':
+				dag_gc_param = atoi(optarg);
+				break;
+			case 'h':
+				show_help_run(makeflow_exe);
+				return 0;
+			case 'j':
+				explicit_local_jobs_max = atoi(optarg);
+				break;
+			case 'J':
+				explicit_remote_jobs_max = atoi(optarg);
+				break;
+			case 'K':
+				preserve_symlinks = 1;
+				break;
+			case 'l':
+				logfilename = xxstrdup(optarg);
+				break;
+			case 'L':
+				batchlogfilename = xxstrdup(optarg);
+				break;
+			case 'm':
+				email_summary_to = xxstrdup(optarg);
+				break;
+			case 'M':
+				monitor_mode = 1;
+				if(monitor_log_dir)
+					free(monitor_log_dir);
+				monitor_log_dir = xxstrdup(optarg);
+				break;
+			case LONG_OPT_MONITOR_LIMITS:
+				monitor_mode = 1;
+				if(monitor_limits_name)
+					free(monitor_limits_name);
+				monitor_limits_name = xxstrdup(optarg);
+				break;
+			case LONG_OPT_MONITOR_INTERVAL:
+				monitor_mode = 1;
+				monitor_interval = atoi(optarg);
+				break;
+			case LONG_OPT_MONITOR_TIME_SERIES:
+				monitor_mode = 1;
+				monitor_enable_time_series = 1;
+				break;
+			case LONG_OPT_MONITOR_OPENED_FILES:
+				monitor_mode = 1;
+				monitor_enable_list_files = 1;
+				break;
+			case LONG_OPT_MONITOR_LOG_NAME:
+				monitor_mode = 1;
+				if(monitor_log_format)
+					free(monitor_log_format);
+				monitor_log_format = xxstrdup(optarg);
+				break;
+			case 'N':
+				free(project);
+				project = xxstrdup(optarg);
+				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+				break;
+			case 'o':
+				debug_config_file(optarg);
+				break;
+			case 'p':
+				port_set = 1;
+				port = atoi(optarg);
+				break;
+			case 'P':
+				priority = atoi(optarg);
+				break;
+			case 'r':
+				dag_retry_flag = 1;
+				dag_retry_max = atoi(optarg);
+				break;
+			case 'R':
+				dag_retry_flag = 1;
+				break;
+			case 'S':
+				dag_submit_timeout = atoi(optarg);
+				break;
+			case 't':
+				work_queue_keepalive_timeout = atoi(optarg);
+				break;
+			case 'T':
+				batch_queue_type = batch_queue_type_from_string(optarg);
+				if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
+					fprintf(stderr, "makeflow: unknown batch queue type: %s\n", optarg);
+					return 1;
+				}
+				break;
+			case 'u':
+				work_queue_keepalive_interval = atoi(optarg);
+				break;
+			case 'v':
+				cctools_version_print(stdout, makeflow_exe);
+				return 0;
+			case 'W':
+				if(!strcmp(optarg, "files")) {
+					wq_option_scheduler = WORK_QUEUE_SCHEDULE_FILES;
+				} else if(!strcmp(optarg, "time")) {
+					wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
+				} else if(!strcmp(optarg, "fcfs")) {
+					wq_option_scheduler = WORK_QUEUE_SCHEDULE_FCFS;
+				} else {
+					fprintf(stderr, "makeflow: unknown scheduling mode %s\n", optarg);
+					return 1;
+				}
+				break;
+			case 'z':
+				output_len_check = 1;
+				break;
+			case 'Z':
+				port_file = optarg;
+				port = 0;
+				port_set = 1;	//WQ is going to set the port, so we continue as if already set.
+				break;
+			case LONG_OPT_PASSWORD:
+				if(copy_file_to_buffer(optarg, &wq_password) < 0) {
+					fprintf(stderr, "makeflow: couldn't open %s: %s\n", optarg, strerror(errno));
+					return 1;
+				}
+				break;
+			case LONG_OPT_DISABLE_BATCH_CACHE:
+				cache_mode = 0;
+				break;
+			default:
+				show_help_run(makeflow_exe);
+				return 1;
+			}
+		}
+		break;
 	}
-
-
-	cctools_version_debug(D_DEBUG, makeflow_exe);
-
-	const char *dagfile;
 
 	if((argc - optind) != 1) {
 		int rv = access("./Makeflow", R_OK);
@@ -2917,336 +2920,324 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
-			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
-			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", makeflow_exe);
-			return 1;
-		}
-		// Use Work Queue default port in standalone mode when port is not
-		// specified with -p option. In Work Queue catalog mode, Work Queue
-		// would choose an arbitrary port when port is not explicitly specified.
-		if(!port_set && work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE) {
-			port_set = 1;
-			port = WORK_QUEUE_DEFAULT_PORT;
-		}
+	if(modus_operandi == MAKEFLOW_RUN) {
+		if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
+			if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
+				fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
+				fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", makeflow_exe);
+				return 1;
+			}
+			// Use Work Queue default port in standalone mode when port is not
+			// specified with -p option. In Work Queue catalog mode, Work Queue
+			// would choose an arbitrary port when port is not explicitly specified.
+			if(!port_set && work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE) {
+				port_set = 1;
+				port = WORK_QUEUE_DEFAULT_PORT;
+			}
 
-		if(port_set) {
-			char *value;
-			value = string_format("%d", port);
-			setenv("WORK_QUEUE_PORT", value, 1);
-			free(value);
-		}
-
-	}
-
-	if(!logfilename)
-		logfilename = string_format("%s.makeflowlog", dagfile);
-	if(!batchlogfilename) {
-		switch (batch_queue_type) {
-		case BATCH_QUEUE_TYPE_CONDOR:
-			batchlogfilename = string_format("%s.condorlog", dagfile);
-			break;
-		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
-			batchlogfilename = string_format("%s.wqlog", dagfile);
-			break;
-		default:
-			batchlogfilename = string_format("%s.batchlog", dagfile);
-			break;
+			if(port_set) {
+				char *value;
+				value = string_format("%d", port);
+				setenv("WORK_QUEUE_PORT", value, 1);
+				free(value);
+			}
 		}
 
-		// In clean mode, delete all existing log files
-		if(clean_mode) {
-			char *cleanlog = string_format("%s.condorlog", dagfile);
-			file_clean(cleanlog, 0);
-			free(cleanlog);
-			cleanlog = string_format("%s.wqlog", dagfile);
-			file_clean(cleanlog, 0);
-			free(cleanlog);
-			cleanlog = string_format("%s.batchlog", dagfile);
-			file_clean(cleanlog, 0);
-			free(cleanlog);
+		if(!logfilename)
+			logfilename = string_format("%s.makeflowlog", dagfile);
+		if(!batchlogfilename) {
+			switch (batch_queue_type) {
+			case BATCH_QUEUE_TYPE_CONDOR:
+				batchlogfilename = string_format("%s.condorlog", dagfile);
+				break;
+			case BATCH_QUEUE_TYPE_WORK_QUEUE:
+			case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
+				batchlogfilename = string_format("%s.wqlog", dagfile);
+				break;
+			default:
+				batchlogfilename = string_format("%s.batchlog", dagfile);
+				break;
+			}
 
-			if(monitor_mode)
-				unlink(monitor_exe);
+			// In clean mode, delete all existing log files
+			if(clean_mode) {
+				char *cleanlog = string_format("%s.condorlog", dagfile);
+				file_clean(cleanlog, 0);
+				free(cleanlog);
+				cleanlog = string_format("%s.wqlog", dagfile);
+				file_clean(cleanlog, 0);
+				free(cleanlog);
+				cleanlog = string_format("%s.batchlog", dagfile);
+				file_clean(cleanlog, 0);
+				free(cleanlog);
+			}
 		}
-	}
 
-	if(monitor_mode) {
+		if(monitor_mode) {
 
-		if(!monitor_log_dir)
-		{
-			fatal("Monitor mode was enabled, but a log output directory was not specified (use -M<dir>)");
+			if(!monitor_log_dir)
+			{
+				fatal("Monitor mode was enabled, but a log output directory was not specified (use -M<dir>)");
+			}
+
+			monitor_exe = resource_monitor_copy_to_wd(NULL);
+
+			if(monitor_interval < 1)
+				fatal("Monitoring interval should be non-negative.");
+
+			if(!monitor_log_format)
+				monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
 		}
-
-		if(monitor_interval < 1)
-			fatal("Monitoring interval should be non-negative.");
-
-		if(!monitor_log_format)
-			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
-
-		copy_monitor();
 	}
 
 	struct dag *d = dag_from_file(dagfile);
 	if(!d) {
-		free(logfilename);
-		free(batchlogfilename);
-		if(errno)
-		{
-			fatal("couldn't load %s: %s\n", dagfile, strerror(errno));
-		}
-		else
-		{
-			fprintf(stderr, "couldn't load %s: invalid syntax.\n", dagfile);
-			return 1;
-		}
+		if(logfilename) free(logfilename);
+		if(batchlogfilename) free(batchlogfilename);
+		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
 
-	if(syntax_check) {
-		fprintf(stdout, "%s: Syntax OK.\n", dagfile);
-		return 0;
-	}
-
-	if(export_as_dax) {
-		dag_to_dax(d, path_basename(dagfile));
-		return 0;
-	}
-
-	if(bundle_directory) {
-		char expanded_path[PATH_MAX];
-
-		collect_input_files(d, bundle_directory, bundler_rename);
-		realpath(bundle_directory, expanded_path);
-
-		char output_makeflow[PATH_MAX];
-		sprintf(output_makeflow, "%s/%s", expanded_path, path_basename(dagfile));
-		if(strcmp(bundle_directory, "*"))
-			dag_to_file(d, output_makeflow, bundler_rename);
-		free(bundle_directory);
-		exit(0);
-	}
-
-	if(display_mode)
-	{
-		switch(display_mode)
-		{
-		case SHOW_INPUT_FILES:
-			dag_show_input_files(d);
-			break;
-
-		case SHOW_OUTPUT_FILES:
-			dag_show_output_files(d);
-			break;
-
-		case SHOW_MAKEFLOW_ANALYSIS:
-			dag_show_analysis(d);
-			break;
-
-		case SHOW_DAG_DOT:
-			dag_to_dot(d, condense_display, change_size);
-			break;
-
-		case SHOW_DAG_PPM:
-			dag_to_ppm(d, ppm_mode, ppm_option);
-			break;
-
-		case SHOW_DAG_FILE:
-			dag_to_file(d, NULL, NULL);
-			break;
-
-		default:
-			fatal("Unknown display option.");
-			break;
+	if(modus_operandi == MAKEFLOW_UTIL) {
+		if(syntax_check) {
+			fprintf(stdout, "%s: Syntax OK.\n", dagfile);
+			return 0;
 		}
 
+		if(export_as_dax) {
+			dag_to_dax(d, path_basename(dagfile));
+			return 0;
+		}
+
+		if(bundle_directory) {
+			char expanded_path[PATH_MAX];
+
+			collect_input_files(d, bundle_directory, bundler_rename);
+			realpath(bundle_directory, expanded_path);
+
+			char output_makeflow[PATH_MAX];
+			sprintf(output_makeflow, "%s/%s", expanded_path, path_basename(dagfile));
+			if(strcmp(bundle_directory, "*"))
+				dag_to_file(d, output_makeflow, bundler_rename);
+			free(bundle_directory);
+			exit(0);
+		}
+
+		if(display_mode)
+		{
+			switch(display_mode)
+			{
+			case SHOW_INPUT_FILES:
+				dag_show_input_files(d);
+				break;
+
+			case SHOW_OUTPUT_FILES:
+				dag_show_output_files(d);
+				break;
+
+			case SHOW_MAKEFLOW_ANALYSIS:
+				dag_show_analysis(d);
+				break;
+
+			case SHOW_DAG_DOT:
+				dag_to_dot(d, condense_display, change_size);
+				break;
+
+			case SHOW_DAG_PPM:
+				dag_to_ppm(d, ppm_mode, ppm_option);
+				break;
+
+			default:
+				fatal("Unknown display option.");
+				break;
+			}
+
+			exit(0);
+		}
 		exit(0);
 	}
 
 
-	if(explicit_local_jobs_max) {
-		d->local_jobs_max = explicit_local_jobs_max;
-	} else {
-		d->local_jobs_max = load_average_get_cpus();
-	}
-
-	if(explicit_remote_jobs_max) {
-		d->remote_jobs_max = explicit_remote_jobs_max;
-	} else {
-		if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
-			d->remote_jobs_max = load_average_get_cpus();
-		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-			d->remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
-		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-			d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
+	if(modus_operandi == MAKEFLOW_RUN) {
+		if(explicit_local_jobs_max) {
+			d->local_jobs_max = explicit_local_jobs_max;
 		} else {
-			d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
+			d->local_jobs_max = load_average_get_cpus();
 		}
-	}
 
-	s = getenv("MAKEFLOW_MAX_REMOTE_JOBS");
-	if(s) {
-		d->remote_jobs_max = MIN(d->remote_jobs_max, atoi(s));
-	}
-
-	s = getenv("MAKEFLOW_MAX_LOCAL_JOBS");
-	if(s) {
-		int n = atoi(s);
-		d->local_jobs_max = MIN(d->local_jobs_max, n);
-		if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
-			d->remote_jobs_max = MIN(d->local_jobs_max, n);
+		if(explicit_remote_jobs_max) {
+			d->remote_jobs_max = explicit_remote_jobs_max;
+		} else {
+			if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
+				d->remote_jobs_max = load_average_get_cpus();
+			} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+				d->remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
+			} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
+				d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
+			} else {
+				d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
+			}
 		}
-	}
 
-	if(monitor_mode)
-	{
-		dag_prepare_for_monitoring(d);
-	}
+		s = getenv("MAKEFLOW_MAX_REMOTE_JOBS");
+		if(s) {
+			d->remote_jobs_max = MIN(d->remote_jobs_max, atoi(s));
+		}
 
-	if(!dag_prepare_for_batch_system(d)) {
-		fatal("Could not prepare for submission to batch system.\n");
-	}
+		s = getenv("MAKEFLOW_MAX_LOCAL_JOBS");
+		if(s) {
+			int n = atoi(s);
+			d->local_jobs_max = MIN(d->local_jobs_max, n);
+			if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
+				d->remote_jobs_max = MIN(d->local_jobs_max, n);
+			}
+		}
 
-	if(dag_gc_method != DAG_GC_NONE)
-		dag_prepare_gc(d);
+		if(monitor_mode && !dag_prepare_for_monitoring(d)) {
+			fatal("Could not prepare for monitoring.\n");
+		}
 
-	dag_prepare_nested_jobs(d);
+		if(!dag_prepare_for_batch_system(d)) {
+			fatal("Could not prepare for submission to batch system.\n");
+		}
 
-	if(clean_mode) {
-		dag_clean(d);
-		file_clean(logfilename, 0);
+		if(dag_gc_method != DAG_GC_NONE)
+			dag_prepare_gc(d);
+
+		dag_prepare_nested_jobs(d);
+
+		if(clean_mode) {
+			dag_clean(d);
+			file_clean(logfilename, 0);
 		file_clean(batchlogfilename, 0);
 		free(logfilename);
 		free(batchlogfilename);
 		return 0;
-	}
+		}
 
-	if(!dag_check(d)) {
-		free(logfilename);
-		free(batchlogfilename);
-		return 1;
-	}
-
-	if(verbose_parsing) {
-		fprintf(stdout, "\r     Total rules: %d", d->nodeid_counter);
-		fprintf(stdout, "\nStarting execution of workflow: %s.\n", dagfile);
-	}
-
-	if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
-		char *cwd = path_getcwd();
-		if(!strncmp(cwd, "/afs", 4)) {
-			fprintf(stderr, "makeflow: This won't work because Condor is not able to write to files in AFS.\n");
-			fprintf(stderr, "makeflow: Instead, run makeflow from a local disk like /tmp.\n");
-			fprintf(stderr, "makeflow: Or, use the Work Queue with -T wq and condor_submit_workers.\n");
-
+		if(!dag_check(d)) {
 			free(logfilename);
 			free(batchlogfilename);
+			return 1;
+		}
+
+		fprintf(stdout, "\r     Total rules: %d", d->nodeid_counter);
+		fprintf(stdout, "\nStarting execution of workflow: %s.\n", dagfile);
+
+		if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
+			char *cwd = path_getcwd();
+			if(!strncmp(cwd, "/afs", 4)) {
+				fprintf(stderr, "makeflow: This won't work because Condor is not able to write to files in AFS.\n");
+				fprintf(stderr, "makeflow: Instead, run makeflow from a local disk like /tmp.\n");
+				fprintf(stderr, "makeflow: Or, use the Work Queue with -T wq and condor_submit_workers.\n");
+
+				free(logfilename);
+				free(batchlogfilename);
+				free(cwd);
+
+				exit(1);
+			}
 			free(cwd);
-
-			exit(1);
 		}
-		free(cwd);
-	}
 
-	setlinebuf(stdout);
-	setlinebuf(stderr);
+		setlinebuf(stdout);
+		setlinebuf(stderr);
 
-	local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
-	if(!local_queue) {
-		fprintf(stderr, "makeflow: couldn't create local job queue.\n");
-		exit(1);
-	}
-
-	remote_queue = batch_queue_create(batch_queue_type);
-	if(!remote_queue) {
-		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
-		if(port != 0)
-			fprintf(stderr, "makeflow: perhaps port %d is already in use?\n", port);
-		exit(1);
-	}
-
-	dag_log_recover(d, logfilename);
-
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		struct work_queue *q = batch_queue_get_work_queue(remote_queue);
-		if(!q) {
-			fprintf(stderr, "makeflow: cannot get work queue object.\n");
+		local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
+		if(!local_queue) {
+			fprintf(stderr, "makeflow: couldn't create local job queue.\n");
 			exit(1);
 		}
 
-		if(wq_password)
-			work_queue_specify_password(q, wq_password);
-		work_queue_specify_master_mode(q, work_queue_master_mode);
-		work_queue_specify_name(q, project);
-		work_queue_specify_priority(q, priority);
-		work_queue_specify_estimate_capacity_on(q, work_queue_estimate_capacity_on);
-		work_queue_specify_keepalive_interval(q, work_queue_keepalive_interval);
-		work_queue_specify_keepalive_timeout(q, work_queue_keepalive_timeout);
-		work_queue_enable_process_module(q);
-		port = work_queue_port(q);
-		if(port_file)
-			opts_write_port_file(port_file, port);
-		if(!cache_mode){
-			batch_job_disable_caching(remote_queue);
-			debug(D_DEBUG, "Work Queue caching is disabled.\n");
+		remote_queue = batch_queue_create(batch_queue_type);
+		if(!remote_queue) {
+			fprintf(stderr, "makeflow: couldn't create batch queue.\n");
+			if(port != 0)
+				fprintf(stderr, "makeflow: perhaps port %d is already in use?\n", port);
+			exit(1);
 		}
-		else {
-			batch_job_enable_caching(remote_queue);
+
+		dag_log_recover(d, logfilename);
+
+		if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
+			struct work_queue *q = batch_queue_get_work_queue(remote_queue);
+			if(!q) {
+				fprintf(stderr, "makeflow: cannot get work queue object.\n");
+				exit(1);
+			}
+
+			if(wq_password)
+				work_queue_specify_password(q, wq_password);
+			work_queue_specify_master_mode(q, work_queue_master_mode);
+			work_queue_specify_name(q, project);
+			work_queue_specify_priority(q, priority);
+			work_queue_specify_estimate_capacity_on(q, work_queue_estimate_capacity_on);
+			work_queue_specify_keepalive_interval(q, work_queue_keepalive_interval);
+			work_queue_specify_keepalive_timeout(q, work_queue_keepalive_timeout);
+			work_queue_enable_process_module(q);
+			port = work_queue_port(q);
+			if(port_file)
+				opts_write_port_file(port_file, port);
+			if(!cache_mode){
+				batch_job_disable_caching(remote_queue);
+				debug(D_DEBUG, "Work Queue caching is disabled.\n");
+			}
+			else {
+				batch_job_enable_caching(remote_queue);
+			}
 		}
-	}
 
-	if(batch_submit_options) {
-		debug(D_DEBUG, "setting batch options to %s\n", batch_submit_options);
-		batch_queue_set_options(remote_queue, batch_submit_options);
-	}
+		if(batch_submit_options) {
+			debug(D_DEBUG, "setting batch options to %s\n", batch_submit_options);
+			batch_queue_set_options(remote_queue, batch_submit_options);
+		}
 
-	if(batchlogfilename) {
-		batch_queue_set_logfile(remote_queue, batchlogfilename);
-	}
+		if(batchlogfilename) {
+			batch_queue_set_logfile(remote_queue, batchlogfilename);
+		}
 
-	port = batch_queue_port(remote_queue);
-	if(port > 0)
-		printf("listening for workers on port %d.\n", port);
-
-
-	signal(SIGINT, handle_abort);
-	signal(SIGQUIT, handle_abort);
-	signal(SIGTERM, handle_abort);
-
-	fprintf(d->logfile, "# STARTED\t%" PRIu64 "\n", timestamp_get());
-	runtime = timestamp_get();
-	dag_run(d);
-	time_completed = timestamp_get();
-	runtime = time_completed - runtime;
-
-	batch_queue_delete(local_queue);
-	batch_queue_delete(remote_queue);
-
-	if(!preserve_symlinks && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
-		clean_symlinks(d, 0);
-	}
-
-	if(write_summary_to || email_summary_to)
-		create_summary(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile);
-	free(logfilename);
-	free(batchlogfilename);
-	free(write_summary_to);
-	free(email_summary_to);
+		port = batch_queue_port(remote_queue);
+		if(port > 0)
+			printf("listening for workers on port %d.\n", port);
 
 
-	if(dag_abort_flag) {
-		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
-		fprintf(stderr, "workflow was aborted.\n");
-		return 1;
-	} else if(dag_failed_flag) {
-		fprintf(d->logfile, "# FAILED\t%" PRIu64 "\n", timestamp_get());
-		fprintf(stderr, "workflow failed.\n");
-		return 1;
-	} else {
-		fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
-		fprintf(stderr, "nothing left to do.\n");
-		return 0;
+		signal(SIGINT, handle_abort);
+		signal(SIGQUIT, handle_abort);
+		signal(SIGTERM, handle_abort);
+
+		fprintf(d->logfile, "# STARTED\t%" PRIu64 "\n", timestamp_get());
+		runtime = timestamp_get();
+		dag_run(d);
+		time_completed = timestamp_get();
+		runtime = time_completed - runtime;
+
+		batch_queue_delete(local_queue);
+		batch_queue_delete(remote_queue);
+
+		if(!preserve_symlinks && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
+			clean_symlinks(d, 0);
+		}
+
+		if(write_summary_to || email_summary_to)
+			create_summary(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile);
+		free(logfilename);
+		free(batchlogfilename);
+		free(write_summary_to);
+		free(email_summary_to);
+
+
+		if(dag_abort_flag) {
+			fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
+			fprintf(stderr, "workflow was aborted.\n");
+			return 1;
+		} else if(dag_failed_flag) {
+			fprintf(d->logfile, "# FAILED\t%" PRIu64 "\n", timestamp_get());
+			fprintf(stderr, "workflow failed.\n");
+			return 1;
+		} else {
+			fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
+			fprintf(stderr, "nothing left to do.\n");
+			return 0;
+		}
 	}
 }
 
