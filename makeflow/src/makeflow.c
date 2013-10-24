@@ -2327,7 +2327,7 @@ static void handle_abort(int sig)
 	dag_abort_flag = 1;
 }
 
-static void show_help(const char *cmd)
+static void show_help_run(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
 	fprintf(stdout, "Frequently used options:\n\n");
@@ -2337,26 +2337,21 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "Other options are:\n");
 	fprintf(stdout, " %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
 	fprintf(stdout, " %-30s Disable the check for AFS. (experts only.)\n", "-A,--disable-afs-check");
-	fprintf(stdout, " %-30s Create portable bundle of workflow in <directory>\n", "-b,--bundle-dir=<directory>");
 	fprintf(stdout, " %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog-server=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
 	fprintf(stdout, " %-30s Write summary of workflow to this file upon success or failure.\n", "-f,--summary-log=<file>");
 	fprintf(stdout, " %-30s Work Queue fast abort multiplier.           (default is deactivated)\n", "-F,--wq-fast-abort=<#>");
 	fprintf(stdout, " %-30s Show this help screen.\n", "-h,--help");
-	fprintf(stdout, " %-30s Show the pre-execution analysis of the Makeflow script - <dagfile>.\n", "-i,--analyze-exec");
-	fprintf(stdout, " %-30s Show input files.\n", "-I,--show-input");
 	fprintf(stdout, " %-30s Max number of local jobs to run at once.    (default is # of cores)\n", "-j,--max-local=<#>");
 	fprintf(stdout, " %-30s Max number of remote jobs to run at once.\n", "-J,--max-remote=<#>");
 	fprintf(stdout, "                                                            (default %d for -Twq, %d otherwise.)\n", 10*MAX_REMOTE_JOBS_DEFAULT, MAX_REMOTE_JOBS_DEFAULT );
-	fprintf(stdout, " %-30s Syntax check.\n", "-k,--syntax-check");
 	fprintf(stdout, " %-30s Preserve (i.e., do not clean intermediate symbolic links)\n", "-K,--preserve-links");
 	fprintf(stdout, " %-30s Use this file for the makeflow log.         (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
 	fprintf(stdout, " %-30s Use this file for the batch system log.     (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
 	fprintf(stdout, " %-30s Send summary of workflow to this email address upon success or failure.\n", "-m,--email=<email>");
 	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
 	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
-	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
 	fprintf(stdout, " %-30s Password file for authenticating workers.\n", "   --password");
 	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
@@ -2378,9 +2373,19 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Enable monitor time series.                 (default is disabled)\n", "--monitor-with-time-series");
 	fprintf(stdout, " %-30s Enable monitoring of openened files.        (default is disabled)\n", "--monitor-with-opened-files");
 	fprintf(stdout, " %-30s Format for monitor logs.                    (default %s)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
+}
 
-	fprintf(stdout, "\n*Display Options:\n\n");
-	fprintf(stdout, " %-30s Display the Makefile as a Dot graph, a PPM completion graph, or print the Makefile to stdout\n", "-D,--display=<opt>");
+static void show_help_util(const char *cmd)
+{
+	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
+	fprintf(stdout, " %-30s Create portable bundle of workflow in <directory>\n", "-b,--bundle-dir=<directory>");
+	fprintf(stdout, " %-30s Show this help screen.\n", "-h,--help");
+	fprintf(stdout, " %-30s Show the pre-execution analysis of the Makeflow script - <dagfile>.\n", "-i,--analyze-exec");
+	fprintf(stdout, " %-30s Show input files.\n", "-I,--show-input");
+	fprintf(stdout, " %-30s Syntax check.\n", "-k,--syntax-check");
+	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
+	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
+	fprintf(stdout, " %-30s Display the Makefile as a Dot graph, a PPM completion graph, or print the Workflow to stdout.\n", "-D,--display=<opt>");
 	fprintf(stdout, " %-30s Where <opt> is:\n", "");
 	fprintf(stdout, " %-35s dot      Standard Dot graph\n", "");
 	fprintf(stdout, " %-35s ppm      Display a completion graph in PPM format\n", "");
@@ -2394,9 +2399,6 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Highlight executable <exe> in completion grap\n", "--ppm-highlight-exe=<exe>");
 	fprintf(stdout, " %-30s Display different levels of depth in completion graph\n", "--ppm-show-levels");
 }
-
-
-
 
 static void summarize(FILE * file, FILE * email, const char *format, ...)
 {
