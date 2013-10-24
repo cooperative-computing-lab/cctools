@@ -2524,8 +2524,8 @@ int main(int argc, char *argv[])
 	/* Shared */
 	int c;
 	random_init();
-	debug_config(argv[0]);
 	makeflow_exe = argv[0];
+	debug_config(makeflow_exe);
 
 	/* Util */
 	char *bundle_directory = NULL;
@@ -2600,7 +2600,7 @@ int main(int argc, char *argv[])
 			export_as_dax = 1;
 			break;
 		case 'h':
-			show_help_util(argv[0]);
+			show_help_util(makeflow_exe);
 			return 0;
 		case 'i':
 			display_mode = SHOW_MAKEFLOW_ANALYSIS;
@@ -2615,10 +2615,10 @@ int main(int argc, char *argv[])
 			display_mode = SHOW_OUTPUT_FILES;
 			break;
 		case 'v':
-			cctools_version_print(stdout, argv[0]);
+			cctools_version_print(stdout, makeflow_exe);
 			return 0;
 		default:
-			show_help_util(argv[0]);
+			show_help_util(makeflow_exe);
 			return 1;
 		}
 	}
@@ -2770,7 +2770,7 @@ int main(int argc, char *argv[])
 			dag_gc_param = atoi(optarg);
 			break;
 		case 'h':
-			show_help_run(argv[0]);
+			show_help_run(makeflow_exe);
 			return 0;
 		case 'j':
 			explicit_local_jobs_max = atoi(optarg);
@@ -2859,7 +2859,7 @@ int main(int argc, char *argv[])
 			work_queue_keepalive_interval = atoi(optarg);
 			break;
 		case 'v':
-			cctools_version_print(stdout, argv[0]);
+			cctools_version_print(stdout, makeflow_exe);
 			return 0;
 		case LONG_OPT_VERBOSE_PARSING:
 			verbose_parsing = 1;
@@ -2894,13 +2894,13 @@ int main(int argc, char *argv[])
 			cache_mode = 0;
 			break;
 		default:
-			show_help_run(argv[0]);
+			show_help_run(makeflow_exe);
 			return 1;
 		}
 	}
 
 
-	cctools_version_debug(D_DEBUG, argv[0]);
+	cctools_version_debug(D_DEBUG, makeflow_exe);
 
 	const char *dagfile;
 
@@ -2908,7 +2908,7 @@ int main(int argc, char *argv[])
 		int rv = access("./Makeflow", R_OK);
 		if(rv < 0) {
 			fprintf(stderr, "makeflow: No makeflow specified and file \"./Makeflow\" could not be found.\n");
-			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
+			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", makeflow_exe);
 			return 1;
 		}
 
@@ -2920,7 +2920,7 @@ int main(int argc, char *argv[])
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
 		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
-			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
+			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", makeflow_exe);
 			return 1;
 		}
 		// Use Work Queue default port in standalone mode when port is not
