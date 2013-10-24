@@ -1381,14 +1381,16 @@ static int send_keepalive(struct link *master){
 }
 
 static void disconnect_master(struct link *master) {
-	debug(D_WQ, "Disconnecting the current master ...\n");
-	link_close(master);
+	do_reset();
+
+	if(master)
+	{
+		debug(D_WQ, "Disconnecting the current master ...\n");
+	}
 
 	if(auto_worker) {
 		record_bad_master(duplicate_work_queue_master(actual_master));
 	}
-
-	do_reset();
 
 	worker_mode = worker_mode_default;
 	
@@ -1520,7 +1522,8 @@ static int handle_master(struct link *master) {
 		} else if(!strncmp(line, "check", 6)) {
 			r = send_keepalive(master);
 		} else if(!strncmp(line, "reset", 5)) {
-			r = do_reset();
+			disconnect_master(master);
+			r = 0;
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
@@ -1729,12 +1732,12 @@ static void foreman_for_master(struct link *master) {
 		}
 		else
 		{
-			disconnect_master(master);
 			break;
 		}
 	}
 
-	do_reset();
+	disconnect_master(master);
+
 }
 
 static void handle_abort(int sig)
