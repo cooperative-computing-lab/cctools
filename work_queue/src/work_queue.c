@@ -2965,8 +2965,10 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 {
 	static int next_taskid = 1;
 
+	t->taskid = next_taskid;
+
 	//Increment taskid. So we get a unique taskid for every submit.
-	t->taskid = next_taskid++;
+	next_taskid++;
 
 	return work_queue_submit_internal(q, t);
 }
