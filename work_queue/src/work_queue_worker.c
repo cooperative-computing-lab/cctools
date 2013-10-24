@@ -994,7 +994,7 @@ static int do_task( struct link *master, int taskid )
 	// If it is a local worker, create a task_info, start the task, and discard the temporary work_queue_task.
 
 	if(foreman_q) {
-		work_queue_submit(foreman_q,task);
+		work_queue_submit_internal(foreman_q,task);
 		return 1;
 	} else {
 		struct work_queue_file *tf;
