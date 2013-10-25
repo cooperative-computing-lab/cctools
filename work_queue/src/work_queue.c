@@ -1396,7 +1396,7 @@ static void handle_worker(struct work_queue *q, struct link *l)
 	}
 }
 
-static int build_poll_table(struct work_queue *q, struct link *master)
+static int build_poll_table(struct work_queue *q)
 {
 	int n = 0;
 	char *key;
@@ -1411,13 +1411,6 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	q->poll_table[0].events = LINK_READ;
 	q->poll_table[0].revents = 0;
 	n = 1;
-
-	if(master) {
-		q->poll_table[n].link = master;
-		q->poll_table[n].events = LINK_READ;
-		q->poll_table[n].revents = 0;
-		n++;
-	}
 
 	// For every worker in the hash table, add an item to the poll table
 	hash_table_firstkey(q->worker_table);
@@ -2997,10 +2990,10 @@ static void print_password_warning( struct work_queue *q )
 
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 {
-	return work_queue_wait_internal(q, timeout, NULL, NULL);
+	return work_queue_wait_internal(q, timeout, NULL);
 }
 
-struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
+struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink)
 {
 	struct work_queue_task *t;
 	time_t stoptime;
@@ -3039,7 +3032,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !foreman_uplink)
 			break;
 
-		int n = build_poll_table(q, foreman_uplink);
+		int n = build_poll_table(q);
 
 		// Wait no longer than the caller's patience.
 		int msec;
@@ -3069,17 +3062,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 
 		int i, j = 1;
-
-		// Consider the foreman_uplink passed into the function and disregard if inactive.
-		if(foreman_uplink) {
-			if(q->poll_table[1].revents) {
-				*foreman_uplink_active = 1; //signal that the master link saw activity
-			} else {
-				*foreman_uplink_active = 0;
-			}
-			j++;
-		}
-
 		// Then consider all existing active workers and dispatch tasks.
 		for(i = j; i < n; i++) {
 			if(q->poll_table[i].revents) {

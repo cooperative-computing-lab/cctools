@@ -1669,7 +1669,6 @@ static void work_for_master(struct link *master) {
 }
 
 static void foreman_for_master(struct link *master) {
-	int master_active = 0;
 	if(!master) {
 		return;
 	}
@@ -1711,7 +1710,7 @@ static void foreman_for_master(struct link *master) {
 			ok &= handle_master(master);
 		}
 
-		task = work_queue_wait_internal(foreman_q, short_timeout, master, &master_active);
+		task = work_queue_wait_internal(foreman_q, short_timeout, master);
 		
 		if(task) {
 			report_task_complete(master, NULL, task);
