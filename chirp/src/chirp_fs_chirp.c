@@ -18,17 +18,18 @@ See the file COPYING for details.
 #include <errno.h>
 #include <string.h>
 
-#define CHIRP_FS_FD_MAX 1024
-
 static char chirp_hostport[CHIRP_PATH_MAX];
 static char chirp_root[CHIRP_PATH_MAX];
 static int  chirp_timeout = 60;
 
-static struct chirp_file *open_files[CHIRP_FS_FD_MAX] = { 0 };
+static struct {
+	char path[CHIRP_PATH_MAX];
+	struct chirp_file *file;
+} open_files[CHIRP_FILESYSTEM_MAXFD];
 
 #define SETUP_FILE \
-if(fd<0 || fd>=CHIRP_FS_FD_MAX) { errno = EBADF; return -1; }\
-struct chirp_file *file = open_files[fd]; \
+if(fd<0 || fd>=CHIRP_FILESYSTEM_MAXFD) { errno = EBADF; return -1; }\
+struct chirp_file *file = open_files[fd].file; \
 if(!fd) { errno = EBADF; return -1;}
 
 #define RESOLVE(path) \
@@ -63,6 +64,16 @@ static int chirp_fs_chirp_init(const char url[CHIRP_PATH_MAX])
 	return cfs_create_dir("/", 0711);
 }
 
+static int chirp_fs_chirp_fname (int fd, char path[CHIRP_PATH_MAX])
+{
+	if (fd < 0 || open_files[fd].path[0] == '\0') {
+		errno = EBADF;
+		return -1;
+	}
+	strcpy(path, open_files[fd].path);
+	return 0;
+}
+
 static int chirp_fs_chirp_resolve (const char *path, char resolved[CHIRP_PATH_MAX])
 {
 	int n;
@@ -82,21 +93,23 @@ static int chirp_fs_chirp_resolve (const char *path, char resolved[CHIRP_PATH_MA
 static INT64_T chirp_fs_chirp_open(const char *path, INT64_T flags, INT64_T mode)
 {
 	int fd;
+	const char *unresolved = path;
 	RESOLVE(path)
 
-	for(fd = 3; fd < CHIRP_FS_FD_MAX; fd++) {
-		if(!open_files[fd])
+	for(fd = 3; fd < CHIRP_FILESYSTEM_MAXFD; fd++) {
+		if(!open_files[fd].file)
 			break;
 	}
 
-	if(fd == CHIRP_FS_FD_MAX) {
+	if(fd == CHIRP_FILESYSTEM_MAXFD) {
 		errno = EMFILE;
 		return -1;
 	}
 
 	struct chirp_file *file = chirp_reli_open(chirp_hostport, path, flags, mode, STOPTIME);
 
-	open_files[fd] = file;
+	strcpy(open_files[fd].path, unresolved);
+	open_files[fd].file = file;
 
 	return fd;
 }
@@ -104,7 +117,8 @@ static INT64_T chirp_fs_chirp_open(const char *path, INT64_T flags, INT64_T mode
 static INT64_T chirp_fs_chirp_close(int fd)
 {
 	SETUP_FILE
-	open_files[fd] = 0;
+	open_files[fd].path[0] = '\0';
+	open_files[fd].file = NULL;
 	return chirp_reli_close(file, STOPTIME);
 }
 
@@ -405,12 +419,15 @@ static int chirp_fs_chirp_do_acl_check()
 struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_init,
 
+	chirp_fs_chirp_fname,
+
 	chirp_fs_chirp_open,
 	chirp_fs_chirp_close,
 	chirp_fs_chirp_pread,
 	chirp_fs_chirp_pwrite,
 	chirp_fs_chirp_sread,
 	chirp_fs_chirp_swrite,
+	cfs_stub_lockf,
 	chirp_fs_chirp_fstat,
 	chirp_fs_chirp_fstatfs,
 	chirp_fs_chirp_fchown,
