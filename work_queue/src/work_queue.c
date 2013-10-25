@@ -3010,7 +3010,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 		
 		// If workers are available and tasks waiting to be dispatched, don't wait on a message.
-		if( known_workers(q) > 0 && list_size(q->ready_list) > 0 ) {
+		if( available_workers(q) > 0 && list_size(q->ready_list) > 0 ) {
 			msec = 0;
 		}
 
