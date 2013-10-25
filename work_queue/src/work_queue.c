@@ -3040,9 +3040,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			msec = 5000;
 		}
 		
-		// If workers are available and tasks waiting to be dispatched, don't wait on a message.
+		// If workers are available and tasks waiting to be dispatched, reduce
+		// the wait time on a message to at most one second.
 		if( q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_READY] > 0 && list_size(q->ready_list) > 0 ) {
-			msec = 0;
+			msec = MIN(1000, msec);
 		}
 
 		// Poll all links for activity.
