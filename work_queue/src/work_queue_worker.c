@@ -1726,9 +1726,6 @@ static void foreman_for_master(struct link *master) {
 		if(result) 
 		{
 			idle_stoptime = time(0) + idle_timeout;
-
-			//Print debug message only when something interesting happened.
-			debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
 		}
 		else
 		{
