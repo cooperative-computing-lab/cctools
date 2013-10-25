@@ -1631,9 +1631,7 @@ static void work_for_master(struct link *master) {
 			break;
 		}
 		
-		if(worker_mode == WORKER_MODE_WORKER) {
-			send_resource_update(master,0);
-		}
+		send_resource_update(master,0);
 		
 		int ok = 1;
 		if(result) {
@@ -1684,7 +1682,6 @@ static void foreman_for_master(struct link *master) {
 	work_queue_resources_measure_locally(&foreman_local, workspace);
 
 	while(!abort_flag) {
-		int result = 1;
 		struct work_queue_task *task = NULL;
 
 		if(time(0) > idle_stoptime && (itable_size(active_tasks)+itable_size(stored_tasks))==0) {
@@ -1693,12 +1690,12 @@ static void foreman_for_master(struct link *master) {
 			break;
 		}
 
-		task = work_queue_wait_internal(foreman_q, short_timeout, master, &master_active);
+		int result = link_usleep(master, 1000, 1, 0); 
 		
-		if(task) {
-			report_task_complete(master, NULL, task);
-			work_queue_task_delete(task);
-			result = 1;
+		if(result < 0)
+		{
+			abort_flag = 1;
+			break;
 		}
 
 		aggregate_workers_resources(foreman_q, aggregated_resources);
@@ -1708,28 +1705,28 @@ static void foreman_for_master(struct link *master) {
 
 		send_resource_update(master,0);
 
-		if(!master_active)
+		int ok = 1;
+		if(result)
 		{
-			//We listen here to the master.
-			//Sometimes work_queue_wait_internal misses when the link to master
-			//goes down, because many tasks are coming back to the foreman. We
-			//catch the master going down here to reduce wasted work.
-			if(link_usleep(master, 1000, 1, 0))
-			{
-				master_active = 1;
-			}
+			ok &= handle_master(master);
 		}
 
-		if(master_active)
-			result &= handle_master(master);
-
-		if(result) 
-		{
-			idle_stoptime = time(0) + idle_timeout;
+		task = work_queue_wait_internal(foreman_q, short_timeout, master, &master_active);
+		
+		if(task) {
+			report_task_complete(master, NULL, task);
+			work_queue_task_delete(task);
+			ok &= 1;
 		}
-		else
+
+		if(!ok)
 		{
 			break;
+		}
+
+		if(ok) 
+		{
+			idle_stoptime = time(0) + idle_timeout;
 		}
 	}
 
