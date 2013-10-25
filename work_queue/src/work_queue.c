@@ -559,6 +559,15 @@ static int release_worker(struct work_queue *q, struct work_queue_worker *w)
 	return 1;
 }
 
+static int reset_worker(struct work_queue *q, struct work_queue_worker *w)
+{
+	if(!w) return 0;
+	send_worker_msg(q,w,"reset\n");
+	remove_worker(q, w);
+	return 1;
+}
+
+
 static int add_worker(struct work_queue *q)
 {
 	struct link *link;
@@ -2965,8 +2974,10 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 {
 	static int next_taskid = 1;
 
+	t->taskid = next_taskid;
+
 	//Increment taskid. So we get a unique taskid for every submit.
-	t->taskid = next_taskid++;
+	next_taskid++;
 
 	return work_queue_submit_internal(q, t);
 }
@@ -3025,7 +3036,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		update_worker_states(q);
 
-		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !(foreman_uplink))
+		if( (q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_FULL]) == 0 && list_size(q->ready_list) == 0 && !foreman_uplink)
 			break;
 
 		int n = build_poll_table(q, foreman_uplink);
@@ -3038,9 +3049,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			msec = 5000;
 		}
 		
-		// If workers are available and tasks waiting to be dispatched, don't wait on a message.
+		// If workers are available and tasks waiting to be dispatched, reduce
+		// the wait time on a message to at most one second.
 		if( q->workers_in_state[WORKER_STATE_BUSY] + q->workers_in_state[WORKER_STATE_READY] > 0 && list_size(q->ready_list) > 0 ) {
-			msec = 0;
+			msec = MIN(1000, msec);
 		}
 
 		// Poll all links for activity.
@@ -3096,7 +3108,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			abort_slow_workers(q);
 		}
 		
-		// If the foreman_uplink is active then break so the caller can handle it.
+		// If there is foreman_uplink then break so the caller can handle it.
 		if(foreman_uplink) {
 			break;
 		}
@@ -3275,8 +3287,7 @@ void work_queue_reset(struct work_queue *q, int flags) {
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		send_worker_msg(q,w,"reset\n");
-		cleanup_worker(q, w);
+		reset_worker(q, w);
 	}
 	
 	if(flags & WORK_QUEUE_RESET_KEEP_TASKS) {

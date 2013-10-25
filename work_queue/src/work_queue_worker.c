@@ -994,7 +994,7 @@ static int do_task( struct link *master, int taskid )
 	// If it is a local worker, create a task_info, start the task, and discard the temporary work_queue_task.
 
 	if(foreman_q) {
-		work_queue_submit(foreman_q,task);
+		work_queue_submit_internal(foreman_q,task);
 		return 1;
 	} else {
 		struct work_queue_file *tf;
@@ -1363,12 +1363,11 @@ static int do_release() {
 
 static int do_reset() {
 	
-	if(worker_mode == WORKER_MODE_FOREMAN) {
+	kill_all_tasks();
+
+	if(worker_mode == WORKER_MODE_FOREMAN)
 		work_queue_reset(foreman_q, 0);
-	} else {
-		kill_all_tasks();
-	}
-	
+
 	if(delete_dir_contents(workspace) < 0) {
 		return 0;
 	}
@@ -1382,21 +1381,16 @@ static int send_keepalive(struct link *master){
 }
 
 static void disconnect_master(struct link *master) {
-	debug(D_WQ, "Disconnecting the current master ...\n");
-	link_close(master);
+	do_reset();
+
+	if(master)
+	{
+		debug(D_WQ, "Disconnecting the current master ...\n");
+	}
 
 	if(auto_worker) {
 		record_bad_master(duplicate_work_queue_master(actual_master));
 	}
-
-	kill_all_tasks();
-
-	if(foreman_q) {
-		work_queue_reset(foreman_q, 0);
-	}
-
-	// Remove the contents of the workspace.
-	delete_dir_contents(workspace);
 
 	worker_mode = worker_mode_default;
 	
@@ -1528,7 +1522,8 @@ static int handle_master(struct link *master) {
 		} else if(!strncmp(line, "check", 6)) {
 			r = send_keepalive(master);
 		} else if(!strncmp(line, "reset", 5)) {
-			r = do_reset();
+			disconnect_master(master);
+			r = 0;
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
@@ -1711,21 +1706,35 @@ static void foreman_for_master(struct link *master) {
 		aggregated_resources->disk.total = foreman_local.disk.total; //overwrite with foreman's local disk information
 		aggregated_resources->disk.inuse = foreman_local.disk.inuse; 
 
-		debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
-
 		send_resource_update(master,0);
-		
+
+		if(!master_active)
+		{
+			//We listen here to the master.
+			//Sometimes work_queue_wait_internal misses when the link to master
+			//goes down, because many tasks are coming back to the foreman. We
+			//catch the master going down here to reduce wasted work.
+			if(link_usleep(master, 100, 1, 0))
+			{
+				master_active = 1;
+			}
+		}
+
 		if(master_active)
 			result &= handle_master(master);
 
-		if(!result) {
-			disconnect_master(master);
+		if(result) 
+		{
+			idle_stoptime = time(0) + idle_timeout;
+		}
+		else
+		{
 			break;
 		}
-		
-		if(result)
-			idle_stoptime = time(0) + idle_timeout;
 	}
+
+	disconnect_master(master);
+
 }
 
 static void handle_abort(int sig)

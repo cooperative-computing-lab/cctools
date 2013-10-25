@@ -43,8 +43,8 @@ See the file COPYING for details.
 #define WORK_QUEUE_THIRDGET 8	/* Access the file on the client from a shared filesystem */
 #define WORK_QUEUE_THIRDPUT 8	/* Access the file on the client from a shared filesystem (included for readability) */
 
-#define WORK_QUEUE_RESET_ALL        0  /**< When resetting, clear out all tasks and files */
-#define WORK_QUEUE_RESET_KEEP_TASKS 1  /**< When resetting, keep the current list of tasks */
+#define WORK_QUEUE_RESET_ALL        1  /**< When resetting, clear out all tasks and files */
+#define WORK_QUEUE_RESET_KEEP_TASKS 0  /**< When resetting, keep the current list of tasks */
 
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
