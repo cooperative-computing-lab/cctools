@@ -197,8 +197,10 @@ struct chirp_file * chirp_reli_open( const char *host, const char *path, INT64_T
 
 INT64_T chirp_reli_close( struct chirp_file *file, time_t stoptime )
 {
-	struct chirp_client *client = connect_to_host(file->host,stoptime);
-	chirp_reli_flush(file,stoptime);
+	struct chirp_client *client;
+	if(chirp_reli_flush(file,stoptime) < 0)
+		return -1;
+	client = connect_to_host(file->host,stoptime);
 	if(client) {
 		if(chirp_client_serial(client)==file->serial) {
 			chirp_client_close(client,file->fd,stoptime);

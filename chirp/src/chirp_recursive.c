@@ -247,7 +247,8 @@ static INT64_T do_put_one_fifo(const char *hostport, const char *source_file, co
 {
 	FILE *file;
 	int save_errno;
-	struct chirp_file *cf;
+	struct chirp_file *cf = 0;
+	INT64_T result;
 	INT64_T offset = 0;
 
 	file = fopen64(source_file, "r");
@@ -260,16 +261,23 @@ static INT64_T do_put_one_fifo(const char *hostport, const char *source_file, co
 		char buffer[65536];
 		while((n = fread(buffer, sizeof(char), 65536, file))) {
 			if(chirp_reli_pwrite(cf, buffer, n, offset, stoptime) < 0)
-				return -1;
+				goto fail;
 			offset += n;
 		}
-		chirp_reli_close(cf, stoptime);
+		if (chirp_reli_close(cf, stoptime) < 0)
+			goto fail;
 	}
 
+	result = offset;
+	goto out;
+fail:
+	result = -1;
+	goto out;
+out:
 	save_errno = errno;
 	fclose(file);
 	errno = save_errno;
-	return offset;
+	return result;
 }
 
 INT64_T chirp_recursive_put(const char *hostport, const char *source_file, const char *target_file, time_t stoptime)
