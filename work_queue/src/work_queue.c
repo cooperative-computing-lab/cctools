@@ -2988,6 +2988,42 @@ static void print_password_warning( struct work_queue *q )
 	}
 }
 
+void retrieve_finished_tasks(struct work_queue *q)
+{
+	struct work_queue_task *t;
+
+	if(itable_size(q->finished_tasks)) {
+		struct list *unsent_tasks = list_create(0);
+		struct work_queue_worker *w;
+		UINT64_T taskid;
+		itable_firstkey(q->finished_tasks);
+		while(itable_nextkey(q->finished_tasks, &taskid, (void **)&t)) {
+			w = itable_lookup(q->worker_task_map, taskid);
+
+			//try to send tasks only if no block is possible.
+			if(link_usleep(w->link, 0, 0 ,1))
+			{
+				fetch_output_from_worker(q, w, taskid);
+				itable_firstkey(q->finished_tasks);  // fetch_output removes the resolved task from the itable, thus potentially corrupting our current location.  This resets it to the top.
+			}
+			else
+			{
+				itable_remove(q->finished_tasks, taskid);
+				list_push_tail(unsent_tasks, t);
+			}
+		}
+
+		//restore the tasks that were not sent to the finished_tasks table.
+		list_first_item(unsent_tasks);
+		while((t = list_pop_head(unsent_tasks)))
+		{
+			itable_insert(q->finished_tasks, taskid, (void *)t);
+		}
+		list_delete(unsent_tasks);
+	}
+}
+
+
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 {
 	return work_queue_wait_internal(q, timeout, NULL);
@@ -3073,16 +3109,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		start_tasks(q);
 		
 		// If any worker has sent a results message, retrieve the output files.
-		if(itable_size(q->finished_tasks)) {
-			struct work_queue_worker *w;
-			UINT64_T taskid;
-			itable_firstkey(q->finished_tasks);
-			while(itable_nextkey(q->finished_tasks, &taskid, (void **)&t)) {
-				w = itable_lookup(q->worker_task_map, taskid);
-				fetch_output_from_worker(q, w, taskid);
-				itable_firstkey(q->finished_tasks);  // fetch_output removes the resolved task from the itable, thus potentially corrupting our current location.  This resets it to the top.
-			}
-		}
+		retrieve_finished_tasks(q);
 
 		// If fast abort is enabled, kill off slow workers.
 		if(q->fast_abort_multiplier > 0) {
