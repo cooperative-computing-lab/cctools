@@ -209,6 +209,12 @@ static void send_resource_update( struct link *master, int force_update )
 {
 	time_t stoptime = time(0) + active_timeout;
 
+	if(!link_usleep(master, 0, 0, 1))
+	{
+		// If sending the resources would block, then we do not send the message.
+		return;
+	}
+
 	if(force_update || memcmp(aggregated_resources_last,aggregated_resources,sizeof(*aggregated_resources))) {
 		work_queue_resources_send(master,aggregated_resources,stoptime);
 		memcpy(aggregated_resources_last,aggregated_resources,sizeof(*aggregated_resources));
