@@ -28,7 +28,7 @@ struct work_queue_file {
 	char *remote_name;	// name on remote machine.
 };
 
-struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active);
+struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink);
 
 /* Adds (arithmetically) all the workers resources (cores, memory, disk) */
 void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *r );
