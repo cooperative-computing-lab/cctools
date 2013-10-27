@@ -439,7 +439,7 @@ static INT64_T rmall(const char *path)
 	INT64_T result;
 	struct chirp_stat info;
 
-	if(root_quota > 0)
+	if(root_quota == 0)
 		return cfs->rmall(path);
 
 	result = cfs->stat(path, &info);
