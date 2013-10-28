@@ -3289,23 +3289,23 @@ void work_queue_reset(struct work_queue *q, int flags) {
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 		reset_worker(q, w);
 	}
-	
-	if(flags & WORK_QUEUE_RESET_KEEP_TASKS) {
+
+	if(flags == WORK_QUEUE_RESET_KEEP_TASKS) {
 		return;
 	}
 
-	if(flags & WORK_QUEUE_RESET_ALL) {
+	if(flags == WORK_QUEUE_RESET_ALL) {
 		l = work_queue_cancel_all_tasks(q);
 		while((t = list_pop_head(l))) {
 			work_queue_task_delete(t);
 			list_delete(l);
 		}
+		return;
 	}
-	else
-	{
-		while((t = list_pop_head(q->ready_list)))
-			work_queue_task_delete(t);
-	}
+	
+	//no flags
+	while((t = list_pop_head(q->ready_list)))
+		work_queue_task_delete(t);
 }
 
 int work_queue_empty(struct work_queue *q)
