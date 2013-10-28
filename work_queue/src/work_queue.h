@@ -96,7 +96,6 @@ struct work_queue_stats {
 	int workers_init;               /**< Number of workers initializing. */
 	int workers_ready;              /**< Number of workers ready for tasks. */
 	int workers_busy;               /**< Number of workers running tasks. */
-	int workers_full;               /**< Number of workers with no slots remaining. */
 	int tasks_running;              /**< Number of tasks currently running. */
 	int tasks_waiting;              /**< Number of tasks waiting for a CPU. */
 	int tasks_complete;             /**< Number of tasks waiting to be returned to user. */
@@ -112,6 +111,7 @@ struct work_queue_stats {
 	double efficiency;		/**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */  
 	double idle_percentage;		/**< The fraction of time that the master is idle waiting for workers to respond. */
 	int capacity;			/**< The estimated number of workers that this master can effectively support. */
+	int workers_full;               /**< @deprecated: Use @ref workers_busy insead. */
 	int total_workers_joined;       /**< @deprecated: Use @ref total_workers_connected instead. */
 	int total_worker_slots;         /**< @deprecated: Use @ref tasks_running instead. */	
 	int avg_capacity;               /**< @deprecated: Use @ref capacity instead. */
