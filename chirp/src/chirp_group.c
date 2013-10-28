@@ -17,9 +17,12 @@ See the file COPYING for details.
 #include <errno.h>
 #include <sys/stat.h>
 
+
 extern const char *chirp_transient_path;
-extern const char *chirp_group_base_url;
-extern int chirp_group_cache_time;
+
+
+const char *chirp_group_base_url = NULL;
+int         chirp_group_cache_time = 900;
 
 /*
 Search for a given subject name in a group.

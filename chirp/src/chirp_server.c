@@ -74,8 +74,6 @@
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
-const char *chirp_group_base_url = 0;
-int         chirp_group_cache_time = 900;
 char        chirp_owner[USERNAME_MAX] = "";
 const char *chirp_super_user = "";
 char        chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
