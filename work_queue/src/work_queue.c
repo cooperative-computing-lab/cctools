@@ -3279,7 +3279,8 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 
 void work_queue_reset(struct work_queue *q, int flags) {
 	struct work_queue_worker *w;
-	struct work_queue_task *t;
+	struct work_queue_task   *t;
+	struct list              *l;
 	char *key;
 	
 	if(!q) return;
@@ -3292,11 +3293,19 @@ void work_queue_reset(struct work_queue *q, int flags) {
 	if(flags & WORK_QUEUE_RESET_KEEP_TASKS) {
 		return;
 	}
-	
-	while((t = list_pop_head(q->ready_list))) {
-		work_queue_task_delete(t);
+
+	if(flags & WORK_QUEUE_RESET_ALL) {
+		l = work_queue_cancel_all_tasks(q);
+		while((t = list_pop_head(l))) {
+			work_queue_task_delete(t);
+			list_delete(l);
+		}
 	}
-	
+	else
+	{
+		while((t = list_pop_head(q->ready_list)))
+			work_queue_task_delete(t);
+	}
 }
 
 int work_queue_empty(struct work_queue *q)

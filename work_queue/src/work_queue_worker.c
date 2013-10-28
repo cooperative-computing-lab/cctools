@@ -1272,15 +1272,10 @@ static void kill_all_tasks() {
 	struct task_info *ti;
 	pid_t pid;
 	UINT64_T taskid;
-	
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		struct list *l;
-		struct work_queue_task *t;
-		l = work_queue_cancel_all_tasks(foreman_q);
-		while((t = list_pop_head(l))) {
-			work_queue_task_delete(t);
-		}
-		list_delete(l);
+
+	if(worker_mode == WORKER_MODE_FOREMAN)
+	{
+		work_queue_reset(foreman_q, WORK_QUEUE_RESET_ALL);
 		return;
 	}
 	
@@ -1364,9 +1359,6 @@ static int do_release() {
 static int do_reset() {
 	
 	kill_all_tasks();
-
-	if(worker_mode == WORKER_MODE_FOREMAN)
-		work_queue_reset(foreman_q, 0);
 
 	if(delete_dir_contents(workspace) < 0) {
 		return 0;
