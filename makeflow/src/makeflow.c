@@ -1290,26 +1290,52 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 	dag_parse_node_filelist(bk, n, outputs, 0);
 	dag_parse_node_filelist(bk, n, inputs, 1);
 
+	int ok;
+	char *comment;
+	//parse variables and comments
 	while((line = dag_parse_readline(bk, n)) != NULL) {
 		if(line[0] == '@' && strchr(line, '=')) {
-			if(!dag_parse_variable(bk, n, line)) {
+			ok = dag_parse_variable(bk, n, line);
+			free(line);
+
+			if(ok) {
+				continue;
+			} else {
 				dag_parse_error(bk, "node variable");
 				free(line);
 				return 0;
 			}
-		} else {
-			if(dag_parse_node_command(bk, n, line)) {
-				n->next = d->nodes;
-				d->nodes = n;
-				itable_insert(d->node_table, n->nodeid, n);
-				break;
-			} else {
-				dag_parse_error(bk, "node command");
-				free(line);
-				return 0;
+		} 
+
+		comment = strchr(line, '#');
+		if(comment)
+		{
+			*comment = '\0';
+			int n = strspn(line, " \t");
+			int m = strlen(line);
+			*comment = '#';
+			
+
+			/* make sure that only spaces and tabs appear before the hash */
+			if(n == m) {
+				continue;
 			}
 		}
-		free(line);
+
+		/* not a comment or a variable, so we break to parse the command */
+		break;
+	}
+
+	ok = dag_parse_node_command(bk, n, line);
+	free(line);
+
+	if(ok) {
+		n->next = d->nodes;
+		d->nodes = n;
+		itable_insert(d->node_table, n->nodeid, n);
+	} else {
+		dag_parse_error(bk, "node command");
+		return 0;
 	}
 
 	debug(D_DEBUG, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
