@@ -1972,15 +1972,9 @@ int main(int argc, char *argv[])
 			worker_mode = worker_mode_default = WORKER_MODE_FOREMAN;
 			break;
 		case 'M':
-			auto_worker = 1;
-			list_push_tail(preferred_masters, strdup(optarg));
-			break;
 		case 'N':
 			auto_worker = 1;
-			if(foreman_name) { // for backward compatibility with old syntax for specifying a worker's project name
-				list_push_tail(preferred_masters, foreman_name);
-			}
-			foreman_name = strdup(optarg);
+			list_push_tail(preferred_masters, strdup(optarg));
 			break;
 		case 'p':
 			pool_name = xxstrdup(optarg);
