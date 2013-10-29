@@ -60,6 +60,7 @@ SUBSECTION(Debugging Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-d, debug, subsystem)Enable debugging for this subsystem.
 OPTION_TRIPLET(-o, debug-file, file)Send debugging to this file.
+OPTION_ITEM(`--verbose')Display runtime progress on stdout.
 OPTIONS_END
 
 SUBSECTION(WorkQueue Options)
