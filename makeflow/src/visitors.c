@@ -719,12 +719,6 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 
 	}
 
-	hash_table_firstkey(h);
-	//this doesn't cause a memory leak, right?
-	while(hash_table_nextkey(h, &label, (void **) &n)) {
-		hash_table_remove(h, label);
-	}
-
 	hash_table_delete(h);
 	free(ancestor_count_list);
 
