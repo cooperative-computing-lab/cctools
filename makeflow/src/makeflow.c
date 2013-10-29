@@ -1468,33 +1468,30 @@ int dag_prepare_for_monitoring(struct dag *d)
 
 	for(n = d->nodes; n; n = n->next)
 	{
-		if(monitor_mode)
+		char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
+		char *log_name;
+
+		dag_node_add_source_file(n, monitor_exe, NULL);
+
+		log_name = string_format("%s.summary", log_name_prefix);
+		dag_node_add_target_file(n, log_name, NULL);
+		free(log_name);
+
+		if(monitor_enable_time_series)
 		{
-			char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
-			char *log_name;
-
-			dag_node_add_source_file(n, monitor_exe, NULL);
-
-			log_name = string_format("%s.summary", log_name_prefix);
+			log_name = string_format("%s.series", log_name_prefix);
 			dag_node_add_target_file(n, log_name, NULL);
 			free(log_name);
-
-			if(monitor_enable_time_series)
-			{
-				log_name = string_format("%s.series", log_name_prefix);
-				dag_node_add_target_file(n, log_name, NULL);
-				free(log_name);
-			}
-
-			if(monitor_enable_list_files)
-			{
-				log_name = string_format("%s.files", log_name_prefix);
-				dag_node_add_target_file(n, log_name, NULL);
-				free(log_name);
-			}
-
-			free(log_name_prefix);
 		}
+
+		if(monitor_enable_list_files)
+		{
+			log_name = string_format("%s.files", log_name_prefix);
+			dag_node_add_target_file(n, log_name, NULL);
+			free(log_name);
+		}
+
+		free(log_name_prefix);
 	}
 
 	return 1;
@@ -2914,8 +2911,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(!dag_prepare_for_monitoring(d)) {
-		fatal("Could not prepare for monitoring.\n");
+	if(monitor_mode) 
+	{
+		dag_prepare_for_monitoring(d);
 	}
 
 	if(!dag_prepare_for_batch_system(d)) {
