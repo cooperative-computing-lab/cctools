@@ -441,17 +441,17 @@ connections leaving the cluster and minimizes the transfer costs for sending
 data into the cluster over wide area networks. </p>
 
 <p>To start a Work Queue foreman, invoke <tt>work_queue_worker</tt> with the
-<tt>--foreman</tt> argument. The foreman can advertise a project name using the
-<tt>-N</tt> option to enable workers to find and connect to it without being
-given its hostname and port.  On the other end, the foreman will connect to the
-master with the same project name specified in <tt>-M</tt> argument
-(alternatively, the hostname and port of the master can be provided instead of
-its project name).
+<tt>--foreman</tt> option. The foreman can advertise a project name using the
+<tt>-f,--foreman-name</tt> option to enable workers to find and connect to it
+without being given its hostname and port.  On the other end, the foreman will
+connect to the master with the same project name specified in <tt>-M</tt>
+argument (alternatively, the hostname and port of the master can be provided
+instead of its project name).
 
 <p>For example, to run a foreman that works for a master with project name
 <tt>myproject</tt> and advertises itself as <tt>foreman_myproject</tt>:
 <div class ="code_area"><pre class="code_snip">
-% work_queue_worker --foreman -M myproject -N foreman_myproject 
+% work_queue_worker -f foreman_myproject -M myproject
 </pre></div>
 
 <p>To run a worker that connects to a foreman, specify the foreman's project name
