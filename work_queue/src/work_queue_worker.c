@@ -1743,7 +1743,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s would ask a catalog server for available masters.\n", "");
-	fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-M,--master-name=<name>"); 
+	fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-N,-M,--master-name=<name>"); 
 	fprintf(stdout, " %-30s projects.\n", ""); 
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
@@ -1752,7 +1752,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Debug file will be closed, renamed, and a new one opened after being.\n", "--debug-release-reset");
 	fprintf(stdout, " %-30s released from a master.\n", "");
 	fprintf(stdout, " %-30s Set worker to run as a foreman.\n", "--foreman");
-	fprintf(stdout, " %-30s\n", "-f,");
+	fprintf(stdout, " %-30s Run as a foreman, and advertise to the catalog server with <name>.\n", "-f,--foreman-name=<name>");
 	fprintf(stdout, " %-30s\n", "--foreman-port=<port>[:<highport>]");
 	fprintf(stdout, " %-30s Set the port for the foreman to listen on.  If <highport> is specified\n", "");
 	fprintf(stdout, " %-30s the port is chosen from the range port:highport.  Implies --foreman.\n", "");
