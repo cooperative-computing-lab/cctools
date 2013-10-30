@@ -87,7 +87,10 @@ run_local_worker()
 		exit 1
 	fi
 	echo "Running worker."
-	../../work_queue/src/work_queue_worker -t 2s -d all -o "$log" localhost `cat $port_file`
+	if ! ../../work_queue/src/work_queue_worker -t 2s -d all -o "$log" localhost `cat $port_file`; then
+		echo "ERROR: could not start worker"
+		exit 1
+	fi
 	echo "Worker completed."
 	return 0
 }
