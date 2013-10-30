@@ -113,17 +113,21 @@ char *resource_monitor_copy_to_wd(char *path_from_cmdline)
 
 //Using default sampling interval. We may want to add an option
 //to change it.
-char *resource_monitor_rewrite_command(char *cmdline, char *template_filename, char *limits_filename,
+char *resource_monitor_rewrite_command(char *cmdline, char *monitor_path, char *template_filename, char *limits_filename,
 				       const char *extra_monitor_options,
 				       int summary, int time_series, int opened_files)
 {
 	char cmd_builder[PATH_MAX];
 	int  index;
 	
-	if(!monitor_exe)
+	if(!monitor_path && !monitor_exe)
 		monitor_exe = resource_monitor_copy_to_wd(NULL);
 
-	index = sprintf(cmd_builder, "./%s --with-disk-footprint ", monitor_exe);
+
+	if(!monitor_path)
+		monitor_path = monitor_exe;
+
+	index = sprintf(cmd_builder, "./%s --with-disk-footprint ", monitor_path);
 
 	index += sprintf(cmd_builder + index, "--with-output-files=%s ", template_filename);
 

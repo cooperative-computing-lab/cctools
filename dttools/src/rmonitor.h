@@ -16,6 +16,7 @@ COPYING for details.
 The command line is rewritten to be run inside the monitor with
 the corresponding log file options.
 @param cmdline A command line.
+@param monitor_path Path to the resource monitor. If NULL, it is located automatically.
 @param template The filename template for all the log files.
 @param limits The name of the resource limits file. NULL if no limits are going to be specified.
 @param summary Generate <template>.summary if not 0.
@@ -24,7 +25,7 @@ the corresponding log file options.
 @return A new command line that runs the original command line wrapped with the resource monitor.
 */
 
-char *resource_monitor_rewrite_command(char *cmdline, char *template_filename, char *limits_filename,
+char *resource_monitor_rewrite_command(char *cmdline, char *monitor_path, char *template_filename, char *limits_filename,
 				       const char *extra_monitor_options,
 				       int summary, int time_series, int opened_files);
 
@@ -39,6 +40,12 @@ char *resource_monitor_copy_to_wd(char *path_from_cmdline);
 
 /**  Reads a single resources file from filename **/
 struct rmsummary *resident_monitor_parse_resources_file(char *filename);
+
+/** Looks for the path of the resource_monitor executable.
+@param path_from_cmdline The first path to look for the resource monitor executable.
+@return The path of the monitor executable.
+*/
+char *resource_monitor_locate(char *path_from_cmdline);
 
 
 #endif
