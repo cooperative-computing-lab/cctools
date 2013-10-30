@@ -207,11 +207,21 @@ static int recv_master_message( struct link *master, char *line, int length, tim
 
 static void send_resource_update( struct link *master, int force_update )
 {
+	static time_t last_stop_time = 0;
+
 	time_t stoptime = time(0) + active_timeout;
 
-	if(force_update || memcmp(aggregated_resources_last,aggregated_resources,sizeof(*aggregated_resources))) {
+	/* send updates at least five seconds apart, and only if resources changed. */
+	int normal_update = 0;
+	if((stoptime - last_stop_time > 5) && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
+	{
+		normal_update = 1;
+	}
+
+	if(force_update || normal_update) {
 		work_queue_resources_send(master,aggregated_resources,stoptime);
 		memcpy(aggregated_resources_last,aggregated_resources,sizeof(*aggregated_resources));
+		last_stop_time = stoptime;
 	}
 }
 
