@@ -41,5 +41,11 @@ char *resource_monitor_copy_to_wd(char *path_from_cmdline);
 /**  Reads a single resources file from filename **/
 struct rmsummary *resident_monitor_parse_resources_file(char *filename);
 
+/** Looks for the path of the resource_monitor executable.
+@param path_from_cmdline The first path to look for the resource monitor executable.
+@return The path of the monitor executable.
+*/
+char *resource_monitor_locate(char *path_from_cmdline);
+
 
 #endif
