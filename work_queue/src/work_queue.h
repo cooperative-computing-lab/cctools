@@ -43,8 +43,8 @@ See the file COPYING for details.
 #define WORK_QUEUE_THIRDGET 8	/* Access the file on the client from a shared filesystem */
 #define WORK_QUEUE_THIRDPUT 8	/* Access the file on the client from a shared filesystem (included for readability) */
 
-#define WORK_QUEUE_RESET_ALL        0  /**< When resetting, clear out all tasks and files */
-#define WORK_QUEUE_RESET_KEEP_TASKS 1  /**< When resetting, keep the current list of tasks */
+#define WORK_QUEUE_RESET_ALL        1  /**< When resetting, clear out all tasks and files */
+#define WORK_QUEUE_RESET_KEEP_TASKS 2  /**< When resetting, keep the current list of tasks */
 
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
@@ -422,8 +422,9 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q);
 /** Reset a work queue and all attached workers.
 @param q A work queue object.
 @param flags Flags to indicate what to reset:
- - @ref WORK_QUEUE_RESET_ALL - cleans up each attached worker and deletes all submitted tasks.
- - @ref WORK_QUEUE_RESET_KEEP_TASKS - cleans up each attached worker but retains incomplete tasks.  Tasks will be resubmitted to workers at the next call to @ref work_queue_wait.
+ - @ref WORK_QUEUE_RESET_ALL - cleans up each attached worker and deletes all submitted tasks (the completed tasks, and the tasks ready to be run).
+ - @ref WORK_QUEUE_RESET_KEEP_TASKS - cleans up each attached worker but retains completed tasks and tasks ready to be run.  Tasks will be resubmitted to workers at the next call to @ref work_queue_wait.
+ - with no flag given (0) - clean up each attached worker, and clear the current list of tasks to be executed, keeping completed tasks and files.
 */
 void work_queue_reset(struct work_queue *q, int flags);
 

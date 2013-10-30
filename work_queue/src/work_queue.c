@@ -560,6 +560,15 @@ static int release_worker(struct work_queue *q, struct work_queue_worker *w)
 	return 1;
 }
 
+static int reset_worker(struct work_queue *q, struct work_queue_worker *w)
+{
+	if(!w) return 0;
+	send_worker_msg(q,w,"reset\n");
+	remove_worker(q, w);
+	return 1;
+}
+
+
 static int add_worker(struct work_queue *q)
 {
 	struct link *link;
@@ -3293,25 +3302,33 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 
 void work_queue_reset(struct work_queue *q, int flags) {
 	struct work_queue_worker *w;
-	struct work_queue_task *t;
+	struct work_queue_task   *t;
+	struct list              *l;
 	char *key;
 	
 	if(!q) return;
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		send_worker_msg(q,w,"reset\n");
-		cleanup_worker(q, w);
+		reset_worker(q, w);
 	}
-	
-	if(flags & WORK_QUEUE_RESET_KEEP_TASKS) {
+
+	if(flags == WORK_QUEUE_RESET_KEEP_TASKS) {
+		return;
+	}
+
+	if(flags == WORK_QUEUE_RESET_ALL) {
+		l = work_queue_cancel_all_tasks(q);
+		while((t = list_pop_head(l))) {
+			work_queue_task_delete(t);
+			list_delete(l);
+		}
 		return;
 	}
 	
-	while((t = list_pop_head(q->ready_list))) {
+	//no flags
+	while((t = list_pop_head(q->ready_list)))
 		work_queue_task_delete(t);
-	}
-	
 }
 
 int work_queue_empty(struct work_queue *q)
