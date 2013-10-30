@@ -1792,7 +1792,7 @@ static void foreman_for_master(struct link *master) {
 		int result = 1;
 		struct work_queue_task *task = NULL;
 
-		if(time(0) > idle_stoptime && (itable_size(active_tasks)+itable_size(stored_tasks))==0) {
+		if(time(0) > idle_stoptime && work_queue_empty(foreman_q)) {
 			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			abort_flag = 1;
 			break;
@@ -1833,16 +1833,15 @@ static void foreman_for_master(struct link *master) {
 
 		send_resource_update(master,0);
 		
-		if(master_active)
+		if(master_active) {
 			result &= handle_master(master);
+			idle_stoptime = time(0) + idle_timeout;
+		}
 
 		if(!result) {
 			disconnect_master(master);
 			break;
-		}
-		
-		if(result)
-			idle_stoptime = time(0) + idle_timeout;
+		} 
 	}
 }
 
