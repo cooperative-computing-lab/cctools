@@ -981,6 +981,8 @@ static int do_task( struct link *master, int taskid )
 		       	work_queue_task_specify_memory(task, n);
 		} else if(sscanf(line,"disk %d",&n)) {
 		       	work_queue_task_specify_disk(task, n);
+		} else if(sscanf(line,"gpus %d",&n)) {
+				work_queue_task_specify_gpus(task, n);
 		} else if(!strcmp(line,"end")) {
 		       	break;
 		} else {

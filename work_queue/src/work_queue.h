@@ -215,6 +215,13 @@ void work_queue_task_specify_disk( struct work_queue_task *t, int disk );
 
 void work_queue_task_specify_cores( struct work_queue_task *t, int cores );
 
+/** Specify the number of gpus required by a task.
+@param t A task object.
+@param gpus The number of gpus required by the task.
+*/
+
+void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus );
+
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the work queue, but is provided for the user's convenience
 in identifying tasks when they complete.
