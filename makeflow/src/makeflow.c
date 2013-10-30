@@ -117,7 +117,7 @@ static int cache_mode = 1;
 int verbose_parsing = 0;
 
 static char *makeflow_exe = NULL;
-static char *monitor_exe = NULL;
+static char *monitor_exe  = "resource_monitor_cctools";
 
 static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
@@ -1658,7 +1658,9 @@ const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
 	if(n->monitor_command)
 		free(n->monitor_command);
 
-	n->monitor_command  = resource_monitor_rewrite_command((char *) n->command, log_name_prefix,
+	n->monitor_command  = resource_monitor_rewrite_command((char *) n->command, 
+			monitor_exe,
+			log_name_prefix,
 			monitor_limits_name,
 			extra_options,
 			1,                           /* summaries always enabled */
