@@ -1690,7 +1690,7 @@ const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
 	if(n->monitor_command)
 		free(n->monitor_command);
 
-	n->monitor_command  = resource_monitor_rewrite_command((char *) n->command, 
+	n->monitor_command  = resource_monitor_rewrite_command((char *) n->command,
 			monitor_exe,
 			log_name_prefix,
 			monitor_limits_name,
@@ -2948,7 +2948,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(monitor_mode) 
+	if(monitor_mode)
 	{
 		dag_prepare_for_monitoring(d);
 	}
