@@ -1745,7 +1745,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s would ask a catalog server for available masters.\n", "");
-	fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-M,--master-name=<name>"); 
+	fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-N,-M,--master-name=<name>"); 
 	fprintf(stdout, " %-30s projects.\n", ""); 
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
@@ -1754,7 +1754,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Debug file will be closed, renamed, and a new one opened after being.\n", "--debug-release-reset");
 	fprintf(stdout, " %-30s released from a master.\n", "");
 	fprintf(stdout, " %-30s Set worker to run as a foreman.\n", "--foreman");
-	fprintf(stdout, " %-30s\n", "-f,");
+	fprintf(stdout, " %-30s Run as a foreman, and advertise to the catalog server with <name>.\n", "-f,--foreman-name=<name>");
 	fprintf(stdout, " %-30s\n", "--foreman-port=<port>[:<highport>]");
 	fprintf(stdout, " %-30s Set the port for the foreman to listen on.  If <highport> is specified\n", "");
 	fprintf(stdout, " %-30s the port is chosen from the range port:highport.  Implies --foreman.\n", "");
@@ -1844,7 +1844,7 @@ static int setup_workspace() {
 
 enum {LONG_OPT_DEBUG_FILESIZE = 1, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
-      LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_DISABLE_SYMLINKS};
+      LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS};
 
 struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1854,9 +1854,9 @@ struct option long_options[] = {
 	{"debug-rotate-max",    required_argument,  0,  LONG_OPT_DEBUG_FILESIZE},
 	{"debug-release-reset", no_argument,        0,  LONG_OPT_DEBUG_RELEASE},
 	{"foreman",             no_argument,        0,  LONG_OPT_FOREMAN},
-	{"foreman-port",        required_argument,  0,  'f'},
+	{"foreman-port",        required_argument,  0,  LONG_OPT_FOREMAN_PORT},
 	{"foreman-port-file",   required_argument,  0,  'Z'},
-	{"foreman-name",        required_argument,  0,  'N'},
+	{"foreman-name",        required_argument,  0,  'f'},
 	{"measure-capacity",    no_argument,        0,  'c'},
 	{"fast-abort",          required_argument,  0,  'F'},
 	{"specify-log",         required_argument,  0,  LONG_OPT_SPECIFY_LOG},
@@ -1933,10 +1933,14 @@ int main(int argc, char *argv[])
 			debug_config_file_size(MAX(0, string_metric_parse(optarg)));
 			break;
 		case 'f':
+			worker_mode = worker_mode_default = WORKER_MODE_FOREMAN;
+			foreman_name = xxstrdup(optarg);
+			break;
+		case LONG_OPT_FOREMAN_PORT:
 		{	char *low_port = optarg;
 			char *high_port= strchr(optarg, ':');
 			
-			worker_mode = WORKER_MODE_FOREMAN;
+			worker_mode = worker_mode_default = WORKER_MODE_FOREMAN;
 			
 			if(high_port) {
 				*high_port = '\0';
@@ -1974,15 +1978,9 @@ int main(int argc, char *argv[])
 			worker_mode = worker_mode_default = WORKER_MODE_FOREMAN;
 			break;
 		case 'M':
-			auto_worker = 1;
-			list_push_tail(preferred_masters, strdup(optarg));
-			break;
 		case 'N':
 			auto_worker = 1;
-			if(foreman_name) { // for backward compatibility with old syntax for specifying a worker's project name
-				list_push_tail(preferred_masters, foreman_name);
-			}
-			foreman_name = strdup(optarg);
+			list_push_tail(preferred_masters, strdup(optarg));
 			break;
 		case 'p':
 			pool_name = xxstrdup(optarg);

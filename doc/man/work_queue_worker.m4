@@ -29,18 +29,18 @@ MANPAGE(condor_submit_workers,1) respectively.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-M, master-name, name)Set the name of the project this worker should work for.  A worker can have multiple projects.
+OPTION_TRIPLET(-N,-M, master-name, name)Set the name of the project this worker should work for.  A worker can have multiple projects.
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
 OPTION_TRIPLET(-o, debug-file, file)Send debugging to this file.
 OPTION_PAIR(--debug-max-rotate, bytes)Set the maximum file size of the debug log.  If the log exceeds this size, it is renamed to "filename.old" and a new logfile is opened.  (default=10M. 0 disables)
 OPTION_ITEM(--debug-release-reset)Debug file will be closed, renamed, and a new one opened after being released from a master.
-OPTION_ITEM(`-f, --foreman')Enable foreman mode.
-OPTION_PAIR(--foreman-port, port[:highport]) Set the port for the foreman to listen on.  If PARAM(highport) is specified the port is chosen from between PARAM(port) and PARAM(highport).
+OPTION_ITEM(`--foreman')Enable foreman mode.
+OPTION_TRIPLET(-f, foreman-name, name)Set the project name of this foreman to PARAM(project). Implies --foreman.
+OPTION_PAIR(--foreman-port, port[:highport]) Set the port for the foreman to listen on.  If PARAM(highport) is specified the port is chosen from between PARAM(port) and PARAM(highport). Implies --foreman.
 OPTION_TRIPLET(-Z, foreman-port-file, file)Select port to listen to at random and write to this file.  Implies --foreman.
 OPTION_TRIPLET(-F, fast-abort, mult)Set the fast abort multiplier for foreman (default=disabled).
 OPTION_PAIR(--specify-log, logfile)Send statistics about foreman to this file.
-OPTION_TRIPLET(-N, foreman-name, name)Set the project name of this foreman to PARAM(project).  If in worker, classic or auto mode, behaves as BOLD(-M) for backwards compatibility.
 OPTION_TRIPLET(-P, password, pwfile)Password file for authenticating to the master.
 OPTION_TRIPLET(-t, timeout, time)Abort after this amount of idle time. (default=900s)
 OPTION_TRIPLET(-w, tcp-window-size, size)Set TCP window size.
