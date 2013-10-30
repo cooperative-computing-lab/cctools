@@ -180,6 +180,7 @@ struct work_queue_worker {
 	int cores_allocated;
 	int memory_allocated;
 	int disk_allocated;
+	int gpus_allocated;
 	struct hash_table *current_files;
 	struct link *link;
 	struct itable *current_tasks;
@@ -227,7 +228,7 @@ static int get_worker_state(struct work_queue *q, struct work_queue_worker *w) {
 	} else if(get_worker_cores(q, w) && itable_size(w->current_tasks) == 0 ) {
 		return WORKER_STATE_READY;
 	} else if(get_worker_cores(q, w) && itable_size(w->current_tasks) > 0) {
-		if(get_worker_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total < w->memory_allocated) {
+		if(get_worker_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total < w->memory_allocated || w->resources->gpus.total > w->gpus_allocated) {
 			return WORKER_STATE_BUSY;
 		} else {
 			return WORKER_STATE_FULL;
@@ -510,7 +511,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 			}
 			t->output = 0;
 			if(t->unlabeled) {
-				t->cores = t->memory = t->disk = -1;
+				t->cores = t->memory = t->disk = t->gpus = -1;
 			}
 			list_push_head(q->ready_list, t);
 		}
@@ -1101,9 +1102,10 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	w->cores_allocated -= t->cores;
 	w->memory_allocated -= t->memory;
 	w->disk_allocated -= t->disk;
+	w->gpus_allocated -= t->gpus;
 	
 	if(t->unlabeled) {
-		t->cores = t->memory = t->disk = -1;
+		t->cores = t->memory = t->disk = t->gpus = -1;
 	}
 
 	w->finished_tasks++;
@@ -1349,6 +1351,8 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 			w->resources->memory = r;
 		} else if(!strcmp(category,"disk")) {
 			w->resources->disk = r;
+		} else if(!strcmp(category,"gpus")) {
+			w->resources->gpus = r;
 		} else if(!strcmp(category,"workers")) {
 			w->resources->workers = r;
 		}
@@ -1794,6 +1798,7 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	send_worker_msg(q,w, "cores %d\n",   t->cores );
 	send_worker_msg(q,w, "memory %d\n",  t->memory );
 	send_worker_msg(q,w, "disk %d\n",    t->disk );
+	send_worker_msg(q,w, "gpus %d\n",    t->gpus );
 
 	if(t->input_files) {
 		struct work_queue_file *tf;
@@ -1886,18 +1891,20 @@ static double compute_capacity( const struct work_queue *q )
 }
 
 static int check_worker_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
-	int cores_used, disk_used, mem_used, ok = 1;
+	int cores_used, disk_used, mem_used, gpus_used, ok = 1;
 	
 	// If none of the resources used have not been specified, treat the task as consuming an entire "average" worker
-	if(t->cores < 0 && t->memory < 0 && t->disk < 0) {
+	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
 		cores_used = MAX((double)w->resources->cores.total/(double)w->resources->workers.total, 1);
 		mem_used = MAX((double)w->resources->memory.total/(double)w->resources->workers.total, 0);
 		disk_used = MAX((double)w->resources->disk.total/(double)w->resources->workers.total, 0);
+		gpus_used = MAX((double)w->resources->gpus.total/(double)w->resources->workers.total, 0);
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 		cores_used = MAX(t->cores, 0);
 		mem_used = MAX(t->memory, 0);
 		disk_used = MAX(t->disk, 0);
+		gpus_used = MAX(t->gpus, 0);
 	}
 	
 	if(w->cores_allocated + cores_used > get_worker_cores(q, w)) {
@@ -1909,6 +1916,10 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 	}
 	
 	if(w->disk_allocated + disk_used > w->resources->disk.total) {
+		ok = 0;
+	}
+
+	if(w->gpus_allocated + gpus_used > w->resources->gpus.total) {
 		ok = 0;
 	}
 	
@@ -2056,20 +2067,23 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 
 	if(start_one_task(q, w, t)) {
 		//If everything is unspecified, set it to the value of an "average" worker.
-		if(t->cores < 0 && t->memory < 0 && t->disk < 0) {
+		if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
 			t->cores = MAX((double)w->resources->cores.total/(double)w->resources->workers.total, 1);
 			t->memory = MAX((double)w->resources->memory.total/(double)w->resources->workers.total, 0);
 			t->disk = MAX((double)w->resources->disk.total/(double)w->resources->workers.total, 0);
+			t->gpus = MAX((double)w->resources->gpus.total/(double)w->resources->workers.total, 0);
 		} else {
 			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 			t->cores = MAX(t->cores, 0);
 			t->memory = MAX(t->memory, 0);
 			t->disk = MAX(t->disk, 0);
+			t->gpus = MAX(t->gpus, 0);
 		}
 		
 		w->cores_allocated += t->cores;
 		w->memory_allocated += t->memory;
 		w->disk_allocated += t->disk;
+		w->gpus_allocated += t->gpus;
 		
 		log_worker_states(q);
 		return 1;
@@ -2222,9 +2236,10 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 		w->cores_allocated -= t->cores;
 		w->memory_allocated -= t->memory;
 		w->disk_allocated -= t->disk;
+		w->gpus_allocated -= t->gpus;
 		
 		if(t->unlabeled) {
-			t->cores = t->memory = t->disk = -1;
+			t->cores = t->memory = t->disk = t->gpus = -1;
 		}
 
 		log_worker_states(q);
@@ -2297,6 +2312,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->memory = -1;
 	t->disk = -1;
 	t->cores = -1;
+	t->gpus = -1;
 	t->unlabeled = 1;
 
 	return t;
@@ -2323,6 +2339,12 @@ void work_queue_task_specify_disk( struct work_queue_task *t, int disk )
 void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
 {
 	t->cores = cores;
+	t->unlabeled = 0;
+}
+
+void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
+{
+	t->gpus = gpus;
 	t->unlabeled = 0;
 }
 
@@ -3257,6 +3279,7 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 			w->cores_allocated -= t->cores;
 			w->memory_allocated -= t->memory;
 			w->disk_allocated -= t->disk;
+			w->gpus_allocated -= t->gpus;
 			
 			itable_remove(w->current_tasks, taskid);
 			
