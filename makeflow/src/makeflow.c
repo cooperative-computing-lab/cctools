@@ -939,6 +939,38 @@ static char *translate_command(struct dag_node *n, char *old_command, int is_loc
 	return new_command;
 }
 
+int copy_monitor(void)
+{
+	char *monitor_orig = resource_monitor_locate(NULL);
+
+	if(!monitor_orig)
+	{
+		fatal("Could not locate resource_monitor executable");
+	}
+
+	struct stat original;
+	struct stat current;
+
+	if(stat(monitor_orig, &original))
+	{
+		fatal("Could not stat resource_monitor executable");
+	}
+
+	if(stat(monitor_exe, &current) || difftime(original.st_mtime, current.st_mtime) > 0)
+	{
+		if(copy_file_to_file(monitor_orig, monitor_exe) < original.st_size)
+		{
+			fatal("Could not copy resource_monitor executable");
+		}
+	}
+
+	free(monitor_orig);
+
+	return 1;
+}
+
+
+
 
 #define dag_parse_error(bk, type) \
 	fprintf(stderr, "makeflow: invalid " type " in file %s at line %ld, column %ld\n", (bk)->d->filename, (bk)->line_number, (bk)->column_number);
@@ -2796,6 +2828,9 @@ int main(int argc, char *argv[])
 			cleanlog = string_format("%s.batchlog", dagfile);
 			file_clean(cleanlog, 0);
 			free(cleanlog);
+
+			if(monitor_mode)
+				unlink(monitor_exe);
 		}
 	}
 
@@ -2806,13 +2841,13 @@ int main(int argc, char *argv[])
 			fatal("Monitor mode was enabled, but a log output directory was not specified (use -M<dir>)");
 		}
 
-		monitor_exe = resource_monitor_copy_to_wd(NULL);
-
 		if(monitor_interval < 1)
 			fatal("Monitoring interval should be non-negative.");
 
 		if(!monitor_log_format)
 			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
+
+		copy_monitor();
 	}
 
 	struct dag *d = dag_from_file(dagfile);
