@@ -1366,7 +1366,7 @@ static int do_release() {
 static int do_reset() {
 	
 	if(worker_mode == WORKER_MODE_FOREMAN) {
-		work_queue_reset(foreman_q, 0);
+		work_queue_reset(foreman_q, WORK_QUEUE_RESET_ALL);
 	} else {
 		kill_all_tasks();
 	}
@@ -1393,8 +1393,11 @@ static void disconnect_master(struct link *master) {
 
 	kill_all_tasks();
 
+	//KNOWN HACK: We remove all workers on a master disconnection to avoid
+	//returning old tasks to a new master. 
 	if(foreman_q) {
-		work_queue_reset(foreman_q, 0);
+		debug(D_WQ, "Disconnecting all workers...\n");
+		release_all_workers(foreman_q); 
 	}
 
 	// Remove the contents of the workspace.
