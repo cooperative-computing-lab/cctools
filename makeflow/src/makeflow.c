@@ -117,7 +117,7 @@ static int cache_mode = 1;
 int verbose_parsing = 0;
 
 static char *makeflow_exe = NULL;
-static char *monitor_exe = NULL;
+static char *monitor_exe  = "resource_monitor_cctools";
 
 static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
@@ -939,6 +939,38 @@ static char *translate_command(struct dag_node *n, char *old_command, int is_loc
 	return new_command;
 }
 
+int copy_monitor(void)
+{
+	char *monitor_orig = resource_monitor_locate(NULL);
+
+	if(!monitor_orig)
+	{
+		fatal("Could not locate resource_monitor executable");
+	}
+
+	struct stat original;
+	struct stat current;
+
+	if(stat(monitor_orig, &original))
+	{
+		fatal("Could not stat resource_monitor executable");
+	}
+
+	if(stat(monitor_exe, &current) || difftime(original.st_mtime, current.st_mtime) > 0)
+	{
+		if(copy_file_to_file(monitor_orig, monitor_exe) < original.st_size)
+		{
+			fatal("Could not copy resource_monitor executable");
+		}
+	}
+
+	free(monitor_orig);
+
+	return 1;
+}
+
+
+
 
 #define dag_parse_error(bk, type) \
 	fprintf(stderr, "makeflow: invalid " type " in file %s at line %ld, column %ld\n", (bk)->d->filename, (bk)->line_number, (bk)->column_number);
@@ -1468,33 +1500,30 @@ int dag_prepare_for_monitoring(struct dag *d)
 
 	for(n = d->nodes; n; n = n->next)
 	{
-		if(monitor_mode)
+		char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
+		char *log_name;
+
+		dag_node_add_source_file(n, monitor_exe, NULL);
+
+		log_name = string_format("%s.summary", log_name_prefix);
+		dag_node_add_target_file(n, log_name, NULL);
+		free(log_name);
+
+		if(monitor_enable_time_series)
 		{
-			char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
-			char *log_name;
-
-			dag_node_add_source_file(n, monitor_exe, NULL);
-
-			log_name = string_format("%s.summary", log_name_prefix);
+			log_name = string_format("%s.series", log_name_prefix);
 			dag_node_add_target_file(n, log_name, NULL);
 			free(log_name);
-
-			if(monitor_enable_time_series)
-			{
-				log_name = string_format("%s.series", log_name_prefix);
-				dag_node_add_target_file(n, log_name, NULL);
-				free(log_name);
-			}
-
-			if(monitor_enable_list_files)
-			{
-				log_name = string_format("%s.files", log_name_prefix);
-				dag_node_add_target_file(n, log_name, NULL);
-				free(log_name);
-			}
-
-			free(log_name_prefix);
 		}
+
+		if(monitor_enable_list_files)
+		{
+			log_name = string_format("%s.files", log_name_prefix);
+			dag_node_add_target_file(n, log_name, NULL);
+			free(log_name);
+		}
+
+		free(log_name_prefix);
 	}
 
 	return 1;
@@ -1661,7 +1690,9 @@ const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
 	if(n->monitor_command)
 		free(n->monitor_command);
 
-	n->monitor_command  = resource_monitor_rewrite_command((char *) n->command, log_name_prefix,
+	n->monitor_command  = resource_monitor_rewrite_command((char *) n->command,
+			monitor_exe,
+			log_name_prefix,
 			monitor_limits_name,
 			extra_options,
 			1,                           /* summaries always enabled */
@@ -2797,6 +2828,9 @@ int main(int argc, char *argv[])
 			cleanlog = string_format("%s.batchlog", dagfile);
 			file_clean(cleanlog, 0);
 			free(cleanlog);
+
+			if(monitor_mode)
+				unlink(monitor_exe);
 		}
 	}
 
@@ -2807,13 +2841,13 @@ int main(int argc, char *argv[])
 			fatal("Monitor mode was enabled, but a log output directory was not specified (use -M<dir>)");
 		}
 
-		monitor_exe = resource_monitor_copy_to_wd(NULL);
-
 		if(monitor_interval < 1)
 			fatal("Monitoring interval should be non-negative.");
 
 		if(!monitor_log_format)
 			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
+
+		copy_monitor();
 	}
 
 	struct dag *d = dag_from_file(dagfile);
@@ -2914,8 +2948,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(!dag_prepare_for_monitoring(d)) {
-		fatal("Could not prepare for monitoring.\n");
+	if(monitor_mode)
+	{
+		dag_prepare_for_monitoring(d);
 	}
 
 	if(!dag_prepare_for_batch_system(d)) {
