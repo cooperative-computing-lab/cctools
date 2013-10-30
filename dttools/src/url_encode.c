@@ -44,3 +44,5 @@ void url_decode(const char *s, char *t, int length)
 	}
 	*t = 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

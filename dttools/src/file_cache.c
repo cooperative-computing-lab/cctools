@@ -279,3 +279,5 @@ int file_cache_commit(struct file_cache *f, const char *path, const char *txn)
 		debug(D_CACHE, "commit failed: %s", strerror(errno));
 	return result;
 }
+
+/* vim: set noexpandtab tabstop=4: */

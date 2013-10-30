@@ -38,3 +38,5 @@ void link_nvpair_write( struct link *l, struct nvpair *nv, time_t stoptime )
 	link_write(l,"\n",1,stoptime);
 	free(text);
 }
+
+/* vim: set noexpandtab tabstop=4: */

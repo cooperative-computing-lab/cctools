@@ -1069,3 +1069,5 @@ int ftp_lite_auth_globus( struct ftp_lite_server *s )
 
 #endif
 
+
+/* vim: set noexpandtab tabstop=4: */

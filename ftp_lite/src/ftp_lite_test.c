@@ -312,3 +312,5 @@ static void do_help( const char *x, const char *y )
 	}
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

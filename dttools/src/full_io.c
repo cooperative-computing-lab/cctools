@@ -293,3 +293,5 @@ ssize_t full_fwrite(FILE * file, const void *buf, size_t count)
 		}
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

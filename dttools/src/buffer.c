@@ -163,3 +163,5 @@ void buffer_rewind(buffer_t * b, size_t n)
     b->end = b->buf+n;
     b->end[0] = '\0';
 }
+
+/* vim: set noexpandtab tabstop=4: */

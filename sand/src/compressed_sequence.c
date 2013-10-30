@@ -242,3 +242,5 @@ struct cseq * cseq_read( FILE *file )
 	return c;
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

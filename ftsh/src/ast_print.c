@@ -273,3 +273,5 @@ void ast_redirect_print( FILE *file, struct ast_redirect *r )
 	}
 }		
 
+
+/* vim: set noexpandtab tabstop=4: */

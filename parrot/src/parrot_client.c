@@ -223,3 +223,5 @@ int parrot_closesearch(SEARCH *search) {
         free(search);
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

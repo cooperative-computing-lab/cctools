@@ -277,3 +277,5 @@ fail:
 	fclose(logfile);
 	exit(1);
 }
+
+/* vim: set noexpandtab tabstop=4: */

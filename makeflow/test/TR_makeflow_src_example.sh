@@ -27,3 +27,5 @@ PRODUCTS="capitol.montage.gif"
 
 dispatch $@
 
+
+# vim: set noexpandtab tabstop=4:

@@ -337,3 +337,5 @@ int ibox_acl_rmdir(const char *path)
 		return -1;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

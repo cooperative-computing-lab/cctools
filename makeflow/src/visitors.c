@@ -723,3 +723,5 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 	free(ancestor_count_list);
 
 }
+
+/* vim: set noexpandtab tabstop=4: */

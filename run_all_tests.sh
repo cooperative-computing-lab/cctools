@@ -63,3 +63,5 @@ echo ""
 echo "Test Results: ${FAILURE} of ${TOTAL} tests failed in ${ELAPSED} seconds."
 echo ""
 
+
+# vim: set noexpandtab tabstop=4:

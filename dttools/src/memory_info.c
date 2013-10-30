@@ -80,3 +80,5 @@ int memory_usage_get(UINT64_T * rssp, UINT64_T * totalp)
 	}
 #endif
 }
+
+/* vim: set noexpandtab tabstop=4: */

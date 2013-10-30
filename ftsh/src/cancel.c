@@ -60,3 +60,5 @@ void cancel_reset()
 {
 	cancel_signal = 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -843,4 +843,4 @@ int string_equal(const char *str1, const char *str2){
 	return !strcmp(str1, str2);
 }
 
-/* vim: set sts=8 sw=8 ts=8 ft=c: */
+/* vim: set noexpandtab tabstop=4: */

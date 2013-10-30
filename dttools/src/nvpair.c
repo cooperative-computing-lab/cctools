@@ -423,3 +423,5 @@ void nvpair_print_table(struct nvpair *n, FILE * s, struct nvpair_header *h)
 void nvpair_print_table_footer(FILE * s, struct nvpair_header *h)
 {
 }
+
+/* vim: set noexpandtab tabstop=4: */

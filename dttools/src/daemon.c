@@ -100,3 +100,5 @@ void daemonize (int cdroot, const char *pidfile)
         exit(EXIT_FAILURE);
     }
 }
+
+/* vim: set noexpandtab tabstop=4: */

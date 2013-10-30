@@ -107,3 +107,5 @@ int get_canonical_path(const char *path, char *canonical, int length)
 		errno = save_errno;
 	return result;
 }
+
+/* vim: set noexpandtab tabstop=4: */

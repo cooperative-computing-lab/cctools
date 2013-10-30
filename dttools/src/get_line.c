@@ -69,5 +69,4 @@ char *get_line(FILE * fp)
 	}
 }
 
-
-
+/* vim: set noexpandtab tabstop=4: */

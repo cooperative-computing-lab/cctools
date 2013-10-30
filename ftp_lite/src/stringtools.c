@@ -29,3 +29,4 @@ void string_chomp( char *buffer )
 	}
 }
 
+/* vim: set noexpandtab tabstop=4: */

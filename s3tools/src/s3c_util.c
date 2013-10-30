@@ -382,3 +382,5 @@ int s3_message_to_string(struct s3_message *mesg, char** text) {
 
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

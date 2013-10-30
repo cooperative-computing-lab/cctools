@@ -27,3 +27,5 @@ clean()
 }
 
 dispatch $@
+
+# vim: set noexpandtab tabstop=4:

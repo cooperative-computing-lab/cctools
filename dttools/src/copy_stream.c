@@ -277,3 +277,5 @@ int copy_file_to_buffer(const char *filename, char **buffer)
 
 	return count;
 }
+
+/* vim: set noexpandtab tabstop=4: */

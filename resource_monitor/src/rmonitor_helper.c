@@ -358,3 +358,5 @@ void __attribute__((destructor)) init() {
 	exit_wrapper_preamble();
 }
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

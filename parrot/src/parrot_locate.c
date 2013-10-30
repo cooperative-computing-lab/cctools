@@ -42,3 +42,5 @@ int main( int argc, char *argv[] )
 	} while( (result = parrot_locate(NULL,buf,sizeof(buf))) > 0);
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

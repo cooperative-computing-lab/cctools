@@ -366,3 +366,5 @@ const char *md5_string(unsigned char digest[16])
 	str[32] = 0;
 	return str;
 }
+
+/* vim: set noexpandtab tabstop=4: */

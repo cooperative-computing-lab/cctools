@@ -14,3 +14,5 @@ void random_init( void )
 {
 	srand((unsigned int) (getpid() ^ time(NULL)));
 }
+
+/* vim: set noexpandtab tabstop=4: */

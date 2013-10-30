@@ -215,3 +215,5 @@ allpairs_compare_t allpairs_compare_function_get( const char *name )
 	}
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

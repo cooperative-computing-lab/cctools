@@ -905,3 +905,5 @@ static int process_status( const char *name, pid_t pid, int status, int line )
 	return result;
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

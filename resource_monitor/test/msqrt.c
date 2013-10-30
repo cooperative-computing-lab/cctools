@@ -45,3 +45,5 @@ int main(int argc, char **argv)
 		select(0, NULL, NULL, NULL, &ts);
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -49,3 +49,5 @@ void catalog_query_delete(struct catalog_query *q)
 	link_close(q->link);
 	free(q);
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -171,3 +171,5 @@ int multi_fork( int n, struct multi_fork_status *p, time_t stoptime, int line )
 	return result;
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

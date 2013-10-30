@@ -133,3 +133,5 @@ void overlap_write_end(FILE * file)
 {
 	fprintf(file, "]\n");
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -65,3 +65,5 @@ ssize_t write( int fd, const void *vbuffer, size_t length )
 	}
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

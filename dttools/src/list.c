@@ -403,3 +403,5 @@ struct list *list_sort(struct list *list, int (*comparator) (const void *, const
 	free(array);
 	return list;
 }
+
+/* vim: set noexpandtab tabstop=4: */

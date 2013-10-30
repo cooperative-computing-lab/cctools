@@ -185,3 +185,5 @@ int domain_name_cache_guess_short(char *name)
 
 	return 1;
 }
+
+/* vim: set noexpandtab tabstop=4: */

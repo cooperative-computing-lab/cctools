@@ -178,3 +178,5 @@ builtin_func_t builtin_lookup( const char *name )
 	return 0;
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

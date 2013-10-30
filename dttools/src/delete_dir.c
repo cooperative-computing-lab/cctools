@@ -82,3 +82,5 @@ int delete_dir_contents(const char *dirname) {
 	closedir(dir);
 	return result;
 }
+
+/* vim: set noexpandtab tabstop=4: */

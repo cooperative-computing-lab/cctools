@@ -95,3 +95,5 @@ int load_average_get_cpus()
 }
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

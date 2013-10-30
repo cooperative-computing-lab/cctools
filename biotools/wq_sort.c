@@ -312,3 +312,5 @@ int main(int argc, char *argv[])
 	work_queue_delete(q);
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

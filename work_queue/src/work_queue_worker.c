@@ -2210,3 +2210,5 @@ abort:
 	abort_worker();
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

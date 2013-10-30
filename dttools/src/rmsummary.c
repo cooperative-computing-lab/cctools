@@ -416,3 +416,5 @@ void rmsummary_debug_report(struct rmsummary *s)
 	if(s->workdir_footprint != -1)
 		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "workdir_footprint", s->workdir_footprint);
 }
+
+/* vim: set noexpandtab tabstop=4: */

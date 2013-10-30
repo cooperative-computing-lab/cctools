@@ -25,3 +25,5 @@ void cctools_version_debug (int type, const char *cmd)
 	debug(type, "System: %s", CCTOOLS_SYSTEM_INFORMATION);
 	debug(type, "Configuration: %s", CCTOOLS_CONFIGURE_ARGUMENTS);
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -271,3 +271,5 @@ int s3_setacl(char* bucketname, char *filename, const char* owner, struct hash_t
 	return 0;
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

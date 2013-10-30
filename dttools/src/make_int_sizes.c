@@ -80,3 +80,5 @@ int main(int argc, char *argv[])
 	printf("#endif\n");
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

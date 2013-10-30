@@ -316,3 +316,5 @@ void debug_flags_restore(INT64_T fl)
 {
 	debug_flags = fl;
 }
+
+/* vim: set noexpandtab tabstop=4: */

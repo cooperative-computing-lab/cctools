@@ -25,3 +25,5 @@ void opts_write_port_file(const char *port_file, const int port)
 		fclose(file);
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

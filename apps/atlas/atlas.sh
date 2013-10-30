@@ -26,3 +26,5 @@ JOBOPTSEARCHPATH=/cvmfs/atlas.cern.ch/repo/sw/Generators/MC12JobOptions/latest/s
 echo "running simulation"
 Generate_trf.py ecmEnergy=8000. runNumber=105144 firstEvent=1 maxEvents=10 randomSeed=1324354657 jobConfig=MC12.147816.Pythia8_AU2CTEQ6L1_Zee.py outputEVNTFile=pythia.EVNT.pool.root
 
+
+# vim: set noexpandtab tabstop=4:

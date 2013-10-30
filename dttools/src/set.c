@@ -255,3 +255,5 @@ void *set_next_element(struct set *s)
 		return 0;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

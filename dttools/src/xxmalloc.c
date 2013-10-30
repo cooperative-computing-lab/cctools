@@ -46,3 +46,5 @@ void *xxrealloc(void *ptr, size_t nsize)
 		fatal("out of memory");
 	return result;
 }
+
+/* vim: set noexpandtab tabstop=4: */

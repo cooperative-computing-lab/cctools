@@ -121,3 +121,5 @@ void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct 
 	nvpair_insert_integer(nv, "gpus_largest",    r->gpus.largest);
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

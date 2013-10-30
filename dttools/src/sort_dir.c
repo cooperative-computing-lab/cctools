@@ -73,3 +73,5 @@ void sort_dir_free(char **list)
 		free(list);
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

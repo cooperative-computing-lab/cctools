@@ -394,3 +394,5 @@ int batch_job_disable_caching(struct batch_queue * q)
 	return 1;
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

@@ -229,3 +229,5 @@ int batch_job_remove_condor(struct batch_queue *q, batch_job_id_t jobid)
 		return 1;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

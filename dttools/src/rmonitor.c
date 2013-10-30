@@ -151,8 +151,4 @@ char *resource_monitor_rewrite_command(char *cmdline, char *monitor_path, char *
 	return xxstrdup(cmd_builder);
 }
 
-
-
-
-
-
+/* vim: set noexpandtab tabstop=4: */

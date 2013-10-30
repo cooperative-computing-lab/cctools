@@ -209,3 +209,5 @@ struct ast_word * ast_word_create( int line, const char *text )
 	return w;
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

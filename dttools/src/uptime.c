@@ -49,3 +49,5 @@ int uptime_get()
 
 	return uptime;
 }
+
+/* vim: set noexpandtab tabstop=4: */

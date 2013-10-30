@@ -351,3 +351,5 @@ int  nvpair_database_nextkey( struct nvpair_database *db, char **key, struct nvp
 }
 
 
+
+/* vim: set noexpandtab tabstop=4: */

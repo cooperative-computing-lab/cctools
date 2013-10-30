@@ -140,3 +140,5 @@ int sequence_count(FILE * file)
 	fseek(file, start_pos, SEEK_SET);
 	return count;
 }
+
+/* vim: set noexpandtab tabstop=4: */

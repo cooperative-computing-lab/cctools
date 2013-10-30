@@ -98,3 +98,5 @@ int fast_pclose(FILE * file)
 	errno = ECHILD;
 	return -1;
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -12,3 +12,5 @@ while [ $I -lt $N ]; do
 done
 
 
+
+# vim: set noexpandtab tabstop=4:

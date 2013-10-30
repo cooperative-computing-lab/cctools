@@ -669,3 +669,5 @@ int expr_is_list( struct expr *e )
 		return 0;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

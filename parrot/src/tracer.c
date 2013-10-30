@@ -449,3 +449,5 @@ const char * tracer_syscall_name( struct tracer *t, int syscall )
 		return tracer_syscall32_name(syscall);
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

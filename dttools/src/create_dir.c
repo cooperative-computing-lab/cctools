@@ -51,3 +51,5 @@ int create_dir(const char *path, int mode)
 	free(temp);
 	return 1;
 }
+
+/* vim: set noexpandtab tabstop=4: */

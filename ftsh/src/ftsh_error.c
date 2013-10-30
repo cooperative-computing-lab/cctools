@@ -89,3 +89,5 @@ void ftsh_fatal( int line, const char *fmt, ... )
 	exit(1);
 	va_end(args);
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -1128,3 +1128,5 @@ int link_poll(struct link_info *links, int nlinks, int msec)
 
 	return result;
 }
+
+/* vim: set noexpandtab tabstop=4: */

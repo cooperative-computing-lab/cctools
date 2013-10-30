@@ -757,3 +757,5 @@ int dag_node_is_sink(struct dag_node *n)
 }
 
 
+
+/* vim: set noexpandtab tabstop=4: */

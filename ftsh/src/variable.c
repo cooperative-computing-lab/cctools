@@ -267,3 +267,5 @@ char * variable_subst( char *value, int line )
 	}
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

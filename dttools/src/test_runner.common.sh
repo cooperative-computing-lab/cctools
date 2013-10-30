@@ -112,3 +112,5 @@ require_identical_files()
 if ! echo $PATH | grep /sbin > /dev/null 2>&1; then
     export PATH=$PATH:/usr/sbin:/sbin
 fi
+
+# vim: set noexpandtab tabstop=4:

@@ -92,3 +92,5 @@ int dpclose(FILE * in, FILE * out, pid_t pid)
 		}
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -30,3 +30,5 @@ int auth_register_all(void)
 {
 	return auth_kerberos_register() + auth_globus_register() + auth_unix_register() + auth_ticket_register() + auth_hostname_register() + auth_address_register();
 }
+
+/* vim: set noexpandtab tabstop=4: */

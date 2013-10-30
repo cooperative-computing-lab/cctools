@@ -168,3 +168,5 @@ void s3_clear_userid() {
 	}
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

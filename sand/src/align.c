@@ -390,3 +390,5 @@ void alignment_delete( struct alignment *aln )
 	}
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

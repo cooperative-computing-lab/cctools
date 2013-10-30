@@ -64,3 +64,5 @@ ftp_lite_size_t ftp_lite_stream_to_buffer( FILE *input, char **buffer )
 
 	return total;
 }
+
+/* vim: set noexpandtab tabstop=4: */

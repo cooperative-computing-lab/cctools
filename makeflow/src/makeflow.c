@@ -3099,4 +3099,4 @@ int main(int argc, char *argv[])
 	}
 }
 
-/* vim: set sw=8 sts=8 ts=8 ft=c: */
+/* vim: set noexpandtab tabstop=4: */

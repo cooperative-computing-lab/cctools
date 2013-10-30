@@ -40,3 +40,5 @@ int find_executable(const char *exe_name, const char *env_path_var, char *exe_pa
 
 	return cur_path != NULL;
 }
+
+/* vim: set noexpandtab tabstop=4: */

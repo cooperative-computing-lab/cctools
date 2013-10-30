@@ -1758,6 +1758,4 @@ int main(int argc, char *argv[])
 	return EXIT_SUCCESS;
 }
 
-/*
- * vim: sts=4 sw=4 ts=4 ft=c
- */
+/* vim: set noexpandtab tabstop=4: */

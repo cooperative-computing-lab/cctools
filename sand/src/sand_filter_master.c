@@ -590,3 +590,5 @@ static void get_options(int argc, char **argv, const char *progname)
 		strcat(filter_program_args, tmp);
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

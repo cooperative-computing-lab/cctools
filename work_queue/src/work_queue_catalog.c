@@ -389,3 +389,5 @@ void debug_print_masters(struct list *ml)
 		debug(D_WQ, "%d:\t%s@%s:%d started on %s\n", ++count, m->proj, m->addr, m->port, timestr);
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

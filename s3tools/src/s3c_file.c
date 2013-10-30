@@ -301,3 +301,5 @@ int s3_stat_file(char* filename, char* bucketname, struct s3_dirent_object* dire
 	return 0;
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

@@ -76,3 +76,5 @@ void mergesort_list(struct list *lst, cmp_op_t cmp)
 		}
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

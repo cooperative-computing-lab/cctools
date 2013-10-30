@@ -47,3 +47,5 @@ See the file COPYING for details.
 
 
 #endif	/*  */
+
+/* vim: set noexpandtab tabstop=4: */

@@ -22,3 +22,5 @@ echo $! > $1 # write pid of sand_filter_master so the process can be reaped in c
 run_local_worker port.file
 
 exit 0;
+
+# vim: set noexpandtab tabstop=4:

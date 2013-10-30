@@ -55,3 +55,5 @@ void matrix_print( struct matrix *m, const char *a, const char *b )
 	}
 
 }
+
+/* vim: set noexpandtab tabstop=4: */

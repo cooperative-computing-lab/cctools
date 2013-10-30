@@ -430,3 +430,5 @@ const char *sha1_string(unsigned char digest[20])
 	str[40] = 0;
 	return str;
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -204,3 +204,5 @@ void auth_clear()
 		list = n;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

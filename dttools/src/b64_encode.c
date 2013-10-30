@@ -40,3 +40,5 @@ int b64_encode(const char *input, int len, char *output, int buf_len)
 
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

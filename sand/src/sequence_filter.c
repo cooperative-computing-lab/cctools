@@ -1061,3 +1061,5 @@ void free_cand_list_element(cand_list_element * cle)
 	free_cand_list_element(n);
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

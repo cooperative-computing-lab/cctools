@@ -1438,3 +1438,5 @@ int main(int argc, char** argv)
 
 /* condor_wait -num $jobcount $dir/$fname.logfile #wait again, just for the fun of it. */
 
+
+/* vim: set noexpandtab tabstop=4: */

@@ -51,3 +51,5 @@ int disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total)
 	return 0;
 #endif
 }
+
+/* vim: set noexpandtab tabstop=4: */

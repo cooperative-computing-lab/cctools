@@ -163,3 +163,5 @@ int datagram_fd(struct datagram *d)
 {
 	return d->fd;
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -41,3 +41,5 @@ int clean_dir(const char *dirname, const char *delete_pattern)
 
 	return 1;
 }
+
+/* vim: set noexpandtab tabstop=4: */

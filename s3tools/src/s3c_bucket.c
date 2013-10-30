@@ -219,3 +219,5 @@ int s3_ls_bucket(char* bucketname, struct list* dirents, const char* access_key_
 	return 0;
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

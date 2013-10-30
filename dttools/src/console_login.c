@@ -95,3 +95,5 @@ int console_input(const char *prompt, char *buf, int buflen)
 {
 	return do_getline(prompt, buf, buflen, 0);
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -841,3 +841,5 @@ int irods_reli_md5( const char *host, const char *path, char *digest )
 #endif
 
 
+
+/* vim: set noexpandtab tabstop=4: */

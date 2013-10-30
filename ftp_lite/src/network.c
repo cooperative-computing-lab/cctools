@@ -470,3 +470,5 @@ int network_string_get( char *str )
 	return 1;
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

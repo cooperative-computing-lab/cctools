@@ -149,3 +149,5 @@ int buffer_delete( const char *tag )
 }
 
 
+
+/* vim: set noexpandtab tabstop=4: */

@@ -47,3 +47,5 @@ char **string_array_append (char **oarray, const char *str)
 	*((size_t *) tmp) = nlength; /* set the new length */
 	return narray;
 }
+
+/* vim: set noexpandtab tabstop=4: */

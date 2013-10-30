@@ -13,3 +13,5 @@ PRODUCTS="mydir/1.txt mydir/2.txt"
 dispatch $@
 
 
+
+# vim: set noexpandtab tabstop=4:

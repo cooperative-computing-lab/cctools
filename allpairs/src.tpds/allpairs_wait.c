@@ -18,3 +18,5 @@ int main(int argc, char** argv) {
     system(command);
     return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

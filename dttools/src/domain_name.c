@@ -94,3 +94,5 @@ int domain_name_lookup(const char *name, char *addr)
 	
 	return 1;
 }
+
+/* vim: set noexpandtab tabstop=4: */

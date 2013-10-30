@@ -132,3 +132,5 @@ int batch_job_remove_local(struct batch_queue *q, batch_job_id_t jobid)
 		return 0;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

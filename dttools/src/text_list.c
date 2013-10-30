@@ -74,3 +74,5 @@ void text_list_delete(struct text_list *t)
 	free(t->items);
 	free(t);
 }
+
+/* vim: set noexpandtab tabstop=4: */

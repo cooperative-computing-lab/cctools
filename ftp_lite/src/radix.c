@@ -130,3 +130,5 @@ int ftp_lite_radix_decode( const unsigned char *inbuf, unsigned char *outbuf, in
 
 	return 1;
 }
+
+/* vim: set noexpandtab tabstop=4: */

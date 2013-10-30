@@ -233,3 +233,5 @@ int itable_nextkey(struct itable *h, UINT64_T * key, void **value)
 		return 0;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

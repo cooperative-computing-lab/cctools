@@ -7,3 +7,5 @@ dfile=`cat $3`
 echo $(($xfile + $yfile + $dfile))
 
 
+
+# vim: set noexpandtab tabstop=4:

@@ -300,3 +300,5 @@ int main( int argc, char *argv[] )
 	
 	return nerrors!=0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

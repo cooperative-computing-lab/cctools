@@ -295,3 +295,5 @@ void auth_ticket_load(const char *tickets)
 		sort_dir_free(list);
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */
