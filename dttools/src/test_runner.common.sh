@@ -97,7 +97,7 @@ run_local_worker()
 
 require_identical_files()
 {
-        echo "Comparing output $1 and $2"
+	echo "Comparing output $1 and $2"
 	if diff --brief $1 $2
 	then
 		echo "$1 and $2 are the same."
