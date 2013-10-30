@@ -429,8 +429,8 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q);
 /** Reset a work queue and all attached workers.
 @param q A work queue object.
 @param flags Flags to indicate what to reset:
- - @ref WORK_QUEUE_RESET_ALL - cleans up each attached worker and deletes all submitted tasks.
- - @ref WORK_QUEUE_RESET_KEEP_TASKS - cleans up each attached worker but retains incomplete tasks.  Tasks will be resubmitted to workers at the next call to @ref work_queue_wait.
+ - @ref WORK_QUEUE_RESET_ALL - deletes all submitted tasks and disconnects all workers.
+ - @ref WORK_QUEUE_RESET_KEEP_TASKS - deletes all tasks except incomplete tasks and disconnects all workers.  Tasks will be resubmitted to workers at the next call to @ref work_queue_wait.
 */
 void work_queue_reset(struct work_queue *q, int flags);
 
