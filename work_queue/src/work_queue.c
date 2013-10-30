@@ -3291,6 +3291,18 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 	return l;
 }
 
+void release_all_workers(struct work_queue *q) {
+	struct work_queue_worker *w;
+	char *key;
+	
+	if(!q) return;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+		release_worker(q, w);
+	}
+}
+
 void work_queue_reset(struct work_queue *q, int flags) {
 	struct work_queue_worker *w;
 	struct work_queue_task *t;
@@ -3298,20 +3310,16 @@ void work_queue_reset(struct work_queue *q, int flags) {
 	
 	if(!q) return;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		send_worker_msg(q,w,"reset\n");
-		cleanup_worker(q, w);
-	}
-	
-	if(flags & WORK_QUEUE_RESET_KEEP_TASKS) {
+	release_all_workers(q); 
+
+	if(flags == WORK_QUEUE_RESET_KEEP_TASKS) {
 		return;
 	}
-	
+
+	//tasks in running, finished, complete lists are deleted in release_worker().
 	while((t = list_pop_head(q->ready_list))) {
 		work_queue_task_delete(t);
 	}
-	
 }
 
 int work_queue_empty(struct work_queue *q)
