@@ -1773,6 +1773,7 @@ static void foreman_for_master(struct link *master) {
 	struct work_queue_resources foreman_local;
 	work_queue_resources_measure_locally(&foreman_local, workspace);
 
+	time_t last_debug_msg = 0;
 	while(!abort_flag) {
 		int result = 1;
 		struct work_queue_task *task = NULL;
@@ -1803,10 +1804,15 @@ static void foreman_for_master(struct link *master) {
 		aggregated_resources->disk.total = foreman_local.disk.total; //overwrite with foreman's local disk information
 		aggregated_resources->disk.inuse = foreman_local.disk.inuse; 
 
-		debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
+		if(time(0) - last_debug_msg > 10)
+		{
+			debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
 
-		if(list_size(completed_tasks) > 0)
-			debug(D_WQ, "Tasks waiting to be sent: %d\n", list_size(completed_tasks));
+			if(itable_size(tasks_to_send_back) > 0)
+				debug(D_WQ, "Tasks waiting to be sent: %d\n", itable_size(tasks_to_send_back));
+
+			last_debug_msg = time(0);
+		}
 
 		send_resource_update(master,0);
 		
