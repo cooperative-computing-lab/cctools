@@ -442,12 +442,12 @@ static int start_task(struct work_queue_task *t) {
 		return 1;
 }
 
-static void report_task_complete(struct link *master, struct task_info *ti, struct work_queue_task *t)
+static void report_task_complete(struct link *master, struct task_info *ti)
 {
 	INT64_T output_length;
 	struct stat st;
 
-	if(ti) {
+	if(ti->pid) {
 		fstat(ti->output_fd, &st);
 		output_length = st.st_size;
 		lseek(ti->output_fd, 0, SEEK_SET);
@@ -461,7 +461,9 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 
 		total_task_execution_time += (ti->execution_end - ti->execution_start);
 		total_tasks_executed++;
-	} else if(t) {
+	} else {
+		struct work_queue_task *t = ti->task;
+
 		if(t->output) {
 			output_length = strlen(t->output);
 		} else {
@@ -518,7 +520,7 @@ static int handle_tasks(struct link *master) {
 				}
 			}
 			
-			list_push_tail(completed_tasks, ti);
+			itable_insert(tasks_to_send_back, ti->taskid, ti);
 
 			if(!tasks_to_send_back_msg)
 			{
@@ -529,6 +531,31 @@ static int handle_tasks(struct link *master) {
 		
 	}
 	return 1;
+}
+
+static int report_tasks(struct link *master, struct itable *tasks_infos, int max_count)
+{
+	if(max_count < 0)
+	{
+		max_count = itable_size(tasks_infos);
+	}
+
+	struct task_info *ti;
+	uint64_t taskid;
+	int count = 0;
+	itable_firstkey(tasks_infos);
+	while( (count < max_count) && (itable_nextkey(tasks_infos, &taskid, (void **) &ti)))
+	{
+		report_task_complete(master, ti);
+		count++;
+	}
+
+	send_master_message(master, "end\n");
+
+	if(count == itable_size(tasks_infos))
+		tasks_to_send_back_msg = 0;
+
+	return count;
 }
 
 static void make_hash_key(const char *addr, int port, char *key)
@@ -1587,6 +1614,9 @@ static int handle_master(struct link *master) {
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
+		} else if(sscanf(line, "send_results %d", &n) == 1) {
+			report_tasks(master, tasks_to_send_back, n);
+			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
