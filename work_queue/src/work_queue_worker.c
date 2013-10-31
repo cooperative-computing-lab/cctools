@@ -181,7 +181,7 @@ static int released_by_master = 0;
 static char *current_project = NULL;
 
 __attribute__ (( format(printf,2,3) ))
-static void send_master_message( struct link *master, const char *fmt, ... )
+static int send_master_message( struct link *master, const char *fmt, ... )
 {
 	char debug_msg[2*WORK_QUEUE_LINE_MAX];
 	va_list va;
@@ -193,9 +193,11 @@ static void send_master_message( struct link *master, const char *fmt, ... )
 	va_copy(debug_va, va);
 
 	vdebug(D_WQ, debug_msg, debug_va);
-	link_putvfstring(master, fmt, time(0)+active_timeout, va);	
+	int written = link_putvfstring(master, fmt, time(0)+active_timeout, va);	
 
 	va_end(va);
+
+	return written >= 0;
 }
 
 static int recv_master_message( struct link *master, char *line, int length, time_t stoptime )
