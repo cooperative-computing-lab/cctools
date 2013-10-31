@@ -207,6 +207,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
+static int process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line); 
 
@@ -353,8 +354,6 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 		result = 0;	
 	} else if(string_prefix_is(line, "workqueue")) {
 		result = process_workqueue(q, w, line);
-	} else if (string_prefix_is(line,"result")) {
-		result = process_result(q, w, line, stoptime);
 	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status")) {
 		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) { 
@@ -1119,6 +1118,46 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	w->finished_tasks++;
 
 	log_worker_states(q);
+
+	return 0;
+}
+
+static int process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count)
+{
+	//max_count == -1, tells the worker to send all available results.
+
+	send_worker_msg(q, w, "send_results %d\n", max_count);
+
+	char line[WORK_QUEUE_LINE_MAX];
+
+	debug(D_WQ, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
+
+	int i = 0;
+	while(1) {
+		int result = recv_worker_msg_retry(q, w, line, sizeof(line));
+		if(result < 0) 
+			return result;
+		
+		if(string_prefix_is(line,"result")) {
+			result = process_result(q, w, line);
+			if(result < 0) 
+				return result;
+			i++;
+		} else if(!strcmp(line,"end")) {
+			//Only return success if last message is end.
+			break;
+		} else {
+			debug(D_WQ, "%s (%s): sent invalid response to send_results: %s",w->hostname,w->addrport,line);
+			return -1;
+		}
+
+	}
+
+	if(max_count > 0 && i > max_count)
+	{
+		debug(D_WQ, "%s (%s): sent %d results. At most %d were expected.",w->hostname,w->addrport, i, max_count);
+		return -1;
+	}
 
 	return 0;
 }
@@ -3114,7 +3153,13 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		
 		// Start tasks on ready workers
 		start_tasks(q);
-		
+
+		while(list_size(q->workers_with_available_results) > 0)
+		{
+			struct work_queue_worker *w = list_pop_head(q->workers_with_available_results);
+			process_available_results(q, w, -1);
+		}
+
 		// If any worker has sent a results message, retrieve the output files.
 		if(itable_size(q->finished_tasks)) {
 			struct work_queue_worker *w;
