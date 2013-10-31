@@ -3304,9 +3304,7 @@ void release_all_workers(struct work_queue *q) {
 }
 
 void work_queue_reset(struct work_queue *q, int flags) {
-	struct work_queue_worker *w;
 	struct work_queue_task *t;
-	char *key;
 	
 	if(!q) return;
 

@@ -46,3 +46,4 @@ work_queue_submit_internal is the submit function used in foreman, where the
 taskid should not be modified.*/
 int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t);
 
+void release_all_workers(struct work_queue *q);
