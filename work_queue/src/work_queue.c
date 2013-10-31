@@ -118,6 +118,8 @@ struct work_queue {
 	struct hash_table *worker_table;
 	struct itable  *worker_task_map;
 
+	struct list    *workers_with_available_results;
+
 	int workers_in_state[WORKER_STATE_MAX];
 
 	INT64_T total_tasks_submitted;
@@ -355,6 +357,9 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 		result = process_result(q, w, line, stoptime);
 	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status")) {
 		result = process_queue_status(q, w, line, stoptime);
+	} else if (string_prefix_is(line, "available_results")) { 
+		list_push_tail(q->workers_with_available_results, w);
+		result = 0;
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
@@ -2711,6 +2716,8 @@ struct work_queue *work_queue_create(int port)
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
 	
+	q->workers_with_available_results = list_create();
+	
 	// The poll table is initially null, and will be created
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
@@ -2919,6 +2926,8 @@ void work_queue_delete(struct work_queue *q)
 		itable_delete(q->running_tasks);
 		itable_delete(q->finished_tasks);
 		list_delete(q->complete_list);
+
+		list_delete(q->workers_with_available_results);
 		
 		list_free(q->task_reports);
 		list_delete(q->task_reports);
@@ -3262,6 +3271,11 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 	}
 	while( (t = list_pop_head(q->complete_list)) ) {
 		list_push_tail(l, t);
+	}
+
+	while(list_size(q->workers_with_available_results))
+	{
+		list_pop_head(q->workers_with_available_results);
 	}
 
 	hash_table_firstkey(q->worker_table);
