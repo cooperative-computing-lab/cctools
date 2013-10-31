@@ -166,6 +166,8 @@ static struct work_queue *foreman_q = NULL;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 static struct list *waiting_tasks = NULL;
+static struct itable *tasks_to_send_back = NULL;
+
 static timestamp_t total_task_execution_time = 0;
 static int total_tasks_executed = 0;
 
@@ -1282,10 +1284,30 @@ static void kill_task(struct task_info *ti) {
 	task_info_delete(ti);
 }
 
+static void do_reset_task_to_send_back() {
+	tasks_to_send_back_msg = 0;
+
+	struct task_info *ti;
+	uint64_t          taskid;
+
+	itable_firstkey(tasks_to_send_back);
+	while(itable_size(tasks_to_send_back) > 0)
+	{
+		itable_nextkey(tasks_to_send_back, &taskid, (void **) &ti);
+		work_queue_task_delete(ti->task);
+		task_info_delete(ti);
+		itable_remove(tasks_to_send_back, taskid);
+		itable_firstkey(tasks_to_send_back);        //Reset after deleting from table.
+	}
+	
+}
+
 static void kill_all_tasks() {
 	struct task_info *ti;
 	pid_t pid;
 	UINT64_T taskid;
+
+	do_reset_task_to_send_back();
 	
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		struct list *l;
@@ -1297,7 +1319,7 @@ static void kill_all_tasks() {
 		list_delete(l);
 		return;
 	}
-	
+
 	// If there are no stored tasks, then there are no active tasks, return. 
 	if(!stored_tasks) return;
 	// If there are no active local tasks, return.
@@ -1333,6 +1355,10 @@ static void kill_all_tasks() {
 
 static int do_kill(int taskid) {
 	struct task_info *ti;
+
+	ti = itable_remove(tasks_to_send_back, taskid);
+	work_queue_task_delete(ti->task);
+	task_info_delete(ti);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		struct work_queue_task *t;
@@ -1376,8 +1402,9 @@ static int do_release() {
 }
 
 static int do_reset() {
-	
+
 	if(worker_mode == WORKER_MODE_FOREMAN) {
+		do_reset_task_to_send_back();
 		work_queue_reset(foreman_q, WORK_QUEUE_RESET_ALL);
 	} else {
 		kill_all_tasks();
@@ -1447,6 +1474,10 @@ static void abort_worker() {
 	}
 	if(stored_tasks) {
 		itable_delete(stored_tasks);
+	}
+
+	if(tasks_to_send_back_msg) {
+		itable_delete(tasks_to_send_back);
 	}
 
 	// Remove workspace. 
@@ -2167,6 +2198,8 @@ int main(int argc, char *argv[])
 		stored_tasks = itable_create(0);
 		waiting_tasks = list_create();
 	}
+
+	tasks_to_send_back = itable_create(0);
 
 	// set $WORK_QUEUE_SANDBOX to workspace.
 	debug(D_WQ, "WORK_QUEUE_SANDBOX set to %s.\n", workspace);
