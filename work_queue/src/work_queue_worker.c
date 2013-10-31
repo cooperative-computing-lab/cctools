@@ -168,6 +168,9 @@ static struct itable *stored_tasks = NULL;
 static struct list *waiting_tasks = NULL;
 static struct itable *tasks_to_send_back = NULL;
 
+static int tasks_to_send_back_msg      = 0;         /* Flag to indicate whether we already sent a
+													   "results_available" message to the master */
+
 static timestamp_t total_task_execution_time = 0;
 static int total_tasks_executed = 0;
 
@@ -515,9 +518,13 @@ static int handle_tasks(struct link *master) {
 				}
 			}
 			
-			report_task_complete(master, ti, NULL);
-			work_queue_task_delete(ti->task);
-			task_info_delete(ti);
+			list_push_tail(completed_tasks, ti);
+
+			if(!tasks_to_send_back_msg)
+			{
+				send_master_message(master, "available_results\n");
+				tasks_to_send_back_msg = 1;
+			}
 		}
 		
 	}
@@ -1749,9 +1756,16 @@ static void foreman_for_master(struct link *master) {
 		task = work_queue_wait_internal(foreman_q, short_timeout, master, &master_active);
 		
 		if(task) {
-			report_task_complete(master, NULL, task);
-			work_queue_task_delete(task);
+			struct task_info *ti = task_info_create(task->taskid);
+			ti->task = task;
+			itable_insert(tasks_to_send_back, ti->taskid, (void **) &ti);
 			result = 1;
+
+			if(!tasks_to_send_back_msg)
+			{
+				send_master_message(master, "available_results\n");
+				tasks_to_send_back_msg = 1;
+			}
 		}
 
 		aggregate_workers_resources(foreman_q, aggregated_resources);
@@ -1760,6 +1774,9 @@ static void foreman_for_master(struct link *master) {
 		aggregated_resources->disk.inuse = foreman_local.disk.inuse; 
 
 		debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
+
+		if(list_size(completed_tasks) > 0)
+			debug(D_WQ, "Tasks waiting to be sent: %d\n", list_size(completed_tasks));
 
 		send_resource_update(master,0);
 		
