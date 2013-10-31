@@ -204,7 +204,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
-static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
+static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line); 
 
@@ -1021,7 +1021,8 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 	return 0;
 }
 
-static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime) {
+static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line)
+{
 
 	if(!q || !w || !line) return -1; 
 
@@ -1033,6 +1034,8 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	INT64_T actual;
 	timestamp_t observed_execution_time;
 	timestamp_t effective_stoptime = 0;
+
+	time_t stoptime;
 
 	//Format: result, output length, execution time, taskid
 	char items[3][WORK_QUEUE_PROTOCOL_FIELD_MAX];
