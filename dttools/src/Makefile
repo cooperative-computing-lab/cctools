@@ -131,7 +131,7 @@ libdttools.a: ${OBJECTS}
 test: all
 
 clean:
-	rm -f core *~ *.o *.os *.so libdttools.a large_chunk.txt $(PROGRAMS)
+	rm -f core *~ *.o *.os *.so libdttools.a large_chunk.txt $(PROGRAMS) $(TEST_PROGRAMS)
 
 install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin

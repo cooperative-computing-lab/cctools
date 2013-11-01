@@ -38,7 +38,7 @@ test: all
 	@${CCTOOLS_HOME}/dttools/src/test_runner.sh TR_*.sh
 
 clean:
-	rm -fr Python.framework _work_queue.${CCTOOLS_DYNAMIC_SUFFIX} work_queue.binding.py work_queue.binding.py.bak work_queue.py work_queue_wrap.* *.pyc
+	rm -fr Python.framework _work_queue.${CCTOOLS_DYNAMIC_SUFFIX} work_queue.binding.py work_queue.binding.py.bak work_queue.py work_queue_wrap.* *.pyc work_queue_example.py3*
 
 install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc

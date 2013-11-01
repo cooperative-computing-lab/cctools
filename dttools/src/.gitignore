@@ -6,9 +6,7 @@ hmac_test
 int_sizes.h
 libdttools.a
 make_int_sizes
-microbench
 mpi_queue_worker
-multirun
 tar_stream
 watchdog
 work_queue_example
