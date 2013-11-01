@@ -166,6 +166,10 @@ static struct work_queue *foreman_q = NULL;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 static struct list *waiting_tasks = NULL;
+static struct list *results_to_be_sent = NULL;
+
+static int results_to_be_sent_msg = 0;         //Flag to indicate we have sent an available_results message.
+
 static timestamp_t total_task_execution_time = 0;
 static int total_tasks_executed = 0;
 
@@ -1280,10 +1284,23 @@ static void kill_task(struct task_info *ti) {
 	task_info_delete(ti);
 }
 
+static void do_reset_results_to_be_sent() {
+
+	struct task_info *ti;
+	results_to_be_sent_msg = 0;
+
+	while((ti = list_pop_head(results_to_be_sent)))
+	{
+		task_info_delete(ti);
+	}
+}
+
 static void kill_all_tasks() {
 	struct task_info *ti;
 	pid_t pid;
 	UINT64_T taskid;
+
+	do_reset_results_to_be_sent();
 	
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		struct list *l;
@@ -1376,6 +1393,7 @@ static int do_release() {
 static int do_reset() {
 	
 	if(worker_mode == WORKER_MODE_FOREMAN) {
+		do_reset_results_to_be_sent();
 		work_queue_reset(foreman_q, WORK_QUEUE_RESET_ALL);
 	} else {
 		kill_all_tasks();
@@ -1445,6 +1463,10 @@ static void abort_worker() {
 	}
 	if(stored_tasks) {
 		itable_delete(stored_tasks);
+	}
+
+	if(results_to_be_sent) {
+		list_delete(results_to_be_sent);
 	}
 
 	// Remove workspace. 
@@ -1662,6 +1684,12 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
+		if(!results_to_be_sent_msg && list_size(results_to_be_sent) > 0)
+		{
+			send_master_message(master, "available_results\n");
+			results_to_be_sent_msg = 1;
+		}
+
 		ok &= check_disk_space_for_filesize(0);
 
 		if(ok) {
@@ -1720,6 +1748,12 @@ static void foreman_for_master(struct link *master) {
 			report_task_complete(master, NULL, task);
 			work_queue_task_delete(task);
 			result = 1;
+		}
+
+		if(!results_to_be_sent_msg && list_size(results_to_be_sent) > 0)
+		{
+			send_master_message(master, "available_results\n");
+			results_to_be_sent_msg = 1;
 		}
 
 		aggregate_workers_resources(foreman_q, aggregated_resources);
@@ -2171,6 +2205,8 @@ int main(int argc, char *argv[])
 		stored_tasks = itable_create(0);
 		waiting_tasks = list_create();
 	}
+
+	results_to_be_sent = list_create(0);
 
 	// set $WORK_QUEUE_SANDBOX to workspace.
 	debug(D_WQ, "WORK_QUEUE_SANDBOX set to %s.\n", workspace);
