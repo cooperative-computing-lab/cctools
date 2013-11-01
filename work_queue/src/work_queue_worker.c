@@ -166,6 +166,11 @@ static struct work_queue *foreman_q = NULL;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 static struct list *waiting_tasks = NULL;
+static struct itable *tasks_to_send_back = NULL;
+
+static int tasks_to_send_back_msg      = 0;         /* Flag to indicate whether we already sent a
+													   "results_available" message to the master */
+
 static timestamp_t total_task_execution_time = 0;
 static int total_tasks_executed = 0;
 
@@ -181,7 +186,7 @@ static int released_by_master = 0;
 static char *current_project = NULL;
 
 __attribute__ (( format(printf,2,3) ))
-static void send_master_message( struct link *master, const char *fmt, ... )
+static int send_master_message( struct link *master, const char *fmt, ... )
 {
 	char debug_msg[2*WORK_QUEUE_LINE_MAX];
 	va_list va;
@@ -193,9 +198,11 @@ static void send_master_message( struct link *master, const char *fmt, ... )
 	va_copy(debug_va, va);
 
 	vdebug(D_WQ, debug_msg, debug_va);
-	link_putvfstring(master, fmt, time(0)+active_timeout, va);	
+	int written = link_putvfstring(master, fmt, time(0)+active_timeout, va);	
 
 	va_end(va);
+
+	return written >= 0;
 }
 
 static int recv_master_message( struct link *master, char *line, int length, time_t stoptime )
@@ -435,12 +442,12 @@ static int start_task(struct work_queue_task *t) {
 		return 1;
 }
 
-static void report_task_complete(struct link *master, struct task_info *ti, struct work_queue_task *t)
+static void report_task_complete(struct link *master, struct task_info *ti)
 {
 	INT64_T output_length;
 	struct stat st;
 
-	if(ti) {
+	if(ti->pid) {
 		fstat(ti->output_fd, &st);
 		output_length = st.st_size;
 		lseek(ti->output_fd, 0, SEEK_SET);
@@ -454,7 +461,9 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 
 		total_task_execution_time += (ti->execution_end - ti->execution_start);
 		total_tasks_executed++;
-	} else if(t) {
+	} else {
+		struct work_queue_task *t = ti->task;
+
 		if(t->output) {
 			output_length = strlen(t->output);
 		} else {
@@ -511,13 +520,42 @@ static int handle_tasks(struct link *master) {
 				}
 			}
 			
-			report_task_complete(master, ti, NULL);
-			work_queue_task_delete(ti->task);
-			task_info_delete(ti);
+			itable_insert(tasks_to_send_back, ti->taskid, ti);
+
+			if(!tasks_to_send_back_msg)
+			{
+				send_master_message(master, "available_results\n");
+				tasks_to_send_back_msg = 1;
+			}
 		}
 		
 	}
 	return 1;
+}
+
+static int report_tasks(struct link *master, struct itable *tasks_infos, int max_count)
+{
+	if(max_count < 0)
+	{
+		max_count = itable_size(tasks_infos);
+	}
+
+	struct task_info *ti;
+	uint64_t taskid;
+	int count = 0;
+	itable_firstkey(tasks_infos);
+	while( (count < max_count) && (itable_nextkey(tasks_infos, &taskid, (void **) &ti)))
+	{
+		report_task_complete(master, ti);
+		count++;
+	}
+
+	send_master_message(master, "end\n");
+
+	if(count == itable_size(tasks_infos))
+		tasks_to_send_back_msg = 0;
+
+	return count;
 }
 
 static void make_hash_key(const char *addr, int port, char *key)
@@ -1280,10 +1318,30 @@ static void kill_task(struct task_info *ti) {
 	task_info_delete(ti);
 }
 
+static void do_reset_task_to_send_back() {
+	tasks_to_send_back_msg = 0;
+
+	struct task_info *ti;
+	uint64_t          taskid;
+
+	itable_firstkey(tasks_to_send_back);
+	while(itable_size(tasks_to_send_back) > 0)
+	{
+		itable_nextkey(tasks_to_send_back, &taskid, (void **) &ti);
+		work_queue_task_delete(ti->task);
+		task_info_delete(ti);
+		itable_remove(tasks_to_send_back, taskid);
+		itable_firstkey(tasks_to_send_back);        //Reset after deleting from table.
+	}
+	
+}
+
 static void kill_all_tasks() {
 	struct task_info *ti;
 	pid_t pid;
 	UINT64_T taskid;
+
+	do_reset_task_to_send_back();
 	
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		struct list *l;
@@ -1295,7 +1353,7 @@ static void kill_all_tasks() {
 		list_delete(l);
 		return;
 	}
-	
+
 	// If there are no stored tasks, then there are no active tasks, return. 
 	if(!stored_tasks) return;
 	// If there are no active local tasks, return.
@@ -1331,6 +1389,10 @@ static void kill_all_tasks() {
 
 static int do_kill(int taskid) {
 	struct task_info *ti;
+
+	ti = itable_remove(tasks_to_send_back, taskid);
+	work_queue_task_delete(ti->task);
+	task_info_delete(ti);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		struct work_queue_task *t;
@@ -1374,8 +1436,9 @@ static int do_release() {
 }
 
 static int do_reset() {
-	
+
 	if(worker_mode == WORKER_MODE_FOREMAN) {
+		do_reset_task_to_send_back();
 		work_queue_reset(foreman_q, WORK_QUEUE_RESET_ALL);
 	} else {
 		kill_all_tasks();
@@ -1445,6 +1508,10 @@ static void abort_worker() {
 	}
 	if(stored_tasks) {
 		itable_delete(stored_tasks);
+	}
+
+	if(tasks_to_send_back_msg) {
+		itable_delete(tasks_to_send_back);
 	}
 
 	// Remove workspace. 
@@ -1547,6 +1614,9 @@ static int handle_master(struct link *master) {
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
+		} else if(sscanf(line, "send_results %d", &n) == 1) {
+			report_tasks(master, tasks_to_send_back, n);
+			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1703,6 +1773,7 @@ static void foreman_for_master(struct link *master) {
 	struct work_queue_resources foreman_local;
 	work_queue_resources_measure_locally(&foreman_local, workspace);
 
+	time_t last_debug_msg = 0;
 	while(!abort_flag) {
 		int result = 1;
 		struct work_queue_task *task = NULL;
@@ -1716,9 +1787,16 @@ static void foreman_for_master(struct link *master) {
 		task = work_queue_wait_internal(foreman_q, short_timeout, master, &master_active);
 		
 		if(task) {
-			report_task_complete(master, NULL, task);
-			work_queue_task_delete(task);
+			struct task_info *ti = task_info_create(task->taskid);
+			ti->task = task;
+			itable_insert(tasks_to_send_back, ti->taskid, (void **) &ti);
 			result = 1;
+
+			if(!tasks_to_send_back_msg)
+			{
+				send_master_message(master, "available_results\n");
+				tasks_to_send_back_msg = 1;
+			}
 		}
 
 		aggregate_workers_resources(foreman_q, aggregated_resources);
@@ -1726,7 +1804,15 @@ static void foreman_for_master(struct link *master) {
 		aggregated_resources->disk.total = foreman_local.disk.total; //overwrite with foreman's local disk information
 		aggregated_resources->disk.inuse = foreman_local.disk.inuse; 
 
-		debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
+		if(time(0) - last_debug_msg > 10)
+		{
+			debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
+
+			if(itable_size(tasks_to_send_back) > 0)
+				debug(D_WQ, "Tasks waiting to be sent: %d\n", itable_size(tasks_to_send_back));
+
+			last_debug_msg = time(0);
+		}
 
 		send_resource_update(master,0);
 		
@@ -2165,6 +2251,8 @@ int main(int argc, char *argv[])
 		stored_tasks = itable_create(0);
 		waiting_tasks = list_create();
 	}
+
+	tasks_to_send_back = itable_create(0);
 
 	// set $WORK_QUEUE_SANDBOX to workspace.
 	debug(D_WQ, "WORK_QUEUE_SANDBOX set to %s.\n", workspace);
