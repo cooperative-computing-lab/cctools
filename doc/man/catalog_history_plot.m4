@@ -31,6 +31,11 @@ LONGCODE_BEGIN
 % catalog_history_plot.py 86400 SUM.MAX@memory_total SUM.AVG@memory_avail SUM.MIN@minfree
 LONGCODE_END
 
+To see full results using all catalog history tools:
+
+LONGCODE_BEGIN
+% catalog_history_select.py /data/catalog.history/ 2013-04-15-01-01-01 w1 | catalog_history_filter.py type=wq_master | catalog_history_plot.py 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running
+LONGCODE_END
 
 SECTION(COPYRIGHT)
 
