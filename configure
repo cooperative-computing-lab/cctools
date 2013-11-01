@@ -300,7 +300,7 @@ do
 		--without-system-makeflow-linker)
 			include_package_makeflow_linker=""
 			;;
-		--without-system-catalog_histort)
+		--without-system-catalog_history)
 			include_package_catalog_history=""
 			;;
 		--without-system-doc)
