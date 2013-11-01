@@ -274,6 +274,11 @@ int pfs_table::resolve_name( const char *cname, struct pfs_name *pname, bool do_
 	    return ELOOP;
 	}
 
+	if(strlen(cname) == 0) {
+		errno = ENOENT;
+		return 0;
+	}
+
 	complete_path(cname,full_logical_name);
 
 	if(!strncmp(full_logical_name,"/proc/self",10)) {
