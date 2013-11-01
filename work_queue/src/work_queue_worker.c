@@ -514,6 +514,8 @@ static int handle_tasks(struct link *master) {
 					}
 				}
 			}
+
+			list_push_tail(results_to_be_sent, ti);
 			
 			report_task_complete(master, ti, NULL);
 			work_queue_task_delete(ti->task);
@@ -1745,6 +1747,10 @@ static void foreman_for_master(struct link *master) {
 		task = work_queue_wait_internal(foreman_q, short_timeout, master, &master_active);
 		
 		if(task) {
+			struct task_info *ti = task_info_create(task->taskid);
+			ti->task = task;
+			list_push_tail(results_to_be_sent, ti);
+
 			report_task_complete(master, NULL, task);
 			work_queue_task_delete(task);
 			result = 1;
