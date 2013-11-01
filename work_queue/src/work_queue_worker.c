@@ -439,12 +439,12 @@ static int start_task(struct work_queue_task *t) {
 		return 1;
 }
 
-static void report_task_complete(struct link *master, struct task_info *ti, struct work_queue_task *t)
+static void report_task_complete(struct link *master, struct task_info *ti)
 {
 	INT64_T output_length;
 	struct stat st;
 
-	if(ti) {
+	if(ti->pid) {
 		fstat(ti->output_fd, &st);
 		output_length = st.st_size;
 		lseek(ti->output_fd, 0, SEEK_SET);
@@ -458,7 +458,8 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 
 		total_task_execution_time += (ti->execution_end - ti->execution_start);
 		total_tasks_executed++;
-	} else if(t) {
+	} else {
+		struct work_queue_task *t = ti->task;
 		if(t->output) {
 			output_length = strlen(t->output);
 		} else {
@@ -473,6 +474,34 @@ static void report_task_complete(struct link *master, struct task_info *ti, stru
 		total_tasks_executed++;
 	}
 	
+}
+
+static int report_tasks(struct link *master, struct list *tasks_infos, int max_count)
+{
+	if(max_count < 0)
+	{
+		max_count = list_size(tasks_infos);
+	}
+
+	struct task_info *ti;
+
+	int count = 0;
+	while( (count < max_count) && (ti = list_pop_head(tasks_infos)) )
+	{
+		report_task_complete(master, ti);
+		work_queue_task_delete(ti->task);
+		task_info_delete(ti);
+		count++;
+	}
+
+	send_master_message(master, "end\n");
+
+	if(list_size(tasks_infos) == 0)
+	{
+		results_to_be_sent_msg = 0;
+	}
+
+	return count;
 }
 
 static int handle_tasks(struct link *master) {
@@ -516,10 +545,6 @@ static int handle_tasks(struct link *master) {
 			}
 
 			list_push_tail(results_to_be_sent, ti);
-			
-			report_task_complete(master, ti, NULL);
-			work_queue_task_delete(ti->task);
-			task_info_delete(ti);
 		}
 		
 	}
@@ -1571,6 +1596,9 @@ static int handle_master(struct link *master) {
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
+		} else if(sscanf(line, "send_results %d", &n) == 1) {
+			report_tasks(master, results_to_be_sent, n);
+			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
@@ -1751,8 +1779,6 @@ static void foreman_for_master(struct link *master) {
 			ti->task = task;
 			list_push_tail(results_to_be_sent, ti);
 
-			report_task_complete(master, NULL, task);
-			work_queue_task_delete(task);
 			result = 1;
 		}
 
@@ -1770,6 +1796,12 @@ static void foreman_for_master(struct link *master) {
 		if(time(0) - last_debug_msg > 10)
 		{
 			debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
+
+
+			if(list_size(results_to_be_sent) > 0)
+			{
+				debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
+			}
 
 			last_debug_msg = time(0);
 		}
