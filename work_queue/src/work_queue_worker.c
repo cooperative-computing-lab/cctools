@@ -217,7 +217,7 @@ static void send_resource_update( struct link *master, int force_update )
 
 	/* send updates at least five seconds apart, and only if resources changed. */
 	int normal_update = 0;
-	if((stoptime - last_stop_time > 5) && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
+	if(!results_to_be_sent_msg && (stoptime - last_stop_time > 5) && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
 	{
 		normal_update = 1;
 	}
@@ -500,6 +500,8 @@ static int report_tasks(struct link *master, struct list *tasks_infos, int max_c
 	{
 		results_to_be_sent_msg = 0;
 	}
+
+	send_resource_update(master, 0);
 
 	return count;
 }
