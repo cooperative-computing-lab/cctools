@@ -1704,7 +1704,6 @@ static void foreman_for_master(struct link *master) {
 	work_queue_resources_measure_locally(&foreman_local, workspace);
 
 	while(!abort_flag) {
-		int result = 1;
 		struct work_queue_task *task = NULL;
 
 		if(time(0) > idle_stoptime && (itable_size(active_tasks)+itable_size(stored_tasks))==0) {
@@ -1718,7 +1717,6 @@ static void foreman_for_master(struct link *master) {
 		if(task) {
 			report_task_complete(master, NULL, task);
 			work_queue_task_delete(task);
-			result = 1;
 		}
 
 		aggregate_workers_resources(foreman_q, aggregated_resources);
@@ -1731,15 +1729,15 @@ static void foreman_for_master(struct link *master) {
 		send_resource_update(master,0);
 		
 		if(master_active)
-			result &= handle_master(master);
-
-		if(!result) {
-			disconnect_master(master);
-			break;
+		{
+			if(!handle_master(master))
+			{
+				disconnect_master(master);
+				break;
+			}
 		}
 		
-		if(result)
-			idle_stoptime = time(0) + idle_timeout;
+		idle_stoptime = time(0) + idle_timeout;
 	}
 }
 
