@@ -12,6 +12,8 @@
 import sys
 import re
 
+current_version = "1.0"
+
 sep = re.compile('([A-Z]+)?\.([A-Z]+)?\@?([^\@]*)')
 
 lastReport = 0
@@ -37,6 +39,11 @@ def badSyntax(str):
 #report_frequency = 31536000   # 1 year
 if len(sys.argv)>2:
   report_frequency = int(sys.argv[1])
+elif (sys.argv[1]=='-v'):
+  print "Version "+current_version
+  sys.exit(0)
+elif (sys.argv[1]=='-h'):
+  badSyntax('')
 else:
   badSyntax('No granularity specified...')
 
@@ -53,11 +60,13 @@ else:
   badSyntax('No summarization arguments included...')
 
 
+logTime = None
 
 def handleReport():
-  global output_vars, seriess
+  global output_vars, seriess, logTime
   #print "Time to report........................."
-  output = [str(reportNumber)]
+  #output = [str(reportNumber)] #To be used if you want to look at behavior based on the time passing after a server starts reporting
+  output = [str(logTime)]
   for var in output_vars:
     value = 0
     interop = var['interop']

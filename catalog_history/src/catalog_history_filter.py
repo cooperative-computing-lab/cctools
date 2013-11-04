@@ -12,6 +12,8 @@
 import sys
 import re
 
+current_version = "1.0"
+
 sep = re.compile('([!=<>]+)')
 
 dynamic = 0
@@ -19,6 +21,7 @@ dynamic = 0
 checkPoint = {}
 eventLog = []
 status = {}
+default_series_id = 1000000
 
 
 debug = 0
@@ -37,14 +40,20 @@ def badSyntax(str):
 
 conditions = {}
 if len(sys.argv)>1:
-  for arg in sys.argv[1:]:
-    if (arg=='-static'):
-      dynamic = 0
-    if (arg=='-dynamic'):
-      dynamic = 1
-    else:
-      key,op,val = sep.split(arg)
-      conditions[key] = [op,val]
+  if (sys.argv[1]=='-v'):
+    print "Version "+current_version
+    sys.exit(0)
+  elif (sys.argv[1]=='-h'):
+    badSyntax('')
+  else:
+    for arg in sys.argv[1:]:
+      if (arg=='-static'):
+        dynamic = 0
+      if (arg=='-dynamic'):
+        dynamic = 1
+      else:
+        key,op,val = sep.split(arg)
+        conditions[key] = [op,val]
 else:
   badSyntax("No arguments...")
 
@@ -160,7 +169,8 @@ if dynamic==0:
             #print lastHost+' '+str(include)
             #sys.exit(0)
           else:
-            lastHost = str(random.randint(1000000,4000000))
+            lastHost = str(default_series_id)
+            default_series_id += 1
           if include>0:
             checkPoint[lastHost] = seriesTmp
           seriesTmp = {}

@@ -13,8 +13,7 @@ import os
 import time
 import datetime
 
-
-day_length = 3600*24   # 1 day
+current_version = "1.0"
 
 
 debug = 0
@@ -41,16 +40,22 @@ def timeToFileName(ts, days_offset=0):
 
 # Get source directory
 if len(sys.argv)>1 and sys.argv[1]:
-  arg = sys.argv[1]
-  if (arg[0]=='.'):
-    pass
-    directory = os.getcwd()+'/'+arg+'/'
+  if (sys.argv[1]=='-v'):
+    print "Version "+current_version
+    sys.exit(0)
+  elif (sys.argv[1]=='-h'):
+    badSyntax('')
   else:
-    directory = arg+'/'
-  if not os.path.isdir(directory):
-    badSyntax('Source directory does not exist...')
+    arg = sys.argv[1]
+    if (arg[0]=='.'):
+      pass
+      directory = os.getcwd()+'/'+arg+'/'
+    else:
+      directory = arg+'/'
+    if not os.path.isdir(directory):
+      badSyntax('Source directory does not exist...')
 else:
-  directory = os.getcwd()+'/'
+  badSyntax("You must specify a source directory. Use '.' for the current directory.")
 
 
 # Get starting point
@@ -65,6 +70,7 @@ if len(sys.argv)>2 and sys.argv[2]:
     begin = int(arg)
   filename = timeToFileName(begin,True)
 else:
+  logError("No starting point specified. Starting at the beginning of this year.")
   datearr = datetime.date(datetime.date.today().year, 1, 1)
   begin = int( time.mktime(datearr.timetuple()))
 
@@ -93,7 +99,9 @@ if len(sys.argv)>3 and sys.argv[3]:
   else:
     end = int(arg)
 else:
-  end = begin + day_length
+  logError("No ending point specified. Ending with data from today (if available).")
+  end = int( time.mktime(datetime.datetime.now().timetuple()) )
+
 
 logDebug('Start:'+str(begin)+' End:'+str(end))
 
@@ -104,6 +112,7 @@ seriesLog = []
 # Go a day earlier (day_offset=-1) to handle for auto-deleted series' which start reporting again after not appearing in the checkpoint
 day = -1
 filename = timeToFileName(begin,day)
+filesFound = 0
 try:
   checkpoint_file = open(filename+'.ckpt', 'r')
   lastHost = None
@@ -134,6 +143,7 @@ while True:
   try:
     logDebug(filename+'.log')
     f = open(filename+'.log', 'r')
+    filesFound += 1
     for line in f:
       
       line_num += 1
@@ -236,6 +246,7 @@ while True:
   day += 1
   filename = timeToFileName(begin,day)
 
-
+if filesFound==0:
+  logError("No files found in that source directory for the specified time frame.")
 
 
