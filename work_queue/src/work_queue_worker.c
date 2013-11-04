@@ -171,7 +171,7 @@ static struct work_queue *foreman_q = NULL;
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 static struct list *waiting_tasks = NULL;
-static struct list *results_to_be_sent = NULL;
+static struct itable *results_to_be_sent = NULL;
 
 static int results_to_be_sent_msg = 0;         //Flag to indicate we have sent an available_results message.
 
@@ -481,17 +481,32 @@ static void report_task_complete(struct link *master, struct task_info *ti)
 	
 }
 
-static int report_tasks(struct link *master, struct list *tasks_infos, int max_count)
+static int itable_pop(struct itable *t, uint64_t *key, void **value)
+{
+	itable_firstkey(t);
+
+	int result = itable_nextkey(t, key, value);
+
+	if(result)
+	{
+		itable_remove(t, *key);
+	}
+
+	return result;
+}
+
+static int report_tasks(struct link *master, struct itable *tasks_infos, int max_count)
 {
 	if(max_count < 0)
 	{
-		max_count = list_size(tasks_infos);
+		max_count = itable_size(tasks_infos);
 	}
 
 	struct task_info *ti;
+	uint64_t          taskid;
 
 	int count = 0;
-	while( (count < max_count) && (ti = list_pop_head(tasks_infos)) )
+	while((count < max_count) && itable_pop(tasks_infos, &taskid, (void **) &ti))
 	{
 		report_task_complete(master, ti);
 		work_queue_task_delete(ti->task);
@@ -501,7 +516,7 @@ static int report_tasks(struct link *master, struct list *tasks_infos, int max_c
 
 	send_master_message(master, "end\n");
 
-	if(list_size(tasks_infos) == 0)
+	if(itable_size(tasks_infos) == 0)
 	{
 		results_to_be_sent_msg = 0;
 	}
@@ -551,7 +566,7 @@ static int handle_tasks(struct link *master) {
 				}
 			}
 
-			list_push_tail(results_to_be_sent, ti);
+			itable_insert(results_to_be_sent, ti->taskid, ti);
 		}
 		
 	}
@@ -1321,9 +1336,10 @@ static void kill_task(struct task_info *ti) {
 static void do_reset_results_to_be_sent() {
 
 	struct task_info *ti;
+	uint64_t taskid;
 	results_to_be_sent_msg = 0;
 
-	while((ti = list_pop_head(results_to_be_sent)))
+	while(itable_pop(results_to_be_sent, &taskid, (void **) &ti))
 	{
 		task_info_delete(ti);
 	}
@@ -1500,7 +1516,7 @@ static void abort_worker() {
 	}
 
 	if(results_to_be_sent) {
-		list_delete(results_to_be_sent);
+		itable_delete(results_to_be_sent);
 	}
 
 	// Remove workspace. 
@@ -1721,7 +1737,7 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
-		if(!results_to_be_sent_msg && list_size(results_to_be_sent) > 0)
+		if(!results_to_be_sent_msg && itable_size(results_to_be_sent) > 0)
 		{
 			send_master_message(master, "available_results\n");
 			results_to_be_sent_msg = 1;
@@ -1784,12 +1800,11 @@ static void foreman_for_master(struct link *master) {
 		if(task) {
 			struct task_info *ti = task_info_create(task->taskid);
 			ti->task = task;
-			list_push_tail(results_to_be_sent, ti);
-
+			itable_insert(results_to_be_sent, task->taskid, ti);
 			result = 1;
 		}
 
-		if(!results_to_be_sent_msg && list_size(results_to_be_sent) > 0)
+		if(!results_to_be_sent_msg && itable_size(results_to_be_sent) > 0)
 		{
 			send_master_message(master, "available_results\n");
 			results_to_be_sent_msg = 1;
@@ -1805,7 +1820,7 @@ static void foreman_for_master(struct link *master) {
 			debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
 
 
-			if(list_size(results_to_be_sent) > 0)
+			if(itable_size(results_to_be_sent) > 0)
 			{
 				debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
 			}
@@ -2251,7 +2266,7 @@ int main(int argc, char *argv[])
 		waiting_tasks = list_create();
 	}
 
-	results_to_be_sent = list_create(0);
+	results_to_be_sent = itable_create(0);
 
 	// set $WORK_QUEUE_SANDBOX to workspace.
 	debug(D_WQ, "WORK_QUEUE_SANDBOX set to %s.\n", workspace);
