@@ -119,6 +119,9 @@ static double worker_volatility = 0.0;
 // Flag gets set on receipt of a terminal signal.
 static int abort_flag = 0;
 
+// do not print foreman consecutive debug messages in less than this many seconds
+static int foreman_debug_msg_interval = 10; 
+
 // Threshold for available disk space (MB) beyond which clean up and restart.
 static UINT64_T disk_avail_threshold = 100;
 
@@ -157,6 +160,8 @@ static int cores_allocated = 0;
 static int memory_allocated = 0;
 static int disk_allocated = 0;
 static int gpus_allocated = 0;
+// do not send consecutive resource updates in less than this many seconds
+static int send_resources_interval = 5;
 
 
 // Foreman mode global variables
@@ -215,9 +220,9 @@ static void send_resource_update( struct link *master, int force_update )
 
 	time_t stoptime = time(0) + active_timeout;
 
-	/* send updates at least five seconds apart, and only if resources changed. */
+	/* send updates at least send_resources_interval seconds apart, and only if resources changed. */
 	int normal_update = 0;
-	if(!results_to_be_sent_msg && (stoptime - last_stop_time > 5) && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
+	if(!results_to_be_sent_msg && (stoptime - last_stop_time > send_resources_interval) && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
 	{
 		normal_update = 1;
 	}
@@ -1795,7 +1800,7 @@ static void foreman_for_master(struct link *master) {
 		aggregated_resources->disk.total = foreman_local.disk.total; //overwrite with foreman's local disk information
 		aggregated_resources->disk.inuse = foreman_local.disk.inuse; 
 
-		if(time(0) - last_debug_msg > 10)
+		if(time(0) - last_debug_msg > foreman_debug_msg_interval)
 		{
 			debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
 
