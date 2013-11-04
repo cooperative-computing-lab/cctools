@@ -1736,6 +1736,16 @@ static void foreman_for_master(struct link *master) {
 				break;
 			}
 		}
+		else
+		{
+			if(!task && work_queue_empty(foreman_q))
+			{
+				//if no task returned, and the queue is empty, wait_internal
+				//did not wait at all. We wait here one second to avoid busy
+				//waiting.
+				link_sleep(master, 1 /* one second */, 1 /* read */, 0);
+			}
+		}
 		
 		idle_stoptime = time(0) + idle_timeout;
 	}
