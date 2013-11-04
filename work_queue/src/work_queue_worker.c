@@ -1399,6 +1399,9 @@ static void kill_all_tasks() {
 static int do_kill(int taskid) {
 	struct task_info *ti;
 
+	//if task already finished, do not send its result to the master
+	itable_remove(results_to_be_sent, taskid);
+
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		struct work_queue_task *t;
 		t = work_queue_cancel_by_taskid(foreman_q, taskid);
