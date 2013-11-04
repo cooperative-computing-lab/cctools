@@ -241,6 +241,24 @@ static int available_workers(struct work_queue *q) {
 	return available_workers;
 }
 
+//Returns count of workers that are running at least 1 task.
+static int workers_with_tasks(struct work_queue *q) {
+	struct work_queue_worker *w;
+	char* id;
+	int workers_with_tasks = 0;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+		if(strcmp(w->hostname, "unknown")){
+			if(itable_size(w->current_tasks)){
+				workers_with_tasks++;
+			}
+		}	
+	}
+	
+	return workers_with_tasks;
+}
+
 static void log_worker_stats(struct work_queue *q)
 {
 	struct work_queue_stats s;
@@ -3333,8 +3351,8 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->port = q->port;
 	s->priority = q->priority;
 	s->workers_init = hash_table_size(q->worker_table) - known_workers(q);
-	s->workers_ready = available_workers(q); 
-	s->workers_busy = known_workers(q) - available_workers(q); 
+	s->workers_ready = known_workers(q)- workers_with_tasks(q); //FIXME: should be available_workers(q)? 
+	s->workers_busy = workers_with_tasks(q); //FIXME: should be (known_workers(q) - available_workers(q))?
 
 	s->tasks_waiting = list_size(q->ready_list);
 	s->tasks_running = itable_size(q->running_tasks) + itable_size(q->finished_tasks);
