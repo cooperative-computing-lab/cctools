@@ -33,10 +33,13 @@ pfs_pointer::~pfs_pointer()
 pfs_off_t pfs_pointer::seek( pfs_off_t value, int whence )
 {
 	if(whence==SEEK_SET) {
+        if(value<0) return (errno = EINVAL, -1);
 		offset = value;
 	} else if(whence==SEEK_CUR) {
+        if(offset+value<0) return (errno = EINVAL, -1);
 		offset += value;
 	} else {
+        if(file->get_size()+value<0) return (errno = EINVAL, -1);
 		offset = file->get_size()+value;
 	}
 
