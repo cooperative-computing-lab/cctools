@@ -294,7 +294,7 @@ batch_job_id_t batch_job_wait_work_queue(struct batch_queue * q, struct batch_jo
 			free(outfile);
 		}
 
-		fprintf(logfile, "TASK % " PRId64, timestamp_get()); 
+		fprintf(logfile, "TASK %" PRId64 " ", timestamp_get()); 
 		fprintf(logfile, "%d %d %d ", t->taskid, t->result, t->return_status); 
 		fprintf(logfile, "%d ", t->worker_selection_algorithm); 
 		fprintf(logfile, "%" PRIu64 " %" PRIu64 " ", t->time_task_submit, t->time_task_finish);
