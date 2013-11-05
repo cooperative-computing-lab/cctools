@@ -498,6 +498,10 @@ struct pool_config *get_pool_config(const char *path) {
 	fclose(fp);
 
 	// sanity checks
+	if(pc->min_workers < 1) {
+		fatal("Invalid configuration: min_workers should be greater than zero. Please include a 'min_workers:' specification in the configuration file (%s).\n", path);
+	}
+
 	if(pc->min_workers > pc->max_workers) {
 		fatal("Invalid configuration: min_workers (%d) is greater than max_workers (%d).\n", pc->min_workers, pc->max_workers);
 	}
