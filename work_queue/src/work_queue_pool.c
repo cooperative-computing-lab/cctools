@@ -1503,6 +1503,7 @@ int main(int argc, char *argv[])
 			auto_worker_pool = 1;
 			break;
 		case 'c':
+			auto_worker_pool = 1;
 			pool_config_path = xxstrdup(optarg);
 			break;
 		case 'T':
