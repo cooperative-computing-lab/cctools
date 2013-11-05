@@ -378,7 +378,7 @@ struct pool_config *get_pool_config(const char *path) {
 				pc->max_workers = max_workers;
 			} else if(!strncmp(name, "min_workers", strlen(name))) {
 				int min_workers = atoi(value);
-				if(min_workers <= 0) {
+				if(min_workers < 0) {
 					fprintf(stderr, "Invalid configuration: min_workers (current value: %d) should be greater than 0.\n", min_workers);
 					goto fail;
 				}
@@ -393,29 +393,29 @@ struct pool_config *get_pool_config(const char *path) {
 				}
 			} else if(!strncmp(name, "default_capacity", strlen(name))) {
 				int default_capacity = atoi(value);
-				if(default_capacity <= 0) {
-					fprintf(stderr, "Invalid configuration: default_capacity (current value: %d) should be greater than 0.\n", default_capacity);
+				if(default_capacity < 0) {
+					fprintf(stderr, "Invalid configuration: default_capacity, if specified, should be greater than 0 (current value: %d).\n", default_capacity);
 					goto fail;
 				}
 				pc->default_capacity = default_capacity;
 			} else if(!strncmp(name, "max_change_per_min", strlen(name))) {
 				int max_change_per_min = atoi(value);
-				if(max_change_per_min <= 0) {
-					fprintf(stderr, "Invalid configuration: max_change_per_min (current value: %d) should be greater than 0.\n", max_change_per_min);
+				if(max_change_per_min < 0) {
+					fprintf(stderr, "Invalid configuration: max_change_per_min, if specified, should be greater than 0 (current value: %d).\n", max_change_per_min);
 					goto fail;
 				}
 				pc->max_change_per_min = max_change_per_min;
 			} else if(!strncmp(name, "billing_cycle", strlen(name))) {
 				int billing_cycle = string_time_parse(value);
-				if(billing_cycle <= 0) {
-					fprintf(stderr, "Invalid configuration: billing_cycle (current value: %d) should be greater than 0.\n", billing_cycle);
+				if(billing_cycle < 0) {
+					fprintf(stderr, "Invalid configuration: billing_cycle, if specified, should be greater than 0 (current value: %d).\n", billing_cycle);
 					goto fail;
 				}
 				pc->billing_cycle = billing_cycle;
 			} else if(!strncmp(name, "worker_terminate_boundary", strlen(name))) {
 				int boundary = string_time_parse(value);
 				if(boundary <= 0) {
-					fprintf(stderr, "Invalid configuration: worker_terminate_boundary (current value: %d) should be greater than 0.\n", boundary);
+					fprintf(stderr, "Invalid configuration: worker_terminate_boundary, if specified, should be greater than 0 (current value: %d).\n", boundary);
 					goto fail;
 				}
 				pc->worker_terminate_boundary = boundary;
