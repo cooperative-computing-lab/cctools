@@ -110,8 +110,8 @@ seriesLog = []
   
 # Read the initial checkpoint file and group data by the value of the "key" field
 # Go a day earlier (day_offset=-1) to handle for auto-deleted series' which start reporting again after not appearing in the checkpoint
-day = -1
-filename = timeToFileName(begin,day)
+day_offset = 0 
+filename = timeToFileName(begin,day_offset)
 filesFound = 0
 try:
   checkpoint_file = open(filename+'.ckpt', 'r')

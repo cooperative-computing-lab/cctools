@@ -2,10 +2,10 @@ include(manual.h)dnl
 HEADER(catalog_history_select)
 
 SECTION(NAME)
-BOLD(catalog_history_select.py) - command line tool that returns catalog history for a specified time period.
+BOLD(catalog_history_select) - command line tool that returns catalog history for a specified time period.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(catalog_history_select.py [source_directory] [starting_point] [ending_point_or_duration]))
+CODE(BOLD(catalog_history_select [source_directory] [starting_point] [ending_point_or_duration]))
 
 SECTION(DESCRIPTION)
 
@@ -23,19 +23,19 @@ SECTION(EXAMPLES)
 To show 1 week worth of history starting on 15 April 2013:
 
 LONGCODE_BEGIN
-% catalog_history_select.py /data/catalog.history 2013-04-15-01-01-01 w1
+% catalog_history_select /data/catalog.history 2013-04-15-01-01-01 w1
 LONGCODE_END
 
 To show all history after 1 March 2013:
 
 LONGCODE_BEGIN
-% catalog_history_select.py /data/catalog.history 2013-03-01-01-01
+% catalog_history_select /data/catalog.history 2013-03-01-01-01
 LONGCODE_END
 
 To see full results using all catalog history tools:
 
 LONGCODE_BEGIN
-% catalog_history_select.py /data/catalog.history/ 2013-04-15-01-01-01 w1 | catalog_history_filter.py type=wq_master | catalog_history_plot.py 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running
+% catalog_history_select /data/catalog.history/ 2013-04-15-01-01-01 w1 | catalog_history_filter type=wq_master | catalog_history_plot 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running
 LONGCODE_END
 
 

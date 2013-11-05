@@ -2,10 +2,10 @@ include(manual.h)dnl
 HEADER(catalog_history_filter)
 
 SECTION(NAME)
-BOLD(catalog_history_filter.py) - command line tool that filters streamed data from catalog_history_select.py, but keeps the format the same.
+BOLD(catalog_history_filter) - command line tool that filters streamed data from catalog_history_select, but keeps the format the same.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(catalog_history_filter.py [options] [filters]))
+CODE(BOLD(catalog_history_filter [options] [filters]))
 
 SECTION(DESCRIPTION)
 
@@ -27,25 +27,25 @@ SECTION(EXAMPLES)
 To include wq_master or chirp history data:
 
 LONGCODE_BEGIN
-% catalog_history_filter.py type=wq_master type=chirp
+% catalog_history_filter type=wq_master type=chirp
 LONGCODE_END
 
 To include only wq_master history running version 3.7.3:
 
 LONGCODE_BEGIN
-% catalog_history_filter.py type=wq_master | catalog_history_filter.py version=3.7.3
+% catalog_history_filter type=wq_master | catalog_history_filter version=3.7.3
 LONGCODE_END
 
 To ignore any series which reports, at any point, less than 100000 for the field \'memory_avail\':
 
 LONGCODE_BEGIN
-% catalog_history_filter.py -dynamic memory_avail<100000
+% catalog_history_filter -dynamic memory_avail<100000
 LONGCODE_END
 
 To see full results using all catalog history tools:
 
 LONGCODE_BEGIN
-% catalog_history_select.py /data/catalog.history/ 2013-04-15-01-01-01 w1 | catalog_history_filter.py type=wq_master | catalog_history_plot.py 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running
+% catalog_history_select /data/catalog.history/ 2013-04-15-01-01-01 w1 | catalog_history_filter type=wq_master | catalog_history_plot 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running
 LONGCODE_END
 
 SECTION(COPYRIGHT)

@@ -23,17 +23,17 @@ When servers report their status to the catalog server, a log file is created to
 </p>
 
 <p>
-<b>catalog_history_select.py</b>: Returns the status (or checkpoint) for a specified start time, and all following log data until a specified end time. The script takes three arguments. The first argument is a directory where the catalog history files are stored in sub-directories by year. The second argument specifies the start time as a timestamp or date and time in the format YYYY-MM-DD-HH-MM-SS. The third argument (optional) can be a timestamp, duration, or date and time of the same format YYYY-MM-DD-HH-MM-SS. The duration can be in seconds (+180 or s180), minutes (m45), hours (h8), days (d16), weeks (w3), or years (y2).
+<b>catalog_history_select</b>: Returns the status (or checkpoint) for a specified start time, and all following log data until a specified end time. The script takes three arguments. The first argument is a directory where the catalog history files are stored in sub-directories by year. The second argument specifies the start time as a timestamp or date and time in the format YYYY-MM-DD-HH-MM-SS. The third argument (optional) can be a timestamp, duration, or date and time of the same format YYYY-MM-DD-HH-MM-SS. The duration can be in seconds (+180 or s180), minutes (m45), hours (h8), days (d16), weeks (w3), or years (y2).
 
 </p>
 
 <p>
-<b>catalog_history_filter.py</b>: Filters streamed data (through stdin) and returns only the series' which satisfy passed arguments based on static fields (those set on at creation or a checkpoint). For example, type=wq_master would only stream series data for series' with type wq_master. The option -dynamic (as the first argument) will switch the entire script to handle only dynamic fields (those which change over time). For scalability reasons, the remaining arguments specify conditions by which a series will be ignored. For example, memory_avail>20000000 would ignore any series where the value for memory_avail exceeded 20000000 at any point.
+<b>catalog_history_filter</b>: Filters streamed data (through stdin) and returns only the series' which satisfy passed arguments based on static fields (those set on at creation or a checkpoint). For example, type=wq_master would only stream series data for series' with type wq_master. The option -dynamic (as the first argument) will switch the entire script to handle only dynamic fields (those which change over time). For scalability reasons, the remaining arguments specify conditions by which a series will be ignored. For example, memory_avail>20000000 would ignore any series where the value for memory_avail exceeded 20000000 at any point.
 
 </p>
 
 <p>
-<b>catalog_history_plot.py</b>: Summarizes streamed data (through stdin) from either of the previous 2 scripts. Summarizes server status over time with a specified granularity in seconds (first argument). The remaining arguments specify what status information should be summarized and how to do so. These arguments start with an interseries aggregation operator, followed by an intraseries aggregation operator, followed by the field to evaluate. For example SUM.AVG@memory_avail, says to look at the values for the memory_avail field, average all values for a series that occured within the specified 'grain', and sum the series averages to obtain a single value for that 'grain' of time. Available intraseries operators are: MAX,MIN,AVG,FIRST,LAST,COUNT,INC,LIST. Available interseries operators are: SUM.
+<b>catalog_history_plot</b>: Summarizes streamed data (through stdin) from either of the previous 2 scripts. Summarizes server status over time with a specified granularity in seconds (first argument). The remaining arguments specify what status information should be summarized and how to do so. These arguments start with an interseries aggregation operator, followed by an intraseries aggregation operator, followed by the field to evaluate. For example SUM.AVG@memory_avail, says to look at the values for the memory_avail field, average all values for a series that occured within the specified 'grain', and sum the series averages to obtain a single value for that 'grain' of time. Available intraseries operators are: MAX,MIN,AVG,FIRST,LAST,COUNT,INC,LIST. Available interseries operators are: SUM.
 
 
 <h2>Invocation</h2>
@@ -41,7 +41,7 @@ When servers report their status to the catalog server, a log file is created to
 To plot available memory as compared to total memory on chirp servers on a daily basis, you might run something like this:
 
 <pre>
-catalog_history_select.py /data/catalog.history/ 2013-03-01-01-03 | catalog_history_filter.py type=chirp | catalog_history_plot.py 86400 SUM.MAX@memory_total SUM.AVG@memory_avail SUM.MIN@minfree> chirpMemorySum
+catalog_history_select /data/catalog.history/ 2013-03-01-01-03 | catalog_history_filter type=chirp | catalog_history_plot 86400 SUM.MAX@memory_total SUM.AVG@memory_avail SUM.MIN@minfree> chirpMemorySum
 </pre>
 Followed by the following command in gnuplot:
 <pre>
@@ -53,7 +53,7 @@ set xdata time; set timefmt "%s"; set format x "%H:%M"; plot "chirpMemorySum" us
 Or to plot the number of tasks running each hour on Work Queue masters, you might run something like this: 
 
 <pre>
-catalog_history_select.py /data/catalog.history/ 2013-04-15-01-01-01 w1 | catalog_history_filter.py type=wq_master | catalog_history_plot.py 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running > taskRunningMinAvgMax
+catalog_history_select /data/catalog.history/ 2013-04-15-01-01-01 w1 | catalog_history_filter type=wq_master | catalog_history_plot 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running > taskRunningMinAvgMax
 </pre>
 Followed by the following command in gnuplot:
 <pre>

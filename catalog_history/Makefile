@@ -1,9 +1,9 @@
 include ../Makefile.config
 include ../Makefile.rules
 
-SELECT_SCRIPT = src/catalog_history_select.py
-FILTER_SCRIPT = src/catalog_history_filter.py
-PLOT_SCRIPT = src/catalog_history_plot.py
+SELECT_SCRIPT = src/catalog_history_select
+FILTER_SCRIPT = src/catalog_history_filter
+PLOT_SCRIPT = src/catalog_history_plot
 
 test:
 

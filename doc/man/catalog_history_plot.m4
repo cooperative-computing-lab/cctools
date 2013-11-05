@@ -2,10 +2,10 @@ include(manual.h)dnl
 HEADER(catalog_history_plot)
 
 SECTION(NAME)
-BOLD(catalog_history_plot.py) - command line tool that returns easily plottable data from the output of catalog_history_select or catalog_history_filter.
+BOLD(catalog_history_plot) - command line tool that returns easily plottable data from the output of catalog_history_select or catalog_history_filter.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(catalog_history_plot.py [granularity] [summaries]))
+CODE(BOLD(catalog_history_plot [granularity] [summaries]))
 
 SECTION(DESCRIPTION)
 
@@ -22,19 +22,19 @@ SECTION(EXAMPLES)
 To show the distribution for task_running values within 1 hour time periods:
 
 LONGCODE_BEGIN
-% catalog_history_plot.py 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running
+% catalog_history_plot 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running
 LONGCODE_END
 
 To show the distribution of daily values describing memory:
 
 LONGCODE_BEGIN
-% catalog_history_plot.py 86400 SUM.MAX@memory_total SUM.AVG@memory_avail SUM.MIN@minfree
+% catalog_history_plot 86400 SUM.MAX@memory_total SUM.AVG@memory_avail SUM.MIN@minfree
 LONGCODE_END
 
 To see full results using all catalog history tools:
 
 LONGCODE_BEGIN
-% catalog_history_select.py /data/catalog.history/ 2013-04-15-01-01-01 w1 | catalog_history_filter.py type=wq_master | catalog_history_plot.py 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running
+% catalog_history_select /data/catalog.history/ 2013-04-15-01-01-01 w1 | catalog_history_filter type=wq_master | catalog_history_plot 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running
 LONGCODE_END
 
 SECTION(COPYRIGHT)
