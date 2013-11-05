@@ -304,7 +304,8 @@ int add_worker_distribution(struct pool_config *pc, const char *value) {
 	return 1;
 }
 
-struct pool_config *get_pool_config(const char *path) {
+struct pool_config *pool_config_create()
+{
 	struct pool_config *pc = (struct pool_config *)malloc(sizeof(*pc));
 	if(!pc) {
 		fprintf(stderr, "Failed to allocate memory for pool configuration - %s\n", strerror(errno));
@@ -333,15 +334,20 @@ struct pool_config *get_pool_config(const char *path) {
 	pc->billing_cycle = 0;
 	pc->worker_terminate_boundary = 0;
 
+	return pc;
+}
+
+
+struct pool_config *get_pool_config(const char *path) {
 	// Read in new configuration from file
 	FILE *fp;
-
 	fp = fopen(path, "r");
 	if(!fp) {
 		fprintf(stderr, "Failed to open pool configuration file: \"%s\".\n", path);
-		free(pc);
 		return 0;
 	}
+
+	struct pool_config *pc = pool_config_create();
 
 	char *line;
 	int line_count = 0;
