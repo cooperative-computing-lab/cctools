@@ -12,7 +12,7 @@ fi
 save_arguments $0 $@
 
 major=4
-minor=1
+minor=2
 micro=0
 
 # On a release, type would be changed from TRUNK to RELEASE.  TRUNK is a useful
