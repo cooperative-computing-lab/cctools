@@ -48,6 +48,8 @@ See the file COPYING for details.
 #define POOL_CONFIG_IGNORE_CAPACITY 1
 #define MAX_WORKERS_DEFAULT 100
 
+#define MAX_LINE 2048
+
 static time_t pool_start_time;
 static time_t last_log_time; 
 static int abort_flag = 0;
@@ -187,7 +189,6 @@ struct pool_config {
 	int mode;
 };
 
-struct list *get_matched_masters(const char *catalog_host, int catalog_port, struct list *regex_list);
 static int submit_workers(const char *cmd, const char *input_files, int count);
 int decide_worker_distribution(struct list *matched_masters, struct pool_config *pc, const char *catalog_host, int catalog_port);
 UINT64_T get_current_billing_cycles(unsigned int);
@@ -305,7 +306,8 @@ int add_worker_distribution(struct pool_config *pc, const char *value) {
 	return 1;
 }
 
-struct pool_config *get_pool_config(const char *path) {
+struct pool_config *pool_config_create()
+{
 	struct pool_config *pc = (struct pool_config *)malloc(sizeof(*pc));
 	if(!pc) {
 		fprintf(stderr, "Failed to allocate memory for pool configuration - %s\n", strerror(errno));
@@ -334,22 +336,17 @@ struct pool_config *get_pool_config(const char *path) {
 	pc->billing_cycle = 0;
 	pc->worker_terminate_boundary = 0;
 
-	// Read in new configuration from file
-	FILE *fp;
+	return pc;
+}
 
-	fp = fopen(path, "r");
-	if(!fp) {
-		fprintf(stderr, "Failed to open pool configuration file: \"%s\".\n", path);
-		free(pc);
-		return 0;
-	}
-
+int read_next_pair(FILE *stream, const char *path, char *name, char *value)
+{
+	static int line_count = 0;
 	char *line;
-	int line_count = 0;
-	while((line = get_line(fp))) {
+
+	while((line = get_line(stream)))
+	{
 		line_count++;
-		int len;
-		char *name, *value;
 
 		string_chomp(line);
 		if(string_isspace(line)) {
@@ -359,94 +356,158 @@ struct pool_config *get_pool_config(const char *path) {
 		if(line[0] == '#') { // skip comment lines
 			continue;
 		}
-		
-		len = strlen(line);
-		name = (char *)xxmalloc(len * sizeof(char));
-		value = (char *)xxmalloc(len * sizeof(char));
-		
-		if(sscanf(line, " %[^: \t] : %[^\r\n]", name, value) == 2) {
-			if(!strncmp(name, "distribution", strlen(name))) {
-				if(!add_worker_distribution(pc, value)) {
-					fprintf(stderr, "Error loading configuration: failed to record worker distribution.\n");
-					goto fail;
-				}
-			} else if(!strncmp(name, "max_workers", strlen(name))) {
-				int max_workers = atoi(value);
-				if(max_workers <= 0) {
-					fprintf(stderr, "Invalid configuration: max_workers (current value: %d) should be greater than 0.\n", max_workers);
-					goto fail;
-				}
-				pc->max_workers = max_workers;
-			} else if(!strncmp(name, "min_workers", strlen(name))) {
-				int min_workers = atoi(value);
-				if(min_workers <= 0) {
-					fprintf(stderr, "Invalid configuration: min_workers (current value: %d) should be greater than 0.\n", min_workers);
-					goto fail;
-				}
-				pc->min_workers = min_workers;
-			} else if(!strncmp(name, "mode", strlen(name))) {
-				if(!strncmp(value, "fixed", strlen(value))) {
-					pc->mode = POOL_CONFIG_MODE_FIXED;
-				}
-			} else if(!strncmp(name, "ignore_capacity", strlen(name))) {
-				if(!strncmp(value, "yes", strlen(value))) {
-					pc->capacity_mode = POOL_CONFIG_IGNORE_CAPACITY;
-				}
-			} else if(!strncmp(name, "default_capacity", strlen(name))) {
-				int default_capacity = atoi(value);
-				if(default_capacity <= 0) {
-					fprintf(stderr, "Invalid configuration: default_capacity (current value: %d) should be greater than 0.\n", default_capacity);
-					goto fail;
-				}
-				pc->default_capacity = default_capacity;
-			} else if(!strncmp(name, "max_change_per_min", strlen(name))) {
-				int max_change_per_min = atoi(value);
-				if(max_change_per_min <= 0) {
-					fprintf(stderr, "Invalid configuration: max_change_per_min (current value: %d) should be greater than 0.\n", max_change_per_min);
-					goto fail;
-				}
-				pc->max_change_per_min = max_change_per_min;
-			} else if(!strncmp(name, "billing_cycle", strlen(name))) {
-				int billing_cycle = string_time_parse(value);
-				if(billing_cycle <= 0) {
-					fprintf(stderr, "Invalid configuration: billing_cycle (current value: %d) should be greater than 0.\n", billing_cycle);
-					goto fail;
-				}
-				pc->billing_cycle = billing_cycle;
-			} else if(!strncmp(name, "worker_terminate_boundary", strlen(name))) {
-				int boundary = string_time_parse(value);
-				if(boundary <= 0) {
-					fprintf(stderr, "Invalid configuration: worker_terminate_boundary (current value: %d) should be greater than 0.\n", boundary);
-					goto fail;
-				}
-				pc->worker_terminate_boundary = boundary;
-			} else {
-				fprintf(stderr, "Invalid configuration: invalid item -- %s found at line %d.\n", name, line_count);
-				goto fail;
-			}
-		} else {
-			fprintf(stderr, "Line %d in %s is invalid: \"%s\". Should be \"item_name:item_value\".\n", line_count, path, line);
-			free(name);
-			free(value);
-			goto fail;
+
+		char *colon = strchr(line, ':');
+
+		if(!colon || *(colon + 1) == '\0')
+		{
+			fatal("Line %d in %s is invalid: \"%s\". Should be \"item_name:item_value\".\n", line_count, path, line);
 		}
 
-		free(name);
-		free(value);
+		*colon = '\0';
+		name[MAX_LINE - 1]  = '\0';
+		value[MAX_LINE - 1] = '\0';
+
+		strncpy(name,  line,    MAX_LINE);
+		strncpy(value, colon+1, MAX_LINE);
+
+		if(name[MAX_LINE - 1] != '\0' || value[MAX_LINE - 1] != '\0') 
+		{
+			fatal("Line %d in %s is invalid: \"%s\". Runaway line?\n", line_count, path, line);
+		}
+
+		string_chomp(name);
+		string_chomp(value);
+		char *name_t  = xxstrdup(string_trim_spaces(name));
+		char *value_t = xxstrdup(string_trim_spaces(value));
+
+		strcpy(name,  name_t);
+		strcpy(value, value_t);
+
+		free(line);
+		free(name_t);
+		free(value_t);
+
+		return 1;
 	}
+
+	return 0;
+}
+
+
+struct pool_config *get_pool_config(const char *path) {
+	// Read in new configuration from file
+	FILE *fp;
+	fp = fopen(path, "r");
+	if(!fp) {
+		fprintf(stderr, "Failed to open pool configuration file: \"%s\".\n", path);
+		return 0;
+	}
+
+	struct pool_config *pc = pool_config_create();
+
+	char name[MAX_LINE];
+	char value[MAX_LINE];
+
+	while(read_next_pair(fp, path, name, value)) {
+		if(!strcmp(name, "distribution")) {
+			if(!add_worker_distribution(pc, value)) {
+				fatal("Error loading configuration: failed to record worker distribution.\n");
+			}
+			continue;
+		}
+
+		if(!strcmp(name, "max_workers")) {
+			pc->max_workers = atoi(value);
+			if(pc->max_workers <= 0) {
+				fatal("Invalid configuration: max_workers should be greater than 0 (current value: %d).\n", pc->max_workers);
+			}
+			continue;
+		} 
+
+		if(!strcmp(name, "min_workers")) {
+			pc->min_workers = atoi(value);
+			if(pc->min_workers <= 0) {
+				fatal("Invalid configuration: min_workers should be greater than 0 (current value: %d).\n", pc->min_workers);
+			}
+			continue;
+		} 
+
+		if(!strcmp(name, "mode")) {
+			if(!strcmp(value, "fixed")) {
+				pc->mode = POOL_CONFIG_MODE_FIXED;
+			}
+			else if(!strcmp(value, "on-demand")) {
+				pc->mode = POOL_CONFIG_MODE_ON_DEMAND;
+			}
+			else {
+				fatal("Invalid configuration: mode should be one of 'fixed' or 'on-demand' (default 'on-demand', current value %s).\n", value);
+			}
+			continue;
+		} 
+
+		if(!strcmp(name, "ignore_capacity")) {
+			if(!strcmp(value, "yes")) {
+				pc->capacity_mode = POOL_CONFIG_IGNORE_CAPACITY;
+			}
+			if(!strcmp(value, "no")) {
+				pc->capacity_mode = POOL_CONFIG_USE_CAPACITY;
+			}
+			else {
+				fatal("Invalid configuration: ignore_capacity should be one of 'yes' or 'no' (default 'no', current value %s).\n", value);
+			}
+			continue;
+		} 
+
+		if(!strcmp(name, "default_capacity")) {
+			pc->default_capacity = atoi(value);
+			if(pc->default_capacity <= 0) {
+				fatal("Invalid configuration: default_capacity, if specified, should be greater than 0 (current value: %d).\n", pc->default_capacity);
+			}
+			continue;
+		} 
+
+		if(!strcmp(name, "max_change_per_min")) {
+			pc->max_change_per_min = atoi(value);
+			if(pc->max_change_per_min <= 0) {
+				fatal("Invalid configuration: max_change_per_min, if specified, should be greater than 0 (current value: %d).\n", pc->max_change_per_min);
+			}
+			continue;
+		} 
+
+		if(!strcmp(name, "billing_cycle")) {
+			pc->billing_cycle = string_time_parse(value);
+			if(pc->billing_cycle <= 0) {
+				fatal("Invalid configuration: billing_cycle, if specified, should be greater than 0 (current value: %d).\n", pc->billing_cycle);
+			}
+			continue;
+		} 
+
+		if(!strcmp(name, "worker_terminate_boundary")) {
+			pc->worker_terminate_boundary = string_time_parse(value);
+			if(pc->worker_terminate_boundary <= 0) {
+				fatal("Invalid configuration: worker_terminate_boundary, if specified, should be greater than 0 (current value: %d).\n", pc->worker_terminate_boundary);
+			}
+			continue;
+		} 
+
+		fatal("Invalid configuration: invalid item -- %s\n", name);
+
+	} 
+
 	fclose(fp);
 
 	// sanity checks
-	if(pc->min_workers > pc->max_workers) {
-		fprintf(stderr, "Invalid configuration: min_workers (%d) is greater than max_workers (%d).\n", pc->min_workers, pc->max_workers);
-		goto fail;
+	if(pc->min_workers < 1) {
+		fatal("Invalid configuration: min_workers should be greater than zero. Please include a 'min_workers:' specification in the configuration file (%s).\n", path);
 	}
-	
+
+	if(pc->min_workers > pc->max_workers) {
+		fatal("Invalid configuration: min_workers (%d) is greater than max_workers (%d).\n", pc->min_workers, pc->max_workers);
+	}
+
 	return pc;
 
-fail:
-	fclose(fp);
-	return NULL;
 }
 
 void display_pool_config(struct pool_config *pc) {
@@ -1420,10 +1481,10 @@ int main(int argc, char *argv[])
 		{0,0,0,0}
 	};
 
-	while((c = getopt_long(argc, argv, "aAc:C:d:E:hm:l:L:N:o:O:Pqr:S:t:T:vW:", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "aAc:C:d:E:hm:l:L:M:N:o:O:Pqr:S:t:T:vW:", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'a':
-			strcat(worker_args, " -a");
+			//Backwards compatibility, -a is not needed anymore.
 			auto_worker = 1;
 			break;
 		case 'C':
@@ -1446,7 +1507,8 @@ int main(int argc, char *argv[])
 			break;
 		case 'N':
 		case 'M':
-			strcat(worker_args, " -N ");
+			auto_worker = 1;
+			strcat(worker_args, " -M ");
 			strcat(worker_args, optarg);
 			list_push_tail(regex_list, strdup(optarg));
 			break;
@@ -1503,6 +1565,7 @@ int main(int argc, char *argv[])
 			auto_worker_pool = 1;
 			break;
 		case 'c':
+			auto_worker_pool = 1;
 			pool_config_path = xxstrdup(optarg);
 			break;
 		case 'T':
