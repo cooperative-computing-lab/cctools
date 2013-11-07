@@ -2476,13 +2476,13 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	list_first_item(t->input_files);
 	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 		if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload))
-		{	fprintf(stderr, "Error: There is another input file with the same remote file name (%s). All remote file names for a task must be unique.\n", remote_name);
+		{	fprintf(stderr, "Error: There is another input file with the same remote file name (%s).\n", remote_name);
 			return 0;	}
 	}
 	list_first_item(t->output_files);
 	while((tf = (struct work_queue_file*)list_next_item(t->output_files))) {
-		if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload))
-		{	fprintf(stderr, "Error: There is another output file with the same remote file name (%s). All remote file names for a task must be unique.\n", remote_name);
+		if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name))
+		{	fprintf(stderr, "Error: There is another output file with the same local file name (%s).\n", local_name);
 			return 0;	}
 	}
 
