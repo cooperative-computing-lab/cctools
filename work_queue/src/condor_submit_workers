@@ -18,8 +18,7 @@ show_help()
 # which causes long-running workers to eventually sit idle in the queue.
 # The user can still add their own expression via the -r option.
 
-
-requirements="(Memory>0)"
+requirements=""
 transfer_input_files="work_queue_worker"
 
 parse_arguments()
