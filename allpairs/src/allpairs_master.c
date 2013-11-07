@@ -34,6 +34,7 @@ static const char *progname = "allpairs_master";
 static char allpairs_multicore_program[ALLPAIRS_LINE_MAX] = "allpairs_multicore";
 static char allpairs_compare_program[ALLPAIRS_LINE_MAX];
 static char *output_filename = NULL;
+static char *wqstats_filename = NULL;
 
 static double compare_program_time = 0.0;
 static const char * extra_arguments = "";
@@ -55,6 +56,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Extra arguments to pass to the comparison function.\n", "-e,--extra-args=<args>");
 	fprintf(stdout, " %-30s Extra input file needed by the comparison function. (may be given multiple times)\n", "-f,--input-file=<file>");
 	fprintf(stdout, " %-30s Write debugging output to this file (default to standard output)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Record runtime statistics and write to this file (default: off)\n", "-s,--stats-file=<file>");
 	fprintf(stdout, " %-30s Estimated time to run one comparison. (default chosen at runtime)\n", "-t,--estimated-time=<seconds>");
 	fprintf(stdout, " %-30s Width of one work unit, in items to compare. (default chosen at runtime)\n", "-x,--width=<items>");
 	fprintf(stdout, " %-30s Height of one work unit, in items to compare. (default chosen at runtime)\n", "-y,--height=<items>");
@@ -285,6 +287,7 @@ int main(int argc, char **argv)
 		{"advertise", no_argument, 0, 'a'},    //deprecated, left here for backwards compatibility
 		{"project-name", required_argument, 0, 'N'},
 		{"debug-file", required_argument, 0, 'o'},
+		{"wqstats-file", required_argument, 0, 's'},
 		{"input-file", required_argument, 0, 'f'},
 		{"estimated-time", required_argument, 0, 't'},
 		{"priority", required_argument, 0, 'P'},
@@ -292,7 +295,7 @@ int main(int argc, char **argv)
 	};
 
 
-	while((c = getopt_long(argc, argv, "ad:e:f:hN:p:P:t:vx:y:Z:o:", long_options, NULL)) >= 0) {
+	while((c = getopt_long(argc, argv, "ad:e:f:hN:p:P:t:vx:y:Z:o:s:", long_options, NULL)) >= 0) {
 		switch (c) {
 	    case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -309,6 +312,10 @@ int main(int argc, char **argv)
 		case 'o':
 			free(output_filename);
 			output_filename=xxstrdup(optarg);
+			break;
+		case 's':
+			free(wqstats_filename);
+			wqstats_filename=xxstrdup(optarg);
 			break;
 		case 'h':
 			show_help(progname);
@@ -419,6 +426,9 @@ int main(int argc, char **argv)
 
 	if(port_file)
 		opts_write_port_file(port_file, port);
+
+	if(wqstats_filename)
+		work_queue_specify_log(q, wqstats_filename);	
 
 	// advanced work queue options
 	work_queue_specify_master_mode(q, work_queue_master_mode);
