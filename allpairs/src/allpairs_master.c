@@ -202,35 +202,48 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 	struct work_queue_task *task = work_queue_task_create(cmd);
 
 	if(use_external_program) {
-		work_queue_task_specify_file(task,allpairs_compare_program,path_basename(allpairs_compare_program),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+		if(!work_queue_task_specify_file(task,allpairs_compare_program,path_basename(allpairs_compare_program),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE))
+			return 0;
 	}
 
-	work_queue_task_specify_file(task,allpairs_multicore_program,path_basename(allpairs_multicore_program),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+	if(!work_queue_task_specify_file(task,allpairs_multicore_program,path_basename(allpairs_multicore_program),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE))
+		return 0;
 
 	const char *f;
 	list_first_item(extra_files_list);
 	while((f = list_next_item(extra_files_list))) {
-		work_queue_task_specify_file(task,f,path_basename(f),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+		if(!work_queue_task_specify_file(task,f,path_basename(f),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE))
+			return 0;
 	}
 
 	buf = text_list_string(seta,xcurrent,xcurrent+xblock);
-	work_queue_task_specify_buffer(task,buf,strlen(buf),"A",WORK_QUEUE_NOCACHE);
+	if(!work_queue_task_specify_buffer(task,buf,strlen(buf),"A",WORK_QUEUE_NOCACHE)) {
+		free(buf);
+		return 0;		
+	}
+
 	free(buf);
 
 	buf = text_list_string(setb,ycurrent,ycurrent+yblock);
-	work_queue_task_specify_buffer(task,buf,strlen(buf),"B",WORK_QUEUE_NOCACHE);
+	if(!work_queue_task_specify_buffer(task,buf,strlen(buf),"B",WORK_QUEUE_NOCACHE)) {
+		free(buf);
+		return 0;
+	}
+	
 	free(buf);
 	
 	for(x=xcurrent;x<(xcurrent+xblock);x++) {
 		name = text_list_get(seta,x);
 		if(!name) break;
-		work_queue_task_specify_file(task,name,path_basename(name),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+		if(!work_queue_task_specify_file(task,name,path_basename(name),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE))
+			return 0;
 	}
 
 	for(y=ycurrent;y<(ycurrent+yblock);y++) {
 		name = text_list_get(setb,y);
 		if(!name) break;
-		work_queue_task_specify_file(task,name,path_basename(name),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+		if(!work_queue_task_specify_file(task,name,path_basename(name),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE))
+			return 0;
 	}
 
 	/* advance to the next row/column */
