@@ -5,6 +5,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "linux-version.h"
 #include "pfs_sysdeps.h"
 #include "pfs_channel.h"
 #include "pfs_process.h"
@@ -1426,13 +1427,19 @@ void decode_syscall( struct pfs_process *p, int entering )
 				INT64_T newargs[4];
 				int newargs_count;
 				if(p->syscall==SYSCALL32_fork) {
-					newargs[0] = CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
+					if(linux_available(2,5,46))
+						newargs[0] = CLONE_PARENT|SIGCHLD; /* handled by PTRACE_SETOPTIONS in tracer.c */
+					else
+						newargs[0] = CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
 					newargs[1] = 0;
 					newargs_count = 2;
 					p->syscall_args_changed = 1;
 					debug(D_SYSCALL,"converting fork into clone(%llu)", (long long unsigned int)newargs[0]);
 				} else {
-					newargs[0] = (args[0]&~0xff)|CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
+					if(linux_available(2,5,46))
+						newargs[0] = (args[0]&~0xff)|CLONE_PARENT|SIGCHLD; /* handled by PTRACE_SETOPTIONS in tracer.c */
+					else
+						newargs[0] = (args[0]&~0xff)|CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
 					newargs_count = 1;
 					debug(D_SYSCALL,"adjusting clone(%llu,%llu,%llu,%llu) -> clone(%llu)", (long long unsigned int) args[0], (long long unsigned int) args[1], (long long unsigned int) args[2], (long long unsigned int) args[3], (long long unsigned int) newargs[0]);
 				}
@@ -1458,6 +1465,8 @@ void decode_syscall( struct pfs_process *p, int entering )
 						notify_parent = p->pid;
 					}
 					child = pfs_process_create(childpid,p->pid,notify_parent,clone_files,child_signal);
+					if(linux_available(2,5,46))
+						tracer_continue(child->tracer,0); /* child is stopped if we used PTRACE_SETOPTIONS */
 					child->syscall_result = 0;
 					if(args[0]&CLONE_THREAD) child->tgid = p->tgid;
 					if(p->syscall_original==SYSCALL32_fork) {

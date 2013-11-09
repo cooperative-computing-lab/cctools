@@ -10,6 +10,8 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "xxmalloc.h"
 #include "debug.h"
+#include "linux-version.h"
+#include "ptrace.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -22,7 +24,6 @@ See the file COPYING for details.
 #include <limits.h>
 
 #include <sys/wait.h>
-#include <sys/ptrace.h>
 
 #define FATAL fatal("tracer: %d %s",t->pid,strerror(errno));
 
@@ -76,6 +77,11 @@ struct tracer * tracer_attach( pid_t pid )
 	struct tracer *t;
 	char path[PATH_MAX];
 
+	ptrace(PTRACE_ATTACH, pid, 0, 0); /* this handles a race condition where pid has not yet called ptrace(PTRACE_TRACEME, ...) */
+
+	if (linux_available(2,5,46))
+		ptrace(PTRACE_SETOPTIONS,pid,0,(void *)(PTRACE_O_TRACECLONE|PTRACE_O_TRACEFORK|PTRACE_O_TRACEVFORK));
+
 	t = malloc(sizeof(*t));
 	if(!t) return 0;
 
@@ -93,6 +99,13 @@ struct tracer * tracer_attach( pid_t pid )
 	memset(&t->regs,0,sizeof(t->regs));
 
 	return t;
+}
+
+unsigned long tracer_getevent( struct tracer *t )
+{
+	unsigned long message;
+	ptrace(PTRACE_GETEVENTMSG, t->pid, 0, &message);
+	return message;
 }
 
 int tracer_is_64bit( struct tracer *t )

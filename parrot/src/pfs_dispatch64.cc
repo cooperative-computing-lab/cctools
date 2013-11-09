@@ -17,6 +17,7 @@ int pfs_dispatch64( struct pfs_process *p, INT64_T signum )
 
 #else
 
+#include "linux-version.h"
 #include "pfs_sysdeps64.h"
 #include "pfs_channel.h"
 #include "pfs_process.h"
@@ -1026,13 +1027,19 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				INT64_T newargs[4];
 				INT64_T newargs_count;
 				if(p->syscall==SYSCALL64_fork || p->syscall==SYSCALL64_vfork) {
-					newargs[0] = CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
+					if(linux_available(2,5,46))
+						newargs[0] = CLONE_PARENT|SIGCHLD; /* handled by PTRACE_SETOPTIONS in tracer.c */
+					else
+						newargs[0] = CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
 					newargs[1] = 0;
 					newargs_count = 2;
 					p->syscall_args_changed = 1;
 					debug(D_SYSCALL,"converting fork into clone(%"PRIx64")",newargs[0]);
 				} else {
-					newargs[0] = (args[0]&~0xff)|CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
+					if(linux_available(2,5,46))
+						newargs[0] = (args[0]&~0xff)|CLONE_PARENT|SIGCHLD; /* handled by PTRACE_SETOPTIONS in tracer.c */
+					else
+						newargs[0] = (args[0]&~0xff)|CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
 					newargs_count = 1;
 					debug(D_SYSCALL,"adjusting clone(%"PRIx64",%"PRIx64",%"PRIx64",%"PRIx64") -> clone(%"PRIx64")",args[0],args[1],args[2],args[3],newargs[0]);
 				}
@@ -1058,6 +1065,8 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						notify_parent = p->pid;
 					}
 					child = pfs_process_create(childpid,p->pid,notify_parent,clone_files,child_signal);
+					if(linux_available(2,5,46))
+						tracer_continue(child->tracer,0); /* child is stopped if we used PTRACE_SETOPTIONS */
 					child->syscall_result = 0;
 					if(args[0]&CLONE_THREAD) child->tgid = p->tgid;
 					if(p->syscall_original==SYSCALL64_fork) {

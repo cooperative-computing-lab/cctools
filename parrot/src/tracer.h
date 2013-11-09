@@ -18,6 +18,7 @@ void tracer_prepare();
 struct tracer * tracer_attach( pid_t pid );
 void            tracer_detach( struct tracer *t );
 void		tracer_continue( struct tracer *t, int signum );
+unsigned long tracer_getevent( struct tracer *t );
 
 int             tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARGS_MAX] );
 int             tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS_MAX], int nargs );
