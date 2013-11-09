@@ -779,10 +779,10 @@ int main( int argc, char *argv[] )
 			pid = wait4(trace_this_pid,&status,flags,&usage);
 			if (pid == pfs_watchdog_pid) {
 				if (WIFEXITED(status) || WIFSIGNALED(status)) {
-				debug(D_NOTICE,"watchdog died unexpectedly; killing everyone");
-				pfs_process_kill_everyone(SIGKILL);
-				break;
-			}
+					debug(D_NOTICE,"watchdog died unexpectedly; killing everyone");
+					pfs_process_kill_everyone(SIGKILL);
+					break;
+				}
 			} else if(pid>0) {
 				handle_event(pid,status,usage);
 			} else {
@@ -836,4 +836,3 @@ int main( int argc, char *argv[] )
 		return 1;
 	}
 }
-

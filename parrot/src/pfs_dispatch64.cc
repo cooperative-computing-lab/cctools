@@ -1063,7 +1063,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					/* now trace any process at all */
 					trace_this_pid = -1;
 				}
-
 			}
 			break;
 
