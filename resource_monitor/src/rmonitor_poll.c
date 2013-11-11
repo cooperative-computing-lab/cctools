@@ -457,68 +457,59 @@ void acc_dsk_usage(struct statfs *acc, struct statfs *other)
 	acc->f_ffree  += other->f_ffree;
 }
 
-/*
-Most Unixes have fts_open/read/close, but Solaris does not.
-*/
+static struct wdir_info *temporary_dir_info;
+
+static int update_wd_usage(const char *path, const struct stat *s, int typeflag, struct FTW *f)
+{
+	switch(typeflag)
+	{
+		case FTW_D:
+			temporary_dir_info->directories++;
+			break;
+		case FTW_DNR:
+			debug(D_DEBUG, "ftw cannot read %s\n", path);
+			temporary_dir_info->directories++;
+			break;
+		case FTW_DP:
+			break;
+		case FTW_F:
+			temporary_dir_info->directories++;
+			temporary_dir_info->byte_count  += s->st_size;
+			temporary_dir_info->block_count += s->st_blocks;
+			break;
+		case FTW_NS:
+			break;
+		case FTW_SL:
+			temporary_dir_info->files++;
+			break;
+		case FTW_SLN:
+			break;
+		default:
+			break;
+	}
+
+	return 0;
+}
 
 int get_wd_usage(struct wdir_info *d)
 {
-#if !defined(HAS_FTS_H)
-	static int did_message = 0;
-	if(!did_message) {
-		debug(D_NOTICE, "fts_open is not implemented on this platform.");
-		did_message = 1;
-	}
-	return 1;
-#else
-	char *argv[] = {d->path, NULL};
-	FTS *hierarchy;
-	FTSENT *entry;
+	int result;
 
 	d->files = 0;
 	d->directories = 0;
 	d->byte_count = 0;
 	d->block_count = 0;
 
-	hierarchy = fts_open(argv, FTS_PHYSICAL, NULL);
+	temporary_dir_info = d;
+	result = nftw(d->path, update_wd_usage, MAX_FILE_DESCRIPTOR_COUNT, FTW_PHYS);
+	temporary_dir_info = NULL;
 
-	if(!hierarchy)
-	{
-		debug(D_DEBUG, "fts_open error: %s\n", strerror(errno));
-		return 1;
+	if(result == -1) {
+		debug(D_DEBUG, "ftw error\n");
+		result = 1;
 	}
 
-	while( (entry = fts_read(hierarchy)) )
-	{
-		switch(entry->fts_info)
-		{
-		case FTS_D:
-			d->directories++;
-			break;
-		case FTS_DC:
-		case FTS_DP:
-			break;
-		case FTS_SL:
-		case FTS_DEFAULT:
-			d->files++;
-			break;
-		case FTS_F:
-			d->files++;
-			d->byte_count  += entry->fts_statp->st_size;
-			d->block_count += entry->fts_statp->st_blocks;
-			break;
-		case FTS_ERR:
-			debug(D_DEBUG, "fts_read error %s: %s\n", entry->fts_name, strerror(errno));
-			break;
-		default:
-			break;
-		}
-	}
-
-	fts_close(hierarchy);
-
-	return 0;
-#endif /* HAS_FTS_H */
+	return result;
 }
 
 void acc_wd_usage(struct wdir_info *acc, struct wdir_info *other)
