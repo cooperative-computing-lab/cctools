@@ -498,7 +498,15 @@ int main( int argc, char *argv[] )
 		}
 	}
 
-	sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
+	pfs_temp_dir[PFS_PATH_MAX - 1] = '\0';
+	s = getenv("PARROT_TEMP_DIR");
+	if(s && strlen(s) > 0) {
+		strncpy(pfs_temp_dir, s, PFS_PATH_MAX);
+	}
+	else
+	{
+		sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
+	}
 
 	struct option long_options[] = {
 		{"chirp-auth",  required_argument, 0, 'a'},
@@ -639,7 +647,7 @@ int main( int argc, char *argv[] )
 			pfs_session_cache = 1;
 			break;
 		case 't':
-			strcpy(pfs_temp_dir,optarg);
+			strncpy(pfs_temp_dir,optarg,PFS_PATH_MAX);
 			break;
 		case 'T':
 			pfs_master_timeout = string_time_parse(optarg);
@@ -674,6 +682,11 @@ int main( int argc, char *argv[] )
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 	get_linux_version(argv[0]);
+
+	if(pfs_temp_dir[PFS_PATH_MAX - 1] != '\0')
+	{
+		fatal("temporary files directory pathname larger than %d characters\n", PFS_PATH_MAX - 1);
+	}
 
 	pfs_file_cache = file_cache_init(pfs_temp_dir);
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
