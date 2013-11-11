@@ -333,6 +333,10 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 		
 		if(link(sourcename, targetname)) {
 			debug(D_WQ, "Could not link file %s -> %s (%s)\n", sourcename, targetname, strerror(errno));
+			if(errno == EEXIST)	{ 
+				//if the destination already exists, it isn't WQ's fault. So don't treat as failure.
+				return 1; 			
+			} 
 			
 			if((errno == EXDEV || errno == EPERM) && symlinks_enabled) {
 				if(symlink(sourcename, targetname)) {
