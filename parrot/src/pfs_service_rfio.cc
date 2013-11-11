@@ -314,3 +314,5 @@ static pfs_service_rfio pfs_service_rfio_instance;
 pfs_service *pfs_service_rfio = &pfs_service_rfio_instance;
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

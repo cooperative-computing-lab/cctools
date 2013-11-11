@@ -323,3 +323,5 @@ static pfs_service_ftp pfs_service_gsiftp_instance(GLOBUS_GSS);
 pfs_service *pfs_service_ftp = &pfs_service_ftp_instance;
 pfs_service *pfs_service_anonftp = &pfs_service_anonftp_instance;
 pfs_service *pfs_service_gsiftp = &pfs_service_gsiftp_instance;
+
+/* vim: set noexpandtab tabstop=4: */

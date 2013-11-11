@@ -267,3 +267,4 @@ char * pfs_poll_string( int flags )
 	return str;
 }
 
+/* vim: set noexpandtab tabstop=4: */

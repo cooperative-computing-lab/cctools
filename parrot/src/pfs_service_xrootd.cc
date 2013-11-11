@@ -259,3 +259,5 @@ static pfs_service_xrootd pfs_service_xrootd_instance;
 pfs_service *pfs_service_xrootd = &pfs_service_xrootd_instance;
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

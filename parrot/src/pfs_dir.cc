@@ -170,3 +170,5 @@ int pfs_dir::append( const char *srcname )
 
 	return 1;
 }
+
+/* vim: set noexpandtab tabstop=4: */

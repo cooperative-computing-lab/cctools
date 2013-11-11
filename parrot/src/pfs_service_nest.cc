@@ -571,3 +571,5 @@ static pfs_service_nest pfs_service_nest_instance;
 pfs_service *pfs_service_nest = &pfs_service_nest_instance;
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

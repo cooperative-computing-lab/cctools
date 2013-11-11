@@ -416,4 +416,4 @@ public:
 static pfs_service_s3 pfs_service_s3_instance;
 pfs_service *pfs_service_s3 = &pfs_service_s3_instance;
 
-
+/* vim: set noexpandtab tabstop=4: */
