@@ -37,6 +37,7 @@ SOURCES = auth.c  \
           get_line.c  \
           getopt.c  \
           getopt_aux.c  \
+          gpu_info.c \
           hdfs_library.c  \
           hash_cache.c  \
           hash_table.c  \
@@ -140,7 +141,7 @@ install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/include
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/include/cctools
 	cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
-	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp gpu_autodetect ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
 	for file in ${PUBLIC_HEADERS} ; do if [ -f $$file ] ; then cp $$file ${CCTOOLS_INSTALL_DIR}/include/cctools ; fi ; done
 	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then cp /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done
 
