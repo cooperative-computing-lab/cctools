@@ -906,7 +906,7 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 {
 	struct flock lock;
 	FILE        *fsummary;
-	char        *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
+	char        *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME ".summary", getpid(), t->taskid);
 	char        *msg; 
 
 	lock.l_type   = F_WRLCK;
@@ -2973,15 +2973,17 @@ void work_queue_delete(struct work_queue *q)
 int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 {
 	char *wrap_cmd; 
-	char *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
+	char *template = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
+	char *summary  = string_format("%s.summary", template);
 	
-	wrap_cmd = resource_monitor_rewrite_command(t->command_line, NULL, summary, NULL, NULL, 1, 0, 0);
+	wrap_cmd = resource_monitor_rewrite_command(t->command_line, NULL, template, NULL, NULL, 1, 0, 0);
 
 	//BUG: what if user changes current working directory?
 	work_queue_task_specify_file(t, q->monitor_exe, q->monitor_exe, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 	work_queue_task_specify_file(t, summary, summary, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 
 	free(summary);
+	free(template);
 	free(t->command_line);
 
 	t->command_line = wrap_cmd;
