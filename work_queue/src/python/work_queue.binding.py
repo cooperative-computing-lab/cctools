@@ -169,8 +169,15 @@ class Task(_object):
     #                       - @ref WORK_QUEUE_CACHE
     # @param recursive      Indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
     # @return 1 if the task directory is successfully specified, 0 if either of @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
-    def specify_directory(self, local_name=None, remote_name=None, type=None, flags=None, recursive=0):
-        return self.specify_directory(local_name, remote_name, type, flags, recursive)
+    def specify_directory(self, local_name, remote_name=None, type=None, flags=None, recursive=0, cache=True):
+        if remote_name is None:
+            remote_name = os.path.basename(local_name)
+
+        if type is None:
+            type = WORK_QUEUE_INPUT
+
+        flags = Task._determine_file_flags(flags, cache)
+        return work_queue_task_specify_directory(self._task, local_name, remote_name, type, flags, recursive)
 
     ##
     # Add an input bufer to the task.
