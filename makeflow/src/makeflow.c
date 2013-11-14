@@ -1184,7 +1184,7 @@ char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 }
 
 //return 1 if name is special variable, 0 otherwise
-int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, struct hash_table *current_table, char *name, struct dag_variable_value *v)
+int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, char *name, struct dag_variable_value *v)
 {
 	struct dag *d = bk->d;
 	int   special = 0;
@@ -1301,21 +1301,27 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 		return 0;
 	}
 
-	struct dag_lookup_set s = { d, bk->category, n, NULL };
-	struct dag_variable_value *v = dag_lookup(name, &s);
-	struct hash_table *current_table = d->variables;
-
-	if(append && v) {
-		if(s.table)
-			current_table = s.table;
-		v = dag_variable_value_append_or_create(v, value);
-	} else {
-		if(n)
-			current_table = n->variables;
-		v = dag_variable_value_create(value);
+	struct hash_table *current_table;
+	int nodeid;
+	if(n)
+	{
+		current_table = n->variables;
+		nodeid        = n->nodeid;
+	}
+	else
+	{
+		current_table = d->variables;
+		nodeid        = bk->d->nodeid_counter;
 	}
 
-	dag_parse_process_variable(bk, n, current_table, name, v);
+	if(append)
+	{
+		dag_parse_append_variable(bk, nodeid, n, name, value);
+	}
+	else
+	{
+		dag_variable_add_value(name, current_table, nodeid, value);
+	}
 
 	if(append)
 		debug(D_DEBUG, "%s appending to variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
@@ -2893,7 +2899,15 @@ int main(int argc, char *argv[])
 	if(!d) {
 		free(logfilename);
 		free(batchlogfilename);
-		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
+		if(errno)
+		{
+			fatal("couldn't load %s: %s\n", dagfile, strerror(errno));
+		}
+		else
+		{
+			fprintf(stderr, "couldn't load %s: invalid syntax.\n", dagfile);
+			return 1;
+		}
 	}
 
 	if(syntax_check) {

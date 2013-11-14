@@ -43,8 +43,9 @@ struct dag {
     struct list *symlinks_created;           /* Remote filenames for which a symlink was 
                                                 created (used now only for Condor, and only for 
                                                 the final cleanup). */
-    struct hash_table *variables;            /* Mappings between variables defined in the makeflow 
-                                                file and their substitution. */
+	struct hash_table *variables;            /* Mappings between variable names
+												defined in the makeflow file
+												and their values. */
     struct set *collect_table;               /* Keeps files that are garbage collectable. */
     struct list *export_list;                /* List of variables with prefix export. 
                                                 (these are setenv'ed eventually). */
@@ -158,7 +159,7 @@ struct dag_node {
                                            file labeled which tasks have comparable resource usage. */ 
 
 
-    struct hash_table *variables;       /* This node settings for environment variables (@ syntax) */
+    struct hash_table *variables;       /* This node settings for variables with @ syntax */
 
     /* Variables used in dag_width, dag_width_uniform_task, and dag_depth
      * functions. Probably we should move them only to those functions, using
