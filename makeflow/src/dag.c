@@ -58,8 +58,8 @@ struct dag *dag_create()
 
 		/* Add GC_*_LIST to variables table to ensure it is in
 		 * global DAG scope. */
-		hash_table_insert(d->variables, "GC_COLLECT_LIST", dag_variable_value_create(""));
-		hash_table_insert(d->variables, "GC_PRESERVE_LIST", dag_variable_value_create(""));
+		hash_table_insert(d->variables, "GC_COLLECT_LIST", dag_variable_create(""));
+		hash_table_insert(d->variables, "GC_PRESERVE_LIST", dag_variable_create(""));
 
 		memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
 		return d;
@@ -344,10 +344,20 @@ struct dag_variable_value *dag_lookup(const char *name, void *arg)
 	struct dag_lookup_set *s = (struct dag_lookup_set *) arg;
 	struct dag_variable_value *v;
 
+	int nodeid;
+	if(s->node)
+	{
+		nodeid = s->node->nodeid;
+	}
+	else if(s->dag)
+	{
+		nodeid = s->dag->nodeid_counter;
+	}
+
 	if(s) {
 		/* Try node variables table */
 		if(s->node) {
-			v = (struct dag_variable_value *) hash_table_lookup(s->node->variables, name);
+			v = dag_get_variable_value(name, s->node->variables, nodeid);
 			if(v) {
 				s->table = s->node->variables; //why this line?
 				return v;
@@ -356,7 +366,7 @@ struct dag_variable_value *dag_lookup(const char *name, void *arg)
 
 		/* Try variables from category */
 		if(s->category) {
-			v = (struct dag_variable_value *) hash_table_lookup(s->category->variables, name);
+			v = dag_get_variable_value(name, s->category->variables, nodeid);
 			if(v) {
 				s->table = s->category->variables;
 				return v;
@@ -365,7 +375,7 @@ struct dag_variable_value *dag_lookup(const char *name, void *arg)
 
 		/* Try dag variables table */
 		if(s->dag) {
-			v = (struct dag_variable_value *) hash_table_lookup(s->dag->variables, name);
+			v = dag_get_variable_value(name, s->dag->variables, nodeid);
 			if(v) {
 				s->table = s->dag->variables;
 				return v;
@@ -437,8 +447,9 @@ struct dag_variable_value *dag_variable_value_create(const char *value)
 {
 	struct dag_variable_value *v = malloc(sizeof(struct dag_variable_value));
 
-	v->len  = strlen(value);
-	v->size = v->len + 1;
+	v->nodeid = -1;
+	v->len    = strlen(value);
+	v->size   = v->len + 1;
 
 	v->value = malloc(v->size * sizeof(char));
 
