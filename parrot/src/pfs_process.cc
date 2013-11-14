@@ -298,7 +298,7 @@ void pfs_process_exit_group( struct pfs_process *child )
 	while(itable_nextkey(pfs_process_table,&pid,(void**)&p)) {
 		if(p && p!=child && p->tgid == child->tgid) {
 			debug(D_PROCESS,"exiting process %d",p->pid);
-			pfs_process_stop(p,0,usage);
+			pfs_process_stop(p,0,&usage);
 		}
 	}
 }
