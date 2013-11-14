@@ -1214,31 +1214,65 @@ int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, struct
 	}
 	else if(strcmp(RESOURCES_CORES,  name) == 0) {
 		special = 1;
-		current_table = bk->category->variables;
 		bk->category->resources->cores             = atoi(v->value);
 	}
 	else if(strcmp(RESOURCES_MEMORY, name) == 0) {
 		special = 1;
-		current_table = bk->category->variables;
 		bk->category->resources->resident_memory   = atoi(v->value);
 	}
 	else if(strcmp(RESOURCES_DISK,   name) == 0) {
 		special = 1;
-		current_table = bk->category->variables;
 		bk->category->resources->workdir_footprint = atoi(v->value);
 	}
 	else if(strcmp(RESOURCES_GPUS,   name) == 0) {
 		special = 1;
-		current_table = bk->category->variables;
 		bk->category->resources->gpus              = atoi(v->value);
 	}
 	/* else if some other special variable .... */
 	/* ... */
 
-	hash_table_remove(current_table, name); //memory leak...
-	hash_table_insert(current_table, name, v);
-
 	return special;
+}
+
+void dag_parse_append_variable(struct lexer_book *bk, int nodeid, struct dag_node *n, const char *name, const char *value)
+{
+	struct dag_lookup_set      sd = { bk->d, NULL, NULL, NULL };
+	struct dag_variable_value *vd = dag_lookup(name, &sd);
+	
+	struct dag_variable_value *v;
+	if(n)
+	{ 
+		v = dag_get_variable_value(name, n->variables, nodeid);
+		if(v)
+		{
+			dag_variable_value_append_or_create(v, value);
+		}
+		else
+		{ 
+			char *new_value;
+			if(vd)
+			{ 
+				new_value = string_format("%s %s", vd->value, value);
+			}
+			else
+			{
+				new_value = xxstrdup(value);
+			}
+			dag_variable_add_value(name, n->variables, nodeid, new_value);
+			free(new_value);
+		}
+	}
+	else
+	{
+		if(vd)
+		{
+			dag_variable_value_append_or_create(vd, value);
+		}
+		else
+		{
+			dag_variable_add_value(name, bk->d->variables, nodeid, value);
+		}
+	}
 }
 
 int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
