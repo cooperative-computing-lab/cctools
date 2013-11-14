@@ -47,7 +47,7 @@ static struct nvpair **global_catalog = NULL; //pointer to an array of nvpair po
 
 static struct nvpair_header queue_headers[] = {
 	{"project",       "PROJECT", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 18},
-	{"name",          "HOST",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 22},
+	{"name",          "HOST",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 21},
 	{"port",          "PORT",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 5},
 	{"tasks_waiting", "WAITING",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
 	{"tasks_running",  "RUNNING",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},

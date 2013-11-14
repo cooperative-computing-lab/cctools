@@ -149,3 +149,5 @@ static pfs_service_dcap pfs_service_dcap_instance;
 pfs_service *pfs_service_dcap = &pfs_service_dcap_instance;
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

@@ -1010,3 +1010,5 @@ int pfs_fremovexattr (int fd, const char *name)
 	result = pfs_current->table->fremovexattr(fd,name);
 	END
 }
+
+/* vim: set noexpandtab tabstop=4: */

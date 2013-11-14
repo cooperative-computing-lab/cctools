@@ -20,6 +20,7 @@
 #ifdef HAS_FTS_H
 #include <fts.h>
 #endif
+#include <ftw.h>
 
 #include "int_sizes.h"
 
@@ -28,6 +29,8 @@
 
 #define ONE_MEGABYTE 1048576  /* this many bytes */
 #define ONE_SECOND   1000000  /* this many usecs */    
+
+#define MAX_FILE_DESCRIPTOR_COUNT 500 /* maximum depth of file tree walking */
 
 //time in usecs, no seconds:
 struct cpu_time_info

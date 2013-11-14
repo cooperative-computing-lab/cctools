@@ -271,3 +271,5 @@ static pfs_service_gfal pfs_service_gfal_instance;
 pfs_service *pfs_service_gfal = &pfs_service_gfal_instance;
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

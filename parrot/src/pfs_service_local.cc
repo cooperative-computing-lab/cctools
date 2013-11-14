@@ -743,3 +743,5 @@ struct pfs_file * pfs_file_bootstrap( int fd, const char *path )
 	name.is_local = 1;
 	return new pfs_file_local(&name,fd,1);
 }
+
+/* vim: set noexpandtab tabstop=4: */

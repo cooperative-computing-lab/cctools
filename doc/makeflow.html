@@ -26,7 +26,7 @@ td
 
 </style>
 <h1>Makeflow User's Manual</h1>
-<b>Last Updated July 2013</b>
+<b>Last Updated November 2013</b>
 <p>
 Makeflow is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -536,6 +536,46 @@ These will be used to construct a task submission for each makeflow rule that co
 </pre>
 The wrapper script is a shell script that reads the command to be run as an argument and handles bookkeeping operations necessary for Makeflow.
 
+<h2>Makeflow Garbage Collection</h2>
+
+<p>
+As the workflow execution progresses, Makeflow can automatically delete
+intermediate files that are no longer needed. In this context, an intermediate
+file is an input of some rule that is the target of another rule. Therefore, by
+default, garbage collection does not delete the original input files, nor <em>
+	final </em> target files.
+
+<p>
+Which files are deleted can be tailored from the default by appending files to
+the Makeflow variables <tt>GC_PRESERVE_LIST</tt> and <tt>GC_COLLECT_LIST</tt>.
+Files added to <tt>GC_PRESERVE_LIST</tt> are never deleted, thus it is used to
+mark intermediate files that should not be deleted. Similarly,
+<tt>GC_COLLECT_LIST</tt> marks final target files that should be deleted.
+Makeflow is conservative, in the sense that <tt>GC_PRESERVE_LIST</tt> takes
+precedence over <tt>GC_COLLECT_LIST</tt>, and original input files are never
+deleted, even if they are listed in <tt>GC_COLLECT_LIST</tt>.
+
+<p>
+Makeflow offers two modes for garbage collection: reference count, and on
+demand. With the reference count mode, intermediate files are deleted as soon
+as no rule has them listed as input. The on-demand mode is similar to reference
+count, only that files are deleted until the space on the local file system is
+below a given threshold.
+
+<p>
+To activate reference count garbage collection:
+
+<pre>
+makeflow -gref_count
+</pre>
+
+<p>
+To activate on-demand garbage collection, with a threshold of 500MB:
+
+<pre>
+makeflow -gon_demand -G500000000
+</pre>
+
 <h2>Makeflow Log File Format</h2>
 After you  have executed the <tt>example.makeflow</tt> Makeflow script, you
 should see a log file named <tt>example.makeflow.makeflowlog</tt> under the
@@ -627,9 +667,10 @@ event occured is recorded:
 # FAILED timestamp
 </pre>
 
-<tt>Makeflow</tt> garbage-collects system memory associate with each task at
-runtime. The Makeflow log file also logs the garbage collection activities. You
-will find garbage collection related lines start with the '# GC' prefix:
+When file garbage collection is enabled, the log file records information at
+each collection cycle. Collection information is included in lines starting
+with the '# GC' prefix:
+
 <pre>
 # GC timestamp collected time_spent dag_gc_collected
 </pre>
@@ -667,4 +708,4 @@ Example usage:
 For the latest information about Makeflow, please visit our <a href=http://www.cse.nd.edu/~ccl/software/makeflow>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
 
 </body>
-</html>
+
