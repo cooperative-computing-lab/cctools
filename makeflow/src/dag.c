@@ -26,6 +26,8 @@ See the file COPYING for details.
 
 extern int verbose_parsing;
 
+struct dag_variable *dag_variable_create(const char *initial_value);
+
 struct dag *dag_create()
 {
 	struct dag *d = malloc(sizeof(*d));
@@ -286,6 +288,57 @@ char *dag_lookup_set(const char *name, void *arg)
 	return dag_lookup_str(name, &s);
 }
 
+/* 'floor' of node_id */
+int variable_binary_search(struct dag_variable_value **values, int nodeid, int min, int max)
+{
+	if(nodeid < 0)
+		return max;
+
+	struct dag_variable_value *v;
+	int mid;
+
+	while(max >= min)
+	{
+		mid = (max + min)/2;
+		v = values[mid];
+
+		if(v->nodeid < nodeid)
+		{
+			min = mid + 1;
+		}
+		else if(v->nodeid > nodeid)
+		{
+			max = mid - 1;
+		}
+		else
+		{
+			return mid;
+		}
+	}
+
+	//here max =< min, thus v[max] < nodeid < v[min]
+	return max;
+}
+
+struct dag_variable_value *dag_get_variable_value(const char *name, struct hash_table *t, int node_id)
+{
+	struct dag_variable *var;
+
+	var = (struct dag_variable *) hash_table_lookup(t, name);
+
+	if(!var)
+		return NULL;
+
+	if(node_id < 0)
+		return var->values[var->count - 1];
+
+	int index = variable_binary_search(var->values, node_id, 0, var->count - 1);
+	if(index < 0)
+		return NULL;
+
+	return var->values[index];
+}
+
 struct dag_variable_value *dag_lookup(const char *name, void *arg)
 {
 	struct dag_lookup_set *s = (struct dag_lookup_set *) arg;
@@ -337,6 +390,47 @@ char *dag_lookup_str(const char *name, void *arg)
 		return xxstrdup(v->value);
 	else
 		return NULL;
+}
+
+void dag_variable_add_value(const char *name, struct hash_table *current_table, int nodeid, const char *value)
+{
+	struct dag_variable *var = hash_table_lookup(current_table, name);
+	if(!var)
+	{
+		var = dag_variable_create(NULL);
+		hash_table_insert(current_table, name, var);
+	}
+
+	struct dag_variable_value *v = dag_variable_value_create(value);
+	v->nodeid = nodeid;
+
+	if(var->count < 1 || var->values[var->count - 1]->nodeid != v->nodeid)
+	{
+		var->count++;
+		var->values = realloc(var->values, var->count * sizeof(struct dag_variable_value *));
+	}
+
+	//possible memory leak...
+	var->values[var->count - 1] = v;
+}
+
+struct dag_variable *dag_variable_create(const char *initial_value)
+{
+	struct dag_variable *var = malloc(sizeof(struct dag_variable *));
+
+	if(initial_value)
+	{
+		var->count  = 1;
+		var->values = malloc(sizeof(struct dag_variable_value *));
+		var->values[0] = dag_variable_value_create(initial_value);
+	}
+	else
+	{
+		var->count  = 0;
+		var->values = NULL;
+	}
+
+	return var;
 }
 
 struct dag_variable_value *dag_variable_value_create(const char *value)

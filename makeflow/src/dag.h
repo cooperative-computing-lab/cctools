@@ -195,8 +195,19 @@ struct dag_lookup_set {
     struct hash_table *table;
 };
 
+/* A makeflow variable may have different bindings, depending on where it was
+ * defined. struct dag_variable keeps track of these values. When a
+ * substitution is required in a rule, we look for the value binded just before
+ * the rule (using binary search on either n->nodeid or d->nodeid_counter).
+ */
+struct dag_variable {
+	int    count;
+	struct dag_variable_value **values;
+};
 
 struct dag_variable_value {
+	int   nodeid;                           /* The nodeid of the rule to which
+											   this value binding takes effect. */
 	int   size;                             /* memory size allocated for value */
 	int   len;                              /* records strlen(value) */
 	char *value;
@@ -230,6 +241,8 @@ char *dag_node_translate_filename(struct dag_node *n, const char *filename);
 char *dag_file_remote_name(struct dag_node *n, const char *filename);
 int dag_file_isabsolute(const struct dag_file *f);
 
+void dag_variable_add_value(const char *name, struct hash_table *current_table, int nodeid, const char *value);
+struct dag_variable_value *dag_get_variable_value(const char *name, struct hash_table *t, int node_id);
 struct dag_variable_value *dag_lookup(const char *name, void *arg);
 char *dag_lookup_set(const char *name, void *arg);
 char *dag_lookup_str(const char *name, void *arg);
