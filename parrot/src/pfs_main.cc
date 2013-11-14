@@ -295,7 +295,7 @@ something interesting has happened to this pid. Decode
 the event and take the appropriate action.
 */
 
-static void handle_event( pid_t pid, int status, struct rusage usage )
+static void handle_event( pid_t pid, int status, struct rusage *usage )
 {
 	struct pfs_process *p;
 	int signum;
@@ -378,7 +378,6 @@ int main( int argc, char *argv[] )
 	char *s;
 	int i;
 	int chose_auth=0;
-	struct rusage usage;
 	int c;
 	char *tickets = NULL;
 
@@ -784,6 +783,7 @@ int main( int argc, char *argv[] )
 	while(pfs_process_count()>0) {
 		while(1) {
 			int flags;
+			struct rusage usage;
 			if(trace_this_pid!=-1) {
 				flags = WUNTRACED|__WALL;
 			} else {
@@ -797,7 +797,7 @@ int main( int argc, char *argv[] )
 					break;
 				}
 			} else if(pid>0) {
-				handle_event(pid,status,usage);
+				handle_event(pid,status,&usage);
 			} else {
 				break;
 			}

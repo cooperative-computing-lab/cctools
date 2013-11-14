@@ -79,7 +79,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 struct pfs_process * pfs_process_lookup( pid_t pid );
 void pfs_process_delete( struct pfs_process *p );
 
-void pfs_process_stop( struct pfs_process *p, int status, struct rusage usage );
+void pfs_process_stop( struct pfs_process *p, int status, struct rusage *usage );
 void pfs_process_exit_group( struct pfs_process *p );
 int pfs_process_waitpid( struct pfs_process *p, pid_t wait_pid, int *wait_ustatus, int wait_options, struct rusage *wait_urusage );
 
