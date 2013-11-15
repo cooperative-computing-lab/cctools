@@ -108,7 +108,6 @@ struct dag_task_category
 	char *label;
 	struct rmsummary *resources;
 	struct list *nodes;
-	struct hash_table *variables;
 };
 
 /* struct dag_node implements a linked list of nodes. A dag_node
