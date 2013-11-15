@@ -40,7 +40,8 @@ def badSyntax(str):
 if len(sys.argv)>2:
   report_frequency = int(sys.argv[1])
 elif (sys.argv[1]=='-v'):
-  print "Version "+current_version
+  command = sys.argv[0].split('/')[-1]
+  print command+" version CCTOOLS_VERSION (released CCTOOLS_RELEASEDATE)"
   sys.exit(0)
 elif (sys.argv[1]=='-h'):
   badSyntax('')

@@ -41,7 +41,8 @@ def timeToFileName(ts, days_offset=0):
 # Get source directory
 if len(sys.argv)>1 and sys.argv[1]:
   if (sys.argv[1]=='-v'):
-    print "Version "+current_version
+    command = sys.argv[0].split('/')[-1]
+    print command+" version CCTOOLS_VERSION (released CCTOOLS_RELEASEDATE)"
     sys.exit(0)
   elif (sys.argv[1]=='-h'):
     badSyntax('')

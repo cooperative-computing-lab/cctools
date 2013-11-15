@@ -1200,6 +1200,9 @@ CCTOOLS_M4_ARGS=-DCCTOOLS_VERSION=${major}.${minor}.${micro} -DCCTOOLS_RELEASE_D
 CCTOOLS_BUILD_LIB64PARROT_HELPER=${build_lib64parrot_helper}
 CCTOOLS_BUILD_LIB32PARROT_HELPER=${build_lib32parrot_helper}
 
+CCTOOLS_VERSION=${version}
+CCTOOLS_RELEASEDATE=${release_date}
+
 EOF
 
 echo ""
