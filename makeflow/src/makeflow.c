@@ -1231,6 +1231,11 @@ int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, char *
 	/* else if some other special variable .... */
 	/* ... */
 
+	if(special)
+	{
+		set_insert(d->special_vars, name);
+	}
+
 	return special;
 }
 
