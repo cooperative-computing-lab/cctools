@@ -2415,37 +2415,66 @@ struct work_queue_file * work_queue_file_create(const char * remote_name, int ty
 
 int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url, const char *remote_name, int type, int flags)
 {
-        debug(D_WQ, "work_queue_task_specify_url\n");
-        struct list *files;
-        struct work_queue_file *tf;
+	struct list *files;
+	struct work_queue_file *tf;
 
-        if(!t || !file_url || !remote_name) {
-                return 0;
-        }
-        if(remote_name[0] == '/') {
-                return 0;
-        }
+	if(!t || !file_url || !remote_name) {
+		fprintf(stderr, "Error: Null arguments for task, url, and remote name not allowed in specify_url.\n");
+		return 0;
+	}
+	if(remote_name[0] == '/') {
+		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
+		return 0;
+	}
 
+	if(type == WORK_QUEUE_INPUT) {
+		files = t->input_files;
+		
+		//check if two different urls map to the same remote name for inputs. 	
+		list_first_item(t->input_files);
+		while((tf = (struct work_queue_file*)list_next_item(files))) {
+			if(!strcmp(remote_name, tf->remote_name) && strcmp(file_url, tf->payload)) {
+				fprintf(stderr, "Error: input url %s conflicts with another input pointing to same remote name (%s).\n", file_url, remote_name);
+				return 0;       
+			}
+		}
+		//check if there is an output file with the same remote name. 
+		list_first_item(t->output_files);
+		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+			if(!strcmp(remote_name, tf->remote_name)){
+				fprintf(stderr, "Error: input url %s conflicts with an output pointing to same remote name (%s).\n", file_url, remote_name);
+				return 0;	
+			}
+		}
+	} else {
+		files = t->output_files;
+		
+		//check if two different different remote names map to the same url for outputs. 	
+		list_first_item(t->output_files);
+		while((tf = (struct work_queue_file*)list_next_item(files))) {
+			if(!strcmp(file_url, tf->payload) && strcmp(remote_name, tf->remote_name)) {
+				fprintf(stderr, "Error: output url remote name %s conflicts with another output pointing to same url (%s).\n", remote_name, file_url);
+				return 0;       
+			}
+		}
+		
+		//check if there is an input file with the same remote name. 
+		list_first_item(t->input_files);
+		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+			if(!strcmp(remote_name, tf->remote_name)){
+				fprintf(stderr, "Error: output url %s conflicts with an input pointing to same remote name (%s).\n", file_url, remote_name);
+				return 0;	
+			}
+		}
+	}
 
-        if(type == WORK_QUEUE_INPUT) {
-                files = t->input_files;
-        } else {
-                files = t->output_files;
-        }
+	tf = work_queue_file_create(remote_name, WORK_QUEUE_URL, flags);
+	tf->length = strlen(file_url);
+	tf->payload = xxstrdup(file_url);
 
-        list_first_item(files);
-        while((tf = (struct work_queue_file*)list_next_item(files))) {
-                if(!strcmp(remote_name, tf->remote_name))
-                {       return 0;       }
-        }
+	list_push_tail(files, tf);
 
-        tf = work_queue_file_create(remote_name, WORK_QUEUE_URL, flags);
-        tf->length = strlen(file_url);
-        tf->payload = xxstrdup(file_url);
-
-        list_push_tail(files, tf);
-
-        return 1;
+	return 1;
 }
 
 int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)
@@ -2454,6 +2483,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	struct work_queue_file *tf;
 	
 	if(!t || !local_name || !remote_name) {
+		fprintf(stderr, "Error: Null arguments for task, local name, and remote name not allowed in specify_file.\n");
 		return 0;
 	}
 
@@ -2463,29 +2493,53 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	// the worker(the worker on which the task will be executed) is unlikely to
 	// be known. Thus @param remote_name should not be an absolute path.
 	if(remote_name[0] == '/') {
+		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
 		return 0;
 	}
 	
 	
 	if(type == WORK_QUEUE_INPUT) {
 		files = t->input_files;
+		
+		//check if two different local names map to the same remote name for inputs.	
+		list_first_item(t->input_files);
+		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
+				fprintf(stderr, "Error: input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
+				return 0;	
+			}
+		} 
+		
+		//check if there is an output file with the same remote name. 
+		list_first_item(t->output_files);
+		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+			if(!strcmp(remote_name, tf->remote_name)){
+				fprintf(stderr, "Error: input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
+				return 0;	
+			}
+		} 	
 	} else {
 		files = t->output_files;
+		
+		//check if two different different remote names map to the same local name for outputs. 	
+		list_first_item(files);
+		while((tf = (struct work_queue_file*)list_next_item(files))) {
+			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
+				fprintf(stderr, "Error: output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
+				return 0;       
+			}
+		}
+		
+		//check if there is an input file with the same remote name. 
+		list_first_item(t->input_files);
+		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+			if(!strcmp(remote_name, tf->remote_name)){
+				fprintf(stderr, "Error: output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
+				return 0;	
+			}
+		}
 	}
 	
-	list_first_item(t->input_files);
-	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
-		if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload))
-		{	fprintf(stderr, "Error: There is another input file with the same remote file name (%s).\n", remote_name);
-			return 0;	}
-	}
-	list_first_item(t->output_files);
-	while((tf = (struct work_queue_file*)list_next_item(t->output_files))) {
-		if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name))
-		{	fprintf(stderr, "Error: There is another output file with the same local file name (%s).\n", local_name);
-			return 0;	}
-	}
-
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_FILE, flags);
 
 	tf->length = strlen(local_name);
@@ -2500,6 +2554,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	struct work_queue_file *tf;
 	
 	if(!t || !remote_name) {
+		fprintf(stderr, "Error: Null arguments for task and remote name not allowed in specify_directory.\n");
 		return 0;
 	}
 
@@ -2509,6 +2564,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	// the worker(the worker on which the task will be executed) is unlikely to
 	// be known. Thus @param remote_name should not be an absolute path.
 	if(remote_name[0] == '/') {
+		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
 		return 0;
 	}
 
@@ -2547,29 +2603,62 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 	struct list *files;
 	struct work_queue_file *tf;
 	if(!t || !local_name || !remote_name) {
+		fprintf(stderr, "Error: Null arguments for task, local name, and remote name not allowed in specify_file_piece.\n");
 		return 0;
 	}
 
 	// @param remote_name should not be an absolute path. @see
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
+		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
 		return 0;
 	}
 
 	if(end_byte < start_byte) {
+		fprintf(stderr, "Error: End byte lower than start byte for %s.\n", remote_name);
 		return 0;
 	}
 
 	if(type == WORK_QUEUE_INPUT) {
 		files = t->input_files;
+		
+		//check if two different local names map to the same remote name for inputs.	
+		list_first_item(t->input_files);
+		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
+				fprintf(stderr, "Error: piece of input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
+				return 0;	
+			}
+		} 
+		
+		//check if there is an output file with the same remote name. 
+		list_first_item(t->output_files);
+		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+			if(!strcmp(remote_name, tf->remote_name)){
+				fprintf(stderr, "Error: piece of input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
+				return 0;	
+			}
+		}
 	} else {
 		files = t->output_files;
-	}
-	
-	list_first_item(files);
-	while((tf = (struct work_queue_file*)list_next_item(files))) {
-		if(!strcmp(remote_name, tf->remote_name))
-		{	return 0;	}
+		
+		//check if two different different remote names map to the same local name for outputs. 	
+		list_first_item(files);
+		while((tf = (struct work_queue_file*)list_next_item(files))) {
+			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
+				fprintf(stderr, "Error: piece of output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
+				return 0;       
+			}
+		}
+		
+		//check if there is an input file with the same remote name. 
+		list_first_item(t->input_files);
+		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+			if(!strcmp(remote_name, tf->remote_name)){
+				fprintf(stderr, "Error: piece of output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
+				return 0;	
+			}
+		}
 	}
 	
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_FILE_PIECE, flags);
@@ -2587,20 +2676,32 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 {
 	struct work_queue_file *tf;
 	if(!t || !remote_name) {
+		fprintf(stderr, "Error: Null arguments for task and remote name not allowed in specify_buffer.\n");
 		return 0;
 	}
 
 	// @param remote_name should not be an absolute path. @see
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
+		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
 		return 0;
 	}
 
 	list_first_item(t->input_files);
 	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
-		if(!strcmp(remote_name, tf->remote_name))
-		{	return 0;	}
+		if(!strcmp(remote_name, tf->remote_name)) {	
+			fprintf(stderr, "Error: buffer conflicts with another input pointing to same remote name (%s).\n", remote_name);
+			return 0;	
+		}
 	}
+	
+	list_first_item(t->output_files);
+	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		if(!strcmp(remote_name, tf->remote_name)) {	
+			fprintf(stderr, "Error: buffer conflicts with an output pointing to same remote name (%s).\n", remote_name);
+			return 0;	
+		}
+	}	
 	
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_BUFFER, flags);
 	tf->length = length;
@@ -2616,25 +2717,57 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 	struct list *files;
 	struct work_queue_file *tf;
 	if(!t || !remote_name || !cmd) {
+		fprintf(stderr, "Error: Null arguments for task, remote name, and command not allowed in specify_file_command.\n");
 		return 0;
 	}
 
 	// @param remote_name should not be an absolute path. @see
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
+		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
 		return 0;
 	}
 
 	if(type == WORK_QUEUE_INPUT) {
 		files = t->input_files;
+		
+		//check if two different local names map to the same remote name for inputs.	
+		list_first_item(t->input_files);
+		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+			if(!strcmp(remote_name, tf->remote_name) && strcmp(cmd, tf->payload)){
+				fprintf(stderr, "Error: input file command %s conflicts with another input pointing to same remote name (%s).\n", cmd, remote_name);
+				return 0;	
+			}
+		} 
+		
+		//check if there is an output file with the same remote name. 
+		list_first_item(t->output_files);
+	    while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+			if(!strcmp(remote_name, tf->remote_name)) {
+				fprintf(stderr, "Error: input file command %s conflicts with an output pointing to same remote name (%s).\n", cmd, remote_name);
+				return 0;	
+			}
+		} 	
 	} else {
 		files = t->output_files;
-	}
-	
-	list_first_item(files);
-	while((tf = (struct work_queue_file*)list_next_item(files))) {
-		if(!strcmp(remote_name, tf->remote_name))
-		{	return 0;	}
+		
+		//check if two different different remote names map to the same local name for outputs. 	
+		list_first_item(files);
+		while((tf = (struct work_queue_file*)list_next_item(files))) {
+			if(!strcmp(cmd, tf->payload) && strcmp(remote_name, tf->remote_name)) {
+				fprintf(stderr, "Error: output file command %s conflicts with another output pointing to same remote name (%s).\n", cmd, remote_name);
+				return 0;       
+			}
+		}
+		
+		//check if there is an input file with the same remote name. 
+		list_first_item(t->input_files);
+	    while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+			if(!strcmp(remote_name, tf->remote_name)){
+				fprintf(stderr, "Error: output file command %s conflicts with an input pointing to same remote name (%s).\n", cmd, remote_name);
+				return 0;	
+			}
+		}
 	}
 	
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_REMOTECMD, flags);
