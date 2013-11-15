@@ -49,6 +49,9 @@ struct dag {
     struct set *collect_table;               /* Keeps files that are garbage collectable. */
     struct list *export_list;                /* List of variables with prefix export. 
                                                 (these are setenv'ed eventually). */
+	struct set *special_vars;                /* List of special variables,
+												such as, category, disk,
+												memory, etc. */
     FILE *logfile;
     int node_states[DAG_NODE_STATE_MAX];     /* node_states[STATE] keeps the count of nodes that 
                                                 have state STATE \in dag_node_state_t. */
