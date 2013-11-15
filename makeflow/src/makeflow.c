@@ -1184,16 +1184,18 @@ char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 }
 
 //return 1 if name is special variable, 0 otherwise
-int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, char *name, struct dag_variable_value *v)
+int dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *n, int nodeid, char *name, const char *value)
 {
 	struct dag *d = bk->d;
 	int   special = 0;
 
 	if(strcmp(RESOURCES_CATEGORY, name) == 0) {
 		special = 1;
+		set_insert(d->special_vars, RESOURCES_CATEGORY);
+
 		/* If we have never seen this label, then create
 		 * a new category, otherwise retrieve the category. */
-		struct dag_task_category *category = dag_task_category_lookup_or_create(d, v->value);
+		struct dag_task_category *category = dag_task_category_lookup_or_create(d, value);
 
 		/* If we are parsing inside a node, make category
 		 * the category of the node, but do not update
@@ -1205,34 +1207,34 @@ int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, char *
 			n->category = category;
 			/* and add it to the new one */
 			list_push_tail(n->category->nodes, n);
-			debug(D_DEBUG, "Updating category '%s' for rule %d.\n", v->value, n->nodeid);
+			debug(D_DEBUG, "Updating category '%s' for rule %d.\n", value, n->nodeid);
 		}
 		else
 			bk->category = category;
 	}
-	else if(strcmp(RESOURCES_CORES,  name) == 0) {
+	else if(strcmp(RESOURCES_CORES,  name) == 0)
+	{
 		special = 1;
-		bk->category->resources->cores             = atoi(v->value);
+		set_insert(d->special_vars, RESOURCES_CORES);
 	}
-	else if(strcmp(RESOURCES_MEMORY, name) == 0) {
+	else if(strcmp(RESOURCES_MEMORY,  name) == 0)
+	{
 		special = 1;
-		bk->category->resources->resident_memory   = atoi(v->value);
+		set_insert(d->special_vars, RESOURCES_MEMORY);
 	}
-	else if(strcmp(RESOURCES_DISK,   name) == 0) {
+	else if(strcmp(RESOURCES_DISK,  name) == 0)
+	{
 		special = 1;
-		bk->category->resources->workdir_footprint = atoi(v->value);
+		set_insert(d->special_vars, RESOURCES_DISK);
 	}
-	else if(strcmp(RESOURCES_GPUS,   name) == 0) {
+
+	else if(strcmp(RESOURCES_GPUS,  name) == 0)
+	{
 		special = 1;
-		bk->category->resources->gpus              = atoi(v->value);
+		set_insert(d->special_vars, RESOURCES_GPUS);
 	}
 	/* else if some other special variable .... */
 	/* ... */
-
-	if(special)
-	{
-		set_insert(d->special_vars, name);
-	}
 
 	return special;
 }
@@ -1327,6 +1329,8 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 	{
 		dag_variable_add_value(name, current_table, nodeid, value);
 	}
+
+	dag_parse_process_special_variable(bk, n, nodeid, name, value);
 
 	if(append)
 		debug(D_DEBUG, "%s appending to variable name=%s, value=%s", (n ? "node" : "dag"), name, value);

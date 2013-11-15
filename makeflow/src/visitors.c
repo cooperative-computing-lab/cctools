@@ -67,7 +67,7 @@ int dag_to_file_exports(const struct dag *d, FILE * dag_stream, const char *pref
 			if(!string_null_or_empty(v->value))
 					fprintf(dag_stream, "\"%s\"", (char *) v->value);
 			fprintf(dag_stream, "\n");
-		fprintf(dag_stream, "export %s\n", name);
+			fprintf(dag_stream, "export %s\n", name);
 		}
 	}
 
@@ -109,7 +109,6 @@ int dag_to_file_files(struct dag_node *n, struct list *fs, FILE * dag_stream, ch
  * */
 int dag_to_file_node(struct dag_node *n, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
 {
-	fprintf(dag_stream, "\n");
 	dag_to_file_files(n, n->target_files, dag_stream, rename);
 	fprintf(dag_stream, ": ");
 	dag_to_file_files(n, n->source_files, dag_stream, rename);
@@ -127,29 +126,10 @@ int dag_to_file_node(struct dag_node *n, FILE * dag_stream, char *(*rename) (str
 	return 0;
 }
 
-int dag_to_file_category_variables(struct dag_task_category *c, FILE * dag_stream)
-{
-	struct rmsummary *s = c->resources;
-
-	fprintf(dag_stream, "\n");
-	fprintf(dag_stream, "CATEGORY=\"%s\"\n", c->label);
-
-	if(s->cores > -1)
-		fprintf(dag_stream, "CORES=%" PRId64 "\n", s->cores);
-	if(s->resident_memory > -1)
-		fprintf(dag_stream, "MEMORY=%" PRId64 "\n", s->resident_memory);
-	if(s->workdir_footprint > -1)
-		fprintf(dag_stream, "DISK=%" PRId64 "\n", s->workdir_footprint);
-
-	return 0;
-}
-
 /* Writes all the rules to the stream, per category, plus any variables from the category */
 int dag_to_file_category(struct dag_task_category *c, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
 {
 	struct dag_node *n;
-
-	dag_to_file_category_variables(c, dag_stream);
 
 	list_first_item(c->nodes);
 	while((n = list_next_item(c->nodes)))
