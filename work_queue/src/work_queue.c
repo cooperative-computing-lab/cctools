@@ -2511,7 +2511,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	if(remote_name[0] == '/') {
 		return 0;
 	}
-	
+
 	if(type == WORK_QUEUE_OUTPUT || recursive) {
 		return work_queue_task_specify_file(t, local_name, remote_name, type, flags);
 	}
@@ -2525,6 +2525,18 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	}
 
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_DIRECTORY, flags);
+
+	//KNOWN HACK: Every file passes through make_cached_name() which expects the
+	//payload field to be set. So we simply set the payload to remote name if
+	//local name is null. This doesn't affect the behavior of the file transfers.
+	if(local_name) {
+		tf->length = strlen(local_name);
+		tf->payload = xxstrdup(local_name);
+	} else {
+		tf->length = strlen(remote_name);
+		tf->payload = xxstrdup(remote_name);
+	}
+
 	list_push_tail(files, tf);
 	return 1;
 	

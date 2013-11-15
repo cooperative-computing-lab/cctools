@@ -298,7 +298,7 @@ void pfs_process_exit_group( struct pfs_process *child )
 	while(itable_nextkey(pfs_process_table,&pid,(void**)&p)) {
 		if(p && p!=child && p->tgid == child->tgid) {
 			debug(D_PROCESS,"exiting process %d",p->pid);
-			pfs_process_stop(p,0,usage);
+			pfs_process_stop(p,0,&usage);
 		}
 	}
 }
@@ -310,7 +310,7 @@ wait for the parent to show up and claim it.  If we wake up a
 parent ourselves, then cause it to be rescheduled.
 */
 
-void pfs_process_stop( struct pfs_process *child, int status, struct rusage usage )
+void pfs_process_stop( struct pfs_process *child, int status, struct rusage *usage )
 {
 	struct pfs_process *parent;
 
@@ -335,7 +335,7 @@ void pfs_process_stop( struct pfs_process *child, int status, struct rusage usag
 	}
 
 	child->exit_status = status;
-	child->exit_rusage = usage;
+	child->exit_rusage = *usage;
 
 	parent = pfs_process_lookup(child->ppid);
 	debug(D_PSTREE, "process %d parent is %d", child->pid, child->ppid);
