@@ -32,24 +32,15 @@ See the file COPYING for details.
  */
 
 /* Writes 'var=value' pairs for special vars to the stream */
-int dag_to_file_vars(struct hash_table *vars, FILE * dag_stream, const char *prefix)
+int dag_to_file_vars(struct set *var_names, struct hash_table *vars, int nodeid, FILE * dag_stream, const char *prefix)
 {
 	char *name;
-	char *var_names[] = {"GC_COLLECT_LIST", 
-		"GC_PRESERVE_LIST",
-		RESOURCES_CATEGORY,
-		RESOURCES_CORES,
-		RESOURCES_MEMORY,
-		RESOURCES_DISK,
-		RESOURCES_GPUS,
-		NULL
-	};
-
-	int i = 0;
 	struct dag_variable_value *v;
-	for(name = var_names[i]; name; name = var_names[i++])
+
+	set_first_element(var_names);
+	while((name = set_next_element(var_names)))
 	{
-		v = hash_table_lookup(vars, name);
+		v = dag_get_variable_value(name, vars, nodeid);
 		if(v && !string_null_or_empty(v->value))
 			fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, name, (char *) v->value);
 	}
@@ -62,11 +53,11 @@ int dag_to_file_exports(const struct dag *d, FILE * dag_stream, const char *pref
 {
 	char *name;
 
-	struct list *vars = d->export_list;
+	struct set *vars = d->export_vars;
 
 	struct dag_variable_value *v;
-	list_first_item(vars);
-	for(name = list_next_item(vars); name; name = list_next_item(vars))
+	set_first_element(vars);
+	for(name = set_next_element(vars); name; name = set_next_element(vars))
 	{
 		v = hash_table_lookup(d->variables, name);
 		if(v)
@@ -123,7 +114,8 @@ int dag_to_file_node(struct dag_node *n, FILE * dag_stream, char *(*rename) (str
 	dag_to_file_files(n, n->source_files, dag_stream, rename);
 	fprintf(dag_stream, "\n");
 
-	dag_to_file_vars(n->variables, dag_stream, "@");
+	dag_to_file_vars(n->d->special_vars, n->variables, n->nodeid, dag_stream, "@");
+	dag_to_file_vars(n->d->export_vars,  n->variables, n->nodeid, dag_stream, "@");
 
 	if(n->local_job)
 		fprintf(dag_stream, "\tLOCAL %s", n->command);
@@ -160,7 +152,11 @@ int dag_to_file_category(struct dag_task_category *c, FILE * dag_stream, char *(
 
 	list_first_item(c->nodes);
 	while((n = list_next_item(c->nodes)))
+	{
+		dag_to_file_vars(n->d->special_vars, n->d->variables, n->nodeid, dag_stream, "");
+		dag_to_file_vars(n->d->export_vars,  n->d->variables, n->nodeid, dag_stream, "");
 		dag_to_file_node(n, dag_stream, rename);
+	}
 
 	return 0;
 }
@@ -191,8 +187,9 @@ int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename) (stru
 	if(!dag_stream)
 		return 1;
 
-	dag_to_file_vars(d->variables, dag_stream, "");
+	// collect list here dag_to_file_vars(d->export_vars, variables, dag_stream, "");
 	dag_to_file_exports(d, dag_stream, "");
+
 	dag_to_file_categories(d, dag_stream, rename);
 
 	if(dag_file)

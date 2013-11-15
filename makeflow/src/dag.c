@@ -52,7 +52,7 @@ struct dag *dag_create()
 		d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 		d->nodeid_counter = 0;
 		d->collect_table = set_create(0);
-		d->export_list  = list_create();
+		d->export_vars  = set_create(0);
 		d->special_vars = set_create(0);
 
 		d->task_categories = hash_table_create(0, 0);

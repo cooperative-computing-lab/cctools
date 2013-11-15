@@ -47,7 +47,7 @@ struct dag {
 												defined in the makeflow file
 												and their values. */
     struct set *collect_table;               /* Keeps files that are garbage collectable. */
-    struct list *export_list;                /* List of variables with prefix export. 
+    struct set *export_vars;                /* List of variables with prefix export. 
                                                 (these are setenv'ed eventually). */
 	struct set *special_vars;                /* List of special variables,
 												such as, category, disk,

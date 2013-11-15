@@ -1702,7 +1702,7 @@ int dag_parse_export(struct lexer_book *bk, char *line)
 				setenv(argv[i], equal + 1, 1);	//this shouldn't be here...
 			}
 		}
-		list_push_tail(bk->d->export_list, xxstrdup(argv[i]));
+		set_insert(bk->d->export_vars, xxstrdup(argv[i]));
 		debug(D_DEBUG, "export variable=%s", argv[i]);
 	}
 	free(argv);
@@ -1714,8 +1714,8 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 	struct dag_lookup_set s = { d, n->category, n, NULL };
 	char *key;
 
-	list_first_item(d->export_list);
-	while((key = list_next_item(d->export_list))) {
+	set_first_element(d->export_vars);
+	while((key = set_next_element(d->export_vars))) {
 		char *value = dag_lookup_str(key, &s);
 		if(value) {
 			setenv(key, value, 1);
