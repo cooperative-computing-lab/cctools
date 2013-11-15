@@ -365,15 +365,6 @@ struct dag_variable_value *dag_lookup(const char *name, void *arg)
 			}
 		}
 
-		/* Try variables from category */
-		if(s->category) {
-			v = dag_get_variable_value(name, s->category->variables, nodeid);
-			if(v) {
-				s->table = s->category->variables;
-				return v;
-			}
-		}
-
 		/* Try dag variables table */
 		if(s->dag) {
 			v = dag_get_variable_value(name, s->dag->variables, nodeid);
@@ -638,7 +629,6 @@ struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, cons
 		category = malloc(sizeof(struct dag_task_category));
 		category->label = xxstrdup(label);
 		category->nodes = list_create();
-		category->variables = hash_table_create(0, 0);
 		category->resources = make_rmsummary(-1);
 		
 		hash_table_insert(d->task_categories, label, category);
