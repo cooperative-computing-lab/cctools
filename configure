@@ -423,6 +423,9 @@ fi
 if [ $build_sys = LINUX ]
 then
         ldflags="-Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic ${link_as_needed}"
+elif [ $build_sys = DARWIN ]
+then
+        ldflags=""
 else
         ldflags="-static-libgcc"
 fi
