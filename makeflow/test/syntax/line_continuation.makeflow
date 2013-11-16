@@ -1,0 +1,6 @@
+out1:
+    echo "One" "Two" \
+    "Three" > out1
+out2: out1
+    grep "One Two Three" out1 > out2 \
+
