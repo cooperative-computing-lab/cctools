@@ -1,0 +1,347 @@
+<html>
+
+<head>
+<title>Catalog History User's Manual</title>
+</head>
+
+<body>
+
+<h1>Catalog History User's Manual</h1>
+<b>October 2013</b>
+<p>
+
+The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain
+and Copyright (C) 2005- The University of Notre Dame.  All rights reserved.
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+
+<h2>Overview</h2>
+
+
+<p>
+When servers report their status to the catalog server, a log file is created to track those reports. The servers are of different types and are allowed to report any values for any field name. In other words, there is no schema beyond the requirement that each reported item must contain a field and value. The catalog server also creates a daily checkpoint file with the current status of all servers still actively reporting. Samples of data from checkpoints and log files for different types of servers are shown further down in this document. The following scripts operate on this data for the creation of summary reports.
+</p>
+
+<p>
+<b>catalog_history_select</b>: Returns the status (or checkpoint) for a specified start time, and all following log data until a specified end time. The script takes three arguments. The first argument is a directory where the catalog history files are stored in sub-directories by year. The second argument specifies the start time as a timestamp or date and time in the format YYYY-MM-DD-HH-MM-SS. The third argument (optional) can be a timestamp, duration, or date and time of the same format YYYY-MM-DD-HH-MM-SS. The duration can be in seconds (+180 or s180), minutes (m45), hours (h8), days (d16), weeks (w3), or years (y2).
+
+</p>
+
+<p>
+<b>catalog_history_filter</b>: Filters streamed data (through stdin) and returns only the series' which satisfy passed arguments based on static fields (those set on at creation or a checkpoint). For example, type=wq_master would only stream series data for series' with type wq_master. The option -dynamic (as the first argument) will switch the entire script to handle only dynamic fields (those which change over time). For scalability reasons, the remaining arguments specify conditions by which a series will be ignored. For example, memory_avail>20000000 would ignore any series where the value for memory_avail exceeded 20000000 at any point.
+
+</p>
+
+<p>
+<b>catalog_history_plot</b>: Summarizes streamed data (through stdin) from either of the previous 2 scripts. Summarizes server status over time with a specified granularity in seconds (first argument). The remaining arguments specify what status information should be summarized and how to do so. These arguments start with an interseries aggregation operator, followed by an intraseries aggregation operator, followed by the field to evaluate. For example SUM.AVG@memory_avail, says to look at the values for the memory_avail field, average all values for a series that occured within the specified 'grain', and sum the series averages to obtain a single value for that 'grain' of time. Available intraseries operators are: MAX,MIN,AVG,FIRST,LAST,COUNT,INC,LIST. Available interseries operators are: SUM.
+
+
+<h2>Invocation</h2>
+
+To plot available memory as compared to total memory on chirp servers on a daily basis, you might run something like this:
+
+<pre>
+catalog_history_select /data/catalog.history/ 2013-03-01-01-03 | catalog_history_filter type=chirp | catalog_history_plot 86400 SUM.MAX@memory_total SUM.AVG@memory_avail SUM.MIN@minfree> chirpMemorySum
+</pre>
+Followed by the following command in gnuplot:
+<pre>
+set xdata time; set timefmt "%s"; set format x "%H:%M"; plot "chirpMemorySum" using 1:2 title 'SUM.MAX@memory_total', "chirpMemorySum" using 1:3 title 'SUM.AVG@memory_avail', "chirpMemorySum" using 1:4 title 'SUM.MIN@minfree'
+</pre>
+
+
+
+Or to plot the number of tasks running each hour on Work Queue masters, you might run something like this: 
+
+<pre>
+catalog_history_select /data/catalog.history/ 2013-04-15-01-01-01 w1 | catalog_history_filter type=wq_master | catalog_history_plot 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running > taskRunningMinAvgMax
+</pre>
+Followed by the following command in gnuplot:
+<pre>
+set xdata time; set timefmt "%s"; set format x "%m/%d"; plot "taskRunningMinAvgMax" using 1:2 title 'SUM.MIN@task_running', "taskRunningMinAvgMax" using 1:3 title 'SUM.AVG@task_running', "taskRunningMinAvgMax" using 1:4 title 'SUM.MAX@task_running'
+</pre>
+
+
+
+
+<h2>
+Sample Data
+</h2>
+
+
+<h3>
+For servers where type=wq_master
+</h3>
+<p>
+<code>
+#Some sample static fields: ['type', 'workers_by_pool', 'workers_init', 'workers', 'workers_busy', 'workers_ready', 'port', 'tasks_complete', 'start_time', 'project', 'address', 'tasks_waiting', 'lastheardfrom', 'version', 'capacity', 'name', 'owner', 'task_running', 'lifetime', 'priority', 'total_tasks_dispatched', 'disk_total', 'tasks_running', 'memory_total', 'starttime', 'cores_total', 'task_running0', 'my_master']
+</code>
+</p>
+<p>
+<code>
+#Some sample Dynamic Fields: ['workers_by_pool', 'workers', 'workers_ready', 'tasks_complete', 'total_tasks_dispatched', 'capacity', 'tasks_running', 'workers_busy', 'task_running', 'disk_total', 'memory_total', 'cores_total', 'tasks_waiting', 'workers_init', 'starttime', 'owner', 'my_master', 'project', 'start_time']
+</code>
+</p>
+
+<h3>
+For servers where type=chirp
+</h3>
+<p>
+<code>
+#Some sample static fields: ['load1', 'load5', 'avail', 'backend', 'port', 'total_ops', 'opsys', 'version', 'memory_avail', 'name', 'owner', 'cpu', 'opsysversion', 'minfree', 'memory_total', 'type', 'starttime', 'load15', 'bytes_written', 'address', 'lastheardfrom', 'cpus', 'bytes_read', 'total', 'url', 'uptime', 'clients']
+</code>
+</p>
+<p>
+<code>
+#Some sample dynamic fields: ['load5', 'memory_avail', 'load1', 'avail', 'load15', 'total', 'starttime', 'total_ops', 'bytes_written', 'clients', 'bytes_read', 'opsysversion', 'memory_total', 'backend', 'url', 'version', 'owner']
+</code>
+</p>
+
+<h3>
+For servers where type=wq_pool
+</h3>
+<p>
+<code>
+
+#Some sample static fields: ['type', 'starttime', 'name', 'owner', 'lifetime', 'port', 'pool_name', 'decision', 'address', 'workers_requested', 'lastheardfrom']
+</code>
+</p>
+<p>
+<code>
+#Some sample dynamic fields: ['decision', 'workers_requested']
+</code>
+</p>
+
+<h3>
+For servers where type=catalog
+</h3>
+<p>
+<code>
+#Some sample static fields: ['type', 'name', 'owner', 'uptime', 'port', 'address', 'lastheardfrom', 'version', 'url', 'starttime']
+</code>
+</p>
+<p>
+<code>
+#Some sample dynamic fields: []
+</code>
+</p>
+
+
+
+
+
+
+<h3>
+wq_pool sample
+</h3>
+<p>
+<pre>
+key 259.74.246.25:91381:workspace1234.org
+type wq_pool
+starttime 1375886532
+name workspace1234.org
+owner cclosdci
+lifetime 180
+port 91381
+pool_name workspace1234.org-25846
+decision cclosdci:0
+address 259.74.246.25
+workers_requested 0
+lastheardfrom 1376870394
+1376942374 R key
+1376945475 U decision n/a
+1376945496 U decision cclosdci:0
+</pre>
+</p>
+
+
+<h3>
+wq_master sample
+</h3>
+<p>
+<pre>
+key 171.65.257.29:5147:not0rious5678.org
+type wq_master
+workers_by_pool unmanaged:9
+starttime 1376602306
+workers_init 0
+workers 9
+workers_busy 9
+workers_ready 0
+port 5147
+tasks_running 9
+tasks_complete 22
+project forcebalance
+address 171.65.257.29
+tasks_waiting 2
+lastheardfrom 1376870399
+version 3.7.3
+capacity 0
+name not0rious5678.org
+owner kmckiern
+lifetime 300
+priority 0
+total_tasks_dispatched 37
+1376880663 U workers_by_pool unmanaged:7
+1376880663 U workers 7
+1376880663 U workers_busy 7
+1376880663 U tasks_running 7
+1376880663 U tasks_waiting 4
+1376880663 U total_tasks_dispatched 38
+1376880723 U workers_by_pool unmanaged:0
+1376880723 U workers 0
+1376880723 U workers_busy 0
+1376880723 U tasks_running 0
+1376880723 U tasks_waiting 11
+1376880723 U total_tasks_dispatched 42
+1376880783 U workers_by_pool unmanaged:8
+1376880783 U workers 8
+1376880783 U workers_busy 8
+1376880783 U tasks_running 8
+1376880783 U tasks_waiting 3
+1376880843 U workers_by_pool unmanaged:11
+1376880843 U workers 11
+1376880843 U workers_busy 11
+1376880843 U tasks_running 11
+1376880843 U tasks_waiting 0
+1376898613 U workers_by_pool unmanaged:10
+1376898613 U workers 10
+1376898613 U workers_busy 10
+1376898613 U tasks_running 10
+1376898613 U tasks_waiting 1
+1376898933 D
+1376934281 C type wq_master
+1376934281 C workers_by_pool n/a
+1376934281 C starttime 1376934226
+1376934281 C workers_init 0
+1376934281 C workers 0
+1376934281 C workers_busy 0
+1376934281 C workers_ready 0
+1376934281 C port 5147
+1376934281 C tasks_running 0
+1376934281 C tasks_complete 0
+1376934281 C project forcebalance
+1376934281 C address 171.65.102.29
+1376934281 C tasks_waiting 11
+1376934281 C lastheardfrom 1376934281
+1376934281 C version 3.7.3
+1376934281 C capacity 0
+1376934281 C name not0rious.Stanford.EDU
+1376934281 C owner kmckiern
+1376934281 C lifetime 300
+1376934281 C priority 0
+1376934281 C total_tasks_dispatched 11
+1376934341 U workers_by_pool unmanaged:11
+1376934341 U workers 11
+1376934341 U workers_busy 11
+1376934341 U tasks_running 11
+1376934341 U tasks_waiting 0
+1376948443 U workers_busy 10
+1376948443 U workers_ready 1
+1376948443 U tasks_running 10
+1376948443 U tasks_complete 1
+</pre>
+</p>
+
+
+<h3>
+catalog sample
+</h3>
+<p>
+<pre>
+key 188.184.132.31:9097:wq-notary.cern.ch
+type catalog
+name wq-notary.cern.ch
+owner worker
+uptime 2799583
+port 9097
+address 188.184.132.31
+lastheardfrom 1376870370
+version 3.7.1
+url http://wq-notary.cern.ch:9097
+1376942380 R key
+</pre>
+</p>
+
+
+<h3>
+chirp sample
+</h3>
+<p>
+<pre>
+key 129.74.153.171:9094:cclws16.cse.nd.edu
+load1 0.00
+load5 0.00
+avail 385363529728
+backend /var/condor/log/chirp
+port 9094
+total_ops 0
+opsys linux
+version 4.0.2rc1
+memory_avail 3866738688
+name cclws16.cse.nd.edu
+owner unknown
+cpu x86_64
+opsysversion 2.6.32-358.14.1.el6.x86_64
+minfree 1073741824
+memory_total 8193630208
+type chirp
+starttime 1376440078
+load15 0.00
+bytes_written 0
+address 129.74.153.171
+lastheardfrom 1376870109
+cpus 4
+bytes_read 0
+total 407189520384
+url chirp://cclws16.cse.nd.edu:9094
+1376870409 U memory_avail 3866992640
+1376870709 U load1 0.05
+1376870709 U load5 0.01
+1376871010 U load1 0.39
+1376871010 U load5 0.25
+1376871010 U avail 385363525632
+1376871010 U memory_avail 3866611712
+1376871010 U load15 0.09
+1376871310 U load1 0.36
+1376871310 U load5 0.33
+1376871310 U load15 0.16
+1376871610 U load1 0.41
+1376871610 U load5 0.36
+1376871610 U avail 385363521536
+1376871610 U memory_avail 3866484736
+1376871610 U load15 0.21
+1376871910 U load1 0.35
+1376871910 U load5 0.35
+1376871910 U avail 385363517440
+1376871910 U memory_avail 3866357760
+1376871910 U load15 0.24
+1376872210 U load1 0.01
+1376872210 U load5 0.16
+1376872210 U avail 385363513344
+1376872210 U memory_avail 3866484736
+1376872210 U load15 0.18
+1376872510 U load1 0.31
+1376872510 U load5 0.20
+1376872510 U memory_avail 3866357760
+1376872810 U load1 0.04
+1376872810 U load5 0.16
+1376872810 U avail 385363509248
+1376872810 U memory_avail 3866611712
+1376872810 U load15 0.17
+1376873110 U load1 0.01
+1376873110 U load5 0.08
+1376873110 U avail 385363505152
+1376873110 U memory_avail 3866476544
+1376873110 U load15 0.13
+1376873410 U load1 0.00
+1376873410 U load5 0.04
+1376873410 U memory_avail 3866230784
+1376873410 U load15 0.09
+</pre>
+</p>
+
+
+</body>
+
+</html>
+

@@ -74,6 +74,7 @@ include_package_chirp="chirp"
 include_package_resource_monitor="resource_monitor"
 include_package_resource_monitor_visualizer="resource_monitor_visualizer"
 include_package_makeflow_linker="makeflow_linker"
+include_package_catalog_history="catalog_history"
 include_package_doc="doc"
 
 work_queue_bindings=""
@@ -299,6 +300,9 @@ do
 		--without-system-makeflow-linker)
 			include_package_makeflow_linker=""
 			;;
+		--without-system-catalog_history)
+			include_package_catalog_history=""
+			;;
 		--without-system-doc)
 			include_package_doc=""
 			;;
@@ -361,6 +365,7 @@ And SYSTEM may be:
     resource_monitor
     resource_monitor_visualizer
     makeflow_linker
+    catalog_history
     doc
 EOF
 			exit 1
@@ -376,7 +381,7 @@ done
 IFS=" "
 export IFS
 
-potential_packages="dttools work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_resource_monitor_visualizer} ${include_package_makeflow_linker} ${include_package_doc}"
+potential_packages="dttools work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_chirp} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_resource_monitor_visualizer} ${include_package_makeflow_linker} ${include_package_catalog_history} ${include_package_doc}"
 
 check_multiarch
 
@@ -1197,6 +1202,9 @@ CCTOOLS_M4_ARGS=-DCCTOOLS_VERSION=${major}.${minor}.${micro} -DCCTOOLS_RELEASE_D
 
 CCTOOLS_BUILD_LIB64PARROT_HELPER=${build_lib64parrot_helper}
 CCTOOLS_BUILD_LIB32PARROT_HELPER=${build_lib32parrot_helper}
+
+CCTOOLS_VERSION=${version}
+CCTOOLS_RELEASEDATE=${release_date}
 
 EOF
 
