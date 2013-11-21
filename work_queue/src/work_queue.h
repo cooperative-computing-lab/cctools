@@ -81,8 +81,8 @@ struct work_queue_task {
 	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
 	timestamp_t cmd_execution_time;	   /**< Time spent in microseconds for executing the command on the worker. */
 
-	int memory;                       
-	int disk;
+	INT64_T memory;                       
+	INT64_T disk;
 	int cores;
 	int gpus;
 	int unlabeled;
@@ -199,14 +199,14 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 @param memory The amount of memory required by the task, in megabytes.
 */
 
-void work_queue_task_specify_memory( struct work_queue_task *t, int memory );
+void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory );
 
 /** Specify the amount of disk space required by a task.
 @param t A task object.
 @param disk The amount of disk space required by the task, in megabytes.
 */
 
-void work_queue_task_specify_disk( struct work_queue_task *t, int disk );
+void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk );
 
 /** Specify the number of cores required by a task.
 @param t A task object.
