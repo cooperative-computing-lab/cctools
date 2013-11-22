@@ -1,9 +1,7 @@
 include ../Makefile.config
 include ../Makefile.rules
 
-SELECT_SCRIPT = catalog_history_select
-FILTER_SCRIPT = catalog_history_filter
-PLOT_SCRIPT = catalog_history_plot
+SCRIPTS=catalog_history_select catalog_history_filter catalog_history_plot
 
 test:
 
@@ -12,22 +10,10 @@ all:
 clean:
 
 uninstall:
-	rm -f ${CCTOOLS_INSTALL_DIR}/bin/${SELECT_SCRIPT}
-	rm -f ${CCTOOLS_INSTALL_DIR}/bin/${FILTER_SCRIPT}
-	rm -f ${CCTOOLS_INSTALL_DIR}/bin/${PLOT_SCRIPT}
+	for s in ${SCRIPTS}; do rm -f ${CCTOOLS_INSTALL_DIR}/bin/$$s; done
 
 install:
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	chmod 755 src/${SELECT_SCRIPT}
-	chmod 755 src/${FILTER_SCRIPT}
-	chmod 755 src/${PLOT_SCRIPT}
-	cp src/${SELECT_SCRIPT} ${CCTOOLS_INSTALL_DIR}/bin/
-	cp src/${FILTER_SCRIPT} ${CCTOOLS_INSTALL_DIR}/bin/
-	cp src/${PLOT_SCRIPT} ${CCTOOLS_INSTALL_DIR}/bin/
-	sed -itmp "s:CCTOOLS_VERSION:${CCTOOLS_VERSION}:g" ${CCTOOLS_INSTALL_DIR}/bin/${SELECT_SCRIPT}
-	sed -itmp "s:CCTOOLS_RELEASEDATE:${CCTOOLS_RELEASEDATE}:g" ${CCTOOLS_INSTALL_DIR}/bin/${SELECT_SCRIPT}
-	sed -itmp "s:CCTOOLS_VERSION:${CCTOOLS_VERSION}:g" ${CCTOOLS_INSTALL_DIR}/bin/${FILTER_SCRIPT}
-	sed -itmp "s:CCTOOLS_RELEASEDATE:${CCTOOLS_RELEASEDATE}:g" ${CCTOOLS_INSTALL_DIR}/bin/${FILTER_SCRIPT}
-	sed -itmp "s:CCTOOLS_VERSION:${CCTOOLS_VERSION}:g" ${CCTOOLS_INSTALL_DIR}/bin/${PLOT_SCRIPT}
-	sed -itmp "s:CCTOOLS_RELEASEDATE:${CCTOOLS_RELEASEDATE}:g" ${CCTOOLS_INSTALL_DIR}/bin/${PLOT_SCRIPT}
+	for s in ${SCRIPTS}; do cat src/$$s | sed "s:CCTOOLS_VERSION:${CCTOOLS_VERSION}:g" | sed "s:CCTOOLS_RELEASEDATE:${CCTOOLS_RELEASEDATE}:g" > ${CCTOOLS_INSTALL_DIR}/bin/$$s; chmod 755 ${CCTOOLS_INSTALL_DIR}/bin/$$s; done
+
 
