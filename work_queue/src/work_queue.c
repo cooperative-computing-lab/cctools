@@ -166,10 +166,10 @@ struct work_queue_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 	struct work_queue_resources *resources;
-	int cores_allocated;
-	int memory_allocated;
-	int disk_allocated;
-	int gpus_allocated;
+	INT64_T cores_allocated;
+	INT64_T memory_allocated;
+	INT64_T disk_allocated;
+	INT64_T gpus_allocated;
 	struct hash_table *current_files;
 	struct link *link;
 	struct itable *current_tasks;
@@ -204,7 +204,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 /********** work_queue internal functions *************/
 /******************************************************/
 
-static int get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
+static INT64_T get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->cores.total)
 		return w->resources->cores.total * q->asynchrony_multiplier + q->asynchrony_modifier;
 	else
@@ -1385,7 +1385,7 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 	char category[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
 	
-	if(sscanf(line, "resource %s %d %d %d %d", category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
+	if(sscanf(line, "resource %s %"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
 
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
@@ -1838,8 +1838,8 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid);
 	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(t->command_line), t->command_line);
 	send_worker_msg(q,w, "cores %d\n",   t->cores );
-	send_worker_msg(q,w, "memory %d\n",  t->memory );
-	send_worker_msg(q,w, "disk %d\n",    t->disk );
+	send_worker_msg(q,w, "memory %"PRId64"\n",  t->memory );
+	send_worker_msg(q,w, "disk %"PRId64"\n",    t->disk );
 	send_worker_msg(q,w, "gpus %d\n",    t->gpus );
 
 	if(t->input_files) {
@@ -1933,7 +1933,8 @@ static double compute_capacity( const struct work_queue *q )
 }
 
 static int check_worker_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
-	int cores_used, disk_used, mem_used, gpus_used, ok = 1;
+	INT64_T cores_used, disk_used, mem_used, gpus_used;
+	int ok = 1;
 	
 	// If none of the resources used have not been specified, treat the task as consuming an entire "average" worker
 	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
@@ -2366,13 +2367,13 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
-void work_queue_task_specify_memory( struct work_queue_task *t, int memory )
+void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory )
 {
 	t->memory = memory;
 	t->unlabeled = 0;
 }
 
-void work_queue_task_specify_disk( struct work_queue_task *t, int disk )
+void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk )
 {
 	t->disk = disk;
 	t->unlabeled = 0;

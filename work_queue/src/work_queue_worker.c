@@ -151,18 +151,17 @@ static char *base_debug_filename = NULL;
 // Local resource controls
 static struct work_queue_resources * aggregated_resources = 0;
 static struct work_queue_resources * aggregated_resources_last = 0;
-static int manual_cores_option = 1;
-static int manual_disk_option = 0;
-static int manual_memory_option = 0;
-static int manual_gpus_option = 0;
+static INT64_T manual_cores_option = 1;
+static INT64_T manual_disk_option = 0;
+static INT64_T manual_memory_option = 0;
+static INT64_T manual_gpus_option = 0;
 
-static int cores_allocated = 0;
-static int memory_allocated = 0;
-static int disk_allocated = 0;
-static int gpus_allocated = 0;
+static INT64_T cores_allocated = 0;
+static INT64_T memory_allocated = 0;
+static INT64_T disk_allocated = 0;
+static INT64_T gpus_allocated = 0;
 // do not send consecutive resource updates in less than this many seconds
 static int send_resources_interval = 5;
-
 
 // Foreman mode global variables
 static struct work_queue *foreman_q = NULL;
@@ -583,25 +582,25 @@ static void make_hash_key(const char *addr, int port, char *key)
 }
 
 static int check_disk_space_for_filesize(INT64_T file_size) {
-    UINT64_T disk_avail, disk_total;
+	UINT64_T disk_avail, disk_total;
 
-    // Check available disk space
-    if(disk_avail_threshold > 0) {
-	disk_info_get(".", &disk_avail, &disk_total);
-	if(file_size > 0) {	
-	    if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
-		debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
-		return 0;
-	    }
-	} else {
-	    if(disk_avail < disk_avail_threshold) {
-		debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
-		return 0;
-	    }	
-	}	
+	// Check available disk space
+	if(disk_avail_threshold > 0) {
+		disk_info_get(".", &disk_avail, &disk_total);
+		if(file_size > 0) {	
+			if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
+			debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
+			return 0;
+			}
+		} else {
+			if(disk_avail < disk_avail_threshold) {
+			debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
+			return 0;
+			}	
+		}	
     }
 
-    return 1;
+	return 1;
 }
 
 /**
@@ -1644,7 +1643,8 @@ static int handle_master(struct link *master) {
 
 
 static int check_for_resources(struct work_queue_task *t) {
-	int cores_used, disk_used, mem_used, gpus_used, ok = 1;
+	INT64_T cores_used, disk_used, mem_used, gpus_used;
+	int ok = 1;
 	
 	// If resources used have not been specified, treat the task as consuming the entire real worker
 	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
@@ -1659,8 +1659,6 @@ static int check_for_resources(struct work_queue_task *t) {
 		disk_used = MAX(t->disk, 0);
 		gpus_used = MAX(t->gpus, 0);
 	}
-	
-	
 	
 	if(cores_allocated + cores_used > aggregated_resources->cores.total) {
 		ok = 0;
@@ -1679,7 +1677,6 @@ static int check_for_resources(struct work_queue_task *t) {
 	}
 	
 	return ok;
-	
 }
 
 static void work_for_master(struct link *master) {
@@ -1824,12 +1821,10 @@ static void foreman_for_master(struct link *master) {
 
 		if(time(0) - last_debug_msg > foreman_debug_msg_interval)
 		{
-			debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
+			debug(D_WQ, "Foreman local disk inuse and total: %"PRId64" %"PRId64"\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
 
-
-			if(itable_size(results_to_be_sent) > 0)
-			{
-				debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
+			if(itable_size(results_to_be_sent) > 0) {
+				debug(D_WQ, "Foreman local disk inuse and total: %"PRId64" %"PRId64"\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
 			}
 
 			last_debug_msg = time(0);
@@ -1901,7 +1896,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Set the maximum bandwidth the foreman will consume in Mbps. (default=unlimited)\n", "--bandwidth=<mbps>");
 	fprintf(stdout, " %-30s take.\n", "");
 	fprintf(stdout, " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
-	fprintf(stdout, " %-30s worker automatically measure. (default=%d)\n", "", manual_cores_option);
+	fprintf(stdout, " %-30s worker automatically measure. (default=%"PRId64")\n", "", manual_cores_option);
 	fprintf(stdout, " %-30s Set the number of GPUs reported by this worker. (default=0)\n", "--gpus=<n>");
 	fprintf(stdout, " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
 	fprintf(stdout, " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
@@ -2166,14 +2161,14 @@ int main(int argc, char *argv[])
 			if(!strncmp(optarg, "all", 3)) {
 				manual_memory_option = 0;
 			} else {
-				manual_memory_option = atoi(optarg);
+				manual_memory_option = atoll(optarg);
 			}
 			break;
 		case LONG_OPT_DISK:
 			if(!strncmp(optarg, "all", 3)) {
 				manual_disk_option = 0;
 			} else {
-				manual_disk_option = atoi(optarg);
+				manual_disk_option = atoll(optarg);
 			}
 			break;
 		case LONG_OPT_GPUS:
@@ -2308,7 +2303,7 @@ int main(int argc, char *argv[])
 	debug(D_WQ,"local resources:");
 	work_queue_resources_debug(aggregated_resources);
 
-	fprintf(stdout, "work_queue_worker: %d workers, %d cores, %d MB memory, %d MB disk available, %d gpus\n",
+	fprintf(stdout, "work_queue_worker: %"PRId64" workers, %"PRId64" cores, %"PRId64" MB memory, %"PRId64" MB disk available, %"PRId64" gpus\n",
 	       aggregated_resources->workers.total,
 	       aggregated_resources->cores.total,
 	       aggregated_resources->memory.total,
