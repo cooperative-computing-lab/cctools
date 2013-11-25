@@ -134,13 +134,27 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 		return 0;
 	}
 
+	char *http_user_agent = getenv("HTTP_USER_AGENT");
+
 	if(cache_reload == 0) {
-		debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", action, url, actual_host);
-		link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host);
+		if(http_user_agent){
+			debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/ %s)\r\nConnection: close\r\n\r\n", action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO,http_user_agent);
+			link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/ %s)\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, http_user_agent);
+		}
+		else {
+			debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/)\r\nConnection: close\r\n\r\n", action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
+			link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/)\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
+		}
 	} else {
-		//  force refresh of cache end-to-end (RFC 2616)
-		debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", action, url, actual_host);
-		link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host);
+		if(http_user_agent){
+			debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/ %s)\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, http_user_agent);
+			link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/ %s)\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, http_user_agent);
+		}
+		else{
+			//  force refresh of cache end-to-end (RFC 2616)
+			debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/)\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
+			link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/)\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
+		}
 	}
 
 	if(link_readline(link, line, HTTP_LINE_MAX, stoptime)) {
