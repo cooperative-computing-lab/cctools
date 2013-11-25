@@ -4,12 +4,15 @@
 #This software is distributed under the GNU General Public License.
 #See the file COPYING for details.
 #
+
+#
 #This script is used to cat SAM files into a single result
+#
 # Usage: cat_bwa output input1 input2 ... intput*
 #
 # Author: Nick Hazekamp
 # Date: 11/01/2013
-
+#
 
 my $output = shift;
 if (-e $output) {
