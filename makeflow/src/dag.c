@@ -155,6 +155,9 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->ancestor_depth = -1;
 
+	n->resources = make_rmsummary(-1);
+		
+
 	if(verbose_parsing && d->nodeid_counter % PARSING_RULE_MOD_COUNTER == 0)
 	{
 		fprintf(stdout, "\rRules parsed: %d", d->nodeid_counter + 1);
@@ -642,37 +645,53 @@ struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, cons
 		category = malloc(sizeof(struct dag_task_category));
 		category->label = xxstrdup(label);
 		category->nodes = list_create();
-		category->resources = make_rmsummary(-1);
-		
 		hash_table_insert(d->task_categories, label, category);
 	}
 
 	return category;
 }
 
-void dag_task_category_get_env_resources(struct dag_task_category *category)
+void dag_task_fill_resources(struct dag_node *n)
 {
-	if(category)
-		rmsummary_read_env_vars(category->resources);
+	struct rmsummary *rs    = n->resources;
+	struct dag_lookup_set s = { n->d, n->category, n, NULL };
+
+	char    *val_str;
+
+	val_str = dag_lookup_str(RESOURCES_CORES, &s);
+	if(val_str)
+		rs->cores = atoll(val_str);
+
+	val_str = dag_lookup_str(RESOURCES_DISK, &s);
+	if(val_str)
+		rs->workdir_footprint = atoll(val_str);
+
+	val_str = dag_lookup_str(RESOURCES_MEMORY, &s);
+	if(val_str)
+		rs->resident_memory = atoll(val_str);
+
+	val_str = dag_lookup_str(RESOURCES_GPUS, &s);
+	if(val_str)
+		rs->gpus = atoll(val_str);
 }
 
-void dag_task_category_print_debug_resources(struct dag_task_category *category)
+void dag_task_print_debug_resources(struct dag_node *n)
 {
-	if( category->resources->cores > -1 )
-		debug(D_DEBUG, "cores:  %"PRId64".\n",    category->resources->cores);
-	if( category->resources->resident_memory > -1 )
-		debug(D_DEBUG, "memory:   %"PRId64" MB.\n", category->resources->resident_memory);
-	if( category->resources->workdir_footprint > -1 )
-		debug(D_DEBUG, "disk:     %"PRId64" MB.\n", category->resources->workdir_footprint);
-	if( category->resources->gpus > -1 )
-		debug(D_DEBUG, "gpus:  %"PRId64".\n", category->resources->gpus);
+	if( n->resources->cores > -1 )
+		debug(D_DEBUG, "cores:  %"PRId64".\n",      n->resources->cores);
+	if( n->resources->resident_memory > -1 )
+		debug(D_DEBUG, "memory:   %"PRId64" MB.\n", n->resources->resident_memory);
+	if( n->resources->workdir_footprint > -1 )
+		debug(D_DEBUG, "disk:     %"PRId64" MB.\n", n->resources->workdir_footprint);
+	if( n->resources->gpus > -1 )
+		debug(D_DEBUG, "gpus:  %"PRId64".\n", n->resources->gpus);
 }
 
-char *dag_task_category_wrap_as_wq_options(struct dag_task_category *category, const char *default_options)
+char *dag_task_resources_wrap_as_wq_options(struct dag_node *n, const char *default_options)
 {
 	struct rmsummary *s;
 
-	s = category->resources;
+	s = n->resources;
 
 	char *options = NULL;
 
@@ -703,11 +722,11 @@ char *dag_task_category_wrap_as_wq_options(struct dag_task_category *category, c
 		options = opt;\
 	}
 
-char *dag_task_category_wrap_as_rmonitor_options(struct dag_task_category *category)
+char *dag_task_resources_wrap_as_rmonitor_options(struct dag_node *n)
 {
 	struct rmsummary *s;
 
-	s = category->resources;
+	s = n->resources;
 
 	char *options = NULL;
 
@@ -727,7 +746,7 @@ char *dag_task_category_wrap_as_rmonitor_options(struct dag_task_category *categ
 }
 
 /* works as realloc for the first argument */
-char *dag_task_category_add_condor_option(char *options, const char *expression, int64_t value)
+char *dag_task_resources_add_condor_option(char *options, const char *expression, int64_t value)
 {
 	if(value < 0)
 		return options;
@@ -747,18 +766,18 @@ char *dag_task_category_add_condor_option(char *options, const char *expression,
 	return options;
 }
 
-char *dag_task_category_wrap_as_condor_options(struct dag_task_category *category, const char *default_options)
+char *dag_task_resources_wrap_as_condor_options(struct dag_node *n, const char *default_options)
 {
 	struct rmsummary *s;
 
-	s = category->resources;
+	s = n->resources;
 
 	char *options = NULL;
 	char *opt;
 
-	options = dag_task_category_add_condor_option(options, "Cores>=", s->cores); 
-	options = dag_task_category_add_condor_option(options, "Memory>=", s->resident_memory); 
-	options = dag_task_category_add_condor_option(options, "Disk>=", s->workdir_footprint); 
+	options = dag_task_resources_add_condor_option(options, "Cores>=", s->cores); 
+	options = dag_task_resources_add_condor_option(options, "Memory>=", s->resident_memory); 
+	options = dag_task_resources_add_condor_option(options, "Disk>=", s->workdir_footprint); 
 
 	if(!options)
 	{
@@ -820,16 +839,16 @@ char *dag_task_category_wrap_as_condor_options(struct dag_task_category *categor
 	return opt;
 }
 
-char *dag_task_category_wrap_options(struct dag_task_category *category, const char *default_options, batch_queue_type_t batch_type)
+char *dag_task_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type)
 {
 	switch(batch_type)
 	{
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
 		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
-			return dag_task_category_wrap_as_wq_options(category, default_options);
+			return dag_task_resources_wrap_as_wq_options(n, default_options);
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:
-			return dag_task_category_wrap_as_condor_options(category, default_options);
+			return dag_task_resources_wrap_as_condor_options(n, default_options);
 			break;
 		default:
 			if(default_options)

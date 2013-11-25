@@ -108,7 +108,6 @@ struct lexer_book
 struct dag_task_category
 {
 	char *label;
-	struct rmsummary *resources;
 	struct list *nodes;
 };
 
@@ -173,6 +172,7 @@ struct dag_node {
     int children_remaining;
     int only_my_children;               /* Number of nodes this node is the only parent. */
 
+	struct rmsummary *resources;        /* resources required by this rule */
 
     struct dag_node *next;              /* The next node in the list of nodes */
 };
@@ -257,10 +257,10 @@ void dag_variable_value_free(struct dag_variable_value *v);
 struct dag_variable_value *dag_variable_value_append_or_create(struct dag_variable_value *v, const char *value);
 
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label);
-char *dag_task_category_wrap_options(struct dag_task_category *category, const char *default_options, batch_queue_type_t batch_type);
-char *dag_task_category_wrap_as_rmonitor_options(struct dag_task_category *category);
+char *dag_task_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type);
+char *dag_task_resources_wrap_as_rmonitor_options(struct dag_node *n);
 
-void dag_task_category_get_env_resources(struct dag_task_category *category);
-void dag_task_category_print_debug_resources(struct dag_task_category *category);
+void dag_task_fill_resources(struct dag_node *n);
+void dag_task_print_debug_resources(struct dag_node *n);
 
 #endif
