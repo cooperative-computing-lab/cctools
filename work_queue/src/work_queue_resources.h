@@ -11,10 +11,10 @@ See the file COPYING for details.
 #include "nvpair.h"
 
 struct work_queue_resource {
-	INT64_T inuse;
-	INT64_T total;
-	INT64_T smallest;
-	INT64_T largest;
+	int64_t inuse;
+	int64_t total;
+	int64_t smallest;
+	int64_t largest;
 };
 
 struct work_queue_resources {

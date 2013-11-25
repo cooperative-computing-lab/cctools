@@ -77,12 +77,12 @@ struct work_queue_task {
 	timestamp_t time_receive_output_start;	/**< The time at which it started to transfer output files. */
 	timestamp_t time_receive_output_finish;	/**< The time at which it finished transferring output files. */
 
-	INT64_T total_bytes_transferred;/**< Number of bytes transferred since task has last started transferring input data. */
+	int64_t total_bytes_transferred;/**< Number of bytes transferred since task has last started transferring input data. */
 	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
 	timestamp_t cmd_execution_time;	   /**< Time spent in microseconds for executing the command on the worker. */
 
-	INT64_T memory;                       
-	INT64_T disk;
+	int64_t memory;                       
+	int64_t disk;
 	int cores;
 	int gpus;
 	int unlabeled;
@@ -103,8 +103,8 @@ struct work_queue_stats {
 	int total_tasks_complete;       /**< Total number of tasks returned complete. */
 	int total_workers_connected;    /**< Total number of worker connections successfully established to the master. */
 	int total_workers_removed;      /**< Total number of worker connections that were terminated by the master. */
-	INT64_T total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
-	INT64_T total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
+	int64_t total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
+	int64_t total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
 	timestamp_t start_time;         /**< Absolute time at which the master started. */
 	timestamp_t total_send_time;    /**< Total time in microseconds spent in sending data to workers. */
 	timestamp_t total_receive_time; /**< Total time in microseconds spent in receiving data from workers. */

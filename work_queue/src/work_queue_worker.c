@@ -123,7 +123,7 @@ static int abort_flag = 0;
 static int foreman_debug_msg_interval = 10; 
 
 // Threshold for available disk space (MB) beyond which clean up and restart.
-static UINT64_T disk_avail_threshold = 100;
+static uint64_t disk_avail_threshold = 100;
 
 // Terminate only when:
 // terminate_boundary - (current_time - worker_start_time)%terminate_boundary ~~ 0
@@ -151,15 +151,15 @@ static char *base_debug_filename = NULL;
 // Local resource controls
 static struct work_queue_resources * aggregated_resources = 0;
 static struct work_queue_resources * aggregated_resources_last = 0;
-static INT64_T manual_cores_option = 1;
-static INT64_T manual_disk_option = 0;
-static INT64_T manual_memory_option = 0;
-static INT64_T manual_gpus_option = 0;
+static int64_t manual_cores_option = 1;
+static int64_t manual_disk_option = 0;
+static int64_t manual_memory_option = 0;
+static int64_t manual_gpus_option = 0;
 
-static INT64_T cores_allocated = 0;
-static INT64_T memory_allocated = 0;
-static INT64_T disk_allocated = 0;
-static INT64_T gpus_allocated = 0;
+static int64_t cores_allocated = 0;
+static int64_t memory_allocated = 0;
+static int64_t disk_allocated = 0;
+static int64_t gpus_allocated = 0;
 // do not send consecutive resource updates in less than this many seconds
 static int send_resources_interval = 5;
 
@@ -449,7 +449,7 @@ static int start_task(struct work_queue_task *t) {
 
 static void report_task_complete(struct link *master, struct task_info *ti)
 {
-	INT64_T output_length;
+	int64_t output_length;
 	struct stat st;
 
 	if(ti->pid) {
@@ -538,7 +538,7 @@ static int handle_tasks(struct link *master) {
 	int status;
 	
 	itable_firstkey(active_tasks);
-	while(itable_nextkey(active_tasks, (UINT64_T*)&pid, (void**)&ti)) {
+	while(itable_nextkey(active_tasks, (uint64_t*)&pid, (void**)&ti)) {
 		result = wait4(pid, &status, WNOHANG, &ti->rusage);
 		if(result) {
 			if(result < 0) {
@@ -581,14 +581,14 @@ static void make_hash_key(const char *addr, int port, char *key)
 	sprintf(key, "%s:%d", addr, port);
 }
 
-static int check_disk_space_for_filesize(INT64_T file_size) {
-	UINT64_T disk_avail, disk_total;
+static int check_disk_space_for_filesize(int64_t file_size) {
+	uint64_t disk_avail, disk_total;
 
 	// Check available disk space
 	if(disk_avail_threshold > 0) {
 		disk_info_get(".", &disk_avail, &disk_total);
 		if(file_size > 0) {	
-			if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
+			if((uint64_t)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
 			debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
 			return 0;
 			}
@@ -904,7 +904,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 	char dentline[WORK_QUEUE_LINE_MAX];
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	struct stat info;
-	INT64_T actual, length;
+	int64_t actual, length;
 	int fd;
 
 	sprintf(cached_filename, "cache/%s", filename);
@@ -1084,7 +1084,7 @@ static int do_task( struct link *master, int taskid )
 	return 1;
 }
 
-static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
+static int do_put(struct link *master, char *filename, int64_t length, int mode) {
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	char *cur_pos;
 	
@@ -1121,7 +1121,7 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode)
 		return 0;
 	}
 
-	INT64_T actual = link_stream_to_fd(master, fd, length, time(0) + active_timeout);
+	int64_t actual = link_stream_to_fd(master, fd, length, time(0) + active_timeout);
 	close(fd);
 	if(actual != length) {
 		debug(D_WQ, "Failed to put file - %s (%s)\n", filename, strerror(errno));
@@ -1351,7 +1351,7 @@ static void do_reset_results_to_be_sent() {
 static void kill_all_tasks() {
 	struct task_info *ti;
 	pid_t pid;
-	UINT64_T taskid;
+	uint64_t taskid;
 
 	do_reset_results_to_be_sent();
 	
@@ -1373,7 +1373,7 @@ static void kill_all_tasks() {
 	
 	// Send kill signal to all child processes
 	itable_firstkey(active_tasks);
-	while(itable_nextkey(active_tasks, (UINT64_T*)&pid, (void**)&ti)) {
+	while(itable_nextkey(active_tasks, (uint64_t*)&pid, (void**)&ti)) {
 		kill(-1 * ti->pid, SIGKILL);
 	}
 	
@@ -1577,8 +1577,8 @@ static int handle_master(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
 	char path[WORK_QUEUE_LINE_MAX];
-	INT64_T length;
-	INT64_T taskid = 0;
+	int64_t length;
+	int64_t taskid = 0;
 	int flags = WORK_QUEUE_NOCACHE;
 	int mode, r, n;
 
@@ -1643,7 +1643,7 @@ static int handle_master(struct link *master) {
 
 
 static int check_for_resources(struct work_queue_task *t) {
-	INT64_T cores_used, disk_used, mem_used, gpus_used;
+	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
 	
 	// If resources used have not been specified, treat the task as consuming the entire real worker
