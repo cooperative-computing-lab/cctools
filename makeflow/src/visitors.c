@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <inttypes.h>
 
 #include <ctype.h>
@@ -321,6 +322,50 @@ void dag_to_dax_replica_catalog(const struct dag *d, FILE *output)
 	}
 }
 
+/* Write transform catalog to file */
+void dag_to_dax_transform_catalog(const struct dag *d, FILE *output)
+{
+	struct dag_node *n;
+	uint64_t id;
+	char *fn, *pfn;
+	char *type;
+	pfn = (char *) malloc(PATH_MAX * sizeof(char));
+	struct utsname *name = malloc(sizeof(struct utsname));
+	uname(name);
+	struct list *transforms = list_create();
+
+	itable_firstkey(d->node_table);
+	while(itable_nextkey(d->node_table, &id, (void *) &n))
+	{
+		fn = xxstrdup(node_executable(n));
+		if(!list_find(transforms, (int (*)(void *, const void*)) string_equal, fn))
+			list_push_tail(transforms, fn);
+	}
+
+	list_first_item(transforms);
+	while((fn = list_next_item(transforms))) {
+		if(path_lookup(fn, pfn)){
+			realpath(fn, pfn);
+			type = "STAGEABLE";
+		} else {
+			type = "INSTALLED";
+		}
+
+		fprintf(output, "tr %s {\n", fn);
+		fprintf(output, "  site local {\n");
+		fprintf(output, "    pfn \"%s\"\n", pfn);
+		fprintf(output, "    arch \"%s\"\n", name->machine);
+		fprintf(output, "    os \"%s\"\n", name->sysname);
+		fprintf(output, "    type \"%s\"\n", type);
+		fprintf(output, "  }\n");
+		fprintf(output, "}\n\n");
+	}
+
+	list_free(transforms);
+	list_delete(transforms);
+	free(pfn);
+}
+
 /* Entry Point of the dag_to_dax* functions.
  * Writes a dag in DAX format to file.
  * see: http://pegasus.isi.edu/wms/docs/schemas/dax-3.4/dax-3.4.html
@@ -341,6 +386,11 @@ int dag_to_dax(const struct dag *d, const char *name)
 	sprintf(dax_filename, "%s.rc", name);
 	dax = fopen(dax_filename, "w");
 	dag_to_dax_replica_catalog(d, dax);
+	fclose(dax);
+
+	sprintf(dax_filename, "%s.tc", name);
+	dax = fopen(dax_filename, "w");
+	dag_to_dax_transform_catalog(d, dax);
 	fclose(dax);
 
 	return 0;
