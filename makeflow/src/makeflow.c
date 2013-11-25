@@ -1185,7 +1185,7 @@ char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 	return NULL;
 }
 
-//return 1 if name is special variable, 0 otherwise
+//return 1 if name was processed as special variable, 0 otherwise
 int dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *n, int nodeid, char *name, const char *value)
 {
 	struct dag *d = bk->d;
@@ -1193,8 +1193,6 @@ int dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *n
 
 	if(strcmp(RESOURCES_CATEGORY, name) == 0) {
 		special = 1;
-		set_insert(d->special_vars, RESOURCES_CATEGORY);
-
 		/* If we have never seen this label, then create
 		 * a new category, otherwise retrieve the category. */
 		struct dag_task_category *category = dag_task_category_lookup_or_create(d, value);
@@ -1213,27 +1211,6 @@ int dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *n
 		}
 		else
 			bk->category = category;
-	}
-	else if(strcmp(RESOURCES_CORES,  name) == 0)
-	{
-		special = 1;
-		set_insert(d->special_vars, RESOURCES_CORES);
-	}
-	else if(strcmp(RESOURCES_MEMORY,  name) == 0)
-	{
-		special = 1;
-		set_insert(d->special_vars, RESOURCES_MEMORY);
-	}
-	else if(strcmp(RESOURCES_DISK,  name) == 0)
-	{
-		special = 1;
-		set_insert(d->special_vars, RESOURCES_DISK);
-	}
-
-	else if(strcmp(RESOURCES_GPUS,  name) == 0)
-	{
-		special = 1;
-		set_insert(d->special_vars, RESOURCES_GPUS);
 	}
 	/* else if some other special variable .... */
 	/* ... */
