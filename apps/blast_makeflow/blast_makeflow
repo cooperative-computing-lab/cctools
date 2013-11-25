@@ -120,7 +120,8 @@ def initialize_makeflow_parser(parser):
 	makeflow.add_option('--path', dest='path',help='Path to locate indicated files [String] default = .',default='.')
 	makeflow.add_option('--q_gran', dest='query_gran',help='Determines number of sequences per search: makeflow',default=20,type=int)
 	makeflow.add_option('--check', dest='check',help='Add this to precheck arguments through blast process',action='store_true',default="False")
-	makeflow.add_option('--makeflow', dest='makeflow',help='Destination of Makeflow File')
+	makeflow.add_option('--makeflow', dest='makeflow',help='Makeflow destination file [stdout]')
+	makeflow.add_option('--makeflow-config', dest='config',help='Makeflow Configuration File')
 	makeflow.add_option('--verbose', dest='verbose',help='Show verbose level output',action='store_true',default="False")
 
 
@@ -223,6 +224,10 @@ else:
 	makeflow = open(options.makeflow, 'w')
 
 try:
+	if options.config:
+		config = open(options.config, 'r')
+		makeflow.write(config.read())
+
 	#Here we actually start generating the Makeflow
 	#How to get inputs
 	makeflow.write(str(inputlist) + ": " + options.query + " split_fasta\n")
