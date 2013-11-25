@@ -32,18 +32,24 @@ See the file COPYING for details.
  */
 
 /* Writes 'var=value' pairs for special vars to the stream */
+int dag_to_file_var(const char *name, struct hash_table *vars, int nodeid, FILE * dag_stream, const char *prefix)
+{
+	struct dag_variable_value *v;
+	v = dag_get_variable_value(name, vars, nodeid);
+	if(v && !string_null_or_empty(v->value))
+		fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, name, (char *) v->value);
+
+	return 0;
+}
+
 int dag_to_file_vars(struct set *var_names, struct hash_table *vars, int nodeid, FILE * dag_stream, const char *prefix)
 {
 	char *name;
 
-	struct dag_variable_value *v;
-
 	set_first_element(var_names);
 	while((name = set_next_element(var_names)))
 	{
-		v = dag_get_variable_value(name, vars, nodeid);
-		if(v && !string_null_or_empty(v->value))
-			fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, name, (char *) v->value);
+		dag_to_file_var(name, vars, nodeid, dag_stream, prefix);
 	}
 
 	return 0;
@@ -168,7 +174,10 @@ int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename) (stru
 	if(!dag_stream)
 		return 1;
 
-	// collect list here dag_to_file_vars(d->export_vars, variables, dag_stream, "");
+	// For the collect list, use the their final value (the value at node with id nodeid_counter).
+	dag_to_file_var(GC_COLLECT_LIST, d->variables, d->nodeid_counter, dag_stream, "");
+	dag_to_file_var(GC_PRESERVE_LIST, d->variables, d->nodeid_counter, dag_stream, "");
+
 	dag_to_file_exports(d, dag_stream, "");
 
 	dag_to_file_categories(d, dag_stream, rename);

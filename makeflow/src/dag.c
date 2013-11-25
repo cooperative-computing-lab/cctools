@@ -62,6 +62,13 @@ struct dag *dag_create()
 		hash_table_insert(d->variables, "GC_COLLECT_LIST", dag_variable_create(""));
 		hash_table_insert(d->variables, "GC_PRESERVE_LIST", dag_variable_create(""));
 
+		/* Declare special variables */
+		set_insert(d->special_vars, RESOURCES_CATEGORY);
+		set_insert(d->special_vars, RESOURCES_CORES);
+		set_insert(d->special_vars, RESOURCES_MEMORY);
+		set_insert(d->special_vars, RESOURCES_DISK);
+		set_insert(d->special_vars, RESOURCES_GPUS);
+
 		memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
 		return d;
 	}
