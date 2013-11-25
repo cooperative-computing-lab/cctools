@@ -366,6 +366,14 @@ void dag_to_dax_transform_catalog(const struct dag *d, FILE *output)
 	free(pfn);
 }
 
+void dag_to_dax_print_usage(const char *name)
+{
+	fprintf(stdout, "To plan your workflow try:\n");
+	fprintf(stdout, "\tpegasus-plan -Dpegasus.catalog.replica.file=%s.rc \\\n", name);
+	fprintf(stdout, "\t             -Dpegasus.catalog.transformation.file=%s.rc \\\n", name);
+	fprintf(stdout, "\t             -d %s.dax\n\n", name);
+}
+
 /* Entry Point of the dag_to_dax* functions.
  * Writes a dag in DAX format to file.
  * see: http://pegasus.isi.edu/wms/docs/schemas/dax-3.4/dax-3.4.html
@@ -392,6 +400,8 @@ int dag_to_dax(const struct dag *d, const char *name)
 	dax = fopen(dax_filename, "w");
 	dag_to_dax_transform_catalog(d, dax);
 	fclose(dax);
+
+	dag_to_dax_print_usage(name);
 
 	return 0;
 }
