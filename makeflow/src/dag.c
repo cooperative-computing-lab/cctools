@@ -26,7 +26,7 @@ See the file COPYING for details.
 
 extern int verbose_parsing;
 
-struct dag_variable *dag_variable_create(const char *initial_value);
+struct dag_variable *dag_variable_create(const char *name, const char *initial_value);
 
 struct dag *dag_create()
 {
@@ -59,8 +59,8 @@ struct dag *dag_create()
 
 		/* Add GC_*_LIST to variables table to ensure it is in
 		 * global DAG scope. */
-		hash_table_insert(d->variables, "GC_COLLECT_LIST", dag_variable_create(""));
-		hash_table_insert(d->variables, "GC_PRESERVE_LIST", dag_variable_create(""));
+		hash_table_insert(d->variables, GC_COLLECT_LIST,  dag_variable_create(NULL, ""));
+		hash_table_insert(d->variables, GC_PRESERVE_LIST, dag_variable_create(NULL, ""));
 
 		/* Declare special variables */
 		set_insert(d->special_vars, RESOURCES_CATEGORY);
@@ -406,7 +406,8 @@ void dag_variable_add_value(const char *name, struct hash_table *current_table, 
 	struct dag_variable *var = hash_table_lookup(current_table, name);
 	if(!var)
 	{
-		var = dag_variable_create(NULL);
+		char *value_env = getenv(name);
+		var = dag_variable_create(name, value_env);
 		hash_table_insert(current_table, name, var);
 	}
 
@@ -423,9 +424,14 @@ void dag_variable_add_value(const char *name, struct hash_table *current_table, 
 	var->values[var->count - 1] = v;
 }
 
-struct dag_variable *dag_variable_create(const char *initial_value)
+struct dag_variable *dag_variable_create(const char *name, const char *initial_value)
 {
 	struct dag_variable *var = malloc(sizeof(struct dag_variable *));
+
+	if(!initial_value && name)
+	{
+		initial_value = getenv(name);
+	}
 
 	if(initial_value)
 	{
@@ -446,7 +452,7 @@ struct dag_variable_value *dag_variable_value_create(const char *value)
 {
 	struct dag_variable_value *v = malloc(sizeof(struct dag_variable_value));
 
-	v->nodeid = -1;
+	v->nodeid = 0;
 	v->len    = strlen(value);
 	v->size   = v->len + 1;
 

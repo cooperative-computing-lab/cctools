@@ -1001,6 +1001,44 @@ struct dag *dag_from_file(const char *filename)
 	return d;
 }
 
+void dag_close_over_environment(struct dag *d)
+{
+	//for each exported and special variable, if the variable does not have a
+	//value assigned yet, we look for its value in the running environment
+	
+	char *name;
+	struct dag_variable_value *v;
+
+	set_first_element(d->special_vars);
+	while((name = set_next_element(d->special_vars)))
+	{
+		v = dag_get_variable_value(name, d->variables, d->nodeid_counter);
+		if(!v)
+		{
+			char *value_env = getenv(name);
+			if(value_env)
+			{
+				dag_variable_add_value(name, d->variables, 0, value_env);
+			}
+		}
+	}
+
+	set_first_element(d->export_vars);
+	while((name = set_next_element(d->export_vars)))
+	{
+		v = dag_get_variable_value(name, d->variables, d->nodeid_counter);
+		if(!v)
+		{
+			char *value_env = getenv(name);
+			if(value_env)
+			{
+				dag_variable_add_value(name, d->variables, 0, value_env);
+			}
+		}
+	}
+
+}
+
 int dag_parse(struct dag *d, FILE * dag_stream)
 {
 	char *line = NULL;
@@ -1042,7 +1080,9 @@ int dag_parse(struct dag *d, FILE * dag_stream)
 
 		free(line);
 	}
+
 //ok:
+    dag_close_over_environment(d);
 	dag_compile_ancestors(d);
 	free(bk);
 	return 1;
