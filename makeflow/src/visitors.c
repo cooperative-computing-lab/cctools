@@ -21,9 +21,11 @@ See the file COPYING for details.
 #include "list.h"
 #include "itable.h"
 #include "debug.h"
+#include "path.h"
 #include "set.h"
 #include "stringtools.h"
 
+#include "dag.h"
 #include "rmsummary.h"
 #include "visitors.h"
 
@@ -305,6 +307,20 @@ void dag_to_dax_footer(FILE *output)
 	fprintf(output, "</adag>\n");
 }
 
+/* Write replica catalog to file */
+void dag_to_dax_replica_catalog(const struct dag *d, FILE *output)
+{
+	struct dag_file *f = NULL;
+	char fn[PATH_MAX];
+	struct list *input_files = dag_input_files((struct dag*) d);
+	list_first_item(input_files);
+	while((f = (struct dag_file*)list_next_item(input_files)))
+	{
+		realpath(f->filename, fn);
+		fprintf(output, "%s\tfile://%s\t%s\n", path_basename(f->filename), fn, "pool=\"local\"");
+	}
+}
+
 /* Entry Point of the dag_to_dax* functions.
  * Writes a dag in DAX format to file.
  * see: http://pegasus.isi.edu/wms/docs/schemas/dax-3.4/dax-3.4.html
@@ -320,6 +336,11 @@ int dag_to_dax(const struct dag *d, const char *name)
 	dag_to_dax_relationships(d, dax);
 	dag_to_dax_footer(dax);
 
+	fclose(dax);
+
+	sprintf(dax_filename, "%s.rc", name);
+	dax = fopen(dax_filename, "w");
+	dag_to_dax_replica_catalog(d, dax);
 	fclose(dax);
 
 	return 0;
