@@ -1,4 +1,9 @@
 #! /usr/bin/env python
+#
+#Copyright (C) 2013- The University of Notre Dame
+#This software is distributed under the GNU General Public License.
+#See the file COPYING for details.
+#
 # This program implements a distributed version of BWA, using Makeflow and WorkQueue
 
 # Author: Nick Hazekamp
@@ -235,12 +240,12 @@ elif not os.path.exists("./bwa"):
         sys.exit(3)
 
 
-cat_bwa = search_file("cat_bwa.pl", path)
-if cat_bwa and not os.path.exists("./cat_bwa.pl"):
+cat_bwa = search_file("cat_bwa", path)
+if cat_bwa and not os.path.exists("./cat_bwa"):
         log.info("Cat_bwa located: " + cat_bwa)
-        os.symlink(cat_bwa, "cat_bwa.pl")
+        os.symlink(cat_bwa, "cat_bwa")
 elif not os.path.exists("./cat_bwa.pl"):
-        log.error("Unable to find cat_bwa.pl script")
+        log.error("Unable to find cat_bwa")
         sys.exit(3)
 
 if options.makeflow is None:
@@ -330,7 +335,7 @@ try:
 		output = options.output_SAM + " "
 	
 	makeflow.write("\n\n"+output+": cat_bwa.pl "+results_to_cat)
-	makeflow.write("\n\t perl cat_bwa.pl "+output+results_to_cat)	
+	makeflow.write("\n\t./cat_bwa.pl "+output+results_to_cat)	
 
 finally:
 	if options.makeflow is not None:
