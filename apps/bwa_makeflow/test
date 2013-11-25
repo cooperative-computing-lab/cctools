@@ -1,0 +1,17 @@
+BATCH_OPTIONS= Requirements = (Arch == \"x86_64\") && (OpSys == \"LINUX\")\\nOn_exit_remove = (ExitCode!=101) || (ExitBySignal==TRUE)\\n+biocomputejobid=$id\\nPriority = $prio\\n\\n\\n 
+
+
+Query1.fq.0 numsplits.txt : fastq_reduce.pl Query1.fq
+	perl fastq_reduce.pl Query1.fq > numsplits.txt 2>&1
+
+Query2.fq.0 rnumsplits.txt : fastq_reduce.pl Query2.fq
+	perl fastq_reduce.pl Query2.fq > rnumsplits.txt
+
+Ref.fa.bwt Ref.fa.pac Ref.fa.amb Ref.fa.ann Ref.fa.sa : bwa Ref.fa
+	./bwa index Ref.fa 2>&1
+
+BWAMF.output.0 : bwa Ref.fa Ref.fa.bwt Ref.fa.pac Ref.fa.amb Ref.fa.ann Ref.fa.sa Query1.fq.0 Query2.fq.0 
+	./bwa mem -v 0 Ref.fa Query1.fq.0 Query2.fq.0  > BWAMF.output.0  2>&1
+
+bwa_results.sam : cat_bwa.pl BWAMF.output.0 
+	 perl cat_bwa.pl bwa_results.sam BWAMF.output.0 

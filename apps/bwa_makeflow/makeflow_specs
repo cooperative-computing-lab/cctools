@@ -1,0 +1,1 @@
+BATCH_OPTIONS= Requirements = (Arch == \"x86_64\") && (OpSys == \"LINUX\")\\nOn_exit_remove = (ExitCode!=101) || (ExitBySignal==TRUE)\\n+biocomputejobid=$id\\nPriority = $prio\\n\\n\\n 
