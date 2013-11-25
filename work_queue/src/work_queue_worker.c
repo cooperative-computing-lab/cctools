@@ -123,7 +123,7 @@ static int abort_flag = 0;
 static int foreman_debug_msg_interval = 10; 
 
 // Threshold for available disk space (MB) beyond which clean up and restart.
-static UINT64_T disk_avail_threshold = 100;
+static uint64_t disk_avail_threshold = 100;
 
 // Terminate only when:
 // terminate_boundary - (current_time - worker_start_time)%terminate_boundary ~~ 0
@@ -151,18 +151,17 @@ static char *base_debug_filename = NULL;
 // Local resource controls
 static struct work_queue_resources * aggregated_resources = 0;
 static struct work_queue_resources * aggregated_resources_last = 0;
-static int manual_cores_option = 1;
-static int manual_disk_option = 0;
-static int manual_memory_option = 0;
-static int manual_gpus_option = 0;
+static int64_t manual_cores_option = 1;
+static int64_t manual_disk_option = 0;
+static int64_t manual_memory_option = 0;
+static int64_t manual_gpus_option = 0;
 
-static int cores_allocated = 0;
-static int memory_allocated = 0;
-static int disk_allocated = 0;
-static int gpus_allocated = 0;
+static int64_t cores_allocated = 0;
+static int64_t memory_allocated = 0;
+static int64_t disk_allocated = 0;
+static int64_t gpus_allocated = 0;
 // do not send consecutive resource updates in less than this many seconds
 static int send_resources_interval = 5;
-
 
 // Foreman mode global variables
 static struct work_queue *foreman_q = NULL;
@@ -450,7 +449,7 @@ static int start_task(struct work_queue_task *t) {
 
 static void report_task_complete(struct link *master, struct task_info *ti)
 {
-	INT64_T output_length;
+	int64_t output_length;
 	struct stat st;
 
 	if(ti->pid) {
@@ -539,7 +538,7 @@ static int handle_tasks(struct link *master) {
 	int status;
 	
 	itable_firstkey(active_tasks);
-	while(itable_nextkey(active_tasks, (UINT64_T*)&pid, (void**)&ti)) {
+	while(itable_nextkey(active_tasks, (uint64_t*)&pid, (void**)&ti)) {
 		result = wait4(pid, &status, WNOHANG, &ti->rusage);
 		if(result) {
 			if(result < 0) {
@@ -582,26 +581,26 @@ static void make_hash_key(const char *addr, int port, char *key)
 	sprintf(key, "%s:%d", addr, port);
 }
 
-static int check_disk_space_for_filesize(INT64_T file_size) {
-    UINT64_T disk_avail, disk_total;
+static int check_disk_space_for_filesize(int64_t file_size) {
+	uint64_t disk_avail, disk_total;
 
-    // Check available disk space
-    if(disk_avail_threshold > 0) {
-	disk_info_get(".", &disk_avail, &disk_total);
-	if(file_size > 0) {	
-	    if((UINT64_T)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
-		debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
-		return 0;
-	    }
-	} else {
-	    if(disk_avail < disk_avail_threshold) {
-		debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
-		return 0;
-	    }	
-	}	
+	// Check available disk space
+	if(disk_avail_threshold > 0) {
+		disk_info_get(".", &disk_avail, &disk_total);
+		if(file_size > 0) {	
+			if((uint64_t)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
+			debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
+			return 0;
+			}
+		} else {
+			if(disk_avail < disk_avail_threshold) {
+			debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
+			return 0;
+			}	
+		}	
     }
 
-    return 1;
+	return 1;
 }
 
 /**
@@ -905,7 +904,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 	char dentline[WORK_QUEUE_LINE_MAX];
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	struct stat info;
-	INT64_T actual, length;
+	int64_t actual, length;
 	int fd;
 
 	sprintf(cached_filename, "cache/%s", filename);
@@ -1085,7 +1084,7 @@ static int do_task( struct link *master, int taskid )
 	return 1;
 }
 
-static int do_put(struct link *master, char *filename, INT64_T length, int mode) {
+static int do_put(struct link *master, char *filename, int64_t length, int mode) {
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	char *cur_pos;
 	
@@ -1122,7 +1121,7 @@ static int do_put(struct link *master, char *filename, INT64_T length, int mode)
 		return 0;
 	}
 
-	INT64_T actual = link_stream_to_fd(master, fd, length, time(0) + active_timeout);
+	int64_t actual = link_stream_to_fd(master, fd, length, time(0) + active_timeout);
 	close(fd);
 	if(actual != length) {
 		debug(D_WQ, "Failed to put file - %s (%s)\n", filename, strerror(errno));
@@ -1352,7 +1351,7 @@ static void do_reset_results_to_be_sent() {
 static void kill_all_tasks() {
 	struct task_info *ti;
 	pid_t pid;
-	UINT64_T taskid;
+	uint64_t taskid;
 
 	do_reset_results_to_be_sent();
 	
@@ -1374,7 +1373,7 @@ static void kill_all_tasks() {
 	
 	// Send kill signal to all child processes
 	itable_firstkey(active_tasks);
-	while(itable_nextkey(active_tasks, (UINT64_T*)&pid, (void**)&ti)) {
+	while(itable_nextkey(active_tasks, (uint64_t*)&pid, (void**)&ti)) {
 		kill(-1 * ti->pid, SIGKILL);
 	}
 	
@@ -1578,8 +1577,8 @@ static int handle_master(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
 	char path[WORK_QUEUE_LINE_MAX];
-	INT64_T length;
-	INT64_T taskid = 0;
+	int64_t length;
+	int64_t taskid = 0;
 	int flags = WORK_QUEUE_NOCACHE;
 	int mode, r, n;
 
@@ -1644,7 +1643,8 @@ static int handle_master(struct link *master) {
 
 
 static int check_for_resources(struct work_queue_task *t) {
-	int cores_used, disk_used, mem_used, gpus_used, ok = 1;
+	int64_t cores_used, disk_used, mem_used, gpus_used;
+	int ok = 1;
 	
 	// If resources used have not been specified, treat the task as consuming the entire real worker
 	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
@@ -1659,8 +1659,6 @@ static int check_for_resources(struct work_queue_task *t) {
 		disk_used = MAX(t->disk, 0);
 		gpus_used = MAX(t->gpus, 0);
 	}
-	
-	
 	
 	if(cores_allocated + cores_used > aggregated_resources->cores.total) {
 		ok = 0;
@@ -1679,7 +1677,6 @@ static int check_for_resources(struct work_queue_task *t) {
 	}
 	
 	return ok;
-	
 }
 
 static void work_for_master(struct link *master) {
@@ -1824,12 +1821,10 @@ static void foreman_for_master(struct link *master) {
 
 		if(time(0) - last_debug_msg > foreman_debug_msg_interval)
 		{
-			debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
+			debug(D_WQ, "Foreman local disk inuse and total: %"PRId64" %"PRId64"\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
 
-
-			if(itable_size(results_to_be_sent) > 0)
-			{
-				debug(D_WQ, "Foreman local disk inuse and total: %d %d\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
+			if(itable_size(results_to_be_sent) > 0) {
+				debug(D_WQ, "Foreman local disk inuse and total: %"PRId64" %"PRId64"\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
 			}
 
 			last_debug_msg = time(0);
@@ -1901,7 +1896,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Set the maximum bandwidth the foreman will consume in Mbps. (default=unlimited)\n", "--bandwidth=<mbps>");
 	fprintf(stdout, " %-30s take.\n", "");
 	fprintf(stdout, " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
-	fprintf(stdout, " %-30s worker automatically measure. (default=%d)\n", "", manual_cores_option);
+	fprintf(stdout, " %-30s worker automatically measure. (default=%"PRId64")\n", "", manual_cores_option);
 	fprintf(stdout, " %-30s Set the number of GPUs reported by this worker. (default=0)\n", "--gpus=<n>");
 	fprintf(stdout, " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
 	fprintf(stdout, " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
@@ -2166,14 +2161,14 @@ int main(int argc, char *argv[])
 			if(!strncmp(optarg, "all", 3)) {
 				manual_memory_option = 0;
 			} else {
-				manual_memory_option = atoi(optarg);
+				manual_memory_option = atoll(optarg);
 			}
 			break;
 		case LONG_OPT_DISK:
 			if(!strncmp(optarg, "all", 3)) {
 				manual_disk_option = 0;
 			} else {
-				manual_disk_option = atoi(optarg);
+				manual_disk_option = atoll(optarg);
 			}
 			break;
 		case LONG_OPT_GPUS:
@@ -2308,7 +2303,7 @@ int main(int argc, char *argv[])
 	debug(D_WQ,"local resources:");
 	work_queue_resources_debug(aggregated_resources);
 
-	fprintf(stdout, "work_queue_worker: %d workers, %d cores, %d MB memory, %d MB disk available, %d gpus\n",
+	fprintf(stdout, "work_queue_worker: %"PRId64" workers, %"PRId64" cores, %"PRId64" MB memory, %"PRId64" MB disk available, %"PRId64" gpus\n",
 	       aggregated_resources->workers.total,
 	       aggregated_resources->cores.total,
 	       aggregated_resources->memory.total,

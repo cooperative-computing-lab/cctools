@@ -111,11 +111,11 @@ struct work_queue {
 
 	struct list    *workers_with_available_results;
 
-	INT64_T total_tasks_submitted;
-	INT64_T total_tasks_complete;
-	INT64_T total_bytes_sent;
-	INT64_T total_bytes_received;
-	INT64_T total_workers_removed;
+	int64_t total_tasks_submitted;
+	int64_t total_tasks_complete;
+	int64_t total_bytes_sent;
+	int64_t total_bytes_received;
+	int64_t total_workers_removed;
 
 	timestamp_t start_time;
 	timestamp_t total_send_time;
@@ -166,16 +166,16 @@ struct work_queue_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 	struct work_queue_resources *resources;
-	int cores_allocated;
-	int memory_allocated;
-	int disk_allocated;
-	int gpus_allocated;
+	int64_t cores_allocated;
+	int64_t memory_allocated;
+	int64_t disk_allocated;
+	int64_t gpus_allocated;
 	struct hash_table *current_files;
 	struct link *link;
 	struct itable *current_tasks;
 	int finished_tasks;
-	INT64_T total_tasks_complete;
-	INT64_T total_bytes_transferred;
+	int64_t total_tasks_complete;
+	int64_t total_bytes_transferred;
 	timestamp_t total_task_time;
 	timestamp_t total_transfer_time;
 	timestamp_t start_time;
@@ -204,7 +204,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 /********** work_queue internal functions *************/
 /******************************************************/
 
-static int get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
+static int64_t get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->cores.total)
 		return w->resources->cores.total * q->asynchrony_multiplier + q->asynchrony_modifier;
 	else
@@ -413,12 +413,12 @@ Two exceptions are made:
   between the master and the workers that it serves.
 */
 
-static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, INT64_T length)
+static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int64_t length)
 {
 	double avg_transfer_rate; // bytes per second
 	const char *data_source;
 
-	INT64_T     q_total_bytes_transferred = q->total_bytes_sent + q->total_bytes_received;
+	int64_t     q_total_bytes_transferred = q->total_bytes_sent + q->total_bytes_received;
 	timestamp_t q_total_transfer_time     = q->total_send_time  + q->total_receive_time;
 
 	// Note total_transfer_time and q_total_transfer_time are timestamp_t with units of milliseconds.
@@ -495,7 +495,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	char *key, *value;
 	struct work_queue_task *t;
-	UINT64_T taskid;
+	uint64_t taskid;
 
 	if(!q || !w) return;
 	
@@ -625,7 +625,7 @@ Get a single file from a remote worker.
 Returns true on success, false on failure.
 */
 
-static int get_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *local_name, INT64_T length, INT64_T * total_bytes)
+static int get_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *local_name, int64_t length, int64_t * total_bytes)
 {
 	// If necessary, create parent directories of the file.
 
@@ -656,7 +656,7 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 
 	// Choose the actual stoptime and transfer the data.
 	time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
-	INT64_T actual = link_stream_to_fd(w->link, fd, length, stoptime);
+	int64_t actual = link_stream_to_fd(w->link, fd, length, stoptime);
 
 	close(fd);
 
@@ -687,7 +687,7 @@ This makes it efficient to move deep directory hierarchies with
 high throughput and low latency.
 */
 
-static int get_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *remote_name, const char *local_name, INT64_T * total_bytes)
+static int get_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *remote_name, const char *local_name, int64_t * total_bytes)
 {
 	// Remember the length of the specified remote path so it can be chopped from the result.
 	int remote_name_len = strlen(remote_name);
@@ -700,7 +700,7 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 	while(1) {
 		char line[WORK_QUEUE_LINE_MAX];
 		char tmp_remote_path[WORK_QUEUE_LINE_MAX];
-		INT64_T length;
+		int64_t length;
 		int errnum;
 
 		int result = recv_worker_msg_retry(q, w, line, sizeof(line));
@@ -813,7 +813,7 @@ Returns true on success, false on failure.
 
 static int get_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f, const char *cached_name )
 {
-	INT64_T total_bytes = 0;
+	int64_t total_bytes = 0;
 	int result = 0;
 			
 	timestamp_t open_time = timestamp_get();
@@ -1032,11 +1032,11 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	if(!q || !w || !line) return -1; 
 
 	int result;
-	UINT64_T taskid;
-	INT64_T output_length;
+	uint64_t taskid;
+	int64_t output_length;
 	timestamp_t execution_time;
 	struct work_queue_task *t;
-	INT64_T actual;
+	int64_t actual;
 	timestamp_t observed_execution_time;
 	timestamp_t effective_stoptime = 0;
 
@@ -1244,7 +1244,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 void current_tasks_to_nvpair( struct nvpair *nv, struct work_queue_worker *w )
 {
 	struct work_queue_task *t;
-	UINT64_T taskid;
+	uint64_t taskid;
 	int n = 0;
 
 	itable_firstkey(w->current_tasks);
@@ -1318,7 +1318,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 		struct work_queue_task *t;
 		struct work_queue_worker *w;
 		struct nvpair *nv;
-		UINT64_T key;
+		uint64_t key;
 
 		itable_firstkey(q->running_tasks);
 		while(itable_nextkey(q->running_tasks,&key,(void**)&t)) {
@@ -1385,7 +1385,7 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 	char category[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
 	
-	if(sscanf(line, "resource %s %d %d %d %d", category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
+	if(sscanf(line, "resource %s %"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
 
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
@@ -1475,13 +1475,13 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	return n;
 }
 
-static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, INT64_T length, INT64_T *total_bytes, int flags)
+static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, int64_t *total_bytes, int flags)
 {
 
 	struct stat local_info;
 	time_t stoptime;
 	timestamp_t effective_stoptime = 0;
-	INT64_T actual = 0;
+	int64_t actual = 0;
 	
 	if(stat(localname, &local_info) < 0)
 		return 0;
@@ -1537,7 +1537,7 @@ Send a directory and all of its contentss.
 Returns true on success, false.
 */
 
-static int send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *dirname, const char *remotedirname, INT64_T * total_bytes, int flags )
+static int send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *dirname, const char *remotedirname, int64_t * total_bytes, int flags )
 {
 	DIR *dir = opendir(dirname);
 	if(!dir) return 0;
@@ -1581,7 +1581,7 @@ The local file name should already have been expanded by the caller.
 Returns true on success, false on failure.
 */
 
-static int send_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *expanded_local_name, INT64_T * total_bytes)
+static int send_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *expanded_local_name, int64_t * total_bytes)
 {
 	struct stat local_info;
 	struct stat *remote_info;
@@ -1691,8 +1691,8 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 
 static int send_input_file(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f)
 {
-	INT64_T total_bytes = 0;
-	INT64_T actual = 0;
+	int64_t total_bytes = 0;
+	int64_t actual = 0;
 
 	char *cached_name = make_cached_name(t,f);
 
@@ -1838,8 +1838,8 @@ int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct wor
 	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid);
 	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(t->command_line), t->command_line);
 	send_worker_msg(q,w, "cores %d\n",   t->cores );
-	send_worker_msg(q,w, "memory %d\n",  t->memory );
-	send_worker_msg(q,w, "disk %d\n",    t->disk );
+	send_worker_msg(q,w, "memory %"PRId64"\n",  t->memory );
+	send_worker_msg(q,w, "disk %"PRId64"\n",    t->disk );
 	send_worker_msg(q,w, "gpus %d\n",    t->gpus );
 
 	if(t->input_files) {
@@ -1933,7 +1933,8 @@ static double compute_capacity( const struct work_queue *q )
 }
 
 static int check_worker_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
-	int cores_used, disk_used, mem_used, gpus_used, ok = 1;
+	int64_t cores_used, disk_used, mem_used, gpus_used;
+	int ok = 1;
 	
 	// If none of the resources used have not been specified, treat the task as consuming an entire "average" worker
 	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
@@ -1974,8 +1975,8 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 	char *key;
 	struct work_queue_worker *w;
 	struct work_queue_worker *best_worker = 0;
-	INT64_T most_task_cached_bytes = 0;
-	INT64_T task_cached_bytes;
+	int64_t most_task_cached_bytes = 0;
+	int64_t task_cached_bytes;
 	struct stat *remote_info;
 	struct work_queue_file *tf;
 
@@ -2203,7 +2204,7 @@ static void abort_slow_workers(struct work_queue *q)
 {
 	struct work_queue_worker *w;
 	struct work_queue_task *t;
-	UINT64_T key;
+	uint64_t key;
 	const double multiplier = q->fast_abort_multiplier;
 
 	if(q->total_tasks_complete < 10)
@@ -2313,7 +2314,7 @@ static struct work_queue_task *find_running_task_by_id(struct work_queue *q, int
 static struct work_queue_task *find_running_task_by_tag(struct work_queue *q, const char *tasktag) {
 	
 	struct work_queue_task *t;
-	UINT64_T taskid;
+	uint64_t taskid;
 
 	itable_firstkey(q->running_tasks);
 	while(itable_nextkey(q->running_tasks, &taskid, (void**)&t)) {
@@ -2366,13 +2367,13 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
-void work_queue_task_specify_memory( struct work_queue_task *t, int memory )
+void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory )
 {
 	t->memory = memory;
 	t->unlabeled = 0;
 }
 
-void work_queue_task_specify_disk( struct work_queue_task *t, int disk )
+void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk )
 {
 	t->disk = disk;
 	t->unlabeled = 0;
@@ -3298,7 +3299,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// If any worker has sent a results message, retrieve the output files.
 		if(itable_size(q->finished_tasks)) {
 			struct work_queue_worker *w;
-			UINT64_T taskid;
+			uint64_t taskid;
 			itable_firstkey(q->finished_tasks);
 			while(itable_nextkey(q->finished_tasks, &taskid, (void **)&t)) {
 				w = itable_lookup(q->worker_task_map, taskid);
@@ -3439,7 +3440,7 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 	struct list *l = list_create();
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
-	UINT64_T taskid;
+	uint64_t taskid;
 	char *key;
 	
 	while( (t = list_pop_head(q->ready_list)) ) {
