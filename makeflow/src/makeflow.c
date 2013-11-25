@@ -1049,8 +1049,6 @@ int dag_parse(struct dag *d, FILE * dag_stream)
 
 	bk->category = dag_task_category_lookup_or_create(d, "default");
 
-	dag_task_category_get_env_resources(bk->category);
-
 	while((line = dag_parse_readline(bk, NULL)) != NULL) {
 
 		if(strlen(line) == 0 || line[0] == '#') {
@@ -1441,8 +1439,10 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 		return 0;
 	}
 
+
 	debug(D_DEBUG, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
-	dag_task_category_print_debug_resources(n->category);
+	dag_task_fill_resources(n);
+	dag_task_print_debug_resources(n);
 
 	return 1;
 }
@@ -1746,8 +1746,7 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
 {
 	char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
-
-	char *limits_str = dag_task_category_wrap_as_rmonitor_options(n->category);
+	char *limits_str = dag_task_resources_wrap_as_rmonitor_options(n);
 	char *extra_options = string_format("%s -V '%-15s%s'", 
 			limits_str ? limits_str : "", 
 			"category:",
@@ -1877,7 +1876,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	 * restore it after we submit. */
 	struct dag_lookup_set s = { d, n->category, n, NULL };
 	char *batch_options_env    = dag_lookup_str("BATCH_OPTIONS", &s);
-	char *batch_submit_options = dag_task_category_wrap_options(n->category, batch_options_env, batch_queue_get_type(thequeue));
+	char *batch_submit_options = dag_task_resources_wrap_options(n, batch_options_env, batch_queue_get_type(thequeue));
 	char *old_batch_submit_options = NULL;
 
 	free(batch_options_env);
