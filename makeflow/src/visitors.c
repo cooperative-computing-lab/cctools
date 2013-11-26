@@ -344,7 +344,7 @@ void dag_to_dax_transform_catalog(const struct dag *d, FILE *output)
 
 	list_first_item(transforms);
 	while((fn = list_next_item(transforms))) {
-		if(path_lookup(fn, pfn)){
+		if(path_lookup(getenv("PATH"), fn, pfn, PATH_MAX)){
 			realpath(fn, pfn);
 			type = "STAGEABLE";
 		} else {
