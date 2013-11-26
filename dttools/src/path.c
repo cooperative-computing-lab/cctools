@@ -177,7 +177,7 @@ int path_lookup (const char *exe, char *dest){
 		while(*e != ':' && *e != '\0') e++;
 		*e = '\0';
 
-		if( *s == '.' ){
+		if( *s != '/' ){
 			tmp = path_getcwd();
 			realloc(tmp, PATH_MAX);
 			strncat(tmp, "/", 1);
