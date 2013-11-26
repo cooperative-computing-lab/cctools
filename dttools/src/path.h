@@ -16,11 +16,13 @@ void path_collapse (const char *l, char *s, int remove_dotdot);
 void path_dirname (const char *path, char *dir);
 
 /** Lookup exe in search path.
- * @param exe Name of executable to search for
- * @param dest Location for absolute path of executable
+ * @param search_path Colon separated string of directories.
+ * @param exe Name of executable to search for.
+ * @param dest Location for absolute path of executable.
+ * @param destlen Length of destination buffer.
  * @return 0 on success, non-zero if not found.
  */
-int path_lookup (const char *exe, char *dest);
+int path_lookup (char *search_path, const char *exe, char *dest, size_t destlen);
 
 /** Returns a heap allocated freeable string for the current working directory.
  *  @return The current working directory.

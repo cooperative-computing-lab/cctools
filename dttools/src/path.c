@@ -155,33 +155,30 @@ void path_dirname (const char *path, char *dir)
 	}
 }
 
-int path_lookup (const char *exe, char *dest){
-	char *PATH = NULL;
+int path_lookup (char *search_path, const char *exe, char *dest, size_t destlen)
+{
 	char *s;
 	char *e;
 	char fn[PATH_MAX];
-	char *tmp = NULL;
+	char tmp[PATH_MAX];
 	size_t len = 0;
 	size_t exelen = strlen(exe);
 	DIR *dirp = NULL;
 	struct dirent *dp = NULL;
 	struct stat sb;
 
-	PATH = xxstrdup(getenv("PATH"));
-	if(!PATH) PATH = "/bin:/usr/bin";
+	len = strlen(search_path);
+	s = e = search_path;
 
-	len = strlen(PATH);
-	s = e = PATH;
-
-	while(e < PATH+len) {
+	while(e < search_path+len) {
 		while(*e != ':' && *e != '\0') e++;
 		*e = '\0';
 
 		if( *s != '/' ){
-			tmp = path_getcwd();
-			realloc(tmp, PATH_MAX);
-			strncat(tmp, "/", 1);
-			strncat(tmp, s, PATH_MAX - strlen(tmp));
+			char *cwd;
+			cwd = path_getcwd();
+			snprintf(tmp, PATH_MAX, "%s/%s", cwd, s);
+			free(cwd);
 			s = tmp;
 		}
 
@@ -192,9 +189,7 @@ int path_lookup (const char *exe, char *dest){
 					strncat(fn, "/", 1);
 					strncat(fn, dp->d_name, dp->d_namlen);
 					if( stat(fn, &sb) == 0 && sb.st_mode & (S_IXUSR|S_IFREG) ){
-						strncpy(dest, fn, PATH_MAX);
-						free(PATH);
-						if(tmp) free(tmp);
+						strncpy(dest, fn, destlen);
 						closedir(dirp);
 						return 0;
 					}
@@ -207,8 +202,6 @@ int path_lookup (const char *exe, char *dest){
 		s = e;
 	}
 
-	if(tmp) free(tmp);
-	free(PATH);
 	return 1;
 }
 
