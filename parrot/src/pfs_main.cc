@@ -32,6 +32,7 @@ extern "C" {
 #include "chirp_ticket.h"
 #include "ftp_lite.h"
 #include "int_sizes.h"
+#include "delete_dir.h"
 }
 
 #include <stdlib.h>
@@ -88,6 +89,7 @@ INT64_T pfs_write_count = 0;
 const char * pfs_cvmfs_repo_arg = 0;
 bool pfs_cvmfs_repo_switching = false;
 char pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX];
+char pfs_cvmfs_locks_dir[PFS_PATH_MAX];
 
 int pfs_irods_debug_level = 0;
 
@@ -722,6 +724,7 @@ int main( int argc, char *argv[] )
 		sprintf(pfs_cvmfs_alien_cache_dir,"%s/cvmfs", pfs_temp_dir);
 	}
 
+	sprintf(pfs_cvmfs_locks_dir, "%s/cvmfs_locks_%d", pfs_temp_dir, getpid());
 
 	pfs_file_cache = file_cache_init(pfs_temp_dir);
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
@@ -868,6 +871,8 @@ int main( int argc, char *argv[] )
 	}
 
 	if(pfs_paranoid_mode) pfs_paranoia_cleanup();
+
+	delete_dir(pfs_cvmfs_locks_dir);
 
 	if(WIFEXITED(root_exitstatus)) {
 		status = WEXITSTATUS(root_exitstatus);

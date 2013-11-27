@@ -34,6 +34,7 @@ extern char pfs_temp_dir[];
 extern const char * pfs_cvmfs_repo_arg;
 extern bool pfs_cvmfs_repo_switching;
 extern char pfs_cvmfs_alien_cache_dir[];
+extern char pfs_cvmfs_locks_dir[];
 
 static bool cvmfs_configured = false;
 static struct cvmfs_filesystem *cvmfs_filesystem_list = 0;
@@ -362,13 +363,12 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 
 	int repo_name_offset = 0;
 	int repo_name_in_cachedir_offset = 0;
-	char *buf = string_format("repo_name=%n%s,cachedir=%s/cvmfs_locks_%d/%n%s,alien_cachedir=%s/%n%s,timeout=%d,timeout_direct=%d%s%s,%n%s",
+	char *buf = string_format("repo_name=%n%s,cachedir=%s/%n%s,alien_cachedir=%s/%n%s,timeout=%d,timeout_direct=%d%s%s,%n%s",
 			&repo_name_offset,
 			repo_name,
 
 			//cachedir
-			pfs_temp_dir,
-			getpid(),                       // add pid to name, since cachedir needs to be exclusive
+			pfs_cvmfs_locks_dir,
 			&repo_name_in_cachedir_offset,
 			repo_name,
 
