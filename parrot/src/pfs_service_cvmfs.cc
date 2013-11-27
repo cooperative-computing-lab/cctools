@@ -361,9 +361,7 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 
 	int repo_name_offset = 0;
 	int repo_name_in_cachedir_offset = 0;
-	char *buf = (char *)malloc(strlen(user_options)+3*strlen(repo_name)+2*strlen(pfs_temp_dir)+strlen(proxy?proxy:"")+100);
-	sprintf(buf,
-			"repo_name=%n%s,cachedir=%s/cvmfs_locks_%d/%n%s,alien_cachedir=%s/cvmfs/%n%s,timeout=%d,timeout_direct=%d%s%s,%n%s",
+	char *buf = string_format("repo_name=%n%s,cachedir=%s/cvmfs_locks_%d/%n%s,alien_cachedir=%s/cvmfs/%n%s,timeout=%d,timeout_direct=%d%s%s,%n%s",
 			&repo_name_offset,
 			repo_name,
 
