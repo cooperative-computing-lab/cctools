@@ -65,6 +65,8 @@ int pfs_write_rval = 0;
 int pfs_paranoid_mode = 0;
 const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
+
+char sys_temp_dir[PFS_PATH_MAX];
 char pfs_temp_dir[PFS_PATH_MAX];
 
 int *pfs_syscall_totals32 = 0;
@@ -495,6 +497,19 @@ int main( int argc, char *argv[] )
 		if(string_split(x,&nargs,&args)) {
 			pfs_password_cache = password_cache_init(args[0], args[1]);
 		}
+	}
+
+	s = getenv("TMPDIR");
+	if(s) {
+		if(strlen(s) < PFS_PATH_MAX) {
+			strcpy(sys_temp_dir, s);
+		}
+		else {
+			fatal("temporary files directory from $TMPDIR pathname longer than %d characters\n", PFS_PATH_MAX - 1);
+		}
+	}
+	else {
+		strcpy(sys_temp_dir, "/tmp");
 	}
 
 	pfs_temp_dir[PFS_PATH_MAX - 1] = '\0';
