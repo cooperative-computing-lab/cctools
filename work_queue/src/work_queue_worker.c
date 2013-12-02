@@ -27,6 +27,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "debug.h"
 #include "stringtools.h"
+#include "path.h"
 #include "load_average.h"
 #include "domain_name_cache.h"
 #include "getopt.h"
@@ -2138,7 +2139,7 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'Z':
-			port_file = optarg;
+			port_file = xxstrdup(optarg);
 			worker_mode = WORKER_MODE_FOREMAN;
 			break;
 		case LONG_OPT_VOLATILITY:
@@ -2227,6 +2228,28 @@ int main(int argc, char *argv[])
 	if(terminate_boundary > 0 && idle_timeout > terminate_boundary) {
 		idle_timeout = MAX(short_timeout, terminate_boundary - TERMINATE_BOUNDARY_LEEWAY);
 	}
+
+	// set $WORK_QUEUE_SANDBOX to workspace.
+	debug(D_WQ, "WORK_QUEUE_SANDBOX set to %s.\n", workspace);
+	setenv("WORK_QUEUE_SANDBOX", workspace, 0);
+
+	//get absolute pathnames of port and log file.
+	char temp_abs_path[PATH_MAX];
+	if(port_file)
+	{
+		path_absolute(port_file, temp_abs_path, 0);
+		free(port_file);
+		port_file = xxstrdup(temp_abs_path);
+	}
+	if(foreman_stats_filename)
+	{
+		path_absolute(foreman_stats_filename, temp_abs_path, 0);
+		free(foreman_stats_filename);
+		foreman_stats_filename = xxstrdup(temp_abs_path);
+	}
+
+	// change to workspace
+	chdir(workspace);
 	
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		char foreman_string[WORK_QUEUE_LINE_MAX];
@@ -2267,13 +2290,6 @@ int main(int argc, char *argv[])
 	}
 
 	results_to_be_sent = itable_create(0);
-
-	// set $WORK_QUEUE_SANDBOX to workspace.
-	debug(D_WQ, "WORK_QUEUE_SANDBOX set to %s.\n", workspace);
-	setenv("WORK_QUEUE_SANDBOX", workspace, 0);
-
-	// change to workspace
-	chdir(workspace);
 
 	if(!check_disk_space_for_filesize(0)) {
 		goto abort;
