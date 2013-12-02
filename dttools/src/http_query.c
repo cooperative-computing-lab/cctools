@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "http_query.h"
 
+#include "buffer.h"
 #include "stringtools.h"
 #include "debug.h"
 #include "domain_name.h"
@@ -134,27 +135,28 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 		return 0;
 	}
 
-	char *http_user_agent = getenv("HTTP_USER_AGENT");
 
-	if(cache_reload == 0) {
-		if(http_user_agent){
-			debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/ %s)\r\nConnection: close\r\n\r\n", action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO,http_user_agent);
-			link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/ %s)\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, http_user_agent);
-		}
-		else {
-			debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/)\r\nConnection: close\r\n\r\n", action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
-			link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/)\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
-		}
-	} else {
-		if(http_user_agent){
-			debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/ %s)\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, http_user_agent);
-			link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/ %s)\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, http_user_agent);
-		}
-		else{
-			//  force refresh of cache end-to-end (RFC 2616)
-			debug(D_HTTP, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/)\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
-			link_putfstring(link, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/)\r\nCache-Control: max-age=0\r\nConnection: close\r\n\r\n", stoptime, action, url, actual_host, CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
-		}
+	{
+		buffer_t B;
+
+		buffer_init(&B);
+		buffer_abortonfailure(&B, 1);
+
+		buffer_printf(&B, "%s %s HTTP/1.1\r\n", action, url);
+		if(cache_reload)
+			buffer_putliteral(&B, "Cache-Control: max-age=0\r\n");
+		buffer_putliteral(&B, "Connection: close\r\n");
+		buffer_printf(&B, "Host: %s\r\n", actual_host);
+		if(getenv("HTTP_USER_AGENT"))
+			buffer_printf(&B, "User-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/ %s)\r\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, getenv("HTTP_USER_AGENT"));
+		else
+			buffer_printf(&B, "User-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://www.nd.edu/~ccl/)\r\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
+		buffer_putliteral(&B, "\r\n"); /* header terminator */
+
+		debug(D_HTTP, "%s", buffer_tostring(&B, NULL));
+		link_putstring(link, buffer_tostring(&B, NULL), stoptime);
+
+		buffer_free(&B);
 	}
 
 	if(link_readline(link, line, HTTP_LINE_MAX, stoptime)) {
