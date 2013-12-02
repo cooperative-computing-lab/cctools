@@ -32,6 +32,7 @@ extern "C" {
 #include "chirp_ticket.h"
 #include "ftp_lite.h"
 #include "int_sizes.h"
+#include "delete_dir.h"
 }
 
 #include <stdlib.h>
@@ -65,6 +66,8 @@ int pfs_write_rval = 0;
 int pfs_paranoid_mode = 0;
 const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
+
+char sys_temp_dir[PFS_PATH_MAX];
 char pfs_temp_dir[PFS_PATH_MAX];
 
 int *pfs_syscall_totals32 = 0;
@@ -85,6 +88,8 @@ INT64_T pfs_write_count = 0;
 
 const char * pfs_cvmfs_repo_arg = 0;
 bool pfs_cvmfs_repo_switching = false;
+char pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX];
+char pfs_cvmfs_locks_dir[PFS_PATH_MAX];
 
 int pfs_irods_debug_level = 0;
 
@@ -100,6 +105,7 @@ static int channel_size = 10;
 
 enum {
 	LONG_OPT_CVMFS_REPO_SWITCHING=500,
+	LONG_OPT_CVMFS_ALIEN_CACHE,
 };
 
 static void get_linux_version(const char *cmd)
@@ -195,6 +201,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Inhibit catalog queries to list /chirp.\n", "-Q,--no-chirp-catalog");
 	fprintf(stdout, " %-30s CVMFS repositories to enable.             (PARROT_CVMFS_REPO)\n", "-r,--cvmfs-repos=<repos>");
 	fprintf(stdout, " %-30s Allow repository switching when using CVMFS.\n","   --cvmfs-repo-switching");
+	fprintf(stdout, " %-30s Set CVMFS common cache directory.         (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache");
 	fprintf(stdout, " %-30s Enforce this root filesystem checksum, where available.\n", "-R,--root-checksum=<cksum>");
 	fprintf(stdout, " %-30s Use streaming protocols without caching.(PARROT_FORCE_STREAM)\n", "-s,--stream-no-cache");
 	fprintf(stdout, " %-30s Enable whole session caching for all protocols.\n", "-S,--session-caching");
@@ -497,6 +504,19 @@ int main( int argc, char *argv[] )
 		}
 	}
 
+	s = getenv("TMPDIR");
+	if(s) {
+		if(strlen(s) < PFS_PATH_MAX) {
+			strcpy(sys_temp_dir, s);
+		}
+		else {
+			fatal("temporary files directory from $TMPDIR pathname longer than %d characters\n", PFS_PATH_MAX - 1);
+		}
+	}
+	else {
+		strcpy(sys_temp_dir, "/tmp");
+	}
+
 	pfs_temp_dir[PFS_PATH_MAX - 1] = '\0';
 	s = getenv("PARROT_TEMP_DIR");
 	if(s && strlen(s) > 0) {
@@ -504,7 +524,14 @@ int main( int argc, char *argv[] )
 	}
 	else
 	{
-		sprintf(pfs_temp_dir,"/tmp/parrot.%d",getuid());
+		sprintf(pfs_temp_dir,"%s/parrot.%d",sys_temp_dir, getuid());
+	}
+
+	pfs_cvmfs_alien_cache_dir[0]                = '\0';
+	pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX - 1] = '\0';
+	s = getenv("PARROT_CVMFS_ALIEN_CACHE");
+	if(s && strlen(s) > 0) {
+		strncpy(pfs_cvmfs_alien_cache_dir, s, PFS_PATH_MAX);
 	}
 
 	struct option long_options[] = {
@@ -534,6 +561,7 @@ int main( int argc, char *argv[] )
 		{"no-chirp-catalog", no_argument, 0, 'Q'},
 		{"cvmfs-repos", required_argument, 0, 'r'},
 		{"cvmfs-repo-switching", no_argument, 0, LONG_OPT_CVMFS_REPO_SWITCHING},
+		{"cvmfs-alien-cache", required_argument, 0, LONG_OPT_CVMFS_ALIEN_CACHE},
 		{"root-checksum", required_argument, 0, 'R'},
 		{"stream-no-cache", no_argument, 0, 's'},
 		{"session-caching", no_argument, 0, 'S'},
@@ -634,6 +662,9 @@ int main( int argc, char *argv[] )
 		case LONG_OPT_CVMFS_REPO_SWITCHING:
 			pfs_cvmfs_repo_switching = true;
 			break;
+		case LONG_OPT_CVMFS_ALIEN_CACHE:
+			strncpy(pfs_cvmfs_alien_cache_dir,optarg,PFS_PATH_MAX);
+			break;
 		case 'R':
 			pfs_root_checksum = optarg;
 			pfs_checksum_files = 1;
@@ -686,6 +717,14 @@ int main( int argc, char *argv[] )
 	{
 		fatal("temporary files directory pathname larger than %d characters\n", PFS_PATH_MAX - 1);
 	}
+
+	//if alien cache dir has not been set, use default based on final value of pfs_temp_dir.
+	if(strlen(pfs_cvmfs_alien_cache_dir) < 1)
+	{
+		sprintf(pfs_cvmfs_alien_cache_dir,"%s/cvmfs", pfs_temp_dir);
+	}
+
+	sprintf(pfs_cvmfs_locks_dir, "%s/cvmfs_locks_%d", pfs_temp_dir, getpid());
 
 	pfs_file_cache = file_cache_init(pfs_temp_dir);
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
@@ -832,6 +871,8 @@ int main( int argc, char *argv[] )
 	}
 
 	if(pfs_paranoid_mode) pfs_paranoia_cleanup();
+
+	delete_dir(pfs_cvmfs_locks_dir);
 
 	if(WIFEXITED(root_exitstatus)) {
 		status = WEXITSTATUS(root_exitstatus);
