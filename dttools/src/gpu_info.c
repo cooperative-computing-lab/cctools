@@ -13,6 +13,8 @@ See the file COPYING for details.
 #include <sys/wait.h>
 #include <unistd.h>
 
+#define GPU_AUTODETECT "cctools_gpu_autodetect"
+
 int gpu_info_get()
 {
 	pid_t pid;
@@ -21,14 +23,14 @@ int gpu_info_get()
 
 	printf("Called gpu_info_get()\n");
 
-	switch (pid = fork() ) {
+	switch (pid = fork()) {
 	case -1:
 		return 0;
 	case 0:
 		close(pipefd[0]);
 		dup2(pipefd[1], fileno(stdout));
-		char *args[] = {"gpu_autodetect", NULL};
-		execvp("gpu_autodetect", args);
+		char *args[] = {GPU_AUTODETECT, NULL};
+		execvp(GPU_AUTODETECT, args);
 		return 0;
 	default:
 		close(pipefd[1]);
