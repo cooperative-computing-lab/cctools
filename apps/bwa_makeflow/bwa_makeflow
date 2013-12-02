@@ -1,0 +1,468 @@
+#! /usr/bin/env python
+#
+#Copyright (C) 2013- The University of Notre Dame
+#This software is distributed under the GNU General Public License.
+#See the file COPYING for details.
+#
+# This program implements a distributed version of BWA, using Makeflow and WorkQueue
+
+# Author: Nick Hazekamp
+# Date: 09/03/2013
+
+
+import optparse, os, sys, re, string, logging as log, stat
+
+#Initialize Global variables
+num_reads_per_split=50000
+fastq_name = "fastq_reduce"
+cat_name = "cat_bwa"
+
+index_arg = ""
+def index_args(option, opt_str, value, parser):
+	global index_arg
+	index_arg += opt_str[-2:] + " " + value + " "
+
+def parse_index(parser):
+	group = optparse.OptionGroup(parser, "Index Arguments")
+	group.add_option('--index-a',type="string",help="BWT construction algoritm: bwtsw or is [auto]",action="callback",callback=index_args)
+	group.add_option('--index-p',type="string",help="Prefix of the index [same as fasta name]",dest="prefix")
+	parser.add_option_group(group)
+
+bwamem_arg = ""
+def mem_args(option, opt_str, value, parser):
+	global bwamem_arg
+	bwamem_arg += opt_str[-2:] + " " + value + " "
+
+def parse_mem(parser):
+	group = optparse.OptionGroup(parser, "MEM Arguments")
+	group.add_option('--mem-t',type="string",help="Number of threads [1]",action="callback",callback=mem_args)
+	group.add_option('--mem-k',type="string",help="Minimum seed length [19]",action="callback",callback=mem_args)
+	group.add_option('--mem-w',type="string",help="Band width for banded alignment [100]",action="callback",callback=mem_args)
+	group.add_option('--mem-d',type="string",help="Off-diagonal X-dropoff [100]",action="callback",callback=mem_args)
+	group.add_option('--mem-r',type="string",help="Look for internal seeds inside a seed longer than {-k}*FLOAT [1.5]",action="callback",callback=mem_args)
+	group.add_option('--mem-c',type="string",help="Skip seeds with more than INT occurrences [10000]",action="callback",callback=mem_args)
+	group.add_option('--mem-S',default="",help="Skip mate rescue",action="callback",callback=mem_args)
+	group.add_option('--mem-P',default="",help="Skip pairing; mate rescue performed unless -S also in use",action="callback",callback=mem_args)
+	group.add_option('--mem-A',type="string",help="Score for a sequence match [1]",action="callback",callback=mem_args)
+	group.add_option('--mem-B',type="string",help="Penalty for a mismatch [4]",action="callback",callback=mem_args)
+	group.add_option('--mem-O',type="string",help="Gap open penalty [6]",action="callback",callback=mem_args)
+	group.add_option('--mem-E',type="string",help="Gap extension penalty; a gap of size k cost {-O}+{-E}*k [1]",action="callback",callback=mem_args)
+	group.add_option('--mem-L',type="string",help="Penalty for clipping [5]",action="callback",callback=mem_args)
+	group.add_option('--mem-U',type="string",help="Penalty for an unpaired read pair [17]",action="callback",callback=mem_args)
+	group.add_option('--mem-p',default="",help="First query file consists of interleaved paired-end sequences",action="callback",callback=mem_args)
+	group.add_option('--mem-R',type="string",help="Read group header line such as '@RG\\tID:foo\\tSM:bar'. [null]",action="callback",callback=mem_args)
+	#group.add_option('--mem-v',type="string",help="Verbose level: 1=error, 2=warning, 3=message, 4+=debugging [3]",action="callback",callback=mem_args)
+	group.add_option('--mem-T',type="string",help="Minimum score to output [30]",action="callback",callback=mem_args)
+	group.add_option('--mem-a',default="",help="Output all alignments for SE or unpaired PE",action="callback",callback=mem_args)
+	group.add_option('--mem-C',default="",help="Append FASTA/Q comment to SAM output",action="callback",callback=mem_args)
+	group.add_option('--mem-H',default="",help="Use hard clipping 'H' in SAM output",action="callback",callback=mem_args)
+	group.add_option('--mem-M',default="",help="Mark shorter split hits as secondary (for Picard/GATK compatibility)",action="callback",callback=mem_args)
+	parser.add_option_group(group)
+
+
+aln_arg = ""
+def aln_args(option, opt_str, value, parser):
+	global aln_arg
+	aln_arg += opt_str[-2:] + " " + value + " "
+
+def parse_aln(parser):
+	group = optparse.OptionGroup(parser, "ALN Arguments")
+	group.add_option('--aln-n',type="string",help="Max #diff INT or missing prob under 0.02 err rate (float) [0.04]",action="callback",callback=aln_args)
+	group.add_option('--aln-o',type="string",help="Maximum number or fraction of gap opens [1]",action="callback",callback=aln_args)
+	group.add_option('--aln-e',type="string",help="Maximum number of gap extensions, -1 for disabling long gaps [-1]",action="callback",callback=aln_args)
+	group.add_option('--aln-i',type="string",help="Do not put an indel within INT bp towards the end",action="callback",callback=aln_args)
+	group.add_option('--aln-d',type="string",help="Maximum occurrence for extending a long deletion [10]",action="callback",callback=aln_args)
+	group.add_option('--aln-l',type="string",help="Seed length [32]",action="callback",callback=aln_args)
+	group.add_option('--aln-k',type="string",help="Maximum differences in the seed [2]",action="callback",callback=aln_args)
+	group.add_option('--aln-m',type="string",help="Maximum entries in the queue [2000000]",action="callback",callback=aln_args)
+	group.add_option('--aln-t',type="string",help="Number of threads [1]",action="callback",callback=aln_args)
+	group.add_option('--aln-M',type="string",help="Mismatch penalty [3]",action="callback",callback=aln_args)
+	group.add_option('--aln-O',type="string",help="Gap open penalty [11]",action="callback",callback=aln_args)
+	group.add_option('--aln-E',type="string",help="Gap extension penalty [4]",action="callback",callback=aln_args)
+	group.add_option('--aln-R',type="string",help="Stop searching when there are >INT equally best hits [30]",action="callback",callback=aln_args)
+	group.add_option('--aln-q',type="string",help="Quality threshold for read trimming down to 35bp [0]",action="callback",callback=aln_args)
+	group.add_option('--aln-f',type="string",help="File to write output to instead of stdout",action="callback",callback=aln_args)
+	group.add_option('--aln-B',type="string",help="Length of barcode",action="callback",callback=aln_args)
+	group.add_option('--aln-L',default="",help="Log-scaled gap penalty for long deletions",action="callback",callback=aln_args)
+	group.add_option('--aln-N',default="",help="Non-iterative mode: search for all n-difference hits (slow_",action="callback",callback=aln_args)
+	group.add_option('--aln-I',default="",help="The input is in the Illumina 1.3+ FASTQ-like format",action="callback",callback=aln_args)
+	group.add_option('--aln-b',default="",help="The input read file is in BAM format",action="callback",callback=aln_args)
+	group.add_option('--aln-0',default="",help="Use single-end reads only (effective with -b)",action="callback",callback=aln_args)
+	group.add_option('--aln-1',default="",help="Use the 1st read in a pair (effective with -b)",action="callback",callback=aln_args)
+	group.add_option('--aln-2',default="",help="Use the 2nd read in a pair (effective with -b)",action="callback",callback=aln_args)
+	group.add_option('--aln-Y',default="",help="Filter Casava-filtered sequences",action="callback",callback=aln_args)
+	parser.add_option_group(group)
+
+
+samse_arg = ""
+def samse_args(option, opt_str, value, parser):
+	global samse_arg
+	samse_arg += opt_str[-2:] + " " + value + " "
+
+def parse_samse(parser):
+	group = optparse.OptionGroup(parser, "SAMSE Arguments")
+	group.add_option('--samse-n',type="string",help="Maximum hits to output for paired reads [3]",action="callback",callback=samse_args)
+	group.add_option('--samse-f',type="string",help="Sam file to output results to",action="callback",callback=samse_args)
+	group.add_option('--samse-r',type="string",help="Read group header line such as '@RG\\tID:foo\\tSM:bar' [null]",action="callback",callback=samse_args)
+	parser.add_option_group(group)
+
+
+sampe_arg = ""
+def sampe_args(option, opt_str, value, parser):
+	global sampe_arg
+	sampe_arg += opt_str[-2:] + " " + value + " "
+
+def parse_sampe(parser):
+	group = optparse.OptionGroup(parser, "SAMPE Arguments")
+	group.add_option('--sampe-a',type="string",help="Maximum insert size [500]",action="callback",callback=sampe_args)
+	group.add_option('--sampe-o',type="string",help="Maximum occurrences for one end [100000]",action="callback",callback=sampe_args)
+	group.add_option('--sampe-n',type="string",help="Maximum hits to output for paired reads [3]",action="callback",callback=sampe_args)
+	group.add_option('--sampe-N',type="string",help="Maximum hits to output for discordant pairs [10]",action="callback",callback=sampe_args)
+	group.add_option('--sampe-c',type="string",help="Prior of chimeric rate (lower bound) [1.0e-05]",action="callback",callback=sampe_args)
+	group.add_option('--sampe-f',type="string",help="Sam file to output results to",action="callback",callback=sampe_args)
+	group.add_option('--sampe-r',type="string",help="Read group header line such as '@RG\\tID:foo\\tSM:bar' [null]",action="callback",callback=sampe_args)
+	group.add_option('--sampe-P',default="",help="Preload index into memory (for base-space reads only)",action="callback",callback=sampe_args)
+	group.add_option('--sampe-s',default="",help="Disable Smith-Waterman for the unmapped mate",action="callback",callback=sampe_args)
+	group.add_option('--sampe-A',default="",help="Disable insert size estimate (force -s)",action="callback",callback=sampe_args)
+	parser.add_option_group(group)
+
+
+bwasw_arg = ""
+def bwasw_args(option, opt_str, value, parser):
+	global bwasw_arg
+	bwasw_arg += opt_str[-2:] + " " + value + " "
+
+def parse_bwasw(parser):
+	group = optparse.OptionGroup(parser, "BWASW Arguments")
+	group.add_option('--bwasw-a',type="string",help="Score for a match [1]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-b',type="string",help="Mismatch penalty [3]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-q',type="string",help="Gap open penalty [5]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-r',type="string",help="Gap extension penalty [2]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-w',type="string",help="Band width[50]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-m',type="string",help="Mask level [0.50]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-t',type="string",help="Number of threads [1]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-f',type="string",help="File to output results to instead of stdout",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-H',default="",help="In SAM output, use hard clipping instead of soft clipping",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-C',default="",help="Copy FASTA/Q comment to SAM output",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-M',default="",help="Mark multi-part alignments as secondary",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-S',default="",help="Skip Smith-Waterman read pairing",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-I',type="string",help="Ignore pairs with insert >=INT for inferring the size distr [20000]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-T',type="string",help="Score threshould divided by a [30]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-c',type="string",help="Coefficient of length-threshold adjustmnet [5.5]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-z',type="string",help="Z-best [1]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-s',type="string",help="Maximum seeding interval size [3]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-N',type="string",help="# seeds to trigger rev aln; 2*INT is also the chaining threshold [5]",action="callback",callback=bwasw_args)
+	group.add_option('--bwasw-G',type="string",help="Maximum gap size during chaining [10000]",action="callback",callback=bwasw_args)
+	parser.add_option_group(group)
+
+def parse_main_options(parser):
+	group = optparse.OptionGroup(parser, "Input/Output Names")
+	group.add_option('--ref', dest='ref', help='The reference genome to use or index')
+	group.add_option('--fastq', dest='fastq', help='The (forward) fastq file to use for the mapping')
+	group.add_option('--rfastq', dest='rfastq', help='The reverse fastq file to use for mapping if paired-end data')
+	group.add_option('--output_SAM', dest='output_SAM', help='The file to save the output (SAM format) [bwa_results.sam]')
+	group.add_option('--algoalign', dest='algoalign', help='The type of Alignment Algorithm (backtrack, bwasw, mem) [mem]')
+	parser.add_option_group(group)	
+
+def parse_makeflow_options(parser):
+	group = optparse.OptionGroup(parser, "Makeflow Preparation Options")
+	group.add_option('--makeflow', dest='makeflow', help='Makeflow destination file [stdout]')
+	group.add_option('--makeflow-config', dest='config', help='Makeflow configurations')
+	group.add_option('--verbose', dest='verbose', help='Show verbose level output', action='store_true',default="False")
+	parser.add_option_group(group)
+
+
+#Helper function for finding executables in path
+def search_file(filename, search_path, pathsep=os.pathsep):
+    """ Given a search path, find file with requested name """
+    for path in string.split(search_path, pathsep):
+        candidate = os.path.join(path, filename)
+        if os.path.exists(candidate): return os.path.abspath(candidate)
+    return None
+
+
+def count_splits( fastq ):
+	num_reads=num_reads_per_split
+	num_outputs = 0
+	line_count=0
+
+	FILE = open(fastq, "r")
+
+	read_count = 0
+	num_outputs += 1
+	for line in FILE:
+		if (re.search('^[@]', line) and line_count % 4 ==0):
+			if (read_count == num_reads):
+				num_outputs += 1
+				read_count = 0	
+			else:
+				read_count += 1
+		#place all other lines in FASTQ file under same sequence
+		line_count += 1
+	FILE.close()
+	return num_outputs
+
+def write_fastq_reduce(destination):
+	fastq_r = open(destination, 'w')
+	try:
+		fastq_r.write("#!/usr/bin/perl\n")
+		fastq_r.write("#\n")
+		fastq_r.write("#Copyright (C) 2013- The University of Notre Dame\n")
+		fastq_r.write("#This software is distributed under the GNU General Public License.\n")
+		fastq_r.write("#See the file COPYING for details.\n")
+		fastq_r.write("#\n")
+		fastq_r.write("#Programmer: Brian Kachmarck\n")
+		fastq_r.write("#Date: 7/28/2009\n")
+		fastq_r.write("#\n")
+		fastq_r.write("#Revised: Nick Hazekamp\n")
+		fastq_r.write("#Date: 12/02/2013\n")
+		fastq_r.write("#\n")
+		fastq_r.write("#Purpose: Split a FASTQ file into smaller files determined by the number of sequences input\n")
+		fastq_r.write("\n")
+		fastq_r.write("use strict; \n")
+		fastq_r.write("\n")
+		fastq_r.write("\n")
+		fastq_r.write("my $numargs = $#ARGV + 1;\n")
+		fastq_r.write("\n")
+		fastq_r.write("my $file = $ARGV[0];\n")
+		fastq_r.write("\n")
+		fastq_r.write("my $num_reads=" + str(num_reads_per_split) + ";\n")
+		fastq_r.write("\n")
+		fastq_r.write("my $num_outputs = 0;\n")
+		fastq_r.write("my $line_count=0;\n")
+		fastq_r.write("\n")
+		fastq_r.write("#Open input file\n")
+		fastq_r.write("open(INPUT, $file);\n")
+		fastq_r.write("\n")
+		fastq_r.write("my $read_count = 0;\n")
+		fastq_r.write("open (OUTPUT,\">$file.$num_outputs\");\n")
+		fastq_r.write("$num_outputs++;\n")
+		fastq_r.write("while (my $line = <INPUT>) {\n")
+		fastq_r.write("	chomp $line;\n")
+		fastq_r.write("	#FASTQ files begin sequence with '@' character\n")
+		fastq_r.write("	#If line begins with '@' then it is a new sequence and has 3 lines in between\n")
+		fastq_r.write("	if ($line =~ /^[@]/ and $line_count % 4 ==0){\n")
+		fastq_r.write("		#Check if the new sequence should be placed in a new file, otherwise place it in same file\n")
+		fastq_r.write("		if ($read_count == $num_reads){\n")
+		fastq_r.write("			close(OUTPUT);\n")
+		fastq_r.write("			open(OUTPUT, \">$file.$num_outputs\");\n")
+		fastq_r.write("			print OUTPUT $line;\n")
+		fastq_r.write("			print OUTPUT \"\\n\";\n")
+		fastq_r.write("			$num_outputs++;\n")
+		fastq_r.write("			$read_count = 0;\n")
+		fastq_r.write("		}	\n")
+		fastq_r.write("		else{\n")
+		fastq_r.write("			print OUTPUT $line;\n")
+		fastq_r.write("			print OUTPUT \"\\n\";\n")
+		fastq_r.write("			$read_count++;\n")
+		fastq_r.write("		}\n")
+		fastq_r.write("	}\n")
+		fastq_r.write("	#place all other lines in FASTQ file under same sequence\n")
+		fastq_r.write("	else {\n")
+		fastq_r.write("		print OUTPUT $line;\n")
+		fastq_r.write("		print OUTPUT \"\\n\";\n")
+		fastq_r.write("	}\n")
+		fastq_r.write("\n")
+		fastq_r.write("	$line_count++;\n")
+		fastq_r.write("}\n")
+		fastq_r.write("print $num_outputs;\n")
+		fastq_r.write("\n")
+		fastq_r.write("close(INPUT);\n")
+		fastq_r.write("	\n")
+	finally:
+		fastq_r.close()
+
+def write_cat_bwa(destination):
+	cat_bwa = open(destination, 'w')
+	try:
+		cat_bwa.write("#!/usr/bin/perl\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("#Copyright (C) 2013- The University of Notre Dame\n")
+		cat_bwa.write("#This software is distributed under the GNU General Public License.\n")
+		cat_bwa.write("#See the file COPYING for details.\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("#This script is used to cat SAM files into a single result\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("# Usage: cat_bwa output input1 input2 ... intput*\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("# Author: Nick Hazekamp\n")
+		cat_bwa.write("# Date: 11/01/2013\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("\n")
+		cat_bwa.write("my $output = shift;\n")
+		cat_bwa.write("if (-e $output) {\n")
+		cat_bwa.write("	unlink($output) || die \"Could not delete $output\";\n")
+		cat_bwa.write("} \n")
+		cat_bwa.write("\n")
+		cat_bwa.write("open $OUT,'>>',$output or die(\"Could not open \" + $output + \" file.\");\n")
+		cat_bwa.write("\n")
+		cat_bwa.write("$file = 0;\n")
+		cat_bwa.write("\n")
+		cat_bwa.write("while ($in = shift) {\n")
+		cat_bwa.write("	++$file;\n")
+		cat_bwa.write("\n")
+		cat_bwa.write("	open(IN,$in) or die(\"Could not open \" + $in + \" file.\");\n")
+		cat_bwa.write("	$print = 0;\n")
+		cat_bwa.write("	while(my $line = <IN>) {\n")
+		cat_bwa.write("		if (($line =~ /^@/) and ($file ne 1)) { $print = 0;}\n")
+		cat_bwa.write("		elsif (($line =~ /main/)) { $print = 0; }\n")
+		cat_bwa.write("		elsif (($line =~ /M::/)) { $print = 0; }\n")
+		cat_bwa.write("		else { $print = 1; }\n")
+		cat_bwa.write("		if ($print gt 0){\n")
+		cat_bwa.write("			print { $OUT } $line;\n")
+		cat_bwa.write("		} \n")
+		cat_bwa.write("	}\n")
+		cat_bwa.write("	close (IN);\n")
+		cat_bwa.write("}\n")
+		cat_bwa.write("close (OUT);\n")
+	finally:
+		cat_bwa.close()
+
+def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a, sw_a):
+	if destination:
+		makeflow = open(destination,'w')
+	else:
+		makeflow = sys.stdout
+
+	try:
+		if options.config:
+			config = open(configuration, 'r')
+			makeflow.write(config.read())
+	
+		splits = count_splits(options.fastq)
+		rsplits = 0
+		inputlist = ""
+		for i in range(splits):
+			inputlist = inputlist + options.fastq + "." + str(i) + " "
+	
+		makeflow.write("\n\n"+inputlist + ": " + fastq_name + " " + options.fastq);
+		makeflow.write("\n\t./" + fastq_name + " "+options.fastq+" > numsplits.txt 2>&1")
+	
+		if options.rfastq:
+
+			rsplits = count_splits(options.rfastq)
+			rinputlist = ""
+			for i in range(rsplits):
+				rinputlist = rinputlist + options.rfastq + "." + str(i) + " "
+	
+			makeflow.write("\n\n"+rinputlist+": " + fastq_name + " "+options.rfastq);
+			makeflow.write("\n\t./" + fastq_name + " "+options.rfastq+" > rnumsplits.txt")
+
+	 # Rule and Command for Indexing FASTA File
+		ref = options.ref
+
+		if options.prefix:
+			ref = options.prefix
+			index_arg += "-p " + ref + " "
+
+		index = ref+".bwt "+ref+".pac "+ref+".amb "+ref+".ann "+ref+".sa "
+
+		makeflow.write("\n\n"+index+ ": bwa "+options.ref)
+		makeflow.write("\n\t./bwa index " + index_a + options.ref + " 2>&1")
+
+		index = options.ref + " " + index
+		results_to_cat = ""
+    
+		for c in range(splits):
+			sc=str(c)
+			query1=query2=sai1=sai2=output=""
+		
+			query1 = options.fastq + "." + sc + " " 
+			sai1 = query1[:-1] + ".sai "
+			if options.rfastq:
+				query2 = options.rfastq + "." + sc + " " 
+				sai2 = query2[:-1] + ".sai "
+		
+			output = "BWAMF.output." + sc + " "
+			results_to_cat += output
+
+			if options.algoalign=="bwa_backtrack":
+			
+				makeflow.write("\n\n"+sai1+" : bwa "+index+query1)
+				makeflow.write("\n\t./bwa aln "+aln_a+ref+" "+query1+"> "+sai1+" 2>&1")
+
+				if options.rfastq:
+					makeflow.write("\n\n"+sai2+" : bwa "+index+query2)
+					makeflow.write("\n\t./bwa aln "+aln_a+ref+" "+query2+"> "+sai2+" 2>&1")
+
+					makeflow.write("\n\n"+output+": bwa "+index+query1+query2+sai1+sai2)
+					makeflow.write("\n\t./bwa sampe "+pe_a+ref+" "+sai1+sai2+query1+query2+" > "+output+" 2>&1")
+				else:
+					makeflow.write("\n\n"+output+": bwa "+index+query1+sai1)
+					makeflow.write("\n\t./bwa samse "+se_a+ ref+" "+sai1+guery1+" > "+output+" 2>&1")
+	
+			else:
+				algo = "mem "
+        	                args = mem_a + "-v 0 "
+				if(options.algoalign=="bwa_sw"):
+					algo = "bwasw "
+					args = sw_a
+      	
+				makeflow.write("\n\n"+output+": bwa "+ index + query1 + query2)
+				makeflow.write("\n\t./bwa "+algo+args+ref+" "+query1+query2+" > "+output+" 2>&1")
+
+		output = "bwa_results.sam "
+		if options.output_SAM:
+			output = options.output_SAM + " "
+		
+		makeflow.write("\n\n"+output+": " + cat_name +" "+results_to_cat)
+		makeflow.write("\n\t./" + cat_name +" "+output+results_to_cat)	
+
+	finally:
+		if options.makeflow is not None:
+			makeflow.close()
+
+
+#MAIN
+
+    #Parse Command Line
+parser = optparse.OptionParser(usage="usage: %prog --ref ref.fa --fastq query.fq [options]")
+
+parse_main_options(parser)
+parse_makeflow_options(parser)
+parse_index(parser)
+parse_mem(parser)
+parse_aln(parser)
+parse_samse(parser)
+parse_sampe(parser)
+parse_bwasw(parser)
+
+(options, args) = parser.parse_args()
+
+if options.verbose == True:
+        log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
+        log.info("Verbose output.")
+else:
+        log.basicConfig(format="%(levelname)s: %(message)s")
+
+if not options.ref:
+	log.error("No reference file: --ref required")
+
+if not options.fastq:
+	log.error("No query file: --fastq required")
+
+if os.path.exists(fastq_name):
+    os.remove(fastq_name)
+write_fastq_reduce(fastq_name)
+st = os.stat(fastq_name)
+os.chmod(fastq_name, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+if os.path.exists(cat_name):
+    os.remove(cat_name)
+write_cat_bwa(cat_name)
+st = os.stat(cat_name)
+os.chmod(cat_name, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+path = os.getenv("PATH")
+path += os.pathsep + os.pathsep + "."
+
+bwa = search_file("bwa", path)
+if bwa and not os.path.exists("./bwa"):
+        log.info("BWA located: " + bwa)
+        os.symlink(bwa, "bwa")
+elif not os.path.exists("./bwa"):
+        log.error("Unable to find bwa")
+        sys.exit(3)
+
+write_makeflow(options.makeflow, options.config, index_arg, bwamem_arg, aln_arg, samse_arg, sampe_arg, bwasw_arg)
