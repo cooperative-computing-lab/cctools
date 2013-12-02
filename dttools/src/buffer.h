@@ -79,7 +79,7 @@ void buffer_abortonfailure(buffer_t * b, int abortonfailure);
 void buffer_free(buffer_t * b);
 
 /** Print the formatted output to the buffer. The format string follows the
-    same semantics as the UNIX vprintf function. buffer_vprintf does not call
+    same semantics as the UNIX vprintf function. buffer_putvfstring does not call
     the variable argument macros va_(start|end) on ap.
     @param b The buffer to fill.
     @param format The format string.
@@ -87,7 +87,8 @@ void buffer_free(buffer_t * b);
     @return -1 on error.
   */
 
-int buffer_vprintf(buffer_t * b, const char *format, va_list ap);
+int buffer_putvfstring(buffer_t * b, const char *format, va_list ap);
+#define buffer_vprintf buffer_putvfstring
 
 /** Appends the formatted output to the buffer. The format string follows the
     same semantics as the UNIX vprintf function.
@@ -96,8 +97,9 @@ int buffer_vprintf(buffer_t * b, const char *format, va_list ap);
     @param ... The variable arguments for the format string.
     @return -1 on error.
   */
-int buffer_printf(buffer_t * b, const char *format, ...)
+int buffer_putfstring(buffer_t * b, const char *format, ...)
 __attribute__ (( format(printf,2,3) )) ;
+#define buffer_printf buffer_putfstring
 
 /** Appends the string to the end of the buffer.
     @param b The buffer to fill.

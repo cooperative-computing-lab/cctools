@@ -97,7 +97,7 @@ static int grow(buffer_t * b, size_t n)
 	return 0;
 }
 
-int buffer_vprintf(buffer_t * b, const char *format, va_list va)
+int buffer_putvfstring(buffer_t * b, const char *format, va_list va)
 {
 	va_list va2;
 	int rc;
@@ -125,7 +125,7 @@ int buffer_vprintf(buffer_t * b, const char *format, va_list va)
 	return 0;
 }
 
-int buffer_printf(buffer_t * b, const char *format, ...)
+int buffer_putfstring(buffer_t * b, const char *format, ...)
 {
 	va_list va;
 	va_start(va, format);
