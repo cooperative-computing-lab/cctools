@@ -155,6 +155,56 @@ void path_dirname (const char *path, char *dir)
 	}
 }
 
+int path_lookup (char *search_path, const char *exe, char *dest, size_t destlen)
+{
+	char *s;
+	char *e;
+	char fn[PATH_MAX];
+	char tmp[PATH_MAX];
+	size_t len = 0;
+	size_t exelen = strlen(exe);
+	DIR *dirp = NULL;
+	struct dirent *dp = NULL;
+	struct stat sb;
+
+	len = strlen(search_path);
+	s = e = search_path;
+
+	while(e < search_path+len) {
+		while(*e != ':' && *e != '\0') e++;
+		*e = '\0';
+
+		if( *s != '/' ){
+			char *cwd;
+			cwd = path_getcwd();
+			snprintf(tmp, PATH_MAX, "%s/%s", cwd, s);
+			free(cwd);
+			s = tmp;
+		}
+
+		if(( dirp = opendir(s) )) {
+			while(( dp = readdir(dirp) )) {
+				if( dp->d_namlen == exelen && !strcmp(dp->d_name, exe) ) {
+					strncpy(fn, s, PATH_MAX);
+					strncat(fn, "/", 1);
+					strncat(fn, dp->d_name, dp->d_namlen);
+					if( stat(fn, &sb) == 0 && sb.st_mode & (S_IXUSR|S_IFREG) ){
+						strncpy(dest, fn, destlen);
+						closedir(dirp);
+						return 0;
+					}
+				}
+			}
+			closedir(dirp);
+		}
+		*e = ':';
+		e++;
+		s = e;
+	}
+
+	return 1;
+}
+
 char *path_getcwd (void)
 {
 	char *result = NULL;
