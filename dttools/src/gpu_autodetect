@@ -1,0 +1,17 @@
+#!/bin/bash
+
+exe=`which nvidia-smi`
+if [[ $? -ne 0 ]]; then
+  echo 0
+  echo "nvidia-smi not installed"
+  exit 1
+fi
+
+gpu_count=`nvidia-smi -q 2>/dev/null | grep 'Attached GPUs' | awk '{print $4}'`
+if [[ $? -ne 0 ]]; then
+  echo 0
+  echo "NVIDIA driver not installed"
+  exit 1
+fi
+
+echo $gpu_count

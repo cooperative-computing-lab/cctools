@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "memory_info.h"
 #include "disk_info.h"
+#include "gpu_info.h"
 #include "macros.h"
 #include "debug.h"
 #include "nvpair.h"
@@ -40,6 +41,8 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 
 	memory_info_get(&avail,&total);
 	r->memory.total = avail / (UINT64_T) MEGA;
+
+	r->gpus.total = gpu_info_get();
 	
 	r->workers.total = 1;
 }
