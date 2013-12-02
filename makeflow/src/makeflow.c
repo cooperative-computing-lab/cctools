@@ -53,7 +53,11 @@ enum { SHOW_INPUT_FILES = 2,
        SHOW_OUTPUT_FILES,
        SHOW_MAKEFLOW_ANALYSIS,
        SHOW_DAG_DOT,
-       SHOW_DAG_PPM };
+       SHOW_DAG_PPM,
+       SHOW_DAG_FILE
+};
+
+
 
 #define RANDOM_PORT_RETRY_TIME 300
 
@@ -999,6 +1003,44 @@ struct dag *dag_from_file(const char *filename)
 	return d;
 }
 
+void dag_close_over_environment(struct dag *d)
+{
+	//for each exported and special variable, if the variable does not have a
+	//value assigned yet, we look for its value in the running environment
+	
+	char *name;
+	struct dag_variable_value *v;
+
+	set_first_element(d->special_vars);
+	while((name = set_next_element(d->special_vars)))
+	{
+		v = dag_get_variable_value(name, d->variables, d->nodeid_counter);
+		if(!v)
+		{
+			char *value_env = getenv(name);
+			if(value_env)
+			{
+				dag_variable_add_value(name, d->variables, 0, value_env);
+			}
+		}
+	}
+
+	set_first_element(d->export_vars);
+	while((name = set_next_element(d->export_vars)))
+	{
+		v = dag_get_variable_value(name, d->variables, d->nodeid_counter);
+		if(!v)
+		{
+			char *value_env = getenv(name);
+			if(value_env)
+			{
+				dag_variable_add_value(name, d->variables, 0, value_env);
+			}
+		}
+	}
+
+}
+
 int dag_parse(struct dag *d, FILE * dag_stream)
 {
 	char *line = NULL;
@@ -1008,8 +1050,6 @@ int dag_parse(struct dag *d, FILE * dag_stream)
 	bk->stream = dag_stream;
 
 	bk->category = dag_task_category_lookup_or_create(d, "default");
-
-	dag_task_category_get_env_resources(bk->category);
 
 	while((line = dag_parse_readline(bk, NULL)) != NULL) {
 
@@ -1040,7 +1080,9 @@ int dag_parse(struct dag *d, FILE * dag_stream)
 
 		free(line);
 	}
+
 //ok:
+    dag_close_over_environment(d);
 	dag_compile_ancestors(d);
 	free(bk);
 	return 1;
@@ -1223,8 +1265,8 @@ char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
 	return NULL;
 }
 
-//return 1 if name is special variable, 0 otherwise
-int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, struct hash_table *current_table, char *name, struct dag_variable_value *v)
+//return 1 if name was processed as special variable, 0 otherwise
+int dag_parse_process_special_variable(struct lexer_book *bk, struct dag_node *n, int nodeid, char *name, const char *value)
 {
 	struct dag *d = bk->d;
 	int   special = 0;
@@ -1233,7 +1275,7 @@ int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, struct
 		special = 1;
 		/* If we have never seen this label, then create
 		 * a new category, otherwise retrieve the category. */
-		struct dag_task_category *category = dag_task_category_lookup_or_create(d, v->value);
+		struct dag_task_category *category = dag_task_category_lookup_or_create(d, value);
 
 		/* If we are parsing inside a node, make category
 		 * the category of the node, but do not update
@@ -1245,38 +1287,56 @@ int dag_parse_process_variable(struct lexer_book *bk, struct dag_node *n, struct
 			n->category = category;
 			/* and add it to the new one */
 			list_push_tail(n->category->nodes, n);
-			debug(D_DEBUG, "Updating category '%s' for rule %d.\n", v->value, n->nodeid);
+			debug(D_DEBUG, "Updating category '%s' for rule %d.\n", value, n->nodeid);
 		}
 		else
 			bk->category = category;
 	}
-	else if(strcmp(RESOURCES_CORES,  name) == 0) {
-		special = 1;
-		current_table = bk->category->variables;
-		bk->category->resources->cores             = atoi(v->value);
-	}
-	else if(strcmp(RESOURCES_MEMORY, name) == 0) {
-		special = 1;
-		current_table = bk->category->variables;
-		bk->category->resources->resident_memory   = atoi(v->value);
-	}
-	else if(strcmp(RESOURCES_DISK,   name) == 0) {
-		special = 1;
-		current_table = bk->category->variables;
-		bk->category->resources->workdir_footprint = atoi(v->value);
-	}
-	else if(strcmp(RESOURCES_GPUS,   name) == 0) {
-		special = 1;
-		current_table = bk->category->variables;
-		bk->category->resources->gpus              = atoi(v->value);
-	}
 	/* else if some other special variable .... */
 	/* ... */
 
-	hash_table_remove(current_table, name); //memory leak...
-	hash_table_insert(current_table, name, v);
-
 	return special;
+}
+
+void dag_parse_append_variable(struct lexer_book *bk, int nodeid, struct dag_node *n, const char *name, const char *value)
+{
+	struct dag_lookup_set      sd = { bk->d, NULL, NULL, NULL };
+	struct dag_variable_value *vd = dag_lookup(name, &sd);
+	
+	struct dag_variable_value *v;
+	if(n)
+	{ 
+		v = dag_get_variable_value(name, n->variables, nodeid);
+		if(v)
+		{
+			dag_variable_value_append_or_create(v, value);
+		}
+		else
+		{ 
+			char *new_value;
+			if(vd)
+			{ 
+				new_value = string_format("%s %s", vd->value, value);
+			}
+			else
+			{
+				new_value = xxstrdup(value);
+			}
+			dag_variable_add_value(name, n->variables, nodeid, new_value);
+			free(new_value);
+		}
+	}
+	else
+	{
+		if(vd)
+		{
+			dag_variable_value_append_or_create(vd, value);
+		}
+		else
+		{
+			dag_variable_add_value(name, bk->d->variables, nodeid, value);
+		}
+	}
 }
 
 int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
@@ -1307,21 +1367,29 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 		return 0;
 	}
 
-	struct dag_lookup_set s = { d, bk->category, n, NULL };
-	struct dag_variable_value *v = dag_lookup(name, &s);
-	struct hash_table *current_table = d->variables;
-
-	if(append && v) {
-		if(s.table)
-			current_table = s.table;
-		v = dag_variable_value_append_or_create(v, value);
-	} else {
-		if(n)
-			current_table = n->variables;
-		v = dag_variable_value_create(value);
+	struct hash_table *current_table;
+	int nodeid;
+	if(n)
+	{
+		current_table = n->variables;
+		nodeid        = n->nodeid;
+	}
+	else
+	{
+		current_table = d->variables;
+		nodeid        = bk->d->nodeid_counter;
 	}
 
-	dag_parse_process_variable(bk, n, current_table, name, v);
+	if(append)
+	{
+		dag_parse_append_variable(bk, nodeid, n, name, value);
+	}
+	else
+	{
+		dag_variable_add_value(name, current_table, nodeid, value);
+	}
+
+	dag_parse_process_special_variable(bk, n, nodeid, name, value);
 
 	if(append)
 		debug(D_DEBUG, "%s appending to variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
@@ -1415,8 +1483,10 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 		return 0;
 	}
 
+
 	debug(D_DEBUG, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
-	dag_task_category_print_debug_resources(n->category);
+	dag_task_fill_resources(n);
+	dag_task_print_debug_resources(n);
 
 	return 1;
 }
@@ -1695,7 +1765,7 @@ int dag_parse_export(struct lexer_book *bk, char *line)
 				setenv(argv[i], equal + 1, 1);	//this shouldn't be here...
 			}
 		}
-		list_push_tail(bk->d->export_list, xxstrdup(argv[i]));
+		set_insert(bk->d->export_vars, xxstrdup(argv[i]));
 		debug(D_DEBUG, "export variable=%s", argv[i]);
 	}
 	free(argv);
@@ -1707,8 +1777,8 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 	struct dag_lookup_set s = { d, n->category, n, NULL };
 	char *key;
 
-	list_first_item(d->export_list);
-	while((key = list_next_item(d->export_list))) {
+	set_first_element(d->export_vars);
+	while((key = set_next_element(d->export_vars))) {
 		char *value = dag_lookup_str(key, &s);
 		if(value) {
 			setenv(key, value, 1);
@@ -1720,8 +1790,7 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
 {
 	char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
-
-	char *limits_str = dag_task_category_wrap_as_rmonitor_options(n->category);
+	char *limits_str = dag_task_resources_wrap_as_rmonitor_options(n);
 	char *extra_options = string_format("%s -V '%-15s%s'", 
 			limits_str ? limits_str : "", 
 			"category:",
@@ -1851,7 +1920,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	 * restore it after we submit. */
 	struct dag_lookup_set s = { d, n->category, n, NULL };
 	char *batch_options_env    = dag_lookup_str("BATCH_OPTIONS", &s);
-	char *batch_submit_options = dag_task_category_wrap_options(n->category, batch_options_env, batch_queue_get_type(thequeue));
+	char *batch_submit_options = dag_task_resources_wrap_options(n, batch_options_env, batch_queue_get_type(thequeue));
 	char *old_batch_submit_options = NULL;
 
 	free(batch_options_env);
@@ -2310,10 +2379,11 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Format for monitor logs.                    (default %s)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
 
 	fprintf(stdout, "\n*Display Options:\n\n");
-	fprintf(stdout, " %-30s Display the Makefile as a Dot graph or a PPM completion graph.\n", "-D,--display=<opt>");
+	fprintf(stdout, " %-30s Display the Makefile as a Dot graph, a PPM completion graph, or print the Makefile to stdout\n", "-D,--display=<opt>");
 	fprintf(stdout, " %-30s Where <opt> is:\n", "");
 	fprintf(stdout, " %-35s dot      Standard Dot graph\n", "");
 	fprintf(stdout, " %-35s ppm      Display a completion graph in PPM format\n", "");
+	fprintf(stdout, " %-35s file     Display the file as interpreted by makeflow\n", "");
 
 	fprintf(stdout, " %-30s Condense similar boxes.\n", "--dot-merge-similar");
 	fprintf(stdout, " %-30s Change the size of the boxes proportional to file size.\n", "--dot-proportional");
@@ -2598,6 +2668,8 @@ int main(int argc, char *argv[])
 				display_mode = SHOW_DAG_DOT;
 			else if (strcasecmp(optarg, "ppm") == 0)
 				display_mode = SHOW_DAG_PPM;
+			else if (strcasecmp(optarg, "file") == 0)
+				display_mode = SHOW_DAG_FILE;
 			else
 				fatal("Unknown display option: %s\n", optarg);
 			break;
@@ -2896,7 +2968,15 @@ int main(int argc, char *argv[])
 	if(!d) {
 		free(logfilename);
 		free(batchlogfilename);
-		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
+		if(errno)
+		{
+			fatal("couldn't load %s: %s\n", dagfile, strerror(errno));
+		}
+		else
+		{
+			fprintf(stderr, "couldn't load %s: invalid syntax.\n", dagfile);
+			return 1;
+		}
 	}
 
 	if(syntax_check) {
@@ -2945,6 +3025,10 @@ int main(int argc, char *argv[])
 
 		case SHOW_DAG_PPM:
 			dag_to_ppm(d, ppm_mode, ppm_option);
+			break;
+
+		case SHOW_DAG_FILE:
+			dag_to_file(d, NULL, NULL);
 			break;
 
 		default:

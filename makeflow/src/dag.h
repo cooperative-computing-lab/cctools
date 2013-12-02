@@ -18,6 +18,8 @@ See the file COPYING for details.
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
 #define RESOURCES_CATEGORY "CATEGORY"
+#define GC_COLLECT_LIST  "GC_COLLECT_LIST"
+#define GC_PRESERVE_LIST "GC_PRESERVE_LIST"
 
 typedef enum {
 	DAG_NODE_STATE_WAITING = 0,
@@ -43,11 +45,15 @@ struct dag {
     struct list *symlinks_created;           /* Remote filenames for which a symlink was 
                                                 created (used now only for Condor, and only for 
                                                 the final cleanup). */
-    struct hash_table *variables;            /* Mappings between variables defined in the makeflow 
-                                                file and their substitution. */
+	struct hash_table *variables;            /* Mappings between variable names
+												defined in the makeflow file
+												and their values. */
     struct set *collect_table;               /* Keeps files that are garbage collectable. */
-    struct list *export_list;                /* List of variables with prefix export. 
+    struct set *export_vars;                /* List of variables with prefix export. 
                                                 (these are setenv'ed eventually). */
+	struct set *special_vars;                /* List of special variables,
+												such as, category, disk,
+												memory, etc. */
     FILE *logfile;
     int node_states[DAG_NODE_STATE_MAX];     /* node_states[STATE] keeps the count of nodes that 
                                                 have state STATE \in dag_node_state_t. */
@@ -102,9 +108,7 @@ struct lexer_book
 struct dag_task_category
 {
 	char *label;
-	struct rmsummary *resources;
 	struct list *nodes;
-	struct hash_table *variables;
 };
 
 /* struct dag_node implements a linked list of nodes. A dag_node
@@ -158,7 +162,7 @@ struct dag_node {
                                            file labeled which tasks have comparable resource usage. */ 
 
 
-    struct hash_table *variables;       /* This node settings for environment variables (@ syntax) */
+    struct hash_table *variables;       /* This node settings for variables with @ syntax */
 
     /* Variables used in dag_width, dag_width_uniform_task, and dag_depth
      * functions. Probably we should move them only to those functions, using
@@ -168,6 +172,7 @@ struct dag_node {
     int children_remaining;
     int only_my_children;               /* Number of nodes this node is the only parent. */
 
+	struct rmsummary *resources;        /* resources required by this rule */
 
     struct dag_node *next;              /* The next node in the list of nodes */
 };
@@ -195,8 +200,19 @@ struct dag_lookup_set {
     struct hash_table *table;
 };
 
+/* A makeflow variable may have different bindings, depending on where it was
+ * defined. struct dag_variable keeps track of these values. When a
+ * substitution is required in a rule, we look for the value binded just before
+ * the rule (using binary search on either n->nodeid or d->nodeid_counter).
+ */
+struct dag_variable {
+	int    count;
+	struct dag_variable_value **values;
+};
 
 struct dag_variable_value {
+	int   nodeid;                           /* The nodeid of the rule to which
+											   this value binding takes effect. */
 	int   size;                             /* memory size allocated for value */
 	int   len;                              /* records strlen(value) */
 	char *value;
@@ -230,6 +246,8 @@ char *dag_node_translate_filename(struct dag_node *n, const char *filename);
 char *dag_file_remote_name(struct dag_node *n, const char *filename);
 int dag_file_isabsolute(const struct dag_file *f);
 
+void dag_variable_add_value(const char *name, struct hash_table *current_table, int nodeid, const char *value);
+struct dag_variable_value *dag_get_variable_value(const char *name, struct hash_table *t, int node_id);
 struct dag_variable_value *dag_lookup(const char *name, void *arg);
 char *dag_lookup_set(const char *name, void *arg);
 char *dag_lookup_str(const char *name, void *arg);
@@ -239,10 +257,10 @@ void dag_variable_value_free(struct dag_variable_value *v);
 struct dag_variable_value *dag_variable_value_append_or_create(struct dag_variable_value *v, const char *value);
 
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label);
-char *dag_task_category_wrap_options(struct dag_task_category *category, const char *default_options, batch_queue_type_t batch_type);
-char *dag_task_category_wrap_as_rmonitor_options(struct dag_task_category *category);
+char *dag_task_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type);
+char *dag_task_resources_wrap_as_rmonitor_options(struct dag_node *n);
 
-void dag_task_category_get_env_resources(struct dag_task_category *category);
-void dag_task_category_print_debug_resources(struct dag_task_category *category);
+void dag_task_fill_resources(struct dag_node *n);
+void dag_task_print_debug_resources(struct dag_node *n);
 
 #endif

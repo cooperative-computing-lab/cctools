@@ -35,31 +35,51 @@ See the file COPYING for details.
  * BUG: Integrate more with dttools (use DEBUG, etc.)
  */
 
-/* Writes 'var=value' pairs from the dag to the stream */
-int dag_to_file_vars(struct hash_table *vars, FILE * dag_stream, const char *prefix)
+/* Writes 'var=value' pairs for special vars to the stream */
+int dag_to_file_var(const char *name, struct hash_table *vars, int nodeid, FILE * dag_stream, const char *prefix)
 {
-	char *var;
 	struct dag_variable_value *v;
+	v = dag_get_variable_value(name, vars, nodeid);
+	if(v && !string_null_or_empty(v->value))
+		fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, name, (char *) v->value);
 
-	hash_table_firstkey(vars);
-	while(hash_table_nextkey(vars, &var, (void *) &v)) {
-		if(!string_null_or_empty(v->value) && (strcmp(var, "GC_PRESERVE_LIST") || strcmp(var, "GC_COLLECT_LIST")))
-			fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, var, (char *) v->value);
+	return 0;
+}
+
+int dag_to_file_vars(struct set *var_names, struct hash_table *vars, int nodeid, FILE * dag_stream, const char *prefix)
+{
+	char *name;
+
+	set_first_element(var_names);
+	while((name = set_next_element(var_names)))
+	{
+		dag_to_file_var(name, vars, nodeid, dag_stream, prefix);
 	}
 
 	return 0;
 }
 
 /* Writes 'export var' tokens from the dag to the stream */
-int dag_to_file_exports(const struct dag *d, FILE * dag_stream)
+int dag_to_file_exports(const struct dag *d, FILE * dag_stream, const char *prefix)
 {
-	char *var;
+	char *name;
 
-	struct list *vars = d->export_list;
+	struct set *vars = d->export_vars;
 
-	list_first_item(vars);
-	for(var = list_next_item(vars); var; var = list_next_item(vars))
-		fprintf(dag_stream, "export %s\n", var);
+	struct dag_variable_value *v;
+	set_first_element(vars);
+	for(name = set_next_element(vars); name; name = set_next_element(vars))
+	{
+		v = hash_table_lookup(d->variables, name);
+		if(v)
+		{
+			fprintf(dag_stream, "%s%s=", prefix, name);
+			if(!string_null_or_empty(v->value))	
+					fprintf(dag_stream, "\"%s\"", (char *) v->value);
+			fprintf(dag_stream, "\n");
+			fprintf(dag_stream, "export %s\n", name);
+		}
+	}
 
 	return 0;
 
@@ -99,13 +119,13 @@ int dag_to_file_files(struct dag_node *n, struct list *fs, FILE * dag_stream, ch
  * */
 int dag_to_file_node(struct dag_node *n, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
 {
-	fprintf(dag_stream, "\n");
 	dag_to_file_files(n, n->target_files, dag_stream, rename);
 	fprintf(dag_stream, ": ");
 	dag_to_file_files(n, n->source_files, dag_stream, rename);
 	fprintf(dag_stream, "\n");
 
-	dag_to_file_vars(n->variables, dag_stream, "@");
+	dag_to_file_vars(n->d->special_vars, n->variables, n->nodeid, dag_stream, "@");
+	dag_to_file_vars(n->d->export_vars,  n->variables, n->nodeid, dag_stream, "@");
 
 	if(n->local_job)
 		fprintf(dag_stream, "\tLOCAL %s", n->command);
@@ -116,33 +136,18 @@ int dag_to_file_node(struct dag_node *n, FILE * dag_stream, char *(*rename) (str
 	return 0;
 }
 
-int dag_to_file_category_variables(struct dag_task_category *c, FILE * dag_stream)
-{
-	struct rmsummary *s = c->resources;
-
-	fprintf(dag_stream, "\n");
-	fprintf(dag_stream, "CATEGORY=\"%s\"\n", c->label);
-
-	if(s->cores > -1)
-		fprintf(dag_stream, "CORES=%" PRId64 "\n", s->cores);
-	if(s->resident_memory > -1)
-		fprintf(dag_stream, "MEMORY=%" PRId64 "\n", s->resident_memory);
-	if(s->workdir_footprint > -1)
-		fprintf(dag_stream, "DISK=%" PRId64 "\n", s->workdir_footprint);
-
-	return 0;
-}
-
 /* Writes all the rules to the stream, per category, plus any variables from the category */
 int dag_to_file_category(struct dag_task_category *c, FILE * dag_stream, char *(*rename) (struct dag_node * n, const char *filename))
 {
 	struct dag_node *n;
 
-	dag_to_file_category_variables(c, dag_stream);
-
 	list_first_item(c->nodes);
 	while((n = list_next_item(c->nodes)))
+	{
+		dag_to_file_vars(n->d->special_vars, n->d->variables, n->nodeid, dag_stream, "");
+		dag_to_file_vars(n->d->export_vars,  n->d->variables, n->nodeid, dag_stream, "");
 		dag_to_file_node(n, dag_stream, rename);
+	}
 
 	return 0;
 }
@@ -163,16 +168,26 @@ int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*renam
  * equivalent makeflow file. */
 int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename) (struct dag_node * n, const char *filename))
 {
-	FILE *dag_stream = fopen(dag_file, "w");
+	FILE *dag_stream; 
+	
+	if(dag_file)
+		dag_stream = fopen(dag_file, "w");
+	else
+		dag_stream = stdout;
 
 	if(!dag_stream)
 		return 1;
 
-	dag_to_file_vars(d->variables, dag_stream, "");
-	dag_to_file_exports(d, dag_stream);
+	// For the collect list, use the their final value (the value at node with id nodeid_counter).
+	dag_to_file_var(GC_COLLECT_LIST, d->variables, d->nodeid_counter, dag_stream, "");
+	dag_to_file_var(GC_PRESERVE_LIST, d->variables, d->nodeid_counter, dag_stream, "");
+
+	dag_to_file_exports(d, dag_stream, "");
+
 	dag_to_file_categories(d, dag_stream, rename);
 
-	fclose(dag_stream);
+	if(dag_file)
+		fclose(dag_stream);
 
 	return 0;
 }
