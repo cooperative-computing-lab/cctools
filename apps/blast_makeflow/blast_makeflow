@@ -44,7 +44,7 @@ def write_split_fasta(destination):
 		split_fasta.write("import sys, re\n\n")
 		
 		split_fasta.write("if(len(sys.argv) < 3) :\n")
-		split_fasta.write("	sys.stderr.write(\"Usage: split_fasta.py query_granularity fasta_file\n\")\n")
+		split_fasta.write("	sys.stderr.write(\"Usage: split_fasta.py query_granularity fasta_file\")\n")
 		split_fasta.write("	sys.exit(1)\n")
 		split_fasta.write("query_gran = sys.argv[1]\n")
 		split_fasta.write("query = sys.argv[2] \n")
@@ -52,8 +52,8 @@ def write_split_fasta(destination):
 		split_fasta.write("num_queries = 0\n")
 		split_fasta.write("num_jobs = 0\n\n")
 
-		split_fasta.write("FILE  = open(query, "r")\n")
-		split_fasta.write("OF = open(\"input.\" + str(num_jobs), \"w\")\n")
+		split_fasta.write("FILE  = open(query, \"r\")\n")
+		split_fasta.write("OF = open(\"input.\" + str(num_jobs), \"w\") \n")
 		split_fasta.write("for line in FILE:\n")
 		split_fasta.write("	if(re.search('^>', line)):\n")
 		split_fasta.write("		if( num_queries > (int(query_gran) - 1) ):\n")
@@ -82,7 +82,7 @@ def write_cat_blast(destination):
 		cat_blast.write("# See the file COPYING for details.\n")
 
 		cat_blast.write("my $output = shift;\n")
-		cat_blast.write("If (-e $output) {\n")
+		cat_blast.write("if (-e $output) {\n")
 		cat_blast.write("	unlink($output) || die \"could not delete $output\";\n")
 		cat_blast.write("} \n")
 		cat_blast.write("open $OUT,'>>',$output or die(\"Could not open \" + $output + \" file.\");;\n")
@@ -313,8 +313,8 @@ try:
 
 	#Here we actually start generating the Makeflow
 	#How to get inputs
-	makeflow.write(str(inputlist) + ": " + options.query + " split_fasta\n")
-	makeflow.write("\tLOCAL python split_fasta %s %s\n"%(options.query_gran, options.query))
+	makeflow.write(str(inputlist) + ": " + options.query + " "+ split_name + "\n")
+	makeflow.write("\tLOCAL ./" + split_name + " %s %s\n"%(options.query_gran, options.query))
 
 	#How to get outputs
 	db_split = re.split("/",options.database)
@@ -330,8 +330,8 @@ try:
                                 + " " + temp_cmd + " 2> error." + str(i) + "\n")
 
 	#How to concatenate and cleanup outputs (very naive)
-	makeflow.write(options.output + ": cat_blast.pl " + outputlist + "\n")
-	makeflow.write("\tLOCAL perl cat_blast.pl "+options.output+" "+outputlist+" ;find . -maxdepth 1 -name 'output.*' -exec rm {} \\\\;\n")
+	makeflow.write(options.output + ": " + cat_name + " " + outputlist + "\n")
+	makeflow.write("\tLOCAL ./" + cat_name + " " + options.output+" "+outputlist+" ;find . -maxdepth 1 -name 'output.*' -exec rm {} \\\\;\n")
 	
 	#How to concatenate and cleanup errors (very naive)
 	makeflow.write("error: " + errorlist + "\n")
