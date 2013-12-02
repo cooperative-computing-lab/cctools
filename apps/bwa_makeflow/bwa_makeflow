@@ -10,7 +10,9 @@
 # Date: 09/03/2013
 
 
-import optparse, os, sys, re, string, logging as log
+import optparse, os, sys, re, string, logging as log, stat
+
+num_reads_per_split=50000
 
 
 def stop_err( msg ):
@@ -26,7 +28,7 @@ def search_file(filename, search_path, pathsep=os.pathsep):
 
 
 def count_splits( fastq ):
-	num_reads=50000
+	num_reads=num_reads_per_split
 	num_outputs = 0
 	line_count=0
 
@@ -45,6 +47,123 @@ def count_splits( fastq ):
 		line_count += 1
 	FILE.close()
 	return num_outputs
+
+def write_fastq_reduce(destination):
+	fastq_r = open(destination, 'w')
+	try:
+		fastq_r.write("#!/usr/bin/perl\n")
+		fastq_r.write("#\n")
+		fastq_r.write("#Copyright (C) 2013- The University of Notre Dame\n")
+		fastq_r.write("#This software is distributed under the GNU General Public License.\n")
+		fastq_r.write("#See the file COPYING for details.\n")
+		fastq_r.write("#\n")
+		fastq_r.write("#Programmer: Brian Kachmarck\n")
+		fastq_r.write("#Date: 7/28/2009\n")
+		fastq_r.write("#\n")
+		fastq_r.write("#Revised: Nick Hazekamp\n")
+		fastq_r.write("#Date: 12/02/2013\n")
+		fastq_r.write("#\n")
+		fastq_r.write("#Purpose: Split a FASTQ file into smaller files determined by the number of sequences input\n")
+		fastq_r.write("\n")
+		fastq_r.write("use strict; \n")
+		fastq_r.write("\n")
+		fastq_r.write("\n")
+		fastq_r.write("my $numargs = $#ARGV + 1;\n")
+		fastq_r.write("\n")
+		fastq_r.write("my $file = $ARGV[0];\n")
+		fastq_r.write("\n")
+		fastq_r.write("my $num_reads=" + str(num_reads_per_split) + ";\n")
+		fastq_r.write("\n")
+		fastq_r.write("my $num_outputs = 0;\n")
+		fastq_r.write("my $line_count=0;\n")
+		fastq_r.write("\n")
+		fastq_r.write("#Open input file\n")
+		fastq_r.write("open(INPUT, $file);\n")
+		fastq_r.write("\n")
+		fastq_r.write("my $read_count = 0;\n")
+		fastq_r.write("open (OUTPUT,\">$file.$num_outputs\");\n")
+		fastq_r.write("$num_outputs++;\n")
+		fastq_r.write("while (my $line = <INPUT>) {\n")
+		fastq_r.write("	chomp $line;\n")
+		fastq_r.write("	#FASTQ files begin sequence with '@' character\n")
+		fastq_r.write("	#If line begins with '@' then it is a new sequence and has 3 lines in between\n")
+		fastq_r.write("	if ($line =~ /^[@]/ and $line_count % 4 ==0){\n")
+		fastq_r.write("		#Check if the new sequence should be placed in a new file, otherwise place it in same file\n")
+		fastq_r.write("		if ($read_count == $num_reads){\n")
+		fastq_r.write("			close(OUTPUT);\n")
+		fastq_r.write("			open(OUTPUT, \">$file.$num_outputs\");\n")
+		fastq_r.write("			print OUTPUT $line;\n")
+		fastq_r.write("			print OUTPUT \"\\n\";\n")
+		fastq_r.write("			$num_outputs++;\n")
+		fastq_r.write("			$read_count = 0;\n")
+		fastq_r.write("		}	\n")
+		fastq_r.write("		else{\n")
+		fastq_r.write("			print OUTPUT $line;\n")
+		fastq_r.write("			print OUTPUT \"\\n\";\n")
+		fastq_r.write("			$read_count++;\n")
+		fastq_r.write("		}\n")
+		fastq_r.write("	}\n")
+		fastq_r.write("	#place all other lines in FASTQ file under same sequence\n")
+		fastq_r.write("	else {\n")
+		fastq_r.write("		print OUTPUT $line;\n")
+		fastq_r.write("		print OUTPUT \"\\n\";\n")
+		fastq_r.write("	}\n")
+		fastq_r.write("\n")
+		fastq_r.write("	$line_count++;\n")
+		fastq_r.write("}\n")
+		fastq_r.write("print $num_outputs;\n")
+		fastq_r.write("\n")
+		fastq_r.write("close(INPUT);\n")
+		fastq_r.write("	\n")
+	finally:
+		fastq_r.close()
+
+def write_cat_bwa(destination):
+	cat_bwa = open(destination, 'w')
+	try:
+		cat_bwa.write("#!/usr/bin/perl\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("#Copyright (C) 2013- The University of Notre Dame\n")
+		cat_bwa.write("#This software is distributed under the GNU General Public License.\n")
+		cat_bwa.write("#See the file COPYING for details.\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("#This script is used to cat SAM files into a single result\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("# Usage: cat_bwa output input1 input2 ... intput*\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("# Author: Nick Hazekamp\n")
+		cat_bwa.write("# Date: 11/01/2013\n")
+		cat_bwa.write("#\n")
+		cat_bwa.write("\n")
+		cat_bwa.write("my $output = shift;\n")
+		cat_bwa.write("if (-e $output) {\n")
+		cat_bwa.write("	unlink($output) || die \"Could not delete $output\";\n")
+		cat_bwa.write("} \n")
+		cat_bwa.write("\n")
+		cat_bwa.write("open $OUT,'>>',$output or die(\"Could not open \" + $output + \" file.\");\n")
+		cat_bwa.write("\n")
+		cat_bwa.write("$file = 0;\n")
+		cat_bwa.write("\n")
+		cat_bwa.write("while ($in = shift) {\n")
+		cat_bwa.write("	++$file;\n")
+		cat_bwa.write("\n")
+		cat_bwa.write("	open(IN,$in) or die(\"Could not open \" + $in + \" file.\");\n")
+		cat_bwa.write("	$print = 0;\n")
+		cat_bwa.write("	while(my $line = <IN>) {\n")
+		cat_bwa.write("		if (($line =~ /^@/) and ($file ne 1)) { $print = 0;}\n")
+		cat_bwa.write("		elsif (($line =~ /main/)) { $print = 0; }\n")
+		cat_bwa.write("		elsif (($line =~ /M::/)) { $print = 0; }\n")
+		cat_bwa.write("		else { $print = 1; }\n")
+		cat_bwa.write("		if ($print gt 0){\n")
+		cat_bwa.write("			print { $OUT } $line;\n")
+		cat_bwa.write("		} \n")
+		cat_bwa.write("	}\n")
+		cat_bwa.write("	close (IN);\n")
+		cat_bwa.write("}\n")
+		cat_bwa.write("close (OUT);\n")
+	finally:
+		cat_bwa.close()
 
 index_arg = ""
 def index_args(option, opt_str, value, parser):
@@ -219,17 +338,18 @@ if not options.ref:
 if not options.fastq:
 	log.error("No query file: --fastq required")
 
+fastq_name = "fastq_reduce"
+write_fastq_reduce(fastq_name)
+st = os.stat("./" + fastq_name)
+os.chmod("./"+fastq_name, stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+cat_name = "cat_bwa"
+write_cat_bwa(cat_name)
+st = os.stat("./" + cat_name)
+os.chmod("./"+cat_name, stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
 path = os.getenv("PATH")
 path += os.pathsep + os.pathsep + "."
-
-fastq_reduce = search_file('fastq_reduce.pl', path)
-if fastq_reduce and not os.path.exists("./fastq_reduce.pl"):
-        log.info("fastq_reduce located: " + fastq_reduce)
-        os.symlink(fastq_reduce, "fastq_reduce.pl")
-elif not os.path.exists("./fastq_reduce.pl"):
-        log.error("Unable to find fastq_reduce.pl script")
-        sys.exit(3)
-
 
 bwa = search_file("bwa", path)
 if bwa and not os.path.exists("./bwa"):
@@ -237,15 +357,6 @@ if bwa and not os.path.exists("./bwa"):
         os.symlink(bwa, "bwa")
 elif not os.path.exists("./bwa"):
         log.error("Unable to find bwa")
-        sys.exit(3)
-
-
-cat_bwa = search_file("cat_bwa", path)
-if cat_bwa and not os.path.exists("./cat_bwa"):
-        log.info("Cat_bwa located: " + cat_bwa)
-        os.symlink(cat_bwa, "cat_bwa")
-elif not os.path.exists("./cat_bwa.pl"):
-        log.error("Unable to find cat_bwa")
         sys.exit(3)
 
 if options.makeflow is None:
@@ -264,8 +375,8 @@ try:
 	for i in range(splits):
 		inputlist = inputlist + options.fastq + "." + str(i) + " "
 
-	makeflow.write("\n\n"+inputlist + "numsplits.txt : fastq_reduce.pl " + options.fastq);
-	makeflow.write("\n\tperl fastq_reduce.pl "+options.fastq+" > numsplits.txt 2>&1")
+	makeflow.write("\n\n"+inputlist + "numsplits.txt : fastq_reduce " + options.fastq);
+	makeflow.write("\n\t./fastq_reduce "+options.fastq+" > numsplits.txt 2>&1")
 
 	if options.rfastq:
 
@@ -274,8 +385,8 @@ try:
 		for i in range(rsplits):
 			rinputlist = rinputlist + options.rfastq + "." + str(i) + " "
 
-		makeflow.write("\n\n"+rinputlist+"rnumsplits.txt : fastq_reduce.pl "+options.rfastq);
-		makeflow.write("\n\tperl fastq_reduce.pl "+options.rfastq+" > rnumsplits.txt")
+		makeflow.write("\n\n"+rinputlist+"rnumsplits.txt : fastq_reduce "+options.rfastq);
+		makeflow.write("\n\t./fastq_reduce "+options.rfastq+" > rnumsplits.txt")
 
  # Rule and Command for Indexing FASTA File
 	ref = options.ref
@@ -334,8 +445,8 @@ try:
 	if options.output_SAM:
 		output = options.output_SAM + " "
 	
-	makeflow.write("\n\n"+output+": cat_bwa.pl "+results_to_cat)
-	makeflow.write("\n\t./cat_bwa.pl "+output+results_to_cat)	
+	makeflow.write("\n\n"+output+": cat_bwa "+results_to_cat)
+	makeflow.write("\n\t./cat_bwa "+output+results_to_cat)	
 
 finally:
 	if options.makeflow is not None:
