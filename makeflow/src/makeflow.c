@@ -1132,36 +1132,78 @@ void dag_prepare_nested_jobs(struct dag *d)
 	}
 }
 
-char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
-{
-	struct dag *d = bk->d;
-	struct dag_lookup_set s = { d, bk->category, n, NULL };
-	char *raw_line = get_line(bk->stream);
-
-	if(raw_line) {
+/** Read multiple lines connected by shell continuation symbol 
+ * (backslash). Return as a single line. Caller will own the
+ * memory.
+ * The continuation is detected when backslash is the last symbol
+ * before the newline character, and the symbol last before last is
+ * not the backslash (double backslash is an escape sequence for
+ * backslash itself).
+ */
+char* get_continued_line(struct lexer_book *bk) {
+	
+	char *cont_line = NULL;
+	char *raw_line = NULL;
+	int cont = 1;
+	
+	while(cont && ((raw_line=get_line(bk->stream)) != NULL)) {
+		
 		bk->column_number = 1;
 		bk->line_number++;
-
 		if(bk->line_number % 1000 == 0) {
 			debug(D_DEBUG, "read line %ld\n", bk->line_number);
 		}
-
+		
 		/* Strip whitespace */
 		string_chomp(raw_line);
 		while(isspace(*raw_line)) {
 			raw_line++;
 			bk->column_number++;
 		}
+		
+		size_t len = strlen(raw_line);
+		
+		if(len>0 && raw_line[len-1] == '\\' && 
+				(len==1 || raw_line[len-2] != '\\')) {
+			raw_line[len-1] = '\0';
+			cont++;
+		}
+		else {
+			cont = 0;
+		}
+		
+		if(cont_line) {
+			cont_line = string_combine(cont_line,raw_line);
+		}
+		else {
+			cont_line = xxstrdup(raw_line);
+		}
+	}
+	if(cont > 1) {
+		dag_parse_error(bk, "No line found after line continuation backslash");
+		free(cont_line);
+		cont_line = NULL;
+		fatal("Unable to parse the makeflow file");
+	}
+	return cont_line;
+}
 
+char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n)
+{
+	struct dag *d = bk->d;
+	struct dag_lookup_set s = { d, bk->category, n, NULL };
+	
+	char *line = get_continued_line(bk);
+
+	if(line) {
 		/* Chop off comments
 		 * TODO: this will break if we use # in a string. */
-		char *hash = strrchr(raw_line, '#');
-		if(hash && hash != raw_line) {
+		char *hash = strrchr(line, '#');
+		if(hash && hash != line) {
 			*hash = 0;
 		}
 
-		char *subst_line = xxstrdup(raw_line);
-		subst_line = string_subst(subst_line, dag_lookup_str, &s);
+		char *subst_line = string_subst(line, dag_lookup_str, &s);
 
 		free(bk->linetext);
 		bk->linetext = xxstrdup(subst_line);
