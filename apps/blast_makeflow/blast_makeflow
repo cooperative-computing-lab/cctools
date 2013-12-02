@@ -8,7 +8,7 @@
 # popular blastall program.
 #
 
-import sys, re, string, optparse, subprocess, os, logging as log
+import sys, re, string, optparse, subprocess, os, logging as log, stat
 
 #Initialize Global Variable
 blast_args = ""
@@ -29,6 +29,92 @@ def count_splits(query_gran, query):
         FILE.close()
         log.info("\tNumber of splits: " + str(num_jobs))
         return num_jobs
+
+def write_split_fasta(destination):
+	split_fasta = open(destination, "w")
+	try:
+		split_fasta.write("#! /usr/bin/env python\n\n")
+		split_fasta.write("# Copyright (C) 2011- The University of Notre Dame\n")
+		split_fasta.write("# This software is distributed under the GNU General Public License.\n")
+		split_fasta.write("# See the file COPYING for details.\n")
+		split_fasta.write("#\n")
+		split_fasta.write("# This simple script splits a fasta file into pieces\n")
+		split_fasta.write("#\n\n")
+
+		split_fasta.write("import sys, re\n\n")
+		
+		split_fasta.write("if(len(sys.argv) < 3) :\n")
+		split_fasta.write("	sys.stderr.write(\"Usage: split_fasta.py query_granularity fasta_file\n\")\n")
+		split_fasta.write("	sys.exit(1)\n")
+		split_fasta.write("query_gran = sys.argv[1]\n")
+		split_fasta.write("query = sys.argv[2] \n")
+		split_fasta.write("num_chars = 0\n")
+		split_fasta.write("num_queries = 0\n")
+		split_fasta.write("num_jobs = 0\n\n")
+
+		split_fasta.write("FILE  = open(query, "r")\n")
+		split_fasta.write("OF = open(\"input.\" + str(num_jobs), \"w\")\n")
+		split_fasta.write("for line in FILE:\n")
+		split_fasta.write("	if(re.search('^>', line)):\n")
+		split_fasta.write("		if( num_queries > (int(query_gran) - 1) ):\n")
+		split_fasta.write("			OF.close()\n")
+		split_fasta.write("			num_jobs = num_jobs + 1\n")
+		split_fasta.write("			num_queries = 0\n")
+		split_fasta.write("			OF = open(\"input.\" + str(num_jobs), \"w\")\n")
+		split_fasta.write("			OF.write(line)\n")
+		split_fasta.write("		else :\n")
+		split_fasta.write("			OF.write(line)\n")
+		split_fasta.write("		num_queries += 1\n")
+		split_fasta.write("	else :\n")
+		split_fasta.write("		OF.write(line)\n")
+		split_fasta.write("FILE.close()\n")
+		split_fasta.write("OF.close()\n")
+		split_fasta.write("sys.exit(0)\n")
+	finally:
+		split_fasta.close()
+		
+def write_cat_blast(destination):
+	cat_blast = open(destination, "w")
+	try:
+		cat_blast.write("#!/usr/bin/perl\n\n")
+		cat_blast.write("# Copyright (C) 2013- The University of Notre Dame\n")
+		cat_blast.write("# This software is distributed under the GNU General Public License.\n")
+		cat_blast.write("# See the file COPYING for details.\n")
+
+		cat_blast.write("my $output = shift;\n")
+		cat_blast.write("If (-e $output) {\n")
+		cat_blast.write("	unlink($output) || die \"could not delete $output\";\n")
+		cat_blast.write("} \n")
+		cat_blast.write("open $OUT,'>>',$output or die(\"Could not open \" + $output + \" file.\");;\n")
+		cat_blast.write("\n")
+		cat_blast.write("$file = 0;\n")
+		cat_blast.write("$max = scalar @ARGV;\n")
+		cat_blast.write("\n")
+		cat_blast.write("while ($in = shift) {\n")
+		cat_blast.write("	++$file;\n")
+		cat_blast.write("\n")
+		cat_blast.write("	open(IN,$in) or die(\"Could not open \" + $in + \" file.\");\n")
+		cat_blast.write("	@size = <IN>;\n")
+		cat_blast.write("	$lines = @size;\n")
+		cat_blast.write("	close(IN);\n")
+		cat_blast.write("\n")
+		cat_blast.write("	open(IN,$in) or die(\"Could not open \" + $in + \" file.\");\n")
+		cat_blast.write("	$print = 1;\n")
+		cat_blast.write("	while(my $line = <IN>) {\n")
+		cat_blast.write("		if (($line =~ /BLAST/) and ($file ne 1)) { $print = 0;}\n")
+		cat_blast.write("		if (($line =~ /Query/) and ($print eq 0)) { $print = 1; }\n")
+		cat_blast.write("		last if (($line =~ /^\s+Database:/) and ($file lt $max));\n")
+		cat_blast.write("		if ($print gt 0){\n")
+		cat_blast.write("			print { $OUT } $line;\n")
+		cat_blast.write("		}\n")
+		cat_blast.write("	}\n")
+		cat_blast.write("	close (IN);\n")
+		cat_blast.write("}\n")
+		cat_blast.write("close (OUT);\n")
+	finally:
+		cat_blast.close()
+
+
 
 def check_blast(blast_args, process, database):
         log.info("Checking arguments passed to blastall")
@@ -172,23 +258,6 @@ elif not os.path.exists("./legacy_blast.pl"):
 	log.error("Unable to find legacy_blast.pl script")
 	sys.exit(5)
 
-split = search_file("split_fasta", path)
-if split and not os.path.exists("./split_fasta"):
-	log.info("Split_fasta located: " + split) 
-	os.symlink(split, "split_fasta")
-elif not os.path.exists("./split_fasta"):
-	log.error("Unable to find split_fasta script")
-	sys.exit(5)
-
-cat_blast = search_file("cat_blast.pl", path)
-if cat_blast and not os.path.exists("./cat_blast.pl"):
-	log.info("Cat_blast located: " + cat_blast) 
-	os.symlink(cat_blast, "cat_blast.pl")
-elif not os.path.exists("./cat_blast.pl"):
-	log.error("Unable to find cat_blast.pl script")
-	sys.exit(5)
-
-
 #Find blast db
 dbpath = path
 if os.getenv("BLASTDB"):
@@ -202,6 +271,20 @@ elif not os.path.exists("./"+options.database):
 	log.error("Unable to find database: " + options.database)
 	sys.exit(5)
 
+split_name = "split_fasta"
+if os.path.exists(split_name):
+    os.remove(split_name)
+write_split_fasta(split_name)
+st = os.stat(split_name)
+os.chmod(split_name, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+cat_name = "cat_blast"
+if os.path.exists(cat_name):
+    os.remove(cat_name)
+write_cat_blast(cat_name)
+st = os.stat(cat_name)
+os.chmod(cat_name, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 blast_args += " --path . "
 
