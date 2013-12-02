@@ -13,6 +13,104 @@ import sys, re, string, optparse, subprocess, os, logging as log, stat
 #Initialize Global Variable
 blast_args = ""
 
+def callback_blast_args(option, opt_str, value, parser):
+	global blast_args
+        blast_args += opt_str + " " + value + " "
+
+#Parser initialization
+def initialize_blast_parser(parser):
+	blast = optparse.OptionGroup(parser, "BLAST Options")
+	parser.add_option_group(blast)
+	blast.add_option('-p', dest='process', help='Program Name [String]')
+	blast.add_option('-d', dest='database', help='Database [String] default = nr')
+	blast.add_option('-i', dest='query', help='Query File [File In]')
+	blast.add_option('-o', dest='output', help='BLAST report Output File [File Out]')
+	blast.add_option('-e', help='Expectation value (E) [Real] default = 10.0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-m', help='alignment view options: 0 = pairwise, 1 = query-anchored showing identities, 2 = query-anchored no identities, 3 = flat query-anchored, show identities, 4 = flat query-anchored, no identities, 5 = query-anchored no identities and blunt ends, 6 = flat query-anchored, no identities and blunt ends, 7 = XML Blast output, 8 = tabular, 9 tabular with comment lines [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-F', help='Filter query sequence (DUST with blastn, SEG with others) [String] default = T', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-G', help='Cost to open a gap (zero invokes default behavior) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-E', help='Cost to extend a gap (zero invokes default behavior) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-X', help='X dropoff value for gapped alignment (in bits) (zero invokes default behavior) blastn 30, megablast 20, tblastx 0, all others 15 [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-I', help='Show GI\'s in deflines [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-q', help='Penalty for a nucleotide mismatch (blastn only) [Integer] default = -3', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-r', help='Reward for a nucleotide match (blastn only) [Integer] default = 1', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-v', help='Number of database sequences to show one-line descriptions for (V) [Integer] default = 500', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-b', help='Number of database sequence to show alignments for (B) [Integer] default = 250', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-f', help='Threshold for extending hits, default if zero blastp 11, blastn 0, blastx 12, tblastn 13 tblastx 13, megablast 0 [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-g', help='Perfom gapped alignment (not available with tblastx) [T/F] default = T', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-Q', help='Query Genetic code to use [Integer] default = 1', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-D', help='DB Genetic code (for tblast[nx] only) [Integer] default = 1', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-a', help='Number of processors to use [Integer] default = 1', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-O', help='SeqAlign file [File Out] Optional', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-P', help='Specifies single versus multiple hit [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-J', help='Believe the query defline [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-M', help='Matrix [String] default = BLOSUM62', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-W', help='Word size, default if zero (blastn 11, megablast 28, all others 3) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-z', help='Effective length of the database (use zero for the real size) [Real] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-K', help='Number of best hits from a region to keep (off by default, if used a value of 100 is recommended) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-Y', help='Effective length of the search space (use zero for the real size) [Real] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-S', help='Query strands to search against database (for blast[nx], and tblastx) 3 is both, 1 is top, 2 is bottom [Integer] default = 3', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-T', help='Produce HTML output [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-l', help='Restrict search of database to list of GI\'s [String] Optional', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-U', help='Use lower case filtering of FASTA sequence [T/F] Optional default = F', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-y', help='X dropoff value for ungapped extensions in bits (0.0 invokes default behavior) blastn 20, megablast 10, all others 7 [Real] default = 0.0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-Z', help='X dropoff value for final gapped alignment in bits (0.0 invokes default behavior) blastn/megablast 50, tblastx 0, all others 25 [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-R', help='PSI-TBLASTN checkpoint file [File In] Optional', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-n', help='MegaBlast search [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-L', help='Location on query sequence [String] Optional', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-A', help='Multiple Hits window size, default if zero (blastn/megablast 0, all others 40 [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-w', help='Frame shift penalty (OOF algorithm for blastx) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-t', help='Length of the largest intron allowed in tblastn for linking HSPs (0 disables linking) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-B', help='Specifies the number of queries to concatenate for blastn, tblastn [Integer]', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-V', help='Force use of old engin [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-C', help='Uses composition-based statistics for tblastn [String] D', type="str", action="callback", callback=callback_blast_args)
+	blast.add_option('-s', help='Computes locally optimal Smith-Waterman alignments [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
+
+def initialize_makeflow_parser(parser):
+	makeflow = optparse.OptionGroup(parser, "Makeflow Preparation Options")
+	parser.add_option_group(makeflow)
+	makeflow.add_option('--path', dest='path',help='Path to locate indicated files [String] default = .',default='.')
+	makeflow.add_option('--q_gran', dest='query_gran',help='Determines number of sequences per search: makeflow',default=20,type=int)
+	makeflow.add_option('--check', dest='check',help='Add this to precheck arguments through blast process',action='store_true',default="False")
+	makeflow.add_option('--makeflow', dest='makeflow',help='Makeflow destination file [stdout]')
+	makeflow.add_option('--makeflow-config', dest='config',help='Makeflow Configuration File')
+	makeflow.add_option('--verbose', dest='verbose',help='Show verbose level output',action='store_true',default="False")
+
+#Checks if arguments are valid
+def check_blast(blast_args, process, database):
+        log.info("Checking arguments passed to blastall")
+        null = open(os.devnull, 'w')
+        log.info("\tCreating tmp sequence file")
+        TMPF = open("tmp", "w")
+        TMPF.write(">TestSeq\nATATATATTTCCCAGGTAGACCACACAGAGACAGATACACCACA\n")
+        TMPF.close()
+        log.info("\tWriting Command")
+	blast_arg = ("./legacy_blast.pl blastall"
+			+ " -p " + process
+                        + " -d " + database
+			+ " -i tmp -o output --path . "
+                        + blast_args + "\n")
+
+        log.info("\tRunning test query through blastall")
+        try:
+                subprocess.check_call(re.split("\s+",blast_arg), stdout=None, stderr=None)
+        except subprocess.CalledProcessError, err:
+                return(1)
+        log.info("\tSuccessful: Cleaning up")
+        os.remove(os.curdir + "/tmp")
+        os.remove(os.curdir + "/output")
+        null.close()
+        return(0)
+
+#Helper function to find executables in path
+def search_file(filename, search_path, pathsep=os.pathsep):
+    """ Given a search path, find file with requested name """
+    for path in string.split(search_path, pathsep):
+        candidate = os.path.join(path, filename)
+        if os.path.exists(candidate): return os.path.abspath(candidate)
+    return None
+
+#Counts number of splits that will be made for makeflow creation
 def count_splits(query_gran, query):
         log.info("Counting number of splits based on query_granularity " + str(query_gran))
         FILE = open(query, "r")
@@ -114,102 +212,60 @@ def write_cat_blast(destination):
 	finally:
 		cat_blast.close()
 
+def write_makeflow(destination):
+	if destination is None:
+		makeflow = sys.stdout
+	else:
+		makeflow = open(destination, 'w')
+	
+	try:
+		inputlist = ""
+		outputlist = ""
+		errorlist = ""
+		num_splits = count_splits(options.query_gran, options.query)
+		for i in range(num_splits):
+	        	inputlist = inputlist + "input." + str(i) + " "
+	        	outputlist = outputlist + "output." + str(i) + " "
+	        	errorlist = errorlist + "error." + str(i) + " "
+	
 
+		if options.config:
+			config = open(options.config, 'r')
+			makeflow.write(config.read())
 
-def check_blast(blast_args, process, database):
-        log.info("Checking arguments passed to blastall")
-        null = open(os.devnull, 'w')
-        log.info("\tCreating tmp sequence file")
-        TMPF = open("tmp", "w")
-        TMPF.write(">TestSeq\nATATATATTTCCCAGGTAGACCACACAGAGACAGATACACCACA\n")
-        TMPF.close()
-        log.info("\tWriting Command")
-	blast_arg = ("./legacy_blast.pl blastall"
-			+ " -p " + process
-                        + " -d " + database
-			+ " -i tmp -o output --path . "
-                        + blast_args + "\n")
+		#Here we actually start generating the Makeflow
+		#How to get inputs
+		makeflow.write(str(inputlist) + ": " + options.query + " "+ split_name + "\n")
+		makeflow.write("\tLOCAL ./" + split_name + " %s %s\n"%(options.query_gran, options.query))
 
-        log.info("\tRunning test query through blastall")
-        try:
-                subprocess.check_call(re.split("\s+",blast_arg), stdout=None, stderr=None)
-        except subprocess.CalledProcessError, err:
-                return(1)
-        log.info("\tSuccessful: Cleaning up")
-        os.remove(os.curdir + "/tmp")
-        os.remove(os.curdir + "/output")
-        null.close()
-        return(0)
+		#How to get outputs
+		db_split = re.split("/",options.database)
+		database = db_split[0]
+		for i in range(num_splits):
+	        	temp_cmd = blast_args
+	        	makeflow.write("output." + str(i) + " error." + str(i) + ": legacy_blast.pl " + options.process + "  input." + str(i) + " " + options.database + "\n")
+	        	makeflow.write("\tperl legacy_blast.pl blastall"
+					+ " -p " + options.process
+                       	        	+ " -d " + options.database
+					+ " -i input." + str(i)
+					+ " -o output." + str(i)
+                  	                + " " + temp_cmd + " 2> error." + str(i) + "\n")
 
-def search_file(filename, search_path, pathsep=os.pathsep):
-    """ Given a search path, find file with requested name """
-    for path in string.split(search_path, pathsep):
-        candidate = os.path.join(path, filename)
-        if os.path.exists(candidate): return os.path.abspath(candidate)
-    return None
+		#How to concatenate and cleanup outputs (very naive)
+		makeflow.write(options.output + ": " + cat_name + " " + outputlist + "\n")
+		makeflow.write("\tLOCAL ./" + cat_name + " " + options.output+" "+outputlist+" ;find . -maxdepth 1 -name 'output.*' -exec rm {} \\\\;\n")
+		
+		#How to concatenate and cleanup errors (very naive)
+		makeflow.write("error: " + errorlist + "\n")
+		makeflow.write("\tLOCAL find . -maxdepth 1 -name 'error.*' -exec cat {} \\\\;> error;find . -maxdepth 1 -name 'error.*' -exec rm {} \\\\;\n")
 
-def callback_blast_args(option, opt_str, value, parser):
-	global blast_args
-        blast_args += opt_str + " " + value + " "
-
-def initialize_blast_parser(parser):
-	blast = optparse.OptionGroup(parser, "BLAST Options")
-	parser.add_option_group(blast)
-	blast.add_option('-p', dest='process', help='Program Name [String]')
-	blast.add_option('-d', dest='database', help='Database [String] default = nr')
-	blast.add_option('-i', dest='query', help='Query File [File In]')
-	blast.add_option('-o', dest='output', help='BLAST report Output File [File Out]')
-	blast.add_option('-e', help='Expectation value (E) [Real] default = 10.0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-m', help='alignment view options: 0 = pairwise, 1 = query-anchored showing identities, 2 = query-anchored no identities, 3 = flat query-anchored, show identities, 4 = flat query-anchored, no identities, 5 = query-anchored no identities and blunt ends, 6 = flat query-anchored, no identities and blunt ends, 7 = XML Blast output, 8 = tabular, 9 tabular with comment lines [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-F', help='Filter query sequence (DUST with blastn, SEG with others) [String] default = T', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-G', help='Cost to open a gap (zero invokes default behavior) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-E', help='Cost to extend a gap (zero invokes default behavior) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-X', help='X dropoff value for gapped alignment (in bits) (zero invokes default behavior) blastn 30, megablast 20, tblastx 0, all others 15 [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-I', help='Show GI\'s in deflines [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-q', help='Penalty for a nucleotide mismatch (blastn only) [Integer] default = -3', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-r', help='Reward for a nucleotide match (blastn only) [Integer] default = 1', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-v', help='Number of database sequences to show one-line descriptions for (V) [Integer] default = 500', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-b', help='Number of database sequence to show alignments for (B) [Integer] default = 250', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-f', help='Threshold for extending hits, default if zero blastp 11, blastn 0, blastx 12, tblastn 13 tblastx 13, megablast 0 [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-g', help='Perfom gapped alignment (not available with tblastx) [T/F] default = T', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-Q', help='Query Genetic code to use [Integer] default = 1', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-D', help='DB Genetic code (for tblast[nx] only) [Integer] default = 1', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-a', help='Number of processors to use [Integer] default = 1', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-O', help='SeqAlign file [File Out] Optional', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-P', help='Specifies single versus multiple hit [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-J', help='Believe the query defline [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-M', help='Matrix [String] default = BLOSUM62', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-W', help='Word size, default if zero (blastn 11, megablast 28, all others 3) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-z', help='Effective length of the database (use zero for the real size) [Real] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-K', help='Number of best hits from a region to keep (off by default, if used a value of 100 is recommended) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-Y', help='Effective length of the search space (use zero for the real size) [Real] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-S', help='Query strands to search against database (for blast[nx], and tblastx) 3 is both, 1 is top, 2 is bottom [Integer] default = 3', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-T', help='Produce HTML output [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-l', help='Restrict search of database to list of GI\'s [String] Optional', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-U', help='Use lower case filtering of FASTA sequence [T/F] Optional default = F', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-y', help='X dropoff value for ungapped extensions in bits (0.0 invokes default behavior) blastn 20, megablast 10, all others 7 [Real] default = 0.0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-Z', help='X dropoff value for final gapped alignment in bits (0.0 invokes default behavior) blastn/megablast 50, tblastx 0, all others 25 [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-R', help='PSI-TBLASTN checkpoint file [File In] Optional', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-n', help='MegaBlast search [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-L', help='Location on query sequence [String] Optional', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-A', help='Multiple Hits window size, default if zero (blastn/megablast 0, all others 40 [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-w', help='Frame shift penalty (OOF algorithm for blastx) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-t', help='Length of the largest intron allowed in tblastn for linking HSPs (0 disables linking) [Integer] default = 0', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-B', help='Specifies the number of queries to concatenate for blastn, tblastn [Integer]', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-V', help='Force use of old engin [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-C', help='Uses composition-based statistics for tblastn [String] D', type="str", action="callback", callback=callback_blast_args)
-	blast.add_option('-s', help='Computes locally optimal Smith-Waterman alignments [T/F] default = F', type="str", action="callback", callback=callback_blast_args)
-
-def initialize_makeflow_parser(parser):
-	makeflow = optparse.OptionGroup(parser, "Makeflow Preparation Options")
-	parser.add_option_group(makeflow)
-	makeflow.add_option('--path', dest='path',help='Path to locate indicated files [String] default = .',default='.')
-	makeflow.add_option('--q_gran', dest='query_gran',help='Determines number of sequences per search: makeflow',default=20,type=int)
-	makeflow.add_option('--check', dest='check',help='Add this to precheck arguments through blast process',action='store_true',default="False")
-	makeflow.add_option('--makeflow', dest='makeflow',help='Makeflow destination file [stdout]')
-	makeflow.add_option('--makeflow-config', dest='config',help='Makeflow Configuration File')
-	makeflow.add_option('--verbose', dest='verbose',help='Show verbose level output',action='store_true',default="False")
-
+		#How to cleanup inputs (very naive)
+		makeflow.write("clean: error " + options.output + " " + inputlist + "\n")
+		makeflow.write("\tLOCAL find . -maxdepth 1 -name 'input.*' -exec rm {} \\\\; > clean\n")
+	
+	finally:
+		if options.makeflow is not None:
+			makeflow.close()
 
 #Start of Main function
 parser = optparse.OptionParser(usage="usage: %prog -p process -i input -o output -d ref_db [options]")
@@ -291,56 +347,6 @@ blast_args += " --path . "
 if (options.check == True and check_blast(blast_args, options.process, options.database) > 0):
         sys.exit(3)
 
+write_makeflow(options.makeflow)
 
-inputlist = ""
-outputlist = ""
-errorlist = ""
-num_splits = count_splits(options.query_gran, options.query)
-for i in range(num_splits):
-        inputlist = inputlist + "input." + str(i) + " "
-        outputlist = outputlist + "output." + str(i) + " "
-        errorlist = errorlist + "error." + str(i) + " "
 
-if options.makeflow is None:
-	makeflow = sys.stdout
-else:
-	makeflow = open(options.makeflow, 'w')
-
-try:
-	if options.config:
-		config = open(options.config, 'r')
-		makeflow.write(config.read())
-
-	#Here we actually start generating the Makeflow
-	#How to get inputs
-	makeflow.write(str(inputlist) + ": " + options.query + " "+ split_name + "\n")
-	makeflow.write("\tLOCAL ./" + split_name + " %s %s\n"%(options.query_gran, options.query))
-
-	#How to get outputs
-	db_split = re.split("/",options.database)
-	database = db_split[0]
-	for i in range(num_splits):
-	        temp_cmd = blast_args
-	        makeflow.write("output." + str(i) + " error." + str(i) + ": legacy_blast.pl " + options.process + "  input." + str(i) + " " + options.database + "\n")
-	        makeflow.write("\tperl legacy_blast.pl blastall"
-				+ " -p " + options.process
-                                + " -d " + options.database
-				+ " -i input." + str(i)
-				+ " -o output." + str(i)
-                                + " " + temp_cmd + " 2> error." + str(i) + "\n")
-
-	#How to concatenate and cleanup outputs (very naive)
-	makeflow.write(options.output + ": " + cat_name + " " + outputlist + "\n")
-	makeflow.write("\tLOCAL ./" + cat_name + " " + options.output+" "+outputlist+" ;find . -maxdepth 1 -name 'output.*' -exec rm {} \\\\;\n")
-	
-	#How to concatenate and cleanup errors (very naive)
-	makeflow.write("error: " + errorlist + "\n")
-	makeflow.write("\tLOCAL find . -maxdepth 1 -name 'error.*' -exec cat {} \\\\;> error;find . -maxdepth 1 -name 'error.*' -exec rm {} \\\\;\n")
-
-	#How to cleanup inputs (very naive)
-	makeflow.write("clean: error " + options.output + " " + inputlist + "\n")
-	makeflow.write("\tLOCAL find . -maxdepth 1 -name 'input.*' -exec rm {} \\\\; > clean\n")
-
-finally:
-	if options.makeflow is not None:
-		makeflow.close()
