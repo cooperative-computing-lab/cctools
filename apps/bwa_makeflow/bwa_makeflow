@@ -339,14 +339,18 @@ if not options.fastq:
 	log.error("No query file: --fastq required")
 
 fastq_name = "fastq_reduce"
+if os.path.exists(fastq_name):
+    os.remove(fastq_name)
 write_fastq_reduce(fastq_name)
-st = os.stat("./" + fastq_name)
-os.chmod("./"+fastq_name, stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+st = os.stat(fastq_name)
+os.chmod(fastq_name, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 cat_name = "cat_bwa"
+if os.path.exists(cat_name):
+    os.remove(cat_name)
 write_cat_bwa(cat_name)
-st = os.stat("./" + cat_name)
-os.chmod("./"+cat_name, stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+st = os.stat(cat_name)
+os.chmod(cat_name, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 path = os.getenv("PATH")
 path += os.pathsep + os.pathsep + "."
