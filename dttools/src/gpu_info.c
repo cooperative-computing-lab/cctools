@@ -21,8 +21,6 @@ int gpu_info_get()
 	int pipefd[2];
 	pipe(pipefd);
 
-	printf("Called gpu_info_get()\n");
-
 	switch (pid = fork()) {
 	case -1:
 		return 0;
