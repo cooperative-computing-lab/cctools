@@ -160,7 +160,6 @@ int path_lookup (char *search_path, const char *exe, char *dest, size_t destlen)
 	char *s;
 	char *e;
 	size_t len = strlen(search_path);
-	size_t exelen = strlen(exe);
 
 	s = e = search_path;
 
@@ -182,12 +181,12 @@ int path_lookup (char *search_path, const char *exe, char *dest, size_t destlen)
 		if(( dirp = opendir(s) )) {
 			struct dirent *dp = NULL;
 			while(( dp = readdir(dirp) )) {
-				if( dp->d_namlen == exelen && !strcmp(dp->d_name, exe) ) {
+				if( strcmp(dp->d_name, exe) == 0 ) {
 					struct stat sb;
 					char fn[PATH_MAX];
 					strncpy(fn, s, PATH_MAX);
 					strncat(fn, "/", 1);
-					strncat(fn, dp->d_name, dp->d_namlen);
+					strcat(fn, dp->d_name);
 					if( stat(fn, &sb) == 0 && sb.st_mode & (S_IXUSR|S_IFREG) ){
 						strncpy(dest, fn, destlen);
 						closedir(dirp);
