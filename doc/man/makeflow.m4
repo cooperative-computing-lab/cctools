@@ -100,6 +100,7 @@ SUBSECTION(Display Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-D, display, opt)Display the Makefile as a Dot graph or a PPM completion graph. <opt> is one of:
    dot      Standard Dot graph
+   file     Display the file as interpreted by Makeflow
    ppm      Display a completion graph in PPM format
 OPTION_ITEM(`--dot-merge-similar')Condense similar boxes
 OPTION_ITEM(`--dot-proportional')Change the size of the boxes proportional to file size
