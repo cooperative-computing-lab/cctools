@@ -228,6 +228,8 @@ static void pfs_process_do_wake( struct pfs_process *parent, struct pfs_process 
 	parent->state = PFS_PROCESS_STATE_KERNEL;
 	parent->syscall_result = child->pid;
 
+	debug(D_DEBUG, "waking parent %d because of child %d", parent->pid, child->pid);
+
 	if(parent->wait_ustatus) {
 		tracer_copy_out(
 			parent->tracer,
@@ -265,22 +267,10 @@ kick it out with a signal.
 
 static int pfs_process_may_wake( struct pfs_process *parent, struct pfs_process *child )
 {
-	if(child->ppid == parent->pid ) {
-		if( (child->state==PFS_PROCESS_STATE_DONE) ||
-		    ( (child->state==PFS_PROCESS_STATE_WAITPID) && (parent->wait_options&WUNTRACED)) ) {
-			if(parent->state==PFS_PROCESS_STATE_WAITPID) {
-				if( (parent->wait_pid<=0) || (parent->wait_pid==child->pid) ) {
-					pfs_process_do_wake(parent,child);
-					return 1;
-				} else {
-					return 0;
-				}
-			} else {
-				return 0;
-			}
-		} else {
-			return 0;
-		}
+	/* Note: we never wake a parent for STOP signals. */
+	if(child->ppid == parent->pid && child->state == PFS_PROCESS_STATE_DONE && parent->state == PFS_PROCESS_STATE_WAITPID && (parent->wait_pid <= 0 || parent->wait_pid == child->pid)) {
+		pfs_process_do_wake(parent,child);
+		return 1;
 	} else {
 		return 0;
 	}
