@@ -35,7 +35,7 @@ See the file COPYING for details.
 int dag_to_file_vars(struct hash_table *vars, FILE * dag_stream, const char *prefix)
 {
 	char *name;
-	char *var_names[] = {"GC_COLLECT_LIST", 
+	char *var_names[] = {"GC_COLLECT_LIST",
 		"GC_PRESERVE_LIST",
 		RESOURCES_CATEGORY,
 		RESOURCES_CORES,
@@ -72,7 +72,7 @@ int dag_to_file_exports(const struct dag *d, FILE * dag_stream, const char *pref
 		if(v)
 		{
 			fprintf(dag_stream, "%s%s=", prefix, name);
-			if(!string_null_or_empty(v->value))	
+			if(!string_null_or_empty(v->value))
 					fprintf(dag_stream, "\"%s\"", (char *) v->value);
 			fprintf(dag_stream, "\n");
 		fprintf(dag_stream, "export %s\n", name);
