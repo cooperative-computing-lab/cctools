@@ -57,8 +57,6 @@ enum { SHOW_INPUT_FILES = 2,
        SHOW_DAG_FILE
 };
 
-
-
 #define RANDOM_PORT_RETRY_TIME 300
 
 #define MAKEFLOW_AUTO_WIDTH 1

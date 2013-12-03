@@ -159,8 +159,8 @@ int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*renam
  * equivalent makeflow file. */
 int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename) (struct dag_node * n, const char *filename))
 {
-	FILE *dag_stream; 
-	
+	FILE *dag_stream;
+
 	if(dag_file)
 		dag_stream = fopen(dag_file, "w");
 	else
