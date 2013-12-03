@@ -156,7 +156,6 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->ancestor_depth = -1;
 
 	n->resources = make_rmsummary(-1);
-		
 
 	if(verbose_parsing && d->nodeid_counter % PARSING_RULE_MOD_COUNTER == 0)
 	{
@@ -754,13 +753,13 @@ char *dag_task_resources_add_condor_option(char *options, const char *expression
 	char *opt = NULL;
 	if(options)
 	{
-		opt = string_format("%s && (%s%" PRId64 ")", options, expression, value); 
+		opt = string_format("%s && (%s%" PRId64 ")", options, expression, value);
 		free(options);
 		options = opt;
 	}
 	else
 	{
-		options = string_format("(%s%" PRId64 ")", expression, value); 
+		options = string_format("(%s%" PRId64 ")", expression, value);
 	}
 
 	return options;
@@ -775,9 +774,9 @@ char *dag_task_resources_wrap_as_condor_options(struct dag_node *n, const char *
 	char *options = NULL;
 	char *opt;
 
-	options = dag_task_resources_add_condor_option(options, "Cores>=", s->cores); 
-	options = dag_task_resources_add_condor_option(options, "Memory>=", s->resident_memory); 
-	options = dag_task_resources_add_condor_option(options, "Disk>=", s->workdir_footprint); 
+	options = dag_task_resources_add_condor_option(options, "Cores>=", s->cores);
+	options = dag_task_resources_add_condor_option(options, "Memory>=", s->resident_memory);
+	options = dag_task_resources_add_condor_option(options, "Disk>=", s->workdir_footprint);
 
 	if(!options)
 	{
