@@ -10,12 +10,12 @@ prepare()
 run()
 {
     cd syntax
-    
+
     if ../../src/makeflow -k variable_issues.makeflow
     then
-    	exit 1
+      exit 1
     else
-		exit 0
+      exit 0
     fi
 }
 

@@ -1236,20 +1236,20 @@ void dag_parse_append_variable(struct lexer_book *bk, int nodeid, struct dag_nod
 {
 	struct dag_lookup_set      sd = { bk->d, NULL, NULL, NULL };
 	struct dag_variable_value *vd = dag_lookup(name, &sd);
-	
+
 	struct dag_variable_value *v;
 	if(n)
-	{ 
+	{
 		v = dag_get_variable_value(name, n->variables, nodeid);
 		if(v)
 		{
 			dag_variable_value_append_or_create(v, value);
 		}
 		else
-		{ 
+		{
 			char *new_value;
 			if(vd)
-			{ 
+			{
 				new_value = string_format("%s %s", vd->value, value);
 			}
 			else
