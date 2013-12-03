@@ -207,7 +207,7 @@ struct dag_variable {
 
 struct dag_variable_value {
 	int   nodeid;                           /* The nodeid of the rule to which
-											   this value binding takes effect. */
+	                                           this value binding takes effect. */
 	int   size;                             /* memory size allocated for value */
 	int   len;                              /* records strlen(value) */
 	char *value;
