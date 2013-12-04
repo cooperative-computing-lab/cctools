@@ -633,6 +633,8 @@ void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
 	 *
 	 */
 	fprintf(d->logfile, "%" PRIu64 " %d %d %d %d %d %d %d %d %d\n", timestamp_get(), n->nodeid, newstate, n->jobid, d->node_states[0], d->node_states[1], d->node_states[2], d->node_states[3], d->node_states[4], d->nodeid_counter);
+
+	fsync(fileno(d->logfile));
 }
 
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label)
