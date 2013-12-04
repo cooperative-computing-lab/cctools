@@ -66,7 +66,6 @@ void work_queue_resources_send( struct link *master, struct work_queue_resources
 	work_queue_resource_send(master, &r->disk,    "disk",   stoptime);
 	work_queue_resource_send(master, &r->memory,  "memory", stoptime);
 	work_queue_resource_send(master, &r->gpus,    "gpus",   stoptime);
-    sleep(20);
 	work_queue_resource_send(master, &r->cores,   "cores",  stoptime);
 }
 
