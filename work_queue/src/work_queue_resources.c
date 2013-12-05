@@ -63,19 +63,19 @@ void work_queue_resources_send( struct link *master, struct work_queue_resources
 {
 	debug(D_WQ, "Sending resource description to master:");
 	work_queue_resource_send(master, &r->workers, "workers",stoptime);
-	work_queue_resource_send(master, &r->cores,   "cores",  stoptime);
 	work_queue_resource_send(master, &r->disk,    "disk",   stoptime);
 	work_queue_resource_send(master, &r->memory,  "memory", stoptime);
 	work_queue_resource_send(master, &r->gpus,    "gpus",   stoptime);
+	work_queue_resource_send(master, &r->cores,   "cores",  stoptime);
 }
 
 void work_queue_resources_debug( struct work_queue_resources *r )
 {
 	work_queue_resource_debug(&r->workers, "workers");
-	work_queue_resource_debug(&r->cores,   "cores");
 	work_queue_resource_debug(&r->disk,    "disk");
 	work_queue_resource_debug(&r->memory,  "memory");
 	work_queue_resource_debug(&r->gpus,    "gpus");
+	work_queue_resource_debug(&r->cores,   "cores");
 }
 
 void work_queue_resources_clear( struct work_queue_resources *r )
@@ -94,10 +94,10 @@ static void work_queue_resource_add( struct work_queue_resource *total, struct w
 void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r )
 {
 	work_queue_resource_add(&total->workers, &r->workers);
-	work_queue_resource_add(&total->cores,   &r->cores);
 	work_queue_resource_add(&total->memory,  &r->memory);
 	work_queue_resource_add(&total->disk,    &r->disk);
 	work_queue_resource_add(&total->gpus,    &r->gpus);
+	work_queue_resource_add(&total->cores,   &r->cores);
 }
 
 void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct nvpair *nv )
