@@ -1706,6 +1706,7 @@ int pfs_table::socket( int domain, int type, int protocol )
 
 	rfd = ::socket(domain,type,protocol);
 	if(rfd>=0) {
+		debug(D_DEBUG, "created socket with file descriptor %d", rfd);
 		::fcntl(rfd,F_SETFL,O_NONBLOCK);
 		result = find_empty(0);
 		pointers[result] = new pfs_pointer(pfs_file_bootstrap(rfd,"socket"),O_RDWR,0777);
