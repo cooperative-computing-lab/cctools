@@ -3093,15 +3093,18 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			tracer_args_set(p->tracer,p->syscall,p->syscall_args,TRACER_ARGS_MAX);
 			p->syscall_args_changed = 0;
 		}
+
 		if(p->syscall_dummy) {
 			tracer_result_set(p->tracer,p->syscall_result);
 			p->syscall_dummy = 0;
-			debug(D_SYSCALL,"= %"PRId64" %s",p->syscall_result,p->syscall_result<0 ? strerror(-p->syscall_result) : "" );
+			if (p->syscall_result >= 0)
+				debug(D_SYSCALL, "= %"PRId64" [%s]",p->syscall_result,tracer_syscall_name(p->tracer,p->syscall));
+			else
+				debug(D_SYSCALL, "= %"PRId64" %s [%s]",p->syscall_result,strerror(-p->syscall_result),tracer_syscall_name(p->tracer,p->syscall));
 		} else {
-			debug(D_SYSCALL,"= ");
+			debug(D_SYSCALL,"= [%s]",tracer_syscall_name(p->tracer,p->syscall));
 		}
 	}
-
 }
 
 /*

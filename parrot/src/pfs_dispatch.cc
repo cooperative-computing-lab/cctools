@@ -3317,12 +3317,14 @@ void decode_syscall( struct pfs_process *p, int entering )
 		if(p->syscall_dummy) {
 			tracer_result_set(p->tracer,p->syscall_result);
 			p->syscall_dummy = 0;
-			debug(D_SYSCALL,"= %d %s",(int)p->syscall_result,p->syscall_result<0 ? strerror(-p->syscall_result) : "" );
+			if (p->syscall_result >= 0)
+				debug(D_SYSCALL, "= %"PRId64" [%s]",p->syscall_result,tracer_syscall_name(p->tracer,p->syscall));
+			else
+				debug(D_SYSCALL, "= %"PRId64" %s [%s]",p->syscall_result,strerror(-p->syscall_result),tracer_syscall_name(p->tracer,p->syscall));
 		} else {
-			debug(D_SYSCALL,"= ");
+			debug(D_SYSCALL,"= [%s]",tracer_syscall_name(p->tracer,p->syscall));
 		}
 	}
-
 }
 
 /*

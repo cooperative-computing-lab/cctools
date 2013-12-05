@@ -41,7 +41,12 @@ extern "C" {
 #define ENOATTR  EINVAL
 #endif
 
-#define END debug(D_LOCAL,"= %d %s",(int)result,((result>=0) ? "" : strerror(errno)) ); return result;
+#define END \
+	if (result >= 0)\
+		debug(D_LOCAL, "= %d [%s]",(int)result,__func__);\
+	else\
+		debug(D_LOCAL, "= %d %s [%s]",(int)result,strerror(errno),__func__);\
+	return result;
 
 extern "C" ssize_t pread(int fd, void *buf, size_t count, off_t  offset);
 extern "C" ssize_t pwrite(int  fd,  const  void  *buf, size_t count, off_t offset);

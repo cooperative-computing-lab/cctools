@@ -41,12 +41,19 @@ recently-signalled child process.
 
 #define BEGIN \
 	pfs_ssize_t result;\
-	retry:\
+	retry:
 
 #define END \
-	debug(D_LIBCALL,"= %d %s",(int)result,((result>=0) ? "" : strerror(errno)) ); \
-	if(result<0 && errno==EINTR) goto retry;\
-	if(result<0 && errno==0) { debug(D_DEBUG,"whoops, converting errno=0 to ENOENT"); errno = ENOENT; }\
+	if (result >= 0)\
+		debug(D_LIBCALL, "= %d [%s]",(int)result,__func__);\
+	else\
+		debug(D_LIBCALL, "= %d %s [%s]",(int)result,strerror(errno),__func__);\
+	if(result<0 && errno==EINTR)\
+		goto retry;\
+	if(result<0 && errno==0) {\
+		debug(D_DEBUG,"whoops, converting errno=0 to ENOENT");\
+		errno = ENOENT;\
+	}\
 	return result;
 
 int pfs_open( const char *path, int flags, mode_t mode )
