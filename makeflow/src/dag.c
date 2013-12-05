@@ -604,6 +604,8 @@ void dag_count_states(struct dag *d)
 
 void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
 {
+	static time_t last_fsync = 0;
+
 	debug(D_DEBUG, "node %d %s -> %s\n", n->nodeid, dag_node_state_name(n->state), dag_node_state_name(newstate));
 
 	if(d->node_states[n->state] > 0) {
@@ -634,7 +636,17 @@ void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
 	 */
 	fprintf(d->logfile, "%" PRIu64 " %d %d %d %d %d %d %d %d %d\n", timestamp_get(), n->nodeid, newstate, n->jobid, d->node_states[0], d->node_states[1], d->node_states[2], d->node_states[3], d->node_states[4], d->nodeid_counter);
 
-	fsync(fileno(d->logfile));
+	if(time(NULL) - last_fsync > 60) {
+		/* We use fsync here to gurantee that the log is syncronized in AFS,
+		 * even if something goes wrong with the node running makeflow. Using
+		 * fsync comes with an overhead, so we do not fsync more than once per
+		 * minute. This avoids hammering AFS, and reduces the overhead for
+		 * short running tasks, while having the desired effect for long
+		 * running workflows. */
+
+		fsync(fileno(d->logfile)); 
+		last_fsync = time(NULL);
+	}
 }
 
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label)
