@@ -368,7 +368,10 @@ public:
 		} else {
 			result = 0;
 		}
-		debug(D_LOCAL,"= %d %s",fd,(fd>=0) ? "" : strerror(errno));
+		if (result)
+			debug(D_LOCAL, "= %d [%s]",(int)fd,__func__);
+		else
+			debug(D_LOCAL, "= %d %s [%s]",errno,strerror(errno),__func__);
 		return result;
 	}
 
@@ -394,7 +397,10 @@ public:
 		} else {
 			result = 0;
 		}
-		debug(D_LOCAL,"= %s",result ? "Success" : strerror(errno));
+		if (result)
+			debug(D_LOCAL, "= 0 [%s]",__func__);
+		else
+			debug(D_LOCAL, "= %d %s [%s]",errno,strerror(errno),__func__);
 		return result;
 	}
 
