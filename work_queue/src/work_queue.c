@@ -1304,6 +1304,8 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	char request[WORK_QUEUE_LINE_MAX];
 	struct link *l = target->link;
 	
+	strcpy(target->hostname,"QUEUE_STATUS");
+
 	if(!sscanf(line, "%[^_]_status", request) == 1) {
 		return -1;
 	}
@@ -1424,7 +1426,10 @@ static void handle_worker(struct work_queue *q, struct link *l)
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		keep_worker = 0;
 	} else if(result < 0){
-		debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
+		if(!strcmp(w->hostname, "QUEUE_STATUS"))
+			debug(D_WQ, "Work Queue Status worker disconnected (%s)", w->addrport);
+		else
+			debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
 		keep_worker = 0;
 	} // otherwise do nothing..message was consumed and processed in recv_worker_msg()
 
