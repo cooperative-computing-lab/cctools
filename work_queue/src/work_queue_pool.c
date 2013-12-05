@@ -450,7 +450,7 @@ struct pool_config *get_pool_config(const char *path) {
 			if(!strcmp(value, "yes")) {
 				pc->capacity_mode = POOL_CONFIG_IGNORE_CAPACITY;
 			}
-			if(!strcmp(value, "no")) {
+			else if(!strcmp(value, "no")) {
 				pc->capacity_mode = POOL_CONFIG_USE_CAPACITY;
 			}
 			else {
