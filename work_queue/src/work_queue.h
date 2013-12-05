@@ -351,6 +351,13 @@ indicating how many from each worker pool are attached.
 */
 char * work_queue_get_worker_summary( struct work_queue *q );
 
+/** Turn on worker waiting where the master waits for the given number of
+ * workers to connect before dispatching tasks. 
+@param q A work queue object.
+@param worker The number of workers to wait before tasks are dispatched.
+*/
+void work_queue_activate_worker_waiting(struct work_queue *q, int resources);
+
 /** Turn on or off fast abort functionality for a given queue.
 @param q A work queue object.
 @param multiplier The multiplier of the average task time at which point to abort; if negative (and by default) fast_abort is deactivated.

@@ -126,6 +126,7 @@ struct work_queue {
 	int worker_selection_algorithm;
 	int task_ordering;
 	int process_pending_check;
+	int workers_to_wait;
 
 	int short_timeout;		// timeout to send/recv a brief message from worker
 	int long_timeout;		// timeout to send/recv a brief message from a foreman
@@ -2912,6 +2913,7 @@ struct work_queue *work_queue_create(int port)
 	q->worker_selection_algorithm = wq_option_scheduler;
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	q->process_pending_check = 0;
+	q->workers_to_wait = 0;
 
 	q->short_timeout = 5;
 	q->long_timeout = 3600;
@@ -3018,6 +3020,11 @@ int work_queue_port(struct work_queue *q)
 	} else {
 		return 0;
 	}
+}
+
+void work_queue_activate_worker_waiting(struct work_queue *q, int value)
+{
+	q->workers_to_wait = value;
 }
 
 void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
@@ -3299,8 +3306,16 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			process_available_results(q, w, -1);
 		}
 		
-		// Start tasks on ready workers
-		start_tasks(q);
+		if(q->workers_to_wait <= 0) {	
+			//Don't have to wait for any resources; start tasks on ready workers
+			start_tasks(q);
+		} else {
+			if(known_workers(q) >= q->workers_to_wait) {
+				//We have the resources we have been waiting for; start tasks on ready workers
+				start_tasks(q);
+				q->workers_to_wait = 0; //disable it after we started dipatching tasks
+			}
+		}
 
 		// If any worker has sent a results message, retrieve the output files.
 		if(itable_size(q->finished_tasks)) {
