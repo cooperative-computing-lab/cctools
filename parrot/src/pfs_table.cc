@@ -455,6 +455,8 @@ int pfs_table::pipe( int *fds )
 
 	result = ::pipe(rfds);
 	if(result>=0) {
+		debug(D_DEBUG, "created pipe with file descriptors [%d,%d]", rfds[0], rfds[1]);
+
 		fds[0] = find_empty(0);
 		fds[1] = find_empty(fds[0]+1);
 
