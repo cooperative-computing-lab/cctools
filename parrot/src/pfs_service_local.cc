@@ -393,7 +393,7 @@ public:
 			closedir(dir);
 		} else {
 			result = 0;
-       		}
+		}
 		debug(D_LOCAL,"= %s",result ? "Success" : strerror(errno));
 		return result;
 	}
