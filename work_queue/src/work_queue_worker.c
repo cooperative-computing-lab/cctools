@@ -1894,8 +1894,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
 	fprintf(stdout, " %-30s Set the percent chance a worker will decide to shut down every minute.\n", "--volatility=<chance>");
-	fprintf(stdout, " %-30s Set the maximum bandwidth the foreman will consume in Mbps. (default=unlimited)\n", "--bandwidth=<mbps>");
-	fprintf(stdout, " %-30s take.\n", "");
+	fprintf(stdout, " %-30s Set the maximum bandwidth the foreman will consume in bytes per second. Example: 100M for 100MBps. (default=unlimited)\n", "--bandwidth=<Bps>");
 	fprintf(stdout, " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
 	fprintf(stdout, " %-30s worker automatically measure. (default=%"PRId64")\n", "", manual_cores_option);
 	fprintf(stdout, " %-30s Set the number of GPUs reported by this worker. (default=0)\n", "--gpus=<n>");

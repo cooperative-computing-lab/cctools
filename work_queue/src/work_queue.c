@@ -651,7 +651,7 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 				
 	timestamp_t effective_stoptime = 0;
 	if(q->bandwidth) {
-		effective_stoptime = ((length * 8)/q->bandwidth)*1000000 + timestamp_get();
+		effective_stoptime = (length/q->bandwidth)*1000000 + timestamp_get();
 	}
 
 	// Choose the actual stoptime and transfer the data.
@@ -1066,7 +1066,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 	
 	if(q->bandwidth) {
-		effective_stoptime = ((output_length * 8)/q->bandwidth)*1000000 + timestamp_get();
+		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
 	}
 
 	if(n >= 3) {
@@ -1518,7 +1518,7 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	}
 	
 	if(q->bandwidth) {
-		effective_stoptime = ((length * 8)/q->bandwidth)*1000000 + timestamp_get();
+		effective_stoptime = (length/q->bandwidth)*1000000 + timestamp_get();
 	}
 	
 	stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
