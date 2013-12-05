@@ -1304,7 +1304,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	char request[WORK_QUEUE_LINE_MAX];
 	struct link *l = target->link;
 	
-    strcpy(target->hostname,"QUEUE_STATUS");
+	strcpy(target->hostname,"QUEUE_STATUS");
 
 	if(!sscanf(line, "%[^_]_status", request) == 1) {
 		return -1;
