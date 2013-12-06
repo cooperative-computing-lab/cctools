@@ -672,7 +672,7 @@ CHIRP_FILE *chirp_acl_open( const char *dirname )
 		}
 
 		// Stop if acl inheriting not turned on
-		if(!acl_inherit_default_mode) break;	
+		if(!acl_inherit_default_mode) break;
 
 		// Stop if already at the root.
 		if(!strcmp(dirpath,"/")) break;
