@@ -32,6 +32,7 @@ See the file COPYING for details.
 
 static int read_only_mode = 0;
 static char default_acl[PATH_MAX];
+static int acl_inherit_default_mode = 0;
 
 extern const char *chirp_super_user;
 
@@ -45,11 +46,9 @@ void chirp_acl_default(const char *path)
 	strcpy(default_acl, path);
 }
 
-static void make_acl_name(const char *filename, int get_parent, char *aclname)
+void chirp_acl_inherit_default( int onoff )
 {
-	char tmp[CHIRP_PATH_MAX];
-	sprintf(tmp, "%s/%s", filename, CHIRP_ACL_BASE_NAME);
-	path_collapse(tmp, aclname, 1);
+	acl_inherit_default_mode = onoff;
 }
 
 static int ticket_read(char *ticket_filename, struct chirp_ticket *ct)
@@ -587,15 +586,11 @@ int chirp_acl_set(const char *dirname, const char *subject, int flags, int reset
 	if(reset_acl) {
 		aclfile = cfs_fopen("/dev/null", "r");
 	} else {
-		aclfile = cfs_fopen(aclname, "r");
+		aclfile = chirp_acl_open(dirname);
 
 		/* If the acl never existed, then we can simply create it. */
 		if(!aclfile && errno == ENOENT) {
-			if(strlen(default_acl)) {
-				aclfile = cfs_fopen(default_acl, "r");
-			} else {
-				aclfile = cfs_fopen("/dev/null", "r");	/* use local... */
-			}
+			aclfile = cfs_fopen("/dev/null", "r");	/* use local... */
 		}
 	}
 
@@ -649,15 +644,50 @@ int chirp_acl_set(const char *dirname, const char *subject, int flags, int reset
 	return result;
 }
 
-CHIRP_FILE *chirp_acl_open(const char *dirname)
-{
-	char aclname[CHIRP_PATH_MAX];
-	CHIRP_FILE *file;
+/*
+Open the ACL file that is effective for the given directory name.
+If the ACL file does not exist, then:
+- If a default ACL is configured, open that instead.
+- If ACL inheritance is configured, search parent directories.
+*/
 
-	make_acl_name(dirname, 0, aclname);
-	file = cfs_fopen(aclname, "r");
-	if(!file && strlen(default_acl))
-		file = cfs_fopen(default_acl, "r");
+CHIRP_FILE *chirp_acl_open( const char *dirname )
+{
+	char dirpath[CHIRP_PATH_MAX];
+	char aclpath[CHIRP_PATH_MAX];
+	CHIRP_FILE *file=0;
+
+	strcpy(dirpath,dirname);
+
+	while(1) {
+		sprintf(aclpath,"%s/%s",dirpath,CHIRP_ACL_BASE_NAME);
+
+		// Open the file and return if found
+		file = cfs_fopen(aclpath, "r");
+		if(file) return file;
+
+		// Use the default acl, if it is enabled.
+		if(strlen(default_acl)) {
+			return cfs_fopen(default_acl, "r");
+		}
+
+		// Stop if acl inheriting not turned on
+		if(!acl_inherit_default_mode) break;	
+
+		// Stop if already at the root.
+		if(!strcmp(dirpath,"/")) break;
+
+		// Look for the previous directory element.
+		char *slash = strrchr(dirpath,'/');
+
+		// If not found, replace with the root.
+		if(slash==dirpath || slash==0) {
+			strcpy(dirpath,"/");
+		} else {
+			*slash = 0;
+		}
+	}
+
 	return file;
 }
 

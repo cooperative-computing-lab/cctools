@@ -23,11 +23,12 @@ SECTION(OPTIONS)
 
 OPTIONS_BEGIN
 OPTION_TRIPLET(-A, default-acl,file)Use this file as the default ACL.
+OPTION_ITEM(--inherit-default-acl) Directories without an ACL inherit from parent directories.
 OPTION_TRIPLET(-a, auth,method)Enable this authentication method.
 OPTION_ITEM(`-b, --background')Run as daemon.
 OPTION_TRIPLET(-B, pid-file,file)Write PID to file.
 OPTION_ITEM(`-C, --no-core-dump')Do not create a core dump, even due to a crash.
-OPTION_TRIPLET(-c, chalenge-dir,dir)Challenge directory for unix filesystem authentication.
+OPTION_TRIPLET(-c, challenge-dir,dir)Challenge directory for unix filesystem authentication.
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for this sybsystem
 OPTION_ITEM(`-E, --parent-death')Exit if parent process dies.
 OPTION_TRIPLET(-e, parent-check,time)Check for presence of parent at this interval. (default is 300s)
