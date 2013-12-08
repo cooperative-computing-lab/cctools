@@ -661,16 +661,10 @@ CHIRP_FILE *chirp_acl_open( const char *dirname )
 	while(1) {
 		char aclpath[CHIRP_PATH_MAX];
 
-		snprintf(aclpath,sizeof(aclpath),"%s/%s",dirpath,CHIRP_ACL_BASE_NAME);
-
 		// Open the file and return if found
+		snprintf(aclpath,sizeof(aclpath),"%s/%s",dirpath,CHIRP_ACL_BASE_NAME);
 		file = cfs_fopen(aclpath, "r");
 		if(file) return file;
-
-		// Use the default acl, if it is enabled.
-		if(strlen(default_acl)) {
-			return cfs_fopen(default_acl, "r");
-		}
 
 		// Stop if acl inheriting not turned on
 		if(!acl_inherit_default_mode) break;
@@ -689,7 +683,7 @@ CHIRP_FILE *chirp_acl_open( const char *dirname )
 		}
 	}
 
-	return file;
+	return strlen(default_acl) ? cfs_fopen(default_acl, "r") : NULL;
 }
 
 int chirp_acl_read(CHIRP_FILE * aclfile, char *subject, int *flags)
