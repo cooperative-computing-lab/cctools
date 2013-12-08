@@ -654,12 +654,12 @@ If the ACL file does not exist, then:
 CHIRP_FILE *chirp_acl_open( const char *dirname )
 {
 	char dirpath[CHIRP_PATH_MAX];
-	CHIRP_FILE *file=0;
 
 	strcpy(dirpath,dirname);
 
 	while(1) {
 		char aclpath[CHIRP_PATH_MAX];
+		CHIRP_FILE *file;
 
 		// Open the file and return if found
 		snprintf(aclpath,sizeof(aclpath),"%s/%s",dirpath,CHIRP_ACL_BASE_NAME);
