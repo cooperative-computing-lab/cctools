@@ -660,7 +660,8 @@ CHIRP_FILE *chirp_acl_open( const char *dirname )
 
 	while(1) {
 		char aclpath[CHIRP_PATH_MAX];
-		sprintf(aclpath,"%s/%s",dirpath,CHIRP_ACL_BASE_NAME);
+
+		snprintf(aclpath,sizeof(aclpath),"%s/%s",dirpath,CHIRP_ACL_BASE_NAME);
 
 		// Open the file and return if found
 		file = cfs_fopen(aclpath, "r");
