@@ -13,6 +13,7 @@ sand_filter_debug=sand.filter.debug
 sand_sw_debug=sand.sw.debug
 sand_banded_debug=sand.banded.debug
 sand_port=sand.port
+sand_pid=sand.pid
 
 prepare()
 {
@@ -35,6 +36,7 @@ run()
 		echo "Starting filter master..."
 		rm -f "$sand_port"
 		sand_filter_master -s 10 -Z "$sand_port" -d all -o "$sand_filter_debug" "$comp" "$cand" &
+		echo $! >> "$sand_pid"
 		run_local_worker "$sand_port" "$worker_log"
 		wait
 		require_identical_files "$cand" sand_sanity/test.cand.right
@@ -42,6 +44,7 @@ run()
 		echo "Starting Smith-Waterman assembly..."
 		rm -f "$sand_port"
 		sand_align_master -d all -o "$sand_sw_debug" -Z "$sand_port" -e "-a sw" sand_align_kernel "$cand" "$comp" "$sw_ovl" &
+		echo $! >> "$sand_pid"
 		run_local_worker "$sand_port" "$worker_log"
 		wait
 		require_identical_files "$sw_ovl" sand_sanity/test.sw.right
@@ -49,6 +52,7 @@ run()
 		echo "Starting banded assembly..."
 		rm -f "$sand_port"
 		sand_align_master -d all -o "$sand_banded_debug" -Z "$sand_port" -e "-a banded" sand_align_kernel "$cand" "$comp" "$banded_ovl" &
+		echo $! >> "$sand_pid"
 		run_local_worker "$sand_port" "$worker_log"
 		wait
 		require_identical_files "$banded_ovl" sand_sanity/test.banded.right
@@ -60,7 +64,10 @@ run()
 
 clean()
 {
-    rm -f "$comp" "$cand" "$sw_ovl" "$banded_ovl" "$sand_filter_debug" "$sand_sw_debug" "$sand_banded_debug" "$sand_port" "$worker_log"
+	for pid in $(cat "$sand_pid"); do
+		kill "$pid"
+	done
+	rm -f "$comp" "$cand" "$sw_ovl" "$banded_ovl" "$sand_filter_debug" "$sand_sw_debug" "$sand_banded_debug" "$sand_port" "$worker_log" "$sand_pid"
 	return 0
 }
 
