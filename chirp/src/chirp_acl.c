@@ -53,20 +53,23 @@ void chirp_acl_inherit_default( int onoff )
 
 static int ticket_read(char *ticket_filename, struct chirp_ticket *ct)
 {
+	buffer_t B;
 	CHIRP_FILE *tf = cfs_fopen(ticket_filename, "r");
 	if(!tf)
 		return 0;
-	char *b;
-	size_t l;
-	if(!cfs_freadall(tf, &b, &l)) {
+
+	buffer_init(&B);
+	buffer_abortonfailure(&B, 1);
+
+	if(!cfs_freadall(tf, &B)) {
 		cfs_fclose(tf);
 		return 0;
 	}
 	cfs_fclose(tf);
 
-	int result = chirp_ticket_read(b, ct);
+	int result = chirp_ticket_read(buffer_tostring(&B, NULL), ct);
 
-	free(b);
+	buffer_free(&B);
 
 	return result;
 }
@@ -584,13 +587,13 @@ int chirp_acl_set(const char *dirname, const char *subject, int flags, int reset
 	sprintf(newaclname, "%s/%s.%d", dirname, CHIRP_ACL_BASE_NAME, (int) getpid());
 
 	if(reset_acl) {
-		aclfile = cfs_fopen("/dev/null", "r");
+		aclfile = cfs_fopen_local("/dev/null", "r");
 	} else {
 		aclfile = chirp_acl_open(dirname);
 
 		/* If the acl never existed, then we can simply create it. */
 		if(!aclfile && errno == ENOENT) {
-			aclfile = cfs_fopen("/dev/null", "r");	/* use local... */
+			aclfile = cfs_fopen_local("/dev/null", "r");	/* use local... */
 		}
 	}
 
@@ -683,7 +686,7 @@ CHIRP_FILE *chirp_acl_open( const char *dirname )
 		}
 	}
 
-	return strlen(default_acl) ? cfs_fopen(default_acl, "r") : NULL;
+	return strlen(default_acl) ? cfs_fopen_local(default_acl, "r") : NULL;
 }
 
 int chirp_acl_read(CHIRP_FILE * aclfile, char *subject, int *flags)
