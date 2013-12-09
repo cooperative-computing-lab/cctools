@@ -32,15 +32,22 @@ See the file COPYING for details.
 struct chirp_filesystem *cfs = NULL;
 
 struct CHIRP_FILE {
-	INT64_T fd;
-	INT64_T offset;
-	buffer_t B;
-	char read[CHIRP_FILESYSTEM_BUFFER];
-	INT64_T read_n;
-	int error;
+	enum {
+	  LOCAL,
+	  CFS,
+	} type;
+	union {
+		struct {
+			INT64_T fd;
+			INT64_T offset;
+			buffer_t B;
+			char read[CHIRP_FILESYSTEM_BUFFER];
+			INT64_T read_n;
+			int error;
+		} cfile;
+		FILE *lfile;
+	} f;
 };
-
-static CHIRP_FILE CHIRP_FILE_NULL;
 
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 struct chirp_filesystem *cfs_lookup(const char *url)
@@ -79,9 +86,6 @@ CHIRP_FILE *cfs_fopen(const char *path, const char *mode)
 	INT64_T fd;
 	INT64_T flags = 0;
 
-	if(strcmp(path, "/dev/null") == 0)
-		return &CHIRP_FILE_NULL;
-
 	if(strchr(mode, '+')) {
 		errno = ENOTSUP;
 		return 0;
@@ -103,12 +107,29 @@ CHIRP_FILE *cfs_fopen(const char *path, const char *mode)
 		return NULL;
 
 	file = xxmalloc(sizeof(CHIRP_FILE));
-	buffer_init(&file->B);
-	buffer_abortonfailure(&file->B, 1);
-	file->fd = fd;
-	file->offset = file->read_n = 0;
-	file->error = 0;
-	memset(file->read, '\0', sizeof(file->read));
+	file->type = CFS;
+	buffer_init(&file->f.cfile.B);
+	buffer_abortonfailure(&file->f.cfile.B, 1);
+	file->f.cfile.fd = fd;
+	file->type = CFS;
+	file->f.cfile.offset = file->f.cfile.read_n = 0;
+	file->f.cfile.error = 0;
+	memset(file->f.cfile.read, '\0', sizeof(file->f.cfile.read));
+	return file;
+}
+
+CHIRP_FILE *cfs_fopen_local(const char *path, const char *mode)
+{
+	CHIRP_FILE *file;
+	FILE *lfile;
+
+	lfile = fopen(path, mode);
+	if(lfile == NULL)
+		return NULL;
+
+	file = xxmalloc(sizeof(CHIRP_FILE));
+	file->type = LOCAL;
+	file->f.lfile = lfile;
 	return file;
 }
 
@@ -117,32 +138,32 @@ int cfs_fflush(CHIRP_FILE * file)
 	size_t size;
 	const char *content;
 
-	if(file == &CHIRP_FILE_NULL)
-		return 0;
+	if(file->type == LOCAL)
+		return fflush(file->f.lfile);
 
-	content = buffer_tostring(&file->B, &size);
+	content = buffer_tostring(&file->f.cfile.B, &size);
 
-	while((INT64_T) size > file->offset) {	/* finish all writes */
-		int w = cfs->pwrite(file->fd, content, size, file->offset);
+	while((INT64_T) size > file->f.cfile.offset) {	/* finish all writes */
+		int w = cfs->pwrite(file->f.cfile.fd, content, size, file->f.cfile.offset);
 		if(w == -1) {
-			file->error = EIO;
+			file->f.cfile.error = EIO;
 			return EOF;
 		}
-		file->offset += w;
+		file->f.cfile.offset += w;
 	}
 	return 0;
 }
 
 int cfs_fclose(CHIRP_FILE * file)
 {
+	if(file->type == LOCAL)
+		return fclose(file->f.lfile);
+
 	if(cfs_fflush(file) != 0)
 		return EOF;
 
-	if(file == &CHIRP_FILE_NULL)
-		return 0;
-
-	buffer_free(&file->B);
-	cfs->close(file->fd);
+	buffer_free(&file->f.cfile.B);
+	cfs->close(file->f.cfile.fd);
 	free(file);
 
 	return 0;
@@ -152,18 +173,21 @@ int cfs_fclose(CHIRP_FILE * file)
 void cfs_fprintf(CHIRP_FILE * file, const char *format, ...)
 {
 	va_list va;
-	if(file == &CHIRP_FILE_NULL)
-		return;
 	va_start(va, format);
-	buffer_vprintf(&file->B, format, va);
+	if(file->type == LOCAL)
+		vfprintf(file->f.lfile, format, va);
+	else
+		buffer_vprintf(&file->f.cfile.B, format, va);
 	va_end(va);
 }
 
 size_t cfs_fwrite(const void *ptr, size_t size, size_t nitems, CHIRP_FILE * file)
 {
 	size_t bytes = 0, nbytes = size * nitems;
+	if(file->type == LOCAL)
+		return fwrite(ptr, size, nitems, file->f.lfile);
 	for(; bytes < nbytes; bytes++)
-		buffer_printf(&file->B, "%c", (int) (((const char *) ptr)[bytes]));
+		buffer_printf(&file->f.cfile.B, "%c", (int) (((const char *) ptr)[bytes]));
 	return nbytes;
 }
 
@@ -172,14 +196,17 @@ size_t cfs_fread(void *ptr, size_t size, size_t nitems, CHIRP_FILE * file)
 {
 	size_t nitems_read = 0;
 
+	if(file->type == LOCAL)
+		return fread(ptr, size, nitems, file->f.lfile);
+
 	if(size == 0 || nitems == 0)
 		return 0;
 
 	while(nitems_read < nitems) {
-		INT64_T t = cfs->pread(file->fd, ptr, size, file->offset);
+		INT64_T t = cfs->pread(file->f.cfile.fd, ptr, size, file->f.cfile.offset);
 		if(t == -1 || t == 0)
 			return nitems_read;
-		file->offset += t;
+		file->f.cfile.offset += t;
 		ptr = (char *) ptr + size;	//Previously void arithmetic!
 		nitems_read++;
 	}
@@ -189,26 +216,26 @@ size_t cfs_fread(void *ptr, size_t size, size_t nitems, CHIRP_FILE * file)
 char *cfs_fgets(char *s, int n, CHIRP_FILE * file)
 {
 	char *current = s;
-	INT64_T i, empty = file->read_n == 0;
+	INT64_T i, empty = file->f.cfile.read_n == 0;
 
-	if(file == &CHIRP_FILE_NULL)
-		return NULL;
+	if(file->type == LOCAL)
+		return fgets(s, n, file->f.lfile);
 
-	for(i = 0; i < file->read_n; i++)
-		if(i + 2 >= n || file->read[i] == '\n') {	/* we got data now */
-			memcpy(s, file->read, i + 1);
+	for(i = 0; i < file->f.cfile.read_n; i++)
+		if(i + 2 >= n || file->f.cfile.read[i] == '\n') {	/* we got data now */
+			memcpy(s, file->f.cfile.read, i + 1);
 			s[i + 1] = '\0';
-			memmove(file->read, file->read + i + 1, (file->read_n -= i + 1));
+			memmove(file->f.cfile.read, file->f.cfile.read + i + 1, (file->f.cfile.read_n -= i + 1));
 			return s;
 		}
-	memcpy(current, file->read, i);
+	memcpy(current, file->f.cfile.read, i);
 	current += i;
 	n -= i;
-	file->read_n = 0;
+	file->f.cfile.read_n = 0;
 
-	i = cfs->pread(file->fd, file->read, CHIRP_FILESYSTEM_BUFFER - 1, file->offset);
+	i = cfs->pread(file->f.cfile.fd, file->f.cfile.read, CHIRP_FILESYSTEM_BUFFER - 1, file->f.cfile.offset);
 	if(i == -1) {
-		file->error = errno;
+		file->f.cfile.error = errno;
 		return 0;
 	} else if(i == 0 && empty) {
 		return NULL;
@@ -216,8 +243,8 @@ char *cfs_fgets(char *s, int n, CHIRP_FILE * file)
 		return s;
 	}
 
-	file->read_n += i;
-	file->offset += i;
+	file->f.cfile.read_n += i;
+	file->f.cfile.offset += i;
 
 	if(cfs_fgets(current, n, file) == NULL)	/* some error */
 		return NULL;
@@ -227,7 +254,10 @@ char *cfs_fgets(char *s, int n, CHIRP_FILE * file)
 
 int cfs_ferror(CHIRP_FILE * file)
 {
-	return file->error;
+	if(file->type == LOCAL)
+		return ferror(file->f.lfile);
+	else
+		return file->f.cfile.error;
 }
 
 /* copy pasta from dttools/src/create_dir.c */
@@ -312,26 +342,16 @@ int cfs_delete_dir(const char *path)
 	return cfs->rmdir(path) == 0 ? result : 0;
 }
 
-int cfs_freadall(CHIRP_FILE * f, char **s, size_t * l)
+int cfs_freadall(CHIRP_FILE * f, buffer_t *B)
 {
-	char *buffer = xxrealloc(NULL, 4096);
-	INT64_T n;
-	*l = 0;
-	while((n = cfs->pread(f->fd, buffer + (*l), sizeof(char) * 4096, f->offset)) > 0) {
-		f->offset += n;
-		*l += n;
-		buffer = xxrealloc(buffer, (*l) + 4096);
-		*(buffer + (*l)) = '\0';	/* NUL terminator... */
+	size_t n;
+	char buf[BUFSIZ];
+
+	while ((n = cfs_fread(buf, sizeof(char), sizeof(buf), f)) > 0) {
+		buffer_putlstring(B, buf, n);
 	}
-	if(n < 0) {
-		free(buffer);
-		*s = NULL;
-		*l = 0;
-		return 0;
-	} else {
-		*s = buffer;
-		return 1;
-	}
+
+	return cfs_ferror(f) ? 0 : 1;
 }
 
 static int do_stat(const char *filename, struct chirp_stat *buf)

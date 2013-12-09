@@ -1729,6 +1729,8 @@ static void install_handler(int sig, void (*handler) (int sig))
 	sigaction(sig, &s, 0);
 }
 
+#define LONG_OPT_INHERIT_DEFAULT_ACL 255
+
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "use: %s [options]\n", cmd);
@@ -1742,6 +1744,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "\n");
 	fprintf(stdout, "Less common options are:\n");
 	fprintf(stdout, " %-30s Use this file as the default ACL.\n", "-A,--default-acl=<file>");
+	fprintf(stdout, " %-30s Directories without an ACL inherit from parent directories.\n","   --inherit-default-acl");
 	fprintf(stdout, " %-30s Enable this authentication method.\n", "-a,--auth=<method>");
 	fprintf(stdout, " %-30s Write process identifier (PID) to file.\n", "-B,--pid-file=<file>");
 	fprintf(stdout, " %-30s Run as a daemon.\n", "-b,--background");
@@ -1786,6 +1789,7 @@ int main(int argc, char *argv[])
 		{"debug", required_argument, 0, 'd'},
 		{"debug-file", required_argument, 0, 'o'},
 		{"default-acl", required_argument, 0, 'A'},
+		{"inherit-default-acl", no_argument, 0, LONG_OPT_INHERIT_DEFAULT_ACL},
 		{"free-space", required_argument, 0, 'F'},
 		{"group-cache-exp", required_argument, 0, 'T'},
 		{"group-url", required_argument, 0, 'G'},
@@ -1960,6 +1964,9 @@ int main(int argc, char *argv[])
 		case 'l':
 			/* not documented, internal testing */
 			sim_latency = atoi(optarg);
+			break;
+		case LONG_OPT_INHERIT_DEFAULT_ACL:
+			chirp_acl_inherit_default(1);
 			break;
 		case 'h':
 		default:

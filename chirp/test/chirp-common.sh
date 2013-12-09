@@ -16,7 +16,7 @@ chirp_start()
 		for ((i = 0; i < 10; i++)); do
 			if [ -s "$pid" -a -s "$port" ]; then
 				hostport="127.0.0.1:$(cat "$port")"
-				unset debug pid port root
+				unset debug pid port
 				return 0
 			fi
 			sleep 1
@@ -27,7 +27,7 @@ chirp_start()
 	fi
 	touch "$debug"
 	cat "$debug"
-	unset debug pid port root
+	unset debug pid port
 	return 1
 }
 

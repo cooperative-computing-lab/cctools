@@ -61,6 +61,7 @@ void chirp_acl_force_readonly();
 void chirp_acl_timeout_set(int t);
 int chirp_acl_timeout_get();
 void chirp_acl_default(const char *aclpath);
+void chirp_acl_inherit_default( int onoff );
 
 int chirp_acl_init_root(const char *path);
 int chirp_acl_init_copy(const char *path);
