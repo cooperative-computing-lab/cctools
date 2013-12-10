@@ -54,6 +54,7 @@ extern "C" {
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -293,14 +294,23 @@ static int iovec_copy_in( struct pfs_process *p, char *buf, struct pfs_kernel_io
 	return pos;
 }
 
-static int iovec_copy_out( struct pfs_process *p, char *buf, struct pfs_kernel_iovec *v, int count )
+static int iovec_copy_out( struct pfs_process *p, void *buf, struct pfs_kernel_iovec *v, int count, size_t total )
 {
-	int i, pos=0;
-	for(i=0;i<count;i++) {
-		tracer_copy_out(p->tracer,&buf[pos],(void*)v[i].iov_base,v[i].iov_len);
-		pos += v[i].iov_len;
+	int i = 0;
+	size_t current = 0;
+
+	while (current < total) {
+		if (v[i].iov_len <= (total-current)) {
+			tracer_copy_out(p->tracer,((char *)buf)+current,v[i].iov_base,v[i].iov_len);
+			current += v[i].iov_len;
+			i += 1;
+		} else {
+			tracer_copy_out(p->tracer,((char *)buf)+current,v[i].iov_base,total-current);
+			current += (total-current);
+			assert(current == total);
+		}
 	}
-	return pos;
+	return current;
 }
 
 /*
@@ -336,7 +346,7 @@ static void decode_readv( struct pfs_process *p, INT64_T entering, INT64_T sysca
 			if(buffer) {
 				result = pfs_read(fd,buffer,size);
 				if(result>=0) {
-					iovec_copy_out(p,buffer,v,count);
+					iovec_copy_out(p,buffer,v,count,result);
 					divert_to_dummy(p,result);
 				} else {
 					if(errno==EAGAIN && !pfs_is_nonblocking(fd)) {
@@ -1448,7 +1458,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				tracer_copy_in(p->tracer,&umsg,POINTER(args[1]),sizeof(umsg));
 
 				/* Build a copy of all of the various sub-pointers */
-
 				if(umsg.msg_name && umsg.msg_namelen>0) {
 					msg.msg_name = xxmalloc(umsg.msg_namelen);
 					msg.msg_namelen = umsg.msg_namelen;
@@ -1482,12 +1491,13 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				/* Do a sendmsg or recvmsg on the data, and copy out if needed */
 
 				if(p->syscall==SYSCALL64_sendmsg) {
+					/* FIXME uvec could be NULL */
 					iovec_copy_in(p,(char*)vec.iov_base,uvec,umsg.msg_iovlen);
 					p->syscall_result = pfs_sendmsg(args[0],&msg,args[2]);
 				} else {
 					p->syscall_result = pfs_recvmsg(args[0],&msg,args[2]);
 					if(p->syscall_result>0) {
-						iovec_copy_out(p,(char*)vec.iov_base,uvec,umsg.msg_iovlen);
+						iovec_copy_out(p,vec.iov_base,uvec,umsg.msg_iovlen,p->syscall_result);
 						if(msg.msg_name && msg.msg_namelen>0) {
 							tracer_copy_out(p->tracer,msg.msg_name,(void*)(umsg.msg_name),msg.msg_namelen);
 						}
@@ -1502,11 +1512,10 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				}
 	
 				/* Delete the msghdr structure */
-
-				if(msg.msg_control) free(msg.msg_control);
-				if(msg.msg_iov)     free(msg.msg_iov->iov_base);
-				if(uvec)            free(uvec);
-				if(msg.msg_name)    free(msg.msg_name);
+				free(msg.msg_control);
+				free(msg.msg_iov->iov_base);
+				free(uvec);
+				free(msg.msg_name);
 
 				if(p->syscall_result>=0) {
 					divert_to_dummy(p,p->syscall_result);
