@@ -1,9 +1,7 @@
 #! /bin/sh
 
 STATUS_FILE=makeflow.status
-PIDWORKER_FILE=worker.pid
 PORT_FILE=makeflow.port
-
 
 prepare()
 {
@@ -27,13 +25,10 @@ run()
 	# wait at most 5 seconds for makeflow to find a port.
 	wait_for_file_creation $PORT_FILE 5
 
-	# launch the worker with the port found by makeflow.
-	port=`cat $PORT_FILE` 
-	../../work_queue/src/work_queue_worker -t60 localhost $port &
-	echo $! > $PIDWORKER_FILE
+	run_local_worker $PORT_FILE worker.log
 
-	# wait at most one minute for makeflow to exit.
-	wait_for_file_creation $STATUS_FILE 60
+	# wait at most two seconds for makeflow to exit.
+	wait_for_file_creation $STATUS_FILE 2
 
 	# retrieve makeflow exit status
 	status=`cat $STATUS_FILE`
@@ -57,10 +52,6 @@ clean()
 
 	rm -rf input
 	rm -rf mydir
-
-	[ -f $PIDWORKER_FILE ] && kill -9 `cat $PIDWORKER_FILE`
-
-	rm -f $PIDWORKER_FILE
 
 	[ $DELETE_MAKE_FILE ] && rm -f $MAKE_FILE
 
