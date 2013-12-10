@@ -22,7 +22,6 @@ extern "C" {
 #include "create_dir.h"
 #include "file_cache.h"
 #include "md5.h"
-#include "sort_dir.h"
 #include "password_cache.h"
 #include "debug.h"
 #include "getopt.h"
