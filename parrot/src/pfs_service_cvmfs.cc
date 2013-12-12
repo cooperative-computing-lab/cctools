@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "libcvmfs.h"
 
 extern "C" {
+#include "buffer.h"
 #include "debug.h"
 #include "path.h"
 #include "stringtools.h"
@@ -465,6 +466,17 @@ static void cvmfs_read_config()
 	char *allow_switching = getenv("PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES");
 	if( allow_switching && strcmp(allow_switching,"0")!=0) {
 		pfs_cvmfs_repo_switching = true;
+	}
+	{
+		buffer_t B;
+		buffer_init(&B);
+		buffer_abortonfailure(&B, 1);
+		buffer_putfstring(&B, "parrot-%d-%d-%s", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
+		if(getenv("CERNVM_UUID"))
+			buffer_putfstring(&B, "-%s", getenv("CERNVM_UUID")); /* can't use space since that is filtered, use '-' */
+		setenv("CERNVM_UUID", buffer_tostring(&B, NULL), 1);
+		debug(D_CVMFS, "setenv CERNVM_UUID=`%s'", buffer_tostring(&B, NULL));
+		buffer_free(&B);
 	}
 
 	const char *cvmfs_options = pfs_cvmfs_repo_arg;
