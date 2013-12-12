@@ -5,23 +5,26 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "pfs_poll.h"
-#include "pfs_process.h"
 #include "pfs_critical.h"
 #include "pfs_paranoia.h"
+#include "pfs_poll.h"
+#include "pfs_process.h"
 
 extern "C" {
 #include "macros.h"
 #include "debug.h"
 }
 
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <sys/select.h>
-#include <stdio.h>
+
+#include <fcntl.h>
+#include <poll.h>
+
+#include <assert.h>
+#include <errno.h>
 #include <signal.h>
+#include <stdio.h>
+#include <string.h>
 
 #define POLL_TIME_MAX 1
 
@@ -78,18 +81,12 @@ void pfs_poll_clear( int pid )
 
 void pfs_poll_sleep()
 {
+	struct pollfd fds[POLL_TABLE_MAX];
+	int n = 0;
 	struct timeval curtime;
 	struct timeval stoptime;
 	struct timespec sleeptime;
-	fd_set rfds, wfds, efds;
-	struct sleep_entry *s;
-	struct poll_entry *p;
-	int maxfd=0, i;
-	int result;
-
-	FD_ZERO(&rfds);
-	FD_ZERO(&wfds);
-	FD_ZERO(&efds);
+	int i;
 
 	poll_abort_now = 0;
 
@@ -98,23 +95,28 @@ void pfs_poll_sleep()
 	stoptime.tv_sec += POLL_TIME_MAX;
 
 	for(i=0;i<poll_table_size;i++) {
-		p = &poll_table[i];
+		struct poll_entry *p = &poll_table[i];
 		if(p->pid>=0) {
-			maxfd = MAX(p->fd+1,maxfd);
-			if(p->flags&PFS_POLL_READ) FD_SET(p->fd,&rfds);
-			if(p->flags&PFS_POLL_WRITE) FD_SET(p->fd,&wfds);
-			if(p->flags&PFS_POLL_EXCEPT) FD_SET(p->fd,&efds);
+			fds[n].fd = p->fd;
+			fds[n].events = 0;
+			fds[n].revents = 0;
+			if(p->flags&PFS_POLL_READ) fds[n].events |= POLLIN;
+			if(p->flags&PFS_POLL_WRITE) fds[n].events |= POLLOUT;
+			if(p->flags&PFS_POLL_EXCEPT) fds[n].events |= POLLERR;
+			n += 1;
 		}
 	}
 	// Also poll watchdog fd, if necessary.
 	pid_t pfs_watchdog_fd = -1;
 	if ((pfs_watchdog_fd = pfs_paranoia_monitor_fd()) > 0) {
-		maxfd = MAX(pfs_watchdog_fd, maxfd);
-		FD_SET(pfs_watchdog_fd, &rfds);
+		fds[n].fd = pfs_watchdog_fd;
+		fds[n].events = POLLIN;
+		fds[n].revents = 0;
+		n += 1;
 	}
 
 	for(i=0;i<sleep_table_size;i++) {
-		s = &sleep_table[i];
+		struct sleep_entry *s = &sleep_table[i];
 		if(s->pid>=0) {
 			if(timercmp(&stoptime,&s->stoptime,>)) {
 				stoptime = s->stoptime;
@@ -135,30 +137,46 @@ void pfs_poll_sleep()
 		sleeptime.tv_nsec = 0;
 	}
 
-	sigset_t childmask;
-	sigemptyset(&childmask);
-	sigaddset(&childmask, SIGPIPE);
+	sigset_t sigmask;
+	sigemptyset(&sigmask);
+	sigaddset(&sigmask, SIGPIPE);
 
-	result = pselect(maxfd,&rfds,&wfds,&efds,&sleeptime,&childmask);
+	int result = ppoll(fds, n, &sleeptime, &sigmask);
 
 	if(result>0) {
-		if ((pfs_watchdog_fd > 0) && FD_ISSET(pfs_watchdog_fd, &rfds)) {
+		/* Note: fds[n-1] is always watchdog if pfs_watchdog_fd > 0 */
+		if ((pfs_watchdog_fd > 0) && (fds[n-1].revents & POLLIN)) {
 			debug(D_NOTICE,"watchdog died unexpectedly; killing everyone.");
 			pfs_process_kill_everyone(SIGKILL);
 			// Note - above does not return.
 		}
-		for(i=0;i<poll_table_size;i++) {
-			p = &poll_table[i];
-			if(p->pid>=0) {
-				if(
-					(p->flags&PFS_POLL_READ && FD_ISSET(p->fd,&rfds)) ||
-					(p->flags&PFS_POLL_WRITE && FD_ISSET(p->fd,&wfds)) ||
-					(p->flags&PFS_POLL_EXCEPT && FD_ISSET(p->fd,&efds))
-				) {
+		for(i = 0; i < n; i++) {
+			if(fds[i].revents) {
+				int j;
+				char event[64] = "";
+
+				if(fds[i].revents & POLLIN)
+					strcat(event, "|POLLIN");
+				if(fds[i].revents & POLLOUT)
+					strcat(event, "|POLLOUT");
+				if(fds[i].revents & POLLERR)
+					strcat(event, "|POLLERR");
+				if(fds[i].revents & POLLHUP)
+					strcat(event, "|POLLHUP");
+				if(fds[i].revents & POLLNVAL)
+					strcat(event, "|POLLNVAL");
+				assert(strlen(event));
+				debug(D_DEBUG, "poll: got event %s on fd %d", event+1, fds[i].fd);
+
+				for(j = 0; j < poll_table_size; j++) {
+					struct poll_entry *p = &poll_table[j];
 					pid_t pid = p->pid;
-					debug(D_POLL,"waking pid %d because of fd %d",pid,p->fd);
-					pfs_poll_clear(pid);
-					pfs_process_wake(pid);
+					int fd = p->fd;
+					if(pid >= 0 && fd == fds[i].fd) {
+						debug(D_POLL,"waking pid %d because of fd %d",pid,fd);
+						pfs_poll_clear(pid);
+						pfs_process_wake(pid);
+					}
 				}
 			}
 		}
@@ -171,10 +189,10 @@ void pfs_poll_sleep()
 		gettimeofday(&curtime,0);
 
 		for(i=0;i<sleep_table_size;i++) {
-			s = &sleep_table[i];
-			if(s->pid>=0) {
+			struct sleep_entry *s = &sleep_table[i];
+			pid_t pid = s->pid;
+			if(pid>=0) {
 				if(timercmp(&curtime,&s->stoptime,>)) {
-					pid_t pid = s->pid;
 					debug(D_POLL,"waking pid %d because time expired",pid);
 					pfs_poll_clear(pid);
 					pfs_process_wake(pid);
@@ -186,16 +204,15 @@ void pfs_poll_sleep()
 		debug(D_POLL,"waking up all processes to clean up and try again.");
 
 		for(i=0;i<poll_table_size;i++) {
-			p = &poll_table[i];
-			if(p->pid>=0) {
-				pid_t pid = p->pid;
+			struct poll_entry *p = &poll_table[i];
+			pid_t pid = p->pid;
+			if(pid>=0) {
 				debug(D_POLL,"waking pid %d",pid);
 				pfs_poll_clear(pid);
 				pfs_process_wake(pid);
 			}
 		}
 	}
-
 }
 
 void pfs_poll_wakeon( int fd, int flags )
