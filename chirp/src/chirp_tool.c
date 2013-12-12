@@ -36,7 +36,6 @@ See the file COPYING for details.
 #include "list.h"
 #include "domain_name_cache.h"
 #include "md5.h"
-#include "sort_dir.h"
 #include "getopt_aux.h"
 #include "path.h"
 

@@ -6,6 +6,7 @@ See the file COPYING for details.
 */
 
 #include "sort_dir.h"
+#include "string_array.h"
 
 #include <dirent.h>
 #include <string.h>
@@ -14,64 +15,27 @@ See the file COPYING for details.
 
 int sort_dir(const char *dirname, char ***list, int (*sort) (const char *a, const char *b))
 {
-	DIR *dir = 0;
-	struct dirent *d;
-	int size = 10;
-	int used = 0;
-	char *s;
+	DIR *dir;
+	size_t n = 0;
 
-	*list = malloc(size * sizeof(char *));
-	if(!*list)
-		goto failure;
+	*list = string_array_new();
 
 	dir = opendir(dirname);
-	if(!dir)
-		goto failure;
+	if(dir) {
+		struct dirent *d;
 
-	while((d = readdir(dir))) {
-		if(used >= size) {
-			size *= 2;
-			*list = realloc(*list, sizeof(char *) * size);
-			if(!*list)
-				goto failure;
+		while((d = readdir(dir))) {
+			*list = string_array_append(*list, d->d_name);
+			n += 1;
 		}
-
-		s = strdup(d->d_name);
-		if(!s)
-			goto failure;
-
-		(*list)[used++] = s;
+		closedir(dir);
 	}
 
 	if(sort) {
-		qsort(*list, used, sizeof(char *), (int (*)(const void *, const void *)) sort);
+		qsort(*list, n, sizeof(char *), (int (*)(const void *, const void *)) sort);
 	}
 
-	closedir(dir);
-	(*list)[used] = 0;
 	return 1;
-
-      failure:
-	if(*list) {
-		(*list)[used] = 0;
-		sort_dir_free(*list);
-		*list = 0;
-	}
-	if(dir)
-		closedir(dir);
-	return 0;
-}
-
-void sort_dir_free(char **list)
-{
-	int i;
-	if(list) {
-		for(i = 0; list[i]; i++) {
-			if(list[i])
-				free(list[i]);
-		}
-		free(list);
-	}
 }
 
 /* vim: set noexpandtab tabstop=4: */
