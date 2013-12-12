@@ -5,23 +5,27 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "pfs_poll.h"
-#include "pfs_process.h"
 #include "pfs_critical.h"
 #include "pfs_paranoia.h"
+#include "pfs_poll.h"
+#include "pfs_process.h"
 
 extern "C" {
 #include "macros.h"
 #include "debug.h"
 }
 
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>
 #include <unistd.h>
+
+#include <fcntl.h>
+
 #include <sys/select.h>
-#include <stdio.h>
+
+#include <assert.h>
+#include <errno.h>
 #include <signal.h>
+#include <stdio.h>
+#include <string.h>
 
 #define POLL_TIME_MAX 1
 
