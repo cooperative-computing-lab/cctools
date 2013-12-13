@@ -69,7 +69,7 @@ void buffer_max(buffer_t * b, size_t max);
 /** Set the buffer to call fatal(...) on error instead of returning an error code.
 
     @param b                The buffer.
-    @param abort_on_failure Kill the process on errors. (you no longer have to check returns)
+    @param abortonfailure   Kill the process on errors. (you no longer have to check returns)
   */
 void buffer_abortonfailure(buffer_t * b, int abortonfailure);
 
@@ -111,7 +111,7 @@ int buffer_putlstring(buffer_t * b, const char *str, size_t len);
 
 /** Appends the string to the end of the buffer. Length derived via strlen.
     @param b The buffer to fill.
-    @param str The string to append.
+    @param s The string to append.
     @return -1 on error.
   */
 #define buffer_putstring(b,s)  (buffer_putlstring(b,s,strlen(s)))
