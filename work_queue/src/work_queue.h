@@ -73,6 +73,8 @@ struct work_queue_task {
 	timestamp_t time_send_input_finish;	/**< The time at which it finished transferring input files. */
 	timestamp_t time_execute_cmd_start;		    /**< The time at which the task began. */
 	timestamp_t time_execute_cmd_finish;		/**< The time at which the task finished (discovered by the master). */
+	timestamp_t time_receive_result_start;	/**< The time at which it started to transfer the results. */
+	timestamp_t time_receive_result_finish;	/**< The time at which it finished transferring the results. */
 	timestamp_t time_receive_output_start;	/**< The time at which it started to transfer output files. */
 	timestamp_t time_receive_output_finish;	/**< The time at which it finished transferring output files. */
 

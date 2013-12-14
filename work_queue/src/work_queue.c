@@ -1064,6 +1064,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		return 0;
 	}
 	
+	t->time_receive_result_start = timestamp_get();
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 	
 	if(q->bandwidth) {
@@ -1097,6 +1098,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		actual = 0;
 	}
 	t->output[actual] = 0;
+	t->time_receive_result_finish = timestamp_get();
 
 	t->return_status = result;
 	if(t->return_status != 0)
