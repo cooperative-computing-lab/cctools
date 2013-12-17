@@ -1814,13 +1814,13 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 void killeveryone (int sig)
 {
 	/* start with sig */
-	kill(-getpgrp(), sig);
+	kill(0, sig);
 	sleep(1);
-	kill(-getpgrp(), SIGTERM);
+	kill(0, SIGTERM);
 	sleep(1);
-	kill(-getpgrp(), SIGQUIT);
+	kill(0, SIGQUIT);
 	sleep(1);
-	kill(-getpgrp(), SIGKILL);
+	kill(0, SIGKILL);
 	_exit(EXIT_FAILURE);
 }
 
@@ -2123,6 +2123,8 @@ int main(int argc, char *argv[])
 		daemonize(0, pidfile);
 	if(is_daemon && exit_if_parent_fails)
 		fatal("daemon cannot check if parent has exit (-e)");
+
+	setpgrp();
 
 	/* Ensure that all files are created private by default (again because of daemonize). */
 	umask(0077);
