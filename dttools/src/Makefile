@@ -69,6 +69,7 @@ SOURCES = auth.c  \
           sort_dir.c  \
           stringtools.c  \
           string_array.c  \
+          sqlite3.c  \
           text_array.c  \
           text_list.c  \
           timestamp.c  \
