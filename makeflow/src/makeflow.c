@@ -4,49 +4,48 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <signal.h>
-#include <stdarg.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <unistd.h>
-
-#include "cctools.h"
 #include "catalog_query.h"
-#include "catalog_server.h"
-#include "create_dir.h"
+#include "cctools.h"
 #include "copy_stream.h"
-#include "work_queue_catalog.h"
-#include "datagram.h"
-#include "disk_info.h"
-#include "domain_name_cache.h"
-#include "link.h"
-#include "macros.h"
-#include "hash_table.h"
-#include "itable.h"
+#include "create_dir.h"
 #include "debug.h"
-#include "work_queue.h"
-#include "work_queue_internal.h"
 #include "delete_dir.h"
-#include "stringtools.h"
-#include "load_average.h"
-#include "get_line.h"
-#include "int_sizes.h"
-#include "list.h"
-#include "xxmalloc.h"
+#include "disk_info.h"
 #include "getopt_aux.h"
-#include "rmonitor.h"
-#include "random_init.h"
+#include "get_line.h"
+#include "hash_table.h"
+#include "int_sizes.h"
+#include "itable.h"
+#include "link.h"
+#include "list.h"
+#include "load_average.h"
+#include "macros.h"
 #include "path.h"
+#include "random_init.h"
+#include "rmonitor.h"
+#include "stringtools.h"
+#include "work_queue.h"
+#include "work_queue_catalog.h"
+#include "work_queue_internal.h"
+#include "xxmalloc.h"
 
 #include "dag.h"
 #include "visitors.h"
+
+#include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include <ctype.h>
+#include <errno.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* Display options */
 enum { SHOW_INPUT_FILES = 2,
