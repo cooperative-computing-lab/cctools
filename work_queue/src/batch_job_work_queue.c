@@ -242,15 +242,14 @@ batch_job_id_t batch_job_submit_simple_work_queue(struct batch_queue * q, const 
 
 batch_job_id_t batch_job_wait_work_queue(struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
 {
-	static FILE *logfile = 0;
-	struct work_queue_stats s;
-
+	static int try_open_log = 0;
 	int timeout, taskid = -1;
 
-	if(!logfile) {
-		logfile = fopen(q->logfile, "a");
-		if(!logfile) {
-			debug(D_NOTICE, "couldn't open logfile %s: %s\n", q->logfile, strerror(errno));
+	if(!try_open_log)
+	{
+		try_open_log = 1;
+		if(!work_queue_specify_log(q->work_queue, q->logfile))
+		{
 			return -1;
 		}
 	}
@@ -294,42 +293,9 @@ batch_job_id_t batch_job_wait_work_queue(struct batch_queue * q, struct batch_jo
 			free(outfile);
 		}
 
-		fprintf(logfile, "TASK %" PRId64 " ", timestamp_get()); 
-		fprintf(logfile, "%d %d %d ", t->taskid, t->result, t->return_status); 
-		fprintf(logfile, "%d ", t->worker_selection_algorithm); 
-		fprintf(logfile, "%" PRIu64 " %" PRIu64 " ", t->time_task_submit, t->time_task_finish);
-		fprintf(logfile, "%" PRIu64 " %" PRIu64 " ", t->time_send_input_start, t->time_send_input_finish); 
-		fprintf(logfile, "%" PRIu64 " %" PRIu64 " ", t->time_execute_cmd_start, t->time_execute_cmd_finish); 
-		fprintf(logfile, "%" PRIu64 " %" PRIu64 " ", t->time_receive_output_start, t->time_receive_output_finish); 
-		fprintf(logfile, "%" PRIu64 " %" PRIu64 " ", t->total_bytes_transferred, t->total_transfer_time); 
-		fprintf(logfile, "%s ", t->host);
-		fprintf(logfile, "\"%s\" ", t->tag ? t->tag : ""); 
-		fprintf(logfile, "\"%s\" ", t->command_line);
-		fprintf(logfile, "\n");
-
 		taskid = t->taskid;
 		work_queue_task_delete(t);
 	}
-	// Print to work queue log since status has been changed.
-	work_queue_get_stats(q->work_queue, &s);
-
-	char * workers_by_pool = work_queue_get_worker_summary(q->work_queue);
-
-	fprintf(logfile, "QUEUE %" PRIu64 " ", timestamp_get());
-	fprintf(logfile, "%d %d %d ", s.workers_init,  s.workers_ready, s.workers_busy + s.workers_full); 
-	fprintf(logfile, "%d %d %d ", s.tasks_running, s.tasks_waiting, s.tasks_complete); 
-	fprintf(logfile, "%d %d ",    s.total_tasks_dispatched, s.total_tasks_complete); 
-	fprintf(logfile, "%d %d ",    s.total_workers_joined,   s.total_workers_removed); 
-	fprintf(logfile, "%" PRId64 " %" PRId64 " ", s.total_bytes_sent, s.total_bytes_received); 
-	fprintf(logfile, "%.2f %.2f ",s.efficiency, s.idle_percentage); 
-	fprintf(logfile, "%d %d ",    s.capacity,   s.avg_capacity); 
-	fprintf(logfile, "%d %s ",    s.total_workers_connected, workers_by_pool);
-	fprintf(logfile, "\n");
-
-	free(workers_by_pool);
-
-	fflush(logfile);
-	fsync(fileno(logfile));
 
 	if(taskid >= 0) {
 		return taskid;
