@@ -449,8 +449,9 @@ void work_queue_delete(struct work_queue *q);
 /** Add a log file that records the states of the connected workers and submitted tasks.
 @param q A work queue object.
 @param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
 */
-void work_queue_specify_log(struct work_queue *q, const char *logfile);
+int work_queue_specify_log(struct work_queue *q, const char *logfile);
 
 /** Add a mandatory password that each worker must present.
 @param q A work queue object.
