@@ -1951,6 +1951,9 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 		fprintf(stderr, "couldn't submit batch job, still trying...\n");
 
+		if(dag_abort_flag)
+			break;
+
 		if(time(0) > stoptime) {
 			fprintf(stderr, "unable to submit job after %d seconds!\n", dag_submit_timeout);
 			break;
