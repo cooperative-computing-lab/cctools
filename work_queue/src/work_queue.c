@@ -3664,7 +3664,7 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 	}
 }
 
-void work_queue_specify_log(struct work_queue *q, const char *logfile)
+int work_queue_specify_log(struct work_queue *q, const char *logfile)
 {
 	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
@@ -3679,6 +3679,12 @@ void work_queue_specify_log(struct work_queue *q, const char *logfile)
 			"port", "priority", "total_worker_slots");
 		log_worker_stats(q);
 		debug(D_WQ, "log enabled and is being written to %s\n", logfile);
+		return 1;
+	}
+	else
+	{
+		debug(D_NOTICE | D_WQ, "couldn't open logfile %s: %s\n", logfile, strerror(errno)); 
+		return 0;
 	}
 }
 
