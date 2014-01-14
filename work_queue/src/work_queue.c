@@ -454,6 +454,24 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 	return timeout;
 }
 
+static double measure_bandwidth(struct work_queue *q) {
+	double avg_transfer_rate; // bytes per second
+
+	int64_t     q_total_bytes_transferred = q->total_bytes_sent + q->total_bytes_received;
+	timestamp_t q_total_transfer_time     = q->total_send_time  + q->total_receive_time;
+
+	// Note total_transfer_time and q_total_transfer_time are timestamp_t with units of milliseconds.
+	if(q_total_transfer_time>1000000) {
+		avg_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
+	} else {
+		avg_transfer_rate = q->default_transfer_rate;
+	}
+
+	debug(D_WQ,"Current average bandwidth is %.2lf MB/s\n", avg_transfer_rate/MEGABYTE);
+
+	return (avg_transfer_rate/MEGABYTE);
+} 
+
 static void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
 	static time_t last_update_time = 0;
@@ -3609,6 +3627,16 @@ void work_queue_enable_process_module(struct work_queue *q)
 char * work_queue_get_worker_summary( struct work_queue *q )
 {
 	return strdup("n/a");
+}
+
+void work_queue_set_bandwidth(struct work_queue *q, const char *bandwidth)
+{
+	q->bandwidth = string_metric_parse(bandwidth);
+}
+
+double work_queue_get_bandwidth(struct work_queue *q)
+{
+	return measure_bandwidth(q);
 }
 
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)

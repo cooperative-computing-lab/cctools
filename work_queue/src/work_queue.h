@@ -345,6 +345,18 @@ int work_queue_port(struct work_queue *q);
 */
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s);
 
+/** Limit the queue bandwidth when transferring files to and from workers.
+@param q A work queue object.
+@param bandwidth Bandwidth in bytes per second.
+*/
+void work_queue_set_bandwidth(struct work_queue *q, const char *bandwidth);
+
+/** Get current queue bandwidth.
+@param q A work queue object.
+@return The average bandwidth in MB/s measured by the master.
+*/
+double work_queue_get_bandwidth(struct work_queue *q);
+
 /** Summarize workers.
 This function summarizes the workers currently connected to the master,
 indicating how many from each worker pool are attached.
