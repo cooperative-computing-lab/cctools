@@ -244,8 +244,8 @@ while True:
 
   if logTime>end or pastEndTime:
     break
-  day += 1
-  filename = timeToFileName(begin,day)
+  day_offset += 1 
+  filename = timeToFileName(begin,day_offset)
 
 if filesFound==0:
   logError("No files found in that source directory for the specified time frame.")
