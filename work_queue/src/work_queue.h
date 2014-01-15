@@ -69,7 +69,6 @@ struct work_queue_task {
 
 	timestamp_t time_task_submit;	/**< The time at which this task was submitted. */
 	timestamp_t time_task_finish;	/**< The time at which this task was finished. */
-	timestamp_t time_app_delay;	 /**< The time spent in upper-level application (outside of work_queue_wait). */
 	timestamp_t time_send_input_start;	/**< The time at which it started to transfer input files. */
 	timestamp_t time_send_input_finish;	/**< The time at which it finished transferring input files. */
 	timestamp_t time_execute_cmd_start;		    /**< The time at which the task began. */
@@ -86,6 +85,8 @@ struct work_queue_task {
 	int cores;
 	int gpus;
 	int unlabeled;
+	
+	timestamp_t time_app_delay;	 /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 };
 
 /** Statistics describing a work queue. */
@@ -111,10 +112,10 @@ struct work_queue_stats {
 	double efficiency;		/**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */  
 	double idle_percentage;		/**< The fraction of time that the master is idle waiting for workers to respond. */
 	int capacity;			/**< The estimated number of workers that this master can effectively support. */
-	int workers_full;               /**< @deprecated: Use @ref workers_busy insead. */
-	int total_workers_joined;       /**< @deprecated: Use @ref total_workers_connected instead. */
-	int total_worker_slots;         /**< @deprecated: Use @ref tasks_running instead. */	
-	int avg_capacity;               /**< @deprecated: Use @ref capacity instead. */
+	int workers_full;               /**< @deprecated Use @ref workers_busy insead. */
+	int total_workers_joined;       /**< @deprecated Use @ref total_workers_connected instead. */
+	int total_worker_slots;         /**< @deprecated Use @ref tasks_running instead. */	
+	int avg_capacity;               /**< @deprecated Use @ref capacity instead. */
 };
 
 
