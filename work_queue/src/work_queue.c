@@ -3674,6 +3674,15 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	}
 
 	s->capacity = compute_capacity(q);
+	
+	struct work_queue_resources r;
+	aggregate_workers_resources(q,&r);
+	s->workers_min_cores = r.cores.smallest;
+	s->workers_max_cores = r.cores.largest;
+	s->workers_min_memory = r.memory.smallest;
+	s->workers_max_memory = r.memory.largest;
+	s->workers_min_disk = r.disk.smallest;
+	s->workers_max_disk = r.disk.largest;
 
 	//Deprecated values.
 	s->total_workers_joined = hash_table_size(q->worker_table);

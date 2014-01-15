@@ -2303,8 +2303,8 @@ int main(int argc, char *argv[])
 		aggregated_resources->memory.total = 0;
 		aggregated_resources->gpus.total = 0;
 	} else {
-		if(manual_cores_option)  
-			 aggregated_resources->cores.total = manual_cores_option;
+		if(manual_cores_option) 
+			aggregated_resources->cores.total = manual_cores_option;
 		if(manual_memory_option) 
 			aggregated_resources->memory.total = manual_memory_option;
 		if(manual_gpus_option)
@@ -2313,6 +2313,11 @@ int main(int argc, char *argv[])
 
 	if(manual_disk_option)   
 		aggregated_resources->disk.total = manual_disk_option;
+
+	aggregated_resources->cores.smallest = aggregated_resources->cores.largest = aggregated_resources->cores.total;
+	aggregated_resources->memory.smallest = aggregated_resources->memory.largest = aggregated_resources->memory.total;
+	aggregated_resources->disk.smallest = aggregated_resources->disk.largest = aggregated_resources->disk.total;
+	aggregated_resources->gpu.smallest = aggregated_resources->gpu.largest = aggregated_resources->gpu.total;
 
 	debug(D_WQ,"local resources:");
 	work_queue_resources_debug(aggregated_resources);
