@@ -1182,25 +1182,30 @@ static int process_available_results(struct work_queue *q, struct work_queue_wor
 	int i = 0;
 	while(1) {
 		int result = recv_worker_msg_retry(q, w, line, sizeof(line));
-		if(result < 0) 
-			return result;
-		
+		if(result < 0) { 
+			remove_worker(q, w);
+			return -1;
+		}
+
 		if(string_prefix_is(line,"result")) {
 			result = process_result(q, w, line);
-			if(result < 0) 
-				return result;
+			if(result < 0) { 
+				remove_worker(q, w);
+				return -1;
+			}
 			i++;
 		} else if(!strcmp(line,"end")) {
 			//Only return success if last message is end.
 			break;
 		} else {
 			debug(D_WQ, "%s (%s): sent invalid response to send_results: %s",w->hostname,w->addrport,line);
+			remove_worker(q, w);
 			return -1;
 		}
 
 	}
 
-	if(max_count > 0 && i > max_count)
+	if(max_count > 0 && i > max_count) 
 	{
 		debug(D_WQ, "%s (%s): sent %d results. At most %d were expected.",w->hostname,w->addrport, i, max_count);
 		return -1;
