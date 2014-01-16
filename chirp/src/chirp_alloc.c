@@ -395,13 +395,13 @@ INT64_T chirp_alloc_realloc (const char *path, INT64_T change, INT64_T *current)
 	int result;
 	INT64_T dummy;
 
+	if (current == NULL)
+		current = &dummy;
+
 	if(!alloc_enabled) {
 		*current = 0;
 		return 0;
 	}
-
-	if (current == NULL)
-		current = &dummy;
 
 	debug(D_ALLOC, "path `%s' change = %" PRId64, path, change);
 	a = alloc_state_cache(path);
