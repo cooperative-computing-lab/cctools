@@ -1075,7 +1075,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
-	  debug(D_WQ, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
+		debug(D_WQ, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
 		stoptime = time(0) + get_transfer_wait_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
 		return 0;
@@ -1104,8 +1104,11 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	t->output = malloc(retrieved_output_length+1);
 	if(t->output == NULL) {
-		fprintf(stderr, "Error: Allocating memory of size %"PRId64" bytes for retrieving stdout of task %"PRId64" failed.\n", retrieved_output_length, taskid);
-		return -1;
+		fprintf(stderr, "error: allocating memory of size %"PRId64" bytes for retrieving stdout of task %"PRId64" failed.\n", retrieved_output_length, taskid);
+		//drop the entire length of stdout on the link	
+		stoptime = time(0) + get_transfer_wait_time(q, w, t, output_length);
+		link_soak(w->link, output_length, stoptime);
+		retrieved_output_length = 0; 
 	} 
 
 	if(retrieved_output_length > 0) {
