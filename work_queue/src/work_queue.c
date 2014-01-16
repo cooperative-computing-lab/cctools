@@ -86,6 +86,8 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define RESOURCE_MONITOR_TASK_SUMMARY_NAME "cctools-work-queue-%d-resource-monitor-task-%d"
 
+#define MAX_TASK_STDOUT_LENGTH (1*GIGABYTE)  
+ 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
@@ -1049,10 +1051,10 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	int result;
 	uint64_t taskid;
-	int64_t output_length;
+	int64_t output_length, retrieved_output_length;
 	timestamp_t execution_time;
 	struct work_queue_task *t;
-	int64_t actual;
+	int64_t actual, dropped;
 	timestamp_t observed_execution_time;
 	timestamp_t effective_stoptime = 0;
 
@@ -1082,10 +1084,6 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t->time_receive_result_start = timestamp_get();
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 	
-	if(q->bandwidth) {
-		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
-	}
-
 	if(n >= 3) {
 		execution_time = atoll(items[2]);
 		t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
@@ -1093,22 +1091,52 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		t->cmd_execution_time = observed_execution_time;
 	}
 
-	t->output = malloc(output_length + 1);
-	if(output_length > 0) {
-		debug(D_WQ, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, output_length, w->addrport, w->hostname);
-		stoptime = time(0) + get_transfer_wait_time(q, w, t, output_length);
-		actual = link_read(w->link, t->output, output_length, stoptime);
-		if(actual != output_length) {
-			debug(D_WQ, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, output_length);
+	if(q->bandwidth) {
+		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
+	}
+
+	if(output_length <= MAX_TASK_STDOUT_LENGTH) {
+		retrieved_output_length = output_length; 
+	} else {
+		retrieved_output_length = MAX_TASK_STDOUT_LENGTH; 
+		fprintf(stderr, "warning: stdout of task %"PRId64" is of size %"PRId64" GB which exceeds maximum supported size of %d GB. Only %d GB will be retreived.\n", taskid, output_length/GIGABYTE, MAX_TASK_STDOUT_LENGTH/GIGABYTE, MAX_TASK_STDOUT_LENGTH/GIGABYTE);
+	}
+
+	t->output = malloc(retrieved_output_length+1);
+	if(t->output == NULL) {
+		fprintf(stderr, "Error: Allocating memory of size %"PRId64" bytes for retrieving stdout of task %"PRId64" failed.\n", retrieved_output_length, taskid);
+		return -1;
+	} 
+
+	if(retrieved_output_length > 0) {
+		debug(D_WQ, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, retrieved_output_length, w->addrport, w->hostname);
+		
+		//First read the bytes we keep.
+		stoptime = time(0) + get_transfer_wait_time(q, w, t, retrieved_output_length);
+		actual = link_read(w->link, t->output, retrieved_output_length, stoptime);
+		if(actual != retrieved_output_length) {
+			debug(D_WQ, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, retrieved_output_length);
 			t->output[actual] = '\0';
 			return -1;
 		}
+		debug(D_WQ, "Retrieved %"PRId64" bytes from %s (%s)", actual, w->hostname, w->addrport);
+		
+		//Then read the bytes we need to throw away.
+		if(output_length > retrieved_output_length) {
+			debug(D_WQ, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_LENGTH), taskid, MAX_TASK_STDOUT_LENGTH);
+			stoptime = time(0) + get_transfer_wait_time(q, w, t, (output_length-retrieved_output_length));
+			dropped = link_soak(w->link, (output_length-retrieved_output_length), stoptime);
+			if(dropped != (output_length-retrieved_output_length)) {
+				debug(D_WQ, "Failure: received size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", dropped, (output_length-retrieved_output_length));
+				t->output[actual] = '\0';
+				return -1;
+			}
+		}
+		
 		timestamp_t current_time = timestamp_get();
 		if(effective_stoptime && effective_stoptime > current_time) {
 			usleep(effective_stoptime - current_time);
 		}
-		debug(D_WQ, "Got %"PRId64" bytes from %s (%s)", actual, w->hostname, w->addrport);
-		
 	} else {
 		actual = 0;
 	}
