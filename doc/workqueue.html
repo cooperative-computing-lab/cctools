@@ -30,7 +30,7 @@ padding: 0.3%;
 <body>
 
 <h1>Work Queue User's Manual</h1>
-<b>Last Updated June 2013</b>
+<b>Last Updated January 2014</b>
 <p>
 Work Queue is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
@@ -513,6 +513,16 @@ those requirements and the unlabeled resource requirements are assumed to be
 negligible.  For example, if you annotate a task as using 1 core, but don't
 specify its memory or disk requirements, then Work Queue will schedule two such
 tasks to a two-slot worker, regardless of their memory or disk usage.
+
+<h2>Recommended Practices</h2>
+
+<p> The output printed by a task to stdout can be accessed in the
+<tt>output</tt> buffer in <a
+href="api/html/structwork__queue__task.html">work_queue_task
+struct</a>. The size of <tt>output</tt> is limited to 1 GB. For sizes larger
+than 1 GB, please redirect the stdout of the task to a file and specify the file
+as an output file of the task using <tt>work_queue_task_specify_file</tt>
+(<tt>specify_file</tt> in Python) as described above. 
 
 <h2>Advanced Usage</h2>
 
