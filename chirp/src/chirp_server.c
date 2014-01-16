@@ -2092,14 +2092,19 @@ int main(int argc, char *argv[])
 		int port;
 		struct link *l;
 		pid_t pid;
+		int status;
 
 		if(exit_if_parent_fails && getppid() == 1) {
 			fatal("stopping because parent process died.");
 			exit(0);
 		}
 
-		while((pid = waitpid(-1, 0, WNOHANG)) > 0) {
-			debug(D_PROCESS, "pid %d completed (%d total child procs)", pid, total_child_procs);
+		while((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+			if(WIFEXITED(status))
+				debug(D_PROCESS, "pid %d exited with %d (%d total child procs)", pid, WEXITSTATUS(status), total_child_procs);
+			else if(WIFSIGNALED(status))
+				debug(D_PROCESS, "pid %d failed due to signal %d (%s) (%d total child procs)", pid, WTERMSIG(status), string_signal(WTERMSIG(status)), total_child_procs);
+			else assert(0);
 			total_child_procs--;
 		}
 
