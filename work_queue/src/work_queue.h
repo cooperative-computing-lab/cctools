@@ -94,38 +94,49 @@ struct work_queue_task {
 /** Statistics describing a work queue. */
 
 struct work_queue_stats {
-	int port;
-	int priority;
-	int workers_init;               /**< Number of workers initializing. */
-	int workers_ready;              /**< Number of workers ready for tasks. */
-	int workers_busy;               /**< Number of workers running tasks. */
+	int total_workers_connected;	/**< Total number of workers currently connected to the master. */
+	int workers_init;               /**< Number of workers initializing.*/
+	int workers_idle;               /**< Number of workers that are not running a task. */
+	int workers_busy;               /**< Number of workers that are running at least one task. */
+	int total_workers_joined;       /**< Total number of worker connections that were established to the master. */
+	int total_workers_removed;      /**< Total number of worker connections that were terminated by the master. */
+
+	int tasks_waiting;              /**< Number of tasks waiting to be run. */
 	int tasks_running;              /**< Number of tasks currently running. */
-	int tasks_waiting;              /**< Number of tasks waiting for a CPU. */
 	int tasks_complete;             /**< Number of tasks waiting to be returned to user. */
 	int total_tasks_dispatched;     /**< Total number of tasks dispatch to workers. */
-	int total_tasks_complete;       /**< Total number of tasks returned complete. */
-	int total_workers_connected;    /**< Total number of worker connections successfully established to the master. */
-	int total_workers_removed;      /**< Total number of worker connections that were terminated by the master. */
-	int64_t total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
-	int64_t total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
+	int total_tasks_complete;       /**< Total number of tasks completed and returned to user. */
+	int total_tasks_cancelled;      /**< Total number of tasks cancelled. */
+
 	timestamp_t start_time;         /**< Absolute time at which the master started. */
 	timestamp_t total_send_time;    /**< Total time in microseconds spent in sending data to workers. */
 	timestamp_t total_receive_time; /**< Total time in microseconds spent in receiving data from workers. */
-	double efficiency;		/**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */  
-	double idle_percentage;		/**< The fraction of time that the master is idle waiting for workers to respond. */
-	int capacity;			/**< The estimated number of workers that this master can effectively support. */
+	int64_t total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
+	int64_t total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
+	double efficiency;              /**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */  
+	double idle_percentage;         /**< The fraction of time that the master is idle waiting for workers to respond. */
+	int capacity;                   /**< The estimated number of workers that this master can effectively support. */
 
+	double  bandwidth;              /**< Average network bandwidth in MB/S observed by the master when transferring to workers. */
+	int64_t total_cores;            /**< Total number of cores aggregated across the connected workers. */
+	int64_t total_memory;           /**< Total memory in MB aggregated across the connected workers. */
+	int64_t total_disk;	            /**< Total disk space in MB aggregated across the connected workers. */
+	int64_t total_gpus;             /**< Total number of GPUs aggregated across the connected workers. */
+	int64_t min_cores;              /**< The lowest number of cores observed among the connected workers. */
+	int64_t max_cores;              /**< The highest number of cores observed among the connected workers. */
+	int64_t min_memory;             /**< The smallest memory size in MB observed among the connected workers. */
+	int64_t max_memory;             /**< The largest memory size in MB observed among the connected workers. */ 
+	int64_t min_disk;               /**< The smallest disk space in MB observed among the connected workers. */
+	int64_t max_disk;               /**< The largest disk space in MB observed among the connected workers. */
+	int64_t min_gpus;               /**< The lowest number of GPUs observed among the connected workers. */
+	int64_t max_gpus;               /**< The highest number of GPUs observed among the connected workers. */
+
+	int port;						
+	int priority;					
+	int workers_ready;              /**< @deprecated Use @ref workers_idle instead. */
 	int workers_full;               /**< @deprecated Use @ref workers_busy insead. */
-	int total_workers_joined;       /**< @deprecated Use @ref total_workers_connected instead. */
 	int total_worker_slots;         /**< @deprecated Use @ref tasks_running instead. */	
 	int avg_capacity;               /**< @deprecated Use @ref capacity instead. */
-
-	int64_t workers_min_cores;
-	int64_t workers_max_cores;
-	int64_t workers_min_memory;
-	int64_t workers_max_memory;
-	int64_t workers_min_disk;
-	int64_t workers_max_disk;
 };
 
 

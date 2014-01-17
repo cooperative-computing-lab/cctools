@@ -113,8 +113,10 @@ struct work_queue {
 
 	int64_t total_tasks_submitted;
 	int64_t total_tasks_complete;
+	int64_t total_tasks_cancelled;
 	int64_t total_bytes_sent;
 	int64_t total_bytes_received;
+	int64_t total_workers_joined;
 	int64_t total_workers_removed;
 
 	timestamp_t start_time;
@@ -276,17 +278,14 @@ static void log_worker_stats(struct work_queue *q)
 	if(!q->logfile) return;
 	
 	work_queue_get_stats(q, &s);
-	
-	fprintf(q->logfile, "%16" PRIu64 " %25" PRIu64 " ", timestamp_get(), s.start_time); // time
-	fprintf(q->logfile, "%25d %25d %25d %25d", s.workers_init, s.workers_ready, s.workers_busy, 0);	
-	fprintf(q->logfile, "%25d %25d %25d ", s.tasks_waiting, s.tasks_running, s.tasks_complete);
-	fprintf(q->logfile, "%25d %25d %25d %25d ", s.total_tasks_dispatched, s.total_tasks_complete, s.total_workers_joined, s.total_workers_connected);
-	fprintf(q->logfile, "%25d %25" PRId64 " %25" PRId64 " ", s.total_workers_removed, s.total_bytes_sent, s.total_bytes_received); 
-	fprintf(q->logfile, "%25" PRIu64 " %25" PRIu64 " ", s.total_send_time, s.total_receive_time);
-	fprintf(q->logfile, "%25f %25f ", s.efficiency, s.idle_percentage);
-	fprintf(q->logfile, "%25d %25d ", s.capacity, s.avg_capacity);
-	fprintf(q->logfile, "%25d %25d ", s.port, s.priority);
-	fprintf(q->logfile, "%25d ", s.total_worker_slots);
+
+	//print in the order described by the headers in specify_log().
+	fprintf(q->logfile, "%16" PRIu64 " ", timestamp_get()); 
+	fprintf(q->logfile, "%25d %25d %25d %25d %25d %25d ", s.total_workers_connected, s.workers_init, s.workers_idle, s.workers_busy, s.total_workers_joined, s.total_workers_removed);	
+	fprintf(q->logfile, "%25d %25d %25d %25d %25d %25d ", s.tasks_waiting, s.tasks_running, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_tasks_cancelled);
+	fprintf(q->logfile, "%25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25f %25f %25d", s.start_time, s.total_send_time, s.total_receive_time, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity);
+	fprintf(q->logfile, "%25f %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " ", s.bandwidth, s.total_cores, s.total_memory, s.total_disk, s.total_gpus);
+	fprintf(q->logfile, "%25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " ", s.min_cores, s.max_cores, s.min_memory, s.max_memory, s.min_disk, s.max_disk, s.min_gpus, s.max_gpus);
 	fprintf(q->logfile, "\n");
 }
 
@@ -630,6 +629,7 @@ static int add_worker(struct work_queue *q)
 	sprintf(w->addrport, "%s:%d", addr, port);
 	hash_table_insert(q->worker_table, w->hashkey, w);
 	log_worker_stats(q);
+	q->total_workers_joined++;
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
 	
@@ -3424,17 +3424,20 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int ta
 		//see if task is executing at a worker (in running_tasks or finished_tasks).
 		if ((matched_task = find_running_task_by_id(q, taskid))) {
 			if (cancel_running_task(q, matched_task)) {
+				q->total_tasks_cancelled++;	
 				return matched_task;
 			}	
 		} //if not, see if task is in ready list.
 		else if ((matched_task = list_find(q->ready_list, taskid_comparator, &taskid))) {
 			list_remove(q->ready_list, matched_task);
 			debug(D_WQ, "Task with id %d is removed from ready list.", matched_task->taskid);
+			q->total_tasks_cancelled++;	
 			return matched_task;
 		} //if not, see if task is in complete list.
 		else if ((matched_task = list_find(q->complete_list, taskid_comparator, &taskid))) {
 			list_remove(q->complete_list, matched_task);
 			debug(D_WQ, "Task with id %d is removed from complete list.", matched_task->taskid);
+			q->total_tasks_cancelled++;	
 			return matched_task;
 		} 
 		else { 
@@ -3453,17 +3456,20 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 		//see if task is executing at a worker (in running_tasks or finished_tasks).
 		if ((matched_task = find_running_task_by_tag(q, tasktag))) {
 			if (cancel_running_task(q, matched_task)) {
+				q->total_tasks_cancelled++;	
 				return matched_task;
 			}
 		} //if not, see if task is in ready list.
 		else if ((matched_task = list_find(q->ready_list, tasktag_comparator, tasktag))) {
 			list_remove(q->ready_list, matched_task);
 			debug(D_WQ, "Task with tag %s and id %d is removed from ready list.", matched_task->tag, matched_task->taskid);
+			q->total_tasks_cancelled++;	
 			return matched_task;
 		} //if not, see if task is in complete list.
 		else if ((matched_task = list_find(q->complete_list, tasktag_comparator, tasktag))) {
 			list_remove(q->complete_list, matched_task);
 			debug(D_WQ, "Task with tag %s and id %d is removed from complete list.", matched_task->tag, matched_task->taskid);
+			q->total_tasks_cancelled++;	
 			return matched_task;
 		} 
 		else { 
@@ -3483,14 +3489,16 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 	
 	while( (t = list_pop_head(q->ready_list)) ) {
 		list_push_tail(l, t);
+		q->total_tasks_cancelled++;	
 	}
 	while( (t = list_pop_head(q->complete_list)) ) {
 		list_push_tail(l, t);
+		q->total_tasks_cancelled++;	
 	}
 
-	while(list_size(q->workers_with_available_results))
-	{
+	while(list_size(q->workers_with_available_results)) {
 		list_pop_head(q->workers_with_available_results);
+		q->total_tasks_cancelled++;	
 	}
 
 	hash_table_firstkey(q->worker_table);
@@ -3518,6 +3526,7 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 			itable_remove(w->current_tasks, taskid);
 			
 			list_push_tail(l, t);
+			q->total_tasks_cancelled++;	
 		}
 	}
 	return l;
@@ -3640,51 +3649,62 @@ double work_queue_get_effective_bandwidth(struct work_queue *q)
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 {
 	memset(s, 0, sizeof(*s));
-	s->port = q->port;
-	s->priority = q->priority;
-	s->workers_init = hash_table_size(q->worker_table) - known_workers(q);
-	s->workers_ready = known_workers(q)- workers_with_tasks(q); //FIXME: should be available_workers(q)? 
-	s->workers_busy = workers_with_tasks(q); //FIXME: should be (known_workers(q) - available_workers(q))?
 
+	//info about workers 
+	s->total_workers_connected = hash_table_size(q->worker_table);
+	s->workers_init = hash_table_size(q->worker_table) - known_workers(q);
+	s->workers_idle = known_workers(q) - workers_with_tasks(q); //returns workers that are not running any tasks.
+	s->workers_busy = workers_with_tasks(q); 
+	s->total_workers_joined = q->total_workers_joined;
+	s->total_workers_removed = q->total_workers_removed;
+
+	//info about tasks
 	s->tasks_waiting = list_size(q->ready_list);
 	s->tasks_running = itable_size(q->running_tasks) + itable_size(q->finished_tasks);
 	s->tasks_complete = list_size(q->complete_list);
 	s->total_tasks_dispatched = q->total_tasks_submitted;
 	s->total_tasks_complete = q->total_tasks_complete;
-	s->total_workers_connected = hash_table_size(q->worker_table);
-	s->total_workers_removed = q->total_workers_removed;
-	s->total_bytes_sent = q->total_bytes_sent;
-	s->total_bytes_received = q->total_bytes_received;
+	s->total_tasks_cancelled = q->total_tasks_cancelled;
+	
+	//info about queue
+	s->start_time = q->start_time;
 	s->total_send_time = q->total_send_time;
 	s->total_receive_time = q->total_receive_time;
-	s->start_time = q->start_time;
-
+	s->total_bytes_sent = q->total_bytes_sent;
+	s->total_bytes_received = q->total_bytes_received;
 	timestamp_t wall_clock_time = timestamp_get() - q->start_time;
-
-	int effective_workers = hash_table_size(q->worker_table);
-
-	if(wall_clock_time>0 && effective_workers>0) {
-		s->efficiency = (double) (q->total_execute_time) / (wall_clock_time * effective_workers);
+	if(wall_clock_time>0 && s->total_workers_connected>0) {
+		s->efficiency = (double) (q->total_execute_time) / (wall_clock_time * s->total_workers_connected);
 	}
-
 	if(wall_clock_time>0) {
 		s->idle_percentage = (double) q->total_idle_time / wall_clock_time;
 	}
-
 	s->capacity = compute_capacity(q);
-	
+
+	//info about resources
+	s->bandwidth = measure_bandwidth(q);
 	struct work_queue_resources r;
 	aggregate_workers_resources(q,&r);
-	s->workers_min_cores = r.cores.smallest;
-	s->workers_max_cores = r.cores.largest;
-	s->workers_min_memory = r.memory.smallest;
-	s->workers_max_memory = r.memory.largest;
-	s->workers_min_disk = r.disk.smallest;
-	s->workers_max_disk = r.disk.largest;
+	s->total_cores = r.cores.total;
+	s->total_memory = r.memory.total;
+	s->total_disk = r.disk.total;
+	s->total_gpus = r.gpus.total;
+	s->min_cores = r.cores.smallest;
+	s->max_cores = r.cores.largest;
+	s->min_memory = r.memory.smallest;
+	s->max_memory = r.memory.largest;
+	s->min_disk = r.disk.smallest;
+	s->max_disk = r.disk.largest;
+	s->min_gpus = r.gpus.smallest;
+	s->max_gpus = r.gpus.largest;
 
-	//Deprecated values.
-	s->total_workers_joined = hash_table_size(q->worker_table);
-	s->total_worker_slots = itable_size(q->running_tasks); 
+	//deprecated fields
+	s->port = q->port;
+	s->priority = q->priority;
+	s->workers_ready = s->workers_idle; 
+	s->workers_full = s->workers_busy; 
+	s->total_worker_slots = s->tasks_running; 
+	s->avg_capacity = s->capacity;
 }
 
 /*
@@ -3721,14 +3741,13 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
 		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
-		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // header/column labels
-			"timestamp", "start_time",
-			"workers_init", "workers_ready", "workers_active", "workers_full",  // workers
-			"tasks_waiting", "tasks_running", "tasks_complete", // tasks
-			"total_tasks_dispatched", "total_tasks_complete", "total_workers_joined", "total_workers_connected", // totals
-			"total_workers_removed", "total_bytes_sent", "total_bytes_received", "total_send_time", "total_receive_time",
-			"efficiency", "idle_percentage", "capacity", "avg_capacity", // other
-			"port", "priority", "total_worker_slots");
+		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // column labels
+			"timestamp", //time 
+			"total_workers_connected", "workers_init", "workers_idle", "workers_busy", "total_workers_joined", "total_workers_removed", // workers
+			"tasks_waiting", "tasks_running", "tasks_complete", "total_tasks_dispatched", "total_tasks_complete", "total_tasks_cancelled", // tasks
+			"start_time", "total_send_time", "total_receive_time", "total_bytes_sent", "total_bytes_received", "efficiency", "idle_percentage", "capacity", // queue
+			"bandwidth", "total_cores", "total_memory", "total_disk", "total_gpus", //resource totals
+			"min_cores", "max_cores", "min_memory", "max_memory", "min_disk", "max_disk", "min_gpus", "max_gpus"); //resource min/max
 		log_worker_stats(q);
 		debug(D_WQ, "log enabled and is being written to %s\n", logfile);
 		return 1;
