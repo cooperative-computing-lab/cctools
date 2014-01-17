@@ -1199,24 +1199,33 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 
 	nvpair_insert_integer(nv,"port",info.port);
 	nvpair_insert_integer(nv,"priority",info.priority);
-	nvpair_insert_integer(nv,"workers",info.workers_init+info.workers_ready+info.workers_busy);
+
+	//send info on workers
+	nvpair_insert_integer(nv,"workers",info.total_workers_connected);
 	nvpair_insert_integer(nv,"workers_init",info.workers_init);
-	nvpair_insert_integer(nv,"workers_ready",info.workers_ready);
+	nvpair_insert_integer(nv,"workers_idle",info.workers_idle);
 	nvpair_insert_integer(nv,"workers_busy",info.workers_busy);
-	nvpair_insert_integer(nv,"tasks_running",info.tasks_running);
+	nvpair_insert_integer(nv,"workers_ready",info.workers_ready); //workers_ready is deprecated
+	nvpair_insert_integer(nv,"total_workers_connected",info.total_workers_connected);
+	nvpair_insert_integer(nv,"total_workers_joined",info.total_workers_joined);
+	nvpair_insert_integer(nv,"total_workers_removed",info.total_workers_removed);
+	
+	//send info on tasks
 	nvpair_insert_integer(nv,"tasks_waiting",info.tasks_waiting);
+	nvpair_insert_integer(nv,"tasks_running",info.tasks_running);
 	// KNOWN HACK: The following line is inconsistent but kept for compatibility reasons.
 	// Everyone wants to know total_tasks_complete, but few are interested in tasks_complete.
 	nvpair_insert_integer(nv,"tasks_complete",info.total_tasks_complete); 
 	nvpair_insert_integer(nv,"total_tasks_complete",info.total_tasks_complete);
 	nvpair_insert_integer(nv,"total_tasks_dispatched",info.total_tasks_dispatched);
-	nvpair_insert_integer(nv,"total_workers_connected",info.total_workers_connected);
-	nvpair_insert_integer(nv,"total_workers_removed",info.total_workers_removed);
-	nvpair_insert_integer(nv,"total_bytes_sent",info.total_bytes_sent);
-	nvpair_insert_integer(nv,"total_bytes_received",info.total_bytes_received);
+	nvpair_insert_integer(nv,"total_tasks_cancelled",info.total_tasks_cancelled);
+
+	//send info on queue
 	nvpair_insert_integer(nv,"start_time",info.start_time);
 	nvpair_insert_integer(nv,"total_send_time",info.total_send_time);
 	nvpair_insert_integer(nv,"total_receive_time",info.total_receive_time);
+	nvpair_insert_integer(nv,"total_bytes_sent",info.total_bytes_sent);
+	nvpair_insert_integer(nv,"total_bytes_received",info.total_bytes_received);
 	nvpair_insert_float(nv,"efficiency",info.efficiency);
 	nvpair_insert_float(nv,"idle_percentage",info.idle_percentage);
 	nvpair_insert_integer(nv,"capacity",info.capacity);
