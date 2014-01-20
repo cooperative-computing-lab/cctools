@@ -49,7 +49,7 @@ static int setup_hadoop_wrapper (int fd, const char *cmd)
 	return 0;
 }
 
-batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, char *hadoop_streaming_command[], struct hadoop_job *job)
+static batch_job_id_t fork_hadoop(struct batch_queue *q, char *hadoop_streaming_command[], struct hadoop_job *job)
 {
 	int status_pipe[2];
 	FILE *status_file;
@@ -84,7 +84,7 @@ batch_job_id_t batch_job_fork_hadoop(struct batch_queue *q, char *hadoop_streami
 	}
 }
 
-batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_hadoop_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
 	int i;
 	struct hadoop_job *job = xxmalloc(sizeof(struct hadoop_job));
@@ -126,13 +126,13 @@ batch_job_id_t batch_job_submit_simple_hadoop(struct batch_queue *q, const char 
 		NULL,
 	};
 
-	batch_job_id_t status = batch_job_fork_hadoop(q, hadoop_streaming_command, job);
+	batch_job_id_t status = fork_hadoop(q, hadoop_streaming_command, job);
 	for (i = 0; hadoop_streaming_command[i]; i++)
 		free(hadoop_streaming_command[i]);
 	return status;
 }
 
-batch_job_id_t batch_job_submit_hadoop(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_hadoop_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
 	char *command = string_format("%s %s", cmd, args);
 	if (infile) {
@@ -151,13 +151,12 @@ batch_job_id_t batch_job_submit_hadoop(struct batch_queue *q, const char *cmd, c
 		command = new;
 	}
 
-	batch_job_id_t status = batch_job_submit_simple_hadoop(q, command, extra_input_files, extra_output_files);
+	batch_job_id_t status = batch_job_hadoop_submit_simple(q, command, extra_input_files, extra_output_files);
 	free(command);
 	return status;
 }
 
-
-batch_job_id_t batch_job_wait_hadoop(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
+static batch_job_id_t batch_job_hadoop_wait (struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
 {
 	UINT64_T key;
 	struct hadoop_job *job;
@@ -211,8 +210,7 @@ restart:
 	goto restart;
 }
 
-
-int batch_job_remove_hadoop(struct batch_queue *q, batch_job_id_t jobid)
+static int batch_job_hadoop_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
 	UINT64_T key = jobid;
 	struct hadoop_job *job;
@@ -236,5 +234,64 @@ int batch_job_remove_hadoop(struct batch_queue *q, batch_job_id_t jobid)
 	}
 	return 0;
 }
+
+static int batch_queue_hadoop_create (struct batch_queue *q)
+{
+	if(!getenv("HADOOP_HOME")) {
+		debug(D_NOTICE, "error: environment variable HADOOP_HOME not set\n");
+		return -1;
+	}
+	if(!getenv("HDFS_ROOT_DIR")) {
+		debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
+		return -1;
+	}
+	if(!getenv("HADOOP_USER_TMP")) {
+		debug(D_NOTICE, "error: environment variable HADOOP_USER_TMP not set\n");
+		return -1;
+	}
+	if(!getenv("HADOOP_PARROT_PATH")) {
+		/* Note: HADOOP_PARROT_PATH is the path to Parrot on the remote node, not on the local machine. */
+		debug(D_NOTICE, "error: environment variable HADOOP_PARROT_PATH not set\n");
+		return -1;
+	}
+	return 0;
+}
+
+batch_queue_stub_free(hadoop);
+batch_queue_stub_port(hadoop);
+batch_queue_stub_option_update(hadoop);
+
+batch_fs_stub_chdir(hadoop);
+batch_fs_stub_getcwd(hadoop);
+batch_fs_stub_mkdir(hadoop);
+batch_fs_stub_putfile(hadoop);
+batch_fs_stub_stat(hadoop);
+batch_fs_stub_unlink(hadoop);
+
+const struct batch_queue_module batch_queue_hadoop = {
+	BATCH_QUEUE_TYPE_HADOOP,
+	"hadoop",
+
+	batch_queue_hadoop_create,
+	batch_queue_hadoop_free,
+	batch_queue_hadoop_port,
+	batch_queue_hadoop_option_update,
+
+	{
+		batch_job_hadoop_submit,
+		batch_job_hadoop_submit_simple,
+		batch_job_hadoop_wait,
+		batch_job_hadoop_remove,
+	},
+
+	{
+		batch_fs_hadoop_chdir,
+		batch_fs_hadoop_getcwd,
+		batch_fs_hadoop_mkdir,
+		batch_fs_hadoop_putfile,
+		batch_fs_hadoop_stat,
+		batch_fs_hadoop_unlink,
+	},
+};
 
 /* vim: set noexpandtab tabstop=4: */

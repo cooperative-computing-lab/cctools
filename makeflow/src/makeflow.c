@@ -4,6 +4,9 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "auth_all.h"
+#include "auth_ticket.h"
+#include "batch_job.h"
 #include "catalog_query.h"
 #include "cctools.h"
 #include "copy_stream.h"
@@ -26,7 +29,6 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "work_queue.h"
 #include "work_queue_catalog.h"
-#include "work_queue_internal.h"
 #include "xxmalloc.h"
 
 #include "dag.h"
@@ -39,6 +41,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <signal.h>
@@ -70,28 +73,13 @@ enum { SHOW_INPUT_FILES = 2,
 
 /* Unique integers for long options. */
 
-enum { LONG_OPT_MONITOR_INTERVAL = 1,
-       LONG_OPT_MONITOR_LOG_NAME,
-       LONG_OPT_MONITOR_LIMITS,
-       LONG_OPT_MONITOR_TIME_SERIES,
-       LONG_OPT_MONITOR_OPENED_FILES,
-       LONG_OPT_DISABLE_BATCH_CACHE,
-       LONG_OPT_PASSWORD,
-       LONG_OPT_PPM_ROW,
-       LONG_OPT_PPM_FILE,
-       LONG_OPT_PPM_EXE,
-       LONG_OPT_PPM_LEVELS,
-       LONG_OPT_DOT_PROPORTIONAL,
-       LONG_OPT_VERBOSE_PARSING,
-       LONG_OPT_DOT_CONDENSE };
-
 typedef enum {
 	DAG_GC_NONE,
 	DAG_GC_REF_COUNT,
 	DAG_GC_ON_DEMAND,
 } dag_gc_method_t;
 
-static int dag_abort_flag = 0;
+static sig_atomic_t dag_abort_flag = 0;
 static int dag_failed_flag = 0;
 static int dag_submit_timeout = 3600;
 static int dag_retry_flag = 0;
@@ -108,9 +96,7 @@ static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
 static char *project = NULL;
-static int priority = 0;
 static int port = 0;
-static const char *port_file = NULL;
 static int output_len_check = 0;
 
 static int cache_mode = 1;
@@ -128,8 +114,6 @@ static char *monitor_limits_name = NULL;
 static int monitor_interval = 1;	// in seconds  
 static char *monitor_log_format = NULL;
 static char *monitor_log_dir = NULL;
-
-static char *wq_password = 0;
 
 int dag_depth(struct dag *d);
 int dag_width_uniform_task(struct dag *d);
@@ -329,7 +313,7 @@ void collect_input_files(struct dag *d, char *bundle_dir, char *(*rename) (struc
 		path_dirname(new_name, dir);
 		if(dir){
 			sprintf(file_destination, "%s/%s", bundle_dir, dir);
-			if(!create_dir(file_destination, 0755)) {
+			if(batch_fs_mkdir(remote_queue, file_destination, 0755, 1) < 0) {
 				fprintf(stderr,  "Could not create %s. Check the permissions and try again.\n", file_destination);
 				free(dir);
 				exit(1);
@@ -538,24 +522,13 @@ void file_clean(const char *filename, int silent)
 	if(!filename)
 		return;
 
-	if(unlink(filename) == 0) {
+	if(batch_fs_unlink(remote_queue, filename) == 0) {
 		if(!silent)
-			printf("deleted file %s\n", filename);
-	} else {
-		if(errno == ENOENT) {
-			// nothing
-		} else if(errno == EISDIR) {
-			if(delete_dir(filename) != 0) {
-				if(!silent)
-					fprintf(stderr, "couldn't delete directory %s: %s\n", filename, strerror(errno));
-			} else {
-				if(!silent)
-					printf("deleted directory %s\n", filename);
-			}
-		} else {
-			if(!silent)
-				fprintf(stderr, "couldn't delete %s: %s\n", filename, strerror(errno));
-		}
+			printf("deleted path %s\n", filename);
+	} else if(errno == ENOENT) {
+		// say nothing
+	} else if(!silent) {
+		fprintf(stderr, "couldn't delete %s: %s\n", filename, strerror(errno));
 	}
 }
 
@@ -640,7 +613,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	// Rerun if an input file has been updated since the last execution.
 	list_first_item(n->source_files);
 	while((f = list_next_item(n->source_files))) {
-		if(stat(f->filename, &filestat) >= 0) {
+		if(batch_fs_stat(remote_queue, f->filename, &filestat) >= 0) {
 			if(S_ISDIR(filestat.st_mode))
 				continue;
 			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
@@ -663,7 +636,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	// Rerun if an output file is missing.
 	list_first_item(n->target_files);
 	while((f = list_next_item(n->target_files))) {
-		if(stat(f->filename, &filestat) < 0) {
+		if(batch_fs_stat(remote_queue, f->filename, &filestat) < 0) {
 			/* If output file is missing, but node completed and file was garbage, then avoid rerunning. */
 			if(n->state == DAG_NODE_STATE_COMPLETE && set_lookup(d->collect_table, f)) {
 				continue;
@@ -957,9 +930,9 @@ int copy_monitor(void)
 		fatal("Could not stat resource_monitor executable");
 	}
 
-	if(stat(monitor_exe, &current) || difftime(original.st_mtime, current.st_mtime) > 0)
+	if(batch_fs_stat(remote_queue, monitor_exe, &current) == -1 || difftime(original.st_mtime, current.st_mtime) > 0)
 	{
-		if(copy_file_to_file(monitor_orig, monitor_exe) < original.st_size)
+		if(batch_fs_putfile(remote_queue, monitor_orig, monitor_exe) < original.st_size)
 		{
 			fatal("Could not copy resource_monitor executable");
 		}
@@ -1821,12 +1794,11 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	char *output_files = NULL;
 	struct dag_file *f;
 	const char *remotename;
-
 	char current_dir[PATH_MAX];
 	char abs_name[PATH_MAX];
-	getcwd(current_dir, PATH_MAX);
-
 	struct batch_queue *thequeue;
+	int len = 0, len_temp;
+	char *tmp;
 
 	if(n->local_job) {
 		thequeue = local_queue;
@@ -1834,9 +1806,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		thequeue = remote_queue;
 	}
 
-
-	int len = 0, len_temp;
-	char *tmp;
+	batch_fs_getcwd(remote_queue, current_dir, PATH_MAX);
 
 	printf("%s\n", n->command);
 
@@ -1923,8 +1893,8 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	free(batch_options_env);
 	if(batch_submit_options) {
 		debug(D_DEBUG, "Batch options: %s\n", batch_submit_options);
-		old_batch_submit_options = batch_queue_options(thequeue);
-		batch_queue_set_options(thequeue, batch_submit_options);
+		old_batch_submit_options = xxstrdup(batch_queue_get_option(thequeue, "batch-options"));
+		batch_queue_set_option(thequeue, "batch-options", batch_submit_options);
 		free(batch_submit_options);
 	}
 
@@ -1966,7 +1936,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 	/* Restore old batch job options. */
 	if(old_batch_submit_options) {
-		batch_queue_set_options(thequeue, old_batch_submit_options);
+		batch_queue_set_option(thequeue, "batch-options", old_batch_submit_options);
 		free(old_batch_submit_options);
 	}
 
@@ -2035,8 +2005,6 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 	struct dag_file *f;
 	int job_failed = 0;
 
-	struct stat stat_info;
-
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
 
@@ -2049,17 +2017,14 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 	if(info->exited_normally && info->exit_code == 0) {
 		list_first_item(n->target_files);
 		while((f = list_next_item(n->target_files))) {
-			if(access(f->filename, R_OK) != 0) {
+			struct stat buf;
+			if(batch_fs_stat(remote_queue, f->filename, &buf) < 0) {
 				fprintf(stderr, "%s did not create file %s\n", n->command, f->filename);
 				job_failed = 1;
 			} else {
-				if(output_len_check) {
-					if(stat(f->filename, &stat_info) == 0) {
-						if(stat_info.st_size <= 0) {
-							debug(D_DEBUG, "%s created a file of length %ld\n", n->command, (long) stat_info.st_size);
-							job_failed = 1;
-						}
-					}
+				if(output_len_check && buf.st_size <= 0) {
+					debug(D_DEBUG, "%s created a file of length %ld\n", n->command, (long) buf.st_size);
+					job_failed = 1;
 				}
 			}
 		}
@@ -2139,11 +2104,13 @@ int dag_check(struct dag *d)
 	for(n = d->nodes; n; n = n->next) {
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
+			struct stat buf;
+
 			if(hash_table_lookup(d->completed_files, f->filename)) {
 				continue;
 			}
 
-			if(access(f->filename, R_OK) == 0) {
+			if(batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
 				hash_table_insert(d->completed_files, f->filename, f->filename);
 				continue;
 			}
@@ -2168,7 +2135,8 @@ int dag_check(struct dag *d)
 
 int dag_gc_file(struct dag *d, const struct dag_file *f)
 {
-	if(access(f->filename, R_OK) == 0 && unlink(f->filename) < 0) {
+	struct stat buf;
+	if(batch_fs_stat(remote_queue, f->filename, &buf) <= 0 || batch_fs_unlink(remote_queue, f->filename) <= 0) {
 		debug(D_NOTICE, "makeflow: unable to collect %s: %s", f->filename, strerror(errno));
 		return 0;
 	} else {
@@ -2248,7 +2216,7 @@ void dag_gc(struct dag *d)
 		dag_gc_all(d, dag_gc_param);
 		break;
 	case DAG_GC_ON_DEMAND:
-		getcwd(cwd, PATH_MAX);
+		batch_fs_getcwd(remote_queue, cwd, PATH_MAX);
 		if(directory_inode_count(cwd) >= dag_gc_param || directory_low_disk(cwd)) {
 			debug(D_DEBUG, "Performing on demand (%d) garbage collection", dag_gc_param);
 			dag_gc_all(d, INT_MAX);
@@ -2266,7 +2234,6 @@ void dag_run(struct dag *d)
 	struct batch_job_info info;
 
 	while(!dag_abort_flag) {
-
 		dag_dispatch_ready_jobs(d);
 
 		if(d->local_jobs_running == 0 && d->remote_jobs_running == 0)
@@ -2276,7 +2243,7 @@ void dag_run(struct dag *d)
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
-				debug(D_DEBUG, "Job %d has returned.\n", jobid);
+				debug(D_DEBUG, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
 				if(n)
 					dag_node_complete(d, n, &info);
@@ -2295,7 +2262,7 @@ void dag_run(struct dag *d)
 
 			jobid = batch_job_wait_timeout(local_queue, &info, stoptime);
 			if(jobid > 0) {
-				debug(D_DEBUG, "Job %d has returned.\n", jobid);
+				debug(D_DEBUG, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
 					dag_node_complete(d, n, &info);
@@ -2451,8 +2418,6 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 	struct dag_node *n;
 	struct dag_file *f;
 	const char *fn;
-	struct stat st;
-	const char *size;
 	dag_node_state_t state;
 	struct list *output_files;
 	output_files = list_create();
@@ -2495,8 +2460,10 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 	if(list_size(output_files) > 0) {
 		summarize(summary_file, summary_email, "Output files:\n");
 		for(list_first_item(output_files); (fn = list_next_item(output_files)) != NULL;) {
-			stat(fn, &st);
-			size = string_metric(st.st_size, -1, NULL);
+			const char *size;
+			struct stat buf;
+			batch_fs_stat(remote_queue, fn, &buf);
+			size = string_metric(buf.st_size, -1, NULL);
 			summarize(summary_file, summary_email, "\t%s\t%s\n", fn, size);
 		}
 	}
@@ -2534,11 +2501,12 @@ int main(int argc, char *argv[])
 	int preserve_symlinks = 0;
 	int ppm_mode = 0;
 	char *ppm_option = NULL;
+	const char *port_file = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
-	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
-	int work_queue_estimate_capacity_on = 1; // capacity estimation is on by default
-	int work_queue_keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
-	int work_queue_keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
+	const char *master_mode = "standalone";
+	char *priority = NULL; /* use default */
+	char *keepalive_interval = NULL; /* use default */
+	char *keepalive_timeout = NULL; /* use default */
 	char *write_summary_to = NULL;
 	char *catalog_host;
 	int catalog_port;
@@ -2547,6 +2515,10 @@ int main(int argc, char *argv[])
 	timestamp_t time_completed = 0;
 	char *s;
 	int export_as_dax = 0;
+	int did_explicit_auth = 0;
+	char *tickets = NULL;
+	char *password = NULL; /* WorkQueue password */
+	char *working_dir = NULL;
 
 	random_init();
 
@@ -2564,7 +2536,7 @@ int main(int argc, char *argv[])
 	}
 	s = getenv("WORK_QUEUE_MASTER_MODE");
 	if(s) {
-		work_queue_master_mode = atoi(s);
+		master_mode = s;
 	}
 	s = getenv("WORK_QUEUE_NAME");
 	if(s) {
@@ -2575,7 +2547,28 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
-	struct option long_options[] = {
+	enum {
+		LONG_OPT_MONITOR_INTERVAL = INT_MAX-0,
+		LONG_OPT_MONITOR_LOG_NAME = INT_MAX-1,
+		LONG_OPT_MONITOR_LIMITS = INT_MAX-2,
+		LONG_OPT_MONITOR_TIME_SERIES = INT_MAX-4,
+		LONG_OPT_MONITOR_OPENED_FILES = INT_MAX-5,
+		LONG_OPT_DISABLE_BATCH_CACHE = INT_MAX-6,
+		LONG_OPT_PASSWORD = INT_MAX-7,
+		LONG_OPT_PPM_ROW = INT_MAX-8,
+		LONG_OPT_PPM_FILE = INT_MAX-9,
+		LONG_OPT_PPM_EXE = INT_MAX-10,
+		LONG_OPT_PPM_LEVELS = INT_MAX-11,
+		LONG_OPT_DOT_PROPORTIONAL = INT_MAX-12,
+		LONG_OPT_VERBOSE_PARSING = INT_MAX-13,
+		LONG_OPT_DOT_CONDENSE = INT_MAX-14,
+		LONG_OPT_AUTH = INT_MAX-15,
+		LONG_OPT_TICKETS = INT_MAX-16,
+		LONG_OPT_WORKING_DIR = INT_MAX-17,
+	};
+	static const struct option long_options[] = {
+		{"auth", required_argument, 0, LONG_OPT_AUTH},
+		{"tickets", required_argument, 0, LONG_OPT_TICKETS},
 		{"debug", required_argument, 0, 'd'},
 		{"help", no_argument, 0, 'h'},
 		{"clean", no_argument, 0, 'c'},
@@ -2628,14 +2621,14 @@ int main(int argc, char *argv[])
 		{"wq-schedule", required_argument, 0, 'W'},
 		{"zero-length-error", no_argument, 0, 'z'},
 		{"port-file", required_argument, 0, 'Z'},
+		{"working-dir", required_argument, 0, LONG_OPT_WORKING_DIR},
 		{0, 0, 0, 0}
 	};
-
 
 	while((c = getopt_long(argc, argv, "aAb:B:cC:d:D:eEf:F:g:G:hiIj:J:kKl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:", long_options, NULL)) >= 0) {
 		switch (c) {
 		case 'a':
-			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+			master_mode = "catalog";
 			break;
 		case 'A':
 			skip_afs_check = 1;
@@ -2673,6 +2666,13 @@ int main(int argc, char *argv[])
 			else
 				fatal("Unknown display option: %s\n", optarg);
 			break;
+		case LONG_OPT_AUTH:
+			auth_register_byname(optarg);
+			did_explicit_auth = 1;
+			break;
+		case LONG_OPT_TICKETS:
+			tickets = strdup(optarg);
+			break;
 		case LONG_OPT_DOT_CONDENSE:
 			display_mode = SHOW_DAG_DOT;
 			condense_display = 1;
@@ -2705,7 +2705,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'E':
 			// This option is deprecated. Capacity estimation is now on by default.
-			work_queue_estimate_capacity_on = 1;
 			break;
 		case 'f':
 			write_summary_to = xxstrdup(optarg);
@@ -2765,7 +2764,7 @@ int main(int argc, char *argv[])
 		case 'N':
 			free(project);
 			project = xxstrdup(optarg);
-			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+			master_mode = "catalog";
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -2778,7 +2777,8 @@ int main(int argc, char *argv[])
 			port = atoi(optarg);
 			break;
 		case 'P':
-			priority = atoi(optarg);
+			free(priority);
+			priority = xxstrdup(optarg);
 			break;
 		case 'r':
 			dag_retry_flag = 1;
@@ -2790,9 +2790,9 @@ int main(int argc, char *argv[])
 		case 'S':
 			dag_submit_timeout = atoi(optarg);
 			break;
-
 		case 't':
-			work_queue_keepalive_timeout = atoi(optarg);
+			free(keepalive_timeout);
+			keepalive_timeout = xxstrdup(optarg);
 			break;
 		case 'T':
 			batch_queue_type = batch_queue_type_from_string(optarg);
@@ -2802,7 +2802,8 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'u':
-			work_queue_keepalive_interval = atoi(optarg);
+			free(keepalive_interval);
+			keepalive_interval = xxstrdup(optarg);
 			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
@@ -2832,14 +2833,12 @@ int main(int argc, char *argv[])
 			break;
 		case 'M':
 			monitor_mode = 1;
-			if(monitor_log_dir)
-				free(monitor_log_dir);
+			free(monitor_log_dir);
 			monitor_log_dir = xxstrdup(optarg);
 			break;
 		case LONG_OPT_MONITOR_LIMITS:
 			monitor_mode = 1;
-			if(monitor_limits_name)
-				free(monitor_limits_name);
+			free(monitor_limits_name);
 			monitor_limits_name = xxstrdup(optarg);
 			break;
 		case LONG_OPT_MONITOR_INTERVAL:
@@ -2856,18 +2855,21 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_MONITOR_LOG_NAME:
 			monitor_mode = 1;
-			if(monitor_log_format)
-				free(monitor_log_format);
+			free(monitor_log_format);
 			monitor_log_format = xxstrdup(optarg);
 			break;
 		case LONG_OPT_PASSWORD:
-			if(copy_file_to_buffer(optarg, &wq_password) < 0) {
+			if(copy_file_to_buffer(optarg, &password) < 0) {
 				fprintf(stderr, "makeflow: couldn't open %s: %s\n", optarg, strerror(errno));
 				return 1;
 			}
 			break;
 		case LONG_OPT_DISABLE_BATCH_CACHE:
 			cache_mode = 0;
+			break;
+		case LONG_OPT_WORKING_DIR:
+			free(working_dir);
+			working_dir = xxstrdup(optarg);
 			break;
 		default:
 			show_help(argv[0]);
@@ -2876,6 +2878,15 @@ int main(int argc, char *argv[])
 	}
 
 	cctools_version_debug(D_DEBUG, argv[0]);
+
+	if(!did_explicit_auth)
+		auth_register_all();
+	if(tickets) {
+		auth_ticket_load(tickets);
+		free(tickets);
+	} else {
+		auth_ticket_load(NULL);
+	}
 
 	const char *dagfile;
 
@@ -2893,7 +2904,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		if(work_queue_master_mode == WORK_QUEUE_MASTER_MODE_CATALOG && !project) {
+		if(strcmp(master_mode, "catalog") == 0 && project == NULL) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
 			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
 			return 1;
@@ -2901,7 +2912,7 @@ int main(int argc, char *argv[])
 		// Use Work Queue default port in standalone mode when port is not
 		// specified with -p option. In Work Queue catalog mode, Work Queue
 		// would choose an arbitrary port when port is not explicitly specified.
-		if(!port_set && work_queue_master_mode == WORK_QUEUE_MASTER_MODE_STANDALONE) {
+		if(!port_set && strcmp(master_mode, "standalone") == 0) {
 			port_set = 1;
 			port = WORK_QUEUE_DEFAULT_PORT;
 		}
@@ -2912,7 +2923,6 @@ int main(int argc, char *argv[])
 			setenv("WORK_QUEUE_PORT", value, 1);
 			free(value);
 		}
-
 	}
 
 	if(!logfilename)
@@ -2934,13 +2944,13 @@ int main(int argc, char *argv[])
 		// In clean mode, delete all existing log files
 		if(clean_mode) {
 			char *cleanlog = string_format("%s.condorlog", dagfile);
-			file_clean(cleanlog, 0);
+			unlink(cleanlog);
 			free(cleanlog);
 			cleanlog = string_format("%s.wqlog", dagfile);
-			file_clean(cleanlog, 0);
+			unlink(cleanlog);
 			free(cleanlog);
 			cleanlog = string_format("%s.batchlog", dagfile);
-			file_clean(cleanlog, 0);
+			unlink(cleanlog);
 			free(cleanlog);
 
 			if(monitor_mode)
@@ -2949,7 +2959,6 @@ int main(int argc, char *argv[])
 	}
 
 	if(monitor_mode) {
-
 		if(!monitor_log_dir)
 		{
 			fatal("Monitor mode was enabled, but a log output directory was not specified (use -M<dir>)");
@@ -3074,6 +3083,39 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	remote_queue = batch_queue_create(batch_queue_type);
+	if(!remote_queue) {
+		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
+		if(port != 0)
+			fprintf(stderr, "makeflow: perhaps port %d is already in use?\n", port);
+		exit(1);
+	}
+	batch_queue_set_logfile(remote_queue, batchlogfilename);
+	batch_queue_set_option(remote_queue, "batch-options", batch_submit_options);
+	batch_queue_set_option(remote_queue, "skip-afs-check", skip_afs_check ? "yes" : "no");
+	batch_queue_set_option(remote_queue, "password", password);
+	batch_queue_set_option(remote_queue, "master-mode", master_mode);
+	batch_queue_set_option(remote_queue, "name", project);
+	batch_queue_set_option(remote_queue, "priority", priority);
+	batch_queue_set_option(remote_queue, "estimate-capacity", "yes"); // capacity estimation is on by default
+	batch_queue_set_option(remote_queue, "keepalive-interval", keepalive_interval);
+	batch_queue_set_option(remote_queue, "keepalive-timeout", keepalive_timeout);
+	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
+	batch_queue_set_option(remote_queue, "working-dir", working_dir);
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP) {
+		local_queue = remote_queue; /* all local jobs must be run on Chirp */
+		if(dag_gc_method == DAG_GC_ON_DEMAND /* NYI */ ) {
+			dag_gc_method = DAG_GC_REF_COUNT;
+		}
+	} else {
+		local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
+		if(!local_queue) {
+			fprintf(stderr, "makeflow: couldn't create local job queue.\n");
+			exit(1);
+		}
+	}
+
 	if(monitor_mode)
 	{
 		dag_prepare_for_monitoring(d);
@@ -3090,8 +3132,8 @@ int main(int argc, char *argv[])
 
 	if(clean_mode) {
 		dag_clean(d);
-		file_clean(logfilename, 0);
-		file_clean(batchlogfilename, 0);
+		unlink(logfilename);
+		unlink(batchlogfilename);
 		free(logfilename);
 		free(batchlogfilename);
 		return 0;
@@ -3108,82 +3150,16 @@ int main(int argc, char *argv[])
 		fprintf(stdout, "\nStarting execution of workflow: %s.\n", dagfile);
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_CONDOR && !skip_afs_check) {
-		char *cwd = path_getcwd();
-		if(!strncmp(cwd, "/afs", 4)) {
-			fprintf(stderr, "makeflow: This won't work because Condor is not able to write to files in AFS.\n");
-			fprintf(stderr, "makeflow: Instead, run makeflow from a local disk like /tmp.\n");
-			fprintf(stderr, "makeflow: Or, use the Work Queue with -T wq and condor_submit_workers.\n");
-
-			free(logfilename);
-			free(batchlogfilename);
-			free(cwd);
-
-			exit(1);
-		}
-		free(cwd);
-	}
-
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
-	if(!local_queue) {
-		fprintf(stderr, "makeflow: couldn't create local job queue.\n");
-		exit(1);
-	}
-
-	remote_queue = batch_queue_create(batch_queue_type);
-	if(!remote_queue) {
-		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
-		if(port != 0)
-			fprintf(stderr, "makeflow: perhaps port %d is already in use?\n", port);
-		exit(1);
-	}
-
 	dag_log_recover(d, logfilename);
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		struct work_queue *q = batch_queue_get_work_queue(remote_queue);
-		if(!q) {
-			fprintf(stderr, "makeflow: cannot get work queue object.\n");
-			exit(1);
-		}
-
-		if(wq_password)
-			work_queue_specify_password(q, wq_password);
-		work_queue_specify_master_mode(q, work_queue_master_mode);
-		work_queue_specify_name(q, project);
-		work_queue_specify_priority(q, priority);
-		work_queue_specify_estimate_capacity_on(q, work_queue_estimate_capacity_on);
-		work_queue_specify_keepalive_interval(q, work_queue_keepalive_interval);
-		work_queue_specify_keepalive_timeout(q, work_queue_keepalive_timeout);
-		work_queue_enable_process_module(q);
-		port = work_queue_port(q);
-		if(port_file)
-			opts_write_port_file(port_file, port);
-		if(!cache_mode){
-			batch_job_disable_caching(remote_queue);
-			debug(D_DEBUG, "Work Queue caching is disabled.\n");
-		}
-		else {
-			batch_job_enable_caching(remote_queue);
-		}
-	}
-
-	if(batch_submit_options) {
-		debug(D_DEBUG, "setting batch options to %s\n", batch_submit_options);
-		batch_queue_set_options(remote_queue, batch_submit_options);
-	}
-
-	if(batchlogfilename) {
-		batch_queue_set_logfile(remote_queue, batchlogfilename);
-	}
-
 	port = batch_queue_port(remote_queue);
+	if(port_file)
+		opts_write_port_file(port_file, port);
 	if(port > 0)
 		printf("listening for workers on port %d.\n", port);
-
 
 	signal(SIGINT, handle_abort);
 	signal(SIGQUIT, handle_abort);
@@ -3195,7 +3171,8 @@ int main(int argc, char *argv[])
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
 
-	batch_queue_delete(local_queue);
+	if(local_queue != remote_queue)
+		batch_queue_delete(local_queue);
 	batch_queue_delete(remote_queue);
 
 	if(!preserve_symlinks && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
