@@ -147,16 +147,16 @@ static batch_job_id_t batch_job_chirp_wait (struct batch_queue *q, struct batch_
 				buffer_t B;
 				int reaprc;
 
-				debug(D_BATCH, "job %ld completed", id);
+				debug(D_BATCH, "job %" PRICHIRP_JOBID_T " completed", id);
 
 				buffer_init(&B);
 				buffer_abortonfailure(&B, 1);
-				buffer_putfstring(&B, "[%ld]", id);
+				buffer_putfstring(&B, "[%" PRICHIRP_JOBID_T "]", id);
 				reaprc = chirp_reli_job_reap(gethost(q), buffer_tostring(&B, NULL), STOPTIME);
 				buffer_free(&B);
 
 				if (reaprc == 0) {
-					debug(D_BATCH, "reaped job %ld", id);
+					debug(D_BATCH, "reaped job %" PRICHIRP_JOBID_T, id);
 
 					json_value *status = jsonA_getname(job, "status", json_string);
 					assert(status);
@@ -189,7 +189,7 @@ static batch_job_id_t batch_job_chirp_wait (struct batch_queue *q, struct batch_
 					json_value_free(J);
 					return id;
 				} else {
-					debug(D_BATCH, "did not reap job %ld: %d (%s)", id, errno, strerror(errno));
+					debug(D_BATCH, "did not reap job %" PRICHIRP_JOBID_T ": %d (%s)", id, errno, strerror(errno));
 				}
 			}
 		}

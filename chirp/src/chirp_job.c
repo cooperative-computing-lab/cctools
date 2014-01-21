@@ -272,7 +272,7 @@ restart:
 		sqlcatch(sqlite3_bind_text(stmt, 3, chirp_url, -1, SQLITE_TRANSIENT));
 		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 		*id = sqlite3_last_insert_rowid(db); /* in SQLite, this is `id' */
-		debug(D_DEBUG, "created job %lu as `%s' executable = `%s'", *id, subject, executable);
+		debug(D_DEBUG, "created job %" PRICHIRP_JOBID_T " as `%s' executable = `%s'", *id, subject, executable);
 	}
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
@@ -399,10 +399,10 @@ restart:
 	int n = sqlite3_changes(db);
 	assert(n == 0 || n == 1);
 	if (n) {
-		debug(D_DEBUG, "job %lu is committed", id);
+		debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " is committed", id);
 		rc = 0;
 	} else {
-		debug(D_DEBUG, "job %lu not changed", id);
+		debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " not changed", id);
 		rc = EPERM;
 	}
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -446,10 +446,10 @@ restart:
 	int n = sqlite3_changes(db);
 	assert(n == 0 || n == 1);
 	if (n) {
-		debug(D_DEBUG, "job %lu is killed", id);
+		debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " is killed", id);
 		rc = 0;
 	} else {
-		debug(D_DEBUG, "job %lu not killed", id);
+		debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " not killed", id);
 		rc = EPERM;
 	}
 out:

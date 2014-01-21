@@ -217,7 +217,7 @@ static int jgetargs (sqlite3 *db, chirp_jobid_t id, char ***args)
 		assert(((uint64_t)sqlite3_column_int64(stmt, 0)) == n);
 		const char *arg = (const char *) sqlite3_column_text(stmt, 1);
 		*args = string_array_append(*args, arg);
-		debug(D_DEBUG, "jobs[%lu].args[%lu] = `%s'", id, n-1, arg);
+		debug(D_DEBUG, "jobs[%" PRICHIRP_JOBID_T "].args[%u] = `%s'", id, (unsigned)n-1, arg);
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -303,7 +303,7 @@ static int jgetenv (sqlite3 *db, chirp_jobid_t id, const char *subject, const ch
 		assert(sqlite3_column_type(stmt, 1) == SQLITE_TEXT);
 		const char *name = (const char *) sqlite3_column_text(stmt, 0);
 		const char *value = (const char *) sqlite3_column_text(stmt, 1);
-		debug(D_DEBUG, "jobs[%lu].environment[`%s'] = `%s'", id, name, value);
+		debug(D_DEBUG, "jobs[%" PRICHIRP_JOBID_T "].environment[`%s'] = `%s'", id, name, value);
 		n = snprintf(entry, sizeof(buf), "%s=%s", name, value);
 		if (n == -1) {
 			rc = errno; /* EOVERFLOW */
@@ -345,9 +345,9 @@ static int jgetcontext (sqlite3 *db, chirp_jobid_t id, char **executable, char *
 		*executable = xxstrdup((const char *)sqlite3_column_text(stmt, 0));
 		*subject = xxstrdup((const char *)sqlite3_column_text(stmt, 1));
 		*priority = sqlite3_column_int(stmt, 2);
-		debug(D_DEBUG, "jobs[%lu].executable = `%s'", id, *executable);
-		debug(D_DEBUG, "jobs[%lu].subject = `%s'", id, *subject);
-		debug(D_DEBUG, "jobs[%lu].priority = %d", id, *priority);
+		debug(D_DEBUG, "jobs[%" PRICHIRP_JOBID_T "].executable = `%s'", id, *executable);
+		debug(D_DEBUG, "jobs[%" PRICHIRP_JOBID_T "].subject = `%s'", id, *subject);
+		debug(D_DEBUG, "jobs[%" PRICHIRP_JOBID_T "].priority = %d", id, *priority);
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -393,7 +393,7 @@ static int jexecute (pid_t *pid, chirp_jobid_t id, const char *sandbox, const ch
 		bootstrap(sandbox, path, argv, envp);
 	} else if (*pid > 0) { /* parent */
 		setpgid(*pid, 0); /* handle race condition */
-		debug(D_CHIRP, "job %lu started as pid %d", id, (int)*pid);
+		debug(D_CHIRP, "job %" PRICHIRP_JOBID_T " started as pid %d", id, (int)*pid);
 		rc = 0;
 	} else {
 		debug(D_NOTICE, "could not fork: %s", strerror(errno));
@@ -472,7 +472,7 @@ static int job_start (sqlite3 *db, chirp_jobid_t id)
 	else
 		sqlcatch(rc);
 
-	debug(D_DEBUG, "job_start %lu", id);
+	debug(D_DEBUG, "job_start %" PRICHIRP_JOBID_T, id);
 
 	CATCH(sandbox_create(sandbox));
 	CATCH(jgetcontext(db, id, &executable, &subject, &priority));
