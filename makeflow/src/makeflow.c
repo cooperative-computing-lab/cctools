@@ -48,6 +48,16 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+
+/* Notes:
+ *
+ * o Makeflow now uses batch_fs_* functions to access DAG files. This is mostly
+ *   important for Chirp where the files are all remote.
+ * o APIs like work_queue_* should be indirectly accessed by setting options
+ *   in Batch Job using batch_queue_set_option. See batch_job_work_queue.c for
+ *   an example.
+ */
+
 /* Display options */
 enum { SHOW_INPUT_FILES = 2,
        SHOW_OUTPUT_FILES,
