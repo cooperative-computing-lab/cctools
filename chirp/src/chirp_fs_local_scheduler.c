@@ -20,9 +20,6 @@
 #include "xxmalloc.h"
 
 #include <unistd.h>
-#ifdef CCTOOLS_OPSYS_LINUX
-#include <sched.h>
-#endif
 #include <sys/wait.h>
 
 #include <assert.h>
@@ -365,18 +362,6 @@ out:
 	return rc;
 }
 
-static int setcore (void)
-{
-#ifdef CCTOOLS_OPSYS_LINUX
-	cpu_set_t set;
-	CPU_ZERO(&set);
-	CPU_SET(0, &set);
-	return sched_setaffinity(0, sizeof(set), &set) == -1 ? errno : 0;
-#else
-	return 0;
-#endif
-}
-
 static void bootstrap (const char *sandbox, const char *path, char *const argv[], char *const envp[])
 {
 	int rc;
@@ -388,7 +373,6 @@ static void bootstrap (const char *sandbox, const char *path, char *const argv[]
 	CATCH(fd_null(STDERR_FILENO, O_WRONLY));
 	CATCHCODE(chdir(sandbox), -1);
 	CATCHCODE(setpgid(0, 0), -1); /* create new process group */
-	CATCH(setcore());
 	CATCHCODE(execve(path, argv, envp), -1);
 out:
 	signal(SIGUSR1, SIG_DFL);
