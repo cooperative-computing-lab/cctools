@@ -14,7 +14,9 @@
 #include "xxmalloc.h"
 
 #include <unistd.h>
+#ifdef CCTOOLS_OPSYS_LINUX
 #include <sched.h>
+#endif
 #include <sys/wait.h>
 
 #include <assert.h>
@@ -359,10 +361,14 @@ out:
 
 static int setcore (void)
 {
+#ifdef CCTOOLS_OPSYS_LINUX
 	cpu_set_t set;
 	CPU_ZERO(&set);
 	CPU_SET(0, &set);
 	return sched_setaffinity(0, sizeof(set), &set) == -1 ? errno : 0;
+#else
+	return 0;
+#endif
 }
 
 static void bootstrap (const char *sandbox, const char *path, char *const argv[], char *const envp[])
