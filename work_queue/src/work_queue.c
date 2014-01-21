@@ -398,6 +398,28 @@ int recv_worker_msg_retry( struct work_queue *q, struct work_queue_worker *w, ch
 	return result;
 }
 
+static double get_queue_transfer_rate(struct work_queue *q, char **data_source) 
+{
+	double queue_transfer_rate; // bytes per second
+	int64_t     q_total_bytes_transferred = q->total_bytes_sent + q->total_bytes_received;
+	timestamp_t q_total_transfer_time     = q->total_send_time  + q->total_receive_time;
+
+	// Note q_total_transfer_time is timestamp_t with units of milliseconds.
+	if(q_total_transfer_time>1000000) {
+		queue_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
+		if (data_source) {
+			*data_source = xxstrdup("overall queue");
+		}	
+	} else {
+		queue_transfer_rate = q->default_transfer_rate;
+		if (data_source) {
+			*data_source = xxstrdup("conservative default");
+		}	
+	}
+
+	return queue_transfer_rate;
+}
+
 /*
 Select an appropriate timeout value for the transfer of a certain number of bytes.
 We do not know in advance how fast the system will perform.
@@ -417,24 +439,16 @@ Two exceptions are made:
 static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int64_t length)
 {
 	double avg_transfer_rate; // bytes per second
-	const char *data_source;
-
-	int64_t     q_total_bytes_transferred = q->total_bytes_sent + q->total_bytes_received;
-	timestamp_t q_total_transfer_time     = q->total_send_time  + q->total_receive_time;
-
-	// Note total_transfer_time and q_total_transfer_time are timestamp_t with units of milliseconds.
+	char *data_source;
 
 	if(w->total_transfer_time>1000000) {
+		// Note w->total_transfer_time is timestamp_t with units of milliseconds.
 		avg_transfer_rate = 1000000 * w->total_bytes_transferred / w->total_transfer_time;
-		data_source = "worker's observed";
-	} else if(q_total_transfer_time>1000000) {
-		avg_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
-		data_source = "overall queue";
+		data_source = xxstrdup("worker's observed");
 	} else {
-		avg_transfer_rate = q->default_transfer_rate;
-		data_source = "conservative default";
+		avg_transfer_rate = get_queue_transfer_rate(q, &data_source);
 	}
-
+	
 	debug(D_WQ,"%s (%s) using %s average transfer rate of %.2lf MB/s\n", w->hostname, w->addrport, data_source, avg_transfer_rate/MEGABYTE);
 
 	double tolerable_transfer_rate = avg_transfer_rate / q->transfer_outlier_factor; // bytes per second
@@ -451,26 +465,9 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 
 	debug(D_WQ, "%s (%s) will try up to %d seconds to transfer this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
 
+	free(data_source);
 	return timeout;
 }
-
-static double measure_bandwidth(struct work_queue *q) {
-	double avg_transfer_rate; // bytes per second
-
-	int64_t     q_total_bytes_transferred = q->total_bytes_sent + q->total_bytes_received;
-	timestamp_t q_total_transfer_time     = q->total_send_time  + q->total_receive_time;
-
-	// Note total_transfer_time and q_total_transfer_time are timestamp_t with units of milliseconds.
-	if(q_total_transfer_time>1000000) {
-		avg_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
-	} else {
-		avg_transfer_rate = q->default_transfer_rate;
-	}
-
-	debug(D_WQ,"Current average bandwidth is %.2lf MB/s\n", avg_transfer_rate/MEGABYTE);
-
-	return (avg_transfer_rate/MEGABYTE);
-} 
 
 static void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
@@ -3629,14 +3626,15 @@ char * work_queue_get_worker_summary( struct work_queue *q )
 	return strdup("n/a");
 }
 
-void work_queue_set_bandwidth(struct work_queue *q, const char *bandwidth)
+void work_queue_set_bandwidth_limit(struct work_queue *q, const char *bandwidth)
 {
 	q->bandwidth = string_metric_parse(bandwidth);
 }
 
-double work_queue_get_bandwidth(struct work_queue *q)
+double work_queue_get_effective_bandwidth(struct work_queue *q)
 {
-	return measure_bandwidth(q);
+	double queue_bandwidth = get_queue_transfer_rate(q, NULL)/MEGABYTE; //return in MB per second
+	return queue_bandwidth; 
 }
 
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
