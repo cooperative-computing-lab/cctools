@@ -595,8 +595,10 @@ int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, 
 //@}
 
 /* Experimental feature - intentionally left undocumented.
-This feature forces the master to wait for the given number of
-workers to connect before starting to dispatch tasks. 
+This feature exists to simplify performance evaulation and is not recommended
+for production use since it delays execution of the workload. 
+Force the master to wait for the given number of workers to connect before
+starting to dispatch tasks.  
 @param q A work queue object.
 @param worker The number of workers to wait before tasks are dispatched.*/
 void work_queue_activate_worker_waiting(struct work_queue *q, int resources);
