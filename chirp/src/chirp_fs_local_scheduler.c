@@ -1,3 +1,9 @@
+/*
+ * Copyright (C) 2013- The University of Notre Dame
+ * This software is distributed under the GNU General Public License.
+ * See the file COPYING for details.
+*/
+
 #include "chirp_acl.h"
 #include "chirp_job.h"
 #include "chirp_fs_local.h"
