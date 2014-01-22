@@ -2129,8 +2129,12 @@ int main(int argc, char *argv[])
 			os_name = xxstrdup(optarg);
 			break;
 		case 's':
-			user_specified_workdir = xxstrdup(optarg);
+		{	
+			char temp_abs_path[PATH_MAX];
+			path_absolute(optarg, temp_abs_path, 1);
+			user_specified_workdir = xxstrdup(temp_abs_path);
 			break;
+		}	
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);
