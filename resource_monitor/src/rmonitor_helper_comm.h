@@ -12,7 +12,7 @@ See the file COPYING for details.
 #define RESOURCE_MONITOR_HELPER_ENV_VAR "CCTOOLS_RESOURCE_MONITOR_HELPER"
 #define RESOURCE_MONITOR_INFO_ENV_VAR   "CCTOOLS_RESOURCE_MONITOR_INFO"
 
-enum monitor_msg_type { BRANCH, END_WAIT, END, CHDIR, OPEN, READ, WRITE };
+enum monitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN, READ, WRITE };
 
 /* BRANCH: pid of parent 
  * END:    pid of child that ended

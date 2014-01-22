@@ -248,7 +248,7 @@ void exit_wrapper_preamble(void)
 {
 	sigset_t set_cont, set_prev;
 	void (*prev_handler)(int signum);
-	struct timespec timeout = {.tv_sec = 0, .tv_nsec = 500000}; 
+	struct timespec timeout = {.tv_sec = 10, .tv_nsec = 0}; 
 
 	debug(D_DEBUG, "%s from %d.\n", str_msgtype(END_WAIT), getpid());
 
@@ -291,6 +291,8 @@ void exit(int status)
 	exit_wrapper_preamble();
 	end_wrapper_epilogue();
 
+	debug(D_DEBUG, "%d about to call exit()\n", getpid());
+
 	typeof(exit) *original_exit = dlsym(RTLD_NEXT, "exit");
 	original_exit(status);
 
@@ -309,6 +311,8 @@ void _exit(int status)
 
 	exit_wrapper_preamble();
 	end_wrapper_epilogue();
+
+	debug(D_DEBUG, "%d about to call _exit()\n", getpid());
 
 	typeof(_exit) *original_exit = dlsym(RTLD_NEXT, "_exit");
 	original_exit(status);
@@ -331,7 +335,7 @@ pid_t waitpid(pid_t pid, int *status, int options)
 	if(WIFEXITED(status_) || WIFSIGNALED(status_))
 	{
 		struct monitor_msg msg;
-		msg.type   = END;
+		msg.type   = WAIT;
 		msg.origin = getpid();
 		msg.data.p = pidb;
 
