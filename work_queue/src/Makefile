@@ -55,7 +55,7 @@ work_queue_workload_simulator: work_queue_workload_simulator.o ${EXTERNALS} libw
 	${CCTOOLS_LD} work_queue_workload_simulator.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -lchirp -ldttools -lm -o $@
 
 work_queue_pool: work_queue_pool.o ${EXTERNALS} libwork_queue.a
-	${CCTOOLS_LD} work_queue_pool.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -lchirp -ldttools -lm -o $@
+	${CCTOOLS_LD} work_queue_pool.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -lchirp -ldttools -lm -ldl -o $@
 
 libwork_queue.a: ${OBJECTS}
 	${CCTOOLS_AR} rv $@ $^

@@ -1,6 +1,8 @@
 #include "batch_job.h"
 #include "batch_job_internal.h"
 #include "debug.h"
+#include "hdfs_library.h"
+#include "macros.h"
 #include "process.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -12,10 +14,11 @@
 #include <string.h>
 #include <signal.h>
 
-#include <unistd.h>
-
 #include <fcntl.h>
 #include <glob.h>
+#include <pwd.h>
+#include <unistd.h>
+
 #include <sys/stat.h>
 
 static const char WRAPPER_TEMPLATE[] = "./hadoop.wrapper.XXXXXX";
@@ -30,6 +33,7 @@ struct hadoop_job {
 static int setup_hadoop_wrapper (int fd, const char *cmd)
 {
 	FILE *file = fdopen(fd, "w");
+	struct passwd *pwd = getpwuid(getuid());
 
 	if (file == NULL)
 		return -1;
@@ -41,7 +45,7 @@ static int setup_hadoop_wrapper (int fd, const char *cmd)
 	fprintf(file, "cmd=%s\n", escaped_cmd);
 	free(escaped_cmd);
 	/* fprintf(file, "exec %s -- /bin/sh -c %s\n", getenv("HADOOP_PARROT_PATH"), escaped_cmd); */ /* random bash bug, look into later */
-	fprintf(file, "exec %s -- /bin/sh <<EOF\n", getenv("HADOOP_PARROT_PATH"));
+	fprintf(file, "exec %s --work-dir='%s' --username='%s' -- /bin/sh <<EOF\n", getenv("HADOOP_PARROT_PATH"), getenv("HDFS_ROOT_DIR"), pwd->pw_name);
 	fprintf(file, "$cmd\n");
 	fprintf(file, "EOF\n");
 	fclose(file);
@@ -235,38 +239,235 @@ static int batch_job_hadoop_remove (struct batch_queue *q, batch_job_id_t jobid)
 	return 0;
 }
 
-static int batch_queue_hadoop_create (struct batch_queue *q)
+static struct hdfs_library *hdfs_services = 0;
+static hdfsFS fs = NULL;
+static hdfsFS lfs = NULL; /* local file system, for putfile */
+static int batch_queue_hadoop_create (struct batch_queue *Q)
 {
-	if(!getenv("HADOOP_HOME")) {
-		debug(D_NOTICE, "error: environment variable HADOOP_HOME not set\n");
-		return -1;
-	}
-	if(!getenv("HDFS_ROOT_DIR")) {
-		debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
+	if(!getenv("HADOOP_PARROT_PATH")) {
+		/* Note: HADOOP_PARROT_PATH is the path to Parrot on the remote node, not on the local machine. */
+		debug(D_NOTICE, "error: environment variable HADOOP_PARROT_PATH not set\n");
 		return -1;
 	}
 	if(!getenv("HADOOP_USER_TMP")) {
 		debug(D_NOTICE, "error: environment variable HADOOP_USER_TMP not set\n");
 		return -1;
 	}
-	if(!getenv("HADOOP_PARROT_PATH")) {
-		/* Note: HADOOP_PARROT_PATH is the path to Parrot on the remote node, not on the local machine. */
-		debug(D_NOTICE, "error: environment variable HADOOP_PARROT_PATH not set\n");
+	if(!getenv("HDFS_ROOT_DIR")) {
+		debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
 		return -1;
+	}
+
+	if(!hdfs_services) {
+		if (hdfs_library_envinit() == -1)
+			return -1;
+		hdfs_services = hdfs_library_open();
+		if(!hdfs_services)
+			return -1;
+	}
+
+	if(!lfs) {
+		lfs = hdfs_services->connect(NULL, 0); /* local file system, for putfile */
+		if(!lfs)
+			return -1;
+	}
+
+	/* defaults */
+	hash_table_insert(Q->options, "host", xxstrdup("default:50070"));
+	hash_table_insert(Q->options, "working-dir", xxstrdup("/"));
+	hash_table_insert(Q->options, "replicas", xxstrdup("0"));
+
+	return 0;
+}
+
+static int batch_queue_hadoop_free (struct batch_queue *Q)
+{
+	if (fs) {
+		hdfs_services->disconnect(fs);
+		fs = NULL;
+	}
+	if (lfs) {
+		hdfs_services->disconnect(lfs);
+		lfs = NULL;
+	}
+	if (hdfs_services) {
+		hdfs_library_close(hdfs_services);
+		hdfs_services = NULL;
 	}
 	return 0;
 }
 
-batch_queue_stub_free(hadoop);
-batch_queue_stub_port(hadoop);
-batch_queue_stub_option_update(hadoop);
+static void batch_queue_hadoop_option_update (struct batch_queue *Q, const char *what, const char *value)
+{
+	if(strcmp(what, "working-dir") == 0) {
+		if (string_prefix_is(value, "hdfs://")) {
+			char *hostportroot = xxstrdup(value+strlen("hdfs://"));
+			char *root = strchr(hostportroot, '/');
+			char *host = hostportroot;
+			const char *port;
+			free(hash_table_remove(Q->options, "host"));
+			free(hash_table_remove(Q->options, "port"));
+			free(hash_table_remove(Q->options, "root")); /* this is value */
 
-batch_fs_stub_chdir(hadoop);
-batch_fs_stub_getcwd(hadoop);
-batch_fs_stub_mkdir(hadoop);
-batch_fs_stub_putfile(hadoop);
-batch_fs_stub_stat(hadoop);
-batch_fs_stub_unlink(hadoop);
+			if (root) {
+				hash_table_insert(Q->options, "root", xxstrdup(root));
+				*root = '\0'; /* remove root */
+			} else {
+				hash_table_insert(Q->options, "root", xxstrdup("/"));
+			}
+
+			if (strchr(host, ':')) {
+				port = strchr(host, ':')+1;
+				*strchr(host, ':') = '\0';
+			} else {
+				port = "50070"; /* default namenode port */
+			}
+			hash_table_insert(Q->options, "port", xxstrdup(port));
+
+			if (strlen(host))
+				hash_table_insert(Q->options, "host", xxstrdup(host));
+			else
+				hash_table_insert(Q->options, "host", xxstrdup("default"));
+			free(hostportroot);
+		} else {
+			fatal("`%s' is not a valid working-dir", value);
+		}
+	}
+}
+
+batch_queue_stub_port(hadoop);
+
+static hdfsFS getfs (struct batch_queue *Q) {
+
+	if (fs == NULL) {
+		static const char *groups[] = { "supergroup" };
+		const char *host = hash_table_lookup(Q->options, "host");
+		const char *port = hash_table_lookup(Q->options, "port");
+		const char *root = hash_table_lookup(Q->options, "root");
+		if(host == NULL || port == NULL || root == NULL)
+			fatal("To use Hadoop batch execution, you must specify a host and root directory via --working-dir (e.g. hdfs://host:port/data).");
+
+		debug(D_HDFS, "connecting to hdfs://%s:%s%s\n", host, port, root);
+		fs = hdfs_services->connect_as_user(host, atoi(port), NULL, groups, 1);
+		if (fs == NULL) {
+			fatal("could not connect to hdfs: %s", strerror(errno));
+		}
+		hdfs_services->chdir(fs, root);
+	}
+	assert(lfs);
+	return fs;
+}
+
+static const char *getroot (struct batch_queue *Q)
+{
+	const char *workingdir = hash_table_lookup(Q->options, "root");
+	if (workingdir == NULL) {
+		workingdir = "/";
+	}
+	return workingdir;
+}
+
+static int batch_fs_hadoop_chdir (struct batch_queue *Q, const char *path)
+{
+	free(hash_table_remove(Q->options, "root")); /* this is value */
+	hash_table_insert(Q->options, "root", xxstrdup(path));
+	return hdfs_services->chdir(getfs(Q), path);
+}
+
+static int batch_fs_hadoop_getcwd (struct batch_queue *Q, char *buf, size_t size)
+{
+	strncpy(buf, getroot(Q), size);
+	return 0;
+}
+
+static void copystat (struct stat *buf, hdfsFileInfo *hs, const char *path)
+{
+	memset(buf, 0, sizeof(*buf));
+	buf->st_dev = -1;
+	buf->st_rdev = -2;
+	buf->st_ino = hash_string(path);
+	buf->st_mode = hs->mKind == kObjectKindDirectory ? S_IFDIR : S_IFREG;
+
+	/* HDFS does not have execute bit, lie and set it for all files */
+	buf->st_mode |= hs->mPermissions | S_IXUSR | S_IXGRP;
+	buf->st_nlink = hs->mReplication;
+	buf->st_uid = 0;
+	buf->st_gid = 0;
+	buf->st_size = hs->mSize;
+	buf->st_blksize = hs->mBlockSize;
+
+	/* If the blocksize is not set, assume 64MB chunksize */
+	if(buf->st_blksize < 1)
+		buf->st_blksize = 64 * 1024 * 1024;
+	buf->st_blocks = MAX(1, buf->st_size / buf->st_blksize);
+
+	/* Note that hs->mLastAccess is typically zero. */
+	buf->st_atime = buf->st_mtime = buf->st_ctime = hs->mLastMod;
+}
+
+static int do_stat (hdfsFS fs, const char *path, struct stat *buf)
+{
+	debug(D_HDFS, "stat %s", path);
+
+	hdfsFileInfo *file_info = hdfs_services->stat(fs, path);
+	if(file_info == NULL)
+		return (errno = ENOENT, -1);
+	copystat(buf, file_info, path);
+	hdfs_services->free_stat(file_info, 1);
+	return 0;
+}
+
+int batch_fs_hadoop_mkdir (struct batch_queue *Q, const char *path, mode_t mode, int recursive)
+{
+	/* NYI recursive */
+	const char *root = getroot(Q);
+	struct stat buf;
+
+	/* hdfs mkdir incorrectly returns EPERM if it already exists. */
+	if(do_stat(getfs(Q), path, &buf) == 0 && S_ISDIR(buf.st_mode)) {
+		errno = EEXIST;
+		return -1;
+	}
+
+	debug(D_HDFS, "mkdir %s/%s", root, path);
+	return hdfs_services->mkdir(getfs(Q), path);
+}
+
+int batch_fs_hadoop_putfile (struct batch_queue *Q, const char *lpath, const char *rpath)
+{
+	return hdfs_services->copy(lfs, lpath, getfs(Q), rpath);
+}
+
+int batch_fs_hadoop_stat (struct batch_queue *Q, const char *path, struct stat *buf)
+{
+	return do_stat(getfs(Q), path, buf);
+}
+
+int batch_fs_hadoop_unlink (struct batch_queue *Q, const char *path)
+{
+	/*
+	HDFS is known to return bogus errnos from unlink,
+	so check for directories beforehand, and set the errno
+	properly afterwards if needed.
+	*/
+	struct stat info;
+
+	if(do_stat(getfs(Q), path, &info) < 0)
+		return -1;
+
+	if(S_ISDIR(info.st_mode)) {
+		errno = EISDIR;
+		return -1;
+	}
+
+	debug(D_HDFS, "unlink %s", path);
+	if(hdfs_services->unlink(getfs(Q), path, 1) == -1) {
+		errno = EACCES;
+		return -1;
+	}
+
+	return 0;
+}
 
 const struct batch_queue_module batch_queue_hadoop = {
 	BATCH_QUEUE_TYPE_HADOOP,
