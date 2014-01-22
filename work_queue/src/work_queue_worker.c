@@ -260,8 +260,6 @@ static void task_info_delete( struct task_info *ti )
 	free(ti);
 }
 
-
-
 int link_file_in_workspace(char *localname, char *taskname, char *workspace, int into) {
 	int result = 1;
 	struct stat st;
@@ -280,9 +278,8 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 	}
 	sprintf(workspace_name, "%s/%s", workspace, cur_pos);
 	
-	
 	char *targetname, *sourcename;
-	
+
 	if(into) {
 		sourcename = cache_name;
 		targetname = workspace_name;
@@ -320,7 +317,6 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 	} else {
 		debug(D_WQ, "linking file %s %s workspace %s as %s\n", cache_name, into?"into":"from", workspace, workspace_name);
 
-
 		cur_pos = strrchr(targetname, '/');
 		if(cur_pos) {
 			*cur_pos = '\0';
@@ -339,8 +335,13 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 			} 
 			
 			if((errno == EXDEV || errno == EPERM) && symlinks_enabled) {
-				if(symlink(sourcename, targetname)) {
-					debug(D_WQ, "Could not symlink file %s -> %s (%s)\n", sourcename, targetname, strerror(errno));
+				char *cwd = path_getcwd();
+				char *absolute_sourcename = malloc((strlen(cwd) + strlen(sourcename) + 2) * sizeof(char));
+				sprintf(absolute_sourcename, "%s/%s", cwd, sourcename);
+				free(cwd);	
+				debug(D_WQ, "symlinking file %s -> %s\n", absolute_sourcename, targetname);
+				if(symlink(absolute_sourcename, targetname)) {
+					debug(D_WQ, "Could not symlink file %s -> %s (%s)\n", absolute_sourcename, targetname, strerror(errno));
 					return 0;
 				}
 			} else {
@@ -1536,7 +1537,7 @@ static int path_within_workspace(const char *path, const char *workspace) {
 
 	char absolute_workspace[PATH_MAX+1];
 	if(!realpath(workspace, absolute_workspace)) {
-		debug(D_WQ, "Failed to resolve the absolute path of workspace - %s: %s", path, strerror(errno));
+		debug(D_WQ, "Failed to resolve the absolute path of workspace - %s: %s", workspace, strerror(errno));
 		return 0;
 	}	
 
@@ -2252,7 +2253,7 @@ int main(int argc, char *argv[])
 
 	// change to workspace
 	chdir(workspace);
-	
+
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		char foreman_string[WORK_QUEUE_LINE_MAX];
 		
