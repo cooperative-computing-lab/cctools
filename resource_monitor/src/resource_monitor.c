@@ -734,7 +734,7 @@ void cleanup_zombie(struct process_info *p)
   if(p->wd)
     dec_wd_count(p->wd);
 
-  kill(p->pid, SIGTERM);
+  //kill(p->pid, SIGTERM);
 
   itable_remove(processes, p->pid);
   free(p);
@@ -1070,33 +1070,33 @@ void monitor_dispatch_msg(void)
 			return;
 	}
 
-	switch(msg.type)
-	{
+    switch(msg.type)
+    {
         case BRANCH:
-		monitor_track_process(msg.origin);
-		if(summary->max_concurrent_processes < itable_size(processes))
-			summary->max_concurrent_processes = itable_size(processes);
-		break;
+            monitor_track_process(msg.origin);
+            if(summary->max_concurrent_processes < itable_size(processes))
+                summary->max_concurrent_processes = itable_size(processes);
+            break;
         case END_WAIT:
-		p->waiting = 1;
-		break;
+            p->waiting = 1;
+            break;
         case END:
-		monitor_untrack_process(msg.data.p);
-		break;
+            monitor_untrack_process(msg.data.p);
+            break;
         case CHDIR:
-		p->wd = lookup_or_create_wd(p->wd, msg.data.s);
-		break;
+            p->wd = lookup_or_create_wd(p->wd, msg.data.s);
+            break;
         case OPEN:
-		debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
-		monitor_inotify_add_watch(msg.data.s);
-		break;
+            debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
+            monitor_inotify_add_watch(msg.data.s);
+            break;
         case READ:
-		break;
+            break;
         case WRITE:
-		break;
+            break;
         default:
-		break;
-	};
+            break;
+    };
 
 	if(!monitor_check_limits(summary))
 		monitor_final_cleanup(SIGTERM);
