@@ -10,7 +10,15 @@
 
 from work_queue import *
 
+import os
 import sys
+
+def find_executable(executable):
+    for directory in os.environ['PATH'].split(':'):
+        path = os.path.join(directory, executable)
+        if os.path.exists(path):
+            return path
+    return None
 
 port = WORK_QUEUE_DEFAULT_PORT
 
@@ -27,6 +35,8 @@ except:
 
 print "listening on port %d..." % q.port
 
+gzip_path = find_executable("gzip")
+
 for i in range(1, len(sys.argv)):
     infile = "%s" % sys.argv[i] 
     outfile = "%s.gz" % sys.argv[i]
@@ -34,7 +44,7 @@ for i in range(1, len(sys.argv)):
     
     t = Task(command)
     
-    t.specify_file("/usr/bin/gzip", "gzip", WORK_QUEUE_INPUT, cache=True)
+    t.specify_file(gzip_path, "gzip", WORK_QUEUE_INPUT, cache=True)
     t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=False)
     t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=False)
     
