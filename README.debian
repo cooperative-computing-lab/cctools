@@ -12,6 +12,7 @@ Optional packages:
     * libkrb5-dev (kerberos support)
     * libmysqlclient-dev (mysql support)
     * libreadline-dev (readline support)
+    * swig (work queue bindings)
     * python-dev (python package)
     * m4 (manpages)
 
