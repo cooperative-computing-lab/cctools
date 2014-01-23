@@ -1865,6 +1865,7 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 	return 0;
 }
 
+//returns 1 on success, 0 on failure send, and -1 on failure to access locally.
 static int send_input_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
 	struct work_queue_file *f;
@@ -1882,7 +1883,7 @@ static int send_input_files( struct work_queue *q, struct work_queue_worker *w, 
 					debug(D_WQ,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
 					free(expanded_payload);
 					t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
-					return 0;
+					return -1;
 				}
 				free(expanded_payload);
 			}
@@ -1905,7 +1906,9 @@ static int send_input_files( struct work_queue *q, struct work_queue_worker *w, 
 int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
 	t->time_send_input_start = timestamp_get();
-	if(!send_input_files(q, w, t)) return 0;
+	int result = send_input_files(q, w, t);  
+	if (result <= 0) 
+		return result;
 
 	t->time_send_input_finish = timestamp_get();
 	t->time_execute_cmd_start = timestamp_get();
@@ -2185,7 +2188,8 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 	itable_insert(q->running_tasks, t->taskid, t); 
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
 
-	if(start_one_task(q, w, t)) {
+	int result = start_one_task(q, w, t);
+	if(result > 0) {
 		//If everything is unspecified, set it to the value of an "average" worker.
 		if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
 			t->cores = MAX((double)w->resources->cores.total/(double)w->resources->workers.total, 1);
@@ -2207,6 +2211,14 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 		
 		log_worker_stats(q);
 		return 1;
+	} else if(result < 0) {
+		debug(D_WQ, "Failed to send task due to inaccessible input file.");
+		//put task in complete list	
+		list_push_head(q->complete_list, t);
+		itable_remove(w->current_tasks, t->taskid);
+		itable_remove(q->running_tasks, t->taskid); 
+		itable_remove(q->worker_task_map, t->taskid);
+		return 0;
 	} else {
 		debug(D_WQ, "Failed to send task to worker %s (%s).", w->hostname, w->addrport);
 		remove_worker(q, w);	// puts tasks in w->current_tasks back into q->ready_list
