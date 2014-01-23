@@ -21,7 +21,7 @@ set_debug_flag('debug')
 set_debug_flag('wq')
 
 wq = WorkQueue(WORK_QUEUE_RANDOM_PORT, name='workqueue_example', catalog=True, exclusive=False)
-os.environ['PATH'] = '../../../dttools/src:' + os.environ['PATH']
+os.environ['PATH'] = '../../../work_queue/src:' + os.environ['PATH']
 os.system('work_queue_worker -d all localhost %d &' % wq.port)
 
 print wq.name
