@@ -3111,7 +3111,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP) {
+	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP || batch_queue_type == BATCH_QUEUE_TYPE_HADOOP) {
 		local_queue = remote_queue; /* all local jobs must be run on Chirp */
 		if(dag_gc_method == DAG_GC_ON_DEMAND /* NYI */ ) {
 			dag_gc_method = DAG_GC_REF_COUNT;
