@@ -647,7 +647,6 @@ Returns true on success, false on failure.
 static int get_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *local_name, int64_t length, int64_t * total_bytes)
 {
 	// If necessary, create parent directories of the file.
-
 	if(strchr(local_name,'/')) {
 		char dirname[WORK_QUEUE_LINE_MAX];
 		path_dirname(local_name,dirname);
@@ -658,7 +657,6 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	}
 
 	// Create the local file.
-
 	debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
 	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0700);
 	if(fd < 0) {
@@ -667,7 +665,6 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	}
 
 	// If a bandwidth limit is in effect, choose the effective stoptime.
-				
 	timestamp_t effective_stoptime = 0;
 	if(q->bandwidth) {
 		effective_stoptime = (length/q->bandwidth)*1000000 + timestamp_get();
@@ -864,7 +861,6 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
-
 	if(result && f->flags & WORK_QUEUE_CACHE) {
 		struct stat local_info;
 		result = stat(f->payload,&local_info);
@@ -881,21 +877,24 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 static int get_output_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
 	struct work_queue_file *f;
+	int result = 1;
 
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((f = list_next_item(t->output_files))) {
 			char * cached_name = make_cached_name(t,f);
-			get_output_file(q,w,t,f,cached_name);
+			result = get_output_file(q,w,t,f,cached_name); 
+			if(!result) {
+				break;
+			}
 			free(cached_name);
 		}
-
 	}
 
 	// tell the worker you no longer need that task's output directory.
 	send_worker_msg(q,w, "kill %d\n",t->taskid);
 
-	return 1;
+	return result;
 }
 
 // Sends "unlink file" for every file in the list except those that match one or more of the "except_flags"
