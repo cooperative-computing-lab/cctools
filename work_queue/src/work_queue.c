@@ -1054,7 +1054,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	int64_t output_length, retrieved_output_length;
 	timestamp_t execution_time;
 	struct work_queue_task *t;
-	int64_t actual, dropped;
+	int64_t actual;
 	timestamp_t observed_execution_time;
 	timestamp_t effective_stoptime = 0;
 
@@ -1128,12 +1128,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		if(output_length > retrieved_output_length) {
 			debug(D_WQ, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_LENGTH), taskid, MAX_TASK_STDOUT_LENGTH);
 			stoptime = time(0) + get_transfer_wait_time(q, w, t, (output_length-retrieved_output_length));
-			dropped = link_soak(w->link, (output_length-retrieved_output_length), stoptime);
-			if(dropped != (output_length-retrieved_output_length)) {
-				debug(D_WQ, "Failure: received size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", dropped, (output_length-retrieved_output_length));
-				t->output[actual] = '\0';
-				return -1;
-			}
+			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
 		}
 		
 		timestamp_t current_time = timestamp_get();
