@@ -1192,7 +1192,7 @@ pid_t monitor_fork(void)
     return pid;
 }
 
-struct process_info *spawn_first_process(const char *cmd, int child_in_foreground)
+struct process_info *spawn_first_process(const char *executable, char *argv[], int child_in_foreground)
 {
     pid_t pid;
 
@@ -1229,10 +1229,10 @@ struct process_info *spawn_first_process(const char *cmd, int child_in_foregroun
         fatal("fork failed: %s\n", strerror(errno));
     else //child
     {
-        debug(D_DEBUG, "executing: %s\n", cmd);
-        execlp("sh", "sh", "-c", cmd, (char *) NULL);
+        debug(D_DEBUG, "executing: %s\n", executable);
+        execvp(executable, argv);
         //We get here only if execlp fails.
-        fatal("error executing %s: %s\n", cmd, strerror(errno));
+        fatal("error executing %s: %s\n", executable, strerror(errno));
     }
 
     return itable_lookup(processes, pid);
@@ -1334,7 +1334,8 @@ int monitor_resources(long int interval /*in microseconds */)
 
 int main(int argc, char **argv) {
     int i;
-    char cmd[1024] = {'\0'};
+    char command_line[1024] = {'\0'};
+    char *executable;
     char c;
     uint64_t interval = DEFAULT_INTERVAL;
 
@@ -1496,13 +1497,14 @@ int main(int argc, char **argv) {
 
     rmsummary_debug_report(resources_limits);
 
-    //this is ugly, concatenating command and arguments
+    //this is ugly
     if(optind < argc)
     {
+        executable = xxstrdup(argv[optind]);
         for(i = optind; i < argc; i++)
         {
-            strcat(cmd, argv[i]);
-            strcat(cmd, " ");
+            strcat(command_line, argv[i]);
+            strcat(command_line, " ");
         }
     }
     else
@@ -1514,10 +1516,10 @@ int main(int argc, char **argv) {
 
     if(getenv(RESOURCE_MONITOR_INFO_ENV_VAR))
     {
-        debug(D_DEBUG, "using upstream monitor. executing: %s\n", cmd);
-        execlp("sh", "sh", "-c", cmd, (char *) NULL);
+        debug(D_DEBUG, "using upstream monitor. executing: %s\n", command_line);
+        execlp("sh", "sh", "-c", command_line, (char *) NULL);
         //We get here only if execlp fails.
-        fatal("error executing %s: %s\n", cmd, strerror(errno));
+        fatal("error executing %s: %s\n", command_line, strerror(errno));
     }
 
 #ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
@@ -1555,7 +1557,7 @@ int main(int argc, char **argv) {
     log_series  = open_log_file(series_path);
     log_opened  = open_log_file(opened_path);
 
-    summary->command = xxstrdup(cmd);
+    summary->command = xxstrdup(command_line);
     summary->start   = usecs_since_epoch();
 
     
@@ -1578,7 +1580,7 @@ int main(int argc, char **argv) {
 			fprintf(log_summary, "%s\n", verbatim_line);
 	}
 
-    spawn_first_process(cmd, child_in_foreground);
+    spawn_first_process(executable, argv + optind, child_in_foreground);
 
     monitor_resources(interval);
 
