@@ -130,9 +130,9 @@ INT64_T chirp_client_fstat_begin(struct chirp_client *c, INT64_T fd, struct chir
 INT64_T chirp_client_fstat_finish(struct chirp_client *c, INT64_T fd, struct chirp_stat *buf, time_t stoptime);
 
 INT64_T chirp_client_job_create(struct chirp_client *c, const char *json, chirp_jobid_t *id, time_t stoptime);
-INT64_T chirp_client_job_commit(struct chirp_client *c, chirp_jobid_t id, time_t stoptime);
-INT64_T chirp_client_job_kill(struct chirp_client *c, chirp_jobid_t id, time_t stoptime);
-INT64_T chirp_client_job_status(struct chirp_client *c, chirp_jobid_t id, char **status, time_t stoptime);
+INT64_T chirp_client_job_commit(struct chirp_client *c, const char *json, time_t stoptime);
+INT64_T chirp_client_job_kill(struct chirp_client *c, const char *json, time_t stoptime);
+INT64_T chirp_client_job_status(struct chirp_client *c, const char *json, char **status, time_t stoptime);
 INT64_T chirp_client_job_wait(struct chirp_client *c, chirp_jobid_t id, INT64_T timeout, char **status, time_t stoptime);
 INT64_T chirp_client_job_reap(struct chirp_client *c, const char *json, time_t stoptime);
 

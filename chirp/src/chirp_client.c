@@ -1928,21 +1928,74 @@ INT64_T chirp_client_job_create (struct chirp_client *c, const char *json, chirp
 	return result;
 }
 
-INT64_T chirp_client_job_commit (struct chirp_client *c, chirp_jobid_t id, time_t stoptime)
-{
-	return simple_command(c, stoptime, "job_commit %" PRICHIRP_JOBID_T "\n", id);
-}
-
-INT64_T chirp_client_job_kill (struct chirp_client *c, chirp_jobid_t id, time_t stoptime)
-{
-	return simple_command(c, stoptime, "job_kill %" PRICHIRP_JOBID_T "\n", id);
-}
-
-INT64_T chirp_client_job_status (struct chirp_client *c, chirp_jobid_t id, char **status, time_t stoptime)
+INT64_T chirp_client_job_commit (struct chirp_client *c, const char *json, time_t stoptime)
 {
 	INT64_T result;
+	size_t len = strlen(json);
 
-	result = simple_command(c, stoptime, "job_status %" PRICHIRP_JOBID_T "\n", id);
+	if(len >= MAX_BUFFER_SIZE) {
+		errno = ENOMEM;
+		return -1;
+	}
+
+	result = send_command(c, stoptime, "job_commit %zu\n", len);
+	if(result < 0)
+		return result;
+
+	result = link_putlstring(c->link, json, len, stoptime);
+	if(result != (INT64_T)len) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+	return get_result(c, stoptime);
+}
+
+INT64_T chirp_client_job_kill (struct chirp_client *c, const char *json, time_t stoptime)
+{
+	INT64_T result;
+	size_t len = strlen(json);
+
+	if(len >= MAX_BUFFER_SIZE) {
+		errno = ENOMEM;
+		return -1;
+	}
+
+	result = send_command(c, stoptime, "job_kill %zu\n", len);
+	if(result < 0)
+		return result;
+
+	result = link_putlstring(c->link, json, len, stoptime);
+	if(result != (INT64_T)len) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+	return get_result(c, stoptime);
+}
+
+INT64_T chirp_client_job_status (struct chirp_client *c, const char *json, char **status, time_t stoptime)
+{
+	INT64_T result;
+	size_t len = strlen(json);
+
+	if(len >= MAX_BUFFER_SIZE) {
+		errno = ENOMEM;
+		return -1;
+	}
+
+	result = send_command(c, stoptime, "job_status %zu\n", len);
+	if(result < 0)
+		return result;
+
+	result = link_putlstring(c->link, json, len, stoptime);
+	if(result != (INT64_T)len) {
+		c->broken = 1;
+		errno = ECONNRESET;
+		return -1;
+	}
+	result = get_result(c, stoptime);
+
 	if(result > 0) {
 		INT64_T actual;
 

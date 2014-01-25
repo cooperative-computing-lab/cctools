@@ -381,41 +381,64 @@ out:
 	return rc;
 }
 
-int chirp_job_commit (chirp_jobid_t id, const char *subject)
+int chirp_job_commit (json_value *J, const char *subject)
 {
+	/* FIXME subject failure abort */
 	static const char Commit[] =
-		/* FIXME subject failure abort */
+		"BEGIN TRANSACTION;"
+		/* This UPDATE may be executed multiple times. That's why it's wrapped in a transaction. */
 		"UPDATE OR ROLLBACK Jobs"
 		"    SET status = 'COMMITTED', time_commit = CURRENT_TIMESTAMP"
-		"    WHERE id = ? AND (? OR subject = ?) AND status = 'CREATED';";
+		"    WHERE id = ? AND (? OR subject = ?) AND status = 'CREATED';"
+		"END TRANSACTION;";
 
 	time_t timeout = time(NULL)+3;
 	sqlite3 *db = NULL;
 	sqlite3_stmt *stmt = NULL;
+	const char *current;
 	int rc;
+	int i;
 
 	if (!(db = db_get())) return EIO;
+	if (!jistype(J, json_array)) goto invalid;
 
 restart:
-	sqlcatch(sqlite3_prepare_v2(db, Commit, strlen(Commit)+1, &stmt, NULL));
-	sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
+	sqlcatch(sqlite3_prepare_v2(db, Commit, strlen(Commit)+1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int(stmt, 2, strcmp(subject, chirp_super_user) == 0));
 	sqlcatch(sqlite3_bind_text(stmt, 3, subject, -1, SQLITE_TRANSIENT));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	int n = sqlite3_changes(db);
-	assert(n == 0 || n == 1);
-	if (n) {
-		debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " is committed", id);
-		rc = 0;
-	} else {
-		debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " not changed", id);
-		rc = EPERM;
+	for (i = 0; i < (int)J->u.array.length; i++) {
+		int n;
+		chirp_jobid_t id;
+		if (!jistype(J->u.array.values[i], json_integer)) goto invalid;
+		id = J->u.array.values[i]->u.integer;
+		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
+		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+		n = sqlite3_changes(db);
+		assert(n == 0 || n == 1);
+		if (n) {
+			debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " is committed", id);
+		} else {
+			debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " not changed", id);
+			rc = EPERM; /* TODO we may want finer granularity of errors in the future. */
+			goto out;
+		}
+		sqlcatchcode(sqlite3_reset(stmt), SQLITE_OK);
 	}
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	rc = 0;
 	goto out;
-
+invalid:
+	rc = EINVAL;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
@@ -427,39 +450,69 @@ out:
 	return rc;
 }
 
-int chirp_job_kill (chirp_jobid_t id, const char *subject)
+int chirp_job_kill (json_value *J, const char *subject)
 {
+	/* FIXME subject failure abort */
 	static const char Kill[] =
+		"BEGIN TRANSACTION;"
+		/* This UPDATE may be executed multiple times. That's why it's wrapped in a transaction. */
 		"UPDATE Jobs"
 		"    SET status = 'KILLED', time_kill = CURRENT_TIMESTAMP"
 		"    WHERE id IN (SELECT Jobs.id"
 		"                     FROM Jobs NATURAL JOIN JobStatus"
-		"                     WHERE id = ? AND (? OR subject = ?) AND NOT JobStatus.terminal);";
+		"                     WHERE id = ? AND (? OR subject = ?) AND NOT JobStatus.terminal);"
+		"END TRANSACTION;";
 
 	time_t timeout = time(NULL)+3;
 	sqlite3 *db = NULL;
 	sqlite3_stmt *stmt = NULL;
+	const char *current;
 	int rc;
+	int i;
 
 	if (!(db = db_get())) return EIO;
+	if (!jistype(J, json_array)) goto invalid;
 
 restart:
-	sqlcatch(sqlite3_prepare_v2(db, Kill, strlen(Kill)+1, &stmt, NULL));
-	sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
+	sqlcatch(sqlite3_prepare_v2(db, Kill, strlen(Kill)+1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int(stmt, 2, strcmp(subject, chirp_super_user) == 0));
 	sqlcatch(sqlite3_bind_text(stmt, 3, subject, -1, SQLITE_TRANSIENT));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	int n = sqlite3_changes(db);
-	assert(n == 0 || n == 1);
-	if (n) {
-		debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " is killed", id);
-		rc = 0;
-	} else {
-		debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " not killed", id);
-		rc = EPERM;
+	for (i = 0; i < (int)J->u.array.length; i++) {
+		int n;
+		chirp_jobid_t id;
+		if (!jistype(J->u.array.values[i], json_integer)) goto invalid;
+		id = J->u.array.values[i]->u.integer;
+		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
+		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+		n = sqlite3_changes(db);
+		assert(n == 0 || n == 1);
+		if (n) {
+			debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " is killed", id);
+		} else {
+			debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " not killed", id);
+			rc = EPERM; /* TODO we may want finer granularity of errors in the future. */
+			goto out;
+		}
+		sqlcatchcode(sqlite3_reset(stmt), SQLITE_OK);
 	}
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	rc = 0;
+	goto out;
+invalid:
+	rc = EINVAL;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
+	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
 		debug(D_DEBUG, "the database is busy, restarting kill");
 		usleep(2000);
@@ -513,10 +566,12 @@ out:
  * system's (i.e. Confuga's) extra data such as the output replica IDs. This
  * should probably be done in a View all file systems make, perhaps called
  * JobFSPublic */
-int chirp_job_status (chirp_jobid_t id, const char *subject, buffer_t *B)
+int chirp_job_status (json_value *J, const char *subject, buffer_t *B)
 {
+	/* FIXME subject failure abort */
 	static const char Status[] =
 		"BEGIN TRANSACTION;"
+		/* These SELECTs will be executed multiple times, for each job in J. */
 		"SELECT JobsPublic.* FROM JobsPublic WHERE id = ? AND (? OR JobsPublic.subject = ?);" /* subject check happens here */
 		"SELECT arg FROM JobArguments WHERE id = ? ORDER BY n;"
 		"SELECT name, value FROM JobEnvironment WHERE id = ?;"
@@ -526,124 +581,145 @@ int chirp_job_status (chirp_jobid_t id, const char *subject, buffer_t *B)
 	time_t timeout = time(NULL)+3;
 	sqlite3 *db = NULL;
 	sqlite3_stmt *stmt = NULL;
-	int rc;
 	const char *current;
-	int first1 = 1;
+	const char *status;
+	int rc;
+	int i;
 
 	if (!(db = db_get())) return EIO;
+	if (!jistype(J, json_array)) goto invalid;
 
 restart:
 	sqlcatch(sqlite3_prepare_v2(db, Status, strlen(Status)+1, &stmt, &current));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
-	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
-	sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
-	sqlcatch(sqlite3_bind_int(stmt, 2, strcmp(subject, chirp_super_user) == 0));
-	sqlcatch(sqlite3_bind_text(stmt, 3, subject, -1, SQLITE_TRANSIENT));
-	if ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
-	{
-		int i;
+	CATCH(buffer_putliteral(B, "["));
+	status = current;
+	for (i = 0; i < (int)J->u.array.length; i++) {
+		chirp_jobid_t id;
+		int first1 = 1;
 
-		CATCH(buffer_putliteral(B, "{")); /* NOTE: this is matched at the end... */
-		for (i = 0; i < sqlite3_column_count(stmt); i++) {
+		if (!jistype(J->u.array.values[i], json_integer)) goto invalid;
+		id = J->u.array.values[i]->u.integer;
+
+		if (i)
+			buffer_putliteral(B, ",");
+
+		current = status;
+		sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
+		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
+		sqlcatch(sqlite3_bind_int(stmt, 2, strcmp(subject, chirp_super_user) == 0));
+		sqlcatch(sqlite3_bind_text(stmt, 3, subject, -1, SQLITE_TRANSIENT));
+		if ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
+		{
+			int j;
+
+			CATCH(buffer_putliteral(B, "{")); /* NOTE: this is matched at the end... */
+			for (j = 0; j < sqlite3_column_count(stmt); j++) {
+				if (first1) {
+					first1 = 0;
+					CATCH(buffer_printf(B, "\"%s\":", sqlite3_column_name(stmt, j)));
+				} else {
+					CATCH(buffer_printf(B, ",\"%s\":", sqlite3_column_name(stmt, j)));
+				}
+				jsonify(db, stmt, j, B);
+			}
+		} else if (rc == SQLITE_DONE) {
+			rc = EPERM;
+			goto out;
+		} else {
+			sqlcatch(rc);
+		}
+		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+		first1 = 1;
+		sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
+		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
+		CATCH(buffer_putliteral(B, ",\"arguments\":["));
+		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
+		{
+			assert(sqlite3_column_count(stmt) == 1);
+			if (first1) {
+				first1 = 0;
+			} else {
+				CATCH(buffer_putliteral(B, ","));
+			}
+			jsonify(db, stmt, 0, B);
+		}
+		sqlcatchcode(rc, SQLITE_DONE);
+		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+		CATCH(buffer_putliteral(B, "]"));
+
+		first1 = 1;
+		sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
+		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
+		CATCH(buffer_putliteral(B, ",\"environment\":{"));
+		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
+		{
+			assert(sqlite3_column_count(stmt) == 2);
 
 			if (first1) {
 				first1 = 0;
-				CATCH(buffer_printf(B, "\"%s\":", sqlite3_column_name(stmt, i)));
 			} else {
-				CATCH(buffer_printf(B, ",\"%s\":", sqlite3_column_name(stmt, i)));
+				CATCH(buffer_putliteral(B, ","));
 			}
-			jsonify(db, stmt, i, B);
+			jsonify(db, stmt, 0, B);
+			CATCH(buffer_putliteral(B, ":"));
+			jsonify(db, stmt, 1, B);
 		}
-	} else if (rc == SQLITE_DONE) {
-		rc = EPERM;
-		goto out;
-	} else {
-		sqlcatch(rc);
-	}
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+		sqlcatchcode(rc, SQLITE_DONE);
+		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+		CATCH(buffer_putliteral(B, "}"));
 
-	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
-	sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
-	first1 = 1;
-	CATCH(buffer_putliteral(B, ",\"arguments\":["));
-	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
-	{
-		assert(sqlite3_column_count(stmt) == 1);
-		if (first1) {
-			first1 = 0;
-		} else {
-			CATCH(buffer_putliteral(B, ","));
+		first1 = 1;
+		sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
+		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
+		CATCH(buffer_putliteral(B, ",\"files\":["));
+		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
+		{
+			int j;
+			int first2 = 1;
+
+			if (first1) {
+				first1 = 0;
+				CATCH(buffer_putliteral(B, "{"));
+			} else {
+				CATCH(buffer_putliteral(B, ",{"));
+			}
+			for (j = 0; j < sqlite3_column_count(stmt); j++) {
+				if (first2) {
+					first2 = 0;
+					CATCH(buffer_printf(B, "\"%s\":", sqlite3_column_name(stmt, j)));
+				} else {
+					CATCH(buffer_printf(B, ",\"%s\":", sqlite3_column_name(stmt, j)));
+				}
+				jsonify(db, stmt, j, B);
+			}
+			CATCH(buffer_putliteral(B, "}"));
 		}
-		jsonify(db, stmt, 0, B);
+		sqlcatchcode(rc, SQLITE_DONE);
+		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+		CATCH(buffer_putliteral(B, "]}"));
 	}
-	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 	CATCH(buffer_putliteral(B, "]"));
-
-	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
-	sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
-	first1 = 1;
-	CATCH(buffer_putliteral(B, ",\"environment\":{"));
-	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
-	{
-		assert(sqlite3_column_count(stmt) == 2);
-
-		if (first1) {
-			first1 = 0;
-		} else {
-			CATCH(buffer_putliteral(B, ","));
-		}
-		jsonify(db, stmt, 0, B);
-		CATCH(buffer_putliteral(B, ":"));
-		jsonify(db, stmt, 1, B);
-	}
-	sqlcatchcode(rc, SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-	CATCH(buffer_putliteral(B, "}"));
-
-	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
-	sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
-	first1 = 1;
-	CATCH(buffer_putliteral(B, ",\"files\":["));
-	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
-	{
-		int i;
-		int first2 = 1;
-
-		if (first1) {
-			first1 = 0;
-			CATCH(buffer_putliteral(B, "{"));
-		} else {
-			CATCH(buffer_putliteral(B, ",{"));
-		}
-		for (i = 0; i < sqlite3_column_count(stmt); i++) {
-			if (first2) {
-				first2 = 0;
-				CATCH(buffer_printf(B, "\"%s\":", sqlite3_column_name(stmt, i)));
-			} else {
-				CATCH(buffer_printf(B, ",\"%s\":", sqlite3_column_name(stmt, i)));
-			}
-			jsonify(db, stmt, i, B);
-		}
-		CATCH(buffer_putliteral(B, "}"));
-	}
-	sqlcatchcode(rc, SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-	CATCH(buffer_putliteral(B, "]}"));
 
 	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	rc = 0;
+	goto out;
+invalid:
+	rc = EINVAL;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
-		debug(D_DEBUG, "the database is busy, restarting reap");
+		debug(D_DEBUG, "the database is busy, restarting status");
 		usleep(2000);
 		goto restart;
 	}
@@ -728,18 +804,23 @@ restart:
 
 	buffer_putliteral(B, "[");
 	for (i = 0; i < n; i++) {
+		char buf[64];
+		int k = snprintf(buf, sizeof(buf), "[%" PRICHIRP_JOBID_T "]", jobs[i]);
+		assert(k > 0 && k < (int)sizeof(buf));
+		json_value *J = json_parse(buf, k);
+		assert(J);
 		if (i == 0) {
-			CATCH(chirp_job_status(jobs[i], subject, B));
+			CATCH(chirp_job_status(J, subject, B));
 		} else {
 			buffer_putliteral(B, ",");
-			CATCH(chirp_job_status(jobs[i], subject, B));
+			CATCH(chirp_job_status(J, subject, B));
 		}
+		json_value_free(J);
 	}
 	buffer_putliteral(B, "]");
 
 	rc = 0;
 	goto out;
-
 out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
@@ -805,14 +886,12 @@ restart:
 
 	rc = 0;
 	goto out;
-
 invalid:
 	rc = EINVAL;
 	goto out;
 out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
-	/* FIXME we have this annoying problem where sqlend finishes a transaction on error for RPC like status but is worthless for these RPCs... Perhaps only have sqlend END TRANSACTION for selects? */
 	if (rc == EAGAIN && time(NULL) <= timeout) {
 		debug(D_DEBUG, "the database is busy, restarting reap");
 		usleep(2000);

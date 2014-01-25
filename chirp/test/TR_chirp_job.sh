@@ -93,14 +93,14 @@ EOF
 )
 	J1=$(../src/chirp -a unix -d all "$host" job_create "$json")
 	echo Job $J1 created.
-	../src/chirp -a unix -d all "$host" job_commit $J1
-	../src/chirp -a unix -d all "$host" job_commit $J1 # harmless noop
+	../src/chirp -a unix -d all "$host" job_commit "[$J1]"
+	../src/chirp -a unix -d all "$host" job_commit "[$J1]" && return 1 # EPERM
 	J1b=$(../src/chirp -a unix -d all "$host" job_create "$json")
 	echo Job $J1b created.
-	../src/chirp -a unix -d all "$host" job_kill $J1b
+	../src/chirp -a unix -d all "$host" job_kill "[$J1b]"
 	J1c=$(../src/chirp -a unix -d all "$host" job_create "$json")
 	echo Job $J1c created.
-	../src/chirp -a unix -d all "$host" job_commit $J1c
+	../src/chirp -a unix -d all "$host" job_commit "[$J1c]"
 
 	json=$(cat <<EOF
 {
@@ -153,28 +153,28 @@ EOF
 )
 	J2=$(../src/chirp -a unix -d all "$host" job_create "$json")
 	echo Job $J2 created.
-	../src/chirp -a unix -d all "$host" job_commit $J2
+	../src/chirp -a unix -d all "$host" job_commit "[$J2]"
 
 	echo Job status for $J1.
-    ../src/chirp -a unix -d all "$host" job_status $J1
+    ../src/chirp -a unix -d all "$host" job_status "[$J1]"
 	echo Job status for $J1b.
-    ../src/chirp -a unix -d all "$host" job_status $J1b
+    ../src/chirp -a unix -d all "$host" job_status "[$J1b]"
 	echo Job status for $J1c.
-    ../src/chirp -a unix -d all "$host" job_status $J1c
+    ../src/chirp -a unix -d all "$host" job_status "[$J1c]"
     echo Killing $J1c
-    ../src/chirp -a unix -d all "$host" job_kill $J1c
+    ../src/chirp -a unix -d all "$host" job_kill "[$J1c]"
 	echo Job status for $J1c.
-    ../src/chirp -a unix -d all "$host" job_status $J1c
+    ../src/chirp -a unix -d all "$host" job_status "[$J1c]"
 	echo Job status for $J2.
-    ../src/chirp -a unix -d all "$host" job_status $J2
+    ../src/chirp -a unix -d all "$host" job_status "[$J2]"
 
 	echo Waiting for jobs.
     ../src/chirp -a unix -d all "$host" job_wait $J1 2
     ../src/chirp -a unix -d all "$host" job_reap "[$J1]"
     ../src/chirp -a unix -d all "$host" job_wait 0 1
     ../src/chirp -a unix -d all "$host" job_reap "[$J1b,$J1c]"
-    ../src/chirp -a unix -d all "$host" job_status $J1b
-    ../src/chirp -a unix -d all "$host" job_status $J1c
+    ../src/chirp -a unix -d all "$host" job_status "[$J1b]"
+    ../src/chirp -a unix -d all "$host" job_status "[$J1c]"
 
 	# An error due to ACL
 	json=$(cat <<EOF
@@ -228,7 +228,7 @@ EOF
 )
 	J3=$(../src/chirp -a hostname -d all "$host" job_create "$json")
 	echo Job $J3 created.
-	../src/chirp -a hostname -d all "$host" job_commit $J3
+	../src/chirp -a hostname -d all "$host" job_commit "[$J3]"
 	../src/chirp -a hostname -d all "$host" job_wait $J3
 
 	set +e

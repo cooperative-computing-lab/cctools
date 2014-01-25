@@ -21,11 +21,11 @@ enum {
 
 int chirp_job_create (chirp_jobid_t *id, json_value *J, const char *subject);
 
-int chirp_job_commit (chirp_jobid_t id, const char *subject);
+int chirp_job_commit (json_value *J, const char *subject);
 
-int chirp_job_kill (chirp_jobid_t id, const char *subject);
+int chirp_job_kill (json_value *J, const char *subject);
 
-int chirp_job_status (chirp_jobid_t id, const char *subject, buffer_t *B);
+int chirp_job_status (json_value *J, const char *subject, buffer_t *B);
 
 int chirp_job_wait (chirp_jobid_t id, const char *subject, INT64_T timeout, buffer_t *B);
 

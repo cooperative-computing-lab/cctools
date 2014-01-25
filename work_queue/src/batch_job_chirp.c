@@ -112,12 +112,15 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 	chirp_jobid_t id;
 	debug(D_DEBUG, "job = `%s'", buffer_tostring(&B, NULL));
 	int result = chirp_reli_job_create(gethost(q), buffer_tostring(&B, NULL), &id, STOPTIME);
-	buffer_free(&B);
 
-	if (result == 0 && (result = chirp_reli_job_commit(gethost(q), id, STOPTIME)) == 0) {
+	buffer_rewind(&B, 0);
+	buffer_putfstring(&B, "[%" PRICHIRP_JOBID_T "]", id);
+	if (result == 0 && (result = chirp_reli_job_commit(gethost(q), buffer_tostring(&B, NULL), STOPTIME)) == 0) {
 		itable_insert(q->job_table, id, &BATCH_JOB_CHIRP);
+		buffer_free(&B);
 		return (batch_job_id_t) id;
 	} else {
+		buffer_free(&B);
 		return (batch_job_id_t) result;
 	}
 }
@@ -212,15 +215,16 @@ static int batch_job_chirp_remove (struct batch_queue *q, batch_job_id_t jobid)
 		int result;
 		buffer_t B;
 
-		debug(D_BATCH, "removing job %" PRIbjid, jobid);
-
-		result = chirp_reli_job_kill(gethost(q), jobid, STOPTIME);
-		if (result == 0)
-			debug(D_BATCH, "forcibly killed job %" PRIbjid, jobid);
-
 		buffer_init(&B);
 		buffer_abortonfailure(&B, 1);
 		buffer_putfstring(&B, "[%" PRIbjid "]", jobid);
+
+		debug(D_BATCH, "removing job %" PRIbjid, jobid);
+
+		result = chirp_reli_job_kill(gethost(q), buffer_tostring(&B, NULL), STOPTIME);
+		if (result == 0)
+			debug(D_BATCH, "forcibly killed job %" PRIbjid, jobid);
+
 		result = chirp_reli_job_reap(gethost(q), buffer_tostring(&B, NULL), STOPTIME);
 		if (result == 0) {
 			debug(D_BATCH, "reaped job %" PRIbjid, jobid);

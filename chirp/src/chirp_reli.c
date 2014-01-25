@@ -770,19 +770,19 @@ INT64_T chirp_reli_job_create (const char *host, const char *json, chirp_jobid_t
 	RETRY_ATOMIC( result = chirp_client_job_create(client,json,id,stoptime); )
 }
 
-INT64_T chirp_reli_job_commit (const char *host, chirp_jobid_t id, time_t stoptime)
+INT64_T chirp_reli_job_commit (const char *host, const char *json, time_t stoptime)
 {
-	RETRY_ATOMIC( result = chirp_client_job_commit(client,id,stoptime); )
+	RETRY_ATOMIC( result = chirp_client_job_commit(client,json,stoptime); )
 }
 
-INT64_T chirp_reli_job_kill (const char *host, chirp_jobid_t id, time_t stoptime)
+INT64_T chirp_reli_job_kill (const char *host, const char *json, time_t stoptime)
 {
-	RETRY_ATOMIC( result = chirp_client_job_kill(client,id,stoptime); )
+	RETRY_ATOMIC( result = chirp_client_job_kill(client,json,stoptime); )
 }
 
-INT64_T chirp_reli_job_status (const char *host, chirp_jobid_t id, char **status, time_t stoptime)
+INT64_T chirp_reli_job_status (const char *host, const char *json, char **status, time_t stoptime)
 {
-	RETRY_ATOMIC( result = chirp_client_job_status(client,id,status,stoptime); )
+	RETRY_ATOMIC( result = chirp_client_job_status(client,json,status,stoptime); )
 }
 
 INT64_T chirp_reli_job_wait (const char *host, chirp_jobid_t id, INT64_T timeout, char **status, time_t stoptime)

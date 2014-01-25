@@ -1024,26 +1024,18 @@ static INT64_T do_job_create(int argc, char **argv)
 
 static INT64_T do_job_commit(int argc, char **argv)
 {
-	chirp_jobid_t id;
-	sscanf(argv[1], "%" SCNCHIRP_JOBID_T, &id);
-	INT64_T result = chirp_reli_job_commit(current_host, id, stoptime);
-	return result;
+	return chirp_reli_job_commit(current_host, argv[1], stoptime);
 }
 
 static INT64_T do_job_kill(int argc, char **argv)
 {
-	chirp_jobid_t id;
-	sscanf(argv[1], "%" SCNCHIRP_JOBID_T, &id);
-	INT64_T result = chirp_reli_job_kill(current_host, id, stoptime);
-	return result;
+	return chirp_reli_job_kill(current_host, argv[1], stoptime);
 }
 
 static INT64_T do_job_status(int argc, char **argv)
 {
-	chirp_jobid_t id;
 	char *status;
-	sscanf(argv[1], "%" SCNCHIRP_JOBID_T, &id);
-	INT64_T result = chirp_reli_job_status(current_host, id, &status, stoptime);
+	INT64_T result = chirp_reli_job_status(current_host, argv[1], &status, stoptime);
 	if (result > 0) {
 		fprintf(stdout, "%s\n", status);
 		free(status);
@@ -1069,8 +1061,7 @@ static INT64_T do_job_wait(int argc, char **argv)
 
 static INT64_T do_job_reap(int argc, char **argv)
 {
-	INT64_T result = chirp_reli_job_reap(current_host, argv[1], stoptime);
-	return result;
+	return chirp_reli_job_reap(current_host, argv[1], stoptime);
 }
 
 

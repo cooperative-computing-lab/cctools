@@ -661,9 +661,9 @@ INT64_T chirp_reli_fremovexattr(struct chirp_file *file, const char *name, time_
 INT64_T chirp_reli_lremovexattr(const char *host, const char *path, const char *name, time_t stoptime);
 
 INT64_T chirp_reli_job_create (const char *host, const char *json, chirp_jobid_t *id, time_t stoptime);
-INT64_T chirp_reli_job_commit (const char *host, chirp_jobid_t id, time_t stoptime);
-INT64_T chirp_reli_job_kill (const char *host, chirp_jobid_t id, time_t stoptime);
-INT64_T chirp_reli_job_status (const char *host, chirp_jobid_t id, char **status, time_t stoptime);
+INT64_T chirp_reli_job_commit (const char *host, const char *json, time_t stoptime);
+INT64_T chirp_reli_job_kill (const char *host, const char *json, time_t stoptime);
+INT64_T chirp_reli_job_status (const char *host, const char *json, char **status, time_t stoptime);
 INT64_T chirp_reli_job_wait (const char *host, chirp_jobid_t id, INT64_T timeout, char **status, time_t stoptime);
 INT64_T chirp_reli_job_reap (const char *host, const char *json, time_t stoptime);
 

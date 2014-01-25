@@ -1590,12 +1590,11 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if (length < MAX_BUFFER_SIZE && (json = malloc(length))) {
 				actual = link_read(l, json, length, stalltime);
 				if (actual == length) {
-					debug(D_DEBUG, "job_create `%.*s'", (int)length, json);
+					debug(D_CHIRP, "--> job_create `%.*s'", (int)length, json);
 					json_value *J = json_parse(json, length);
 					free(json);
 					if (J) {
 						result = chirp_job_create(&id, J, subject);
-						debug(D_DEBUG, "create id = %" PRICHIRP_JOBID_T "; rc = %d: %s", id, (int)result, strerror(result));
 						json_value_free(J);
 						if (result) {
 							errno = result;
@@ -1617,46 +1616,114 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				result = -1;
 				errno = ENOMEM;
 			}
-		} else if(sscanf(line, "job_commit %" SCNCHIRP_JOBID_T, &id) == 1) {
-			result = chirp_job_commit(id, subject);
-			debug(D_DEBUG, "commit id = %" PRICHIRP_JOBID_T "; rc = %d: %s", id, (int)result, strerror(result));
-			if (result) {
-				errno = result;
-				result = -1;
-			}
-		} else if(sscanf(line, "job_kill %" SCNCHIRP_JOBID_T, &id) == 1) {
-			result = chirp_job_kill(id, subject);
-			debug(D_DEBUG, "kill id = %" PRICHIRP_JOBID_T "; rc = %d: %s", id, (int)result, strerror(result));
-			if (result) {
-				errno = result;
-				result = -1;
-			}
-		} else if(sscanf(line, "job_status %" SCNCHIRP_JOBID_T, &id) == 1) {
-			buffer_t B;
-
-			buffer_init(&B);
-			buffer_max(&B, MAX_BUFFER_SIZE);
-			result = chirp_job_status(id, subject, &B);
-			if(result == 0) {
-				size_t len;
-				const char *status;
-
-				status = buffer_tostring(&B, &len);
-				if (len > 0) {
-					dataout = malloc(len);
-					if (dataout) {
-						memcpy(dataout, status, len);
-						dataoutlength = len;
-						result = len; /* result of job_status is number of bytes in status */
+		} else if(sscanf(line, "job_commit %" PRId64, &length) == 1) {
+			char *json;
+			if (length < MAX_BUFFER_SIZE && (json = malloc(length))) {
+				actual = link_read(l, json, length, stalltime);
+				if (actual == length) {
+					debug(D_CHIRP, "--> job_commit `%.*s'", (int)length, json);
+					json_value *J = json_parse(json, length);
+					free(json);
+					if (J) {
+						result = chirp_job_commit(J, subject);
+						json_value_free(J);
+						if (result) {
+							errno = result;
+							result = -1;
+						}
 					} else {
-						result = errno;
+						result = -1;
+						errno = EINVAL;
 					}
+				} else {
+					free(json);
+					result = -1;
+					break;
 				}
 			} else {
-				errno = result;
+				link_soak(l, length, stalltime);
 				result = -1;
+				errno = ENOMEM;
 			}
-			buffer_free(&B);
+		} else if(sscanf(line, "job_kill %" PRId64, &length) == 1) {
+			char *json;
+			if (length < MAX_BUFFER_SIZE && (json = malloc(length))) {
+				actual = link_read(l, json, length, stalltime);
+				if (actual == length) {
+					debug(D_DEBUG, "--> job_kill `%.*s'", (int)length, json);
+					json_value *J = json_parse(json, length);
+					free(json);
+					if (J) {
+						result = chirp_job_kill(J, subject);
+						json_value_free(J);
+						if (result) {
+							errno = result;
+							result = -1;
+						}
+					} else {
+						result = -1;
+						errno = EINVAL;
+					}
+				} else {
+					free(json);
+					result = -1;
+					break;
+				}
+			} else {
+				link_soak(l, length, stalltime);
+				result = -1;
+				errno = ENOMEM;
+			}
+		} else if(sscanf(line, "job_status %" PRId64, &length) == 1) {
+			char *json;
+			if (length < MAX_BUFFER_SIZE && (json = malloc(length))) {
+				actual = link_read(l, json, length, stalltime);
+				if (actual == length) {
+					debug(D_CHIRP, "--> job_status `%.*s'", (int)length, json);
+					json_value *J = json_parse(json, length);
+					free(json);
+					if (J) {
+						buffer_t B;
+						buffer_init(&B);
+						buffer_max(&B, MAX_BUFFER_SIZE);
+
+						result = chirp_job_status(J, subject, &B);
+						json_value_free(J);
+
+						if(result == 0) {
+							size_t len;
+							const char *status;
+
+							status = buffer_tostring(&B, &len);
+							if (len > 0) {
+								dataout = malloc(len);
+								if (dataout) {
+									memcpy(dataout, status, len);
+									dataoutlength = len;
+									result = len; /* result of job_status is number of bytes in status */
+								} else {
+									result = errno;
+								}
+							}
+						} else {
+							errno = result;
+							result = -1;
+						}
+						buffer_free(&B);
+					} else {
+						result = -1;
+						errno = EINVAL;
+					}
+				} else {
+					free(json);
+					result = -1;
+					break;
+				}
+			} else {
+				link_soak(l, length, stalltime);
+				result = -1;
+				errno = ENOMEM;
+			}
 		} else if(sscanf(line, "job_wait %" SCNCHIRP_JOBID_T " %" SCNd64, &id, &job_wait_timeout) == 2) {
 			buffer_t B;
 

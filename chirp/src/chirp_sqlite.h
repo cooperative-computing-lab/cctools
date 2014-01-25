@@ -60,7 +60,6 @@ do {\
 	}\
 } while (0)
 
-/* FIXME: we already rollback as part of any insert/update? We don't need this anymore? */
 #define sqlend(db) \
 do {\
 	if (rc) {\
