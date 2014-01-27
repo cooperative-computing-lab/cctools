@@ -1597,7 +1597,9 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
 	
-	if(actual != length)
+	*total_bytes += actual;
+	
+	if(actual != length) 
 		return 0;
 		
 	timestamp_t current_time = timestamp_get();
@@ -1858,7 +1860,7 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 		w->hostname,
 		w->addrport,
 		f->type == WORK_QUEUE_BUFFER ? "literal data" : f->payload,
-		actual);
+		total_bytes);
 
 	t->result |= WORK_QUEUE_RESULT_INPUT_FAIL;
 	free(cached_name);
