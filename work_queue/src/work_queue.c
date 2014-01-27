@@ -1046,11 +1046,16 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 	return 0;
 }
 
+/* 
+Returns 1 on success,  0 on failure to receive.
+Failure to store result is treated as success so we continue to retrieve the
+output files of the task. 
+*/
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line) {
 
-	if(!q || !w || !line) return -1; 
+	if(!q || !w || !line) return 0; 
 
-	int result;
+	int task_result;
 	uint64_t taskid;
 	int64_t output_length, retrieved_output_length;
 	timestamp_t execution_time;
@@ -1058,20 +1063,18 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	int64_t actual;
 	timestamp_t observed_execution_time;
 	timestamp_t effective_stoptime = 0;
-
 	time_t stoptime;
 
 	//Format: result, output length, execution time, taskid
 	char items[3][WORK_QUEUE_PROTOCOL_FIELD_MAX];
 	int n = sscanf(line, "result %s %s %s %" SCNd64, items[0], items[1], items[2], &taskid);
 
-
 	if(n < 4) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		return -1;
+		return 0;
 	}
 	
-	result = atoi(items[0]);
+	task_result = atoi(items[0]);
 	output_length = atoll(items[1]);
 	
 	t = itable_lookup(w->current_tasks, taskid);
@@ -1079,7 +1082,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		debug(D_WQ, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
 		stoptime = time(0) + get_transfer_wait_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
-		return 0;
+		return 1;
 	}
 	
 	t->time_receive_result_start = timestamp_get();
@@ -1101,6 +1104,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	} else {
 		retrieved_output_length = MAX_TASK_STDOUT_LENGTH; 
 		fprintf(stderr, "warning: stdout of task %"PRId64" is of size %"PRId64" GB which exceeds maximum supported size of %d GB. Only %d GB will be retreived.\n", taskid, output_length/GIGABYTE, MAX_TASK_STDOUT_LENGTH/GIGABYTE, MAX_TASK_STDOUT_LENGTH/GIGABYTE);
+		t->result |= WORK_QUEUE_RESULT_STDOUT_MISSING;
 	}
 
 	t->output = malloc(retrieved_output_length+1);
@@ -1122,7 +1126,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		if(actual != retrieved_output_length) {
 			debug(D_WQ, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, retrieved_output_length);
 			t->output[actual] = '\0';
-			return -1;
+			return 0;
 		}
 		debug(D_WQ, "Retrieved %"PRId64" bytes from %s (%s)", actual, w->hostname, w->addrport);
 		
@@ -1143,7 +1147,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t->output[actual] = 0;
 	t->time_receive_result_finish = timestamp_get();
 
-	t->return_status = result;
+	t->return_status = task_result;
 	if(t->return_status != 0)
 		t->result |= WORK_QUEUE_RESULT_FUNCTION_FAIL;
 
@@ -1151,7 +1155,6 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	q->total_execute_time += t->cmd_execution_time;
 	itable_remove(q->running_tasks, taskid);
 	itable_insert(q->finished_tasks, taskid, (void*)t);
-
 
 	w->cores_allocated -= t->cores;
 	w->memory_allocated -= t->memory;
@@ -1166,7 +1169,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	log_worker_stats(q);
 
-	return 0;
+	return 1;
 }
 
 static int process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count)
