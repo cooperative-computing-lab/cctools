@@ -198,7 +198,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
-static int process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count);
+static void process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line); 
 
@@ -1172,49 +1172,43 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	return 1;
 }
 
-static int process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count)
+static void process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count)
 {
 	//max_count == -1, tells the worker to send all available results.
 
 	send_worker_msg(q, w, "send_results %d\n", max_count);
-
-	char line[WORK_QUEUE_LINE_MAX];
-
 	debug(D_WQ, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
+	char line[WORK_QUEUE_LINE_MAX];
 	int i = 0;
+	
 	while(1) {
 		int result = recv_worker_msg_retry(q, w, line, sizeof(line));
-		if(result < 0) { 
-			remove_worker(q, w);
-			return -1;
-		}
+		if(result < 0) goto failure;	
 
 		if(string_prefix_is(line,"result")) {
 			result = process_result(q, w, line);
-			if(result < 0) { 
-				remove_worker(q, w);
-				return -1;
-			}
+			if(result == 0) goto failure;
 			i++;
 		} else if(!strcmp(line,"end")) {
 			//Only return success if last message is end.
 			break;
 		} else {
 			debug(D_WQ, "%s (%s): sent invalid response to send_results: %s",w->hostname,w->addrport,line);
-			remove_worker(q, w);
-			return -1;
+			goto failure;
 		}
-
 	}
-
-	if(max_count > 0 && i > max_count) 
-	{
+	
+	if(max_count > 0 && i > max_count) {
 		debug(D_WQ, "%s (%s): sent %d results. At most %d were expected.",w->hostname,w->addrport, i, max_count);
-		return -1;
-	}
+		goto failure; //if the worker disobeyed, consider it as failed.
+	} 
 
-	return 0;
+	return;
+
+   failure:
+	remove_worker(q, w);
+	return;
 }
 
 /*
