@@ -641,9 +641,8 @@ static int add_worker(struct work_queue *q)
 
 /*
 Get a single file from a remote worker.
-Returns true on success, false on failure.
+Returns 1 on success, 0 on failure to receive, -1 on failure to access.
 */
-
 static int get_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *local_name, int64_t length, int64_t * total_bytes)
 {
 	// If necessary, create parent directories of the file.
@@ -652,7 +651,7 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 		path_dirname(local_name,dirname);
 		if(!create_dir(dirname, 0700)) {
 			debug(D_WQ, "Could not create directory - %s (%s)", dirname, strerror(errno));
-			return 0;
+			return -1;
 		}
 	}
 
@@ -661,7 +660,7 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0700);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s for writing: %s", local_name, strerror(errno));
-		return 0;
+		return -1;
 	}
 
 	// If a bandwidth limit is in effect, choose the effective stoptime.
@@ -685,7 +684,6 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	*total_bytes += length;
 
 	// If the transfer was too fast, slow things down.
-
 	timestamp_t current_time = timestamp_get();
 	if(effective_stoptime && effective_stoptime > current_time) {
 		usleep(effective_stoptime - current_time);
@@ -701,8 +699,8 @@ responds with a continuous stream of dir and file message
 that indicate the entire contents of the directory.
 This makes it efficient to move deep directory hierarchies with
 high throughput and low latency.
+Return 1 on success, 0 on failure to receive, -1 on failure to create.
 */
-
 static int get_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *remote_name, const char *local_name, int64_t * total_bytes)
 {
 	// Remember the length of the specified remote path so it can be chopped from the result.
@@ -712,6 +710,8 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 	debug(D_WQ, "%s (%s) sending back %s to %s", w->hostname, w->addrport, remote_name, local_name);
 	send_worker_msg(q,w, "get %s 1\n",remote_name);
 
+	int result = 1;
+
 	// Process the recursive file/dir responses as they are sent.
 	while(1) {
 		char line[WORK_QUEUE_LINE_MAX];
@@ -719,19 +719,27 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 		int64_t length;
 		int errnum;
 
-		int result = recv_worker_msg_retry(q, w, line, sizeof(line));
-		if(result<0) break;
+		result = recv_worker_msg_retry(q, w, line, sizeof(line));
+		if(result<0) {
+			result = 0; //signal sys-level failure	
+			break;	
+		}
 
 		if(sscanf(line,"dir %s", tmp_remote_path)==1) {
 			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
 			result = create_dir(tmp_local_name,0700);
+			if(!result) {
+				debug(D_WQ, "Could not create directory - %s (%s)", tmp_local_name, strerror(errno));
+				result = -1; //signal app-level failure			
+				free(tmp_local_name);
+				break;
+			}
 			free(tmp_local_name);
-			if(!result) break;
 		} else if(sscanf(line,"file %s %"SCNd64, tmp_remote_path, &length)==2) {
 			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
 			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
 			free(tmp_local_name);
-			if(!result) break;
+			if(result <= 0) break;
 		} else if(sscanf(line,"missing %s %d",tmp_remote_path,&errnum)==2) {
 			// If the output file is missing, we make a note of that in the task result,
 			// but we continue and consider the transfer a 'success' so that other
@@ -743,6 +751,7 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 			return 1;
 		} else {
 			debug(D_WQ, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
+			result = 0; //signal sys-level failure	
 			break;
 		}
 	}
@@ -751,8 +760,8 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 	// failure which causes this function to return failure and the task
 	// to be returned to the queue to be attempted elsewhere.
 	debug(D_WQ, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, remote_name, local_name);
-	t->result |= WORK_QUEUE_RESULT_OUTPUT_FAIL;
-	return 0;
+	if(result < 0) t->result |= WORK_QUEUE_RESULT_OUTPUT_MISSING;
+	return result;
 }
 
 /*
@@ -802,8 +811,8 @@ char * make_cached_name( struct work_queue_task *t, struct work_queue_file *f )
 This function stores an output file from the remote cache directory
 to a third-party location, which can be either a remote filesystem
 (WORK_QUEUE_FS_PATH) or a command to run (WORK_QUEUE_FS_CMD).
+Returns 1 on success at worker and 0 on invalid message from worker.
 */
-
 static int do_thirdput( struct work_queue *q, struct work_queue_worker *w,  const char *cached_name, const char *payload, int command )
 {
 	char line[WORK_QUEUE_LINE_MAX];
@@ -824,13 +833,12 @@ static int do_thirdput( struct work_queue *q, struct work_queue_worker *w,  cons
 
 /*
 Get a single output file, located at the worker under 'cached_name'.
-Returns true on success, false on failure.
+Returns 1 on success, 0 on failure to get, -1 on failure to access file.
 */
-
 static int get_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f, const char *cached_name )
 {
 	int64_t total_bytes = 0;
-	int result = 0;
+	int result = 1; //return success unless something fails below.
 			
 	timestamp_t open_time = timestamp_get();
 
@@ -884,7 +892,7 @@ static int get_output_files( struct work_queue *q, struct work_queue_worker *w, 
 		while((f = list_next_item(t->output_files))) {
 			char * cached_name = make_cached_name(t,f);
 			result = get_output_file(q,w,t,f,cached_name); 
-			if(!result) {
+			if(result <= 0) {
 				break;
 			}
 			free(cached_name);
@@ -973,7 +981,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	// Receiving output ...
 	t->time_receive_output_start = timestamp_get();
-	if(!get_output_files(q,w,t)) {
+	if(get_output_files(q,w,t) <= 0) {
 		goto failure;
 	}
 	t->time_receive_output_finish = timestamp_get();
@@ -1017,8 +1025,18 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	return;
 
       failure:
-	debug(D_WQ, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
-	remove_worker(q, w);
+	if(result < 0) {
+		debug(D_WQ, "Failed to store the output received from worker %s (%s).", w->hostname, w->addrport);
+		//put task in complete list and remove from other lists	
+		list_push_head(q->complete_list, t);
+		itable_remove(w->current_tasks, t->taskid);
+		itable_remove(q->running_tasks, t->taskid); 
+		itable_remove(q->worker_task_map, t->taskid);
+		return;
+	} else {
+		debug(D_WQ, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
+		remove_worker(q, w);
+	}	
 	return;
 }
 
