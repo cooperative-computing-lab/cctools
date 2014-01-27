@@ -194,7 +194,7 @@ struct work_queue_task_report {
 	timestamp_t exec_time;
 };
 
-static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
+static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
 
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
@@ -963,7 +963,7 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 		debug(D_NOTICE, "Summary %s could not be removed.\n", summary);
 }
 
-static int fetch_output_from_worker(struct work_queue *q, struct work_queue_worker *w, int taskid)
+static void fetch_output_from_worker(struct work_queue *q, struct work_queue_worker *w, int taskid)
 {
 	struct work_queue_task *t;
 
@@ -1014,12 +1014,12 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 		(t->time_receive_output_finish - t->time_send_input_start) / 1000000.0,
 		(long long) w->total_tasks_complete,
 		w->total_task_time / w->total_tasks_complete / 1000000.0);
-	return 1;
+	return;
 
       failure:
 	debug(D_WQ, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
 	remove_worker(q, w);
-	return 0;
+	return;
 }
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line)
@@ -1091,7 +1091,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		debug(D_WQ, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
 		stoptime = time(0) + get_transfer_wait_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
-		return 1;
+		return 1; 
 	}
 	
 	t->time_receive_result_start = timestamp_get();
@@ -2178,11 +2178,11 @@ static struct work_queue_worker *find_best_worker(struct work_queue *q, struct w
 	}
 }
 
-static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *w)
+static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	struct work_queue_task *t = list_pop_head(q->ready_list);
 	if(!t)
-		return 0;
+		return;
 
 	itable_insert(w->current_tasks, t->taskid, t);
 	itable_insert(q->running_tasks, t->taskid, t); 
@@ -2210,7 +2210,7 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 		w->gpus_allocated += t->gpus;
 		
 		log_worker_stats(q);
-		return 1;
+		return;
 	} else if(result < 0) {
 		debug(D_WQ, "Failed to send task due to inaccessible input file.");
 		//put task in complete list	
@@ -2218,16 +2218,17 @@ static int start_task_on_worker(struct work_queue *q, struct work_queue_worker *
 		itable_remove(w->current_tasks, t->taskid);
 		itable_remove(q->running_tasks, t->taskid); 
 		itable_remove(q->worker_task_map, t->taskid);
-		return 0;
+		return;
 	} else {
 		debug(D_WQ, "Failed to send task to worker %s (%s).", w->hostname, w->addrport);
 		remove_worker(q, w);	// puts tasks in w->current_tasks back into q->ready_list
-		return 0;
+		return;
 	}
 }
 
 static void start_tasks(struct work_queue *q)
-{				// try to start as many task as possible
+{			
+	//start as many tasks as possible
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
