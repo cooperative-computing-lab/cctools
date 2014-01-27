@@ -1765,7 +1765,7 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 }
 
 static int send_input_file(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f)
-
+{
 	int64_t total_bytes = 0;
 	int64_t actual = 0;
 	int result = 1; //return success unless something fails below
@@ -1862,7 +1862,7 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 		f->type == WORK_QUEUE_BUFFER ? "literal data" : f->payload,
 		total_bytes);
 
-	t->result |= WORK_QUEUE_RESULT_INPUT_FAIL;
+	if(result < 0) t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
 	free(cached_name);
 	return result;
 }
