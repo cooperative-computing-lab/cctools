@@ -1552,16 +1552,16 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	return n;
 }
 
+//Send a file. Returns 1 on success, 0 on failure to send, -1 on failure to access.
 static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, int64_t *total_bytes, int flags)
 {
-
 	struct stat local_info;
 	time_t stoptime;
 	timestamp_t effective_stoptime = 0;
 	int64_t actual = 0;
 	
 	if(stat(localname, &local_info) < 0)
-		return 0;
+		return -1;
 
 	/* normalize the mode so as not to set up invalid permissions */
 	local_info.st_mode |= 0600;
@@ -1574,18 +1574,18 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	debug(D_WQ, "%s (%s) needs file %s bytes %lld:%lld as '%s'", w->hostname, w->addrport, localname, (long long) offset, (long long) offset+length, remotename);
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0)
-		return 0;
+		return -1;
 
 	//We want to send bytes starting from 'offset'. So seek to it first.
 	if (offset >= 0 && (offset+length) <= local_info.st_size) {
 		if(lseek(fd, offset, SEEK_SET) == -1) {
 			close(fd);
-			return 0;
+			return -1;
 		}
 	} else {
 		debug(D_NOTICE, "File specification %s (%lld:%lld) is invalid", localname, (long long) offset, (long long) offset+length);
 		close(fd);
-		return 0;
+		return -1;
 	}
 	
 	if(q->bandwidth) {
@@ -1605,25 +1605,22 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 		usleep(effective_stoptime - current_time);
 	}
 	
-	*total_bytes += actual;
 	return 1;
 }
 
 /*
 Send a directory and all of its contentss.
-Returns true on success, false.
+Returns 1 on success, 0 on failure to send, -1 on failure to access directory.
 */
-
 static int send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *dirname, const char *remotedirname, int64_t * total_bytes, int flags )
 {
 	DIR *dir = opendir(dirname);
-	if(!dir) return 0;
+	if(!dir) return -1;
 
 	int result=1;
 
 	// When putting a file its parent directories are automatically
 	// created by the worker, so no need to manually create them.
-
 	struct dirent *d;
 	while((d = readdir(dir))) {
 		if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, "..")) continue;
@@ -1639,13 +1636,13 @@ static int send_directory( struct work_queue *q, struct work_queue_worker *w, st
 				result = send_file( q, w, t, localpath, remotepath, 0, 0, total_bytes, flags );
 			}	
 		} else {
-			result = 0;
+			result = -1;
 		}
 
 		free(localpath);
 		free(remotepath);
 
-		if(!result) break;
+		if(result <= 0) break;
 	}
 	
 	closedir(dir);
@@ -1655,15 +1652,14 @@ static int send_directory( struct work_queue *q, struct work_queue_worker *w, st
 /*
 Send a file or directory to a remote worker, if it is not already cached.
 The local file name should already have been expanded by the caller.
-Returns true on success, false on failure.
+Returns 1 on success, 0 on failure to send, -1 on failure to access file/directory.
 */
-
 static int send_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *expanded_local_name, int64_t * total_bytes)
 {
 	struct stat local_info;
 	struct stat *remote_info;
 
-	if(stat(expanded_local_name, &local_info) < 0) return 0;
+	if(stat(expanded_local_name, &local_info) < 0) return -1;
 	
 	int result = 1;
 
@@ -1767,9 +1763,10 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 }
 
 static int send_input_file(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f)
-{
+
 	int64_t total_bytes = 0;
 	int64_t actual = 0;
+	int result = 1; //return success unless something fails below
 
 	char *cached_name = make_cached_name(t,f);
 
@@ -1782,7 +1779,10 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 		time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, f->length);
 		send_worker_msg(q,w, "put %s %d %o %d\n",cached_name, f->length, 0777, f->flags);
 		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
-		if(actual!=f->length) goto failure;
+		if(actual!=f->length) {
+			result = 0;	
+			goto failure;
+		}	
 		total_bytes = actual;
 		break;
 
@@ -1817,9 +1817,9 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 			}
 		} else {
 			char *expanded_payload = expand_envnames(w, f->payload);
-			int result = send_file_or_directory(q,w,t,f,expanded_payload,&total_bytes);
+			result = send_file_or_directory(q,w,t,f,expanded_payload,&total_bytes);
 			free(expanded_payload);
-			if(!result) goto failure;
+			if(result <= 0) goto failure;
 		}
 		break;
 	}
@@ -1851,7 +1851,7 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 	}
 
 	free(cached_name);
-	return 1;
+	return result;
 
 	failure:
 	debug(D_WQ, "%s (%s) failed to send %s (%" PRId64 " bytes sent).",
@@ -1862,10 +1862,10 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 
 	t->result |= WORK_QUEUE_RESULT_INPUT_FAIL;
 	free(cached_name);
-	return 0;
+	return result;
 }
 
-//returns 1 on success, 0 on failure send, and -1 on failure to access locally.
+//returns 1 on success, 0 on failure to send, and -1 on failure to access locally.
 static int send_input_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
 	struct work_queue_file *f;
@@ -1873,7 +1873,6 @@ static int send_input_files( struct work_queue *q, struct work_queue_worker *w, 
 
 	// Check for existence of each input file first.
 	// If any one fails to exist, set the failure condition and return failure.
-
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
@@ -1892,18 +1891,18 @@ static int send_input_files( struct work_queue *q, struct work_queue_worker *w, 
 
 	// Send each of the input files.
 	// If any one fails to be sent, return failure.
-
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
-			if(!send_input_file(q,w,t,f)) return 0;
+			int result = send_input_file(q,w,t,f);
+			if(result <= 0) return result;
 		}
 	}
 
 	return 1;
 }
 
-int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
+static int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
 	t->time_send_input_start = timestamp_get();
 	int result = send_input_files(q, w, t);  
@@ -2213,7 +2212,7 @@ static void start_task_on_worker(struct work_queue *q, struct work_queue_worker 
 		return;
 	} else if(result < 0) {
 		debug(D_WQ, "Failed to send task due to inaccessible input file.");
-		//put task in complete list	
+		//put task in complete list and remove from other lists	
 		list_push_head(q->complete_list, t);
 		itable_remove(w->current_tasks, t->taskid);
 		itable_remove(q->running_tasks, t->taskid); 
@@ -2221,7 +2220,7 @@ static void start_task_on_worker(struct work_queue *q, struct work_queue_worker 
 		return;
 	} else {
 		debug(D_WQ, "Failed to send task to worker %s (%s).", w->hostname, w->addrport);
-		remove_worker(q, w);	// puts tasks in w->current_tasks back into q->ready_list
+		remove_worker(q, w); //puts tasks in w->current_tasks back into q->ready_list
 		return;
 	}
 }
