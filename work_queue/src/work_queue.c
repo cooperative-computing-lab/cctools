@@ -126,6 +126,7 @@ struct work_queue {
 	int worker_selection_algorithm;
 	int task_ordering;
 	int process_pending_check;
+	int workers_to_wait;
 
 	int short_timeout;		// timeout to send/recv a brief message from worker
 	int long_timeout;		// timeout to send/recv a brief message from a foreman
@@ -397,6 +398,28 @@ int recv_worker_msg_retry( struct work_queue *q, struct work_queue_worker *w, ch
 	return result;
 }
 
+static double get_queue_transfer_rate(struct work_queue *q, char **data_source) 
+{
+	double queue_transfer_rate; // bytes per second
+	int64_t     q_total_bytes_transferred = q->total_bytes_sent + q->total_bytes_received;
+	timestamp_t q_total_transfer_time     = q->total_send_time  + q->total_receive_time;
+
+	// Note q_total_transfer_time is timestamp_t with units of milliseconds.
+	if(q_total_transfer_time>1000000) {
+		queue_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
+		if (data_source) {
+			*data_source = xxstrdup("overall queue");
+		}	
+	} else {
+		queue_transfer_rate = q->default_transfer_rate;
+		if (data_source) {
+			*data_source = xxstrdup("conservative default");
+		}	
+	}
+
+	return queue_transfer_rate;
+}
+
 /*
 Select an appropriate timeout value for the transfer of a certain number of bytes.
 We do not know in advance how fast the system will perform.
@@ -416,24 +439,16 @@ Two exceptions are made:
 static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int64_t length)
 {
 	double avg_transfer_rate; // bytes per second
-	const char *data_source;
-
-	int64_t     q_total_bytes_transferred = q->total_bytes_sent + q->total_bytes_received;
-	timestamp_t q_total_transfer_time     = q->total_send_time  + q->total_receive_time;
-
-	// Note total_transfer_time and q_total_transfer_time are timestamp_t with units of milliseconds.
+	char *data_source;
 
 	if(w->total_transfer_time>1000000) {
+		// Note w->total_transfer_time is timestamp_t with units of milliseconds.
 		avg_transfer_rate = 1000000 * w->total_bytes_transferred / w->total_transfer_time;
-		data_source = "worker's observed";
-	} else if(q_total_transfer_time>1000000) {
-		avg_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
-		data_source = "overall queue";
+		data_source = xxstrdup("worker's observed");
 	} else {
-		avg_transfer_rate = q->default_transfer_rate;
-		data_source = "conservative default";
+		avg_transfer_rate = get_queue_transfer_rate(q, &data_source);
 	}
-
+	
 	debug(D_WQ,"%s (%s) using %s average transfer rate of %.2lf MB/s\n", w->hostname, w->addrport, data_source, avg_transfer_rate/MEGABYTE);
 
 	double tolerable_transfer_rate = avg_transfer_rate / q->transfer_outlier_factor; // bytes per second
@@ -450,6 +465,7 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 
 	debug(D_WQ, "%s (%s) will try up to %d seconds to transfer this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
 
+	free(data_source);
 	return timeout;
 }
 
@@ -1063,6 +1079,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		return 0;
 	}
 	
+	t->time_receive_result_start = timestamp_get();
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 	
 	if(q->bandwidth) {
@@ -1096,6 +1113,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		actual = 0;
 	}
 	t->output[actual] = 0;
+	t->time_receive_result_finish = timestamp_get();
 
 	t->return_status = result;
 	if(t->return_status != 0)
@@ -2912,6 +2930,7 @@ struct work_queue *work_queue_create(int port)
 	q->worker_selection_algorithm = wq_option_scheduler;
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	q->process_pending_check = 0;
+	q->workers_to_wait = 0;
 
 	q->short_timeout = 5;
 	q->long_timeout = 3600;
@@ -3018,6 +3037,11 @@ int work_queue_port(struct work_queue *q)
 	} else {
 		return 0;
 	}
+}
+
+void work_queue_activate_worker_waiting(struct work_queue *q, int value)
+{
+	q->workers_to_wait = value;
 }
 
 void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
@@ -3299,8 +3323,16 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			process_available_results(q, w, -1);
 		}
 		
-		// Start tasks on ready workers
-		start_tasks(q);
+		if(q->workers_to_wait <= 0) {	
+			//Don't have to wait for any resources; start tasks on ready workers
+			start_tasks(q);
+		} else {
+			if(known_workers(q) >= q->workers_to_wait) {
+				//We have the resources we have been waiting for; start tasks on ready workers
+				start_tasks(q);
+				q->workers_to_wait = 0; //disable it after we started dipatching tasks
+			}
+		}
 
 		// If any worker has sent a results message, retrieve the output files.
 		if(itable_size(q->finished_tasks)) {
@@ -3594,6 +3626,17 @@ char * work_queue_get_worker_summary( struct work_queue *q )
 	return strdup("n/a");
 }
 
+void work_queue_set_bandwidth_limit(struct work_queue *q, const char *bandwidth)
+{
+	q->bandwidth = string_metric_parse(bandwidth);
+}
+
+double work_queue_get_effective_bandwidth(struct work_queue *q)
+{
+	double queue_bandwidth = get_queue_transfer_rate(q, NULL)/MEGABYTE; //return in MB per second
+	return queue_bandwidth; 
+}
+
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 {
 	memset(s, 0, sizeof(*s));
@@ -3629,6 +3672,15 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	}
 
 	s->capacity = compute_capacity(q);
+	
+	struct work_queue_resources r;
+	aggregate_workers_resources(q,&r);
+	s->workers_min_cores = r.cores.smallest;
+	s->workers_max_cores = r.cores.largest;
+	s->workers_min_memory = r.memory.smallest;
+	s->workers_max_memory = r.memory.largest;
+	s->workers_min_disk = r.disk.smallest;
+	s->workers_max_disk = r.disk.largest;
 
 	//Deprecated values.
 	s->total_workers_joined = hash_table_size(q->worker_table);
