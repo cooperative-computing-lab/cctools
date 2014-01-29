@@ -974,6 +974,7 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 static void fetch_output_from_worker(struct work_queue *q, struct work_queue_worker *w, int taskid)
 {
 	struct work_queue_task *t;
+	int result;
 
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t)
@@ -981,7 +982,8 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	// Receiving output ...
 	t->time_receive_output_start = timestamp_get();
-	if(get_output_files(q,w,t) <= 0) {
+	result = get_output_files(q,w,t);
+	if(result <= 0) {
 		goto failure;
 	}
 	t->time_receive_output_finish = timestamp_get();
