@@ -7,7 +7,9 @@ See the file COPYING for details.
 
 #include "debug.h"
 
+#include "buffer.h"
 #include "full_io.h"
+#include "path.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
@@ -18,7 +20,9 @@ See the file COPYING for details.
 #include <sys/time.h>
 
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -27,9 +31,9 @@ See the file COPYING for details.
 #include <time.h>
 
 static int debug_fd = STDERR_FILENO;
-static char *debug_file = NULL;
-static int debug_file_size = 1<<20;
-static const char *program_name = "";
+static char debug_file[PATH_MAX];
+static off_t debug_file_size = 1<<20;
+static char program_name[PATH_MAX];
 static INT64_T debug_flags = D_NOTICE;
 static pid_t(*debug_getpid) () = getpid;
 
@@ -145,25 +149,25 @@ static const char *flag_to_name(INT64_T flag)
 
 static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
 {
-	char newfmt[65536];
-	char buffer[65536];
-	int length;
-
+	buffer_t B;
+	char ubuf[1<<16];
 	struct timeval tv;
 	struct tm *tm;
+
+	buffer_init(&B);
+	buffer_ubuf(&B, ubuf, sizeof(ubuf));
+	buffer_max(&B, sizeof(ubuf));
 
 	gettimeofday(&tv, 0);
 	tm = localtime(&tv.tv_sec);
 
-	snprintf(newfmt, 65536, "%04d/%02d/%02d %02d:%02d:%02d.%02ld [%d] %s: %s: %s", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (long) tv.tv_usec / 10000, (int) debug_getpid(), program_name,
-		is_fatal ? "fatal " : flag_to_name(flags), fmt);
+	buffer_putfstring(&B, "%04d/%02d/%02d %02d:%02d:%02d.%02ld [%d] %s: %s: ", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (long) tv.tv_usec / 10000, (int) debug_getpid(), program_name, is_fatal ? "fatal " : flag_to_name(flags));
+	buffer_putvfstring(&B, fmt, args);
+	while(isspace(buffer_tostring(&B, NULL)[buffer_pos(&B)-1]))
+		buffer_rewind(&B, buffer_pos(&B)-1); /* chomp whitespace */
+	buffer_putliteral(&B, "\n");
 
-	vsnprintf(buffer, 65536, newfmt, args);
-	string_chomp(buffer);
-	strcat(buffer, "\n");
-	length = strlen(buffer);
-
-	if(debug_file) {
+	if(debug_file[0]) {
 		struct stat info;
 
 		fstat(debug_fd, &info);
@@ -180,14 +184,15 @@ static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
 			}
 
 			debug_fd = open(debug_file, O_CREAT | O_TRUNC | O_WRONLY, 0660);
-			if(debug_fd == -1){
+			if(debug_fd == -1) {
 				debug_fd = STDERR_FILENO;
 				fatal("could not open log file `%s': %s", debug_file, strerror(errno));
 			}
 		}
 	}
 
-	full_write(debug_fd, buffer, length);
+	full_write(debug_fd, buffer_tostring(&B, NULL), buffer_pos(&B));
+	buffer_free(&B);
 }
 
 void debug(INT64_T flags, const char *fmt, ...)
@@ -256,31 +261,19 @@ void debug_config_fatal(void (*callback) ())
 
 void debug_config(const char *name)
 {
-	const char *n = strdup(name);
-
-	program_name = strrchr(n, '/');
-	if(program_name) {
-		program_name++;
-	} else {
-		program_name = n;
-	}
+	strncpy(program_name, path_basename(name), sizeof(program_name)-1);
 }
 
 void debug_config_file(const char *f)
 {
-	free(debug_file);
-	debug_file = NULL;
 	if(f) {
-		if(*f == '/'){
-			debug_file = strdup(f);
+		if(*f == '/') {
+			strncpy(debug_file, f, sizeof(debug_file)-1);
 		} else {
-			char path[8192];
-			if(getcwd(path, sizeof(path)) == NULL)
+			if(getcwd(debug_file, sizeof(debug_file)) == NULL)
 				assert(0);
-			assert(strlen(path) + strlen(f) + 1 < 8192);
-			strcat(path, "/");
-			strcat(path, f);
-			debug_file = strdup(path);
+			strncat(debug_file, "/", sizeof(debug_file)-strlen(debug_file)-1);
+			strncat(debug_file, f, sizeof(debug_file)-strlen(debug_file)-1);
 		}
 		debug_fd = open(debug_file, O_CREAT | O_APPEND | O_WRONLY, 0660);
 		if (debug_fd == -1){
@@ -288,6 +281,7 @@ void debug_config_file(const char *f)
 			fatal("could not access log file `%s' for writing: %s", debug_file, strerror(errno));
 		}
 	} else {
+		debug_file[0] = '\0';
 		if (debug_fd != STDERR_FILENO){
 			close(debug_fd); /* we opened some file */
 		}
