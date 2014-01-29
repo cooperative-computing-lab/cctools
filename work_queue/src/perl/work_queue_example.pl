@@ -10,6 +10,28 @@
 
 use work_queue;
 
+# Usually, we can execute the gzip utility by simply typing its name at a
+# terminal. However, this is not enough for work queue; we have to specify
+# precisely which files need to be transmitted to the workers. The following
+# function finds the location of an executable, using the value of the PATH
+# variable.
+sub find_executable {
+	local($executable, @paths, $path);
+	$executable = $_[0];
+	@paths=split(/:/, $ENV{"PATH"});
+	push(@paths, "./");
+	print @paths;
+	for $d (@paths) {
+		$path = join('/', $d, $executable);
+		if( -e $path) {
+			return $path;
+		}
+	}
+	return 0;
+}
+
+
+# Main program:
 my $port = $WORK_QUEUE_DEFAULT_PORT;
 
 if ($#ARGV < 0) {
@@ -24,6 +46,9 @@ if (not defined($q)) {
 	exit 1;
 }
 
+my $executable = find_executable("gzip");
+print $executable;
+
 $port = work_queue_port($q);
 print "listening on port $port...\n"; 
 
@@ -34,7 +59,7 @@ for (my $i = 0; $i <= $#ARGV; $i++) {
 
     my $t = work_queue_task_create($command);
 
-    work_queue_task_specify_file($t, "/usr/bin/gzip", "gzip", $WORK_QUEUE_INPUT, $WORK_QUEUE_CACHE); 
+    work_queue_task_specify_file($t, $executable, "gzip", $WORK_QUEUE_INPUT, $WORK_QUEUE_CACHE); 
     work_queue_task_specify_file($t, $infile, $infile, $WORK_QUEUE_INPUT, $WORK_QUEUE_NOCACHE); 
     work_queue_task_specify_file($t, $outfile, $outfile, $WORK_QUEUE_OUTPUT, $WORK_QUEUE_NOCACHE); 
 
