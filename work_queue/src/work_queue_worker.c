@@ -1698,7 +1698,10 @@ static void work_for_master(struct link *master) {
 	time_t volatile_stoptime = time(0) + 60;
 	// Start serving masters
 	while(!abort_flag) {
-		if(time(0) > idle_stoptime && itable_size(stored_tasks) == 0) {
+
+		//disconnect from master after idle timeout if there are no more tasks
+		//to run, nor results to be sent.
+		if(time(0) > idle_stoptime && itable_size(stored_tasks) == 0 && itable_size(results_to_be_sent) == 0) {
 			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			abort_flag = 1;
 			break;
