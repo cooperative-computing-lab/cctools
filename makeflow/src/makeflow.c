@@ -1901,7 +1901,8 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	free(batch_options_env);
 	if(batch_submit_options) {
 		debug(D_DEBUG, "Batch options: %s\n", batch_submit_options);
-		old_batch_submit_options = xxstrdup(batch_queue_get_option(thequeue, "batch-options"));
+		if(batch_queue_get_option(thequeue, "batch-options"))
+			old_batch_submit_options = xxstrdup(batch_queue_get_option(thequeue, "batch-options"));
 		batch_queue_set_option(thequeue, "batch-options", batch_submit_options);
 		free(batch_submit_options);
 	}

@@ -350,9 +350,13 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 		else if(strcmp(value, "standalone") == 0)
 			work_queue_specify_master_mode(q->data, WORK_QUEUE_MASTER_MODE_STANDALONE);
 	} else if(strcmp(what, "name") == 0) {
-		work_queue_specify_name(q->data, value);
+		if(value)
+			work_queue_specify_name(q->data, value);
 	} else if(strcmp(what, "priority") == 0) {
-		work_queue_specify_priority(q->data, atoi(value));
+		if(value)
+			work_queue_specify_priority(q->data, atoi(value));
+		else
+			work_queue_specify_priority(q->data, 0);
 	} else if(strcmp(what, "estimate-capacity") == 0) {
 		work_queue_specify_estimate_capacity_on(q->data, string_istrue(value));
 	} else if(strcmp(what, "keepalive-interval") == 0) {
