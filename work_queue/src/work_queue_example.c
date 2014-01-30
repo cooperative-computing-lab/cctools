@@ -17,11 +17,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/param.h>
+
+/*
+  Usually, we can execute the gzip utility by simply typing its name at a
+  terminal. However, this is not enough for work queue; we have to specify
+  precisely which files need to be transmitted to the workers. To this extent,
+  the following function finds the location of an executable, using the value
+  of the PATH variable.
+*/
+int find_executable(const char *executable, char *location);
 
 int main(int argc, char *argv[])
 {
 	struct work_queue *q;
 	struct work_queue_task *t;
+	char executable[PATH_MAX]; 
 	int port = WORK_QUEUE_DEFAULT_PORT;
 	int taskid;
 	int i;
@@ -33,6 +44,8 @@ int main(int argc, char *argv[])
 	}
 
 	debug_flags_set("all");
+
+	find_executable("gzip", executable);
 
 	q = work_queue_create(port);
 	if(!q) {
@@ -51,7 +64,7 @@ int main(int argc, char *argv[])
 		sprintf(command, "./gzip < %s > %s", infile, outfile);
 
 		t = work_queue_task_create(command);
-		work_queue_task_specify_file(t, "/usr/bin/gzip", "gzip", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE); 
+		work_queue_task_specify_file(t, executable, "gzip", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE); 
 		work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
 		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE); 
 		
@@ -75,6 +88,35 @@ int main(int argc, char *argv[])
 
 	work_queue_delete(q);
 
+	return 0;
+}
+
+int find_executable(const char *executable, char *location) {
+	char *paths_org;
+	char *paths;
+	char p[PATH_MAX];
+	char *d;
+
+	paths_org = getenv("PATH");
+	if(!paths_org)
+		return 0;
+
+	paths = malloc(strlen(paths_org) + 1);
+	strcpy(paths, paths_org);
+	while((d = strsep(&paths, ":"))) {
+		if(*d == '\0')
+		{
+			d = ".";
+		}
+
+		snprintf(p, PATH_MAX, "%s/%s", d, executable);
+
+		if(access(p, X_OK) == 0)
+		{
+			strcpy(location, p);
+			return 1;
+		}
+	}
 	return 0;
 }
 
