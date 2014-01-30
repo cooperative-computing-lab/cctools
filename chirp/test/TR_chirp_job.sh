@@ -2,41 +2,38 @@
 
 set -ex
 
+set -e
+
 . ../../dttools/src/test_runner.common.sh
+. ./chirp-common.sh
 
-chirp_debug=chirp.debug
-chirp_pid=chirp.pid
-chirp_port=chirp.port
-chirp_root=chirp.root
-chirp_transient=chirp.transient
-
-ticket=my.ticket
+c="./hostport.$PPID"
+cr="./root.$PPID"
 
 prepare()
 {
-    mkdir "$chirp_transient"
-
-	../src/chirp_server -r "$chirp_root" -I 127.0.0.1 -Z "$chirp_port" -b -B "$chirp_pid" -d all -o "$chirp_debug" -y "$chirp_transient" --job-concurrency 2
-
-	wait_for_file_creation "$chirp_port" 5
-	wait_for_file_creation "$chirp_pid" 5
+	chirp_start local --auth=hostname --job-concurrency=2
+	echo "$hostport" > "$c"
+	echo "$root" > "$cr"
+	return 0
 }
 
 run()
 {
-	local host="localhost:$(cat "$chirp_port")"
+	hostport=$(cat "$c")
+	root=$(cat "$cr")
 	local json
 
-	../src/chirp -a unix "$host" mkdir -p "/users/$(whoami)/data"
-	../src/chirp -a unix "$host" mkdir -p "/users/$(whoami)/bin"
-	../src/chirp -a unix "$host" put /dev/stdin "/users/$(whoami)/data/db.txt" <<EOF
+	../src/chirp -a unix "$hostport" mkdir -p "/users/$(whoami)/data"
+	../src/chirp -a unix "$hostport" mkdir -p "/users/$(whoami)/bin"
+	../src/chirp -a unix "$hostport" put /dev/stdin "/users/$(whoami)/data/db.txt" <<EOF
 a,b,c
 d,e,f
 EOF
-	../src/chirp -a unix "$host" put /dev/stdin "/users/$(whoami)/data/conf.txt" <<EOF
+	../src/chirp -a unix "$hostport" put /dev/stdin "/users/$(whoami)/data/conf.txt" <<EOF
 A = 1
 EOF
-	../src/chirp -a unix "$host" put /dev/stdin "/users/$(whoami)/bin/script" <<EOF
+	../src/chirp -a unix "$hostport" put /dev/stdin "/users/$(whoami)/bin/script" <<EOF
 #!/bin/sh
 
 cat < db.txt > output
@@ -91,16 +88,16 @@ EOF
 }
 EOF
 )
-	J1=$(../src/chirp -a unix -d all "$host" job_create "$json")
+	J1=$(../src/chirp -a unix -d all "$hostport" job_create "$json")
 	echo Job $J1 created.
-	../src/chirp -a unix -d all "$host" job_commit "[$J1]"
-	../src/chirp -a unix -d all "$host" job_commit "[$J1]" && return 1 # EPERM
-	J1b=$(../src/chirp -a unix -d all "$host" job_create "$json")
+	../src/chirp -a unix -d all "$hostport" job_commit "[$J1]"
+	../src/chirp -a unix -d all "$hostport" job_commit "[$J1]" && return 1 # EPERM
+	J1b=$(../src/chirp -a unix -d all "$hostport" job_create "$json")
 	echo Job $J1b created.
-	../src/chirp -a unix -d all "$host" job_kill "[$J1b]"
-	J1c=$(../src/chirp -a unix -d all "$host" job_create "$json")
+	../src/chirp -a unix -d all "$hostport" job_kill "[$J1b]"
+	J1c=$(../src/chirp -a unix -d all "$hostport" job_create "$json")
 	echo Job $J1c created.
-	../src/chirp -a unix -d all "$host" job_commit "[$J1c]"
+	../src/chirp -a unix -d all "$hostport" job_commit "[$J1c]"
 
 	json=$(cat <<EOF
 {
@@ -151,30 +148,30 @@ EOF
 }
 EOF
 )
-	J2=$(../src/chirp -a unix -d all "$host" job_create "$json")
+	J2=$(../src/chirp -a unix -d all "$hostport" job_create "$json")
 	echo Job $J2 created.
-	../src/chirp -a unix -d all "$host" job_commit "[$J2]"
+	../src/chirp -a unix -d all "$hostport" job_commit "[$J2]"
 
 	echo Job status for $J1.
-    ../src/chirp -a unix -d all "$host" job_status "[$J1]"
+    ../src/chirp -a unix -d all "$hostport" job_status "[$J1]"
 	echo Job status for $J1b.
-    ../src/chirp -a unix -d all "$host" job_status "[$J1b]"
+    ../src/chirp -a unix -d all "$hostport" job_status "[$J1b]"
 	echo Job status for $J1c.
-    ../src/chirp -a unix -d all "$host" job_status "[$J1c]"
+    ../src/chirp -a unix -d all "$hostport" job_status "[$J1c]"
     echo Killing $J1c
-    ../src/chirp -a unix -d all "$host" job_kill "[$J1c]"
+    ../src/chirp -a unix -d all "$hostport" job_kill "[$J1c]"
 	echo Job status for $J1c.
-    ../src/chirp -a unix -d all "$host" job_status "[$J1c]"
+    ../src/chirp -a unix -d all "$hostport" job_status "[$J1c]"
 	echo Job status for $J2.
-    ../src/chirp -a unix -d all "$host" job_status "[$J2]"
+    ../src/chirp -a unix -d all "$hostport" job_status "[$J2]"
 
 	echo Waiting for jobs.
-    ../src/chirp -a unix -d all "$host" job_wait $J1 2
-    ../src/chirp -a unix -d all "$host" job_reap "[$J1]"
-    ../src/chirp -a unix -d all "$host" job_wait 0 1
-    ../src/chirp -a unix -d all "$host" job_reap "[$J1b,$J1c]"
-    ../src/chirp -a unix -d all "$host" job_status "[$J1b]"
-    ../src/chirp -a unix -d all "$host" job_status "[$J1c]"
+    ../src/chirp -a unix -d all "$hostport" job_wait $J1 2
+    ../src/chirp -a unix -d all "$hostport" job_reap "[$J1]"
+    ../src/chirp -a unix -d all "$hostport" job_wait 0 1
+    ../src/chirp -a unix -d all "$hostport" job_reap "[$J1b,$J1c]"
+    ../src/chirp -a unix -d all "$hostport" job_status "[$J1b]"
+    ../src/chirp -a unix -d all "$hostport" job_status "[$J1c]"
 
 	# An error due to ACL
 	json=$(cat <<EOF
@@ -226,24 +223,21 @@ EOF
 }
 EOF
 )
-	J3=$(../src/chirp -a hostname -d all "$host" job_create "$json")
+	J3=$(../src/chirp -a hostname -d all "$hostport" job_create "$json")
 	echo Job $J3 created.
-	../src/chirp -a hostname -d all "$host" job_commit "[$J3]"
-	../src/chirp -a hostname -d all "$host" job_wait $J3
+	../src/chirp -a hostname -d all "$hostport" job_commit "[$J3]"
+	../src/chirp -a hostname -d all "$hostport" job_wait $J3
 
-	set +e
-	return $?
+	return 0
 }
 
 clean()
 {
-	if [ -r "$chirp_pid" ]; then
-		/bin/kill -9 `cat "$chirp_pid"`
-	fi
-
-	rm -rf "$chirp_debug" "$chirp_pid" "$chirp_port" "$chirp_root" "$ticket" "$chirp_transient"
+	chirp_clean
+	rm -rf "$c" "$cr"
+	return 0
 }
 
-dispatch $@
+dispatch "$@"
 
 # vim: set noexpandtab tabstop=4:
