@@ -48,8 +48,6 @@ static int yblock = 0;
 static int xstop = 0;
 static int ystop = 0;
 
-enum {LONG_OPT_OUTPUT_FILE = 1};
-
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Usage: %s [options] <set A> <set B> <compare function>\n", cmd);
@@ -58,7 +56,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Extra arguments to pass to the comparison function.\n", "-e,--extra-args=<args>");
 	fprintf(stdout, " %-30s Extra input file needed by the comparison function. (may be given multiple times)\n", "-f,--input-file=<file>");
 	fprintf(stdout, " %-30s Write debugging output to this file (default to standard output)\n", "-o,--debug-file=<file>");
-	fprintf(stdout, " %-30s Write task output to this file (default to standard output)\n", "--output-file=<file>");
+	fprintf(stdout, " %-30s Write task output to this file (default to standard output)\n", "-O,--output-file=<file>");
 	fprintf(stdout, " %-30s Record runtime statistics and write to this file (default: off)\n", "-s,--wqstats-file=<file>");
 	fprintf(stdout, " %-30s Estimated time to run one comparison. (default chosen at runtime)\n", "-t,--estimated-time=<seconds>");
 	fprintf(stdout, " %-30s Width of one work unit, in items to compare. (default chosen at runtime)\n", "-x,--width=<items>");
@@ -303,7 +301,7 @@ int main(int argc, char **argv)
 		{"advertise", no_argument, 0, 'a'},    //deprecated, left here for backwards compatibility
 		{"project-name", required_argument, 0, 'N'},
 		{"debug-file", required_argument, 0, 'o'},
-		{"output-file", required_argument, 0, LONG_OPT_OUTPUT_FILE},
+		{"output-file", required_argument, 0, 'O'},
 		{"wqstats-file", required_argument, 0, 's'},
 		{"input-file", required_argument, 0, 'f'},
 		{"estimated-time", required_argument, 0, 't'},
@@ -312,7 +310,7 @@ int main(int argc, char **argv)
 	};
 
 
-	while((c = getopt_long(argc, argv, "ad:e:f:hN:p:P:t:vx:y:Z:o:s:", long_options, NULL)) >= 0) {
+	while((c = getopt_long(argc, argv, "ad:e:f:hN:p:P:t:vx:y:Z:O:o:s:", long_options, NULL)) >= 0) {
 		switch (c) {
 	    case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
@@ -329,7 +327,7 @@ int main(int argc, char **argv)
 		case 'o':
 			debug_config_file(optarg);
 			break;
-		case LONG_OPT_OUTPUT_FILE:
+		case 'O':
 			free(output_filename);
 			output_filename=xxstrdup(optarg);
 			break;
