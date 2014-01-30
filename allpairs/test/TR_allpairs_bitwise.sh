@@ -17,7 +17,7 @@ prepare()
 
     ln -s ../src/allpairs_multicore .
 
-    (PATH=.:$PATH ../src/allpairs_master -x 1 -y 1 -o $TEST_OUTPUT -Z $PORT_FILE $TEST_INPUT $TEST_INPUT BITWISE )&
+    (PATH=.:$PATH ../src/allpairs_master -x 1 -y 1 --output-file $TEST_OUTPUT -Z $PORT_FILE $TEST_INPUT $TEST_INPUT BITWISE )&
 
     pid=$!
 	echo $pid > $PIDMASTER_FILE
