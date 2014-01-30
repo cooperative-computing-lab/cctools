@@ -95,7 +95,8 @@ OPTION_ITEM(` ignore_capacity:') Boolean yes|no value. The default is no.
 OPTION_ITEM(` mode:') One of fixed|on-demand. If on-demand (the default),
 work_queue_pool adjust the observed capacity of the master as tasks are
 dispatched/completed, until the number of workers assigned to the master equal
-that of its distribution specification (see above). If fixed, the number of
+that of its distribution specification (see above). Please note that on-demand does not work if the master is a foreman.
+If fixed, the number of
 workers assigned is immediately  the one given in the distribution.
 OPTION_ITEM(` max_change_per_min:') For on-demand mode, this fields indicated
 the maximum number of workers that can be submitted per minute.
@@ -172,6 +173,11 @@ min_workers: 50
 LONGCODE_END
 
 Note that the previous works even when not all the masters have distinct names.
+
+SECTION(KNOWN BUGS)
+
+CODE(mode: on-demand) does not work when the master is a foreman. Use
+CODE(mode: fixed), an specify a number of workers with: CODE(min_workers:).
 
 
 SECTION(COPYRIGHT)

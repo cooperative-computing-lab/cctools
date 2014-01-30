@@ -2029,17 +2029,17 @@ int main(int argc, char *argv[])
 	int c;
 	time_t current;
 	int is_daemon = 0;
-	char pidfile[PATH_MAX];
+	char pidfile[PATH_MAX] = "";
 	int exit_if_parent_fails = 0;
 	int dont_dump_core = 0;
 	time_t gc_alarm = 0;
 	const char *manual_hostname = 0;
 	int max_child_procs = 0;
 	const char *listen_on_interface = 0;
-	char chirp_debug_file[PATH_MAX];
+	char chirp_debug_file[PATH_MAX] = "";
 	int total_child_procs = 0;
 	int did_explicit_auth = 0;
-	char port_file[PATH_MAX];
+	char port_file[PATH_MAX] = "";
 
 	change_process_title_init(argv);
 	change_process_title("chirp_server");

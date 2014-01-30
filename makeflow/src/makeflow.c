@@ -2330,7 +2330,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Use this file for the batch system log.     (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
 	fprintf(stdout, " %-30s Send summary of workflow to this email address upon success or failure.\n", "-m,--email=<email>");
 	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
-	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-output=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
 	fprintf(stdout, " %-30s Password file for authenticating workers.\n", "   --password");
 	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
@@ -2616,7 +2616,8 @@ int main(int argc, char *argv[])
 		{"monitor-with-opened-files", no_argument, 0, LONG_OPT_MONITOR_OPENED_FILES},
 		{"password", required_argument, 0, LONG_OPT_PASSWORD},
 		{"project-name", required_argument, 0, 'N'},
-		{"debug-output", required_argument, 0, 'o'},
+		{"debug-output", required_argument, 0, 'o'}, /* deprecated alias for --debug-file */
+		{"debug-file", required_argument, 0, 'o'},
 		{"show-output", no_argument, 0, 'O'},
 		{"port", required_argument, 0, 'p'},
 		{"priority", required_argument, 0, 'P'},

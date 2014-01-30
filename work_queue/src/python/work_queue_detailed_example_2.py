@@ -21,7 +21,7 @@ for i in range(5):
 
     wq.submit(task)
 
-os.environ['PATH'] = '../../../dttools/src:' + os.environ['PATH']
+os.environ['PATH'] = '../../../work_queue/src:' + os.environ['PATH']
 os.system('work_queue_worker -d all -t 5 localhost %d &' % wq.port)
 
 while not wq.empty():

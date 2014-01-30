@@ -35,16 +35,21 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 	UINT64_T avail,total;
 
 	r->cores.total = load_average_get_cpus();
+	r->cores.largest = r->cores.smallest = r->cores.total;
 
 	disk_info_get(disk_path,&avail,&total);
 	r->disk.total = avail / (UINT64_T) MEGA;
+	r->disk.largest = r->disk.smallest = r->disk.total;
 
 	memory_info_get(&avail,&total);
 	r->memory.total = avail / (UINT64_T) MEGA;
+	r->memory.largest = r->memory.smallest = r->memory.total;
 
 	r->gpus.total = gpu_info_get();
+	r->gpus.largest = r->gpus.smallest = r->gpus.total;
 	
 	r->workers.total = 1;
+	r->workers.largest = r->workers.smallest = r->workers.total;
 }
 
 static void work_queue_resource_debug( struct work_queue_resource *r, const char *name )

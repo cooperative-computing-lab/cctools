@@ -1698,7 +1698,10 @@ static void work_for_master(struct link *master) {
 	time_t volatile_stoptime = time(0) + 60;
 	// Start serving masters
 	while(!abort_flag) {
-		if(time(0) > idle_stoptime && itable_size(stored_tasks) == 0) {
+
+		//disconnect from master after idle timeout if there are no more tasks
+		//to run, nor results to be sent.
+		if(time(0) > idle_stoptime && itable_size(stored_tasks) == 0 && itable_size(results_to_be_sent) == 0) {
 			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			abort_flag = 1;
 			break;
@@ -2303,8 +2306,8 @@ int main(int argc, char *argv[])
 		aggregated_resources->memory.total = 0;
 		aggregated_resources->gpus.total = 0;
 	} else {
-		if(manual_cores_option)  
-			 aggregated_resources->cores.total = manual_cores_option;
+		if(manual_cores_option) 
+			aggregated_resources->cores.total = manual_cores_option;
 		if(manual_memory_option) 
 			aggregated_resources->memory.total = manual_memory_option;
 		if(manual_gpus_option)
@@ -2313,6 +2316,11 @@ int main(int argc, char *argv[])
 
 	if(manual_disk_option)   
 		aggregated_resources->disk.total = manual_disk_option;
+
+	aggregated_resources->cores.smallest = aggregated_resources->cores.largest = aggregated_resources->cores.total;
+	aggregated_resources->memory.smallest = aggregated_resources->memory.largest = aggregated_resources->memory.total;
+	aggregated_resources->disk.smallest = aggregated_resources->disk.largest = aggregated_resources->disk.total;
+	aggregated_resources->gpus.smallest = aggregated_resources->gpus.largest = aggregated_resources->gpus.total;
 
 	debug(D_WQ,"local resources:");
 	work_queue_resources_debug(aggregated_resources);

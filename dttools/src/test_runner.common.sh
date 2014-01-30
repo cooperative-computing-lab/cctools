@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Tests sometimes chdir, so we get the full path now. `pwd` is annoying to portable.
+WORK_QUEUE_WORKER=$(cd "$(dirname "$0")/../../work_queue/src/"; pwd)/work_queue_worker
+
 dispatch() 
 {
 	case "$1" in
@@ -87,7 +90,7 @@ run_local_worker()
 		exit 1
 	fi
 	echo "Running worker."
-	if ! ../../work_queue/src/work_queue_worker -t 2s -d all -o "$log" localhost `cat $port_file`; then
+	if ! "$WORK_QUEUE_WORKER" --timeout=2s --debug=all --debug-file="$log" localhost $(cat "$port_file"); then
 		echo "ERROR: could not start worker"
 		exit 1
 	fi
