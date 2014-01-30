@@ -1755,7 +1755,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if (length < MAX_BUFFER_SIZE && (json = malloc(length))) {
 				actual = link_read(l, json, length, stalltime);
 				if (actual == length) {
-					debug(D_DEBUG, "job_reap `%.*s'", (int)length, json);
+					debug(D_DEBUG, "--> job_reap `%.*s'", (int)length, json);
 					json_value *J = json_parse(json, length);
 					free(json);
 					if (J) {
