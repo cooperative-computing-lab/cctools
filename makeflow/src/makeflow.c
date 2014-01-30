@@ -2144,7 +2144,7 @@ int dag_check(struct dag *d)
 int dag_gc_file(struct dag *d, const struct dag_file *f)
 {
 	struct stat buf;
-	if(batch_fs_stat(remote_queue, f->filename, &buf) <= 0 || batch_fs_unlink(remote_queue, f->filename) <= 0) {
+	if(batch_fs_stat(remote_queue, f->filename, &buf) == 0 && batch_fs_unlink(remote_queue, f->filename) == -1) {
 		debug(D_NOTICE, "makeflow: unable to collect %s: %s", f->filename, strerror(errno));
 		return 0;
 	} else {
