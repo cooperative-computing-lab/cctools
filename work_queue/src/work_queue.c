@@ -3691,7 +3691,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->capacity = compute_capacity(q);
 
 	//info about resources
-	s->bandwidth = measure_bandwidth(q);
+	s->bandwidth = work_queue_get_effective_bandwidth(q); 
 	struct work_queue_resources r;
 	aggregate_workers_resources(q,&r);
 	s->total_cores = r.cores.total;
