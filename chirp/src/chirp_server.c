@@ -2308,9 +2308,14 @@ int main(int argc, char *argv[])
 		if(cfs->init(chirp_url) == -1)
 			fatal("could not initialize %s backend filesystem: %s", chirp_url, strerror(errno));
 		rc = chirp_job_schedule();
-		fatal("schedule rc = %d: %s", rc, strerror(rc));
-		raise(SIGKILL);
-		_exit(EXIT_FAILURE);
+		if(rc == -1 && errno == ENOSYS) {
+			debug(D_DEBUG, "no scheduler available, quitting!");
+			_exit(EXIT_SUCCESS);
+		} else {
+			fatal("schedule rc = %d: %s", rc, strerror(rc));
+			raise(SIGKILL);
+			_exit(EXIT_FAILURE);
+		}
 	} else if (chirp_job_schedd > 0) {
 		debug(D_CHIRP, "forked scheduler %d", (int)chirp_job_schedd);
 	} else {
