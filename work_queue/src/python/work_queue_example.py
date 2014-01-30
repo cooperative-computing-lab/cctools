@@ -13,54 +13,63 @@ from work_queue import *
 import os
 import sys
 
+# Usually, we can execute the gzip utility by simply typing its name at a
+# terminal. However, this is not enough for work queue; we have to specify
+# precisely which files need to be transmitted to the workers. To this extent,
+# the following function finds the location of an executable, using the value
+# of the PATH variable.
 def find_executable(executable):
-    for directory in os.environ['PATH'].split(':'):
+    paths=os.environ['PATH'].split(':')
+    paths.append('./')
+    for directory in paths:
         path = os.path.join(directory, executable)
         if os.path.exists(path):
             return path
     return None
 
-port = WORK_QUEUE_DEFAULT_PORT
+# Main program
+if __name__ == '__main__':
+  port = WORK_QUEUE_DEFAULT_PORT
 
-if len(sys.argv) < 2:
-    print "work_queue_example <file1> [file2] [file3] ..."
-    print "Each file given on the command line will be compressed using a remote worker."
-    sys.exit(1)
+  if len(sys.argv) < 2:
+      print "work_queue_example <file1> [file2] [file3] ..."
+      print "Each file given on the command line will be compressed using a remote worker."
+      sys.exit(1)
 
-try:
-    q = WorkQueue(port)
-except:
-    print "Instantiation of Work Queue failed!" 
-    sys.exit(1)
+  try:
+      q = WorkQueue(port)
+  except:
+      print "Instantiation of Work Queue failed!" 
+      sys.exit(1)
 
-print "listening on port %d..." % q.port
+  print "listening on port %d..." % q.port
 
-gzip_path = find_executable("gzip")
+  gzip_path = find_executable("gzip")
 
-for i in range(1, len(sys.argv)):
-    infile = "%s" % sys.argv[i] 
-    outfile = "%s.gz" % sys.argv[i]
-    command = "./gzip < %s > %s" % (infile, outfile)
-    
-    t = Task(command)
-    
-    t.specify_file(gzip_path, "gzip", WORK_QUEUE_INPUT, cache=True)
-    t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=False)
-    t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=False)
-    
-    taskid = q.submit(t)
+  for i in range(1, len(sys.argv)):
+      infile = "%s" % sys.argv[i] 
+      outfile = "%s.gz" % sys.argv[i]
+      command = "./gzip < %s > %s" % (infile, outfile)
+      
+      t = Task(command)
+      
+      t.specify_file(gzip_path, "gzip", WORK_QUEUE_INPUT, cache=True)
+      t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=False)
+      t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=False)
+      
+      taskid = q.submit(t)
 
-    print "submitted task (id# %d): %s" % (taskid, t.command)
+      print "submitted task (id# %d): %s" % (taskid, t.command)
 
-print "waiting for tasks to complete..."
+  print "waiting for tasks to complete..."
 
-while not q.empty():
-    t = q.wait(5)
-    if t:
-        print "task (id# %d) complete: %s (return code %d)" % (t.id, t.command, t.return_status)
-    #task object will be garbage collected by Python automatically when it goes out of scope
+  while not q.empty():
+      t = q.wait(5)
+      if t:
+          print "task (id# %d) complete: %s (return code %d)" % (t.id, t.command, t.return_status)
+      #task object will be garbage collected by Python automatically when it goes out of scope
 
-print "all tasks complete!"
+  print "all tasks complete!"
 
-#work queue object will be garbage collected by Python automatically when it goes out of scope
-sys.exit(0)
+  #work queue object will be garbage collected by Python automatically when it goes out of scope
+  sys.exit(0)

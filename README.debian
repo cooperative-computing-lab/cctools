@@ -13,7 +13,8 @@ Optional packages:
     * libmysqlclient-dev (mysql support)
     * libreadline-dev (readline support)
     * swig (work queue bindings)
-    * python-dev (python package)
+    * python-dev (work queue bindings)
+    * libperl5-dev (work queue bindings)
     * m4 (manpages)
 
 Debian Package page:
