@@ -30,6 +30,7 @@ OPTION_TRIPLET(-p,port,port)The port that the master will be listening on.
 OPTION_TRIPLET(-e,extra-args,args)Extra arguments to pass to the comparison function.
 OPTION_TRIPLET(-f,input-file,file)Extra input file needed by the comparison function. (may be given multiple times)
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file (default to standard output)
+OPTION_TRIPLET(-O,--output-file,file)Write task output to this file (default to standard output)
 OPTION_TRIPLET(-t,estimated-time,seconds)Estimated time to run one comparison. (default chosen at runtime)
 OPTION_TRIPLET(-x,width,item)Width of one work unit, in items to compare. (default chosen at runtime)
 OPTION_TRIPLET(-y,height,items)Height of one work unit, in items to compare. (default chosen at runtime)
