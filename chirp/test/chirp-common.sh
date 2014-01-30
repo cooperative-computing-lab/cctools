@@ -5,18 +5,19 @@ chirp_start()
 	debug=`mktemp ./chirp.debug.XXXXXX`
 	pid=`mktemp ./chirp.pid.XXXXXX`
 	port=`mktemp ./chirp.port.XXXXXX`
+	transient=`mktemp -d ./chirp.transient.XXXXXX`
 	if [ "$1" = local ]; then
 		root=`mktemp -d ./chirp.root.XXXXXX`
 	else
 		root="$1"
 	fi
 	shift
-	echo "$CHIRP_SERVER" --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$root" "$@"
-	if "$CHIRP_SERVER" --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" "$@"; then
+	echo "$CHIRP_SERVER" --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"
+	if "$CHIRP_SERVER" --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"; then
 		for ((i = 0; i < 10; i++)); do
 			if [ -s "$pid" -a -s "$port" ]; then
 				hostport="127.0.0.1:$(cat "$port")"
-				unset debug pid port
+				unset debug pid port transient
 				return 0
 			fi
 			sleep 1
@@ -27,7 +28,7 @@ chirp_start()
 	fi
 	touch "$debug"
 	cat "$debug"
-	unset debug pid port
+	unset debug pid port transient
 	return 1
 }
 
@@ -40,8 +41,8 @@ chirp_clean()
 			echo could not kill $pid
 		fi
 	done
-	echo rm -rf ./chirp.debug.* ./chirp.pid.* ./chirp.port.* ./chirp.root.*
-	rm -rf ./chirp.debug.* ./chirp.pid.* ./chirp.port.* ./chirp.root.*
+	echo rm -rf ./chirp.debug.* ./chirp.pid.* ./chirp.port.* ./chirp.transient.* ./chirp.root.*
+	rm -rf ./chirp.debug.* ./chirp.pid.* ./chirp.port.* ./chirp.transient.* ./chirp.root.*
 	return 0
 }
 
