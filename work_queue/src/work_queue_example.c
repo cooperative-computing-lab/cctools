@@ -114,9 +114,12 @@ int find_executable(const char *executable, char *location) {
 		if(access(p, X_OK) == 0)
 		{
 			strcpy(location, p);
+			free(paths);
 			return 1;
 		}
 	}
+
+	free(paths);
 	return 0;
 }
 
