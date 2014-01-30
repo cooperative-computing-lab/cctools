@@ -71,6 +71,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORK_QUEUE_RESULT_OUTPUT_FAIL 8
 #define WORK_QUEUE_RESULT_OUTPUT_MISSING 16
 #define WORK_QUEUE_RESULT_LINK_FAIL 32
+#define WORK_QUEUE_RESULT_STDOUT_MISSING 64
 
 // The default capacity reported before information is available.
 #define WORK_QUEUE_DEFAULT_CAPACITY 10
@@ -1109,6 +1110,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		stoptime = time(0) + get_transfer_wait_time(q, w, t, output_length);
 		link_soak(w->link, output_length, stoptime);
 		retrieved_output_length = 0; 
+		t->result |= WORK_QUEUE_RESULT_STDOUT_MISSING;
 	} 
 
 	if(retrieved_output_length > 0) {
