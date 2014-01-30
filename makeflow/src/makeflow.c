@@ -3006,20 +3006,6 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	if(bundle_directory) {
-		char expanded_path[PATH_MAX];
-		
-		collect_input_files(d, bundle_directory, bundler_rename);
-		realpath(bundle_directory, expanded_path);
-
-		char output_makeflow[PATH_MAX];
-		sprintf(output_makeflow, "%s/%s", expanded_path, path_basename(dagfile));
-		if(strcmp(bundle_directory, "*"))
-			dag_to_file(d, output_makeflow, bundler_rename);
-		free(bundle_directory);
-		exit(0);
-	}
-
 	if(display_mode)
 	{
 		switch(display_mode)
@@ -3122,6 +3108,20 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "makeflow: couldn't create local job queue.\n");
 			exit(1);
 		}
+	}
+
+	if(bundle_directory) {
+		char expanded_path[PATH_MAX];
+
+		collect_input_files(d, bundle_directory, bundler_rename);
+		realpath(bundle_directory, expanded_path);
+
+		char output_makeflow[PATH_MAX];
+		sprintf(output_makeflow, "%s/%s", expanded_path, path_basename(dagfile));
+		if(strcmp(bundle_directory, "*"))
+			dag_to_file(d, output_makeflow, bundler_rename);
+		free(bundle_directory);
+		exit(0);
 	}
 
 	if(monitor_mode)
