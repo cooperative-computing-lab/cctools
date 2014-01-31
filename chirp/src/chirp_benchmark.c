@@ -216,6 +216,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	memset(data, -1, sizeof(data));
 	RUN_LOOP("write1", do_pwrite(fd, data, 1, 0));
 	RUN_LOOP("write8", do_pwrite(fd, data, 8192, 0));
 
