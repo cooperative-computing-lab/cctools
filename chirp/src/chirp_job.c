@@ -852,7 +852,8 @@ int chirp_job_reap (json_value *J, const char *subject)
 		"        FROM Jobs NATURAL JOIN JobStatus NATURAL LEFT OUTER JOIN JobReaped"
 		"        WHERE Jobs.id == ? AND"
 		"              (? OR Jobs.subject = ?) AND"
-		"              JobStatus.terminal;"
+		"              JobStatus.terminal AND"
+		"              JobReaped.time_reap IS NULL;"
 		"END TRANSACTION;";
 
 	time_t timeout = time(NULL)+3;
