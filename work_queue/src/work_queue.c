@@ -914,6 +914,10 @@ static void delete_worker_files( struct work_queue *q, struct work_queue_worker 
 	}
 }
 
+static void delete_output_files(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) 
+{
+	delete_worker_files(q, w, t, t->output_files, 0);
+}
 
 static void delete_uncacheable_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
@@ -976,6 +980,12 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	t->time_receive_output_finish = timestamp_get();
 
 	delete_uncacheable_files(q,w,t);
+
+	/* If there was an app-level failure, the task may be resubmitted and rerun
+	   at a different worker. The rerun may produce different outputs. So we need
+	   to evict all the output files of the task from the worker's cache. */
+	if(t->result & (WORK_QUEUE_RESULT_STDOUT_MISSING | WORK_QUEUE_RESULT_OUTPUT_MISSING))
+		delete_output_files(q,w,t);
 
 	// At this point, a task is completed.
 	itable_remove(w->current_tasks, taskid);
