@@ -1999,7 +1999,7 @@ INT64_T chirp_client_job_status (struct chirp_client *c, const char *json, char 
 	if(result > 0) {
 		INT64_T actual;
 
-		if(result >= MAX_BUFFER_SIZE || (*status = malloc(result)) == NULL) {
+		if(result >= MAX_BUFFER_SIZE || (*status = malloc(result+1)) == NULL) {
 			errno = ENOMEM;
 			return -1;
 		}
