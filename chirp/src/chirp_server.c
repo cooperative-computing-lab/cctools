@@ -2309,7 +2309,6 @@ int main(int argc, char *argv[])
 	chirp_job_schedd = fork();
 	if (chirp_job_schedd == 0) {
 		int rc;
-		/* FIXME check for other things to init */
 		change_process_title("chirp_server [scheduler]");
 		if(cfs->init(chirp_url) == -1)
 			fatal("could not initialize %s backend filesystem: %s", chirp_url, strerror(errno));

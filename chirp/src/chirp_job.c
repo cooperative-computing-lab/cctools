@@ -22,6 +22,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* TODO:
+ *
+ * o Finer grained errors for exception handling in status/commit/kill/reap/wait.
+ * o Tags/Job Group for jobs for wait?
+ * o Maintain complete job database vs. garbage collecting old/lost jobs.
+ * o Job execute ACL?
+ */
+
 extern const char *chirp_super_user;
 extern char        chirp_transient_path[PATH_MAX];
 
@@ -388,7 +396,6 @@ out:
 
 int chirp_job_commit (json_value *J, const char *subject)
 {
-	/* FIXME subject failure abort */
 	static const char Commit[] =
 		"BEGIN TRANSACTION;"
 		/* This UPDATE may be executed multiple times. That's why it's wrapped in a transaction. */
@@ -458,7 +465,6 @@ out:
 
 int chirp_job_kill (json_value *J, const char *subject)
 {
-	/* FIXME subject failure abort */
 	static const char Kill[] =
 		"BEGIN TRANSACTION;"
 		/* This UPDATE may be executed multiple times. That's why it's wrapped in a transaction. */
@@ -575,7 +581,6 @@ out:
  * JobFSPublic */
 int chirp_job_status (json_value *J, const char *subject, buffer_t *B)
 {
-	/* FIXME subject failure abort */
 	static const char Status[] =
 		"BEGIN TRANSACTION;"
 		/* These SELECTs will be executed multiple times, for each job in J. */
