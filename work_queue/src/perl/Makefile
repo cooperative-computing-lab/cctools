@@ -7,7 +7,7 @@ ldflags=${CCTOOLS_PERL_LDFLAGS} ${CCTOOLS_HOME}/work_queue/src/libwork_queue.a $
 
 all: work_queue.pm work_queue.${CCTOOLS_DYNAMIC_SUFFIX}
 
-work_queue_wrap.c work_queue.pm: ../work_queue.i ${CCTOOLS_HOME}/work_queue/src/libwork_queue.a
+work_queue_wrap.c work_queue.pm: ../work_queue.i ../libwork_queue.a
 	@echo "SWIG work_queue.i (perl5)"
 	@${CCTOOLS_SWIG} -perl5 -exportall -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c ../work_queue.i
 
