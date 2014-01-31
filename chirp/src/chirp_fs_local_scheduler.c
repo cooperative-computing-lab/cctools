@@ -765,7 +765,6 @@ out:
 
 int chirp_fs_local_job_schedule (sqlite3 *db)
 {
-	int rc = 0;
 	int count = 0;
 
 	/* TODO Job time limits */
@@ -780,14 +779,13 @@ int chirp_fs_local_job_schedule (sqlite3 *db)
 
 		/* Look at jobs waiting in `COMMIT' state, schedule if we can */
 		if (count < chirp_job_concurrency) {
-			rc = job_schedule_fifo(db, &count);
+			job_schedule_fifo(db, &count);
 		}
 
 		usleep(50000);
 	}
 
-	debug(D_DEBUG, "scheduler exit: rc = %d (`%s')", rc, strerror(rc));
-	return rc;
+	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */

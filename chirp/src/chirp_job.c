@@ -181,7 +181,7 @@ out:
 	return rc;
 }
 
-static sqlite3 *db_get (void)
+static int db_get (sqlite3 **dbp)
 {
 	static sqlite3 *db = NULL;
 	sqlite3_stmt *stmt = NULL;
@@ -215,7 +215,8 @@ out:
 		sqlite3_close(db);
 		db = NULL;
 	}
-	return db;
+	*dbp = db;
+	return rc;
 }
 
 static int readpath (char file[CHIRP_PATH_MAX], json_value *J) {
@@ -259,7 +260,7 @@ int chirp_job_create (chirp_jobid_t *id, json_value *J, const char *subject)
 	const char *current = Create;
 	int rc;
 
-	if (!(db = db_get())) return EIO;
+	CATCH(db_get(&db));
 	if (!jistype(J, json_object)) goto invalid;
 
 restart:
@@ -399,7 +400,7 @@ int chirp_job_commit (json_value *J, const char *subject)
 	int rc;
 	int i;
 
-	if (!(db = db_get())) return EIO;
+	CATCH(db_get(&db));
 	if (!jistype(J, json_array)) goto invalid;
 
 restart:
@@ -470,7 +471,7 @@ int chirp_job_kill (json_value *J, const char *subject)
 	int rc;
 	int i;
 
-	if (!(db = db_get())) return EIO;
+	CATCH(db_get(&db));
 	if (!jistype(J, json_array)) goto invalid;
 
 restart:
@@ -586,7 +587,7 @@ int chirp_job_status (json_value *J, const char *subject, buffer_t *B)
 	int rc;
 	int i;
 
-	if (!(db = db_get())) return EIO;
+	CATCH(db_get(&db));
 	if (!jistype(J, json_array)) goto invalid;
 
 restart:
@@ -749,7 +750,7 @@ int chirp_job_wait (chirp_jobid_t id, const char *subject, INT64_T timeout, buff
 	int i, n;
 	chirp_jobid_t jobs[1024];
 
-	if (!(db = db_get())) return EIO;
+	CATCH(db_get(&db));
 
 	if (timeout < 0) {
 		timeout = CHIRP_JOB_WAIT_MAX_TIMEOUT+time(NULL);
@@ -853,7 +854,7 @@ int chirp_job_reap (json_value *J, const char *subject)
 	int rc;
 	int i;
 
-	if (!(db = db_get())) return EIO;
+	CATCH(db_get(&db));
 	if (!jistype(J, json_array)) goto invalid;
 
 restart:
@@ -902,13 +903,16 @@ out:
 
 int chirp_job_schedule (void)
 {
+	int rc;
 	sqlite3 *db = NULL;
-	if (!(db = db_get())) return EIO;
+	CATCH(db_get(&db));
 
 	debug(D_DEBUG, "scheduler running with concurrency: %d", chirp_job_concurrency);
 	debug(D_DEBUG, "scheduler running with time limit: %d", chirp_job_time_limit);
 
-	return cfs->job_schedule(db);
+	CATCH(cfs->job_schedule(db));
+out:
+	return rc;
 }
 
 /* vim: set noexpandtab tabstop=4: */

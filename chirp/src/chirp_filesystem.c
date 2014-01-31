@@ -733,20 +733,12 @@ INT64_T cfs_stub_lremovexattr(const char *path, const char *name)
 
 int cfs_stub_job_dbinit (sqlite3 *db)
 {
-	errno = ENOSYS;
-	return -1;
-}
-
-int cfs_stub_job_kill (sqlite3 *db, chirp_jobid_t id)
-{
-	errno = ENOSYS;
-	return -1;
+	return ENOSYS;
 }
 
 int cfs_stub_job_schedule (sqlite3 *db)
 {
-	errno = ENOSYS;
-	return -1;
+	return ENOSYS;
 }
 
 /* vim: set noexpandtab tabstop=4: */
