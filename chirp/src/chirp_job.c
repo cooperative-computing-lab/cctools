@@ -74,6 +74,7 @@ int   chirp_job_time_limit = 3600; /* 1 hour */
 static int db_create (const char *path)
 {
 	static const char Create[] =
+		"BEGIN EXCLUSIVE TRANSACTION;"
 		"PRAGMA foreign_keys = ON;"
 		"CREATE TABLE Jobs (id INTEGER PRIMARY KEY,"
 		"                   error TEXT,"
@@ -163,7 +164,8 @@ static int db_create (const char *path)
 		"CREATE TABLE FileType (type TEXT PRIMARY KEY);"
 		"INSERT INTO FileType VALUES ('INPUT');"
 		"INSERT INTO FileType VALUES ('OUTPUT');"
-		IMMUTABLE("FileType");
+		IMMUTABLE("FileType")
+		"END TRANSACTION;";
 
 	sqlite3 *db = NULL;
 	sqlite3_stmt *stmt = NULL;
