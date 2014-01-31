@@ -59,7 +59,7 @@ libwork_queue.a: ${OBJECTS}
 	ranlib $@
 
 
-bindings:
+bindings: libwork_queue.a work_queue.i
 	@for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; $(MAKE) all; cd ..; done
 
 clean-bindings:
