@@ -1,13 +1,13 @@
 #!/bin/sh
 
+set -e
+
 . ../../dttools/src/test_runner.common.sh
+. ../../chirp/test/chirp-common.sh
+CHIRP_SERVER=../../chirp/src/chirp_server
 
-
-chirp_debug=chirp.debug
-chirp_pid=chirp.pid
-chirp_port=chirp.port
+c="./hostport.$PPID"
 parrot_debug=parrot.debug
-
 expected=expected.txt
 output=output.txt
 
@@ -15,7 +15,8 @@ psearch="../src/parrot_run -d all -o $parrot_debug ../src/parrot_search"
 
 prepare()
 {
-	../../chirp/src/chirp_server -r ./fixtures -I 127.0.0.1 -Z "$chirp_port" -b -B "$chirp_pid" -d all -o "$chirp_debug"
+	chirp_start ./fixtures
+	echo "$hostport" > "$c"
 
 	cat > "$expected" <<EOF
 ++
@@ -44,36 +45,35 @@ no results
 /a/b/c/bar
 ++
 EOF
-
-	wait_for_file_creation "$chirp_port" 5
-	wait_for_file_creation "$chirp_pid" 5
+	return 0
 }
 
 run()
 {
+	hostport=$(cat "$c")
 	{
 		echo ++
-		$psearch /chirp/localhost:`cat $chirp_port`/ 'bar' | sort
+		$psearch /chirp/$hostport/ 'bar' | sort
 		echo ++
-		$psearch /chirp/localhost:`cat $chirp_port`/ '/bar'
+		$psearch /chirp/$hostport/ '/bar'
 		echo ++
-		$psearch /chirp/localhost:`cat $chirp_port`/ 'c/bar'
+		$psearch /chirp/$hostport/ 'c/bar'
 		echo ++
-		$psearch /chirp/localhost:`cat $chirp_port`/ '/c/bar'
+		$psearch /chirp/$hostport/ '/c/bar'
 		echo ++
-		$psearch /chirp/localhost:`cat $chirp_port`/ 'b/bar'
+		$psearch /chirp/$hostport/ 'b/bar'
 		echo ++
-		$psearch /chirp/localhost:`cat $chirp_port`/ '/b/bar'
+		$psearch /chirp/$hostport/ '/b/bar'
 		echo ++
-		$psearch /chirp/localhost:`cat $chirp_port`/ 'b/foo'
+		$psearch /chirp/$hostport/ 'b/foo'
 		echo ++
-		$psearch /chirp/localhost:`cat $chirp_port`/ '/a/b/foo'
+		$psearch /chirp/$hostport/ '/a/b/foo'
 		echo ++
-		$psearch /chirp/localhost:`cat $chirp_port`/ '/*/foo'
+		$psearch /chirp/$hostport/ '/*/foo'
 		echo ++
-		$psearch /chirp/localhost:`cat $chirp_port`/ '/*/*/foo'
+		$psearch /chirp/$hostport/ '/*/*/foo'
 		echo ++
-		$psearch /chirp/localhost:`cat $chirp_port`/ '*/*r' | sort
+		$psearch /chirp/$hostport/ '*/*r' | sort
 		echo ++
 	} > "$output"
 
@@ -83,12 +83,10 @@ run()
 
 clean()
 {
-	if [ -r "$chirp_pid" ]; then
-		/bin/kill -9 `cat $chirp_pid`
-	fi
-	rm -f "$chirp_debug" "$chirp_pid" "$chirp_port" "$parrot_debug" "$expected" "$output"
+	chirp_clean
+	rm -f "$c" "$parrot_debug" "$expected" "$output"
 }
 
-dispatch $@
+dispatch "$@"
 
 # vim: set noexpandtab tabstop=4:
