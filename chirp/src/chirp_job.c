@@ -26,6 +26,7 @@ extern const char *chirp_super_user;
 extern char        chirp_transient_path[PATH_MAX];
 
 int   chirp_job_concurrency = 1;
+int   chirp_job_enabled = 0;
 pid_t chirp_job_schedd = 0;
 int   chirp_job_time_limit = 3600; /* 1 hour */
 
@@ -262,6 +263,7 @@ int chirp_job_create (chirp_jobid_t *id, json_value *J, const char *subject)
 	const char *current = Create;
 	int rc;
 
+	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
 	if (!jistype(J, json_object)) goto invalid;
 
@@ -402,6 +404,7 @@ int chirp_job_commit (json_value *J, const char *subject)
 	int rc;
 	int i;
 
+	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
 	if (!jistype(J, json_array)) goto invalid;
 
@@ -473,6 +476,7 @@ int chirp_job_kill (json_value *J, const char *subject)
 	int rc;
 	int i;
 
+	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
 	if (!jistype(J, json_array)) goto invalid;
 
@@ -589,6 +593,7 @@ int chirp_job_status (json_value *J, const char *subject, buffer_t *B)
 	int rc;
 	int i;
 
+	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
 	if (!jistype(J, json_array)) goto invalid;
 
@@ -752,6 +757,7 @@ int chirp_job_wait (chirp_jobid_t id, const char *subject, INT64_T timeout, buff
 	int i, n;
 	chirp_jobid_t jobs[1024];
 
+	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
 
 	if (timeout < 0) {
@@ -856,6 +862,7 @@ int chirp_job_reap (json_value *J, const char *subject)
 	int rc;
 	int i;
 
+	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
 	if (!jistype(J, json_array)) goto invalid;
 
@@ -907,6 +914,7 @@ int chirp_job_schedule (void)
 {
 	int rc;
 	sqlite3 *db = NULL;
+	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
 
 	debug(D_DEBUG, "scheduler running with concurrency: %d", chirp_job_concurrency);

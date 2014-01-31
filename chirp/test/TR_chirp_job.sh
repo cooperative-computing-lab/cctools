@@ -12,7 +12,7 @@ cr="./root.$PPID"
 
 prepare()
 {
-	chirp_start local --auth=hostname --job-concurrency=2
+	chirp_start local --auth=hostname --jobs --job-concurrency=2
 	echo "$hostport" > "$c"
 	echo "$root" > "$cr"
 	return 0

@@ -12,6 +12,7 @@
 #include "chirp_types.h"
 
 extern int   chirp_job_concurrency;
+extern int   chirp_job_enabled;
 extern pid_t chirp_job_schedd;
 extern int   chirp_job_time_limit;
 

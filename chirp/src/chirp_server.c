@@ -1952,6 +1952,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Base url for group lookups. (default: disabled)\n", "-G,--group-url=<url>");
 	fprintf(stdout, " %-30s Run as lower privilege user. (root protection)\n", "-i,--user=<user>");
 	fprintf(stdout, " %-30s Listen only on this network interface.\n", "-I,--interface=<addr>");
+	fprintf(stdout, " %-30s Enable Chirp job execution. (default: OFF)\n", "--jobs");
 	fprintf(stdout, " %-30s Maximum concurrent jobs. (default: %d)\n", "--job-concurrency", chirp_job_concurrency);
 	fprintf(stdout, " %-30s Execution time limit for jobs. (default: %ds)\n", "--job-time-limit", chirp_job_time_limit);
 	fprintf(stdout, " %-30s Set the maximum number of clients to accept at once. (default unlimited)\n", "-M,--max-clients=<count>");
@@ -1979,9 +1980,10 @@ static void show_help(const char *cmd)
 int main(int argc, char *argv[])
 {
 	enum {
-		LONGOPT_JOB_CONCURRENCY = INT_MAX-0,
-		LONGOPT_JOB_TIME_LIMIT = INT_MAX-1,
-		LONGOPT_INHERIT_DEFAULT_ACL = INT_MAX-2,
+		LONGOPT_JOBS                             = INT_MAX-0,
+		LONGOPT_JOB_CONCURRENCY                  = INT_MAX-1,
+		LONGOPT_JOB_TIME_LIMIT                   = INT_MAX-2,
+		LONGOPT_INHERIT_DEFAULT_ACL              = INT_MAX-3,
 	};
 
 	static const struct option long_options[] = {
@@ -2001,6 +2003,7 @@ int main(int argc, char *argv[])
 		{"help", no_argument, 0, 'h'},
 		{"idle-clients", required_argument, 0, 't'},
 		{"interface", required_argument, 0, 'I'},
+		{"jobs", required_argument, 0, LONGOPT_JOBS},
 		{"job-concurrency", required_argument, 0, LONGOPT_JOB_CONCURRENCY},
 		{"job-time-limit", required_argument, 0, LONGOPT_JOB_TIME_LIMIT},
 		{"max-clients", required_argument, 0, 'M'},
@@ -2172,6 +2175,9 @@ int main(int argc, char *argv[])
 			break;
 		case LONGOPT_INHERIT_DEFAULT_ACL:
 			chirp_acl_inherit_default(1);
+			break;
+		case LONGOPT_JOBS:
+			chirp_job_enabled = 1;
 			break;
 		case LONGOPT_JOB_CONCURRENCY:
 			chirp_job_concurrency = atoi(optarg);
