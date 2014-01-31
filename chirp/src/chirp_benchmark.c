@@ -111,9 +111,9 @@ int do_bandwidth(const char *file, int bytes, int blocksize, int do_write)
 	for(i = 0; i < blocksize; i++)
 		buffer[i] = (char) i;
 
-	fd = do_open(file, (do_write ? O_WRONLY : O_RDONLY) | O_CREAT | do_sync | O_TRUNC, 0777);
+	fd = do_open(file, (do_write ? O_WRONLY|O_TRUNC|O_CREAT : O_RDONLY) | do_sync, 0777);
 	if(fd < 0 || fd == 0) {
-		printf("couldn't open %s: %s", file, strerror(errno));
+		fprintf(stderr, "couldn't open %s: %s\n", file, strerror(errno));
 		free(buffer);
 		return 0;
 	}
@@ -216,6 +216,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	memset(data, -1, sizeof(data));
 	RUN_LOOP("write1", do_pwrite(fd, data, 1, 0));
 	RUN_LOOP("write8", do_pwrite(fd, data, 8192, 0));
 
