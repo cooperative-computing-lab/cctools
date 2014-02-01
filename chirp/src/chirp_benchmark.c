@@ -162,7 +162,9 @@ void print_total()
 	for(j=0;j<cycles;j++) {\
 		gettimeofday( &start, 0 );\
 		for( i=0; i<loops; i++ ) {\
-			test;\
+			int rc = test;\
+			if(rc < 0)\
+				return -1;\
 		}\
 		gettimeofday( &stop, 0 );\
 		runtime = (stop.tv_sec-start.tv_sec)*1000000 + (stop.tv_usec-start.tv_usec);\
@@ -173,7 +175,6 @@ void print_total()
 		}\
 	}\
 	print_total();
-
 
 int main(int argc, char *argv[])
 {
@@ -236,7 +237,7 @@ int main(int argc, char *argv[])
 	do_close(fd);
 
 	RUN_LOOP("stat", do_stat(fname, &buf));
-	RUN_LOOP("open", fd = do_open(fname, O_RDONLY | do_sync, 0777); do_close(fd););
+	RUN_LOOP("open", fd = do_open(fname, O_RDONLY | do_sync, 0777); do_close(fd));
 
 	if(bwloops == 0)
 		return 0;
