@@ -335,15 +335,18 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 			} 
 			
 			if((errno == EXDEV || errno == EPERM) && symlinks_enabled) {
-				char *cwd = path_getcwd();
-				char *absolute_sourcename = malloc((strlen(cwd) + strlen(sourcename) + 2) * sizeof(char));
-				sprintf(absolute_sourcename, "%s/%s", cwd, sourcename);
+				//use absolute path when symlinking. Else link will point to a 
+				//file relative to current directory.	
+				char *cwd = path_getcwd();	
+				char *absolute_sourcename = string_format("%s/%s", cwd, sourcename);	
 				free(cwd);	
 				debug(D_WQ, "symlinking file %s -> %s\n", absolute_sourcename, targetname);
 				if(symlink(absolute_sourcename, targetname)) {
 					debug(D_WQ, "Could not symlink file %s -> %s (%s)\n", absolute_sourcename, targetname, strerror(errno));
+					free(absolute_sourcename);	
 					return 0;
 				}
+				free(absolute_sourcename);	
 			} else {
 				return 0;
 			}
