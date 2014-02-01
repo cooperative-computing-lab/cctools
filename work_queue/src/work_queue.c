@@ -87,7 +87,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define RESOURCE_MONITOR_TASK_SUMMARY_NAME "cctools-work-queue-%d-resource-monitor-task-%d"
 
-#define MAX_TASK_STDOUT_LENGTH (1*GIGABYTE)  
+#define MAX_TASK_STDOUT_LENGTH (1*KILOBYTE)  
  
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
@@ -1145,6 +1145,10 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 			debug(D_WQ, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_LENGTH), taskid, MAX_TASK_STDOUT_LENGTH);
 			stoptime = time(0) + get_transfer_wait_time(q, w, t, (output_length-retrieved_output_length));
 			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
+		
+			//overwrite the last few bytes of buffer to signal truncated stdout.
+			char *truncate_msg = "\nSTDOUT TRUNCATED BEYOND THIS";	
+			strncpy(t->output+MAX_TASK_STDOUT_LENGTH-strlen(truncate_msg), truncate_msg, strlen(truncate_msg));
 		}
 		
 		timestamp_t current_time = timestamp_get();
