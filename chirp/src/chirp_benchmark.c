@@ -34,16 +34,16 @@ See the file COPYING for details.
 #define do_sync (getenv("CHIRP_SYNC") ? O_SYNC : 0)
 #endif
 
-char *host;
 #define STOPTIME (time(NULL)+5)
 
+int do_chirp;
+char *host;
 double measure[10000];
 double total;
 double average;
 double variance;
 double stddev;
 int loops, cycles;
-int do_chirp;
 int measure_bandwidth = 0;
 
 long do_open(const char *file, int flags, int mode)
