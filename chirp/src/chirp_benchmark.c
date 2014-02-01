@@ -115,7 +115,7 @@ int do_bandwidth(const char *file, int bytes, int blocksize, int do_write)
 		buffer[i] = (char) i;
 
 	fd = do_open(file, (do_write ? O_WRONLY|O_TRUNC|O_CREAT : O_RDONLY) | do_sync, 0777);
-	if(fd < 0 || fd == 0) {
+	if(fd < 0) {
 		fprintf(stderr, "couldn't open %s: %s\n", file, strerror(errno));
 		free(buffer);
 		return 0;
@@ -213,7 +213,7 @@ int main(int argc, char *argv[])
 #endif
 
 	fd = do_open(fname, O_WRONLY | O_CREAT | O_TRUNC | do_sync, 0777);
-	if(fd < 0 || fd == 0) {
+	if(fd < 0) {
 		perror(fname);
 		return -1;
 	}
