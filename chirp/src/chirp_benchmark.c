@@ -35,7 +35,7 @@ See the file COPYING for details.
 #endif
 
 char *host;
-time_t stoptime;
+#define STOPTIME (time(NULL)+5)
 
 double measure[10000];
 double total;
@@ -49,7 +49,7 @@ int measure_bandwidth = 0;
 long do_open(const char *file, int flags, int mode)
 {
 	if(do_chirp) {
-		return (long) chirp_reli_open(host, file, flags, mode, stoptime);
+		return (long) chirp_reli_open(host, file, flags, mode, STOPTIME);
 	} else {
 		return open(file, flags, mode);
 	}
@@ -58,7 +58,7 @@ long do_open(const char *file, int flags, int mode)
 int do_close(long fd)
 {
 	if(do_chirp) {
-		return chirp_reli_close((struct chirp_file *) fd, stoptime);
+		return chirp_reli_close((struct chirp_file *) fd, STOPTIME);
 	} else {
 		return close(fd);
 	}
@@ -76,7 +76,7 @@ int do_fsync(long fd)
 int do_pread(long fd, char *buffer, int length, int offset)
 {
 	if(do_chirp) {
-		return chirp_reli_pread((struct chirp_file *) fd, buffer, length, offset, stoptime);
+		return chirp_reli_pread((struct chirp_file *) fd, buffer, length, offset, STOPTIME);
 	} else {
 		return full_pread(fd, buffer, length, offset);
 	}
@@ -85,7 +85,7 @@ int do_pread(long fd, char *buffer, int length, int offset)
 int do_pwrite(long fd, const char *buffer, int length, int offset)
 {
 	if(do_chirp) {
-		return chirp_reli_pwrite((struct chirp_file *) fd, buffer, length, offset, stoptime);
+		return chirp_reli_pwrite((struct chirp_file *) fd, buffer, length, offset, STOPTIME);
 	} else {
 		return full_pwrite(fd, buffer, length, offset);
 	}
@@ -95,7 +95,7 @@ int do_stat(const char *file, struct stat *buf)
 {
 	if(do_chirp) {
 		struct chirp_stat lbuf;
-		return chirp_reli_stat(host, file, &lbuf, stoptime);
+		return chirp_reli_stat(host, file, &lbuf, STOPTIME);
 	} else {
 		return stat(file, buf);
 	}
@@ -185,7 +185,6 @@ int main(int argc, char *argv[])
 	int runtime;
 	struct stat buf;
 	struct timeval start, stop;
-	stoptime = time(0) + 3600;
 	int filesize = 16 * 1024 * 1024;
 
 	if(argc != 6) {
