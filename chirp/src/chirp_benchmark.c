@@ -7,22 +7,31 @@ See the file COPYING for details.
 
 #include "chirp_reli.h"
 
-#include "full_io.h"
 #include "auth_all.h"
+#include "full_io.h"
 #include "getopt_aux.h"
 
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <stdlib.h>
 #include <fcntl.h>
-#include <sys/time.h>
-#include <string.h>
-#include <math.h>
-#include <stdarg.h>
-#include <errno.h>
+#include <unistd.h>
+
+#include <sys/stat.h>
 #ifndef CCTOOLS_OPSYS_CYGWIN
 #include <sys/syscall.h>
+#endif
+#include <sys/time.h>
+
+#include <errno.h>
+#include <math.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+
+#ifdef CCTOOLS_OPSYS_DARWIN
+#define do_sync 0
+#else
+#define do_sync (getenv("CHIRP_SYNC") ? O_SYNC : 0)
 #endif
 
 char *host;
@@ -36,12 +45,6 @@ double stddev;
 int loops, cycles;
 int do_chirp;
 int measure_bandwidth = 0;
-
-#ifdef CCTOOLS_OPSYS_DARWIN
-#define do_sync 0
-#else
-#define do_sync (getenv("CHIRP_SYNC") ? O_SYNC : 0)
-#endif
 
 long do_open(const char *file, int flags, int mode)
 {
