@@ -201,11 +201,7 @@ int main(int argc, char *argv[])
 	cycles = atoi(argv[4]);
 	bwloops = atoi(argv[5]);
 
-	if(!strcmp(host, "unix")) {
-		do_chirp = 0;
-	} else {
-		do_chirp = 1;
-	}
+	do_chirp = (strcmp(host, "unix") != 0);
 
 #ifdef SYS_getpid
 	RUN_LOOP("getpid", syscall(SYS_getpid));
