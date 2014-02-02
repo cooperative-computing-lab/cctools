@@ -158,28 +158,33 @@ void print_total()
 }
 
 #define RUN_LOOP( name, test ) \
-	printf("%s\t",name);\
-	for(j=0;j<cycles;j++) {\
-		gettimeofday( &start, 0 );\
-		for( i=0; i<loops; i++ ) {\
-			int rc = test;\
-			if(rc < 0)\
-				return -1;\
+	do {\
+		int j;\
+		off_t n = 0;\
+		printf("%s\t",name);\
+		for(j=0;j<cycles;j++) {\
+			int i;\
+			gettimeofday( &start, 0 );\
+			for( i=0; i<loops; i++ ) {\
+				n += 1;\
+				int rc = test;\
+				if(rc < 0)\
+					return -1;\
+			}\
+			gettimeofday( &stop, 0 );\
+			runtime = (stop.tv_sec-start.tv_sec)*1000000 + (stop.tv_usec-start.tv_usec);\
+			if(measure_bandwidth) {\
+				measure[j] = (filesize*loops/(double)runtime);\
+			} else {\
+				measure[j] = ((double)(runtime))/loops;\
+			}\
 		}\
-		gettimeofday( &stop, 0 );\
-		runtime = (stop.tv_sec-start.tv_sec)*1000000 + (stop.tv_usec-start.tv_usec);\
-		if(measure_bandwidth) {\
-			measure[j] = (filesize*loops/(double)runtime);\
-		} else {\
-			measure[j] = ((double)(runtime))/loops;\
-		}\
-	}\
-	print_total();
+		print_total();\
+	} while (0)
 
 int main(int argc, char *argv[])
 {
 	long fd;
-	int i, j, k;
 	int bwloops;
 	char *fname;
 	char data[8192];
@@ -216,8 +221,8 @@ int main(int argc, char *argv[])
 	}
 
 	memset(data, -1, sizeof(data));
-	RUN_LOOP("write1", do_pwrite(fd, data, 1, 0));
-	RUN_LOOP("write8", do_pwrite(fd, data, 8192, 0));
+	RUN_LOOP("write1", do_pwrite(fd, data, 1, n));
+	RUN_LOOP("write8", do_pwrite(fd, data, 8192, n*8192));
 
 	do_close(fd);
 
@@ -227,8 +232,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	RUN_LOOP("read1", do_pread(fd, data, 1, 0));
-	RUN_LOOP("read8", do_pread(fd, data, 8192, 0));
+	RUN_LOOP("read1", do_pread(fd, data, 1, n));
+	RUN_LOOP("read8", do_pread(fd, data, 8192, n*8192));
 
 	do_close(fd);
 
@@ -241,6 +246,7 @@ int main(int argc, char *argv[])
 	loops = bwloops;
 	measure_bandwidth = 1;
 
+	int k;
 	for(k = filesize; k >= (4 * 1024); k = k / 2) {
 		printf("%4d ", k / 1024);
 		RUN_LOOP("write", do_bandwidth(fname, filesize, k, 1));
