@@ -76,7 +76,7 @@ int do_fsync(long fd)
 int do_pread(long fd, char *buffer, int length, int offset)
 {
 	if(do_chirp) {
-		return chirp_reli_pread((struct chirp_file *) fd, buffer, length, offset, STOPTIME);
+		return chirp_reli_pread_unbuffered((struct chirp_file *) fd, buffer, length, offset, STOPTIME);
 	} else {
 		return full_pread(fd, buffer, length, offset);
 	}
@@ -85,7 +85,7 @@ int do_pread(long fd, char *buffer, int length, int offset)
 int do_pwrite(long fd, const char *buffer, int length, int offset)
 {
 	if(do_chirp) {
-		return chirp_reli_pwrite((struct chirp_file *) fd, buffer, length, offset, STOPTIME);
+		return chirp_reli_pwrite_unbuffered((struct chirp_file *) fd, buffer, length, offset, STOPTIME);
 	} else {
 		return full_pwrite(fd, buffer, length, offset);
 	}
