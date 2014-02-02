@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -e
+set -ex
 
 . ../../dttools/src/test_runner.common.sh
 . ./chirp-common.sh

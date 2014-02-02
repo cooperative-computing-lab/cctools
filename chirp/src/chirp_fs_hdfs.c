@@ -204,7 +204,7 @@ static INT64_T chirp_fs_hdfs_stat(const char *path, struct chirp_stat *buf)
 
 static INT64_T chirp_fs_hdfs_fstat(int fd, struct chirp_stat *buf)
 {
-	return chirp_fs_hdfs_stat(open_files[fd].path, buf);
+	return do_stat(open_files[fd].path, buf);
 }
 
 static INT64_T chirp_fs_hdfs_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime)
@@ -607,9 +607,8 @@ static INT64_T chirp_fs_hdfs_lstat(const char *path, struct chirp_stat *buf)
 	return do_stat(path, buf);
 }
 
-static INT64_T chirp_fs_hdfs_statfs(const char *path, struct chirp_statfs *buf)
+static INT64_T do_statfs(const char *path, struct chirp_statfs *buf)
 {
-	RESOLVE(path)
 	debug(D_HDFS, "statfs %s", path);
 
 	INT64_T capacity = hdfs_services->get_capacity(fs);
@@ -628,9 +627,15 @@ static INT64_T chirp_fs_hdfs_statfs(const char *path, struct chirp_statfs *buf)
 	return 0;
 }
 
+static INT64_T chirp_fs_hdfs_statfs(const char *path, struct chirp_statfs *buf)
+{
+	RESOLVE(path)
+	return do_statfs(path, buf);
+}
+
 static INT64_T chirp_fs_hdfs_fstatfs(int fd, struct chirp_statfs *buf)
 {
-	return chirp_fs_hdfs_statfs(open_files[fd].path, buf);
+	return do_statfs(open_files[fd].path, buf);
 }
 
 static INT64_T chirp_fs_hdfs_access(const char *path, INT64_T mode)

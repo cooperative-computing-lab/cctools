@@ -7,35 +7,26 @@ See the file COPYING for details.
 
 #include "chirp_reli.h"
 
-#include "full_io.h"
 #include "auth_all.h"
+#include "full_io.h"
 #include "getopt_aux.h"
 
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <stdlib.h>
 #include <fcntl.h>
-#include <sys/time.h>
-#include <string.h>
-#include <math.h>
-#include <stdarg.h>
-#include <errno.h>
+#include <unistd.h>
+
+#include <sys/stat.h>
 #ifndef CCTOOLS_OPSYS_CYGWIN
 #include <sys/syscall.h>
 #endif
+#include <sys/time.h>
 
-char *host;
-time_t stoptime;
+#include <errno.h>
+#include <math.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-double measure[10000];
-double total;
-double average;
-double variance;
-double stddev;
-int loops, cycles;
-int do_chirp;
-int measure_bandwidth = 0;
 
 #ifdef CCTOOLS_OPSYS_DARWIN
 #define do_sync 0
@@ -43,10 +34,22 @@ int measure_bandwidth = 0;
 #define do_sync (getenv("CHIRP_SYNC") ? O_SYNC : 0)
 #endif
 
+#define STOPTIME (time(NULL)+5)
+
+int do_chirp;
+char *host;
+double measure[10000];
+double total;
+double average;
+double variance;
+double stddev;
+int loops, cycles;
+int measure_bandwidth = 0;
+
 long do_open(const char *file, int flags, int mode)
 {
 	if(do_chirp) {
-		return (long) chirp_reli_open(host, file, flags, mode, stoptime);
+		return (long) chirp_reli_open(host, file, flags, mode, STOPTIME);
 	} else {
 		return open(file, flags, mode);
 	}
@@ -55,7 +58,7 @@ long do_open(const char *file, int flags, int mode)
 int do_close(long fd)
 {
 	if(do_chirp) {
-		return chirp_reli_close((struct chirp_file *) fd, stoptime);
+		return chirp_reli_close((struct chirp_file *) fd, STOPTIME);
 	} else {
 		return close(fd);
 	}
@@ -73,7 +76,7 @@ int do_fsync(long fd)
 int do_pread(long fd, char *buffer, int length, int offset)
 {
 	if(do_chirp) {
-		return chirp_reli_pread((struct chirp_file *) fd, buffer, length, offset, stoptime);
+		return chirp_reli_pread_unbuffered((struct chirp_file *) fd, buffer, length, offset, STOPTIME);
 	} else {
 		return full_pread(fd, buffer, length, offset);
 	}
@@ -82,7 +85,7 @@ int do_pread(long fd, char *buffer, int length, int offset)
 int do_pwrite(long fd, const char *buffer, int length, int offset)
 {
 	if(do_chirp) {
-		return chirp_reli_pwrite((struct chirp_file *) fd, buffer, length, offset, stoptime);
+		return chirp_reli_pwrite_unbuffered((struct chirp_file *) fd, buffer, length, offset, STOPTIME);
 	} else {
 		return full_pwrite(fd, buffer, length, offset);
 	}
@@ -92,7 +95,7 @@ int do_stat(const char *file, struct stat *buf)
 {
 	if(do_chirp) {
 		struct chirp_stat lbuf;
-		return chirp_reli_stat(host, file, &lbuf, stoptime);
+		return chirp_reli_stat(host, file, &lbuf, STOPTIME);
 	} else {
 		return stat(file, buf);
 	}
@@ -112,7 +115,7 @@ int do_bandwidth(const char *file, int bytes, int blocksize, int do_write)
 		buffer[i] = (char) i;
 
 	fd = do_open(file, (do_write ? O_WRONLY|O_TRUNC|O_CREAT : O_RDONLY) | do_sync, 0777);
-	if(fd < 0 || fd == 0) {
+	if(fd < 0) {
 		fprintf(stderr, "couldn't open %s: %s\n", file, strerror(errno));
 		free(buffer);
 		return 0;
@@ -155,34 +158,39 @@ void print_total()
 }
 
 #define RUN_LOOP( name, test ) \
-	printf("%s\t",name);\
-	for(j=0;j<cycles;j++) {\
-		gettimeofday( &start, 0 );\
-		for( i=0; i<loops; i++ ) {\
-			test;\
+	do {\
+		int j;\
+		off_t n = 0;\
+		printf("%s\t",name);\
+		for(j=0;j<cycles;j++) {\
+			int i;\
+			gettimeofday( &start, 0 );\
+			for( i=0; i<loops; i++ ) {\
+				n += 1;\
+				int rc = test;\
+				if(rc < 0)\
+					return -1;\
+			}\
+			gettimeofday( &stop, 0 );\
+			runtime = (stop.tv_sec-start.tv_sec)*1000000 + (stop.tv_usec-start.tv_usec);\
+			if(measure_bandwidth) {\
+				measure[j] = (filesize*loops/(double)runtime);\
+			} else {\
+				measure[j] = ((double)(runtime))/loops;\
+			}\
 		}\
-		gettimeofday( &stop, 0 );\
-		runtime = (stop.tv_sec-start.tv_sec)*1000000 + (stop.tv_usec-start.tv_usec);\
-		if(measure_bandwidth) {\
-			measure[j] = (filesize*loops/(double)runtime);\
-		} else {\
-			measure[j] = ((double)(runtime))/loops;\
-		}\
-	}\
-	print_total();
-
+		print_total();\
+	} while (0)
 
 int main(int argc, char *argv[])
 {
 	long fd;
-	int i, j, k;
 	int bwloops;
 	char *fname;
 	char data[8192];
 	int runtime;
 	struct stat buf;
 	struct timeval start, stop;
-	stoptime = time(0) + 3600;
 	int filesize = 16 * 1024 * 1024;
 
 	if(argc != 6) {
@@ -198,11 +206,7 @@ int main(int argc, char *argv[])
 	cycles = atoi(argv[4]);
 	bwloops = atoi(argv[5]);
 
-	if(!strcmp(host, "unix")) {
-		do_chirp = 0;
-	} else {
-		do_chirp = 1;
-	}
+	do_chirp = (strcmp(host, "unix") != 0);
 
 #ifdef SYS_getpid
 	RUN_LOOP("getpid", syscall(SYS_getpid));
@@ -211,14 +215,14 @@ int main(int argc, char *argv[])
 #endif
 
 	fd = do_open(fname, O_WRONLY | O_CREAT | O_TRUNC | do_sync, 0777);
-	if(fd < 0 || fd == 0) {
+	if(fd < 0) {
 		perror(fname);
 		return -1;
 	}
 
 	memset(data, -1, sizeof(data));
-	RUN_LOOP("write1", do_pwrite(fd, data, 1, 0));
-	RUN_LOOP("write8", do_pwrite(fd, data, 8192, 0));
+	RUN_LOOP("write1", do_pwrite(fd, data, 1, n));
+	RUN_LOOP("write8", do_pwrite(fd, data, 8192, n*8192));
 
 	do_close(fd);
 
@@ -228,13 +232,13 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	RUN_LOOP("read1", do_pread(fd, data, 1, 0));
-	RUN_LOOP("read8", do_pread(fd, data, 8192, 0));
+	RUN_LOOP("read1", do_pread(fd, data, 1, n));
+	RUN_LOOP("read8", do_pread(fd, data, 8192, n*8192));
 
 	do_close(fd);
 
 	RUN_LOOP("stat", do_stat(fname, &buf));
-	RUN_LOOP("open", fd = do_open(fname, O_RDONLY | do_sync, 0777); do_close(fd););
+	RUN_LOOP("open", fd = do_open(fname, O_RDONLY | do_sync, 0777); do_close(fd));
 
 	if(bwloops == 0)
 		return 0;
@@ -242,6 +246,7 @@ int main(int argc, char *argv[])
 	loops = bwloops;
 	measure_bandwidth = 1;
 
+	int k;
 	for(k = filesize; k >= (4 * 1024); k = k / 2) {
 		printf("%4d ", k / 1024);
 		RUN_LOOP("write", do_bandwidth(fname, filesize, k, 1));
