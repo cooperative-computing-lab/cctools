@@ -598,6 +598,9 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				errno = ENOMEM;
 			}
 		} else if(sscanf(line, "pwrite %" SCNd64 " %" SCNd64 " %" SCNd64, &fd, &length, &offset) == 3) {
+			INT64_T oldsize = cfs_fd_size(fd);
+			if(oldsize == -1)
+				goto failure;
 			if(offset < 0) {
 				errno = EINVAL;
 				goto failure;
@@ -607,9 +610,6 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			char *data = malloc(length);
 			if(data) {
 				INT64_T newsize;
-				INT64_T oldsize = cfs_fd_size(fd);
-				if(oldsize == -1)
-					goto failure;
 				actual = link_read(l, data, length, stalltime);
 				if(actual != length) {
 					free(data);
