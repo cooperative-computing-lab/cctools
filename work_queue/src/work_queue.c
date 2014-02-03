@@ -87,8 +87,8 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define RESOURCE_MONITOR_TASK_SUMMARY_NAME "cctools-work-queue-%d-resource-monitor-task-%d"
 
-#define MAX_TASK_STDOUT_LENGTH (1*KILOBYTE)  
- 
+#define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
+
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
@@ -1109,11 +1109,11 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
 	}
 
-	if(output_length <= MAX_TASK_STDOUT_LENGTH) {
+	if(output_length <= MAX_TASK_STDOUT_STORAGE) {
 		retrieved_output_length = output_length; 
 	} else {
-		retrieved_output_length = MAX_TASK_STDOUT_LENGTH; 
-		fprintf(stderr, "warning: stdout of task %"PRId64" is of size %"PRId64" GB which exceeds maximum supported size of %d GB. Only %d GB will be retreived.\n", taskid, output_length/GIGABYTE, MAX_TASK_STDOUT_LENGTH/GIGABYTE, MAX_TASK_STDOUT_LENGTH/GIGABYTE);
+		retrieved_output_length = MAX_TASK_STDOUT_STORAGE; 
+		fprintf(stderr, "warning: stdout of task %"PRId64" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retreived.\n", taskid, ((double) output_length)/MAX_TASK_STDOUT_STORAGE, MAX_TASK_STDOUT_STORAGE/GIGABYTE, MAX_TASK_STDOUT_STORAGE/GIGABYTE);
 		t->result |= WORK_QUEUE_RESULT_STDOUT_MISSING;
 	}
 
@@ -1142,13 +1142,14 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		
 		//Then read the bytes we need to throw away.
 		if(output_length > retrieved_output_length) {
-			debug(D_WQ, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_LENGTH), taskid, MAX_TASK_STDOUT_LENGTH);
+			debug(D_WQ, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_STORAGE), taskid, MAX_TASK_STDOUT_STORAGE);
 			stoptime = time(0) + get_transfer_wait_time(q, w, t, (output_length-retrieved_output_length));
 			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
 		
 			//overwrite the last few bytes of buffer to signal truncated stdout.
-			char *truncate_msg = "\nSTDOUT TRUNCATED BEYOND THIS";	
-			strncpy(t->output+MAX_TASK_STDOUT_LENGTH-strlen(truncate_msg), truncate_msg, strlen(truncate_msg));
+			char *truncate_msg = string_format("\n>>>>>> WORK QUEUE HAS TRUNCATED THE STDOUT AFTER THIS POINT.\n>>>>>> MAXIMUM OF %d BYTES REACHED, %" PRId64 " BYTES TRUNCATED.", MAX_TASK_STDOUT_STORAGE, output_length - retrieved_output_length);	
+			strncpy(t->output+MAX_TASK_STDOUT_STORAGE-strlen(truncate_msg), truncate_msg, strlen(truncate_msg));
+			free(truncate_msg);
 		}
 		
 		timestamp_t current_time = timestamp_get();
