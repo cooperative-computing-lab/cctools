@@ -194,8 +194,9 @@ struct work_queue_task_report {
 	timestamp_t exec_time;
 };
 
+static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int fail_type);
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
-static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int task_dispatched);
+static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 
 static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
@@ -988,27 +989,26 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 static void fetch_output_from_worker(struct work_queue *q, struct work_queue_worker *w, int taskid)
 {
 	struct work_queue_task *t;
-	int result;
+	int result = 1;
 
 	t = itable_lookup(w->current_tasks, taskid);
-	if(!t)
-		goto failure;
+	if(!t) {
+		debug(D_WQ, "Failed to find task %d at worker %s (%s).", taskid, w->hostname, w->addrport);
+		handle_failure(q, w, t, 0); 
+		return;	
+	}
 
 	// Receiving output ...
 	t->time_receive_output_start = timestamp_get();
 	result = get_output_files(q,w,t);
 	if(result <= 0) {
-		goto failure;
+		debug(D_WQ, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
+		handle_failure(q, w, t, result); 
+		return;	
 	}
 	t->time_receive_output_finish = timestamp_get();
 
 	delete_uncacheable_files(q,w,t);
-
-	/* If there was an app-level failure, the task may be resubmitted and rerun
-	   at a different worker. The rerun may produce different outputs. So we need
-	   to evict all the output files of the task from the worker's cache. */
-	if(t->result & (WORK_QUEUE_RESULT_STDOUT_MISSING | WORK_QUEUE_RESULT_OUTPUT_MISSING))
-		delete_output_files(q,w,t);
 
 	// At this point, a task is completed.
 	itable_remove(w->current_tasks, taskid);
@@ -1038,33 +1038,17 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		(t->time_receive_output_finish - t->time_send_input_start) / 1000000.0,
 		(long long) w->total_tasks_complete,
 		w->total_task_time / w->total_tasks_complete / 1000000.0);
-	return;
-
-      failure:
-	if(result < 0) {
-		debug(D_WQ, "Failed to store the output received from worker %s (%s).", w->hostname, w->addrport);
-		handle_app_failure(q, w, t, 1);
-		return;
-	} else {
-		debug(D_WQ, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
-		handle_worker_failure(q, w);
-	}	
+	
 	return;
 }
 
 /*
-Application failures are classified into two groups: (1) failures observed
-during dispatch of a task to a worker, and (2) failures observed during the
-retrieval of task outputs from a worker. The application failures also include
-resource access or allocation failures that happen during dispatch or retrieval
-of a task. 
-This function marks the task as complete so it is returned to the application. 
-It returns after updating the data structures that hold submitted tasks in WQ.
+This function handles app-level failures. It remove the task from WQ and marks
+the task as complete so it is returned to the application. 
 */
-static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int task_dispatched) 
+static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
-	//remove the task from tables that track dispatched tasks. It doesn't matter
-	//if one or more of these tables don't contain the task.
+	//remove the task from tables that track dispatched tasks. 
 	itable_remove(q->running_tasks, t->taskid); 
 	itable_remove(q->finished_tasks, t->taskid); 
 	itable_remove(q->worker_task_map, t->taskid);
@@ -1072,6 +1056,16 @@ static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w
 	
 	//add the task to complete list so it is given back to the application.
 	list_push_head(q->complete_list, t);
+
+	/*If the failure happened after a task execution, we remove all the output
+	files specified for that task from the worker's cache.  This is because the
+	application may resubmit the task and the resubmitted task may produce
+	different outputs. */
+	if(t) {
+		if(t->time_execute_cmd_start > 0) {
+			delete_output_files(q,w,t);
+		}	
+	}
 
 	return;
 }
@@ -1081,6 +1075,16 @@ static void handle_worker_failure(struct work_queue *q, struct work_queue_worker
 	//WQ failures happen in the master-worker interactions. In this case, we
 	//remove the worker and retry the tasks dispatched to it elsewhere.
 	remove_worker(q, w);
+	return;
+}
+
+static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int fail_type)
+{
+	if(fail_type < 0) {
+		handle_app_failure(q, w, t);
+	} else {
+		handle_worker_failure(q, w);
+	}
 	return;
 }
 
@@ -1258,32 +1262,38 @@ static void process_available_results(struct work_queue *q, struct work_queue_wo
 	char line[WORK_QUEUE_LINE_MAX];
 	int i = 0;
 	
+	int result = 1; //return success unless something fails below.
+
 	while(1) {
 		int result = recv_worker_msg_retry(q, w, line, sizeof(line));
-		if(result < 0) goto failure;	
-
+		if(result < 0) {
+			result = 0; //return 0 to signal a worker failure	
+			break; 
+		}
+		
 		if(string_prefix_is(line,"result")) {
 			result = process_result(q, w, line);
-			if(result == 0) goto failure;
+			if(result <= 0) break; 
 			i++;
 		} else if(!strcmp(line,"end")) {
 			//Only return success if last message is end.
 			break;
 		} else {
 			debug(D_WQ, "%s (%s): sent invalid response to send_results: %s",w->hostname,w->addrport,line);
-			goto failure;
+			result = 0;
+			break;
 		}
 	}
 	
 	if(max_count > 0 && i > max_count) {
 		debug(D_WQ, "%s (%s): sent %d results. At most %d were expected.",w->hostname,w->addrport, i, max_count);
-		goto failure; //if the worker disobeyed, consider it as failed.
+		result = 0; //if the worker disobeyed, consider it as failed.
 	} 
 
-	return;
+	if(result <= 0) {
+		handle_failure(q, w, NULL, result);
+	}
 
-   failure:
-	handle_worker_failure(q, w);
 	return;
 }
 
@@ -1845,7 +1855,6 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
 		if(actual!=f->length) {
 			result = 0;	
-			goto failure;
 		}	
 		total_bytes = actual;
 		break;
@@ -1883,48 +1892,46 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 			char *expanded_payload = expand_envnames(w, f->payload);
 			result = send_file_or_directory(q,w,t,f,expanded_payload,&total_bytes);
 			free(expanded_payload);
-			if(result <= 0) goto failure;
 		}
 		break;
 	}
 
-	timestamp_t close_time = timestamp_get();
-	timestamp_t elapsed_time = close_time-open_time;
+	if(result > 0) {
+		timestamp_t close_time = timestamp_get();
+		timestamp_t elapsed_time = close_time-open_time;
 
-	t->total_bytes_transferred += total_bytes;
-	t->total_transfer_time += elapsed_time;
+		t->total_bytes_transferred += total_bytes;
+		t->total_transfer_time += elapsed_time;
 
-	w->total_bytes_transferred += total_bytes;
-	w->total_transfer_time += elapsed_time;
+		w->total_bytes_transferred += total_bytes;
+		w->total_transfer_time += elapsed_time;
 
-	q->total_bytes_sent += total_bytes;
-	q->total_send_time += elapsed_time;
+		q->total_bytes_sent += total_bytes;
+		q->total_send_time += elapsed_time;
 
-	// Avoid division by zero below.
-	if(elapsed_time==0) elapsed_time = 1;
+		// Avoid division by zero below.
+		if(elapsed_time==0) elapsed_time = 1;
 
-	if(total_bytes > 0) {
-		debug(D_WQ, "%s (%s) received %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s",
+		if(total_bytes > 0) {
+			debug(D_WQ, "%s (%s) received %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s",
+				w->hostname,
+				w->addrport,
+				total_bytes / 1000000.0,
+				elapsed_time / 1000000.0,
+				(double) total_bytes / elapsed_time,
+				(double) w->total_bytes_transferred / w->total_transfer_time
+			);
+		}
+	} else {
+		debug(D_WQ, "%s (%s) failed to send %s (%" PRId64 " bytes sent).",
 			w->hostname,
 			w->addrport,
-			total_bytes / 1000000.0,
-			elapsed_time / 1000000.0,
-			(double) total_bytes / elapsed_time,
-			(double) w->total_bytes_transferred / w->total_transfer_time
-		);
+			f->type == WORK_QUEUE_BUFFER ? "literal data" : f->payload,
+			total_bytes);
+	
+		if(result < 0) t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
 	}
-
-	free(cached_name);
-	return result;
-
-	failure:
-	debug(D_WQ, "%s (%s) failed to send %s (%" PRId64 " bytes sent).",
-		w->hostname,
-		w->addrport,
-		f->type == WORK_QUEUE_BUFFER ? "literal data" : f->payload,
-		total_bytes);
-
-	if(result < 0) t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
+	
 	free(cached_name);
 	return result;
 }
@@ -2273,20 +2280,12 @@ static void start_task_on_worker(struct work_queue *q, struct work_queue_worker 
 		w->gpus_allocated += t->gpus;
 		
 		log_worker_stats(q);
-		return;
-	} else if(result < 0) {
-		debug(D_WQ, "Failed to send task due to inaccessible input file.");
-		//put task in complete list and remove from other lists	
-		list_push_head(q->complete_list, t);
-		itable_remove(w->current_tasks, t->taskid);
-		itable_remove(q->running_tasks, t->taskid); 
-		itable_remove(q->worker_task_map, t->taskid);
-		return;
 	} else {
-		debug(D_WQ, "Failed to send task to worker %s (%s).", w->hostname, w->addrport);
-		handle_worker_failure(q, w); //puts tasks in w->current_tasks back into q->ready_list
-		return;
+		debug(D_WQ, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
+		handle_failure(q, w, t, result);
 	}
+	
+	return;
 }
 
 static void start_tasks(struct work_queue *q)
@@ -3033,7 +3032,9 @@ struct work_queue *work_queue_create(int port)
 	q->master_link = link_serve(port);
 
 	if(!q->master_link) {
-		goto failure;
+		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
+		free(q);
+		return 0;
 	} else {
 		char address[LINK_ADDRESS_MAX];
 		link_address_local(q->master_link, address, &q->port);
@@ -3093,11 +3094,6 @@ struct work_queue *work_queue_create(int port)
 	
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
-
-failure:
-	debug(D_NOTICE, "Could not create work_queue on port %i.", port);
-	free(q);
-	return 0;
 }
 
 int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_file)
