@@ -194,8 +194,10 @@ struct work_queue_task_report {
 	timestamp_t exec_time;
 };
 
-static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
+static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
+static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int task_dispatched);
 
+static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
@@ -1041,16 +1043,44 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
       failure:
 	if(result < 0) {
 		debug(D_WQ, "Failed to store the output received from worker %s (%s).", w->hostname, w->addrport);
-		//put task in complete list and remove from other lists	
-		list_push_head(q->complete_list, t);
-		itable_remove(w->current_tasks, t->taskid);
-		itable_remove(q->running_tasks, t->taskid); 
-		itable_remove(q->worker_task_map, t->taskid);
+		handle_app_failure(q, w, t, 1);
 		return;
 	} else {
 		debug(D_WQ, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
-		remove_worker(q, w);
+		handle_worker_failure(q, w);
 	}	
+	return;
+}
+
+/*
+Application failures are classified into two groups: (1) failures observed
+during dispatch of a task to a worker, and (2) failures observed during the
+retrieval of task outputs from a worker. The application failures also include
+resource access or allocation failures that happen during dispatch or retrieval
+of a task. 
+This function marks the task as complete so it is returned to the application. 
+It returns after updating the data structures that hold submitted tasks in WQ.
+*/
+static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int task_dispatched) 
+{
+	//remove the task from tables that track dispatched tasks. It doesn't matter
+	//if one or more of these tables don't contain the task.
+	itable_remove(q->running_tasks, t->taskid); 
+	itable_remove(q->finished_tasks, t->taskid); 
+	itable_remove(q->worker_task_map, t->taskid);
+	itable_remove(w->current_tasks, t->taskid);
+	
+	//add the task to complete list so it is given back to the application.
+	list_push_head(q->complete_list, t);
+
+	return;
+}
+
+static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w) 
+{
+	//WQ failures happen in the master-worker interactions. In this case, we
+	//remove the worker and retry the tasks dispatched to it elsewhere.
+	remove_worker(q, w);
 	return;
 }
 
@@ -1253,7 +1283,7 @@ static void process_available_results(struct work_queue *q, struct work_queue_wo
 	return;
 
    failure:
-	remove_worker(q, w);
+	handle_worker_failure(q, w);
 	return;
 }
 
@@ -1522,23 +1552,23 @@ static void handle_worker(struct work_queue *q, struct link *l)
 	link_to_hash_key(l, key);
 	w = hash_table_lookup(q->worker_table, key);
 
-	int keep_worker = 1;
+	int worker_failure = 0;
 	int result = recv_worker_msg(q, w, line, sizeof(line));
 
 	//if result > 0, it means a message is left to consume
 	if(result > 0) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		keep_worker = 0;
+		worker_failure = 1;
 	} else if(result < 0){
 		if(!strcmp(w->hostname, "QUEUE_STATUS"))
 			debug(D_WQ, "Work Queue Status worker disconnected (%s)", w->addrport);
 		else
 			debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
-		keep_worker = 0;
+		worker_failure = 1;
 	} // otherwise do nothing..message was consumed and processed in recv_worker_msg()
 
-	if(!keep_worker) {
-		remove_worker(q, w);
+	if(worker_failure) {
+		handle_worker_failure(q, w);
 	}
 }
 
@@ -2254,7 +2284,7 @@ static void start_task_on_worker(struct work_queue *q, struct work_queue_worker 
 		return;
 	} else {
 		debug(D_WQ, "Failed to send task to worker %s (%s).", w->hostname, w->addrport);
-		remove_worker(q, w); //puts tasks in w->current_tasks back into q->ready_list
+		handle_worker_failure(q, w); //puts tasks in w->current_tasks back into q->ready_list
 		return;
 	}
 }
@@ -2303,7 +2333,7 @@ static void remove_unresponsive_workers(struct work_queue *q) {
 				if(last_recv_elapsed_time >= q->keepalive_interval) {
 					if(send_worker_msg(q,w, "check\n")<0) {
 						debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
-						remove_worker(q, w);
+						handle_worker_failure(q, w);
 					} else {
 						debug(D_WQ, "Sent keepalive check to worker %s (%s)", w->hostname, w->addrport);
 						w->keepalive_check_sent_time = current_time;	
@@ -2315,7 +2345,7 @@ static void remove_unresponsive_workers(struct work_queue *q) {
 				if (q->link_poll_end > w->keepalive_check_sent_time) {
 					if ((int)((q->link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
 						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
-						remove_worker(q, w);
+						handle_worker_failure(q, w);
 					}
 				}
 			}
