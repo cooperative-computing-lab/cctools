@@ -179,12 +179,12 @@ struct worker_status {
 struct pool_config {
 	struct list *project;
 	struct list *distribution;
-	unsigned int max_workers;
-	unsigned int min_workers;
-	unsigned int default_capacity;
-	unsigned int max_change_per_min;
-	unsigned int billing_cycle;
-	unsigned int worker_terminate_boundary;
+	int max_workers;
+	int min_workers;
+	int default_capacity;
+	int max_change_per_min;
+	int billing_cycle;
+	int worker_terminate_boundary;
 	int capacity_mode;
 	int mode;
 };
@@ -427,7 +427,7 @@ struct pool_config *get_pool_config(const char *path) {
 
 		if(!strcmp(name, "min_workers")) {
 			pc->min_workers = atoi(value);
-			if(pc->min_workers <= 0) {
+			if(pc->min_workers < 0) {
 				fatal("Invalid configuration: min_workers should be greater than 0 (current value: %d).\n", pc->min_workers);
 			}
 			continue;
@@ -498,7 +498,7 @@ struct pool_config *get_pool_config(const char *path) {
 	fclose(fp);
 
 	// sanity checks
-	if(pc->min_workers < 1) {
+	if(pc->min_workers < 0) {
 		fatal("Invalid configuration: min_workers should be greater than zero. Please include a 'min_workers:' specification in the configuration file (%s).\n", path);
 	}
 
@@ -641,7 +641,7 @@ void start_serving_masters(const char *catalog_host, int catalog_port, const cha
 			sum_capacity += m->capacity > 0 ? m->capacity : m->tasks_waiting; 
 		}
 
-		unsigned int workers_submitted = itable_size(job_table);
+		int workers_submitted = itable_size(job_table);
 
 		time_t now = time(0);
 		if(now - last_log_time >= LOG_INTERVAL && logfile) {	
