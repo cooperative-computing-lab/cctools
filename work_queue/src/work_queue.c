@@ -892,9 +892,13 @@ static int get_output_files( struct work_queue *q, struct work_queue_worker *w, 
 		while((f = list_next_item(t->output_files))) {
 			char * cached_name = make_cached_name(t,f);
 			result = get_output_file(q,w,t,f,cached_name); 
-			if(result <= 0) {
+			
+			//if success or app-level failure, continue to get other files.
+			//but if there was a worker failure (failed to get), return.
+			if(result == 0) {
 				break;
-			}
+			} 
+					
 			free(cached_name);
 		}
 	}
