@@ -84,7 +84,7 @@ enum { LONG_OPT_MONITOR_INTERVAL = 1,
        LONG_OPT_PPM_LEVELS,
        LONG_OPT_DOT_PROPORTIONAL,
        LONG_OPT_VERBOSE_PARSING,
-       LONG_OPT_WAIT_HOOK,
+       LONG_OPT_WQ_WAIT_FOR_WORKERS,
        LONG_OPT_DOT_CONDENSE };
 
 typedef enum {
@@ -2627,7 +2627,7 @@ int main(int argc, char *argv[])
 		{"submission-timeout", required_argument, 0, 'S'},
 		{"wq-keepalive-timeout", required_argument, 0, 't'},
 		{"wq-keepalive-interval", required_argument, 0, 'u'},
-		{"wq-wait-queue-size", required_argument, 0, LONG_OPT_WAIT_HOOK},
+		{"wq-wait-queue-size", required_argument, 0, LONG_OPT_WQ_WAIT_FOR_WORKERS},
 		{"verbose", no_argument, 0, LONG_OPT_VERBOSE_PARSING},
 		{"version", no_argument, 0, 'v'},
 		{"wq-schedule", required_argument, 0, 'W'},
@@ -2874,7 +2874,7 @@ int main(int argc, char *argv[])
 		case LONG_OPT_DISABLE_BATCH_CACHE:
 			cache_mode = 0;
 			break;
-		case LONG_OPT_WAIT_HOOK:
+		case LONG_OPT_WQ_WAIT_FOR_WORKERS:
 			wq_wait_queue_size = atoi(optarg);
 			break;
 		default:
