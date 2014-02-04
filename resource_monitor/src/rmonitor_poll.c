@@ -90,7 +90,7 @@ int monitor_poll_process_once(struct process_info *p)
 	get_cpu_time_usage(p->pid, &p->cpu);
 	get_mem_usage(p->pid, &p->mem);
 	get_sys_io_usage(p->pid, &p->io);
-	get_map_io_usage(p->pid, &p->io);
+	//get_map_io_usage(p->pid, &p->io);
 
 	return 0;
 }
