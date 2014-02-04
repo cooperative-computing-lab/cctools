@@ -590,7 +590,7 @@ static int release_worker(struct work_queue *q, struct work_queue_worker *w)
 	return 1;
 }
 
-static int add_worker(struct work_queue *q)
+static void add_worker(struct work_queue *q)
 {
 	struct link *link;
 	struct work_queue_worker *w;
@@ -598,14 +598,14 @@ static int add_worker(struct work_queue *q)
 	int port;
 
 	link = link_accept(q->master_link, time(0) + q->short_timeout);
-	if(!link) return 0;
+	if(!link) return;
 
 	link_keepalive(link, 1);
 	link_tune(link, LINK_TUNE_INTERACTIVE);
 
 	if(!link_address_remote(link, addr, &port)) {
 		link_close(link);
-		return 0;
+		return;
 	}
 
 	debug(D_WQ,"worker %s:%d connected",addr,port);
@@ -615,11 +615,17 @@ static int add_worker(struct work_queue *q)
 		if(!link_auth_password(link,q->password,time(0)+q->short_timeout)) {
 			debug(D_WQ|D_NOTICE,"worker %s:%d presented the wrong password",addr,port);
 			link_close(link);
-			return 0;
+			return;
 		}
 	}
 
 	w = malloc(sizeof(*w));
+	if(!w) {
+		debug(D_NOTICE, "Cannot allocate memory for worker %s:%d.", addr, port);
+		link_close(link);
+		return;
+	}
+
 	memset(w, 0, sizeof(*w));
 	w->hostname = strdup("unknown");
 	w->os = strdup("unknown");
@@ -639,7 +645,7 @@ static int add_worker(struct work_queue *q)
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
 	
-	return 1;
+	return;
 }
 
 /*
@@ -885,8 +891,15 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 		result = stat(f->payload,&local_info);
 		if(result==0) {
 			struct stat *remote_info = malloc(sizeof(*remote_info));
+			if(!remote_info) {
+				debug(D_NOTICE, "Cannot allocate memory for cache entry for output file %s at %s (%s)", f->payload, w->hostname, w->addrport);
+				return -1;
+			}
 			memcpy(remote_info, &local_info, sizeof(local_info));
 			hash_table_insert(w->current_files, cached_name, remote_info);
+			result = 1; //signal success.
+		} else {
+			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno)); 
 		}
 	}
 
@@ -1184,7 +1197,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	t->output = malloc(retrieved_output_length+1);
 	if(t->output == NULL) {
-		fprintf(stderr, "error: allocating memory of size %"PRId64" bytes for retrieving stdout of task %"PRId64" failed.\n", retrieved_output_length, taskid);
+		fprintf(stderr, "error: allocating memory of size %"PRId64" bytes failed for storing stdout of task %"PRId64".\n", retrieved_output_length, taskid);
 		//drop the entire length of stdout on the link	
 		stoptime = time(0) + get_transfer_wait_time(q, w, t, output_length);
 		link_soak(w->link, output_length, stoptime);
@@ -1224,7 +1237,10 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	} else {
 		actual = 0;
 	}
-	t->output[actual] = 0;
+	
+	if(t->output)	
+		t->output[actual] = 0;
+	
 	t->time_receive_result_finish = timestamp_get();
 
 	t->return_status = task_result;
@@ -1591,6 +1607,11 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	// Allocate a small table, if it hasn't been done yet.
 	if(!q->poll_table) {
 		q->poll_table = malloc(sizeof(*q->poll_table) * q->poll_table_size);
+		if(!q->poll_table) {
+			//if we can't allocate a poll table, we can't do anything else.
+			fatal("allocating memory for poll table failed.");
+			return 0;
+		}
 	}
 	// The first item in the poll table is the master link, which accepts new connections.
 	q->poll_table[0].link = q->master_link;
@@ -1613,6 +1634,11 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 		if(n >= q->poll_table_size) {
 			q->poll_table_size *= 2;
 			q->poll_table = realloc(q->poll_table, sizeof(*q->poll_table) * q->poll_table_size);
+			if(q->poll_table == NULL) {
+				//if we can't allocate a poll table, we can't do anything else.
+				fatal("reallocating memory for poll table failed.");
+				return 0;
+			}
 		}
 
 		q->poll_table[n].link = w->link;
@@ -1632,8 +1658,10 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	timestamp_t effective_stoptime = 0;
 	int64_t actual = 0;
 	
-	if(stat(localname, &local_info) < 0)
+	if(stat(localname, &local_info) < 0) {
+		debug(D_NOTICE, "Cannot stat file %s: %s", localname, strerror(errno)); 
 		return -1;
+	}
 
 	/* normalize the mode so as not to set up invalid permissions */
 	local_info.st_mode |= 0600;
@@ -1645,12 +1673,15 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	
 	debug(D_WQ, "%s (%s) needs file %s bytes %lld:%lld as '%s'", w->hostname, w->addrport, localname, (long long) offset, (long long) offset+length, remotename);
 	int fd = open(localname, O_RDONLY, 0);
-	if(fd < 0)
+	if(fd < 0) {
+		debug(D_NOTICE, "Cannot open file %s: %s", localname, strerror(errno)); 
 		return -1;
+	}
 
 	//We want to send bytes starting from 'offset'. So seek to it first.
 	if (offset >= 0 && (offset+length) <= local_info.st_size) {
 		if(lseek(fd, offset, SEEK_SET) == -1) {
+			debug(D_NOTICE, "Cannot seek file %s to offset %lld: %s", localname, (long long) offset, strerror(errno));
 			close(fd);
 			return -1;
 		}
@@ -1689,7 +1720,10 @@ Returns 1 on success, 0 on failure to send, -1 on failure to access directory.
 static int send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *dirname, const char *remotedirname, int64_t * total_bytes, int flags )
 {
 	DIR *dir = opendir(dirname);
-	if(!dir) return -1;
+	if(!dir) {
+		debug(D_NOTICE, "Cannot open dir %s: %s", dirname, strerror(errno)); 
+		return -1;
+	}
 
 	int result=1;
 
@@ -1710,6 +1744,7 @@ static int send_directory( struct work_queue *q, struct work_queue_worker *w, st
 				result = send_file( q, w, t, localpath, remotepath, 0, 0, total_bytes, flags );
 			}	
 		} else {
+			debug(D_NOTICE, "Cannot stat file %s: %s", localpath, strerror(errno)); 
 			result = -1;
 		}
 
@@ -1733,7 +1768,10 @@ static int send_file_or_directory( struct work_queue *q, struct work_queue_worke
 	struct stat local_info;
 	struct stat *remote_info;
 
-	if(stat(expanded_local_name, &local_info) < 0) return -1;
+	if(stat(expanded_local_name, &local_info) < 0) {
+		debug(D_NOTICE, "Cannot stat file %s: %s", expanded_local_name, strerror(errno)); 
+		return -1;
+	}	
 	
 	int result = 1;
 
@@ -1757,8 +1795,12 @@ static int send_file_or_directory( struct work_queue *q, struct work_queue_worke
 
 		if(result && tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = malloc(sizeof(*remote_info));
-			memcpy(remote_info, &local_info, sizeof(local_info));
-			hash_table_insert(w->current_files, cached_name, remote_info);
+			if(remote_info) {
+				memcpy(remote_info, &local_info, sizeof(local_info));
+				hash_table_insert(w->current_files, cached_name, remote_info);
+			} else {
+				debug(D_NOTICE, "Cannot allocate memory for cache entry for input file %s at %s (%s)", expanded_local_name, w->hostname, w->addrport);
+			}
 		}
 	}
 
@@ -1789,6 +1831,7 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 
 	expanded_name = (char *) malloc(strlen(payload) + (50 * sizeof(char)));
 	if(expanded_name == NULL) {
+		debug(D_NOTICE, "Cannot allocate memory for filename %s.\n", payload);
 		return NULL;
 	} else {
 		//Initialize to null byte so it works correctly with strcat.
@@ -1890,8 +1933,12 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 			}
 		} else {
 			char *expanded_payload = expand_envnames(w, f->payload);
-			result = send_file_or_directory(q,w,t,f,expanded_payload,&total_bytes);
-			free(expanded_payload);
+			if(expanded_payload) { 
+				result = send_file_or_directory(q,w,t,f,expanded_payload,&total_bytes);
+				free(expanded_payload);
+			} else {
+				result = -1; //signal app-level failure.
+			}
 		}
 		break;
 	}
@@ -1949,6 +1996,10 @@ static int send_input_files( struct work_queue *q, struct work_queue_worker *w, 
 		while((f = list_next_item(t->input_files))) {
 			if(f->type == WORK_QUEUE_FILE || f->type == WORK_QUEUE_FILE_PIECE) {
 				char * expanded_payload = expand_envnames(w, f->payload);
+				if(!expanded_payload) {
+					t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
+					return -1;	
+				}	
 				if(stat(expanded_payload, &s) != 0) {
 					debug(D_WQ,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
 					free(expanded_payload);
@@ -2492,6 +2543,10 @@ static struct work_queue_task *find_running_task_by_tag(struct work_queue *q, co
 struct work_queue_task *work_queue_task_create(const char *command_line)
 {
 	struct work_queue_task *t = malloc(sizeof(*t));
+	if(!t) {
+		fprintf(stderr, "Error: failed to allocate memory for task.\n");
+		return NULL;
+	}
 	memset(t, 0, sizeof(*t));
 
 	if(command_line) t->command_line = xxstrdup(command_line);
@@ -2555,8 +2610,11 @@ struct work_queue_file * work_queue_file_create(const char * remote_name, int ty
 	struct work_queue_file *f;
 	
 	f = malloc(sizeof(*f));
-	if(!f) return NULL;
-	
+	if(!f) {
+		debug(D_NOTICE, "Cannot allocate memory for file %s.\n", remote_name);
+		return NULL;
+	}
+
 	memset(f, 0, sizeof(*f));
 	
 	f->remote_name = xxstrdup(remote_name);
@@ -2622,6 +2680,8 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 	}
 
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_URL, flags);
+	if(!tf) return 0;
+
 	tf->length = strlen(file_url);
 	tf->payload = xxstrdup(file_url);
 
@@ -2694,6 +2754,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	}
 	
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_FILE, flags);
+	if(!tf) return 0;
 
 	tf->length = strlen(local_name);
 	tf->payload = xxstrdup(local_name);
@@ -2734,6 +2795,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	}
 
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_DIRECTORY, flags);
+	if(!tf) return 0;
 
 	//KNOWN HACK: Every file passes through make_cached_name() which expects the
 	//payload field to be set. So we simply set the payload to remote name if
@@ -2815,6 +2877,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 	}
 	
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_FILE_PIECE, flags);
+	if(!tf) return 0;
 
 	tf->length = strlen(local_name);
 	tf->offset = start_byte;
@@ -2857,8 +2920,15 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 	}	
 	
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_BUFFER, flags);
+	if(!tf) return 0;
+	
 	tf->length = length;
 	tf->payload = malloc(length);
+	if(!tf->payload) {
+		fprintf(stderr, "Error: failed to allocate memory for buffer with remote name %s and length %d bytes.\n", remote_name, length);
+		return 0;	
+	}
+	
 	memcpy(tf->payload, data, length);
 	list_push_tail(t->input_files, tf);
 
@@ -2924,6 +2994,8 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 	}
 	
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_REMOTECMD, flags);
+	if(!tf) return 0;
+
 	tf->length = strlen(cmd);
 	tf->payload = xxstrdup(cmd);
 
@@ -3010,6 +3082,10 @@ int work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, c
 struct work_queue *work_queue_create(int port)
 {
 	struct work_queue *q = malloc(sizeof(*q));
+	if(!q) {
+		fprintf(stderr, "Error: failed to allocate memory for queue.\n");
+		return 0;
+	}
 	char *envstring;
 
 	random_init();

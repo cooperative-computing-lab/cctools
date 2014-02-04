@@ -149,7 +149,7 @@ Once created and elaborated with functions such as @ref work_queue_task_specify_
 and @ref work_queue_task_specify_buffer, the task should be passed to @ref work_queue_submit.
 @param full_command The shell command line to be executed by the task.  If null,
 the command will be given later by @ref work_queue_task_specify_command
-@return A new task object.
+@return A new task object, or null if it could not be created. 
 */
 struct work_queue_task *work_queue_task_create(const char *full_command);
 
