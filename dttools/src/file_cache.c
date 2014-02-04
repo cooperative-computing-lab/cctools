@@ -104,6 +104,11 @@ static int wait_for_running_txn(struct file_cache *c, const char *path)
 
 }
 
+static int mkdir_or_exists( const char *path, mode_t mode )
+{
+	return mkdir(path,mode)==0 || errno==EEXIST;
+}
+
 struct file_cache *file_cache_init(const char *root)
 {
 	char path[PATH_MAX];
@@ -127,11 +132,11 @@ struct file_cache *file_cache_init(const char *root)
 		if(!create_dir(path, 0777))
 			goto failure;
 		sprintf(path, "%s/txn", root);
-		if(!create_dir(path, 0777))
+		if(mkdir_or_exists(path,0777)!=0)
 			goto failure;
 		for(i = 0; i <= 0xff; i++) {
 			sprintf(path, "%s/%02x", root, i);
-			if(!create_dir(path, 0777) != 0)
+			if(mkdir_or_exists(path,0777)!=0)
 				goto failure;
 		}
 	}
