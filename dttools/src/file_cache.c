@@ -132,11 +132,11 @@ struct file_cache *file_cache_init(const char *root)
 		if(!create_dir(path, 0777))
 			goto failure;
 		sprintf(path, "%s/txn", root);
-		if(mkdir_or_exists(path,0777)!=0)
+		if(!mkdir_or_exists(path,0777))
 			goto failure;
 		for(i = 0; i <= 0xff; i++) {
 			sprintf(path, "%s/%02x", root, i);
-			if(mkdir_or_exists(path,0777)!=0)
+			if(!mkdir_or_exists(path,0777))
 				goto failure;
 		}
 	}
