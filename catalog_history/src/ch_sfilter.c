@@ -47,31 +47,50 @@ void deltadb_delete( struct deltadb *db )
 	free(db);
 }
 
+static int is_number(char const* p){
+	char* end;
+	strtod(p, &end);
+	if (end==NULL)
+		return 1;
+	return 0;
+}
+
 static int keep_object(struct argument *arg, const char *input)
 {
 	char *operator = arg->operator;
+	int cmp;
+	if (is_number(arg->val) && is_number(input)){
+		char* end;
+		double in = strtod(input, &end);
+		double v = strtod(arg->val, &end);
+		if (in<v) cmp = -1;
+		else if (in==v) cmp = 0;
+		else cmp = 1;
+		printf("%s cmp %s =%i\n",input,arg->val,cmp);
+	} else cmp = strcmp(input,arg->val);
+	//printf("%s strcmp %s =%i\n",input,arg->val,cmp);
 	if(strcmp(operator,"=")==0) {
-		if(strcmp(input,arg->val)==0)
+		if(cmp==0)
 			return 1;
 		else return 0;
 	} else if(strcmp(operator,"!=")==0) {
-		if(strcmp(input,arg->val)!=0)
+		if(cmp!=0)
 			return 1;
 		else return 0;
 	} else if(strcmp(operator,">")==0) {
-		if(strcmp(input,arg->val)>0)
+		if(cmp>0)
 			return 1;
 		else return 0;
 	} else if(strcmp(operator,">=")==0) {
-		if(strcmp(input,arg->val)>=0)
+		if(cmp>=0)
 			return 1;
 		else return 0;
 	} else if(strcmp(operator,"<")==0) {
-		if(strcmp(input,arg->val)<0)
+		if(cmp<0)
 			return 1;
 		else return 0;
 	} else if(strcmp(operator,"<=")==0) {
-		if(strcmp(input,arg->val)<=0)
+		if(cmp<=0)
 			return 1;
 		else return 0;
 	}

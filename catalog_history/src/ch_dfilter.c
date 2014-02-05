@@ -47,32 +47,50 @@ void deltadb_delete( struct deltadb *db )
 	free(db);
 }
 
+static int is_number(char const* p){
+	char* end;
+	strtod(p, &end);
+	if (end==NULL)
+		return 1;
+	return 0;
+}
+
 static int show_object(struct argument *arg, const char *input)
 {
 	char *operator = arg->operator;
-	//printf("------%s %s\n",operator,input);
+	int cmp;
+	if (is_number(arg->val) && is_number(input)){
+		char* end;
+		double in = strtod(input, &end);
+		double v = strtod(arg->val, &end);
+		if (in<v) cmp = -1;
+		else if (in==v) cmp = 0;
+		else cmp = 1;
+		printf("%s cmp %s =%i\n",input,arg->val,cmp);
+	} else cmp = strcmp(input,arg->val);
+	//printf("%s strcmp %s =%i\n",input,arg->val,cmp);
 	if(strcmp(operator,"=")==0) {
-		if(strcmp(input,arg->val)==0)
+		if(cmp==0)
 			return 1;
 		else return 0;
 	} else if(strcmp(operator,"!=")==0) {
-		if(strcmp(input,arg->val)!=0)
+		if(cmp!=0)
 			return 1;
 		else return 0;
 	} else if(strcmp(operator,">")==0) {
-		if(strcmp(input,arg->val)>0)
+		if(cmp>0)
 			return 1;
 		else return 0;
 	} else if(strcmp(operator,">=")==0) {
-		if(strcmp(input,arg->val)>=0)
+		if(cmp>=0)
 			return 1;
 		else return 0;
 	} else if(strcmp(operator,"<")==0) {
-		if(strcmp(input,arg->val)<0)
+		if(cmp<0)
 			return 1;
 		else return 0;
 	} else if(strcmp(operator,"<=")==0) {
-		if(strcmp(input,arg->val)<=0)
+		if(cmp<=0)
 			return 1;
 		else return 0;
 	}
@@ -104,6 +122,7 @@ static int checkpoint_read( struct deltadb *db )
 	FILE * file = stdin;
 	if(!file) return 0;
 	while(1) {
+		struct nvpair *nv1 = nvpair_create();
 		struct nvpair *nv = nvpair_create();
 		int num_pairs = nvpair_parse_stream(nv,file);
 		if(num_pairs>0) {
@@ -114,6 +133,7 @@ static int checkpoint_read( struct deltadb *db )
 					nvpair_print_text(nv,stdout);
 				nvpair_delete( hash_table_remove(db->table,key) );
 				hash_table_insert(db->table,key,nv);
+				//printf("Created %p %p for %s\n",nv,nv1,key);
 				
 			} else debug(D_NOTICE,"no key in object create.");
 		} else if (num_pairs == -1) {
@@ -146,8 +166,8 @@ static int log_play( struct deltadb *db )
 	
 	int notime = 1;
 	while(fgets(line,sizeof(line),stream)) {
-		printf("(%s",line);
-		fflush(stdout);
+		//printf("(%s",line);
+		//fflush(stdout);
 		
 		line_number += 1;
 		
@@ -186,35 +206,15 @@ static int log_play( struct deltadb *db )
 						}
 						printf("%s",line);
 					}
-					//nvpair_delete(nv);
+					nvpair_delete(nv);
 				}
 				break;
 			case 'U':
 				nv = hash_table_lookup(table,key);
-				//printf("nv=%i\n",nv);
 				if(nv){
-					//printf("nv!\n");
-					//fflush(stdout);
 					int shown = show_object2(db->args,nv,key);
-					//printf("%s %s %s\n",key, name, value);
-					//fflush(stdout);
-
-/*
-					char newvalue[strlen(value)];
-					strcpy(newvalue,value);
-					void *old;
-					old = hash_table_remove(nv->table, name);
-					if(old)
-						free(old);
-					hash_table_insert(nv->table, name, newvalue);
-*/
-
-
-					//nvpair_insert_string(nv, name, "");
-					//printf("%s %s\n",key, name);
-					//fflush(stdout);
+					nvpair_insert_string(nv, name, value);
 					int show = show_object2(db->args,nv,key);
-					//printf("OnU %i %i\n",shown,show);
 
 					if ( (shown||show) && notime){
 						printf("T %lld\n",(long long)current);
@@ -234,9 +234,13 @@ static int log_play( struct deltadb *db )
 				break;
 			case 'R':
 				nv = hash_table_lookup(table,key);
-				if(nv){
+				if(nv!=NULL){
 					int shown = show_object2(db->args,nv,key);
-					//nvpair_remove(nv, name);
+					//fprintf(stderr,"[%s\n",line);
+					//fflush(stderr);
+					//fprintf(stderr,"[%s %i\n",key,nv);
+					//fflush(stderr);
+					nvpair_remove(nv, name);
 					int show = show_object2(db->args,nv,key);
 
 					if ( (shown||show) && notime){

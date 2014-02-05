@@ -124,7 +124,7 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 				break;
 			case 'T':
 				current = atol(key);
-				if(started==0 && current>start_time){
+				if(started==0 && current>=start_time){
 					hash_table_firstkey(table);
 					char *object_key;
 					
@@ -132,6 +132,7 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 						nvpair_print_text(nv,stdout);
 					}
 					printf(".Checkpoint End.\n");
+					printf("T %i\n",start_time);
 					printf(line);
 					started = 1;
 				} else if(current>end_time) {
@@ -164,14 +165,14 @@ static int log_play_time( struct deltadb *db, time_t start_time, time_t end_time
 	int day = t->tm_yday;
 
 	sprintf(filename,"%s/%d/%d.ckpt",db->logdir,year,day);
-	//debug(D_NOTICE,"Reading file: %s",filename);
+	debug(D_NOTICE,"Reading file: %s",filename);
 	checkpoint_read(db,filename);
 
 	int started = 0;
 	while(1) {
 		sprintf(filename,"%s/%d/%d.log",db->logdir,year,day);
 		FILE *file = fopen(filename,"r");
-		//debug(D_NOTICE,"Reading file: %s",filename);
+		debug(D_NOTICE,"Reading file: %s",filename);
 		if(!file) {
 			file_errors += 1;
 			debug(D_NOTICE,"couldn't open %s: %s",filename,strerror(errno));
@@ -203,10 +204,8 @@ int main( int argc, char *argv[] )
 	memset(&t1,0,sizeof(t1));
 	memset(&t2,0,sizeof(t2));
 	
-	int duration_value;
-	char duration_metric;
-	sscanf(argv[3], "%c%i", &duration_metric, &duration_value);
 	
+
 	int start_year, start_month, start_day, start_hour, start_minute, start_second;
 	sscanf(argv[2], "%d-%d-%d@%d:%d:%d", &start_year, &start_month, &start_day, &start_hour, &start_minute, &start_second);
 	//printf("%d-%d-%d@%d:%d:%d",start_year, start_month, start_day, start_hour, start_minute, start_second);
@@ -218,27 +217,49 @@ int main( int argc, char *argv[] )
 	t1.tm_min = start_minute;
 	t1.tm_sec = start_second;
 
-	t2.tm_year = start_year-1900;
-	t2.tm_mon = start_month-1;
-	t2.tm_mday = start_day;
-	t2.tm_hour = start_hour;
-	t2.tm_min = start_minute;
-	t2.tm_sec = start_second;
 
 	time_t start_time = mktime(&t1);
-	time_t stop_time = mktime(&t2);
-	if (duration_metric=='y')
-		stop_time += duration_value*365*24*3600;
-	else if (duration_metric=='w')
-		stop_time += duration_value*7*24*3600;
-	else if (duration_metric=='d')
-		stop_time += duration_value*24*3600;
-	else if (duration_metric=='h')
-		stop_time += duration_value*3600;
-	else if (duration_metric=='m')
-		stop_time += duration_value*60;
-	else if (duration_metric=='s')
-		stop_time += duration_value;
+	time_t stop_time;
+
+	if (strlen(argv[3])>=14){
+		sscanf(argv[3], "%d-%d-%d@%d:%d:%d", &start_year, &start_month, &start_day, &start_hour, &start_minute, &start_second);
+
+		t2.tm_year = start_year-1900;
+		t2.tm_mon = start_month-1;
+		t2.tm_mday = start_day;
+		t2.tm_hour = start_hour;
+		t2.tm_min = start_minute;
+		t2.tm_sec = start_second;
+
+		stop_time = mktime(&t2);
+
+	} else {
+		int duration_value;
+		char duration_metric;
+		sscanf(argv[3], "%c%i", &duration_metric, &duration_value);
+
+		t2.tm_year = start_year-1900;
+		t2.tm_mon = start_month-1;
+		t2.tm_mday = start_day;
+		t2.tm_hour = start_hour;
+		t2.tm_min = start_minute;
+		t2.tm_sec = start_second;
+
+		stop_time = mktime(&t2);
+		if (duration_metric=='y')
+			stop_time += duration_value*365*24*3600;
+		else if (duration_metric=='w')
+			stop_time += duration_value*7*24*3600;
+		else if (duration_metric=='d')
+			stop_time += duration_value*24*3600;
+		else if (duration_metric=='h')
+			stop_time += duration_value*3600;
+		else if (duration_metric=='m')
+			stop_time += duration_value*60;
+		else if (duration_metric=='s')
+			stop_time += duration_value;
+	}
+
 
 
 	//Time Zone thing to be fixed later
