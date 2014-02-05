@@ -1997,7 +1997,7 @@ int main(int argc, char *argv[])
 		{"help", no_argument, 0, 'h'},
 		{"idle-clients", required_argument, 0, 't'},
 		{"interface", required_argument, 0, 'I'},
-		{"jobs", required_argument, 0, LONGOPT_JOBS},
+		{"jobs", no_argument, 0, LONGOPT_JOBS},
 		{"job-concurrency", required_argument, 0, LONGOPT_JOB_CONCURRENCY},
 		{"job-time-limit", required_argument, 0, LONGOPT_JOB_TIME_LIMIT},
 		{"max-clients", required_argument, 0, 'M'},
