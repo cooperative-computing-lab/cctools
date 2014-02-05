@@ -145,6 +145,29 @@ int update_one_catalog(void *catalog_host, const void *text)
 	return 1;
 }
 
+static int backend_setup(const char *url)
+{
+	if(cfs->init(url) == -1)
+		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
+
+	if(!chirp_acl_init_root("/"))
+		fatal("could not initialize %s ACL: %s", url, strerror(errno));
+
+	if(chirp_alloc_init(root_quota) == -1)
+		fatal("could not initialize %s allocations: %s", url, strerror(errno));
+
+	return 0;
+}
+
+static int gc_tickets(const char *url)
+{
+	backend_setup(url);
+
+	chirp_acl_gctickets();
+
+	return 0;
+}
+
 static int update_all_catalogs(const char *url)
 {
 	buffer_t B;
@@ -161,11 +184,7 @@ static int update_all_catalogs(const char *url)
 	load_average_get(avg);
 	cpus = load_average_get_cpus();
 
-	if(cfs->init(url) == -1)
-		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
-
-	if(chirp_alloc_init(root_quota) == -1)
-		fatal("could not initialize %s allocations: %s", url, strerror(errno));
+	backend_setup(url);
 
 	if(chirp_alloc_statfs("/", &info) < 0) {
 		memset(&info, 0, sizeof(info));
@@ -201,27 +220,6 @@ static int update_all_catalogs(const char *url)
 	list_iterate(catalog_host_list, update_one_catalog, buffer_tostring(&B, NULL));
 
 	buffer_free(&B);
-
-	return 0;
-}
-
-static int backend_setup(const char *url)
-{
-	if(cfs->init(url) == -1)
-		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
-
-	if(!chirp_acl_init_root("/"))
-		fatal("could not initialize %s ACL: %s", url, strerror(errno));
-
-	return 0;
-}
-
-static int gc_tickets(const char *url)
-{
-	if(cfs->init(url) == -1)
-		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
-
-	chirp_acl_gctickets();
 
 	return 0;
 }
@@ -1831,11 +1829,7 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 	 * which does not play nicely with fork. So, we only manipulate the backend
 	 * file system in a child process which actually handles client requests.
 	 * */
-	if(cfs->init(url) == -1)
-		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
-
-	if(chirp_alloc_init(root_quota) == -1)
-		fatal("could not initialize %s allocations: %s", url, strerror(errno));
+	backend_setup(url);
 
 	link_address_remote(link, addr, &port);
 
@@ -2310,8 +2304,7 @@ int main(int argc, char *argv[])
 	if (chirp_job_schedd == 0) {
 		int rc;
 		change_process_title("chirp_server [scheduler]");
-		if(cfs->init(chirp_url) == -1)
-			fatal("could not initialize %s backend filesystem: %s", chirp_url, strerror(errno));
+		backend_setup(chirp_url);
 		rc = chirp_job_schedule();
 		if(rc == 0) {
 			/* normal exit, parent probably died */
