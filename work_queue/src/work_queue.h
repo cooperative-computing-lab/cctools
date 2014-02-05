@@ -49,6 +49,12 @@ See the file COPYING for details.
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
 
+#define WORK_QUEUE_RESULT_SUCCESS 0		   /**< The task ran successfully >**/
+#define WORK_QUEUE_RESULT_INPUT_MISSING 1  /**< The task cannot be run due to a missing input file >**/
+#define WORK_QUEUE_RESULT_FUNCTION_FAIL 2  /**< The task ran but failed to return success (1) on completion >**/
+#define WORK_QUEUE_RESULT_OUTPUT_MISSING 4 /**< The task ran but failed to generate a specified output file >**/ 
+#define WORK_QUEUE_RESULT_STDOUT_MISSING 8 /**< The task ran but its stdout has been truncated >**/
+
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 extern int wq_option_scheduler;	/**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
 

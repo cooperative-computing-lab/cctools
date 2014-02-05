@@ -61,18 +61,6 @@ The following major problems must be fixed:
 extern int setenv(const char *name, const char *value, int overwrite);
 #endif
 
-// FIXME: These internal error flags should be clearly distinguished
-// from the task result codes given by work_queue_wait.
-
-#define WORK_QUEUE_RESULT_UNSET 0
-#define WORK_QUEUE_RESULT_INPUT_FAIL 1
-#define WORK_QUEUE_RESULT_INPUT_MISSING 2
-#define WORK_QUEUE_RESULT_FUNCTION_FAIL 4
-#define WORK_QUEUE_RESULT_OUTPUT_FAIL 8
-#define WORK_QUEUE_RESULT_OUTPUT_MISSING 16
-#define WORK_QUEUE_RESULT_LINK_FAIL 32
-#define WORK_QUEUE_RESULT_STDOUT_MISSING 64
-
 // The default capacity reported before information is available.
 #define WORK_QUEUE_DEFAULT_CAPACITY 10
 
@@ -529,22 +517,18 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	itable_firstkey(w->current_tasks);
 	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
-		if(t->result & WORK_QUEUE_RESULT_INPUT_MISSING || t->result & WORK_QUEUE_RESULT_OUTPUT_MISSING || t->result & WORK_QUEUE_RESULT_FUNCTION_FAIL) {
-			list_push_head(q->complete_list, t);
-		} else {
-			t->result = WORK_QUEUE_RESULT_UNSET;
-			t->total_bytes_transferred = 0;
-			t->total_transfer_time = 0;
-			t->cmd_execution_time = 0;
-			if(t->output) {
-				free(t->output);
-			}
-			t->output = 0;
-			if(t->unlabeled) {
-				t->cores = t->memory = t->disk = t->gpus = -1;
-			}
-			list_push_head(q->ready_list, t);
+		t->result = 0;	
+		t->total_bytes_transferred = 0;
+		t->total_transfer_time = 0;
+		t->cmd_execution_time = 0;
+		if(t->output) {
+			free(t->output);
 		}
+		t->output = 0;
+		if(t->unlabeled) {
+			t->cores = t->memory = t->disk = t->gpus = -1;
+		}
+		list_push_head(q->ready_list, t);
 		itable_remove(q->running_tasks, t->taskid);
 		itable_remove(q->finished_tasks, t->taskid);
 		itable_remove(q->worker_task_map, t->taskid);
@@ -2555,7 +2539,6 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->input_files = list_create();
 	t->output_files = list_create();
 	t->return_status = -1;
-	t->result = WORK_QUEUE_RESULT_UNSET;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 
@@ -3385,7 +3368,7 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 	}
 	t->total_transfer_time = 0;
 	t->cmd_execution_time = 0;
-	t->result = WORK_QUEUE_RESULT_UNSET;
+	t->result = 0;
 	
 	if(q->monitor_mode)
 		work_queue_monitor_wrap(q, t);
