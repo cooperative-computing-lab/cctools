@@ -1601,6 +1601,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 							result = id;
 						}
 					} else {
+						debug(D_DEBUG, "does not parse as json!");
 						result = -1;
 						errno = EINVAL;
 					}
@@ -1630,6 +1631,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 							result = -1;
 						}
 					} else {
+						debug(D_DEBUG, "does not parse as json!");
 						result = -1;
 						errno = EINVAL;
 					}
@@ -1659,6 +1661,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 							result = -1;
 						}
 					} else {
+						debug(D_DEBUG, "does not parse as json!");
 						result = -1;
 						errno = EINVAL;
 					}
@@ -1709,6 +1712,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 						}
 						buffer_free(&B);
 					} else {
+						debug(D_DEBUG, "does not parse as json!");
 						result = -1;
 						errno = EINVAL;
 					}
@@ -1764,6 +1768,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 							result = -1;
 						}
 					} else {
+						debug(D_DEBUG, "does not parse as json!");
 						result = -1;
 						errno = EINVAL;
 					}

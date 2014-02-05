@@ -4,6 +4,17 @@
 #include <assert.h>
 #include <string.h>
 
+const char json_type_str[][10] = {
+    "NONE",
+    "OBJECT",
+    "ARRAY",
+    "INTEGER",
+    "DOUBLE",
+    "STRING",
+    "BOOLEAN",
+    "NULL",
+};
+
 json_value *jsonA_getname (json_value *object, const char *name, json_type t)
 {
     unsigned int i;

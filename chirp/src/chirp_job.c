@@ -11,6 +11,7 @@
 
 #include "debug.h"
 #include "json.h"
+#include "json_aux.h"
 #include "macros.h"
 #include "path.h"
 
@@ -238,22 +239,60 @@ static int readpath (char file[CHIRP_PATH_MAX], json_value *J) {
 }
 
 #define jistype(o,t) ((o)->type == (t))
+#define jchecktype(o,t) \
+	do {\
+		json_type tt = (t);\
+		if (!jistype(o,tt)) {\
+			debug(D_DEBUG, "JSON type failure: type(%s) == %s", #o, json_type_str[tt]);\
+			goto invalid;\
+		}\
+	} while (0)
 
-static json_value *jgetname (json_value *object, const char *name, json_type t)
-{
-	unsigned int i;
-	assert(object->type == json_object);
-	for (i = 0; i < object->u.object.length; i++) {
-		if (strcmp(name, object->u.object.values[i].name) == 0) {
-			if (jistype(object->u.object.values[i].value, t)) {
-				return object->u.object.values[i].value;
-			} else {
-				return NULL;
-			}
-		}
-	}
-	return NULL;
-}
+#define jgetnameopt(v,o,n,t) \
+	do {\
+		unsigned int i;\
+		json_value *object = (o);\
+		const char *name = (n);\
+		json_type tt = (t);\
+		assert(object->type == json_object);\
+		v = NULL;\
+		for (i = 0; i < object->u.object.length; i++) {\
+			if (strcmp(name, object->u.object.values[i].name) == 0) {\
+				if (jistype(object->u.object.values[i].value, tt)) {\
+					v = object->u.object.values[i].value;\
+					break;\
+				} else if (!jistype(object->u.object.values[i].value, json_null)) {\
+					debug(D_DEBUG, "%s[%s] is type `%s' (expected `%s' or `NULL')", #o, #n, json_type_str[object->u.object.values[i].value->type], json_type_str[tt]);\
+					goto invalid;\
+				}\
+			}\
+		}\
+	} while (0)
+
+#define jgetnamefail(v,o,n,t) \
+	do {\
+		unsigned int i;\
+		json_value *object = (o);\
+		const char *name = (n);\
+		json_type tt = (t);\
+		assert(object->type == json_object);\
+		v = NULL;\
+		for (i = 0; i < object->u.object.length; i++) {\
+			if (strcmp(name, object->u.object.values[i].name) == 0) {\
+				if (jistype(object->u.object.values[i].value, tt)) {\
+					v = object->u.object.values[i].value;\
+					break;\
+				} else {\
+					debug(D_DEBUG, "%s[%s] is type `%s' (expected `%s')", #o, #n, json_type_str[object->u.object.values[i].value->type], json_type_str[tt]);\
+					goto invalid;\
+				}\
+			}\
+		}\
+		if (!v) {\
+			debug(D_DEBUG, "%s[%s] is type `%s' (expected `%s')", #o, #n, "NULL", json_type_str[tt]);\
+			goto invalid;\
+		}\
+	} while (0)
 
 int chirp_job_create (chirp_jobid_t *id, json_value *J, const char *subject)
 {
@@ -273,7 +312,7 @@ int chirp_job_create (chirp_jobid_t *id, json_value *J, const char *subject)
 
 	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
-	if (!jistype(J, json_object)) goto invalid;
+	jchecktype(J, json_object);
 
 restart:
 	sqlcatch(sqlite3_prepare_v2(db, Create, strlen(Create)+1, &stmt, &current));
@@ -282,10 +321,10 @@ restart:
 
 	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
 	{
-		sqlcatch(sqlite3_bind_text(stmt, 1, subject, -1, SQLITE_TRANSIENT));
+		json_value *value;
 		char executable[CHIRP_PATH_MAX];
-		json_value *value = jgetname(J, "executable", json_string);
-		if (!value) goto invalid;
+		sqlcatch(sqlite3_bind_text(stmt, 1, subject, -1, SQLITE_TRANSIENT));
+		jgetnamefail(value, J, "executable", json_string);
 		if (!readpath(executable, value)) goto invalid;
 		sqlcatch(sqlite3_bind_text(stmt, 2, executable, -1, SQLITE_TRANSIENT));
 		sqlcatch(sqlite3_bind_text(stmt, 3, chirp_url, -1, SQLITE_TRANSIENT));
@@ -299,13 +338,13 @@ restart:
 	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
 	{
 		int i;
-		json_value *value = jgetname(J, "arguments", json_array);
-		if (!value) goto invalid;
-		for (i = 0; i < (int)value->u.array.length; i++) {
+		json_value *arguments;
+		jgetnamefail(arguments, J, "arguments", json_array);
+		for (i = 0; i < (int)arguments->u.array.length; i++) {
 			sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)*id));
 			sqlcatch(sqlite3_bind_int64(stmt, 2, (sqlite3_int64)i+1));
-			json_value *arg = value->u.array.values[i];
-			if (!jistype(arg, json_string)) goto invalid;
+			json_value *arg = arguments->u.array.values[i];
+			jchecktype(arg, json_string);
 			sqlcatch(sqlite3_bind_text(stmt, 3, arg->u.string.ptr, -1, SQLITE_TRANSIENT));
 			sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 			debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " bound arg %d as `%s'", *id, i+1, arg->u.string.ptr);
@@ -317,15 +356,16 @@ restart:
 	/* handle environment */
 	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
 	{
-		json_value *value = jgetname(J, "environment", json_object);
-		if (value) {
+		json_value *environment;
+		jgetnameopt(environment, J, "environment", json_object);
+		if (environment) {
 			int i;
-			for (i = 0; i < (int)value->u.object.length; i++) {
+			for (i = 0; i < (int)environment->u.object.length; i++) {
 				sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)*id));
-				const char *n = value->u.object.values[i].name;
+				const char *n = environment->u.object.values[i].name;
 				sqlcatch(sqlite3_bind_text(stmt, 2, n, -1, SQLITE_TRANSIENT));
-				json_value *v = value->u.object.values[i].value;
-				if (!jistype(v, json_string)) goto invalid;
+				json_value *v = environment->u.object.values[i].value;
+				jchecktype(v, json_string);
 				sqlcatch(sqlite3_bind_text(stmt, 3, v->u.string.ptr, -1, SQLITE_TRANSIENT));
 				sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 				debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " environment variable `%s'=`%s'", *id, n, v->u.string.ptr);
@@ -339,31 +379,34 @@ restart:
 	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
 	{
 		int i;
-		json_value *value = jgetname(J, "files", json_array);
-		if (!value) goto invalid;
+		json_value *value;
+		jgetnamefail(value, J, "files", json_array);
 		for (i = 0; i < (int)value->u.array.length; i++) {
 			char path[CHIRP_PATH_MAX];
 
 			json_value *file = value->u.array.values[i];
-			if (!jistype(file, json_object)) goto invalid;
+			jchecktype(file, json_object);
 
 			sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)*id));
 
-			json_value *serv_path = jgetname(file, "serv_path", json_string);
-			if (!serv_path || strlen(serv_path->u.string.ptr) >= sizeof(path)) goto invalid;
+			json_value *serv_path;
+			jgetnamefail(serv_path, file, "serv_path", json_string);
+			if (strlen(serv_path->u.string.ptr) >= sizeof(path)) goto invalid;
 			path_collapse(serv_path->u.string.ptr, path, 1);
 			sqlcatch(sqlite3_bind_text(stmt, 2, path, -1, SQLITE_TRANSIENT));
 
-			json_value *task_path = jgetname(file, "task_path", json_string);
-			if (!task_path || strlen(task_path->u.string.ptr) >= sizeof(path)) goto invalid;
+			json_value *task_path;
+			jgetnamefail(task_path, file, "task_path", json_string);
+			if (strlen(task_path->u.string.ptr) >= sizeof(path)) goto invalid;
 			path_collapse(task_path->u.string.ptr, path, 1);
 			sqlcatch(sqlite3_bind_text(stmt, 3, path, -1, SQLITE_TRANSIENT));
 
-			json_value *type = jgetname(file, "type", json_string);
-			if (!type) goto invalid;
+			json_value *type;
+			jgetnamefail(type, file, "type", json_string);
 			sqlcatch(sqlite3_bind_text(stmt, 4, type->u.string.ptr, -1, SQLITE_TRANSIENT));
 
-			json_value *binding = jgetname(file, "binding", json_string); /* can be null */
+			json_value *binding;
+			jgetnameopt(binding, file, "binding", json_string); /* can be null */
 			sqlcatch(sqlite3_bind_text(stmt, 5, binding ? binding->u.string.ptr : "SYMLINK", -1, SQLITE_TRANSIENT));
 
 			sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
@@ -413,7 +456,7 @@ int chirp_job_commit (json_value *J, const char *subject)
 
 	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
-	if (!jistype(J, json_array)) goto invalid;
+	jchecktype(J, json_array);
 
 restart:
 	sqlcatch(sqlite3_prepare_v2(db, Commit, strlen(Commit)+1, &stmt, &current));
@@ -426,7 +469,7 @@ restart:
 	for (i = 0; i < (int)J->u.array.length; i++) {
 		int n;
 		chirp_jobid_t id;
-		if (!jistype(J->u.array.values[i], json_integer)) goto invalid;
+		jchecktype(J->u.array.values[i], json_integer);
 		id = J->u.array.values[i]->u.integer;
 		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
 		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
@@ -484,7 +527,7 @@ int chirp_job_kill (json_value *J, const char *subject)
 
 	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
-	if (!jistype(J, json_array)) goto invalid;
+	jchecktype(J, json_array);
 
 restart:
 	sqlcatch(sqlite3_prepare_v2(db, Kill, strlen(Kill)+1, &stmt, &current));
@@ -497,7 +540,7 @@ restart:
 	for (i = 0; i < (int)J->u.array.length; i++) {
 		int n;
 		chirp_jobid_t id;
-		if (!jistype(J->u.array.values[i], json_integer)) goto invalid;
+		jchecktype(J->u.array.values[i], json_integer);
 		id = J->u.array.values[i]->u.integer;
 		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
 		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
@@ -600,7 +643,7 @@ int chirp_job_status (json_value *J, const char *subject, buffer_t *B)
 
 	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
-	if (!jistype(J, json_array)) goto invalid;
+	jchecktype(J, json_array);
 
 restart:
 	sqlcatch(sqlite3_prepare_v2(db, Status, strlen(Status)+1, &stmt, &current));
@@ -613,7 +656,7 @@ restart:
 		chirp_jobid_t id;
 		int first1 = 1;
 
-		if (!jistype(J->u.array.values[i], json_integer)) goto invalid;
+		jchecktype(J->u.array.values[i], json_integer);
 		id = J->u.array.values[i]->u.integer;
 
 		if (i)
@@ -870,7 +913,7 @@ int chirp_job_reap (json_value *J, const char *subject)
 
 	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
-	if (!jistype(J, json_array)) goto invalid;
+	jchecktype(J, json_array);
 
 restart:
 	sqlcatch(sqlite3_prepare_v2(db, Reap, strlen(Reap)+1, &stmt, &current));
@@ -882,7 +925,7 @@ restart:
 	sqlcatch(sqlite3_bind_text(stmt, 3, subject, -1, SQLITE_TRANSIENT));
 	for (i = 0; i < (int)J->u.array.length; i++) {
 		chirp_jobid_t id;
-		if (!jistype(J->u.array.values[i], json_integer)) goto invalid;
+		jchecktype(J->u.array.values[i], json_integer);
 		id = J->u.array.values[i]->u.integer;
 		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
 		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
