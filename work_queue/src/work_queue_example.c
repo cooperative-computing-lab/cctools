@@ -93,34 +93,34 @@ int main(int argc, char *argv[])
 }
 
 int find_executable(const char *executable, char *location) {
-	char *paths_org;
-	char *paths;
+	char *path_env_variable;
+	char *paths_org, *paths;
 	char p[PATH_MAX];
 	char *d;
 
-	paths_org = getenv("PATH");
-	if(!paths_org)
+	path_env_variable = getenv("PATH");
+	if(!path_env_variable)
 		return 0;
 
-	paths = malloc(strlen(paths_org) + 1);
-	strcpy(paths, paths_org);
+	paths = malloc(strlen(path_env_variable) + 1);
+	paths_org = paths;
+
+	strcpy(paths, path_env_variable);
 	while((d = strsep(&paths, ":"))) {
-		if(*d == '\0')
-		{
+		if(*d == '\0') {
 			d = ".";
 		}
 
 		snprintf(p, PATH_MAX, "%s/%s", d, executable);
 
-		if(access(p, X_OK) == 0)
-		{
+		if(access(p, X_OK) == 0) {
 			strcpy(location, p);
-			free(paths);
-			return 1;
+			free(paths_org);
+			return 1; 
 		}
 	}
 
-	free(paths);
+	free(paths_org);
 	return 0;
 }
 
