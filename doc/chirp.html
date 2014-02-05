@@ -1018,13 +1018,13 @@ to a local namespace (a sandbox).</p>
 
 <p>To support the new job interface, Chirp has the following new RPC:</p>
 
-<code>&lt;integer result&gt;                 = <b style="color: orange;">job_create</b> &lt;JSON-encoded job description&gt;
-&lt;integer result&gt;                 = <b style="color: orange;">job_create</b> &lt;JSON-encoded job description&gt;
-&lt;integer result&gt;                 = <b style="color: orange;">job_commit</b> &lt;JSON-encoded array of job IDs&gt;
-&lt;JSON-encoded array of statuses&gt; = <b style="color: orange;">job_status</b> &lt;JSON-encoded array of job IDs&gt;
-&lt;JSON-encoded array of statuses&gt; = <b style="color: orange;">job_wait</b>   &lt;job ID&gt; &lt;timeout&gt;
-&lt;integer result&gt;                 = <b style="color: orange;">job_reap</b>   &lt;JSON-encoded array of job IDs&gt;
-&lt;integer result&gt;                 = <b style="color: orange;">job_kill</b>   &lt;JSON-encoded array of job IDs&gt;
+<code>&lt;integer result&gt;                 = <b style="color: #cc0000;">job_create</b> &lt;JSON-encoded job description&gt;
+&lt;integer result&gt;                 = <b style="color: #cc0000;">job_create</b> &lt;JSON-encoded job description&gt;
+&lt;integer result&gt;                 = <b style="color: #cc0000;">job_commit</b> &lt;JSON-encoded array of job IDs&gt;
+&lt;JSON-encoded array of statuses&gt; = <b style="color: #cc0000;">job_status</b> &lt;JSON-encoded array of job IDs&gt;
+&lt;JSON-encoded array of statuses&gt; = <b style="color: #cc0000;">job_wait</b>   &lt;job ID&gt; &lt;timeout&gt;
+&lt;integer result&gt;                 = <b style="color: #cc0000;">job_reap</b>   &lt;JSON-encoded array of job IDs&gt;
+&lt;integer result&gt;                 = <b style="color: #cc0000;">job_kill</b>   &lt;JSON-encoded array of job IDs&gt;
 </code>
 
 <p>As usual, these RPC may be sent through the Chirp client command line tool
@@ -1035,7 +1035,7 @@ be passed.</p>
 
 <h3 id="jobs.create">Creating a Job<a class="sectionlink" href="#jobs.create" title="Link to this section.">&#x21d7;</a></h3>
 
-<code>&lt;integer result&gt;                 = <b style="color: orange;">job_create</b> &lt;JSON-encoded job description&gt;</code>
+<code>&lt;integer result&gt;                 = <b style="color: #cc0000;">job_create</b> &lt;JSON-encoded job description&gt;</code>
 
 <p>To create a job, you need the usual attributes of an executable to run, the
 arguments to pass to the executable, any environment variables to add, and any
@@ -1144,7 +1144,7 @@ you would any other file and give a relative (task) path for the
 
 <h3 id="jobs.commit">Committing (to Start) a Job<a class="sectionlink" href="#jobs.commit" title="Link to this section.">&#x21d7;</a></h3>
 
-<code>&lt;integer result&gt;                 = <b style="color: orange;">job_commit</b> &lt;JSON-encoded array of job IDs&gt;</code>
+<code>&lt;integer result&gt;                 = <b style="color: #cc0000;">job_commit</b> &lt;JSON-encoded array of job IDs&gt;</code>
 
 <p>Chirp uses two-phase commit for creating a job. This serves to protect
 against orphan jobs which become lost because a client or the server lose a
@@ -1165,7 +1165,7 @@ finish.</p>
 
 <h3 id="jobs.status">Querying the Status of a Job<a class="sectionlink" href="#jobs.status" title="Link to this section.">&#x21d7;</a></h3>
 
-<code>&lt;JSON-encoded array of statuses&gt; = <b style="color: orange;">job_status</b> &lt;JSON-encoded array of job IDs&gt;</code>
+<code>&lt;JSON-encoded array of statuses&gt; = <b style="color: #cc0000;">job_status</b> &lt;JSON-encoded array of job IDs&gt;</code>
 
 <p>At any point in a job's lifetime, you may query its status. Status
 information is JSON-encoded and holds all job metadata.</p>
@@ -1315,7 +1315,7 @@ information is JSON-encoded and holds all job metadata.</p>
         }
     ]
 }'
-<b style="color: orange;">4</b>
+<b style="color: #cc0000;">4</b>
 <span class="prompt">$ </span>chirp host:port job_commit '[4]'
 <span class="prompt">$ </span>sleep 1
 <span class="prompt">$ </span>chirp host:port job_status '[4]'
@@ -1368,7 +1368,7 @@ not help with waiting for one or more jobs to finish. For that, we use the
 
 <h3 id="jobs.wait">Waiting for a Job to Terminate<a class="sectionlink" href="#jobs.wait" title="Link to this section.">&#x21d7;</a></h3>
 
-<code>&lt;JSON-encoded array of statuses&gt; = <b style="color: orange;">job_wait</b>   &lt;job ID&gt; &lt;timeout&gt;</code>
+<code>&lt;JSON-encoded array of statuses&gt; = <b style="color: #cc0000;">job_wait</b>   &lt;job ID&gt; &lt;timeout&gt;</code>
 
 <p>Use the <tt>job_wait</tt> RPC to wait for a job to finish. This will give
 you the status information of jobs which have completed and have a
@@ -1403,7 +1403,7 @@ discussed next.</p>
 
 <h3 id="jobs.reap">Reaping a Finished Job<a class="sectionlink" href="#jobs.reap" title="Link to this section.">&#x21d7;</a></h3>
 
-<code>&lt;integer result&gt;                 = <b style="color: orange;">job_reap</b>   &lt;JSON-encoded array of job IDs&gt;</code>
+<code>&lt;integer result&gt;                 = <b style="color: #cc0000;">job_reap</b>   &lt;JSON-encoded array of job IDs&gt;</code>
 
 <p>Similar in intent to <tt>job_commit</tt>, <tt>job_reap</tt> notifies the
 Chirp server that your application has logged the termination of the job. This
@@ -1413,7 +1413,7 @@ future calls to <tt>job_wait</tt> will not include this job.</p>
 
 <h3 id="jobs.kill">Killing a Job<a class="sectionlink" href="#jobs.kill" title="Link to this section.">&#x21d7;</a></h3>
 
-<code>&lt;integer result&gt;                 = <b style="color: orange;">job_kill</b>   &lt;JSON-encoded array of job IDs&gt;</code>
+<code>&lt;integer result&gt;                 = <b style="color: #cc0000;">job_kill</b>   &lt;JSON-encoded array of job IDs&gt;</code>
 
 <p><tt>job_kill</tt> informs the Chirp server to kill a job. Any job which has
 not reached a terminal state (<tt>FINISHED</tt>, <tt>KILLED</tt>, or
