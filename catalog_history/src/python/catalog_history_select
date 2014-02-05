@@ -115,10 +115,12 @@ day_offset = 0
 filename = timeToFileName(begin,day_offset)
 filesFound = 0
 try:
-  checkpoint_file = open(filename+'.ckpt', 'r')
   lastHost = None
   seriesTmp = {}
-  for line in checkpoint_file.readlines():
+#  checkpoint_file = open(filename+'.ckpt', 'r')
+#  for line in checkpoint_file.readlines():
+  f = open(filename+'.ckpt', 'r')
+  for line in f:
     line = line.strip()
     if line.__len__() <= 0:
       seriesNow[seriesTmp["key"]] = seriesTmp
