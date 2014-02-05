@@ -645,12 +645,22 @@ Returns 1 on success, 0 on failure to receive, -1 on failure to access.
 */
 static int get_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *local_name, int64_t length, int64_t * total_bytes)
 {
+	// If a bandwidth limit is in effect, choose the effective stoptime.
+	timestamp_t effective_stoptime = 0;
+	if(q->bandwidth) {
+		effective_stoptime = (length/q->bandwidth)*1000000 + timestamp_get();
+	}
+
+	// Choose the actual stoptime.
+	time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
+
 	// If necessary, create parent directories of the file.
 	if(strchr(local_name,'/')) {
 		char dirname[WORK_QUEUE_LINE_MAX];
 		path_dirname(local_name,dirname);
 		if(!create_dir(dirname, 0700)) {
 			debug(D_WQ, "Could not create directory - %s (%s)", dirname, strerror(errno));
+			link_soak(w->link, length, stoptime);
 			return -1;
 		}
 	}
@@ -660,17 +670,11 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0700);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s for writing: %s", local_name, strerror(errno));
+		link_soak(w->link, length, stoptime);
 		return -1;
 	}
 
-	// If a bandwidth limit is in effect, choose the effective stoptime.
-	timestamp_t effective_stoptime = 0;
-	if(q->bandwidth) {
-		effective_stoptime = (length/q->bandwidth)*1000000 + timestamp_get();
-	}
-
-	// Choose the actual stoptime and transfer the data.
-	time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
+	// Write the data on the link to file.
 	int64_t actual = link_stream_to_fd(w->link, fd, length, stoptime);
 
 	close(fd);
@@ -719,8 +723,7 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 		int64_t length;
 		int errnum;
 
-		result = recv_worker_msg_retry(q, w, line, sizeof(line));
-		if(result<0) {
+		if(recv_worker_msg_retry(q, w, line, sizeof(line)) < 0) {
 			result = 0; //signal sys-level failure	
 			break;	
 		}
@@ -739,7 +742,8 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
 			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
 			free(tmp_local_name);
-			if(result <= 0) break;
+			//Return if worker failure. Else wait for end message from worker.	
+			if(result == 0) break;
 		} else if(sscanf(line,"missing %s %d",tmp_remote_path,&errnum)==2) {
 			// If the output file is missing, we make a note of that in the task result,
 			// but we continue and consider the transfer a 'success' so that other
@@ -747,8 +751,12 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 			debug(D_WQ, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,remote_name,strerror(errnum));
 			t->result |= WORK_QUEUE_RESULT_OUTPUT_MISSING;
 		} else if(!strcmp(line,"end")) {
-			// The only successful return is via an end message.
-			return 1;
+			// We have to return on receiving an end message.
+			if (result > 0) {
+				return result;
+			} else {
+				break;
+			}
 		} else {
 			debug(D_WQ, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
 			result = 0; //signal sys-level failure	
@@ -894,7 +902,7 @@ static int get_output_files( struct work_queue *q, struct work_queue_worker *w, 
 			result = get_output_file(q,w,t,f,cached_name); 
 			
 			//if success or app-level failure, continue to get other files.
-			//but if there was a worker failure (failed to get), return.
+			//if worker failure, return.
 			if(result == 0) {
 				break;
 			} 
