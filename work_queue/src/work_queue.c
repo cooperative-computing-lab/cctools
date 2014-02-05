@@ -928,12 +928,13 @@ static void delete_worker_files( struct work_queue *q, struct work_queue_worker 
 		if(!(tf->flags & except_flags)) {
 			char *cached_name = make_cached_name(t,tf);
 			send_worker_msg(q,w, "unlink %s\n",cached_name);
+			hash_table_remove(w->current_files, cached_name);
 			free(cached_name);
 		}
 	}
 }
 
-static void delete_output_files(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) 
+static void delete_task_output_files(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) 
 {
 	delete_worker_files(q, w, t, t->output_files, 0);
 }
@@ -1060,7 +1061,7 @@ static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w
 	different outputs. */
 	if(t) {
 		if(t->time_execute_cmd_start > 0) {
-			delete_output_files(q,w,t);
+			delete_task_output_files(q,w,t);
 		}	
 	}
 
