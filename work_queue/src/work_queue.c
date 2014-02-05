@@ -1228,8 +1228,6 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t->time_receive_result_finish = timestamp_get();
 
 	t->return_status = task_result;
-	if(t->return_status != 0)
-		t->result |= WORK_QUEUE_RESULT_FUNCTION_FAIL;
 
 	t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
 	q->total_execute_time += t->cmd_execution_time;
