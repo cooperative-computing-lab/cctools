@@ -1009,6 +1009,419 @@ files have the execute bit set.</p>
 management (<tt>-F</tt>) when using HDFS as a backend.</p>
 
 
+<h2 id="jobs">Advanced Topic: Job Execution on Chirp<a class="sectionlink" href="#jobs" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>As of version 4.1.0, Chirp supports job execution. Jobs run using
+executables and files located on the Chirp server. Each job descriptiong sent
+to the Chirp server provides a <i>binding</i> of each file the job requires
+to a local namespace (a sandbox).</p>
+
+<p>To support the new job interface, Chirp has the following new RPC:</p>
+
+<code>&lt;integer result&gt;                 = <b style="color: orange;">job_create</b> &lt;JSON-encoded job description&gt;
+&lt;integer result&gt;                 = <b style="color: orange;">job_create</b> &lt;JSON-encoded job description&gt;
+&lt;integer result&gt;                 = <b style="color: orange;">job_commit</b> &lt;JSON-encoded array of job IDs&gt;
+&lt;JSON-encoded array of statuses&gt; = <b style="color: orange;">job_status</b> &lt;JSON-encoded array of job IDs&gt;
+&lt;JSON-encoded array of statuses&gt; = <b style="color: orange;">job_wait</b>   &lt;job ID&gt; &lt;timeout&gt;
+&lt;integer result&gt;                 = <b style="color: orange;">job_reap</b>   &lt;JSON-encoded array of job IDs&gt;
+&lt;integer result&gt;                 = <b style="color: orange;">job_kill</b>   &lt;JSON-encoded array of job IDs&gt;
+</code>
+
+<p>As usual, these RPC may be sent through the Chirp client command line tool
+or through the C API.</p>
+
+<p>To enable job execution on a Chirp server, the <tt>--jobs</tt> switch must
+be passed.</p>
+
+<h3 id="jobs.create">Creating a Job<a class="sectionlink" href="#jobs.create" title="Link to this section.">&#x21d7;</a></h3>
+
+<code>&lt;integer result&gt;                 = <b style="color: orange;">job_create</b> &lt;JSON-encoded job description&gt;</code>
+
+<p>To create a job, you need the usual attributes of an executable to run, the
+arguments to pass to the executable, any environment variables to add, and any
+files to bind into the job's namespace.</p>
+
+<p>In Chirp's Job execution framework, files are <i>bound</i> into the job's
+namespace. The name of the file in the task's name space is labeled
+<tt>task_path</tt> while the name in the server namespace is labeled
+<tt>serv_path</tt>. <b>Files are bound in the task namespace at job start
+and job end, for inputs and outputs, respectively.</b>
+
+<h4 id="jobs.create.e1">Example 1<a class="sectionlink" href="#jobs.create.e1" title="Link to this section.">&#x21d7;</a></h4>
+
+<code style="white-space: pre;">{
+    "executable": "/bin/sh",
+    "arguments": [
+        "sh",
+        "-c",
+        "echo Hello, world! &gt; my.output"
+    ],
+    "files": [
+        {
+            "task_path": "my.output",
+            "serv_path": "/users/pdonnel3/my.0.output",
+            "type": "OUTPUT"
+        }
+    ]
+}
+</code>
+
+<p>Notice that the first argument is <tt>"sh"</tt>. This argument corresponds
+to <tt>argv[0]</tt> in a regular POSIX application.</p>
+
+<p>Additionally, the output file is explicitly marked as an <tt>OUTPUT</tt>.
+This file is bound into the server namespace at task completion.</p>
+
+<h4 id="jobs.create.e2">Example 2 -- Two Inputs<a class="sectionlink" href="#jobs.create.e2" title="Link to this section.">&#x21d7;</a></h4>
+
+<code style="white-space: pre;">{
+    "executable": "/bin/tar",
+    "arguments": [
+        "tar",
+        "-cf",
+        "archive.tar",
+        "a",
+        "b"
+    ],
+    "files": [
+        {
+            "task_path": "a",
+            "serv_path": "/users/pdonnel3/a.txt",
+            "type": "INPUT",
+            "binding": "SYMLINK"
+        },
+        {
+            "task_path": "b",
+            "serv_path": "/users/pdonnel3/b.txt",
+            "type": "INPUT",
+            "binding": "SYMLINK"
+        },
+        {
+            "task_path": "archive.tar",
+            "serv_path": "/users/pdonnel3/archive.tar",
+            "type": "OUTPUT",
+            "binding": "SYMLINK"
+        }
+    ]
+}
+</code>
+
+<p>Here, each file is bound as a symbolic link the location on the server. This
+type of access is usually fast as the server does not need make a copy. You may
+also bind files as <tt>COPY</tt> if necessary. <tt>SYMLINK</tt> is the
+default.</p>
+
+<h4 id="jobs.create.e3">Example 3 -- Using custom executable.<a class="sectionlink" href="#jobs.create.e3" title="Link to this section.">&#x21d7;</a></h4>
+
+<p>Often, you will have a script or executable which is present on the Chirp
+server which you want to execute directly. To do this, bind the executable as
+you would any other file and give a relative (task) path for the
+<tt>executable</tt> job attribute:</p>
+
+<code style="white-space: pre;">{
+    "executable": "./myscript.sh",
+    "arguments": [
+        "myscript",
+        "b",
+    ],
+    "files": [
+        {
+            "task_path": "myscript.sh",
+            "serv_path": "/users/pdonnel3/myscript.sh",
+            "type": "INPUT",
+            "binding": "SYMLINK"
+        },
+        {
+            "task_path": "output.txt",
+            "serv_path": "/users/pdonnel3/output.txt",
+            "type": "OUTPUT",
+            "binding": "SYMLINK"
+        }
+    ]
+}
+</code>
+
+
+<h3 id="jobs.commit">Committing (to Start) a Job<a class="sectionlink" href="#jobs.commit" title="Link to this section.">&#x21d7;</a></h3>
+
+<code>&lt;integer result&gt;                 = <b style="color: orange;">job_commit</b> &lt;JSON-encoded array of job IDs&gt;</code>
+
+<p>Chirp uses two-phase commit for creating a job. This serves to protect
+against orphan jobs which become lost because a client or the server lose a
+connection.</p>
+
+<p>To commit a job, pass a JSON-encoded array of job identifiers to the
+<tt>job_commit</tt> RPC. For example:</p>
+
+<code><span class="prompt">$ </span>chirp host:port job_commit '[0, 1]'</code>
+
+<p>will commit jobs <tt>0</tt> and <tt>1</tt>.
+
+<p>Once a job is committed, the Chirp server is free to schedule and execute
+the job. You may query the <a href="#jobs.status">status</a> of the job to see
+if it has begun executing or <a href="#jobs.wait">wait</a> for the job to
+finish.</p>
+
+
+<h3 id="jobs.status">Querying the Status of a Job<a class="sectionlink" href="#jobs.status" title="Link to this section.">&#x21d7;</a></h3>
+
+<code>&lt;JSON-encoded array of statuses&gt; = <b style="color: orange;">job_status</b> &lt;JSON-encoded array of job IDs&gt;</code>
+
+<p>At any point in a job's lifetime, you may query its status. Status
+information is JSON-encoded and holds all job metadata.</p>
+
+<h4 id="jobs.status.e1">Example 1 -- Status of <a href="#jobs.create.e1">Create Example 1</a><a class="sectionlink" href="#jobs.status.e1" title="Link to this section.">&#x21d7;</a></h4>
+
+<code><span class="prompt">$ </span>chirp host:port job_status '[0]'
+[
+  {
+    "id":1,
+    "error":null,
+    "executable":"\/bin\/sh",
+    "exit_code":null,
+    "exit_status":null,
+    "exit_signal":null,
+    "priority":1,
+    "status":"CREATED",
+    "subject":"unix:pdonnel3",
+    "time_commit":null,
+    "time_create":"2014-02-04 23:32:02",
+    "time_error":null,
+    "time_finish":null,
+    "time_kill":null,
+    "time_start":null,
+    "time_reap":null,
+    "arguments":[
+      "sh",
+      "-c",
+      "echo Hello, world! &gt; my.output"
+    ],
+    "environment":{
+    },
+    "files":[
+      {
+        "serv_path":"\/users\/pdonnel3\/my.0.output",
+        "task_path":"my.output",
+        "type":"OUTPUT",
+        "binding":"SYMLINK"
+      }
+    ]
+  }
+]
+</code>
+
+<p>After we commit the job, we get this status:</p>
+
+<code><span class="prompt">$ </span>chirp host:port job_commit '[0]'
+<span class="prompt">$ </span>chirp host:port job_status '[0]'
+[
+  {
+    "id":1,
+    "error":null,
+    "executable":"\/bin\/sh",
+    "exit_code":null,
+    "exit_status":null,
+    "exit_signal":null,
+    "priority":1,
+    "status":"COMMITTED",
+    "subject":"unix:pdonnel3",
+    "time_commit":"2014-02-05 01:18:39",
+    "time_create":"2014-02-04 23:32:02",
+    "time_error":null,
+    "time_finish":null,
+    "time_kill":null,
+    "time_start":null,
+    "time_reap":null,
+    "arguments":[
+      "sh",
+      "-c",
+      "echo Hello, world! &gt; my.output"
+    ],
+    "environment":{
+
+    },
+    "files":[
+      {
+        "serv_path":"\/users\/pdonnel3\/my.0.output",
+        "task_path":"my.output",
+        "type":"OUTPUT",
+        "binding":"SYMLINK"
+      }
+    ]
+  }
+]
+</code>
+
+<p>After a short time, we can again get the job's status to see that it failed:</p>
+
+<code><span class="prompt">$ </span>chirp host:port job_status '[0]'
+[
+  {
+    "id":1,
+    "error":"No such file or directory",
+    "executable":"\/bin\/sh",
+    "exit_code":null,
+    "exit_status":null,
+    "exit_signal":null,
+    "priority":1,
+    "status":"ERRORED",
+    "subject":"unix:pdonnel3",
+    "time_commit":"2014-02-05 01:18:39",
+    "time_create":"2014-02-04 23:32:02",
+    "time_error":"2014-02-05 01:18:39",
+    "time_finish":null,
+    "time_kill":null,
+    "time_start":null,
+    "time_reap":null,
+    "arguments":[
+      "sh",
+      "-c",
+      "echo Hello, world! &gt; my.output"
+    ],
+    "environment":{
+
+    },
+    "files":[
+      {
+        "serv_path":"\/users\/pdonnel3\/my.0.output",
+        "task_path":"my.output",
+        "type":"OUTPUT",
+        "binding":"SYMLINK"
+      }
+    ]
+  }
+]
+</code>
+
+<p>This is caused by <tt>/users/pdonnel3</tt> directory not existing. If we create this directory:</p>
+
+<code><span class="prompt">$ </span>chirp host:port mkdir -p /users/pdonnel3</code>
+
+<h4 id="jobs.status.e2">Retrying <a href="#jobs.create.e1">Create Example 1</a><a class="sectionlink" href="#jobs.status.e2" title="Link to this section.">&#x21d7;</a></h4>
+
+<code><span class="prompt">$ </span>chirp host:port mkdir -p /users/pdonnel3
+<span class="prompt">$ </span>chirp host:port job_create '{
+    "executable": "/bin/sh",
+    "arguments": [
+        "sh",
+        "-c",
+        "echo Hello, world! &gt; my.output"
+    ],
+    "files": [
+        {
+            "task_path": "my.output",
+            "serv_path": "/users/pdonnel3/my.0.output",
+            "type": "OUTPUT"
+        }
+    ]
+}'
+<b style="color: orange;">4</b>
+<span class="prompt">$ </span>chirp host:port job_commit '[4]'
+<span class="prompt">$ </span>sleep 1
+<span class="prompt">$ </span>chirp host:port job_status '[4]'
+[
+  [
+    {
+      "id":4,
+      "error":null,
+      "executable":"\/bin\/sh",
+      "exit_code":0,
+      "exit_status":"EXITED",
+      "exit_signal":null,
+      "priority":1,
+      "status":"FINISHED",
+      "subject":"unix:batrick",
+      "time_commit":"2014-02-05 01:26:15",
+      "time_create":"2014-02-05 01:25:58",
+      "time_error":null,
+      "time_finish":"2014-02-05 01:26:15",
+      "time_kill":null,
+      "time_start":"2014-02-05 01:26:15",
+      "time_reap":null,
+      "arguments":[
+        "sh",
+        "-c",
+        "echo Hello, world! &gt; my.output"
+      ],
+      "environment":{
+
+      },
+      "files":[
+        {
+          "serv_path":"\/users\/pdonnel3\/my.0.output",
+          "task_path":"my.output",
+          "type":"OUTPUT",
+          "binding":"SYMLINK"
+        }
+      ]
+    }
+  ]
+]
+<span class="prompt">$ </span>chirp host:port cat /users/pdonnel3/my.0.output
+Hello, world!
+</code>
+
+<p>Again, you can get the status of a job at any time. However, this RPC does
+not help with waiting for one or more jobs to finish. For that, we use the
+<tt>job_wait</tt> RPC discussed next.</p>
+
+
+<h3 id="jobs.wait">Waiting for a Job to Terminate<a class="sectionlink" href="#jobs.wait" title="Link to this section.">&#x21d7;</a></h3>
+
+<code>&lt;JSON-encoded array of statuses&gt; = <b style="color: orange;">job_wait</b>   &lt;job ID&gt; &lt;timeout&gt;</code>
+
+<p>Use the <tt>job_wait</tt> RPC to wait for a job to finish. This will give
+you the status information of jobs which have completed and have a
+<tt>status</tt> of <tt>FINISHED</tt>, <tt>KILLED</tt>, or <tt>ERRORED</tt>.</p>
+
+<p><tt>job_wait</tt> takes an job identifier argument which matches jobs in the
+following way:</p>
+
+<table>
+  <tr>
+    <td style="text-align: center;"><tt style="font-weight: bold">0</tt></td>
+    <td>Match all jobs for the current user.</td>
+  </tr>
+  <tr>
+    <td style="text-align: center;"><tt style="font-weight: bold">X &gt; 0</tt></td>
+    <td>Match job with id equal to <tt>X</tt>.</td>
+  </tr>
+  <tr>
+    <td style="text-align: center;"><tt style="font-weight: bold">X &lt; 0</tt></td>
+    <td>Match job with id <b>greater than</b> <tt>abs(X)</tt>.</td>
+  </tr>
+</table>
+
+<p><tt>job_wait</tt> is essentially <tt>job_status</tt> except the RPC blocks
+until a job matches the above condition or the <tt>timeout</tt> is
+exceeded.</p>
+
+<p>Unlike the regular UNIX wait system call, Chirp's <tt>job_wait</tt> does not
+reap a job you wait for. You must do that through the <tt>job_reap</tt> RPC
+discussed next.</p>
+
+
+<h3 id="jobs.reap">Reaping a Finished Job<a class="sectionlink" href="#jobs.reap" title="Link to this section.">&#x21d7;</a></h3>
+
+<code>&lt;integer result&gt;                 = <b style="color: orange;">job_reap</b>   &lt;JSON-encoded array of job IDs&gt;</code>
+
+<p>Similar in intent to <tt>job_commit</tt>, <tt>job_reap</tt> notifies the
+Chirp server that your application has logged the termination of the job. This
+allows the Chirp server to reap the job. The side-effect of this operation is
+future calls to <tt>job_wait</tt> will not include this job.</p>
+
+
+<h3 id="jobs.kill">Killing a Job<a class="sectionlink" href="#jobs.kill" title="Link to this section.">&#x21d7;</a></h3>
+
+<code>&lt;integer result&gt;                 = <b style="color: orange;">job_kill</b>   &lt;JSON-encoded array of job IDs&gt;</code>
+
+<p><tt>job_kill</tt> informs the Chirp server to kill a job. Any job which has
+not reached a terminal state (<tt>FINISHED</tt>, <tt>KILLED</tt>, or
+<tt>ERRORED</tt>) will immediately be moved to the <tt>KILLED</tt> state. If
+the job is running, the internal Chirp scheduler will also terminate the job at
+its convenience.</p>
+
+
 <h2 id="debugging">Debugging Advice<a class="sectionlink" href="#debugging" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>Debugging a distributed system can be quite difficult because of the sheer
