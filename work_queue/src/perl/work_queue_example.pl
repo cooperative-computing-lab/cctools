@@ -20,7 +20,6 @@ sub find_executable {
 	$executable = $_[0];
 	@paths=split(/:/, $ENV{"PATH"});
 	push(@paths, "./");
-	print @paths;
 	for $d (@paths) {
 		$path = join('/', $d, $executable);
 		if( -e $path) {
@@ -47,7 +46,6 @@ if (not defined($q)) {
 }
 
 my $executable = find_executable("gzip");
-print $executable;
 
 $port = work_queue_port($q);
 print "listening on port $port...\n"; 
