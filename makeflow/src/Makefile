@@ -22,4 +22,5 @@ install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
 	chmod 755 ${SCRIPTS}
 	cp makeflow ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
-	ln ${CCTOOLS_INSTALL_DIR}/bin/makeflow ${CCTOOLS_INSTALL_DIR}/bin/makeflow_util
+	ln ${CCTOOLS_INSTALL_DIR}/bin/makeflow ${CCTOOLS_INSTALL_DIR}/bin/makeflow_analyze
+	ln ${CCTOOLS_INSTALL_DIR}/bin/makeflow ${CCTOOLS_INSTALL_DIR}/bin/makeflow_viz

@@ -5,7 +5,7 @@
 out_dir="linker_deps_out"
 
 prepare() {
-    ln ../src/makeflow ../src/makeflow_util
+    ln ../src/makeflow ../src/makeflow_analyze
     if [ -d "$out_dir" ]; then
         exit 1
     fi
@@ -15,7 +15,7 @@ prepare() {
 
 run() {
     cd linker
-    out=`../../src/makeflow_util -b "$out_dir" some_dependencies.mf | grep simple.mf`
+    out=`../../src/makeflow_analyze -b "$out_dir" some_dependencies.mf | grep simple.mf`
     if [ -z "$out" ]; then
         exit 1
     fi
@@ -23,7 +23,7 @@ run() {
 }
 
 clean() {
-    rm ../src/makeflow_util
+    rm ../src/makeflow_analyze
     cd linker
     rm -r "$out_dir"
     exit 0

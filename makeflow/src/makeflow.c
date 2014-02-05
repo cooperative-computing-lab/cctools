@@ -2375,16 +2375,10 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Format for monitor logs.                    (default %s)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
 }
 
-static void show_help_util(const char *cmd)
+static void show_help_viz(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
-	fprintf(stdout, " %-30s Create portable bundle of workflow in <directory>\n", "-b,--bundle-dir=<directory>");
 	fprintf(stdout, " %-30s Show this help screen.\n", "-h,--help");
-	fprintf(stdout, " %-30s Show the pre-execution analysis of the Makeflow script - <dagfile>.\n", "-i,--analyze-exec");
-	fprintf(stdout, " %-30s Show input files.\n", "-I,--show-input");
-	fprintf(stdout, " %-30s Syntax check.\n", "-k,--syntax-check");
-	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
-	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
 	fprintf(stdout, " %-30s Display the Makefile as a Dot graph, a PPM completion graph, or print the Workflow to stdout.\n", "-D,--display=<opt>");
 	fprintf(stdout, " %-30s Where <opt> is:\n", "");
 	fprintf(stdout, " %-35s dot      Standard Dot graph\n", "");
@@ -2398,6 +2392,18 @@ static void show_help_util(const char *cmd)
 	fprintf(stdout, " %-30s Highlight node that creates file <file> in completion graph\n", "--ppm-highlight-file=<file>");
 	fprintf(stdout, " %-30s Highlight executable <exe> in completion grap\n", "--ppm-highlight-exe=<exe>");
 	fprintf(stdout, " %-30s Display different levels of depth in completion graph\n", "--ppm-show-levels");
+}
+
+static void show_help_analyze(const char *cmd)
+{
+	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
+	fprintf(stdout, " %-30s Create portable bundle of workflow in <directory>\n", "-b,--bundle-dir=<directory>");
+	fprintf(stdout, " %-30s Show this help screen.\n", "-h,--help");
+	fprintf(stdout, " %-30s Show the pre-execution analysis of the Makeflow script - <dagfile>.\n", "-i,--analyze-exec");
+	fprintf(stdout, " %-30s Show input files.\n", "-I,--show-input");
+	fprintf(stdout, " %-30s Syntax check.\n", "-k,--syntax-check");
+	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
+	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
 }
 
 static void summarize(FILE * file, FILE * email, const char *format, ...)
@@ -2521,28 +2527,31 @@ static void create_summary(struct dag *d, const char *write_summary_to, const ch
 
 int main(int argc, char *argv[])
 {
-	typedef enum {MAKEFLOW_RUN, MAKEFLOW_UTIL} runtime_mode;
+	typedef enum {MAKEFLOW_RUN, MAKEFLOW_VIZ, MAKEFLOW_ANALYZE} runtime_mode;
 
 	int c;
 	random_init();
 	makeflow_exe = argv[0];
 	debug_config(makeflow_exe);
+	int display_mode = 0;
 
 	runtime_mode modus_operandi = MAKEFLOW_RUN;
-	if(!strncmp("makeflow_util", path_basename(makeflow_exe), 13)) modus_operandi = MAKEFLOW_UTIL;
+	if(!strncmp("makeflow_viz", path_basename(makeflow_exe), 13)) modus_operandi = MAKEFLOW_VIZ;
+	if(!strncmp("makeflow_analyze", path_basename(makeflow_exe), 13)) modus_operandi = MAKEFLOW_ANALYZE;
 
 	cctools_version_debug(D_DEBUG, makeflow_exe);
 	const char *dagfile;
 
-	/* Util variables */
+	/* Analyze variables */
 	char *bundle_directory = NULL;
-	int display_mode = 0;
+	int syntax_check = 0;
+
+/* Visualize variables */
 	int condense_display = 0;
 	int change_size = 0;
 	int export_as_dax = 0;
 	int ppm_mode = 0;
 	char *ppm_option = NULL;
-	int syntax_check = 0;
 
 	/* Run variables */
 	char *batchlogfilename = NULL;
@@ -2567,14 +2576,11 @@ int main(int argc, char *argv[])
 	char *s;
 
 	switch(modus_operandi) {
-	case MAKEFLOW_UTIL:
+	case MAKEFLOW_VIZ:
 	{
-		struct option long_options_util[] = {
-			{"bundle-dir", required_argument, 0, 'b'},
+		struct option long_options_viz[] = {
 			{"display-mode", required_argument, 0, 'D'},
 			{"help", no_argument, 0, 'h'},
-			{"analyze-exec", no_argument, 0, 'i'},
-			{"show-input", no_argument, 0, 'I'},
 			{"dot-merge-similar", no_argument, 0,  LONG_OPT_DOT_CONDENSE},
 			{"dot-proportional",  no_argument, 0,  LONG_OPT_DOT_PROPORTIONAL},
 			{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
@@ -2582,17 +2588,13 @@ int main(int argc, char *argv[])
 			{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
 			{"ppm-show-levels", no_argument, 0, LONG_OPT_PPM_LEVELS},
 			{"export-as-dax", no_argument, 0, 'e'},
-			{"syntax-check", no_argument, 0, 'k'},
 			{"version", no_argument, 0, 'v'},
 			{0, 0, 0, 0}
 		};
-		const char *option_string_util = "b:D:ehiIkv";
+		const char *option_string_viz = "b:D:ehv";
 
-		while((c = getopt_long(argc, argv, option_string_util, long_options_util, NULL)) >= 0) {
+		while((c = getopt_long(argc, argv, option_string_viz, long_options_viz, NULL)) >= 0) {
 			switch (c) {
-			case 'b':
-				bundle_directory = xxstrdup(optarg);
-				break;
 			case 'D':
 				if(strcasecmp(optarg, "dot") == 0)
 					display_mode = SHOW_DAG_DOT;
@@ -2632,7 +2634,39 @@ int main(int argc, char *argv[])
 				export_as_dax = 1;
 				break;
 			case 'h':
-				show_help_util(makeflow_exe);
+				show_help_viz(makeflow_exe);
+				return 0;
+			case 'v':
+				cctools_version_print(stdout, makeflow_exe);
+				return 0;
+			default:
+				show_help_viz(makeflow_exe);
+				return 1;
+			}
+		}
+		break;
+	}
+	case MAKEFLOW_ANALYZE:
+	{
+		struct option long_options_analyze[] = {
+			{"bundle-dir", required_argument, 0, 'b'},
+			{"help", no_argument, 0, 'h'},
+			{"analyze-exec", no_argument, 0, 'i'},
+			{"show-input", no_argument, 0, 'I'},
+			{"syntax-check", no_argument, 0, 'k'},
+			{"show-output", no_argument, 0, 'O'},
+			{"version", no_argument, 0, 'v'},
+			{0, 0, 0, 0}
+		};
+		const char *option_string_analyze = "b:hiIkOv";
+
+		while((c = getopt_long(argc, argv, option_string_analyze, long_options_analyze, NULL)) >= 0) {
+			switch (c) {
+			case 'b':
+				bundle_directory = xxstrdup(optarg);
+				break;
+			case 'h':
+				show_help_analyze(makeflow_exe);
 				return 0;
 			case 'i':
 				display_mode = SHOW_MAKEFLOW_ANALYSIS;
@@ -2650,7 +2684,7 @@ int main(int argc, char *argv[])
 				cctools_version_print(stdout, makeflow_exe);
 				return 0;
 			default:
-				show_help_util(makeflow_exe);
+				show_help_analyze(makeflow_exe);
 				return 1;
 			}
 		}
@@ -2997,14 +3031,9 @@ int main(int argc, char *argv[])
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
 
-	if(modus_operandi == MAKEFLOW_UTIL) {
+	if(modus_operandi == MAKEFLOW_ANALYZE) {
 		if(syntax_check) {
 			fprintf(stdout, "%s: Syntax OK.\n", dagfile);
-			return 0;
-		}
-
-		if(export_as_dax) {
-			dag_to_dax(d, path_basename(dagfile));
 			return 0;
 		}
 
@@ -3038,6 +3067,26 @@ int main(int argc, char *argv[])
 				dag_show_analysis(d);
 				break;
 
+			default:
+				fatal("Unknown display option.");
+				break;
+			}
+			exit(0);
+		}
+
+		exit(0);
+	}
+
+	if(modus_operandi == MAKEFLOW_VIZ) {
+		if(export_as_dax) {
+			dag_to_dax(d, path_basename(dagfile));
+			return 0;
+		}
+
+		if(display_mode)
+		{
+			switch(display_mode)
+			{
 			case SHOW_DAG_DOT:
 				dag_to_dot(d, condense_display, change_size);
 				break;
@@ -3050,12 +3099,11 @@ int main(int argc, char *argv[])
 				fatal("Unknown display option.");
 				break;
 			}
-
 			exit(0);
 		}
+
 		exit(0);
 	}
-
 
 	if(modus_operandi == MAKEFLOW_RUN) {
 		if(explicit_local_jobs_max) {

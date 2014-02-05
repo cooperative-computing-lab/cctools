@@ -24,7 +24,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 
-#define MAKEFLOW_PATH "makeflow_util"
+#define MAKEFLOW_PATH "makeflow_analyze"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
 typedef enum {UNKNOWN, EXE, NAMED, MAKEFLOW, PERL, PYTHON} file_type;

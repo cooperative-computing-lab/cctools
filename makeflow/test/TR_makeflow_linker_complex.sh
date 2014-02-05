@@ -5,7 +5,7 @@
 out_dir="linker_complex_out"
 
 prepare() {
-  ln ../src/makeflow ../src/makeflow_util
+  ln ../src/makeflow ../src/makeflow_analyze
   if [ -d "$out_dir" ]; then
     exit 1
   fi
@@ -21,7 +21,7 @@ prepare() {
 
 run() {
   cd linker
-  ../../src/makeflow_util -b "$out_dir" complex.mf &> tmp
+  ../../src/makeflow_analyze -b "$out_dir" complex.mf &> tmp
   cat tmp | awk '{print $2}' | sort > tmp2
 
   `diff tmp2 expected/complex.mf`
@@ -29,7 +29,7 @@ run() {
 }
 
 clean() {
-  rm ../src/makeflow_util
+  rm ../src/makeflow_analyze
   cd linker
   rm -r "$out_dir"
   rm -r /tmp/a

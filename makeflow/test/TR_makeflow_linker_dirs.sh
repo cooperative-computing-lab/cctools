@@ -8,20 +8,20 @@ prepare() {
     if [ -d "$out_dir" ]; then
         exit 1
     fi
-    ln ../src/makeflow ../src/makeflow_util
+    ln ../src/makeflow ../src/makeflow_analyze
     cd ../src/; make
     exit 0
 }
 
 run() {
     cd linker
-    ../../src/makeflow_util -b "$out_dir" directories.mf &> tmp
+    ../../src/makeflow_analyze -b "$out_dir" directories.mf &> tmp
     `diff tmp expected/directories.mf`
     exit $?
 }
 
 clean() {
-    rm ../src/makeflow_util
+    rm ../src/makeflow_analyze
     cd linker
     rm -r "$out_dir"
     rm tmp
