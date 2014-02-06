@@ -385,7 +385,7 @@ static int log_play( struct deltadb *db  )
 											if (r->LAST) printf("%s%s.LAST %i\n",prefix,namep,red->last);
 											if (r->PAVG) printf("%s%s.PAVG %i\n",prefix,namep,red->pavg);
 											if (r->INC) printf("%s%s.INC %i\n",prefix,namep,red->inc);
-										} else printf("=%s%s %i\n",prefix,namep,red->last);
+										} else printf("%s%s %i\n",prefix,namep,red->last);
 										
 										sprintf(value,"%i",red->last);
 										reduction_init(red,value);
