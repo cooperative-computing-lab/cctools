@@ -21,7 +21,7 @@ PUBLIC_HEADERS = debug.h  \
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h}
 LIBRARIES = lib_catalog_history.a
-PROGRAMS = ch_select ch_dfilter ch_sfilter ch_cfilter ch_project ch_treduce ch_pivot
+PROGRAMS = ch_select ch_dfilter ch_sfilter ch_cfilter ch_project ch_treduce ch_pivot ch_sreduce
 
 TEST_PROGRAMS = 
 PROGRAM_SOURCES = ${PROGRAMS:%=%.c}
@@ -45,6 +45,9 @@ ch_project: ch_project.o lib_catalog_history.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 ch_treduce: ch_treduce.o lib_catalog_history.a
+	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
+
+ch_sreduce: ch_sreduce.o lib_catalog_history.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 ch_pivot: ch_pivot.o lib_catalog_history.a
