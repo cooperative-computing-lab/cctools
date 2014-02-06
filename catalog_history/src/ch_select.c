@@ -142,7 +142,7 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 				}
 				break;
 			default:
-				debug(D_NOTICE,"corrupt log data: %s",line);
+				debug(D_DEBUG,"corrupt log data: %s",line);
 				break;
 		}
 	}
@@ -165,17 +165,17 @@ static int log_play_time( struct deltadb *db, time_t start_time, time_t end_time
 	int day = t->tm_yday;
 
 	sprintf(filename,"%s/%d/%d.ckpt",db->logdir,year,day);
-	debug(D_NOTICE,"Reading file: %s",filename);
+	debug(D_DEBUG,"Reading file: %s",filename);
 	checkpoint_read(db,filename);
 
 	int started = 0;
 	while(1) {
 		sprintf(filename,"%s/%d/%d.log",db->logdir,year,day);
 		FILE *file = fopen(filename,"r");
-		debug(D_NOTICE,"Reading file: %s",filename);
+		debug(D_DEBUG,"Reading file: %s",filename);
 		if(!file) {
 			file_errors += 1;
-			debug(D_NOTICE,"couldn't open %s: %s",filename,strerror(errno));
+			debug(D_DEBUG,"couldn't open %s: %s",filename,strerror(errno));
 			if (file_errors>5)
 				break;
 		} else {
