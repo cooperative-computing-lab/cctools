@@ -141,6 +141,8 @@ static int log_play( struct deltadb *db, FILE *stream  )
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if(n<1) continue;
 
+		if(line[0]=='.') break;
+
 		switch(oper) {
 			case 'C':
 				nv = nvpair_create();
@@ -201,6 +203,9 @@ int main( int argc, char *argv[] )
 
 	checkpoint_read(db,stdin);
 	log_play(db,stdin);
+
+	printf(".Log End.\n");
+
 	deltadb_delete(db);
 
 	return 0;
