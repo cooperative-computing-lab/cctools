@@ -7,7 +7,7 @@ See the file COPYING for details.
 #include "nvpair.h"
 #include "hash_table.h"
 #include "debug.h"
-#include "limits.h"
+#include "reduction.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -16,114 +16,6 @@ See the file COPYING for details.
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-typedef enum {
-	CNT,
-	SUM,
-	FIRST,
-	LAST,
-	MIN,
-	AVG,
-	MAX,
-	PAVG,
-	INC
-} reduction_t;
-
-struct reduction {
-	char *attr;
-	reduction_t type;
-	long cnt;
-	long sum;
-	long first;
-	long last;
-	long min;
-	long max;
-};
-
-struct reduction *reduction_create( const char *name, const char *attr )
-{
-	struct reduction *r;
-	reduction_t type;
-
-	if (strcmp(name,"CNT")==0)		type = CNT;
-	else if (strcmp(name,"SUM")==0)		type = SUM;
-	else if (strcmp(name,"FIRST")==0)	type = FIRST;
-	else if (strcmp(name,"LAST")==0)	type = LAST;
-	else if (strcmp(name,"MIN")==0)		type = MIN;
-	else if (strcmp(name,"AVG")==0)		type = AVG;
-	else if (strcmp(name,"MAX")==0)		type = MAX;
-	else if (strcmp(name,"PAVG")==0)	type = PAVG;
-	else if (strcmp(name,"INC")==0)		type = INC;
-	else	return 0;
-
-	r = malloc(sizeof(*r));
-	memset(r,0,sizeof(*r));
-	r->type = type;
-	r->attr = strdup(attr);
-	return r;
-};
-
-void reduction_delete( struct reduction *r )
-{
-	if(!r) return;
-	free(r->attr);
-	free(r);
-}
-
-void reduction_reset( struct reduction *r )
-{
-	r->cnt = r->sum = r->first = r->last = r->min = r->max = 0;
-};
-
-void reduction_update( struct reduction *r, const char *value )
-{
-	long val = atol(value);
-
-	if(r->cnt==0) {
-		r->min = r->max = r->first = val;
-	} else {
-		if (val < r->min) r->min = val;
-		if (val > r->max) r->max = val;
-	}
-
-	r->sum += val;
-	r->last = val;
-	r->cnt++;
-};
-
-void reduction_print( struct reduction *r )
-{
-	printf("%s",r->attr);
-	switch(r->type) {
-		case CNT:
-			printf(".CNT %ld\n",r->cnt);
-			break;
-		case SUM:
-			printf(".SUM %ld\n",r->sum);
-			break;
-		case FIRST:
-			printf(".FIRST %ld\n",r->first);
-			break;
-		case LAST:
-			printf(".LAST %ld\n",r->last);
-			break;
-		case MIN:
-			printf(".MIN %ld\n",r->min);
-			break;
-		case AVG:
-			printf(".AVG %ld\n",r->cnt>0 ? r->sum/r->cnt : 0);
-			break;
-		case MAX:
-			printf(".MAX %ld\n",r->max);
-			break;
-		case PAVG:
-			printf(".PAVG %ld\n",r->cnt>0 ? r->sum/r->cnt : 0 );
-			break;
-		case INC:
-			printf(".INC %ld\n",r->last-r->first);
-			break;
-	}
-}
 
 struct deltadb {
 	struct hash_table *table;
@@ -178,6 +70,53 @@ static int checkpoint_read( struct deltadb *db, FILE *file )
 
 #define NVPAIR_LINE_MAX 1024
 
+void emit_all_reductions( struct deltadb *db, time_t current, int first_output )
+{
+	int i;
+	struct nvpair *nv;
+	char *key;
+	const char *value;
+
+	/* Reset all reduction state. */
+	for(i=0;i<db->nreductions;i++) {
+		reduction_reset(db->reductions[i]);
+	}
+
+	/* After each event, iterate over all objects... */
+
+	hash_table_firstkey(db->table);
+	while(hash_table_nextkey(db->table,&key,(void**)&nv)) {
+
+		/* Update all reductions for that object. */
+		for(i=0;i<db->nreductions;i++) {
+			struct reduction *r = db->reductions[i];
+			value = nvpair_lookup_string(nv,r->attr);
+			if(value) reduction_update(r,value);
+		}
+	}
+
+	if(first_output) {
+		/* The first time we do this, make it a checkpoint record. */
+		printf("key 0 \n");
+		for(i=0;i<db->nreductions;i++) {
+			struct reduction *r = db->reductions[i];
+			reduction_print(r);
+		}
+		printf("\n");
+		printf(".Checkpoint End.\n");
+		printf("T %ld\n",(long)current);
+		first_output = 0;
+	} else {
+		/* After that, make it an update record. */
+		printf("T %ld\n",(long)current);
+		for(i=0;i<db->nreductions;i++) {
+			struct reduction *r = db->reductions[i];
+			printf("U 0 ");
+			reduction_print(r);
+		}
+	}
+}
+
 /*
 Replay a given log file into the hash table, up to the given snapshot time.
 Return true if the stoptime was reached.
@@ -227,53 +166,13 @@ static int log_play( struct deltadb *db, FILE *stream  )
 				break;
 		}
 
-		int i;
-
-		/* Reset all reduction state. */
-		for(i=0;i<db->nreductions;i++) {
-			reduction_reset(db->reductions[i]);
-		}
-
-		/* After each event, iterate over all objects... */
-
-		char *hkey;
-		hash_table_firstkey(db->table);
-		while(hash_table_nextkey(db->table,&hkey,(void**)&nv)) {
-
-			/* Update all reductions for that object. */
-			for(i=0;i<db->nreductions;i++) {
-				struct reduction *r = db->reductions[i];
-				const char *hvalue = nvpair_lookup_string(nv,r->attr);
-				if(hvalue) reduction_update(r,hvalue);
-			}
-		}
-
-		/* Q: What does it mean where there are no items in the current snapshot? */
-
-
-		/* Optimization: Only display when the value actually changes. */
-
-		if(first_output) {
-			printf("key 0 \n");
-			for(i=0;i<db->nreductions;i++) {
-				struct reduction *r = db->reductions[i];
-				reduction_print(r);
-			}
-			printf("\n");
-			printf(".Checkpoint End.\n");
-			printf("T %ld\n",(long)current);
-			first_output = 0;
-		} else {
-			printf("T %ld\n",(long)current);
-			for(i=0;i<db->nreductions;i++) {
-				struct reduction *r = db->reductions[i];
-				printf("U 0 ");
-				reduction_print(r);
-			}
-		}
+		emit_all_reductions(db,current,first_output);
+		first_output = 0;
 	}
-	return 1;
+
+	return 0;
 }
+
 
 int main( int argc, char *argv[] )
 {
@@ -294,11 +193,6 @@ int main( int argc, char *argv[] )
 
 		db->reductions[db->nreductions++] = r;
 	}
-
-	/*
-	Need to add a beginning record here.
-	 */
-
 
 	checkpoint_read(db,stdin);
 	log_play(db,stdin);

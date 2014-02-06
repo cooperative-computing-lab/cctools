@@ -4,7 +4,7 @@ include ../../Makefile.rules
 
 CCTOOLS_INTERNAL_LDFLAGS+=-ldttools -lm
 
-SOURCES = nvpair.o
+SOURCES = nvpair.o reduction.o
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h}
 LIBRARIES = libcatalog_history.a
