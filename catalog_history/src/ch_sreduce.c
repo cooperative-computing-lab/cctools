@@ -97,7 +97,7 @@ void emit_all_reductions( struct deltadb *db, time_t current, int first_output )
 
 	if(first_output) {
 		/* The first time we do this, make it a checkpoint record. */
-		printf("key 0 \n");
+		printf("key 0\n");
 		for(i=0;i<db->nreductions;i++) {
 			struct reduction *r = db->reductions[i];
 			reduction_print(r);
