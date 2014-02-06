@@ -187,14 +187,7 @@ struct silly2 * silly2_create(){
 static int parse_input( struct deltadb *db )
 {      
 	checkpoint_read(db);
-	
-	while(1) {
-
-		int keepgoing = log_play(db);
-		
-		if(!keepgoing) break;
-
-	}
+	log_play(db);
 
 	int i;
 	struct silly2 *s;
