@@ -40,16 +40,15 @@ struct reducer *reducer_create()
 
 struct reduction {
 	int cnt;
-	long sum;
-	int first;
-	int last;
-	int min;
-	int avg;
-	int max;
-	int pavg;
-	int inc;
+	double sum;
+	double first;
+	double last;
+	double min;
+	double avg;
+	double max;
+	double pavg;
+	double inc;
 	char *str;
-	char str2[128];
 
 	//Keep track of changes?
 	//int CNT:1;
@@ -63,6 +62,7 @@ struct reduction {
     //int INC:1;
 	int dirty;
 	int removed;
+	int is_number;
 
 	struct reducer *reduce;
 };
@@ -70,22 +70,82 @@ struct reduction *reduction_create()
 {
 	struct reduction *r;
 	r = malloc(sizeof(*r));
-	r->str = NULL;
+	r->str = malloc(sizeof(char)*256);
 	return r;
 };
+
+static int is_number(char const* p){
+	char* end;
+	strtod(p, &end);
+	if (end==NULL || strlen(end)==0)
+		return 1;
+	return 0;
+}
+
+typedef enum {
+	CNT,
+	SUM,
+	FIRST,
+	LAST,
+	MIN,
+	AVG,
+	MAX,
+	PAVG,
+	INC
+} reduction2_t;
+
+
+char *reduction_str(struct reduction *r, reduction2_t type){
+	if (!r->is_number)
+		return r->str;
+	double val;
+	switch (type){
+		case CNT:
+			val = r->cnt;
+			break;
+		case SUM:
+			val = r->sum;
+			break;
+		case FIRST:
+			val = r->first;
+			break;
+		case LAST:
+			val = r->last;
+			break;
+		case MIN:
+			val = r->min;
+			break;
+		case AVG:
+			val = r->avg;
+			break;
+		case MAX:
+			val = r->max;
+			break;
+		case PAVG:
+			val = r->pavg;
+			break;
+		case INC:
+			val = r->inc;
+			break;
+	}
+	//int val2 = val;
+	sprintf(r->str,"%.15g",val);
+	return r->str;
+}
+
 void reduction_init(struct reduction *r, char *value)
 {
-	int val = atoi(value);
-	char str[15];
-	sprintf(str, "%i", val);
-	if ( val>0 && (strcmp(str,value)==0) && r->str==NULL){
+	//if (is_number(value) && r->str==NULL){
+	if (is_number(value)){
+		char* end;
+		double val = strtod(value, &end);
 		r->cnt = 1;
 		r->sum = r->first = r->last = r->min = r->avg = r->max = r->pavg = val;
 		r->inc = 0;
-		r->str = NULL;
+		r->is_number = 1;
 	} else {
-		r->str = r->str2;
 		strcpy(r->str,value);
+		r->is_number = 0;
 	}
 
 	r->dirty = 0;
@@ -94,10 +154,10 @@ void reduction_init(struct reduction *r, char *value)
 };
 void reduction_update(struct reduction *r, char *value)
 {
-	int val = atoi(value);
-	char str[15];
-	sprintf(str, "%i", val);
-	if ( val>0 && (strcmp(str,value)==0) && r->str==NULL){
+	//if (is_number(value) && r->str==NULL){
+	if (is_number(value) && r->is_number){
+		char* end;
+		double val = strtod(value, &end);
 		r->cnt += 1;
 		r->sum += val;
 		r->last = val;
@@ -109,10 +169,10 @@ void reduction_update(struct reduction *r, char *value)
 		r->avg = (r->sum/r->cnt);
 		r->pavg = r->avg;
 		r->inc = r->last - r->first;
-		r->str = NULL;
+		r->is_number = 1;
 	} else {
-		r->str = r->str2;
 		strcpy(r->str,value);
+		r->is_number = 0;
 	}
 	r->dirty = 1;
 	r->removed = 0;
@@ -369,25 +429,27 @@ static int log_play( struct deltadb *db  )
 									if (s->new==1)
 										prefix[0] = '\0';
 									else sprintf(prefix,"U %s ",keyp);
-									if (red->str!=NULL){
+									if (!red->is_number){
 										printf("%s%s %s\n",prefix,namep,red->str);
 										reduction_init(red,red->str);
 									} else {
 
 										const struct reducer *r = hash_table_lookup(db->reducers,namep);
 										if (r){
-											if (r->CNT) printf("%s%s.CNT %i\n",prefix,namep,red->cnt);
-											if (r->SUM) printf("%s%s.SUM %li\n",prefix,namep,red->sum);
-											if (r->MIN) printf("%s%s.MIN %i\n",prefix,namep,red->min);
-											if (r->AVG) printf("%s%s.AVG %i\n",prefix,namep,red->avg);
-											if (r->MAX) printf("%s%s.MAX %i\n",prefix,namep,red->max);
-											if (r->FIRST) printf("%s%s.FIRST %i\n",prefix,namep,red->first);
-											if (r->LAST) printf("%s%s.LAST %i\n",prefix,namep,red->last);
-											if (r->PAVG) printf("%s%s.PAVG %i\n",prefix,namep,red->pavg);
-											if (r->INC) printf("%s%s.INC %i\n",prefix,namep,red->inc);
-										} else printf("%s%s %i\n",prefix,namep,red->last);
+
+											if (r->CNT) printf("%s%s.CNT %s\n",prefix,namep,reduction_str(red,CNT));
+											if (r->SUM) printf("%s%s.SUM %s\n",prefix,namep,reduction_str(red,SUM));
+											if (r->MIN) printf("%s%s.MIN %s\n",prefix,namep,reduction_str(red,MIN));
+											if (r->AVG) printf("%s%s.AVG %s\n",prefix,namep,reduction_str(red,AVG));
+											if (r->MAX) printf("%s%s.MAX %s\n",prefix,namep,reduction_str(red,MAX));
+											if (r->FIRST) printf("%s%s.FIRST %s\n",prefix,namep,reduction_str(red,FIRST));
+											if (r->LAST) printf("%s%s.LAST %s\n",prefix,namep,reduction_str(red,LAST));
+											if (r->PAVG) printf("%s%s.PAVG %s\n",prefix,namep,reduction_str(red,PAVG));
+											if (r->INC) printf("%s%s.INC %s\n",prefix,namep,reduction_str(red,INC));
+										} else printf("%s%s %s\n",prefix,namep,reduction_str(red,LAST));
+
 										
-										sprintf(value,"%i",red->last);
+										sprintf(value,"%f",red->last);
 										reduction_init(red,value);
 									}
 								}

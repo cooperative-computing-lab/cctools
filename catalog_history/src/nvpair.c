@@ -70,6 +70,7 @@ int nvpair_parse_stream(struct nvpair *n, FILE * stream)
 	char value[NVPAIR_LINE_MAX];
 
 	while(fgets(line, sizeof(line), stream)) {
+		printf("(%s",line);
 		if(line[0] == '.') {
 			return -1;
 		} else if(line[0] == '\n') {
