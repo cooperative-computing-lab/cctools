@@ -56,7 +56,7 @@ run() {
 }
 
 clean() {
-	rm -rf $out_dir ../../makeflow/src/makeflow_analyze
+	rm -rf $out_dir
 }
 
 dispatch "$@"
