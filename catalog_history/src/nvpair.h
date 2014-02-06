@@ -136,7 +136,6 @@ struct nvpair_header {
 @param stream The stream on which to print.
 */
 void nvpair_print_text(struct nvpair *n, FILE * stream);
-void nvpair_print_text2(struct hash_table *fields, int *field_cnt, struct nvpair *n, FILE * s, long current, char*key);
 
 /** Print an entire nvpair in XML form.
 @param n The nvpair to print.

@@ -231,51 +231,6 @@ void nvpair_print_text(struct nvpair *n, FILE * s)
 	fprintf(s, "\n");
 }
 
-
-struct silly {
-	int pos;
-};
-struct silly * silly_create(){
-	struct silly *s = malloc(sizeof(*s));
-	return s;
-}
-
-
-void nvpair_print_text2(struct hash_table *fields, int *field_cnt, struct nvpair *n, FILE * s, long current, char *key)
-{
-	int i;
-	char *name;
-	void *val;
-	char *value;
-	char values[70][256];
-	for(i=0;i<70;i++) values[i][0] = '\0';
-
-	if (key){
-		//printf("key=%s",key);
-		//fflush(stdout);
-		strcpy(values[0],key);
-	}
-
-	hash_table_firstkey(n->table);
-	while(hash_table_nextkey(n->table, &name, &val)) {
-		value = val;
-		struct silly *s = hash_table_lookup(fields,name);
-		if (!s){
-			s = silly_create();
-			s->pos = *field_cnt;
-			*field_cnt += 1;
-			hash_table_insert(fields,name,s);
-		}
-		strcpy(values[s->pos],value);
-	}
-	
-	//Time   Key   Value   Value   Value...
-	fprintf(s, "%lu",current);
-	for(i=0;i<*field_cnt;i++){
-		fprintf(s, "\t%s",values[i]);
-	}
-	fprintf(s,"\n");
-}
 void nvpair_print_json(struct nvpair *n, FILE * s)
 {
 	char *key;
