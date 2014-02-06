@@ -96,13 +96,11 @@ static int log_play( struct deltadb *db  )
 	char name[NVPAIR_LINE_MAX];
 	char value[NVPAIR_LINE_MAX];
 	char oper;
-	//char *keyp;
-	//char *namep;
-	//void *sp;
-	//void *valp;
+	char *keyp;
+	void *nvp;
 	
 	while(fgets(line,sizeof(line),stream)) {
-		//printf("%s",line);
+		//printf("(%s",line);
 		//fflush(stdout);
 
 		line_number += 1;
@@ -122,7 +120,6 @@ static int log_play( struct deltadb *db  )
 				if(num_pairs>0) {
 					nvpair_delete(hash_table_remove(db->table,key));
 					hash_table_insert(db->table,key,nv);
-					nvpair_print_text2(db->fields,&db->field_cnt,nv,stdout,current,key);
 				} else if (num_pairs == -1) {
 					nvpair_delete(nv);
 					return 1;
@@ -133,32 +130,27 @@ static int log_play( struct deltadb *db  )
 
 				break;
 			case 'D':
-				//s = hash_table_lookup(table,key);
-				//if(s) {
-				//	s->deleted = 1;
-				//}
+				nv = hash_table_remove(db->table,key);
+				if(nv) nvpair_delete(nv);
 				break;
 			case 'U':
-				/*s = hash_table_lookup(table,key);
-				if(s) {
-					struct reduction *r = hash_table_lookup(s->pairs,name);
-					if (!r) {
-						r = reduction_create();
-						reduction_init(r,value);
-						hash_table_insert(s->pairs, name, r);
-					} else reduction_update(r,value);
-				}*/
+				nv = hash_table_lookup(db->table,key);
+				if(nv) nvpair_insert_string(nv,name,value);
 				break;
 			case 'R':
-				/*s = hash_table_lookup(table,key);
-				if(s) {
-					struct reduction *r = hash_table_lookup(s->pairs,name);
-					if (r){
-						r->removed = 1;
-					}
-				}*/
+				nv = hash_table_lookup(db->table,key);
+				if(nv) nvpair_remove(nv,name);
 				break;
 			case 'T':
+
+				hash_table_firstkey(db->table);
+				while(hash_table_nextkey(db->table, &keyp, &nvp)) {
+					struct nvpair *nv = nvp;
+					nvpair_print_text2(db->fields,&db->field_cnt,nv,stdout,current,keyp);
+				}
+
+
+
 				current = atol(key);
 				break;
 			default:
