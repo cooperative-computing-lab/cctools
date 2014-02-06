@@ -65,9 +65,8 @@ void emit_table_values( struct deltadb *db, time_t current)
 			if(!value) value = "null";
 			printf("%s\t",value);
 		}
+		printf("\n");
 	}
-
-	printf("\n");
 }
 
 #define NVPAIR_LINE_MAX 1024
@@ -114,7 +113,7 @@ static int log_play( struct deltadb *db, FILE *stream )
 	while(fgets(line,sizeof(line),stream)) {
 		line_number += 1;
 		
-		if (line[0]=='.') return 0;
+		if (line[0]=='.') break;
 		
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if(n<1) continue;
@@ -130,7 +129,7 @@ static int log_play( struct deltadb *db, FILE *stream )
 					hash_table_insert(db->table,key,nv);
 				} else if (num_pairs == -1) {
 					nvpair_delete(nv);
-					return 1;
+					break;
 				} else {
 					nvpair_delete(nv);
 				}
@@ -159,6 +158,7 @@ static int log_play( struct deltadb *db, FILE *stream )
 				break;
 		}
 	}
+	emit_table_values(db,current);
 	return 1;
 }
 
