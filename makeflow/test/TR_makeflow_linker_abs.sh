@@ -8,8 +8,6 @@ prepare() {
     if [ -d "$out_dir" ]; then
         exit 1
     fi
-    ln ../src/makeflow ../src/makeflow_analyze
-    cd ../src/; make
     exit 0
 }
 
@@ -21,7 +19,6 @@ run() {
 }
 
 clean() {
-    rm -rf ../src/makeflow_analyze
     cd linker
     rm -rf "$out_dir" tmp
     exit 0

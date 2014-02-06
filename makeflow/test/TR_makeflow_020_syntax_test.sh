@@ -4,7 +4,6 @@
 
 prepare()
 {
-    ln ../src/makeflow ../src/makeflow_analyze
     exit 0
 }
 
@@ -16,7 +15,6 @@ run()
 
 clean()
 {
-    rm -f ../src/makeflow_analyze
     exit 0
 }
 

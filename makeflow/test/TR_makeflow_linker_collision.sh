@@ -5,14 +5,12 @@
 out_dir="linker_collision_out"
 
 prepare() {
-  ln ../src/makeflow ../src/makeflow_analyze
   if [ -d "$out_dir" ]; then
     exit 1
   fi
 
   touch linker/ls
 
-  cd ../src/; make
   exit $?
 }
 
@@ -26,7 +24,6 @@ run() {
 }
 
 clean() {
-  rm ../src/makeflow
   cd linker
   rm -r "$out_dir"
   rm -f /tmp/asdf asdf tmp tmp2 ls

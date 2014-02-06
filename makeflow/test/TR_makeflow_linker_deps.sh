@@ -5,11 +5,10 @@
 out_dir="linker_deps_out"
 
 prepare() {
-    ln ../src/makeflow ../src/makeflow_analyze
     if [ -d "$out_dir" ]; then
         exit 1
     fi
-    cd ../src/; make
+
     exit 0
 }
 
@@ -23,7 +22,6 @@ run() {
 }
 
 clean() {
-    rm ../src/makeflow_analyze
     cd linker
     rm -r "$out_dir"
     exit 0

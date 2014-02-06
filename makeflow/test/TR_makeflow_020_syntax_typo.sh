@@ -4,7 +4,7 @@
 
 prepare()
 {
-    ln ../src/makeflow ../src/makeflow_analyze
+	exit 0
 }
 
 run()
@@ -26,7 +26,6 @@ run()
 
 clean()
 {
-    rm -f ../src/makeflow_analyze
     cd syntax; ../../src/makeflow -c typo.makeflow && exit 0
     exit 1
 }

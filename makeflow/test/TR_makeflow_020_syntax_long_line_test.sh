@@ -4,7 +4,6 @@
 
 prepare()
 {
-    ln ../src/makeflow ../src/makeflow_analyze
     syntax/long_line_test.pl > syntax/long_line_test.makeflow
     exit 0
 }
@@ -17,7 +16,7 @@ run()
 
 clean()
 {
-    rm -f syntax/long_line_test.makeflow ../src/makeflow_analyze
+    rm -f syntax/long_line_test.makeflow
     exit 0
 }
 

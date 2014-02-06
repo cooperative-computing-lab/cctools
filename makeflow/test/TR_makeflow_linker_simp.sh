@@ -5,13 +5,12 @@
 out_dir="linker_simp_out"
 
 prepare() {
-    ln ../src/makeflow ../src/makeflow_analyze
     cd linker
     if [ -d "$out_dir" ]; then
         exit 1
     fi
     mkdir "$out_dir"
-    cd ../../src/; make
+
     exit 0
 }
 
@@ -26,7 +25,6 @@ run() {
 }
 
 clean() {
-    rm -rf ../src/makeflow_analyze
     cd linker
     rm -rf "$out_dir"
     exit 0
