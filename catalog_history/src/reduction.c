@@ -8,6 +8,7 @@ See the file COPYING for details.
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 struct reduction *reduction_create( const char *name, const char *attr )
 {
@@ -35,7 +36,7 @@ struct reduction *reduction_create( const char *name, const char *attr )
 void reduction_delete( struct reduction *r )
 {
 	if(!r) return;
-	free(r->attr);
+	free((char*)r->attr);
 	free(r);
 }
 
@@ -46,7 +47,7 @@ void reduction_reset( struct reduction *r )
 
 void reduction_update( struct reduction *r, const char *value )
 {
-	long val = atol(value);
+	double val = atof(value);
 
 	if(r->cnt==0) {
 		r->min = r->max = r->first = val;
@@ -65,31 +66,31 @@ void reduction_print( struct reduction *r )
 	printf("%s",r->attr);
 	switch(r->type) {
 		case CNT:
-			printf(".CNT %ld\n",r->cnt);
+			printf(".CNT %lf\n",r->cnt);
 			break;
 		case SUM:
-			printf(".SUM %ld\n",r->sum);
+			printf(".SUM %lf\n",r->sum);
 			break;
 		case FIRST:
-			printf(".FIRST %ld\n",r->first);
+			printf(".FIRST %lf\n",r->first);
 			break;
 		case LAST:
-			printf(".LAST %ld\n",r->last);
+			printf(".LAST %lf\n",r->last);
 			break;
 		case MIN:
-			printf(".MIN %ld\n",r->min);
+			printf(".MIN %lf\n",r->min);
 			break;
 		case AVG:
-			printf(".AVG %ld\n",r->cnt>0 ? r->sum/r->cnt : 0);
+			printf(".AVG %lf\n",r->cnt>0 ? r->sum/r->cnt : 0);
 			break;
 		case MAX:
-			printf(".MAX %ld\n",r->max);
+			printf(".MAX %lf\n",r->max);
 			break;
 		case PAVG:
-			printf(".PAVG %ld\n",r->cnt>0 ? r->sum/r->cnt : 0 );
+			printf(".PAVG %lf\n",r->cnt>0 ? r->sum/r->cnt : 0 );
 			break;
 		case INC:
-			printf(".INC %ld\n",r->last-r->first);
+			printf(".INC %lf\n",r->last-r->first);
 			break;
 	}
 }

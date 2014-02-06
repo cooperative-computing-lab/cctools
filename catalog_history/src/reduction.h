@@ -22,12 +22,12 @@ typedef enum {
 struct reduction {
 	reduction_t type;
 	const char *attr;
-	long cnt;
-	long sum;
-	long first;
-	long last;
-	long min;
-	long max;
+	double cnt;
+	double sum;
+	double first;
+	double last;
+	double min;
+	double max;
 };
 
 struct reduction *reduction_create( const char *name, const char *attr );
