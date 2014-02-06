@@ -133,6 +133,8 @@ static int log_play( struct deltadb *db, FILE *stream  )
 	char oper;
 
 	int first_output = 1;
+
+	time_t previous_time = 0;
 	
 	while(fgets(line,sizeof(line),stream)) {
 
@@ -166,7 +168,10 @@ static int log_play( struct deltadb *db, FILE *stream  )
 				break;
 		}
 
-		emit_all_reductions(db,current,first_output);
+		if(previous_time!=current) {
+			emit_all_reductions(db,previous_time,first_output);
+			previous_time = current;
+		}
 		first_output = 0;
 	}
 
