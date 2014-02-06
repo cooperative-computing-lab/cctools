@@ -76,6 +76,7 @@ Return true if the stoptime was reached.
 static int log_play( struct hash_table *table, FILE *stream, const char *filename, time_t start_time, time_t end_time, int started)
 {
 	time_t current = 0;
+	time_t last_ts = 0;
 	struct nvpair *nv;
 
 	char line[NVPAIR_LINE_MAX];
@@ -90,8 +91,12 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if (started==1){
+			//printf("(%s",line);
 			if (oper=='T'){
-				current = atol(key);
+				last_ts = current;
+				current = atol(key);\
+				if ((current-last_ts)>(24*3600) && last_ts>0)
+					continue;
 				if(current>end_time){
 					return 0;
 				}
@@ -100,6 +105,7 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 			continue;
 		}
 		if(n<1) continue;
+		//printf("-\n");
 
 		switch(oper) {
 			case 'C':
@@ -123,7 +129,10 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 				if(nv) nvpair_remove(nv,name);
 				break;
 			case 'T':
-				current = atol(key);
+				last_ts = current;
+				current = atol(key);\
+				if ((current-last_ts)>(24*3600) && last_ts>0)
+					current = last_ts;
 				if(started==0 && current>=start_time){
 					hash_table_firstkey(table);
 					char *object_key;
@@ -143,6 +152,7 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 				break;
 			default:
 				debug(D_DEBUG,"corrupt log data: %s",line);
+				printf("corrupt log data: %s",line);
 				break;
 		}
 	}
@@ -173,6 +183,8 @@ static int log_play_time( struct deltadb *db, time_t start_time, time_t end_time
 		sprintf(filename,"%s/%d/%d.log",db->logdir,year,day);
 		FILE *file = fopen(filename,"r");
 		debug(D_DEBUG,"Reading file: %s",filename);
+		fprintf(stderr,"Reading file: %s\n",filename);
+		fflush(stderr);
 		if(!file) {
 			file_errors += 1;
 			debug(D_DEBUG,"couldn't open %s: %s",filename,strerror(errno));
