@@ -346,6 +346,8 @@ static int log_play( struct deltadb *db  )
 	while(fgets(line,sizeof(line),stream)) {
 		//printf("(%s",line);
 		//fflush(stdout);
+		//debug(D_NOTICE,"(%s",line);
+		//fflush(stderr);
 
 		line_number += 1;
 		
@@ -425,12 +427,12 @@ static int log_play( struct deltadb *db  )
 									red = hash_table_remove(s->pairs,namep);
 									reduction_delete(red);
 								} else if (red->dirty || s->new==1){
-									char prefix[32];
+									char prefix[NVPAIR_LINE_MAX];
 									if (s->new==1)
 										prefix[0] = '\0';
 									else sprintf(prefix,"U %s ",keyp);
 									if (!red->is_number){
-										printf("%s%s %s\n",prefix,namep,red->str);
+										printf("%s%s %p\n",prefix,namep,red->str);
 										reduction_init(red,red->str);
 									} else {
 
