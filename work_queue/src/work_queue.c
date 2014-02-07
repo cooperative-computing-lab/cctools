@@ -3378,6 +3378,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			hash_table_firstkey(q->workers_with_available_results);
 			while(hash_table_nextkey(q->workers_with_available_results,&key,(void**)&w)) {
 				process_available_results(q, w, -1);
+				hash_table_remove(q->workers_with_available_results, key);
 			}	
 		}
 		
