@@ -807,6 +807,7 @@ int chirp_job_wait (chirp_jobid_t id, const char *subject, INT64_T timeout, buff
 	int rc;
 	int i, n;
 	chirp_jobid_t jobs[1024];
+	json_value *J;
 
 	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
@@ -821,6 +822,7 @@ restart:
 	stmt = NULL;
 	rc = 0;
 	n = 0;
+	J = NULL;
 
 	do {
 		const char *current = Wait;
@@ -862,26 +864,33 @@ restart:
 			usleep(5000);
 	} while (time(NULL) <= timeout && n == 0);
 
-	buffer_putliteral(B, "[");
-	for (i = 0; i < n; i++) {
-		char buf[64];
-		int k = snprintf(buf, sizeof(buf), "[%" PRICHIRP_JOBID_T "]", jobs[i]);
-		assert(k > 0 && k < (int)sizeof(buf));
-		json_value *J = json_parse(buf, k);
-		assert(J);
-		if (i == 0) {
-			CATCH(chirp_job_status(J, subject, B));
-		} else {
-			buffer_putliteral(B, ",");
-			CATCH(chirp_job_status(J, subject, B));
+	{
+		int first = 1;
+		buffer_t Bstatus;
+		buffer_init(&Bstatus);
+		buffer_abortonfailure(&Bstatus, 1);
+
+		buffer_putliteral(&Bstatus, "[");
+		for (i = 0; i < n; i++) {
+			if (first)
+				buffer_putfstring(&Bstatus, "%" PRICHIRP_JOBID_T, jobs[i]);
+			else
+				buffer_putfstring(&Bstatus, ",%" PRICHIRP_JOBID_T, jobs[i]);
+			first = 0;
 		}
-		json_value_free(J);
+		buffer_putliteral(&Bstatus, "]");
+
+		J = json_parse(buffer_tostring(&Bstatus, NULL), buffer_pos(&Bstatus));
+		assert(J);
+		buffer_free(&Bstatus);
+		CATCH(chirp_job_status(J, subject, B));
 	}
-	buffer_putliteral(B, "]");
 
 	rc = 0;
 	goto out;
 out:
+	if (J)
+		json_value_free(J);
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
