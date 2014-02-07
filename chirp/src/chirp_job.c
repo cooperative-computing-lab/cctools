@@ -300,8 +300,8 @@ int chirp_job_create (chirp_jobid_t *id, json_value *J, const char *subject)
 		"BEGIN TRANSACTION;"
 		"INSERT OR ROLLBACK INTO Jobs (subject, executable, url) VALUES ( ?, ?, ? );"
 		"INSERT OR ROLLBACK INTO JobArguments (id, n, arg) VALUES ( ?, ?, ? );"
-		"INSERT OR ROLLBACK INTO JobEnvironment (id, name, value) VALUES ( ?, ?, ? );"
-		"INSERT OR ROLLBACK INTO JobFiles (id, serv_path, task_path, type, binding) VALUES ( ?, ?, ?, ?, ? );"
+		"INSERT OR REPLACE INTO JobEnvironment (id, name, value) VALUES ( ?, ?, ? );"
+		"INSERT OR REPLACE INTO JobFiles (id, serv_path, task_path, type, binding) VALUES ( ?, ?, ?, ?, ? );"
 		"END TRANSACTION;";
 
 	time_t timeout = time(NULL)+3;
