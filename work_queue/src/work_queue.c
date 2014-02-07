@@ -112,7 +112,7 @@ struct work_queue {
 	struct hash_table *worker_table;
 	struct itable  *worker_task_map;
 
-	struct list    *workers_with_available_results;
+	struct hash_table *workers_with_available_results;
 
 	int64_t total_tasks_submitted;
 	int64_t total_tasks_complete;
@@ -365,7 +365,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status")) {
 		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) { 
-		list_push_tail(q->workers_with_available_results, w);
+		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
 		result = 0;
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
@@ -561,6 +561,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	cleanup_worker(q, w);
 
 	hash_table_remove(q->worker_table, w->hashkey);
+	hash_table_remove(q->workers_with_available_results, w->hashkey);
 	
 	log_worker_stats(q);
 	
@@ -2974,7 +2975,7 @@ struct work_queue *work_queue_create(int port)
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
 	
-	q->workers_with_available_results = list_create();
+	q->workers_with_available_results = hash_table_create(0, 0);
 	
 	// The poll table is initially null, and will be created
 	// (and resized) as needed by build_poll_table.
@@ -3186,7 +3187,7 @@ void work_queue_delete(struct work_queue *q)
 		itable_delete(q->finished_tasks);
 		list_delete(q->complete_list);
 
-		list_delete(q->workers_with_available_results);
+		hash_table_delete(q->workers_with_available_results);
 		
 		list_free(q->task_reports);
 		list_delete(q->task_reports);
@@ -3371,10 +3372,13 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 		}
 
-		while(list_size(q->workers_with_available_results) > 0)
-		{
-			struct work_queue_worker *w = list_pop_head(q->workers_with_available_results);
-			process_available_results(q, w, -1);
+		if(hash_table_size(q->workers_with_available_results) > 0) {
+			char *key;
+			struct work_queue_worker *w;
+			hash_table_firstkey(q->workers_with_available_results);
+			while(hash_table_nextkey(q->workers_with_available_results,&key,(void**)&w)) {
+				process_available_results(q, w, -1);
+			}	
 		}
 		
 		if(q->workers_to_wait <= 0) {	
@@ -3550,10 +3554,12 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 		q->total_tasks_cancelled++;	
 	}
 
-	while(list_size(q->workers_with_available_results)) {
-		list_pop_head(q->workers_with_available_results);
-		q->total_tasks_cancelled++;	
-	}
+
+	hash_table_firstkey(q->workers_with_available_results);
+	while(hash_table_nextkey(q->workers_with_available_results, &key, (void **) &w)) {
+		hash_table_remove(q->workers_with_available_results, key);
+		hash_table_firstkey(q->workers_with_available_results);
+	}	
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
