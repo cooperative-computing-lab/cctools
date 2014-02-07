@@ -40,13 +40,16 @@ int main(int argc, char *argv[])
 	   the location of gzip in 'gzip_path', which is usually found in /bin/gzip
 	   or /usr/bin/gzip. We use the 'access' function (from unistd.h standard C
 	   library), and test the path for execution (X_OK) and reading (R_OK)
-	   permissions.
+	   permissions. 
 	 */
 	gzip_path = "/bin/gzip";
 	if(access(gzip_path, X_OK | R_OK) != 0) {
-		fprintf(stderr, "gzip was not found at %s. Please modify the gzip_path variable accordingly. To determine the location of gzip, from the terminal type: which gzip (usual locations are /bin/gzip and /usr/bin/gzip)", gzip_path);
+		gzip_path = "/usr/bin/gzip";
+		if(access(gzip_path, X_OK | R_OK) != 0) {
+			fprintf(stderr, "gzip was not found. Please modify the gzip_path variable accordingly. To determine the location of gzip, from the terminal type: which gzip (usual locations are /bin/gzip and /usr/bin/gzip)\n");
+			exit(1);
+		}
 	}
-
 
 	/* We create the tasks queue using the default port. If this port is
 	 * already been used by another program, you can try setting port = 0 to
@@ -68,7 +71,7 @@ int main(int argc, char *argv[])
 
 		/* Note that we write ./gzip here, to guarantee that the gzip version
 		 * we are using is the one being sent to the workers. */
-		sprintf(command, "./gzipo < %s > %s", infile, outfile);
+		sprintf(command, "./gzip < %s > %s", infile, outfile);
 
 		t = work_queue_task_create(command);
 
@@ -94,6 +97,8 @@ int main(int argc, char *argv[])
 
 	while(!work_queue_empty(q)) {
 
+		/* Application specific code goes here ... */
+
 		/* work_queue_wait waits at most 5 seconds for some task to return. */
 		t = work_queue_wait(q, 5);
 
@@ -101,11 +106,13 @@ int main(int argc, char *argv[])
 			printf("task (id# %d) complete: %s (return code %d)\n", t->taskid, t->command_line, t->return_status);
 			if(t->return_status != 0)
 			{
-				/* The task failed. Error handling (e.g. resubmit with new parameters) here. */
+				/* The task failed. Error handling (e.g., resubmit with new parameters) here. */
 			}
 
 			work_queue_task_delete(t);
 		}
+
+		/* Application specific code goes here ... */
 	}
 
 	printf("all tasks complete!\n");
