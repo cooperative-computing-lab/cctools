@@ -12,11 +12,11 @@
 #include "copy_stream.h"
 #include "create_dir.h"
 #include "debug.h"
-#include "delete_dir.h"
 #include "domain_name.h"
 #include "fd.h"
 #include "path.h"
 #include "string_array.h"
+#include "unlink_recursive.h"
 #include "xxmalloc.h"
 
 #include <unistd.h>
@@ -109,9 +109,10 @@ static int sandbox_create (char sandbox[PATH_MAX])
 static int sandbox_delete (const char *sandbox)
 {
 	int rc;
-	CATCHCODE(delete_dir(sandbox), -1);
+	CATCHCODE(unlink_recursive(sandbox), -1);
 
 	rc = 0;
+	goto out;
 out:
 	return rc;
 }
