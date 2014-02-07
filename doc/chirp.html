@@ -1011,10 +1011,10 @@ management (<tt>-F</tt>) when using HDFS as a backend.</p>
 
 <h2 id="jobs">Advanced Topic: Job Execution on Chirp<a class="sectionlink" href="#jobs" title="Link to this section.">&#x21d7;</a></h2>
 
-<p>As of version 4.1.0, Chirp supports job execution. Jobs run using
+<p>As of version 4.2.0, Chirp supports job execution. Jobs run using
 executables and files located on the Chirp server. Each job descriptiong sent
-to the Chirp server provides a <i>binding</i> of each file the job requires
-to a local namespace (a sandbox).</p>
+to the Chirp server provides a <i>binding</i> of each file the job requires to
+a local namespace (a sandbox).</p>
 
 <p>To support the new job interface, Chirp has the following new RPC:</p>
 
@@ -1153,9 +1153,9 @@ connection.</p>
 <p>To commit a job, pass a JSON-encoded array of job identifiers to the
 <tt>job_commit</tt> RPC. For example:</p>
 
-<code><span class="prompt">$ </span>chirp host:port job_commit '[0, 1]'</code>
+<code><span class="prompt">$ </span>chirp host:port job_commit '[1, 2]'</code>
 
-<p>will commit jobs <tt>0</tt> and <tt>1</tt>.
+<p>will commit jobs <tt>1</tt> and <tt>2</tt>.
 
 <p>Once a job is committed, the Chirp server is free to schedule and execute
 the job. You may query the <a href="#jobs.status">status</a> of the job to see
@@ -1172,7 +1172,7 @@ information is JSON-encoded and holds all job metadata.</p>
 
 <h4 id="jobs.status.e1">Example 1 -- Status of <a href="#jobs.create.e1">Create Example 1</a><a class="sectionlink" href="#jobs.status.e1" title="Link to this section.">&#x21d7;</a></h4>
 
-<code><span class="prompt">$ </span>chirp host:port job_status '[0]'
+<code><span class="prompt">$ </span>chirp host:port job_status '[1]'
 [
   {
     "id":1,
@@ -1212,8 +1212,8 @@ information is JSON-encoded and holds all job metadata.</p>
 
 <p>After we commit the job, we get this status:</p>
 
-<code><span class="prompt">$ </span>chirp host:port job_commit '[0]'
-<span class="prompt">$ </span>chirp host:port job_status '[0]'
+<code><span class="prompt">$ </span>chirp host:port job_commit '[1]'
+<span class="prompt">$ </span>chirp host:port job_status '[1]'
 [
   {
     "id":1,
@@ -1254,7 +1254,7 @@ information is JSON-encoded and holds all job metadata.</p>
 
 <p>After a short time, we can again get the job's status to see that it failed:</p>
 
-<code><span class="prompt">$ </span>chirp host:port job_status '[0]'
+<code><span class="prompt">$ </span>chirp host:port job_status '[1]'
 [
   {
     "id":1,
@@ -1408,7 +1408,7 @@ discussed next.</p>
 <p>Similar in intent to <tt>job_commit</tt>, <tt>job_reap</tt> notifies the
 Chirp server that your application has logged the termination of the job. This
 allows the Chirp server to reap the job. The side-effect of this operation is
-future calls to <tt>job_wait</tt> will not include this job.</p>
+future calls to <tt>job_wait</tt> will not include the reaped jobs.</p>
 
 
 <h3 id="jobs.kill">Killing a Job<a class="sectionlink" href="#jobs.kill" title="Link to this section.">&#x21d7;</a></h3>
