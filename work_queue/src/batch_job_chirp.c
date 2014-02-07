@@ -61,10 +61,10 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 
 	buffer_putliteral(&B, "\"executable\":\"/bin/sh\",");
 
-	buffer_putfstring(&B, "\"arguments\":[\"sh\", \"-c\",\"{\n%s", cmd);
+	buffer_putfstring(&B, "\"arguments\":[\"sh\",\"-c\",\"{\\n%s", cmd);
 	if (args)
 		buffer_putfstring(&B, " %s", args);
-	buffer_putliteral(&B, "\n}");
+	buffer_putliteral(&B, "\\n}");
 	if (infile)
 		buffer_putfstring(&B, " <%s", infile);
 	if (outfile)
