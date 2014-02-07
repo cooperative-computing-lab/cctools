@@ -145,8 +145,8 @@ static batch_job_id_t batch_job_chirp_wait (struct batch_queue *q, struct batch_
 
 		debug(D_DEBUG, "status = `%s'", status);
 		assert(strlen(status) == (size_t)result);
-		json_value *J = json_parse(status, strlen(status));
-		assert(jistype(J, json_array));
+		json_value *J = json_parse(status, result);
+		assert(J && jistype(J, json_array));
 
 		for (i = 0; i < J->u.array.length; i++) {
 			json_value *job = J->u.array.values[i];
