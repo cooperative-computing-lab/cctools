@@ -26,7 +26,7 @@
 
 #define jistype(o,t) ((o)->type == (t))
 
-#define STOPTIME  (time(NULL)+5)
+#define STOPTIME  (time(NULL)+30)
 
 static const int BATCH_JOB_CHIRP = 1;
 
@@ -136,8 +136,9 @@ static batch_job_id_t batch_job_chirp_wait (struct batch_queue *q, struct batch_
 	char *status;
 	time_t timeout = stoptime-time(NULL);
 
-	assert(timeout >= 0);
-	int result = chirp_reli_job_wait(gethost(q), 0, timeout, &status, stoptime);
+	if (timeout < 0)
+		timeout = 0;
+	int result = chirp_reli_job_wait(gethost(q), 0, timeout, &status, STOPTIME);
 
 	if (result > 0) {
 		unsigned i;
