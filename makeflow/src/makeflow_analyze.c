@@ -221,17 +221,11 @@ static void show_help_analyze(const char *cmd)
 
 int main(int argc, char *argv[])
 {
-	typedef enum {MAKEFLOW_RUN, MAKEFLOW_VIZ, MAKEFLOW_ANALYZE} runtime_mode;
-
 	int c;
 	random_init();
 	set_makeflow_exe(argv[0]);
 	debug_config(get_makeflow_exe());
 	int display_mode = 0;
-
-	runtime_mode modus_operandi = MAKEFLOW_RUN;
-	if(!strncmp("makeflow_viz", path_basename(get_makeflow_exe()), 13)) modus_operandi = MAKEFLOW_VIZ;
-	if(!strncmp("makeflow_analyze", path_basename(get_makeflow_exe()), 13)) modus_operandi = MAKEFLOW_ANALYZE;
 
 	cctools_version_debug(D_DEBUG, get_makeflow_exe());
 	const char *dagfile;
