@@ -640,12 +640,15 @@ int chirp_job_status (json_value *J, const char *subject, buffer_t *B)
 	const char *status;
 	int rc;
 	int i;
+	size_t start = buffer_pos(B);
 
 	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
 	jchecktype(J, json_array);
 
 restart:
+	buffer_rewind(B, start); /* a failed job_status may add to buffer */
+
 	sqlcatch(sqlite3_prepare_v2(db, Status, strlen(Status)+1, &stmt, &current));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
