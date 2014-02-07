@@ -42,8 +42,31 @@ int   chirp_job_time_limit = 3600; /* 1 hour */
 #define CATCH(expr) \
 	do {\
 		rc = (expr);\
-		if (rc) goto out;\
+		if (rc) {\
+			if (rc == -1) {\
+				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(errno));\
+				rc = errno;\
+			} else {\
+				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(rc));\
+			}\
+			goto out;\
+		}\
 	} while (0)
+
+#define CATCHCODE(expr, code) \
+	do {\
+		rc = (expr);\
+		if (rc == (code)) {\
+			if (rc == -1) {\
+				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(errno));\
+				rc = errno;\
+			} else {\
+				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(rc));\
+			}\
+			goto out;\
+		}\
+	} while (0)
+
 
 
 #define IMMUTABLE(T) \
@@ -430,7 +453,6 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
-		debug(D_DEBUG, "the database is busy, restarting create");
 		usleep(2000);
 		goto restart;
 	}
@@ -499,7 +521,6 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
-		debug(D_DEBUG, "the database is busy, restarting commit");
 		usleep(2000);
 		goto restart;
 	}
@@ -570,7 +591,6 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
-		debug(D_DEBUG, "the database is busy, restarting kill");
 		usleep(2000);
 		goto restart;
 	}
@@ -778,7 +798,6 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
-		debug(D_DEBUG, "the database is busy, restarting status");
 		usleep(2000);
 		goto restart;
 	}
@@ -894,7 +913,6 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
-		debug(D_DEBUG, "the database is busy, restarting wait");
 		usleep(2000);
 		goto restart;
 	}
@@ -964,7 +982,6 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
-		debug(D_DEBUG, "the database is busy, restarting reap");
 		usleep(2000);
 		goto restart;
 	}

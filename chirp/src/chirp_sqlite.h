@@ -14,14 +14,17 @@ do {\
 	char *errmsg;\
 	rc = sqlite3_exec((db), (sql), NULL, NULL, &errmsg);\
 	if (rc) {\
-		debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s': %s", __FILE__, __LINE__, rc, sqlite3_errstr(rc), errmsg);\
-		sqlite3_free(errmsg);\
-		if (rc == SQLITE_CONSTRAINT)\
-			rc = EINVAL;\
-		else if (rc == SQLITE_BUSY)\
+		if (rc == SQLITE_BUSY) {\
 			rc = EAGAIN;\
-		else\
-			rc = EIO;\
+		} else {\
+			debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s': %s", __FILE__, __LINE__, rc, sqlite3_errstr(rc), errmsg);\
+			if (rc == SQLITE_CONSTRAINT) {\
+				rc = EINVAL;\
+			} else {\
+				rc = EIO;\
+			}\
+		}\
+		sqlite3_free(errmsg);\
 		goto out;\
 	}\
 } while (0)
@@ -30,13 +33,16 @@ do {\
 do {\
 	rc = S;\
 	if (rc) {\
-		debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s'", __FILE__, __LINE__, rc, sqlite3_errstr(rc));\
-		if (rc == SQLITE_CONSTRAINT)\
-			rc = EINVAL;\
-		else if (rc == SQLITE_BUSY)\
+		if (rc == SQLITE_BUSY) {\
 			rc = EAGAIN;\
-		else\
-			rc = EIO;\
+		} else {\
+			debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s'", __FILE__, __LINE__, rc, sqlite3_errstr(rc));\
+			if (rc == SQLITE_CONSTRAINT) {\
+				rc = EINVAL;\
+			} else {\
+				rc = EIO;\
+			}\
+		}\
 		sqlite3_finalize(stmt);\
 		stmt = NULL;\
 		goto out;\
@@ -47,13 +53,16 @@ do {\
 do {\
 	rc = S;\
 	if (rc != code) {\
-		debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s'", __FILE__, __LINE__, rc, sqlite3_errstr(rc));\
-		if (rc == SQLITE_CONSTRAINT)\
-			rc = EINVAL;\
-		else if (rc == SQLITE_BUSY)\
+		if (rc == SQLITE_BUSY) {\
 			rc = EAGAIN;\
-		else\
-			rc = EIO;\
+		} else {\
+			debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s'", __FILE__, __LINE__, rc, sqlite3_errstr(rc));\
+			if (rc == SQLITE_CONSTRAINT) {\
+				rc = EINVAL;\
+			} else {\
+				rc = EIO;\
+			}\
+		}\
 		sqlite3_finalize(stmt);\
 		stmt = NULL;\
 		goto out;\
@@ -66,7 +75,11 @@ do {\
 		char *errmsg;\
 		int erc = sqlite3_exec((db), "ROLLBACK TRANSACTION;", NULL, NULL, &errmsg);\
 		if (erc) {\
-			debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s': %s", __FILE__, __LINE__, erc, sqlite3_errstr(erc), errmsg);\
+			if (erc == SQLITE_ERROR /* cannot rollback because no transaction is active */) {\
+				; /* do nothing */\
+			} else {\
+				debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s': %s", __FILE__, __LINE__, erc, sqlite3_errstr(erc), errmsg);\
+			}\
 			sqlite3_free(errmsg);\
 		}\
 	}\
