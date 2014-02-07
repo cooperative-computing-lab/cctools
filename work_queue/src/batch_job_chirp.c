@@ -39,13 +39,13 @@ static const char *gethost (struct batch_queue *q)
 	return host;
 }
 
-static const char *getworkingdir (struct batch_queue *q)
+static const char *getroot (struct batch_queue *q)
 {
-	const char *workingdir = hash_table_lookup(q->options, "working-dir");
-	if (workingdir == NULL) {
-		workingdir = "/";
+	const char *root = hash_table_lookup(q->options, "root");
+	if (root == NULL) {
+		root = "/";
 	}
-	return workingdir;
+	return root;
 }
 
 static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
@@ -75,17 +75,17 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 
 	buffer_putliteral(&B, "\"files\":[");
 	if (infile)
-		buffer_putfstring(&B, "\"{\"task_path\": \"./%s\", \"serv_path\": \"%s/%s\", \"type\": \"INPUT\"},", infile, getworkingdir(q), infile);
+		buffer_putfstring(&B, "\"{\"task_path\":\"./%s\",\"serv_path\":\"%s/%s\",\"type\":\"INPUT\"},", infile, getroot(q), infile);
 	if (outfile)
-		buffer_putfstring(&B, "\"{\"task_path\": \"./%s\", \"serv_path\": \"%s/%s\", \"type\": \"OUTPUT\"},", outfile, getworkingdir(q), outfile);
+		buffer_putfstring(&B, "\"{\"task_path\":\"./%s\",\"serv_path\":\"%s/%s\",\"type\":\"OUTPUT\"},", outfile, getroot(q), outfile);
 	if (errfile)
-		buffer_putfstring(&B, "\"{\"task_path\": \"./%s\", \"serv_path\": \"%s/%s\", \"type\": \"OUTPUT\"},", errfile, getworkingdir(q), errfile);
+		buffer_putfstring(&B, "\"{\"task_path\":\"./%s\",\"serv_path\":\"%s/%s\",\"type\":\"OUTPUT\"},", errfile, getroot(q), errfile);
 	if (extra_input_files) {
 		char *file;
 		char *list = xxstrdup(extra_input_files);
 		while ((file = strsep(&list, ","))) {
 			if (strlen(file)) {
-				buffer_putfstring(&B, "{\"task_path\": \"%s\", \"serv_path\": \"%s/%s\", \"type\": \"INPUT\"},", file, getworkingdir(q), file);
+				buffer_putfstring(&B, "{\"task_path\":\"%s\",\"serv_path\":\"%s/%s\",\"type\":\"INPUT\"},", file, getroot(q), file);
 			}
 		}
 		free(list);
@@ -95,7 +95,7 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 		char *list = xxstrdup(extra_output_files);
 		while ((file = strsep(&list, ","))) {
 			if (strlen(file)) {
-				buffer_putfstring(&B, "{\"task_path\": \"%s\", \"serv_path\": \"%s/%s\", \"type\": \"OUTPUT\"},", file, getworkingdir(q), file);
+				buffer_putfstring(&B, "{\"task_path\":\"%s\",\"serv_path\":\"%s/%s\",\"type\":\"OUTPUT\"},", file, getroot(q), file);
 			}
 		}
 		free(list);
@@ -250,15 +250,13 @@ static void batch_queue_chirp_option_update (struct batch_queue *q, const char *
 		if (string_prefix_is(value, "chirp://")) {
 			char *hostportroot = xxstrdup(value+strlen("chirp://"));
 			char *root = strchr(hostportroot, '/');
-			free(hash_table_remove(q->options, "host"));
-			free(hash_table_remove(q->options, "working-dir")); /* this is value */
 			if (root) {
-				hash_table_insert(q->options, "working-dir", xxstrdup(root));
+				batch_queue_set_option(q, "root", root);
 				*root = '\0'; /* remove root */
-				hash_table_insert(q->options, "host", xxstrdup(hostportroot));
+				batch_queue_set_option(q, "host", hostportroot);
 			} else {
-				hash_table_insert(q->options, "working-dir", xxstrdup("/"));
-				hash_table_insert(q->options, "host", xxstrdup(hostportroot));
+				batch_queue_set_option(q, "root", "/");
+				batch_queue_set_option(q, "host", hostportroot);
 			}
 			free(hostportroot);
 		} else {
@@ -276,24 +274,28 @@ int batch_fs_chirp_chdir (struct batch_queue *q, const char *path)
 
 int batch_fs_chirp_getcwd (struct batch_queue *q, char *buf, size_t size)
 {
-	strncpy(buf, getworkingdir(q), size);
+	strncpy(buf, getroot(q), size);
 	return 0;
 }
 
 int batch_fs_chirp_mkdir (struct batch_queue *q, const char *path, mode_t mode, int recursive)
 {
+	char resolved[CHIRP_PATH_MAX];
+	snprintf(resolved, sizeof(resolved), "%s/%s", getroot(q), path);
 	if (recursive)
-		return chirp_reli_mkdir_recursive(gethost(q), path, mode, STOPTIME);
+		return chirp_reli_mkdir_recursive(gethost(q), resolved, mode, STOPTIME);
 	else
-		return chirp_reli_mkdir(gethost(q), path, mode, STOPTIME);
+		return chirp_reli_mkdir(gethost(q), resolved, mode, STOPTIME);
 }
 
 int batch_fs_chirp_putfile (struct batch_queue *q, const char *lpath, const char *rpath)
 {
+	char resolved[CHIRP_PATH_MAX];
 	struct stat buf;
 	FILE *file = fopen(lpath, "r");
+	snprintf(resolved, sizeof(resolved), "%s/%s", getroot(q), rpath);
 	if (file && fstat(fileno(file), &buf) == 0) {
-		int n = chirp_reli_putfile(gethost(q), rpath, file, buf.st_mode, buf.st_size, STOPTIME);
+		int n = chirp_reli_putfile(gethost(q), resolved, file, buf.st_mode, buf.st_size, STOPTIME);
 		fclose(file);
 		return n;
 	}
@@ -318,7 +320,9 @@ int batch_fs_chirp_putfile (struct batch_queue *q, const char *lpath, const char
 int batch_fs_chirp_stat (struct batch_queue *q, const char *path, struct stat *buf)
 {
 	struct chirp_stat cbuf;
-	int rc = chirp_reli_stat(gethost(q), path, &cbuf, STOPTIME);
+	char resolved[CHIRP_PATH_MAX];
+	snprintf(resolved, sizeof(resolved), "%s/%s", getroot(q), path);
+	int rc = chirp_reli_stat(gethost(q), resolved, &cbuf, STOPTIME);
 	if (rc >= 0) {
 		COPY_STATC(cbuf, *buf);
 	}
@@ -327,7 +331,9 @@ int batch_fs_chirp_stat (struct batch_queue *q, const char *path, struct stat *b
 
 int batch_fs_chirp_unlink (struct batch_queue *q, const char *path)
 {
-	return chirp_reli_rmall(gethost(q), path, STOPTIME);
+	char resolved[CHIRP_PATH_MAX];
+	snprintf(resolved, sizeof(resolved), "%s/%s", getroot(q), path);
+	return chirp_reli_rmall(gethost(q), resolved, STOPTIME);
 }
 
 const struct batch_queue_module batch_queue_chirp = {
