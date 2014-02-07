@@ -10,13 +10,13 @@ prepare() {
         exit 1
     fi
     mkdir "$out_dir"
-    cd ../../src/; make
+
     exit 0
 }
 
 run() {
     cd linker
-    ../../src/makeflow -b "$out_dir" simple.mf
+    ../../src/makeflow_analyze -b "$out_dir" simple.mf
 
     if [ ! -f "$out_dir"/simple.mf ]; then
         exit 1

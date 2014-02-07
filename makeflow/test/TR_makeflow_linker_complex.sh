@@ -14,13 +14,13 @@ prepare() {
   mkdir -p /tmp/makeflow_test_complex/a/b/x
   touch /tmp/makeflow_test_complex/a/b/x/y
   chmod 777 /tmp/makeflow_test_complex/a/b/x/y
-  cd ../src/; make
+
   exit $?
 }
 
 run() {
   cd linker
-  ../../src/makeflow -b "$out_dir" complex.mf &> tmp
+  ../../src/makeflow_analyze -b "$out_dir" complex.mf &> tmp
   cat tmp | awk '{print $2}' | sort > tmp2
 
   `diff tmp2 expected/complex.mf`
