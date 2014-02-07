@@ -33,13 +33,10 @@ execution engine.
 
 SUBSECTION(Commands)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-b, bundle-dir, directory)Create portable bundle of workflow.
 OPTION_ITEM(`-c, --clean')Clean up: remove logfile and all targets.
 OPTION_TRIPLET(-f, summary-log, file)Write summary of workflow to file.
 OPTION_ITEM(`-h, --help')Show this help screen.
-OPTION_ITEM(`-I, --show-input')Show input files.
 OPTION_TRIPLET(-m, email, email)Email summary of workflow to address.
-OPTION_ITEM(`-O, --show-output')Show output files.
 OPTION_ITEM(`-v, --version')Show version string.
 OPTIONS_END
 
@@ -90,27 +87,9 @@ OPTIONS_END
 SUBSECTION(Other Options)
 OPTIONS_BEGIN
 OPTION_ITEM(`-A, --disable-afs-check')Disable the check for AFS. (experts only)
-OPTION_ITEM(`-e, --export-as-dax')Export the DAG in DAX format. (Pegasus)
-OPTION_ITEM(`-k, --syntax-check')Syntax check.
 OPTION_ITEM(`-K, --preserve-links')Preserve (i.e., do not clean) intermediate symbolic links.
 OPTION_ITEM(`-z, --zero-length-error')Force failure on zero-length output files.
 OPTIONS_END
-
-SUBSECTION(Display Options)
-OPTIONS_BEGIN
-OPTION_TRIPLET(-D, display, opt)Display the Makefile as a Dot graph or a PPM completion graph. <opt> is one of:
-   dot      Standard Dot graph
-   file     Display the file as interpreted by Makeflow
-   ppm      Display a completion graph in PPM format
-OPTION_ITEM(`--dot-merge-similar')Condense similar boxes
-OPTION_ITEM(`--dot-proportional')Change the size of the boxes proportional to file size
-OPTION_ITEM(` ')The following options for ppm generation are mutually exclusive:
-OPTION_PAIR(--ppm-highlight-row, row)Highlight row <row> in completion grap
-OPTION_PAIR(--ppm-highlight-file,file)Highlight node that creates file <file> in completion graph
-OPTION_PAIR(--ppm-highlight-executable,exe)Highlight executable <exe> in completion grap
-OPTION_ITEM(`--ppm-show-levels')Display different levels of depth in completion graph
-OPTIONS_END
-
 
 SECTION(ENVIRONMENT VARIABLES)
 
@@ -175,4 +154,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_MAKEFLOW
 
 FOOTER
-

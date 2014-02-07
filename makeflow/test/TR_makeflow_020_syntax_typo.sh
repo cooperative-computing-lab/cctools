@@ -4,14 +4,14 @@
 
 prepare()
 {
-    clean $@
+	exit 0
 }
 
 run()
 {
-    cd syntax; 
+    cd syntax;
 
-    if ! ../../src/makeflow -k typo.makeflow 
+    if ! ../../src/makeflow_analyze -k typo.makeflow
     then
     	exit 1
     fi

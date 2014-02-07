@@ -8,13 +8,13 @@ prepare() {
     if [ -d "$out_dir" ]; then
         exit 1
     fi
-    cd ../src/; make
+
     exit 0
 }
 
 run() {
     cd linker
-    out=`../../src/makeflow -b "$out_dir" some_dependencies.mf | grep simple.mf`
+    out=`../../src/makeflow_analyze -b "$out_dir" some_dependencies.mf | grep simple.mf`
     if [ -z "$out" ]; then
         exit 1
     fi

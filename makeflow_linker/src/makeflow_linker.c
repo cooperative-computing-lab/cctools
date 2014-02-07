@@ -24,7 +24,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 
-#define MAKEFLOW_PATH "makeflow"
+#define MAKEFLOW_PATH "makeflow_analyze"
 #define MAKEFLOW_BUNDLE_FLAG "-b"
 
 typedef enum {UNKNOWN, EXE, NAMED, MAKEFLOW, PERL, PYTHON} file_type;
@@ -198,6 +198,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 			case NAMED:
 				exit(0);
 			case MAKEFLOW:
+				args[0] = MAKEFLOW_PATH;
 				args[1] = MAKEFLOW_BUNDLE_FLAG;
 				args[2] = workspace;
 				args[3] = dep->original_name;

@@ -8,13 +8,12 @@ prepare() {
     if [ -d "$out_dir" ]; then
         exit 1
     fi
-    cd ../src/; make
     exit 0
 }
 
 run() {
     cd linker
-    `../../src/makeflow -b "$out_dir" absolute.mf &> tmp`
+    `../../src/makeflow_analyze -b "$out_dir" absolute.mf &> tmp`
     `diff tmp expected/absolute.mf`
     exit $?
 }
