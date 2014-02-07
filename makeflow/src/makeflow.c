@@ -607,7 +607,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	// Below are a bunch of situations when a node has to be rerun.
 
 	// If a job was submitted to Condor, then just reconnect to it.
-	if(n->state == DAG_NODE_STATE_RUNNING && !n->local_job && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
+	if(n->state == DAG_NODE_STATE_RUNNING && !(n->local_job && local_queue) && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
 		// Reconnect the Condor jobs
 		fprintf(stderr, "rule still running: %s\n", n->command);
 		itable_insert(d->remote_job_table, n->jobid, n);
@@ -675,7 +675,7 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 
 	// Remove running batch jobs
 	if(n->state == DAG_NODE_STATE_RUNNING) {
-		if(n->local_job) {
+		if(n->local_job && local_queue) {
 			batch_job_remove(local_queue, n->jobid);
 			if(itable_remove(d->local_job_table, n->jobid)) {
 				d->local_jobs_running--;
@@ -1142,7 +1142,7 @@ void dag_prepare_nested_jobs(struct dag *d)
 		dag_nested_width = MIN(dag_nested_width, d->local_jobs_max);
 		struct dag_node *n;
 		for(n = d->nodes; n; n = n->next) {
-			if(n->nested_job && (n->local_job || batch_queue_type == BATCH_QUEUE_TYPE_LOCAL)) {
+			if(n->nested_job && ((n->local_job && local_queue) || batch_queue_type == BATCH_QUEUE_TYPE_LOCAL)) {
 				char *command = xxmalloc(strlen(n->command) + 20);
 				sprintf(command, "%s -j %d", n->command, d->local_jobs_max / dag_nested_width);
 				free((char *) n->command);
@@ -1808,7 +1808,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	int len = 0, len_temp;
 	char *tmp;
 
-	if(n->local_job) {
+	if(n->local_job && local_queue) {
 		thequeue = local_queue;
 	} else {
 		thequeue = remote_queue;
@@ -1951,7 +1951,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 	if(n->jobid >= 0) {
 		dag_node_state_change(d, n, DAG_NODE_STATE_RUNNING);
-		if(n->local_job) {
+		if(n->local_job && local_queue) {
 			itable_insert(d->local_job_table, n->jobid, n);
 			d->local_jobs_running++;
 		} else {
@@ -1974,7 +1974,7 @@ int dag_node_ready(struct dag *d, struct dag_node *n)
 	if(n->state != DAG_NODE_STATE_WAITING)
 		return 0;
 
-	if(n->local_job) {
+	if(n->local_job && local_queue) {
 		if(d->local_jobs_running >= d->local_jobs_max)
 			return 0;
 	} else {
@@ -2017,7 +2017,7 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
 
-	if(n->local_job) {
+	if(n->local_job && local_queue) {
 		d->local_jobs_running--;
 	} else {
 		d->remote_jobs_running--;
@@ -3108,7 +3108,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP || batch_queue_type == BATCH_QUEUE_TYPE_HADOOP) {
-		local_queue = remote_queue; /* all local jobs must be run on Chirp */
+		local_queue = 0; /* all local jobs must be run on Chirp */
 		if(dag_gc_method == DAG_GC_ON_DEMAND /* NYI */ ) {
 			dag_gc_method = DAG_GC_REF_COUNT;
 		}
@@ -3189,7 +3189,7 @@ int main(int argc, char *argv[])
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
 
-	if(local_queue != remote_queue)
+	if(local_queue)
 		batch_queue_delete(local_queue);
 	batch_queue_delete(remote_queue);
 
