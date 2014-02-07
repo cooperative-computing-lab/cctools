@@ -114,7 +114,7 @@ int buffer_putvfstring(buffer_t * b, const char *format, va_list va)
 		if (rc == -1) return -1;
 	} else {
 		b->end += rc;
-		return 0;
+		return rc;
 	}
 
 	va_copy(va2, va);
@@ -123,7 +123,7 @@ int buffer_putvfstring(buffer_t * b, const char *format, va_list va)
 	b->end += rc;
 	va_end(va2);
 
-	return 0;
+	return rc;
 }
 
 int buffer_putfstring(buffer_t * b, const char *format, ...)
