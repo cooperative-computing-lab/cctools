@@ -826,7 +826,7 @@ int chirp_job_wait (chirp_jobid_t id, const char *subject, INT64_T timeout, buff
 	int rc;
 	int i, n;
 	chirp_jobid_t jobs[1024];
-	json_value *J;
+	json_value *J=NULL;
 
 	if (!chirp_job_enabled) return ENOSYS;
 	CATCH(db_get(&db));
