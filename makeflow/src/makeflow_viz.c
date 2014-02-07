@@ -91,8 +91,6 @@ static void show_help_viz(const char *cmd)
 
 int main(int argc, char *argv[])
 {
-	typedef enum {MAKEFLOW_RUN, MAKEFLOW_VIZ, MAKEFLOW_ANALYZE} runtime_mode;
-
 	int c;
 	random_init();
 	set_makeflow_exe(argv[0]);
