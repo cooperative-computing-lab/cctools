@@ -128,9 +128,6 @@ static int monitor_interval = 1;	// in seconds
 static char *monitor_log_format = NULL;
 static char *monitor_log_dir = NULL;
 
-static char *wq_password = 0;
-int wq_wait_queue_size = 0;
-
 int verbose_parsing = 0;
 
 void dag_export_variables(struct dag *d, struct dag_node *n);
@@ -1448,10 +1445,11 @@ int main(int argc, char *argv[])
 	timestamp_t runtime = 0;
 	int skip_afs_check = 0;
 	timestamp_t time_completed = 0;
-	int work_queue_estimate_capacity_on = 1; // capacity estimation is on by default
-	int work_queue_keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
-	int work_queue_keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
-	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+	const char *work_queue_keepalive_interval = NULL;
+	const char *work_queue_keepalive_timeout = NULL;
+	const char *work_queue_master_mode = "standalone";
+	const char *work_queue_port_file = NULL;
+	const char *priority = NULL;
 	char *work_queue_password = NULL;
 	char *wq_wait_queue_size = 0;
 	int did_explicit_auth = 0;
@@ -1468,10 +1466,12 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
+
 	s = getenv("WORK_QUEUE_MASTER_MODE");
 	if(s) {
-		master_mode = s;
+		work_queue_master_mode = s;
 	}
+
 	s = getenv("WORK_QUEUE_NAME");
 	if(s) {
 		project = xxstrdup(s);
@@ -1531,11 +1531,11 @@ int main(int argc, char *argv[])
 	};
 
 	const char *option_string_run = "aAB:cC:d:EfF:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:";
-	       //                         "aAB:cC:d:D:eEf:F:g:G:hiIj:J:kKl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:"
+
 	while((c = getopt_long(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
 		switch (c) {
 			case 'a':
-				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+				work_queue_master_mode = "catalog";
 				break;
 			case 'A':
 				skip_afs_check = 1;
@@ -1568,7 +1568,7 @@ int main(int argc, char *argv[])
 				did_explicit_auth = 1;
 				break;
 			case LONG_OPT_TICKETS:
-				tickets = strdup(optarg);
+				chirp_tickets = strdup(optarg);
 				break;
 			case 'f':
 				write_summary_to = xxstrdup(optarg);
@@ -1649,7 +1649,7 @@ int main(int argc, char *argv[])
 			case 'N':
 				free(project);
 				project = xxstrdup(optarg);
-				work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
+				work_queue_master_mode = "catalog";
 				break;
 			case 'o':
 				debug_config_file(optarg);
@@ -1659,7 +1659,7 @@ int main(int argc, char *argv[])
 				port = atoi(optarg);
 				break;
 			case 'P':
-				priority = atoi(optarg);
+				priority = optarg;
 				break;
 			case 'r':
 				dag_retry_flag = 1;
@@ -1672,7 +1672,7 @@ int main(int argc, char *argv[])
 				dag_submit_timeout = atoi(optarg);
 				break;
 			case 't':
-				work_queue_keepalive_timeout = atoi(optarg);
+				work_queue_keepalive_timeout = optarg;
 				break;
 			case 'T':
 				batch_queue_type = batch_queue_type_from_string(optarg);
@@ -1682,7 +1682,7 @@ int main(int argc, char *argv[])
 				}
 				break;
 			case 'u':
-				work_queue_keepalive_interval = atoi(optarg);
+				work_queue_keepalive_interval = optarg;
 				break;
 			case 'v':
 				cctools_version_print(stdout, get_makeflow_exe());
@@ -1703,12 +1703,12 @@ int main(int argc, char *argv[])
 				output_len_check = 1;
 				break;
 			case 'Z':
-				port_file = optarg;
+				work_queue_port_file = optarg;
 				port = 0;
 				port_set = 1;	//WQ is going to set the port, so we continue as if already set.
 				break;
 			case LONG_OPT_PASSWORD:
-				if(copy_file_to_buffer(optarg, &wq_password) < 0) {
+				if(copy_file_to_buffer(optarg, &work_queue_password) < 0) {
 					fprintf(stderr, "makeflow: couldn't open %s: %s\n", optarg, strerror(errno));
 					return 1;
 				}
@@ -1717,7 +1717,7 @@ int main(int argc, char *argv[])
 				cache_mode = 0;
 				break;
 			case LONG_OPT_WQ_WAIT_FOR_WORKERS:
-				wq_wait_queue_size = atoi(optarg);
+				wq_wait_queue_size = optarg;
 				break;
 			default:
 				show_help_run(get_makeflow_exe());
@@ -1727,9 +1727,9 @@ int main(int argc, char *argv[])
 
 	if(!did_explicit_auth)
 		auth_register_all();
-	if(tickets) {
-		auth_ticket_load(tickets);
-		free(tickets);
+	if(chirp_tickets) {
+		auth_ticket_load(chirp_tickets);
+		free(chirp_tickets);
 	} else {
 		auth_ticket_load(NULL);
 	}
@@ -1748,7 +1748,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		if(strcmp(master_mode, "catalog") == 0 && project == NULL) {
+		if(strcmp(work_queue_master_mode, "catalog") == 0 && project == NULL) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
 			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", get_makeflow_exe());
 			return 1;
@@ -1756,7 +1756,7 @@ int main(int argc, char *argv[])
 		// Use Work Queue default port in standalone mode when port is not
 		// specified with -p option. In Work Queue catalog mode, Work Queue
 		// would choose an arbitrary port when port is not explicitly specified.
-		if(!port_set && strcmp(master_mode, "standalone") == 0) {
+		if(!port_set && strcmp(work_queue_master_mode, "standalone") == 0) {
 			port_set = 1;
 			port = WORK_QUEUE_DEFAULT_PORT;
 		}
@@ -1870,13 +1870,13 @@ int main(int argc, char *argv[])
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
 	batch_queue_set_option(remote_queue, "batch-options", batch_submit_options);
 	batch_queue_set_option(remote_queue, "skip-afs-check", skip_afs_check ? "yes" : "no");
-	batch_queue_set_option(remote_queue, "password", password);
-	batch_queue_set_option(remote_queue, "master-mode", master_mode);
+	batch_queue_set_option(remote_queue, "password", work_queue_password);
+	batch_queue_set_option(remote_queue, "master-mode", work_queue_master_mode);
 	batch_queue_set_option(remote_queue, "name", project);
 	batch_queue_set_option(remote_queue, "priority", priority);
 	batch_queue_set_option(remote_queue, "estimate-capacity", "yes"); // capacity estimation is on by default
-	batch_queue_set_option(remote_queue, "keepalive-interval", keepalive_interval);
-	batch_queue_set_option(remote_queue, "keepalive-timeout", keepalive_timeout);
+	batch_queue_set_option(remote_queue, "keepalive-interval", work_queue_keepalive_interval);
+	batch_queue_set_option(remote_queue, "keepalive-timeout", work_queue_keepalive_timeout);
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
@@ -1927,8 +1927,8 @@ int main(int argc, char *argv[])
 	dag_log_recover(d, logfilename);
 
 	port = batch_queue_port(remote_queue);
-	if(port_file)
-		opts_write_port_file(port_file, port);
+	if(work_queue_port_file)
+		opts_write_port_file(work_queue_port_file, port);
 	if(port > 0)
 		printf("listening for workers on port %d.\n", port);
 
