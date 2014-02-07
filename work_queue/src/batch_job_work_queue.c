@@ -369,6 +369,11 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 			work_queue_specify_keepalive_timeout(q->data, atoi(value));
 		else
 			work_queue_specify_keepalive_timeout(q->data, WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
+	} else if(strcmp(what, "wait-queue-size") == 0) {
+		if(value)
+			work_queue_activate_worker_waiting(q, atoi(value));
+		else
+			work_queue_activate_worker_waiting(q, 0);
 	}
 }
 

@@ -71,6 +71,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORK_QUEUE_RESULT_OUTPUT_FAIL 8
 #define WORK_QUEUE_RESULT_OUTPUT_MISSING 16
 #define WORK_QUEUE_RESULT_LINK_FAIL 32
+#define WORK_QUEUE_RESULT_STDOUT_MISSING 64
 
 // The default capacity reported before information is available.
 #define WORK_QUEUE_DEFAULT_CAPACITY 10
@@ -85,6 +86,8 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_HASHKEY_MAX 32
 
 #define RESOURCE_MONITOR_TASK_SUMMARY_NAME "cctools-work-queue-%d-resource-monitor-task-%d"
+
+#define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
@@ -197,7 +200,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
-static int process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count);
+static void process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line); 
 
@@ -911,6 +914,10 @@ static void delete_worker_files( struct work_queue *q, struct work_queue_worker 
 	}
 }
 
+static void delete_output_files(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) 
+{
+	delete_worker_files(q, w, t, t->output_files, 0);
+}
 
 static void delete_uncacheable_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
@@ -973,6 +980,12 @@ static int fetch_output_from_worker(struct work_queue *q, struct work_queue_work
 	t->time_receive_output_finish = timestamp_get();
 
 	delete_uncacheable_files(q,w,t);
+
+	/* If there was an app-level failure, the task may be resubmitted and rerun
+	   at a different worker. The rerun may produce different outputs. So we need
+	   to evict all the output files of the task from the worker's cache. */
+	if(t->result & (WORK_QUEUE_RESULT_STDOUT_MISSING | WORK_QUEUE_RESULT_OUTPUT_MISSING))
+		delete_output_files(q,w,t);
 
 	// At this point, a task is completed.
 	itable_remove(w->current_tasks, taskid);
@@ -1043,49 +1056,48 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 	return 0;
 }
 
+/* 
+Returns 1 on success,  0 on failure to receive.
+Failure to store result is treated as success so we continue to retrieve the
+output files of the task. 
+*/
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line) {
 
-	if(!q || !w || !line) return -1; 
+	if(!q || !w || !line) return 0; 
 
-	int result;
+	int task_result;
 	uint64_t taskid;
-	int64_t output_length;
+	int64_t output_length, retrieved_output_length;
 	timestamp_t execution_time;
 	struct work_queue_task *t;
 	int64_t actual;
 	timestamp_t observed_execution_time;
 	timestamp_t effective_stoptime = 0;
-
 	time_t stoptime;
 
 	//Format: result, output length, execution time, taskid
 	char items[3][WORK_QUEUE_PROTOCOL_FIELD_MAX];
 	int n = sscanf(line, "result %s %s %s %" SCNd64, items[0], items[1], items[2], &taskid);
 
-
 	if(n < 4) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		return -1;
+		return 0;
 	}
 	
-	result = atoi(items[0]);
+	task_result = atoi(items[0]);
 	output_length = atoll(items[1]);
 	
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
-	  debug(D_WQ, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
+		debug(D_WQ, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
 		stoptime = time(0) + get_transfer_wait_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
-		return 0;
+		return 1;
 	}
 	
 	t->time_receive_result_start = timestamp_get();
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 	
-	if(q->bandwidth) {
-		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
-	}
-
 	if(n >= 3) {
 		execution_time = atoll(items[2]);
 		t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
@@ -1093,29 +1105,64 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		t->cmd_execution_time = observed_execution_time;
 	}
 
-	t->output = malloc(output_length + 1);
-	if(output_length > 0) {
-		debug(D_WQ, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, output_length, w->addrport, w->hostname);
+	if(q->bandwidth) {
+		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
+	}
+
+	if(output_length <= MAX_TASK_STDOUT_STORAGE) {
+		retrieved_output_length = output_length; 
+	} else {
+		retrieved_output_length = MAX_TASK_STDOUT_STORAGE; 
+		fprintf(stderr, "warning: stdout of task %"PRId64" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retreived.\n", taskid, ((double) output_length)/MAX_TASK_STDOUT_STORAGE, MAX_TASK_STDOUT_STORAGE/GIGABYTE, MAX_TASK_STDOUT_STORAGE/GIGABYTE);
+		t->result |= WORK_QUEUE_RESULT_STDOUT_MISSING;
+	}
+
+	t->output = malloc(retrieved_output_length+1);
+	if(t->output == NULL) {
+		fprintf(stderr, "error: allocating memory of size %"PRId64" bytes for retrieving stdout of task %"PRId64" failed.\n", retrieved_output_length, taskid);
+		//drop the entire length of stdout on the link	
 		stoptime = time(0) + get_transfer_wait_time(q, w, t, output_length);
-		actual = link_read(w->link, t->output, output_length, stoptime);
-		if(actual != output_length) {
-			debug(D_WQ, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, output_length);
+		link_soak(w->link, output_length, stoptime);
+		retrieved_output_length = 0; 
+		t->result |= WORK_QUEUE_RESULT_STDOUT_MISSING;
+	} 
+
+	if(retrieved_output_length > 0) {
+		debug(D_WQ, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, retrieved_output_length, w->addrport, w->hostname);
+		
+		//First read the bytes we keep.
+		stoptime = time(0) + get_transfer_wait_time(q, w, t, retrieved_output_length);
+		actual = link_read(w->link, t->output, retrieved_output_length, stoptime);
+		if(actual != retrieved_output_length) {
+			debug(D_WQ, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, retrieved_output_length);
 			t->output[actual] = '\0';
-			return -1;
+			return 0;
 		}
+		debug(D_WQ, "Retrieved %"PRId64" bytes from %s (%s)", actual, w->hostname, w->addrport);
+		
+		//Then read the bytes we need to throw away.
+		if(output_length > retrieved_output_length) {
+			debug(D_WQ, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_STORAGE), taskid, MAX_TASK_STDOUT_STORAGE);
+			stoptime = time(0) + get_transfer_wait_time(q, w, t, (output_length-retrieved_output_length));
+			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
+		
+			//overwrite the last few bytes of buffer to signal truncated stdout.
+			char *truncate_msg = string_format("\n>>>>>> WORK QUEUE HAS TRUNCATED THE STDOUT AFTER THIS POINT.\n>>>>>> MAXIMUM OF %d BYTES REACHED, %" PRId64 " BYTES TRUNCATED.", MAX_TASK_STDOUT_STORAGE, output_length - retrieved_output_length);	
+			strncpy(t->output+MAX_TASK_STDOUT_STORAGE-strlen(truncate_msg), truncate_msg, strlen(truncate_msg));
+			free(truncate_msg);
+		}
+		
 		timestamp_t current_time = timestamp_get();
 		if(effective_stoptime && effective_stoptime > current_time) {
 			usleep(effective_stoptime - current_time);
 		}
-		debug(D_WQ, "Got %"PRId64" bytes from %s (%s)", actual, w->hostname, w->addrport);
-		
 	} else {
 		actual = 0;
 	}
 	t->output[actual] = 0;
 	t->time_receive_result_finish = timestamp_get();
 
-	t->return_status = result;
+	t->return_status = task_result;
 	if(t->return_status != 0)
 		t->result |= WORK_QUEUE_RESULT_FUNCTION_FAIL;
 
@@ -1123,7 +1170,6 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	q->total_execute_time += t->cmd_execution_time;
 	itable_remove(q->running_tasks, taskid);
 	itable_insert(q->finished_tasks, taskid, (void*)t);
-
 
 	w->cores_allocated -= t->cores;
 	w->memory_allocated -= t->memory;
@@ -1138,47 +1184,46 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	log_worker_stats(q);
 
-	return 0;
+	return 1;
 }
 
-static int process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count)
+static void process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count)
 {
 	//max_count == -1, tells the worker to send all available results.
 
 	send_worker_msg(q, w, "send_results %d\n", max_count);
-
-	char line[WORK_QUEUE_LINE_MAX];
-
 	debug(D_WQ, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
+	char line[WORK_QUEUE_LINE_MAX];
 	int i = 0;
+	
 	while(1) {
 		int result = recv_worker_msg_retry(q, w, line, sizeof(line));
-		if(result < 0) 
-			return result;
-		
+		if(result < 0) goto failure;	
+
 		if(string_prefix_is(line,"result")) {
 			result = process_result(q, w, line);
-			if(result < 0) 
-				return result;
+			if(result == 0) goto failure;
 			i++;
 		} else if(!strcmp(line,"end")) {
 			//Only return success if last message is end.
 			break;
 		} else {
 			debug(D_WQ, "%s (%s): sent invalid response to send_results: %s",w->hostname,w->addrport,line);
-			return -1;
+			goto failure;
 		}
-
 	}
-
-	if(max_count > 0 && i > max_count)
-	{
+	
+	if(max_count > 0 && i > max_count) {
 		debug(D_WQ, "%s (%s): sent %d results. At most %d were expected.",w->hostname,w->addrport, i, max_count);
-		return -1;
-	}
+		goto failure; //if the worker disobeyed, consider it as failed.
+	} 
 
-	return 0;
+	return;
+
+   failure:
+	remove_worker(q, w);
+	return;
 }
 
 /*

@@ -8,20 +8,12 @@ See the file COPYING for details.
 #ifndef DELETE_DIR_H
 #define DELETE_DIR_H
 
-/** @file delete_dir.h Delete a directory recursively. */
+#include "unlink_recursive.h"
 
-/** Delete a directory recursively.
-@param dir The full path of the directory to delete.
-@return 0 on success, -1 on failure.
-*/
+/** @file delete_dir.h See unlink_recursive.h instead. */
 
-int delete_dir(const char *dir);
+#define delete_dir unlink_recursive
 
-/** Delete only the contents of the directory recursively.
-@param dir The full path of the directory to delete.
-@return 0 on success, -1 on failure.
-*/
-
-int delete_dir_contents(const char *dir);
+#define delete_dir_contents unlink_dir_contents
 
 #endif

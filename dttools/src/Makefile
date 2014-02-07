@@ -24,7 +24,6 @@ SOURCES = auth.c  \
           daemon.c  \
           datagram.c  \
           debug.c  \
-          delete_dir.c  \
           disk_info.c  \
           domain_name.c  \
           domain_name_cache.c  \
@@ -75,8 +74,9 @@ SOURCES = auth.c  \
           text_list.c  \
           timestamp.c  \
           timer.c  \
-          url_encode.c  \
+          unlink_recursive.c  \
           uptime.c \
+          url_encode.c  \
           username.c  \
           xxmalloc.c
 

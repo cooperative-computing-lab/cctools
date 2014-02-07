@@ -2527,6 +2527,8 @@ int main(int argc, char *argv[])
 	int did_explicit_auth = 0;
 	char *tickets = NULL;
 	char *password = NULL; /* WorkQueue password */
+	char *wq_password = 0;
+	char *wq_wait_queue_size = 0;
 	char *working_dir = NULL;
 
 	random_init();
@@ -2570,10 +2572,11 @@ int main(int argc, char *argv[])
 		LONG_OPT_PPM_LEVELS = INT_MAX-11,
 		LONG_OPT_DOT_PROPORTIONAL = INT_MAX-12,
 		LONG_OPT_VERBOSE_PARSING = INT_MAX-13,
-		LONG_OPT_DOT_CONDENSE = INT_MAX-14,
-		LONG_OPT_AUTH = INT_MAX-15,
-		LONG_OPT_TICKETS = INT_MAX-16,
-		LONG_OPT_WORKING_DIR = INT_MAX-17,
+		LONG_OPT_WQ_WAIT_FOR_WORKERS = INT_MAX-14,
+		LONG_OPT_DOT_CONDENSE = INT_MAX-15,
+		LONG_OPT_AUTH = INT_MAX-16,
+		LONG_OPT_TICKETS = INT_MAX-17,
+		LONG_OPT_WORKING_DIR = INT_MAX-18,
 	};
 	static const struct option long_options[] = {
 		{"auth", required_argument, 0, LONG_OPT_AUTH},
@@ -2626,6 +2629,7 @@ int main(int argc, char *argv[])
 		{"submission-timeout", required_argument, 0, 'S'},
 		{"wq-keepalive-timeout", required_argument, 0, 't'},
 		{"wq-keepalive-interval", required_argument, 0, 'u'},
+		{"wq-wait-queue-size", required_argument, 0, LONG_OPT_WQ_WAIT_FOR_WORKERS},
 		{"verbose", no_argument, 0, LONG_OPT_VERBOSE_PARSING},
 		{"version", no_argument, 0, 'v'},
 		{"wq-schedule", required_argument, 0, 'W'},
@@ -2880,6 +2884,9 @@ int main(int argc, char *argv[])
 		case LONG_OPT_WORKING_DIR:
 			free(working_dir);
 			working_dir = xxstrdup(optarg);
+		case LONG_OPT_WQ_WAIT_FOR_WORKERS:
+			free(wq_wait_queue_size);
+			wq_wait_queue_size = xxstrdup(optarg);
 			break;
 		default:
 			show_help(argv[0]);
@@ -3097,6 +3104,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "keepalive-interval", keepalive_interval);
 	batch_queue_set_option(remote_queue, "keepalive-timeout", keepalive_timeout);
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
+	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP || batch_queue_type == BATCH_QUEUE_TYPE_HADOOP) {

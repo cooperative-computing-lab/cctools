@@ -37,8 +37,14 @@ int create_dir(const char *path, int mode)
 				errno = ENOTDIR;
 				return 0;
 			}
-		} else if (errno == ENOENT && mkdir(temp, mode) == 0) {
-			/* continue */
+		} else if (errno == ENOENT) {
+			if(mkdir(temp, mode)==0 || errno==EEXIST) {
+				/* continue */
+			} else {
+				free(temp);
+				// use errno from mkdir
+				return 0;
+			}		
 		} else {
 			free(temp);
 			return 0;

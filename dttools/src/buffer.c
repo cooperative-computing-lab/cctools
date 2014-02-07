@@ -68,14 +68,11 @@ void buffer_free(buffer_t * b)
 /* make room for at least n chars */
 static int grow(buffer_t * b, size_t n)
 {
-	size_t newlen;
-	size_t inuse;
+	size_t used = inuse(b);
+	size_t newlen = sizeof(b->initial); /* current buf is always at least as big as b->initial */
 
-	inuse = inuse(b);
-
-	newlen = sizeof(b->initial); /* current buf is always at least as big as b->initial */
 	/* simple solution to find next power of 2 */
-	while (newlen < inuse+n) newlen <<= 1;
+	while (newlen < used+n) newlen <<= 1;
 
 	if (b->max > 0 && newlen > b->max) {
 		errno = ENOBUFS;
@@ -85,22 +82,25 @@ static int grow(buffer_t * b, size_t n)
 	if (b->buf == b->ubuf.buf || b->buf == b->initial) {
 		char *new = malloc(newlen);
 		checkerror(b, NULL, new);
-		memcpy(new, b->buf, inuse);
+		memcpy(new, b->buf, used);
 		b->buf = new;
 	} else {
 		char *new = realloc(b->buf, newlen);
 		checkerror(b, NULL, new);
 		b->buf = new;
 	}
-	b->end = b->buf+inuse;
+	b->end = b->buf+used;
+	b->end[0] = '\0';
 	b->len = newlen;
+	assert(avail(b) > n);
 	return 0;
 }
 
 int buffer_putvfstring(buffer_t * b, const char *format, va_list va)
 {
-	va_list va2;
 	int rc;
+	va_list va2;
+	size_t used = inuse(b);
 
 	va_copy(va2, va);
 	rc = vsnprintf(b->end, avail(b), format, va2);
@@ -108,21 +108,24 @@ int buffer_putvfstring(buffer_t * b, const char *format, va_list va)
 
 	checkerror(b, -1, rc);
 	/* N.B. vsnprintf rc does not include NUL byte */
-	if (((size_t)rc) >= avail(b))
-		rc = grow(b, rc+1);
-		if (rc == -1) return -1;
-	else {
+	if (avail(b) <= (size_t)rc && grow(b, rc+1) == -1) {
+		return -1;
+	} else {
 		b->end += rc;
-		return 0;
+		assert(rc+used == inuse(b));
+		assert(inuse(b) < b->len);
+		return rc;
 	}
 
 	va_copy(va2, va);
 	rc = vsnprintf(b->end, avail(b), format, va2);
 	assert(rc >= 0);
 	b->end += rc;
+	assert(rc+used == inuse(b));
+	assert(inuse(b) < b->len);
 	va_end(va2);
 
-	return 0;
+	return rc;
 }
 
 int buffer_putfstring(buffer_t * b, const char *format, ...)
@@ -136,7 +139,7 @@ int buffer_putfstring(buffer_t * b, const char *format, ...)
 
 int buffer_putlstring(buffer_t * b, const char *str, size_t len)
 {
-	if (avail(b) < len+1 && grow(b, len+1) == -1) {
+	if (avail(b) <= len && grow(b, len+1) == -1) {
 		return -1;
 	}
 	strncpy(b->end, str, len);
