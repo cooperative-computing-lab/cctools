@@ -11,14 +11,14 @@
 #include <errno.h>
 #include <signal.h>
 
-batch_job_id_t batch_job_submit_simple_local(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_local_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
 	batch_job_id_t jobid;
 
 	fflush(NULL);
 	jobid = fork();
 	if(jobid > 0) {
-		debug(D_BATCH, "started process %d: %s", jobid, cmd);
+		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, cmd);
 		struct batch_job_info *info = malloc(sizeof(*info));
 		memset(info, 0, sizeof(*info));
 		info->submitted = time(0);
@@ -53,7 +53,7 @@ batch_job_id_t batch_job_submit_simple_local(struct batch_queue *q, const char *
 	return -1;
 }
 
-batch_job_id_t batch_job_submit_local(struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_local_submit (struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
 	if(cmd == NULL)
 		cmd = "/bin/false";
@@ -68,12 +68,12 @@ batch_job_id_t batch_job_submit_local(struct batch_queue * q, const char *cmd, c
 
 	char *command = string_format("%s %s <%s >%s 2>%s", cmd, args, infile, outfile, errfile);
 
-	batch_job_id_t status = batch_job_submit_simple_local(q, command, extra_input_files, extra_output_files);
+	batch_job_id_t status = batch_job_local_submit_simple(q, command, extra_input_files, extra_output_files);
 	free(command);
 	return status;
 }
 
-batch_job_id_t batch_job_wait_local(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	while(1) {
 		int timeout;
@@ -117,20 +117,58 @@ batch_job_id_t batch_job_wait_local(struct batch_queue * q, struct batch_job_inf
 	}
 }
 
-int batch_job_remove_local(struct batch_queue *q, batch_job_id_t jobid)
+static int batch_job_local_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
 	if(itable_lookup(q->job_table, jobid)) {
 		if(kill(jobid, SIGTERM) == 0) {
-			debug(D_BATCH, "signalled process %d", jobid);
+			debug(D_BATCH, "signalled process %" PRIbjid, jobid);
 			return 1;
 		} else {
-			debug(D_BATCH, "could not signal process %d: %s\n", jobid, strerror(errno));
+			debug(D_BATCH, "could not signal process %" PRIbjid ": %s\n", jobid, strerror(errno));
 			return 0;
 		}
 	} else {
-		debug(D_BATCH, "process %d is not under my control.\n", jobid);
+		debug(D_BATCH, "process %" PRIbjid " is not under my control.\n", jobid);
 		return 0;
 	}
 }
+
+batch_queue_stub_create(local);
+batch_queue_stub_free(local);
+batch_queue_stub_port(local);
+batch_queue_stub_option_update(local);
+
+batch_fs_stub_chdir(local);
+batch_fs_stub_getcwd(local);
+batch_fs_stub_mkdir(local);
+batch_fs_stub_putfile(local);
+batch_fs_stub_stat(local);
+batch_fs_stub_unlink(local);
+
+const struct batch_queue_module batch_queue_local = {
+	BATCH_QUEUE_TYPE_LOCAL,
+	"local",
+
+	batch_queue_local_create,
+	batch_queue_local_free,
+	batch_queue_local_port,
+	batch_queue_local_option_update,
+
+	{
+		batch_job_local_submit,
+		batch_job_local_submit_simple,
+		batch_job_local_wait,
+		batch_job_local_remove,
+	},
+
+	{
+		batch_fs_local_chdir,
+		batch_fs_local_getcwd,
+		batch_fs_local_mkdir,
+		batch_fs_local_putfile,
+		batch_fs_local_stat,
+		batch_fs_local_unlink,
+	},
+};
 
 /* vim: set noexpandtab tabstop=4: */

@@ -6,10 +6,10 @@ See the file COPYING for details.
 
 #include "chirp_filesystem.h"
 #include "chirp_fs_local.h"
+#include "chirp_fs_local_scheduler.h"
 #include "chirp_protocol.h"
 #include "chirp_acl.h"
 
-#include "create_dir.h"
 #include "debug.h"
 #include "hash_table.h"
 #include "xxmalloc.h"
@@ -144,7 +144,7 @@ static int chirp_fs_local_fname (int fd, char path[CHIRP_PATH_MAX])
 	return 0;
 }
 
-static int chirp_fs_local_resolve (const char *path, char resolved[CHIRP_PATH_MAX])
+int chirp_fs_local_resolve (const char *path, char resolved[CHIRP_PATH_MAX])
 {
 	int n;
 	char collapse[CHIRP_PATH_MAX];
@@ -930,6 +930,9 @@ struct chirp_filesystem chirp_fs_local = {
 #endif
 
 	chirp_fs_do_acl_check,
+
+	chirp_fs_local_job_dbinit,
+	chirp_fs_local_job_schedule,
 };
 
 /* vim: set noexpandtab tabstop=4: */

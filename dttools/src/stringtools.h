@@ -71,13 +71,18 @@ __attribute__ (( format(printf,1,2) ));
   @param ... Variable arguments passed to snprintf
   @return The number of character written, not counting the final '\0'.
  */
-
 int string_nformat(char *str, const size_t max, const char *fmt, ...);
 
 char *string_trim(char *s, int(func)(int));
 char *string_trim_spaces(char *s);
 char *string_trim_quotes(char *s);
-int string_istrue(char *s);
+
+/** Converts a string to a boolean value. "true", "yes", and "N">0 are,
+ * case-insensitive, true. Everything else (including NULL) is false.
+ * @param str A boolean, possibly NULL, string.
+ * @return True or false.
+ */
+int string_istrue(const char *str);
 
 #ifndef CCTOOLS_OPSYS_LINUX
 char *strsep(char **stringp, const char *delim);

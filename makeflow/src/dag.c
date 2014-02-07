@@ -634,7 +634,7 @@ void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
 	 * node_id_counter - total number of nodes in this makeflow.
 	 *
 	 */
-	fprintf(d->logfile, "%" PRIu64 " %d %d %d %d %d %d %d %d %d\n", timestamp_get(), n->nodeid, newstate, n->jobid, d->node_states[0], d->node_states[1], d->node_states[2], d->node_states[3], d->node_states[4], d->nodeid_counter);
+	fprintf(d->logfile, "%" PRIu64 " %d %d %" PRIbjid " %d %d %d %d %d %d\n", timestamp_get(), n->nodeid, newstate, n->jobid, d->node_states[0], d->node_states[1], d->node_states[2], d->node_states[3], d->node_states[4], d->nodeid_counter);
 
 	if(time(NULL) - last_fsync > 60) {
 		/* We use fsync here to gurantee that the log is syncronized in AFS,

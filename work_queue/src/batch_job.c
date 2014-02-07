@@ -7,179 +7,82 @@ See the file COPYING for details.
 
 #include "batch_job.h"
 #include "batch_job_internal.h"
-#include "itable.h"
-#include "mpi_queue.h"
-#include "work_queue.h"
 
 #include "debug.h"
-
-#include "macros.h"
-#include "process.h"
-#include "stringtools.h"
-#include "timestamp.h"
+#include "itable.h"
 #include "xxmalloc.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <signal.h>
-#include <fcntl.h>
-
-#include <sys/wait.h>
 #include <sys/stat.h>
-#include <sys/signal.h>
 
-const char *batch_queue_type_string()
-{
-	return "local, condor, sge, moab, torque, cluster, wq, hadoop, mpi-queue";
-}
+#include <stdlib.h>
+#include <string.h>
 
-batch_queue_type_t batch_queue_type_from_string(const char *str)
-{
-	if(!strcmp(str, "condor"))
-		return BATCH_QUEUE_TYPE_CONDOR;
-	if(!strcmp(str, "sge"))
-		return BATCH_QUEUE_TYPE_SGE;
-	if(!strcmp(str, "moab"))
-		return BATCH_QUEUE_TYPE_MOAB;
-	if(!strcmp(str, "torque"))
-		return BATCH_QUEUE_TYPE_TORQUE;
-	if(!strcmp(str, "cluster"))
-		return BATCH_QUEUE_TYPE_CLUSTER;
-	if(!strcmp(str, "local"))
-		return BATCH_QUEUE_TYPE_LOCAL;
-	if(!strcmp(str, "unix"))
-		return BATCH_QUEUE_TYPE_LOCAL;
-	if(!strcmp(str, "wq"))
-		return BATCH_QUEUE_TYPE_WORK_QUEUE;
-	if(!strcmp(str, "workqueue"))
-		return BATCH_QUEUE_TYPE_WORK_QUEUE;
-	if(!strcmp(str, "wq-sharedfs"))
-		return BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS;
-	if(!strcmp(str, "workqueue-sharedfs"))
-		return BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS;
-	if(!strcmp(str, "hadoop"))
-		return BATCH_QUEUE_TYPE_HADOOP;
-	if(!strcmp(str, "mpi"))
-		return BATCH_QUEUE_TYPE_MPI_QUEUE;
-	if(!strcmp(str, "mpi-queue"))
-		return BATCH_QUEUE_TYPE_MPI_QUEUE;
-	return BATCH_QUEUE_TYPE_UNKNOWN;
-}
+extern const struct batch_queue_module batch_queue_chirp;
+extern const struct batch_queue_module batch_queue_cluster;
+extern const struct batch_queue_module batch_queue_condor;
+extern const struct batch_queue_module batch_queue_hadoop;
+extern const struct batch_queue_module batch_queue_local;
+extern const struct batch_queue_module batch_queue_moab;
+extern const struct batch_queue_module batch_queue_mpi_queue;
+extern const struct batch_queue_module batch_queue_sge;
+extern const struct batch_queue_module batch_queue_torque;
+extern const struct batch_queue_module batch_queue_wq;
+extern const struct batch_queue_module batch_queue_wq_sharedfs;
 
-const char *batch_queue_type_to_string(batch_queue_type_t t)
-{
-	switch (t) {
-	case BATCH_QUEUE_TYPE_LOCAL:
-		return "local";
-	case BATCH_QUEUE_TYPE_CONDOR:
-		return "condor";
-	case BATCH_QUEUE_TYPE_SGE:
-		return "sge";
-	case BATCH_QUEUE_TYPE_MOAB:
-		return "moab";
-	case BATCH_QUEUE_TYPE_TORQUE:
-		return "torque";
-	case BATCH_QUEUE_TYPE_CLUSTER:
-		return "cluster";
-	case BATCH_QUEUE_TYPE_WORK_QUEUE:
-		return "wq";
-	case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
-		return "wq-sharedfs";
-	case BATCH_QUEUE_TYPE_HADOOP:
-		return "hadoop";
-	case BATCH_QUEUE_TYPE_MPI_QUEUE:
-		return "mpi-queue";
-	default:
-		return "unknown";
-	}
-}
+static struct batch_queue_module batch_queue_unknown = {
+	BATCH_QUEUE_TYPE_UNKNOWN, "unknown",
 
-struct work_queue *batch_queue_get_work_queue(struct batch_queue *q) {
-	if(!q) {
-		debug(D_BATCH, "error: batch queue has not been created yet.\n");
-		return NULL;
-	}
-	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE || q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		return q->work_queue;
-	} else {
-		debug(D_BATCH, "error: batch queue type is not Work Queue.\n");
-	}
-	return NULL;
-}
+	NULL, NULL, NULL, NULL,
+
+	{NULL, NULL, NULL, NULL},
+
+	{NULL, NULL, NULL, NULL, NULL, NULL},
+};
+
+#define BATCH_JOB_SYSTEMS  "local, chirp, cluster, condor, hadoop, moab, sge, torque, mpi-queue, wq"
+const struct batch_queue_module * const batch_queue_modules[] = {
+    &batch_queue_chirp,
+    &batch_queue_cluster,
+    &batch_queue_condor,
+    &batch_queue_hadoop,
+    &batch_queue_local,
+    &batch_queue_moab,
+    &batch_queue_mpi_queue,
+    &batch_queue_sge,
+    &batch_queue_torque,
+    &batch_queue_wq,
+    &batch_queue_wq_sharedfs,
+    &batch_queue_unknown
+};
 
 struct batch_queue *batch_queue_create(batch_queue_type_t type)
 {
+	int i;
 	struct batch_queue *q;
 
-	if(type == BATCH_QUEUE_TYPE_UNKNOWN)
-		return 0;
-
-	q = malloc(sizeof(*q));
+	q = xxmalloc(sizeof(*q));
 	q->type = type;
-	q->options_text = 0;
+	strncpy(q->logfile, "", sizeof(q->logfile));
+	q->options = hash_table_create(0, NULL);
 	q->job_table = itable_create(0);
 	q->output_table = itable_create(0);
+	q->data = NULL;
 
-	if(type == BATCH_QUEUE_TYPE_CONDOR)
-		q->logfile = strdup("condor.logfile");
-	else if(type == BATCH_QUEUE_TYPE_WORK_QUEUE || type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS)
-		q->logfile = strdup("wq.log");
-	else
-		q->logfile = NULL;
-
-	if(type == BATCH_QUEUE_TYPE_WORK_QUEUE || type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		q->work_queue = work_queue_create(0);
-		if(!q->work_queue) {
-			batch_queue_delete(q);
-			return 0;
-		}
-	} else {
-		q->work_queue = 0;
-	}
-	
-	if(type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
-		q->mpi_queue = mpi_queue_create(0);
-		if(!q->mpi_queue) {
-			batch_queue_delete(q);
-			return 0;
-		}
-	} else {
-		q->mpi_queue = 0;
-	}
-	
-	if(type == BATCH_QUEUE_TYPE_SGE || type == BATCH_QUEUE_TYPE_MOAB || type == BATCH_QUEUE_TYPE_TORQUE || type == BATCH_QUEUE_TYPE_CLUSTER) {
-		batch_job_setup_cluster(q);
+	q->module = NULL;
+	for (i = 0; batch_queue_modules[i]->type != BATCH_QUEUE_TYPE_UNKNOWN; i++)
+		if (batch_queue_modules[i]->type == type)
+			q->module = batch_queue_modules[i];
+	if (q->module == NULL) {
+		batch_queue_delete(q);
+		return NULL;
 	}
 
-	if(type == BATCH_QUEUE_TYPE_HADOOP) {
-		int fail = 0;
-
-		if(!getenv("HADOOP_HOME")) {
-			debug(D_NOTICE, "error: environment variable HADOOP_HOME not set\n");
-			fail = 1;
-		}
-		if(!getenv("HDFS_ROOT_DIR")) {
-			debug(D_NOTICE, "error: environment variable HDFS_ROOT_DIR not set\n");
-			fail = 1;
-		}
-		if(!getenv("HADOOP_USER_TMP")) {
-			debug(D_NOTICE, "error: environment variable HADOOP_USER_TMP not set\n");
-			fail = 1;
-		}
-		if(!getenv("HADOOP_PARROT_PATH")) {
-			/* Note: HADOOP_PARROT_PATH is the path to Parrot on the remote node, not on the local machine. */
-			debug(D_NOTICE, "error: environment variable HADOOP_PARROT_PATH not set\n");
-			fail = 1;
-		}
-	
-		if(fail) {
-			batch_queue_delete(q);
-			return 0;
-		}
+	if(q->module->create(q) == -1) {
+		batch_queue_delete(q);
+		return NULL;
 	}
+
+	debug(D_BATCH, "created queue %p (%s)", q, q->module->typestr);
 
 	return q;
 }
@@ -187,212 +90,135 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 void batch_queue_delete(struct batch_queue *q)
 {
 	if(q) {
-		if(q->options_text)
-			free(q->options_text);
-		if(q->job_table)
-			itable_delete(q->job_table);
-		if(q->output_table)
-			itable_delete(q->output_table);
-		if(q->logfile)
-			free(q->logfile);
-		if(q->work_queue)
-			work_queue_delete(q->work_queue);
+		char *key;
+		char *value;
+
+		debug(D_BATCH, "deleting queue %p", q);
+
+		q->module->free(q);
+
+		for (hash_table_firstkey(q->options); hash_table_nextkey(q->options, &key, (void **) &value); free(value))
+			;
+		hash_table_delete(q->options);
+		itable_delete(q->job_table);
+		itable_delete(q->output_table);
 		free(q);
 	}
 }
 
-void batch_queue_set_logfile(struct batch_queue *q, const char *logfile)
+const char *batch_queue_get_option (struct batch_queue *q, const char *what)
 {
-	if(q->logfile)
-		free(q->logfile);
-	q->logfile = strdup(logfile);
-}
-
-void batch_queue_set_options(struct batch_queue *q, const char *options_text)
-{
-	if(q->options_text) {
-		free(q->options_text);
-	}
-
-	if(options_text) {
-		q->options_text = xxstrdup(options_text);
-	} else {
-		q->options_text = NULL;
-	}
+	return hash_table_lookup(q->options, what);
 }
 
 batch_queue_type_t batch_queue_get_type(struct batch_queue *q)
 {
-	return q->type;	
+	return q->type;
 }
 
-char *batch_queue_options(struct batch_queue *q)
+void batch_queue_set_logfile(struct batch_queue *q, const char *logfile)
 {
-    if (q->options_text)
-    	return xxstrdup(q->options_text);
-    else
-    	return NULL;
-}
-
-batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
-{
-	if(!q->job_table)
-		q->job_table = itable_create(0);
-
-	if(q->type == BATCH_QUEUE_TYPE_LOCAL) {
-		return batch_job_submit_local(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_CONDOR) {
-		return batch_job_submit_condor(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
-		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
-		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
-		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
-		return batch_job_submit_cluster(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		return batch_job_submit_work_queue(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		return batch_job_submit_work_queue(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
-		return batch_job_submit_hadoop(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
-		return batch_job_submit_mpi_queue(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-	} else {
-		errno = EINVAL;
-		return -1;
-	}
-}
-
-batch_job_id_t batch_job_submit_simple(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
-{
-	if(!q->job_table)
-		q->job_table = itable_create(0);
-
-	if(q->type == BATCH_QUEUE_TYPE_LOCAL) {
-		return batch_job_submit_simple_local(q, cmd, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_CONDOR) {
-		return batch_job_submit_simple_condor(q, cmd, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
-		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
-		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
-		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
-		return batch_job_submit_simple_cluster(q, cmd, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		return batch_job_submit_simple_work_queue(q, cmd, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		return batch_job_submit_simple_work_queue(q, cmd, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
-		return batch_job_submit_simple_hadoop(q, cmd, extra_input_files, extra_output_files);
-	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
-		return batch_job_submit_simple_mpi_queue(q, cmd, extra_input_files, extra_output_files);
-	} else {
-		errno = EINVAL;
-		return -1;
-	}
-}
-
-batch_job_id_t batch_job_wait(struct batch_queue * q, struct batch_job_info * info)
-{
-	return batch_job_wait_timeout(q, info, 0);
-}
-
-batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
-{
-	if(!q->job_table)
-		q->job_table = itable_create(0);
-
-	if(q->type == BATCH_QUEUE_TYPE_LOCAL) {
-		return batch_job_wait_local(q, info, stoptime);
-	} else if(q->type == BATCH_QUEUE_TYPE_CONDOR) {
-		return batch_job_wait_condor(q, info, stoptime);
-	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
-		return batch_job_wait_cluster(q, info, stoptime);
-	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
-		return batch_job_wait_cluster(q, info, stoptime);
-	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
-		return batch_job_wait_cluster(q, info, stoptime);
-	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
-		return batch_job_wait_cluster(q, info, stoptime);
-	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		return batch_job_wait_work_queue(q, info, stoptime);
-	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		return batch_job_wait_work_queue(q, info, stoptime);
-	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
-		return batch_job_wait_hadoop(q, info, stoptime);
-	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
-		return batch_job_wait_mpi_queue(q, info, stoptime);
-	} else {
-		errno = EINVAL;
-		return -1;
-	}
-}
-
-int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
-{
-	if(!q->job_table)
-		q->job_table = itable_create(0);
-
-	if(q->type == BATCH_QUEUE_TYPE_LOCAL) {
-		return batch_job_remove_local(q, jobid);
-	} else if(q->type == BATCH_QUEUE_TYPE_CONDOR) {
-		return batch_job_remove_condor(q, jobid);
-	} else if(q->type == BATCH_QUEUE_TYPE_SGE) {
-		return batch_job_remove_cluster(q, jobid);
-	} else if(q->type == BATCH_QUEUE_TYPE_MOAB) {
-		return batch_job_remove_cluster(q, jobid);
-	} else if(q->type == BATCH_QUEUE_TYPE_TORQUE) {
-		return batch_job_remove_cluster(q, jobid);
-	} else if(q->type == BATCH_QUEUE_TYPE_CLUSTER) {
-		return batch_job_remove_cluster(q, jobid);
-	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		return batch_job_remove_work_queue(q, jobid);
-	} else if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		return batch_job_remove_work_queue(q, jobid);
-	} else if(q->type == BATCH_QUEUE_TYPE_HADOOP) {
-		return batch_job_remove_hadoop(q, jobid);
-	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
-		return batch_job_remove_mpi_queue(q, jobid);
-	} else {
-		errno = EINVAL;
-		return -1;
-	}
+	strncpy(q->logfile, logfile, sizeof(q->logfile));
+	q->logfile[sizeof(q->logfile)-1] = '\0';
+	debug(D_BATCH, "set logfile to `%s'", logfile);
 }
 
 int batch_queue_port(struct batch_queue *q)
 {
-	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		return work_queue_port(q->work_queue);
-	} else if(q->type == BATCH_QUEUE_TYPE_MPI_QUEUE) {
-		return mpi_queue_port(q->mpi_queue);
+	return q->module->port(q);
+}
+
+void batch_queue_set_option (struct batch_queue *q, const char *what, const char *value)
+{
+	char *current = hash_table_remove(q->options, what);
+	free(current);
+	if(value) {
+		hash_table_insert(q->options, what, xxstrdup(value));
+		debug(D_BATCH, "set option `%s' to `%s'", what, value);
 	} else {
-		return 0;
+		debug(D_BATCH, "cleared option `%s'", what);
 	}
+	q->module->option_update(q, what, value);
 }
 
-int batch_job_enable_caching(struct batch_queue * q)
+batch_queue_type_t batch_queue_type_from_string(const char *str)
 {
-	if(!q) 
-		return 0;
-
-	q->caching = 1;
-
-	return 1;
+	int i;
+	for (i = 0; batch_queue_modules[i]->type != BATCH_QUEUE_TYPE_UNKNOWN; i++)
+		if (strcmp(batch_queue_modules[i]->typestr, str) == 0)
+			return batch_queue_modules[i]->type;
+	return BATCH_QUEUE_TYPE_UNKNOWN;
 }
 
-int batch_job_disable_caching(struct batch_queue * q)
+const char *batch_queue_type_to_string(batch_queue_type_t t)
 {
-	if(!q) 
-		return 0;
-
-	q->caching = 0;
-
-	return 1;
+	int i;
+	for (i = 0; batch_queue_modules[i]->type != BATCH_QUEUE_TYPE_UNKNOWN; i++)
+		if (batch_queue_modules[i]->type == t)
+			return batch_queue_modules[i]->typestr;
+	return "unknown";
 }
 
+const char *batch_queue_type_string()
+{
+	return BATCH_JOB_SYSTEMS;
+}
+
+
+batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+{
+	return q->module->job.submit(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
+}
+
+batch_job_id_t batch_job_submit_simple(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+{
+	return q->module->job.submit_simple(q, cmd, extra_input_files, extra_output_files);
+}
+
+batch_job_id_t batch_job_wait(struct batch_queue * q, struct batch_job_info * info)
+{
+	return q->module->job.wait(q, info, 0);
+}
+
+batch_job_id_t batch_job_wait_timeout(struct batch_queue * q, struct batch_job_info * info, time_t stoptime)
+{
+	return q->module->job.wait(q, info, stoptime);
+}
+
+int batch_job_remove(struct batch_queue *q, batch_job_id_t jobid)
+{
+	return q->module->job.remove(q, jobid);
+}
+
+
+int batch_fs_chdir (struct batch_queue *q, const char *path)
+{
+	return q->module->fs.chdir(q, path);
+}
+
+int batch_fs_getcwd (struct batch_queue *q, char *buf, size_t size)
+{
+	return q->module->fs.getcwd(q, buf, size);
+}
+
+int batch_fs_mkdir (struct batch_queue *q, const char *path, mode_t mode, int recursive)
+{
+	return q->module->fs.mkdir(q, path, mode, recursive);
+}
+
+int batch_fs_putfile (struct batch_queue *q, const char *lpath, const char *rpath)
+{
+	return q->module->fs.putfile(q, lpath, rpath);
+}
+
+int batch_fs_stat (struct batch_queue *q, const char *path, struct stat *buf)
+{
+	return q->module->fs.stat(q, path, buf);
+}
+
+int batch_fs_unlink (struct batch_queue *q, const char *path)
+{
+	return q->module->fs.unlink(q, path);
+}
 
 /* vim: set noexpandtab tabstop=4: */

@@ -340,7 +340,7 @@ static double measure_task_time()
 
 		jobid = batch_job_wait(batch_q,&info);
 		if(jobid<0) {
-			fprintf(stderr,"wavefront: couldn't wait for process %d: %s\n",jobid,strerror(errno));
+			fprintf(stderr,"wavefront: couldn't wait for process %" PRIbjid ": %s\n",jobid,strerror(errno));
 			exit(1);
 		}
 

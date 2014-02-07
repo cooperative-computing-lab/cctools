@@ -83,7 +83,7 @@ struct command {
    Hopefully we do not have commands to chirp that often.
 */
 
-static struct command list[50];
+static struct command list[100];
 
 static void acl_simple(char **acl)
 {
@@ -1011,6 +1011,60 @@ static INT64_T do_xattr_set(int argc, char **argv)
 	}
 }
 
+static INT64_T do_job_create(int argc, char **argv)
+{
+	chirp_jobid_t id;
+	INT64_T result = chirp_reli_job_create(current_host, argv[1], &id, stoptime);
+	if (result == 0) {
+		fprintf(stdout, "%" PRICHIRP_JOBID_T "\n", id);
+		fflush(stdout);
+	}
+	return result;
+}
+
+static INT64_T do_job_commit(int argc, char **argv)
+{
+	return chirp_reli_job_commit(current_host, argv[1], stoptime);
+}
+
+static INT64_T do_job_kill(int argc, char **argv)
+{
+	return chirp_reli_job_kill(current_host, argv[1], stoptime);
+}
+
+static INT64_T do_job_status(int argc, char **argv)
+{
+	char *status;
+	INT64_T result = chirp_reli_job_status(current_host, argv[1], &status, stoptime);
+	if (result > 0) {
+		fprintf(stdout, "%s\n", status);
+		free(status);
+	}
+	return result;
+}
+
+static INT64_T do_job_wait(int argc, char **argv)
+{
+	chirp_jobid_t id;
+	INT64_T timeout = -1;
+	char *status;
+	sscanf(argv[1], "%" SCNCHIRP_JOBID_T, &id);
+	if (argc >= 3)
+		sscanf(argv[2], "%" SCNd64, &timeout);
+	INT64_T result = chirp_reli_job_wait(current_host, id, timeout, &status, stoptime);
+	if (result > 0) {
+		fprintf(stdout, "%s\n", status);
+		free(status);
+	}
+	return result;
+}
+
+static INT64_T do_job_reap(int argc, char **argv)
+{
+	return chirp_reli_job_reap(current_host, argv[1], stoptime);
+}
+
+
 /* If adding a command below, remember to modify the size of
  * struct command list[] at the top of this file. */
 static struct command list[] = {
@@ -1063,6 +1117,12 @@ static struct command list[] = {
 	{"xattr_get", 1, 2, 2, "<file> <attribute>", do_xattr_get},
 	{"xattr_list", 1, 1, 1, "<file>", do_xattr_list},
 	{"xattr_set", 1, 2, 3, "<file> <attribute> [value]", do_xattr_set},
+	{"job_create", 1, 1, 1, "<json>", do_job_create},
+	{"job_commit", 1, 1, 1, "<id>", do_job_commit},
+	{"job_kill", 1, 1, 1, "<id>", do_job_kill},
+	{"job_status", 1, 1, 1, "<id>", do_job_status},
+	{"job_wait", 1, 1, 2, "<id> [timeout]", do_job_wait},
+	{"job_reap", 1, 1, 1, "<json>", do_job_reap},
 	{0, 0, 0, 0, 0, 0},
 };
 

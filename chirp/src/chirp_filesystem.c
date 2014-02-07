@@ -30,6 +30,7 @@ See the file COPYING for details.
 #define CHIRP_FILESYSTEM_BUFFER  65536
 
 struct chirp_filesystem *cfs = NULL;
+char   chirp_url[CHIRP_PATH_MAX] = "local://./";
 
 struct CHIRP_FILE {
 	enum {
@@ -728,6 +729,16 @@ INT64_T cfs_stub_lremovexattr(const char *path, const char *name)
 {
 	errno = ENOSYS;
 	return -1;
+}
+
+int cfs_stub_job_dbinit (sqlite3 *db)
+{
+	return ENOSYS;
+}
+
+int cfs_stub_job_schedule (sqlite3 *db)
+{
+	return ENOSYS;
 }
 
 /* vim: set noexpandtab tabstop=4: */

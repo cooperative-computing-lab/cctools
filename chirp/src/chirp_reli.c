@@ -451,8 +451,14 @@ INT64_T chirp_reli_fsync( struct chirp_file *file, time_t stoptime )
 		struct chirp_client *client = connect_to_host(host,stoptime); \
 		if(client) { \
 			ZZZ \
-			if(result>=0 || errno!=ECONNRESET) return result; \
- 			invalidate_host(host); \
+			if(result>=0) \
+				return result; \
+			else if (errno == ECONNRESET) \
+				invalidate_host(host); \
+			else if (errno == EAGAIN) \
+				; /* fall through */ \
+			else \
+				return result; \
 		} else { \
 			if(errno==ENOENT) return -1; \
 			if(errno==EPERM) return -1; \
@@ -757,6 +763,36 @@ INT64_T chirp_reli_fremovexattr(struct chirp_file *file, const char *name, time_
 INT64_T chirp_reli_lremovexattr(const char *host, const char *path, const char *name, time_t stoptime)
 {
 	RETRY_ATOMIC( result = chirp_client_lremovexattr(client,path,name,stoptime); )
+}
+
+INT64_T chirp_reli_job_create (const char *host, const char *json, chirp_jobid_t *id, time_t stoptime)
+{
+	RETRY_ATOMIC( result = chirp_client_job_create(client,json,id,stoptime); )
+}
+
+INT64_T chirp_reli_job_commit (const char *host, const char *json, time_t stoptime)
+{
+	RETRY_ATOMIC( result = chirp_client_job_commit(client,json,stoptime); )
+}
+
+INT64_T chirp_reli_job_kill (const char *host, const char *json, time_t stoptime)
+{
+	RETRY_ATOMIC( result = chirp_client_job_kill(client,json,stoptime); )
+}
+
+INT64_T chirp_reli_job_status (const char *host, const char *json, char **status, time_t stoptime)
+{
+	RETRY_ATOMIC( result = chirp_client_job_status(client,json,status,stoptime); )
+}
+
+INT64_T chirp_reli_job_wait (const char *host, chirp_jobid_t id, INT64_T timeout, char **status, time_t stoptime)
+{
+	RETRY_ATOMIC( result = chirp_client_job_wait(client,id,timeout,status,stoptime); )
+}
+
+INT64_T chirp_reli_job_reap (const char *host, const char *json, time_t stoptime)
+{
+	RETRY_ATOMIC( result = chirp_client_job_reap(client,json,stoptime); )
 }
 
 INT64_T chirp_reli_remote_debug( const char *host, const char *flag, time_t stoptime )

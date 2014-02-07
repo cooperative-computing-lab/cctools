@@ -30,6 +30,7 @@ SOURCES = auth.c  \
           dpopen.c  \
           envtools.c  \
           fast_popen.c  \
+          fd.c  \
           full_io.c  \
           file_cache.c  \
           get_canonical_path.c  \
@@ -43,6 +44,8 @@ SOURCES = auth.c  \
           hmac.c  \
           http_query.c  \
           itable.c  \
+          json.c  \
+          json_aux.c \
           link.c  \
           link_auth.c  \
           link_nvpair.c \

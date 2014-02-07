@@ -9,9 +9,7 @@ See the file COPYING for details.
 
 #include "chirp_filesystem.h"
 
-#include "hash_table.h"
-
-#include <stdio.h>
+extern const char *chirp_super_user;
 
 #define CHIRP_ACL_BASE_NAME ".__acl"
 #define CHIRP_ACL_BASE_LENGTH (strlen(CHIRP_ACL_BASE_NAME))
@@ -67,8 +65,6 @@ int chirp_acl_init_root(const char *path);
 int chirp_acl_init_copy(const char *path);
 int chirp_acl_init_reserve(const char *path, const char *subject);
 int chirp_acl_whoami(const char *subject, char **esubject);
-
-int is_a_directory(const char *filename);
 
 #endif
 
