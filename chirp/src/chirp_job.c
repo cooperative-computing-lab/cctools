@@ -844,9 +844,9 @@ restart:
 	J = NULL;
 
 	do {
-		const char *current = Wait;
+		const char *current;
 
-		sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
+		sqlcatch(sqlite3_prepare_v2(db, Wait, strlen(Wait)+1, &stmt, &current));
 		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
