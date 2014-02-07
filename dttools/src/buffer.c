@@ -93,6 +93,7 @@ static int grow(buffer_t * b, size_t n)
 		b->buf = new;
 	}
 	b->end = b->buf+inuse;
+	b->end[0] = '\0';
 	b->len = newlen;
 	return 0;
 }
