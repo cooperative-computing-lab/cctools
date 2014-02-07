@@ -1782,7 +1782,7 @@ int main(int argc, char *argv[])
 	if(!q) {
 		fatal("Unable to create batch queue of type: %s", batch_queue_type_to_string(batch_queue_type));
 	}
-	batch_queue_set_options(q, getenv("BATCH_OPTIONS"));
+	batch_queue_set_option(q, "batch-options", getenv("BATCH_OPTIONS"));
 	job_table = itable_create(0);
 
 	// The worker pool now works in one of the following 3 modes:

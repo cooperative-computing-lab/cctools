@@ -834,9 +834,11 @@ char *string_trim_quotes(char *s)
 	return front;
 }
 
-int string_istrue(char *s)
+int string_istrue(const char *str)
 {
-	return (strcasecmp(s, "true") == 0) || (strcasecmp(s, "yes") == 0) || (atoi(s) > 0);
+	if(str == NULL)
+		str = "";
+	return (strcasecmp(str, "true") == 0) || (strcasecmp(str, "yes") == 0) || (atoi(str) > 0);
 }
 
 int string_equal(const char *str1, const char *str2){

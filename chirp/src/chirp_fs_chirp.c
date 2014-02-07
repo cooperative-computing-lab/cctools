@@ -478,7 +478,10 @@ struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_fremovexattr,
 	chirp_fs_chirp_lremovexattr,
 
-	chirp_fs_chirp_do_acl_check
+	chirp_fs_chirp_do_acl_check,
+
+	cfs_stub_job_dbinit,
+	cfs_stub_job_schedule,
 };
 
 /* vim: set noexpandtab tabstop=4: */

@@ -11,6 +11,8 @@ See the file COPYING for details.
 
 extern struct chirp_filesystem chirp_fs_local;
 
+int chirp_fs_local_resolve (const char *path, char resolved[CHIRP_PATH_MAX]);
+
 #endif
 
 /* vim: set noexpandtab tabstop=4: */

@@ -25,11 +25,12 @@
 void path_absolute (const char *src, char *dest, int exist)
 {
 	struct stat buf;
-    int created = 0;
+	int created = 0;
 	if (stat(src, &buf) == -1) {
+		/* realpath requires the filename exist, we create the file if necessary */
 		if (errno == ENOENT && !exist) {
-			/* realpath requires the filename exist, we create the file if necessary */
-			if (creat(src, S_IRUSR|S_IWUSR) == -1) {
+			/* We use mkdir because src may end with forward slashes. */
+			if (mkdir(src, S_IRUSR|S_IWUSR) == -1) {
 				fatal("generating absolute path to `%s': %s", src, strerror(errno));
 			}
             created = 1;
@@ -41,7 +42,8 @@ void path_absolute (const char *src, char *dest, int exist)
 		fatal("could not resolve path `%s': %s", src, strerror(errno));
 	}
     if (created) {
-        unlink(src);
+		if (rmdir(src) == -1)
+			fatal("could not delete temporary dir `%s': %s", src, strerror(errno));
     }
 }
 

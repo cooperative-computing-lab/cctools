@@ -85,8 +85,8 @@ used by both the client and server implementations of the protocol.
 /** Error: The service is not currently available. */
 #define CHIRP_ERROR_GRP_UNREACHABLE -20
 
-/** Error: A attempted job operation refers to a process which does not exist. */
-#define CHIRP_ERROR_NO_SUCH_PROCESS -21
+/** Error: A attempted job operation refers to a job which does not exist. */
+#define CHIRP_ERROR_NO_SUCH_JOB -21
 
 /** Error: A attempted operation does not apply to a pipe. */
 #define CHIRP_ERROR_IS_A_PIPE -22

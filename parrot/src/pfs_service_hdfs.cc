@@ -28,6 +28,7 @@ extern "C" {
 #include <sys/statfs.h>
 
 extern int pfs_enable_small_file_optimizations;
+extern const char *pfs_username;
 
 #define HDFS_DEFAULT_PORT 9100
 
@@ -197,11 +198,12 @@ public:
 	}
 
 	virtual void * connect( pfs_name *name ) {
+		static const char *groups[] = { "supergroup" };
 		hdfsFS fs;
 		HDFS_CHECK_INIT(0)
 
-		debug(D_HDFS, "connecting to %s:%d", name->host, name->port);
-		fs = hdfs->connect(name->host, name->port);
+		debug(D_HDFS, "connecting to %s:%d as %s", name->host, name->port, pfs_username);
+		fs = hdfs->connect_as_user(name->host, name->port, pfs_username, groups, 1);
 		if (errno == HDFS_EINTERNAL) {
 			errno = ECONNRESET;
 		}

@@ -30,11 +30,11 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <dirent.h>
 
+const char *chirp_super_user = "";
+
 static int read_only_mode = 0;
 static char default_acl[PATH_MAX];
 static int acl_inherit_default_mode = 0;
-
-extern const char *chirp_super_user;
 
 void chirp_acl_force_readonly()
 {
@@ -190,7 +190,7 @@ int chirp_acl_check_dir(const char *dirname, const char *subject, int flags)
 
 	/* The superuser can implicitly list and admin */
 
-	if(chirp_super_user && !strcmp(subject, chirp_super_user)) {
+	if(strcmp(subject, chirp_super_user) == 0) {
 		myflags |= CHIRP_ACL_LIST | CHIRP_ACL_ADMIN;
 	}
 

@@ -72,6 +72,7 @@ struct hdfs_library {
 	int (*chdir) (hdfsFS, const char *);
 	tOffset (*tell) (hdfsFS, hdfsFile);
 	int (*setrep) (hdfsFS fs, const char *path, UINT16_T nreps );
+	int (*copy) (hdfsFS srcFS, const char* src, hdfsFS dstFS, const char* dst);
 };
 
 int hdfs_library_envinit(void);

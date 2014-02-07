@@ -2,6 +2,7 @@
 #include "batch_job_internal.h"
 #include "debug.h"
 #include "itable.h"
+#include "path.h"
 #include "process.h"
 #include "stringtools.h"
 
@@ -12,11 +13,23 @@
 #include <signal.h>
 #include <sys/stat.h>
 
-batch_job_id_t batch_job_submit_condor(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
 	FILE *file;
 	int njobs;
 	int jobid;
+	const char *options = hash_table_lookup(q->options, "batch-options");
+
+	if(!string_istrue(hash_table_lookup(q->options, "skip-afs-check"))) {
+		char *cwd = path_getcwd();
+		if(!strncmp(cwd, "/afs", 4)) {
+			debug(D_NOTICE|D_BATCH, "makeflow: This won't work because Condor is not able to write to files in AFS.\n");
+			debug(D_NOTICE|D_BATCH, "makeflow: Instead, run makeflow from a local disk like /tmp.\n");
+			debug(D_NOTICE|D_BATCH, "makeflow: Or, use the Work Queue with -T wq and condor_submit_workers.\n");
+			return -1;
+		}
+		free(cwd);
+	}
 
 	file = fopen("condor.submit", "w");
 	if(!file) {
@@ -45,8 +58,8 @@ batch_job_id_t batch_job_submit_condor(struct batch_queue *q, const char *cmd, c
 	fprintf(file, "copy_to_spool = true\n");
 	fprintf(file, "transfer_executable = true\n");
 	fprintf(file, "log = %s\n", q->logfile);
-	if(q->options_text)
-		fprintf(file, "%s\n", q->options_text);
+	if(options)
+		fprintf(file, "%s\n", options);
 	fprintf(file, "queue\n");
 	fclose(file);
 
@@ -73,7 +86,7 @@ batch_job_id_t batch_job_submit_condor(struct batch_queue *q, const char *cmd, c
 	return -1;
 }
 
-int setup_condor_wrapper(const char *wrapperfile)
+static int setup_condor_wrapper(const char *wrapperfile)
 {
 	FILE *file;
 
@@ -94,18 +107,17 @@ int setup_condor_wrapper(const char *wrapperfile)
 	return 0;
 }
 
-
-batch_job_id_t batch_job_submit_simple_condor(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_condor_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
 	if(setup_condor_wrapper("condor.sh") < 0) {
 		debug(D_BATCH, "could not create condor.sh: %s", strerror(errno));
 		return -1;
 	}
 
-	return batch_job_submit_condor(q, "condor.sh", cmd, 0, 0, 0, extra_input_files, extra_output_files);
+	return batch_job_condor_submit(q, "condor.sh", cmd, 0, 0, 0, extra_input_files, extra_output_files);
 }
 
-batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	static FILE *logfile = 0;
 
@@ -136,7 +148,7 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 			struct batch_job_info *info;
 			int logcode, exitcode;
 
-			if(sscanf(line, "%d (%d.%d.%d) %d/%d %d:%d:%d", &type, &jobid, &proc, &subproc, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec) == 9) {
+			if(sscanf(line, "%d (%" SCNbjid ".%d.%d) %d/%d %d:%d:%d", &type, &jobid, &proc, &subproc, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec) == 9) {
 				tm.tm_year = 2008 - 1900;
 				tm.tm_isdst = 0;
 
@@ -155,7 +167,7 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 					info->submitted = current;
 				} else if(type == 1) {
 					info->started = current;
-					debug(D_BATCH, "job %d running now", jobid);
+					debug(D_BATCH, "job %" PRIbjid " running now", jobid);
 				} else if(type == 9) {
 					itable_remove(q->job_table, jobid);
 
@@ -163,7 +175,7 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 					info->exited_normally = 0;
 					info->exit_signal = SIGKILL;
 
-					debug(D_BATCH, "job %d was removed", jobid);
+					debug(D_BATCH, "job %" PRIbjid " was removed", jobid);
 
 					memcpy(info_out, info, sizeof(*info));
 					free(info);
@@ -175,15 +187,15 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 
 					fgets(line, sizeof(line), logfile);
 					if(sscanf(line, " (%d) Normal termination (return value %d)", &logcode, &exitcode) == 2) {
-						debug(D_BATCH, "job %d completed normally with status %d.", jobid, exitcode);
+						debug(D_BATCH, "job %" PRIbjid " completed normally with status %d.", jobid, exitcode);
 						info->exited_normally = 1;
 						info->exit_code = exitcode;
 					} else if(sscanf(line, " (%d) Abnormal termination (signal %d)", &logcode, &exitcode) == 2) {
-						debug(D_BATCH, "job %d completed abnormally with signal %d.", jobid, exitcode);
+						debug(D_BATCH, "job %" PRIbjid " completed abnormally with signal %d.", jobid, exitcode);
 						info->exited_normally = 0;
 						info->exit_signal = exitcode;
 					} else {
-						debug(D_BATCH, "job %d completed with unknown status.", jobid);
+						debug(D_BATCH, "job %" PRIbjid " completed with unknown status.", jobid);
 						info->exited_normally = 0;
 						info->exit_signal = 0;
 					}
@@ -211,9 +223,9 @@ batch_job_id_t batch_job_wait_condor(struct batch_queue * q, struct batch_job_in
 	return -1;
 }
 
-int batch_job_remove_condor(struct batch_queue *q, batch_job_id_t jobid)
+static int batch_job_condor_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
-	char *command = string_format("condor_rm %d", jobid);
+	char *command = string_format("condor_rm %" PRIbjid, jobid);
 
 	debug(D_BATCH, "%s", command);
 	FILE *file = popen(command, "r");
@@ -229,5 +241,49 @@ int batch_job_remove_condor(struct batch_queue *q, batch_job_id_t jobid)
 		return 1;
 	}
 }
+
+static int batch_queue_condor_create (struct batch_queue *q)
+{
+	strncpy(q->logfile, "condor.logfile", sizeof(q->logfile));
+
+	return 0;
+}
+
+batch_queue_stub_free(condor);
+batch_queue_stub_port(condor);
+batch_queue_stub_option_update(condor);
+
+batch_fs_stub_chdir(condor);
+batch_fs_stub_getcwd(condor);
+batch_fs_stub_mkdir(condor);
+batch_fs_stub_putfile(condor);
+batch_fs_stub_stat(condor);
+batch_fs_stub_unlink(condor);
+
+const struct batch_queue_module batch_queue_condor = {
+	BATCH_QUEUE_TYPE_CONDOR,
+	"condor",
+
+	batch_queue_condor_create,
+	batch_queue_condor_free,
+	batch_queue_condor_port,
+	batch_queue_condor_option_update,
+
+	{
+		batch_job_condor_submit,
+		batch_job_condor_submit_simple,
+		batch_job_condor_wait,
+		batch_job_condor_remove,
+	},
+
+	{
+		batch_fs_condor_chdir,
+		batch_fs_condor_getcwd,
+		batch_fs_condor_mkdir,
+		batch_fs_condor_putfile,
+		batch_fs_condor_stat,
+		batch_fs_condor_unlink,
+	},
+};
 
 /* vim: set noexpandtab tabstop=4: */
