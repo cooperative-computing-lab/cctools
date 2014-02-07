@@ -108,9 +108,8 @@ int buffer_putvfstring(buffer_t * b, const char *format, va_list va)
 
 	checkerror(b, -1, rc);
 	/* N.B. vsnprintf rc does not include NUL byte */
-	if (((size_t)rc) >= avail(b)) {
-		rc = grow(b, rc+1);
-		if (rc == -1) return -1;
+	if (avail(b) <= (size_t)rc && grow(b, rc+1) == -1) {
+		return -1;
 	} else {
 		b->end += rc;
 		assert(rc+used == inuse(b));
@@ -140,7 +139,7 @@ int buffer_putfstring(buffer_t * b, const char *format, ...)
 
 int buffer_putlstring(buffer_t * b, const char *str, size_t len)
 {
-	if (avail(b) < len+1 && grow(b, len+1) == -1) {
+	if (avail(b) <= len && grow(b, len+1) == -1) {
 		return -1;
 	}
 	strncpy(b->end, str, len);
