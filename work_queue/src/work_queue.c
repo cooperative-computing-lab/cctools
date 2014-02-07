@@ -1264,7 +1264,7 @@ static void process_available_results(struct work_queue *q, struct work_queue_wo
 	int result = 1; //return success unless something fails below.
 
 	while(1) {
-		int result = recv_worker_msg_retry(q, w, line, sizeof(line));
+		result = recv_worker_msg_retry(q, w, line, sizeof(line));
 		if(result < 0) {
 			result = 0; //return 0 to signal a worker failure	
 			break; 
