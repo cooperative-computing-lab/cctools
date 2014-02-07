@@ -838,8 +838,6 @@ int chirp_job_wait (chirp_jobid_t id, const char *subject, INT64_T timeout, buff
 	}
 
 restart:
-	stmt = NULL;
-	rc = 0;
 	n = 0;
 	J = NULL;
 
