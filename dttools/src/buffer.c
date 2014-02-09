@@ -108,8 +108,9 @@ int buffer_putvfstring(buffer_t * b, const char *format, va_list va)
 
 	checkerror(b, -1, rc);
 	/* N.B. vsnprintf rc does not include NUL byte */
-	if (avail(b) <= (size_t)rc && grow(b, rc+1) == -1) {
-		return -1;
+	if (avail(b) <= (size_t)rc) {
+		rc = grow(b, rc+1);
+		if (rc == -1) return -1;
 	} else {
 		b->end += rc;
 		assert(rc+used == inuse(b));
