@@ -1717,6 +1717,10 @@ int main(int argc, char *argv[])
 			case LONG_OPT_WQ_WAIT_FOR_WORKERS:
 				wq_wait_queue_size = optarg;
 				break;
+			case LONG_OPT_WORKING_DIR:
+				free(working_dir);
+				working_dir = xxstrdup(optarg);
+				break;
 			default:
 				show_help_run(get_makeflow_exe());
 				return 1;
