@@ -1215,3 +1215,5 @@ echo "To build and install, type '${MAKE} install'"
 echo ""
 
 exit 0
+
+# vim: set noexpandtab tabstop=4:
