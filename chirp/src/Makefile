@@ -19,6 +19,11 @@ DTTOOLS_STATIC_LIBRARY = ../../dttools/src/libdttools.a
 CHIRP_STATIC_LIBRARY = libchirp.a
 STATIC_LIBRARIES = ${CHIRP_STATIC_LIBRARY} ${DTTOOLS_STATIC_LIBRARY}
 
+# We only use sqlite3 multi-process (i.e. no threads). So we can turn off
+# SQLITE_THREADSAFE. This disables somewhat costly mutex locks.
+sqlite3.o: sqlite3.c
+	$(CCTOOLS_CC) -o $@ -c -DSQLITE_THREADSAFE=0 $(CCTOOLS_INTERNAL_CCFLAGS) $^
+
 all: ${TARGETS}
 
 # This is the library intended to be used by clients of the system.

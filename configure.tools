@@ -194,17 +194,27 @@ library_search_normal()
 	return 1
 }
 
+append()
+{
+	for arg; do
+		ccflags="${ccflags} -D${arg}"
+	done
+}
+
 optional_function()
 {
-	multiarch_include=`echo $2 | sed "s|include/|include/$HOST_MULTIARCH/|"`
+	name="$1"
+	header="$2"
+	shift
+	shift
 
-	if check_function $1 $2
-	then
-		ccflags="${ccflags} -D$3"
+	multiarch_include=$(echo "${header}" | sed "s|include/|include/$HOST_MULTIARCH/|")
+
+	if check_function "$name" "$header"; then
+		append "$@"
 		return 0
-	elif [ X$HOST_MULTIARCH != X ] && check_function $1 $multiarch_include;
-	then
-		ccflags="${ccflags} -D$3"
+	elif [ -n "$HOST_MULTIARCH" ] && check_function "$name" "$multiarch_include"; then
+		append "$@"
 		return 0
 	fi
 		
@@ -213,9 +223,10 @@ optional_function()
 
 optional_file()
 {
-	if check_file $1
-	then
-		ccflags="${ccflags} -D$2"
+	file="$1"
+	shift
+	if check_file "$file"; then
+		append "$@"
 		return 0
 	else
 		return 1
@@ -224,17 +235,19 @@ optional_file()
 
 optional_include()
 {
-	echo -n "checking for header $1..."
+	header="$1"
+	shift
+
+	echo -n "checking for header ${header}..."
 
 cat > .configure.tmp.c << EOF
 #include <stdlib.h>
-#include <$1>
+#include <${header}>
 EOF
-	if gcc .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1 
-	then
+	if gcc .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1; then
 		echo yes
 		rm -f .configure.tmp.c .configure.tmp.out
-		ccflags="${ccflags} -D$2"
+		append "$@"
 		return 0
 	else
 		echo no

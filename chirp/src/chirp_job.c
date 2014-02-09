@@ -240,6 +240,7 @@ static int db_get (sqlite3 **dbp)
 				sqlcatch(sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE, NULL));
 		}
 		sqlcatch(rc);
+		sqlite3_busy_timeout(db, 5000);
 
 		sqlcatchexec(db, Init);
 	}
@@ -453,6 +454,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_create; restarting");
 		usleep(2000);
 		goto restart;
 	}
@@ -521,6 +523,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_commit; restarting");
 		usleep(2000);
 		goto restart;
 	}
@@ -591,6 +594,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_kill; restarting");
 		usleep(2000);
 		goto restart;
 	}
@@ -789,6 +793,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_status; restarting");
 		usleep(2000);
 		goto restart;
 	}
@@ -902,6 +907,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_wait; restarting");
 		usleep(2000);
 		goto restart;
 	}
@@ -971,6 +977,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_reap; restarting");
 		usleep(2000);
 		goto restart;
 	}
