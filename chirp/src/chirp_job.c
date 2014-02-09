@@ -240,6 +240,7 @@ static int db_get (sqlite3 **dbp)
 				sqlcatch(sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE, NULL));
 		}
 		sqlcatch(rc);
+		sqlite3_busy_timeout(db, 5000);
 
 		sqlcatchexec(db, Init);
 	}
@@ -453,6 +454,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_create; restarting");
 		usleep(2000);
 		goto restart;
 	}
@@ -521,6 +523,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_commit; restarting");
 		usleep(2000);
 		goto restart;
 	}
@@ -591,6 +594,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_kill; restarting");
 		usleep(2000);
 		goto restart;
 	}
@@ -645,19 +649,15 @@ out:
 int chirp_job_status (json_value *J, const char *subject, buffer_t *B)
 {
 	static const char Status[] =
-		"BEGIN TRANSACTION;"
 		/* These SELECTs will be executed multiple times, for each job in J. */
 		"SELECT JobsPublic.* FROM JobsPublic WHERE id = ? AND (? OR JobsPublic.subject = ?);" /* subject check happens here */
 		"SELECT arg FROM JobArguments WHERE id = ? ORDER BY n;"
 		"SELECT name, value FROM JobEnvironment WHERE id = ?;"
-		"SELECT serv_path, task_path, type, binding FROM JobFiles WHERE id = ?;"
-		"END TRANSACTION;";
+		"SELECT serv_path, task_path, type, binding FROM JobFiles WHERE id = ?;";
 
 	time_t timeout = time(NULL)+3;
 	sqlite3 *db = NULL;
 	sqlite3_stmt *stmt = NULL;
-	const char *current;
-	const char *status;
 	int rc;
 	int i;
 	size_t start = buffer_pos(B);
@@ -669,13 +669,11 @@ int chirp_job_status (json_value *J, const char *subject, buffer_t *B)
 restart:
 	buffer_rewind(B, start); /* a failed job_status may add to buffer */
 
-	sqlcatch(sqlite3_prepare_v2(db, Status, strlen(Status)+1, &stmt, &current));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+	sqlcatchexec(db, "BEGIN TRANSACTION;");
 
 	CATCHCODE(buffer_putliteral(B, "["), -1);
-	status = current;
 	for (i = 0; i < (int)J->u.array.length; i++) {
+		const char *current;
 		chirp_jobid_t id;
 		int first1 = 1;
 
@@ -685,8 +683,7 @@ restart:
 		if (i)
 			buffer_putliteral(B, ",");
 
-		current = status;
-		sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
+		sqlcatch(sqlite3_prepare_v2(db, Status, strlen(Status)+1, &stmt, &current));
 		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
 		sqlcatch(sqlite3_bind_int(stmt, 2, strcmp(subject, chirp_super_user) == 0));
 		sqlcatch(sqlite3_bind_text(stmt, 3, subject, -1, SQLITE_TRANSIENT));
@@ -785,9 +782,7 @@ restart:
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 	CATCHCODE(buffer_putliteral(B, "]"), -1);
 
-	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+	sqlcatchexec(db, "END TRANSACTION;");
 
 	rc = 0;
 	goto out;
@@ -798,6 +793,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_status; restarting");
 		usleep(2000);
 		goto restart;
 	}
@@ -911,6 +907,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_wait; restarting");
 		usleep(2000);
 		goto restart;
 	}
@@ -980,6 +977,7 @@ out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	if (rc == EAGAIN && time(NULL) <= timeout) {
+		debug(D_DEBUG, "timeout job_reap; restarting");
 		usleep(2000);
 		goto restart;
 	}
