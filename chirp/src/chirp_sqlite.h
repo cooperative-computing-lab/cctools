@@ -36,7 +36,7 @@ do {\
 		if (rc == SQLITE_BUSY) {\
 			rc = EAGAIN;\
 		} else {\
-			debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s'", __FILE__, __LINE__, rc, sqlite3_errstr(rc));\
+			debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s': %s", __FILE__, __LINE__, rc, sqlite3_errstr(rc), sqlite3_errmsg(db));\
 			if (rc == SQLITE_CONSTRAINT) {\
 				rc = EINVAL;\
 			} else {\
@@ -56,7 +56,7 @@ do {\
 		if (rc == SQLITE_BUSY) {\
 			rc = EAGAIN;\
 		} else {\
-			debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s'", __FILE__, __LINE__, rc, sqlite3_errstr(rc));\
+			debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s': %s", __FILE__, __LINE__, rc, sqlite3_errstr(rc), sqlite3_errmsg(db));\
 			if (rc == SQLITE_CONSTRAINT) {\
 				rc = EINVAL;\
 			} else {\
