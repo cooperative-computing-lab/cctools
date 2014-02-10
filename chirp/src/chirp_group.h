@@ -8,8 +8,10 @@ See the file COPYING for details.
 #ifndef CHIRP_GROUP_H
 #define CHIRP_GROUP_H
 
-extern const char *chirp_group_base_url;
-extern int         chirp_group_cache_time;
+#include <limits.h>
+
+extern char chirp_group_base_url[PATH_MAX];
+extern int  chirp_group_cache_time;
 
 int chirp_group_lookup(const char *group, const char *subject);
 

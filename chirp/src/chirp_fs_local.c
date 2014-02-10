@@ -456,13 +456,14 @@ static struct chirp_dirent *chirp_fs_local_readdir(struct chirp_dir *dir)
 	struct dirent *d = readdir(dir->dir);
 	if(d) {
 		char path[CHIRP_PATH_MAX];
-		struct stat buf;
+		struct stat64 buf;
 		dir->cd.name = d->d_name;
 		sprintf(path, "%s/%s", dir->path, dir->cd.name);
 		memset(&dir->cd.info, 0, sizeof(dir->cd.info));
-		dir->cd.lstatus = lstat(path, &buf);
-		if(dir->cd.lstatus == 0)
+		dir->cd.lstatus = lstat64(path, &buf);
+		if(dir->cd.lstatus == 0) {
 			COPY_CSTAT(buf, dir->cd.info);
+		}
 		return &dir->cd;
 	} else {
 		return 0;
