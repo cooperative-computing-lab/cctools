@@ -54,7 +54,7 @@ int chirp_group_lookup(const char *group, const char *subject)
 	}
 
 	if(fetch_group) {
-		sprintf(url, "%s%s", chirp_group_base_url, &group[6]);
+		sprintf(url, "%s/%s", chirp_group_base_url, &group[6]);
 		debug(D_DEBUG, "fetching group %s from %s", group, url);
 		mkdir(cachedir, 0777);
 		sprintf(line, "wget --no-check-certificate -q %s -O %s", url, cachepath);
