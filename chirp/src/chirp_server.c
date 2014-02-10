@@ -2093,7 +2093,7 @@ int main(int argc, char *argv[])
 			minimum_space_free = string_metric_parse(optarg);
 			break;
 		case 'G':
-			chirp_group_base_url = optarg;
+			strncpy(chirp_group_base_url, optarg, sizeof(chirp_group_base_url)-1);
 			break;
 		case 'i':
 			safe_username = optarg;

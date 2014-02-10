@@ -20,9 +20,8 @@ See the file COPYING for details.
 
 extern char chirp_transient_path[PATH_MAX];
 
-
-const char *chirp_group_base_url = NULL;
-int         chirp_group_cache_time = 900;
+char chirp_group_base_url[PATH_MAX];
+int  chirp_group_cache_time = 900;
 
 /*
 Search for a given subject name in a group.
@@ -39,7 +38,7 @@ int chirp_group_lookup(const char *group, const char *subject)
 	char line[CHIRP_PATH_MAX];
 	struct stat info;
 
-	if(!chirp_group_base_url)
+	if(chirp_group_base_url[0] == '\0')
 		return 0;
 
 	int fetch_group = 1;
