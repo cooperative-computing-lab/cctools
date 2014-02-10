@@ -18,7 +18,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 
 
-extern const char *chirp_transient_path;
+extern char chirp_transient_path[PATH_MAX];
 
 
 const char *chirp_group_base_url = NULL;
