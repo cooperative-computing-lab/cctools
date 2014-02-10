@@ -57,7 +57,7 @@ int chirp_group_lookup(const char *group, const char *subject)
 		sprintf(url, "%s/%s", chirp_group_base_url, &group[6]);
 		debug(D_DEBUG, "fetching group %s from %s", group, url);
 		mkdir(cachedir, 0777);
-		sprintf(line, "curl --silent --output '%s' %s", cachepath, url);
+		sprintf(line, "curl --silent --insecure --output '%s' %s", cachepath, url);
 		if(system(line) != 0) {
 			debug(D_NOTICE, "failed to fetch group using: %s", line);
 			unlink(cachepath);
