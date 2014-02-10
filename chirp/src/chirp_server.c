@@ -737,7 +737,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					char statenc[CHIRP_STAT_MAXENCODING];
 					if(!strncmp(d->name, ".__", 3))
 						continue;
-					chirp_stat_encode(statenc, &statbuf);
+					chirp_stat_encode(statenc, &d->info);
 					link_putfstring(l, "%s\n%s\n", stalltime, d->name, statenc);
 				}
 				cfs->closedir(dir);
