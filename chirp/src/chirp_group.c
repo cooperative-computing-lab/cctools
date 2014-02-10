@@ -18,11 +18,10 @@ See the file COPYING for details.
 #include <sys/stat.h>
 
 
-extern const char *chirp_transient_path;
+extern char chirp_transient_path[PATH_MAX];
 
-
-const char *chirp_group_base_url = NULL;
-int         chirp_group_cache_time = 900;
+char chirp_group_base_url[PATH_MAX];
+int  chirp_group_cache_time = 900;
 
 /*
 Search for a given subject name in a group.
@@ -39,7 +38,7 @@ int chirp_group_lookup(const char *group, const char *subject)
 	char line[CHIRP_PATH_MAX];
 	struct stat info;
 
-	if(!chirp_group_base_url)
+	if(chirp_group_base_url[0] == '\0')
 		return 0;
 
 	int fetch_group = 1;
@@ -55,10 +54,10 @@ int chirp_group_lookup(const char *group, const char *subject)
 	}
 
 	if(fetch_group) {
-		sprintf(url, "%s%s", chirp_group_base_url, &group[6]);
+		sprintf(url, "%s/%s", chirp_group_base_url, &group[6]);
 		debug(D_DEBUG, "fetching group %s from %s", group, url);
 		mkdir(cachedir, 0777);
-		sprintf(line, "wget --no-check-certificate -q %s -O %s", url, cachepath);
+		sprintf(line, "curl --silent --output '%s' %s", cachepath, url);
 		if(system(line) != 0) {
 			debug(D_NOTICE, "failed to fetch group using: %s", line);
 			unlink(cachepath);
