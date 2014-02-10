@@ -734,7 +734,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					char statenc[CHIRP_STAT_MAXENCODING];
 					if(!strncmp(d->name, ".__", 3))
 						continue;
-					chirp_stat_encode(statenc, &statbuf);
+					chirp_stat_encode(statenc, &d->info);
 					link_putfstring(l, "%s\n%s\n", stalltime, d->name, statenc);
 				}
 				cfs->closedir(dir);
@@ -1886,7 +1886,7 @@ int main(int argc, char *argv[])
 			minimum_space_free = string_metric_parse(optarg);
 			break;
 		case 'G':
-			chirp_group_base_url = optarg;
+			strncpy(chirp_group_base_url, optarg, sizeof(chirp_group_base_url)-1);
 			break;
 		case 'i':
 			safe_username = optarg;

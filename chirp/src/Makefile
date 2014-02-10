@@ -22,7 +22,6 @@ STATIC_LIBRARIES = ${CHIRP_STATIC_LIBRARY} ${DTTOOLS_STATIC_LIBRARY}
 all: ${TARGETS}
 
 # This is the library intended to be used by clients of the system.
-
 libchirp.a: ${LIBRARY_OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
