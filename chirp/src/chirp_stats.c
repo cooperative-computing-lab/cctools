@@ -62,14 +62,14 @@ void chirp_stats_summary(buffer_t *B)
 	if(!stats_table)
 		stats_table = hash_table_create(0, 0);
 
-	buffer_printf(B, "bytes_written %" PRIu64 "\n", total_bytes_written);
-	buffer_printf(B, "bytes_read %" PRIu64 "\n", total_bytes_read);
-	buffer_printf(B, "total_ops %" PRIu64 "\n", total_ops);
+	buffer_putfstring(B, "bytes_written %" PRIu64 "\n", total_bytes_written);
+	buffer_putfstring(B, "bytes_read %" PRIu64 "\n", total_bytes_read);
+	buffer_putfstring(B, "total_ops %" PRIu64 "\n", total_ops);
 
 	buffer_putliteral(B, "clients ");
 	hash_table_firstkey(stats_table);
 	while(hash_table_nextkey(stats_table, &addr, (void **) &s)) {
-		buffer_printf(B, "%s,1,1,%" PRIu64 ",%" PRIu64 ",%" PRIu64 "; ", s->addr, s->ops, s->bytes_read, s->bytes_written);
+		buffer_putfstring(B, "%s,1,1,%" PRIu64 ",%" PRIu64 ",%" PRIu64 "; ", s->addr, s->ops, s->bytes_read, s->bytes_written);
 	}
 	buffer_putliteral(B, "\n");
 }

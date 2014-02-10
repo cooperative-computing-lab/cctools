@@ -3,19 +3,21 @@ include ../../rules.mk
 
 # We only use sqlite3 multi-process (i.e. no threads). So we can turn off
 # SQLITE_THREADSAFE. This disables somewhat costly mutex locks.
-LOCAL_CCFLAGS = -DSQLITE_THREADSAFE=0
+LOCAL_CCFLAGS = -DSQLITE_THREADSAFE=0 -fstack-protector-all
 
 CHIRPSO = libchirp_client.$(CCTOOLS_DYNAMIC_SUFFIX)
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
-LIBRARIES = libchirp.a $(CHIRPSO)
-OBJECTS = chirp_tool.o $(OBJECTS_LIBRARY) $(OBJECTS_SERVER)
+LIBRARIES = libchirp.a $(CHIRPSO) libconfuga.a
+OBJECTS = chirp_tool.o $(OBJECTS_CONFUGA) $(OBJECTS_LIBRARY) $(OBJECTS_SERVER)
+OBJECTS_CONFUGA = $(SOURCES_CONFUGA:%.c=%.o)
 OBJECTS_LIBRARY = $(SOURCES_LIBRARY:%.c=%.o)
 OBJECTS_SERVER = $(SOURCES_SERVER:%.c=%.o)
 PROGRAMS = chirp chirp_get chirp_put chirp_server chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute
-PUBLIC_HEADERS = chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h
+PUBLIC_HEADERS = chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h confuga.h
 SCRIPTS = chirp_audit_cluster chirp_server_hdfs
+SOURCES_CONFUGA = confuga.c confuga_namespace.c confuga_replica.c confuga_node.c confuga_job.c
 SOURCES_LIBRARY = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_ticket.c
-SOURCES_SERVER = sqlite3.c chirp_stats.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chirp_acl.c chirp_group.c chirp_filesystem.c chirp_fs_hdfs.c chirp_fs_local.c chirp_fs_local_scheduler.c chirp_fs_chirp.c chirp_job.c
+SOURCES_SERVER = sqlite3.c chirp_stats.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chirp_acl.c chirp_group.c chirp_filesystem.c chirp_fs_hdfs.c chirp_fs_local.c chirp_fs_local_scheduler.c chirp_fs_chirp.c chirp_fs_confuga.c chirp_job.c
 TARGETS = $(PROGRAMS) $(LIBRARIES)
 
 all: $(TARGETS)
@@ -35,7 +37,11 @@ chirp: chirp_tool.o
 # This is the library intended to be used by clients of the system.
 libchirp.a: $(OBJECTS_LIBRARY)
 
-chirp_server: $(OBJECTS_SERVER)
+confuga.o confuga_rm.o confuga_nm.o: confuga.h
+libconfuga.a: $(OBJECTS_CONFUGA) $(OBJECTS_LIBRARY)
+libconfuga.$(CCTOOLS_DYNAMIC_SUFFIX): $(OBJECTS_CONFUGA) ../../dttools/src/auth_all.o $(EXTERNAL_DEPENDENCIES)
+
+chirp_server: $(OBJECTS_SERVER) libconfuga.a
 $(PROGRAMS): libchirp.a $(EXTERNAL_DEPENDENCIES)
 
 clean:

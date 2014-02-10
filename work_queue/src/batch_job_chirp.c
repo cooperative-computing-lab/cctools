@@ -11,6 +11,7 @@
 #include "debug.h"
 #include "json.h"
 #include "json_aux.h"
+#include "random.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
@@ -72,9 +73,9 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 
 	buffer_putliteral(&B, "{");
 
-	buffer_putliteral(&B, "\"executable\":\"/bin/sh\",");
+	buffer_putliteral(&B, "\"executable\":\"/bin/sh\"");
 
-	buffer_putfstring(&B, "\"arguments\":[\"sh\",\"-c\",\"{\\n");
+	buffer_putfstring(&B, ",\"arguments\":[\"sh\",\"-c\",\"{\\n");
 	jsonA_escapestring(&B, cmd);
 	if (args) {
 		buffer_putliteral(&B, " ");
@@ -93,9 +94,9 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 		buffer_putliteral(&B, " 2>");
 		jsonA_escapestring(&B, errfile);
 	}
-	buffer_putliteral(&B, "\"],");
+	buffer_putliteral(&B, "\"]");
 
-	buffer_putliteral(&B, "\"files\":[");
+	buffer_putliteral(&B, ",\"files\":[");
 	addfile(q, &B, infile, "INPUT");
 	addfile(q, &B, outfile, "OUTPUT");
 	addfile(q, &B, errfile, "OUTPUT");
@@ -124,7 +125,11 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 		if (s[l-1] == ',')
 			buffer_rewind(&B, l-1);
 	}
-	buffer_putliteral(&B, "]}");
+	buffer_putliteral(&B, "]");
+
+	buffer_putfstring(&B, ",\"tag\":\"%s\"", (const char *)hash_table_lookup(q->options, "tag"));
+
+	buffer_putliteral(&B, "}");
 
 	chirp_jobid_t id;
 	debug(D_DEBUG, "job = `%s'", buffer_tostring(&B));
@@ -258,7 +263,17 @@ static int batch_job_chirp_remove (struct batch_queue *q, batch_job_id_t jobid)
 	return rc;
 }
 
-batch_queue_stub_create(chirp);
+static int batch_queue_chirp_create (struct batch_queue *q)
+{
+	BUFFER_STACK(B, 128)
+	char tag[21];
+
+	random_hex(tag, sizeof(tag));
+	buffer_putfstring(&B, "unknown-project:%s", tag);
+	batch_queue_set_option(q, "tag", buffer_tostring(&B));
+	return 0;
+}
+
 batch_queue_stub_free(chirp);
 batch_queue_stub_port(chirp);
 
@@ -281,6 +296,16 @@ static void batch_queue_chirp_option_update (struct batch_queue *q, const char *
 		} else {
 			fatal("`%s' is not a valid working-dir", value);
 		}
+	} else if (strcmp(what, "name") == 0) {
+		char tag[21];
+		BUFFER_STACK(B, 128)
+
+		random_hex(tag, sizeof(tag));
+		buffer_putfstring(&B, "%.32s:%s", value, tag);
+		batch_queue_set_option(q, "tag", buffer_tostring(&B));
+	} else if (strcmp(what, "tag") == 0) {
+		if (value == NULL)
+			fatal("tag value must be set!");
 	}
 }
 

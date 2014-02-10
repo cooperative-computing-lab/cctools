@@ -310,10 +310,10 @@ static INT64_T chirp_fs_chirp_utime(const char *path, time_t actime, time_t modt
 	return chirp_reli_utime(chirp_hostport, path, actime, modtime, STOPTIME);
 }
 
-static INT64_T chirp_fs_chirp_md5(const char *path, unsigned char digest[16])
+static INT64_T chirp_fs_chirp_hash(const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX])
 {
 	RESOLVE(path)
-	return chirp_reli_md5(chirp_hostport, path, digest, STOPTIME);
+	return chirp_reli_hash(chirp_hostport, path, algorithm, digest, STOPTIME);
 }
 
 static INT64_T chirp_fs_chirp_setrep(const char *path, int nreps)
@@ -401,6 +401,7 @@ static int chirp_fs_chirp_do_acl_check()
 
 struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_init,
+	cfs_stub_destroy,
 
 	chirp_fs_chirp_fname,
 
@@ -445,7 +446,7 @@ struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_lchown,
 	chirp_fs_chirp_truncate,
 	chirp_fs_chirp_utime,
-	chirp_fs_chirp_md5,
+	chirp_fs_chirp_hash,
 	chirp_fs_chirp_setrep,
 
 	chirp_fs_chirp_getxattr,

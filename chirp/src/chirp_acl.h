@@ -33,6 +33,7 @@ extern const char *chirp_super_user;
 #define CHIRP_ACL_ALL             (~0)
 
 int chirp_acl_check(const char *filename, const char *subject, int flags);
+int chirp_acl_check_recursive(const char *path, const char *subject, int flags);
 int chirp_acl_check_dir(const char *dirname, const char *subject, int flags);
 int chirp_acl_check_link(const char *linkname, const char *subject, int flags);
 

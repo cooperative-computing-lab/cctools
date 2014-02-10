@@ -7,24 +7,24 @@ See the file COPYING for details.
 
 #include "catalog_query.h"
 #include "cctools.h"
-#include "nvpair.h"
-#include "link.h"
-#include "stringtools.h"
 #include "debug.h"
 #include "getopt_aux.h"
+#include "link.h"
+#include "nvpair.h"
+#include "stringtools.h"
+#include "xxmalloc.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
 
-#define MODE_TABLE 1
-#define MODE_SHORT 2
-#define MODE_LONG  3
-#define MODE_TOTAL 4
-
-static int show_all_types = 0;
-static INT64_T minavail = 0;
+enum {
+	MODE_TABLE,
+	MODE_SHORT,
+	MODE_LONG,
+	MODE_TOTAL,
+};
 
 static struct nvpair_header headers[] = {
 	{"type", "TYPE", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
@@ -87,36 +87,47 @@ static struct nvpair *table[10000];
 
 int main(int argc, char *argv[])
 {
-	struct catalog_query *q;
-	struct nvpair *n;
-	time_t timeout = 60, stoptime;
-	const char *catalog_host = 0;
-	signed char c;
-	int i;
-	int count = 0;
-	int mode = MODE_TABLE;
-	INT64_T total = 0, avail = 0;
-	const char *filter_name = 0;
-	const char *filter_value = 0;
+	enum {
+		LONGOPT_SERVER_LASTHEARDFROM = INT_MAX-0,
+		LONGOPT_SERVER_PROJECT       = INT_MAX-1,
+	};
 
-	debug_config(argv[0]);
-
-
-	static struct option long_options[] = {
+	static const struct option long_options[] = {
+		{"all", no_argument, 0, 'a'},
+		{"brief", no_argument, 0, 's'},
 		{"catalog", required_argument, 0, 'c'},
 		{"debug", required_argument, 0, 'd'},
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-rotate-max", required_argument, 0, 'O'},
-		{"server-space", required_argument, 0, 'A'},
-		{"all", no_argument, 0, 'a'},
-		{"timeout", required_argument, 0, 't'},
-		{"brief", no_argument, 0, 's'},
-		{"verbose", no_argument, 0, 'l'},
-		{"totals", no_argument, 0, 'T'},
-		{"version", no_argument, 0, 'v'},
 		{"help", no_argument, 0, 'h'},
+		{"server-lastheardfrom", required_argument, 0, LONGOPT_SERVER_LASTHEARDFROM},
+		{"server-project", required_argument, 0, LONGOPT_SERVER_PROJECT},
+		{"server-space", required_argument, 0, 'A'},
+		{"timeout", required_argument, 0, 't'},
+		{"totals", no_argument, 0, 'T'},
+		{"verbose", no_argument, 0, 'l'},
+		{"version", no_argument, 0, 'v'},
 		{0, 0, 0, 0}
 	};
+
+	struct catalog_query *q;
+	struct nvpair *n;
+	time_t timeout = 60, stoptime;
+	const char *catalog_host = 0;
+	int i;
+	int c;
+	int count = 0;
+	int mode = MODE_TABLE;
+	INT64_T sum_total = 0, sum_avail = 0;
+	const char *filter_name = 0;
+	const char *filter_value = 0;
+	int show_all_types = 0;
+
+	const char *server_project = NULL;
+	time_t      server_lastheardfrom = 0;
+	uint64_t    server_avail = 0;
+
+	debug_config(argv[0]);
 
 	while((c = getopt_long(argc, argv, "aA:c:d:t:o:O:sTlvh", long_options, NULL)) > -1) {
 		switch (c) {
@@ -133,7 +144,7 @@ int main(int argc, char *argv[])
 			timeout = string_time_parse(optarg);
 			break;
 		case 'A':
-			minavail = string_metric_parse(optarg);
+			server_avail = string_metric_parse(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -152,6 +163,12 @@ int main(int argc, char *argv[])
 			break;
 		case 'T':
 			mode = MODE_TOTAL;
+			break;
+		case LONGOPT_SERVER_LASTHEARDFROM:
+			server_lastheardfrom = time(0)-string_time_parse(optarg);
+			break;
+		case LONGOPT_SERVER_PROJECT:
+			server_project = xxstrdup(optarg);
 			break;
 		case 'h':
 		default:
@@ -207,11 +224,17 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		if(minavail != 0) {
-			if(minavail > nvpair_lookup_integer(table[i], "avail")) {
-				continue;
-			}
-		}
+		const char *lastheardfrom = nvpair_lookup_string(table[i], "lastheardfrom");
+		if (lastheardfrom && (time_t)strtoul(lastheardfrom, NULL, 10) < server_lastheardfrom)
+			continue;
+
+		const char *avail = nvpair_lookup_string(table[i], "avail");
+		if (avail && strtoul(avail, NULL, 10) < server_avail)
+			continue;
+
+		const char *project = nvpair_lookup_string(table[i], "project");
+		if (server_project && (project == NULL || !(strcmp(project, server_project) == 0)))
+			continue;
 
 		if(filter_name) {
 			const char *v = nvpair_lookup_string(table[i], filter_name);
@@ -229,16 +252,16 @@ int main(int argc, char *argv[])
 		} else if(mode == MODE_TABLE) {
 			nvpair_print_table(table[i], stdout, headers);
 		} else if(mode == MODE_TOTAL) {
-			avail += nvpair_lookup_integer(table[i], "avail");
-			total += nvpair_lookup_integer(table[i], "total");
+			sum_avail += nvpair_lookup_integer(table[i], "avail");
+			sum_total += nvpair_lookup_integer(table[i], "total");
 		}
 	}
 
 	if(mode == MODE_TOTAL) {
 		printf("NODES: %4d\n", count);
-		printf("TOTAL: %6sB\n", string_metric(total, -1, 0));
-		printf("AVAIL: %6sB\n", string_metric(avail, -1, 0));
-		printf("INUSE: %6sB\n", string_metric(total - avail, -1, 0));
+		printf("TOTAL: %6sB\n", string_metric(sum_total, -1, 0));
+		printf("AVAIL: %6sB\n", string_metric(sum_avail, -1, 0));
+		printf("INUSE: %6sB\n", string_metric(sum_total - sum_avail, -1, 0));
 	}
 
 	if(mode == MODE_TABLE) {

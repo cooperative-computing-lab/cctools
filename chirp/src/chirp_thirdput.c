@@ -9,7 +9,9 @@ See the file COPYING for details.
 #include "chirp_thirdput.h"
 #include "chirp_acl.h"
 
+#include "auth_all.h"
 #include "debug.h"
+#include "full_io.h"
 
 #include <unistd.h>
 #include <string.h>
@@ -17,6 +19,8 @@ See the file COPYING for details.
 #include <sys/time.h>
 #include <errno.h>
 #include <sys/stat.h>
+
+extern char chirp_transient_path[PATH_MAX];
 
 static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, const char *hostname, const char *rpath, const char *hostsubject, time_t stoptime)
 {
@@ -161,21 +165,67 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 	return -1;
 }
 
-INT64_T chirp_thirdput(const char *subject, const char *lpath, const char *hostname, const char *rpath, time_t stoptime)
+INT64_T chirp_thirdput(const char *subject, const char *ticket, const char *lpath, const char *hostname, const char *rpath, time_t stoptime)
 {
 	INT64_T result;
 	time_t start, stop;
 	char hostsubject[CHIRP_PATH_MAX];
+	char tmpticket[PATH_MAX] = "";
+
+	/* Enable only globus, hostname, and address authentication for third-party transfers. */
+	auth_clear();
+	if(auth_globus_has_delegated_credential()) {
+		auth_globus_use_delegated_credential(1);
+		auth_globus_register();
+	}
+	if(ticket) {
+		buffer_t B;
+		CHIRP_FILE *file;
+		int fd;
+
+		snprintf(tmpticket, sizeof(tmpticket), "%s/ticket.XXXXXX", chirp_transient_path);
+		file = cfs_fopen(ticket, "r");
+		if (file == NULL)
+			return (errno = EINVAL, -1);
+
+		buffer_init(&B);
+		if(!cfs_freadall(file, &B)) {
+			cfs_fclose(file);
+			buffer_free(&B);
+			return (errno = EINVAL, -1);
+		}
+		cfs_fclose(file);
+
+		fd = mkstemp(tmpticket);
+		if (fd == -1) {
+			buffer_free(&B);
+			return (errno = EIO, -1);
+		}
+		full_write(fd, buffer_tostring(&B), buffer_pos(&B));
+		close(fd);
+		buffer_free(&B);
+
+		auth_ticket_register();
+		auth_ticket_load(tmpticket);
+	}
+	auth_hostname_register();
+	auth_address_register();
 
 	result = chirp_reli_whoami(hostname, hostsubject, sizeof(hostsubject), stoptime);
 	if(result < 0)
 		return result;
 
-	debug(D_DEBUG, "thirdput: sending %s to /chirp/%s/%s", lpath, hostname, rpath);
+	debug(D_DEBUG, "thirdput: sending %s to chirp://%s/%s", lpath, hostname, rpath);
 
 	start = time(0);
 	result = chirp_thirdput_recursive(subject, lpath, hostname, rpath, hostsubject, stoptime);
 	stop = time(0);
+
+	{
+		int save = errno;
+		unlink(tmpticket);
+		errno = save;
+	}
 
 	if(stop == start)
 		stop++;

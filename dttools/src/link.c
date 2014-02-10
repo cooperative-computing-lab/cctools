@@ -357,6 +357,13 @@ struct link *link_serve_address(const char *addr, int port)
 	if(link->fd < 0)
 		goto failure;
 
+	value = fcntl(link->fd, F_GETFD);
+	if (value == -1)
+		goto failure;
+	value |= FD_CLOEXEC;
+	if (fcntl(link->fd, F_SETFD, value) == -1)
+		goto failure;
+
 	value = 1;
 	setsockopt(link->fd, SOL_SOCKET, SO_REUSEADDR, (void *) &value, sizeof(value));
 

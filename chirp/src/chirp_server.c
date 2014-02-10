@@ -36,9 +36,9 @@
 #include "list.h"
 #include "load_average.h"
 #include "macros.h"
-#include "md5.h"
 #include "memory_info.h"
 #include "path.h"
+#include "random.h"
 #include "stringtools.h"
 #include "url_encode.h"
 #include "username.h"
@@ -76,10 +76,12 @@
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
-char        chirp_hostname[DOMAIN_NAME_MAX] = "";
-char        chirp_owner[USERNAME_MAX] = "";
-int         chirp_port = CHIRP_PORT;
-char        chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
+struct list *catalog_host_list;
+char         chirp_hostname[DOMAIN_NAME_MAX] = "";
+char         chirp_owner[USERNAME_MAX] = "";
+int          chirp_port = CHIRP_PORT;
+char         chirp_project_name[128];
+char         chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
 
 static char        address[LINK_ADDRESS_MAX];
 static time_t      advertise_alarm = 0;
@@ -88,7 +90,6 @@ static int         config_pipe[2];
 static struct      datagram *catalog_port;
 static char        hostname[DOMAIN_NAME_MAX];
 static int         idle_timeout = 60; /* one minute */
-static struct      list *catalog_host_list;
 static UINT64_T    minimum_space_free = 0;
 static UINT64_T    root_quota = 0;
 static gid_t       safe_gid = 0;
@@ -165,6 +166,8 @@ static int gc_tickets(const char *url)
 
 	chirp_acl_gctickets();
 
+	cfs->destroy();
+
 	return 0;
 }
 
@@ -196,30 +199,34 @@ static int update_all_catalogs(const char *url)
 	buffer_max(&B, DATAGRAM_PAYLOAD_MAX);
 	buffer_abortonfailure(&B, 1);
 	buffer_putliteral(&B, "type chirp\n");
-	buffer_printf(&B, "version %d.%d.%s\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
-	buffer_printf(&B, "url chirp://%s:%d\n", hostname, chirp_port);
-	buffer_printf(&B, "name %s\n", hostname);
-	buffer_printf(&B, "owner %s\n", chirp_owner);
-	buffer_printf(&B, "total %" PRIu64 "\n", info.f_blocks * info.f_bsize);
-	buffer_printf(&B, "avail %" PRIu64 "\n", info.f_bavail * info.f_bsize);
-	buffer_printf(&B, "starttime %lu\n", (unsigned long) starttime);
-	buffer_printf(&B, "port %d\n", chirp_port);
-	buffer_printf(&B, "cpu %s\n", name.machine);
-	buffer_printf(&B, "opsys %s\n", name.sysname);
-	buffer_printf(&B, "opsysversion %s\n", name.release);
-	buffer_printf(&B, "load1 %0.02lf\n", avg[0]);
-	buffer_printf(&B, "load5 %0.02lf\n", avg[1]);
-	buffer_printf(&B, "load15 %0.02lf\n", avg[2]);
-	buffer_printf(&B, "minfree %" PRIu64 "\n", minimum_space_free);
-	buffer_printf(&B, "memory_total %" PRIu64 "\n", memory_total);
-	buffer_printf(&B, "memory_avail %" PRIu64 "\n", memory_avail);
-	buffer_printf(&B, "cpus %d\n", cpus);
-	buffer_printf(&B, "backend %s\n", url);
+	buffer_putfstring(&B, "avail %" PRIu64 "\n", info.f_bavail * info.f_bsize);
+	buffer_putfstring(&B, "backend %s\n", url);
+	buffer_putfstring(&B, "cpu %s\n", name.machine);
+	buffer_putfstring(&B, "cpus %d\n", cpus);
+	buffer_putfstring(&B, "load1 %0.02lf\n", avg[0]);
+	buffer_putfstring(&B, "load15 %0.02lf\n", avg[2]);
+	buffer_putfstring(&B, "load5 %0.02lf\n", avg[1]);
+	buffer_putfstring(&B, "memory_avail %" PRIu64 "\n", memory_avail);
+	buffer_putfstring(&B, "memory_total %" PRIu64 "\n", memory_total);
+	buffer_putfstring(&B, "minfree %" PRIu64 "\n", minimum_space_free);
+	buffer_putfstring(&B, "name %s\n", hostname);
+	buffer_putfstring(&B, "opsys %s\n", name.sysname);
+	buffer_putfstring(&B, "opsysversion %s\n", name.release);
+	buffer_putfstring(&B, "owner %s\n", chirp_owner);
+	buffer_putfstring(&B, "port %d\n", chirp_port);
+	if (strlen(chirp_project_name))
+		buffer_putfstring(&B, "project %s\n", chirp_project_name);
+	buffer_putfstring(&B, "starttime %lu\n", (unsigned long) starttime);
+	buffer_putfstring(&B, "total %" PRIu64 "\n", info.f_blocks * info.f_bsize);
+	buffer_putfstring(&B, "url chirp://%s:%d\n", hostname, chirp_port);
+	buffer_putfstring(&B, "version %d.%d.%s\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
 	chirp_stats_summary(&B);
 
 	list_iterate(catalog_host_list, update_one_catalog, buffer_tostring(&B));
 
 	buffer_free(&B);
+
+	cfs->destroy();
 
 	return 0;
 }
@@ -237,10 +244,12 @@ static int run_in_child_process(int (*func) (const char *a), const char *args, c
 		}
 		debug(D_PROCESS, "*** %s complete ***", name);
 		if(WIFEXITED(status)) {
+			debug(D_PROCESS, "pid %d exited with %d", pid, WEXITSTATUS(status));
 			return WEXITSTATUS(status);
-		} else {
+		} else if(WIFSIGNALED(status)) {
+			debug(D_PROCESS, "pid %d failed due to signal %d (%s)", pid, WTERMSIG(status), string_signal(WTERMSIG(status)));
 			return -1;
-		}
+		} else assert(0);
 	} else {
 		debug(D_PROCESS, "couldn't fork: %s", strerror(errno));
 		return -1;
@@ -526,6 +535,8 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		char pattern[CHIRP_LINE_MAX];
 
 		chirp_jobid_t id;
+
+		char algorithm[CHIRP_LINE_MAX];
 
 		INT64_T fd, length, flags, offset, actual;
 		INT64_T uid, gid, mode;
@@ -885,13 +896,8 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			}
 		} else if(sscanf(line, "thirdput %s %s %s", path, hostname, newpath) == 3) {
 			path_fix(path);
-			if(cfs == &chirp_fs_hdfs)
-				goto failure;
-
 			/* ACL check will occur inside of chirp_thirdput */
-
-			result = chirp_thirdput(subject, path, hostname, newpath, stalltime);
-
+			result = chirp_thirdput(subject, NULL, path, hostname, newpath, stalltime);
 		} else if(sscanf(line, "open %s %s %" SCNd64, path, newpath, &mode) == 3) {
 			flags = 0;
 
@@ -1527,12 +1533,28 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				result = -1;
 			}
 		} else if(sscanf(line, "md5 %s", path) == 1) {
-			dataout = xxmalloc(16);
+			/* backwards compatibility */
+			unsigned char digest[CHIRP_DIGEST_MAX];
 			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
-			if(cfs->md5(path, (unsigned char *) dataout) >= 0) {
-				result = dataoutlength = 16;
+			result = cfs->hash(path, "md5", digest);
+			if (result >= 0) {
+				dataout = xxmalloc(result);
+				memcpy(dataout, digest, result);
+			} else {
+				result = errno_to_chirp(errno);
+			}
+		} else if(sscanf(line, "hash %s %s", algorithm, path) == 2) {
+			unsigned char digest[CHIRP_DIGEST_MAX];
+			path_fix(path);
+			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
+				goto failure;
+			result = cfs->hash(path, algorithm, digest);
+			if (result >= 0) {
+				dataout = xxmalloc(result);
+				dataoutlength = result;
+				memcpy(dataout, digest, result);
 			} else {
 				result = errno_to_chirp(errno);
 			}
@@ -1854,14 +1876,6 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 			setgid(safe_gid);
 			setuid(safe_uid);
 		}
-		/* Enable only globus, hostname, and address authentication for third-party transfers. */
-		auth_clear();
-		if(auth_globus_has_delegated_credential()) {
-			auth_globus_use_delegated_credential(1);
-			auth_globus_register();
-		}
-		auth_hostname_register();
-		auth_address_register();
 
 		change_process_title("chirp_server [%s:%d] [%s]", addr, port, typesubject);
 
@@ -1875,10 +1889,21 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 	}
 
 	link_close(link);
+
+	cfs->destroy();
 }
 
 void killeveryone (int sig)
 {
+	int i;
+	int n = sysconf(_SC_OPEN_MAX);
+
+	/* This process sleeps for a short time in between kills, immediately close
+	 * all fds to free up (bound) sockets.
+	 */
+	for (i = 0; i < n; i++)
+		close(i);
+
 	/* start with sig */
 	kill(0, sig);
 	sleep(1);
@@ -1958,7 +1983,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Superuser for all directories. (default: none)\n", "-P,--superuser=<user>");
-	fprintf(stdout, " %-30s Listen on this port. (default: %d)\n", "-p,--port=<port>", chirp_port);
+	fprintf(stdout, " %-30s Listen on this port. (default: %d; arbitrary: 0)\n", "-p,--port=<port>", chirp_port);
 	fprintf(stdout, " %-30s Enforce this root quota in software.\n", "-Q,--root-quota=<size>");
 	fprintf(stdout, " %-30s Read-only mode.\n", "-R,--read-only");
 	fprintf(stdout, " %-30s Abort stalled operations after this long. (default: %ds)\n", "-s,--stalled=<time>", stall_timeout);
@@ -1976,6 +2001,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "\n\n");
 }
 
+#include <sys/prctl.h>
 int main(int argc, char *argv[])
 {
 	enum {
@@ -1983,6 +2009,7 @@ int main(int argc, char *argv[])
 		LONGOPT_JOB_CONCURRENCY                  = INT_MAX-1,
 		LONGOPT_JOB_TIME_LIMIT                   = INT_MAX-2,
 		LONGOPT_INHERIT_DEFAULT_ACL              = INT_MAX-3,
+		LONGOPT_PROJECT_NAME                     = INT_MAX-4,
 	};
 
 	static const struct option long_options[] = {
@@ -2014,6 +2041,7 @@ int main(int argc, char *argv[])
 		{"pid-file", required_argument, 0, 'B'},
 		{"port", required_argument, 0, 'p'},
 		{"port-file", required_argument, 0, 'Z'},
+		{"project-name", required_argument, 0, LONGOPT_PROJECT_NAME},
 		{"read-only", no_argument, 0, 'R'},
 		{"root", required_argument, 0, 'r'},
 		{"root-quota", required_argument, 0, 'Q'},
@@ -2042,12 +2070,13 @@ int main(int argc, char *argv[])
 	int did_explicit_auth = 0;
 	char port_file[PATH_MAX] = "";
 
+	random_init();
 	change_process_title_init(argv);
 	change_process_title("chirp_server");
 
 	catalog_host_list = list_create();
 
-	debug_config(argv[0]);
+	debug_config("chirp_server");
 
 	/* Ensure that all files are created private by default. */
 	umask(0077);
@@ -2179,10 +2208,13 @@ int main(int argc, char *argv[])
 			chirp_job_enabled = 1;
 			break;
 		case LONGOPT_JOB_CONCURRENCY:
-			chirp_job_concurrency = atoi(optarg);
+			chirp_job_concurrency = strtoul(optarg, NULL, 10);
 			break;
 		case LONGOPT_JOB_TIME_LIMIT:
 			chirp_job_time_limit = atoi(optarg);
+			break;
+		case LONGOPT_PROJECT_NAME:
+			strncpy(chirp_project_name, optarg, sizeof(chirp_project_name)-1);
 			break;
 		case 'h':
 		default:
@@ -2308,12 +2340,13 @@ int main(int argc, char *argv[])
 		change_process_title("chirp_server [scheduler]");
 		backend_setup(chirp_url);
 		rc = chirp_job_schedule();
+		cfs->destroy();
 		if(rc == 0) {
 			/* normal exit, parent probably died */
-			_exit(EXIT_SUCCESS);
+			exit(EXIT_SUCCESS);
 		} else if(rc == ENOSYS) {
 			debug(D_DEBUG, "no scheduler available, quitting!");
-			_exit(EXIT_SUCCESS);
+			exit(EXIT_SUCCESS);
 		} else {
 			fatal("schedule rc = %d: %s", rc, strerror(rc));
 		}

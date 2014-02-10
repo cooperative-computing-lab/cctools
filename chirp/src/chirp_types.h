@@ -221,6 +221,10 @@ typedef int64_t chirp_jobid_t;
 #define PRICHIRP_JOBID_T  PRId64
 #define SCNCHIRP_JOBID_T  SCNd64
 
+/** Maximum digest size for a supported hash function.
+ */
+#define CHIRP_DIGEST_MAX 128
+
 #endif
 
 /* vim: set noexpandtab tabstop=4: */

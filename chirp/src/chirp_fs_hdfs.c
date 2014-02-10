@@ -142,6 +142,13 @@ static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX])
 	return cfs_create_dir("/", 0711);
 }
 
+static void chirp_fs_hdfs_destroy (void)
+{
+	hdfs_services->disconnect(fs);
+	hdfs_library_close(hdfs_services);
+	hdfs_services = NULL;
+}
+
 static int chirp_fs_hdfs_fname (int fd, char path[CHIRP_PATH_MAX])
 {
 	SETUP_FILE
@@ -677,6 +684,7 @@ static int chirp_fs_hdfs_do_acl_check()
 
 struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_init,
+	chirp_fs_hdfs_destroy,
 
 	chirp_fs_hdfs_fname,
 
@@ -720,7 +728,7 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	cfs_basic_lchown,
 	chirp_fs_hdfs_truncate,
 	chirp_fs_hdfs_utime,
-	cfs_basic_md5,
+	cfs_basic_hash,
 	chirp_fs_hdfs_setrep,
 
 	cfs_stub_getxattr,

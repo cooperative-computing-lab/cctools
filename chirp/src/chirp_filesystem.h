@@ -24,6 +24,7 @@ typedef struct CHIRP_FILE CHIRP_FILE;
 
 struct chirp_filesystem {
 	int (*init) ( const char url[CHIRP_PATH_MAX] );
+	void (*destroy) ( void );
 
 	int (*fname) ( int fd, char path[CHIRP_PATH_MAX] );
 
@@ -67,7 +68,7 @@ struct chirp_filesystem {
 	INT64_T (*lchown)    ( const char *path, INT64_T uid, INT64_T gid );
 	INT64_T (*truncate)  ( const char *path, INT64_T length );
 	INT64_T (*utime)     ( const char *path, time_t atime, time_t mtime  );
-	INT64_T (*md5)       ( const char *path, unsigned char digest[16] );
+	INT64_T (*hash)      ( const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX] );
 	INT64_T (*setrep)    ( const char *path, int nreps );
 
     INT64_T (*getxattr)  ( const char *path, const char *name, void *data, size_t size );
@@ -96,7 +97,6 @@ void cfs_normalize ( char url[CHIRP_PATH_MAX] );
 
 /* CFS implementation for many stdio.h things */
 int         cfs_create_dir(const char *path, int mode);
-int         cfs_delete_dir(const char *path);
 int         cfs_exists( const char *path );
 int         cfs_fclose(CHIRP_FILE * file);
 INT64_T     cfs_fd_size( int fd );
@@ -114,17 +114,19 @@ int         cfs_isdir(const char *filename);
 int         cfs_isnotdir(const char *filename);
 
 /* "basic" implementation made of primitives for operations the backend FS does not implement */
+INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime );
+INT64_T cfs_basic_hash (const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX]);
+INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime);
+INT64_T cfs_basic_rmall(const char *path);
 INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
 INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
-INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime);
-INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime );
-INT64_T cfs_basic_md5(const char *path, unsigned char digest[16]);
 INT64_T cfs_basic_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime);
 INT64_T cfs_basic_chown(const char *path, INT64_T uid, INT64_T gid);
 INT64_T cfs_basic_lchown(const char *path, INT64_T uid, INT64_T gid);
 INT64_T cfs_basic_fchown(int fd, INT64_T uid, INT64_T gid);
 
 /* stubs for operations not implemented in the backend FS */
+void cfs_stub_destroy(void);
 INT64_T cfs_stub_lockf (int fd, int cmd, INT64_T len);
 INT64_T cfs_stub_getxattr (const char *path, const char *name, void *data, size_t size);
 INT64_T cfs_stub_fgetxattr (int fd, const char *name, void *data, size_t size);
@@ -145,6 +147,24 @@ int     cfs_stub_job_schedule (sqlite3 *db);
 
 extern struct chirp_filesystem *cfs;
 extern char   chirp_url[CHIRP_PATH_MAX];
+
+#define STAT_TO_CSTAT(cbuf, buf)\
+	do {\
+		memset(&(cbuf),0,sizeof(cbuf));\
+		(cbuf).cst_dev = (buf).st_dev;\
+		(cbuf).cst_ino = (buf).st_ino;\
+		(cbuf).cst_mode = (buf).st_mode;\
+		(cbuf).cst_nlink = (buf).st_nlink;\
+		(cbuf).cst_uid = (buf).st_uid;\
+		(cbuf).cst_gid = (buf).st_gid;\
+		(cbuf).cst_rdev = (buf).st_rdev;\
+		(cbuf).cst_size = (buf).st_size;\
+		(cbuf).cst_blksize = (buf).st_blksize;\
+		(cbuf).cst_blocks = (buf).st_blocks;\
+		(cbuf).cst_atime = (buf).st_atime;\
+		(cbuf).cst_mtime = (buf).st_mtime;\
+		(cbuf).cst_ctime = (buf).st_ctime;\
+	} while (0)
 
 #endif /* CHIRP_FILESYSTEM_H */
 

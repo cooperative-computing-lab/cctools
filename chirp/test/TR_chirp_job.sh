@@ -91,7 +91,7 @@ EOF
 	J1=$(../src/chirp -a unix -d all "$hostport" job_create "$json")
 	echo Job $J1 created.
 	../src/chirp -a unix -d all "$hostport" job_commit "[$J1]"
-	../src/chirp -a unix -d all "$hostport" job_commit "[$J1]" && return 1 # EPERM
+	../src/chirp -a unix -d all "$hostport" job_commit "[$J1]" || return 1 # harmless NOP
 	J1b=$(../src/chirp -a unix -d all "$hostport" job_create "$json")
 	echo Job $J1b created.
 	../src/chirp -a unix -d all "$hostport" job_kill "[$J1b]"
@@ -221,10 +221,7 @@ EOF
 }
 EOF
 )
-	J3=$(../src/chirp -a hostname -d all "$hostport" job_create "$json")
-	echo Job $J3 created.
-	../src/chirp -a hostname -d all "$hostport" job_commit "[$J3]"
-	../src/chirp -a hostname -d all "$hostport" job_wait $J3
+	../src/chirp -a hostname -d all "$hostport" job_create "$json" && return 1 # EPERM
 
 	return 0
 }

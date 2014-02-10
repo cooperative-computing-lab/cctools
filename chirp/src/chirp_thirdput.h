@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include "int_sizes.h"
 #include <sys/time.h>
 
-INT64_T chirp_thirdput(const char *subject, const char *lpath, const char *hostname, const char *rpath, time_t stoptime);
+INT64_T chirp_thirdput(const char *subject, const char *ticket, const char *lpath, const char *hostname, const char *rpath, time_t stoptime);
 
 #endif
 

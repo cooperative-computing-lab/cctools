@@ -99,6 +99,7 @@ static struct flag_info table[] = {
 	{"makeflow_lexer",    D_MAKEFLOW_LEXER},
 	{"makeflow_parser",   D_MAKEFLOW_PARSER},
 	{"rmonitor", D_RMON},
+	{"confuga", D_CONFUGA},
 	{"all", D_ALL},
 	{"time", 0},		/* backwards compatibility */
 	{"pid", 0},		/* backwards compatibility */

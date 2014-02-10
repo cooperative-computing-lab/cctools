@@ -610,6 +610,22 @@ INT64_T chirp_reli_truncate(const char *host, const char *path, INT64_T length, 
 INT64_T chirp_reli_utime(const char *host, const char *path, time_t actime, time_t modtime, time_t stoptime);
 
 /** Checksum a remote file.
+ *
+ * A hash checksum is performed remotely by the file server, so it is much more
+ * efficient than pulling data and computing the hash locally.  Note that the
+ * data is returned in <b>binary</b> digest form.
+ *
+ * @param host The name and port of the Chirp server to access.
+ * @param path The pathname of the file to access.
+ * @param algorithm The type of hash function to use (e.g. "md5" or "sha1").
+ * @param digest The buffer to place the binary checksum digest.
+ * @param stoptime The absolute time at which to abort.
+ * @return On success, returns actual size of the digest.  On failure, returns less than zero and sets errno.
+*/
+
+INT64_T chirp_reli_hash(const char *host, const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime);
+
+/** Checksum a remote file. (DEPRECATED: use @ref chirp_reli_hash)
 This MD5 checksum is performed remotely by the file server, so it is much more
 efficient than computing one by invoking a local command.  Note that the data
 is returned in <b>binary</b> digest form.  Use @ref md5_string to convert the
@@ -618,7 +634,7 @@ digest into a human readable form.
 @param path The pathname of the file to access.
 @param digest The buffer to place the binary checksum digest.
 @param stoptime The absolute time at which to abort.
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
+@return On success, returns greater than or equal to zero.  On failure, returns less than zero and sets errno.
 @see md5_string
 */
 
