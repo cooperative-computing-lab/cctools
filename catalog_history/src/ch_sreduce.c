@@ -7,7 +7,7 @@ See the file COPYING for details.
 #include "nvpair.h"
 #include "hash_table.h"
 #include "debug.h"
-#include "reduction.h"
+#include "deltadb_reduction.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -19,15 +19,15 @@ See the file COPYING for details.
 
 struct deltadb {
 	struct hash_table *table;
-	struct reduction *reductions[100];
-	int nreductions;
+	struct deltadb_reduction *deltadb_reductions[100];
+	int ndeltadb_reductions;
 };
 
 struct deltadb * deltadb_create()
 {
 	struct deltadb *db = malloc(sizeof(*db));
 	db->table = hash_table_create(0,0);
-	db->nreductions = 0;
+	db->ndeltadb_reductions = 0;
 	return db;
 }
 
@@ -70,16 +70,16 @@ static int checkpoint_read( struct deltadb *db, FILE *file )
 
 #define NVPAIR_LINE_MAX 1024
 
-void emit_all_reductions( struct deltadb *db, time_t current, int first_output )
+void emit_all_deltadb_reductions( struct deltadb *db, time_t current, int first_output )
 {
 	int i;
 	struct nvpair *nv;
 	char *key;
 	const char *value;
 
-	/* Reset all reduction state. */
-	for(i=0;i<db->nreductions;i++) {
-		reduction_reset(db->reductions[i]);
+	/* Reset all deltadb_reduction state. */
+	for(i=0;i<db->ndeltadb_reductions;i++) {
+		deltadb_reduction_reset(db->deltadb_reductions[i]);
 	}
 
 	/* After each event, iterate over all objects... */
@@ -87,20 +87,20 @@ void emit_all_reductions( struct deltadb *db, time_t current, int first_output )
 	hash_table_firstkey(db->table);
 	while(hash_table_nextkey(db->table,&key,(void**)&nv)) {
 
-		/* Update all reductions for that object. */
-		for(i=0;i<db->nreductions;i++) {
-			struct reduction *r = db->reductions[i];
+		/* Update all deltadb_reductions for that object. */
+		for(i=0;i<db->ndeltadb_reductions;i++) {
+			struct deltadb_reduction *r = db->deltadb_reductions[i];
 			value = nvpair_lookup_string(nv,r->attr);
-			if(value) reduction_update(r,value);
+			if(value) deltadb_reduction_update(r,value);
 		}
 	}
 
 	if(first_output) {
 		/* The first time we do this, make it a checkpoint record. */
 		printf("key 0\n");
-		for(i=0;i<db->nreductions;i++) {
-			struct reduction *r = db->reductions[i];
-			reduction_print(r);
+		for(i=0;i<db->ndeltadb_reductions;i++) {
+			struct deltadb_reduction *r = db->deltadb_reductions[i];
+			deltadb_reduction_print(r);
 		}
 		printf("\n");
 		printf(".Checkpoint End.\n");
@@ -109,10 +109,10 @@ void emit_all_reductions( struct deltadb *db, time_t current, int first_output )
 	} else {
 		/* After that, make it an update record. */
 		printf("T %ld\n",(long)current);
-		for(i=0;i<db->nreductions;i++) {
-			struct reduction *r = db->reductions[i];
+		for(i=0;i<db->ndeltadb_reductions;i++) {
+			struct deltadb_reduction *r = db->deltadb_reductions[i];
 			printf("U 0 ");
-			reduction_print(r);
+			deltadb_reduction_print(r);
 		}
 	}
 }
@@ -171,7 +171,7 @@ static int log_play( struct deltadb *db, FILE *stream  )
 		}
 
 		if(previous_time!=current) {
-			emit_all_reductions(db,previous_time,first_output);
+			emit_all_deltadb_reductions(db,previous_time,first_output);
 			previous_time = current;
 		}
 		first_output = 0;
@@ -191,14 +191,14 @@ int main( int argc, char *argv[] )
 		char *attr = strtok(argv[i], ",");
 		char *type = strtok(0,",");
 
-		struct reduction *r = reduction_create(type,attr);
+		struct deltadb_reduction *r = deltadb_reduction_create(type,attr);
 
 		if(!r) {
-			fprintf(stderr,"%s: invalid reduction: %s\n",argv[0],type);
+			fprintf(stderr,"%s: invalid deltadb_reduction: %s\n",argv[0],type);
 			return 1;
 		}
 
-		db->reductions[db->nreductions++] = r;
+		db->deltadb_reductions[db->ndeltadb_reductions++] = r;
 	}
 
 	checkpoint_read(db,stdin);
