@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "deltadb_expr.h"
 #include "deltadb_value.h"
+#include "deltadb_functions.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -36,6 +37,13 @@ struct deltadb_expr * deltadb_expr_create_symbol( const char *n )
 	return e;
 }
 
+struct deltadb_expr * deltadb_expr_create_fcall( const char *fname, struct deltadb_expr *args )
+{
+	struct deltadb_expr *e = deltadb_expr_create(DELTADB_EXPR_FCALL,0,args);
+	e->symbol = fname;
+	return e;
+}
+
 struct deltadb_expr * deltadb_expr_create_list( struct deltadb_expr *list )
 {
 	return deltadb_expr_create(DELTADB_EXPR_LIST,0,list);
@@ -55,12 +63,9 @@ void deltadb_expr_delete( struct deltadb_expr *e )
 	deltadb_expr_delete(e->left);
 	deltadb_expr_delete(e->right);
 	deltadb_expr_delete(e->next);
+	deltadb_value_delete(e->value);
 
-	if(e->type==DELTADB_EXPR_VALUE) {
-		deltadb_value_delete(e->value);
-	} else if(e->type==DELTADB_EXPR_SYMBOL) {
-		free((char*)e->symbol);
-	}
+	if(e->symbol) free((char*) e->symbol);
 
 	free(e);
 }
@@ -120,11 +125,9 @@ void deltadb_expr_print( FILE *file, struct deltadb_expr *e )
 			break;
 		case DELTADB_EXPR_LIST:
 			fprintf(file,"[");
-			e=e->right;
-			while(e) {
+			for(e=e->right;e;e=e->next) {
 				deltadb_expr_print(file,e);
 				if(e->next) fprintf(file,",");
-				e = e->next;
 			}
 			fprintf(file,"]");			
 			break;
@@ -133,6 +136,14 @@ void deltadb_expr_print( FILE *file, struct deltadb_expr *e )
 			break;
 		case DELTADB_EXPR_SYMBOL:
 			fprintf(file,"%s",e->symbol);
+			break;
+		case DELTADB_EXPR_FCALL:
+			fprintf(file,"%s(",e->symbol);
+			for(e=e->right;e;e=e->next) {
+				deltadb_expr_print(file,e);
+				if(e->next) fprintf(file,",");
+			}
+			fprintf(file,")");
 			break;
 	}
 }
@@ -206,6 +217,9 @@ struct deltadb_value * deltadb_expr_eval( struct deltadb_expr *e )
 			break;
 		case DELTADB_EXPR_VALUE:
 			result = deltadb_value_copy(e->value);
+			break;
+		case DELTADB_EXPR_FCALL:
+			result = deltadb_function_call(e->symbol,b);
 			break;
 	}
 

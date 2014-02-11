@@ -59,11 +59,11 @@ void deltadb_parser_delete( struct deltadb_parser *p )
 
 int deltadb_parser_expect( struct deltadb_parser *p, deltadb_token_t t )
 {
-	deltadb_token_t actual = deltadb_scanner_lookahead(p->scanner);
-
-	if(actual==t) {
+	if(deltadb_scanner_accept(p->scanner,t)) {
 		return 1;
 	} else {
+		deltadb_token_t actual = deltadb_scanner_lookahead(p->scanner);
+	
 		sprintf(p->error_string,"expected %s but found %s instead",
 			deltadb_scanner_get_token_name(t),
 			deltadb_scanner_get_token_name(actual)
@@ -127,7 +127,20 @@ struct deltadb_expr * deltadb_parse_atomic_expr( struct deltadb_parser *p )
 		}
 	} else if(deltadb_scanner_accept(p->scanner,DELTADB_TOKEN_SYMBOL)) {
 		symbol = strdup(deltadb_scanner_get_string_value(p->scanner));
-		return deltadb_expr_create_symbol(symbol);
+
+		if(deltadb_scanner_accept(p->scanner,DELTADB_TOKEN_LPAREN)) {
+			e = deltadb_parse_expr_list(p);
+			if(deltadb_parser_expect(p,DELTADB_TOKEN_RPAREN)) {
+				return deltadb_expr_create_fcall(symbol,e);
+			} else {
+				deltadb_expr_delete(e);
+				free(symbol);
+				return 0;
+			}
+		} else {
+			return deltadb_expr_create_symbol(symbol);
+		}
+
 	} else if(deltadb_scanner_accept(p->scanner,DELTADB_TOKEN_REAL_LITERAL)) {
 		return deltadb_expr_create_value(deltadb_value_create_real(deltadb_scanner_get_real_value(p->scanner)));
 	} else if(deltadb_scanner_accept(p->scanner,DELTADB_TOKEN_STRING_LITERAL)) {
@@ -243,15 +256,6 @@ struct deltadb_expr * deltadb_parse_binary_expr( struct deltadb_parser *p, int l
 struct deltadb_expr * deltadb_parse_expr( struct deltadb_parser *p )
 {
 	return deltadb_parse_binary_expr(p,0);
-}
-
-char * deltadb_parse_symbol( struct deltadb_parser *p )
-{
-	if(deltadb_scanner_expect(p->scanner,DELTADB_TOKEN_SYMBOL)) {
-		return strdup(deltadb_scanner_get_string_value(p->scanner));
-	} else {
-		return 0;
-	}
 }
 
 struct deltadb_value * deltadb_parse_value_list( struct deltadb_parser *p )

@@ -30,7 +30,8 @@ typedef enum {
 	DELTADB_EXPR_GE,
 	DELTADB_EXPR_LIST,
 	DELTADB_EXPR_VALUE,
-	DELTADB_EXPR_SYMBOL
+	DELTADB_EXPR_SYMBOL,
+	DELTADB_EXPR_FCALL
 } deltadb_expr_type_t;
 
 struct deltadb_expr {
@@ -46,6 +47,7 @@ struct deltadb_expr * deltadb_expr_create( deltadb_expr_type_t type, struct delt
 struct deltadb_expr * deltadb_expr_create_symbol( const char *n );
 struct deltadb_expr * deltadb_expr_create_list( struct deltadb_expr *list );
 struct deltadb_expr * deltadb_expr_create_value( struct deltadb_value *value );
+struct deltadb_expr * deltadb_expr_create_fcall( const char *fname, struct deltadb_expr *args );
 
 void deltadb_expr_print( FILE *file, struct deltadb_expr *e );
 void deltadb_expr_delete( struct deltadb_expr *e );
