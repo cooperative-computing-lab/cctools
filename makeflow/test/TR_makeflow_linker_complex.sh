@@ -15,7 +15,7 @@ prepare() {
   touch /tmp/makeflow_test_complex/a/b/x/y
   chmod 777 /tmp/makeflow_test_complex/a/b/x/y
 
-  exit $?
+  exit 0
 }
 
 run() {
