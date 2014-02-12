@@ -27,7 +27,10 @@ See the file COPYING for details.
 #include <fnmatch.h>
 #include <utime.h>
 #include <unistd.h>
-#include <alloca.h>
+
+#if !defined(CCTOOLS_OPSYS_FREEBSD)
+#include <alloca.h>                     // FreeBSD has alloca in stdlib.
+#endif
 
 #include <sys/fcntl.h>
 #include <sys/file.h>
