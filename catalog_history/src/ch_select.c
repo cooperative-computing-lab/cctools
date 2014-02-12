@@ -92,9 +92,11 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if (started==1){
 			//printf("(%s",line);
+			if (line[0]=='T' && line[1]!=' ') // Handles garbage times that cause the select to think it is done.
+				continue;
 			if (oper=='T'){
 				last_ts = current;
-				current = atol(key);\
+				current = atol(key);
 				if ((current-last_ts)>(24*3600) && last_ts>0)
 					continue;
 				if(current>end_time){
@@ -130,7 +132,7 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 				break;
 			case 'T':
 				last_ts = current;
-				current = atol(key);\
+				current = atol(key);
 				if ((current-last_ts)>(24*3600) && last_ts>0)
 					current = last_ts;
 				if(started==0 && current>=start_time){

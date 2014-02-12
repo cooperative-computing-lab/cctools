@@ -161,9 +161,9 @@ static int log_play( struct deltadb *db )
 	while(fgets(line,sizeof(line),stream)) {
 		
 		line_number += 1;
-		
+
 		if (line[0]=='.') return 0;
-		
+
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if(n<1) continue;
 		
