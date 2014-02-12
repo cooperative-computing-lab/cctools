@@ -1,19 +1,24 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 
 <head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
 <title>Watchdog User's Manual</title>
 </head>
 
 <body>
 
+<div id="manual">
 <h1>Watchdog User's Manual</h1>
-<b>February 2006</b>
-<p>
 
-The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain
-and Copyright (C) 2005- The University of Notre Dame.  All rights reserved.
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
+<p style="text-align: right;"><b>Last edited: February 2006</b></p>
+
+<p>watchdog is Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005- The University of Notre Dame.<br>
+All rights reserved.<br>
+This software is distributed under the GNU General Public License.<br>
+See the file COPYING for details.</p>
+
 
 <h2>Overview</h2>
 
@@ -39,15 +44,11 @@ these actions are taken with an exponential backoff and a random factor.
 To run a server under the eye of watchdog, simply place <tt>watchdog</tt>
 in front of the server name.  That is, if you normally run:
 
-<pre>
-/path/to/chirp_server -r /my/data -p 10101
-</pre>
+<code>/path/to/chirp_server -r /my/data -p 10101</code>
 
 Then run this instead:
 
-<pre>
-watchdog /path/to/chirp_server -r /my/data -p 10101
-</pre>
+<code>watchdog /path/to/chirp_server -r /my/data -p 10101</code>
 
 For most situations, this is all that is needed.
 You may fine tune the behavior of watchdog in
@@ -78,6 +79,6 @@ is first sent an advisory SIGTERM signal.  If it does not exit
 voluntarily within one minute (-S), then it is killed outright
 with a SIGKILL signal.
 
-</body
-
+</div>
+</body>
 </html>

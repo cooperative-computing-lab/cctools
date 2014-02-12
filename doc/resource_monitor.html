@@ -1,30 +1,24 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 
-  <head>
-    <title>Resource Monitor User's Manual</title>
-  </head>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
+<title>Resource Monitor User's Manual</title>
+</head>
 
-  <body>
+<body>
 
-    <style type="text/css">
-      pre {
-      background: #ffffcc;
-      font-family: monospace;
-      font-size: 75%
-      font-align: left;
-      white-space: pre;
-      border: solid 1px black;
-      padding: 5px;
-      margin: 20px;
-      }
-    </style>
-    <h1>Resource Monitor User's Manual</h1>
-    <b>Last Updated August 2013</b>
-    <p>
-      resource_monitor is Copyright (C) 2013 The University of Notre Dame.
-      This software is distributed under the GNU General Public License.
-      See the file COPYING for details.
-    <p>
+<div id="manual">
+<h1>Resource Monitor User's Manual</h1>
+
+<p style="text-align: right;"><b>Last edited: August 2013</b></p>
+
+<p>resource_monitor is Copyright (C) 2013 The University of Notre Dame.<br>
+All rights reserved.<br>
+This software is distributed under the GNU General Public License.<br>
+See the file COPYING for details.</p>
+
       <h2>Overview</h2>
 
       <b>resource_monitor</b> is a tool to monitor the computational
@@ -72,8 +66,7 @@
 
      Simply type:
 
-      <pre>
-	% resource_monitor -- ls </pre>
+      <code>% resource_monitor -- ls</code>
 
      This will generate three files describing the resource usage of
      the command "ls". These files are <tt>
@@ -83,8 +76,7 @@ which PID represents the
 corresponding process id. Alternatively, we can specify the output
 names, and the sampling intervals:
 
-      <pre>
-	% resource_monitor -O log-sleep -i 2 -- sleep 10 </pre>
+      <code>% resource_monitor -O log-sleep -i 2 -- sleep 10</code>
 
       The previous command will monitor "sleep 10", at two second
       intervals, and will generate the
@@ -103,8 +95,7 @@ names, and the sampling intervals:
 	  resource_monitor by giving the <tt>-M</tt> flag to makeflow with a
 	  desired output directory, for example:
 
-      <pre>
-	% makeflow -Mmonitor_logs Makeflow </pre>
+      <code>% makeflow -Mmonitor_logs Makeflow</code>
 
 	  In this case, makeflow wraps every command line rule with the monitor,
 	  and writes the resulting logs per rule in the directory
@@ -114,9 +105,9 @@ names, and the sampling intervals:
 
       From Work Queue:
 
-      <pre>
-	q = work_queue_create(port);
-	work_queue_enable_monitoring(q, some-log-file); </pre>
+<code>q = work_queue_create(port);
+work_queue_enable_monitoring(q, some-log-file);
+</code>
 
       wraps every task with the monitor, and appends all generated
       summary files into the file <tt>some-log-file</tt>. Currently
@@ -130,78 +121,74 @@ names, and the sampling intervals:
       and the generated log files as output files. For example,
       consider the following submission file:
 
-      <pre>
-	universe = vanilla
-	executable = /bin/echo
-	arguments = hello condor
-	output = test.output
-	should_transfer_files = yes
-	when_to_transfer_output = on_exit
-	log = condor.test.logfile
-	queue </pre>
+      <code>universe = vanilla
+executable = /bin/echo
+arguments = hello condor
+output = test.output
+should_transfer_files = yes
+when_to_transfer_output = on_exit
+log = condor.test.logfile
+queue
+</code>
 
       This can be rewritten, for example, as:
 
-      <pre>
-	universe = vanilla
-	executable = /path/to/resource_monitor
-	arguments = -O echo-log -- /bin/echo hello condor
-	output = test.output echo-log.summary echo-log.series echo-log.files
-	should_transfer_files = yes
-	when_to_transfer_output = on_exit
-	log = condor.test.logfile
-	queue </pre>
-      
+      <code>universe = vanilla
+executable = /path/to/resource_monitor
+arguments = -O echo-log -- /bin/echo hello condor
+output = test.output echo-log.summary echo-log.series echo-log.files
+should_transfer_files = yes
+when_to_transfer_output = on_exit
+log = condor.test.logfile
+queue
+</code>
 
       <h2>Output Format</h2>
 
       The summary file has the following format:
 
-      <pre>
-	command: [the command line given as an argument]
-	start:                     [seconds at the start of execution, since the epoch, float]
-	end:                       [seconds at the end of execution, since the epoch,   float]
-	exit_type:                 [one of normal, signal or limit,                    string]
-	signal:                    [number of the signal that terminated the process.
-	                            Only present if exit_type is signal                   int]
-	limits_exceeded:           [resources over the limit. Only present if
-	                            exit_type is limit,                                string]
-	exit_status:               [final status of the parent process,                   int]
-	max_concurrent_processes:  [the maximum number of processes running concurrently, int]
-	wall_time:                 [seconds spent during execution, end - start,        float]
-	cpu_time:                  [user + system time of the execution, in seconds,    float]
-	virtual_memory:            [maximum virtual memory across all processes, in MB,   int]
-	resident_memory:           [maximum resident size across all processes, in MB,    int]
-	swap_memory:               [maximum swap usage across all processes, in MB,       int]
-	bytes_read:                [number of bytes read from disk,                       int]
-	bytes_written:             [number of bytes written to disk,                      int]
-	workdir_number_files_dirs: [total maximum number of files and directories of
-	                            all the working directories in the tree,              int]
-	workdir_footprint:         [size in MB of all working directories in the tree,    int]
-	</pre>
+      <code>command:                   [the command line given as an argument]
+start:                     [seconds at the start of execution, since the epoch, float]
+end:                       [seconds at the end of execution, since the epoch,   float]
+exit_type:                 [one of normal, signal or limit,                    string]
+signal:                    [number of the signal that terminated the process.
+                            Only present if exit_type is signal                   int]
+limits_exceeded:           [resources over the limit. Only present if
+                            exit_type is limit,                                string]
+exit_status:               [final status of the parent process,                   int]
+max_concurrent_processes:  [the maximum number of processes running concurrently, int]
+wall_time:                 [seconds spent during execution, end - start,        float]
+cpu_time:                  [user + system time of the execution, in seconds,    float]
+virtual_memory:            [maximum virtual memory across all processes, in MB,   int]
+resident_memory:           [maximum resident size across all processes, in MB,    int]
+swap_memory:               [maximum swap usage across all processes, in MB,       int]
+bytes_read:                [number of bytes read from disk,                       int]
+bytes_written:             [number of bytes written to disk,                      int]
+workdir_number_files_dirs: [total maximum number of files and directories of
+                            all the working directories in the tree,              int]
+workdir_footprint:         [size in MB of all working directories in the tree,    int]
+</code>
 
       The time-series log has a row per time sample. For each row, the columns have the following meaning:
 
-      <pre>
-	wall_clock                [the sample time, since the epoch, in microseconds,      int]
-	concurrent_processes      [concurrent processes at the time of the sample,         int]
-	cpu_time                  [accumulated user + kernel time, in microseconds,        int]
-	virtual_memory            [current virtual memory size, in MB,                     int]
-	resident_memory           [current resident memory size, in MB,                    int]
-	swap_memory               [current swap usage, in MB,                              int]
-	bytes_read                [accumulated number of bytes read,                       int]
-	bytes_written             [accumulated number of bytes written,                    int]
-	workdir_number_files_dirs [current number of files and directories, across all
-	                           working directories in the tree,                        int]
-	workdir_footprint         [current size of working directories in the tree, in MB  int]
-	</pre>
-      
+      <code>wall_clock                [the sample time, since the epoch, in microseconds,      int]
+concurrent_processes      [concurrent processes at the time of the sample,         int]
+cpu_time                  [accumulated user + kernel time, in microseconds,        int]
+virtual_memory            [current virtual memory size, in MB,                     int]
+resident_memory           [current resident memory size, in MB,                    int]
+swap_memory               [current swap usage, in MB,                              int]
+bytes_read                [accumulated number of bytes read,                       int]
+bytes_written             [accumulated number of bytes written,                    int]
+workdir_number_files_dirs [current number of files and directories, across all
+                           working directories in the tree,                        int]
+workdir_footprint         [current size of working directories in the tree, in MB  int]
+</code>
+     
       <h2>Specifying Resource Limits</h2>
 
       The limits file should contain lines of the form:
 
-      <pre>
-	resource: max_value </pre>
+      <code>resource: max_value</code>
 
       It may contain any of the following fields, in the same units as
       defined for the summary file:
@@ -214,35 +201,31 @@ names, and the sampling intervals:
 
       Thus, for example, to automatically kill a process after one hour, or if it is using 5GB of swap, we can create the following file <tt>limits.txt</tt>:
 
-      <pre>
-	wall_time: 3600
-	swap_memory: 5242880 </pre>
+      <code>wall_time: 3600
+swap_memory: 5242880
+</code>
 
       In <tt>makeflow</tt> we then specify:
 
-      <pre>
-	makeflow -Mmonitor_logs --monitor-limits=limits.txt </pre>
+      <code>makeflow -Mmonitor_logs --monitor-limits=limits.txt</code>
 
       Or with <tt>condor:</tt>
 	
-      <pre>
-	universe = vanilla
-	executable = matlab
-	arguments = -O matlab-script-log --limits-file=limits.txt -- matlab < script.m
-	output = matlab.output matlab-script-log.summary matlab-script-log.series matlab-script-log.files
-	transfer_input_files=script.m limits.txt
-	should_transfer_files = yes
-	when_to_transfer_output = on_exit
-	log = condor.matlab.logfile
-	queue </pre>
+<code>universe = vanilla
+executable = matlab
+arguments = -O matlab-script-log --limits-file=limits.txt -- matlab &lt; script.m
+output = matlab.output matlab-script-log.summary matlab-script-log.series matlab-script-log.files
+transfer_input_files=script.m limits.txt
+should_transfer_files = yes
+when_to_transfer_output = on_exit
+log = condor.matlab.logfile
+queue
+</code>
       
   <h2>For More Information</h2>
 
   For the latest information about <b>resource_monitor</b> please subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
 
+</div>
 </body>
 </html>
-
-
-
-

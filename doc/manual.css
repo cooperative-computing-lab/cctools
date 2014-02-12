@@ -1,0 +1,110 @@
+body {
+  background: gray;
+}
+#manual {
+  background: white;
+  border: 2px solid #000000;
+  padding: 20px;
+  max-width: 1000px;
+  margin: 20px auto 20px auto;
+}
+h1 {
+  border-top: 3px solid #000000;
+  border-bottom: 3px solid #000000;
+  font-weight: bold;
+  text-align: center;
+}
+h2 {
+  border-bottom: 2px solid #000000;
+  border-left: 5px solid #000000;
+  font-weight: bold;
+  padding-left: 10px;
+}
+h3 {
+  border-bottom: 2px solid #000000;
+  border-left: 5px double #000000;
+  font-weight: bold;
+  padding-left: 10px;
+  margin-left: 20px;
+}
+h4 {
+  border-bottom: 1px solid #000000;
+  border-left: 5px inset #000000;
+  font-weight: bold;
+  padding-left: 10px;
+  margin-left: 30px;
+}
+hr {
+  border: 0;
+  width: 80%;
+  height: 5px;
+  color: black;
+}
+p {
+  font: normal normal normal 18px Times, serif;
+}
+ul, ol {
+  font: normal normal normal 20px Times, serif;
+}
+table {
+  background: #dddddd;
+  border-collapse: collapse;
+  margin: 10px auto 10px auto;
+}
+tr {
+  border-spacing: 0;
+  margin: none;
+  padding: 5px;
+}
+td {
+  border: 2px solid black;
+  margin: none;
+  padding: 10px;
+}
+th {
+  border: 3px solid black;
+  font-variant: small-caps;
+  margin: none;
+  padding: 10px;
+}
+tt {
+  font: normal normal normal 16px "Courier New", Courier, monospace;
+}
+code {
+  background: #ffffcc;
+  border: 1px dashed #000000;
+  color: #000000;
+  display: block;
+  /*font: normal normal normal .75em/100% "Courier New", Courier, monospace;*/
+  font: normal normal normal 18px "Courier New", Courier, monospace;
+  margin: 10px 0 10px 20px;
+  max-width: 65em; /* a little more than .75*80 */
+  /* FIXME always takes up max WIDTH!!! :( */
+  overflow-x: auto; /* CSS 3 */
+  padding: 10px 10px 10px 10px;
+  text-align: left;
+  text-decoration: none;
+  white-space: pre;
+}
+.sectionlink {
+  color: blue;
+  border: none;
+  display: none;
+  float: right;
+  font-weight: normal;
+  text-decoration: none;
+}
+code .prompt {
+  color: #cc0000;
+  font-weight: bold;
+}
+h1:hover .sectionlink, h2:hover .sectionlink, h3:hover .sectionlink, h4:hover .sectionlink, h5:hover .sectionlink, h6:hover .sectionlink {
+  display: block;
+}
+:target {
+  background-color: #ededed;
+  border: dashed black 2px;
+  border-radius: 8px;
+  font-weight: bold;
+  padding: 10px;
+}

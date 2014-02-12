@@ -1,39 +1,27 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 
 <head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
 <title>Makeflow User's Manual</title>
 </head>
 
 <body>
 
-<style type="text/css">
-pre {
-background: #ffffcc;
-font-family: monospace;
-font-size: 75%
-font-align: left;
-white-space: pre;
-border: solid 1px black;
-padding: 5px;
-margin: 20px;
-}
-
-td
-{
-    text-align: right;
-    border: 1px solid black
-}
-
-</style>
+<div id="manual">
 <h1>Makeflow User's Manual</h1>
-<b>Last Updated November 2013</b>
-<p>
-Makeflow is Copyright (C) 2009 The University of Notre Dame.
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-<p>
+
+<p style="text-align: right;"><b>Last edited: November 2013</b></p>
+
+<p>Makeflow is Copyright (C) 2009 The University of Notre Dame.<br>
+All rights reserved.<br>
+This software is distributed under the GNU General Public License.<br>
+See the file COPYING for details.</p>
+
 <h2>Overview</h2>
 
+<p>
 Makeflow is a <b>workflow engine</b> for distributed computing.
 It accepts a specification of a large amount of work to be
 performed, and runs it on remote machines in parallel where possible.
@@ -70,8 +58,7 @@ of the image, and then combines them back together into an animation.
 The first and the last task are marked as LOCAL to force them to
 run on the controlling machine.
 
-<pre>
-CURL=/usr/bin/curl
+<code>CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
 URL=http://www.cse.nd.edu/~ccl/images/capitol.jpg
 
@@ -92,7 +79,7 @@ capitol.360.jpg: capitol.jpg $CONVERT
 
 capitol.jpg: $CURL
         LOCAL $CURL -o capitol.jpg $URL
-</pre>
+</code>
 
 Note that Makeflow differs from Make in a few important ways.
 Read section 4 below to get all of the details.
@@ -102,42 +89,31 @@ Read section 4 below to get all of the details.
 To try out the example above, copy and paste it into a file named <tt>example.makeflow</tt>.
 To run it on your local machine:
 
-<pre>
-% makeflow example.makeflow
-</pre>
+<code>% makeflow example.makeflow</code>
 
 Note that if you run it a second time, nothing will happen, because all of the files are built:
 
-<pre>
-% makeflow example.makeflow
+<code>% makeflow example.makeflow
 makeflow: nothing left to do
-</pre>
+</code>
 
 Use the <tt>-c</tt> option to clean everything up before trying it again:
 
-<pre>
-% makeflow -c example.makeflow
-</pre>
+<code>% makeflow -c example.makeflow</code>
 
 If you have access to a batch system running <a href=http://www.sun.com/software/sge>SGE</a>,
 then you can direct Makeflow to run your jobs there:
 
-<pre>
-% makeflow -T sge example.makeflow
-</pre>
+<code>% makeflow -T sge example.makeflow</code>
 
 Or, if you have a <a href=http://www.cs.wisc.edu/condor>Condor Pool</a>,
 then you can direct Makeflow to run your jobs there:
 
-<pre>
-% makeflow -T condor example.makeflow
-</pre>
+<code>% makeflow -T condor example.makeflow</code>
 
 To submit Makeflow as a Condor job that submits more Condor jobs:
 
-<pre>
-% condor_submit_makeflow example.makeflow
-</pre>
+<code>% condor_submit_makeflow example.makeflow</code>
 
 You will notice that a workflow can run very slowly if you submit
 each batch job to SGE or Condor, because it typically
@@ -148,33 +124,24 @@ quickly dispatches work to remote worker processes.
 <p>
 To begin, let's assume that you are logged into a machine
 named <tt>barney.nd.edu</tt>. start your Makeflow like this:
-<pre>
-% makeflow -T wq example.makeflow
-</pre>
+<code>% makeflow -T wq example.makeflow</code>
 
 Then, submit 10 worker processes to Condor like this:
 
-<pre>
-% condor_submit_workers barney.nd.edu 9123 10
+<code>% condor_submit_workers barney.nd.edu 9123 10
 Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
-</pre>
+</code>
 
 Or, submit 10 worker processes to SGE like this:
-<pre>
-% sge_submit_workers barney.nd.edu 9123 10
-</pre>
+<code>% sge_submit_workers barney.nd.edu 9123 10</code>
 
 Or, submit 10 worker processes to Torque like this:
-<pre>
-% torque_submit_workers barney.nd.edu 9123 10
-</pre>
+<code>% torque_submit_workers barney.nd.edu 9123 10</code>
 
 Or, you can start workers manually on any other machine you can log into:
-<pre>
-% work_queue_worker barney.nd.edu 9123
-</pre>
+<code>% work_queue_worker barney.nd.edu 9123</code>
 
 Once the workers begin running, Makeflow will dispatch multiple
 tasks to each one very quickly.  If a worker should fail, Makeflow
@@ -216,8 +183,7 @@ the environment variables CORES, MEMORY, and DISK.
 
 Consider the following example:
 
-<pre>
-MEMORY=100
+<code>MEMORY=100
 one: src
     cmd
 
@@ -253,12 +219,11 @@ DISK=400
 
 seven: src
     cmd
-</pre>
+</code>
 
-<pre>
-export CORES=4
+<code>export CORES=4
 makeflow ...
-</pre>
+</code>
 
 <h6> Job categories (job named after its output): </h6>
 
@@ -275,7 +240,7 @@ makeflow ...
 
 <h6> Resources specified: </h6>
 <table>
-<th><tr><td> Category </td> <td> Cores </td> <td> Memory (MB) </td> <td> Disk (MB) </td> </tr></th>
+<tr><th>Category</th><th>Cores</th><th>Memory (MB)</th><th>Disk (MB)</th></tr>
 <tr><td> preprocessing </td> <td> - </td> <td> 200 </td> <td> 200 </td> </tr>
 <tr><td> simulation </td> <td> - </td> <td> - </td> <td> 700 </td> </tr>
 <tr><td> analysis </td> <td> 1 </td> <td> 400 </td> <td> 400 </td> </tr>
@@ -294,22 +259,20 @@ The Makeflow language is very similar to Make, but it does have a few important 
 <h3>Get the Dependencies Right</h3>
 
 You must be careful to accurately specify <b>all of the files that a rule requires and creates</b>, including any custom executables.  This is because Makeflow requires all these information to construct the environment for a remote job.  For example, suppose that you have written a simulation program called <tt>mysim.exe</tt> that reads <tt>calib.data</tt> and then produces and output file.  The following rule won't work, because it doesn't inform Makeflow what files are neded to execute the simulation:
-<pre>
-# This is an incorrect rule.
+<code># This is an incorrect rule.
 
 output.txt:
         ./mysim.exe -c calib.data -o output.txt
-</pre>
+</code>
 
 However, the following is correct, because the rule states all of the files needed to run the simulation.  Makeflow will use this information to
 construct a batch job that consists of <tt>mysim.exe</tt> and <tt>calib.data</tt> and uses it to produce <tt>output.txt</tt>:
 
-<pre>
-# This is a correct rule.
+<code># This is a correct rule.
 
 output.txt: mysim.exe calib.data
         ./mysim.exe -c calib.data -o output.txt
-</pre>
+</code>
 When a regular file is specified as an input file, it means the command relies on the contents of that file. When a directory is specified as an input file, however, it could mean one of two things. First, the command depends on the contents inside the directory. Second, the command relies on the existence of the directory (for example, you just want to add more things into the directory later, it does not matter what's already in it). <b>Makeflow assumes that an input directory indicates that the command relies on the directory's existence</b>.
 
 <h3>No Phony Rules</h3>
@@ -337,8 +300,7 @@ Makeflow, this can be achieved by defining the variables after the rule's
 requirements, but before the rule's command, and prepending the name of the
 variable with <tt>@</tt>, as follows:
 
-<pre>
-SOME_VARIABLE=original_value
+<code>SOME_VARIABLE=original_value
 
 #rule 1 target_1: source_1
 	command_1
@@ -348,7 +310,7 @@ SOME_VARIABLE=original_value
 	command_2
 
 #rule 3 target_3: source_3
-	command_3 </pre>
+	command_3 </code>
 
 In this example, SOME_VARIABLE has the value 'original_value' for rules 1 and
 3, and the value 'local_value_for_2' for rule 2.
@@ -363,14 +325,10 @@ variable or the <tt>-B</tt> option to Makeflow.
 When executing jobs, Makeflow simply uses the default settings in your batch system.  If you need to pass additional options, use the <tt>BATCH_OPTIONS</tt> variable or the <tt>-B</tt> option to Makeflow.
 <p>
 When using Condor, this string will be added to each submit file.  For example, if you want to add <tt>Requirements</tt> and <tt>Rank</tt> lines to your Condor submit files, add this to your Makeflow:
-<pre>
-BATCH_OPTIONS = Requirements = (Memory>1024)
-</pre>
+<code>BATCH_OPTIONS = Requirements = (Memory&gt;1024)</code>
 <p>
 When using SGE, the string will be added to the qsub options.  For example, to specify that jobs should be submitted to the <tt>devel</tt> queue:
-<pre>
-BATCH_OPTIONS = -q devel
-</pre>
+<code>BATCH_OPTIONS = -q devel</code>
 
 
 <h3>Remote File Renaming</h3>
@@ -378,21 +336,18 @@ BATCH_OPTIONS = -q devel
 With the Work Queue and Condor batch systems, Makeflow has a
 feature called remote file renaming. For example:
 
-<pre>
-local_name->remote_name
-</pre>
+<code>local_name-&gt;remote_name</code>
 
 indicates that the file <tt>local_name</tt> is called
 <tt>remote_name</tt> in the remote system. Consider the following
 example:
 
-<pre>
-b.out: a.in myprog
-        LOCAL myprog a.in > b.out 
+<code>b.out: a.in myprog
+LOCAL myprog a.in &gt; b.out 
 
 c.out->out: a.in->in1 b.out myprog->prog
         prog in1 b.out > out
-</pre>
+</code>
 
 The first rule runs locally, using the executable <tt>myprog</tt>
 and the local file <tt>a.in</tt> to locally create <tt>b.out</tt>.
@@ -409,16 +364,12 @@ When run with the <tt>-D</tt> option, Makeflow will emit a diagram of the Makefl
 <a href=http://www.graphviz.org>Graphviz DOT</a> format.  If you have <tt>dot</tt> installed,
 then you can generate an image of your workload like this:
 
-<pre>
-% makeflow -D example.makeflow | dot -T gif > example.gif
-</pre>
+<code>% makeflow -D example.makeflow | dot -T gif > example.gif</code>
 
 <h3>Total number of tasks in a Makeflow</h3>
 The following command parses Makeflow's '-D' option output and returns the
 total number of tasks in the given Makeflow script:
-<pre>
-% makeflow -D example.makeflow | grep '^N[0-9]\+ \[label=' | wc -l
-</pre>
+<code>% makeflow -D example.makeflow | grep '^N[0-9]\+ \[label=' | wc -l</code>
 
 <h2>Running Makeflow with Work Queue</h2>
 
@@ -433,18 +384,14 @@ not available on your system. You can change the default port via the '-p
 &lt;port number&gt;' option. For example, if you want the master to listen on port
 9567 by default, you can run the following command: 
 
-<pre>
-% makeflow -T wq -p 9567 example.makeflow
-</pre>
+<code>% makeflow -T wq -p 9567 example.makeflow</code>
 
 <h3>Project Names</h3>
 
 A simpler way to match workers to masters is to use the
 project name matching. You can give the master a project name with the -N option.
 
-<pre> 
-% makeflow -T wq -a -N MyProj example.makeflow 
-</pre> 
+<code> % makeflow -T wq -a -N MyProj example.makeflow </code> 
 The -N option gives the master a project name called 'MyProj'. The -a option
 enables the catalog mode of the master.  Only in the catalog mode a master
 would advertise its information, such as the project name, running status,
@@ -456,9 +403,7 @@ set up your own catalog server later.
 <p>
 To start a worker that automatically finds MyProj's master via the default Notre
 Dame catalog server:
-<pre>
-% work_queue_worker -a -N MyProj 
-</pre>
+<code>% work_queue_worker -a -N MyProj </code>
 The '-a' option enables the catalog mode on the worker, which tells the worker
 to contact a catalog server to find out a project's (specified by -N option)
 hostname and port.  
@@ -469,9 +414,7 @@ randomly select one to work for. When one project is done, the worker would
 repeat this process.  Thus, the worker can work for a different master without
 being stopped and given the different master's hostname and port. An example of
 specifying multiple projects:
-<pre>
-% work_queue_worker -a -N proj1 -N proj2 -N proj3
-</pre>
+<code>% work_queue_worker -a -N proj1 -N proj2 -N proj3</code>
 
 <h3>Setting a Password</h3>
 
@@ -480,27 +423,23 @@ a password.  To do this, select any passphrase and write it to
 a file called <tt>mypwfile</tt>.  Then, run Makeflow and each
 worker with the <tt>--password</tt> option to indicate the password file:
 
-<pre>
-% makeflow <b>--password</b> mypwfile ...
+<code>% makeflow <b>--password</b> mypwfile ...
 % work_queue_worker <b>--password</b> mypwfile ...
-</pre>
-</pre>
+</code>
+</code>
 
 <h3>Catalog Server</h3>
 
 <p>
 Now let's look at how to set up your own catalog server. Say you want to run
 your catalog server on a machine named <tt>catalog.somewhere.edu</tt>.  Tthe default port that the catalog server will be listening on is 9097, you can change it via the '-p' option.
-<pre>
-% catalog_server
-</pre>
+<code>% catalog_server</code>
 Now you have a catalog server listening at catalog.somewhere.edu:9097. To make your
 masters and workers contact this catalog server, simply add the '-C
 hostname:port' option to both of your master and worker: 
-<pre>
-% makeflow -T wq -C catalog.somewhere.edu:9097 -N MyProj example.makeflow
+<code>% makeflow -T wq -C catalog.somewhere.edu:9097 -N MyProj example.makeflow
 % work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj 
-</pre>
+</code>
 
 <h3>Supported Makeflow Drivers</h3>
 The full list of supported Makeflow drivers include
@@ -531,9 +470,7 @@ entire cluster, and the following environment variables must be set.
 </ul>
 
 These will be used to construct a task submission for each makeflow rule that consists of
-<pre>
-% $SUBMIT_COMMAND $SUBMIT_OPTIONS "&lt;rule name&gt;" $CLUSTER_NAME.wrapper "&lt;rule commandline&gt;"
-</pre>
+<code>% $SUBMIT_COMMAND $SUBMIT_OPTIONS "&lt;rule name&gt;" $CLUSTER_NAME.wrapper "&lt;rule commandline&gt;"</code>
 The wrapper script is a shell script that reads the command to be run as an argument and handles bookkeeping operations necessary for Makeflow.
 
 <h2>Makeflow Garbage Collection</h2>
@@ -565,16 +502,12 @@ below a given threshold.
 <p>
 To activate reference count garbage collection:
 
-<pre>
-makeflow -gref_count
-</pre>
+<code>makeflow -gref_count</code>
 
 <p>
 To activate on-demand garbage collection, with a threshold of 500MB:
 
-<pre>
-makeflow -gon_demand -G500000000
-</pre>
+<code>makeflow -gon_demand -G500000000</code>
 
 <h2>Makeflow Log File Format</h2>
 After you  have executed the <tt>example.makeflow</tt> Makeflow script, you
@@ -590,14 +523,12 @@ integer, associated with each node. This id is referred as node id. The
 Makeflow log file starts with a list of node (task) descriptions where each
 task is specified in the following format:
 
-<pre>
-# NODE node_id original_command
-# SYMBOL node_id symbol
+<code># NODE node_id original_command# SYMBOL node_id symbol
 # PARENTS node_id parent_node_id_1 parent_node_id_2 ... parent_node_id_n
 # SOURCES node_id source_file_1 source_file_2 ... source_file_n
 # TARGETS node_id target_file_1 target_file_2 ... target_file_n
 # COMMAND node_id translated_command
-</pre>
+</code>
 
 These annotation lines all start with '#' and will be treated as comments by
 Makeflow. When Makeflow tries to resume the execution of a Makeflow script from
@@ -608,8 +539,7 @@ such as gnuplot, to skip them when plotting data.
 <p>
 The body sections of a Makeflow log file come after the node specificiation
 section. The following is a snippet from <tt>example.makeflow.makeflowlog</tt>:
-<pre>
-# STARTED timestamp
+<code># STARTED timestamp
 1347281321284638 5 1 9206 5 1 0 0 0 6
 1347281321348488 5 2 9206 5 0 1 0 0 6
 1347281321348760 4 1 9207 4 1 1 0 0 6
@@ -623,16 +553,14 @@ section. The following is a snippet from <tt>example.makeflow.makeflowlog</tt>:
 1347281321753064 0 1 9215 0 1 5 0 0 6
 1347281325731146 0 2 9215 0 0 6 0 0 6
 # COMPLETED timestamp
-</pre>
+</code>
 
 If a Makeflow execution is completed without errors, a body section of the log
 consists of a series of node (task) status change lines (the 10 column line)
 surrounded by a pair of "# STARTED" and "# COMPLETED" lines which record the
 start and end unix time of that execution.  A node status change line has the
 following form: 
-<pre>
-timestamp node_id new_state job_id nodes_waiting nodes_running nodes_complete nodes_failed nodes_aborted node_id_counter
-</pre>
+<code>timestamp node_id new_state job_id nodes_waiting nodes_running nodes_complete nodes_failed nodes_aborted node_id_counter</code>
 Here is the column specificiation:
 <ul>
 	<li><b>timestamp</b> - the unix time (in microseconds) when this line is written to the log file. </li>
@@ -662,18 +590,15 @@ Here is the column specificiation:
 You might also see the following two lines in the Makeflow log file if the
 Makeflow is aborted or failed during a execution. The unix time at which such
 event occured is recorded:
-<pre>
-# ABORTED timestamp
+<code># ABORTED timestamp
 # FAILED timestamp
-</pre>
+</code>
 
 When file garbage collection is enabled, the log file records information at
 each collection cycle. Collection information is included in lines starting
 with the '# GC' prefix:
 
-<pre>
-# GC timestamp collected time_spent dag_gc_collected
-</pre>
+<code># GC timestamp collected time_spent dag_gc_collected</code>
 Each garbage collection line records the garbage collection statistics during a
 garbage collection cycle: 
 <ul>
@@ -697,9 +622,7 @@ To avoid naming conflicts, files which would otherwise have an identical path ar
 </ul>
 
 Example usage:
-<pre>
-% makeflow -b some_output_directory example.makeflow
-</pre>
+<code>% makeflow -b some_output_directory example.makeflow</code>
 
 
 
@@ -707,5 +630,6 @@ Example usage:
 
 For the latest information about Makeflow, please visit our <a href=http://www.cse.nd.edu/~ccl/software/makeflow>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
 
+</div>
 </body>
-
+</html>

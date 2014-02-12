@@ -1,30 +1,25 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 
 <head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
 <title>SAND User's Manual</title>
 </head>
 
 <body>
 
-<style type="text/css">
-pre {
-background: #ffffcc;
-font-family: monospace;
-font-size: 75%
-font-align: left;
-white-space: pre;
-border: solid 1px black;
-padding: 5px;
-margin: 20px;
-}
-</style>
+<div id="manual">
 <h1>SAND User's Manual</h1>
-<b>Last Updated January 2011</b>
-<p>
-SAND is Copyright (C) 2010- The University of Notre Dame.
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-<p>
+
+<p style="text-align: right;"><b>Last edited: January 2011</b></p>
+
+<p>SAND is Copyright (C) 2010- The University of Notre Dame.<br>
+All rights reserved.<br>
+This software is distributed under the GNU General Public License.<br>
+See the file COPYING for details.</p>
+
+
 <h2>Overview</h2>
 
 <p>SAND is a set of modules for accelerating genome assembly and other
@@ -60,15 +55,14 @@ to output new Celera 7.0 style overlaps.
 
 You will see the assembly start as normal.  When the overlapping stage begins, you will see output like this:
 
-<pre>
- Total | Workers   | Tasks                      Avg | Candidates
-  Time | Idle Busy | Submit Idle  Run   Done   Time | Found
-     0 |    0    0 |      0    0    0      0    nan | 0
-     5 |    0    0 |      0    0    0      0    nan | 0
-    10 |    0    0 |      0    0    0      0    nan | 0
-    15 |    0    0 |      0    0    0      0    nan | 0
+<code>Total | Workers   | Tasks                      Avg | Candidates
+Time | Idle Busy | Submit Idle  Run   Done   Time | Found
+   0 |    0    0 |      0    0    0      0    nan | 0
+   5 |    0    0 |      0    0    0      0    nan | 0
+  10 |    0    0 |      0    0    0      0    nan | 0
+  15 |    0    0 |      0    0    0      0    nan | 0
 ...
-</pre>
+</code>
 
 SAND is now waiting for you to start <tt>work_queue_worker</tt> processes.
 Each worker that you start will connect back to the master process
@@ -80,19 +74,16 @@ specifying the hostname where the master runs and the port number it is listenin
 (This can be changed with the sandPort option in the CA spec file.)
 For example:
 
-<pre>
-% work_queue_worker master.somewhere.edu 9123
-</pre>
+<code>% work_queue_worker master.somewhere.edu 9123</code>
 
 With one worker, you will see some change in the output, like this:
-<pre>
- Total | Workers   | Tasks                      Avg | Candidates
-  Time | Idle Busy | Submit Idle  Run   Done   Time | Found
-     0 |    0    0 |      0    0    0      0    nan | 0
-     5 |    0    1 |    100   83    1     16   0.32 | 1858
-    10 |    0    1 |    100   69    1     30   0.33 | 3649
-    15 |    0    1 |    100   55    1     44   0.34 | 5464
-</pre>
+<code>Total | Workers   | Tasks                      Avg | Candidates
+Time | Idle Busy | Submit Idle  Run   Done   Time | Found
+   0 |    0    0 |      0    0    0      0    nan | 0
+   5 |    0    1 |    100   83    1     16   0.32 | 1858
+  10 |    0    1 |    100   69    1     30   0.33 | 3649
+  15 |    0    1 |    100   55    1     44   0.34 | 5464
+</code>
 
 For a very small assembly, a single worker might be sufficient.
 However, to run a really large assembly at scale, you will need to
@@ -105,21 +96,19 @@ to start many workers with a single submit command.
 <p>
 We have provided some simple scripts to make this easy.
 For example, to submit 10 workers to your local Condor pool:
-<pre>
-% condor_submit_workers master.somewhere.edu 9123 10
+<code>% condor_submit_workers master.somewhere.edu 9123 10
 Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
-</pre>
+</code>
 
 Or, to submit 10 worker processes to your SGE cluster:
-<pre>
-% sge_submit_workers master.somewhere.edu 9123 10
+<code>% sge_submit_workers master.somewhere.edu 9123 10
 Your job 1054781 ("worker.sh") has been submitted
 Your job 1054782 ("worker.sh") has been submitted
 Your job 1054783 ("worker.sh") has been submitted
 ...
-</pre>
+</code>
 
 Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>
 are simple shell scripts, so you can edit them directly if you would
@@ -142,58 +131,49 @@ of Celera.  We assume that you begin with a file of reads in FASTA format.
 To use the SAND modules, you must first generate repeats and compress the data.  (If you don't have data handy, download <tt>small.cfa</tt> and  <tt>small.repeats</tt> data from the <a href=http://www.nd.edu/~ccl/software/sand>SAND Webpage</a>.)
 
 To generate repeats from a FASTA file, use the <tt>meryl</tt> tool from the Celera Assembler:
-<pre>
-% meryl -B -m 24 -C -L 100 -v -o small.meryl -s small.fa
-% meryl -Dt -s small.meryl -n 100 > small.repeats
-</pre>
+<code>% meryl -B -m 24 -C -L 100 -v -o small.meryl -s small.fa
+% meryl -Dt -s small.meryl -n 100 &gt; small.repeats
+</code>
 
 Then use <tt>sand_compress_reads</tt> to compress the sequence data into a compressed FASTA (.cfa) file:
-<pre>
-% sand_compress_reads small.fa small.cfa
-</pre>
+<code>% sand_compress_reads small.fa small.cfa</code>
 
 The filtering step will read in the compressed sequence data (<tt>small.cfa</tt>) and quickly produce a list of candidate sequences (<tt>small.cand</tt>) for the following step to consider in detail.  Start the filtering step as follows:
-<pre>
-% sand_filter_master -r small.repeats small.cfa small.cand
-</pre>
+<code>% sand_filter_master -r small.repeats small.cfa small.cand</code>
 
 While the filtering step runs, it will print some statistics to the
 console, showing the number of workers available, tasks running, and so forth:
 
-<pre>
- Total | Workers   | Tasks                      Avg | Candidates
-  Time | Idle Busy | Submit Idle  Run   Done   Time | Found
-     0 |    0    0 |      0    0    0      0    nan | 0
-     5 |    0   14 |    158   14   14    130   0.39 | 16452
-    10 |    0   15 |    356   15   15    326   0.38 | 42382
-    15 |    0   15 |    549   15   15    519   0.38 | 69055
-    20 |    0   15 |    744   15   15    714   0.38 | 96298
-    25 |    0   15 |    942   15   15    912   0.38 | 124284
-</pre>
+<code>Total | Workers   | Tasks                      Avg | Candidates
+Time | Idle Busy | Submit Idle  Run   Done   Time | Found
+   0 |    0    0 |      0    0    0      0    nan | 0
+   5 |    0   14 |    158   14   14    130   0.39 | 16452
+  10 |    0   15 |    356   15   15    326   0.38 | 42382
+  15 |    0   15 |    549   15   15    519   0.38 | 69055
+  20 |    0   15 |    744   15   15    714   0.38 | 96298
+  25 |    0   15 |    942   15   15    912   0.38 | 124284
+</code>
 
 The alignment step will take the list of candidates generated in the previous step (<tt>small.cand</tt>),
 the compressed sequences (<tt>small.cfa</tt>) and produce a listing of how and where the sequences
 overlap (<tt>small.ovl</tt>).  For example:
 
-<pre>
-% sand_align_master sand_align_kernel -e "-q 0.04 -m 40" small.cand small.cfa small.ovl
-</pre>
+<code>% sand_align_master sand_align_kernel -e "-q 0.04 -m 40" small.cand small.cfa small.ovl</code>
 
 The options <tt>-q 0.04 -m 40</tt> passed to <tt>sand_align_kernel</tt> indicate a minimum alignment quality of 0.04 and a minimum alignment length of 40 bases.
 Again, a progress table will be printed to standard out:
-<pre>
- Total | Workers   | Tasks                      Avg | K-Cand K-Seqs | Total
-  Time | Idle Busy | Submit Idle  Run   Done   Time | Loaded Loaded | Speedup
-     0 |    0    0 |      0    0    0      0   0.00 |      0      0 |  0.00
-     8 |    0   48 |    100   52   48      0   0.00 |   1000    284 |  0.00
-    10 |    0   86 |    100   13   86      1   7.07 |   1000    284 |  0.71
-    36 |    1   83 |    181   14   83      2  19.47 |   1810    413 |  1.08
-   179 |    1   83 |    259   92   83      3  22.51 |   2590   1499 |  0.38
-   186 |    2   80 |    259   15   80     85  28.54 |   2590   1499 | 13.04
-   199 |    2   80 |    334   90   80     86  29.96 |   3340   1499 | 12.95
-   200 |    2   80 |    334   90   80    114  59.43 |   3340   1499 | 33.88
-   202 |    2   81 |    334    9   81    165  86.08 |   3340   1499 | 70.32
-</pre>
+<code>Total | Workers   | Tasks                      Avg | K-Cand K-Seqs | Total
+Time | Idle Busy | Submit Idle  Run   Done   Time | Loaded Loaded | Speedup
+   0 |    0    0 |      0    0    0      0   0.00 |      0      0 |  0.00
+   8 |    0   48 |    100   52   48      0   0.00 |   1000    284 |  0.00
+  10 |    0   86 |    100   13   86      1   7.07 |   1000    284 |  0.71
+  36 |    1   83 |    181   14   83      2  19.47 |   1810    413 |  1.08
+ 179 |    1   83 |    259   92   83      3  22.51 |   2590   1499 |  0.38
+ 186 |    2   80 |    259   15   80     85  28.54 |   2590   1499 | 13.04
+ 199 |    2   80 |    334   90   80     86  29.96 |   3340   1499 | 12.95
+ 200 |    2   80 |    334   90   80    114  59.43 |   3340   1499 | 33.88
+ 202 |    2   81 |    334    9   81    165  86.08 |   3340   1499 | 70.32
+</code>
 
 After the sequence alignment step completes, you will have an overlap (<tt>.ovl</tt>)
 file that can be fed into the final stages of your assembler to complete the consensus step.
@@ -224,5 +204,7 @@ The columns of the output are as follows:
 <h2>For More Information</h2>
 
 For the latest information about SAND, please visit our <a href=http://www.cse.nd.edu/~ccl/software/sand>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
+
+</div>
 </body>
 </html>

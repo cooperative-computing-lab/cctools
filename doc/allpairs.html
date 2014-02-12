@@ -1,21 +1,15 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
+
 <head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
 <title>Allpairs User's Manual</title>
 </head>
+
 <body>
 
-<style type="text/css">
-pre {
-background: #ffffcc;
-font-family: monospace;
-font-size: 75%
-font-align: left;
-white-space: pre;
-border: solid 1px black;
-padding: 5px;
-margin: 20px;
-}
-</style>
+<div id="manual">
 <h1>Allpairs User's Manual</h1>
 <b>Last Updated October 2010</b>
 <p>
@@ -53,28 +47,22 @@ data movement, fault tolerance and so on for you.
 <h2 id="preparation">All-Pairs on a Single Machine</h2>
 
 Let's suppose you have a whole lot of files that you want to compare all to each other, named <tt>a</tt>, <tt>b</tt>, <tt>c</tt>, and so on.  Suppose that you also have a program named <tt>compareit</tt> that when invoked as <tt>compareit a b</tt> will compare files <tt>a</tt> and <tt>b</tt> and produce some output summarizing the difference between the two, like this:
-<pre>
-a b are 45 percent similar
-</pre>
+<code>a b are 45 percent similar</code>
 <p>
 To use the allpairs framework, create a file called <tt>set.list</tt> that lists each of your files, one per line:
-<pre>
-a
+<code>a
 b
 c
 ...
-</pre>
+</code>
 Then, invoke <tt>allpairs_multicore</tt> like this:
-<pre>
-allpairs_multicore set.list set.list compareit
-</pre>
+<code>allpairs_multicore set.list set.list compareit</code>
 The framework will carry out all possible comparisons of the objects, and print the results one by one:
-<pre>
-a a are 100 percent similar
+<code>a a are 100 percent similar
 a b are 45 percent similar
 a c are 37 percent similar
 ...
-</pre>
+</code>
 For large sets of objects, allpairs_multicore will use as many cores as you have available, and will carefully manage virtual memory to exploit locality and avoid thrashing.  Because of this, you should be prepared for the results to come back in any order.
 
 <h2>All-Pairs on a Distributed System</h2>
@@ -97,29 +85,22 @@ extra step involved here is starting the workers. Starting the All-Pairs master
 program is almost identical to starting the All-Pairs multicore program.
 <p>
 For example, to run the same example as above on a distributed system:
-<pre>
-allpairs_master set.list set.list compareit
-</pre> 
+<code>allpairs_master set.list set.list compareit</code> 
 
 This will start the master process, which will wait for workers to connect.
 Let's suppose the master is running on a machine named <tt>barney.nd.edu</tt>.
 If you have access to login to other machines, you could simply start
 worker processes by hand on each one, like this:
-<pre>
-% work_queue_worker barney.nd.edu 9123
-</pre>
+<code>% work_queue_worker barney.nd.edu 9123</code>
 If you have access to a batch system like <a href=http://www.cs.wisc.edu/condor>Condor</a>, you can submit multiple workers at once:
-<pre>
-% condor_submit_workers barney.nd.edu 9123 10
+<code>% condor_submit_workers barney.nd.edu 9123 10
 Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
-</pre>
+</code>
 
 A similar script is available for Sun Grid Engine:
-<pre>
-% sge_submit_workers barney.nd.edu 9123 10
-</pre>
+<code>% sge_submit_workers barney.nd.edu 9123 10</code>
 
 In the above two examples, the first argument is the port number that the
 master process will be or is listening on and the second the argument is the
@@ -192,5 +173,6 @@ which is 3/4 of memory by default.
 
 For the latest information about Allpairs, please visit our <a href=http://www.cse.nd.edu/~ccl/software/allpairs>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software/help.shtml>mailing list</a>.
 
+</div>
 </body>
 </html>

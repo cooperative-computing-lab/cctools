@@ -1,103 +1,116 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
+
 <head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
 <title>Cooperative Computing Tools Documentation</title>
 </head>
+
 <body>
+
+<div id="manual">
 
 <h1>Cooperative Computing Tools Documentation</h1>
 
-<table cellspacing=10>
-<tr>
-<td colspan=2>
-<a href=install.html><b>CCTools Installation Instructions</b></a>
+<h2><a style="font-size: 20px;" href="install.html">CCTools Installation Instructions</a></h2>
+<h2><a style="font-size: 20px;" href="api/html/index.html">CCTools API Documentation</a></h2>
 
-<tr>
-<td colspan=2>
-<a href=api/html/index.html><b>CCTools API Documentation</b></a>
+<h2>Individual Tool Documents</h2>
+<table>
+<tr style="vertical-align: top;">
+    <td>
+        <a href=makeflow.html><b>Makeflow User's Manual</b></a>
+        <ul>
+            <li><a href=man/makeflow.html>makeflow</a></li>
+            <li><a href=man/makeflow_linker.html>makeflow_linker</a></li>
+            <li><a href=man/makeflow_monitor.html>makeflow_monitor</a></li>
+            <li><a href=man/starch.html>starch</a></li>
+        </ul>
+        <a href=resource_monitor.html><b>Resource Monitor Manual</b></a>
+        <ul>
+            <li><a href=man/resource_monitor.html>resource_monitor</a></li>
+            <li><a href=man/resource_monitor_visualizer.html>resource_monitor_visualizer</a></li>
+        </ul>
+    </td>
 
-<tr valign=top>
-<td>
-<a href=makeflow.html><b>Makeflow User's Manual</b></a>
-<dir>
-<li> <a href=man/makeflow.html>makeflow</a>
-<li> <a href=man/makeflow_linker.html>makeflow_linker</a>
-<li> <a href=man/makeflow_monitor.html>makeflow_monitor</a>
-<li> <a href=man/starch.html>starch</a>
-</dir>
+    <td>
+        <a href=workqueue.html><b>Work Queue User's Manual</b></a>
+        <ul>
+            <li><a href=man/work_queue_worker.html>work_queue_worker</a></li>
+            <li><a href=man/work_queue_status.html>work_queue_status</a></li>
+            <li><a href=man/work_queue_pool.html>work_queue_pool</a></li>
+            <li><a href=man/condor_submit_workers.html>condor_submit_workers</a></li>
+            <li><a href=man/sge_submit_workers.html>sge_submit_workers</a></li>
+            <li><a href=man/ec2_submit_workers.html>ec2_submit_workers</a></li>
+            <li><a href=man/ec2_remove_workers.html>ec2_remove_workers</a></li>
+        </ul>
+    </td>
 
-<a href=resource_monitor.html><b>Resource Monitor Manual</b></a>
-<dir>
-<li> <a href=man/resource_monitor.html>resource_monitor</a>
-<li> <a href=man/resource_monitor_visualizer.html>resource_monitor_visualizer</a>
-</dir>
+    <td>
+        <a href=allpairs.html><b>All Pairs User's Manual</b></a>
+        <ul>
+            <li><a href=man/allpairs_master.html>allpairs_master</a></li>
+            <li><a href=man/allpairs_multicore.html>allpairs_multicore</a></li>
+        </ul>
 
-<td>
-<a href=workqueue.html><b>Work Queue User's Manual</b></a>
-<dir>
-<li> <a href=man/work_queue_worker.html>work_queue_worker</a>
-<li> <a href=man/work_queue_status.html>work_queue_status</a>
-<li> <a href=man/work_queue_pool.html>work_queue_pool</a>
-<li> <a href=man/condor_submit_workers.html>condor_submit_workers</a>
-<li> <a href=man/sge_submit_workers.html>sge_submit_workers</a>
-<li> <a href=man/ec2_submit_workers.html>ec2_submit_workers</a>
-<li> <a href=man/ec2_remove_workers.html>ec2_remove_workers</a>
-</dir>
+        <a href=wavefront.html><b>Wavefront User's Manual</b></a>
+        <ul>
+            <li><a href=man/wavefront_master.html>wavefront_master</a></li>
+        </ul>
+    </td>
+</tr>
 
-<td>
-<a href=allpairs.html><b>All Pairs User's Manual</b></a>
-<dir>
-<li> <a href=man/allpairs_master.html>allpairs_master</a>
-<li> <a href=man/allpairs_multicore.html>allpairs_multicore</a>
-</dir>
+<tr style="vertical-align: top;">
+    <td>
+        <a href=parrot.html><b>Parrot User's Manual</b></a>
+        <ul>
+            <li><a href=man/parrot_run.html>parrot_run</a></li>
+            <li><a href=man/parrot_run_hdfs.html>parrot_run_hdfs</a></li>
+            <li><a href=man/parrot_cp.html>parrot_cp</a></li>
+            <li><a href=man/parrot_md5.html>parrot_md5</a></li>
+            <li><a href=man/parrot_getacl.html>parrot_getacl</a></li>
+            <li><a href=man/parrot_setacl.html>parrot_setacl</a></li>
+            <li><a href=man/parrot_mkalloc.html>parrot_mkalloc</a></li>
+            <li><a href=man/parrot_lsalloc.html>parrot_lsalloc</a></li>
+            <li><a href=man/parrot_locate.html>parrot_locate</a></li>
+            <li><a href=man/parrot_timeout.html>parrot_timeout</a></li>
+            <li><a href=man/parrot_whoami.html>parrot_whoami</a></li>
+        </ul>
+    </td>
 
-<a href=wavefront.html><b>Wavefront User's Manual</b></a>
-<dir>
-<li> <a href=man/wavefront_master.html>wavefront_master</a>
-</dir>
+    <td>
+        <a href=chirp.html><b>Chirp User's Manual</b></a>
+        <ul>
+            <li><a href=man/chirp.html>chirp</a></li>
+            <li><a href=man/chirp_status.html>chirp_status</a></li>
+            <li><a href=man/chirp_fuse.html>chirp_fuse</a></li>
+            <li><a href=man/chirp_get.html>chirp_get</a></li>
+            <li><a href=man/chirp_put.html>chirp_put</a></li>
+            <li><a href=man/chirp_stream_files.html>chirp_stream_files</a></li>
+            <li><a href=man/chirp_distribute.html>chirp_distribute</a></li>
+            <li><a href=man/chirp_benchmark.html>chirp_benchmark</a></li>
+            <li><a href=man/chirp_server.html>chirp_server</a></li>
+            <li><a href=man/chirp_server_hdfs.html>chirp_server_hdfs</a></li>
+            <li><a href=man/catalog_server.html>catalog_server</a></li>
+            <li><a href=chirp_protocol.html>The Chirp Protocol</a></li>
+        </ul>
+    </td>
 
-<tr valign=top>
-<td>
-<a href=parrot.html><b>Parrot User's Manual</b></a>
-<dir>
-<li> <a href=man/parrot_run.html>parrot_run</a>
-<li> <a href=man/parrot_run_hdfs.html>parrot_run_hdfs</a>
-<li> <a href=man/parrot_cp.html>parrot_cp</a>
-<li> <a href=man/parrot_md5.html>parrot_md5</a>
-<li> <a href=man/parrot_getacl.html>parrot_getacl</a>
-<li> <a href=man/parrot_setacl.html>parrot_setacl</a>
-<li> <a href=man/parrot_mkalloc.html>parrot_mkalloc</a>
-<li> <a href=man/parrot_lsalloc.html>parrot_lsalloc</a>
-<li> <a href=man/parrot_locate.html>parrot_locate</a>
-<li> <a href=man/parrot_timeout.html>parrot_timeout</a>
-<li> <a href=man/parrot_whoami.html>parrot_whoami</a>
-</dir>
-
-<td>
-<a href=chirp.html><b>Chirp User's Manual</b></a>
-<dir>
-<li> <a href=man/chirp.html>chirp</a>
-<li> <a href=man/chirp_status.html>chirp_status</a>
-<li> <a href=man/chirp_fuse.html>chirp_fuse</a>
-<li> <a href=man/chirp_get.html>chirp_get</a>
-<li> <a href=man/chirp_put.html>chirp_put</a>
-<li> <a href=man/chirp_stream_files.html>chirp_stream_files</a>
-<li> <a href=man/chirp_distribute.html>chirp_distribute</a>
-<li> <a href=man/chirp_benchmark.html>chirp_benchmark</a>
-<li> <a href=man/chirp_server.html>chirp_server</a>
-<li> <a href=man/chirp_server_hdfs.html>chirp_server_hdfs</a>
-<li> <a href=man/catalog_server.html>catalog_server</a>
-<li> <a href=chirp_protocol.html>The Chirp Protocol</a>
-</dir>
-
-<td>
-<a href=sand.html><b>SAND User's Manual</b></a>
-<dir>
-<li> <a href=man/sand_filter_master.html>sand_filter_master</a>
-<li> <a href=man/sand_filter_kernel.html>sand_filter_kernel</a>
-<li> <a href=man/sand_align_master.html>sand_align_master</a>
-<li> <a href=man/sand_align_kernel.html>sand_align_kernel</a>
-<li> <a href=man/sand_compress_reads.html>sand_compress_reads</a>
-<li> <a href=man/sand_uncompress_reads.html>sand_uncompress_reads</a>
-</dir>
-
+    <td>
+        <a href=sand.html><b>SAND User's Manual</b></a>
+        <ul>
+            <li><a href=man/sand_filter_master.html>sand_filter_master</a></li>
+            <li><a href=man/sand_filter_kernel.html>sand_filter_kernel</a></li>
+            <li><a href=man/sand_align_master.html>sand_align_master</a></li>
+            <li><a href=man/sand_align_kernel.html>sand_align_kernel</a></li>
+            <li><a href=man/sand_compress_reads.html>sand_compress_reads</a></li>
+            <li><a href=man/sand_uncompress_reads.html>sand_uncompress_reads</a></li>
+        </ul>
+    </td>
+</tr>
 </table>
+
+</div>
+</body>
+</html>

@@ -1,22 +1,26 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 
 <head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
 <title>Catalog History User's Manual</title>
 </head>
 
 <body>
 
-<h1>Catalog History User's Manual</h1>
-<b>October 2013</b>
-<p>
+<div id="manual">
 
-The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain
+<h1>Catalog History User's Manual</h1>
+
+<p style="text-align: right;"><b>Last edited: October 2013</b></p>
+
+<p>The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain
 and Copyright (C) 2005- The University of Notre Dame.  All rights reserved.
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
+This software is distributed under the GNU General Public License.  See the
+file COPYING for details.</p>
 
 <h2>Overview</h2>
-
 
 <p>
 When servers report their status to the catalog server, a log file is created to track those reports. The servers are of different types and are allowed to report any values for any field name. In other words, there is no schema beyond the requirement that each reported item must contain a field and value. The catalog server also creates a daily checkpoint file with the current status of all servers still actively reporting. Samples of data from checkpoints and log files for different types of servers are shown further down in this document. The following scripts operate on this data for the creation of summary reports.
@@ -40,25 +44,25 @@ When servers report their status to the catalog server, a log file is created to
 
 To plot available memory as compared to total memory on chirp servers on a daily basis, you might run something like this:
 
-<pre>
+<code>
 catalog_history_select /data/catalog.history/ 2013-03-01-01-03 | catalog_history_filter type=chirp | catalog_history_plot 86400 SUM.MAX@memory_total SUM.AVG@memory_avail SUM.MIN@minfree> chirpMemorySum
-</pre>
+</code>
 Followed by the following command in gnuplot:
-<pre>
+<code>
 set xdata time; set timefmt "%s"; set format x "%H:%M"; plot "chirpMemorySum" using 1:2 title 'SUM.MAX@memory_total', "chirpMemorySum" using 1:3 title 'SUM.AVG@memory_avail', "chirpMemorySum" using 1:4 title 'SUM.MIN@minfree'
-</pre>
+</code>
 
 
 
 Or to plot the number of tasks running each hour on Work Queue masters, you might run something like this: 
 
-<pre>
+<code>
 catalog_history_select /data/catalog.history/ 2013-04-15-01-01-01 w1 | catalog_history_filter type=wq_master | catalog_history_plot 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running > taskRunningMinAvgMax
-</pre>
+</code>
 Followed by the following command in gnuplot:
-<pre>
+<code>
 set xdata time; set timefmt "%s"; set format x "%m/%d"; plot "taskRunningMinAvgMax" using 1:2 title 'SUM.MIN@task_running', "taskRunningMinAvgMax" using 1:3 title 'SUM.AVG@task_running', "taskRunningMinAvgMax" using 1:4 title 'SUM.MAX@task_running'
-</pre>
+</code>
 
 
 
@@ -134,7 +138,7 @@ For servers where type=catalog
 wq_pool sample
 </h3>
 <p>
-<pre>
+<code>
 key 259.74.246.25:91381:workspace1234.org
 type wq_pool
 starttime 1375886532
@@ -150,7 +154,7 @@ lastheardfrom 1376870394
 1376942374 R key
 1376945475 U decision n/a
 1376945496 U decision cclosdci:0
-</pre>
+</code>
 </p>
 
 
@@ -158,7 +162,7 @@ lastheardfrom 1376870394
 wq_master sample
 </h3>
 <p>
-<pre>
+<code>
 key 171.65.257.29:5147:not0rious5678.org
 type wq_master
 workers_by_pool unmanaged:9
@@ -239,7 +243,7 @@ total_tasks_dispatched 37
 1376948443 U workers_ready 1
 1376948443 U tasks_running 10
 1376948443 U tasks_complete 1
-</pre>
+</code>
 </p>
 
 
@@ -247,7 +251,7 @@ total_tasks_dispatched 37
 catalog sample
 </h3>
 <p>
-<pre>
+<code>
 key 188.184.132.31:9097:wq-notary.cern.ch
 type catalog
 name wq-notary.cern.ch
@@ -259,7 +263,7 @@ lastheardfrom 1376870370
 version 3.7.1
 url http://wq-notary.cern.ch:9097
 1376942380 R key
-</pre>
+</code>
 </p>
 
 
@@ -267,7 +271,7 @@ url http://wq-notary.cern.ch:9097
 chirp sample
 </h3>
 <p>
-<pre>
+<code>
 key 129.74.153.171:9094:cclws16.cse.nd.edu
 load1 0.00
 load5 0.00
@@ -337,11 +341,9 @@ url chirp://cclws16.cse.nd.edu:9094
 1376873410 U load5 0.04
 1376873410 U memory_avail 3866230784
 1376873410 U load15 0.09
-</pre>
+</code>
 </p>
 
-
+</div>
 </body>
-
 </html>
-
