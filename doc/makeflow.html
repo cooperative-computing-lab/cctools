@@ -254,51 +254,77 @@ done using rule lexical scoping, explained in the next section.
 
 <h2>The Fine Details</h2>
 
-The Makeflow language is very similar to Make, but it does have a few important differences that you should be aware of.
+<p>The Makeflow language is very similar to Make, but it does have a few important differences that you should be aware of.</p>
 
 <h3>Get the Dependencies Right</h3>
 
-You must be careful to accurately specify <b>all of the files that a rule requires and creates</b>, including any custom executables.  This is because Makeflow requires all these information to construct the environment for a remote job.  For example, suppose that you have written a simulation program called <tt>mysim.exe</tt> that reads <tt>calib.data</tt> and then produces and output file.  The following rule won't work, because it doesn't inform Makeflow what files are neded to execute the simulation:
+<p>You must be careful to accurately specify <b>all of the files that a rule
+requires and creates</b>, including any custom executables.  This is because
+Makeflow requires all these information to construct the environment for a
+remote job.  For example, suppose that you have written a simulation program
+called <tt>mysim.exe</tt> that reads <tt>calib.data</tt> and then produces and
+output file.  The following rule won't work, because it doesn't inform Makeflow
+what files are neded to execute the simulation:</p>
+
 <code># This is an incorrect rule.
 
 output.txt:
         ./mysim.exe -c calib.data -o output.txt
 </code>
 
-However, the following is correct, because the rule states all of the files needed to run the simulation.  Makeflow will use this information to
-construct a batch job that consists of <tt>mysim.exe</tt> and <tt>calib.data</tt> and uses it to produce <tt>output.txt</tt>:
+<p>However, the following is correct, because the rule states all of the files
+needed to run the simulation.  Makeflow will use this information to construct
+a batch job that consists of <tt>mysim.exe</tt> and <tt>calib.data</tt> and
+uses it to produce <tt>output.txt</tt>:</p>
 
 <code># This is a correct rule.
 
 output.txt: mysim.exe calib.data
         ./mysim.exe -c calib.data -o output.txt
 </code>
-When a regular file is specified as an input file, it means the command relies on the contents of that file. When a directory is specified as an input file, however, it could mean one of two things. First, the command depends on the contents inside the directory. Second, the command relies on the existence of the directory (for example, you just want to add more things into the directory later, it does not matter what's already in it). <b>Makeflow assumes that an input directory indicates that the command relies on the directory's existence</b>.
+
+<p>When a regular file is specified as an input file, it means the command
+relies on the contents of that file. When a directory is specified as an input
+file, however, it could mean one of two things. First, the command depends on
+the contents inside the directory. Second, the command relies on the existence
+of the directory (for example, you just want to add more things into the
+directory later, it does not matter what's already in it). <b>Makeflow assumes
+that an input directory indicates that the command relies on the directory's
+existence</b>.</p>
 
 <h3>No Phony Rules</h3>
 
-For a similar reason, you cannot have "phony" rules that don't actually
-create the specified files.  For example, it is common practice to define
-a <tt>clean</tt> rule in Make that deletes all derived files.  This doesn't
-make sense in Makeflow, because such a rule does not actually create 
-a file named <tt>clean</tt>.  Instead use the <tt>-c</tt> option as shown above.
+<p>For a similar reason, you cannot have "phony" rules that don't actually
+create the specified files.  For example, it is common practice to define a
+<tt>clean</tt> rule in Make that deletes all derived files.  This doesn't make
+sense in Makeflow, because such a rule does not actually create a file named
+<tt>clean</tt>.  Instead use the <tt>-c</tt> option as shown above.</p>
 
 <h3>Just Plain Rules</h3>
 
-Makeflow does not support all of the syntax that you find in various versions of Make.  Each rule must have exactly one command to execute.  If you have multiple commands, simply join them together with semicolons.  Makeflow allows you to define and use variables, but it does not support  pattern rules, wildcards, or special variables like <tt>$&lt;</tt> or <tt>$@</tt>.  You simply have to write out the rules longhand, or write a script in your favorite language to generate a large Makeflow.
+<p>Makeflow does not support all of the syntax that you find in various
+versions of Make.  Each rule must have exactly one command to execute.  If you
+have multiple commands, simply join them together with semicolons.  Makeflow
+allows you to define and use variables, but it does not support  pattern rules,
+wildcards, or special variables like <tt>$&lt;</tt> or <tt>$@</tt>.  You simply
+have to write out the rules longhand, or write a script in your favorite
+language to generate a large Makeflow.</p>
 
 <h3>Local Job Execution</h3>
 
-Certain jobs don't make much sense to distribute.  For example, if you have a very fast running job that consumes a large amount of data, then it should simply run on the same machine as Makeflow.  To force this, simply add the word <tt>LOCAL</tt> to the beginning of the command line in the rule.
+<p>Certain jobs don't make much sense to distribute.  For example, if you have
+a very fast running job that consumes a large amount of data, then it should
+simply run on the same machine as Makeflow.  To force this, simply add the word
+<tt>LOCAL</tt> to the beginning of the command line in the rule.</p>
 
 <h3>Rule Lexical Scope</h3>
 
-Variables in Makeflow have global scope, that is, once defined,
-their value can be accessed from any rule. Sometimes it is useful to
-define a variable locally inside a rule, without affecting the global value. In
-Makeflow, this can be achieved by defining the variables after the rule's
-requirements, but before the rule's command, and prepending the name of the
-variable with <tt>@</tt>, as follows:
+<p>Variables in Makeflow have global scope, that is, once defined, their value
+can be accessed from any rule. Sometimes it is useful to define a variable
+locally inside a rule, without affecting the global value. In Makeflow, this
+can be achieved by defining the variables after the rule's requirements, but
+before the rule's command, and prepending the name of the variable with
+<tt>@</tt>, as follows:</p>
 
 <code>SOME_VARIABLE=original_value
 
@@ -315,134 +341,147 @@ variable with <tt>@</tt>, as follows:
 In this example, SOME_VARIABLE has the value 'original_value' for rules 1 and
 3, and the value 'local_value_for_2' for rule 2.
 
-
 <h3>Batch Job Refinement</h3>
 
-When executing jobs, Makeflow simply uses the default settings in your batch
+<p>When executing jobs, Makeflow simply uses the default settings in your batch
 system.  If you need to pass additional options, use the <tt>BATCH_OPTIONS</tt>
-variable or the <tt>-B</tt> option to Makeflow.
+variable or the <tt>-B</tt> option to Makeflow.</p>
 
-When executing jobs, Makeflow simply uses the default settings in your batch system.  If you need to pass additional options, use the <tt>BATCH_OPTIONS</tt> variable or the <tt>-B</tt> option to Makeflow.
-<p>
-When using Condor, this string will be added to each submit file.  For example, if you want to add <tt>Requirements</tt> and <tt>Rank</tt> lines to your Condor submit files, add this to your Makeflow:
+<p>When executing jobs, Makeflow simply uses the default settings in your batch
+system.  If you need to pass additional options, use the <tt>BATCH_OPTIONS</tt>
+variable or the <tt>-B</tt> option to Makeflow.</p>
+
+<p>When using Condor, this string will be added to each submit file.  For
+example, if you want to add <tt>Requirements</tt> and <tt>Rank</tt> lines to
+your Condor submit files, add this to your Makeflow:</p>
+
 <code>BATCH_OPTIONS = Requirements = (Memory&gt;1024)</code>
 <p>
 When using SGE, the string will be added to the qsub options.  For example, to specify that jobs should be submitted to the <tt>devel</tt> queue:
 <code>BATCH_OPTIONS = -q devel</code>
 
-
 <h3>Remote File Renaming</h3>
 
-With the Work Queue and Condor batch systems, Makeflow has a
-feature called remote file renaming. For example:
+<p>With the Work Queue and Condor batch systems, Makeflow has a feature called
+remote file renaming. For example:</p>
 
 <code>local_name-&gt;remote_name</code>
 
-indicates that the file <tt>local_name</tt> is called
-<tt>remote_name</tt> in the remote system. Consider the following
-example:
+<p>indicates that the file <tt>local_name</tt> is called <tt>remote_name</tt>
+in the remote system. Consider the following example:</p>
 
 <code>b.out: a.in myprog
 LOCAL myprog a.in &gt; b.out 
 
-c.out->out: a.in->in1 b.out myprog->prog
-        prog in1 b.out > out
+c.out-&gt;out: a.in-&gt;in1 b.out myprog-&gt;prog
+        prog in1 b.out &gt; out
 </code>
 
-The first rule runs locally, using the executable <tt>myprog</tt>
-and the local file <tt>a.in</tt> to locally create <tt>b.out</tt>.
-The second rule runs remotely, but the remote system
-expects <tt>a.in</tt> to be named <tt>in1</tt>, <tt>c.out</tt>,
-to be named <tt>out</tt> and so on. Note that we did not need to
-rename the file <tt>b.out</tt>. Without remote file renaming, we
-would have to create either a symbolic link, or a copy of the
-files with the expected correct names. 
+<p>The first rule runs locally, using the executable <tt>myprog</tt> and the
+local file <tt>a.in</tt> to locally create <tt>b.out</tt>.  The second rule
+runs remotely, but the remote system expects <tt>a.in</tt> to be named
+<tt>in1</tt>, <tt>c.out</tt>, to be named <tt>out</tt> and so on. Note that we
+did not need to rename the file <tt>b.out</tt>. Without remote file renaming,
+we would have to create either a symbolic link, or a copy of the files with the
+expected correct names.</p>
 
 <h3>Displaying a Makeflow</h3>
 
-When run with the <tt>-D</tt> option, Makeflow will emit a diagram of the Makeflow in the
-<a href=http://www.graphviz.org>Graphviz DOT</a> format.  If you have <tt>dot</tt> installed,
-then you can generate an image of your workload like this:
+<p>When run with the <tt>-D</tt> option, Makeflow will emit a diagram of the
+Makeflow in the <a href=http://www.graphviz.org>Graphviz DOT</a> format. If you
+have <tt>dot</tt> installed, then you can generate an image of your workload
+like this:</p>
 
-<code>% makeflow -D example.makeflow | dot -T gif > example.gif</code>
+<code>% makeflow -D example.makeflow | dot -T gif &gt; example.gif</code>
 
 <h3>Total number of tasks in a Makeflow</h3>
-The following command parses Makeflow's '-D' option output and returns the
-total number of tasks in the given Makeflow script:
+
+<p>The following command parses Makeflow's '-D' option output and returns the
+total number of tasks in the given Makeflow script:</p>
+
 <code>% makeflow -D example.makeflow | grep '^N[0-9]\+ \[label=' | wc -l</code>
 
 <h2>Running Makeflow with Work Queue</h2>
 
-With the '-T wq' option, Makeflow runs as a master process that dispatches
-tasks to remote worker processes using the <a href=workqueue.html>Work Queue</a> framework.
+<p>With the '-T wq' option, Makeflow runs as a master process that dispatches
+tasks to remote worker processes using the <a href="workqueue.html">Work
+Queue</a> framework.</p>
 
 <h3>Selecting a Port</h3>
 
-Makeflow listens on a port which the remote workers would connect to.
-The default port number is 9123.  Sometimes, however, the port number might be
-not available on your system. You can change the default port via the '-p
-&lt;port number&gt;' option. For example, if you want the master to listen on port
-9567 by default, you can run the following command: 
+<p>Makeflow listens on a port which the remote workers would connect to.  The
+default port number is 9123.  Sometimes, however, the port number might be not
+available on your system. You can change the default port via the <tt>-p
+&lt;port number&gt;</tt> option. For example, if you want the master to listen
+on port 9567 by default, you can run the following command:</p>
 
 <code>% makeflow -T wq -p 9567 example.makeflow</code>
 
 <h3>Project Names</h3>
 
-A simpler way to match workers to masters is to use the
-project name matching. You can give the master a project name with the -N option.
+<p>A simpler way to match workers to masters is to use the project name
+matching. You can give the master a project name with the -N option.</p>
 
 <code> % makeflow -T wq -a -N MyProj example.makeflow </code> 
-The -N option gives the master a project name called 'MyProj'. The -a option
+
+<p>The -N option gives the master a project name called 'MyProj'. The -a option
 enables the catalog mode of the master.  Only in the catalog mode a master
 would advertise its information, such as the project name, running status,
 hostname and port number, to a catalog server. Then a worker could retrieve
 these information from the same catalog server.  The above command uses the
 default catalog server at Notre Dame which runs 24/7. We will talk about how to
-set up your own catalog server later.
+set up your own catalog server later.</p>
 
-<p>
-To start a worker that automatically finds MyProj's master via the default Notre
-Dame catalog server:
+<p>To start a worker that automatically finds MyProj's master via the default
+Notre Dame catalog server:</p>
+
 <code>% work_queue_worker -a -N MyProj </code>
-The '-a' option enables the catalog mode on the worker, which tells the worker
+
+<p>The <tt>-a</tt> option enables the catalog mode on the worker, which tells the worker
 to contact a catalog server to find out a project's (specified by -N option)
-hostname and port.  
-<p>
-You can also give multiple -N options to a worker. The worker will find out
+hostname and port.</p>
+
+<p>You can also give multiple -N options to a worker. The worker will find out
 which ones of the specified projects are running from the catalog server and
 randomly select one to work for. When one project is done, the worker would
 repeat this process.  Thus, the worker can work for a different master without
 being stopped and given the different master's hostname and port. An example of
-specifying multiple projects:
+specifying multiple projects:</p>
+
 <code>% work_queue_worker -a -N proj1 -N proj2 -N proj3</code>
 
 <h3>Setting a Password</h3>
 
-We recommend that any workflow that uses a project name also set
-a password.  To do this, select any passphrase and write it to
-a file called <tt>mypwfile</tt>.  Then, run Makeflow and each
-worker with the <tt>--password</tt> option to indicate the password file:
+<p>We recommend that any workflow that uses a project name also set a password.
+To do this, select any passphrase and write it to a file called
+<tt>mypwfile</tt>.  Then, run Makeflow and each worker with the
+<tt>--password</tt> option to indicate the password file:</p>
 
 <code>% makeflow <b>--password</b> mypwfile ...
 % work_queue_worker <b>--password</b> mypwfile ...
 </code>
-</code>
 
 <h3>Catalog Server</h3>
 
-<p>
-Now let's look at how to set up your own catalog server. Say you want to run
-your catalog server on a machine named <tt>catalog.somewhere.edu</tt>.  Tthe default port that the catalog server will be listening on is 9097, you can change it via the '-p' option.
+<p>Now let's look at how to set up your own catalog server. Say you want to
+run your catalog server on a machine named <tt>catalog.somewhere.edu</tt>.
+The default port that the catalog server will be listening on is 9097, you can
+change it via the '-p' option.</p>
+
 <code>% catalog_server</code>
-Now you have a catalog server listening at catalog.somewhere.edu:9097. To make your
-masters and workers contact this catalog server, simply add the '-C
-hostname:port' option to both of your master and worker: 
+
+<p>Now you have a catalog server listening at catalog.somewhere.edu:9097. To
+make your masters and workers contact this catalog server, simply add the
+<tt>-C hostname:port</tt> option to both of your master and worker:</p>
+
 <code>% makeflow -T wq -C catalog.somewhere.edu:9097 -N MyProj example.makeflow
 % work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj 
 </code>
 
 <h3>Supported Makeflow Drivers</h3>
-The full list of supported Makeflow drivers include
+
+<p>The full list of supported Makeflow drivers include:</p>
+
 <ul>
 	<li>Local - local execution on a single multicore system</li>
 	<li>Condor - execution on a campus grid via the local <a href="http://www.cs.wisc.edu/condor">Condor Pool</a></li>
@@ -454,14 +493,16 @@ The full list of supported Makeflow drivers include
 </ul>
 
 <h4>User-defined Clusters</h4>
-For clusters that are not directly supported by Makeflow we strongly suggest using the
-<a href="http://nd.edu/~ccl/software/workqueue">Work Queue</a> system and submitting workers
-via the cluster's normal submission mechanism.
 
-<p>
-For clusters using managers similar to SGE or Moab that are configured to preclude the use of Work Queue we have
-the "Cluster" custom driver.  To use the "Cluster" driver the Makeflow must be run in a parallel filesystem available to the
-entire cluster, and the following environment variables must be set.
+<p>For clusters that are not directly supported by Makeflow we strongly suggest
+using the <a href="http://nd.edu/~ccl/software/workqueue">Work Queue</a> system
+and submitting workers via the cluster's normal submission mechanism.</p>
+
+<p>For clusters using managers similar to SGE or Moab that are configured to
+preclude the use of Work Queue we have the "Cluster" custom driver.  To use the
+"Cluster" driver the Makeflow must be run in a parallel filesystem available to
+the entire cluster, and the following environment variables must be set.</p>
+
 <ul>
 	<li>BATCH_QUEUE_CLUSTER_NAME: The name of the cluster, used in debugging messages and as the name for the wrapper script.</li>
 	<li>BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND: The submit command for the cluster (such as qsub or msub)</li>
@@ -469,59 +510,56 @@ entire cluster, and the following environment variables must be set.
 	<li>BATCH_QUEUE_CLUSTER_REMOVE_COMMAND: The delete command for the cluster (such as qdel or mdel)</li>
 </ul>
 
-These will be used to construct a task submission for each makeflow rule that consists of
+<p>These will be used to construct a task submission for each makeflow rule that consists of:</p>
+
 <code>% $SUBMIT_COMMAND $SUBMIT_OPTIONS "&lt;rule name&gt;" $CLUSTER_NAME.wrapper "&lt;rule commandline&gt;"</code>
-The wrapper script is a shell script that reads the command to be run as an argument and handles bookkeeping operations necessary for Makeflow.
+
+<p>The wrapper script is a shell script that reads the command to be run as an argument and handles bookkeeping operations necessary for Makeflow.</p>
 
 <h2>Makeflow Garbage Collection</h2>
 
-<p>
-As the workflow execution progresses, Makeflow can automatically delete
+<p>As the workflow execution progresses, Makeflow can automatically delete
 intermediate files that are no longer needed. In this context, an intermediate
 file is an input of some rule that is the target of another rule. Therefore, by
-default, garbage collection does not delete the original input files, nor <em>
-	final </em> target files.
+default, garbage collection does not delete the original input files, nor <b>
+final</b> target files.</p>
 
-<p>
-Which files are deleted can be tailored from the default by appending files to
-the Makeflow variables <tt>GC_PRESERVE_LIST</tt> and <tt>GC_COLLECT_LIST</tt>.
-Files added to <tt>GC_PRESERVE_LIST</tt> are never deleted, thus it is used to
-mark intermediate files that should not be deleted. Similarly,
-<tt>GC_COLLECT_LIST</tt> marks final target files that should be deleted.
-Makeflow is conservative, in the sense that <tt>GC_PRESERVE_LIST</tt> takes
-precedence over <tt>GC_COLLECT_LIST</tt>, and original input files are never
-deleted, even if they are listed in <tt>GC_COLLECT_LIST</tt>.
+<p>Which files are deleted can be tailored from the default by appending files
+to the Makeflow variables <tt>GC_PRESERVE_LIST</tt> and
+<tt>GC_COLLECT_LIST</tt>.  Files added to <tt>GC_PRESERVE_LIST</tt> are never
+deleted, thus it is used to mark intermediate files that should not be deleted.
+Similarly, <tt>GC_COLLECT_LIST</tt> marks final target files that should be
+deleted.  Makeflow is conservative, in the sense that <tt>GC_PRESERVE_LIST</tt>
+takes precedence over <tt>GC_COLLECT_LIST</tt>, and original input files are
+never deleted, even if they are listed in <tt>GC_COLLECT_LIST</tt>.</p>
 
-<p>
-Makeflow offers two modes for garbage collection: reference count, and on
+<p>Makeflow offers two modes for garbage collection: reference count, and on
 demand. With the reference count mode, intermediate files are deleted as soon
 as no rule has them listed as input. The on-demand mode is similar to reference
 count, only that files are deleted until the space on the local file system is
-below a given threshold.
+below a given threshold.</p>
 
-<p>
-To activate reference count garbage collection:
+<p>To activate reference count garbage collection:</p>
 
 <code>makeflow -gref_count</code>
 
-<p>
-To activate on-demand garbage collection, with a threshold of 500MB:
+<p>To activate on-demand garbage collection, with a threshold of 500MB:</p>
 
 <code>makeflow -gon_demand -G500000000</code>
 
 <h2>Makeflow Log File Format</h2>
-After you  have executed the <tt>example.makeflow</tt> Makeflow script, you
+
+<p>After you  have executed the <tt>example.makeflow</tt> Makeflow script, you
 should see a log file named <tt>example.makeflow.makeflowlog</tt> under the
 directory where you ran the <tt>makeflow</tt> command.  The Makeflow log file
 records all the tasks that Makeflow tries to run and how the tasks status
-change during the previous executions.  
+change during the previous executions.</p>
 
-<p>
-In Makeflow, each task is called a node. You can think of it as a tree node in
-a tree structure of the target workflow. There is a unique id, a positive
+<p>In Makeflow, each task is called a node. You can think of it as a tree node
+in a tree structure of the target workflow. There is a unique id, a positive
 integer, associated with each node. This id is referred as node id. The
 Makeflow log file starts with a list of node (task) descriptions where each
-task is specified in the following format:
+task is specified in the following format:</p>
 
 <code># NODE node_id original_command# SYMBOL node_id symbol
 # PARENTS node_id parent_node_id_1 parent_node_id_2 ... parent_node_id_n
@@ -530,15 +568,16 @@ task is specified in the following format:
 # COMMAND node_id translated_command
 </code>
 
-These annotation lines all start with '#' and will be treated as comments by
-Makeflow. When Makeflow tries to resume the execution of a Makeflow script from
-a existing Makeflow log file, it will skip the scanning of these commented
-lines. Also, annotations being commented out allows third-party applications,
-such as gnuplot, to skip them when plotting data.
+<p>These annotation lines all start with <tt>#</tt> and will be treated as
+comments by Makeflow. When Makeflow tries to resume the execution of a Makeflow
+script from a existing Makeflow log file, it will skip the scanning of these
+commented lines. Also, annotations being commented out allows third-party
+applications, such as gnuplot, to skip them when plotting data.</p>
 
-<p>
-The body sections of a Makeflow log file come after the node specificiation
-section. The following is a snippet from <tt>example.makeflow.makeflowlog</tt>:
+<p>The body sections of a Makeflow log file come after the node specificiation
+section. The following is a snippet from
+<tt>example.makeflow.makeflowlog</tt>:</p>
+
 <code># STARTED timestamp
 1347281321284638 5 1 9206 5 1 0 0 0 6
 1347281321348488 5 2 9206 5 0 1 0 0 6
@@ -555,13 +594,16 @@ section. The following is a snippet from <tt>example.makeflow.makeflowlog</tt>:
 # COMPLETED timestamp
 </code>
 
-If a Makeflow execution is completed without errors, a body section of the log
-consists of a series of node (task) status change lines (the 10 column line)
-surrounded by a pair of "# STARTED" and "# COMPLETED" lines which record the
-start and end unix time of that execution.  A node status change line has the
-following form: 
+<p>If a Makeflow execution is completed without errors, a body section of the
+log consists of a series of node (task) status change lines (the 10 column
+line) surrounded by a pair of "# STARTED" and "# COMPLETED" lines which record
+the start and end unix time of that execution.  A node status change line has
+the following form:</p>
+
 <code>timestamp node_id new_state job_id nodes_waiting nodes_running nodes_complete nodes_failed nodes_aborted node_id_counter</code>
-Here is the column specificiation:
+
+<p>Here is the column specificiation:</p>
+
 <ul>
 	<li><b>timestamp</b> - the unix time (in microseconds) when this line is written to the log file. </li>
 	<li><b>node_id</b> - the id of this node (task). </li>
@@ -587,20 +629,23 @@ Here is the column specificiation:
 	<li><b>node_id_counter</b> - total number of nodes in this Makeflow</li>
 </ul>
 
-You might also see the following two lines in the Makeflow log file if the
+<p>You might also see the following two lines in the Makeflow log file if the
 Makeflow is aborted or failed during a execution. The unix time at which such
-event occured is recorded:
+event occured is recorded:</p>
+
 <code># ABORTED timestamp
 # FAILED timestamp
 </code>
 
-When file garbage collection is enabled, the log file records information at
+<p>When file garbage collection is enabled, the log file records information at
 each collection cycle. Collection information is included in lines starting
-with the '# GC' prefix:
+with the <tt># GC</tt> prefix:</p>
 
 <code># GC timestamp collected time_spent dag_gc_collected</code>
-Each garbage collection line records the garbage collection statistics during a
-garbage collection cycle: 
+
+<p>Each garbage collection line records the garbage collection statistics
+during a garbage collection cycle:</p>
+
 <ul>
 	<li><b>timestamp</b> - the unix time (in microseconds) when this line is written to the log file. </li>
 	<li><b>collected</b> - the number of files were collected in this garbage collection cycle.</li>
@@ -609,11 +654,21 @@ garbage collection cycle:
 </ul>
 
 <h2>Linking Workflow Dependencies</h2>
-<tt>Makeflow</tt> provides a tool to collect all of the dependencies for a given workflow into one directory. By collecting all of the input files and programs contained in a workflow it is possible to run the workflow on other machines.
 
-Currently, <tt>Makeflow</tt> copies all of the files specified as dependencies by the rules in the makeflow file, including scripts and data files. Some of the files not collected are dynamically linked libraries, executables not listed as dependencies (<tt>python</tt>, <tt>perl</tt>), and configuration files (<tt>mail.rc</tt>).
+<p><tt>Makeflow</tt> provides a tool to collect all of the dependencies for a
+given workflow into one directory. By collecting all of the input files and
+programs contained in a workflow it is possible to run the workflow on other
+machines.</p>
 
-To avoid naming conflicts, files which would otherwise have an identical path are renamed when copied into the bundle
+<p>Currently, <tt>Makeflow</tt> copies all of the files specified as
+dependencies by the rules in the makeflow file, including scripts and data
+files. Some of the files not collected are dynamically linked libraries,
+executables not listed as dependencies (<tt>python</tt>, <tt>perl</tt>), and
+configuration files (<tt>mail.rc</tt>).</p>
+
+<p>To avoid naming conflicts, files which would otherwise have an identical
+path are renamed when copied into the bundle:</p>
+
 <ul>
   <li>All file paths are relative to the top level directory.</li>
   <li>The makeflow file is rewritten with the new file locations and placed in the top level directory.</li>
@@ -621,14 +676,13 @@ To avoid naming conflicts, files which would otherwise have an identical path ar
   <li>Files with the same path are appended with a unique number</li>
 </ul>
 
-Example usage:
+<p>Example usage:</p>
+
 <code>% makeflow -b some_output_directory example.makeflow</code>
-
-
 
 <h2>For More Information</h2>
 
-For the latest information about Makeflow, please visit our <a href=http://www.cse.nd.edu/~ccl/software/makeflow>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
+<p>For the latest information about Makeflow, please visit our <a href=http://www.cse.nd.edu/~ccl/software/makeflow>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.</p>
 
 </div>
 </body>
