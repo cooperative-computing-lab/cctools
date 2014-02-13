@@ -19,7 +19,7 @@ All rights reserved.<br>
 This software is distributed under the GNU General Public License.<br>
 See the file COPYING for details.</p>
 
-      <h2>Overview</h2>
+<h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
 
       <b>resource_monitor</b> is a tool to monitor the computational
       resources used by the process created by the command given as an
@@ -55,14 +55,14 @@ See the file COPYING for details.</p>
 
       <p>
 
-      <h2>Installation</h2>
+		  <h2 id="installation">Installation<a class="sectionlink" href="#installation" title="Link to this section.">&#x21d7;</a></h2>
 
       The <b>resource_monitor</b> is included in the <b>current development version</b> of
       <a href=http://http://www.cse.nd.edu/~ccl/software/download.shtml>CCTools</a>. For installation, please follow these <a href=http://www3.nd.edu/~ccl/software/manuals/install.html>instructions.</a>
 
-      <h2>Running resource_monitor</h2>
+	  <h2 id="running">Running resource_monitor<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
 
-     <h3> Stand-alone mode </h3>
+	  <h3 id="running.standalone"> Stand-alone mode <a class="sectionlink" href="#running.standalone" title="Link to this section.">&#x21d7;</a></h3>
 
      Simply type:
 
@@ -89,7 +89,7 @@ names, and the sampling intervals:
       the tree process is terminated. This is likely to change in
       future versions of the tool.
 
-      <h3> Makeflow mode </h3>
+	  <h3 id="running.makeflow"> Makeflow mode <a class="sectionlink" href="#running.makeflow" title="Link to this section.">&#x21d7;</a></h3>
 
 	  If you already have a makeflow file, you can activate the
 	  resource_monitor by giving the <tt>-M</tt> flag to makeflow with a
@@ -101,7 +101,7 @@ names, and the sampling intervals:
 	  and writes the resulting logs per rule in the directory
 	  <tt>monitor_logs</tt>.
 
-      <h3> Work-queue mode </h3>
+	  <h3 id="running.wq"> Work-queue mode <a class="sectionlink" href="#running.wq" title="Link to this section.">&#x21d7;</a></h3>
 
       From Work Queue:
 
@@ -113,7 +113,7 @@ work_queue_enable_monitoring(q, some-log-file);
       summary files into the file <tt>some-log-file</tt>. Currently
       only summary reports are generated from work queue.
 
-      <h3> Monitoring with Condor </h3>
+	  <h3 id="running.condor"> Monitoring with Condor <a class="sectionlink" href="#running.condor" title="Link to this section.">&#x21d7;</a></h3>
 
       Unlike the previous examples, when using
       the <tt>resource_monitor</tt> directly with <b>condor</b>, you
@@ -143,7 +143,7 @@ log = condor.test.logfile
 queue
 </code>
 
-      <h2>Output Format</h2>
+<h2 id="outputformat">Output Format<a class="sectionlink" href="#outputformat" title="Link to this section.">&#x21d7;</a></h2>
 
       The summary file has the following format:
 
@@ -184,7 +184,7 @@ workdir_number_files_dirs [current number of files and directories, across all
 workdir_footprint         [current size of working directories in the tree, in MB  int]
 </code>
      
-      <h2>Specifying Resource Limits</h2>
+<h2 id="specifyinglimits">Specifying Resource Limits<a class="sectionlink" href="#specifyinglimits" title="Link to this section.">&#x21d7;</a></h2>
 
       The limits file should contain lines of the form:
 
@@ -222,7 +222,7 @@ log = condor.matlab.logfile
 queue
 </code>
       
-  <h2>For More Information</h2>
+<h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
   For the latest information about <b>resource_monitor</b> please subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
 

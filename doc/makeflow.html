@@ -19,7 +19,7 @@ All rights reserved.<br>
 This software is distributed under the GNU General Public License.<br>
 See the file COPYING for details.</p>
 
-<h2>Overview</h2>
+<h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>
 Makeflow is a <b>workflow engine</b> for distributed computing.
@@ -39,7 +39,7 @@ of machines, large or small.
 <p>
 Makeflow is part of the <a href=http://www.cse.nd.edu/~ccl/software>Cooperating Computing Tools</a>.  You can download the CCTools from <a href=http://www.cse.nd.edu/~ccl/software/download>this web page</a>, follow the <a href=install.html>installation instructions</a>, and you are ready to go.
 
-<h2>The Makeflow Language</h2>
+<h2 id="language">The Makeflow Language<a class="sectionlink" href="#language" title="Link to this section.">&#x21d7;</a></h2>
 
 The Makeflow language is very similar to Make.
 A Makeflow script consists of a set of rules.
@@ -84,7 +84,7 @@ capitol.jpg: $CURL
 Note that Makeflow differs from Make in a few important ways.
 Read section 4 below to get all of the details.
 
-<h2>Running Makeflow</h2>
+<h2 id="running">Running Makeflow<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
 
 To try out the example above, copy and paste it into a file named <tt>example.makeflow</tt>.
 To run it on your local machine:
@@ -158,7 +158,7 @@ and <tt>torque_submit_workers</tt>.
 are simple shell scripts, so you can edit them directly if you would
 like to change batch options or other details.
 
-<h2>Resources Categories</h2>
+<h2 id="resources">Resources Categories<a class="sectionlink" href="#resources" title="Link to this section.">&#x21d7;</a></h2>
 
 Makeflow has the capability of automatically setting the cores, memory,
 and disk space requirements to the underlying batch system (currently this only
@@ -252,11 +252,11 @@ has the value of "preprocessing", and then it is re-established to "simulation"
 (so that <tt>four</tt> and <tt>six</tt> belong to the same category). This is
 done using rule lexical scoping, explained in the next section.
 
-<h2>The Fine Details</h2>
+<h2 id="details">The Fine Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>The Makeflow language is very similar to Make, but it does have a few important differences that you should be aware of.</p>
 
-<h3>Get the Dependencies Right</h3>
+<h3 id="details.dependencies">Get the Dependencies Right<a class="sectionlink" href="#details.dependencies" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>You must be careful to accurately specify <b>all of the files that a rule
 requires and creates</b>, including any custom executables.  This is because
@@ -292,7 +292,7 @@ directory later, it does not matter what's already in it). <b>Makeflow assumes
 that an input directory indicates that the command relies on the directory's
 existence</b>.</p>
 
-<h3>No Phony Rules</h3>
+<h3 id="details.phony">No Phony Rules<a class="sectionlink" href="#details.phony" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>For a similar reason, you cannot have "phony" rules that don't actually
 create the specified files.  For example, it is common practice to define a
@@ -300,7 +300,7 @@ create the specified files.  For example, it is common practice to define a
 sense in Makeflow, because such a rule does not actually create a file named
 <tt>clean</tt>.  Instead use the <tt>-c</tt> option as shown above.</p>
 
-<h3>Just Plain Rules</h3>
+<h3 id="details.plain">Just Plain Rules<a class="sectionlink" href="#details.plain" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>Makeflow does not support all of the syntax that you find in various
 versions of Make.  Each rule must have exactly one command to execute.  If you
@@ -310,14 +310,14 @@ wildcards, or special variables like <tt>$&lt;</tt> or <tt>$@</tt>.  You simply
 have to write out the rules longhand, or write a script in your favorite
 language to generate a large Makeflow.</p>
 
-<h3>Local Job Execution</h3>
+<h3 id="details.local">Local Job Execution<a class="sectionlink" href="#details.local" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>Certain jobs don't make much sense to distribute.  For example, if you have
 a very fast running job that consumes a large amount of data, then it should
 simply run on the same machine as Makeflow.  To force this, simply add the word
 <tt>LOCAL</tt> to the beginning of the command line in the rule.</p>
 
-<h3>Rule Lexical Scope</h3>
+<h3 id="details.scope">Rule Lexical Scope<a class="sectionlink" href="#details.scope" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>Variables in Makeflow have global scope, that is, once defined, their value
 can be accessed from any rule. Sometimes it is useful to define a variable
@@ -341,7 +341,7 @@ before the rule's command, and prepending the name of the variable with
 In this example, SOME_VARIABLE has the value 'original_value' for rules 1 and
 3, and the value 'local_value_for_2' for rule 2.
 
-<h3>Batch Job Refinement</h3>
+<h3 id="details.refinement">Batch Job Refinement<a class="sectionlink" href="#details.refinement" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>When executing jobs, Makeflow simply uses the default settings in your batch
 system.  If you need to pass additional options, use the <tt>BATCH_OPTIONS</tt>
@@ -360,7 +360,7 @@ your Condor submit files, add this to your Makeflow:</p>
 When using SGE, the string will be added to the qsub options.  For example, to specify that jobs should be submitted to the <tt>devel</tt> queue:
 <code>BATCH_OPTIONS = -q devel</code>
 
-<h3>Remote File Renaming</h3>
+<h3 id="details.renaming">Remote File Renaming<a class="sectionlink" href="#details.renaming" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>With the Work Queue and Condor batch systems, Makeflow has a feature called
 remote file renaming. For example:</p>
@@ -385,7 +385,7 @@ did not need to rename the file <tt>b.out</tt>. Without remote file renaming,
 we would have to create either a symbolic link, or a copy of the files with the
 expected correct names.</p>
 
-<h3>Displaying a Makeflow</h3>
+<h3 id="details.displaying">Displaying a Makeflow<a class="sectionlink" href="#details.displaying" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>When run with the <tt>-D</tt> option, Makeflow will emit a diagram of the
 Makeflow in the <a href=http://www.graphviz.org>Graphviz DOT</a> format. If you
@@ -394,20 +394,20 @@ like this:</p>
 
 <code>% makeflow -D example.makeflow | dot -T gif &gt; example.gif</code>
 
-<h3>Total number of tasks in a Makeflow</h3>
+<h3 id="details.number">Total number of tasks in a Makeflow<a class="sectionlink" href="#details.number" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>The following command parses Makeflow's '-D' option output and returns the
 total number of tasks in the given Makeflow script:</p>
 
 <code>% makeflow -D example.makeflow | grep '^N[0-9]\+ \[label=' | wc -l</code>
 
-<h2>Running Makeflow with Work Queue</h2>
+<h2 id="workqueue">Running Makeflow with Work Queue<a class="sectionlink" href="#workqueue" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>With the '-T wq' option, Makeflow runs as a master process that dispatches
 tasks to remote worker processes using the <a href="workqueue.html">Work
 Queue</a> framework.</p>
 
-<h3>Selecting a Port</h3>
+<h3 id="workqueue.port">Selecting a Port<a class="sectionlink" href="#workqueue.port" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>Makeflow listens on a port which the remote workers would connect to.  The
 default port number is 9123.  Sometimes, however, the port number might be not
@@ -417,7 +417,7 @@ on port 9567 by default, you can run the following command:</p>
 
 <code>% makeflow -T wq -p 9567 example.makeflow</code>
 
-<h3>Project Names</h3>
+<h3 id="workqueue.projectnames">Project Names<a class="sectionlink" href="#workqueue.projectnames" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>A simpler way to match workers to masters is to use the project name
 matching. You can give the master a project name with the -N option.</p>
@@ -450,7 +450,7 @@ specifying multiple projects:</p>
 
 <code>% work_queue_worker -a -N proj1 -N proj2 -N proj3</code>
 
-<h3>Setting a Password</h3>
+<h3 id="workqueue.password">Setting a Password<a class="sectionlink" href="#workqueue.password" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>We recommend that any workflow that uses a project name also set a password.
 To do this, select any passphrase and write it to a file called
@@ -461,7 +461,7 @@ To do this, select any passphrase and write it to a file called
 % work_queue_worker <b>--password</b> mypwfile ...
 </code>
 
-<h3>Catalog Server</h3>
+<h3 id="workqueue.catalog">Catalog Server<a class="sectionlink" href="#workqueue.catalog" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>Now let's look at how to set up your own catalog server. Say you want to
 run your catalog server on a machine named <tt>catalog.somewhere.edu</tt>.
@@ -478,7 +478,7 @@ make your masters and workers contact this catalog server, simply add the
 % work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj 
 </code>
 
-<h3>Supported Makeflow Drivers</h3>
+<h3 id="workqueue.drivers">Supported Makeflow Drivers<a class="sectionlink" href="#workqueue.drivers" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>The full list of supported Makeflow drivers include:</p>
 
@@ -492,7 +492,7 @@ make your masters and workers contact this catalog server, simply add the
 	<li>Hadoop - execution on a cluster managed by the <a href="http://hadoop.apache.org/">Hadoop</a> framework, using data stored in <a href="http://hadoop.apache.org/hdfs">HDFS</a>.</li>
 </ul>
 
-<h4>User-defined Clusters</h4>
+<h4 id="workqueue.drivers.clusters">User-defined Clusters<a class="sectionlink" href="#workqueue.drivers.clusters" title="Link to this section.">&#x21d7;</a></h4>
 
 <p>For clusters that are not directly supported by Makeflow we strongly suggest
 using the <a href="http://nd.edu/~ccl/software/workqueue">Work Queue</a> system
@@ -516,7 +516,7 @@ the entire cluster, and the following environment variables must be set.</p>
 
 <p>The wrapper script is a shell script that reads the command to be run as an argument and handles bookkeeping operations necessary for Makeflow.</p>
 
-<h2>Makeflow Garbage Collection</h2>
+<h2 id="garbage">Makeflow Garbage Collection<a class="sectionlink" href="#garbage" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>As the workflow execution progresses, Makeflow can automatically delete
 intermediate files that are no longer needed. In this context, an intermediate
@@ -547,7 +547,7 @@ below a given threshold.</p>
 
 <code>makeflow -gon_demand -G500000000</code>
 
-<h2>Makeflow Log File Format</h2>
+<h2 id="logformat">Makeflow Log File Format<a class="sectionlink" href="#logformat" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>After you  have executed the <tt>example.makeflow</tt> Makeflow script, you
 should see a log file named <tt>example.makeflow.makeflowlog</tt> under the
@@ -653,7 +653,7 @@ during a garbage collection cycle:</p>
 	<li><b>dag_gc_collected</b> - the total number of files has been collected so far since the start this Makeflow execution.</li>
 </ul>
 
-<h2>Linking Workflow Dependencies</h2>
+<h2 id="linking">Linking Workflow Dependencies<a class="sectionlink" href="#linking" title="Link to this section.">&#x21d7;</a></h2>
 
 <p><tt>Makeflow</tt> provides a tool to collect all of the dependencies for a
 given workflow into one directory. By collecting all of the input files and
@@ -680,7 +680,7 @@ path are renamed when copied into the bundle:</p>
 
 <code>% makeflow -b some_output_directory example.makeflow</code>
 
-<h2>For More Information</h2>
+<h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>For the latest information about Makeflow, please visit our <a href=http://www.cse.nd.edu/~ccl/software/makeflow>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.</p>
 

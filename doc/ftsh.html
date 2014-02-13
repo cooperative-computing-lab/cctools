@@ -26,7 +26,7 @@ file COPYING for details.</p>
 </ul>
 
 <a name=introduction></a>
-<h2>Introduction</h2>
+<h2 id="introduction">Introduction<a class="sectionlink" href="#introduction" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>Shell scripts are a vital tool for integrating software.
 They are indispensable for rapid prototyping and system assembly.
@@ -111,9 +111,9 @@ available from the <a href=http://www.cse.nd.edu/~ccl/software/ftsh>ftsh web pag
 For a quick introduction, read on!
 
 <a name=basics></a>
-<h2>Basics</h2>
+<h2 id="basics">Basics<a class="sectionlink" href="#basics" title="Link to this section.">&#x21d7;</a></h2>
 
-<h3>Simple Commands</h3>
+<h3 id="basics.commands">Simple Commands<a class="sectionlink" href="#basics.commands" title="Link to this section.">&#x21d7;</a></h3>
 
 An ftsh program is built up from simple commands.
 A simple command names a program to be executed, just <tt>sh</tt> or <tt>csh</tt>.
@@ -136,7 +136,7 @@ exit code.  It may be killed by a signal, or it may fail to start
 altogether if the program does not exist or its image cannot be loaded.
 These cases are also considered failures.
 
-<h3>Groups</h3>
+<h3 id="basics.groups">Groups<a class="sectionlink" href="#basics.groups" title="Link to this section.">&#x21d7;</a></h3>
 
 A "group" is simply a list of commands.
 Each command only runs if the previous command succeeded.
@@ -161,7 +161,7 @@ Ftsh returns the result of the top-level group that makes up the program.
 So, if any command in the top-level group fails, then ftsh itself will
 fail.  If they all succeed, then ftsh succeeds.
 
-<h3>Try Statements</h3>
+<h3 id="basics.try">Try Statements<a class="sectionlink" href="#basics.try" title="Link to this section.">&#x21d7;</a></h3>
 
 A try statement is used to contain and retry group failure.
 Here is a simple try statement:
@@ -273,7 +273,7 @@ immediately with the given exit code.  The second is to call
 in place of the current shell process, thus voiding any
 surrounding controls.
 
-<h3>Redirection</h3>
+<h3 id="basics.redirection">Redirection<a class="sectionlink" href="#basics.redirection" title="Link to this section.">&#x21d7;</a></h3>
 
 Ftsh uses Bourne shell style I/O redirection. For example:
 <code>echo "hello" &gt; outfile</code>
@@ -288,7 +288,7 @@ of the Bourne shell, such as the redirection of explicit file descriptors:
 ...and redirection of both input and output at once:
 <code>grep needle &gt;&amp; out-and-err-file</code>
 
-<h2>Variables</h2>
+<h2 id="variables">Variables<a class="sectionlink" href="#variables" title="Link to this section.">&#x21d7;</a></h2>
 
 Ftsh provides variables similar to that of the Bourne shell.
 For example,
@@ -343,7 +343,7 @@ This prevents both the namespace and garbage
 collection problem left by scripts that manually read and write to files.
 
 <a name=structures></a>
-<h2>Structures</h2>
+<h2 id="structures">Structures<a class="sectionlink" href="#structures" title="Link to this section.">&#x21d7;</a></h2>
 
 Complex programs are built up by combining basic elements
 with programming structures.  Ftsh has most of the decision
@@ -351,7 +351,7 @@ elements of other programming languages, such as conditionals
 and loops.  Each of these elements behaves in a very precise way with
 respect to successes and failures.
 
-<h3>For-Statements</h3>
+<h3 id="structures.for">For-Statements<a class="sectionlink" href="#structures.for" title="Link to this section.">&#x21d7;</a></h3>
 
 A for-statement executes a command group once for each
 word in a list.  For example:
@@ -415,7 +415,7 @@ restart after a failure, place it outside:
 end
 </code>
 
-<h3>Loops, Conditionals, and Expressions</h3>
+<h3 id="structures.loops">Loops, Conditionals, and Expressions<a class="sectionlink" href="#structures.loops" title="Link to this section.">&#x21d7;</a></h3>
 
 Ftsh has loops and conditionals similar to other languages.
 For example:
@@ -508,7 +508,7 @@ catch
 end
 </code>
 
-<h3>Functions</h3>
+<h3 id="structures.functions">Functions<a class="sectionlink" href="#structures.functions" title="Link to this section.">&#x21d7;</a></h3>
 
 Simple functions are named groups of commands that may
 be called in the same manner as an external program.
@@ -551,15 +551,15 @@ If a function is used in an expression but does not
 return a value, then the expression evaluation fails.
 
 <a name=miscellaneous></a>
-<h2>Miscellaneous Features</h2>
+<h2 id="misc">Miscellaneous Features<a class="sectionlink" href="#misc" title="Link to this section.">&#x21d7;</a></h2>
 
-<h3>Environment</h3>
+<h3 id="misc.environment">Environment<a class="sectionlink" href="#misc.environment" title="Link to this section.">&#x21d7;</a></h3>
 Variables may be exported into the environment, just like the Bourne shell:
 <code>PATH="/usr/bin:/usr/local/bin"
 export PATH
 </code>
 
-<h3>Nested Shells</h3>
+<h3 id="misc.nesting">Nested Shells<a class="sectionlink" href="#misc.nesting" title="Link to this section.">&#x21d7;</a></h3>
 
 Ftsh is perfectly safe to nest.
 That is, an ftsh script may safely call other scripts written in ftsh.
@@ -568,7 +568,7 @@ variables, so logs, error settings, and timeouts are uniform from
 top to bottom.  If a sub-shell provides its own arguments, these
 override the environment settings of the parent.
 
-<h3>Error Logging</h3>
+<h3 id="misc.logging">Error Logging<a class="sectionlink" href="#misc.logging" title="Link to this section.">&#x21d7;</a></h3>
 
 Ftsh may optionally keep a log that describes all the details
 of a script's execution.  The -f option specifies a log file.
@@ -596,7 +596,7 @@ levels are currently defined:
 <li><b>40</b> - Display process activities such as signals and completions. 
 </ul>
 
-<h3>Command-Line Arguments</h3>
+<h3 id="misc.arguments">Command-Line Arguments<a class="sectionlink" href="#misc.arguments" title="Link to this section.">&#x21d7;</a></h3>
 Ftsh accepts the following command-line arguments:
 <ul>
 <li> <b>-f &lt;file&gt;</b> The name of a log file for tracing the
@@ -618,7 +618,7 @@ Equivalent to the environment variable FTSH_KILL_TIMEOUT.
 <li> <b>-h</b> Show the help screen.
 </ul>
 
-<h3>Cancelling Processes</h3>
+<h3 id="misc.cancelling">Cancelling Processes<a class="sectionlink" href="#misc.cancelling" title="Link to this section.">&#x21d7;</a></h3>
 
 Cancelling a running process in UNIX is rather quite complex.
 Although starting and stopping one single process is fairly
