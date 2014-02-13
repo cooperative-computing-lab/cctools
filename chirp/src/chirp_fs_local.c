@@ -442,7 +442,7 @@ static struct chirp_dir *chirp_fs_local_opendir(const char *path)
 	RESOLVENULL(path)
 	DIR *dir = opendir(path);
 	if(dir) {
-		struct chirp_dir *cdir = malloc(sizeof(*cdir));
+		struct chirp_dir *cdir = xxmalloc(sizeof(*cdir));
 		cdir->dir = dir;
 		strcpy(cdir->path, path); /* N.B. readdir passes this to chirp_fs_local_lstat */
 		return cdir;
