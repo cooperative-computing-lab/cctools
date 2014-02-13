@@ -17,7 +17,7 @@ Allpairs is Copyright (C) 2009 The University of Notre Dame.
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 <p>
-<h2>Overview</h2>
+<h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
 
 <table>
 <tr>
@@ -44,7 +44,7 @@ part of the matrix, using a specified number of CPU cores. The abstraction then
 runs each of the functions in parallel, automatically handling load balancing,
 data movement, fault tolerance and so on for you.
 
-<h2 id="preparation">All-Pairs on a Single Machine</h2>
+<h2 id="singlemachine" id="preparation">All-Pairs on a Single Machine<a class="sectionlink" href="#singlemachine" title="Link to this section.">&#x21d7;</a></h2>
 
 Let's suppose you have a whole lot of files that you want to compare all to each other, named <tt>a</tt>, <tt>b</tt>, <tt>c</tt>, and so on.  Suppose that you also have a program named <tt>compareit</tt> that when invoked as <tt>compareit a b</tt> will compare files <tt>a</tt> and <tt>b</tt> and produce some output summarizing the difference between the two, like this:
 <code>a b are 45 percent similar</code>
@@ -65,7 +65,7 @@ a c are 37 percent similar
 </code>
 For large sets of objects, allpairs_multicore will use as many cores as you have available, and will carefully manage virtual memory to exploit locality and avoid thrashing.  Because of this, you should be prepared for the results to come back in any order.
 
-<h2>All-Pairs on a Distributed System</h2>
+<h2 id="distributed">All-Pairs on a Distributed System<a class="sectionlink" href="#distributed" title="Link to this section.">&#x21d7;</a></h2>
 
 So far, we have introduced how to use All-Pairs abstraction on a single
 machine.  But sometimes the All-Pairs problem is too big to allow a single
@@ -123,7 +123,7 @@ can change this worker expiration time by setting the '<tt>-t</tt>' option.</p>
 simple shell scripts, so you can edit them directly if you would like to
 change batch options or other details.</p>
 
-<h2>Using an Internal Function</h2>
+<h2 id="internalfunction">Using an Internal Function<a class="sectionlink" href="#internalfunction" title="Link to this section.">&#x21d7;</a></h2>
 
 If you have a very fast comparison program (less than a tenth of a second),
 the allpairs framework may be spending more time starting your program
@@ -146,7 +146,7 @@ We have implemented several internal comparison functions as examples, including
 <li> IRIS - Performs a similarity comparison between two iris templates.
 </dir>
 
-<h2>Tuning Performance</h2>
+<h2 id="tuning">Tuning Performance<a class="sectionlink" href="#tuning" title="Link to this section.">&#x21d7;</a></h2>
 
 By default, both <tt>allpairs_master</tt> and <tt>allpairs_multicore</tt> will adjust to
 the proprties of your workload to run it efficiently.  <tt>allpairs_master</tt> will run
@@ -169,7 +169,7 @@ which is 3/4 of memory by default.
 </dir>
 
 
-<h2>For More Information</h2>
+<h2 id="moreinfo" id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
 For the latest information about Allpairs, please visit our <a href=http://www.cse.nd.edu/~ccl/software/allpairs>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software/help.shtml>mailing list</a>.
 

@@ -17,11 +17,11 @@
 <body>
 
 <div id="manual">
-<h1>Chirp Protocol Version 2</h2>
+<h1>Chirp Protocol Version 2</h1>
 
 <p style="text-align: right;"><b>Last edited: 23 June 2008</b></p>
 
-<h2>Introduction</h2>
+<h2 id="introduction">Introduction<a class="sectionlink" href="#introduction" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>Chirp is a simple and lightweight remote I/O protocol with multiple implementations.  It is used in several distributed computing systems where users wish to access data over the wide area using a Unix filesystem like protocol.  This document lays out the underlying protocol so as to promote interoperability between implementations, and permit additional implementations by other parties.  At the time of writing, there are four independent implementations used for both research and production:</p>
 <p>
@@ -32,17 +32,17 @@
 <li> A C client implementation that is part of the ROOT I/O library used in the high energy physics community.
 </dir>
 
-<h2>Authentication Protocol</h2>
+<h2 id="authentication">Authentication Protocol<a class="sectionlink" href="#authentication" title="Link to this section.">&#x21d7;</a></h2>
 
 Chirp is carried over a stream protocol such as TCP or Unix domain sockets.  A server waits for a client to connect by the appropriate mechanism, and then waits for the client to identify itself.  There are currently two methods of authentication: cookie authentication and negotiated authentication.
 
-<h3>Cookie Authentication</h3>
+<h3 id="authentication.cookie">Cookie Authentication<a class="sectionlink" href="#authentication.cookie" title="Link to this section.">&#x21d7;</a></h3>
 
 In certain situations, the client may be provided in advance with a "cookie" that provides expedited access to a server with a fixed identity.  This method is typically used within Condor when communicating with the embedded Chirp proxy.
 <p>
 In this situation, the client is provided with a file named <tt>chirp.config</tt> which contains the host and port of the server, and a cookie string.  The client must connect to the server and immediately send <tt>cookie</tt>, a space, the cookie string, and a newline.  If the response from the server is <tt>0\n</tt> then the cookie is accepted, and the client may proceed to the main Chirp protocol described below.  Any other response indicates the cookie was rejected, and the client must abort. 
 
-<h3>Negotiated Authentication</h3>
+<h3 id="authentication.negotiated">Negotiated Authentication<a class="sectionlink" href="#authentication.negotiated" title="Link to this section.">&#x21d7;</a></h3>
 
 In the general case, the client must prove its identity to the server.  There are several possible methods of authentication, and both client and server may only accept some subset of them.  The client drives the negotiation process by simply sending the requested authentication type as a plain string followed by a newline.  If the server does not support the method, it responds <tt>no\n</tt> and waits for the client to request another.  If it does support the method, it responds <tt>yes\n</tt> and then performs that method.  At the time of writing, the supported authentication methods are <tt>hostname</tt>, <tt>unix</tt>, <tt>kerberos</tt>, and <tt>globus</tt>.
 <p>
@@ -53,27 +53,27 @@ client: unix
 server: yes
 </code>
 
-<h4>Hostname Authentication</h4>
+<h4 id="authentication.hostname">Hostname Authentication<a class="sectionlink" href="#authentication.hostname" title="Link to this section.">&#x21d7;</a></h4>
 
 This method of authentication simply asks that the server identify by the client by the name of the host it is calling from.  The server responds by performing a remote domain name lookup on the caller’s IP address.  If this succeeds, the server responds <tt>yes\n</tt>, otherwise <tt>no\n</tt> and fails (see below).  If the client is authorized to connect, the server sends an additional <tt>yes\n</tt> otherwise <tt>no\n</tt> and fails.
 
-<h4>Unix Authentication</h4>
+<h4 id="authentication.unix">Unix Authentication<a class="sectionlink" href="#authentication.unix" title="Link to this section.">&#x21d7;</a></h4>
 
 This method of authentication causes the server the challenge the client to prove its identity by creating a file on the local file system.  The server transmits the name of a non-existent file in a writable directory.  The client must then attempt to create it.  If successful, the client should respond <tt>yes\n</tt> otherwise <tt>no\n</tt> and fails.  The server then checks that the file was actually created, and if satisfied responds <tt>yes\n</tt> otherwise <tt>no\n</tt> and fails.
 
-<h4>Kerberos Authentication</h4>
+<h4 id="authentication.kerberos">Kerberos Authentication<a class="sectionlink" href="#authentication.kerberos" title="Link to this section.">&#x21d7;</a></h4>
 
 This method is performed by invoking the standard Kerberos 5 libraries to authenticate in the usual manner, and is defined by that standard.
 
-<h4>Globus Authentication</h4>
+<h4 id="authentication.globus">Globus Authentication<a class="sectionlink" href="#authentication.globus" title="Link to this section.">&#x21d7;</a></h4>
 
 This method is performed by invoking the Secure Sockets Layer to authenticate using Globus credentials and is defined by that standard.
 
-<h3>Completing Authentication</h3>
+<h3 id="authentication.completing">Completing Authentication<a class="sectionlink" href="#authentication.completing" title="Link to this section.">&#x21d7;</a></h3>
 
 If the authentication method succeeds, then the server will send two lines to the client, giving the successful authentication method and the client's identity.  The client may then proceed to the main protocol below.  If the method fails, then the server and client return to negotiating a method.
 
-<h2>Chirp Protocol</h2>
+<h2 id="authentication.protocol">Chirp Protocol<a class="sectionlink" href="#authentication.protocol" title="Link to this section.">&#x21d7;</a></h2>
 
 A request consists of an LF-terminated line possibly followed by binary data. At a minimum, a Chirp server must accept requests of 1024 characters. It may accept longer lines.  If a line exceeds a server's internal maximum, it must gracefully consume the excess characters and return a TOO_BIG error code, defined below. Certain requests are immediately followed by binary data.  The number of bytes is dependent on the semantics of the request, also described below.
 <p>
@@ -111,7 +111,7 @@ A response consists of an LF-terminated line, bearing an ASCII integer.  A valid
 Negative values beyond -17 are reserved for future expansion.  The
 receipt of such a values should be interpreted in the same way as UNKNOWN.
 
-<h2>Chirp Commands</h2>
+<h2 id="commands">Chirp Commands<a class="sectionlink" href="#commands" title="Link to this section.">&#x21d7;</a></h2>
 
 Following are the available commands.  Each argument to a command is specific 
 Here are the available commands that are standardized.  Note that each implementation may support some additional commands which are not (yet) documented because they are still experimental.  Each argument to a command is specified with a type and a name.

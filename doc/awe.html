@@ -18,8 +18,7 @@ AWE is Copyright (C) 2013- The University of Notre Dame.
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 <p>
-<h2>Overview</h2>
-
+<h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
 Accelerated Weighted Ensemble or AWE package provides a Python library for adaptive
 sampling of molecular dynamics. The framework decomposes the resampling
 computations and the molecular dynamics simulations into tasks that are
@@ -31,7 +30,7 @@ package, for dispatching jobs for execution on allocated resources.
 Documentation on downloading, installing, and using Work Queue can be found 
 <a href="workqueue.html">here</a>. 
 
-<h2>Software Requirements</h2>
+<h2 id="requirement">Software Requirements<a class="sectionlink" href="#requirement" title="Link to this section.">&#x21d7;</a></h2>
 AWE currently uses the GROMACS molecular dynamics simulation package. So it
 requires an installation of GROMACS 4.5 or above and its installed location
 added to PATH. It also requires the GROMACS XTC library for operation. 
@@ -68,7 +67,7 @@ href="http://www.gromacs.org/Developer_Zone/Programming_Guide/XTC_Library">GROMA
 </tr>
 </table> 
 
-<h2>Building and Installing AWE</h2>
+<h2 id="building">Building and Installing AWE<a class="sectionlink" href="#building" title="Link to this section.">&#x21d7;</a></h2>
 Download the CCTools source package from this <a
 href="http://www.nd.edu/~ccl/software/download">web page</a> and install
 using the steps <a href="http://www.nd.edu/~ccl/software/manuals/install.html">here</a>. 
@@ -100,7 +99,7 @@ accordingly when setting <tt>PYTHONPATH</tt>.
 <p>You can check if AWE was correctly installed by running:
 <code>% awe-verify</code>
 
-<h2>Running AWE</h2>
+<h2 id="running">Running AWE<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
 
 First, create a directory from which you want to instantiate and run the AWE
 program. In this manual, we are going to run AWE to sample the state transitions
@@ -182,7 +181,7 @@ still be available, so you can either run another master with the
 same workers, remove them from the batch system, or wait for them to
 expire.  If you do nothing for 15 minutes, they will automatically exit.
 
-<h2> Output of AWE</h2>
+<h2 id="output"> Output of AWE<a class="sectionlink" href="#output" title="Link to this section.">&#x21d7;</a></h2>
 
 The AWE master creates the following output files on completion:
 <ul>
@@ -233,7 +232,7 @@ transition matrix, and <tt>-n</tt> specifies the number of cells
 
 <p>This prints the matrix to a file called <tt>trans-probability-matrix.csv</tt>.
 
-<h2> Running AWE on Different Protein Systems</h2>
+<h2 id="differentproteins"> Running AWE on Different Protein Systems<a class="sectionlink" href="#differentproteins" title="Link to this section.">&#x21d7;</a></h2>
 You can run AWE to sample a different protein system by following the steps
 below:
 
@@ -259,8 +258,7 @@ where <tt>i</tt> is the index of the cell and <tt>j</tt> is the index of the wal
 <tt>sim.mdp</tt>. 
 </ol>
 
-<h2>For More Information</h2>
-
+<h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 For the latest information about AWE, please visit our <a
 href=http://www.nd.edu/~ccl/software/awe>web site</a> and subscribe to our <a
 href=http://www.nd.edu/~ccl/software/help.shtml>mailing list</a>.

@@ -39,7 +39,7 @@ This software is distributed under the GNU General Public License.<br>
 See the file COPYING for details.</p>
 
 
-<h2>Overview</h2>
+<h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>
 Work Queue is a framework for building master/worker applications.
@@ -56,7 +56,7 @@ economics, and other fields.  It can also be used as an execution engine
 for the <a href="http://www.nd.edu/~ccl/software/makeflow">Makeflow</a> workflow engine.
 <p>
 
-<h2>Installing Work Queue</h2>
+<h2 id="install">Installing Work Queue<a class="sectionlink" href="#install" title="Link to this section.">&#x21d7;</a></h2>
 <p>
 Work Queue is part of the <a href="http://www.nd.edu/~ccl/software">Cooperating Computing Tools</a>.  
 The CCTools package can be downloaded from <a href="http://www.nd.edu/~ccl/software/download">this web page</a>.
@@ -66,7 +66,7 @@ of the Work Queue API can be viewed from either within the CCTools package or
 <a href="http://www.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">here</a>
 and <a href="http://www.nd.edu/~ccl/software/manuals/api/html/namespaceWorkQueuePython.html">here</a>.
 
-<h2>Building Work Queue Application</h2>
+<h2 id="building">Building Work Queue Application<a class="sectionlink" href="#building" title="Link to this section.">&#x21d7;</a></h2>
 
 Let's begin by running a simple but complete example of a Work Queue
 application. After trying it out, we will then show how to write a Work Queue
@@ -94,7 +94,7 @@ If you are using the Perl example, set PERL5LIB to include the Perl modules in c
 export PERL5LIB=${PERL5LIB}:${CCTOOLS}/lib/perl5/site_perl
 </pre></div>
 
-<h2>Running Work Queue Application</h2>
+<h2 id="running">Running Work Queue Application<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
 The example application simply compresses a bunch of files in parallel. The
 files to be compressed must be listed on the command line. Each will be
 transmitted to a remote worker, compressed, and then sent back to the Work Queue
@@ -156,7 +156,7 @@ with <tt>kill</tt>, <tt>condor_rm</tt>, or <tt>qdel</tt> as appropriate.
 If you forget to remove them, they will exit automatically after fifteen minutes.
 (This can be adjusted with the <tt>-t</tt> option to <tt>worker</tt>.)
 
-<h2>Writing Work Queue Master Program</h2>
+<h2 id="writing">Writing Work Queue Master Program<a class="sectionlink" href="#writing" title="Link to this section.">&#x21d7;</a></h2>
 
 To write your own program using Work Queue, begin with <a
 href=work_queue_example.c>C example</a> or <a
@@ -332,7 +332,7 @@ all is done, delete the queue:
 Full details of all of the Work Queue functions can be found in
 the <a href="http://www.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">Work Queue API</a>.
 
-<h2>Project names</h2>
+<h2 id="names">Project names<a class="sectionlink" href="#names" title="Link to this section.">&#x21d7;</a></h2>
 Keeping track of the master's hostname and port can get cumbersome, especially
 if there are multiple masters. To help with difficulty, we provide the project
 name feature to identify a Work Queue master with a more recognizable project
@@ -387,7 +387,7 @@ Your job 153099 ("worker.sh") has been submitted
 ...
 </pre></div>
 
-<h2>Security</h2>
+<h2 id="security">Security<a class="sectionlink" href="#security" title="Link to this section.">&#x21d7;</a></h2>
 
 By default, Work Queue does <b>not</b> perform any authentication,
 so any workers will be able to connect to your master, and
@@ -425,7 +425,7 @@ verify that the other has the matching password before proceeding.
 The password is not sent in the clear, but is securely verified
 through a SHA1-based challenge-response protocol.
 
-<h2>Work Queue Foremen</h2>
+<h2 id="foremen">Work Queue Foremen<a class="sectionlink" href="#foremen" title="Link to this section.">&#x21d7;</a></h2>
 <p>A Work Queue foreman allows Work Queue workers to be managed in an
 hierarchical manner. Each foreman connects to the Work Queue master and accepts
 tasks as though it were a worker. It then accepts connections from Work Queue
@@ -463,7 +463,7 @@ in the <tt>-N</tt> option. For example:
 % work_queue_worker -N foreman_myproject 
 </pre></div>
 
-<h2>Multi-slot workers</h2>
+<h2 id="multislot">Multi-slot workers<a class="sectionlink" href="#multislot" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>The Work Queue workers, by default, advertise a single slot spanning a single
 core. As a result, the workers only execute a single core task by default.
@@ -517,7 +517,7 @@ negligible.  For example, if you annotate a task as using 1 core, but don't
 specify its memory or disk requirements, then Work Queue will schedule two such
 tasks to a two-slot worker, regardless of their memory or disk usage.
 
-<h2>Recommended Practices</h2>
+<h2 id="recommended">Recommended Practices<a class="sectionlink" href="#recommended" title="Link to this section.">&#x21d7;</a></h2>
 
 <p> The output printed by a task to stdout can be accessed in the
 <tt>output</tt> buffer in <a
@@ -527,7 +527,7 @@ truncated. So, please redirect the stdout of the task to a file and specify the
 file as an output file of the task using <tt>work_queue_task_specify_file</tt>
 (<tt>specify_file</tt> in Python) as described above. 
 
-<h2>Advanced Usage</h2>
+<h2 id="advanced">Advanced Usage<a class="sectionlink" href="#advanced" title="Link to this section.">&#x21d7;</a></h2>
 
 The technique described above is suitable for distributed programs of
 tens to hundreds of workers.  As you scale your program up to larger sizes,
@@ -607,7 +607,7 @@ of tasks, number of workers, number of failures, and so forth.  Obtain this data
 in order to make a progress bar or other user-visible information.
 </ul>
 
-<h2>For More Information</h2>
+<h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
 For the latest information about Work Queue, please visit our <a
 href="http://www.nd.edu/~ccl/software/workqueue">web site</a> and

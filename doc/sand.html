@@ -20,7 +20,7 @@ This software is distributed under the GNU General Public License.<br>
 See the file COPYING for details.</p>
 
 
-<h2>Overview</h2>
+<h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>SAND is a set of modules for accelerating genome assembly and other
 bioinformatics tasks.
@@ -37,7 +37,7 @@ href=http://www.cse.nd.edu/~ccl/software/download>this web page</a>,
 follow the <a href=install.html>installation instructions</a>, and you
 are ready to go.</p>
 
-<h2>Using SAND with the Celera Assembler</h2>
+<h2 id="celera">Using SAND with the Celera Assembler<a class="sectionlink" href="#celera" title="Link to this section.">&#x21d7;</a></h2>
 
 If you are already using the Celera Assembler version 5.4, you can easily switch to using SAND
 to accelerate assemblies by using our modified <tt>sand_runCA_5.4</tt> script. If you are using the newer 
@@ -123,7 +123,7 @@ still be available, so you can either run another master with the
 same workers, remove them from the batch system, or wait for them to
 expire.  If you do nothing for 15 minutes, they will automatically exit.
 
-<h2>SAND in More Detail</h2>
+<h2 id="detail">SAND in More Detail<a class="sectionlink" href="#detail" title="Link to this section.">&#x21d7;</a></h2>
 
 This section explains the two SAND modules in more detail,
 if you would like to tune the performance or use them independently
@@ -178,7 +178,7 @@ Time | Idle Busy | Submit Idle  Run   Done   Time | Loaded Loaded | Speedup
 After the sequence alignment step completes, you will have an overlap (<tt>.ovl</tt>)
 file that can be fed into the final stages of your assembler to complete the consensus step.
 
-<h2>Tuning Suggestions</h2>
+<h2 id="tuning">Tuning Suggestions<a class="sectionlink" href="#tuning" title="Link to this section.">&#x21d7;</a></h2>
 
 <dir>
 <li> As a rule of thumb, a single task should take a minute or two.  If tasks are much longer than that, it becomes more difficult to measure progress and recover from failures.  If tasks are much shorter than that, the overhead of managing the tasks becomes excessive.  Use the <tt>-n</tt> parameter to increase or decrease the size of tasks.
@@ -201,7 +201,7 @@ The columns of the output are as follows:
 
 </dir>
 
-<h2>For More Information</h2>
+<h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
 For the latest information about SAND, please visit our <a href=http://www.cse.nd.edu/~ccl/software/sand>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
 
