@@ -1,29 +1,25 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
+
 <head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
 <title>Wavefront User's Manual</title>
 </head>
 
 <body>
 
-<style type="text/css">
-pre {
-background: #ffffcc;
-font-family: monospace;
-font-size: 75%
-font-align: left;
-white-space: pre;
-border: solid 1px black;
-padding: 5px;
-margin: 20px;
-}
-</style>
+<div id="manual">
 <h1>Wavefront User's Manual</h1>
-<b>Last Updated June 2013</b>
-<p>
-Wavefront is Copyright (C) 2010 The University of Notre Dame.
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-<p>
+
+<p style="text-align: right;"><b>Last edited: June 2013</b></p>
+
+<p>Wavefront is Copyright (C) 2010- The University of Notre Dame.<br>
+All rights reserved.<br>
+This software is distributed under the GNU General Public License.<br>
+See the file COPYING for details.</p>
+
+<h2>Introduction<a class="sectionlink" href="#introduction" title="Link to this section.">&#x21d7;</a></h2>
 
 <table>
 <tr>
@@ -50,9 +46,7 @@ run the program named <tt><b>wavefront_master</b></tt>. You need to set up an
 input file with initial boundary values of R, and provide a function that
 computes a new cell from adjacent cells. Each line of the input file has the format:
 
-<pre>
-row column arg1,arg2,...
-</pre>
+<code>row column arg1,arg2,...</code>
 
 In which row and column describe the position of a cell, with zero-based
 indices, and arg1,arg2,... is the list of arguments fed to F (that is, each
@@ -62,9 +56,7 @@ R[i,j] is actually a tuple).
 To run wavefront, specifying the program that computes each cell, and the
 number of cells in each dimension, for example:
 
-<pre>
-wavefront_master ./func.exe 10 10 input.data output.data
-</pre>
+<code>wavefront_master ./func.exe 10 10 input.data output.data</code>
 
 in which input.data is the file with the initial boundary conditions,
 and output.data are the results computed for a 10x10 matrix.
@@ -72,33 +64,25 @@ and output.data are the results computed for a 10x10 matrix.
 The program <tt>func.exe</tt> may be written in any language that you like.
 For each cell of the result, the program will be invoked like this:
 
-<pre>
-./func.exe x y x-file y-file d-file
-</pre>
+<code>./func.exe x y x-file y-file d-file</code>
 
 in which each of <tt>x-file</tt>, <tt>y-file</tt> and <tt>d-file</tt> are files
 that contain the data from
 the x, y, and diagonal neighbors, in the format:
 
-<pre>
-arg1,arg2,...
-</pre>
+<code>arg1,arg2,...</code>
 
 These files are generated automatically by <tt>wavefront_master</tt>. Your
 function is required to parse them, and to print the result of the current cell
 to <tt>stdout</tt>, in the format:
 
-<pre>
-arg1,arg2,...
-</pre>
+<code>arg1,arg2,...</code>
 
 <tt>wavefront_master</tt> is a Work Queue application, thus it does not perform
 any work by itself, but it relies on workers connecting to it. To launch a
 single worker:
 
-<pre>
-work_queue_worker mymachine.somewhere.edu 9123
-</pre>
+<code>work_queue_worker mymachine.somewhere.edu 9123</code>
 
 in which 9123 is the default port for Work Queue applications. Work Queue
 provides convenient alternatives to launch many workers simultaneously for
@@ -108,15 +92,14 @@ different batch systems (e.g. condor), which are explained in the section <b>
 Wavefront will check for a few error conditions, and then start to run,
 showing progress on the console like this:
 
-<pre>
-# elapsed time : waiting jobs / running jobs / complete jobs (percent complete)
+<code># elapsed time : waiting jobs / running jobs / complete jobs (percent complete)
 0 : 0 / 1 / 0 (%0.00)
 5 : 0 / 2 / 1 (%1.23)
 10 : 0 / 3 / 3 (%3.70)
 16 : 0 / 4 / 6 (%7.41)
 21 : 0 / 4 / 8 (%9.88)
 ...
-</pre>
+</code>
 
 When complete, your outputs will be stored in the output file specified, with the same format as for the input data.
 
@@ -138,6 +121,10 @@ Each pixel represents the state of one cell in the matrix: green indicates compl
 
 Note that at the broadest part of the workload, there are not enough CPUs to run all cells at once, so some must wait.  Also note that the wave does not need to run synchronously: cells may begin to compute as soon as their dependencies are satisfied.
 
-<h2>For More Information</h2>
+<h2>For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
 For the latest information about Wavefront, please visit our <a href=http://www.cse.nd.edu/~ccl/software/wavefront>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
+
+</div>
+</body>
+</html>

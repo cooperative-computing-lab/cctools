@@ -1,16 +1,26 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
+
 <head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
 <title>Installing the Cooperative Computing Tools</title>
 </head>
 
 <body>
+
+<div id="manual">
 <h1>Installing the Cooperative Computing Tools</h1>
 
-<b>Last Modified October 2011</b>
-<p>
-The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005-2011 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+<p style="text-align: right;"><b>Last edited: February 2014</b></p>
 
-<h2>Overview</h2>
+<p>The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005- The University of Notre Dame.<br>
+All rights reserved.<br>
+This software is distributed under the GNU General Public License.<br>
+See the file COPYING for details.</p>
+
+
+<h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
 
 The Cooperative Computing Tools (cctools) are a collection of programs designed to
 assist users with the difficulties of building and managing complex,
@@ -29,19 +39,21 @@ fault-prone distributed systems.  The components of the cctools are:
 This short manual describes how to install the cctools.
 For more information about the tools themselves, see the links above.
 
-<h2>Installing</h2>
+<h2 id="installing">Installing<a class="sectionlink" href="#installing" title="Link to this section.">&#x21d7;</a></h2>
 
 The cctools may already be installed on your system.
 Simply run <tt>chirp -v</tt>.  If you see something like
 
-<pre>
-chirp version 1.0.1 built by dthain@hedwig on Sep 12 2004 at 20:04:51
-</pre>
+<code>chirp version 4.1.0rc3-RELEASE (released 02/11/2014)
+        Built by btovar@cclws00 on Feb 11 2014 at 09:20:32
+        System: Linux cclws00 2.6.18-348.16.1.el5 #1 SMP Sat Jul 27 01:05:23 EDT 2013 x86_64 x86_64 x86_64 GNU/Linux
+        Configuration: --strict --tcp-low-port 9000
+</code>
 
-then the cctools are installed, and you are ready to go.
-Otherwise, you must install the cctools yourself.
+then the cctools are installed, and you are ready to go.  Otherwise, you must
+install the cctools yourself.
 
-<h3>Installation From a Binary Package (UNIX)</h3>
+<h3 id="installing.frombinaryunix">Installation From a Binary Package (UNIX)<a class="sectionlink" href="#installing.frombinaryunix" title="Link to this section.">&#x21d7;</a></h3>
 
 From any other location, we recommend that you install a binary
 package from the <a href=http://www.cse.nd.edu/~ccl/software/download.shtml>cctools web page</a>
@@ -49,14 +61,13 @@ Simply unpack the tarball in any directory that you like,
 and then add the <tt>bin</tt> directory to your path.
 For example, to install in $HOME/cctools:
 
-<pre>
-% cd $HOME
+<code>% cd $HOME
 % gunzip cctools-xxx-yyy.tar.gz
 % tar xvf cctools-xxx-yyy.tar
 % setenv PATH $HOME/cctools/bin:$PATH
-</pre>
+</code>
 
-<h3>Installation From a Binary Package (DOS)</h3>
+<h3 id="installing.frombinarydos">Installation From a Binary Package (DOS)<a class="sectionlink" href="#installing.frombinarydos" title="Link to this section.">&#x21d7;</a></h3>
 
 From any other location, we recommend that you install the binary package for
 the Windows operating system from the <a href=http://www.cse.nd.edu/~ccl/software/download.shtml>cctools web page</a>
@@ -64,14 +75,13 @@ Simply unzip the zipfile in any directory that you like, and then add the
 <tt>bin</tt> directory to your path.  For example, to install in
 %UserProfile%\cctools using the DOS shell:
 
-<pre>
-% cd %UserProfile%
+<code>% cd %UserProfile%
 % winzip32 -e cctools-xxx-yyy.zip 
 % set PATH=%UserProfile%\cctools\bin;%PATH%
-</pre>
+</code>
 
 
-<h3>Installation From a Source Package </h3>
+<h3 id="installing.fromsource">Installation From a Source Package <a class="sectionlink" href="#installing.fromsource" title="Link to this section.">&#x21d7;</a></h3>
 
 Building the CCTools from source is very easy.
 Just download a source package:
@@ -82,15 +92,14 @@ Just download a source package:
 
 And follow this recipe while logged in as any ordinary user:
 
-<pre>
-% gunzip cctools-xxx-src.tar.gz
+<code>% gunzip cctools-xxx-src.tar.gz
 % tar xvf cctools-xxx-src.tar
 % cd cctools-xxx-src
 % ./configure
 % make
 % make install
 % setenv PATH ${HOME}/cctools/bin:$PATH
-</pre>
+</code>
 
 The software will happily build and run without installing
 any external packages.  Optionally, the cctools will interoperate
@@ -110,19 +119,19 @@ Once the desired packages are correctly installed, unpack the cctools and
 then issue a configure command that points to all of the other
 installations.  Then, make and install.  For example:
 
-<pre>
-% gunzip cctools-xxx.tar.gz
+<code>% gunzip cctools-xxx.tar.gz
 % tar xvf cctools-xxx.tar
 % cd cctools-xxx
 % ./configure --with-krb5-path /usr/kerberos --with-globus-path /usr/local/globus ...
 % make
 % make install
 % setenv PATH ${HOME}/cctools/bin:$PATH
-</pre>
+</code>
 
 <dir>
 <a href=index.html>Cooperative Computing Tools Documentation Index</a>
 </dir>
 
+</div>
 </body>
 </html>
