@@ -2196,7 +2196,7 @@ int main(int argc, char *argv[])
 	if(is_daemon && exit_if_parent_fails)
 		fatal("daemon cannot check if parent has exit (-e)");
 
-	setpgrp();
+	setpgid(0,0);
 
 	/* Ensure that all files are created private by default (again because of daemonize). */
 	umask(0077);

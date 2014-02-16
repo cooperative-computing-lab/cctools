@@ -27,7 +27,6 @@ See the file COPYING for details.
 #include <fnmatch.h>
 #include <utime.h>
 #include <unistd.h>
-#include <alloca.h>
 
 #include <sys/fcntl.h>
 #include <sys/file.h>
