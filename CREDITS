@@ -111,6 +111,10 @@ and other items.  In alphabetical order:
 	University of Notre Dame
 	Contributed to features in Makeflow.
 
+	Casey Robinson
+	University of Notre Dame
+	Implemented the Makeflow linker, and monitor visualizer.
+
 	Alain Roy
 	University of Wisconsin
 	Tested and deployed ftsh with the Virtual Data Toolkit.
@@ -130,6 +134,10 @@ and other items.  In alphabetical order:
 	Andrew Thrasher
 	University of Notre Dame
 	Contributed to SAND and several Work Queue applications.
+
+	Benjamin Tovar
+	University of Notre Dame
+	Contributed to Makeflow, Work Queue, Parrot, Chirp, and resource monitoring.
 
 	Li Yu
 	Notre Dame
