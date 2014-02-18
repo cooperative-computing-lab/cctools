@@ -210,7 +210,7 @@ set_up_working_directory()
 	then
 		echo "$0: couldnot find cctools_gpu_autodetect in PATH. gpus will not be automatically detected."
 	else
-		cp $gpu_detection .
+		cp $gpu_detection ${submit_dir}
 	fi
 
 	cd ${submit_dir}

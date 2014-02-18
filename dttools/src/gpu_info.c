@@ -28,7 +28,11 @@ int gpu_info_get()
 		close(pipefd[0]);
 		dup2(pipefd[1], fileno(stdout));
 		char *args[] = {GPU_AUTODETECT, NULL};
-		execvp(GPU_AUTODETECT, args);
+		if(!access(GPU_AUTODETECT, R_OK|X_OK)){
+			execv(GPU_AUTODETECT, args);
+		} else {
+			execvp(GPU_AUTODETECT, args);
+		}
 		return 0;
 	default:
 		close(pipefd[1]);
