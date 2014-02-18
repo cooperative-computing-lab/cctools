@@ -19,7 +19,7 @@ show_help()
 # The user can still add their own expression via the -r option.
 
 requirements=""
-transfer_input_files="work_queue_worker"
+transfer_input_files="work_queue_worker cctools_gpu_autodetect"
 
 parse_arguments()
 {
