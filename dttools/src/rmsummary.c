@@ -209,8 +209,7 @@ void rmsummary_print(FILE *stream, struct rmsummary *s)
 	if(s->exit_type)
 		fprintf(stream, "%-20s%20s\n",  "exit_type:", s->exit_type);
 
-	if(s->exit_status)
-		fprintf(stream, "%-20s%20" PRId64 "\n",  "exit_status:", s->exit_status);
+	fprintf(stream, "%-20s%20" PRId64 "\n",  "exit_status:", s->exit_status);
 
 	if(s->exit_type)
 	{
