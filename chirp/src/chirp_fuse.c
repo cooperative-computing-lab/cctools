@@ -485,6 +485,20 @@ static int chirp_fuse_mknod(const char *path, mode_t mode, dev_t rdev)
 	return 0;
 }
 
+static int chirp_fuse_create(const char *path, mode_t mode, struct fuse_file_info *fi)
+{
+	int error;
+	dev_t rdev = 0;
+
+	error = chirp_fuse_mknod(path, mode, rdev);
+	if(error != 0)
+		return error;
+
+	return chirp_fuse_open(path, fi);
+}
+
+
+
 
 #if FUSE_USE_VERSION==22
 static int chirp_fuse_statfs(const char *path, struct statfs *info)
@@ -524,6 +538,7 @@ static struct fuse_operations chirp_fuse_operations = {
 	.access = chirp_fuse_access,
 	.chmod = chirp_fuse_chmod,
 	.chown = chirp_fuse_chown,
+	.create = chirp_fuse_create,
 	.getattr = chirp_fuse_getattr,
 	.link = chirp_fuse_link,
 	.mkdir = chirp_fuse_mkdir,
