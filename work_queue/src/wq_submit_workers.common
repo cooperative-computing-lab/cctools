@@ -146,7 +146,7 @@ parse_arguments_common()
 		shift
 	done
 
-	parse_arguments $*
+	parse_arguments "$@"
 
 	while [ $# -gt 0 ]
 	do
@@ -250,7 +250,7 @@ submit_workers_command()
 
 submit_workers()
 {
-	parse_arguments_common $*
+	parse_arguments_common "$@"
 	set_up_working_directory
 	set_up_password_file_common
 	submit_workers_command

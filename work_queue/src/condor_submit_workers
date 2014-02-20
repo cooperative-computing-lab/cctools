@@ -64,5 +64,5 @@ queue $count
 EOF
 }
 
-submit_workers $*
+submit_workers "$@"
 

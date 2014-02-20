@@ -72,5 +72,5 @@ EOF
 	fi
 }
 
-submit_workers $*
+submit_workers "$@"
 
