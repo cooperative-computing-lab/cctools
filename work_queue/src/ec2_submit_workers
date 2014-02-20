@@ -126,5 +126,5 @@ EOF
 	done
 }
 
-submit_workers $*
+submit_workers "$@"
 
