@@ -89,6 +89,7 @@ const char * pfs_cvmfs_repo_arg = 0;
 bool pfs_cvmfs_repo_switching = false;
 char pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX];
 char pfs_cvmfs_locks_dir[PFS_PATH_MAX];
+bool pfs_cvmfs_enable_alien  = true;
 
 int pfs_irods_debug_level = 0;
 
@@ -104,6 +105,7 @@ static int channel_size = 10;
 
 enum {
 	LONG_OPT_CVMFS_REPO_SWITCHING=500,
+	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
 	LONG_OPT_CVMFS_ALIEN_CACHE,
 };
 
@@ -201,6 +203,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s CVMFS repositories to enable.             (PARROT_CVMFS_REPO)\n", "-r,--cvmfs-repos=<repos>");
 	fprintf(stdout, " %-30s Allow repository switching when using CVMFS.\n","   --cvmfs-repo-switching");
 	fprintf(stdout, " %-30s Set CVMFS common cache directory.         (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache");
+	fprintf(stdout, " %-30s Disable CVMFS common cache directory.\n","   --cvmfs-disable-alien-cache");
 	fprintf(stdout, " %-30s Enforce this root filesystem checksum, where available.\n", "-R,--root-checksum=<cksum>");
 	fprintf(stdout, " %-30s Use streaming protocols without caching.(PARROT_FORCE_STREAM)\n", "-s,--stream-no-cache");
 	fprintf(stdout, " %-30s Enable whole session caching for all protocols.\n", "-S,--session-caching");
@@ -561,6 +564,7 @@ int main( int argc, char *argv[] )
 		{"cvmfs-repos", required_argument, 0, 'r'},
 		{"cvmfs-repo-switching", no_argument, 0, LONG_OPT_CVMFS_REPO_SWITCHING},
 		{"cvmfs-alien-cache", required_argument, 0, LONG_OPT_CVMFS_ALIEN_CACHE},
+		{"cvmfs-disable-alien-cache", no_argument, 0, LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE},
 		{"root-checksum", required_argument, 0, 'R'},
 		{"stream-no-cache", no_argument, 0, 's'},
 		{"session-caching", no_argument, 0, 'S'},
@@ -663,6 +667,9 @@ int main( int argc, char *argv[] )
 			break;
 		case LONG_OPT_CVMFS_ALIEN_CACHE:
 			strncpy(pfs_cvmfs_alien_cache_dir,optarg,PFS_PATH_MAX);
+			break;
+		case LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE:
+			pfs_cvmfs_enable_alien = false;
 			break;
 		case 'R':
 			pfs_root_checksum = optarg;
