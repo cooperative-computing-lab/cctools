@@ -367,7 +367,14 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 	int repo_name_in_cachedir_offset = 0;
 
 	char *cache_options;
-	if(pfs_cvmfs_enable_alien)
+
+	int enable_alien_on_this_repository = pfs_cvmfs_enable_alien;
+	if(enable_alien_on_this_repository && strstr(user_options,"quota_limit=")) {
+		debug(D_NOTICE, "Disabling alien cache since it is mutually exclusive with quota limits.\n");
+		enable_alien_on_this_repository = false;
+	}
+
+	if(enable_alien_on_this_repository)
 	{
 		cache_options = string_format("cachedir=%s/%n%s,alien_cachedir=%s/%n%s", 
 				//cachedir
