@@ -36,6 +36,7 @@ extern const char * pfs_cvmfs_repo_arg;
 extern bool pfs_cvmfs_repo_switching;
 extern char pfs_cvmfs_alien_cache_dir[];
 extern char pfs_cvmfs_locks_dir[];
+extern bool pfs_cvmfs_enable_alien;
 
 static bool cvmfs_configured = false;
 static struct cvmfs_filesystem *cvmfs_filesystem_list = 0;
@@ -364,20 +365,40 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 
 	int repo_name_offset = 0;
 	int repo_name_in_cachedir_offset = 0;
-	char *buf = string_format("repo_name=%n%s,cachedir=%s/%n%s,alien_cachedir=%s/%n%s,timeout=%d,timeout_direct=%d%s%s,%n%s",
+
+	char *cache_options;
+
+	int enable_alien_on_this_repository = pfs_cvmfs_enable_alien;
+	if(enable_alien_on_this_repository && strstr(user_options,"quota_limit=")) {
+		debug(D_NOTICE, "Disabling alien cache since it is mutually exclusive with quota limits.\n");
+		enable_alien_on_this_repository = false;
+	}
+
+	if(enable_alien_on_this_repository)
+	{
+		cache_options = string_format("cachedir=%s/%n%s,alien_cachedir=%s/%n%s", 
+				//cachedir
+				pfs_cvmfs_locks_dir,
+				&repo_name_in_cachedir_offset,
+				repo_name,
+
+				//alien_cachedir
+				pfs_cvmfs_alien_cache_dir,
+				&repo_name_in_cachedir_offset,
+				repo_name);
+	}
+	else
+	{
+		cache_options = string_format("cachedir=%s/cvmfs/%n%s", 
+				pfs_temp_dir, 
+				&repo_name_in_cachedir_offset,
+				repo_name);
+	}
+
+	char *buf = string_format("repo_name=%n%s,%s,timeout=%d,timeout_direct=%d%s%s,%n%s",
 			&repo_name_offset,
 			repo_name,
-
-			//cachedir
-			pfs_cvmfs_locks_dir,
-			&repo_name_in_cachedir_offset,
-			repo_name,
-
-			//alien_cachedir
-			pfs_cvmfs_alien_cache_dir,
-			&repo_name_in_cachedir_offset,
-			repo_name,
-
+			cache_options,
 			pfs_master_timeout,
 			pfs_master_timeout,
 			proxy ? ",proxies=" : "",
