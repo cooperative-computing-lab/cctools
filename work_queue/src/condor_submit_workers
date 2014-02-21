@@ -48,7 +48,7 @@ set_up_password_file()
 
 submit_workers_command()
 {
-	condor_submit << EOF
+	cat > condor_submit_file.$$ <<EOF
 universe = vanilla
 executable = work_queue_worker
 arguments = $arguments $host $port
@@ -60,8 +60,24 @@ error = worker.\$(PROCESS).error
 log = workers.log
 getenv = true
 requirements = $requirements
-queue $count
 EOF
+
+	if [ ! -z "$cores" ]; then
+		echo "request_cpus = ${cores}" >> condor_submit_file.$$
+	fi
+
+	if [ ! -z "$memory" ]; then
+		echo "request_memory = ${memory}" >> condor_submit_file.$$
+	fi
+
+	if [ ! -z "$disk" ]; then
+		echo "request_disk = ${disk}" >> condor_submit_file.$$
+	fi
+
+	echo "queue $count" >> condor_submit_file.$$
+
+	condor_submit condor_submit_file.$$
+	rm condor_submit_file.$$
 }
 
 submit_workers "$@"

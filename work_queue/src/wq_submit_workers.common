@@ -10,6 +10,9 @@ host=
 port=
 count=1
 
+cores=
+memory=
+disk=
 
 show_help()
 {
@@ -123,14 +126,17 @@ parse_arguments_common()
 			--cores)  
 			shift
 			arguments="$arguments --cores $1"
+			cores="$1"
 			;; 
 			--memory)  
 			shift
 			arguments="$arguments --memory $1"
+			memory="$1"
 			;;
 			--disk)  
 			shift
 			arguments="$arguments --disk $1"
+			disk="$1"
 			;;
 			-r)  
 			shift
