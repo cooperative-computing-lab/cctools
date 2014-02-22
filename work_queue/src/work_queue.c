@@ -3893,7 +3893,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->port = q->port;
 	s->priority = q->priority;
 	s->workers_ready = s->workers_idle; 
-	s->workers_full = s->workers_busy; 
+	s->workers_full = 0;
 	s->total_worker_slots = s->tasks_running; 
 	s->avg_capacity = s->capacity;
 }
