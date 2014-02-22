@@ -13,7 +13,7 @@ save_arguments $0 $@
 
 major=4
 minor=1
-micro=0rc7
+micro=0rc8
 
 # On a release, type would be changed from TRUNK to RELEASE.  TRUNK is a useful
 # signal that the user is not using a blessed (tagged) release.
