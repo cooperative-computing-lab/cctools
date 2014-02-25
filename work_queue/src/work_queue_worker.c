@@ -1775,7 +1775,7 @@ static void work_for_master(struct link *master) {
 		}
 
 		//Reset idle timeout if something interesting is happening at this worker.
-		if(itable_size(stored_tasks) > 0 || itable_size(results_to_be_sent) > 0) {
+		if(list_size(waiting_tasks) > 0 || itable_size(stored_tasks) > 0 || itable_size(results_to_be_sent) > 0) {
 			idle_stoptime = time(0) + idle_timeout;
 		}
 	}
