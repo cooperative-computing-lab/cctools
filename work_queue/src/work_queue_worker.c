@@ -1685,7 +1685,6 @@ static int check_for_resources(struct work_queue_task *t) {
 }
 
 static void work_for_master(struct link *master) {
-	int result;
 	timestamp_t msec;
 	sigset_t mask;
 
@@ -1703,9 +1702,7 @@ static void work_for_master(struct link *master) {
 	// Start serving masters
 	while(!abort_flag) {
 
-		//disconnect from master after idle timeout if there are no more tasks
-		//to run, nor results to be sent.
-		if(time(0) > idle_stoptime && itable_size(stored_tasks) == 0 && itable_size(results_to_be_sent) == 0) {
+		if(time(0) > idle_stoptime) {
 			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			abort_flag = 1;
 			break;
@@ -1731,9 +1728,9 @@ static void work_for_master(struct link *master) {
 			msec = 1000;
 		}
 
-		result = link_usleep_mask(master, msec, &mask, 1, 0);
+		int master_activity = link_usleep_mask(master, msec, &mask, 1, 0);
 
-		if(result < 0) {
+		if(master_activity < 0) {
 			abort_flag = 1;
 			break;
 		}
@@ -1743,7 +1740,7 @@ static void work_for_master(struct link *master) {
 		}
 		
 		int ok = 1;
-		if(result) {
+		if(master_activity) {
 			ok &= handle_master(master);
 		}
 
@@ -1777,7 +1774,8 @@ static void work_for_master(struct link *master) {
 			break;
 		}
 
-		if(result != 0 || itable_size(active_tasks)) {
+		//Reset idle timeout if something interesting is happening at this worker.
+		if(list_size(waiting_tasks) > 0 || itable_size(stored_tasks) > 0 || itable_size(results_to_be_sent) > 0) {
 			idle_stoptime = time(0) + idle_timeout;
 		}
 	}
