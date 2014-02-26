@@ -3534,15 +3534,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}	
 		}
 		
-		if(q->workers_to_wait <= 0) {	
-			//Don't have to wait for any resources; start tasks on ready workers
+		if(known_workers(q) >= q->workers_to_wait) {
+			//We have the resources we have been waiting for; start tasks on ready workers
 			start_tasks(q);
-		} else {
-			if(known_workers(q) >= q->workers_to_wait) {
-				//We have the resources we have been waiting for; start tasks on ready workers
-				start_tasks(q);
-				q->workers_to_wait = 0; //disable it after we started dipatching tasks
-			}
+			q->workers_to_wait = 0; //disable it after we started dipatching tasks
 		}
 
 		// If any worker has sent a results message, retrieve the output files.
