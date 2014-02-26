@@ -3434,6 +3434,69 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
+static int work_queue_wait_poll_links(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active)
+{
+	int n = build_poll_table(q, foreman_uplink);
+
+	// Wait no longer than the caller's patience.
+	int msec;
+	if(stoptime) {
+		msec = MAX(0, (stoptime - time(0)) * 1000);
+	} else {
+		msec = 5000;
+	}
+
+	// If workers are available and tasks waiting to be dispatched, don't wait on a message.
+	if( available_workers(q) > 0 && list_size(q->ready_list) > 0 ) {
+		msec = 0;
+	}
+
+	// Poll all links for activity.
+	timestamp_t link_poll_start = timestamp_get();
+	int result = link_poll(q->poll_table, n, msec);
+	q->link_poll_end = timestamp_get();
+	q->total_idle_time += q->link_poll_end - link_poll_start;
+
+
+	// If the master link was awake, then accept as many workers as possible.
+	if(q->poll_table[0].revents) {
+		do {
+			add_worker(q);
+		} while(link_usleep(q->master_link, 0, 1, 0) && (stoptime > time(0)));
+	}
+
+	int i, j = 1;
+
+	// Consider the foreman_uplink passed into the function and disregard if inactive.
+	if(foreman_uplink) {
+		if(q->poll_table[1].revents) {
+			*foreman_uplink_active = 1; //signal that the master link saw activity
+		} else {
+			*foreman_uplink_active = 0;
+		}
+		j++;
+	}
+
+	// Then consider all existing active workers
+	for(i = j; i < n; i++) {
+		if(q->poll_table[i].revents) {
+			handle_worker(q, q->poll_table[i].link);
+		}
+	}
+
+	if(hash_table_size(q->workers_with_available_results) > 0) {
+		char *key;
+		struct work_queue_worker *w;
+		hash_table_firstkey(q->workers_with_available_results);
+		while(hash_table_nextkey(q->workers_with_available_results,&key,(void**)&w)) {
+			process_available_results(q, w, -1);
+			hash_table_remove(q->workers_with_available_results, key);
+		}	
+	}
+
+	return result;
+}
+
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
 {
 	struct work_queue_task *t;
@@ -3476,64 +3539,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(itable_size(q->running_tasks) == 0 && list_size(q->ready_list) == 0 && !(foreman_uplink))
 			break;
 
-		int n = build_poll_table(q, foreman_uplink);
+		int result = work_queue_wait_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active);
 
-		// Wait no longer than the caller's patience.
-		int msec;
-		if(stoptime) {
-			msec = MAX(0, (stoptime - time(0)) * 1000);
-		} else {
-			msec = 5000;
-		}
-		
-		// If workers are available and tasks waiting to be dispatched, don't wait on a message.
-		if( available_workers(q) > 0 && list_size(q->ready_list) > 0 ) {
-			msec = 0;
-		}
-
-		// Poll all links for activity.
-		timestamp_t link_poll_start = timestamp_get();
-		int result = link_poll(q->poll_table, n, msec);
-		q->link_poll_end = timestamp_get();
-		q->total_idle_time += q->link_poll_end - link_poll_start;
-
-
-		// If the master link was awake, then accept as many workers as possible.
-		if(q->poll_table[0].revents) {
-			do {
-				add_worker(q);
-			} while(link_usleep(q->master_link, 0, 1, 0) && (stoptime > time(0)));
-		}
-
-		int i, j = 1;
-
-		// Consider the foreman_uplink passed into the function and disregard if inactive.
-		if(foreman_uplink) {
-			if(q->poll_table[1].revents) {
-				*foreman_uplink_active = 1; //signal that the master link saw activity
-			} else {
-				*foreman_uplink_active = 0;
-			}
-			j++;
-		}
-
-		// Then consider all existing active workers and dispatch tasks.
-		for(i = j; i < n; i++) {
-			if(q->poll_table[i].revents) {
-				handle_worker(q, q->poll_table[i].link);
-			}
-		}
-
-		if(hash_table_size(q->workers_with_available_results) > 0) {
-			char *key;
-			struct work_queue_worker *w;
-			hash_table_firstkey(q->workers_with_available_results);
-			while(hash_table_nextkey(q->workers_with_available_results,&key,(void**)&w)) {
-				process_available_results(q, w, -1);
-				hash_table_remove(q->workers_with_available_results, key);
-			}	
-		}
-		
+		// Dispatch tasks.
 		if(known_workers(q) >= q->workers_to_wait) {
 			//We have the resources we have been waiting for; start tasks on ready workers
 			start_tasks(q);
