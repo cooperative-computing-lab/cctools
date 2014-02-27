@@ -3452,7 +3452,7 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
-static int work_queue_wait_poll_links(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active)
+static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active)
 {
 	int n = build_poll_table(q, foreman_uplink);
 
@@ -3515,6 +3515,17 @@ static int work_queue_wait_poll_links(struct work_queue *q, int stoptime, struct
 	return result;
 }
 
+static void wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
+{
+	//IF SOMETHING THEN
+	start_tasks(q, stoptime);
+
+	//IF SOMETHING THEN
+	receive_tasks(q, stoptime);
+
+	//ELSE
+}
+
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
 {
 	struct work_queue_task *t;
@@ -3557,16 +3568,14 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(itable_size(q->running_tasks) == 0 && list_size(q->ready_list) == 0 && !(foreman_uplink))
 			break;
 
-		int result = work_queue_wait_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active);
+		int result = wait_loop_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active);
 
-		// Dispatch tasks.
+
+		//We have the resources we have been waiting for; start task transfers
 		if(known_workers(q) >= q->workers_to_wait) {
-			//We have the resources we have been waiting for; start tasks on ready workers
-			start_tasks(q, stoptime);
+			wait_loop_transfer_tasks(q, stoptime);
 			q->workers_to_wait = 0; //disable it after we started dipatching tasks
 		}
-
-		receive_tasks(q, stoptime);
 
 		// If fast abort is enabled, kill off slow workers.
 		if(q->fast_abort_multiplier > 0) {
