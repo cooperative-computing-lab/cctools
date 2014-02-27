@@ -168,6 +168,7 @@ struct work_queue_worker {
 	char *version;
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
+	int  foreman;                             // 0 if regular worker, 1 if foreman
 	struct work_queue_resources *resources;
 	int64_t cores_allocated;
 	int64_t memory_allocated;
@@ -313,7 +314,7 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 	time_t stoptime;
 
 	//If foreman, then we wait until foreman gives the master some attention.
-	if(!strcmp(w->os, "foreman"))
+	if(w->foreman)
 		stoptime = time(0) + q->long_timeout;
 	else
 		stoptime = time(0) + q->short_timeout;
@@ -342,7 +343,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	time_t stoptime;
 	
 	//If foreman, then we wait until foreman gives the master some attention.
-	if(!strcmp(w->os, "foreman"))
+	if(w->foreman)
 		stoptime = time(0) + q->long_timeout;
 	else
 		stoptime = time(0) + q->short_timeout;
@@ -457,7 +458,7 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 
 	int timeout = length / tolerable_transfer_rate;
 
-	if(!strcmp(w->os, "foreman")) {
+	if(w->foreman) {
 		// A foreman must have a much larger minimum timeout, b/c it does not respond immediately to the master.
 		timeout = MAX(q->foreman_transfer_timeout,timeout);
 	} else {
@@ -625,6 +626,7 @@ static void add_worker(struct work_queue *q)
 	w->os = strdup("unknown");
 	w->arch = strdup("unknown");
 	w->version = strdup("unknown");
+	w->foreman = 0;
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
 	w->current_tasks = itable_create(0);
@@ -1121,6 +1123,11 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 	w->os       = strdup(items[1]);
 	w->arch     = strdup(items[2]);
 	w->version  = strdup(items[3]);
+
+	if(!strcmp(w->os, "foreman"))
+	{
+		w->foreman = 1;
+	}
 
 	log_worker_stats(q);
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
