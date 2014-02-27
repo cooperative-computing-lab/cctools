@@ -3600,8 +3600,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(itable_size(q->running_tasks) == 0 && list_size(q->ready_list) == 0 && !(foreman_uplink))
 			break;
 
-		int result = wait_loop_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active);
-
+		wait_loop_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active);
 
 		//We have the resources we have been waiting for; start task transfers
 		if(known_workers(q) >= q->workers_to_wait) {
@@ -3620,12 +3619,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 		
 		// If nothing was awake, restart the loop or return without a task.
-		if(result <= 0) {
-			if(stoptime && time(0) >= stoptime) {
-				break;
-			} else {
-				continue;
-			}
+		if(stoptime && time(0) >= stoptime) {
+			break;
+		} else {
+			continue;
 		}
 	}
 
