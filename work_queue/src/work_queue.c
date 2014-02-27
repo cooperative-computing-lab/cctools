@@ -140,6 +140,13 @@ struct work_queue {
 	double asynchrony_multiplier;
 	int asynchrony_modifier;
 
+	int unlabeled_over;
+
+	double memory_over_factor;
+	double disk_over_factor;
+	double cores_over_factor;
+	double gpus_over_factor;
+
 	int minimum_transfer_timeout;
 	int foreman_transfer_timeout;
 	int transfer_outlier_factor;
@@ -3159,6 +3166,13 @@ struct work_queue *work_queue_create(int port)
 	
 	q->asynchrony_multiplier = 1.0;
 	q->asynchrony_modifier = 0;
+
+	q->unlabeled_over = 0;
+
+	q->cores_over_factor = 0.0;
+	q->memory_over_factor = 0.0;
+	q->disk_over_factor  = 0.0;
+	q->gpus_over_factor = 0.0;
 
 	q->minimum_transfer_timeout = 10;
 	q->foreman_transfer_timeout = 3600;
