@@ -2363,6 +2363,24 @@ static void start_tasks(struct work_queue *q)
 	}
 }
 
+static void receive_tasks(struct work_queue *q)
+{
+	struct work_queue_task *t;
+
+	// If any worker has sent a results message, retrieve the output files.
+	if(itable_size(q->finished_tasks)) {
+		struct work_queue_worker *w;
+		uint64_t taskid;
+		itable_firstkey(q->finished_tasks);
+		while(itable_nextkey(q->finished_tasks, &taskid, (void **)&t)) {
+			w = itable_lookup(q->worker_task_map, taskid);
+			fetch_output_from_worker(q, w, taskid);
+			itable_firstkey(q->finished_tasks);  // fetch_output removes the resolved task from the itable, thus potentially corrupting our current location.  This resets it to the top.
+		}
+	}
+}
+
+
 //Sends keepalives to check if connected workers are responsive. If not, removes those workers. 
 static void remove_unresponsive_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
@@ -3548,17 +3566,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			q->workers_to_wait = 0; //disable it after we started dipatching tasks
 		}
 
-		// If any worker has sent a results message, retrieve the output files.
-		if(itable_size(q->finished_tasks)) {
-			struct work_queue_worker *w;
-			uint64_t taskid;
-			itable_firstkey(q->finished_tasks);
-			while(itable_nextkey(q->finished_tasks, &taskid, (void **)&t)) {
-				w = itable_lookup(q->worker_task_map, taskid);
-				fetch_output_from_worker(q, w, taskid);
-				itable_firstkey(q->finished_tasks);  // fetch_output removes the resolved task from the itable, thus potentially corrupting our current location.  This resets it to the top.
-			}
-		}
+		receive_tasks(q, stoptime);
 
 		// If fast abort is enabled, kill off slow workers.
 		if(q->fast_abort_multiplier > 0) {
