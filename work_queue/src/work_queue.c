@@ -1338,7 +1338,6 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_integer(nv,"total_tasks_complete",info.total_tasks_complete);
 	nvpair_insert_integer(nv,"total_tasks_dispatched",info.total_tasks_dispatched);
 	nvpair_insert_integer(nv,"total_tasks_cancelled",info.total_tasks_cancelled);
-	nvpair_insert_integer(nv,"total_tasks_failed",info.total_tasks_failed);
 
 	//send info on queue
 	nvpair_insert_integer(nv,"start_time",info.start_time);
