@@ -138,7 +138,16 @@ struct work_queue {
 	timestamp_t total_app_time;	// sum of time spend above work_queue_wait
 
 	int cores_over;
+	int memory_over;
+	int disk_over;
+	int gpus_over;
+	int unlabeled_over;
+
+	double memory_over_factor;
+	double disk_over_factor;
 	double cores_over_factor;
+	double gpus_over_factor;
+	double unlabeled_over_factor;
 
 	int minimum_transfer_timeout;
 	int foreman_transfer_timeout;
@@ -217,10 +226,39 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 
 static int64_t get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->cores.total)
-		return w->resources->cores.total * q->cores_over_factor + q->cores_over;
+		return ceil(w->resources->cores.total * q->cores_over_factor) + q->cores_over;
 	else
 		return 0;
 }
+
+static int64_t get_worker_overcommit_unlabeled(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->workers.total)
+		return ceil(w->resources->workers.total * q->unlabeled_over_factor) +  q->unlabeled_over;
+	else
+		return 0;
+}
+
+static int64_t get_worker_overcommit_gpus(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->gpus.total)
+		return ceil(w->resources->gpus.total * q->gpus_over_factor) + q->gpus_over;
+	else
+		return 0;
+}
+
+static int64_t get_worker_overcommit_memory(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->memory.total)
+		return ceil(w->resources->memory.total * q->memory_over_factor) + q->memory_over;
+	else
+		return 0;
+}
+
+static int64_t get_worker_overcommit_disk(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->disk.total)
+		return ceil(w->resources->disk.total * q->disk_over_factor) + q->disk_over;
+	else
+		return 0;
+}
+
 
 //Returns count of workers that have identified themselves.
 static int known_workers(struct work_queue *q) {
@@ -3228,8 +3266,17 @@ struct work_queue *work_queue_create(int port)
 	q->monitor_mode   =  0;
 	q->password = 0;
 	
-	q->cores_over_factor = 1.0;
 	q->cores_over = 0;
+	q->memory_over = 0;
+	q->gpus_over   = 0;
+	q->disk_over   = 0;
+	q->unlabeled_over = 0;
+
+	q->cores_over_factor  = 1.0;
+	q->memory_over_factor = 1.0;
+	q->disk_over_factor   = 1.0;
+	q->gpus_over_factor   = 1.0;
+	q->unlabeled_over_factor = 1.0;
 
 	q->minimum_transfer_timeout = 10;
 	q->foreman_transfer_timeout = 3600;
@@ -3936,10 +3983,28 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 {
 	
 	if(!strcmp(name, "cores-over-factor") || !strcmp(name, "asynchrony-multiplier")) {
-		q->cores_over_factor = MAX(value, 1.0);
+		q->cores_over_factor = MAX(value, 0.0);
 		
-	} else if(!strcmp(name, "asynchrony-modifier")) {
-		q->asynchrony_modifier = MAX(value, 0);
+	} else if(!strcmp(name, "cores-over") || !strcmp(name, "asynchrony-modifier")) {
+		q->cores_over = value;
+		
+	} else if(!strcmp(name, "memory-over-factor")) {
+		q->memory_over_factor = MAX(value, 0.0);
+		
+	} else if(!strcmp(name, "memory-over")) {
+		q->memory_over = value;
+		
+	} else if(!strcmp(name, "gpus-over-factor")) {
+		q->gpus_over_factor = MAX(value, 0.0);
+
+	} else if(!strcmp(name, "gpus-over")) {
+		q->gpus_over = value;
+
+	} else if(!strcmp(name, "disk-over-factor")) {
+		q->disk_over_factor = MAX(value, 0.0);
+		
+	} else if(!strcmp(name, "disk-over")) {
+		q->disk_over = value;
 		
 	} else if(!strcmp(name, "min-transfer-timeout")) {
 		q->minimum_transfer_timeout = (int)value;
