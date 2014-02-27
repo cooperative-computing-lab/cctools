@@ -2423,8 +2423,11 @@ static void abort_slow_workers(struct work_queue *q)
 		timestamp_t runtime = current - t->time_send_input_start;
 		if(runtime > (average_task_time * multiplier)) {
 			w = itable_lookup(q->worker_task_map, t->taskid);
-			debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
-			remove_worker(q, w);
+			if(!w->foreman)
+			{
+				debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
+				remove_worker(q, w);
+			}
 		}
 	}
 }
