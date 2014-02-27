@@ -2201,8 +2201,6 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 		if(w->resources->workers.largest < 1 || w->unlabeled_allocated + 1 > get_worker_overcommit_unlabeled(q, w)) {
 			ok = 0;
 		}
-
-
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 		cores_used = MAX(t->cores, 0);
@@ -2702,28 +2700,73 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
+
+static void set_task_unlabel_flag( struct work_queue_task *t )
+{
+	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0)
+	{
+		t->unlabeled = 1;
+	}
+}
+
 void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory )
 {
-	t->memory = memory;
-	t->unlabeled = 0;
+	if(memory < 0)
+	{
+		t->memory = -1;
+	}
+	else
+	{
+		t->memory = memory;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk )
 {
-	t->disk = disk;
-	t->unlabeled = 0;
+	if(disk < 0)
+	{
+		t->disk = -1;
+	}
+	else
+	{
+		t->disk = disk;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
 {
-	t->cores = cores;
-	t->unlabeled = 0;
+	if(cores < 0)
+	{
+		t->cores = -1;
+	}
+	else
+	{
+		t->cores = cores;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
 {
-	t->gpus = gpus;
-	t->unlabeled = 0;
+	if(gpus < 0)
+	{
+		t->gpus = -1;
+	}
+	else
+	{
+		t->gpus = gpus;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
