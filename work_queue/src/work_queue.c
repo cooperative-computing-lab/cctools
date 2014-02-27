@@ -2349,20 +2349,25 @@ static int start_tasks(struct work_queue *q, time_t stoptime)
 
 	int task_started = 0;
 
-	while(list_size(q->ready_list)) {
-		t = list_peek_head(q->ready_list);
-		w = find_best_worker(q, t);
-		if(w) {
-			start_task_on_worker(q, w);
-			task_started++;
-		} else {
-			//Move task to the end of queue when there is at least one available worker.  
-			//This prevents a resource-hungry task from clogging the entire queue.
-			if(available_workers(q) > 0) {
-				list_push_tail(q->ready_list, list_pop_head(q->ready_list));
-			}	
-			break;
-		}
+	if(list_size(q->ready_list) > 0)
+	{
+		// Start at least one task, regardless of the stoptime value.
+		do {
+			t = list_peek_head(q->ready_list);
+			w = find_best_worker(q, t);
+			if(w) {
+				start_task_on_worker(q, w);
+				task_started++;
+			} else {
+				//Move task to the end of queue when there is at least one available worker.  
+				//This prevents a resource-hungry task from clogging the entire queue.
+				if(available_workers(q) > 0) {
+					list_push_tail(q->ready_list, list_pop_head(q->ready_list));
+				}	
+				break;
+			}
+			//stoptime <= 0 means an infinite timeout
+		} while(list_size(q->ready_list) && (stoptime <= 0 || time(0) < stoptime));
 	}
 
 	return task_started;
@@ -2374,17 +2379,23 @@ static int receive_tasks(struct work_queue *q, time_t stoptime)
 
 	int tasks_received = 0;
 
-	// If any worker has sent a results message, retrieve the output files.
-	if(itable_size(q->finished_tasks)) {
-		struct work_queue_worker *w;
-		uint64_t taskid;
+	struct work_queue_worker *w;
+	uint64_t taskid;
+
+	if(itable_size(q->finished_tasks) > 0)
+	{
 		itable_firstkey(q->finished_tasks);
-		while(itable_nextkey(q->finished_tasks, &taskid, (void **)&t)) {
+		// Receive at least one task, regardless of the stoptime value.
+		do {
+			itable_nextkey(q->finished_tasks, &taskid, (void **)&t);
+
 			w = itable_lookup(q->worker_task_map, taskid);
 			fetch_output_from_worker(q, w, taskid);
 			itable_firstkey(q->finished_tasks);  // fetch_output removes the resolved task from the itable, thus potentially corrupting our current location.  This resets it to the top.
 			tasks_received++;
-		}
+
+			//stoptime <= 0 means an infinite timeout
+		} while(itable_size(q->finished_tasks) && (stoptime <=0 || time(0) < stoptime));
 	}
 
 	return tasks_received;
@@ -3532,15 +3543,16 @@ static void wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 
 	do 
 	{
-		time_t task_transfer_time = MIN(stoptime, INT64_MAX);
+		//Compute task_transfer_stoptime in some way...
+		time_t task_transfer_stoptime = MIN(stoptime, INT64_MAX);
 
 		//IF SOMETHING THEN
-		task_started = start_tasks(q, task_transfer_time);
+		task_started = start_tasks(q, task_transfer_stoptime);
 
 		//IF SOMETHING THEN
-		tasks_received = receive_tasks(q, task_transfer_time);
+		tasks_received = receive_tasks(q, task_transfer_stoptime);
 
-		//ELSE
+		//ELSE (break here to mimic old wq behaviour. To modify with a better policy)
 		break;
 
 	}while ( (time(0) < stoptime) && (task_started > 0 || tasks_received > 0));
