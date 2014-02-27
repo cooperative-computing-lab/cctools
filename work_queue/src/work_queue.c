@@ -2341,7 +2341,7 @@ static void start_task_on_worker(struct work_queue *q, struct work_queue_worker 
 	return;
 }
 
-static void start_tasks(struct work_queue *q)
+static void start_tasks(struct work_queue *q, time_t stoptime)
 {			
 	//start as many tasks as possible
 	struct work_queue_task *t;
@@ -2363,7 +2363,7 @@ static void start_tasks(struct work_queue *q)
 	}
 }
 
-static void receive_tasks(struct work_queue *q)
+static void receive_tasks(struct work_queue *q, time_t stoptime)
 {
 	struct work_queue_task *t;
 
@@ -3562,7 +3562,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// Dispatch tasks.
 		if(known_workers(q) >= q->workers_to_wait) {
 			//We have the resources we have been waiting for; start tasks on ready workers
-			start_tasks(q);
+			start_tasks(q, stoptime);
 			q->workers_to_wait = 0; //disable it after we started dipatching tasks
 		}
 
