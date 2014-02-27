@@ -110,6 +110,8 @@ struct work_queue {
 	int64_t total_tasks_submitted;
 	int64_t total_tasks_complete;
 	int64_t total_tasks_cancelled;
+	int64_t total_tasks_failed;
+
 	int64_t total_bytes_sent;
 	int64_t total_bytes_received;
 	int64_t total_workers_joined;
@@ -118,7 +120,9 @@ struct work_queue {
 	timestamp_t start_time;
 	timestamp_t total_send_time;
 	timestamp_t total_receive_time;
+	timestamp_t total_good_transfer_time;  // send time for tasks with t->result == WQ_RESULT_SUCCESS
 	timestamp_t total_execute_time;
+	timestamp_t total_good_execute_time;  // execute time for tasks with t->result == WQ_RESULT_SUCCESS
 
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;
@@ -164,6 +168,7 @@ struct work_queue_worker {
 	char *version;
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
+	int  foreman;                             // 0 if regular worker, 1 if foreman
 	struct work_queue_resources *resources;
 	int64_t cores_allocated;
 	int64_t memory_allocated;
@@ -309,7 +314,7 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 	time_t stoptime;
 
 	//If foreman, then we wait until foreman gives the master some attention.
-	if(!strcmp(w->os, "foreman"))
+	if(w->foreman)
 		stoptime = time(0) + q->long_timeout;
 	else
 		stoptime = time(0) + q->short_timeout;
@@ -338,7 +343,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	time_t stoptime;
 	
 	//If foreman, then we wait until foreman gives the master some attention.
-	if(!strcmp(w->os, "foreman"))
+	if(w->foreman)
 		stoptime = time(0) + q->long_timeout;
 	else
 		stoptime = time(0) + q->short_timeout;
@@ -453,7 +458,7 @@ static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queu
 
 	int timeout = length / tolerable_transfer_rate;
 
-	if(!strcmp(w->os, "foreman")) {
+	if(w->foreman) {
 		// A foreman must have a much larger minimum timeout, b/c it does not respond immediately to the master.
 		timeout = MAX(q->foreman_transfer_timeout,timeout);
 	} else {
@@ -621,6 +626,7 @@ static void add_worker(struct work_queue *q)
 	w->os = strdup("unknown");
 	w->arch = strdup("unknown");
 	w->version = strdup("unknown");
+	w->foreman = 0;
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
 	w->current_tasks = itable_create(0);
@@ -1033,6 +1039,12 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	w->total_task_time += t->cmd_execution_time;
 
+	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
+	{
+		q->total_good_execute_time  += t->cmd_execution_time;
+		q->total_good_transfer_time += t->total_transfer_time;
+	}
+
 	debug(D_WQ, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
 		w->hostname,
 		w->addrport,
@@ -1111,6 +1123,11 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 	w->os       = strdup(items[1]);
 	w->arch     = strdup(items[2]);
 	w->version  = strdup(items[3]);
+
+	if(!strcmp(w->os, "foreman"))
+	{
+		w->foreman = 1;
+	}
 
 	log_worker_stats(q);
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
@@ -1242,7 +1259,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	w->memory_allocated -= t->memory;
 	w->disk_allocated -= t->disk;
 	w->gpus_allocated -= t->gpus;
-	
+
 	if(t->unlabeled) {
 		t->cores = t->memory = t->disk = t->gpus = -1;
 	}
@@ -2395,10 +2412,10 @@ static void abort_slow_workers(struct work_queue *q)
 	uint64_t key;
 	const double multiplier = q->fast_abort_multiplier;
 
-	if(q->total_tasks_complete < 10)
+	if(q->total_tasks_complete - q->total_tasks_failed < 10)
 		return;
 
-	timestamp_t average_task_time = (q->total_execute_time + q->total_send_time) / q->total_tasks_complete;
+	timestamp_t average_task_time = (q->total_good_execute_time + q->total_good_transfer_time) / (q->total_tasks_complete - q->total_tasks_failed);
 	timestamp_t current = timestamp_get();
 
 	itable_firstkey(q->running_tasks);
@@ -2406,8 +2423,11 @@ static void abort_slow_workers(struct work_queue *q)
 		timestamp_t runtime = current - t->time_send_input_start;
 		if(runtime > (average_task_time * multiplier)) {
 			w = itable_lookup(q->worker_task_map, t->taskid);
-			debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
-			remove_worker(q, w);
+			if(!w->foreman)
+			{
+				debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
+				remove_worker(q, w);
+			}
 		}
 	}
 }
@@ -3201,9 +3221,6 @@ int work_queue_activate_fast_abort(struct work_queue *q, double multiplier)
 	if(multiplier >= 1) {
 		q->fast_abort_multiplier = multiplier;
 		return 0;
-	} else if(multiplier < 0) {
-		q->fast_abort_multiplier = multiplier;
-		return 0;
 	} else {
 		q->fast_abort_multiplier = -1.0;
 		return 1;
@@ -3445,6 +3462,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		t = list_pop_head(q->complete_list);
 		if(t) {
 			last_left_time = timestamp_get();
+
+			if( t->result != SUCCESS )
+			{
+				q->total_tasks_failed++;
+			}
 			return t;
 		}
 		
@@ -3792,13 +3814,8 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 		q->transfer_outlier_factor = value;
 		
 	} else if(!strcmp(name, "fast-abort-multiplier")) {
-		if(value >= 1) {
-			q->fast_abort_multiplier = value;
-		} else if(value< 0) {
-			q->fast_abort_multiplier = value;
-		} else {
-			q->fast_abort_multiplier = -1.0;
-		}
+		work_queue_activate_fast_abort(q, value);
+
 	} else if(!strcmp(name, "keepalive-interval")) {
 		q->keepalive_interval = MAX(0, (int)value);
 		
