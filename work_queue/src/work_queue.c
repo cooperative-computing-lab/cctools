@@ -120,7 +120,9 @@ struct work_queue {
 	timestamp_t start_time;
 	timestamp_t total_send_time;
 	timestamp_t total_receive_time;
+	timestamp_t total_good_transfer_time;  // send time for tasks with t->result == WQ_RESULT_SUCCESS
 	timestamp_t total_execute_time;
+	timestamp_t total_good_execute_time;  // execute time for tasks with t->result == WQ_RESULT_SUCCESS
 
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;
@@ -1035,6 +1037,12 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	w->total_task_time += t->cmd_execution_time;
 
+	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
+	{
+		q->total_good_execute_time  += t->cmd_execution_time;
+		q->total_good_transfer_time += t->total_transfer_time;
+	}
+
 	debug(D_WQ, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
 		w->hostname,
 		w->addrport,
@@ -1244,7 +1252,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	w->memory_allocated -= t->memory;
 	w->disk_allocated -= t->disk;
 	w->gpus_allocated -= t->gpus;
-	
+
 	if(t->unlabeled) {
 		t->cores = t->memory = t->disk = t->gpus = -1;
 	}
@@ -2400,7 +2408,7 @@ static void abort_slow_workers(struct work_queue *q)
 	if(q->total_tasks_complete - q->total_tasks_failed < 10)
 		return;
 
-	timestamp_t average_task_time = (q->total_execute_time + q->total_send_time) / (q->total_tasks_complete - q->total_tasks_failed);
+	timestamp_t average_task_time = (q->total_good_execute_time + q->total_good_transfer_time) / (q->total_tasks_complete - q->total_tasks_failed);
 	timestamp_t current = timestamp_get();
 
 	itable_firstkey(q->running_tasks);
