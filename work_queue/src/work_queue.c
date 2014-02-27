@@ -224,7 +224,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 /********** work_queue internal functions *************/
 /******************************************************/
 
-static int64_t get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
+static int64_t get_worker_overcommit_cores(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->cores.total)
 		return ceil(w->resources->cores.total * q->cores_over_factor) + q->cores_over;
 	else
@@ -257,8 +257,8 @@ static int64_t get_worker_overcommit_disk(struct work_queue *q, struct work_queu
 		return ceil(w->resources->disk.total * q->disk_over_factor) + q->disk_over;
 	else
 		return 0;
-}
 
+}
 
 //Returns count of workers that have identified themselves.
 static int known_workers(struct work_queue *q) {
@@ -285,7 +285,7 @@ static int available_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown")){
-			if(get_worker_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
+			if(get_worker_overcommit_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
 				available_workers++;
 			}
 		}	
@@ -2190,7 +2190,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 			ok = 0;
 		}
 
-		if(w->unlabeled_allocated + 1 > w->resources->workers.total) {
+		if(w->resources->workers.largest < 1 || w->unlabeled_allocated + 1 > get_worker_unlabeled(q, w)) {
 			ok = 0;
 		}
 
@@ -2204,13 +2204,20 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 
 		if(w->unlabeled_allocated > 0) {
 			ok = 0;
-		} else if(w->cores_allocated + cores_used > get_worker_cores(q, w)) {
+
+		} if(w->resources->cores.largest < cores_used || w->cores_allocated + cores_used > get_worker_overcommit_cores(q, w)) {
 			ok = 0;
-		} else if(w->memory_allocated + mem_used > w->resources->memory.total) {
+		}
+
+		if(w->resources->memory.largest < mem_used || w->memory_allocated + mem_used > get_worker_overcommit_memory(q, w)) {
 			ok = 0;
-		} else if(w->disk_allocated + disk_used > w->resources->disk.total) {
+		}
+
+		if(w->resources->disk.largest < disk_used || w->disk_allocated + disk_used > get_worker_overcommit_disk(q, w)) {
 			ok = 0;
-		} else if(w->gpus_allocated + gpus_used > w->resources->gpus.total) {
+		}
+
+		if(w->resources->gpus.largest < gpus_used || w->gpus_allocated + gpus_used > get_worker_overcommit_gpus(q, w)) {
 			ok = 0;
 		}
 	}
