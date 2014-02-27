@@ -2398,10 +2398,10 @@ static void abort_slow_workers(struct work_queue *q)
 	uint64_t key;
 	const double multiplier = q->fast_abort_multiplier;
 
-	if(q->total_tasks_complete < 10)
+	if(q->total_tasks_complete - q->total_tasks_failed < 10)
 		return;
 
-	timestamp_t average_task_time = (q->total_execute_time + q->total_send_time) / q->total_tasks_complete;
+	timestamp_t average_task_time = (q->total_execute_time + q->total_send_time) / (q->total_tasks_complete - q->total_tasks_failed);
 	timestamp_t current = timestamp_get();
 
 	itable_firstkey(q->running_tasks);
