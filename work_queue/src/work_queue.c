@@ -2341,17 +2341,20 @@ static void start_task_on_worker(struct work_queue *q, struct work_queue_worker 
 	return;
 }
 
-static void start_tasks(struct work_queue *q, time_t stoptime)
+static int start_tasks(struct work_queue *q, time_t stoptime)
 {			
 	//start as many tasks as possible
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
+
+	int task_started = 0;
 
 	while(list_size(q->ready_list)) {
 		t = list_peek_head(q->ready_list);
 		w = find_best_worker(q, t);
 		if(w) {
 			start_task_on_worker(q, w);
+			task_started++;
 		} else {
 			//Move task to the end of queue when there is at least one available worker.  
 			//This prevents a resource-hungry task from clogging the entire queue.
@@ -2361,11 +2364,15 @@ static void start_tasks(struct work_queue *q, time_t stoptime)
 			break;
 		}
 	}
+
+	return task_started;
 }
 
-static void receive_tasks(struct work_queue *q, time_t stoptime)
+static int receive_tasks(struct work_queue *q, time_t stoptime)
 {
 	struct work_queue_task *t;
+
+	int tasks_received = 0;
 
 	// If any worker has sent a results message, retrieve the output files.
 	if(itable_size(q->finished_tasks)) {
@@ -2376,8 +2383,11 @@ static void receive_tasks(struct work_queue *q, time_t stoptime)
 			w = itable_lookup(q->worker_task_map, taskid);
 			fetch_output_from_worker(q, w, taskid);
 			itable_firstkey(q->finished_tasks);  // fetch_output removes the resolved task from the itable, thus potentially corrupting our current location.  This resets it to the top.
+			tasks_received++;
 		}
 	}
+
+	return tasks_received;
 }
 
 
