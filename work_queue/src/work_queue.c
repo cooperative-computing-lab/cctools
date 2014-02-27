@@ -3201,9 +3201,6 @@ int work_queue_activate_fast_abort(struct work_queue *q, double multiplier)
 	if(multiplier >= 1) {
 		q->fast_abort_multiplier = multiplier;
 		return 0;
-	} else if(multiplier < 0) {
-		q->fast_abort_multiplier = multiplier;
-		return 0;
 	} else {
 		q->fast_abort_multiplier = -1.0;
 		return 1;
@@ -3792,13 +3789,8 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 		q->transfer_outlier_factor = value;
 		
 	} else if(!strcmp(name, "fast-abort-multiplier")) {
-		if(value >= 1) {
-			q->fast_abort_multiplier = value;
-		} else if(value< 0) {
-			q->fast_abort_multiplier = value;
-		} else {
-			q->fast_abort_multiplier = -1.0;
-		}
+		work_queue_activate_fast_abort(q, value);
+
 	} else if(!strcmp(name, "keepalive-interval")) {
 		q->keepalive_interval = MAX(0, (int)value);
 		
