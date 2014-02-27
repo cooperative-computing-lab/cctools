@@ -3527,13 +3527,23 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 
 static void wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 {
-	//IF SOMETHING THEN
-	start_tasks(q, stoptime);
+	int task_started;
+	int tasks_received;
 
-	//IF SOMETHING THEN
-	receive_tasks(q, stoptime);
+	do 
+	{
+		time_t task_transfer_time = MIN(stoptime, INT64_MAX);
 
-	//ELSE
+		//IF SOMETHING THEN
+		task_started = start_tasks(q, task_transfer_time);
+
+		//IF SOMETHING THEN
+		tasks_received = receive_tasks(q, task_transfer_time);
+
+		//ELSE
+		break;
+
+	}while ( (time(0) < stoptime) && (task_started > 0 || tasks_received > 0));
 }
 
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
