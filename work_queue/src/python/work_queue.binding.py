@@ -287,6 +287,18 @@ class Task(_object):
     def result(self):
         return self._task.result
 
+    ##
+    # Get the number of times the task has been resubmitted internally.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.retries
+    # @endcode
+    @property
+    def retries(self):
+        return self._task.retries
+
     ## 
     # Get the address and port of the host on which the task ran.
     # Must be called only after the task completes execution.

@@ -557,6 +557,8 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		if(t->unlabeled) {
 			t->cores = t->memory = t->disk = t->gpus = -1;
 		}
+		/* printf("Retry %d: %d\n", t->taskid, t->retries); */
+		t->retries += 1;
 		list_push_head(q->ready_list, t);
 
 		reap_task_from_worker(q, w, t);
@@ -2651,6 +2653,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->input_files = list_create();
 	t->output_files = list_create();
 	t->return_status = -1;
+	t->retries = 0;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 
