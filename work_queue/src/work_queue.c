@@ -176,6 +176,7 @@ struct work_queue_worker {
 	char hashkey[WORKER_HASHKEY_MAX];
 	int  foreman;                             // 0 if regular worker, 1 if foreman
 	struct work_queue_resources *resources;
+	int64_t unlabeled_allocated;
 	int64_t cores_allocated;
 	int64_t memory_allocated;
 	int64_t disk_allocated;
@@ -219,28 +220,28 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 
 static int64_t get_worker_overcommit_cores(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->cores.total)
-		return w->resources->cores.total * ceil(1.0 + q->cores_over_factor) + q->cores_over;
+		return ceil(w->resources->cores.total * (1.0 + q->cores_over_factor)) + q->cores_over;
 	else
 		return 0;
 }
 
 static int64_t get_worker_overcommit_gpus(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->gpus.total)
-		return w->resources->gpus.total * ceil(1.0 + q->gpus_over_factor);
+		return ceil(w->resources->gpus.total * (1.0 + q->gpus_over_factor));
 	else
 		return 0;
 }
 
 static int64_t get_worker_overcommit_memory(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->memory.total)
-		return w->resources->memory.total * ceil(1.0 + q->memory_over_factor);
+		return ceil(w->resources->memory.total * (1.0 + q->memory_over_factor));
 	else
 		return 0;
 }
 
 static int64_t get_worker_overcommit_disk(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->disk.total)
-		return w->resources->disk.total * ceil(1.0 + q->disk_over_factor);
+		return ceil(w->resources->disk.total * (1.0 + q->disk_over_factor));
 	else
 		return 0;
 }
@@ -270,11 +271,36 @@ static int available_workers(struct work_queue *q) {
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
-		if(strcmp(w->hostname, "unknown")){
-			if(get_worker_overcommit_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
-				available_workers++;
-			}
-		}	
+
+		if(!strcmp(w->hostname, "unknown"))
+			continue;
+
+		if(w->unlabeled_allocated > 0)
+		{
+			if(!w->foreman)
+				continue;
+
+			if(w->resources->workers.total <= w->unlabeled_allocated)
+				continue;
+		}
+		else
+		{
+			int r;
+			r = get_worker_overcommit_cores(q, w);
+			if(r > 0 && r <= w->cores_allocated)
+				continue;
+			r = get_worker_overcommit_memory(q, w);
+			if(r > 0 && r <= w->memory_allocated)
+				continue;
+			r = get_worker_overcommit_disk(q, w);
+			if(r > 0 && r <= w->disk_allocated)
+				continue;
+			r = get_worker_overcommit_gpus(q, w);
+			if(r > 0 && r <= w->gpus_allocated)
+				continue;
+		}
+		//worker survived all checks
+		available_workers++;
 	}
 	
 	return available_workers;
@@ -2180,23 +2206,21 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 		disk_used = MAX(t->disk, 0);
 		gpus_used = MAX(t->gpus, 0);
 	}
-	
+
+	// Do not mix labeled and unlabeled
 	if(w->resources->cores.total < cores_used || w->cores_allocated + cores_used > get_worker_overcommit_cores(q, w)) {
 		ok = 0;
 	}
-	
-	if(w->resources->memory.total < mem_used || w->memory_allocated + mem_used > get_worker_overcommit_memory(q, w)) {
+	else if(w->resources->memory.total < mem_used || w->memory_allocated + mem_used > get_worker_overcommit_memory(q, w)) {
 		ok = 0;
 	}
-	
-	if(w->resources->disk.total < disk_used || w->disk_allocated + disk_used > get_worker_overcommit_disk(q, w)) {
+	else if(w->resources->disk.total < disk_used || w->disk_allocated + disk_used > get_worker_overcommit_disk(q, w)) {
+		ok = 0;
+	}
+	else if(w->resources->gpus.total < gpus_used || w->gpus_allocated + gpus_used > get_worker_overcommit_gpus(q, w)) {
 		ok = 0;
 	}
 
-	if(w->resources->gpus.total < gpus_used || w->gpus_allocated + gpus_used > get_worker_overcommit_gpus(q, w)) {
-		ok = 0;
-	}
-	
 	return ok;
 }
 
@@ -3511,6 +3535,10 @@ static void print_password_warning( struct work_queue *q )
 
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 {
+	debug(D_WQ, "workers status -- total: %d, active: %d, available: %d.",
+		hash_table_size(q->worker_table),
+		known_workers(q),
+		available_workers(q));
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
