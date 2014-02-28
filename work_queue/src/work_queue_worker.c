@@ -161,6 +161,8 @@ static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
+static int64_t unlabeled_allocated = 0;
+
 // do not send consecutive resource updates in less than this many seconds
 static int send_resources_interval = 5;
 
@@ -428,23 +430,17 @@ static int start_task(struct work_queue_task *t) {
 
 		ti->status = 0;
 		
-		if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-			t->cores = MAX((double)aggregated_resources->cores.total/(double)aggregated_resources->workers.total, 1);
-			t->memory = MAX((double)aggregated_resources->memory.total/(double)aggregated_resources->workers.total, 0);
-			t->disk = MAX((double)aggregated_resources->disk.total/(double)aggregated_resources->workers.total, 0);
-			t->gpus = MAX((double)aggregated_resources->gpus.total/(double)aggregated_resources->workers.total, 0);
+		if(t->unlabeled)
+		{
+			unlabeled_allocated++;
 		} else {
 			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
-			t->cores = MAX(t->cores, 0);
-			t->memory = MAX(t->memory, 0);
-			t->disk = MAX(t->disk, 0);
-			t->gpus = MAX(t->gpus, 0);
-		}
 
-		cores_allocated += t->cores;
-		memory_allocated += t->memory;
-		disk_allocated += t->disk;
-		gpus_allocated += t->gpus;
+			cores_allocated  += MAX(t->cores, 0);
+			memory_allocated += MAX(t->memory, 0);
+			disk_allocated   += MAX(t->disk, 0);
+			gpus_allocated   += MAX(t->gpus, 0);
+		}
 
 		itable_insert(stored_tasks, t->taskid, ti);
 		itable_insert(active_tasks, ti->pid, ti);
@@ -464,10 +460,17 @@ static void report_task_complete(struct link *master, struct task_info *ti)
 		send_master_message(master, "result %d %lld %llu %d\n", ti->status, (long long) output_length, (unsigned long long) ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
 		
-		cores_allocated -= ti->task->cores;
-		memory_allocated -= ti->task->memory;
-		disk_allocated -= ti->task->disk;
-		gpus_allocated -= ti->task->gpus;
+		if(ti->task->unlabeled)
+		{
+			unlabeled_allocated--;
+		}
+		else
+		{
+			cores_allocated  -= MAX(ti->task->cores, 0);
+			memory_allocated -= MAX(ti->task->memory, 0);
+			disk_allocated   -= MAX(ti->task->disk, 0);
+			gpus_allocated   -= MAX(ti->task->gpus, 0);
+		}
 
 		total_task_execution_time += (ti->execution_end - ti->execution_start);
 		total_tasks_executed++;
@@ -1333,10 +1336,17 @@ static void kill_task(struct task_info *ti) {
 	sprintf(dirname, "t.%d", ti->taskid);
 	delete_dir(dirname);
 
-	cores_allocated -= ti->task->cores;
-	memory_allocated -= ti->task->memory;
-	disk_allocated -= ti->task->disk;
-	gpus_allocated -= ti->task->gpus;
+	if(ti->task->unlabeled)
+	{
+		unlabeled_allocated--;
+	}
+	else
+	{
+		cores_allocated  -= MAX(ti->task->cores, 0);
+		memory_allocated -= MAX(ti->task->memory, 0);
+		disk_allocated   -= MAX(ti->task->disk, 0);
+		gpus_allocated   -= MAX(ti->task->gpus, 0);
+	}
 
 	task_info_delete(ti);
 }
@@ -1398,6 +1408,8 @@ static void kill_all_tasks() {
 		task_info_delete(ti);
 	}
 	itable_clear(stored_tasks);
+
+	unlabeled_allocated = 0;
 	cores_allocated = 0;
 	memory_allocated = 0;
 	disk_allocated = 0;
@@ -1651,34 +1663,46 @@ static int check_for_resources(struct work_queue_task *t) {
 	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
 	
-	// If resources used have not been specified, treat the task as consuming the entire real worker
-	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-		cores_used = MAX((double)aggregated_resources->cores.total/(double)aggregated_resources->workers.total, 1);
-		mem_used = MAX((double)aggregated_resources->memory.total/(double)aggregated_resources->workers.total, 0);
-		disk_used = MAX((double)aggregated_resources->disk.total/(double)aggregated_resources->workers.total, 0);
-		gpus_used = MAX((double)aggregated_resources->gpus.total/(double)aggregated_resources->workers.total, 0);
+	// If resources used have not been specified, treat the task as consuming an entire real worker
+	if(t->unlabeled) {
+		// Do not mix labeled and unlabeled in a regular worker
+		if(worker_mode == WORKER_MODE_WORKER && unlabeled_allocated > 0) {
+			if(cores_allocated > 0 || memory_allocated > 0 || disk_allocated > 0 || gpus_allocated > 0) {
+				ok = 0;
+			}
+		}
+
+		if(unlabeled_allocated + 1 > aggregated_resources->workers.total) {
+			ok = 0;
+		}
+
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 		cores_used = MAX(t->cores, 0);
-		mem_used = MAX(t->memory, 0);
-		disk_used = MAX(t->disk, 0);
-		gpus_used = MAX(t->gpus, 0);
-	}
-	
-	if(cores_allocated + cores_used > aggregated_resources->cores.total) {
-		ok = 0;
-	}
-	
-	if(memory_allocated + mem_used > aggregated_resources->memory.total) {
-		ok = 0;
-	}
-	
-	if(disk_allocated + disk_used > aggregated_resources->disk.total) {
-		ok = 0;
-	}
+		mem_used   = MAX(t->memory, 0);
+		disk_used  = MAX(t->disk, 0);
+		gpus_used  = MAX(t->gpus, 0);
 
-	if(gpus_allocated + gpus_used > aggregated_resources->gpus.total) {
-		ok = 0;
+		// Do not mix labeled and unlabeled in a regular worker
+		if(worker_mode == WORKER_MODE_WORKER && unlabeled_allocated > 0) {
+			ok = 0;
+		}
+	
+		if(cores_allocated + cores_used > aggregated_resources->cores.total) {
+			ok = 0;
+		}
+
+		if(memory_allocated + mem_used > aggregated_resources->memory.total) {
+			ok = 0;
+		}
+
+		if(disk_allocated + disk_used > aggregated_resources->disk.total) {
+			ok = 0;
+		}
+
+		if(gpus_allocated + gpus_used > aggregated_resources->gpus.total) {
+			ok = 0;
+		}
 	}
 	
 	return ok;
