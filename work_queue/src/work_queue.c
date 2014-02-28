@@ -3559,6 +3559,52 @@ static void wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 }
 
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
+/*
+      --------------------
+     |  compute stoptime  |
+      --------------------
+               |
+               v
+         --------------
++------>|  poll links  |
+|        --------------
+|              |
+|              v
+|        -------------
+|       |  send task  |<----------------+
+|        -------------                  |
+|              |                    yes |
+|              v                        |
+|     ------------------  yes   -----------------
+|    | tasks remaining? |----->| time remaining? |
+|     ------------------        -----------------
+|           no |                     no |
+|              v                        +-----------+
+|     ------------------                            |
+|    |   receive task   |<--------------+           |
+|     ------------------                |           |
+|              |                    yes |           |
+|              v                        |           |
+|     ------------------  yes   -----------------   |
+|    | tasks remaining? |----->| time remaining? |  |
+|     ------------------        -----------------   |
+|           no |                    no |            |
+|              v                       +------------+
+|     ------------------               |
+|    |fast abort workers|              |
+|     ------------------               |
+|              |                       |
+|              v                       |
+| yes  -----------------               |
++-----| time remaining? |              |
+       -----------------               |
+            no |                       |
+               |-----------------------+
+               v
+           ----------
+          |  return  |
+           ----------
+*/
 {
 	struct work_queue_task *t;
 	time_t stoptime;
