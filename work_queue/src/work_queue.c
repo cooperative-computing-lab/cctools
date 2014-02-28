@@ -543,9 +543,10 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 			t->cores = t->memory = t->disk = t->gpus = -1;
 		}
 		list_push_head(q->ready_list, t);
-		itable_remove(q->running_tasks, t->taskid);
+
+		reap_task_from_worker(q, w, t);
+
 		itable_remove(q->finished_tasks, t->taskid);
-		itable_remove(q->worker_task_map, t->taskid);
 	}
 	itable_clear(w->current_tasks);
 	w->finished_tasks = 0;
@@ -1022,10 +1023,11 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	delete_uncacheable_files(q,w,t);
 
 	// At this point, a task is completed.
-	itable_remove(w->current_tasks, taskid);
+	reap_task_from_worker(q, w, t);
+
 	itable_remove(q->finished_tasks, t->taskid);
 	list_push_head(q->complete_list, t);
-	itable_remove(q->worker_task_map, t->taskid);
+
 	w->finished_tasks--;
 	t->time_task_finish = timestamp_get();
 
@@ -1065,11 +1067,11 @@ the task as complete so it is returned to the application.
 */
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
+	reap_task_from_worker(q, w, t);
+
 	//remove the task from tables that track dispatched tasks. 
-	itable_remove(q->running_tasks, t->taskid); 
 	itable_remove(q->finished_tasks, t->taskid); 
-	itable_remove(q->worker_task_map, t->taskid);
-	itable_remove(w->current_tasks, t->taskid);
+
 	
 	//add the task to complete list so it is given back to the application.
 	list_push_head(q->complete_list, t);
@@ -1256,21 +1258,11 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
 	q->total_execute_time += t->cmd_execution_time;
+
 	itable_remove(q->running_tasks, taskid);
 	itable_insert(q->finished_tasks, taskid, (void*)t);
 
-	w->cores_allocated -= t->cores;
-	w->memory_allocated -= t->memory;
-	w->disk_allocated -= t->disk;
-	w->gpus_allocated -= t->gpus;
-
-	if(t->unlabeled) {
-		t->cores = t->memory = t->disk = t->gpus = -1;
-	}
-
 	w->finished_tasks++;
-
-	log_worker_stats(q);
 
 	return SUCCESS;
 }
@@ -2371,32 +2363,9 @@ static void start_task_on_worker(struct work_queue *q, struct work_queue_worker 
 	if(!t)
 		return;
 
-	itable_insert(w->current_tasks, t->taskid, t);
-	itable_insert(q->running_tasks, t->taskid, t); 
-	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
-
 	int result = start_one_task(q, w, t);
 	if(result == SUCCESS) {
-		//If everything is unspecified, set it to the value of an "average" worker.
-		if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-			t->cores = MAX((double)w->resources->cores.total/(double)w->resources->workers.total, 1);
-			t->memory = MAX((double)w->resources->memory.total/(double)w->resources->workers.total, 0);
-			t->disk = MAX((double)w->resources->disk.total/(double)w->resources->workers.total, 0);
-			t->gpus = MAX((double)w->resources->gpus.total/(double)w->resources->workers.total, 0);
-		} else {
-			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
-			t->cores = MAX(t->cores, 0);
-			t->memory = MAX(t->memory, 0);
-			t->disk = MAX(t->disk, 0);
-			t->gpus = MAX(t->gpus, 0);
-		}
-		
-		w->cores_allocated += t->cores;
-		w->memory_allocated += t->memory;
-		w->disk_allocated += t->disk;
-		w->gpus_allocated += t->gpus;
-		
-		log_worker_stats(q);
+		commit_task_to_worker(q, w, t);
 	} else {
 		debug(D_WQ, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
@@ -2535,11 +2504,6 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 	if (w) {
 		//send message to worker asking to kill its task.
 		send_worker_msg(q,w, "kill %d\n",t->taskid);
-		//update table.
-		itable_remove(q->running_tasks, t->taskid);
-		itable_remove(q->finished_tasks, t->taskid);
-		itable_remove(q->worker_task_map, t->taskid);
-
 		debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 			
 		//Delete any input files that are not to be cached.
@@ -2547,18 +2511,11 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 
 		//Delete all output files since they are not needed as the task was aborted.
 		delete_worker_files(q, w, t, t->output_files, 0);
-		
-		w->cores_allocated -= t->cores;
-		w->memory_allocated -= t->memory;
-		w->disk_allocated -= t->disk;
-		w->gpus_allocated -= t->gpus;
-		
-		if(t->unlabeled) {
-			t->cores = t->memory = t->disk = t->gpus = -1;
-		}
 
-		log_worker_stats(q);
-		itable_remove(w->current_tasks, t->taskid);
+		//update tables.
+		reap_task_from_worker(q, w, t);
+
+		itable_remove(q->finished_tasks, t->taskid);
 
 		return 1;
 	}
