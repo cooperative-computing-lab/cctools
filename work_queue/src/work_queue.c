@@ -206,6 +206,9 @@ static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w
 static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
+static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
+static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
+
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static void process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count);
@@ -2361,6 +2364,66 @@ static struct work_queue_worker *find_best_worker(struct work_queue *q, struct w
 	default:
 		return find_worker_by_fcfs(q, t);
 	}
+}
+
+static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
+{
+	itable_insert(w->current_tasks, t->taskid, t);
+	itable_insert(q->running_tasks, t->taskid, t); 
+	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
+
+	if(t->unlabeled) {
+		w->unlabeled_allocated++;
+	} else {
+		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabeled resources
+		w->cores_allocated  += MAX(t->cores, 0);
+		w->memory_allocated += MAX(t->memory,0);
+		w->disk_allocated   += MAX(t->disk,  0);
+		w->gpus_allocated   += MAX(t->gpus,  0);
+	}
+
+	log_worker_stats(q);
+}
+
+static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
+{
+	struct work_queue_worker *wr = itable_lookup(q->worker_task_map, t->taskid);
+
+	if(wr != w)
+	{
+		debug(D_WQ, "Cannot reap task %d from worker. It is not being run by %s (%s)\n", t->taskid, w->hostname, w->addrport);
+	}
+
+	//update tables.
+	itable_remove(w->current_tasks, t->taskid);
+	itable_remove(q->running_tasks, t->taskid); 
+	itable_remove(q->worker_task_map, t->taskid);
+	
+	if(t->unlabeled)
+	{
+		w->unlabeled_allocated--;
+
+	}
+	else
+	{
+		w->cores_allocated  -= t->cores;
+		w->memory_allocated -= t->memory;
+		w->disk_allocated   -= t->disk;
+		w->gpus_allocated   -= t->gpus;
+	}
+
+	if(w->unlabeled_allocated < 0 || w->cores_allocated < 0 || w->memory_allocated < 0 || w->disk_allocated < 0 || w->gpus_allocated < 0)
+	{
+		w->unlabeled_allocated = MAX(w->unlabeled_allocated,0);
+		w->cores_allocated     = MAX(w->cores_allocated,0);
+		w->memory_allocated    = MAX(w->memory_allocated,0);
+		w->disk_allocated      = MAX(w->disk_allocated,0);
+		w->gpus_allocated      = MAX(w->gpus_allocated,0);
+
+		debug(D_WQ, "Worker resource accounting error! Task: %d. Worker: %s (%s) Reseting to zero.\n", t->taskid, w->hostname, w->addrport);
+	}
+
+	log_worker_stats(q);
 }
 
 static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w)
