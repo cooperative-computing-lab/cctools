@@ -2207,17 +2207,16 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 		if(w->unlabeled_allocated > 0) {
 			ok = 0;
 		}
-
-		else if(w->resources->cores.total < cores_used || w->cores_allocated + cores_used > get_worker_overcommit_cores(q, w)) {
+		else if(w->resources->cores.largest < cores_used || w->cores_allocated + cores_used > get_worker_overcommit_cores(q, w)) {
 			ok = 0;
 		}
-		else if(w->resources->memory.total < mem_used || w->memory_allocated + mem_used > get_worker_overcommit_memory(q, w)) {
+		else if(w->resources->memory.largest < mem_used || w->memory_allocated + mem_used > get_worker_overcommit_memory(q, w)) {
 			ok = 0;
 		}
-		else if(w->resources->disk.total < disk_used || w->disk_allocated + disk_used > get_worker_overcommit_disk(q, w)) {
+		else if(w->resources->disk.largest < disk_used || w->disk_allocated + disk_used > get_worker_overcommit_disk(q, w)) {
 			ok = 0;
 		}
-		else if(w->resources->gpus.total < gpus_used || w->gpus_allocated + gpus_used > get_worker_overcommit_gpus(q, w)) {
+		else if(w->resources->gpus.largest < gpus_used || w->gpus_allocated + gpus_used > get_worker_overcommit_gpus(q, w)) {
 			ok = 0;
 		}
 	}
