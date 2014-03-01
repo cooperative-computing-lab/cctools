@@ -157,10 +157,6 @@ static int64_t manual_disk_option = 0;
 static int64_t manual_memory_option = 0;
 static int64_t manual_gpus_option = 0;
 
-static int64_t cores_allocated = 0;
-static int64_t memory_allocated = 0;
-static int64_t disk_allocated = 0;
-static int64_t gpus_allocated = 0;
 static int64_t unlabeled_allocated = 0;
 
 // do not send consecutive resource updates in less than this many seconds
@@ -436,10 +432,10 @@ static int start_task(struct work_queue_task *t) {
 		} else {
 			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 
-			cores_allocated  += MAX(t->cores, 0);
-			memory_allocated += MAX(t->memory, 0);
-			disk_allocated   += MAX(t->disk, 0);
-			gpus_allocated   += MAX(t->gpus, 0);
+			aggregated_resources->cores.inuse  += MAX(t->cores, 0);
+			aggregated_resources->memory.inuse += MAX(t->memory, 0);
+			aggregated_resources->disk.inuse   += MAX(t->disk, 0);
+			aggregated_resources->gpus.inuse   += MAX(t->gpus, 0);
 		}
 
 		itable_insert(stored_tasks, t->taskid, ti);
@@ -466,10 +462,10 @@ static void report_task_complete(struct link *master, struct task_info *ti)
 		}
 		else
 		{
-			cores_allocated  -= MAX(ti->task->cores, 0);
-			memory_allocated -= MAX(ti->task->memory, 0);
-			disk_allocated   -= MAX(ti->task->disk, 0);
-			gpus_allocated   -= MAX(ti->task->gpus, 0);
+			aggregated_resources->cores.inuse  -= MAX(ti->task->cores, 0);
+			aggregated_resources->memory.inuse -= MAX(ti->task->memory, 0);
+			aggregated_resources->disk.inuse   -= MAX(ti->task->disk, 0);
+			aggregated_resources->gpus.inuse   -= MAX(ti->task->gpus, 0);
 		}
 
 		total_task_execution_time += (ti->execution_end - ti->execution_start);
@@ -1342,10 +1338,10 @@ static void kill_task(struct task_info *ti) {
 	}
 	else
 	{
-		cores_allocated  -= MAX(ti->task->cores, 0);
-		memory_allocated -= MAX(ti->task->memory, 0);
-		disk_allocated   -= MAX(ti->task->disk, 0);
-		gpus_allocated   -= MAX(ti->task->gpus, 0);
+		aggregated_resources->cores.inuse  -= MAX(ti->task->cores, 0);
+		aggregated_resources->memory.inuse -= MAX(ti->task->memory, 0);
+		aggregated_resources->disk.inuse   -= MAX(ti->task->disk, 0);
+		aggregated_resources->gpus.inuse   -= MAX(ti->task->gpus, 0);
 	}
 
 	task_info_delete(ti);
@@ -1410,10 +1406,11 @@ static void kill_all_tasks() {
 	itable_clear(stored_tasks);
 
 	unlabeled_allocated = 0;
-	cores_allocated = 0;
-	memory_allocated = 0;
-	disk_allocated = 0;
-	gpus_allocated = 0;
+	aggregated_resources->workers.inuse = 0;
+	aggregated_resources->cores.inuse = 0;
+	aggregated_resources->memory.inuse = 0;
+	aggregated_resources->disk.inuse = 0;
+	aggregated_resources->gpus.inuse = 0;
 }
 
 static int do_kill(int taskid) {
@@ -1662,17 +1659,19 @@ static int handle_master(struct link *master) {
 static int check_for_resources(struct work_queue_task *t) {
 	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
+
+	struct work_queue_resources *r = aggregated_resources;  //abbrev
 	
 	// If resources used have not been specified, treat the task as consuming an entire real worker
 	if(t->unlabeled) {
 		// Do not mix labeled and unlabeled in a regular worker
-		if(worker_mode == WORKER_MODE_WORKER && unlabeled_allocated > 0) {
-			if(cores_allocated > 0 || memory_allocated > 0 || disk_allocated > 0 || gpus_allocated > 0) {
+		if(unlabeled_allocated > 0) {
+			if(r->cores.inuse > 0 || r->memory.inuse > 0 || r->disk.inuse > 0 || r->gpus.inuse > 0) {
 				ok = 0;
 			}
 		}
 
-		if(unlabeled_allocated + 1 > aggregated_resources->workers.total) {
+		if(r->workers.inuse + 1 > r->workers.total) {
 			ok = 0;
 		}
 
@@ -1688,19 +1687,19 @@ static int check_for_resources(struct work_queue_task *t) {
 			ok = 0;
 		}
 	
-		if(cores_allocated + cores_used > aggregated_resources->cores.total) {
+		if(r->cores.inuse + cores_used > r->cores.total) {
 			ok = 0;
 		}
 
-		if(memory_allocated + mem_used > aggregated_resources->memory.total) {
+		if(r->memory.inuse + mem_used > r->memory.total) {
 			ok = 0;
 		}
 
-		if(disk_allocated + disk_used > aggregated_resources->disk.total) {
+		if(r->disk.inuse + disk_used > r->disk.total) {
 			ok = 0;
 		}
 
-		if(gpus_allocated + gpus_used > aggregated_resources->gpus.total) {
+		if(r->gpus.inuse + gpus_used > aggregated_resources->gpus.total) {
 			ok = 0;
 		}
 	}
@@ -1780,7 +1779,7 @@ static void work_for_master(struct link *master) {
 
 		if(ok) {
 			int visited = 0;
-			while(list_size(waiting_tasks) > visited && cores_allocated < aggregated_resources->cores.total) {
+			while(list_size(waiting_tasks) > visited && aggregated_resources->cores.inuse < aggregated_resources->cores.total) {
 				struct work_queue_task *t;
 				
 				t = list_pop_head(waiting_tasks);
