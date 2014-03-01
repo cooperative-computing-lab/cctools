@@ -290,17 +290,16 @@ static int available_workers(struct work_queue *q) {
 		{
 			int r;
 			r = get_worker_overcommit_cores(q, w);
-			if(r > 0 && r <= w->cores_allocated)
+			if(r < 1 || r <= w->cores_allocated)
 				continue;
 			r = get_worker_overcommit_memory(q, w);
-			if(r > 0 && r <= w->memory_allocated)
+			if(r < 1 || r <= w->memory_allocated)
 				continue;
 			r = get_worker_overcommit_disk(q, w);
-			if(r > 0 && r <= w->disk_allocated)
+			if(r < 1 || r <= w->disk_allocated)
 				continue;
-			r = get_worker_overcommit_gpus(q, w);
-			if(r > 0 && r <= w->gpus_allocated)
-				continue;
+
+			/* Note we do not check for gpus, as they are optional.*/
 		}
 		//worker survived all checks
 		available_workers++;
@@ -592,9 +591,6 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 			free(t->output);
 		}
 		t->output = 0;
-		if(t->unlabeled) {
-			t->cores = t->memory = t->disk = t->gpus = -1;
-		}
 		list_push_head(q->ready_list, t);
 
 		reap_task_from_worker(q, w, t);
@@ -2398,10 +2394,10 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	}
 	else
 	{
-		w->cores_allocated  -= t->cores;
-		w->memory_allocated -= t->memory;
-		w->disk_allocated   -= t->disk;
-		w->gpus_allocated   -= t->gpus;
+		w->cores_allocated  -= MAX(t->cores, 0);
+		w->memory_allocated -= MAX(t->memory,0);
+		w->disk_allocated   -= MAX(t->disk,  0);
+		w->gpus_allocated   -= MAX(t->gpus,  0);
 	}
 
 	if(w->unlabeled_allocated < 0 || w->cores_allocated < 0 || w->memory_allocated < 0 || w->disk_allocated < 0 || w->gpus_allocated < 0)
@@ -2645,11 +2641,12 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 
-	t->memory = -1;
-	t->disk = -1;
-	t->cores = -1;
-	t->gpus = -1;
 	t->unlabeled = 1;
+	t->cores   = -1;
+	t->memory  = -1;
+	t->disk    = -1;
+	t->gpus    = -1;
+
 
 	return t;
 }
