@@ -4069,21 +4069,25 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 {
 	struct work_queue_worker *w;
 	char *key;
-	int first = 1;
+
+	memset(total,0,sizeof(*total));
 
 	if(hash_table_size(q->worker_table)==0) {
-		memset(total,0,sizeof(*total));
 		return;
 	}
 
 	hash_table_firstkey(q->worker_table);
+	hash_table_nextkey(q->worker_table,&key,(void**)&w);
+
+	total->cores.smallest  = w->resources->cores.smallest; /*avoid smallest being zero*/
+	total->disk.smallest   = w->resources->disk.smallest;
+	total->memory.smallest = w->resources->memory.smallest;
+	total->gpus.smallest   = w->resources->gpus.smallest;
+
+	work_queue_resources_add(total,w->resources, !w->foreman && w->unlabeled_allocated /*max out*/);
+
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		if(first) {
-			*total = *w->resources;
-			first = 0;
-		} else {
-			work_queue_resources_add(total,w->resources);
-		}
+			work_queue_resources_add(total,w->resources, !w->foreman && w->unlabeled_allocated /*max out*/);
 	}
 }
 
