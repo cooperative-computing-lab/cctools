@@ -221,6 +221,13 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 /********** work_queue internal functions *************/
 /******************************************************/
 
+static int64_t get_worker_overcommit_unlabeled(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->workers.total)
+		return w->resources->workers.total + q->unlabeled_over;
+	else
+		return 0;
+}
+
 static int64_t get_worker_overcommit_cores(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->cores.total)
 		return ceil(w->resources->cores.total * (1.0 + q->cores_over_factor)) + q->cores_over;
@@ -283,7 +290,9 @@ static int available_workers(struct work_queue *q) {
 			if(!w->foreman)
 				continue;
 
-			if(w->resources->workers.total <= w->unlabeled_allocated)
+			int r;
+			r = get_worker_overcommit_unlabeled(q, w);
+			if(r <= w->unlabeled_allocated)
 				continue;
 		}
 		else
@@ -2193,7 +2202,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 			}
 		}
 
-		if(w->unlabeled_allocated + 1 > w->resources->workers.total) {
+		if(w->unlabeled_allocated + 1 > get_worker_overcommit_unlabeled(q, w)) {
 			ok = 0;
 		}
 	} else {
