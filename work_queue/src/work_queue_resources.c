@@ -38,7 +38,8 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 	r->cores.largest = r->cores.smallest = r->cores.total;
 
 	disk_info_get(disk_path,&avail,&total);
-	r->disk.total = avail / (UINT64_T) MEGA;
+	r->disk.total = total / (UINT64_T) MEGA;
+	r->disk.inuse = avail / (UINT64_T) MEGA;
 	r->disk.largest = r->disk.smallest = r->disk.total;
 
 	memory_info_get(&avail,&total);
