@@ -1617,9 +1617,6 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 			w->resources->workers = r;
 		}
 
-		if(w->cores_allocated) {
-			log_worker_stats(q);
-		}
 	}
 
 	return 0;
