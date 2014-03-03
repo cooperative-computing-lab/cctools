@@ -481,12 +481,35 @@ static int start_task(struct work_queue_task *t) {
 		return 1;
 }
 
+void account_worker_locally_committed_resources(struct work_queue_task *task, int mode)
+{
+	int mult = mode > 0 ? 1 : -1;
+
+	if(task->unlabeled)
+	{
+		// Max out worker
+		local_resources->cores.committed += (unlabeled_allocated + 1) * local_resources->cores.total;
+		local_resources->disk.committed  += (unlabeled_allocated + 1) * local_resources->disk.total;
+		local_resources->memory.committed+= (unlabeled_allocated + 1) * local_resources->memory.total;
+		local_resources->gpus.committed  += (unlabeled_allocated + 1) * local_resources->gpus.total;
+		local_resources->workers.committed+=(unlabeled_allocated + 1) * local_resources->workers.total;
+	}
+	else
+	{
+		local_resources->cores.committed   += mult * MAX(task->cores, 0);
+		local_resources->disk.committed    += mult * MAX(task->disk,  0);
+		local_resources->memory.committed  += mult * MAX(task->memory,0);
+		local_resources->gpus.committed    += mult * MAX(task->gpus,  0);
+	}
+}
+
 static void report_task_complete(struct link *master, struct task_info *ti)
 {
 	int64_t output_length;
 	struct stat st;
 
 	if(ti->pid) {
+		/* worker */
 		fstat(ti->output_fd, &st);
 		output_length = st.st_size;
 		lseek(ti->output_fd, 0, SEEK_SET);
@@ -504,10 +527,12 @@ static void report_task_complete(struct link *master, struct task_info *ti)
 			local_resources->disk.inuse   -= MAX(ti->task->disk, 0);
 			local_resources->gpus.inuse   -= MAX(ti->task->gpus, 0);
 		}
+		account_worker_locally_committed_resources(ti->task, -1 /* subtract */);
 
 		total_task_execution_time += (ti->execution_end - ti->execution_start);
 		total_tasks_executed++;
 	} else {
+		/* foreman */
 		struct work_queue_task *t = ti->task;
 		if(t->output) {
 			output_length = strlen(t->output);
@@ -1121,6 +1146,8 @@ static int do_task( struct link *master, int taskid )
 			}
 		}
 		list_push_tail(waiting_tasks, task);
+
+		account_worker_locally_committed_resources(task, 1 /* add */);
 	}
 	return 1;
 }
@@ -1380,6 +1407,8 @@ static void kill_task(struct task_info *ti) {
 		local_resources->disk.inuse   -= MAX(ti->task->disk, 0);
 		local_resources->gpus.inuse   -= MAX(ti->task->gpus, 0);
 	}
+
+	account_worker_locally_committed_resources(ti->task, -1 /* subtract */);
 
 	task_info_delete(ti);
 }
