@@ -209,6 +209,32 @@ static int recv_master_message( struct link *master, char *line, int length, tim
 	return result;
 }
 
+static void worker_measure_locally(struct work_queue_resources *r)
+{
+	work_queue_resources_measure_locally(r,workspace);
+
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		r->cores.total  = 0;
+		r->memory.total = 0;
+		r->gpus.total   = 0;
+	} else {
+		if(manual_cores_option) 
+			r->cores.total  = manual_cores_option;
+		if(manual_memory_option) 
+			r->memory.total = manual_memory_option;
+		if(manual_gpus_option)
+			r->gpus.total   = manual_gpus_option;
+	}
+
+	if(manual_disk_option)   
+		r->disk.total = manual_disk_option;
+
+	r->cores.smallest  = r->cores.largest  = r->cores.total;
+	r->memory.smallest = r->memory.largest = r->memory.total;
+	r->disk.smallest   = r->disk.largest   = r->disk.total;
+	r->gpus.smallest   = r->gpus.largest   = r->gpus.total;
+}
+
 static void send_resource_update( struct link *master, int force_update )
 {
 	static time_t last_stop_time = 0;
