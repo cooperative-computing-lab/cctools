@@ -120,9 +120,6 @@ static double worker_volatility = 0.0;
 // Flag gets set on receipt of a terminal signal.
 static int abort_flag = 0;
 
-// do not measure disk capacity in less than this many seconds
-static int foreman_disk_measurement_interval = 10; 
-
 // Threshold for available disk space (MB) beyond which clean up and restart.
 static uint64_t disk_avail_threshold = 100;
 
@@ -215,8 +212,21 @@ static int recv_master_message( struct link *master, char *line, int length, tim
 static void send_resource_update( struct link *master, int force_update )
 {
 	static time_t last_stop_time = 0;
-
 	time_t stoptime = time(0) + active_timeout;
+
+	struct work_queue_resources local_resources;
+
+	if(stoptime - last_stop_time > send_resources_interval || force_update)
+	{
+		work_queue_resources_measure_locally(&local_resources, workspace);
+	}
+
+	if(worker_mode == WORKER_MODE_FOREMAN)
+	{
+		aggregate_workers_resources(foreman_q, aggregated_resources,1);
+		aggregated_resources->disk.total = local_resources.disk.total; //overwrite with foreman's local disk information
+		aggregated_resources->disk.inuse = local_resources.disk.inuse; 
+	}
 
 	/* send updates at least send_resources_interval seconds apart, and only if resources changed. */
 	int normal_update = 0;
@@ -1813,10 +1823,6 @@ static void foreman_for_master(struct link *master) {
 	debug(D_WQ, "working for master at %s:%d as foreman.\n", actual_addr, actual_port);
 
 	time_t idle_stoptime = time(0) + idle_timeout;
-
-	struct work_queue_resources foreman_local;
-
-	time_t last_disk_measurement = 0;
 	while(!abort_flag) {
 		int result = 1;
 		struct work_queue_task *task = NULL;
@@ -1841,18 +1847,6 @@ static void foreman_for_master(struct link *master) {
 			send_master_message(master, "available_results\n");
 			results_to_be_sent_msg = 1;
 		}
-
-		if(time(0) - last_disk_measurement > foreman_disk_measurement_interval)
-		{
-			work_queue_resources_measure_locally(&foreman_local, workspace);
-			debug(D_WQ, "Foreman local disk inuse and total: %"PRId64" %"PRId64"\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
-
-			last_disk_measurement = time(0);
-		}
-
-		aggregate_workers_resources(foreman_q, aggregated_resources,1);
-		aggregated_resources->disk.total = foreman_local.disk.total; //overwrite with foreman's local disk information
-		aggregated_resources->disk.inuse = foreman_local.disk.inuse; 
 
 		send_resource_update(master,0);
 		
