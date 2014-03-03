@@ -176,11 +176,14 @@ struct work_queue_worker {
 	char hashkey[WORKER_HASHKEY_MAX];
 	int  foreman;                             // 0 if regular worker, 1 if foreman
 	struct work_queue_resources *resources;
-	int64_t unlabeled_allocated;
-	int64_t cores_allocated;
-	int64_t memory_allocated;
-	int64_t disk_allocated;
-	int64_t gpus_allocated;
+	int64_t unlabeled_allocated;              // -1 if regular worker running labeled tasks
+
+	int64_t unlabeled_to_allocate;
+	int64_t cores_to_allocate;
+	int64_t memory_to_allocate;
+	int64_t disk_to_allocate;
+	int64_t gpus_to_allocate;
+
 	struct hash_table *current_files;
 	struct link *link;
 	struct itable *current_tasks;
@@ -299,13 +302,13 @@ static int available_workers(struct work_queue *q) {
 		{
 			int r;
 			r = get_worker_overcommit_cores(q, w);
-			if(r < 1 || r <= w->cores_allocated)
+			if(r < 1 || w->cores_to_allocate < 1)
 				continue;
 			r = get_worker_overcommit_memory(q, w);
-			if(r < 1 || r <= w->memory_allocated)
+			if(r < 1 || w->memory_to_allocate < 1)
 				continue;
 			r = get_worker_overcommit_disk(q, w);
-			if(r < 1 || r <= w->disk_allocated)
+			if(r < 1 || w->disk_to_allocate < 1)
 				continue;
 
 			/* Note we do not check for gpus, as they are optional.*/
@@ -1607,15 +1610,27 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
+			w->cores_to_allocate     = get_worker_overcommit_cores(q, w)     - w->resources->cores.committed;
 		} else if(!strcmp(category,"memory")) {
 			w->resources->memory = r;
+			w->memory_to_allocate    = get_worker_overcommit_memory(q, w)    - w->resources->memory.committed;
 		} else if(!strcmp(category,"disk")) {
 			w->resources->disk = r;
+			w->disk_to_allocate      = get_worker_overcommit_disk(q, w)      - w->resources->disk.committed;
 		} else if(!strcmp(category,"gpus")) {
 			w->resources->gpus = r;
+			w->gpus_to_allocate      = get_worker_overcommit_gpus(q, w)      - w->resources->gpus.committed;
 		} else if(!strcmp(category,"workers")) {
 			w->resources->workers = r;
+			w->unlabeled_to_allocate = get_worker_overcommit_unlabeled(q, w) - w->resources->workers.committed;
 		}
+		
+		/* Warning! updates are asynchronous now! Ideally: */
+		//if(sync from worker) {
+		
+
+		//}
+
 
 	}
 
@@ -2193,36 +2208,34 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 	// If none of the resources used have not been specified...
 	if(t->unlabeled) {
 		// Do not mix labeled and unlabeled
-		if(w->unlabeled_allocated > 0) {
-			if(w->cores_allocated > 0 || w->memory_allocated > 0 || w->disk_allocated > 0 || w->gpus_allocated > 0) {
-				ok = 0;
-			}
+		if(w->unlabeled_allocated < 0) {
+			ok = 0;
 		}
 
-		if(w->unlabeled_allocated + 1 > get_worker_overcommit_unlabeled(q, w)) {
+		if(w->unlabeled_to_allocate < 1) {
 			ok = 0;
 		}
 	} else {
-		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
-		cores_used = MAX(t->cores, 0);
-		mem_used = MAX(t->memory, 0);
-		disk_used = MAX(t->disk, 0);
-		gpus_used = MAX(t->gpus, 0);
+		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources (there must be "whatever" left, though, thus the MAX(..., 1)
+		cores_used = MAX(t->cores, 1);
+		mem_used = MAX(t->memory,  1);
+		disk_used = MAX(t->disk,   1);
+		gpus_used = MAX(t->gpus,   0);
 
 		// Do not mix labeled and unlabeled
 		if(w->unlabeled_allocated > 0) {
 			ok = 0;
 		}
-		else if(w->resources->cores.largest < cores_used || w->cores_allocated + cores_used > get_worker_overcommit_cores(q, w)) {
+		else if(w->resources->cores.largest < cores_used || w->cores_to_allocate < cores_used) {
 			ok = 0;
 		}
-		else if(w->resources->memory.largest < mem_used || w->memory_allocated + mem_used > get_worker_overcommit_memory(q, w)) {
+		else if(w->resources->memory.largest < mem_used  || w->memory_to_allocate < mem_used) {
 			ok = 0;
 		}
-		else if(w->resources->disk.largest < disk_used || w->disk_allocated + disk_used > get_worker_overcommit_disk(q, w)) {
+		else if(w->resources->disk.largest < disk_used   || w->disk_to_allocate < disk_used) {
 			ok = 0;
 		}
-		else if(w->resources->gpus.largest < gpus_used || w->gpus_allocated + gpus_used > get_worker_overcommit_gpus(q, w)) {
+		else if(w->resources->gpus.largest < gpus_used   || w->gpus_to_allocate < gpus_used) {
 			ok = 0;
 		}
 	}
@@ -2367,12 +2380,15 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 
 	if(t->unlabeled) {
 		w->unlabeled_allocated++;
+		w->unlabeled_to_allocate--;
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabeled resources
-		w->cores_allocated  += MAX(t->cores, 0);
-		w->memory_allocated += MAX(t->memory,0);
-		w->disk_allocated   += MAX(t->disk,  0);
-		w->gpus_allocated   += MAX(t->gpus,  0);
+		w->cores_to_allocate  -= MAX(t->cores, 0);
+		w->memory_to_allocate -= MAX(t->memory,0);
+		w->disk_to_allocate   -= MAX(t->disk,  0);
+		w->gpus_to_allocate   -= MAX(t->gpus,  0);
+
+		w->unlabeled_allocated = -1;
 	}
 
 	log_worker_stats(q);
@@ -2395,25 +2411,17 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	if(t->unlabeled)
 	{
 		w->unlabeled_allocated--;
-
 	}
 	else
 	{
-		w->cores_allocated  -= MAX(t->cores, 0);
-		w->memory_allocated -= MAX(t->memory,0);
-		w->disk_allocated   -= MAX(t->disk,  0);
-		w->gpus_allocated   -= MAX(t->gpus,  0);
-	}
+		if( itable_size(w->current_tasks) < 1)
+		{
+			// Mark the worker as ready to run unlabeled tasks.
+			w->unlabeled_allocated = 0;
+		}
 
-	if(w->unlabeled_allocated < 0 || w->cores_allocated < 0 || w->memory_allocated < 0 || w->disk_allocated < 0 || w->gpus_allocated < 0)
-	{
-		w->unlabeled_allocated = MAX(w->unlabeled_allocated,0);
-		w->cores_allocated     = MAX(w->cores_allocated,0);
-		w->memory_allocated    = MAX(w->memory_allocated,0);
-		w->disk_allocated      = MAX(w->disk_allocated,0);
-		w->gpus_allocated      = MAX(w->gpus_allocated,0);
-
-		debug(D_WQ, "Worker resource accounting error! Task: %d. Worker: %s (%s) Reseting to zero.\n", t->taskid, w->hostname, w->addrport);
+		/* For the rest do nothing. The *_to_allocate will get updated from the
+		 * workers resource updates */
 	}
 
 	log_worker_stats(q);
@@ -3870,11 +3878,6 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 
 			//Delete all output files since they are not needed as the task was aborted.
 			delete_worker_files(q, w, t, t->output_files, 0);
-			
-			w->cores_allocated -= t->cores;
-			w->memory_allocated -= t->memory;
-			w->disk_allocated -= t->disk;
-			w->gpus_allocated -= t->gpus;
 			
 			itable_remove(w->current_tasks, taskid);
 			
