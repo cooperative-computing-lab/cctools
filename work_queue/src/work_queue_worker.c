@@ -248,11 +248,17 @@ static void send_resource_update( struct link *master, int force_update )
 		worker_measure_locally(local_resources);
 	}
 
+	if(worker_mode == WORKER_MODE_FOREMAN)
+	{
+		aggregate_committed_in_queue(foreman_q,  local_resources, 0);
+	}
+
 	memcpy(aggregated_resources, local_resources, sizeof(*local_resources));
 
 	if(worker_mode == WORKER_MODE_FOREMAN)
 	{
-		aggregate_workers_resources(foreman_q, aggregated_resources,1);
+		aggregate_workers_resources(foreman_q,  aggregated_resources, 0);
+
 		aggregated_resources->disk.total = local_resources->disk.total; //overwrite with foreman's local disk information
 		aggregated_resources->disk.inuse = local_resources->disk.inuse; 
 	}

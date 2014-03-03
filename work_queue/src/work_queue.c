@@ -4124,6 +4124,8 @@ void aggregate_committed_in_queue(struct work_queue *q, struct work_queue_resour
 			total->gpus.committed   += MAX(t->gpus,  0);
 		}
 	}
+	//Reset ready_list to first position.
+	list_first_item(q->ready_list);
 }
 
 int work_queue_specify_log(struct work_queue *q, const char *logfile)
