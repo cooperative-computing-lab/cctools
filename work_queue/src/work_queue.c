@@ -4097,7 +4097,32 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 	work_queue_resources_add(total,w->resources, !w->foreman && w->unlabeled_allocated /*max out*/);
 
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-			work_queue_resources_add(total,w->resources, !w->foreman && w->unlabeled_allocated /*max out*/);
+		work_queue_resources_add(total,w->resources, !w->foreman && w->unlabeled_allocated /*max out*/);
+	}
+}
+
+void aggregate_committed_in_queue(struct work_queue *q, struct work_queue_resources *total, int reset_total)
+{
+	if(reset_total)
+	{
+		memset(total,0,sizeof(*total));
+	}
+
+	struct work_queue_task *t;
+	list_first_item(q->ready_list);
+	while((t = list_next_item(q->ready_list)))
+	{
+		if(t->unlabeled)
+		{
+			total->workers.committed++;
+		}
+		else
+		{
+			total->cores.committed  += MAX(t->cores, 0);
+			total->disk.committed   += MAX(t->disk,  0);
+			total->memory.committed += MAX(t->memory,0);
+			total->gpus.committed   += MAX(t->gpus,  0);
+		}
 	}
 }
 
