@@ -1850,7 +1850,7 @@ static void foreman_for_master(struct link *master) {
 			last_disk_measurement = time(0);
 		}
 
-		aggregate_workers_resources(foreman_q, aggregated_resources);
+		aggregate_workers_resources(foreman_q, aggregated_resources,1);
 		aggregated_resources->disk.total = foreman_local.disk.total; //overwrite with foreman's local disk information
 		aggregated_resources->disk.inuse = foreman_local.disk.inuse; 
 

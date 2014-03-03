@@ -1420,7 +1420,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
-	aggregate_workers_resources(q,&r);
+	aggregate_workers_resources(q,&r,1);
 	work_queue_resources_add_to_nvpair(&r,nv);
 
 	char owner[USERNAME_MAX];
@@ -4041,7 +4041,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	//info about resources
 	s->bandwidth = work_queue_get_effective_bandwidth(q); 
 	struct work_queue_resources r;
-	aggregate_workers_resources(q,&r);
+	aggregate_workers_resources(q,&r,1);
 	s->total_cores = r.cores.total;
 	s->total_memory = r.memory.total;
 	s->total_disk = r.disk.total;
@@ -4065,18 +4065,18 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 }
 
 /*
-This function is a little roundabout, because work_queue_resources_add
-updates the min and max of each value as it goes.  So, we set total
-to the value of the first item, then use work_queue_resources_add.
-If there are no items, we must manually return zero.
+ If reset_total == 0, then we aggragate to whatever value was already in total.
 */
 
-void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total )
+void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total, int reset_total)
 {
 	struct work_queue_worker *w;
 	char *key;
 
-	memset(total,0,sizeof(*total));
+	if(reset_total)
+	{
+		memset(total,0,sizeof(*total));
+	}
 
 	if(hash_table_size(q->worker_table)==0) {
 		return;
