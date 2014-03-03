@@ -15,6 +15,7 @@ struct work_queue_resource {
 	int64_t total;
 	int64_t smallest;
 	int64_t largest;
+	int64_t committed;
 };
 
 struct work_queue_resources {

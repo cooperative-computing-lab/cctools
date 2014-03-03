@@ -1603,7 +1603,7 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 	char category[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
 	
-	if(sscanf(line, "resource %s %"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
+	if(sscanf(line, "resource %s %"PRId64 "%"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.total,&r.smallest,&r.largest,&r.committed)==6) {
 
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
@@ -4046,6 +4046,10 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_memory = r.memory.total;
 	s->total_disk = r.disk.total;
 	s->total_gpus = r.gpus.total;
+	s->committed_cores = r.cores.committed;
+	s->committed_memory = r.memory.committed;
+	s->committed_disk = r.disk.committed;
+	s->committed_gpus = r.gpus.committed;
 	s->min_cores = r.cores.smallest;
 	s->max_cores = r.cores.largest;
 	s->min_memory = r.memory.smallest;
@@ -4102,12 +4106,13 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
 		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
-		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // column labels
+		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // column labels
 			"timestamp", //time 
 			"total_workers_connected", "workers_init", "workers_idle", "workers_busy", "total_workers_joined", "total_workers_removed", // workers
 			"tasks_waiting", "tasks_running", "tasks_complete", "total_tasks_dispatched", "total_tasks_complete", "total_tasks_cancelled", // tasks
 			"start_time", "total_send_time", "total_receive_time", "total_bytes_sent", "total_bytes_received", "efficiency", "idle_percentage", "capacity", // queue
 			"bandwidth", "total_cores", "total_memory", "total_disk", "total_gpus", //resource totals
+			"committed_cores", "committed_memory", "committed_disk", "committed_gpus", //resource committed
 			"min_cores", "max_cores", "min_memory", "max_memory", "min_disk", "max_disk", "min_gpus", "max_gpus"); //resource min/max
 		log_worker_stats(q);
 		debug(D_WQ, "log enabled and is being written to %s\n", logfile);

@@ -1448,6 +1448,12 @@ static void kill_all_tasks() {
 	local_resources->memory.inuse = 0;
 	local_resources->disk.inuse = 0;
 	local_resources->gpus.inuse = 0;
+
+	local_resources->workers.committed = 0;
+	local_resources->cores.committed = 0;
+	local_resources->memory.committed = 0;
+	local_resources->disk.committed = 0;
+	local_resources->gpus.committed = 0;
 }
 
 static int do_kill(int taskid) {
