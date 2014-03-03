@@ -225,6 +225,8 @@ static void worker_measure_locally(struct work_queue_resources *r)
 			r->memory.total = manual_memory_option;
 		if(manual_gpus_option)
 			r->gpus.total   = manual_gpus_option;
+
+		r->workers.inuse = itable_size(active_tasks) > 0 ? 1 : 0;
 	}
 
 	if(manual_disk_option)   
@@ -462,7 +464,7 @@ static int start_task(struct work_queue_task *t) {
 		}
 
 		ti->status = 0;
-		
+
 		if(t->unlabeled)
 		{
 			unlabeled_allocated++;
