@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "macros.h"
 #include "timestamp.h"
+#include "buffer.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -99,33 +100,34 @@ int nvpair_print(struct nvpair *n, char *text, int length)
 	int total = 0;
 
 	hash_table_firstkey(n->table);
-	while(hash_table_nextkey(n->table, &key, &value)) {
+	while(hash_table_nextkey(n->table, &key, &value) && length > 0) {
 		actual = snprintf(text, length, "%s %s\n", key, (char *) value);
 		total += actual;
 		text += actual;
 		length -= actual;
-
 	}
 	return total;
 }
 
 int nvpair_print_alloc(struct nvpair *n, char **text)
 {
-	int length = 1024;
-	int needed;
+	size_t needed;
 
-	*text = malloc(length);
-	if(!*text)
-		return 0;
+	char *key;
+	void *value;
 
-	needed = nvpair_print(n, *text, length);
-	if(needed >= length) {
-		free(*text);
-		*text = malloc(needed + 1);
-		if(!*text)
-			return 0;
-		nvpair_print(n, *text, needed + 1);
+	buffer_t b;
+	buffer_init(&b);
+	buffer_abortonfailure(&b, 0);
+
+	hash_table_firstkey(n->table);
+	while(hash_table_nextkey(n->table, &key, &value)) {
+		buffer_printf(&b, "%s %s\n", key, (char *) value);
 	}
+
+	*text  = xxstrdup(buffer_tostring(&b, &needed));
+
+	buffer_free(&b);
 
 	return needed;
 }
