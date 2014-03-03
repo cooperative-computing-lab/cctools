@@ -87,6 +87,7 @@ struct work_queue_task {
 	int64_t total_bytes_transferred;/**< Number of bytes transferred since task has last started transferring input data. */
 	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
 	timestamp_t cmd_execution_time;	   /**< Time spent in microseconds for executing the command on the worker. */
+	timestamp_t total_cmd_execution_time;	/**< Time spent in microseconds for executing the command on any worker, including resubmittions of the task. */
 
 	int64_t memory;                       
 	int64_t disk;

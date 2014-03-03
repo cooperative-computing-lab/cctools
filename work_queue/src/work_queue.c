@@ -550,6 +550,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		t->total_bytes_transferred = 0;
 		t->total_transfer_time = 0;
 		t->cmd_execution_time = 0;
+		t->total_cmd_execution_time += timestamp_get() - t->time_execute_cmd_start;
 		if(t->output) {
 			free(t->output);
 		}
@@ -1210,6 +1211,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	} else {
 		t->cmd_execution_time = observed_execution_time;
 	}
+	t->total_cmd_execution_time += t->cmd_execution_time;
 
 	if(q->bandwidth) {
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
@@ -2654,6 +2656,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->output_files = list_create();
 	t->return_status = -1;
 	t->retries = 0;
+	t->total_cmd_execution_time = 0;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 

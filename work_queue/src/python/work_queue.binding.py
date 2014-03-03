@@ -467,6 +467,18 @@ class Task(_object):
     def cmd_execution_time(self):
         return self._task.cmd_execution_time 
 
+    ## 
+    # Get the time spent in microseconds for executing the command on any worker. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.total_cmd_execution_time
+    # @endcode
+    @property
+    def total_cmd_execution_time(self):
+        return self._task.total_cmd_execution_time 
+
 
 ##
 # Python Work Queue object
