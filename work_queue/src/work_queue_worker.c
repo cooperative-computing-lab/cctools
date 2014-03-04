@@ -120,9 +120,6 @@ static double worker_volatility = 0.0;
 // Flag gets set on receipt of a terminal signal.
 static int abort_flag = 0;
 
-// do not measure disk capacity in less than this many seconds
-static int foreman_disk_measurement_interval = 10; 
-
 // Threshold for available disk space (MB) beyond which clean up and restart.
 static uint64_t disk_avail_threshold = 100;
 
@@ -150,17 +147,16 @@ static time_t worker_start_time = 0;
 static char *base_debug_filename = NULL;
 
 // Local resource controls
-static struct work_queue_resources * aggregated_resources = 0;
+static struct work_queue_resources * local_resources = 0;          //Local resources for worker/foreman
+static struct work_queue_resources * aggregated_resources = 0;     //Aggregated resources for foreman
 static struct work_queue_resources * aggregated_resources_last = 0;
-static int64_t manual_cores_option = 1;
+static int64_t manual_cores_option = 0;
 static int64_t manual_disk_option = 0;
 static int64_t manual_memory_option = 0;
 static int64_t manual_gpus_option = 0;
 
-static int64_t cores_allocated = 0;
-static int64_t memory_allocated = 0;
-static int64_t disk_allocated = 0;
-static int64_t gpus_allocated = 0;
+static int64_t unlabeled_committed = 0;
+
 // do not send consecutive resource updates in less than this many seconds
 static int send_resources_interval = 5;
 
@@ -214,15 +210,169 @@ static int recv_master_message( struct link *master, char *line, int length, tim
 	return result;
 }
 
+void reset_inuse_resources(struct work_queue_resources *r)
+{
+	r->unlabeled.inuse = 0;
+	r->workers.inuse = 0;
+	r->cores.inuse = 0;
+	r->memory.inuse = 0;
+	r->disk.inuse = 0;
+	r->gpus.inuse = 0;
+}
+
+void reset_committed_resources(struct work_queue_resources *r)
+{
+	r->unlabeled.committed = 0;
+	r->workers.committed = 0;
+	r->cores.committed = 0;
+	r->memory.committed = 0;
+	r->disk.committed = 0;
+	r->gpus.committed = 0;
+}
+
+void account_task_locally_inuse_resources(struct work_queue_resources *r, struct work_queue_task *t)
+{
+	if(t->unlabeled)
+	{
+		// Max out worker
+		r->cores.inuse   += r->cores.total;
+		r->disk.inuse    += r->disk.total;
+		r->memory.inuse  += r->memory.total;
+		r->gpus.inuse    += r->gpus.total;
+		r->unlabeled.inuse++;
+	}
+	else
+	{
+		r->cores.inuse   += MAX(t->cores, 0);
+		r->disk.inuse    += MAX(t->disk,  0);
+		r->memory.inuse  += MAX(t->memory,0);
+		r->gpus.inuse    += MAX(t->gpus,  0);
+	}
+}
+
+void account_worker_locally_inuse_resources(struct work_queue_resources *r)
+{
+	struct task_info *ti;
+	uint64_t taskid;
+
+	r->workers.inuse     = itable_size(active_tasks) > 0 ? 1 : 0;
+
+	// Overcount how much committed this worker is, by counting all tasks in the worker.
+	r->workers.committed = itable_size(active_tasks) + list_size(waiting_tasks);
+
+	itable_firstkey(active_tasks);
+	while(itable_nextkey(active_tasks, &taskid, (void**)&ti)) {
+		account_task_locally_inuse_resources(r, ti->task);
+	}
+}
+
+void account_task_locally_committed_resources(struct work_queue_resources *r, struct work_queue_task *t)
+{
+	if(t->unlabeled)
+	{
+		// Max out worker
+		r->cores.committed   += r->cores.total;
+		r->disk.committed    += r->disk.total;
+		r->memory.committed  += r->memory.total;
+		r->gpus.committed    += r->gpus.total;
+		r->unlabeled.committed++;                     //bug, assumes r is local_resources
+	}
+	else
+	{
+		r->cores.committed   += MAX(t->cores, 0);
+		r->disk.committed    += MAX(t->disk,  0);
+		r->memory.committed  += MAX(t->memory,0);
+		r->gpus.committed    += MAX(t->gpus,  0);
+	}
+}
+
+void account_worker_locally_committed_resources(struct work_queue_resources *r)
+{
+	struct task_info *ti;
+	uint64_t taskid;
+
+	itable_firstkey(stored_tasks);
+	while(itable_nextkey(stored_tasks, &taskid, (void**)&ti)) {
+		account_task_locally_committed_resources(r, ti->task);
+	}
+
+	struct work_queue_task *t;
+	list_first_item(waiting_tasks);
+	while((t = list_next_item(waiting_tasks)))
+	{
+		account_task_locally_committed_resources(r, t);
+	}
+}
+
+static void worker_measure_locally(struct work_queue_resources *r)
+{
+	work_queue_resources_measure_locally(r,workspace);
+
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		r->cores.total  = 0;
+		r->memory.total = 0;
+		r->gpus.total   = 0;
+	} else {
+		if(manual_cores_option) 
+			r->cores.total  = manual_cores_option;
+		if(manual_memory_option) 
+			r->memory.total = manual_memory_option;
+		if(manual_gpus_option)
+			r->gpus.total   = manual_gpus_option;
+	}
+
+	if(manual_disk_option)   
+		r->disk.total = manual_disk_option;
+
+	r->cores.smallest  = r->cores.largest  = r->cores.total;
+	r->memory.smallest = r->memory.largest = r->memory.total;
+	r->disk.smallest   = r->disk.largest   = r->disk.total;
+	r->gpus.smallest   = r->gpus.largest   = r->gpus.total;
+
+	reset_inuse_resources(r);
+	reset_committed_resources(r);
+
+	if(worker_mode == WORKER_MODE_FOREMAN)
+	{
+		aggregate_committed_in_queue(foreman_q,   r, 0);
+		aggregate_committed_in_transit(foreman_q, r, 0);
+	}
+	else
+	{
+		account_worker_locally_inuse_resources(r);
+		account_worker_locally_committed_resources(r);
+	}
+}
+
+static void worker_measure_all(struct work_queue_resources *local, struct work_queue_resources *global)
+{
+	worker_measure_locally(local);
+	memcpy(global, local, sizeof(*local));
+
+	if(worker_mode == WORKER_MODE_FOREMAN)
+	{
+		aggregate_workers_resources(foreman_q,  global, 0);
+		aggregated_resources->disk.total = local->disk.total; //overwrite with foreman's local disk information
+		aggregated_resources->disk.inuse = local->disk.inuse; 
+	}
+}
+
 static void send_resource_update( struct link *master, int force_update )
 {
 	static time_t last_stop_time = 0;
-
 	time_t stoptime = time(0) + active_timeout;
 
-	/* send updates at least send_resources_interval seconds apart, and only if resources changed. */
+	/* Measure only every send_resources_interval seconds apart. */
+	if(!force_update && (stoptime - last_stop_time < send_resources_interval))
+		return;
+
+	worker_measure_all(local_resources, aggregated_resources);
+
+	/* send updates only if resources changed, and not if master may ask for
+	 * results from us. This to avoid deadlocks where we fill the send buffer
+	 * with resource updates. */
 	int normal_update = 0;
-	if(!results_to_be_sent_msg && (stoptime - last_stop_time > send_resources_interval) && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
+	if(!results_to_be_sent_msg && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
 	{
 		normal_update = 1;
 	}
@@ -427,27 +577,12 @@ static int start_task(struct work_queue_task *t) {
 		}
 
 		ti->status = 0;
-		
-		if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-			t->cores = MAX((double)aggregated_resources->cores.total/(double)aggregated_resources->workers.total, 1);
-			t->memory = MAX((double)aggregated_resources->memory.total/(double)aggregated_resources->workers.total, 0);
-			t->disk = MAX((double)aggregated_resources->disk.total/(double)aggregated_resources->workers.total, 0);
-			t->gpus = MAX((double)aggregated_resources->gpus.total/(double)aggregated_resources->workers.total, 0);
-		} else {
-			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
-			t->cores = MAX(t->cores, 0);
-			t->memory = MAX(t->memory, 0);
-			t->disk = MAX(t->disk, 0);
-			t->gpus = MAX(t->gpus, 0);
-		}
-
-		cores_allocated += t->cores;
-		memory_allocated += t->memory;
-		disk_allocated += t->disk;
-		gpus_allocated += t->gpus;
 
 		itable_insert(stored_tasks, t->taskid, ti);
 		itable_insert(active_tasks, ti->pid, ti);
+
+		// Force measure the new inuse.
+		worker_measure_all(local_resources, aggregated_resources);
 
 		return 1;
 }
@@ -458,20 +593,17 @@ static void report_task_complete(struct link *master, struct task_info *ti)
 	struct stat st;
 
 	if(ti->pid) {
+		/* worker */
 		fstat(ti->output_fd, &st);
 		output_length = st.st_size;
 		lseek(ti->output_fd, 0, SEEK_SET);
 		send_master_message(master, "result %d %lld %llu %d\n", ti->status, (long long) output_length, (unsigned long long) ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
 		
-		cores_allocated -= ti->task->cores;
-		memory_allocated -= ti->task->memory;
-		disk_allocated -= ti->task->disk;
-		gpus_allocated -= ti->task->gpus;
-
 		total_task_execution_time += (ti->execution_end - ti->execution_start);
 		total_tasks_executed++;
 	} else {
+		/* foreman */
 		struct work_queue_task *t = ti->task;
 		if(t->output) {
 			output_length = strlen(t->output);
@@ -529,7 +661,7 @@ static int report_tasks(struct link *master, struct itable *tasks_infos, int max
 		results_to_be_sent_msg = 0;
 	}
 
-	send_resource_update(master, 0);
+	send_resource_update(master, 1);
 
 	return count;
 }
@@ -1063,11 +1195,17 @@ static int do_task( struct link *master, int taskid )
 		}
 	}
 
+	local_resources->tag = taskid;     // Next resource measurement is now tag the last task received.
+
 	// If this is a foreman, just send the task structure along.
 	// If it is a local worker, create a task_info, start the task, and discard the temporary work_queue_task.
 
 	if(foreman_q) {
 		work_queue_submit_internal(foreman_q,task);
+
+		// Force measure the new committed.
+		worker_measure_all(local_resources, aggregated_resources);
+
 		return 1;
 	} else {
 		struct work_queue_file *tf;
@@ -1086,6 +1224,10 @@ static int do_task( struct link *master, int taskid )
 		}
 		list_push_tail(waiting_tasks, task);
 	}
+
+	// Force measure the new committed.
+	worker_measure_all(local_resources, aggregated_resources);
+
 	return 1;
 }
 
@@ -1332,12 +1474,6 @@ static void kill_task(struct task_info *ti) {
 	// Clean up the task's directory
 	sprintf(dirname, "t.%d", ti->taskid);
 	delete_dir(dirname);
-
-	cores_allocated -= ti->task->cores;
-	memory_allocated -= ti->task->memory;
-	disk_allocated -= ti->task->disk;
-	gpus_allocated -= ti->task->gpus;
-
 	task_info_delete(ti);
 }
 
@@ -1398,10 +1534,9 @@ static void kill_all_tasks() {
 		task_info_delete(ti);
 	}
 	itable_clear(stored_tasks);
-	cores_allocated = 0;
-	memory_allocated = 0;
-	disk_allocated = 0;
-	gpus_allocated = 0;
+
+	reset_inuse_resources(local_resources);
+	reset_committed_resources(local_resources);
 }
 
 static int do_kill(int taskid) {
@@ -1416,6 +1551,10 @@ static int do_kill(int taskid) {
 		if(t) {
 			work_queue_task_delete(t);
 		}
+
+		// Force measure the new committed.
+		worker_measure_all(local_resources, aggregated_resources);
+
 		return 1;
 	}
 	
@@ -1432,6 +1571,10 @@ static int do_kill(int taskid) {
 		sprintf(dirname, "t.%d", taskid);
 		delete_dir(dirname);
 	}
+
+	// Force measure the new committed.
+	worker_measure_all(local_resources, aggregated_resources);
+
 	return 1;
 }
 
@@ -1650,35 +1793,49 @@ static int handle_master(struct link *master) {
 static int check_for_resources(struct work_queue_task *t) {
 	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
+
+	struct work_queue_resources *r = local_resources;  //abbrev
 	
-	// If resources used have not been specified, treat the task as consuming the entire real worker
-	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-		cores_used = MAX((double)aggregated_resources->cores.total/(double)aggregated_resources->workers.total, 1);
-		mem_used = MAX((double)aggregated_resources->memory.total/(double)aggregated_resources->workers.total, 0);
-		disk_used = MAX((double)aggregated_resources->disk.total/(double)aggregated_resources->workers.total, 0);
-		gpus_used = MAX((double)aggregated_resources->gpus.total/(double)aggregated_resources->workers.total, 0);
+	// If resources used have not been specified, treat the task as consuming an entire real worker
+	if(t->unlabeled) {
+		// Do not mix labeled and unlabeled in a regular worker
+		if(unlabeled_committed > 0) {
+			if(r->cores.inuse > 0 || r->memory.inuse > 0 || r->disk.inuse > 0 || r->gpus.inuse > 0) {
+				ok = 0;
+			}
+		}
+
+		if(r->workers.inuse + 1 > r->workers.total) {
+			ok = 0;
+		}
+
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 		cores_used = MAX(t->cores, 0);
-		mem_used = MAX(t->memory, 0);
-		disk_used = MAX(t->disk, 0);
-		gpus_used = MAX(t->gpus, 0);
-	}
-	
-	if(cores_allocated + cores_used > aggregated_resources->cores.total) {
-		ok = 0;
-	}
-	
-	if(memory_allocated + mem_used > aggregated_resources->memory.total) {
-		ok = 0;
-	}
-	
-	if(disk_allocated + disk_used > aggregated_resources->disk.total) {
-		ok = 0;
-	}
+		mem_used   = MAX(t->memory, 0);
+		disk_used  = MAX(t->disk, 0);
+		gpus_used  = MAX(t->gpus, 0);
 
-	if(gpus_allocated + gpus_used > aggregated_resources->gpus.total) {
-		ok = 0;
+		// Do not mix labeled and unlabeled in a regular worker
+		if(unlabeled_committed > 0) {
+			ok = 0;
+		}
+	
+		if(r->cores.inuse + cores_used > r->cores.total) {
+			ok = 0;
+		}
+
+		if(r->memory.inuse + mem_used > r->memory.total) {
+			ok = 0;
+		}
+
+		if(r->disk.inuse + disk_used > r->disk.total) {
+			ok = 0;
+		}
+
+		if(r->gpus.inuse + gpus_used > r->gpus.total) {
+			ok = 0;
+		}
 	}
 	
 	return ok;
@@ -1735,9 +1892,7 @@ static void work_for_master(struct link *master) {
 			break;
 		}
 		
-		if(worker_mode == WORKER_MODE_WORKER) {
-			send_resource_update(master,0);
-		}
+		send_resource_update(master,0);
 		
 		int ok = 1;
 		if(master_activity) {
@@ -1756,7 +1911,7 @@ static void work_for_master(struct link *master) {
 
 		if(ok) {
 			int visited = 0;
-			while(list_size(waiting_tasks) > visited && cores_allocated < aggregated_resources->cores.total) {
+			while(list_size(waiting_tasks) > visited) {
 				struct work_queue_task *t;
 				
 				t = list_pop_head(waiting_tasks);
@@ -1790,10 +1945,6 @@ static void foreman_for_master(struct link *master) {
 	debug(D_WQ, "working for master at %s:%d as foreman.\n", actual_addr, actual_port);
 
 	time_t idle_stoptime = time(0) + idle_timeout;
-
-	struct work_queue_resources foreman_local;
-
-	time_t last_disk_measurement = 0;
 	while(!abort_flag) {
 		int result = 1;
 		struct work_queue_task *task = NULL;
@@ -1818,18 +1969,6 @@ static void foreman_for_master(struct link *master) {
 			send_master_message(master, "available_results\n");
 			results_to_be_sent_msg = 1;
 		}
-
-		if(time(0) - last_disk_measurement > foreman_disk_measurement_interval)
-		{
-			work_queue_resources_measure_locally(&foreman_local, workspace);
-			debug(D_WQ, "Foreman local disk inuse and total: %"PRId64" %"PRId64"\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
-
-			last_disk_measurement = time(0);
-		}
-
-		aggregate_workers_resources(foreman_q, aggregated_resources);
-		aggregated_resources->disk.total = foreman_local.disk.total; //overwrite with foreman's local disk information
-		aggregated_resources->disk.inuse = foreman_local.disk.inuse; 
 
 		send_resource_update(master,0);
 		
@@ -2298,46 +2437,28 @@ int main(int argc, char *argv[])
 		goto abort;
 	}
 
-	aggregated_resources = work_queue_resources_create();
+	local_resources           = work_queue_resources_create();
+	aggregated_resources      = work_queue_resources_create();
 	aggregated_resources_last = work_queue_resources_create();
-	work_queue_resources_measure_locally(aggregated_resources,workspace);
 
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		aggregated_resources->cores.total = 0;
-		aggregated_resources->memory.total = 0;
-		aggregated_resources->gpus.total = 0;
-	} else {
-		if(manual_cores_option) 
-			aggregated_resources->cores.total = manual_cores_option;
-		if(manual_memory_option) 
-			aggregated_resources->memory.total = manual_memory_option;
-		if(manual_gpus_option)
-			aggregated_resources->gpus.total = manual_gpus_option;
-	}
-
-	if(manual_disk_option)   
-		aggregated_resources->disk.total = manual_disk_option;
-
-	aggregated_resources->cores.smallest = aggregated_resources->cores.largest = aggregated_resources->cores.total;
-	aggregated_resources->memory.smallest = aggregated_resources->memory.largest = aggregated_resources->memory.total;
-	aggregated_resources->disk.smallest = aggregated_resources->disk.largest = aggregated_resources->disk.total;
-	aggregated_resources->gpus.smallest = aggregated_resources->gpus.largest = aggregated_resources->gpus.total;
+	worker_measure_locally(local_resources);
 
 	debug(D_WQ,"local resources:");
-	work_queue_resources_debug(aggregated_resources);
+	work_queue_resources_debug(local_resources);
 
 	fprintf(stdout, "work_queue_worker: %"PRId64" workers, %"PRId64" cores, %"PRId64" MB memory, %"PRId64" MB disk available, %"PRId64" gpus\n",
-	       aggregated_resources->workers.total,
-	       aggregated_resources->cores.total,
-	       aggregated_resources->memory.total,
-	       aggregated_resources->disk.total,
-		   aggregated_resources->gpus.total);
+	       local_resources->workers.total,
+	       local_resources->cores.total,
+	       local_resources->memory.total,
+	       local_resources->disk.total,
+		   local_resources->gpus.total);
 
 	while(!abort_flag) {
 		if((master = connect_master(time(0) + idle_timeout)) == NULL) {
 			break;
 		}
 
+		local_resources->tag = -1;     // Reset resources tag.
 		if(worker_mode == WORKER_MODE_FOREMAN) {
 			foreman_for_master(master);
 		} else {

@@ -15,14 +15,18 @@ struct work_queue_resource {
 	int64_t total;
 	int64_t smallest;
 	int64_t largest;
+	int64_t committed;
 };
 
 struct work_queue_resources {
+	int64_t tag;                       // Identifies this resources snapshot. 
+	                                   // Now we use it with the last tag received by the worker.
 	struct work_queue_resource workers;
 	struct work_queue_resource disk;
 	struct work_queue_resource cores;
 	struct work_queue_resource memory;
 	struct work_queue_resource gpus;
+	struct work_queue_resource unlabeled;
 };
 
 struct work_queue_resources * work_queue_resources_create();
@@ -31,7 +35,7 @@ void work_queue_resources_debug( struct work_queue_resources *r );
 void work_queue_resources_measure_locally( struct work_queue_resources *r, const char *workspace );
 void work_queue_resources_send( struct link *master, struct work_queue_resources *r, time_t stoptime );
 void work_queue_resources_clear( struct work_queue_resources *r );
-void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r );
+void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r, int ma_out );
 void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct nvpair *nv );
 
 #endif
