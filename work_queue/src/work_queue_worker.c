@@ -1195,6 +1195,8 @@ static int do_task( struct link *master, int taskid )
 		}
 	}
 
+	local_resources->tag = taskid;     // Next resource measurement is now tag the last task received.
+
 	// If this is a foreman, just send the task structure along.
 	// If it is a local worker, create a task_info, start the task, and discard the temporary work_queue_task.
 
@@ -2456,6 +2458,7 @@ int main(int argc, char *argv[])
 			break;
 		}
 
+		local_resources->tag = -1;     // Reset resources tag.
 		if(worker_mode == WORKER_MODE_FOREMAN) {
 			foreman_for_master(master);
 		} else {

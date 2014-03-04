@@ -175,9 +175,12 @@ struct work_queue_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 	int  foreman;                             // 0 if regular worker, 1 if foreman
-	struct work_queue_resources *resources;
-	int64_t unlabeled_allocated;              // -1 if regular worker running labeled tasks
 
+
+	int64_t last_task_sent;                   // Used to tag resources updates.
+	struct work_queue_resources *resources;
+
+	int64_t unlabeled_allocated;              // -1 if regular worker running labeled tasks
 	int64_t unlabeled_to_allocate;
 	int64_t cores_to_allocate;
 	int64_t memory_to_allocate;
@@ -699,6 +702,7 @@ static void add_worker(struct work_queue *q)
 	w->finished_tasks = 0;
 	w->start_time = timestamp_get();
 	w->resources = work_queue_resources_create();
+	w->last_task_sent = -1;
 	link_to_hash_key(link, w->hashkey);
 	sprintf(w->addrport, "%s:%d", addr, port);
 	hash_table_insert(q->worker_table, w->hashkey, w);
@@ -1608,31 +1612,32 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 
 	int n = sscanf(line, "resource %s %"PRId64 "%"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.total,&r.smallest,&r.largest,&r.committed);
 
-	if(n == 1 && !strcmp(category, "tag"))
+	if(n == 2 && !strcmp(category, "tag"))
 	{
 		/* Hack, we use r.inuse to receive the tag. */
-		//if(sync from worker) {
+		w->resources->tag = r.inuse;
 
-
-		//}
+		if(w->resources->tag == w->last_task_sent)
+		{
+			w->cores_to_allocate     = get_worker_overcommit_cores(q, w)     - w->resources->cores.committed;
+			w->memory_to_allocate    = get_worker_overcommit_memory(q, w)    - w->resources->memory.committed;
+			w->disk_to_allocate      = get_worker_overcommit_disk(q, w)      - w->resources->disk.committed;
+			w->gpus_to_allocate      = get_worker_overcommit_gpus(q, w)      - w->resources->gpus.committed;
+			w->unlabeled_to_allocate = get_worker_overcommit_unlabeled(q, w) - w->resources->workers.committed;
+		}
 	}
 	else if(n == 6)
 	{
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
-			w->cores_to_allocate     = get_worker_overcommit_cores(q, w)     - w->resources->cores.committed;
 		} else if(!strcmp(category,"memory")) {
 			w->resources->memory = r;
-			w->memory_to_allocate    = get_worker_overcommit_memory(q, w)    - w->resources->memory.committed;
 		} else if(!strcmp(category,"disk")) {
 			w->resources->disk = r;
-			w->disk_to_allocate      = get_worker_overcommit_disk(q, w)      - w->resources->disk.committed;
 		} else if(!strcmp(category,"gpus")) {
 			w->resources->gpus = r;
-			w->gpus_to_allocate      = get_worker_overcommit_gpus(q, w)      - w->resources->gpus.committed;
 		} else if(!strcmp(category,"workers")) {
 			w->resources->workers = r;
-			w->unlabeled_to_allocate = get_worker_overcommit_unlabeled(q, w) - w->resources->workers.committed; // Incorrect, needs to sync available workers and unlabeled committed.
 		}
 	}
 
@@ -2379,6 +2384,8 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	itable_insert(w->current_tasks, t->taskid, t);
 	itable_insert(q->running_tasks, t->taskid, t); 
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
+
+	w->last_task_sent = t->taskid;
 
 	if(t->unlabeled) {
 		// Do not lose track of unlabeled, even if labeled are running already
