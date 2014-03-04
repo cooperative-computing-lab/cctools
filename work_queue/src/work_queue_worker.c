@@ -357,7 +357,38 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 	return result;
 }
 
+/* Resources related tasks */
 
+void resources_measure_locally(struct work_queue_resources *r)
+{
+	work_queue_resources_measure_locally(r,workspace);
+
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		r->cores.total = 0;
+		r->memory.total = 0;
+		r->gpus.total = 0;
+	} else {
+		if(manual_cores_option) 
+			r->cores.total = manual_cores_option;
+		if(manual_memory_option) 
+			r->memory.total = manual_memory_option;
+		if(manual_gpus_option)
+			r->gpus.total = manual_gpus_option;
+	}
+
+	if(manual_disk_option)   
+		r->disk.total = manual_disk_option;
+
+	r->cores.smallest = r->cores.largest = r->cores.total;
+	r->memory.smallest = r->memory.largest = r->memory.total;
+	r->disk.smallest = r->disk.largest = r->disk.total;
+	r->gpus.smallest = r->gpus.largest = r->gpus.total;
+
+	debug(D_WQ,"local resources:");
+	work_queue_resources_debug(r);
+}
+
+/* End of resources related tasks */
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
@@ -1736,9 +1767,8 @@ static void work_for_master(struct link *master) {
 			break;
 		}
 		
-		if(worker_mode == WORKER_MODE_WORKER) {
-			send_resource_update(master,0);
-		}
+		resources_measure_locally(local_resources);
+		send_resource_update(master,0);
 		
 		int ok = 1;
 		if(master_activity) {
@@ -2300,38 +2330,8 @@ int main(int argc, char *argv[])
 	local_resources = work_queue_resources_create();
 	aggregated_resources = work_queue_resources_create();
 	aggregated_resources_last = work_queue_resources_create();
-	work_queue_resources_measure_locally(local_resources,workspace);
 
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		local_resources->cores.total = 0;
-		local_resources->memory.total = 0;
-		local_resources->gpus.total = 0;
-	} else {
-		if(manual_cores_option) 
-			local_resources->cores.total = manual_cores_option;
-		if(manual_memory_option) 
-			local_resources->memory.total = manual_memory_option;
-		if(manual_gpus_option)
-			local_resources->gpus.total = manual_gpus_option;
-	}
-
-	if(manual_disk_option)   
-		local_resources->disk.total = manual_disk_option;
-
-	local_resources->cores.smallest = local_resources->cores.largest = local_resources->cores.total;
-	local_resources->memory.smallest = local_resources->memory.largest = local_resources->memory.total;
-	local_resources->disk.smallest = local_resources->disk.largest = local_resources->disk.total;
-	local_resources->gpus.smallest = local_resources->gpus.largest = local_resources->gpus.total;
-
-	debug(D_WQ,"local resources:");
-	work_queue_resources_debug(local_resources);
-
-	fprintf(stdout, "work_queue_worker: %"PRId64" workers, %"PRId64" cores, %"PRId64" MB memory, %"PRId64" MB disk available, %"PRId64" gpus\n",
-			local_resources->workers.total,
-			local_resources->cores.total,
-			local_resources->memory.total,
-			local_resources->disk.total,
-			local_resources->gpus.total);
+	resources_measure_locally(local_resources);
 
 	while(!abort_flag) {
 		if((master = connect_master(time(0) + idle_timeout)) == NULL) {
