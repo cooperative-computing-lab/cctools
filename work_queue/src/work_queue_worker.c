@@ -218,6 +218,12 @@ static void worker_measure_locally(struct work_queue_resources *r)
 		r->cores.total  = 0;
 		r->memory.total = 0;
 		r->gpus.total   = 0;
+
+		r->workers.committed = 0;
+		r->cores.committed  = 0;
+		r->memory.committed = 0;
+		r->disk.committed   = 0;
+		r->gpus.committed   = 0;
 	} else {
 		if(manual_cores_option) 
 			r->cores.total  = manual_cores_option;
@@ -243,14 +249,12 @@ static void send_resource_update( struct link *master, int force_update )
 	static time_t last_stop_time = 0;
 	time_t stoptime = time(0) + active_timeout;
 
-	if(stoptime - last_stop_time > send_resources_interval || force_update)
-	{
-		worker_measure_locally(local_resources);
-	}
+	worker_measure_locally(local_resources);
 
 	if(worker_mode == WORKER_MODE_FOREMAN)
 	{
 		aggregate_committed_in_queue(foreman_q,  local_resources, 0);
+		aggregate_committed_in_transit(foreman_q,local_resources, 0);
 	}
 
 	memcpy(aggregated_resources, local_resources, sizeof(*local_resources));

@@ -4131,6 +4131,39 @@ void aggregate_committed_in_queue(struct work_queue *q, struct work_queue_resour
 	list_first_item(q->ready_list);
 }
 
+/* For task dispatched from the ready_list, but for which we have not receive a resource update from the worker. */
+void aggregate_committed_in_transit(struct work_queue *q, struct work_queue_resources *total, int reset_total)
+{
+	struct work_queue_worker *w;
+	char *key;
+
+	int unlabeled;
+	int cores;
+	int memory;
+	int disk;
+	int gpus;
+
+	if(reset_total)
+	{
+		memset(total,0,sizeof(*total));
+	}
+
+	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+		//In transit: The original to allocate minus the ones remaining to allocate.
+		unlabeled = get_worker_overcommit_unlabeled(q, w) - w->resources->workers.committed - w->unlabeled_to_allocate;
+		cores = get_worker_overcommit_cores(q, w) - w->resources->cores.committed - w->cores_to_allocate;
+		memory = get_worker_overcommit_memory(q, w) - w->resources->memory.committed - w->memory_to_allocate;
+		disk = get_worker_overcommit_disk(q, w) - w->resources->disk.committed - w->disk_to_allocate;
+		gpus = get_worker_overcommit_gpus(q, w) - w->resources->gpus.committed - w->gpus_to_allocate;
+
+		total->workers.committed+= MAX(unlabeled,0);
+		total->cores.committed  += MAX(cores,    0);
+		total->disk.committed   += MAX(disk,     0);
+		total->memory.committed += MAX(memory,   0);
+		total->gpus.committed   += MAX(disk,     0);
+	}
+}
+
 int work_queue_specify_log(struct work_queue *q, const char *logfile)
 {
 	q->logfile = fopen(logfile, "a");

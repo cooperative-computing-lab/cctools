@@ -36,6 +36,9 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 /* Adds (arithmetically) all the workers resources (cores, memory, disk) committed, for tasks in the ready_list. if reset_total == 0, then we aggregate to whatever value was already in r.*/
 void aggregate_committed_in_queue( struct work_queue *q, struct work_queue_resources *r, int reset_total);
 
+/* Adds (arithmetically) all the workers resources (cores, memory, disk) committed, for tasks just sent to a worker/foreman */
+void aggregate_committed_in_transit(struct work_queue *q, struct work_queue_resources *total, int reset_total);
+
 /** Enable use of the process module.
 This allows @ref work_queue_wait to call @ref process_pending from @ref process.h, exiting if a process has completed.
 Warning: this will reap any child processes, and their information can only be retrieved via @ref process_wait.
