@@ -249,6 +249,10 @@ static void send_resource_update( struct link *master, int force_update )
 	static time_t last_stop_time = 0;
 	time_t stoptime = time(0) + active_timeout;
 
+	/* Measure only every send_resources_interval seconds apart. */
+	if(stoptime - last_stop_time < send_resources_interval && !force_update)
+		return;
+
 	worker_measure_locally(local_resources);
 
 	if(worker_mode == WORKER_MODE_FOREMAN)
@@ -267,9 +271,10 @@ static void send_resource_update( struct link *master, int force_update )
 		aggregated_resources->disk.inuse = local_resources->disk.inuse; 
 	}
 
-	/* send updates at least send_resources_interval seconds apart, and only if resources changed. */
+
+	/* send updates only if resources changed. */
 	int normal_update = 0;
-	if(!results_to_be_sent_msg && (stoptime - last_stop_time > send_resources_interval) && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
+	if(memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
 	{
 		normal_update = 1;
 	}
