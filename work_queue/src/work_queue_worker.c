@@ -120,9 +120,6 @@ static double worker_volatility = 0.0;
 // Flag gets set on receipt of a terminal signal.
 static int abort_flag = 0;
 
-// do not measure disk capacity in less than this many seconds
-static int foreman_disk_measurement_interval = 10; 
-
 // Threshold for available disk space (MB) beyond which clean up and restart.
 static uint64_t disk_avail_threshold = 100;
 
@@ -386,6 +383,23 @@ void resources_measure_locally(struct work_queue_resources *r)
 
 	debug(D_WQ,"local resources:");
 	work_queue_resources_debug(r);
+}
+
+void resources_measure_all(struct work_queue_resources *local, struct work_queue_resources *aggr)
+{
+	resources_measure_locally(local);
+
+	if(worker_mode == WORKER_MODE_FOREMAN)
+	{
+		aggregate_workers_resources(foreman_q, aggregated_resources);
+		aggregated_resources->disk.total = local->disk.total;
+		aggregated_resources->disk.inuse = local->disk.inuse; 
+
+	}
+	else
+	{
+		memcpy(aggr, local, sizeof(struct work_queue_resources));
+	}
 }
 
 /* End of resources related tasks */
@@ -1822,7 +1836,6 @@ static void foreman_for_master(struct link *master) {
 
 	time_t idle_stoptime = time(0) + idle_timeout;
 
-	time_t last_disk_measurement = 0;
 	while(!abort_flag) {
 		int result = 1;
 		struct work_queue_task *task = NULL;
@@ -1848,18 +1861,7 @@ static void foreman_for_master(struct link *master) {
 			results_to_be_sent_msg = 1;
 		}
 
-		if(time(0) - last_disk_measurement > foreman_disk_measurement_interval)
-		{
-			work_queue_resources_measure_locally(local_resources, workspace);
-			debug(D_WQ, "Foreman local disk inuse and total: %"PRId64" %"PRId64"\n", aggregated_resources->disk.inuse, aggregated_resources->disk.total);
-
-			last_disk_measurement = time(0);
-		}
-
-		aggregate_workers_resources(foreman_q, aggregated_resources);
-		aggregated_resources->disk.total = local_resources->disk.total; //overwrite with foreman's local disk information
-		aggregated_resources->disk.inuse = local_resources->disk.inuse; 
-
+		resources_measure_all(local_resources, aggregated_resources);
 		send_resource_update(master,0);
 		
 		if(master_active) {
