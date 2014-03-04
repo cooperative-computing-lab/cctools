@@ -2207,8 +2207,8 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 	
 	// If none of the resources used have not been specified...
 	if(t->unlabeled) {
-		// Do not mix labeled and unlabeled
-		if(w->unlabeled_allocated < 0) {
+		// Do not mix labeled and unlabeled at a regular worker
+		if(!w->foreman && w->unlabeled_allocated < 0) {
 			ok = 0;
 		}
 
@@ -2222,8 +2222,8 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 		disk_used = MAX(t->disk,   1);
 		gpus_used = MAX(t->gpus,   0);
 
-		// Do not mix labeled and unlabeled
-		if(w->unlabeled_allocated > 0) {
+		// Do not mix labeled and unlabeled at a regular worker
+		if(!w->foreman && w->unlabeled_allocated > 0) {
 			ok = 0;
 		}
 		else if(w->resources->cores.largest < cores_used || w->cores_to_allocate < cores_used) {
@@ -2379,7 +2379,8 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
 
 	if(t->unlabeled) {
-		w->unlabeled_allocated++;
+		// Do not lose track of unlabeled, even if labeled are running already
+		w->unlabeled_allocated = MAX(w->unlabeled_allocated, 0) + 1;
 		w->unlabeled_to_allocate--;
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabeled resources
@@ -2388,7 +2389,12 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 		w->disk_to_allocate   -= MAX(t->disk,  0);
 		w->gpus_to_allocate   -= MAX(t->gpus,  0);
 
-		w->unlabeled_allocated = -1;
+		// Do not lose track of unlabeled
+		if(w->unlabeled_allocated < 1)
+			w->unlabeled_allocated = -1;
+
+		// Be conservative. Assume that the labeled task committed uses an empty worker.
+		w->unlabeled_to_allocate--;
 	}
 
 	log_worker_stats(q);
