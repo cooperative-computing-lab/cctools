@@ -32,6 +32,8 @@ void work_queue_resources_delete( struct work_queue_resources *r )
 
 void work_queue_resources_measure_locally( struct work_queue_resources *r, const char *disk_path )
 {
+	static int gpu_check = 0;
+
 	UINT64_T avail,total;
 
 	r->cores.total = load_average_get_cpus();
@@ -46,8 +48,12 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 	r->memory.total = avail / (UINT64_T) MEGA;
 	r->memory.largest = r->memory.smallest = r->memory.total;
 
-	r->gpus.total = gpu_info_get();
-	r->gpus.largest = r->gpus.smallest = r->gpus.total;
+	if(!gpu_check)
+	{
+		r->gpus.total = gpu_info_get();
+		r->gpus.largest = r->gpus.smallest = r->gpus.total;
+		gpu_check = 1;
+	}
 	
 	r->workers.total = 1;
 	r->workers.largest = r->workers.smallest = r->workers.total;
