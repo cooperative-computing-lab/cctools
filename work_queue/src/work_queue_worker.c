@@ -212,11 +212,62 @@ static int recv_master_message( struct link *master, char *line, int length, tim
 	return result;
 }
 
+
+/* Resources related tasks */
+
+void resources_measure_locally(struct work_queue_resources *r)
+{
+	work_queue_resources_measure_locally(r,workspace);
+
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		r->cores.total = 0;
+		r->memory.total = 0;
+		r->gpus.total = 0;
+	} else {
+		if(manual_cores_option) 
+			r->cores.total = manual_cores_option;
+		if(manual_memory_option) 
+			r->memory.total = manual_memory_option;
+		if(manual_gpus_option)
+			r->gpus.total = manual_gpus_option;
+	}
+
+	if(manual_disk_option)   
+		r->disk.total = manual_disk_option;
+
+	r->cores.smallest = r->cores.largest = r->cores.total;
+	r->memory.smallest = r->memory.largest = r->memory.total;
+	r->disk.smallest = r->disk.largest = r->disk.total;
+	r->gpus.smallest = r->gpus.largest = r->gpus.total;
+
+	debug(D_WQ,"local resources:");
+	work_queue_resources_debug(r);
+}
+
+void resources_measure_all(struct work_queue_resources *local, struct work_queue_resources *aggr)
+{
+	resources_measure_locally(local);
+
+	if(worker_mode == WORKER_MODE_FOREMAN)
+	{
+		aggregate_workers_resources(foreman_q, aggregated_resources);
+		aggregated_resources->disk.total = local->disk.total;
+		aggregated_resources->disk.inuse = local->disk.inuse; 
+
+	}
+	else
+	{
+		memcpy(aggr, local, sizeof(struct work_queue_resources));
+	}
+}
+
 static void send_resource_update( struct link *master, int force_update )
 {
 	static time_t last_stop_time = 0;
 
 	time_t stoptime = time(0) + active_timeout;
+
+	resources_measure_all(local_resources, aggregated_resources);
 
 	/* send updates at least send_resources_interval seconds apart, and only if resources changed. */
 	int normal_update = 0;
@@ -231,6 +282,8 @@ static void send_resource_update( struct link *master, int force_update )
 		last_stop_time = stoptime;
 	}
 }
+
+/* End of resources related tasks */
 
 static void report_worker_ready( struct link *master )
 {
@@ -353,56 +406,6 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 	
 	return result;
 }
-
-/* Resources related tasks */
-
-void resources_measure_locally(struct work_queue_resources *r)
-{
-	work_queue_resources_measure_locally(r,workspace);
-
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		r->cores.total = 0;
-		r->memory.total = 0;
-		r->gpus.total = 0;
-	} else {
-		if(manual_cores_option) 
-			r->cores.total = manual_cores_option;
-		if(manual_memory_option) 
-			r->memory.total = manual_memory_option;
-		if(manual_gpus_option)
-			r->gpus.total = manual_gpus_option;
-	}
-
-	if(manual_disk_option)   
-		r->disk.total = manual_disk_option;
-
-	r->cores.smallest = r->cores.largest = r->cores.total;
-	r->memory.smallest = r->memory.largest = r->memory.total;
-	r->disk.smallest = r->disk.largest = r->disk.total;
-	r->gpus.smallest = r->gpus.largest = r->gpus.total;
-
-	debug(D_WQ,"local resources:");
-	work_queue_resources_debug(r);
-}
-
-void resources_measure_all(struct work_queue_resources *local, struct work_queue_resources *aggr)
-{
-	resources_measure_locally(local);
-
-	if(worker_mode == WORKER_MODE_FOREMAN)
-	{
-		aggregate_workers_resources(foreman_q, aggregated_resources);
-		aggregated_resources->disk.total = local->disk.total;
-		aggregated_resources->disk.inuse = local->disk.inuse; 
-
-	}
-	else
-	{
-		memcpy(aggr, local, sizeof(struct work_queue_resources));
-	}
-}
-
-/* End of resources related tasks */
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
@@ -1781,7 +1784,6 @@ static void work_for_master(struct link *master) {
 			break;
 		}
 		
-		resources_measure_locally(local_resources);
 		send_resource_update(master,0);
 		
 		int ok = 1;
@@ -1861,7 +1863,6 @@ static void foreman_for_master(struct link *master) {
 			results_to_be_sent_msg = 1;
 		}
 
-		resources_measure_all(local_resources, aggregated_resources);
 		send_resource_update(master,0);
 		
 		if(master_active) {
