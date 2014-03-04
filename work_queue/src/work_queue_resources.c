@@ -22,6 +22,7 @@ struct work_queue_resources * work_queue_resources_create()
 {
 	struct work_queue_resources *r = malloc(sizeof(*r));
 	memset(r,0,sizeof(*r));
+	r->tag = -1;
 	return r;
 }
 
@@ -83,6 +84,9 @@ void work_queue_resources_send( struct link *master, struct work_queue_resources
 	work_queue_resource_send(master, &r->gpus,    "gpus",   stoptime);
 	work_queue_resource_send(master, &r->unlabeled,"unlabeled",stoptime);
 	work_queue_resource_send(master, &r->cores,   "cores",  stoptime);
+
+	//Send the tag last. Once the tag is received, the master can decide to update *_to_allocate.
+	link_putfstring(master, "resource tag %"PRId64"\n", stoptime, r->tag);
 }
 
 void work_queue_resources_debug( struct work_queue_resources *r )

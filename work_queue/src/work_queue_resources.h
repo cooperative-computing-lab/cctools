@@ -19,6 +19,8 @@ struct work_queue_resource {
 };
 
 struct work_queue_resources {
+	int64_t tag;                       // Identifies this resources snapshot. 
+	                                   // Now we use it with the last tag received by the worker.
 	struct work_queue_resource workers;
 	struct work_queue_resource disk;
 	struct work_queue_resource cores;

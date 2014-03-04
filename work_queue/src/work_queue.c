@@ -1605,9 +1605,19 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 {
 	char category[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
-	
-	if(sscanf(line, "resource %s %"PRId64 "%"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.total,&r.smallest,&r.largest,&r.committed)==6) {
 
+	int n = sscanf(line, "resource %s %"PRId64 "%"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.total,&r.smallest,&r.largest,&r.committed);
+
+	if(n == 1 && !strcmp(category, "tag"))
+	{
+		/* Hack, we use r.inuse to receive the tag. */
+		//if(sync from worker) {
+
+
+		//}
+	}
+	else if(n == 6)
+	{
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
 			w->cores_to_allocate     = get_worker_overcommit_cores(q, w)     - w->resources->cores.committed;
@@ -1624,14 +1634,6 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 			w->resources->workers = r;
 			w->unlabeled_to_allocate = get_worker_overcommit_unlabeled(q, w) - w->resources->workers.committed; // Incorrect, needs to sync available workers and unlabeled committed.
 		}
-		
-		/* Warning! updates are asynchronous now! Ideally: */
-		//if(sync from worker) {
-		
-
-		//}
-
-
 	}
 
 	return 0;
