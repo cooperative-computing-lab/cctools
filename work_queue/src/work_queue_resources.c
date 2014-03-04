@@ -81,6 +81,7 @@ void work_queue_resources_send( struct link *master, struct work_queue_resources
 	work_queue_resource_send(master, &r->disk,    "disk",   stoptime);
 	work_queue_resource_send(master, &r->memory,  "memory", stoptime);
 	work_queue_resource_send(master, &r->gpus,    "gpus",   stoptime);
+	work_queue_resource_send(master, &r->unlabeled,"unlabeled",stoptime);
 	work_queue_resource_send(master, &r->cores,   "cores",  stoptime);
 }
 
@@ -90,6 +91,7 @@ void work_queue_resources_debug( struct work_queue_resources *r )
 	work_queue_resource_debug(&r->disk,    "disk");
 	work_queue_resource_debug(&r->memory,  "memory");
 	work_queue_resource_debug(&r->gpus,    "gpus");
+	work_queue_resource_debug(&r->unlabeled,"unlabeled");
 	work_queue_resource_debug(&r->cores,   "cores");
 }
 
@@ -117,6 +119,7 @@ void work_queue_resources_add( struct work_queue_resources *total, struct work_q
 	work_queue_resource_add(&total->memory,  &r->memory,  max_out);
 	work_queue_resource_add(&total->disk,    &r->disk,    max_out);
 	work_queue_resource_add(&total->gpus,    &r->gpus,    max_out);
+	work_queue_resource_add(&total->unlabeled,&r->unlabeled,max_out);
 	work_queue_resource_add(&total->cores,   &r->cores,   max_out);
 }
 
@@ -131,22 +134,25 @@ void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct 
 	nvpair_insert_integer(nv, "cores_total",     r->cores.total);
 	nvpair_insert_integer(nv, "cores_smallest",  r->cores.smallest);
 	nvpair_insert_integer(nv, "cores_largest",   r->cores.largest);
-	nvpair_insert_integer(nv, "cores_committed",   r->cores.committed);
+	nvpair_insert_integer(nv, "cores_committed", r->cores.committed);
 	nvpair_insert_integer(nv, "memory_inuse",    r->memory.inuse);
 	nvpair_insert_integer(nv, "memory_total",    r->memory.total);
 	nvpair_insert_integer(nv, "memory_smallest", r->memory.smallest);
 	nvpair_insert_integer(nv, "memory_largest",  r->memory.largest);
-	nvpair_insert_integer(nv, "memory_committed",  r->memory.committed);
+	nvpair_insert_integer(nv, "memory_committed",r->memory.committed);
 	nvpair_insert_integer(nv, "disk_inuse",      r->disk.inuse);
 	nvpair_insert_integer(nv, "disk_total",      r->disk.total);
 	nvpair_insert_integer(nv, "disk_smallest",   r->disk.smallest);
 	nvpair_insert_integer(nv, "disk_largest",    r->disk.largest);
-	nvpair_insert_integer(nv, "disk_committed",    r->disk.committed);
+	nvpair_insert_integer(nv, "disk_committed",  r->disk.committed);
 	nvpair_insert_integer(nv, "gpus_inuse",      r->gpus.inuse);
 	nvpair_insert_integer(nv, "gpus_total",      r->gpus.total);
 	nvpair_insert_integer(nv, "gpus_smallest",   r->gpus.smallest);
 	nvpair_insert_integer(nv, "gpus_largest",    r->gpus.largest);
-	nvpair_insert_integer(nv, "gpus_committed",    r->gpus.committed);
+	nvpair_insert_integer(nv, "gpus_committed",  r->gpus.committed);
+	/* Note unlabeled.total, smallest and largest do not make much sense. */
+	nvpair_insert_integer(nv, "unlabeled_inuse", r->unlabeled.inuse);
+	nvpair_insert_integer(nv, "unlabeled_committed",r->unlabeled.committed);
 }
 
 

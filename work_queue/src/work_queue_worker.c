@@ -155,7 +155,7 @@ static int64_t manual_disk_option = 0;
 static int64_t manual_memory_option = 0;
 static int64_t manual_gpus_option = 0;
 
-static int64_t unlabeled_allocated = 0;
+static int64_t unlabeled_committed = 0;
 
 // do not send consecutive resource updates in less than this many seconds
 static int send_resources_interval = 5;
@@ -212,6 +212,7 @@ static int recv_master_message( struct link *master, char *line, int length, tim
 
 void reset_inuse_resources(struct work_queue_resources *r)
 {
+	r->unlabeled.inuse = 0;
 	r->workers.inuse = 0;
 	r->cores.inuse = 0;
 	r->memory.inuse = 0;
@@ -221,6 +222,7 @@ void reset_inuse_resources(struct work_queue_resources *r)
 
 void reset_committed_resources(struct work_queue_resources *r)
 {
+	r->unlabeled.committed = 0;
 	r->workers.committed = 0;
 	r->cores.committed = 0;
 	r->memory.committed = 0;
@@ -237,7 +239,7 @@ void account_task_locally_inuse_resources(struct work_queue_resources *r, struct
 		r->disk.inuse    += r->disk.total;
 		r->memory.inuse  += r->memory.total;
 		r->gpus.inuse    += r->gpus.total;
-		r->workers.inuse += r->workers.total;
+		r->unlabeled.inuse++;
 	}
 	else
 	{
@@ -273,7 +275,7 @@ void account_task_locally_committed_resources(struct work_queue_resources *r, st
 		r->disk.committed    += r->disk.total;
 		r->memory.committed  += r->memory.total;
 		r->gpus.committed    += r->gpus.total;
-		r->workers.committed += r->workers.total;
+		r->unlabeled.committed++;                     //bug, assumes r is local_resources
 	}
 	else
 	{
@@ -575,11 +577,6 @@ static int start_task(struct work_queue_task *t) {
 		}
 
 		ti->status = 0;
-
-		if(t->unlabeled)
-		{
-			unlabeled_allocated++;
-		}
 
 		itable_insert(stored_tasks, t->taskid, ti);
 		itable_insert(active_tasks, ti->pid, ti);
@@ -1536,7 +1533,6 @@ static void kill_all_tasks() {
 	}
 	itable_clear(stored_tasks);
 
-	unlabeled_allocated = 0;
 	reset_inuse_resources(local_resources);
 	reset_committed_resources(local_resources);
 }
@@ -1551,10 +1547,6 @@ static int do_kill(int taskid) {
 		struct work_queue_task *t;
 		t = work_queue_cancel_by_taskid(foreman_q, taskid);
 		if(t) {
-			if(t->unlabeled)
-			{
-				unlabeled_allocated--;
-			}
 			work_queue_task_delete(t);
 		}
 
@@ -1576,14 +1568,6 @@ static int do_kill(int taskid) {
 		}
 		sprintf(dirname, "t.%d", taskid);
 		delete_dir(dirname);
-	}
-
-	if(ti)
-	{
-		if(ti->task->unlabeled)
-		{
-			unlabeled_allocated--;
-		}
 	}
 
 	// Force measure the new committed.
@@ -1813,7 +1797,7 @@ static int check_for_resources(struct work_queue_task *t) {
 	// If resources used have not been specified, treat the task as consuming an entire real worker
 	if(t->unlabeled) {
 		// Do not mix labeled and unlabeled in a regular worker
-		if(unlabeled_allocated > 0) {
+		if(unlabeled_committed > 0) {
 			if(r->cores.inuse > 0 || r->memory.inuse > 0 || r->disk.inuse > 0 || r->gpus.inuse > 0) {
 				ok = 0;
 			}
@@ -1831,7 +1815,7 @@ static int check_for_resources(struct work_queue_task *t) {
 		gpus_used  = MAX(t->gpus, 0);
 
 		// Do not mix labeled and unlabeled in a regular worker
-		if(unlabeled_allocated > 0) {
+		if(unlabeled_committed > 0) {
 			ok = 0;
 		}
 	

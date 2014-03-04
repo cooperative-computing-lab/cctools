@@ -1622,7 +1622,7 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 			w->gpus_to_allocate      = get_worker_overcommit_gpus(q, w)      - w->resources->gpus.committed;
 		} else if(!strcmp(category,"workers")) {
 			w->resources->workers = r;
-			w->unlabeled_to_allocate = get_worker_overcommit_unlabeled(q, w) - w->resources->workers.committed;
+			w->unlabeled_to_allocate = get_worker_overcommit_unlabeled(q, w) - w->resources->workers.committed; // Incorrect, needs to sync available workers and unlabeled committed.
 		}
 		
 		/* Warning! updates are asynchronous now! Ideally: */
