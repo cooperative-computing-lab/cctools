@@ -31,7 +31,7 @@ void work_queue_resources_debug( struct work_queue_resources *r );
 void work_queue_resources_measure_locally( struct work_queue_resources *r, const char *workspace );
 void work_queue_resources_send( struct link *master, struct work_queue_resources *r, time_t stoptime );
 void work_queue_resources_clear( struct work_queue_resources *r );
-void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r );
+void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r, int ma_out );
 void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct nvpair *nv );
 
 #endif

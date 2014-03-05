@@ -137,8 +137,14 @@ struct work_queue {
 	timestamp_t total_idle_time;	// sum of time spent waiting for workers
 	timestamp_t total_app_time;	// sum of time spend above work_queue_wait
 
-	double asynchrony_multiplier;
-	int asynchrony_modifier;
+	int cores_over;
+
+	int unlabeled_over;
+
+	double memory_over_factor;
+	double disk_over_factor;
+	double cores_over_factor;
+	double gpus_over_factor;
 
 	int minimum_transfer_timeout;
 	int foreman_transfer_timeout;
@@ -170,6 +176,7 @@ struct work_queue_worker {
 	char hashkey[WORKER_HASHKEY_MAX];
 	int  foreman;                             // 0 if regular worker, 1 if foreman
 	struct work_queue_resources *resources;
+	int64_t unlabeled_allocated;
 	int64_t cores_allocated;
 	int64_t memory_allocated;
 	int64_t disk_allocated;
@@ -199,6 +206,9 @@ static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w
 static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
+static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
+static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
+
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static void process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count);
@@ -211,12 +221,41 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 /********** work_queue internal functions *************/
 /******************************************************/
 
-static int64_t get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
-	if(w->resources->cores.total)
-		return w->resources->cores.total * q->asynchrony_multiplier + q->asynchrony_modifier;
+static int64_t get_worker_overcommit_unlabeled(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->workers.total)
+		return w->resources->workers.total + q->unlabeled_over;
 	else
 		return 0;
 }
+
+static int64_t get_worker_overcommit_cores(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->cores.total)
+		return ceil(w->resources->cores.total * (1.0 + q->cores_over_factor)) + q->cores_over;
+	else
+		return 0;
+}
+
+static int64_t get_worker_overcommit_gpus(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->gpus.total)
+		return ceil(w->resources->gpus.total * (1.0 + q->gpus_over_factor));
+	else
+		return 0;
+}
+
+static int64_t get_worker_overcommit_memory(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->memory.total)
+		return ceil(w->resources->memory.total * (1.0 + q->memory_over_factor));
+	else
+		return 0;
+}
+
+static int64_t get_worker_overcommit_disk(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->disk.total)
+		return ceil(w->resources->disk.total * (1.0 + q->disk_over_factor));
+	else
+		return 0;
+}
+
 
 //Returns count of workers that have identified themselves.
 static int known_workers(struct work_queue *q) {
@@ -242,11 +281,37 @@ static int available_workers(struct work_queue *q) {
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
-		if(strcmp(w->hostname, "unknown")){
-			if(get_worker_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
-				available_workers++;
-			}
-		}	
+
+		if(!strcmp(w->hostname, "unknown"))
+			continue;
+
+		if(w->unlabeled_allocated > 0)
+		{
+			if(!w->foreman)
+				continue;
+
+			int r;
+			r = get_worker_overcommit_unlabeled(q, w);
+			if(r <= w->unlabeled_allocated)
+				continue;
+		}
+		else
+		{
+			int r;
+			r = get_worker_overcommit_cores(q, w);
+			if(r < 1 || r <= w->cores_allocated)
+				continue;
+			r = get_worker_overcommit_memory(q, w);
+			if(r < 1 || r <= w->memory_allocated)
+				continue;
+			r = get_worker_overcommit_disk(q, w);
+			if(r < 1 || r <= w->disk_allocated)
+				continue;
+
+			/* Note we do not check for gpus, as they are optional.*/
+		}
+		//worker survived all checks
+		available_workers++;
 	}
 	
 	return available_workers;
@@ -535,13 +600,11 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 			free(t->output);
 		}
 		t->output = 0;
-		if(t->unlabeled) {
-			t->cores = t->memory = t->disk = t->gpus = -1;
-		}
 		list_push_head(q->ready_list, t);
-		itable_remove(q->running_tasks, t->taskid);
+
+		reap_task_from_worker(q, w, t);
+
 		itable_remove(q->finished_tasks, t->taskid);
-		itable_remove(q->worker_task_map, t->taskid);
 	}
 	itable_clear(w->current_tasks);
 	w->finished_tasks = 0;
@@ -1018,10 +1081,11 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	delete_uncacheable_files(q,w,t);
 
 	// At this point, a task is completed.
-	itable_remove(w->current_tasks, taskid);
+	reap_task_from_worker(q, w, t);
+
 	itable_remove(q->finished_tasks, t->taskid);
 	list_push_head(q->complete_list, t);
-	itable_remove(q->worker_task_map, t->taskid);
+
 	w->finished_tasks--;
 	t->time_task_finish = timestamp_get();
 
@@ -1061,11 +1125,11 @@ the task as complete so it is returned to the application.
 */
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
+	reap_task_from_worker(q, w, t);
+
 	//remove the task from tables that track dispatched tasks. 
-	itable_remove(q->running_tasks, t->taskid); 
 	itable_remove(q->finished_tasks, t->taskid); 
-	itable_remove(q->worker_task_map, t->taskid);
-	itable_remove(w->current_tasks, t->taskid);
+
 	
 	//add the task to complete list so it is given back to the application.
 	list_push_head(q->complete_list, t);
@@ -1252,21 +1316,11 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
 	q->total_execute_time += t->cmd_execution_time;
+
 	itable_remove(q->running_tasks, taskid);
 	itable_insert(q->finished_tasks, taskid, (void*)t);
 
-	w->cores_allocated -= t->cores;
-	w->memory_allocated -= t->memory;
-	w->disk_allocated -= t->disk;
-	w->gpus_allocated -= t->gpus;
-
-	if(t->unlabeled) {
-		t->cores = t->memory = t->disk = t->gpus = -1;
-	}
-
 	w->finished_tasks++;
-
-	log_worker_stats(q);
 
 	return SUCCESS;
 }
@@ -2139,36 +2193,43 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
 	
-	// If none of the resources used have not been specified, treat the task as consuming an entire "average" worker
-	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-		cores_used = MAX((double)w->resources->cores.total/(double)w->resources->workers.total, 1);
-		mem_used = MAX((double)w->resources->memory.total/(double)w->resources->workers.total, 0);
-		disk_used = MAX((double)w->resources->disk.total/(double)w->resources->workers.total, 0);
-		gpus_used = MAX((double)w->resources->gpus.total/(double)w->resources->workers.total, 0);
+	// If none of the resources used have not been specified...
+	if(t->unlabeled) {
+		// Do not mix labeled and unlabeled
+		if(w->unlabeled_allocated > 0) {
+			if(w->cores_allocated > 0 || w->memory_allocated > 0 || w->disk_allocated > 0 || w->gpus_allocated > 0) {
+				ok = 0;
+			}
+		}
+
+		if(w->unlabeled_allocated + 1 > get_worker_overcommit_unlabeled(q, w)) {
+			ok = 0;
+		}
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 		cores_used = MAX(t->cores, 0);
 		mem_used = MAX(t->memory, 0);
 		disk_used = MAX(t->disk, 0);
 		gpus_used = MAX(t->gpus, 0);
-	}
-	
-	if(w->cores_allocated + cores_used > get_worker_cores(q, w)) {
-		ok = 0;
-	}
-	
-	if(w->memory_allocated + mem_used > w->resources->memory.total) {
-		ok = 0;
-	}
-	
-	if(w->disk_allocated + disk_used > w->resources->disk.total) {
-		ok = 0;
+
+		// Do not mix labeled and unlabeled
+		if(w->unlabeled_allocated > 0) {
+			ok = 0;
+		}
+		else if(w->resources->cores.largest < cores_used || w->cores_allocated + cores_used > get_worker_overcommit_cores(q, w)) {
+			ok = 0;
+		}
+		else if(w->resources->memory.largest < mem_used || w->memory_allocated + mem_used > get_worker_overcommit_memory(q, w)) {
+			ok = 0;
+		}
+		else if(w->resources->disk.largest < disk_used || w->disk_allocated + disk_used > get_worker_overcommit_disk(q, w)) {
+			ok = 0;
+		}
+		else if(w->resources->gpus.largest < gpus_used || w->gpus_allocated + gpus_used > get_worker_overcommit_gpus(q, w)) {
+			ok = 0;
+		}
 	}
 
-	if(w->gpus_allocated + gpus_used > w->resources->gpus.total) {
-		ok = 0;
-	}
-	
 	return ok;
 }
 
@@ -2301,38 +2362,75 @@ static struct work_queue_worker *find_best_worker(struct work_queue *q, struct w
 	}
 }
 
+static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
+{
+	itable_insert(w->current_tasks, t->taskid, t);
+	itable_insert(q->running_tasks, t->taskid, t); 
+	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
+
+	if(t->unlabeled) {
+		w->unlabeled_allocated++;
+	} else {
+		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabeled resources
+		w->cores_allocated  += MAX(t->cores, 0);
+		w->memory_allocated += MAX(t->memory,0);
+		w->disk_allocated   += MAX(t->disk,  0);
+		w->gpus_allocated   += MAX(t->gpus,  0);
+	}
+
+	log_worker_stats(q);
+}
+
+static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
+{
+	struct work_queue_worker *wr = itable_lookup(q->worker_task_map, t->taskid);
+
+	if(wr != w)
+	{
+		debug(D_WQ, "Cannot reap task %d from worker. It is not being run by %s (%s)\n", t->taskid, w->hostname, w->addrport);
+	}
+
+	//update tables.
+	itable_remove(w->current_tasks, t->taskid);
+	itable_remove(q->running_tasks, t->taskid); 
+	itable_remove(q->worker_task_map, t->taskid);
+	
+	if(t->unlabeled)
+	{
+		w->unlabeled_allocated--;
+
+	}
+	else
+	{
+		w->cores_allocated  -= MAX(t->cores, 0);
+		w->memory_allocated -= MAX(t->memory,0);
+		w->disk_allocated   -= MAX(t->disk,  0);
+		w->gpus_allocated   -= MAX(t->gpus,  0);
+	}
+
+	if(w->unlabeled_allocated < 0 || w->cores_allocated < 0 || w->memory_allocated < 0 || w->disk_allocated < 0 || w->gpus_allocated < 0)
+	{
+		w->unlabeled_allocated = MAX(w->unlabeled_allocated,0);
+		w->cores_allocated     = MAX(w->cores_allocated,0);
+		w->memory_allocated    = MAX(w->memory_allocated,0);
+		w->disk_allocated      = MAX(w->disk_allocated,0);
+		w->gpus_allocated      = MAX(w->gpus_allocated,0);
+
+		debug(D_WQ, "Worker resource accounting error! Task: %d. Worker: %s (%s) Reseting to zero.\n", t->taskid, w->hostname, w->addrport);
+	}
+
+	log_worker_stats(q);
+}
+
 static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	struct work_queue_task *t = list_pop_head(q->ready_list);
 	if(!t)
 		return;
 
-	itable_insert(w->current_tasks, t->taskid, t);
-	itable_insert(q->running_tasks, t->taskid, t); 
-	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
-
 	int result = start_one_task(q, w, t);
 	if(result == SUCCESS) {
-		//If everything is unspecified, set it to the value of an "average" worker.
-		if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-			t->cores = MAX((double)w->resources->cores.total/(double)w->resources->workers.total, 1);
-			t->memory = MAX((double)w->resources->memory.total/(double)w->resources->workers.total, 0);
-			t->disk = MAX((double)w->resources->disk.total/(double)w->resources->workers.total, 0);
-			t->gpus = MAX((double)w->resources->gpus.total/(double)w->resources->workers.total, 0);
-		} else {
-			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
-			t->cores = MAX(t->cores, 0);
-			t->memory = MAX(t->memory, 0);
-			t->disk = MAX(t->disk, 0);
-			t->gpus = MAX(t->gpus, 0);
-		}
-		
-		w->cores_allocated += t->cores;
-		w->memory_allocated += t->memory;
-		w->disk_allocated += t->disk;
-		w->gpus_allocated += t->gpus;
-		
-		log_worker_stats(q);
+		commit_task_to_worker(q, w, t);
 	} else {
 		debug(D_WQ, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
@@ -2471,11 +2569,6 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 	if (w) {
 		//send message to worker asking to kill its task.
 		send_worker_msg(q,w, "kill %d\n",t->taskid);
-		//update table.
-		itable_remove(q->running_tasks, t->taskid);
-		itable_remove(q->finished_tasks, t->taskid);
-		itable_remove(q->worker_task_map, t->taskid);
-
 		debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 			
 		//Delete any input files that are not to be cached.
@@ -2483,18 +2576,11 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 
 		//Delete all output files since they are not needed as the task was aborted.
 		delete_worker_files(q, w, t, t->output_files, 0);
-		
-		w->cores_allocated -= t->cores;
-		w->memory_allocated -= t->memory;
-		w->disk_allocated -= t->disk;
-		w->gpus_allocated -= t->gpus;
-		
-		if(t->unlabeled) {
-			t->cores = t->memory = t->disk = t->gpus = -1;
-		}
 
-		log_worker_stats(q);
-		itable_remove(w->current_tasks, t->taskid);
+		//update tables.
+		reap_task_from_worker(q, w, t);
+
+		itable_remove(q->finished_tasks, t->taskid);
 
 		return 1;
 	}
@@ -2563,11 +2649,12 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 
-	t->memory = -1;
-	t->disk = -1;
-	t->cores = -1;
-	t->gpus = -1;
 	t->unlabeled = 1;
+	t->cores   = -1;
+	t->memory  = -1;
+	t->disk    = -1;
+	t->gpus    = -1;
+
 
 	return t;
 }
@@ -2578,28 +2665,73 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
+
+static void set_task_unlabel_flag( struct work_queue_task *t )
+{
+	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0)
+	{
+		t->unlabeled = 1;
+	}
+}
+
 void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory )
 {
-	t->memory = memory;
-	t->unlabeled = 0;
+	if(memory < 0)
+	{
+		t->memory = -1;
+	}
+	else
+	{
+		t->memory = memory;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk )
 {
-	t->disk = disk;
-	t->unlabeled = 0;
+	if(disk < 0)
+	{
+		t->disk = -1;
+	}
+	else
+	{
+		t->disk = disk;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
 {
-	t->cores = cores;
-	t->unlabeled = 0;
+	if(cores < 0)
+	{
+		t->cores = -1;
+	}
+	else
+	{
+		t->cores = cores;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
 {
-	t->gpus = gpus;
-	t->unlabeled = 0;
+	if(gpus < 0)
+	{
+		t->gpus = -1;
+	}
+	else
+	{
+		t->gpus = gpus;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
@@ -3157,8 +3289,15 @@ struct work_queue *work_queue_create(int port)
 	q->monitor_mode   =  0;
 	q->password = 0;
 	
-	q->asynchrony_multiplier = 1.0;
-	q->asynchrony_modifier = 0;
+	q->cores_over_factor = 0.0;
+	q->cores_over = 0;
+
+	q->unlabeled_over = 0;
+
+	q->cores_over_factor = 0.0;
+	q->memory_over_factor = 0.0;
+	q->disk_over_factor  = 0.0;
+	q->gpus_over_factor = 0.0;
 
 	q->minimum_transfer_timeout = 10;
 	q->foreman_transfer_timeout = 3600;
@@ -3431,6 +3570,10 @@ static void print_password_warning( struct work_queue *q )
 
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 {
+	debug(D_WQ, "workers status -- total: %d, active: %d, available: %d.",
+		hash_table_size(q->worker_table),
+		known_workers(q),
+		available_workers(q));
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
@@ -3795,11 +3938,20 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 int work_queue_tune(struct work_queue *q, const char *name, double value)
 {
 	
-	if(!strcmp(name, "asynchrony-multiplier")) {
-		q->asynchrony_multiplier = MAX(value, 1.0);
+	if(!strcmp(name, "cores-over-factor")) {
+		q->cores_over_factor = MAX(value, 0.0);
 		
-	} else if(!strcmp(name, "asynchrony-modifier")) {
-		q->asynchrony_modifier = MAX(value, 0);
+	} else if(!strcmp(name, "cores-over")) {
+		q->cores_over = MAX(value, 0);
+		
+	} else if(!strcmp(name, "memory-over")) {
+		q->memory_over_factor = MAX(value, 0);
+		
+	} else if(!strcmp(name, "disk-over")) {
+		q->disk_over_factor = MAX(value, 0);
+		
+	} else if(!strcmp(name, "gpus-over")) {
+		q->gpus_over_factor = MAX(value, 0);
 		
 	} else if(!strcmp(name, "min-transfer-timeout")) {
 		q->minimum_transfer_timeout = (int)value;
@@ -3926,21 +4078,25 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 {
 	struct work_queue_worker *w;
 	char *key;
-	int first = 1;
+
+	memset(total,0,sizeof(*total));
 
 	if(hash_table_size(q->worker_table)==0) {
-		memset(total,0,sizeof(*total));
 		return;
 	}
 
 	hash_table_firstkey(q->worker_table);
+	hash_table_nextkey(q->worker_table,&key,(void**)&w);
+
+	total->cores.smallest  = w->resources->cores.smallest; /*avoid smallest being zero*/
+	total->disk.smallest   = w->resources->disk.smallest;
+	total->memory.smallest = w->resources->memory.smallest;
+	total->gpus.smallest   = w->resources->gpus.smallest;
+
+	work_queue_resources_add(total,w->resources, !w->foreman && w->unlabeled_allocated /*max out*/);
+
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		if(first) {
-			*total = *w->resources;
-			first = 0;
-		} else {
-			work_queue_resources_add(total,w->resources);
-		}
+			work_queue_resources_add(total,w->resources, !w->foreman && w->unlabeled_allocated /*max out*/);
 	}
 }
 

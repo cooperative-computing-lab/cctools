@@ -95,21 +95,25 @@ void work_queue_resources_clear( struct work_queue_resources *r )
 	memset(r,0,sizeof(*r));
 }
 
-static void work_queue_resource_add( struct work_queue_resource *total, struct work_queue_resource *r )
+static void work_queue_resource_add( struct work_queue_resource *total, struct work_queue_resource *r, int max_out )
 {
-	total->inuse += r->inuse;
+	if(max_out)
+	{
+		total->inuse += max_out ? r->total : r->inuse;
+	}
+
 	total->total += r->total;
 	total->smallest = MIN(total->smallest,r->smallest);
 	total->largest = MAX(total->smallest,r->largest);
 }
 
-void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r )
+void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r, int max_out )
 {
-	work_queue_resource_add(&total->workers, &r->workers);
-	work_queue_resource_add(&total->memory,  &r->memory);
-	work_queue_resource_add(&total->disk,    &r->disk);
-	work_queue_resource_add(&total->gpus,    &r->gpus);
-	work_queue_resource_add(&total->cores,   &r->cores);
+	work_queue_resource_add(&total->workers, &r->workers, max_out);
+	work_queue_resource_add(&total->memory,  &r->memory,  max_out);
+	work_queue_resource_add(&total->disk,    &r->disk,    max_out);
+	work_queue_resource_add(&total->gpus,    &r->gpus,    max_out);
+	work_queue_resource_add(&total->cores,   &r->cores,   max_out);
 }
 
 void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct nvpair *nv )
