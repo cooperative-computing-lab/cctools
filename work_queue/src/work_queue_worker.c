@@ -152,6 +152,7 @@ static char *base_debug_filename = NULL;
 // Local resource controls
 static struct work_queue_resources * aggregated_resources = 0;
 static struct work_queue_resources * aggregated_resources_last = 0;
+static int64_t last_task_received  = -1;
 static int64_t manual_cores_option = 1;
 static int64_t manual_disk_option = 0;
 static int64_t manual_memory_option = 0;
@@ -226,6 +227,8 @@ static void send_resource_update( struct link *master, int force_update )
 	{
 		normal_update = 1;
 	}
+
+	aggregated_resources->tag = last_task_received;
 
 	if(force_update || normal_update) {
 		work_queue_resources_send(master,aggregated_resources,stoptime);
@@ -1062,6 +1065,8 @@ static int do_task( struct link *master, int taskid )
 			return 0;
 		}
 	}
+
+	last_task_received = task->taskid;
 
 	// If this is a foreman, just send the task structure along.
 	// If it is a local worker, create a task_info, start the task, and discard the temporary work_queue_task.
@@ -2337,6 +2342,8 @@ int main(int argc, char *argv[])
 		if((master = connect_master(time(0) + idle_timeout)) == NULL) {
 			break;
 		}
+
+		last_task_received  = -1;               //Reset last task received flag.
 
 		if(worker_mode == WORKER_MODE_FOREMAN) {
 			foreman_for_master(master);
