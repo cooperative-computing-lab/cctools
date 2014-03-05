@@ -63,6 +63,7 @@ struct reduction {
 	int dirty;
 	int removed;
 	int is_number;
+	int end;
 
 	struct reducer *reduce;
 };
@@ -135,10 +136,13 @@ char *reduction_str(struct reduction *r, reduction2_t type){
 
 void reduction_init(struct reduction *r, char *value)
 {
+	float val;
+
 	//if (is_number(value) && r->str==NULL){
-	if (is_number(value)){
-		char* end;
-		double val = strtod(value, &end);
+	//if (is_number(value)){
+	if (sscanf(value,"%f",&val)==1){
+		//char* end;
+		//double val = strtod(value, &end);
 		r->cnt = 1;
 		r->sum = r->first = r->last = r->min = r->avg = r->max = r->pavg = val;
 		r->inc = 0;
@@ -154,10 +158,12 @@ void reduction_init(struct reduction *r, char *value)
 };
 void reduction_update(struct reduction *r, char *value)
 {
+	float val;
 	//if (is_number(value) && r->str==NULL){
-	if (is_number(value) && r->is_number){
-		char* end;
-		double val = strtod(value, &end);
+	//if (is_number(value) && r->is_number){
+	if (sscanf(value,"%f",&val)==1 && r->is_number){
+		//char* end;
+		//float val = strtod(value, &end);
 		r->cnt += 1;
 		r->sum += val;
 		r->last = val;
@@ -175,6 +181,12 @@ void reduction_update(struct reduction *r, char *value)
 		r->is_number = 0;
 	}
 	r->dirty = 1;
+	r->removed = 0;
+};
+void reduction_end(struct reduction *r)
+{
+	r->inc = r->sum = r->min = r->avg = r->max = r->pavg = r->cnt = 0;
+	r->dirty = 0;
 	r->removed = 0;
 };
 
@@ -426,13 +438,13 @@ static int log_play( struct deltadb *db  )
 									printf("R %s %s\n",keyp,namep);
 									red = hash_table_remove(s->pairs,namep);
 									reduction_delete(red);
-								} else if (red->dirty || s->new==1){
+								} else {//if (red->dirty || s->new==1){
 									char prefix[NVPAIR_LINE_MAX];
 									if (s->new==1)
 										prefix[0] = '\0';
 									else sprintf(prefix,"U %s ",keyp);
 									if (!red->is_number){
-										printf("%s%s %p\n",prefix,namep,red->str);
+										printf("%s%s %s\n",prefix,namep,red->str);
 										reduction_init(red,red->str);
 									} else {
 
@@ -451,8 +463,7 @@ static int log_play( struct deltadb *db  )
 										} else printf("%s%s %s\n",prefix,namep,reduction_str(red,LAST));
 
 										
-										sprintf(value,"%f",red->last);
-										reduction_init(red,value);
+										reduction_end(red);
 									}
 								}
 							}

@@ -108,8 +108,17 @@ static int checkpoint_read( struct deltadb *db )
 		int num_pairs = nvpair_parse_stream(nv,file);
 		if(num_pairs>0) {
 			const char *key = nvpair_lookup_string(nv,"key");
-			if(key) {
-				
+			if(!key){
+				const char *addr = nvpair_lookup_string(nv,"address");
+				const char *port = nvpair_lookup_string(nv,"port");
+				const char *name = nvpair_lookup_string(nv,"name");
+				char str[NVPAIR_LINE_MAX];
+				if (addr && port && name){
+					key = str;
+					sprintf(str,"%s:%s:%s",addr,port,name);
+				}
+			}
+			if (key){
 				struct argument *arg = db->args;
 				int keep = 0;
 				while (arg!=NULL){
@@ -126,7 +135,9 @@ static int checkpoint_read( struct deltadb *db )
 					hash_table_remove(db->table,key);
 					hash_table_insert(db->table,key,key);
 				}
-			} else debug(D_NOTICE,"no key in object create.");
+			} else {
+				debug(D_NOTICE,"no key in object create.");
+			}
 		} else if (num_pairs == -1) {
 			return 1;
 		} else {
