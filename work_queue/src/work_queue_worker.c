@@ -434,7 +434,7 @@ static int start_task(struct work_queue_task *t) {
 			t->disk = MAX((double)aggregated_resources->disk.total/(double)aggregated_resources->workers.total, 0);
 			t->gpus = MAX((double)aggregated_resources->gpus.total/(double)aggregated_resources->workers.total, 0);
 		} else {
-			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
+			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabeled resources
 			t->cores = MAX(t->cores, 0);
 			t->memory = MAX(t->memory, 0);
 			t->disk = MAX(t->disk, 0);
