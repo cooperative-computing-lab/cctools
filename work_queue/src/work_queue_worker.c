@@ -227,13 +227,13 @@ void resources_measure_locally(struct work_queue_resources *r)
 		if(manual_cores_option) 
 			r->cores.total = manual_cores_option;
 		if(manual_memory_option) 
-			r->memory.total = manual_memory_option;
+			r->memory.total = MIN(r->memory.total, manual_memory_option);
 		if(manual_gpus_option)
 			r->gpus.total = manual_gpus_option;
 	}
 
 	if(manual_disk_option)   
-		r->disk.total = manual_disk_option;
+		r->disk.total = MIN(r->disk.total, manual_disk_option);
 
 	r->cores.smallest = r->cores.largest = r->cores.total;
 	r->memory.smallest = r->memory.largest = r->memory.total;
