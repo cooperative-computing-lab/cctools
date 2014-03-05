@@ -19,6 +19,7 @@ struct work_queue_resource {
 };
 
 struct work_queue_resources {
+	int64_t tag;                       // Identifies the resource snapshot. 
 	struct work_queue_resource workers;
 	struct work_queue_resource disk;
 	struct work_queue_resource cores;

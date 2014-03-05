@@ -1558,9 +1558,14 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 {
 	char category[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
-	
-	if(sscanf(line, "resource %s %"PRId64 " %"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.committed,&r.total,&r.smallest,&r.largest)==6) {
 
+	int n = sscanf(line, "resource %s %"PRId64 " %"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.committed,&r.total,&r.smallest,&r.largest);
+		
+	if(n == 2 && !strcmp(category,"tag"))
+	{
+		/* Shortcut, inuse has the tag, as "resources tag" only sends one value */
+		w->resources->tag = r.inuse;
+	} else if(n == 6) {
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
 		} else if(!strcmp(category,"memory")) {
