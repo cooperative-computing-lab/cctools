@@ -3473,9 +3473,11 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
-static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active)
+static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active, int last_tasks_transfered)
 {
 	int n = build_poll_table(q, foreman_uplink);
+
+	static int busy_waiting = 0;
 
 	// Wait no longer than the caller's patience.
 	int msec;
@@ -3485,9 +3487,16 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 		msec = 5000;
 	}
 
-	// If workers are available and tasks waiting to be dispatched, don't wait on a message.
-	if( available_workers(q) > 0 && list_size(q->ready_list) > 0 ) {
+	// If workers are available and tasks waiting to be dispatched, don't wait
+	// on a message. However, take care of not busy waiting, if no available
+	// worker can execute a task in the ready list.
+	
+	if((last_tasks_transfered || !busy_waiting) && available_workers(q) > 0 && list_size(q->ready_list) > 0) {
 		msec = 0;
+		busy_waiting = 1;        //Mark that we may be busy waiting, so that if no task are transfered, we force a wait next cycle.
+	}
+	else {
+		busy_waiting = 0;
 	}
 
 	// Poll all links for activity.
@@ -3536,7 +3545,7 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 	return result;
 }
 
-static void wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
+static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 {
 	int task_started;
 	int tasks_received;
@@ -3556,6 +3565,8 @@ static void wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 		break;
 
 	}while ( (time(0) < stoptime) && (task_started > 0 || tasks_received > 0));
+
+	return task_started + tasks_received;
 }
 
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
@@ -3608,6 +3619,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 {
 	struct work_queue_task *t;
 	time_t stoptime;
+	int    tasks_transfered = 0;
 
 	static timestamp_t last_left_time = 0;
 	if(last_left_time!=0) {
@@ -3646,11 +3658,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(itable_size(q->running_tasks) == 0 && list_size(q->ready_list) == 0 && !(foreman_uplink))
 			break;
 
-		wait_loop_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active);
+		wait_loop_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active, tasks_transfered);
 
 		//We have the resources we have been waiting for; start task transfers
 		if(known_workers(q) >= q->workers_to_wait) {
-			wait_loop_transfer_tasks(q, stoptime);
+			tasks_transfered = wait_loop_transfer_tasks(q, stoptime);
 			q->workers_to_wait = 0; //disable it after we started dipatching tasks
 		}
 
