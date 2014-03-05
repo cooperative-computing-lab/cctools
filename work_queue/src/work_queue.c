@@ -2135,36 +2135,33 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
 	
-	// If none of the resources used have not been specified, treat the task as consuming an entire "average" worker
-	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-		cores_used = MAX((double)w->resources->cores.total/(double)w->resources->workers.total, 1);
-		mem_used = MAX((double)w->resources->memory.total/(double)w->resources->workers.total, 0);
-		disk_used = MAX((double)w->resources->disk.total/(double)w->resources->workers.total, 0);
-		gpus_used = MAX((double)w->resources->gpus.total/(double)w->resources->workers.total, 0);
+	if(t->unlabeled)
+	{
+		// Do not allow labeled/unlabeled mix.
+		if(t->cores > 0 || t->memory > 0 || t->disk > 0 || t->gpus > 0) {
+			ok = 0;
+		}
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 		cores_used = MAX(t->cores, 0);
 		mem_used = MAX(t->memory, 0);
 		disk_used = MAX(t->disk, 0);
 		gpus_used = MAX(t->gpus, 0);
-	}
-	
-	if(w->cores_allocated + cores_used > get_worker_cores(q, w)) {
-		ok = 0;
-	}
-	
-	if(w->memory_allocated + mem_used > w->resources->memory.total) {
-		ok = 0;
-	}
-	
-	if(w->disk_allocated + disk_used > w->resources->disk.total) {
-		ok = 0;
+
+		if(w->unlabeled_allocated > 0)
+		{
+			ok = 0;
+		} else if(w->cores_allocated + cores_used > get_worker_cores(q, w)) {
+			ok = 0;
+		} else if(w->memory_allocated + mem_used > w->resources->memory.total) {
+			ok = 0;
+		} else if(w->disk_allocated + disk_used > w->resources->disk.total) {
+			ok = 0;
+		} else if(w->gpus_allocated + gpus_used > w->resources->gpus.total) {
+			ok = 0;
+		}
 	}
 
-	if(w->gpus_allocated + gpus_used > w->resources->gpus.total) {
-		ok = 0;
-	}
-	
 	return ok;
 }
 
