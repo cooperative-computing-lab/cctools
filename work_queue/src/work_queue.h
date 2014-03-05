@@ -127,6 +127,10 @@ struct work_queue_stats {
 	int64_t total_memory;           /**< Total memory in MB aggregated across the connected workers. */
 	int64_t total_disk;	            /**< Total disk space in MB aggregated across the connected workers. */
 	int64_t total_gpus;             /**< Total number of GPUs aggregated across the connected workers. */
+	int64_t committed_cores;        /**< Committed number of cores aggregated across the connected workers. */
+	int64_t committed_memory;       /**< Committed memory in MB aggregated across the connected workers. */
+	int64_t committed_disk;	        /**< Committed disk space in MB aggregated across the connected workers. */
+	int64_t committed_gpus;         /**< Committed number of GPUs aggregated across the connected workers. */
 	int64_t min_cores;              /**< The lowest number of cores observed among the connected workers. */
 	int64_t max_cores;              /**< The highest number of cores observed among the connected workers. */
 	int64_t min_memory;             /**< The smallest memory size in MB observed among the connected workers. */

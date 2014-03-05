@@ -64,14 +64,14 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 
 static void work_queue_resource_debug( struct work_queue_resource *r, const char *name )
 {
-	debug(D_WQ,"%8s %6"PRId64" inuse %6"PRId64" total %6"PRId64" smallest %6"PRId64" largest",name, r->inuse, r->total, r->smallest, r->largest);
+	debug(D_WQ,"%8s %6"PRId64" inuse %6"PRId64" committed %6"PRId64" total %6"PRId64" smallest %6"PRId64" largest",name, r->inuse, r->committed, r->total, r->smallest, r->largest);
 }
 
 
 static void work_queue_resource_send( struct link *master, struct work_queue_resource *r, const char *name, time_t stoptime )
 {
 	work_queue_resource_debug(r, name);
-	link_putfstring(master, "resource %s %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", stoptime, name, r->inuse, r->total, r->smallest, r->largest );
+	link_putfstring(master, "resource %s %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", stoptime, name, r->inuse, r->committed, r->total, r->smallest, r->largest );
 }
 
 void work_queue_resources_send( struct link *master, struct work_queue_resources *r, time_t stoptime )
@@ -101,9 +101,10 @@ void work_queue_resources_clear( struct work_queue_resources *r )
 static void work_queue_resource_add( struct work_queue_resource *total, struct work_queue_resource *r )
 {
 	total->inuse += r->inuse;
+	total->committed += r->inuse;
 	total->total += r->total;
 	total->smallest = MIN(total->smallest,r->smallest);
-	total->largest = MAX(total->smallest,r->largest);
+	total->largest = MAX(total->largest,r->largest);
 }
 
 void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r )
@@ -121,22 +122,27 @@ void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct 
 	nvpair_insert_integer(nv, "workers_total",   r->workers.total);
 	nvpair_insert_integer(nv, "workers_smallest",r->workers.smallest);
 	nvpair_insert_integer(nv, "workers_largest", r->workers.largest);
+	nvpair_insert_integer(nv, "workers_committed", r->workers.committed);
 	nvpair_insert_integer(nv, "cores_inuse",     r->cores.inuse);
 	nvpair_insert_integer(nv, "cores_total",     r->cores.total);
 	nvpair_insert_integer(nv, "cores_smallest",  r->cores.smallest);
 	nvpair_insert_integer(nv, "cores_largest",   r->cores.largest);
+	nvpair_insert_integer(nv, "cores_committed", r->cores.committed);
 	nvpair_insert_integer(nv, "memory_inuse",    r->memory.inuse);
 	nvpair_insert_integer(nv, "memory_total",    r->memory.total);
 	nvpair_insert_integer(nv, "memory_smallest", r->memory.smallest);
 	nvpair_insert_integer(nv, "memory_largest",  r->memory.largest);
+	nvpair_insert_integer(nv, "memory_committed", r->memory.committed);
 	nvpair_insert_integer(nv, "disk_inuse",      r->disk.inuse);
 	nvpair_insert_integer(nv, "disk_total",      r->disk.total);
 	nvpair_insert_integer(nv, "disk_smallest",   r->disk.smallest);
 	nvpair_insert_integer(nv, "disk_largest",    r->disk.largest);
+	nvpair_insert_integer(nv, "disk_committed",  r->disk.committed);
 	nvpair_insert_integer(nv, "gpus_inuse",      r->gpus.inuse);
 	nvpair_insert_integer(nv, "gpus_total",      r->gpus.total);
 	nvpair_insert_integer(nv, "gpus_smallest",   r->gpus.smallest);
 	nvpair_insert_integer(nv, "gpus_largest",    r->gpus.largest);
+	nvpair_insert_integer(nv, "gpus_committed",  r->gpus.committed);
 }
 
 

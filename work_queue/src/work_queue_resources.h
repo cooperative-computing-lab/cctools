@@ -12,6 +12,7 @@ See the file COPYING for details.
 
 struct work_queue_resource {
 	int64_t inuse;
+	int64_t committed;
 	int64_t total;
 	int64_t smallest;
 	int64_t largest;
