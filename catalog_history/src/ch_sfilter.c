@@ -103,21 +103,16 @@ static int checkpoint_read( struct deltadb *db )
 {
 	FILE * file = stdin;
 	if(!file) return 0;
+
+	char firstline[NVPAIR_LINE_MAX];
+	fgets(firstline, sizeof(firstline), file);
+	printf("%s",firstline);
+
 	while(1) {
 		struct nvpair *nv = nvpair_create();
 		int num_pairs = nvpair_parse_stream(nv,file);
 		if(num_pairs>0) {
 			const char *key = nvpair_lookup_string(nv,"key");
-			if(!key){
-				const char *addr = nvpair_lookup_string(nv,"address");
-				const char *port = nvpair_lookup_string(nv,"port");
-				const char *name = nvpair_lookup_string(nv,"name");
-				char str[NVPAIR_LINE_MAX];
-				if (addr && port && name){
-					key = str;
-					sprintf(str,"%s:%s:%s",addr,port,name);
-				}
-			}
 			if (key){
 				struct argument *arg = db->args;
 				int keep = 0;

@@ -87,6 +87,8 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 	
 	int updates = 0;
 	
+	printf("T %i\n",start_time);
+
 	while(fgets(line,sizeof(line),stream)) {
 
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
@@ -143,7 +145,6 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 						nvpair_print_text(nv,stdout);
 					}
 					printf(".Checkpoint End.\n");
-					printf("T %i\n",start_time);
 					printf(line);
 					started = 1;
 				} else if(current>end_time) {

@@ -74,6 +74,11 @@ void emit_table_values( struct deltadb *db, time_t current)
 static int checkpoint_read( struct deltadb *db, FILE *stream )
 {
 	if(!stream) return 0;
+
+	char firstline[NVPAIR_LINE_MAX];
+	fgets(firstline, sizeof(firstline), stream);
+	printf("%s",firstline);
+
 	while(1) {
 		struct nvpair *nv = nvpair_create();
 		int num_pairs = nvpair_parse_stream(nv,stream);

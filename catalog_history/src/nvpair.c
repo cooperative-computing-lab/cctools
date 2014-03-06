@@ -68,15 +68,23 @@ int nvpair_parse_stream(struct nvpair *n, FILE * stream)
 	char line[NVPAIR_LINE_MAX];
 	char name[NVPAIR_LINE_MAX];
 	char value[NVPAIR_LINE_MAX];
+	char key[NVPAIR_LINE_MAX];
+	key[0] = '\0';
 
 	while(fgets(line, sizeof(line), stream)) {
 		if(line[0] == '.') {
 			return -1;
 		} else if(line[0] == '\n') {
+			if (strlen(key)==0){
+				sprintf(key,"%s:%s:%s",nvpair_lookup_string(n,"address"),nvpair_lookup_string(n,"port"),nvpair_lookup_string(n,"name"));
+				nvpair_insert_string(n, "key", key);
+			}
 			return num_pairs;
 		}
 
 		if(sscanf(line, "%s %[^\r\n]", name, value) == 2) {
+			if (strcmp(name,"key")==0)
+				strcpy(key,value);
 			nvpair_insert_string(n, name, value);
 			num_pairs += 1;
 		} else {

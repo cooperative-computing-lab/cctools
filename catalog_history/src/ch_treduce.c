@@ -97,7 +97,7 @@ typedef enum {
 
 
 char *reduction_str(struct reduction *r, reduction2_t type){
-	if (!r->is_number)
+	if (!r->is_number || r->cnt<=0)
 		return r->str;
 	double val;
 	switch (type){
@@ -134,21 +134,33 @@ char *reduction_str(struct reduction *r, reduction2_t type){
 	return r->str;
 }
 
+int isnumeric(char *str){
+	int decimal_point = 0;
+	while(*str) {
+		if(!isdigit(*str)){
+			if (str[0]=='.' && decimal_point==0){
+				decimal_point = 1;
+			} else return 0;
+	}
+	str++;
+}
+
+  return 1;
+}
+
 void reduction_init(struct reduction *r, char *value)
 {
 	float val;
+	strcpy(r->str,value);
 
-	//if (is_number(value) && r->str==NULL){
-	//if (is_number(value)){
-	if (sscanf(value,"%f",&val)==1){
-		//char* end;
-		//double val = strtod(value, &end);
+	if (isnumeric(r->str)){
+		sscanf(value,"%f",&val);
 		r->cnt = 1;
 		r->sum = r->first = r->last = r->min = r->avg = r->max = r->pavg = val;
 		r->inc = 0;
 		r->is_number = 1;
 	} else {
-		strcpy(r->str,value);
+
 		r->is_number = 0;
 	}
 
@@ -185,7 +197,8 @@ void reduction_update(struct reduction *r, char *value)
 };
 void reduction_end(struct reduction *r)
 {
-	r->inc = r->sum = r->min = r->avg = r->max = r->pavg = r->cnt = 0;
+	sprintf(r->str,"%f",r->last);
+	r->inc = r->sum = r->min = r->avg = r->max = r->pavg = r->cnt = -1;
 	r->dirty = 0;
 	r->removed = 0;
 };
@@ -266,8 +279,9 @@ int object_status_parse_stream(struct object_status *s, FILE * stream, struct ha
 				} else printf("%s",line);
 			}
 			//fflush(stdout);
-			if (strcmp(name,"key")==0)
+			if (strcmp(name,"key")==0){
 				strcpy(s->key,value);
+			}
 			struct reduction *red = reduction_create();
 			reduction_init(red,value);
 			hash_table_insert(s->pairs, name, red);
@@ -315,6 +329,12 @@ static int checkpoint_read( struct deltadb *db )
 {
 	FILE * file = stdin;
 	if(!file) return 0;
+
+	char firstline[NVPAIR_LINE_MAX];
+	fgets(firstline, sizeof(firstline), file);
+	time_t current = atoi(firstline+2);
+	db->end_span = current + db->time_span;
+
 	while(1) {
 		struct object_status *s = object_status_create();
 		int num_pairs = object_status_parse_stream(s,file,db->reducers,NULL);
@@ -356,17 +376,17 @@ static int log_play( struct deltadb *db  )
 	void *valp;
 	
 	while(fgets(line,sizeof(line),stream)) {
-		//printf("(%s",line);
-		//fflush(stdout);
-		//debug(D_NOTICE,"(%s",line);
+		//debug(D_NOTICE,"Processed line: %s",line);
 		//fflush(stderr);
 
 		line_number += 1;
 		
-		if (line[0]=='.') return 0;
+		if (line[0]!='.'){
+			int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
+			if(n<1) continue;
+
+		} else oper = '.';
 		
-		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
-		if(n<1) continue;
 		
 		//int include;
 		switch(oper) {
@@ -409,18 +429,17 @@ static int log_play( struct deltadb *db  )
 					}
 				}
 				break;
+			case '.':
+				sprintf(key,"%i",db->end_span+1);
 			case 'T':
 				current = atol(key);
-				if (db->end_span==0)
-					db->end_span = current + db->time_span;
-				if (current > db->end_span){
+				while (current > db->end_span){
 					//Flush Span
-					printf("T %lld\n",(long long)db->end_span);
-
-
+					printf("T %lld\n",(long long)db->end_span-1);
 
 					hash_table_firstkey(table);
 					while(hash_table_nextkey(table, &keyp, &sp)) {
+
 						s = sp;
 						if ( s->new==1 && s->deleted==1 ){
 							//
@@ -487,6 +506,9 @@ static int log_play( struct deltadb *db  )
 				fflush(stderr);
 				break;
 		}
+
+		if (oper=='.')
+			return 0;
 	}
 	return 1;
 }
@@ -502,7 +524,7 @@ static int parse_input( struct deltadb *db )
 {      
 	checkpoint_read(db);
 	
-	printf(".Checkpoint End.\n");                                                                                                                                                                                                                                                                                                                                                                          
+	printf(".Checkpoint End.\n");
 	
 	while(1) {
 

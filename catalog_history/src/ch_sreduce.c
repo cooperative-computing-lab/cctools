@@ -40,6 +40,10 @@ void deltadb_delete( struct deltadb *db )
 
 static int checkpoint_read( struct deltadb *db, FILE *file )
 {
+	char firstline[1024];
+	fgets(firstline, sizeof(firstline), file);
+	printf("%s",firstline);
+
 	while(1) {
 		int c = fgetc(file);
 		if(c=='.') {

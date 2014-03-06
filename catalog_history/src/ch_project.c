@@ -47,6 +47,11 @@ static int checkpoint_read( struct deltadb *db )
 {
 	FILE * file = stdin;
 	if(!file) return 0;
+
+	char firstline[NVPAIR_LINE_MAX];
+	fgets(firstline, sizeof(firstline), file);
+	printf("%s",firstline);
+
 	while(1) {
 		int keep = 0;
 		struct nvpair *nv = nvpair_create();
