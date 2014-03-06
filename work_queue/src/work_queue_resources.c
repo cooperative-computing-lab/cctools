@@ -39,13 +39,16 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 	r->cores.total = load_average_get_cpus();
 	r->cores.largest = r->cores.smallest = r->cores.total;
 
+	/* For disk and memory, we compute the total thinking that the worker is
+	 * not executing by itself, but that it has to share its resources with
+	 * other processes/workers. */
+
 	disk_info_get(disk_path,&avail,&total);
-	r->disk.total = total / (UINT64_T) MEGA;
-	r->disk.inuse = avail / (UINT64_T) MEGA;
+	r->disk.total = (avail / (UINT64_T) MEGA) + r->disk.inuse; // Free + whatever we are using.
 	r->disk.largest = r->disk.smallest = r->disk.total;
 
 	memory_info_get(&avail,&total);
-	r->memory.total = avail / (UINT64_T) MEGA;
+	r->memory.total = (avail / (UINT64_T) MEGA) + r->memory.inuse; // Free + whatever we are using.
 	r->memory.largest = r->memory.smallest = r->memory.total;
 
 	if(!gpu_check)
