@@ -3571,7 +3571,7 @@ static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 	do 
 	{
 		//Compute task_transfer_stoptime in some way...
-		time_t task_transfer_stoptime = MIN(stoptime, INT64_MAX);
+		time_t task_transfer_stoptime = stoptime;
 
 		//IF SOMETHING THEN
 		task_started = start_tasks(q, task_transfer_stoptime);
