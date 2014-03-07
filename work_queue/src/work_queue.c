@@ -3571,7 +3571,7 @@ static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 	do 
 	{
 		//Compute task_transfer_stoptime in some way...
-		time_t task_transfer_stoptime = MIN(stoptime, INT64_MAX);
+		time_t task_transfer_stoptime = stoptime;
 
 		//IF SOMETHING THEN
 		task_started = start_tasks(q, task_transfer_stoptime);
@@ -3608,17 +3608,17 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 |    | tasks remaining? |----->| time remaining? |
 |     ------------------        -----------------
 |           no |                     no |
-|              v                        +-----------+
-|     ------------------                            |
-|    |   receive task   |<--------------+           |
-|     ------------------                |           |
-|              |                    yes |           |
-|              v                        |           |
-|     ------------------  yes   -----------------   |
-|    | tasks remaining? |----->| time remaining? |  |
-|     ------------------        -----------------   |
-|           no |                    no |            |
-|              v                       +------------+
+|              v                        |
+|     ------------------                |           
+|    |   receive task   |<--------------+           
+|     ------------------                |           
+|              |                    yes |           
+|              v                        |           
+|     ------------------  yes   -----------------   
+|    | tasks remaining? |----->| time remaining? |  
+|     ------------------        -----------------   
+|           no |                    no |            
+|              v                       |
 |     ------------------               |
 |    |fast abort workers|              |
 |     ------------------               |
@@ -3679,7 +3679,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		wait_loop_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active, tasks_transfered);
 
 		//We have the resources we have been waiting for; start task transfers
-		if(known_workers(q) >= q->workers_to_wait) {
+		int known = known_workers(q);
+		if(known > 0 && known >= q->workers_to_wait) {
 			tasks_transfered = wait_loop_transfer_tasks(q, stoptime);
 			q->workers_to_wait = 0; //disable it after we started dipatching tasks
 		}
