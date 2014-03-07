@@ -432,6 +432,30 @@ class Task(_object):
         return self._task.time_receive_output_finish
 
     ## 
+    # Get the number of bytes received since task started receiving input data.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.total_bytes_received
+    # @endcode
+    @property
+    def total_bytes_received(self):
+        return self._task.total_bytes_received
+
+    ## 
+    # Get the number of bytes sent since task started sending input data.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.total_bytes_sent
+    # @endcode
+    @property
+    def total_bytes_sent(self):
+        return self._task.total_bytes_sent
+
+    ## 
     # Get the number of bytes transferred since task started transferring input data.
     # Must be called only after the task completes execution.
     # @a Note: This is defined using property decorator. So it must be called without parentheses
