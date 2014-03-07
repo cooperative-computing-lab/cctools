@@ -2360,10 +2360,9 @@ static void start_task_on_worker(struct work_queue *q, struct work_queue_worker 
 	if(!t)
 		return;
 
+	commit_task_to_worker(q, w, t);
 	int result = start_one_task(q, w, t);
-	if(result == SUCCESS) {
-		commit_task_to_worker(q, w, t);
-	} else {
+	if(result != SUCCESS) {
 		debug(D_WQ, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
 	}
