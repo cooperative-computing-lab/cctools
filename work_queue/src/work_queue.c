@@ -896,6 +896,7 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 	if(total_bytes>0) {
 		q->total_bytes_received += total_bytes;
 		q->total_receive_time += sum_time;
+		t->total_bytes_received += total_bytes;
 		t->total_bytes_transferred += total_bytes;
 		t->total_transfer_time += sum_time;
 		w->total_bytes_transferred += total_bytes;
@@ -1971,6 +1972,7 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 		timestamp_t close_time = timestamp_get();
 		timestamp_t elapsed_time = close_time-open_time;
 
+		t->total_bytes_sent += total_bytes;
 		t->total_bytes_transferred += total_bytes;
 		t->total_transfer_time += elapsed_time;
 
@@ -3526,6 +3528,8 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 		free(t->host);
 		t->host = 0;
 	}
+	t->total_bytes_received = 0;
+	t->total_bytes_sent = 0;
 	t->total_transfer_time = 0;
 	t->cmd_execution_time = 0;
 	t->result = 0;
