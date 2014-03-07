@@ -17,6 +17,8 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 
+time_t current = 0;
+
 struct deltadb {
 	struct hash_table *table;
 	struct deltadb_reduction *deltadb_reductions[100];
@@ -42,6 +44,7 @@ static int checkpoint_read( struct deltadb *db, FILE *file )
 {
 	char firstline[1024];
 	fgets(firstline, sizeof(firstline), file);
+	current = atoi(firstline+2);
 	printf("%s",firstline);
 
 	while(1) {
@@ -108,7 +111,6 @@ void emit_all_deltadb_reductions( struct deltadb *db, time_t current, int first_
 		}
 		printf("\n");
 		printf(".Checkpoint End.\n");
-		printf("T %ld\n",(long)current);
 		first_output = 0;
 	} else {
 		/* After that, make it an update record. */
@@ -127,7 +129,6 @@ Return true if the stoptime was reached.
 */
 static int log_play( struct deltadb *db, FILE *stream  )
 {
-	time_t current = 0;
 	struct nvpair *nv;
 
 	char line[NVPAIR_LINE_MAX];

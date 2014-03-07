@@ -77,7 +77,7 @@ static int checkpoint_read( struct deltadb *db, FILE *stream )
 
 	char firstline[NVPAIR_LINE_MAX];
 	fgets(firstline, sizeof(firstline), stream);
-	printf("%s",firstline);
+	time_t current = atoi(firstline+2);
 
 	while(1) {
 		struct nvpair *nv = nvpair_create();

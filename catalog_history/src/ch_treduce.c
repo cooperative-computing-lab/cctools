@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <time.h>
 #include <errno.h>
 #include <sys/stat.h>
@@ -60,10 +61,9 @@ struct reduction {
     //int MAX:1;
     //int PAVG:1;
     //int INC:1;
-	int dirty;
-	int removed;
+	int dead;
+	int gone;
 	int is_number;
-	int end;
 
 	struct reducer *reduce;
 };
@@ -75,13 +75,6 @@ struct reduction *reduction_create()
 	return r;
 };
 
-static int is_number(char const* p){
-	char* end;
-	strtod(p, &end);
-	if (end==NULL || strlen(end)==0)
-		return 1;
-	return 0;
-}
 
 typedef enum {
 	CNT,
@@ -164,8 +157,8 @@ void reduction_init(struct reduction *r, char *value)
 		r->is_number = 0;
 	}
 
-	r->dirty = 0;
-	r->removed = 0;
+	r->dead = 0;
+	r->gone = 0;
 	//r->CNT = r->SUM = r->FIRST = r->LAST = r->MIN = r->AVG = r->MAX = r->PAVG = r->INC = 0;
 };
 void reduction_update(struct reduction *r, char *value)
@@ -173,9 +166,9 @@ void reduction_update(struct reduction *r, char *value)
 	float val;
 	//if (is_number(value) && r->str==NULL){
 	//if (is_number(value) && r->is_number){
-	if (sscanf(value,"%f",&val)==1 && r->is_number){
+	if (isnumeric(r->str) && r->is_number){
 		//char* end;
-		//float val = strtod(value, &end);
+		sscanf(value,"%f",&val);
 		r->cnt += 1;
 		r->sum += val;
 		r->last = val;
@@ -192,15 +185,16 @@ void reduction_update(struct reduction *r, char *value)
 		strcpy(r->str,value);
 		r->is_number = 0;
 	}
-	r->dirty = 1;
-	r->removed = 0;
+	r->dead = 0;
+	r->gone = 0;
 };
-void reduction_end(struct reduction *r)
+void reduction_done(struct reduction *r)
 {
-	sprintf(r->str,"%f",r->last);
-	r->inc = r->sum = r->min = r->avg = r->max = r->pavg = r->cnt = -1;
-	r->dirty = 0;
-	r->removed = 0;
+	if (r->is_number){
+		r->cnt = 1;
+		r->sum = r->first = r->last = r->min = r->avg = r->max = r->pavg = r->last;
+		r->inc = 0;
+	}
 };
 
 void reduction_delete(struct reduction *r)
@@ -213,7 +207,8 @@ void reduction_delete(struct reduction *r)
 struct object_status {
 	char *key;
 	struct hash_table *pairs;
-	int deleted;
+	int dead;
+	int gone;
 	int new;
 };
 struct object_status *object_status_create()
@@ -223,7 +218,7 @@ struct object_status *object_status_create()
 	s->key = malloc(sizeof(char)*64);
 	s->key[0] = '\0';
 	s->pairs = hash_table_create(7, hash_string);
-	s->deleted = 0;
+	s->dead = s->gone = 0;
 	s->new = 1;
 	return s;
 }
@@ -334,6 +329,8 @@ static int checkpoint_read( struct deltadb *db )
 	fgets(firstline, sizeof(firstline), file);
 	time_t current = atoi(firstline+2);
 	db->end_span = current + db->time_span;
+	printf("%s",firstline);
+
 
 	while(1) {
 		struct object_status *s = object_status_create();
@@ -374,6 +371,7 @@ static int log_play( struct deltadb *db  )
 	char *namep;
 	void *sp;
 	void *valp;
+	int finishUp = 0;
 	
 	while(fgets(line,sizeof(line),stream)) {
 		//debug(D_NOTICE,"Processed line: %s",line);
@@ -406,7 +404,7 @@ static int log_play( struct deltadb *db  )
 			case 'D':
 				s = hash_table_lookup(table,key);
 				if(s) {
-					s->deleted = 1;
+					s->dead = 1;
 				}
 				break;
 			case 'U':
@@ -425,12 +423,13 @@ static int log_play( struct deltadb *db  )
 				if(s) {
 					struct reduction *r = hash_table_lookup(s->pairs,name);
 					if (r){
-						r->removed = 1;
+						r->dead = 1;
 					}
 				}
 				break;
 			case '.':
-				sprintf(key,"%i",db->end_span+1);
+				sprintf(key,"%lld",(long long)db->end_span+1);
+				finishUp = 1;
 			case 'T':
 				current = atol(key);
 				while (current > db->end_span){
@@ -441,55 +440,77 @@ static int log_play( struct deltadb *db  )
 					while(hash_table_nextkey(table, &keyp, &sp)) {
 
 						s = sp;
-						if ( s->new==1 && s->deleted==1 ){
-							//
-						} else if (s->deleted==1){
+						if (s->dead && s->gone){
 							printf("D %s\n",keyp);
 							hash_table_remove(table,keyp);
 							object_status_delete(s);
-						} else {
-							if (s->new==1)
-								printf("C %s\n",keyp);
+						} else if (s->new==1){
+							printf("C %s\n",keyp);
 							hash_table_firstkey(s->pairs);
 							while(hash_table_nextkey(s->pairs, &namep, &valp)) {
 								red = valp;
-								if (red->removed==1){
-									printf("R %s %s\n",keyp,namep);
-									red = hash_table_remove(s->pairs,namep);
-									reduction_delete(red);
-								} else {//if (red->dirty || s->new==1){
-									char prefix[NVPAIR_LINE_MAX];
-									if (s->new==1)
-										prefix[0] = '\0';
-									else sprintf(prefix,"U %s ",keyp);
-									if (!red->is_number){
-										printf("%s%s %s\n",prefix,namep,red->str);
-										reduction_init(red,red->str);
-									} else {
-
-										const struct reducer *r = hash_table_lookup(db->reducers,namep);
-										if (r){
-
-											if (r->CNT) printf("%s%s.CNT %s\n",prefix,namep,reduction_str(red,CNT));
-											if (r->SUM) printf("%s%s.SUM %s\n",prefix,namep,reduction_str(red,SUM));
-											if (r->MIN) printf("%s%s.MIN %s\n",prefix,namep,reduction_str(red,MIN));
-											if (r->AVG) printf("%s%s.AVG %s\n",prefix,namep,reduction_str(red,AVG));
-											if (r->MAX) printf("%s%s.MAX %s\n",prefix,namep,reduction_str(red,MAX));
-											if (r->FIRST) printf("%s%s.FIRST %s\n",prefix,namep,reduction_str(red,FIRST));
-											if (r->LAST) printf("%s%s.LAST %s\n",prefix,namep,reduction_str(red,LAST));
-											if (r->PAVG) printf("%s%s.PAVG %s\n",prefix,namep,reduction_str(red,PAVG));
-											if (r->INC) printf("%s%s.INC %s\n",prefix,namep,reduction_str(red,INC));
-										} else printf("%s%s %s\n",prefix,namep,reduction_str(red,LAST));
-
-										
-										reduction_end(red);
-									}
+								if (!red->is_number){
+									printf("%s %s\n",namep,red->str);
+									//reduction_init(red,red->str); //Not necessary because there is no reduction on strings
+								} else {
+									const struct reducer *r = hash_table_lookup(db->reducers,namep);
+									if (r){
+										if (r->CNT) printf("%s.CNT %s\n",namep,reduction_str(red,CNT));
+										if (r->SUM) printf("%s.SUM %s\n",namep,reduction_str(red,SUM));
+										if (r->MIN) printf("%s.MIN %s\n",namep,reduction_str(red,MIN));
+										if (r->AVG) printf("%s.AVG %s\n",namep,reduction_str(red,AVG));
+										if (r->MAX) printf("%s.MAX %s\n",namep,reduction_str(red,MAX));
+										if (r->FIRST) printf("%s.FIRST %s\n",namep,reduction_str(red,FIRST));
+										if (r->LAST) printf("%s.LAST %s\n",namep,reduction_str(red,LAST));
+										if (r->PAVG) printf("%s.PAVG %s\n",namep,reduction_str(red,PAVG));
+										if (r->INC) printf("%s.INC %s\n",namep,reduction_str(red,INC));
+										reduction_done(red);
+									} else printf("%s %s\n",namep,reduction_str(red,LAST));
+									//reduction_end(red);
+								}
+								if(red->dead){
+									red->gone = 1;
 								}
 							}
 							if (s->new==1){
 								printf("\n");
 								s->new = 0;
 							}
+						} else {
+							hash_table_firstkey(s->pairs);
+							while(hash_table_nextkey(s->pairs, &namep, &valp)) {
+								red = valp;
+								if (red->dead && red->gone){
+									printf("R %s %s\n",keyp,namep);
+									reduction_delete(hash_table_remove(s->pairs,namep));
+								} else {
+									if (!red->is_number){
+										printf("U %s %s\n",namep,red->str);
+										//reduction_init(red,red->str); //Not necessary because there is no reduction on strings
+									} else {
+										const struct reducer *r = hash_table_lookup(db->reducers,namep);
+										if (r){
+
+											if (r->CNT) printf("U %s %s.CNT %s\n",keyp,namep,reduction_str(red,CNT));
+											if (r->SUM) printf("U %s %s.SUM %s\n",keyp,namep,reduction_str(red,SUM));
+											if (r->MIN) printf("U %s %s.MIN %s\n",keyp,namep,reduction_str(red,MIN));
+											if (r->AVG) printf("U %s %s.AVG %s\n",keyp,namep,reduction_str(red,AVG));
+											if (r->MAX) printf("U %s %s.MAX %s\n",keyp,namep,reduction_str(red,MAX));
+											if (r->FIRST) printf("U %s %s.FIRST %s\n",keyp,namep,reduction_str(red,FIRST));
+											if (r->LAST) printf("U %s %s.LAST %s\n",keyp,namep,reduction_str(red,LAST));
+											if (r->PAVG) printf("U %s %s.PAVG %s\n",keyp,namep,reduction_str(red,PAVG));
+											if (r->INC) printf("U %s %s.INC %s\n",keyp,namep,reduction_str(red,INC));
+											reduction_done(red);
+										} else printf("U %s %s %s\n",keyp,namep,reduction_str(red,LAST));
+
+									}
+								}
+							}
+						}
+
+
+						if(s!=NULL && s->dead){
+							s->gone = 1;
 						}
 
 					}
@@ -500,6 +521,28 @@ static int log_play( struct deltadb *db  )
 
 					db->end_span += db->time_span;
 				}
+				if (finishUp){
+					printf("T %lld\n",(long long)db->end_span-1);
+
+					hash_table_firstkey(table);
+					while(hash_table_nextkey(table, &keyp, &sp)) {
+						if (s->dead && s->gone){
+							printf("D %s\n",keyp);
+							hash_table_remove(table,keyp);
+							object_status_delete(s);
+						} else {
+							hash_table_firstkey(s->pairs);
+							while(hash_table_nextkey(s->pairs, &namep, &valp)) {
+								red = valp;
+								if (red->dead && red->gone){
+									printf("R %s %s\n",keyp,namep);
+									reduction_delete(hash_table_remove(s->pairs,namep));
+								}
+							}
+						}
+					}
+					return 0;
+				}
 				break;
 			default:
 				debug(D_NOTICE,"corrupt log data[%i]: %s",line_number,line);
@@ -507,8 +550,6 @@ static int log_play( struct deltadb *db  )
 				break;
 		}
 
-		if (oper=='.')
-			return 0;
 	}
 	return 1;
 }
