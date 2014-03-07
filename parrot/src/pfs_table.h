@@ -119,7 +119,7 @@ public:
 	int	accept( int fd, struct sockaddr *addr, int * addrlen );
 
 	void	follow_symlink( struct pfs_name *pname, int depth = 0 );
-	int	resolve_name( const char *cname, pfs_name *pname, bool do_follow_symlink = true, int depth = 0 );
+	int	resolve_name( const char *caller, const char *cname, pfs_name *pname, bool do_follow_symlink = true, int depth = 0 );
 
 	/* mmap operations */
 	pfs_size_t mmap_create_object( pfs_file *file, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
