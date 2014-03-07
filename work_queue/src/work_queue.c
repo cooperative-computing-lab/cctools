@@ -3608,17 +3608,17 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 |    | tasks remaining? |----->| time remaining? |
 |     ------------------        -----------------
 |           no |                     no |
-|              v                        +-----------+
-|     ------------------                            |
-|    |   receive task   |<--------------+           |
-|     ------------------                |           |
-|              |                    yes |           |
-|              v                        |           |
-|     ------------------  yes   -----------------   |
-|    | tasks remaining? |----->| time remaining? |  |
-|     ------------------        -----------------   |
-|           no |                    no |            |
-|              v                       +------------+
+|              v                        |
+|     ------------------                |           
+|    |   receive task   |<--------------+           
+|     ------------------                |           
+|              |                    yes |           
+|              v                        |           
+|     ------------------  yes   -----------------   
+|    | tasks remaining? |----->| time remaining? |  
+|     ------------------        -----------------   
+|           no |                    no |            
+|              v                       |
 |     ------------------               |
 |    |fast abort workers|              |
 |     ------------------               |
