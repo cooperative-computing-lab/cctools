@@ -135,7 +135,7 @@ int		pfs_get_real_fd( int fd );
 int		pfs_get_full_name( int fd, char *name );
 int		pfs_get_local_name( const char *rpath, char *lpath, char *firstline, int length );
 int		pfs_is_nonblocking( int fd );
-int		pfs_resolve_name( const char *path, struct pfs_name *pname );
+int		pfs_resolve_name(const char *caller, const char *path, struct pfs_name *pname );
 
 int		pfs_search( const char *path, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i);
 
