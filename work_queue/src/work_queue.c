@@ -2065,10 +2065,20 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 		}
 	}
 
-	send_worker_msg(q,w, "end\n");
+	// send_worker_msg returns the number of bytes sent, or a number less than
+	// zero to indicate errors. We are lazy here, we only check the last
+	// message we sent to the worker (other messages may have failed above).
+	result = send_worker_msg(q,w, "end\n");
 
-	debug(D_WQ, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
-	return SUCCESS;
+	if(result > -1)
+	{
+		debug(D_WQ, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
+		return SUCCESS;
+	}
+	else
+	{
+		return WORKER_FAILURE;
+	}
 }
 
 /*
