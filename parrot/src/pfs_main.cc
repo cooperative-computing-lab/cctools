@@ -48,6 +48,7 @@ extern "C" {
 #include <termio.h>
 #include <termios.h>
 
+FILE *namelist_file;
 pid_t trace_this_pid = -1;
 
 int pfs_master_timeout = 300;
@@ -107,6 +108,7 @@ enum {
 	LONG_OPT_CVMFS_REPO_SWITCHING=500,
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
 	LONG_OPT_CVMFS_ALIEN_CACHE,
+	LONG_OPT_NAMELIST,
 };
 
 static void get_linux_version(const char *cmd)
@@ -192,6 +194,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Checksum files where available.\n", "-K,--with-checksums");
 	fprintf(stdout, " %-30s Do not checksum files.\n", "-k,--no-checksums");
 	fprintf(stdout, " %-30s Path to ld.so to use.                      (PARROT_LDSO_PATH)\n", "-l,--ld-path=<path>");
+	fprintf(stdout, " %-30s Record all the names of accessed files.\n", "  --name-list=<path>");
 	fprintf(stdout, " %-30s Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n", "-m,--ftab-file=<file>");
 	fprintf(stdout, " %-30s Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
 	fprintf(stdout, " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
@@ -553,6 +556,7 @@ int main( int argc, char *argv[] )
 		{"with-checksums", no_argument, 0, 'K'},
 		{"no-checksums", no_argument, 0, 'k'},
 		{"ld-path", required_argument, 0, 'l'},
+		{"name-list", required_argument, 0, LONG_OPT_NAMELIST},
 		{"tab-file", required_argument, 0, 'm'},
 		{"mount", required_argument, 0, 'M'},
 		{"hostname", required_argument, 0, 'N'},
@@ -634,6 +638,11 @@ int main( int argc, char *argv[] )
 			break;
 		case 'l':
 			pfs_ldso_path = optarg;
+			break;
+		case LONG_OPT_NAMELIST:
+			namelist_file = fopen(optarg, "a");
+			if(!namelist_file)
+				debug(D_DEBUG, "Can not open namelist file: %s", optarg);
 			break;
 		case 'm':
 			pfs_resolve_file_config(optarg);
@@ -880,6 +889,9 @@ int main( int argc, char *argv[] )
 
 	delete_dir(pfs_cvmfs_locks_dir);
 
+	if(namelist_file)
+		fclose(namelist_file);
+	
 	if(WIFEXITED(root_exitstatus)) {
 		status = WEXITSTATUS(root_exitstatus);
 		debug(D_PROCESS,"%s exited normally with status %d",argv[optind],status);

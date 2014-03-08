@@ -536,7 +536,7 @@ void decode_socketcall( struct pfs_process *p, int entering, int syscall, INT64_
 			if(paddr->sun_family==AF_UNIX) {
 				pfs_name pname;
 				((char*)x)[a[2]] = 0;
-				if(pfs_resolve_name(paddr->sun_path,&pname)) {
+				if(pfs_resolve_name("bind32",paddr->sun_path,&pname)) {
 					addr.sun_family = AF_UNIX;
 					strcpy(addr.sun_path,pname.path);
 					r = pfs_bind(a[0],(struct sockaddr *)&addr,sizeof(addr));
@@ -557,7 +557,7 @@ void decode_socketcall( struct pfs_process *p, int entering, int syscall, INT64_
 			if(paddr->sun_family==AF_UNIX) {
 				pfs_name pname;
 				((char*)x)[a[2]] = 0;
-				if(pfs_resolve_name(paddr->sun_path,&pname)) {
+				if(pfs_resolve_name("connect32",paddr->sun_path,&pname)) {
 					addr.sun_family = AF_UNIX;
 					strcpy(addr.sun_path,pname.path);
 					r = pfs_connect(a[0],(struct sockaddr *)&addr,sizeof(addr));
