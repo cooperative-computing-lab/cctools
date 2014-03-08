@@ -1223,7 +1223,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				if(paddr->sun_family==AF_UNIX) {
 					pfs_name pname;
 					((char*)x)[args[2]] = 0;
-					if(pfs_resolve_name(paddr->sun_path,&pname)) {
+					if(pfs_resolve_name("bind64",paddr->sun_path,&pname)) {
 						addr.sun_family = AF_UNIX;
 						strcpy(addr.sun_path,pname.path);
 						p->syscall_result = pfs_bind(args[0],(struct sockaddr *)&addr,sizeof(addr));
@@ -1247,7 +1247,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				if(paddr->sun_family==AF_UNIX) {
 					pfs_name pname;
 					((char*)x)[args[2]] = 0;
-					if(pfs_resolve_name(paddr->sun_path,&pname)) {
+					if(pfs_resolve_name("connect64",paddr->sun_path,&pname)) {
 						addr.sun_family = AF_UNIX;
 						strcpy(addr.sun_path,pname.path);
 						p->syscall_result = pfs_connect(args[0],(struct sockaddr *)&addr,sizeof(addr));
