@@ -288,12 +288,12 @@ static void log_worker_stats(struct work_queue *q)
 	work_queue_get_stats(q, &s);
 
 	//print in the order described by the headers in specify_log().
-	fprintf(q->logfile, "%16" PRIu64 " ", timestamp_get()); 
-	fprintf(q->logfile, "%25d %25d %25d %25d %25d %25d ", s.total_workers_connected, s.workers_init, s.workers_idle, s.workers_busy, s.total_workers_joined, s.total_workers_removed);	
-	fprintf(q->logfile, "%25d %25d %25d %25d %25d %25d ", s.tasks_waiting, s.tasks_running, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_tasks_cancelled);
-	fprintf(q->logfile, "%25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25f %25f %25d", s.start_time, s.total_send_time, s.total_receive_time, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity);
-	fprintf(q->logfile, "%25f %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " ", s.bandwidth, s.total_cores, s.total_memory, s.total_disk, s.total_gpus);
-	fprintf(q->logfile, "%25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " %25" PRIu64 " ", s.min_cores, s.max_cores, s.min_memory, s.max_memory, s.min_disk, s.max_disk, s.min_gpus, s.max_gpus);
+	fprintf(q->logfile, "%" PRIu64 " ", timestamp_get()); 
+	fprintf(q->logfile, "%d %d %d %d %d %d ", s.total_workers_connected, s.workers_init, s.workers_idle, s.workers_busy, s.total_workers_joined, s.total_workers_removed);	
+	fprintf(q->logfile, "%d %d %d %d %d %d ", s.tasks_waiting, s.tasks_running, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_tasks_cancelled);
+	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %f %f %d", s.start_time, s.total_send_time, s.total_receive_time, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity);
+	fprintf(q->logfile, "%f %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " ", s.bandwidth, s.total_cores, s.total_memory, s.total_disk, s.total_gpus);
+	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " ", s.min_cores, s.max_cores, s.min_memory, s.max_memory, s.min_disk, s.max_disk, s.min_gpus, s.max_gpus);
 	fprintf(q->logfile, "\n");
 }
 
@@ -4084,13 +4084,24 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
 		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
-		fprintf(q->logfile, "#%16s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s %25s\n", // column labels
-			"timestamp", //time 
-			"total_workers_connected", "workers_init", "workers_idle", "workers_busy", "total_workers_joined", "total_workers_removed", // workers
-			"tasks_waiting", "tasks_running", "tasks_complete", "total_tasks_dispatched", "total_tasks_complete", "total_tasks_cancelled", // tasks
-			"start_time", "total_send_time", "total_receive_time", "total_bytes_sent", "total_bytes_received", "efficiency", "idle_percentage", "capacity", // queue
-			"bandwidth", "total_cores", "total_memory", "total_disk", "total_gpus", //resource totals
-			"min_cores", "max_cores", "min_memory", "max_memory", "min_disk", "max_disk", "min_gpus", "max_gpus"); //resource min/max
+		fprintf(q->logfile,
+				// start with a comment
+				"#"
+			// time:	
+			"timestamp "
+			//workers:
+			"total_workers_connected workers_init workers_idle workers_busy total_workers_joined total_workers_removed "
+			// tasks:
+			"tasks_waiting tasks_running tasks_complete total_tasks_dispatched total_tasks_complete total_tasks_cancelled "
+			// queue:
+			"start_time total_send_time total_receive_time total_bytes_sent total_bytes_received efficiency idle_percentage capacity "
+			// resource totals:
+			"bandwidth total_cores total_memory total_disk total_gpus "
+			//mins/maxs:
+			"min_cores max_cores min_memory max_memory min_disk max_disk min_gpus max_gpus "
+			//end with a newline
+			"\n"
+			);
 		log_worker_stats(q);
 		debug(D_WQ, "log enabled and is being written to %s\n", logfile);
 		return 1;
