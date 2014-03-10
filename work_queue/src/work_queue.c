@@ -137,8 +137,17 @@ struct work_queue {
 	timestamp_t total_idle_time;	// sum of time spent waiting for workers
 	timestamp_t total_app_time;	// sum of time spend above work_queue_wait
 
-	double asynchrony_multiplier;
-	int asynchrony_modifier;
+	int cores_over;
+	int memory_over;
+	int disk_over;
+	int gpus_over;
+	int unlabeled_over;
+
+	double memory_over_factor;
+	double disk_over_factor;
+	double cores_over_factor;
+	double gpus_over_factor;
+	double unlabeled_over_factor;
 
 	int minimum_transfer_timeout;
 	int foreman_transfer_timeout;
@@ -215,11 +224,40 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 /********** work_queue internal functions *************/
 /******************************************************/
 
-static int64_t get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
+static int64_t get_worker_overcommit_cores(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->cores.total)
-		return w->resources->cores.total * q->asynchrony_multiplier + q->asynchrony_modifier;
+		return ceil(w->resources->cores.total * q->cores_over_factor) + q->cores_over;
 	else
 		return 0;
+}
+
+static int64_t get_worker_overcommit_unlabeled(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->workers.total)
+		return ceil(w->resources->workers.total * q->unlabeled_over_factor) +  q->unlabeled_over;
+	else
+		return 0;
+}
+
+static int64_t get_worker_overcommit_gpus(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->gpus.total)
+		return ceil(w->resources->gpus.total * q->gpus_over_factor) + q->gpus_over;
+	else
+		return 0;
+}
+
+static int64_t get_worker_overcommit_memory(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->memory.total)
+		return ceil(w->resources->memory.total * q->memory_over_factor) + q->memory_over;
+	else
+		return 0;
+}
+
+static int64_t get_worker_overcommit_disk(struct work_queue *q, struct work_queue_worker *w) {
+	if(w->resources->disk.total)
+		return ceil(w->resources->disk.total * q->disk_over_factor) + q->disk_over;
+	else
+		return 0;
+
 }
 
 //Returns count of workers that have identified themselves.
@@ -247,12 +285,20 @@ static int available_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown")){
-			if(get_worker_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
-				available_workers++;
+			if(w->unlabeled_allocated > 0)
+			{
+				if(get_worker_overcommit_unlabeled(q, w) > w->unlabeled_allocated)
+					available_workers++;
 			}
-		}	
+			else
+			{
+				if(get_worker_overcommit_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
+					available_workers++;
+				}
+			}	
+		}
 	}
-	
+
 	return available_workers;
 }
 
@@ -2152,11 +2198,9 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 			ok = 0;
 		}
 
-		if(w->unlabeled_allocated + 1 > w->resources->workers.total) {
+		if(w->resources->workers.largest < 1 || w->unlabeled_allocated + 1 > get_worker_overcommit_unlabeled(q, w)) {
 			ok = 0;
 		}
-
-
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 		cores_used = MAX(t->cores, 0);
@@ -2166,13 +2210,20 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 
 		if(w->unlabeled_allocated > 0) {
 			ok = 0;
-		} else if(w->cores_allocated + cores_used > get_worker_cores(q, w)) {
+
+		} if(w->resources->cores.largest < cores_used || w->cores_allocated + cores_used > get_worker_overcommit_cores(q, w)) {
 			ok = 0;
-		} else if(w->memory_allocated + mem_used > w->resources->memory.total) {
+		}
+
+		if(w->resources->memory.largest < mem_used || w->memory_allocated + mem_used > get_worker_overcommit_memory(q, w)) {
 			ok = 0;
-		} else if(w->disk_allocated + disk_used > w->resources->disk.total) {
+		}
+
+		if(w->resources->disk.largest < disk_used || w->disk_allocated + disk_used > get_worker_overcommit_disk(q, w)) {
 			ok = 0;
-		} else if(w->gpus_allocated + gpus_used > w->resources->gpus.total) {
+		}
+
+		if(w->resources->gpus.largest < gpus_used || w->gpus_allocated + gpus_used > get_worker_overcommit_gpus(q, w)) {
 			ok = 0;
 		}
 	}
@@ -2649,28 +2700,73 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
+
+static void set_task_unlabel_flag( struct work_queue_task *t )
+{
+	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0)
+	{
+		t->unlabeled = 1;
+	}
+}
+
 void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory )
 {
-	t->memory = memory;
-	t->unlabeled = 0;
+	if(memory < 0)
+	{
+		t->memory = -1;
+	}
+	else
+	{
+		t->memory = memory;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk )
 {
-	t->disk = disk;
-	t->unlabeled = 0;
+	if(disk < 0)
+	{
+		t->disk = -1;
+	}
+	else
+	{
+		t->disk = disk;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
 {
-	t->cores = cores;
-	t->unlabeled = 0;
+	if(cores < 0)
+	{
+		t->cores = -1;
+	}
+	else
+	{
+		t->cores = cores;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
 {
-	t->gpus = gpus;
-	t->unlabeled = 0;
+	if(gpus < 0)
+	{
+		t->gpus = -1;
+	}
+	else
+	{
+		t->gpus = gpus;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
@@ -3228,8 +3324,17 @@ struct work_queue *work_queue_create(int port)
 	q->monitor_mode   =  0;
 	q->password = 0;
 	
-	q->asynchrony_multiplier = 1.0;
-	q->asynchrony_modifier = 0;
+	q->cores_over = 0;
+	q->memory_over = 0;
+	q->gpus_over   = 0;
+	q->disk_over   = 0;
+	q->unlabeled_over = 0;
+
+	q->cores_over_factor  = 1.0;
+	q->memory_over_factor = 1.0;
+	q->disk_over_factor   = 1.0;
+	q->gpus_over_factor   = 1.0;
+	q->unlabeled_over_factor = 1.0;
 
 	q->minimum_transfer_timeout = 10;
 	q->foreman_transfer_timeout = 3600;
@@ -3935,11 +4040,29 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 int work_queue_tune(struct work_queue *q, const char *name, double value)
 {
 	
-	if(!strcmp(name, "asynchrony-multiplier")) {
-		q->asynchrony_multiplier = MAX(value, 1.0);
+	if(!strcmp(name, "cores-over-factor") || !strcmp(name, "asynchrony-multiplier")) {
+		q->cores_over_factor = MAX(value, 0.0);
 		
-	} else if(!strcmp(name, "asynchrony-modifier")) {
-		q->asynchrony_modifier = MAX(value, 0);
+	} else if(!strcmp(name, "cores-over") || !strcmp(name, "asynchrony-modifier")) {
+		q->cores_over = value;
+		
+	} else if(!strcmp(name, "memory-over-factor")) {
+		q->memory_over_factor = MAX(value, 0.0);
+		
+	} else if(!strcmp(name, "memory-over")) {
+		q->memory_over = value;
+		
+	} else if(!strcmp(name, "gpus-over-factor")) {
+		q->gpus_over_factor = MAX(value, 0.0);
+
+	} else if(!strcmp(name, "gpus-over")) {
+		q->gpus_over = value;
+
+	} else if(!strcmp(name, "disk-over-factor")) {
+		q->disk_over_factor = MAX(value, 0.0);
+		
+	} else if(!strcmp(name, "disk-over")) {
+		q->disk_over = value;
 		
 	} else if(!strcmp(name, "min-transfer-timeout")) {
 		q->minimum_transfer_timeout = (int)value;
