@@ -285,12 +285,20 @@ static int available_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown")){
-			if(get_worker_overcommit_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
-				available_workers++;
+			if(w->unlabeled_allocated > 0)
+			{
+				if(get_worker_overcommit_unlabeled(q, w) > w->unlabeled_allocated)
+					available_workers++;
 			}
-		}	
+			else
+			{
+				if(get_worker_overcommit_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
+					available_workers++;
+				}
+			}	
+		}
 	}
-	
+
 	return available_workers;
 }
 
@@ -2190,7 +2198,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 			ok = 0;
 		}
 
-		if(w->resources->workers.largest < 1 || w->unlabeled_allocated + 1 > get_worker_unlabeled(q, w)) {
+		if(w->resources->workers.largest < 1 || w->unlabeled_allocated + 1 > get_worker_overcommit_unlabeled(q, w)) {
 			ok = 0;
 		}
 
