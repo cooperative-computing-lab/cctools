@@ -137,8 +137,8 @@ struct work_queue {
 	timestamp_t total_idle_time;	// sum of time spent waiting for workers
 	timestamp_t total_app_time;	// sum of time spend above work_queue_wait
 
-	double asynchrony_multiplier;
-	int asynchrony_modifier;
+	double asynchrony_multiplier;     /* Times the resource value, but disk */
+	int    asynchrony_modifier;       /* Plus this many cores or unlabeled tasks */
 
 	int minimum_transfer_timeout;
 	int foreman_transfer_timeout;
@@ -215,11 +215,19 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 /********** work_queue internal functions *************/
 /******************************************************/
 
-static int64_t get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
-	if(w->resources->cores.total)
-		return w->resources->cores.total * q->asynchrony_multiplier + q->asynchrony_modifier;
-	else
-		return 0;
+static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total, int cores_flag) {
+	int64_t r = 0;
+	if(total > 0)
+	{
+		r = ceil(total * q->asynchrony_multiplier);
+
+		if(cores_flag)
+		{
+			r += q->asynchrony_modifier;
+		}
+	}
+
+	return r;
 }
 
 //Returns count of workers that have identified themselves.
@@ -247,12 +255,18 @@ static int available_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown")){
-			if(get_worker_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
+			if(w->unlabeled_allocated > 0)
+			{
+				if(overcommitted_resource_total(q, w->resources->workers.total, 1) > w->unlabeled_allocated) {
+					available_workers++;
+				}
+			}
+			else if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || overcommitted_resource_total(q, w->resources->memory.total, 0) > w->memory_allocated){
 				available_workers++;
 			}
 		}	
 	}
-	
+
 	return available_workers;
 }
 
@@ -2152,11 +2166,9 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 			ok = 0;
 		}
 
-		if(w->unlabeled_allocated + 1 > w->resources->workers.total) {
+		if(w->unlabeled_allocated + 1 > overcommitted_resource_total(q, w->resources->workers.total, 1)) {
 			ok = 0;
 		}
-
-
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 		cores_used = MAX(t->cores, 0);
@@ -2166,13 +2178,13 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 
 		if(w->unlabeled_allocated > 0) {
 			ok = 0;
-		} else if(w->cores_allocated + cores_used > get_worker_cores(q, w)) {
+		} else if(w->cores_allocated + cores_used > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
 			ok = 0;
-		} else if(w->memory_allocated + mem_used > w->resources->memory.total) {
+		} else if(w->memory_allocated + mem_used > overcommitted_resource_total(q, w->resources->memory.total, 0)) {
 			ok = 0;
-		} else if(w->disk_allocated + disk_used > w->resources->disk.total) {
+		} else if(w->disk_allocated + disk_used > w->resources->disk.total) { /* No overcommit disk */
 			ok = 0;
-		} else if(w->gpus_allocated + gpus_used > w->resources->gpus.total) {
+		} else if(w->gpus_allocated + gpus_used > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
 			ok = 0;
 		}
 	}
@@ -2649,28 +2661,73 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
+
+static void set_task_unlabel_flag( struct work_queue_task *t )
+{
+	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0)
+	{
+		t->unlabeled = 1;
+	}
+}
+
 void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory )
 {
-	t->memory = memory;
-	t->unlabeled = 0;
+	if(memory < 0)
+	{
+		t->memory = -1;
+	}
+	else
+	{
+		t->memory = memory;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk )
 {
-	t->disk = disk;
-	t->unlabeled = 0;
+	if(disk < 0)
+	{
+		t->disk = -1;
+	}
+	else
+	{
+		t->disk = disk;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
 {
-	t->cores = cores;
-	t->unlabeled = 0;
+	if(cores < 0)
+	{
+		t->cores = -1;
+	}
+	else
+	{
+		t->cores = cores;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
 {
-	t->gpus = gpus;
-	t->unlabeled = 0;
+	if(gpus < 0)
+	{
+		t->gpus = -1;
+	}
+	else
+	{
+		t->gpus = gpus;
+		t->unlabeled = 0;
+	}
+
+	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
