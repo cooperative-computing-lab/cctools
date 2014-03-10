@@ -12,7 +12,7 @@ import sys
 import os
 import time
 import datetime
-
+  
 current_version = "1.0"
 
 debug = 0
@@ -111,7 +111,7 @@ if len(sys.argv)>3 and sys.argv[3]:
   else:
     end = int(arg)
 else:
-  logError("No ending point specified. Ending with data from today (if available).")
+  logError("No ending point specified. Ending with data from today (if available).\n")
   end = int( time.mktime(datetime.datetime.now().timetuple()) )
 
 
@@ -233,6 +233,20 @@ while True:
             host = res.pop(0)
             field = res.pop(0)
             value = " ".join(res)
+            
+            interval = logTime-lastReported[host]
+            m, s = divmod(interval, 60)
+            h, m = divmod(m, 60)
+            if (interval>54200):
+              print "Host reported after silence for %d:%02d:%02d (longer than 15 minutes): %s"  % (h, m, s, host)
+              print "Status at Time "+str(lastReported[host])+":"
+              
+              for i in seriesNow[host]:
+                print i+" "+seriesNow[host][i]
+              print "T "+str(logTime)+" ...after %d:%02d:%02d" % (h, m, s)
+              print line+"\n\n"
+              
+                
             if host in seriesNow:
               seriesNow[host][field] = value
             else:
