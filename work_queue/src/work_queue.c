@@ -255,7 +255,7 @@ static int available_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown")){
-			if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
+			if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || overcommitted_resource_total(q, w->resources->memory.total, 0) > w->memory_allocated){
 				available_workers++;
 			}
 		}	
@@ -2160,7 +2160,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 			ok = 0;
 		}
 
-		if(w->unlabeled_allocated + 1 > w->resources->workers.total) {
+		if(w->unlabeled_allocated + 1 > overcommitted_resource_total(q, w->resources->workers.total, 1)) {
 			ok = 0;
 		}
 
@@ -2176,11 +2176,11 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 			ok = 0;
 		} else if(w->cores_allocated + cores_used > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
 			ok = 0;
-		} else if(w->memory_allocated + mem_used > w->resources->memory.total) {
+		} else if(w->memory_allocated + mem_used > overcommitted_resource_total(q, w->resources->memory.total, 0)) {
 			ok = 0;
-		} else if(w->disk_allocated + disk_used > w->resources->disk.total) {
+		} else if(w->disk_allocated + disk_used > w->resources->disk.total) { /* No overcommit disk */
 			ok = 0;
-		} else if(w->gpus_allocated + gpus_used > w->resources->gpus.total) {
+		} else if(w->gpus_allocated + gpus_used > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
 			ok = 0;
 		}
 	}
