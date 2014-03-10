@@ -2151,6 +2151,12 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 		if(t->cores > 0 || t->memory > 0 || t->disk > 0 || t->gpus > 0) {
 			ok = 0;
 		}
+
+		if(w->unlabeled_allocated + 1 > w->resources->workers.total) {
+			ok = 0;
+		}
+
+
 	} else {
 		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
 		cores_used = MAX(t->cores, 0);
@@ -2158,8 +2164,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 		disk_used = MAX(t->disk, 0);
 		gpus_used = MAX(t->gpus, 0);
 
-		if(w->unlabeled_allocated > 0)
-		{
+		if(w->unlabeled_allocated > 0) {
 			ok = 0;
 		} else if(w->cores_allocated + cores_used > get_worker_cores(q, w)) {
 			ok = 0;
