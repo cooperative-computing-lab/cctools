@@ -230,13 +230,6 @@ static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total,
 	return r;
 }
 
-static int64_t get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
-	if(w->resources->cores.total)
-		return w->resources->cores.total * q->asynchrony_multiplier + q->asynchrony_modifier;
-	else
-		return 0;
-}
-
 //Returns count of workers that have identified themselves.
 static int known_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
@@ -262,7 +255,7 @@ static int available_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown")){
-			if(get_worker_cores(q, w) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
+			if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || w->resources->memory.total > w->memory_allocated){
 				available_workers++;
 			}
 		}	
@@ -2181,7 +2174,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 
 		if(w->unlabeled_allocated > 0) {
 			ok = 0;
-		} else if(w->cores_allocated + cores_used > get_worker_cores(q, w)) {
+		} else if(w->cores_allocated + cores_used > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
 			ok = 0;
 		} else if(w->memory_allocated + mem_used > w->resources->memory.total) {
 			ok = 0;
