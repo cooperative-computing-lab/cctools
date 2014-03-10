@@ -137,8 +137,8 @@ struct work_queue {
 	timestamp_t total_idle_time;	// sum of time spent waiting for workers
 	timestamp_t total_app_time;	// sum of time spend above work_queue_wait
 
-	double asynchrony_multiplier;
-	int asynchrony_modifier;
+	int cores_over;
+	double cores_over_factor;
 
 	int minimum_transfer_timeout;
 	int foreman_transfer_timeout;
@@ -217,7 +217,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 
 static int64_t get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->cores.total)
-		return w->resources->cores.total * q->asynchrony_multiplier + q->asynchrony_modifier;
+		return w->resources->cores.total * q->cores_over_factor + q->cores_over;
 	else
 		return 0;
 }
@@ -3228,8 +3228,8 @@ struct work_queue *work_queue_create(int port)
 	q->monitor_mode   =  0;
 	q->password = 0;
 	
-	q->asynchrony_multiplier = 1.0;
-	q->asynchrony_modifier = 0;
+	q->cores_over_factor = 1.0;
+	q->cores_over = 0;
 
 	q->minimum_transfer_timeout = 10;
 	q->foreman_transfer_timeout = 3600;
@@ -3935,8 +3935,8 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 int work_queue_tune(struct work_queue *q, const char *name, double value)
 {
 	
-	if(!strcmp(name, "asynchrony-multiplier")) {
-		q->asynchrony_multiplier = MAX(value, 1.0);
+	if(!strcmp(name, "cores-over-factor") || !strcmp(name, "asynchrony-multiplier")) {
+		q->cores_over_factor = MAX(value, 1.0);
 		
 	} else if(!strcmp(name, "asynchrony-modifier")) {
 		q->asynchrony_modifier = MAX(value, 0);
