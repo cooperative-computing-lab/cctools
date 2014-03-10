@@ -137,8 +137,8 @@ struct work_queue {
 	timestamp_t total_idle_time;	// sum of time spent waiting for workers
 	timestamp_t total_app_time;	// sum of time spend above work_queue_wait
 
-	double asynchrony_multiplier;
-	int asynchrony_modifier;
+	double asynchrony_multiplier;     /* Times the resource value, but disk */
+	int    asynchrony_modifier;       /* Plus this many cores or unlabeled tasks */
 
 	int minimum_transfer_timeout;
 	int foreman_transfer_timeout;
@@ -214,6 +214,21 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 /******************************************************/
 /********** work_queue internal functions *************/
 /******************************************************/
+
+static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total, int cores_flag) {
+	int64_t r = 0;
+	if(total > 0)
+	{
+		r = ceil(total * q->asynchrony_multiplier);
+
+		if(cores_flag)
+		{
+			r += q->asynchrony_modifier;
+		}
+	}
+
+	return r;
+}
 
 static int64_t get_worker_cores(struct work_queue *q, struct work_queue_worker *w) {
 	if(w->resources->cores.total)
