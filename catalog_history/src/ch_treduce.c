@@ -485,7 +485,7 @@ static int log_play( struct deltadb *db  )
 									reduction_delete(hash_table_remove(s->pairs,namep));
 								} else {
 									if (!red->is_number){
-										printf("U %s %s\n",namep,red->str);
+										printf("U %s %s %s\n",keyp,namep,red->str);
 										//reduction_init(red,red->str); //Not necessary because there is no reduction on strings
 									} else {
 										const struct reducer *r = hash_table_lookup(db->reducers,namep);
