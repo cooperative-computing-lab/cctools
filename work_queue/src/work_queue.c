@@ -255,12 +255,18 @@ static int available_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown")){
-			if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || overcommitted_resource_total(q, w->resources->memory.total, 0) > w->memory_allocated){
+			if(w->unlabeled_allocated > 0)
+			{
+				if(overcommitted_resource_total(q, w->resources->workers.total, 1) > w->unlabeled_allocated) {
+					available_workers++;
+				}
+			}
+			else if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || overcommitted_resource_total(q, w->resources->memory.total, 0) > w->memory_allocated){
 				available_workers++;
 			}
 		}	
 	}
-	
+
 	return available_workers;
 }
 
