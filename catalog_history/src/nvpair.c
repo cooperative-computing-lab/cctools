@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "nvpair.h"
 #include "nvpair_private.h"
+#include "debug.h"
 
 #include "hash_table.h"
 #include "stringtools.h"
@@ -88,7 +89,8 @@ int nvpair_parse_stream(struct nvpair *n, FILE * stream)
 			nvpair_insert_string(n, name, value);
 			num_pairs += 1;
 		} else {
-			return 0;
+			debug(D_DEBUG,"corrupt log data: %s",line);
+			//return 0;
 		}
 
 	}
@@ -123,7 +125,8 @@ int nvpair_parse_stream_limited(struct nvpair *n, FILE * stream, char ** attr_li
 				num_pairs += 1;
 			}
 		} else {
-			return 0;
+			debug(D_DEBUG,"corrupt log data: %s",line);
+			//return 0;
 		}
 
 	}

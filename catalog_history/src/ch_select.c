@@ -86,15 +86,52 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 	char oper;
 	
 	int updates = 0;
-	
+	int creating = 0;
+	int bad = 0;
+
 	printf("T %i\n",start_time);
 
 	while(fgets(line,sizeof(line),stream)) {
+		int n = 0;
+		if (!creating){
+			n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
+			switch(oper) {
+				case 'C':
+					if (n!=2) bad = 1;
+					else creating = 1;
+					break;
+				case 'D':
+					if (n!=2) bad = 1;
+					break;
+				case 'U':
+					if (n!=4) bad = 1;
+					break;
+				case 'R':
+					if (n!=3) bad = 1;
+					break;
+				case 'T':
+					if (n!=2) bad = 1;
+					break;
+				default:
+					if(!creating && started) bad = 1;
+			}
 
-		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
+		} else {
+			n = sscanf(line,"%s %[^\n]",name,value);
+			oper = '\0';
+			if (n==1) bad = 1;
+			if (n<=0) creating = 0;
+		}
+		if (bad){
+			debug(D_NOTICE,"corrupt log data: %s",line);
+			bad = 0;
+			continue;
+		}
+
+
 		if (started==1){
 			//printf("(%s",line);
-			if (line[0]=='T' && line[1]!=' ') // Handles garbage times that cause the select to think it is done.
+			if (line[0]=='T' && line[1]!=' ') // Handles corrupt times that cause the select to think it is done.
 				continue;
 			if (oper=='T'){
 				last_ts = current;
@@ -131,6 +168,7 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 			case 'R':
 				nv = hash_table_lookup(table,key);
 				if(nv) nvpair_remove(nv,name);
+				else debug(D_DEBUG,"no attribute to remove: %s",line);
 				break;
 			case 'T':
 				last_ts = current;
@@ -154,8 +192,8 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 				}
 				break;
 			default:
-				debug(D_DEBUG,"corrupt log data: %s",line);
-				printf("corrupt log data: %s",line);
+				debug(D_NOTICE,"corrupt log data: %s",line);
+				//printf("corrupt log data: %s",line);
 				break;
 		}
 	}
