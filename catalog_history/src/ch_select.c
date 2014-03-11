@@ -92,13 +92,15 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 	printf("T %i\n",start_time);
 
 	while(fgets(line,sizeof(line),stream)) {
+		debug(D_NOTICE,"Line: %i %i %s",creating, started, line);
+
 		int n = 0;
 		if (!creating){
 			n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 			switch(oper) {
 				case 'C':
 					if (n!=2) bad = 1;
-					else creating = 1;
+					else if (started) creating = 1;
 					break;
 				case 'D':
 					if (n!=2) bad = 1;
@@ -119,8 +121,8 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 		} else {
 			n = sscanf(line,"%s %[^\n]",name,value);
 			oper = '\0';
-			if (n==1) bad = 1;
 			if (n<=0) creating = 0;
+			else if (n==1) bad = 1;
 		}
 		if (bad){
 			debug(D_NOTICE,"corrupt log data: %s",line);
