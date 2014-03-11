@@ -9,10 +9,16 @@ arguments=""
 host=
 port=
 count=1
+nodes=1
 
 cores=
 memory=
 disk=
+
+gpuq=
+
+forward=0
+numworkers=1
 
 show_help()
 {
@@ -41,9 +47,13 @@ show_help_common()
 	echo "  -O,--os <os>             Set operating system string for the worker to report to master instead of the value in uname."
 	echo "  -s,--workdir <path>      Set the location for creating the working directory of the worker."
 	echo "  -P,--password <pwfile>   Password file to authenticate workers to master."
-	echo "  --cores <num>            Set the number of cores each worker should use (0=auto). (default=1)"
+	echo "  -c, --cores <num>        Set the number of cores each worker should use (0=auto). (default=1)"
 	echo "  --memory <size>          Manually set the amonut of memory (in MB) reported by this worker."
 	echo "  --disk <size>            Manually set the amount of disk (in MB) reported by this worker."
+	echo "  -n,--nodesperjob         (LPW) Set the number of nodes for each batch job (valid for Torque jobs)."
+	echo "  -W,--workerspernode      (LPW) Set the number of workers for each node."
+	echo "  -g,--gpuq                (LPW) Special flag to distinguish between cpu and gpu queues (e.g. on BW)"
+	echo "  -f,--forward             (LPW) Enable SSH port forwarding."
 	echo "  -h,--help                Show this help message."
 	echo ""
 	echo "batch specific options:"
@@ -123,10 +133,9 @@ parse_arguments_common()
 			pwfile=$1 
 			arguments="$arguments -P $pwfile"
 			;;
-			--cores)  
+			-c | --cores)
 			shift
-			arguments="$arguments --cores $1"
-			cores="$1"
+			cores="$1" # Lee-Ping autosets the number of cores later on.
 			;; 
 			--memory)  
 			shift
@@ -140,8 +149,22 @@ parse_arguments_common()
 			;;
 			-r)  
 			shift
-			requirements="$requirments $1"
+			requirements="$requirements $1"
 			;;
+			-n | --nodesperjob)  
+			shift
+			nodes="$1"
+			;;
+			-W | --workerspernode)  
+			shift
+			numworkers="$1"
+			;;
+			-f | --forward)
+			forward=1
+			;;
+			-g | --gpuq)
+			gpuq=1
+			;; 
 			-h | --help)
 			show_help_common
 			;;
@@ -254,11 +277,109 @@ submit_workers_command()
 	echo "Please define a submit_workers_command function in your script"
 }
 
+ssh_port_forward()
+{
+    if [[ $forward == 1 && ! $HOSTNAME =~ "h2o" ]]; then
+        if [ `ps aux | grep $USER | grep ServerAlive | grep $port | grep -v grep | awk '{print \$2}' | wc -l` -eq 0 ] ; then
+            echo "Establishing SSH connection to $host:$port and forwarding port to localhost:$port on $HOSTNAME"
+            ssh -x -o ServerAliveInterval=180 -N -f -L$port:$host:$port $host
+        fi
+    fi
+}
+
+set_up_lpw_extras()
+{
+    #================================#
+    #| Lee-Ping's Modifications for |#
+    #| Best Performance on Clusters |#
+    #|  using Torque: vsp-compute,  |#
+    #|         icme, biox3          |#
+    #================================#
+    # Host-specific worker submission directory.
+    if [[ x$WORK != x ]] ; then
+        hometemp=$WORK/temp
+    elif [[ $HOSTNAME =~ "hs-ln01" ]] ; then
+        hometemp=/hsgs/nobackup/${USER}/temp
+    else
+        hometemp=$HOME/temp
+    fi
+    submit_dir=$hometemp/${USER}-workers/$$
+    # Host-specific parameters to qsub.
+    if [[ $HOSTNAME =~ "biox3" ]] ; then
+        #---- BIOX3 ----#
+        qsub_extras="#PBS -q MP
+#PBS -V
+#PBS -l walltime=72:00:00"
+        self_ssh="y"
+        scratch_dir=/tmp/$USER
+        nodecores=16
+    elif [[ $HOSTNAME =~ "vsp-compute" ]] ; then
+        #---- VSP-COMPUTE ----#
+        scratch_dir=/opt/scratch/$USER
+        nodecores=12
+    elif [[ $HOSTNAME =~ "h2o" || $HOSTNAME =~ "nid" ]] ; then
+        qsub_extras="#PBS -l walltime=24:00:00
+#PBS -l gres=ccm"
+	if [[ x$gpuq != "x" ]] ; then
+            node_extras=":xk"
+	fi
+        scratch_dir=/tmp/leeping/\$HOSTNAME/\$RANDOM
+        nodecores=32
+    elif [[ $HOSTNAME =~ "icme" ]] ; then
+        #---- ICME GPU CLUSTER ----#
+        scratch_dir=/home/$USER/scratch/\$HOSTNAME
+        node_extras=":gpus=7"
+        qsub_extras="#PBS -l walltime=440:00:00
+#PBS -q rlongq"
+        # Notes: node006 is slow and has a few broken GPUs
+        # node012 was experiencing erratic and slow behavior (Feb 22, 2014)
+        nodecores=12
+    elif [[ $HOSTNAME =~ "hs-ln01" ]] ; then
+        #---- PROCLUS (H&S) ----#
+	# On Proclus it is advantageous to specify the 
+        # number of cores per job because compute nodes 
+        # are highly shared.
+        nodecores=16
+	if [ "x$cores" == "x" ] ; then cores=$(( $nodecores / $numworkers )) ; fi
+        qsub_extras="#$ -l h_vmem=3.75G
+#$ -l h_rt=672:00:00
+#$ -pe shm $(( cores * numworkers ))"
+        self_ssh="y"
+        scratch_dir=/tmp/$USER/\$HOSTNAME
+        headnode="hs-ln01" # Using $HOSTNAME for ssh does not work.
+    elif [[ $TACC_SYSTEM == "stampede" ]] ; then
+        #---- TACC STAMPEDE ----#
+        scratch_dir=/tmp/$USER
+	nodecores=12
+	qsub_extras="#SBATCH -p gpu                # Queue name
+#SBATCH -N 1                  # Total number of nodes requested
+#SBATCH -n 1                  # Total number of mpi tasks requested
+#SBATCH -t 24:00:00           # Run time (hh:mm:ss) - 1.5 hours
+#SBATCH -A TG-MCB100057       # <-- Allocation name to charge job against"
+    elif [[ $HOSTNAME =~ "sherlock" ]] ; then
+        #---- SHERLOCK CAMPUS-WIDE CLUSTER ----#
+	scratch_dir=/local-scratch/$USER
+        headnode=${HOSTNAME%.stanford.edu}
+	nodecores=16
+        qsub_extras="#SBATCH -p normal             # Queue name
+#SBATCH -t 48:00:00           # Run time (hh:mm:ss) - 1.5 hours"
+    fi
+    # Set the number of cores for the worker.
+    if [ "x$cores" == "x" ] ; then cores=$(( $nodecores / $numworkers )) ; fi
+    arguments="$arguments --cores $cores"
+    if [[ x$headnode == x ]] ; then
+        headnode=$HOSTNAME
+    fi
+    jobname="wq$port"
+}
+
 submit_workers()
 {
 	parse_arguments_common "$@"
+        set_up_lpw_extras
 	set_up_working_directory
 	set_up_password_file_common
+	ssh_port_forward
 	submit_workers_command
 
 	exit $?

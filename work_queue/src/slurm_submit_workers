@@ -48,6 +48,56 @@ parse_arguments()
 
 submit_workers_command()
 {
+        cat >worker.sh <<EOF
+#!/bin/bash
+
+#SBATCH -J $jobname           # Job name
+#SBATCH -o myjob.%j.out       # Name of stdout output file (%j expands to jobId)
+$qsub_extras
+
+for node in \$(scontrol show hostname \$SLURM_JOB_NODELIST) ; do
+    nohup ssh \$node "$PWD/worker1.sh &> $PWD/worker.log.\$node &"
+done
+sleep 999999
+
+EOF
+        cat >worker1.sh <<EOF
+#!/bin/bash
+
+# Limit core dump size.
+ulimit -c 0
+
+# Go into the directory where the worker program is located.
+cd $PWD
+
+# Set environment variables.
+export OMP_NUM_THREADS=$cores
+export MKL_NUM_THREADS=$cores
+export _CONDOR_SCRATCH_DIR=$scratch_dir
+mkdir -p \$_CONDOR_SCRATCH_DIR
+
+# Optional SSH port forwarding
+if [ $forward == 1 ]; then
+    if [ \`ps aux | grep $USER | grep $headnode | grep ServerAlive | grep $port | grep -v grep | awk '{print \$2}' | wc -l\` -eq 0 ] ; then
+        ssh -x -o ServerAliveInterval=180 -N -f -L$port:localhost:$port $headnode
+    fi
+fi
+
+# Actually execute the workers.
+if [ $forward == 1 ]; then
+    for i in \`seq $numworkers\` ; do
+        ./work_queue_worker -d all -t 86400s $arguments localhost $port &
+    done
+else
+    for i in \`seq $numworkers\` ; do
+        ./work_queue_worker -d all -t 86400s $arguments $host $port &
+    done
+fi
+wait
+EOF
+
+        chmod 755 worker.sh worker1.sh
+
 	sbatch=`which sbatch 2>/dev/null`
 	if [ $? != 0 ]
 	then
@@ -55,10 +105,8 @@ submit_workers_command()
 		exit 1
 	fi
 
-	sbatch --job-name wqWorker --ntasks $count --nodes $count $slurm_parameters <<EOF 
-#!/bin/sh
-srun work_queue_worker $arguments $host $port
-EOF
+        # Submit a single job to multiple nodes.
+	sbatch --ntasks $count --nodes $count $slurm_parameters worker.sh
 
 }
 

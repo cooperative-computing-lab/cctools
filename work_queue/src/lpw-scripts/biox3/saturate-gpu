@@ -1,4 +1,0 @@
-#!/bin/bash
-for i in "biox3-3-1" "biox3-3-3" "biox3-3-5" "biox3-3-7" ; do
-    torque_submit_workers_gpu -t 864000s -p "-l host=$i" not0rious.stanford.edu 9240 1
-done
