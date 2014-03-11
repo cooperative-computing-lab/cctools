@@ -305,7 +305,7 @@ static void log_worker_stats(struct work_queue *q)
 	fprintf(q->logfile, "%" PRIu64 " ", timestamp_get()); 
 	fprintf(q->logfile, "%d %d %d %d %d %d ", s.total_workers_connected, s.workers_init, s.workers_idle, s.workers_busy, s.total_workers_joined, s.total_workers_removed);	
 	fprintf(q->logfile, "%d %d %d %d %d %d ", s.tasks_waiting, s.tasks_running, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_tasks_cancelled);
-	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %f %f %d", s.start_time, s.total_send_time, s.total_receive_time, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity);
+	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %f %f %d ", s.start_time, s.total_send_time, s.total_receive_time, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity);
 	fprintf(q->logfile, "%f %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " ", s.bandwidth, s.total_cores, s.total_memory, s.total_disk, s.total_gpus);
 	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " ", s.min_cores, s.max_cores, s.min_memory, s.max_memory, s.min_disk, s.max_disk, s.min_gpus, s.max_gpus);
 	fprintf(q->logfile, "\n");
