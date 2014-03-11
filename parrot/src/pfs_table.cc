@@ -842,7 +842,7 @@ pfs_ssize_t pfs_table::writev( int fd, const struct iovec *vector, int count )
 	int i;
 	pfs_ssize_t result = 0;
 	pfs_ssize_t chunk;
-	
+
 	for( i = 0; i < count; i++ ) {
 		chunk = this->write( fd, vector->iov_base, vector->iov_len );
 		if( chunk < 0 ) return chunk;
@@ -1473,7 +1473,7 @@ int pfs_table::lutimens( const char *n, const struct timespec times[2] )
 {
 	pfs_name pname;
 	int result=-1;
-	
+
 	if(resolve_name("lutimens",n,&pname,false)) {
 		result = pname.service->lutimens(&pname,times);
 	}
