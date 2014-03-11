@@ -194,7 +194,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Checksum files where available.\n", "-K,--with-checksums");
 	fprintf(stdout, " %-30s Do not checksum files.\n", "-k,--no-checksums");
 	fprintf(stdout, " %-30s Path to ld.so to use.                      (PARROT_LDSO_PATH)\n", "-l,--ld-path=<path>");
-	fprintf(stdout, " %-30s Record all the file names.\n", "  --name-list=<path>");
+	fprintf(stdout, " %-30s Record all the file names.\n", "   --name-list=<path>");
 	fprintf(stdout, " %-30s Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n", "-m,--ftab-file=<file>");
 	fprintf(stdout, " %-30s Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
 	fprintf(stdout, " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
