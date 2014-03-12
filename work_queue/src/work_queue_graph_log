@@ -1,0 +1,199 @@
+#! /usr/bin/env python
+
+import sys
+import re
+import os
+from subprocess import Popen, PIPE
+
+gnuplot_cmd   = 'gnuplot'
+format        = 'png'
+resolution    = 1000000      # this many useconds to one log entry. Default is one second.
+x_units       = 60           # this many resolutions make one x unit. Default is one minute.
+x_units_label = 'minutes'
+
+def read_fields(file, lines_patience = 10):
+  for line in file:
+    if line[0] != '#':
+      lines_patience = lines_patience - 1
+    else:
+      return line.strip('#\n\r\t ').split()
+    if lines_patience < 1: 
+      break
+  sys.stderr.write("Could not find fields descriptions (a line such as # timestamp total_....)\n")
+  sys.exit(1)
+
+def time_to_resolution(t):
+	return (t - (t % resolution)) / resolution
+
+def read_log_entries(file, fields):
+  log_entries = {}
+  idxs  = range(0, len(fields))
+  pairs = zip(idxs, fields)
+  epoch = None
+
+  for line in file:
+    try:
+      numbers = [float(x) for x in line.split()]
+      record  = {}
+
+      for (i, field) in pairs:
+        if re.search('.*_time$', field):
+          numbers[i] = time_to_resolution(numbers[i])
+        elif field == 'timestamp':
+          if not epoch:
+            epoch = time_to_resolution(numbers[i])
+          numbers[i] = time_to_resolution(numbers[i]) - epoch
+        record[field] = numbers[i]
+
+      record['total_transfer_time']    = record['total_send_time'] + record['total_receive_time']
+      record['total_master_time']      = record['timestamp'] - record['total_transfer_time']
+      log_entries[record['timestamp']] = record
+
+    except ValueError:
+      continue
+
+  return log_entries
+
+def sort_time(log_entries):
+  times = []
+  for k in log_entries.keys():
+    times.append(k)
+  times.sort()
+  return times
+
+def preamble_common_gp(times):
+  return '''
+set term %s linewidth 2;
+set xlabel "%s"
+set xrange [0:%f];
+set noborder;
+set tics nomirror;
+set key right top;
+''' % (format, x_units_label, times[-1] / x_units,)
+
+def pout(file, str):
+  file.write(str)
+  file.write('\n')
+  
+def data_one_time_field(file, times, log_entries, field, mod = 1):
+  for t in times:
+    r = log_entries[t]
+    if r[field] is None: break
+    pout(file, '%3.1lf %3.1lf' % (t/x_units, r[field]/mod))
+  pout(file, 'EOF')
+
+def plot_times(file, times, log_entries):
+  pout(file, preamble_common_gp(times))
+  pout(file, 'set ylabel "%s"' % (x_units_label,))
+  pout(file, 'set yrange [0:%f]' % (times[-1] / x_units,))
+  pout(file, """
+plot '-' using 1:2 title 'wall time' with lines,\\
+     '-' using 1:2 title 'sent+recv' with lines,\\
+     '-' using 1:2 title 'master'    with lines,\\
+     '-' using 1:2 title 'sent'      with lines,\\
+     '-' using 1:2 title 'rec'       with lines;
+""")
+  data_one_time_field(file, times, log_entries, 'timestamp',           x_units)
+  data_one_time_field(file, times, log_entries, 'total_transfer_time', x_units)
+  data_one_time_field(file, times, log_entries, 'total_master_time',   x_units)
+  data_one_time_field(file, times, log_entries, 'total_send_time',     x_units)
+  data_one_time_field(file, times, log_entries, 'total_receive_time',  x_units)
+
+def plot_log_times(file, times, log_entries):
+  pout(file, preamble_common_gp(times))
+  pout(file, 'set ylabel "%s"' % (x_units_label,))
+  pout(file, 'set logscale y')
+  pout(file, """
+plot '-' using 1:2 title 'wall time' with lines,\\
+     '-' using 1:2 title 'sent+recv' with lines,\\
+     '-' using 1:2 title 'master'    with lines,\\
+     '-' using 1:2 title 'sent'      with lines,\\
+     '-' using 1:2 title 'rec'       with lines,\\
+     '-' using 1:2 title 'exec'      with lines;
+""")
+  data_one_time_field(file, times, log_entries, 'timestamp',           x_units)
+  data_one_time_field(file, times, log_entries, 'total_transfer_time', x_units)
+  data_one_time_field(file, times, log_entries, 'total_master_time',   x_units)
+  data_one_time_field(file, times, log_entries, 'total_send_time',     x_units)
+  data_one_time_field(file, times, log_entries, 'total_receive_time',  x_units)
+  data_one_time_field(file, times, log_entries, 'total_execute_time',  x_units)
+
+def plot_tasks(file, times, log_entries):
+  pout(file, preamble_common_gp(times))
+  pout(file, 'set ylabel "number of tasks/workers/cores";')
+  pout(file, """
+plot '-' using 1:2 title 'tasks running'     with lines,\\
+     '-' using 1:2 title 'tasks waiting'     with lines,\\
+     '-' using 1:2 title 'workers connected' with lines,\\
+     '-' using 1:2 title 'workers busy'      with lines,\\
+     '-' using 1:2 title 'cores'             with lines;
+""")
+  data_one_time_field(file, times, log_entries, 'tasks_running')
+  data_one_time_field(file, times, log_entries, 'tasks_waiting')
+  data_one_time_field(file, times, log_entries, 'total_workers_connected')
+  data_one_time_field(file, times, log_entries, 'workers_busy')
+  data_one_time_field(file, times, log_entries, 'total_cores')
+
+def plot_log_tasks(file, times, log_entries):
+  pout(file, preamble_common_gp(times))
+  pout(file, 'set ylabel "number of tasks/workers/cores";')
+  pout(file, 'set logscale y')
+  pout(file, """
+plot '-' using 1:2 title 'tasks running'     with lines,\\
+     '-' using 1:2 title 'tasks waiting'     with lines,\\
+     '-' using 1:2 title 'workers connected' with lines,\\
+     '-' using 1:2 title 'workers busy'      with lines,\\
+     '-' using 1:2 title 'cores'             with lines,\\
+     '-' using 1:2 title 'tasks completed'   with lines;
+""")
+  data_one_time_field(file, times, log_entries, 'tasks_running')
+  data_one_time_field(file, times, log_entries, 'tasks_waiting')
+  data_one_time_field(file, times, log_entries, 'total_workers_connected')
+  data_one_time_field(file, times, log_entries, 'workers_busy')
+  data_one_time_field(file, times, log_entries, 'total_cores')
+  data_one_time_field(file, times, log_entries, 'total_tasks_complete')
+
+def run_gnuplot(fn, times, log_entries, output):
+  try:
+    fout = open(output, 'w')
+    gnuplot = Popen(gnuplot_cmd, stdin = PIPE, stdout = fout)
+    fn(gnuplot.stdin, times, log_entries)
+    gnuplot.stdin.close()
+    gnuplot.wait()
+  except IOError:
+    sys.stderr.write("Could not generate file %s.\n" % (output,))
+    exit(1)
+  except OSError:
+    sys.stderr.write("Could not execute %s.\n" % (gnuplot_cmd,))
+    exit(1)
+
+def show_usage():
+  print '%s work-queue-log [prefix-output]\n' % (os.path.basename(sys.argv[0],))
+  print '\tprefix-output defaults to work-queue-log.'
+  print '\tThe scripts generates prefix-output.{time,time-log,tasks,tasks-log}.%s.\n' % (format,)
+
+if __name__ == '__main__':
+  if len(sys.argv) < 2 or len(sys.argv) > 3:
+    show_usage()
+    sys.exit(1)
+
+  filename = sys.argv[1]
+  prefix   = sys.argv[-1]
+
+  try:
+    file        = open(filename)
+    log_entries = read_log_entries(file, read_fields(file))
+    times       = sort_time(log_entries)
+    file.close()
+
+    run_gnuplot(plot_times,     times, log_entries, prefix + '.time.'      + format)
+    run_gnuplot(plot_log_times, times, log_entries, prefix + '.time-log.'  + format)
+    run_gnuplot(plot_tasks,     times, log_entries, prefix + '.tasks.'     + format)
+    run_gnuplot(plot_log_tasks, times, log_entries, prefix + '.tasks-log.' + format)
+
+  except IOError:
+    sys.stderr.write("Could not open file %s\n" % (filename,))
+    sys.exit(1)
+
+
+
