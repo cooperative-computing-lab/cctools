@@ -92,8 +92,6 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 	printf("T %i\n",start_time);
 
 	while(fgets(line,sizeof(line),stream)) {
-		debug(D_NOTICE,"Line: %i %i %s",creating, started, line);
-
 		int n = 0;
 		if (!creating){
 			n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
