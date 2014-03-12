@@ -12,17 +12,20 @@ See the file COPYING for details.
 
 struct work_queue_resource {
 	int64_t inuse;
+	int64_t committed;
 	int64_t total;
 	int64_t smallest;
 	int64_t largest;
 };
 
 struct work_queue_resources {
+	int64_t tag;                       // Identifies the resource snapshot. 
 	struct work_queue_resource workers;
 	struct work_queue_resource disk;
 	struct work_queue_resource cores;
 	struct work_queue_resource memory;
 	struct work_queue_resource gpus;
+	struct work_queue_resource unlabeled;
 };
 
 struct work_queue_resources * work_queue_resources_create();

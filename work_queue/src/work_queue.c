@@ -1558,9 +1558,14 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 {
 	char category[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
-	
-	if(sscanf(line, "resource %s %"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.total,&r.smallest,&r.largest)==5) {
 
+	int n = sscanf(line, "resource %s %"PRId64 " %"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.committed,&r.total,&r.smallest,&r.largest);
+		
+	if(n == 2 && !strcmp(category,"tag"))
+	{
+		/* Shortcut, inuse has the tag, as "resources tag" only sends one value */
+		w->resources->tag = r.inuse;
+	} else if(n == 6) {
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
 		} else if(!strcmp(category,"memory")) {
@@ -4112,6 +4117,29 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->avg_capacity = s->capacity;
 }
 
+/* Unlike aggregate_workers_resources below, does not reset total */
+void aggregate_committed_in_queue( struct work_queue *q, struct work_queue_resources *total )
+{
+	struct work_queue_task *t;
+
+	list_first_item(q->ready_list);
+	while((t = list_next_item(q->ready_list)))
+	{
+		if(t->unlabeled)
+		{
+			total->unlabeled.committed++;
+		}
+		else
+		{
+			total->cores.committed  += MAX(t->cores, 0);
+			total->memory.committed += MAX(t->memory,0);
+			total->disk.committed   += MAX(t->disk,  0);
+			total->gpus.committed   += MAX(t->gpus,  0);
+		}
+	}
+	list_first_item(q->ready_list);
+}
+
 /*
 This function is a little roundabout, because work_queue_resources_add
 updates the min and max of each value as it goes.  So, we set total
@@ -4139,6 +4167,8 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 			work_queue_resources_add(total,w->resources);
 		}
 	}
+
+	aggregate_committed_in_queue(q, total);
 }
 
 int work_queue_specify_log(struct work_queue *q, const char *logfile)
