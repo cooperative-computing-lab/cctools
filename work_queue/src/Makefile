@@ -33,7 +33,7 @@ endif
 
 PROGRAM_SOURCES = ${PROGRAMS:%=%.c} ${TEST_PROGRAMS:%=%.c}
 
-SCRIPTS = wq_submit_workers.common condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers ec2_submit_workers ec2_remove_workers slurm_submit_workers
+SCRIPTS = wq_submit_workers.common condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers ec2_submit_workers ec2_remove_workers slurm_submit_workers work_queue_graph_log
 
 TEST_PROGRAMS = work_queue_example work_queue_workload_simulator
 
