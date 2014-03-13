@@ -29,6 +29,9 @@ def read_fields(file, lines_patience = 10):
 def time_to_resolution(t):
 	return (t - (t % resolution)) / resolution
 
+def time_field_p(field):
+  return (field == 'timestamp' or re.search('.*_time$', field))
+
 def read_log_entries(file, fields):
   log_entries = {}
   idxs  = range(0, len(fields))
@@ -41,12 +44,12 @@ def read_log_entries(file, fields):
       record  = {}
 
       for (i, field) in pairs:
-        if re.search('.*_time$', field):
+        if time_field_p(field):
           numbers[i] = time_to_resolution(numbers[i])
-        elif field == 'timestamp':
+        if field == 'timestamp':
           if not epoch:
-            epoch = time_to_resolution(numbers[i])
-          numbers[i] = time_to_resolution(numbers[i]) - epoch
+            epoch = numbers[i]
+          numbers[i] = numbers[i] - epoch
         record[field] = numbers[i]
 
       record['total_transfer_time']    = record['total_send_time'] + record['total_receive_time']
@@ -79,7 +82,10 @@ def pout(file, str):
   file.write(str)
   file.write('\n')
   
-def data_one_time_field(file, times, log_entries, field, mod = 1):
+def data_one_time_field(file, times, log_entries, field):
+  # if a time field, then scale
+  mod = time_field_p(field) and x_units or 1
+
   for t in times:
     r = log_entries[t]
     try:
@@ -100,11 +106,11 @@ plot '-' using 1:2 title 'wall time' with lines,\\
      '-' using 1:2 title 'sent'      with lines,\\
      '-' using 1:2 title 'rec'       with lines;
 """)
-  data_one_time_field(file, times, log_entries, 'timestamp',           x_units)
-  data_one_time_field(file, times, log_entries, 'total_transfer_time', x_units)
-  data_one_time_field(file, times, log_entries, 'total_master_time',   x_units)
-  data_one_time_field(file, times, log_entries, 'total_send_time',     x_units)
-  data_one_time_field(file, times, log_entries, 'total_receive_time',  x_units)
+  data_one_time_field(file, times, log_entries, 'timestamp')
+  data_one_time_field(file, times, log_entries, 'total_transfer_time')
+  data_one_time_field(file, times, log_entries, 'total_master_time')
+  data_one_time_field(file, times, log_entries, 'total_send_time')
+  data_one_time_field(file, times, log_entries, 'total_receive_time')
 
 def plot_log_times(file, times, log_entries):
   pout(file, preamble_common_gp(times))
@@ -118,12 +124,12 @@ plot '-' using 1:2 title 'wall time' with lines,\\
      '-' using 1:2 title 'rec'       with lines,\\
      '-' using 1:2 title 'exec'      with lines;
 """)
-  data_one_time_field(file, times, log_entries, 'timestamp',           x_units)
-  data_one_time_field(file, times, log_entries, 'total_transfer_time', x_units)
-  data_one_time_field(file, times, log_entries, 'total_master_time',   x_units)
-  data_one_time_field(file, times, log_entries, 'total_send_time',     x_units)
-  data_one_time_field(file, times, log_entries, 'total_receive_time',  x_units)
-  data_one_time_field(file, times, log_entries, 'total_execute_time',  x_units)
+  data_one_time_field(file, times, log_entries, 'timestamp')
+  data_one_time_field(file, times, log_entries, 'total_transfer_time')
+  data_one_time_field(file, times, log_entries, 'total_master_time')
+  data_one_time_field(file, times, log_entries, 'total_send_time')
+  data_one_time_field(file, times, log_entries, 'total_receive_time')
+  data_one_time_field(file, times, log_entries, 'total_execute_time')
 
 def plot_tasks(file, times, log_entries):
   pout(file, preamble_common_gp(times))
