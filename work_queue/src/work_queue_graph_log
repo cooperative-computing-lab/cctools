@@ -77,7 +77,6 @@ def pout(file, str):
 
 class WQPlot:
 
-  plot_line = "'-' using 1:2 title '%s' with lines"
 
   def __init__(self, ylabel, fields, labels=None, xlabel = x_units_label):
     self.fields      = fields
@@ -111,10 +110,13 @@ set key right top;
         break
     pout(file, 'EOF')
 
+  def plot_line(self, label):
+   return "'-' using 1:2 title '%s' with lines" % (label,)
+
   def write_plot(self, file):
     self.preamble(file)
     
-    plots = [ WQPlot.plot_line % (label,) for label in self.labels ]
+    plots = [ self.plot_line(label) for label in self.labels ]
     pout(file, 'plot %s;' % (',\\\n'.join(plots),))
 
     for field in self.fields:
