@@ -15,6 +15,9 @@ resolution    = 1000000      # this many useconds to one log entry. Default is o
 x_units       = 60           # this many resolutions make one x unit. Default is one minute.
 x_units_label = 'minutes'
 
+log_entries   = None
+times         = None
+
 def read_fields(file, lines_patience = 10):
   for line in file:
     if line[0] != '#':
@@ -68,117 +71,74 @@ def sort_time(log_entries):
   times.sort()
   return times
 
-def preamble_common_gp(times):
-  return '''
-set term %s linewidth 2;
-set xlabel "%s"
-set xrange [0:%f];
-set noborder;
-set tics nomirror;
-set key right top;
-''' % (format, x_units_label, times[-1] / x_units,)
-
 def pout(file, str):
   file.write(str)
   file.write('\n')
-  
-def data_one_time_field(file, times, log_entries, field):
-  # if a time field, then scale
-  mod = time_field_p(field) and x_units or 1
 
-  for t in times:
-    r = log_entries[t]
+class WQPlot:
+
+  plot_line = "'-' using 1:2 title '%s' with lines"
+
+  def __init__(self, ylabel, fields, labels=None, xlabel = x_units_label):
+    self.fields      = fields
+    self.labels      = labels or self.fields
+    self.xlabel      = xlabel
+    self.ylabel      = ylabel
+
+  def preamble(self, file):
+    self.__preamble_common(file)
+
+  def __preamble_common(self, file):
+    pout(file, """
+set term %s linewidth 2;
+set xlabel '%s';
+set ylabel '%s';
+set noborder;
+set tics nomirror;
+set key right top;
+  """ % (format, self.xlabel, self.ylabel))
+
+  def __data_one_time_field(self, file, field):
+    # if a time field, then scale
+    mod = time_field_p(field) and x_units or 1
+
+    for t in times:
+      r = log_entries[t]
+      try:
+        pout(file, '%lf %lf' % (t/x_units, r[field]/mod))
+      except KeyError:
+        sys.stderr.write("Field '%s' does not exist in the log\n" % (field,))
+        break
+    pout(file, 'EOF')
+
+  def write_plot(self, file):
+    self.preamble(file)
+    
+    plots = [ WQPlot.plot_line % (label,) for label in self.labels ]
+    pout(file, 'plot %s;' % (',\\\n'.join(plots),))
+
+    for field in self.fields:
+      self.__data_one_time_field(file, field)
+
+  def plot(self, output):
     try:
-      pout(file, '%3.1lf %3.1lf' % (t/x_units, r[field]/mod))
-    except KeyError:
-      sys.stderr.write("Field '%s' does not exist in the log\n" % (field,))
-      break
-  pout(file, 'EOF')
+      fout = open(output, 'w')
+      gnuplot = Popen(gnuplot_cmd, stdin = PIPE, stdout = fout)
+      self.write_plot(gnuplot.stdin)
+      gnuplot.stdin.close()
+      gnuplot.wait()
+    except IOError:
+      sys.stderr.write("Could not generate file %s.\n" % (output,))
+      exit(1)
+    except OSError:
+      sys.stderr.write("Could not execute %s.\n" % (gnuplot_cmd,))
+      exit(1)
 
-def plot_times(file, times, log_entries):
-  pout(file, preamble_common_gp(times))
-  pout(file, 'set ylabel "%s"' % (x_units_label,))
-  pout(file, 'set yrange [0:%f]' % (times[-1] / x_units,))
-  pout(file, """
-plot '-' using 1:2 title 'wall time' with lines,\\
-     '-' using 1:2 title 'sent+recv' with lines,\\
-     '-' using 1:2 title 'master'    with lines,\\
-     '-' using 1:2 title 'sent'      with lines,\\
-     '-' using 1:2 title 'rec'       with lines;
-""")
-  data_one_time_field(file, times, log_entries, 'timestamp')
-  data_one_time_field(file, times, log_entries, 'total_transfer_time')
-  data_one_time_field(file, times, log_entries, 'total_master_time')
-  data_one_time_field(file, times, log_entries, 'total_send_time')
-  data_one_time_field(file, times, log_entries, 'total_receive_time')
-
-def plot_log_times(file, times, log_entries):
-  pout(file, preamble_common_gp(times))
-  pout(file, 'set ylabel "%s"' % (x_units_label,))
-  pout(file, 'set logscale y')
-  pout(file, """
-plot '-' using 1:2 title 'wall time' with lines,\\
-     '-' using 1:2 title 'sent+recv' with lines,\\
-     '-' using 1:2 title 'master'    with lines,\\
-     '-' using 1:2 title 'sent'      with lines,\\
-     '-' using 1:2 title 'rec'       with lines,\\
-     '-' using 1:2 title 'exec'      with lines;
-""")
-  data_one_time_field(file, times, log_entries, 'timestamp')
-  data_one_time_field(file, times, log_entries, 'total_transfer_time')
-  data_one_time_field(file, times, log_entries, 'total_master_time')
-  data_one_time_field(file, times, log_entries, 'total_send_time')
-  data_one_time_field(file, times, log_entries, 'total_receive_time')
-  data_one_time_field(file, times, log_entries, 'total_execute_time')
-
-def plot_tasks(file, times, log_entries):
-  pout(file, preamble_common_gp(times))
-  pout(file, 'set ylabel "number of tasks/workers/cores";')
-  pout(file, """
-plot '-' using 1:2 title 'tasks running'     with lines,\\
-     '-' using 1:2 title 'tasks waiting'     with lines,\\
-     '-' using 1:2 title 'workers connected' with lines,\\
-     '-' using 1:2 title 'workers busy'      with lines,\\
-     '-' using 1:2 title 'cores'             with lines;
-""")
-  data_one_time_field(file, times, log_entries, 'tasks_running')
-  data_one_time_field(file, times, log_entries, 'tasks_waiting')
-  data_one_time_field(file, times, log_entries, 'total_workers_connected')
-  data_one_time_field(file, times, log_entries, 'workers_busy')
-  data_one_time_field(file, times, log_entries, 'total_cores')
-
-def plot_log_tasks(file, times, log_entries):
-  pout(file, preamble_common_gp(times))
-  pout(file, 'set ylabel "number of tasks/workers/cores";')
-  pout(file, 'set logscale y')
-  pout(file, """
-plot '-' using 1:2 title 'tasks running'     with lines,\\
-     '-' using 1:2 title 'tasks waiting'     with lines,\\
-     '-' using 1:2 title 'workers connected' with lines,\\
-     '-' using 1:2 title 'workers busy'      with lines,\\
-     '-' using 1:2 title 'cores'             with lines,\\
-     '-' using 1:2 title 'tasks completed'   with lines;
-""")
-  data_one_time_field(file, times, log_entries, 'tasks_running')
-  data_one_time_field(file, times, log_entries, 'tasks_waiting')
-  data_one_time_field(file, times, log_entries, 'total_workers_connected')
-  data_one_time_field(file, times, log_entries, 'workers_busy')
-  data_one_time_field(file, times, log_entries, 'total_cores')
-  data_one_time_field(file, times, log_entries, 'total_tasks_complete')
-
-def run_gnuplot(fn, times, log_entries, output):
-  try:
-    fout = open(output, 'w')
-    gnuplot = Popen(gnuplot_cmd, stdin = PIPE, stdout = fout)
-    fn(gnuplot.stdin, times, log_entries)
-    gnuplot.stdin.close()
-    gnuplot.wait()
-  except IOError:
-    sys.stderr.write("Could not generate file %s.\n" % (output,))
-    exit(1)
-  except OSError:
-    sys.stderr.write("Could not execute %s.\n" % (gnuplot_cmd,))
-    exit(1)
+class WQPlotLog(WQPlot):
+  def preamble(self, file):
+    WQPlot.preamble(self, file)
+    pout(file, 'set logscale y')
+    pout(file, '')
 
 def show_usage():
   print '%s work-queue-log [prefix-output]\n' % (os.path.basename(sys.argv[0],))
@@ -199,10 +159,28 @@ if __name__ == '__main__':
     times       = sort_time(log_entries)
     file.close()
 
-    run_gnuplot(plot_times,     times, log_entries, prefix + '.time.'      + format)
-    run_gnuplot(plot_log_times, times, log_entries, prefix + '.time-log.'  + format)
-    run_gnuplot(plot_tasks,     times, log_entries, prefix + '.tasks.'     + format)
-    run_gnuplot(plot_log_tasks, times, log_entries, prefix + '.tasks-log.' + format)
+    plot_of_times = WQPlot(ylabel = x_units_label,
+        fields = ['timestamp', 'total_transfer_time', 'total_master_time', 
+                  'total_send_time', 'total_receive_time'],
+        labels = ['wall time', 'sent+recv', 'master', 'sent', 'rec'])
+
+    plot_of_times_log = WQPlotLog(ylabel = x_units_label,
+        fields = ['timestamp', 'total_transfer_time', 'total_master_time', 
+                  'total_send_time', 'total_receive_time', 'total_execute_time'],
+        labels = ['wall time', 'sent+recv', 'master', 'sent', 'rec', 'exec'])
+
+    plot_of_tasks = WQPlot(ylabel = 'number of tasks/workers/cores',
+        fields =['tasks_running', 'tasks_waiting', 'total_workers_connected', 'workers_busy', 'total_cores'],
+        labels = ['tasks running', 'tasks waiting', 'workers connected', 'workers busy', 'cores'])
+
+    plot_of_tasks_log = WQPlotLog(ylabel = 'number of tasks/workers/cores',
+        fields =['tasks_running', 'tasks_waiting', 'total_workers_connected', 'workers_busy', 'total_cores', 'total_tasks_complete'],
+        labels = ['tasks running', 'tasks waiting', 'workers connected', 'workers busy', 'cores', 'tasks completed'])
+
+    plot_of_times.plot(prefix     + '.time.'      + format)
+    plot_of_times_log.plot(prefix + '.time-log.'  + format)
+    plot_of_tasks.plot(prefix     + '.tasks.'     + format)
+    plot_of_tasks_log.plot(prefix + '.tasks-log.' + format)
 
   except IOError:
     sys.stderr.write("Could not open file %s\n" % (filename,))
