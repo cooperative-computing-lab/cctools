@@ -13,6 +13,7 @@ extern "C" {
 #include "debug.h"
 #include "path.h"
 #include "stringtools.h"
+#include "create_dir.h"
 }
 
 #include <unistd.h>
@@ -187,11 +188,15 @@ static void cvmfs_parrot_logger(const char *msg)
 }
 
 static bool write_key(char const *key_text,char const *key_basename,std::string &full_key_fname)
-{
-	full_key_fname = pfs_temp_dir;
+{    
+	// Write keys per instance, avoiding race condition in which two parrot
+	// instances try to write the same key. As a bonus, we clear the key files
+	// on exit, since pfs_cvmfs_locks_dir is garbage collected on exit.
+	full_key_fname = pfs_cvmfs_locks_dir;
+
 	full_key_fname += "/cvmfs";
 
-	if( mkdir(full_key_fname.c_str(),0755) != 0 && errno != EEXIST ) {
+	if( !create_dir(full_key_fname.c_str(),0755) && errno != EEXIST ) {
 		debug(D_CVMFS|D_NOTICE,"WARNING: failed to mkdir %s: errno=%d %s",
 			  full_key_fname.c_str(), errno, strerror(errno));
 	}
