@@ -82,8 +82,11 @@ def pout(file, str):
 def data_one_time_field(file, times, log_entries, field, mod = 1):
   for t in times:
     r = log_entries[t]
-    if r[field] is None: break
-    pout(file, '%3.1lf %3.1lf' % (t/x_units, r[field]/mod))
+    try:
+      pout(file, '%3.1lf %3.1lf' % (t/x_units, r[field]/mod))
+    except KeyError:
+      sys.stderr.write("Field '%s' does not exist in the log\n" % (field,))
+      break
   pout(file, 'EOF')
 
 def plot_times(file, times, log_entries):
