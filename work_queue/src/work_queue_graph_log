@@ -7,6 +7,7 @@
 import sys
 import re
 import os
+import getopt
 from subprocess import Popen, PIPE
 
 gnuplot_cmd   = 'gnuplot'
@@ -143,20 +144,35 @@ class WQPlotLog(WQPlot):
     pout(file, '')
 
 def show_usage():
-  print '%s work-queue-log [prefix-output]\n' % (os.path.basename(sys.argv[0],))
+  print '%s [-h] [-o prefix-output] work-queue-log\n' % (os.path.basename(sys.argv[0],))
   print '\tprefix-output defaults to work-queue-log.'
   print '\tThe scripts generates prefix-output.{time,time-log,tasks,tasks-log}.%s.\n' % (format,)
 
 if __name__ == '__main__':
-  if len(sys.argv) < 2 or len(sys.argv) > 3:
+
+  try:
+    optlist, args = getopt.getopt(sys.argv[1:], 'ho:')
+  except getopt.GetoptError as e:
+    sys.stderr.write(str(e) + '\n')
     show_usage()
     sys.exit(1)
 
-  filename = sys.argv[1]
-  prefix   = sys.argv[-1]
+  if len(args) < 1:
+    show_usage()
+    sys.exit(1)
+
+  logname = args[0]
+  prefix  = logname
+
+  for opt, arg in optlist:
+    if   opt == '-o': 
+      prefix = arg
+    elif opt == '-h':
+      show_usage()
+      sys.exit(0)
 
   try:
-    file        = open(filename)
+    file        = open(logname)
     log_entries = read_log_entries(file, read_fields(file))
     times       = sort_time(log_entries)
     file.close()
