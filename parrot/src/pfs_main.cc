@@ -739,11 +739,13 @@ int main( int argc, char *argv[] )
 		sprintf(pfs_cvmfs_alien_cache_dir,"%s/cvmfs", pfs_temp_dir);
 	}
 
-	sprintf(pfs_cvmfs_locks_dir, "%s/cvmfs_locks_%d", pfs_temp_dir, getpid());
 
 	pfs_file_cache = file_cache_init(pfs_temp_dir);
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
 	file_cache_cleanup(pfs_file_cache);
+
+	sprintf(pfs_cvmfs_locks_dir, "%s/cvmfs_locks_XXXXXX", pfs_temp_dir);
+	mkdtemp(pfs_cvmfs_locks_dir);
 
 	if(!chose_auth) auth_register_all();
 
