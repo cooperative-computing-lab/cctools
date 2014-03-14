@@ -7,6 +7,9 @@ See the file COPYING for details.
 #ifndef PFS_MMAP_H
 #define PFS_MMAP_H
 
+#include <assert.h>
+
+#include "pfs_channel.h"
 #include "pfs_types.h"
 #include "pfs_file.h"
 
@@ -27,7 +30,8 @@ public:
 	pfs_mmap( pfs_mmap * m ) {
 		file = m->file;
 		logical_addr = m->logical_addr;
-		channel_offset = m->channel_offset;
+		pfs_channel_lookup(file->get_name()->path,&channel_offset); /* increase refcount */
+		assert(channel_offset == m->channel_offset);
 		map_length = m->map_length;
 		file_offset = m->file_offset;
 		prot = m->prot;
