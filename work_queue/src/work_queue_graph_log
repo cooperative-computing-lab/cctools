@@ -123,28 +123,22 @@ set key right top;
       self.__data_one_time_field(file, field)
 
   def __plot_internal(self, output, command):
-    try:
       sys.stdout.write("Generating '%s'.\n" % (output,))
       fout = open(output, 'w')
       gnuplot = Popen(command, stdin = PIPE, stdout = fout)
       self.write_plot(gnuplot.stdin)
       gnuplot.stdin.close()
       gnuplot.wait()
+  def plot(self, output):
+    try:
+      self.__plot_internal(output, command = gnuplot_cmd)
     except IOError:
       sys.stderr.write("Could not generate file %s.\n" % (output,))
       exit(1)
-
-  def plot(self, output):
-    try: 
-      self.__plot_internal(output, command = gnuplot_cmd)
     except OSError:
-      output = output + '.gnuplot'
-      sys.stderr.write("Could not execute '%s'. Trying script text generation '%s'\n" % (gnuplot_cmd, output))
-      try:
-        self.__plot_internal(output, command = 'cat')
-      except OSError:
-        sys.stderr.write("Could not execute 'cat'. Terminating.\n")
-        exit(1)
+      sys.stderr.write("Could not execute '%s'. Please try again specifying -c <gnuplot-path>, or -Ttext\n" % (gnuplot_cmd, ))
+      exit(1)
+
 
 class WQPlotLog(WQPlot):
   def preamble(self, file):
