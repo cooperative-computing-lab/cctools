@@ -519,6 +519,41 @@ tasks to a two-slot worker, regardless of their memory or disk usage.
 
 <h2 id="recommended">Recommended Practices<a class="sectionlink" href="#recommended" title="Link to this section.">&#x21d7;</a></h2>
 
+<h3> logging and plotting </h3>
+
+You can specify a log file to obtain a time series of work queue statistics. Usually this log file is specified just after the creation of the queue as follows:
+
+<div class="code_area">
+<h4 class="code_header">C/Perl</h4>
+<pre class="code_snip">
+ work_queue_specify_log(q, "mylogfile");
+
+</pre>
+
+<h4 class="code_header">Python</h4>
+<pre class="code_snip">
+ q.specify_log("mylogfile")
+
+</pre>
+</div>
+
+The script <tt>work_queue_graph_log</tt> is a wrapper for <tt>gnuplot</tt>, and
+with it you can plot some of the statistics, such as total time spent
+transfering tasks, number of tasks running, and workers connected: 
+
+<div class="code_area">
+<pre class="code_snip">
+ % work_queue_graph_log -o myplots mylogfile
+ % ls
+ % ... myplots.tasks.png myplots.tasks-log.png myplots.time.png myplots.time-log.png ...
+
+</pre>
+</div>
+
+We find it very helpful to plot these statistics when diagnosing a problem with
+work queue applications.
+
+<h3> stdout size limit </h3>
 <p> The output printed by a task to stdout can be accessed in the
 <tt>output</tt> buffer in <a
 href="api/html/structwork__queue__task.html">work_queue_task struct</a>. The

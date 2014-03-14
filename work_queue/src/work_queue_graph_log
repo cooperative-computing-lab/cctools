@@ -1,0 +1,225 @@
+#! /usr/bin/env python
+
+# Copyright (C) 2014- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+import sys
+import re
+import os
+import getopt
+from subprocess import Popen, PIPE
+
+gnuplot_cmd   = 'gnuplot'
+format        = 'png'
+extension     = format
+resolution    = 1000000      # this many useconds to one log entry. Default is one second.
+x_units       = 60           # this many resolutions make one x unit. Default is one minute.
+x_units_label = 'minutes'
+
+log_entries   = None
+times         = None
+
+def read_fields(file, lines_patience = 10):
+  for line in file:
+    if line[0] != '#':
+      lines_patience = lines_patience - 1
+    else:
+      return line.strip('#\n\r\t ').split()
+    if lines_patience < 1: 
+      break
+  sys.stderr.write("Could not find fields descriptions (a line such as # timestamp total_....)\n")
+  sys.exit(1)
+
+def time_to_resolution(t):
+	return (t - (t % resolution)) / resolution
+
+def time_field_p(field):
+  return (field == 'timestamp' or re.search('.*_time$', field))
+
+def read_log_entries(file, fields):
+  log_entries = {}
+  idxs  = range(0, len(fields))
+  pairs = zip(idxs, fields)
+  epoch = None
+
+  for line in file:
+    try:
+      numbers = [float(x) for x in line.split()]
+      record  = {}
+
+      for (i, field) in pairs:
+        if time_field_p(field):
+          numbers[i] = time_to_resolution(numbers[i])
+        if field == 'timestamp':
+          if not epoch:
+            epoch = numbers[i]
+          numbers[i] = numbers[i] - epoch
+        record[field] = numbers[i]
+
+      record['total_transfer_time']    = record['total_send_time'] + record['total_receive_time']
+      record['total_master_time']      = record['timestamp'] - record['total_transfer_time']
+      log_entries[record['timestamp']] = record
+
+    except ValueError:
+      continue
+
+  return log_entries
+
+def sort_time(log_entries):
+  times = []
+  for k in log_entries.keys():
+    times.append(k)
+  times.sort()
+  return times
+
+def pout(file, str):
+  file.write(str)
+  file.write('\n')
+
+class WQPlot:
+  def __init__(self, ylabel, fields, labels=None, xlabel = x_units_label):
+    self.fields      = fields
+    self.labels      = labels or self.fields
+    self.xlabel      = xlabel
+    self.ylabel      = ylabel
+
+  def preamble(self, file):
+    self.__preamble_common(file)
+
+  def __preamble_common(self, file):
+    pout(file, """
+set term %s linewidth 2;
+set xlabel '%s';
+set ylabel '%s';
+set noborder;
+set tics nomirror;
+set key right top;
+  """ % (format, self.xlabel, self.ylabel))
+
+  def __data_one_time_field(self, file, field):
+    # if a time field, then scale
+    mod = time_field_p(field) and x_units or 1
+
+    for t in times:
+      r = log_entries[t]
+      try:
+        pout(file, '%lf %lf' % (t/x_units, r[field]/mod))
+      except KeyError:
+        sys.stderr.write("Field '%s' does not exist in the log\n" % (field,))
+        break
+    pout(file, 'EOF')
+
+  def plot_line(self, label):
+   return "'-' using 1:2 title '%s' with lines" % (label,)
+
+  def write_plot(self, file):
+    self.preamble(file)
+    
+    plots = [ self.plot_line(label) for label in self.labels ]
+    pout(file, 'plot %s;' % (',\\\n'.join(plots),))
+
+    for field in self.fields:
+      self.__data_one_time_field(file, field)
+
+  def __plot_internal(self, output, command):
+      sys.stdout.write("Generating '%s'.\n" % (output,))
+      fout = open(output, 'w')
+      gnuplot = Popen(command, stdin = PIPE, stdout = fout)
+      self.write_plot(gnuplot.stdin)
+      gnuplot.stdin.close()
+      gnuplot.wait()
+  def plot(self, output):
+    try:
+      self.__plot_internal(output, command = gnuplot_cmd)
+    except IOError:
+      sys.stderr.write("Could not generate file %s.\n" % (output,))
+      exit(1)
+    except OSError:
+      sys.stderr.write("Could not execute '%s'. Please try again specifying -c <gnuplot-path>, or -Ttext\n" % (gnuplot_cmd, ))
+      exit(1)
+
+
+class WQPlotLog(WQPlot):
+  def preamble(self, file):
+    WQPlot.preamble(self, file)
+    pout(file, 'set logscale y')
+    pout(file, '')
+
+def show_usage():
+  print '%s [options] <work-queue-log>\n' % (os.path.basename(sys.argv[0],))
+  print '\t-h\t\t\tThis message.'
+  print '\t-c <gnuplot-path>\tSpecify the location of the gnuplot executable.'
+  print '\t\t\t\tDefault is gnuplot.'
+  print '\t-o <prefix-output>\tGenerate prefix-output.{time,time-log,tasks,tasks-log}.%s.' % (format,)
+  print '\t\t\t\tDefault is <work-queue-log>.'
+  print '\t-T <output-format>\tSet output format. Default is png.'
+  print '\t\t\t\tIf \'text\', then the gnuplot scripts are written instead of the images.'
+
+if __name__ == '__main__':
+
+  try:
+    optlist, args = getopt.getopt(sys.argv[1:], 'c:ho:T:')
+  except getopt.GetoptError as e:
+    sys.stderr.write(str(e) + '\n')
+    show_usage()
+    sys.exit(1)
+
+  if len(args) < 1:
+    show_usage()
+    sys.exit(1)
+
+  logname = args[0]
+  prefix  = logname
+
+  for opt, arg in optlist:
+    if   opt == '-c': 
+      gnuplot_cmd = arg
+    elif opt == '-o': 
+      prefix = arg
+    elif opt == '-h':
+      show_usage()
+      sys.exit(0)
+    elif opt == '-T':
+      if arg == 'text':
+        gnuplot_cmd = 'cat'
+        extension   = format + '.gnuplot'
+      else:
+        format    = arg
+        extension = format
+
+  try:
+    file        = open(logname)
+    log_entries = read_log_entries(file, read_fields(file))
+    times       = sort_time(log_entries)
+    file.close()
+
+    plot_of_times = WQPlot(ylabel = x_units_label,
+        fields = ['timestamp', 'total_transfer_time', 'total_master_time', 
+                  'total_send_time', 'total_receive_time'],
+        labels = ['wall time', 'sent+recv', 'master', 'sent', 'rec'])
+
+    plot_of_times_log = WQPlotLog(ylabel = x_units_label,
+        fields = ['timestamp', 'total_transfer_time', 'total_master_time', 
+                  'total_send_time', 'total_receive_time', 'total_execute_time'],
+        labels = ['wall time', 'sent+recv', 'master', 'sent', 'rec', 'exec'])
+
+    plot_of_tasks = WQPlot(ylabel = 'number of tasks/workers/cores',
+        fields =['tasks_running', 'tasks_waiting', 'total_workers_connected', 'workers_busy', 'total_cores'],
+        labels = ['tasks running', 'tasks waiting', 'workers connected', 'workers busy', 'cores'])
+
+    plot_of_tasks_log = WQPlotLog(ylabel = 'number of tasks/workers/cores',
+        fields =['tasks_running', 'tasks_waiting', 'total_workers_connected', 'workers_busy', 'total_cores', 'total_tasks_complete'],
+        labels = ['tasks running', 'tasks waiting', 'workers connected', 'workers busy', 'cores', 'tasks completed'])
+
+    plot_of_times.plot(prefix     + '.time.'      + extension)
+    plot_of_times_log.plot(prefix + '.time-log.'  + extension)
+    plot_of_tasks.plot(prefix     + '.tasks.'     + extension)
+    plot_of_tasks_log.plot(prefix + '.tasks-log.' + extension)
+
+  except IOError:
+    sys.stderr.write("Could not open file %s\n" % (filename,))
+    sys.exit(1)
+
+
+
