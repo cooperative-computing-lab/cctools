@@ -115,8 +115,6 @@ char resolved_##path[CHIRP_PATH_MAX];\
 if (chirp_fs_local_resolve(path, resolved_##path) == -1) return NULL;\
 path = resolved_##path;
 
-
-
 /*
  * The provided url could have any of the following forms:
  * o `local://path'
