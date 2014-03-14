@@ -160,7 +160,7 @@ def show_usage():
   print '\t-o <prefix-output>\tGenerate prefix-output.{time,time-log,tasks,tasks-log}.%s.' % (format,)
   print '\t\t\t\tDefault is <work-queue-log>.'
   print '\t-T <output-format>\tSet output format. Default is png.'
-  print '\t\t\t\tIf txt, then the gnuplot scripts are written instead of the images.'
+  print '\t\t\t\tIf \'text\', then the gnuplot scripts are written instead of the images.'
 
 if __name__ == '__main__':
 
@@ -187,7 +187,7 @@ if __name__ == '__main__':
       show_usage()
       sys.exit(0)
     elif opt == '-T':
-      if arg == 'txt':
+      if arg == 'text':
         gnuplot_cmd = 'cat'
         extension   = format + '.gnuplot'
       else:
