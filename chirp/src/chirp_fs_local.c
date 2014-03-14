@@ -103,9 +103,9 @@ static struct {
 	char path[CHIRP_PATH_MAX];
 } open_files[CHIRP_FILESYSTEM_MAXFD];
 
-#define fdvalid(fd) (!(0 <= fd && fd < CHIRP_FILESYSTEM_MAXFD && open_files[fd].fd >= 0))
+#define fdvalid(fd) (0 <= fd && fd < CHIRP_FILESYSTEM_MAXFD && open_files[fd].fd >= 0)
 #define SETUP_FILE \
-if(fdvalid(fd)) return (errno = EBADF, -1);\
+if(!fdvalid(fd)) return (errno = EBADF, -1);\
 int lfd = open_files[fd].fd;\
 (void)lfd; /* silence unused warnings */
 

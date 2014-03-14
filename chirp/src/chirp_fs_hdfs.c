@@ -73,9 +73,9 @@ static struct {
 	hdfsFile file;
 } open_files[CHIRP_FILESYSTEM_MAXFD];
 
-#define fdvalid(fd) (!(0 <= fd && fd < CHIRP_FILESYSTEM_MAXFD && open_files[fd].file))
+#define fdvalid(fd) (0 <= fd && fd < CHIRP_FILESYSTEM_MAXFD && open_files[fd].file)
 #define SETUP_FILE \
-if(fdvalid(fd)) return (errno = EBADF, -1);\
+if(!fdvalid(fd)) return (errno = EBADF, -1);\
 hdfsFile *file = open_files[fd].file;\
 (void)file; /* silence unused warnings */
 
