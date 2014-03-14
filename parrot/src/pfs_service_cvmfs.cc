@@ -370,8 +370,7 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 
 	int repo_name_offset = 0;
 	int repo_name_in_cachedir_offset = 0;
-
-	char *cache_options;
+	int repo_name_in_alien_cachedir_offset = 0;
 
 	int enable_alien_on_this_repository = pfs_cvmfs_enable_alien;
 	if(enable_alien_on_this_repository && strstr(user_options,"quota_limit=")) {
@@ -379,31 +378,21 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 		enable_alien_on_this_repository = false;
 	}
 
-	if(enable_alien_on_this_repository)
-	{
-		cache_options = string_format("cachedir=%s/%n%s,alien_cachedir=%s/%n%s", 
-				//cachedir
-				pfs_cvmfs_locks_dir,
-				&repo_name_in_cachedir_offset,
-				repo_name,
-
-				//alien_cachedir
-				pfs_cvmfs_alien_cache_dir,
-				&repo_name_in_cachedir_offset,
-				repo_name);
-	}
-	else
-	{
-		cache_options = string_format("cachedir=%s/cvmfs/%n%s", 
-				pfs_temp_dir, 
-				&repo_name_in_cachedir_offset,
-				repo_name);
-	}
-
-	char *buf = string_format("repo_name=%n%s,%s,timeout=%d,timeout_direct=%d%s%s,%n%s",
+	char *buf = string_format("repo_name=%n%s,cachedir=%s/cvmfs/%n%s,%s%s%s%n%s%stimeout=%d,timeout_direct=%d%s%s,%n%s",
 			&repo_name_offset,
 			repo_name,
-			cache_options,
+
+			enable_alien_on_this_repository ? pfs_cvmfs_locks_dir : pfs_temp_dir,
+			&repo_name_in_cachedir_offset,
+			repo_name,
+
+			enable_alien_on_this_repository ? "alien_cachedir=" : "",
+			enable_alien_on_this_repository ? pfs_cvmfs_alien_cache_dir : "",
+			enable_alien_on_this_repository ? "/" : "",
+			&repo_name_in_alien_cachedir_offset,
+			enable_alien_on_this_repository ? repo_name : "",
+			enable_alien_on_this_repository ? "," : "",
+
 			pfs_master_timeout,
 			pfs_master_timeout,
 			proxy ? ",proxies=" : "",
@@ -432,6 +421,12 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 	f->wildcard_subst = subst;
 	if( wildcard ) {
 		// make a note to fix up the repo name later
+		// Order of the following is important! Substitute in reverse order as
+		// they appear in buf.
+		if(enable_alien_on_this_repository)
+		{
+			f->wildcard_subst.push_back(repo_name_in_alien_cachedir_offset - f->subst_offset);
+		}
 		f->wildcard_subst.push_back(repo_name_in_cachedir_offset - f->subst_offset);
 		f->wildcard_subst.push_back(repo_name_offset - f->subst_offset);
 	}
