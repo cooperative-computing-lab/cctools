@@ -96,6 +96,19 @@ See the file COPYING for details.
 	(b).cst_ctime = (a).st_ctime;
 #endif
 
+static char local_root[CHIRP_PATH_MAX];
+
+static struct {
+	int fd;
+	char path[CHIRP_PATH_MAX];
+} open_files[CHIRP_FILESYSTEM_MAXFD];
+
+#define fdvalid(fd) (!(0 <= fd && fd < CHIRP_FILESYSTEM_MAXFD && open_files[fd].fd >= 0))
+#define SETUP_FILE \
+if(fdvalid(fd)) return (errno = EBADF, -1);\
+int lfd = open_files[fd].fd;\
+(void)lfd; /* silence unused warnings */
+
 #define RESOLVE(path) \
 char resolved_##path[CHIRP_PATH_MAX];\
 if (chirp_fs_local_resolve(path, resolved_##path) == -1) return -1;\
@@ -106,11 +119,7 @@ char resolved_##path[CHIRP_PATH_MAX];\
 if (chirp_fs_local_resolve(path, resolved_##path) == -1) return NULL;\
 path = resolved_##path;
 
-static char local_root[CHIRP_PATH_MAX];
 
-static struct {
-	char path[CHIRP_PATH_MAX];
-} open_files[CHIRP_FILESYSTEM_MAXFD];
 
 /*
  * The provided url could have any of the following forms:
@@ -135,10 +144,7 @@ static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 
 static int chirp_fs_local_fname (int fd, char path[CHIRP_PATH_MAX])
 {
-	if (fd < 0 || open_files[fd].path[0] == '\0') {
-		errno = EBADF;
-		return -1;
-	}
+	SETUP_FILE
 	strcpy(path, open_files[fd].path);
 	return 0;
 }
@@ -174,46 +180,52 @@ static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode
 
 static INT64_T chirp_fs_local_close(int fd)
 {
-	INT64_T rc;
-	rc = close(fd);
-	if (rc == 0) {
+	SETUP_FILE
+	if (close(lfd) == -1) {
+		open_files[fd].fd = -1;
 		open_files[fd].path[0] = '\0';
+		return -1;
+	} else {
+		return 0;
 	}
-	return rc;
 }
 
 static INT64_T chirp_fs_local_pread(int fd, void *buffer, INT64_T length, INT64_T offset)
 {
+	SETUP_FILE
 	INT64_T result;
-	result = full_pread64(fd, buffer, length, offset);
+	result = full_pread64(lfd, buffer, length, offset);
 	if(result < 0 && errno == ESPIPE) {
 		/* if this is a pipe, return whatever amount is available */
-		result = read(fd, buffer, length);
+		result = read(lfd, buffer, length);
 	}
 	return result;
 }
 
 static INT64_T chirp_fs_local_pwrite(int fd, const void *buffer, INT64_T length, INT64_T offset)
 {
+	SETUP_FILE
 	INT64_T result;
-	result = full_pwrite64(fd, buffer, length, offset);
+	result = full_pwrite64(lfd, buffer, length, offset);
 	if(result < 0 && errno == ESPIPE) {
 		/* if this is a pipe, then just write without the offset. */
-		result = full_write(fd, buffer, length);
+		result = full_write(lfd, buffer, length);
 	}
 	return result;
 }
 
 static INT64_T chirp_fs_local_lockf (int fd, int cmd, INT64_T len)
 {
-	return lockf(fd, cmd, len);
+	SETUP_FILE
+	return lockf(lfd, cmd, len);
 }
 
 static INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat *buf)
 {
+	SETUP_FILE
 	struct stat64 info;
 	int result;
-	result = fstat64(fd, &info);
+	result = fstat64(lfd, &info);
 	if(result == 0)
 		COPY_CSTAT(info, *buf);
 	buf->cst_mode = buf->cst_mode & (~0077);
@@ -222,9 +234,10 @@ static INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat *buf)
 
 static INT64_T chirp_fs_local_fstatfs(int fd, struct chirp_statfs *buf)
 {
+	SETUP_FILE
 	struct statfs64 info;
 	int result;
-	result = fstatfs64(fd, &info);
+	result = fstatfs64(lfd, &info);
 	if(result == 0) {
 		memset(buf, 0, sizeof(*buf));
 #ifdef CCTOOLS_OPSYS_SUNOS
@@ -245,6 +258,7 @@ static INT64_T chirp_fs_local_fstatfs(int fd, struct chirp_statfs *buf)
 
 static INT64_T chirp_fs_local_fchown(int fd, INT64_T uid, INT64_T gid)
 {
+	SETUP_FILE
 	// Changing file ownership is silently ignored,
 	// because permissions are handled through the ACL model.
 	return 0;
@@ -252,21 +266,24 @@ static INT64_T chirp_fs_local_fchown(int fd, INT64_T uid, INT64_T gid)
 
 static INT64_T chirp_fs_local_fchmod(int fd, INT64_T mode)
 {
+	SETUP_FILE
 	// A remote user can change some of the permissions bits,
 	// which only affect local users, but we don't let them
 	// take away the owner bits, which would affect the Chirp server.
 	mode = 0600 | (mode & 0177);
-	return fchmod(fd, mode);
+	return fchmod(lfd, mode);
 }
 
 static INT64_T chirp_fs_local_ftruncate(int fd, INT64_T length)
 {
-	return ftruncate64(fd, length);
+	SETUP_FILE
+	return ftruncate64(lfd, length);
 }
 
 static INT64_T chirp_fs_local_fsync(int fd)
 {
-	return fsync(fd);
+	SETUP_FILE
+	return fsync(lfd);
 }
 
 static INT64_T chirp_fs_local_unlink(const char *path)
@@ -742,10 +759,11 @@ static INT64_T chirp_fs_local_getxattr(const char *path, const char *name, void 
 
 static INT64_T chirp_fs_local_fgetxattr(int fd, const char *name, void *data, size_t size)
 {
+	SETUP_FILE
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return fgetxattr(fd, name, data, size, 0, 0);
+	return fgetxattr(lfd, name, data, size, 0, 0);
 #else
-	return fgetxattr(fd, name, data, size);
+	return fgetxattr(lfd, name, data, size);
 #endif
 }
 
@@ -771,10 +789,11 @@ static INT64_T chirp_fs_local_listxattr(const char *path, char *list, size_t siz
 
 static INT64_T chirp_fs_local_flistxattr(int fd, char *list, size_t size)
 {
+	SETUP_FILE
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return flistxattr(fd, list, size, 0);
+	return flistxattr(lfd, list, size, 0);
 #else
-	return flistxattr(fd, list, size);
+	return flistxattr(lfd, list, size);
 #endif
 }
 
@@ -800,10 +819,11 @@ static INT64_T chirp_fs_local_setxattr(const char *path, const char *name, const
 
 static INT64_T chirp_fs_local_fsetxattr(int fd, const char *name, const void *data, size_t size, int flags)
 {
+	SETUP_FILE
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return fsetxattr(fd, name, data, size, 0, flags);
+	return fsetxattr(lfd, name, data, size, 0, flags);
 #else
-	return fsetxattr(fd, name, data, size, flags);
+	return fsetxattr(lfd, name, data, size, flags);
 #endif
 }
 
@@ -829,10 +849,11 @@ static INT64_T chirp_fs_local_removexattr(const char *path, const char *name)
 
 static INT64_T chirp_fs_local_fremovexattr(int fd, const char *name)
 {
+	SETUP_FILE
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return fremovexattr(fd, name, 0);
+	return fremovexattr(lfd, name, 0);
 #else
-	return fremovexattr(fd, name);
+	return fremovexattr(lfd, name);
 #endif
 }
 

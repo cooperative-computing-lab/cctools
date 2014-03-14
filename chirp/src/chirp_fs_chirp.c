@@ -27,10 +27,11 @@ static struct {
 	struct chirp_file *file;
 } open_files[CHIRP_FILESYSTEM_MAXFD];
 
+#define fdvalid(fd) (!(0 <= fd && fd < CHIRP_FILESYSTEM_MAXFD && open_files[fd].file))
 #define SETUP_FILE \
-if(fd<0 || fd>=CHIRP_FILESYSTEM_MAXFD) { errno = EBADF; return -1; }\
-struct chirp_file *file = open_files[fd].file; \
-if(!fd) { errno = EBADF; return -1;}
+if(fdvalid(fd)) return (errno = EBADF, -1);\
+struct chirp_file *file = open_files[fd].file;\
+(void)file; /* silence unused warnings */
 
 #define RESOLVE(path) \
 char resolved_##path[CHIRP_PATH_MAX];\
@@ -66,10 +67,7 @@ static int chirp_fs_chirp_init(const char url[CHIRP_PATH_MAX])
 
 static int chirp_fs_chirp_fname (int fd, char path[CHIRP_PATH_MAX])
 {
-	if (fd < 0 || open_files[fd].path[0] == '\0') {
-		errno = EBADF;
-		return -1;
-	}
+	SETUP_FILE
 	strcpy(path, open_files[fd].path);
 	return 0;
 }
