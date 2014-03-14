@@ -147,7 +147,7 @@ class WQPlotLog(WQPlot):
     pout(file, '')
 
 def show_usage():
-  print '%s [options] [-h] [-o prefix-output] <work-queue-log>\n' % (os.path.basename(sys.argv[0],))
+  print '%s [options] <work-queue-log>\n' % (os.path.basename(sys.argv[0],))
   print '\t-h\t\t\tThis message.'
   print '\t-c <gnuplot-path>\tSpecify the location of the gnuplot executable.'
   print '\t\t\t\tDefault is gnuplot.'
