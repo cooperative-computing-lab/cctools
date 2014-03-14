@@ -77,8 +77,6 @@ def pout(file, str):
   file.write('\n')
 
 class WQPlot:
-
-
   def __init__(self, ylabel, fields, labels=None, xlabel = x_units_label):
     self.fields      = fields
     self.labels      = labels or self.fields
@@ -123,19 +121,29 @@ set key right top;
     for field in self.fields:
       self.__data_one_time_field(file, field)
 
-  def plot(self, output):
+  def __plot_internal(self, output, command):
     try:
+      sys.stdout.write("Generating '%s'.\n" % (output,))
       fout = open(output, 'w')
-      gnuplot = Popen(gnuplot_cmd, stdin = PIPE, stdout = fout)
+      gnuplot = Popen(command, stdin = PIPE, stdout = fout)
       self.write_plot(gnuplot.stdin)
       gnuplot.stdin.close()
       gnuplot.wait()
     except IOError:
       sys.stderr.write("Could not generate file %s.\n" % (output,))
       exit(1)
+
+  def plot(self, output):
+    try: 
+      self.__plot_internal(output, command = gnuplot_cmd)
     except OSError:
-      sys.stderr.write("Could not execute %s.\n" % (gnuplot_cmd,))
-      exit(1)
+      output = output + '.gnuplot'
+      sys.stderr.write("Could not execute '%s'. Trying script text generation '%s'\n" % (gnuplot_cmd, output))
+      try:
+        self.__plot_internal(output, command = 'cat')
+      except OSError:
+        sys.stderr.write("Could not execute 'cat'. Terminating.\n")
+        exit(1)
 
 class WQPlotLog(WQPlot):
   def preamble(self, file):
