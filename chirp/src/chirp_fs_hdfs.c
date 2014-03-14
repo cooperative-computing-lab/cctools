@@ -391,44 +391,6 @@ static INT64_T chirp_fs_hdfs_pread(int fd, void *buffer, INT64_T length, INT64_T
 	return hdfs_services->pread(fs, open_files[fd].file, offset, buffer, length);
 }
 
-static INT64_T chirp_fs_hdfs_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
-{
-	INT64_T total = 0;
-	INT64_T actual = 0;
-	char *buffer = vbuffer;
-
-	if(stride_length < 0 || stride_skip < 0 || offset < 0) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	while(length >= stride_length) {
-		actual = chirp_fs_hdfs_pread(fd, &buffer[total], stride_length, offset);
-		if(actual > 0) {
-			length -= actual;
-			total += actual;
-			offset += stride_skip;
-			if(actual == stride_length) {
-				continue;
-			} else {
-				break;
-			}
-		} else {
-			break;
-		}
-	}
-
-	if(total > 0) {
-		return total;
-	} else {
-		if(actual < 0) {
-			return -1;
-		} else {
-			return 0;
-		}
-	}
-}
-
 static void chirp_fs_hdfs_write_zeroes(int fd, INT64_T length)
 {
 	/* ANSI C standard requires this be initialized with 0.
@@ -752,7 +714,7 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_close,
 	chirp_fs_hdfs_pread,
 	chirp_fs_hdfs_pwrite,
-	chirp_fs_hdfs_sread,
+	cfs_basic_sread,
 	chirp_fs_hdfs_swrite,
 	cfs_stub_lockf,
 	chirp_fs_hdfs_fstat,
