@@ -12,6 +12,7 @@ from subprocess import Popen, PIPE
 
 gnuplot_cmd   = 'gnuplot'
 format        = 'png'
+extension     = format
 resolution    = 1000000      # this many useconds to one log entry. Default is one second.
 x_units       = 60           # this many resolutions make one x unit. Default is one minute.
 x_units_label = 'minutes'
@@ -155,14 +156,16 @@ def show_usage():
   print '%s [options] [-h] [-o prefix-output] <work-queue-log>\n' % (os.path.basename(sys.argv[0],))
   print '\t-h\t\t\tThis message.'
   print '\t-c <gnuplot-path>\tSpecify the location of the gnuplot executable.'
-  print '\t\t\t\tDefault is gnuplot'
+  print '\t\t\t\tDefault is gnuplot.'
   print '\t-o <prefix-output>\tGenerate prefix-output.{time,time-log,tasks,tasks-log}.%s.' % (format,)
-  print '\t\t\t\tDefault is <work-queue-log>'
+  print '\t\t\t\tDefault is <work-queue-log>.'
+  print '\t-T <output-format>\tSet output format. Default is png.'
+  print '\t\t\t\tIf txt, then the gnuplot scripts are written instead of the images.'
 
 if __name__ == '__main__':
 
   try:
-    optlist, args = getopt.getopt(sys.argv[1:], 'c:ho:')
+    optlist, args = getopt.getopt(sys.argv[1:], 'c:ho:T:')
   except getopt.GetoptError as e:
     sys.stderr.write(str(e) + '\n')
     show_usage()
@@ -183,6 +186,13 @@ if __name__ == '__main__':
     elif opt == '-h':
       show_usage()
       sys.exit(0)
+    elif opt == '-T':
+      if arg == 'txt':
+        gnuplot_cmd = 'cat'
+        extension   = format + '.gnuplot'
+      else:
+        format    = arg
+        extension = format
 
   try:
     file        = open(logname)
@@ -208,10 +218,10 @@ if __name__ == '__main__':
         fields =['tasks_running', 'tasks_waiting', 'total_workers_connected', 'workers_busy', 'total_cores', 'total_tasks_complete'],
         labels = ['tasks running', 'tasks waiting', 'workers connected', 'workers busy', 'cores', 'tasks completed'])
 
-    plot_of_times.plot(prefix     + '.time.'      + format)
-    plot_of_times_log.plot(prefix + '.time-log.'  + format)
-    plot_of_tasks.plot(prefix     + '.tasks.'     + format)
-    plot_of_tasks_log.plot(prefix + '.tasks-log.' + format)
+    plot_of_times.plot(prefix     + '.time.'      + extension)
+    plot_of_times_log.plot(prefix + '.time-log.'  + extension)
+    plot_of_tasks.plot(prefix     + '.tasks.'     + extension)
+    plot_of_tasks_log.plot(prefix + '.tasks-log.' + extension)
 
   except IOError:
     sys.stderr.write("Could not open file %s\n" % (filename,))
