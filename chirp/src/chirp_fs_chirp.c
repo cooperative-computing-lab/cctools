@@ -27,10 +27,11 @@ static struct {
 	struct chirp_file *file;
 } open_files[CHIRP_FILESYSTEM_MAXFD];
 
+#define fdvalid(fd) (0 <= fd && fd < CHIRP_FILESYSTEM_MAXFD && open_files[fd].file)
 #define SETUP_FILE \
-if(fd<0 || fd>=CHIRP_FILESYSTEM_MAXFD) { errno = EBADF; return -1; }\
-struct chirp_file *file = open_files[fd].file; \
-if(!fd) { errno = EBADF; return -1;}
+if(!fdvalid(fd)) return (errno = EBADF, -1);\
+struct chirp_file *file = open_files[fd].file;\
+(void)file; /* silence unused warnings */
 
 #define RESOLVE(path) \
 char resolved_##path[CHIRP_PATH_MAX];\
@@ -47,6 +48,7 @@ path = resolved_##path;
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 static int chirp_fs_chirp_init(const char url[CHIRP_PATH_MAX])
 {
+	int i;
 	char *path;
 
 	debug(D_CHIRP, "url: %s", url);
@@ -61,15 +63,15 @@ static int chirp_fs_chirp_init(const char url[CHIRP_PATH_MAX])
 		strcpy(chirp_root, "/");
 	}
 
+	for (i = 0; i < CHIRP_FILESYSTEM_MAXFD; i++)
+		open_files[i].file = NULL;
+
 	return cfs_create_dir("/", 0711);
 }
 
 static int chirp_fs_chirp_fname (int fd, char path[CHIRP_PATH_MAX])
 {
-	if (fd < 0 || open_files[fd].path[0] == '\0') {
-		errno = EBADF;
-		return -1;
-	}
+	SETUP_FILE
 	strcpy(path, open_files[fd].path);
 	return 0;
 }
@@ -90,28 +92,33 @@ static int chirp_fs_chirp_resolve (const char *path, char resolved[CHIRP_PATH_MA
 	return 0;
 }
 
+static INT64_T getfd(void)
+{
+	INT64_T fd;
+	/* find an unused file descriptor */
+	for(fd = 0; fd < CHIRP_FILESYSTEM_MAXFD; fd++)
+		if(!open_files[fd].file)
+			return fd;
+	debug(D_CHIRP, "too many files open");
+	errno = EMFILE;
+	return -1;
+}
+
 static INT64_T chirp_fs_chirp_open(const char *path, INT64_T flags, INT64_T mode)
 {
-	int fd;
 	const char *unresolved = path;
 	RESOLVE(path)
-
-	for(fd = 3; fd < CHIRP_FILESYSTEM_MAXFD; fd++) {
-		if(!open_files[fd].file)
-			break;
-	}
-
-	if(fd == CHIRP_FILESYSTEM_MAXFD) {
-		errno = EMFILE;
-		return -1;
-	}
+	int fd = getfd();
+	if (fd == -1) return -1;
 
 	struct chirp_file *file = chirp_reli_open(chirp_hostport, path, flags, mode, STOPTIME);
-
-	strcpy(open_files[fd].path, unresolved);
-	open_files[fd].file = file;
-
-	return fd;
+	if (file) {
+		strcpy(open_files[fd].path, unresolved);
+		open_files[fd].file = file;
+		return fd;
+	} else {
+		return -1;
+	}
 }
 
 static INT64_T chirp_fs_chirp_close(int fd)
