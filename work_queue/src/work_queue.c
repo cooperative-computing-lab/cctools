@@ -308,6 +308,7 @@ static void log_worker_stats(struct work_queue *q)
 	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %f %f %d ", s.start_time, s.total_send_time, s.total_receive_time, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity);
 	fprintf(q->logfile, "%f %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " ", s.bandwidth, s.total_cores, s.total_memory, s.total_disk, s.total_gpus);
 	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " ", s.min_cores, s.max_cores, s.min_memory, s.max_memory, s.min_disk, s.max_disk, s.min_gpus, s.max_gpus);
+	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " ", s.total_execute_time, s.total_good_execute_time);
 	fprintf(q->logfile, "\n");
 }
 
@@ -1373,6 +1374,8 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_float(nv,"efficiency",info.efficiency);
 	nvpair_insert_float(nv,"idle_percentage",info.idle_percentage);
 	nvpair_insert_integer(nv,"capacity",info.capacity);
+	nvpair_insert_integer(nv,"total_execute_time",info.total_execute_time);
+	nvpair_insert_integer(nv,"total_good_execute_time",info.total_good_execute_time);
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
@@ -4082,6 +4085,8 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_receive_time = q->total_receive_time;
 	s->total_bytes_sent = q->total_bytes_sent;
 	s->total_bytes_received = q->total_bytes_received;
+	s->total_execute_time = q->total_execute_time;
+	s->total_good_execute_time = q->total_good_execute_time;
 	timestamp_t wall_clock_time = timestamp_get() - q->start_time;
 	if(wall_clock_time>0 && s->total_workers_connected>0) {
 		s->efficiency = (double) (q->total_execute_time) / (wall_clock_time * s->total_workers_connected);
@@ -4191,6 +4196,8 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			"bandwidth total_cores total_memory total_disk total_gpus "
 			//mins/maxs:
 			"min_cores max_cores min_memory max_memory min_disk max_disk min_gpus max_gpus "
+			//execute/good execute time
+			"total_execute_time total_good_execute_time "
 			//end with a newline
 			"\n"
 			);
