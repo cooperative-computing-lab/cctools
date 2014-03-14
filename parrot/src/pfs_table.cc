@@ -1489,7 +1489,10 @@ int pfs_table::unlink( const char *n )
 
 	if(resolve_name("unlink",n,&pname,false)) {
 		result = pname.service->unlink(&pname);
-		if(result==0) pfs_cache_invalidate(&pname);
+		if(result==0) {
+			pfs_cache_invalidate(&pname);
+			pfs_channel_update_name(pname.path,0);
+		}
 	}
 
 	return result;
@@ -1556,6 +1559,7 @@ int pfs_table::rename( const char *n1, const char *n2 )
 			if(result==0) {
 				pfs_cache_invalidate(&p1);
 				pfs_cache_invalidate(&p2);
+				pfs_channel_update_name(p1.path, p2.path);
 			}
 		} else {
 			errno = EXDEV;
