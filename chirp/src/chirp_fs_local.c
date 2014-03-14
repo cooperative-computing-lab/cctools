@@ -99,7 +99,7 @@ See the file COPYING for details.
 static char local_root[CHIRP_PATH_MAX];
 
 static struct {
-	int fd;
+	INT64_T fd;
 	char path[CHIRP_PATH_MAX];
 } open_files[CHIRP_FILESYSTEM_MAXFD];
 
@@ -130,6 +130,7 @@ path = resolved_##path;
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 {
+	int i;
 	char tmp[CHIRP_PATH_MAX];
 
 	if (strprfx(url, "local://") || strprfx(url, "file://"))
@@ -138,6 +139,9 @@ static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 		strcpy(tmp, url);
 
 	path_collapse(tmp, local_root, 1);
+
+	for (i = 0; i < CHIRP_FILESYSTEM_MAXFD; i++)
+		open_files[i].fd = -1;
 
 	return cfs_create_dir("/", 0711);
 }
@@ -165,17 +169,33 @@ int chirp_fs_local_resolve (const char *path, char resolved[CHIRP_PATH_MAX])
 	return 0;
 }
 
-static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode)
+static INT64_T getfd(void)
 {
 	INT64_T fd;
+	/* find an unused file descriptor */
+	for(fd = 0; fd < CHIRP_FILESYSTEM_MAXFD; fd++)
+		if(open_files[fd].fd == -1)
+			return fd;
+	debug(D_CHIRP, "too many files open");
+	errno = EMFILE;
+	return -1;
+}
+
+static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode)
+{
 	const char *unresolved = path;
 	RESOLVE(path)
+	INT64_T fd = getfd();
+	if (fd == -1) return -1;
 	mode = 0600 | (mode & 0100);
-	fd = open64(path, flags, (int) mode);
-	if (fd >= 0) {
+	INT64_T lfd = open64(path, flags, (int) mode);
+	if (lfd >= 0) {
+		open_files[fd].fd = lfd;
 		strcpy(open_files[fd].path, unresolved);
+		return fd;
+	} else {
+		return -1;
 	}
-	return fd;
 }
 
 static INT64_T chirp_fs_local_close(int fd)

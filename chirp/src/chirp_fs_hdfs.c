@@ -135,7 +135,8 @@ static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX])
 		return -1;
 	}
 
-	memset(open_files, 0, sizeof(open_files));
+	for (i = 0; i < CHIRP_FILESYSTEM_MAXFD; i++)
+		open_files[i].file = NULL;
 
 	return cfs_create_dir("/", 0711);
 }
@@ -270,18 +271,6 @@ static void chirp_fs_hdfs_closedir(struct chirp_dir *dir)
 	free(dir);
 }
 
-static INT64_T get_fd(void)
-{
-	INT64_T fd;
-	/* find an unused file descriptor */
-	for(fd = 0; fd < CHIRP_FILESYSTEM_MAXFD; fd++)
-		if(!open_files[fd].path[0])
-			return fd;
-	debug(D_HDFS, "too many files open");
-	errno = EMFILE;
-	return -1;
-}
-
 /*
 HDFS is known to return bogus errnos from unlink,
 so check for directories beforehand, and set the errno
@@ -308,11 +297,24 @@ static INT64_T do_unlink(const char *path)
 	return 0;
 }
 
-static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
+static INT64_T getfd(void)
 {
 	INT64_T fd;
+	/* find an unused file descriptor */
+	for(fd = 0; fd < CHIRP_FILESYSTEM_MAXFD; fd++)
+		if(!open_files[fd].file)
+			return fd;
+	debug(D_CHIRP, "too many files open");
+	errno = EMFILE;
+	return -1;
+}
+
+static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
+{
 	struct chirp_stat info;
 	RESOLVE(path)
+	INT64_T fd = getfd();
+	if(fd == -1) return -1;
 
 	int result = do_stat(path, &info);
 
@@ -323,10 +325,6 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		errno = EISDIR;
 		return -1;
 	}
-
-	fd = get_fd();
-	if(fd == -1)
-		return -1;
 
 	mode = 0600 | (mode & 0100);
 
@@ -372,13 +370,14 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		return -1;
 	}
 
-	open_files[fd].file = hdfs_services->open(fs, path, flags, 0, hdfs_nreps, 0);
-	if(open_files[fd].file == NULL) {
-		debug(D_HDFS, "open %s failed: %s", path, strerror(errno));
-		return -1;
-	} else {
+	hdfsFile file = hdfs_services->open(fs, path, flags, 0, hdfs_nreps, 0);
+	if (file) {
+		open_files[fd].file = file;
 		strcpy(open_files[fd].path, path);
 		return fd;
+	} else {
+		debug(D_HDFS, "open %s failed: %s", path, strerror(errno));
+		return -1;
 	}
 }
 
