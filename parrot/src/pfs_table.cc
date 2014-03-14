@@ -842,7 +842,7 @@ pfs_ssize_t pfs_table::writev( int fd, const struct iovec *vector, int count )
 	int i;
 	pfs_ssize_t result = 0;
 	pfs_ssize_t chunk;
-
+	
 	for( i = 0; i < count; i++ ) {
 		chunk = this->write( fd, vector->iov_base, vector->iov_len );
 		if( chunk < 0 ) return chunk;
@@ -1473,7 +1473,7 @@ int pfs_table::lutimens( const char *n, const struct timespec times[2] )
 {
 	pfs_name pname;
 	int result=-1;
-
+	
 	if(resolve_name("lutimens",n,&pname,false)) {
 		result = pname.service->lutimens(&pname,times);
 	}
@@ -1489,7 +1489,10 @@ int pfs_table::unlink( const char *n )
 
 	if(resolve_name("unlink",n,&pname,false)) {
 		result = pname.service->unlink(&pname);
-		if(result==0) pfs_cache_invalidate(&pname);
+		if(result==0) {
+			pfs_cache_invalidate(&pname);
+			pfs_channel_update_name(pname.path,0);
+		}
 	}
 
 	return result;
@@ -1556,6 +1559,7 @@ int pfs_table::rename( const char *n1, const char *n2 )
 			if(result==0) {
 				pfs_cache_invalidate(&p1);
 				pfs_cache_invalidate(&p2);
+				pfs_channel_update_name(p1.path, p2.path);
 			}
 		} else {
 			errno = EXDEV;
