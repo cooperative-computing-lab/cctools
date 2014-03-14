@@ -25,18 +25,19 @@ public:
 		prot = _prot;
 		flags = _flags;
 		file->addref();
+		pfs_channel_addref(channel_offset);
 	}
 
 	pfs_mmap( pfs_mmap * m ) {
 		file = m->file;
 		logical_addr = m->logical_addr;
-		pfs_channel_lookup(file->get_name()->path,&channel_offset); /* increase refcount */
-		assert(channel_offset == m->channel_offset);
+		channel_offset = m->channel_offset;
 		map_length = m->map_length;
 		file_offset = m->file_offset;
 		prot = m->prot;
 		flags = m->flags;
 		file->addref();
+		pfs_channel_addref(channel_offset);
 	}
 
 	~pfs_mmap()
@@ -46,6 +47,7 @@ public:
 			file->close();
 			delete file;
 		}
+		pfs_channel_free(channel_offset);
 	}
 
 	pfs_file   *file;
