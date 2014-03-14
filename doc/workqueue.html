@@ -537,7 +537,9 @@ You can specify a log file to obtain a time series of work queue statistics. Usu
 </pre>
 </div>
 
-You can plot some of the statistics with the script work_queue_graph_log:
+The script work_queue_graph_log is a wrapper for gnuplot, and with it you can
+plot some of the statistics, such as total time spent transfering tasks, number
+of tasks running, workers connected, etc.: 
 
 <div class="code_area">
 <pre class="code_snip">
@@ -548,7 +550,8 @@ You can plot some of the statistics with the script work_queue_graph_log:
 </pre>
 </div>
 
-
+We find very helpful to plot this statistics when diagnosing a problem with
+work queue applications.
 
 <h3> stdout size limit </h3>
 <p> The output printed by a task to stdout can be accessed in the
