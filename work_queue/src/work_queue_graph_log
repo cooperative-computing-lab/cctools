@@ -144,14 +144,17 @@ class WQPlotLog(WQPlot):
     pout(file, '')
 
 def show_usage():
-  print '%s [-h] [-o prefix-output] work-queue-log\n' % (os.path.basename(sys.argv[0],))
-  print '\tprefix-output defaults to work-queue-log.'
-  print '\tThe scripts generates prefix-output.{time,time-log,tasks,tasks-log}.%s.\n' % (format,)
+  print '%s [options] [-h] [-o prefix-output] <work-queue-log>\n' % (os.path.basename(sys.argv[0],))
+  print '\t-h\t\t\tThis message.'
+  print '\t-c <gnuplot-path>\tSpecify the location of the gnuplot executable.'
+  print '\t\t\t\tDefault is gnuplot'
+  print '\t-o <prefix-output>\tGenerate prefix-output.{time,time-log,tasks,tasks-log}.%s.' % (format,)
+  print '\t\t\t\tDefault is <work-queue-log>'
 
 if __name__ == '__main__':
 
   try:
-    optlist, args = getopt.getopt(sys.argv[1:], 'ho:')
+    optlist, args = getopt.getopt(sys.argv[1:], 'c:ho:')
   except getopt.GetoptError as e:
     sys.stderr.write(str(e) + '\n')
     show_usage()
@@ -165,7 +168,9 @@ if __name__ == '__main__':
   prefix  = logname
 
   for opt, arg in optlist:
-    if   opt == '-o': 
+    if   opt == '-c': 
+      gnuplot_cmd = arg
+    elif opt == '-o': 
       prefix = arg
     elif opt == '-h':
       show_usage()
