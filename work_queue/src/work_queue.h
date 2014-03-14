@@ -136,7 +136,7 @@ struct work_queue_stats {
 	int64_t min_gpus;               /**< The lowest number of GPUs observed among the connected workers. */
 	int64_t max_gpus;               /**< The highest number of GPUs observed among the connected workers. */
 	timestamp_t total_execute_time; /**< Total time in microseconds workers spent executing completed tasks. */
-	timestamp_t total_good_execute_time; /**< Total time in microseconds workers spent executing succesfull tasks . */
+	timestamp_t total_good_execute_time; /**< Total time in microseconds workers spent executing successful tasks. */
 
 	int port;						
 	int priority;					
