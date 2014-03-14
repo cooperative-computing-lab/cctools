@@ -329,45 +329,45 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 	mode = 0600 | (mode & 0100);
 
 	switch (flags & O_ACCMODE) {
-	case O_RDONLY:
-		debug(D_HDFS, "opening file %s (flags: %"PRIo64") for reading; mode: %"PRIo64"", path, flags, mode);
-		if(!file_exists) {
-			errno = ENOENT;
-			return -1;
-		}
-		break;
-	case O_WRONLY:
-		// You may truncate the file by deleting it.
-		debug(D_HDFS, "opening file %s (flags: %"PRIo64") for writing; mode: %"PRIo64"", path, flags, mode);
-		if(flags & O_TRUNC) {
-			if(file_exists) {
+		case O_RDONLY:
+			debug(D_HDFS, "opening file %s (flags: %"PRIo64") for reading; mode: %"PRIo64"", path, flags, mode);
+			if(!file_exists) {
+				errno = ENOENT;
+				return -1;
+			}
+			break;
+		case O_WRONLY:
+			// You may truncate the file by deleting it.
+			debug(D_HDFS, "opening file %s (flags: %"PRIo64") for writing; mode: %"PRIo64"", path, flags, mode);
+			if(flags & O_TRUNC) {
+				if(file_exists) {
+					do_unlink(path);
+					file_exists = 0;
+					flags ^= O_TRUNC;
+				}
+			} else if(file_exists && info.cst_size == 0) {
+				/* file is empty, just delete it as if O_TRUNC (useful for FUSE with some UNIX utils, like mv) */
 				do_unlink(path);
 				file_exists = 0;
-				flags ^= O_TRUNC;
+			} else {
+				if(file_exists) {
+					errno = EACCES;
+					return -1;
+				}
 			}
-		} else if(file_exists && info.cst_size == 0) {
-			/* file is empty, just delete it as if O_TRUNC (useful for FUSE with some UNIX utils, like mv) */
-			do_unlink(path);
-			file_exists = 0;
-		} else {
-			if(file_exists) {
-				errno = EACCES;
-				return -1;
-			}
-		}
 
-		// You cannot append to an existing file.
-		if(flags & O_APPEND) {
-			if(file_exists) {
-				errno = EACCES;
-				return -1;
+			// You cannot append to an existing file.
+			if(flags & O_APPEND) {
+				if(file_exists) {
+					errno = EACCES;
+					return -1;
+				}
 			}
-		}
-		break;
-	default:
-		debug(D_HDFS, "file %s must be opened O_RDONLY or O_WRONLY but not O_RDWR", path);
-		errno = EACCES;
-		return -1;
+			break;
+		default:
+			debug(D_HDFS, "file %s must be opened O_RDONLY or O_WRONLY but not O_RDWR", path);
+			errno = EACCES;
+			return -1;
 	}
 
 	hdfsFile file = hdfs_services->open(fs, path, flags, 0, hdfs_nreps, 0);
