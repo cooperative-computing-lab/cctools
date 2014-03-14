@@ -11,34 +11,16 @@ See the file COPYING for details.
 #include "chirp_acl.h"
 
 #include "debug.h"
-#include "hash_table.h"
 #include "xxmalloc.h"
 #include "int_sizes.h"
 #include "path.h"
 #include "full_io.h"
 #include "delete_dir.h"
 
-#include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
 #include <dirent.h>
 #include <fnmatch.h>
-#include <utime.h>
 #include <unistd.h>
-
-#include <sys/fcntl.h>
-#include <sys/file.h>
-#include <sys/stat.h>
-#ifdef HAS_SYS_STATFS_H
-#include <sys/statfs.h>
-#endif
-#ifdef HAS_SYS_STATVFS_H
-#include <sys/statvfs.h>
-#endif
-#include <sys/param.h>
-#include <sys/mount.h>
+#include <utime.h>
 
 #if defined(HAS_ATTR_XATTR_H)
 #include <attr/xattr.h>
@@ -48,6 +30,20 @@ See the file COPYING for details.
 #ifndef ENOATTR
 #define ENOATTR  EINVAL
 #endif
+
+#include <sys/stat.h>
+#ifdef HAS_SYS_STATFS_H
+#include <sys/statfs.h>
+#endif
+#ifdef HAS_SYS_STATVFS_H
+#include <sys/statvfs.h>
+#endif
+
+#include <assert.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* Cygwin does not have 64-bit I/O, while Darwin has it by default. */
 
