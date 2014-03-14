@@ -93,6 +93,7 @@ path = resolved_##path;
 static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX])
 {
 	static const char *groups[] = { "supergroup" };
+	int i;
 	char *path;
 
 	if(!hdfs_services) {

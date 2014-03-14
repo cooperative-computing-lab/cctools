@@ -48,6 +48,7 @@ path = resolved_##path;
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 static int chirp_fs_chirp_init(const char url[CHIRP_PATH_MAX])
 {
+	int i;
 	char *path;
 
 	debug(D_CHIRP, "url: %s", url);
