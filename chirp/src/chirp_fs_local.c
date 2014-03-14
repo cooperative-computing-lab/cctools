@@ -201,12 +201,12 @@ static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode
 static INT64_T chirp_fs_local_close(int fd)
 {
 	SETUP_FILE
-	if (close(lfd) == -1) {
+	if (close(lfd) == 0) {
 		open_files[fd].fd = -1;
 		open_files[fd].path[0] = '\0';
-		return -1;
-	} else {
 		return 0;
+	} else {
+		return -1;
 	}
 }
 
