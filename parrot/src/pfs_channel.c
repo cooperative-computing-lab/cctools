@@ -197,7 +197,7 @@ int pfs_channel_lookup( const char *name, pfs_size_t *start )
 int pfs_channel_update_name( const char *oldname, const char *newname )
 {
 	struct entry *e = head;
-    debug(D_CHANNEL,"updating channel for file '%s'",oldname);
+	debug(D_CHANNEL,"updating channel for file '%s'",oldname);
 	do {
 		if(e->name && !strcmp(e->name,oldname)) {
 			if(e->name)
