@@ -14,6 +14,9 @@ See the file COPYING for details.
 #define AUTH_TYPE_MAX 1024
 #define AUTH_LINE_MAX (AUTH_SUBJECT_MAX+AUTH_TYPE_MAX)
 
+/** Forward declaration to silent compiler warnings, defined in link.c */
+struct link;
+
 typedef int (*auth_assert_t) (struct link * l, time_t stoptime);
 typedef int (*auth_accept_t) (struct link * l, char **subject, time_t stoptime);
 
