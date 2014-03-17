@@ -20,6 +20,7 @@ char * pfs_channel_base();
 int    pfs_channel_fd();
 
 int    pfs_channel_lookup( const char *name, pfs_size_t *start );
+int    pfs_channel_addref( pfs_size_t start );
 int    pfs_channel_alloc( const char *name, pfs_size_t length, pfs_size_t *start );
 void   pfs_channel_free( pfs_size_t start );
 
