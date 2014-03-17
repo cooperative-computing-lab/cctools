@@ -14,12 +14,14 @@ gnuplot_cmd   = 'gnuplot'
 format        = 'png'
 extension     = format
 resolution    = 1000000      # this many useconds to one log entry. Default is one second.
-x_units       = 60           # this many resolutions make one x unit. Default is one minute.
-x_units_label = 'minutes'
 x_range       = None         # If unspecified, then plot all the valid range.
 
 log_entries   = None
 times         = None
+
+unit_labels   = {'s' : 'seconds', 'm' : 'minutes', 'h' : 'hours', 'd' : 'days'}
+unit_factors  = {'s' : 1, 'm' : 60, 'h' : 3600, 'd' : 86400}
+x_units       = 'm'          # Default is minutes.
 
 def read_fields(file, lines_patience = 10):
   for line in file:
@@ -79,10 +81,10 @@ def pout(file, str):
   file.write('\n')
 
 class WQPlot:
-  def __init__(self, ylabel, fields, labels=None, xlabel = x_units_label, range = x_range):
+  def __init__(self, ylabel, fields, labels=None, x_units = x_units, range = x_range):
     self.fields      = fields
     self.labels      = labels or self.fields
-    self.xlabel      = xlabel
+    self.x_units     = x_units
     self.ylabel      = ylabel
     self.range       = range
 
@@ -97,18 +99,19 @@ set ylabel '%s';
 set noborder;
 set tics nomirror;
 set key right top;
-  """ % (format, self.xlabel, self.ylabel))
+  """ % (format, unit_labels[self.x_units], self.ylabel))
     if self.range:
       pout(file, 'set xrange [%s]' % (self.range,))
 
   def __data_one_time_field(self, file, field):
+    time_scale = unit_factors[self.x_units]
     # if a time field, then scale
-    mod = time_field_p(field) and x_units or 1
+    mod = time_field_p(field) and time_scale or 1
 
     for t in times:
       r = log_entries[t]
       try:
-        pout(file, '%lf %lf' % (t/x_units, r[field]/mod))
+        pout(file, '%lf %lf' % (t/time_scale, r[field]/mod))
       except KeyError:
         sys.stderr.write("Field '%s' does not exist in the log\n" % (field,))
         break
@@ -158,15 +161,17 @@ def show_usage():
   print '\t\t\t\tDefault is gnuplot.'
   print '\t-o <prefix-output>\tGenerate prefix-output.{time,time-log,tasks,tasks-log}.%s.' % (format,)
   print '\t\t\t\tDefault is <work-queue-log>.'
+  print '\t-r <range>\t\tRange of time to plot, in time units (see -u) from'
+  print '\t\t\t\tthe start of execution. Of the form: min:max, min:, or :max.'
   print '\t-T <output-format>\tSet output format. Default is png.'
   print '\t\t\t\tIf \'text\', then the gnuplot scripts are written instead of the images.'
-  print '\t-r <range>\t\tRange of time to plot, in minutes from the start of execution.'
-  print '\t\t\t\tOf the form: min:max, min:, or :max.'
+  print '\t-u <time-unit>\t\tTime scale to output. One of s,m,h or d, for seconds,'
+  print '\t\t\t\tminutes (default), hours or days.'
 
 if __name__ == '__main__':
 
   try:
-    optlist, args = getopt.getopt(sys.argv[1:], 'c:ho:r:T:')
+    optlist, args = getopt.getopt(sys.argv[1:], 'c:ho:r:T:u:')
   except getopt.GetoptError as e:
     sys.stderr.write(str(e) + '\n')
     show_usage()
@@ -187,6 +192,8 @@ if __name__ == '__main__':
     elif opt == '-h':
       show_usage()
       sys.exit(0)
+    elif opt == '-r':
+      x_range = arg
     elif opt == '-T':
       if arg == 'text':
         gnuplot_cmd = 'cat'
@@ -194,8 +201,12 @@ if __name__ == '__main__':
       else:
         format    = arg
         extension = format
-    elif opt == '-r':
-      x_range = arg
+    elif opt == '-u':
+      if arg in unit_factors:
+        x_units = arg
+      else:
+        sys.stderr.write("Time scale factor '%s' is not valid. Options: s,m,h or d.\n"  % (arg,))
+        exit(1)
 
   try:
     file        = open(logname)
@@ -203,21 +214,21 @@ if __name__ == '__main__':
     times       = sort_time(log_entries)
     file.close()
 
-    plot_of_times = WQPlot(ylabel = x_units_label, range = x_range,
+    plot_of_times = WQPlot(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
         fields = ['timestamp', 'total_transfer_time', 'total_master_time', 
                   'total_send_time', 'total_receive_time'],
         labels = ['wall time', 'sent+recv', 'master', 'sent', 'rec'])
 
-    plot_of_times_log = WQPlotLog(ylabel = x_units_label, range = x_range,
+    plot_of_times_log = WQPlotLog(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
         fields = ['timestamp', 'total_transfer_time', 'total_master_time', 
                   'total_send_time', 'total_receive_time', 'total_execute_time'],
         labels = ['wall time', 'sent+recv', 'master', 'sent', 'rec', 'exec'])
 
-    plot_of_tasks = WQPlot(ylabel = 'number of tasks/workers/cores', range = x_range,
+    plot_of_tasks = WQPlot(x_units = x_units, ylabel = 'number of tasks/workers/cores', range = x_range,
         fields =['tasks_running', 'tasks_waiting', 'total_workers_connected', 'workers_busy', 'total_cores'],
         labels = ['tasks running', 'tasks waiting', 'workers connected', 'workers busy', 'cores'])
 
-    plot_of_tasks_log = WQPlotLog(ylabel = 'number of tasks/workers/cores', range = x_range,
+    plot_of_tasks_log = WQPlotLog(x_units = x_units, ylabel = 'number of tasks/workers/cores', range = x_range,
         fields =['tasks_running', 'tasks_waiting', 'total_workers_connected', 'workers_busy', 'total_cores', 'total_tasks_complete'],
         labels = ['tasks running', 'tasks waiting', 'workers connected', 'workers busy', 'cores', 'tasks completed'])
 
