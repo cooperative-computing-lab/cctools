@@ -52,7 +52,7 @@ LONGCODE_END
 Plot up to the eleventh hour:
 
 LONGCODE_BEGIN
-% work_queue_graph_log -u d -r :11 mylog
+% work_queue_graph_log -u h -r :11 mylog
 
 LONGCODE_END
 Generate script text:
