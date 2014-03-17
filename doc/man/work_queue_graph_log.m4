@@ -34,6 +34,7 @@ OPTIONS_BEGIN
 OPTION_PAIR(-o,prefix-output)Generate prefix-output.{time,time-log,tasks,tasks-log}.<output-format>. Default is <work-queue-log>.
 OPTION_PAIR(-c,gnuplot-path)Specify the location of the gnuplot executable. Default is gnuplot.
 OPTION_PAIR(-T,output-format)Set output format. Default is png. If "text", then the gnuplot scripts are written instead of the images.
+OPTION_PAIR(-r,range)Range of time to plot, in minutes from the start of execution. Of the form: min:max, min:, or :max.
 OPTION_ITEM(`-h')Show help text.
 OPTIONS_END
 
@@ -47,6 +48,12 @@ LONGCODE_BEGIN
 mylog.tasks.png mylog.tasks-log.png mylog.time.png mylog.time-log.png
 LONGCODE_END
 
+Plot the first 40 minutes:
+
+LONGCODE_BEGIN
+% work_queue_graph_log -r :40 mylog
+
+LONGCODE_END
 Generate script text:
 
 LONGCODE_BEGIN
