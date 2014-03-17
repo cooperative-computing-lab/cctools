@@ -367,7 +367,7 @@ int pfs_process_waitpid( struct pfs_process *p, pid_t wait_pid, int *wait_ustatu
 
 	itable_firstkey(pfs_process_table);
 	while(itable_nextkey(pfs_process_table,&childpid,(void**)&child)) {
-		if(child && child->ppid == p->pid) {
+		if(child && child->ppid == p->pid && child->tgid == child->pid) {
 			nchildren++;
 			if(pfs_process_may_wake(p,child)) return 1;
 		}
