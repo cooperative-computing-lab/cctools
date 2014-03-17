@@ -7,6 +7,9 @@ See the file COPYING for details.
 #ifndef PFS_MMAP_H
 #define PFS_MMAP_H
 
+#include <assert.h>
+
+#include "pfs_channel.h"
 #include "pfs_types.h"
 #include "pfs_file.h"
 
@@ -22,6 +25,7 @@ public:
 		prot = _prot;
 		flags = _flags;
 		file->addref();
+		pfs_channel_addref(channel_offset);
 	}
 
 	pfs_mmap( pfs_mmap * m ) {
@@ -33,6 +37,7 @@ public:
 		prot = m->prot;
 		flags = m->flags;
 		file->addref();
+		pfs_channel_addref(channel_offset);
 	}
 
 	~pfs_mmap()
@@ -42,6 +47,7 @@ public:
 			file->close();
 			delete file;
 		}
+		pfs_channel_free(channel_offset);
 	}
 
 	pfs_file   *file;

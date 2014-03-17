@@ -194,6 +194,20 @@ int pfs_channel_lookup( const char *name, pfs_size_t *start )
 	return 0;
 }
 
+int pfs_channel_addref( pfs_size_t start )
+{
+	struct entry *e = head;
+
+	do {
+		if(e->start==start) {
+			e->inuse++;
+			return 1;
+		}
+		e = e->next;
+	} while(e!=head);
+	return 0;
+}
+
 int pfs_channel_update_name( const char *oldname, const char *newname )
 {
 	struct entry *e = head;

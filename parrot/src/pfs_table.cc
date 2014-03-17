@@ -2580,11 +2580,7 @@ int pfs_table::mmap_delete( pfs_size_t logical_addr, pfs_size_t length )
 				mmap_update(logical_addr+length,0);
 			}
 
-			// Decrement (and possibly free) the file in the channel.
-			pfs_channel_free(m->channel_offset);
-
-			// Delete the mapping, which may also delete the file object.
-			delete m;
+			delete m; // Delete the mapping, which may also delete the file object and free the channel.
 
 			return 0;
 		}
