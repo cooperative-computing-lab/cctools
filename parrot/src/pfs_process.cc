@@ -111,7 +111,6 @@ Note that a new process really has two kinds of parents:
 struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t notify_ppid, int share_table, int exit_signal )
 {  
 	struct pfs_process *actual_parent;
-	struct pfs_process *notify_parent;
 	struct pfs_process *child;
 
 	if(!pfs_process_table) pfs_process_table = itable_create(0);
@@ -193,11 +192,6 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 		memset(child->signal_interruptible,0,sizeof(child->signal_interruptible));
 	}
 
-	notify_parent = pfs_process_lookup(notify_ppid);
-	if (!notify_parent) {
-		child->ppid = actual_ppid;
-	}
-
 	itable_insert(pfs_process_table,pid,child);
 	pfs_paranoia_add_pid(pid);
 
@@ -258,13 +252,10 @@ static void pfs_process_do_wake( struct pfs_process *parent, struct pfs_process 
 	parent->wait_urusage = 0;
 }
 
-/*
-Examine the state of this parent and child.
-If the parent is waiting for the child, then wake it up.
-Or, if the process is in a waitio state, then
-kick it out with a signal.
-*/
-
+/* Examine the state of this parent and child.  If the parent is waiting for
+ * the child, then wake it up.  Or, if the process is in a waitio state, then
+ * kick it out with a signal.
+ */
 static int pfs_process_may_wake( struct pfs_process *parent, struct pfs_process *child )
 {
 	/* Note: we never wake a parent for STOP signals. */
@@ -376,7 +367,7 @@ int pfs_process_waitpid( struct pfs_process *p, pid_t wait_pid, int *wait_ustatu
 
 	itable_firstkey(pfs_process_table);
 	while(itable_nextkey(pfs_process_table,&childpid,(void**)&child)) {
-		if(child && child->ppid==p->pid) {
+		if(child && child->ppid == p->pid && child->tgid == child->pid) {
 			nchildren++;
 			if(pfs_process_may_wake(p,child)) return 1;
 		}
