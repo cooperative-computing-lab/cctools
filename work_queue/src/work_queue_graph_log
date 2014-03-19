@@ -45,11 +45,14 @@ def read_log_entries(file, fields):
   idxs  = range(0, len(fields))
   pairs = zip(idxs, fields)
   epoch = None
+  count_lines = 0
 
   for line in file:
+    count_lines = count_lines + 1
     try:
       numbers = [float(x) for x in line.split()]
       record  = {}
+
 
       for (i, field) in pairs:
         if time_field_p(field):
@@ -65,7 +68,11 @@ def read_log_entries(file, fields):
       log_entries[record['timestamp']] = record
 
     except ValueError:
+      sys.stderr.write('Line %d has an invalid value. Ignoring.\n' % (count_lines, ))
       continue
+    except IndexError:
+      sys.stderr.write('Line %d has less than %d fields. Aborting.\n' % (count_lines, len(fields)))
+      sys.exit(1)
 
   return log_entries
 
