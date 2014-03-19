@@ -836,7 +836,6 @@ from distutils import sysconfig
 libs = sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
 if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
     libs.insert(0, '-L' + sysconfig.get_config_var('LIBPL'))
-libs.extend(sysconfig.get_config_var('LINKFORSHARED').split())
 print ' '.join(libs)
 EOF
 				python_ccflags=`cat $python_ccflags_file`
