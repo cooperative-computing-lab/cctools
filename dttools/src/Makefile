@@ -92,6 +92,7 @@ PUBLIC_HEADERS = auth.h  \
                  buffer.h  \
                  debug.h  \
                  int_sizes.h  \
+                 link.h  \
                  md5.h  \
                  rmonitor_hooks.h \
                  timestamp.h
