@@ -125,7 +125,7 @@ The AWE-WQ execution flowchart is illustrated below:
 
 <h3>Tutorial</h3>
 <p>
-WIthin the <tt>tutorial</tt> directory of the source code we provide several input files for you to follow along.
+Within the <tt>tutorial</tt> directory of the source code we provide several input files for you to follow along.
 Checkout the sourcecode using:
 <code>% git clone https://github.com/cooperative-computing-lab/awe.git awe.git
 % cd awe.git
@@ -242,17 +242,19 @@ Finally, we give a name to the master (“awe-wq”) to that workers can easily 
 
 <p>
 <b>Workers</b>
-Resources can be allocated either directly using work_queue_worker or managed automati- cally using <tt>work_queue_pool</tt>.
+Resources can be allocated either directly using work_queue_worker to run tasks locally.
+To run jobs on SGE or CONDOR use <tt>sge_submit_workers</tt> and <tt>condor_submit_workers</tt>.
+Additionally, resources can be managed automatically using <tt>work_queue_pool</tt>.
 Using <tt>work_queue_worker</tt> also allows the worker to operate as a ”Foreman”, enabling the hierarchical distribution of tasks.
-The <tt>work_queue_pool</tt> program maintains workers for the master based on need, and is in charge of submission to various backends such as the local machine, Condor, SGE, PBS, etc.
-Since the master has started we can start some workers locally.
-<code>% work_queue_pool -a -N awe-wq 24</code>
+Since the master has started we can start a worker locally.
+<code>% work_queue_worker -a -N awe-wq</code>
 
 <h4>Monitoring AWE-WQ Progress</h4>
 
 <p>
 Use <tt>work_queue_status</tt> to get the current resources runtime status (number of workers, number of tasks waiting/completed, etc).
 By using <tt>awe-plot-wq-stats</tt> the plot of the resource usage over the runtime of the program can be obtained.
+In this case, I've submitted several workers to SGE.
 <code>% work_queue_status
 PROJECT            HOST                    PORT  WAITING  BUSY COMPLETE WORKERS
 awe-wq             fah.crc.nd.edu          1024      133    36    57547      36
