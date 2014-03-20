@@ -210,6 +210,21 @@ static int process_resource(struct work_queue *q, struct work_queue_worker *w, c
 
 static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink );
 
+/** Clone a @ref work_queue_file
+This performs a deep copy.
+@param file The file to clone.
+@return A newly allocated file.
+*/
+static struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file);
+
+/** Clone a list of @ref work_queue_file structs
+Thie performs a deep copy of the list.
+@param list The list to clone.
+@return A newly allocated list of files.
+*/
+static struct list *work_queue_task_file_list_clone(struct list *list);
+
+
 /******************************************************/
 /********** work_queue internal functions *************/
 /******************************************************/
@@ -2630,7 +2645,7 @@ static struct work_queue_task *find_running_task_by_tag(struct work_queue *q, co
 }
 
 
-struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file)
+static struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file)
 {
 
   /*
@@ -2646,7 +2661,7 @@ struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file
 }
 
 
-struct list *work_queue_task_file_list_clone(struct list *list)
+static struct list *work_queue_task_file_list_clone(struct list *list)
 {
   struct list *new = list_create();
   struct work_queue_file
