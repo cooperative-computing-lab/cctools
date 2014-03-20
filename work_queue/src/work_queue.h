@@ -153,21 +153,6 @@ the command will be given later by @ref work_queue_task_specify_command
 */
 struct work_queue_task *work_queue_task_create(const char *full_command);
 
-/** Clone a @ref work_queue_file
-This performs a deep copy.
-@param file The file to clone.
-@return A newly allocated file.
-*/
-struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file);
-
-/** Clone a list of @ref work_queue_file structs
-Thie performs a deep copy of the list.
-@param list The list to clone.
-@return A newly allocated list of files.
-*/
-struct list *work_queue_task_file_list_clone(struct list *list);
-
-
 /** Create a copy of a task
 
 Create a functionally identical copy of a @ref work_queue_task that
