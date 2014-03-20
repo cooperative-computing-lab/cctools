@@ -2496,13 +2496,13 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   /*
     Need to copy over the following fields otherwise segfaults abound:
 
-    tag			:: char *
-    command_line	:: char *
-    output		:: char *
-    input_files		:: list *
-    output_files	:: list *
-    host		:: char *
-    hostname		:: char *
+    tag                 :: char *
+    command_line        :: char *
+    output              :: char *
+    input_files         :: list *
+    output_files        :: list *
+    host                :: char *
+    hostname            :: char *
    */
 
   if(task->tag         ) { new->tag          = strdup(task->tag)         ; }
