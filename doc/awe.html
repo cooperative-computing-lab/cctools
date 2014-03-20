@@ -101,136 +101,185 @@ accordingly when setting <tt>PYTHONPATH</tt>.
 
 <h2 id="running">Running AWE<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
 
-First, create a directory from which you want to instantiate and run the AWE
-program. In this manual, we are going to run AWE to sample the state transitions
-of the Alanine Dipeptide protein using the code in <tt>awe-ala.py</tt>.
-<code>% cd $HOME
-% mkdir awe-alanine 
-% cd awe-alanine 
-</code>
+<h3>Introduction</h3>
+<p>
+The general workflow for running AWE-WQ is outlined below.
+Three preprocessing steps are required before AWE-WQ can be executed:
+first, a sample the conformational space; second, cluster the results from the sampling procedure; third, define cell regions and import file formats.
+There are numerous options and ways to accomplish the sampling step.
+Different programs, such as GROMACS, NAMD, CHARMM, or AMBER may be used to run the simulations.
+Clustering may be done using the <a href="http://msmbuilder.org">MSMBuilder</a> program.
+Finally use the <tt>SaveStructures.py</tt> command from MSMBuilder to extract conformations from each of the clusters, as well as the <tt>awe-import-gens</tt> and <tt>awe-prepare</tt> scripts from AWE-WQ to import convert to AWE-WQ file formats.
+If desired, the <tt>awe-calc-gens-rmsd</tt> will compute the RMSD of the cluster centers to a reference structure and <tt>awe-define-regions</tt> can be used to determine the regions cells belong to based on RMSD.
 
-<p>To run AWE to sample a protein molecule, you will need to have the files
-describing the topology of atoms in that molecule, the coordinates of the
-walkers, and the coordinates of the cells.  In addition, AWE transfers the
-executables from the GROMACS package required for running the simulations of
-each walker. 
-
-<p>These files and executables can be fetched to the current working directory by running 
- 
-<code>% awe-prepare</code>
-
-<p>This will create two directories named <tt>awe-generic-data</tt> and
-<tt>awe-instance-data</tt>. <tt>awe-generic-data</tt> will contain files that
-all AWE runs will require, such as the task executables and Gromacs forcefield
-files. <tt>awe-instance-data</tt> will contain files that are particular to a
-protein system such as the state definitions, initial protein coordinates, etc.
-Note that <tt>awe-prepare</tt>, by default, will transfer the files for the
-Alanine Dipeptide protein molecule. Further, <tt>awe-prepare</tt> will also copy
-the example program <tt>awe-ala.py</tt> provided in the AWE source that samples
-the state transitions for the Alanine Dipeptide protein. 
-
-<p>To run the example in <tt>awe-ala.py</tt>, do
-
-<code>% python awe-ala.py</code>
-
-<p> You will see this output right away:
-<code> Running on port 9123...
-Loading cells and walkers
-</code>
-
-The AWE master program successfully started and began loading the cells and
-walkers for running the simulations. After that, the master waits for workers to
-connect so it can dispatch the simulation tasks for execution by the connected
-workers.
-
-Now, start a worker for this master on the same machine:
-<code>% work_queue_worker localhost 9123</code>
-
-However, to run a really large sampling, you will need to run as many workers as
-possible.  A simple (but tiresome) way of doing so is to <tt>ssh</tt> into
-several machines and manually run <tt>work_queue_worker</tt> as above.  But, if
-you have access to a batch system like <a
-href=http://www.cs.wisc.edu/condor>Condor</a> or <a
-href=http://www.sun.com/software/sge>SGE</a>, you can use them to start many
-workers with a single submit command.
+<center><image title="AWE-WQ Workflow" src="awe/workflow.png"/></center>
 
 <p>
-We have provided some scripts to make this easy.  For example, to submit 10
-workers to your local Condor pool:
+AWE-WQ uses a Master/Worker model to execute tasks on remote machines.
+A task is comprised of several files:
+The cell definitions, the starting conformation, requisite MD software, assignment program, and a script that executes the task.
+The AWE-WQ execution flowchart is illustrated below:
 
-<code>% condor_submit_workers master.somewhere.edu 9123 10
-Submitting job(s)..........
-Logging submit event(s)..........
-10 job(s) submitted to cluster 298.
+<center><image width=300 title="AWE-WQ Flowchart" src="awe/flowchart.png"/></center>
+
+
+<h3>Tutorial</h3>
+<p>
+Within the <tt>tutorial</tt> directory of the source code we provide several input files for you to follow along.
+Checkout the sourcecode using:
+<code>% git clone https://github.com/cooperative-computing-lab/awe.git awe.git
+% cd awe.git
 </code>
 
-Or, to submit 10 worker processes to your SGE cluster:
-<code>% sge_submit_workers master.somewhere.edu 9123 10
-Your job 1054781 ("worker.sh") has been submitted
-Your job 1054782 ("worker.sh") has been submitted
-Your job 1054783 ("worker.sh") has been submitted
+The tutorial is also stored as an IPython notebook file which you can start using:
+<code>% cd tutorial
+% ipython notebook
+</code>
+
+The following files are provided:
+<ul>
+<li><tt>XTC.tar.bz2</tt>: MD trajectory files for Alanine Dipeptide</li>
+<li><tt>native.pdb</tt>: Conformation of the "native" structure</li>
+<li><tt>AtomIndices.dat</tt>: atoms to use</li>
+</ul>
+
+<h4>Sampling</h4>
+Sampling has already been done and the files are stored in <tt>XTC.tar.bz2</tt>
+Extract the trajectory files:
+<code>% tar xf XTC.tar.bz2</code>
+The directory structure is <tt>XTC/RUN#/frame0.xtc</tt>, where <tt>#</tt> is the trajectory number.
+
+<h4>Determine Cell Definitions</h4>
+The sampling data is imported into MSMBuilder using the <tt>ConvertDataToHDF.py</tt> command, paramterized with a PDB file containing the system coordinates and the path to the MD data:
+<code>% ConvertDataToHDF.py -s native.pdb -i XTC</code>
+
+The next step defines the cells.
+Conformations are clustered with a hybrid k-centers/k-medoids algorithm using the RMSD between atoms as the distance metric.
+The AtomIndices.dat defines the atoms to consider when computing the distance between conformations.
+Using a subset (such as all non-hydrogens) prevents too fine a granularity from overfitting the data.
+Finally, we will cluster the data into 100 cells.
+<code>% Cluster.py rmsd -a AtomIndices.dat hybrid -k 100</code>
+
+By inspecting the implied timescales (not shown) we build a Markov State Model at lagtime 10.
+<code>% BuildMSM.py -l 10</code>
+
+<h4>AWE-WQ Input Preparation</h4>
+<p>
+Extract a given number of conformations from each of the cells defined above (<tt>SaveStructures.py</tt>) and import the cell definitions from MSMBuilder format to AWE-WQ format (<tt>awe-import-gens</tt>) and setup the initial files for the AWE-WQ run (<tt>awe-prepare</tt>).
+Regions of metastable states need to then be determined, which are ultimately given as a list of the cells belonging to each region (e.g. ”folded” and ”unfolded”) and scripts are given to do so using RMSD to a reference structure (<tt>awe-calc-gens-rmsd</tt>, <tt>awe-define-regions</tt>).
+
+<p>
+Since we plan to maintain 10 simulations in the cells, so we need to extract conformations from the states using MSMBuilder.
+<code>% SaveStructures.py -c 10 -f pdb -S sep -o Walkers</code>
+
+In order to run AWE-WQ we must then import the cell definitions which were written by MSMBuilder to <tt>Gens.lh5</tt>.
+When building the Markiov State Model using <tt>BuildMSM.py</tt>, several of the clusters may be prunned.
+This information is stored in <tt>Data/Mapping.dat</tt> and needs to be included when importing to AWE-WQ.
+The following command will output the cell definitions to <tt>cells.dat</tt>:
+<code>% awe-import-gens -g Data/Gens.lh5 -o cells.dat -m Data/Mapping.dat</code>
+
+<p>
+In order to compute reaction rates we need to specify regions of metastable states.
+AWE-WQ provides some commands to assist with this process: awe-calc-gens-rmsd and awe-define-regions.
+We use awe-calc-gens-rmsd to compute the RMSD of each cell to some reference conformation such as the native state.
+<code>% awe-calc-gens-rmsd \
+    -r native.pdb \
+    -n AtomIndices.dat \
+    -g Data/Gens.lh5 \
+    -o native-rmsd.dat
+</code>
+
+By plotting the distribution of values we can classify conformations with RMSD ≤ 2.3 &Aring as folded and those with RMSD ≥ 2.5 &Aring as unfolded.
+The two output files <tt>folded.dat</tt> and <tt>unfolded.dat</tt> now contain the integer indices of the states belonging to these regions.
+<code>% awe-define-regions -i native-rmsd.dat -c 0.23 -O ’<=’ -o folded.dat
+% awe-define-regions -i native-rmsd.dat -c 0.25 -O ’>=’ -o unfolded.dat
+</code>
+
+<p>
+We can now prepare for AWE-WQ by checking dependencies and populating the directory with other necessary files by running awe-prepare.
+
+This will create two directories named <tt>awe-generic-data</tt> and <tt>awe-instance-data</tt>. <tt>awe-generic-data</tt> will contain files that all AWE runs will require, such as the task executables and Gromacs forcefield files.
+<tt>awe-instance-data</tt> will contain files that are particular to a protein system such as the state definitions, initial protein coordinates, etc.
+<code>% awe-prepare
+Checking for compatible python...OK
+Checking for executable work_queue_status...OK
+Checking for executable pdb2gmx...OK
+Checking for executable grompp...OK
+Checking for executable mdrun...OK
+Checking for executable awe-assign...OK
+Checking for compatible Gromacs...OK
+Checking for python module work_queue...OK
+Checking for python module numpy...OK
+Checking for python module prody...OK
+Checking for python module pylab...OK
+Checking for python module trax...OK
+Checking for python module awe...OK
+Decompressing awe-generic-data.tar.bz2
+Decompressing awe-instance-data.tar.bz2
+Copying example
+Copying binaries
+Copying Gromacs forcefield files
+</code>
+
+<h4>Running AWE-WQ</h4>
+
+<p>
+There are two components to consider when running AWE-WQ: the master process and the resources.
+The master is the driver of the algorithm, managing task definitions, scheduling, processing, and the resampling procedure.
+In order to run the walkers, resources must be allocated.
+
+<p>
+<b>Master:</b>
+Start the AWE-WQ process on a machine.
+This process loads the initial conformations (walk- ers) for each cell, and is in charge of scheduling each task, processing the result, and the resampling procedure.
+This runs AWE-WQ maintaining 10 walkers in 100 cells, whose definition is provided in cells.dat with initial weights in Data/Populations.dat.
+The coordinates for the walkers are found in the Walkers directory.
+The metastable regions are provided in folded.dat and unfolded.dat as a list of cell id numbers belonging to each region.
+Finally, we give a name to the master (“awe-wq”) to that workers can easily locate the host and port.
+<code>% awe-wq -N 10 -C 100 -c cells.dat -w Data/Populations.dat -W Walkers \
+         -r folded.dat unfolded.dat -n awe-wq
+</code>
+
+<p>
+<b>Workers</b>
+Resources can be allocated either directly using work_queue_worker to run tasks locally.
+To run jobs on SGE or CONDOR use <tt>sge_submit_workers</tt> and <tt>condor_submit_workers</tt>.
+Additionally, resources can be managed automatically using <tt>work_queue_pool</tt>.
+Using <tt>work_queue_worker</tt> also allows the worker to operate as a ”Foreman”, enabling the hierarchical distribution of tasks.
+Since the master has started we can start a worker locally.
+<code>% work_queue_worker -a -N awe-wq</code>
+
+<h4>Monitoring AWE-WQ Progress</h4>
+
+<p>
+Use <tt>work_queue_status</tt> to get the current resources runtime status (number of workers, number of tasks waiting/completed, etc).
+By using <tt>awe-plot-wq-stats</tt> the plot of the resource usage over the runtime of the program can be obtained.
+In this case, I've submitted several workers to SGE.
+<code>% work_queue_status
+PROJECT            HOST                    PORT  WAITING  BUSY COMPLETE WORKERS
+awe-wq             fah.crc.nd.edu          1024      133    36    57547      36
 ...
 </code>
 
-Once the workers begin running, the AWE master can dispatch tasks to
-each one very quickly.  It's ok if a machine running a worker crashes
-or is turned off; the work will be silently sent elsewhere to run.
 <p>
-When the AWE master process completes, your workers will
-still be available, so you can either run another master with the
-same workers, remove them from the batch system, or wait for them to
-expire.  If you do nothing for 15 minutes, they will automatically exit.
+The <tt>awe-flux</tt> command allows the convergence of the calculated flux to be monitored.
+Once convergence within a determined threshold is obtained the program may be halted.
 
-<h2 id="output"> Output of AWE<a class="sectionlink" href="#output" title="Link to this section.">&#x21d7;</a></h2>
+<p>
+Additionally, other analyses are appropriate.
+For instance, the energy surface for Alanine Dipeptide can be visualized as a function of its dihedral angles.
+As such, we can plot, as shown below, the cell coordinates and the initial estimation of the weights as well as computed weights after several iterations of AWE-WQ.
 
-The AWE master creates the following output files on completion:
-<ul>
-<li><tt>cell-weights.csv</tt> describing the weight of the cells </li>
-<li><tt>walker-history.csv</tt> describing the cells that were visited by the walkers </li>
-<li><tt>color-transition-matrix.csv</tt> that describes the number of
-transitions between the defined cell groups</li> 
-<li><tt>walker-weights.csv</tt> that describes the weights of the walkers</li>
-</ul>
-
-You can use these output files to generate different plots that visualize the
-output of the AWE run. To generate a Ramachandran plot (free energy landscape on
-phi-psi space) using <tt>cell-weights.csv</tt>, run the following command.
-<code>% python awe-rama-ala.py -w cell-weights.csv -p awe-instance-data/topol.pdb -c awe-instance-data/cells.dat -n 100</code>
-
-where, <tt>-w</tt> specifies the csv file recording cell weights, <tt>-p</tt>
-the structure file of simulation target, <tt>-c</tt> the data file recording
-coordinates of cell centers, and <tt>-n</tt> the number of cells
-
-This produces an output file named <tt>awe-rama-ala.png</tt> that contains the
-Ramachandran plot.
-
-<p>To generate and visualize forward and backward fluxes from the output file
-<tt>color-transition-matrix.dat</tt>, use the script <tt>awe-flux.py</tt>.
-
-<code>% python awe-flux.py -i color-transition-matrix.csv -l 0.01</code>
-
-where <tt>-i</tt> specifies the data file recording transitions at every
-iteration, <tt>-l</tt> specifies the scale iteration length to actual unit and
-(nano/pico/femto-seconds).
-
-This will produce the following outputs:		
-<ul>
-<li><tt>instan-forward-flux.dat</tt>: instantaneous forward flux</li>
-<li><tt>instan-backward-flux.dat</tt>: instantaneous backward flux</li>
-<li><tt>forward-flux.png</tt>: plot of forward flux</li>
-<li><tt>backward-flux.png</tt>: plot of backward flux</li>
-</ul>
-
-<p>Finally, to generate transition probability matrix from AWE output, run the
-script <tt>awe-transMatrix.py</tt>
-
-<code>% python awe-transMatrix.py -p walker-history.dat -w walker-weights.dat -t 1 -n 100</code>
-where <tt>-p</tt> specifies the data file recording dependencies of walkers,
-<tt>-w</tt> specifies the data file recording weights and cell ID of walkers,
-<tt>-t</tt> specifies the time lag (number of iterations) for calculating,
-transition matrix, and <tt>-n</tt> specifies the number of cells
-
-<p>This prints the matrix to a file called <tt>trans-probability-matrix.csv</tt>.
+<table style="background-color:transparent">
+<tr>
+  <th>Before</th>
+  <th>After</th>
+</tr>
+<tr>
+  <td><image src="awe/ala-rama-msm.png" title="Initial approximation using MSM, before running AWE-WQ"></td>
+  <td><image src="awe/ala-rama-awe.png" title="After running AWE-WQ"></td>
+</tr>
+</table>
 
 <h2 id="differentproteins"> Running AWE on Different Protein Systems<a class="sectionlink" href="#differentproteins" title="Link to this section.">&#x21d7;</a></h2>
 You can run AWE to sample a different protein system by following the steps
