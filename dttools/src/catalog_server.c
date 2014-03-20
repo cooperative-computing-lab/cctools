@@ -95,9 +95,6 @@ static char *logfilename = 0;
 /* Location of the history file. */
 static const char * history_dir = 0;
 
-/* debug filename */
-static char *debug_filename = 0;
-
 /* Settings for the master catalog that we will report *to* */
 static int outgoing_alarm = 0;
 static int outgoing_timeout = 300;
@@ -471,7 +468,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Maximum number of child processes.  (default is %d)\n", "-m,--max-jobs=<n>",child_procs_max);
 	fprintf(stdout, " %-30s Maximum size of a server to be believed.  (default is any)\n", "-M,--server-size=<size>");
 	fprintf(stdout, " %-30s Preferred host name of this server.\n", "-n,--name=<name>");
-	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size. (default 10M, 0 disables)\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Port number to listen on (default is %d)\n", "-p,--port=<port>", port);
 	fprintf(stdout, " %-30s Single process mode; do not work on queries.\n", "-S,--single");
@@ -552,8 +549,7 @@ int main(int argc, char *argv[])
 				preferred_hostname = optarg;
 				break;
 			case 'o':
-				free(debug_filename);
-				debug_filename = strdup(optarg);
+				debug_config_file(optarg);
 				break;
 			case 'O':
 				debug_config_file_size(string_metric_parse(optarg));
@@ -584,8 +580,6 @@ int main(int argc, char *argv[])
 	}
 
 	if (is_daemon) daemonize(0, pidfile);
-
-	debug_config_file(debug_filename);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 

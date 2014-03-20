@@ -20,7 +20,7 @@ SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-c,catalog,host)Query the catalog on this host.
 OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
-OPTION_TRIPLET(-o,debug-file,file)Send debugging output to this file.
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to the system syslog (":syslog") or to the systemd journal (":journal").
 OPTION_TRIPLET(-O,debug-rotate-max,bytes)Rotate file once it reaches this size.
 OPTION_TRIPLET(-A,server-space,size)Only show servers with this space available. (example: -A 100MB).
 OPTION_TRIPLET(-t,timeout,time)Timeout.

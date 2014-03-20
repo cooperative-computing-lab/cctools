@@ -527,7 +527,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	fprintf(stdout, " %-30s Abort after this amount of idle time. (default=%ds)\n", "-t,--timeout=<time>", idle_timeout);
-	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
 	fprintf(stdout, " %-30s Set TCP window size.\n", "-w,--tcp-window=<size>");
 	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");

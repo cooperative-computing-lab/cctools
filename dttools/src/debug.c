@@ -8,34 +8,40 @@ See the file COPYING for details.
 #include "debug.h"
 
 #include "buffer.h"
-#include "full_io.h"
 #include "path.h"
-#include "stringtools.h"
 #include "xxmalloc.h"
 
-#include <unistd.h>
-#include <fcntl.h>
-
-#include <sys/stat.h>
 #include <sys/time.h>
 
-#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-static int debug_fd = STDERR_FILENO;
-static char debug_file[PATH_MAX];
-static off_t debug_file_size = 1<<20;
-static char program_name[PATH_MAX];
-static INT64_T debug_flags = D_NOTICE;
-static pid_t(*debug_getpid) () = getpid;
+extern void debug_stderr_write (INT64_T flags, const char *str);
+
+extern void debug_file_write (INT64_T flags, const char *str);
+extern void debug_file_size (off_t size);
+extern void debug_file_path (const char *path);
+extern void debug_file_rename (const char *suffix);
+
+#ifdef HAS_SYSLOG_H
+extern void debug_syslog_write (INT64_T flags, const char *str);
+extern void debug_syslog_config (const char *name);
+#endif
+
+#ifdef HAS_SYSTEMD_JOURNAL_H
+extern void debug_journal_write (INT64_T flags, const char *str);
+#endif
+
+
+static void (*debug_write) (INT64_T flags, const char *str) = debug_stderr_write;
+static pid_t (*debug_getpid) (void) = getpid;
+static char debug_program_name[PATH_MAX];
+static INT64_T debug_flags = D_NOTICE|D_ERROR|D_FATAL;
 
 struct flag_info {
 	const char *name;
@@ -43,8 +49,14 @@ struct flag_info {
 };
 
 static struct flag_info table[] = {
-	{"syscall", D_SYSCALL},
+	/* info, the default, is not shown here */
+	{"fatal", D_FATAL},
+	{"error", D_ERROR},
 	{"notice", D_NOTICE},
+	{"debug", D_DEBUG},
+
+	/* subsystems */
+	{"syscall", D_SYSCALL},
 	{"channel", D_CHANNEL},
 	{"process", D_PROCESS},
 	{"resolve", D_RESOLVE},
@@ -71,7 +83,6 @@ static struct flag_info table[] = {
 	{"poll", D_POLL},
 	{"hdfs", D_HDFS},
 	{"bxgrid", D_BXGRID},
-	{"debug", D_DEBUG},
 	{"login", D_LOGIN},
 	{"irods", D_IRODS},
 	{"wq", D_WQ},
@@ -93,7 +104,6 @@ struct fatal_callback {
 };
 
 struct fatal_callback *fatal_callback_list = 0;
-
 
 int debug_flags_set(const char *flagname)
 {
@@ -135,85 +145,69 @@ void debug_set_flag_name(INT64_T flag, const char *name)
 	}
 }
 
-static const char *flag_to_name(INT64_T flag)
+static const char *debug_flags_to_name(INT64_T flags)
 {
 	struct flag_info *i;
 
 	for(i = table; i->name; i++) {
-		if(i->flag & flag)
+		if(i->flag & flags)
 			return i->name;
 	}
 
 	return "debug";
 }
 
-static void do_debug(int is_fatal, INT64_T flags, const char *fmt, va_list args)
+static void do_debug(INT64_T flags, const char *fmt, va_list args)
 {
 	buffer_t B;
 	char ubuf[1<<16];
-	struct timeval tv;
-	struct tm *tm;
 
 	buffer_init(&B);
 	buffer_ubuf(&B, ubuf, sizeof(ubuf));
 	buffer_max(&B, sizeof(ubuf));
 
-	gettimeofday(&tv, 0);
-	tm = localtime(&tv.tv_sec);
+	if (debug_write == debug_file_write || debug_write == debug_stderr_write) {
+		struct timeval tv;
+		struct tm *tm;
+		gettimeofday(&tv, 0);
+		tm = localtime(&tv.tv_sec);
 
-	buffer_putfstring(&B, "%04d/%02d/%02d %02d:%02d:%02d.%02ld [%d] %s: %s: ", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (long) tv.tv_usec / 10000, (int) debug_getpid(), program_name, is_fatal ? "fatal " : flag_to_name(flags));
+		buffer_putfstring(&B, "%04d/%02d/%02d %02d:%02d:%02d.%02ld ", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (long) tv.tv_usec / 10000);
+		buffer_putfstring(&B, "%s[%d] ", debug_program_name, getpid());
+	}
+	/* Parrot prints debug messages for children: */
+	if (getpid() != debug_getpid()) {
+		buffer_putfstring(&B, "<child:%d> ", (int)debug_getpid());
+	}
+	buffer_putfstring(&B, "%s: ", debug_flags_to_name(flags));
+
 	buffer_putvfstring(&B, fmt, args);
 	while(isspace(buffer_tostring(&B, NULL)[buffer_pos(&B)-1]))
 		buffer_rewind(&B, buffer_pos(&B)-1); /* chomp whitespace */
 	buffer_putliteral(&B, "\n");
 
-	if(debug_file[0]) {
-		struct stat info;
+	debug_write(flags, buffer_tostring(&B, NULL));
 
-		fstat(debug_fd, &info);
-		if(info.st_size >= debug_file_size && debug_file_size != 0) {
-			close(debug_fd);
-
-			if(stat(debug_file, &info) == 0) {
-				if(info.st_size >= debug_file_size) {
-					char *newname = malloc(strlen(debug_file) + 5);
-					sprintf(newname, "%s.old", debug_file);
-					rename(debug_file, newname);
-					free(newname);
-				}
-			}
-
-			debug_fd = open(debug_file, O_CREAT | O_TRUNC | O_WRONLY, 0660);
-			if(debug_fd == -1) {
-				debug_fd = STDERR_FILENO;
-				fatal("could not open log file `%s': %s", debug_file, strerror(errno));
-			}
-		}
-	}
-
-	full_write(debug_fd, buffer_tostring(&B, NULL), buffer_pos(&B));
 	buffer_free(&B);
 }
 
 void debug(INT64_T flags, const char *fmt, ...)
 {
-	va_list args;
-	va_start(args, fmt);
-
 	if(flags & debug_flags) {
+		va_list args;
 		int save_errno = errno;
-		do_debug(0, flags, fmt, args);
+		va_start(args, fmt);
+		do_debug(flags, fmt, args);
+		va_end(args);
 		errno = save_errno;
 	}
-
-	va_end(args);
 }
 
 void vdebug(INT64_T flags, const char *fmt, va_list args)
 {
 	if(flags & debug_flags) {
 		int save_errno = errno;
-		do_debug(0, flags, fmt, args);
+		do_debug(flags, fmt, args);
 		errno = save_errno;
 	}
 }
@@ -221,33 +215,31 @@ void vdebug(INT64_T flags, const char *fmt, va_list args)
 void warn(INT64_T flags, const char *fmt, ...)
 {
 	va_list args;
+
+	int save_errno = errno;
 	va_start(args, fmt);
-
-        int save_errno = errno;
-        do_debug(0, flags, fmt, args);
-        errno = save_errno;
-
+	do_debug(flags|D_ERROR, fmt, args);
 	va_end(args);
+	errno = save_errno;
 }
 
 void fatal(const char *fmt, ...)
 {
 	struct fatal_callback *f;
 	va_list args;
-	va_start(args, fmt);
 
-	do_debug(1, 0, fmt, args);
+	va_start(args, fmt);
+	do_debug(D_FATAL, fmt, args);
+	va_end(args);
 
 	for(f = fatal_callback_list; f; f = f->next) {
 		f->callback();
 	}
 
 	while(1) {
-		kill(getpid(), SIGTERM);
-		kill(getpid(), SIGKILL);
+		raise(SIGQUIT); /* dump core */
+		raise(SIGKILL);
 	}
-
-	va_end(args);
 }
 
 void debug_config_fatal(void (*callback) ())
@@ -259,44 +251,44 @@ void debug_config_fatal(void (*callback) ())
 	fatal_callback_list = f;
 }
 
-void debug_config(const char *name)
+void debug_config_file (const char *path)
 {
-	strncpy(program_name, path_basename(name), sizeof(program_name)-1);
-}
-
-void debug_config_file(const char *f)
-{
-	if(f) {
-		if(*f == '/') {
-			strncpy(debug_file, f, sizeof(debug_file)-1);
-		} else {
-			if(getcwd(debug_file, sizeof(debug_file)) == NULL)
-				assert(0);
-			strncat(debug_file, "/", sizeof(debug_file)-strlen(debug_file)-1);
-			strncat(debug_file, f, sizeof(debug_file)-strlen(debug_file)-1);
-		}
-		debug_fd = open(debug_file, O_CREAT | O_APPEND | O_WRONLY, 0660);
-		if (debug_fd == -1){
-			debug_fd = STDERR_FILENO;
-			fatal("could not access log file `%s' for writing: %s", debug_file, strerror(errno));
-		}
+	if(path == NULL || strcmp(path, ":stderr") == 0) {
+		debug_write = debug_stderr_write;
+	} else if (strcmp(path, ":syslog") == 0) {
+#ifdef HAS_SYSLOG_H
+		debug_write = debug_syslog_write;
+		debug_syslog_config(debug_program_name);
+#else
+		fprintf(stderr, "syslog is not available");
+		exit(EXIT_FAILURE);
+#endif
+	} else if (strcmp(path, ":journal") == 0) {
+#ifdef HAS_SYSTEMD_JOURNAL_H
+		debug_write = debug_journal_write;
+#else
+		fprintf(stderr, "systemd journal is not available");
+		exit(EXIT_FAILURE);
+#endif
 	} else {
-		debug_file[0] = '\0';
-		if (debug_fd != STDERR_FILENO){
-			close(debug_fd); /* we opened some file */
-		}
-		debug_fd = STDERR_FILENO;
+		debug_write = debug_file_write;
+		debug_file_path(path);
 	}
 }
 
-void debug_config_file_size( size_t size )
+void debug_config (const char *name)
 {
-	debug_file_size = size;
+	strncpy(debug_program_name, path_basename(name), sizeof(debug_program_name)-1);
 }
 
-void debug_config_getpid(pid_t(*getpidfunc) ())
+void debug_config_file_size (off_t size)
 {
-	debug_getpid = getpidfunc;
+	debug_file_size(size);
+}
+
+void debug_config_getpid (pid_t (*getpidf)(void))
+{
+	debug_getpid = getpidf;
 }
 
 INT64_T debug_flags_clear()
@@ -309,6 +301,11 @@ INT64_T debug_flags_clear()
 void debug_flags_restore(INT64_T fl)
 {
 	debug_flags = fl;
+}
+
+void debug_rename(const char *suffix)
+{
+	debug_file_rename(suffix);
 }
 
 /* vim: set noexpandtab tabstop=4: */

@@ -3,6 +3,8 @@ CCTOOLS_HOME = ../..
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
+WORK_QUEUE_LDFLAGS = -lwork_queue -lchirp -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+
 SOURCES =   batch_job.c  \
 	    batch_job_chirp.c  \
 	    batch_job_condor.c  \
@@ -39,23 +41,24 @@ TEST_PROGRAMS = work_queue_example work_queue_workload_simulator
 
 all: ${LIBRARIES} $(PROGRAMS) $(TEST_PROGRAMS) bindings
 
+
 work_queue_worker: work_queue_worker.o ${EXTERNALS} libwork_queue.a
-	${CCTOOLS_LD} work_queue_worker.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -lchirp -ldttools -lm -o $@
+	${CCTOOLS_LD} work_queue_worker.o $(WORK_QUEUE_LDFLAGS) -o $@
 
 mpi_queue_worker: mpi_queue_worker.o ${EXTERNALS} libwork_queue.a
-	${CCTOOLS_MPI_LD} mpi_queue_worker.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -lchirp -ldttools -lm -o $@
+	${CCTOOLS_MPI_LD} mpi_queue_worker.o $(WORK_QUEUE_LDFLAGS) -o $@
 
 work_queue_status: work_queue_status.o ${EXTERNALS} libwork_queue.a
-	${CCTOOLS_LD} work_queue_status.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -lchirp -ldttools -lm -o $@
+	${CCTOOLS_LD} work_queue_status.o $(WORK_QUEUE_LDFLAGS) -o $@
 
 work_queue_example: work_queue_example.o ${EXTERNALS} libwork_queue.a
-	${CCTOOLS_LD} work_queue_example.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -lchirp -ldttools -lm -o $@
+	${CCTOOLS_LD} work_queue_example.o $(WORK_QUEUE_LDFLAGS) -o $@
 
 work_queue_workload_simulator: work_queue_workload_simulator.o ${EXTERNALS} libwork_queue.a
-	${CCTOOLS_LD} work_queue_workload_simulator.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -lchirp -ldttools -lm -o $@
+	${CCTOOLS_LD} work_queue_workload_simulator.o $(WORK_QUEUE_LDFLAGS) -o $@
 
 work_queue_pool: work_queue_pool.o ${EXTERNALS} libwork_queue.a
-	${CCTOOLS_LD} work_queue_pool.o ${CCTOOLS_INTERNAL_LDFLAGS} -lwork_queue -lchirp -ldttools -lm -ldl -o $@
+	${CCTOOLS_LD} work_queue_pool.o $(WORK_QUEUE_LDFLAGS) -o $@
 
 libwork_queue.a: ${OBJECTS}
 	${CCTOOLS_AR} rv $@ $^

@@ -38,7 +38,7 @@ OPTION_ITEM(`-h, --help')Give help information.
 OPTION_TRIPLET(-I, interface,addr)Listen only on this network interface.
 OPTION_TRIPLET(-M, max-clients,count)Set the maximum number of clients to accept at once. (default unlimited)
 OPTION_TRIPLET(-n, catalog-name,name)Use this name when reporting to the catalog.
-OPTION_TRIPLET(-o,debug-file, file)Send debugging output to this file.
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to the system syslog (":syslog") or to the systemd journal (":journal").
 OPTION_TRIPLET(-O, debug-rotate-max,bytes)Rotate debug file once it reaches this size.
 OPTION_TRIPLET(-P,superuser,user)Superuser for all directories. (default is none)
 OPTION_TRIPLET(-p,port,port)Listen on this port (default is 9094)
