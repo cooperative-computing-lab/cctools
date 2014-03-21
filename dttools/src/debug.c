@@ -238,7 +238,7 @@ void fatal(const char *fmt, ...)
 	}
 
 	while(1) {
-		raise(SIGQUIT); /* dump core */
+		raise(SIGTERM);
 		raise(SIGKILL);
 	}
 }

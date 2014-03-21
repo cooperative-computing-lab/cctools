@@ -143,7 +143,7 @@ Logs a warning message, regardless of if given flags are active.
 
 void warn(INT64_T flags, const char *fmt, ...);
 
-/** Emit a fatal debugging message and exit.
+/** Emit a fatal debugging message and terminate with SIGTERM.
 Displays a printf-style message, and then forcibly exits the program.
 @param fmt A printf-style formatting string, followed by the necessary arguments.
 */
