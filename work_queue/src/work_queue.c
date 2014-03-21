@@ -2170,7 +2170,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 	if(t->unlabeled)
 	{
 		// Do not allow labeled/unlabeled mix.
-		if(t->cores > 0 || t->memory > 0 || t->disk > 0 || t->gpus > 0) {
+		if(w->cores_allocated > 0 || w->memory_allocated > 0 || w->disk_allocated > 0 || w->gpus_allocated > 0) {
 			ok = 0;
 		}
 
