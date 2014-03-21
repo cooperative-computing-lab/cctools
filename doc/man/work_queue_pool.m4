@@ -63,7 +63,7 @@ OPTION_TRIPLET(-t, timeout, time)Abort after this amount of idle time.
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
 OPTION_TRIPLET(-M, master-name, project)Name of a preferred project. A worker can have multiple preferred projects.
 OPTION_ITEM(`-N')Same as -M,--master-name (deprecated).
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to the system syslog (":syslog") or to the systemd journal (":journal").
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_ITEM(`-E, --extra-options')Extra options that should be added to the worker.
 OPTIONS_END
 

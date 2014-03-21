@@ -55,7 +55,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s The port that the master will be listening on.\n", "-p,--port=<port>");
 	fprintf(stdout, " %-30s Extra arguments to pass to the comparison function.\n", "-e,--extra-args=<args>");
 	fprintf(stdout, " %-30s Extra input file needed by the comparison function. (may be given multiple times)\n", "-f,--input-file=<file>");
-	fprintf(stdout, " %-30s Write debugging output to this file (default to standard output) (can also be :stderr, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Write task output to this file (default to standard output)\n", "-O,--output-file=<file>");
 	fprintf(stdout, " %-30s Record runtime statistics and write to this file (default: off)\n", "-s,--wqstats-file=<file>");
 	fprintf(stdout, " %-30s Estimated time to run one comparison. (default chosen at runtime)\n", "-t,--estimated-time=<seconds>");

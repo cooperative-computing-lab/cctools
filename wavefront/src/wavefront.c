@@ -374,7 +374,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Manually set the block size for batch mode.\n", "-b,--block-size=<size>");
 	fprintf(stdout, " %-30s Run the whole problem locally in multicore mode. (default)\n", "-L,--multicore");
 	fprintf(stdout, " %-30s Manually set the number of process to run at once.\n", "-n,--jobs=<njobs>");
-	fprintf(stdout, " %-30s Write debug information to this file. (can also be :stderr, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Interval between image writes, in seconds. (default=%d)\n", "-t,--bitmap-interval=<secs>",progress_bitmap_interval);
 	fprintf(stdout, " %-30s Run in distributed mode with <type> batch system: (default=%s)\n", "-T,--batch-type=<type>", batch_queue_type_to_string(batch_system_type));
 	fprintf(stdout, " %-30s %s\n", "", batch_queue_type_string());

@@ -22,6 +22,7 @@ See the file COPYING for details.
 #include <time.h>
 
 extern void debug_stderr_write (INT64_T flags, const char *str);
+extern void debug_stdout_write (INT64_T flags, const char *str);
 
 extern void debug_file_write (INT64_T flags, const char *str);
 extern void debug_file_size (off_t size);
@@ -166,7 +167,7 @@ static void do_debug(INT64_T flags, const char *fmt, va_list args)
 	buffer_ubuf(&B, ubuf, sizeof(ubuf));
 	buffer_max(&B, sizeof(ubuf));
 
-	if (debug_write == debug_file_write || debug_write == debug_stderr_write) {
+	if (debug_write == debug_file_write || debug_write == debug_stderr_write || debug_write == debug_stdout_write) {
 		struct timeval tv;
 		struct tm *tm;
 		gettimeofday(&tv, 0);
@@ -255,6 +256,8 @@ void debug_config_file (const char *path)
 {
 	if(path == NULL || strcmp(path, ":stderr") == 0) {
 		debug_write = debug_stderr_write;
+	} else if(strcmp(path, ":stdout") == 0) {
+		debug_write = debug_stdout_write;
 	} else if (strcmp(path, ":syslog") == 0) {
 #ifdef HAS_SYSLOG_H
 		debug_write = debug_syslog_write;

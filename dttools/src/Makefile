@@ -26,7 +26,7 @@ SOURCES = auth.c  \
           debug.c  \
           debug_file.c  \
           debug_journal.c  \
-          debug_stderr.c  \
+          debug_stream.c  \
           debug_syslog.c  \
           disk_info.c  \
           domain_name.c  \

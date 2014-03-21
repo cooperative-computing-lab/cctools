@@ -1160,7 +1160,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s Require this authentication mode.\n", "-a,--auth=<flag>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<flag>");
-	fprintf(stdout, " %-30s Send debugging output to this file. (can also be :stderr, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
 	fprintf(stdout, " %-30s Long transfer information.\n", "-l,--verbose");
 	fprintf(stdout, " %-30s Set remote operation timeout.\n", "-t,--timeout=<time>");

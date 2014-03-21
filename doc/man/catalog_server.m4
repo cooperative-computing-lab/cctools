@@ -48,7 +48,7 @@ OPTION_TRIPLET(-L, update-log,file)Log new updates to this file.
 OPTION_TRIPLET(-m, max-jobs,n)Maximum number of child processes.  (default is 50)
 OPTION_TRIPLET(-M, server-size, size)Maximum size of a server to be believed.  (default is any)
 OPTION_TRIPLET(-n, name, name)Set the preferred hostname of this server.
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to the system syslog (":syslog") or to the systemd journal (":journal").
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_TRIPLET(-O, debug-rotate-max, bytes)Rotate debug file once it reaches this size.
 OPTION_TRIPLET(-p,, port, port)Port number to listen on (default is 9097)
 OPTION_ITEM(`-S, --single')Single process mode; do not fork on queries.

@@ -468,7 +468,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Maximum number of child processes.  (default is %d)\n", "-m,--max-jobs=<n>",child_procs_max);
 	fprintf(stdout, " %-30s Maximum size of a server to be believed.  (default is any)\n", "-M,--server-size=<size>");
 	fprintf(stdout, " %-30s Preferred host name of this server.\n", "-n,--name=<name>");
-	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size. (default 10M, 0 disables)\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Port number to listen on (default is %d)\n", "-p,--port=<port>", port);
 	fprintf(stdout, " %-30s Single process mode; do not work on queries.\n", "-S,--single");
