@@ -35,7 +35,7 @@ OPTION_TRIPLET(-l, ld-path, path)Path to ld.so to use.
 OPTION_TRIPLET(-m, ftab-file, file)Use this file as a mountlist.
 OPTION_TRIPLET(-M, mount, /foo=/bar)Mount (redirect) /foo to /bar.
 OPTION_TRIPLET(-N, hostname, name)Pretend that this is my hostname.
-OPTION_TRIPLET(-o, debug-file, file)Send debugging messages to this file.
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_TRIPLET(-O, debug-rotate-max, bytes)Rotate debug files of this size.
 OPTION_TRIPLET(-p, proxy, host:port)Use this proxy server for HTTP requests.
 OPTION_ITEM(`-Q, --no-chirp-catalog')Inhibit catalog queries to list /chirp.

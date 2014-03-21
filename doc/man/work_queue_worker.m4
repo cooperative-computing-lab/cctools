@@ -32,7 +32,7 @@ OPTIONS_BEGIN
 OPTION_TRIPLET(-N,-M, master-name, name)Set the name of the project this worker should work for.  A worker can have multiple projects.
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
-OPTION_TRIPLET(-o, debug-file, file)Send debugging to this file.
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_PAIR(--debug-max-rotate, bytes)Set the maximum file size of the debug log.  If the log exceeds this size, it is renamed to "filename.old" and a new logfile is opened.  (default=10M. 0 disables)
 OPTION_ITEM(--debug-release-reset)Debug file will be closed, renamed, and a new one opened after being released from a master.
 OPTION_ITEM(`--foreman')Enable foreman mode.

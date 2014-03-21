@@ -24,6 +24,10 @@ SOURCES = auth.c  \
           daemon.c  \
           datagram.c  \
           debug.c  \
+          debug_file.c  \
+          debug_journal.c  \
+          debug_stream.c  \
+          debug_syslog.c  \
           disk_info.c  \
           domain_name.c  \
           domain_name_cache.c  \

@@ -1933,7 +1933,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "The most common options are:\n");
 	fprintf(stdout, " %-30s URL of storage directory, like `file://path' or `hdfs://host:port/path'.\n", "-r,--root=<url>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<name>");
-	fprintf(stdout, " %-30s Send debugging output to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Send status updates to this host. (default: `%s')\n", "-u,--advertise=<host>", CATALOG_HOST);
 	fprintf(stdout, " %-30s Show version info.\n", "-v,--version");
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
@@ -2038,7 +2038,6 @@ int main(int argc, char *argv[])
 	const char *manual_hostname = 0;
 	int max_child_procs = 0;
 	const char *listen_on_interface = 0;
-	char chirp_debug_file[PATH_MAX] = "";
 	int total_child_procs = 0;
 	int did_explicit_auth = 0;
 	char port_file[PATH_MAX] = "";
@@ -2131,7 +2130,7 @@ int main(int argc, char *argv[])
 			chirp_acl_force_readonly();
 			break;
 		case 'o':
-			path_absolute(optarg, chirp_debug_file, 0);
+			debug_config_file(optarg);
 			break;
 		case 'O':
 			debug_config_file_size(string_metric_parse(optarg));
@@ -2200,9 +2199,6 @@ int main(int argc, char *argv[])
 
 	/* Ensure that all files are created private by default (again because of daemonize). */
 	umask(0077);
-
-	/* open debug file now because daemonize closes all open fds */
-	debug_config_file(strlen(chirp_debug_file) ? chirp_debug_file : NULL);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 

@@ -1160,6 +1160,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s Require this authentication mode.\n", "-a,--auth=<flag>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
 	fprintf(stdout, " %-30s Long transfer information.\n", "-l,--verbose");
 	fprintf(stdout, " %-30s Set remote operation timeout.\n", "-t,--timeout=<time>");
@@ -1184,6 +1185,7 @@ int main(int argc, char *argv[])
 	static struct option long_options[] = {
 		{"auth", required_argument, 0, 'a'},
 		{"debug", required_argument, 0, 'd'},
+		{"debug-file", required_argument, 0, 'o'},
 		{"tickets", required_argument, 0, 'i'},
 		{"verbose", no_argument, 0, 'l'},
 		{"timeout", required_argument, 0, 't'},
@@ -1200,6 +1202,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case 'o':
+			debug_config_file(optarg);
 			break;
 		case 'h':
 			show_help(argv[0]);

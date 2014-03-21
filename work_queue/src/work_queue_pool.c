@@ -1385,7 +1385,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, " %-30s Name of a preferred project. A worker can have multiple preferred\n", "-M,--master-name=<project>");
     fprintf(stdout, " %-30s projects.\n", "");
     fprintf(stdout, " %-30s Same as -M,--master-name (deprecated).\n", "-N");
-    fprintf(stdout, " %-30s Send worker debugging output to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
     fprintf(stdout, " %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
 }
 
