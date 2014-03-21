@@ -7,8 +7,6 @@ See the file COPYING for details.
 #include "chirp_filesystem.h"
 #include "chirp_fs_local.h"
 #include "chirp_fs_local_scheduler.h"
-#include "chirp_protocol.h"
-#include "chirp_acl.h"
 
 #include "debug.h"
 #include "xxmalloc.h"
@@ -18,7 +16,6 @@ See the file COPYING for details.
 #include "delete_dir.h"
 
 #include <dirent.h>
-#include <fnmatch.h>
 #include <unistd.h>
 #include <utime.h>
 
@@ -501,202 +498,6 @@ static void chirp_fs_local_closedir(struct chirp_dir *dir)
 	free(dir);
 }
 
-static int search_to_access(int flags)
-{
-	int access_flags = F_OK;
-	if(flags & CHIRP_SEARCH_R_OK)
-		access_flags |= R_OK;
-	if(flags & CHIRP_SEARCH_W_OK)
-		access_flags |= W_OK;
-	if(flags & CHIRP_SEARCH_X_OK)
-		access_flags |= X_OK;
-
-	return access_flags;
-}
-
-static int search_match_file(const char *pattern, const char *name)
-{
-	debug(D_DEBUG, "search_match_file(`%s', `%s')", pattern, name);
-	/* Decompose the pattern in atoms which are each matched against. */
-	while (1) {
-		char atom[CHIRP_PATH_MAX];
-		const char *end = strchr(pattern, '|'); /* disjunction operator */
-
-		memset(atom, 0, sizeof(atom));
-		if (end)
-			strncpy(atom, pattern, (size_t)(end-pattern));
-		else
-			strcpy(atom, pattern);
-
-		/* Here we might have a pattern like '*' which matches any file so we
-		 * iteratively pull leading components off of `name' until we get a
-		 * match.  In the case of '*', we would pull off all leading components
-		 * until we reach the file name, which would always match '*'.
-		 */
-		const char *test = name;
-		do {
-			int result = fnmatch(atom, test, FNM_PATHNAME);
-			debug(D_DEBUG, "fnmatch(`%s', `%s', FNM_PATHNAME) = %d", atom, test, result);
-			if(result == 0) {
-				return 1;
-			}
-			test = strchr(test, '/');
-			if (test) test += 1;
-		} while (test);
-
-		if (end)
-			pattern = end+1;
-		else
-			break;
-	}
-
-	return 0;
-}
-
-static int search_should_recurse(const char *base, const char *pattern)
-{
-	debug(D_DEBUG, "search_should_recurse(base = `%s', pattern = `%s')", base, pattern);
-	/* Decompose the pattern in atoms which are each matched against. */
-	while (1) {
-		char atom[CHIRP_PATH_MAX];
-
-		if (*pattern != '/') return 1; /* unanchored pattern is always recursive */
-
-		const char *end = strchr(pattern, '|'); /* disjunction operator */
-		memset(atom, 0, sizeof(atom));
-		if (end)
-			strncpy(atom, pattern, (size_t)(end-pattern));
-		else
-			strcpy(atom, pattern);
-
-		/* Here we want to determine if `base' matches earlier parts of
-		 * `pattern' to see if we should recurse in the directory `base'. To do
-		 * this, we strip off final parts of `pattern' until we get a match.
-		 */
-		while (*atom) {
-			int result = fnmatch(atom, base, FNM_PATHNAME);
-			debug(D_DEBUG, "fnmatch(`%s', `%s', FNM_PATHNAME) = %d", atom, base, result);
-			if(result == 0) {
-				return 1;
-			}
-			char *last = strrchr(atom, '/');
-			if (last) {
-				*last = '\0';
-			} else {
-				break;
-			}
-		}
-
-		if (end)
-			pattern = end+1;
-		else
-			break;
-	}
-	return 0;
-}
-
-static int search_directory(const char *subject, const char * const base, char fullpath[CHIRP_PATH_MAX], const char *pattern, int flags, struct link *l, time_t stoptime)
-{
-	if(strlen(pattern) == 0)
-		return 0;
-
-	debug(D_DEBUG, "search_directory(subject = `%s', base = `%s', fullpath = `%s', pattern = `%s', flags = %d, ...)", subject, base, fullpath, pattern, flags);
-
-	int access_flags = search_to_access(flags);
-	int includeroot = flags & CHIRP_SEARCH_INCLUDEROOT;
-	int metadata = flags & CHIRP_SEARCH_METADATA;
-	int stopatfirst = flags & CHIRP_SEARCH_STOPATFIRST;
-
-	int result = 0;
-	void *dirp = chirp_fs_local_opendir(fullpath);
-	char *current = fullpath + strlen(fullpath);	/* point to end to current directory */
-
-	if(dirp) {
-		errno = 0;
-		struct chirp_dirent *entry;
-		while((entry = chirp_fs_local_readdir(dirp))) {
-			char *name = entry->name;
-
-			if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0 || strncmp(name, ".__", 3) == 0)
-				continue;
-			sprintf(current, "/%s", name);
-
-			if(search_match_file(pattern, base)) {
-				const char *matched;
-				if (includeroot) {
-					if (base-fullpath == 1 && fullpath[0] == '/') {
-						matched = base;
-					} else {
-						matched = fullpath;
-					}
-				} else {
-					matched = base;
-				}
-
-				result += 1;
-				if (access_flags == F_OK || chirp_fs_local_access(fullpath, access_flags) == 0) {
-					if(metadata) {
-						/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
-						struct chirp_stat info;
-						if(entry->lstatus == -1) {
-							link_putfstring(l, "0:%s::\n", stoptime, matched); // FIXME is this a bug?
-							link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, matched);
-						} else {
-							char statenc[CHIRP_STAT_MAXENCODING];
-							chirp_stat_encode(statenc, &info);
-							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, statenc);
-							if(stopatfirst) return 1;
-						}
-					} else {
-						link_putfstring(l, "0:%s::\n", stoptime, matched);
-						if(stopatfirst) return 1;
-					}
-				} /* FIXME access failure */
-			}
-
-			if(cfs_isdir(fullpath) && search_should_recurse(base, pattern)) {
-				if(chirp_acl_check_dir(fullpath, subject, CHIRP_ACL_LIST)) {
-					int n = search_directory(subject, base, fullpath, pattern, flags, l, stoptime);
-					if(n > 0) {
-						result += n;
-						if(stopatfirst)
-							return result;
-					}
-				} else {
-					link_putfstring(l, "%d:%d:%s:\n", stoptime, EPERM, CHIRP_SEARCH_ERR_OPEN, fullpath);
-				}
-			}
-			*current = '\0';	/* clear current entry */
-			errno = 0;
-		}
-
-		if(errno)
-			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, fullpath);
-
-		errno = 0;
-		chirp_fs_local_closedir(dirp);
-		if(errno)
-			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, fullpath);
-	} else {
-		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, fullpath);
-	}
-
-	return result;
-}
-
-/* Note we need the subject because we must check the ACL for any nested directories. */
-static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
-{
-	char fullpath[CHIRP_PATH_MAX];
-	strcpy(fullpath, dir);
-	path_remove_trailing_slashes(fullpath); /* this prevents double slashes from appearing in paths we examine. */
-
-	debug(D_DEBUG, "chirp_fs_local_search(subject = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, dir, pattern, flags);
-
-	/* FIXME we should still check for literal paths to search since we can optimize that */
-	return search_directory(subject, fullpath + strlen(fullpath), fullpath, pattern, flags, l, stoptime);
-}
-
 static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
 {
 	struct stat64 linfo;
@@ -900,7 +701,7 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_ftruncate,
 	chirp_fs_local_fsync,
 
-	chirp_fs_local_search,
+	cfs_basic_search,
 
 	chirp_fs_local_opendir,
 	chirp_fs_local_readdir,
