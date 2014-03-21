@@ -28,6 +28,7 @@ extern void debug_file_write (INT64_T flags, const char *str);
 extern void debug_file_size (off_t size);
 extern void debug_file_path (const char *path);
 extern void debug_file_rename (const char *suffix);
+extern void debug_file_reopen (void);
 
 #ifdef HAS_SYSLOG_H
 extern void debug_syslog_write (INT64_T flags, const char *str);
@@ -309,6 +310,11 @@ void debug_flags_restore(INT64_T fl)
 void debug_rename(const char *suffix)
 {
 	debug_file_rename(suffix);
+}
+
+void debug_reopen(void)
+{
+	debug_file_reopen();
 }
 
 /* vim: set noexpandtab tabstop=4: */

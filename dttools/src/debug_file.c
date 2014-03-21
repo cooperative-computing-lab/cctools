@@ -24,26 +24,23 @@ static int file_fd = -1;
 static char file_path[PATH_MAX];
 static off_t file_size_max = 1<<20;
 
-static void reopen (void)
+void debug_file_reopen (void)
 {
-	file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY, 0660);
-	if (file_fd == -1){
-		fprintf(stderr, "could not access log file `%s' for writing: %s\n", file_path, strerror(errno));
-		exit(EXIT_FAILURE);
+	if (strlen(file_path)) {
+		file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY, 0660);
+		if (file_fd == -1){
+			fprintf(stderr, "could not access log file `%s' for writing: %s\n", file_path, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
 	}
 }
 
 void debug_file_write (INT64_T flags, const char *str)
 {
+	int rc;
 	if (file_size_max > 0) {
 		struct stat info;
-		int rc = fstat(file_fd, &info);
-		if (rc == -1 && errno == EBADF) {
-			/* This may happen when a daemonize function like the one in
-			 * daemon.h closes all open fds. */
-			reopen();
-			rc = fstat(file_fd, &info);
-		}
+		rc = fstat(file_fd, &info);
 		if (rc == 0) {
 			if (info.st_size >= file_size_max) {
 				close(file_fd);
@@ -52,7 +49,7 @@ void debug_file_write (INT64_T flags, const char *str)
 					snprintf(old, sizeof(old)-1, "%s.old", file_path);
 					rename(file_path, old);
 				}
-				reopen();
+				debug_file_reopen();
 			}
 		} else {
 			fprintf(stderr, "couldn't stat debug file: %s\n", strerror(errno));
@@ -60,14 +57,18 @@ void debug_file_write (INT64_T flags, const char *str)
 		}
 	}
 
-	full_write(file_fd, str, strlen(str));
+	rc = full_write(file_fd, str, strlen(str));
+	if (rc == -1) {
+		fprintf(stderr, "couldn't write to debug file: %s\n", strerror(errno));
+		abort();
+	}
 }
 
 void debug_file_path (const char *path)
 {
 	path_absolute(path, file_path, 0);
 	close(file_fd);
-	reopen();
+	debug_file_reopen();
 }
 
 void debug_file_size (off_t size)
@@ -83,7 +84,7 @@ void debug_file_rename (const char *suffix)
 		close(file_fd);
 		snprintf(old, sizeof(old)-1, "%s.%s", file_path, suffix);
 		rename(file_path, old);
-		reopen();
+		debug_file_reopen();
 	}
 }
 

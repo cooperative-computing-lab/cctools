@@ -221,4 +221,8 @@ void debug_flags_restore(INT64_T flags);
 */
 void debug_rename(const char *suffix);
 
+/** Reopen the debug stream.
+*/
+void debug_reopen(void);
+
 #endif

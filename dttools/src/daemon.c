@@ -23,38 +23,38 @@ void daemonize (int cdroot, const char *pidfile)
 	/* Become session leader and lose controlling terminal */
 	pid_t pid = fork();
 	if (pid < 0) {
-		debug(D_DEBUG, "could not fork: %s", strerror(errno));
-		exit(EXIT_FAILURE);
+		fatal("could not fork: %s", strerror(errno));
 	} else if (pid > 0) {
 		exit(EXIT_SUCCESS); /* exit parent */
 	}
 
 	pid_t group = setsid();
 	if (group == (pid_t) -1) {
-		debug(D_DEBUG, "could not create session: %s", strerror(errno));
-		exit(EXIT_FAILURE);
+		fatal("could not create session: %s", strerror(errno));
 	}
 
 	/* Second fork ensures process cannot acquire controlling terminal */
 	pid = fork();
 	if (pid < 0) {
-		debug(D_DEBUG, "could not fork: %s", strerror(errno));
-		exit(EXIT_FAILURE);
+		fatal("could not fork: %s", strerror(errno));
 	} else if (pid > 0) {
 		exit(EXIT_SUCCESS); /* exit parent */
 	}
 
-	if (pidfile) {
+	if (pidfile && strlen(pidfile)) {
 		FILE *file = fopen(pidfile, "w");
-		fprintf(file, "%ld", (long)getpid());
-		fclose(file);
+		if (file) {
+			fprintf(file, "%ld", (long)getpid());
+			fclose(file);
+		} else {
+			fatal("could not open `%s' for writing: %s", pidfile, strerror(errno));
+		}
 	}
 
 	if (cdroot){
 		int status = chdir("/");
 		if (status == -1) {
-			debug(D_DEBUG, "could not chdir to `/': %s", strerror(errno));
-			exit(EXIT_FAILURE);
+			fatal("could not chdir to `/': %s", strerror(errno));
 		}
 	}
 
@@ -64,19 +64,18 @@ void daemonize (int cdroot, const char *pidfile)
 
     FILE *file0 = freopen("/dev/null", "r", stdin);
     if (file0 == NULL) {
-        debug(D_DEBUG, "could not reopen stdin: %s", strerror(errno));
-        exit(EXIT_FAILURE);
+        fatal("could not reopen stdin: %s", strerror(errno));
     }
     FILE *file1 = freopen("/dev/null", "w", stdout);
     if (file1 == NULL) {
-        debug(D_DEBUG, "could not reopen stdout: %s", strerror(errno));
-        exit(EXIT_FAILURE);
+        fatal("could not reopen stdout: %s", strerror(errno));
     }
     FILE *file2 = freopen("/dev/null", "w", stderr);
     if (file2 == NULL) {
-        debug(D_DEBUG, "could not reopen stderr: %s", strerror(errno));
-        exit(EXIT_FAILURE);
+        fatal("could not reopen stderr: %s", strerror(errno));
     }
+
+	debug_reopen();
 }
 
 /* vim: set noexpandtab tabstop=4: */
