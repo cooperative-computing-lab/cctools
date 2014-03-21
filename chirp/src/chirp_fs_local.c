@@ -70,22 +70,54 @@ See the file COPYING for details.
 #define fstatfs64 fstatvfs64
 #endif
 
-#ifndef COPY_CSTAT
-#define COPY_CSTAT( a, b )\
-	memset(&(b),0,sizeof(b));\
-	(b).cst_dev = (a).st_dev;\
-	(b).cst_ino = (a).st_ino;\
-	(b).cst_mode = (a).st_mode;\
-	(b).cst_nlink = (a).st_nlink;\
-	(b).cst_uid = (a).st_uid;\
-	(b).cst_gid = (a).st_gid;\
-	(b).cst_rdev = (a).st_rdev;\
-	(b).cst_size = (a).st_size;\
-	(b).cst_blksize = (a).st_blksize;\
-	(b).cst_blocks = (a).st_blocks;\
-	(b).cst_atime = (a).st_atime;\
-	(b).cst_mtime = (a).st_mtime;\
-	(b).cst_ctime = (a).st_ctime;
+#define COPY_STAT_LOCAL_TO_CHIRP(cinfo,linfo) \
+	do {\
+		struct chirp_stat *cinfop = &(cinfo);\
+		struct stat64 *linfop = &(linfo);\
+		memset(cinfop, 0, sizeof(struct chirp_stat));\
+		cinfop->cst_dev = linfop->st_dev;\
+		cinfop->cst_ino = linfop->st_ino;\
+		cinfop->cst_mode = linfop->st_mode & (~0077);\
+		cinfop->cst_nlink = linfop->st_nlink;\
+		cinfop->cst_uid = linfop->st_uid;\
+		cinfop->cst_gid = linfop->st_gid;\
+		cinfop->cst_rdev = linfop->st_rdev;\
+		cinfop->cst_size = linfop->st_size;\
+		cinfop->cst_blksize = linfop->st_blksize;\
+		cinfop->cst_blocks = linfop->st_blocks;\
+		cinfop->cst_atime = linfop->st_atime;\
+		cinfop->cst_mtime = linfop->st_mtime;\
+		cinfop->cst_ctime = linfop->st_ctime;\
+	} while (0)
+
+#ifdef CCTOOLS_OPSYS_SUNOS
+#define COPY_STATFS_LOCAL_TO_CHIRP(cinfo,linfo) \
+	do {\
+		struct chirp_statfs *cinfop = &(cinfo);\
+		struct statfs64 *linfop = &(linfo);\
+		memset(cinfop, 0, sizeof(struct chirp_statfs));\
+		cinfop->f_type = linfop->f_fsid;\
+		cinfop->f_bsize = linfop->f_frsize;\
+		cinfop->f_blocks = linfop->f_blocks;\
+		cinfop->f_bavail = linfop->f_bavail;\
+		cinfop->f_bfree = linfop->f_bfree;\
+		cinfop->f_files = linfop->f_files;\
+		cinfop->f_ffree = linfop->f_ffree;\
+	} while (0)
+#else
+#define COPY_STATFS_LOCAL_TO_CHIRP(cinfo,linfo) \
+	do {\
+		struct chirp_statfs *cinfop = &(cinfo);\
+		struct statfs64 *linfop = &(linfo);\
+		memset(cinfop, 0, sizeof(struct chirp_statfs));\
+		cinfop->f_type = linfop->f_type;\
+		cinfop->f_bsize = linfop->f_bsize;\
+		cinfop->f_blocks = linfop->f_blocks;\
+		cinfop->f_bavail = linfop->f_bavail;\
+		cinfop->f_bfree = linfop->f_bfree;\
+		cinfop->f_files = linfop->f_files;\
+		cinfop->f_ffree = linfop->f_ffree;\
+	} while (0)
 #endif
 
 static char local_root[CHIRP_PATH_MAX];
@@ -230,39 +262,23 @@ static INT64_T chirp_fs_local_lockf (int fd, int cmd, INT64_T len)
 	return lockf(lfd, cmd, len);
 }
 
-static INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat *buf)
+static INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat *info)
 {
 	SETUP_FILE
-	struct stat64 info;
-	int result;
-	result = fstat64(lfd, &info);
+	struct stat64 linfo;
+	int result = fstat64(lfd, &linfo);
 	if(result == 0)
-		COPY_CSTAT(info, *buf);
-	buf->cst_mode = buf->cst_mode & (~0077);
+		COPY_STAT_LOCAL_TO_CHIRP(*info, linfo);
 	return result;
 }
 
-static INT64_T chirp_fs_local_fstatfs(int fd, struct chirp_statfs *buf)
+static INT64_T chirp_fs_local_fstatfs(int fd, struct chirp_statfs *info)
 {
 	SETUP_FILE
-	struct statfs64 info;
-	int result;
-	result = fstatfs64(lfd, &info);
-	if(result == 0) {
-		memset(buf, 0, sizeof(*buf));
-#ifdef CCTOOLS_OPSYS_SUNOS
-		buf->f_type = info.f_fsid;
-		buf->f_bsize = info.f_frsize;
-#else
-		buf->f_type = info.f_type;
-		buf->f_bsize = info.f_bsize;
-#endif
-		buf->f_blocks = info.f_blocks;
-		buf->f_bavail = info.f_bavail;
-		buf->f_bfree = info.f_bfree;
-		buf->f_files = info.f_files;
-		buf->f_ffree = info.f_ffree;
-	}
+	struct statfs64 linfo;
+	int result = fstatfs64(lfd, &linfo);
+	if (result == 0)
+		COPY_STATFS_LOCAL_TO_CHIRP(*info, linfo);
 	return result;
 }
 
@@ -309,9 +325,9 @@ static INT64_T chirp_fs_local_unlink(const char *path)
 	 */
 
 	if(result < 0 && errno == EPERM) {
-		struct stat64 info;
-		result = stat64(path, &info);
-		if(result == 0 && S_ISDIR(info.st_mode)) {
+		struct stat64 linfo;
+		result = stat64(path, &linfo);
+		if(result == 0 && S_ISDIR(linfo.st_mode)) {
 			result = -1;
 			errno = EISDIR;
 		} else {
@@ -405,49 +421,33 @@ static INT64_T chirp_fs_local_rmdir(const char *path)
 	}
 }
 
-static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *buf)
+static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *info)
 {
-	struct stat64 info;
-	int result;
 	RESOLVE(path)
-	result = stat64(path, &info);
+	struct stat64 linfo;
+	int result = stat64(path, &linfo);
 	if(result == 0)
-		COPY_CSTAT(info, *buf);
+		COPY_STAT_LOCAL_TO_CHIRP(*info, linfo);
 	return result;
 }
 
-static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *buf)
+static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *info)
 {
-	struct stat64 info;
-	int result;
 	RESOLVE(path)
-	result = lstat64(path, &info);
+	struct stat64 linfo;
+	int result = lstat64(path, &linfo);
 	if(result == 0)
-		COPY_CSTAT(info, *buf);
+		COPY_STAT_LOCAL_TO_CHIRP(*info, linfo);
 	return result;
 }
 
-static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs *buf)
+static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs *info)
 {
-	struct statfs64 info;
-	int result;
 	RESOLVE(path)
-	result = statfs64(path, &info);
-	if(result == 0) {
-		memset(buf, 0, sizeof(*buf));
-#ifdef CCTOOLS_OPSYS_SUNOS
-		buf->f_type = info.f_fsid;
-		buf->f_bsize = info.f_frsize;
-#else
-		buf->f_type = info.f_type;
-		buf->f_bsize = info.f_bsize;
-#endif
-		buf->f_blocks = info.f_blocks;
-		buf->f_bavail = info.f_bavail;
-		buf->f_bfree = info.f_bfree;
-		buf->f_files = info.f_files;
-		buf->f_ffree = info.f_ffree;
-	}
+	struct statfs64 linfo;
+	int result = statfs64(path, &linfo);
+	if (result == 0)
+		COPY_STATFS_LOCAL_TO_CHIRP(*info, linfo);
 	return result;
 }
 
@@ -482,14 +482,13 @@ static struct chirp_dirent *chirp_fs_local_readdir(struct chirp_dir *dir)
 	struct dirent *d = readdir(dir->dir);
 	if(d) {
 		char path[CHIRP_PATH_MAX];
-		struct stat64 buf;
+		struct stat64 linfo;
 		dir->cd.name = d->d_name;
 		sprintf(path, "%s/%s", dir->path, dir->cd.name);
 		memset(&dir->cd.info, 0, sizeof(dir->cd.info));
-		dir->cd.lstatus = lstat64(path, &buf);
-		if(dir->cd.lstatus == 0) {
-			COPY_CSTAT(buf, dir->cd.info);
-		}
+		dir->cd.lstatus = lstat64(path, &linfo);
+		if(dir->cd.lstatus == 0)
+			COPY_STAT_LOCAL_TO_CHIRP(dir->cd.info, linfo);
 		return &dir->cd;
 	} else {
 		return 0;
@@ -501,7 +500,6 @@ static void chirp_fs_local_closedir(struct chirp_dir *dir)
 	closedir(dir->dir);
 	free(dir);
 }
-
 
 static int search_to_access(int flags)
 {
@@ -639,13 +637,13 @@ static int search_directory(const char *subject, const char * const base, char f
 				if (access_flags == F_OK || chirp_fs_local_access(fullpath, access_flags) == 0) {
 					if(metadata) {
 						/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
-						struct chirp_stat buf;
+						struct chirp_stat info;
 						if(entry->lstatus == -1) {
 							link_putfstring(l, "0:%s::\n", stoptime, matched); // FIXME is this a bug?
 							link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, matched);
 						} else {
 							char statenc[CHIRP_STAT_MAXENCODING];
-							chirp_stat_encode(statenc, &buf);
+							chirp_stat_encode(statenc, &info);
 							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, statenc);
 							if(stopatfirst) return 1;
 						}
@@ -701,16 +699,16 @@ static INT64_T chirp_fs_local_search(const char *subject, const char *dir, const
 
 static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
 {
-	struct stat buf;
+	struct stat64 linfo;
 	RESOLVE(path)
 
 	// A remote user can change some of the permissions bits,
 	// which only affect local users, but we don't let them
 	// take away the owner bits, which would affect the Chirp server.
 
-	if (stat(path, &buf) == -1)
+	if (stat64(path, &linfo) == -1)
 		return -1;
-	if(S_ISDIR(buf.st_mode)) {
+	if(S_ISDIR(linfo.st_mode)) {
 		// On a directory, the user cannot set the execute bit.
 		mode = 0700 | (mode & 0077);
 	} else {
