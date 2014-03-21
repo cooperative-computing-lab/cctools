@@ -32,7 +32,7 @@ struct datagram {
 	int fd;
 };
 
-struct datagram *datagram_create(int port)
+struct datagram *datagram_create_address(const char *addr, int port)
 {
 	struct datagram *d = 0;
 	struct sockaddr_in address;
@@ -49,21 +49,31 @@ struct datagram *datagram_create(int port)
 
 	setsockopt(d->fd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on));
 
-	if(port != DATAGRAM_PORT_ANY) {
-		address.sin_family = AF_INET;
-		address.sin_port = htons(port);
+	memset(&address, 0, sizeof(address));
+	address.sin_family = AF_INET;
+#if defined(CCTOOLS_OPSYS_DARWIN)
+	address.sin_len = sizeof(address);
+#endif
+	if(addr) {
+		string_to_ip_address(addr, (unsigned char *) &address.sin_addr.s_addr);
+	} else {
 		address.sin_addr.s_addr = htonl(INADDR_ANY);
-
-		success = bind(d->fd, (struct sockaddr *) &address, sizeof(address));
-		if(success < 0)
-			goto failure;
 	}
+	address.sin_port =  DATAGRAM_PORT_ANY ? htons(0) : htons(port);
+
+	success = bind(d->fd, (struct sockaddr *) &address, sizeof(address));
+	if(success < 0)
+		goto failure;
 
 	return d;
-
-      failure:
+failure:
 	datagram_delete(d);
 	return 0;
+}
+
+struct datagram *datagram_create(int port)
+{
+	return datagram_create_address(NULL, port);
 }
 
 void datagram_delete(struct datagram *d)

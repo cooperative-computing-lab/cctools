@@ -466,6 +466,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
 	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
 	fprintf(stdout, " %-30s Record catalog history to this directory.\n", "-H,--history=<directory>");
+	fprintf(stdout, " %-30s Listen only on this network interface.\n", "-I,--interface=<addr>");
 	fprintf(stdout, " %-30s Lifetime of data, in seconds (default is %d)\n", "-l,--lifetime=<secs>", lifetime);
 	fprintf(stdout, " %-30s Log new updates to this file.\n", "-L,--update-log=<file>");
 	fprintf(stdout, " %-30s Maximum number of child processes.  (default is %d)\n", "-m,--max-jobs=<n>",child_procs_max);
@@ -489,6 +490,7 @@ int main(int argc, char *argv[])
 	time_t current;
 	int is_daemon = 0;
 	char *pidfile = NULL;
+	char *interface = NULL;
 
 	outgoing_host_list = list_create();
 
@@ -505,6 +507,7 @@ int main(int argc, char *argv[])
 		{"max-jobs", required_argument, 0, 'm'},
 		{"server-size", required_argument, 0, 'M'},
 		{"name", required_argument, 0, 'n'},
+		{"interface", required_argument, 0, 'I'},
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-rotate-max", required_argument, 0, 'O'},
 		{"port", required_argument, 0, 'p'},
@@ -517,7 +520,7 @@ int main(int argc, char *argv[])
         {0,0,0,0}};
 
 
-	while((ch = getopt_long(argc, argv, "bB:d:hH:l:L:m:M:n:o:O:p:ST:u:U:vZ:", long_options, NULL)) > -1) {
+	while((ch = getopt_long(argc, argv, "bB:d:hH:I:l:L:m:M:n:o:O:p:ST:u:U:vZ:", long_options, NULL)) > -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
@@ -541,6 +544,10 @@ int main(int argc, char *argv[])
 				break;
 			case 'H':
 				history_dir = strdup(optarg);
+				break;
+			case 'I':
+				free(interface);
+				interface = strdup(optarg);
 				break;
 			case 'm':
 				child_procs_max = atoi(optarg);
@@ -621,7 +628,7 @@ int main(int argc, char *argv[])
 	if(!table)
 		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
-	list_port = link_serve(port);
+	list_port = link_serve_address(interface, port);
 	if(list_port) {
 		/*
 		If a port was chosen automatically, read it back
@@ -635,16 +642,23 @@ int main(int argc, char *argv[])
 			link_address_local(list_port,addr,&port);
 		}
 	} else {
-		fatal("couldn't listen on tcp port %d", port);
+		if(interface)
+			fatal("couldn't listen on TCP address %s port %d", interface, port);
+		else
+			fatal("couldn't listen on TCP port %d", port);
 	}
 
 	outgoing_dgram = datagram_create(0);
 	if(!outgoing_dgram)
 		fatal("couldn't create outgoing udp port");
 
-	update_dgram = datagram_create(port);
-	if(!update_dgram)
-		fatal("couldn't listen on udp port %d", port);
+	update_dgram = datagram_create_address(interface, port);
+	if(!update_dgram) {
+		if(interface)
+			fatal("couldn't listen on UDP address %s port %d", interface, port);
+		else
+			fatal("couldn't listen on UDP port %d", port);
+	}
 
 	opts_write_port_file(port_file,port);
 

@@ -75,6 +75,13 @@ if(length>0) {
 */
 struct datagram *datagram_create(int port);
 
+/** Create a new address/port for sending or receiving datagrams.
+@param address The IP address to listen on.
+@param port The UDP port number to bind to.  On most versions of Unix, an ordinary user can only bind to ports greater than 1024.
+@return A new object for sending or receiving datagrams.  On failure, returns null and sets errno appropriately.  A very common error is EADDRINUSE, which indicates another process is already bound to that port.
+*/
+struct datagram *datagram_create_address(const char *address, int port);
+
 /** Destroy a datagram port.
 @param d The datagram object to destroy.
 */
