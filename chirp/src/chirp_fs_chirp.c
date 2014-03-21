@@ -189,12 +189,6 @@ static INT64_T chirp_fs_chirp_fsync(int fd)
 	return chirp_reli_fsync(file, STOPTIME);
 }
 
-
-static INT64_T chirp_fs_chirp_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime)
-{
-	return 1;		//FIXME
-}
-
 static struct chirp_dir *chirp_fs_chirp_opendir(const char *path)
 {
 	RESOLVENULL(path)
@@ -442,7 +436,8 @@ struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_ftruncate,
 	chirp_fs_chirp_fsync,
 
-	chirp_fs_chirp_search,
+	/* TODO ideally we'd pass this on to the proxy, but we'd have to deal with buffers/links. */
+	cfs_basic_search,
 
 	chirp_fs_chirp_opendir,
 	chirp_fs_chirp_readdir,
