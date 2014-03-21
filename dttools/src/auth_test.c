@@ -24,7 +24,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, "Where options are:\n");
 	fprintf(stdout, " %-30s This message\n", "-h,--help=<flag>");
 	fprintf(stdout, " %-30s Debugging\n", "-d,--debug=<flag>");
-	fprintf(stdout, " %-30s Write debug information to this file\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Rotate debug files of this size (default 10M, 0 disables)\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Allow this auth type\n", "-a,--auth=<type>");
 	fprintf(stdout, " %-30s Port number\n", "-p,--port=<num>");

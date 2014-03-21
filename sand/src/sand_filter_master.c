@@ -112,7 +112,7 @@ static void show_help(const char *cmd)
 	printf(" -P <integer>   Priority. Higher the value, higher the priority.\n");
 	printf(" -C <catalog>   Set catalog server to <catalog>. Format: HOSTNAME:PORT\n");
 	printf(" -Z <file>      Select port at random and write it out to this file.\n");
-	printf(" -o <file>      Send debugging to this file.\n");
+	printf(" -o <file>      Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n");
 	printf(" -v             Show version string\n");
 	printf(" -h             Show this help screen\n");
 }

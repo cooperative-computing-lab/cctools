@@ -144,7 +144,6 @@ static char *os_name = NULL;
 static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
 static time_t worker_start_time = 0;
-static char *base_debug_filename = NULL;
 
 // Local resource controls
 static struct work_queue_resources * local_resources = 0;
@@ -1492,13 +1491,8 @@ static int do_kill(int taskid) {
 static int do_release() {
 	debug(D_WQ, "released by master at %s:%d.\n", actual_addr, actual_port);
 
-	if(base_debug_filename && getenv("WORK_QUEUE_RESET_DEBUG_FILE")) {
-		char debug_filename[WORK_QUEUE_LINE_MAX];
-		
-		sprintf(debug_filename, "%s.%s", base_debug_filename, current_project);
-		debug_config_file(NULL);
-		rename(base_debug_filename, debug_filename);
-		debug_config_file(base_debug_filename);
+	if(getenv("WORK_QUEUE_RESET_DEBUG_FILE")) {
+		debug_rename(current_project);
 	}
 	
 	released_by_master = 1;
@@ -1901,7 +1895,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s projects.\n", ""); 
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
-	fprintf(stdout, " %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n", "--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Debug file will be closed, renamed, and a new one opened after being.\n", "--debug-release-reset");
 	fprintf(stdout, " %-30s released from a master.\n", "");
@@ -2123,7 +2117,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'o':
 			debug_config_file(optarg);
-			base_debug_filename = strdup(optarg);
 			break;
 		case LONG_OPT_FOREMAN:
 			worker_mode = worker_mode_default = WORKER_MODE_FOREMAN;

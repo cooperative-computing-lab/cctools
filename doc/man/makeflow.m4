@@ -56,7 +56,7 @@ OPTIONS_END
 SUBSECTION(Debugging Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-d, debug, subsystem)Enable debugging for this subsystem.
-OPTION_TRIPLET(-o, debug-file, file)Send debugging to this file.
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_ITEM(`--verbose')Display runtime progress on stdout.
 OPTIONS_END
 

@@ -35,7 +35,7 @@ OPTION_ITEM(`-D, --no-optimize')Disable small file optimizations such as recursi
 OPTION_ITEM(`-f, --foreground')Run in foreground for debugging.
 OPTION_TRIPLET(-i,tickets,files)Comma-delimited list of tickets to use for authentication.
 OPTION_TRIPLET(-m,mount-options,option)Pass mount option to FUSE. Can be specified multiple times.
-OPTION_TRIPLET(-o,debug-file,file)Send debugging output to this file.
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_TRIPLET(-t,timeout,timeout)Timeout for network operations. (default is 60s)
 OPTION_ITEM(`-v, --version')Show program version.
 OPTION_ITEM(`-h, --help')Give help information.
