@@ -214,6 +214,62 @@ static int recv_master_message( struct link *master, char *line, int length, tim
 
 /* Resources related tasks */
 
+void resources_count_inuse(struct work_queue_resources *r)
+{
+	pid_t pid;
+	uint64_t taskid;
+	struct task_info *ti;
+	struct work_queue_task *task;
+
+	cores_allocated  = 0;
+	memory_allocated = 0;
+	disk_allocated   = 0;
+	gpus_allocated   = 0;
+
+	// Disk is used regardless of task state:
+	itable_firstkey(stored_tasks);
+	while(itable_nextkey(stored_tasks, (uint64_t*)&taskid, (void**)&ti)) {
+		if(ti->task->unlabeled)
+		{
+			disk_allocated   += local_resources->disk.total;
+		}
+		else
+		{
+			disk_allocated   += MAX(ti->task->disk,  0);
+		}
+	}
+
+	list_first_item(waiting_tasks);
+	while((task = list_next_item(waiting_tasks)))
+	{
+		if(task->unlabeled)
+		{
+			disk_allocated   += local_resources->disk.total;
+		}
+		else
+		{
+			disk_allocated   += MAX(task->disk,  0);
+		}
+	}
+
+	// Add rest of resources
+	itable_firstkey(active_tasks);
+	while(itable_nextkey(active_tasks, (uint64_t*)&pid, (void**)&ti)) {
+		if(ti->task->unlabeled)
+		{
+			cores_allocated  += local_resources->cores.total;
+			memory_allocated += local_resources->memory.total;
+			gpus_allocated   += local_resources->gpus.total;
+		}
+		else
+		{
+			cores_allocated  += MAX(ti->task->cores, 0);
+			memory_allocated += MAX(ti->task->memory,0);
+			gpus_allocated   += MAX(ti->task->gpus,  0);
+		}
+	}
+}
+
 void resources_measure_locally(struct work_queue_resources *r)
 {
 	work_queue_resources_measure_locally(r,workspace);
