@@ -47,9 +47,8 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-/* Cygwin does not have 64-bit I/O, while Darwin has it by default. */
-
-#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD
+#if defined(CCTOOLS_OPSYS_CYGWIN) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
+/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
 #define fopen64 fopen
 #define open64 open
 #define lseek64 lseek
@@ -61,15 +60,10 @@ See the file COPYING for details.
 #define truncate64 truncate
 #define statfs64 statfs
 #define fstatfs64 fstatfs
-#endif
-
-#if CCTOOLS_OPSYS_DARWIN
+#elif defined(CCTOOLS_OPSYS_DARWIN)
 #define lchown chown
-#endif
-
+#elif defined(CCTOOLS_OPSYS_SUNOS)
 /* Solaris has statfs, but it doesn't work! Use statvfs instead. */
-
-#if CCTOOLS_OPSYS_SUNOS
 #define statfs statvfs
 #define fstatfs fstatvfs
 #define statfs64 statvfs64
