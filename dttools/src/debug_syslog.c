@@ -31,7 +31,7 @@ void debug_syslog_write (INT64_T flags, const char *str)
 
 void debug_syslog_config (const char *name)
 {
-	openlog(name, LOG_PID|LOG_NDELAY|LOG_NOWAIT, LOG_USER);
+	openlog(name, LOG_PID|LOG_NOWAIT, LOG_USER);
 }
 #endif
 
