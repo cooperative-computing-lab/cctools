@@ -31,6 +31,8 @@ See the file COPYING for details.
 #define ENOATTR  EINVAL
 #endif
 
+#include <sys/mount.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #ifdef HAS_SYS_STATFS_H
 #include <sys/statfs.h>
