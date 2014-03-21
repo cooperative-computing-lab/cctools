@@ -245,7 +245,7 @@ if __name__ == '__main__':
     plot_of_tasks_log.plot(prefix + '.tasks-log.' + extension)
 
   except IOError:
-    sys.stderr.write("Could not open file %s\n" % (filename,))
+    sys.stderr.write("Could not open file %s\n" % (logname,))
     sys.exit(1)
 
 
