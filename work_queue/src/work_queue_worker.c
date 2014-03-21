@@ -299,6 +299,7 @@ void resources_measure_locally(struct work_queue_resources *r)
 void resources_measure_all(struct work_queue_resources *local, struct work_queue_resources *aggr)
 {
 	resources_measure_locally(local);
+	resources_count_inuse(local);
 
 	if(worker_mode == WORKER_MODE_FOREMAN)
 	{
@@ -546,14 +547,11 @@ static int start_task(struct work_queue_task *t) {
 			t->disk = MAX(t->disk, 0);
 			t->gpus = MAX(t->gpus, 0);
 		}
-
-		cores_allocated += t->cores;
-		memory_allocated += t->memory;
-		disk_allocated += t->disk;
-		gpus_allocated += t->gpus;
-
+		
 		itable_insert(stored_tasks, t->taskid, ti);
 		itable_insert(active_tasks, ti->pid, ti);
+
+		resources_count_inuse(local_resources);
 
 		return 1;
 }
@@ -570,11 +568,6 @@ static void report_task_complete(struct link *master, struct task_info *ti)
 		send_master_message(master, "result %d %lld %llu %d\n", ti->status, (long long) output_length, (unsigned long long) ti->execution_end-ti->execution_start, ti->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
 		
-		cores_allocated -= ti->task->cores;
-		memory_allocated -= ti->task->memory;
-		disk_allocated -= ti->task->disk;
-		gpus_allocated -= ti->task->gpus;
-
 		total_task_execution_time += (ti->execution_end - ti->execution_start);
 		total_tasks_executed++;
 	} else {
@@ -592,7 +585,6 @@ static void report_task_complete(struct link *master, struct task_info *ti)
 		total_task_execution_time += t->cmd_execution_time;
 		total_tasks_executed++;
 	}
-	
 }
 
 static int itable_pop(struct itable *t, uint64_t *key, void **value)
@@ -684,6 +676,8 @@ static int handle_tasks(struct link *master) {
 		}
 		
 	}
+
+	resources_count_inuse(local_resources);
 	return 1;
 }
 
@@ -1441,11 +1435,6 @@ static void kill_task(struct task_info *ti) {
 	sprintf(dirname, "t.%d", ti->taskid);
 	delete_dir(dirname);
 
-	cores_allocated -= ti->task->cores;
-	memory_allocated -= ti->task->memory;
-	disk_allocated -= ti->task->disk;
-	gpus_allocated -= ti->task->gpus;
-
 	task_info_delete(ti);
 }
 
@@ -1506,10 +1495,6 @@ static void kill_all_tasks() {
 		task_info_delete(ti);
 	}
 	itable_clear(stored_tasks);
-	cores_allocated = 0;
-	memory_allocated = 0;
-	disk_allocated = 0;
-	gpus_allocated = 0;
 }
 
 static int do_kill(int taskid) {
