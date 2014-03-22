@@ -74,7 +74,7 @@ See the file COPYING for details.
 		memset(cinfop, 0, sizeof(struct chirp_stat));\
 		cinfop->cst_dev = linfop->st_dev;\
 		cinfop->cst_ino = linfop->st_ino;\
-		cinfop->cst_mode = linfop->st_mode & (~0077);\
+		cinfop->cst_mode = linfop->st_mode;\
 		cinfop->cst_nlink = linfop->st_nlink;\
 		cinfop->cst_uid = linfop->st_uid;\
 		cinfop->cst_gid = linfop->st_gid;\
@@ -206,7 +206,8 @@ static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode
 	RESOLVE(path)
 	INT64_T fd = getfd();
 	if (fd == -1) return -1;
-	mode = 0600 | (mode & 0100);
+	mode &= S_IXUSR|S_IRWXG|S_IRWXO;
+	mode |= S_IRUSR|S_IWUSR;
 	INT64_T lfd = open64(path, flags, (int) mode);
 	if (lfd >= 0) {
 		open_files[fd].fd = lfd;
@@ -289,11 +290,16 @@ static INT64_T chirp_fs_local_fchown(int fd, INT64_T uid, INT64_T gid)
 
 static INT64_T chirp_fs_local_fchmod(int fd, INT64_T mode)
 {
+	struct stat64 linfo;
 	SETUP_FILE
-	// A remote user can change some of the permissions bits,
-	// which only affect local users, but we don't let them
-	// take away the owner bits, which would affect the Chirp server.
-	mode = 0600 | (mode & 0177);
+	mode &= S_IXUSR|S_IRWXG|S_IRWXO; /* users can only set owner execute and group/other bits */
+	if (fstat64(lfd, &linfo) == -1)
+		return -1;
+	if(S_ISDIR(linfo.st_mode)) {
+		mode |= S_IRWXU; /* all owner bits must be set */
+	} else {
+		mode |= S_IRUSR|S_IWUSR; /* owner read/write must be set */
+	}
 	return fchmod(lfd, mode);
 }
 
@@ -377,7 +383,7 @@ static INT64_T chirp_fs_local_chdir(const char *path)
 static INT64_T chirp_fs_local_mkdir(const char *path, INT64_T mode)
 {
 	RESOLVE(path)
-	return mkdir(path, 0700);
+	return mkdir(path, S_IRWXU);
 }
 
 /*
@@ -502,21 +508,14 @@ static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
 {
 	struct stat64 linfo;
 	RESOLVE(path)
-
-	// A remote user can change some of the permissions bits,
-	// which only affect local users, but we don't let them
-	// take away the owner bits, which would affect the Chirp server.
-
+	mode &= S_IXUSR|S_IRWXG|S_IRWXO; /* users can only set owner execute and group/other bits */
 	if (stat64(path, &linfo) == -1)
 		return -1;
 	if(S_ISDIR(linfo.st_mode)) {
-		// On a directory, the user cannot set the execute bit.
-		mode = 0700 | (mode & 0077);
+		mode |= S_IRWXU; /* all owner bits must be set */
 	} else {
-		// On a file, the user can set the execute bit.
-		mode = 0600 | (mode & 0177);
+		mode |= S_IRUSR|S_IWUSR; /* owner read/write must be set */
 	}
-
 	return chmod(path, mode);
 }
 
