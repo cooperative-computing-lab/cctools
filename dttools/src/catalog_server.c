@@ -596,7 +596,7 @@ int main(int argc, char *argv[])
 	}
 
 	current = time(0);
-	debug(D_ALL, "*** %s starting at %s", argv[0], ctime(&current));
+	debug(D_NOTICE, "*** %s starting at %s", argv[0], ctime(&current));
 
 	if(!list_size(outgoing_host_list)) {
 		list_push_head(outgoing_host_list, CATALOG_HOST_DEFAULT);

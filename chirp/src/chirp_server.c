@@ -2227,7 +2227,7 @@ int main(int argc, char *argv[])
 	}
 
 	current = time(0);
-	debug(D_ALL, "*** %s starting at %s", argv[0], ctime(&current));
+	debug(D_NOTICE, "*** %s starting at %s", argv[0], ctime(&current));
 
 	if(!chirp_owner[0]) {
 		if(!username_get(chirp_owner)) {
