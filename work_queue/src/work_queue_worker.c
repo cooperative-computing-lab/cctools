@@ -12,7 +12,6 @@ See the file COPYING for details.
 #include "cctools.h"
 #include "macros.h"
 #include "catalog_query.h"
-#include "catalog_server.h"
 #include "work_queue_catalog.h"
 #include "datagram.h"
 #include "domain_name_cache.h"

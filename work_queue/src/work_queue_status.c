@@ -8,7 +8,6 @@ See the file COPYING for details.
 #include "cctools.h"
 #include "debug.h"
 #include "catalog_query.h"
-#include "catalog_server.h"
 #include "domain_name_cache.h"
 #include "work_queue.h"
 #include "nvpair.h"

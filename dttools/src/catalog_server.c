@@ -6,7 +6,7 @@ See the file COPYING for details.
 */
 
 #include "cctools.h"
-#include "catalog_server.h"
+#include "catalog_query.h"
 #include "datagram.h"
 #include "link.h"
 #include "nvpair_database.h"

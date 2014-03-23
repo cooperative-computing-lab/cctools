@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 #include "buffer.h"
-#include "catalog_server.h"
+#include "catalog_query.h"
 #include "datagram.h"
 #include "debug.h"
 #include "domain_name_cache.h"

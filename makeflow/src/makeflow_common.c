@@ -19,7 +19,6 @@ See the file COPYING for details.
 
 #include "cctools.h"
 #include "catalog_query.h"
-#include "catalog_server.h"
 #include "create_dir.h"
 #include "copy_stream.h"
 #include "work_queue_catalog.h"

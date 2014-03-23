@@ -8,7 +8,6 @@ See the file COPYING for details.
 
 #include "work_queue.h"
 #include "catalog_query.h"
-#include "catalog_server.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "nvpair.h"

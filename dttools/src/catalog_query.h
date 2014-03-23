@@ -14,6 +14,12 @@ See the file COPYING for details.
 Query the global catalog server for server descriptions.
 */
 
+#define CATALOG_HOST_DEFAULT "catalog.cse.nd.edu"
+#define CATALOG_PORT_DEFAULT 9097
+
+#define CATALOG_HOST (getenv("CATALOG_HOST") ? getenv("CATALOG_HOST") : CATALOG_HOST_DEFAULT )
+#define CATALOG_PORT (getenv("CATALOG_PORT") ? atoi(getenv("CATALOG_PORT")) : CATALOG_PORT_DEFAULT )
+
 /** Create a catalog query.
 Connects to a catalog server, issues a query, and waits for the results.
 The caller may specify a specific catalog host and port.

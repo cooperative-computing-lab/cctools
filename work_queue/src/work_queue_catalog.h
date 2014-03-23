@@ -12,7 +12,6 @@ See the file COPYING for details.
 #include "work_queue_resources.h"
 
 #include "catalog_query.h"
-#include "catalog_server.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "nvpair.h"
@@ -35,6 +34,9 @@ See the file COPYING for details.
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#define CATALOG_TYPE_WORK_QUEUE_MASTER "wq_master"
+#define CATALOG_TYPE_WORK_QUEUE_POOL   "wq_pool"
 
 #define WORK_QUEUE_CATALOG_MASTER_UPDATE_INTERVAL 30 
 #define	WORK_QUEUE_CATALOG_MASTER_AD_LIFETIME 300 

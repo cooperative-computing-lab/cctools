@@ -21,7 +21,6 @@ The following major problems must be fixed:
 #include "debug.h"
 #include "stringtools.h"
 #include "catalog_query.h"
-#include "catalog_server.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "hash_table.h"

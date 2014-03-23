@@ -17,7 +17,6 @@ See the file COPYING for details.
 #include "delete_dir.h"
 #include "macros.h"
 #include "catalog_query.h"
-#include "catalog_server.h"
 #include "work_queue_catalog.h"
 #include "list.h"
 #include "get_line.h"

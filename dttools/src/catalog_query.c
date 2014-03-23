@@ -6,7 +6,6 @@ See the file COPYING for details.
 */
 
 #include "catalog_query.h"
-#include "catalog_server.h"
 
 #include "link_nvpair.h"
 #include "http_query.h"

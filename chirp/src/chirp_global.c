@@ -34,7 +34,6 @@ the space used (in MB.)
 #include "chirp_client.h"
 #include "chirp_protocol.h"
 #include "catalog_query.h"
-#include "catalog_server.h"
 
 #include "macros.h"
 #include "debug.h"

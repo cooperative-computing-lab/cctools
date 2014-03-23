@@ -20,7 +20,7 @@
 #include "chirp_types.h"
 
 #include "auth_all.h"
-#include "catalog_server.h"
+#include "catalog_query.h"
 #include "cctools.h"
 #include "change_process_title.h"
 #include "create_dir.h"
