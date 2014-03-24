@@ -107,7 +107,7 @@ void work_queue_resources_clear( struct work_queue_resources *r )
 static void work_queue_resource_add( struct work_queue_resource *total, struct work_queue_resource *r )
 {
 	total->inuse += r->inuse;
-	total->committed += r->inuse;
+	total->committed += r->committed;
 	total->total += r->total;
 	total->smallest = MIN(total->smallest,r->smallest);
 	total->largest = MAX(total->largest,r->largest);

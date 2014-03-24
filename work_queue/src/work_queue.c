@@ -1567,6 +1567,8 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 	{
 		/* Shortcut, inuse has the tag, as "resources tag" only sends one value */
 		w->resources->tag = r.inuse;
+		log_worker_stats(q);
+
 	} else if(n == 6) {
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
@@ -1578,10 +1580,6 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 			w->resources->gpus = r;
 		} else if(!strcmp(category,"workers")) {
 			w->resources->workers = r;
-		}
-
-		if(w->cores_allocated) {
-			log_worker_stats(q);
 		}
 	}
 
@@ -2169,7 +2167,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 	if(t->unlabeled)
 	{
 		// Do not allow labeled/unlabeled mix.
-		if(t->cores > 0 || t->memory > 0 || t->disk > 0 || t->gpus > 0) {
+		if(w->cores_allocated > 0 || w->memory_allocated > 0 || w->disk_allocated > 0 || w->gpus_allocated > 0) {
 			ok = 0;
 		}
 
