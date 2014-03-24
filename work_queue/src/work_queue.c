@@ -1568,6 +1568,8 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 	{
 		/* Shortcut, inuse has the tag, as "resources tag" only sends one value */
 		w->resources->tag = r.inuse;
+		log_worker_stats(q);
+
 	} else if(n == 6) {
 		if(!strcmp(category,"cores")) {
 			w->resources->cores = r;
@@ -1579,10 +1581,6 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 			w->resources->gpus = r;
 		} else if(!strcmp(category,"workers")) {
 			w->resources->workers = r;
-		}
-
-		if(w->cores_allocated) {
-			log_worker_stats(q);
 		}
 	}
 
