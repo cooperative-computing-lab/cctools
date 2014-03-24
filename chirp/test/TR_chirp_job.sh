@@ -98,6 +98,8 @@ EOF
 	J1c=$(../src/chirp -a unix -d all "$hostport" job_create "$json")
 	echo Job $J1c created.
 	../src/chirp -a unix -d all "$hostport" job_commit "[$J1c]"
+	echo Killing $J1c
+	../src/chirp -a unix -d all "$hostport" job_kill "[$J1c]"
 
 	json=$(cat <<EOF
 {
@@ -156,10 +158,6 @@ EOF
     ../src/chirp -a unix -d all "$hostport" job_status "[$J1]"
 	echo Job status for $J1b.
     ../src/chirp -a unix -d all "$hostport" job_status "[$J1b]"
-	echo Job status for $J1c.
-    ../src/chirp -a unix -d all "$hostport" job_status "[$J1c]"
-    echo Killing $J1c
-    ../src/chirp -a unix -d all "$hostport" job_kill "[$J1c]"
 	echo Job status for $J1c.
     ../src/chirp -a unix -d all "$hostport" job_status "[$J1c]"
 	echo Job status for $J2.
