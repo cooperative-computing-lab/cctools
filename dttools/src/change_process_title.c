@@ -34,6 +34,14 @@ void change_process_title_init(char **argv)
 
 	/* save the space where we were operating */
 	process_title = argv[0];
+#ifdef _GNU_SOURCE
+	{
+		extern char *program_invocation_name;
+		extern char *program_invocation_short_name;
+		program_invocation_name = argv[0];
+		program_invocation_short_name = argv[0];
+	}
+#endif
 	process_title_end = argv[argc - 1] + strlen(argv[argc - 1]);
 	process_title_length = process_title_end - process_title;
 
