@@ -268,11 +268,14 @@ static void send_resource_update( struct link *master, int force_update )
 
 	time_t stoptime = time(0) + active_timeout;
 
+	if(!force_update && (stoptime - last_stop_time < send_resources_interval))
+		return;
+
 	resources_measure_all(local_resources, aggregated_resources);
 
-	/* send updates at least send_resources_interval seconds apart, and only if resources changed. */
+	/* send updates only if resources changed, and if we are not waiting for the master to ask for results. */
 	int normal_update = 0;
-	if(!results_to_be_sent_msg && (stoptime - last_stop_time > send_resources_interval) && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
+	if(!results_to_be_sent_msg && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
 	{
 		normal_update = 1;
 	}
