@@ -2484,34 +2484,11 @@ static int save_file_from_channel( pfs_file *file, pfs_size_t file_offset, pfs_s
 	return 1;
 }
 
-pfs_size_t pfs_table::mmap_create_object( pfs_file *file, pfs_size_t file_offset, pfs_size_t map_length, int prot, int flags )
+pfs_size_t pfs_table::mmap_create_object( pfs_file *file, pfs_size_t channel_offset, pfs_size_t map_length, pfs_size_t file_offset, int prot, int flags )
 {
-	pfs_size_t channel_offset;
-	pfs_ssize_t file_length;
-
-	file_length = file->get_size();
-	if(file_length<0) return -1;
-
-	if(!pfs_channel_lookup(file->get_name()->path,&channel_offset)) {
-
-		if(!pfs_channel_alloc(file->get_name()->path,file_length,&channel_offset)) {
-			errno = ENOMEM;
-			return -1;
-		}
-
-		debug(D_CHANNEL,"%s loading to channel %llx size %llx",file->get_name()->path,(long long)channel_offset,(long long)file_length);
-
-		if(!load_file_to_channel(file,file_length,channel_offset,1024*1024)) {
-			pfs_channel_free(channel_offset);
-			return -1;
-		}
-	} else {
-	  debug(D_CHANNEL,"%s cached at channel %llx",file->get_name()->path,(long long)channel_offset);
-	}
-
 	pfs_mmap *m;
 
-	m = new pfs_mmap( file, 0, channel_offset, map_length, file_offset, prot, flags );
+	m = new pfs_mmap(file, 0, channel_offset, map_length, file_offset, prot, flags);
 
 	m->next = mmap_list;
 	mmap_list = m;
@@ -2521,9 +2498,44 @@ pfs_size_t pfs_table::mmap_create_object( pfs_file *file, pfs_size_t file_offset
 
 pfs_size_t pfs_table::mmap_create( int fd, pfs_size_t file_offset, pfs_size_t map_length, int prot, int flags )
 {
+	pfs_file *file;
+	pfs_size_t channel_offset;
+	pfs_ssize_t file_length;
+
 	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) )
 		return (errno = EBADF, -1);
-	return mmap_create_object(pointers[fd]->file,file_offset,map_length,prot,flags);
+
+
+	if(!(pointers[fd]->flags&(O_WRONLY|O_RDWR|O_APPEND)) && prot&PROT_WRITE && flags&MAP_SHARED)
+		return (errno = EACCES, -1);
+
+	file = pointers[fd]->file;
+	file_length = file->get_size();
+
+	if(file_length<0)
+		return (errno = ENODEV, -1);
+
+	/* FIXME we don't check the range because it's valid to mmap a file plus extra. However, we don't allocate space in the channel for this! */
+	//else if(!(file_offset < file_length)) /* beginning of range [off, off+len) */
+	//	return (errno = ENXIO, -1);
+	//else if(!((file_offset+map_length) <= file_length)) /* end of range [off, off+len) */
+	//	return (errno = ENXIO, -1);
+
+	if(!pfs_channel_lookup(file->get_name()->path,&channel_offset)) {
+		if(!pfs_channel_alloc(file->get_name()->path,file_length,&channel_offset))
+			return (errno = ENOMEM, -1);
+
+		debug(D_CHANNEL,"%s loading to channel %llx size %llx",file->get_name()->path,(long long)channel_offset,(long long)file_length);
+
+		if(!load_file_to_channel(file,file_length,channel_offset,1024*1024)) {
+			pfs_channel_free(channel_offset);
+			return -1;
+		}
+	} else {
+		debug(D_CHANNEL,"%s cached at channel %llx",file->get_name()->path,(long long)channel_offset);
+	}
+
+	return mmap_create_object(file, channel_offset, map_length, file_offset, prot, flags);
 }
 
 int pfs_table::mmap_update( pfs_size_t logical_addr, pfs_size_t channel_offset )
@@ -2560,12 +2572,7 @@ int pfs_table::mmap_delete( pfs_size_t logical_addr, pfs_size_t length )
 			// This will increase the reference count of both the file and the memory object.
 
 			if(logical_addr>m->logical_addr) {
-				mmap_create_object(
-					m->file,
-					m->file_offset,
-					logical_addr-m->logical_addr,
-					m->prot,
-					m->flags);
+				mmap_create_object(m->file, m->channel_offset, logical_addr-m->logical_addr, m->file_offset, m->prot, m->flags);
 				mmap_update(m->logical_addr,0);
 			}
 
@@ -2573,12 +2580,7 @@ int pfs_table::mmap_delete( pfs_size_t logical_addr, pfs_size_t length )
 			// This will increase the reference count of both the file and the memory object.
 
 			if((logical_addr+length) < (m->logical_addr+m->map_length)) {
-				mmap_create_object(
-					m->file,
-					m->file_offset+m->map_length-(m->logical_addr-logical_addr),
-					m->map_length - length - (logical_addr - m->logical_addr),
-					m->prot,
-					m->flags);
+				mmap_create_object(m->file, m->channel_offset, m->map_length-length-(logical_addr-m->logical_addr), m->file_offset+m->map_length-(m->logical_addr-logical_addr), m->prot, m->flags);
 				mmap_update(logical_addr+length,0);
 			}
 
