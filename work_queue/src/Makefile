@@ -64,12 +64,11 @@ libwork_queue.a: ${OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
 
-
 bindings: libwork_queue.a work_queue.i
-	@for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; $(MAKE) all; cd ..; done
+	for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; $(MAKE) all; cd ..; done
 
 clean-bindings:
-	@for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; $(MAKE) clean; cd ..; done
+	for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; $(MAKE) clean; cd ..; done
 
 install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
@@ -84,11 +83,9 @@ install: all
 	cp work_queue_example.c ${CCTOOLS_INSTALL_DIR}/doc
 	for file in ${PUBLIC_HEADERS} ; do if [ -f $$file ] ; then cp $$file ${CCTOOLS_INSTALL_DIR}/include/cctools ; fi ; done
 	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then cp /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done
-
-	@for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; $(MAKE) $@; cd ..; done
+	for m in $(CCTOOLS_WORK_QUEUE_BINDINGS); do cd $$m; $(MAKE) $@; cd ..; done
 
 test:
 
 clean: clean-bindings
 	rm -fr *.o ${LIBRARIES} ${PROGRAMS} ${TEST_PROGRAMS}
-
