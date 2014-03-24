@@ -2521,6 +2521,8 @@ pfs_size_t pfs_table::mmap_create_object( pfs_file *file, pfs_size_t file_offset
 
 pfs_size_t pfs_table::mmap_create( int fd, pfs_size_t file_offset, pfs_size_t map_length, int prot, int flags )
 {
+	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) )
+		return (errno = EBADF, -1);
 	return mmap_create_object(pointers[fd]->file,file_offset,map_length,prot,flags);
 }
 
