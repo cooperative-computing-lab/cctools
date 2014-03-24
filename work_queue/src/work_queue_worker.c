@@ -240,9 +240,6 @@ void resources_measure_locally(struct work_queue_resources *r)
 	r->memory.smallest = r->memory.largest = r->memory.total;
 	r->disk.smallest = r->disk.largest = r->disk.total;
 	r->gpus.smallest = r->gpus.largest = r->gpus.total;
-
-	debug(D_WQ,"local resources:");
-	work_queue_resources_debug(r);
 }
 
 void resources_measure_all(struct work_queue_resources *local, struct work_queue_resources *aggr)
