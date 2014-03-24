@@ -1812,6 +1812,19 @@ static void work_for_master(struct link *master) {
 					visited++;
 				}
 			}
+
+			// If all resources are free, but we cannot execute any of the
+			// waiting tasks, then disconnect so that the master gets the tasks
+			// back. (Imagine for example that some other process in the host
+			// running the worker used so much memory or disk, that now no task cannot be
+			// scheduled.) Note we check against stored_tasks, and not
+			// active_tasks, so that we do not disconnect if there are results
+			// waiting to be sent back (which in turn may free some disk).
+			if(list_size(waiting_tasks) > 0 && itable_size(stored_tasks) == 0)
+			{
+				debug(D_WQ, "No task can be executed with the available resources.\n");
+				ok = 0;
+			}
 		}
 
 		if(!ok) {
