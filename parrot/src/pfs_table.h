@@ -122,10 +122,9 @@ public:
 	int	resolve_name( const char *caller, const char *cname, pfs_name *pname, bool do_follow_symlink = true, int depth = 0 );
 
 	/* mmap operations */
-	pfs_size_t mmap_create_object( pfs_file *file, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
 	pfs_size_t mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
-	int	   mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
-	int	   mmap_delete( pfs_size_t logical_address, pfs_size_t length );
+	int	       mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
+	int	       mmap_delete( pfs_size_t logical_address, pfs_size_t length );
 	void       mmap_print();
 
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
@@ -141,6 +140,8 @@ private:
 	void collapse_path( const char *short_path, char *long_path, int remove_dotdot );
 	void complete_path( const char *short_path, char *long_path );
 
+	pfs_size_t mmap_create_object( pfs_file *file, pfs_size_t channel_offset, pfs_size_t map_length, pfs_size_t file_offset, int prot, int flags );
+
 	int         pointer_count;
 	pfs_pointer **pointers;
 	int         *fd_flags;
@@ -151,5 +152,4 @@ private:
 
 #endif
 
-
-
+/* vim: set noexpandtab tabstop=4: */

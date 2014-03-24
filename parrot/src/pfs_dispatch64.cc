@@ -903,7 +903,7 @@ static void decode_mmap( struct pfs_process *p, INT64_T syscall, INT64_T enterin
 		debug(D_SYSCALL,"channel_offset=0x%"PRIx64" source_offset=0x%"PRIx64" total=0x%"PRIx64,channel_offset,source_offset,nargs[5]);
 		debug(D_SYSCALL,"mmap changed: fd=%"PRId64" offset=0x%"PRIx64,nargs[4],nargs[5]);
 
-	      	tracer_args_set(p->tracer,p->syscall,nargs,6);
+		tracer_args_set(p->tracer,p->syscall,nargs,6);
 		p->syscall_args_changed = 1;
 	} else {
 		/*
