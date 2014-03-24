@@ -2505,6 +2505,10 @@ pfs_size_t pfs_table::mmap_create( int fd, pfs_size_t file_offset, pfs_size_t ma
 	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) )
 		return (errno = EBADF, -1);
 
+
+	if(!(pointers[fd]->flags&(O_WRONLY|O_RDWR|O_APPEND)) && prot&PROT_WRITE && flags&MAP_SHARED)
+		return (errno = EACCES, -1);
+
 	file = pointers[fd]->file;
 	file_length = file->get_size();
 
