@@ -45,9 +45,17 @@ static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
 
 #define CERN_KEY_PLACEHOLDER   "<BUILTIN-cern.ch.pub>"
 #define OASIS_KEY_PLACEHOLDER  "<BUILTIN-opensciencegrid.org.pub>"
-#define GEANT4_KEY_PLACEHOLDER "<BUILTIN-geant4.ch.pub>"              // Officially cern-it1.cern.ch.pub
+#define GEANT4_KEY_PLACEHOLDER "<BUILTIN-geant4.ch.pub>"              // Officially cern.ch.pub. Kept separate to document match order below.
 
-static const char *default_cvmfs_repo = "*:try_local_filesystem *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/* *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/* geant4.cern.ch:pubkey=" GEANT4_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/geant4;http://cernvmfs.gridpp.rl.ac.uk/opt/geant4;http://cvmfs.racf.bnl.gov/opt/geant4";
+/* All repositories are matched in order, therefore we write them from less to more specific */
+static const char *default_cvmfs_repo =
+"*:try_local_filesystem \
+\
+ *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/* \
+\
+ *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/* \
+\
+ geant4.cern.ch:pubkey=" GEANT4_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/geant4;http://cernvmfs.gridpp.rl.ac.uk/opt/geant4;http://cvmfs.racf.bnl.gov/opt/geant4";
 
 static bool wrote_cern_key;
 static std::string cern_key_fname;
@@ -81,13 +89,13 @@ static bool wrote_geant4_key;
 static std::string geant4_key_fname;
 static const char *geant4_key_text = 
 "-----BEGIN PUBLIC KEY-----\n\
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo8uKvscgW7FNxzb65Uhm\n\
-yr8jPJiyrl2kVzb/hhgdfN14C0tCbfFoE6ciuZFg+9ytLeiL9pzM96gSC+atIFl4\n\
-7wTgtAFO1W4PtDQBwA/IG2bnwvNrzk19ob0JYhjZlS9tYKeh7TKCub55+vMwcEbP\n\
-urzo3WSNCzJngiGMh1vM5iSlGLpCdSGzdwxLGwc1VjRM7q3KAd7M7TJCynKqXZPX\n\
-R2xiD6I/p4xv39AnwphCFSmDh0MWE1WeeNHIiiveikvvN+l8d/ZNASIDhKNCsz6o\n\
-aFDsGXvjGy7dg43YzjSSYSFGUnONtl5Fe6y4bQZj1LEPbeInW334MAbMwYF4LKma\n\
-yQIDAQAB\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAukBusmYyFW8KJxVMmeCj\n\
+N7vcU1mERMpDhPTa5PgFROSViiwbUsbtpP9CvfxB/KU1gggdbtWOTZVTQqA3b+p8\n\
+g5Vve3/rdnN5ZEquxeEfIG6iEZta9Zei5mZMeuK+DPdyjtvN1wP0982ppbZzKRBu\n\
+BbzR4YdrwwWXXNZH65zZuUISDJB4my4XRoVclrN5aGVz4PjmIZFlOJ+ytKsMlegW\n\
+SNDwZO9z/YtBFil/Ca8FJhRPFMKdvxK+ezgq+OQWAerVNX7fArMC+4Ya5pF3ASr6\n\
+3mlvIsBpejCUBygV4N2pxIcPJu/ZDaikmVvdPTNOTZlIFMf4zIP/YHegQSJmOyVp\n\
+HQIDAQAB\n\
 -----END PUBLIC KEY-----\n\
 ";
 
