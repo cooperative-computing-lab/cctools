@@ -47,7 +47,7 @@ static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
 #define OASIS_KEY_PLACEHOLDER  "<BUILTIN-opensciencegrid.org.pub>"
 #define GEANT4_KEY_PLACEHOLDER "<BUILTIN-geant4.ch.pub>"              // Officially cern-it1.cern.ch.pub
 
-static const char *default_cvmfs_repo = "*:try_local_filesystem geant4.cern.ch:pubkey=" GEANT4_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/geant4;http://cernvmfs.gridpp.rl.ac.uk/opt/geant4;http://cvmfs.racf.bnl.gov/opt/geant4 *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/* *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/*";
+static const char *default_cvmfs_repo = "*:try_local_filesystem *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/* *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/* geant4.cern.ch:pubkey=" GEANT4_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/geant4;http://cernvmfs.gridpp.rl.ac.uk/opt/geant4;http://cvmfs.racf.bnl.gov/opt/geant4";
 
 static bool wrote_cern_key;
 static std::string cern_key_fname;
