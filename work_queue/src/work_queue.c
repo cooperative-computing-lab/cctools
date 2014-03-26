@@ -211,14 +211,14 @@ static int process_resource(struct work_queue *q, struct work_queue_worker *w, c
 static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink );
 
 /** Clone a @ref work_queue_file
-This performs a deep copy.
+This performs a deep copy of the file struct.
 @param file The file to clone.
 @return A newly allocated file.
 */
 static struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file);
 
 /** Clone a list of @ref work_queue_file structs
-Thie performs a deep copy of the list.
+Thie performs a deep copy of the file list.
 @param list The list to clone.
 @return A newly allocated list of files.
 */
@@ -2645,28 +2645,23 @@ static struct work_queue_task *find_running_task_by_tag(struct work_queue *q, co
 }
 
 
-static struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file)
-{
-
-  /*
-    payload     :: char *
-    remote_name :: char *
-   */
+static struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file) {
   const int file_t_size = sizeof(struct work_queue_file);
   struct work_queue_file *new = calloc(1, file_t_size);
+  
   memcpy(new, file, file_t_size);
+  //allocate new memory for strings so we don't segfault when the original
+  //memory is freed. 
   new->payload = strdup(file->payload);
   new->remote_name = strdup(file->remote_name);
+  
   return new;
 }
 
 
-static struct list *work_queue_task_file_list_clone(struct list *list)
-{
+static struct list *work_queue_task_file_list_clone(struct list *list) {
   struct list *new = list_create();
-  struct work_queue_file
-    *old_file,
-    *new_file;
+  struct work_queue_file *old_file, *new_file;
 
   list_first_item(list);
   while ((old_file = list_next_item(list))) {
@@ -2713,27 +2708,29 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   struct work_queue_task *new = malloc(sizeof(*new));
   memcpy(new, task, sizeof(*new));
 
-  /*
-    Need to copy over the following fields otherwise segfaults abound:
+  //allocate new memory so we don't segfault when original memory is freed. 
+  if(task->tag) { 
+	new->tag = strdup(task->tag); 
+  }
+  
+  if(task->command_line) { 
+	new->command_line = strdup(task->command_line); 
+  }
 
-    tag			:: char *
-    command_line	:: char *
-    output		:: char *
-    input_files		:: list *
-    output_files	:: list *
-    host		:: char *
-    hostname		:: char *
-   */
-
-  if(task->tag         ) { new->tag          = strdup(task->tag)         ; }
-  if(task->command_line) { new->command_line = strdup(task->command_line); }
-
-  new->input_files  = work_queue_task_file_list_clone(task->input_files);
+  new->input_files = work_queue_task_file_list_clone(task->input_files);
   new->output_files = work_queue_task_file_list_clone(task->output_files);
 
-  if(task->output  ) { new->output   = strdup(task->output)  ; }
-  if(task->host    ) { new->host     = strdup(task->host)    ; }
-  if(task->hostname) { new->hostname = strdup(task->hostname); }
+  if(task->output) { 
+	new->output = strdup(task->output); 
+  }
+  
+  if(task->host) { 
+	new->host = strdup(task->host); 
+  }
+  
+  if(task->hostname) { 
+	new->hostname = strdup(task->hostname); 
+  }
 
   return new;
 }
