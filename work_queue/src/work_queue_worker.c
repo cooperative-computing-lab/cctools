@@ -159,7 +159,7 @@ static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
 // do not send consecutive resource updates in less than this many seconds
-static int send_resources_interval = 5;
+static int send_resources_interval = 120;
 
 // Foreman mode global variables
 static struct work_queue *foreman_q = NULL;
@@ -268,7 +268,13 @@ static void send_resource_update( struct link *master, int force_update )
 
 	resources_measure_all(local_resources, aggregated_resources);
 
-	/* send updates only if resources changed, and if we are not waiting for the master to ask for results. */
+	/* send updates only if resources changed, and if the master may not ask
+	 * about results (to avoid deadlocks) */
+	if(!force_update && (stoptime - last_stop_time < send_resources_interval))
+	{
+		return;
+	}
+
 	int normal_update = 0;
 	if(!results_to_be_sent_msg && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
 	{
@@ -579,7 +585,7 @@ static int report_tasks(struct link *master, struct itable *tasks_infos, int max
 		results_to_be_sent_msg = 0;
 	}
 
-	send_resource_update(master, 0);
+	send_resource_update(master, 1);
 
 	return count;
 }
@@ -1114,6 +1120,10 @@ static int do_task( struct link *master, int taskid )
 	}
 
 	last_task_received = task->taskid;
+
+	// Measure and report resources, given that disk space decreased given the
+	// task input files.
+	send_resource_update(master, 1);
 
 	// If this is a foreman, just send the task structure along.
 	// If it is a local worker, create a task_info, start the task, and discard the temporary work_queue_task.
@@ -1807,6 +1817,8 @@ static void work_for_master(struct link *master) {
 				t = list_pop_head(waiting_tasks);
 				if(t && check_for_resources(t)) {
 					start_task(t);
+					//Update the master with the resources now in use
+					send_resource_update(master, 1);
 				} else {
 					list_push_tail(waiting_tasks, t);
 					visited++;
