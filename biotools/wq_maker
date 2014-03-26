@@ -1,18 +1,18 @@
 #!/usr/bin/env perl
 
-# wq_maker 
-#
+# wq_maker
+# 
 # Copyright (C) 2013- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
-#
+# 
 # This program implements elastic genome annotation using the cctools work queue
 # framework and the MAKER annotation pipeline as described in the following
 # paper:
-#
+# 
 # Andrew Thrasher, Zachary Musgrave, Douglas Thain, Scott Emrich,
-# "Shifting the Bioinformatics Computing Paradigm: A Case Study in Parallelizing
-# Genome Annotation Using Maker and Work Queue", 
+#  "Shifting the Bioinformatics Computing Paradigm: A Case Study in
+#   Parallelizing Genome Annotation Using Maker and Work Queue",
 # IEEE International Conference on Computational Advances in Bio and Medical
 # Sciences, February, 2012.
 
@@ -24,29 +24,103 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 use lib "$FindBin::Bin/../perl/lib";
 
+#Record starting time.
+my $start_time = time; 
+
+#Default values for model
+my $partition_overhead_coeff_a = 0.0001;
+my $partition_overhead_coeff_b = 0.0005;
+my $per_byte_annotate_time = 0.003; #0.00444	
+my $bandwidth_bytes_per_sec = 10*1000000; #10MBps
+my $observed_memory_gb = 3.5; #in gb; corresponds to medium instance in EC2/Azure
+
+#Variables that control behavior
+my $run_timing_code = 0;
+my $sample_env = 0;
+my $sample_tasks = 1;
+my $estimate_granularity = 1;
+my $tolerable_task_failures = 1;
+
+#Counters
+my $resources = 0;
+my $tasks = 0;
+my $total_tiers = 0;
+
+my %task_failures; 
+
+my $actual_transfer_time = 0;
+
+my $common_dependency_size = 0; 
+
+#Global variables
+my %CTL_OPT;
+my $DS_CTL;
+my $GFF_DB;
+my $build;
+my $iterator;
+my $wkdir = get_wkdir();
+
+
 BEGIN{
    if (not ($ENV{CGL_SO_SOURCE})) {
       $ENV{CGL_SO_SOURCE} = "$FindBin::Bin/../lib/CGL/so.obo";
    }
    if (not ($ENV{CGL_GO_SOURCE})) {
-      $ENV{CGL_GO_SOURCE} = "$FindBin::Bin/../lib/CGL/gene_ontology.obo"
+      $ENV{CGL_GO_SOURCE} = "$FindBin::Bin/../lib/CGL/gene_ontology.obo";
    }
-   
-   #Handle CTRL+C
-   $SIG{'INT'} = sub {
-      print STDERR "\n\nMaker aborted by user!\n\n";
-      exit (1);
-   };    
-   
-   #supress warnings from storable module
-   $SIG{'__WARN__'} = sub {
-      warn $_[0] if ( $_[0] !~ /Not a CODE reference/ &&
-		      $_[0] !~ /Can\'t store item / &&
-		      $_[0] !~ /Find\:\:skip_pattern|File\/Find\.pm/
-		    );
-   };
+
+   $SIG{'INT'} = sub { die "Maker terminated by user.\n" };
 }
 
+$| = 1; #turn on autoflush.
+
+my $maker_help = `maker -h`;
+
+my $usage = "$maker_help
+Work Queue Options:
+
+     -port <int>           Sets the port for work_queue to listen on (default: 9135)
+ 
+     -fa   <int>           Sets the work_queue fast abort option with the given multiplier. 
+
+     -N <project>          Sets the project name to <project>.
+
+     -resources <int>      Specify the number of resources that will be provisioned (default: $resources). 
+	 
+     -tasks <int>          Sets the number of tasks to use for annotating the tiers (default: automatic). 
+     
+     -d <level>            Sets the debug flag for Work Queue. For all debugging output, try 'all'.
+	 
+     -bw <integer>         Sets the expected network bandwidth in MBytes/second.
+
+     -reuse-tiers          Skip generation of tiers files and reuse the tier files present in current directory.
+     
+     -workerstowait <int>  Sets the number of tasks to use for annotating the tiers (default: automatic). 
+     
+     -workerequivalence    Assume the number of workers to be equivalent to the number of tasks (default: off). 
+     
+     -sample               Empirically estimate the model coefficients by sampling the execution environment. 
+	 
+     -samplesize <int>     Specify the number of sample partitions. (default = $sample_tasks) 
+	 
+     -estimate-gran <int>  Estimate runtimes with task sizes in increments of this value (default = 1).
+     
+     -show-estimates       Print the estimated runtimes for all possible task sizes for the given size of resources and exit.
+	 
+     -show-optimals        Print the optimal size of resources and tasks for operating on the inputs and exit.
+     
+     -schedulebydata       Use WQ scheduling option that schedules tasks based on the amount of required data a worker has.
+     
+     -tasktimes <file>     Record the individual task execution times in this file (default = off)
+     
+     -taskoverheads <file> Record the individual task execution times in this file (default = off)
+     
+     -adapttobw            Measure BW during task submission and adapt the number of tasks and resources used according to BW.
+     
+     -tcc                  Setup TCC configuration for bandwidth adaptations.
+";
+
+#load required libraries
 use Cwd;
 use Cwd qw(abs_path); 
 use Getopt::Long qw(:config no_ignore_case);
@@ -56,7 +130,8 @@ use Error::Simple;
 use Storable qw(nstore retrieve);
 use work_queue;
 use POSIX qw(ceil floor);
-#external libraries below.
+
+#external libraries
 use Proc::Signal;
 use GI;
 use Fasta;
@@ -65,79 +140,16 @@ use GFFDB;
 use Process::MpiChunk;
 use Process::MpiTiers;
 
-$| = 1; #turn on autoflush.
-
-my $usage = "
-Usage:
-	 maker_wq [options] <maker_opts> <maker_bopts> <maker_exe>
-     
-Maker Options:
-
-     -genome|g <filename> Specify the genome file.
-
-     -predictor|p <type>  Selects the predictor(s) to use when building
-                          annotations.  Defines a pool of gene models for
-                          annotation selection.
-                          types: snap
-                                 augustus
-                                 fgenesh
-                                 genemark
-                                 est2genome (Uses EST's directly)
-                                 protein2genome (For Prokaryotic annotation only)
-                                 model_gff (Pass through GFF3 annotations)
-                                 pred_gff (Uses passed through GFF3 predictions)
-
-                          Use a ',' to seperate types (nospaces)
-                          i.e. -predictor=snap,augustus,fgenesh
-
-     -RM_off|R           Turns all repeat masking off.
-
-     -datastore/         Forcably turn on/off MAKER's use of a two deep datastore
-      nodatastore        directory structure for output.  By default this option
-                         turns on whenever there are more the 1,000 contigs in
-                         the input genome fasta file.
-
-     -base    <string>   Set the base name MAKER uses to save output files.
-                         MAKER uses the input genome file name by default.
-
-     -retry|r <integer>  Rerun failed contigs up to the specified count.
-
-     -cpus|c  <integer>  Tells how many cpus to use for BLAST analysis.
-
-     -force|f            Forces maker to delete old files before running again.
-                         This will require all blast analyses to be re-run.
-
-     -again|a            Caculate all annotations and output files again even if
-                         no settings have changed. Does not delete old analyses.
-
-     -evaluate|e         Run Evaluator on final annotations (under development).
-
-     -CTL                Generate empty control files in the current directory.
-
-     -help|?             Prints this usage statement.
-
-Work Queue Options
-
-     -port <integer>     Sets the port for work_queue to listen on (default: 9135)
- 
-     -fa   <integer>     Sets the work_queue fast abort option with the given multiplier. 
-
-     -N <project>	 Sets the project name to <project>.
-
-     -k <integer>	 Sets the number of sequences per task for remote computation. 
- 
-     -d <level>  	 Sets the debug flag for Work Queue and the CCTOOLS package. For all debugging output, try 'all'.
-
-";
-
-#------------------------------------ MAIN -------------------------------------
-
 #---Process options on the command line 
 my %OPT;
 try{
     GetOptions("RM_off|R" => \$OPT{R},
 	       "force|f" => \$OPT{force},
 	       "genome|g=s" => \$OPT{genome},
+	       "est|E=s" => \$OPT{est},
+	       "estr|S=s" => \$OPT{estr},
+	       "protein|P=s" => \$OPT{protein},
+	       "snaphmm|H=s" => \$OPT{snaphmm},
 	       "cpus|c=i" => \$OPT{cpus},
 	       "predictor=s" =>\$OPT{predictor},
 	       "retry=i" =>\$OPT{retry},
@@ -147,32 +159,40 @@ try{
 	       "base=s" =>\$OPT{out_name},
 	       "datastore!" =>\$OPT{datastore},
 	       "CTL" => sub {GI::generate_control_files(); exit(0);},
-	       "help|?" => sub {print $usage; exit(0)},
 	       "port=i" => \$OPT{port},
 	       "fa=i" => \$OPT{fast_abort},
 	       "N=s" => \$OPT{project},
 	       "d=s" => \$OPT{debug},
- 	       "k=i" => \$OPT{size}
+ 	       "resources=i" => \$OPT{resources},
+ 	       "tasks=i" => \$OPT{tasks},
+ 	       "workerstowait=i" => \$OPT{workers_to_wait},
+ 	       "workerequivalence" => \$OPT{worker_equivalence},
+ 	       "bw=i" => \$OPT{bw},
+ 	       "show-estimates" => \$OPT{show_estimates},
+ 	       "show-optimals" => \$OPT{show_optimals},
+ 	       "reuse-tiers" => \$OPT{reuse_tiers},
+ 	       "sample" => \$OPT{sample},
+ 	       "samplesize=i" => \$OPT{sample_tasks},
+ 	       "estimate-gran=i" => \$OPT{estimate_granularity},
+ 	       "schedulebydata" => \$OPT{schedule_by_data},
+ 	       "adapttobw" => \$OPT{adapt_to_bw},
+ 	       "tcc" => \$OPT{tcc},
+ 	       "tasktimes=s" => \$OPT{tasktimes_file},
+ 	       "taskoverheads=s" => \$OPT{taskoverheads_file},
+	       "help|?" => sub {print $usage; exit(0)}
 	       );
 
 } catch Error::Simple with{
     my $E = shift;
     print STDERR $E->{-text};
-    die "\n\nMaker failed parsing command line options!\n" if();
+    die "Failed to parse command line options.\n";
 };
 
-if(!defined $OPT{size}){
-	$OPT{size} = 1; 
+if(!defined($OPT{"genome"})) {
+	print "Please specify the genome file that you want to annotate and run again!\n";
+	exit (0);
 }
-
-#global variables 
-my %CTL_OPT;
-my $DS_CTL;
-my $GFF_DB;
-my $build;
-my $iterator;
-my $tiers_per_task = $OPT{size}; 
-my $wkdir = get_wkdir();
+my $contigs_file = $OPT{genome};
 
 try{
     #get arguments off the command line
@@ -209,54 +229,313 @@ try{
     exit($code);
 };
 
+if(defined($OPT{"est"})) {
+	set_est_maker_opts($OPT{"est"});
+}
+
+if(defined($OPT{"estr"})) {
+	set_estr_maker_opts($OPT{"estr"});
+}
+
+if(defined($OPT{"protein"})) {
+	set_protein_maker_opts($OPT{"protein"});
+}
+
+if(defined($OPT{"snaphmm"})) {
+	set_snaphmm_maker_opts($OPT{"snaphmm"});
+}
+
+if(defined $OPT{"tasks"}){
+	$tasks = $OPT{"tasks"}; 
+}
+
+if(defined($OPT{"bw"})) {
+	$bandwidth_bytes_per_sec = $OPT{"bw"}*1000000;
+}
+
+if(defined($OPT{"sample_tasks"})) {
+	$sample_tasks = $OPT{"sample_tasks"}; 
+}
+
+if(defined($OPT{"estimate_granularity"})) {
+	$estimate_granularity= $OPT{"estimate_granularity"}; 
+}
+
+if(defined($OPT{"sample"})) {
+	$sample_env = 1;
+}
+
+if(defined($OPT{"resources"})) {
+	$resources = $OPT{"resources"}; 
+}
+
 my $datastore = $DS_CTL->{root}; 
 if(!-e $datastore) {
 	`mkdir $datastore`;
 }
 
-my $total_tiers = GenTiers();
-print time." :: Total number of tiers generated was $total_tiers \n";
+#Call main loop here
+main(); 
 
-###Begin WorkQueue section
-my $wq = setup_workqueue();
-create_worker_script();
-
-my $last_annotated_tier = 0;
-my $init_tiers_submit = get_initial_tiers_to_submit($total_tiers, $tiers_per_task); 
-$last_annotated_tier = submit_tiers_to_annotate($wq, $total_tiers, $last_annotated_tier, $init_tiers_submit);
-print time." :: Initial submission to Work Queue is $init_tiers_submit tiers\n";
-my $tiers_submitted = $init_tiers_submit;
-
-my %task_failures; 
-
-my $annotated_tiers = 0;
-while ($annotated_tiers < $tiers_submitted) {
-	$annotated_tiers += $tiers_per_task * process_completed_tier_task($wq, 5);
-	my $tiers_to_submit = get_tiers_to_submit($tiers_per_task);
-	while ($tiers_to_submit > 0 && $tiers_submitted < $total_tiers) {
-		print time." :: There is capacity to annotate $tiers_to_submit tiers.\n";
-		my $remaining_tiers = $total_tiers - $tiers_submitted;	
-		if ($tiers_to_submit > $remaining_tiers) {	
-			$last_annotated_tier = submit_tiers_to_annotate($wq, $total_tiers, ($last_annotated_tier+1), $remaining_tiers);	
-			$tiers_submitted += $remaining_tiers; 
-		} else {
-			$last_annotated_tier = submit_tiers_to_annotate($wq, $total_tiers, ($last_annotated_tier+1), $tiers_to_submit);	
-			$tiers_submitted += $tiers_to_submit; 
-		}
-	}
-}
-
-delete_workqueue($wq);
-print "\n".time." :: Tiers annotated :: $annotated_tiers in total \n";
 
 #------------------------------- FUNCTION DEFINITIONS -------------------------------------
+
+sub main {
+	if(defined $OPT{"reuse_tiers"}){
+		my $i = 0; 
+		while (-e "$i\_todo.tier"){
+			$i++;
+		}
+		$total_tiers = $i;
+	} 
+	
+	if ($total_tiers <= 0) {
+		$total_tiers = generate_tiers();
+	}
+	print localtime()." :: Total number of tiers is $total_tiers \n";
+	
+	my $tiers_to_annotate = $total_tiers;
+	
+	my $start_tier = 0;
+	my $tiers_annotated = 0;
+	my $total_tiers_annotated = 0;
+
+	my $partition_time_start;
+	my $actual_partition_time = 0;
+
+	#get the size of the software dependencies to transfer	
+	$common_dependency_size = get_sw_depedency_size();
+ 
+	if(defined $OPT{"show_optimals"}){
+		if($tasks == 0 && $resources == 0)	 {
+			print_global_optimal_runtimes();
+		} elsif ($resources > 0) {
+			my($optimal_runtime, $optimal_partition_time, $optimal_parallel_time, $optimal_transfer_time, $optimal_tasks) = get_optimal_runtimes_for_workers($resources, 0, $total_tiers, 0); 
+			print "\n------------------------------------------------------------\n";
+			print "Tasks Resources Runtime Partition Task Transfer\n";
+			print "------------------------------------------------------------\n";
+
+			print "$optimal_tasks $resources $optimal_runtime $optimal_partition_time $optimal_parallel_time $optimal_transfer_time\n";
+		} 
+		else {
+			my($optimal_runtime, $optimal_partition_time, $optimal_parallel_time, $optimal_transfer_time, $optimal_resources) = get_optimal_runtimes_for_tasksize($tasks, 0, $total_tiers, 0);
+			print "\n------------------------------------------------------------\n";
+			print "Tasks Resources Runtime Partition Task Transfer\n";
+			print "------------------------------------------------------------\n";
+
+			print "$tasks $optimal_resources $optimal_runtime $optimal_partition_time $optimal_parallel_time $optimal_transfer_time\n";	
+		}	
+		exit(0);	
+	}
+
+	if(defined($OPT{"show_estimates"})) {
+		for(my $i = 1; $i <= $tasks; $i++) {
+			my($runtime, $partition_time, $parallel_time, $transfer_time) = estimate_runtime($i, 0, $i, 0, $total_tiers);
+			print "$i $runtime $partition_time $parallel_time $transfer_time\n";
+		}	
+		exit(0);	
+	}
+
+	create_worker_prog();
+	create_task_setup_script();
+
+	###Begin WorkQueue section
+	my $wq_start_time = time; 
+	
+	my $wq = setup_workqueue();
+	if(defined $OPT{"workers_to_wait"}){
+		work_queue::work_queue_activate_worker_waiting($wq, $OPT{"workers_to_wait"});
+	}
+	
+	if(defined($OPT{"tcc"})) {
+		tcc_adaptation_setup($wq, 0);
+	}
+
+	my $workers_used = 0;	
+	if($sample_env) {
+		$run_timing_code = 1;
+		my $sample_size = ($total_tiers * 1)/100; #sample 1% of actual workload
+		if($sample_size < 1) {
+			$sample_size = 4;
+		}
+		print localtime()." :: Sample size is $sample_size, sample tasks is $sample_tasks.\n";
+		
+		$partition_time_start = time;
+		#submit tasks for sampling 
+		$tiers_annotated = submit_annotation_tasks($wq, 0, $sample_size, $sample_tasks, $sample_tasks);
+		$actual_partition_time += time - $partition_time_start;
+	
+		$workers_used += $sample_tasks;	 #we cached common dependencies at the used workers.
+		$start_tier += $tiers_annotated;
+		$total_tiers_annotated += $tiers_annotated;
+		$tiers_to_annotate = $total_tiers - $tiers_annotated;
+		
+		my $total_task_execution_time = process_completed_tasks($wq, $sample_tasks, 5);	
+		$per_byte_annotate_time = $total_task_execution_time/get_contigs_size(0, $sample_size);
+		print localtime()." :: Measured per byte annotation time is $per_byte_annotate_time.\n";
+		$observed_memory_gb = get_observed_min_memory($wq);
+		$run_timing_code = 0;
+	}
+
+	my $optimal_tasks = $tasks;
+	my $optimal_tasks_to_submit = $tasks;
+	
+	($optimal_tasks, $optimal_tasks_to_submit) = compute_submission_params($start_tier, $tiers_to_annotate, $workers_used);	
+	print localtime()." :: Optimal number of tasks for annotating $tiers_to_annotate tiers is $optimal_tasks in batches of $optimal_tasks_to_submit\n";
+	
+	my $tasks_submitted = 0;
+	if(defined $OPT{"adapt_to_bw"}){
+		my $tasks_to_submit = 1;
+		if($sample_env) {
+			$tasks_to_submit = $sample_tasks + 1; #one more than the sampling task
+		}	
+		my $tasks_retrieved = 0;
+	
+		my $workers_to_setup = $optimal_tasks_to_submit; #setup number of workers equivalent to the optimal tasks to submit.
+		my $workers_setup = 1; #include the worker setup from sampling 
+		
+		while ($workers_setup < $workers_to_setup) { 	
+			if(defined($OPT{"tcc"})) {
+				tcc_adaptation_setup($wq, $tasks_submitted);
+			}	
+			
+			$partition_time_start = time;
+			$tiers_annotated = submit_annotation_tasks($wq, $start_tier, $tiers_to_annotate, $optimal_tasks, $tasks_to_submit);
+			$actual_partition_time += time - $partition_time_start;
+			
+			$start_tier += $tiers_annotated;
+			$total_tiers_annotated += $tiers_annotated;
+			$tiers_to_annotate = $total_tiers - $total_tiers_annotated;
+			
+			$tasks_submitted += $tasks_to_submit;
+			$workers_setup++;
+		
+			$tasks_to_submit = 1;
+		
+			my $busy_workers = 0;
+			while($busy_workers < ($tasks_submitted-$tasks_retrieved)) {
+				my ($execution_time, $transfer_bytes, $transfer_time) = call_wq_wait($wq, 1);	
+				if ($execution_time > 0 || $transfer_bytes > 0 || $transfer_time > 0) {
+					$tasks_retrieved++;	
+					$tasks_to_submit++;	
+					print localtime()." :: Tasks to submit set to $tasks_to_submit\n";
+				}	
+				$busy_workers = get_busy_workers($wq);
+				print localtime()." :: Busy workers: $busy_workers, tasks submitted: $tasks_submitted, tasks retreived: $tasks_retrieved\n";
+			}
+
+			$bandwidth_bytes_per_sec = measure_bw($wq);
+			print localtime()." :: Measured bandwidth at WQ is $bandwidth_bytes_per_sec\n";
+
+			($optimal_tasks, $optimal_tasks_to_submit) = compute_submission_params($start_tier, $tiers_to_annotate, $workers_used);	
+			$workers_to_setup = $optimal_tasks_to_submit;	
+			print localtime()." :: During initial submissions: Optimal number of tasks for annotating $tiers_to_annotate tiers is $optimal_tasks in batches of $optimal_tasks_to_submit\n";
+		}	
+		process_completed_tasks($wq, ($tasks_submitted-$tasks_retrieved), 5);	
+		$workers_used = $workers_setup;
+	}
+		
+	print localtime()." :: Number of workers setup with data is $workers_used\n";
+	
+	while($total_tiers_annotated < $total_tiers) {
+		if(defined($OPT{"tcc"})) {
+			tcc_adaptation_setup($wq, $tasks_submitted);
+		}	
+		print localtime()." :: $optimal_tasks tasks remain. Submitting $optimal_tasks_to_submit tasks.\n";
+		
+		$partition_time_start = time;
+		$tiers_annotated = submit_annotation_tasks($wq, $start_tier, $tiers_to_annotate, $optimal_tasks, $optimal_tasks_to_submit);
+		$actual_partition_time += time - $partition_time_start;
+	
+		if($workers_used < $optimal_tasks_to_submit) {
+			$workers_used = $optimal_tasks_to_submit; #we cached common dependencies at the used workers.
+		}	
+		$start_tier += $tiers_annotated;
+		$total_tiers_annotated += $tiers_annotated;
+		$tiers_to_annotate = $total_tiers - $total_tiers_annotated;
+		$tasks_submitted += $optimal_tasks_to_submit;
+	
+		process_completed_tasks($wq, $optimal_tasks_to_submit, 5);	
+		
+		#we need to account for the submitted batch in the optimal number of tasks computed at the beginning.	
+		$optimal_tasks -= $optimal_tasks_to_submit;
+		if($optimal_tasks < $optimal_tasks_to_submit) {
+			$optimal_tasks_to_submit = $optimal_tasks;
+		}
+		if(defined $OPT{"adapt_to_bw"}){
+			($optimal_tasks, $optimal_tasks_to_submit) = compute_submission_params($start_tier, $tiers_to_annotate, $workers_used);	
+			print localtime()." :: During Runtime: Optimal number of tasks for annotating $tiers_to_annotate tiers is $optimal_tasks in batches of $optimal_tasks_to_submit\n";
+		}	
+	}
+
+	remove_tier_files();
+	delete_workqueue($wq);
+
+	print "\n".localtime()." :: Tiers annotated :: $total_tiers_annotated in total \n";
+
+	my $wq_total_time = time - $wq_start_time;
+	my $total_time = time - $start_time;
+	print "Partition_time: $actual_partition_time\n";
+	print "Transfer_time: $actual_transfer_time\n";
+	print "WQ Total time: $wq_total_time\n";
+	print "Total time: $total_time\n";
+	
+	exit(0);
+}
+
+sub tcc_adaptation_setup {
+	my($wq, $submitted_tasks) = @_;
+
+	$estimate_granularity = 4;
+		
+	if ($submitted_tasks <= 1) {
+		set_wq_bw($wq, "75M");
+		print "\n".localtime()." :: Bandwidth set to 75 MBps.\n";
+	}elsif ($submitted_tasks > 1 && $submitted_tasks <= 3) {
+		set_wq_bw($wq, "40M");
+		print "\n".localtime()." :: Bandwidth set to 40 MBps.\n";
+	}elsif ($submitted_tasks > 3 && $submitted_tasks <= 5) {
+		set_wq_bw($wq, "10M");
+		print "\n".localtime()." :: Bandwidth set to 10 MBps.\n";
+	}else { #($submitted_tasks > 10 && $submitted_tasks <= 15) {
+		set_wq_bw($wq, "100M");
+		print "\n".localtime()." :: Bandwidth set to 100 MBps.\n";
+	}
+		
+	return;
+}
+
 sub get_wkdir {
 	my $wkdir = cwd();
 	$wkdir .= "/";
 	return $wkdir;
 }
 
-sub GenTiers {
+sub set_est_maker_opts {
+	my($est) = @_;
+	`perl -pi -e 's/^est:(.*)/est:$est/g;' maker_opts.ctl`;
+	return 0;
+}
+
+sub set_estr_maker_opts {
+	my($estr) = @_;
+	`perl -pi -e 's/^est_reads:(.*)/est_reads:$estr/g;' maker_opts.ctl`;
+	return 0;
+}
+
+sub set_protein_maker_opts {
+	my($protein) = @_;
+	`perl -pi -e 's/^protein:(.*)/protein:$protein/g;' maker_opts.ctl`;
+	return 0;
+}
+
+sub set_snaphmm_maker_opts {
+	my($snaphmm) = @_;
+	`perl -pi -e 's/^snaphmm:(.*)/snaphmm:$snaphmm/g;' maker_opts.ctl`;
+	return 0;
+}
+
+sub generate_tiers {
 	# $iterator is implicitly global
 	my $tier_ds;
 	my $numTiers = 0;
@@ -275,92 +554,63 @@ sub GenTiers {
 	return $numTiers;
 }
 
-sub setup_workqueue {
-	if(defined($OPT{"debug"})){
-		work_queue::cctools_debug_flags_set($OPT{"debug"}); 
-		print time." :: Work Queue debug flags set.\n";
-	}
+sub compute_submission_params {
+	my ($start_tier, $tiers_to_annotate, $workers_used) = @_ ;
+		
+	my $optimal_tasks;
+	my $optimal_tasks_to_submit;	
+	if($tasks == 0) {
+		if(defined $OPT{"worker_equivalence"}){
+			($optimal_tasks, $optimal_tasks_to_submit) = get_optimal_tasks($start_tier, $tiers_to_annotate, $workers_used, 1);
+		} else {
+			($optimal_tasks, $optimal_tasks_to_submit) = get_optimal_tasks($start_tier, $tiers_to_annotate, $workers_used, 0);
+		}
 
-	my $port = "9155";
-	if(defined($OPT{"port"})) {
-		$port = $OPT{"port"}; 
-	} 
-	my $wq = work_queue::work_queue_create($port);
-	if(defined($wq)) {
-		print time." :: Work Queue listening on port $port.\n";
+		my $memory_limited_task_size = get_memory_limited_task_size($start_tier, $tiers_to_annotate);
+		print localtime()." :: Memory limited task size is $memory_limited_task_size.\n";
+		if ($memory_limited_task_size > $optimal_tasks) {
+			print localtime()." :: Optimal tasks ($optimal_tasks) is increased to $memory_limited_task_size due to the observed memory size.\n";
+			$optimal_tasks = $memory_limited_task_size;	
+			$optimal_tasks_to_submit = get_optimal_tasks_to_submit($optimal_tasks, $start_tier, $tiers_to_annotate, $workers_used);
+		}
+
 	} else {
-		print STDERR "Failed to create Work Queue on port $port.\n"; 
-		exit(0);
+		if(!defined $OPT{"worker_equivalence"}){
+			$optimal_tasks = $tasks;	
+			$optimal_tasks_to_submit = get_optimal_tasks_to_submit($tasks, $start_tier, $tiers_to_annotate, $workers_used);
+		}
 	}
-	if(defined($OPT{"fast_abort"})) {
-		my $multiplier = $OPT{"fast_abort"}; 
-		my $fa = work_queue::work_queue_activate_fast_abort($wq, $multiplier); 
-		print time." :: Work Queue fast abort set to $multiplier.\n";
-	}
-	if(defined($OPT{"project"})) {
-		work_queue::work_queue_specify_name($wq, $OPT{"project"});
-		work_queue::work_queue_specify_master_mode($wq, 1);
-		print time." :: Work Queue project name set to $OPT{\"project\"}.\n";
-	}
-	work_queue::work_queue_specify_log($wq, "maker_wq.stats");
-	return $wq;
+	return ($optimal_tasks, $optimal_tasks_to_submit);	
 }
 
-sub create_worker_script {
- my $worker_script = <<'END';
+sub create_worker_prog {
+	my $worker_prog_name = "maker_wq_worker";	
+	open (my $file_h, ">", $worker_prog_name); 
+
+	print $file_h <<'END';
 #!/usr/bin/env perl
 use strict "vars";
 use strict "refs";
 use warnings;
-use FindBin;
-use vars qw($RANK $LOG $CMD_ARGS);
 
-BEGIN {
+use FindBin;
+use vars qw($RANK $LOG);
+
+BEGIN{
    if (not ($ENV{CGL_SO_SOURCE})) {
-	  $ENV{CGL_SO_SOURCE} = "$FindBin::Bin/../lib/CGL/so.obo";
+      $ENV{CGL_SO_SOURCE} = "$FindBin::Bin/../lib/CGL/so.obo";
    }
    if (not ($ENV{CGL_GO_SOURCE})) {
-	  $ENV{CGL_GO_SOURCE} = "$FindBin::Bin/../lib/CGL/gene_ontology.obo"
+      $ENV{CGL_GO_SOURCE} = "$FindBin::Bin/../lib/CGL/gene_ontology.obo"
    }
-   
-   $CMD_ARGS = join(' ', @ARGV);
-   
-   #Handle CTRL+C
-   $SIG{'INT'} = sub {
-	  print STDERR "\n\nMaker aborted by user!!\n\n" unless($main::qq);
-	  exit (1);
-   };    
-   
-   #supress warnings from storable module
-   $SIG{'__WARN__'} = sub {
-	  warn $_[0] if ( $_[0] !~ /Not a CODE reference/ &&
-			  $_[0] !~ /Can\'t store item / &&
-			  $_[0] !~ /Find\:\:skip_pattern|File\/Find\.pm/
-			);
-   };
-  
-  #output to log file of seq that caused rank to die
-   $SIG{'__DIE__'} =
-   sub {
-      if (defined ($LOG) && defined $_[0]) {
-	 my $die_count = $LOG->get_die_count();
-	 $die_count++;
-	 
-	 $LOG->add_entry("DIED","RANK",$RANK);
-	 $LOG->add_entry("DIED","COUNT",$die_count);
-      }
-
-      die $_[0]."\n".
-	  "FATAL ERROR\n";
-   };
 }
 
 my $link_output = `find -name "*" -exec ln -s {} . \\\;`;
 
 my $numArgs = $#ARGV + 1;
 if ($numArgs < 1) {
-		print "Usage: maker_wq_worker <tier count>\n";
-		exit;
+        print "Usage: maker_wq_worker counter\n";
+        exit;
 }
 
 my $counter = $ARGV[0];
@@ -389,6 +639,7 @@ foreach my $c (@ts) {
 	$tier->CTL_OPT->{the_void} = ".";
 	$tier->{the_void} = ".";  
 
+	#use Process::MpiTiers;
 	print time." :: Worker $counter :: starting \n";
 	$tier->run_all;
 	print time." :: Worker $counter :: finished \n";
@@ -397,90 +648,139 @@ foreach my $c (@ts) {
 	elsif($tier->terminated) { print "EXIT:1 \n"; next; }
 }
 END
-
- open(my $fh, '>maker_wq_worker');
- print $fh $worker_script;
- chmod(0755, $fh); 
- close($fh); 
- return;
+		
+	close ($file_h);
+	chmod 0755, $worker_prog_name;
+	return;
 }
 
-sub get_tiers_to_submit {
-	my ($tiers_in_task) = @_;
-	my $tasks_to_submit = work_queue::work_queue_hungry($wq);
-	my $tiers_to_submit = $tasks_to_submit * $tiers_in_task;
-
-	return $tiers_to_submit;
+sub create_task_setup_script {
+	my $task_setup_script = "task_env_setup.sh";	
+	open (my $file_h, ">", $task_setup_script); 
+	
+	print $file_h "#!/bin/sh\n\n";
+	print $file_h "if [ ! -d lib ]; then\n";
+	print $file_h "\t echo \"Running tar to extract all the input files\"\n";
+	print $file_h "\t find -maxdepth 1 -name \"*.tar\" -exec tar -x -f {} \\\;\n";
+	print $file_h "fi\n";
+	
+	close ($file_h);
+	chmod 0755, $task_setup_script;	
+	return;
 }
 
-sub get_initial_tiers_to_submit {
-	my($total_tiers, $tiers_in_task) = @_;	
-	my $total_tier_tasks = ceil($total_tiers / $tiers_in_task);
-	my $initial_submit_tiers = ($total_tier_tasks <= 100 ? $total_tiers : 100*$tiers_in_task);
+sub setup_workqueue {
+	if(defined($OPT{"debug"})){
+		work_queue::cctools_debug_flags_set($OPT{"debug"}); 
+		print localtime()." :: Work Queue debug flags set.\n";
+	}
 
-	return $initial_submit_tiers;
-}
-
-sub submit_tiers_to_annotate {
-	my($wq, $total_tiers, $start_tier, $tiers_to_submit) = @_;
-	if (($total_tiers - $start_tier) < 1) {
-		return 0;
-	} elsif (($total_tiers - $start_tier) < $tiers_to_submit) {
-		$tiers_to_submit = $total_tiers - $start_tier;	
+	my $port = "9155";
+	if(defined($OPT{"port"})) {
+		$port = $OPT{"port"}; 
+	} 
+	my $wq = work_queue::work_queue_create($port);
+	if(defined($wq)) {
+		print localtime()." :: Work Queue listening on port $port.\n";
 	} else {
-		#do nothing..
+		print STDERR "Failed to create Work Queue on port $port.\n"; 
+		exit(0);
 	}
-	my $end_tier = $start_tier + $tiers_to_submit - 1;
-	my $tiers_in_task = $tiers_per_task;	
-	while($start_tier <= $end_tier) {
-		my $tiers_left = ($end_tier - $start_tier) + 1; 
-		if ( $tiers_left < $tiers_per_task) {
-			$tiers_in_task = $tiers_left; 
-		}
-		SubmitWQTask($wq, $start_tier, $tiers_in_task);
-		$start_tier += $tiers_in_task;	
+	if(defined($OPT{"fast_abort"})) {
+		my $multiplier = $OPT{"fast_abort"}; 
+		my $fa = work_queue::work_queue_activate_fast_abort($wq, $multiplier); 
+		print localtime()." :: Work Queue fast abort set to $multiplier.\n";
 	}
-	return $end_tier; #return last annotated tier.
+	if(defined($OPT{"project"})) {
+		work_queue::work_queue_specify_name($wq, $OPT{"project"});
+		work_queue::work_queue_specify_master_mode($wq, 1);
+		print localtime()." :: Work Queue project name set to $OPT{\"project\"}.\n";
+	}
+	
+	if(defined($OPT{"schedule_by_data"})) {
+		work_queue::work_queue_specify_algorithm($wq, $WORK_QUEUE_SCHEDULE_FILES);
+	}
+	
+	work_queue::work_queue_specify_log($wq, "maker_wq.stats");
+
+	return $wq;
 }
 
-sub SubmitWQTask {
-	my($wq, $tier_to_submit, $tiers_in_task) = @_;
+sub submit_annotation_tasks {
+	my($wq, $start_tier, $num_tiers, $total_tasks, $tasks_to_submit) = @_;
+	
+	my $tiers_remaining = $num_tiers;
+	my $tasks_remaining = $total_tasks;
+	my $tiers_per_task;
+
+	if($tasks_to_submit > $total_tasks) {
+		return 0;
+	}
+
+	while(($total_tasks-$tasks_remaining) < $tasks_to_submit) {
+		if($start_tier >= $total_tiers) {
+		    last;
+		}
+		
+		if($tiers_remaining % $tasks_remaining == 0) {
+			$tiers_per_task = $tiers_remaining / $tasks_remaining;
+		} else {
+			$tiers_per_task = ceil($tiers_remaining / $tasks_remaining);
+		}
+	
+		if ($start_tier + $tiers_per_task > $total_tiers) {
+			$tiers_per_task = $total_tiers - $start_tier;
+		}	
+		print localtime()." :: Chosen tiers per task is $tiers_per_task.\n";
+		
+		submit_task($wq, $start_tier, $tiers_per_task);
+		
+		$tasks_remaining--;	
+		$tiers_remaining -= $tiers_per_task;
+		$start_tier += $tiers_per_task;	
+	}
+	
+	#return the number of tiers that were submitted for annotation.
+	return ($num_tiers-$tiers_remaining);
+}
+
+sub submit_task {
+	my($wq, $start_tier, $tiers_in_task) = @_;
 	if($tiers_in_task < 1) {
 		print STDERR "Invalid query size. Should be at least 1.\n"; 
 		exit(0);
 	}
 	
-	my $task_command .= "find -name \"*.tar\" -exec tar --skip-old-files -x -f {} \\\;
-	                     ./maker_wq_worker";
-	my $query_seq = ""; 
-	for(my $i = 0; $i < $tiers_in_task; $i++) {
-		my $val = $tier_to_submit + $i; 
-		$query_seq .= "$val "; 
-	}
-	if($query_seq eq ""){
-		return 0; 
-	}
-	print time." :: Creating WQ task for query sequence(s) $query_seq\n";  
-	my $task = work_queue::work_queue_task_create("$task_command $query_seq"); 
-	work_queue::work_queue_task_specify_tag($task, "$tier_to_submit"); #parm2 must be a string
+	my $task_command .= "time ./task_env_setup.sh; time ./maker_wq_worker";
 	
-
-	for(my $i = 0; $i < $tiers_in_task; $i++){
-		submit_input_base_files($task, $tier_to_submit);
-		submit_input_tier_files($task, $tier_to_submit);
-		configure_remote_tier_annotation($tier_to_submit);	
-		specify_output_tier_files($task, $tier_to_submit);
-		$tier_to_submit++; 
+	my $query_seqs = ""; 
+	for(my $tier_num = $start_tier; $tier_num < $start_tier+$tiers_in_task; $tier_num++) {
+		$query_seqs .= "$tier_num "; 
 	}
-	work_queue::work_queue_submit($wq, $task);
-	print time." :: Submitted task with command: $task_command for query seq: $query_seq\n";
+	
+	my $task = work_queue::work_queue_task_create("$task_command $query_seqs"); 
+	my $task_tag = "$start_tier" . "-" . ($start_tier+$tiers_in_task-1);
+	work_queue::work_queue_task_specify_tag($task, $task_tag); 
+	
+	work_queue::work_queue_task_specify_file($task, "task_env_setup.sh", "task_env_setup.sh", 0, 1);
+
+	submit_env_files($task);
+	submit_input_base_files($task, $start_tier);
+	
+	for(my $tier_num = $start_tier; $tier_num < ($start_tier+$tiers_in_task); $tier_num++){
+		submit_input_tier_files($task, $tier_num);
+		configure_remote_tier_annotation($tier_num);	
+		specify_output_tier_files($task, $tier_num);
+	}	
+	
+	my $taskid = work_queue::work_queue_submit($wq, $task);
+	print localtime()." :: Submitted task $taskid for annotating $tiers_in_task tiers with command: $task_command $query_seqs\n";
 
 	return 1;
 }
 
-sub submit_input_base_files {
-	my ($task, $tier) = @_;
-	
+sub submit_env_files{
+	my ($task) = @_;
 	work_queue::work_queue_task_specify_file($task, "maker_wq_worker", "maker_wq_worker", 0, 1);
 	
 	#specify the MAKER library files 
@@ -488,12 +788,17 @@ sub submit_input_base_files {
 	$lib =~ s/bin/lib/; 
 	if(! -e "$wkdir/lib.tar") {
 		`tar -C $lib/.. -cf $wkdir/lib.tar lib/`;	
-		`tar -C $wkdir/perl_libs_install -rf $wkdir/lib.tar lib/`;	
+		`tar -C $lib/../perl -rf $wkdir/lib.tar lib/`;	
 	}
 	work_queue::work_queue_task_specify_file($task, "lib.tar", "lib.tar", 0, 1);
+}
 
+sub submit_input_base_files {
+	my ($task, $tier) = @_;
+	
 	my $tierFile = $tier."_todo.tier";
 	my $tier_ds = ${retrieve($tierFile)}; #$tier_ds holds all the information for task 
+	
 	submit_edb_input_files($task, \$tier_ds);
 	submit_pdb_input_files($task, \$tier_ds);	
 	submit_ddb_input_files($task, \$tier_ds);	
@@ -736,37 +1041,442 @@ sub delete_workqueue {
 	work_queue::work_queue_delete($wq);
 }
 
-sub process_completed_tier_task {
+sub remove_tier_files {
+	unlink "*.tier";
+}
+
+sub get_observed_min_memory {
+	my($wq) = @_;
+
+	my $wq_stats = work_queue::work_queue_stats->new();
+	work_queue_get_stats($wq, $wq_stats);
+	return ($wq_stats->{min_memory}/1000); #return in GB.	
+}
+
+sub get_busy_workers {
+	my($wq) = @_;
+
+	my $wq_stats = work_queue::work_queue_stats->new();
+	work_queue_get_stats($wq, $wq_stats);
+	return $wq_stats->{workers_busy};	
+}
+
+sub set_wq_bw {
+	my ($wq, $bw) = @_;
+	work_queue::work_queue_set_bandwidth($wq, $bw);
+}
+
+sub measure_bw {
+	my($wq) = @_;
+	my $wq_bw = work_queue::work_queue_get_bandwidth($wq); #return value is in MB/s.
+	return $wq_bw*1024*1024; #return in bytes per second.
+}
+
+sub call_wq_wait {
 	my($wq, $timeout) = @_;
 
-	#some thing is launching "maintain.pl" which becomes a zombie script, it needs to die before we run WQ wait. 
-	Proc::Signal::reap_children_by_name(9, 'maintain.pl');
+	my $task_execution_time = 0;
+	my $transfered_bytes= 0;
+	my $transfer_time = 0;
+
+	my $tasktimes_fh;
+	if(defined($OPT{"tasktimes_file"})) {
+		my $tasktimes_file = $OPT{"tasktimes_file"}; 
+		open $tasktimes_fh, ">>$tasktimes_file"; 
+	}
+
+	my $taskoverheads_fh;
+	if(defined($OPT{"taskoverheads_file"})) {
+		my $taskoverheads_file = $OPT{"taskoverheads_file"}; 
+		open $taskoverheads_fh, ">>$taskoverheads_file"; 
+	}
+		
 	my $t = work_queue::work_queue_wait($wq, $timeout); 
 	if(defined($t)) {
-		my $counter = $t->{tag}; 
-		my $output = $t->{output}; 
+		my $tasktag = $t->{tag}; 
+
+		$transfer_time = $t->{total_transfer_time};
+		$transfered_bytes = $t->{total_bytes_transferred};
+		$task_execution_time = $t->{cmd_execution_time}/1000000;
+		
+		if(defined($OPT{"tasktimes_file"})) {
+			my $taskid = $t->{taskid};
+			my $cmd_execution_time = $t->{cmd_execution_time};
+			print $tasktimes_fh "$taskid $cmd_execution_time\n";	
+		}
+		
+		if(defined($OPT{"taskoverheads_file"})) {
+			my $taskid = $t->{taskid};
+			my $input_start = $t->{time_send_input_start};
+			my $input_end = $t->{time_send_input_finish};
+			my $exec_start = $t->{time_execute_cmd_start};
+			my $exec_end = $t->{time_execute_cmd_finish};
+			my $result_start = $t->{time_receive_result_start};
+			my $result_end = $t->{time_receive_result_finish};
+			my $output_start = $t->{time_receive_output_start};
+			my $output_end = $t->{time_receive_output_finish};
+			print $taskoverheads_fh "$taskid $input_start $input_end $exec_start $exec_end $result_start $result_end $output_start $output_end\n";	
+		}
+		
+		#Check if return status indicates failure
+		my $output = $t->{output};
+		open (task_outfile, '>>task_outputs.txt'); 
+		print task_outfile "$output\n";
+		print task_outfile "=================================\n\n";
+		close (task_outfile);
+		
 		my $retStatus = index($output, "EXIT:");
 		if ($retStatus != -1) {
 			$retStatus = substr($output, $retStatus+5, 2);
 			$retStatus = sprintf("%d", $retStatus);
 		}
 		if($retStatus == 0 || $retStatus == 1) {
-			print time." :: Finished WQ task with starting tier $counter.\n";
-			unlink "$counter\_todo.tier" or warn "Could not unlink $counter\_todo.tier: $!\n";
+			my $task_result = $t->{result}; 	
+			print localtime()." :: Finished WQ task for tiers $tasktag with result $task_result.\n";
 			work_queue::work_queue_task_delete($t);
-			return 1;
 		} else { #tier resubmission on failure 
-			$task_failures{$counter} += 1; 
-			if($task_failures{$counter} < 5){
-				print time." :: Failed, resubmitting WQ task with starting tier $counter\n";
+			$task_failures{$tasktag} += 1; 
+			if($task_failures{$tasktag} <= $tolerable_task_failures){
+				print localtime()." :: Failed, resubmitting WQ task for tiers $tasktag\n";
 				work_queue::work_queue_submit($wq, $t);
 			} else{
-				print time." :: WQ task with starting tier $counter has failed too many times\n"; 
+				print localtime()." :: Giving up on task for tiers $tasktag since it has failed $tolerable_task_failures times\n"; 
 				work_queue::work_queue_task_delete($t);
 			}
 		}
-	} 
-	return 0;
+		if(defined($OPT{"tasktimes_file"})) {
+			close $tasktimes_fh;
+		}	
+		if(defined($OPT{"taskoverheads_file"})) {
+			close $taskoverheads_fh;
+		}		
+	}		
+	return ($task_execution_time, $transfered_bytes, $transfer_time);
 }
 
-exit(0);
+sub process_completed_tasks {
+	my($wq, $tasks_to_retrieve, $timeout) = @_;
+	
+	#somewhere MAKER launches "maintain.pl" which becomes a zombie script, it needs to be reaped before WQ wait. 
+	Proc::Signal::reap_children_by_name(9, 'maintain.pl');
+
+	my $total_task_execution_times = 0;
+	my $total_transfered_bytes= 0;
+	my $total_transfer_time = 0;
+	
+	my $retrieved_tasks = 0;
+	while ($retrieved_tasks < $tasks_to_retrieve) {
+		my ($task_execution_time, $transfered_bytes, $transfer_time) = call_wq_wait($wq, $timeout); 
+		if($task_execution_time > 0 || $transfered_bytes > 0 || $transfer_time > 0) {
+			$retrieved_tasks++;
+			$total_task_execution_times += $task_execution_time;
+			$total_transfered_bytes += $transfered_bytes;
+			$total_transfer_time += $transfer_time;
+			print localtime()." :: Retrieved $retrieved_tasks so far.\n";
+		}	
+	}	
+	
+	$bandwidth_bytes_per_sec = $total_transfered_bytes / ($total_transfer_time / 1000000);
+	print localtime()." :: Measured bandwidth at application is $bandwidth_bytes_per_sec.\n";
+	
+	$actual_transfer_time += $total_transfer_time;
+	
+	return $total_task_execution_times;
+}
+
+sub get_sw_depedency_size {
+	my $tier = 0; #all tiers have the same sw dependency, so just use tier 0.
+	my $tierFile = $tier."_todo.tier";
+	my $tier_ds = ${retrieve($tierFile)}; #$tier_ds holds all the information for task 
+
+	my $sw_dependency_size = 0;
+	
+	$sw_dependency_size += -s "maker_wq_worker";
+	
+	my $lib = "$FindBin::Bin";
+	$lib =~ s/bin/lib/; 
+	if(! -e "$wkdir/lib.tar") {
+		`tar -C $lib/.. -cf $wkdir/lib.tar lib/`;	
+		`tar -C $lib/../perl -rf $wkdir/lib.tar lib/`;	
+	}
+	my $lib_size = -s "$wkdir/lib.tar";  
+	$sw_dependency_size += $lib_size;
+
+	if (defined $tier_ds->CTL_OPT->{_e_db}){
+		my $edb_size = 0;	
+		my @ests = @{$tier_ds->CTL_OPT->{_e_db}};
+		for(my $j = 0; $j < scalar(@ests); $j++){
+			my $file = $ests[$j]; 
+			$edb_size += -s $file;	
+		}	
+		$sw_dependency_size += $edb_size;
+	}
+
+	if (defined $tier_ds->CTL_OPT->{_p_db}){ 
+		my @proteins = @{$tier_ds->CTL_OPT->{_p_db}}; 	
+		my $pdb_size = 0;	
+		for(my $j = 0; $j < scalar(@proteins); $j++){
+			my $file = $proteins[$j]; 
+			$pdb_size += -s $file;	
+		}
+		$sw_dependency_size += $pdb_size;
+	}	
+	
+	if (defined $tier_ds->CTL_OPT->{_d_db}){
+		my @d = @{$tier_ds->CTL_OPT->{_d_db}}; 	
+		my $ddb_size = 0;	
+		for(my $j = 0; $j < scalar(@d); $j++){
+			my $file = $d[$j]; 
+			$ddb_size += -s $file;	
+		}
+		$sw_dependency_size += $ddb_size;
+	}
+
+	if (defined $tier_ds->CTL_OPT->{_r_db}){
+		my @r = @{$tier_ds->CTL_OPT->{_r_db}}; 	
+		my $rdb_size = 0;	
+		for(my $j = 0; $j < scalar(@r); $j++){
+			my $file = $r[$j]; 
+			$rdb_size += -s $file;	
+		}
+		$sw_dependency_size += $rdb_size;
+	}
+	
+	if (defined $tier_ds->CTL_OPT->{_a_db}){
+		my @a = @{$tier_ds->CTL_OPT->{_a_db}}; 	
+		my $adb_size = 0;	
+		for(my $j = 0; $j < scalar(@a); $j++){
+			my $file = $a[$j];
+			$adb_size += -s $file;	
+		}
+		$sw_dependency_size += $adb_size;
+	}
+
+	my @inputs = ("_est", "_altest", "_repeat_protein", "_protein", "_est_reads", "protein", "repeat_protein", "genome", "est", "est_reads", "altest", 'snaphmm',  'SEEN_file', 'rmlib'); 
+	my $extern_input_size = 0;	
+	foreach my $input (@inputs){
+		if (! defined $tier_ds->CTL_OPT->{$input}){next;}
+		my $file = $tier_ds->CTL_OPT->{$input}; 
+		if(-e $file){
+			$file = abs_path($file); 
+			$sw_dependency_size += -s $file;
+		}
+	}
+	
+	my @execs = ('formatdb', 'blastall', '_formater', '_tblastx', 'tblastx', 'blastx', 'xdformat', 'exonerate', 'snap', 'RepeatMasker', 'blastn', 'formatdb', 'gmhmme3', '_blastx', '_blastn', 'probuild', 'augustus', 'gmhmme3', 'gmhmmp', 'fgenesh', 'twinscan');
+	my $extern_exec_size = 0;	
+	foreach my $v (@execs){
+		my $file = $tier_ds->CTL_OPT->{$v}; 
+		if (! -e $file){ next; }
+		$file = abs_path($file); 
+		my @fields = split(/\//, $file); 
+		my $prefix = ""; 
+		for (my $j = 0; $j < scalar(@fields) - 1; $j++) {
+			$prefix .= "/".$fields[$j];
+		}
+		my $folder = $fields[scalar(@fields) - 2]; 
+		if(-e $file){
+			if (! -e "$v.tar"){
+				`tar -C $prefix/.. -cf $wkdir/$v.tar $folder`; 
+			}
+			$sw_dependency_size += -s "$v.tar";
+		}
+	}
+ 	
+	return $sw_dependency_size;
+}
+
+sub get_contigs_size {
+	my($start_tier, $num_tiers) = @_;
+	my $contigs_size = 0; 
+	for (my $i = $start_tier; $i < ($start_tier + $num_tiers); $i++) {
+		$contigs_size += -s "$i\_todo.tier";
+	}
+	return $contigs_size;
+}
+
+sub get_memory_limited_task_size {
+	my ($start_tier, $num_tiers) = @_;
+
+	my $observed_memory_mb = $observed_memory_gb * 1000;
+	my $input_size = get_contigs_size($start_tier, $num_tiers)/1000000; 
+	
+	print localtime()." :: Input size is $input_size MB and observed memory is $observed_memory_mb MB.\n";
+	
+	return ceil($input_size/$observed_memory_mb);
+}
+
+sub estimate_runtime {
+	my($resources, $resources_used, $tasks, $start_tier, $num_tiers) = @_; 
+	
+	my $optimal_time = -1;
+
+	my $data_common = $common_dependency_size; 
+	
+	my $data_unique = get_contigs_size($start_tier, $num_tiers); 
+	my $contigs_size = $data_unique;
+	
+	#Model:
+	#T(n,k,r) = [T_part + T_merge] + [(t*n)/k * ceil(k/r)] + [(total_data_unique + (data_common * r))/BW_Bps]. 
+	#T_merge is trivial since we just put each task output in a directory and say done.
+
+	my $partition_time = ($partition_overhead_coeff_a * $tasks) + ($partition_overhead_coeff_b * $num_tiers);
+	my $total_workload_time = ($contigs_size * $per_byte_annotate_time); 
+	my $parallel_time = ($total_workload_time / $tasks) * ceil($tasks/$resources);
+	
+	my $new_resources;	
+	my $resources_to_consider = $resources;
+	if($resources > $tasks) { 
+		$resources_to_consider = $tasks;	
+	}	
+	if($resources_to_consider <= $resources_used) {
+		$new_resources = 0;
+	} else {
+		$new_resources = $resources_to_consider - $resources_used;
+	}
+	my $transfer_time = ((2*$data_unique) + ($data_common * $new_resources)) / $bandwidth_bytes_per_sec; 
+
+	my $total_execution_time = $partition_time + $parallel_time + $transfer_time;
+
+	return ($total_execution_time, $partition_time, $parallel_time, $transfer_time);
+}
+
+sub get_optimal_runtimes_for_workers {
+	my($resources, $start_tier, $num_tiers, $resources_used) = @_; 
+	
+	my $optimal_time = -1;
+	my $optimal_parallel_time = 0; 
+	my $optimal_partition_time = 0; 
+	my $optimal_transfer_time = 0; 
+	
+	my $optimal_tasks;
+
+	for (my $tasks = 1; $tasks <= $total_tiers; $tasks++) {
+		my($total_time, $partition_time, $parallel_time, $transfer_time) = estimate_runtime($resources, $resources_used, $tasks, $start_tier, $num_tiers);
+		#print "Resources $resources, used resources $resources_used, tasks $tasks: $total_time, $partition_time, $parallel_time, $transfer_time\n";
+		if ($optimal_time < 0 || ($total_time < $optimal_time)) {
+			$optimal_time = $total_time;
+			$optimal_partition_time = $partition_time;
+			$optimal_parallel_time = $parallel_time;
+			$optimal_transfer_time = $transfer_time;
+			$optimal_tasks = $tasks; 
+		} 	
+	} 	
+	
+	#print "Total transfer time is $transfer_overhead and optimal task size is $optimal_tasks\n";		
+	return ($optimal_time, $optimal_partition_time, $optimal_parallel_time, $optimal_transfer_time, $optimal_tasks);
+}
+
+sub get_optimal_runtimes_for_tasksize {
+	my($tasks, $start_tier, $num_tiers, $resources_used) = @_; 
+	
+	my $optimal_time = -1;
+	my $optimal_parallel_time = 0; 
+	my $optimal_partition_time = 0; 
+	my $optimal_transfer_time = 0; 
+	
+	my $optimal_resources;
+
+	for (my $resources = 1; $resources <= $tasks; $resources++) {
+		my($total_time, $partition_time, $parallel_time, $transfer_time) = estimate_runtime($resources, $resources_used, $tasks, $start_tier, $num_tiers);
+		#print "Resources $resources, used resources $resources_used, tasks $tasks: $total_time, $partition_time, $parallel_time, $transfer_time\n";
+		if ($optimal_time < 0 || ($total_time < $optimal_time)) {
+			$optimal_time = $total_time;
+			$optimal_partition_time = $partition_time;
+			$optimal_parallel_time = $parallel_time;
+			$optimal_transfer_time = $transfer_time;
+			$optimal_resources = $resources; 
+		} 	
+	} 	
+	
+	#print "Total transfer time is $transfer_overhead and optimal task size is $optimal_tasks\n";		
+	return ($optimal_time, $optimal_partition_time, $optimal_parallel_time, $optimal_transfer_time, $optimal_resources);
+}
+
+sub get_optimal_tasks {
+	my($start_tier, $num_tiers, $workers_used, $equal_resources) = @_; 
+	
+	my $global_optimal_time = -1;
+	my $global_optimal_partition_time;
+	my $global_optimal_parallel_time;
+	my $global_optimal_transfer_time;
+	my $global_optimal_tasks;
+	my $global_optimal_resources;
+
+	my $optimal_runtime;
+	my $optimal_partition_time;
+	my $optimal_parallel_time;
+	my $optimal_transfer_time;
+	my $optimal_resources;
+	
+	my $tasks = 1;	
+	while ($tasks <= $num_tiers) { 
+		if ($equal_resources == 1) {
+			($optimal_runtime, $optimal_partition_time, $optimal_parallel_time, $optimal_transfer_time, $optimal_resources) = estimate_runtime($tasks, $workers_used, $tasks, $start_tier, $num_tiers);
+			$optimal_resources = $tasks;	
+		} else {	
+			($optimal_runtime, $optimal_partition_time, $optimal_parallel_time, $optimal_transfer_time, $optimal_resources) = get_optimal_runtimes_for_tasksize($tasks, $start_tier, $num_tiers, $workers_used);
+		}	
+		if ($global_optimal_time < 0 || ($optimal_runtime < $global_optimal_time)) {
+			$global_optimal_time = $optimal_runtime;
+			$global_optimal_partition_time = $optimal_partition_time;
+			$global_optimal_parallel_time = $optimal_parallel_time;
+			$global_optimal_transfer_time = $optimal_transfer_time;
+			$global_optimal_tasks = $tasks;
+			$global_optimal_resources = $optimal_resources;
+		}
+		
+		if($tasks == 1 && $estimate_granularity > 1) {
+			$tasks += $estimate_granularity-1;
+		} else {
+			$tasks += $estimate_granularity;
+		}
+	}
+
+	return ($global_optimal_tasks, $global_optimal_resources);
+	#return ($global_optimal_tasks, $global_optimal_resources, $global_optimal_time, $global_optimal_partition_time, $global_optimal_parallel_time, $global_optimal_transfer_time);
+}
+
+sub get_optimal_tasks_to_submit {
+	my($tasks, $start_tier, $num_tiers, $workers_used) = @_; 
+	
+	my ($optimal_runtime, $optimal_partition_time, $optimal_parallel_time, $optimal_transfer_time, $optimal_resources) = get_optimal_runtimes_for_tasksize($tasks, $start_tier, $num_tiers, $workers_used);
+	return ($optimal_resources);
+}
+
+
+sub print_global_optimal_runtimes {
+	my $global_optimal_time = -1;
+	my $global_optimal_partition_time;
+	my $global_optimal_parallel_time;
+	my $global_optimal_transfer_time;
+	my $global_optimal_tasks;
+	my $global_optimal_resources;
+	
+	print "\n------------------------------------------------------------\n";
+	print "Tasks Resources Runtime Partition Task Transfer\n";
+	print "------------------------------------------------------------\n";
+
+	my $tasks = 1;	
+	while ($tasks <= $total_tiers) { 
+		my($optimal_runtime, $optimal_partition_time, $optimal_parallel_time, $optimal_transfer_time, $optimal_resources) = get_optimal_runtimes_for_tasksize($tasks, 0, $total_tiers, 0);
+		if ($global_optimal_time < 0 || ($optimal_runtime < $global_optimal_time)) {
+			$global_optimal_time = $optimal_runtime;
+			$global_optimal_partition_time = $optimal_partition_time;
+			$global_optimal_parallel_time = $optimal_parallel_time;
+			$global_optimal_transfer_time = $optimal_transfer_time;
+			$global_optimal_tasks = $tasks;
+			$global_optimal_resources = $optimal_resources;
+		}
+		print "$tasks $optimal_resources $optimal_runtime $optimal_partition_time $optimal_parallel_time $optimal_transfer_time\n";	
+		
+		if($tasks == 1 && $estimate_granularity > 1) {
+			$tasks += $estimate_granularity-1;
+		} else {
+			$tasks += $estimate_granularity;
+		}
+	}
+	
+	print "------------------------------------------------------------\n";
+	print "\n--> Please allocate $global_optimal_resources resources that will lead to the lower run time of $global_optimal_time s using $global_optimal_tasks tasks.\n";		
+}
