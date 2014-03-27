@@ -2647,7 +2647,7 @@ static struct work_queue_task *find_running_task_by_tag(struct work_queue *q, co
 
 static struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file) {
   const int file_t_size = sizeof(struct work_queue_file);
-  struct work_queue_file *new = xxmalloc(1, file_t_size);
+  struct work_queue_file *new = xxmalloc(file_t_size);
   
   memcpy(new, file, file_t_size);
   //allocate new memory for strings so we don't segfault when the original
