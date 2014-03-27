@@ -47,6 +47,7 @@
 
 int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 {
+	rmsummary_assign_as_string_field(s, key, value, category);
 	rmsummary_assign_as_string_field(s, key, value, command);
 	rmsummary_assign_as_time_field  (s, key, value, start);
 	rmsummary_assign_as_time_field  (s, key, value, end);
@@ -66,6 +67,7 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	rmsummary_assign_as_int_field   (s, key, value, workdir_num_files);
 	rmsummary_assign_as_int_field   (s, key, value, workdir_footprint);
 	rmsummary_assign_as_int_field   (s, key, value, cores);
+	rmsummary_assign_as_int_field   (s, key, value, gpus);
 
 	return 0;
 }
@@ -117,9 +119,12 @@ char *rmsummary_read_single_chunk(FILE *stream)
 		if( ntotal + n > nmax )
 		{
 			nmax = ntotal + n + nline;
-			line = realloc(line, nmax * sizeof(char) );
-			if(!line)
+			summ = realloc(summ, nmax * sizeof(char) );
+			if(!summ)
 				fatal("Could not read summary file : %s.\n", strerror(errno)); 
+
+            fprintf(stderr, "::::: %s\n", line);
+
 		}
 		memcpy((summ + ntotal), line, n); 
 		ntotal += n;
@@ -197,8 +202,8 @@ void rmsummary_print(FILE *stream, struct rmsummary *s)
 	if(s->command)
 		fprintf(stream, "%-15s%s\n",  "command:", s->command);
 
-	if(s->cores > -1)
-		fprintf(stream, "%-20s%20" PRId64 "\n",  "cores:", s->cores);
+	if(s->category)
+		fprintf(stream, "%-15s%s\n",  "category:", s->category);
 
 	if(s->start > -1)
 		fprintf(stream, "%-20s%20lf s\n", "start:", s->start / 1000000e0);
@@ -227,6 +232,8 @@ void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const cha
 	if(s->cores > -1)
 		fprintf(stream, "%s%-20s%15" PRId64 "\n", prefix,  "cores:", s->cores);
 
+	if(s->gpus > -1)
+		fprintf(stream, "%-20s%20" PRId64 "\n",  "gpus:", s->gpus);
 
 	if(s->wall_time > -1)
 		fprintf(stream, "%s%-20s%20lf s\n", prefix, "wall_time:", s->wall_time >= 0 ? s->wall_time / 1000000e0 : -1);
@@ -320,6 +327,7 @@ struct rmsummary *make_rmsummary(signed char default_value)
 	memset(s, default_value, sizeof(struct rmsummary));
 
 	s->command   = NULL;
+	s->category  = NULL;
 	s->exit_type = NULL;
 	s->limits_exceeded = NULL;
 

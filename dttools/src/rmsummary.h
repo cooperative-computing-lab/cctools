@@ -22,6 +22,7 @@ COPYING for details.
 // signed quantities when comparing to maximum limits.
 struct rmsummary
 {
+	char    *category;
 	char    *command;
 
 	int64_t  start;
@@ -44,10 +45,13 @@ struct rmsummary
 	int64_t  workdir_num_files;
 	int64_t  workdir_footprint;
 
-	/* these fields are not used when reading/printing summaries */ 
 	int64_t  cores;
-	int64_t  fs_nodes;
 	int64_t  gpus;
+	int64_t  task_id;
+
+	/* these fields are not used when reading/printing summaries */ 
+	int64_t  fs_nodes;
+
 };
 
 struct rmsummary_field
