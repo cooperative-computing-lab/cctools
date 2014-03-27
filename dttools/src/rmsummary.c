@@ -136,7 +136,7 @@ char *rmsummary_read_single_chunk(FILE *stream)
 
 /* Parse a string for summary fields. Separator is usually '\n' or ',' */
 #define MAX_LINE 1024
-struct rmsummary *rmsummary_parse_single(char *buffer, char separator)
+struct rmsummary *rmsummary_parse_from_str(char *buffer, char separator)
 {
 	char key[MAX_LINE], value[MAX_LINE];
 	char *token, *saveptr;
@@ -189,7 +189,7 @@ struct rmsummary *rmsummary_parse_file_single(char *filename)
 	}
 
 	char *buffer = rmsummary_read_single_chunk(stream);
-	struct rmsummary *s = rmsummary_parse_single(buffer, '\n');
+	struct rmsummary *s = rmsummary_parse_from_str(buffer, '\n');
 
 	free(buffer);
 	fclose(stream);
@@ -303,7 +303,7 @@ struct rmsummary *rmsummary_parse_next(FILE *stream)
 	char             *buffer;
 
 	buffer = rmsummary_read_single_chunk(stream);
-	s      = rmsummary_parse_single(buffer, '\n');
+	s      = rmsummary_parse_from_str(buffer, '\n');
 
 	return s;
 }
@@ -313,7 +313,7 @@ struct rmsummary *rmsummary_parse_limits_exceeded(char *limits_exceeded)
 	struct rmsummary *limits = NULL;
 
 	if(limits_exceeded)
-		limits = rmsummary_parse_single(limits_exceeded, ',');
+		limits = rmsummary_parse_from_str(limits_exceeded, ',');
 
 	return limits;
 }

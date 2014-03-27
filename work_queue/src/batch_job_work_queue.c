@@ -156,7 +156,7 @@ static struct rmsummary *parse_batch_options_resources(const char *options_text)
 
 	resources = strchr(resources, ':') + 1;
 
-	return rmsummary_parse_single(resources, ',');
+	return rmsummary_parse_from_str(resources, ',');
 }
 
 static void work_queue_task_specify_resources(struct work_queue_task *t, struct rmsummary *resources)

@@ -65,15 +65,18 @@ struct rmsummary_field
 	}       value;
 };
 
-/**  Reads a single summary file from filename **/
-struct rmsummary *resource_monitor_parse_summary_file(char *filename);
+struct rmsummary *rmonitor_parse_summary_file(char *filename);
 
 void rmsummary_print(FILE *stream, struct rmsummary *s);
 void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix);
 
-struct rmsummary *rmsummary_parse_single(char *buffer, char separator);
+
+/**  Reads a single summary file from filename **/
 struct rmsummary *rmsummary_parse_file_single(char *filename);
 struct rmsummary *rmsummary_parse_limits_exceeded(char *filename);
+
+/** Reads a single summary file from buffer, with separator between fields (usually ',' or '\n'). **/
+struct rmsummary *rmsummary_parse_from_str(char *buffer, char separator);
 
 /**  Reads a single summary from stream. summaries are separated by '#' or '\n'. **/
 struct rmsummary *rmsummary_parse_next(FILE *stream);
