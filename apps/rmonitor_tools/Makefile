@@ -5,15 +5,12 @@ include ${CCTOOLS_HOME}/Makefile.rules
 
 LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
-TARGETS=hogmem msqrt
+TARGETS=cluster
 
 all: ${TARGETS}
 
-hogmem: hogmem.c 
-
-msqrt: msqrt.c
-
-test:
+cluster: cluster.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
+	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
 
 clean:
 	-rm *.o ${TARGETS}
