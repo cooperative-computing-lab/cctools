@@ -987,7 +987,7 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 
 	fcntl(q->monitor_fd, F_SETLKW, &lock);
 	
-	msg = string_format("# Work Queue pid: %d Task: %d\nsummary:", getpid(), t->taskid);
+	msg = string_format("# Work Queue pid: %d Task: %d summary:\n", getpid(), t->taskid);
 	write(q->monitor_fd, msg, strlen(msg));
 	free(msg);
 
