@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 #include <errno.h>
 #include <math.h>
@@ -12,46 +13,21 @@
 #include "itable.h"
 #include "list.h"
 #include "xxmalloc.h"
+#include "stringtools.h"
+#include "buffer.h"
 #include "path.h"
 #include "getopt_aux.h"
 
 #include "rmsummary.h"
 
-#define MAX_LINE 1024
+#include "rmon_tools.h"
+
 
 #define DEFAULT_MAX_CLUSTERS 4
 
-#define RULE_PREFIX "resource-rule-"
-#define RULE_SUFFIX ".summary"
-
-#define NUM_FIELDS 12
-
-#define field_flag(k) (((unsigned int) 1) << (k - 1))
-
-struct rmDsummary
-{
-	char    *command;
-
-	double  start;
-	double  end;
-
-	double  wall_time;
-	double  total_processes;
-	double  max_concurrent_processes;
-	double  cpu_time;
-	double  virtual_memory; 
-	double  resident_memory; 
-	double  swap_memory; 
-	double  bytes_read;
-	double  bytes_written;
-	double  workdir_num_files;
-	double  workdir_footprint;
-	double  cores;
-
-	int64_t  task_id;
-};
-
-enum fields      { WALL_TIME = 1, CPU_TIME, MAX_PROCESSES, TOTAL_PROCESSES, VIRTUAL, RESIDENT, SWAP, B_READ, B_WRITTEN, WDIR_FILES, WDIR_FOOTPRINT, TASK_ID};
+static char *report_filename = "clusters.txt";
+struct rmDsummary *max_values;
+int fields_flags;
 
 struct cluster
 {
@@ -66,71 +42,21 @@ struct cluster
 	struct cluster *right;
 
 	double          internal_conflict;        // distance between left and right
-	
+
 };
 
+void print_summary_file(FILE *stream, struct rmDsummary *s, int include_abbrev)
+{
 
-int fields_flags;
-struct rmDsummary *max_values;
-
-#define assign_field_summ(s, field, key, value)\
-	if(!strcmp(key, #field)){\
-		double val = strtod(value, NULL);\
-		(s)->field = val;\
-		continue;\
+	struct field *f;
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
+	{
+		if(f->active)
+		{
+			fprintf(stream, "%s%6.3lf ", (include_abbrev) ? f->abbrev : "", value_of_field(s, f));
+		}
 	}
 
-int get_rule_number(char *filename)
-{
-	char  name[MAX_LINE];
-	const char *base =  path_basename(filename);
-
-	sscanf(base, RULE_PREFIX "%6c" RULE_SUFFIX, name);
-	return atoi(name);
-}
-													
-struct rmDsummary *parse_summary_file(char *filename)
-{
-	debug(D_RMON, "parsing summary %s\n", filename);
-	struct rmsummary  *so = rmsummary_parse_file_single(filename);
-	struct rmDsummary *s  = malloc(sizeof(struct rmDsummary));
-
-	s->command = xxstrdup(so->command);
-	s->start = so->start;
-	s->end = so->end;
-	s->wall_time = so->wall_time;
-	s->total_processes = so->total_processes;
-	s->max_concurrent_processes = so->max_concurrent_processes;
-	s->cpu_time = so->cpu_time;
-	s->virtual_memory = so->virtual_memory; 
-	s->resident_memory = so->resident_memory; 
-	s->swap_memory = so->swap_memory; 
-	s->bytes_read = so->bytes_read;
-	s->bytes_written = so->bytes_written;
-	s->workdir_num_files = so->workdir_num_files;
-	s->workdir_footprint = so->workdir_footprint;
-	s->cores = so->cores;
-
-	s->task_id = get_rule_number(filename);
-	debug(D_RMON, "rule %" PRId64 "\n", s->task_id);
-
-	return s;
-}
-
-void print_summary_file(FILE *stream, struct rmDsummary *s, int include_field)
-{
-	if( field_flag(TASK_ID)           & fields_flags ) fprintf(stream, "%" PRId64, s->task_id);
-	if( field_flag(WALL_TIME)      & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "t: " : "", s->wall_time);
-	if( field_flag(CPU_TIME)       & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "c: " : "", s->cpu_time);
-	if( field_flag(MAX_PROCESSES)      & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "p: " : "", s->max_concurrent_processes);
-	if( field_flag(TOTAL_PROCESSES)    & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "P: " : "", s->total_processes);
-	if( field_flag(VIRTUAL)        & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "v: " : "", s->virtual_memory);
-	if( field_flag(RESIDENT)       & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "m: " : "", s->resident_memory);
-	if( field_flag(SWAP)           & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "s: " : "", s->resident_memory);
-	if( field_flag(B_READ)         & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "r: " : "", s->bytes_read);
-	if( field_flag(B_WRITTEN)      & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "w: " : "", s->bytes_written);
-	if( field_flag(WDIR_FILES)     & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "n: " : "", s->workdir_num_files);
-	if( field_flag(WDIR_FOOTPRINT) & fields_flags ) fprintf(stream, "%s%lf ", include_field ? "z: " : "", s->workdir_footprint);
 	fprintf(stream, "\n");
 }
 
@@ -140,47 +66,25 @@ void print_covariance_matrix(FILE *stream, double covariance[NUM_FIELDS][NUM_FIE
 
 	fprintf(stream, "#   ");
 
-	if( field_flag(WALL_TIME)       & fields_flags ) fprintf(stream, "%10s ", "t ");
-	if( field_flag(MAX_PROCESSES)   & fields_flags ) fprintf(stream, "%10s ", "p ");
-	if( field_flag(TOTAL_PROCESSES) & fields_flags ) fprintf(stream, "%10s ", "P ");
-	if( field_flag(CPU_TIME)        & fields_flags ) fprintf(stream, "%10s ", "c ");
-	if( field_flag(VIRTUAL)         & fields_flags ) fprintf(stream, "%10s ", "v ");
-	if( field_flag(RESIDENT)        & fields_flags ) fprintf(stream, "%10s ", "m ");
-	if( field_flag(SWAP    )        & fields_flags ) fprintf(stream, "%10s ", "s ");
-	if( field_flag(B_READ)          & fields_flags ) fprintf(stream, "%10s ", "r ");
-	if( field_flag(B_WRITTEN)       & fields_flags ) fprintf(stream, "%10s ", "w ");
-	if( field_flag(WDIR_FILES)      & fields_flags ) fprintf(stream, "%10s ", "n ");
-	if( field_flag(WDIR_FOOTPRINT)  & fields_flags ) fprintf(stream, "%10s ", "z ");
+	for(col = WALL_TIME; col < NUM_FIELDS; col++)
+		if(fields[col].active)
+			fprintf(stream, "%6s ", fields[col].abbrev);
 
 	fprintf(stream, "\n");
 
-	/* To NUM_FIELDS - 1 because we do not want RULE */
-	for(row = 1; row < NUM_FIELDS; row++)
+	for(row = WALL_TIME; row < NUM_FIELDS; row++)
 	{
-		if(!(field_flag(row) & fields_flags))
+		if(!fields[row].active)
 			continue;
-	
-		switch(row)
-		{
-			case WALL_TIME:       fprintf(stream, "%s ", "# t "); break; 
-			case MAX_PROCESSES:   fprintf(stream, "%s ", "# p "); break;
-			case TOTAL_PROCESSES: fprintf(stream, "%s ", "# P "); break;
-			case CPU_TIME:        fprintf(stream, "%s ", "# c "); break;
-			case VIRTUAL:         fprintf(stream, "%s ", "# v "); break;
-			case RESIDENT:        fprintf(stream, "%s ", "# m "); break;
-			case SWAP    :        fprintf(stream, "%s ", "# s "); break;
-			case B_READ:          fprintf(stream, "%s ", "# r "); break;
-			case B_WRITTEN:       fprintf(stream, "%s ", "# w "); break;
-			case WDIR_FILES:      fprintf(stream, "%s ", "# n "); break;
-			case WDIR_FOOTPRINT:  fprintf(stream, "%s ", "# z "); break;
-			case TASK_ID:                                         break;
-		}
 
-		for(col = 1; col < NUM_FIELDS; col++)
+		fprintf(stream, "# %s ", fields[row].abbrev);
+
+		for(col = WALL_TIME; col < NUM_FIELDS; col++)
 		{
-			if(!(field_flag(col) & fields_flags))
+			if(!fields[col].active)
 				continue;
-			fprintf(stream, "%10lf ", covariance[row][col]);
+
+			fprintf(stream, "%6.3lf ", covariance[row][col]);
 		}
 
 		fprintf(stream, "\n");
@@ -188,38 +92,6 @@ void print_covariance_matrix(FILE *stream, double covariance[NUM_FIELDS][NUM_FIE
 
 	fprintf(stream, "# \n");
 }
-
-struct list *parse_summary_recursive(char *dirname)
-{
-
-	FTS *hierarchy;
-	FTSENT *entry;
-	char *argv[] = {dirname, NULL};
-
-	struct list *summaries = list_create(0);
-
-	hierarchy = fts_open(argv, FTS_PHYSICAL, NULL);
-
-	if(!hierarchy)
-		fatal("fts_open error: %s\n", strerror(errno));
-
-	struct rmDsummary *s;
-	while( (entry = fts_read(hierarchy)) )
-		if( strstr(entry->fts_name, RULE_SUFFIX) )
-		{
-			s = parse_summary_file(entry->fts_accpath);
-			list_push_head(summaries, (void *) s);
-		}
-
-	fts_close(hierarchy);
-
-	return summaries;
-}
-
-#define assign_field_max(max, s, field)\
-	if((max)->field < (s)->field){\
-		(max)->field = (s)->field;\
-	}
 
 struct rmDsummary *find_max_summary(struct list *summaries)
 {
@@ -229,40 +101,31 @@ struct rmDsummary *find_max_summary(struct list *summaries)
 	list_first_item(summaries);
 	while( (s = list_next_item(summaries)) )
 	{
-		assign_field_max(max, s, wall_time);
-		assign_field_max(max, s, cpu_time);
-		assign_field_max(max, s, max_concurrent_processes);
-		assign_field_max(max, s, total_processes);
-		assign_field_max(max, s, virtual_memory);
-		assign_field_max(max, s, resident_memory);
-		assign_field_max(max, s, swap_memory);
-		assign_field_max(max, s, bytes_read);
-		assign_field_max(max, s, bytes_written);
-		assign_field_max(max, s, workdir_num_files);
-		assign_field_max(max, s, workdir_footprint);
+		struct field *f;
+		for(f = &fields[WALL_TIME]; f->name != NULL; f++)
+		{
+			if(f->active)
+			{
+				if(value_of_field(max, f) < value_of_field(s, f))
+					assign_to_field(max, f, value_of_field(s, f));
+			}
+		}
 	}
 
 	return max;
 }
 
-#define normalize_field(max, s, field)\
-	if((max)->field > 0){\
-		(s)->field /= (max)->field;\
-	}
-
 void normalize_summary(struct rmDsummary *s)
 {
-		normalize_field(max_values, s, wall_time);
-		normalize_field(max_values, s, cpu_time);
-		normalize_field(max_values, s, max_concurrent_processes);
-		normalize_field(max_values, s, total_processes);
-		normalize_field(max_values, s, virtual_memory);
-		normalize_field(max_values, s, resident_memory);
-		normalize_field(max_values, s, swap_memory);
-		normalize_field(max_values, s, bytes_read);
-		normalize_field(max_values, s, bytes_written);
-		normalize_field(max_values, s, workdir_num_files);
-		normalize_field(max_values, s, workdir_footprint);
+	struct field *f;
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
+	{
+		if(f->active)
+		{
+			if(value_of_field(max_values, f) > 0)
+				assign_to_field(s, f, value_of_field(s, f) / value_of_field(max_values, f));
+		}
+	}
 }
 
 void normalize_summaries(struct list *summaries)
@@ -273,24 +136,17 @@ void normalize_summaries(struct list *summaries)
 		normalize_summary(s);
 }
 
-#define denormalize_field(max, s, field)\
-	if((max)->field > 0){\
-		(s)->field *= (max)->field;\
-	}
-
 void denormalize_summary(struct rmDsummary *s)
 {
-		denormalize_field(max_values, s, wall_time);
-		denormalize_field(max_values, s, cpu_time);
-		denormalize_field(max_values, s, max_concurrent_processes);
-		denormalize_field(max_values, s, total_processes);
-		denormalize_field(max_values, s, virtual_memory);
-		denormalize_field(max_values, s, resident_memory);
-		denormalize_field(max_values, s, swap_memory);
-		denormalize_field(max_values, s, bytes_read);
-		denormalize_field(max_values, s, bytes_written);
-		denormalize_field(max_values, s, workdir_num_files);
-		denormalize_field(max_values, s, workdir_footprint);
+	struct field *f;
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
+	{
+		if(f->active)
+		{
+			if(value_of_field(max_values, f) > 0)
+				assign_to_field(s, f, value_of_field(s, f) * value_of_field(max_values, f));
+		}
+	}
 }
 
 void denormalize_summaries(struct list *summaries)
@@ -301,86 +157,18 @@ void denormalize_summaries(struct list *summaries)
 		denormalize_summary(s);
 }
 
-#define assign_field_bin(s, a, b, op, field)\
-	(s)->field = op((a)->field, (b)->field)
-
-struct rmDsummary *summary_bin_op(struct rmDsummary *s, struct rmDsummary *a, struct rmDsummary *b, double (*op)(double, double))
-{
-	assign_field_bin(s, a, b, op, wall_time);
-	assign_field_bin(s, a, b, op, cpu_time);
-	assign_field_bin(s, a, b, op, max_concurrent_processes);
-	assign_field_bin(s, a, b, op, total_processes);
-	assign_field_bin(s, a, b, op, virtual_memory);
-	assign_field_bin(s, a, b, op, resident_memory);
-	assign_field_bin(s, a, b, op, swap_memory);
-	assign_field_bin(s, a, b, op, bytes_read);
-	assign_field_bin(s, a, b, op, bytes_written);
-	assign_field_bin(s, a, b, op, workdir_num_files);
-	assign_field_bin(s, a, b, op, workdir_footprint);
-
-	return s;
-}
-
-#define assign_field_unit(s, a, u, op, field)\
-	(s)->field = op((a)->field, u);
-
-struct rmDsummary *summary_unit_op(struct rmDsummary *s, struct rmDsummary *a, double u, double (*op)(double, double))
-{
-
-	assign_field_unit(s, a, u, op, wall_time);
-	assign_field_unit(s, a, u, op, cpu_time);
-	assign_field_unit(s, a, u, op, max_concurrent_processes);
-	assign_field_unit(s, a, u, op, virtual_memory);
-	assign_field_unit(s, a, u, op, resident_memory);
-	assign_field_unit(s, a, u, op, swap_memory);
-	assign_field_unit(s, a, u, op, bytes_read);
-	assign_field_unit(s, a, u, op, bytes_written);
-	assign_field_unit(s, a, u, op, workdir_num_files);
-	assign_field_unit(s, a, u, op, workdir_footprint);
-
-	return s;
-}
-
-double plus(double a, double b)
-{
-	return a + b;
-}
-
-double minus(double a, double b)
-{
-	return a - b;
-}
-
-double mult(double a, double b)
-{
-	return a * b;
-}
-
-double minus_squared(double a, double b)
-{
-	return pow(a - b, 2);
-}
-
-double divide(double a, double b)
-{
-	return a/b;
-}
-
 double summary_accumulate(struct rmDsummary *s)
 {
 	double acc = 0;
 
-	if( field_flag(WALL_TIME)       & fields_flags ) acc += s->wall_time;
-	if( field_flag(CPU_TIME)        & fields_flags ) acc += s->cpu_time;
-	if( field_flag(MAX_PROCESSES)   & fields_flags ) acc += s->max_concurrent_processes;
-	if( field_flag(TOTAL_PROCESSES) & fields_flags ) acc += s->total_processes;
-	if( field_flag(VIRTUAL)         & fields_flags ) acc += s->virtual_memory;
-	if( field_flag(RESIDENT)        & fields_flags ) acc += s->resident_memory;
-	if( field_flag(SWAP)            & fields_flags ) acc += s->swap_memory;
-	if( field_flag(B_READ)          & fields_flags ) acc += s->bytes_read;
-	if( field_flag(B_WRITTEN)       & fields_flags ) acc += s->bytes_written;
-	if( field_flag(WDIR_FILES)      & fields_flags ) acc += s->workdir_num_files;
-	if( field_flag(WDIR_FOOTPRINT)  & fields_flags ) acc += s->workdir_footprint;
+	struct field *f;
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
+	{
+		if(f->active)
+		{
+			acc += value_of_field(s, f);
+		}
+	}
 
 	return acc;
 }
@@ -401,7 +189,7 @@ double summary_euclidean(struct rmDsummary *a, struct rmDsummary *b)
 double cluster_ward_distance(struct cluster *a, struct cluster *b)
 {
 	struct rmDsummary *s = calloc(1, sizeof(struct rmDsummary));
-	
+
 	summary_bin_op(s, a->centroid, b->centroid, minus_squared);
 
 	double accum = summary_accumulate(s);
@@ -475,53 +263,6 @@ double covariance_scalar_merge(double uxA, double uyA, double sA, int nA, double
 	return sX;
 }
 
-/* This code is ugly. Need better translation between fields and
- * row/column numbers. */
-double n_to_field(struct rmDsummary *s, enum fields n)
-{
-	switch(n)
-	{
-		case WALL_TIME:
-			return s->wall_time;
-			break;
-		case CPU_TIME:
-			return s->cpu_time;
-			break;
-		case MAX_PROCESSES:
-			return s->max_concurrent_processes;
-			break;
-		case TOTAL_PROCESSES:
-			return s->total_processes;
-			break;
-		case VIRTUAL:
-			return s->virtual_memory;
-			break;
-		case RESIDENT:
-			return s->resident_memory;
-			break;
-		case SWAP:
-			return s->swap_memory;
-			break;
-		case B_READ:
-			return s->bytes_read;
-			break;
-		case B_WRITTEN:
-			return s->bytes_written;
-			break;
-		case WDIR_FILES:
-			return s->workdir_num_files;
-			break;
-		case WDIR_FOOTPRINT:
-			return s->workdir_footprint;
-			break;
-		case TASK_ID:
-			return s->task_id;
-			break;
-	}
-
-	return 0;
-}
-
 void covariance_matrix_merge(struct cluster *c, struct cluster *left, struct cluster *right)
 {
 	enum fields row, col;
@@ -541,19 +282,19 @@ void covariance_matrix_merge(struct cluster *c, struct cluster *left, struct clu
 	/* To NUM_FIELDS - 1 because we do not want RULE */
 	for(row = 1; row < NUM_FIELDS; row++)
 	{
-		if(!(field_flag(row) & fields_flags))
+		if(!(fields[row].active))
 			continue;
 
-		uxA = n_to_field(uA, row);
-		uxB = n_to_field(uB, row);
+		uxA = value_of_field(uA, &fields[row]);
+		uxB = value_of_field(uB, &fields[row]);
 
 		for(col = row; col < NUM_FIELDS; col++)
 		{
-			if(!(field_flag(col) & fields_flags))
+			if(!(fields[col].active))
 				continue;
 
-			uyA = n_to_field(uA, col);
-			uyB = n_to_field(uB, col);
+			uyA = value_of_field(uA, &fields[col]);
+			uyB = value_of_field(uB, &fields[col]);
 
 			sA  = left->covariance[row][col];
 			sB  = right->covariance[row][col];
@@ -579,7 +320,7 @@ struct cluster *cluster_merge(struct cluster *left, struct cluster *right)
 
 	covariance_matrix_merge(c, left, right);
 
-    cluster_find_centroid(c);
+	cluster_find_centroid(c);
 
 	return c;
 }
@@ -610,7 +351,6 @@ struct list *cluster_collect_summaries(struct cluster *c)
 
 	cluster_collect_summaries_recursive(c, summaries);
 
-			//BUG: rules incorrectly sorted
 	summaries = list_sort(summaries, summary_cmp_rule);
 
 	return summaries;
@@ -741,7 +481,7 @@ struct list *collect_final_clusters(struct cluster *final, int max_clusters)
 
 		cmax = NULL;
 		dmax = 0;
-				
+
 		list_first_item(clusters);
 		while( (c = list_next_item(clusters)) )
 		{
@@ -773,7 +513,7 @@ struct list *collect_final_clusters(struct cluster *final, int max_clusters)
 					list_push_tail(clusters_next, c);
 			}
 			else
-					list_push_tail(clusters_next, c);
+				list_push_tail(clusters_next, c);
 		}
 
 		list_delete(clusters);
@@ -809,51 +549,69 @@ void report_clusters_centroids(FILE *freport, struct list *clusters)
 
 #define add_plot_column(stream, column, flag, title)\
 	if( flag & fields_flags )\
-	{\
-		if(column == 2)\
-			fprintf(stream, " index clusters_index using %d:xticlabels(1) title '%s'", column, title);\
-		else\
-			fprintf(stream, ", '' index clusters_index using %d title '%s'", column, title);\
-		column++;\
-	}
+{\
+	if(column == 2)\
+	fprintf(stream, " index clusters_index using %d:xticlabels(1) title '%s'", column, title);\
+	else\
+	fprintf(stream, ", '' index clusters_index using %d title '%s'", column, title);\
+	column++;\
+}
 
 
-/* It would be nice to have a function flag to title */
-void report_clusters_histograms(char *plot_cmd_file, char *clusters_file, int max_clusters)
+void report_clusters_histograms(char *clusters_file, int max_clusters)
 {
 	FILE *fplot;
 	int   column;
 
+	char *plot_cmd_file = string_format("%s.gnuplot", clusters_file);
 	fplot = fopen(plot_cmd_file, "w");
+	free(plot_cmd_file);
+
 	if(!fplot)
 		fatal("cannot open file for plot command.\n");
 
-		column = 2;
+	column = 2;
 
-		fprintf(fplot, "foutput = sprintf(\"clusters_%%03d.jpg\", 1 + clusters_index)\n");
-		fprintf(fplot, "set terminal push\n");
-		fprintf(fplot, "set terminal jpeg size 1024,768\n");
-		fprintf(fplot, "set output foutput\n");
-		fprintf(fplot, "set multiplot\n");
-		fprintf(fplot, "plot '%s' ", clusters_file);
-		add_plot_column(fplot, column, field_flag(WALL_TIME),       "wall time");      
-		add_plot_column(fplot, column, field_flag(CPU_TIME),        "cpu time");      
-		add_plot_column(fplot, column, field_flag(MAX_PROCESSES),   "concurrent processes");
-		add_plot_column(fplot, column, field_flag(TOTAL_PROCESSES), "total processes");
-		add_plot_column(fplot, column, field_flag(VIRTUAL),         "virtual memory");       
-		add_plot_column(fplot, column, field_flag(RESIDENT),        "resident memory");
-		add_plot_column(fplot, column, field_flag(SWAP),            "swap memory");
-		add_plot_column(fplot, column, field_flag(B_READ),          "bytes read");        
-		add_plot_column(fplot, column, field_flag(B_WRITTEN),       "bytes written");     
-		add_plot_column(fplot, column, field_flag(WDIR_FILES),      "num files");    
-		add_plot_column(fplot, column, field_flag(WDIR_FOOTPRINT),  "disk footprint");
+	fprintf(fplot, "div=1.1; bw = 0.9; h=1.0; BW=0.9; wd=10; LIMIT=255-wd; white = 0;\n");
+	fprintf(fplot, "red = \"#080000\"; green = \"#000800\"; blue = \"#000008\";\n");
+	fprintf(fplot, "set auto x;\n");
+	fprintf(fplot, "set auto y;\n");
+	fprintf(fplot, "set style data histogram;\n");
+	fprintf(fplot, "set style histogram rowstacked;\n");
+	fprintf(fplot, "set style fill solid;\n");
+	fprintf(fplot, "set boxwidth bw;\n");
+	fprintf(fplot, "set key invert box opaque;\n"); 
+	fprintf(fplot, "set xtics nomirror; set ytics nomirror; set border front;\n");
+	fprintf(fplot, "unset border; set noytics; set xlabel \"number of tasks\"; set ylabel \" resource proportion to max used\";\n");
+	fprintf(fplot, "do for [clusters_index=0:%d] {\n", max_clusters - 1);
 
-		fprintf(fplot, "\n");
-		fprintf(fplot, "unset multiplot\n");
-		fprintf(fplot, "clusters_index = clusters_index + 1\n");
-		fprintf(fplot, "if (clusters_index < %d) reread\n", max_clusters);
+	fprintf(fplot, "foutput = sprintf(\"%s.%%03d.png\", 1 + clusters_index)\n", report_filename);
+	fprintf(fplot, "set terminal push\n");
+	fprintf(fplot, "set terminal png size 1024,768\n");
+	fprintf(fplot, "set output foutput\n");
+	fprintf(fplot, "set multiplot\n");
+	fprintf(fplot, "plot '%s' ", clusters_file);
 
-		fprintf(fplot, "\n");
+	struct field *f;
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
+	{
+		if(f->active)
+		{
+			if(column == 2)
+				fprintf(fplot, " index clusters_index using %d:xticlabels(1) title '%s'", 
+						column,
+						f->name);
+			else
+				fprintf(fplot, ", '' index clusters_index using %d title '%s'", 
+						column,
+						f->name);
+			column++;
+		}
+	}
+
+	fprintf(fplot, ";\n");
+	fprintf(fplot, "unset multiplot;\n");
+	fprintf(fplot, "}\n");
 }
 
 void report_clusters_rules(FILE *freport, struct list *clusters)
@@ -864,7 +622,7 @@ void report_clusters_rules(FILE *freport, struct list *clusters)
 	fprintf(freport, "# %d clusters ------\n", list_size(clusters));
 
 	list_first_item(clusters);
-	
+
 	while( (c = list_next_item(clusters)) )
 	{
 		/* Centroids are denormalized just for show, so that the
@@ -904,121 +662,76 @@ struct list *create_initial_clusters(struct list *summaries)
 	return initial_clusters;
 }
 
-int parse_fields_options(char *field_str)
+static void show_usage(const char *cmd)
 {
-	char *c =  field_str;
-	int flags = 0;
-
-	while( *c != '\0' )
-	{
-		switch(*c)
-		{
-			case 't':
-				flags |= field_flag(WALL_TIME);
-				debug(D_DEBUG, "adding clustering field: wall time: %d\n", field_flag(WALL_TIME));
-				break;
-			case 'p':
-				flags |= field_flag(MAX_PROCESSES);
-				debug(D_DEBUG, "adding clustering field: concurrent processes: %d\n", field_flag(MAX_PROCESSES));
-				break;
-			case 'P':
-				flags |= field_flag(TOTAL_PROCESSES);
-				debug(D_DEBUG, "adding clustering field: total processes: %d\n", field_flag(TOTAL_PROCESSES));
-				break;
-			case 'c':
-				flags |= field_flag(CPU_TIME);
-				debug(D_DEBUG, "adding clustering field: cpu time: %d\n", field_flag(CPU_TIME));
-				break;
-			case 'v':
-				flags |= field_flag(VIRTUAL);
-				debug(D_DEBUG, "adding clustering field: virtual memory: %d\n", field_flag(VIRTUAL));
-				break;
-			case 'm':
-				flags |= field_flag(RESIDENT);
-				debug(D_DEBUG, "adding clustering field: resident memory: %d\n", field_flag(RESIDENT));
-				break;
-			case 's':
-				flags |= field_flag(SWAP);
-				debug(D_DEBUG, "adding clustering field: swap memory: %d\n", field_flag(SWAP));
-				break;
-			case 'r':
-				flags |= field_flag(B_READ);
-				debug(D_DEBUG, "adding clustering field: bytes read: %d\n", field_flag(B_READ));
-				break;
-			case 'w':
-				flags |= field_flag(B_WRITTEN);
-				debug(D_DEBUG, "adding clustering field: bytes written: %d\n", field_flag(B_WRITTEN));
-				break;
-			case 'n':
-				flags |= field_flag(WDIR_FILES);
-				debug(D_DEBUG, "adding clustering field: number of files: %d\n", field_flag(WDIR_FILES));
-				break;
-			case 'z':
-				flags |= field_flag(WDIR_FOOTPRINT);
-				debug(D_DEBUG, "adding clustering field: footprint %d\n", field_flag(WDIR_FOOTPRINT));
-				break;
-			default:
-				fprintf(stderr, "%c is not an option\n", *c);
-				break;
-		}
-		c++;
-	}
-
-	return flags;
+	fprintf(stdout, "\nUse: %s [options]\n\n", cmd);
+	fprintf(stdout, "\nIf no -D or -L are specified, read the summary file list from standard input.\n\n");
+	fprintf(stdout, "%-20s Enable debugging for this subsystem.\n", "-d <subsystem>");
+	fprintf(stdout, "%-20s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o <file>");
+	fprintf(stdout, "%-20s Read summaries recursively from <dir> (filename of form '%s[0-9]+%s').\n", "-D <dir>", RULE_PREFIX, RULE_SUFFIX);
+	fprintf(stdout, "%-20s Read summaries filenames from file <list>.\n", "-L <list>");
+	fprintf(stdout, "%-20s Find at most <number> clusters.         (Default %d)\n", "-n <number>", DEFAULT_MAX_CLUSTERS);
+	fprintf(stdout, "%-20s Write cluster information to this file. (Default %s)\n", "-O <file>", report_filename);
+	fprintf(stdout, "%-20s Select these fields for clustering.     (Default is: tcvmsrwhz).\n\n", "-f <fields>");
+	fprintf(stdout, "<fields> is a string in which each character should be one of the following:\n");
+	fprintf(stdout, "%s", make_field_names_str("\n"));
+	fprintf(stdout, "%-20s Show this message.\n", "-h,--help");
 }
 
 int main(int argc, char **argv)
 {
-	char           *report_filename = NULL;
 	char           *input_directory = NULL;
+	char           *input_list      = NULL;
 	FILE           *freport;
 	int             max_clusters = DEFAULT_MAX_CLUSTERS; 
-	struct list    *summaries, *initial_clusters, *final_clusters;
+	struct list    *initial_clusters, *final_clusters;
 	struct cluster *final;
-
-	fields_flags = ~(field_flag(TASK_ID));
-
-	if(argc < 2)
-	{
-				/* BUG: show usage here */
-		fatal("Need an input directory.\n");
-	}
 
 	debug_config(argv[0]);
 
 	signed char c;
-	while( (c = getopt(argc, argv, "d:f:m:o:")) > -1 )
+	while( (c = getopt(argc, argv, "D:d:f:hL:n:O:o:")) > -1 )
 	{
 		switch(c)
 		{
+			case 'D':
+				input_directory = xxstrdup(optarg);
+				break;
+			case 'L':
+				input_list      = xxstrdup(optarg);
+				break;
 			case 'd':
 				debug_flags_set(optarg);
 				break;
-			case 'f':
-				fields_flags = parse_fields_options(optarg);
+			case 'o':
+				debug_config_file(optarg);
 				break;
-			case 'm':
+			case 'f':
+				parse_fields_options(optarg);
+				break;
+			case 'n':
 				max_clusters = atoi(optarg);
 				if(max_clusters < 1)
 					fatal("The number of clusters cannot be less than one.\n");
 				break;
-			case 'o':
+			case 'O':
 				report_filename = xxstrdup(optarg);
 				break;
+			case 'h':
+				show_usage(argv[0]);
+				exit(0);
+				break;
 			default:
-				/* BUG: show usage here */
-				fatal("%c is not a valid option.\n", c);
+				show_usage(argv[0]);
+				exit(1);
 				break;
 		}
 	}
 
-	if(optind >= argc)
+	if(!input_directory && !input_list)
 	{
-		/* BUG: show usage here */
-		fatal("Need an input directory.\n");
+		input_list = "-";
 	}
-	else
-		input_directory = argv[optind];
 
 	if(!report_filename)
 		report_filename = xxstrdup("clusters.txt");
@@ -1028,13 +741,23 @@ int main(int argc, char **argv)
 		fatal("%s: %s\n", report_filename, strerror(errno));
 
 
-	summaries = parse_summary_recursive(input_directory);
+	struct rmDsummary_set *set = make_new_set("all", NULL);
 
-	max_values = find_max_summary(summaries);
+	if(input_directory)
+	{
+		parse_summary_recursive(set, input_directory);
+	}
 
-	normalize_summaries(summaries);
+	if(input_list)
+	{
+		parse_summary_from_filelist(set, input_list);
+	}
 
-	initial_clusters = create_initial_clusters(summaries);
+	max_values = find_max_summary(set->summaries);
+
+	normalize_summaries(set->summaries);
+
+	initial_clusters = create_initial_clusters(set->summaries);
 
 	final = nearest_neighbor_clustering(initial_clusters, cluster_ward_distance);
 
@@ -1046,9 +769,9 @@ int main(int argc, char **argv)
 		list_delete(final_clusters);
 	}
 
-	report_clusters_histograms("gnuplot-plot-cmd", report_filename, max_clusters);
+	report_clusters_histograms(report_filename, max_clusters);
 
-	denormalize_summaries(summaries);
+	denormalize_summaries(set->summaries);
 
 	fclose(freport);
 

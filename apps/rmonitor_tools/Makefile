@@ -9,7 +9,7 @@ TARGETS=cluster
 
 all: ${TARGETS}
 
-cluster: cluster.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
+cluster: rmon_tools.o cluster.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
 	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
 
 clean:
