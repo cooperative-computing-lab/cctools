@@ -2647,13 +2647,13 @@ static struct work_queue_task *find_running_task_by_tag(struct work_queue *q, co
 
 static struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file) {
   const int file_t_size = sizeof(struct work_queue_file);
-  struct work_queue_file *new = calloc(1, file_t_size);
+  struct work_queue_file *new = xxmalloc(1, file_t_size);
   
   memcpy(new, file, file_t_size);
   //allocate new memory for strings so we don't segfault when the original
   //memory is freed. 
-  new->payload = strdup(file->payload);
-  new->remote_name = strdup(file->remote_name);
+  new->payload = xxstrdup(file->payload);
+  new->remote_name = xxstrdup(file->remote_name);
   
   return new;
 }
@@ -2705,31 +2705,31 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 
 struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task)
 {
-  struct work_queue_task *new = malloc(sizeof(*new));
+  struct work_queue_task *new = xxmalloc(sizeof(*new));
   memcpy(new, task, sizeof(*new));
 
   //allocate new memory so we don't segfault when original memory is freed. 
   if(task->tag) { 
-	new->tag = strdup(task->tag); 
+	new->tag = xxstrdup(task->tag); 
   }
   
   if(task->command_line) { 
-	new->command_line = strdup(task->command_line); 
+	new->command_line = xxstrdup(task->command_line); 
   }
 
   new->input_files = work_queue_task_file_list_clone(task->input_files);
   new->output_files = work_queue_task_file_list_clone(task->output_files);
 
   if(task->output) { 
-	new->output = strdup(task->output); 
+	new->output = xxstrdup(task->output); 
   }
   
   if(task->host) { 
-	new->host = strdup(task->host); 
+	new->host = xxstrdup(task->host); 
   }
   
   if(task->hostname) { 
-	new->hostname = strdup(task->hostname); 
+	new->hostname = xxstrdup(task->hostname); 
   }
 
   return new;
