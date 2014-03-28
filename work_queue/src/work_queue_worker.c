@@ -270,6 +270,63 @@ void resources_count_inuse(struct work_queue_resources *r)
 	}
 }
 
+void resources_count_committed(struct work_queue_resources *r)
+{
+	uint64_t taskid;
+	struct task_info *ti;
+	struct work_queue_task *task;
+
+	r->unlabeled.committed = 0;
+	r->workers.committed   = 0;
+	r->cores.committed     = 0;
+	r->memory.committed    = 0;
+	r->disk.committed      = 0;
+	r->gpus.committed      = 0;
+
+	itable_firstkey(stored_tasks);
+	while(itable_nextkey(stored_tasks, (uint64_t*)&taskid, (void**)&ti)) {
+		if(ti->task->unlabeled)
+		{
+			r->unlabeled.committed += 1;
+			r->workers.committed   += 1;
+			r->cores.committed     += local_resources->cores.total;
+			r->memory.committed    += local_resources->memory.total;
+			r->gpus.committed      += local_resources->gpus.total;
+			r->disk.committed      += local_resources->disk.total;
+		}
+		else
+		{
+			r->workers.committed  = MAX(r->workers.committed, 1);
+			r->cores.committed   += MAX(ti->task->cores, 0);
+			r->memory.committed  += MAX(ti->task->memory,0);
+			r->gpus.committed    += MAX(ti->task->gpus,  0);
+			r->disk.committed    += MAX(ti->task->disk,  0);
+		}
+	}
+
+	list_first_item(waiting_tasks);
+	while((task = list_next_item(waiting_tasks)))
+	{
+		if(task->unlabeled)
+		{
+			r->unlabeled.committed += 1;
+			r->workers.committed   += 1;
+			r->cores.committed     += local_resources->cores.total;
+			r->memory.committed    += local_resources->memory.total;
+			r->gpus.committed      += local_resources->gpus.total;
+			r->disk.committed      += local_resources->disk.total;
+		}
+		else
+		{
+			r->workers.committed  = MAX(r->workers.committed, 1);
+			r->cores.committed   += MAX(task->cores, 0);
+			r->memory.committed  += MAX(task->memory,0);
+			r->gpus.committed    += MAX(task->gpus,  0);
+			r->disk.committed    += MAX(task->disk,  0);
+		}
+	}
+}
+
 void resources_measure_locally(struct work_queue_resources *r)
 {
 	work_queue_resources_measure_locally(r,workspace);
@@ -300,6 +357,7 @@ void resources_measure_all(struct work_queue_resources *local, struct work_queue
 {
 	resources_measure_locally(local);
 	resources_count_inuse(local);
+	resources_count_committed(local);
 
 	if(worker_mode == WORKER_MODE_FOREMAN)
 	{
