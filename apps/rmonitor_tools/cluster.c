@@ -741,7 +741,7 @@ int main(int argc, char **argv)
 		fatal("%s: %s\n", report_filename, strerror(errno));
 
 
-	struct rmDsummary_set *set = make_new_set("all", NULL);
+	struct rmDsummary_set *set = make_new_set("all");
 
 	if(input_directory)
 	{

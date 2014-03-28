@@ -49,6 +49,7 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 {
 	rmsummary_assign_as_string_field(s, key, value, category);
 	rmsummary_assign_as_string_field(s, key, value, command);
+	rmsummary_assign_as_int_field   (s, key, value, task_id);
 	rmsummary_assign_as_time_field  (s, key, value, start);
 	rmsummary_assign_as_time_field  (s, key, value, end);
 	rmsummary_assign_as_string_field(s, key, value, exit_type);

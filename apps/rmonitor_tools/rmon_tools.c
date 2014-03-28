@@ -210,20 +210,28 @@ struct rmDsummary *parse_summary_file(char *filename)
 	if(!stream)
 		fatal("Cannot open resources summary file: %s : %s\n", filename, strerror(errno));
 
-	struct rmDsummary *s = parse_summary(stream);
-
-	if(s->task_id < 0)
-	{
-		s->task_id = get_rule_number(filename);
-	}
+	struct rmDsummary *s = parse_summary(stream, filename);
 
 	fclose(stream);
 
 	return s;
 }
 
-struct rmDsummary *parse_summary(FILE *stream)
+struct rmDsummary *parse_summary(FILE *stream, char *filename)
 {
+	static FILE *last_stream = NULL;
+	static int   summ_id     = 1;
+
+	if(last_stream != stream)
+	{
+		last_stream = stream;
+		summ_id     = 1;
+	}
+	else
+	{
+		summ_id++;
+	}
+
 	struct rmsummary  *so = rmsummary_parse_next(stream);
 
 	if(!so)
@@ -233,10 +241,21 @@ struct rmDsummary *parse_summary(FILE *stream)
 
 	s->command    = so->command;
 
+	s->file       = xxstrdup(filename);
+
 	if(so->category)
+	{
 		s->category   = so->category;
-	else
+	}
+	else if(so->command)
+	{
 		s->category   = parse_executable_name(so->command);
+	}
+	else
+	{
+		s->category   = xxstrdup(DEFAULT_CATEGORY);
+		s->command    = xxstrdup(DEFAULT_CATEGORY);
+	}
 
 	s->start     = usecs_to_secs(so->start);
 	s->end       = usecs_to_secs(so->end);
@@ -258,6 +277,19 @@ struct rmDsummary *parse_summary(FILE *stream)
 	s->workdir_footprint = so->workdir_footprint;
 
 	s->task_id = so->task_id;
+	if(s->task_id < 0)
+	{
+		s->task_id = get_rule_number(filename);
+	}
+
+	struct field *f;	
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
+	{
+		if(value_of_field(s, f) < 0)
+		{
+			assign_to_field(s, f, 0);
+		}
+	}
 
 	free(so); //we do not free so->command on purpouse.
 
@@ -324,7 +356,7 @@ void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname)
 			if(!stream)
 				fatal("Cannot open resources summary file: %s : %s\n", entry->fts_accpath, strerror(errno));
 
-			while((s = parse_summary(stream)))
+			while((s = parse_summary(stream, entry->fts_accpath)))
 				list_push_tail(dest->summaries, s);
 
 			fclose(stream);
@@ -350,23 +382,13 @@ char *parse_executable_name(char *command)
 	return executable;
 }
 
-struct rmDsummary_set *make_new_set(char *category, char *output_directory)
+struct rmDsummary_set *make_new_set(char *category)
 {
 	struct rmDsummary_set *ss = malloc(sizeof(struct rmDsummary_set));
 
 	ss->category  = category;
 
 	ss->histograms = itable_create(0);
-
-	if(output_directory)
-	{
-		char *path = sanitize_path_name(category);
-		ss->output_dir_path = string_format("%s/%s", output_directory, path);
-		free(path);
-
-		if(mkdir(ss->output_dir_path, 0755) < 0 && errno != EEXIST)
-			fatal("Could not create directory: %s\n", ss->output_dir_path);
-	}
 
 	ss->summaries = list_create();
 

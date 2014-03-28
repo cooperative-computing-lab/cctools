@@ -30,8 +30,8 @@
 
 #include "rmsummary.h"
 
-#define double_from_offset(s, offset) (*((double *) ((char *) s + offset)))
-#define double_to_offset(s, offset, value) (*((double *) ((char *) s + offset)) = (double) value)
+#define ALL_SUMMARIES_CATEGORY "(all)"
+#define DEFAULT_CATEGORY "(without category)"
 
 #define RULE_PREFIX "resource-rule-"
 #define RULE_SUFFIX ".summary"
@@ -44,6 +44,8 @@ struct rmDsummary
 {
 	char    *command;
 	char    *category;
+
+	char    *file;
 
 	int64_t  task_id;
 
@@ -70,12 +72,6 @@ struct rmDsummary_set
 {
 	char  *category;
 	struct list *summaries;
-
-	char  *output_dir_path;
-
-	char  *stats_path;
-	char  *limits_std_path;
-	char  *limits_max_path;
 
 	//per resource, address by field
 	struct itable *histograms;
@@ -120,13 +116,13 @@ double divide(double a, double b);
 
 void parse_fields_options(char *field_str);
 
-struct rmDsummary *parse_summary(FILE *stream);
+struct rmDsummary *parse_summary(FILE *stream, char *filename);
 struct rmDsummary *parse_summary_file(char *filename);
 char *parse_executable_name(char *command);
 
 void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename);
 void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname);
 
-struct rmDsummary_set *make_new_set(char *category, char *output_directory);
+struct rmDsummary_set *make_new_set(char *category);
 
 #endif
