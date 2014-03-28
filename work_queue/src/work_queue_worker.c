@@ -229,7 +229,7 @@ void resources_count_inuse(struct work_queue_resources *r)
 	while(itable_nextkey(stored_tasks, (uint64_t*)&taskid, (void**)&ti)) {
 		if(ti->task->unlabeled)
 		{
-			r->disk.inuse   += local_resources->disk.total;
+			r->disk.inuse    = local_resources->disk.total;
 		}
 		else
 		{
@@ -242,7 +242,7 @@ void resources_count_inuse(struct work_queue_resources *r)
 	{
 		if(task->unlabeled)
 		{
-			r->disk.inuse   += local_resources->disk.total;
+			r->disk.inuse    = local_resources->disk.total;
 		}
 		else
 		{
@@ -257,9 +257,9 @@ void resources_count_inuse(struct work_queue_resources *r)
 		{
 			r->unlabeled.inuse += 1;
 			r->workers.inuse   += 1;
-			r->cores.inuse  += local_resources->cores.total;
-			r->memory.inuse += local_resources->memory.total;
-			r->gpus.inuse   += local_resources->gpus.total;
+			r->cores.inuse  = local_resources->cores.total;
+			r->memory.inuse = local_resources->memory.total;
+			r->gpus.inuse   = local_resources->gpus.total;
 		}
 		else
 		{
