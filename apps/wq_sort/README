@@ -5,7 +5,7 @@ the Work Queue framework for distributed execution on available resources.
 To run: 
 
 1. Run 'make'.
-1. Run './wq_sort /bin/sort sample.txt' that uses the GNU sort utility as the
+2. Run './wq_sort /bin/sort sample.txt' that uses the GNU sort utility as the
 computation kernel and sorts the integers in the file sample.txt.
 3. Start workers: 
 work_queue_workers -d all <HOSTNAME> <PORT> 
