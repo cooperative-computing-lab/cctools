@@ -1,0 +1,54 @@
+This directory contains applications that are built using software in CCTools.
+
+The applications are grouped according to the software used in building and
+running them:
+1. Makeflow: makeflow_blast, makeflow_bwa
+2. Parrot: parrot_atlas, parrot_cms 
+3. Work Queue: wq_maker, wq_replica_exchange, wq_sort 
+
+
+makeflow_blast
+--------------------
+
+The README file in makeflow_blast/ contains instructions on how to run this
+application.
+
+makeflow_bwa
+--------------------
+
+The README file in makeflow_bwa/ contains instructions on how to run this
+application.
+
+parrot_atlas
+--------------------
+
+The README file in parrot_atlas/ contains instructions on how to run this
+application.
+
+parrot_cms
+--------------------
+
+The README file in parrot_cms/ contains instructions on how to run this
+application.
+
+
+wq_maker
+--------------------
+
+The README file in wq_maker/ contains instructions on how to run this
+application.
+
+
+wq_replica_exchange
+--------------------
+
+The README file in wq_replica_exchange/ contains instructions on how to run this
+application.
+
+
+wq_sort
+--------------------
+
+The README file in wq_sort/ contains instructions on how to run this
+application.
+
