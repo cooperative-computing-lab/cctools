@@ -1,0 +1,42 @@
+The makeflow_blast program aligns a sequences of genomes listed in a fasta file
+to the given database. It aligns by partitioning the file into pieces containing
+one or more sequences and distributing them for individual alignment. The
+program uses the Makeflow framework for distributed execution on available
+resources. 
+
+To build Makeflow: 
+
+1. Install BLAST and all its required dependencies. BLAST can be downloaded from:
+ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/
+2. Install CCTools. 
+3. Copy makeflow_blast from cctools/apps to the location the makeflow will be executed.
+4. Run './makeflow_blast -p blastx -d database_name -i input.fa -o output.txt --makeflow Makeflow' 
+This produces a file called Makeflow.
+
+To run:
+
+1. Run 'makeflow'
+Note if the --makeflow option is specified with a MAKEFLOWFILE, run
+makeflow <MAKEFLOWFILE> 
+
+This step runs the makeflow locally on the machine on which it is executed.
+
+2. If you want to run with a distributed execution engine (Work Queue, Condor,
+or SGE), specify the '-T' option. For example, to run with Work Queue, 
+makeflow -T wq
+
+3. Start Workers
+work_queue_workers -d all <HOSTNAME> <PORT> 
+where <HOSTNAME> is the name of the host on which the master is running
+      <PORT> is the port number on which the master is listening.
+
+Alternatively, you can also specify a project name for the master and use that
+to start workers:
+1. makeflow -T wq -N BLAST
+2. work_queue_worker -d all -N BLAST
+
+For listing the command-line options, do:
+./makeflow_blast -h 
+
+When the alignment completes, you will find the whole output from the individual partitions 
+in the directory the makeflow was run in.
