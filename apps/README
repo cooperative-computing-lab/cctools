@@ -31,20 +31,20 @@ parrot_cms
 The README file in parrot_cms/ contains instructions on how to run this
 application.
 
-
 wq_maker
 --------------------
 
+wq_maker annotates large sequences of genomes by harnessing distributed compute
+resources. It uses the Work Queue framework. 
+
 The README file in wq_maker/ contains instructions on how to run this
 application.
-
 
 wq_replica_exchange
 --------------------
 
 The README file in wq_replica_exchange/ contains instructions on how to run this
 application.
-
 
 wq_sort
 --------------------
