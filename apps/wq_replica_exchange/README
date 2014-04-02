@@ -6,11 +6,12 @@ The directory includes files for the WW protein as a test input.
 
 To run: 
 
-1. Install ProtoMol and make sure its installation is in PATH.
-2. ./wq_replica_exchange ww_exteq_nowater1.pdb ww_exteq_nowater1.psf par_all27_prot_lipid.inp  300 400  30
+1. Install CCTools.
+2. Install ProtoMol and make sure its installation is in PATH.
+3. ./wq_replica_exchange ww_exteq_nowater1.pdb ww_exteq_nowater1.psf par_all27_prot_lipid.inp  300 400  30
 This runs the replica exchange simulations on the WW protein with 30 replicas
 using temperatures between 300 and 400F.
-3. Start workers: 
+4. Start workers: 
 work_queue_workers -d all <HOSTNAME> <PORT> 
 where <HOSTNAME> is the name of the host on which the master is running
       <PORT> is the port number on which the master is listening.
