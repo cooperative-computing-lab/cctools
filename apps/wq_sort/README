@@ -1,0 +1,25 @@
+The wq_sort program sorts a column of integers in a file by partitioning the
+file into pieces and distributing them for individual sorting. The program uses
+the Work Queue framework for distributed execution on available resources. 
+
+To run: 
+
+1. Run 'make'.
+2. Run './wq_sort /bin/sort sample.txt' that uses the GNU sort utility as the
+computation kernel and sorts the integers in the file sample.txt.
+3. Start workers: 
+work_queue_workers -d all <HOSTNAME> <PORT> 
+where <HOSTNAME> is the name of the host on which the master is running
+      <PORT> is the port number on which the master is listening.
+
+Alternatively, you can also specify a project name for the master and use that
+to start workers:
+
+1. ./wq_sort -N WQSORT /bin/sort sample.txt 
+2. work_queue_worker -d all -N WQSORT
+
+For listing the command-line options, do:
+./wq_sort -h 
+
+When the sorting completes, you will find the output file in the same directory
+as where wq_sort was run.

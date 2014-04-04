@@ -1,0 +1,42 @@
+The makeflow_bwa program aligns genome sequences listed in a fastq file to the given 
+a fasta reference. It uses the Burrows-Wheeler Aligner. It aligns by partitioning the file into 
+pieces containing one or more sequences and distributing them for individual alignment. The 
+program uses the Makeflow and Work Queue frameworks for distributed execution on available 
+resources. 
+
+To build Makeflow: 
+
+1. Install BWA and all its required dependencies. BWA can be downloaded from:
+http://sourceforge.net/projects/bio-bwa/files/
+2. Install CCTools. 
+3. Copy makeflow_bwa from cctools/apps to the location the makeflow will be executed.
+4. Run './makeflow_bwa --ref test_ref.fa --fastq test_pe_1.fq --output_SAM output.sam --algoalign backtrack --makeflow Makeflow' 
+This produces a file called Makeflow.
+
+To run:
+
+1. Run 'makeflow'
+Note if the --makeflow option is specified with a MAKEFLOWFILE, run
+makeflow <MAKEFLOWFILE> 
+
+This step runs the makeflow locally on the machine on which it is executed.
+
+2. If you want to run with a distributed execution engine (Work Queue, Condor,
+or SGE), specify the '-T' option. For example, to run with Work Queue, 
+makeflow -T wq
+
+3. Start Workers
+work_queue_workers -d all <HOSTNAME> <PORT> 
+where <HOSTNAME> is the name of the host on which the master is running
+      <PORT> is the port number on which the master is listening.
+
+Alternatively, you can also specify a project name for the master and use that
+to start workers:
+1. makeflow -T wq -N BWA
+2. work_queue_worker -d all -N BWA 
+
+For listing the command-line options, do:
+./makeflow_bwa -h 
+
+When the alignment completes, you will find the whole output from the individual partitions 
+in the directory the makeflow was run in.

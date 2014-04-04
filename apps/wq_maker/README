@@ -1,0 +1,29 @@
+The wq_maker program annotates sequences of genomes listed in a fasta file. It
+annotates by partitioning the file into pieces containing one or more sequences
+and distributing them for individual annotation. The program uses the Work Queue
+framework for distributed execution on available resources. 
+
+To run: 
+
+1. Install CCTools.
+2. Instal MAKER and all its required dependencies. MAKER can be download from:
+http://gmod.org/wiki/MAKER
+3. Install wq_maker in the bin directory of the MAKER installation.  
+4. Run './wq_maker -g <FASTA_FILE' to annotate sequences in file <FASTA_FILE>.
+5. Start workers: 
+work_queue_worker -d all <HOSTNAME> <PORT> 
+where <HOSTNAME> is the name of the host on which the master is running
+      <PORT> is the port number on which the master is listening.
+
+Alternatively, you can also specify a project name for the master and use that
+to start workers:
+
+1. ./wq_maker -g agambiae.fa -N WQMAKER
+2. work_queue_worker -d all -N WQMAKER
+
+For listing the command-line options, do:
+./wq_maker -h 
+
+When the annotation completes, you will find the (.gff) output files in the
+directory agambiae.maker.output which is created in the same directory as where
+wq_maker was run.

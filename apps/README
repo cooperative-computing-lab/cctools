@@ -1,0 +1,71 @@
+This directory contains applications that are built using software in CCTools.
+
+The applications are grouped according to the software used in building and
+running them:
+1. Makeflow: makeflow_blast, makeflow_bwa
+2. Parrot: parrot_atlas, parrot_cms 
+3. Work Queue: wq_maker, wq_replica_exchange, wq_sort 
+
+
+makeflow_blast
+--------------------
+
+The makeflow_blast program aligns a sequences of genomes listed in a fasta file
+to the given database. The program uses the Makeflow framework for distributed
+execution on available resources. 
+
+The README file in makeflow_blast/ contains instructions on how to run this
+application.
+
+makeflow_bwa
+--------------------
+The makeflow_bwa program aligns genome sequences listed in a fastq file to the
+given a fasta reference. It uses the Burrows-Wheeler Aligner. The program uses
+the Makeflow framework for distributed execution on available resources. 
+
+The README file in makeflow_bwa/ contains instructions on how to run this
+application.
+
+parrot_atlas
+--------------------
+This program is an example of running a ATLAS simulation job using
+the CVMFS filesystem accessed via Parrot. 
+
+The README file in parrot_atlas/ contains instructions on how to run this
+application.
+
+parrot_cms
+--------------------
+This program is an example of running a CMS simulation job using
+the CVMFS filesystem accessed via Parrot. 
+
+The README file in parrot_cms/ contains instructions on how to run this
+application.
+
+wq_maker
+--------------------
+
+The wq_maker program annotates large sequences of genomes by harnessing
+distributed compute resources. It uses the Work Queue framework for distributed
+execution on available resources. 
+
+The README file in wq_maker/ contains instructions on how to run this
+application.
+
+wq_replica_exchange
+--------------------
+The wq_replica_exchange program runs the replica exchange molecular dynamics
+simulations using the Work Queue framework. 
+
+The README file in wq_replica_exchange/ contains instructions on how to run this
+application.
+
+wq_sort
+--------------------
+The wq_sort program sorts a column of integers in a file by partitioning the
+file into pieces and distributing them for individual sorting. The program uses
+the Work Queue framework for distributed execution on available resources. 
+
+The README file in wq_sort/ contains instructions on how to run this
+application.
+
