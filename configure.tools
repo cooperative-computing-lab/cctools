@@ -256,6 +256,23 @@ EOF
 	fi
 }
 
+optional_library()
+{
+	library="$1"
+	shift
+
+	echo -n "checking for library ${library}..."
+
+	if echo 'int main;' | gcc -o /dev/null -x c - "-l${library}" >/dev/null 2>/dev/null; then
+		echo yes
+		append "$@"
+		return 0
+	else
+		echo no
+		return 1
+	fi
+}
+
 check_gnu_make()
 {
 	if check_path $1
