@@ -22,6 +22,7 @@ COPYING for details.
 // signed quantities when comparing to maximum limits.
 struct rmsummary
 {
+	char    *category;
 	char    *command;
 
 	int64_t  start;
@@ -44,10 +45,13 @@ struct rmsummary
 	int64_t  workdir_num_files;
 	int64_t  workdir_footprint;
 
-	/* these fields are not used when reading/printing summaries */ 
 	int64_t  cores;
-	int64_t  fs_nodes;
 	int64_t  gpus;
+	int64_t  task_id;
+
+	/* these fields are not used when reading/printing summaries */ 
+	int64_t  fs_nodes;
+
 };
 
 struct rmsummary_field
@@ -61,15 +65,18 @@ struct rmsummary_field
 	}       value;
 };
 
-/**  Reads a single summary file from filename **/
-struct rmsummary *resource_monitor_parse_summary_file(char *filename);
+struct rmsummary *rmonitor_parse_summary_file(char *filename);
 
 void rmsummary_print(FILE *stream, struct rmsummary *s);
 void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix);
 
-struct rmsummary *rmsummary_parse_single(char *buffer, char separator);
+
+/**  Reads a single summary file from filename **/
 struct rmsummary *rmsummary_parse_file_single(char *filename);
 struct rmsummary *rmsummary_parse_limits_exceeded(char *filename);
+
+/** Reads a single summary file from buffer, with separator between fields (usually ',' or '\n'). **/
+struct rmsummary *rmsummary_parse_from_str(char *buffer, char separator);
 
 /**  Reads a single summary from stream. summaries are separated by '#' or '\n'. **/
 struct rmsummary *rmsummary_parse_next(FILE *stream);

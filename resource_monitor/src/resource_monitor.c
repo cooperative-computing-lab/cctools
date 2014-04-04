@@ -270,7 +270,7 @@ FILE *open_log_file(const char *log_path)
 void parse_limits_string(struct rmsummary *limits, char *str)
 {
 	struct rmsummary *s;
-	s = rmsummary_parse_single(str, ',');
+	s = rmsummary_parse_from_str(str, ',');
 
 	rmsummary_merge_override(limits, s);
 
