@@ -15,14 +15,14 @@ work_queue_wrap.c work_queue.py: work_queue.i ../python/work_queue.binding.py
 	@cat work_queue.binding.py >> work_queue.py
 
 work_queue_wrap.o: work_queue_wrap.c
-	$(CCTOOLS_CC) -c -o $@ -fPIC -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src $(CCTOOLS_PYTHON_CCFLAGS) $^
+	$(CCTOOLS_CC) -c -o $@ -fPIC -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src $(CCTOOLS_PYTHON3_CCFLAGS) $^
 
 # The odd symlink in the following rule is necessary to overcome a problem
 # in the framework search path emitted by the Python configuration on macOS.
 
 _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX): work_queue_wrap.o $(CCTOOLS_HOME)/work_queue/src/libwork_queue.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 	@ln -sf /System/Library/Frameworks/Python.framework .
-	$(CCTOOLS_LD) $(CCTOOLS_DYNAMIC_FLAG) -o $@ $^ $(CCTOOLS_INTERNAL_LDFLAGS) $(CCTOOLS_PYTHON_LDFLAGS)
+	$(CCTOOLS_LD) $(CCTOOLS_DYNAMIC_FLAG) -o $@ $^ $(CCTOOLS_INTERNAL_LDFLAGS) $(CCTOOLS_PYTHON3_LDFLAGS)
 	@rm Python.framework
 
 work_queue_example.py3: ../python/work_queue_example.py
