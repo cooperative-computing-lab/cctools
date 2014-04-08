@@ -2,28 +2,25 @@ CCTOOLS_HOME = ../../..
 
 include ${CCTOOLS_HOME}/Makefile.config
 
-ccflags=${CCTOOLS_PYTHON_CCFLAGS} -I${CCTOOLS_HOME}/work_queue/src -I${CCTOOLS_HOME}/dttools/src
-ldflags=${CCTOOLS_PYTHON_LDFLAGS}  ${CCTOOLS_HOME}/work_queue/src/libwork_queue.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
-
 # Python always uses 'so' for its modules (even on Darwin)
 CCTOOLS_DYNAMIC_SUFFIX=so
 
 all: work_queue.py _work_queue.${CCTOOLS_DYNAMIC_SUFFIX}
 
-work_queue_wrap.c work_queue.py: ../work_queue.i work_queue.binding.py ../libwork_queue.a
+work_queue_wrap.c work_queue.py: work_queue.i work_queue.binding.py
 	@echo "SWIG work_queue.i (python)"
-	@${CCTOOLS_SWIG} -python -I${CCTOOLS_HOME}/dttools/src -o work_queue_wrap.c ../work_queue.i
+	@$(CCTOOLS_SWIG) -o work_queue_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src work_queue.i
 	@cat work_queue.binding.py >> work_queue.py
 
 work_queue_wrap.o: work_queue_wrap.c
-	${CCTOOLS_CC} -fPIC -c $< -o $@ ${ccflags}
+	$(CCTOOLS_CC) -c -o $@ -fPIC -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src $(CCTOOLS_PYTHON_CCFLAGS) $^
 
 # The odd symlink in the following rule is necessary to overcome a problem
 # in the framework search path emitted by the Python configuration on macOS.
 
-_work_queue.${CCTOOLS_DYNAMIC_SUFFIX}: work_queue_wrap.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
+_work_queue.$(CCTOOLS_DYNAMIC_SUFFIX): work_queue_wrap.o $(CCTOOLS_HOME)/work_queue/src/libwork_queue.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 	@ln -sf /System/Library/Frameworks/Python.framework . 
-	${CCTOOLS_LD} ${CCTOOLS_DYNAMIC_FLAG} $< -o $@ ${CCTOOLS_INTERNAL_LDFLAGS} ${ldflags}
+	$(CCTOOLS_LD) $(CCTOOLS_DYNAMIC_FLAG) -o $@ $^ $(CCTOOLS_INTERNAL_LDFLAGS) $(CCTOOLS_PYTHON_LDFLAGS)
 	@rm Python.framework
 
 test: all
