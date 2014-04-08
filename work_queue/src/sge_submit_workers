@@ -21,10 +21,10 @@ sge_parameters=""
 # Used options (as in the getopts format):  aM:N:C:t:d:w:i:b:z:A:O:s:P:jp:h  
 parse_arguments()
 {
-	if [ -z "$cores" -o $cores=0 ]
-	then
-		cores=1
-	fi
+	# if [ -z "$cores" -o $cores=0 ]
+	# then
+	# 	cores=1
+	# fi
 
 	while [ $# -gt 0 ]
 	do
@@ -53,13 +53,92 @@ submit_workers_command()
 		exit 1
 	fi
 
-	cat >worker.sh <<EOF
+        #====================================================#
+        #| Worker script has two layers.  This gives us     |#
+        #| the option of whether we should SSH back into    |#
+        #| the local node before running the worker, which  |#
+        #| allows us to surpass some buggy resource limits. |#
+        #====================================================#
+        cat >worker.sh <<EOF
 #!/bin/sh
-#$ -pe smp $cores
-./work_queue_worker $arguments $host $port
+#$ -V
+#$ -N $jobname
+#$ -o \$JOB_NAME.o\$JOB_ID
+#$ -e \$JOB_NAME.e\$JOB_ID
+$qsub_extras
+
+
+# Execute the second layer with an optional self-SSH.
+if [ "x$self_ssh" == "x" ] ; then
+    $PWD/worker1.sh
+else
+    ssh \$HOSTNAME "$PWD/worker1.sh \$\$"
+fi
 EOF
 
-	chmod 755 worker.sh
+        #=======================================#
+        #|   Create the second layer script.   |#
+        #| This actually launches the workers. |#
+        #=======================================#
+        cat >worker1.sh <<EOF
+#!/bin/sh
+
+# Limit core dump size.
+ulimit -c 0
+
+# This function makes the script kill itself if:
+# 1) the second layer stops running (i.e. job deleted by scheduler)
+# 2) there are no more workers (i.e. idle timeout)
+waitkill(){
+    while sleep 1 ; do 
+        kill -0 \$1 2> /dev/null || break
+        [ \$( ps xjf | grep work_queue_worker | grep -v grep | wc -l ) -gt 0 ] || break
+    done
+    kill -TERM -\$\$
+};
+
+# Go into the directory where the worker program is.
+cd $PWD
+
+# Set environment variables.
+export OMP_NUM_THREADS=$cores
+export MKL_NUM_THREADS=$cores
+
+if [[ \$HOSTNAME =~ "cn43" ]] ; then 
+    # Compute node specific fix
+    export _CONDOR_SCRATCH_DIR=/state/partition1/tmp/$USER/\$HOSTNAME
+elif [[ \$HOSTNAME =~ "cn106" ]] ; then 
+    export _CONDOR_SCRATCH_DIR=/tmp/$USER.1/\$HOSTNAME
+else
+    export _CONDOR_SCRATCH_DIR=$scratch_dir
+fi
+mkdir -p \$_CONDOR_SCRATCH_DIR
+
+# Optional SSH port forwarding
+if [ $forward == 1 ]; then
+    if [ \`ps aux | grep $USER | grep $headnode | grep ServerAlive | grep $port | grep -v grep | awk '{print \$2}' | wc -l\` -eq 0 ] ; then
+        ssh -o ServerAliveInterval=180 -N -f -L$port:localhost:$port $headnode
+    fi
+fi
+
+if [[ x$self_ssh != x ]] ; then 
+    waitkill \$1 &
+fi
+
+# Actually execute the workers.
+for i in \`seq $numworkers\`; do
+    export CUDA_DEVICE=\$(( i - 1 ))
+    if [ $forward == 1 ]; then
+        ./work_queue_worker -d all $arguments localhost $port &
+    else
+        ./work_queue_worker -d all $arguments $host $port &
+    fi
+done
+
+wait
+EOF
+
+chmod 755 worker.sh worker1.sh
 
 	if [ $use_jobarray = 1 ]
 	then

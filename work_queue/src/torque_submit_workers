@@ -20,10 +20,10 @@ torque_parameters=""
 parse_arguments()
 {
 
-	if [ -z "$cores" -o $cores=0 ]
-	then
-		cores=1
-	fi
+	# if [ -z "$cores" -o $cores=0 ]
+	# then
+	# 	cores=1
+	# fi
 
 	while [ $# -gt 0 ]
 	do
@@ -56,14 +56,138 @@ submit_workers_command()
 		exit 1
 	fi
 
-	cat >worker.sh <<EOF
-#!/bin/sh
-#PBS -l nodes=1:ppn=$cores
+        #====================================#
+        #| This script is the only one that |#
+        #|      goes three layers deep.     |#
+        #====================================#
+        # First create the script that will
+        # be submitted to the scheduler.
+        cat >worker.sh <<EOF
+#!/bin/bash
+#PBS -N $jobname
+#PBS -l nodes=$nodes:ppn=$(( cores * numworkers ))$node_extras
+$qsub_extras
 
-./work_queue_worker $arguments $host $port
+export PATH=$(dirname $(which qsub)):\$PATH
+
+#===========================================#
+#| If submitting a multiple-node job, then |#
+#| the second-layer script is broadcast to |#
+#| each allocated node using "pbsdsh".     |#
+#===========================================#
+. /etc/profile
+. /etc/bashrc
+. ~/.bashrc
+
+if [[ \$HOSTNAME =~ "nid" ]] ; then
+    module add ccm
+    if [[ x$gpuq == x ]] ; then
+        qchem42 --stage
+    fi
+    ccmlogin "$PWD/worker1.sh \$PBS_JOBID"
+    sleep 999999
+elif [ $nodes -gt 1 ] ; then
+    pbsdsh -u -v $PWD/worker1.sh
+else
+    $PWD/worker1.sh
+fi
 EOF
 
-	chmod 755 worker.sh
+        #====================================================#
+        #| Create the second layer script.  This gives us   |#
+        #| the option of whether we should SSH back into    |#
+        #| the local node before running the worker, which  |#
+        #| allows us to surpass some buggy resource limits. |#
+        #====================================================#
+        cat <<EOF > worker1.sh
+#!/bin/bash
+
+if [[ \$HOSTNAME =~ "nid" ]] ; then
+    for i in \`uniq $HOME/.crayccm/ccm_nodelist.\$1 \` ; do
+        nohup ssh \$i "$PWD/worker2.sh &> $PWD/worker.log.\\\$HOSTNAME &"
+    done
+elif [ "x$self_ssh" != "x" ] ; then
+    ssh \$HOSTNAME "$PWD/worker2.sh \$\$"
+else
+    $PWD/worker2.sh
+fi
+wait
+EOF
+
+        #=======================================#
+        #|    Create the third layer script.   |#
+        #| This actually launches the workers. |#
+        #=======================================#
+        cat <<EOF > worker2.sh
+#!/bin/bash
+
+# Load environment variables.
+. /etc/profile
+. /etc/bashrc
+. $HOME/.bashrc
+
+# Limit core dump size.
+ulimit -c 0
+
+# This function makes the script kill itself if:
+# 1) the second layer stops running (i.e. job deleted by scheduler)
+# 2) there are no more workers (i.e. idle timeout)
+waitkill(){
+    while sleep 1 ; do 
+        kill -0 \$1 2> /dev/null || break
+        [ \$( ps xjf | grep work_queue_worker | grep -v grep | wc -l ) -gt 0 ] || break
+    done
+    kill -TERM -\$\$
+};
+
+# Go into the directory where the worker program is.
+cd $PWD
+
+# Set environment variables.
+export OMP_NUM_THREADS=$cores
+export MKL_NUM_THREADS=$cores
+export _CONDOR_SCRATCH_DIR=$scratch_dir
+mkdir -p \$_CONDOR_SCRATCH_DIR
+
+# Create the PBS Node File
+if [ "x$NODEFILE_DIR" != "x" ] ; then
+    export PBS_NODEFILE=$NODEFILE_DIR/pbs_nodefile.\$HOSTNAME
+    rm -f \$PBS_NODEFILE
+    for i in \`seq $(( cores * numworkers ))\` ; do
+        echo \$HOSTNAME >> \$PBS_NODEFILE
+    done
+fi
+
+# Optional SSH port forwarding
+if [ $forward == 1 ]; then
+    if [ \`ps aux | grep $USER | grep $headnode | grep ServerAlive | grep $port | grep -v grep | awk '{print \$2}' | wc -l\` -eq 0 ] ; then
+        if [[ \$HOSTNAME =~ "nid" ]] ; then
+            # On Blue Waters the SSH port forwarding connection is compute node --> not0rious --> master
+            ssh -p 22 -x -o ServerAliveInterval=180 -N -f -L$port:$host:$port not0rious.stanford.edu
+        else
+            ssh -x -o ServerAliveInterval=180 -N -f -L$port:localhost:$port $headnode
+        fi
+    fi
+fi
+
+if [[ "x$self_ssh" != "x" ]] ; then
+    waitkill \$1 &
+fi
+
+# Actually execute the workers.
+for i in \`seq $numworkers\`; do
+    export CUDA_DEVICE=\$(( i - 1 ))
+    if [ $forward == 1 ]; then
+        ./work_queue_worker -d all $arguments localhost $port &
+    else
+        ./work_queue_worker -d all $arguments $host $port &
+    fi
+done
+
+wait
+EOF
+
+	chmod 755 worker*.sh
 
 	if [ $use_jobarray = 1 ]
 	then
@@ -77,4 +201,3 @@ EOF
 }
 
 submit_workers "$@"
-
