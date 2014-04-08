@@ -2335,6 +2335,8 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	itable_insert(q->running_tasks, t->taskid, t); 
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
 
+	t->total_submissions += 1;
+
 	if(t->unlabeled) {
 		w->unlabeled_allocated++;
 	} else {
