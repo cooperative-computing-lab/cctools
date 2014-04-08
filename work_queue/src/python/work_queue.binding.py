@@ -298,6 +298,18 @@ class Task(_object):
     def result(self):
         return self._task.result
 
+    ##
+    # Get the number of times the task has been resubmitted internally.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.retries
+    # @endcode
+    @property
+    def retries(self):
+        return self._task.retries
+
     ## 
     # Get the address and port of the host on which the task ran.
     # Must be called only after the task completes execution.
@@ -431,6 +443,30 @@ class Task(_object):
         return self._task.time_receive_output_finish
 
     ## 
+    # Get the number of bytes received since task started receiving input data.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.total_bytes_received
+    # @endcode
+    @property
+    def total_bytes_received(self):
+        return self._task.total_bytes_received
+
+    ## 
+    # Get the number of bytes sent since task started sending input data.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.total_bytes_sent
+    # @endcode
+    @property
+    def total_bytes_sent(self):
+        return self._task.total_bytes_sent
+
+    ## 
     # Get the number of bytes transferred since task started transferring input data.
     # Must be called only after the task completes execution.
     # @a Note: This is defined using property decorator. So it must be called without parentheses
@@ -465,6 +501,18 @@ class Task(_object):
     @property
     def cmd_execution_time(self):
         return self._task.cmd_execution_time 
+
+    ## 
+    # Get the time spent in microseconds for executing the command on any worker. 
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.total_cmd_execution_time
+    # @endcode
+    @property
+    def total_cmd_execution_time(self):
+        return self._task.total_cmd_execution_time 
 
 
 ##

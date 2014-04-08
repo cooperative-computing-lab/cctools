@@ -564,6 +564,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		t->total_bytes_transferred = 0;
 		t->total_transfer_time = 0;
 		t->cmd_execution_time = 0;
+		t->total_cmd_execution_time += timestamp_get() - t->time_execute_cmd_start;
 		if(t->output) {
 			free(t->output);
 		}
@@ -571,6 +572,8 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		if(t->unlabeled) {
 			t->cores = t->memory = t->disk = t->gpus = -1;
 		}
+		/* printf("Retry %d: %d\n", t->taskid, t->retries); */
+		t->retries += 1;
 		list_push_head(q->ready_list, t);
 
 		reap_task_from_worker(q, w, t);
@@ -907,6 +910,7 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 	if(total_bytes>0) {
 		q->total_bytes_received += total_bytes;
 		q->total_receive_time += sum_time;
+		t->total_bytes_received += total_bytes;
 		t->total_bytes_transferred += total_bytes;
 		t->total_transfer_time += sum_time;
 		w->total_bytes_transferred += total_bytes;
@@ -1222,6 +1226,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	} else {
 		t->cmd_execution_time = observed_execution_time;
 	}
+	t->total_cmd_execution_time += t->cmd_execution_time;
 
 	if(q->bandwidth) {
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
@@ -1979,6 +1984,7 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 		timestamp_t close_time = timestamp_get();
 		timestamp_t elapsed_time = close_time-open_time;
 
+		t->total_bytes_sent += total_bytes;
 		t->total_bytes_transferred += total_bytes;
 		t->total_transfer_time += elapsed_time;
 
@@ -2691,6 +2697,8 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->input_files = list_create();
 	t->output_files = list_create();
 	t->return_status = -1;
+	t->retries = 0;
+	t->total_cmd_execution_time = 0;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 
@@ -3593,6 +3601,8 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 		free(t->host);
 		t->host = 0;
 	}
+	t->total_bytes_received = 0;
+	t->total_bytes_sent = 0;
 	t->total_transfer_time = 0;
 	t->cmd_execution_time = 0;
 	t->result = 0;
