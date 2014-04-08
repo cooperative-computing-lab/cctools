@@ -83,9 +83,13 @@ struct work_queue_task {
 	timestamp_t time_receive_output_start;	/**< The time at which it started to transfer output files. */
 	timestamp_t time_receive_output_finish;	/**< The time at which it finished transferring output files. */
 
+	int64_t total_bytes_received;/**< Number of bytes received since task has last started receiving input data. */
+	int64_t total_bytes_sent;/**< Number of bytes sent since task has last started sending input data. */
 	int64_t total_bytes_transferred;/**< Number of bytes transferred since task has last started transferring input data. */
 	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
 	timestamp_t cmd_execution_time;	   /**< Time spent in microseconds for executing the command on the worker. */
+	int total_submissions;			   /**< The number of times the task has been submitted. */
+	timestamp_t total_cmd_execution_time;	/**< Time spent in microseconds for executing the command on any worker, including resubmittions of the task. */
 
 	int64_t memory;                       
 	int64_t disk;

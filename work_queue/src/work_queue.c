@@ -564,6 +564,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		t->total_bytes_transferred = 0;
 		t->total_transfer_time = 0;
 		t->cmd_execution_time = 0;
+		t->total_cmd_execution_time += timestamp_get() - t->time_execute_cmd_start;
 		if(t->output) {
 			free(t->output);
 		}
@@ -907,6 +908,7 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 	if(total_bytes>0) {
 		q->total_bytes_received += total_bytes;
 		q->total_receive_time += sum_time;
+		t->total_bytes_received += total_bytes;
 		t->total_bytes_transferred += total_bytes;
 		t->total_transfer_time += sum_time;
 		w->total_bytes_transferred += total_bytes;
@@ -1222,6 +1224,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	} else {
 		t->cmd_execution_time = observed_execution_time;
 	}
+	t->total_cmd_execution_time += t->cmd_execution_time;
 
 	if(q->bandwidth) {
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
@@ -1979,6 +1982,7 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 		timestamp_t close_time = timestamp_get();
 		timestamp_t elapsed_time = close_time-open_time;
 
+		t->total_bytes_sent += total_bytes;
 		t->total_bytes_transferred += total_bytes;
 		t->total_transfer_time += elapsed_time;
 
@@ -2347,6 +2351,8 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	itable_insert(q->running_tasks, t->taskid, t); 
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
 
+	t->total_submissions += 1;
+
 	if(t->unlabeled) {
 		w->unlabeled_allocated++;
 	} else {
@@ -2691,9 +2697,9 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->input_files = list_create();
 	t->output_files = list_create();
 	t->return_status = -1;
+	t->total_cmd_execution_time = 0;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
-
 	t->memory = -1;
 	t->disk = -1;
 	t->cores = -1;
@@ -3593,6 +3599,8 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 		free(t->host);
 		t->host = 0;
 	}
+	t->total_bytes_received = 0;
+	t->total_bytes_sent = 0;
 	t->total_transfer_time = 0;
 	t->cmd_execution_time = 0;
 	t->result = 0;
