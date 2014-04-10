@@ -90,6 +90,7 @@ bool pfs_cvmfs_repo_switching = false;
 char pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX];
 char pfs_cvmfs_locks_dir[PFS_PATH_MAX];
 bool pfs_cvmfs_enable_alien  = true;
+bool pfs_cvmfs_thread_bug_fix = false;
 
 int pfs_irods_debug_level = 0;
 
@@ -107,6 +108,7 @@ enum {
 	LONG_OPT_CVMFS_REPO_SWITCHING=500,
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
 	LONG_OPT_CVMFS_ALIEN_CACHE,
+	LONG_OPT_CVMFS_THREAD_BUG_FIX
 };
 
 static void get_linux_version(const char *cmd)
@@ -342,6 +344,15 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 			} else {
 				tracer_continue(p->tracer,signum);
 				if(signum==SIGSTOP && p->nsyscalls==0) {
+					if(pfs_cvmfs_thread_bug_fix)
+					{
+						/* There is an unidentified race condition when using
+						 * threads and cvmfs, in which the thread misses the
+						 * SIGCONT. Sleeping for a second seems to give a
+						 * chance to the thread to catch the signal. Hopefully
+						 * we will be able to remove this hack soon. */
+						sleep(1);
+					}
 					kill(p->pid,SIGCONT);
 				}
 			}
@@ -577,6 +588,7 @@ int main( int argc, char *argv[] )
 		{"syscall-table", no_argument, 0, 'W'},
 		{"sync-write", no_argument, 0, 'Y'},
 		{"auto-decompress", no_argument, 0, 'Z'},
+		{"cvmfs-enable-thread-clone-bugfix", no_argument, 0, LONG_OPT_CVMFS_THREAD_BUG_FIX},
         {0,0,0,0}
 	};
 
@@ -670,6 +682,9 @@ int main( int argc, char *argv[] )
 			break;
 		case LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE:
 			pfs_cvmfs_enable_alien = false;
+			break;
+		case LONG_OPT_CVMFS_THREAD_BUG_FIX:
+			pfs_cvmfs_thread_bug_fix = true;
 			break;
 		case 'R':
 			pfs_root_checksum = optarg;
