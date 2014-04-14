@@ -273,6 +273,37 @@ optional_library()
 	fi
 }
 
+optional_library_function()
+{
+	h="$1"
+	f="$2"
+	l="$3"
+	shift
+	shift
+	shift
+
+	echo -n "checking for library function ${f}..."
+
+	gcc -o /dev/null -x c - "-l${l}" >/dev/null 2>/dev/null <<EOF
+#include <stdlib.h>
+#include <${h}>
+
+int main (int argc, char *argv[])
+{
+	(void)${f};
+	return 0;
+}
+EOF
+	if [ $? -eq 0 ]; then
+		echo yes
+		append "$@"
+		return 0
+	else
+		echo no
+		return 1
+	fi
+}
+
 check_gnu_make()
 {
 	if check_path $1
