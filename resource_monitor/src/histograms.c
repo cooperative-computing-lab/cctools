@@ -664,8 +664,6 @@ void write_histogram_stats(FILE *stream, struct histogram *h)
 
 void histograms_of_category(struct rmDsummary_set *ss)
 {
-	struct histogram     *h;
-
 	/* construct histograms of category across all resources */
 	struct field *f; 
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++) 
@@ -673,7 +671,7 @@ void histograms_of_category(struct rmDsummary_set *ss)
 		if(!f->active)
 			continue;
 
-		h = histogram_of_field(ss, f, output_directory);
+		histogram_of_field(ss, f, output_directory);
 	}
 }
 
