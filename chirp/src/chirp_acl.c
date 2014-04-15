@@ -347,9 +347,7 @@ int chirp_acl_ticket_get(const char *subject, const char *ticket_subject, char *
 		*ticket_esubject = xxstrdup(ct.subject);
 		*ticket = xxstrdup(ct.ticket);
 
-		time_t now;
-		time(&now);
-		now = mktime(gmtime(&now));	/* convert to UTC */
+		time_t now = time(NULL);
 		*ticket_expiration = ct.expiration - now;
 
 		size_t n;
@@ -444,7 +442,6 @@ int chirp_acl_ticket_create(const char *subject, const char *newsubject, const c
 	char expiration[128];
 
 	now = time(NULL);
-	now = mktime(gmtime(&now));	/* convert to UTC */
 	sprintf(expiration, "%lu", (unsigned long) (now + offset));
 
 	/* Note about tickets making tickets:

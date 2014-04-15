@@ -106,7 +106,6 @@ int chirp_ticket_read(const char *ticket, struct chirp_ticket *ct)
 	const char *s;
 	const char *buffer = b;
 	time_t now = time(NULL);
-	now = mktime(gmtime(&now));	/* convert to UTC */
 	ct->subject = NULL;
 	ct->ticket = NULL;
 	ct->expiration = now;	/* default expire now... */
