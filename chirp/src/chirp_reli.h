@@ -181,8 +181,8 @@ INT64_T chirp_reli_fstatfs(struct chirp_file *file, struct chirp_statfs *info, t
 INT64_T chirp_reli_fchown(struct chirp_file *file, INT64_T uid, INT64_T gid, time_t stoptime);
 
 /** Change the mode bits of a file.
-Note that the current Chirp file server ignores the mode bits,
-except to determine whether a program is executable.  See @ref chirp_reli_setacl instead.
+The mode bits may set group/other permissions. If the file is a not a directory, the mode bits may also set user execute.
+See @ref chirp_reli_setacl for alternate strong authorization control.
 @param file A chirp_file handle returned by chirp_reli_open.
 @param mode The new mode bits, typically <tt>0700</tt> for an executable or <tt>0600</tt> for a data file.
 @param stoptime The absolute time at which to abort.
@@ -563,8 +563,8 @@ INT64_T chirp_reli_statfs(const char *host, const char *path, struct chirp_statf
 INT64_T chirp_reli_access(const char *host, const char *path, INT64_T flags, time_t stoptime);
 
 /** Change mode bits.
-Note that the current Chirp file server ignores the mode bits,
-except to determine whether a program is executable.  See @ref chirp_reli_setacl instead.
+The mode bits may set group/other permissions. If the file is a not a directory, the mode bits may also set user execute.
+See @ref chirp_reli_setacl for alternate strong authorization control.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the file to access.
 @param mode The new mode bits, typically <tt>0700</tt> for an executable or <tt>0600</tt> for a data file.
