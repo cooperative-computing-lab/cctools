@@ -56,7 +56,6 @@ struct chirp_filesystem {
 	INT64_T (*link)      ( const char *path, const char *newpath );
 	INT64_T (*symlink)   ( const char *path, const char *newpath );
 	INT64_T (*readlink)  ( const char *path, char *target, INT64_T length );
-	INT64_T (*chdir)     ( const char *path );
 	INT64_T (*mkdir)     ( const char *path, INT64_T mode );
 	INT64_T (*rmdir)     ( const char *path );
 	INT64_T (*stat)      ( const char *path, struct chirp_stat *buf );
@@ -121,6 +120,9 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime );
 INT64_T cfs_basic_md5(const char *path, unsigned char digest[16]);
 INT64_T cfs_basic_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime);
+INT64_T cfs_basic_chown(const char *path, INT64_T uid, INT64_T gid);
+INT64_T cfs_basic_lchown(const char *path, INT64_T uid, INT64_T gid);
+INT64_T cfs_basic_fchown(int fd, INT64_T uid, INT64_T gid);
 
 /* stubs for operations not implemented in the backend FS */
 INT64_T cfs_stub_lockf (int fd, int cmd, INT64_T len);

@@ -447,15 +447,6 @@ static INT64_T chirp_fs_hdfs_swrite(int fd, const void *vbuffer, INT64_T length,
 	return -1;
 }
 
-static INT64_T chirp_fs_hdfs_fchown(int fd, INT64_T uid, INT64_T gid)
-{
-	SETUP_FILE
-	// Changing file ownership is silently ignored,
-	// because permissions are handled through the ACL model.
-	debug(D_HDFS, "fchown %s %ld %ld", open_files[fd].path, (long) uid, (long) gid);
-	return 0;
-}
-
 static INT64_T chirp_fs_hdfs_fchmod(int fd, INT64_T mode)
 {
 	struct chirp_stat info;
@@ -496,18 +487,6 @@ static INT64_T chirp_fs_hdfs_fsync(int fd)
 	SETUP_FILE
 	debug(D_HDFS, "fsync %s", open_files[fd].path);
 	return hdfs_services->flush(fs, file);
-}
-
-static INT64_T chirp_fs_hdfs_getfile(const char *path, struct link *link, time_t stoptime)
-{
-	/* N.B. This calls up to chirp_filesystem.c, no RESOLVE necessary. */
-	return cfs_basic_getfile(path, link, stoptime);
-}
-
-static INT64_T chirp_fs_hdfs_putfile(const char *path, struct link *link, INT64_T length, INT64_T mode, time_t stoptime)
-{
-	/* N.B. This calls up to chirp_filesystem.c, no RESOLVE necessary. */
-	return cfs_basic_putfile(path, link, length, mode, stoptime);
 }
 
 static INT64_T chirp_fs_hdfs_unlink(const char *path)
@@ -642,24 +621,6 @@ static INT64_T chirp_fs_hdfs_chmod(const char *path, INT64_T mode)
 	return hdfs_services->chmod(fs, path, mode);
 }
 
-static INT64_T chirp_fs_hdfs_chown(const char *path, INT64_T uid, INT64_T gid)
-{
-	// Changing file ownership is silently ignored,
-	// because permissions are handled through the ACL model.
-	RESOLVE(path)
-	debug(D_HDFS, "chown (ignored) %s %ld %ld", path, (long) uid, (long) gid);
-	return 0;
-}
-
-static INT64_T chirp_fs_hdfs_lchown(const char *path, INT64_T uid, INT64_T gid)
-{
-	// Changing file ownership is silently ignored,
-	// because permissions are handled through the ACL model.
-	RESOLVE(path)
-	debug(D_HDFS, "lchown (ignored) %s %ld %ld", path, (long) uid, (long) gid);
-	return 0;
-}
-
 static INT64_T chirp_fs_hdfs_truncate(const char *path, INT64_T length)
 {
 	struct chirp_stat info;
@@ -687,19 +648,6 @@ static INT64_T chirp_fs_hdfs_utime(const char *path, time_t actime, time_t modti
 	RESOLVE(path)
 	debug(D_HDFS, "utime %s %ld %ld", path, (long) actime, (long) modtime);
 	return hdfs_services->utime(fs, path, modtime, actime);
-}
-
-static INT64_T chirp_fs_hdfs_md5(const char *path, unsigned char digest[16])
-{
-	RESOLVE(path)
-	return cfs_basic_md5(path, digest);
-}
-
-static INT64_T chirp_fs_hdfs_chdir(const char *path)
-{
-	RESOLVE(path)
-	debug(D_HDFS, "chdir %s", path);
-	return hdfs_services->chdir(fs, path);
 }
 
 static INT64_T chirp_fs_hdfs_setrep(const char *path, int nreps)
@@ -741,7 +689,7 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	cfs_stub_lockf,
 	chirp_fs_hdfs_fstat,
 	chirp_fs_hdfs_fstatfs,
-	chirp_fs_hdfs_fchown,
+	cfs_basic_fchown,
 	chirp_fs_hdfs_fchmod,
 	chirp_fs_hdfs_ftruncate,
 	chirp_fs_hdfs_fsync,
@@ -752,8 +700,8 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_readdir,
 	chirp_fs_hdfs_closedir,
 
-	chirp_fs_hdfs_getfile,
-	chirp_fs_hdfs_putfile,
+	cfs_basic_getfile,
+	cfs_basic_putfile,
 
 	chirp_fs_hdfs_unlink,
 	chirp_fs_hdfs_rmall,
@@ -761,7 +709,6 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_link,
 	chirp_fs_hdfs_symlink,
 	chirp_fs_hdfs_readlink,
-	chirp_fs_hdfs_chdir,
 	chirp_fs_hdfs_mkdir,
 	chirp_fs_hdfs_rmdir,
 	chirp_fs_hdfs_stat,
@@ -769,11 +716,11 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_statfs,
 	chirp_fs_hdfs_access,
 	chirp_fs_hdfs_chmod,
-	chirp_fs_hdfs_chown,
-	chirp_fs_hdfs_lchown,
+	cfs_basic_chown,
+	cfs_basic_lchown,
 	chirp_fs_hdfs_truncate,
 	chirp_fs_hdfs_utime,
-	chirp_fs_hdfs_md5,
+	cfs_basic_md5,
 	chirp_fs_hdfs_setrep,
 
 	cfs_stub_getxattr,
