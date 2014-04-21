@@ -489,18 +489,6 @@ static INT64_T chirp_fs_hdfs_fsync(int fd)
 	return hdfs_services->flush(fs, file);
 }
 
-static INT64_T chirp_fs_hdfs_getfile(const char *path, struct link *link, time_t stoptime)
-{
-	/* N.B. This calls up to chirp_filesystem.c, no RESOLVE necessary. */
-	return cfs_basic_getfile(path, link, stoptime);
-}
-
-static INT64_T chirp_fs_hdfs_putfile(const char *path, struct link *link, INT64_T length, INT64_T mode, time_t stoptime)
-{
-	/* N.B. This calls up to chirp_filesystem.c, no RESOLVE necessary. */
-	return cfs_basic_putfile(path, link, length, mode, stoptime);
-}
-
 static INT64_T chirp_fs_hdfs_unlink(const char *path)
 {
 	RESOLVE(path)
@@ -662,12 +650,6 @@ static INT64_T chirp_fs_hdfs_utime(const char *path, time_t actime, time_t modti
 	return hdfs_services->utime(fs, path, modtime, actime);
 }
 
-static INT64_T chirp_fs_hdfs_md5(const char *path, unsigned char digest[16])
-{
-	RESOLVE(path)
-	return cfs_basic_md5(path, digest);
-}
-
 static INT64_T chirp_fs_hdfs_setrep(const char *path, int nreps)
 {
 	RESOLVE(path)
@@ -718,8 +700,8 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_readdir,
 	chirp_fs_hdfs_closedir,
 
-	chirp_fs_hdfs_getfile,
-	chirp_fs_hdfs_putfile,
+	cfs_basic_getfile,
+	cfs_basic_putfile,
 
 	chirp_fs_hdfs_unlink,
 	chirp_fs_hdfs_rmall,
@@ -738,7 +720,7 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	cfs_basic_lchown,
 	chirp_fs_hdfs_truncate,
 	chirp_fs_hdfs_utime,
-	chirp_fs_hdfs_md5,
+	cfs_basic_md5,
 	chirp_fs_hdfs_setrep,
 
 	cfs_stub_getxattr,
