@@ -456,10 +456,10 @@ static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs *info
 	return result;
 }
 
-static INT64_T chirp_fs_local_access(const char *path, INT64_T mode)
+static INT64_T chirp_fs_local_access(const char *path, INT64_T amode)
 {
 	RESOLVE(path)
-	return access(path, mode);
+	return access(path, amode);
 }
 
 struct chirp_dir {
