@@ -265,12 +265,22 @@ the data stored there:
 (see contents of /chirp/server.nd.edu/mix/1523.data)
 </code>
 
-<h2 id="accessedfiles">Record Accessed files</h2>
+<h2 id="accessedfiles">Record Accessed Files<a class="sectionlink" href="#accessedfiles" title="Link to this section.">&#x21d7;</a></h2>
 
-To figure out the underlying file dependencies, Parrot allows you to record the names of all the accessed files during the execution process of one program, which is implemented as the <b>--name-list dependencylist</b> option. When one filename is resolved by the Parrot <b>name resolver</b>, it is also recorded into the <b>dependencylist</b> file. The system call type of a file is also transferred to the name resolver and recorded into the dependencylist file.
-For example, all the accessed file names will be recorded into <b>list.txt</b> if we run the following command:
+<p>To figure out the underlying file dependencies, Parrot allows you to record the
+names of all the accessed files during the execution process of one program,
+which is implemented as the <b>--name-list dependencylist</b> option. When one
+filename is resolved by the Parrot <b>name resolver</b>, it is also recorded
+into the <b>dependencylist</b> file. The system call type of a file is also
+transferred to the name resolver and recorded into the dependencylist file.
+For example, all the accessed file names will be recorded into <b>list.txt</b>
+if we run the following command:</p>
+
 <code>% parrot_run --name-list list.txt ls ~</code>
-The format of list.txt is <b>filename|system-call-type</b>, such as <tt>usr/bin/ls|stat</tt>, which means the file <tt>/usr/bin/ls</tt> is accessed using the <tt>stat</tt> system call.
+
+<p>The format of list.txt is <b>filename|system-call-type</b>, such as
+<tt>usr/bin/ls|stat</tt>, which means the file <tt>/usr/bin/ls</tt> is accessed
+using the <tt>stat</tt> system call.</p>
 
 <h2 id="parrot_cp">More Efficient Copies with <tt>parrot_cp</tt><a class="sectionlink" href="#parrot_cp" title="Link to this section.">&#x21d7;</a></h2>
 
