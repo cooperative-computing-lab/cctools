@@ -120,6 +120,9 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime );
 INT64_T cfs_basic_md5(const char *path, unsigned char digest[16]);
 INT64_T cfs_basic_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime);
+INT64_T cfs_basic_chown(const char *path, INT64_T uid, INT64_T gid);
+INT64_T cfs_basic_lchown(const char *path, INT64_T uid, INT64_T gid);
+INT64_T cfs_basic_fchown(int fd, INT64_T uid, INT64_T gid);
 
 /* stubs for operations not implemented in the backend FS */
 INT64_T cfs_stub_lockf (int fd, int cmd, INT64_T len);

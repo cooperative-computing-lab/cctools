@@ -280,14 +280,6 @@ static INT64_T chirp_fs_local_fstatfs(int fd, struct chirp_statfs *info)
 	return result;
 }
 
-static INT64_T chirp_fs_local_fchown(int fd, INT64_T uid, INT64_T gid)
-{
-	SETUP_FILE
-	// Changing file ownership is silently ignored,
-	// because permissions are handled through the ACL model.
-	return 0;
-}
-
 static INT64_T chirp_fs_local_fchmod(int fd, INT64_T mode)
 {
 	struct stat64 linfo;
@@ -515,20 +507,6 @@ static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
 	return chmod(path, mode);
 }
 
-static INT64_T chirp_fs_local_chown(const char *path, INT64_T uid, INT64_T gid)
-{
-	// Changing file ownership is silently ignored,
-	// because permissions are handled through the ACL model.
-	return 0;
-}
-
-static INT64_T chirp_fs_local_lchown(const char *path, INT64_T uid, INT64_T gid)
-{
-	// Changing file ownership is silently ignored,
-	// because permissions are handled through the ACL model.
-	return 0;
-}
-
 static INT64_T chirp_fs_local_truncate(const char *path, INT64_T length)
 {
 	RESOLVE(path)
@@ -691,7 +669,7 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_lockf,
 	chirp_fs_local_fstat,
 	chirp_fs_local_fstatfs,
-	chirp_fs_local_fchown,
+	cfs_basic_fchown,
 	chirp_fs_local_fchmod,
 	chirp_fs_local_ftruncate,
 	chirp_fs_local_fsync,
@@ -718,8 +696,8 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_statfs,
 	chirp_fs_local_access,
 	chirp_fs_local_chmod,
-	chirp_fs_local_chown,
-	chirp_fs_local_lchown,
+	cfs_basic_chown,
+	cfs_basic_lchown,
 	chirp_fs_local_truncate,
 	chirp_fs_local_utime,
 	cfs_basic_md5,

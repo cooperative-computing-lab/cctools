@@ -436,6 +436,26 @@ int cfs_exists(const char *path)
 	}
 }
 
+INT64_T cfs_basic_chown(const char *path, INT64_T uid, INT64_T gid)
+{
+	// Changing file ownership is silently ignored,
+	// because permissions are handled through the ACL model.
+	return 0;
+}
+
+INT64_T cfs_basic_lchown(const char *path, INT64_T uid, INT64_T gid)
+{
+	// Changing file ownership is silently ignored,
+	// because permissions are handled through the ACL model.
+	return 0;
+}
+
+INT64_T cfs_basic_fchown(int fd, INT64_T uid, INT64_T gid)
+{
+	// Changing file ownership is silently ignored,
+	// because permissions are handled through the ACL model.
+	return 0;
+}
 
 INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime)
 {
