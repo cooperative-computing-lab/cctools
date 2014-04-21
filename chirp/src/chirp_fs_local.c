@@ -208,7 +208,7 @@ static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode
 	if (fd == -1) return -1;
 	mode &= S_IXUSR|S_IRWXG|S_IRWXO;
 	mode |= S_IRUSR|S_IWUSR;
-	INT64_T lfd = open64(path, flags, (int) mode);
+	INT64_T lfd = open64(path, flags, mode);
 	if (lfd >= 0) {
 		open_files[fd].fd = lfd;
 		strcpy(open_files[fd].path, unresolved);
