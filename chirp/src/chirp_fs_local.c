@@ -383,7 +383,9 @@ static INT64_T chirp_fs_local_chdir(const char *path)
 static INT64_T chirp_fs_local_mkdir(const char *path, INT64_T mode)
 {
 	RESOLVE(path)
-	return mkdir(path, S_IRWXU);
+	mode &= S_IRWXG|S_IRWXO; /* users can only set group/other bits */
+	mode |= S_IRWXU;
+	return mkdir(path, mode);
 }
 
 /*
