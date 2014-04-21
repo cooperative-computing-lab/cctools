@@ -695,13 +695,6 @@ static INT64_T chirp_fs_hdfs_md5(const char *path, unsigned char digest[16])
 	return cfs_basic_md5(path, digest);
 }
 
-static INT64_T chirp_fs_hdfs_chdir(const char *path)
-{
-	RESOLVE(path)
-	debug(D_HDFS, "chdir %s", path);
-	return hdfs_services->chdir(fs, path);
-}
-
 static INT64_T chirp_fs_hdfs_setrep(const char *path, int nreps)
 {
 	RESOLVE(path)
@@ -761,7 +754,6 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_link,
 	chirp_fs_hdfs_symlink,
 	chirp_fs_hdfs_readlink,
-	chirp_fs_hdfs_chdir,
 	chirp_fs_hdfs_mkdir,
 	chirp_fs_hdfs_rmdir,
 	chirp_fs_hdfs_stat,

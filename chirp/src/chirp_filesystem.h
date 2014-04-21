@@ -56,7 +56,6 @@ struct chirp_filesystem {
 	INT64_T (*link)      ( const char *path, const char *newpath );
 	INT64_T (*symlink)   ( const char *path, const char *newpath );
 	INT64_T (*readlink)  ( const char *path, char *target, INT64_T length );
-	INT64_T (*chdir)     ( const char *path );
 	INT64_T (*mkdir)     ( const char *path, INT64_T mode );
 	INT64_T (*rmdir)     ( const char *path );
 	INT64_T (*stat)      ( const char *path, struct chirp_stat *buf );

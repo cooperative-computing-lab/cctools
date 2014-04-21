@@ -374,12 +374,6 @@ static INT64_T chirp_fs_local_readlink(const char *path, char *buf, INT64_T leng
 	return readlink(path, buf, length);
 }
 
-static INT64_T chirp_fs_local_chdir(const char *path)
-{
-	RESOLVE(path)
-	return chdir(path);
-}
-
 static INT64_T chirp_fs_local_mkdir(const char *path, INT64_T mode)
 {
 	RESOLVE(path)
@@ -717,7 +711,6 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_link,
 	chirp_fs_local_symlink,
 	chirp_fs_local_readlink,
-	chirp_fs_local_chdir,
 	chirp_fs_local_mkdir,
 	chirp_fs_local_rmdir,
 	chirp_fs_local_stat,
