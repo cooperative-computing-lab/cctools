@@ -34,6 +34,7 @@ OPTION_ITEM(`-k, --no-checksums')Do not checksum files.
 OPTION_TRIPLET(-l, ld-path, path)Path to ld.so to use.
 OPTION_TRIPLET(-m, ftab-file, file)Use this file as a mountlist.
 OPTION_TRIPLET(-M, mount, /foo=/bar)Mount (redirect) /foo to /bar.
+OPTION_TRIPLET(name-list, path)Record all the file names.
 OPTION_TRIPLET(-N, hostname, name)Pretend that this is my hostname.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_TRIPLET(-O, debug-rotate-max, bytes)Rotate debug files of this size.
@@ -82,6 +83,15 @@ LONGCODE_END
 To see the list of available Chirp servers around the world:
 LONGCODE_BEGIN
 % parrot_run ls -la /chirp
+LONGCODE_END
+
+Parrot can record the names of all the accessed files during the execution process of one program, like this:
+LONGCODE_BEGIN
+% parrot_run --name-list list.txt ls ~
+LONGCODE_END
+The absolute paths of all the accessed files, together with the system call types, will be recorded into BOLD(list.txt). For example, the file BOLD(/usr/bin/ls) is accessed using the BOLD(stat) system call, like this:
+LONGCODE_BEGIN
+% /usr/bin/ls|stat
 LONGCODE_END
 
 SECTION(COPYRIGHT)
