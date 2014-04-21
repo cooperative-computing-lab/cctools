@@ -322,7 +322,8 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		return -1;
 	}
 
-	mode = 0600 | (mode & 0100);
+	mode &= S_IXUSR|S_IRWXG|S_IRWXO;
+	mode |= S_IRUSR|S_IWUSR;
 
 	switch (flags & O_ACCMODE) {
 		case O_RDONLY:
@@ -457,11 +458,17 @@ static INT64_T chirp_fs_hdfs_fchown(int fd, INT64_T uid, INT64_T gid)
 
 static INT64_T chirp_fs_hdfs_fchmod(int fd, INT64_T mode)
 {
+	struct chirp_stat info;
 	SETUP_FILE
-	// The owner may only add or remove the execute bit,
-	// because permissions are handled through the ACL model.
+	mode &= S_IXUSR|S_IRWXG|S_IRWXO; /* users can only set owner execute and group/other bits */
+	if (do_stat(open_files[fd].path, &info) == -1)
+		return -1;
+	if(S_ISDIR(info.cst_mode)) {
+		mode |= S_IRWXU; /* all owner bits must be set */
+	} else {
+		mode |= S_IRUSR|S_IWUSR; /* owner read/write must be set */
+	}
 	debug(D_HDFS, "fchmod %s %lo", open_files[fd].path, (long) mode);
-	mode = 0600 | (mode & 0100);
 	return hdfs_services->chmod(fs, open_files[fd].path, mode);
 }
 
@@ -621,11 +628,17 @@ static INT64_T chirp_fs_hdfs_access(const char *path, INT64_T mode)
 
 static INT64_T chirp_fs_hdfs_chmod(const char *path, INT64_T mode)
 {
-	// The owner may only add or remove the execute bit,
-	// because permissions are handled through the ACL model.
+	struct chirp_stat info;
 	RESOLVE(path)
+	mode &= S_IXUSR|S_IRWXG|S_IRWXO; /* users can only set owner execute and group/other bits */
+	if (do_stat(path, &info) == -1)
+		return -1;
+	if(S_ISDIR(info.cst_mode)) {
+		mode |= S_IRWXU; /* all owner bits must be set */
+	} else {
+		mode |= S_IRUSR|S_IWUSR; /* owner read/write must be set */
+	}
 	debug(D_HDFS, "chmod %s %ld", path, (long) mode);
-	mode = 0600 | (mode & 0100);
 	return hdfs_services->chmod(fs, path, mode);
 }
 
