@@ -4,7 +4,7 @@ include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
 TARGETS = makeflow makeflow_viz makeflow_analyze
-SCRIPTS = condor_submit_makeflow makeflow_log_parser makeflow_monitor starch
+SCRIPTS = condor_submit_makeflow makeflow_graph_log makeflow_monitor starch
 
 LOCAL_LDFLAGS=-lwork_queue -lchirp -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
@@ -27,4 +27,6 @@ test: all
 install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
 	chmod 755 ${SCRIPTS}
-	cp ${TARGETS} ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp makeflow ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp makeflow_viz ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp makeflow_analyze ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
