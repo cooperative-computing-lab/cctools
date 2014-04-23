@@ -276,14 +276,11 @@ output.txt: mysim.exe calib.data
         ./mysim.exe -c calib.data -o output.txt
 </code>
 
-<p>When a regular file is specified as an input file, it means the command
-relies on the contents of that file. When a directory is specified as an input
-file, however, it could mean one of two things. First, the command depends on
-the contents inside the directory. Second, the command relies on the existence
-of the directory (for example, you just want to add more things into the
-directory later, it does not matter what's already in it). <b>Makeflow assumes
-that an input directory indicates that the command relies on the directory's
-existence</b>.</p>
+<p>Note that when a directory is specified as an input dependency, it
+means that the command relies on the directory and all of its contents.
+So, if you have a large collection of input data, you can place it
+in a single directory, and then simply give the name of that directory.
+</p>
 
 <h3 id="details.phony">No Phony Rules<a class="sectionlink" href="#details.phony" title="Link to this section.">&#x21d7;</a></h3>
 
