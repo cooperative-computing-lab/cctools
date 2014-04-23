@@ -402,47 +402,6 @@ void dag_log_recover(struct dag *d, const char *filename)
 		exit(1);
 	}
 
-	if(first_run) {
-		struct dag_file *f;
-		struct dag_node *p;
-		for(n = d->nodes; n; n = n->next) {
-			/* record node information to log */
-			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->original_command);
-
-			/* Record the node category to the log */
-			fprintf(d->logfile, "# CATEGORY\t%d\t%s\n", n->nodeid, n->category->label);
-
-			/* Record node parents to log */
-			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
-			list_first_item(n->source_files);
-			while((f = list_next_item(n->source_files))) {
-				p = f->target_of;
-				if(p)
-					fprintf(d->logfile, "\t%d", p->nodeid);
-			}
-			fputc('\n', d->logfile);
-
-			/* Record node inputs to log */
-			fprintf(d->logfile, "# SOURCES\t%d", n->nodeid);
-			list_first_item(n->source_files);
-			while((f = list_next_item(n->source_files))) {
-				fprintf(d->logfile, "\t%s", f->filename);
-			}
-			fputc('\n', d->logfile);
-
-			/* Record node outputs to log */
-			fprintf(d->logfile, "# TARGETS\t%d", n->nodeid);
-			list_first_item(n->target_files);
-			while((f = list_next_item(n->target_files))) {
-				fprintf(d->logfile, "\t%s", f->filename);
-			}
-			fputc('\n', d->logfile);
-
-			/* Record translated command to log */
-			fprintf(d->logfile, "# COMMAND\t%d\t%s\n", n->nodeid, n->command);
-		}
-	}
-
 	dag_count_states(d);
 
 	// Decide rerun tasks
