@@ -27,6 +27,4 @@ test: all
 install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
 	chmod 755 ${SCRIPTS}
-	cp makeflow ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
-	cp makeflow_viz ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
-	cp makeflow_analyze ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp ${TARGETS} ${SCRIPTS} ${CCTOOLS_INSTALL_DIR}/bin
