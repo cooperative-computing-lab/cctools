@@ -24,9 +24,6 @@ See the file COPYING for details.
 #elif defined(HAS_SYS_XATTR_H)
 #include <sys/xattr.h>
 #endif
-#ifndef ENOATTR
-#define ENOATTR  EINVAL
-#endif
 
 #include <sys/mount.h>
 #include <sys/param.h>
