@@ -1621,10 +1621,15 @@ static void handle_worker(struct work_queue *q, struct link *l)
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		worker_failure = 1;
 	} else if(result < 0){
-		if(!strcmp(w->hostname, "QUEUE_STATUS"))
+		if(!strcmp(w->hostname, "QUEUE_STATUS")) {
 			debug(D_WQ, "Work Queue Status worker disconnected (%s)", w->addrport);
-		else
+		} else if (string_prefix_is(line, "name")) {
+			//send project name (q->name) if there is one. otherwise send blank line
+			if(q->name) link_putfstring(l, "%s\n", time(0)+q->short_timeout, q->name);
+			else        link_putfstring(l, "\n",   time(0)+q->short_timeout);
+		} else {
 			debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
+		}
 		worker_failure = 1;
 	} // otherwise do nothing..message was consumed and processed in recv_worker_msg()
 
