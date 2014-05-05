@@ -1049,10 +1049,10 @@ static struct link *connect_master(time_t stoptime) {
 		}
 
 		if(master && list_size(preferred_masters) > 0) {
-			debug(D_WQ, "verifying master's project name");
-			link_putfstring(master, "name\n", time(0)+master_timeout);
 			char line[1024];
-			link_readline(master, line, sizeof(line), time(0)+master_timeout);
+			debug(D_WQ, "verifying master's project name");
+			send_master_message(master, "name\n");
+			recv_master_message(master, line, sizeof(line), time(0)+master_timeout);
 			if(!list_find(preferred_masters, (int (*)(void *, const void *)) string_equal, (void *)line)) {
 				fprintf(stderr, "work_queue_worker: master does not have the correct project name - %s found instead\n", line);
 				link_close(master);
