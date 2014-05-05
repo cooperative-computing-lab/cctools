@@ -12,10 +12,9 @@
 <div id="manual">
 <h1>Makeflow User's Manual</h1>
 
-<p style="text-align: right;"><b>Last edited: November 2013</b></p>
+<p style="text-align: right;"><b>Last edited: April 2014</b></p>
 
 <p>Makeflow is Copyright (C) 2009 The University of Notre Dame.<br>
-All rights reserved.<br>
 This software is distributed under the GNU General Public License.<br>
 See the file COPYING for details.</p>
 
@@ -137,9 +136,6 @@ Logging submit event(s)..........
 Or, submit 10 worker processes to SGE like this:
 <code>% sge_submit_workers barney.nd.edu 9123 10</code>
 
-Or, submit 10 worker processes to Torque like this:
-<code>% torque_submit_workers barney.nd.edu 9123 10</code>
-
 Or, you can start workers manually on any other machine you can log into:
 <code>% work_queue_worker barney.nd.edu 9123</code>
 
@@ -153,33 +149,30 @@ so you can either run another Makeflow with the same workers,
 remove them from the batch system, or wait for them to expire.
 If you do nothing for 15 minutes, they will automatically exit.
 <p>
-Note that <tt>condor_submit_workers</tt>, <tt>sge_submit_workers</tt>,
-and <tt>torque_submit_workers</tt>.
+Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>,
 are simple shell scripts, so you can edit them directly if you would
 like to change batch options or other details.
 
-<h2 id="resources">Resources Categories<a class="sectionlink" href="#resources" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="resources">Resources and Categories<a class="sectionlink" href="#resources" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 Makeflow has the capability of automatically setting the cores, memory,
 and disk space requirements to the underlying batch system (currently this only
 works with Work Queue and Condor). Jobs are grouped into <em> job categories
 </em>, and jobs in the same category have the same cores, memory, and disk
 requirements.
-<br>
-<br>
-
+</p>
+<p>
 Job categories and resources are specified with variables.  Jobs are assigned
 to the category named in the value of the variable CATEGORY.  Likewise, the
 values of the variables CORES, MEMORY (in MB), and DISK (in MB) describe the
 resources requirements for the category specified in CATEGORY.
-<br>
-<br>
-
+</p>
+<p>
 Jobs without an explicit category are assigned to <tt>default</tt>.
 Jobs in the default category get their resource requirements from the value of
 the environment variables CORES, MEMORY, and DISK.
-<br>
-<br>
+</p>
 
 Consider the following example:
 
@@ -283,14 +276,11 @@ output.txt: mysim.exe calib.data
         ./mysim.exe -c calib.data -o output.txt
 </code>
 
-<p>When a regular file is specified as an input file, it means the command
-relies on the contents of that file. When a directory is specified as an input
-file, however, it could mean one of two things. First, the command depends on
-the contents inside the directory. Second, the command relies on the existence
-of the directory (for example, you just want to add more things into the
-directory later, it does not matter what's already in it). <b>Makeflow assumes
-that an input directory indicates that the command relies on the directory's
-existence</b>.</p>
+<p>Note that when a directory is specified as an input dependency, it
+means that the command relies on the directory and all of its contents.
+So, if you have a large collection of input data, you can place it
+in a single directory, and then simply give the name of that directory.
+</p>
 
 <h3 id="details.phony">No Phony Rules<a class="sectionlink" href="#details.phony" title="Link to this section.">&#x21d7;</a></h3>
 
@@ -394,12 +384,9 @@ like this:</p>
 
 <code>% makeflow -D example.makeflow | dot -T gif &gt; example.gif</code>
 
-<h3 id="details.number">Total number of tasks in a Makeflow<a class="sectionlink" href="#details.number" title="Link to this section.">&#x21d7;</a></h3>
+<p>To observe how a makeflow runs over time, use <tt>makeflow_graph_log</tt> to convert a log file into a timeline that shows the number of tasks ready, running, and complete over time:</p>
 
-<p>The following command parses Makeflow's '-D' option output and returns the
-total number of tasks in the given Makeflow script:</p>
-
-<code>% makeflow -D example.makeflow | grep '^N[0-9]\+ \[label=' | wc -l</code>
+<code>makeflow_graph_log example.makeflowlog example.png</code>
 
 <h2 id="workqueue">Running Makeflow with Work Queue<a class="sectionlink" href="#workqueue" title="Link to this section.">&#x21d7;</a></h2>
 
@@ -478,7 +465,34 @@ make your masters and workers contact this catalog server, simply add the
 % work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj 
 </code>
 
-<h3 id="workqueue.drivers">Supported Makeflow Drivers<a class="sectionlink" href="#workqueue.drivers" title="Link to this section.">&#x21d7;</a></h3>
+<h2 id="linking">Linking Workflow Dependencies<a class="sectionlink" href="#linking" title="Link to this section.">&#x21d7;</a></h2>
+
+<p><tt>Makeflow</tt> provides a tool to collect all of the dependencies for a
+given workflow into one directory. By collecting all of the input files and
+programs contained in a workflow it is possible to run the workflow on other
+machines.</p>
+
+<p>Currently, <tt>Makeflow</tt> copies all of the files specified as
+dependencies by the rules in the makeflow file, including scripts and data
+files. Some of the files not collected are dynamically linked libraries,
+executables not listed as dependencies (<tt>python</tt>, <tt>perl</tt>), and
+configuration files (<tt>mail.rc</tt>).</p>
+
+<p>To avoid naming conflicts, files which would otherwise have an identical
+path are renamed when copied into the bundle:</p>
+
+<ul>
+  <li>All file paths are relative to the top level directory.</li>
+  <li>The makeflow file is rewritten with the new file locations and placed in the top level directory.</li>
+  <li>Files originally specified with an absolute path are placed into the top level directory.</li>
+  <li>Files with the same path are appended with a unique number</li>
+</ul>
+
+<p>Example usage:</p>
+
+<code>% makeflow -b some_output_directory example.makeflow</code>
+
+<h2 id="workqueue.drivers">Supported Makeflow Drivers<a class="sectionlink" href="#workqueue.drivers" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>The full list of supported Makeflow drivers include:</p>
 
@@ -552,31 +566,11 @@ below a given threshold.</p>
 <p>After you  have executed the <tt>example.makeflow</tt> Makeflow script, you
 should see a log file named <tt>example.makeflow.makeflowlog</tt> under the
 directory where you ran the <tt>makeflow</tt> command.  The Makeflow log file
-records all the tasks that Makeflow tries to run and how the tasks status
-change during the previous executions.</p>
+records how and when every task is run by Makeflow.  It exists primarily so
+that Makeflow can recover cleanly after a failure, but can also be used for logging
+and debugging.</p>
 
-<p>In Makeflow, each task is called a node. You can think of it as a tree node
-in a tree structure of the target workflow. There is a unique id, a positive
-integer, associated with each node. This id is referred as node id. The
-Makeflow log file starts with a list of node (task) descriptions where each
-task is specified in the following format:</p>
-
-<code># NODE node_id original_command# SYMBOL node_id symbol
-# PARENTS node_id parent_node_id_1 parent_node_id_2 ... parent_node_id_n
-# SOURCES node_id source_file_1 source_file_2 ... source_file_n
-# TARGETS node_id target_file_1 target_file_2 ... target_file_n
-# COMMAND node_id translated_command
-</code>
-
-<p>These annotation lines all start with <tt>#</tt> and will be treated as
-comments by Makeflow. When Makeflow tries to resume the execution of a Makeflow
-script from a existing Makeflow log file, it will skip the scanning of these
-commented lines. Also, annotations being commented out allows third-party
-applications, such as gnuplot, to skip them when plotting data.</p>
-
-<p>The body sections of a Makeflow log file come after the node specificiation
-section. The following is a snippet from
-<tt>example.makeflow.makeflowlog</tt>:</p>
+<p>A sample logfile might look like this:</p>
 
 <code># STARTED timestamp
 1347281321284638 5 1 9206 5 1 0 0 0 6
@@ -594,20 +588,20 @@ section. The following is a snippet from
 # COMPLETED timestamp
 </code>
 
-<p>If a Makeflow execution is completed without errors, a body section of the
-log consists of a series of node (task) status change lines (the 10 column
-line) surrounded by a pair of "# STARTED" and "# COMPLETED" lines which record
-the start and end unix time of that execution.  A node status change line has
-the following form:</p>
+<p>
+Each line in the log file represents a single action taken on a single rule in the workflow.
+For simplicity, rules are numbered from the beginning of the Makeflow, starting with zero.
+Each line contains the following items:
+</p>
 
-<code>timestamp node_id new_state job_id nodes_waiting nodes_running nodes_complete nodes_failed nodes_aborted node_id_counter</code>
+<code>timestamp task_id new_state job_id tasks_waiting tasks_running tasks_complete tasks_failed tasks_aborted task_id_counter</code>
 
-<p>Here is the column specificiation:</p>
+<p>Which are defined as follows:</p>
 
 <ul>
 	<li><b>timestamp</b> - the unix time (in microseconds) when this line is written to the log file. </li>
-	<li><b>node_id</b> - the id of this node (task). </li>
-	<li><b>new_state</b> - a integer represents the new state this node (whose id is in the node_id column) has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:</li>
+	<li><b>task_id</b> - the id of this n. </li>
+	<li><b>new_state</b> - a integer represents the new state this task (whose id is in the task_id column) has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:</li>
 	<ol start="0">
 		<li> waiting </li>
 		<li> running </li>
@@ -615,29 +609,27 @@ the following form:</p>
 		<li> failed </li>
 		<li> aborted </li>
 	</ol>
-	<li><b>job_id</b> - the job id of this node in the underline execution
+	<li><b>job_id</b> - the job id of this task in the underline execution
 	system (local or batch system). If the Makeflow is executed locally, the
-	job id would be the process id of the process that executes this node. If
+	job id would be the process id of the process that executes this task. If
 	the underline execution system is a batch system, such as Condor or SGE,
 	the job id would be the job id assigned by the batch system when the task
 	was sent to the batch system for execution.</li>
-	<li><b>nodes_waiting</b> - the number of nodes are waiting to be executed.</li>
-	<li><b>nodes_running</b> - the number of nodes are being executed.</li>
-	<li><b>nodes_complete</b> - the number of nodes has been completed.</li>
-	<li><b>nodes_failed</b> - the number of nodes has failed.</li>
-	<li><b>nodes_aborted</b> - the number of nodes has been aborted.</li>
-	<li><b>node_id_counter</b> - total number of nodes in this Makeflow</li>
+	<li><b>tasks_waiting</b> - the number of tasks are waiting to be executed.</li>
+	<li><b>tasks_running</b> - the number of tasks are being executed.</li>
+	<li><b>tasks_complete</b> - the number of tasks has been completed.</li>
+	<li><b>tasks_failed</b> - the number of tasks has failed.</li>
+	<li><b>tasks_aborted</b> - the number of tasks has been aborted.</li>
+	<li><b>task_id_counter</b> - total number of tasks in this Makeflow</li>
 </ul>
 
-<p>You might also see the following two lines in the Makeflow log file if the
-Makeflow is aborted or failed during a execution. The unix time at which such
-event occured is recorded:</p>
+<p> In addition, lines starting with a pound sign are comments and 
+contain additional high-level information that can be safely ignored.
+The logfile begins with a comment to indicate the starting time, and ends with
+a comment indicating whether the entire workflow completed, failed, or was aborted.
+</p>
 
-<code># ABORTED timestamp
-# FAILED timestamp
-</code>
-
-<p>When file garbage collection is enabled, the log file records information at
+<p>When file garbage collection is enabled, the log file also records information at
 each collection cycle. Collection information is included in lines starting
 with the <tt># GC</tt> prefix:</p>
 
@@ -652,33 +644,6 @@ during a garbage collection cycle:</p>
 	<li><b>time_spent</b> - the length of time this cycle took.</li>
 	<li><b>dag_gc_collected</b> - the total number of files has been collected so far since the start this Makeflow execution.</li>
 </ul>
-
-<h2 id="linking">Linking Workflow Dependencies<a class="sectionlink" href="#linking" title="Link to this section.">&#x21d7;</a></h2>
-
-<p><tt>Makeflow</tt> provides a tool to collect all of the dependencies for a
-given workflow into one directory. By collecting all of the input files and
-programs contained in a workflow it is possible to run the workflow on other
-machines.</p>
-
-<p>Currently, <tt>Makeflow</tt> copies all of the files specified as
-dependencies by the rules in the makeflow file, including scripts and data
-files. Some of the files not collected are dynamically linked libraries,
-executables not listed as dependencies (<tt>python</tt>, <tt>perl</tt>), and
-configuration files (<tt>mail.rc</tt>).</p>
-
-<p>To avoid naming conflicts, files which would otherwise have an identical
-path are renamed when copied into the bundle:</p>
-
-<ul>
-  <li>All file paths are relative to the top level directory.</li>
-  <li>The makeflow file is rewritten with the new file locations and placed in the top level directory.</li>
-  <li>Files originally specified with an absolute path are placed into the top level directory.</li>
-  <li>Files with the same path are appended with a unique number</li>
-</ul>
-
-<p>Example usage:</p>
-
-<code>% makeflow -b some_output_directory example.makeflow</code>
 
 <h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 

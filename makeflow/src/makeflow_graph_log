@@ -1,0 +1,87 @@
+#!/bin/sh
+
+# makeflow_graph_log
+# Copyright (C) 2014- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+# This program simply runs a makeflow log file through gnuplot
+# in a standard way, so that it is easy to read.
+
+show_help()
+{
+    echo "use: makeflow_graph_log <makeflowlog> <imagefile>"
+    exit 1
+}
+
+while [ $# -gt 0 ]
+do
+    case $1 in
+	-h |--help )
+	    show_help
+	    exit 1
+	    ;;
+	*)
+	    break
+	    ;;
+	esac
+    shift
+done
+
+if [ $# -ne 2 ]
+then
+    show_help
+    exit 1
+fi
+
+infile=$1
+outfile=$2
+tempfile=$outfile.tmp
+output_format=${outfile##*.}
+
+# check for the necessary programs in the path
+
+for prog in gnuplot convert
+do
+   if which $prog >& /dev/null
+   then
+      true
+   else
+      echo "$0: could not find $prog in your PATH"
+      exit 1
+   fi
+done
+
+if [ ! -f $infile ]
+then
+    echo "$0: $infile does not exist"
+    exit 1
+fi
+
+# Note that gnuplot generates very different fonts and output
+# depending on what driver that you use.  So, we use gnuplot
+# to always generate a precise and attractive EPS, and then
+# rely upon convert to yield the appropriate output format.
+
+gnuplot <<EOF
+set terminal postscript solid eps 24 color
+set output "$tempfile"
+set size 2,1
+set timefmt "%s"
+set xdata time
+set ylabel "Jobs Submitted / Complete"
+set y2label "Jobs Running"
+set y2tics 
+set style line 1 
+set key top left
+plot "$infile" using (\$1/1000):(\$6+\$7+\$8+\$9) title "Submitted" with lines lw 5, "" using (\$1/1000):6 title "Running" with lines lw 5, "" using (\$1/1000):7 title "Complete" with lines lw 5
+EOF
+
+if [ $output_format = "eps" ]
+then
+    mv $tempfile $outfile
+else
+    convert eps:$tempfile -background white -flatten -antialias $outfile
+    rm $tempfile
+fi
+
