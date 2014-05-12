@@ -46,48 +46,53 @@ double stddev;
 int loops, cycles;
 int measure_bandwidth = 0;
 
-long do_open(const char *file, int flags, int mode)
+struct chirp_file *cf;
+int                uf;
+
+int do_open(const char *file, int flags, int mode)
 {
 	if(do_chirp) {
-		return (long) chirp_reli_open(host, file, flags, mode, STOPTIME);
+		cf = chirp_reli_open(host, file, flags, mode, STOPTIME);
+		return cf == NULL ? -1 : 0;
 	} else {
-		return open(file, flags, mode);
+		uf = open(file, flags, mode);
+		return uf;
 	}
 }
 
-int do_close(long fd)
+int do_close(void)
 {
 	if(do_chirp) {
-		return chirp_reli_close((struct chirp_file *) fd, STOPTIME);
+		return chirp_reli_close(cf, STOPTIME);
 	} else {
-		return close(fd);
+		return close(uf);
 	}
 }
 
-int do_fsync(long fd)
+int do_fsync(void)
 {
 	if(do_chirp) {
 		return 0;
 	} else {
-		return fsync(fd);
+		return fsync(uf);
 	}
 }
 
-int do_pread(long fd, char *buffer, int length, int offset)
+int do_pread(char *buffer, int length, int offset)
 {
 	if(do_chirp) {
-		return chirp_reli_pread_unbuffered((struct chirp_file *) fd, buffer, length, offset, STOPTIME);
+		return chirp_reli_pread_unbuffered(cf, buffer, length, offset, STOPTIME);
 	} else {
-		return full_pread(fd, buffer, length, offset);
+		return full_pread(uf, buffer, length, offset);
 	}
 }
 
-int do_pwrite(long fd, const char *buffer, int length, int offset)
+int do_pwrite(const char *buffer, int length, int offset)
 {
 	if(do_chirp) {
-		return chirp_reli_pwrite_unbuffered((struct chirp_file *) fd, buffer, length, offset, STOPTIME);
+		return chirp_reli_pwrite_unbuffered(cf, buffer, length, offset, STOPTIME);
 	} else {
-		return full_pwrite(fd, buffer, length, offset);
+		return full_pwrite(uf, buffer, length, offset);
 	}
 }
 
@@ -104,9 +109,9 @@ int do_stat(const char *file, struct stat *buf)
 int do_bandwidth(const char *file, int bytes, int blocksize, int do_write)
 {
 	int offset = 0;
-	long fd;
 	char *buffer = malloc(blocksize);
 	int i;
+	int rc;
 
 	if(!buffer)
 		return 0;
@@ -114,8 +119,8 @@ int do_bandwidth(const char *file, int bytes, int blocksize, int do_write)
 	for(i = 0; i < blocksize; i++)
 		buffer[i] = (char) i;
 
-	fd = do_open(file, (do_write ? O_WRONLY|O_TRUNC|O_CREAT : O_RDONLY) | do_sync, 0777);
-	if(fd < 0) {
+	rc = do_open(file, (do_write ? O_WRONLY|O_TRUNC|O_CREAT : O_RDONLY) | do_sync, 0777);
+	if(rc < 0) {
 		fprintf(stderr, "couldn't open %s: %s\n", file, strerror(errno));
 		free(buffer);
 		return 0;
@@ -123,15 +128,15 @@ int do_bandwidth(const char *file, int bytes, int blocksize, int do_write)
 
 	while(bytes > 0) {
 		if(do_write) {
-			do_pwrite(fd, buffer, blocksize, offset);
+			do_pwrite(buffer, blocksize, offset);
 		} else {
-			do_pread(fd, buffer, blocksize, offset);
+			do_pread(buffer, blocksize, offset);
 		}
 		offset += blocksize;
 		bytes -= blocksize;
 	}
 
-	do_close(fd);
+	do_close();
 	free(buffer);
 	return 1;
 }
@@ -184,7 +189,7 @@ void print_total()
 
 int main(int argc, char *argv[])
 {
-	long fd;
+	int rc;
 	int bwloops;
 	char *fname;
 	char data[8192];
@@ -214,31 +219,27 @@ int main(int argc, char *argv[])
 	RUN_LOOP("getpid", getpid());
 #endif
 
-	fd = do_open(fname, O_WRONLY | O_CREAT | O_TRUNC | do_sync, 0777);
-	if(fd < 0) {
+	rc = do_open(fname, O_WRONLY | O_CREAT | O_TRUNC | do_sync, 0777);
+	if(rc < 0) {
 		perror(fname);
 		return -1;
 	}
-
 	memset(data, -1, sizeof(data));
-	RUN_LOOP("write1", do_pwrite(fd, data, 1, n));
-	RUN_LOOP("write8", do_pwrite(fd, data, 8192, n*8192));
+	RUN_LOOP("write1", do_pwrite(data, 1, n));
+	RUN_LOOP("write8", do_pwrite(data, 8192, n*8192));
+	do_close();
 
-	do_close(fd);
-
-	fd = do_open(fname, O_RDONLY | do_sync, 0777);
-	if(fd < 0) {
+	rc = do_open(fname, O_RDONLY | do_sync, 0777);
+	if(rc < 0) {
 		perror(fname);
 		return -1;
 	}
-
-	RUN_LOOP("read1", do_pread(fd, data, 1, n));
-	RUN_LOOP("read8", do_pread(fd, data, 8192, n*8192));
-
-	do_close(fd);
+	RUN_LOOP("read1", do_pread(data, 1, n));
+	RUN_LOOP("read8", do_pread(data, 8192, n*8192));
+	do_close();
 
 	RUN_LOOP("stat", do_stat(fname, &buf));
-	RUN_LOOP("open", fd = do_open(fname, O_RDONLY | do_sync, 0777); do_close(fd));
+	RUN_LOOP("open", rc = do_open(fname, O_RDONLY | do_sync, 0777); do_close());
 
 	if(bwloops == 0)
 		return 0;
