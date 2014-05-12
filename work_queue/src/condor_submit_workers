@@ -28,7 +28,7 @@ parse_arguments()
 		case $1 in
 			-r)  
 			shift
-			requirements="$requirments $1"
+			requirements="$requirements $1"
 			;;
 			*)
 			break
