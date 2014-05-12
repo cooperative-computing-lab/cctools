@@ -2657,27 +2657,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			break;
 
 		/*
-		Because parrot is in control of the session
-		and the process parentage, it must do set/getpgid
-		on behalf of the child process.
-		*/
-		case SYSCALL64_getpgid:
-			if(entering) {	
-				p->syscall_result = getpgid(p->syscall_args[0]);
-				if(p->syscall_result<0) p->syscall_result = -errno;
-				divert_to_dummy(p,p->syscall_result);
-			}
-			break;
-
-               case SYSCALL64_setpgid:
-                        if(entering) {  
-                                p->syscall_result = setpgid(p->syscall_args[0],p->syscall_args[1]);
-                                if(p->syscall_result<0) p->syscall_result = -errno;
-                                divert_to_dummy(p,p->syscall_result);
-                        }
-                        break;
-
-		/*
 		These things are not currently permitted.
 		*/
 		case SYSCALL64_chroot:
@@ -2704,7 +2683,8 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		access, so we simply send them along to the
 		underlying OS.
 		*/
-
+		case SYSCALL64_getpgid:
+		case SYSCALL64_setpgid:
 		case SYSCALL64__sysctl:
 		case SYSCALL64_adjtimex:
 		case SYSCALL64_afs_syscall:
