@@ -32,7 +32,7 @@ parse_arguments()
 			requirements="$requirements $1"
 			;;
 
-		        --autosize)
+			--autosize)
 			arguments="$arguments --cores \$\$(TotalSlotCpus) --memory \$\$(TotalSlotMemory) --disk \$\$(TotalSlotDisk)"
 			cores="TotalSlotCpus"
 			memory="TotalSlotMemory"
