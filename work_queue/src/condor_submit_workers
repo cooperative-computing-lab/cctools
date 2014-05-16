@@ -12,6 +12,7 @@ fi
 show_help() 
 {
 	echo "  -r <requirements>        Condor requirements ClassAd."
+	echo "  --autosize               Condor will automatically size the worker to the slot."
 }
 
 # This dummy requirement inhibits Condor from adding its own Memory expression,
@@ -28,11 +29,20 @@ parse_arguments()
 		case $1 in
 			-r)  
 			shift
-			requirements="$requirments $1"
+			requirements="$requirements $1"
 			;;
+
+			--autosize)
+			arguments="$arguments --cores \$\$(TotalSlotCpus) --memory \$\$(TotalSlotMemory) --disk \$\$(TotalSlotDisk)"
+			cores="TotalSlotCpus"
+			memory="TotalSlotMemory"
+			disk="TotalSlotDisk"
+			;;
+
 			*)
 			break
 			;;
+			
 		esac
 		shift
 	done

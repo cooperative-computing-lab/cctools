@@ -1339,13 +1339,6 @@ INT64_T chirp_client_statfs(struct chirp_client * c, const char *path, struct ch
 	return result;
 }
 
-INT64_T chirp_client_mkfifo(struct chirp_client * c, const char *path, time_t stoptime)
-{
-	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
-	return simple_command(c, stoptime, "mkfifo %s\n", safepath);
-}
-
 INT64_T chirp_client_unlink(struct chirp_client * c, const char *path, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];

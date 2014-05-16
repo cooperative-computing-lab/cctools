@@ -388,42 +388,41 @@ pfs_service * pfs_service_lookup( const char *name )
 		return pfs_service_lfc;
 #endif
 #ifdef HAS_RFIO
-        } else if(!strcmp(name,"rfio")) {
-                extern pfs_service *pfs_service_rfio;
+	} else if(!strcmp(name,"rfio")) {
+		extern pfs_service *pfs_service_rfio;
 		return pfs_service_rfio;
 #endif
 #ifdef HAS_DCAP
-        } else if(!strcmp(name,"dcap")) {
-                extern pfs_service *pfs_service_dcap;
+	} else if(!strcmp(name,"dcap")) {
+		extern pfs_service *pfs_service_dcap;
 		return pfs_service_dcap;
 #endif
 #ifdef HAS_IRODS
-        } else if(!strcmp(name,"irods")) {
-                extern pfs_service *pfs_service_irods;
+	} else if(!strcmp(name,"irods")) {
+		extern pfs_service *pfs_service_irods;
 		return pfs_service_irods;
 #endif
-        } else if(!strcmp(name,"hdfs")) {
-                extern pfs_service *pfs_service_hdfs;
+	} else if(!strcmp(name,"hdfs")) {
+		extern pfs_service *pfs_service_hdfs;
 		return pfs_service_hdfs;
 #ifdef HAS_BXGRID
-        } else if(!strcmp(name,"bxgrid")) {
-                extern pfs_service *pfs_service_bxgrid;
+	} else if(!strcmp(name,"bxgrid")) {
+		extern pfs_service *pfs_service_bxgrid;
 		return pfs_service_bxgrid;
 #endif
 #ifdef HAS_XROOTD
-        } else if(!strcmp(name,"xrootd") || !strcmp(name,"root") ) {
-                extern pfs_service *pfs_service_xrootd;
-        	return pfs_service_xrootd;
+	} else if(!strcmp(name,"xrootd")) {
+		extern pfs_service *pfs_service_xrootd;
+		return pfs_service_xrootd;
 #endif
 #ifdef HAS_CVMFS
-        } else if(!strcmp(name,"cvmfs")) {
-                extern pfs_service *pfs_service_cvmfs;
-            return pfs_service_cvmfs;
+	} else if(!strcmp(name,"cvmfs")) {
+		extern pfs_service *pfs_service_cvmfs;
+		return pfs_service_cvmfs;
 #endif
 	} else {
 		return 0;
 	}
-
 }
 
 pfs_service * pfs_service_lookup_default()

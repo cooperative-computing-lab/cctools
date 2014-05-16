@@ -412,17 +412,6 @@ This causes the server to call <b>another</b> Chirp server and invoke @ref chirp
 
 INT64_T chirp_reli_whoareyou(const char *host, const char *rhost, char *subject, INT64_T length, time_t stoptime);
 
-/** Create a named pipe (FIFO).
-A named pipe (FIFO) is a rendezvous that appears as a file.
-Programs that read from the named pipe will block until another program connects and issues a write.
-@param host The name and port of the Chirp server to access.
-@param path The pathname of the FIFO to create.
-@param stoptime The absolute time at which to abort.
-@return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
-*/
-
-INT64_T chirp_reli_mkfifo(const char *host, const char *path, time_t stoptime);
-
 /** Delete a file.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the file to delete.

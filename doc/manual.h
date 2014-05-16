@@ -8,6 +8,9 @@ LIST_ITEM MANUAL(Cooperative Computing Tools Documentation,"../index.html")
 LIST_ITEM MANUAL(Makeflow User Manual,"../makeflow.html")
 LIST_ITEM MANPAGE(makeflow,1)
 LIST_ITEM MANPAGE(makeflow_monitor,1)
+LIST_ITEM MANPAGE(makeflow_analyze,1)
+LIST_ITEM MANPAGE(makeflow_viz,1)
+LIST_ITEM MANPAGE(makeflow_graph_log,1)
 LIST_ITEM MANPAGE(starch,1)
 LIST_END')dnl
 dnl
