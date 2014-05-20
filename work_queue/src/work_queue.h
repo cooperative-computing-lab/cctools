@@ -72,6 +72,8 @@ struct work_queue_task {
 	char *host;			/**< The address and port of the host on which it ran. */
 	char *hostname;			/**< The name of the host on which it ran. */		
 
+	timestamp_t time_committed;	/**< The time at which a task was committed to a worker. */
+
 	timestamp_t time_task_submit;	/**< The time at which this task was submitted. */
 	timestamp_t time_task_finish;	/**< The time at which this task was finished. */
 	timestamp_t time_send_input_start;	/**< The time at which it started to transfer input files. */
