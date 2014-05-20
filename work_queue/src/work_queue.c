@@ -578,7 +578,9 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		t->total_bytes_transferred = 0;
 		t->total_transfer_time = 0;
 		t->cmd_execution_time = 0;
-		t->total_cmd_execution_time += timestamp_get() - t->time_execute_cmd_start;
+		if (t->time_execute_cmd_start >= t->time_committed) {
+			t->total_cmd_execution_time += timestamp_get() - t->time_execute_cmd_start;
+		}
 		if(t->output) {
 			free(t->output);
 		}
@@ -2362,6 +2364,8 @@ static struct work_queue_worker *find_best_worker(struct work_queue *q, struct w
 
 static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
+	t->time_committed = timestamp_get();
+
 	itable_insert(w->current_tasks, t->taskid, t);
 	itable_insert(q->running_tasks, t->taskid, t); 
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
@@ -2712,6 +2716,9 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->input_files = list_create();
 	t->output_files = list_create();
 	t->return_status = -1;
+
+	t->time_committed = 0;
+	t->time_execute_cmd_start = 0;
 	t->total_cmd_execution_time = 0;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
