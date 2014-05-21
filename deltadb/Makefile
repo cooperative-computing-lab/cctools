@@ -1,19 +1,18 @@
 include ../Makefile.config
 include ../Makefile.rules
 
-SCRIPTS=catalog_history_select catalog_history_filter catalog_history_plot
+SCRIPTS= ddb_collect ddb_select_static ddb_select_dynamic ddb_select_complete ddb_project ddb_reduce_temporal ddb_reduce_spatial ddb_pivot ddb_test
 
-test:
+all test install clean:
+	cd src && $(MAKE) $@ && cd ..
 
-all:
 
-clean:
 
-uninstall:
-	for s in ${SCRIPTS}; do rm -f ${CCTOOLS_INSTALL_DIR}/bin/$$s; done
+#uninstall:
+#	for s in ${SCRIPTS}; do rm -f ${CCTOOLS_INSTALL_DIR}/bin/$$s; done
 
-install:
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	for s in ${SCRIPTS}; do cat src/$$s | sed "s:CCTOOLS_VERSION:${CCTOOLS_VERSION}:g" | sed "s:CCTOOLS_RELEASEDATE:${CCTOOLS_RELEASEDATE}:g" > ${CCTOOLS_INSTALL_DIR}/bin/$$s; chmod 755 ${CCTOOLS_INSTALL_DIR}/bin/$$s; done
+#install:
+#	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
+#	for s in ${SCRIPTS}; do cat src/$$s | sed "s:CCTOOLS_VERSION:${CCTOOLS_VERSION}:g" | sed "s:CCTOOLS_RELEASEDATE:${CCTOOLS_RELEASEDATE}:g" > ${CCTOOLS_INSTALL_DIR}/bin/$$s; chmod 755 ${CCTOOLS_INSTALL_DIR}/bin/$$s; done
 
 

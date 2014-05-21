@@ -8,36 +8,36 @@ SOURCES = nvpair.c deltadb_reduction.c deltadb_value.c deltadb_expr.c deltadb_sc
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h}
 LIBRARIES = libdeltadb.a
-PROGRAMS = ch_select ch_dfilter ch_sfilter ch_cfilter ch_project ch_treduce ch_pivot ch_sreduce deltadb_test
+PROGRAMS = ddb_collect ddb_select_static ddb_select_dynamic ddb_select_complete ddb_project ddb_reduce_temporal ddb_reduce_spatial ddb_pivot ddb_test
 PROGRAM_SOURCES = ${PROGRAMS:%=%.c}
 
 all: ${LIBRARIES} $(PROGRAMS)
 
-deltadb_test: deltadb_test.c libdeltadb.a
+ddb_test: ddb_test.c libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ch_select: ch_select.o libdeltadb.a
+ddb_collect: ddb_collect.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ch_dfilter: ch_dfilter.o libdeltadb.a
+ddb_select_static: ddb_select_static.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ch_sfilter: ch_sfilter.o libdeltadb.a
+ddb_select_dynamic: ddb_select_dynamic.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ch_cfilter: ch_cfilter.o libdeltadb.a
+ddb_select_complete: ddb_select_complete.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ch_project: ch_project.o libdeltadb.a
+ddb_project: ddb_project.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ch_treduce: ch_treduce.o libdeltadb.a
+ddb_reduce_temporal: ddb_reduce_temporal.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ch_sreduce: ch_sreduce.o libdeltadb.a
+ddb_reduce_spatial: ddb_reduce_spatial.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ch_pivot: ch_pivot.o libdeltadb.a
+ddb_pivot: ddb_pivot.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 

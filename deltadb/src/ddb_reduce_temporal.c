@@ -231,8 +231,10 @@ void object_status_delete(struct object_status *s)
 
 	hash_table_firstkey(s->pairs);
 	while(hash_table_nextkey(s->pairs, &key, &value)) {
-		hash_table_remove(s->pairs, key);
-		free(value);
+		if (key!=NULL){
+			hash_table_remove(s->pairs, key);
+			free(value);
+		}
 	}
 	hash_table_delete(s->pairs);
 	free(s->key);
@@ -320,33 +322,7 @@ void deltadb_delete( struct deltadb *db )
 
 
 
-static int checkpoint_read( struct deltadb *db )
-{
-	FILE * file = stdin;
-	if(!file) return 0;
 
-	char firstline[NVPAIR_LINE_MAX];
-	fgets(firstline, sizeof(firstline), file);
-	time_t current = atoi(firstline+2);
-	db->end_span = current + db->time_span;
-	printf("%s",firstline);
-
-
-	while(1) {
-		struct object_status *s = object_status_create();
-		int num_pairs = object_status_parse_stream(s,file,db->reducers,NULL);
-		if(num_pairs>0) {
-			hash_table_insert(db->table,s->key,s);
-			s->new = 0;
-		} else if (num_pairs == -1) {
-			object_status_delete(s);
-			return 1;
-		} else {
-			object_status_delete(s);
-		}
-	}
-	return 1;
-}
 
 /*
 Replay a given log file into the hash table, up to the given snapshot time.
@@ -373,19 +349,18 @@ static int log_play( struct deltadb *db  )
 	void *valp;
 	int finishUp = 0;
 	
-	while(fgets(line,sizeof(line),stream)) {
-		//debug(D_NOTICE,"Processed line: %s",line);
-		//fflush(stderr);
-
+	while(1) {
 		line_number += 1;
 		
-		if (line[0]!='.'){
+		if (fgets(line,sizeof(line),stream)){
+			//debug(D_NOTICE,"Processed line: %s",line);
 			int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 			if(n<1) continue;
+		} else {
+			oper = '\n';
+		}
 
-		} else oper = '.';
-		
-		
+
 		//int include;
 		switch(oper) {
 			case 'C':
@@ -427,11 +402,15 @@ static int log_play( struct deltadb *db  )
 					}
 				}
 				break;
-			case '.':
+			case '\n':
 				sprintf(key,"%lld",(long long)db->end_span+1);
 				finishUp = 1;
+
 			case 'T':
 				current = atol(key);
+				if (db->end_span==0){
+					db->end_span = current + db->time_span;
+				}
 				while (current > db->end_span){
 					//Flush Span
 					printf("T %lld\n",(long long)db->end_span-1);
@@ -450,7 +429,12 @@ static int log_play( struct deltadb *db  )
 							while(hash_table_nextkey(s->pairs, &namep, &valp)) {
 								red = valp;
 								if (!red->is_number){
-									printf("%s %s\n",namep,red->str);
+									const struct reducer *r = hash_table_lookup(db->reducers,namep);
+									if (r && r->LAST){
+										printf("%s.LAST %s\n",namep,red->str);
+									} else {
+										printf("%s %s\n",namep,red->str);
+									}
 									//reduction_init(red,red->str); //Not necessary because there is no reduction on strings
 								} else {
 									const struct reducer *r = hash_table_lookup(db->reducers,namep);
@@ -518,23 +502,32 @@ static int log_play( struct deltadb *db  )
 
 
 
-
 					db->end_span += db->time_span;
 				}
 				if (finishUp){
-					printf("T %lld\n",(long long)db->end_span-1);
+					int timeouted = 0;
 
 					hash_table_firstkey(table);
 					while(hash_table_nextkey(table, &keyp, &sp)) {
+						s = sp;
 						if (s->dead && s->gone){
+							if (!timeouted){
+								printf("T %lld\n",(long long)db->end_span-1);
+								timeouted = 1;
+							}
 							printf("D %s\n",keyp);
 							hash_table_remove(table,keyp);
 							object_status_delete(s);
+
 						} else {
 							hash_table_firstkey(s->pairs);
 							while(hash_table_nextkey(s->pairs, &namep, &valp)) {
 								red = valp;
 								if (red->dead && red->gone){
+									if (!timeouted){
+										printf("T %lld\n",(long long)db->end_span-1);
+										timeouted = 1;
+									}
 									printf("R %s %s\n",keyp,namep);
 									reduction_delete(hash_table_remove(s->pairs,namep));
 								}
@@ -551,7 +544,7 @@ static int log_play( struct deltadb *db  )
 		}
 
 	}
-	return 1;
+	return 0;
 }
 
 
@@ -562,21 +555,11 @@ checkpoint file and working ahead in the various log files.
 */
 
 static int parse_input( struct deltadb *db )
-{      
-	checkpoint_read(db);
-	
-	printf(".Checkpoint End.\n");
-	
+{
 	while(1) {
-
 		int keepgoing = log_play(db);
-		
 		if(!keepgoing) break;
-
 	}
-
-	printf(".Log End.\n");
-
 	return 1;
 }
 

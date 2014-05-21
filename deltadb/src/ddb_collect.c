@@ -89,7 +89,7 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 	int creating = 0;
 	int bad = 0;
 
-	printf("T %i\n",start_time);
+	printf("T %i\n",(int)start_time);
 
 	while(fgets(line,sizeof(line),stream)) {
 		int n = 0;
@@ -180,9 +180,11 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 					char *object_key;
 					
 					while(hash_table_nextkey(table, &object_key, (void **)&nv)) {
+
+						printf("C %s\n",nvpair_lookup_string(nv,"key"));
 						nvpair_print_text(nv,stdout);
 					}
-					printf(".Checkpoint End.\n");
+					//printf(".Checkpoint End.\n");
 					printf(line);
 					started = 1;
 				} else if(current>end_time) {
@@ -246,7 +248,7 @@ static int log_play_time( struct deltadb *db, time_t start_time, time_t end_time
 			day = 0;
 		}
 	}
-	printf(".Log End.\n");
+	//printf(".Log End.\n");
 	return 1;
 }
 
@@ -261,6 +263,12 @@ int main( int argc, char *argv[] )
 
 	int start_year, start_month, start_day, start_hour, start_minute, start_second;
 	sscanf(argv[2], "%d-%d-%d@%d:%d:%d", &start_year, &start_month, &start_day, &start_hour, &start_minute, &start_second);
+	if (start_hour>23)
+		start_hour = 0;
+	if (start_minute>23)
+		start_minute = 0;
+	if (start_second>23)
+		start_second = 0;
 	//printf("%d-%d-%d@%d:%d:%d",start_year, start_month, start_day, start_hour, start_minute, start_second);
 
 	t1.tm_year = start_year-1900;

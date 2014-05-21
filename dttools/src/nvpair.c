@@ -72,6 +72,10 @@ int nvpair_parse_stream(struct nvpair *n, FILE * stream)
 
 	while(fgets(line, sizeof(line), stream)) {
 		if(line[0] == '\n') {
+			if (nvpair_lookup_string(n,"key")){
+				sprintf(value,"%s:%s:%s",nvpair_lookup_string(n,"address"),nvpair_lookup_string(n,"port"),nvpair_lookup_string(n,"name"));
+				nvpair_insert_string(n, "key", value);
+			}
 			if(got_something) {
 				return 1;
 			} else {

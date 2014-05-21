@@ -40,40 +40,7 @@ void deltadb_delete( struct deltadb *db )
 	free(db);
 }
 
-static int checkpoint_read( struct deltadb *db, FILE *file )
-{
-	char firstline[1024];
-	fgets(firstline, sizeof(firstline), file);
-	current = atoi(firstline+2);
-	printf("%s",firstline);
 
-	while(1) {
-		int c = fgetc(file);
-		if(c=='.') {
-			char line[1024];
-			fgets(line,sizeof(line),file);
-			return 1;
-		} else {
-			ungetc(c,file);
-
-		}
-		struct nvpair *nv = nvpair_create();
-		if(nvpair_parse_stream(nv,file)) {
-			const char *key = nvpair_lookup_string(nv,"key");
-			if(key) {
-				nvpair_delete(hash_table_remove(db->table,key));
-				hash_table_insert(db->table,key,nv);
-			} else {
-				nvpair_delete(nv);
-			}
-		} else {
-			nvpair_delete(nv);
-			break;
-		}
-	}
-
-	return 1;
-}
 
 #define NVPAIR_LINE_MAX 1024
 
@@ -104,13 +71,14 @@ void emit_all_deltadb_reductions( struct deltadb *db, time_t current, int first_
 
 	if(first_output) {
 		/* The first time we do this, make it a checkpoint record. */
-		printf("key 0\n");
+		printf("T %ld\n",(long)current);
+		printf("C 0\n");
 		for(i=0;i<db->ndeltadb_reductions;i++) {
 			struct deltadb_reduction *r = db->deltadb_reductions[i];
 			deltadb_reduction_print(r);
 		}
 		printf("\n");
-		printf(".Checkpoint End.\n");
+		//printf(".Checkpoint End.\n");
 		first_output = 0;
 	} else {
 		/* After that, make it an update record. */
@@ -142,11 +110,12 @@ static int log_play( struct deltadb *db, FILE *stream  )
 	time_t previous_time = 0;
 	
 	while(fgets(line,sizeof(line),stream)) {
+		//debug(D_NOTICE,"Processed line: %s",line);
 
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if(n<1) continue;
 
-		if(line[0]=='.') break;
+		if(line[0]=='\n') break;
 
 		switch(oper) {
 			case 'C':
@@ -175,12 +144,15 @@ static int log_play( struct deltadb *db, FILE *stream  )
 				break;
 		}
 
-		if(previous_time!=current) {
+		if (previous_time==0){
+			previous_time = current;
+		} else if(previous_time!=current) {
 			emit_all_deltadb_reductions(db,previous_time,first_output);
+			first_output = 0;
 			previous_time = current;
 		}
-		first_output = 0;
 	}
+	emit_all_deltadb_reductions(db,previous_time,first_output);
 
 	return 0;
 }
@@ -206,10 +178,7 @@ int main( int argc, char *argv[] )
 		db->deltadb_reductions[db->ndeltadb_reductions++] = r;
 	}
 
-	checkpoint_read(db,stdin);
 	log_play(db,stdin);
-
-	printf(".Log End.\n");
 
 	deltadb_delete(db);
 

@@ -69,44 +69,18 @@ void emit_table_values( struct deltadb *db, time_t current)
 	}
 }
 
-#define NVPAIR_LINE_MAX 1024
-
-static int checkpoint_read( struct deltadb *db, FILE *stream )
-{
-	if(!stream) return 0;
-
-	char firstline[NVPAIR_LINE_MAX];
-	fgets(firstline, sizeof(firstline), stream);
-	time_t current = atoi(firstline+2);
-
-	while(1) {
-		struct nvpair *nv = nvpair_create();
-		int num_pairs = nvpair_parse_stream(nv,stream);
-		if(num_pairs>0) {
-			const char *key = nvpair_lookup_string(nv,"key");
-			if(key) {
-				nvpair_delete(hash_table_remove(db->table,key));
-				hash_table_insert(db->table,key,nv);
-				
-			} else debug(D_NOTICE,"no key in object create.");
-		} else if (num_pairs == -1) {
-			nvpair_delete(nv);
-			return 1;
-		} else {
-			nvpair_delete(nv);
-		}
-	}
-	return 1;
-}
 
 /*
 Replay a given log file into the hash table, up to the given snapshot time.
 Return true if the stoptime was reached.
 */
 
+#define NVPAIR_LINE_MAX 1024
+
 static int log_play( struct deltadb *db, FILE *stream )
 {
 	time_t current = 0;
+	time_t previous_time = 0;
 	int line_number = 0;
 
 	char line[NVPAIR_LINE_MAX];
@@ -116,9 +90,10 @@ static int log_play( struct deltadb *db, FILE *stream )
 	char oper;
 	
 	while(fgets(line,sizeof(line),stream)) {
+		//debug(D_NOTICE,"Processed line: %s",line);
 		line_number += 1;
 		
-		if (line[0]=='.') break;
+		if (line[0]=='\n') break;
 		
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if(n<1) continue;
@@ -154,8 +129,9 @@ static int log_play( struct deltadb *db, FILE *stream )
 				if(nv) nvpair_remove(nv,name);
 				break;
 			case 'T':
+				previous_time = current;
 				current = atol(key);
-				emit_table_values(db,current);
+				emit_table_values(db,previous_time);
 				break;
 			default:
 				debug(D_NOTICE,"corrupt log data[%i]: %s",line_number,line);
@@ -177,7 +153,6 @@ int main( int argc, char *argv[] )
 	}
 
 	emit_table_header(db);
-	checkpoint_read(db,stdin);
 	log_play(db,stdin);
 
 	deltadb_delete(db);

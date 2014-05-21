@@ -41,41 +41,12 @@ void deltadb_delete( struct deltadb *db )
 }
 
 
-#define NVPAIR_LINE_MAX 4096
-
-static int checkpoint_read( struct deltadb *db )
-{
-	FILE * file = stdin;
-	if(!file) return 0;
-
-	char firstline[NVPAIR_LINE_MAX];
-	fgets(firstline, sizeof(firstline), file);
-	printf("%s",firstline);
-
-	while(1) {
-		int keep = 0;
-		struct nvpair *nv = nvpair_create();
-		int num_pairs = nvpair_parse_stream_limited(nv,file,db->attr_list,db->attr_len);
-		if(num_pairs>0) {
-			nvpair_print_text(nv,stdout);
-		} else if (num_pairs == -1) {
-			nvpair_delete(nv);
-			return 1;
-		} else {
-
-			break;
-		}
-		if (!keep)
-			nvpair_delete(nv);
-
-	}
-	return 1;
-}
-
 /*
 Replay a given log file into the hash table, up to the given snapshot time.
 Return true if the stoptime was reached.
 */
+
+#define NVPAIR_LINE_MAX 4096
 
 static int log_play( struct deltadb *db )
 {
@@ -83,7 +54,6 @@ static int log_play( struct deltadb *db )
 	time_t current = 0;
 	struct nvpair *nv;
 	int line_number = 0;
-	//struct hash_table *table = db->table;
 
 	char line[NVPAIR_LINE_MAX];
 	char key[NVPAIR_LINE_MAX];
@@ -93,10 +63,9 @@ static int log_play( struct deltadb *db )
 	
 	int notime = 1;
 	while(fgets(line,sizeof(line),stream)) {
-		
 		line_number += 1;
 		
-		if (line[0]=='.') return 0;
+		if (line[0]=='\n') return 0;
 		
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if(n<1) continue;
@@ -167,7 +136,7 @@ static int log_play( struct deltadb *db )
 				break;
 		}
 	}
-	return 1;
+	return 0;
 }
 
 /*
@@ -176,21 +145,11 @@ checkpoint file and working ahead in the various log files.
 */
 
 static int parse_input( struct deltadb *db )
-{      
-	checkpoint_read(db);
-	
-	printf(".Checkpoint End.\n");
-	
+{
 	while(1) {
-
 		int keepgoing = log_play(db);
-		
 		if(!keepgoing) break;
-
 	}
-
-	printf(".Log End.\n");
-
 	return 1;
 }
 

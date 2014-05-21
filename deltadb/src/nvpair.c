@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "macros.h"
 #include "timestamp.h"
+#include "buffer.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -73,19 +74,22 @@ int nvpair_parse_stream(struct nvpair *n, FILE * stream)
 	key[0] = '\0';
 
 	while(fgets(line, sizeof(line), stream)) {
-		if(line[0] == '.') {
-			return -1;
-		} else if(line[0] == '\n') {
+		if(line[0] == '\n') {
 			if (strlen(key)==0){
 				sprintf(key,"%s:%s:%s",nvpair_lookup_string(n,"address"),nvpair_lookup_string(n,"port"),nvpair_lookup_string(n,"name"));
 				nvpair_insert_string(n, "key", key);
 			}
-			return num_pairs;
+			if (num_pairs){
+				return num_pairs;
+			} else {
+				continue;
+			}
 		}
 
 		if(sscanf(line, "%s %[^\r\n]", name, value) == 2) {
 			if (strcmp(name,"key")==0)
 				strcpy(key,value);
+			//printf("-----%s,%s\n",name,value);
 			nvpair_insert_string(n, name, value);
 			num_pairs += 1;
 		} else {
@@ -143,33 +147,34 @@ int nvpair_print(struct nvpair *n, char *text, int length)
 	int total = 0;
 
 	hash_table_firstkey(n->table);
-	while(hash_table_nextkey(n->table, &key, &value)) {
+	while(hash_table_nextkey(n->table, &key, &value) && length > 0) {
 		actual = snprintf(text, length, "%s %s\n", key, (char *) value);
 		total += actual;
 		text += actual;
 		length -= actual;
-
 	}
 	return total;
 }
 
 int nvpair_print_alloc(struct nvpair *n, char **text)
 {
-	int length = 1024;
-	int needed;
+	size_t needed;
 
-	*text = malloc(length);
-	if(!*text)
-		return 0;
+	char *key;
+	void *value;
 
-	needed = nvpair_print(n, *text, length);
-	if(needed >= length) {
-		free(*text);
-		*text = malloc(needed + 1);
-		if(!*text)
-			return 0;
-		nvpair_print(n, *text, needed + 1);
+	buffer_t b;
+	buffer_init(&b);
+	buffer_abortonfailure(&b, 0);
+
+	hash_table_firstkey(n->table);
+	while(hash_table_nextkey(n->table, &key, &value)) {
+		buffer_printf(&b, "%s %s\n", key, (char *) value);
 	}
+
+	*text  = xxstrdup(buffer_tostring(&b, &needed));
+
+	buffer_free(&b);
 
 	return needed;
 }

@@ -55,7 +55,7 @@ static int is_number(char const* p){
 	return 0;
 }
 
-static int keep_object(struct argument *arg, const char *input)
+static int show_object(struct argument *arg, const char *input)
 {
 	char *operator = arg->operator;
 	int cmp;
@@ -97,6 +97,24 @@ static int keep_object(struct argument *arg, const char *input)
 	return 0;
 }
 
+static int show_object2(struct argument *args, struct nvpair *nv, const char *key){
+	struct argument *arg = args;
+	int show = 0;
+	while (arg!=NULL){
+		const char *var;
+		if (strcmp(arg->param,"key")!=0)
+			var = nvpair_lookup_string(nv,arg->param);
+		else var = key;
+		if ( var!=NULL && show_object(arg,var) ){
+			show = 1;
+			break;
+		}
+		arg = arg->next;
+	}
+	return show;
+}
+
+
 #define NVPAIR_LINE_MAX 4096
 
 static int checkpoint_read( struct deltadb *db )
@@ -113,31 +131,18 @@ static int checkpoint_read( struct deltadb *db )
 		int num_pairs = nvpair_parse_stream(nv,file);
 		if(num_pairs>0) {
 			const char *key = nvpair_lookup_string(nv,"key");
-			if (key){
-				struct argument *arg = db->args;
-				int keep = 0;
-				while (arg!=NULL){
-					const char *var = nvpair_lookup_string(nv,arg->param);
-					if ( var!=NULL && keep_object(arg,var) ){
-						keep = 1;
-						break;
-					}
-					arg = arg->next;
-				}
-				if (keep==1){
-					nvpair_print_text(nv,stdout);
-					fflush(stdout);
-					hash_table_remove(db->table,key);
-					hash_table_insert(db->table,key,key);
-				}
-			} else {
-				debug(D_NOTICE,"no key in object create.");
-			}
-		} else if (num_pairs == -1) {
-			return 1;
-		} else {
+			if(key) {
 
-			break;
+				if (show_object2(db->args,nv,key)==1)
+					nvpair_print_text(nv,stdout);
+				nvpair_delete( hash_table_remove(db->table,key) );
+				hash_table_insert(db->table,key,nv);
+				//printf("Created %p %p for %s\n",nv,nv1,key);
+				
+			} else debug(D_NOTICE,"no key in object create.");
+		} else if (num_pairs == -1) {
+			nvpair_delete(nv);
+			return 1;
 		}
 		nvpair_delete(nv);
 	}
@@ -165,11 +170,13 @@ static int log_play( struct deltadb *db )
 	
 	int notime = 1;
 	while(fgets(line,sizeof(line),stream)) {
+		//printf("(%s",line);
+		//fflush(stdout);
 		
 		line_number += 1;
-
+		
 		if (line[0]=='.') return 0;
-
+		
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if(n<1) continue;
 		
@@ -180,63 +187,81 @@ static int log_play( struct deltadb *db )
 				nvpair_insert_string(nv, "key", key);
 				if (res>0){
 
-					if (db->static_variables_only==1){ //should this object be output?
-						struct argument *arg = db->args;
-						int keep = 0;
-						while (arg!=NULL){
-							const char *var = nvpair_lookup_string(nv,arg->param);
-							if ( var!=NULL && keep_object(arg,var) ){
-								keep = 1;
-								break;
-							}
-							arg = arg->next;
+					if (show_object2(db->args,nv,key)==1){
+						if (notime){
+							printf("T %lld\n",(long long)current);
+							notime = 0;
 						}
-						if (keep==1){
-							if (notime){
-								printf("T %lld\n",(long long)current);
-								notime = 0;
-							}
-							printf("C %s\n",key);
-							nvpair_print_text(nv,stdout);
-							hash_table_remove(table,key);
-							hash_table_insert(table,key,key);
-						}
-					} else {
-
+						printf("C %s\n",key);
+						nvpair_print_text(nv,stdout);
 					}
+					nvpair_delete( hash_table_remove(table,key) );
+					hash_table_insert(table,key,nv);
 
-				}
-				nvpair_delete(nv);
+				} else	nvpair_delete(nv);
 				break;
 			case 'D':
 				nv = hash_table_remove(table,key);
 				if(nv){
-					if (notime){
-						printf("T %lld\n",(long long)current);
-						notime = 0;
+					if (show_object2(db->args,nv,key)==1){
+						if (notime){
+							printf("T %lld\n",(long long)current);
+							notime = 0;
+						}
+						printf("%s",line);
 					}
-					printf("%s",line);
-				}//nvpair_delete(nv);
+					nvpair_delete(nv);
+				}
 				break;
 			case 'U':
 				nv = hash_table_lookup(table,key);
 				if(nv){
-					if (notime){
+					int shown = show_object2(db->args,nv,key);
+					nvpair_insert_string(nv, name, value);
+					int show = show_object2(db->args,nv,key);
+
+					if ( (shown||show) && notime){
 						printf("T %lld\n",(long long)current);
 						notime = 0;
 					}
-					printf("%s",line);
-				}//nvpair_insert_string(nv,name,value);
+					if (shown && show){
+						printf("%s",line);
+					} else if (shown){
+						printf("D %s\n",key);
+					} else if (show) {
+						printf("C %s\n",key);
+						nvpair_print_text(nv,stdout);
+					}
+
+
+				}
 				break;
 			case 'R':
 				nv = hash_table_lookup(table,key);
-				if(nv){
-					if (notime){
+				if(nv!=NULL){
+					int shown = show_object2(db->args,nv,key);
+					//fprintf(stderr,"[%s\n",line);
+					//fflush(stderr);
+					//fprintf(stderr,"[%s %i\n",key,nv);
+					//fflush(stderr);
+					nvpair_remove(nv, name);
+					int show = show_object2(db->args,nv,key);
+
+					if ( (shown||show) && notime){
 						printf("T %lld\n",(long long)current);
 						notime = 0;
 					}
-					printf("%s",line);
-				}//nvpair_remove(nv,name);
+					if (shown && show){
+						printf("%s",line);
+					} else if (shown){
+						printf("D %s\n",key);
+					} else if (show) {
+						printf("C %s\n",key);
+						nvpair_print_text(nv,stdout);
+					}
+
+
+				}
 				break;
 			case 'T':
 				current = atol(key);
