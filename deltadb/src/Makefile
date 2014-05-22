@@ -4,7 +4,7 @@ include ../../Makefile.rules
 
 CCTOOLS_INTERNAL_LDFLAGS+=-ldttools -lm
 
-SOURCES = nvpair.c deltadb_reduction.c deltadb_value.c deltadb_expr.c deltadb_scanner.c deltadb_parser.c deltadb_functions.c
+SOURCES = deltadb_reduction.c deltadb_value.c deltadb_expr.c deltadb_scanner.c deltadb_parser.c deltadb_functions.c
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h}
 LIBRARIES = libdeltadb.a

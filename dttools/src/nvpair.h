@@ -44,6 +44,7 @@ void nvpair_parse(struct nvpair *n, const char *text);
 @param stream The I/O stream to read.
 */
 int nvpair_parse_stream(struct nvpair *n, FILE * stream);
+int nvpair_parse_stream_limited(struct nvpair *n, FILE * stream, char ** attr_list, int attr_len);
 
 /** Print an nvpair to ASCII text with a limit.
 @param n The npvair to print.
