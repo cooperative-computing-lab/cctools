@@ -20,6 +20,7 @@ See the file COPYING for details.
 
 #include "hash_table.h"
 #include "debug.h"
+#include "path.h"
 #include "stringtools.h"
 
 extern int pfs_irods_debug_level;
@@ -28,6 +29,12 @@ static struct hash_table *connect_cache = 0;
 static rodsEnv irods_env;
 static int got_irods_env = 0;
 static int irods_serial = 0;
+
+#define CLEAN(path) \
+char clean_##path[PATH_MAX];\
+snprintf(clean_##path, PATH_MAX, "%s", path);\
+path_remove_trailing_slashes(clean_##path);\
+path = clean_##path;
 
 struct irods_file {
 	char *host;
@@ -174,6 +181,7 @@ struct irods_file * irods_reli_open ( const char *host, const char *path, int fl
 	struct irods_server *server;
 	dataObjInp_t request;
 	int result;
+	CLEAN(path)
 
 	server = connect_to_host(host);
 	if(!server) return 0;
@@ -364,12 +372,12 @@ int irods_reli_close    ( struct irods_file *file )
 	return 0;
 }
 
-
 int irods_reli_stat ( const char *host, const char *path, struct pfs_stat *info )
 {
 	int result;
 	dataObjInp_t request;
 	rodsObjStat_t *response = 0;
+	CLEAN(path)
 
 	/* Special case: /irods looks like an empty dir */
 
@@ -433,6 +441,7 @@ int irods_reli_getdir( const char *host, const char *path, void (*callback) ( co
 	int i;
 	int result;
 	int keepgoing;
+	CLEAN(path)
 
 	queryHandle_t query_handle;
 	genQueryInp_t query_in;
@@ -553,6 +562,7 @@ int irods_reli_mkdir ( const char *host, const char *path )
 {
 	collInp_t request;
 	int result;
+	CLEAN(path)
 
 	struct irods_server *server = connect_to_host(host);
 	if(!server) return -1;
@@ -576,6 +586,7 @@ int irods_reli_unlink( const char *host, const char *path )
 {
 	dataObjInp_t request;
 	int result;
+	CLEAN(path)
 
 	/*
 	Note that an irods Unlink will fail silently if you
@@ -619,6 +630,7 @@ int irods_reli_rmdir ( const char *host, const char *path )
 {
 	collInp_t request;
 	int result;
+	CLEAN(path)
  
         /*
         Note that an irods rmdir will fail silently if you
@@ -662,6 +674,8 @@ int irods_reli_rename   ( const char *host, const char *path, const char *newpat
 {
 	dataObjCopyInp_t request;
 	int result;
+	CLEAN(path)
+	CLEAN(newpath)
 
 	/* rcDataObjRename does not have the Unix semantics of atomically
 	   destroying the target file.  So, we must do it ourselves.
@@ -694,6 +708,7 @@ int irods_reli_truncate ( const char *host, const char *path, INT64_T length )
 {
 	dataObjInp_t request;
 	int result;
+	CLEAN(path)
 
 	struct irods_server *server = connect_to_host(host);
 	if(!server) return -1;
@@ -718,6 +733,7 @@ int irods_reli_getfile ( const char *host, const char *path, const char *local_p
 {
 	dataObjInp_t request;
 	int result;
+	CLEAN(path)
 
 	struct irods_server *server = connect_to_host(host);
 	if(!server) return -1;
@@ -748,6 +764,7 @@ int irods_reli_putfile ( const char *host, const char *path, const char *local_p
 {
 	dataObjInp_t request;
 	int result;
+	CLEAN(path)
 
 	struct irods_server *server = connect_to_host(host);
 	if(!server) return -1;
@@ -809,6 +826,7 @@ int irods_reli_md5( const char *host, const char *path, char *digest )
 	dataObjInp_t request;
 	int result;
 	char *str = 0;
+	CLEAN(path)
 
 	struct irods_server *server = connect_to_host(host);
 	if(!server) return -1;
