@@ -487,6 +487,7 @@ then
 	then
 		ccflags="${ccflags} -I${globus_path}/include/${globus_flavor} -DHAS_GLOBUS_GSS"
 		ldflags="${ldflags} -L${globus_path}/lib"
+
 		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
 		do
 			library_search ${library}_${globus_flavor} ${globus_path}
@@ -1031,20 +1032,20 @@ library_search nsl      /usr
 
 if [ $build_sys != DARWIN ]
 then
-	ldflags="${ldflags} -lrt"
+	external_dynlibs="${external_dynlibs} -lrt"
 fi
 
 if [ $build_sys != FREEBSD ]
 then
-	ldflags="${ldflags} -ldl"
+	external_dynlibs="${external_dynlibs} -ldl"
 fi
 
 #Hack to get chirp to compile on cygwin.
 if [ ${build_sys} != CYGWIN ]
 then
-	ldflags="${ldflags} -lstdc++ -lpthread -lz -lc -lm"
+	external_dynlibs="${external_dynlibs} -lstdc++ -lpthread -lz -lc -lm"
 else
-	ldflags="${ldflags} -lstdc++ -lpthread -lz -lm"
+	external_dynlibs="${external_dynlibs} -lstdc++ -lpthread -lz -lm"
 fi
 
 
@@ -1076,7 +1077,7 @@ optional_include sys/xattr.h HAS_SYS_XATTR_H
 optional_include syslog.h HAS_SYSLOG_H
 
 if optional_library_function systemd/sd-journal.h sd_journal_print systemd HAS_SYSTEMD_JOURNAL_H; then
-	ldflags="${ldflags} -lsystemd"
+	external_dynlibs="${external_dynlibs} -lsystemd"
 fi
 
 cctools_doctargets=
@@ -1165,7 +1166,9 @@ CCTOOLS_CXXFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CXXFL
 
 CCTOOLS_LD=@echo LINK \$@; ${linker}
 CCTOOLS_BASE_LDFLAGS=${ldflags}
-CCTOOLS_INTERNAL_LDFLAGS= ${internal_ldflags} \${CCTOOLS_BASE_LDFLAGS}
+CCTOOLS_EXTERNAL_ARCHIVES=${external_archives}
+CCTOOLS_EXTERNAL_DYNLIBS=${external_dynlibs}
+CCTOOLS_INTERNAL_LDFLAGS=\$(CCTOOLS_BASE_LDFLAGS) ${internal_ldflags} \$(CCTOOLS_EXTERNAL_ARCHIVES) \$(CCTOOLS_EXTERNAL_DYNLIBS)
 CCTOOLS_LDFLAGS=-L\${CCTOOLS_INSTALL_DIR}/lib \${CCTOOLS_BASE_LDFLAGS}
 
 CCTOOLS_MPI_LD=@echo MPI_LINK \$@; ${mpilinker}

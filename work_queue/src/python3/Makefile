@@ -22,7 +22,7 @@ work_queue_wrap.o: work_queue_wrap.c
 
 _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX): work_queue_wrap.o $(CCTOOLS_HOME)/work_queue/src/libwork_queue.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 	@ln -sf /System/Library/Frameworks/Python.framework .
-	$(CCTOOLS_LD) $(CCTOOLS_DYNAMIC_FLAG) -o $@ $^ $(CCTOOLS_INTERNAL_LDFLAGS) $(CCTOOLS_PYTHON3_LDFLAGS)
+	$(CCTOOLS_LD) $(CCTOOLS_BASE_LDFLAGS) $(CCTOOLS_DYNAMIC_FLAG) -o $@ $^ $(CCTOOLS_EXTERNAL_DYNLIBS) $(CCTOOLS_PYTHON3_LDFLAGS)
 	@rm Python.framework
 
 work_queue_example.py3: ../python/work_queue_example.py
