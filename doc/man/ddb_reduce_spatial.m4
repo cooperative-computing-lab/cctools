@@ -1,30 +1,29 @@
 include(manual.h)dnl
-HEADER(ddb_reduce_temporal)
+HEADER(ddb_reduce_spatial)
 
 SECTION(NAME)
-BOLD(ddb_reduce_temporal) - command line tool that aggregates attribute values (from standard input) over a specified time span.
+BOLD(ddb_reduce_spatial) - command line tool that summarizes attribute values (from standard input) over all objects.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(ddb_reduce_temporal [time span] [arguments]))
+CODE(BOLD(ddb_reduce_spatial [arguments]))
 
 SECTION(DESCRIPTION)
 
-BOLD(ddb_reduce_temporal) is a tool to summarize the data when multiple values exist over a specified time span for a given object and attribute. It first aggregates attribute values over the time span, and then reduces them to a single value which represents the time span based on the reducer in the argument for that attribute.
+BOLD(ddb_reduce_spatial) is a tool to summarize the data when multiple objects have matching attributes. A single object with aggregated attribute values is returned for each timestamp.
 
 BOLD(deltadb) (prefix 'ddb_') is a collection of tools designed to operate on data in the format stored by the catalog server (a log of object changes over time). They are designed to be piped together to perform customizable queries on the data. A paper entitled DeltaDB describes the operation of the tools in detail (see reference below).
 
 SECTION(ARGUMENTS)
 OPTIONS_BEGIN
-OPTION_ITEM(` time span') The time span span over which attribute values will be reduced. Accepts the following formats; s\#\# for seconds, m\#\# for minutes, h\#\# for hours, d\#\# for days, y\#\# for years. (m15 means 15 minute time spans)
-OPTION_ITEM(` arguments') Any number of arguments of the form <field>,<reduction_operator> such as: tasks_running,MAX. Acceptable reduction operators are currently MIN, MAX, AVERAGE, FIRST, and LAST.
+OPTION_ITEM(` arguments') Any number of arguments of the form <field>,<reduction_operator> such as: tasks_running,MAX. Acceptable reduction operators are currently MIN, MAX, AVERAGE, FIRST, and LAST. If preceded by a temporal reduction, the field name is likely to include a temporal reduction desciptor which would require the argument to look something like this: workers.MAX,SUM
 OPTIONS_END
 
 SECTION(EXAMPLES)
 
-To include the largest number of workers each day:
+To find the total sum of memory available at each timestamp:
 
 LONGCODE_BEGIN
-% ddb_reduce_temporal d1 workers,MAX
+% ddb_reduce_spatial d1 memory_avail,SUM
 LONGCODE_END
 
 
@@ -53,7 +52,7 @@ LIST_ITEM MANPAGE(ddb_select_static,1)
 LIST_ITEM MANPAGE(ddb_select_dynamic,1)
 LIST_ITEM MANPAGE(ddb_select_complete,1)
 LIST_ITEM MANPAGE(ddb_project,1)
-LIST_ITEM MANPAGE(ddb_reduce_spatial,1)
+LIST_ITEM MANPAGE(ddb_reduce_temporal,1)
 LIST_ITEM MANPAGE(ddb_pivot,1)
 LIST_END
 
