@@ -9,7 +9,7 @@ DIR=${CCTOOLS}/bin
 DATA=/var/tmp/catalog.history
 
 
-${DIR}/ddb_collect ${DATA} 2013-02-1@00:00:00 d365 | \
-${DIR}/ddb_select_static  type=wq_master | \
-${DIR}/ddb_reduce_temporal d30 workers,MAX total_tasks_dispatched,MAX task_running,MAX tasks_running,MAX | \
-${DIR}/ddb_pivot owner workers.MAX total_tasks_dispatched.MAX tasks_running.MAX task_running.MAX
+${DIR}/deltadb_collect ${DATA} 2013-02-1@00:00:00 d365 | \
+${DIR}/deltadb_select_static  type=wq_master | \
+${DIR}/deltadb_reduce_temporal d30 workers,MAX total_tasks_dispatched,MAX task_running,MAX tasks_running,MAX | \
+${DIR}/deltadb_pivot owner workers.MAX total_tasks_dispatched.MAX tasks_running.MAX task_running.MAX

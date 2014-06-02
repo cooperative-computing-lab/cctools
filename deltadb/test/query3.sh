@@ -9,8 +9,8 @@ DIR=${CCTOOLS}/bin
 DATA=/var/tmp/catalog.history
 
 
-${DIR}/ddb_collect ${DATA} 2013-03-14@00:00:00 d1 | \
-${DIR}/ddb_select_static  type=chirp | \
-${DIR}/ddb_project name | \
-${DIR}/ddb_reduce_temporal d1 name,LAST | \
-${DIR}/ddb_pivot name.LAST
+${DIR}/deltadb_collect ${DATA} 2013-03-14@00:00:00 d1 | \
+${DIR}/deltadb_select_static  type=chirp | \
+${DIR}/deltadb_project name | \
+${DIR}/deltadb_reduce_temporal d1 name,LAST | \
+${DIR}/deltadb_pivot name.LAST

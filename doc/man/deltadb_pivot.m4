@@ -34,11 +34,11 @@ LONGCODE_END
 To see full results using a chain of multiple deltadb tools:
 
 LONGCODE_BEGIN
-% ddb_collect /data/catalog.history 2013-02-1@00:00:00 d7 | \\
-% ddb_select_static  type=wq_master | \\
-% ddb_reduce_temporal m15 workers,MAX task_running,MAX tasks_running,MAX | \\
-% ddb_reduce_spatial name,CNT workers.MAX,SUM task_running.MAX,SUM tasks_running.MAX,SUM | \\
-% ddb_pivot name.CNT workers.MAX.SUM task_running.MAX.SUM tasks_running.MAX.SUM
+% deltadb_collect /data/catalog.history 2013-02-1@00:00:00 d7 | \\
+% deltadb_select_static  type=wq_master | \\
+% deltadb_reduce_temporal m15 workers,MAX task_running,MAX tasks_running,MAX | \\
+% deltadb_reduce_spatial name,CNT workers.MAX,SUM task_running.MAX,SUM tasks_running.MAX,SUM | \\
+% deltadb_pivot name.CNT workers.MAX.SUM task_running.MAX.SUM tasks_running.MAX.SUM
 LONGCODE_END
 
 SECTION(COPYRIGHT)
@@ -51,13 +51,13 @@ LIST_BEGIN
 LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
 LIST_ITEM LINK(DeltaDB User's Manual,"http://www.nd.edu/~ccl/software/manuals/deltadb.html")
 LIST_ITEM LINK(DeltaDB paper,"http://www.nd.edu/~ccl/research/papers/pivie-deltadb-2014.pdf")
-LIST_ITEM MANPAGE(ddb_select_static,1)
-LIST_ITEM MANPAGE(ddb_select_dynamic,1)
-LIST_ITEM MANPAGE(ddb_select_complete,1)
-LIST_ITEM MANPAGE(ddb_project,1)
-LIST_ITEM MANPAGE(ddb_reduce_temporal,1)
-LIST_ITEM MANPAGE(ddb_reduce_spatial,1)
-LIST_ITEM MANPAGE(ddb_pivot,1)
+LIST_ITEM MANPAGE(deltadb_select_static,1)
+LIST_ITEM MANPAGE(deltadb_select_dynamic,1)
+LIST_ITEM MANPAGE(deltadb_select_complete,1)
+LIST_ITEM MANPAGE(deltadb_project,1)
+LIST_ITEM MANPAGE(deltadb_reduce_temporal,1)
+LIST_ITEM MANPAGE(deltadb_reduce_spatial,1)
+LIST_ITEM MANPAGE(deltadb_pivot,1)
 LIST_END
 
 FOOTER

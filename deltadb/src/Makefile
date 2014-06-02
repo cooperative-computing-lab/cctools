@@ -4,40 +4,38 @@ include ../../Makefile.rules
 
 CCTOOLS_INTERNAL_LDFLAGS+=-ldttools -lm
 
-SOURCES = deltadb_reduction.c deltadb_value.c deltadb_expr.c deltadb_scanner.c deltadb_parser.c deltadb_functions.c
+SOURCES = deltadb_reduction.c
 OBJECTS = ${SOURCES:%.c=%.o}
 HEADERS = ${SOURCES:%.c=%.h}
 LIBRARIES = libdeltadb.a
-PROGRAMS = ddb_collect ddb_select_static ddb_select_dynamic ddb_select_complete ddb_project ddb_reduce_temporal ddb_reduce_spatial ddb_pivot ddb_test
+PROGRAMS = deltadb_collect deltadb_select_static deltadb_select_dynamic deltadb_select_complete deltadb_project deltadb_reduce_temporal deltadb_reduce_spatial deltadb_pivot
 PROGRAM_SOURCES = ${PROGRAMS:%=%.c}
 
 all: ${LIBRARIES} $(PROGRAMS)
 
-ddb_test: ddb_test.c libdeltadb.a
+
+deltadb_collect: deltadb_collect.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ddb_collect: ddb_collect.o libdeltadb.a
+deltadb_select_static: deltadb_select_static.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ddb_select_static: ddb_select_static.o libdeltadb.a
+deltadb_select_dynamic: deltadb_select_dynamic.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ddb_select_dynamic: ddb_select_dynamic.o libdeltadb.a
+deltadb_select_complete: deltadb_select_complete.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ddb_select_complete: ddb_select_complete.o libdeltadb.a
+deltadb_project: deltadb_project.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ddb_project: ddb_project.o libdeltadb.a
+deltadb_reduce_temporal: deltadb_reduce_temporal.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ddb_reduce_temporal: ddb_reduce_temporal.o libdeltadb.a
+deltadb_reduce_spatial: deltadb_reduce_spatial.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
-ddb_reduce_spatial: ddb_reduce_spatial.o libdeltadb.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-ddb_pivot: ddb_pivot.o libdeltadb.a
+deltadb_pivot: deltadb_pivot.o libdeltadb.a
 	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
 
 
