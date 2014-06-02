@@ -33,7 +33,7 @@ const char *special_path[] = {"var", "sys", "dev", "proc", "net", "misc", "selin
 #define special_path_len (sizeof(special_path))/(sizeof(const char *))
 
 /*
-One file can be tagged with multiple syscalls, however, the package finally will only contain one version of the same file. Because, the namelist file will be sorted and 
+One file can be tagged with multiple syscalls, however, the package finally will only contain one version of the same file. Because, the namelist file will be sorted and
 remove duplicates before copying each item, the final version of one file is determined by the syscall whose alphabet sequence is highest among all the syscalls of one file.
 these system calls will result in the whole copy of one file item.
 "lstat", "stat", "follow_symlink", "link2", "symlink2", "readlink", "unlink"
@@ -138,9 +138,9 @@ void remove_final_slashes(char *path)
 	path[n] = '\0';
 }
 
-/* 
-Function with behaviour like `mkdir -p'.  
-Correctly copying the file permissions from AFS items into the package, 
+/*
+Function with behaviour like `mkdir -p'.
+Correctly copying the file permissions from AFS items into the package,
 which is stored on the local filesystem, is inefficient, because AFS has
 its own ACLs, which is different UNIX file permission mechanism.
 If `fixed_mode` is 1, use the mode parameter; otherwise use the mode of the original file.
@@ -189,7 +189,7 @@ int mkpath(const char *path, mode_t mode, int fixed_mode) {
 
 
 /*
-preprocess: check whether the environment variable file exists; check whether the list namelist file exists; check whether the package path exists 
+preprocess: check whether the environment variable file exists; check whether the list namelist file exists; check whether the package path exists
 create the package directory.
 */
 int prepare_work()
@@ -527,25 +527,25 @@ int post_process( ) {
 		debug(D_DEBUG, "copy_file_to_file(`%s`) fails.\n", envpath);
 		return -1;
 	}
-	
+
 	sprintf(common_mountlist, "%s/%s", packagepath, "common-mountlist");
 	file = fopen(common_mountlist, "w");
 	if(!file) {
 		debug(D_DEBUG, "common-mountlist file `%s` can not be opened.\n", common_mountlist);
 		return -1;
 	}
-	if((fputs("/dev /dev\n", file) == EOF) || 
-		(fputs("/misc /misc\n", file) == EOF) ||  
-		(fputs("/net /net\n", file) == EOF) || 
-		(fputs("/proc /proc\n", file) == EOF) || 
-		(fputs("/sys /sys\n", file) == EOF) || 
-		(fputs("/var /var\n", file) == EOF) || 
+	if((fputs("/dev /dev\n", file) == EOF) ||
+		(fputs("/misc /misc\n", file) == EOF) ||
+		(fputs("/net /net\n", file) == EOF) ||
+		(fputs("/proc /proc\n", file) == EOF) ||
+		(fputs("/sys /sys\n", file) == EOF) ||
+		(fputs("/var /var\n", file) == EOF) ||
 		(fputs("/selinux /selinux\n", file) == EOF)) {
 			debug(D_DEBUG, "fputs fails: %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
 	}
 	fclose(file);
-	
+
 	fprintf(stdout, "Package Path: %s\nPackage Size: ", packagepath);
 	sprintf(size_cmd, "du -hs %s", packagepath);
 
