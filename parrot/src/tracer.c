@@ -66,23 +66,24 @@ struct tracer {
 	int has_args5_bug;
 };
 
-void tracer_prepare()
+int tracer_attach (pid_t pid)
 {
-	ptrace(PTRACE_TRACEME,0,0,0);
-	/* Ignore return value, as it is sometimes bogus. */
+	if (ptrace(PTRACE_ATTACH, pid, 0, 0) == -1) /* this handles a race condition where pid has not yet called ptrace(PTRACE_TRACEME, ...) */
+		return -1;
+
+	if (linux_available(2,5,46)) {
+		if (ptrace(PTRACE_SETOPTIONS,pid,0,(void *)(PTRACE_O_TRACECLONE|PTRACE_O_TRACEFORK|PTRACE_O_TRACEVFORK)) == -1)
+			return -1;
+	}
+
+	return 0;
 }
 
-struct tracer * tracer_attach( pid_t pid )
+struct tracer *tracer_init (pid_t pid)
 {
-	struct tracer *t;
 	char path[PATH_MAX];
 
-	ptrace(PTRACE_ATTACH, pid, 0, 0); /* this handles a race condition where pid has not yet called ptrace(PTRACE_TRACEME, ...) */
-
-	if (linux_available(2,5,46))
-		ptrace(PTRACE_SETOPTIONS,pid,0,(void *)(PTRACE_O_TRACECLONE|PTRACE_O_TRACEFORK|PTRACE_O_TRACEVFORK));
-
-	t = malloc(sizeof(*t));
+	struct tracer *t = malloc(sizeof(*t));
 	if(!t) return 0;
 
 	t->pid = pid;

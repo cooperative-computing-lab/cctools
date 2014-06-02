@@ -394,8 +394,6 @@ void write_rval(const char* message, int status) {
 int main( int argc, char *argv[] )
 {
 	pid_t pid=0;
-	int signum;
-	int status;
 	struct pfs_process *p;
 	char *s;
 	int i;
@@ -805,12 +803,18 @@ int main( int argc, char *argv[] )
 	if(pid==0) {
 		pid = fork();
 		if(pid>0) {
+			pid_t wpid;
+			int status;
 			debug(D_PROCESS,"pid %d started",pid);
+			do {
+				wpid = waitpid(pid, &status, WUNTRACED);
+			} while (wpid != pid);
+			if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGSTOP)
+				fatal("child did not stop as expected!");
 		} else if(pid==0) {
 			pfs_paranoia_payload();
 			setpgrp();
-			tracer_prepare();
-			kill(getpid(),SIGSTOP);
+			raise(SIGSTOP); /* wait to be traced */
 			getpid();
 			// This call is necessary to force the kernel to report the current heap
 			// size, so that Parrot can observe it in order to rewrite the following exec.
@@ -834,6 +838,8 @@ int main( int argc, char *argv[] )
 
 	root_pid = pid;
 	debug(D_PROCESS,"attaching to pid %d",pid);
+	if (tracer_attach(pid) == -1)
+		fatal("could not trace child");
 	p = pfs_process_create(pid,getpid(),getpid(),0,SIGCHLD);
 	if(!p) {
 		if(pfs_write_rval) {
@@ -848,7 +854,7 @@ int main( int argc, char *argv[] )
 
 	while(pfs_process_count()>0) {
 		while(1) {
-			int flags;
+			int status, flags;
 			struct rusage usage;
 			if(trace_this_pid!=-1) {
 				flags = WUNTRACED|__WALL;
@@ -905,14 +911,14 @@ int main( int argc, char *argv[] )
 		fclose(namelist_file);
 	
 	if(WIFEXITED(root_exitstatus)) {
-		status = WEXITSTATUS(root_exitstatus);
+		int status = WEXITSTATUS(root_exitstatus);
 		debug(D_PROCESS,"%s exited normally with status %d",argv[optind],status);
 		if(pfs_write_rval) {
 			write_rval("normal", status);
 		}
 		return status;
 	} else {
-		signum = WTERMSIG(root_exitstatus);
+		int signum = WTERMSIG(root_exitstatus);
 		debug(D_PROCESS,"%s exited abnormally with signal %d (%s)",argv[optind],signum,string_signal(signum));
 		if(pfs_write_rval) {
 			write_rval("abnormal", signum);

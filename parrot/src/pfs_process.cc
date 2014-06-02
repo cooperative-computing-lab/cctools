@@ -116,7 +116,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 	if(!pfs_process_table) pfs_process_table = itable_create(0);
 
 	child = (struct pfs_process *) xxmalloc(sizeof(*child));
-	child->tracer = tracer_attach(pid);
+	child->tracer = tracer_init(pid);
 	if(!child->tracer) {
 		free(child);
 		return 0;
