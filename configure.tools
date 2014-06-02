@@ -162,7 +162,7 @@ library_search_normal()
 	then
 		if check_file $libdir/lib$1.a
 		then
-			ldflags="${ldflags} $libdir/lib$1.a"
+			external_archives="${external_archives} $libdir/lib$1.a"
 			return 0
 		fi
 	fi
@@ -177,7 +177,7 @@ library_search_normal()
 			then
 				ldflags="${ldflags} -L$libdir"
 			fi
-			ldflags="${ldflags} -l$1"
+			external_dynlibs="${external_dynlibs} -l$1"
 			return 0
 		fi
 	fi
@@ -186,7 +186,7 @@ library_search_normal()
 	then
 		if check_file $libdir/lib$1.a
 		then
-			ldflags="${ldflags} $libdir/lib$1.a"
+			external_archives="${external_archives} $libdir/lib$1.a"
 			return 0
 		fi
 	fi

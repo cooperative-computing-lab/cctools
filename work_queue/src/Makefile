@@ -64,13 +64,25 @@ libwork_queue.a: ${OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
 
-bindings: libwork_queue.a work_queue.i
-	for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; $(MAKE) all; cd ..; done
+#phony gymnastics to stop compilation if one of the submakes fail
+CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL =  $(CCTOOLS_WORK_QUEUE_BINDINGS:%=install-%)
+CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN   =  $(CCTOOLS_WORK_QUEUE_BINDINGS:%=clean-%)
+.PHONY: ${CCTOOLS_WORK_QUEUE_BINDINGS} ${CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL} bindings install-bindings clean-bindings
+
+bindings: ${CCTOOLS_WORK_QUEUE_BINDINGS}
+${CCTOOLS_WORK_QUEUE_BINDINGS}: libwork_queue.a work_queue.i
+	${MAKE} -C $@ all
+
+install-bindings: ${CCTOOLS_WORK_QUEUE_BINDINGS}
+${CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL}: ${CCTOOLS_WORK_QUEUE_BINDINGS}
+	${MAKE} -C $@ install
 
 clean-bindings:
-	for m in ${CCTOOLS_WORK_QUEUE_BINDINGS}; do cd $$m; $(MAKE) clean; cd ..; done
+${CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN}:
+	${MAKE} -C $@ clean
 
-install: all
+
+install: all install-bindings
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc

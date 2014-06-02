@@ -12,7 +12,7 @@ work_queue_wrap.o: work_queue_wrap.c
 	$(CCTOOLS_CC) -c -o $@ -fPIC -Wno-unused-value -Wno-unused-variable -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src $(CCTOOLS_PERL_CCFLAGS) $^
 
 work_queue.${CCTOOLS_DYNAMIC_SUFFIX}: work_queue_wrap.o $(CCTOOLS_HOME)/work_queue/src/libwork_queue.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
-	$(CCTOOLS_LD) $(CCTOOLS_DYNAMIC_FLAG) -o $@ $^ $(CCTOOLS_INTERNAL_LDFLAGS) $(CCTOOLS_PERL_LDFLAGS)
+	$(CCTOOLS_LD) $(CCTOOLS_BASE_LDFLAGS) $(CCTOOLS_DYNAMIC_FLAG) -o $@ $^ $(CCTOOLS_EXTERNAL_DYNLIBS) $(CCTOOLS_PERL_LDFLAGS)
 
 test: all
 

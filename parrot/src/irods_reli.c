@@ -30,6 +30,7 @@ static rodsEnv irods_env;
 static int got_irods_env = 0;
 static int irods_serial = 0;
 
+/* iRODS considers paths ending in a forward slash to be invalid and throws an error. */
 #define CLEAN(path) \
 char clean_##path[PATH_MAX];\
 snprintf(clean_##path, PATH_MAX, "%s", path);\
