@@ -1,34 +1,27 @@
 include(manual.h)dnl
-HEADER(catalog_history_plot)
+HEADER(deltadb_pivot)
 
 SECTION(NAME)
-BOLD(catalog_history_plot) - command line tool that returns easily plottable data from the output of catalog_history_select or catalog_history_filter.
+BOLD(deltadb_pivot) - command line tool that returns deltadb data in a more easily plottable format.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(catalog_history_plot [granularity] [summaries]))
+CODE(BOLD(deltadb_pivot [arguments]))
 
 SECTION(DESCRIPTION)
 
-BOLD(catalog_history_plot) is a tool that returns the status (or checkpoint) for a specified start time, and all following log data until a specified end time...
+BOLD(deltadb_pivot) is a tool which returns a column for each attribute in the arguments, where each row contains the value of that attribute for each object and each timestamp in the deltadb stream.
 
 SECTION(ARGUMENTS)
 OPTIONS_BEGIN
-OPTION_ITEM(` granularity') The number of seconds between each summarized value in the output.
-OPTION_ITEM(` summaries') Any number of arguments specifying what status information should be summarized and how to do so. These arguments start with an interseries aggregation operator, followed by an intraseries aggregation operator, followed by the field to evaluate. For example SUM.AVG@memory_avail, says to look at the values for the memory_avail field, average all values for a series that occured within the specified 'grain', and sum the series averages to obtain a single value for that 'grain' of time. Available intraseries operators are: MAX,MIN,AVG,FIRST,LAST,COUNT,INC,LIST. Available interseries operators are: SUM. .
+OPTION_ITEM(` arguments') The attributes in the input that should be included as columns in the output.
 OPTIONS_END
 
 SECTION(EXAMPLES)
 
-To show the distribution for task_running values within 1 hour time periods:
+To show the object name for each object at each timestamp:
 
 LONGCODE_BEGIN
-% catalog_history_plot 3600 SUM.MIN@task_running SUM.AVG@task_running SUM.MAX@task_running
-LONGCODE_END
-
-To show the distribution of daily values describing memory:
-
-LONGCODE_BEGIN
-% catalog_history_plot 86400 SUM.MAX@memory_total SUM.AVG@memory_avail SUM.MIN@minfree
+% deltadb_pivot name
 LONGCODE_END
 
 To see full results using a chain of multiple deltadb tools:
@@ -51,6 +44,7 @@ LIST_BEGIN
 LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
 LIST_ITEM LINK(DeltaDB User's Manual,"http://www.nd.edu/~ccl/software/manuals/deltadb.html")
 LIST_ITEM LINK(DeltaDB paper,"http://www.nd.edu/~ccl/research/papers/pivie-deltadb-2014.pdf")
+LIST_ITEM MANPAGE(deltadb_select_collect,1)
 LIST_ITEM MANPAGE(deltadb_select_static,1)
 LIST_ITEM MANPAGE(deltadb_select_dynamic,1)
 LIST_ITEM MANPAGE(deltadb_select_complete,1)
