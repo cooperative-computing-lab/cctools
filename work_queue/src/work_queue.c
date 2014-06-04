@@ -2197,23 +2197,11 @@ static double compute_capacity( const struct work_queue *q )
 	return (double) avg_exec_time / (avg_transfer_time + avg_app_time);
 }
 
-//comparator function for comparing if two hostnames match.
-static int hostname_comparator(void *h, const void *w) {
-
-	char *hostname = h;
-	const char *worker_hostname = w;
-
-	if (!strcmp(hostname, worker_hostname)) {
-		return 1;
-	}
-	return 0;
-}
-
 static int check_worker_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
 
-	if (list_find(q->worker_blacklist, hostname_comparator, w->hostname)) {
+	if (list_find(q->worker_blacklist, string_equal, w->hostname)) {
         ok = 0;
     }
 	
@@ -3675,14 +3663,14 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	return work_queue_submit_internal(q, t);
 }
 
-void work_queue_blacklist_host(struct work_queue *q, char *hostname)
+void work_queue_blacklist_host(struct work_queue *q, const char *hostname)
 {
 	list_push_tail(q->worker_blacklist, hostname);
 }
 
-void work_queue_unblacklist_host(struct work_queue *q, char *hostname)
+void work_queue_unblacklist_host(struct work_queue *q, const char *hostname)
 {
-	if (list_find(q->worker_blacklist, hostname_comparator, hostname)) {
+	if (list_find(q->worker_blacklist, string_equal, hostname)) {
 		list_remove(q->worker_blacklist, hostname);
     }
 }

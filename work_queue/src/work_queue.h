@@ -340,14 +340,14 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 @param q A work queue object.
 @param hostname A string for hostname.
 */
-void work_queue_blacklist_host(struct work_queue *q, char *hostname);
+void work_queue_blacklist_host(struct work_queue *q, const char *hostname);
 
 
 /** Unblacklist host from a queue.
 @param q A work queue object.
 @param hostname A string for hostname.
 */
-void work_queue_unblacklist_host(struct work_queue *q, char *hostname);
+void work_queue_unblacklist_host(struct work_queue *q, const char *hostname);
 
 
 /** Clear blacklist of a queue.
