@@ -336,6 +336,25 @@ Once returned, it is safe to re-submit the same take object via @ref work_queue_
 */
 int work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 
+/** Blacklist host from a queue.
+@param q A work queue object.
+@param hostname A string for hostname.
+*/
+void work_queue_blacklist_host(struct work_queue *q, char *hostname);
+
+
+/** Unblacklist host from a queue.
+@param q A work queue object.
+@param hostname A string for hostname.
+*/
+void work_queue_unblacklist_host(struct work_queue *q, char *hostname);
+
+
+/** Clear blacklist of a queue.
+@param q A work queue object.
+*/
+void work_queue_clear_host_blacklist(struct work_queue *q);
+
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the queue is empty.
 If a task has completed, the corresponding task object will be returned by this function.

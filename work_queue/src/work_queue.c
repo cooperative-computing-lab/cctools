@@ -102,6 +102,7 @@ struct work_queue {
 	struct list    *complete_list;   // completed and awaiting return to the master process
 
 	struct hash_table *worker_table;
+	struct list *worker_blacklist;
 	struct itable  *worker_task_map;
 
 	struct hash_table *workers_with_available_results;
@@ -2196,9 +2197,25 @@ static double compute_capacity( const struct work_queue *q )
 	return (double) avg_exec_time / (avg_transfer_time + avg_app_time);
 }
 
+//comparator function for comparing if two hostnames match.
+static int hostname_comparator(void *h, const void *w) {
+
+	char *hostname = h;
+	const char *worker_hostname = w;
+
+	if (!strcmp(hostname, worker_hostname)) {
+		return 1;
+	}
+	return 0;
+}
+
 static int check_worker_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
+
+	if (list_find(q->worker_blacklist, hostname_comparator, w->hostname)) {
+        ok = 0;
+    }
 	
 	if(t->unlabeled)
 	{
@@ -2603,6 +2620,7 @@ static int tasktag_comparator(void *t, const void *r) {
 	}	
 	return 0;
 }
+
 
 static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
 
@@ -3365,6 +3383,7 @@ struct work_queue *work_queue_create(int port)
 	q->complete_list = list_create();
 
 	q->worker_table = hash_table_create(0, 0);
+	q->worker_blacklist = list_create();
 	q->worker_task_map = itable_create(0);
 	
 	q->workers_with_available_results = hash_table_create(0, 0);
@@ -3564,6 +3583,7 @@ void work_queue_delete(struct work_queue *q)
 		}
 		if(q->catalog_host) free(q->catalog_host);
 		hash_table_delete(q->worker_table);
+		list_delete(q->worker_blacklist);
 		itable_delete(q->worker_task_map);
 		
 		list_delete(q->ready_list);
@@ -3653,6 +3673,24 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	next_taskid++;
 
 	return work_queue_submit_internal(q, t);
+}
+
+void work_queue_blacklist_host(struct work_queue *q, char *hostname)
+{
+	list_push_tail(q->worker_blacklist, hostname);
+}
+
+void work_queue_unblacklist_host(struct work_queue *q, char *hostname)
+{
+	if (list_find(q->worker_blacklist, hostname_comparator, hostname)) {
+		list_remove(q->worker_blacklist, hostname);
+    }
+}
+
+void work_queue_clear_host_blacklist(struct work_queue *q)
+{
+	list_delete(q->worker_blacklist);
+	q->worker_blacklist = list_create();
 }
 
 static void print_password_warning( struct work_queue *q )
