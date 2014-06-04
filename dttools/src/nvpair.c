@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "nvpair.h"
 #include "nvpair_private.h"
+#include "debug.h"
 
 #include "hash_table.h"
 #include "stringtools.h"
@@ -65,25 +66,71 @@ void nvpair_parse(struct nvpair *n, const char *data)
 
 int nvpair_parse_stream(struct nvpair *n, FILE * stream)
 {
-	int got_something = 0;
+	int num_pairs = 0;
 	char line[NVPAIR_LINE_MAX];
 	char name[NVPAIR_LINE_MAX];
 	char value[NVPAIR_LINE_MAX];
+	char key[NVPAIR_LINE_MAX];
+	key[0] = '\0';
 
 	while(fgets(line, sizeof(line), stream)) {
 		if(line[0] == '\n') {
-			if(got_something) {
-				return 1;
+			if (strlen(key)==0){
+				sprintf(key,"%s:%s:%s",nvpair_lookup_string(n,"address"),nvpair_lookup_string(n,"port"),nvpair_lookup_string(n,"name"));
+				nvpair_insert_string(n, "key", key);
+			}
+			if (num_pairs){
+				return num_pairs;
 			} else {
 				continue;
 			}
 		}
 
 		if(sscanf(line, "%s %[^\r\n]", name, value) == 2) {
+			if (strcmp(name,"key")==0)
+				strcpy(key,value);
+			//printf("-----%s,%s\n",name,value);
 			nvpair_insert_string(n, name, value);
-			got_something = 1;
+			num_pairs += 1;
 		} else {
-			return 0;
+			debug(D_DEBUG,"corrupt log data: %s",line);
+			//return 0;
+		}
+
+	}
+
+	return 0;
+}
+
+int nvpair_parse_stream_limited(struct nvpair *n, FILE * stream, char ** attr_list, int attr_len)
+{
+	int num_pairs = 0;
+	char line[NVPAIR_LINE_MAX];
+	char name[NVPAIR_LINE_MAX];
+	char value[NVPAIR_LINE_MAX];
+
+	while(fgets(line, sizeof(line), stream)) {
+		if(line[0] == '.') {
+			return -1;
+		} else if(line[0] == '\n') {
+			return num_pairs;
+		}
+
+		if(sscanf(line, "%s %[^\r\n]", name, value) == 2) {
+			int i, include = 0;
+			for(i=0; i<attr_len; i++){
+				if(strcmp(name,attr_list[i])==0){
+					include = 1;
+					break;
+				}
+			}
+			if ( include>0 || strcmp(name,"key")==0 ){
+				nvpair_insert_string(n, name, value);
+				num_pairs += 1;
+			}
+		} else {
+			debug(D_DEBUG,"corrupt log data: %s",line);
+			//return 0;
 		}
 
 	}

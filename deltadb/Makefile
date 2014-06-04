@@ -1,13 +1,12 @@
 include ../Makefile.config
 include ../Makefile.rules
 
-SCRIPTS=catalog_history_select catalog_history_filter catalog_history_plot
+SCRIPTS= deltadb_collect deltadb_select_static deltadb_select_dynamic deltadb_select_complete deltadb_project deltadb_reduce_temporal deltadb_reduce_spatial deltadb_pivot
 
-test:
+all test install clean:
+	cd src && $(MAKE) $@ && cd ..
 
-all:
 
-clean:
 
 uninstall:
 	for s in ${SCRIPTS}; do rm -f ${CCTOOLS_INSTALL_DIR}/bin/$$s; done
