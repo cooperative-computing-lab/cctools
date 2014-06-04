@@ -1,7 +1,7 @@
 include ../Makefile.config
 include ../Makefile.rules
 
-SCRIPTS= deltadb_collect deltadb_select_static deltadb_select_dynamic deltadb_select_complete deltadb_project deltadb_reduce_temporal deltadb_reduce_spatial deltadb_pivot deltadb_test
+SCRIPTS= deltadb_collect deltadb_select_static deltadb_select_dynamic deltadb_select_complete deltadb_project deltadb_reduce_temporal deltadb_reduce_spatial deltadb_pivot
 
 all test install clean:
 	cd src && $(MAKE) $@ && cd ..
