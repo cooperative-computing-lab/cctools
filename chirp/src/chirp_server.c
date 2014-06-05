@@ -2036,7 +2036,7 @@ int main(int argc, char *argv[])
 	int dont_dump_core = 0;
 	time_t gc_alarm = 0;
 	const char *manual_hostname = 0;
-	int max_child_procs = 0;
+	int max_child_procs = 100;
 	const char *listen_on_interface = 0;
 	int total_child_procs = 0;
 	int did_explicit_auth = 0;
