@@ -102,7 +102,7 @@ struct work_queue {
 	struct list    *complete_list;   // completed and awaiting return to the master process
 
 	struct hash_table *worker_table;
-	struct list *worker_blacklist;
+	struct hash_table *worker_blacklist;
 	struct itable  *worker_task_map;
 
 	struct hash_table *workers_with_available_results;
@@ -2201,7 +2201,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
 
-	if (list_find(q->worker_blacklist, string_equal, w->hostname)) {
+	if (!hash_table_lookup(q->worker_blacklist,w->hostname)) {
         ok = 0;
     }
 	
@@ -3371,7 +3371,7 @@ struct work_queue *work_queue_create(int port)
 	q->complete_list = list_create();
 
 	q->worker_table = hash_table_create(0, 0);
-	q->worker_blacklist = list_create();
+	q->worker_blacklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
 	
 	q->workers_with_available_results = hash_table_create(0, 0);
@@ -3571,7 +3571,7 @@ void work_queue_delete(struct work_queue *q)
 		}
 		if(q->catalog_host) free(q->catalog_host);
 		hash_table_delete(q->worker_table);
-		list_delete(q->worker_blacklist);
+		hash_table_delete(q->worker_blacklist);
 		itable_delete(q->worker_task_map);
 		
 		list_delete(q->ready_list);
@@ -3665,20 +3665,19 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 
 void work_queue_blacklist_host(struct work_queue *q, const char *hostname)
 {
-	list_push_tail(q->worker_blacklist, hostname);
+	if (!hash_table_lookup(q->worker_blacklist, hostname)) {
+		hash_table_insert(q->worker_blacklist, hostname, 0);
+	}
 }
 
 void work_queue_unblacklist_host(struct work_queue *q, const char *hostname)
 {
-	if (list_find(q->worker_blacklist, string_equal, hostname)) {
-		list_remove(q->worker_blacklist, hostname);
-    }
+	hash_table_remove(q->worker_blacklist, hostname);
 }
 
 void work_queue_clear_host_blacklist(struct work_queue *q)
 {
-	list_delete(q->worker_blacklist);
-	q->worker_blacklist = list_create();
+	hash_table_clear(q->worker_blacklist);
 }
 
 static void print_password_warning( struct work_queue *q )
