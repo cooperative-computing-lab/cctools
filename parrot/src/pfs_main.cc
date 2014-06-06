@@ -840,11 +840,8 @@ int main( int argc, char *argv[] )
 		while(1) {
 			int flags;
 			struct rusage usage;
-			if(trace_this_pid!=-1) {
-				flags = WUNTRACED|__WALL;
-			} else {
-				flags = WUNTRACED|__WALL|WNOHANG;
-			}
+
+			flags = WUNTRACED|__WALL|WNOHANG;
 			pid = wait4(trace_this_pid,&status,flags,&usage);
 			if (pid == pfs_watchdog_pid) {
 				if (WIFEXITED(status) || WIFSIGNALED(status)) {
@@ -854,10 +851,14 @@ int main( int argc, char *argv[] )
 				}
 			} else if(pid>0) {
 				handle_event(pid,status,&usage);
+			} else if(trace_this_pid > 0) {
+				debug(D_PROCESS, "Waiting for process %d\n", trace_this_pid);
+				usleep(100);       //Avoid busy waiting while the process gives signs of live.
 			} else {
 				break;
 			}
 		}
+
 		if(pid==-1 && errno==ECHILD) break;
 		if(pfs_process_count()>0) pfs_poll_sleep();
 	}
