@@ -45,7 +45,7 @@ static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
 
 #define CERN_KEY_PLACEHOLDER   "<BUILTIN-cern.ch.pub>"
 #define OASIS_KEY_PLACEHOLDER  "<BUILTIN-opensciencegrid.org.pub>"
-#define GEANT4_KEY_PLACEHOLDER "<BUILTIN-geant4.ch.pub>"              // Officially cern-it1.cern.ch.pub
+#define CERN_IT1_KEY_PLACEHOLDER "<BUILTIN-cern-it1.ch.pub>"
 
 /* All repositories are matched in order, therefore we write them from less to more specific */
 static const char *default_cvmfs_repo =
@@ -53,9 +53,7 @@ static const char *default_cvmfs_repo =
 \
  *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/* \
 \
- *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/* \
-\
- geant4.cern.ch:pubkey=" GEANT4_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/geant4;http://cernvmfs.gridpp.rl.ac.uk/opt/geant4;http://cvmfs.racf.bnl.gov/opt/geant4";
+ *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/*";
 
 static bool wrote_cern_key;
 static std::string cern_key_fname;
@@ -85,9 +83,9 @@ FQIDAQAB\n\
 -----END PUBLIC KEY-----\n\
 ";
 
-static bool wrote_geant4_key;
-static std::string geant4_key_fname;
-static const char *geant4_key_text = 
+static bool wrote_cern_it1_key;
+static std::string cern_it1_key_fname;
+static const char *cern_it1_key_text = 
 "-----BEGIN PUBLIC KEY-----\n\
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo8uKvscgW7FNxzb65Uhm\n\
 yr8jPJiyrl2kVzb/hhgdfN14C0tCbfFoE6ciuZFg+9ytLeiL9pzM96gSC+atIFl4\n\
@@ -269,15 +267,15 @@ static bool write_oasis_key()
 	return true;
 }
 
-static bool write_geant4_key()
+static bool write_cern_it1_key()
 {
-	if( wrote_geant4_key ) {
+	if( wrote_cern_it1_key ) {
 		return true;
 	}
-	if( !write_key(geant4_key_text,"geant4.ch.pub",geant4_key_fname) ) {
+	if( !write_key(cern_it1_key_text,"cern_it1.ch.pub",cern_it1_key_fname) ) {
 		return false;
 	}
-	wrote_geant4_key = true;
+	wrote_cern_it1_key = true;
 	return true;
 }
 
@@ -345,17 +343,17 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 			f->cvmfs_options.replace(oasis_key_pos-f->cvmfs_options.c_str(),strlen(OASIS_KEY_PLACEHOLDER),oasis_key_fname);
 		}
 
-		// check for references to the built-in geant4.ch.pub key
-		char const *geant4_key_pos = strstr(f->cvmfs_options.c_str(),GEANT4_KEY_PLACEHOLDER);
-		if( geant4_key_pos ) {
-			if( !write_geant4_key() ) {
+		// check for references to the built-in cern_it1.ch.pub key
+		char const *cern_it1_key_pos = strstr(f->cvmfs_options.c_str(),CERN_IT1_KEY_PLACEHOLDER);
+		if( cern_it1_key_pos ) {
+			if( !write_cern_it1_key() ) {
 				debug(D_CVMFS|D_NOTICE,
-					  "ERROR: cannot load cvmfs repository %s, because failed to write geant4.ch.pub",
+					  "ERROR: cannot load cvmfs repository %s, because failed to write cern_it1.ch.pub",
 					  f->host.c_str());
 				return false;
 			}
 
-			f->cvmfs_options.replace(geant4_key_pos-f->cvmfs_options.c_str(),strlen(GEANT4_KEY_PLACEHOLDER),geant4_key_fname);
+			f->cvmfs_options.replace(cern_it1_key_pos-f->cvmfs_options.c_str(),strlen(CERN_IT1_KEY_PLACEHOLDER),cern_it1_key_fname);
 		}
 
 		cvmfs_set_log_fn(cvmfs_parrot_logger);
