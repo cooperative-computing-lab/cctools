@@ -340,20 +340,20 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 @param q A work queue object.
 @param hostname A string for hostname.
 */
-void work_queue_blacklist_host(struct work_queue *q, const char *hostname);
+void work_queue_blacklist_add(struct work_queue *q, const char *hostname);
 
 
 /** Unblacklist host from a queue.
 @param q A work queue object.
 @param hostname A string for hostname.
 */
-void work_queue_unblacklist_host(struct work_queue *q, const char *hostname);
+void work_queue_blacklist_remove(struct work_queue *q, const char *hostname);
 
 
 /** Clear blacklist of a queue.
 @param q A work queue object.
 */
-void work_queue_clear_host_blacklist(struct work_queue *q);
+void work_queue_blacklist_clear(struct work_queue *q);
 
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the queue is empty.

@@ -3663,19 +3663,19 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	return work_queue_submit_internal(q, t);
 }
 
-void work_queue_blacklist_host(struct work_queue *q, const char *hostname)
+void work_queue_blacklist_add(struct work_queue *q, const char *hostname)
 {
 	if (!hash_table_lookup(q->worker_blacklist, hostname)) {
 		hash_table_insert(q->worker_blacklist, hostname, 0);
 	}
 }
 
-void work_queue_unblacklist_host(struct work_queue *q, const char *hostname)
+void work_queue_blacklist_remove(struct work_queue *q, const char *hostname)
 {
 	hash_table_remove(q->worker_blacklist, hostname);
 }
 
-void work_queue_clear_host_blacklist(struct work_queue *q)
+void work_queue_blacklist_clear(struct work_queue *q)
 {
 	hash_table_clear(q->worker_blacklist);
 }
