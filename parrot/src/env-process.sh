@@ -1,0 +1,76 @@
+#!/bin/sh
+#The script is used to obtain and preserve the environment variables.
+show_help()
+{
+	echo "Options:"
+	echo "-s, --shell       The type of shell used to do the experiment."
+	echo "                  Supported shell types: csh, tcsh, bash, zsh."
+	echo "-p, --path        File to write the environment variables and its values."
+	echo "-h, --help        Show this help message."
+
+	exit 1
+}
+
+while [ $# -gt 0 ]
+do
+	case $1 in
+		-s | --shell)
+			shift
+			shell_type=$1
+			;;
+		-p | --path)
+			shift
+			env_path=$1
+			;;
+		-h | --help)
+			show_help
+			;;
+		*)
+			break
+			;;
+	esac
+	shift
+done
+
+if [ -z $shell_type ]; then
+	echo "Please indicate the shell type!"
+	exit 1
+fi
+
+if [ -z $env_path ]; then
+	echo "Please indicate the file to write environment variables!"
+	exit 1
+fi
+
+if [ -e $env_path ]; then
+	rm $env_path
+fi
+
+if [ -e $env_path.bak ]; then
+	rm $env_path.bak
+fi
+
+env>$env_path
+
+IFS=''
+while read line
+do
+	IFS="="     # Set the field separator
+	set $line      # Breaks the string into $1, $2, ...
+	variable_name=$1
+	variable_value=$2
+	if [ "$shell_type" = bash -o "$shell_type" = zsh ]; then
+		echo export $variable_name=\"$variable_value\" >> $env_path.bak
+	elif [ "$shell_type" = tcsh -o "$shell_type" = csh ]; then
+		echo setenv $variable_name \"$variable_value\" >> $env_path.bak
+	else
+		echo "This shell type currently is not supported."
+		rm $env_path
+		exit 1
+	fi
+
+	IFS=""
+done < $env_path
+
+cp -f $env_path.bak $env_path
+rm -f $env_path.bak
