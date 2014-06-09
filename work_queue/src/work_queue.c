@@ -2203,6 +2203,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 
 	if (hash_table_lookup(q->worker_blacklist,w->hostname)) {
         ok = 0;
+		return ok;
     }
 	
 	if(t->unlabeled)
