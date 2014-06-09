@@ -2201,7 +2201,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
 
-	if (hash_table_lookup(q->worker_blacklist,w->hostname)) {
+	if (hash_table_lookup(q->worker_blacklist,w->hostname) && !w->foreman) {
         ok = 0;
 		return ok;
     }
