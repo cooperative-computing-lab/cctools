@@ -71,7 +71,10 @@ int tracer_attach (pid_t pid)
 	if (ptrace(PTRACE_ATTACH, pid, 0, 0) == -1) /* this handles a race condition where pid has not yet called ptrace(PTRACE_TRACEME, ...) */
 		return -1;
 
-	if (linux_available(2,5,46)) {
+	if (linux_available(3,8,0)) {
+		if (ptrace(PTRACE_SETOPTIONS,pid,0,(void *)(PTRACE_O_EXITKILL|PTRACE_O_TRACECLONE|PTRACE_O_TRACEFORK|PTRACE_O_TRACEVFORK)) == -1)
+			return -1;
+	} else if (linux_available(2,5,46)) {
 		if (ptrace(PTRACE_SETOPTIONS,pid,0,(void *)(PTRACE_O_TRACECLONE|PTRACE_O_TRACEFORK|PTRACE_O_TRACEVFORK)) == -1)
 			return -1;
 	}
