@@ -134,7 +134,7 @@ ccompiler=gcc
 cxxcompiler=g++
 mpicompiler=mpicc
 
-ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-deprecated-declarations -fno-exceptions"
+ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-deprecated-declarations"
 
 if [ ${build_sys} != CYGWIN ]
 then
@@ -520,11 +520,57 @@ else
 	echo "*** skipping globus support"
 fi
 
-if [ $config_irods_path != no ] && library_search RodsAPIs "${irods_path}" core/obj
+# irods 4.0 moved all its source to the iRODS subdirectory
+
+if [ $config_irods_path != no ]
 then
-	ccflags="${ccflags} -I${irods_path}/lib/core/include -I${irods_path}/lib/api/include -I${irods_path}/lib/md5/include -I${irods_path}/server/core/include -I${irods_path}/server/api/include -I${irods_path}/server/icat/include -I${irods_path}/server/drivers/include -I${irods_path}/server/re/include -DHAS_IRODS"
-else
-	if [ $config_irods_path = yes ]
+	if library_search RodsAPIs "${irods_path}/lib/core/obj"
+	then
+		# detected irods 3.x installation
+
+		ccflags="${ccflags} -DHAS_IRODS"
+
+		for d in ${irods_path}/lib/*/include ${irods_path}/server/*/include
+		do
+			ccflags="${ccflags} -I$d"
+		done
+
+	elif library_search RodsAPIs "${irods_path}/iRODS/lib/core/obj"
+	then
+		# detected irods 4.x installation
+
+		# irods 4.x uses .so plugins which are found in /var/lib/irods.
+		# These require the parrot is linked with -rdynamic so that
+		# the plugins can refer to symbols in libRodsAPI.a in parrot.
+
+		# irods 4.x changed the API from C to C++, so we must look
+		# for .hpp files instead of .h files.
+
+		ccflags="${ccflags} -DHAS_IRODS -DIRODS_USES_PLUGINS -DIRODS_USES_HPP"
+		ldflags="-rdynamic"
+
+		echo "*** warning: irods 4.0 requires plugins installed in /var/lib"
+
+		for d in ${irods_path}/iRODS/lib/*/include ${irods_path}/iRODS/server/*/include
+		do
+			ccflags="${ccflags} -I$d"
+		done
+
+		# irods 4.x depends on a specific version of boost:
+
+		boost_path=`ls -d ${irods_path}/external/boost_*`
+		if [ ! -d ${boost_path} ]
+		then
+			echo "*** Could not find irods boost in ${irods_path}/external !"
+			exit 1
+		fi
+
+		echo "found irods boost in $boost_path"
+		ccflags="${ccflags} -I${boost_path}"
+		boost_lib="${boost_path}/stage/lib"
+		external_archives="${external_archives} ${boost_lib}/libboost_filesystem.a ${boost_lib}/libboost_thread.a ${boost_lib}/libboost_system.a"
+
+	elif [ $config_irods_path = yes ]
 	then
 		echo "*** Sorry, I couldn't find IRODS in $irods_path"
 		echo "*** Check --with-irods-path and try again."
@@ -532,6 +578,8 @@ else
 	else
 		echo "*** skipping irods support"
 	fi
+else
+	echo "*** skipping irods support"
 fi
 
 if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql

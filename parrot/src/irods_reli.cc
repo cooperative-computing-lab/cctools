@@ -5,23 +5,34 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#ifdef HAS_IRODS
+
+#ifdef IRODS_USES_HPP
+#include "rodsClient.hpp"
+#include "rodsPath.hpp"
+#include "miscUtil.hpp"
+#ifdef IRODS_USES_PLUGINS
+#include "irods_network_home.hpp"
+#endif
+#else
+#include "rodsClient.h"
+#include "rodsPath.h"
+#include "miscUtil.h"
+#endif
+
+extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 
-#ifdef HAS_IRODS
-
 #include "irods_reli.h"
-
-#include "rodsClient.h"
-#include "rodsPath.h"
-#include "miscUtil.h"
 
 #include "hash_table.h"
 #include "debug.h"
 #include "path.h"
 #include "stringtools.h"
+}
 
 extern int pfs_irods_debug_level;
 
@@ -91,6 +102,19 @@ static struct irods_server * connect_to_host( const char *hostport )
 		errno = EACCES;
 		return 0;
 	}
+#ifdef IRODS_USES_PLUGINS
+	static int did_plugin_warning = 0;
+
+	if(!did_plugin_warning) {
+		std::string plugin_path = irods::NETWORK_HOME+"libtcp.so";
+		if(access(plugin_path.c_str(),R_OK)!=0) {
+			debug(D_NOTICE,"warning: irods 4.x requires plugins installed in %s",irods::NETWORK_HOME.c_str());
+			debug(D_NOTICE,"warning: could not find %s",plugin_path.c_str());
+		}
+		did_plugin_warning = 1;
+	}
+
+#endif
 
 	if(!connect_cache) connect_cache = hash_table_create(0,0);
 
@@ -139,7 +163,7 @@ static struct irods_server * connect_to_host( const char *hostport )
 		return 0;
 	}
 
-	server = malloc(sizeof(*server));
+	server = (struct irods_server *) malloc(sizeof(*server));
 	server->conn = conn;
 	server->lastused = current;
 	server->serial = irods_serial++;
@@ -202,10 +226,10 @@ struct irods_file * irods_reli_open ( const char *host, const char *path, int fl
 		request.openFlags = flags;
 		request.dataSize = -1;
 
-		addKeyVal (&request.condInput, DATA_TYPE_KW, "generic");
+		addKeyVal (&request.condInput, (char*)DATA_TYPE_KW, (char*)"generic");
 
 		if(irods_env.rodsDefResource[0]) {
-			addKeyVal (&request.condInput, RESC_NAME_KW,irods_env.rodsDefResource);
+		  addKeyVal (&request.condInput, (char*)RESC_NAME_KW, irods_env.rodsDefResource);
 		}
 
 		debug(D_IRODS,"rcDataObjCreate %s %s",host,path);
@@ -238,7 +262,7 @@ struct irods_file * irods_reli_open ( const char *host, const char *path, int fl
 		irods_reli_truncate(host,path,0);
 	}
 
-	file = malloc(sizeof(*file));
+	file = (struct irods_file *) malloc(sizeof(*file));
 	file->host = strdup(host);
 	file->path = strdup(path);
 	file->fd = result;
@@ -611,7 +635,7 @@ int irods_reli_unlink( const char *host, const char *path )
 	memset(&request,0,sizeof(request));
 	strcpy(request.objPath,path);
 
-	addKeyVal (&request.condInput, FORCE_FLAG_KW, "");
+	addKeyVal (&request.condInput, (char*)FORCE_FLAG_KW, (char*)"");
 
 	debug(D_IRODS,"rcUnlink %s %s",host,path);
 	result = rcDataObjUnlink(server->conn,&request);
@@ -655,7 +679,7 @@ int irods_reli_rmdir ( const char *host, const char *path )
 	memset(&request,0,sizeof(request));
 	strcpy(request.collName,path);
 
-	addKeyVal (&request.condInput, FORCE_FLAG_KW, "");
+	addKeyVal (&request.condInput, (char*)FORCE_FLAG_KW, (char*)"");
 
 	debug(D_IRODS,"rcRmColl %s %s",host,path);
 	result = rcRmColl(server->conn,&request,0);
@@ -745,7 +769,7 @@ int irods_reli_getfile ( const char *host, const char *path, const char *local_p
 	request.numThreads = 0; // server chooses threads
 	request.openFlags = O_RDONLY;
 
-	addKeyVal (&request.condInput, FORCE_FLAG_KW, "");
+	addKeyVal (&request.condInput, (char*)FORCE_FLAG_KW, (char*)"");
 
 	debug(D_IRODS,"rcDataObjGet %s %s %s",host,path,local_path);
 	result = rcDataObjGet(server->conn,&request,(char*) local_path);
@@ -776,8 +800,8 @@ int irods_reli_putfile ( const char *host, const char *path, const char *local_p
 	request.numThreads = 0; // server chooses threads
 	request.openFlags = O_CREAT|O_WRONLY;
 
-	addKeyVal (&request.condInput, FORCE_FLAG_KW, "");
-	addKeyVal (&request.condInput, ALL_KW, "");
+	addKeyVal (&request.condInput, (char*)FORCE_FLAG_KW, (char*)"");
+	addKeyVal (&request.condInput, (char*)ALL_KW, (char*)"");
 
 	debug(D_IRODS,"rcDataObjPut %s %s %s",host,path,local_path);
 	result = rcDataObjPut(server->conn,&request,(char*)local_path);
