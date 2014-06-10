@@ -79,6 +79,9 @@ int tracer_attach (pid_t pid)
 			return -1;
 	}
 
+	if (ptrace(PTRACE_SYSCALL, pid, NULL, (void *)SIGCONT) == -1)
+		return -1;
+
 	return 0;
 }
 
