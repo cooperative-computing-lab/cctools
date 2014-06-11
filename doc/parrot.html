@@ -282,6 +282,22 @@ if we run the following command:</p>
 <tt>usr/bin/ls|stat</tt>, which means the file <tt>/usr/bin/ls</tt> is accessed
 using the <tt>stat</tt> system call.</p>
 
+<h2 id="env_process">Preserve the Environment Variables<a class="sectionlink" href="#env_process" title="Link to this section.">&#x21d7;</a></h2>
+<p>When the execution environment of your program is fixed (this should be done before you generate the package), preserve environment variables using <tt>env_process</tt>. <b>--shell</b> parameter indicates the type of the shell used for your program, <b>--path</b> parameter indicates the file to write the environment variables and its values.</p>
+<code>%	env_process -s bash -p envlist</code>
+<p>One file named <b>envlist</b> will be created after this command is done.</p>
+
+<h2 id="parrot_pack">Generate a Package based on the Accessed Files<a class="sectionlink" href="#parrot_pack" title="Link to this section.">&#x21d7;</a></h2>
+<p>After recording the accessed files of one program with the help of the <b>--name-list</b> parameter of <tt>parrot_run</tt>), <tt>parrot_pack</tt> can generate a package containing all the accessed files. <tt>parrot_pack</tt> shares the same <b>--name-list</b> parameter with <tt>parrot_run</tt>. To preserve the original execution environment, <b>--env-path</b> can be set to the path of the environment variable file. <b>--package-path</b> parameter is used to indicate the location of package.</p>
+<code>%	parrot_pack --name-list namelist --env-path envlist --package-path /tmp/package</code>
+<p>After executing this command, one package with the path of <b>/tmp/package</b> will be generated.</p>
+
+<h2 id="create_mountlist">Create the Mountlist for Redirecting the File Access<a class="sectionlink" href="#create_mountlist" title="Link to this section.">&#x21d7;</a></h2>
+<p>If <tt>parrot_run</tt> is used to repeat one experiment, one mountlist must be created so that the file access request of your program can be redirected into the package. <b>--mountlist</b> parameter should be set to the path of the mountlist file, <b>--path</b> parameter indicates the paht of the package.</p>
+<code>%	create_mountlist -p /tmp/package -m mountlist</code>
+<p>One file named <b>mountlist</b> will be generated after the successful execution of this commond. Then <tt>parrot_run</tt> can be used to repeat the experiment.</p>
+<code>% parrot_run -m mountlist [program] [program options]</code>
+
 <h2 id="parrot_cp">More Efficient Copies with <tt>parrot_cp</tt><a class="sectionlink" href="#parrot_cp" title="Link to this section.">&#x21d7;</a></h2>
 
 If you are using Parrot to copy lots of files across the network,
