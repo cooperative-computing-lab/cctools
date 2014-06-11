@@ -14,7 +14,6 @@ See the file COPYING for details.
 #include "cctools.h"
 #include "macros.h"
 #include "catalog_query.h"
-#include "datagram.h"
 #include "domain_name_cache.h"
 #include "nvpair.h"
 #include "copy_stream.h"
@@ -29,30 +28,16 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "path.h"
 #include "load_average.h"
-#include "domain_name_cache.h"
 #include "getopt.h"
 #include "getopt_aux.h"
-#include "full_io.h"
 #include "create_dir.h"
 #include "delete_dir.h"
 #include "itable.h"
 #include "random_init.h"
-#include "macros.h"
 
 #include <unistd.h>
-
 #include <dirent.h>
 #include <fcntl.h>
-
-#include <sys/mman.h>
-#include <sys/poll.h>
-#include <sys/resource.h>
-#include <sys/signal.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/utsname.h>
-#include <sys/wait.h>
-
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
@@ -62,6 +47,15 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#include <sys/mman.h>
+#include <sys/poll.h>
+#include <sys/resource.h>
+#include <sys/signal.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
 
 #ifdef CCTOOLS_OPSYS_SUNOS
 extern int setenv(const char *name, const char *value, int overwrite);
