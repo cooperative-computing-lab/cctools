@@ -1,8 +1,8 @@
 include ../../Makefile.config
 include ../../Makefile.rules
 
-PROGRAMS = parrot_run parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp parrot_timeout parrot_search
-SCRIPTS = make_growfs parrot_identity_box parrot_run_hdfs
+PROGRAMS = parrot_run parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp parrot_timeout parrot_search parrot_pack
+SCRIPTS = make_growfs parrot_identity_box parrot_run_hdfs create_mountlist env_process
 LIBRARIES = libparrot_helper.so libparrot_client.a
 
 ifeq ($(CCTOOLS_BUILD_LIB64PARROT_HELPER),yes)
@@ -61,6 +61,9 @@ parrot_cp: parrot_cp.o parrot_client.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 parrot_search: parrot_search.o parrot_client.o
+	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
+
+parrot_pack: parrot_pack.o
 	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
 
 libparrot_client.a: parrot_client.o

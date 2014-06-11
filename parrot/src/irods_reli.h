@@ -10,6 +10,8 @@ See the file COPYING for details.
 
 #include "pfs_types.h"
 
+extern "C" {
+
 struct irods_file;
 
 struct irods_file * irods_reli_open ( const char *server, const char *path, int flags, int mode );
@@ -30,5 +32,7 @@ int irods_reli_md5      ( const char *server, const char *path, char *digest );
 
 int irods_reli_putfile ( const char *host, const char *path, const char *local_path );
 int irods_reli_getfile ( const char *host, const char *path, const char *local_path );
+
+}
 
 #endif
