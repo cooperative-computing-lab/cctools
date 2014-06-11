@@ -5,6 +5,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "linux-version.h"
 #include "pfs_channel.h"
 #include "pfs_process.h"
 #include "pfs_dispatch.h"
@@ -12,6 +13,7 @@ See the file COPYING for details.
 #include "pfs_service.h"
 #include "pfs_critical.h"
 #include "pfs_paranoia.h"
+#include "ptrace.h"
 
 extern "C" {
 #include "cctools.h"
@@ -50,6 +52,10 @@ extern "C" {
 #include <termios.h>
 
 FILE *namelist_file;
+int linux_major;
+int linux_minor;
+int linux_micro;
+
 pid_t trace_this_pid = -1;
 
 int pfs_master_timeout = 300;
@@ -117,38 +123,32 @@ enum {
 static void get_linux_version(const char *cmd)
 {
 	struct utsname name;
-	int major,minor,micro,fields;
+	int fields;
 
 	uname(&name);
 
 #ifdef CCTOOLS_CPU_I386
-        if(!strcmp(name.machine,"x86_64")) {
-                fatal("Sorry, you need to download a Parrot built specifically for an x86_64 CPU");
-        }
+	if(!strcmp(name.machine,"x86_64")) {
+		fatal("Sorry, you need to download a Parrot built specifically for an x86_64 CPU");
+	}
 #endif
 
-	if(!strcmp(name.sysname,"Linux")) {
-		debug(D_DEBUG,"kernel is %s %s",name.sysname,name.release);
-		fields = sscanf(name.release,"%d.%d.%d",&major,&minor,&micro);
-		if(fields==3) {
-			if(major==2) {
-				if(minor==4) {
-					pfs_trap_after_fork = 1;
-					return;
-				} else if(minor==6) {
-					pfs_trap_after_fork = 0;
-					return;
-				}
-			} else if(major==3) {
-				if(minor<=2) {
-					pfs_trap_after_fork = 0;
-					return;
-				}
-			}
-		}
-	}
+	if(strcmp(name.sysname, "Linux") != 0)
+		fatal("Sorry, parrot only operates on Linux");
 
-	debug(D_NOTICE,"parrot_run %d.%d.%s has not been tested on %s %s yet, this may not work",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,name.sysname,name.release);
+	fields = sscanf(name.release,"%d.%d.%d",&linux_major,&linux_minor,&linux_micro);
+	if(fields != 3)
+		fatal("could not get linux version from: `%s'", name.release);
+
+	debug(D_DEBUG,"kernel is %s %s",name.sysname,name.release);
+
+	/* compatibility checking */
+	if(!linux_available(2,4,0))
+		pfs_trap_after_fork = 1;
+
+	/* warning for latest untested version of Linux */
+	if(linux_available(3,3,0))
+		debug(D_NOTICE,"parrot_run %d.%d.%s has not been tested on %s %s yet, this may not work",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,name.sysname,name.release);
 }
 
 static void pfs_helper_init( const char *argv0 ) 
@@ -322,7 +322,17 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 		return;
 	}
 
-	if(WIFEXITED(status)) {
+	if(status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
+		pid_t child;
+
+		child = tracer_getevent(p->tracer);
+		debug(D_PROCESS, "pid %d cloned %d",pid,child);
+
+		/* At this point the child is stopped, it will be resumed with
+		 * tracer_continue when clone finishes. We only do this because
+		 * CLONE_PTRACE is buggy with multithreaded code. */
+		tracer_continue(p->tracer,0);
+	} else if(WIFEXITED(status)) {
 		debug(D_PROCESS,"pid %d exited normally with code %d",pid,WEXITSTATUS(status));
 		pfs_process_stop(p,status,usage);
 		if(pid==root_pid) root_exitstatus = status;
@@ -420,8 +430,6 @@ void whack_sleepy_threads() {
 int main( int argc, char *argv[] )
 {
 	pid_t pid=0;
-	int signum;
-	int status;
 	struct pfs_process *p;
 	char *s;
 	int i;
@@ -833,12 +841,18 @@ int main( int argc, char *argv[] )
 	if(pid==0) {
 		pid = fork();
 		if(pid>0) {
+			pid_t wpid;
+			int status;
 			debug(D_PROCESS,"pid %d started",pid);
+			do {
+				wpid = waitpid(pid, &status, WUNTRACED);
+			} while (wpid != pid);
+			if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGSTOP)
+				fatal("child did not stop as expected!");
 		} else if(pid==0) {
 			pfs_paranoia_payload();
 			setpgrp();
-			tracer_prepare();
-			kill(getpid(),SIGSTOP);
+			raise(SIGSTOP); /* wait to be traced */
 			getpid();
 			// This call is necessary to force the kernel to report the current heap
 			// size, so that Parrot can observe it in order to rewrite the following exec.
@@ -862,6 +876,8 @@ int main( int argc, char *argv[] )
 
 	root_pid = pid;
 	debug(D_PROCESS,"attaching to pid %d",pid);
+	if (tracer_attach(pid) == -1)
+		fatal("could not trace child");
 	p = pfs_process_create(pid,getpid(),getpid(),0,SIGCHLD);
 	if(!p) {
 		if(pfs_write_rval) {
@@ -876,11 +892,10 @@ int main( int argc, char *argv[] )
 
 	while(pfs_process_count()>0) {
 		while(1) {
+			int status, flags;
+			struct rusage usage;
 
 			whack_sleepy_threads();
-
-			int flags;
-			struct rusage usage;
 
 			flags = WUNTRACED|__WALL|WNOHANG;
 			pid = wait4(trace_this_pid,&status,flags,&usage);
@@ -938,14 +953,14 @@ int main( int argc, char *argv[] )
 		fclose(namelist_file);
 	
 	if(WIFEXITED(root_exitstatus)) {
-		status = WEXITSTATUS(root_exitstatus);
+		int status = WEXITSTATUS(root_exitstatus);
 		debug(D_PROCESS,"%s exited normally with status %d",argv[optind],status);
 		if(pfs_write_rval) {
 			write_rval("normal", status);
 		}
 		return status;
 	} else {
-		signum = WTERMSIG(root_exitstatus);
+		int signum = WTERMSIG(root_exitstatus);
 		debug(D_PROCESS,"%s exited abnormally with signal %d (%s)",argv[optind],signum,string_signal(signum));
 		if(pfs_write_rval) {
 			write_rval("abnormal", signum);
