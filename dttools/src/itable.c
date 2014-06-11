@@ -216,7 +216,8 @@ int itable_nextkey(struct itable *h, UINT64_T * key, void **value)
 {
 	if(h->ientry) {
 		*key = h->ientry->key;
-		*value = h->ientry->value;
+		if(value)
+			*value = h->ientry->value;
 
 		h->ientry = h->ientry->next;
 		if(!h->ientry) {

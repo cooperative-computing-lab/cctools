@@ -108,7 +108,7 @@ void itable_firstkey(struct itable *h);
 This function returns the next key and value in the iteration.
 @param h A pointer to an integer table.
 @param key A pointer to a key integer.
-@param value A pointer to a value pointer.
+@param value A pointer to a value pointer. (can be NULL)
 @return Zero if there are no more elements to visit, one otherwise.
 */
 
