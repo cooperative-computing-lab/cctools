@@ -1,9 +1,9 @@
-This is a short instruction about how to make use of `env-process.sh` and `parrot_pack`
+This is a short instruction about how to make use of `env_process` and `parrot_pack`
 to generate one package for your experiment and repeat your experiment within your package.
 Step 1: Preserve environment variables.
 When the execution environment of your program is fixed (this should be done before you
-generate the package), preserve environment variables using `env-process.sh`.
-	env-process.sh -s bash -p envlist
+generate the package), preserve environment variables using `env_process`.
+	env_process -s bash -p envlist
 	Parameters:
 	-s, --shell       The type of shell used to do the experiment.
 	                  Supported shell types: csh, tcsh, bash, zsh.
@@ -24,7 +24,7 @@ Step 4: After you find out a new environment to repeat your experiment, another 
 a Virtual Machine, first obtain the package and cctools.
 Step 5: Create the mountlist file so that the file access request of your program can be redirected
 into the package.
-	create-mountlist.sh -p /tmp/package -m mountlist
+	create_mountlist -p /tmp/package -m mountlist
 	Parameters:
 	-m, --mountfile   Set the path of the mountlist file.
 	-p, --path                   The path of the package.
