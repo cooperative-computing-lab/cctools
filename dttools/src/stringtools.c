@@ -114,7 +114,7 @@ void string_chomp(char *start)
 	}
 }
 
-int whole_string_match_regex(const char *text, char *pattern)
+int whole_string_match_regex(const char *text, const char *pattern)
 {
 	char *new_pattern;
 	int result;
