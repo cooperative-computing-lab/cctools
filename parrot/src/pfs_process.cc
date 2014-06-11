@@ -197,7 +197,10 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 
 	nprocs++;
 
-	debug(D_PSTREE,"%d %s %d",actual_ppid,share_table ? "newthread" : "fork", pid);
+	child->thread             = share_table ? 1 : 0;
+	child->time_first_sigcont = -1;
+
+	debug(D_PSTREE,"%d %s %d", actual_ppid, child->thread ? "newthread" : "fork", pid);
 	
 	return child;
 }
