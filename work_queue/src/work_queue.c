@@ -4091,26 +4091,6 @@ void release_all_workers(struct work_queue *q) {
 	}
 }
 
-void work_queue_reset(struct work_queue *q, int flags) {
-	struct work_queue_task *t;
-	
-	if(!q) return;
-
-	release_all_workers(q); 
-
-	if(flags == WORK_QUEUE_RESET_KEEP_TASKS) {
-		return;
-	}
-
-	//CLEANUP: Why would the user need to set KEEP_TASKS flag? 
-	
-	//WORK_QUEUE_RESET_ALL (or any other flag value) will clear out all tasks.
-	//tasks in running, finished, complete lists are deleted in release_worker().
-	while((t = list_pop_head(q->ready_list))) {
-		work_queue_task_delete(t);
-	}
-}
-
 int work_queue_empty(struct work_queue *q)
 {
 	return ((list_size(q->ready_list) + itable_size(q->running_tasks) + itable_size(q->finished_tasks) + list_size(q->complete_list)) == 0);
