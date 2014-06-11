@@ -43,6 +43,9 @@ LIST_ITEM MANPAGE(parrot_locate,1)
 LIST_ITEM MANPAGE(parrot_timeout,1)
 LIST_ITEM MANPAGE(parrot_whoami,1)
 LIST_ITEM MANPAGE(parrot_md5,1)
+LIST_ITEM MANPAGE(parrot_pack,1)
+LIST_ITEM MANPAGE(env_process,1)
+LIST_ITEM MANPAGE(create_mountlist,1)
 LIST_END')dnl
 define(SEE_ALSO_CHIRP,
 `LIST_BEGIN
