@@ -357,7 +357,7 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 					}
 					p->time_first_sigcont = time(NULL);
 					kill(p->pid,SIGCONT);
-				} 
+				}
 			}
 		}
 	} else {

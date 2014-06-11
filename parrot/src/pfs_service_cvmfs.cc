@@ -57,7 +57,7 @@ static const char *default_cvmfs_repo =
 
 static bool wrote_cern_key;
 static std::string cern_key_fname;
-static const char *cern_key_text = 
+static const char *cern_key_text =
 "-----BEGIN PUBLIC KEY-----\n\
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAukBusmYyFW8KJxVMmeCj\n\
 N7vcU1mERMpDhPTa5PgFROSViiwbUsbtpP9CvfxB/KU1gggdbtWOTZVTQqA3b+p8\n\
