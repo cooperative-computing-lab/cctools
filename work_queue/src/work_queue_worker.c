@@ -8,11 +8,12 @@ See the file COPYING for details.
 #include "work_queue_protocol.h"
 #include "work_queue_internal.h"
 #include "work_queue_resources.h"
+#include "work_queue_catalog.h"
+#include "work_queue_process.h"
 
 #include "cctools.h"
 #include "macros.h"
 #include "catalog_query.h"
-#include "work_queue_catalog.h"
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "nvpair.h"
@@ -72,20 +73,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_MODE_NONE    0
 #define WORKER_MODE_WORKER  1
 #define WORKER_MODE_FOREMAN 2
-
-struct task_info {
-	int taskid;
-	pid_t pid;
-	int status;
-	
-	struct rusage rusage;
-	timestamp_t execution_start;
-	timestamp_t execution_end;
-	
-	char *output_file_name;
-	int output_fd;
-	struct work_queue_task *task;
-};
 
 struct distribution_node {
 	void *item;
@@ -300,24 +287,6 @@ static void report_worker_ready( struct link *master )
 	send_resource_update(master,1);
 }
 
-static struct task_info * task_info_create( int taskid )
-{
-	struct task_info *ti = malloc(sizeof(*ti));
-	memset(ti,0,sizeof(*ti));
-	ti->taskid = taskid;
-	return ti;
-}
-
-static void task_info_delete( struct task_info *ti )
-{
-	if(ti->output_fd) {
-		close(ti->output_fd);
-		unlink(ti->output_file_name);
-	}
-
-	free(ti);
-}
-
 int link_file_in_workspace(char *localname, char *taskname, char *workspace, int into) {
 	int result = 1;
 	struct stat st;
@@ -414,70 +383,13 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 	return result;
 }
 
-static const char task_output_template[] = "./worker.stdout.XXXXXX";
-
-static pid_t task_info_execute(const char *cmd, struct task_info *ti)
-{
-	char working_dir[1024];
-	fflush(NULL); /* why is this necessary? */
-	
-	sprintf(working_dir, "t.%d", ti->taskid);
-	ti->output_file_name = strdup(task_output_template);
-	ti->output_fd = mkstemp(ti->output_file_name);
-	if (ti->output_fd == -1) {
-		debug(D_WQ, "Could not open worker stdout: %s", strerror(errno));
-		return 0;
-	}
-
-	ti->execution_start = timestamp_get();
-
-	ti->pid = fork();
-	
-	if(ti->pid > 0) {
-		// Make child process the leader of its own process group. This allows
-		// signals to also be delivered to processes forked by the child process.
-		// This is currently used by kill_task(). 
-		setpgid(ti->pid, 0); 
-		
-		debug(D_WQ, "started process %d: %s", ti->pid, cmd);
-		return ti->pid;
-	} else if(ti->pid < 0) {
-		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
-		unlink(ti->output_file_name);
-		close(ti->output_fd);
-		return ti->pid;
-	} else {
-		if(chdir(working_dir)) {
-			fatal("could not change directory into %s: %s", working_dir, strerror(errno));
-		}
-		
-		int fd = open("/dev/null", O_RDONLY);
-		if (fd == -1) fatal("could not open /dev/null: %s", strerror(errno));
-		int result = dup2(fd, STDIN_FILENO);
-		if (result == -1) fatal("could not dup /dev/null to stdin: %s", strerror(errno));
-
-		result = dup2(ti->output_fd, STDOUT_FILENO);
-		if (result == -1) fatal("could not dup pipe to stdout: %s", strerror(errno));
-
-		result = dup2(ti->output_fd, STDERR_FILENO);
-		if (result == -1) fatal("could not dup pipe to stderr: %s", strerror(errno));
-
-		close(ti->output_fd);
-
-		execlp("sh", "sh", "-c", cmd, (char *) 0);
-		_exit(127);	// Failed to execute the cmd.
-	}
-	return 0;
-}
-
 static int start_task(struct work_queue_task *t) {
-		struct task_info *ti = task_info_create(t->taskid);
-		ti->task = t;
-		task_info_execute(t->command_line,ti);
+		struct work_queue_process *ti = work_queue_process_create(t);
+		work_queue_process_execute(t->command_line,ti);
 	
 		if(ti->pid < 0) {
 			fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
-			task_info_delete(ti);
+			work_queue_process_delete(ti);
 			abort_flag = 1;
 			return 0;
 		}
@@ -508,7 +420,7 @@ static int start_task(struct work_queue_task *t) {
 		return 1;
 }
 
-static void report_task_complete(struct link *master, struct task_info *ti)
+static void report_task_complete(struct link *master, struct work_queue_process *ti)
 {
 	int64_t output_length;
 	struct stat st;
@@ -517,7 +429,7 @@ static void report_task_complete(struct link *master, struct task_info *ti)
 		fstat(ti->output_fd, &st);
 		output_length = st.st_size;
 		lseek(ti->output_fd, 0, SEEK_SET);
-		send_master_message(master, "result %d %lld %llu %d\n", ti->status, (long long) output_length, (unsigned long long) ti->execution_end-ti->execution_start, ti->taskid);
+		send_master_message(master, "result %d %lld %llu %d\n", ti->status, (long long) output_length, (unsigned long long) ti->execution_end-ti->execution_start, ti->task->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
 		
 		cores_allocated -= ti->task->cores;
@@ -566,7 +478,7 @@ static int report_tasks(struct link *master, struct itable *tasks_infos, int max
 		max_count = itable_size(tasks_infos);
 	}
 
-	struct task_info *ti;
+	struct work_queue_process *ti;
 	uint64_t          taskid;
 
 	int count = 0;
@@ -574,7 +486,7 @@ static int report_tasks(struct link *master, struct itable *tasks_infos, int max
 	{
 		report_task_complete(master, ti);
 		work_queue_task_delete(ti->task);
-		task_info_delete(ti);
+		work_queue_process_delete(ti);
 		count++;
 	}
 
@@ -591,7 +503,7 @@ static int report_tasks(struct link *master, struct itable *tasks_infos, int max
 }
 
 static int handle_tasks(struct link *master) {
-	struct task_info *ti;
+	struct work_queue_process *ti;
 	pid_t pid;
 	int result = 0;
 	struct work_queue_file *tf;
@@ -617,20 +529,20 @@ static int handle_tasks(struct link *master) {
 			ti->execution_end = timestamp_get();
 			
 			itable_remove(active_tasks, ti->pid);
-			itable_remove(stored_tasks, ti->taskid);
+			itable_remove(stored_tasks, ti->task->taskid);
 			itable_firstkey(active_tasks);
 			
 			if(WIFEXITED(status)) {
-				sprintf(dirname, "t.%d", ti->taskid);
+				sprintf(dirname, "t.%d", ti->task->taskid);
 				list_first_item(ti->task->output_files);
 				while((tf = (struct work_queue_file *)list_next_item(ti->task->output_files))) {
 					if(!link_file_in_workspace(tf->payload, tf->remote_name, dirname, 0)) {
-						debug(D_NOTICE, "File %s does not exist and is output of task %d.", (char*)tf->remote_name, ti->taskid);
+						debug(D_NOTICE, "File %s does not exist and is output of task %d.", (char*)tf->remote_name, ti->task->taskid);
 					}
 				}
 			}
 
-			itable_insert(results_to_be_sent, ti->taskid, ti);
+			itable_insert(results_to_be_sent, ti->task->taskid, ti);
 		}
 		
 	}
@@ -1138,7 +1050,7 @@ static int do_task( struct link *master, int taskid )
 	send_resource_update(master, 1);
 
 	// If this is a foreman, just send the task structure along.
-	// If it is a local worker, create a task_info, start the task, and discard the temporary work_queue_task.
+	// If it is a local worker, create a work_queue_process, start the task, and discard the temporary work_queue_task.
 
 	if(foreman_q) {
 		work_queue_submit_internal(foreman_q,task);
@@ -1381,7 +1293,7 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 
 }
 
-static void kill_task(struct task_info *ti) {
+static void kill_task(struct work_queue_process *ti) {
 	char dirname[1024];
 	
 	//make sure a few seconds have passed since child process was created to avoid sending a signal 
@@ -1400,11 +1312,11 @@ static void kill_task(struct task_info *ti) {
 	waitpid(ti->pid, NULL, 0);
 	
 	// Clean up the task info structure.
-	itable_remove(stored_tasks, ti->taskid);
+	itable_remove(stored_tasks, ti->task->taskid);
 	itable_remove(active_tasks, ti->pid);
 	
 	// Clean up the task's directory
-	sprintf(dirname, "t.%d", ti->taskid);
+	sprintf(dirname, "t.%d", ti->task->taskid);
 	delete_dir(dirname);
 
 	cores_allocated -= ti->task->cores;
@@ -1412,23 +1324,23 @@ static void kill_task(struct task_info *ti) {
 	disk_allocated -= ti->task->disk;
 	gpus_allocated -= ti->task->gpus;
 
-	task_info_delete(ti);
+	work_queue_process_delete(ti);
 }
 
 static void do_reset_results_to_be_sent() {
 
-	struct task_info *ti;
+	struct work_queue_process *ti;
 	uint64_t taskid;
 	results_to_be_sent_msg = 0;
 
 	while(itable_pop(results_to_be_sent, &taskid, (void **) &ti))
 	{
-		task_info_delete(ti);
+		work_queue_process_delete(ti);
 	}
 }
 
 static void kill_all_tasks() {
-	struct task_info *ti;
+	struct work_queue_process *ti;
 	pid_t pid;
 	uint64_t taskid;
 
@@ -1461,15 +1373,15 @@ static void kill_all_tasks() {
 		pid = wait(0);
 		ti = itable_remove(active_tasks, pid);
 		if(ti) {
-			itable_remove(stored_tasks, ti->taskid);
-			task_info_delete(ti);
+			itable_remove(stored_tasks, ti->task->taskid);
+			work_queue_process_delete(ti);
 		}
 	}
 	
 	// Clear out the stored tasks list if any are left.
 	itable_firstkey(stored_tasks);
 	while(itable_nextkey(stored_tasks, &taskid, (void**)&ti)) {
-		task_info_delete(ti);
+		work_queue_process_delete(ti);
 	}
 	itable_clear(stored_tasks);
 	cores_allocated = 0;
@@ -1479,7 +1391,7 @@ static void kill_all_tasks() {
 }
 
 static int do_kill(int taskid) {
-	struct task_info *ti;
+	struct work_queue_process *ti;
 
 	//if task already finished, do not send its result to the master
 	itable_remove(results_to_be_sent, taskid);
@@ -1501,7 +1413,7 @@ static int do_kill(int taskid) {
 		char dirname[1024];
 		if(ti) {
 			itable_remove(stored_tasks, taskid);
-			task_info_delete(ti);
+			work_queue_process_delete(ti);
 		}
 		sprintf(dirname, "t.%d", taskid);
 		delete_dir(dirname);
@@ -1870,8 +1782,7 @@ static void foreman_for_master(struct link *master) {
 		task = work_queue_wait_internal(foreman_q, short_timeout, master, &master_active);
 		
 		if(task) {
-			struct task_info *ti = task_info_create(task->taskid);
-			ti->task = task;
+			struct work_queue_process *ti = work_queue_process_create(task);
 			itable_insert(results_to_be_sent, task->taskid, ti);
 			result = 1;
 		}
