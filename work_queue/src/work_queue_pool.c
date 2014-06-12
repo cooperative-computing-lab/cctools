@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2008- The University of Notre Dame
+Copyright (C) 2014- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -40,6 +40,8 @@ static const char *project_regex = 0;
 static int worker_timeout = 300;
 static const char *extra_worker_args=0;
 static int abort_flag = 0;
+static const char *scratch_dir = 0;
+static const char *password_file = 0;
 
 static void handle_abort( int sig )
 {
@@ -171,28 +173,56 @@ static int submit_worker( struct batch_queue *queue )
 {
 	char cmd[1024];
 
-	// XXX add password argument and input files
-	sprintf(cmd,"work_queue_worker -M %s -t %d -C %s:%d",project_regex,worker_timeout,catalog_host,catalog_port);
+	const char *extra_input_files = 0;
+
+	sprintf(cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o output.log ",project_regex,worker_timeout,catalog_host,catalog_port);
+
+	if(password_file) {
+		strcat(cmd," -P");
+		strcat(cmd,password_file);
+		extra_input_files = password_file;
+	}
 
 	if(extra_worker_args) {
 		strcat(cmd," ");
 		strcat(cmd,extra_worker_args);
 	}
 
-	return batch_job_submit_simple(queue,cmd,0,0);
+	debug(D_WQ,"submitting worker: %s",cmd);
+
+	return batch_job_submit_simple(queue,cmd,extra_input_files,"output.log");
 }
 
-static int submit_workers( struct batch_queue *queue, int count )
+static int submit_workers( struct batch_queue *queue, struct itable *job_table, int count )
 {
 	int i;
 	for(i=0;i<count;i++) {
-		if(!submit_worker(queue)) break;
+		int jobid = submit_worker(queue);
+		if(jobid>0) {
+			debug(D_WQ,"worker job %d submitted",jobid);
+			itable_insert(job_table,jobid,0);
+		} else {
+			break;
+		}
 	}
 	return i;
 }
 
+void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
+{
+	uint64_t jobid;
+	void *value;
 
+	debug(D_WQ,"removing all remaining worker jobs...");
+	int count = itable_size(job_table);
+	itable_firstkey(job_table);
+	while(itable_nextkey(job_table,&jobid,&value)) {
+		debug(D_WQ,"removing job %d",jobid);
+		batch_job_remove(queue,jobid);
+	}
+	debug(D_WQ,"%d workers removed.",count);
 
+}
 
 /*
 Main loop of work queue pool.  Determine the number of workers needed by our
@@ -203,6 +233,7 @@ submit more until the desired state is reached.
 static void mainloop( struct batch_queue *queue, const char *project_regex )
 {
 	int workers_submitted = 0;
+	struct itable *job_table = itable_create(0);
 
 	while(!abort_flag) {
 		struct list *masters_list = get_masters_list_cached(project_regex);
@@ -228,7 +259,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex )
 
 		if(new_workers_needed>0) {
 			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
-			workers_submitted += submit_workers(queue,new_workers_needed);
+			workers_submitted += submit_workers(queue,job_table,new_workers_needed);
 		} else if(new_workers_needed<0) {
 			debug(D_WQ,"too many workers, will wait for some to exit");
 		} else {
@@ -242,7 +273,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex )
 			struct batch_job_info info;
 			int jobid = batch_job_wait_timeout(queue,&info,stoptime);
 			if(jobid>0) {
-				debug(D_WQ,"worker job %d exited");
+				debug(D_WQ,"worker job %d exited",jobid);
 				workers_submitted--;
 			} else {
 				break;
@@ -251,6 +282,9 @@ static void mainloop( struct batch_queue *queue, const char *project_regex )
 
 		sleep(5);
 	}
+
+	remove_all_workers(queue,job_table);
+	itable_delete(job_table);
 }
 
 static void show_help(const char *cmd)
@@ -259,10 +293,12 @@ static void show_help(const char *cmd)
 	printf("where options are:\n");
 	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,--master-name=<project>");
 	printf(" %-30s Batch system type. One of: %s (default is local)\n", "-T,--batch-type=<type>",batch_queue_type_string());
+	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
 	printf(" %-30s Maximum workers running.  (default=%d)\n", "-W,--max-workers", workers_max);
 	printf(" %-30s Workers abort after this amount of idle time. (default=%d)\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
+	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)","-S,--scratch-dir");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
@@ -280,10 +316,12 @@ int main(int argc, char *argv[])
 	static struct option long_options[] = {
 		{"master-name", required_argument, 0, 'M'},
 		{"batch-type", required_argument, 0, 'T'},
+		{"password", required_argument, 0, 'P'},
 		{"min-workers", required_argument, 0, 'w'},
 		{"max-workers", required_argument, 0, 'w'},
 		{"timeout", required_argument, 0, 't'},
 		{"extra-options", required_argument, 0, 'E'},
+		{"scratch-dir", required_argument, 0, 'S' },
 		{"debug", required_argument, 0, 'd'},
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-file-size", required_argument, 0, 'O'},
@@ -294,7 +332,7 @@ int main(int argc, char *argv[])
 
 	char c;
 
-	while((c = getopt_long(argc, argv, "N:M:T:t:w:W:E:d:o:O:vh", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "N:M:T:t:w:W:E:P:S:d:o:O:vh", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'N':
 		case 'M':
@@ -318,6 +356,12 @@ int main(int argc, char *argv[])
 			break;
 		case 'E':
 			extra_worker_args = optarg;
+			break;
+		case 'P':
+			password_file = optarg;
+			break;
+		case 'S':
+			scratch_dir = optarg;
 			break;
 		case 'd':
 			debug_flags_set(optarg);
@@ -352,6 +396,22 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if(!scratch_dir) {
+		scratch_dir = string_format("/tmp/wq-pool-%d",getuid());
+	}
+
+	if(!create_dir(scratch_dir,0700)) {
+		fprintf(stderr,"work_queue_pool: couldn't create %s: %s",scratch_dir,strerror(errno));
+		return 1;
+	}
+
+	if(chdir(scratch_dir)!=0) {
+		fprintf(stderr,"work_queue_pool: couldn't chdir to %s: %s",scratch_dir,strerror(errno));
+		return 1;
+	}
+
+	system("cp `which work_queue_worker` .");
+
 	signal(SIGINT, handle_abort);
         signal(SIGQUIT, handle_abort);
         signal(SIGTERM, handle_abort);
@@ -365,10 +425,7 @@ int main(int argc, char *argv[])
 
 	mainloop( queue, project_regex );
 
-	fatal("must remove all batch jobs here");
 	batch_queue_delete(queue);
 
 	return 0;
 }
-
-/* vim: set noexpandtab tabstop=4: */
