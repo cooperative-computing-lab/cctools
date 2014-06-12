@@ -43,10 +43,10 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 
 /* priority */
 #define D_INFO     (0LL)     /**< Indicates a message that is of general interest to the user. (the default) */
-#define D_FATAL    (1LL<<1)  /**< Indicates a message that is fatal. */
-#define D_ERROR    (1LL<<2)  /**< Indicates a message that is a warning/error */
-#define D_NOTICE   (1LL<<3)  /**< Indicates a message that is always shown. */
-#define D_DEBUG    (1LL<<4)  /**< Indicates a general debugging message. */
+#define D_FATAL    (1LL<<0)  /**< Indicates a message that is fatal. */
+#define D_ERROR    (1LL<<1)  /**< Indicates a message that is a warning/error */
+#define D_NOTICE   (1LL<<2)  /**< Indicates a message that is always shown. */
+#define D_DEBUG    (1LL<<3)  /**< Indicates a general debugging message. */
 
 /* subsystem */
 #define D_SYSCALL  (1LL<<4)  /**< Debug system calls in Parrot. */
