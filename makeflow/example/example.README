@@ -52,4 +52,4 @@ Or, you can submit 100 workers to Condor like this:
     condor_submit_workers servername 9123 100
 
 For more information, please check out our manuals and mailing list here:
-http://www.cse.nd.edu/~ccl/software/help.shtml
+http://ccl.cse.nd.edu/software/help.shtml

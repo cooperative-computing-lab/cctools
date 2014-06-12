@@ -12,7 +12,7 @@ CODE(parrot_run) runs an application or a shell inside the Parrot virtual filesy
 PARA
 Parrot works by trapping the application's system calls through the CODE(ptrace) debugging interface.  It does not require any special privileges to install or run, so it is useful to ordinary users that wish to access data across wide area networks.  The CODE(ptrace) debugging interface does have some cost, so applications may run slower, depending on how many I/O operations they perform.
 PARA
-For complete details with examples, see the LINK(Parrot User's Manual,http://www.nd.edu/~ccl/software/manuals/parrot.html)
+For complete details with examples, see the LINK(Parrot User's Manual,http://ccl.cse.nd.edu/software/manuals/parrot.html)
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN

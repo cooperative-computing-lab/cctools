@@ -1,4 +1,4 @@
-URL=http://www.cse.nd.edu/~ccl/images/capitol.jpg
+URL=http://ccl.cse.nd.edu/images/capitol.jpg
 
 capitol.diff: capitol.0.jpg capitol.270.jpg
 	! diff --brief capitol.0.jpg capitol.270.jpg > capitol.diff;

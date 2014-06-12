@@ -42,7 +42,7 @@ do not provide reliable append operations. Likewise, files can only be opened
 in either read (O_RDONLY) or write mode (O_WRONLY), and not both (O_RDWR).
 
 PARA
-For complete details with examples, see the LINK(Parrot User's Manual,http://www.nd.edu/~ccl/software/manuals/parrot.html)
+For complete details with examples, see the LINK(Parrot User's Manual,http://ccl.cse.nd.edu/software/manuals/parrot.html)
 
 SECTION(OPTIONS)
 PARA

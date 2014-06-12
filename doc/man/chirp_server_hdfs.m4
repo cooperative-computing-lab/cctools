@@ -18,7 +18,7 @@ the environment is setup, the Chirp server will execute using HDFS as the backen
 filesystem for all filesystem access.
 
 PARA
-For complete details with examples, see the LINK(Chirp User's Manual,http://www.nd.edu/~ccl/software/manuals/chirp.html).
+For complete details with examples, see the LINK(Chirp User's Manual,http://ccl.cse.nd.edu/software/manuals/chirp.html).
 
 SECTION(OPTIONS)
 

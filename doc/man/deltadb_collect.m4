@@ -52,9 +52,9 @@ COPYRIGHT_BOILERPLATE
 SECTION(SEE ALSO)
 
 LIST_BEGIN
-LIST_ITEM LINK(The Cooperative Computing Tools,"http://www.nd.edu/~ccl/software/manuals")
-LIST_ITEM LINK(DeltaDB User's Manual,"http://www.nd.edu/~ccl/software/manuals/deltadb.html")
-LIST_ITEM LINK(DeltaDB paper,"http://www.nd.edu/~ccl/research/papers/pivie-deltadb-2014.pdf")
+LIST_ITEM LINK(The Cooperative Computing Tools,"http://ccl.cse.nd.edu/software/manuals")
+LIST_ITEM LINK(DeltaDB User's Manual,"http://ccl.cse.nd.edu/software/manuals/deltadb.html")
+LIST_ITEM LINK(DeltaDB paper,"http://ccl.cse.nd.edu/research/papers/pivie-deltadb-2014.pdf")
 LIST_ITEM MANPAGE(deltadb_select_static,1)
 LIST_ITEM MANPAGE(deltadb_select_dynamic,1)
 LIST_ITEM MANPAGE(deltadb_select_complete,1)

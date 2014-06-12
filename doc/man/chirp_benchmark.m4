@@ -17,7 +17,7 @@ tests the throughput for reading and writing to the given filename with
 various block sizes.
 
 PARA
-For complete details with examples, see the LINK(Chirp User's Manual,http://www.nd.edu/~ccl/software/manuals/chirp.html).
+For complete details with examples, see the LINK(Chirp User's Manual,http://ccl.cse.nd.edu/software/manuals/chirp.html).
 
 SECTION(EXIT STATUS)
 On success, returns zero.  On failure, returns non-zero.

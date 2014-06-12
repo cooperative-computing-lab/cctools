@@ -24,16 +24,16 @@ See the file COPYING for details.</p>
 
 <p>SAND is a set of modules for accelerating genome assembly and other
 bioinformatics tasks.
-Using the  <a href="http://www.cse.nd.edu/~ccl/software/workqueue/">Work Queue</a>
+Using the  <a href="http://ccl.cse.nd.edu/software/workqueue/">Work Queue</a>
 framework, SAND can distribute computational tasks to hundreds of nodes harnessed
 from clusters, clouds, grids, or just the idle machines you have in your office.
 SAND can be used as a drop-in replacement for the conventional overlapper in
 the Celera Assembler, or can be used as a standalone tool by advanced users.
 
 <p>SAND is part of the <a
-href=http://www.cse.nd.edu/~ccl/software>Cooperating Computing
+href=http://ccl.cse.nd.edu/software>Cooperating Computing
 Tools</a>.  You can download the CCTools from <a
-href=http://www.cse.nd.edu/~ccl/software/download>this web page</a>,
+href=http://ccl.cse.nd.edu/software/download>this web page</a>,
 follow the <a href=install.html>installation instructions</a>, and you
 are ready to go.</p>
 
@@ -128,7 +128,7 @@ expire.  If you do nothing for 15 minutes, they will automatically exit.
 This section explains the two SAND modules in more detail,
 if you would like to tune the performance or use them independently
 of Celera.  We assume that you begin with a file of reads in FASTA format.
-To use the SAND modules, you must first generate repeats and compress the data.  (If you don't have data handy, download <tt>small.cfa</tt> and  <tt>small.repeats</tt> data from the <a href=http://www.nd.edu/~ccl/software/sand>SAND Webpage</a>.)
+To use the SAND modules, you must first generate repeats and compress the data.  (If you don't have data handy, download <tt>small.cfa</tt> and  <tt>small.repeats</tt> data from the <a href=http://ccl.cse.nd.edu/software/sand>SAND Webpage</a>.)
 
 To generate repeats from a FASTA file, use the <tt>meryl</tt> tool from the Celera Assembler:
 <code>% meryl -B -m 24 -C -L 100 -v -o small.meryl -s small.fa
@@ -203,7 +203,7 @@ The columns of the output are as follows:
 
 <h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
-For the latest information about SAND, please visit our <a href=http://www.cse.nd.edu/~ccl/software/sand>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.
+For the latest information about SAND, please visit our <a href=http://ccl.cse.nd.edu/software/sand>web site</a> and subscribe to our <a href=http://ccl.cse.nd.edu/software>mailing list</a>.
 
 </div>
 </body>

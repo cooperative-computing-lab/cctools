@@ -6,7 +6,7 @@ Note that this documentation is a work in progress.
 Only the most widely used interfaces are documented here.
 Less used interfaces are not documented, but can still be browsed through this interface.
 
-- <b><a href="http://www.cse.nd.edu/~ccl/software/howto/code.shtml">Writing Your First Program with Chirp</a></b>
+- <b><a href="http://ccl.cse.nd.edu/software/howto/code.shtml">Writing Your First Program with Chirp</a></b>
 
 If you are writing programs to submit jobs to Work Queue, Condor, or other systems, start here:
 
@@ -34,9 +34,9 @@ Or, you can browse all documented modules in the package:
 
 For more information about using and installing CCTools:
 
-- <a href="http://www.cse.nd.edu/~ccl/software">CCTools Software</a>
-- <a href="http://www.cse.nd.edu/~ccl/software/manuals">CCTools User Manuals</a>
-- <a href="http://www.cse.nd.edu/~ccl/software/howto">CCTools HOWTO Manuals</a>
+- <a href="http://ccl.cse.nd.edu/software">CCTools Software</a>
+- <a href="http://ccl.cse.nd.edu/software/manuals">CCTools User Manuals</a>
+- <a href="http://ccl.cse.nd.edu/software/howto">CCTools HOWTO Manuals</a>
 
 */
 

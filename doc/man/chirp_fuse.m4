@@ -23,7 +23,7 @@ the name of a directory on which the filesystem should be mounted.
 
 PARA
 For complete details with examples, see the
-LINK(Chirp User's Manual,http://www.nd.edu/~ccl/software/manuals/chirp.html).
+LINK(Chirp User's Manual,http://ccl.cse.nd.edu/software/manuals/chirp.html).
 
 SECTION(OPTIONS)
 

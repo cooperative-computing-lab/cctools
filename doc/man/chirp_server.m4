@@ -17,7 +17,7 @@ filesystem or even the Hadoop HDFS filesystem. Chirp supports flexible and
 robust ACL management of data.
 
 PARA
-For complete details with examples, see the LINK(Chirp User's Manual,http://www.nd.edu/~ccl/software/manuals/chirp.html).
+For complete details with examples, see the LINK(Chirp User's Manual,http://ccl.cse.nd.edu/software/manuals/chirp.html).
 
 SECTION(OPTIONS)
 
