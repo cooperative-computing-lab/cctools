@@ -36,7 +36,7 @@ your jobs there to run.  If you don't already have a batch system, Makeflow come
 system called Work Queue that will let you distribute the load across any collection
 of machines, large or small.
 <p>
-Makeflow is part of the <a href=http://www.cse.nd.edu/~ccl/software>Cooperating Computing Tools</a>.  You can download the CCTools from <a href=http://www.cse.nd.edu/~ccl/software/download>this web page</a>, follow the <a href=install.html>installation instructions</a>, and you are ready to go.
+Makeflow is part of the <a href=http://ccl.cse.nd.edu/software>Cooperating Computing Tools</a>.  You can download the CCTools from <a href=http://ccl.cse.nd.edu/software/download>this web page</a>, follow the <a href=install.html>installation instructions</a>, and you are ready to go.
 
 <h2 id="language">The Makeflow Language<a class="sectionlink" href="#language" title="Link to this section.">&#x21d7;</a></h2>
 
@@ -59,7 +59,7 @@ run on the controlling machine.
 
 <code>CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
-URL=http://www.cse.nd.edu/~ccl/images/capitol.jpg
+URL=http://ccl.cse.nd.edu/images/capitol.jpg
 
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
         LOCAL $CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
@@ -502,14 +502,14 @@ path are renamed when copied into the bundle:</p>
 	<li>SGE - execution on a high-performance cluster using the <a href="http://www.oracle.com/us/products/tools/oracle-grid-engine-075549.html">Oracle Grid Engine</a> (formerly the Sun Grid Engine).</li>
 	<li>Moab - execution on a high-performance cluster using the <a href="http://www.adaptivecomputing.com/resources/docs/mwm/6-0/index.php">Moab Workload Manager</a></li>
 	<li>Cluster - execution on a high-performance cluster using a user-defined cluster manager</li>
-	<li>Work Queue - execution on a lightweight, scalable master-worker <a href="http://nd.edu/~ccl/software/workqueue/">framework</a> managed directly by Makeflow</li>
+	<li>Work Queue - execution on a lightweight, scalable master-worker <a href="http://ccl.cse.nd.edu/software/workqueue/">framework</a> managed directly by Makeflow</li>
 	<li>Hadoop - execution on a cluster managed by the <a href="http://hadoop.apache.org/">Hadoop</a> framework, using data stored in <a href="http://hadoop.apache.org/hdfs">HDFS</a>.</li>
 </ul>
 
 <h4 id="workqueue.drivers.clusters">User-defined Clusters<a class="sectionlink" href="#workqueue.drivers.clusters" title="Link to this section.">&#x21d7;</a></h4>
 
 <p>For clusters that are not directly supported by Makeflow we strongly suggest
-using the <a href="http://nd.edu/~ccl/software/workqueue">Work Queue</a> system
+using the <a href="http://ccl.cse.nd.edu/software/workqueue">Work Queue</a> system
 and submitting workers via the cluster's normal submission mechanism.</p>
 
 <p>For clusters using managers similar to SGE or Moab that are configured to
@@ -647,7 +647,7 @@ during a garbage collection cycle:</p>
 
 <h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
-<p>For the latest information about Makeflow, please visit our <a href=http://www.cse.nd.edu/~ccl/software/makeflow>web site</a> and subscribe to our <a href=http://www.cse.nd.edu/~ccl/software>mailing list</a>.</p>
+<p>For the latest information about Makeflow, please visit our <a href=http://ccl.cse.nd.edu/software/makeflow>web site</a> and subscribe to our <a href=http://ccl.cse.nd.edu/software>mailing list</a>.</p>
 
 </div>
 </body>
