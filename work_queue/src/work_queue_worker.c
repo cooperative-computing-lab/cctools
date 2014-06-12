@@ -1520,22 +1520,6 @@ static int do_release() {
 	return 0;
 }
 
-static int do_reset() {
-	
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		do_reset_results_to_be_sent();
-		work_queue_reset(foreman_q, WORK_QUEUE_RESET_ALL);
-	} else {
-		kill_all_tasks();
-	}
-	
-	if(delete_dir_contents(workspace) < 0) {
-		return 0;
-	}
-		
-	return 1;
-}
-
 static int send_keepalive(struct link *master){
 	send_master_message(master, "alive\n");
 	return 1;
@@ -1694,8 +1678,6 @@ static int handle_master(struct link *master) {
 			r = 0;
 		} else if(!strncmp(line, "check", 6)) {
 			r = send_keepalive(master);
-		} else if(!strncmp(line, "reset", 5)) {
-			r = do_reset();
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
@@ -1714,7 +1696,6 @@ static int handle_master(struct link *master) {
 
 	return r;
 }
-
 
 static int check_for_resources(struct work_queue_task *t) {
 	int64_t cores_used, disk_used, mem_used, gpus_used;
