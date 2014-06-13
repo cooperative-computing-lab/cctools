@@ -1502,7 +1502,12 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		char line[WORK_QUEUE_LINE_MAX];
 		debug(D_WQ, "verifying master's project name");
 		send_master_message(master, "name\n");
-		recv_master_message(master, line, sizeof(line),idle_stoptime);
+		if(!recv_master_message(master, line, sizeof(line),idle_stoptime)) {
+			debug(D_WQ,"no response from master while verifying name");
+			link_close(master);
+			return 0;
+		}
+ 
 		if(strcmp(line,verify_project)) {
 			fprintf(stderr, "work_queue_worker: master has project %s instead of %s\n", line, verify_project);
 			link_close(master);
