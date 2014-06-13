@@ -1569,49 +1569,49 @@ static void handle_sigchld(int sig)
 
 static void show_help(const char *cmd)
 {
-	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
-	fprintf(stdout, "where options are:\n");
-	fprintf(stdout, " %-30s Name of master (project) to contact.  May be a regular expression.\n", "-N,-M,--master-name=<name>"); 
-	fprintf(stdout, " %-30s Catalog server to query for masters.  (default: %s:%d) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
-	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
-	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
-	fprintf(stdout, " %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n", "--debug-rotate-max=<bytes>");
-	fprintf(stdout, " %-30s Set worker to run as a foreman.\n", "--foreman");
-	fprintf(stdout, " %-30s Run as a foreman, and advertise to the catalog server with <name>.\n", "-f,--foreman-name=<name>");
-	fprintf(stdout, " %-30s\n", "--foreman-port=<port>[:<highport>]");
-	fprintf(stdout, " %-30s Set the port for the foreman to listen on.  If <highport> is specified\n", "");
-	fprintf(stdout, " %-30s the port is chosen from the range port:highport.  Implies --foreman.\n", "");
-	fprintf(stdout, " %-30s Select port to listen to at random and write to this file.  Implies --foreman.\n", "-Z,--foreman-port-file=<file>");
-	fprintf(stdout, " %-30s Set the fast abort multiplier for foreman (default=disabled).\n", "-F,--fast-abort=<mult>");
-	fprintf(stdout, " %-30s Send statistics about foreman to this file.\n", "--specify-log=<logfile>");
-	fprintf(stdout, " %-30s When in Foreman mode, this foreman will advertise to the catalog server\n", "-N,--foreman-name=<name>");
-	fprintf(stdout, " %-30s as <name>.\n", "");
-	fprintf(stdout, " %-30s Password file for authenticating to the master.\n", "-P,--password=<pwfile>");
-	fprintf(stdout, " %-30s Set both --idle-timeout and --connect-timeout.\n", "-t,--timeout=<time>");
-	fprintf(stdout, " %-30s Disconnect after this time if master sends no work. (default=%ds)\n", "   --idle-timeout=<time>", idle_timeout);
-	fprintf(stdout, " %-30s Abort after this time if no masters are available. (default=%ds)\n", "   --connect-timeout=<time>", idle_timeout);
-	fprintf(stdout, " %-30s Set TCP window size.\n", "-w,--tcp-window-size=<size>");
-	fprintf(stdout, " %-30s Set initial value for backoff interval when worker fails to connect\n", "-i,--min-backoff=<time>");
-	fprintf(stdout, " %-30s to a master. (default=%ds)\n", "", init_backoff_interval);
-	fprintf(stdout, " %-30s Set maximum value for backoff interval when worker fails to connect\n", "-b,--max-backoff=<time>");
-	fprintf(stdout, " %-30s to a master. (default=%ds)\n", "", max_backoff_interval);
-	fprintf(stdout, " %-30s Set available disk space threshold (in MB). When exceeded worker will\n", "-z,--disk-threshold=<size>");
-	fprintf(stdout, " %-30s clean up and reconnect. (default=%" PRIu64 "MB)\n", "", disk_avail_threshold);
-	fprintf(stdout, " %-30s Set architecture string for the worker to report to master instead\n", "-A,--arch=<arch>");
-	fprintf(stdout, " %-30s of the value in uname (%s).\n", "", arch_name);
-	fprintf(stdout, " %-30s Set operating system string for the worker to report to master instead\n", "-O,--os=<os>");
-	fprintf(stdout, " %-30s of the value in uname (%s).\n", "", os_name);
-	fprintf(stdout, " %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
-	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
-	fprintf(stdout, " %-30s Set the percent chance a worker will decide to shut down every minute.\n", "--volatility=<chance>");
-	fprintf(stdout, " %-30s Set the maximum bandwidth the foreman will consume in bytes per second. Example: 100M for 100MBps. (default=unlimited)\n", "--bandwidth=<Bps>");
-	fprintf(stdout, " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
-	fprintf(stdout, " %-30s worker automatically measure. (default=%"PRId64")\n", "", manual_cores_option);
-	fprintf(stdout, " %-30s Set the number of GPUs reported by this worker. (default=0)\n", "--gpus=<n>");
-	fprintf(stdout, " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
-	fprintf(stdout, " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
-	fprintf(stdout, " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
-	fprintf(stdout, " %-30s Show this help screen\n", "-h,--help");
+	printf( "Use: %s [options] <masterhost> <port>\n", cmd);
+	printf( "where options are:\n");
+	printf( " %-30s Name of master (project) to contact.  May be a regular expression.\n", "-N,-M,--master-name=<name>"); 
+	printf( " %-30s Catalog server to query for masters.  (default: %s:%d) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
+	printf( " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
+	printf( " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	printf( " %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n", "--debug-rotate-max=<bytes>");
+	printf( " %-30s Set worker to run as a foreman.\n", "--foreman");
+	printf( " %-30s Run as a foreman, and advertise to the catalog server with <name>.\n", "-f,--foreman-name=<name>");
+	printf( " %-30s\n", "--foreman-port=<port>[:<highport>]");
+	printf( " %-30s Set the port for the foreman to listen on.  If <highport> is specified\n", "");
+	printf( " %-30s the port is chosen from the range port:highport.  Implies --foreman.\n", "");
+	printf( " %-30s Select port to listen to at random and write to this file.  Implies --foreman.\n", "-Z,--foreman-port-file=<file>");
+	printf( " %-30s Set the fast abort multiplier for foreman (default=disabled).\n", "-F,--fast-abort=<mult>");
+	printf( " %-30s Send statistics about foreman to this file.\n", "--specify-log=<logfile>");
+	printf( " %-30s When in Foreman mode, this foreman will advertise to the catalog server\n", "-N,--foreman-name=<name>");
+	printf( " %-30s as <name>.\n", "");
+	printf( " %-30s Password file for authenticating to the master.\n", "-P,--password=<pwfile>");
+	printf( " %-30s Set both --idle-timeout and --connect-timeout.\n", "-t,--timeout=<time>");
+	printf( " %-30s Disconnect after this time if master sends no work. (default=%ds)\n", "   --idle-timeout=<time>", idle_timeout);
+	printf( " %-30s Abort after this time if no masters are available. (default=%ds)\n", "   --connect-timeout=<time>", idle_timeout);
+	printf( " %-30s Set TCP window size.\n", "-w,--tcp-window-size=<size>");
+	printf( " %-30s Set initial value for backoff interval when worker fails to connect\n", "-i,--min-backoff=<time>");
+	printf( " %-30s to a master. (default=%ds)\n", "", init_backoff_interval);
+	printf( " %-30s Set maximum value for backoff interval when worker fails to connect\n", "-b,--max-backoff=<time>");
+	printf( " %-30s to a master. (default=%ds)\n", "", max_backoff_interval);
+	printf( " %-30s Set available disk space threshold (in MB). When exceeded worker will\n", "-z,--disk-threshold=<size>");
+	printf( " %-30s clean up and reconnect. (default=%" PRIu64 "MB)\n", "", disk_avail_threshold);
+	printf( " %-30s Set architecture string for the worker to report to master instead\n", "-A,--arch=<arch>");
+	printf( " %-30s of the value in uname (%s).\n", "", arch_name);
+	printf( " %-30s Set operating system string for the worker to report to master instead\n", "-O,--os=<os>");
+	printf( " %-30s of the value in uname (%s).\n", "", os_name);
+	printf( " %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
+	printf( " %-30s Show version string\n", "-v,--version");
+	printf( " %-30s Set the percent chance a worker will decide to shut down every minute.\n", "--volatility=<chance>");
+	printf( " %-30s Set the maximum bandwidth the foreman will consume in bytes per second. Example: 100M for 100MBps. (default=unlimited)\n", "--bandwidth=<Bps>");
+	printf( " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
+	printf( " %-30s worker automatically measure. (default=%"PRId64")\n", "", manual_cores_option);
+	printf( " %-30s Set the number of GPUs reported by this worker. (default=0)\n", "--gpus=<n>");
+	printf( " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
+	printf( " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
+	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
+	printf( " %-30s Show this help screen\n", "-h,--help");
 }
 
 static int setup_workspace() {
@@ -1632,7 +1632,7 @@ static int setup_workspace() {
 		return 0;
 	} 
 
-	fprintf(stdout, "work_queue_worker: working in %s\n", workspace);
+	printf( "work_queue_worker: working in %s\n", workspace);
 	return 1;
 }
 
@@ -1955,7 +1955,8 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-		fprintf(stdout, "work_queue_worker-foreman: listening on port %d\n", work_queue_port(foreman_q));
+		printf( "work_queue_worker-foreman: listening on port %d\n", work_queue_port(foreman_q));
+
 		if(port_file)
 		{	opts_write_port_file(port_file, work_queue_port(foreman_q));	}
 		
