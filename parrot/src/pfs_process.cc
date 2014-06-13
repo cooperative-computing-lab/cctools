@@ -5,26 +5,29 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "pfs_process.h"
-#include "pfs_dispatch.h"
-#include "pfs_poll.h"
 #include "pfs_channel.h"
+#include "pfs_dispatch.h"
 #include "pfs_paranoia.h"
+#include "pfs_poll.h"
+#include "pfs_process.h"
 
 extern "C" {
 #include "debug.h"
-#include "xxmalloc.h"
-#include "stringtools.h"
-#include "macros.h"
 #include "itable.h"
+#include "macros.h"
+#include "stringtools.h"
+#include "xxmalloc.h"
 }
 
-#include <sys/wait.h>
-#include <signal.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <fcntl.h>
 #include <unistd.h>
+
+#include <sys/wait.h>
+
+#include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdlib.h>
 #include <string.h>
 
 struct pfs_process *pfs_current=0;
@@ -129,12 +132,14 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 	child->tgid = pid;
 	child->state = PFS_PROCESS_STATE_KERNEL;
 	child->flags = PFS_PROCESS_FLAGS_STARTUP;
+	child->parent_wcontinued = 0;
+	child->parent_wuntraced = 0;
 	child->seltime.tv_sec = 0;
 	child->syscall = SYSCALL32_fork;
 	child->syscall_dummy = 0;
 	child->syscall_result = 0;
 	child->syscall_args_changed = 0;
-	child->exit_status = 0;
+	child->wait_status = 0;
 	child->exit_signal = exit_signal;
 	/* to prevent accidental copy out */
 	child->wait_ustatus = 0;
@@ -227,28 +232,17 @@ static void pfs_process_do_wake( struct pfs_process *parent, struct pfs_process 
 
 	debug(D_DEBUG, "waking parent %d because of child %d", parent->pid, child->pid);
 
-	if(parent->wait_ustatus) {
-		tracer_copy_out(
-			parent->tracer,
-			&child->exit_status,
-			parent->wait_ustatus,
-			sizeof(child->exit_status)
-		);
-	}
-	if(parent->wait_urusage) {
-		tracer_copy_out(
-			parent->tracer,
-			&child->exit_rusage,
-			parent->wait_urusage,
-			sizeof(child->exit_rusage)
-		);
+	if(parent->wait_ustatus)
+		tracer_copy_out(parent->tracer, &child->wait_status, parent->wait_ustatus, sizeof(child->wait_status));
+	if(parent->wait_urusage)
+		tracer_copy_out(parent->tracer,	&child->wait_rusage, parent->wait_urusage, sizeof(child->wait_rusage));
+
+	if(child->state == PFS_PROCESS_STATE_DONE) {
+		pfs_process_delete(child);
 	}
 
-	if(child->state==PFS_PROCESS_STATE_DONE) {
-		pfs_process_delete(child);
-	} else {
-		child->state=PFS_PROCESS_STATE_USER;
-	}
+	child->parent_wcontinued = 0;
+	child->parent_wuntraced = 0;
 
 	/* to prevent accidental copy out */
 	parent->wait_ustatus = 0;
@@ -261,8 +255,7 @@ static void pfs_process_do_wake( struct pfs_process *parent, struct pfs_process 
  */
 static int pfs_process_may_wake( struct pfs_process *parent, struct pfs_process *child )
 {
-	/* Note: we never wake a parent for STOP signals. */
-	if(child->ppid == parent->pid && child->state == PFS_PROCESS_STATE_DONE && parent->state == PFS_PROCESS_STATE_WAITPID && (parent->wait_pid <= 0 || parent->wait_pid == child->pid)) {
+	if(child->ppid == parent->pid && parent->state == PFS_PROCESS_STATE_WAITPID && (child->state == PFS_PROCESS_STATE_DONE || (child->parent_wuntraced && child->state == PFS_PROCESS_STATE_STOPPED && (parent->wait_options & WUNTRACED)) || (child->parent_wcontinued && (parent->wait_options & WCONTINUED))) && (parent->wait_pid <= 0 || parent->wait_pid == child->pid)) {
 		pfs_process_do_wake(parent,child);
 		return 1;
 	} else {
@@ -314,23 +307,21 @@ void pfs_process_stop( struct pfs_process *child, int status, struct rusage *usa
 			if(!child->table->refs()) delete child->table;
 			child->table = 0;
 		}
+	} else if (WIFSTOPPED(status)) {
+		debug(D_DEBUG, "%d entering stopped state", child->pid);
+		child->state = PFS_PROCESS_STATE_STOPPED;
+		child->parent_wuntraced = 1;
 	} else {
-		child->state = PFS_PROCESS_STATE_WAITPID;
+		assert(0);
 	}
-
-	child->exit_status = status;
-	child->exit_rusage = *usage;
+	child->wait_status = status;
+	child->wait_rusage = *usage;
 
 	parent = pfs_process_lookup(child->ppid);
 	debug(D_PSTREE, "process %d parent is %d", child->pid, child->ppid);
 
 	if(parent) {
-		int send_signal = 0;
-		if(child->state==PFS_PROCESS_STATE_DONE) {
-			if(child->exit_signal) {
-				send_signal = child->exit_signal;
-			}
-		}
+		int send_signal = child->state == PFS_PROCESS_STATE_DONE ? child->exit_signal : 0;
 
 		/*
 		XXX WARNING
@@ -345,6 +336,24 @@ void pfs_process_stop( struct pfs_process *child, int status, struct rusage *usa
 		}
 	} else {
 		debug(D_PSTREE, "process %d parent %d not in process table", child->pid, child->ppid);
+	}
+}
+
+void pfs_process_continued (struct pfs_process *p, int status, struct rusage *usage)
+{
+	p->parent_wcontinued = 1;
+	p->wait_status = status;
+	p->wait_rusage = *usage;
+
+	struct pfs_process *parent = pfs_process_lookup(p->ppid);
+	debug(D_PSTREE, "process %d parent is %d", p->pid, p->ppid);
+
+	if(parent) {
+		if(pfs_process_may_wake(parent,p)) {
+			tracer_continue(parent->tracer,0);
+		}
+	} else {
+		debug(D_PSTREE, "process %d parent %d not in process table", p->pid, p->ppid);
 	}
 }
 
@@ -440,7 +449,6 @@ int  pfs_process_raise( pid_t pid, int sig, int really_sendit )
 			}
 		}
 	} else {
-		debug(D_PROCESS,"sending signal %d (%s) to pfs pid %d",sig,string_signal(sig),pid);
 		switch(p->state) {
 			case PFS_PROCESS_STATE_WAITPID:
 			case PFS_PROCESS_STATE_WAITREAD:
@@ -457,8 +465,10 @@ int  pfs_process_raise( pid_t pid, int sig, int really_sendit )
 				break;
 			default:
 				if(really_sendit) {
+					debug(D_PROCESS,"sending signal %d (%s) to pfs pid %d",sig,string_signal(sig),pid);
 					result = kill(pid,sig);
 				} else {
+					debug(D_PROCESS,"prepared pfs pid %d to receive signal %d (%s)",pid,sig,string_signal(sig));
 					result = 0;
 				}
 				break;

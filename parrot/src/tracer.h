@@ -16,9 +16,10 @@ See the file COPYING for details.
 struct tracer;
 
 int tracer_attach( pid_t pid );
-void tracer_detach( struct tracer *t );
+int tracer_detach( struct tracer *t );
 struct tracer *tracer_init( pid_t pid );
-void tracer_continue( struct tracer *t, int signum );
+int tracer_continue( struct tracer *t, int signum );
+int tracer_listen( struct tracer *t );
 unsigned long tracer_getevent( struct tracer *t );
 
 int             tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARGS_MAX] );
