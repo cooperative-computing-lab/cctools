@@ -88,7 +88,7 @@ struct list * work_queue_catalog_query_cached( const char *catalog_host, int cat
 	static struct list * masters_list = 0;
 	static time_t masters_list_timestamp = 0;
 
-	if(masters_list && time(0)-masters_list_timestamp>60) {
+	if(masters_list && (time(0)-masters_list_timestamp)<60) {
 		return masters_list;
 	}
 
