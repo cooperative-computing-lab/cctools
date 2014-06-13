@@ -1477,6 +1477,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		return 0;
 	}
 
+	printf("connected to master %s:%d\n", host, port );
 	debug(D_WQ, "connected to master %s:%d", host, port );
 
 	link_tune(master,LINK_TUNE_INTERACTIVE);
@@ -1527,6 +1528,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	last_task_received  = -1;               //Reset last task received flag.
 
 	disconnect_master(master);
+	printf("disconnected from master %s:%d\n", host, port );
 
 	return 1;
 }
