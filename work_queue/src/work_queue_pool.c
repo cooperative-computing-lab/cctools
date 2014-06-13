@@ -4,6 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "work_queue_catalog.h"
+
 #include "cctools.h"
 #include "batch_job.h"
 #include "hash_table.h"
@@ -50,82 +52,6 @@ static void handle_abort( int sig )
 
 static void ignore_signal( int sig )
 {
-}
-
-/*
-Query the catalog for all WQ masters whose project name matches the given regex.
-Return a linked list of nvpairs describing the masters.
-*/
-
-static struct list * get_masters_list( const char *catalog_host, int catalog_port, const char *project_regex )
-{
-	time_t stoptime = time(0) + 60;
-
-	struct catalog_query *q = catalog_query_create(catalog_host, catalog_port, stoptime);
-	if(!q) return 0;
-
-	struct list *masters_list = list_create();
-
-	// for each nvpair returned by the query
-	struct nvpair *nv;
-	while((nv = catalog_query_read(q, stoptime))) {
-
-		// if it is a WQ master...
-		const char *nv_type = nvpair_lookup_string(nv,"type");
-		if(nv_type && !strcmp(nv_type,"wq_master")) {
-
-			const char *nv_project = nvpair_lookup_string(nv,"project");
-			// and the project name matches...
-			if(nv_project && whole_string_match_regex(nv_project,project_regex)) {
-
-				// put the item in the list.
-				list_push_head(masters_list,nv);
-			}
-		}
-	}
-
-	catalog_query_delete(q);
-
-	debug(D_WQ,"query returned %d matching masters",list_size(masters_list));
-	return masters_list;
-}
-
-/*
-Cache queries against the catalog server, so that we don't return more than once per minute.
-*/
-
-static struct list * get_masters_list_cached( const char *project_regex )
-{
-	static struct list * masters_list = 0;
-	static time_t masters_list_timestamp = 0;
-
-	if(masters_list && (time(0)-masters_list_timestamp)<60) {
-		return masters_list;
-	}
-
-	if(masters_list) {
-		struct nvpair *nv;
-		while((nv=list_pop_head(masters_list))) {
-			nvpair_delete(nv);
-		}
-		free(masters_list);
-		masters_list = 0;
-	}
-
-	while(1) {
-		debug(D_WQ,"querying catalog %s:%d for masters with project  matching %s",catalog_host,catalog_port,project_regex);
-		masters_list = get_masters_list(catalog_host,catalog_port,project_regex);
-		if(masters_list) {
-			break;
-		} else {
-			debug(D_WQ|D_NOTICE,"unable to contact catalog server %s:%d, still trying...\n", catalog_host, catalog_port);
-			sleep(5);
-		}
-	}
-
-	masters_list_timestamp = time(0);
-
-	return masters_list;
 }
 
 /*
@@ -217,7 +143,7 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 	int count = itable_size(job_table);
 	itable_firstkey(job_table);
 	while(itable_nextkey(job_table,&jobid,&value)) {
-		debug(D_WQ,"removing job %d",jobid);
+		debug(D_WQ,"removing job %"PRId64,jobid);
 		batch_job_remove(queue,jobid);
 	}
 	debug(D_WQ,"%d workers removed.",count);
@@ -236,7 +162,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex )
 	struct itable *job_table = itable_create(0);
 
 	while(!abort_flag) {
-		struct list *masters_list = get_masters_list_cached(project_regex);
+	  struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
 
 		int workers_needed = count_workers_needed(masters_list);
 

@@ -1431,75 +1431,6 @@ static void foreman_for_master(struct link *master) {
 	}
 }
 
-/*
-Query the catalog for all WQ masters whose project name matches the given regex.
-Return a linked list of nvpairs describing the masters.
-*/
-
-static struct list * get_masters_list( const char *catalog_host, int catalog_port, const char *project_regex )
-{
-	time_t stoptime = time(0) + 60;
-
-	struct catalog_query *q = catalog_query_create(catalog_host, catalog_port, stoptime);
-	if(!q) {
-		debug(D_NOTICE,"unable to contact catalog server at %s:%d\n", catalog_host, catalog_port);
-		return 0;
-	}
-
-	struct list *masters_list = list_create();
-
-	// for each nvpair returned by the query
-	struct nvpair *nv;
-	while((nv = catalog_query_read(q, stoptime))) {
-
-		// if it is a WQ master...
-		const char *nv_type = nvpair_lookup_string(nv,"type");
-		if(nv_type && !strcmp(nv_type,"wq_master")) {
-
-			// and the project name matches...
-			const char *nv_project = nvpair_lookup_string(nv,"project");
-			if(nv_project && whole_string_match_regex(nv_project,project_regex)) {
-
-				// put the item in the list.
-				list_push_head(masters_list,nv);
-			}
-		}
-	}
-
-	catalog_query_delete(q);
-
-	return masters_list;
-}
-
-static struct list * get_masters_list_cached( const char *catalog_host, int catalog_port, const char *project_regex )
-{
-	static struct list * masters_list = 0;
-	static time_t masters_list_timestamp = 0;
-
-	if(masters_list && time(0)-masters_list_timestamp>60) {
-		return masters_list;
-	}
-
-	if(masters_list) {
-		struct nvpair *nv;
-		while((nv=list_pop_head(masters_list))) {
-			nvpair_delete(nv);
-		}
-	}
-
-	while(1) {
-		debug(D_WQ,"querying catalog for masters with project=%s",project_regex);
-		masters_list = get_masters_list(catalog_host,catalog_port,project_regex);
-		if(masters_list) break;
-		debug(D_WQ,"unable to contact catalog, still trying...");
-		sleep(5);
-	}
-
-	masters_list_timestamp = time(0);
-
-	return masters_list;
-}
-
 static int serve_master_by_hostport( const char *host, int port, const char *verify_project )
 {
 	if(!domain_name_cache_lookup(host,master_addr)) {
@@ -1556,7 +1487,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 static int serve_master_by_name( const char *catalog_host, int catalog_port, const char *project_regex )
 {
-	struct list *masters_list = get_masters_list_cached(catalog_host,catalog_port,project_regex);
+	struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
 	
 	debug(D_WQ,"project name %s matches %d masters",project_regex,list_size(masters_list));
 
@@ -1734,7 +1665,7 @@ int main(int argc, char *argv[])
 			terminate_boundary = MAX(MIN_TERMINATE_BOUNDARY, string_time_parse(optarg));
 			break;
 		case 'C':
-			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
+			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
 				fprintf(stderr, "The provided catalog server is invalid. The format of the '-C' option is '-C HOSTNAME:PORT'.\n");
 				exit(1);
 			}
