@@ -27,6 +27,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "getopt.h"
 #include "getopt_aux.h"
+#include "xxmalloc.h"
 
 #include "compressed_sequence.h"
 #include "sequence_filter.h"
@@ -528,7 +529,7 @@ static void get_options(int argc, char **argv, const char *progname)
 			priority = atoi(optarg);
 			break;
 		case 'C':
-			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
+			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
 				fprintf(stderr, "sand_filter: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			}

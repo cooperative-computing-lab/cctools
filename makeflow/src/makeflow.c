@@ -1504,7 +1504,7 @@ int main(int argc, char *argv[])
 				clean_mode = 1;
 				break;
 			case 'C':
-				if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
+				if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
 					fprintf(stderr, "makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
 					exit(1);
 				}
