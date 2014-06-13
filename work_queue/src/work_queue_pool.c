@@ -98,15 +98,14 @@ static int count_workers_needed( struct list *masters_list )
 static int submit_worker( struct batch_queue *queue )
 {
 	char cmd[1024];
+	char extra_input_files[1024];
 
-	const char *extra_input_files = 0;
-
-	sprintf(cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o output.log ",project_regex,worker_timeout,catalog_host,catalog_port);
+	sprintf(cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o worker.log ",project_regex,worker_timeout,catalog_host,catalog_port);
+	strcpy(extra_input_files,"work_queue_worker");
 
 	if(password_file) {
-		strcat(cmd," -P");
-		strcat(cmd,password_file);
-		extra_input_files = password_file;
+		strcat(cmd," -P pwfile");
+		strcat(extra_input_files,",pwfile");
 	}
 
 	if(extra_worker_args) {
@@ -126,7 +125,7 @@ static int submit_workers( struct batch_queue *queue, struct itable *job_table, 
 		int jobid = submit_worker(queue);
 		if(jobid>0) {
 			debug(D_WQ,"worker job %d submitted",jobid);
-			itable_insert(job_table,jobid,0);
+			itable_insert(job_table,jobid,(void*)1);
 		} else {
 			break;
 		}
@@ -162,7 +161,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex )
 	struct itable *job_table = itable_create(0);
 
 	while(!abort_flag) {
-	  struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
+	        struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
 
 		int workers_needed = count_workers_needed(masters_list);
 
@@ -197,10 +196,16 @@ static void mainloop( struct batch_queue *queue, const char *project_regex )
 
 		while(1) {
 			struct batch_job_info info;
-			int jobid = batch_job_wait_timeout(queue,&info,stoptime);
+			batch_job_id_t jobid;
+			jobid = batch_job_wait_timeout(queue,&info,stoptime);
 			if(jobid>0) {
-				debug(D_WQ,"worker job %d exited",jobid);
-				workers_submitted--;
+				if(itable_lookup(job_table,jobid)) {
+					itable_remove(job_table,jobid);
+					debug(D_WQ,"worker job %"PRId64" exited",jobid);
+					workers_submitted--;
+				} else {
+					// it may have been a job from a previous run.					
+				}
 			} else {
 				break;
 			}
@@ -331,12 +336,19 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	char cmd[1024];
+	sprintf(cmd,"cp `which work_queue_worker` %s",scratch_dir);
+	system(cmd);
+
+	if(password_file) {
+		sprintf(cmd,"cp %s %s/pwfile",password_file,scratch_dir);
+		system(cmd);
+	}
+
 	if(chdir(scratch_dir)!=0) {
 		fprintf(stderr,"work_queue_pool: couldn't chdir to %s: %s",scratch_dir,strerror(errno));
 		return 1;
 	}
-
-	system("cp `which work_queue_worker` .");
 
 	signal(SIGINT, handle_abort);
         signal(SIGQUIT, handle_abort);
