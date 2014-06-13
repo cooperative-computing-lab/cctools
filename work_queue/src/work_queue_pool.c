@@ -38,6 +38,7 @@ static const char *catalog_host = 0;
 static int catalog_port = 0;
 static int workers_min = 5;
 static int workers_max = 100;
+static int consider_capacity = 0;
 static const char *project_regex = 0;
 static int worker_timeout = 300;
 static const char *extra_worker_args=0;
@@ -80,7 +81,7 @@ static int count_workers_needed( struct list *masters_list )
 		int tasks = tr+tw;
 		int need = tasks;
 
-		if(capacity>0) {
+		if(consider_capacity && capacity>0) {
 			need = MIN(capacity,tasks);
 		}
 
@@ -230,6 +231,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Workers abort after this amount of idle time. (default=%d)\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)","-S,--scratch-dir");
+	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
@@ -253,6 +255,7 @@ int main(int argc, char *argv[])
 		{"timeout", required_argument, 0, 't'},
 		{"extra-options", required_argument, 0, 'E'},
 		{"scratch-dir", required_argument, 0, 'S' },
+		{"capacity", no_argument, 0, 'c' },
 		{"debug", required_argument, 0, 'd'},
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-file-size", required_argument, 0, 'O'},
@@ -263,7 +266,7 @@ int main(int argc, char *argv[])
 
 	char c;
 
-	while((c = getopt_long(argc, argv, "N:M:T:t:w:W:E:P:S:d:o:O:vh", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'N':
 		case 'M':
@@ -293,6 +296,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'S':
 			scratch_dir = optarg;
+			break;
+		case 'c':
+			consider_capacity = 1;
 			break;
 		case 'd':
 			debug_flags_set(optarg);
