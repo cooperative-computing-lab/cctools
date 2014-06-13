@@ -662,7 +662,7 @@ then
 	do
 		if ! library_search $library ${cvmfs_path}
 		then
-			echo "*** Couldn't find $library in ${lib_path}"
+			echo "*** Couldn't find $library in ${cvmfs_path}"
 			exit 1
 		fi
 	done
