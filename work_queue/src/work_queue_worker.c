@@ -64,21 +64,49 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define MIN_TERMINATE_BOUNDARY 0 
 #define TERMINATE_BOUNDARY_LEEWAY 30
 
-#define WORKER_MODE_NONE    0
 #define WORKER_MODE_WORKER  1
 #define WORKER_MODE_FOREMAN 2
 
-// Maximum time to wait before aborting if there is no connection to the master.
+/*
+Timeouts explained:
+
+main loop:
+	if project name given:
+		query catalog using single_connect_timeout
+		pick master at random from matches
+
+	connect to master with single_connect_timeout
+
+	worker service loop:
+		disconnect if no work received within idle_timeout
+		disconnect if ctrl-c sets abort_flag
+		disconnect if send/recv messages takes longer than active_timeout
+
+	stop main loop if single-master and idle_timeout has expired
+	stop main loop if connect timeout has expired.
+	stop if ctrl-c sets abort_flag
+
+	sleep before trying again, with exp backoff
+*/
+
+
+// Maximum time to stay connected to a single master without any work.
 static int idle_timeout = 900;
 
-// Maximum time to wait before switching to another master. Used in auto mode.
-static const int master_timeout = 15;
+// Current time at which we will give up if no work is received.
+static time_t idle_stoptime = 0;
 
-// Maximum time to wait when actively communicating with the master.
+// Maximum time to attempt connecting to all available masters before giving up.
+static int connect_timeout = 900;
+
+// Maximum time to attempt a single link_connect before trying other options.
+static int single_connect_timeout = 15;
+
+// Maximum time to attempt sending/receiving any given file or message.
 static const int active_timeout = 3600;
 
-// A short timeout constant
-static const int short_timeout = 5;
+// Maximum time for the foreman to spend waiting in its internal loop
+static const int foreman_internal_timeout = 5;
 
 // Initial value for backoff interval (in seconds) when worker fails to connect to a master.
 static int init_backoff_interval = 1; 
@@ -89,7 +117,8 @@ static int max_backoff_interval = 60;
 // Chance that a worker will decide to shut down each minute without warning, to simulate failure.
 static double worker_volatility = 0.0;
 
-// Flag gets set on receipt of a terminal signal.
+// If flag is set, then the worker proceeds to immediately cleanup and shut down.
+// This can be set by Ctrl-C or by any condition that prevents further progress.
 static int abort_flag = 0;
 
 // Threshold for available disk space (MB) beyond which clean up and restart.
@@ -171,11 +200,15 @@ static void send_master_message( struct link *master, const char *fmt, ... )
 
 static int recv_master_message( struct link *master, char *line, int length, time_t stoptime )
 {
-	int result = link_readline(master,line,length,time(0)+active_timeout);
+	int result = link_readline(master,line,length,stoptime);
 	if(result) debug(D_WQ,"rx from master: %s",line);
 	return result;
 }
 
+void reset_idle_timer()
+{
+	idle_stoptime = time(0) + idle_timeout;
+}
 
 /* Resources related tasks */
 
@@ -640,7 +673,7 @@ failure:
 	return 0;
 }
 
-static int do_task( struct link *master, int taskid )
+static int do_task( struct link *master, int taskid, time_t stoptime )
 {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
@@ -648,7 +681,6 @@ static int do_task( struct link *master, int taskid )
 	char taskname[WORK_QUEUE_LINE_MAX];
 	char dirname[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
-	time_t stoptime = time(0) + active_timeout;
 	struct work_queue_task *task = work_queue_task_create(0);
 
 	task->taskid = taskid;
@@ -1183,9 +1215,9 @@ static int handle_master(struct link *master) {
 	int flags = WORK_QUEUE_NOCACHE;
 	int mode, r, n;
 
-	if(recv_master_message(master, line, sizeof(line), time(0)+active_timeout)) {
+	if(recv_master_message(master, line, sizeof(line), idle_stoptime )) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
-			r = do_task(master, taskid);
+			r = do_task(master, taskid,time(0)+active_timeout);
 		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) >= 3) {
 			if(path_within_workspace(filename, workspace)) {
 				r = do_put(master, filename, length, mode);
@@ -1290,14 +1322,14 @@ static void work_for_master(struct link *master) {
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
 	
-	time_t idle_stoptime = time(0) + idle_timeout;
+	reset_idle_timer();
+
 	time_t volatile_stoptime = time(0) + 60;
 	// Start serving masters
 	while(!abort_flag) {
 
 		if(time(0) > idle_stoptime) {
-			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
-			abort_flag = 1;
+			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", master_addr,master_port,idle_timeout);
 			break;
 		}
 		
@@ -1322,10 +1354,7 @@ static void work_for_master(struct link *master) {
 
 		int master_activity = link_usleep_mask(master, msec*1000, &mask, 1, 0);
 
-		if(master_activity < 0) {
-			abort_flag = 1;
-			break;
-		}
+		if(master_activity < 0) break;
 		
 		send_resource_update(master,0);
 		
@@ -1379,9 +1408,9 @@ static void work_for_master(struct link *master) {
 
 		if(!ok) break;
 
-		//Reset idle timeout if something interesting is happening at this worker.
+		//Reset idle_stoptime if something interesting is happening at this worker.
 		if(list_size(waiting_tasks) > 0 || itable_size(stored_tasks) > 0 || itable_size(results_to_be_sent) > 0) {
-			idle_stoptime = time(0) + idle_timeout;
+			reset_idle_timer();
 		}
 	}
 }
@@ -1394,7 +1423,7 @@ static void foreman_for_master(struct link *master) {
 
 	debug(D_WQ, "working for master at %s:%d as foreman.\n", master_addr, master_port);
 
-	time_t idle_stoptime = time(0) + idle_timeout;
+	reset_idle_timer();
 
 	while(!abort_flag) {
 		int result = 1;
@@ -1402,11 +1431,10 @@ static void foreman_for_master(struct link *master) {
 
 		if(time(0) > idle_stoptime && work_queue_empty(foreman_q)) {
 			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
-			abort_flag = 1;
 			break;
 		}
 
-		task = work_queue_wait_internal(foreman_q, short_timeout, master, &master_active);
+		task = work_queue_wait_internal(foreman_q, foreman_internal_timeout, master, &master_active);
 		
 		if(task) {
 			struct work_queue_process *ti = work_queue_process_create(task);
@@ -1424,7 +1452,7 @@ static void foreman_for_master(struct link *master) {
 		
 		if(master_active) {
 			result &= handle_master(master);
-			idle_stoptime = time(0) + idle_timeout;
+			reset_idle_timer();
 		}
 
 		if(!result) disconnect_master(master);
@@ -1438,9 +1466,14 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		return 0;
 	}		
 
-	struct link *master = link_connect(master_addr,port,time(0)+master_timeout);
+	/*
+	For a single connection attempt, we use the short single_connect_timeout.
+	If this fails, the outer loop will try again up to connect_timeout.
+	*/
+
+	struct link *master = link_connect(master_addr,port,time(0)+single_connect_timeout);
 	if(!master) {
-		fprintf(stderr,"couldn't connect to %s:%d: %s",master_addr,port,strerror(errno));
+		fprintf(stderr,"couldn't connect to %s:%d: %s\n",master_addr,port,strerror(errno));
 		return 0;
 	}
 
@@ -1448,9 +1481,17 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 	link_tune(master,LINK_TUNE_INTERACTIVE);
 
+	/*
+	For the preliminary steps of password and project verification, we use the idle timeout,
+	because we have not yet been assigned any work and should leave if the master is not responsive.
+	*/
+
+
+	reset_idle_timer();
+
 	if(password) {
 		debug(D_WQ,"authenticating to master");
-		if(!link_auth_password(master,password,time(0) + master_timeout)) {
+		if(!link_auth_password(master,password,idle_stoptime)) {
 			fprintf(stderr,"work_queue_worker: wrong password for master %s:%d\n",host,port);
 			link_close(master);
 			return 0;
@@ -1461,7 +1502,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		char line[WORK_QUEUE_LINE_MAX];
 		debug(D_WQ, "verifying master's project name");
 		send_master_message(master, "name\n");
-		recv_master_message(master, line, sizeof(line), time(0)+master_timeout);
+		recv_master_message(master, line, sizeof(line),idle_stoptime);
 		if(strcmp(line,verify_project)) {
 			fprintf(stderr, "work_queue_worker: master has project %s instead of %s\n", line, verify_project);
 			link_close(master);
@@ -1525,14 +1566,11 @@ static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <masterhost> <port>\n", cmd);
 	fprintf(stdout, "where options are:\n");
-	fprintf(stdout, " %-30s would ask a catalog server for available masters.\n", "");
 	fprintf(stdout, " %-30s Name of master (project) to contact.  May be a regular expression.\n", "-N,-M,--master-name=<name>"); 
-	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog=<catalog>");
+	fprintf(stdout, " %-30s Catalog server to query for masters.  (default: %s:%d) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n", "--debug-rotate-max=<bytes>");
-	fprintf(stdout, " %-30s Debug file will be closed, renamed, and a new one opened after being.\n", "--debug-release-reset");
-	fprintf(stdout, " %-30s released from a master.\n", "");
 	fprintf(stdout, " %-30s Set worker to run as a foreman.\n", "--foreman");
 	fprintf(stdout, " %-30s Run as a foreman, and advertise to the catalog server with <name>.\n", "-f,--foreman-name=<name>");
 	fprintf(stdout, " %-30s\n", "--foreman-port=<port>[:<highport>]");
@@ -1544,7 +1582,9 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s When in Foreman mode, this foreman will advertise to the catalog server\n", "-N,--foreman-name=<name>");
 	fprintf(stdout, " %-30s as <name>.\n", "");
 	fprintf(stdout, " %-30s Password file for authenticating to the master.\n", "-P,--password=<pwfile>");
-	fprintf(stdout, " %-30s Abort after this amount of idle time. (default=%ds)\n", "-t,--timeout=<time>", idle_timeout);
+	fprintf(stdout, " %-30s Set both --idle-timeout and --connect-timeout.\n", "-t,--timeout=<time>");
+	fprintf(stdout, " %-30s Disconnect after this time if master sends no work. (default=%ds)\n", "   --idle-timeout=<time>", idle_timeout);
+	fprintf(stdout, " %-30s Abort after this time if no masters are available. (default=%ds)\n", "   --connect-timeout=<time>", idle_timeout);
 	fprintf(stdout, " %-30s Set TCP window size.\n", "-w,--tcp-window-size=<size>");
 	fprintf(stdout, " %-30s Set initial value for backoff interval when worker fails to connect\n", "-i,--min-backoff=<time>");
 	fprintf(stdout, " %-30s to a master. (default=%ds)\n", "", init_backoff_interval);
@@ -1592,9 +1632,10 @@ static int setup_workspace() {
 }
 
 
-enum {LONG_OPT_DEBUG_FILESIZE = 1, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
+enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
-      LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS};
+      LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
+      LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT};
 
 struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1602,7 +1643,6 @@ struct option long_options[] = {
 	{"debug",               required_argument,  0,  'd'},
 	{"debug-file",          required_argument,  0,  'o'},
 	{"debug-rotate-max",    required_argument,  0,  LONG_OPT_DEBUG_FILESIZE},
-	{"debug-release-reset", no_argument,        0,  LONG_OPT_DEBUG_RELEASE},
 	{"foreman",             no_argument,        0,  LONG_OPT_FOREMAN},
 	{"foreman-port",        required_argument,  0,  LONG_OPT_FOREMAN_PORT},
 	{"foreman-port-file",   required_argument,  0,  'Z'},
@@ -1613,10 +1653,12 @@ struct option long_options[] = {
 	{"master-name",         required_argument,  0,  'M'},
 	{"password",            required_argument,  0,  'P'},
 	{"timeout",             required_argument,  0,  't'},
+	{"idle-timeout",        required_argument,  0,  LONG_OPT_IDLE_TIMEOUT},
+	{"connect-timeout",     required_argument,  0,  LONG_OPT_CONNECT_TIMEOUT},
 	{"tcp-window-size",     required_argument,  0,  'w'},
 	{"min-backoff",         required_argument,  0,  'i'},
 	{"max-mackoff",         required_argument,  0,  'b'},
-	{"disk-thershold",      required_argument,  0,  'z'},
+	{"disk-threshold",      required_argument,  0,  'z'},
 	{"arch",                required_argument,  0,  'A'},
 	{"os",                  required_argument,  0,  'O'},
 	{"workdir",             required_argument,  0,  's'},
@@ -1709,7 +1751,13 @@ int main(int argc, char *argv[])
 			foreman_stats_filename = xxstrdup(optarg); 
 			break;
 		case 't':
+			connect_timeout = idle_timeout = string_time_parse(optarg);
+			break;
+		case LONG_OPT_IDLE_TIMEOUT:
 			idle_timeout = string_time_parse(optarg);
+			break;
+		case LONG_OPT_CONNECT_TIMEOUT:
+			connect_timeout = string_time_parse(optarg);
 			break;
 		case 'j':
 			manual_cores_option = atoi(optarg);
@@ -1862,7 +1910,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(terminate_boundary > 0 && idle_timeout > terminate_boundary) {
-		idle_timeout = MAX(short_timeout, terminate_boundary - TERMINATE_BOUNDARY_LEEWAY);
+		idle_timeout = terminate_boundary - TERMINATE_BOUNDARY_LEEWAY;
 	}
 
 	// set $WORK_QUEUE_SANDBOX to workspace.
@@ -1938,9 +1986,9 @@ int main(int argc, char *argv[])
 	resources_measure_locally(local_resources);
 
 	int backoff_interval = init_backoff_interval;
+	time_t connect_stoptime = time(0) + connect_timeout;
 
-	while(!abort_flag) {
-
+	while(1) {
 		int result;
 
 		if(project_regex) {
@@ -1951,14 +1999,30 @@ int main(int argc, char *argv[])
 
 		/*
 		If the last attempt was a succesful connection, then reset the backoff_interval,
-		sleep briefly, and try again.  On failure, slow down the retries exponentially
-		to avoid pathological conditions.
+		and the connect timeout, then try again if a project name was given.
+		If the connect attempt failed, then slow down the retries.
 		*/
 
 		if(result) {
 			backoff_interval = init_backoff_interval;
+			connect_stoptime = time(0) + connect_timeout;
+
+			if(!project_regex && (time(0)>idle_stoptime)) {
+				debug(D_NOTICE,"stopping: no other masters available");
+				break;
+			}
 		} else {
 			backoff_interval = MIN(backoff_interval*2,max_backoff_interval);
+		}
+
+		if(abort_flag) {
+			debug(D_NOTICE,"stopping: abort signal received");
+			break;
+		}
+
+		if(time(0)>connect_stoptime) {
+			debug(D_NOTICE,"stopping: could not connect after %d seconds (--connect-timeout)",connect_timeout);
+			break;
 		}
 
 		sleep(backoff_interval);
