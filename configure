@@ -69,7 +69,6 @@ include_package_allpairs="allpairs"
 include_package_wavefront="wavefront"
 include_package_makeflow="makeflow"
 include_package_ftplite="ftp_lite"
-include_package_s3tools="s3tools"
 include_package_chirp="chirp"
 include_package_resource_monitor="resource_monitor"
 include_package_resource_monitor_visualizer="resource_monitor_visualizer"
@@ -114,8 +113,6 @@ krb5_path="/usr"
 readline_path="/usr"
 globus_path="/usr"
 fuse_path="/usr"
-rfio_path="/usr"
-dcap_path="/usr"
 irods_path="/usr"
 mysql_path="/usr"
 perl_path="/usr"
@@ -152,8 +149,6 @@ config_python3_path=auto
 config_zlib_path=yes
 
 config_krb5_path=no
-config_rfio_path=no
-config_dcap_path=no
 config_irods_path=no
 config_xrootd_path=no
 config_cvmfs_path=no
@@ -201,16 +196,6 @@ do
 			shift
 			fuse_path=$1
 			config_fuse_path=yes
-			;;
-		--with-rfio-path)
-			shift
-			rfio_path=$1
-			config_rfio_path=yes
-			;;
-		--with-dcap-path)
-			shift
-			dcap_path=$1
-			config_dcap_path=yes
 			;;
 		--with-irods-path)
 			shift
@@ -282,9 +267,6 @@ do
 		--without-system-ftp-lite)
 			include_package_ftplite=""
 			;;
-		--without-system-s3tools)
-			include_package_s3tools=""
-			;;
 		--without-system-chirp)
 			include_package_chirp=""
 			;;
@@ -340,8 +322,6 @@ Where PACKAGE may be:
     readline
     krb5
     fuse
-    rfio
-    dcap
     globus
     irods
     mysql
@@ -359,7 +339,6 @@ And SYSTEM may be:
     wavefront
     makeflow
     ftp-lite
-    s3tools
     chirp
     parrot
     resource_monitor
@@ -381,7 +360,7 @@ done
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_chirp} work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_s3tools} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_resource_monitor_visualizer} ${include_package_makeflow_linker} ${include_package_catalog_history} ${include_package_doc}"
+potential_packages="dttools ${include_package_chirp} work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_makeflow} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_resource_monitor_visualizer} ${include_package_makeflow_linker} ${include_package_catalog_history} ${include_package_doc}"
 
 check_multiarch
 
@@ -440,34 +419,6 @@ fi
 ##########################################################################
 library_search_mode=prefer_static
 ##########################################################################
-
-if [ $config_rfio_path != no ] && library_search shift ${rfio_path}
-then
-	ccflags="${ccflags} -I${rfio_path}/include -DHAS_RFIO"
-else
-	if [ $config_rfio_path = yes ]
-	then
-		  echo "*** Sorry, I couldn't find RFIO in $rfio_path"
-		  echo "*** Check --with-rfio-path and try again."
-		  exit 1
-	else
-		  echo "*** skipping rfio support"
-	fi
-fi
-
-if [ $config_dcap_path != no ] && library_search dcap ${dcap_path}
-then
-	ccflags="${ccflags} -I${dcap_path}/dcap -DHAS_DCAP"
-else
-	if [ $config_dcap_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find dcap in ${dcap_path}"
-		echo "*** Check --with-dcap-path and try again."
-		exit 1
-	else
-		echo "*** skipping dcap support"
-	fi
-fi
 
 if [ x$globus_flavor = xauto ]
 then
