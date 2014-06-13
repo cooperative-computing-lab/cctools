@@ -130,7 +130,7 @@ int whole_string_match_regex(const char *text, char *pattern)
 	if(*pattern != '^')
 		strncat(new_pattern, "^", 1);
 	strncat(new_pattern, pattern, strlen(pattern));
-	if(text[strlen(pattern) - 1] != '$')
+	if(pattern[strlen(pattern) - 1] != '$')
 		strncat(new_pattern, "$", 1);
 
 	result = string_match_regex(text, new_pattern);
