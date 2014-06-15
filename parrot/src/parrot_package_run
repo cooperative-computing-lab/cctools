@@ -47,16 +47,8 @@ echo "/ $package_path" >> $mountlist
 echo "$package_path $package_path" >> $mountlist
 cat $package_path/common-mountlist >> $mountlist
 
-/bin/$shell_type << EOF
-if [ "$shell_type" = bash -o "$shell_type" = zsh ]; then
-	. $package_path/env_list
-elif [ "$shell_type" = tcsh -o "$shell_type" = csh ]; then
-	source $package_path/env_list
-else
-	echo "This shell type currently is not supported."
-	exit 1
-fi
+#import environment varibales
+. $package_path/env_list
 
-#import the environment variables
-parrot_run -m $mountlist /bin/$shell_type
-EOF
+#initialize the repeat process
+exec parrot_run -m $mountlist /bin/$shell_type
