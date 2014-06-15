@@ -2,7 +2,7 @@ include ../../Makefile.config
 include ../../Makefile.rules
 
 PROGRAMS = parrot_run parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp parrot_timeout parrot_search parrot_package_create
-SCRIPTS = make_growfs parrot_identity_box parrot_run_hdfs parrot_package_env parrot_package_run
+SCRIPTS = make_growfs parrot_identity_box parrot_run_hdfs parrot_package_run
 LIBRARIES = libparrot_helper.so libparrot_client.a
 
 ifeq ($(CCTOOLS_BUILD_LIB64PARROT_HELPER),yes)

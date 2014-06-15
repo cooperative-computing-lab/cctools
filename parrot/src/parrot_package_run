@@ -4,10 +4,12 @@ package_path=""
 mountlist=""
 show_help()
 {
+	echo "Usage: parrot_package_run --package-path path-of-package --shell-type type-of-shell"
+	echo "Example: parrot_package_run --package-path /tmp/pack --shell-type bash"
+	echo ''
 	echo "Options:"
 	echo "-p, --package-path         The path of the package."
-	echo "-s, --shell-type           The type of shell used to do the experiment."
-	echo "                           Supported shell types: csh, tcsh, bash, zsh."
+	echo "-s, --shell-type           The type of shell used to do the experiment. (e.g., bash, tcsh, csh, zsh)"
 	echo "-h, --help                 Show this help message."
 
 	exit 1
@@ -34,6 +36,16 @@ do
 	shift
 done
 
+if [ -z $package_path ]; then
+	echo "Please indicate package-path!"
+	exit 1
+fi
+
+if [ -z $shell_type ]; then
+	echo "Please indicate shell-type!"
+	exit 1
+fi
+
 package_path=`readlink -f $package_path`
 cd $package_path
 
@@ -48,7 +60,20 @@ echo "$package_path $package_path" >> $mountlist
 cat $package_path/common-mountlist >> $mountlist
 
 #import environment varibales
-. $package_path/env_list
+IFS=''
+while read line
+do
+	IFS="="     # Set the field separator
+	set $line      # Breaks the string into $1, $2, ...
+	variable_name=$1
+	name_len=${#variable_name}
+	name_len=`expr $name_len + 1`
+	variable_value=${line:name_len}
+	export $variable_name=$variable_value
+	IFS=""
+done < env_list
+
+unset PARROT_ENABLED
 
 #initialize the repeat process
 exec parrot_run -m $mountlist /bin/$shell_type
