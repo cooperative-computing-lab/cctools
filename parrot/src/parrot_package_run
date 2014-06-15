@@ -5,9 +5,10 @@ mountlist=""
 show_help()
 {
 	echo "Options:"
-	echo "-m, --mountfile   Set the path of the mountlist file."
-	echo "-p, --path                   The path of the package."
-	echo "-h, --help                    Show this help message."
+	echo "-p, --package-path         The path of the package."
+	echo "-s, --shell-type           The type of shell used to do the experiment."
+	echo "                           Supported shell types: csh, tcsh, bash, zsh."
+	echo "-h, --help                 Show this help message."
 
 	exit 1
 }
@@ -15,13 +16,13 @@ show_help()
 while [ $# -gt 0 ]
 do
 	case $1 in
-		-p | --path)
+		-p | --package-path)
 			shift
 			package_path=$1
 			;;
-		-m | --mountfile)
+		-s | --shell-type)
 			shift
-			mountlist=$1
+			shell_type=$1
 			;;
 		-h | --help)
 			show_help
@@ -33,12 +34,29 @@ do
 	shift
 done
 
+package_path=`readlink -f $package_path`
+cd $package_path
+
+mountlist="mountlist"
 #construct mountlist
 if [ -e $mountlist ]; then
-rm $mountlist
+	rm $mountlist
 fi
 
-package_path=`readlink -f $package_path`
 echo "/ $package_path" >> $mountlist
 echo "$package_path $package_path" >> $mountlist
 cat $package_path/common-mountlist >> $mountlist
+
+/bin/$shell_type << EOF
+if [ "$shell_type" = bash -o "$shell_type" = zsh ]; then
+	. $package_path/env_list
+elif [ "$shell_type" = tcsh -o "$shell_type" = csh ]; then
+	source $package_path/env_list
+else
+	echo "This shell type currently is not supported."
+	exit 1
+fi
+
+#import the environment variables
+parrot_run -m $mountlist /bin/$shell_type
+EOF
