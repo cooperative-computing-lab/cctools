@@ -44,18 +44,12 @@ const char *special_caller[] = {"open_object", "bind32", "connect32", "bind64", 
 mode_t default_dirmode = S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH;
 mode_t default_regmode = S_IRWXU | S_IRGRP;
 
-enum {
-	LONG_OPT_NAMELIST = 1,
-	LONG_OPT_ENVPATH,
-	LONG_OPT_PACKAGEPATH,
-};
-
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] ...\n", cmd);
-	fprintf(stdout, " %-34s The path of the namelist list.\n", "   --name-list=<listpath>");
-	fprintf(stdout, " %-34s The path of the environment variable file.\n", "   --env-path=<envpath>");
-	fprintf(stdout, " %-34s The path of the package.\n", "   --package-path=<packagepath>");
+	fprintf(stdout, " %-34s The path of the namelist list.\n", "-n,--name-list=<listpath>");
+	fprintf(stdout, " %-34s The path of the environment variable file.\n", "-e,--env-path=<envpath>");
+	fprintf(stdout, " %-34s The path of the package.\n", "-p,--package-path=<packagepath>");
 	fprintf(stdout, " %-34s Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n", "-d,--debug=<name>");
 	fprintf(stdout, " %-34s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal) (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-34s Show the help info.\n", "-h,--help");
@@ -522,7 +516,7 @@ int post_process( ) {
 	char new_envpath[LINE_MAX], common_mountlist[LINE_MAX], size_cmd[LINE_MAX], cmd_rv[100];
 	FILE *file, *cmd_fp;
 
-	sprintf(new_envpath, "%s/%s", packagepath, envpath);
+	sprintf(new_envpath, "%s/%s", packagepath, "env_list");
 	if(copy_file_to_file(envpath, new_envpath) == -1) {
 		debug(D_DEBUG, "copy_file_to_file(`%s`) fails.\n", envpath);
 		return -1;
@@ -577,21 +571,23 @@ int main(int argc, char *argv[])
 
 	struct option long_options[] = {
 		{"help", no_argument, 0, 'h'},
-		{"name-list", required_argument, 0, LONG_OPT_NAMELIST},
-		{"env-path", required_argument, 0, LONG_OPT_ENVPATH},
-		{"package-path", required_argument, 0, LONG_OPT_PACKAGEPATH},
+		{"name-list", required_argument, 0, 'n'},
+		{"env-path", required_argument, 0, 'e'},
+		{"package-path", required_argument, 0, 'p'},
+		{"debug", required_argument, 0, 'd'},
+		{"debug-file", required_argument, 0, 'o'},
 		{0,0,0,0}
 	};
 
-	while((c=getopt_long(argc, argv, "+hd:o:", long_options, NULL)) > -1) {
+	while((c=getopt_long(argc, argv, "+hd:o:e:n:p:", long_options, NULL)) > -1) {
 		switch(c) {
-		case LONG_OPT_ENVPATH:
+		case 'e':
 			envpath = optarg;
 			break;
-		case LONG_OPT_NAMELIST:
+		case 'n':
 			namelist = optarg;
 			break;
-		case LONG_OPT_PACKAGEPATH:
+		case 'p':
 			packagepath = optarg;
 			break;
 		case 'd':

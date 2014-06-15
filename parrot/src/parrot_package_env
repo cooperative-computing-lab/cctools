@@ -3,10 +3,10 @@
 show_help()
 {
 	echo "Options:"
-	echo "-s, --shell       The type of shell used to do the experiment."
-	echo "                  Supported shell types: csh, tcsh, bash, zsh."
-	echo "-p, --path        File to write the environment variables and its values."
-	echo "-h, --help        Show this help message."
+	echo "-s, --shell-type       The type of shell used to do the experiment."
+	echo "                       Supported shell types: csh, tcsh, bash, zsh."
+	echo "-e, --env-path         File to write the environment variables and its values."
+	echo "-h, --help             Show this help message."
 
 	exit 1
 }
@@ -14,11 +14,11 @@ show_help()
 while [ $# -gt 0 ]
 do
 	case $1 in
-		-s | --shell)
+		-s | --shell-type)
 			shift
 			shell_type=$1
 			;;
-		-p | --path)
+		-e | --env-path)
 			shift
 			env_path=$1
 			;;
