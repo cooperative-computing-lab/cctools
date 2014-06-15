@@ -24,7 +24,7 @@
 int LINE_MAX=1024;
 const char *namelist;
 const char *packagepath;
-const char *envpath;
+const char *envlist;
 
 int line_process(const char *path, char *caller, int ignore_direntry, int is_direntry);
 
@@ -48,7 +48,7 @@ static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] ...\n", cmd);
 	fprintf(stdout, " %-34s The path of the namelist list.\n", "-n,--name-list=<listpath>");
-	fprintf(stdout, " %-34s The path of the environment variable file.\n", "-e,--env-path=<envpath>");
+	fprintf(stdout, " %-34s The path of the environment variable file.\n", "-e,--env-list=<envlist>");
 	fprintf(stdout, " %-34s The path of the package.\n", "-p,--package-path=<packagepath>");
 	fprintf(stdout, " %-34s Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n", "-d,--debug=<name>");
 	fprintf(stdout, " %-34s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal) (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
@@ -189,8 +189,8 @@ create the package directory.
 */
 int prepare_work()
 {
-	if(access(envpath, F_OK) == -1) {
-		fprintf(stderr, "The environment variable file (`%s`) does not exist.\n", envpath);
+	if(access(envlist, F_OK) == -1) {
+		fprintf(stderr, "The environment variable file (`%s`) does not exist.\n", envlist);
 		return -1;
 	}
 	if(access(namelist, F_OK) == -1) {
@@ -514,12 +514,12 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 
 /* copy the environment variable file into the package; create common-mountlist file. */
 int post_process( ) {
-	char new_envpath[LINE_MAX], common_mountlist[LINE_MAX], size_cmd[LINE_MAX], cmd_rv[100];
+	char new_envlist[LINE_MAX], common_mountlist[LINE_MAX], size_cmd[LINE_MAX], cmd_rv[100];
 	FILE *file, *cmd_fp;
 
-	sprintf(new_envpath, "%s/%s", packagepath, "env_list");
-	if(copy_file_to_file(envpath, new_envpath) == -1) {
-		debug(D_DEBUG, "copy_file_to_file(`%s`) fails.\n", envpath);
+	sprintf(new_envlist, "%s/%s", packagepath, "env_list");
+	if(copy_file_to_file(envlist, new_envlist) == -1) {
+		debug(D_DEBUG, "copy_file_to_file(`%s`) fails.\n", envlist);
 		return -1;
 	}
 
@@ -573,7 +573,7 @@ int main(int argc, char *argv[])
 	struct option long_options[] = {
 		{"help", no_argument, 0, 'h'},
 		{"name-list", required_argument, 0, 'n'},
-		{"env-path", required_argument, 0, 'e'},
+		{"env-list", required_argument, 0, 'e'},
 		{"package-path", required_argument, 0, 'p'},
 		{"debug", required_argument, 0, 'd'},
 		{"debug-file", required_argument, 0, 'o'},
@@ -583,7 +583,7 @@ int main(int argc, char *argv[])
 	while((c=getopt_long(argc, argv, "+hd:o:e:n:p:", long_options, NULL)) > -1) {
 		switch(c) {
 		case 'e':
-			envpath = optarg;
+			envlist = optarg;
 			break;
 		case 'n':
 			namelist = optarg;
