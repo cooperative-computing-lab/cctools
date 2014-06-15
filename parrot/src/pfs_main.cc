@@ -50,6 +50,7 @@ extern "C" {
 #include <termio.h>
 #include <termios.h>
 
+extern char **environ;
 FILE *namelist_file;
 int linux_major;
 int linux_minor;
@@ -115,6 +116,7 @@ enum {
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
 	LONG_OPT_CVMFS_ALIEN_CACHE,
 	LONG_OPT_NAMELIST,
+	LONG_OPT_ENVLIST,
 };
 
 static void get_linux_version(const char *cmd)
@@ -184,6 +186,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Enable data channel authentication in GridFTP.\n", "-C,--channel-auth");
 	fprintf(stdout, " %-30s Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n", "-d,--debug=<name>");
 	fprintf(stdout, " %-30s Disable small file optimizations.\n", "-D,--no-optimize");
+	fprintf(stdout, " %-30s Record the environment variables at the starting point.\n", "   --env-list=<path>");
 	fprintf(stdout, " %-30s Enable file snapshot caching for all protocols.\n", "-F,--with-snapshots");
 	fprintf(stdout, " %-30s Disable following symlinks.\n", "-f,--no-follow-symlinks");
 	fprintf(stdout, " %-30s Fake this gid; Real gid stays the same.          (PARROT_GID)\n", "-G,--gid=<num>");
@@ -567,6 +570,7 @@ int main( int argc, char *argv[] )
 		{"no-checksums", no_argument, 0, 'k'},
 		{"ld-path", required_argument, 0, 'l'},
 		{"name-list", required_argument, 0, LONG_OPT_NAMELIST},
+		{"env-list", required_argument, 0, LONG_OPT_ENVLIST},
 		{"tab-file", required_argument, 0, 'm'},
 		{"mount", required_argument, 0, 'M'},
 		{"hostname", required_argument, 0, 'N'},
@@ -648,6 +652,20 @@ int main( int argc, char *argv[] )
 			break;
 		case 'l':
 			pfs_ldso_path = optarg;
+			break;
+		case LONG_OPT_ENVLIST:
+			int count;
+			count = 0;
+			FILE *fp;
+			fp = fopen(optarg, "w");
+			if(!fp)
+				debug(D_DEBUG, "Can not open envlist file: %s", optarg);
+			while(environ[count] != NULL)
+			{
+				fprintf(fp, "%s\n", environ[count]);
+				count++;
+			}
+			fclose(fp);
 			break;
 		case LONG_OPT_NAMELIST:
 			namelist_file = fopen(optarg, "a");
