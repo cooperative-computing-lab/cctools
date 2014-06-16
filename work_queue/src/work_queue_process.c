@@ -41,7 +41,11 @@ void work_queue_process_delete( struct work_queue_process *p )
 
 	if(p->output_fd) {
 		close(p->output_fd);
+	}
+
+	if(p->output_file_name) {
 		unlink(p->output_file_name);
+		free(p->output_file_name);
 	}
 
 	if(p->sandbox) {

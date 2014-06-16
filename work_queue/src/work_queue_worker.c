@@ -1579,6 +1579,7 @@ static void workspace_cleanup()
 	if(procs_running)      itable_delete(procs_running);
 	if(procs_table)        itable_delete(procs_table);
 	if(procs_complete)     itable_delete(procs_complete);
+	if(procs_waiting)      list_delete(procs_waiting);
 
 	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
 	delete_dir(workspace);
