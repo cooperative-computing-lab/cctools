@@ -1038,10 +1038,11 @@ static int send_keepalive(struct link *master){
 }
 
 static void disconnect_master(struct link *master) {
-	debug(D_WQ, "disconnecting from master %s:%d",master_addr,master_port);
 
+	debug(D_WQ, "disconnecting from master %s:%d",master_addr,master_port);
 	link_close(master);
 
+	debug(D_WQ, "killing all outstanding tasks");
 	kill_all_tasks();
 
 	//KNOWN HACK: We remove all workers on a master disconnection to avoid
@@ -1051,7 +1052,7 @@ static void disconnect_master(struct link *master) {
 		release_all_workers(foreman_q); 
 	}
 
-	// Remove the contents of the workspace.
+	debug(D_WQ,"cleaning up workspace %s",workspace);
 	delete_dir_contents(workspace);
 
 	if(released_by_master) {
@@ -1353,7 +1354,7 @@ static void foreman_for_master(struct link *master) {
 			reset_idle_timer();
 		}
 
-		if(!result) disconnect_master(master);
+		if(!result) break;
 	}
 }
 
