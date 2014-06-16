@@ -290,11 +290,13 @@ static void report_worker_ready( struct link *master )
 	send_resource_update(master,1);
 }
 
-int link_file_in_workspace(char *localname, char *taskname, char *workspace, int into) {
+// XXX This function modifies the taskname, which is not friendly to the caller.
+
+int link_file_in_workspace( const char *localname, char *taskname, const char *workspace, int into) {
 	int result = 1;
 	struct stat st;
 	
-	char *cache_name;
+	const char *cache_name;
 	char workspace_name[WORK_QUEUE_LINE_MAX];
 	
 	cache_name = localname;
@@ -308,7 +310,7 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 	}
 	sprintf(workspace_name, "%s/%s", workspace, cur_pos);
 	
-	char *targetname, *sourcename;
+	const char *targetname, *sourcename;
 
 	if(into) {
 		sourcename = cache_name;
@@ -666,6 +668,33 @@ failure:
 	return 0;
 }
 
+/*
+For each of the files and directories needed by a task, link
+them into the sandbox.  Return true if successful.
+*/
+
+int setup_sandbox( struct work_queue_process *p, const char *dirname )
+{
+	struct work_queue_file *f;
+	char taskname[WORK_QUEUE_LINE_MAX];
+
+	list_first_item(p->task->input_files);
+	while((f = list_next_item(p->task->input_files))) {
+		if(f->type == WORK_QUEUE_DIRECTORY) {
+			sprintf(taskname, "t.%d/%s", p->task->taskid, f->remote_name);
+			if(!create_dir(taskname, 0700)) {
+				debug(D_NOTICE, "Directory %s could not be created and is needed by task %d.", taskname, p->task->taskid);
+				return 0;
+			}
+		} else if(!link_file_in_workspace(f->payload, f->remote_name, dirname, 1)) {
+			debug(D_NOTICE, "File %s does not exist and is needed by task %d.", (char*)f->payload, p->task->taskid);
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
 static int do_task( struct link *master, int taskid, time_t stoptime )
 {
 	char line[WORK_QUEUE_LINE_MAX];
@@ -674,6 +703,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char taskname[WORK_QUEUE_LINE_MAX];
 	char dirname[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
+
 	struct work_queue_task *task = work_queue_task_create(0);
 
 	task->taskid = taskid;
@@ -704,12 +734,13 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		} else if(sscanf(line,"disk %d",&n)) {
 		       	work_queue_task_specify_disk(task, n);
 		} else if(sscanf(line,"gpus %d",&n)) {
-				work_queue_task_specify_gpus(task, n);
+			work_queue_task_specify_gpus(task, n);
 		} else if(!strcmp(line,"end")) {
 		       	break;
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
 			work_queue_task_delete(task);
+			delete_dir(dirname);
 			return 0;
 		}
 	}
@@ -720,26 +751,20 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	// task input files.
 	send_resource_update(master, 1);
 
-	// If this is a foreman, just send the task structure along.
-	// If it is a local worker, create a work_queue_process, start the task, and discard the temporary work_queue_task.
+	// Every received task goes into stored_tasks.
+	struct work_queue_process *p = work_queue_process_create(task);
+	itable_insert(stored_tasks,taskid,p);
 
-	if(foreman_q) {
+	if(worker_mode==WORKER_MODE_FOREMAN) {
 		work_queue_submit_internal(foreman_q,task);
-		return 1;
 	} else {
-		struct work_queue_file *tf;
-		list_first_item(task->input_files);
-		while((tf = list_next_item(task->input_files))) {
-			if(tf->type == WORK_QUEUE_DIRECTORY) {
-				sprintf(taskname, "t.%d/%s", taskid, tf->remote_name);
-				if(!create_dir(taskname, 0700)) {
-					debug(D_NOTICE, "Directory %s could not be created and is needed by task %d.", taskname, taskid);
-					return 0;
-				}
-			} else if(!link_file_in_workspace((char*)tf->payload, tf->remote_name, dirname, 1)) {
-				debug(D_NOTICE, "File %s does not exist and is needed by task %d.", (char*)tf->payload, task->taskid);
-				return 0;
-			}
+		// XXX sandbox setup should be done in task execution,
+		// so that it can be returned cleanly as a failure to execute.
+		if(!setup_sandbox(p,dirname)) {
+			work_queue_process_delete(p);
+			work_queue_task_delete(task);
+			delete_dir(dirname);
+			return 0;
 		}
 		list_push_tail(waiting_tasks, task);
 	}
