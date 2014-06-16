@@ -5,13 +5,15 @@
 #include "debug.h"
 #include "errno.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
 
-#include <stdio.h>
 #include <sys/resource.h>
+#include <sys/wait.h>
 
 struct work_queue_process * work_queue_process_create( struct work_queue_task *t )
 {
@@ -85,5 +87,24 @@ pid_t work_queue_process_execute(const char *cmd, struct work_queue_process *ti)
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return 0;
+}
+
+void  work_queue_process_kill( struct work_queue_process *p )
+{
+	//make sure a few seconds have passed since child process was created to avoid sending a signal 
+	//before it has been fully initialized. Else, the signal sent to that process gets lost.	
+	timestamp_t elapsed_time_execution_start = timestamp_get() - p->execution_start;
+	
+	if (elapsed_time_execution_start/1000000 < 3)
+		sleep(3 - (elapsed_time_execution_start/1000000));	
+	
+	debug(D_WQ, "terminating task %d pid %d",p->task->taskid,p->pid);
+
+	// Send signal to process group of child which is denoted by -ve value of child pid.
+	// This is done to ensure delivery of signal to processes forked by the child. 
+	kill((-1*p->pid), SIGKILL);
+	
+	// Reap the child process to avoid zombies.
+	waitpid(p->pid, NULL, 0);
 }
 

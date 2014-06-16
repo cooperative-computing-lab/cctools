@@ -971,38 +971,25 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 
 }
 
-static void kill_task(struct work_queue_process *ti) {
-	char dirname[1024];
+static void kill_task(struct work_queue_process *p) {
 	
-	//make sure a few seconds have passed since child process was created to avoid sending a signal 
-	//before it has been fully initialized. Else, the signal sent to that process gets lost.	
-	timestamp_t elapsed_time_execution_start = timestamp_get() - ti->execution_start;
-	
-	if (elapsed_time_execution_start/1000000 < 3)
-		sleep(3 - (elapsed_time_execution_start/1000000));	
-	
-	debug(D_WQ, "terminating the current running task - process %d", ti->pid);
-	// Send signal to process group of child which is denoted by -ve value of child pid.
-	// This is done to ensure delivery of signal to processes forked by the child. 
-	kill((-1*ti->pid), SIGKILL);
-	
-	// Reap the child process to avoid zombies.
-	waitpid(ti->pid, NULL, 0);
-	
+	work_queue_process_kill(p);
+
 	// Clean up the task info structure.
-	itable_remove(stored_tasks, ti->task->taskid);
-	itable_remove(active_tasks, ti->pid);
+	itable_remove(stored_tasks, p->task->taskid);
+	itable_remove(active_tasks, p->pid);
 	
+	char dirname[1024];
 	// Clean up the task's directory
-	sprintf(dirname, "t.%d", ti->task->taskid);
+	sprintf(dirname, "t.%d", p->task->taskid);
 	delete_dir(dirname);
 
-	cores_allocated -= ti->task->cores;
-	memory_allocated -= ti->task->memory;
-	disk_allocated -= ti->task->disk;
-	gpus_allocated -= ti->task->gpus;
+	cores_allocated -= p->task->cores;
+	memory_allocated -= p->task->memory;
+	disk_allocated -= p->task->disk;
+	gpus_allocated -= p->task->gpus;
 
-	work_queue_process_delete(ti);
+	work_queue_process_delete(p);
 }
 
 static void do_reset_results_to_be_sent() {
