@@ -40,7 +40,6 @@ extern char pfs_cvmfs_locks_dir[];
 extern bool pfs_cvmfs_enable_alien;
 
 static bool cvmfs_configured = false;
-static struct cvmfs_filesystem *cvmfs_filesystem_list = 0;
 static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
 
 #define CERN_KEY_PLACEHOLDER   "<BUILTIN-cern.ch.pub>"
@@ -100,15 +99,14 @@ yQIDAQAB\n\
 /*
 A cvmfs_filesystem structure represents an entire
 filesystem rooted at a given host and path.
-All known filesystem are kept in a linked list
-rooted at cvmfs_filesystem_list
+All known filesystem are kept in a map in
+cvmfs_filesystem_list
 */
 
 class cvmfs_filesystem {
 public:
 	std::string host;
 	std::string path;
-	struct cvmfs_filesystem *next;
 	std::string cvmfs_options;
 	  // index into cvmfs_options+subst_offset to insert chars matching * in host
 	std::list<int> wildcard_subst;
@@ -120,6 +118,10 @@ public:
 
 	cvmfs_filesystem *createMatch(char const *repo_name) const;
 };
+
+typedef std::list<cvmfs_filesystem*> CvmfsFilesystemList;
+CvmfsFilesystemList cvmfs_filesystem_list;
+
 
 /*
 A cvmfs_dirent contains information about a node
@@ -395,7 +397,6 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 {
 	cvmfs_filesystem *f = new cvmfs_filesystem;
 	f->subst_offset = 0;
-	f->next = NULL;
 	f->host = repo_name;
 	f->path = path;
 
@@ -644,8 +645,7 @@ static void cvmfs_read_config()
 				debug(D_CVMFS, "filesystem configured %c%s with repo path %s and options %s",
 					  contains_wildcard ? '*' : ' ',
 					  f->host.c_str(), f->path.c_str(), f->cvmfs_options.c_str());
-				f->next = cvmfs_filesystem_list;
-				cvmfs_filesystem_list = f;
+				cvmfs_filesystem_list.push_front(f);
 			}
 		}
 
@@ -657,7 +657,6 @@ static void cvmfs_read_config()
 
 static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath_result)
 {
-	struct cvmfs_filesystem *f;
 	const char *subpath;
 
 	if(!name->host[0]) {
@@ -670,13 +669,16 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 		cvmfs_read_config();
 	}
 
-	if( !cvmfs_filesystem_list ) {
+	if( cvmfs_filesystem_list.empty() ) {
 		errno = ENOENT;
 		return 0;
 	}
 
 	size_t namelen = strlen(name->host);
-	for(f = cvmfs_filesystem_list; f; f = f->next) {
+	CvmfsFilesystemList::const_iterator i    = cvmfs_filesystem_list.begin();
+	CvmfsFilesystemList::const_iterator iend = cvmfs_filesystem_list.end();
+	for(; i != iend; ++i) {
+		cvmfs_filesystem *f = *i;
 		if( f->match_wildcard ) {
 			size_t hostlen = f->host.length();
 			if( hostlen >= namelen || strcmp(f->host.c_str(),name->host+(namelen-hostlen))!=0 ) {
@@ -708,8 +710,7 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 
 			// insert new instance at front of list, so in future we test it before
 			// the general pattern
-			f->next = cvmfs_filesystem_list;
-			cvmfs_filesystem_list = f;
+			cvmfs_filesystem_list.push_front(f);
 		}
 
 		return f;
@@ -1032,15 +1033,16 @@ class pfs_service_cvmfs:public pfs_service {
 			pfs_dir *dir = new pfs_dir(name);
 			dir->append(".");
 			dir->append("..");
-			struct cvmfs_filesystem *f = cvmfs_filesystem_list;
-			while(f) {
+			CvmfsFilesystemList::const_iterator i    = cvmfs_filesystem_list.begin();
+			CvmfsFilesystemList::const_iterator iend = cvmfs_filesystem_list.end();
+			for(; i != iend; ++i) {
+				cvmfs_filesystem *f = *i;
 				/* If the host begins with dot, then it is a wildcard entry. */
 				/* Otherwise, it is a normal entry. */
 				const char *host = f->host.c_str();
 				if(host && host[0]!='.') {
 					dir->append(host);
 				}
-				f = f->next;
 			}
 			return dir;
 		}
