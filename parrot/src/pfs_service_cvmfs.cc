@@ -71,7 +71,7 @@ HQIDAQAB\n\
 
 static bool wrote_oasis_key;
 static std::string oasis_key_fname;
-static const char *oasis_key_text = 
+static const char *oasis_key_text =
 "-----BEGIN PUBLIC KEY-----\n\
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqQGYXTp9cRcMbGeDoijB\n\
 gKNTCEpIWB7XcqIHVXJjfxEkycQXMyZkB7O0CvV3UmmY2K7CQqTnd9ddcApn7BqQ\n\
@@ -85,7 +85,7 @@ FQIDAQAB\n\
 
 static bool wrote_cern_it1_key;
 static std::string cern_it1_key_fname;
-static const char *cern_it1_key_text = 
+static const char *cern_it1_key_text =
 "-----BEGIN PUBLIC KEY-----\n\
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo8uKvscgW7FNxzb65Uhm\n\
 yr8jPJiyrl2kVzb/hhgdfN14C0tCbfFoE6ciuZFg+9ytLeiL9pzM96gSC+atIFl4\n\
@@ -101,7 +101,7 @@ yQIDAQAB\n\
 A cvmfs_filesystem structure represents an entire
 filesystem rooted at a given host and path.
 All known filesystem are kept in a linked list
-rooted at cvmfs_filesystem_list 
+rooted at cvmfs_filesystem_list
 */
 
 class cvmfs_filesystem {
@@ -207,7 +207,7 @@ static void cvmfs_parrot_logger(const char *msg)
 }
 
 static bool write_key(char const *key_text,char const *key_basename,std::string &full_key_fname)
-{    
+{
 	// Write keys per instance, avoiding race condition in which two parrot
 	// instances try to write the same key. As a bonus, we clear the key files
 	// on exit, since pfs_cvmfs_locks_dir is garbage collected on exit.
@@ -382,7 +382,7 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 
 		debug(D_CVMFS, "cvmfs_init(%s)", f->cvmfs_options.c_str());
 		int rc = cvmfs_init(f->cvmfs_options.c_str());
-		
+
 		if(rc != 0) {
 			return false;
 		}
@@ -722,7 +722,7 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 	message.  Suppress the error message if the hostname begins
 	with dot.
 	*/
- 
+
 	if(name->host[0]!='.') {
 		debug(D_CVMFS|D_NOTICE, "PARROT_CVMFS_REPO does not contain an entry for the CVMFS repository '%s'",name->host);
 	}
@@ -758,7 +758,7 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
         /* During each iteration path->rest is decomposed into
 	xpath->rest/path_head/path_tail. path_head is tried for
 	symlink expansion, and on failing, added to xpath->rest. */
-	   
+
 	char path_head[PFS_PATH_MAX];
 	char path_tail[PFS_PATH_MAX];
 	char link_target[PFS_PATH_MAX];
@@ -777,7 +777,7 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 
 		strncat(xpath->rest, path_head, PFS_PATH_MAX - 1);
 
-		int rl = xpath->service->readlink(xpath, link_target, PFS_PATH_MAX - 1); 
+		int rl = xpath->service->readlink(xpath, link_target, PFS_PATH_MAX - 1);
 
 		if(rl<0) {
 			if(errno==EINVAL) {
@@ -800,14 +800,14 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 				char *last_d = strrchr(xpath->rest, '/');
 				if(last_d)
 				{
-					
+
 					char path_relative[PFS_PATH_MAX];
 					*(last_d + 1) = '\0';
-					
-					strncat(xpath->rest, link_target, PFS_PATH_MAX); 
+
+					strncat(xpath->rest, link_target, PFS_PATH_MAX);
 					path_collapse(xpath->rest, path_relative, 1);
 					snprintf(link_target, PFS_PATH_MAX, "/cvmfs/%s%s",
-						 xpath->host, path_relative); 
+						 xpath->host, path_relative);
 				}
 			}
 
@@ -915,7 +915,7 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_leaf_symlinks, bool expan
 		else
 			return false;
 	}
-	
+
 	name = strdup(subpath);
 	mode = st.st_mode;
 	size = st.st_size;
