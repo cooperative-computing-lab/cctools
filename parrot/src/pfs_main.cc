@@ -654,6 +654,10 @@ int main( int argc, char *argv[] )
 			pfs_ldso_path = optarg;
 			break;
 		case LONG_OPT_ENVLIST:
+			if(access(optarg, F_OK) != -1) {
+				fprintf(stderr, "The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", optarg);
+				return 1;
+			}
 			int count;
 			count = 0;
 			FILE *fp;
@@ -668,6 +672,10 @@ int main( int argc, char *argv[] )
 			fclose(fp);
 			break;
 		case LONG_OPT_NAMELIST:
+			if(access(optarg, F_OK) != -1) {
+				fprintf(stderr, "The namelist file (%s) has already existed. Please delete it first or refer to another namelist file!!\n", optarg);
+				return 1;
+			}
 			namelist_file = fopen(optarg, "a");
 			if(!namelist_file)
 				debug(D_DEBUG, "Can not open namelist file: %s", optarg);
