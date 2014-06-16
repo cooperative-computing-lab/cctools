@@ -419,22 +419,22 @@ static int start_task( struct work_queue_process *p )
 	return 1;
 }
 
-static void report_task_complete(struct link *master, struct work_queue_process *ti)
+static void report_task_complete( struct link *master, struct work_queue_process *p )
 {
 	int64_t output_length;
 	struct stat st;
 
-	if(ti->pid) {
-		fstat(ti->output_fd, &st);
+	if(worker_mode==WORKER_MODE_WORKER) {
+		fstat(p->output_fd, &st);
 		output_length = st.st_size;
-		lseek(ti->output_fd, 0, SEEK_SET);
-		send_master_message(master, "result %d %lld %llu %d\n", ti->status, (long long) output_length, (unsigned long long) ti->execution_end-ti->execution_start, ti->task->taskid);
-		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
+		lseek(p->output_fd, 0, SEEK_SET);
+		send_master_message(master, "result %d %lld %llu %d\n", p->status, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->taskid);
+		link_stream_from_fd(master, p->output_fd, output_length, time(0)+active_timeout);
 
-		total_task_execution_time += (ti->execution_end - ti->execution_start);
+		total_task_execution_time += (p->execution_end - p->execution_start);
 		total_tasks_executed++;
 	} else {
-		struct work_queue_task *t = ti->task;
+		struct work_queue_task *t = p->task;
 		if(t->output) {
 			output_length = strlen(t->output);
 		} else {

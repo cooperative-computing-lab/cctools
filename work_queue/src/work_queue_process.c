@@ -54,37 +54,37 @@ void work_queue_process_delete( struct work_queue_process *p )
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
-pid_t work_queue_process_execute( struct work_queue_process *ti )
+pid_t work_queue_process_execute( struct work_queue_process *p )
 {
 	fflush(NULL); /* why is this necessary? */
 	
-	ti->output_file_name = strdup(task_output_template);
-	ti->output_fd = mkstemp(ti->output_file_name);
-	if (ti->output_fd == -1) {
+	p->output_file_name = strdup(task_output_template);
+	p->output_fd = mkstemp(p->output_file_name);
+	if (p->output_fd == -1) {
 		debug(D_WQ, "Could not open worker stdout: %s", strerror(errno));
 		return 0;
 	}
 
-	ti->execution_start = timestamp_get();
+	p->execution_start = timestamp_get();
 
-	ti->pid = fork();
+	p->pid = fork();
 	
-	if(ti->pid > 0) {
+	if(p->pid > 0) {
 		// Make child process the leader of its own process group. This allows
 		// signals to also be delivered to processes forked by the child process.
 		// This is currently used by kill_task(). 
-		setpgid(ti->pid, 0); 
+		setpgid(p->pid, 0); 
 		
-		debug(D_WQ, "started process %d: %s", ti->pid, ti->task->command_line);
-		return ti->pid;
-	} else if(ti->pid < 0) {
+		debug(D_WQ, "started process %d: %s", p->pid, p->task->command_line);
+		return p->pid;
+	} else if(p->pid < 0) {
 		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
-		unlink(ti->output_file_name);
-		close(ti->output_fd);
-		return ti->pid;
+		unlink(p->output_file_name);
+		close(p->output_fd);
+		return p->pid;
 	} else {
-		if(chdir(ti->sandbox)) {
-			fatal("could not change directory into %s: %s", ti->sandbox, strerror(errno));
+		if(chdir(p->sandbox)) {
+			fatal("could not change directory into %s: %s", p->sandbox, strerror(errno));
 		}
 		
 		int fd = open("/dev/null", O_RDONLY);
@@ -92,15 +92,15 @@ pid_t work_queue_process_execute( struct work_queue_process *ti )
 		int result = dup2(fd, STDIN_FILENO);
 		if (result == -1) fatal("could not dup /dev/null to stdin: %s", strerror(errno));
 
-		result = dup2(ti->output_fd, STDOUT_FILENO);
+		result = dup2(p->output_fd, STDOUT_FILENO);
 		if (result == -1) fatal("could not dup pipe to stdout: %s", strerror(errno));
 
-		result = dup2(ti->output_fd, STDERR_FILENO);
+		result = dup2(p->output_fd, STDERR_FILENO);
 		if (result == -1) fatal("could not dup pipe to stderr: %s", strerror(errno));
 
-		close(ti->output_fd);
+		close(p->output_fd);
 
-		execlp("sh", "sh", "-c", ti->task->command_line, (char *) 0);
+		execlp("sh", "sh", "-c", p->task->command_line, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return 0;
