@@ -443,11 +443,6 @@ static void report_task_complete(struct link *master, struct work_queue_process 
 		lseek(ti->output_fd, 0, SEEK_SET);
 		send_master_message(master, "result %d %lld %llu %d\n", ti->status, (long long) output_length, (unsigned long long) ti->execution_end-ti->execution_start, ti->task->taskid);
 		link_stream_from_fd(master, ti->output_fd, output_length, time(0)+active_timeout);
-		
-		cores_allocated -= ti->task->cores;
-		memory_allocated -= ti->task->memory;
-		disk_allocated -= ti->task->disk;
-		gpus_allocated -= ti->task->gpus;
 
 		total_task_execution_time += (ti->execution_end - ti->execution_start);
 		total_tasks_executed++;
@@ -499,44 +494,48 @@ static void report_tasks_complete( struct link *master )
 	send_resource_update(master, 1);
 }
 
-static int handle_tasks(struct link *master) {
-	struct work_queue_process *ti;
+static int handle_tasks(struct link *master) 
+{
+	struct work_queue_process *p;
 	pid_t pid;
-	int result = 0;
-	struct work_queue_file *tf;
 	int status;
 	
 	itable_firstkey(procs_running);
-	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&ti)) {
-		result = wait4(pid, &status, WNOHANG, &ti->rusage);
-		if(result) {
-			if(result < 0) {
-				debug(D_WQ, "Error checking on child process (%d).", ti->pid);
-				abort_flag = 1;
-				return 0;
-			}
+	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
+		int result = wait4(pid, &status, WNOHANG, &p->rusage);
+		if(result==0) {
+			// pid is still going 
+		} else if(result<0) {
+			debug(D_WQ, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
+		} else if(result>0) {
 			if (!WIFEXITED(status)){
-				debug(D_WQ, "Task (process %d) did not exit normally.\n", ti->pid);
-				ti->status = WTERMSIG(status);
+				p->status = WTERMSIG(status);
+				debug(D_WQ, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->status);
 			} else {
-				ti->status = WEXITSTATUS(status);
+				p->status = WEXITSTATUS(status);
+				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->status);
 			}
 			
-			ti->execution_end = timestamp_get();
+			p->execution_end = timestamp_get();
 			
-			itable_remove(procs_running, ti->pid);
+			cores_allocated  -= p->task->cores;
+			memory_allocated -= p->task->memory;
+			disk_allocated   -= p->task->disk;
+			gpus_allocated   -= p->task->gpus;
+
+			itable_remove(procs_running, p->pid);
 			itable_firstkey(procs_running);
 			
-			if(WIFEXITED(status)) {
-				list_first_item(ti->task->output_files);
-				while((tf = (struct work_queue_file *)list_next_item(ti->task->output_files))) {
-					if(!link_file_in_workspace(tf->payload, tf->remote_name, ti->sandbox, 0)) {
-						debug(D_NOTICE, "File %s does not exist and is output of task %d.", (char*)tf->remote_name, ti->task->taskid);
-					}
+			struct work_queue_file *f;
+			list_first_item(p->task->output_files);
+			while((f = list_next_item(p->task->output_files))) {
+				if(!link_file_in_workspace(f->payload, f->remote_name, p->sandbox, 0)) {
+					debug(D_NOTICE, "task %d did not create file %s as expected",p->task->taskid,f->remote_name);
 				}
 			}
 
-			itable_insert(procs_complete, ti->task->taskid, ti);
+			itable_insert(procs_complete, p->task->taskid, p);
+
 		}
 		
 	}
@@ -989,18 +988,16 @@ static int do_kill(int taskid)
 		work_queue_cancel_by_taskid(foreman_q, taskid);
 	} else {
 		work_queue_process_kill(p);
-
+		if(itable_remove(procs_running, p->pid)) {
+			cores_allocated -= p->task->cores;
+			memory_allocated -= p->task->memory;
+			disk_allocated -= p->task->disk;
+			gpus_allocated -= p->task->gpus;
+		}
 	}
 
 	// XXX also remove from the waiting list!
 	itable_remove(procs_complete, p->task->taskid);
-	itable_remove(procs_running, p->pid);
-
-	// XXX double-check when allocations are made and removed.	
-	cores_allocated -= p->task->cores;
-	memory_allocated -= p->task->memory;
-	disk_allocated -= p->task->disk;
-	gpus_allocated -= p->task->gpus;
 
 	work_queue_process_delete(p);
 
