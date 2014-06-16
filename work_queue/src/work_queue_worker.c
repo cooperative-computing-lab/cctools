@@ -780,6 +780,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		// XXX sandbox setup should be done in task execution,
 		// so that it can be returned cleanly as a failure to execute.
 		if(!setup_sandbox(p)) {
+			itable_remove(procs_table,taskid);
 			work_queue_process_delete(p);
 			return 0;
 		}
