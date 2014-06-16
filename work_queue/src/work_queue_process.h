@@ -19,12 +19,15 @@ struct work_queue_process {
 	timestamp_t execution_start;
 	timestamp_t execution_end;
 	
+	char *sandbox;
+
 	char *output_file_name;
 	int output_fd;
+
 	struct work_queue_task *task;
 };
 
-struct work_queue_process * work_queue_process_create( struct work_queue_task *t );
+struct work_queue_process * work_queue_process_create( int taskid );
 pid_t work_queue_process_execute( struct work_queue_process *p );
 void  work_queue_process_kill( struct work_queue_process *p );
 void  work_queue_process_delete( struct work_queue_process *p );

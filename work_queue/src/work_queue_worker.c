@@ -504,7 +504,6 @@ static int handle_tasks(struct link *master) {
 	pid_t pid;
 	int result = 0;
 	struct work_queue_file *tf;
-	char dirname[WORK_QUEUE_LINE_MAX];
 	int status;
 	
 	itable_firstkey(procs_running);
@@ -529,10 +528,9 @@ static int handle_tasks(struct link *master) {
 			itable_firstkey(procs_running);
 			
 			if(WIFEXITED(status)) {
-				sprintf(dirname, "t.%d", ti->task->taskid);
 				list_first_item(ti->task->output_files);
 				while((tf = (struct work_queue_file *)list_next_item(ti->task->output_files))) {
-					if(!link_file_in_workspace(tf->payload, tf->remote_name, dirname, 0)) {
+					if(!link_file_in_workspace(tf->payload, tf->remote_name, ti->sandbox, 0)) {
 						debug(D_NOTICE, "File %s does not exist and is output of task %d.", (char*)tf->remote_name, ti->task->taskid);
 					}
 				}
@@ -663,7 +661,7 @@ For each of the files and directories needed by a task, link
 them into the sandbox.  Return true if successful.
 */
 
-int setup_sandbox( struct work_queue_process *p, const char *dirname )
+int setup_sandbox( struct work_queue_process *p )
 {
 	struct work_queue_file *f;
 	char taskname[WORK_QUEUE_LINE_MAX];
@@ -671,12 +669,12 @@ int setup_sandbox( struct work_queue_process *p, const char *dirname )
 	list_first_item(p->task->input_files);
 	while((f = list_next_item(p->task->input_files))) {
 		if(f->type == WORK_QUEUE_DIRECTORY) {
-			sprintf(taskname, "t.%d/%s", p->task->taskid, f->remote_name);
+			sprintf(taskname, "%s/%s", p->sandbox, f->remote_name);
 			if(!create_dir(taskname, 0700)) {
 				debug(D_NOTICE, "Directory %s could not be created and is needed by task %d.", taskname, p->task->taskid);
 				return 0;
 			}
-		} else if(!link_file_in_workspace(f->payload, f->remote_name, dirname, 1)) {
+		} else if(!link_file_in_workspace(f->payload, f->remote_name, p->sandbox, 1)) {
 			debug(D_NOTICE, "File %s does not exist and is needed by task %d.", (char*)f->payload, p->task->taskid);
 			return 0;
 		}
@@ -691,14 +689,10 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char filename[WORK_QUEUE_LINE_MAX];
 	char localname[WORK_QUEUE_LINE_MAX];
 	char taskname[WORK_QUEUE_LINE_MAX];
-	char dirname[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
 
 	struct work_queue_process *p = work_queue_process_create(taskid);
 	struct work_queue_task *task = p->task;
-
-	sprintf(dirname, "t.%d" , taskid);
-	mkdir(dirname, 0700);
 
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
 	  	if(sscanf(line,"cmd %d",&length)==1) {
@@ -729,7 +723,6 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
 			work_queue_process_delete(p);
-			delete_dir(dirname);
 			return 0;
 		}
 	}
@@ -748,9 +741,8 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	} else {
 		// XXX sandbox setup should be done in task execution,
 		// so that it can be returned cleanly as a failure to execute.
-		if(!setup_sandbox(p,dirname)) {
+		if(!setup_sandbox(p)) {
 			work_queue_process_delete(p);
-			delete_dir(dirname);
 			return 0;
 		}
 		list_push_tail(procs_waiting,p);
@@ -999,10 +991,6 @@ static int do_kill(int taskid)
 		work_queue_process_kill(p);
 
 	}
-
-	char *dirname = string_format("t.%d",taskid);
-	delete_dir(dirname);
-	free(dirname);
 
 	// XXX also remove from the waiting list!
 	itable_remove(procs_complete, p->task->taskid);

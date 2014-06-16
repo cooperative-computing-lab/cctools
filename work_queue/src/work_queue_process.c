@@ -4,6 +4,9 @@
 
 #include "debug.h"
 #include "errno.h"
+#include "stringtools.h"
+#include "create_dir.h"
+#include "delete_dir.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,19 +18,35 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 
-struct work_queue_process * work_queue_process_create( struct work_queue_task *t )
+struct work_queue_process * work_queue_process_create( int taskid )
 {
 	struct work_queue_process *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
-	p->task = t;
+	p->task = work_queue_task_create(0);
+	p->task->taskid = taskid;
+	p->sandbox = string_format("t.%d",taskid);
+
+	if(!create_dir(p->sandbox,0777)) {
+		work_queue_process_delete(p);
+		return 0;
+	}
+
+	
 	return p;
 }
 
 void work_queue_process_delete( struct work_queue_process *p )
 {
+	if(p->task) work_queue_task_delete(p->task);
+
 	if(p->output_fd) {
 		close(p->output_fd);
 		unlink(p->output_file_name);
+	}
+
+	if(p->sandbox) {
+		delete_dir(p->sandbox);
+		free(p->sandbox);
 	}
 
 	free(p);
@@ -37,10 +56,8 @@ static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
 pid_t work_queue_process_execute( struct work_queue_process *ti )
 {
-	char working_dir[1024];
 	fflush(NULL); /* why is this necessary? */
 	
-	sprintf(working_dir, "t.%d", ti->task->taskid);
 	ti->output_file_name = strdup(task_output_template);
 	ti->output_fd = mkstemp(ti->output_file_name);
 	if (ti->output_fd == -1) {
@@ -66,8 +83,8 @@ pid_t work_queue_process_execute( struct work_queue_process *ti )
 		close(ti->output_fd);
 		return ti->pid;
 	} else {
-		if(chdir(working_dir)) {
-			fatal("could not change directory into %s: %s", working_dir, strerror(errno));
+		if(chdir(ti->sandbox)) {
+			fatal("could not change directory into %s: %s", ti->sandbox, strerror(errno));
 		}
 		
 		int fd = open("/dev/null", O_RDONLY);
