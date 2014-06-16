@@ -21,7 +21,7 @@ echo "[$(date)] Testing on $(uname -a)." > "$CCTOOLS_TEST_LOG"
 SUCCESS=0
 FAILURE=0
 START_TIME=$(date +%s)
-for package in sand; do
+for package in ${CCTOOLS_PACKAGES}; do
 	if [ -d "${package}/test" ]; then
 		cd "${package}/test"
 		for script in TR_*; do
