@@ -1034,8 +1034,8 @@ static int do_kill(int taskid)
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		work_queue_cancel_by_taskid(foreman_q, taskid);
 	} else {
-		work_queue_process_kill(p);
 		if(itable_remove(procs_running, p->pid)) {
+			work_queue_process_kill(p);
 			cores_allocated -= p->task->cores;
 			memory_allocated -= p->task->memory;
 			disk_allocated -= p->task->disk;
