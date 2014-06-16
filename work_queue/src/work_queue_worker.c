@@ -694,9 +694,8 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char dirname[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
 
-	struct work_queue_task *task = work_queue_task_create(0);
-
-	task->taskid = taskid;
+	struct work_queue_process *p = work_queue_process_create(taskid);
+	struct work_queue_task *task = p->task;
 
 	sprintf(dirname, "t.%d" , taskid);
 	mkdir(dirname, 0700);
@@ -729,7 +728,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		       	break;
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
-			work_queue_task_delete(task);
+			work_queue_process_delete(p);
 			delete_dir(dirname);
 			return 0;
 		}
@@ -742,7 +741,6 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	send_resource_update(master, 1);
 
 	// Every received task goes into procs_table.
-	struct work_queue_process *p = work_queue_process_create(task);
 	itable_insert(procs_table,taskid,p);
 
 	if(worker_mode==WORKER_MODE_FOREMAN) {
@@ -752,7 +750,6 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		// so that it can be returned cleanly as a failure to execute.
 		if(!setup_sandbox(p,dirname)) {
 			work_queue_process_delete(p);
-			work_queue_task_delete(task);
 			delete_dir(dirname);
 			return 0;
 		}
@@ -1017,9 +1014,7 @@ static int do_kill(int taskid)
 	disk_allocated -= p->task->disk;
 	gpus_allocated -= p->task->gpus;
 
-	// XXX process_delete and task_delete should be coupled.
 	work_queue_process_delete(p);
-	work_queue_task_delete(p->task);
 
 	return 1;
 }
