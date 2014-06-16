@@ -411,19 +411,6 @@ static int start_task( struct work_queue_process *p )
 
 	struct work_queue_task *t = p->task;
 		
-	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-		t->cores = MAX((double)local_resources->cores.total/(double)local_resources->workers.total, 1);
-		t->memory = MAX((double)local_resources->memory.total/(double)local_resources->workers.total, 0);
-		t->disk = MAX((double)local_resources->disk.total/(double)local_resources->workers.total, 0);
-		t->gpus = MAX((double)local_resources->gpus.total/(double)local_resources->workers.total, 0);
-	} else {
-		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabeled resources
-		t->cores = MAX(t->cores, 0);
-		t->memory = MAX(t->memory, 0);
-		t->disk = MAX(t->disk, 0);
-		t->gpus = MAX(t->gpus, 0);
-	}
-
 	cores_allocated += t->cores;
 	memory_allocated += t->memory;
 	disk_allocated += t->disk;
@@ -682,6 +669,29 @@ int setup_sandbox( struct work_queue_process *p )
 	return 1;
 }
 
+/*
+For a task run locally, if the resources are all set to -1,
+then assume that the task occupies all worker resources.
+Otherwise, just make sure all values are non-zero.
+*/
+
+static void normalize_resources( struct work_queue_process *p )
+{
+	struct work_queue_task *t = p->task;
+
+	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
+		t->cores = local_resources->cores.total;
+		t->memory = local_resources->memory.total;
+		t->disk = local_resources->disk.total;
+		t->gpus = local_resources->gpus.total;
+	} else {
+		t->cores = MAX(t->cores, 0);
+		t->memory = MAX(t->memory, 0);
+		t->disk = MAX(t->disk, 0);
+		t->gpus = MAX(t->gpus, 0);
+	}
+}
+
 static int do_task( struct link *master, int taskid, time_t stoptime )
 {
 	char line[WORK_QUEUE_LINE_MAX];
@@ -744,6 +754,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			work_queue_process_delete(p);
 			return 0;
 		}
+		normalize_resources(p);
 		list_push_tail(procs_waiting,p);
 	}
 	return 1;
@@ -1167,41 +1178,17 @@ static int handle_master(struct link *master) {
 	return r;
 }
 
-static int check_for_resources(struct work_queue_task *t) {
-	int64_t cores_used, disk_used, mem_used, gpus_used;
-	int ok = 1;
-	
-	// If resources used have not been specified, treat the task as consuming the entire real worker
-	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-		cores_used = MAX((double)local_resources->cores.total/(double)local_resources->workers.total, 1);
-		mem_used = MAX((double)local_resources->memory.total/(double)local_resources->workers.total, 0);
-		disk_used = MAX((double)local_resources->disk.total/(double)local_resources->workers.total, 0);
-		gpus_used = MAX((double)local_resources->gpus.total/(double)local_resources->workers.total, 0);
-	} else {
-		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
-		cores_used = MAX(t->cores, 0);
-		mem_used = MAX(t->memory, 0);
-		disk_used = MAX(t->disk, 0);
-		gpus_used = MAX(t->gpus, 0);
-	}
-	
-	if(cores_allocated + cores_used > local_resources->cores.total) {
-		ok = 0;
-	}
-	
-	if(memory_allocated + mem_used > local_resources->memory.total) {
-		ok = 0;
-	}
-	
-	if(disk_allocated + disk_used > local_resources->disk.total) {
-		ok = 0;
-	}
+/*
+Return true if this task can run with the resources currently available.
+*/
 
-	if(gpus_allocated + gpus_used > local_resources->gpus.total) {
-		ok = 0;
-	}
-	
-	return ok;
+static int check_for_resources(struct work_queue_task *t)
+{
+	return
+		(cores_allocated  + t->cores  <= local_resources->cores.total) &&
+		(memory_allocated + t->memory <= local_resources->memory.total) &&
+		(disk_allocated   + t->disk   <= local_resources->disk.total) &&
+		(gpus_allocated   + t->gpus   <= local_resources->gpus.total);
 }
 
 static void work_for_master(struct link *master) {
