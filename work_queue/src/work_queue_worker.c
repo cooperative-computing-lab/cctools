@@ -400,12 +400,7 @@ int link_file_in_workspace( const char *localname, char *taskname, const char *w
 static int start_task( struct work_queue_process *p )
 {
 	pid_t pid = work_queue_process_execute(p);
-
-	if(pid<0) {
-		fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
-		abort_flag = 1;
-		return 0;
-	}
+	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
 	itable_insert(procs_running,pid,p);
 
@@ -1320,7 +1315,7 @@ static void foreman_for_master(struct link *master) {
 		if(task) {
 			struct work_queue_process *p;
 			p = itable_lookup(procs_table,task->taskid);
-			// XXX deal with unexpected failure here
+			if(!p) fatal("no entry in procs table for taskid %d",task->taskid);
 			itable_insert(procs_complete, task->taskid, p);
 			result = 1;
 		}
