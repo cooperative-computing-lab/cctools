@@ -971,82 +971,16 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 
 }
 
-static void do_reset_results_to_be_sent() {
-
-	struct work_queue_process *ti;
-	uint64_t taskid;
-	results_to_be_sent_msg = 0;
-
-	while(itable_pop(results_to_be_sent, &taskid, (void **) &ti))
-	{
-		work_queue_process_delete(ti);
-	}
-}
-
-static void kill_all_tasks() {
-	struct work_queue_process *ti;
-	pid_t pid;
-	uint64_t taskid;
-
-	do_reset_results_to_be_sent();
-	
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		struct list *l;
-		struct work_queue_task *t;
-		l = work_queue_cancel_all_tasks(foreman_q);
-		while((t = list_pop_head(l))) {
-			work_queue_task_delete(t);
-		}
-		list_delete(l);
-		return;
-	}
-	
-	// If there are no stored tasks, then there are no active tasks, return. 
-	if(!stored_tasks) return;
-	// If there are no active local tasks, return.
-	if(!active_tasks) return;
-	
-	// Send kill signal to all child processes
-	itable_firstkey(active_tasks);
-	while(itable_nextkey(active_tasks, (uint64_t*)&pid, (void**)&ti)) {
-		kill(-1 * ti->pid, SIGKILL);
-	}
-	
-	// Wait for all children to return, and remove them from the active tasks list.
-	while(itable_size(active_tasks)) {
-		pid = wait(0);
-		ti = itable_remove(active_tasks, pid);
-		if(ti) {
-			itable_remove(stored_tasks, ti->task->taskid);
-			work_queue_process_delete(ti);
-		}
-	}
-	
-	// Clear out the stored tasks list if any are left.
-	itable_firstkey(stored_tasks);
-	while(itable_nextkey(stored_tasks, &taskid, (void**)&ti)) {
-		work_queue_process_delete(ti);
-	}
-	itable_clear(stored_tasks);
-	cores_allocated = 0;
-	memory_allocated = 0;
-	disk_allocated = 0;
-	gpus_allocated = 0;
-}
-
 static int do_kill(int taskid)
 {
 	struct work_queue_process *p;
 
-	p = itable_lookup(stored_tasks, taskid);
+	p = itable_remove(stored_tasks, taskid);
 	if(!p) {
 		debug(D_WQ,"master requested kill of task %d which does not exist!",taskid);
 		return 1;
 	}
 	
-	//if task already finished, do not send its result to the master
-	itable_remove(results_to_be_sent, taskid);
-
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		work_queue_cancel_by_taskid(foreman_q, taskid);
 	} else {
@@ -1058,10 +992,11 @@ static int do_kill(int taskid)
 	delete_dir(dirname);
 	free(dirname);
 
-	itable_remove(stored_tasks, p->task->taskid);
-	itable_remove(active_tasks, p->pid);
 	// XXX also remove from the waiting list!
-	
+	itable_remove(results_to_be_sent, p->task->taskid);
+	itable_remove(active_tasks, p->pid);
+
+	// XXX double-check when allocations are made and removed.	
 	cores_allocated -= p->task->cores;
 	memory_allocated -= p->task->memory;
 	disk_allocated -= p->task->disk;
@@ -1072,6 +1007,24 @@ static int do_kill(int taskid)
 	work_queue_task_delete(p->task);
 
 	return 1;
+}
+
+static void kill_all_tasks() {
+	struct work_queue_process *p;
+	uint64_t taskid;
+
+	itable_firstkey(stored_tasks);
+	while(itable_nextkey(stored_tasks,&taskid,(void**)&p)) {
+		do_kill(taskid);
+	}
+
+	// These should have already gone to zero,
+	// but let's be extra careful.
+
+	cores_allocated = 0;
+	memory_allocated = 0;
+	disk_allocated = 0;
+	gpus_allocated = 0;
 }
 
 static int do_release() {
