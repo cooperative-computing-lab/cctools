@@ -963,6 +963,13 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 
 }
 
+/*
+Note that a kill message from the master is used for every case
+where a task is to be removed, whether it is waiting, running,
+of finished.  Regardless of the state, we kill the process and
+remove all of the associated files and other state.
+*/
+
 static int do_kill(int taskid)
 {
 	struct work_queue_process *p;
@@ -1031,7 +1038,8 @@ static int send_keepalive(struct link *master){
 }
 
 static void disconnect_master(struct link *master) {
-	debug(D_WQ, "Disconnecting the current master ...\n");
+	debug(D_WQ, "disconnecting from master %s:%d",master_addr,master_port);
+
 	link_close(master);
 
 	kill_all_tasks();
@@ -1051,36 +1059,6 @@ static void disconnect_master(struct link *master) {
 	} else {
 		sleep(5);
 	}
-}
-
-static void abort_worker() {
-	if(user_specified_workdir) {
-		free(user_specified_workdir);
-	} 
-	free(os_name);
-	free(arch_name);
-
-	// Kill all running tasks
-	kill_all_tasks();
-
-	if(foreman_q) {
-		work_queue_delete(foreman_q);
-	}
-	
-	if(active_tasks) {
-		itable_delete(active_tasks);
-	}
-	if(stored_tasks) {
-		itable_delete(stored_tasks);
-	}
-
-	if(results_to_be_sent) {
-		itable_delete(results_to_be_sent);
-	}
-
-	// Remove workspace. 
-	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
-	delete_dir(workspace);
 }
 
 static int path_within_workspace(const char *path, const char *workspace) {
@@ -1536,7 +1514,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Show this help screen\n", "-h,--help");
 }
 
-static int setup_workspace() {
+static int workspace_setup() {
 	// Setup working space(dir)
 	const char *workdir;
 	if (user_specified_workdir){
@@ -1558,6 +1536,20 @@ static int setup_workspace() {
 	return 1;
 }
 
+static void workspace_cleanup()
+{
+	if(user_specified_workdir) free(user_specified_workdir);
+	if(os_name) free(os_name);
+	if(arch_name) free(arch_name);
+
+	if(foreman_q)          work_queue_delete(foreman_q);
+	if(active_tasks)       itable_delete(active_tasks);
+	if(stored_tasks)       itable_delete(stored_tasks);
+	if(results_to_be_sent) itable_delete(results_to_be_sent);
+
+	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
+	delete_dir(workspace);
+}
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
@@ -1828,7 +1820,7 @@ int main(int argc, char *argv[])
 
 	random_init();
 
-	if(!setup_workspace()) {
+	if(!workspace_setup()) {
 		fprintf(stderr, "work_queue_worker: failed to setup workspace at %s.\n", workspace);
 		exit(1);
 	}
@@ -1897,7 +1889,8 @@ int main(int argc, char *argv[])
 	results_to_be_sent = itable_create(0);
 
 	if(!check_disk_space_for_filesize(0)) {
-		goto abort;
+		fprintf(stderr,"work_queue_worker: %s has less than minimum disk space %"PRIu64" MB\n",workspace,disk_avail_threshold);
+		return 1;
 	}
 
 	local_resources = work_queue_resources_create();
@@ -1948,8 +1941,9 @@ int main(int argc, char *argv[])
 
 		sleep(backoff_interval);
 	}
-abort:
-	abort_worker();
+
+	workspace_cleanup();
+
 	return 0;
 }
 
