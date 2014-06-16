@@ -971,27 +971,6 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 
 }
 
-static void kill_task(struct work_queue_process *p) {
-	
-	work_queue_process_kill(p);
-
-	// Clean up the task info structure.
-	itable_remove(stored_tasks, p->task->taskid);
-	itable_remove(active_tasks, p->pid);
-	
-	char dirname[1024];
-	// Clean up the task's directory
-	sprintf(dirname, "t.%d", p->task->taskid);
-	delete_dir(dirname);
-
-	cores_allocated -= p->task->cores;
-	memory_allocated -= p->task->memory;
-	disk_allocated -= p->task->disk;
-	gpus_allocated -= p->task->gpus;
-
-	work_queue_process_delete(p);
-}
-
 static void do_reset_results_to_be_sent() {
 
 	struct work_queue_process *ti;
@@ -1055,34 +1034,43 @@ static void kill_all_tasks() {
 	gpus_allocated = 0;
 }
 
-static int do_kill(int taskid) {
-	struct work_queue_process *ti;
+static int do_kill(int taskid)
+{
+	struct work_queue_process *p;
 
+	p = itable_lookup(stored_tasks, taskid);
+	if(!p) {
+		debug(D_WQ,"master requested kill of task %d which does not exist!",taskid);
+		return 1;
+	}
+	
 	//if task already finished, do not send its result to the master
 	itable_remove(results_to_be_sent, taskid);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
-		struct work_queue_task *t;
-		t = work_queue_cancel_by_taskid(foreman_q, taskid);
-		if(t) {
-			work_queue_task_delete(t);
-		}
-		return 1;
-	}
-	
-	ti = itable_lookup(stored_tasks, taskid);
-	
-	if(ti && itable_lookup(active_tasks, ti->pid)) {
-		kill_task(ti);
+		work_queue_cancel_by_taskid(foreman_q, taskid);
 	} else {
-		char dirname[1024];
-		if(ti) {
-			itable_remove(stored_tasks, taskid);
-			work_queue_process_delete(ti);
-		}
-		sprintf(dirname, "t.%d", taskid);
-		delete_dir(dirname);
+		work_queue_process_kill(p);
+
 	}
+
+	char *dirname = string_format("t.%d",taskid);
+	delete_dir(dirname);
+	free(dirname);
+
+	itable_remove(stored_tasks, p->task->taskid);
+	itable_remove(active_tasks, p->pid);
+	// XXX also remove from the waiting list!
+	
+	cores_allocated -= p->task->cores;
+	memory_allocated -= p->task->memory;
+	disk_allocated -= p->task->disk;
+	gpus_allocated -= p->task->gpus;
+
+	// XXX process_delete and task_delete should be coupled.
+	work_queue_process_delete(p);
+	work_queue_task_delete(p->task);
+
 	return 1;
 }
 
