@@ -35,7 +35,7 @@ void work_queue_process_delete( struct work_queue_process *p )
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
-pid_t work_queue_process_execute(const char *cmd, struct work_queue_process *ti)
+pid_t work_queue_process_execute( struct work_queue_process *ti )
 {
 	char working_dir[1024];
 	fflush(NULL); /* why is this necessary? */
@@ -58,7 +58,7 @@ pid_t work_queue_process_execute(const char *cmd, struct work_queue_process *ti)
 		// This is currently used by kill_task(). 
 		setpgid(ti->pid, 0); 
 		
-		debug(D_WQ, "started process %d: %s", ti->pid, cmd);
+		debug(D_WQ, "started process %d: %s", ti->pid, ti->task->command_line);
 		return ti->pid;
 	} else if(ti->pid < 0) {
 		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
@@ -83,7 +83,7 @@ pid_t work_queue_process_execute(const char *cmd, struct work_queue_process *ti)
 
 		close(ti->output_fd);
 
-		execlp("sh", "sh", "-c", cmd, (char *) 0);
+		execlp("sh", "sh", "-c", ti->task->command_line, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return 0;

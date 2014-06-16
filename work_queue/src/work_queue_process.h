@@ -25,7 +25,7 @@ struct work_queue_process {
 };
 
 struct work_queue_process * work_queue_process_create( struct work_queue_task *t );
-pid_t work_queue_process_execute( const char *cmd, struct work_queue_process *p );
+pid_t work_queue_process_execute( struct work_queue_process *p );
 void  work_queue_process_kill( struct work_queue_process *p );
 void  work_queue_process_delete( struct work_queue_process *p );
 

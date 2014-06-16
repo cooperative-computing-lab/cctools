@@ -155,10 +155,8 @@ static int64_t gpus_allocated = 0;
 // do not send consecutive resource updates in less than this many seconds
 static int send_resources_interval = 120;
 
-// Foreman mode global variables
 static struct work_queue *foreman_q = NULL;
 
-// Forked task related
 static struct itable *active_tasks = NULL;
 static struct itable *stored_tasks = NULL;
 static struct list *waiting_tasks = NULL;
@@ -388,19 +386,19 @@ int link_file_in_workspace( const char *localname, char *taskname, const char *w
 	return result;
 }
 
-static int start_task(struct work_queue_task *t)
+static int start_task( struct work_queue_process *p )
 {
-	struct work_queue_process *ti = work_queue_process_create(t);
-	work_queue_process_execute(t->command_line,ti);
-	
-	if(ti->pid < 0) {
+	pid_t pid = work_queue_process_execute(p);
+
+	if(pid<0) {
 		fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
-		work_queue_process_delete(ti);
 		abort_flag = 1;
 		return 0;
 	}
 
-	ti->status = 0;
+	itable_insert(active_tasks,pid,p);
+
+	struct work_queue_task *t = p->task;
 		
 	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
 		t->cores = MAX((double)local_resources->cores.total/(double)local_resources->workers.total, 1);
@@ -419,8 +417,6 @@ static int start_task(struct work_queue_task *t)
 	memory_allocated += t->memory;
 	disk_allocated += t->disk;
 	gpus_allocated += t->gpus;
-
-	itable_insert(active_tasks, ti->pid, ti);
 
 	return 1;
 }
@@ -476,35 +472,20 @@ static int itable_pop(struct itable *t, uint64_t *key, void **value)
 	return result;
 }
 
-static int report_tasks(struct link *master, struct itable *tasks_infos, int max_count)
+static void report_tasks_complete( struct link *master )
 {
-	if(max_count < 0)
-	{
-		max_count = itable_size(tasks_infos);
-	}
+	struct work_queue_process *p;
+	uint64_t taskid;
 
-	struct work_queue_process *ti;
-	uint64_t          taskid;
-
-	int count = 0;
-	while((count < max_count) && itable_pop(tasks_infos, &taskid, (void **) &ti))
-	{
-		report_task_complete(master, ti);
-		work_queue_task_delete(ti->task);
-		work_queue_process_delete(ti);
-		count++;
+	while(itable_pop(results_to_be_sent,&taskid,(void**)&p)) {
+		report_task_complete(master,p);
 	}
 
 	send_master_message(master, "end\n");
 
-	if(itable_size(tasks_infos) == 0)
-	{
-		results_to_be_sent_msg = 0;
-	}
+	results_to_be_sent_msg = 0;
 
 	send_resource_update(master, 1);
-
-	return count;
 }
 
 static int handle_tasks(struct link *master) {
@@ -764,7 +745,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			delete_dir(dirname);
 			return 0;
 		}
-		list_push_tail(waiting_tasks, task);
+		list_push_tail(waiting_tasks,p);
 	}
 	return 1;
 }
@@ -1180,7 +1161,7 @@ static int handle_master(struct link *master) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
-			report_tasks(master, results_to_be_sent, n);
+			report_tasks_complete(master);
 			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
@@ -1299,15 +1280,14 @@ static void work_for_master(struct link *master) {
 		if(ok) {
 			int visited = 0;
 			while(list_size(waiting_tasks) > visited && cores_allocated < local_resources->cores.total) {
-				struct work_queue_task *t;
+				struct work_queue_process *p;
 				
-				t = list_pop_head(waiting_tasks);
-				if(t && check_for_resources(t)) {
-					start_task(t);
-					//Update the master with the resources now in use
+				p = list_pop_head(waiting_tasks);
+				if(p && check_for_resources(p->task)) {
+					start_task(p);
 					send_resource_update(master, 1);
 				} else {
-					list_push_tail(waiting_tasks, t);
+					list_push_tail(waiting_tasks, p);
 					visited++;
 				}
 			}
@@ -1360,8 +1340,10 @@ static void foreman_for_master(struct link *master) {
 		task = work_queue_wait_internal(foreman_q, foreman_internal_timeout, master, &master_active);
 		
 		if(task) {
-			struct work_queue_process *ti = work_queue_process_create(task);
-			itable_insert(results_to_be_sent, task->taskid, ti);
+			struct work_queue_process *p;
+			p = itable_lookup(stored_tasks,task->taskid);
+			// XXX deal with unexpected failure here
+			itable_insert(results_to_be_sent, task->taskid, p);
 			result = 1;
 		}
 
