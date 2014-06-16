@@ -386,41 +386,42 @@ int link_file_in_workspace(char *localname, char *taskname, char *workspace, int
 	return result;
 }
 
-static int start_task(struct work_queue_task *t) {
-		struct work_queue_process *ti = work_queue_process_create(t);
-		work_queue_process_execute(t->command_line,ti);
+static int start_task(struct work_queue_task *t)
+{
+	struct work_queue_process *ti = work_queue_process_create(t);
+	work_queue_process_execute(t->command_line,ti);
 	
-		if(ti->pid < 0) {
-			fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
-			work_queue_process_delete(ti);
-			abort_flag = 1;
-			return 0;
-		}
+	if(ti->pid < 0) {
+		fprintf(stderr, "work_queue_worker: failed to fork task. Shutting down worker...\n");
+		work_queue_process_delete(ti);
+		abort_flag = 1;
+		return 0;
+	}
 
-		ti->status = 0;
+	ti->status = 0;
 		
-		if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-			t->cores = MAX((double)local_resources->cores.total/(double)local_resources->workers.total, 1);
-			t->memory = MAX((double)local_resources->memory.total/(double)local_resources->workers.total, 0);
-			t->disk = MAX((double)local_resources->disk.total/(double)local_resources->workers.total, 0);
-			t->gpus = MAX((double)local_resources->gpus.total/(double)local_resources->workers.total, 0);
-		} else {
-			// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabeled resources
-			t->cores = MAX(t->cores, 0);
-			t->memory = MAX(t->memory, 0);
-			t->disk = MAX(t->disk, 0);
-			t->gpus = MAX(t->gpus, 0);
-		}
+	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
+		t->cores = MAX((double)local_resources->cores.total/(double)local_resources->workers.total, 1);
+		t->memory = MAX((double)local_resources->memory.total/(double)local_resources->workers.total, 0);
+		t->disk = MAX((double)local_resources->disk.total/(double)local_resources->workers.total, 0);
+		t->gpus = MAX((double)local_resources->gpus.total/(double)local_resources->workers.total, 0);
+	} else {
+		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabeled resources
+		t->cores = MAX(t->cores, 0);
+		t->memory = MAX(t->memory, 0);
+		t->disk = MAX(t->disk, 0);
+		t->gpus = MAX(t->gpus, 0);
+	}
 
-		cores_allocated += t->cores;
-		memory_allocated += t->memory;
-		disk_allocated += t->disk;
-		gpus_allocated += t->gpus;
+	cores_allocated += t->cores;
+	memory_allocated += t->memory;
+	disk_allocated += t->disk;
+	gpus_allocated += t->gpus;
 
-		itable_insert(stored_tasks, t->taskid, ti);
-		itable_insert(active_tasks, ti->pid, ti);
+	itable_insert(stored_tasks, t->taskid, ti);
+	itable_insert(active_tasks, ti->pid, ti);
 
-		return 1;
+	return 1;
 }
 
 static void report_task_complete(struct link *master, struct work_queue_process *ti)
