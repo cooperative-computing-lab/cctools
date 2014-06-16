@@ -61,9 +61,6 @@ See the file COPYING for details.
 extern int setenv(const char *name, const char *value, int overwrite);
 #endif
 
-#define MIN_TERMINATE_BOUNDARY 0 
-#define TERMINATE_BOUNDARY_LEEWAY 30
-
 #define WORKER_MODE_WORKER  1
 #define WORKER_MODE_FOREMAN 2
 
@@ -123,11 +120,6 @@ static int abort_flag = 0;
 
 // Threshold for available disk space (MB) beyond which clean up and restart.
 static uint64_t disk_avail_threshold = 100;
-
-// Terminate only when:
-// terminate_boundary - (current_time - worker_start_time)%terminate_boundary ~~ 0
-// Use case: hourly charge resource such as Amazon EC2
-static int terminate_boundary = 0;
 
 // Password shared between master and worker.
 char *password = 0;
@@ -1633,13 +1625,10 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	while((c = getopt_long(argc, argv, "aB:cC:d:f:F:t:j:o:p:M:N:P:w:i:b:z:A:O:s:vZ:h", long_options, 0)) != (char) -1) {
+	while((c = getopt_long(argc, argv, "acC:d:f:F:t:j:o:p:M:N:P:w:i:b:z:A:O:s:vZ:h", long_options, 0)) != (char) -1) {
 		switch (c) {
 		case 'a':
 			//Left here for backwards compatibility
-			break;
-		case 'B':
-			terminate_boundary = MAX(MIN_TERMINATE_BOUNDARY, string_time_parse(optarg));
 			break;
 		case 'C':
 			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
@@ -1842,10 +1831,6 @@ int main(int argc, char *argv[])
 	if(!setup_workspace()) {
 		fprintf(stderr, "work_queue_worker: failed to setup workspace at %s.\n", workspace);
 		exit(1);
-	}
-
-	if(terminate_boundary > 0 && idle_timeout > terminate_boundary) {
-		idle_timeout = terminate_boundary - TERMINATE_BOUNDARY_LEEWAY;
 	}
 
 	// set $WORK_QUEUE_SANDBOX to workspace.
