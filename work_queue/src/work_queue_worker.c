@@ -64,29 +64,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_MODE_WORKER  1
 #define WORKER_MODE_FOREMAN 2
 
-/*
-Timeouts explained:
-
-main loop:
-	if project name given:
-		query catalog using single_connect_timeout
-		pick master at random from matches
-
-	connect to master with single_connect_timeout
-
-	worker service loop:
-		disconnect if no work received within idle_timeout
-		disconnect if ctrl-c sets abort_flag
-		disconnect if send/recv messages takes longer than active_timeout
-
-	stop main loop if single-master and idle_timeout has expired
-	stop main loop if connect timeout has expired.
-	stop if ctrl-c sets abort_flag
-
-	sleep before trying again, with exp backoff
-*/
-
-
 // Maximum time to stay connected to a single master without any work.
 static int idle_timeout = 900;
 
@@ -127,7 +104,6 @@ char *password = 0;
 // Allow worker to use symlinks when link() fails.  Enabled by default.
 static int symlinks_enabled = 1;
 
-// Basic worker global variables
 static int worker_mode = WORKER_MODE_WORKER;
 static const char *master_host = 0;
 static char master_addr[LINK_ADDRESS_MAX];
@@ -138,7 +114,6 @@ static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
 static time_t worker_start_time = 0;
 
-// Local resource controls
 static struct work_queue_resources * local_resources = 0;
 static struct work_queue_resources * aggregated_resources = 0;
 static struct work_queue_resources * aggregated_resources_last = 0;
@@ -152,7 +127,7 @@ static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
-// do not send consecutive resource updates in less than this many seconds
+
 static int send_resources_interval = 120;
 
 static struct work_queue *foreman_q = NULL;
@@ -173,7 +148,7 @@ static struct list   *procs_waiting = NULL;
 // These are additional pointers into procs_table.
 static struct itable *procs_complete = NULL;
 
-static int results_to_be_sent_msg = 0;         //Flag to indicate we have sent an available_results message.
+static int results_to_be_sent_msg = 0;
 
 static timestamp_t total_task_execution_time = 0;
 static int total_tasks_executed = 0;
@@ -206,12 +181,19 @@ static int recv_master_message( struct link *master, char *line, int length, tim
 	return result;
 }
 
+/*
+We track how much time has elapsed since the master assigned a task.
+If time(0) > idle_stoptime, then the worker will disconnect.
+*/
+
 void reset_idle_timer()
 {
 	idle_stoptime = time(0) + idle_timeout;
 }
 
-/* Resources related tasks */
+/*
+Measure only the resources associated with this particular node.
+*/
 
 void resources_measure_locally(struct work_queue_resources *r)
 {
@@ -239,6 +221,12 @@ void resources_measure_locally(struct work_queue_resources *r)
 	r->gpus.smallest = r->gpus.largest = r->gpus.total;
 }
 
+/*
+Measure the resources assocated with this node;
+if a foreman, also add the sum of my workers.
+*/
+
+
 void resources_measure_all(struct work_queue_resources *local, struct work_queue_resources *aggr)
 {
 	resources_measure_locally(local);
@@ -255,6 +243,11 @@ void resources_measure_all(struct work_queue_resources *local, struct work_queue
 		memcpy(aggr, local, sizeof(struct work_queue_resources));
 	}
 }
+
+/*
+Send a message to the master with my current resources.
+Don't send a message more than every send_resources_interval seconds.
+*/
 
 static void send_resource_update( struct link *master, int force_update )
 {
@@ -289,7 +282,10 @@ static void send_resource_update( struct link *master, int force_update )
 	}
 }
 
-/* End of resources related tasks */
+/*
+Send the initial "ready" message to the master with the version and so forth.
+The master will not start sending tasks until this message is recevied.
+*/
 
 static void report_worker_ready( struct link *master )
 {
@@ -299,9 +295,17 @@ static void report_worker_ready( struct link *master )
 	send_resource_update(master,1);
 }
 
-// XXX This function modifies the taskname, which is not friendly to the caller.
 
-int link_file_in_workspace( const char *localname, char *taskname, const char *workspace, int into) {
+/*
+Make a symbolic link from a process' sandbox directory into the cache
+directory, so as to create the appropriate namespace for a process.
+If a hard link fails, try a symbolic link instead.
+
+XXX This function temporarily modifies the taskname, which is not friendly to the caller.
+*/
+
+int link_file_in_workspace( const char *localname, char *taskname, const char *workspace, int into)
+{
 	int result = 1;
 	struct stat st;
 	
@@ -397,7 +401,12 @@ int link_file_in_workspace( const char *localname, char *taskname, const char *w
 	return result;
 }
 
-static int start_task( struct work_queue_process *p )
+/*
+Start executing the given process on the local host,
+accounting for the resources as necessary.
+*/
+
+static int start_process( struct work_queue_process *p )
 {
 	pid_t pid = work_queue_process_execute(p);
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
@@ -413,6 +422,12 @@ static int start_task( struct work_queue_process *p )
 
 	return 1;
 }
+
+/*
+Transmit the results of the given process to the master.
+If a local worker, stream the output from disk.
+If a foreman, send the outputs contained in the task structure.
+*/
 
 static void report_task_complete( struct link *master, struct work_queue_process *p )
 {
@@ -446,26 +461,33 @@ static void report_task_complete( struct link *master, struct work_queue_process
 	
 }
 
-static int itable_pop(struct itable *t, uint64_t *key, void **value)
+/*
+Remove one item from an itable, ignoring the key
+*/
+
+static void * itable_pop(struct itable *t )
 {
+	uint64_t key;
+	void *value;
+
 	itable_firstkey(t);
-
-	int result = itable_nextkey(t, key, value);
-
-	if(result)
-	{
-		itable_remove(t, *key);
+	if(itable_nextkey(t, &key, (void*)&value)) {
+		return itable_remove(t,key);
+	} else {
+		return 0;
 	}
-
-	return result;
 }
+
+/*
+For every process in the procs_complete table,
+remove it, and send the results to the master.
+*/
 
 static void report_tasks_complete( struct link *master )
 {
 	struct work_queue_process *p;
-	uint64_t taskid;
 
-	while(itable_pop(procs_complete,&taskid,(void**)&p)) {
+	while((p=itable_pop(procs_complete))) {
 		report_task_complete(master,p);
 	}
 
@@ -475,6 +497,12 @@ static void report_tasks_complete( struct link *master )
 
 	send_resource_update(master, 1);
 }
+
+/*
+Scan over all of the processes known by the worker,
+and if they have exited, move them into the procs_complete table
+for later processing.
+*/
 
 static int handle_tasks(struct link *master) 
 {
@@ -508,6 +536,7 @@ static int handle_tasks(struct link *master)
 			itable_remove(procs_running, p->pid);
 			itable_firstkey(procs_running);
 			
+			// Link the output files into the cache directory as needed.
 			struct work_queue_file *f;
 			list_first_item(p->task->output_files);
 			while((f = list_next_item(p->task->output_files))) {
@@ -527,18 +556,17 @@ static int handle_tasks(struct link *master)
 static int check_disk_space_for_filesize(int64_t file_size) {
 	uint64_t disk_avail, disk_total;
 
-	// Check available disk space
 	if(disk_avail_threshold > 0) {
 		disk_info_get(".", &disk_avail, &disk_total);
 		if(file_size > 0) {	
 			if((uint64_t)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
-			debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
-			return 0;
+				debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
+				return 0;
 			}
 		} else {
 			if(disk_avail < disk_avail_threshold) {
-			debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
-			return 0;
+				debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
+				return 0;
 			}	
 		}	
     }
@@ -687,6 +715,12 @@ static void normalize_resources( struct work_queue_process *p )
 	}
 }
 
+/*
+Handle an incoming task message from the master.
+Generate a work_queue_process wrapped around a work_queue_task,
+and deposit it into the waiting list or the foreman_q as appropriate.
+*/
+
 static int do_task( struct link *master, int taskid, time_t stoptime )
 {
 	char line[WORK_QUEUE_LINE_MAX];
@@ -755,7 +789,13 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	return 1;
 }
 
-static int do_put(struct link *master, char *filename, int64_t length, int mode) {
+/*
+Handle an incoming "put" message from the master,
+which places a file into the cache directory.
+*/
+
+static int do_put( struct link *master, char *filename, int64_t length, int mode )
+{
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	char *cur_pos;
 	
@@ -974,6 +1014,7 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 }
 
 /*
+do_kill removes a process currently known by the worker.
 Note that a kill message from the master is used for every case
 where a task is to be removed, whether it is waiting, running,
 of finished.  Regardless of the state, we kill the process and
@@ -1009,6 +1050,12 @@ static int do_kill(int taskid)
 
 	return 1;
 }
+
+/*
+Kill off all known tasks by iterating over the complete
+procs_table and calling do_kill.  This should result in
+all empty procs_* structures and zero resources allocated.
+*/
 
 static void kill_all_tasks() {
 	struct work_queue_process *p;
@@ -1257,7 +1304,7 @@ static void work_for_master(struct link *master) {
 				
 				p = list_pop_head(procs_waiting);
 				if(p && check_for_resources(p->task)) {
-					start_task(p);
+					start_process(p);
 					send_resource_update(master, 1);
 				} else {
 					list_push_tail(procs_waiting, p);
