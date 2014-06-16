@@ -1007,8 +1007,8 @@ static int do_kill(int taskid)
 		}
 	}
 
-	// XXX also remove from the waiting list!
 	itable_remove(procs_complete, p->task->taskid);
+	list_remove(procs_waiting,p);
 
 	work_queue_process_delete(p);
 
