@@ -157,10 +157,21 @@ static int send_resources_interval = 120;
 
 static struct work_queue *foreman_q = NULL;
 
-static struct itable *active_tasks = NULL;
-static struct itable *stored_tasks = NULL;
-static struct list *waiting_tasks = NULL;
-static struct itable *results_to_be_sent = NULL;
+// Table of all processes in any state, indexed by taskid.
+// Processes should be created/deleted when added/removed from this table.
+static struct itable *procs_table = NULL;
+
+// Table of all processes currently running, indexed by pid.
+// These are additional pointers into procs_table.
+static struct itable *procs_running = NULL;
+
+// List of all procs that are waiting to be run.
+// These are additional pointers into procs_table.
+static struct list   *procs_waiting = NULL;
+
+// Table of all processes with results to be sent back, indexed by taskid.
+// These are additional pointers into procs_table.
+static struct itable *procs_complete = NULL;
 
 static int results_to_be_sent_msg = 0;         //Flag to indicate we have sent an available_results message.
 
@@ -396,7 +407,7 @@ static int start_task( struct work_queue_process *p )
 		return 0;
 	}
 
-	itable_insert(active_tasks,pid,p);
+	itable_insert(procs_running,pid,p);
 
 	struct work_queue_task *t = p->task;
 		
@@ -477,7 +488,7 @@ static void report_tasks_complete( struct link *master )
 	struct work_queue_process *p;
 	uint64_t taskid;
 
-	while(itable_pop(results_to_be_sent,&taskid,(void**)&p)) {
+	while(itable_pop(procs_complete,&taskid,(void**)&p)) {
 		report_task_complete(master,p);
 	}
 
@@ -496,8 +507,8 @@ static int handle_tasks(struct link *master) {
 	char dirname[WORK_QUEUE_LINE_MAX];
 	int status;
 	
-	itable_firstkey(active_tasks);
-	while(itable_nextkey(active_tasks, (uint64_t*)&pid, (void**)&ti)) {
+	itable_firstkey(procs_running);
+	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&ti)) {
 		result = wait4(pid, &status, WNOHANG, &ti->rusage);
 		if(result) {
 			if(result < 0) {
@@ -514,8 +525,8 @@ static int handle_tasks(struct link *master) {
 			
 			ti->execution_end = timestamp_get();
 			
-			itable_remove(active_tasks, ti->pid);
-			itable_firstkey(active_tasks);
+			itable_remove(procs_running, ti->pid);
+			itable_firstkey(procs_running);
 			
 			if(WIFEXITED(status)) {
 				sprintf(dirname, "t.%d", ti->task->taskid);
@@ -527,7 +538,7 @@ static int handle_tasks(struct link *master) {
 				}
 			}
 
-			itable_insert(results_to_be_sent, ti->task->taskid, ti);
+			itable_insert(procs_complete, ti->task->taskid, ti);
 		}
 		
 	}
@@ -730,9 +741,9 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	// task input files.
 	send_resource_update(master, 1);
 
-	// Every received task goes into stored_tasks.
+	// Every received task goes into procs_table.
 	struct work_queue_process *p = work_queue_process_create(task);
-	itable_insert(stored_tasks,taskid,p);
+	itable_insert(procs_table,taskid,p);
 
 	if(worker_mode==WORKER_MODE_FOREMAN) {
 		work_queue_submit_internal(foreman_q,task);
@@ -745,7 +756,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			delete_dir(dirname);
 			return 0;
 		}
-		list_push_tail(waiting_tasks,p);
+		list_push_tail(procs_waiting,p);
 	}
 	return 1;
 }
@@ -979,7 +990,7 @@ static int do_kill(int taskid)
 {
 	struct work_queue_process *p;
 
-	p = itable_remove(stored_tasks, taskid);
+	p = itable_remove(procs_table, taskid);
 	if(!p) {
 		debug(D_WQ,"master requested kill of task %d which does not exist!",taskid);
 		return 1;
@@ -997,8 +1008,8 @@ static int do_kill(int taskid)
 	free(dirname);
 
 	// XXX also remove from the waiting list!
-	itable_remove(results_to_be_sent, p->task->taskid);
-	itable_remove(active_tasks, p->pid);
+	itable_remove(procs_complete, p->task->taskid);
+	itable_remove(procs_running, p->pid);
 
 	// XXX double-check when allocations are made and removed.	
 	cores_allocated -= p->task->cores;
@@ -1017,8 +1028,8 @@ static void kill_all_tasks() {
 	struct work_queue_process *p;
 	uint64_t taskid;
 
-	itable_firstkey(stored_tasks);
-	while(itable_nextkey(stored_tasks,&taskid,(void**)&p)) {
+	itable_firstkey(procs_table);
+	while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
 		do_kill(taskid);
 	}
 
@@ -1269,7 +1280,7 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
-		if(!results_to_be_sent_msg && itable_size(results_to_be_sent) > 0)
+		if(!results_to_be_sent_msg && itable_size(procs_complete) > 0)
 		{
 			send_master_message(master, "available_results\n");
 			results_to_be_sent_msg = 1;
@@ -1279,15 +1290,15 @@ static void work_for_master(struct link *master) {
 
 		if(ok) {
 			int visited = 0;
-			while(list_size(waiting_tasks) > visited && cores_allocated < local_resources->cores.total) {
+			while(list_size(procs_waiting) > visited && cores_allocated < local_resources->cores.total) {
 				struct work_queue_process *p;
 				
-				p = list_pop_head(waiting_tasks);
+				p = list_pop_head(procs_waiting);
 				if(p && check_for_resources(p->task)) {
 					start_task(p);
 					send_resource_update(master, 1);
 				} else {
-					list_push_tail(waiting_tasks, p);
+					list_push_tail(procs_waiting, p);
 					visited++;
 				}
 			}
@@ -1296,13 +1307,13 @@ static void work_for_master(struct link *master) {
 			// waiting tasks, then disconnect so that the master gets the tasks
 			// back. (Imagine for example that some other process in the host
 			// running the worker used so much memory or disk, that now no task
-			// cannot be scheduled.) Note we check against stored_tasks, and
-			// not active_tasks, so that we do not disconnect if there are
+			// cannot be scheduled.) Note we check against procs_table, and
+			// not procs_running, so that we do not disconnect if there are
 			// results waiting to be sent back (which in turn may free some
 			// disk).  Note also this is a short-term solution. In the long
 			// term we want the worker to report to the master something like
 			// 'task not done'.
-			if(list_size(waiting_tasks) > 0 && itable_size(stored_tasks) == 0)
+			if(list_size(procs_waiting) > 0 && itable_size(procs_table) == 0)
 			{
 				debug(D_WQ, "No task can be executed with the available resources.\n");
 				ok = 0;
@@ -1312,7 +1323,7 @@ static void work_for_master(struct link *master) {
 		if(!ok) break;
 
 		//Reset idle_stoptime if something interesting is happening at this worker.
-		if(list_size(waiting_tasks) > 0 || itable_size(stored_tasks) > 0 || itable_size(results_to_be_sent) > 0) {
+		if(list_size(procs_waiting) > 0 || itable_size(procs_table) > 0 || itable_size(procs_complete) > 0) {
 			reset_idle_timer();
 		}
 	}
@@ -1341,13 +1352,13 @@ static void foreman_for_master(struct link *master) {
 		
 		if(task) {
 			struct work_queue_process *p;
-			p = itable_lookup(stored_tasks,task->taskid);
+			p = itable_lookup(procs_table,task->taskid);
 			// XXX deal with unexpected failure here
-			itable_insert(results_to_be_sent, task->taskid, p);
+			itable_insert(procs_complete, task->taskid, p);
 			result = 1;
 		}
 
-		if(!results_to_be_sent_msg && itable_size(results_to_be_sent) > 0)
+		if(!results_to_be_sent_msg && itable_size(procs_complete) > 0)
 		{
 			send_master_message(master, "available_results\n");
 			results_to_be_sent_msg = 1;
@@ -1550,9 +1561,9 @@ static void workspace_cleanup()
 	if(arch_name) free(arch_name);
 
 	if(foreman_q)          work_queue_delete(foreman_q);
-	if(active_tasks)       itable_delete(active_tasks);
-	if(stored_tasks)       itable_delete(stored_tasks);
-	if(results_to_be_sent) itable_delete(results_to_be_sent);
+	if(procs_running)      itable_delete(procs_running);
+	if(procs_table)        itable_delete(procs_table);
+	if(procs_complete)     itable_delete(procs_complete);
 
 	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
 	delete_dir(workspace);
@@ -1889,10 +1900,10 @@ int main(int argc, char *argv[])
 
 	}
 
-	active_tasks = itable_create(0);
-	stored_tasks = itable_create(0);
-	waiting_tasks = list_create();
-	results_to_be_sent = itable_create(0);
+	procs_running  = itable_create(0);
+	procs_table    = itable_create(0);
+	procs_waiting  = list_create();
+	procs_complete = itable_create(0);
 
 	if(!check_disk_space_for_filesize(0)) {
 		fprintf(stderr,"work_queue_worker: %s has less than minimum disk space %"PRIu64" MB\n",workspace,disk_avail_threshold);
