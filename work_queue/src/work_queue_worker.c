@@ -1055,6 +1055,8 @@ static int do_kill(int taskid)
 Kill off all known tasks by iterating over the complete
 procs_table and calling do_kill.  This should result in
 all empty procs_* structures and zero resources allocated.
+If this failed to bring the system back to a fresh state,
+then we need to abort to clean things up.
 */
 
 static void kill_all_tasks() {
@@ -1066,13 +1068,16 @@ static void kill_all_tasks() {
 		do_kill(taskid);
 	}
 
-	// These should have already gone to zero,
-	// but let's be extra careful.
+	assert(itable_size(procs_table)==0);
+	assert(itable_size(procs_running)==0);
+	assert(itable_size(procs_complete)==0);
+	assert(list_size(procs_waiting)==0);
+	assert(cores_allocated==0);
+	assert(memory_allocated==0);
+	assert(disk_allocated==0);
+	assert(gpus_allocated==0);
 
-	cores_allocated = 0;
-	memory_allocated = 0;
-	disk_allocated = 0;
-	gpus_allocated = 0;
+	debug(D_WQ,"all data structures are clean");
 }
 
 static int do_release() {
