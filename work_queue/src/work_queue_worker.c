@@ -1905,12 +1905,11 @@ int main(int argc, char *argv[])
 		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);	
 		work_queue_specify_log(foreman_q, foreman_stats_filename);
 
-	} else {
-		active_tasks = itable_create(0);
-		stored_tasks = itable_create(0);
-		waiting_tasks = list_create();
- 	}
+	}
 
+	active_tasks = itable_create(0);
+	stored_tasks = itable_create(0);
+	waiting_tasks = list_create();
 	results_to_be_sent = itable_create(0);
 
 	if(!check_disk_space_for_filesize(0)) {
