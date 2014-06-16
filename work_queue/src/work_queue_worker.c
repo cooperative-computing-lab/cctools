@@ -420,7 +420,6 @@ static int start_task(struct work_queue_task *t)
 	disk_allocated += t->disk;
 	gpus_allocated += t->gpus;
 
-	itable_insert(stored_tasks, t->taskid, ti);
 	itable_insert(active_tasks, ti->pid, ti);
 
 	return 1;
@@ -535,7 +534,6 @@ static int handle_tasks(struct link *master) {
 			ti->execution_end = timestamp_get();
 			
 			itable_remove(active_tasks, ti->pid);
-			itable_remove(stored_tasks, ti->task->taskid);
 			itable_firstkey(active_tasks);
 			
 			if(WIFEXITED(status)) {
