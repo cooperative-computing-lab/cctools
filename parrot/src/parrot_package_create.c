@@ -604,14 +604,14 @@ int main(int argc, char *argv[])
 	}
 	debug_config_file_size(0); /* do not rotate debug file by default */
 
-	fprintf(stdout, "The packaging process has began ...\nThe start time is: ");
-	print_time();
-
 	//preprocess: check whether the environment variable file exists; check whether the namelist file exists; check whether the package path exists;
 	if((prepare_work()) != 0) {
 		show_help(argv[0]);
 		exit(EXIT_FAILURE);
 	}
+
+	fprintf(stdout, "The packaging process has began ...\nThe start time is: ");
+	print_time();
 
 	if(sort_uniq_namelist(namelist, &fd) == -1) {
 		debug(D_DEBUG, "sort_uniq_namelist func fails.\n");
