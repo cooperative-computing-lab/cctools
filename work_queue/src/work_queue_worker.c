@@ -494,8 +494,6 @@ static void report_tasks_complete( struct link *master )
 	send_master_message(master, "end\n");
 
 	results_to_be_sent_msg = 0;
-
-	send_resource_update(master, 1);
 }
 
 /*
@@ -766,10 +764,6 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	}
 
 	last_task_received = task->taskid;
-
-	// Measure and report resources, given that disk space decreased given the
-	// task input files.
-	send_resource_update(master, 1);
 
 	// Every received task goes into procs_table.
 	itable_insert(procs_table,taskid,p);
@@ -1286,8 +1280,6 @@ static void work_for_master(struct link *master) {
 
 		if(master_activity < 0) break;
 		
-		send_resource_update(master,0);
-		
 		int ok = 1;
 		if(master_activity) {
 			ok &= handle_master(master);
@@ -1311,7 +1303,6 @@ static void work_for_master(struct link *master) {
 				p = list_pop_head(procs_waiting);
 				if(p && check_for_resources(p->task)) {
 					start_process(p);
-					send_resource_update(master, 1);
 				} else {
 					list_push_tail(procs_waiting, p);
 					visited++;
