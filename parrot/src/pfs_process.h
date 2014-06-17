@@ -73,9 +73,6 @@ struct pfs_process {
 	int 	       exit_signal;
 	int            interrupted;
 	int            nsyscalls;
-
-	int            thread;                // True if thread, false if regular process.
-	time_t         time_first_sigcont;
 };
 
 struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t notify_ppid, int share_table, int exit_signal );

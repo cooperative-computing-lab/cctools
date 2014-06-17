@@ -34,7 +34,6 @@ extern "C" {
 #include "ftp_lite.h"
 #include "int_sizes.h"
 #include "delete_dir.h"
-#include "itable.h"
 }
 
 #include <stdlib.h>
@@ -100,8 +99,6 @@ char pfs_cvmfs_locks_dir[PFS_PATH_MAX];
 bool pfs_cvmfs_enable_alien  = true;
 
 int pfs_irods_debug_level = 0;
-
-struct itable *stopped_threads;
 
 /*
 This process at the very top of the traced tree
@@ -360,13 +357,6 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 				tracer_continue(p->tracer,signum);
 
 				if(signum==SIGSTOP && p->nsyscalls==0) {
-					if(p->thread)
-					{
-						static const int dummy = 0;
-						debug(D_PROCESS,"Adding thread %d to list of stopped threads\n", pid);
-						itable_insert(stopped_threads, p->pid, &dummy);
-					}
-					p->time_first_sigcont = time(NULL);
 					kill(p->pid,SIGCONT);
 				}
 			}
@@ -401,30 +391,6 @@ void write_rval(const char* message, int status) {
 		fclose(file);
 	}
 
-}
-
-void whack_sleepy_threads() {
-	//oh my. Some threads do not get the SIGCONT after they've just
-	//been created. This functions sends SIGCONTs every second
-	//until such threads become responsive (so far, I've only seen
-	//at most one extra SIGCONT needed).
-
-	UINT64_T pid_stop;
-	itable_firstkey(stopped_threads);
-	time_t  now = time(0);
-	while(itable_nextkey(stopped_threads, &pid_stop, NULL))
-	{
-		struct pfs_process *p = pfs_process_lookup(pid_stop);
-		if(p->nsyscalls == 0 && (now - p->time_first_sigcont > 1))
-		{
-			debug(D_PROCESS,"Sending SIGCONT to thread %" PRId64 "\n", pid_stop);
-			p->time_first_sigcont = now;
-			kill(pid_stop, SIGCONT);
-		} else if(p->nsyscalls > 0) {
-			debug(D_PROCESS,"Removing thread %" PRId64 " from list of stopped threads\n", pid_stop);
-			itable_remove(stopped_threads, pid_stop);
-		}
-	}
 }
 
 int main( int argc, char *argv[] )
@@ -465,8 +431,6 @@ int main( int argc, char *argv[] )
 	install_handler(SIGCHLD,handle_sigchld);
 	install_handler(SIGIO,handle_sigio);
 	install_handler(SIGXFSZ,ignore_signal);
-
-	stopped_threads = itable_create(0);
 
 	if(isatty(0)) {
 		pfs_master_timeout = 300;
@@ -894,8 +858,6 @@ int main( int argc, char *argv[] )
 		while(1) {
 			int status, flags;
 			struct rusage usage;
-
-			whack_sleepy_threads();
 
 			flags = WUNTRACED|__WALL|WNOHANG;
 			pid = wait4(trace_this_pid,&status,flags,&usage);
