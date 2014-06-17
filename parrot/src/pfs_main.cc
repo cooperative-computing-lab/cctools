@@ -115,8 +115,6 @@ enum {
 	LONG_OPT_CVMFS_REPO_SWITCHING=500,
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
 	LONG_OPT_CVMFS_ALIEN_CACHE,
-	LONG_OPT_NAMELIST,
-	LONG_OPT_ENVLIST,
 };
 
 static void get_linux_version(const char *cmd)
@@ -186,7 +184,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Enable data channel authentication in GridFTP.\n", "-C,--channel-auth");
 	fprintf(stdout, " %-30s Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n", "-d,--debug=<name>");
 	fprintf(stdout, " %-30s Disable small file optimizations.\n", "-D,--no-optimize");
-	fprintf(stdout, " %-30s Record the environment variables at the starting point.\n", "   --env-list=<path>");
+	fprintf(stdout, " %-30s Record the environment variables at the starting point.\n", "-e,--env-list=<path>");
 	fprintf(stdout, " %-30s Enable file snapshot caching for all protocols.\n", "-F,--with-snapshots");
 	fprintf(stdout, " %-30s Disable following symlinks.\n", "-f,--no-follow-symlinks");
 	fprintf(stdout, " %-30s Fake this gid; Real gid stays the same.          (PARROT_GID)\n", "-G,--gid=<num>");
@@ -197,7 +195,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Checksum files where available.\n", "-K,--with-checksums");
 	fprintf(stdout, " %-30s Do not checksum files.\n", "-k,--no-checksums");
 	fprintf(stdout, " %-30s Path to ld.so to use.                      (PARROT_LDSO_PATH)\n", "-l,--ld-path=<path>");
-	fprintf(stdout, " %-30s Record all the file names.\n", "   --name-list=<path>");
+	fprintf(stdout, " %-30s Record all the file names.\n", "-n,--name-list=<path>");
 	fprintf(stdout, " %-30s Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n", "-m,--ftab-file=<file>");
 	fprintf(stdout, " %-30s Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
 	fprintf(stdout, " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
@@ -569,8 +567,8 @@ int main( int argc, char *argv[] )
 		{"with-checksums", no_argument, 0, 'K'},
 		{"no-checksums", no_argument, 0, 'k'},
 		{"ld-path", required_argument, 0, 'l'},
-		{"name-list", required_argument, 0, LONG_OPT_NAMELIST},
-		{"env-list", required_argument, 0, LONG_OPT_ENVLIST},
+		{"name-list", required_argument, 0, 'n'},
+		{"env-list", required_argument, 0, 'e'},
 		{"tab-file", required_argument, 0, 'm'},
 		{"mount", required_argument, 0, 'M'},
 		{"hostname", required_argument, 0, 'N'},
@@ -598,7 +596,7 @@ int main( int argc, char *argv[] )
         {0,0,0,0}
 	};
 
-	while((c=getopt_long(argc,argv,"+ha:b:B:c:Cd:DFfG:Hi:I:kKl:m:M:N:o:O:p:PQr:R:sSt:T:U:u:vw:WY", long_options, NULL)) > -1) {
+	while((c=getopt_long(argc,argv,"+ha:b:B:c:Cd:DFfG:e:Hi:I:kKl:m:n:M:N:o:O:p:PQr:R:sSt:T:U:u:vw:WY", long_options, NULL)) > -1) {
 		switch(c) {
 		case 'a':
 			if(!auth_register_byname(optarg)) {
@@ -625,6 +623,24 @@ int main( int argc, char *argv[] )
 			break;
 		case 'D':
 			pfs_enable_small_file_optimizations = 0;
+			break;
+		case 'e':
+			if(access(optarg, F_OK) != -1) {
+				fprintf(stderr, "The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", optarg);
+				return 1;
+			}
+			int count;
+			count = 0;
+			FILE *fp;
+			fp = fopen(optarg, "w");
+			if(!fp)
+				debug(D_DEBUG, "Can not open envlist file: %s", optarg);
+			while(environ[count] != NULL)
+			{
+				fprintf(fp, "%s\n", environ[count]);
+				count++;
+			}
+			fclose(fp);
 			break;
 		case 'F':
 			pfs_force_cache = 1;
@@ -653,25 +669,13 @@ int main( int argc, char *argv[] )
 		case 'l':
 			pfs_ldso_path = optarg;
 			break;
-		case LONG_OPT_ENVLIST:
-			if(access(optarg, F_OK) != -1) {
-				fprintf(stderr, "The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", optarg);
-				return 1;
-			}
-			int count;
-			count = 0;
-			FILE *fp;
-			fp = fopen(optarg, "w");
-			if(!fp)
-				debug(D_DEBUG, "Can not open envlist file: %s", optarg);
-			while(environ[count] != NULL)
-			{
-				fprintf(fp, "%s\n", environ[count]);
-				count++;
-			}
-			fclose(fp);
+		case 'm':
+			pfs_resolve_file_config(optarg);
 			break;
-		case LONG_OPT_NAMELIST:
+		case 'M':
+			pfs_resolve_manual_config(optarg);
+			break;
+		case 'n':
 			if(access(optarg, F_OK) != -1) {
 				fprintf(stderr, "The namelist file (%s) has already existed. Please delete it first or refer to another namelist file!!\n", optarg);
 				return 1;
@@ -679,12 +683,6 @@ int main( int argc, char *argv[] )
 			namelist_file = fopen(optarg, "a");
 			if(!namelist_file)
 				debug(D_DEBUG, "Can not open namelist file: %s", optarg);
-			break;
-		case 'm':
-			pfs_resolve_file_config(optarg);
-			break;
-		case 'M':
-			pfs_resolve_manual_config(optarg);
 			break;
 		case 'N':
 			pfs_false_uname = optarg;
