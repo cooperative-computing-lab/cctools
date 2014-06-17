@@ -46,6 +46,16 @@ if [ -z $shell_type ]; then
 	exit 1
 fi
 
+if [ ! -d $package_path ]; then
+	echo "Please ensure directory " $package_path " exists!"
+	exit 1
+fi
+
+if [ ! -x /bin/$shell_type ]; then
+	echo "Please ensure shell /bin/"$shell_type " exists and is executable!"
+	exit 1
+fi
+
 package_path=`readlink -f $package_path`
 cd $package_path
 
