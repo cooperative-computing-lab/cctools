@@ -30,7 +30,7 @@ OBJECTS = $(SOURCES:%.c=%.o)
 PROGRAMS = work_queue_worker work_queue_status work_queue_example work_queue_pool
 PUBLIC_HEADERS = batch_job.h work_queue.h
 SCRIPTS = wq_submit_workers.common condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers ec2_submit_workers ec2_remove_workers slurm_submit_workers work_queue_graph_log
-TEST_PROGRAMS = work_queue_example work_queue_workload_simulator
+TEST_PROGRAMS = work_queue_example work_queue_test work_queue_test_watch
 TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) bindings
 
 ifeq ($(CCTOOLS_USE_MPI),true)
