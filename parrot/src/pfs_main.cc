@@ -683,6 +683,9 @@ int main( int argc, char *argv[] )
 			namelist_file = fopen(optarg, "a");
 			if(!namelist_file)
 				debug(D_DEBUG, "Can not open namelist file: %s", optarg);
+			char *cmd;
+			sprintf(cmd, "find /lib*/ -name ld-linux*>>%s", optarg);
+			system(cmd);
 			break;
 		case 'N':
 			pfs_false_uname = optarg;
