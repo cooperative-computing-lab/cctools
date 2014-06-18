@@ -1,4 +1,10 @@
 /*
+Copyright (C) 2014- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
+/*
 The following major problems must be fixed:
 - The capacity code assumes one task per worker.
 - The log specification need to be updated.
