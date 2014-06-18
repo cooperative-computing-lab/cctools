@@ -345,7 +345,7 @@ int string_split_quotes(char *str, int *argc, char ***argv)
 		while(*str) {
 			if(*str == '\\') {
 				/* If we are backwhacked, shift and continue */
-				memcpy(str, str + 1, strlen(str));
+				memmove(str, str + 1, strlen(str));
 				if(*str)
 					str++;
 			} else if(isspace((int) *str)) {
@@ -356,16 +356,16 @@ int string_split_quotes(char *str, int *argc, char ***argv)
 			} else if(*str == '\'' || *str == '\"') {
 				/* Upon finding a quote, we enter a new loop */
 				char quote = *str;
-				memcpy(str, str + 1, strlen(str));
+				memmove(str, str + 1, strlen(str));
 				while(*str) {
 					if(*str == '\\') {
 						/* Skip anything backwhacked */
-						memcpy(str, str + 1, strlen(str));
+						memmove(str, str + 1, strlen(str));
 						if(*str)
 							str++;
 					} else if(*str == quote) {
 						/* Shift and stop on a matching quote */
-						memcpy(str, str + 1, strlen(str));
+						memmove(str, str + 1, strlen(str));
 						break;
 					} else {
 						/* Otherwise, keep going */
