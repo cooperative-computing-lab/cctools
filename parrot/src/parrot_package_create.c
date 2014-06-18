@@ -627,14 +627,22 @@ int main(int argc, char *argv[])
 	count = 0;
 	while(fgets(line, LINE_MAX, namelist_file) != NULL) {
 		count++;
-        caller = strchr(line, '|') + 1;
-        caller[strlen(caller) - 1] = '\0';
-        path_len = strlen(line) - strlen(caller) - 1;
+		char *s;
+		if((s = strchr(line, '|')) != NULL) {
+			caller = s + 1;
+			caller[strlen(caller) - 1] = '\0';
+			path_len = strlen(line) - strlen(caller) - 1;
+			strcpy(path, line);
+			path[path_len] = '\0';
+		} else {
+			caller = "open_object";
+			strcpy(path, line);
+			path[strlen(line) - 1] = '\0';
+			path_len = strlen(path);
+		}
+		remove_final_slashes(path);
 		debug(D_DEBUG, "%d --- line: %s; path_len: %d\n", count, line, path_len);
-        strcpy(path, line);
-        path[path_len] = '\0';
-        remove_final_slashes(path);
-        if(line_process(path, caller, 0, 0) == -1)
+		if(line_process(path, caller, 0, 0) == -1)
 			debug(D_DEBUG, "line(%s) does not been processed perfectly.\n", line);
 	}
 	fclose(namelist_file);
