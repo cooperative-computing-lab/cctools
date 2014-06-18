@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include "buffer.h"
 #include "stringtools.h"
 #include "debug.h"
-#include "domain_name.h"
+#include "domain_name_cache.h"
 #include "url_encode.h"
 
 #include <errno.h>
@@ -126,7 +126,7 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 	}
 
 	debug(D_HTTP, "connect %s port %d", actual_host, actual_port);
-	if(!domain_name_lookup(actual_host, addr))
+	if(!domain_name_cache_lookup(actual_host, addr))
 		return 0;
 
 	link = link_connect(addr, actual_port, stoptime);
