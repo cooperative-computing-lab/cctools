@@ -681,11 +681,17 @@ int main( int argc, char *argv[] )
 				return 1;
 			}
 			namelist_file = fopen(optarg, "a");
-			if(!namelist_file)
+			if(!namelist_file) {
 				debug(D_DEBUG, "Can not open namelist file: %s", optarg);
-			char *cmd;
-			sprintf(cmd, "find /lib*/ -name ld-linux*>>%s", optarg);
-			system(cmd);
+				return 1;
+			}
+			char cmd[PFS_PATH_MAX];
+			if(sprintf(cmd, "find /lib*/ -name ld-linux*>>%s", optarg) >= 0)
+				system(cmd);
+			else {
+				debug(D_DEBUG, "writing ld-linux* into namelist file failed.");
+				return 1;
+			}
 			break;
 		case 'N':
 			pfs_false_uname = optarg;
