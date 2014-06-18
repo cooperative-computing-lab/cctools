@@ -428,7 +428,7 @@ void dag_variable_add_value(const char *name, struct hash_table *current_table, 
 
 struct dag_variable *dag_variable_create(const char *name, const char *initial_value)
 {
-	struct dag_variable *var = malloc(sizeof(struct dag_variable *));
+	struct dag_variable *var = malloc(sizeof(struct dag_variable));
 
 	if(!initial_value && name)
 	{
