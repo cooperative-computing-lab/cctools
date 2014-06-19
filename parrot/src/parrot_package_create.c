@@ -19,9 +19,6 @@
 #include "copy_stream.h"
 #include "debug.h"
 
-#define SIZE 256
-
-int LINE_MAX=1024;
 const char *namelist;
 const char *packagepath;
 const char *envlist;
@@ -160,7 +157,7 @@ int mkpath(const char *path, mode_t mode, int fixed_mode) {
 		}
 	}
 
-	char pathcopy[LINE_MAX], *parent_dir;
+	char pathcopy[PATH_MAX], *parent_dir;
 	int rv;
 	rv = -1;
 	if(strcmp(path, ".") == 0 || strcmp(path, "/") == 0)
@@ -229,7 +226,7 @@ int is_special_path(const char *path)
 {
 	int size;
 	unsigned int i;
-	char pathcopy[LINE_MAX], *first_dir, *tmp_dir;
+	char pathcopy[PATH_MAX], *first_dir, *tmp_dir;
 	strcpy(pathcopy, path);
 	first_dir = strchr(pathcopy, '/') + 1;
 	if((tmp_dir = strchr(first_dir, '/')) == NULL) {
@@ -256,7 +253,7 @@ Currently only copy DIR REG LINK; the remaining files are ignored.
 int dir_entry(const char* filename)
 {
 	struct stat source_stat;
-	char new_path[LINE_MAX];
+	char new_path[PATH_MAX];
 	strcpy(new_path, packagepath);
 	strcat(new_path, filename);
 	if(access(new_path, F_OK) == 0) {
@@ -290,7 +287,7 @@ int dir_entry(const char* filename)
 int create_dir_subitems(const char *path, char *new_path) {
 	DIR *dir;
 	struct dirent *entry;
-	char full_entrypath[LINE_MAX], dir_name[LINE_MAX];
+	char full_entrypath[PATH_MAX], dir_name[PATH_MAX];
 	if(strcpy(dir_name, path) == NULL) {
 		debug(D_DEBUG, "create_dir_subitems(`%s`) error: %s\n", path, strerror(errno));
 		return -1;
@@ -333,7 +330,7 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 		break;
 	}
 	int fullcopy, existance;
-	char new_path[LINE_MAX];
+	char new_path[PATH_MAX];
 	struct stat source_stat;
 	fullcopy = 0;
 	ignore_direntry = 1;
@@ -388,7 +385,7 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 			}
 		} else {
 			if(is_direntry == 0) {
-				char tmppath[LINE_MAX], dir_name[LINE_MAX];
+				char tmppath[PATH_MAX], dir_name[PATH_MAX];
 				strcpy(tmppath, path);
 				strcpy(dir_name, dirname(tmppath));
 				line_process(dir_name, "metadatacopy", 1, 0);
@@ -451,7 +448,7 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 			}
 		}
 	} else if(S_ISLNK(source_stat.st_mode)) {
-		char buf[LINE_MAX], linked_path[LINE_MAX], pathcopy[LINE_MAX], dir_name[LINE_MAX], newbuf[LINE_MAX];
+		char buf[PATH_MAX], linked_path[PATH_MAX], pathcopy[PATH_MAX], dir_name[PATH_MAX], newbuf[PATH_MAX];
 		int len;
 		/* first use `readlink` to obtain the target of the symlink. */
 		if ((len = readlink(path, buf, sizeof(buf)-1)) != -1) {
@@ -484,7 +481,7 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 
 		/* ensure the directory of the symlink has been created in the target package. */
 		if(is_direntry == 0) {
-			char new_dir[LINE_MAX];
+			char new_dir[PATH_MAX];
 			strcpy(new_dir, packagepath);
 			strcat(new_dir, dir_name);
 			if(access(new_dir, F_OK) == -1) {
@@ -514,16 +511,16 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 
 /* copy the environment variable file into the package; create common-mountlist file. */
 int post_process( ) {
-	char new_envlist[LINE_MAX], common_mountlist[LINE_MAX], size_cmd[LINE_MAX], cmd_rv[100];
+	char new_envlist[PATH_MAX], common_mountlist[PATH_MAX], size_cmd[PATH_MAX], cmd_rv[100];
 	FILE *file, *cmd_fp;
 
-	snprintf(new_envlist, LINE_MAX, "%s/%s", packagepath, "env_list");
+	snprintf(new_envlist, PATH_MAX, "%s/%s", packagepath, "env_list");
 	if(copy_file_to_file(envlist, new_envlist) == -1) {
 		debug(D_DEBUG, "copy_file_to_file(`%s`) fails.\n", envlist);
 		return -1;
 	}
 
-	snprintf(common_mountlist, LINE_MAX, "%s/%s", packagepath, "common-mountlist");
+	snprintf(common_mountlist, PATH_MAX, "%s/%s", packagepath, "common-mountlist");
 	file = fopen(common_mountlist, "w");
 	if(!file) {
 		debug(D_DEBUG, "common-mountlist file `%s` can not be opened.\n", common_mountlist);
@@ -542,7 +539,7 @@ int post_process( ) {
 	fclose(file);
 
 	fprintf(stdout, "Package Path: %s\nPackage Size: ", packagepath);
-	snprintf(size_cmd, LINE_MAX, "du -hs %s", packagepath);
+	snprintf(size_cmd, PATH_MAX, "du -hs %s", packagepath);
 
 	cmd_fp = popen(size_cmd, "r");
 	if(cmd_fp == NULL) {
@@ -566,7 +563,7 @@ int main(int argc, char *argv[])
 {
 	int c, fd, count, path_len;
 	FILE *namelist_file;
-	char line[LINE_MAX], path[LINE_MAX], *caller;
+	char line[PATH_MAX], path[PATH_MAX], *caller;
 
 	signal(SIGCHLD, wait_for_children);
 
@@ -625,7 +622,7 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 	count = 0;
-	while(fgets(line, LINE_MAX, namelist_file) != NULL) {
+	while(fgets(line, PATH_MAX, namelist_file) != NULL) {
 		count++;
 		char *s;
 		if((s = strchr(line, '|')) != NULL) {
