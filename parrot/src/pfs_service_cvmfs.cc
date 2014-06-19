@@ -120,6 +120,10 @@ public:
 	bool use_local_filesystem; // always use locally mounted cvmfs filesystem
 	bool cvmfs_not_configured; // only local access is possible
 
+#if LIBCVMFS_VERSION > 1
+	cvmfs_context *cvmfs_ctx;
+#endif
+
 	cvmfs_filesystem *createMatch(char const *repo_name) const;
 };
 
@@ -403,6 +407,9 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 	f->subst_offset = 0;
 	f->host = repo_name;
 	f->path = path;
+#if LIBCVMFS_VERSION > 1
+	f->cvmfs_ctx = NULL;
+#endif
 
 	char *proxy = getenv("HTTP_PROXY");
 	if( !proxy || !proxy[0] || !strcmp(proxy,"DIRECT") ) {
