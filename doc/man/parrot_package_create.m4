@@ -37,9 +37,13 @@ PARA
 Step 1: Run your program under CODE(parrot_run) and using BOLD(--name-list) and BOLD(--env-list) parameters to
 record the filename list and environment variables.
 LONGCODE_BEGIN
-% parrot_run --name-list namelist --env-list envlist...
+% parrot_run --name-list namelist --env-list envlist /bin/bash
 LONGCODE_END
-At the end of step 1, one file named BOLD(namelist) containing all the accessed file names and one file named BOLD(envlist) containing environment variables will be generated.
+After the execution of this command, you can run your program inside CODE(parrot_run). At the end of step 1, one file named BOLD(namelist) containing all the accessed file names and one file named BOLD(envlist) containing environment variables will be generated.
+After everything is done, exit CODE(parrot_run):
+LONGCODE_BEGIN
+% exit
+LONGCODE_END
 PARA
 Step 2: Using CODE(parrot_package_create) to generate a package.
 LONGCODE_BEGIN

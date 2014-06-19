@@ -1,14 +1,14 @@
 include(manual.h)dnl
-HEADER(parrot_package_run)dnl
+HEADER(chroot_package_run)dnl
 
 SECTION(NAME)
-BOLD(parrot_package_run) - repeat a program with the package with the help of CODE(parrot_run)
+BOLD(chroot_package_run) - repeat a program with the package with the help of CODE(chroot)
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_package_run [options]))
+CODE(BOLD(chroot_package_run [options]))
 
 SECTION(DESCRIPTION)
-If CODE(parrot_run) is used to repeat one experiment, one mountlist must be created so that the file access request of your program can be redirected into the package. CODE(parrot_package_run) is used to create the mountlist.
+If CODE(chroot) is used to help repeat one experiment, common directories like BODE(/proc), BOLD(/dev), BOLD(/net), BOLD(/sys), BOLD(/var), BOLD(/misc) and BOLD(/selinux) will be remounted into the package if they exists on your local filesystem. After you finish all your test within CODE(chroot_package_run), these remounted directories will be unmounted.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
@@ -23,14 +23,14 @@ On success, returns zero. On failure, returns non-zero.
 SECTION(EXAMPLES)
 To repeat one program within one package BOLD(/tmp/package) in a BOLD(bash) shell:
 LONGCODE_BEGIN
-% parrot_package_run --package-path /tmp/package --shell-type bash
+% chroot_package_run --package-path /tmp/package --shell-type bash
 LONGCODE_END
-After the execution of this command, one shell will be returned, where you can repeat your original program. After everything is done, exit CODE(parrot_package_run):
+After the execution of this command, one shell will be returned, where you can repeat your original program. After everything is done, exit CODE(chroot_package_run):
 LONGCODE_BEGIN
 % exit
 LONGCODE_END
 
-Here is a short instruction about how to make use of CODE(parrot_run), CODE(parrot_package_create) and CODE(parrot_package_run)
+Here is a short instruction about how to make use of CODE(parrot_run), CODE(parrot_package_create) and CODE(chroot_package_run)
 to generate one package for your experiment and repeat your experiment within your package.
 PARA
 Step 1: Run your program under CODE(parrot_run) and using BOLD(--name-list) and BOLD(--env-list) parameters to
@@ -51,9 +51,9 @@ LONGCODE_END
 At the end of step 2, one package with the path of BOLD(/tmp/package) will be generated.
 Step 3: Repeat your program within your package.
 LONGCODE_BEGIN
-% parrot_package_run --package-path /tmp/package --shell-type bash ...
+% chroot_package_run --package-path /tmp/package --shell-type bash ...
 LONGCODE_END
-After the execution of this command, one shell will be returned, where you can repeat your original program (Please replace BOLD(--shell-type) parameter with the shell type you actually used). After everything is done, exit CODE(parrot_package_run):
+After the execution of this command, one shell will be returned, where you can repeat your original program (Please replace BOLD(--shell-type) parameter with the shell type you actually used). After everything is done, exit CODE(chroot_package_run):
 LONGCODE_BEGIN
 % exit
 LONGCODE_END
