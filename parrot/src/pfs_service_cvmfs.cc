@@ -8,6 +8,10 @@ See the file COPYING for details.
 #include "pfs_service.h"
 #include "libcvmfs.h"
 
+#ifndef LIBCVMFS_VERSION
+	#define LIBCVMFS_VERSION 1
+#endif
+
 extern "C" {
 #include "buffer.h"
 #include "debug.h"
