@@ -75,14 +75,16 @@ do
 	name_len=${#variable_name}
 	name_len=`expr $name_len + 1`
 	variable_value=${line:name_len}
-	export $variable_name=$variable_value
+	export "$variable_name"="$variable_value"
 	IFS=""
 done < env_list
 
 unset PARROT_ENABLED
 
 # This allows DNS lookups via your system's networking
-mkdir etc
+if [ ! -e etc ]; then
+	mkdir etc
+fi
 cp -L /etc/resolv.conf etc/
 
 common_mountlist=$package_path/common-mountlist
@@ -103,4 +105,5 @@ do
 	tmp_fs=`echo $item|cut -d' ' -f1`
 	virtual_fs=$package_path/$tmp_fs
 	umount $virtual_fs 1>/dev/null 2>/dev/null
+	rmdir $virtual_fs
 done <$common_mountlist
