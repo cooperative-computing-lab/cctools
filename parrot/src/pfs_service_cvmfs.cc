@@ -131,6 +131,61 @@ typedef std::list<cvmfs_filesystem*> CvmfsFilesystemList;
 CvmfsFilesystemList cvmfs_filesystem_list;
 
 
+int compat_cvmfs_open(const char *path) {
+	assert (cvmfs_active_filesystem != NULL);
+#if LIBCVMFS_VERSION == 1
+	return cvmfs_open(path);
+#else
+	return cvmfs_open(cvmfs_active_filesystem->cvmfs_ctx, path);
+#endif
+}
+
+int compat_cvmfs_close(int fd) {
+	assert (cvmfs_active_filesystem != NULL);
+#if LIBCVMFS_VERSION == 1
+	return cvmfs_close(fd);
+#else
+	return cvmfs_close(cvmfs_active_filesystem->cvmfs_ctx, fd);
+#endif
+}
+
+int compat_cvmfs_readlink(const char *path, char *buf, size_t size) {
+	assert (cvmfs_active_filesystem != NULL);
+#if LIBCVMFS_VERSION == 1
+	return cvmfs_readlink(path, buf, size);
+#else
+	return cvmfs_readlink(cvmfs_active_filesystem->cvmfs_ctx, path, buf, size);
+#endif
+}
+
+int compat_cvmfs_stat(const char *path, struct stat *st) {
+	assert (cvmfs_active_filesystem != NULL);
+#if LIBCVMFS_VERSION == 1
+	return cvmfs_stat(path, st);
+#else
+	return cvmfs_stat(cvmfs_active_filesystem->cvmfs_ctx, path, st);
+#endif
+}
+
+int compat_cvmfs_lstat(const char *path, struct stat *st) {
+	assert (cvmfs_active_filesystem != NULL);
+#if LIBCVMFS_VERSION == 1
+	return cvmfs_lstat(path, st);
+#else
+	return cvmfs_lstat(cvmfs_active_filesystem->cvmfs_ctx, path, st);
+#endif
+}
+
+int compat_cvmfs_listdir(const char *path,char ***buf,size_t *buflen) {
+	assert (cvmfs_active_filesystem != NULL);
+#if LIBCVMFS_VERSION == 1
+	return cvmfs_listdir(path, buf, buflen);
+#else
+	return cvmfs_listdir(cvmfs_active_filesystem->cvmfs_ctx, path, buf, buflen);
+#endif
+}
+
+
 /*
 A cvmfs_dirent contains information about a node
 in the file tree.
