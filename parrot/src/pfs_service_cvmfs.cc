@@ -325,6 +325,13 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 	}
 #endif
 
+#if LIBCVMFS_VERSION > 1
+	if (f->cvmfs_ctx != NULL) {
+		debug(D_CVMFS,"re-activating repository %s",f->host.c_str());
+		cvmfs_active_filesystem = f;
+		return true;
+	}
+#endif
 	debug(D_CVMFS,"activating repository %s",f->host.c_str());
 
 	// check for references to the built-in cern.ch.pub key
@@ -390,12 +397,21 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 		}
 	}
 
+#if LIBCVMFS_VERSION == 1
 	debug(D_CVMFS, "cvmfs_init(%s)", f->cvmfs_options.c_str());
 	int rc = cvmfs_init(f->cvmfs_options.c_str());
 
 	if(rc != 0) {
 		return false;
 	}
+#else
+	debug(D_CVMFS, "cvmfs_attach_repo(%s)", f->cvmfs_options.c_str());
+	f->cvmfs_ctx = cvmfs_attach_repo(f->cvmfs_options.c_str());
+	if (f->cvmfs_ctx == NULL) {
+		return false;
+	}
+#endif
+
 	cvmfs_active_filesystem = f;
 
 	return true;
