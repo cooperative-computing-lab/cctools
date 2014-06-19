@@ -982,10 +982,10 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_leaf_symlinks, bool expan
 	int rc;
 	if( follow_leaf_symlinks ) {
 		debug(D_CVMFS,"stat(%s)",path->rest);
-		rc = cvmfs_stat(path->rest, &st);
+		rc = compat_cvmfs_stat(path->rest, &st);
 	} else {
 		debug(D_CVMFS,"lstat(%s)",path->rest);
-		rc = cvmfs_lstat(path->rest, &st);
+		rc = compat_cvmfs_lstat(path->rest, &st);
 	}
 
 	if(rc != 0) {
@@ -1023,7 +1023,7 @@ class pfs_file_cvmfs:public pfs_file {
 	}
 
 	virtual int close() {
-		return cvmfs_close(fd);
+		return compat_cvmfs_close(fd);
 	}
 
 	virtual pfs_ssize_t read(void *d, pfs_size_t length, pfs_off_t offset) {
@@ -1095,7 +1095,7 @@ class pfs_service_cvmfs:public pfs_service {
 		}
 
 		debug(D_CVMFS,"open(%s)",name->rest);
-		int fd = cvmfs_open(name->rest);
+		int fd = compat_cvmfs_open(name->rest);
 
 		if(fd<0) return 0;
 
@@ -1152,7 +1152,7 @@ class pfs_service_cvmfs:public pfs_service {
 		size_t buflen = 0;
 
 		debug(D_CVMFS, "getdir(%s)", name->rest);
-		int rc = cvmfs_listdir(name->rest, &buf, &buflen);
+		int rc = compat_cvmfs_listdir(name->rest, &buf, &buflen);
 
 		if(rc<0) return 0;
 
@@ -1311,7 +1311,7 @@ class pfs_service_cvmfs:public pfs_service {
 
 		if(S_ISLNK(d.mode)) {
 			debug(D_CVMFS, "readlink(%s)", name->rest);
-			int rc = cvmfs_readlink(name->rest, buf, bufsiz);
+			int rc = compat_cvmfs_readlink(name->rest, buf, bufsiz);
 
 			if(rc < 0) return rc;
 
