@@ -325,78 +325,78 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 	}
 #endif
 
-		debug(D_CVMFS,"activating repository %s",f->host.c_str());
+	debug(D_CVMFS,"activating repository %s",f->host.c_str());
 
-		// check for references to the built-in cern.ch.pub key
-		char const *cern_key_pos = strstr(f->cvmfs_options.c_str(),CERN_KEY_PLACEHOLDER);
-		if( cern_key_pos ) {
-			if( !write_cern_key() ) {
-				debug(D_CVMFS|D_NOTICE,
-					  "ERROR: cannot load cvmfs repository %s, because failed to write cern.ch.pub",
-					  f->host.c_str());
-				return false;
-			}
-
-			f->cvmfs_options.replace(cern_key_pos-f->cvmfs_options.c_str(),strlen(CERN_KEY_PLACEHOLDER),cern_key_fname);
-		}
-
-		// check for references to the built-in opensciencegrid.org.pub key
-		char const *oasis_key_pos = strstr(f->cvmfs_options.c_str(),OASIS_KEY_PLACEHOLDER);
-		if( oasis_key_pos ) {
-			if( !write_oasis_key() ) {
-				debug(D_CVMFS|D_NOTICE,
-					  "ERROR: cannot load cvmfs repository %s, because failed to write opensciencegrid.org.pub",
-					  f->host.c_str());
-				return false;
-			}
-
-			f->cvmfs_options.replace(oasis_key_pos-f->cvmfs_options.c_str(),strlen(OASIS_KEY_PLACEHOLDER),oasis_key_fname);
-		}
-
-		// check for references to the built-in cern_it1.ch.pub key
-		char const *cern_it1_key_pos = strstr(f->cvmfs_options.c_str(),CERN_IT1_KEY_PLACEHOLDER);
-		if( cern_it1_key_pos ) {
-			if( !write_cern_it1_key() ) {
-				debug(D_CVMFS|D_NOTICE,
-					  "ERROR: cannot load cvmfs repository %s, because failed to write cern_it1.ch.pub",
-					  f->host.c_str());
-				return false;
-			}
-
-			f->cvmfs_options.replace(cern_it1_key_pos-f->cvmfs_options.c_str(),strlen(CERN_IT1_KEY_PLACEHOLDER),cern_it1_key_fname);
-		}
-
-		cvmfs_set_log_fn(cvmfs_parrot_logger);
-
-		// Internally, cvmfs will attempt to lock this file,
-		// and then block silently if it cannot run.  Since
-		// we are linked against cvmfs anyhow, we use the same
-		// routine to check here explicitly.  There is still
-		// a race condition here, but now the user has a good
-		// chance of getting a useful error message before
-		// cvmfs_init blocks.
-
-		char lockfile[PFS_PATH_MAX];
-		sprintf(lockfile,"%s/cvmfs/%s/lock.%s",pfs_temp_dir,f->host.c_str(),f->host.c_str());
-		debug(D_CVMFS,"checking lock file %s",lockfile);
-		int fd = open(lockfile,O_RDONLY|O_CREAT,0600);
-		if(fd>=0) {
-			int result = flock(fd,LOCK_EX|LOCK_NB);
-
-			close(fd);
-
-			if(result<0) {
-				debug(D_NOTICE|D_CVMFS,"waiting for another process to release cvmfs lock %s",lockfile);
-			}
-		}
-
-		debug(D_CVMFS, "cvmfs_init(%s)", f->cvmfs_options.c_str());
-		int rc = cvmfs_init(f->cvmfs_options.c_str());
-
-		if(rc != 0) {
+	// check for references to the built-in cern.ch.pub key
+	char const *cern_key_pos = strstr(f->cvmfs_options.c_str(),CERN_KEY_PLACEHOLDER);
+	if( cern_key_pos ) {
+		if( !write_cern_key() ) {
+			debug(D_CVMFS|D_NOTICE,
+				  "ERROR: cannot load cvmfs repository %s, because failed to write cern.ch.pub",
+				  f->host.c_str());
 			return false;
 		}
-		cvmfs_active_filesystem = f;
+
+		f->cvmfs_options.replace(cern_key_pos-f->cvmfs_options.c_str(),strlen(CERN_KEY_PLACEHOLDER),cern_key_fname);
+	}
+
+	// check for references to the built-in opensciencegrid.org.pub key
+	char const *oasis_key_pos = strstr(f->cvmfs_options.c_str(),OASIS_KEY_PLACEHOLDER);
+	if( oasis_key_pos ) {
+		if( !write_oasis_key() ) {
+			debug(D_CVMFS|D_NOTICE,
+				  "ERROR: cannot load cvmfs repository %s, because failed to write opensciencegrid.org.pub",
+				  f->host.c_str());
+			return false;
+		}
+
+		f->cvmfs_options.replace(oasis_key_pos-f->cvmfs_options.c_str(),strlen(OASIS_KEY_PLACEHOLDER),oasis_key_fname);
+	}
+
+	// check for references to the built-in cern_it1.ch.pub key
+	char const *cern_it1_key_pos = strstr(f->cvmfs_options.c_str(),CERN_IT1_KEY_PLACEHOLDER);
+	if( cern_it1_key_pos ) {
+		if( !write_cern_it1_key() ) {
+			debug(D_CVMFS|D_NOTICE,
+				  "ERROR: cannot load cvmfs repository %s, because failed to write cern_it1.ch.pub",
+				  f->host.c_str());
+			return false;
+		}
+
+		f->cvmfs_options.replace(cern_it1_key_pos-f->cvmfs_options.c_str(),strlen(CERN_IT1_KEY_PLACEHOLDER),cern_it1_key_fname);
+	}
+
+	cvmfs_set_log_fn(cvmfs_parrot_logger);
+
+	// Internally, cvmfs will attempt to lock this file,
+	// and then block silently if it cannot run.  Since
+	// we are linked against cvmfs anyhow, we use the same
+	// routine to check here explicitly.  There is still
+	// a race condition here, but now the user has a good
+	// chance of getting a useful error message before
+	// cvmfs_init blocks.
+
+	char lockfile[PFS_PATH_MAX];
+	sprintf(lockfile,"%s/cvmfs/%s/lock.%s",pfs_temp_dir,f->host.c_str(),f->host.c_str());
+	debug(D_CVMFS,"checking lock file %s",lockfile);
+	int fd = open(lockfile,O_RDONLY|O_CREAT,0600);
+	if(fd>=0) {
+		int result = flock(fd,LOCK_EX|LOCK_NB);
+
+		close(fd);
+
+		if(result<0) {
+			debug(D_NOTICE|D_CVMFS,"waiting for another process to release cvmfs lock %s",lockfile);
+		}
+	}
+
+	debug(D_CVMFS, "cvmfs_init(%s)", f->cvmfs_options.c_str());
+	int rc = cvmfs_init(f->cvmfs_options.c_str());
+
+	if(rc != 0) {
+		return false;
+	}
+	cvmfs_active_filesystem = f;
 
 	return true;
 }
