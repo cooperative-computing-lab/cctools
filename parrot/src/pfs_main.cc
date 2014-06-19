@@ -715,13 +715,13 @@ int main( int argc, char *argv[] )
 				return 1;
 			}
 			char cmd[PFS_PATH_MAX];
-			if(snprintf(cmd, "find /lib*/ -name ld-linux*>>%s", optarg) >= 0)
+			if(snprintf(cmd, PFS_PATH_MAX, "find /lib*/ -name ld-linux*>>%s", optarg) >= 0)
 				system(cmd);
 			else {
 				debug(D_DEBUG, "writing ld-linux* into namelist file failed.");
 				return 1;
 			}
-			if(snprintf(cmd, "find /bin/ -name '*'>>%s", optarg) >= 0) {
+			if(snprintf(cmd, PFS_PATH_MAX, "find /bin/ -name '*'>>%s", optarg) >= 0)
 				system(cmd);
 			else {
 				debug(D_DEBUG, "writing /bin/* into namelist file failed.");

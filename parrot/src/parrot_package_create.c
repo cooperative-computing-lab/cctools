@@ -516,13 +516,13 @@ int post_process( ) {
 	char new_envlist[LINE_MAX], common_mountlist[LINE_MAX], size_cmd[LINE_MAX], cmd_rv[100];
 	FILE *file, *cmd_fp;
 
-	sprintf(new_envlist, "%s/%s", packagepath, "env_list");
+	snprintf(new_envlist, LINE_MAX, "%s/%s", packagepath, "env_list");
 	if(copy_file_to_file(envlist, new_envlist) == -1) {
 		debug(D_DEBUG, "copy_file_to_file(`%s`) fails.\n", envlist);
 		return -1;
 	}
 
-	sprintf(common_mountlist, "%s/%s", packagepath, "common-mountlist");
+	snprintf(common_mountlist, LINE_MAX, "%s/%s", packagepath, "common-mountlist");
 	file = fopen(common_mountlist, "w");
 	if(!file) {
 		debug(D_DEBUG, "common-mountlist file `%s` can not be opened.\n", common_mountlist);
@@ -541,7 +541,7 @@ int post_process( ) {
 	fclose(file);
 
 	fprintf(stdout, "Package Path: %s\nPackage Size: ", packagepath);
-	sprintf(size_cmd, "du -hs %s", packagepath);
+	snprintf(size_cmd, LINE_MAX, "du -hs %s", packagepath);
 
 	cmd_fp = popen(size_cmd, "r");
 	if(cmd_fp == NULL) {
