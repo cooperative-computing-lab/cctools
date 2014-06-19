@@ -26,23 +26,21 @@ See the file COPYING for details.
 
 int submit_tasks(struct work_queue *q, int input_size, int run_time, int output_size, int count )
 {
-	static int series=0;
-	char input_file[128], output_file[128], command[256];
+	static int ntasks=0;
+	char output_file[128];
+	char command[256];
 	char gen_input_cmd[256];
 
-	series++;
-
-	sprintf(input_file,"input.%d",series);
-	sprintf(gen_input_cmd, "dd if=/dev/zero of=%s bs=1M count=%d",input_file,input_size);
+	sprintf(gen_input_cmd, "dd if=/dev/zero of=input.0 bs=1M count=%d",input_size);
 	system(gen_input_cmd);
 
 	int i;
 	for(i=0;i<count;i++) {
-		sprintf(output_file, "output.%d.%d", series, i);
+		sprintf(output_file, "output.%d",ntasks++);
 		sprintf(command, "dd if=/dev/zero of=outfile bs=1M count=%d; sleep %d", output_size, run_time );
 
 		struct work_queue_task *t = work_queue_task_create(command);
-		work_queue_task_specify_file(t, input_file, "infile", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+		work_queue_task_specify_file(t, "input.0", "infile", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 		work_queue_task_specify_file(t, output_file, "outfile", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 		work_queue_task_specify_cores(t,1);
 		work_queue_submit(q, t);
@@ -60,75 +58,8 @@ void wait_for_all_tasks( struct work_queue *q )
 	}
 }
 
-void show_help()
+void work_queue_mainloop( const char *q )
 {
-	printf("Usage: work_queue_test [options]\n");
-	printf("Where options are:\n");
-     	printf("-Z <file>  Write listening port to this file.\n");
-	printf("-p <port>  Listen on this port.\n");
-	printf("-M <name>  Advertise this project name.\n");
-	printf("-d <flag>  Enable debugging for this subsystem.\n");
-	printf("-o <file>  Send debugging output to this file.\n");
-	printf("-v         Show version information.\n");
-	printf("-h         Show this help screen.\n");
-}
-
-int main(int argc, char *argv[])
-{
-	int port = WORK_QUEUE_DEFAULT_PORT;
-	const char *port_file=0;
-	const char *project_name=0;
-	char c;
-
-	while((c = getopt(argc, argv, "d:o:M:N:p:Z:vh"))!=-1) {
-		switch (c) {
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'o':
-			debug_config_file(optarg);
-			break;
-		case 'p':
-			port = atoi(optarg);
-			break;
-		case 'M':
-		case 'N':
-			project_name = optarg;
-			break;
-		case 'Z':
-			port_file = xxstrdup(optarg);
-			port = 0;
-			break;
-		case 'v':
-			cctools_version_print(stdout, argv[0]);
-			return 0;
-			break;
-		case 'h':			
-			show_help(argv[0]);
-			return 0;
-		default:
-			show_help(argv[0]);
-			return 1;
-		}
-	}
-		       
-
-	struct work_queue *q = work_queue_create(port);
-	if(!q) fatal("couldn't listen on any port!");
-
-	printf("listening on port %d...\n", work_queue_port(q));
-
-	if(port_file) {
-		FILE *file = fopen(port_file,"w");
-		if(!file) fatal("couldn't open %s: %s",port_file,strerror(errno));
-		fprintf(file,"%d\n",work_queue_port(q));
-		fclose(file);
-	}
-
-	if(project_name) {
-		work_queue_specify_name(q,project_name);
-	}
-
 	char line[1024];
 
 	int sleep_time, run_time, input_size, output_size, count;
