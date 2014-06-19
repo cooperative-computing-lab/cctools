@@ -721,12 +721,6 @@ int main( int argc, char *argv[] )
 				debug(D_DEBUG, "writing ld-linux* into namelist file failed.");
 				return 1;
 			}
-			if(snprintf(cmd, PFS_PATH_MAX, "find /bin/ -name '*'>>%s", optarg) >= 0)
-				system(cmd);
-			else {
-				debug(D_DEBUG, "writing /bin/* into namelist file failed.");
-				return 1;
-			}
 			break;
 		case 'N':
 			pfs_false_uname = optarg;
