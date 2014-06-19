@@ -1,0 +1,106 @@
+#!/bin/sh
+#This script can help repeat one program within a package.
+package_path=""
+mountlist=""
+show_help()
+{
+	echo "Usage: chroot_package_run --package-path path-of-package --shell-type type-of-shell"
+	echo "Example: chroot_package_run --package-path /tmp/pack --shell-type bash"
+	echo ''
+	echo "Options:"
+	echo "-p, --package-path         The path of the package."
+	echo "-s, --shell-type           The type of shell used to do the experiment. (e.g., bash, tcsh, csh, zsh)"
+	echo "-h, --help                 Show this help message."
+
+	exit 1
+}
+
+while [ $# -gt 0 ]
+do
+	case $1 in
+		-p | --package-path)
+			shift
+			package_path=$1
+			;;
+		-s | --shell-type)
+			shift
+			shell_type=$1
+			;;
+		-h | --help)
+			show_help
+			;;
+		*)
+			break
+			;;
+	esac
+	shift
+done
+
+if [ -z $package_path ]; then
+	echo "Please indicate package-path!"
+	exit 1
+fi
+
+if [ -z $shell_type ]; then
+	echo "Please indicate shell-type!"
+	exit 1
+fi
+
+if [ ! -d $package_path ]; then
+	echo "Please ensure directory " $package_path " exists!"
+	exit 1
+fi
+
+if [ ! -x /bin/$shell_type ]; then
+	echo "Please ensure shell /bin/"$shell_type " exists and is executable!"
+	exit 1
+fi
+
+user=`whoami`
+if [ ! "$user" = "root" ]; then
+	echo "chroot_package_run needs the root account!!"
+	exit 1
+fi
+
+package_path=`readlink -f $package_path`
+cd $package_path
+
+#import environment varibales
+IFS=''
+while read line
+do
+	IFS="="     # Set the field separator
+	set $line      # Breaks the string into $1, $2, ...
+	variable_name=$1
+	name_len=${#variable_name}
+	name_len=`expr $name_len + 1`
+	variable_value=${line:name_len}
+	export $variable_name=$variable_value
+	IFS=""
+done < env_list
+
+unset PARROT_ENABLED
+
+# This allows DNS lookups via your system's networking
+mkdir etc
+cp -L /etc/resolv.conf etc/
+
+common_mountlist=$package_path/common-mountlist
+while read item
+do
+	tmp_fs=`echo $item|cut -d' ' -f1`
+	virtual_fs=./$tmp_fs
+	mkdir -p $virtual_fs 1>/dev/null 2>/dev/null
+	mount --bind $tmp_fs $virtual_fs 1>/dev/null 2>/dev/null
+done <$common_mountlist
+
+chroot . /bin/$shell_type
+
+#umount chroot dirs
+
+while read item
+do
+	tmp_fs=`echo $item|cut -d' ' -f1`
+	virtual_fs=$package_path/$tmp_fs
+	umount $virtual_fs 1>/dev/null 2>/dev/null
+done <$common_mountlist
