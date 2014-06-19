@@ -292,38 +292,38 @@ static bool write_cern_it1_key()
 
 static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 {
-	static int did_warning = 0;
+	if(cvmfs_active_filesystem == f) {
+		return true;
+	}
 
-	if(cvmfs_active_filesystem != f) {
+	if(cvmfs_active_filesystem != NULL && !pfs_cvmfs_repo_switching) {
+		debug(D_CVMFS|D_NOTICE,
+			  "ERROR: using multiple CVMFS repositories in a single parrot session "
+			  "is not allowed.  Define PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES "
+			  "to enable experimental support, which could result in parrot crashing "
+			  "or performing poorly.");
+		return false;
+	}
 
-		if(cvmfs_active_filesystem != NULL) {
-
-			if(!did_warning) {
-
-				did_warning = 1;
-
-				if(!pfs_cvmfs_repo_switching) {
-					debug(D_CVMFS|D_NOTICE,
-						  "ERROR: using multiple CVMFS repositories in a single parrot session "
-						  "is not allowed.  Define PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES "
-						  "to enable experimental support, which could result in parrot crashing "
-						  "or performing poorly.");
-					return false;
-				} else {
-					debug(D_CVMFS,
-						  "ERROR: using multiple CVMFS repositories in a single parrot session "
-						  "is not fully supported.  PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES "
-						  "has been defined, so switching now from %s to %s.  "
-						  "Parrot may crash or perform poorly!",
-						  cvmfs_active_filesystem->host.c_str(),
-						  f->host.c_str());
-				}
-			}
-
-			debug(D_CVMFS, "cvmfs_fini()");
-			cvmfs_fini();
-			cvmfs_active_filesystem = NULL;
+#if LIBCVMFS_VERSION == 1
+	if(cvmfs_active_filesystem != NULL) {
+		static bool did_warning = false;
+		if (!did_warning) {
+			did_warning = true;
+			debug(D_CVMFS,
+				  "ERROR: using multiple CVMFS repositories in a single parrot session "
+				  "is not fully supported.  PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES "
+				  "has been defined, so switching now from %s to %s.  "
+				  "Parrot may crash or perform poorly!",
+				  cvmfs_active_filesystem->host.c_str(),
+				  f->host.c_str());
 		}
+
+		debug(D_CVMFS, "cvmfs_fini()");
+		cvmfs_fini();
+		cvmfs_active_filesystem = NULL;
+	}
+#endif
 
 		debug(D_CVMFS,"activating repository %s",f->host.c_str());
 
@@ -397,7 +397,7 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 			return false;
 		}
 		cvmfs_active_filesystem = f;
-	}
+
 	return true;
 }
 
