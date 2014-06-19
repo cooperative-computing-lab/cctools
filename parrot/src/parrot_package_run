@@ -79,7 +79,7 @@ do
 	name_len=${#variable_name}
 	name_len=`expr $name_len + 1`
 	variable_value=${line:name_len}
-	export $variable_name=$variable_value
+	export "$variable_name"="$variable_value"
 	IFS=""
 done < env_list
 
