@@ -368,8 +368,12 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 				debug(D_DEBUG, "stat(%s) fails: %s\n", new_path, strerror(errno));
 				return -1;
 			}
-			/* Here is the tricky point: we use `truncate` system call to change the size of one empty file (`st_size`), but its `st_blocks` is still 0. */
-			if(target_stat.st_blocks) {
+			/*
+			Firstly we tried to use use `truncate` system call to change the size of one empty file (`st_size`) and use `st_blocks` to check whether a file
+			is really empty. In normal linux filesystem, the `st_blocks` of one empty file is always 0 even if its size is set to non-zero by truncate.
+			However, we give up truncate finally. Because using truncate system call on an empty file on afs results in the `st_blocks` becomes non-zero.
+			*/
+			if(target_stat.st_size) {
 				debug(D_DEBUG, "`%s`: fullcopy exist! pass!\n", path);
 			} else {
 				if(remove(new_path) == -1) {
@@ -401,10 +405,6 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 				int fd = open(new_path, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR);
 				if (fd == -1) {
 					debug(D_DEBUG, "open(`%s`) fails: %s\n", new_path, strerror(errno));
-					return -1;
-				}
-				if(ftruncate(fd, source_stat.st_size) == -1) {
-					debug(D_DEBUG, "truncate(`%s`) fails: %s\n", new_path, strerror(errno));
 					return -1;
 				}
 				close(fd);
