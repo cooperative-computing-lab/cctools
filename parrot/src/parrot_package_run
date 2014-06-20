@@ -69,6 +69,13 @@ echo "/ $package_path" >> $mountlist
 echo "$package_path $package_path" >> $mountlist
 cat $package_path/common-mountlist >> $mountlist
 
+cmd_parrot_run=`which parrot_run`
+
+if [ -z $cmd_parrot_run ]; then
+	echo "Can't find parrot_run! Please add the path of parrot_run into environment varaible  PATH!"
+	exit 1
+fi
+
 #import environment varibales
 IFS=''
 while read line
@@ -86,4 +93,4 @@ done < env_list
 unset PARROT_ENABLED
 
 #initialize the repeat process
-exec parrot_run -m $mountlist /bin/$shell_type
+exec $cmd_parrot_run -m $mountlist /bin/$shell_type
