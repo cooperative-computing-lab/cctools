@@ -85,6 +85,26 @@ cmd_rm=`which rm`
 cmd_umount=`which umount`
 cmd_rmdir=`which rmdir`
 
+if [ -z $cmd_chroot ]; then
+	echo "Can't not find chroot! Please add the path of chroot into PATH environment variables!"
+	exit 1
+fi
+
+if [ -z $cmd_rm ]; then
+	echo "Can't not find rm! Please add the path of rm into PATH environment variables!"
+	exit 1
+fi
+
+if [ -z $cmd_umount ]; then
+	echo "Can't not find umount! Please add the path of umount into PATH environment variables!"
+	exit 1
+fi
+
+if [ -z $cmd_rmdir ]; then
+	echo "Can't not find rmdir! Please add the path of rmdir into PATH environment variables!"
+	exit 1
+fi
+
 #import environment varibales
 IFS=''
 while read line
