@@ -534,10 +534,6 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 			&f->subst_offset,
 			user_options);
 #else
-	if (pfs_cvmfs_enable_alien) {
-		debug(D_CVMFS|D_NOTICE, "Note: --cvmfs-alien-cache is ignored! Use --cvmfs-config instead.");
-	}
-
 	char *buf = string_format("repo_name=%n%s,timeout=%d,timeout_direct=%d%s%s,%n%s",
 			&repo_name_offset,
 			repo_name,
