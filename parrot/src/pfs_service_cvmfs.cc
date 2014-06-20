@@ -38,6 +38,7 @@ extern "C" {
 extern int pfs_master_timeout;
 extern char pfs_temp_dir[];
 extern const char * pfs_cvmfs_repo_arg;
+extern const char * pfs_cvmfs_config_arg;
 extern bool pfs_cvmfs_repo_switching;
 extern char pfs_cvmfs_alien_cache_dir[];
 extern char pfs_cvmfs_locks_dir[];
@@ -57,6 +58,10 @@ static const char *default_cvmfs_repo =
  *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/* \
 \
  *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/*";
+
+#if LIBCVMFS_VERSION > 1
+static const char *default_cvmfs_global_config = "cache_directory=/tmp/libcvmfs-defaultcache,max_open_files=500,change_to_cache_directory,log_prefix=libcvmfs";
+#endif
 
 static bool wrote_cern_key;
 static std::string cern_key_fname;
@@ -496,9 +501,9 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 		user_options = "";
 	}
 
-	int repo_name_offset = 0;
-	int repo_name_in_cachedir_offset = 0;
-	int repo_name_in_alien_cachedir_offset = 0;
+	int repo_name_offset                   = -1;
+	int repo_name_in_cachedir_offset       = -1;
+	int repo_name_in_alien_cachedir_offset = -1;
 
 	int enable_alien_on_this_repository = pfs_cvmfs_enable_alien;
 	if(enable_alien_on_this_repository && strstr(user_options,"quota_limit=")) {
@@ -506,6 +511,7 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 		enable_alien_on_this_repository = false;
 	}
 
+#if LIBCVMFS_VERSION == 1
 	char *buf = string_format("repo_name=%n%s,cachedir=%s/cvmfs/%n%s,%s%s%s%n%s%stimeout=%d,timeout_direct=%d%s%s,%n%s",
 			&repo_name_offset,
 			repo_name,
@@ -527,6 +533,22 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 			proxy ? proxy : "",
 			&f->subst_offset,
 			user_options);
+#else
+	if (pfs_cvmfs_enable_alien) {
+		debug(D_CVMFS|D_NOTICE, "Note: --cvmfs-alien-cache is ignored! Use --cvmfs-config instead.");
+	}
+
+	char *buf = string_format("repo_name=%n%s,timeout=%d,timeout_direct=%d%s%s,%n%s",
+			&repo_name_offset,
+			repo_name,
+
+			pfs_master_timeout,
+			pfs_master_timeout,
+			proxy ? ",proxies=" : "",
+			proxy ? proxy : "",
+			&f->subst_offset,
+			user_options);
+#endif
 
 	f->use_local_filesystem = false;
 	f->try_local_filesystem = false;
@@ -551,12 +573,15 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 		// make a note to fix up the repo name later
 		// Order of the following is important! Substitute in reverse order as
 		// they appear in buf.
-		if(enable_alien_on_this_repository)
-		{
+		if(repo_name_in_alien_cachedir_offset >= 0) {
 			f->wildcard_subst.push_back(repo_name_in_alien_cachedir_offset - f->subst_offset);
 		}
-		f->wildcard_subst.push_back(repo_name_in_cachedir_offset - f->subst_offset);
-		f->wildcard_subst.push_back(repo_name_offset - f->subst_offset);
+		if(repo_name_in_cachedir_offset >= 0) {
+			f->wildcard_subst.push_back(repo_name_in_cachedir_offset - f->subst_offset);
+		}
+		if(repo_name_offset >= 0){
+			f->wildcard_subst.push_back(repo_name_offset - f->subst_offset);
+		}
 	}
 	return f;
 }
@@ -610,7 +635,10 @@ cvmfs_filesystem *cvmfs_filesystem::createMatch(char const *repo_name) const
  */
 static void cvmfs_read_config()
 {
+	assert (!cvmfs_configured);
 	std::string cvmfs_options_buf;
+
+	debug(D_CVMFS, "Using libcvmfs version: %d", LIBCVMFS_VERSION);
 
 	char *allow_switching = getenv("PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES");
 	if( allow_switching && strcmp(allow_switching,"0")!=0) {
@@ -627,6 +655,28 @@ static void cvmfs_read_config()
 		debug(D_CVMFS, "setenv CERNVM_UUID=`%s'", buffer_tostring(&B, NULL));
 		buffer_free(&B);
 	}
+
+#if LIBCVMFS_VERSION > 1
+	const char *cvmfs_global_options = pfs_cvmfs_config_arg;
+	if ( !cvmfs_global_options ) {
+		cvmfs_global_options = getenv("PARROT_CVMFS_CONFIG");
+	}
+	if ( !cvmfs_global_options ) {
+		cvmfs_global_options = default_cvmfs_global_config;
+	}
+	if ( !cvmfs_global_options || !cvmfs_global_options[0] ) {
+		debug(D_CVMFS|D_NOTICE, "No global CVMFS configuration found. To enable CVMFS access, you must configure PARROT_CVMFS_CONFIG.");
+		return;
+	}
+
+	debug(D_CVMFS|D_DEBUG, "Using CVMFS global options: %s", cvmfs_global_options);
+
+	const int init_retval = cvmfs_init(cvmfs_global_options);
+	if (init_retval != 0) {
+		debug(D_CVMFS, "ERROR: failed to initialize cvmfs (%d)", init_retval);
+		return;
+	}
+#endif
 
 	const char *cvmfs_options = pfs_cvmfs_repo_arg;
 	if( !cvmfs_options ) {
@@ -747,8 +797,8 @@ static cvmfs_filesystem *lookup_filesystem(pfs_name * name, char const **subpath
 	}
 
 	if( !cvmfs_configured ) {
-		cvmfs_configured = true;
 		cvmfs_read_config();
+		cvmfs_configured = true;
 	}
 
 	if( cvmfs_filesystem_list.empty() ) {
