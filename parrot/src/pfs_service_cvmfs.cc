@@ -6,7 +6,7 @@ See the file COPYING for details.
 #ifdef HAS_CVMFS
 
 #include "pfs_service.h"
-#include "libcvmfs.h"
+#include <libcvmfs.h>
 
 #ifndef LIBCVMFS_VERSION
 	#define LIBCVMFS_VERSION 1
