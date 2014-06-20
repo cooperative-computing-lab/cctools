@@ -23,7 +23,7 @@ const char *namelist;
 const char *packagepath;
 const char *envlist;
 
-int line_process(const char *path, char *caller, int ignore_direntry, int is_direntry);
+int line_process(const char *path, char *caller, int ignore_direntry, int is_direntry, FILE *special_file);
 
 //files from these paths will be ignored.
 const char *special_path[] = {"var", "sys", "dev", "proc", "net", "misc", "selinux"};
@@ -250,7 +250,7 @@ int is_special_path(const char *path)
 Create one subitem entry of one directory using metadatacopy.
 Currently only copy DIR REG LINK; the remaining files are ignored.
 */
-int dir_entry(const char* filename)
+int dir_entry(const char* filename, FILE *special_file)
 {
 	struct stat source_stat;
 	char new_path[PATH_MAX];
@@ -261,30 +261,29 @@ int dir_entry(const char* filename)
 	} else if(lstat(filename, &source_stat) == 0) {
 		if(S_ISDIR(source_stat.st_mode)) {
 			debug(D_DEBUG, "dir_entry: `%s`, ---dir\n", filename);
-			line_process(filename, "metadatacopy", 1, 1);
-		} else if(S_ISCHR(source_stat.st_mode)) {
-			debug(D_DEBUG, "dir_entry: `%s`, ---character, do nothing!\n", filename);
-		} else if(S_ISBLK(source_stat.st_mode)) {
-			debug(D_DEBUG, "dir_entry: `%s`, ---block, do nothing!\n", filename);
 		} else if(S_ISREG(source_stat.st_mode)) {
 			debug(D_DEBUG, "dir_entry: `%s`, ---regular file\n", filename);
-			line_process(filename, "metadatacopy", 1, 1);
-		} else if(S_ISFIFO(source_stat.st_mode)) {
-			debug(D_DEBUG, "dir_entry: `%s`, ---fifo special file, do nothing!\n", filename);
 		} else if(S_ISLNK(source_stat.st_mode)) {
-			debug(D_DEBUG, "dir_entry: `%s`, ---link file, do nothing!\n", filename);
-			line_process(filename, "metadatacopy", 1, 1);
+			debug(D_DEBUG, "dir_entry: `%s`, ---link file!\n", filename);
+		} else if(S_ISCHR(source_stat.st_mode)) {
+			debug(D_DEBUG, "dir_entry: `%s`, ---character!\n", filename);
+		} else if(S_ISBLK(source_stat.st_mode)) {
+			debug(D_DEBUG, "dir_entry: `%s`, ---block!\n", filename);
+		} else if(S_ISFIFO(source_stat.st_mode)) {
+			debug(D_DEBUG, "dir_entry: `%s`, ---fifo special file!\n", filename);
 		} else if(S_ISSOCK(source_stat.st_mode)) {
-			debug(D_DEBUG, "dir_entry: `%s`, ---socket file, do nothing!\n", filename);
+			debug(D_DEBUG, "dir_entry: `%s`, ---socket file!\n", filename);
 		}
+		line_process(filename, "metadatacopy", 1, 1, special_file);
 	} else {
 		debug(D_DEBUG, "lstat(`%s`): %s\n", filename, strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 	return 0;
 }
 
 /* Create empty subitems of one directory to maintain its structure. */
-int create_dir_subitems(const char *path, char *new_path) {
+int create_dir_subitems(const char *path, char *new_path, FILE *special_file) {
 	DIR *dir;
 	struct dirent *entry;
 	char full_entrypath[PATH_MAX], dir_name[PATH_MAX];
@@ -300,7 +299,7 @@ int create_dir_subitems(const char *path, char *new_path) {
 		{
 			strcpy(full_entrypath, dir_name);
 			strcat(full_entrypath, entry->d_name);
-			dir_entry(full_entrypath);
+			dir_entry(full_entrypath, special_file);
 		}
 		closedir(dir);
 	} else {
@@ -314,7 +313,7 @@ ignore_direntry is to tell whether the directory struture of one directory needs
 if is_direntry is 1, ignore the process to check whether its parent dir has been created in the target package, which can greatly reduce the amount of `access` syscall.
 Currently only process DIR REG LINK, all the remaining files are ignored.
 */
-int line_process(const char *path, char *caller, int ignore_direntry, int is_direntry)
+int line_process(const char *path, char *caller, int ignore_direntry, int is_direntry, FILE *special_file)
 {
 	debug(D_DEBUG, "line_process(`%s`) func\n", path);
 	int afs_item = 0;
@@ -392,7 +391,7 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 				char tmppath[PATH_MAX], dir_name[PATH_MAX];
 				strcpy(tmppath, path);
 				strcpy(dir_name, dirname(tmppath));
-				line_process(dir_name, "metadatacopy", 1, 0);
+				line_process(dir_name, "metadatacopy", 1, 0, special_file);
 			}
 			if(fullcopy) {
 				if(copy_file_to_file(path, new_path) < 0) {
@@ -437,7 +436,7 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 				debug(D_DEBUG, "mkpath(`%s`) fails.\n", new_path);
 				return -1;
 			}
-			if((ignore_direntry == 0) && (create_dir_subitems(path, new_path) == -1)) {
+			if((ignore_direntry == 0) && (create_dir_subitems(path, new_path, special_file) == -1)) {
 				debug(D_DEBUG, "create_dir_subitems(`%s`) fails.\n", path);
 				return -1;
 			}
@@ -474,9 +473,9 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 
 		/* process the target of the symlink recursively. */
 		if(fullcopy) {
-			line_process(linked_path, "fullcopy", 0, 0);
+			line_process(linked_path, "fullcopy", 0, 0, special_file);
 		} else {
-			line_process(linked_path, "metadatacopy", 1, 0);
+			line_process(linked_path, "metadatacopy", 1, 0, special_file);
 		}
 
 		/* ensure the directory of the symlink has been created in the target package. */
@@ -486,7 +485,7 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 			strcat(new_dir, dir_name);
 			if(access(new_dir, F_OK) == -1) {
 				debug(D_DEBUG, "the dir `%s` of the target of symbolink file `%s` does not exist, need to be created firstly\n", dir_name, path);
-				line_process(dir_name, "metadatacopy", 1, 0);
+				line_process(dir_name, "metadatacopy", 1, 0, special_file);
 			}
 		}
 
@@ -503,8 +502,13 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 			debug(D_DEBUG, "create symlink from `%s` to `%s`.\n", new_path, buf);
 		}
 	} else {
-		debug(D_DEBUG, "The file type is not DIR or REG or LINK, ignore it!\n");
-		return -1;
+		debug(D_DEBUG, "The file type is not DIR or REG or LINK, write this item into special file!\n");
+		char item[PATH_MAX*2];
+		snprintf(item, sizeof(item), "%s %s\n", path, path);
+		if (fputs(item, special_file) == EOF) {
+			debug(D_DEBUG, "fputs special_file fails: %s\n", strerror(errno));
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -611,6 +615,15 @@ int main(int argc, char *argv[])
 	fprintf(stdout, "The packaging process has began ...\nThe start time is: ");
 	print_time();
 
+	char special_filename[PATH_MAX];
+	FILE *special_file;
+	snprintf(special_filename, PATH_MAX, "%s%s", packagepath, "/special_files");
+	special_file = fopen(special_filename, "w");
+	if(!special_file) {
+		debug(D_DEBUG, "fopen(`%s`) failed: %s\n", special_filename, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
 	if(sort_uniq_namelist(namelist, &fd) == -1) {
 		debug(D_DEBUG, "sort_uniq_namelist func fails.\n");
 		exit(EXIT_FAILURE);
@@ -639,11 +652,11 @@ int main(int argc, char *argv[])
 		}
 		remove_final_slashes(path);
 		debug(D_DEBUG, "%d --- line: %s; path_len: %d\n", count, line, path_len);
-		if(line_process(path, caller, 0, 0) == -1)
+		if(line_process(path, caller, 0, 0, special_file) == -1)
 			debug(D_DEBUG, "line(%s) does not been processed perfectly.\n", line);
 	}
 	fclose(namelist_file);
-
+	fclose(special_file);
 	if(post_process() == -1) {
 		debug(D_DEBUG, "post_process fails.\n");
 		exit(EXIT_FAILURE);
