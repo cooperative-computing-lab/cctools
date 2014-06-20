@@ -65,6 +65,26 @@ fi
 package_path=`readlink -f $package_path`
 cd $package_path
 
+# This allows DNS lookups via your system's networking
+if [ ! -e etc ]; then
+	mkdir etc
+fi
+cp -L /etc/resolv.conf etc/
+
+common_mountlist=$package_path/common-mountlist
+while read item
+do
+	tmp_fs=`echo $item|cut -d' ' -f1`
+	virtual_fs=./$tmp_fs
+	mkdir -p $virtual_fs 1>/dev/null 2>/dev/null
+	mount --bind $tmp_fs $virtual_fs 1>/dev/null 2>/dev/null
+done <$common_mountlist
+
+cmd_chroot=`which chroot`
+cmd_rm=`which rm`
+cmd_umount=`which umount`
+cmd_rmdir=`which rmdir`
+
 #import environment varibales
 IFS=''
 while read line
@@ -81,29 +101,16 @@ done < env_list
 
 unset PARROT_ENABLED
 
-# This allows DNS lookups via your system's networking
-if [ ! -e etc ]; then
-	mkdir etc
-fi
-cp -L /etc/resolv.conf etc/
+$cmd_chroot . /bin/$shell_type
 
-common_mountlist=$package_path/common-mountlist
-while read item
-do
-	tmp_fs=`echo $item|cut -d' ' -f1`
-	virtual_fs=./$tmp_fs
-	mkdir -p $virtual_fs 1>/dev/null 2>/dev/null
-	mount --bind $tmp_fs $virtual_fs 1>/dev/null 2>/dev/null
-done <$common_mountlist
-
-chroot . /bin/$shell_type
+#post cleaning process
+$cmd_rm $package_path/etc/resolv.conf
 
 #umount chroot dirs
-
 while read item
 do
 	tmp_fs=`echo $item|cut -d' ' -f1`
 	virtual_fs=$package_path/$tmp_fs
-	umount $virtual_fs 1>/dev/null 2>/dev/null
-	rmdir $virtual_fs
+	$cmd_umount -f $virtual_fs 1>/dev/null 2>/dev/null
+	$cmd_rmdir $virtual_fs
 done <$common_mountlist
