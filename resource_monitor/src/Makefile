@@ -5,7 +5,7 @@ UNAME := $(shell uname)
 include ${CCTOOLS_HOME}/Makefile.config
 include ${CCTOOLS_HOME}/Makefile.rules
 
-TARGETS = resource_monitorv resource_monitor resource_monitor_cluster resource_monitor_histograms
+TARGETS = resource_monitorv resource_monitor resource_monitor_cluster resource_monitor_histograms piggybacker
 LIBRARIES = librmonitor_helper.so
 
 ifeq (${UNAME}, Darwin)
@@ -66,7 +66,7 @@ resource_monitor_histograms: rmon_tools.o histograms.o ${CCTOOLS_HOME}/dttools/s
 	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
 
 clean:
-	rm -f core *~ *.o *.a *.so resource_monitor_pb.* rmonitor_piggyback.h* piggybacker resource_monitor resource_monitorv
+	rm -f core *~ *.o *.a *.so $(TARGETS) $(LIBRARIES) resource_monitor_pb.* rmonitor_piggyback.h*
 
 test: all
 
