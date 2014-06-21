@@ -68,6 +68,9 @@ fi
 echo "/ $package_path" >> $mountlist
 echo "$package_path $package_path" >> $mountlist
 cat $package_path/common-mountlist >> $mountlist
+
+sort -u special_files >> special_files.bak
+mv -f special_files.bak special_files
 cat $package_path/special_files >> $mountlist
 
 cmd_parrot_run=`which parrot_run`
