@@ -105,6 +105,27 @@ if [ -z $cmd_rmdir ]; then
 	exit 1
 fi
 
+#create hardlink to special files
+while read line
+do
+	item=`echo $line|cut -d' ' -f1`
+	if [ -e $package_path/$item ]; then
+		continue
+	fi
+	filename=`basename $item`
+	filepath=${item%$filename}
+	if [ ! -e $package_path/$filepath ]; then
+		mkdir -p $package_path/$filepath
+	fi
+	cd $package_path/$filepath
+	ln $item $filename
+	if [ ! $? -eq 0 ]; then
+		echo "Creating hardlink to special file ("$item") failed."
+	fi
+done < $package_path/special_files
+
+cd $package_path
+
 #import environment varibales
 IFS=''
 while read line
@@ -134,3 +155,11 @@ do
 	$cmd_umount -f $virtual_fs 1>/dev/null 2>/dev/null
 	$cmd_rmdir $virtual_fs
 done <$common_mountlist
+
+#remove special files
+while read line
+do
+	item=`echo $line|cut -d' ' -f1`
+	unlink $package_path/$item
+done < $package_path/special_files
+
