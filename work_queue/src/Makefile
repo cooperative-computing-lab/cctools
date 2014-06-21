@@ -70,17 +70,17 @@ libwork_queue.a: ${OBJECTS}
 
 bindings: $(CCTOOLS_WORK_QUEUE_BINDINGS)
 $(CCTOOLS_WORK_QUEUE_BINDINGS): libwork_queue.a work_queue.i
-	$(MAKE) -C $@
+	@$(MAKE) -C $@
 
 CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL = $(CCTOOLS_WORK_QUEUE_BINDINGS:%=install-%)
 install-bindings: $(CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL)
 $(CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL): $(CCTOOLS_WORK_QUEUE_BINDINGS)
-	${MAKE} -C $(@:install-%=%) install
+	@${MAKE} -C $(@:install-%=%) install
 
 CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN = $(CCTOOLS_WORK_QUEUE_BINDINGS:%=clean-%)
 clean-bindings: $(CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN)
 $(CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN):
-	${MAKE} -C $(@:clean-%=%) clean
+	@${MAKE} -C $(@:clean-%=%) clean
 
 install: all install-bindings
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
