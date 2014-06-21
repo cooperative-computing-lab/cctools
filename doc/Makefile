@@ -46,3 +46,5 @@ test:
 
 clean:
 	rm -rf api $(HTMLFILES) $(MANFILES) $(ZIPFILES) *~
+
+.PHONY: all clean install test

@@ -5,18 +5,23 @@ include ${CCTOOLS_HOME}/Makefile.rules
 
 WORK_QUEUE_LDFLAGS = -lwork_queue -lchirp -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
-SOURCES =   batch_job.c  \
-	    batch_job_chirp.c  \
-	    batch_job_condor.c  \
-	    batch_job_hadoop.c  \
-	    batch_job_local.c  \
-	    batch_job_mpi_queue.c  \
-	    batch_job_cluster.c  \
-	    batch_job_work_queue.c \
-	    work_queue_catalog.c   \
-	    work_queue_resources.c \
-	    work_queue_status.c    \
-	    work_queue.c
+SOURCES = \
+	batch_job.c  \
+	batch_job_chirp.c  \
+	batch_job_condor.c  \
+	batch_job_hadoop.c  \
+	batch_job_local.c  \
+	batch_job_mpi_queue.c  \
+	batch_job_cluster.c  \
+	batch_job_work_queue.c \
+	work_queue_catalog.c   \
+	work_queue_example.c \
+	work_queue_pool.c \
+	work_queue_resources.c \
+	work_queue_status.c    \
+	work_queue_worker.c    \
+	work_queue_workload_simulator.c    \
+	work_queue.c
 
 PUBLIC_HEADERS = batch_job.h work_queue.h
 
@@ -41,7 +46,6 @@ TEST_PROGRAMS = work_queue_example work_queue_workload_simulator
 
 all: ${LIBRARIES} $(PROGRAMS) $(TEST_PROGRAMS) bindings
 
-
 work_queue_worker: work_queue_worker.o ${EXTERNALS} libwork_queue.a
 	${CCTOOLS_LD} work_queue_worker.o $(WORK_QUEUE_LDFLAGS) -o $@
 
@@ -64,23 +68,19 @@ libwork_queue.a: ${OBJECTS}
 	${CCTOOLS_AR} rv $@ $^
 	ranlib $@
 
-#phony gymnastics to stop compilation if one of the submakes fail
-CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL =  $(CCTOOLS_WORK_QUEUE_BINDINGS:%=install-%)
-CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN   =  $(CCTOOLS_WORK_QUEUE_BINDINGS:%=clean-%)
-.PHONY: ${CCTOOLS_WORK_QUEUE_BINDINGS} ${CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL} bindings install-bindings clean-bindings
+bindings: $(CCTOOLS_WORK_QUEUE_BINDINGS)
+$(CCTOOLS_WORK_QUEUE_BINDINGS): libwork_queue.a work_queue.i
+	$(MAKE) -C $@
 
-bindings: ${CCTOOLS_WORK_QUEUE_BINDINGS}
-${CCTOOLS_WORK_QUEUE_BINDINGS}: libwork_queue.a work_queue.i
-	${MAKE} -C $@ all
+CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL = $(CCTOOLS_WORK_QUEUE_BINDINGS:%=install-%)
+install-bindings: $(CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL)
+$(CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL): $(CCTOOLS_WORK_QUEUE_BINDINGS)
+	${MAKE} -C $(@:install-%=%) install
 
-install-bindings: ${CCTOOLS_WORK_QUEUE_BINDINGS}
-${CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL}: ${CCTOOLS_WORK_QUEUE_BINDINGS}
-	${MAKE} -C $@ install
-
-clean-bindings:
-${CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN}:
-	${MAKE} -C $@ clean
-
+CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN = $(CCTOOLS_WORK_QUEUE_BINDINGS:%=clean-%)
+clean-bindings: $(CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN)
+$(CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN):
+	${MAKE} -C $(@:clean-%=%) clean
 
 install: all install-bindings
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
@@ -95,9 +95,10 @@ install: all install-bindings
 	cp work_queue_example.c ${CCTOOLS_INSTALL_DIR}/doc
 	for file in ${PUBLIC_HEADERS} ; do if [ -f $$file ] ; then cp $$file ${CCTOOLS_INSTALL_DIR}/include/cctools ; fi ; done
 	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then cp /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done
-	for m in $(CCTOOLS_WORK_QUEUE_BINDINGS); do cd $$m; $(MAKE) $@; cd ..; done
 
 test:
 
 clean: clean-bindings
-	rm -fr *.o ${LIBRARIES} ${PROGRAMS} ${TEST_PROGRAMS}
+	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
+
+.PHONY: all clean install test ${CCTOOLS_WORK_QUEUE_BINDINGS} bindings ${CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL} install-bindings $(CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN) clean-bindings
