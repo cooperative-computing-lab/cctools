@@ -166,12 +166,16 @@ export IFS
 while [ $# -gt 0 ]
 do
 	case $1 in
+		--debug)
+			optdebug=1
+			optstrict=1
+			;;
 		--prefix)
 			shift
 			install_path=$1
 			;;
 		--strict)
-			ccflags="${ccflags} -Werror"
+			optstrict=1
 			;;
 		--with-globus-path)
 			shift
@@ -356,6 +360,10 @@ EOF
 	esac
 	shift
 done
+
+if [ "$optstrict" = 1 ]; then
+	ccflags="${ccflags} -Werror"
+fi
 
 IFS=" "
 export IFS
@@ -1144,30 +1152,42 @@ fi
 
 echo "Creating Makefile.config..."
 
+if [ "$optdebug" = 1 ]; then
+	CCTOOLS_CC="${ccompiler}"
+	CCTOOLS_CXX="${cxxcompiler}"
+	CCTOOLS_LD="${linker}"
+	CCTOOLS_MPI_LD="${mpilinker}"
+else
+	CCTOOLS_CC='@echo COMPILE $@;'"${ccompiler}"
+	CCTOOLS_CXX='@echo COMPILE $@;'"${cxxcompiler}"
+	CCTOOLS_LD='@echo LINK $@;'"${linker}"
+	CCTOOLS_MPI_LD='@echo MPI_LINK $@;'"${mpilinker}"
+fi
+
 cat <<EOF >>Makefile.config
 # Generated at `date` by $USER@`uname -n`
 
 CCTOOLS_INSTALL_DIR=${install_path}
 CCTOOLS_PACKAGES=${packages}
 
-CCTOOLS_CC=@echo COMPILE \$@; ${ccompiler}
+CCTOOLS_CC=${CCTOOLS_CC}
 CCTOOLS_BASE_CCFLAGS=${ccflags}
 CCTOOLS_INTERNAL_CCFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CCFLAGS}
 CCTOOLS_CCFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CCFLAGS}
 
-CCTOOLS_CXX=@echo COMPILE \$@; ${cxxcompiler}
+CCTOOLS_CXX=${CCTOOLS_CXX}
 CCTOOLS_BASE_CXXFLAGS=${ccflags}
 CCTOOLS_INTERNAL_CXXFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CXXFLAGS}
 CCTOOLS_CXXFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CXXFLAGS}
 
-CCTOOLS_LD=@echo LINK \$@; ${linker}
+CCTOOLS_LD=${CCTOOLS_LD}
 CCTOOLS_BASE_LDFLAGS=${ldflags}
 CCTOOLS_EXTERNAL_ARCHIVES=${external_archives}
 CCTOOLS_EXTERNAL_DYNLIBS=${external_dynlibs}
 CCTOOLS_INTERNAL_LDFLAGS=\$(CCTOOLS_BASE_LDFLAGS) ${internal_ldflags} \$(CCTOOLS_EXTERNAL_ARCHIVES) \$(CCTOOLS_EXTERNAL_DYNLIBS)
 CCTOOLS_LDFLAGS=-L\${CCTOOLS_INSTALL_DIR}/lib \${CCTOOLS_BASE_LDFLAGS}
 
-CCTOOLS_MPI_LD=@echo MPI_LINK \$@; ${mpilinker}
+CCTOOLS_MPI_LD=${CCTOOLS_MPI_LD}
 CCTOOLS_USE_MPI=$usempi
 
 CCTOOLS_READLINE_LDFLAGS=${cctools_readline_ldflags}
