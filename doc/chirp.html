@@ -437,18 +437,18 @@ directory, but she can create her own directory:</p>
 including edit the access control.  Here is the new ACL for
 <tt>/mydata</tt>:</p>
 
-<code> chirp:bigwig:> getacl /mydata
+<code> chirp:bigwig:&gt; getacl /mydata
 hostname:ws1.somewhere.edu rwlda
 </code>
 
 <p>If Betty wants to authenticate with Globus credentials from
 here on, she can change the access control as follows:</p>
 
-<code> chirp:bigwig:> setacl /mydata globus:/O=Univ_of_Somewhere/CN=Betty rwla</code>
+<code> chirp:bigwig:&gt; setacl /mydata globus:/O=Univ_of_Somewhere/CN=Betty rwla</code>
 
 <p>And, the new acl will look as follows:</p>
 
-<code> chirp:bigwig:> getacl /mydata
+<code> chirp:bigwig:&gt; getacl /mydata
 hostname:ws1.somewhere.edu rwlda
 globus:/O=Univ_of_Somewhere/CN=Betty rwla
 </code>
@@ -480,9 +480,9 @@ unix:bprof
 (Notice the URL syntax.)  Then, to make a directory <tt>/homework</tt> that is
 readable by students and writable by faculty, do this:</p>
 
-<code> chirp:bigwig> mkdir /homework
- chirp:bigwig> setacl /homework group:students rl
- chirp:bigwig> setacl /homework group:faculty  rwld
+<code> chirp:bigwig&gt; mkdir /homework
+ chirp:bigwig&gt; setacl /homework group:students rl
+ chirp:bigwig&gt; setacl /homework group:faculty  rwld
 </code>
 
 <p>If the groups are to be shared among many Chirp servers, place the group
