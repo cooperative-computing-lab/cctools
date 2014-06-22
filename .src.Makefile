@@ -13,7 +13,7 @@ $(CLEAN_TARGETS):
 clean: $(CLEAN_TARGETS)
 
 INSTALL_TARGETS = $(TARGETS:%=install-%)
-$(INSTALL_TARGETS): $(TARGETS)
+$(INSTALL_TARGETS):
 	@$(MAKE) -C $(@:install-%=%) install
 install: $(INSTALL_TARGETS)
 
