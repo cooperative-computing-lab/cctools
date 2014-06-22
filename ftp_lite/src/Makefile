@@ -20,6 +20,6 @@ clean:
 
 install:
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/include
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/include/cctools
 	cp libftp_lite.a ${CCTOOLS_INSTALL_DIR}/lib
-	cp ftp_lite.h ${CCTOOLS_INSTALL_DIR}/include/cctools
+	cp ftp_lite.h ${CCTOOLS_INSTALL_DIR}/include/cctools/
