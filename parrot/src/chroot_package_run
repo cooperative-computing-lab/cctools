@@ -112,7 +112,7 @@ mv -f special_files.bak special_files
 while read line
 do
 	item=`echo $line|cut -d' ' -f1`
-	if [ -e $package_path/$item ]; then
+	if [ -e $package_path/$item -o ! -e $item ]; then
 		continue
 	fi
 	filename=`basename $item`
@@ -163,6 +163,8 @@ done <$common_mountlist
 while read line
 do
 	item=`echo $line|cut -d' ' -f1`
-	unlink $package_path/$item
+	if [ -e $package_path/$item ]; then
+		unlink $package_path/$item
+	fi
 done < $package_path/special_files
 
