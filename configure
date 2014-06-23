@@ -314,6 +314,7 @@ Use: configure [options]
 Where options are:
   --help
   --prefix             <path>
+  --debug
   --strict
   --globus-flavor      <flavor>
   --xrootd-arch        <arch>
