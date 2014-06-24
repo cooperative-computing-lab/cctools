@@ -487,7 +487,7 @@ Two exceptions are made:
   between the master and the workers that it serves.
 */
 
-static timestamp_t get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int64_t length)
+static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int64_t length)
 {
 	double avg_transfer_rate; // bytes per second
 	char *data_source;
@@ -1193,6 +1193,71 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 	return 0;
 }
 
+/*
+If the master has requested that a file be watched with WORK_QUEUE_WATCH,
+the worker will periodically send back append messages indicating that
+the file has been written to.  There are a variety of ways in which the
+message could be stale (e.g. task was cancelled) so if the message does
+not line up with an expected task and file, then we discard it and keep
+going.
+*/
+
+static int process_append( struct work_queue *q, struct work_queue_worker *w, const char *line )
+{
+	int64_t taskid;
+	char path[WORK_QUEUE_LINE_MAX];
+	int64_t offset;
+	int64_t length;
+
+	int n = sscanf(line,"append %"PRId64" %s %"PRId64" %"PRId64,&taskid,path,&offset,&length);
+	if(n!=4) {
+		debug(D_WQ,"Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line );
+		return WORKER_FAILURE;
+	}
+
+	
+	struct work_queue_task *t = itable_lookup(w->current_tasks,taskid);
+	if(!t) {
+		debug(D_WQ,"worker %s (%s) sent output for unassigned task %"PRId64, w->hostname, w->addrport, taskid);
+		link_soak(w->link,length,time(0)+get_transfer_wait_time(q,w,0,length));
+		return SUCCESS;
+	}
+
+
+	time_t stoptime = time(0) + get_transfer_wait_time(q,w,t,length);
+
+	struct work_queue_file *f;
+	const char *local_name = 0;
+
+	list_first_item(t->output_files);
+	while((f=list_next_item(t->output_files))) {
+		if(!strcmp(path,f->remote_name)) {
+			local_name = f->payload;
+			break;
+		}
+	}
+
+	if(!local_name) {
+		debug(D_WQ,"worker %s (%s) sent output for unwatched file %s",w->hostname,w->addrport,path);
+		link_soak(w->link,length,stoptime);
+		return SUCCESS;
+	}	
+
+	int fd = open(local_name,O_WRONLY|O_CREAT,0777);
+	if(fd<0) {
+		debug(D_WQ,"unable to append to watched file %s: %s",local_name,strerror(errno));
+		link_soak(w->link,length,stoptime);
+		return SUCCESS;
+	}
+
+	lseek(fd,offset,SEEK_SET);
+	link_stream_to_fd(w->link,fd,length,stoptime);
+	ftruncate(fd,offset+length);
+	close(fd);
+
+	return SUCCESS;
+}
+
 /* 
 Returns 1 on success,  0 on failure to receive.
 Failure to store result is treated as success so we continue to retrieve the
@@ -1338,6 +1403,9 @@ static void process_available_results(struct work_queue *q, struct work_queue_wo
 			result = process_result(q, w, line);
 			if(result != SUCCESS) break; 
 			i++;
+		} else if(string_prefix_is(line,"append")) {
+			result = process_append(q,w,line);
+			if(result != SUCCESS) break;
 		} else if(!strcmp(line,"end")) {
 			//Only return success if last message is end.
 			break;

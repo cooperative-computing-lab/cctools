@@ -42,6 +42,7 @@ See the file COPYING for details.
 #define WORK_QUEUE_PREEXIST 4   /* If the filename already exists on the host, use it in place. */
 #define WORK_QUEUE_THIRDGET 8	/* Access the file on the client from a shared filesystem */
 #define WORK_QUEUE_THIRDPUT 8	/* Access the file on the client from a shared filesystem (included for readability) */
+#define WORK_QUEUE_WATCH 16     /* Watch the output file and send back changes as the task runs. */
 
 #define WORK_QUEUE_RESET_ALL        0  /**< When resetting, clear out all tasks and files */
 #define WORK_QUEUE_RESET_KEEP_TASKS 1  /**< When resetting, keep the current list of tasks */
