@@ -38,7 +38,6 @@ ifeq ($(CCTOOLS_USE_MPI),true)
 endif
 
 all: $(TARGETS)
-
 libwork_queue.a: $(OBJECTS)
 
 work_queue_test: work_queue_test.o work_queue_test_main.o
