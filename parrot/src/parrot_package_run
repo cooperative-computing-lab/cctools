@@ -1,0 +1,100 @@
+#!/bin/sh
+#This script can be used to create the mountlist file for executing one pacakge under Parrot.
+package_path=""
+mountlist=""
+show_help()
+{
+	echo "Usage: parrot_package_run --package-path path-of-package --shell-type type-of-shell"
+	echo "Example: parrot_package_run --package-path /tmp/pack --shell-type bash"
+	echo ''
+	echo "Options:"
+	echo "-p, --package-path         The path of the package."
+	echo "-s, --shell-type           The type of shell used to do the experiment. (e.g., bash, tcsh, csh, zsh)"
+	echo "-h, --help                 Show this help message."
+
+	exit 1
+}
+
+while [ $# -gt 0 ]
+do
+	case $1 in
+		-p | --package-path)
+			shift
+			package_path=$1
+			;;
+		-s | --shell-type)
+			shift
+			shell_type=$1
+			;;
+		-h | --help)
+			show_help
+			;;
+		*)
+			break
+			;;
+	esac
+	shift
+done
+
+if [ -z $package_path ]; then
+	echo "Please indicate package-path!"
+	exit 1
+fi
+
+if [ -z $shell_type ]; then
+	echo "Please indicate shell-type!"
+	exit 1
+fi
+
+if [ ! -d $package_path ]; then
+	echo "Please ensure directory " $package_path " exists!"
+	exit 1
+fi
+
+if [ ! -x /bin/$shell_type ]; then
+	echo "Please ensure shell /bin/"$shell_type " exists and is executable!"
+	exit 1
+fi
+
+package_path=`readlink -f $package_path`
+cd $package_path
+
+mountlist="mountlist"
+#construct mountlist
+if [ -e $mountlist ]; then
+	rm $mountlist
+fi
+
+echo "/ $package_path" >> $mountlist
+echo "$package_path $package_path" >> $mountlist
+cat $package_path/common-mountlist >> $mountlist
+
+sort -u special_files >> special_files.bak
+mv -f special_files.bak special_files
+cat $package_path/special_files >> $mountlist
+
+cmd_parrot_run=`which parrot_run`
+
+if [ -z $cmd_parrot_run ]; then
+	echo "Can't find parrot_run! Please add the path of parrot_run into environment varaible  PATH!"
+	exit 1
+fi
+
+#import environment varibales
+IFS=''
+while read line
+do
+	IFS="="     # Set the field separator
+	set $line      # Breaks the string into $1, $2, ...
+	variable_name=$1
+	name_len=${#variable_name}
+	name_len=`expr $name_len + 1`
+	variable_value=${line:name_len}
+	export "$variable_name"="$variable_value"
+	IFS=""
+done < env_list
+
+unset PARROT_ENABLED
+
+#initialize the repeat process
+exec $cmd_parrot_run -m $mountlist /bin/$shell_type
