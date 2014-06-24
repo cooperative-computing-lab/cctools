@@ -92,7 +92,7 @@ int work_queue_watch_send_changes( struct work_queue_watch *w, struct link *mast
 		if(stat(path,&info)==0) {
 			if(info.st_size>e->size) {
 				int64_t change = info.st_size - e->size;
-				debug(D_WQ,"%s increased from %"PRId64" to %"PRId64" bytes",path,e->size,info.st_size);
+				debug(D_WQ,"%s increased from %"PRId64" to %"PRId64" bytes",path,e->size,(int64_t)info.st_size);
 				int fd = open(path,O_RDONLY);
 				if(fd<0) {
 					debug(D_WQ,"unable to open %s: %s",path,strerror(errno));

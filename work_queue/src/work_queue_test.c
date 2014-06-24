@@ -58,7 +58,7 @@ void wait_for_all_tasks( struct work_queue *q )
 	}
 }
 
-void work_queue_mainloop( const char *q )
+void work_queue_mainloop( struct work_queue *q )
 {
 	char line[1024];
 
@@ -99,8 +99,6 @@ void work_queue_mainloop( const char *q )
 	}
 
 	work_queue_delete(q);
-
-	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */
