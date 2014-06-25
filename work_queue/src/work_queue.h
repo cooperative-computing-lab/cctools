@@ -194,6 +194,10 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 @param flags	May be zero to indicate no special handling or any of the following or'd together:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
+- @ref WORK_QUEUE_WATCH indicates that the worker will watch the output file as it is created
+and incrementally return the file to the master as the task runs.  (The frequency of these updates
+is entirely dependent upon the system load.  If the master is busy interacting with many workers,
+output updates will be infrequent.)
 @return 1 if the task file is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
 int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags);

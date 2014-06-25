@@ -623,6 +623,11 @@ it may not be possible to submit all of the tasks, and then wait for all of them
 submit a small number of tasks, then alternate waiting and submiting to keep a constant
 number in the queue.  <tt>work_queue_hungry</tt> will tell you if more submission are warranted.
 <p>
+<li><b>Watched Files.</b>  If you would like to see the output of a task as it is produced,
+add WORK_QUEUE_WATCH to the flags argument of <tt>work_queue_specify_file</tt>.
+This will cause the worker to periodically send output appended to that file back to the master.
+This is useful for a program that produces a log or progress bar as part of its output.
+<p>
 <li><b>Asynchronous transfer.</b> If you have tasks with a balanced or large
 computation-to-data ratio, this feature can help improve the CPU utilization and
 lower the runtime overheads incurred due to data transfer. This feature
