@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "work_queue_watch.h"
+#include "work_queue_watcher.h"
 #include "work_queue_process.h"
 #include "work_queue_internal.h"
 
@@ -21,7 +21,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <sys/stat.h>
 
-struct work_queue_watch {
+struct work_queue_watcher {
 	struct list *watchlist;
 };
 
@@ -40,14 +40,14 @@ static void entry_delete( struct entry *e )
 	free(e);
 }
 
-struct work_queue_watch * work_queue_watch_create()
+struct work_queue_watcher * work_queue_watcher_create()
 {
-	struct work_queue_watch *w = malloc(sizeof(*w));
+	struct work_queue_watcher *w = malloc(sizeof(*w));
 	w->watchlist = list_create();
 	return w;
 }
 
-void work_queue_watch_delete( struct work_queue_watch *w )
+void work_queue_watcher_delete( struct work_queue_watcher *w )
 {
 	struct entry *e;
 
@@ -59,7 +59,7 @@ void work_queue_watch_delete( struct work_queue_watch *w )
 	free(w);
 }
 
-void work_queue_watch_add_process( struct work_queue_watch *w, struct work_queue_process *p )
+void work_queue_watcher_add_process( struct work_queue_watcher *w, struct work_queue_process *p )
 {
 	struct work_queue_file *f;
 
@@ -80,7 +80,7 @@ void work_queue_watch_add_process( struct work_queue_watch *w, struct work_queue
 	}
 }
 
-void work_queue_watch_remove_process( struct work_queue_watch *w, struct work_queue_process *p )
+void work_queue_watcher_remove_process( struct work_queue_watcher *w, struct work_queue_process *p )
 {
 	struct entry *e;
 	int size = list_size(w->watchlist);
@@ -98,7 +98,7 @@ void work_queue_watch_remove_process( struct work_queue_watch *w, struct work_qu
 }
 
 
-int work_queue_watch_check( struct work_queue_watch *w )
+int work_queue_watcher_check( struct work_queue_watcher *w )
 {
 	struct entry *e;
 
@@ -117,7 +117,7 @@ int work_queue_watch_check( struct work_queue_watch *w )
 	return 0;
 }
 
-int work_queue_watch_send_changes( struct work_queue_watch *w, struct link *master, time_t stoptime )
+int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *master, time_t stoptime )
 {
 	struct entry *e;
 
