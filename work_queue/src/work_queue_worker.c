@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "work_queue_resources.h"
 #include "work_queue_process.h"
 #include "work_queue_catalog.h"
+#include "work_queue_watch.h"
 
 #include "cctools.h"
 #include "macros.h"
@@ -113,6 +114,8 @@ static char *os_name = NULL;
 static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
 static time_t worker_start_time = 0;
+
+static struct work_queue_watch * watcher = 0;
 
 static struct work_queue_resources * local_resources = 0;
 static struct work_queue_resources * aggregated_resources = 0;
@@ -479,8 +482,8 @@ static void * itable_pop(struct itable *t )
 }
 
 /*
-For every process in the procs_complete table,
-remove it, and send the results to the master.
+For every unreported complete task and watched file,
+send the results to the master.
 */
 
 static void report_tasks_complete( struct link *master )
@@ -490,6 +493,8 @@ static void report_tasks_complete( struct link *master )
 	while((p=itable_pop(procs_complete))) {
 		report_task_complete(master,p);
 	}
+
+	work_queue_watch_send_changes(watcher,master,time(0)+active_timeout);
 
 	send_master_message(master, "end\n");
 
@@ -781,6 +786,9 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		normalize_resources(p);
 		list_push_tail(procs_waiting,p);
 	}
+
+	work_queue_watch_add_process(watcher,p);
+
 	return 1;
 }
 
@@ -1041,6 +1049,8 @@ static int do_kill(int taskid)
 	itable_remove(procs_complete, p->task->taskid);
 	list_remove(procs_waiting,p);
 
+	work_queue_watch_remove_process(watcher,p);
+
 	work_queue_process_delete(p);
 
 	return 1;
@@ -1287,10 +1297,11 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
-		if(!results_to_be_sent_msg && itable_size(procs_complete) > 0)
-		{
-			send_master_message(master, "available_results\n");
-			results_to_be_sent_msg = 1;
+		if(!results_to_be_sent_msg) {
+			if(work_queue_watch_check(watcher) || itable_size(procs_complete) > 0) {
+				send_master_message(master, "available_results\n");
+				results_to_be_sent_msg = 1;
+			}
 		}
 
 		ok &= check_disk_space_for_filesize(0);
@@ -1571,6 +1582,8 @@ static void workspace_cleanup()
 	if(procs_table)        itable_delete(procs_table);
 	if(procs_complete)     itable_delete(procs_complete);
 	if(procs_waiting)      list_delete(procs_waiting);
+
+	if(watcher)            work_queue_watch_delete(watcher);
 
 	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
 	delete_dir(workspace);
@@ -1911,6 +1924,8 @@ int main(int argc, char *argv[])
 	procs_table    = itable_create(0);
 	procs_waiting  = list_create();
 	procs_complete = itable_create(0);
+
+	watcher = work_queue_watch_create();
 
 	if(!check_disk_space_for_filesize(0)) {
 		fprintf(stderr,"work_queue_worker: %s has less than minimum disk space %"PRIu64" MB\n",workspace,disk_avail_threshold);

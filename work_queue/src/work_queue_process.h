@@ -1,10 +1,12 @@
 #ifndef WORK_QUEUE_PROCESS_H
 #define WORK_QUEUE_PROCESS_H
 
+#include "work_queue.h"
+#include "timestamp.h"
+
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/resource.h>
-#include "timestamp.h"
 
 /*
 work_queue_process is a running instance of a work_queue_task.

@@ -5,10 +5,13 @@ See the file COPYING for details.
 */
 
 #include "work_queue_watch.h"
+#include "work_queue_process.h"
+#include "work_queue_internal.h"
 
-#include "hash_table.h"
+#include "list.h"
 #include "debug.h"
 #include "link.h"
+#include "stringtools.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -19,60 +22,91 @@ See the file COPYING for details.
 #include <sys/stat.h>
 
 struct work_queue_watch {
-	struct hash_table *table;
+	struct list *watchlist;
 };
 
 struct entry {
+	int64_t taskid;
+	char *physical_path;
+	char *logical_path;
 	time_t last_checked;
 	int64_t size;
 };
 
+static void entry_delete( struct entry *e )
+{
+	free(e->physical_path);
+	free(e->physical_path);
+	free(e);
+}
+
 struct work_queue_watch * work_queue_watch_create()
 {
 	struct work_queue_watch *w = malloc(sizeof(*w));
-	w->table = hash_table_create(0,0);
+	w->watchlist = list_create();
 	return w;
 }
 
 void work_queue_watch_delete( struct work_queue_watch *w )
 {
-	char *path;
 	struct entry *e;
 
-	hash_table_firstkey(w->table);
-	while(hash_table_nextkey(w->table,&path,(void**)&e)) {
-		e = hash_table_remove(w->table,path);
-		free(e);
-		hash_table_firstkey(w->table);
+	list_first_item(w->watchlist);
+	while((e=list_pop_head(w->watchlist))) {
+		entry_delete(e);
 	}
-	hash_table_delete(w->table);
+	list_delete(w->watchlist);
 	free(w);
 }
 
-
-void work_queue_watch_add_file( struct work_queue_watch *w, const char *path )
+void work_queue_watch_add_process( struct work_queue_watch *w, struct work_queue_process *p )
 {
-	struct entry *e = malloc(sizeof(*e));
-	memset(e,0,sizeof(*e));
-	hash_table_insert(w->table,path,e);
+	struct work_queue_file *f;
+
+	list_first_item(p->task->output_files);
+	while((f=list_next_item(p->task->output_files))) {
+		if(f->flags & WORK_QUEUE_WATCH) {
+			// XXX wrap up this object
+
+			struct entry *e = malloc(sizeof(*e));
+			e->taskid = p->task->taskid;
+			e->physical_path = string_format("%s/%s",p->sandbox,f->remote_name);
+			e->logical_path = strdup(f->remote_name);
+			e->last_checked = 0;
+			e->size = 0;
+
+			list_push_tail(w->watchlist,e);
+		}
+	}
 }
 
-void work_queue_watch_remove_file( struct work_queue_watch *w, const char *path )
+void work_queue_watch_remove_process( struct work_queue_watch *w, struct work_queue_process *p )
 {
-	struct entry *e = hash_table_remove(w->table,path);
-	if(e) free(e);
+	struct entry *e;
+	int size = list_size(w->watchlist);
+	int i;
+
+	for(i=0;i<size;i++) {
+		e = list_pop_head(w->watchlist);
+		if(e->taskid == p->task->taskid) {
+			entry_delete(e);
+		} else {
+			list_push_tail(w->watchlist,e);
+		}
+	}
+
 }
+
 
 int work_queue_watch_check( struct work_queue_watch *w )
 {
-	char *path;
 	struct entry *e;
 
-	hash_table_firstkey(w->table);
-	while(hash_table_nextkey(w->table,&path,(void**)&e)) {
+	list_first_item(w->watchlist);
+	while((e=list_next_item(w->watchlist))) {
 		struct stat info;
-		if(stat(path,&info)==0) {
-			if(info.st_size > e->size) {
+		if(stat(e->physical_path,&info)==0) {
+			if(info.st_size != e->size) {
 				return 1;
 			}
 		}
@@ -83,27 +117,35 @@ int work_queue_watch_check( struct work_queue_watch *w )
 
 int work_queue_watch_send_changes( struct work_queue_watch *w, struct link *master, time_t stoptime )
 {
-	char *path;
 	struct entry *e;
 
-	hash_table_firstkey(w->table);
-	while(hash_table_nextkey(w->table,&path,(void**)&e)) {
+	list_first_item(w->watchlist);
+	while((e=list_next_item(w->watchlist))) {
 		struct stat info;
-		if(stat(path,&info)==0) {
-			if(info.st_size>e->size) {
-				int64_t change = info.st_size - e->size;
-				debug(D_WQ,"%s increased from %"PRId64" to %"PRId64" bytes",path,e->size,(int64_t)info.st_size);
-				int fd = open(path,O_RDONLY);
+		if(stat(e->physical_path,&info)==0) {
+			if(info.st_size!=e->size) {
+				int64_t offset, length;
+				if(info.st_size>e->size) {
+					offset = e->size;
+					length = info.st_size - e->size;
+					debug(D_WQ,"%s increased from %"PRId64" to %"PRId64" bytes",e->physical_path,offset,offset+length);
+				} else {
+					offset = 0;
+					length = info.st_size;
+					debug(D_WQ,"%s truncated to %"PRId64" bytes",e->physical_path,length);
+				}
+
+				int fd = open(e->physical_path,O_RDONLY);
 				if(fd<0) {
-					debug(D_WQ,"unable to open %s: %s",path,strerror(errno));
+					debug(D_WQ,"unable to open %s: %s",e->physical_path,strerror(errno));
 					continue;
 				}
 
-				lseek(fd,e->size,SEEK_SET);
-				link_putfstring(master,"update %s %"PRId64" %"PRId64"\n",stoptime,path,e->size,change);
-				int actual = link_stream_from_fd(master,fd,change,stoptime);
+				lseek(fd,offset,SEEK_SET);
+				link_putfstring(master,"update %"PRId64" %s %"PRId64" %"PRId64"\n",stoptime,e->taskid,e->logical_path,offset,length);
+				int actual = link_stream_from_fd(master,fd,length,stoptime);
 				close(fd);
-				if(actual!=change) return 0;
+				if(actual!=length) return 0;
 			}
 
 		}
