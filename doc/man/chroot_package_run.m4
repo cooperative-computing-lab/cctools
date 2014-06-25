@@ -49,6 +49,7 @@ LONGCODE_BEGIN
 % parrot_package_create --name-list namelist --env-path envlist --package-path /tmp/package
 LONGCODE_END
 At the end of step 2, one package with the path of BOLD(/tmp/package) will be generated.
+PARA
 Step 3: Repeat your program within your package.
 LONGCODE_BEGIN
 % chroot_package_run --package-path /tmp/package --shell-type bash ...
