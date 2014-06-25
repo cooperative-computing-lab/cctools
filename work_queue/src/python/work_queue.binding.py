@@ -180,6 +180,7 @@ class Task(_object):
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
     # @param recursive      Indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
+    # @param cache          Legacy parameter for setting file caching attribute.  By default this is enabled.
     # @return 1 if the task directory is successfully specified, 0 if either of @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
     def specify_directory(self, local_name, remote_name=None, type=None, flags=None, recursive=0, cache=True):
         if remote_name is None:

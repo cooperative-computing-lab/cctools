@@ -173,7 +173,7 @@ struct work_queue_task *work_queue_task_create(const char *full_command);
 
 /** Create a copy of a task
 Create a functionally identical copy of a @ref work_queue_task that
-can be re-submitted to the @ref work_queue.
+can be re-submitted via @ref work_queue_submit.
 @return A new task object
 */
 struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task);
