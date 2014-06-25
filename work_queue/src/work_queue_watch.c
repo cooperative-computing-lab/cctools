@@ -102,6 +102,8 @@ int work_queue_watch_check( struct work_queue_watch *w )
 {
 	struct entry *e;
 
+	debug(D_WQ,"checking for changed files...");
+
 	list_first_item(w->watchlist);
 	while((e=list_next_item(w->watchlist))) {
 		struct stat info;
@@ -146,6 +148,7 @@ int work_queue_watch_send_changes( struct work_queue_watch *w, struct link *mast
 				int actual = link_stream_from_fd(master,fd,length,stoptime);
 				close(fd);
 				if(actual!=length) return 0;
+				e->size = info.st_size;
 			}
 
 		}
