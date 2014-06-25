@@ -546,14 +546,13 @@ static int handle_tasks(struct link *master)
 			while((f = list_next_item(p->task->output_files))) {
 
 				char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
-				char *cache_name = string_format("cache/%s",f->payload);
 
-				if(rename(sandbox_name,cache_name)!=0) {
-					debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,cache_name,strerror(errno));
+				debug(D_WQ,"moving output file from %s to %s",sandbox_name,f->payload);
+				if(rename(sandbox_name,f->payload)!=0) {
+					debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
 				}
 
 				free(sandbox_name);
-				free(cache_name);
 			}
 
 			itable_insert(procs_complete, p->task->taskid, p);
