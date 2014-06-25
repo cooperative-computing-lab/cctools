@@ -29,7 +29,6 @@ struct entry {
 	int64_t taskid;
 	char *physical_path;
 	char *logical_path;
-	time_t last_checked;
 	int64_t size;
 };
 
@@ -38,6 +37,16 @@ static void entry_delete( struct entry *e )
 	free(e->physical_path);
 	free(e->physical_path);
 	free(e);
+}
+
+static struct entry * entry_create( int64_t taskid, char *physical_path, char *logical_path )
+{
+	struct entry *e = malloc(sizeof(*e));
+	e->taskid = taskid;
+	e->physical_path = physical_path;
+	e->logical_path = logical_path;
+	e->size = 0;
+	return e;
 }
 
 struct work_queue_watcher * work_queue_watcher_create()
@@ -66,14 +75,13 @@ void work_queue_watcher_add_process( struct work_queue_watcher *w, struct work_q
 	list_first_item(p->task->output_files);
 	while((f=list_next_item(p->task->output_files))) {
 		if(f->flags & WORK_QUEUE_WATCH) {
-			// XXX wrap up this object
 
-			struct entry *e = malloc(sizeof(*e));
-			e->taskid = p->task->taskid;
-			e->physical_path = string_format("%s/%s",p->sandbox,f->remote_name);
-			e->logical_path = strdup(f->remote_name);
-			e->last_checked = 0;
-			e->size = 0;
+			struct entry *e;
+			e = entry_create(
+				p->task->taskid,
+				string_format("%s/%s",p->sandbox,f->remote_name),
+				strdup(f->remote_name)
+			);
 
 			list_push_tail(w->watchlist,e);
 		}
