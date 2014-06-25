@@ -133,8 +133,15 @@ mpicompiler=mpicc
 
 ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-deprecated-declarations"
 
-if [ ${build_sys} != CYGWIN ]
+# Cygwin has some compiler oddities.
+# 1 - Sloppy definitions of the ctype.h functions cause spurious warnings
+# about char -> int conversions.
+# 2 - All code is PIC by default, and adding the flag causes more warnings.
+
+if [ ${build_sys} = CYGWIN ]
 then
+	ccflags="${ccflags} -Wno-char-subscripts"
+else
 	ccflags="${ccflags} -fPIC"
 fi
 
