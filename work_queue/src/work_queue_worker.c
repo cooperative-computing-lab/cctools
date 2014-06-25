@@ -1124,6 +1124,8 @@ static void disconnect_master(struct link *master) {
 
 	if(released_by_master) {
 		released_by_master = 0;
+	} else if(abort_flag) {
+		// Bail out quickly
 	} else {
 		sleep(5);
 	}
