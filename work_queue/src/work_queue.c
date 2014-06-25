@@ -1195,21 +1195,21 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 
 /*
 If the master has requested that a file be watched with WORK_QUEUE_WATCH,
-the worker will periodically send back append messages indicating that
+the worker will periodically send back update messages indicating that
 the file has been written to.  There are a variety of ways in which the
 message could be stale (e.g. task was cancelled) so if the message does
 not line up with an expected task and file, then we discard it and keep
 going.
 */
 
-static int process_append( struct work_queue *q, struct work_queue_worker *w, const char *line )
+static int process_update( struct work_queue *q, struct work_queue_worker *w, const char *line )
 {
 	int64_t taskid;
 	char path[WORK_QUEUE_LINE_MAX];
 	int64_t offset;
 	int64_t length;
 
-	int n = sscanf(line,"append %"PRId64" %s %"PRId64" %"PRId64,&taskid,path,&offset,&length);
+	int n = sscanf(line,"update %"PRId64" %s %"PRId64" %"PRId64,&taskid,path,&offset,&length);
 	if(n!=4) {
 		debug(D_WQ,"Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line );
 		return WORKER_FAILURE;
@@ -1245,7 +1245,7 @@ static int process_append( struct work_queue *q, struct work_queue_worker *w, co
 
 	int fd = open(local_name,O_WRONLY|O_CREAT,0777);
 	if(fd<0) {
-		debug(D_WQ,"unable to append to watched file %s: %s",local_name,strerror(errno));
+		debug(D_WQ,"unable to update watched file %s: %s",local_name,strerror(errno));
 		link_soak(w->link,length,stoptime);
 		return SUCCESS;
 	}
@@ -1403,8 +1403,8 @@ static void process_available_results(struct work_queue *q, struct work_queue_wo
 			result = process_result(q, w, line);
 			if(result != SUCCESS) break; 
 			i++;
-		} else if(string_prefix_is(line,"append")) {
-			result = process_append(q,w,line);
+		} else if(string_prefix_is(line,"update")) {
+			result = process_update(q,w,line);
 			if(result != SUCCESS) break;
 		} else if(!strcmp(line,"end")) {
 			//Only return success if last message is end.
