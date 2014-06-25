@@ -538,14 +538,22 @@ static int handle_tasks(struct link *master)
 
 			itable_remove(procs_running, p->pid);
 			itable_firstkey(procs_running);
-			
-			// Link the output files into the cache directory as needed.
+
+			// Output files must be moved back into the cache directory.
+
 			struct work_queue_file *f;
 			list_first_item(p->task->output_files);
 			while((f = list_next_item(p->task->output_files))) {
-				if(!link_file_in_workspace(f->payload, f->remote_name, p->sandbox, 0)) {
-					debug(D_NOTICE, "task %d did not create file %s as expected",p->task->taskid,f->remote_name);
+
+				char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
+				char *cache_name = string_format("cache/%s",f->payload);
+
+				if(rename(sandbox_name,cache_name)!=0) {
+					debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,cache_name,strerror(errno));
 				}
+
+				free(sandbox_name);
+				free(cache_name);
 			}
 
 			itable_insert(procs_complete, p->task->taskid, p);
