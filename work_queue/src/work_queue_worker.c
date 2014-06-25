@@ -1778,7 +1778,7 @@ static void work_for_master(struct link *master) {
 			msec = 1000;
 		}
 
-		int master_activity = link_usleep_mask(master, msec, &mask, 1, 0);
+		int master_activity = link_usleep_mask(master, msec*1000, &mask, 1, 0);
 
 		if(master_activity < 0) {
 			abort_flag = 1;
