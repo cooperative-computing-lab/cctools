@@ -42,7 +42,7 @@ struct entry {
 static void entry_delete( struct entry *e )
 {
 	free(e->physical_path);
-	free(e->physical_path);
+	free(e->logical_path);
 	free(e);
 }
 
