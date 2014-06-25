@@ -21,6 +21,13 @@ See the file COPYING for details.
 #include <string.h>
 #include <sys/stat.h>
 
+/*
+The watcher keeps a linked list of files that must be watched.
+For each one, it tracks the path and size (obviously) but also
+the taskid and logical path, so that it can send back enough
+info for the master to match the updates up with the right file.
+*/
+
 struct work_queue_watcher {
 	struct list *watchlist;
 };
@@ -68,6 +75,13 @@ void work_queue_watcher_delete( struct work_queue_watcher *w )
 	free(w);
 }
 
+/*
+For each watched file in this process, add an entry to the watcher list.
+If the process has no watched files, then nothing is kept.
+Note that the path of the watched file is relative to the sandbox
+directory chosen for the running process.
+*/
+
 void work_queue_watcher_add_process( struct work_queue_watcher *w, struct work_queue_process *p )
 {
 	struct work_queue_file *f;
@@ -88,6 +102,10 @@ void work_queue_watcher_add_process( struct work_queue_watcher *w, struct work_q
 	}
 }
 
+/*
+Remove any watched files associated with the given process.
+*/
+
 void work_queue_watcher_remove_process( struct work_queue_watcher *w, struct work_queue_process *p )
 {
 	struct entry *e;
@@ -105,18 +123,25 @@ void work_queue_watcher_remove_process( struct work_queue_watcher *w, struct wor
 
 }
 
+/*
+Check to see if any watched files have changed since the last look.
+If any one file has changed, it is not necessary to look for any more,
+since the files will be rescanned in work_queue_watcher_send_results.
+Also, note that the debug message does not specify the specific file;
+we don't want the user to be thrown off by missing messages about
+files not examined.
+*/
 
 int work_queue_watcher_check( struct work_queue_watcher *w )
 {
 	struct entry *e;
-
-	debug(D_WQ,"checking for changed files...");
 
 	list_first_item(w->watchlist);
 	while((e=list_next_item(w->watchlist))) {
 		struct stat info;
 		if(stat(e->physical_path,&info)==0) {
 			if(info.st_size != e->size) {
+				debug(D_WQ,"watched files have changed");
 				return 1;
 			}
 		}
@@ -124,6 +149,15 @@ int work_queue_watcher_check( struct work_queue_watcher *w )
 
 	return 0;
 }
+
+/*
+Scan over all watched files, and send back any changes since the last check.
+We assume that files generally change by appending, however if the file has
+shrunk since the last measurement, we send the whole file.
+If the file is not accessible or there is some other problem,
+don't take any drastic action, because it does not (necessarily)
+indicate a task failure.
+*/
 
 int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *master, time_t stoptime )
 {
