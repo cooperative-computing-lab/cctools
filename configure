@@ -359,7 +359,7 @@ And SYSTEM may be:
     catalog_history
     doc
 EOF
-			exit 1
+			exit 0
 			;;
 		*)
 			echo "Unknown argument $1"
