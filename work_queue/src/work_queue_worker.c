@@ -118,8 +118,8 @@ static time_t worker_start_time = 0;
 static struct work_queue_watcher * watcher = 0;
 
 static struct work_queue_resources * local_resources = 0;
-static struct work_queue_resources * aggregated_resources = 0;
-static struct work_queue_resources * aggregated_resources_last = 0;
+static struct work_queue_resources * total_resources = 0;
+static struct work_queue_resources * total_resources_last = 0;
 static int64_t last_task_received  = -1;
 static int64_t manual_cores_option = 1;
 static int64_t manual_disk_option = 0;
@@ -131,7 +131,7 @@ static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
 
-static int send_resources_interval = 120;
+static int send_resources_interval = 5;
 
 static struct work_queue *foreman_q = NULL;
 
@@ -195,7 +195,8 @@ void reset_idle_timer()
 }
 
 /*
-Measure only the resources associated with this particular node.
+Measure only the resources associated with this particular node
+and apply any operations that override.
 */
 
 void resources_measure_locally(struct work_queue_resources *r)
@@ -225,64 +226,41 @@ void resources_measure_locally(struct work_queue_resources *r)
 }
 
 /*
-Measure the resources assocated with this node;
-if a foreman, also add the sum of my workers.
-*/
-
-
-void resources_measure_all(struct work_queue_resources *local, struct work_queue_resources *aggr)
-{
-	resources_measure_locally(local);
-
-	if(worker_mode == WORKER_MODE_FOREMAN)
-	{
-		aggregate_workers_resources(foreman_q, aggregated_resources);
-		aggregated_resources->disk.total = local->disk.total;
-		aggregated_resources->disk.inuse = local->disk.inuse; 
-
-	}
-	else
-	{
-		memcpy(aggr, local, sizeof(struct work_queue_resources));
-	}
-}
-
-/*
-Send a message to the master with my current resources.
+Send a message to the master with my current resources, if they have changed.
 Don't send a message more than every send_resources_interval seconds.
+Only a foreman needs to send regular updates after the initial ready message.
 */
 
 static void send_resource_update( struct link *master, int force_update )
 {
-	static time_t last_stop_time = 0;
+	static time_t last_send_time = 0;
 
 	time_t stoptime = time(0) + active_timeout;
 
-	if(!force_update && (stoptime - last_stop_time < send_resources_interval))
-		return;
-
-	resources_measure_all(local_resources, aggregated_resources);
-
-	/* send updates only if resources changed, and if the master may not ask
-	 * about results (to avoid deadlocks) */
-	if(!force_update && (stoptime - last_stop_time < send_resources_interval))
-	{
-		return;
+	if(!force_update) {
+		if( results_to_be_sent_msg ) return;
+		if( (time(0)-last_send_time) < send_resources_interval ) return;
 	}
 
-	int normal_update = 0;
-	if(!results_to_be_sent_msg && memcmp(aggregated_resources_last,aggregated_resources,sizeof(struct work_queue_resources)))
-	{
-		normal_update = 1;
+        if(worker_mode == WORKER_MODE_FOREMAN) {
+                aggregate_workers_resources(foreman_q, total_resources);
+                total_resources->disk.total = local_resources->disk.total;
+                total_resources->disk.inuse = local_resources->disk.inuse;
+	} else {
+                memcpy(total_resources, local_resources, sizeof(struct work_queue_resources));
+        }
+
+
+	if(!force_update) {
+		if( !memcmp(total_resources_last,total_resources,sizeof(struct work_queue_resources))) return;
 	}
 
-	aggregated_resources->tag = last_task_received;
+	total_resources->tag = last_task_received;
 
-	if(force_update || normal_update) {
-		work_queue_resources_send(master,aggregated_resources,stoptime);
-		memcpy(aggregated_resources_last,aggregated_resources,sizeof(*aggregated_resources));
-		last_stop_time = stoptime;
-	}
+	work_queue_resources_send(master,total_resources,stoptime);
+
+	memcpy(total_resources_last,total_resources,sizeof(*total_resources));
+	last_send_time = time(0);
 }
 
 /*
@@ -1916,8 +1894,8 @@ int main(int argc, char *argv[])
 	}
 
 	local_resources = work_queue_resources_create();
-	aggregated_resources = work_queue_resources_create();
-	aggregated_resources_last = work_queue_resources_create();
+	total_resources = work_queue_resources_create();
+	total_resources_last = work_queue_resources_create();
 
 	resources_measure_locally(local_resources);
 
