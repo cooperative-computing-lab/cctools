@@ -109,7 +109,7 @@ static int worker_mode = WORKER_MODE_WORKER;
 static const char *master_host = 0;
 static char master_addr[LINK_ADDRESS_MAX];
 static int master_port;
-static char workspace[WORKER_WORKSPACE_NAME_MAX];
+static char *workspace;
 static char *os_name = NULL; 
 static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
@@ -1096,8 +1096,6 @@ static void disconnect_master(struct link *master) {
 		release_all_workers(foreman_q); 
 	}
 
-	debug(D_WQ,"cleaning up workspace %s",workspace);
-	delete_dir_contents(workspace);
 
 	if(released_by_master) {
 		released_by_master = 0;
@@ -1379,6 +1377,81 @@ static void foreman_for_master(struct link *master) {
 	}
 }
 
+/*
+workspace_create is done once when the worker starts.
+*/
+
+static int workspace_create() {
+	// Setup working space(dir)
+	const char *workdir;
+	if (user_specified_workdir){
+		workdir = user_specified_workdir;	
+	} else if(getenv("_CONDOR_SCRATCH_DIR")) {
+		workdir = getenv("_CONDOR_SCRATCH_DIR");
+	} else if(getenv("TEMP")) {
+		workdir = getenv("TEMP");
+	} else {
+		workdir = "/tmp";
+	}
+
+	printf( "work_queue_worker: creating workspace %s\n", workspace);
+
+	workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
+	if(!create_dir(workspace,0777)) return 0;
+
+	return 1;
+}
+
+/*
+workspace_prepare is called every time we connect to a new master,
+*/
+
+static int workspace_prepare()
+{
+	debug(D_WQ,"preparing workspace %s",workspace);
+	char *cachedir = string_format("%s/cache",workspace);
+	int result = create_dir (cachedir,0777);
+	free(cachedir);
+	return result;
+}
+
+/*
+workspace_cleanup is called every time we disconnect from a master,
+to remove any state left over from a previous run.
+*/
+
+static void workspace_cleanup()
+{
+	debug(D_WQ,"cleaning workspace %s",workspace);
+	delete_dir_contents(workspace);
+}
+
+/*
+workspace_delete is called when the worker is about to exit,
+so that all files are removed.
+XXX the cleanup of internal data structures doesn't quite belong here.
+*/
+
+static void workspace_delete()
+{
+	if(user_specified_workdir) free(user_specified_workdir);
+	if(os_name) free(os_name);
+	if(arch_name) free(arch_name);
+
+	if(foreman_q)          work_queue_delete(foreman_q);
+	if(procs_running)      itable_delete(procs_running);
+	if(procs_table)        itable_delete(procs_table);
+	if(procs_complete)     itable_delete(procs_complete);
+	if(procs_waiting)      list_delete(procs_waiting);
+
+	if(watcher)            work_queue_watcher_delete(watcher);
+
+	printf( "work_queue_worker: deleting workspace %s\n", workspace);
+
+	delete_dir(workspace);
+	free(workspace);
+}
+
 static int serve_master_by_hostport( const char *host, int port, const char *verify_project )
 {
 	if(!domain_name_cache_lookup(host,master_addr)) {
@@ -1436,7 +1509,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		}
 	}
 
-
+	workspace_prepare();
 	report_worker_ready(master);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
@@ -1447,6 +1520,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 	last_task_received  = -1;               //Reset last task received flag.
 
+	workspace_cleanup();
 	disconnect_master(master);
 	printf("disconnected from master %s:%d\n", host, port );
 
@@ -1534,46 +1608,6 @@ static void show_help(const char *cmd)
 	printf( " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf( " %-30s Show this help screen\n", "-h,--help");
-}
-
-static int workspace_setup() {
-	// Setup working space(dir)
-	const char *workdir;
-	if (user_specified_workdir){
-		workdir = user_specified_workdir;	
-	} else if(getenv("_CONDOR_SCRATCH_DIR")) {
-		workdir = getenv("_CONDOR_SCRATCH_DIR");
-	} else if(getenv("TEMP")) {
-		workdir = getenv("TEMP");
-	} else {
-		workdir = "/tmp";
-	}
-
-	sprintf(workspace, "%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
-	if(mkdir(workspace, 0700) == -1) {
-		return 0;
-	} 
-
-	printf( "work_queue_worker: working in %s\n", workspace);
-	return 1;
-}
-
-static void workspace_cleanup()
-{
-	if(user_specified_workdir) free(user_specified_workdir);
-	if(os_name) free(os_name);
-	if(arch_name) free(arch_name);
-
-	if(foreman_q)          work_queue_delete(foreman_q);
-	if(procs_running)      itable_delete(procs_running);
-	if(procs_table)        itable_delete(procs_table);
-	if(procs_complete)     itable_delete(procs_complete);
-	if(procs_waiting)      list_delete(procs_waiting);
-
-	if(watcher)            work_queue_watcher_delete(watcher);
-
-	fprintf(stdout, "work_queue_worker: cleaning up %s\n", workspace);
-	delete_dir(workspace);
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -1845,7 +1879,7 @@ int main(int argc, char *argv[])
 
 	random_init();
 
-	if(!workspace_setup()) {
+	if(!workspace_create()) {
 		fprintf(stderr, "work_queue_worker: failed to setup workspace at %s.\n", workspace);
 		exit(1);
 	}
@@ -1968,7 +2002,7 @@ int main(int argc, char *argv[])
 		sleep(backoff_interval);
 	}
 
-	workspace_cleanup();
+	workspace_delete();
 
 	return 0;
 }
