@@ -1475,7 +1475,8 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		work_for_master(master);
 	}
 
-	last_task_received  = -1;               //Reset last task received flag.
+	last_task_received  = -1;
+	results_to_be_sent_msg = 0;
 
 	workspace_cleanup();
 	disconnect_master(master);
