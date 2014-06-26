@@ -97,8 +97,6 @@ void work_queue_mainloop( struct work_queue *q )
 			fprintf(stderr,"ignoring badly formatted line: %s\n",line);			continue;
 		}
 	}
-
-	work_queue_delete(q);
 }
 
 /* vim: set noexpandtab tabstop=4: */
