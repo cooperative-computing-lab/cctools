@@ -299,109 +299,73 @@ static void report_worker_ready( struct link *master )
 }
 
 
-/*
-Make a symbolic link from a process' sandbox directory into the cache
-directory, so as to create the appropriate namespace for a process.
-If a hard link fails, try a symbolic link instead.
+const char *skip_dotslash( const char *s )
+{
+	while(!strncmp(s,"./",2)) s+=2;
+	return s;
+}
 
-XXX This function temporarily modifies the taskname, which is not friendly to the caller.
+/*
+Link a file from one place to another.
+If a hard link doesn't work, use a symbolic link.
+If it is a directory, do it recursively.
 */
 
-int link_file_in_workspace( const char *localname, char *taskname, const char *workspace, int into)
+int link_recursive( const char *source, const char *target )
 {
-	int result = 1;
-	struct stat st;
-	
-	const char *cache_name;
-	char workspace_name[WORK_QUEUE_LINE_MAX];
-	
-	cache_name = localname;
-	while(!strncmp(cache_name, "./", 2)) {
-		cache_name += 2;
-	}
-	
-	char *cur_pos = taskname;
-	while(!strncmp(cur_pos, "./", 2)) {
-		cur_pos += 2;
-	}
-	sprintf(workspace_name, "%s/%s", workspace, cur_pos);
-	
-	const char *targetname, *sourcename;
+	struct stat info;
 
-	if(into) {
-		sourcename = cache_name;
-		targetname = workspace_name;
+	if(stat(source,&info)<0) return 0;
+	
+	if(S_ISDIR(info.st_mode)) {
+		DIR *dir = opendir(source);
+		if(!dir) return 0;
+		
+		mkdir(target, 0777);
+
+		struct dirent *d;
+		int result = 1;
+		
+		while((d = readdir(dir))) {
+			if(!strcmp(d->d_name,".")) continue;
+			if(!strcmp(d->d_name,"..")) continue;
+
+			char *subsource = string_format("%s/%s",source,d->d_name);
+			char *subtarget = string_format("%s/%s",target,d->d_name);
+			
+			result = link_recursive(subsource,subtarget);
+			
+			free(subsource);
+			free(subtarget);
+
+			if(!result) break;
+		}
+		closedir(dir);
+
+		return result;
 	} else {
-		sourcename = workspace_name;
-		targetname = cache_name;
-	}
+		if(link(source, target)==0) return 1;
 
-	if(stat((char*)sourcename, &st)) {
-		debug(D_WQ, "Could not link %s %s workspace (does not exist)", sourcename, into?"into":"from");
+		if( (errno == EXDEV || errno == EPERM) && symlinks_enabled) {
+
+			/*
+			Use an absolute path when symlinking, otherwise the link will
+			be accidentally relative to the current directory.
+			*/
+
+			char *cwd = path_getcwd();	
+			char *absolute_source = string_format("%s/%s", cwd, source);
+
+			int result = symlink(absolute_source, target);
+
+			free(absolute_source);	
+			free(cwd);	
+
+			if(result==0) return 1;
+		}
+
 		return 0;
 	}
-	
-	if(S_ISDIR(st.st_mode)) {
-		DIR *sourcedir = opendir(sourcename);
-		struct dirent *d;
-		char dir_localname[WORK_QUEUE_LINE_MAX];
-		char dir_taskname[WORK_QUEUE_LINE_MAX];
-		if(!sourcedir) {
-			debug(D_WQ, "Could not open directory %s for reading (%s)\n", targetname, strerror(errno));
-			return 1;
-		}
-		
-		mkdir(targetname, 0700);
-		
-		while((d = readdir(sourcedir))) {
-			if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
-			{	continue;	}
-			
-			sprintf(dir_localname, "%s/%s", localname, d->d_name);
-			sprintf(dir_taskname, "%s/%s", taskname, d->d_name);
-			result &= link_file_in_workspace(dir_localname, dir_taskname, workspace, into);
-		}
-		closedir(sourcedir);
-	} else {
-		debug(D_WQ, "linking file %s %s workspace %s as %s\n", cache_name, into?"into":"from", workspace, workspace_name);
-
-		cur_pos = strrchr(targetname, '/');
-		if(cur_pos) {
-			*cur_pos = '\0';
-			if(!create_dir(targetname, 0700)) {
-				debug(D_WQ, "Could not create directory - %s (%s)\n", targetname, strerror(errno));
-				return 1;
-			}
-			*cur_pos = '/';
-		}
-		
-		if(link(sourcename, targetname)) {
-			debug(D_WQ, "Could not link file %s -> %s (%s)\n", sourcename, targetname, strerror(errno));
-			if(errno == EEXIST)	{ 
-				//if the destination already exists, it isn't WQ's fault. So don't treat as failure.
-				return 1; 			
-			} 
-			
-			if((errno == EXDEV || errno == EPERM) && symlinks_enabled) {
-				//use absolute path when symlinking. Else link will point to a 
-				//file relative to current directory.	
-				char *cwd = path_getcwd();	
-				char *absolute_sourcename = string_format("%s/%s", cwd, sourcename);	
-				free(cwd);	
-				debug(D_WQ, "symlinking file %s -> %s\n", absolute_sourcename, targetname);
-				if(symlink(absolute_sourcename, targetname)) {
-					debug(D_WQ, "Could not symlink file %s -> %s (%s)\n", absolute_sourcename, targetname, strerror(errno));
-					free(absolute_sourcename);	
-					return 0;
-				}
-				free(absolute_sourcename);	
-			} else {
-				return 0;
-			}
-		}
-	}
-	
-	return result;
 }
 
 /*
@@ -683,20 +647,25 @@ them into the sandbox.  Return true if successful.
 int setup_sandbox( struct work_queue_process *p )
 {
 	struct work_queue_file *f;
-	char taskname[WORK_QUEUE_LINE_MAX];
 
 	list_first_item(p->task->input_files);
 	while((f = list_next_item(p->task->input_files))) {
+
+		char *sandbox_name = string_format("%s/%s",skip_dotslash(p->sandbox),f->remote_name);
+		int result = 0;
+
 		if(f->type == WORK_QUEUE_DIRECTORY) {
-			sprintf(taskname, "%s/%s", p->sandbox, f->remote_name);
-			if(!create_dir(taskname, 0700)) {
-				debug(D_NOTICE, "Directory %s could not be created and is needed by task %d.", taskname, p->task->taskid);
-				return 0;
-			}
-		} else if(!link_file_in_workspace(f->payload, f->remote_name, p->sandbox, 1)) {
-			debug(D_NOTICE, "File %s does not exist and is needed by task %d.", (char*)f->payload, p->task->taskid);
-			return 0;
+			debug(D_WQ,"creating directory %s",sandbox_name);
+			result = create_dir(sandbox_name, 0700);
+			if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_name, strerror(errno));
+		} else {
+			debug(D_WQ,"linking %s to %s",f->payload,sandbox_name);
+			result = link_recursive(skip_dotslash(f->payload),skip_dotslash(sandbox_name));
+			if(!result) debug(D_WQ,"couldn't link %s into sandbox as %s: %s",f->payload,sandbox_name,strerror(errno));
 		}
+
+		free(sandbox_name);
+		if(!result) return 0;
 	}
 
 	return 1;
