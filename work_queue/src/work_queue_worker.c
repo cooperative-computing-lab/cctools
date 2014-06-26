@@ -1354,9 +1354,10 @@ static int workspace_create() {
 		workdir = "/tmp";
 	}
 
-	printf( "work_queue_worker: creating workspace %s\n", workspace);
 
 	workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
+
+	printf( "work_queue_worker: creating workspace %s\n", workspace);
 	if(!create_dir(workspace,0777)) return 0;
 
 	return 1;
