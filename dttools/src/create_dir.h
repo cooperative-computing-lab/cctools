@@ -12,10 +12,18 @@ See the file COPYING for details.
 
 /** Create a new directory recursively.
 @param path The full path of a directory.  It is not necessary for all components of the path to exist.
-@param mode The desired unix mode bits of the directory.
+@param mode The desired unix mode bits of the directory and parents.
 @return One on success, zero on failure.
 */
 
 int create_dir(const char *path, int mode);
+
+/** Create needed parent directories of a file or directory.
+@param path The full path of a file or directory.
+@param mode The desired unix mode bits of the parent directories.
+@return One on success, zero on failure.
+*/
+
+int create_dir_parents(const char *path, int mode);
 
 #endif

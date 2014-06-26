@@ -654,6 +654,9 @@ int setup_sandbox( struct work_queue_process *p )
 		char *sandbox_name = string_format("%s/%s",skip_dotslash(p->sandbox),f->remote_name);
 		int result = 0;
 
+		// remote name may contain relative path components, so create them in advance
+		create_dir_parents(sandbox_name,0777);
+
 		if(f->type == WORK_QUEUE_DIRECTORY) {
 			debug(D_WQ,"creating directory %s",sandbox_name);
 			result = create_dir(sandbox_name, 0700);

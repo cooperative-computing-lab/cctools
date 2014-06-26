@@ -58,4 +58,23 @@ int create_dir(const char *path, int mode)
 	return 1;
 }
 
+int create_dir_parents(const char *path, int mode)
+{
+	int result = 0;
+
+	char *tmp = strdup(path);
+	char *slash = strrchr(tmp,'/');
+
+	if(slash && slash>tmp ) {
+		*slash = 0;
+		result = create_dir(tmp,mode);
+	} else {
+		result = 1;
+	}
+
+	free(tmp);
+	return result;
+
+}
+
 /* vim: set noexpandtab tabstop=4: */
