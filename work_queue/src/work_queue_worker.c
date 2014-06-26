@@ -661,7 +661,16 @@ int setup_sandbox( struct work_queue_process *p )
 		} else {
 			debug(D_WQ,"linking %s to %s",f->payload,sandbox_name);
 			result = link_recursive(skip_dotslash(f->payload),skip_dotslash(sandbox_name));
-			if(!result) debug(D_WQ,"couldn't link %s into sandbox as %s: %s",f->payload,sandbox_name,strerror(errno));
+			if(!result) {
+				if(errno==EEXIST) {
+					// XXX silently ignore the case where the target file exists.
+					// This happens when masters apps map the same input file twice, or to the same name.
+					// Would be better to reject this at the master instead.
+					result = 1;
+				} else {
+					debug(D_WQ,"couldn't link %s into sandbox as %s: %s",f->payload,sandbox_name,strerror(errno));
+				}
+			}
 		}
 
 		free(sandbox_name);
