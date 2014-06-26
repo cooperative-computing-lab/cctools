@@ -1106,49 +1106,6 @@ static void disconnect_master(struct link *master) {
 	}
 }
 
-static int path_within_workspace(const char *path, const char *workspace) {
-	if(!path) return 0;
-
-	char absolute_workspace[PATH_MAX+1];
-	if(!realpath(workspace, absolute_workspace)) {
-		debug(D_WQ, "Failed to resolve the absolute path of workspace - %s: %s", workspace, strerror(errno));
-		return 0;
-	}	
-
-	char *p;
-	if(path[0] == '/') {
-		p = strstr(path, absolute_workspace);
-		if(p != path) {
-			return 0;
-		}
-	}
-
-	char absolute_path[PATH_MAX+1];
-	char *tmp_path = xxstrdup(path);
-
-	int rv = 1;
-	while((p = strrchr(tmp_path, '/')) != NULL) {
-		//debug(D_WQ, "Check if %s is within workspace - %s", tmp_path, absolute_workspace);
-		*p = '\0';
-		if(realpath(tmp_path, absolute_path)) {
-			p = strstr(absolute_path, absolute_workspace);
-			if(p != absolute_path) {
-				rv = 0;
-			}
-			break;
-		} else {
-			if(errno != ENOENT) {
-				debug(D_WQ, "Failed to resolve the absolute path of %s: %s", tmp_path, strerror(errno));
-				rv = 0;
-				break;
-			}
-		}
-	}
-
-	free(tmp_path);
-	return rv;
-}
-
 static int handle_master(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
@@ -1162,7 +1119,7 @@ static int handle_master(struct link *master) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(master, taskid,time(0)+active_timeout);
 		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) >= 3) {
-			if(path_within_workspace(filename, workspace)) {
+			if(path_within_dir(filename, workspace)) {
 				r = do_put(master, filename, length, mode);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
@@ -1171,7 +1128,7 @@ static int handle_master(struct link *master) {
                 } else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
                         r = do_url(master, filename, length, mode);
 		} else if(sscanf(line, "unlink %s", filename) == 1) {
-			if(path_within_workspace(filename, workspace)) {
+			if(path_within_dir(filename, workspace)) {
 				r = do_unlink(filename);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
