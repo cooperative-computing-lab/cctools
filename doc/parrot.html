@@ -288,10 +288,12 @@ using the <tt>stat</tt> system call.</p>
 <p>After executing this command, one package with the path of <b>/tmp/package</b> will be generated.</p>
 
 <h2 id="parrot_package_run">Repeat one Program within the Package<a class="sectionlink" href="#parrot_package_run" title="Link to this section.">&#x21d7;</a></h2>
-<p>Once a package is generated with the help of <tt>parrot_package_create</tt>, we can use <tt>parrot_package_run</tt> to repeat the program within the package. <tt>parrot_package_run</tt> is based on the mountlist redirection mechanism of <tt>parrot_run</tt>. One mountlist wll be created so that the file access request of your program can be redirected into the package. <b>--shell-type</b> parameter specifies the type of the shell you used to execute your original program, <b>--package-path</b> parameter specifies the paht of the package.</p>
-<code>% parrot_package_run --package-path /tmp/package --shell-type bash</code>
+<p>Once a package is generated with the help of <tt>parrot_package_create</tt>, we can use <tt>parrot_package_run</tt> to repeat the program within the package. <tt>parrot_package_run</tt> is based on the mountlist redirection mechanism of <tt>parrot_run</tt>. One mountlist wll be created so that the file access request of your program can be redirected into the package. <b>--package-path</b> parameter specifies the paht of the package.</p>
+<code>% parrot_package_run --package-path /tmp/package /bin/bash</code>
 <p>After the execution of this command, one shell will be returned, where you can repeat your original program. After everything is done, exit <tt>parrot_package_run</tt>:</p>
 <code>% exit</code>
+<p>You can also directly set your command as the arguments of <tt>parrot_package_run</tt>. In this case, <tt>parrot_package_run</tt> will exit automatically after the command is finished, and you do not need to use <tt>exit</tt> to exit. However, your command must belong to the original command set executed inside <tt>parrot_run</tt> and preserved by <tt>parrot_package_create</tt>.</p>
+<code>% parrot_package_run --package-path /tmp/package ls -al</code>
 
 <h2 id="parrot_cp">More Efficient Copies with <tt>parrot_cp</tt><a class="sectionlink" href="#parrot_cp" title="Link to this section.">&#x21d7;</a></h2>
 
