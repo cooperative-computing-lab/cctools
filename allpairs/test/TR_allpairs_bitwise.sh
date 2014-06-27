@@ -29,8 +29,8 @@ prepare()
 run()
 {
     ../../work_queue/src/work_queue_worker localhost `cat $PORT_FILE` --timeout 2 -d all
-#    pid=$!
-	#echo $pid > $PIDWORKER_FILE
+    pid=$!
+	echo $pid > $PIDWORKER_FILE
 
 	wait_for_file_creation $TEST_OUTPUT 5
 	wait_for_file_modification $TEST_OUTPUT 3
