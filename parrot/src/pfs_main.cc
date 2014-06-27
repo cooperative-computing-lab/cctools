@@ -69,7 +69,6 @@ pid_t trace_this_pid = -1;
 int pfs_master_timeout = 300;
 struct file_cache *pfs_file_cache = 0;
 struct password_cache *pfs_password_cache = 0;
-int pfs_trap_after_fork = 0;
 int pfs_force_stream = 0;
 int pfs_force_cache = 0;
 int pfs_force_sync = 0;
@@ -148,13 +147,11 @@ static void get_linux_version(const char *cmd)
 
 	debug(D_DEBUG,"kernel is %s %s",name.sysname,name.release);
 
-	/* compatibility checking */
-	if(!linux_available(2,4,0))
-		pfs_trap_after_fork = 1;
-
 	/* warning for latest untested version of Linux */
-	if(linux_available(3,3,0))
+	if(linux_available(3,15,3))
 		debug(D_NOTICE,"parrot_run %d.%d.%s has not been tested on %s %s yet, this may not work",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,name.sysname,name.release);
+	else if (!linux_available(2,5,46))
+		fatal("this version of Parrot requires at least kernel version 2.5.46");
 }
 
 static void pfs_helper_init( const char *argv0 ) 
