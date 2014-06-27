@@ -363,6 +363,13 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 		} else if((linux_available(3,4,0) && ((status>>16) == PTRACE_EVENT_STOP)) || (!linux_available(3,4,0) && ptrace(PTRACE_GETSIGINFO, pid, 0, &info) == -1 && errno == EINVAL)) {
 			/* group-stop, `man ptrace` for more information */
 			debug(D_PROCESS, "process %d has group-stopped due to signal %d (%s) (state %d)",pid,signum,string_signal(signum),p->state);
+			if (!linux_available(3,4,0)) {
+				static int notified = 0;
+				if (!notified) {
+					debug(D_NOTICE, "The ptrace interface cannot handle group-stop for this Linux version. This may not work...");
+					notified = 1;
+				}
+			}
 			pfs_process_stop(p,status,usage);
 			tracer_listen(p->tracer);
 		} else {
@@ -814,10 +821,6 @@ int main( int argc, char *argv[] )
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 	get_linux_version(argv[0]);
-
-    if (!linux_available(3,4,0)) {
-        debug(D_NOTICE, "The ptrace interface cannot handle group-stop for this Linux version. This may not work...");
-    }
 
 	if(pfs_temp_dir[PFS_PATH_MAX - 1] != '\0')
 	{
