@@ -389,10 +389,12 @@ Your job 153099 ("worker.sh") has been submitted
 
 <h2 id="security">Security<a class="sectionlink" href="#security" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 By default, Work Queue does <b>not</b> perform any authentication,
 so any workers will be able to connect to your master, and
 vice versa.  This may be fine for a short running anonymous application,
 but is not safe for a long running application with a public name.
+</p>
 <p>
 We recommend that you enable a password for your applications.  Create
 a file (e.g. <tt>mypwfile</tt>) that contains any password (or other
@@ -401,8 +403,10 @@ will be particular to your application and should not match any other
 passwords that you own.  Note that the contents of the file are taken
 verbatim as the password; this means that any new line character at
 the end of the phrase will be considered as part of the password.
+</p>
 <p>
 Then, modify your master program to use the password:
+</p>
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
@@ -416,6 +420,7 @@ Then, modify your master program to use the password:
 <p>
 And give the <tt>--password</tt> option to give the same password file to your
 workers:
+</p>
 <div class ="code_area"><pre class="code_snip">
 work_queue_worker --password mypwfile  MACHINENAME 9123 
 </pre></div>
@@ -424,6 +429,7 @@ With this option enabled, both the master and the workers will
 verify that the other has the matching password before proceeding.
 The password is not sent in the clear, but is securely verified
 through a SHA1-based challenge-response protocol.
+</p>
 
 <h2 id="foremen">Work Queue Foremen<a class="sectionlink" href="#foremen" title="Link to this section.">&#x21d7;</a></h2>
 <p>A Work Queue foreman allows Work Queue workers to be managed in an
