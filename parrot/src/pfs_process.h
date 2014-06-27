@@ -29,6 +29,7 @@ extern "C" {
 #define PFS_PROCESS_STATE_WAITREAD 3
 #define PFS_PROCESS_STATE_WAITWRITE 4
 #define PFS_PROCESS_STATE_DONE 5
+#define PFS_PROCESS_STATE_STOPPED 6
 
 #define PFS_SCRATCH_SIZE 4096
 
@@ -41,7 +42,11 @@ struct pfs_process {
 
 	mode_t umask;
 	pid_t  pid, ppid, tgid;
-	int    flags, state;
+	int flags, state;
+	int parent_wcontinued;
+	int parent_wuntraced;
+	int interrupted;
+	int nsyscalls;
 	pfs_table *table;
 	struct tracer *tracer;
 	struct timeval seltime;
@@ -68,11 +73,13 @@ struct pfs_process {
 	struct rusage *wait_urusage;
 	int            wait_options;
 
-	struct rusage  exit_rusage;
-	int            exit_status;
-	int 	       exit_signal;
-	int            interrupted;
-	int            nsyscalls;
+	int            thread;                // True if thread, false if regular process.
+	time_t         time_first_sigcont;
+
+	/* status and rusage for parent call to wait*(...) */
+	struct rusage  wait_rusage;
+	int            wait_status;
+	int            exit_signal; /* signal sent to parent on process death */
 };
 
 struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t notify_ppid, int share_table, int exit_signal );
@@ -80,6 +87,7 @@ struct pfs_process * pfs_process_lookup( pid_t pid );
 void pfs_process_delete( struct pfs_process *p );
 
 void pfs_process_stop( struct pfs_process *p, int status, struct rusage *usage );
+void pfs_process_continued( struct pfs_process *p, int status, struct rusage *usage );
 void pfs_process_exit_group( struct pfs_process *p );
 int pfs_process_waitpid( struct pfs_process *p, pid_t wait_pid, int *wait_ustatus, int wait_options, struct rusage *wait_urusage );
 

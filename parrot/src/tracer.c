@@ -27,6 +27,10 @@ See the file COPYING for details.
 
 #define FATAL fatal("tracer: %d %s",t->pid,strerror(errno));
 
+#ifndef PTRACE_OLDSETOPTIONS
+#	define PTRACE_OLDSETOPTIONS 21
+#endif
+
 /*
 Note that we would normally get such register definitions
 from the system header files.  However, we want this code
@@ -68,20 +72,48 @@ struct tracer {
 
 int tracer_attach (pid_t pid)
 {
-	if (ptrace(PTRACE_ATTACH, pid, 0, 0) == -1) /* this handles a race condition where pid has not yet called ptrace(PTRACE_TRACEME, ...) */
-		return -1;
+	intptr_t options = PTRACE_O_TRACESYSGOOD|PTRACE_O_TRACEEXEC|PTRACE_O_TRACECLONE|PTRACE_O_TRACEFORK|PTRACE_O_TRACEVFORK;
 
-	if (linux_available(3,8,0)) {
-		if (ptrace(PTRACE_SETOPTIONS,pid,0,(void *)(PTRACE_O_EXITKILL|PTRACE_O_TRACECLONE|PTRACE_O_TRACEFORK|PTRACE_O_TRACEVFORK)) == -1)
+	if (linux_available(3,8,0))
+		options |= PTRACE_O_EXITKILL;
+	else if (!linux_available(2,5,46))
+		fatal("linux is too old");
+
+	if (linux_available(3,4,0)) {
+		/* So this is a really annoying situation, in order to correctly deal
+		 * with group-stops with ptrace, we must use PTRACE_SEIZE.  For a full
+		 * explanation, see pfs_main.cc where PTRACE_LISTEN is used.
+		 */
+		if (ptrace(PTRACE_SEIZE, pid, 0, (void *)options) == -1)
 			return -1;
-	} else if (linux_available(2,5,46)) {
-		if (ptrace(PTRACE_SETOPTIONS,pid,0,(void *)(PTRACE_O_TRACECLONE|PTRACE_O_TRACEFORK|PTRACE_O_TRACEVFORK)) == -1)
+	} else {
+		if (ptrace(PTRACE_ATTACH, pid, 0, 0) == -1)
 			return -1;
+		if (linux_available(2,6,0)) {
+			if (ptrace(PTRACE_SETOPTIONS, pid, 0, (void *)options) == -1)
+				return -1;
+		} else {
+			if (ptrace(PTRACE_OLDSETOPTIONS, pid, 0, (void *)options) == -1)
+				return -1;
+		}
 	}
 
 	if (ptrace(PTRACE_SYSCALL, pid, NULL, (void *)SIGCONT) == -1)
 		return -1;
 
+	return 0;
+}
+
+int tracer_listen (struct tracer *t)
+{
+	if (linux_available(3,4,0)) {
+		if (ptrace(PTRACE_LISTEN, t->pid, NULL, NULL) == -1)
+			return -1;
+	} else {
+		/* This version of Linux does not allow transparently listening for wake up from group-stop. We have no choice but to restart it... */
+		if (ptrace(PTRACE_SYSCALL, t->pid, NULL, 0) == -1)
+			return -1;
+	}
 	return 0;
 }
 
@@ -129,17 +161,22 @@ int tracer_is_64bit( struct tracer *t )
 	}
 }
 
-void tracer_detach( struct tracer *t )
+int tracer_detach( struct tracer *t )
 {
-	ptrace(PTRACE_DETACH,t->pid,0,0);
+	pid_t pid = t->pid;
 	close(t->memory_file);
 	free(t);
+	if (ptrace(PTRACE_DETACH,pid,0,0) == -1)
+		return -1;
+	return 0;
 }
 
-void tracer_continue( struct tracer *t, int signum )
+int tracer_continue( struct tracer *t, int signum )
 {
-	ptrace(PTRACE_SYSCALL,t->pid,0,signum);
 	t->gotregs = 0;
+	if (ptrace(PTRACE_SYSCALL,t->pid,0,signum) == -1)
+		return -1;
+	return 0;
 }
 
 int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARGS_MAX] )
@@ -160,6 +197,9 @@ int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARG
 #else
 	if(tracer_is_64bit(t)) {
 		*syscall = t->regs.regs64.orig_rax;
+#if 0 /* Enable this for extreme debugging... */
+		debug(D_DEBUG, "rax = %d; -%d is -ENOSYS (rax == -ENOSYS indicates syscall-enter-stop)", (int)t->regs.regs64.rax, ENOSYS);
+#endif
 		args[0] = t->regs.regs64.rdi;
 		args[1] = t->regs.regs64.rsi;
 		args[2] = t->regs.regs64.rdx;

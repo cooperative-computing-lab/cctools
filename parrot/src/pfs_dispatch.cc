@@ -976,25 +976,22 @@ static void redirect_ldso( struct pfs_process *p, const char *ldso, INT64_T *arg
 /*
 Several things to note about exec.
 
-An entry to execve looks like a normal syscall.
-An exit from execve indicates a successfull execve in progress.
-Finally, a *third* event with args[0]==0 indicates an execve
-that has completed with the new image active.
+An entry to execve looks like a normal syscall. An exit from execve indicates a
+successful execve in progress.
 
-Now, we cannot execute the path named by the execve directly.
-It must be resolved through PFS, because our idea of the 
-current dir (or even the meaning of the name) may be quite
-different.  We resolve the file name into a local path,
-perhaps by pulling it into the cache.
+Now, we cannot execute the path named by the execve directly.  It must be
+resolved through PFS, because our idea of the current dir (or even the meaning
+of the name) may be quite different.  We resolve the file name into a local
+path, perhaps by pulling it into the cache.
 
-In the simple (second) case, we copy the new local name
-into the address space of the process and exec that instead.
-If the exec fails, we must restore the changed bytes afterwards.
+In the simple (second) case, we copy the new local name into the address space
+of the process and exec that instead.  If the exec fails, we must restore the
+changed bytes afterwards.
 
-In the complex (first) case, the program contains a pound-bang
-indicating an interpreter.  We instead resolve the interpreter
-as the executable and fiddle around with the job's argv to
-indicate that.  Then, we do much the same as the first case.
+In the complex (first) case, the program contains a pound-bang indicating an
+interpreter.  We instead resolve the interpreter as the executable and fiddle
+around with the job's argv to indicate that.  Then, we do much the same as the
+first case.
 */
 
 void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *args )
@@ -1009,14 +1006,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 	// fails with EFAULT.  So far, this has been observed with one-line
 	// test cases, but not with real applications (yet).
 
-	if(args[0]==0) {
-		debug(D_PROCESS,"execve %s complete in 32 bit mode",p->new_logical_name);	
-		debug(D_PSTREE,"%d exec %s",p->pid,p->new_logical_name);
-
-		p->state = PFS_PROCESS_STATE_USER;
-		p->completing_execve = 0;
-
-	} else if(entering) {
+	if(entering) {
 
 		/* Otherwise this is the process starting a new execve(). */
 
@@ -1040,10 +1030,9 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 		divert_to_dummy, but this caused the error message to
 		be lost. */
 
-		if(!is_executable(path) ||
-		   (pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0)) {
-			p->completing_execve = 1;
+		if(!is_executable(path) || (pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0)) {
 			p->new_physical_name[0] = 0;
+			p->completing_execve = 1;
 			return;
 		}
 
@@ -1175,6 +1164,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 		INT64_T actual_result;
 		tracer_result_get(p->tracer,&actual_result);
 
+		p->completing_execve = 0;
 		if(actual_result==0) {
 			debug(D_PROCESS,"execve: %s succeeded in 32 bit mode",p->new_logical_name);
 			strcpy(p->name,p->new_logical_name);
@@ -1199,8 +1189,6 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			debug(D_PROCESS,"execve: restoring scratch area at %p",scratch_addr);
 			
 			tracer_copy_out(p->tracer,p->scratch_data,(void*)scratch_addr,scratch_size);
-
-			p->completing_execve = 0;
 		} else {
 
 			/* If we get here, then we are not entering,
@@ -1212,10 +1200,7 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			   and the third call to execve never occurs,
 			   from which parrot concludes there was an
 			   error. */
-
-			p->completing_execve = 0;
 		}
-
 	}
 }
 
@@ -1371,6 +1356,15 @@ void decode_syscall( struct pfs_process *p, int entering )
 	char path[PFS_PATH_MAX];
 	char path2[PFS_PATH_MAX];
 
+	if(p->completing_execve) {
+		if(p->syscall != SYSCALL32_execve)
+		{
+			debug(D_PROCESS, "Changing execve code number from 64 to 32 bit mode.\n");
+			p->syscall = SYSCALL32_execve;
+		}
+		p->completing_execve = 0;
+	}
+
 	if(entering) {
 		p->state = PFS_PROCESS_STATE_KERNEL;
 		p->syscall_dummy = 0;
@@ -1383,15 +1377,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 		changed.  So, we must explicitly check for this condition
 		and fix up the system call number to end up in the right code.
 		*/
-
-		if(p->completing_execve) {
-			if(p->syscall != SYSCALL32_execve)
-			{
-				debug(D_PROCESS, "Changing execve code number from 64 to 32 bit mode.\n"); 
-				p->syscall = SYSCALL32_execve;
-			}
-			p->completing_execve = 0;
-		}
 
 		debug(D_SYSCALL,"%s",tracer_syscall_name(p->tracer,p->syscall));
 		p->syscall_original = p->syscall;
@@ -2536,15 +2521,16 @@ void decode_syscall( struct pfs_process *p, int entering )
 				debug(D_PROCESS,"%s %d %d",tracer_syscall32_name(p->syscall),(int)args[0],(int)args[1]);
 				p->syscall_result = pfs_process_raise(args[0],args[1],0);
 				if (p->syscall_result == -1) p->syscall_result = -errno;
+				debug(D_PROCESS,"allowing process to send kill(%d, %d)",(int)args[0],(int)args[1]);
 			}
 			break;
-
 
 		case SYSCALL32_tgkill:
 			if(entering) {
 				debug(D_PROCESS,"tgkill %d %d %d",(int)args[0],(int)args[1],(int)args[2]);
 				p->syscall_result = pfs_process_raise(args[1],args[2],0);
 				if (p->syscall_result == -1) p->syscall_result = -errno;
+				debug(D_PROCESS,"allowing process to send tgkill(%d, %d)",(int)args[1],(int)args[2]);
 			}
 			break;
 
@@ -3338,6 +3324,8 @@ void pfs_dispatch32( struct pfs_process *p, INT64_T signum )
 		case PFS_PROCESS_STATE_WAITWRITE:
 			decode_syscall(p,0);
 			break;
+		case PFS_PROCESS_STATE_STOPPED:
+			p->state = PFS_PROCESS_STATE_USER;
 		case PFS_PROCESS_STATE_USER:
 			p->interrupted = 0;
 		case PFS_PROCESS_STATE_WAITREAD:

@@ -7,48 +7,56 @@ See the file COPYING for details.
 
 #include "linux-version.h"
 #include "pfs_channel.h"
-#include "pfs_process.h"
-#include "pfs_dispatch.h"
-#include "pfs_poll.h"
-#include "pfs_service.h"
 #include "pfs_critical.h"
+#include "pfs_dispatch.h"
 #include "pfs_paranoia.h"
+#include "pfs_poll.h"
+#include "pfs_process.h"
+#include "pfs_service.h"
 #include "ptrace.h"
 
+#ifndef PTRACE_EVENT_STOP
+#  define PTRACE_EVENT_STOP 128
+#endif
+
 extern "C" {
-#include "cctools.h"
-#include "tracer.h"
-#include "stringtools.h"
 #include "auth_all.h"
-#include "xxmalloc.h"
-#include "create_dir.h"
-#include "file_cache.h"
-#include "md5.h"
-#include "password_cache.h"
-#include "debug.h"
-#include "getopt.h"
-#include "pfs_resolve.h"
+#include "cctools.h"
 #include "chirp_client.h"
 #include "chirp_global.h"
 #include "chirp_ticket.h"
-#include "ftp_lite.h"
-#include "int_sizes.h"
+#include "create_dir.h"
+#include "debug.h"
 #include "delete_dir.h"
+#include "file_cache.h"
+#include "ftp_lite.h"
+#include "getopt.h"
+#include "int_sizes.h"
+#include "itable.h"
+#include "md5.h"
+#include "password_cache.h"
+#include "pfs_resolve.h"
+#include "stringtools.h"
+#include "tracer.h"
+#include "xxmalloc.h"
 }
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <unistd.h>
-#include <signal.h>
-#include <time.h>
-#include <limits.h>
-#include <sys/wait.h>
 #include <fcntl.h>
-#include <sys/utsname.h>
 #include <termio.h>
 #include <termios.h>
+#include <unistd.h>
+
+#include <sys/utsname.h>
+#include <sys/wait.h>
+
+#include <assert.h>
+#include <errno.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 extern char **environ;
 FILE *namelist_file;
@@ -311,7 +319,6 @@ the event and take the appropriate action.
 static void handle_event( pid_t pid, int status, struct rusage *usage )
 {
 	struct pfs_process *p;
-	int signum;
 
 	p = pfs_process_lookup(pid);
 	if(!p) {
@@ -320,47 +327,82 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 		return;
 	}
 
-	if(status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
-		pid_t child;
-
-		child = tracer_getevent(p->tracer);
-		debug(D_PROCESS, "pid %d cloned %d",pid,child);
+	if (WIFSTOPPED(status) && WSTOPSIG(status) == (SIGTRAP|0x80)) {
+		/* The common case, a syscall delivery stop. */
+		p->nsyscalls++;
+		pfs_dispatch(p, 0);
+	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
+		pid_t child = tracer_getevent(p->tracer);
+		debug(D_PROCESS, "pid %d cloned %d", pid, child);
 
 		/* At this point the child is stopped, it will be resumed with
 		 * tracer_continue when clone finishes. We only do this because
 		 * CLONE_PTRACE is buggy with multithreaded code. */
-		tracer_continue(p->tracer,0);
-	} else if(WIFEXITED(status)) {
+		tracer_continue(p->tracer, 0);
+	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXEC<<8))) {
+		debug(D_PROCESS, "pid %d is completing exec", (int)pid);
+		tracer_continue(p->tracer, 0);
+	} else if (WIFEXITED(status)) {
 		debug(D_PROCESS,"pid %d exited normally with code %d",pid,WEXITSTATUS(status));
 		pfs_process_stop(p,status,usage);
-		if(pid==root_pid) root_exitstatus = status;
-	} else if(WIFSIGNALED(status)) {
-		signum = WTERMSIG(status);
+		if (pid == root_pid)
+			root_exitstatus = status;
+	} else if (WIFSIGNALED(status)) {
+		int signum = WTERMSIG(status);
 		debug(D_PROCESS,"pid %d exited abnormally with signal %d (%s)",pid,signum,string_signal(signum));
 		pfs_process_stop(p,status,usage);
-		if(pid==root_pid) root_exitstatus = status;
-	} else if(WIFSTOPPED(status)) {
-		signum = WSTOPSIG(status);
-		if(signum==SIGTRAP) {
-			p->nsyscalls++;
-			pfs_dispatch(p,0);
+		if (pid == root_pid)
+			root_exitstatus = status;
+	} else if (WIFSTOPPED(status)) {
+		int signum = WSTOPSIG(status);
+		siginfo_t info;
+		if(signum == SIGTRAP && ((status>>16) == PTRACE_EVENT_STOP)) {
+			/* this is PTRACE_EVENT_STOP */
+			assert(linux_available(3,4,0));
+			tracer_continue(p->tracer, 0);
+		} else if((linux_available(3,4,0) && ((status>>16) == PTRACE_EVENT_STOP)) || (!linux_available(3,4,0) && ptrace(PTRACE_GETSIGINFO, pid, 0, &info) == -1 && errno == EINVAL)) {
+			/* group-stop, `man ptrace` for more information */
+			debug(D_PROCESS, "process %d has group-stopped due to signal %d (%s) (state %d)",pid,signum,string_signal(signum),p->state);
+			pfs_process_stop(p,status,usage);
+			tracer_listen(p->tracer);
 		} else {
+			/* signal-delivery-stop */
 			debug(D_PROCESS,"pid %d received signal %d (%s) (state %d)",pid,signum,string_signal(signum),p->state);
-			if(signum==SIGTTIN) {
-				tcsetpgrp(0,pid);
-				tracer_continue(p->tracer,SIGCONT);
-			} else if(signum==SIGTTOU) {
-				tcsetpgrp(1,pid);
-				tcsetpgrp(2,pid);
-				tracer_continue(p->tracer,SIGCONT);
-			} else {
-				debug(D_PROCESS,"pid %d stopped from signal %d (%s) (state %d) delivering with tracer_continue.",pid,signum,string_signal(signum),p->state);
-				tracer_continue(p->tracer,signum);
+			switch(signum) {
+				/* There are 4 process stop signals: SIGTTIN, SIGTTOU, SIGSTOP, and SIGTSTP.
+				 * The Open Group Base Specifications Issue 6
+				 * IEEE Std 1003.1, 2004 Edition
+				 * Also mentioned in `man ptrace`.
+				 */
+				case SIGTTIN:
+					tcsetpgrp(STDIN_FILENO,pid);
+					signum = 0; /* suppress delivery */
+					break;
+				case SIGTTOU:
+					tcsetpgrp(STDOUT_FILENO,pid);
+					tcsetpgrp(STDERR_FILENO,pid);
+					signum = 0; /* suppress delivery */
+					break;
+				case SIGSTOP:
+					/* Black magic to get threads working on old Linux kernels... */
 
-				if(signum==SIGSTOP && p->nsyscalls==0) {
-					kill(p->pid,SIGCONT);
-				}
+					if(p->nsyscalls == 0) { /* stop before we begin running the process */
+						debug(D_DEBUG, "suppressing bootstrap SIGSTOP for %d",pid);
+						signum = 0; /* suppress delivery */
+						kill(p->pid,SIGCONT);
+					}
+					break;
+				case SIGTSTP:
+					break;
+				case SIGCONT:
+#ifdef __W_CONTINUED
+					pfs_process_continued(p, __W_CONTINUED, usage);
+#else
+					pfs_process_continued(p, 0xffff, usage);
+#endif
+					break;
 			}
+			tracer_continue(p->tracer,signum); /* deliver (or not) the signal */
 		}
 	} else {
 		fatal("pid %d stopped with strange status %d",pid,status);
@@ -765,13 +807,17 @@ int main( int argc, char *argv[] )
 		default:
 			show_help(argv[0]);
 			break;
-	}
+		}
 	}
 
 	if(optind>=argc) show_help(argv[0]);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 	get_linux_version(argv[0]);
+
+    if (!linux_available(3,4,0)) {
+        debug(D_NOTICE, "The ptrace interface cannot handle group-stop for this Linux version. This may not work...");
+    }
 
 	if(pfs_temp_dir[PFS_PATH_MAX - 1] != '\0')
 	{
@@ -896,6 +942,9 @@ int main( int argc, char *argv[] )
 
 			flags = WUNTRACED|__WALL|WNOHANG;
 			pid = wait4(trace_this_pid,&status,flags,&usage);
+#if 0 /* Enable this for extreme debugging... */
+			debug(D_DEBUG, "%d = wait4(%d, %p, %d, %p)", (int)pid, (int)trace_this_pid, &status, flags, &usage);
+#endif
 
 			if(pid == pfs_watchdog_pid) {
 				if (WIFEXITED(status) || WIFSIGNALED(status)) {
