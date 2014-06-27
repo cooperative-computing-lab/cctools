@@ -89,4 +89,4 @@ export_env
 unset PARROT_ENABLED
 
 #initialize the repeat process
-exec $cmd_parrot_run -m $mountlist -- "$@"
+exec $cmd_parrot_run -m $mountlist -w $PWD -- "$@"
