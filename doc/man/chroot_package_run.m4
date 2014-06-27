@@ -8,7 +8,7 @@ SECTION(SYNOPSIS)
 CODE(BOLD(chroot_package_run --package-path your-package-path [command]))
 
 SECTION(DESCRIPTION)
-If CODE(chroot) is used to help repeat one experiment, common directories like BODE(/proc), BOLD(/dev), BOLD(/net), BOLD(/sys), BOLD(/var), BOLD(/misc) and BOLD(/selinux) will be remounted into the package if they exists on your local filesystem. After you finish all your test within CODE(chroot_package_run), these remounted directories will be unmounted.
+If CODE(chroot) is used to help repeat one experiment, common directories like BOLD(/proc), BOLD(/dev), BOLD(/net), BOLD(/sys), BOLD(/var), BOLD(/misc) and BOLD(/selinux) will be remounted into the package if they exists on your local filesystem. After you finish all your test within CODE(chroot_package_run), these remounted directories will be unmounted.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
