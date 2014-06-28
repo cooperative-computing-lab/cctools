@@ -37,6 +37,7 @@ struct entry {
 	char *physical_path;
 	char *logical_path;
 	int64_t size;
+	int do_not_watch;
 };
 
 static void entry_delete( struct entry *e )
@@ -53,6 +54,7 @@ static struct entry * entry_create( int64_t taskid, char *physical_path, char *l
 	e->physical_path = physical_path;
 	e->logical_path = logical_path;
 	e->size = 0;
+	e->do_not_watch = 0;
 	return e;
 }
 
@@ -139,6 +141,7 @@ int work_queue_watcher_check( struct work_queue_watcher *w )
 	list_first_item(w->watchlist);
 	while((e=list_next_item(w->watchlist))) {
 		struct stat info;
+		if(e->do_not_watch) continue;
 		if(stat(e->physical_path,&info)==0) {
 			if(info.st_size != e->size) {
 				debug(D_WQ,"watched files have changed");
@@ -152,11 +155,14 @@ int work_queue_watcher_check( struct work_queue_watcher *w )
 
 /*
 Scan over all watched files, and send back any changes since the last check.
-We assume that files generally change by appending, however if the file has
-shrunk since the last measurement, we send the whole file.
+This feature is designed to work with files that are accessed append-only.
+If the file has shrunk since the last measurement, then we mark the file
+as non-append and stop watching it.
 If the file is not accessible or there is some other problem,
 don't take any drastic action, because it does not (necessarily)
 indicate a task failure.
+In all cases, the complete file is sent back in the normal way
+when the task ends, to ensure reliable output.
 */
 
 int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *master, time_t stoptime )
@@ -166,19 +172,12 @@ int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *
 	list_first_item(w->watchlist);
 	while((e=list_next_item(w->watchlist))) {
 		struct stat info;
+		if(e->do_not_watch) continue;
 		if(stat(e->physical_path,&info)==0) {
-			if(info.st_size!=e->size) {
-				int64_t offset, length;
-				if(info.st_size>e->size) {
-					offset = e->size;
-					length = info.st_size - e->size;
-					debug(D_WQ,"%s increased from %"PRId64" to %"PRId64" bytes",e->physical_path,offset,offset+length);
-				} else {
-					offset = 0;
-					length = info.st_size;
-					debug(D_WQ,"%s truncated to %"PRId64" bytes",e->physical_path,length);
-				}
-
+			if(info.st_size>e->size) {
+				int64_t offset = e->size;
+				int64_t length = info.st_size - e->size;
+				debug(D_WQ,"%s increased from %"PRId64" to %"PRId64" bytes",e->physical_path,offset,offset+length);
 				int fd = open(e->physical_path,O_RDONLY);
 				if(fd<0) {
 					debug(D_WQ,"unable to open %s: %s",e->physical_path,strerror(errno));
@@ -191,7 +190,12 @@ int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *
 				close(fd);
 				if(actual!=length) return 0;
 				e->size = info.st_size;
+			} else if(info.st_size<e->size) {
+				debug(D_WQ,"%s unexpectedly shrank from %"PRId64" to %"PRId64" bytes",e->physical_path,e->size,info.st_size);
+				debug(D_WQ,"%s will no longer be watched for changes",e->physical_path);
+				e->do_not_watch = 1;
 			}
+
 
 		}
 	}
