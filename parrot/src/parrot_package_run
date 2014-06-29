@@ -5,9 +5,9 @@ mountlist=""
 show_help()
 {
 	echo "Usage: parrot_package_run --package-path path-of-package [--shell your-shell] [command]"
-	echo "If --shell is set, the following command will be ignored."
+	echo "If --shell is set, the following command will be ignored. The current directory will be set to the preserved $PWD variable."
 	echo "Example 1: parrot_package_run --package-path /tmp/pack --shell /bin/bash"
-	echo "If --shell is not set, and no command is given, run /bin/sh and return the prompt."
+	echo "If --shell is not set, and no command is given, run /bin/sh and return the prompt. The current directory will be set to the preserved $PWD variable."
 	echo "Example 2: parrot_package_run --package-path /tmp/pack"
 	echo "If --shell is not set, but one command is given, run your command within the chroot jail and exit parrot_package_run automatically."
 	echo "Example 3: parrot_package_run --package-path /tmp/pack ls"
