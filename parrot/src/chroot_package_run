@@ -4,19 +4,15 @@ package_path=""
 mountlist=""
 show_help()
 {
-	echo "Usage: chroot_package_run --package-path path-of-package [--shell your-shell] [command]"
-	echo "If --shell is set, the following command will be ignored. One shell with / as the current directory will be returned."
-	echo "Example 1: chroot_package_run --package-path /tmp/pack --shell /bin/bash"
-	echo "If --shell is not set, and no command is given, run /bin/sh and return the prompt with / as the current directory."
-	echo "Example 2: chroot_package_run --package-path /tmp/pack"
-	echo "If --shell is not set, but one command is given, run your command within the chroot jail and exit chroot_package_run automatically."
-	echo "Example 3: chroot_package_run --package-path /tmp/pack ls"
+	echo "Usage: chroot_package_run --package-path path-of-package [command]"
+	echo "If no command is given, a /bin/sh shell will be returned."
+	echo "Example 1: chroot_package_run --package-path /tmp/pack"
+	echo "If one command is given, run your command within the chroot jail and exit chroot_package_run automatically."
+	echo "Example 2: chroot_package_run --package-path /tmp/pack ls"
 	echo ''
 	echo "Options:"
 	echo "-p, --package-path         The path of the package."
-	echo "-s, --shell                The shell you want to enter into."
 	echo "-h, --help                 Show this help message."
-
 	exit 1
 }
 
@@ -36,10 +32,6 @@ do
 		-p | --package-path)
 			shift
 			package_path=$(complete_path "$1")
-			;;
-		-s | --shell)
-			shift
-			shell_type=$1
 			;;
 		-h | --help)
 			show_help
@@ -182,16 +174,11 @@ export_env
 
 unset PARROT_ENABLED
 
-if [ ! -z $shell_type ]; then
-	$cmd_chroot "$package_path" "$shell_type"
-elif [ -z "$1" ]; then
-	$cmd_chroot "$package_path" /bin/sh
+export PACKAGE_CHROOT_PWD="$PWD"
+if [ -z "$1" ]; then
+	$cmd_chroot "$package_path" /bin/sh -c 'cd "$PACKAGE_CHROOT_PWD"; exec /bin/sh'
 else
-	PACKAGE_CHROOT_PWD="$PWD"
-	$cmd_chroot "$package_path" /bin/sh <<EOF
-	cd "$PACKAGE_CHROOT_PWD"
-	eval "$@"
-EOF
+	$cmd_chroot "$package_path" /bin/sh -c 'cd "$PACKAGE_CHROOT_PWD"; exec "$@"' -- "$@"
 fi
 
 #post cleaning process

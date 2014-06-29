@@ -4,20 +4,15 @@ package_path=""
 mountlist=""
 show_help()
 {
-	echo "Usage: parrot_package_run --package-path path-of-package [--shell your-shell] [command]"
-	echo "If --shell is set, the following command will be ignored. The current directory will be set to the preserved $PWD variable."
-	echo "Example 1: parrot_package_run --package-path /tmp/pack --shell /bin/bash"
-	echo "If --shell is not set, and no command is given, run /bin/sh and return the prompt. The current directory will be set to the preserved $PWD variable."
-	echo "Example 2: parrot_package_run --package-path /tmp/pack"
-	echo "If --shell is not set, but one command is given, run your command within the chroot jail and exit parrot_package_run automatically."
-	echo "Example 3: parrot_package_run --package-path /tmp/pack ls"
-	echo "Example: parrot_package_run --package-path /tmp/pack /bin/bash"
+	echo "Usage: parrot_package_run --package-path path-of-package [command]"
+	echo "If no command is given, a /bin/sh shell will be returned."
+	echo "Example 1: parrot_package_run --package-path /tmp/pack"
+	echo "If one command is given, run your command within the chroot jail and exit parrot_package_run automatically."
+	echo "Example 2: parrot_package_run --package-path /tmp/pack ls"
 	echo ''
 	echo "Options:"
 	echo "-p, --package-path         The path of the package."
-	echo "-s, --shell                The shell you want to enter into."
 	echo "-h, --help                 Show this help message."
-
 	exit 1
 }
 
@@ -37,10 +32,6 @@ do
 		-p | --package-path)
 			shift
 			package_path=$(complete_path "$1")
-			;;
-		-s | --shell)
-			shift
-			shell_type=$1
 			;;
 		-h | --help)
 			show_help
@@ -105,9 +96,7 @@ export_env
 unset PARROT_ENABLED
 
 #initialize the repeat process
-if [ ! -z $shell_type ]; then
-	exec $cmd_parrot_run -m $mountlist -w $PWD -- "$shell_type"
-elif [ -z "$1" ]; then
+if [ -z "$1" ]; then
 	exec $cmd_parrot_run -m $mountlist -w $PWD -- /bin/sh
 else
 	exec $cmd_parrot_run -m $mountlist -w $PWD -- "$@"
