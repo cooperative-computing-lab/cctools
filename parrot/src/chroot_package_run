@@ -1,5 +1,5 @@
 #!/bin/sh
-#This script can help repeat one program within a package.
+#This script can help repeat one program within a package with the help of chroot.
 package_path=""
 mountlist=""
 show_help()
@@ -20,12 +20,21 @@ show_help()
 	exit 1
 }
 
+complete_path() {
+	orig_path=$1
+	if [ "${orig_path:0:1}" != "/" ]; then
+		echo "$(pwd)/$orig_path"
+	else
+		echo $orig_path
+	fi
+}
+
 while [ $# -gt 0 ]
 do
 	case $1 in
 		-p | --package-path)
 			shift
-			package_path=$1
+			package_path=$(complete_path "$1")
 			;;
 		-s | --shell)
 			shift
