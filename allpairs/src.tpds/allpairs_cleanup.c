@@ -15,7 +15,7 @@ See the file COPYING for details.
 
 void printUsage(char* cmd) {
 	printf("Use: %s <options> -F [finalize file]",cmd);
-        printf(" where options are:\n");
+	printf(" where options are:\n");
 	printf(" -a <mode>      Explicit authentication mode.\n");
 	printf(" -d <subsystem> Enable debugging for this subsystem.  (Try -d all to start.)\n");
 	//printf(" -t <string>    Timeout, e.g. 60s\n");
@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
     char* node_list;
     char* hn;
     char* fun_path;
-    int strlentmp;
+    size_t strlentmp;
     FILE* fp = fopen(finalize_file,"r");
     if(!fp) {
 	fprintf(stderr,"Finalize file not readable.\n");
@@ -96,11 +96,11 @@ int main(int argc, char** argv) {
     }
 
     // 0th item is workload id
-    if(fscanf(fp, " wID=%i ",&strlentmp) == 1) {
+    if(fscanf(fp, " wID=%zu ",&strlentmp) == 1) {
 	wID = malloc((strlentmp+1)*sizeof(char));
 	if(!wID)
 	{
-	    fprintf(stderr,"Could not allocate %i bytes for workload ID\n",strlentmp);
+	    fprintf(stderr,"Could not allocate %zu bytes for workload ID\n",strlentmp);
 	    exit(1);
 	}
 	if(fscanf(fp, " %s ", wID) != 1) {
@@ -111,11 +111,11 @@ int main(int argc, char** argv) {
     
     
     // first item is local prefix -- remove everything.
-    if(fscanf(fp, " local_dir=%i ",&strlentmp) == 1) {
+    if(fscanf(fp, " local_dir=%zu ",&strlentmp) == 1) {
 	local_dir = (char*) malloc((strlentmp+1)*sizeof(char));
 	if(!local_dir)
 	{
-	    fprintf(stderr,"Could not allocate %i bytes for local directory\n",strlentmp);
+	    fprintf(stderr,"Could not allocate %zu bytes for local directory\n",strlentmp);
 	    exit(1);
 	}
 	if(fscanf(fp," %s ", local_dir) != 1) {
@@ -126,11 +126,11 @@ int main(int argc, char** argv) {
 
     // second item is matrix host -\ remove
     // third item is matrix path  -/ matrix
-    if(fscanf(fp, " mat_host=%i ",&strlentmp) == 1) {
+    if(fscanf(fp, " mat_host=%zu ",&strlentmp) == 1) {
 	mat_host = (char *) malloc((strlentmp+1)*sizeof(char));
 	if(!mat_host)
 	{
-	    fprintf(stderr,"Could not allocate %i bytes for matrix host\n",strlentmp);
+	    fprintf(stderr,"Could not allocate %zu bytes for matrix host\n",strlentmp);
 	    exit(1);
 	}
 	if(fscanf(fp," %s ", mat_host) != 1) {
@@ -139,11 +139,11 @@ int main(int argc, char** argv) {
 	}
     }
 
-    if(fscanf(fp, " mat_path=%i ",&strlentmp) == 1) {
+    if(fscanf(fp, " mat_path=%zu ",&strlentmp) == 1) {
 	mat_path = (char *) malloc((strlentmp+1)*sizeof(char));
 	if(!mat_path)
 	{
-	    fprintf(stderr,"Could not allocate %i bytes for matrix path\n",strlentmp);
+	    fprintf(stderr,"Could not allocate %zu bytes for matrix path\n",strlentmp);
 	    exit(1);
 	}
 	if(fscanf(fp," %s ", mat_path) != 1) {
@@ -154,11 +154,11 @@ int main(int argc, char** argv) {
     
 
     // 4th item is chirp_dirname
-    if(fscanf(fp, " remote_dir=%i ",&strlentmp) == 1) {
+    if(fscanf(fp, " remote_dir=%zu ",&strlentmp) == 1) {
 	remote_dir = (char *) malloc((strlentmp+1)*sizeof(char));
 	if(!remote_dir)
 	{
-	    fprintf(stderr,"Could not allocate %i bytes for remote path\n",strlentmp);
+	    fprintf(stderr,"Could not allocate %zu bytes for remote path\n",strlentmp);
 	    exit(1);
 	}
 	if(fscanf(fp," %s ", remote_dir) != 1) {
@@ -172,11 +172,11 @@ int main(int argc, char** argv) {
     }
      
     // 7th item is full goodstring
-    if(fscanf(fp, " node_list=%i ",&strlentmp) == 1) {
+    if(fscanf(fp, " node_list=%zu ",&strlentmp) == 1) {
 	node_list = (char *) malloc((strlentmp+1)*sizeof(char));
 	if(!node_list)
 	{
-	    fprintf(stderr,"Could not allocate %i bytes for remote hosts\n",strlentmp);
+	    fprintf(stderr,"Could not allocate %zu bytes for remote hosts\n",strlentmp);
 	    exit(1);
 	}
 	if(fread(node_list,1,strlentmp,fp) != strlentmp) {
@@ -190,11 +190,11 @@ int main(int argc, char** argv) {
     }
 
     // 9th item is hostname
-    if(fscanf(fp, " host=%i ",&strlentmp) == 1) {
+    if(fscanf(fp, " host=%zu ",&strlentmp) == 1) {
 	hn = malloc((strlentmp+1)*sizeof(char));
 	if(!hn)
 	{
-	    fprintf(stderr,"Could not allocate %i bytes for hostname\n",strlentmp);
+	    fprintf(stderr,"Could not allocate %zu bytes for hostname\n",strlentmp);
 	    exit(1);
 	}
 	if(fscanf(fp, " %s ", hn) != 1) {
@@ -208,11 +208,11 @@ int main(int argc, char** argv) {
     }
     
     // 10th item is full function directory -- remove tarball, exception list
-    if(fscanf(fp, " fun_path=%i ",&strlentmp) == 1) {
+    if(fscanf(fp, " fun_path=%zu ",&strlentmp) == 1) {
 	fun_path = (char *) malloc((strlentmp+1)*sizeof(char));
 	if(!fun_path)
 	{
-	    fprintf(stderr,"Could not allocate %i bytes for function directory\n",strlentmp);
+	    fprintf(stderr,"Could not allocate %zu bytes for function directory\n",strlentmp);
 	    exit(1);
 	}
 	if(fscanf(fp," %s ", fun_path) != 1) {

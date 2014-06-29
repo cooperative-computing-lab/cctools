@@ -30,6 +30,7 @@ See the file COPYING for details.
 #include "chirp_matrix.h"
 
 #include "catalog_query.h"
+#include "cctools.h"
 #include "nvpair.h"
 #include "link.h"
 #include "stringtools.h"
@@ -558,8 +559,6 @@ int main(int argc, char** argv)
     abase = bbase = 0;
     abaseend = bbaseend = -1; 
 
-    time_t timeout;
-
     /*
       declare and initialize the environment: hostname
     */
@@ -645,7 +644,7 @@ int main(int argc, char** argv)
 	    debug_flags_set(optarg);
 	    break;
 	case 't':
-	    timeout = string_time_parse(optarg);
+		/* ignored */
 	    break;
 	case 'L': // force LOCAL execution
 	    if(LOCALorREMOTE == 1) {
@@ -717,7 +716,7 @@ int main(int argc, char** argv)
     
     if(local_prefix_chosen == 0) // if the local state wasn't specified via command line argument
 	sprintf(local_prefix,"/tmp/%s/",argv[workloadID_index]); // default value: /tmp/WORKLOADID
-    for(i=1; i < strlen(local_prefix); i++)  // create the prefix hierarchy as necessary
+    for(i=1; i < (int)strlen(local_prefix); i++)  // create the prefix hierarchy as necessary
 	if(local_prefix[i] == '/') {
 	    local_prefix[i] = '\0';
 	    mkdir(local_prefix, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH); 
@@ -1325,7 +1324,7 @@ int main(int argc, char** argv)
 	    sprintf(reqstring,"Requirements = (Arch==\"INTEL\" || Arch == \"X86_64\") && (Disk > %lld) && (Memory >= 450) && (MachineGroup != \"itm\") && (Machine != \"%s\") && ( (VirtualMachineID == 1) || ((VirtualMachineID == 2) && (Disk > %lld)) ) && ( stringListIMember(MachineShortName, \"",diskreq,hostname,diskreq2);
 	    INT64_T diskreq2 = diskreq*2; // double the requirement for dual-processor machines.
 	    */
-	    sprintf(reqstring,"Requirements = (Arch==\"INTEL\" || Arch == \"X86_64\") && (Disk > %lld) && (Memory >= 450) && (MachineGroup != \"itm\") && (Machine != \"%s\") && ( (VirtualMachineID == 1))  && ( stringListIMember(MachineShortName, \"",diskreq,hostname);
+	    sprintf(reqstring,"Requirements = (Arch==\"INTEL\" || Arch == \"X86_64\") && (Disk > %" PRId64 ") && (Memory >= 450) && (MachineGroup != \"itm\") && (Machine != \"%s\") && ( (VirtualMachineID == 1))  && ( stringListIMember(MachineShortName, \"",diskreq,hostname);
 
 	    sprintf(reqclose,"\") )\n"); // set third "third" of requirements string
 	    rsl = strlen(reqstring)+2+strlen(reqclose); // measure the length of the requirements string's 1st and 3rd parts

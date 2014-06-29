@@ -34,20 +34,13 @@ int main(int argc, char** argv) {
 	if(k != 1) {
 	    k=fscanf(statusPipe," outcome: %s",event);
 	    if(k != 1)
-		printf("Failed string1: %s\n",event);
-	    else
-		;//printf("Successful string1: %s\n",event);
+			printf("Failed string1: %s\n",event);
 	}
-	else
-	    ;//printf("Successful string1: %s\n",event);
 	if(strcmp(event,"ULOG_NO_EVENT") != 0) {
 	    k=fscanf(statusPipe," Queued Jobs: %d",&j);
 	    if(k != 1) {
-		fscanf(statusPipe,"%s",event);
-		printf("Failed string2: %s\n",event);
-	    }
-	    else {
-		;//printf("Successful string2: %d\n",j);
+			fscanf(statusPipe,"%s",event);
+			printf("Failed string2: %s\n",event);
 	    }
 	}
 	else
