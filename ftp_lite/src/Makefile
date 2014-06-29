@@ -20,6 +20,6 @@ clean:
 
 install:
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(HEADERS_PUBLIC) $(CCTOOLS_INSTALL_DIR)/include/cctools/

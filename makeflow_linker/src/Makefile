@@ -17,5 +17,4 @@ test: all
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
-	cp $(TARGETS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
-
+	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/

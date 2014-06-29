@@ -28,9 +28,10 @@ INSTALL_PACKAGES = $(CCTOOLS_PACKAGES:%=install-%)
 $(INSTALL_PACKAGES): $(CCTOOLS_PACKAGES)
 	@$(MAKE) -C $(@:install-%=%) install
 install: $(INSTALL_PACKAGES)
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/{etc,doc}
-	cp config.mk ${CCTOOLS_INSTALL_DIR}/etc/config.mk
-	cp COPYING ${CCTOOLS_INSTALL_DIR}/doc
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/etc
+	cp config.mk ${CCTOOLS_INSTALL_DIR}/etc/
+	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
+	cp COPYING ${CCTOOLS_INSTALL_DIR}/doc/
 
 test: $(CCTOOLS_PACKAGES)
 	./run_all_tests.sh

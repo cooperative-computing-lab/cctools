@@ -2,22 +2,22 @@ include ../../config.mk
 include ../../rules.mk
 
 SOURCES = \
-	batch_job.c  \
-	batch_job_chirp.c  \
-	batch_job_condor.c  \
-	batch_job_hadoop.c  \
-	batch_job_local.c  \
-	batch_job_mpi_queue.c  \
-	batch_job_cluster.c  \
+	batch_job.c \
+	batch_job_chirp.c \
+	batch_job_cluster.c \
+	batch_job_condor.c \
+	batch_job_hadoop.c \
+	batch_job_local.c \
+	batch_job_mpi_queue.c \
 	batch_job_work_queue.c \
-	work_queue_catalog.c   \
+	work_queue.c \
+	work_queue_catalog.c \
 	work_queue_example.c \
 	work_queue_pool.c \
 	work_queue_resources.c \
-	work_queue_status.c    \
-	work_queue_worker.c    \
-	work_queue_workload_simulator.c    \
-	work_queue.c
+	work_queue_status.c \
+	work_queue_worker.c \
+	work_queue_workload_simulator.c
 
 EXTERNAL_DEPENDENCIES = ../../chirp/src/libchirp.a ../../dttools/src/libdttools.a
 LIBRARIES = libwork_queue.a
@@ -56,17 +56,15 @@ $(CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN):
 
 install: all install-bindings
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/include
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	chmod 755 $(SCRIPTS)
-	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib
-	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin
-	cp $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin
-	cp work_queue_example.c $(CCTOOLS_INSTALL_DIR)/doc
-	for file in $(PUBLIC_HEADERS) ; do if [ -f $$file ] ; then cp $$file $(CCTOOLS_INSTALL_DIR)/include/cctools ; fi ; done
-	for file in $(CYGWINLIB) ; do if [ -f /bin/$$file ] ; then cp /bin/$$file $(CCTOOLS_INSTALL_DIR)/bin/$$file ; fi ; done
+	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
+	for file in $(CYGWINLIB) ; do if [ -f /bin/$$file ]; then cp /bin/$$file $(CCTOOLS_INSTALL_DIR)/bin/; fi; done
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
+	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
+	cp work_queue_example.c $(CCTOOLS_INSTALL_DIR)/doc/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
+	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 
 test:
 

@@ -19,4 +19,4 @@ test: all
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	chmod 755 $(SCRIPTS)
-	cp $(TARGETS) $(SCRIPTS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
+	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
