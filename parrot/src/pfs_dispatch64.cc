@@ -994,36 +994,45 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			decode_execve(p,entering,p->syscall,args);
 			break;
 
-		/*
-		Some variants of fork do not propagate ptrace, so we
-		must convert them into clone with appropriate flags.
-		Once a fork is started, we must trace only that pid
-		so that we can determine the child pid before seeing
-		any events from the child. On return, we must fill
-		in the child process with its parent's ppid.
-		*/
-
+		case SYSCALL64_vfork:
+			if (entering && !linux_available(2,5,46)) {
+				static int notified = 0;
+				if (!notified) {
+					debug(D_NOTICE, "sorry, I cannot run this program (%s) without parrot_helper.so.",p->name);
+					notified = 0;
+				}
+				divert_to_dummy(p,-ENOSYS);
+				break;
+			}
+			/* no break */
 		case SYSCALL64_fork:
 		case SYSCALL64_clone:
 			if(entering) {
-				if (!linux_available(2,5,46)) { /* tracing children handled by PTRACE_SETOPTIONS in tracer.c */
-					INT64_T newargs[4];
-					INT64_T newargs_count;
+				if (!linux_available(2,5,46)) {
+					/* Some variants of fork do not propagate ptrace, so we
+					 * must convert them into clone with appropriate flags.
+					 * Once a fork is started, we must trace only that pid so
+					 * that we can determine the child pid before seeing any
+					 * events from the child. On return, we must fill in the
+					 * child process with its parent's ppid.
+					 */
 					if(p->syscall==SYSCALL64_fork || p->syscall==SYSCALL64_vfork) {
-						newargs[0] = CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
-						newargs[1] = 0;
-						newargs_count = 2;
-						p->syscall_args_changed = 1;
-						debug(D_SYSCALL,"converting fork into clone(%"PRIx64")",newargs[0]);
+						args[0] = CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
+						args[1] = 0;
+						p->syscall_args_changed = 2;
+						tracer_args_set(p->tracer,SYSCALL64_clone,args,2);
+						debug(D_SYSCALL,"converting fork into clone(%"PRIx64")",args[0]);
 					} else {
-						newargs[0] = (args[0]&~0xff)|CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
-						newargs_count = 1;
-						debug(D_SYSCALL,"adjusting clone(%"PRIx64",%"PRIx64",%"PRIx64",%"PRIx64") -> clone(%"PRIx64")",args[0],args[1],args[2],args[3],newargs[0]);
+						INT64_T newarg = (args[0]&~0xff)|CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
+						debug(D_SYSCALL,"adjusting clone(%"PRIx64",%"PRIx64",%"PRIx64",%"PRIx64") -> clone(%"PRIx64")",args[0],args[1],args[2],args[3],newarg);
+						args[0] = newarg;
+						p->syscall_args_changed = 1;
+						tracer_args_set(p->tracer,SYSCALL64_clone,args,1);
 					}
-					tracer_args_set(p->tracer,SYSCALL64_clone,newargs,newargs_count);
 				}
+				/* else tracing children handled by PTRACE_SETOPTIONS in tracer.c */
 				trace_this_pid = p->pid;
-			} else {
+			} else if (!linux_available(2,5,46)) {
 				INT64_T childpid;
 				struct pfs_process *child;
 				tracer_result_get(p->tracer,&childpid);
@@ -1043,8 +1052,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						notify_parent = p->pid;
 					}
 					child = pfs_process_create(childpid,p->pid,notify_parent,clone_files,child_signal);
-					if(linux_available(2,5,46))
-						tracer_continue(child->tracer,0); /* child is stopped if we used PTRACE_SETOPTIONS */
 					child->syscall_result = 0;
 					if(args[0]&CLONE_THREAD) child->tgid = p->tgid;
 					if(p->syscall_original==SYSCALL64_fork) {
@@ -1060,23 +1067,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					/* now trace any process at all */
 					trace_this_pid = -1;
 				}
-			}
-			break;
-
-		/*
-		Note that we do not support vfork.  The behavior of vfork
-		varies greatly from kernel to kernel, and is in fact impossible
-		to support through ptrace without a kernel patch in some cases.
-		However, glibc is smart and converts vfork into fork if the
-		kernel response that it does not exist.  So, failed vforks
-		eventually end up in the previous case.  Also note parrot_helper.so,
-		which also aims to solve this problem.
-		*/
-
-		case SYSCALL64_vfork:
-			if(entering) {
-				debug(D_NOTICE,"sorry, I cannot run this program (%s) without parrot_helper.so.",p->name);
-				divert_to_dummy(p,-ENOSYS);
 			}
 			break;
 
