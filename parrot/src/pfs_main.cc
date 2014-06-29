@@ -75,7 +75,7 @@ int pfs_force_cache = 0;
 int pfs_force_sync = 0;
 int pfs_follow_symlinks = 1;
 int pfs_session_cache = 0;
-int pfs_use_helper = 1;
+int pfs_use_helper = 0;
 int pfs_checksum_files = 1;
 int pfs_write_rval = 0;
 int pfs_paranoid_mode = 0;
@@ -120,9 +120,10 @@ static int root_exitstatus = 0;
 static int channel_size = 10;
 
 enum {
-	LONG_OPT_CVMFS_REPO_SWITCHING=500,
+	LONG_OPT_CVMFS_REPO_SWITCHING = UCHAR_MAX+1,
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
 	LONG_OPT_CVMFS_ALIEN_CACHE,
+	LONG_OPT_HELPER,
 };
 
 static void get_linux_version(const char *cmd)
@@ -196,8 +197,8 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Enable file snapshot caching for all protocols.\n", "-F,--with-snapshots");
 	fprintf(stdout, " %-30s Disable following symlinks.\n", "-f,--no-follow-symlinks");
 	fprintf(stdout, " %-30s Fake this gid; Real gid stays the same.          (PARROT_GID)\n", "-G,--gid=<num>");
-	fprintf(stdout, " %-30s Disable use of helper library.\n", "-H,--no-helper");
 	fprintf(stdout, " %-30s Show this screen.\n", "-h,--help");
+	fprintf(stdout, " %-30s Enable use of helper library.\n", "--helper");
 	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
 	fprintf(stdout, " %-30s Set the debug level output for the iRODS driver.\n", "-I,--debug-level-irods=<num>");
 	fprintf(stdout, " %-30s Checksum files where available.\n", "-K,--with-checksums");
@@ -332,13 +333,35 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 		p->nsyscalls++;
 		pfs_dispatch(p, 0);
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
-		pid_t child = tracer_getevent(p->tracer);
-		debug(D_PROCESS, "pid %d cloned %d", pid, child);
+		pid_t cpid;
+		struct pfs_process *child;
+		pid_t notify_parent;
+		INT64_T child_signal, clone_files;
 
-		/* At this point the child is stopped, it will be resumed with
-		 * tracer_continue when clone finishes. We only do this because
-		 * CLONE_PTRACE is buggy with multithreaded code. */
-		tracer_continue(p->tracer, 0);
+		cpid = tracer_getevent(p->tracer);
+		debug(D_PROCESS, "pid %d cloned %d",pid,cpid);
+
+		if(status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
+			child_signal = SIGCHLD;
+			clone_files = 0;
+		} else {
+			/* per clone(1): "The low byte of flags contains the number of the termination signal sent to the parent when the child dies." */
+			child_signal = p->syscall_args[0]&0xff;
+			clone_files = p->syscall_args[0]&CLONE_FILES;
+		}
+		if (p->syscall_args[0]&(CLONE_PARENT|CLONE_THREAD)) {
+			notify_parent = p->ppid;
+		} else {
+			notify_parent = p->pid;
+		}
+		child = pfs_process_create(cpid,pid,notify_parent,clone_files,child_signal);
+		child->syscall_result = 0;
+		if(p->syscall_args[0]&CLONE_THREAD)
+			child->tgid = p->tgid;
+		child->state = PFS_PROCESS_STATE_USER;
+		tracer_continue(p->tracer,0); /* child starts stopped. */
+
+		trace_this_pid = -1; /* now trace any process at all */
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXEC<<8))) {
 		debug(D_PROCESS, "pid %d is completing exec", (int)pid);
 		tracer_continue(p->tracer, 0);
@@ -611,6 +634,7 @@ int main( int argc, char *argv[] )
 		{"gid", required_argument, 0, 'G'},
 		{"no-helper", no_argument, 0, 'H'},
 		{"help", no_argument, 0, 'h'},
+		{"helper", no_argument, 0, LONG_OPT_HELPER},
 		{"tickets", required_argument, 0, 'i'},
 		{"debug-level-irods", required_argument, 0, 'I'},
 		{"with-checksums", no_argument, 0, 'K'},
@@ -703,7 +727,7 @@ int main( int argc, char *argv[] )
 			pfs_gid = atoi(optarg);
 			break;
 		case 'H':
-			pfs_use_helper = 0;
+			/* deprecated */
 			break;
 		case 'I':
 			pfs_irods_debug_level = atoi(optarg);
@@ -810,6 +834,9 @@ int main( int argc, char *argv[] )
 		case 'W':
 			pfs_syscall_totals32 = (int*) calloc(SYSCALL32_MAX,sizeof(int));
 			pfs_syscall_totals64 = (int*) calloc(SYSCALL64_MAX,sizeof(int));
+			break;
+		case LONG_OPT_HELPER:
+			pfs_use_helper = 1;
 			break;
 		default:
 			show_help(argv[0]);
