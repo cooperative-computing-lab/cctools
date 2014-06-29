@@ -70,21 +70,6 @@ fi
 package_path=`readlink -f $package_path`
 cd $package_path
 
-# This allows DNS lookups via your system's networking
-if [ ! -e etc ]; then
-	mkdir etc
-fi
-cp -L /etc/resolv.conf etc/
-
-common_mountlist=$package_path/common-mountlist
-while read item
-do
-	tmp_fs=`echo $item|cut -d' ' -f1`
-	virtual_fs=./$tmp_fs
-	mkdir -p $virtual_fs 1>/dev/null 2>/dev/null
-	mount --bind $tmp_fs $virtual_fs 1>/dev/null 2>/dev/null
-done <$common_mountlist
-
 cmd_chroot=`which chroot`
 cmd_rm=`which rm`
 cmd_umount=`which umount`
@@ -113,35 +98,50 @@ fi
 sort -u special_files >> special_files.bak
 mv -f special_files.bak special_files
 
+common_mountlist=$package_path/common-mountlist
 #umount chroot dirs
-umount_virtual_fs() {
+unmount_virtual_fs() {
 	while read item
 	do
 		tmp_fs=`echo $item|cut -d' ' -f1`
-		virtual_fs=$package_path/$tmp_fs
+		virtual_fs="$package_path/$tmp_fs"
 		if [ -e $virtual_fs ]; then
 			$cmd_umount -f $virtual_fs 1>/dev/null 2>/dev/null
 			$cmd_rmdir $virtual_fs
 		fi
-	done <$common_mountlist
+	done <"$common_mountlist"
 }
 
 #remove special files
 remove_special_files() {
 	if [ -e $package_path/etc/resolv.conf ]; then
-		$cmd_rm $package_path/etc/resolv.conf
+		$cmd_rm "$package_path/etc/resolv.conf"
 	fi
 	while read line
 	do
 		item=`echo $line|cut -d' ' -f1`
-		if [ -e $package_path/$item ]; then
-			unlink $package_path/$item
+		if [ -e "$package_path/$item" ]; then
+			unlink "$package_path/$item"
 		fi
-	done < $package_path/special_files
+	done < "$package_path/special_files"
 }
 
-umount_virtual_fs
+unmount_virtual_fs
 remove_special_files
+
+# This allows DNS lookups via your system's networking
+if [ ! -e etc ]; then
+	mkdir etc
+fi
+cp -L /etc/resolv.conf etc/
+
+while read item
+do
+	tmp_fs=`echo $item|cut -d' ' -f1`
+	virtual_fs=./$tmp_fs
+	mkdir -p $virtual_fs 1>/dev/null 2>/dev/null
+	mount --bind $tmp_fs $virtual_fs 1>/dev/null 2>/dev/null
+done <$common_mountlist
 
 #create hardlink to special files
 while read line
@@ -195,5 +195,5 @@ EOF
 fi
 
 #post cleaning process
-umount_virtual_fs
+unmount_virtual_fs
 remove_special_files
