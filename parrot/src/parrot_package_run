@@ -23,7 +23,8 @@ show_help()
 
 complete_path() {
 	orig_path=$1
-	if [ "${orig_path:0:1}" != "/" ]; then
+	first_ch=`echo $orig_path | head -c 1`
+	if [ $first_ch != "/" ]; then
 		echo "$(pwd)/$orig_path"
 	else
 		echo $orig_path
