@@ -773,6 +773,7 @@ int main( int argc, char *argv[] )
 				debug(D_DEBUG, "writing ld-linux* into namelist file failed.");
 				return 1;
 			}
+			fprintf(namelist_file, "/bin/sh\n");
 			break;
 		case 'N':
 			pfs_false_uname = optarg;
