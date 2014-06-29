@@ -1,8 +1,10 @@
-include ../Makefile.config
-include ../Makefile.rules
+include ../config.mk
+include ../rules.mk
 
 PHONY_TARGETS ?= src
 TARGETS ?= $(PHONY_TARGETS)
+
+all: $(TARGETS)
 
 $(TARGETS):
 	@$(MAKE) -C $@
@@ -17,4 +19,9 @@ $(INSTALL_TARGETS):
 	@$(MAKE) -C $(@:install-%=%) install
 install: $(INSTALL_TARGETS)
 
-.PHONY: $(PHONY_TARGETS) all clean install test
+TEST_TARGETS = $(TARGETS:%=test-%)
+$(TEST_TARGETS):
+	@$(MAKE) -C $(@:test-%=%) test
+test: $(TEST_TARGETS)
+
+.PHONY: $(PHONY_TARGETS) $(CLEAN_TARGETS) $(INSTALL_TARGETS) $(TEST_TARGETS) all clean install test

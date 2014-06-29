@@ -1,45 +1,47 @@
-CCTOOLS_HOME = ../../..
+include ../../../config.mk
+include ../../../rules.mk
 
-include ${CCTOOLS_HOME}/Makefile.config
+PYTHON_INSTALL_DIR = $(CCTOOLS_INSTALL_DIR)/lib/python$(CCTOOLS_PYTHON3_VERSION)/site-packages
 
 # Python always uses 'so' for its modules (even on Darwin)
-CCTOOLS_DYNAMIC_SUFFIX=so
+CCTOOLS_DYNAMIC_SUFFIX = so
+# SWIG produces code that causes a lot of warnings, so use -w to turn those off.
+LOCAL_CCFLAGS = -w -fPIC $(CCTOOLS_PYTHON3_CCFLAGS)
+LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS)
 
-all: work_queue.py _work_queue.${CCTOOLS_DYNAMIC_SUFFIX} work_queue_example.py3
+EXTERNAL_DEPENDENCIES = ../libwork_queue.a ../../../dttools/src/libdttools.a
+WQPYTHONSO = _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
+LIBRARIES = $(WQPYTHONSO)
+OBJECTS = work_queue_wrap.o
+TARGETS = $(LIBRARIES) work_queue_example.py3
 
-work_queue_wrap.c work_queue.py: work_queue.i ../python/work_queue.binding.py
-	@echo "SWIG work_queue.i (python)"
-	@$(CCTOOLS_SWIG) -o work_queue_wrap.c -python -py3 -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src work_queue.i
-	@cp ../python/work_queue.binding.py .
-	@${CCTOOLS_PYTHON3_2TO3} -w work_queue.binding.py
-	@cat work_queue.binding.py >> work_queue.py
-
-work_queue_wrap.o: work_queue_wrap.c
-	$(CCTOOLS_CC) -c -o $@ -fPIC -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src $(CCTOOLS_PYTHON3_CCFLAGS) $^
+all: $(TARGETS)
 
 # The odd symlink in the following rule is necessary to overcome a problem
 # in the framework search path emitted by the Python configuration on macOS.
+work_queue_wrap.c work_queue.py: work_queue.i work_queue.binding.py3
+	@echo "SWIG work_queue.i (python)"
+	@$(CCTOOLS_SWIG) -o work_queue_wrap.c -python -py3 -I../../../dttools/src -I../ work_queue.i
+	@cat work_queue.binding.py3 >> work_queue.py
+	ln -sf /System/Library/Frameworks/Python.framework .
 
-_work_queue.$(CCTOOLS_DYNAMIC_SUFFIX): work_queue_wrap.o $(CCTOOLS_HOME)/work_queue/src/libwork_queue.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
-	@ln -sf /System/Library/Frameworks/Python.framework .
-	$(CCTOOLS_LD) $(CCTOOLS_BASE_LDFLAGS) $(CCTOOLS_DYNAMIC_FLAG) -o $@ $^ $(CCTOOLS_EXTERNAL_DYNLIBS) $(CCTOOLS_PYTHON3_LDFLAGS)
-	@rm Python.framework
+$(WQPYTHONSO): work_queue_wrap.o $(EXTERNAL_DEPENDENCIES)
 
-work_queue_example.py3: ../python/work_queue_example.py
-	@cp ../python/work_queue_example.py work_queue_example.py3
-	@chmod 755 work_queue_example.py3
-	@${CCTOOLS_PYTHON3_2TO3} -w work_queue_example.py3
+%.py3: %.py
+	cp $< $@
+	chmod 755 $@
+	$(CCTOOLS_PYTHON3_2TO3) -w $@
 
-test: all
-	@echo running work queue python binding tests
-	@${CCTOOLS_HOME}/dttools/src/test_runner.sh TR_*.sh
+work_queue.binding.py3: work_queue.binding.py
+work_queue_example.py3: work_queue_example.py
+
+test:
 
 clean:
-	rm -fr Python.framework _work_queue.${CCTOOLS_DYNAMIC_SUFFIX} work_queue.binding.py work_queue.binding.py.bak work_queue.py work_queue_wrap.* *.pyc work_queue_example.py3*
+	rm -f $(OBJECTS) $(TARGETS) Python.framework work_queue.binding.py3* work_queue.py work_queue_wrap.c *.pyc work_queue_example.py3*
 
 install: all
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON3_VERSION}/site-packages
-	cp _work_queue.${CCTOOLS_DYNAMIC_SUFFIX} ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON3_VERSION}/site-packages
-	cp work_queue.py ${CCTOOLS_INSTALL_DIR}/lib/python${CCTOOLS_PYTHON3_VERSION}/site-packages
-	cp work_queue_example.py3 ${CCTOOLS_INSTALL_DIR}/doc/work_queue_example.py3
+	mkdir -p $(PYTHON_INSTALL_DIR)
+	cp work_queue.py _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(PYTHON_INSTALL_DIR)/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
+	cp work_queue_example.py3 $(CCTOOLS_INSTALL_DIR)/doc/

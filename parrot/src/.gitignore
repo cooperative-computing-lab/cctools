@@ -5,7 +5,7 @@ parrot_locate
 parrot_lsalloc
 parrot_md5
 parrot_mkalloc
-parrot_pack
+parrot_package_create
 parrot_run
 parrot_search
 parrot_setacl

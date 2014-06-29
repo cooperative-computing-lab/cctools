@@ -1,27 +1,18 @@
-CCTOOLS_HOME = ../../
+include ../../config.mk
+include ../../rules.mk
 
-include ${CCTOOLS_HOME}/Makefile.config
-include ${CCTOOLS_HOME}/Makefile.rules
+EXTERNAL_DEPENDENCIES = ../../work_queue/src/libwork_queue.a ../../chirp/src/libchirp.a ../../dttools/src/libdttools.a
+PROGRAMS = wavefront wavefront_master
+TARGETS = $(PROGRAMS)
 
-PROGRAMS =  wavefront wavefront_master
+all: $(PROGRAMS)
+$(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 
-LOCAL_LDFLAGS=-lwork_queue -lchirp -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
-
-all: ${PROGRAMS}
-
-
-wavefront: wavefront.o ${CCTOOLS_HOME}/dttools/src/libdttools.a ${CCTOOLS_HOME}/chirp/src/libchirp.a
-	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
-
-wavefront_master: wavefront_master.o ${CCTOOLS_HOME}/dttools/src/libdttools.a ${CCTOOLS_HOME}/chirp/src/libchirp.a
-	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
+clean:
+	rm -f $(PROGRAMS)
 
 test:
 
-clean:
-	rm -f core *~ *.o *.a ${PROGRAMS} 
-
 install: all
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
-
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
+	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/

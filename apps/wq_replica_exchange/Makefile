@@ -1,6 +1,6 @@
 
-include ../../Makefile.config
-include ../../Makefile.rules
+include ../../config.mk
+include ../../rules.mk
 
 all:
 

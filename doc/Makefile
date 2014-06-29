@@ -1,4 +1,4 @@
-include ../Makefile.config
+include ../config.mk
 
 SOURCES=${shell ls man/*.m4}
 

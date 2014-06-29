@@ -1,6 +1,5 @@
-
-include ../../Makefile.config
-include ../../Makefile.rules
+include ../../config.mk
+include ../../rules.mk
 
 SOURCES = auth.c  \
           auth_all.c  \
@@ -84,73 +83,46 @@ SOURCES = auth.c  \
           username.c  \
           xxmalloc.c
 
-EXTRA_HEADERS = batch_job_internal.h \
-                macros.h
+HEADERS_PUBLIC = \
+	auth.h \
+	auth_address.h \
+	auth_all.h \
+	auth_globus.h \
+	auth_hostname.h \
+	auth_kerberos.h \
+	auth_ticket.h \
+	auth_unix.h \
+	buffer.h \
+	debug.h \
+	int_sizes.h \
+	link.h \
+	md5.h \
+	timestamp.h
 
-PUBLIC_HEADERS = auth.h  \
-                 auth_address.h  \
-                 auth_all.h  \
-                 auth_globus.h  \
-                 auth_hostname.h  \
-                 auth_kerberos.h  \
-                 auth_ticket.h \
-                 auth_unix.h  \
-                 batch_job.h  \
-                 buffer.h  \
-                 debug.h  \
-                 int_sizes.h  \
-                 link.h  \
-                 md5.h  \
-                 rmonitor_hooks.h \
-                 timestamp.h
-
-OBJECTS = ${SOURCES:%.c=%.o}
-HEADERS = ${SOURCES:%.c=%.h} ${EXTRA_HEADERS}
-LIBRARIES = libdttools.a
-PROGRAMS = catalog_update catalog_server watchdog
-
-TEST_PROGRAMS = microbench multirun
-PROGRAM_SOURCES = ${PROGRAMS:%=%.c} ${TEST_PROGRAMS:%=%.c}
 CYGWINLIB = cygwin1.dll cyggcc_s-1.dll cygintl-8.dll cygreadline7.dll cygncursesw-10.dll cygiconv-2.dll cygattr-1.dll sh.exe
+LIBRARIES = libdttools.a
+OBJECTS = $(SOURCES:%.c=%.o)
+PROGRAMS = catalog_update catalog_server watchdog
+TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
+TEST_PROGRAMS = auth_test microbench multirun
 
-all: ${LIBRARIES} $(PROGRAMS) $(TEST_PROGRAMS)
+all: $(TARGETS)
 
-auth_test: auth_test.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-catalog_update: catalog_update.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-catalog_server: catalog_server.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-watchdog: watchdog.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-microbench: microbench.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-multirun: multirun.o libdttools.a
-	${CCTOOLS_LD} $^ ${CCTOOLS_INTERNAL_LDFLAGS} -o $@
-
-libdttools.a: ${OBJECTS}
-	${CCTOOLS_AR} rv $@ $^
-	ranlib $@
+libdttools.a: $(OBJECTS)
+$(PROGRAMS) $(TEST_PROGRAMS): $(LIBRARIES)
 
 test: all
 
 clean:
-	rm -f core *~ *.o *.os *.so libdttools.a large_chunk.txt $(PROGRAMS) $(TEST_PROGRAMS)
+	rm -f $(OBJECTS) $(TARGETS)
 
 install: all
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/include
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/include/cctools
-	cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
-	cp cctools_gpu_autodetect ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
-	for file in ${PUBLIC_HEADERS} ; do if [ -f $$file ] ; then cp $$file ${CCTOOLS_INSTALL_DIR}/include/cctools ; fi ; done
-	for file in ${CYGWINLIB} ; do if [ -f /bin/$$file ] ; then cp /bin/$$file ${CCTOOLS_INSTALL_DIR}/bin/$$file ; fi ; done
-
-
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/include
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
+	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
+	cp cctools_gpu_autodetect $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
+	for file in $(PUBLIC_HEADERS) ; do if [ -f $$file ] ; then cp $$file $(CCTOOLS_INSTALL_DIR)/include/cctools/ ; fi ; done
+	for file in $(CYGWINLIB) ; do if [ -f /bin/$$file ] ; then cp /bin/$$file $(CCTOOLS_INSTALL_DIR)/bin/ ; fi ; done

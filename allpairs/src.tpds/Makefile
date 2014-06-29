@@ -1,7 +1,7 @@
 CCTOOLS_HOME = ../../../
 
-include ${CCTOOLS_HOME}/Makefile.config
-include ${CCTOOLS_HOME}/Makefile.rules
+include ${CCTOOLS_HOME}/config.mk
+include ${CCTOOLS_HOME}/rules.mk
 
 TARGETS = allpairs allpairs_status allpairs_wait allpairs_cleanup
 
