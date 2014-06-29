@@ -1,3 +1,3 @@
-PHONY_TARGETS = src src.tpds
+PHONY_TARGETS = src
 
 include ../.module.mk
