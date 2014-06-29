@@ -191,7 +191,7 @@ int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *
 				if(actual!=length) return 0;
 				e->size = info.st_size;
 			} else if(info.st_size<e->size) {
-				debug(D_WQ,"%s unexpectedly shrank from %"PRId64" to %"PRId64" bytes",e->physical_path,e->size,info.st_size);
+				debug(D_WQ,"%s unexpectedly shrank from %"PRId64" to %"PRId64" bytes",e->physical_path,(int64_t)e->size,(int64_t)info.st_size);
 				debug(D_WQ,"%s will no longer be watched for changes",e->physical_path);
 				e->do_not_watch = 1;
 			}
