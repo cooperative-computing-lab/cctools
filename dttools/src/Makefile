@@ -100,7 +100,6 @@ HEADERS_PUBLIC = \
 	md5.h \
 	timestamp.h
 
-CYGWINLIB = cygwin1.dll cyggcc_s-1.dll cygintl-8.dll cygreadline7.dll cygncursesw-10.dll cygiconv-2.dll cygattr-1.dll sh.exe
 LIBRARIES = libdttools.a
 OBJECTS = $(SOURCES:%.c=%.o)
 PROGRAMS = catalog_update catalog_server watchdog
@@ -121,7 +120,6 @@ clean:
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(SCRIPTS) $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
-	for file in $(CYGWINLIB) ; do if [ -f /bin/$$file ] ; then cp /bin/$$file $(CCTOOLS_INSTALL_DIR)/bin/ ; fi ; done
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools

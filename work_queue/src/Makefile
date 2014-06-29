@@ -58,7 +58,6 @@ install: all install-bindings
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	chmod 755 $(SCRIPTS)
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
-	for file in $(CYGWINLIB) ; do if [ -f /bin/$$file ]; then cp /bin/$$file $(CCTOOLS_INSTALL_DIR)/bin/; fi; done
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
