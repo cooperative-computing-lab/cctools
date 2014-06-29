@@ -75,7 +75,7 @@ int pfs_force_cache = 0;
 int pfs_force_sync = 0;
 int pfs_follow_symlinks = 1;
 int pfs_session_cache = 0;
-int pfs_use_helper = 1;
+int pfs_use_helper = 0;
 int pfs_checksum_files = 1;
 int pfs_write_rval = 0;
 int pfs_paranoid_mode = 0;
@@ -120,9 +120,10 @@ static int root_exitstatus = 0;
 static int channel_size = 10;
 
 enum {
-	LONG_OPT_CVMFS_REPO_SWITCHING=500,
+	LONG_OPT_CVMFS_REPO_SWITCHING = UCHAR_MAX+1,
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
 	LONG_OPT_CVMFS_ALIEN_CACHE,
+	LONG_OPT_HELPER,
 };
 
 static void get_linux_version(const char *cmd)
@@ -196,8 +197,8 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Enable file snapshot caching for all protocols.\n", "-F,--with-snapshots");
 	fprintf(stdout, " %-30s Disable following symlinks.\n", "-f,--no-follow-symlinks");
 	fprintf(stdout, " %-30s Fake this gid; Real gid stays the same.          (PARROT_GID)\n", "-G,--gid=<num>");
-	fprintf(stdout, " %-30s Disable use of helper library.\n", "-H,--no-helper");
 	fprintf(stdout, " %-30s Show this screen.\n", "-h,--help");
+	fprintf(stdout, " %-30s Enable use of helper library.\n", "--helper");
 	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
 	fprintf(stdout, " %-30s Set the debug level output for the iRODS driver.\n", "-I,--debug-level-irods=<num>");
 	fprintf(stdout, " %-30s Checksum files where available.\n", "-K,--with-checksums");
@@ -633,6 +634,7 @@ int main( int argc, char *argv[] )
 		{"gid", required_argument, 0, 'G'},
 		{"no-helper", no_argument, 0, 'H'},
 		{"help", no_argument, 0, 'h'},
+		{"helper", no_argument, 0, LONG_OPT_HELPER},
 		{"tickets", required_argument, 0, 'i'},
 		{"debug-level-irods", required_argument, 0, 'I'},
 		{"with-checksums", no_argument, 0, 'K'},
@@ -725,7 +727,7 @@ int main( int argc, char *argv[] )
 			pfs_gid = atoi(optarg);
 			break;
 		case 'H':
-			pfs_use_helper = 0;
+			/* deprecated */
 			break;
 		case 'I':
 			pfs_irods_debug_level = atoi(optarg);
@@ -832,6 +834,9 @@ int main( int argc, char *argv[] )
 		case 'W':
 			pfs_syscall_totals32 = (int*) calloc(SYSCALL32_MAX,sizeof(int));
 			pfs_syscall_totals64 = (int*) calloc(SYSCALL64_MAX,sizeof(int));
+			break;
+		case LONG_OPT_HELPER:
+			pfs_use_helper = 1;
 			break;
 		default:
 			show_help(argv[0]);

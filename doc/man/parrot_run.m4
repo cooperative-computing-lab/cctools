@@ -25,8 +25,8 @@ OPTION_ITEM(`-D, --no-optimize')Disable small file optimizations.
 OPTION_ITEM(`-F, --with-snapshots')Enable file snapshot caching for all protocols.
 OPTION_ITEM(`-f, --no-follow-symlinks')Disable following symlinks.
 OPTION_TRIPLET(-G,gid,num)Fake this gid; Real gid stays the same.
-OPTION_ITEM(`-H, --no-helper')Disable use of helper library.
 OPTION_ITEM(`-h, --help')Show this screen.
+OPTION_ITEM(`    --helper')Enable use of helper library.
 OPTION_TRIPLET(-i, tickets, files)Comma-delimited list of tickets to use for authentication.
 OPTION_TRIPLET(-I, debug-level-irods, num)Set the iRODS driver internal debug level.
 OPTION_ITEM(`-K, --with-checksums')Checksum files where available.
