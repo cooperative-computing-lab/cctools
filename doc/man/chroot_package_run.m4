@@ -2,13 +2,13 @@ include(manual.h)dnl
 HEADER(chroot_package_run)dnl
 
 SECTION(NAME)
-BOLD(chroot_package_run) - repeat a program with the package with the help of CODE(chroot)
+BOLD(chroot_package_run) - repeat a program within the package with the help of CODE(chroot)
 
 SECTION(SYNOPSIS)
 CODE(BOLD(chroot_package_run --package-path your-package-path [command]))
 
 SECTION(DESCRIPTION)
-If CODE(chroot) is used to help repeat one experiment, common directories like BOLD(/proc), BOLD(/dev), BOLD(/net), BOLD(/sys), BOLD(/var), BOLD(/misc) and BOLD(/selinux) will be remounted into the package if they exists on your local filesystem. After you finish all your test within CODE(chroot_package_run), these remounted directories will be unmounted.
+If CODE(chroot) is used to help repeat one experiment, common directories like BOLD(/proc), BOLD(/dev), BOLD(/net), BOLD(/sys), BOLD(/var), BOLD(/misc) and BOLD(/selinux) will be remounted into the package if they exists on your local filesystem. After you finish all your test within CODE(chroot_package_run), these remounted directories will be unmounted. If no command is given, a /bin/sh shell will be returned.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
