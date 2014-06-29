@@ -2,13 +2,13 @@ include(manual.h)dnl
 HEADER(parrot_package_run)dnl
 
 SECTION(NAME)
-BOLD(parrot_package_run) - repeat a program with the package with the help of CODE(parrot_run)
+BOLD(parrot_package_run) - repeat a program within the package with the help of CODE(parrot_run)
 
 SECTION(SYNOPSIS)
 CODE(BOLD(parrot_package_run --package-path your-package-path [command]))
 
 SECTION(DESCRIPTION)
-If CODE(parrot_run) is used to repeat one experiment, one mountlist must be created so that the file access request of your program can be redirected into the package. CODE(parrot_package_run) is used to create the mountlist.
+If CODE(parrot_run) is used to repeat one experiment, one mountlist must be created so that the file access request of your program can be redirected into the package. CODE(parrot_package_run) is used to create the mountlist and repeat your program within the package with the help of CODE(parrot_run) and BOLD(mountlist). If no command is given, a /bin/sh shell will be returned.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
