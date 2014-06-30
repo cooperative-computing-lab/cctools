@@ -5,13 +5,25 @@ mountlist=""
 show_help()
 {
 	echo "Usage: parrot_package_run --package-path path-of-package [command]"
-	echo "Example: parrot_package_run --package-path /tmp/pack /bin/bash"
+	echo "If no command is given, a /bin/sh shell will be returned."
+	echo "Example 1: parrot_package_run --package-path /tmp/pack"
+	echo "If one command is given, run your command within the chroot jail and exit parrot_package_run automatically."
+	echo "Example 2: parrot_package_run --package-path /tmp/pack ls"
 	echo ''
 	echo "Options:"
 	echo "-p, --package-path         The path of the package."
 	echo "-h, --help                 Show this help message."
-
 	exit 1
+}
+
+complete_path() {
+	orig_path=$1
+	first_ch=`echo $orig_path | head -c 1`
+	if [ $first_ch != "/" ]; then
+		echo "$(pwd)/$orig_path"
+	else
+		echo $orig_path
+	fi
 }
 
 while [ $# -gt 0 ]
@@ -19,7 +31,7 @@ do
 	case $1 in
 		-p | --package-path)
 			shift
-			package_path=$1
+			package_path=$(complete_path "$1")
 			;;
 		-h | --help)
 			show_help
@@ -38,11 +50,6 @@ fi
 
 if [ ! -d $package_path ]; then
 	echo "Please ensure directory " $package_path " exists!"
-	exit 1
-fi
-
-if [ -z "$1" ]; then
-	echo "Please specify one command you want to execute!"
 	exit 1
 fi
 
@@ -89,4 +96,8 @@ export_env
 unset PARROT_ENABLED
 
 #initialize the repeat process
-exec $cmd_parrot_run -m $mountlist -- "$@"
+if [ -z "$1" ]; then
+	exec $cmd_parrot_run -m $mountlist -w $PWD -- /bin/sh
+else
+	exec $cmd_parrot_run -m $mountlist -w $PWD -- "$@"
+fi

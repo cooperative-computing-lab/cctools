@@ -710,11 +710,17 @@ int main( int argc, char *argv[] )
 				debug(D_DEBUG, "Can not open envlist file: %s", optarg);
 				return 1;
 			}
-			while(environ[count] != NULL)
-			{
+			while(environ[count] != NULL) {
 				fprintf(fp, "%s\n", environ[count]);
 				count++;
 			}
+			char working_dir[PFS_PATH_MAX];
+			::getcwd(working_dir,sizeof(working_dir));
+			if(working_dir == NULL) {
+				debug(D_DEBUG, "Can not obtain the current working directory!");
+				return 1;
+			}
+			fprintf(fp, "PWD=%s\n", working_dir);
 			fclose(fp);
 			break;
 		case 'F':
@@ -767,6 +773,7 @@ int main( int argc, char *argv[] )
 				debug(D_DEBUG, "writing ld-linux* into namelist file failed.");
 				return 1;
 			}
+			fprintf(namelist_file, "/bin/sh\n");
 			break;
 		case 'N':
 			pfs_false_uname = optarg;

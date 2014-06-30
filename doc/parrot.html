@@ -288,7 +288,7 @@ using the <tt>stat</tt> system call.</p>
 <p>After executing this command, one package with the path of <b>/tmp/package</b> will be generated.</p>
 
 <h2 id="parrot_package_run">Repeat one Program within the Package<a class="sectionlink" href="#parrot_package_run" title="Link to this section.">&#x21d7;</a></h2>
-<p>Once a package is generated with the help of <tt>parrot_package_create</tt>, we can use <tt>parrot_package_run</tt> to repeat the program within the package. <tt>parrot_package_run</tt> is based on the mountlist redirection mechanism of <tt>parrot_run</tt>. One mountlist wll be created so that the file access request of your program can be redirected into the package. <b>--package-path</b> parameter specifies the paht of the package.</p>
+<p>Once a package is generated with the help of <tt>parrot_package_create</tt>, we can use <tt>parrot_package_run</tt> to repeat the program within the package. <tt>parrot_package_run</tt> is based on the mountlist redirection mechanism of <tt>parrot_run</tt>. One mountlist wll be created so that the file access request of your program can be redirected into the package. <b>--package-path</b> parameter specifies the paht of the package. If no command is given, a /bin/sh shell will be returned.</p>
 <code>% parrot_package_run --package-path /tmp/package /bin/bash</code>
 <p>After the execution of this command, one shell will be returned, where you can repeat your original program. After everything is done, exit <tt>parrot_package_run</tt>:</p>
 <code>% exit</code>
