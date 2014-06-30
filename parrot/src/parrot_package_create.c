@@ -29,15 +29,6 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 const char *special_path[] = {"var", "sys", "dev", "proc", "net", "misc", "selinux"};
 #define special_path_len (sizeof(special_path))/(sizeof(const char *))
 
-/*
-One file can be tagged with multiple syscalls, however, the package finally will only contain one version of the same file. Because, the namelist file will be sorted and
-remove duplicates before copying each item, the final version of one file is determined by the syscall whose alphabet sequence is highest among all the syscalls of one file.
-these system calls will result in the whole copy of one file item.
-"lstat", "stat", "follow_symlink", "link2", "symlink2", "readlink", "unlink"
-*/
-const char *special_caller[] = {"open_object", "bind32", "connect32", "bind64", "connect64", "truncate link1", "mkalloc", "lsalloc", "whoami", "md5", "copyfile1", "copyfile2"};
-#define special_caller_len (sizeof(special_caller))/(sizeof(const char *))
-
 mode_t default_dirmode = S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH;
 mode_t default_regmode = S_IRWXU | S_IRGRP;
 
@@ -206,20 +197,6 @@ int prepare_work()
 }
 
 /*
-If this caller is special, execute fullcopy; otherwise execute metadatcopy.
-*/
-int is_special_caller(char *caller)
-{
-	unsigned int i;
-	for(i = 0; i < special_caller_len; i++){
-		if(strcmp(special_caller[i], caller) == 0) {
-			return 1;
-		}
-	}
-	return 0;
-}
-
-/*
 If the path path is special, ignore it.
 */
 int is_special_path(const char *path)
@@ -335,7 +312,7 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 	ignore_direntry = 1;
 	if(strcmp(caller,"metadatacopy") == 0) {
 		fullcopy = 0;
-	} else if(strcmp(caller,"fullcopy") == 0 || is_special_caller(caller)) {
+	} else {
 		fullcopy = 1;
 		ignore_direntry = 0;
 	}

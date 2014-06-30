@@ -269,6 +269,12 @@ extern int pfs_master_timeout;
 extern FILE*namelist_file;
 extern struct hash_table *namelist_table;
 
+/*
+One file can be tagged with multiple syscalls, however, the package finally will only contain one version of the same file. Because, the namelist file will be sorted and
+remove duplicates before copying each item, the final version of one file is determined by the syscall whose alphabet sequence is highest among all the syscalls of one file.
+these system calls will result in the whole copy of one file item.
+"lstat", "stat", "follow_symlink", "link2", "symlink2", "readlink", "unlink"
+*/
 const char *special_caller[] = {"open_object", "bind32", "connect32", "bind64", "connect64", "truncate link1", "mkalloc", "lsalloc", "whoami", "md5", "copyfile1", "copyfile2"};
 #define special_caller_len (sizeof(special_caller))/(sizeof(const char *))
 
