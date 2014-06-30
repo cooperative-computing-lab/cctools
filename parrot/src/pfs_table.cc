@@ -28,6 +28,7 @@ extern "C" {
 #include "pfs_resolve.h"
 #include "pfs_channel.h"
 #include "md5.h"
+#include "hash_table.h"
 }
 
 #include <assert.h>
@@ -266,10 +267,50 @@ in the name structure. Return true on success, false otherwise.
 extern int pfs_master_timeout;
 
 extern FILE*namelist_file;
+extern struct hash_table *namelist_table;
 
-void write_filename_list(const char *content, const char caller[]) {
-	fprintf(namelist_file, "%s|%s\n", content, caller);
+const char *special_caller[] = {"open_object", "bind32", "connect32", "bind64", "connect64", "truncate link1", "mkalloc", "lsalloc", "whoami", "md5", "copyfile1", "copyfile2"};
+#define special_caller_len (sizeof(special_caller))/(sizeof(const char *))
+
+/*
+If this caller is special, execute fullcopy; otherwise execute metadatcopy.
+*/
+int is_special_caller(const char *caller)
+{
+	unsigned int i;
+	for(i = 0; i < special_caller_len; i++){
+		if(strcmp(special_caller[i], caller) == 0) {
+			return 1;
+		}
+	}
+	return 0;
 }
+
+void namelist_table_insert(const char *content, const char caller[]) {
+	char *item_value;
+	int is_fullcopy;
+	item_value = (char *)hash_table_lookup(namelist_table, content);
+	is_fullcopy = is_special_caller(caller);
+	if(!item_value) {
+		if(is_fullcopy) {
+			//fprintf(stdout, "line: (%s) does not exist in hash table, insert fullcopy!\n", content);
+			hash_table_insert(namelist_table, content, "fullcopy");
+		} else {
+			//fprintf(stdout, "line: (%s) does not exist in hash table, insert metadatacopy!\n", content);
+			hash_table_insert(namelist_table, content, "metadatacopy");
+		}
+	} else if(!strcmp(item_value, "metadatacopy") && is_fullcopy) {
+		//fprintf(stdout, "line: (%s) exist in hash table and metadatacopy, transfer into fullcopy!\n", content);
+		hash_table_remove(namelist_table, content);
+		hash_table_insert(namelist_table, content, "fullcopy");
+	} else {
+		//fprintf(stdout, "line: (%s) exist in hash table and fullcopy, do nothing!\n", content);
+	}
+}
+
+//void write_filename_list(const char *content, const char caller[]) {
+//	fprintf(namelist_file, "%s|%s\n", content, caller);
+//}
 
 int pfs_table::resolve_name(const char caller[], const char *cname, struct pfs_name *pname, bool do_follow_symlink, int depth ) {
 	char full_logical_name[PFS_PATH_MAX];
@@ -295,9 +336,10 @@ int pfs_table::resolve_name(const char caller[], const char *cname, struct pfs_n
 	collapse_path(full_logical_name,pname->logical_name,1);
 	result = pfs_resolve(pname->logical_name,pname->path,time(0)+pfs_master_timeout);
 
-	if(namelist_file)
-		write_filename_list(pname->path, caller);
-
+	if(namelist_file) {
+		namelist_table_insert(pname->path, caller);
+		//write_filename_list(pname->path, caller);
+	}
 	if(result==PFS_RESOLVE_DENIED) {
 		errno = EACCES;
 		return 0;

@@ -39,6 +39,7 @@ extern "C" {
 #include "stringtools.h"
 #include "tracer.h"
 #include "xxmalloc.h"
+#include "hash_table.h"
 }
 
 #include <fcntl.h>
@@ -62,6 +63,7 @@ extern "C" {
 
 extern char **environ;
 FILE *namelist_file;
+struct hash_table *namelist_table;
 int linux_major;
 int linux_minor;
 int linux_micro;
@@ -775,6 +777,11 @@ int main( int argc, char *argv[] )
 				debug(D_DEBUG, "Can not open namelist file: %s", optarg);
 				return 1;
 			}
+			namelist_table = hash_table_create(0, 0);
+			if(!namelist_table) {
+				debug(D_DEBUG, "Failed to create hash table for namelist!\n");
+				return 1;
+			}
 			char cmd[PFS_PATH_MAX];
 			if(snprintf(cmd, PFS_PATH_MAX, "find /lib*/ -name ld-linux*>>%s", optarg) >= 0)
 				system(cmd);
@@ -1044,8 +1051,16 @@ int main( int argc, char *argv[] )
 
 	delete_dir(pfs_cvmfs_locks_dir);
 
-	if(namelist_file)
+	if(namelist_table && namelist_file) {
+		char *key;
+		void *value;
+		hash_table_firstkey(namelist_table);
+		while(hash_table_nextkey(namelist_table, &key, &value)) {
+			fprintf(namelist_file, "%s|%s\n", key, (char *)value);
+		}
+		hash_table_delete(namelist_table);
 		fclose(namelist_file);
+	}
 	
 	if(WIFEXITED(root_exitstatus)) {
 		int status = WEXITSTATUS(root_exitstatus);
