@@ -766,17 +766,6 @@ class WorkQueue(_object):
         return work_queue_specify_estimate_capacity_on(self._work_queue, 1)
 
     ##
-    # Reset a work queue and all attached workers.
-    #
-    # @param self   Reference to the current work queue object.
-    # @param flags  Flags to indicate what to reset:
-    #                 - @ref WORK_QUEUE_RESET_ALL 
-    #                 - @ref WORK_QUEUE_RESET_KEEP_TASKS
-    #                 - 
-    def reset(self, flags):
-        return work_queue_reset(self._work_queue, flags)
-
-    ##
     # Tune advanced parameters for work queue.
     # 
     # @param self  Reference to the current work queue object.
