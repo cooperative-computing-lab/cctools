@@ -270,28 +270,11 @@ extern FILE*namelist_file;
 extern struct hash_table *namelist_table;
 
 /*
-One file can be tagged with multiple syscalls, however, the package finally will only contain one version of the same file. Because, the namelist file will be sorted and
-remove duplicates before copying each item, the final version of one file is determined by the syscall whose alphabet sequence is highest among all the syscalls of one file.
-these system calls will result in the whole copy of one file item.
-"lstat", "stat", "follow_symlink", "link2", "symlink2", "readlink", "unlink"
-const char *special_caller[] = {"open_object", "bind32", "connect32", "bind64", "connect64", "truncate", "link1", "mkalloc", "lsalloc", "whoami", "md5", "copyfile1", "copyfile2"};
-define special_caller_len (sizeof(special_caller))/(sizeof(const char *))
+All the syscalls calling "resolve_name" function can be divided into two categories: special_syscall & others.
+special_syscall: {"open_object", "bind32", "connect32", "bind64", "connect64", "truncate", "link1", "mkalloc", "lsalloc", "whoami", "md5", "copyfile1", "copyfile2"};
+As for special_syscall, the copy degree of the involved file will be fullcopy; the copy degree of files involved in other syscalls will be metadatacopy.
+The following syscalls were fullcopy before, but now become metadatacopy. -- "lstat", "stat", "follow_symlink", "link2", "symlink2", "readlink", "unlink"
 */
-
-/*
-If this caller is special, execute fullcopy; otherwise execute metadatcopy.
-int is_special_caller(const char *caller)
-{
-	unsigned int i;
-	for(i = 0; i < special_caller_len; i++){
-		if(strcmp(special_caller[i], caller) == 0) {
-			return 1;
-		}
-	}
-	return 0;
-}
-*/
-
 void namelist_table_insert(const char *content, int is_special_syscall) {
 	char *item_value;
 	item_value = (char *)hash_table_lookup(namelist_table, content);
@@ -300,24 +283,15 @@ void namelist_table_insert(const char *content, int is_special_syscall) {
 	FULLCOPY = "fullcopy";
 	if(!item_value) {
 		if(is_special_syscall) {
-			//fprintf(stdout, "line: (%s) does not exist in hash table, insert fullcopy!\n", content);
 			hash_table_insert(namelist_table, content, FULLCOPY);
 		} else {
-			//fprintf(stdout, "line: (%s) does not exist in hash table, insert metadatacopy!\n", content);
 			hash_table_insert(namelist_table, content, METADATA);
 		}
 	} else if(item_value == METADATA && is_special_syscall) {
-		//fprintf(stdout, "line: (%s) exist in hash table and metadatacopy, transfer into fullcopy!\n", content);
 		hash_table_remove(namelist_table, content);
 		hash_table_insert(namelist_table, content, FULLCOPY);
-	} else {
-		//fprintf(stdout, "line: (%s) exist in hash table and fullcopy, do nothing!\n", content);
 	}
 }
-
-//void write_filename_list(const char *content, const char caller[]) {
-//	fprintf(namelist_file, "%s|%s\n", content, caller);
-//}
 
 int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pfs_name *pname, bool do_follow_symlink, int depth ) {
 	char full_logical_name[PFS_PATH_MAX];
@@ -345,7 +319,6 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 
 	if(namelist_file) {
 		namelist_table_insert(pname->path, is_special_syscall);
-		//write_filename_list(pname->path, caller);
 	}
 	if(result==PFS_RESOLVE_DENIED) {
 		errno = EACCES;
