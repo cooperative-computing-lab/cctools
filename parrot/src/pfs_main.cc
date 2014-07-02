@@ -101,6 +101,7 @@ INT64_T pfs_read_count = 0;
 INT64_T pfs_write_count = 0;
 
 const char * pfs_cvmfs_repo_arg = 0;
+const char * pfs_cvmfs_config_arg = 0;
 bool pfs_cvmfs_repo_switching = false;
 char pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX];
 char pfs_cvmfs_locks_dir[PFS_PATH_MAX];
@@ -119,7 +120,8 @@ static int root_exitstatus = 0;
 static int channel_size = 10;
 
 enum {
-	LONG_OPT_CVMFS_REPO_SWITCHING = UCHAR_MAX+1,
+	LONG_OPT_CVMFS_REPO_SWITCHING=UCHAR_MAX+1,
+	LONG_OPT_CVMFS_CONFIG,
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
 	LONG_OPT_CVMFS_ALIEN_CACHE,
 	LONG_OPT_HELPER,
@@ -210,6 +212,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Use this proxy server for HTTP requests.         (HTTP_PROXY)\n", "-p,--proxy=<hst:p>");
 	fprintf(stdout, " %-30s Enable paranoid mode for identity boxing mode.\n", "-P,--paranoid");
 	fprintf(stdout, " %-30s Inhibit catalog queries to list /chirp.\n", "-Q,--no-chirp-catalog");
+	fprintf(stdout, " %-30s CVMFS common configuration.               (PARROT_CVMFS_CONFIG)\n", "   --cvmfs-config=<config>");
 	fprintf(stdout, " %-30s CVMFS repositories to enable.             (PARROT_CVMFS_REPO)\n", "-r,--cvmfs-repos=<repos>");
 	fprintf(stdout, " %-30s Allow repository switching when using CVMFS.\n","   --cvmfs-repo-switching");
 	fprintf(stdout, " %-30s Set CVMFS common cache directory.         (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache");
@@ -624,6 +627,7 @@ int main( int argc, char *argv[] )
 		{"block-size", required_argument, 0, 'b'},
 		{"channel-auth", no_argument, 0, 'C'},
 		{"chirp-auth",  required_argument, 0, 'a'},
+		{"cvmfs-repos", required_argument, 0, 'r'},
 		{"cvmfs-alien-cache", required_argument, 0, LONG_OPT_CVMFS_ALIEN_CACHE},
 		{"cvmfs-disable-alien-cache", no_argument, 0, LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE},
 		{"cvmfs-repo-switching", no_argument, 0, LONG_OPT_CVMFS_REPO_SWITCHING},
@@ -789,6 +793,9 @@ int main( int argc, char *argv[] )
 			break;
 		case 'Q':
 			chirp_global_inhibit_catalog(1);
+			break;
+		case LONG_OPT_CVMFS_CONFIG:
+			pfs_cvmfs_config_arg = optarg;
 			break;
 		case 'r':
 			pfs_cvmfs_repo_arg = optarg;
