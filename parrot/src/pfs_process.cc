@@ -234,12 +234,12 @@ static void pfs_process_do_wake( struct pfs_process *parent, struct pfs_process 
 	if(parent->wait_urusage)
 		tracer_copy_out(parent->tracer,	&child->wait_rusage, parent->wait_urusage, sizeof(child->wait_rusage));
 
+	child->parent_wcontinued = 0;
+	child->parent_wuntraced = 0;
+
 	if(child->state == PFS_PROCESS_STATE_DONE) {
 		pfs_process_delete(child);
 	}
-
-	child->parent_wcontinued = 0;
-	child->parent_wuntraced = 0;
 
 	/* to prevent accidental copy out */
 	parent->wait_ustatus = 0;
