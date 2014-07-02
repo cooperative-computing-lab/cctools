@@ -68,6 +68,7 @@ and <a href="http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueueP
 
 <h2 id="building">Building Work Queue Application<a class="sectionlink" href="#building" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 Let's begin by running a simple but complete example of a Work Queue
 application. After trying it out, we will then show how to write a Work Queue
 application from scratch.
@@ -522,6 +523,47 @@ those requirements and the unlabeled resource requirements are assumed to be
 negligible.  For example, if you annotate a task as using 1 core, but don't
 specify its memory or disk requirements, then Work Queue will schedule two such
 tasks to a two-slot worker, regardless of their memory or disk usage.
+
+<h2 id="debugging">Debugging<a class="sectionlink" href="#debugging" title="Link to this section.">&#x21d7;</a></h2>
+<p>Work Queue can be set up to print debug messages at the master and worker to
+help troubleshoot failures,
+bugs, and errors.
+
+<p>When using the <a
+href="http://www.nd.edu/~ccl/software/manuals/api/html/work__queue_8h.html">C
+API</a> include the <a
+href="http://ccl.cse.nd.edu/software/manuals/api/html/debug_8h.html">debug.h</a>
+header to enable the debug messages at the master:
+<div class="code_area">
+<h4 class="code_header">C</h4>
+<pre class="code_snip">
+ #include &#60;debug.h&#62;
+ cctools_debug_flags_set("all"); 
+</pre>
+</div>
+
+<p>In Perl and Python, simply do:
+<div class="code_area">
+<h4 class="code_header">Perl</h4>
+<pre class="code_snip">
+ cctools_debug_flags_set("all");
+</pre>
+</div>
+<div class="code_area">
+<h4 class="code_header">Python</h4>
+<pre class="code_snip">
+ cctools_debug_flags_set("all")
+</pre>
+</div>
+
+<p>The <tt>all</tt> flag causes debug messages from every subsystem called by
+Work Queue to be printed. More information about the debug flags are <a
+href="http://ccl.cse.nd.edu/software/manuals/api/html/debug_8h.html">here</a>.
+
+<p>To enable debugging at the worker, set the <tt>-d</tt> option:
+<div class ="code_area"><pre class="code_snip">
+work_queue_worker -d all MACHINENAME 9123 
+</pre></div>
 
 <h2 id="recommended">Recommended Practices<a class="sectionlink" href="#recommended" title="Link to this section.">&#x21d7;</a></h2>
 
