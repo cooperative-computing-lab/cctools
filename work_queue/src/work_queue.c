@@ -2082,10 +2082,11 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 {
 	t->time_send_input_start = timestamp_get();
 	int result = send_input_files(q, w, t);  
-	if (result != SUCCESS) 
+	if (result != SUCCESS) {
+		t->time_send_input_finish = timestamp_get();
 		return result;
+	}
 
-	t->time_send_input_finish = timestamp_get();
 	t->time_execute_cmd_start = timestamp_get();
 	t->hostname = xxstrdup(w->hostname);
 	t->host = xxstrdup(w->addrport);
