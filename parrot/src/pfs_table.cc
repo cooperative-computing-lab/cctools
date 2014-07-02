@@ -266,7 +266,7 @@ in the name structure. Return true on success, false otherwise.
 */
 extern int pfs_master_timeout;
 
-extern FILE*namelist_file;
+extern FILE *namelist_file;
 extern struct hash_table *namelist_table;
 
 /*
@@ -317,7 +317,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 	collapse_path(full_logical_name,pname->logical_name,1);
 	result = pfs_resolve(pname->logical_name,pname->path,time(0)+pfs_master_timeout);
 
-	if(namelist_file) {
+	if(namelist_table) {
 		namelist_table_insert(pname->path, is_special_syscall);
 	}
 	if(result==PFS_RESOLVE_DENIED) {
