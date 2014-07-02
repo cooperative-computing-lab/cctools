@@ -754,9 +754,9 @@ int pfs_is_nonblocking( int fd )
 	}
 }
 
-int pfs_resolve_name(const char *caller, const char *path, struct pfs_name *pname )
+int pfs_resolve_name(int is_special_syscall, const char *path, struct pfs_name *pname )
 {
-	return pfs_current->table->resolve_name(caller,path,pname);
+	return pfs_current->table->resolve_name(is_special_syscall,path,pname);
 }
 
 /*

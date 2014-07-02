@@ -252,7 +252,7 @@ void pfs_table::follow_symlink( struct pfs_name *pname, int depth )
 				name_to_resolve = absolute_link_target;
 			}
 		}
-		if (resolve_name("follow_symlink", name_to_resolve, &new_pname, true, depth + 1)) {
+		if (resolve_name(0, name_to_resolve, &new_pname, true, depth + 1)) {
 			*pname = new_pname;
 		}
 	}
@@ -274,13 +274,12 @@ One file can be tagged with multiple syscalls, however, the package finally will
 remove duplicates before copying each item, the final version of one file is determined by the syscall whose alphabet sequence is highest among all the syscalls of one file.
 these system calls will result in the whole copy of one file item.
 "lstat", "stat", "follow_symlink", "link2", "symlink2", "readlink", "unlink"
+const char *special_caller[] = {"open_object", "bind32", "connect32", "bind64", "connect64", "truncate", "link1", "mkalloc", "lsalloc", "whoami", "md5", "copyfile1", "copyfile2"};
+define special_caller_len (sizeof(special_caller))/(sizeof(const char *))
 */
-const char *special_caller[] = {"open_object", "bind32", "connect32", "bind64", "connect64", "truncate link1", "mkalloc", "lsalloc", "whoami", "md5", "copyfile1", "copyfile2"};
-#define special_caller_len (sizeof(special_caller))/(sizeof(const char *))
 
 /*
 If this caller is special, execute fullcopy; otherwise execute metadatcopy.
-*/
 int is_special_caller(const char *caller)
 {
 	unsigned int i;
@@ -291,24 +290,26 @@ int is_special_caller(const char *caller)
 	}
 	return 0;
 }
+*/
 
-void namelist_table_insert(const char *content, const char caller[]) {
+void namelist_table_insert(const char *content, int is_special_syscall) {
 	char *item_value;
-	int is_fullcopy;
 	item_value = (char *)hash_table_lookup(namelist_table, content);
-	is_fullcopy = is_special_caller(caller);
+	const char *METADATA, *FULLCOPY;
+	METADATA = "metadatacopy";
+	FULLCOPY = "fullcopy";
 	if(!item_value) {
-		if(is_fullcopy) {
+		if(is_special_syscall) {
 			//fprintf(stdout, "line: (%s) does not exist in hash table, insert fullcopy!\n", content);
-			hash_table_insert(namelist_table, content, "fullcopy");
+			hash_table_insert(namelist_table, content, FULLCOPY);
 		} else {
 			//fprintf(stdout, "line: (%s) does not exist in hash table, insert metadatacopy!\n", content);
-			hash_table_insert(namelist_table, content, "metadatacopy");
+			hash_table_insert(namelist_table, content, METADATA);
 		}
-	} else if(!strcmp(item_value, "metadatacopy") && is_fullcopy) {
+	} else if(item_value == METADATA && is_special_syscall) {
 		//fprintf(stdout, "line: (%s) exist in hash table and metadatacopy, transfer into fullcopy!\n", content);
 		hash_table_remove(namelist_table, content);
-		hash_table_insert(namelist_table, content, "fullcopy");
+		hash_table_insert(namelist_table, content, FULLCOPY);
 	} else {
 		//fprintf(stdout, "line: (%s) exist in hash table and fullcopy, do nothing!\n", content);
 	}
@@ -318,7 +319,7 @@ void namelist_table_insert(const char *content, const char caller[]) {
 //	fprintf(namelist_file, "%s|%s\n", content, caller);
 //}
 
-int pfs_table::resolve_name(const char caller[], const char *cname, struct pfs_name *pname, bool do_follow_symlink, int depth ) {
+int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pfs_name *pname, bool do_follow_symlink, int depth ) {
 	char full_logical_name[PFS_PATH_MAX];
 	char tmp[PFS_PATH_MAX];
 	pfs_resolve_t result;
@@ -343,7 +344,7 @@ int pfs_table::resolve_name(const char caller[], const char *cname, struct pfs_n
 	result = pfs_resolve(pname->logical_name,pname->path,time(0)+pfs_master_timeout);
 
 	if(namelist_file) {
-		namelist_table_insert(pname->path, caller);
+		namelist_table_insert(pname->path, is_special_syscall);
 		//write_filename_list(pname->path, caller);
 	}
 	if(result==PFS_RESOLVE_DENIED) {
@@ -429,7 +430,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 		flags |= O_DIRECTORY;
 	}
 
-	if(resolve_name("open_object",lname,&pname)) {
+	if(resolve_name(1,lname,&pname)) {
 		if(flags&O_DIRECTORY) {
 			file = pname.service->getdir(&pname);
 		} else if(pname.service->is_local()) {
@@ -1255,7 +1256,7 @@ int pfs_table::chdir( const char *path )
 		return -1;
 	}
 
-	if(resolve_name("chdir",path,&pname)) {
+	if(resolve_name(0,path,&pname)) {
 		result = pname.service->chdir(&pname,newpath);
 		if(result>=0) {
 			collapse_path(pname.logical_name,working_dir,1);
@@ -1277,7 +1278,7 @@ int pfs_table::access( const char *n, mode_t mode )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name("access",n,&pname)) {
+	if(resolve_name(0,n,&pname)) {
 		result = pname.service->access(&pname,mode);
 	}
 
@@ -1289,7 +1290,7 @@ int pfs_table::chmod( const char *n, mode_t mode )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("chmod",n,&pname)) {
+	if(resolve_name(0,n,&pname)) {
 		result = pname.service->chmod(&pname,mode);
 	}
 
@@ -1301,7 +1302,7 @@ int pfs_table::chown( const char *n, uid_t uid, gid_t gid )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("chown",n,&pname)) {
+	if(resolve_name(0,n,&pname)) {
 		result = pname.service->chown(&pname,uid,gid);
 	}
 
@@ -1322,7 +1323,7 @@ int pfs_table::lchown( const char *n, uid_t uid, gid_t gid )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("lchown",n,&pname,false)) {
+	if(resolve_name(0,n,&pname,false)) {
 		result = pname.service->lchown(&pname,uid,gid);
 	}
 
@@ -1334,7 +1335,7 @@ int pfs_table::truncate( const char *n, pfs_off_t offset )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("truncate",n,&pname)) {
+	if(resolve_name(1,n,&pname)) {
 		result = pname.service->truncate(&pname,offset);
 	}
 
@@ -1346,7 +1347,7 @@ ssize_t pfs_table::getxattr (const char *path, const char *name, void *value, si
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("getxattr",path,&pname)) {
+	if(resolve_name(0,path,&pname)) {
 		result = pname.service->getxattr(&pname,name,value,size);
 	}
 
@@ -1358,7 +1359,7 @@ ssize_t pfs_table::lgetxattr (const char *path, const char *name, void *value, s
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("lgetxattr",path,&pname,false)) {
+	if(resolve_name(0,path,&pname,false)) {
 		result = pname.service->lgetxattr(&pname,name,value,size);
 	}
 
@@ -1384,7 +1385,7 @@ ssize_t pfs_table::listxattr (const char *path, char *list, size_t size)
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("listxattr",path,&pname)) {
+	if(resolve_name(0,path,&pname)) {
 		result = pname.service->listxattr(&pname,list,size);
 	}
 
@@ -1396,7 +1397,7 @@ ssize_t pfs_table::llistxattr (const char *path, char *list, size_t size)
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("llistxattr",path,&pname,false)) {
+	if(resolve_name(0,path,&pname,false)) {
 		result = pname.service->llistxattr(&pname,list,size);
 	}
 
@@ -1422,7 +1423,7 @@ int pfs_table::setxattr (const char *path, const char *name, const void *value, 
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("setxattr",path,&pname)) {
+	if(resolve_name(0,path,&pname)) {
 		result = pname.service->setxattr(&pname,name,value,size,flags);
 	}
 
@@ -1434,7 +1435,7 @@ int pfs_table::lsetxattr (const char *path, const char *name, const void *value,
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("lsetxattr",path,&pname,false)) {
+	if(resolve_name(0,path,&pname,false)) {
 		result = pname.service->lsetxattr(&pname,name,value,size,flags);
 	}
 
@@ -1460,7 +1461,7 @@ int pfs_table::removexattr (const char *path, const char *name)
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("removexattr",path,&pname)) {
+	if(resolve_name(0,path,&pname)) {
 		result = pname.service->removexattr(&pname,name);
 	}
 
@@ -1472,7 +1473,7 @@ int pfs_table::lremovexattr (const char *path, const char *name)
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("lremovexattr",path,&pname,false)) {
+	if(resolve_name(0,path,&pname,false)) {
 		result = pname.service->lremovexattr(&pname,name);
 	}
 
@@ -1498,7 +1499,7 @@ int pfs_table::utime( const char *n, struct utimbuf *buf )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("utime",n,&pname)) {
+	if(resolve_name(0,n,&pname)) {
 		result = pname.service->utime(&pname,buf);
 	}
 
@@ -1510,7 +1511,7 @@ int pfs_table::utimens( const char *n, const struct timespec times[2] )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("utimens",n,&pname)) {
+	if(resolve_name(0,n,&pname)) {
 		result = pname.service->utimens(&pname,times);
 	}
 
@@ -1522,7 +1523,7 @@ int pfs_table::lutimens( const char *n, const struct timespec times[2] )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("lutimens",n,&pname,false)) {
+	if(resolve_name(0,n,&pname,false)) {
 		result = pname.service->lutimens(&pname,times);
 	}
 
@@ -1535,7 +1536,7 @@ int pfs_table::unlink( const char *n )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name("unlink",n,&pname,false)) {
+	if(resolve_name(0,n,&pname,false)) {
 		result = pname.service->unlink(&pname);
 		if(result==0) {
 			pfs_cache_invalidate(&pname);
@@ -1551,7 +1552,7 @@ int pfs_table::stat( const char *n, struct pfs_stat *b )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name("stat",n,&pname)) {
+	if(resolve_name(0,n,&pname)) {
 		result = pname.service->stat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pname.service->get_block_size();
@@ -1570,7 +1571,7 @@ int pfs_table::statfs( const char *n, struct pfs_statfs *b )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name("statfs",n,&pname)) {
+	if(resolve_name(0,n,&pname)) {
 		result = pname.service->statfs(&pname,b);
 	}
 
@@ -1582,7 +1583,7 @@ int pfs_table::lstat( const char *n, struct pfs_stat *b )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("lstat",n,&pname,false)) {
+	if(resolve_name(0,n,&pname,false)) {
 		result = pname.service->lstat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pname.service->get_block_size();
@@ -1601,7 +1602,7 @@ int pfs_table::rename( const char *n1, const char *n2 )
 	pfs_name p1, p2;
 	int result = -1;
 
-	if(resolve_name("rename1",n1,&p1,false) && resolve_name("rename2",n2,&p2,false)) {
+	if(resolve_name(0,n1,&p1,false) && resolve_name(0,n2,&p2,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->rename(&p1,&p2);
 			if(result==0) {
@@ -1622,7 +1623,7 @@ int pfs_table::link( const char *n1, const char *n2 )
 	pfs_name p1, p2;
 	int result = -1;
 
-	if(resolve_name("link1",n1,&p1,false) && resolve_name("link2",n2,&p2,false)) {
+	if(resolve_name(1,n1,&p1,false) && resolve_name(0,n2,&p2,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->link(&p1,&p2);
 		} else {
@@ -1647,7 +1648,7 @@ int pfs_table::symlink( const char *n1, const char *n2 )
 	verbatim down to the needed driver.
 	*/
 
-	if(resolve_name("symlink2",n2,&pname,false)) {
+	if(resolve_name(0,n2,&pname,false)) {
 		result = pname.service->symlink(n1,&pname);
 	}
 
@@ -1672,7 +1673,7 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("readlink",n,&pname,false)) {
+	if(resolve_name(0,n,&pname,false)) {
 		int pid, fd;
 		if(sscanf(pname.path,"/proc/%d/fd/%d",&pid,&fd)==2) {
 			struct pfs_process *target = pfs_process_lookup(pid);
@@ -1714,7 +1715,7 @@ int pfs_table::mknod( const char *n, mode_t mode, dev_t dev )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("mknod",n,&pname)) {
+	if(resolve_name(0,n,&pname)) {
 		result = pname.service->mknod(&pname,mode,dev);
 	}
 
@@ -1726,7 +1727,7 @@ int pfs_table::mkdir( const char *n, mode_t mode )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("mkdir",n,&pname)) {
+	if(resolve_name(0,n,&pname)) {
 		result = pname.service->mkdir(&pname,mode);
 	}
 
@@ -1738,7 +1739,7 @@ int pfs_table::rmdir( const char *n )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("rmdir",n,&pname,false)) {
+	if(resolve_name(0,n,&pname,false)) {
 		result = pname.service->rmdir(&pname);
 	}
 
@@ -1829,7 +1830,7 @@ int pfs_table::mkalloc( const char *n, pfs_ssize_t size, mode_t mode )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("mkalloc",n,&pname)) {
+	if(resolve_name(1,n,&pname)) {
 		result = pname.service->mkalloc(&pname,size,mode);
 	}
 
@@ -1841,7 +1842,7 @@ int pfs_table::lsalloc( const char *n, char *a, pfs_ssize_t *total, pfs_ssize_t 
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name("lsalloc",n,&pname)) {
+	if(resolve_name(1,n,&pname)) {
 		result = pname.service->lsalloc(&pname,a,total,avail);
 		if(result==0) {
 			strcpy(a,pname.path);
@@ -1856,7 +1857,7 @@ int pfs_table::whoami( const char *n, char *buf, int length )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name("whoami",n,&pname)) {
+	if(resolve_name(1,n,&pname)) {
 		result = pname.service->whoami(&pname,buf,length);
 	}
 
@@ -2228,7 +2229,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 			}
 		} else {
 			/* Check to see if search is implemented in the service */
-			if(resolve_name("search",path, &pname)) {
+			if(resolve_name(0,path, &pname)) {
 				debug(D_DEBUG, "attempting service `%s' search routine for path `%s'", pname.service_name, pname.path);
 				if ((result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, i))==-1 && errno == ENOSYS) {
 					debug(D_DEBUG, "no service to search found: falling back to manual search `%s'", directory);
@@ -2255,7 +2256,7 @@ int pfs_table::getacl( const char *n, char *buf, int length )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name("getacl",n,&pname)) {
+	if(resolve_name(0,n,&pname)) {
 		result = pname.service->getacl(&pname,buf,length);
 	}
 
@@ -2267,7 +2268,7 @@ int pfs_table::setacl( const char *n, const char *subject, const char *rights )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name("setacl",n,&pname)) {
+	if(resolve_name(0,n,&pname)) {
 		result = pname.service->setacl(&pname,subject,rights);
 	}
 
@@ -2285,7 +2286,7 @@ int pfs_table::locate( const char *n, char *buf, int length )
 		if(loc) delete(loc);
 		loc = 0;
 		
-		if(resolve_name("locate", n, &pname)) {
+		if(resolve_name(0, n, &pname)) {
 			loc = pname.service->locate(&pname);
 		}
 	}
@@ -2316,8 +2317,8 @@ pfs_ssize_t pfs_table::copyfile( const char *source, const char *target )
 		return -1;
 	}
 
-	if(resolve_name("copyfile1",source,&psource)<0) return -1;
-	if(resolve_name("copyfile2",target,&ptarget)<0) return -1;
+	if(resolve_name(1,source,&psource)<0) return -1;
+	if(resolve_name(1,target,&ptarget)<0) return -1;
 
 	if(psource.service == ptarget.service) {
 		result = ptarget.service->thirdput(&psource,&ptarget);
@@ -2413,7 +2414,7 @@ int pfs_table::md5( const char *path, unsigned char *digest )
 		return -1;
 	}
 
-	if(resolve_name("md5",path,&pname)<0) return -1;
+	if(resolve_name(1,path,&pname)<0) return -1;
 
 	result = pname.service->md5(&pname,digest);
 
