@@ -64,8 +64,6 @@ extern INT64_T pfs_syscall_count;
 extern INT64_T pfs_read_count;
 extern INT64_T pfs_write_count;
 
-extern int pfs_trap_after_fork;
-
 extern char *pfs_ldso_path;
 extern int *pfs_syscall_totals32;
 
@@ -1398,78 +1396,15 @@ void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL32_vfork:
-			if (entering && !linux_available(2,5,46)) {
-				static int notified = 0;
-				if (!notified) {
-					debug(D_NOTICE, "sorry, I cannot run this program (%s) without parrot_helper.so.",p->name);
-					notified = 0;
-				}
-				divert_to_dummy(p,-ENOSYS);
-				break;
-			}
-			/* no break */
 		case SYSCALL32_fork:
 		case SYSCALL32_clone:
 			if(entering) {
-				if(!linux_available(2,5,46)) {
-					/* Some variants of fork do not propagate ptrace, so we
-					 * must convert them into clone with appropriate flags.
-					 * Once a fork is started, we must trace only that pid so
-					 * that we can determine the child pid before seeing any
-					 * events from the child. On return, we must fill in the
-					 * child process with its parent's ppid.
-					 */
-					if(p->syscall==SYSCALL32_fork || p->syscall==SYSCALL32_vfork) {
-						args[0] = CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
-						args[1] = 0;
-						p->syscall_args_changed = 2;
-						tracer_args_set(p->tracer,SYSCALL32_clone,args,2);
-						debug(D_SYSCALL,"converting fork into clone(%"PRIx64")",args[0]);
-					} else {
-						INT64_T newarg = (args[0]&~0xff)|CLONE_PTRACE|CLONE_PARENT|SIGCHLD;
-						debug(D_SYSCALL,"adjusting clone(%"PRIx64",%"PRIx64",%"PRIx64",%"PRIx64") -> clone(%"PRIx64")",args[0],args[1],args[2],args[3],newarg);
-						args[0] = newarg;
-						p->syscall_args_changed = 1;
-						tracer_args_set(p->tracer,SYSCALL32_clone,args,1);
-					}
-				}
-				/* else tracing children handled by PTRACE_SETOPTIONS in tracer.c */
+				/* Once a fork is started, we must trace only that pid so that
+				 * we can determine the child pid before seeing any events from
+				 * the child. On return, we must fill in the child process with
+				 * its parent's ppid.
+				 */
 				trace_this_pid = p->pid;
-			} else if (!linux_available(2,5,46)) {
-				INT64_T childpid;
-				struct pfs_process *child;
-				tracer_result_get(p->tracer,&childpid);
-				if(childpid>0) {
-					int child_signal,clone_files;
-					if(p->syscall_original==SYSCALL32_fork) {
-						child_signal = SIGCHLD;
-						clone_files = 0;
-					} else {
-						child_signal = args[0]&0xff;
-						clone_files = args[0]&CLONE_FILES;
-					}
-					pid_t notify_parent;
-					if(args[0]&(CLONE_PARENT|CLONE_THREAD)) {
-						notify_parent = p->ppid;
-					} else {
-						notify_parent = p->pid;
-					}
-					child = pfs_process_create(childpid,p->pid,notify_parent,clone_files,child_signal);
-					child->syscall_result = 0;
-					if(args[0]&CLONE_THREAD) child->tgid = p->tgid;
-					if(p->syscall_original==SYSCALL32_fork) {
-						memcpy(child->syscall_args,p->syscall_args,sizeof(p->syscall_args));
-						child->syscall_args_changed = 1;
-					}
-					if(pfs_trap_after_fork) {
-						child->state = PFS_PROCESS_STATE_KERNEL;
-					} else {
-						child->state = PFS_PROCESS_STATE_USER;
-					}
-					debug(D_PROCESS,"%d created pid %d",(int)p->pid,(int)childpid);
-					/* now trace any process at all */
-					trace_this_pid = -1;
-				}
 			}
 			break;
 

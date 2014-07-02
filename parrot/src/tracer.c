@@ -13,17 +13,19 @@ See the file COPYING for details.
 #include "linux-version.h"
 #include "ptrace.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <unistd.h>
-#include <signal.h>
-#include <time.h>
 #include <fcntl.h>
-#include <limits.h>
+#include <unistd.h>
 
 #include <sys/wait.h>
+
+#include <assert.h>
+#include <errno.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 #define FATAL fatal("tracer: %d %s",t->pid,strerror(errno));
 
@@ -76,8 +78,7 @@ int tracer_attach (pid_t pid)
 
 	if (linux_available(3,8,0))
 		options |= PTRACE_O_EXITKILL;
-	else if (!linux_available(2,5,46))
-		fatal("linux is too old");
+	assert(linux_available(2,5,46));
 
 	if (linux_available(3,4,0)) {
 		/* So this is a really annoying situation, in order to correctly deal
