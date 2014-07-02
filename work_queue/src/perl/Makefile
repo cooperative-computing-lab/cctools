@@ -1,31 +1,35 @@
-CCTOOLS_HOME = ../../..
+include ../../../config.mk
+include ../../../rules.mk
 
-include ${CCTOOLS_HOME}/Makefile.config
+PERL_INSTALL_DIR = $(CCTOOLS_INSTALL_DIR)/lib/perl5/site_perl/$(CCTOOLS_PERL_VERSION)
 
-all: work_queue.pm work_queue.${CCTOOLS_DYNAMIC_SUFFIX}
+# SWIG produces code that causes a lot of warnings, so use -w to turn those off.
+# Perl also defines some HAS_* stuff so we need to undefine those too.
+LOCAL_CCFLAGS = -w -UHAS_USLEEP -UHAS_ISNAN -UHAS_UTIME -fPIC -Wno-unused-value -Wno-unused-variable $(CCTOOLS_PERL_CCFLAGS)
+LOCAL_LINKAGE = $(CCTOOLS_PERL_LDFLAGS)
 
-work_queue_wrap.c work_queue.pm: work_queue.i
+EXTERNAL_DEPENDENCIES = ../libwork_queue.a ../../../dttools/src/libdttools.a
+WQPERLSO = work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
+LIBRARIES = work_queue.pm $(WQPERLSO)
+OBJECTS = work_queue_wrap.o
+TARGETS = $(LIBRARIES)
+
+all: $(TARGETS)
+
+work_queue_wrap.c work_queue.pm: work_queue.i $(EXTERNAL_DEPENDENCIES)
 	@echo "SWIG work_queue.i (perl5)"
-	@$(CCTOOLS_SWIG) -o work_queue_wrap.c -perl5 -exportall -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src work_queue.i
+	@$(CCTOOLS_SWIG) -o work_queue_wrap.c -perl5 -exportall -I../../../dttools/src -I../ work_queue.i
 
-work_queue_wrap.o: work_queue_wrap.c
-	$(CCTOOLS_CC) -c -o $@ -fPIC -Wno-unused-value -Wno-unused-variable -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src $(CCTOOLS_PERL_CCFLAGS) $^
+$(WQPERLSO): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
 
-work_queue.${CCTOOLS_DYNAMIC_SUFFIX}: work_queue_wrap.o $(CCTOOLS_HOME)/work_queue/src/libwork_queue.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
-	$(CCTOOLS_LD) $(CCTOOLS_BASE_LDFLAGS) $(CCTOOLS_DYNAMIC_FLAG) -o $@ $^ $(CCTOOLS_EXTERNAL_DYNLIBS) $(CCTOOLS_PERL_LDFLAGS)
+clean:
+	rm -f $(OBJECTS) $(TARGETS) work_queue_wrap.c
 
 test: all
 
-clean:
-	rm -fr work_queue.pm work_queue.${CCTOOLS_DYNAMIC_SUFFIX} work_queue_wrap.*
-
-PERL_INSTALL_DIR=$(CCTOOLS_INSTALL_DIR)/lib/perl5/site_perl/$(CCTOOLS_PERL_VERSION)
-
 install: all
 	mkdir -p $(PERL_INSTALL_DIR)
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
+	cp $(LIBRARIES) $(PERL_INSTALL_DIR)/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 	chmod 755 work_queue_example.pl
-	cp work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(PERL_INSTALL_DIR)
-	cp work_queue.pm $(PERL_INSTALL_DIR)
-	cp work_queue_example.pl ${CCTOOLS_INSTALL_DIR}/doc
-
+	cp work_queue_example.pl $(CCTOOLS_INSTALL_DIR)/doc/

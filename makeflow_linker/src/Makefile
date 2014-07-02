@@ -1,24 +1,20 @@
-CCTOOLS_HOME = ../../
+include ../../config.mk
+include ../../rules.mk
 
-include ${CCTOOLS_HOME}/Makefile.config
-include ${CCTOOLS_HOME}/Makefile.rules
+EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
+SCRIPTS = makeflow_linker_python_driver makeflow_linker_perl_driver
+PROGRAMS = makeflow_linker
+TARGETS = $(PROGRAMS)
 
-TARGETS= makeflow_linker
-DRIVERS= makeflow_linker_python_driver makeflow_linker_perl_driver
+all: $(TARGETS)
 
-LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
-
-all: ${TARGETS}
-
-makeflow_linker: makeflow_linker.o  ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
+$(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f core *~ *.o *.a ${TARGETS}
+	rm -f $(OBJECTS) $(TARGETS)
 
 test: all
 
 install: all
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	cp ${TARGETS} ${DRIVERS} ${CCTOOLS_INSTALL_DIR}/bin
-
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
+	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/

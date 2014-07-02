@@ -1,25 +1,25 @@
-include ../../Makefile.config
-include ../../Makefile.rules
+include ../../config.mk
+include ../../rules.mk
 
-all: ftp_lite_test ftp_lite_copy libftp_lite.a
+EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
+HEADERS_PUBLIC = ftp_lite.h
+LIBRARIES = libftp_lite.a
+OBJECTS = ftp_lite.o error.o radix.o login.o stream.o network.o
+PROGRAMS = ftp_lite_test ftp_lite_copy
+TARGETS = $(PROGRAMS) $(LIBRARIES)
 
-ftp_lite_test: ftp_lite_test.o libftp_lite.a
-	${CCTOOLS_LD} $^ -o $@ -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+all: $(TARGETS)
 
-ftp_lite_copy: ftp_lite_copy.o libftp_lite.a
-	${CCTOOLS_LD} $^ -o $@ -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
-
-libftp_lite.a: ftp_lite.o error.o radix.o login.o stream.o network.o
-	${CCTOOLS_AR} rv $@ $^
-	ranlib $@
+libftp_lite.a: $(OBJECTS)
+$(PROGRAMS): libftp_lite.a $(EXTERNAL_DEPENDENCIES)
 
 test:
 
 clean:
-	rm -f ftp_lite_test ftp_lite_copy libftp_lite.a core *~ *.o *.so so_locations
+	rm -f $(OBJECTS) $(TARGETS)
 
 install:
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/include/cctools
-	cp libftp_lite.a ${CCTOOLS_INSTALL_DIR}/lib
-	cp ftp_lite.h ${CCTOOLS_INSTALL_DIR}/include/cctools/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
+	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
+	cp $(HEADERS_PUBLIC) $(CCTOOLS_INSTALL_DIR)/include/cctools/

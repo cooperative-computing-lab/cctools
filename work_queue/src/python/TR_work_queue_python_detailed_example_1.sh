@@ -2,7 +2,7 @@
 
 . ../../../dttools/src/test_runner.common.sh
 
-export `grep CCTOOLS_PYTHON= ../../../Makefile.config`
+export `grep CCTOOLS_PYTHON= ../../../config.mk`
 
 prepare()
 {

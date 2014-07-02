@@ -1,1 +1,3 @@
-../.src.Makefile
+PHONY_TARGETS = src
+
+include ../.module.mk

@@ -1,35 +1,22 @@
-CCTOOLS_HOME = ../../../
+include ../../config.mk
+include ../../rules.mk
 
-include ${CCTOOLS_HOME}/Makefile.config
-include ${CCTOOLS_HOME}/Makefile.rules
+EXTERNAL_DEPENDENCIES = ../../chirp/src/libchirp.a ../../dttools/src/libdttools.a
+OBJECTS = ragged_array.o
+PROGRAMS = allpairs allpairs_status allpairs_wait allpairs_cleanup
+SCRIPTS = allpairs_wrapper.sh
+TARGETS = $(PROGRAMS)
 
-TARGETS = allpairs allpairs_status allpairs_wait allpairs_cleanup
+all: $(TARGETS)
 
-LOCAL_LDFLAGS=-lchirp -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
-
-all: ${TARGETS}
-
-allpairs: allpairs.o
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS} -lm #-lefence
-
-allpairs_status: allpairs_status.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-
-allpairs_wait: allpairs_wait.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
-
-allpairs_cleanup: allpairs_cleanup.o ${CCTOOLS_HOME}/chirp/src/libchirp.a
-	${CCTOOLS_LD} -o $@ $^ ${LOCAL_LDFLAGS}
+$(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
+allpairs: $(OBJECTS)
 
 test:
 
 clean:
-	rm -f core *~ *.o *.a ${TARGETS} 
+	rm -f $(OBJECTS) $(TARGETS)
 
 install: all
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	cp allpairs ${CCTOOLS_INSTALL_DIR}/bin
-	cp allpairs_wait ${CCTOOLS_INSTALL_DIR}/bin
-	cp allpairs_status ${CCTOOLS_INSTALL_DIR}/bin
-	cp allpairs_cleanup ${CCTOOLS_INSTALL_DIR}/bin	
-	cp allpairs_wrapper.sh ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
+	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/

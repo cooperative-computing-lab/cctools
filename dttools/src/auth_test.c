@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
 				fatal("couldn't register %s authentication", optarg);
 			break;
 		default:
-			show_use(argv[0]);
+			show_help(argv[0]);
 			exit(1);
 			break;
 		}

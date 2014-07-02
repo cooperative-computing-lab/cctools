@@ -1,11 +1,11 @@
 #!/bin/sh
 
-if [ ! -r Makefile.config ]; then
+if [ ! -r config.mk ]; then
     echo "Please run ./configure && make before executing the test script" 
     exit 1
 fi
 
-CCTOOLS_PACKAGES=$(grep CCTOOLS_PACKAGES Makefile.config | cut -d = -f 2)
+CCTOOLS_PACKAGES=$(grep CCTOOLS_PACKAGES config.mk | cut -d = -f 2)
 if [ -z "$CCTOOLS_TEST_LOG" ]; then
 	CCTOOLS_TEST_LOG="./cctools.test.log"
 fi

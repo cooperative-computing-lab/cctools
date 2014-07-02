@@ -1,25 +1,22 @@
-CCTOOLS_HOME = ../../
+include ../../config.mk
+include ../../rules.mk
 
-include ${CCTOOLS_HOME}/Makefile.config
-include ${CCTOOLS_HOME}/Makefile.rules
+LOCAL_LINKAGE = -lpthread
 
-TARGETS = allpairs_multicore allpairs_master
+EXTERNAL_DEPENDENCIES = ../../sand/src/libsandtools.a ../../work_queue/src/libwork_queue.a ../../dttools/src/libdttools.a
+OBJECTS = allpairs_compare.o
+PROGRAMS = allpairs_multicore allpairs_master
+TARGETS = $(PROGRAMS)
 
-LOCAL_LDFLAGS=../../sand/src/libsandtools.a -lwork_queue -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+all: $(TARGETS)
 
-all: ${TARGETS}
-
-allpairs_multicore: allpairs_multicore.o allpairs_compare.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_LD} -o $@ allpairs_multicore.o allpairs_compare.o -lpthread ${LOCAL_LDFLAGS}
-
-allpairs_master: allpairs_master.o allpairs_compare.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_LD} -o $@ allpairs_master.o allpairs_compare.o ${LOCAL_LDFLAGS}
+$(PROGRAMS): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
 
 test:
 
 clean:
-	rm -f core *~ *.o *.a ${TARGETS} 
+	rm -f $(OBJECTS) $(TARGETS)
 
 install: all
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	cp ${TARGETS} ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
+	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/

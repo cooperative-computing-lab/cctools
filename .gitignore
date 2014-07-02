@@ -7,4 +7,4 @@
 *.swp
 cctools.test.log
 configure.rerun
-Makefile.config
+config.mk

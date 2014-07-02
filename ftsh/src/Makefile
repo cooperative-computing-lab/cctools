@@ -1,24 +1,17 @@
+include ../../config.mk
+include ../../rules.mk
 
-include ../../Makefile.config
-include ../../Makefile.rules
+EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
+LIBRARIES = libftsh.a
+OBJECTS = $(SOURCES:%.c=%.o)
+PROGRAMS = ftsh
+SOURCES = ast.c ast_execute.c ast_print.c buffer.c builtin.c cancel.c expr.c ftsh.c ftsh_error.c multi_fork.c parser.tab.c scanner.c timed_exec.c variable.c
+TARGETS = $(PROGRAMS) $(LIBRARIES)
 
-LOCAL_LDFLAGS=-ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+all: $(TARGETS)
 
-PROGRAMS=ftsh
-LIBRARIES=libftsh.a
-SOURCES=ftsh.c ftsh_error.c ast.c ast_print.c ast_execute.c expr.c parser.tab.c scanner.c variable.c buffer.c timed_exec.c multi_fork.c cancel.c builtin.o
-
-OBJECTS = ${SOURCES:%.c=%.o}
-HEADERS = ${SOURCES:%.c=%.h}
-
-all: ${PROGRAMS} ${LIBRARIES}
-
-ftsh: ftsh.o libftsh.a
-	${CCTOOLS_LD} $^ -o $@ ${LOCAL_LDFLAGS}
-
-libftsh.a: ${OBJECTS}
-	ar rv $@ $^
-	ranlib $@
+libftsh.a: $(OBJECTS)
+$(PROGRAMS): libftsh.a
 
 parser.tab.c parser.tab.h: parser.y
 	bison -d parser.y
@@ -29,8 +22,8 @@ scanner.c: scanner.l parser.tab.h
 test:
 
 install: all
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	cp ftsh ${CCTOOLS_INSTALL_DIR}/bin
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
+	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
 
 clean:
-	rm -f ${PROGRAMS} ${OBJECTS} ${LIBRARIES} parser.tab.c parser.tab.h scanner.c *~
+	rm -f $(OBJECTS) $(TARGETS) parser.tab.c parser.tab.h scanner.c

@@ -380,7 +380,7 @@ potential_packages="dttools ${include_package_chirp} work_queue ${include_packag
 
 check_multiarch
 
-rm -f Makefile.config
+rm -f config.mk
 echo "checking for all the things I know how to build..."
 for p in $potential_packages
 do
@@ -391,7 +391,6 @@ do
 		if [ -d `pwd`/$p/src ]
 		then
 			internal_ccflags="${internal_ccflags} -I`pwd`/$p/src"
-			internal_ldflags="${internal_ldflags} -L`pwd`/$p/src"
 		fi
 	else
 		echo "package $p not found (that's ok)"
@@ -454,14 +453,11 @@ then
 	then
 		ccflags="${ccflags} -I${globus_path}/include/${globus_flavor} -DHAS_GLOBUS_GSS"
 		ldflags="${ldflags} -L${globus_path}/lib"
-
 		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
 		do
 			library_search ${library}_${globus_flavor} ${globus_path}
 		done
-
-		cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist_${globus_flavor}"
-
+		external_dynlibs="${external_dynlibs} -lglobus_gss_assist_${globus_flavor}"
 	elif check_file ${globus_path}/include/globus/globus_common.h
 	then
 		ccflags="${ccflags} -I${globus_path}/lib/globus/include -I${globus_path}/include/globus -DHAS_GLOBUS_GSS"
@@ -470,9 +466,7 @@ then
 		do
 			library_search $library ${globus_path}
 		done
-
-		cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${globus_path}/lib -lglobus_gss_assist"
-
+		external_dynlibs="${external_dynlibs} -lglobus_gss_assist"
 	else
 		if [ $config_globus_path = yes ]
 		then
@@ -720,7 +714,8 @@ then
 		ccflags="${ccflags} -I${krb5_include_path}"
 	fi
 
-	cctools_dynamic_auth_libs="${cctools_dynamic_auth_libs} -L${krb5_path}/lib -lkrb5"
+	ldflags="${ldflags} -L${krb5_path}/lib"
+	external_dynlibs="${external_dynlibs} -lkrb5"
 
 	ccflags="${ccflags} -DHAS_KRB5"
 else
@@ -1158,7 +1153,7 @@ EOF
 fi
 
 
-echo "Creating Makefile.config..."
+echo "Creating config.mk..."
 
 if [ "$optdebug" = 1 ]; then
 	CCTOOLS_CC="${ccompiler}"
@@ -1172,7 +1167,7 @@ else
 	CCTOOLS_MPI_LD='@echo MPI_LINK $@;'"${mpilinker}"
 fi
 
-cat <<EOF >>Makefile.config
+cat <<EOF >>config.mk
 # Generated at `date` by $USER@`uname -n`
 
 CCTOOLS_INSTALL_DIR=${install_path}
@@ -1188,12 +1183,13 @@ CCTOOLS_BASE_CXXFLAGS=${ccflags}
 CCTOOLS_INTERNAL_CXXFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CXXFLAGS}
 CCTOOLS_CXXFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CXXFLAGS}
 
-CCTOOLS_LD=${CCTOOLS_LD}
-CCTOOLS_BASE_LDFLAGS=${ldflags}
-CCTOOLS_EXTERNAL_ARCHIVES=${external_archives}
-CCTOOLS_EXTERNAL_DYNLIBS=${external_dynlibs}
-CCTOOLS_INTERNAL_LDFLAGS=\$(CCTOOLS_BASE_LDFLAGS) ${internal_ldflags} \$(CCTOOLS_EXTERNAL_ARCHIVES) \$(CCTOOLS_EXTERNAL_DYNLIBS)
-CCTOOLS_LDFLAGS=-L\${CCTOOLS_INSTALL_DIR}/lib \${CCTOOLS_BASE_LDFLAGS}
+CCTOOLS_LD = ${CCTOOLS_LD}
+CCTOOLS_BASE_LDFLAGS = ${ldflags}
+CCTOOLS_INTERNAL_LDFLAGS = \$(CCTOOLS_BASE_LDFLAGS) ${internal_ldflags}
+CCTOOLS_EXTERNAL_ARCHIVES = ${external_archives}
+CCTOOLS_EXTERNAL_DYNLIBS = ${external_dynlibs}
+CCTOOLS_EXTERNAL_LINKAGE = \$(CCTOOLS_EXTERNAL_ARCHIVES) \$(CCTOOLS_EXTERNAL_DYNLIBS)
+CCTOOLS_LDFLAGS = -L\$(CCTOOLS_INSTALL_DIR)/lib \$(CCTOOLS_BASE_LDFLAGS)
 
 CCTOOLS_MPI_LD=${CCTOOLS_MPI_LD}
 CCTOOLS_USE_MPI=$usempi
@@ -1202,7 +1198,6 @@ CCTOOLS_READLINE_LDFLAGS=${cctools_readline_ldflags}
 
 CCTOOLS_DYNAMIC_SUFFIX=${cctools_dynamic_suffix}
 CCTOOLS_DYNAMIC_FLAG=${cctools_dynamic_flag}
-CCTOOLS_DYNAMIC_AUTH_LIBS=${cctools_dynamic_auth_libs}
 
 CC=\$(CCTOOLS_CC)
 CCFLAGS=\$(CCTOOLS_CCFLAGS)

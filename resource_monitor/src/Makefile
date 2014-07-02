@@ -1,77 +1,62 @@
-CCTOOLS_HOME = ../../
-
 UNAME := $(shell uname)
 
-include ${CCTOOLS_HOME}/Makefile.config
-include ${CCTOOLS_HOME}/Makefile.rules
+include ../../config.mk
+include ../../rules.mk
 
-TARGETS = resource_monitorv resource_monitor resource_monitor_cluster resource_monitor_histograms piggybacker
-LIBRARIES = librmonitor_helper.so
-
-ifeq (${UNAME}, Darwin)
-LIBRARIES =
-TARGETS = resource_monitorv
+ifeq ($(UNAME), FreeBSD)
+LOCAL_LINKAGE = -lkvm
 endif
 
-ifeq (${UNAME}, FreeBSD)
-LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS} -lkvm
-else
-LOCAL_LDFLAGS= -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
+EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
+LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) librmonitor_poll.a
+OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o rmon_tools.o rmonitor_poll.o rmonitor_helper.o
+PROGRAMS = resource_monitorv resource_monitor resource_monitor_cluster resource_monitor_histograms piggybacker
+TARGETS = $(LIBRARIES) $(PROGRAMS)
+
+ifeq ($(UNAME), Darwin)
+LIBRARIES = librmonitor_poll.a
+PROGRAMS = resource_monitorv piggybacker
 endif
 
-all: ${TARGETS} ${LIBRARIES}
-
-resource_monitorv: rmonitor_helper_comm.o resource_monitor.o librmonitor_poll.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
-
-resource_monitor: rmonitor_helper_comm.o resource_monitor_pb.o librmonitor_poll.a rmonitor_piggyback.h ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
+all: $(TARGETS)
 
 librmonitor_poll.a: rmonitor_poll.o
-	${CCTOOLS_AR} rv $@ $^
-	ranlib $@
 
-resource_monitor_pb.c: resource_monitor.c
-	cp resource_monitor.c resource_monitor_pb.c
-
-resource_monitor_pb.o: rmonitor_piggyback.h resource_monitor_pb.c 
-	${CCTOOLS_CC} -g -DCCTOOLS_USE_RMONITOR_HELPER_LIB ${CCTOOLS_INTERNAL_CCFLAGS} $^ -c
-
-resource_monitor.o: rmonitor_piggyback.h resource_monitor.c 
-	${CCTOOLS_CC} -g ${CCTOOLS_INTERNAL_CCFLAGS} $^ -c
-
-ifeq (${UNAME}, FreeBSD)
-librmonitor_helper.so: rmonitor_helper.o rmonitor_helper_comm.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_CC} -shared -Wl,-soname,$@ -lc -fPIC $^ -o $@
+ifeq ($(UNAME), FreeBSD)
+librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX): rmonitor_helper.o rmonitor_helper_comm.o $(EXTERNAL_DEPENDENCIES)
+	$(CCTOOLS_CC) -shared -Wl,-soname,$@ -lc -fPIC $^ -o $@
 else
-librmonitor_helper.so: rmonitor_helper.o rmonitor_helper_comm.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_CC} -shared -ldl -fPIC $^ -o $@
+librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX): rmonitor_helper.o rmonitor_helper_comm.o $(EXTERNAL_DEPENDENCIES)
+	$(CCTOOLS_CC) -shared -ldl -fPIC $^ -o $@
 endif
 
-ifeq (${UNAME}, Darwin)
+ifeq ($(UNAME), Darwin)
 rmonitor_piggyback.h: piggybacker
 	./piggybacker rmonitor_piggyback.h CCTOOLS_USE_RMONITOR_HELPER_LIB
 else
-rmonitor_piggyback.h: librmonitor_helper.so piggybacker
-	./piggybacker rmonitor_piggyback.h CCTOOLS_USE_RMONITOR_HELPER_LIB librmonitor_helper.so
+rmonitor_piggyback.h: librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) piggybacker
+	./piggybacker rmonitor_piggyback.h CCTOOLS_USE_RMONITOR_HELPER_LIB librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
 endif
 
-piggybacker: piggybacker.o
-	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
+resource_monitor.o resource_monitor_pb.o: rmonitor_piggyback.h
+resource_monitor resource_monitorv: rmonitor_helper_comm.o librmonitor_poll.a
+resource_monitor_cluster resource_monitor_histograms: rmon_tools.o
+$(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 
-resource_monitor_cluster: rmon_tools.o cluster.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
-
-resource_monitor_histograms: rmon_tools.o histograms.o ${CCTOOLS_HOME}/dttools/src/libdttools.a
-	${CCTOOLS_LD} $^ ${LOCAL_LDFLAGS} -o $@
+resource_monitor_pb.o: resource_monitor.c
+	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) -DCCTOOLS_USE_RMONITOR_HELPER_LIB $<
+resource_monitor: resource_monitor_pb.o
+	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
+resource_monitorv: resource_monitor.o
+	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 clean:
-	rm -f core *~ *.o *.a *.so $(TARGETS) $(LIBRARIES) resource_monitor_pb.* rmonitor_piggyback.h*
+	rm -f $(OBJECTS) $(TARGETS) resource_monitor_pb.* rmonitor_piggyback.h*
 
 test: all
 
 install: all
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	cp ${TARGETS} ${CCTOOLS_INSTALL_DIR}/bin
-	mkdir -p ${CCTOOLS_INSTALL_DIR}/lib
-	-cp ${LIBRARIES} ${CCTOOLS_INSTALL_DIR}/lib
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
+	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
+	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/

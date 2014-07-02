@@ -460,7 +460,7 @@ check_for_globus()
 	# stops working with version > 2.0
 	#
 
-	$4 --static --flavor=$3 $2 2> Makefile.config.globus.errors > Makefile.config.globus
+	$4 --static --flavor=$3 $2 2> config.mk.globus.errors > config.mk.globus
 
 	#
 	# This script seems to always exit with status zero,
@@ -474,19 +474,19 @@ check_for_globus()
 		# in the output Makefile itself.
 		#
 
-		if grep ERROR Makefile.config.globus > /dev/null
+		if grep ERROR config.mk.globus > /dev/null
 		then
 			#
 			# On the other hand, some working versions have
 			# the string ERROR in a package name!
 			#
 
-			if grep ERROR_VERSION Makefile.config.globus > /dev/null
+			if grep ERROR_VERSION config.mk.globus > /dev/null
 			then
 				echo "tricky, but yes!"
 				return 0
 			else
-				rm Makefile.config.globus
+				rm config.mk.globus
 				echo "broken"
 				return 1
 			fi

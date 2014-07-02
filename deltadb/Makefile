@@ -1,1 +1,1 @@
-../.src.Makefile
+../.module.mk
