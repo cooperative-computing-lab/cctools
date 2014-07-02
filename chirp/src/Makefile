@@ -8,7 +8,7 @@ LOCAL_CCFLAGS = -DSQLITE_THREADSAFE=0
 CHIRPSO = libchirp_client.$(CCTOOLS_DYNAMIC_SUFFIX)
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = libchirp.a $(CHIRPSO)
-OBJECTS = $(OBJECTS_LIBRARY) $(OBJECTS_SERVER)
+OBJECTS = chirp_tool.o $(OBJECTS_LIBRARY) $(OBJECTS_SERVER)
 OBJECTS_LIBRARY = $(SOURCES_LIBRARY:%.c=%.o)
 OBJECTS_SERVER = $(SOURCES_SERVER:%.c=%.o)
 PROGRAMS = chirp chirp_get chirp_put chirp_server chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute
