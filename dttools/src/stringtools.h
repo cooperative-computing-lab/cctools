@@ -19,7 +19,7 @@ void string_from_ip_address(const unsigned char *ip_addr_bytes, char *str);
 int string_to_ip_address(const char *str, unsigned char *ip_addr_bytes);
 int string_ip_subnet(const char *addr, char *subnet);
 void string_chomp(char *str);
-int whole_string_match_regex(const char *text, char *pattern);
+int whole_string_match_regex(const char *text, const char *pattern);
 int string_match_regex(const char *text, char *pattern);
 int string_match(const char *pattern, const char *text);
 char *string_front(const char *str, int max);

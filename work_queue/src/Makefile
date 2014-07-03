@@ -1,6 +1,10 @@
 include ../../config.mk
 include ../../rules.mk
 
+# Note that this list of sources only contains
+# the items that go into libwork_queue.a, to
+# avoid polluting user programs with our internal code.
+
 SOURCES = \
 	batch_job.c \
 	batch_job_chirp.c \
@@ -12,12 +16,13 @@ SOURCES = \
 	batch_job_work_queue.c \
 	work_queue.c \
 	work_queue_catalog.c \
-	work_queue_example.c \
-	work_queue_pool.c \
-	work_queue_resources.c \
-	work_queue_status.c \
-	work_queue_worker.c \
-	work_queue_workload_simulator.c
+	work_queue_resources.c
+
+PUBLIC_HEADERS = batch_job.h work_queue.h
+
+LIBDTTOOLS = ${CCTOOLS_HOME}/dttools/src/libdttools.a
+LIBCHIRP = $(CCTOOLS_HOME)/chirp/src/libchirp.a
+EXTERNALS = $(LIBDTTOOLS) $(LIBCHIRP)
 
 EXTERNAL_DEPENDENCIES = ../../chirp/src/libchirp.a ../../dttools/src/libdttools.a
 LIBRARIES = libwork_queue.a
@@ -25,7 +30,7 @@ OBJECTS = $(SOURCES:%.c=%.o)
 PROGRAMS = work_queue_worker work_queue_status work_queue_example work_queue_pool
 PUBLIC_HEADERS = batch_job.h work_queue.h
 SCRIPTS = wq_submit_workers.common condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers ec2_submit_workers ec2_remove_workers slurm_submit_workers work_queue_graph_log
-TEST_PROGRAMS = work_queue_example work_queue_workload_simulator
+TEST_PROGRAMS = work_queue_example work_queue_test work_queue_test_watch
 TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) bindings
 
 ifeq ($(CCTOOLS_USE_MPI),true)
@@ -33,8 +38,14 @@ ifeq ($(CCTOOLS_USE_MPI),true)
 endif
 
 all: $(TARGETS)
-
 libwork_queue.a: $(OBJECTS)
+
+work_queue_test: work_queue_test.o work_queue_test_main.o
+
+work_queue_test_watch: work_queue_test_watch.o work_queue_test_main.o
+
+work_queue_worker: work_queue_worker.o work_queue_process.o work_queue_watcher.o
+
 $(PROGRAMS) $(TEST_PROGRAMS) bindings: libwork_queue.a $(EXTERNAL_DEPENDENCIES)
 
 mpi_queue_worker: mpi_queue_worker.o

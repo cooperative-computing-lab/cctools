@@ -335,4 +335,49 @@ out:
 	return rc;
 }
 
+/*
+Return true if the given path resolves within the tree below dir.
+This implementation was factored out of work_queue_worker and
+can probably be made simpler.
+*/
+
+int path_within_dir(const char *path, const char *dir)
+{
+	if(!path) return 0;
+
+	char absolute_dir[PATH_MAX+1];
+	if(!realpath(dir, absolute_dir)) return 0;
+
+	char *p;
+	if(path[0] == '/') {
+		p = strstr(path, absolute_dir);
+		if(p != path) {
+			return 0;
+		}
+	}
+
+	char absolute_path[PATH_MAX+1];
+	char *tmp_path = xxstrdup(path);
+
+	int rv = 1;
+	while((p = strrchr(tmp_path, '/')) != NULL) {
+		*p = '\0';
+		if(realpath(tmp_path, absolute_path)) {
+			p = strstr(absolute_path, absolute_dir);
+			if(p != absolute_path) {
+				rv = 0;
+			}
+			break;
+		} else {
+			if(errno != ENOENT) {
+				rv = 0;
+				break;
+			}
+		}
+	}
+
+	free(tmp_path);
+	return rv;
+}
+
 /* vim: set noexpandtab tabstop=4: */

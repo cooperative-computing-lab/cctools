@@ -35,4 +35,6 @@ void path_split_multi (const char *input, char *first, char *rest);
 
 int path_find (buffer_t *B, const char *dir, const char *pattern, int recursive);
 
+int path_within_dir( const char *path, const char *dir );
+
 #endif

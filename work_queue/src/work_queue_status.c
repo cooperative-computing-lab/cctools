@@ -4,17 +4,18 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "work_queue.h"
+#include "work_queue_catalog.h"
 
 #include "cctools.h"
 #include "debug.h"
 #include "catalog_query.h"
 #include "domain_name_cache.h"
-#include "work_queue.h"
 #include "nvpair.h"
 #include "link_nvpair.h"
 #include "link.h"
 #include "getopt.h"
-#include "work_queue_catalog.h"
+#include "stringtools.h"
 
 #include <errno.h>
 #include <string.h>
@@ -116,7 +117,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 	while((c = getopt_long(argc, argv, "QTWC:d:lo:O:Rt:vh", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'C':
-			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
+			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
 				fprintf(stderr, "Cannot parse catalog description: %s. \n", optarg);
 				exit(EXIT_FAILURE);
 			}
@@ -225,7 +226,7 @@ int get_masters(time_t stoptime)
 		if(i == catalog_size)
 			resize_catalog( catalog_size * 2 );
 
-		if(strcmp(nvpair_lookup_string(nv, "type"), CATALOG_TYPE_WORK_QUEUE_MASTER) == 0) {
+		if(strcmp(nvpair_lookup_string(nv, "type"), "wq_master") == 0) {
 			global_catalog[i] = nv; //make the global catalog point to this memory that nv references
 			i++; //only increment i when a master nvpair is found
 		}else{

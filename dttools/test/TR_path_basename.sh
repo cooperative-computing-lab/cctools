@@ -6,15 +6,17 @@ exe="path_basename.test"
 
 prepare()
 {
-	gcc -g -o "$exe" -x c - -x none ../src/libdttools.a -lm <<EOF
+	gcc -g -o "$exe" -x c - -x none -I ../src ../src/libdttools.a -lm <<EOF
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "path.h"
+
 void test (const char *in, const char *expected)
 {
-	char *out = path_basename(in);
+	const char *out = path_basename(in);
 	if (strcmp(out, expected) != 0) {
 		fprintf(stderr, "for %s, got %s expected %s\n", in, out, expected);
 		exit(EXIT_FAILURE);

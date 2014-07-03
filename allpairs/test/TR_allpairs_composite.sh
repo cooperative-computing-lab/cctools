@@ -6,40 +6,46 @@ TEST_INPUT=integer.list
 TEST_OUTPUT_STEP=composite_step.output
 TEST_OUTPUT=composite.output
 TEST_TRUTH=composites.txt
-PIDMASTER_FILE=allpairs.pid
-PIDWORKER_FILE=worker.pid
+PIDMASTER_FILE=master.pid
 PORT_FILE=worker.port
 
-prepare()
+export PATH=.:../src:../../work_queue/src:$PATH
+
+cleanfiles()
 {
+        if [ -f $TEST_INPUT ]
+        then
+                xargs rm < $TEST_INPUT
+        fi
+
 	rm -f $TEST_INPUT
 	rm -f $TEST_OUTPUT_STEP
 	rm -f $TEST_OUTPUT
 	rm -f $PIDMASTER_FILE
-	rm -f $PIDWORKER_FILE
 	rm -f $PORT_FILE
+	rm -f allpairs_multicore
+}
 
+prepare()
+{
+	cleanfiles
 	./gen_ints.sh $TEST_INPUT 20
-
-    ln -s ../src/allpairs_multicore .
-    (PATH=.:$PATH ../src/allpairs_master -x 1 -y 1 --output-file $TEST_OUTPUT_STEP -Z $PORT_FILE $TEST_INPUT $TEST_INPUT ./divisible.sh )&
-
-    pid=$!
-	echo $pid > $PIDMASTER_FILE
-
-	wait_for_file_creation $PORT_FILE 5
-	exit 0
+	ln -s ../src/allpairs_multicore .
 }
 
 run()
 {
-    ../../work_queue/src/work_queue_worker localhost `cat $PORT_FILE` &
-    pid=$!
-	echo $pid > $PIDWORKER_FILE
+	echo "starting master"
+	allpairs_master -x 1 -y 1 --output-file $TEST_OUTPUT_STEP -Z $PORT_FILE $TEST_INPUT $TEST_INPUT ./divisible.sh &
+	echo $! > $PIDMASTER_FILE
 
-	wait_for_file_creation $TEST_OUTPUT_STEP 5
-	wait_for_file_modification $TEST_OUTPUT_STEP 3
+	echo "waiting for $PORT_FILE to be created"
+	wait_for_file_creation $PORT_FILE 5
 
+	echo "starting worker"
+ 	work_queue_worker localhost `cat $PORT_FILE` --timeout 2 -d all
+
+	echo "checking output"
 	awk '$3 ~ /^0$/{print $1}' $TEST_OUTPUT_STEP | sort -n | uniq > $TEST_OUTPUT
 
 	diff $TEST_TRUTH $TEST_OUTPUT
@@ -48,20 +54,13 @@ run()
 
 clean()
 {
-    /bin/kill -9 `cat $PIDMASTER_FILE`
-    /bin/kill -9 `cat $PIDWORKER_FILE`
+	if [ -f $PIDMASTER_FILE ]
+	then
+		kill -9 `cat $PIDMASTER_FILE`
+	fi
 
-	xargs rm < $TEST_INPUT
-	
-	rm -f $TEST_INPUT
-	rm -f $TEST_OUTPUT_STEP
-	rm -f $TEST_OUTPUT
-	rm -f $PIDMASTER_FILE
-	rm -f $PIDWORKER_FILE
-	rm -f $PORT_FILE
-    rm -f allpairs_multicore
-
-    exit 0
+    	cleanfiles
+	exit 0
 }
 
 dispatch $@

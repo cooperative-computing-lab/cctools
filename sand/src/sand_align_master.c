@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include "envtools.h"
 #include "getopt.h"
 #include "getopt_aux.h"
+#include "xxmalloc.h"
 
 #include "sequence.h"
 #include "compressed_sequence.h"
@@ -364,7 +365,7 @@ int main(int argc, char *argv[])
 			priority = atoi(optarg);
 			break;
 		case 'C':
-			if(!parse_catalog_server_description(optarg, &catalog_host, &catalog_port)) {
+			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
 				fprintf(stderr, "sand_align: catalog server should be given as HOSTNAME:PORT'.\n");
 				exit(1);
 			}
