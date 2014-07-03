@@ -1,8 +1,7 @@
-
 include ../../Makefile.config
 include ../../Makefile.rules
 
-TESTS=quotes variables loops recurse functions args try forany forall lists expr
+TESTS = quotes variables loops recurse functions args try forany forall lists expr
 
 all:
 
