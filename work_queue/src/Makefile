@@ -65,9 +65,9 @@ install: all install-bindings
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 
-test:
-
 clean: clean-bindings
 	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
+
+test: all
 
 .PHONY: all clean install test $(CCTOOLS_WORK_QUEUE_BINDINGS) bindings $(CCTOOLS_WORK_QUEUE_BINDINGS_INSTALL) install-bindings $(CCTOOLS_WORK_QUEUE_BINDINGS_CLEAN) clean-bindings

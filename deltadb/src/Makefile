@@ -14,8 +14,6 @@ all: $(TARGETS)
 libdeltadb.a: $(OBJECTS)
 $(PROGRAMS): $(LIBRARIES) $(EXTERNAL_DEPENDENCIES)
 
-test: all
-
 clean:
 	rm -f $(OBJECTS) $(TARGETS)
 
@@ -25,5 +23,7 @@ uninstall:
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	for s in $(SCRIPTS); do cat $$s | sed "s:CCTOOLS_VERSION:$(CCTOOLS_VERSION):g" | sed "s:CCTOOLS_RELEASEDATE:$(CCTOOLS_RELEASEDATE):g" > $(CCTOOLS_INSTALL_DIR)/bin/$$s; chmod 755 $(CCTOOLS_INSTALL_DIR)/bin/$$s; done
+
+test: all
 
 .PHONY: all clean install test uninstall

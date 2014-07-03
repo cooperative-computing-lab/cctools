@@ -38,8 +38,6 @@ libchirp.a: $(OBJECTS_LIBRARY)
 chirp_server: $(OBJECTS_SERVER)
 $(PROGRAMS): libchirp.a $(EXTERNAL_DEPENDENCIES)
 
-test: all
-
 clean:
 	rm -f $(OBJECTS) $(TARGETS)
 
@@ -52,3 +50,7 @@ install: all
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
+
+test: all
+
+.PHONY: all clean install test

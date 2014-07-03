@@ -14,9 +14,11 @@ $(PROGRAMS): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
 clean:
 	rm -f $(OBJECTS) $(TARGETS)
 
-test: all
-
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	chmod 755 $(SCRIPTS)
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
+
+test: all
+
+.PHONY: all clean install test

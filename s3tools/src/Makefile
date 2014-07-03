@@ -16,6 +16,8 @@ $(PROGRAMS): s3common.o $(LIBRARIES) $(EXTERNAL_DEPENDENCIES)
 clean:
 	rm -f $(OBJECTS) $(TARGETS)
 
-install:
+install: all
 
-test:
+test: all
+
+.PHONY: all clean install test

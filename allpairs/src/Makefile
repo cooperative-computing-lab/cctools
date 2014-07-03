@@ -12,11 +12,13 @@ all: $(TARGETS)
 
 $(PROGRAMS): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
 
-test:
-
 clean:
 	rm -f $(OBJECTS) $(TARGETS)
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
+
+test: all
+
+.PHONY: all clean install test

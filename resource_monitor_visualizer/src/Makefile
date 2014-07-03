@@ -14,10 +14,10 @@ install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
 	cp -r $(STATIC_RESOURCES) $(CCTOOLS_INSTALL_DIR)/lib/
 
-test:
-
 uninstall:
 	rm -rf $(CCTOOLS_INSTALL_DIR)/lib/$(STATIC_RESOURCES)
 	cd $(CCTOOLS_INSTALL_DIR) && rm -f $(SCRIPTS)
+
+test: all
 
 .PHONY: all clean install uninstall test

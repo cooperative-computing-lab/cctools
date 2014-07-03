@@ -112,8 +112,6 @@ all: $(TARGETS)
 libdttools.a: $(OBJECTS)
 $(PROGRAMS) $(TEST_PROGRAMS): $(LIBRARIES)
 
-test: all
-
 clean:
 	rm -f $(OBJECTS) $(TARGETS)
 
@@ -124,3 +122,7 @@ install: all
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(HEADERS_PUBLIC) $(CCTOOLS_INSTALL_DIR)/include/cctools/
+
+test: all
+
+.PHONY: all clean install test

@@ -19,11 +19,13 @@ parser.tab.c parser.tab.h: parser.y
 scanner.c: scanner.l parser.tab.h
 	flex -t scanner.l > scanner.c
 
-test:
-
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
 
 clean:
 	rm -f $(OBJECTS) $(TARGETS) parser.tab.c parser.tab.h scanner.c
+
+test: all
+
+.PHONY: all clean install test

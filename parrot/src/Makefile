@@ -53,8 +53,6 @@ parrot_run: $(OBJECTS_PARROT_RUN)
 $(UTILITIES): libparrot_client.a
 $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 
-test:
-
 clean:
 	rm -f $(OBJECTS) $(TARGETS) $(PROGRAMS) $(LIBRARIES) tracer.table.c tracer.table.h tracer.table64.c tracer.table64.h
 
@@ -72,3 +70,7 @@ ifeq ($(CCTOOLS_BUILD_LIB32PARROT_HELPER),yes)
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib/lib
 endif
 	for lib in $(LIBRARIES); do cp $$lib $(CCTOOLS_INSTALL_DIR)/lib/$$lib; done
+
+test: all
+
+.PHONY: all clean install test

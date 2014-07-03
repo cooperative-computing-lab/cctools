@@ -16,8 +16,6 @@ all: $(TARGETS)
 libsandtools.a: $(OBJECTS)
 $(PROGRAMS): $(LIBRARIES) $(EXTERNAL_DEPENDENCIES)
 
-test: all
-
 clean:
 	rm -f $(OBJECTS) $(PROGRAMS) $(LIBRARIES)
 
@@ -25,3 +23,7 @@ install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	chmod 755 $(PROGRAMS) $(SCRIPTS)
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
+
+test: all
+
+.PHONY: all clean install test
