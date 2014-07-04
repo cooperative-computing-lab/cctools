@@ -11,7 +11,9 @@ parrot_debug=parrot.debug
 expected=expected.txt
 output=output.txt
 
-psearch="../src/parrot_run -d all -o $parrot_debug ../src/parrot_search"
+psearch() {
+	../src/parrot_run --no-chirp-catalog --debug=all --debug-file="$parrot_debug" ../src/parrot_search "$@"
+}
 
 prepare()
 {
@@ -53,27 +55,27 @@ run()
 	hostport=$(cat "$c")
 	{
 		echo ++
-		$psearch /chirp/$hostport/ 'bar' | sort
+		psearch /chirp/$hostport/ 'bar' | sort
 		echo ++
-		$psearch /chirp/$hostport/ '/bar'
+		psearch /chirp/$hostport/ '/bar'
 		echo ++
-		$psearch /chirp/$hostport/ 'c/bar'
+		psearch /chirp/$hostport/ 'c/bar'
 		echo ++
-		$psearch /chirp/$hostport/ '/c/bar'
+		psearch /chirp/$hostport/ '/c/bar'
 		echo ++
-		$psearch /chirp/$hostport/ 'b/bar'
+		psearch /chirp/$hostport/ 'b/bar'
 		echo ++
-		$psearch /chirp/$hostport/ '/b/bar'
+		psearch /chirp/$hostport/ '/b/bar'
 		echo ++
-		$psearch /chirp/$hostport/ 'b/foo'
+		psearch /chirp/$hostport/ 'b/foo'
 		echo ++
-		$psearch /chirp/$hostport/ '/a/b/foo'
+		psearch /chirp/$hostport/ '/a/b/foo'
 		echo ++
-		$psearch /chirp/$hostport/ '/*/foo'
+		psearch /chirp/$hostport/ '/*/foo'
 		echo ++
-		$psearch /chirp/$hostport/ '/*/*/foo'
+		psearch /chirp/$hostport/ '/*/*/foo'
 		echo ++
-		$psearch /chirp/$hostport/ '*/*r' | sort
+		psearch /chirp/$hostport/ '*/*r' | sort
 		echo ++
 	} > "$output"
 

@@ -33,7 +33,6 @@ extern "C" {
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <sys/ioctl.h>
 
 class pfs_file_rfio : public pfs_file
 {

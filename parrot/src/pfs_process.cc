@@ -6,9 +6,7 @@ See the file COPYING for details.
 */
 
 #include "pfs_channel.h"
-#include "pfs_dispatch.h"
 #include "pfs_paranoia.h"
-#include "pfs_poll.h"
 #include "pfs_process.h"
 
 extern "C" {
@@ -31,6 +29,7 @@ extern "C" {
 #include <string.h>
 
 struct pfs_process *pfs_current=0;
+int parrot_dir_fd = -1;
 
 static struct itable * pfs_process_table = 0;
 static int nprocs = 0;
@@ -82,12 +81,70 @@ void pfs_process_sigio()
 	}
 }
 
-void pfs_process_wake( pid_t pid )
+int pfs_process_stat( pid_t pid, int fd, struct stat *buf )
 {
-	struct pfs_process *p = pfs_process_lookup(pid);
-	if(p && (p->state==PFS_PROCESS_STATE_WAITREAD || p->state==PFS_PROCESS_STATE_WAITWRITE) ) {
-		debug(D_PROCESS,"pid %d woken from wait state",p->pid);
-		pfs_dispatch(p,0);
+	char path[4096];
+	snprintf(path, sizeof(path), "/proc/%d/fd/%d", pid, fd);
+	if (stat(path, buf) == -1)
+		return -1;
+	return 0;
+}
+
+static int bootnative( mode_t mode )
+{
+	return (S_ISSOCK(mode) || S_ISBLK(mode) || S_ISCHR(mode) || S_ISFIFO(mode));
+}
+
+static void initfd( pfs_process *p, int fd )
+{
+	if(fd == parrot_dir_fd || fd == pfs_channel_fd()) {
+		p->table->setspecial(fd);
+	} else {
+		struct stat buf;
+		int fdflags;
+		if (fstat(fd, &buf) == 0 && !((fdflags = fcntl(fd, F_GETFD))&FD_CLOEXEC)) {
+			debug(D_DEBUG, "found %d", fd);
+			if (bootnative(buf.st_mode)) {
+				p->table->setnative(fd, 0);
+			} else {
+				int flflags = fcntl(fd, F_GETFL);
+				debug(D_PROCESS, "attaching to inherited native fd %d with flags %d", fd, flflags);
+
+				/* create a duplicate because the tracee(s) might close the fd */
+				int nfd = dup(fd);
+				if (nfd == -1)
+					fatal("could not dup %d: %s", fd, strerror(errno));
+				/* So nfd closes on exec and is not attached again... */
+				fcntl(nfd, F_SETFD, fcntl(nfd, F_GETFD)|FD_CLOEXEC);
+
+				/* The fd was closed and opened as a "Parrot fd" by the root tracee, find its inode: */
+				if (pfs_process_stat(p->pid, fd, &buf) == -1)
+					fatal("could not stat root tracee: %s", strerror(errno));
+				p->table->attach(fd, nfd, fdflags, S_IRUSR|S_IWUSR, "fd", &buf);
+			}
+		}
+	}
+}
+
+void pfs_process_bootstrapfd( void )
+{
+	int count = sysconf(_SC_OPEN_MAX);
+	for (int i = 0; i < count; i++) {
+		if (!(i == parrot_dir_fd || i == pfs_channel_fd())) {
+			struct stat buf;
+			if (fstat(i, &buf) == 0 && !(fcntl(i, F_GETFD)&FD_CLOEXEC) && !bootnative(buf.st_mode)) {
+				debug(D_DEBUG, "[root tracee] bootstrapping non-native fd as Parrot fd: %d", i);
+				int fd = openat(parrot_dir_fd, "p", O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR);
+				if (fd == -1)
+					fatal("could not open Parrot fd: %s", strerror(errno));
+				if (unlinkat(parrot_dir_fd, "p", 0) == -1)
+					fatal("could not unlink Parrot fd file: %s", strerror(errno));
+				if (dup2(fd, i) == -1)
+					fatal("could not dup2 Parrot fd: %s", strerror(errno));
+				if (close(fd) == -1)
+					fatal("could not close Parrot fd: %s", strerror(errno));
+			}
+		}
 	}
 }
 
@@ -115,14 +172,14 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	child->seltime.tv_sec = 0;
 	child->syscall = SYSCALL32_fork;
 	child->syscall_dummy = 0;
+	child->syscall_parrotfd = -1;
 	child->syscall_result = 0;
 	child->syscall_args_changed = 0;
 	/* to prevent accidental copy out */
 	child->interrupted = 0;
 	child->did_stream_warning = 0;
 	child->nsyscalls = 0;
-	child->heap_address = 0;
-	child->break_address = 0;
+	child->scratch_used = 0;
 	child->completing_execve = 0;
 
 	actual_parent = pfs_process_lookup(ppid);
@@ -137,37 +194,18 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 		}
 		strcpy(child->name,actual_parent->name);
 		child->umask = actual_parent->umask;
-		strcpy(child->tty,actual_parent->tty);
 		memcpy(child->signal_interruptible,actual_parent->signal_interruptible,sizeof(child->signal_interruptible));
 	} else {
 		child->table = new pfs_table;
 
 		/* The first child process must inherit file descriptors */
-
-		int count = sysconf(_SC_OPEN_MAX);
-		int *flags = (int*)malloc(sizeof(int)*count);
-		int i;
-
-		/* Scan through the known file descriptors */
-
-		for(int i=0;i<count;i++) {
-			flags[i] = fcntl(i,F_GETFL);
-		}
-
 		/* If valid, duplicate and attach them to the child process. */
-
-		for(i=0;i<count;i++) {
-			if(i==pfs_channel_fd()) continue;
-			if(flags[i]>=0) {
-				child->table->attach(i,dup(i),flags[i],0666,"fd");
-				debug(D_PROCESS,"attaching to inherited fd %d with flags %d",i,flags[i]);
-			} 
+		int count = sysconf(_SC_OPEN_MAX);
+		for(int i=0;i<count;i++) {
+			initfd(child, i);
 		}
-
-		free(flags);
 
 		child->umask = 000;
-		strcpy(child->tty,"/dev/tty");
 		memset(child->signal_interruptible,0,sizeof(child->signal_interruptible));
 	}
 
@@ -181,9 +219,18 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	return child;
 }
 
+void pfs_process_exec( struct pfs_process *p )
+{
+	debug(D_PROCESS, "pid %d is completing exec", p->pid);
+	/* after a successful exec, signal handlers are reset */
+	memset(p->signal_interruptible,0,sizeof(p->signal_interruptible));
+
+	/* and certain files in the file table are closed */
+	p->table->close_on_exec();
+}
+
 static void pfs_process_delete( struct pfs_process *p )
 {
-	pfs_poll_clear(p->pid);
 	if(p->table) {
 		p->table->delref();
 		if(!p->table->refs()) delete p->table;
@@ -197,15 +244,15 @@ static void pfs_process_delete( struct pfs_process *p )
 
 /* The given process has completed with this status and rusage.
  */
-void pfs_process_stop( struct pfs_process *child, int status, struct rusage *usage )
+void pfs_process_stop( struct pfs_process *p, int status, struct rusage *usage )
 {
 	assert(WIFEXITED(status) || WIFSIGNALED(status));
 	if(WIFEXITED(status)) {
-		debug(D_PSTREE,"%d exit status %d",child->pid,WEXITSTATUS(status));
+		debug(D_PSTREE,"%d exit status %d (%" PRIu64 " syscalls)",p->pid,WEXITSTATUS(status),p->nsyscalls);
 	} else {
-		debug(D_PSTREE,"%d exit signal %d",child->pid,WTERMSIG(status));
+		debug(D_PSTREE,"%d exit signal %d (%" PRIu64 " syscalls)",p->pid,WTERMSIG(status),p->nsyscalls);
 	}
-	pfs_process_delete(child);
+	pfs_process_delete(p);
 	nprocs--;
 }
 
@@ -262,28 +309,12 @@ int pfs_process_raise( pid_t pid, int sig, int really_sendit )
 			}
 		}
 	} else {
-		switch(p->state) {
-			case PFS_PROCESS_STATE_WAITREAD:
-			case PFS_PROCESS_STATE_WAITWRITE:
-				if(p->signal_interruptible[sig]) {
-					debug(D_PROCESS,"signal %d interrupts pid %d",sig,pid);
-					p->interrupted = 1;
-					pfs_dispatch(p,sig);
-				} else {
-					debug(D_PROCESS,"signal %d queued to pid %d",sig,pid);
-					if(really_sendit) kill(pid,sig);
-				}
-				result = 0;
-				break;
-			default:
-				if(really_sendit) {
-					debug(D_PROCESS,"sending signal %d (%s) to pfs pid %d",sig,string_signal(sig),pid);
-					result = kill(pid,sig);
-				} else {
-					debug(D_PROCESS,"prepared pfs pid %d to receive signal %d (%s)",pid,sig,string_signal(sig));
-					result = 0;
-				}
-				break;
+		if(really_sendit) {
+			debug(D_PROCESS,"sending signal %d (%s) to pfs pid %d",sig,string_signal(sig),pid);
+			result = kill(pid,sig);
+		} else {
+			debug(D_PROCESS,"prepared pfs pid %d to receive signal %d (%s)",pid,sig,string_signal(sig));
+			result = 0;
 		}
 	}
 
@@ -311,96 +342,45 @@ void pfs_process_killall()
 	}
 }
 
-PTRINT_T pfs_process_scratch_address( struct pfs_process *p )
+uintptr_t pfs_process_scratch_address( struct pfs_process *p )
 {
-	if(p->break_address && pfs_process_verify_break_rw_address(p)) {
-		return p->break_address - sysconf(_SC_PAGESIZE);
-	} else {
-		return pfs_process_heap_address(p);
-	}
+	uintptr_t stack;
+	tracer_stack_get(p->tracer, &stack);
+	stack -= sizeof(p->scratch_data);
+	stack &= ~0x3; /* ensure it is aligned for most things */
+	return stack;
 }
 
-PTRINT_T pfs_process_heap_address( struct pfs_process *p )
+void pfs_process_scratch_get( struct pfs_process *p, void *data, size_t len )
 {
-	UPTRINT_T start, end, offset;
-	int major, minor,inode;
-	char flagstring[5];
-	FILE *file;
-	char line[1024];
-	int fields;
-
-	if(p->heap_address) return p->heap_address;
-
-	sprintf(line,"/proc/%d/maps",p->pid);
-
-	file  = fopen(line,"r");
-	if(!file) {
-		debug(D_PROCESS,"couldn't open %s: %s",line,strerror(errno));
-		return 0;
-	}
-
-	while(fgets(line,sizeof(line),file)) {
-		debug(D_PROCESS,"line: %s",line);
-
-		fields = sscanf(line, "%" SCNxPTR "-%" SCNxPTR " %s %" SCNxPTR "%d:%d %d",
-			&start,&end,flagstring,&offset,&major,&minor,&inode);
-
-		if(fields==7 && inode==0 && flagstring[0]=='r' && flagstring[1]=='w' && flagstring[3]=='p') {
-			fclose(file);
-			p->heap_address = start;
-			debug(D_PROCESS,"heap address is 0x%llx",(long long)start);
-			return p->heap_address;
-		}
-	}
-
-	debug(D_PROCESS,"couldn't find heap start address for pid %d",p->pid);
-
-	fclose(file);
-	return 0;
+	assert(p->scratch_used <= len);
+	uintptr_t scratch = pfs_process_scratch_address(p);
+	if (tracer_copy_in(p->tracer, data, (const void *)scratch, p->scratch_used) == -1)
+		fatal("could not copy in scratch: %s", strerror(errno));
+	//debug(D_DEBUG, "%s: `%.*s':%zu", __func__, (int)len, (char *)data, p->scratch_used);
 }
 
-
-/* Verify that p->break_address falls into a writable address. 
- * 0 it does not, 1 it does */
-int pfs_process_verify_break_rw_address( struct pfs_process *p )
+uintptr_t pfs_process_scratch_set( struct pfs_process *p, const void *data, size_t len )
 {
-	PTRINT_T start, end, offset;
-	int major, minor,inode;
-	char flagstring[5];
-	FILE *file;
-	char line[1024];
-	int fields;
+	assert(len <= sizeof(p->scratch_data));
+	uintptr_t scratch = pfs_process_scratch_address(p);
+	if (tracer_copy_in(p->tracer, p->scratch_data, (const void *)scratch, len) == -1)
+		fatal("could not copy in scratch: %s", strerror(errno));
+	if (tracer_copy_out(p->tracer, data, (const void *)scratch, len) == -1)
+		fatal("could not set scratch: %s", strerror(errno));
+	//debug(D_DEBUG, "%s: `%.*s':%zu", __func__, (int)len, (char *)p->scratch_data, len);
+	p->scratch_used = len;
+	return scratch;
+}
 
-	if(!p->break_address) return p->heap_address;
-
-	sprintf(line,"/proc/%d/maps",p->pid);
-
-	file  = fopen(line,"r");
-	if(!file) {
-		debug(D_PROCESS,"couldn't open %s: %s",line,strerror(errno));
-		return 0;
-	}
-
-	while(fgets(line,sizeof(line),file)) {
-		fields = sscanf(line,PTR_FORMAT "-" PTR_FORMAT " %s " PTR_FORMAT "%d:%d %d",&start,&end,flagstring,&offset,&major,&minor,&inode);
-
-		if( start <= p->break_address && p->break_address <= end ) {
-			fclose(file);
-			if(fields==7 && inode==0 && flagstring[0]=='r' && flagstring[1]=='w' && flagstring[3]=='p') {
-				debug(D_DEBUG,"break address 0x%llx is valid.",(long long)p->break_address);
-				return 1;
-			} else {
-				debug(D_PROCESS,"cannot read/write at break address, or break address is not private 0x%llx",(long long)p->break_address);
-				return 0;
-			}
-		}
-	}
-
-	fclose(file);
-
-	debug(D_PROCESS,"break address 0x%llx is invalid.", (long long)p->break_address);
-
-	return 0;
+void pfs_process_scratch_restore( struct pfs_process *p )
+{
+	assert(p->scratch_used > 0);
+	uintptr_t scratch = pfs_process_scratch_address(p);
+	if (tracer_copy_out(p->tracer, p->scratch_data, (const void *)scratch, p->scratch_used) == -1)
+		fatal("could not restore scratch: %s", strerror(errno));
+	//debug(D_DEBUG, "%s: `%.*s':%zu", __func__, (int)p->scratch_used, (char *)p->scratch_data, p->scratch_used);
+	p->scratch_used = 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */

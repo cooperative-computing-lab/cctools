@@ -16,11 +16,11 @@ See the file COPYING for details.
 struct tracer;
 
 int tracer_attach( pid_t pid );
-int tracer_detach( struct tracer *t );
+void tracer_detach( struct tracer *t );
 struct tracer *tracer_init( pid_t pid );
 int tracer_continue( struct tracer *t, int signum );
 int tracer_listen( struct tracer *t );
-unsigned long tracer_getevent( struct tracer *t );
+int tracer_getevent( struct tracer *t, unsigned long *message );
 
 int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARGS_MAX] );
 int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS_MAX], int nargs );
@@ -29,6 +29,8 @@ void		tracer_has_args5_bug( struct tracer *t );
 
 int             tracer_result_get( struct tracer *t, INT64_T *result );
 int             tracer_result_set( struct tracer *t, INT64_T result );
+
+int tracer_stack_get( struct tracer *t, uintptr_t *ptr );
 
 ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, size_t length );
 ssize_t tracer_copy_in( struct tracer *t, void *data, const void *uaddr, size_t length );

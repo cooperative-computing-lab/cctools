@@ -69,12 +69,6 @@ int pfs_file::fcntl( int cmd, void *arg )
 	return -1;
 }
 
-int pfs_file::ioctl( int cmd, void *arg )
-{
-	errno = EINVAL;
-	return -1;
-}
-
 int pfs_file::fchmod( mode_t mode )
 {
 	return 0;
@@ -178,16 +172,6 @@ void pfs_file::set_last_offset( pfs_off_t o )
 int pfs_file::is_seekable()
 {
 	return name.service->is_seekable();
-}
-
-void pfs_file::poll_register( int which )
-{
-	/* do nothing! */
-}
-
-int pfs_file::poll_ready()
-{
-	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */
