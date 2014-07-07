@@ -1641,15 +1641,12 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 		} else if(sscanf(pname.path,"/proc/%d/exe",&pid)==1) {
 			struct pfs_process *target = pfs_process_lookup(pid);
 			if(target) {
-				char complete_target_name[PFS_PATH_MAX];
-				complete_path(target->name,complete_target_name);
-				collapse_path(complete_target_name, target->name, 1);
-				strncpy(buf,target->name,size);
-				result = MIN(size,(pfs_size_t)strlen(target->name));
-			} else {
-				result = pname.service->readlink(&pname,buf,size);
+				/* Fill in the target->name for readlink. */
+				char complete_target_path[PFS_PATH_MAX];
+				complete_path(target->name,complete_target_path);
+				collapse_path(complete_target_path, pname.path, 1);
 			}
-
+			result = pname.service->readlink(&pname,buf,size);
 		} else {
 			result = pname.service->readlink(&pname,buf,size);
 		}
