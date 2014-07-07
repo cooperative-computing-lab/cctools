@@ -58,6 +58,8 @@ extern "C" {
 #include <string.h>
 #include <time.h>
 
+#define SIG_ISSTOP(s) (s == SIGTTIN || s == SIGTTOU || s == SIGSTOP || s == SIGTSTP)
+
 extern char **environ;
 FILE *namelist_file;
 int linux_major;
@@ -379,13 +381,19 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 	} else if (WIFSTOPPED(status)) {
 		int signum = WSTOPSIG(status);
 		siginfo_t info;
-		if(signum == SIGTRAP && ((status>>16) == PTRACE_EVENT_STOP)) {
-			/* this is PTRACE_EVENT_STOP */
-			assert(linux_available(3,4,0));
+		if(linux_available(3,4,0) && ((status>>16) == PTRACE_EVENT_STOP) && (signum == SIGTRAP || signum == 0)) {
+			/* This is generic PTRACE_EVENT_STOP (but not group-stop):
+			 *
+			 *     Stop induced by PTRACE_INTERRUPT command, or group-stop, or
+			 *     initial ptrace-stop when a new child is attached (only if
+			 *     attached  using  PTRACE_SEIZE), or PTRACE_EVENT_STOP if
+			 *     PTRACE_SEIZE was used.
+			 */
 			tracer_continue(p->tracer, 0);
-		} else if((linux_available(3,4,0) && ((status>>16) == PTRACE_EVENT_STOP)) || (!linux_available(3,4,0) && ptrace(PTRACE_GETSIGINFO, pid, 0, &info) == -1 && errno == EINVAL)) {
+		} else if((linux_available(3,4,0) && ((status>>16) == PTRACE_EVENT_STOP)) || (!linux_available(3,4,0) && SIG_ISSTOP(signum) && ptrace(PTRACE_GETSIGINFO, pid, 0, &info) == -1 && errno == EINVAL)) {
 			/* group-stop, `man ptrace` for more information */
 			debug(D_PROCESS, "process %d has group-stopped due to signal %d (%s) (state %d)",pid,signum,string_signal(signum),p->state);
+			assert(SIG_ISSTOP(signum));
 			if (!linux_available(3,4,0)) {
 				static int notified = 0;
 				if (!notified) {
