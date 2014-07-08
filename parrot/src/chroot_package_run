@@ -17,21 +17,21 @@ show_help()
 }
 
 complete_path() {
-	orig_path=$1
-	first_ch=`echo ${orig_path} | head -c 1`
-	if [ ${first_ch} != "/" ]; then
+	orig_path="$1"
+	first_ch=`echo "${orig_path}" | head -c 1`
+	if [ "${first_ch}" != "/" ]; then
 		echo "$(pwd)/${orig_path}"
 	else
-		echo ${orig_path}
+		echo "${orig_path}"
 	fi
 }
 
-while [ $# -gt 0 ]
+while [ "$#" -gt 0 ]
 do
-	case $1 in
+	case "$1" in
 		-p | --package-path)
 			shift
-			package_path=$(complete_path "$1")
+			package_path="$(complete_path "$1")"
 			;;
 		-h | --help)
 			show_help
@@ -43,13 +43,13 @@ do
 	shift
 done
 
-if [ -z ${package_path} ]; then
+if [ -z "${package_path}" ]; then
 	echo "Please specify package-path!"
 	exit 1
 fi
 
-if [ ! -d ${package_path} ]; then
-	echo "Please ensure directory " ${package_path} " exists!"
+if [ ! -d "${package_path}" ]; then
+	echo "Please ensure directory ${package_path} exists!"
 	exit 1
 fi
 
@@ -59,30 +59,30 @@ if [ ! "${user}" = "root" ]; then
 	exit 1
 fi
 
-package_path=`readlink -f ${package_path}`
-cd ${package_path}
+package_path=`readlink -f "${package_path}"`
+cd "${package_path}"
 
 cmd_chroot=`which chroot`
 cmd_rm=`which rm`
 cmd_umount=`which umount`
 cmd_rmdir=`which rmdir`
 
-if [ -z ${cmd_chroot} ]; then
+if [ -z "${cmd_chroot}" ]; then
 	echo "Can't not find chroot! Please add the path of chroot into PATH environment variables!"
 	exit 1
 fi
 
-if [ -z ${cmd_rm} ]; then
+if [ -z "${cmd_rm}" ]; then
 	echo "Can't not find rm! Please add the path of rm into PATH environment variables!"
 	exit 1
 fi
 
-if [ -z ${cmd_umount} ]; then
+if [ -z "${cmd_umount}" ]; then
 	echo "Can't not find umount! Please add the path of umount into PATH environment variables!"
 	exit 1
 fi
 
-if [ -z ${cmd_rmdir} ]; then
+if [ -z "${cmd_rmdir}" ]; then
 	echo "Can't not find rmdir! Please add the path of rmdir into PATH environment variables!"
 	exit 1
 fi
@@ -90,28 +90,28 @@ fi
 sort -u special_files >> special_files.bak
 mv -f special_files.bak special_files
 
-common_mountlist=${package_path}/common-mountlist
+common_mountlist="${package_path}/common-mountlist"
 #umount chroot dirs
 unmount_virtual_fs() {
 	while read item
 	do
-		tmp_fs=`echo ${item}|cut -d' ' -f1`
+		tmp_fs=`echo "${item}"|cut -d' ' -f1`
 		virtual_fs="${package_path}/${tmp_fs}"
-		if [ -e ${virtual_fs} ]; then
-			${cmd_umount} -f ${virtual_fs} 1>/dev/null 2>/dev/null
-			${cmd_rmdir} ${virtual_fs}
+		if [ -e "${virtual_fs}" ]; then
+			"${cmd_umount}" -f "${virtual_fs}" 1>/dev/null 2>/dev/null
+			"${cmd_rmdir}" "${virtual_fs}"
 		fi
-	done <${common_mountlist}
+	done <"${common_mountlist}"
 }
 
 #remove special files
 remove_special_files() {
-	if [ -e ${package_path}/etc/resolv.conf ]; then
-		${cmd_rm} ${package_path}/etc/resolv.conf
+	if [ -e "${package_path}/etc/resolv.conf" ]; then
+		"${cmd_rm}" "${package_path}/etc/resolv.conf"
 	fi
 	while read line
 	do
-		item=`echo ${line}|cut -d' ' -f1`
+		item=`echo "${line}"|cut -d' ' -f1`
 		if [ -e "${package_path}/${item}" ]; then
 			unlink "${package_path}/${item}"
 		fi
@@ -129,32 +129,32 @@ cp -L /etc/resolv.conf etc/
 
 while read item
 do
-	tmp_fs=`echo ${item}|cut -d' ' -f1`
+	tmp_fs=`echo "${item}"|cut -d' ' -f1`
 	virtual_fs="./${tmp_fs}"
-	mkdir -p ${virtual_fs} 1>/dev/null 2>/dev/null
-	mount --bind ${tmp_fs} ${virtual_fs} 1>/dev/null 2>/dev/null
-done <${common_mountlist}
+	mkdir -p "${virtual_fs}" 1>/dev/null 2>/dev/null
+	mount --bind "${tmp_fs}" "${virtual_fs}" 1>/dev/null 2>/dev/null
+done <"${common_mountlist}"
 
 #create hardlink to special files
 while read line
 do
-	item=`echo ${line}|cut -d' ' -f1`
-	if [ -e ${package_path}/${item} -o ! -e ${item} ]; then
+	item=`echo "${line}"|cut -d' ' -f1`
+	if [ -e "${package_path}/${item}" -o ! -e "${item}" ]; then
 		continue
 	fi
-	filename=`basename ${item}`
-	filepath=${item%filename}
-	if [ ! -e ${package_path}/${filepath} ]; then
-		mkdir -p ${package_path}/${filepath}
+	filename=`basename "${item}"`
+	filepath="${item%filename}"
+	if [ ! -e "${package_path}/${filepath}" ]; then
+		mkdir -p "${package_path}/${filepath}"
 	fi
-	cd ${ackage_path}/${filepath}
-	ln ${item} ${filename}
-	if [ ! $? -eq 0 ]; then
+	cd "${ackage_path}/${filepath}"
+	ln "${item}" "${filename}"
+	if [ ! "$?" -eq 0 ]; then
 		echo "Creating hardlink to special file (${item}) failed."
 	fi
-done < ${package_path}/special_files
+done < "${package_path}/special_files"
 
-cd ${package_path}
+cd "${package_path}"
 
 #import environment varibales
 export_env() {
@@ -162,11 +162,11 @@ export_env() {
 	do
 		IFS="="     # Set the field separator
 		set ${line}      # Breaks the string into $1, $2, ...
-		variable_name=$1
-		name_len=${#variable_name}
-		name_len=`expr ${name_len} + 1`
-		variable_value=${line:name_len}
-		export ${variable_name}=${variable_value}
+		variable_name="$1"
+		name_len="${#variable_name}"
+		name_len=`expr "${name_len}" + 1`
+		variable_value="${line:name_len}"
+		export "${variable_name}"="${variable_value}"
 		IFS=" "
 	done < env_list
 }
@@ -174,11 +174,11 @@ export_env
 
 unset PARROT_ENABLED
 
-export PACKAGE_CHROOT_PWD=${PWD}
+export PACKAGE_CHROOT_PWD="${PWD}"
 if [ -z "$1" ]; then
-	${cmd_chroot} ${package_path} /bin/sh -c 'cd ${PACKAGE_CHROOT_PWD}; exec /bin/sh'
+	"${cmd_chroot}" "${package_path}" /bin/sh -c 'cd "${PACKAGE_CHROOT_PWD}"; exec /bin/sh'
 else
-	${cmd_chroot} ${package_path} /bin/sh -c 'cd ${PACKAGE_CHROOT_PWD}; exec "$@"' -- "$@"
+	"${cmd_chroot}" "${package_path}" /bin/sh -c 'cd "${PACKAGE_CHROOT_PWD}"; exec "$@"' -- "$@"
 fi
 
 #post cleaning process
