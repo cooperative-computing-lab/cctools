@@ -18,7 +18,7 @@ show_help()
 
 complete_path() {
 	orig_path="$1"
-	first_ch=`echo "${orig_path}" | head -c 1`
+	first_ch=$(echo "${orig_path}" | head -c 1)
 	if [ "${first_ch}" != "/" ]; then
 		echo "$(pwd)/${orig_path}"
 	else
@@ -53,19 +53,19 @@ if [ ! -d "${package_path}" ]; then
 	exit 1
 fi
 
-user=`whoami`
+user=$(whoami)
 if [ ! "${user}" = "root" ]; then
 	echo "chroot_package_run needs the root account!!"
 	exit 1
 fi
 
-package_path=`readlink -f "${package_path}"`
+package_path=$(readlink -f "${package_path}")
 cd "${package_path}"
 
-cmd_chroot=`which chroot`
-cmd_rm=`which rm`
-cmd_umount=`which umount`
-cmd_rmdir=`which rmdir`
+cmd_chroot=$(which chroot)
+cmd_rm=$(which rm)
+cmd_umount=$(which umount)
+cmd_rmdir=$(which rmdir)
 
 if [ -z "${cmd_chroot}" ]; then
 	echo "Can't not find chroot! Please add the path of chroot into PATH environment variables!"
@@ -95,7 +95,7 @@ common_mountlist="${package_path}/common-mountlist"
 unmount_virtual_fs() {
 	while read item
 	do
-		tmp_fs=`echo "${item}"|cut -d' ' -f1`
+		tmp_fs=$(echo "${item}"|cut -d' ' -f1)
 		virtual_fs="${package_path}/${tmp_fs}"
 		if [ -e "${virtual_fs}" ]; then
 			"${cmd_umount}" -f "${virtual_fs}" 1>/dev/null 2>/dev/null
@@ -111,7 +111,7 @@ remove_special_files() {
 	fi
 	while read line
 	do
-		item=`echo "${line}"|cut -d' ' -f1`
+		item=$(echo "${line}"|cut -d' ' -f1)
 		if [ -e "${package_path}/${item}" ]; then
 			unlink "${package_path}/${item}"
 		fi
@@ -129,7 +129,7 @@ cp -L /etc/resolv.conf etc/
 
 while read item
 do
-	tmp_fs=`echo "${item}"|cut -d' ' -f1`
+	tmp_fs=$(echo "${item}"|cut -d' ' -f1)
 	virtual_fs="./${tmp_fs}"
 	mkdir -p "${virtual_fs}" 1>/dev/null 2>/dev/null
 	mount --bind "${tmp_fs}" "${virtual_fs}" 1>/dev/null 2>/dev/null
@@ -138,11 +138,11 @@ done <"${common_mountlist}"
 #create hardlink to special files
 while read line
 do
-	item=`echo "${line}"|cut -d' ' -f1`
+	item=$(echo "${line}"|cut -d' ' -f1)
 	if [ -e "${package_path}/${item}" -o ! -e "${item}" ]; then
 		continue
 	fi
-	filename=`basename "${item}"`
+	filename=$(basename "${item}")
 	filepath="${item%filename}"
 	if [ ! -e "${package_path}/${filepath}" ]; then
 		mkdir -p "${package_path}/${filepath}"
@@ -164,7 +164,7 @@ export_env() {
 		set ${line}      # Breaks the string into $1, $2, ...
 		variable_name="$1"
 		name_len="${#variable_name}"
-		name_len=`expr "${name_len}" + 1`
+		name_len=$(expr "${name_len}" + 1)
 		variable_value="${line:name_len}"
 		export "${variable_name}"="${variable_value}"
 		IFS=" "

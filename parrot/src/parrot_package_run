@@ -18,7 +18,7 @@ show_help()
 
 complete_path() {
 	orig_path="$1"
-	first_ch=`echo "${orig_path}" | head -c 1`
+	first_ch=$(echo "${orig_path}" | head -c 1)
 	if [ "${first_ch}" != "/" ]; then
 		echo "$(pwd)/${orig_path}"
 	else
@@ -53,7 +53,7 @@ if [ ! -d "${package_path}" ]; then
 	exit 1
 fi
 
-package_path=`readlink -f "${package_path}"`
+package_path=$(readlink -f "${package_path}")
 cd "${package_path}"
 
 mountlist="mountlist"
@@ -70,7 +70,7 @@ sort -u special_files >> special_files.bak
 mv -f special_files.bak special_files
 cat "${package_path}/special_files" >> "${mountlist}"
 
-cmd_parrot_run=`which parrot_run`
+cmd_parrot_run=$(which parrot_run)
 
 if [ -z "${cmd_parrot_run}" ]; then
 	echo "Can't find parrot_run! Please add the path of parrot_run into environment varaible  PATH!"
@@ -85,7 +85,7 @@ export_env() {
 		set $line      # Breaks the string into $1, $2, ...
 		variable_name="$1"
 		name_len="${#variable_name}"
-		name_len=`expr "${name_len}" + 1`
+		name_len=$(expr "${name_len}" + 1)
 		variable_value="${line:name_len}"
 		export "${variable_name}"="${variable_value}"
 		IFS=" "
