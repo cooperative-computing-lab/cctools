@@ -1409,41 +1409,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		/*
-		On ptraces that do not preserve the process structure,
-		we must trap and manage variants of wait() to permit
-		the propagation of child completion.
-		*/
-		case SYSCALL32_waitpid:
-			if(entering) {
-				char flags[4096] = "0";
-				if(args[2]&WCONTINUED)
-					strcat(flags, "|WCONTINUED");
-				if(args[2]&WNOHANG)
-					strcat(flags, "|WNOHANG");
-				if(args[2]&WUNTRACED)
-					strcat(flags, "|WUNTRACED");
-				debug(D_DEBUG, "waitpid(%" PRId64 ", %p, %s)", args[0], (void *)args[1], flags);
-				pfs_process_waitpid(p,args[0],(int*)POINTER(args[1]),args[2],0);
-				divert_to_dummy(p,p->syscall_result);
-			}
-			break;
-
-		case SYSCALL32_wait4:
-			if(entering) {
-				char flags[4096] = "0";
-				if(args[2]&WCONTINUED)
-					strcat(flags, "|WCONTINUED");
-				if(args[2]&WNOHANG)
-					strcat(flags, "|WNOHANG");
-				if(args[2]&WUNTRACED)
-					strcat(flags, "|WUNTRACED");
-				debug(D_DEBUG, "wait4(%" PRId64 ", %p, %s, %p)", args[0], (void *)args[1], flags, (void *)args[3]);
-				pfs_process_waitpid(p,args[0],(int*)POINTER(args[1]),args[2],(struct rusage*)POINTER(args[3]));
-				divert_to_dummy(p,p->syscall_result);
-			}
-			break;
-
-		/*
 		We don't do anything special with exit.  Just let it
 		run to completion, and then process the exit event
 		in the main loop.
@@ -2906,6 +2871,8 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_vhangup:
 		case SYSCALL32_vm86:
 		case SYSCALL32_vm86old:
+		case SYSCALL32_wait4:
+		case SYSCALL32_waitpid:
 			break;
 
 		/* These *xattr system calls were originally not supported.  The main

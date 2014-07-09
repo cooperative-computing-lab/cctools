@@ -1005,21 +1005,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			}
 			break;
 
-		case SYSCALL64_wait4:
-			if(entering) {
-				char flags[4096] = "0";
-				if(args[2]&WCONTINUED)
-					strcat(flags, "|WCONTINUED");
-				if(args[2]&WNOHANG)
-					strcat(flags, "|WNOHANG");
-				if(args[2]&WUNTRACED)
-					strcat(flags, "|WUNTRACED");
-				debug(D_DEBUG, "wait4(%" PRId64 ", %p, %s, %p)", args[0], (void *)args[1], flags, (void *)args[3]);
-				pfs_process_waitpid(p,args[0],(int*)args[1],args[2],(struct rusage*)args[3]);
-				divert_to_dummy(p,p->syscall_result);
-			}
-			break;
-
 		/*
 		We don't do anything special with exit.  Just let it
 		run to completion, and then process the exit event
@@ -2688,6 +2673,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_times:
 		case SYSCALL64_ustat:
 		case SYSCALL64_vhangup:
+		case SYSCALL64_wait4:
 			break;
 
 		/* These *xattr system calls were originally not supported.  The main

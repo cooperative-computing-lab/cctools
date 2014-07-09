@@ -97,14 +97,7 @@ void pfs_process_wake( pid_t pid )
 	}
 }
 
-/*
-Note that a new process really has two kinds of parents:
-- The 'actual parent' process is the process that called fork or clone to create the child process.  From this parent, the child inherits the file table and other properties.
-- If 'notify parent' is the parent process that should be notified when the process exits.  This is different than the actual parent if the child was created with the CLONE_PARENT flag to clone.
-*/
-
-
-struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t notify_ppid, int share_table, int exit_signal )
+struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table )
 {  
 	struct pfs_process *actual_parent;
 	struct pfs_process *child;
@@ -121,22 +114,16 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 	child->new_logical_name[0] = 0;
 	child->new_physical_name[0] = 0;
 	child->pid = pid;
-	child->ppid = notify_ppid;
+	child->ppid = ppid;
 	child->tgid = pid;
 	child->state = PFS_PROCESS_STATE_KERNEL;
 	child->flags = PFS_PROCESS_FLAGS_STARTUP;
-	child->parent_wcontinued = 0;
-	child->parent_wuntraced = 0;
 	child->seltime.tv_sec = 0;
 	child->syscall = SYSCALL32_fork;
 	child->syscall_dummy = 0;
 	child->syscall_result = 0;
 	child->syscall_args_changed = 0;
-	child->wait_status = 0;
-	child->exit_signal = exit_signal;
 	/* to prevent accidental copy out */
-	child->wait_ustatus = 0;
-	child->wait_urusage = 0;
 	child->interrupted = 0;
 	child->did_stream_warning = 0;
 	child->nsyscalls = 0;
@@ -144,7 +131,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 	child->break_address = 0;
 	child->completing_execve = 0;
 
-	actual_parent = pfs_process_lookup(actual_ppid);
+	actual_parent = pfs_process_lookup(ppid);
 
 	if(actual_parent) {
 		child->flags |= actual_parent->flags;
@@ -195,7 +182,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t actual_ppid, pid_t not
 
 	nprocs++;
 
-	debug(D_PSTREE,"%d %s %d", actual_ppid, share_table ? "newthread" : "fork", pid);
+	debug(D_PSTREE,"%d %s %d", ppid, share_table ? "newthread" : "fork", pid);
 	
 	return child;
 }
@@ -207,50 +194,6 @@ void pfs_process_delete( struct pfs_process *p )
 	pfs_paranoia_delete_pid(p->pid);
 	tracer_detach(p->tracer);
 	free(p);
-}
-
-/*
-Cause this parent process to wake up, reporting
-the status of the given child process.  If the
-latter is complete, reap its status.
-*/
-
-static void pfs_process_do_wake( struct pfs_process *parent, struct pfs_process *child )
-{
-	parent->state = PFS_PROCESS_STATE_KERNEL;
-	parent->syscall_result = child->pid;
-
-	debug(D_DEBUG, "waking parent %d because of child %d", parent->pid, child->pid);
-
-	if(parent->wait_ustatus)
-		tracer_copy_out(parent->tracer, &child->wait_status, parent->wait_ustatus, sizeof(child->wait_status));
-	if(parent->wait_urusage)
-		tracer_copy_out(parent->tracer,	&child->wait_rusage, parent->wait_urusage, sizeof(child->wait_rusage));
-
-	child->parent_wcontinued = 0;
-	child->parent_wuntraced = 0;
-
-	if(child->state == PFS_PROCESS_STATE_DONE) {
-		pfs_process_delete(child);
-	}
-
-	/* to prevent accidental copy out */
-	parent->wait_ustatus = 0;
-	parent->wait_urusage = 0;
-}
-
-/* Examine the state of this parent and child.  If the parent is waiting for
- * the child, then wake it up.  Or, if the process is in a waitio state, then
- * kick it out with a signal.
- */
-static int pfs_process_may_wake( struct pfs_process *parent, struct pfs_process *child )
-{
-	if(child->ppid == parent->pid && parent->state == PFS_PROCESS_STATE_WAITPID && (child->state == PFS_PROCESS_STATE_DONE || (child->parent_wuntraced && child->state == PFS_PROCESS_STATE_STOPPED && (parent->wait_options & WUNTRACED)) || (child->parent_wcontinued && (parent->wait_options & WCONTINUED))) && (parent->wait_pid <= 0 || parent->wait_pid == child->pid)) {
-		pfs_process_do_wake(parent,child);
-		return 1;
-	} else {
-		return 0;
-	}
 }
 
 void pfs_process_exit_group( struct pfs_process *child )
@@ -270,120 +213,28 @@ void pfs_process_exit_group( struct pfs_process *child )
 	}
 }
 
-/*
-The given process has stopped or completed with this status and rusage.
-If this process has a parent, attempt to inform it, otherwise
-wait for the parent to show up and claim it.  If we wake up a
-parent ourselves, then cause it to be rescheduled.
-*/
-
+/* The given process has stopped or completed with this status and rusage. If
+ * this process has a parent, attempt to inform it, otherwise wait for the
+ * parent to show up and claim it. If we wake up a parent ourselves, then
+ * cause it to be rescheduled.
+ */
 void pfs_process_stop( struct pfs_process *child, int status, struct rusage *usage )
 {
-	struct pfs_process *parent;
-
-	if(child->state==PFS_PROCESS_STATE_DONE) return;
-
-	if(WIFEXITED(status) || WIFSIGNALED(status) ) {
-		if(WIFEXITED(status)) {
-			debug(D_PSTREE,"%d exit status %d",child->pid,WEXITSTATUS(status));
-		} else {
-			debug(D_PSTREE,"%d exit signal %d",child->pid,WTERMSIG(status));
-		}
-		child->state = PFS_PROCESS_STATE_DONE;
-		pfs_poll_clear(child->pid);
-		nprocs--;
-		if(child->table) {
-			child->table->delref();
-			if(!child->table->refs()) delete child->table;
-			child->table = 0;
-		}
-	} else if (WIFSTOPPED(status)) {
-		debug(D_DEBUG, "%d entering stopped state", child->pid);
-		child->state = PFS_PROCESS_STATE_STOPPED;
-		child->parent_wuntraced = 1;
+	assert(WIFEXITED(status) || WIFSIGNALED(status));
+	if(WIFEXITED(status)) {
+		debug(D_PSTREE,"%d exit status %d",child->pid,WEXITSTATUS(status));
 	} else {
-		assert(0);
+		debug(D_PSTREE,"%d exit signal %d",child->pid,WTERMSIG(status));
 	}
-	child->wait_status = status;
-	child->wait_rusage = *usage;
-
-	parent = pfs_process_lookup(child->ppid);
-	debug(D_PSTREE, "process %d parent is %d", child->pid, child->ppid);
-
-	if(parent) {
-		int send_signal = child->state == PFS_PROCESS_STATE_DONE ? child->exit_signal : 0;
-
-		/*
-		XXX WARNING
-		Do not refer to child after this point!
-		It may have been deleted by pfs_process_may_wake!
-		*/
-
-		if(pfs_process_may_wake(parent,child)) {
-			tracer_continue(parent->tracer,0);
-		} else if(send_signal!=0) {
-			pfs_process_raise(parent->pid,send_signal,1);
-		}
-	} else {
-		debug(D_PSTREE, "process %d parent %d not in process table", child->pid, child->ppid);
+	child->state = PFS_PROCESS_STATE_DONE;
+	pfs_poll_clear(child->pid);
+	nprocs--;
+	if(child->table) {
+		child->table->delref();
+		if(!child->table->refs()) delete child->table;
+		child->table = 0;
 	}
-}
-
-void pfs_process_continued (struct pfs_process *p, int status, struct rusage *usage)
-{
-	p->parent_wcontinued = 1;
-	p->wait_status = status;
-	p->wait_rusage = *usage;
-
-	struct pfs_process *parent = pfs_process_lookup(p->ppid);
-	debug(D_PSTREE, "process %d parent is %d", p->pid, p->ppid);
-
-	if(parent) {
-		if(pfs_process_may_wake(parent,p)) {
-			tracer_continue(parent->tracer,0);
-		}
-	} else {
-		debug(D_PSTREE, "process %d parent %d not in process table", p->pid, p->ppid);
-	}
-}
-
-/*
-This process is entering the waitpid state. Mark its structure as such,
-then search to see if it can be immediately satisfied. If so,
-return true.  Otherwise, if WNOHANG is given, get ready to return
-from the kernel.
-*/
-
-int pfs_process_waitpid( struct pfs_process *p, pid_t wait_pid, int *wait_ustatus, int wait_options, struct rusage *wait_urusage )
-{
-	UINT64_T childpid;
-	struct pfs_process *child;
-	int nchildren = 0;
-
-	p->state = PFS_PROCESS_STATE_WAITPID;
-	p->wait_pid = wait_pid;
-	p->wait_ustatus = wait_ustatus;
-	p->wait_options = wait_options;
-	p->wait_urusage = wait_urusage;
-	p->syscall_result = -EINTR;
-
-	itable_firstkey(pfs_process_table);
-	while(itable_nextkey(pfs_process_table,&childpid,(void**)&child)) {
-		if(child && child->ppid == p->pid && child->tgid == child->pid) {
-			nchildren++;
-			if(pfs_process_may_wake(p,child)) return 1;
-		}
-	}
-
-	if(nchildren==0) {
-		p->state = PFS_PROCESS_STATE_KERNEL;
-		p->syscall_result = -ECHILD;
-	} else if(wait_options&WNOHANG) {
-		p->state = PFS_PROCESS_STATE_KERNEL;
-		p->syscall_result = 0;
-	}
-
-	return 0;
+	pfs_process_delete(child);
 }
 
 int pfs_process_count()
