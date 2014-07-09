@@ -72,7 +72,6 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 struct pfs_process * pfs_process_lookup( pid_t pid );
 
 void pfs_process_stop( struct pfs_process *p, int status, struct rusage *usage );
-void pfs_process_exit_group( struct pfs_process *p );
 
 void pfs_process_sigio();
 void pfs_process_wake( pid_t pid );

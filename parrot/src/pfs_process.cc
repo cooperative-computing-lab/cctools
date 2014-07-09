@@ -195,23 +195,6 @@ static void pfs_process_delete( struct pfs_process *p )
 	free(p);
 }
 
-void pfs_process_exit_group( struct pfs_process *child )
-{
-	struct pfs_process *p;
-	UINT64_T pid;
-
-	struct rusage usage;
-	memset(&usage,0,sizeof(usage));
-
-	itable_firstkey(pfs_process_table);
-	while(itable_nextkey(pfs_process_table,&pid,(void**)&p)) {
-		if(p && p!=child && p->tgid == child->tgid) {
-			debug(D_PROCESS,"exiting process %d",p->pid);
-			pfs_process_stop(p,0,&usage);
-		}
-	}
-}
-
 /* The given process has completed with this status and rusage.
  */
 void pfs_process_stop( struct pfs_process *child, int status, struct rusage *usage )
