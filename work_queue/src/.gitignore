@@ -2,5 +2,7 @@ mpi_queue_worker
 work_queue_example
 work_queue_pool
 work_queue_status
+work_queue_test
+work_queue_test_watch
 work_queue_worker
 work_queue_workload_simulator
