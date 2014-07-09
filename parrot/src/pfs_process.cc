@@ -76,14 +76,8 @@ void pfs_process_sigio()
 	itable_firstkey(pfs_process_table);
 	while(itable_nextkey(pfs_process_table,&pid,(void**)&p)) {
 		if(p && p->flags&PFS_PROCESS_FLAGS_ASYNC) {
-			switch(p->state) {
-				case PFS_PROCESS_STATE_DONE:
-					break;
-				default:
-					debug(D_PROCESS,"SIGIO forwarded to pid %d",p->pid);
-					pfs_process_raise(p->pid,SIGIO,1);
-					break;
-			}
+			debug(D_PROCESS,"SIGIO forwarded to pid %d",p->pid);
+			pfs_process_raise(p->pid,SIGIO,1);
 		}
 	}
 }
@@ -187,12 +181,17 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	return child;
 }
 
-void pfs_process_delete( struct pfs_process *p )
+static void pfs_process_delete( struct pfs_process *p )
 {
-	/* The file table was deleted in pfs_process_stop */
-	itable_remove(pfs_process_table,p->pid);
+	pfs_poll_clear(p->pid);
+	if(p->table) {
+		p->table->delref();
+		if(!p->table->refs()) delete p->table;
+		p->table = 0;
+	}
 	pfs_paranoia_delete_pid(p->pid);
 	tracer_detach(p->tracer);
+	itable_remove(pfs_process_table,p->pid);
 	free(p);
 }
 
@@ -213,10 +212,7 @@ void pfs_process_exit_group( struct pfs_process *child )
 	}
 }
 
-/* The given process has stopped or completed with this status and rusage. If
- * this process has a parent, attempt to inform it, otherwise wait for the
- * parent to show up and claim it. If we wake up a parent ourselves, then
- * cause it to be rescheduled.
+/* The given process has completed with this status and rusage.
  */
 void pfs_process_stop( struct pfs_process *child, int status, struct rusage *usage )
 {
@@ -226,15 +222,8 @@ void pfs_process_stop( struct pfs_process *child, int status, struct rusage *usa
 	} else {
 		debug(D_PSTREE,"%d exit signal %d",child->pid,WTERMSIG(status));
 	}
-	child->state = PFS_PROCESS_STATE_DONE;
-	pfs_poll_clear(child->pid);
-	nprocs--;
-	if(child->table) {
-		child->table->delref();
-		if(!child->table->refs()) delete child->table;
-		child->table = 0;
-	}
 	pfs_process_delete(child);
+	nprocs--;
 }
 
 int pfs_process_count()
@@ -291,7 +280,6 @@ int pfs_process_raise( pid_t pid, int sig, int really_sendit )
 		}
 	} else {
 		switch(p->state) {
-			case PFS_PROCESS_STATE_WAITPID:
 			case PFS_PROCESS_STATE_WAITREAD:
 			case PFS_PROCESS_STATE_WAITWRITE:
 				if(p->signal_interruptible[sig]) {

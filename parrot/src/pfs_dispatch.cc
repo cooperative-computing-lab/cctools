@@ -3214,16 +3214,10 @@ void pfs_dispatch32( struct pfs_process *p, INT64_T signum )
 		case PFS_PROCESS_STATE_WAITWRITE:
 			decode_syscall(p,0);
 			break;
-		case PFS_PROCESS_STATE_STOPPED:
-			p->state = PFS_PROCESS_STATE_USER;
 		case PFS_PROCESS_STATE_USER:
 			p->interrupted = 0;
 		case PFS_PROCESS_STATE_WAITREAD:
 			decode_syscall(p,1);
-			break;
-		case PFS_PROCESS_STATE_WAITPID:
-		case PFS_PROCESS_STATE_DONE:
-			p->interrupted = 0;
 			break;
 		default:
 			debug(D_PROCESS,"process %d in unexpected state %d",(int)p->pid,(int)p->state);
@@ -3235,10 +3229,8 @@ void pfs_dispatch32( struct pfs_process *p, INT64_T signum )
 		case PFS_PROCESS_STATE_USER:
 			tracer_continue(p->tracer,signum);
 			break;
-		case PFS_PROCESS_STATE_WAITPID:
 		case PFS_PROCESS_STATE_WAITREAD:
 		case PFS_PROCESS_STATE_WAITWRITE:
-		case PFS_PROCESS_STATE_DONE:
 			break;
 		default:
 			debug(D_PROCESS,"process %d in unexpected state %d",(int)p->pid,(int)p->state);
@@ -3250,8 +3242,6 @@ void pfs_dispatch32( struct pfs_process *p, INT64_T signum )
 
 void pfs_dispatch( struct pfs_process *p, INT64_T signum )
 {
-	if(p->state==PFS_PROCESS_STATE_DONE) return;
-
 	if(tracer_is_64bit(p->tracer)) {
 		pfs_dispatch64(p,signum);
 	} else {

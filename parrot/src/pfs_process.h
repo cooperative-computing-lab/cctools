@@ -20,16 +20,17 @@ extern "C" {
 #include <sys/resource.h>
 #include <sys/time.h>
 
-#define PFS_PROCESS_FLAGS_STARTUP 1
-#define PFS_PROCESS_FLAGS_ASYNC 2
+enum {
+    PFS_PROCESS_FLAGS_STARTUP = (1<<0),
+    PFS_PROCESS_FLAGS_ASYNC   = (1<<1)
+};
 
-#define PFS_PROCESS_STATE_KERNEL 0
-#define PFS_PROCESS_STATE_USER 1
-#define PFS_PROCESS_STATE_WAITPID 2
-#define PFS_PROCESS_STATE_WAITREAD 3
-#define PFS_PROCESS_STATE_WAITWRITE 4
-#define PFS_PROCESS_STATE_DONE 5
-#define PFS_PROCESS_STATE_STOPPED 6
+enum {
+    PFS_PROCESS_STATE_KERNEL,
+    PFS_PROCESS_STATE_USER,
+    PFS_PROCESS_STATE_WAITREAD,
+    PFS_PROCESS_STATE_WAITWRITE
+};
 
 #define PFS_SCRATCH_SIZE 4096
 
@@ -72,7 +73,6 @@ struct pfs_process {
 
 struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table );
 struct pfs_process * pfs_process_lookup( pid_t pid );
-void pfs_process_delete( struct pfs_process *p );
 
 void pfs_process_stop( struct pfs_process *p, int status, struct rusage *usage );
 void pfs_process_exit_group( struct pfs_process *p );
