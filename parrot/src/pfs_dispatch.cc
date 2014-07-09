@@ -2765,18 +2765,17 @@ void decode_syscall( struct pfs_process *p, int entering )
 		These things are not currently permitted.
 		*/
 		case SYSCALL32_chroot:
+		case SYSCALL32_lookup_dcookie:
 		case SYSCALL32_mount:
+		case SYSCALL32_remap_file_pages:
 		case SYSCALL32_stime:
+		case SYSCALL32_sys_epoll_create:
+		case SYSCALL32_sys_epoll_ctl:
+		case SYSCALL32_sys_epoll_wait:
 		case SYSCALL32_sysfs:
 		case SYSCALL32_umount2:
 		case SYSCALL32_umount:
 		case SYSCALL32_uselib:
-		case SYSCALL32_lookup_dcookie:
-		case SYSCALL32_sys_epoll_create:
-		case SYSCALL32_sys_epoll_ctl:
-		case SYSCALL32_sys_epoll_wait:
-		case SYSCALL32_remap_file_pages:
-
 			divert_to_dummy(p,-EPERM);
 			break;
 		/*
@@ -2785,6 +2784,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 		*/
 		case SYSCALL32_acct:
 		case SYSCALL32_break:
+		case SYSCALL32_fadvise64:
 		case SYSCALL32_ftime:
 		case SYSCALL32_gtty:
 		case SYSCALL32_lock:
@@ -2792,7 +2792,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_profil:
 		case SYSCALL32_stty:
 		case SYSCALL32_ulimit:
-		case SYSCALL32_fadvise64:
 			divert_to_dummy(p,-ENOSYS);
 			break;
 
@@ -2801,26 +2800,28 @@ void decode_syscall( struct pfs_process *p, int entering )
 		access, so we simply send them along to the
 		underlying OS.
 		*/
-		case SYSCALL32_getpgid:
-		case SYSCALL32_setpgid:
-		case SYSCALL32_uname:
-		case SYSCALL32_olduname:
 		case SYSCALL32__sysctl:
 		case SYSCALL32_adjtimex:
 		case SYSCALL32_afs_syscall:
 		case SYSCALL32_alarm:
+		case SYSCALL32_alloc_hugepages:
 		case SYSCALL32_bdflush:
 		case SYSCALL32_capget:
 		case SYSCALL32_capset:
-		case SYSCALL32_clock_settime:
-		case SYSCALL32_clock_gettime:
 		case SYSCALL32_clock_getres:
+		case SYSCALL32_clock_gettime:
+		case SYSCALL32_clock_settime:
 		case SYSCALL32_create_module:		
 		case SYSCALL32_delete_module:		
+		case SYSCALL32_free_hugepages:
+		case SYSCALL32_futex:
 		case SYSCALL32_get_kernel_syms:
+		case SYSCALL32_get_robust_list:
+		case SYSCALL32_get_thread_area:
 		case SYSCALL32_getgroups32:
 		case SYSCALL32_getgroups:
 		case SYSCALL32_getitimer:
+		case SYSCALL32_getpgid:
 		case SYSCALL32_getpgrp:
 		case SYSCALL32_getpid:
 		case SYSCALL32_getpriority:
@@ -2846,6 +2847,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_munlockall:
 		case SYSCALL32_nanosleep:
 		case SYSCALL32_nice:
+		case SYSCALL32_olduname:
 		case SYSCALL32_pause:
 		case SYSCALL32_prctl:
 		case SYSCALL32_query_module:
@@ -2859,21 +2861,26 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_rt_sigtimedwait:
 		case SYSCALL32_sched_get_priority_max:
 		case SYSCALL32_sched_get_priority_min:
+		case SYSCALL32_sched_getaffinity:
 		case SYSCALL32_sched_getparam:
 		case SYSCALL32_sched_getscheduler:
 		case SYSCALL32_sched_rr_get_interval:
+		case SYSCALL32_sched_setaffinity:
 		case SYSCALL32_sched_setparam:
 		case SYSCALL32_sched_setscheduler:
 		case SYSCALL32_sched_yield:
+		case SYSCALL32_set_robust_list:
+		case SYSCALL32_set_thread_area:
+		case SYSCALL32_set_tid_address:
 		case SYSCALL32_setdomainname:
 		case SYSCALL32_setgroups32:
 		case SYSCALL32_setgroups:
 		case SYSCALL32_sethostname:
 		case SYSCALL32_setitimer:
+		case SYSCALL32_setpgid:
 		case SYSCALL32_setpriority:
 		case SYSCALL32_setrlimit:
 		case SYSCALL32_settimeofday:
-		case SYSCALL32_set_tid_address:
 		case SYSCALL32_sgetmask:
 		case SYSCALL32_sigaltstack:
 		case SYSCALL32_sigpending:
@@ -2887,26 +2894,18 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_sysinfo:
 		case SYSCALL32_syslog:
 		case SYSCALL32_time:
-		case SYSCALL32_times:
 		case SYSCALL32_timer_create:
-		case SYSCALL32_timer_settime:
-		case SYSCALL32_timer_gettime:
-		case SYSCALL32_timer_getoverrun:
 		case SYSCALL32_timer_delete:
+		case SYSCALL32_timer_getoverrun:
+		case SYSCALL32_timer_gettime:
+		case SYSCALL32_timer_settime:
+		case SYSCALL32_times:
 		case SYSCALL32_ugetrlimit:
+		case SYSCALL32_uname:
 		case SYSCALL32_ustat:
 		case SYSCALL32_vhangup:
 		case SYSCALL32_vm86:
 		case SYSCALL32_vm86old:
-		case SYSCALL32_sched_setaffinity:
-		case SYSCALL32_sched_getaffinity:
-		case SYSCALL32_set_thread_area:
-		case SYSCALL32_get_thread_area:
-		case SYSCALL32_alloc_hugepages:
-		case SYSCALL32_free_hugepages:
-		case SYSCALL32_futex:
-		case SYSCALL32_set_robust_list:
-		case SYSCALL32_get_robust_list:
 			break;
 
 		/* These *xattr system calls were originally not supported.  The main

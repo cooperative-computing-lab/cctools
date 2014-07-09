@@ -2538,14 +2538,14 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		Changing the userid is not allow, but for completeness,
 		you can always change to your own uid.
 		*/
+		case SYSCALL64_setfsgid:
+		case SYSCALL64_setfsuid:
 		case SYSCALL64_setgid:
 		case SYSCALL64_setregid:
-		case SYSCALL64_setuid:
-		case SYSCALL64_setresuid:
 		case SYSCALL64_setresgid:
-		case SYSCALL64_setfsuid:
-		case SYSCALL64_setfsgid:
+		case SYSCALL64_setresuid:
 		case SYSCALL64_setreuid:
+		case SYSCALL64_setuid:
 			divert_to_dummy(p,0);
 			break;
 
@@ -2574,13 +2574,12 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		These things are not currently permitted.
 		*/
 		case SYSCALL64_chroot:
+		case SYSCALL64_lookup_dcookie:
 		case SYSCALL64_mount:
+		case SYSCALL64_remap_file_pages:
 		case SYSCALL64_sysfs:
 		case SYSCALL64_umount2:
 		case SYSCALL64_uselib:
-		case SYSCALL64_lookup_dcookie:
-		case SYSCALL64_remap_file_pages:
-
 			divert_to_dummy(p,-EPERM);
 			break;
 		/*
@@ -2597,20 +2596,26 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		access, so we simply send them along to the
 		underlying OS.
 		*/
-		case SYSCALL64_getpgid:
-		case SYSCALL64_setpgid:
 		case SYSCALL64__sysctl:
 		case SYSCALL64_adjtimex:
 		case SYSCALL64_afs_syscall:
 		case SYSCALL64_alarm:
+		case SYSCALL64_arch_prctl:
 		case SYSCALL64_capget:
 		case SYSCALL64_capset:
+		case SYSCALL64_clock_getres:
+		case SYSCALL64_clock_gettime:
+		case SYSCALL64_clock_nanosleep:
+		case SYSCALL64_clock_settime:
 		case SYSCALL64_create_module:		
 		case SYSCALL64_delete_module:		
 		case SYSCALL64_futex:
 		case SYSCALL64_get_kernel_syms:
+		case SYSCALL64_get_robust_list:
+		case SYSCALL64_get_thread_area:
 		case SYSCALL64_getgroups:
 		case SYSCALL64_getitimer:
+		case SYSCALL64_getpgid:
 		case SYSCALL64_getpgrp:
 		case SYSCALL64_getpid:
 		case SYSCALL64_getpriority:
@@ -2623,10 +2628,12 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_ioperm:
 		case SYSCALL64_iopl:
 		case SYSCALL64_madvise:
+		case SYSCALL64_migrate_pages:
 		case SYSCALL64_mincore:
 		case SYSCALL64_mlock:
 		case SYSCALL64_mlockall:
 		case SYSCALL64_modify_ldt:
+		case SYSCALL64_move_pages:
 		case SYSCALL64_mprotect:
 		case SYSCALL64_mremap:
 		case SYSCALL64_msync:
@@ -2635,7 +2642,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_nanosleep:
 		case SYSCALL64_pause:
 		case SYSCALL64_prctl:
-		case SYSCALL64_arch_prctl:
 		case SYSCALL64_query_module:
 		case SYSCALL64_quotactl:
 		case SYSCALL64_reboot:
@@ -2648,20 +2654,25 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_rt_sigtimedwait:
 		case SYSCALL64_sched_get_priority_max:
 		case SYSCALL64_sched_get_priority_min:
+		case SYSCALL64_sched_getaffinity:
 		case SYSCALL64_sched_getparam:
 		case SYSCALL64_sched_getscheduler:
 		case SYSCALL64_sched_rr_get_interval:
+		case SYSCALL64_sched_setaffinity:
 		case SYSCALL64_sched_setparam:
 		case SYSCALL64_sched_setscheduler:
 		case SYSCALL64_sched_yield:
+		case SYSCALL64_set_robust_list:
+		case SYSCALL64_set_thread_area:
+		case SYSCALL64_set_tid_address:
 		case SYSCALL64_setdomainname:
 		case SYSCALL64_setgroups:
 		case SYSCALL64_sethostname:
 		case SYSCALL64_setitimer:
+		case SYSCALL64_setpgid:
 		case SYSCALL64_setpriority:
 		case SYSCALL64_setrlimit:
 		case SYSCALL64_settimeofday:
-		case SYSCALL64_set_tid_address:
 		case SYSCALL64_sigaltstack:
 		case SYSCALL64_swapoff:
 		case SYSCALL64_swapon:
@@ -2669,26 +2680,14 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_sysinfo:
 		case SYSCALL64_syslog:
 		case SYSCALL64_time:
+		case SYSCALL64_timer_create:
+		case SYSCALL64_timer_delete:
+		case SYSCALL64_timer_getoverrun:
+		case SYSCALL64_timer_gettime:
+		case SYSCALL64_timer_settime:
 		case SYSCALL64_times:
 		case SYSCALL64_ustat:
 		case SYSCALL64_vhangup:
-		case SYSCALL64_sched_setaffinity:
-		case SYSCALL64_sched_getaffinity:
-		case SYSCALL64_set_thread_area:
-		case SYSCALL64_get_thread_area:
-		case SYSCALL64_timer_create:
-		case SYSCALL64_timer_settime:
-		case SYSCALL64_timer_gettime:
-		case SYSCALL64_timer_getoverrun:
-		case SYSCALL64_timer_delete:
-		case SYSCALL64_clock_settime:
-		case SYSCALL64_clock_gettime:
-		case SYSCALL64_clock_getres:
-		case SYSCALL64_clock_nanosleep:
-		case SYSCALL64_migrate_pages:
-		case SYSCALL64_get_robust_list:
-		case SYSCALL64_set_robust_list:
-		case SYSCALL64_move_pages:
 			break;
 
 		/* These *xattr system calls were originally not supported.  The main
