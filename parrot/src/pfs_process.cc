@@ -40,17 +40,14 @@ struct pfs_process * pfs_process_lookup( pid_t pid )
 	return (struct pfs_process *) itable_lookup(pfs_process_table,pid);
 }
 
-/*
-It would be nice if we could clean up everyone quietly and then
-some time later, kill hard.  However, on Linux, if someone kills
-us before we have a chance to clean up, then due to a "feature"
-of ptrace, all our children will be left stuck in a debug-wait
-state.  So, rather than chance ourselves getting killed, we
-will be very aggressive about cleaning up.  Upon receiving any
-shutdown signal, we immediately blow away everyone involved,
-and then kill ourselves.
-*/
-
+/* It would be nice if we could clean up everyone quietly and then some time
+ * later, kill hard.  However, on Linux, if someone kills us before we have a
+ * chance to clean up, then due to a "feature" of ptrace, all our children will
+ * be left stuck in a debug-wait state.  So, rather than chance ourselves
+ * getting killed, we will be very aggressive about cleaning up.  Upon
+ * receiving any shutdown signal, we immediately blow away everyone involved,
+ * and then kill ourselves.
+ */
 void pfs_process_kill_everyone( int sig )
 {   
 	debug(D_NOTICE,"received signal %d (%s), killing all my children...",sig,string_signal(sig));
@@ -64,15 +61,11 @@ void pfs_process_kill_everyone( int sig )
 	}
 }   
 
-/*
-For every process interested in asynchronous events,
-send a SIGIO.  Note that is is more coarse than it
-should be.  Most processes register interest only
-on particular fds, however, we have limited mechanism
-for figuring out which fds are ready.  Just signal
-everybody.
-*/
-
+/* For every process interested in asynchronous events, send a SIGIO.  Note
+ * that is is more coarse than it should be.  Most processes register interest
+ * only on particular fds, however, we have limited mechanism for figuring out
+ * which fds are ready.  Just signal everybody.
+ */
 void pfs_process_sigio()
 {
 	UINT64_T pid;
@@ -418,7 +411,7 @@ extern "C" char * pfs_process_name()
 
 extern const char *pfs_username;
 
-int  pfs_process_raise( pid_t pid, int sig, int really_sendit )
+int pfs_process_raise( pid_t pid, int sig, int really_sendit )
 {
 	struct pfs_process *p;
 	int result;
