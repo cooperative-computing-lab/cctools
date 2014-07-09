@@ -30,7 +30,7 @@ EXTERNALS = $(LIBDTTOOLS) $(LIBCHIRP)
 
 EXTERNAL_DEPENDENCIES = ../../chirp/src/libchirp.a ../../dttools/src/libdttools.a
 LIBRARIES = libwork_queue.a
-OBJECTS = $(OBJECTS_LIBRARY) $(OBJECTS_WORKER) work_queue_test_main.o
+OBJECTS = $(OBJECTS_LIBRARY) $(OBJECTS_WORKER) work_queue_test_main.o mpi_queue_worker.o
 OBJECTS_LIBRARY = $(SOURCES_LIBRARY:%.c=%.o)
 OBJECTS_WORKER = $(SOURCES_WORKER:%.c=%.o)
 PROGRAMS = work_queue_worker work_queue_status work_queue_example work_queue_pool
