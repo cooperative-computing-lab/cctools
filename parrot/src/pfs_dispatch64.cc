@@ -2279,16 +2279,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			break;
 
 		/*
-		The tracing mechanism re-parents traced children,
-		so we must fake the parent pid if the child wants
-		to send its parent a signal.
-		*/
-
-		case SYSCALL64_getppid:
-			divert_to_dummy(p,p->ppid);
-			break;
-
-		/*
 		Always return the dummy uids.	
 		*/
 
@@ -2603,6 +2593,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_getpgid:
 		case SYSCALL64_getpgrp:
 		case SYSCALL64_getpid:
+		case SYSCALL64_getppid:
 		case SYSCALL64_getpriority:
 		case SYSCALL64_getrlimit:
 		case SYSCALL64_getrusage:
