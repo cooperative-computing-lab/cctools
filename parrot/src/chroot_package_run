@@ -87,9 +87,6 @@ if [ -z "${cmd_rmdir}" ]; then
 	exit 1
 fi
 
-sort -u special_files >> special_files.bak
-mv -f special_files.bak special_files
-
 common_mountlist="${package_path}/common-mountlist"
 #umount chroot dirs
 unmount_virtual_fs() {
