@@ -66,9 +66,6 @@ struct pfs_process {
 	int did_stream_warning;
 	int diverted_length;
 	int signal_interruptible[256];
-
-	int            thread;                // True if thread, false if regular process.
-	time_t         time_first_sigcont;
 };
 
 struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table );
