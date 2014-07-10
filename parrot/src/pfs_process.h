@@ -73,9 +73,6 @@ struct pfs_process {
 	struct rusage *wait_urusage;
 	int            wait_options;
 
-	int            thread;                // True if thread, false if regular process.
-	time_t         time_first_sigcont;
-
 	/* status and rusage for parent call to wait*(...) */
 	struct rusage  wait_rusage;
 	int            wait_status;
