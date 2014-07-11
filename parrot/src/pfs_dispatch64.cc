@@ -1005,21 +1005,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			}
 			break;
 
-		case SYSCALL64_wait4:
-			if(entering) {
-				char flags[4096] = "0";
-				if(args[2]&WCONTINUED)
-					strcat(flags, "|WCONTINUED");
-				if(args[2]&WNOHANG)
-					strcat(flags, "|WNOHANG");
-				if(args[2]&WUNTRACED)
-					strcat(flags, "|WUNTRACED");
-				debug(D_DEBUG, "wait4(%" PRId64 ", %p, %s, %p)", args[0], (void *)args[1], flags, (void *)args[3]);
-				pfs_process_waitpid(p,args[0],(int*)args[1],args[2],(struct rusage*)args[3]);
-				divert_to_dummy(p,p->syscall_result);
-			}
-			break;
-
 		/*
 		We don't do anything special with exit.  Just let it
 		run to completion, and then process the exit event
@@ -2294,16 +2279,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			break;
 
 		/*
-		The tracing mechanism re-parents traced children,
-		so we must fake the parent pid if the child wants
-		to send its parent a signal.
-		*/
-
-		case SYSCALL64_getppid:
-			divert_to_dummy(p,p->ppid);
-			break;
-
-		/*
 		Always return the dummy uids.	
 		*/
 
@@ -2618,6 +2593,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_getpgid:
 		case SYSCALL64_getpgrp:
 		case SYSCALL64_getpid:
+		case SYSCALL64_getppid:
 		case SYSCALL64_getpriority:
 		case SYSCALL64_getrlimit:
 		case SYSCALL64_getrusage:
@@ -2688,6 +2664,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_times:
 		case SYSCALL64_ustat:
 		case SYSCALL64_vhangup:
+		case SYSCALL64_wait4:
 			break;
 
 		/* These *xattr system calls were originally not supported.  The main
@@ -3026,16 +3003,10 @@ void pfs_dispatch64( struct pfs_process *p, INT64_T signum )
 		case PFS_PROCESS_STATE_WAITWRITE:
 			decode_syscall(p,0);
 			break;
-		case PFS_PROCESS_STATE_STOPPED:
-			p->state = PFS_PROCESS_STATE_USER;
 		case PFS_PROCESS_STATE_USER:
 			p->interrupted = 0;
 		case PFS_PROCESS_STATE_WAITREAD:
 			decode_syscall(p,1);
-			break;
-		case PFS_PROCESS_STATE_WAITPID:
-		case PFS_PROCESS_STATE_DONE:
-			p->interrupted = 0;
 			break;
 		default:
 			debug(D_PROCESS,"process %d in unexpected state %d",p->pid,p->state);
@@ -3047,10 +3018,8 @@ void pfs_dispatch64( struct pfs_process *p, INT64_T signum )
 		case PFS_PROCESS_STATE_USER:
 			tracer_continue(p->tracer,signum);
 			break;
-		case PFS_PROCESS_STATE_WAITPID:
 		case PFS_PROCESS_STATE_WAITREAD:
 		case PFS_PROCESS_STATE_WAITWRITE:
-		case PFS_PROCESS_STATE_DONE:
 			break;
 		default:
 			debug(D_PROCESS,"process %d in unexpected state %d",p->pid,p->state);

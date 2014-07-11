@@ -337,26 +337,17 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
 		pid_t cpid;
 		struct pfs_process *child;
-		pid_t notify_parent;
-		INT64_T child_signal, clone_files;
+		INT64_T clone_files;
 
 		cpid = tracer_getevent(p->tracer);
 		debug(D_PROCESS, "pid %d cloned %d",pid,cpid);
 
 		if(status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
-			child_signal = SIGCHLD;
 			clone_files = 0;
 		} else {
-			/* per clone(1): "The low byte of flags contains the number of the termination signal sent to the parent when the child dies." */
-			child_signal = p->syscall_args[0]&0xff;
 			clone_files = p->syscall_args[0]&CLONE_FILES;
 		}
-		if (p->syscall_args[0]&(CLONE_PARENT|CLONE_THREAD)) {
-			notify_parent = p->ppid;
-		} else {
-			notify_parent = p->pid;
-		}
-		child = pfs_process_create(cpid,pid,notify_parent,clone_files,child_signal);
+		child = pfs_process_create(cpid,pid,clone_files);
 		child->syscall_result = 0;
 		if(p->syscall_args[0]&CLONE_THREAD)
 			child->tgid = p->tgid;
@@ -431,13 +422,6 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 					}
 					break;
 				case SIGTSTP:
-					break;
-				case SIGCONT:
-#ifdef __W_CONTINUED
-					pfs_process_continued(p, __W_CONTINUED, usage);
-#else
-					pfs_process_continued(p, 0xffff, usage);
-#endif
 					break;
 			}
 			tracer_continue(p->tracer,signum); /* deliver (or not) the signal */
@@ -972,7 +956,7 @@ int main( int argc, char *argv[] )
 	debug(D_PROCESS,"attaching to pid %d",pid);
 	if (tracer_attach(pid) == -1)
 		fatal("could not trace child");
-	p = pfs_process_create(pid,getpid(),getpid(),0,SIGCHLD);
+	p = pfs_process_create(pid,getpid(),0);
 	if(!p) {
 		if(pfs_write_rval) {
 			write_rval("noattach", 0);
