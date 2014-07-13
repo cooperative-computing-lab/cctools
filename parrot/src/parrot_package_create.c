@@ -128,23 +128,29 @@ its own ACLs, which is different UNIX file permission mechanism.
 If `fixed_mode` is 1, use the mode parameter; otherwise use the mode of the original file.
 Currently, each directory is created using fixed mode (i.e., fixed_mode = 1).
 */
-int mkpath(const char *path, mode_t mode, int fixed_mode) {
+int mkpath(const char *path, mode_t mode, int fixed_mode, FILE *special_file) {
+    (void)mode; /* silence warnings */
 	debug(D_DEBUG, "mkpath(`%s`) func\n", path);
 	if(access(path, F_OK) == 0) {
 		debug(D_DEBUG, "%s already exists, mkpath exist!\n", path);
 		return 0;
 	}
 
-	if(fixed_mode == 0) {
-		const char *old_path;
-		old_path = path + strlen(packagepath);
-		struct stat st;
-		if(stat(old_path, &st) == 0) {
-			mode = st.st_mode;
-		} else {
-			debug(D_DEBUG, "stat(`%s`) fails: %s\n", old_path, strerror(errno));
-			return -1;
+	const char *old_path;
+	old_path = path + strlen(packagepath);
+	struct stat st;
+	if((access(old_path, F_OK) == 0) && (lstat(old_path, &st)) == 0) {
+		if(S_ISLNK(st.st_mode)) {
+			debug(D_DEBUG, "inside mkpath meets a symbolink: `%s`\n", old_path);
+			line_process(old_path, "metadatacopy", 1, 1, special_file);
 		}
+	} else {
+		debug(D_DEBUG, "lstat(`%s`) fails: %s\n", old_path, strerror(errno));
+		return -1;
+	}
+
+	if(fixed_mode == 0) {
+		mode = st.st_mode;
 	}
 
 	char pathcopy[PATH_MAX], *parent_dir;
@@ -159,7 +165,7 @@ int mkpath(const char *path, mode_t mode, int fixed_mode) {
 	if((parent_dir = dirname(pathcopy)) == NULL)
 		return -1;
 
-	if((mkpath(parent_dir, default_dirmode, 1) == -1) && (errno != EEXIST))
+	if((mkpath(parent_dir, default_dirmode, 1, special_file) == -1) && (errno != EEXIST))
 		return -1;
 
 	if((mkdir(path, default_dirmode) == -1) && (errno != EEXIST))
@@ -188,7 +194,11 @@ int prepare_work()
 		fprintf(stderr, "The package path (`%s`) has already existed, please delete it first or refer to another package path.\n", packagepath);
 		return -1;
 	}
-	if(mkpath(packagepath, default_dirmode, 1) == -1) {
+	char mkdir_cmd[PATH_MAX * 2];
+	if(snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", packagepath) >= 0) {
+		system(mkdir_cmd);
+	}
+	if(access(packagepath, F_OK) != 0) {
 		fprintf(stderr, "mkdir(`%s`) fails: %s\n", packagepath, strerror(errno));
 		return -1;
 	}
@@ -408,7 +418,7 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 	} else if(S_ISDIR(source_stat.st_mode)) {
 		debug(D_DEBUG, "`%s`: regular dir\n", path);
 		if(is_direntry == 0) {
-			if(mkpath(new_path, default_dirmode, 1) == -1) {
+			if(mkpath(new_path, default_dirmode, 1, special_file) == -1) {
 				debug(D_DEBUG, "mkpath(`%s`) fails.\n", new_path);
 				return -1;
 			}
