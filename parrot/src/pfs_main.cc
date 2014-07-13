@@ -406,7 +406,6 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 					notified = 1;
 				}
 			}
-			pfs_process_stop(p,status,usage);
 			tracer_listen(p->tracer);
 		} else {
 			/* signal-delivery-stop */
