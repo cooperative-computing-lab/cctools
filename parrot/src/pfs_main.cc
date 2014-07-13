@@ -154,8 +154,8 @@ static void get_linux_version(const char *cmd)
 	/* warning for latest untested version of Linux */
 	if(linux_available(3,15,3))
 		debug(D_NOTICE,"parrot_run %d.%d.%s has not been tested on %s %s yet, this may not work",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO,name.sysname,name.release);
-	else if (!linux_available(2,5,46))
-		fatal("this version of Parrot requires at least kernel version 2.5.46");
+	else if (!linux_available(2,5,60))
+		fatal("this version of Parrot requires at least kernel version 2.5.60");
 }
 
 static void pfs_helper_init( const char *argv0 ) 
@@ -325,8 +325,7 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 
 	p = pfs_process_lookup(pid);
 	if(!p) {
-		debug(D_PROCESS,"killing unexpected pid %d",pid);
-		kill(pid,SIGKILL);
+		debug(D_PROCESS,"ignoring event %d for unknown pid %d",status,pid);
 		return;
 	}
 
@@ -358,15 +357,30 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXEC<<8))) {
 		debug(D_PROCESS, "pid %d is completing exec", (int)pid);
 		tracer_continue(p->tracer, 0);
-	} else if (WIFEXITED(status)) {
-		debug(D_PROCESS,"pid %d exited normally with code %d",pid,WEXITSTATUS(status));
-		pfs_process_stop(p,status,usage);
-		if (pid == root_pid)
-			root_exitstatus = status;
-	} else if (WIFSIGNALED(status)) {
-		int signum = WTERMSIG(status);
-		debug(D_PROCESS,"pid %d exited abnormally with signal %d (%s)",pid,signum,string_signal(signum));
-		pfs_process_stop(p,status,usage);
+	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8)) || WIFEXITED(status) || WIFSIGNALED(status)) {
+		/* In my own testing, if we use PTRACE_O_TRACEEXIT then we never get
+		 * WIFEXITED(status) || WIFSIGNALED(status).  There may be corner cases
+		 * (maybe in the future) where we do receive e.g. WIFSIGNALED(status),
+		 * possibly due to SIGKILL. The ptrace manual says as much. So, I'm
+		 * leaving that check in to handle the possibility. I also changed the
+		 * above check if pfs_process_lookup(pid) fails to simply ignore the
+		 * failure. Conceivably, we could receive PTRACE_EVENT_EXIT (due to
+		 * normal exit) followed by an event due to SIGKILL. By the time we
+		 * process SIGKILL, we have already destroyed our process data
+		 * structures.
+		 */
+		struct rusage _usage;
+		if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8))) {
+			debug(D_DEBUG, "pid %d received PTRACE_EVENT_EXIT",pid);
+			status = tracer_getevent(p->tracer);
+		}
+		if (WIFEXITED(status))
+			debug(D_PROCESS,"pid %d exited normally with code %d",pid,WEXITSTATUS(status));
+		else if (WIFSIGNALED(status))
+			debug(D_PROCESS,"pid %d exited abnormally with signal %d (%s)",pid,WTERMSIG(status),string_signal(WTERMSIG(status)));
+		else
+			debug(D_PROCESS,"pid %d is exiting with status: %d",pid,status);
+		pfs_process_stop(p,status,&_usage);
 		if (pid == root_pid)
 			root_exitstatus = status;
 	} else if (WIFSTOPPED(status)) {

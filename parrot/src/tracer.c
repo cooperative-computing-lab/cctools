@@ -74,11 +74,11 @@ struct tracer {
 
 int tracer_attach (pid_t pid)
 {
-	intptr_t options = PTRACE_O_TRACESYSGOOD|PTRACE_O_TRACEEXEC|PTRACE_O_TRACECLONE|PTRACE_O_TRACEFORK|PTRACE_O_TRACEVFORK;
+	intptr_t options = PTRACE_O_TRACESYSGOOD|PTRACE_O_TRACEEXEC|PTRACE_O_TRACEEXIT|PTRACE_O_TRACECLONE|PTRACE_O_TRACEFORK|PTRACE_O_TRACEVFORK;
 
 	if (linux_available(3,8,0))
 		options |= PTRACE_O_EXITKILL;
-	assert(linux_available(2,5,46));
+	assert(linux_available(2,5,60));
 
 	if (linux_available(3,4,0)) {
 		/* So this is a really annoying situation, in order to correctly deal

@@ -1006,19 +1006,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			break;
 
 		/*
-		We don't do anything special with exit.  Just let it
-		run to completion, and then process the exit event
-		in the main loop.
-		*/
-
-		case SYSCALL64_exit_group:
-			if(entering) pfs_process_exit_group(p);
-			break;
-	
-		case SYSCALL64_exit:
-			break;
-
-		/*
 		Here begin all of the I/O operations, given in the
 		same order as in pfs_table.  Notice that most operations
 		use the simple but slow tracer_copy_{in,out} routines.
@@ -2584,6 +2571,8 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_clock_settime:
 		case SYSCALL64_create_module:		
 		case SYSCALL64_delete_module:		
+		case SYSCALL64_exit:
+		case SYSCALL64_exit_group:
 		case SYSCALL64_futex:
 		case SYSCALL64_get_kernel_syms:
 		case SYSCALL64_get_robust_list:
