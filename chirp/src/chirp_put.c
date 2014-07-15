@@ -37,14 +37,14 @@ See the file COPYING for details.
 #endif
 
 static int timeout = 3600;
-static int buffer_size = 65536;
+static size_t buffer_size = 65536;
 
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "use: %s [options] <local-file> <hostname[:port]> <remote-file>\n", cmd);
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s Require this authentication mode.\n", "-a,--auth=<flag>");
-	fprintf(stdout, " %-30s Set transfer buffer size. (default is %d bytes)\n", "-b,--block-size=<size>", buffer_size);
+	fprintf(stdout, " %-30s Set transfer buffer size. (default is %zu bytes)\n", "-b,--block-size=<size>", buffer_size);
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug <flag>");
 	fprintf(stdout, " %-30s Follow input file like tail -f.\n", "-f,--follow");
 	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 	const char *hostname, *source_file, *target_file;
 	time_t stoptime;
 	FILE *file;
-	signed char c;
+	int c;
 	char *tickets = NULL;
 
 	debug_config(argv[0]);
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 			did_explicit_auth = 1;
 			break;
 		case 'b':
-			buffer_size = atoi(optarg);
+			buffer_size = (size_t)strtoul(optarg, NULL, 0);
 			break;
 		case 'd':
 			debug_flags_set(optarg);
@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
 					break;
 				}
 			}
-			wactual = chirp_stream_write(stream, buffer, ractual, stoptime);
+			wactual = chirp_stream_write(stream, buffer, (int)ractual, stoptime);
 			if(wactual != ractual) {
 				fprintf(stderr, "chirp_put: couldn't write to %s: %s\n", target_file, strerror(errno));
 				return 1;
