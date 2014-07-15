@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
 		whole_file_mode = 0;
 
 	if(whole_file_mode) {
-		int result = chirp_recursive_put(hostname, source_file, target_file, stoptime);
+		INT64_T result = chirp_recursive_put(hostname, source_file, target_file, stoptime);
 		if(result < 0) {
 			fprintf(stderr, "chirp_put: couldn't put %s to host %s: %s\n", source_file, hostname, strerror(errno));
 			return 1;
