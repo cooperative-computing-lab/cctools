@@ -220,7 +220,7 @@ static INT64_T do_get(int argc, char **argv)
 	result = chirp_recursive_get(current_host, source_full_path, target_full_path, stoptime);
 	stop = timestamp_get();
 
-	elapsed = (stop - start) / 1000000.0;
+	elapsed = (double)(stop - start) / 1000000.0;
 
 	if(result > 0) {
 		printf("%sB read in %.2fs ", string_metric(result, -1, 0), elapsed);
@@ -263,7 +263,7 @@ static INT64_T do_ticket_create(int argc, char **argv)
 	char name[CHIRP_PATH_MAX] = "";
 	const char *subject = NULL;
 	time_t duration = 86400;	/* one day */
-	unsigned bits = 1024;
+	size_t bits = 1024;
 
 	int i;
 
@@ -289,7 +289,7 @@ static INT64_T do_ticket_create(int argc, char **argv)
 					return -1;
 				}
 			} else if(strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "-bits") == 0) {
-				bits = strtoull(argv[++i], NULL, 10);
+				bits = (size_t)strtoul(argv[++i], NULL, 10);
 				if(bits == 0) {
 					fprintf(stderr, "invalid number of bits: %s\n", argv[i]);
 					return -1;
@@ -307,7 +307,7 @@ static INT64_T do_ticket_create(int argc, char **argv)
 		fprintf(stderr, "could not create ticket\n");
 		return result;
 	}
-	fprintf(stderr, "ticket '%s': successfully created with %d bits.\n", name, bits);
+	fprintf(stderr, "ticket '%s': successfully created with %zu bits.\n", name, bits);
 
 	result = chirp_reli_ticket_register(current_host, name, subject, duration, stoptime);
 	if(result < 0) {
@@ -552,7 +552,7 @@ static INT64_T do_rmdir(int argc, char **argv)
 static INT64_T do_mkdir(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
-	int result;
+	INT64_T result;
 	int create_parents = (argc == 3 && strcmp(argv[1], "-p") == 0);
 
 	if(create_parents) {
@@ -675,7 +675,7 @@ static INT64_T do_remote_debug(int argc, char **argv)
 static INT64_T do_whoami(int argc, char **argv)
 {
 	char name[CHIRP_LINE_MAX];
-	int result;
+	INT64_T result;
 
 	result = chirp_reli_whoami(current_host, name, sizeof(name), stoptime);
 	if(result >= 0) {
@@ -688,7 +688,7 @@ static INT64_T do_whoami(int argc, char **argv)
 static INT64_T do_whoareyou(int argc, char **argv)
 {
 	char name[CHIRP_LINE_MAX];
-	int result;
+	INT64_T result;
 
 	result = chirp_reli_whoareyou(current_host, argv[1], name, sizeof(name), stoptime);
 	if(result >= 0) {
@@ -702,7 +702,7 @@ static INT64_T do_md5(int argc, char **argv)
 {
 	unsigned char digest[16];
 	char full_path[CHIRP_LINE_MAX];
-	int result;
+	INT64_T result;
 
 	complete_remote_path(argv[1], full_path);
 
@@ -726,7 +726,7 @@ static INT64_T do_localpath(int argc, char **argv)
 {
 	char localpath[CHIRP_LINE_MAX];
 	char full_path[CHIRP_LINE_MAX];
-	int result;
+	INT64_T result;
 
 	if(argc == 2) {
 		complete_remote_path(argv[1], full_path);
@@ -745,7 +745,7 @@ static INT64_T do_localpath(int argc, char **argv)
 static INT64_T do_audit(int argc, char **argv)
 {
 	struct chirp_audit *list;
-	int result;
+	INT64_T result;
 	int raw_mode = 0;
 
 	if(argc > 1) {
@@ -838,7 +838,7 @@ static INT64_T do_lsalloc(int argc, char **argv)
 	char full_path[CHIRP_PATH_MAX];
 	char alloc_path[CHIRP_PATH_MAX];
 	INT64_T total, inuse;
-	int result;
+	INT64_T result;
 
 	if(argc != 2)
 		argv[1] = ".";
@@ -1177,8 +1177,8 @@ int main(int argc, char *argv[])
 	char line[CHIRP_LINE_MAX];
 	char **user_argv = 0;
 	int user_argc;
-	signed char c;
-	int result = 0;
+	int c;
+	INT64_T result = 0;
 
 	debug_config(argv[0]);
 
