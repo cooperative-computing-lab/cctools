@@ -1016,21 +1016,19 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 
 		tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
 
+		if(!is_executable(path)) {
+			divert_to_dummy(p, -errno);
+			return;
+		}
+
 		p->new_logical_name[0] = 0;
 		p->new_physical_name[0] = 0;
 		firstline[0] = 0;
 
 		strcpy(p->new_logical_name,path);
 
-		/* If path is not executable, we simply return, as the
-		next call to exec will fail with the correct error
-		message. The previous behaviour called
-		divert_to_dummy, but this caused the error message to
-		be lost. */
-
-		if(!is_executable(path) || (pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0)) {
-			p->new_physical_name[0] = 0;
-			p->completing_execve = 1;
+		if (pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0) {
+			divert_to_dummy(p, -errno);
 			return;
 		}
 
@@ -1158,7 +1156,9 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 		p->completing_execve = 1;
 
 		debug(D_PROCESS,"execve: %s about to start",p->new_logical_name);
-	} else {
+	} else if (p->syscall_dummy) {
+		debug(D_PROCESS, "execve: %s failed: %s", p->new_logical_name, strerror(-p->syscall_result));
+	} else { /* That is, we are not entering */
 		INT64_T actual_result;
 		tracer_result_get(p->tracer,&actual_result);
 
