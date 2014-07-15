@@ -4,9 +4,9 @@
 
 const char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 
-int b64_encode(const char *input, int len, char *output, int buf_len)
+int b64_encode(const char *input, size_t len, char *output, size_t buf_len)
 {
-	int i, out_len;
+	size_t i, out_len;
 
 	out_len = (len / 3) * 4;
 	if(len % 3)
