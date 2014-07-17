@@ -653,13 +653,8 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	char mv_cmd[PATH_MAX * 2];
-	if(snprintf(mv_cmd, PATH_MAX * 2, "mv -f %s %s", special_filename_tmp, special_filename) >= 0)
-		system(mv_cmd);
-	else {
-		debug(D_DEBUG, "mv special_files.tmp to special_files fails.\n");
-		exit(EXIT_FAILURE);
-	}
+    if(rename(special_filename_tmp, special_filename) == -1)
+		fatal("mv: %s", strerror(errno));
 
 	if(post_process() == -1) {
 		debug(D_DEBUG, "post_process fails.\n");
