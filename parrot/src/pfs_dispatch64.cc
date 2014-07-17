@@ -2239,8 +2239,10 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			if(entering) {
 				debug(D_PROCESS,"%s %d %d",tracer_syscall64_name(p->syscall),(int)args[0],(int)args[1]);
 				p->syscall_result = pfs_process_raise(args[0],args[1],0);
-				if (p->syscall_result == -1) p->syscall_result = -errno;
-				debug(D_PROCESS,"allowing process to send kill(%d, %d)",(int)args[0],(int)args[1]);
+				if (p->syscall_result == -1)
+					divert_to_dummy(p, -errno);
+				else
+					debug(D_PROCESS,"allowing process to send kill(%d, %d)",(int)args[0],(int)args[1]);
 			}
 			break;
 
@@ -2248,8 +2250,10 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			if(entering) {
 				debug(D_PROCESS,"tgkill %d %d %d",(int)args[0],(int)args[1],(int)args[2]);
 				p->syscall_result = pfs_process_raise(args[1],args[2],0);
-				if (p->syscall_result == -1) p->syscall_result = -errno;
-				debug(D_PROCESS,"allowing process to send tgkill(%d, %d)",(int)args[1],(int)args[2]);
+				if (p->syscall_result == -1)
+					divert_to_dummy(p, -errno);
+				else
+					debug(D_PROCESS,"allowing process to send tgkill(%d, %d)",(int)args[1],(int)args[2]);
 			}
 			break;
 
