@@ -13,6 +13,7 @@
 #define INT32_T  int32_t
 #define INT64_T  int64_t
 #define PTRINT_T intptr_t
+#define INTPTR_T intptr_t
 
 #define INT8_FORMAT  "%" PRId8
 #define INT16_FORMAT "%" PRId16
@@ -25,6 +26,7 @@
 #define UINT32_T  uint32_t
 #define UINT64_T  uint64_t
 #define UPTRINT_T uintptr_t
+#define UINTPTR_T uintptr_t
 
 #define UINT8_FORMAT  "%" PRIu8
 #define UINT16_FORMAT "%" PRIu16
