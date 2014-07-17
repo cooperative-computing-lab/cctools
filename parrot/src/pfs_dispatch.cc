@@ -2694,7 +2694,8 @@ void decode_syscall( struct pfs_process *p, int entering )
 			* returns the unchanged brk address.
 			*/
 			if (!entering) {
-				tracer_result_get(p->tracer, (INT64_T *)&p->break_address);
+				tracer_result_get(p->tracer, &p->syscall_result);
+				p->break_address = (INTPTR_T)p->syscall_result;
 				debug(D_PROCESS,"break address: 0x%" PRIx64, (INT64_T)p->break_address);
 			}
 			break;
