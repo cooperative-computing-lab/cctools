@@ -2685,24 +2685,13 @@ void decode_syscall( struct pfs_process *p, int entering )
 			divert_to_dummy(p,0);
 			break;
 
-		/* Whenever the break address is udpated validly, save it. */
-		/* This is used as one way of computing a scratch space. */
-
 		case SYSCALL32_brk:
-			if(entering) {
-			} else {
-				if(p->syscall_result==0) {
-					if(p->syscall_args[0]!=0) {
-						p->break_address = p->syscall_args[0];
-						debug(D_PROCESS,"break address: %x",(int)p->break_address);
-					}
-				}
-				else 
-				{
-					/* On brk error, our knowledge of the address space might be incorrect. */
-					p->break_address = 0;
-					p->heap_address = 0;
-				}
+			/* Whenever the break address is updated, save it. On failure, Linux
+			* returns the unchanged brk address.
+			*/
+			if (!entering) {
+				tracer_result_get(p->tracer, (INT64_T *)&p->break_address);
+				debug(D_PROCESS,"break address: 0x%" PRIx64, (INT64_T)p->break_address);
 			}
 			break;
 
