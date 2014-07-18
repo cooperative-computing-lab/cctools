@@ -22,17 +22,17 @@ int tracer_continue( struct tracer *t, int signum );
 int tracer_listen( struct tracer *t );
 unsigned long tracer_getevent( struct tracer *t );
 
-int             tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARGS_MAX] );
-int             tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS_MAX], int nargs );
+int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARGS_MAX] );
+int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS_MAX], int nargs );
 
 void		tracer_has_args5_bug( struct tracer *t );
 
 int             tracer_result_get( struct tracer *t, INT64_T *result );
 int             tracer_result_set( struct tracer *t, INT64_T result );
 
-int             tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, int length );
-int             tracer_copy_in( struct tracer *t, void *data, const void *uaddr, int length );
-int             tracer_copy_in_string( struct tracer *t, char *data, const void *uaddr, int maxlength );
+ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, size_t length );
+ssize_t tracer_copy_in( struct tracer *t, void *data, const void *uaddr, size_t length );
+ssize_t tracer_copy_in_string( struct tracer *t, char *data, const void *uaddr, size_t maxlength );
 
 int             tracer_is_64bit( struct tracer *t );
 

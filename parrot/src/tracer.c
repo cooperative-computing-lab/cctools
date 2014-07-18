@@ -318,19 +318,20 @@ in and out of the target process.  We use a long here because
 that represents the natural type of the target platform.
 */
 
-static int tracer_copy_out_slow( struct tracer *t, const void *data, const void *uaddr, int length )
+static ssize_t tracer_copy_out_slow( struct tracer *t, const void *data, const void *uaddr, size_t length )
 {
 	UINT8_T *bdata = (UINT8_T *)data;
 	UINT8_T *buaddr = (UINT8_T *)uaddr;
-	UINT32_T size = length;
-	UINT32_T wordsize = sizeof(long);
+	size_t size = length;
 	long word;
+	size_t wordsize = sizeof(word);
 
 	/* first, copy whole words */ 
 
-	while(size>=sizeof(long)) {
+	while(size>=wordsize) {
 		word = *(long*)bdata;
-		ptrace(PTRACE_POKEDATA,t->pid,buaddr,word);
+		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1)
+			return -1;
 		size -= wordsize;
 		buaddr += wordsize;
 		bdata += wordsize;
@@ -339,17 +340,18 @@ static int tracer_copy_out_slow( struct tracer *t, const void *data, const void 
 	/* if necessary, copy the last few bytes */
 
 	if(size>0) {
-		word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0);
+		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1)
+			return -1;
 		memcpy(&word,bdata,size);
-		ptrace(PTRACE_POKEDATA,t->pid,buaddr,word);
+		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1)
+			return -1;
 	}
 
-	return length;		
+	return length;
 }
 
-int tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, int length )
+ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, size_t length )
 {
-	int result;
 	static int has_fast_write=1;
 	UPTRINT_T iuaddr = (UPTRINT_T)uaddr;
 
@@ -360,32 +362,41 @@ int tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, int 
 #endif
 
 	if(has_fast_write) {
-		result = full_pwrite64(t->memory_file,data,length,iuaddr);
-		if( result!=length ) {
-			has_fast_write = 0;
-			debug(D_SYSCALL,"writing to /proc/X/mem failed, falling back to slow ptrace write");
+		ssize_t result = full_pwrite64(t->memory_file,data,length,iuaddr);
+		if( (size_t)result!=length ) {
+			/* this may be because execve caused a remapping, we need to reopen */
+			close(t->memory_file);
+			char path[PATH_MAX];
+			sprintf(path,"/proc/%d/mem",t->pid);
+			t->memory_file = open64(path,O_RDWR);
+			result = full_pwrite64(t->memory_file,data,length,iuaddr);
+			if ((size_t)result == length) {
+				return result;
+			} else {
+				has_fast_write = 0;
+				debug(D_SYSCALL,"writing to /proc/%d/mem failed, falling back to slow ptrace write", t->pid);
+			}
 		} else {
 			return result;
 		}
 	}
 
-	result = tracer_copy_out_slow(t,data,(void*)iuaddr,length);
-
-	return result;
+	return tracer_copy_out_slow(t,data,(void*)iuaddr,length);
 }
 
-static int tracer_copy_in_slow( struct tracer *t, const void *data, const void *uaddr, int length )
+static ssize_t tracer_copy_in_slow( struct tracer *t, const void *data, const void *uaddr, size_t length )
 {
 	UINT8_T *bdata = (UINT8_T *)data;
 	UINT8_T *buaddr = (UINT8_T *)uaddr;
-	UINT32_T size = length;
-	UINT32_T wordsize = sizeof(long);
+	size_t size = length;
 	long word;
+	size_t wordsize = sizeof(word);
 
 	/* first, copy whole words */ 
 
-	while(size>=sizeof(long)) {
-		*((long*)bdata) = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0);
+	while(size>=wordsize) {
+		if ((*((long*)bdata) = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1)
+			return -1;
 		size -= wordsize;
 		buaddr += wordsize;
 		bdata += wordsize;
@@ -394,24 +405,26 @@ static int tracer_copy_in_slow( struct tracer *t, const void *data, const void *
 	/* if necessary, copy the last few bytes */
 
 	if(size>0) {
-		word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0);
+		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1)
+			return -1;
 		memcpy(bdata,&word,size);
 	}
 
-	return length;		
+	return length;
 }
 
-int tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, int length )
+ssize_t tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, size_t length )
 {
 	UINT8_T *bdata = (UINT8_T *)str;
 	UINT8_T *buaddr = (UINT8_T *)uaddr;
-	UINT32_T total = 0;
-	UINT32_T wordsize = sizeof(long);
+	ssize_t total = 0;
 	long word;
+	size_t wordsize = sizeof(word);
 	unsigned int i;
 
 	while(length>0) {
-		word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0);
+		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1)
+			return -1;
 		UINT8_T *worddata = (void*)&word;
 		for(i=0;i<wordsize;i++) {
 			*bdata = worddata[i];
@@ -448,36 +461,43 @@ is 32 or 64 bit, since the 32-bit pread() cannot read above the 2GB
 limit on a 32-bit process.
 */
 
-int tracer_copy_in( struct tracer *t, void *data, const void *uaddr, int length )
+ssize_t tracer_copy_in( struct tracer *t, void *data, const void *uaddr, size_t length )
 {
-	int result;
 	static int fast_read_success = 0;
 	static int fast_read_failure = 0;
 	static int fast_read_attempts = 100;
 
-	UPTRINT_T iuaddr = (UPTRINT_T)uaddr;
+	uintptr_t iuaddr = (UPTRINT_T)uaddr;
 
 #if !defined(CCTOOLS_CPU_I386)
 	if(!tracer_is_64bit(t)) iuaddr &= 0xffffffff;
 #endif
 
 	if(fast_read_success>0 || fast_read_failure<fast_read_attempts) {
-		result = full_pread64(t->memory_file,data,length,iuaddr);
+		ssize_t result = full_pread64(t->memory_file,data,length,iuaddr);
 		if(result>0) {
 			fast_read_success++;
 			return result;
 		} else {
-			fast_read_failure++;
-			// fall through to slow method, print message on the last attempt.
-			if(fast_read_success==0 && fast_read_failure>=fast_read_attempts) {
-				debug(D_SYSCALL,"reading from /proc/X/mem failed, falling back to slow ptrace read");
+			/* this may be because execve caused a remapping, we need to reopen */
+			close(t->memory_file);
+			char path[PATH_MAX];
+			sprintf(path,"/proc/%d/mem",t->pid);
+			t->memory_file = open64(path,O_RDWR);
+			result = full_pread64(t->memory_file,data,length,iuaddr);
+			if ((size_t)result == length) {
+				return result;
+			} else {
+				fast_read_failure++;
+				// fall through to slow method, print message on the last attempt.
+				if(fast_read_success==0 && fast_read_failure>=fast_read_attempts) {
+					debug(D_SYSCALL,"reading from /proc/%d/mem failed, falling back to slow ptrace read", t->pid);
+				}
 			}
 		}
 	}
 
-	result = tracer_copy_in_slow(t,data,(void*)iuaddr,length);
-
-	return result;
+	return tracer_copy_in_slow(t,data,(void *)iuaddr,length);
 }
 
 #include "tracer.table.c"
