@@ -12,7 +12,7 @@
 <div id="manual">
 <h1>Makeflow User's Manual</h1>
 
-<p style="text-align: right;"><b>Last edited: April 2014</b></p>
+<p style="text-align: right;"><b>Last edited: July 2014</b></p>
 
 <p>Makeflow is Copyright (C) 2009 The University of Notre Dame.<br>
 This software is distributed under the GNU General Public License.<br>
@@ -152,98 +152,6 @@ If you do nothing for 15 minutes, they will automatically exit.
 Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>,
 are simple shell scripts, so you can edit them directly if you would
 like to change batch options or other details.
-
-<h2 id="resources">Resources and Categories<a class="sectionlink" href="#resources" title="Link to this section.">&#x21d7;</a></h2>
-
-<p>
-Makeflow has the capability of automatically setting the cores, memory,
-and disk space requirements to the underlying batch system (currently this only
-works with Work Queue and Condor). Jobs are grouped into <em> job categories
-</em>, and jobs in the same category have the same cores, memory, and disk
-requirements.
-</p>
-<p>
-Job categories and resources are specified with variables.  Jobs are assigned
-to the category named in the value of the variable CATEGORY.  Likewise, the
-values of the variables CORES, MEMORY (in MB), and DISK (in MB) describe the
-resources requirements for the category specified in CATEGORY.
-</p>
-<p>
-Jobs without an explicit category are assigned to <tt>default</tt>.
-Jobs in the default category get their resource requirements from the value of
-the environment variables CORES, MEMORY, and DISK.
-</p>
-
-Consider the following example:
-
-<code>MEMORY=100
-one: src
-    cmd
-
-CATEGORY="simulation"
-DISK=500
-
-CATEGORY="preprocessing"
-MEMORY=200
-DISK=200
-
-two: src
-    cmd
-
-three: src
-    cmd
-
-CATEGORY="simulation"
-DISK=700
-four: src
-    cmd
-
-five: src
-@CATEGORY="preprocessing"
-    cmd
-
-six: src
-    cmd
-
-CATEGORY="analysis"
-CORES=1
-MEMORY=400
-DISK=400
-
-seven: src
-    cmd
-</code>
-
-<code>export CORES=4
-makeflow ...
-</code>
-
-<h6> Job categories (job named after its output): </h6>
-
-<dl>
-<dt> preprocessing: </dt>
-<dd> two, three, five </dd>
-<dt> simulation: </dt>
-<dd> four, six </dd>
-<dt> analysis: </dt>
-<dd> seven </dd>
-<dt> default: </dt>
-<dd> one </dd>
-<tr>
-
-<h6> Resources specified: </h6>
-<table>
-<tr><th>Category</th><th>Cores</th><th>Memory (MB)</th><th>Disk (MB)</th></tr>
-<tr><td> preprocessing </td> <td> - </td> <td> 200 </td> <td> 200 </td> </tr>
-<tr><td> simulation </td> <td> - </td> <td> - </td> <td> 700 </td> </tr>
-<tr><td> analysis </td> <td> 1 </td> <td> 400 </td> <td> 400 </td> </tr>
-<tr><td> default_category </td> <td> 4 </td> <td> 100 </td> <td> - </td> </tr>
-</table>
-
-<p> Note that in this example, in job <tt>five</tt>, the CATEGORY temporarily
-has the value of "preprocessing", and then it is re-established to "simulation"
-(so that <tt>four</tt> and <tt>six</tt> belong to the same category). This is
-done using rule lexical scoping, explained in the next section.
 
 <h2 id="details">The Fine Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
 
@@ -388,6 +296,46 @@ like this:</p>
 
 <code>makeflow_graph_log example.makeflowlog example.png</code>
 
+<h2 id="workqueue.drivers">Supported Makeflow Drivers<a class="sectionlink" href="#workqueue.drivers" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>The full list of supported Makeflow drivers include:</p>
+
+<ul>
+	<li>Local - local execution on a single multicore system</li>
+	<li>Condor - execution on a campus grid via the local <a href="http://www.cs.wisc.edu/condor">Condor Pool</a></li>
+	<li>SGE - execution on a high-performance cluster using the <a href="http://www.oracle.com/us/products/tools/oracle-grid-engine-075549.html">Oracle Grid Engine</a> (formerly the Sun Grid Engine).</li>
+	<li>Moab - execution on a high-performance cluster using the <a href="http://www.adaptivecomputing.com/resources/docs/mwm/6-0/index.php">Moab Workload Manager</a></li>
+	<li>Cluster - execution on a high-performance cluster using a user-defined cluster manager</li>
+	<li>Work Queue - execution on a lightweight, scalable master-worker <a href="http://ccl.cse.nd.edu/software/workqueue/">framework</a> managed directly by Makeflow</li>
+	<li>Hadoop - execution on a cluster managed by the <a href="http://hadoop.apache.org/">Hadoop</a> framework, using data stored in <a href="http://hadoop.apache.org/hdfs">HDFS</a>.</li>
+</ul>
+
+<h4 id="workqueue.drivers.clusters">User-defined Clusters<a class="sectionlink" href="#workqueue.drivers.clusters" title="Link to this section.">&#x21d7;</a></h4>
+
+<p>For clusters that are not directly supported by Makeflow we strongly suggest
+using the <a href="http://ccl.cse.nd.edu/software/workqueue">Work Queue</a> system
+and submitting workers via the cluster's normal submission mechanism.</p>
+
+<p>For clusters using managers similar to SGE or Moab that are configured to
+preclude the use of Work Queue we have the "Cluster" custom driver.  To use the
+"Cluster" driver the Makeflow must be run in a parallel filesystem available to
+the entire cluster, and the following environment variables must be set.</p>
+
+<ul>
+	<li>BATCH_QUEUE_CLUSTER_NAME: The name of the cluster, used in debugging messages and as the name for the wrapper script.</li>
+	<li>BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND: The submit command for the cluster (such as qsub or msub)</li>
+	<li>BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS: The command-line arguments that must be passed to the submit command.  This string should end with the argument used to set the name of the task (usually -N).</li>
+	<li>BATCH_QUEUE_CLUSTER_REMOVE_COMMAND: The delete command for the cluster (such as qdel or mdel)</li>
+</ul>
+
+<p>These will be used to construct a task submission for each makeflow rule that consists of:</p>
+
+<code>% $SUBMIT_COMMAND $SUBMIT_OPTIONS "&lt;rule name&gt;" $CLUSTER_NAME.wrapper "&lt;rule commandline&gt;"</code>
+
+<p>The wrapper script is a shell script that reads the command to be run as an argument and handles bookkeeping operations necessary for Makeflow.</p>
+
+
+
 <h2 id="workqueue">Running Makeflow with Work Queue<a class="sectionlink" href="#workqueue" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>With the '-T wq' option, Makeflow runs as a master process that dispatches
@@ -465,6 +413,81 @@ make your masters and workers contact this catalog server, simply add the
 % work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj 
 </code>
 
+
+<h2 id="resources">Resources and Categories<a class="sectionlink" href="#resources" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>
+Makeflow has the capability of automatically setting the cores, memory,
+and disk space requirements to the underlying batch system (currently this only
+works with Work Queue and Condor). Jobs are grouped into <em> job categories
+</em>, and jobs in the same category have the same cores, memory, and disk
+requirements.
+</p>
+<p>
+Job categories and resources are specified with variables.  Jobs are assigned
+to the category named in the value of the variable CATEGORY.  Likewise, the
+values of the variables CORES, MEMORY (in MB), and DISK (in MB) describe the
+resources requirements for the category specified in CATEGORY.
+</p>
+<p>
+Jobs without an explicit category are assigned to <tt>default</tt>.  Jobs in
+the default category get their resource requirements from the value of the
+environment variables CORES, MEMORY, and DISK.
+</p>
+
+Consider the following example:
+
+<code> 
+
+
+#Following tasks are assigned to the category preprocessing. MEMORY and CORES
+are read from the environment, if defined.  
+
+CATEGORY="preprocessing"
+DISK=500
+
+one: src
+    cmd
+
+two: src
+    cmd
+
+#Switch to category simulation. Note that now CORES, MEMORY, and DISK are specified.
+
+CATEGORY="simulation"
+
+CORES=1
+MEMORY=400
+DISK=400
+
+three: src
+    cmd
+
+four: src
+    cmd
+
+#Another category switch. MEMORY is read from the environment.
+
+CATEGORY="analysis"
+CORES=4
+DISK=600
+
+five: src
+    cmd
+</code>
+
+<code>export MEMORY=800
+makeflow ...
+</code>
+
+<h6> Resources specified: </h6>
+<table>
+<tr><th>Category</th><th>Cores</th><th>Memory (MB)</th><th>Disk (MB)</th></tr>
+<tr><td> preprocessing </td> <td> (unspecified) </td> <td> 800 (from environment) </td> <td> 500 </td> </tr>
+<tr><td> simulation </td> <td> 1 </td> <td> 400 </td> <td> 400 </td> </tr>
+<tr><td> analysis </td> <td> 4 </td> <td> 800  (from environment)</td> <td> 600 </td> </tr>
+</table>
+
 <h2 id="linking">Linking Workflow Dependencies<a class="sectionlink" href="#linking" title="Link to this section.">&#x21d7;</a></h2>
 
 <p><tt>Makeflow</tt> provides a tool to collect all of the dependencies for a
@@ -491,44 +514,6 @@ path are renamed when copied into the bundle:</p>
 <p>Example usage:</p>
 
 <code>% makeflow -b some_output_directory example.makeflow</code>
-
-<h2 id="workqueue.drivers">Supported Makeflow Drivers<a class="sectionlink" href="#workqueue.drivers" title="Link to this section.">&#x21d7;</a></h2>
-
-<p>The full list of supported Makeflow drivers include:</p>
-
-<ul>
-	<li>Local - local execution on a single multicore system</li>
-	<li>Condor - execution on a campus grid via the local <a href="http://www.cs.wisc.edu/condor">Condor Pool</a></li>
-	<li>SGE - execution on a high-performance cluster using the <a href="http://www.oracle.com/us/products/tools/oracle-grid-engine-075549.html">Oracle Grid Engine</a> (formerly the Sun Grid Engine).</li>
-	<li>Moab - execution on a high-performance cluster using the <a href="http://www.adaptivecomputing.com/resources/docs/mwm/6-0/index.php">Moab Workload Manager</a></li>
-	<li>Cluster - execution on a high-performance cluster using a user-defined cluster manager</li>
-	<li>Work Queue - execution on a lightweight, scalable master-worker <a href="http://ccl.cse.nd.edu/software/workqueue/">framework</a> managed directly by Makeflow</li>
-	<li>Hadoop - execution on a cluster managed by the <a href="http://hadoop.apache.org/">Hadoop</a> framework, using data stored in <a href="http://hadoop.apache.org/hdfs">HDFS</a>.</li>
-</ul>
-
-<h4 id="workqueue.drivers.clusters">User-defined Clusters<a class="sectionlink" href="#workqueue.drivers.clusters" title="Link to this section.">&#x21d7;</a></h4>
-
-<p>For clusters that are not directly supported by Makeflow we strongly suggest
-using the <a href="http://ccl.cse.nd.edu/software/workqueue">Work Queue</a> system
-and submitting workers via the cluster's normal submission mechanism.</p>
-
-<p>For clusters using managers similar to SGE or Moab that are configured to
-preclude the use of Work Queue we have the "Cluster" custom driver.  To use the
-"Cluster" driver the Makeflow must be run in a parallel filesystem available to
-the entire cluster, and the following environment variables must be set.</p>
-
-<ul>
-	<li>BATCH_QUEUE_CLUSTER_NAME: The name of the cluster, used in debugging messages and as the name for the wrapper script.</li>
-	<li>BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND: The submit command for the cluster (such as qsub or msub)</li>
-	<li>BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS: The command-line arguments that must be passed to the submit command.  This string should end with the argument used to set the name of the task (usually -N).</li>
-	<li>BATCH_QUEUE_CLUSTER_REMOVE_COMMAND: The delete command for the cluster (such as qdel or mdel)</li>
-</ul>
-
-<p>These will be used to construct a task submission for each makeflow rule that consists of:</p>
-
-<code>% $SUBMIT_COMMAND $SUBMIT_OPTIONS "&lt;rule name&gt;" $CLUSTER_NAME.wrapper "&lt;rule commandline&gt;"</code>
-
-<p>The wrapper script is a shell script that reads the command to be run as an argument and handles bookkeeping operations necessary for Makeflow.</p>
 
 <h2 id="garbage">Makeflow Garbage Collection<a class="sectionlink" href="#garbage" title="Link to this section.">&#x21d7;</a></h2>
 
