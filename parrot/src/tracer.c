@@ -320,30 +320,32 @@ that represents the natural type of the target platform.
 
 static ssize_t tracer_copy_out_slow( struct tracer *t, const void *data, const void *uaddr, size_t length )
 {
-	UINT8_T *bdata = (UINT8_T *)data;
-	UINT8_T *buaddr = (UINT8_T *)uaddr;
+	const uint8_t *bdata = data;
+	const uint8_t *buaddr = uaddr;
 	size_t size = length;
 	long word;
-	size_t wordsize = sizeof(word);
 
 	/* first, copy whole words */ 
 
-	while(size>=wordsize) {
+	while(size>=sizeof(word)) {
 		word = *(long*)bdata;
-		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1)
+		errno = 0;
+		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1 && errno)
 			return -1;
-		size -= wordsize;
-		buaddr += wordsize;
-		bdata += wordsize;
+		size -= sizeof(word);
+		buaddr += sizeof(word);
+		bdata += sizeof(word);
 	}
 
 	/* if necessary, copy the last few bytes */
 
 	if(size>0) {
-		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1)
+		errno = 0;
+		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno)
 			return -1;
 		memcpy(&word,bdata,size);
-		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1)
+		errno = 0;
+		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1 && errno)
 			return -1;
 	}
 
@@ -353,7 +355,7 @@ static ssize_t tracer_copy_out_slow( struct tracer *t, const void *data, const v
 ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, size_t length )
 {
 	static int has_fast_write=1;
-	UPTRINT_T iuaddr = (UPTRINT_T)uaddr;
+	uintptr_t iuaddr = (uintptr_t)uaddr;
 
 	if(length==0) return 0;
 
@@ -381,31 +383,32 @@ ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, 
 		}
 	}
 
-	return tracer_copy_out_slow(t,data,(void*)iuaddr,length);
+	return tracer_copy_out_slow(t,data,(const void *)iuaddr,length);
 }
 
-static ssize_t tracer_copy_in_slow( struct tracer *t, const void *data, const void *uaddr, size_t length )
+static ssize_t tracer_copy_in_slow( struct tracer *t, void *data, const void *uaddr, size_t length )
 {
-	UINT8_T *bdata = (UINT8_T *)data;
-	UINT8_T *buaddr = (UINT8_T *)uaddr;
+	uint8_t *bdata = data;
+	const uint8_t *buaddr = uaddr;
 	size_t size = length;
 	long word;
-	size_t wordsize = sizeof(word);
 
 	/* first, copy whole words */ 
 
-	while(size>=wordsize) {
-		if ((*((long*)bdata) = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1)
+	while(size>=sizeof(word)) {
+		errno = 0;
+		if ((*((long*)bdata) = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno)
 			return -1;
-		size -= wordsize;
-		buaddr += wordsize;
-		bdata += wordsize;
+		size -= sizeof(word);
+		buaddr += sizeof(word);
+		bdata += sizeof(word);
 	}
 
 	/* if necessary, copy the last few bytes */
 
 	if(size>0) {
-		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1)
+		errno = 0;
+		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno)
 			return -1;
 		memcpy(bdata,&word,size);
 	}
@@ -415,18 +418,19 @@ static ssize_t tracer_copy_in_slow( struct tracer *t, const void *data, const vo
 
 ssize_t tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, size_t length )
 {
-	UINT8_T *bdata = (UINT8_T *)str;
-	UINT8_T *buaddr = (UINT8_T *)uaddr;
+	uint8_t *bdata = (uint8_t *)str;
+	const uint8_t *buaddr = uaddr;
 	ssize_t total = 0;
-	long word;
-	size_t wordsize = sizeof(word);
-	unsigned int i;
 
 	while(length>0) {
-		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1)
+		size_t i;
+		long word;
+		const uint8_t *worddata;
+		errno = 0;
+		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno)
 			return -1;
-		UINT8_T *worddata = (void*)&word;
-		for(i=0;i<wordsize;i++) {
+		worddata = (const uint8_t *)&word;
+		for(i=0;i<sizeof(word);i++) {
 			*bdata = worddata[i];
 			total++;
 			length--;
@@ -436,7 +440,7 @@ ssize_t tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, s
 				bdata++;
 			}
 		}
-		buaddr += wordsize;
+		buaddr += sizeof(word);
 	}
 
 	return total;
@@ -467,7 +471,7 @@ ssize_t tracer_copy_in( struct tracer *t, void *data, const void *uaddr, size_t 
 	static int fast_read_failure = 0;
 	static int fast_read_attempts = 100;
 
-	uintptr_t iuaddr = (UPTRINT_T)uaddr;
+	uintptr_t iuaddr = (uintptr_t)uaddr;
 
 #if !defined(CCTOOLS_CPU_I386)
 	if(!tracer_is_64bit(t)) iuaddr &= 0xffffffff;
@@ -497,7 +501,7 @@ ssize_t tracer_copy_in( struct tracer *t, void *data, const void *uaddr, size_t 
 		}
 	}
 
-	return tracer_copy_in_slow(t,data,(void *)iuaddr,length);
+	return tracer_copy_in_slow(t,data,(const void *)iuaddr,length);
 }
 
 #include "tracer.table.c"
