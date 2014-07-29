@@ -67,6 +67,10 @@ static UINT64_T total_finished_cycles = 0;
 
 static FILE *logfile = NULL;
 
+static int num_cores_option  = 0;
+static int num_memory_option = 0;
+static int num_disk_option   = 0; 
+
 static char name_of_this_pool[WORK_QUEUE_POOL_NAME_MAX];
 typedef enum {
 	TABLE_ALIGN_LEFT,
@@ -1385,13 +1389,42 @@ static void show_help(const char *cmd)
     fprintf(stdout, " %-30s projects.\n", "");
     fprintf(stdout, " %-30s Same as -M,--master-name (deprecated).\n", "-N");
 	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Set the number of cores requested per worker.\n", "--cores=<n>");
+	fprintf(stdout, " %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
+	fprintf(stdout, " %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
     fprintf(stdout, " %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
 }
+
+enum {LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK};
+
+static struct option long_options[] = {
+	{"debug", required_argument, 0, 'd'},
+	{"logfile", required_argument, 0, 'l'},
+	{"scratch", required_argument, 0, 'S'},
+	{"batch-type", required_argument, 0, 'T'},
+	{"retry", required_argument, 0, 'r'},
+	{"workers-per-job", required_argument, 0, 'm'},
+	{"worker-executable", required_argument, 0, 'W'},
+	{"auto-pool-feature", no_argument,       0, 'A'},
+	{"config", required_argument, 0, 'c'},
+	{"advertise", no_argument,       0, 'a'},
+	{"timeout", required_argument, 0, 't'},
+	{"catalog", required_argument, 0, 'C'},
+	{"master-name", required_argument, 0, 'M'},
+	{"debug-file", required_argument, 0, 'o'},
+	{"cores",  required_argument,  0,  LONG_OPT_CORES},
+	{"memory", required_argument,  0,  LONG_OPT_MEMORY},
+	{"disk",   required_argument,  0,  LONG_OPT_DISK},
+	{"extra-options", required_argument, 0, 'E'},
+	{"version", no_argument, 0, 'v'},
+	{"help", no_argument, 0, 'h'},
+	{0,0,0,0}
+};
 
 int main(int argc, char *argv[])
 {
 	int count;
-    signed char c;
+    signed int c;
 	FILE *fp;
 	int goal = 0;
 	char scratch_dir[PATH_MAX] = "";
@@ -1458,27 +1491,6 @@ int main(int argc, char *argv[])
 	last_decision_time = time(0);
 
 	debug_config(argv[0]);
-
-	static struct option long_options[] = {
-		{"debug", required_argument, 0, 'd'},
-		{"logfile", required_argument, 0, 'l'},
-		{"scratch", required_argument, 0, 'S'},
-		{"batch-type", required_argument, 0, 'T'},
-		{"retry", required_argument, 0, 'r'},
-		{"workers-per-job", required_argument, 0, 'm'},
-		{"worker-executable", required_argument, 0, 'W'},
-		{"auto-pool-feature", no_argument,       0, 'A'},
-		{"config", required_argument, 0, 'c'},
-		{"advertise", no_argument,       0, 'a'},
-		{"timeout", required_argument, 0, 't'},
-		{"catalog", required_argument, 0, 'C'},
-		{"master-name", required_argument, 0, 'M'},
-		{"debug-file", required_argument, 0, 'o'},
-		{"extra-options", required_argument, 0, 'E'},
-		{"version", no_argument, 0, 'v'},
-		{"help", no_argument, 0, 'h'},
-		{0,0,0,0}
-	};
 
 	while((c = getopt_long(argc, argv, "aAc:C:d:E:hm:l:L:M:N:o:O:Pqr:S:t:T:vW:", long_options, NULL)) > -1) {
 		switch (c) {
@@ -1592,6 +1604,15 @@ int main(int argc, char *argv[])
 		case 'h':
 			show_help(argv[0]);
 			exit(EXIT_SUCCESS);
+		case LONG_OPT_CORES:
+			num_cores_option = atoi(optarg);
+			break;
+		case LONG_OPT_MEMORY:
+			num_memory_option = atoll(optarg);
+			break;
+		case LONG_OPT_DISK:
+			num_disk_option = atoll(optarg);
+			break;
 		default:
 			show_help(argv[0]);
 			return EXIT_FAILURE;
@@ -1781,6 +1802,7 @@ int main(int argc, char *argv[])
 	if(!q) {
 		fatal("Unable to create batch queue of type: %s", batch_queue_type_to_string(batch_queue_type));
 	}
+
 	batch_queue_set_option(q, "batch-options", getenv("BATCH_OPTIONS"));
 	job_table = itable_create(0);
 
