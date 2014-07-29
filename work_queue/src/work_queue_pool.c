@@ -67,9 +67,9 @@ static UINT64_T total_finished_cycles = 0;
 
 static FILE *logfile = NULL;
 
-static int num_cores_option  = 0;
-static int num_memory_option = 0;
-static int num_disk_option   = 0; 
+static char *num_cores_option  = NULL;
+static char *num_memory_option = NULL;
+static char *num_disk_option   = NULL; 
 
 static char name_of_this_pool[WORK_QUEUE_POOL_NAME_MAX];
 typedef enum {
@@ -1605,13 +1605,13 @@ int main(int argc, char *argv[])
 			show_help(argv[0]);
 			exit(EXIT_SUCCESS);
 		case LONG_OPT_CORES:
-			num_cores_option = atoi(optarg);
+			num_cores_option = xxstrdup(optarg);
 			break;
 		case LONG_OPT_MEMORY:
-			num_memory_option = atoll(optarg);
+			num_memory_option = xxstrdup(optarg);
 			break;
 		case LONG_OPT_DISK:
-			num_disk_option = atoll(optarg);
+			num_disk_option = xxstrdup(optarg);
 			break;
 		default:
 			show_help(argv[0]);
@@ -1804,6 +1804,10 @@ int main(int argc, char *argv[])
 	}
 
 	batch_queue_set_option(q, "batch-options", getenv("BATCH_OPTIONS"));
+	batch_queue_set_option(q, "cores",  num_cores_option);
+	batch_queue_set_option(q, "memory", num_memory_option);
+	batch_queue_set_option(q, "disk",   num_disk_option);
+
 	job_table = itable_create(0);
 
 	// The worker pool now works in one of the following 3 modes:

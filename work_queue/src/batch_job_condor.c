@@ -60,6 +60,20 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "log = %s\n", q->logfile);
 	if(options)
 		fprintf(file, "%s\n", options);
+
+	char *resource = NULL;
+	resource = hash_table_lookup(q->options, "cores");
+	if(resource)
+		fprintf(file, "request_cpus = %s\n", resource);
+
+	resource = hash_table_lookup(q->options, "memory");
+	if(resource)
+		fprintf(file, "request_memory = %s\n", resource);
+
+	resource = hash_table_lookup(q->options, "disk");
+	if(resource)
+		fprintf(file, "request_disk = %s\n", resource);
+
 	fprintf(file, "queue\n");
 	fclose(file);
 
