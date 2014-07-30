@@ -1606,12 +1606,18 @@ int main(int argc, char *argv[])
 			exit(EXIT_SUCCESS);
 		case LONG_OPT_CORES:
 			num_cores_option = xxstrdup(optarg);
+			strcat(extra_worker_args, " --cores=");
+			strcat(extra_worker_args, num_cores_option);
 			break;
 		case LONG_OPT_MEMORY:
 			num_memory_option = xxstrdup(optarg);
+			strcat(extra_worker_args, " --memory=");
+			strcat(extra_worker_args, num_memory_option);
 			break;
 		case LONG_OPT_DISK:
 			num_disk_option = xxstrdup(optarg);
+			strcat(extra_worker_args, " --disk=");
+			strcat(extra_worker_args, num_disk_option);
 			break;
 		default:
 			show_help(argv[0]);
