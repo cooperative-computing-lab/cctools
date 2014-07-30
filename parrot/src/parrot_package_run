@@ -93,9 +93,11 @@ export_env
 
 unset PARROT_ENABLED
 
+ldso_file="$(echo "$(pwd)/$(ldd ${cmd_parrot_run} | grep ld-linux | cut -d' ' -f1)" | sed -e 's/[ \t]//g')"
+
 #initialize the repeat process
 if [ -z "$1" ]; then
-	exec "${cmd_parrot_run}" -m "${mountlist}" -w "${PWD}" -- /bin/sh
+	exec "${cmd_parrot_run}" -m "${mountlist}" -l "${ldso_file}" -w "${PWD}" -- /bin/sh
 else
-	exec "${cmd_parrot_run}" -m "${mountlist}" -w "${PWD}" -- "$@"
+	exec "${cmd_parrot_run}" -m "${mountlist}" -l "${ldso_file}" -w "${PWD}" -- "$@"
 fi
