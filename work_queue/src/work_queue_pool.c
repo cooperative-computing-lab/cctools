@@ -42,9 +42,15 @@ static int consider_capacity = 0;
 static const char *project_regex = 0;
 static int worker_timeout = 300;
 static const char *extra_worker_args=0;
+static const char *resource_args=0;
 static int abort_flag = 0;
 static const char *scratch_dir = 0;
 static const char *password_file = 0;
+
+static char *num_cores_option  = NULL;
+static char *num_disk_option   = NULL;
+static char *num_memory_option = NULL;
+static char *num_gpus_option   = NULL;
 
 static void handle_abort( int sig )
 {
@@ -96,6 +102,24 @@ static int count_workers_needed( struct list *masters_list )
 	return needed_workers;
 }
 
+static void set_worker_resources( struct batch_queue *queue )
+{
+	batch_queue_set_option(queue, "cores", num_cores_option);
+	batch_queue_set_option(queue, "memory", num_memory_option);
+	batch_queue_set_option(queue, "disk", num_disk_option);
+	batch_queue_set_option(queue, "gpus", num_gpus_option);
+
+	resource_args = string_format("%s%s%s%s%s%s%s%s\n",
+			num_cores_option ? " --cores=" : "",
+			num_cores_option ? num_cores_option : "",
+			num_memory_option ? " --memory=" : "",
+			num_memory_option ? num_memory_option : "",
+			num_disk_option ? " --disk=" : "",
+			num_disk_option ? num_disk_option : "",
+			num_gpus_option ? " --gpus=" : "",
+			num_gpus_option ? num_gpus_option : "");
+}
+
 static int submit_worker( struct batch_queue *queue )
 {
 	char cmd[1024];
@@ -109,10 +133,16 @@ static int submit_worker( struct batch_queue *queue )
 		strcat(extra_input_files,",pwfile");
 	}
 
+	if(resource_args) {
+		strcat(cmd," ");
+		strcat(cmd,resource_args);
+	}
+
 	if(extra_worker_args) {
 		strcat(cmd," ");
 		strcat(cmd,extra_worker_args);
 	}
+
 
 	debug(D_WQ,"submitting worker: %s",cmd);
 
@@ -230,12 +260,40 @@ static void show_help(const char *cmd)
 	printf(" %-30s Maximum workers running.  (default=%d)\n", "-W,--max-workers", workers_max);
 	printf(" %-30s Workers abort after this amount of idle time. (default=%d)\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
+	printf(" %-30s Set the number of cores requested per worker.\n", "--cores=<n>");
+	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
+	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
+	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
 	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
+
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS };
+static struct option long_options[] = {
+	{"master-name", required_argument, 0, 'M'},
+	{"batch-type", required_argument, 0, 'T'},
+	{"password", required_argument, 0, 'P'},
+	{"min-workers", required_argument, 0, 'w'},
+	{"max-workers", required_argument, 0, 'w'},
+	{"timeout", required_argument, 0, 't'},
+	{"extra-options", required_argument, 0, 'E'},
+	{"cores",  required_argument,  0,  LONG_OPT_CORES},
+	{"memory", required_argument,  0,  LONG_OPT_MEMORY},
+	{"disk",   required_argument,  0,  LONG_OPT_DISK},
+	{"gpus",   required_argument,  0,  LONG_OPT_GPUS},
+	{"scratch-dir", required_argument, 0, 'S' },
+	{"capacity", no_argument, 0, 'c' },
+	{"debug", required_argument, 0, 'd'},
+	{"debug-file", required_argument, 0, 'o'},
+	{"debug-file-size", required_argument, 0, 'O'},
+	{"version", no_argument, 0, 'v'},
+	{"help", no_argument, 0, 'h'},
+	{0,0,0,0}
+};
+
 
 int main(int argc, char *argv[])
 {
@@ -246,25 +304,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	static struct option long_options[] = {
-		{"master-name", required_argument, 0, 'M'},
-		{"batch-type", required_argument, 0, 'T'},
-		{"password", required_argument, 0, 'P'},
-		{"min-workers", required_argument, 0, 'w'},
-		{"max-workers", required_argument, 0, 'w'},
-		{"timeout", required_argument, 0, 't'},
-		{"extra-options", required_argument, 0, 'E'},
-		{"scratch-dir", required_argument, 0, 'S' },
-		{"capacity", no_argument, 0, 'c' },
-		{"debug", required_argument, 0, 'd'},
-		{"debug-file", required_argument, 0, 'o'},
-		{"debug-file-size", required_argument, 0, 'O'},
-		{"version", no_argument, 0, 'v'},
-		{"help", no_argument, 0, 'h'},
-		{0,0,0,0}
-	};
-
-	char c;
+	int c;
 
 	while((c = getopt_long(argc, argv, "N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
 		switch (c) {
@@ -290,6 +330,18 @@ int main(int argc, char *argv[])
 			break;
 		case 'E':
 			extra_worker_args = optarg;
+			break;
+		case LONG_OPT_CORES:
+			num_cores_option = xxstrdup(optarg);
+			break;
+		case LONG_OPT_MEMORY:
+			num_memory_option = xxstrdup(optarg);
+			break;
+		case LONG_OPT_DISK:
+			num_disk_option = xxstrdup(optarg);
+			break;
+		case LONG_OPT_GPUS:
+			num_gpus_option = xxstrdup(optarg);
 			break;
 		case 'P':
 			password_file = optarg;
@@ -366,6 +418,8 @@ int main(int argc, char *argv[])
 		fprintf(stderr,"work_queue_pool: couldn't establish queue type %s",batch_queue_type_to_string(batch_queue_type));
 		return 1;
 	}
+
+	set_worker_resources( queue );
 
 	mainloop( queue, project_regex );
 
