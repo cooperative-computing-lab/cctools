@@ -29,6 +29,12 @@ See the file COPYING for details.
 
 #define FATAL fatal("tracer: %d %s",t->pid,strerror(errno));
 
+#define ERROR \
+	do {\
+		debug(D_DEBUG, "%s: ptrace error: %s", __func__, strerror(errno));\
+		return -1;\
+	} while (0)
+
 #ifndef PTRACE_OLDSETOPTIONS
 #	define PTRACE_OLDSETOPTIONS 21
 #endif
@@ -86,21 +92,21 @@ int tracer_attach (pid_t pid)
 		 * explanation, see pfs_main.cc where PTRACE_LISTEN is used.
 		 */
 		if (ptrace(PTRACE_SEIZE, pid, 0, (void *)options) == -1)
-			return -1;
+			ERROR;
 	} else {
 		if (ptrace(PTRACE_ATTACH, pid, 0, 0) == -1)
-			return -1;
+			ERROR;
 		if (linux_available(2,6,0)) {
 			if (ptrace(PTRACE_SETOPTIONS, pid, 0, (void *)options) == -1)
-				return -1;
+				ERROR;
 		} else {
 			if (ptrace(PTRACE_OLDSETOPTIONS, pid, 0, (void *)options) == -1)
-				return -1;
+				ERROR;
 		}
 	}
 
 	if (ptrace(PTRACE_SYSCALL, pid, NULL, (void *)SIGCONT) == -1)
-		return -1;
+		ERROR;
 
 	return 0;
 }
@@ -109,11 +115,11 @@ int tracer_listen (struct tracer *t)
 {
 	if (linux_available(3,4,0)) {
 		if (ptrace(PTRACE_LISTEN, t->pid, NULL, NULL) == -1)
-			return -1;
+			ERROR;
 	} else {
 		/* This version of Linux does not allow transparently listening for wake up from group-stop. We have no choice but to restart it... */
 		if (ptrace(PTRACE_SYSCALL, t->pid, NULL, 0) == -1)
-			return -1;
+			ERROR;
 	}
 	return 0;
 }
@@ -141,11 +147,11 @@ struct tracer *tracer_init (pid_t pid)
 	return t;
 }
 
-unsigned long tracer_getevent( struct tracer *t )
+int tracer_getevent( struct tracer *t, unsigned long *message )
 {
-	unsigned long message;
-	ptrace(PTRACE_GETEVENTMSG, t->pid, 0, &message);
-	return message;
+	if (ptrace(PTRACE_GETEVENTMSG, t->pid, 0, message) == -1)
+		ERROR;
+	return 0;
 }
 
 int tracer_is_64bit( struct tracer *t )
@@ -162,28 +168,26 @@ int tracer_is_64bit( struct tracer *t )
 	}
 }
 
-int tracer_detach( struct tracer *t )
+void tracer_detach( struct tracer *t )
 {
-	pid_t pid = t->pid;
+	ptrace(PTRACE_DETACH,t->pid,0,0); /* ignore failure */
 	close(t->memory_file);
 	free(t);
-	if (ptrace(PTRACE_DETACH,pid,0,0) == -1)
-		return -1;
-	return 0;
 }
 
 int tracer_continue( struct tracer *t, int signum )
 {
 	t->gotregs = 0;
 	if (ptrace(PTRACE_SYSCALL,t->pid,0,signum) == -1)
-		return -1;
+		ERROR;
 	return 0;
 }
 
 int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARGS_MAX] )
 {
 	if(!t->gotregs) {
-		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs)!=0) FATAL;
+		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
+			ERROR;
 		t->gotregs = 1;
 	}
 
@@ -235,7 +239,8 @@ void tracer_has_args5_bug( struct tracer *t )
 int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS_MAX], int nargs )
 {
 	if(!t->gotregs) {
-		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs)!=0) FATAL;
+		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
+			ERROR;
 		t->gotregs = 1;
 	}
 
@@ -270,7 +275,8 @@ int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS
 	}
 #endif
 
-	if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs)!=0) FATAL;
+	if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
+		ERROR;
 
 	return 1;
 }
@@ -278,7 +284,8 @@ int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS
 int tracer_result_get( struct tracer *t, INT64_T *result )
 {
 	if(!t->gotregs) {
-		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs)!=0) FATAL;
+		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
+			ERROR;
 		t->gotregs = 1;
 	}
 
@@ -294,7 +301,8 @@ int tracer_result_get( struct tracer *t, INT64_T *result )
 int tracer_result_set( struct tracer *t, INT64_T result )
 {
 	if(!t->gotregs) {
-		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs)!=0) FATAL;
+		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
+			ERROR;
 		t->gotregs = 1;
 	}
 
@@ -304,7 +312,8 @@ int tracer_result_set( struct tracer *t, INT64_T result )
 	t->regs.regs64.rax = result;
 #endif
 
-	if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs)!=0) FATAL;
+	if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
+		ERROR;
 
 	return 1;
 }
@@ -331,7 +340,7 @@ static ssize_t tracer_copy_out_slow( struct tracer *t, const void *data, const v
 		word = *(long*)bdata;
 		errno = 0;
 		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1 && errno)
-			return -1;
+			ERROR;
 		size -= sizeof(word);
 		buaddr += sizeof(word);
 		bdata += sizeof(word);
@@ -342,11 +351,11 @@ static ssize_t tracer_copy_out_slow( struct tracer *t, const void *data, const v
 	if(size>0) {
 		errno = 0;
 		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno)
-			return -1;
+			ERROR;
 		memcpy(&word,bdata,size);
 		errno = 0;
 		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1 && errno)
-			return -1;
+			ERROR;
 	}
 
 	return length;
@@ -365,7 +374,9 @@ ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, 
 
 	if(has_fast_write) {
 		ssize_t result = full_pwrite64(t->memory_file,data,length,iuaddr);
-		if( (size_t)result!=length ) {
+		if ((size_t)result == length) {
+			return length;
+		} else {
 			/* this may be because execve caused a remapping, we need to reopen */
 			close(t->memory_file);
 			char path[PATH_MAX];
@@ -378,8 +389,6 @@ ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, 
 				has_fast_write = 0;
 				debug(D_SYSCALL,"writing to /proc/%d/mem failed, falling back to slow ptrace write", t->pid);
 			}
-		} else {
-			return result;
 		}
 	}
 
@@ -390,30 +399,38 @@ static ssize_t tracer_copy_in_slow( struct tracer *t, void *data, const void *ua
 {
 	uint8_t *bdata = data;
 	const uint8_t *buaddr = uaddr;
-	size_t size = length;
+	size_t total = 0;
 	long word;
 
 	/* first, copy whole words */ 
 
-	while(size>=sizeof(word)) {
+	while((length-total)>=sizeof(word)) {
 		errno = 0;
-		if ((*((long*)bdata) = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno)
-			return -1;
-		size -= sizeof(word);
+		if ((*((long*)bdata) = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno) {
+			if (total)
+				return total;
+			else
+				ERROR;
+		}
+		total += sizeof(word);
 		buaddr += sizeof(word);
 		bdata += sizeof(word);
 	}
 
 	/* if necessary, copy the last few bytes */
 
-	if(size>0) {
+	if((length-total)>0) {
 		errno = 0;
-		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno)
-			return -1;
-		memcpy(bdata,&word,size);
+		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno) {
+			if (total)
+				return total;
+			else
+				ERROR;
+		}
+		memcpy(bdata,&word,(length-total));
 	}
 
-	return length;
+	return total;
 }
 
 ssize_t tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, size_t length )
@@ -428,7 +445,7 @@ ssize_t tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, s
 		const uint8_t *worddata;
 		errno = 0;
 		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno)
-			return -1;
+			ERROR;
 		worddata = (const uint8_t *)&word;
 		for(i=0;i<sizeof(word);i++) {
 			*bdata = worddata[i];
@@ -489,7 +506,7 @@ ssize_t tracer_copy_in( struct tracer *t, void *data, const void *uaddr, size_t 
 			sprintf(path,"/proc/%d/mem",t->pid);
 			t->memory_file = open64(path,O_RDWR);
 			result = full_pread64(t->memory_file,data,length,iuaddr);
-			if ((size_t)result == length) {
+			if ((size_t)result > 0) {
 				return result;
 			} else {
 				fast_read_failure++;

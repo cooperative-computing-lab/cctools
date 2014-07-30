@@ -324,6 +324,7 @@ the event and take the appropriate action.
 static void handle_event( pid_t pid, int status, struct rusage *usage )
 {
 	struct pfs_process *p;
+	unsigned long message;
 
 	p = pfs_process_lookup(pid);
 	if(!p) {
@@ -340,7 +341,9 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 		struct pfs_process *child;
 		INT64_T clone_files;
 
-		cpid = tracer_getevent(p->tracer);
+		if (tracer_getevent(p->tracer, &message) == -1)
+			return;
+		cpid = message;
 		debug(D_PROCESS, "pid %d cloned %d",pid,cpid);
 
 		if(status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
@@ -374,7 +377,9 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 		struct rusage _usage;
 		if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8))) {
 			debug(D_DEBUG, "pid %d received PTRACE_EVENT_EXIT",pid);
-			status = tracer_getevent(p->tracer);
+			if (tracer_getevent(p->tracer, &message) == -1)
+				return;
+			status = message;
 		}
 		if (WIFEXITED(status))
 			debug(D_PROCESS,"pid %d exited normally with code %d",pid,WEXITSTATUS(status));
