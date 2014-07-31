@@ -63,6 +63,7 @@ SOURCES = \
 	nvpair_database.c \
 	password_cache.c \
 	path.c \
+	pattern.c \
 	preadwrite.c \
 	process.c \
 	random_init.c \
