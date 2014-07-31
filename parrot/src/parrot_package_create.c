@@ -302,6 +302,10 @@ Currently only process DIR REG LINK, all the remaining files are ignored.
 int line_process(const char *path, char *caller, int ignore_direntry, int is_direntry, FILE *special_file)
 {
 	debug(D_DEBUG, "line_process(`%s`) func\n", path);
+	if(strlen(path) == 0) {
+		debug(D_DEBUG, "line_process function: parameter path is null\n");
+		return -1;
+	}
 	int afs_item = 0;
 	switch(is_special_path(path)) {
 	case 1:
