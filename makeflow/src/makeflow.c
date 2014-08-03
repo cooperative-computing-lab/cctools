@@ -1447,7 +1447,7 @@ int main(int argc, char *argv[])
 		{"catalog-server", required_argument, 0, 'C'},
 		{"clean", no_argument, 0, 'c'},
 		{"debug", required_argument, 0, 'd'},
-		{"debug-output", required_argument, 0, 'o'},
+		{"debug-file", required_argument, 0, 'o'},
 		{"disable-afs-check", no_argument, 0, 'A'},
 		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
 		{"email", required_argument, 0, 'm'},
