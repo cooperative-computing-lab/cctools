@@ -43,6 +43,7 @@ See the file COPYING for details.
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -70,24 +71,6 @@ See the file COPYING for details.
 
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 #define DEFAULT_MONITOR_INTERVAL   1
-
-/* Unique integers for long options. */
-
-enum {
-	LONG_OPT_MONITOR_INTERVAL = 1,
-	LONG_OPT_MONITOR_LOG_NAME,
-	LONG_OPT_MONITOR_LIMITS,
-	LONG_OPT_MONITOR_TIME_SERIES,
-	LONG_OPT_MONITOR_OPENED_FILES,
-	LONG_OPT_DISABLE_BATCH_CACHE,
-	LONG_OPT_PASSWORD,
-	LONG_OPT_VERBOSE_PARSING,
-	LONG_OPT_WQ_WAIT_FOR_WORKERS,
-	LONG_OPT_DOT_CONDENSE,
-	LONG_OPT_AUTH,
-	LONG_OPT_TICKETS,
-	LONG_OPT_WORKING_DIR,
-};
 
 typedef enum {
 	DAG_GC_NONE,
@@ -1236,6 +1219,7 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Send summary of workflow to this email address upon success or failure.\n", "-m,--email=<email>");
 	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
 	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Password file for authenticating workers.\n", "   --password");
 	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
@@ -1438,6 +1422,23 @@ int main(int argc, char *argv[])
 		wq_option_fast_abort_multiplier = atof(s);
 	}
 
+	enum {
+		LONG_OPT_AUTH = UCHAR_MAX+1,
+		LONG_OPT_DEBUG_ROTATE_MAX,
+		LONG_OPT_DISABLE_BATCH_CACHE,
+		LONG_OPT_DOT_CONDENSE,
+		LONG_OPT_MONITOR_INTERVAL,
+		LONG_OPT_MONITOR_LIMITS,
+		LONG_OPT_MONITOR_LOG_NAME,
+		LONG_OPT_MONITOR_OPENED_FILES,
+		LONG_OPT_MONITOR_TIME_SERIES,
+		LONG_OPT_PASSWORD,
+		LONG_OPT_TICKETS,
+		LONG_OPT_VERBOSE_PARSING,
+		LONG_OPT_WORKING_DIR,
+		LONG_OPT_WQ_WAIT_FOR_WORKERS,
+	};
+
 	static struct option long_options_run[] = {
 		{"advertise", no_argument, 0, 'a'},
 		{"auth", required_argument, 0, LONG_OPT_AUTH},
@@ -1448,6 +1449,7 @@ int main(int argc, char *argv[])
 		{"clean", no_argument, 0, 'c'},
 		{"debug", required_argument, 0, 'd'},
 		{"debug-file", required_argument, 0, 'o'},
+		{"debug-rotate-max", required_argument, 0, LONG_OPT_DEBUG_ROTATE_MAX},
 		{"disable-afs-check", no_argument, 0, 'A'},
 		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
 		{"email", required_argument, 0, 'm'},
@@ -1677,6 +1679,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_WORKING_DIR:
 				free(working_dir);
 				working_dir = xxstrdup(optarg);
+				break;
+			case LONG_OPT_DEBUG_ROTATE_MAX:
+				debug_config_file_size(string_metric_parse(optarg));
 				break;
 			default:
 				show_help_run(get_makeflow_exe());
