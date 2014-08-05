@@ -1,0 +1,36 @@
+The test set of packaging utility should at least be:
+1. vim
+2. firefox
+3. emacs (GUI version)
+4. TauRoast
+5. python helloworld.py
+The content of helloworld.py:
+print "Hello, World!"
+6. javac helloworld.java
+The content of helloworld.java:
+class helloworld {
+    public static void main(String[] args) {
+        System.out.println("Hello World!"); // Display the string.
+    }
+}
+7. java helloworld (helloworld is the result of test 6 - javac helloworld.java)
+
+Test memory leakage of parrot_run:
+valgrind --tool=memcheck --leak-check=yes ~/cctools/bin/parrot_run -e envlist -n namelist ls
+
+Test memory leakage of parrot_package_create:
+valgrind --tool=memcheck --leak-check=yes ~/cctools/bin/parrot_package_create -e envlist -n namelist -p /tmp/pack
+
+Test bashisms of sh shell scripts (parrot_package_run and chroot_package_run):
+checkbashisms parrot_package_run
+checkbashisms chroot_package_run
+
+Test parrot_package_run for three cases:
+parrot_package_run -p pack
+parrot_package_run -p pack /bin/bash
+parrot_package_run -p pack ls
+
+Test chroot_package_run for three cases:
+chroot_package_run -p pack
+chroot_package_run -p pack /bin/bash
+chroot_package_run -p pack ls
