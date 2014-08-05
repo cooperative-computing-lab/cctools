@@ -2266,27 +2266,71 @@ static double compute_capacity( const struct work_queue *q )
 	return (double) avg_exec_time / (avg_transfer_time + avg_app_time);
 }
 
+static int check_foreman_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
+	int64_t cores_used, disk_used, mem_used, gpus_used;
+	int ok = 1;
+
+	if(t->unlabeled)
+	{
+		// Unlabeled tasks run alone in a worker. Return immediately if foreman
+		// does not have workers free. 
+		if(w->unlabeled_allocated + 1 > overcommitted_resource_total(q, w->resources->workers.total, 1)) 
+		{
+			ok = 0;
+			return ok;
+		}
+
+		// Assume unlabeled tasks use an average worker at the foreman.
+
+		cores_used = overcommitted_resource_total(q, w->resources->cores.total, 1) / w->resources->workers.total;
+		mem_used   = overcommitted_resource_total(q, w->resources->memory.total, 1) / w->resources->workers.total;  
+		disk_used  = w->resources->disk.total / w->resources->workers.total;  
+		gpus_used  = overcommitted_resource_total(q, w->resources->gpus.total, 1) / w->resources->workers.total;  
+
+	}
+	else
+	{
+		// Assume the task will take "whatever it can get" for unlabeled resources
+		cores_used = MAX(t->cores, 0);
+		mem_used   = MAX(t->memory, 0);
+		disk_used  = MAX(t->disk, 0);
+		gpus_used  = MAX(t->gpus, 0);
+	}
+
+	if(w->cores_allocated + cores_used > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
+		ok = 0;
+	} else if(w->memory_allocated + mem_used > overcommitted_resource_total(q, w->resources->memory.total, 0)) {
+		ok = 0;
+	} else if(w->disk_allocated + disk_used > w->resources->disk.total) { /* No overcommit disk */
+		ok = 0;
+	} else if(w->gpus_allocated + gpus_used > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
+		ok = 0;
+	}
+
+	return ok;
+}
+
 static int check_worker_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
 
-	if (hash_table_lookup(q->worker_blacklist,w->hostname) && !w->foreman) {
-        ok = 0;
+	if(!t->unlabeled && w->unlabeled_allocated > 0)
+	{
+		// Do not allow labeled/unlabeled mix at a regular worker.
+		ok = 0;
 		return ok;
-    }
-	
+	}
+
 	if(t->unlabeled)
 	{
-		// Do not allow labeled/unlabeled mix.
-		if(w->cores_allocated > 0 || w->memory_allocated > 0 || w->disk_allocated > 0 || w->gpus_allocated > 0) {
+		if(w->unlabeled_allocated + 1 > overcommitted_resource_total(q, w->resources->workers.total, 1)) 
+		{
 			ok = 0;
 		}
-
-		if(w->unlabeled_allocated + 1 > overcommitted_resource_total(q, w->resources->workers.total, 1)) {
-			ok = 0;
-		}
-	} else {
-		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabled resources
+	}
+	else
+	{
+		// Assume the task will take "whatever it can get" for unlabeled resources
 		cores_used = MAX(t->cores, 0);
 		mem_used = MAX(t->memory, 0);
 		disk_used = MAX(t->disk, 0);
@@ -2308,7 +2352,24 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 	return ok;
 }
 
+static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
+	if(w->foreman)
+	{
+		return check_foreman_against_task(q, w, t);
+	}
+	else 
+	{
+		if (hash_table_lookup(q->worker_blacklist,w->hostname) && !w->foreman) {
+			return 0;
+		}
+		else
+		{
+			return check_worker_against_task(q, w, t);
+		}
+	}
+}
+	
 static struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
@@ -2321,7 +2382,7 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if( check_worker_against_task(q, w, t) ) {
+		if( check_hand_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
 			list_first_item(t->input_files);
 			while((tf = list_next_item(t->input_files))) {
@@ -2350,7 +2411,7 @@ static struct work_queue_worker *find_worker_by_fcfs(struct work_queue *q, struc
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		if( check_worker_against_task(q, w, t) ) {
+		if( check_hand_against_task(q, w, t) ) {
 			return w;
 		}
 	}
@@ -2366,7 +2427,7 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q, str
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		if(check_worker_against_task(q, w, t)) {
+		if(check_hand_against_task(q, w, t)) {
 			list_push_tail(valid_workers, w);
 		}
 	}
@@ -2397,7 +2458,7 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(check_worker_against_task(q, w, t)) {
+		if(check_hand_against_task(q, w, t)) {
 			if(w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
 				if(!best_worker || t < best_time) {
@@ -2437,6 +2498,47 @@ static struct work_queue_worker *find_best_worker(struct work_queue *q, struct w
 	}
 }
 
+static void count_worker_resources(struct work_queue_worker *w)
+{
+	struct work_queue_task *t;
+	uint64_t taskid;
+	int64_t cores_avg, mem_avg, disk_avg, gpus_avg;
+	int64_t cores_used, mem_used, disk_used, gpus_used;
+
+	w->cores_allocated  = 0;
+	w->memory_allocated = 0;
+	w->disk_allocated   = 0;
+	w->gpus_allocated   = 0;
+
+	cores_avg = w->resources->cores.total / w->resources->workers.total;
+	mem_avg   = w->resources->memory.total / w->resources->workers.total;
+	disk_avg  = w->resources->disk.total / w->resources->workers.total;
+	gpus_avg  = w->resources->gpus.total / w->resources->workers.total;
+
+	itable_firstkey(w->current_tasks);
+	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
+		if(t->unlabeled)
+		{
+			cores_used = cores_avg;
+			mem_used  = mem_avg;
+			disk_used = disk_avg;
+			gpus_used = gpus_avg;
+		}
+		else
+		{
+			cores_used = MAX(t->cores, 0);
+			mem_used  = MAX(t->memory, 0);
+			disk_used = MAX(t->disk, 0);
+			gpus_used = MAX(t->gpus, 0);
+		}
+
+		w->cores_allocated  += cores_used;
+		w->memory_allocated += mem_used;
+		w->disk_allocated   += disk_used;
+		w->gpus_allocated   += gpus_used;
+	}
+}
+
 static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
 	t->time_committed = timestamp_get();
@@ -2449,14 +2551,10 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 
 	if(t->unlabeled) {
 		w->unlabeled_allocated++;
-	} else {
-		// Otherwise use any values given, and assume the task will take "whatever it can get" for unlabeled resources
-		w->cores_allocated  += MAX(t->cores, 0);
-		w->memory_allocated += MAX(t->memory,0);
-		w->disk_allocated   += MAX(t->disk,  0);
-		w->gpus_allocated   += MAX(t->gpus,  0);
 	}
-
+	
+	count_worker_resources(w);
+	
 	log_worker_stats(q);
 }
 
@@ -2479,24 +2577,8 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 		w->unlabeled_allocated--;
 
 	}
-	else
-	{
-		w->cores_allocated  -= MAX(t->cores, 0);
-		w->memory_allocated -= MAX(t->memory,0);
-		w->disk_allocated   -= MAX(t->disk,  0);
-		w->gpus_allocated   -= MAX(t->gpus,  0);
-	}
 
-	if(w->unlabeled_allocated < 0 || w->cores_allocated < 0 || w->memory_allocated < 0 || w->disk_allocated < 0 || w->gpus_allocated < 0)
-	{
-		w->unlabeled_allocated = MAX(w->unlabeled_allocated,0);
-		w->cores_allocated     = MAX(w->cores_allocated,0);
-		w->memory_allocated    = MAX(w->memory_allocated,0);
-		w->disk_allocated      = MAX(w->disk_allocated,0);
-		w->gpus_allocated      = MAX(w->gpus_allocated,0);
-
-		debug(D_WQ, "Worker resource accounting error! Task: %d. Worker: %s (%s) Reseting to zero.\n", t->taskid, w->hostname, w->addrport);
-	}
+	count_worker_resources(w);
 
 	log_worker_stats(q);
 }
