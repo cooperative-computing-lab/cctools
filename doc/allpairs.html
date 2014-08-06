@@ -46,6 +46,7 @@ data movement, fault tolerance and so on for you.
 
 <h2 id="singlemachine" id="preparation">All-Pairs on a Single Machine<a class="sectionlink" href="#singlemachine" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 Let's suppose you have a whole lot of files that you want to compare all to each other, named <tt>a</tt>, <tt>b</tt>, <tt>c</tt>, and so on.  Suppose that you also have a program named <tt>compareit</tt> that when invoked as <tt>compareit a b</tt> will compare files <tt>a</tt> and <tt>b</tt> and produce some output summarizing the difference between the two, like this:
 <code>a b are 45 percent similar</code>
 <p>
@@ -63,10 +64,12 @@ a b are 45 percent similar
 a c are 37 percent similar
 ...
 </code>
+<p>
 For large sets of objects, allpairs_multicore will use as many cores as you have available, and will carefully manage virtual memory to exploit locality and avoid thrashing.  Because of this, you should be prepared for the results to come back in any order.
 
 <h2 id="distributed">All-Pairs on a Distributed System<a class="sectionlink" href="#distributed" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 So far, we have introduced how to use All-Pairs abstraction on a single
 machine.  But sometimes the All-Pairs problem is too big to allow a single
 machine to finish it in a reasonable amount of time, even if the single machine
@@ -87,6 +90,7 @@ program is almost identical to starting the All-Pairs multicore program.
 For example, to run the same example as above on a distributed system:
 <code>allpairs_master set.list set.list compareit</code> 
 
+<p>
 This will start the master process, which will wait for workers to connect.
 Let's suppose the master is running on a machine named <tt>barney.nd.edu</tt>.
 If you have access to login to other machines, you could simply start
@@ -99,9 +103,11 @@ Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 </code>
 
+<p>
 A similar script is available for Sun Grid Engine:
 <code>% sge_submit_workers barney.nd.edu 9123 10</code>
 
+<p>
 In the above two examples, the first argument is the port number that the
 master process will be or is listening on and the second the argument is the
 number of workers to start. Note that <tt>9123</tt> is the default port
@@ -125,6 +131,7 @@ change batch options or other details.</p>
 
 <h2 id="internalfunction">Using an Internal Function<a class="sectionlink" href="#internalfunction" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 If you have a very fast comparison program (less than a tenth of a second),
 the allpairs framework may be spending more time starting your program
 than actually accomplishing real work.  If you can express your comparison
@@ -148,6 +155,7 @@ We have implemented several internal comparison functions as examples, including
 
 <h2 id="tuning">Tuning Performance<a class="sectionlink" href="#tuning" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 By default, both <tt>allpairs_master</tt> and <tt>allpairs_multicore</tt> will adjust to
 the proprties of your workload to run it efficiently.  <tt>allpairs_master</tt> will run
 a few sample executions of your comparison program to measure how long it takes, and
@@ -171,7 +179,10 @@ which is 3/4 of memory by default.
 
 <h2 id="moreinfo" id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
-For the latest information about Allpairs, please visit our <a href=http://ccl.cse.nd.edu/software/allpairs>web site</a> and subscribe to our <a href=http://ccl.cse.nd.edu/software/help.shtml>mailing list</a>.
+<p>
+For the latest information about Allpairs, please visit our <a
+href=http://ccl.cse.nd.edu/software/allpairs>web site</a> and subscribe to our
+<a href=http://ccl.cse.nd.edu/software/help.shtml>mailing list</a>.
 
 </div>
 </body>
