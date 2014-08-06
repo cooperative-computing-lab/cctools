@@ -398,7 +398,8 @@ void dag_log_recover(struct dag *d, const char *filename)
 			/* Record node information to log */
 			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->original_command);
 
-			/* Record the node category to the log */
+			/* Record the node category to the log. Eventually SYMBOL should be deprecated. */
+			fprintf(d->logfile, "# CATEGORY\t%d\t%s\n", n->nodeid, n->category->label);
 			fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->category->label);
 
 			/* Record node parents to log */
