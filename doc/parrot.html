@@ -41,7 +41,7 @@ is not duplicated.
 Almost any application - whether static or dynmically linked,
 standard or commercial, command-line or GUI - should work with
 Parrot.  There are a few exceptions.  Because Parrot relies on
-the Linux <tt>ptrace</code> interface
+the Linux <tt>ptrace</tt> interface
 any program that relies on the ptrace interface cannot run under Parrot.
 This means Parrot cannot run a debugger, nor can it run itself recursively.
 In addition, Parrot cannot run setuid programs, as the operating system
@@ -63,12 +63,15 @@ Please check the <a href=http://ccl.cse.nd.edu/software/parrot/known-bugs.html>k
 
 <h2 id="installation">Installation<a class="sectionlink" href="#installation" title="Link to this section.">&#x21d7;</a></h2>
 
-Parrot is distributed as part of the
-<a href=http://ccl.cse.nd.edu/software>Cooperative Computing Tools</a>.
-To install, please read the <a href=install.html>cctools installation instructions</a>.
+<p>
+Parrot is distributed as part of the <a
+href=http://ccl.cse.nd.edu/software>Cooperative Computing Tools</a>.  To
+install, please read the <a href=install.html>cctools installation
+instructions</a>.
 
 <h2 id="examples">Examples<a class="sectionlink" href="#examples" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 To use Parrot, you simply use the <tt>parrot</tt> command followed by any other Unix program.  For example, to run a Parrot-enabled <tt>vi</tt>, execute this command:
 <code>% parrot_run vi /anonftp/ftp.gnu.org/pub/README</code>
 Of course, it can be clumsy to put <tt>parrot_run</tt> before every command you run, so try starting a shell with Parrot already loaded:
@@ -79,8 +82,8 @@ Now, you should be able to run any standard command using Parrot filenames.  Her
 % set autolist
 % cat /anonftp/ftp.gnu.org/pub<b>[Press TAB here]</b>
 </code>
-<p>
 
+<p>
 <center>
 <table width=75% border=2>
 <tr bgcolor=#ffffaa>
@@ -97,8 +100,8 @@ endif
 </code>
 </table>
 </center>
-<p>
 
+<p>
 We have limited the examples so far to HTTP and anonymous FTP, as they are
 the only services we know that absolutely everyone is familiar with.
 There are a number of other more powerful and secure remote services
@@ -146,6 +149,7 @@ by producing a bogus directory entry:
 -r--r--r--    1 dthain   dthain          0 Jul 16 11:50 /http/www.yahoo.com
 </code>
 
+<p>
 A less-drastic example is found in FTP.  If you attempt
 to perform a directory listing of an FTP server, Parrot
 fills in the available information -- the file names and
@@ -157,6 +161,7 @@ drwxrwxrwx 1 dthain dip      0 Oct  5 16:00 gnu
 ...
 </code>
 
+<p>
 If you would like to get a better idea of the underlying behavior
 of Parrot, try running it with the <tt>-d remote</tt> option,
 which will display all of the remote I/O operations that it performs
@@ -173,12 +178,14 @@ ftp.cs.wisc.edu --> 150 Opening BINARY mode data connection for file list.
 ...
 </code>
 
+<p>
 If your program is upset by the unusual semantics of such
 storage systems, then consider using the Chirp protocol and
 server:
 
 <h2 id="protocol">The Chirp Protocol and Server<a class="sectionlink" href="#protocol" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 Although Parrot works with many different protocols,
 is it limited by the capabilities provided by each underlying system.
 (For example, HTTP does not have reliable directory listings.)
@@ -202,6 +209,7 @@ that host from elsewhere:
 % ls -la
 % ...
 </code>
+<p>
 In general, Parrot gives better performance and usability
 with Chirp than with other protocols.
 You can read extensively about the Chirp server and protocol
@@ -214,6 +222,7 @@ access control and space allocation features of Chirp from the Unix command line
 
 <h2 id="nameresolution">Name Resolution<a class="sectionlink" href="#nameresolution" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 In addition to accessing remote storage, Parrot allows you
 to create a custom namespace for any program.  All file name
 activity passes through the Parrot <b>name resolver</b>, which
@@ -239,6 +248,7 @@ Instruct Parrot to use the mountlist as follows:
 A single mount entry may be given on the command line
 with the <b>-M</b> option as follows:
 <code>% parrot_run -M /dbase=/anonftp/ftp.cs.wisc.edu/db tcsh</code>
+<p>
 A more sophisticated way to perform name binding is with
 an <i>external resolver</i>.  This is a program executed
 whenever Parrot needs to locate a file or directory.
@@ -253,11 +263,13 @@ copy of a file.  For example:
 /chirp/server.nd.edu/mix/1523.data
 </code>
 
+<p>
 To connect the program <tt>locate_file</tt> to Parrot,
 simply give a mount string that specifies the program
 as a resolver:
 <code>% parrot_run -M /dbase=resolver:/path/to/locate_file tcsh</code>
 
+<p>
 Now, if you attempt to access files under /dbase,
 Parrot will execute <tt>locate_file</tt> and access
 the data stored there:
@@ -297,6 +309,7 @@ using the <tt>stat</tt> system call.</p>
 
 <h2 id="parrot_cp">More Efficient Copies with <tt>parrot_cp</tt><a class="sectionlink" href="#parrot_cp" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 If you are using Parrot to copy lots of files across the network,
 you may see better performance using the <tt>parrot_cp</tt> tool.
 This program looks like an ordinary <tt>cp</tt>, but it makes
@@ -319,12 +332,13 @@ an ordinary <tt>cp</tt> without any performance gain or loss.
 
 <h3 id="notes.proxy">HTTP Proxy Servers<a class="sectionlink" href="#notes.proxy" title="Link to this section.">&#x21d7;</a></h3>
 
+<p>
 HTTP, CVMFS, and GROW can take advantage of standard HTTP proxy servers.
 To route requests through a single proxy server, set the HTTP_PROXY
 environment variable to the server name and port:
 <code>% setenv HTTP_PROXY "http://proxy.nd.edu:8080"
 </code>
-Multiple proxy servers can be given, separated by a semicolon.
+<p>Multiple proxy servers can be given, separated by a semicolon.
 This will cause Parrot to try each proxy in order until one succeeds.
 If <tt>DIRECT</tt> is given as the last name in the list, then
 Parrot will fall back on a direct connection to the target web server.
@@ -334,6 +348,7 @@ For example:
 
 <h3 id="notes.grow">GROW - Global Read Only Web Filesystem<a class="sectionlink" href="#notes.grow" title="Link to this section.">&#x21d7;</a></h3>
 
+<p>
 Although the strict HTTP protocol does not allow for correct
 structured directory listings, it is possible to emulate
 directory listings with a little help from the underlying filesystem.
@@ -359,6 +374,7 @@ hierarchy.  For example:
 % ls -la
 </code>
 
+<p>
 In addition to providing precise directory metadata, GROW offers
 two additional advantages over plain HTTP:
 <dir>
@@ -369,15 +385,14 @@ it can tell if a file is up-to-date without any network communication.
 The directory is only checked for changes at the beginning of program
 execution, so changes become visible only to newly executed programs.
 <li><b>SHA-1 Integrity.</b>
-<tt>make_growfs</tt> generates SHA-1 checksums on the directory
-and each file so that the integrity of the system can be verified at
-runtime.
-If a checksum fails, GROW will attempt to reload the file or directory
-listing in order to repair the error, trying until the master timeout
-(set by the -T option) expires.  This will also occur if the underlying
-files have been modified and <tt>make_growfs</tt> has not yet been re-run.
-If necessary, checksums can be disabled by giving the <tt>-k</tt> option
-to either Parrot or <tt>make_growfs</tt>.
+<tt>make_growfs</tt> generates SHA-1 checksums on the directory and each file so
+that the integrity of the system can be verified at runtime.  If a checksum
+fails, GROW will attempt to reload the file or directory listing in order to
+repair the error, trying until the master timeout (set by the -T option)
+expires.  This will also occur if the underlying files have been modified and
+<tt>make_growfs</tt> has not yet been re-run.  If necessary, checksums can be
+disabled by giving the <tt>-k</tt> option to either Parrot or
+<tt>make_growfs</tt>.
 </dir>
 
 <h3 id="notes.cvmfs">CVMFS - CernVM-FS<a class="sectionlink" href="#notes.cvmfs" title="Link to this section.">&#x21d7;</a></h3>
@@ -481,6 +496,7 @@ run-time by re-initializing the CVMFS library.  This feature is experimental.
 
 <h3 id="notes.hdfs">Hadoop Distributed File System (HDFS)<a class="sectionlink" href="#notes.hdfs" title="Link to this section.">&#x21d7;</a></h3>
 
+<p>
 HDFS is the primary distributed filesystem used in the <a
     href="http://hadoop.apache.org">Hadoop</a> project.  Parrot supports read
 and write access to HDFS systems using the <tt>parrot_run_hdfs</tt> wrapper.  This
@@ -494,6 +510,7 @@ variables:
 HADOOP_HOME   Location of your Hadoop installation.
 </code>
 
+<p>
 Based on these environmental variables, <tt>parrot_run_hdfs</tt> will attempt to
 find the appropriate paths for <tt>libjvm.so</tt> and <tt>libhdfs.so</tt>.
 These paths are stored in the environmental variables <tt>LIBJVM_PATH</tt> and
@@ -504,7 +521,6 @@ environment before calling <tt>parrot_run_hdfs</tt>, or you may edit the script
 directly.
 
 <p>
-
 Note that while Parrot supports read access to HDFS, it only provides
 write-once support on HDFS.  This is because the current implementations of
 HDFS do not provide reliable append operations.  Likewise, files can only be
@@ -513,6 +529,7 @@ and not both (<tt>O_RDWR</tt>).
 
 <h2 id="identityboxing">Identity Boxing<a class="sectionlink" href="#notes.identityboxing" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 Parot provides a unique feature known as <i>identity boxing</i>.
 This feature allows you to run a (possibly) untrusted program
 within a protection domain, as if it were run in a completely separate account.
@@ -548,6 +565,7 @@ For example, <tt>MyFriend</tt> above can see his initial ACL as follows:
 MyFriend rwlxa
 </code>
 
+<p>
 This means that <tt>MyFriend</tt> can read, write, list, execute, and
 administer items in the current directory.  Now, suppose that <tt>MyFriend</tt>
 wants to allow <tt>Freddy</tt> read access to the same directory.
@@ -562,6 +580,7 @@ storage.  You can read more about ACLs and identity boxing in the
 
 <h2 id="64bit">64-Bit Support<a class="sectionlink" href="#64bit" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 In all modes, Parrot supports applications that access large (>2GB) files
 that require 64-bit seek pointers.   However, we have found that many tools
 and filesystems do not manipulate such large files properly.  If possible,
@@ -579,12 +598,14 @@ Parrot supports 64 bit programs and processors in the following combinations:
 
 <h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
+<p>
 For the latest information on Parrot, visit the home page:
 
 <dir>
 <li> <a href=http://ccl.cse.nd.edu/software/parrot>Parrot Home Page</a>
 </dir>
 
+<p>
 An exhaustive list of all options and commands can be found in the manual pages:
 
 <dir>
