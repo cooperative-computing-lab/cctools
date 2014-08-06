@@ -106,6 +106,12 @@ static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
 static int monitor_enable_list_files  = 0;
 
+
+/* Write a verbose transaction log with SYMBOL tags.
+ * SYMBOLs are category labels (SYMBOLs should be deprecated
+ * once weaver/pbui tools are updated.) */
+static int log_verbose_mode = 0; 
+
 static char *monitor_limits_name = NULL;
 static int monitor_interval = 1;	// in seconds
 static char *monitor_log_format = NULL;
@@ -384,6 +390,48 @@ void dag_log_recover(struct dag *d, const char *filename)
 		clean_symlinks(d, 1);
 		exit(1);
 	}
+
+	if(first_run && log_verbose_mode) {
+		struct dag_file *f;
+		struct dag_node *p;
+		for(n = d->nodes; n; n = n->next) {
+			/* Record node information to log */
+			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->original_command);
+
+			/* Record the node category to the log */
+			fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->category->label);
+
+			/* Record node parents to log */
+			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
+			list_first_item(n->source_files);
+			while( (f = list_next_item(n->source_files)) ) {
+				p = f->target_of;
+				if(p)
+					fprintf(d->logfile, "\t%d", p->nodeid);
+			}
+			fputc('\n', d->logfile);
+
+			/* Record node inputs to log */
+			fprintf(d->logfile, "# SOURCES\t%d", n->nodeid);
+			list_first_item(n->source_files);
+			while( (f = list_next_item(n->source_files)) ) {
+				fprintf(d->logfile, "\t%s", f->filename);
+			}
+			fputc('\n', d->logfile);
+
+			/* Record node outputs to log */
+			fprintf(d->logfile, "# TARGETS\t%d", n->nodeid);
+			list_first_item(n->target_files);
+			while( (f = list_next_item(n->target_files)) ) {
+				fprintf(d->logfile, "\t%s", f->filename);
+			}
+			fputc('\n', d->logfile);
+
+			/* Record translated command to log */
+			fprintf(d->logfile, "# COMMAND\t%d\t%s\n", n->nodeid, n->command);
+		}
+	}
+
 
 	dag_count_states(d);
 
@@ -1233,6 +1281,7 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
 	fprintf(stdout, " %-30s Disable Work Queue caching.                 (default is false)\n", "--disable-wq-cache");
+	fprintf(stdout, " %-30s Add node id symbol tags in the makeflow log.        (default is false)\n", "--log-verbose");
 
 	fprintf(stdout, "\n*Monitor Options:\n\n");
 	fprintf(stdout, " %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
@@ -1435,6 +1484,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_PASSWORD,
 		LONG_OPT_TICKETS,
 		LONG_OPT_VERBOSE_PARSING,
+		LONG_OPT_LOG_VERBOSE_MODE,
 		LONG_OPT_WORKING_DIR,
 		LONG_OPT_WQ_WAIT_FOR_WORKERS,
 	};
@@ -1476,6 +1526,7 @@ int main(int argc, char *argv[])
 		{"summary-log", no_argument, 0, 'f'},
 		{"tickets", required_argument, 0, LONG_OPT_TICKETS},
 		{"version", no_argument, 0, 'v'},
+		{"log-verbose", no_argument, 0, LONG_OPT_LOG_VERBOSE_MODE},
 		{"working-dir", required_argument, 0, LONG_OPT_WORKING_DIR},
 		{"wq-estimate-capacity", no_argument, 0, 'E'},
 		{"wq-fast-abort", required_argument, 0, 'F'},
@@ -1682,6 +1733,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_DEBUG_ROTATE_MAX:
 				debug_config_file_size(string_metric_parse(optarg));
+				break;
+			case LONG_OPT_LOG_VERBOSE_MODE:
+				log_verbose_mode = 1;
 				break;
 			default:
 				show_help_run(get_makeflow_exe());
