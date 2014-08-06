@@ -1,0 +1,46 @@
+Weaver - README
+===============
+
+Overview
+--------
+
+Weaver is a high-level framework that enables the integration of distributed
+computing abstractions into scientific and data processing workflows using the
+Python programming language.  Weaver is currently under major development and
+thus it should be considered unstable.
+
+Dependencies
+------------
+
+Required:
+    - Python <http://www.python.org> (2.6.x, 2.7.x, 3.x)
+
+Although other versions of Python may work, Weaver has only been tested with
+Python 2.7.x and 3.2.x.  In order to execute the DAGs produced by Weaver,
+makeflow is required.
+
+Optional:
+    - mysql-python <http://sourceforge.net/projects/mysql-python/>
+
+      If you want to use MySQL-based datasets, then you must install the
+      database connector. 
+
+Usage
+-----
+
+To generate a DAG sandbox, compile your workflow using `weaver` as so::
+
+    $ weaver -o map_example examples/map.py
+
+You can then examine the sandbox and run the appropriate DAG execution engine
+on the generated DAG.  By default, Weaver generates makeflow DAGs and which
+can be used as follows::
+
+    $ weaver -o map_example examples/map.py
+    $ cd map_example
+    $ makeflow Makeflow
+
+For more information about the compiler run::
+
+    $ weaver -h
+
