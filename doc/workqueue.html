@@ -1,5 +1,5 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
-<html>
+<html lang="en">
 
 <head>
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
@@ -108,13 +108,15 @@ application, run it as:
 </pre></div>
 
 You will see this right away:
-<div class ="code_area"><pre class="code_snip">
+<div class ="code_area">
+<pre class="code_snip">
 listening on port 9123...
 submitted task: /usr/bin/gzip < a > a.gz
 submitted task: /usr/bin/gzip < b > b.gz
 submitted task: /usr/bin/gzip < c > c.gz
 waiting for tasks to complete...
-</pre></div>
+</pre>
+</div>
 
 The Work Queue master is now waiting for workers to connect and begin requesting
 work. (Without any workers, it will wait forever.) You can start one worker on
@@ -364,7 +366,7 @@ must be specified to run in the <tt>WORK_QUEUE_MASTER_MODE_CATALOG</tt>.
 </div>
 
 To start a worker for this master, specify the project name (<tt>myproject</tt>)
-to connect in the </tt>-N</tt> option:
+to connect in the <tt>-N</tt> option:
 
 <div class ="code_area"><pre class="code_snip">
 work_queue_worker -N myproject 
