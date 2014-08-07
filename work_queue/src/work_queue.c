@@ -82,6 +82,11 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
+/* Default: When there is a choice, send a task rather than receive 3 out of 4 times.
+ * Classical WQ:   1.0 (always prefer to send)
+ * Evictionphobic: 0.0 (always prefer to receive completed tasks) */
+double wq_option_send_receive_ratio    = 0.75; 
+
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
@@ -124,6 +129,8 @@ struct work_queue {
 	timestamp_t total_good_transfer_time;  // send time for tasks with t->result == WQ_RESULT_SUCCESS
 	timestamp_t total_execute_time;
 	timestamp_t total_good_execute_time;  // execute time for tasks with t->result == WQ_RESULT_SUCCESS
+
+	double  send_receive_ratio;
 
 	double fast_abort_multiplier;
 	int worker_selection_algorithm;
@@ -2604,13 +2611,11 @@ static void start_task_on_worker(struct work_queue *q, struct work_queue_worker 
 	return;
 }
 
-static int start_tasks(struct work_queue *q, time_t stoptime)
+static int send_one_task(struct work_queue *q, time_t stoptime)
 {			
 	//start as many tasks as possible
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
-
-	int task_started = 0;
 
 	if(list_size(q->ready_list) > 0)
 	{
@@ -2620,7 +2625,7 @@ static int start_tasks(struct work_queue *q, time_t stoptime)
 			w = find_best_worker(q, t);
 			if(w) {
 				start_task_on_worker(q, w);
-				task_started++;
+				return 1;
 			} else {
 				//Move task to the end of queue when there is at least one available worker.  
 				//This prevents a resource-hungry task from clogging the entire queue.
@@ -2630,17 +2635,15 @@ static int start_tasks(struct work_queue *q, time_t stoptime)
 				break;
 			}
 			//stoptime <= 0 means an infinite timeout
-		} while(list_size(q->ready_list) && (stoptime <= 0 || time(0) < stoptime));
+		} while((stoptime <= 0 || time(0) < stoptime));
 	}
 
-	return task_started;
+	return 0;
 }
 
-static int receive_tasks(struct work_queue *q, time_t stoptime)
+static int receive_one_task(struct work_queue *q, time_t stoptime)
 {
 	struct work_queue_task *t;
-
-	int tasks_received = 0;
 
 	struct work_queue_worker *w;
 	uint64_t taskid;
@@ -2648,20 +2651,19 @@ static int receive_tasks(struct work_queue *q, time_t stoptime)
 	if(itable_size(q->finished_tasks) > 0)
 	{
 		itable_firstkey(q->finished_tasks);
-		// Receive at least one task, regardless of the stoptime value.
-		do {
-			itable_nextkey(q->finished_tasks, &taskid, (void **)&t);
+		itable_nextkey(q->finished_tasks, &taskid, (void **)&t);
+		w = itable_lookup(q->worker_task_map, taskid);
+		fetch_output_from_worker(q, w, taskid);
 
-			w = itable_lookup(q->worker_task_map, taskid);
-			fetch_output_from_worker(q, w, taskid);
-			itable_firstkey(q->finished_tasks);  // fetch_output removes the resolved task from the itable, thus potentially corrupting our current location.  This resets it to the top.
-			tasks_received++;
+		// fetch_output removes the resolved task from the itable, thus
+		// potentially corrupting our current location.  This resets it to the
+		// top.
+		itable_firstkey(q->finished_tasks);  
 
-			//stoptime <= 0 means an infinite timeout
-		} while(itable_size(q->finished_tasks) && (stoptime <=0 || time(0) < stoptime));
+		return 1;
 	}
 
-	return tasks_received;
+	return 0;
 }
 
 
@@ -3537,6 +3539,8 @@ struct work_queue *work_queue_create(int port)
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
 
+	q->send_receive_ratio = wq_option_send_receive_ratio;
+
 	q->fast_abort_multiplier = wq_option_fast_abort_multiplier;
 	q->worker_selection_algorithm = wq_option_scheduler;
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
@@ -3615,6 +3619,22 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_fil
 	q->monitor_mode = 1;
 
 	return 1;
+}
+
+int work_queue_send_receive_ratio(struct work_queue *q, double ratio)
+{
+
+	if(ratio > 1) {
+		q->send_receive_ratio = 1;
+		return 1;
+	} else if(ratio < 0) {
+		q->send_receive_ratio = 0;
+		return 1;
+	} else {
+		q->send_receive_ratio = ratio;
+		return 0;
+	}
+
 }
 
 int work_queue_activate_fast_abort(struct work_queue *q, double multiplier)
@@ -3929,26 +3949,35 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 
 static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 {
-	int task_started;
-	int tasks_received;
+	int task_sent = 0, total_tasks_sent = 0;
+	int task_received = 0, total_tasks_received = 0;
 
 	do 
 	{
 		//Compute task_transfer_stoptime in some way...
 		time_t task_transfer_stoptime = stoptime;
 
-		//IF SOMETHING THEN
-		task_started = start_tasks(q, task_transfer_stoptime);
+		task_sent     = 0;
+		task_received = 0;
 
-		//IF SOMETHING THEN
-		tasks_received = receive_tasks(q, task_transfer_stoptime);
+		double coin          = random() / ((double) RAND_MAX);
+		int    send_decision = coin < q->send_receive_ratio;
 
-		//ELSE (break here to mimic old wq behaviour. To modify with a better policy)
-		break;
+		if((list_size(q->ready_list) > 0) && (itable_size(q->finished_tasks) < 1 || send_decision))
+		{
+			task_sent         = send_one_task(q, task_transfer_stoptime);
+			total_tasks_sent += task_sent;
+		}
+			
+		if(itable_size(q->finished_tasks) > 0 && (!task_sent || !send_decision))
+		{
+			task_received         = receive_one_task(q, task_transfer_stoptime);
+			total_tasks_received += task_received;
+		}
 
-	}while ( (time(0) < stoptime) && (task_started > 0 || tasks_received > 0));
+	} while((time(0) < stoptime) && (task_sent || task_received));
 
-	return task_started + tasks_received;
+	return total_tasks_sent + total_tasks_received;
 }
 
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
@@ -3964,24 +3993,14 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 |              |
 |              v
 |        -------------
-|       |  send task  |<----------------+
+|       |transfer task|<----------------+
 |        -------------                  |
 |              |                    yes |
 |              v                        |
 |     ------------------  yes   -----------------
 |    | tasks remaining? |----->| time remaining? |
 |     ------------------        -----------------
-|           no |                     no |
-|              v                        |
-|     ------------------                |           
-|    |   receive task   |<--------------+           
-|     ------------------                |           
-|              |                    yes |           
-|              v                        |           
-|     ------------------  yes   -----------------   
-|    | tasks remaining? |----->| time remaining? |  
-|     ------------------        -----------------   
-|           no |                    no |            
+|           no |                    no |
 |              v                       |
 |     ------------------               |
 |    |fast abort workers|              |
