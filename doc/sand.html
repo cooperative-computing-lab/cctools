@@ -1,5 +1,5 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
-<html>
+<html lang="en">
 
 <head>
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
@@ -31,10 +31,10 @@ SAND can be used as a drop-in replacement for the conventional overlapper in
 the Celera Assembler, or can be used as a standalone tool by advanced users.
 
 <p>SAND is part of the <a
-href=http://ccl.cse.nd.edu/software>Cooperating Computing
+href="http://ccl.cse.nd.edu/software">Cooperating Computing
 Tools</a>.  You can download the CCTools from <a
-href=http://ccl.cse.nd.edu/software/download>this web page</a>,
-follow the <a href=install.html>installation instructions</a>, and you
+href="http://ccl.cse.nd.edu/software/download">this web page</a>,
+follow the <a href="install.html">installation instructions</a>, and you
 are ready to go.</p>
 
 <h2 id="celera">Using SAND with the Celera Assembler<a class="sectionlink" href="#celera" title="Link to this section.">&#x21d7;</a></h2>
@@ -90,8 +90,8 @@ However, to run a really large assembly at scale, you will need to
 run as many workers as possible.  A simple (but tiresome) way of doing
 so is to <tt>ssh</tt> into lots of machines and manually run <tt>work_queue_worker</tt>
 as above.  But, if you have access to a batch system like
-<a href=http://www.cs.wisc.edu/condor>Condor</a> or
-<a href=http://www.sun.com/software/sge>SGE</a>, you can use them
+<a href="http://www.cs.wisc.edu/condor">Condor</a> or
+<a href="http://www.sun.com/software/sge">SGE</a>, you can use them
 to start many workers with a single submit command.
 <p>
 We have provided some simple scripts to make this easy.
@@ -128,7 +128,7 @@ expire.  If you do nothing for 15 minutes, they will automatically exit.
 This section explains the two SAND modules in more detail,
 if you would like to tune the performance or use them independently
 of Celera.  We assume that you begin with a file of reads in FASTA format.
-To use the SAND modules, you must first generate repeats and compress the data.  (If you don't have data handy, download <tt>small.cfa</tt> and  <tt>small.repeats</tt> data from the <a href=http://ccl.cse.nd.edu/software/sand>SAND Webpage</a>.)
+To use the SAND modules, you must first generate repeats and compress the data.  (If you don't have data handy, download <tt>small.cfa</tt> and  <tt>small.repeats</tt> data from the <a href="http://ccl.cse.nd.edu/software/sand">SAND Webpage</a>.)
 
 To generate repeats from a FASTA file, use the <tt>meryl</tt> tool from the Celera Assembler:
 <code>% meryl -B -m 24 -C -L 100 -v -o small.meryl -s small.fa
@@ -203,7 +203,7 @@ The columns of the output are as follows:
 
 <h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
-For the latest information about SAND, please visit our <a href=http://ccl.cse.nd.edu/software/sand>web site</a> and subscribe to our <a href=http://ccl.cse.nd.edu/software>mailing list</a>.
+For the latest information about SAND, please visit our <a href="http://ccl.cse.nd.edu/software/sand">web site</a> and subscribe to our <a href="http://ccl.cse.nd.edu/software">mailing list</a>.
 
 </div>
 </body>
