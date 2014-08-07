@@ -1,5 +1,5 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
-<html>
+<html lang="en">
 
 <head>
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
@@ -20,7 +20,7 @@ This software is distributed under the GNU General Public License.<br>
 See the file COPYING for details.</p>
 
 <ul>
-    <li>Douglas Thain and Miron Livny, <a href=http://www.cse.nd.edu/~dthain/papers/parrot-scpe.pdf>Parrot: An Application Environment for Data-Intensive Computing</a>, Scalable Computing: Practice and Experience, Volume 6, Number 3, Pages 9--18, 2005.</li>
+    <li>Douglas Thain and Miron Livny, <a href="http://www.cse.nd.edu/~dthain/papers/parrot-scpe.pdf">Parrot: An Application Environment for Data-Intensive Computing</a>, Scalable Computing: Practice and Experience, Volume 6, Number 3, Pages 9--18, 2005.</li>
 </ul>
 
 <h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
@@ -59,13 +59,13 @@ system call trapping.  Ports to other platforms and processors
 Linux may be possible in the future.
 <p>
 Like any software, Parrot is bound to have some bugs.
-Please check the <a href=http://ccl.cse.nd.edu/software/parrot/known-bugs.html>known bugs</a> page for the latest scoop.
+Please check the <a href="http://ccl.cse.nd.edu/software/parrot/known-bugs.html">known bugs</a> page for the latest scoop.
 
 <h2 id="installation">Installation<a class="sectionlink" href="#installation" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>
 Parrot is distributed as part of the <a
-href=http://ccl.cse.nd.edu/software>Cooperative Computing Tools</a>.  To
+href="http://ccl.cse.nd.edu/software">Cooperative Computing Tools</a>.  To
 install, please read the <a href=install.html>cctools installation
 instructions</a>.
 
@@ -85,8 +85,8 @@ Now, you should be able to run any standard command using Parrot filenames.  Her
 
 <p>
 <center>
-<table width=75% border=2>
-<tr bgcolor=#ffffaa>
+<table width="75%" border=2>
+<tr bgcolor="#ffffaa">
 <td>
 Hint: You may find it useful to have some visual indication
 of when Parrot is active, so we recommend that you modify
@@ -116,11 +116,11 @@ then the file name.  Here are all the currently supported services:
 <tr><td>/grow/www.somewhere.com/index.html<td>GROW - Global Read-Only Web Filesystem <td>included
 <tr><td>/ftp/ftp.cs.wisc.edu/RoadMap<td>File Transfer Protocol<td>included
 <tr><td>/anonftp/ftp.cs.wisc.edu/RoadMap<td>Anonymous File Transfer Protocol<td>included
-<tr><td>/gsiftp/ftp.globus.org/path<td>Globus Security + File Transfer Protocol<td><a href=http://www.globus.org/gridftp>more info</a>
-<tr><td>/irods/host:port/zone/home/user/path<td>iRODS<td><a href=http://irods.sdsc.edu>more info</a>
-<tr><td>/hdfs/namenode:port/path<td>Hadoop Distributed File System (HDFS)<td><a href=http://hadoop.apache.org/common/docs/current/hdfs_user_guide.html>more info</a>
-<tr><td>/xrootd/host:port/path<td>XRootD/Scalla Distributed Storage System (xrootd)<td><a href=http://project-arda-dev.web.cern.ch/project-arda-dev/xrootd/site/index.html>more info</a>
-<tr><td>/cvmfs/grid.cern.ch/path<td>CernVM-FS<td><a href=http://cernvm.cern.ch/portal/filesystem>more info</a> 
+<tr><td>/gsiftp/ftp.globus.org/path<td>Globus Security + File Transfer Protocol<td><a href="http://www.globus.org/gridftp">more info</a>
+<tr><td>/irods/host:port/zone/home/user/path<td>iRODS<td><a href="http://irods.sdsc.edu">more info</a>
+<tr><td>/hdfs/namenode:port/path<td>Hadoop Distributed File System (HDFS)<td><a href="http://hadoop.apache.org/common/docs/current/hdfs_user_guide.html">more info</a>
+<tr><td>/xrootd/host:port/path<td>XRootD/Scalla Distributed Storage System (xrootd)<td><a href="http://project-arda-dev.web.cern.ch/project-arda-dev/xrootd/site/index.html">more info</a>
+<tr><td>/cvmfs/grid.cern.ch/path<td>CernVM-FS<td><a href="http://cernvm.cern.ch/portal/filesystem">more info</a> 
 <tr><td>/chirp/target.cs.wisc.edu/path<td>Chirp Storage System<td>included + <a href=chirp.html>more info</a> 
 </table>
 <hr>
@@ -129,13 +129,13 @@ The following protocols have been supported in the past, but are not currently i
 <p>
 <hr>
 <table>
-<tr><td>/nest/nest.cs.wisc.edu/path<td>Network Storage Technology<td><a href=http://www.cs.wisc.edu/condor/nest>more info</a>
-<tr><td>/rfio/host.cern.ch/path<td>Castor Remote File I/O<td><a href=http://castor.web.cern.ch/castor/Welcome.html>more info</a>
-<tr><td>/dcap/dcap.cs.wisc.edu/pnfs/cs.wisc.edu/path<td>DCache Access Protocol<td><a href=http://dcache.desy.de>more info</a>
-<tr><td>/lfn/logical/path<td>Logical File Name - Grid File Access Library<td><a href=http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html>more info</a>
-<tr><td>/srm/server/path<td>Site File Name - Grid File Access Library<td><a href=http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html>more info</a>
-<tr><td>/guid/abc123<td>Globally Unique File Name - Grid File Access Library<td><a href=http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html>more info</a>
-<tr><td>/gfal/protocol://host//path<td>Grid File Access Library<td><a href=http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html>more info</a>
+<tr><td>/nest/nest.cs.wisc.edu/path<td>Network Storage Technology<td><a href="http://www.cs.wisc.edu/condor/nest">more info</a>
+<tr><td>/rfio/host.cern.ch/path<td>Castor Remote File I/O<td><a href="http://castor.web.cern.ch/castor/Welcome.html">more info</a>
+<tr><td>/dcap/dcap.cs.wisc.edu/pnfs/cs.wisc.edu/path<td>DCache Access Protocol<td><a href="http://dcache.desy.de">more info</a>
+<tr><td>/lfn/logical/path<td>Logical File Name - Grid File Access Library<td><a href="http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html">more info</a>
+<tr><td>/srm/server/path<td>Site File Name - Grid File Access Library<td><a href="http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html">more info</a>
+<tr><td>/guid/abc123<td>Globally Unique File Name - Grid File Access Library<td><a href="http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html">more info</a>
+<tr><td>/gfal/protocol://host//path<td>Grid File Access Library<td><a href="http://grid-deployment.web.cern.ch/grid-deployment/gis/GFAL/GFALindex.html">more info</a>
 </table>
 <hr>
 <p>
@@ -409,7 +409,7 @@ mirrored in multiple locations and accessed via groups of
 load-balanced web proxies, with fail-over between groups.
 
 <p>The CVMFS repositories hosted by the <a
-href=http://cernvm.cern.ch/>CernVM project</a> and by
+href="http://cernvm.cern.ch/">CernVM project</a> and by
 Open Science Grid (OASIS) are enabled by default.
 To access a different repository, it is necessary to configure parrot
 to know how to access the repository.  This may be done with the
@@ -576,9 +576,9 @@ Freddy   rl
 
 Identity boxing and ACLs are particularly useful when using distributed
 storage.  You can read more about ACLs and identity boxing in the
-<a href=chirp.html>Chirp</a> manual.
+<a href="chirp.html">Chirp</a> manual.
 
-<h2 id="64bit">64-Bit Support<a class="sectionlink" href="#64bit" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="id64bit">64-Bit Support<a class="sectionlink" href="#id64bit" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>
 In all modes, Parrot supports applications that access large (>2GB) files
@@ -591,8 +591,8 @@ Parrot supports 64 bit programs and processors in the following combinations:
 <table>
 <tr><th colspan="2">Program Type</th><th>CPU Type</th></tr>
 <tr><th>32-bit</th><th>64-bit</th></tr>
-<tr><td><font size=+1 color=green>YES</font> <td> <font size=+1 color=red>NO</font><td> Parrot for 32-bit X86 CPU    <br> Pentium, Xeon, Athlon, Sempron</tr>
-<tr><td><font size=+1 color=green>YES</font> <td> <font size=+1 color=green>YES</font> <td > Parrot for 64-bit X86_64 CPU <br> Opteron, Athlon64, Turion64, Sempron64</tr>
+<tr><td><font size="+1" color=green>YES</font> <td> <font size="+1" color=red>NO</font><td> Parrot for 32-bit X86 CPU    <br> Pentium, Xeon, Athlon, Sempron</tr>
+<tr><td><font size="+1" color=green>YES</font> <td> <font size="+1" color=green>YES</font> <td > Parrot for 64-bit X86_64 CPU <br> Opteron, Athlon64, Turion64, Sempron64</tr>
 </table>
 </center>
 
@@ -602,24 +602,24 @@ Parrot supports 64 bit programs and processors in the following combinations:
 For the latest information on Parrot, visit the home page:
 
 <dir>
-<li> <a href=http://ccl.cse.nd.edu/software/parrot>Parrot Home Page</a>
+<li> <a href="http://ccl.cse.nd.edu/software/parrot">Parrot Home Page</a>
 </dir>
 
 <p>
 An exhaustive list of all options and commands can be found in the manual pages:
 
 <dir>
-<li> <a href=man/parrot_run.html>parrot_run</a>
-<li> <a href=man/parrot_run_hdfs.html>parrot_run_hdfs</a>
-<li> <a href=man/parrot_cp.html>parrot_cp</a>
-<li> <a href=man/parrot_md5.html>parrot_md5</a>
-<li> <a href=man/parrot_getacl.html>parrot_getacl</a>
-<li> <a href=man/parrot_setacl.html>parrot_setacl</a>
-<li> <a href=man/parrot_mkalloc.html>parrot_mkalloc</a>
-<li> <a href=man/parrot_lsalloc.html>parrot_lsalloc</a>
-<li> <a href=man/parrot_locate.html>parrot_locate</a>
-<li> <a href=man/parrot_timeout.html>parrot_timeout</a>
-<li> <a href=man/parrot_whoami.html>parrot_whoami</a>
+<li> <a href="man/parrot_run.html">parrot_run</a>
+<li> <a href="man/parrot_run_hdfs.html">parrot_run_hdfs</a>
+<li> <a href="man/parrot_cp.html">parrot_cp</a>
+<li> <a href="man/parrot_md5.html">parrot_md5</a>
+<li> <a href="man/parrot_getacl.html">parrot_getacl</a>
+<li> <a href="man/parrot_setacl.html">parrot_setacl</a>
+<li> <a href="man/parrot_mkalloc.html">parrot_mkalloc</a>
+<li> <a href="man/parrot_lsalloc.html">parrot_lsalloc</a>
+<li> <a href="man/parrot_locate.html">parrot_locate</a>
+<li> <a href="man/parrot_timeout.html">parrot_timeout</a>
+<li> <a href="man/parrot_whoami.html">parrot_whoami</a>
 </dir>
 
 </div>
