@@ -1,5 +1,5 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
-<html>
+<html lang="en">
 
 <head>
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
@@ -17,11 +17,11 @@
 <h2 id="toc">Table of Contents<a class="sectionlink" href="#toc" title="Link to this section.">&#x21d7;</a></h2>
 
 <ul>
-<li> <a href=#front_matter>Front Matter</a>
-<li> <a href=#introduction>Introduction</a>
-<li> <a href=#installation>Installation</a>
-<li> <a href=#examples>Examples</a>
-<li> <a href=#reference>Reference</a>
+<li> <a href="#front_matter">Front Matter</a>
+<li> <a href="#introduction">Introduction</a>
+<li> <a href="#installation">Installation</a>
+<li> <a href="#examples">Examples</a>
+<li> <a href="#reference">Reference</a>
 </ul>
 
 <a name=front_matter></a>
@@ -36,7 +36,7 @@ This program is released under the GNU General Public License. See the file COPY
 <p>
 This software comes with no warranty and no guarantee of support.
 Questions, bug reports, and patches may be sent to
-<a href=mailto:condor-admin@cs.wisc.edu>condor-admin@cs.wisc.edu</a>.
+<a href="mailto:condor-admin@cs.wisc.edu">condor-admin@cs.wisc.edu</a>.
 We will address such inquiries as time and resources permit.
 
 <a name=introduction></a>
@@ -52,7 +52,7 @@ All procedures perform blocking I/O.
 <p>
 The library may be built as-is in order to communicate with ordinary
 name/password or anonymous FTP servers.  However, if the
-<a href=http://www.globus.org>Globus Toolkit</a> is available, it will
+<a href="http://www.globus.org">Globus Toolkit</a> is available, it will
 also perform GSI authentication with your proxy certificate.
 <p>
 FTP-Lite provides perfectly reasonable performance for simple clients
@@ -62,8 +62,8 @@ Globus Toolkit. It uses a variety of techniques, such as
 multiple data streams and non-blocking interfaces, for achieving high
 performance and multi-server access.
 <p>
-This library was designed specifically to be used with the
-<a href=http://www.cs.wisc.edu/condor/pfs>Pluggable File System</a>,
+This library was designed specifiy to be used with the
+<a href="http://www.cs.wisc.edu/condor/pfs">Pluggable File System</a>,
 which presents network storage devices as UNIX file systems.
 You are welcome to use it for other purposes, according to the terms
 set out in the GNU Library General Public License.
@@ -72,7 +72,7 @@ set out in the GNU Library General Public License.
 <h2 id="installation">Installation<a class="sectionlink" href="#installation" title="Link to this section.">&#x21d7;</a></h2>
 
 Download the FTP-Lite source package from the
-<a href=http://www.cs.wisc.edu/condor/ftp_lite>web page</a>.
+<a href="http://www.cs.wisc.edu/condor/ftp_lite">web page</a>.
 Unpack the archive like so:
 
 <code>% gunzip ftp_lite-0.0.tar.gz
@@ -109,11 +109,11 @@ LDFLAGS += -L/install/dir/lib -lftp_lite
 <h2 id="examples">Examples<a class="sectionlink" href="#examples" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>
-For examples of using the library, we recommend that you begin by examining the code for the simple programs <tt>ftp_lite_test</tt> and <tt>ftp_lite_copy</tt>.  A complete description of every function may be found in the <a href=#reference>reference</a> section below.  Here is a brief example to get you started.
+For examples of using the library, we recommend that you begin by examining the code for the simple programs <tt>ftp_lite_test</tt> and <tt>ftp_lite_copy</tt>.  A complete description of every function may be found in the <a href="#reference">reference</a> section below.  Here is a brief example to get you started.
 <p>
 A program using the library must first include <tt>ftp_lite.h</tt>:
 <code>#include "ftp_lite.h"</code>
-To open a server, call <tt>ftp_lite_open</tt> with a server name, port number, and a stream on which to send debugging messages.  For no debugging, leave the third argument null.  On success, this function returns a pointer to a server.
+To open a server,  <tt>ftp_lite_open</tt> with a server name, port number, and a stream on which to send debugging messages.  For no debugging, leave the third argument null.  On success, this function returns a pointer to a server.
 <code>struct ftp_server *s;
 
 s = ftp_lite_open( "ftp.cs.wisc.edu", FTP_LITE_DEFAULT_PORT, stderr );
@@ -136,7 +136,7 @@ if(!s) {
 	return 0;
 }
 </code>
-To retrieve a file, call <tt>ftp_lite_get</tt> with the server pointer, a path name, and the offset at which to begin.  On success, it returns a <tt>FILE</tt> object.
+To retrieve a file,  <tt>ftp_lite_get</tt> with the server pointer, a path name, and the offset at which to begin.  On success, it returns a <tt>FILE</tt> object.
 <code>FILE *f;
 
 f = ftp_lite_get( s, "README", 0 );
@@ -173,91 +173,89 @@ If the library is returning unexpected results, we recommend that you debug the 
 <p>
 So, here are the procedures in the library:
 <dir>
-<li><b>ftp_lite_auth_anonymous</b><p>
-<code>int ftp_lite_auth_anonymous( struct ftp_lite_server *s );</code><p>
+<li><b>ftp_lite_auth_anonymous</b>
+<code>int ftp_lite_auth_anonymous( struct ftp_lite_server *s );</code>
 Attempt to log in anonymously to an already-opened server.
-<p>
-<li><b>ftp_lite_auth_globus</b><p>
-<code>int ftp_lite_auth_globus( struct ftp_lite_server *s );</code><p>
+<li><b>ftp_lite_auth_globus</b>
+<code>int ftp_lite_auth_globus( struct ftp_lite_server *s );</code>
 Attempt to log in with Globus credentials to an already-opened server.
-The caller must have already established a proxy certificate with <tt>grid-proxy-init</tt> or a similar tool.
-<p>
-<li><b>ftp_lite_auth_userpass</b><p>
-<code>int ftp_lite_auth_userpass( struct ftp_lite_server *s, const char *user, const char *password );</code><p>
+The er must have already established a proxy certificate with <tt>grid-proxy-init</tt> or a similar tool.
+<li><b>ftp_lite_auth_userpass</b>
+<code>int ftp_lite_auth_userpass( struct ftp_lite_server *s, const char *user, const char *password );</code>
 Attempt to log in with this name and password.   This mechanism sends names and passwords in the clear and should be deprecated in favor of Globus authentication.
-<p>
-<li><b>ftp_lite_change_dir</b><p>
-<code>int ftp_lite_change_dir( struct ftp_lite_server *s, const char *dir );</code><p>
+
+<li><b>ftp_lite_change_dir</b>
+<code>int ftp_lite_change_dir( struct ftp_lite_server *s, const char *dir );</code>
 Change the current working directory to that given.
-<p>
-<li><b>ftp_lite_close</b><p>
-<code>void ftp_lite_close( struct ftp_lite_server *server );</code><p>
+
+<li><b>ftp_lite_close</b>
+<code>void ftp_lite_close( struct ftp_lite_server *server );</code>
 Close this open server.  Once a connection is closed, the server pointer is no longer valid.
-<p>
-<li><b>ftp_lite_delete int</b><p>
-<code>int ftp_lite_delete( struct ftp_lite_server *s, const char *path );</code><p>
+
+<li><b>ftp_lite_delete int</b>
+<code>int ftp_lite_delete( struct ftp_lite_server *s, const char *path );</code>
 Delete a file.
-<p>
-<li><b>ftp_lite_delete_dir</b><p>
-<code>int ftp_lite_delete_dir( struct ftp_lite_server *s, const char *dir );</code><p>
+
+<li><b>ftp_lite_delete_dir</b>
+<code>int ftp_lite_delete_dir( struct ftp_lite_server *s, const char *dir );</code>
 Delete a directory.  Most servers will not permit the deletion of a directory that is not empty.
-<p>
-<li><b>ftp_lite_done</b><p>
-<code>int ftp_lite_done( struct ftp_lite_server *s );</code><p>
-Signal that a data transfer is complete.  This must be called before any other functions are invoked.
-<p>
-<li><b>ftp_lite_get</b><p>
-<code>FILE * ftp_lite_get( struct ftp_lite_server *s, const char *path, off_t offset );</code><p>
-Retrieve a file beginning from this offset.  On success, returns a stream pointer.  On failure, returns null.  After reading to the end of the stream, you must call <tt>fclose</tt> and <tt>ftp_lite_done</tt>.
-<p>
-<li><b>ftp_lite_list</b><p>
-<code>FILE * ftp_lite_list( struct ftp_lite_server *s, const char *path );</code><p>
-Retrieve the list of names contained in this directory.  On success, return a stream pointer which will provide the list of newline-terminated names.  On failure, returns null.  After reading to the end of the stream, you must call <tt>fclose</tt> and <tt>ftp_lite_done</tt>.
-<p>
-<li><b>ftp_lite_login</b><p>
-<code>int ftp_lite_login( const char *prompt, char *name, int namelen, char *pass, int passlen );</code><p>
+
+<li><b>ftp_lite_done</b>
+<code>int ftp_lite_done( struct ftp_lite_server *s );</code>
+Signal that a data transfer is complete.  This must be ed before any other functions are invoked.
+
+<li><b>ftp_lite_get</b>
+<code>FILE * ftp_lite_get( struct ftp_lite_server *s, const char *path, off_t offset );</code>
+Retrieve a file beginning from this offset.  On success, returns a stream pointer.  On failure, returns null.  After reading to the end of the stream, you must  <tt>fclose</tt> and <tt>ftp_lite_done</tt>.
+
+<li><b>ftp_lite_list</b>
+<code>FILE * ftp_lite_list( struct ftp_lite_server *s, const char *path );</code>
+Retrieve the list of names contained in this directory.  On success, return a stream pointer which will provide the list of newline-terminated names.  On failure, returns null.  After reading to the end of the stream, you must  <tt>fclose</tt> and <tt>ftp_lite_done</tt>.
+
+<li><b>ftp_lite_login</b>
+<code>int ftp_lite_login( const char *prompt, char *name, int namelen, char *pass, int passlen );</code>
 Display a prompt on the console and ask the user to enter a name and password.  <tt>name</tt> and <tt>pass</tt> are filled in up to the lengths given.
-<p>
-<li><b>ftp_lite_make_dir</b><p>
-<code>int ftp_lite_make_dir( struct ftp_lite_server *s, const char *dir );</code><p>
+
+<li><b>ftp_lite_make_dir</b>
+<code>int ftp_lite_make_dir( struct ftp_lite_server *s, const char *dir );</code>
 Create a directory.
-<p>
-<li><b>ftp_lite_nop</b><p>
-<code>int ftp_lite_nop( struct ftp_lite_server *s );</code><p>
+
+<li><b>ftp_lite_nop</b>
+<code>int ftp_lite_nop( struct ftp_lite_server *s );</code>
 Send a no-operation command to the server.  This command is useful for determining if a connection is still alive.
-<p>
-<li><b>ftp_lite_open</b><p>
-<code>struct ftp_lite_server * ftp_lite_open( const char *host, int port, FILE *log );</code><p>
+
+<li><b>ftp_lite_open</b>
+<code>struct ftp_lite_server * ftp_lite_open( const char *host, int port, FILE *log );</code>
 Connect to a server on the given host and port.  The third argument gives a stream which is used for debugging information.  On success, return an opaque pointer to a server.  On failure, return null.  The appropriate port depends on the authentication method to be used.  For Globus authentication, connect to <tt>FTP_LITE_GSS_DEFAULT_PORT</tt>.  For anonymous and userpass authentication, connect to <tt>FTP_LITE_DEFAULT_PORT</tt>.
-<p>
-<li><b>ftp_lite_open_and_auth</b><p>
-<code>struct ftp_lite_server * ftp_lite_open_and_auth( const char *host, FILE *log );</code><p>
+
+<li><b>ftp_lite_open_and_auth</b>
+<code>struct ftp_lite_server * ftp_lite_open_and_auth( const char *host, FILE *log );</code>
 Connect to a server, but try all available ports and authentication methods.  The second argument gives a stream to be used for debugging.  On success, return an opaque pointer to a server.  On failure, return null.
-<p>
-<li><b>ftp_lite_put</b><p>
-<code>FILE * ftp_lite_put( struct ftp_lite_server *s, const char *path, off_t offset, size_t size );</code><p>
-Transmit a file to a server.  On success, returns a stream to be written to.  On failure, returns null.  After writing all data to the stream, you must call <tt>fclose</tt> and <tt>ftp_lite_done</tt>.  <tt>offset</tt> controls the point at which writing will begin in the target file.  If <tt>size</tt> is <tt>FTP_LITE_WHOLE_FILE</tt>, then the target file will be truncated when the stream is closed.  A variety of FTP commands may be used to implement a put, and not all severs will support all combinations of <tt>offset</tt> and <tt>size</tt>.
-<p>
-<li><b>ftp_lite_rename</b><p>
-<code>int ftp_lite_rename( struct ftp_lite_server *s, const char *oldname, const char *newname );</code><p>
+
+<li><b>ftp_lite_put</b>
+<code>FILE * ftp_lite_put( struct ftp_lite_server *s, const char *path, off_t offset, size_t size );</code>
+Transmit a file to a server.  On success, returns a stream to be written to.  On failure, returns null.  After writing all data to the stream, you must  <tt>fclose</tt> and <tt>ftp_lite_done</tt>.  <tt>offset</tt> controls the point at which writing will begin in the target file.  If <tt>size</tt> is <tt>FTP_LITE_WHOLE_FILE</tt>, then the target file will be truncated when the stream is closed.  A variety of FTP commands may be used to implement a put, and not all severs will support all combinations of <tt>offset</tt> and <tt>size</tt>.
+
+<li><b>ftp_lite_rename</b>
+<code>int ftp_lite_rename( struct ftp_lite_server *s, const char *oldname, const char *newname );</code>
 Move the file <tt>oldname</tt> in <tt>newname</tt>.
-<p>
-<li><b>ftp_lite_size</b><p>
-<code>size_t ftp_lite_size( struct ftp_lite_server *s, const char *path );</code><p>
+
+<li><b>ftp_lite_size</b>
+<code>size_t ftp_lite_size( struct ftp_lite_server *s, const char *path );</code>
 Return the number of bytes stored in this file.  On failure, returns -1.
-<p>
-<li><b>ftp_lite_stream_to_buffer</b><p>
-<code>int ftp_lite_stream_to_buffer( FILE *input, char **buffer );</code><p>
-Copy the contents of this stream into a memory buffer.  On success, returns the number of bytes copied.  On failure, returns -1.  <tt>input</tt> must be a stream opened for reading, and <tt>buffer</tt> must be a pointer to an uninitialized <tt>char *</tt>.  Space for the buffer will be allocated with <tt>malloc</tt>.  The caller becomes responsible for freeing the buffer when done.
-<p>
-<li><b>ftp_lite_stream_to_stream</b><p>
-<code>int ftp_lite_stream_to_stream( FILE *input, FILE *output );</code><p>
+
+<li><b>ftp_lite_stream_to_buffer</b>
+<code>int ftp_lite_stream_to_buffer( FILE *input, char **buffer );</code>
+Copy the contents of this stream into a memory buffer.  On success, returns the number of bytes copied.  On failure, returns -1.  <tt>input</tt> must be a stream opened for reading, and <tt>buffer</tt> must be a pointer to an uninitialized <tt>char *</tt>.  Space for the buffer will be allocated with <tt>malloc</tt>.  The er becomes responsible for freeing the buffer when done.
+
+<li><b>ftp_lite_stream_to_stream</b>
+<code>int ftp_lite_stream_to_stream( FILE *input, FILE *output );</code>
 Copy the contents of one stream into another.  On success, returns the number of bytes copied.  On failure, returns -1.
-<p>
-<li><b>ftp_lite_third_party_transfer</b><p>
-<code>int ftp_lite_third_party_transfer( struct ftp_lite_server *source, const char *source_file, struct ftp_lite_server *target, const char *target_file );</code><p>
+
+<li><b>ftp_lite_third_party_transfer</b>
+<code>int ftp_lite_third_party_transfer( struct ftp_lite_server *source, const char *source_file, struct ftp_lite_server *target, const char *target_file );</code>
 Performs a third-party transfer between two servers.  Each server must already be opened and authenticated.  There are a large number of reasons for which a third party transfer might fail.  We recommend you use this feature with the debugging stream enabled.
-<p>
+
 </dir>
 
 </div>

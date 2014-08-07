@@ -1,5 +1,5 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
-<html>
+<html lang="en">
 
 <head>
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
@@ -18,7 +18,7 @@ AWE is Copyright (C) 2013- The University of Notre Dame.
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 <p>
-<h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="overview">Overview<a class="sectionlink" href="#overview">&#x21d7;</a></h2>
 Accelerated Weighted Ensemble or AWE package provides a Python library for adaptive
 sampling of molecular dynamics. The framework decomposes the resampling
 computations and the molecular dynamics simulations into tasks that are
@@ -30,7 +30,7 @@ package, for dispatching jobs for execution on allocated resources.
 Documentation on downloading, installing, and using Work Queue can be found 
 <a href="workqueue.html">here</a>. 
 
-<h2 id="requirement">Software Requirements<a class="sectionlink" href="#requirement" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="requirement">Software Requirements<a class="sectionlink" href="#requirement">&#x21d7;</a></h2>
 AWE currently uses the GROMACS molecular dynamics simulation package. So it
 requires an installation of GROMACS 4.5 or above and its installed location
 added to PATH. It also requires the GROMACS XTC library for operation. 
@@ -112,7 +112,7 @@ Clustering may be done using the <a href="http://msmbuilder.org">MSMBuilder</a> 
 Finally use the <tt>SaveStructures.py</tt> command from MSMBuilder to extract conformations from each of the clusters, as well as the <tt>awe-import-gens</tt> and <tt>awe-prepare</tt> scripts from AWE-WQ to import convert to AWE-WQ file formats.
 If desired, the <tt>awe-calc-gens-rmsd</tt> will compute the RMSD of the cluster centers to a reference structure and <tt>awe-define-regions</tt> can be used to determine the regions cells belong to based on RMSD.
 
-<center><image title="AWE-WQ Workflow" src="awe/workflow.png"/></center>
+<center><img title="AWE-WQ Workflow" src="awe/workflow.png"/></center>
 
 <p>
 AWE-WQ uses a Master/Worker model to execute tasks on remote machines.
@@ -120,7 +120,7 @@ A task is comprised of several files:
 The cell definitions, the starting conformation, requisite MD software, assignment program, and a script that executes the task.
 The AWE-WQ execution flowchart is illustrated below:
 
-<center><image width=300 title="AWE-WQ Flowchart" src="awe/flowchart.png"/></center>
+<center> <img width=300 title="AWE-WQ Flowchart" src="awe/flowchart.png"> </center>
 
 
 <h3>Tutorial</h3>
@@ -276,8 +276,8 @@ As such, we can plot, as shown below, the cell coordinates and the initial estim
   <th>After</th>
 </tr>
 <tr>
-  <td><image src="awe/ala-rama-msm.png" title="Initial approximation using MSM, before running AWE-WQ"></td>
-  <td><image src="awe/ala-rama-awe.png" title="After running AWE-WQ"></td>
+  <td><img src="awe/ala-rama-msm.png" title="Initial approximation using MSM, before running AWE-WQ"></td>
+  <td><img src="awe/ala-rama-awe.png" title="After running AWE-WQ"></td>
 </tr>
 </table>
 
@@ -308,9 +308,8 @@ where <tt>i</tt> is the index of the cell and <tt>j</tt> is the index of the wal
 </ol>
 
 <h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
-For the latest information about AWE, please visit our <a
-href=http://ccl.cse.nd.edu/software/awe>web site</a> and subscribe to our <a
-href=http://ccl.cse.nd.edu/software/help.shtml>mailing list</a>.
+For the latest information about AWE, please visit our <a href="http://ccl.cse.nd.edu/software/awe">web site</a> and subscribe to our <a
+href="http://ccl.cse.nd.edu/software/help.shtml">mailing list</a>.
 
 </div>
 </body>

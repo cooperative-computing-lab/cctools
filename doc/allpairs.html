@@ -22,7 +22,7 @@ See the file COPYING for details.
 <table>
 <tr>
 	<td valign=middle>
-			<a href=http://ccl.cse.nd.edu/software/allpairs/large.gif><img src=http://ccl.cse.nd.edu/software/allpairs/small.gif align=right border=0></a>
+			<a href="http://ccl.cse.nd.edu/software/allpairs/large.gif"><img src="http://ccl.cse.nd.edu/software/allpairs/small.gif" align=right border=0></a>
 	</td>
 	<td valign=middle>
 		<div id=abstraction>
@@ -44,7 +44,7 @@ part of the matrix, using a specified number of CPU cores. The abstraction then
 runs each of the functions in parallel, automatically handling load balancing,
 data movement, fault tolerance and so on for you.
 
-<h2 id="singlemachine" id="preparation">All-Pairs on a Single Machine<a class="sectionlink" href="#singlemachine" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="singlemachine">All-Pairs on a Single Machine<a class="sectionlink" href="#singlemachine" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>
 Let's suppose you have a whole lot of files that you want to compare all to each other, named <tt>a</tt>, <tt>b</tt>, <tt>c</tt>, and so on.  Suppose that you also have a program named <tt>compareit</tt> that when invoked as <tt>compareit a b</tt> will compare files <tt>a</tt> and <tt>b</tt> and produce some output summarizing the difference between the two, like this:
@@ -73,8 +73,7 @@ For large sets of objects, allpairs_multicore will use as many cores as you have
 So far, we have introduced how to use All-Pairs abstraction on a single
 machine.  But sometimes the All-Pairs problem is too big to allow a single
 machine to finish it in a reasonable amount of time, even if the single machine
-is multicore. So, we have built a <a
-		href=http://ccl.cse.nd.edu/software/workqueue>Work Queue</a>
+is multicore. So, we have built a <a href="http://ccl.cse.nd.edu/software/workqueue">Work Queue</a>
 version of the All-Pairs abstraction which allows the users to easily apply the
 All-Pairs abstraction on clusters, grids or clouds.
 <p>
@@ -96,7 +95,7 @@ Let's suppose the master is running on a machine named <tt>barney.nd.edu</tt>.
 If you have access to login to other machines, you could simply start
 worker processes by hand on each one, like this:
 <code>% work_queue_worker barney.nd.edu 9123</code>
-If you have access to a batch system like <a href=http://www.cs.wisc.edu/condor>Condor</a>, you can submit multiple workers at once:
+If you have access to a batch system like <a href="http://www.cs.wisc.edu/condor">Condor</a>, you can submit multiple workers at once:
 <code>% condor_submit_workers barney.nd.edu 9123 10
 Submitting job(s)..........
 Logging submit event(s)..........
@@ -138,7 +137,7 @@ than actually accomplishing real work.  If you can express your comparison
 as a simple function in C, you can embed that into the allpairs framework
 to achieve significant speedups.
 <p>
-To accomplish this, <a href=http://ccl.cse.nd.edu/software/download.shtml>download</a>
+To accomplish this, <a href="http://ccl.cse.nd.edu/software/download.shtml">download</a>
 the CCTools source code, and build it.  Then, look for the file <tt>allpairs/src/allpairs_compare.c</tt>.
 At the top, you will see a function named <tt>allpairs_compare_CUSTOM</tt>, which accepts
 two memory objects as arguments.  Implement your comparison function, and then rebuild
@@ -177,12 +176,11 @@ which is 3/4 of memory by default.
 </dir>
 
 
-<h2 id="moreinfo" id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>
-For the latest information about Allpairs, please visit our <a
-href=http://ccl.cse.nd.edu/software/allpairs>web site</a> and subscribe to our
-<a href=http://ccl.cse.nd.edu/software/help.shtml>mailing list</a>.
+For the latest information about Allpairs, please visit our <a href="http://ccl.cse.nd.edu/software/allpairs">web site</a> and subscribe to our
+<a href="http://ccl.cse.nd.edu/software/help.shtml">mailing list</a>.
 
 </div>
 </body>
