@@ -2388,6 +2388,74 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q, str
 	return w;
 }
 
+// 1 if a < b, 0 if a >= b
+static int compare_worst_fit(struct work_queue_resources *a, struct work_queue_resources *b)
+{
+	//Total worker order: free cores > free memory > free disk > free gpus
+	if((a->cores.total < b->cores.total))
+		return 1;
+
+	if((a->cores.total > b->cores.total))
+		return 0;
+
+	//Same number of free cores...
+	if((a->memory.total < b->memory.total))
+		return 1;
+
+	if((a->memory.total > b->memory.total))
+		return 0;
+
+	//Same number of free memory...
+	if((a->disk.total < b->disk.total))
+		return 1;
+
+	if((a->disk.total > b->disk.total))
+		return 0;
+
+	//Same number of free disk...
+	if((a->gpus.total < b->gpus.total))
+		return 1;
+
+	if((a->gpus.total > b->gpus.total))
+		return 0;
+
+	//Number of free resources are the same.
+	return 0;
+}
+
+static struct work_queue_worker *find_worker_by_worst_fit(struct work_queue *q, struct work_queue_task *t)
+{
+	char *key;
+	struct work_queue_worker *w;
+	struct work_queue_worker *best_worker = NULL;
+
+	struct work_queue_resources bres;
+	struct work_queue_resources wres;
+
+	memset(&bres, 0, sizeof(struct work_queue_resources));
+	memset(&wres, 0, sizeof(struct work_queue_resources));
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		if( check_worker_against_task(q, w, t) ) {
+
+			//Use total field on bres, wres to indicate free resources.
+			wres.cores.total   = w->resources->cores.total   - w->cores_allocated;
+			wres.memory.total  = w->resources->memory.total  - w->memory_allocated;
+			wres.disk.total    = w->resources->disk.total    - w->disk_allocated;
+			wres.gpus.total    = w->resources->gpus.total    - w->gpus_allocated;
+
+			if(!best_worker || compare_worst_fit(&bres, &wres))
+			{
+				best_worker = w;
+				memcpy(&bres, &wres, sizeof(struct work_queue_resources));
+			}
+		}
+	}
+
+	return best_worker;
+}
+
 static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
@@ -2431,6 +2499,8 @@ static struct work_queue_worker *find_best_worker(struct work_queue *q, struct w
 		return find_worker_by_time(q, t);
 	case WORK_QUEUE_SCHEDULE_RAND:
 		return find_worker_by_random(q, t);
+	case WORK_QUEUE_SCHEDULE_WORST:
+		return find_worker_by_worst_fit(q, t);
 	case WORK_QUEUE_SCHEDULE_FCFS:
 	default:
 		return find_worker_by_fcfs(q, t);
