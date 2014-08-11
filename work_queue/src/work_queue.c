@@ -2429,11 +2429,11 @@ static struct work_queue_worker *find_best_worker(struct work_queue *q, struct w
 		return find_worker_by_files(q, t);
 	case WORK_QUEUE_SCHEDULE_TIME:
 		return find_worker_by_time(q, t);
-	case WORK_QUEUE_SCHEDULE_RAND:
-		return find_worker_by_random(q, t);
 	case WORK_QUEUE_SCHEDULE_FCFS:
-	default:
 		return find_worker_by_fcfs(q, t);
+	case WORK_QUEUE_SCHEDULE_RAND:
+	default:
+		return find_worker_by_random(q, t);
 	}
 }
 

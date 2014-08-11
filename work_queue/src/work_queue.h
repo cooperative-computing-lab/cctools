@@ -28,7 +28,7 @@ See the file COPYING for details.
 #define WORK_QUEUE_SCHEDULE_FCFS	 1 /**< Select worker on a first-come-first-serve basis. */
 #define WORK_QUEUE_SCHEDULE_FILES	 2 /**< Select worker that has the most data required by the task. */
 #define WORK_QUEUE_SCHEDULE_TIME	 3 /**< Select worker that has the fastest execution time on previous tasks. */
-#define WORK_QUEUE_SCHEDULE_RAND	 4 /**< Select a random worker. */
+#define WORK_QUEUE_SCHEDULE_RAND	 4 /**< Select a random worker. (default) */
 
 #define WORK_QUEUE_TASK_ORDER_FIFO 0  /**< Retrieve tasks based on first-in-first-out order. */
 #define WORK_QUEUE_TASK_ORDER_LIFO 1  /**< Retrieve tasks based on last-in-first-out order. */
@@ -448,7 +448,7 @@ will be executed next.
 - @ref WORK_QUEUE_SCHEDULE_FCFS	 - Select worker on a first-come-first-serve basis.
 - @ref WORK_QUEUE_SCHEDULE_FILES - Select worker that has the most data required by the task.
 - @ref WORK_QUEUE_SCHEDULE_TIME	 - Select worker that has the fastest execution time on previous tasks.
-- @ref WORK_QUEUE_SCHEDULE_RAND	 - Select a random worker.
+- @ref WORK_QUEUE_SCHEDULE_RAND	 - Select a random worker (default).
 */
 void work_queue_specify_algorithm(struct work_queue *q, int algo);
 
