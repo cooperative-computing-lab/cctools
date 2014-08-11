@@ -2361,8 +2361,8 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q, str
 {
 	char *key;
 	struct work_queue_worker *w = NULL;
-	struct list *valid_workers = list_create();
 	int random_worker;
+	struct list *valid_workers = list_create();
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
@@ -2371,20 +2371,17 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q, str
 		}
 	}
 
+	w = NULL;
 	if(list_size(valid_workers) > 0) {
 		random_worker = (rand() % list_size(valid_workers)) + 1;
-	} else {
-		list_delete(valid_workers);
-		return NULL;
+
+		while(random_worker && list_size(valid_workers)) {
+			w = list_pop_head(valid_workers);
+			random_worker--;
+		}
 	}
 
-	w = NULL;
-	while(random_worker && list_size(valid_workers)) {
-		w = list_pop_head(valid_workers);
-		random_worker--;
-	}
 	list_delete(valid_workers);
-	
 	return w;
 }
 
