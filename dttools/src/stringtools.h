@@ -76,6 +76,7 @@ int string_nformat(char *str, const size_t max, const char *fmt, ...);
 char *string_trim(char *s, int(func)(int));
 char *string_trim_spaces(char *s);
 char *string_trim_quotes(char *s);
+char *string_replace_spaces(char *str);
 
 /** Converts a string to a boolean value. "true", "yes", and "N">0 are,
  * case-insensitive, true. Everything else (including NULL) is false.
