@@ -834,6 +834,20 @@ char *string_trim_quotes(char *s)
 	return front;
 }
 
+char *string_replace_spaces(char *s)
+{
+	char *cur = s;
+
+	while (*cur) {
+		if (isspace((int) *cur))
+			*cur = '_';
+
+		cur++;
+	}
+
+	return s;
+}
+
 int string_istrue(const char *str)
 {
 	if(str == NULL)
