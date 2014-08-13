@@ -39,6 +39,7 @@ The following major problems must be fixed:
 #include "process.h"
 #include "path.h"
 #include "md5.h"
+#include "url_encode.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -851,13 +852,16 @@ char * make_cached_name( struct work_queue_task *t, struct work_queue_file *f )
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	md5_buffer(f->payload,strlen(f->payload),digest);
 
+	char payload_enc[PATH_MAX];
+	url_encode(path_basename(f->payload), payload_enc, PATH_MAX);
+
 	switch(f->type) {
 		case WORK_QUEUE_FILE:
 		case WORK_QUEUE_DIRECTORY:
-			return string_format("file-%s-%s",md5_string(digest),path_basename(f->payload));
+			return string_format("file-%s-%s",md5_string(digest),payload_enc);
 			break;
 		case WORK_QUEUE_FILE_PIECE:
-			return string_format("piece-%s-%s-%lld-%lld",md5_string(digest),path_basename(f->payload),(long long)f->offset,(long long)f->piece_length);
+			return string_format("piece-%s-%s-%lld-%lld",md5_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
 			break;
 		case WORK_QUEUE_REMOTECMD:
 			return string_format("cmd-%s",md5_string(digest));
