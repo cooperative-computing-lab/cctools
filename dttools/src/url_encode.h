@@ -27,8 +27,8 @@ void url_encode(const char *source, char *target, int length);
 /** Decodes an RFC 2396 string into plain ASCII.
 For example, the string <tt>Let%27s%20go</tt> becomes <tt>Let's go</tt>.
 Typically used to decode URLs and Chirp file names.
-@param source The plain ASCII input string.
-@param target The location of the encoded output string.
+@param source The location of the encoded output string.
+@param target The plain ASCII input string.
 @param length The size in bytes of the output string space.
 @see url_encode
  */

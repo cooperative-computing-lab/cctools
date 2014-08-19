@@ -39,6 +39,7 @@ The following major problems must be fixed:
 #include "process.h"
 #include "path.h"
 #include "md5.h"
+#include "url_encode.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -851,13 +852,16 @@ char * make_cached_name( struct work_queue_task *t, struct work_queue_file *f )
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	md5_buffer(f->payload,strlen(f->payload),digest);
 
+	char payload_enc[PATH_MAX];
+	url_encode(path_basename(f->payload), payload_enc, PATH_MAX);
+
 	switch(f->type) {
 		case WORK_QUEUE_FILE:
 		case WORK_QUEUE_DIRECTORY:
-			return string_format("file-%s-%s",md5_string(digest),path_basename(f->payload));
+			return string_format("file-%s-%s",md5_string(digest),payload_enc);
 			break;
 		case WORK_QUEUE_FILE_PIECE:
-			return string_format("piece-%s-%s-%lld-%lld",md5_string(digest),path_basename(f->payload),(long long)f->offset,(long long)f->piece_length);
+			return string_format("piece-%s-%s-%lld-%lld",md5_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
 			break;
 		case WORK_QUEUE_REMOTECMD:
 			return string_format("cmd-%s",md5_string(digest));
@@ -2166,6 +2170,8 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 	send_worker_msg(q,w, "disk %"PRId64"\n",    t->disk );
 	send_worker_msg(q,w, "gpus %d\n",    t->gpus );
 
+	char remote_name_encoded[PATH_MAX];
+
 	if(t->input_files) {
 		struct work_queue_file *tf;
 		list_first_item(t->input_files);
@@ -2174,7 +2180,8 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 				send_worker_msg(q,w, "dir %s\n", tf->remote_name);
 			} else {
 				char *cached_name = make_cached_name(t,tf);
-				send_worker_msg(q,w, "infile %s %s %d\n", cached_name, tf->remote_name, tf->flags);
+				url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
+				send_worker_msg(q,w, "infile %s %s %d\n", cached_name, remote_name_encoded, tf->flags);
 				free(cached_name);
 			}
 		}
@@ -2185,7 +2192,8 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 		list_first_item(t->output_files);
 		while((tf = list_next_item(t->output_files))) {
 			char *cached_name = make_cached_name(t,tf);
-			send_worker_msg(q,w, "outfile %s %s %d\n", cached_name, tf->remote_name, tf->flags);
+			url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
+			send_worker_msg(q,w, "outfile %s %s %d\n", cached_name, remote_name_encoded, tf->flags);
 			free(cached_name);
 		}
 	}

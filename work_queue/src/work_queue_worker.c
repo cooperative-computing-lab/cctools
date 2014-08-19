@@ -35,6 +35,7 @@ See the file COPYING for details.
 #include "delete_dir.h"
 #include "itable.h"
 #include "random_init.h"
+#include "url_encode.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -696,6 +697,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char filename[WORK_QUEUE_LINE_MAX];
 	char localname[WORK_QUEUE_LINE_MAX];
 	char taskname[WORK_QUEUE_LINE_MAX];
+	char taskname_encoded[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
 
 	struct work_queue_process *p = work_queue_process_create(taskid);
@@ -709,11 +711,13 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			work_queue_task_specify_command(task,cmd);
 			debug(D_WQ,"rx from master: %s",cmd);
 			free(cmd);
-		} else if(sscanf(line,"infile %s %s %d", filename, taskname, &flags)) {
+		} else if(sscanf(line,"infile %s %s %d", filename, taskname_encoded, &flags)) {
 			sprintf(localname, "cache/%s", filename);
+			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);
 			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags);
-		} else if(sscanf(line,"outfile %s %s %d", filename, taskname, &flags)) {
+		} else if(sscanf(line,"outfile %s %s %d", filename, taskname_encoded, &flags)) {
 			sprintf(localname, "cache/%s", filename);
+			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);
 			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags);
 		} else if(sscanf(line, "dir %s", filename)) {
 			work_queue_task_specify_directory(task, filename, filename, WORK_QUEUE_INPUT, 0700, 0);
