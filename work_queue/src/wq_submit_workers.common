@@ -214,7 +214,7 @@ set_up_working_directory()
 	gpu_detection=`which cctools_gpu_autodetect 2>/dev/null`
 	if [ $? != 0 ]
 	then
-		echo "$0: couldnot find cctools_gpu_autodetect in PATH. gpus will not be automatically detected."
+		echo "$0: could not find cctools_gpu_autodetect in PATH. gpus will not be automatically detected."
 	else
 		cp $gpu_detection ${submit_dir}
 	fi
