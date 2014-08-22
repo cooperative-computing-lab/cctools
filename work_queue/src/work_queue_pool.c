@@ -395,8 +395,11 @@ int main(int argc, char *argv[])
 	}
 
 	char cmd[1024];
-	sprintf(cmd,"cp `which work_queue_worker` %s",scratch_dir);
-	system(cmd);
+	sprintf(cmd,"cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
+	if (system(cmd)) {
+		fprintf(stderr, "work_queue_pool: please add work_queue_worker to your PATH.\n");
+		exit(EXIT_FAILURE);
+	}
 
 	if(password_file) {
 		sprintf(cmd,"cp %s %s/pwfile",password_file,scratch_dir);
