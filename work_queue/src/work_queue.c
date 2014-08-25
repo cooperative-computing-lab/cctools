@@ -1271,7 +1271,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	if(!q || !w || !line) return WORKER_FAILURE; 
 
-	int task_result;
+	int task_status, exit_status;
 	uint64_t taskid;
 	int64_t output_length, retrieved_output_length;
 	timestamp_t execution_time;
@@ -1281,17 +1281,18 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	timestamp_t effective_stoptime = 0;
 	time_t stoptime;
 
-	//Format: result, output length, execution time, taskid
-	char items[3][WORK_QUEUE_PROTOCOL_FIELD_MAX];
-	int n = sscanf(line, "result %s %s %s %" SCNd64, items[0], items[1], items[2], &taskid);
+	//Format: task completion status, exit status (exit code or signal), output length, execution time, taskid
+	char items[4][WORK_QUEUE_PROTOCOL_FIELD_MAX];
+	int n = sscanf(line, "result %s %s %s %s %" SCNd64, items[0], items[1], items[2], items[3], &taskid);
 
-	if(n < 4) {
+	if(n < 5) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		return WORKER_FAILURE;
 	}
 	
-	task_result = atoi(items[0]);
-	output_length = atoll(items[1]);
+	task_status = atoi(items[0]);
+	exit_status   = atoi(items[1]);
+	output_length = atoll(items[2]);
 	
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
@@ -1304,12 +1305,9 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t->time_receive_result_start = timestamp_get();
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 	
-	if(n >= 3) {
-		execution_time = atoll(items[2]);
-		t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
-	} else {
-		t->cmd_execution_time = observed_execution_time;
-	}
+	execution_time = atoll(items[3]);
+	t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
+
 	t->total_cmd_execution_time += t->cmd_execution_time;
 
 	if(q->bandwidth) {
@@ -1372,7 +1370,8 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	
 	t->time_receive_result_finish = timestamp_get();
 
-	t->return_status = task_result;
+	t->result        = task_status;
+	t->return_status = exit_status;
 
 	t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
 	q->total_execute_time += t->cmd_execution_time;
