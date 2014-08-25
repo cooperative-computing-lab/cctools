@@ -1951,9 +1951,9 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Base url for group lookups. (default: disabled)\n", "-G,--group-url=<url>");
 	fprintf(stdout, " %-30s Run as lower privilege user. (root protection)\n", "-i,--user=<user>");
 	fprintf(stdout, " %-30s Listen only on this network interface.\n", "-I,--interface=<addr>");
-	fprintf(stdout, " %-30s Enable Chirp job execution. (default: OFF)\n", "--jobs");
-	fprintf(stdout, " %-30s Maximum concurrent jobs. (default: %d)\n", "--job-concurrency", chirp_job_concurrency);
-	fprintf(stdout, " %-30s Execution time limit for jobs. (default: %ds)\n", "--job-time-limit", chirp_job_time_limit);
+	fprintf(stdout, " %-30s Enable Chirp job execution. (default: OFF)\n", "   --jobs");
+	fprintf(stdout, " %-30s Maximum concurrent jobs. (default: %d)\n", "   --job-concurrency", chirp_job_concurrency);
+	fprintf(stdout, " %-30s Execution time limit for jobs. (default: %ds)\n", "   --job-time-limit", chirp_job_time_limit);
 	fprintf(stdout, " %-30s Set the maximum number of clients to accept at once. (default unlimited)\n", "-M,--max-clients=<count>");
 	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
