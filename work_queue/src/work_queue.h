@@ -97,6 +97,7 @@ struct work_queue_task {
 	int total_submissions;			   /**< The number of times the task has been submitted. */
 	timestamp_t total_cmd_execution_time;	/**< Time spent in microseconds for executing the command on any worker, including resubmittions of the task. */
 
+	int64_t maximum_end_time;                       
 	int64_t memory;                       
 	int64_t disk;
 	int cores;
@@ -275,6 +276,13 @@ void work_queue_task_specify_cores( struct work_queue_task *t, int cores );
 */
 
 void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus );
+
+/** Specify the maximum end time allowed for the task (in seconds since the Epoch). If seconds less than 1, then no end time is specified.
+@param t A task object.
+@param seconds Number of seconds since the Epoch.
+*/
+
+void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t seconds );
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the work queue, but is provided for the user's convenience

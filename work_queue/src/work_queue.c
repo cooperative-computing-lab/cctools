@@ -1114,6 +1114,46 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 }
 
 /*
+Expire tasks in the ready list.
+*/
+static void expire_waiting_task(struct work_queue *q, struct work_queue_task *t)
+{
+	t->result |= WORK_QUEUE_RESULT_TASK_TIMEOUT;
+
+	//add the task to complete list so it is given back to the application.
+	list_push_head(q->complete_list, t);
+
+	return;
+}
+
+static void expire_waiting_tasks(struct work_queue *q)
+{
+	struct work_queue_task *t;
+	int64_t current_time;
+	int count;
+
+	current_time = time(0);
+	count = list_size(q->ready_list);
+
+	while(count > 0)
+	{
+		count--;
+
+		t = list_pop_head(q->ready_list);
+
+		if(t->maximum_end_time > 0 && t->maximum_end_time <= current_time)
+		{
+			expire_waiting_task(q, t);
+		}
+		else
+		{
+			list_push_tail(q->ready_list, t);
+		}
+	}
+}
+
+
+/*
 This function handles app-level failures. It remove the task from WQ and marks
 the task as complete so it is returned to the application. 
 */
@@ -3001,6 +3041,19 @@ void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
 	set_task_unlabel_flag(t);
 }
 
+void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t seconds )
+{
+	if(seconds < 1)
+	{
+		t->maximum_end_time = 0;
+	}
+	else
+	{
+		t->maximum_end_time = seconds;
+	}
+}
+
+
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 {
 	if(t->tag)
@@ -4040,6 +4093,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			break;
 
 		wait_loop_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active, tasks_transfered);
+
+		expire_waiting_tasks(q);
 
 		//We have the resources we have been waiting for; start task transfers
 		int known = known_workers(q);
