@@ -15,7 +15,8 @@ This object is private to the work_queue_worker.
 
 struct work_queue_process {
 	pid_t pid;
-	int status;
+	int task_status;                // Any of WORK_QUEUE_RESULT_*
+	int exit_status;                // Exit code, or signal number to task process.
 	
 	struct rusage rusage;
 	timestamp_t execution_start;
