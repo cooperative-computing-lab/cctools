@@ -168,25 +168,45 @@ static int do_chirp_acl_get(const char *dirname, const char *subject, int *total
 
 int chirp_acl_check_dir(const char *dirname, const char *subject, int flags)
 {
-	int myflags;
+	int myflags = 0;
+	int paflags = 0;
 
 	if(cfs->do_acl_check() == 0)
 		return 1;
 
-	if(!do_chirp_acl_get(dirname, subject, &myflags)) {
-		/*
-		   Applications are very sensitive to this error condition.
-		   A missing ACL file indicates permission denied,
-		   but a missing directory entirely indicates no such entry.
-		 */
-
-		if(cfs_isdir(dirname)) {
-			errno = EACCES;
-		} else {
-			errno = ENOENT;
+	/* If flags is CHIRP_ACL_DELETE, then check if we have delete permissions in the *containing directory*. */
+	if (flags & CHIRP_ACL_DELETE) {
+		char dir[CHIRP_PATH_MAX];
+		path_dirname(dirname, dir);
+		if(!do_chirp_acl_get(dir, subject, &paflags)) {
+			/* Applications are very sensitive to this error condition. A
+			 * missing ACL file indicates permission denied, but a missing
+			 * directory entirely indicates no such entry.
+			 */
+			if(cfs_isdir(dirname)) {
+				errno = EACCES;
+			} else {
+				errno = ENOENT;
+			}
+			return 0;
 		}
-		return 0;
 	}
+	/* other flags require checking the actual directory... */
+	if ((flags & ~CHIRP_ACL_DELETE)) {
+		if(!do_chirp_acl_get(dirname, subject, &myflags)) {
+			/* Applications are very sensitive to this error condition. A
+			 * missing ACL file indicates permission denied, but a missing
+			 * directory entirely indicates no such entry.
+			 */
+			if(cfs_isdir(dirname)) {
+				errno = EACCES;
+			} else {
+				errno = ENOENT;
+			}
+			return 0;
+		}
+	}
+	myflags |= (paflags & CHIRP_ACL_DELETE);
 
 	/* The superuser can implicitly list and admin */
 
