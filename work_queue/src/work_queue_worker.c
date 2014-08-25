@@ -473,6 +473,11 @@ static int handle_tasks(struct link *master)
 			}
 			
 			p->execution_end = timestamp_get();
+
+			if(p->task->maximum_end_time > 0 && p->execution_end - p->task->maximum_end_time)
+			{
+				p->task->result |= WORK_QUEUE_RESULT_TASK_TIMEOUT;
+			}
 			
 			cores_allocated  -= p->task->cores;
 			memory_allocated -= p->task->memory;
