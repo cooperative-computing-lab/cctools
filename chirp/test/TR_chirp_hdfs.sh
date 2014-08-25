@@ -5,8 +5,15 @@ set -ex
 . ../../dttools/src/test_runner.common.sh
 . ./chirp-common.sh
 
+me=$(whoami)
+
+if [ -z "$me" ]; then
+	echo "I don't know who I am!" >&2
+	exit 1
+fi
+
 c="./hostport.$PPID"
-chirp_hdfs_root="hdfs:///users/$USER/$0.$(hostname).$PPID"
+chirp_hdfs_root="hdfs:///users/${me}/.chirp.test/$0.$(hostname).$PPID"
 
 prepare()
 {
