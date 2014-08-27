@@ -362,6 +362,25 @@ int process_name(struct work_queue *q, struct work_queue_worker *w, char *line)
 	return 0;
 }
 
+int process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
+{
+	char field[WORK_QUEUE_LINE_MAX];
+	char value[WORK_QUEUE_LINE_MAX];
+
+	int n = sscanf(line,"info %s %[^\n]", field, value);
+	debug(D_WQ, "Receiving %s info from worker (%s)", field, w->addrport);
+
+	if(n != 2) 
+		return -1;
+
+	//if(string_prefix_is(field, "...")) {
+     //.....
+	//}
+
+	//Note we always mark info messages as processed, as they are optional.
+	return 0;
+}
+
 
 /**
  * This function receives a message from worker and records the time a message is successfully 
@@ -411,6 +430,8 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 		result = -1;
 	} else if (string_prefix_is(line, "name")) {
 		result = process_name(q, w, line);
+	} else if (string_prefix_is(line, "info")) {
+		result = process_info(q, w, line);
 	} else {
 		// Message is not a status update: return it to the user.
 		return 1;
