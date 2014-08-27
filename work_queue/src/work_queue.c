@@ -4407,7 +4407,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_good_execute_time = qs->total_good_execute_time;
 	timestamp_t wall_clock_time = timestamp_get() - qs->start_time;
 	if(wall_clock_time>0 && s->total_workers_connected>0) {
-		s->efficiency = (double) (qs->total_execute_time) / (wall_clock_time * s->total_workers_connected);
+		s->efficiency = (double) (qs->total_good_execute_time) / (wall_clock_time * s->total_workers_connected);
 	}
 	if(wall_clock_time>0) {
 		s->idle_percentage = (double) q->total_idle_time / wall_clock_time;
@@ -4438,6 +4438,41 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->workers_full = 0;
 	s->total_worker_slots = s->tasks_running; 
 	s->avg_capacity = s->capacity;
+}
+
+void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stats *s)
+{
+	work_queue_get_stats(q, s);
+
+	char *key;
+	struct work_queue_worker *w;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		if(w->foreman)
+		{
+			accumulate_stat(s, w->stats, total_workers_joined);
+			accumulate_stat(s, w->stats, total_workers_removed);
+			accumulate_stat(s, w->stats, total_send_time);
+			accumulate_stat(s, w->stats, total_receive_time);
+			accumulate_stat(s, w->stats, total_execute_time);
+			accumulate_stat(s, w->stats, total_bytes_sent);
+			accumulate_stat(s, w->stats, total_bytes_received);
+		}
+	}
+
+	s->total_workers_joined  += q->stats_disconnected_workers->total_workers_joined;
+	s->total_workers_removed += q->stats_disconnected_workers->total_workers_removed;
+	s->total_send_time       += q->stats_disconnected_workers->total_send_time;
+	s->total_receive_time    += q->stats_disconnected_workers->total_receive_time;
+	s->total_execute_time    += q->stats_disconnected_workers->total_execute_time;
+	s->total_bytes_sent      += q->stats_disconnected_workers->total_bytes_sent;
+	s->total_bytes_received  += q->stats_disconnected_workers->total_bytes_received;
+
+	timestamp_t wall_clock_time = timestamp_get() - q->stats->start_time;
+	if(wall_clock_time>0 && s->total_workers_connected>0) {
+		s->efficiency = (double) (q->stats->total_good_execute_time) / (wall_clock_time * s->total_workers_connected);
+	}
 }
 
 /* Unlike aggregate_workers_resources below, does not reset total */

@@ -410,11 +410,17 @@ Rather than assuming a specific port, the user should simply call this function 
 */
 int work_queue_port(struct work_queue *q);
 
-/** Get queue statistics.
+/** Get queue statistics (only from master).
 @param q A work queue object.
 @param s A pointer to a buffer that will be filed with statistics.
 */
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s);
+
+/** Get statistics of the master queue together with foremen information.
+@param q A work queue object.
+@param s A pointer to a buffer that will be filed with statistics.
+*/
+void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stats *s);
 
 /** Limit the queue bandwidth when transferring files to and from workers.
 @param q A work queue object.
