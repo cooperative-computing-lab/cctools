@@ -132,7 +132,8 @@ static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
 
-static int send_resources_interval = 5;
+static int send_resources_interval = 30;
+static int send_stats_interval     = 60;
 
 static struct work_queue *foreman_q = NULL;
 
@@ -263,6 +264,37 @@ static void send_resource_update( struct link *master, int force_update )
 	memcpy(total_resources_last,total_resources,sizeof(*total_resources));
 	last_send_time = time(0);
 }
+
+/*
+Send a message to the master with my current statistics information.
+*/
+
+static void send_stats_update( struct link *master, int force_update)
+{
+	static time_t last_send_time = 0;
+
+	if(!force_update) {
+		if( results_to_be_sent_msg ) return;
+		if((time(0) - last_send_time) < send_stats_interval ) return;
+	}
+
+
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		struct work_queue_stats s;
+		work_queue_get_stats_hierarchy(foreman_q, &s);
+
+		send_master_message(master, "info total_workers_joined %lld\n", (long long) s.total_workers_joined);
+		send_master_message(master, "info total_workers_removed %lld\n", (long long) s.total_workers_removed);
+		send_master_message(master, "info total_send_time %lld\n", (long long) s.total_send_time);
+		send_master_message(master, "info total_receive_time %lld\n", (long long) s.total_receive_time);
+		send_master_message(master, "info total_execute_time %lld\n", (long long) s.total_execute_time);
+		send_master_message(master, "info total_bytes_sent %lld\n", (long long) s.total_bytes_sent);
+		send_master_message(master, "info total_bytes_received %lld\n", (long long) s.total_bytes_received);
+	}
+
+	last_send_time = time(0);
+}
+
 
 /*
 Send the initial "ready" message to the master with the version and so forth.
@@ -405,7 +437,7 @@ static void report_task_complete( struct link *master, struct work_queue_process
 		total_tasks_executed++;
 	}
 
-	send_master_message(master, "info total_execute_time %llu\n", (unsigned long long) total_task_execution_time);
+	send_stats_update(master, 1);
 }
 
 /*
@@ -1309,6 +1341,7 @@ static void foreman_for_master(struct link *master) {
 			results_to_be_sent_msg = 1;
 		}
 
+		send_stats_update(master,0);
 		send_resource_update(master,0);
 		
 		if(master_active) {
