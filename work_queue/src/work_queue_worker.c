@@ -1800,7 +1800,7 @@ int main(int argc, char *argv[])
 
 	//checks that the foreman has a unique name from the master
 	if(worker_mode == WORKER_MODE_FOREMAN && foreman_name){
-		if(!strcmp(foreman_name,project_regex) == 0) {
+		if(project_regex && strcmp(foreman_name,project_regex) == 0) {
 			fatal("Foreman (%s) and Master (%s) share a name. Ensure that these are unique.\n",foreman_name,project_regex);
 		}
 	}
