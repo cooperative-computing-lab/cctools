@@ -108,6 +108,9 @@ struct work_queue {
 
 	struct hash_table *workers_with_available_results;
 
+	struct work_queue_stats *stats;
+	struct work_queue_stats *stats_disconnected_workers;
+
 	int64_t total_tasks_submitted;
 	int64_t total_tasks_complete;
 	int64_t total_tasks_cancelled;
@@ -170,6 +173,7 @@ struct work_queue_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 	int  foreman;                             // 0 if regular worker, 1 if foreman
+	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
 	int64_t unlabeled_allocated;
 	int64_t cores_allocated;
@@ -621,6 +625,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	itable_delete(w->current_tasks);
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
+	free(w->stats);
 	free(w->hostname);
 	free(w->os);
 	free(w->arch);
@@ -686,6 +691,7 @@ static void add_worker(struct work_queue *q)
 	w->finished_tasks = 0;
 	w->start_time = timestamp_get();
 	w->resources = work_queue_resources_create();
+	w->stats     = calloc(1, sizeof(struct work_queue_stats));
 	link_to_hash_key(link, w->hashkey);
 	sprintf(w->addrport, "%s:%d", addr, port);
 	hash_table_insert(q->worker_table, w->hashkey, w);
@@ -3530,6 +3536,9 @@ struct work_queue *work_queue_create(int port)
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_blacklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
+
+	q->stats                      = calloc(1, sizeof(struct work_queue_stats));
+	q->stats_disconnected_workers = calloc(1, sizeof(struct work_queue_stats));
 	
 	q->workers_with_available_results = hash_table_create(0, 0);
 	
@@ -3740,6 +3749,9 @@ void work_queue_delete(struct work_queue *q)
 		
 		list_free(q->task_reports);
 		list_delete(q->task_reports);
+
+		free(q->stats);
+		free(q->stats_disconnected_workers);
  
 		free(q->poll_table);
 		link_close(q->master_link);
