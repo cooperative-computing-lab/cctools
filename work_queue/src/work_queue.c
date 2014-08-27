@@ -587,6 +587,24 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 	w->finished_tasks = 0;
 }
 
+#define accumulate_stat(qs, ws, field) (qs)->field += (ws)->field
+
+static void record_removed_worker_stats(struct work_queue *q, struct work_queue_worker *w)
+{
+	struct work_queue_stats *qs = q->stats_disconnected_workers;
+	struct work_queue_stats *ws = w->stats;
+
+	accumulate_stat(qs, ws, total_workers_joined);
+	accumulate_stat(qs, ws, total_send_time);
+	accumulate_stat(qs, ws, total_receive_time);
+	accumulate_stat(qs, ws, total_execute_time);
+	accumulate_stat(qs, ws, total_bytes_sent);
+	accumulate_stat(qs, ws, total_bytes_received);
+
+	//Count all the workers joined as removed.
+	qs->total_workers_removed = ws->total_workers_joined;
+}
+
 static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	if(!q || !w) return;
@@ -601,6 +619,8 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
 	
 	log_worker_stats(q);
+
+	record_removed_worker_stats(q, w);
 	
 	if(w->link)
 		link_close(w->link);
