@@ -404,7 +404,8 @@ static void report_task_complete( struct link *master, struct work_queue_process
 		total_task_execution_time += t->cmd_execution_time;
 		total_tasks_executed++;
 	}
-	
+
+	send_master_message(master, "info total_execute_time %llu\n", (unsigned long long) total_task_execution_time);
 }
 
 /*
