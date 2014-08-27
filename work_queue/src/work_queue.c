@@ -373,9 +373,21 @@ int process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 	if(n != 2) 
 		return -1;
 
-	//if(string_prefix_is(field, "...")) {
-     //.....
-	//}
+	if(string_prefix_is(field, "total_workers_joined")) {
+		w->stats->total_workers_joined = atoll(value);
+	} else if(string_prefix_is(field, "total_workers_removed")) {
+		w->stats->total_workers_removed = atoll(value);
+	} else if(string_prefix_is(field, "total_send_time")) {
+		w->stats->total_send_time = atoll(value);
+	} else if(string_prefix_is(field, "total_receive_time")) {
+		w->stats->total_receive_time = atoll(value);
+	} else if(string_prefix_is(field, "total_execute_time")) {
+		w->stats->total_execute_time = atoll(value);
+	} else if(string_prefix_is(field, "total_bytes_sent")) {
+		w->stats->total_bytes_sent = atoll(value);
+	} else if(string_prefix_is(field, "total_bytes_received")) {
+		w->stats->total_bytes_received = atoll(value);
+	}
 
 	//Note we always mark info messages as processed, as they are optional.
 	return 0;
@@ -639,9 +651,8 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
 	
-	log_worker_stats(q);
-
 	record_removed_worker_stats(q, w);
+	log_worker_stats(q);
 	
 	if(w->link)
 		link_close(w->link);
