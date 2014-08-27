@@ -118,11 +118,18 @@ struct work_queue_stats {
 	int tasks_complete;             /**< Number of tasks waiting to be returned to user. */
 	int total_tasks_dispatched;     /**< Total number of tasks dispatch to workers. */
 	int total_tasks_complete;       /**< Total number of tasks completed and returned to user. */
+	int total_tasks_failed;         /**< Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS. */
 	int total_tasks_cancelled;      /**< Total number of tasks cancelled. */
 
 	timestamp_t start_time;         /**< Absolute time at which the master started. */
 	timestamp_t total_send_time;    /**< Total time in microseconds spent in sending data to workers. */
 	timestamp_t total_receive_time; /**< Total time in microseconds spent in receiving data from workers. */
+	timestamp_t total_good_transfer_time;    /**< Total time in microseconds spent in sending and receiving data to workers for tasks with result WQ_RESULT_SUCCESS. */
+
+	timestamp_t total_execute_time; /**< Total time in microseconds workers spent executing completed tasks. */
+	timestamp_t total_good_execute_time; /**< Total time in microseconds workers spent executing successful tasks. */
+
+
 	int64_t total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
 	int64_t total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
 	double efficiency;              /**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */  
@@ -146,9 +153,6 @@ struct work_queue_stats {
 	int64_t max_disk;               /**< The largest disk space in MB observed among the connected workers. */
 	int64_t min_gpus;               /**< The lowest number of GPUs observed among the connected workers. */
 	int64_t max_gpus;               /**< The highest number of GPUs observed among the connected workers. */
-	timestamp_t total_execute_time; /**< Total time in microseconds workers spent executing completed tasks. */
-	timestamp_t total_good_execute_time; /**< Total time in microseconds workers spent executing successful tasks. */
-
 	int port;						
 	int priority;					
 	int workers_ready;              /**< @deprecated Use @ref workers_idle instead. */
