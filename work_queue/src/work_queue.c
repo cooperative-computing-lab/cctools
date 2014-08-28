@@ -82,10 +82,10 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
-/* Default: When there is a choice, send a task rather than receive 3 out of 4 times.
+/* Default: When there is a choice, send a task rather than receive 1 out of 2 times.
  * Classical WQ:   1.0 (always prefer to send)
  * Evictionphobic: 0.0 (always prefer to receive completed tasks) */
-double wq_option_send_receive_ratio    = 0.75; 
+double wq_option_send_receive_ratio    = 0.5; 
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
