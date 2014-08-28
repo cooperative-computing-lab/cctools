@@ -31,6 +31,7 @@ See the file COPYING for details.
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <signal.h>
 
@@ -72,7 +73,6 @@ static int count_workers_needed( struct list *masters_list )
 	int masters=0;
 	struct nvpair *nv;
 
-	debug(D_WQ,"evaluating master list...");
 
 	list_first_item(masters_list);
 	while((nv=list_next_item(masters_list))) {
@@ -97,8 +97,6 @@ static int count_workers_needed( struct list *masters_list )
 		needed_workers += need;
 		masters++;
 	}
-
-	debug(D_WQ,"%d total workers needed across %d masters",needed_workers,masters);
 
 	return needed_workers;
 }
@@ -181,6 +179,69 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 
 }
 
+
+static struct nvpair_header queue_headers[] = {
+	{"project",       "PROJECT", NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT, 18},
+	{"name",          "HOST",    NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT, 21},
+	{"port",          "PORT",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 5},
+	{"tasks_waiting", "WAITING", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
+	{"tasks_running", "RUNNING", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
+	{"tasks_complete","COMPLETE",NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8},
+	{"workers",       "WORKERS", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
+	{NULL,NULL,0,0,0}
+};
+
+void print_stats(struct list *masters, struct list *foremen, int submitted, int needed, int requested)
+{
+		struct timeval tv;
+		struct tm *tm;
+		gettimeofday(&tv, 0);
+		tm = localtime(&tv.tv_sec);
+
+		needed    = needed    > 0 ? needed    : 0;
+		requested = requested > 0 ? requested : 0;
+
+		fprintf(stdout, "%04d/%02d/%02d %02d:%02d:%02d: "
+				"|submitted: %d |needed: %d |requested: %d \n", 
+				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
+				submitted, needed, requested);
+
+		if( !(list_size(masters) > 0 || (foremen && list_size(foremen) > 0)) )
+		{
+			fprintf(stdout, "No change this cycle.\n\n");
+			return;
+		}
+
+		nvpair_print_table_header(stdout, queue_headers);
+
+		struct nvpair *nv;
+		if(list_size(masters) > 0)
+		{
+			fprintf(stdout, "masters:\n");
+
+			list_first_item(masters);
+			while((nv = list_next_item(masters)))
+			{
+				nvpair_print_table(nv, stdout, queue_headers);
+
+			}
+		}
+
+		if(foremen && list_size(foremen) > 0)
+		{
+			fprintf(stdout, "foremen:\n");
+
+			list_first_item(foremen);
+			while((nv = list_next_item(foremen)))
+			{
+				nvpair_print_table(nv, stdout, queue_headers);
+
+			}
+		}
+
+		fprintf(stdout, "\n");
+}
+
 /*
 Main loop of work queue pool.  Determine the number of workers needed by our
 current list of masters, compare it to the number actually submitted, then
@@ -199,12 +260,17 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 
 	while(!abort_flag) {
 		masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
+
+		debug(D_WQ,"evaluating master list...");
 		int workers_needed = count_workers_needed(masters_list);
+		debug(D_WQ,"%d total workers needed across %d masters",workers_needed,list_size(masters_list));
 
 		if(foremen_regex)
 		{
+			debug(D_WQ,"evaluating foremen list...");
 			foremen_list    = work_queue_catalog_query_cached(catalog_host,catalog_port,foremen_regex);
 			workers_needed += count_workers_needed(foremen_list);
+			debug(D_WQ,"%d total workers needed across %d foremen",workers_needed,list_size(foremen_list));
 		}
 
 		debug(D_WQ,"raw workers needed: %d", workers_needed);
@@ -223,6 +289,8 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 
 		debug(D_WQ,"workers needed: %d",workers_needed);
 		debug(D_WQ,"workers in queue: %d",workers_submitted);
+
+		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed);
 
 		if(new_workers_needed>0) {
 			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
