@@ -40,6 +40,7 @@ static int workers_min = 5;
 static int workers_max = 100;
 static int consider_capacity = 0;
 static const char *project_regex = 0;
+static const char *foremen_regex = 0;
 static int worker_timeout = 300;
 static const char *extra_worker_args=0;
 static const char *resource_args=0;
@@ -120,12 +121,12 @@ static void set_worker_resources( struct batch_queue *queue )
 			num_gpus_option ? num_gpus_option : "");
 }
 
-static int submit_worker( struct batch_queue *queue )
+static int submit_worker( struct batch_queue *queue, const char *master_regex )
 {
 	char cmd[1024];
 	char extra_input_files[1024];
 
-	sprintf(cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o worker.log ",project_regex,worker_timeout,catalog_host,catalog_port);
+	sprintf(cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o worker.log ",master_regex,worker_timeout,catalog_host,catalog_port);
 	strcpy(extra_input_files,"work_queue_worker");
 
 	if(password_file) {
@@ -149,11 +150,11 @@ static int submit_worker( struct batch_queue *queue )
 	return batch_job_submit_simple(queue,cmd,extra_input_files,"output.log");
 }
 
-static int submit_workers( struct batch_queue *queue, struct itable *job_table, int count )
+static int submit_workers( struct batch_queue *queue, struct itable *job_table, int count, const char *master_regex )
 {
 	int i;
 	for(i=0;i<count;i++) {
-		int jobid = submit_worker(queue);
+		int jobid = submit_worker(queue, master_regex);
 		if(jobid>0) {
 			debug(D_WQ,"worker job %d submitted",jobid);
 			itable_insert(job_table,jobid,(void*)1);
@@ -186,15 +187,25 @@ current list of masters, compare it to the number actually submitted, then
 submit more until the desired state is reached.
 */
 
-static void mainloop( struct batch_queue *queue, const char *project_regex )
+static void mainloop( struct batch_queue *queue, const char *project_regex, const char *foremen_regex )
 {
 	int workers_submitted = 0;
 	struct itable *job_table = itable_create(0);
 
-	while(!abort_flag) {
-	        struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
+	struct list *masters_list = NULL;
+	struct list *foremen_list = NULL;
 
+	const char *submission_regex = foremen_regex ? foremen_regex : project_regex;
+
+	while(!abort_flag) {
+		masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
 		int workers_needed = count_workers_needed(masters_list);
+
+		if(foremen_regex)
+		{
+			foremen_list    = work_queue_catalog_query_cached(catalog_host,catalog_port,foremen_regex);
+			workers_needed += count_workers_needed(foremen_list);
+		}
 
 		debug(D_WQ,"raw workers needed: %d", workers_needed);
 
@@ -215,7 +226,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex )
 
 		if(new_workers_needed>0) {
 			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
-			workers_submitted += submit_workers(queue,job_table,new_workers_needed);
+			workers_submitted += submit_workers(queue,job_table,new_workers_needed,submission_regex);
 		} else if(new_workers_needed<0) {
 			debug(D_WQ,"too many workers, will wait for some to exit");
 		} else {
@@ -254,6 +265,7 @@ static void show_help(const char *cmd)
 	printf("Use: work_queue_pool [options]\n");
 	printf("where options are:\n");
 	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,--master-name=<project>");
+	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
 	printf(" %-30s Batch system type. One of: %s (default is local)\n", "-T,--batch-type=<type>",batch_queue_type_string());
 	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
@@ -274,6 +286,7 @@ static void show_help(const char *cmd)
 enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS };
 static struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
+	{"foremen-name", required_argument, 0, 'F'},
 	{"batch-type", required_argument, 0, 'T'},
 	{"password", required_argument, 0, 'P'},
 	{"min-workers", required_argument, 0, 'w'},
@@ -306,8 +319,11 @@ int main(int argc, char *argv[])
 
 	int c;
 
-	while((c = getopt_long(argc, argv, "N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "F:N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
 		switch (c) {
+		case 'F':
+			foremen_regex = optarg;
+			break;
 		case 'N':
 		case 'M':
 			project_regex = optarg;
@@ -424,7 +440,7 @@ int main(int argc, char *argv[])
 
 	set_worker_resources( queue );
 
-	mainloop( queue, project_regex );
+	mainloop( queue, project_regex, foremen_regex );
 
 	batch_queue_delete(queue);
 
