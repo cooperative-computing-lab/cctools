@@ -294,21 +294,15 @@ static void decode_write( struct pfs_process *p, INT64_T entering, INT64_T sysca
 				p->syscall_result = pfs_pwrite(fd,local_addr,actual,offset);
 			}
 
-			if(p->syscall_result>=0) {
-				tracer_result_set(p->tracer,p->syscall_result);
-				p->state = PFS_PROCESS_STATE_KERNEL;
-				entering = 0;
-				pfs_write_count += p->syscall_result;
-			} else {
-				p->syscall_result = -errno;
-				tracer_result_set(p->tracer,p->syscall_result);
-				if(p->syscall_result==-EPIPE) {
-					// make sure that we are not in a wait state,
-					// otherwise pfs_process_raise will re-dispatch.
-					p->state = PFS_PROCESS_STATE_KERNEL;
-					pfs_process_raise(p->pid,SIGPIPE,1);
-				}
+			if(p->syscall_result!=actual) {
+				debug(D_SYSCALL,"write returned %"PRId64" instead of %"PRId64,p->syscall_result, actual);
 			}
+
+			if (p->syscall_result >= 0)
+				pfs_write_count += p->syscall_result;
+			else
+				p->syscall_result = -errno;
+			tracer_result_set(p->tracer, p->syscall_result);
 		}
 		pfs_channel_free(p->io_channel_offset);
 	}
@@ -1048,6 +1042,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_quotactl:
 		case SYSCALL64_reboot:
 		case SYSCALL64_restart_syscall:
+		case SYSCALL64_rt_sigaction:
 		case SYSCALL64_rt_sigpending:
 		case SYSCALL64_rt_sigprocmask:
 		case SYSCALL64_rt_sigqueueinfo:
@@ -1129,33 +1124,20 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			}
 			break;
 
-		/* Note that we call pfs_process_raise here so that the process data
-		 * structures are made aware of the signal propagation, possibly
-		 * kicking someone out of sleep.  However, we do *not* convert this
-		 * call to a dummy, so that the sender can deliver itself, thus getting
-		 * the correct data into the sa_info structure.
-		 */
-
 		case SYSCALL64_kill:
 		case SYSCALL64_tkill:
 			if(entering) {
-				debug(D_PROCESS,"%s %d %d",tracer_syscall64_name(p->syscall),(int)args[0],(int)args[1]);
-				p->syscall_result = pfs_process_raise(args[0],args[1],0);
-				if (p->syscall_result == -1)
+				debug(D_PROCESS, "%s(%d, %d)", tracer_syscall_name(p->tracer, p->syscall), (int)args[0], (int)args[1]);
+				if (pfs_process_cankill(args[0]) == -1)
 					divert_to_dummy(p, -errno);
-				else
-					debug(D_PROCESS,"allowing process to send kill(%d, %d)",(int)args[0],(int)args[1]);
 			}
 			break;
 
 		case SYSCALL64_tgkill:
 			if(entering) {
-				debug(D_PROCESS,"tgkill %d %d %d",(int)args[0],(int)args[1],(int)args[2]);
-				p->syscall_result = pfs_process_raise(args[1],args[2],0);
-				if (p->syscall_result == -1)
+				debug(D_PROCESS, "tgkill(%d, %d, %d)", (int)args[0], (int)args[1], (int)args[2]);
+				if (pfs_process_cankill(args[1]) == -1)
 					divert_to_dummy(p, -errno);
-				else
-					debug(D_PROCESS,"allowing process to send tgkill(%d, %d)",(int)args[1],(int)args[2]);
 			}
 			break;
 
@@ -1210,31 +1192,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_setuid:
 			if (entering)
 				divert_to_dummy(p,0);
-			break;
-
-		/* Generally speaking, the kernel implements signal handling, so we
-		 * just pass through operations such as sigaction and signal. However,
-		 * we must keep track of which signals are allowed to interrupt I/O
-		 * operations in progress.  Each process has an array,
-		 * signal_interruptible, that records this. The SA_RESTART flag to
-		 * sigaction can turn this on or off.  The traditional BSD signal()
-		 * always turns it on.
-		 */
-
-		case SYSCALL64_rt_sigaction:
-			if(entering) {
-				if(args[1]) {
-					INT64_T sig = args[0];
-					struct pfs_kernel_sigaction act;
-					int r = tracer_copy_in(p->tracer,&act,POINTER(args[1]),sizeof(act));
-					if(r!=sizeof(act)) debug(D_NOTICE,"rt_sigaction: %d",r);
-					if(act.pfs_sa_flags&SA_RESTART) {
-						pfs_current->signal_interruptible[sig] = 0;
-					} else {
-						pfs_current->signal_interruptible[sig] = 1;
-					}
-				}
-			}
 			break;
 
 		/* Here begin all of the I/O operations, given in the same order as in
@@ -2870,13 +2827,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 	}
 }
 
-/*
-Note that we clear the interrupted flag whenever
-we start a new system call or leave an old one.
-We don't want one system call to be interrupted
-by a signal from a previous system call.
-*/
-
 void pfs_dispatch64( struct pfs_process *p )
 {
 	struct pfs_process *oldcurrent = pfs_current;
@@ -2887,7 +2837,6 @@ void pfs_dispatch64( struct pfs_process *p )
 			decode_syscall(p,0);
 			break;
 		case PFS_PROCESS_STATE_USER:
-			p->interrupted = 0;
 			p->nsyscalls += 1;
 			decode_syscall(p,1);
 			break;

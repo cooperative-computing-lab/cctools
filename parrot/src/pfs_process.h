@@ -45,7 +45,6 @@ struct pfs_process {
 	mode_t umask;
 	pid_t  pid, ppid, tgid;
 	int flags;
-	int interrupted;
 	uint64_t nsyscalls;
 	pfs_table *table;
 	struct tracer *tracer;
@@ -68,24 +67,21 @@ struct pfs_process {
 	int completing_execve;
 	int did_stream_warning;
 	int diverted_length;
-	int signal_interruptible[256];
 };
 
 struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table );
 void pfs_process_exec( struct pfs_process *p );
-struct pfs_process * pfs_process_lookup( pid_t pid );
-
 void pfs_process_stop( struct pfs_process *p, int status, struct rusage *usage );
 
-void pfs_process_sigio();
+extern "C" int pfs_process_getpid();
 int  pfs_process_count();
-int  pfs_process_raise( pid_t pid, int sig, int really_sendit );
+struct pfs_process * pfs_process_lookup( pid_t pid );
+int  pfs_process_cankill( pid_t pid );
+extern "C" char *pfs_process_name();
 
-extern "C" int  pfs_process_getpid();
-extern "C" char * pfs_process_name();
-extern "C" void pfs_process_kill();
 extern "C" void pfs_process_killall();
-extern "C" void pfs_process_kill_everyone(int);
+extern "C" void pfs_process_kill_everyone(int sig);
+extern "C" void pfs_process_sigio(int sig);
 
 uintptr_t pfs_process_scratch_address( struct pfs_process *p );
 void pfs_process_scratch_get( struct pfs_process *p, void *data, size_t len );
