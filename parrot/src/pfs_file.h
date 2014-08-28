@@ -9,7 +9,6 @@ See the file COPYING for details.
 #define PFS_FILE_H
 
 #include "pfs_name.h"
-#include "pfs_poll.h"
 #include "pfs_types.h"
 #include "pfs_refcount.h"
 
@@ -28,7 +27,6 @@ public:
 	virtual	int ftruncate( pfs_size_t length );
 	virtual	int fsync();
 	virtual int fcntl( int cmd, void *arg );
-	virtual int ioctl( int cmd, void *arg );
 	virtual int fchmod( mode_t mode );
 	virtual int fchown( uid_t uid, gid_t gid );
 	virtual int flock( int op );
@@ -49,8 +47,9 @@ public:
 	virtual pfs_off_t get_last_offset();
 	virtual void set_last_offset( pfs_off_t offset );
 
-	virtual void poll_register( int which );
-	virtual int poll_ready();
+	virtual int canbenative (char *path, size_t len) {
+		return 0;
+	}
 
 protected:
 	pfs_name name;

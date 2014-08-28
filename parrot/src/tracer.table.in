@@ -252,9 +252,9 @@ alloc_hugepages	250
 free_hugepages	251
 exit_group		252
 lookup_dcookie		253
-sys_epoll_create	254
-sys_epoll_ctl		255
-sys_epoll_wait		256
+epoll_create	254
+epoll_ctl		255
+epoll_wait		256
 remap_file_pages	257
 set_tid_address		258
 timer_create       259

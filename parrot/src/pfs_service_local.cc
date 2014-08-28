@@ -24,13 +24,11 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/mman.h>
-#include <sys/ioctl.h>
 #include <sys/vfs.h>
 #include <sys/file.h>
 #include <sys/time.h>
 #include <utime.h>
 #include <dirent.h>
-#include <sys/poll.h>
 
 #if defined(HAS_ATTR_XATTR_H)
 #include <attr/xattr.h>
@@ -99,10 +97,20 @@ private:
 
 public:
 	pfs_file_local( pfs_name *name, int f, int i ) : pfs_file(name) {
+		assert(f >= 0);
 		fd = f;
 		last_offset = 0;
 		is_a_pipe = i;
 		is_a_named_pipe = -1;
+	}
+
+	virtual int canbenative (char *path, size_t len) {
+		struct stat64 buf;
+		if (::fstat64(fd, &buf) == 0 && (S_ISSOCK(buf.st_mode) || S_ISBLK(buf.st_mode) || S_ISCHR(buf.st_mode) || S_ISFIFO(buf.st_mode))) {
+			snprintf(path, len, name.rest);
+			return 1;
+		}
+		return 0;
 	}
 
 	virtual int close() {
@@ -221,13 +229,6 @@ process to sleep and wait for actual input to become ready.
 		END
 	}
 
-	virtual int ioctl( int cmd, void *arg ) {
-		int result;
-		debug(D_LOCAL,"ioctl %d 0x%x 0x%p",fd,cmd,arg);
-		result = ::ioctl(fd,cmd,arg);
-		END
-	}
-
 	virtual int fchmod( mode_t mode ) {
 		int result;
 		debug(D_LOCAL,"fchmod %d %d",fd,mode);
@@ -327,30 +328,6 @@ process to sleep and wait for actual input to become ready.
 	{
 		return !is_a_pipe;
 	}
-	
-	virtual void poll_register( int which ) {
-		pfs_poll_wakeon(fd,which);
-	}
-
-	virtual int poll_ready() {
-		struct pollfd pfd;
-		int result=0, flags =0;
-
-		pfd.fd = fd;
-		pfd.events = POLLIN|POLLOUT|POLLERR|POLLHUP|POLLPRI;
-		pfd.revents = 0;
-
-		result = ::poll(&pfd,1,0);
-		if(result>0) {
-			if(pfd.revents&POLLIN) flags |= PFS_POLL_READ;
-			if(pfd.revents&POLLHUP) flags |= PFS_POLL_READ;
-			if(pfd.revents&POLLOUT) flags |= PFS_POLL_WRITE;
-			if(pfd.revents&POLLERR) flags |= PFS_POLL_READ;
-			if(pfd.revents&POLLERR) flags |= PFS_POLL_WRITE;
-			if(pfd.revents&POLLPRI) flags |= PFS_POLL_EXCEPT;
-		}
-		return flags;
-	}
 };
 
 class pfs_service_local : public pfs_service {
@@ -362,7 +339,7 @@ public:
 
 		flags |= O_NONBLOCK;
 		debug(D_LOCAL,"open %s %d %d",name->rest,flags,(flags&O_CREAT) ? mode : 0);
-		int fd = ::open64(name->rest,flags,mode);
+		int fd = ::open64(name->rest,flags|O_NOCTTY,mode);
 		if(fd>=0) {
 			result = new pfs_file_local(name,fd,0);
 		} else {

@@ -27,9 +27,19 @@ static off_t file_size_max = 1<<20;
 void debug_file_reopen (void)
 {
 	if (strlen(file_path)) {
-		file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY, 0660);
+		file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY|O_NOCTTY, 0660);
 		if (file_fd == -1){
 			fprintf(stderr, "could not access log file `%s' for writing: %s\n", file_path, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		int flags = fcntl(file_fd, F_GETFD);
+		if (flags == -1) {
+			fprintf(stderr, "could not get file flags: %s\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		flags |= FD_CLOEXEC;
+		if (fcntl(file_fd, F_SETFD, flags) == -1) {
+			fprintf(stderr, "could not set file flags: %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 	}

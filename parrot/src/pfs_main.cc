@@ -10,7 +10,6 @@ See the file COPYING for details.
 #include "pfs_critical.h"
 #include "pfs_dispatch.h"
 #include "pfs_paranoia.h"
-#include "pfs_poll.h"
 #include "pfs_process.h"
 #include "pfs_service.h"
 #include "ptrace.h"
@@ -47,6 +46,7 @@ extern "C" {
 #include <termios.h>
 #include <unistd.h>
 
+#include <sys/stat.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
@@ -326,6 +326,8 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 	struct pfs_process *p;
 	unsigned long message;
 
+	trace_this_pid = -1; /* now always trace any process at all */
+
 	p = pfs_process_lookup(pid);
 	if(!p) {
 		debug(D_PROCESS,"ignoring event %d for unknown pid %d",status,pid);
@@ -334,8 +336,7 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 
 	if (WIFSTOPPED(status) && WSTOPSIG(status) == (SIGTRAP|0x80)) {
 		/* The common case, a syscall delivery stop. */
-		p->nsyscalls++;
-		pfs_dispatch(p, 0);
+		pfs_dispatch(p);
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
 		pid_t cpid;
 		struct pfs_process *child;
@@ -356,12 +357,12 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 		if(p->syscall_args[0]&CLONE_THREAD)
 			child->tgid = p->tgid;
 		child->state = PFS_PROCESS_STATE_USER;
-		tracer_continue(p->tracer,0); /* child starts stopped. */
-
-		trace_this_pid = -1; /* now trace any process at all */
+		if (tracer_continue(p->tracer,0) == -1) /* child starts stopped. */
+			return;
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXEC<<8))) {
-		debug(D_PROCESS, "pid %d is completing exec", (int)pid);
-		tracer_continue(p->tracer, 0);
+		pfs_process_exec(p);
+		if (tracer_continue(p->tracer,0) == -1)
+			return;
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8)) || WIFEXITED(status) || WIFSIGNALED(status)) {
 		/* In my own testing, if we use PTRACE_O_TRACEEXIT then we never get
 		 * WIFEXITED(status) || WIFSIGNALED(status).  There may be corner cases
@@ -401,7 +402,8 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 			 *     attached  using  PTRACE_SEIZE), or PTRACE_EVENT_STOP if
 			 *     PTRACE_SEIZE was used.
 			 */
-			tracer_continue(p->tracer, 0);
+			if (tracer_continue(p->tracer, 0) == -1)
+				return;
 		} else if((linux_available(3,4,0) && ((status>>16) == PTRACE_EVENT_STOP)) || (!linux_available(3,4,0) && SIG_ISSTOP(signum) && ptrace(PTRACE_GETSIGINFO, pid, 0, &info) == -1 && errno == EINVAL)) {
 			/* group-stop, `man ptrace` for more information */
 			debug(D_PROCESS, "process %d has group-stopped due to signal %d (%s) (state %d)",pid,signum,string_signal(signum),p->state);
@@ -413,7 +415,8 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 					notified = 1;
 				}
 			}
-			tracer_listen(p->tracer);
+			if (tracer_listen(p->tracer) == -1)
+				return;
 		} else {
 			/* signal-delivery-stop */
 			debug(D_PROCESS,"pid %d received signal %d (%s) (state %d)",pid,signum,string_signal(signum),p->state);
@@ -443,8 +446,22 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 					break;
 				case SIGTSTP:
 					break;
+				case SIGSEGV:
+					if (ptrace(PTRACE_GETSIGINFO, pid, 0, &info) == 0) {
+						if (info.si_code == SEGV_MAPERR) {
+							debug(D_PROCESS, "pid %d faulted on address %p (unmapped)", pid, info.si_addr);
+						} else if (info.si_code == SEGV_ACCERR) {
+							debug(D_PROCESS, "pid %d faulted on address %p (permissions)", pid, info.si_addr);
+						} else {
+							debug(D_PROCESS, "pid %d faulted on address %p", pid, info.si_addr);
+						}
+					} else {
+						debug(D_DEBUG, "couldn't get signal info: %s", strerror(errno));
+					}
+					break;
 			}
-			tracer_continue(p->tracer,signum); /* deliver (or not) the signal */
+			if (tracer_continue(p->tracer,signum) == -1) /* deliver (or not) the signal */
+				return;
 		}
 	} else {
 		fatal("pid %d stopped with strange status %d",pid,status);
@@ -457,11 +474,6 @@ struct timeval clock_to_timeval( clock_t c )
 	result.tv_sec = c/CLOCKS_PER_SEC;
 	result.tv_usec = (c - result.tv_sec)*1000000/CLOCKS_PER_SEC;
 	return result;
-}
-
-void handle_sigchld( int sig  )
-{
-	pfs_poll_abort();
 }
 
 static void handle_sigio( int sig )
@@ -480,7 +492,7 @@ void write_rval(const char* message, int status) {
 
 int main( int argc, char *argv[] )
 {
-	pid_t pid=0;
+	pid_t pid;
 	struct pfs_process *p;
 	char *s;
 	int i;
@@ -513,7 +525,6 @@ int main( int argc, char *argv[] )
 	install_handler(SIGINT,pass_through);
 	install_handler(SIGTTIN,control_terminal);
 	install_handler(SIGTTOU,control_terminal);
-	install_handler(SIGCHLD,handle_sigchld);
 	install_handler(SIGIO,handle_sigio);
 	install_handler(SIGXFSZ,ignore_signal);
 
@@ -910,6 +921,16 @@ int main( int argc, char *argv[] )
 
 	if(!pfs_channel_init(channel_size*1024*1024)) fatal("couldn't establish I/O channel");	
 
+	{
+		char buf[4096];
+		snprintf(buf, sizeof(buf), "%s/parrot-fd.XXXXXX", pfs_temp_dir);
+		if (mkdtemp(buf) == NULL)
+			fatal("could not create parrot-fd temporary directory: %s", strerror(errno));
+		parrot_dir_fd = open(buf, O_RDONLY|O_DIRECTORY);
+		if (parrot_dir_fd == -1)
+			fatal("could not open tempdir: %s", strerror(errno));
+	}
+
 	if(pfs_use_helper) pfs_helper_init(argv[0]);
 
 	pid_t pfs_watchdog_pid = -2;
@@ -921,8 +942,6 @@ int main( int argc, char *argv[] )
 			debug(D_PROCESS,"watchdog PID %d",pfs_watchdog_pid);
 		}
 	} 
-
-	pfs_poll_init();
 
 	/*
 	For reasons I don't understand yet, parrot gets very confused when
@@ -941,38 +960,33 @@ int main( int argc, char *argv[] )
 	setpgrp();
 	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
 
-	if(pid==0) {
-		pid = fork();
-		if(pid>0) {
-			pid_t wpid;
-			int status;
-			debug(D_PROCESS,"pid %d started",pid);
-			do {
-				wpid = waitpid(pid, &status, WUNTRACED);
-			} while (wpid != pid);
-			if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGSTOP)
-				fatal("child did not stop as expected!");
-		} else if(pid==0) {
-			pfs_paranoia_payload();
-			setpgrp();
-			raise(SIGSTOP); /* wait to be traced */
-			getpid();
-			// This call is necessary to force the kernel to report the current heap
-			// size, so that Parrot can observe it in order to rewrite the following exec.
-			sbrk(4096);
-			execvp(argv[optind],&argv[optind]);
-			debug(D_NOTICE,"unable to execute %s: %s",argv[optind],strerror(errno));
-			if(pfs_write_rval) {
-				write_rval("noexec", 0);
-			}
-			_exit(1);
-		} else {
-			debug(D_NOTICE,"unable to fork %s: %s",argv[optind],strerror(errno));
-			if(pfs_write_rval) {
-				write_rval("nofork", 0);
-			}
-			exit(1);
+	pid = fork();
+	if(pid>0) {
+		pid_t wpid;
+		int status;
+		debug(D_PROCESS,"pid %d started",pid);
+		do {
+			wpid = waitpid(pid, &status, WUNTRACED);
+		} while (wpid != pid);
+		if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGSTOP)
+			fatal("child did not stop as expected!");
+	} else if(pid==0) {
+		pfs_paranoia_payload();
+		pfs_process_bootstrapfd();
+		setpgrp();
+		raise(SIGSTOP); /* wait to be traced */
+		execvp(argv[optind],&argv[optind]);
+		debug(D_NOTICE,"unable to execute %s: %s",argv[optind],strerror(errno));
+		if(pfs_write_rval) {
+			write_rval("noexec", 0);
 		}
+		_exit(1);
+	} else {
+		debug(D_NOTICE,"unable to fork %s: %s",argv[optind],strerror(errno));
+		if(pfs_write_rval) {
+			write_rval("nofork", 0);
+		}
+		exit(1);
 	}
 
 	CRITICAL_BEGIN
@@ -995,10 +1009,12 @@ int main( int argc, char *argv[] )
 
 	while(pfs_process_count()>0) {
 		while(1) {
-			int status, flags;
+			int flags = WUNTRACED|__WALL;
+			int status;
 			struct rusage usage;
 
-			flags = WUNTRACED|__WALL|WNOHANG;
+			if(trace_this_pid != -1)
+				debug(D_PROCESS, "Waiting for process %d\n", trace_this_pid);
 			pid = wait4(trace_this_pid,&status,flags,&usage);
 #if 0 /* Enable this for extreme debugging... */
 			debug(D_DEBUG, "%d = wait4(%d, %p, %d, %p)", (int)pid, (int)trace_this_pid, &status, flags, &usage);
@@ -1012,16 +1028,12 @@ int main( int argc, char *argv[] )
 				}
 			} else if(pid>0) {
 				handle_event(pid,status,&usage);
-			} else if(trace_this_pid > 0) {
-				debug(D_PROCESS, "Waiting for process %d\n", trace_this_pid);
-				usleep(100);       //Avoid busy waiting while the process gives signs of live.
 			} else {
 				break;
 			}
 		}
 
 		if(pid==-1 && errno==ECHILD) break;
-		if(pfs_process_count()>0) pfs_poll_sleep();
 	}
 
 	if(pfs_syscall_totals32) {

@@ -5,6 +5,10 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+extern "C" {
+#include "debug.h"
+}
+
 #include "pfs_pointer.h"
 #include "pfs_file.h"
 
@@ -14,6 +18,8 @@ See the file COPYING for details.
 #include <string.h>
 #include <stdio.h>
 
+std::map<std::pair<dev_t, ino_t>, pfs_pointer *> pfs_pointer::pointers;
+
 pfs_pointer::pfs_pointer( pfs_file *f, int fl, int m )
 {
 	file = f;
@@ -21,13 +27,32 @@ pfs_pointer::pfs_pointer( pfs_file *f, int fl, int m )
 	mode = m;
 	offset = 0;
 
-       	/* Remove any flags that have a one-time effect */
+	dev = 0;
+	ino = 0;
+
+	/* Remove any flags that have a one-time effect */
 	flags = flags & ~(O_TRUNC);
 	flags = flags & ~(O_CREAT);
 }
 
+void pfs_pointer::bind( dev_t dev, ino_t ino )
+{
+	debug(D_DEBUG, "binding to <dev=%d, ino=%d>", (int)dev, (int)ino);
+	this->dev = dev;
+	this->ino = ino;
+	pointers[std::pair<dev_t, ino_t>(dev, ino)] = this;
+}
+
+pfs_pointer *pfs_pointer::lookup( dev_t dev, ino_t ino )
+{
+	debug(D_DEBUG, "looking up <dev=%d, ino=%d>", (int)dev, (int)ino);
+	return pointers[std::pair<dev_t, ino_t>(dev, ino)];
+}
+
 pfs_pointer::~pfs_pointer()
 {
+	if (this->dev)
+		pointers.erase(std::pair<dev_t, ino_t>(this->dev, this->ino));
 }
 
 pfs_off_t pfs_pointer::seek( pfs_off_t value, int whence )

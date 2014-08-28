@@ -80,7 +80,7 @@ int pfs_channel_init( pfs_size_t size )
 {
 	char path[PATH_MAX];
 
-	sprintf(path,"%s/pfs.tmp.XXXXXX",pfs_temp_dir);
+	sprintf(path,"%s/parrot-channel.XXXXXX",pfs_temp_dir);
 	channel_fd = mkstemp(path);
 	if(channel_fd<0) return 0;
 	unlink(path);
@@ -260,7 +260,5 @@ void pfs_channel_free( pfs_size_t start )
 		e = e->next;
 	} while(e!=head);
 }
-
-
 
 /* vim: set noexpandtab tabstop=4: */

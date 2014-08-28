@@ -40,10 +40,10 @@ EOF
 
 	# We can only test the multi interface through parrot...
 	if [ -x ../../parrot/src/parrot_run ]; then
-		../../parrot/src/parrot_run ls -l /multi/"$hostport1"@"$VOLUME"/
-		../../parrot/src/parrot_run df -h /multi/"$hostport1"@"$VOLUME"/
-		../../parrot/src/parrot_run sh -c "echo 1 > /multi/$hostport1@$VOLUME/foo"
-		../../parrot/src/parrot_run sh -c "echo 2 > /multi/$hostport1@$VOLUME/bar"
+		../../parrot/src/parrot_run -d syscall ls -l /multi/"$hostport1"@"$VOLUME"/
+		../../parrot/src/parrot_run -d syscall df -h /multi/"$hostport1"@"$VOLUME"/
+		../../parrot/src/parrot_run -d syscall sh -c "echo 1 > /multi/$hostport1@$VOLUME/foo"
+		../../parrot/src/parrot_run -d syscall sh -c "echo 2 > /multi/$hostport1@$VOLUME/bar"
 	fi
 
 	return 0

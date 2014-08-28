@@ -31,26 +31,28 @@ extern "C" {
 #include "hash_table.h"
 }
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <errno.h>
-#include <string.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <fnmatch.h>
-#include <ctype.h>
-#include <math.h>
-#include <signal.h>
-#include <malloc.h>
+#include <unistd.h>
 
-#include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
-#include <sys/time.h>
 #include <sys/resource.h>
-#include <sys/poll.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <math.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#ifndef O_CLOEXEC
+#	define O_CLOEXEC 02000000
+#endif
 
 extern int pfs_force_stream;
 extern int pfs_force_sync;
@@ -58,6 +60,22 @@ extern int pfs_follow_symlinks;
 extern int pfs_enable_small_file_optimizations;
 
 extern const char * pfs_initial_working_directory;
+
+static const int _SENTINEL1 = 0;
+#define NATIVE ((pfs_pointer *)&_SENTINEL1)
+static const int _SENTINEL2 = 0;
+#define SPECIAL ((pfs_pointer *)&_SENTINEL2)
+
+#define PARROT_POINTER(pointer) (!(pointer == NATIVE || pointer == SPECIAL || pointer == NULL))
+
+#define VALID_FD(fd) (0 <= fd && fd <= pointer_count)
+#define PARROT_FD(fd) (VALID_FD(fd) && PARROT_POINTER(pointers[fd]))
+
+#define CHECK_FD(fd) \
+	do {\
+		if (!PARROT_FD(fd))\
+			return (errno = EBADF, -1);\
+	} while (0)
 
 pfs_table::pfs_table()
 {
@@ -85,10 +103,8 @@ pfs_table::~pfs_table()
 		this->close(i);
 	}
 
-	pfs_mmap *m;
-
 	while(mmap_list) {
-		m = mmap_list;
+		pfs_mmap *m = mmap_list;
 		mmap_list = m->next;
 		delete m;
 	}
@@ -105,8 +121,10 @@ pfs_table * pfs_table::fork()
 		if(this->pointers[i]) {
 			table->fd_flags[i] = this->fd_flags[i];
 			table->pointers[i] = this->pointers[i];
-			this->pointers[i]->addref();
-			this->pointers[i]->file->addref();
+			if (PARROT_POINTER(this->pointers[i])) {
+				this->pointers[i]->addref();
+				this->pointers[i]->file->addref();
+			}
 		}
 	}
 
@@ -123,15 +141,62 @@ pfs_table * pfs_table::fork()
 	return table;
 }
 
+void pfs_table::setparrot(int fd, int rfd, struct stat *buf)
+{
+	if (!PARROT_FD(fd))
+		fatal("fd %d is not an open parrotfd", fd);
+
+	/* It's possible for another thread to create a native fd which is equal to
+	 * the parrot fd. If that happens we change the parrot fd to what the
+	 * kernel gave us. Keep in mind that we don't need to worry about another
+	 * racing thread which overwrites pointers[fd] with NATIVE because after
+	 * opening a parrot fd, we ignore other tracees and wait for openat to
+	 * return the actual parrot fd.
+	 */
+
+	if (rfd != fd) {
+		debug(D_DEBUG, "parrotfd %d changed to real fd %d", fd, rfd);
+		pointers[rfd] = pointers[fd];
+		fd_flags[rfd] = fd_flags[fd];
+		pointers[fd] = NULL;
+		fd_flags[fd] = 0;
+		fd = rfd;
+	}
+
+	debug(D_DEBUG, "setting parrotfd %d to %p (%d:%d)", fd, pointers[fd], (int)buf->st_dev, (int)buf->st_ino);
+	assert(S_ISREG(buf->st_mode));
+	pointers[fd]->bind(buf->st_dev, buf->st_ino);
+}
+
+int pfs_table::bind( int fd, char *lpath, size_t len )
+{
+	if (!isnative(fd))
+		return (errno = EBADF, -1);
+	if (strlen(lpath) == 0)
+		return (errno = ENOENT, -1);
+
+	/* Resolve the path... */
+	struct pfs_name pname;
+	if (!resolve_name(1, lpath, &pname))
+		return -1;
+
+	if (!pname.is_local)
+		return (errno = EOPNOTSUPP, -1);
+	if (strlen(pname.rest) >= len)
+		return (errno = ENAMETOOLONG, -1);
+
+	strcpy(lpath, pname.rest);
+
+	return 0;
+}
+
 void pfs_table::close_on_exec()
 {
-	int i;
-
-	for(i=0;i<pointer_count;i++) {
-		if(this->pointers[i]) {
-			if((this->fd_flags[i])&FD_CLOEXEC) {
-				this->close(i);
-			}
+	for(int i=0;i<pointer_count;i++) {
+		if(pointers[i] /* parrot, special, or native */ && fd_flags[i]&FD_CLOEXEC) {
+			assert(pointers[i] != SPECIAL);
+			debug(D_DEBUG, "closing on exec: %d", i);
+			close(i);
 		}
 	}
 
@@ -149,12 +214,79 @@ Connect this logical file descriptor in the table
 to this physical file descriptor in the tracing process.
 */
 
-void pfs_table::attach( int logical, int physical, int flags, mode_t mode, const char *name )
+void pfs_table::attach( int logical, int physical, int flags, mode_t mode, const char *name, struct stat *buf )
 {
 	pointers[logical] = new pfs_pointer(pfs_file_bootstrap(physical,name),flags,mode);
 	fd_flags[logical] = 0;
+	setparrot(logical, logical, buf);
 }
 
+void pfs_table::setnative( int fd, int fdflags )
+{
+	debug(D_DEBUG, "setting fd %d as native%s", fd, fdflags & FD_CLOEXEC ? " (FD_CLOEXEC)" : "");
+	pointers[fd] = NATIVE;
+	fd_flags[fd] = fdflags;
+}
+
+void pfs_table::setspecial( int fd )
+{
+	debug(D_DEBUG, "setting fd %d as special", fd);
+	pointers[fd] = SPECIAL;
+	fd_flags[fd] = 0;
+}
+
+int pfs_table::isvalid( int fd )
+{
+	return VALID_FD(fd);
+}
+
+int pfs_table::isnative( int fd )
+{
+	return VALID_FD(fd) && pointers[fd] == NATIVE;
+}
+
+int pfs_table::isspecial( int fd )
+{
+	return VALID_FD(fd) && pointers[fd] == SPECIAL;
+}
+
+void pfs_table::recvfd( pid_t pid, int fd )
+{
+	struct stat buf;
+	if (pfs_process_stat(pid, fd, &buf) == -1)
+		fatal("could not stat %d: %s", fd, strerror(errno));
+
+	debug(D_DEBUG, "received fd %d", fd);
+
+	pfs_pointer *pointer = pfs_pointer::lookup(buf.st_dev, buf.st_ino);
+	if (pointer) {
+		debug(D_DEBUG, "binding parrotfd %d to %p", fd, pointer);
+		pointers[fd] = pointer;
+		fd_flags[fd] = 0;
+		/* No need to increment reference, sendfd (below) did so. */
+	} else {
+		setnative(fd, 0);
+	}
+}
+
+void pfs_table::sendfd( int fd, int errored )
+{
+	if (PARROT_POINTER(pointers[fd])) {
+		if (errored == 0) {
+			char path[4096];
+			get_full_name(fd, path);
+			debug(D_DEBUG, "sending parrot fd %d: `%s'", fd, path);
+			pointers[fd]->addref();
+			pointers[fd]->file->addref();
+		} else {
+			/* the kernel raised an error sending the fd, decrement the reference count */
+			pointers[fd]->delref();
+			pointers[fd]->file->delref();
+		}
+	} else if (pointers[fd] == NATIVE && errored == 0) {
+		debug(D_DEBUG, "sending native fd %d", fd);
+	} /* else SPECIAL, we don't care */
+}
 
 /* Chose the lowest numbered file descriptor that is available. */
 
@@ -186,47 +318,47 @@ of short_path, and copy it to full_path.
  
 void pfs_table::complete_path( const char *short_path, char *full_path )
 {
-        if( short_path[0]=='/' ) {
-                strcpy(full_path,short_path);
-        } else {
-                strcpy(full_path,working_dir);
-                strcat(full_path,"/");
-                strcat(full_path,short_path);
-        }
+	if( short_path[0]=='/' ) {
+		strcpy(full_path,short_path);
+	} else {
+		strcpy(full_path,working_dir);
+		strcat(full_path,"/");
+		strcat(full_path,short_path);
+	}
 }
 
 /*
 Complete a path, starting with this fd assumed to be a directory.
 */
 
-void pfs_table::complete_at_path( int dirfd, const char *path, char *full_path )
+#ifndef AT_FDCWD
+#	define AT_FDCWD -100
+#endif
+
+int pfs_table::complete_at_path( int dirfd, const char *path, char *full_path )
 {
 	if(path) {
 		if(path[0]=='/') {
 			strcpy(full_path,path);
 		} else {
-#ifdef AT_FDCWD
 			if(dirfd==AT_FDCWD) {
 				sprintf(full_path,"%s/%s",working_dir,path);
-			} else
-#endif
-			{
-				get_full_name(dirfd,full_path);
+			} else {
+				if (get_full_name(dirfd,full_path) == -1) return -1;
 				strcat(full_path,"/");
 				strcat(full_path,path);
 			}
 		}
 	} else {
 		/* some *at syscalls (see utimensat) allow path to be NULL, fill full_path with path of dirfd */
-#ifdef AT_FDCWD
 		if(dirfd==AT_FDCWD) {
 			strcpy(full_path,working_dir);
-		} else
-#endif
-		{
-			get_full_name(dirfd,full_path);
+		} else {
+			if (get_full_name(dirfd,full_path) == -1) return -1;
 		}
 	}
+	debug(D_DEBUG, "%s: `%s' -> `%s'", __func__, path, full_path);
+	return 0;
 }
 
 void pfs_table::follow_symlink( struct pfs_name *pname, int depth )
@@ -428,19 +560,10 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 	return file;
 }
 
-int pfs_table::open( const char *lname, int flags, mode_t mode, int force_cache )
+int pfs_table::open( const char *lname, int flags, mode_t mode, int force_cache, char *path, size_t len )
 {
 	int result = -1;
 	pfs_file *file=0;
-
-	if(!strcmp(lname,"/dev/tty")) {
-		if(pfs_current->tty[0]) {
-			lname = pfs_current->tty;
-		} else {
-			errno = ENXIO;
-			return -1;
-		}
-	}
 
 	/* Apply the umask to our mode */
 	mode = mode &~(pfs_current->umask);
@@ -456,12 +579,20 @@ int pfs_table::open( const char *lname, int flags, mode_t mode, int force_cache 
 	if(pfs_force_sync) flags |= O_SYNC;
 #endif
 
-       	result = find_empty(0);
+	result = find_empty(0);
 	if(result>=0) {
 		file = open_object(lname,flags,mode,force_cache);
 		if(file) {
-			pointers[result] = new pfs_pointer(file,flags,mode);
-			if(flags&O_APPEND) this->lseek(result,0,SEEK_END);
+			if(path && file->canbenative(path, len)) {
+				file->close();
+				return -2;
+			} else {
+				pointers[result] = new pfs_pointer(file,flags,mode);
+				fd_flags[result] = 0;
+				if (flags&O_CLOEXEC)
+					fd_flags[result] |= FD_CLOEXEC;
+				if(flags&O_APPEND) this->lseek(result,0,SEEK_END);
+			}
 		} else {
 			result = -1;
 		}
@@ -470,243 +601,26 @@ int pfs_table::open( const char *lname, int flags, mode_t mode, int force_cache 
 		errno = EMFILE;
 	}
 
-	if(result>=0 && !pfs_current->tty[0] && (!(flags&O_NOCTTY)) && isatty(file->get_real_fd())) {
-		strcpy(pfs_current->tty,lname);
-	}
-
-	if(result>=0) fd_flags[result] = 0;
-
-	return result;
-}
-
-int pfs_table::pipe( int *fds )
-{
-	int result=-1;
-	int rfds[2];
-
-	result = ::pipe(rfds);
-	if(result>=0) {
-		debug(D_DEBUG, "created pipe with file descriptors [%d,%d]", rfds[0], rfds[1]);
-
-		fds[0] = find_empty(0);
-		fds[1] = find_empty(fds[0]+1);
-
-		::fcntl(rfds[0],F_SETFL,O_NONBLOCK);
-		::fcntl(rfds[1],F_SETFL,O_NONBLOCK);
-
-		pointers[fds[0]] = new pfs_pointer(pfs_file_bootstrap(rfds[0],"rpipe"),O_RDONLY,0777);
-		pointers[fds[1]] = new pfs_pointer(pfs_file_bootstrap(rfds[1],"wpipe"),O_WRONLY,0777);
-
-		fd_flags[fds[0]] = 0;
-		fd_flags[fds[1]] = 0;
-	}
-
 	return result;
 }
 
 int pfs_table::get_real_fd( int fd )
 {
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		return -1;
-	}
-
+	CHECK_FD(fd);
 	return pointers[fd]->file->get_real_fd();
 }
 
 int pfs_table::get_full_name( int fd, char *name )
 {
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		return -1;
-	}
-
+	CHECK_FD(fd);
 	strcpy(name,pointers[fd]->file->get_name()->path);
 	return 0;
 }
 
 int pfs_table::get_local_name( int fd, char *name )
 {
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		return -1;
-	}
-
+	CHECK_FD(fd);
 	return pointers[fd]->file->get_local_name(name);
-}
-
-/*
-Select is actually quite simple.  We register all the
-files in the set with the master poller, and then run
-a non blocking check.  If any report back, then mark the
-output sets and return.  Otherwise, return -EAGAIN so
-that we are put to sleep.
-*/
-
-int pfs_table::select( int n, fd_set *r, fd_set *w, fd_set *e, struct timeval *timeout )
-{
-	fd_set out_r, out_w, out_e;
-	int i, result = 0;
-
-	FD_ZERO(&out_r);
-	FD_ZERO(&out_w);
-	FD_ZERO(&out_e);
-
-	if(n>pointer_count) n = pointer_count;
-
-	for(i=0;i<n;i++) {
-		if(!pointers[i]) continue;
-
-		int wantflags = 0;
-		if(r && FD_ISSET(i,r)) wantflags|=PFS_POLL_READ;
-		if(w && FD_ISSET(i,w)) wantflags|=PFS_POLL_WRITE;
-		if(e && FD_ISSET(i,e)) wantflags|=PFS_POLL_EXCEPT;
-		if(!wantflags) continue;
-		debug(D_POLL,"fd %d want  %s",i,pfs_poll_string(wantflags));
-
-		int flags = pointers[i]->file->poll_ready();
-		pfs_file *f = pointers[i]->file;
-		debug(D_POLL,"fd %d ready %s %s",i,pfs_poll_string(flags),f->get_name()->path);
-
-		if(wantflags&PFS_POLL_READ && flags&PFS_POLL_READ) {
-			FD_SET(i,&out_r);
-			result++;
-		}
-		if(wantflags&PFS_POLL_WRITE && flags&PFS_POLL_WRITE) {
-			FD_SET(i,&out_w);
-			result++;
-		}
-		if(wantflags&PFS_POLL_EXCEPT && flags&PFS_POLL_EXCEPT) {
-			FD_SET(i,&out_e);
-			result++;
-		}
-	}
-
-
-	if(result>0) {
-		if(r) FD_ZERO(r);
-		if(w) FD_ZERO(w);
-		if(e) FD_ZERO(e);
-		for(i=0;i<n;i++) {
-			if(r && FD_ISSET(i,&out_r)) FD_SET(i,r);
-			if(w && FD_ISSET(i,&out_w)) FD_SET(i,w);
-			if(e && FD_ISSET(i,&out_e)) FD_SET(i,e);
-		}
-		pfs_current->seltime.tv_sec=0;
-	} else {
-		if(timeout) {
-			struct timeval curtime, stoptime, timeleft;
-
-			gettimeofday(&curtime,0);
-			if(pfs_current->seltime.tv_sec==0) {
-				pfs_current->seltime = curtime;
-			}
-			timeradd(&pfs_current->seltime,timeout,&stoptime);
-			if(
-				(curtime.tv_sec>stoptime.tv_sec) ||
-				( (curtime.tv_sec==stoptime.tv_sec) && (curtime.tv_usec>=stoptime.tv_usec) )
-			) {
-				result = 0;
-				pfs_current->seltime.tv_sec=0;
-				debug(D_POLL,"select time expired");
-			} else {
-				timersub(&stoptime,&curtime,&timeleft);
-				debug(D_POLL,"select time remaining %d.%06d",(int)timeleft.tv_sec,(int)timeleft.tv_usec);
-				pfs_poll_wakein(timeleft);
-				result = -1;
-				errno = EAGAIN;
-			}
-		} else {
-			result = -1;
-			errno = EAGAIN;
-		}
-
-		/*
-		If result is zero, then we timed out. Clear all the output bits and return.
-		Clearing is not strictly mandated by the standard, but many programs seem
-		to depend on it.
-
-		If result is not zero, then we need to register all of the fds of interest
-		with the master pfs_poll mechanism, and then return EAGAIN, which will put
-		this process to sleep.  When it wakes up, it will call pfs_table::select
-		again and start over.
-		*/
-
-		if(result==0) {
-			if(r) FD_ZERO(r);
-			if(w) FD_ZERO(w);
-			if(e) FD_ZERO(e);
-		} else {
-			for(i=0;i<n;i++) {
-				if(!pointers[i]) continue;
-				int flags=0;
-				if(r && FD_ISSET(i,r)) flags|=PFS_POLL_READ;
-				if(w && FD_ISSET(i,w)) flags|=PFS_POLL_WRITE;
-				if(e && FD_ISSET(i,e)) flags|=PFS_POLL_EXCEPT;
-				if(flags) pointers[i]->file->poll_register(flags);
-			}
-		}
-	}
-
-	return result;
-}
-
-/*
-Careful with poll: if any of the file descriptors is invalid,
-do not return failure right away, but mark the file descriptor
-as invalid with POLLNVAL.
-*/
-
-int pfs_table::poll( struct pollfd *ufds, unsigned int nfds, int timeout )
-{
-	unsigned i;
-	int result=0,maxfd=0;
-	struct timeval tv;
-	fd_set rfds, wfds, efds;
-
-	FD_ZERO(&rfds);
-	FD_ZERO(&wfds);
-	FD_ZERO(&efds);
-
-	for(i=0;i<nfds;i++) {
-		int fd = ufds[i].fd;
-		if(fd<0 || fd>=pointer_count || pointers[fd]==0) {
-			continue;
-			/* will fill in POLLNVAL later */
-		} else {
-			if(ufds[i].events&POLLIN)  FD_SET(fd,&rfds);
-			if(ufds[i].events&POLLOUT) FD_SET(fd,&wfds);
-			if(ufds[i].events&POLLERR) FD_SET(fd,&efds);
-		}
-		maxfd = MAX(maxfd,fd+1);
-	}
-
-	if(timeout>=0) {
-		tv.tv_sec = timeout / 1000;
-		tv.tv_usec = 1000*(timeout % 1000);
-		result = this->select(maxfd,&rfds,&wfds,&efds,&tv);
-	} else {
-		result = this->select(maxfd,&rfds,&wfds,&efds,0);
-	}
-
-	if(result>0) {
-		for(i=0;i<nfds;i++) {
-			int fd = ufds[i].fd;
-			ufds[i].revents = 0;
-			if(fd<0 || fd>=pointer_count || pointers[fd]==0) {
-				ufds[i].revents |= POLLNVAL;
-				continue;
-			}
-			if(ufds[i].events&POLLIN&&FD_ISSET(fd,&rfds))
-				ufds[i].revents |= POLLIN;
-			if(ufds[i].events&POLLOUT&&FD_ISSET(fd,&wfds))
-				ufds[i].revents |= POLLOUT;
-			if(ufds[i].events&POLLERR&&FD_ISSET(fd,&efds))
-				ufds[i].revents |= POLLERR;
-		}
-	}
-
-	return result;
 }
 
 /*
@@ -717,16 +631,19 @@ or the file itself might be in use by several opens.
 
 int pfs_table::close( int fd )
 {
-	int result = -1;
-
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		result = -1;
-		errno = EBADF;
+	if (isnative(fd)) {
+		debug(D_DEBUG, "marking closed native fd %d", fd);
+		pointers[fd] = NULL;
+		fd_flags[fd] = 0;
+		return 0;
 	} else {
+		CHECK_FD(fd);
+
+		debug(D_DEBUG, "closing parrot fd %d", fd);
 		pfs_pointer *p = pointers[fd];
 		pfs_file *f = p->file;
 
-		result = 0;
+		int result = 0;
 
 		if(f->refs()==1) {
 			result = f->close();
@@ -743,21 +660,18 @@ int pfs_table::close( int fd )
 
 		pointers[fd]=0;
 		fd_flags[fd]=0;
+		return result;
 	}
-	return result;
 }
 
 pfs_ssize_t pfs_table::read( int fd, void *data, pfs_size_t nbyte )
 {
 	pfs_ssize_t result = -1;
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		result = this->pread(fd,data,nbyte,pointers[fd]->tell());
-		if(result>0) pointers[fd]->bump(result);
-	}
+	CHECK_FD(fd);
+
+	result = this->pread(fd,data,nbyte,pointers[fd]->tell());
+	if(result>0) pointers[fd]->bump(result);
 
 	return result;
 }
@@ -766,13 +680,10 @@ pfs_ssize_t pfs_table::write( int fd, const void *data, pfs_size_t nbyte )
 {
 	pfs_ssize_t result = -1;
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		result = this->pwrite(fd,data,nbyte,pointers[fd]->tell());
-		if(result>0) pointers[fd]->bump(result);
-	}
+	CHECK_FD(fd);
+
+	result = this->pwrite(fd,data,nbyte,pointers[fd]->tell());
+	if(result>0) pointers[fd]->bump(result);
 
 	return result;
 }
@@ -792,10 +703,9 @@ pfs_ssize_t pfs_table::pread( int fd, void *data, pfs_size_t nbyte, pfs_off_t of
 {
 	pfs_ssize_t result = -1;
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else if( (!data) || (nbyte<0) ) {
+	CHECK_FD(fd);
+
+	if( (!data) || (nbyte<0) ) {
 		errno = EINVAL;
 		result = -1;
 	} else if( nbyte==0 ) {
@@ -819,10 +729,9 @@ pfs_ssize_t pfs_table::pwrite( int fd, const void *data, pfs_size_t nbyte, pfs_o
 {
 	pfs_ssize_t result = -1;
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else if( (!data) || (nbyte<0) ) {
+	CHECK_FD(fd);
+
+	if( (!data) || (nbyte<0) ) {
 		errno = EINVAL;
 		result = -1;
 	} else if( nbyte==0 ) {
@@ -848,6 +757,8 @@ pfs_ssize_t pfs_table::readv( int fd, const struct iovec *vector, int count )
 	pfs_ssize_t result = 0;
 	pfs_ssize_t chunk;
 
+	CHECK_FD(fd);
+
 	for( i = 0; i < count; i++ ) {
 		chunk = this->read( fd, vector->iov_base, vector->iov_len );
 		if( chunk < 0 ) return chunk;
@@ -864,6 +775,8 @@ pfs_ssize_t pfs_table::writev( int fd, const struct iovec *vector, int count )
 	int i;
 	pfs_ssize_t result = 0;
 	pfs_ssize_t chunk;
+
+	CHECK_FD(fd);
 
 	for( i = 0; i < count; i++ ) {
 		chunk = this->write( fd, vector->iov_base, vector->iov_len );
@@ -882,95 +795,49 @@ pfs_off_t pfs_table::lseek( int fd, pfs_off_t offset, int whence )
 	pfs_pointer *p;
 	pfs_off_t result = -1;
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
+	CHECK_FD(fd);
+
+	p = pointers[fd];
+	f = p->file;
+	if(!f->is_seekable()) {
+		errno = ESPIPE;
 		result = -1;
 	} else {
-		p = pointers[fd];
-		f = p->file;
-		if(!f->is_seekable()) {
-			errno = ESPIPE;
-			result = -1;
-		} else {
-			result = p->seek(offset,whence);
-		}
+		result = p->seek(offset,whence);
 	}
 
 	return result;
 }
 
-int pfs_table::dup( int fd )
+int pfs_table::dup2( int ofd, int nfd, int flags )
 {
-	return search_dup2( fd, 0 );
-}
+	if (!VALID_FD(ofd) || !VALID_FD(nfd))
+		return (errno = EBADF, -1);
+	if (ofd == nfd)
+		return nfd;
 
-int pfs_table::search_dup2( int fd, int search )
-{
-	int i;
+	debug(D_DEBUG, "dup2(%d, %d, %x)", ofd, nfd, flags);
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) || (search<0) || (search>=pointer_count) ) {
-		errno = EBADF;
-		return -1;
+	close(nfd);
+
+	pointers[nfd] = pointers[ofd];
+	if (PARROT_POINTER(pointers[nfd])) {
+		pointers[nfd]->addref();
+		pointers[nfd]->file->addref();
 	}
+	fd_flags[nfd] = flags;
 
-	for( i=search; i<pointer_count; i++ )
-		if(!pointers[i]) break;
-
-	if( i==pointer_count ) {
-		errno = EMFILE;
-		return -1;
-	} else {
-		return dup2(fd,i);
-	}
-}
-
-int pfs_table::dup2( int ofd, int nfd )
-{
-	int result=-1;
-
-	if( (nfd<0) || (nfd>=pointer_count) ) {
-		errno = EBADF;
-		result = -1;
-	} else if( (ofd<0) || (ofd>=pointer_count) || (pointers[ofd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else if( ofd==nfd ) {
-		result = ofd;
-	} else {
-
-		// If this fd is already in use, close it.
-		// But, close _can_ fail!  If that happens,
-		// abort the dup with the errno from the close.
-
-		if( pointers[nfd]!=0 ) {
-			result = this->close(nfd);
-		} else {
-			result = 0;
-		}
-
-		if(result==0) {
-			pointers[nfd] = pointers[ofd];
-			pointers[nfd]->addref();
-			pointers[nfd]->file->addref();
-			fd_flags[nfd] = 0;
-			result = nfd;
-		}
-	}
-
-	return result;
+	return nfd;
 }
 
 int pfs_table::fchdir( int fd )
 {
 	int result = -1;
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		pfs_name *pname = pointers[fd]->file->get_name();
-		result = this->chdir(pname->path);
-	}
+	CHECK_FD(fd);
+
+	pfs_name *pname = pointers[fd]->file->get_name();
+	result = this->chdir(pname->path);
 
 	return result;
 }
@@ -979,15 +846,12 @@ int pfs_table::ftruncate( int fd, pfs_off_t size )
 {
 	int result = -1;
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
+	CHECK_FD(fd);
+
+	if( size<0 ) {
+		result = 0;
 	} else {
-		if( size<0 ) {
-			result = 0;
-		} else {
-			result = pointers[fd]->file->ftruncate(size);
-		}
+		result = pointers[fd]->file->ftruncate(size);
 	}
 
 	return result;
@@ -997,15 +861,12 @@ int pfs_table::fstat( int fd, struct pfs_stat *b )
 {
 	int result;
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		pfs_file *file = pointers[fd]->file;
-		result = file->fstat(b);
-		if(result>=0) {
-			b->st_blksize = file->get_block_size();
-		}
+	CHECK_FD(fd);
+
+	pfs_file *file = pointers[fd]->file;
+	result = file->fstat(b);
+	if(result>=0) {
+		b->st_blksize = file->get_block_size();
 	}
 
 	return result;
@@ -1014,48 +875,24 @@ int pfs_table::fstat( int fd, struct pfs_stat *b )
 
 int pfs_table::fstatfs( int fd, struct pfs_statfs *buf )
 {
-	int result;
+	CHECK_FD(fd);
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		result = pointers[fd]->file->fstatfs(buf);
-	}
-
-
-	return result;
+	return pointers[fd]->file->fstatfs(buf);
 }
 
 
 int pfs_table::fsync( int fd )
 {
-	int result;
+	CHECK_FD(fd);
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		result = pointers[fd]->file->fsync();
-	}
-
-
-	return result;
+	return pointers[fd]->file->fsync();
 }
 
 int pfs_table::flock( int fd, int op )
 {
-	int result = -1;
+	CHECK_FD(fd);
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-       		result = pointers[fd]->file->flock(op);
-	}
-
-
-	return result;
+	return pointers[fd]->file->flock(op);
 }
 
 int pfs_table::fcntl( int fd, int cmd, void *arg )
@@ -1063,15 +900,14 @@ int pfs_table::fcntl( int fd, int cmd, void *arg )
 	int result;
 	int flags;
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else switch(cmd) {
+	CHECK_FD(fd);
+
+	switch(cmd) {
 		case F_GETFD:
 			result = fd_flags[fd];
 			break;
 		case F_SETFD:
-			fd_flags[fd] = (PTRINT_T)arg;
+			fd_flags[fd] = (intptr_t)arg;
 			result = 0;
 			break;
 		case F_GETFL:
@@ -1084,18 +920,6 @@ int pfs_table::fcntl( int fd, int cmd, void *arg )
 			pointers[fd]->file->fcntl(cmd,(void*)(PTRINT_T)flags);
 			result = 0;
 			break;
-
-		#ifdef F_DUPFD
-		case F_DUPFD:
-			result = this->search_dup2(fd,(PTRINT_T)arg);
-			break;
-		#endif
-
-		#ifdef F_DUP2FD
-		case F_DUP2FD:
-			result = this->dup2(fd,(PTRINT_T)arg);
-			break;
-		#endif
 
 		/*
 			A length of zero to FREESP indicates the file
@@ -1138,37 +962,14 @@ int pfs_table::fcntl( int fd, int cmd, void *arg )
 			break;
 	}
 
-
-	return result;
-}
-
-int pfs_table::ioctl( int fd, int cmd, void *arg )
-{
-	int result;
-
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		result = pointers[fd]->file->ioctl(cmd,arg);
-	}
-
-
 	return result;
 }
 
 int pfs_table::fchmod( int fd, mode_t mode )
 {
-	int result;
+	CHECK_FD(fd);
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		result = pointers[fd]->file->fchmod(mode);
-	}
-
-	return result;
+	return pointers[fd]->file->fchmod(mode);
 }
 
 extern uid_t pfs_uid;
@@ -1176,14 +977,9 @@ extern gid_t pfs_gid;
 
 int pfs_table::fchown( int fd, uid_t uid, gid_t gid )
 {
-	int result;
+	CHECK_FD(fd);
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		result = pointers[fd]->file->fchown(uid,gid);
-	}
+	int result = pointers[fd]->file->fchown(uid,gid);
 
 	/*
 	If the service doesn't implement it, but its our own uid,
@@ -1341,16 +1137,9 @@ ssize_t pfs_table::lgetxattr (const char *path, const char *name, void *value, s
 
 ssize_t pfs_table::fgetxattr (int fd, const char *name, void *value, size_t size)
 {
-	int result;
+	CHECK_FD(fd);
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		result = pointers[fd]->file->fgetxattr(name,value,size);
-	}
-
-	return result;
+	return pointers[fd]->file->fgetxattr(name,value,size);
 }
 
 ssize_t pfs_table::listxattr (const char *path, char *list, size_t size)
@@ -1379,16 +1168,9 @@ ssize_t pfs_table::llistxattr (const char *path, char *list, size_t size)
 
 ssize_t pfs_table::flistxattr (int fd, char *list, size_t size)
 {
-	int result;
+	CHECK_FD(fd);
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		result = pointers[fd]->file->flistxattr(list,size);
-	}
-
-	return result;
+	return pointers[fd]->file->flistxattr(list,size);
 }
 
 int pfs_table::setxattr (const char *path, const char *name, const void *value, size_t size, int flags)
@@ -1417,16 +1199,9 @@ int pfs_table::lsetxattr (const char *path, const char *name, const void *value,
 
 int pfs_table::fsetxattr (int fd, const char *name, const void *value, size_t size, int flags)
 {
-	int result;
+	CHECK_FD(fd);
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		result = pointers[fd]->file->fsetxattr(name,value,size,flags);
-	}
-
-	return result;
+	return pointers[fd]->file->fsetxattr(name,value,size,flags);
 }
 
 int pfs_table::removexattr (const char *path, const char *name)
@@ -1455,16 +1230,9 @@ int pfs_table::lremovexattr (const char *path, const char *name)
 
 int pfs_table::fremovexattr (int fd, const char *name)
 {
-	int result;
+	CHECK_FD(fd);
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = -1;
-	} else {
-		result = pointers[fd]->file->fremovexattr(name);
-	}
-
-	return result;
+	return pointers[fd]->file->fremovexattr(name);
 }
 
 int pfs_table::utime( const char *n, struct utimbuf *buf )
@@ -1651,10 +1419,14 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 		if(sscanf(pname.path,"/proc/%d/fd/%d",&pid,&fd)==2) {
 			struct pfs_process *target = pfs_process_lookup(pid);
 			if(target && target->table) {
-				if(target->table->get_full_name(fd,buf)==0) {
-					result = strlen(buf);
+				if(target->table->isnative(fd)) {
+					result = ::readlink(pname.path,buf,size);
 				} else {
-					result = -1;
+					if(target->table->get_full_name(fd,buf)==0) {
+						result = strlen(buf);
+					} else {
+						result = -1;
+					}
 				}
 			} else {
 				errno = ENOENT;
@@ -1718,79 +1490,14 @@ int pfs_table::rmdir( const char *n )
 
 struct dirent * pfs_table::fdreaddir( int fd )
 {
-	struct dirent * result;
+	if (!PARROT_FD(fd))
+		return (errno = EBADF, (struct dirent *)NULL);
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) ) {
-		errno = EBADF;
-		result = 0;
-	} else {
-		pfs_off_t next_offset;
-		pfs_pointer *fp = pointers[fd];
-		result = fp->file->fdreaddir(fp->tell(),&next_offset);
-		if(result) fp->seek(next_offset,SEEK_SET);
-	}
-
-
-	return result;
-}
-
-int pfs_table::socket( int domain, int type, int protocol )
-{
-	int rfd;
-	int result=-1;
-
-	rfd = ::socket(domain,type,protocol);
-	if(rfd>=0) {
-		debug(D_DEBUG, "created socket with file descriptor %d", rfd);
-		::fcntl(rfd,F_SETFL,O_NONBLOCK);
-		result = find_empty(0);
-		pointers[result] = new pfs_pointer(pfs_file_bootstrap(rfd,"socket"),O_RDWR,0777);
-		fd_flags[result] = 0;
-	} else {
-		result = -1;
-	}
-
-	return result;
-}
-
-int pfs_table::socketpair( int domain, int type, int protocol, int *fds )
-{
-	int result=-1;
-	int rfds[2];
-
-
-	result = ::socketpair(domain,type,protocol,rfds);
-	if(result>=0) {
-		fds[0] = find_empty(0);
-		fds[1] = find_empty(fds[0]+1);
-
-		::fcntl(rfds[0],F_SETFL,O_NONBLOCK);
-		::fcntl(rfds[1],F_SETFL,O_NONBLOCK);
-
-		pointers[fds[0]] = new pfs_pointer(pfs_file_bootstrap(rfds[0],"socketpair"),O_RDWR,0777);
-		pointers[fds[1]] = new pfs_pointer(pfs_file_bootstrap(rfds[1],"socketpair"),O_RDWR,0777);
-
-		fd_flags[fds[0]] = 0;
-		fd_flags[fds[1]] = 0;
-	}
-
-	return result;
-}
-
-int pfs_table::accept( int fd, struct sockaddr *addr, int *addrlen )
-{
-	int rfd;
-	int result=-1;
-
-	rfd = ::accept(get_real_fd(fd),addr,(socklen_t*)addrlen);
-	if(rfd>=0) {
-		result = find_empty(0);
-		pointers[result] = new pfs_pointer(pfs_file_bootstrap(rfd,"socket"),O_RDWR,0777);
-		::fcntl(rfd,F_SETFL,O_NONBLOCK);
-		fd_flags[rfd] = 0;
-	} else {
-		result = -1;
-	}
+	pfs_off_t next_offset;
+	pfs_pointer *fp = pointers[fd];
+	struct dirent *result = fp->file->fdreaddir(fp->tell(),&next_offset);
+	if(result)
+		fp->seek(next_offset,SEEK_SET);
 
 	return result;
 }
@@ -1988,7 +1695,7 @@ static int search_directory(pfs_table *t, const char * const base, char *fullpat
 	int includeroot = flags & PFS_SEARCH_INCLUDEROOT;
 
 	int result = 0;
-	int fd = t->open(fullpath, O_DIRECTORY|O_RDONLY, 0, 0);
+	int fd = t->open(fullpath, O_DIRECTORY|O_RDONLY, 0, 0, NULL, 0);
 	char *current = fullpath + strlen(fullpath);	/* point to end to current directory */
 
 	if(fd >= 0) {
@@ -2521,9 +2228,7 @@ pfs_size_t pfs_table::mmap_create( int fd, pfs_size_t file_offset, pfs_size_t ma
 	pfs_size_t channel_offset;
 	pfs_ssize_t file_length;
 
-	if( (fd<0) || (fd>=pointer_count) || (pointers[fd]==0) )
-		return (errno = EBADF, -1);
-
+	CHECK_FD(fd);
 
 	if(!(pointers[fd]->flags&(O_WRONLY|O_RDWR|O_APPEND)) && prot&PROT_WRITE && flags&MAP_SHARED)
 		return (errno = EACCES, -1);

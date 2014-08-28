@@ -30,6 +30,8 @@ void		tracer_has_args5_bug( struct tracer *t );
 int             tracer_result_get( struct tracer *t, INT64_T *result );
 int             tracer_result_set( struct tracer *t, INT64_T result );
 
+int tracer_stack_get( struct tracer *t, uintptr_t *ptr );
+
 ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, size_t length );
 ssize_t tracer_copy_in( struct tracer *t, void *data, const void *uaddr, size_t length );
 ssize_t tracer_copy_in_string( struct tracer *t, char *data, const void *uaddr, size_t maxlength );

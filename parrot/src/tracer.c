@@ -71,6 +71,7 @@ struct tracer {
 	pid_t pid;
 	int memory_file;
 	int gotregs;
+	int setregs;
 	union {
 		struct i386_registers regs32;
 		struct x86_64_registers regs64;
@@ -113,6 +114,11 @@ int tracer_attach (pid_t pid)
 
 int tracer_listen (struct tracer *t)
 {
+	if(t->setregs) {
+		if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
+			return -1;
+		t->setregs = 0;
+	}
 	if (linux_available(3,4,0)) {
 		if (ptrace(PTRACE_LISTEN, t->pid, NULL, NULL) == -1)
 			ERROR;
@@ -133,11 +139,24 @@ struct tracer *tracer_init (pid_t pid)
 
 	t->pid = pid;
 	t->gotregs = 0;
+	t->setregs = 0;
 	t->has_args5_bug = 0;
 
 	sprintf(path,"/proc/%d/mem",pid);
 	t->memory_file = open64(path,O_RDWR);
 	if(t->memory_file<0) {
+		free(t);
+		return 0;
+	}
+	int flags = fcntl(t->memory_file, F_GETFD);
+	if (flags == -1) {
+		close(t->memory_file);
+		free(t);
+		return 0;
+	}
+	flags |= FD_CLOEXEC;
+	if (fcntl(t->memory_file, F_SETFD, flags) == -1) {
+		close(t->memory_file);
 		free(t);
 		return 0;
 	}
@@ -157,7 +176,8 @@ int tracer_getevent( struct tracer *t, unsigned long *message )
 int tracer_is_64bit( struct tracer *t )
 {
 	if(!t->gotregs) {
-		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs)!=0) FATAL;
+		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
+			return -1;
 		t->gotregs = 1;
 	}
 	
@@ -170,6 +190,10 @@ int tracer_is_64bit( struct tracer *t )
 
 void tracer_detach( struct tracer *t )
 {
+	if(t->setregs) {
+		ptrace(PTRACE_SETREGS,t->pid,0,&t->regs); /* ignore failure */
+		t->setregs = 0;
+	}
 	ptrace(PTRACE_DETACH,t->pid,0,0); /* ignore failure */
 	close(t->memory_file);
 	free(t);
@@ -178,6 +202,11 @@ void tracer_detach( struct tracer *t )
 int tracer_continue( struct tracer *t, int signum )
 {
 	t->gotregs = 0;
+	if(t->setregs) {
+		if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
+			return -1;
+		t->setregs = 0;
+	}
 	if (ptrace(PTRACE_SYSCALL,t->pid,0,signum) == -1)
 		ERROR;
 	return 0;
@@ -277,6 +306,7 @@ int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS
 
 	if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
 		ERROR;
+	t->setregs = 1;
 
 	return 1;
 }
@@ -314,8 +344,26 @@ int tracer_result_set( struct tracer *t, INT64_T result )
 
 	if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
 		ERROR;
+	t->setregs = 1;
 
 	return 1;
+}
+
+int tracer_stack_get( struct tracer *t, uintptr_t *ptr )
+{
+	if(!t->gotregs) {
+		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
+			return -1;
+		t->gotregs = 1;
+	}
+
+#ifdef CCTOOLS_CPU_I386
+	*ptr = t->regs.regs32.esp;
+#else
+	*ptr = t->regs.regs64.rsp;
+#endif
+
+	return 0;
 }
 
 /*
