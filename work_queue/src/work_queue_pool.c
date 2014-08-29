@@ -249,6 +249,17 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 		fprintf(stdout, "\n");
 }
 
+void delete_projects_list(struct list *l)
+{
+	if(l) {
+		struct nvpair *nv;
+		while((nv=list_pop_head(l))) {
+			nvpair_delete(nv);
+		}
+		list_delete(l);
+	}
+}
+
 /*
 Main loop of work queue pool.  Determine the number of workers needed by our
 current list of masters, compare it to the number actually submitted, then
@@ -266,7 +277,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 	const char *submission_regex = foremen_regex ? foremen_regex : project_regex;
 
 	while(!abort_flag) {
-		masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
+		masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
 
 		debug(D_WQ,"evaluating master list...");
 		int workers_needed = count_workers_needed(masters_list, 0);
@@ -275,7 +286,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		if(foremen_regex)
 		{
 			debug(D_WQ,"evaluating foremen list...");
-			foremen_list    = work_queue_catalog_query_cached(catalog_host,catalog_port,foremen_regex);
+			foremen_list    = work_queue_catalog_query(catalog_host,catalog_port,foremen_regex);
 			workers_needed += count_workers_needed(foremen_list, 1);
 			debug(D_WQ,"%d total workers needed across %d foremen",workers_needed,list_size(foremen_list));
 		}
@@ -328,7 +339,10 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 			}
 		}
 
-		sleep(5);
+		delete_projects_list(masters_list);
+		delete_projects_list(foremen_list);
+
+		sleep(30);
 	}
 
 	remove_all_workers(queue,job_table);
