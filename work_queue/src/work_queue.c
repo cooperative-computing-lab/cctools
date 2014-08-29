@@ -593,8 +593,6 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		list_push_head(q->ready_list, t);
 
 		reap_task_from_worker(q, w, t);
-
-		itable_remove(q->finished_tasks, t->taskid);
 	}
 	itable_clear(w->current_tasks);
 	w->finished_tasks = 0;
@@ -1075,10 +1073,8 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	delete_uncacheable_files(q,w,t);
 
 	// At this point, a task is completed.
-	reap_task_from_worker(q, w, t);
-
-	itable_remove(q->finished_tasks, t->taskid);
 	list_push_head(q->complete_list, t);
+	reap_task_from_worker(q, w, t);
 
 	w->finished_tasks--;
 	t->time_task_finish = timestamp_get();
@@ -1119,15 +1115,12 @@ the task as complete so it is returned to the application.
 */
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
-	reap_task_from_worker(q, w, t);
-
-	//remove the task from tables that track dispatched tasks. 
-	itable_remove(q->finished_tasks, t->taskid); 
-
-	
 	//add the task to complete list so it is given back to the application.
 	list_push_head(q->complete_list, t);
 
+	//remove the task from tables that track dispatched tasks. 
+	reap_task_from_worker(q, w, t);
+	
 	/*If the failure happened after a task execution, we remove all the output
 	files specified for that task from the worker's cache.  This is because the
 	application may resubmit the task and the resubmitted task may produce
@@ -2575,6 +2568,7 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	//update tables.
 	itable_remove(w->current_tasks, t->taskid);
 	itable_remove(q->running_tasks, t->taskid); 
+	itable_remove(q->finished_tasks, t->taskid);
 	itable_remove(q->worker_task_map, t->taskid);
 	
 	if(t->unlabeled)
@@ -2784,8 +2778,6 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 
 		//update tables.
 		reap_task_from_worker(q, w, t);
-
-		itable_remove(q->finished_tasks, t->taskid);
 
 		return 1;
 	}
@@ -4211,23 +4203,13 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 		
 		itable_firstkey(w->current_tasks);
 		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
-			itable_remove(q->running_tasks, taskid);
-			itable_remove(q->finished_tasks, taskid);
-			itable_remove(q->worker_task_map, taskid);
-			
 			//Delete any input files that are not to be cached.
 			delete_worker_files(q, w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 
 			//Delete all output files since they are not needed as the task was aborted.
 			delete_worker_files(q, w, t, t->output_files, 0);
-			
-			w->cores_allocated -= t->cores;
-			w->memory_allocated -= t->memory;
-			w->disk_allocated -= t->disk;
-			w->gpus_allocated -= t->gpus;
-			
-			itable_remove(w->current_tasks, taskid);
-			
+			reap_task_from_worker(q, w, t);
+
 			list_push_tail(l, t);
 			q->total_tasks_cancelled++;	
 		}
