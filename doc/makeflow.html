@@ -20,42 +20,43 @@ See the file COPYING for details.</p>
 
 <h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
 
-<p>
-Makeflow is a <b>workflow engine</b> for distributed computing.
-It accepts a specification of a large amount of work to be
-performed, and runs it on remote machines in parallel where possible.
-In addition, Makeflow is fault-tolerant, so you can use it to coordinate
-very large tasks that may run for days or weeks in the face of failures.
-Makeflow is designed to be similar to <b>Make</b>, so if you can write
-a Makefile, then you can write a Makeflow.
-<p>
-You can run a Makeflow on your local machine to test it out.
-If you have a multi-core machine, then you can run multiple tasks simultaneously.
-If you have a Condor pool or a Sun Grid Engine batch system, then you can send
-your jobs there to run.  If you don't already have a batch system, Makeflow comes with a
-system called Work Queue that will let you distribute the load across any collection
-of machines, large or small.
-<p>
-Makeflow is part of the <a href="http://ccl.cse.nd.edu/software">Cooperating Computing Tools</a>.  You can download the CCTools from <a href="http://ccl.cse.nd.edu/software/download">this web page</a>, follow the <a href="install.html">installation instructions</a>, and you are ready to go.
+<p>Makeflow is a <b>workflow engine</b> for distributed computing.  It accepts
+a specification of a large amount of work to be performed, and runs it on
+remote machines in parallel where possible.  In addition, Makeflow is
+fault-tolerant, so you can use it to coordinate very large tasks that may run
+for days or weeks in the face of failures.  Makeflow is designed to be similar
+to <b>Make</b>, so if you can write a Makefile, then you can write a
+Makeflow.</p>
+
+<p>You can run a Makeflow on your local machine to test it out.  If you have a
+multi-core machine, then you can run multiple tasks simultaneously.  If you
+have a Condor pool or a Sun Grid Engine batch system, then you can send your
+jobs there to run.  If you don't already have a batch system, Makeflow comes
+with a system called Work Queue that will let you distribute the load across
+any collection of machines, large or small.</p>
+
+<p> Makeflow is part of the <a
+href="http://ccl.cse.nd.edu/software">Cooperating Computing Tools</a>.  You can
+download the CCTools from <a
+href="http://ccl.cse.nd.edu/software/download">this web page</a>, follow the <a
+href="install.html">installation instructions</a>, and you are ready to go.</p>
 
 <h2 id="language">The Makeflow Language<a class="sectionlink" href="#language" title="Link to this section.">&#x21d7;</a></h2>
 
-The Makeflow language is very similar to Make.
-A Makeflow script consists of a set of rules.
-Each rule specifies a set of <i>target files</i> to create,
-a set of <i>source files</i> needed to create them,
-and a <i>command</i> that generates the target files from the source files.
-<p>
-Makeflow attempts to generate all of the target files in a script.
-It examines all of the rules and determines which rules must run before
-others.  Where possible, it runs commands in parallel to reduce the
-execution time.
-<p>
-Here is a Makeflow that uses the <tt>convert</tt> utility to make an animation.
-It downloads an image from the web, creates four variations
-of the image, and then combines them back together into an animation.
-The first and the last task are marked as LOCAL to force them to
-run on the controlling machine.
+<p>The Makeflow language is very similar to Make.  A Makeflow script consists
+of a set of rules.  Each rule specifies a set of <i>target files</i> to create,
+a set of <i>source files</i> needed to create them, and a <i>command</i> that
+generates the target files from the source files.</p>
+
+<p>Makeflow attempts to generate all of the target files in a script.  It
+examines all of the rules and determines which rules must run before others.
+Where possible, it runs commands in parallel to reduce the execution time.</p>
+
+<p>Here is a Makeflow that uses the <tt>convert</tt> utility to make an
+animation.  It downloads an image from the web, creates four variations of the
+image, and then combines them back together into an animation.  The first and
+the last task are marked as LOCAL to force them to run on the controlling
+machine.</p>
 
 <code>CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
@@ -80,52 +81,55 @@ capitol.jpg: $CURL
         LOCAL $CURL -o capitol.jpg $URL
 </code>
 
-Note that Makeflow differs from Make in a few important ways.
-Read section 4 below to get all of the details.
+<p>Note that Makeflow differs from Make in a few important ways.  Read section
+4 below to get all of the details.</p>
 
 <h2 id="running">Running Makeflow<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
 
-To try out the example above, copy and paste it into a file named <tt>example.makeflow</tt>.
-To run it on your local machine:
+<p>To try out the example above, copy and paste it into a file named
+<tt>example.makeflow</tt>.  To run it on your local machine:</p>
 
 <code>% makeflow example.makeflow</code>
 
-Note that if you run it a second time, nothing will happen, because all of the files are built:
+<p>Note that if you run it a second time, nothing will happen, because all of
+the files are built:</p>
 
 <code>% makeflow example.makeflow
 makeflow: nothing left to do
 </code>
 
-Use the <tt>-c</tt> option to clean everything up before trying it again:
+<p>Use the <tt>-c</tt> option to clean everything up before trying it
+again:</p>
 
 <code>% makeflow -c example.makeflow</code>
 
-If you have access to a batch system running <a href="http://www.sun.com/software/sge">SGE</a>,
-then you can direct Makeflow to run your jobs there:
+<p>If you have access to a batch system running <a
+href="http://www.sun.com/software/sge">SGE</a>, then you can direct Makeflow to
+run your jobs there:</p>
 
 <code>% makeflow -T sge example.makeflow</code>
 
-Or, if you have a <a href="http://www.cs.wisc.edu/condor">Condor Pool</a>,
-then you can direct Makeflow to run your jobs there:
+<p>Or, if you have a <a href="http://www.cs.wisc.edu/condor">Condor Pool</a>,
+then you can direct Makeflow to run your jobs there:</p>
 
 <code>% makeflow -T condor example.makeflow</code>
 
-To submit Makeflow as a Condor job that submits more Condor jobs:
+<p>To submit Makeflow as a Condor job that submits more Condor jobs:</p>
 
 <code>% condor_submit_makeflow example.makeflow</code>
 
-You will notice that a workflow can run very slowly if you submit
-each batch job to SGE or Condor, because it typically
-takes 30 seconds or so to start each batch job running.  To get
-around this limitation, we provide the Work Queue system.
-This allows Makeflow to function as a master process that 
-quickly dispatches work to remote worker processes.
-<p>
-To begin, let's assume that you are logged into a machine
-named <tt>barney.nd.edu</tt>. start your Makeflow like this:
+<p>You will notice that a workflow can run very slowly if you submit each batch
+job to SGE or Condor, because it typically takes 30 seconds or so to start each
+batch job running.  To get around this limitation, we provide the Work Queue
+system.  This allows Makeflow to function as a master process that quickly
+dispatches work to remote worker processes.</p>
+
+<p>To begin, let's assume that you are logged into a machine named
+<tt>barney.nd.edu</tt>. start your Makeflow like this:</p>
+
 <code>% makeflow -T wq example.makeflow</code>
 
-Then, submit 10 worker processes to Condor like this:
+<p>Then, submit 10 worker processes to Condor like this:</p>
 
 <code>% condor_submit_workers barney.nd.edu 9123 10
 Submitting job(s)..........
@@ -133,25 +137,26 @@ Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 </code>
 
-Or, submit 10 worker processes to SGE like this:
+<p>Or, submit 10 worker processes to SGE like this:</p>
+
 <code>% sge_submit_workers barney.nd.edu 9123 10</code>
 
-Or, you can start workers manually on any other machine you can log into:
+<p>Or, you can start workers manually on any other machine you can log into:</p>
+
 <code>% work_queue_worker barney.nd.edu 9123</code>
 
-Once the workers begin running, Makeflow will dispatch multiple
-tasks to each one very quickly.  If a worker should fail, Makeflow
-will retry the work elsewhere, so it is safe to submit many
-workers to an unreliable system.
-<p>
-When the Makeflow completes, your workers will still be available,
-so you can either run another Makeflow with the same workers,
-remove them from the batch system, or wait for them to expire.
-If you do nothing for 15 minutes, they will automatically exit.
-<p>
-Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>,
-are simple shell scripts, so you can edit them directly if you would
-like to change batch options or other details.
+<p>Once the workers begin running, Makeflow will dispatch multiple tasks to
+each one very quickly.  If a worker should fail, Makeflow will retry the work
+elsewhere, so it is safe to submit many workers to an unreliable system.</p>
+
+<p>When the Makeflow completes, your workers will still be available, so you
+can either run another Makeflow with the same workers, remove them from the
+batch system, or wait for them to expire.  If you do nothing for 15 minutes,
+they will automatically exit.</p>
+
+<p>Note that <tt>condor_submit_workers</tt> and <tt>sge_submit_workers</tt>,
+are simple shell scripts, so you can edit them directly if you would like to
+change batch options or other details.</p>
 
 <h2 id="details">The Fine Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
 
