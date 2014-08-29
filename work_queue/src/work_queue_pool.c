@@ -67,7 +67,7 @@ static void ignore_signal( int sig )
 Count up the workers needed in a given list of masters, IGNORING how many workers are actually connected.
 */
 
-static int count_workers_needed( struct list *masters_list )
+static int count_workers_needed( struct list *masters_list, int only_waiting )
 {
 	int needed_workers=0;
 	int masters=0;
@@ -86,7 +86,14 @@ static int count_workers_needed( struct list *masters_list )
 		const int capacity = nvpair_lookup_integer(nv,"capacity");
 
 		int tasks = tr+tw;
-		int need = tasks;
+
+		int need;
+
+		if(only_waiting) {
+			need = tw;
+		} else {
+			need = tasks;
+		}
 
 		if(consider_capacity && capacity>0) {
 			need = MIN(capacity,tasks);
@@ -262,14 +269,14 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
 
 		debug(D_WQ,"evaluating master list...");
-		int workers_needed = count_workers_needed(masters_list);
+		int workers_needed = count_workers_needed(masters_list, 0);
 		debug(D_WQ,"%d total workers needed across %d masters",workers_needed,list_size(masters_list));
 
 		if(foremen_regex)
 		{
 			debug(D_WQ,"evaluating foremen list...");
 			foremen_list    = work_queue_catalog_query_cached(catalog_host,catalog_port,foremen_regex);
-			workers_needed += count_workers_needed(foremen_list);
+			workers_needed += count_workers_needed(foremen_list, 1);
 			debug(D_WQ,"%d total workers needed across %d foremen",workers_needed,list_size(foremen_list));
 		}
 
