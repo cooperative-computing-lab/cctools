@@ -29,6 +29,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+#include <math.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -39,6 +40,7 @@ static const char *catalog_host = 0;
 static int catalog_port = 0;
 static int workers_min = 5;
 static int workers_max = 100;
+static double tasks_per_worker = -1;
 static int consider_capacity = 0;
 static const char *project_regex = 0;
 static const char *foremen_regex = 0;
@@ -104,6 +106,8 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		needed_workers += need;
 		masters++;
 	}
+
+	needed_workers = (int) ceil(needed_workers / tasks_per_worker);
 
 	return needed_workers;
 }
@@ -359,6 +363,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
 	printf(" %-30s Maximum workers running.  (default=%d)\n", "-W,--max-workers", workers_max);
+	printf(" %-30s Average tasks per worker. (default=one task per core)\n", "--tasks-per-worker"); 
 	printf(" %-30s Workers abort after this amount of idle time. (default=%d)\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
 	printf(" %-30s Set the number of cores requested per worker.\n", "--cores=<n>");
@@ -372,7 +377,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER };
 static struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
@@ -380,6 +385,7 @@ static struct option long_options[] = {
 	{"password", required_argument, 0, 'P'},
 	{"min-workers", required_argument, 0, 'w'},
 	{"max-workers", required_argument, 0, 'w'},
+	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
 	{"timeout", required_argument, 0, 't'},
 	{"extra-options", required_argument, 0, 'E'},
 	{"cores",  required_argument,  0,  LONG_OPT_CORES},
@@ -432,6 +438,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'W':
 			workers_max = atoi(optarg);
+			break;
+		case LONG_OPT_TASKS_PER_WORKER:
+			tasks_per_worker = atof(optarg);
 			break;
 		case 'E':
 			extra_worker_args = optarg;
@@ -488,6 +497,11 @@ int main(int argc, char *argv[])
 	if(workers_min>workers_max) {
 		fprintf(stderr,"work_queue_pool: --min-workers (%d) is greater than --max-workers (%d)\n",workers_min,workers_max);
 		return 1;
+	}
+
+	if(tasks_per_worker < 1)
+	{
+		tasks_per_worker = num_cores_option ? atof(num_cores_option) : 1;
 	}
 
 	if(!scratch_dir) {
