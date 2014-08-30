@@ -593,7 +593,9 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		list_push_head(q->ready_list, t);
 
 		reap_task_from_worker(q, w, t);
+		itable_firstkey(w->current_tasks);
 	}
+
 	itable_clear(w->current_tasks);
 	w->finished_tasks = 0;
 }
@@ -1742,7 +1744,6 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	// For every worker in the hash table, add an item to the poll table
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-
 		// If poll table is not large enough, reallocate it
 		if(n >= q->poll_table_size) {
 			q->poll_table_size *= 2;
@@ -4208,6 +4209,7 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 
 			list_push_tail(l, t);
 			q->total_tasks_cancelled++;	
+			itable_firstkey(w->current_tasks);
 		}
 	}
 	return l;
