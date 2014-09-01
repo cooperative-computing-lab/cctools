@@ -555,11 +555,17 @@ class WorkQueue(_object):
         except Exception, e:
             raise Exception('Unable to create internal Work Queue structure: %s' % e)
 
-    def __del__(self):
+    def __free_queue(self):
         if self._work_queue:
             if self._shutdown:
                 self.shutdown_workers(0)
             work_queue_delete(self._work_queue)
+
+    def __exit__(self):
+        self.__free_queue()
+
+    def __del__(self):
+        self.__free_queue()
     
     ##
     # Get the project name of the queue. 
