@@ -548,7 +548,7 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	return timeout;
 }
 
-static void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
+void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
 	static time_t last_update_time = 0;
 	char address[LINK_ADDRESS_MAX];

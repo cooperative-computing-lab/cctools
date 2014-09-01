@@ -1112,7 +1112,12 @@ static void disconnect_master(struct link *master) {
 	if(foreman_q) {
 		debug(D_WQ, "Disconnecting all workers...\n");
 		release_all_workers(foreman_q); 
+
+		if(project_regex) {
+			update_catalog(foreman_q, master, 1);
+		}
 	}
+
 
 
 	if(released_by_master) {

@@ -47,3 +47,5 @@ taskid should not be modified.*/
 int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t);
 
 void release_all_workers(struct work_queue *q);
+
+void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update );
