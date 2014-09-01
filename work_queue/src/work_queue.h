@@ -56,6 +56,7 @@ See the file COPYING for details.
 #define WORK_QUEUE_RESULT_STDOUT_MISSING 4 /**< The task ran but its stdout has been truncated >**/
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
+
 extern int wq_option_scheduler;	/**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
 
 /** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
@@ -438,6 +439,12 @@ char * work_queue_get_worker_summary( struct work_queue *q );
 @returns 0 if activated or deactivated with an appropriate multiplier, 1 if deactivated due to inappropriate multiplier.
 */
 int work_queue_activate_fast_abort(struct work_queue *q, double multiplier);
+
+
+/** Change the preference to send or receive tasks.
+@param q A work queue object.
+@param ratio The send/receive ratio when there is a choice between sending and receiving tasks. 1 Always prefer to send (e.g., for homogenous, stable resources). 0 Always prefer to receive (e.g., for resources with hight rate of eviction). Default is 0.75 (one average, receive one task per three sent). **/
+int work_queue_send_receive_ratio(struct work_queue *q, double ratio);
 
 /** Change the worker selection algorithm.
 Note that this function controls which <b>worker</b> will be selected
