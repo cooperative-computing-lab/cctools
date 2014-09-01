@@ -200,7 +200,7 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
-static void process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count);
+static void process_available_results(struct work_queue *q, struct work_queue_worker *w);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line); 
 
@@ -620,9 +620,9 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		list_push_head(q->ready_list, t);
 
 		reap_task_from_worker(q, w, t);
-
-		itable_remove(q->finished_tasks, t->taskid);
+		itable_firstkey(w->current_tasks);
 	}
+
 	itable_clear(w->current_tasks);
 	w->finished_tasks = 0;
 }
@@ -1123,10 +1123,8 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	delete_uncacheable_files(q,w,t);
 
 	// At this point, a task is completed.
-	reap_task_from_worker(q, w, t);
-
-	itable_remove(q->finished_tasks, t->taskid);
 	list_push_head(q->complete_list, t);
+	reap_task_from_worker(q, w, t);
 
 	w->finished_tasks--;
 	t->time_task_finish = timestamp_get();
@@ -1167,15 +1165,12 @@ the task as complete so it is returned to the application.
 */
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
-	reap_task_from_worker(q, w, t);
-
-	//remove the task from tables that track dispatched tasks. 
-	itable_remove(q->finished_tasks, t->taskid); 
-
-	
 	//add the task to complete list so it is given back to the application.
 	list_push_head(q->complete_list, t);
 
+	//remove the task from tables that track dispatched tasks. 
+	reap_task_from_worker(q, w, t);
+	
 	/*If the failure happened after a task execution, we remove all the output
 	files specified for that task from the worker's cache.  This is because the
 	application may resubmit the task and the resubmitted task may produce
@@ -1433,11 +1428,11 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	return SUCCESS;
 }
 
-static void process_available_results(struct work_queue *q, struct work_queue_worker *w, int max_count)
+static void process_available_results(struct work_queue *q, struct work_queue_worker *w)
 {
+	
 	//max_count == -1, tells the worker to send all available results.
-
-	send_worker_msg(q, w, "send_results %d\n", max_count);
+	send_worker_msg(q, w, "send_results %d\n", -1);
 	debug(D_WQ, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
 	char line[WORK_QUEUE_LINE_MAX];
@@ -1468,13 +1463,8 @@ static void process_available_results(struct work_queue *q, struct work_queue_wo
 		}
 	}
 	
-	if(max_count > 0 && i > max_count) {
-		debug(D_WQ, "%s (%s): sent %d results. At most %d were expected.",w->hostname,w->addrport, i, max_count);
-		result = WORKER_FAILURE; //if the worker disobeyed, consider it as failed.
-	} 
-
 	if(result != SUCCESS) {
-		handle_failure(q, w, NULL, result);
+		handle_worker_failure(q, w);
 	}
 
 	return;
@@ -1807,7 +1797,6 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	// For every worker in the hash table, add an item to the poll table
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-
 		// If poll table is not large enough, reallocate it
 		if(n >= q->poll_table_size) {
 			q->poll_table_size *= 2;
@@ -2636,6 +2625,7 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	//update tables.
 	itable_remove(w->current_tasks, t->taskid);
 	itable_remove(q->running_tasks, t->taskid); 
+	itable_remove(q->finished_tasks, t->taskid);
 	itable_remove(q->worker_task_map, t->taskid);
 	
 	if(t->unlabeled)
@@ -2842,8 +2832,6 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 
 		//update tables.
 		reap_task_from_worker(q, w, t);
-
-		itable_remove(q->finished_tasks, t->taskid);
 
 		return 1;
 	}
@@ -4002,8 +3990,9 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 		struct work_queue_worker *w;
 		hash_table_firstkey(q->workers_with_available_results);
 		while(hash_table_nextkey(q->workers_with_available_results,&key,(void**)&w)) {
-			process_available_results(q, w, -1);
+			process_available_results(q, w);
 			hash_table_remove(q->workers_with_available_results, key);
+			hash_table_firstkey(q->workers_with_available_results);
 		}	
 	}
 
@@ -4293,25 +4282,16 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 		
 		itable_firstkey(w->current_tasks);
 		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
-			itable_remove(q->running_tasks, taskid);
-			itable_remove(q->finished_tasks, taskid);
-			itable_remove(q->worker_task_map, taskid);
-			
 			//Delete any input files that are not to be cached.
 			delete_worker_files(q, w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 
 			//Delete all output files since they are not needed as the task was aborted.
 			delete_worker_files(q, w, t, t->output_files, 0);
-			
-			w->cores_allocated -= t->cores;
-			w->memory_allocated -= t->memory;
-			w->disk_allocated -= t->disk;
-			w->gpus_allocated -= t->gpus;
-			
-			itable_remove(w->current_tasks, taskid);
-			
+			reap_task_from_worker(q, w, t);
+
 			list_push_tail(l, t);
 			q->stats->total_tasks_cancelled++;	
+			itable_firstkey(w->current_tasks);
 		}
 	}
 	return l;
