@@ -1585,7 +1585,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	struct link *l = target->link;
 	
 	free(target->hostname);
-	target->hostname = strdup("QUEUE_STATUS");
+	target->hostname = xxstrdup("QUEUE_STATUS");
 
 	if(!sscanf(line, "%[^_]_status", request) == 1) {
 		return -1;
@@ -1660,6 +1660,11 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	}
 
 	link_write(l, "\n", 1, stoptime);
+
+	//do not count a status connection as a worker
+	q->stats->total_workers_joined--;
+	q->stats->total_workers_removed--;
+
 	return 0;
 }
 
