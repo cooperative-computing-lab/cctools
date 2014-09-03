@@ -1280,8 +1280,8 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
-	fprintf(stdout, " %-30s Disable Work Queue caching.                 (default is false)\n", "--disable-wq-cache");
-	fprintf(stdout, " %-30s Add node id symbol tags in the makeflow log.        (default is false)\n", "--log-verbose");
+	fprintf(stdout, " %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
+	fprintf(stdout, " %-30s Add node id symbol tags in the makeflow log.        (default is false)\n", "   --log-verbose");
 
 	fprintf(stdout, "\n*Monitor Options:\n\n");
 	fprintf(stdout, " %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
