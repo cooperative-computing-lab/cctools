@@ -75,6 +75,9 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 	int masters=0;
 	struct nvpair *nv;
 
+	if(!masters_list) {
+		return needed_workers;
+	}
 
 	list_first_item(masters_list);
 	while((nv=list_next_item(masters_list))) {
@@ -217,7 +220,11 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
 				submitted, needed, requested);
 
-		if( !(list_size(masters) > 0 || (foremen && list_size(foremen) > 0)) )
+		int master_count = 0;
+		master_count += masters ? list_size(masters) : 0;
+		master_count += foremen ? list_size(foremen) : 0;
+
+		if(master_count < 1)
 		{
 			fprintf(stdout, "No change this cycle.\n\n");
 			return;
@@ -226,7 +233,7 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 		nvpair_print_table_header(stdout, queue_headers);
 
 		struct nvpair *nv;
-		if(list_size(masters) > 0)
+		if(masters && list_size(masters) > 0)
 		{
 			fprintf(stdout, "masters:\n");
 
@@ -285,7 +292,10 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 
 		debug(D_WQ,"evaluating master list...");
 		int workers_needed = count_workers_needed(masters_list, 0);
-		debug(D_WQ,"%d total workers needed across %d masters",workers_needed,list_size(masters_list));
+
+		debug(D_WQ,"%d total workers needed across %d masters",
+				workers_needed,
+				masters_list ? list_size(masters_list) : 0);
 
 		if(foremen_regex)
 		{
