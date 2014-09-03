@@ -3,6 +3,10 @@ annotates by partitioning the file into pieces containing one or more sequences
 and distributing them for individual annotation. The program uses the Work Queue
 framework for distributed execution on available resources. 
 
+The latest version of MAKER includes several updates and changes to the
+implementation. The wq_maker.2_38 program runs with MAKER 2.38. Please note that
+this program has been minimally tested and may contain bugs. 
+
 To run: 
 
 1. Install CCTools.
