@@ -1240,6 +1240,7 @@ void dag_run(struct dag *d)
 static void handle_abort(int sig)
 {
 	dag_abort_flag = 1;
+	signal(sig, SIG_DFL);
 }
 
 static void show_help_run(const char *cmd)
