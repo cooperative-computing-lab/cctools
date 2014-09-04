@@ -335,10 +335,12 @@ void pfs_process_killall()
 	UINT64_T pid;
 	struct pfs_process *p;
 
-	itable_firstkey(pfs_process_table);
-	while(itable_nextkey(pfs_process_table,&pid,(void**)&p)) {
-		debug(D_PROCESS,"killing pid %d",p->pid);
-		kill(p->pid,SIGKILL);
+	if (pfs_process_table) {
+		itable_firstkey(pfs_process_table);
+		while(itable_nextkey(pfs_process_table,&pid,(void**)&p)) {
+			debug(D_PROCESS,"killing pid %d",p->pid);
+			kill(p->pid,SIGKILL);
+		}
 	}
 }
 
