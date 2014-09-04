@@ -31,7 +31,7 @@ See the file COPYING for details.
 
 #define ERROR \
 	do {\
-		debug(D_DEBUG, "%s: ptrace error: %s", __func__, strerror(errno));\
+		debug(D_DEBUG, "%s (%s:%d): ptrace error: %s", __func__, __FILE__, __LINE__, strerror(errno));\
 		return -1;\
 	} while (0)
 
@@ -95,8 +95,14 @@ int tracer_attach (pid_t pid)
 		if (ptrace(PTRACE_SEIZE, pid, 0, (void *)options) == -1)
 			ERROR;
 	} else {
+		int status;
 		if (ptrace(PTRACE_ATTACH, pid, 0, 0) == -1)
 			ERROR;
+		/* wait for the signal-delivery-stop for the PTRACE_ATTACH bootstrap SIGSTOP */
+		if (waitpid(pid, &status, WUNTRACED|__WALL) == -1)
+			ERROR;
+		assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP);
+		/* The SIGSTOP will be supressed in the upcoming PTRACE_SYSCALL */
 		if (linux_available(2,6,0)) {
 			if (ptrace(PTRACE_SETOPTIONS, pid, 0, (void *)options) == -1)
 				ERROR;
@@ -104,10 +110,10 @@ int tracer_attach (pid_t pid)
 			if (ptrace(PTRACE_OLDSETOPTIONS, pid, 0, (void *)options) == -1)
 				ERROR;
 		}
+		/* suppress delivery */
+		if (ptrace(PTRACE_SYSCALL, pid, NULL, (void *)0) == -1)
+			ERROR;
 	}
-
-	if (ptrace(PTRACE_SYSCALL, pid, NULL, (void *)SIGCONT) == -1)
-		ERROR;
 
 	return 0;
 }

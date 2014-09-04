@@ -481,6 +481,13 @@ static void handle_sigio( int sig )
 	pfs_process_sigio();
 }
 
+static volatile sig_atomic_t attached_and_ready = 0;
+static void set_attached_and_ready (int sig)
+{
+	assert(sig == SIGUSR1);
+	attached_and_ready = 1;
+}
+
 void write_rval(const char* message, int status) {
 	FILE *file = fopen(pfs_write_rval_file, "w+");
 	if(file) {
@@ -960,6 +967,19 @@ int main( int argc, char *argv[] )
 	setpgrp();
 	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
 
+	/* XXX Notes on strange code ahead:
+	 *
+	 * Previously we had a really simple synchronization mechanism whereby the
+	 * child would raise(SIGSTOP) and wait for the parent to attach. Apparently
+	 * this does not work on obscure Linux flavors (Cray Linux 2.6.32) so we
+	 * need to be more fancy. The exact problem appears to be that we cannot
+	 * PTRACE_ATTACH a stopped process and then do PTRACE_SETOPTIONS.
+	 *
+	 * So the solution is: only attach when the child is spinning.
+	 *
+	 * This requires awkward signal gymnastics:
+	 */
+
 	pid = fork();
 	if(pid>0) {
 		pid_t wpid;
@@ -970,11 +990,19 @@ int main( int argc, char *argv[] )
 		} while (wpid != pid);
 		if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGSTOP)
 			fatal("child did not stop as expected!");
+		kill(pid, SIGCONT);
+		do {
+			wpid = waitpid(pid, &status, WCONTINUED);
+		} while (wpid != pid);
+		if (!WIFCONTINUED(status))
+			fatal("child did not continue as expected!");
 	} else if(pid==0) {
 		pfs_paranoia_payload();
 		pfs_process_bootstrapfd();
 		setpgrp();
-		raise(SIGSTOP); /* wait to be traced */
+		signal(SIGUSR1, set_attached_and_ready);
+		raise(SIGSTOP); /* synchronize with parent, above */
+		while (!attached_and_ready) ; /* spin waiting to be traced (NO SLEEPING/STOPPING) */
 		execvp(argv[optind],&argv[optind]);
 		debug(D_NOTICE,"unable to execute %s: %s",argv[optind],strerror(errno));
 		if(pfs_write_rval) {
@@ -995,6 +1023,7 @@ int main( int argc, char *argv[] )
 	debug(D_PROCESS,"attaching to pid %d",pid);
 	if (tracer_attach(pid) == -1)
 		fatal("could not trace child");
+	kill(pid, SIGUSR1);
 	p = pfs_process_create(pid,getpid(),0);
 	if(!p) {
 		if(pfs_write_rval) {
