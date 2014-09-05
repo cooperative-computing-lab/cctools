@@ -1239,6 +1239,18 @@ void dag_run(struct dag *d)
 
 static void handle_abort(int sig)
 {
+	static int abort_count_to_exit = 5;
+
+	abort_count_to_exit -= 1;
+	int fd = open("/dev/tty", O_WRONLY);
+	if (fd >= 0) {
+		char buf[256];
+		snprintf(buf, sizeof(buf), "Received signal %d, will try to clean up remote resources. Send signal %d more times to force exit.\n", sig, abort_count_to_exit);
+		write(fd, buf, strlen(buf));
+		close(fd);
+	}
+	if (abort_count_to_exit == 1)
+		signal(sig, SIG_DFL);
 	dag_abort_flag = 1;
 }
 
