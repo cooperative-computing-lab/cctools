@@ -538,11 +538,13 @@ class WorkQueue(_object):
         self._shutdown   = shutdown
         self._work_queue = None
         self._stats      = None
+        self._stats_hierarchy = None
         self._task_table = {}
 
         try:
             self._work_queue = work_queue_create(port)
             self._stats      = work_queue_stats()
+            self._stats_hierarchy = work_queue_stats()
             if not self._work_queue:
                 raise Exception('Could not create work_queue on port %d' % port)
 
@@ -596,6 +598,23 @@ class WorkQueue(_object):
     def stats(self):
         work_queue_get_stats(self._work_queue, self._stats)
         return self._stats
+
+    ##
+    # Get worker hierarchy statistics.  
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print q.stats
+    # @endcode
+    # The fields in @ref work_queue_stats can also be individually accessed through this call. For example:
+    # @code
+    # >>> print q.stats.workers_busy
+    # @endcode
+    @property
+    def stats_hierarchy(self):
+        work_queue_get_stats_hierarchy(self._work_queue, self._stats_hierarchy)
+        return self._stats_hierarchy
+
 
     ## Enables resource monitoring of tasks in the queue. And writes a summary of the monitored information to a file.
     #
