@@ -119,18 +119,22 @@ static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch
 
 static int batch_job_local_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
-	if(itable_lookup(q->job_table, jobid)) {
-		if(kill(jobid, SIGTERM) == 0) {
-			debug(D_BATCH, "signalled process %" PRIbjid, jobid);
-			return 1;
-		} else {
-			debug(D_BATCH, "could not signal process %" PRIbjid ": %s\n", jobid, strerror(errno));
+	int status;
+
+	if(kill(jobid, SIGTERM) == 0) {
+		if(!itable_lookup(q->job_table, jobid)) {
+			debug(D_BATCH, "runaway process %" PRIbjid "?\n", jobid);
 			return 0;
+		} else {
+			debug(D_BATCH, "waiting for process %" PRIbjid, jobid);
+			waitpid(jobid, &status, 0);
+			return 1;
 		}
 	} else {
-		debug(D_BATCH, "process %" PRIbjid " is not under my control.\n", jobid);
+		debug(D_BATCH, "could not signal process %" PRIbjid ": %s\n", jobid, strerror(errno));
 		return 0;
 	}
+
 }
 
 batch_queue_stub_create(local);
