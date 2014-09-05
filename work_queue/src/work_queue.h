@@ -29,6 +29,7 @@ See the file COPYING for details.
 #define WORK_QUEUE_SCHEDULE_FILES	 2 /**< Select worker that has the most data required by the task. */
 #define WORK_QUEUE_SCHEDULE_TIME	 3 /**< Select worker that has the fastest execution time on previous tasks. */
 #define WORK_QUEUE_SCHEDULE_RAND	 4 /**< Select a random worker. (default) */
+#define WORK_QUEUE_SCHEDULE_WORST	 5 /**< Select the worst fit worker (the worker with more unused resources). */
 
 #define WORK_QUEUE_TASK_ORDER_FIFO 0  /**< Retrieve tasks based on first-in-first-out order. */
 #define WORK_QUEUE_TASK_ORDER_LIFO 1  /**< Retrieve tasks based on last-in-first-out order. */
