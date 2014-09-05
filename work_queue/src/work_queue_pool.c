@@ -29,8 +29,10 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+#include <math.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <signal.h>
 
@@ -38,8 +40,10 @@ static const char *catalog_host = 0;
 static int catalog_port = 0;
 static int workers_min = 5;
 static int workers_max = 100;
+static double tasks_per_worker = -1;
 static int consider_capacity = 0;
 static const char *project_regex = 0;
+static const char *foremen_regex = 0;
 static int worker_timeout = 300;
 static const char *extra_worker_args=0;
 static const char *resource_args=0;
@@ -65,13 +69,15 @@ static void ignore_signal( int sig )
 Count up the workers needed in a given list of masters, IGNORING how many workers are actually connected.
 */
 
-static int count_workers_needed( struct list *masters_list )
+static int count_workers_needed( struct list *masters_list, int only_waiting )
 {
 	int needed_workers=0;
 	int masters=0;
 	struct nvpair *nv;
 
-	debug(D_WQ,"evaluating master list...");
+	if(!masters_list) {
+		return needed_workers;
+	}
 
 	list_first_item(masters_list);
 	while((nv=list_next_item(masters_list))) {
@@ -85,7 +91,14 @@ static int count_workers_needed( struct list *masters_list )
 		const int capacity = nvpair_lookup_integer(nv,"capacity");
 
 		int tasks = tr+tw;
-		int need = tasks;
+
+		int need;
+
+		if(only_waiting) {
+			need = tw;
+		} else {
+			need = tasks;
+		}
 
 		if(consider_capacity && capacity>0) {
 			need = MIN(capacity,tasks);
@@ -97,7 +110,7 @@ static int count_workers_needed( struct list *masters_list )
 		masters++;
 	}
 
-	debug(D_WQ,"%d total workers needed across %d masters",needed_workers,masters);
+	needed_workers = (int) ceil(needed_workers / tasks_per_worker);
 
 	return needed_workers;
 }
@@ -120,12 +133,12 @@ static void set_worker_resources( struct batch_queue *queue )
 			num_gpus_option ? num_gpus_option : "");
 }
 
-static int submit_worker( struct batch_queue *queue )
+static int submit_worker( struct batch_queue *queue, const char *master_regex )
 {
 	char cmd[1024];
 	char extra_input_files[1024];
 
-	sprintf(cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o worker.log ",project_regex,worker_timeout,catalog_host,catalog_port);
+	sprintf(cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o worker.log ",master_regex,worker_timeout,catalog_host,catalog_port);
 	strcpy(extra_input_files,"work_queue_worker");
 
 	if(password_file) {
@@ -149,11 +162,11 @@ static int submit_worker( struct batch_queue *queue )
 	return batch_job_submit_simple(queue,cmd,extra_input_files,"output.log");
 }
 
-static int submit_workers( struct batch_queue *queue, struct itable *job_table, int count )
+static int submit_workers( struct batch_queue *queue, struct itable *job_table, int count, const char *master_regex )
 {
 	int i;
 	for(i=0;i<count;i++) {
-		int jobid = submit_worker(queue);
+		int jobid = submit_worker(queue, master_regex);
 		if(jobid>0) {
 			debug(D_WQ,"worker job %d submitted",jobid);
 			itable_insert(job_table,jobid,(void*)1);
@@ -180,21 +193,117 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 
 }
 
+
+static struct nvpair_header queue_headers[] = {
+	{"project",       "PROJECT", NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT, 18},
+	{"name",          "HOST",    NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT, 21},
+	{"port",          "PORT",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 5},
+	{"tasks_waiting", "WAITING", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
+	{"tasks_running", "RUNNING", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
+	{"tasks_complete","COMPLETE",NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8},
+	{"workers",       "WORKERS", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
+	{NULL,NULL,0,0,0}
+};
+
+void print_stats(struct list *masters, struct list *foremen, int submitted, int needed, int requested)
+{
+		struct timeval tv;
+		struct tm *tm;
+		gettimeofday(&tv, 0);
+		tm = localtime(&tv.tv_sec);
+
+		needed    = needed    > 0 ? needed    : 0;
+		requested = requested > 0 ? requested : 0;
+
+		fprintf(stdout, "%04d/%02d/%02d %02d:%02d:%02d: "
+				"|submitted: %d |needed: %d |requested: %d \n", 
+				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
+				submitted, needed, requested);
+
+		int master_count = 0;
+		master_count += masters ? list_size(masters) : 0;
+		master_count += foremen ? list_size(foremen) : 0;
+
+		if(master_count < 1)
+		{
+			fprintf(stdout, "No change this cycle.\n\n");
+			return;
+		}
+
+		nvpair_print_table_header(stdout, queue_headers);
+
+		struct nvpair *nv;
+		if(masters && list_size(masters) > 0)
+		{
+			fprintf(stdout, "masters:\n");
+
+			list_first_item(masters);
+			while((nv = list_next_item(masters)))
+			{
+				nvpair_print_table(nv, stdout, queue_headers);
+
+			}
+		}
+
+		if(foremen && list_size(foremen) > 0)
+		{
+			fprintf(stdout, "foremen:\n");
+
+			list_first_item(foremen);
+			while((nv = list_next_item(foremen)))
+			{
+				nvpair_print_table(nv, stdout, queue_headers);
+
+			}
+		}
+
+		fprintf(stdout, "\n");
+}
+
+void delete_projects_list(struct list *l)
+{
+	if(l) {
+		struct nvpair *nv;
+		while((nv=list_pop_head(l))) {
+			nvpair_delete(nv);
+		}
+		list_delete(l);
+	}
+}
+
 /*
 Main loop of work queue pool.  Determine the number of workers needed by our
 current list of masters, compare it to the number actually submitted, then
 submit more until the desired state is reached.
 */
 
-static void mainloop( struct batch_queue *queue, const char *project_regex )
+static void mainloop( struct batch_queue *queue, const char *project_regex, const char *foremen_regex )
 {
 	int workers_submitted = 0;
 	struct itable *job_table = itable_create(0);
 
-	while(!abort_flag) {
-	        struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
+	struct list *masters_list = NULL;
+	struct list *foremen_list = NULL;
 
-		int workers_needed = count_workers_needed(masters_list);
+	const char *submission_regex = foremen_regex ? foremen_regex : project_regex;
+
+	while(!abort_flag) {
+		masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
+
+		debug(D_WQ,"evaluating master list...");
+		int workers_needed = count_workers_needed(masters_list, 0);
+
+		debug(D_WQ,"%d total workers needed across %d masters",
+				workers_needed,
+				masters_list ? list_size(masters_list) : 0);
+
+		if(foremen_regex)
+		{
+			debug(D_WQ,"evaluating foremen list...");
+			foremen_list    = work_queue_catalog_query(catalog_host,catalog_port,foremen_regex);
+			workers_needed += count_workers_needed(foremen_list, 1);
+			debug(D_WQ,"%d total workers needed across %d foremen",workers_needed,list_size(foremen_list));
+		}
 
 		debug(D_WQ,"raw workers needed: %d", workers_needed);
 
@@ -213,9 +322,11 @@ static void mainloop( struct batch_queue *queue, const char *project_regex )
 		debug(D_WQ,"workers needed: %d",workers_needed);
 		debug(D_WQ,"workers in queue: %d",workers_submitted);
 
+		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed);
+
 		if(new_workers_needed>0) {
 			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
-			workers_submitted += submit_workers(queue,job_table,new_workers_needed);
+			workers_submitted += submit_workers(queue,job_table,new_workers_needed,submission_regex);
 		} else if(new_workers_needed<0) {
 			debug(D_WQ,"too many workers, will wait for some to exit");
 		} else {
@@ -242,7 +353,10 @@ static void mainloop( struct batch_queue *queue, const char *project_regex )
 			}
 		}
 
-		sleep(5);
+		delete_projects_list(masters_list);
+		delete_projects_list(foremen_list);
+
+		sleep(30);
 	}
 
 	remove_all_workers(queue,job_table);
@@ -254,10 +368,12 @@ static void show_help(const char *cmd)
 	printf("Use: work_queue_pool [options]\n");
 	printf("where options are:\n");
 	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,--master-name=<project>");
+	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
 	printf(" %-30s Batch system type. One of: %s (default is local)\n", "-T,--batch-type=<type>",batch_queue_type_string());
 	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
 	printf(" %-30s Maximum workers running.  (default=%d)\n", "-W,--max-workers", workers_max);
+	printf(" %-30s Average tasks per worker. (default=one task per core)\n", "--tasks-per-worker"); 
 	printf(" %-30s Workers abort after this amount of idle time. (default=%d)\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
 	printf(" %-30s Set the number of cores requested per worker.\n", "--cores=<n>");
@@ -271,13 +387,15 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER };
 static struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
+	{"foremen-name", required_argument, 0, 'F'},
 	{"batch-type", required_argument, 0, 'T'},
 	{"password", required_argument, 0, 'P'},
 	{"min-workers", required_argument, 0, 'w'},
 	{"max-workers", required_argument, 0, 'w'},
+	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
 	{"timeout", required_argument, 0, 't'},
 	{"extra-options", required_argument, 0, 'E'},
 	{"cores",  required_argument,  0,  LONG_OPT_CORES},
@@ -306,8 +424,11 @@ int main(int argc, char *argv[])
 
 	int c;
 
-	while((c = getopt_long(argc, argv, "N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "F:N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
 		switch (c) {
+		case 'F':
+			foremen_regex = optarg;
+			break;
 		case 'N':
 		case 'M':
 			project_regex = optarg;
@@ -327,6 +448,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'W':
 			workers_max = atoi(optarg);
+			break;
+		case LONG_OPT_TASKS_PER_WORKER:
+			tasks_per_worker = atof(optarg);
 			break;
 		case 'E':
 			extra_worker_args = optarg;
@@ -385,6 +509,11 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if(tasks_per_worker < 1)
+	{
+		tasks_per_worker = num_cores_option ? atof(num_cores_option) : 1;
+	}
+
 	if(!scratch_dir) {
 		scratch_dir = string_format("/tmp/wq-pool-%d",getuid());
 	}
@@ -424,7 +553,7 @@ int main(int argc, char *argv[])
 
 	set_worker_resources( queue );
 
-	mainloop( queue, project_regex );
+	mainloop( queue, project_regex, foremen_regex );
 
 	batch_queue_delete(queue);
 

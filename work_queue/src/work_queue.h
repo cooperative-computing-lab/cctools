@@ -56,6 +56,7 @@ See the file COPYING for details.
 #define WORK_QUEUE_RESULT_STDOUT_MISSING 4 /**< The task ran but its stdout has been truncated >**/
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
+
 extern int wq_option_scheduler;	/**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
 
 /** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
@@ -118,11 +119,18 @@ struct work_queue_stats {
 	int tasks_complete;             /**< Number of tasks waiting to be returned to user. */
 	int total_tasks_dispatched;     /**< Total number of tasks dispatch to workers. */
 	int total_tasks_complete;       /**< Total number of tasks completed and returned to user. */
+	int total_tasks_failed;         /**< Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS. */
 	int total_tasks_cancelled;      /**< Total number of tasks cancelled. */
 
 	timestamp_t start_time;         /**< Absolute time at which the master started. */
 	timestamp_t total_send_time;    /**< Total time in microseconds spent in sending data to workers. */
 	timestamp_t total_receive_time; /**< Total time in microseconds spent in receiving data from workers. */
+	timestamp_t total_good_transfer_time;    /**< Total time in microseconds spent in sending and receiving data to workers for tasks with result WQ_RESULT_SUCCESS. */
+
+	timestamp_t total_execute_time; /**< Total time in microseconds workers spent executing completed tasks. */
+	timestamp_t total_good_execute_time; /**< Total time in microseconds workers spent executing successful tasks. */
+
+
 	int64_t total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
 	int64_t total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
 	double efficiency;              /**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */  
@@ -146,9 +154,6 @@ struct work_queue_stats {
 	int64_t max_disk;               /**< The largest disk space in MB observed among the connected workers. */
 	int64_t min_gpus;               /**< The lowest number of GPUs observed among the connected workers. */
 	int64_t max_gpus;               /**< The highest number of GPUs observed among the connected workers. */
-	timestamp_t total_execute_time; /**< Total time in microseconds workers spent executing completed tasks. */
-	timestamp_t total_good_execute_time; /**< Total time in microseconds workers spent executing successful tasks. */
-
 	int port;						
 	int priority;					
 	int workers_ready;              /**< @deprecated Use @ref workers_idle instead. */
@@ -406,11 +411,17 @@ Rather than assuming a specific port, the user should simply call this function 
 */
 int work_queue_port(struct work_queue *q);
 
-/** Get queue statistics.
+/** Get queue statistics (only from master).
 @param q A work queue object.
 @param s A pointer to a buffer that will be filed with statistics.
 */
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s);
+
+/** Get statistics of the master queue together with foremen information.
+@param q A work queue object.
+@param s A pointer to a buffer that will be filed with statistics.
+*/
+void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stats *s);
 
 /** Limit the queue bandwidth when transferring files to and from workers.
 @param q A work queue object.
@@ -438,6 +449,12 @@ char * work_queue_get_worker_summary( struct work_queue *q );
 @returns 0 if activated or deactivated with an appropriate multiplier, 1 if deactivated due to inappropriate multiplier.
 */
 int work_queue_activate_fast_abort(struct work_queue *q, double multiplier);
+
+
+/** Change the preference to send or receive tasks.
+@param q A work queue object.
+@param ratio The send/receive ratio when there is a choice between sending and receiving tasks. 1 Always prefer to send (e.g., for homogenous, stable resources). 0 Always prefer to receive (e.g., for resources with hight rate of eviction). Default is 0.75 (one average, receive one task per three sent). **/
+int work_queue_send_receive_ratio(struct work_queue *q, double ratio);
 
 /** Change the worker selection algorithm.
 Note that this function controls which <b>worker</b> will be selected
