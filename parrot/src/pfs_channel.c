@@ -28,6 +28,9 @@ struct entry {
 	struct entry *next;
 };
 
+#define CHANNEL_FMT "`%s':%" PRIx64 ":%zu"
+#define CHANNEL_FMT_ARGS(e) e->name, (uint64_t)e->start, (size_t)e->length
+
 static struct entry *head=0;
 static int channel_fd=-1;
 static char *channel_base=0;
@@ -40,11 +43,7 @@ static struct entry * entry_create( const char *name, pfs_size_t start, pfs_size
 	e = malloc(sizeof(*e));
 	if(!e) return 0;
 
-	if(name) {
-		e->name = xxstrdup(name);
-	} else {
-		e->name = 0;
-	}
+	e->name = name ? xxstrdup(name) : NULL;
 
 	e->start = start;
 	e->length = length;
@@ -72,7 +71,7 @@ static void entry_delete( struct entry *e )
 	if(head==e) head = e->next;
 	if(e->prev) e->prev->next = e->next;
 	if(e->next) e->next->prev = e->prev;
-	if(e->name) free(e->name);
+	free(e->name);
 	free(e);
 }
 
@@ -148,6 +147,7 @@ int pfs_channel_alloc( const char *name, pfs_size_t length, pfs_size_t *start )
 				e->inuse = 1;
 				*start = e->start;
 				memset(channel_base+*start+length-page_size,0,page_size);
+				debug(D_DEBUG, "allocated channel " CHANNEL_FMT, CHANNEL_FMT_ARGS(e));
 				return 1;
 			} else {
 				/* not big enough */
@@ -201,6 +201,7 @@ int pfs_channel_addref( pfs_size_t start )
 	do {
 		if(e->start==start) {
 			e->inuse++;
+			debug(D_DEBUG, "increasing refcount to %d for channel " CHANNEL_FMT, e->inuse, CHANNEL_FMT_ARGS(e));
 			return 1;
 		}
 		e = e->next;
@@ -211,15 +212,12 @@ int pfs_channel_addref( pfs_size_t start )
 int pfs_channel_update_name( const char *oldname, const char *newname )
 {
 	struct entry *e = head;
-	debug(D_CHANNEL,"updating channel for file '%s'",oldname);
+	debug(D_CHANNEL,"updating channel for file '%s' to '%s'",oldname,newname);
 	do {
 		if(e->name && !strcmp(e->name,oldname)) {
-			if(e->name)
-				free(e->name);
-			if(newname)
-				e->name = xxstrdup(newname);
-			else
-				e->name = 0;
+			free(e->name);
+			e->name = newname ? xxstrdup(newname) : 0;
+			debug(D_DEBUG, "channel is now " CHANNEL_FMT, CHANNEL_FMT_ARGS(e));
 			return 1;
 		}
 		e = e->next;
@@ -235,24 +233,21 @@ void pfs_channel_free( pfs_size_t start )
 	do {
 		if(e->start==start) {
 			e->inuse--;
+			debug(D_DEBUG, "decreasing refcount to %d for channel " CHANNEL_FMT, e->inuse, CHANNEL_FMT_ARGS(e));
 			if(e->inuse<=0) {
-				e->inuse=0;
-				if(e->name) {
-					free(e->name);
-					e->name = 0;
+				struct entry *prev = e->prev;
+				struct entry *next = e->next;
+
+				debug(D_DEBUG, "freeing channel " CHANNEL_FMT, CHANNEL_FMT_ARGS(e));
+				e->inuse = 0;
+				/* collapse adjacent free blocks */
+				if((e->start <= next->start) && next->inuse == 0) {
+					e->length += next->length;
+					entry_delete(next);
 				}
-				if( (e->prev->start < e->start) && !e->prev->inuse) {
-					struct entry *f = e->prev;
-					f->length += e->length;
+				if((prev->start <= e->start) && prev->inuse == 0) {
+					prev->length += e->length;
 					entry_delete(e);
-					e = f;
-				}
-				if( (e->next->start>e->start) && !e->next->inuse) {
-					struct entry *f = e->next;
-					f->start = e->start;
-					f->length += e->length;
-					entry_delete(e);
-					e = f;
 				}
 			}
 			return;
