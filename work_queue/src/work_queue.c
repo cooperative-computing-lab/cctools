@@ -1633,7 +1633,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	struct link *l = target->link;
 	
 	free(target->hostname);
-	target->hostname = strdup("QUEUE_STATUS");
+	target->hostname = xxstrdup("QUEUE_STATUS");
 
 	if(!sscanf(line, "%[^_]_status", request) == 1) {
 		return -1;
@@ -1708,6 +1708,11 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	}
 
 	link_write(l, "\n", 1, stoptime);
+
+	//do not count a status connection as a worker
+	q->stats->total_workers_joined--;
+	q->stats->total_workers_removed--;
+
 	return 0;
 }
 
@@ -2563,10 +2568,18 @@ static void count_worker_resources(struct work_queue_worker *w)
 	w->disk_allocated   = 0;
 	w->gpus_allocated   = 0;
 
-	cores_avg = w->resources->cores.total / w->resources->workers.total;
-	mem_avg   = w->resources->memory.total / w->resources->workers.total;
-	disk_avg  = w->resources->disk.total / w->resources->workers.total;
-	gpus_avg  = w->resources->gpus.total / w->resources->workers.total;
+	cores_avg = 0;
+	mem_avg   = 0;
+	disk_avg  = 0;
+	gpus_avg  = 0;
+
+	if(w->resources->workers.total > 0)
+	{
+		cores_avg = w->resources->cores.total / w->resources->workers.total;
+		mem_avg   = w->resources->memory.total / w->resources->workers.total;
+		disk_avg  = w->resources->disk.total / w->resources->workers.total;
+		gpus_avg  = w->resources->gpus.total / w->resources->workers.total;
+	}
 
 	itable_firstkey(w->current_tasks);
 	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
