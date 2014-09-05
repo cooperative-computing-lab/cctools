@@ -2550,11 +2550,16 @@ pfs_size_t pfs_table::mmap_create( int fd, pfs_size_t file_offset, pfs_size_t ma
 			pfs_channel_free(channel_offset);
 			return -1;
 		}
+
+		channel_offset = mmap_create_object(file, channel_offset, map_length, file_offset, prot, flags);
+
+		/* pfs_channel_alloc adds a ref and so does mmap_create_object, remove the extra: */
+		pfs_channel_free(channel_offset);
+		return channel_offset;
 	} else {
 		debug(D_CHANNEL,"%s cached at channel %llx",file->get_name()->path,(long long)channel_offset);
+		return mmap_create_object(file, channel_offset, map_length, file_offset, prot, flags);
 	}
-
-	return mmap_create_object(file, channel_offset, map_length, file_offset, prot, flags);
 }
 
 int pfs_table::mmap_update( pfs_size_t logical_addr, pfs_size_t channel_offset )
