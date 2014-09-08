@@ -2181,7 +2181,7 @@ static int load_file_to_channel( pfs_file *file, pfs_size_t length, pfs_size_t s
 		we must invalidate the others' mapping of this file,
 		otherwise, they will see old data that was in this place.
 		*/
-		msync(pfs_channel_base()+start,length,MS_INVALIDATE|MS_SYNC);
+		msync(pfs_channel_base()+start,length,MS_INVALIDATE|MS_ASYNC);
 		return 1;
 	}
 }

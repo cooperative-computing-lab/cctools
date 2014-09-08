@@ -106,6 +106,7 @@ static void divert_to_channel( struct pfs_process *p, INT64_T syscall, const voi
 	tracer_args_set(p->tracer,syscall,args,sizeof(args)/sizeof(args[0]));
 	p->syscall_args_changed = 1;
 	p->diverted_length = length;
+	msync(pfs_channel_base()+channel_offset, length, MS_INVALIDATE|MS_ASYNC);
 }
 
 /*
