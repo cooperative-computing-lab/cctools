@@ -78,7 +78,7 @@ extern int *pfs_syscall_totals32;
 
 extern void handle_specific_process( pid_t pid );
 
-#define POINTER( i ) ((void *)(((uintptr_t)(i))&0xffffffff))
+#define POINTER( i ) ((void *)(uintptr_t)(i))
 
 /*
 Divert this incoming system call to a read or write on the I/O channel
