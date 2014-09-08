@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "debug.h"
 #include "stringtools.h"
+#include "xxmalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,20 +88,28 @@ struct list * work_queue_catalog_query( const char *catalog_host, int catalog_po
 	return masters_list;
 }
 
-struct list * work_queue_catalog_query_cached( const char *catalog_host, int catalog_port, const char *project_regex )
+struct list *work_queue_catalog_query_cached( const char *catalog_host, int catalog_port, const char *project_regex )
 {
 	static struct list * masters_list = 0;
 	static time_t masters_list_timestamp = 0;
+	static char *prev_regex = 0;
 
-	if(masters_list && (time(0)-masters_list_timestamp)<60) {
+	if(prev_regex && !strcmp(project_regex, prev_regex) && masters_list && (time(0)-masters_list_timestamp)<60) {
 		return masters_list;
 	}
+
+	if(prev_regex)
+	{
+		free(prev_regex);
+	}
+	prev_regex = xxstrdup(project_regex);
 
 	if(masters_list) {
 		struct nvpair *nv;
 		while((nv=list_pop_head(masters_list))) {
 			nvpair_delete(nv);
 		}
+		list_delete(masters_list);
 	}
 
 	while(1) {
