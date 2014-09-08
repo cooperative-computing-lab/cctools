@@ -5,13 +5,16 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "tracer.h"
-#include "stringtools.h"
-#include "full_io.h"
-#include "xxmalloc.h"
-#include "debug.h"
+/* Included with Parrot... */
 #include "linux-version.h"
 #include "ptrace.h"
+#include "tracer.h"
+
+#include "buffer.h"
+#include "debug.h"
+#include "full_io.h"
+#include "stringtools.h"
+#include "xxmalloc.h"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -257,6 +260,9 @@ int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARG
 		else                  args[5] = t->regs.regs64.rbp;
 	}
 #endif
+#if 0 /* Enable this for extreme debugging... */
+	debug(D_DEBUG, "GET args[] = {%"PRId64", %"PRId64", %"PRId64", %"PRId64", %"PRId64", %"PRId64"}", args[0], args[1], args[2], args[3], args[4], args[5]);
+#endif
 
 	return 1;
 }
@@ -271,13 +277,27 @@ void tracer_has_args5_bug( struct tracer *t )
 	t->has_args5_bug = 1;
 }
 
-int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS_MAX], int nargs )
+int tracer_args_set( struct tracer *t, INT64_T syscall, const INT64_T *args, int nargs )
 {
 	if(!t->gotregs) {
 		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
 			ERROR;
 		t->gotregs = 1;
 	}
+
+#if 0 /* Enable this for extreme debugging... */
+	{
+		int i;
+		buffer_t B;
+		buffer_init(&B);
+		buffer_putfstring(&B, "SET args[%zu] = {", (size_t)nargs);
+		for (i = 0; i < nargs; i++)
+			buffer_putfstring(&B, "%" PRId64 ", ", args[i]);
+		buffer_putliteral(&B, "}");
+		debug(D_DEBUG, "%s", buffer_tostring(&B, NULL));
+		buffer_free(&B);
+	}
+#endif
 
 #ifdef CCTOOLS_CPU_I386
 	t->regs.regs32.orig_eax = syscall;
@@ -310,8 +330,6 @@ int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS
 	}
 #endif
 
-	if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
-		ERROR;
 	t->setregs = 1;
 
 	return 1;
@@ -348,8 +366,6 @@ int tracer_result_set( struct tracer *t, INT64_T result )
 	t->regs.regs64.rax = result;
 #endif
 
-	if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
-		ERROR;
 	t->setregs = 1;
 
 	return 1;

@@ -78,7 +78,7 @@ extern int *pfs_syscall_totals32;
 
 extern void handle_specific_process( pid_t pid );
 
-#define POINTER( i ) ((void*)(PTRINT_T)(i))
+#define POINTER( i ) ((void *)(((uintptr_t)(i))&0xffffffff))
 
 /*
 Divert this incoming system call to a read or write on the I/O channel
@@ -86,7 +86,7 @@ Divert this incoming system call to a read or write on the I/O channel
 
 static void divert_to_channel( struct pfs_process *p, int syscall, const void *uaddr, size_t length, pfs_size_t channel_offset )
 {
-	INT64_T args[] = {pfs_channel_fd(), (INT64_T)(UPTRINT_T)uaddr, (INT64_T)length, (INT64_T)(channel_offset&0xffffffff), (INT64_T)(((UINT64_T)channel_offset) >> 32)};
+	INT64_T args[] = {pfs_channel_fd(), (INT64_T)(uintptr_t)uaddr, (INT64_T)length, (INT64_T)(channel_offset&0xffffffff), (INT64_T)(((UINT64_T)channel_offset) >> 32)};
 	debug(D_DEBUG, "divert_to_channel(%d, %s, %p, %zu, %" PRId64 ")", p->pid, tracer_syscall_name(p->tracer,syscall), uaddr, length, (INT64_T)channel_offset);
 	debug(D_DEBUG, "--> %s(%" PRId64 ", 0x%" PRIx64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,syscall), args[0], args[1], args[2], args[3]);
 	tracer_args_set(p->tracer,syscall,args,sizeof(args)/sizeof(args[0]));
@@ -144,7 +144,7 @@ static void divert_to_parrotfd( struct pfs_process *p, INT64_T fd, char *path, c
 {
 	pathtofilename(path);
 	debug(D_DEBUG, "diverting to openat(%d, `%s', O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR)", parrot_dir_fd, path);
-	INT64_T args[] = {parrot_dir_fd, (INT64_T)pfs_process_scratch_set(p, path, strlen(path)+1), O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR};
+	INT64_T args[] = {parrot_dir_fd, (INT64_T)(uintptr_t)pfs_process_scratch_set(p, path, strlen(path)+1), O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR};
 	if (flags & O_CLOEXEC)
 		args[2] |= O_CLOEXEC;
 	tracer_args_set(p->tracer,SYSCALL32_openat,args,sizeof(args)/sizeof(args[0]));
@@ -188,10 +188,9 @@ into the channel, and then redirecting the system call
 to read from the channel fd.
 */
 
-static void decode_read( struct pfs_process *p, int entering, int syscall, INT64_T *args )
+static void decode_read( struct pfs_process *p, int entering, int syscall, const INT64_T *args )
 {
 	int fd = args[0];
-	void *uaddr = POINTER(args[1]);
 	pfs_size_t length = args[2];
 	pfs_off_t offset = args[3];
 
@@ -212,7 +211,7 @@ static void decode_read( struct pfs_process *p, int entering, int syscall, INT64
 			if(p->syscall_result==0) {
 				divert_to_dummy(p,0);
 			} else if(p->syscall_result>0) {
-				divert_to_channel(p,SYSCALL32_pread,uaddr,p->syscall_result,p->io_channel_offset);
+				divert_to_channel(p,SYSCALL32_pread,POINTER(args[1]),p->syscall_result,p->io_channel_offset);
 				pfs_read_count += p->syscall_result;
 			} else {
 				divert_to_dummy(p,-errno);
@@ -236,7 +235,7 @@ static void decode_read( struct pfs_process *p, int entering, int syscall, INT64
 		*/
 
 		if( (actual==-EINTR) && (p->diverted_length>0) ) {
-			tracer_copy_out(p->tracer,pfs_channel_base()+p->io_channel_offset,uaddr,p->diverted_length);
+			tracer_copy_out(p->tracer,pfs_channel_base()+p->io_channel_offset,POINTER(args[1]),p->diverted_length);
 			p->syscall_result = p->diverted_length;
 			tracer_result_set(p->tracer,p->syscall_result);
 		}
@@ -252,13 +251,12 @@ to it.  When the syscall completes, we write the data
 to its destination and then set the result.
 */
 
-static void decode_write( struct pfs_process *p, int entering, int syscall, INT64_T *args )
+static void decode_write( struct pfs_process *p, int entering, int syscall, const INT64_T *args )
 {
 	if(entering) {
-		void *uaddr = POINTER(args[1]);
 		INT64_T length = args[2];
 		if(pfs_channel_alloc(0,length,&p->io_channel_offset)) {
-			divert_to_channel(p,SYSCALL32_pwrite,uaddr,length,p->io_channel_offset);
+			divert_to_channel(p,SYSCALL32_pwrite,POINTER(args[1]),length,p->io_channel_offset);
 		} else {
 			divert_to_dummy(p,-ENOMEM);
 		}
@@ -366,7 +364,7 @@ they do seem to appear sporadically in X11, the dynamic linker,
 and sporadically in networking utilities.
 */
 
-static void decode_readv( struct pfs_process *p, int entering, int syscall, INT64_T *args )
+static void decode_readv( struct pfs_process *p, int entering, int syscall, const INT64_T *args )
 {
 	if(entering) {
 		int fd = args[0];
@@ -406,7 +404,7 @@ static void decode_readv( struct pfs_process *p, int entering, int syscall, INT6
 	}
 }
 
-static void decode_writev( struct pfs_process *p, int entering, int syscall, INT64_T *args )
+static void decode_writev( struct pfs_process *p, int entering, int syscall, const INT64_T *args )
 {
 	if(entering) {
 		int fd = args[0];
@@ -446,7 +444,7 @@ static void decode_writev( struct pfs_process *p, int entering, int syscall, INT
 	}
 }
 
-static void decode_stat( struct pfs_process *p, int entering, int syscall, INT64_T *args, int sixty_four )
+static void decode_stat( struct pfs_process *p, int entering, int syscall, const INT64_T *args, int sixty_four )
 {
 	if(entering) {
 		char path[PFS_PATH_MAX];
@@ -502,7 +500,7 @@ static void decode_stat( struct pfs_process *p, int entering, int syscall, INT64
 	}
 }
 
-static void decode_statfs( struct pfs_process *p, int entering, int syscall, INT64_T *args, int sixty_four )
+static void decode_statfs( struct pfs_process *p, int entering, int syscall, const INT64_T *args, int sixty_four )
 {
 	if(entering) {
 		struct pfs_statfs lbuf;
@@ -540,7 +538,7 @@ On Linux, all of the socket related system calls are
 multiplexed through one system call.
 */
 
-void decode_socketcall( struct pfs_process *p, int entering, int syscall, INT64_T *a )
+void decode_socketcall( struct pfs_process *p, int entering, int syscall, const INT64_T *a )
 {
 	if (p->syscall_dummy)
 		return;
@@ -756,7 +754,7 @@ static int is_executable( const char *path )
 
 #define GET_PTR32(addr) ((PTRINT_T)(addr)&0xffffffff)
 
-static void redirect_ldso( struct pfs_process *p, const char *ldso, INT64_T *args, char * const start_of_available_scratch )
+static void redirect_ldso( struct pfs_process *p, const char *ldso, const INT64_T *args, char * const start_of_available_scratch )
 {
 	pid_t child_pid;
 	int child_status;
@@ -850,9 +848,8 @@ static void redirect_ldso( struct pfs_process *p, const char *ldso, INT64_T *arg
 	}
 
 	/* change the registers to reflect argv */
-	args[0] = (PTRINT_T) ext_ldso_physical_name;
-	args[1] = (PTRINT_T) ext_argv;
-	tracer_args_set(p->tracer,p->syscall,args,3);
+	INT64_T nargs[] = {(INT64_T)(uintptr_t)ext_ldso_physical_name, (INT64_T)(uintptr_t)ext_argv};
+	tracer_args_set(p->tracer,p->syscall,nargs,sizeof(nargs)/sizeof(nargs[0]));
 
 	debug(D_PROCESS,"redirect_ldso: will execute %s %s",ldso,real_physical_name);
 }
@@ -878,7 +875,7 @@ around with the job's argv to indicate that.  Then, we do much the same as the
 first case.
 */
 
-void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *args )
+void decode_execve( struct pfs_process *p, int entering, int syscall, const INT64_T *args )
 {
 	char *scratch_addr  = (char*)pfs_process_scratch_address(p);
 	int   scratch_size  = PFS_SCRATCH_SIZE;
@@ -1014,11 +1011,8 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			}
 
 			/* change the registers to reflect argv */
-			args[0] = (PTRINT_T) ext_physical_name;
-			args[1] = (PTRINT_T) ext_argv;
-
-			/* up to three arguments (args[0-2]) were modified. */
-			tracer_args_set(p->tracer,p->syscall,args,3);
+			INT64_T nargs[] = {(INT64_T)(uintptr_t)ext_physical_name, (INT64_T)(uintptr_t)ext_argv};
+			tracer_args_set(p->tracer,p->syscall,nargs,sizeof(nargs)/sizeof(nargs[0]));
 		} else {
 			debug(D_PROCESS,"execve: %s is an ordinary executable",p->new_logical_name);
 
@@ -1029,10 +1023,8 @@ void decode_execve( struct pfs_process *p, int entering, int syscall, INT64_T *a
 			tracer_copy_out(p->tracer,p->new_physical_name,scratch_addr,strlen(p->new_physical_name)+1);
 
 			/* set the new program name to the logical name */
-			args[0] = (PTRINT_T) scratch_addr;
-
-			/* only the first argument was modified. */
-			tracer_args_set(p->tracer,p->syscall,args,1);
+			INT64_T nargs[] = {(INT64_T)(uintptr_t)scratch_addr};
+			tracer_args_set(p->tracer,p->syscall,nargs,sizeof(nargs)/sizeof(nargs[0]));
 		}
 
 		if (pfs_ldso_path) {
@@ -1099,7 +1091,7 @@ To unify the two cases, we copy the arguments into the
 nargs array and adjust the offset as needed.
 */
 
-void decode_mmap( struct pfs_process *p, int entering, INT64_T *args )
+void decode_mmap( struct pfs_process *p, int entering, const INT64_T *args )
 {
 	INT32_T nargs[6];
 	nargs[0] = args[0];
@@ -1163,13 +1155,8 @@ void decode_mmap( struct pfs_process *p, int entering, INT64_T *args )
 		if(p->syscall==SYSCALL32_mmap) {
 			tracer_copy_out(p->tracer,nargs,POINTER(args[0]),sizeof(nargs));
 		} else {
-			args[0] = nargs[0];
-			args[1] = nargs[1];
-			args[2] = nargs[2];
-			args[3] = nargs[3];
-			args[4] = nargs[4];
-			args[5] = 1 + ((nargs[5] - 1) / getpagesize()); /* ceil division */
-			tracer_args_set(p->tracer,p->syscall,args,6);
+			INT64_T nargs64[] = {nargs[0], nargs[1], nargs[2], nargs[3], nargs[4], (nargs[5]+(getpagesize()-1)) / getpagesize() /* ceil division */};
+			tracer_args_set(p->tracer,p->syscall,nargs64,sizeof(nargs64)/sizeof(nargs64[0]));
 			p->syscall_args_changed = 1;
 		}
 		return;
@@ -1195,7 +1182,7 @@ void decode_mmap( struct pfs_process *p, int entering, INT64_T *args )
 
 void decode_syscall( struct pfs_process *p, int entering )
 {
-	INT64_T *args;
+	const INT64_T *args;
 
 	char path[PFS_PATH_MAX];
 	char path2[PFS_PATH_MAX];
@@ -1660,7 +1647,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 				if (entering) debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else if (entering) {
 				int fd = args[0];
-				char *uaddr = (char*) POINTER(args[1]);
+				uintptr_t uaddr = args[1];
 				size_t length = args[2];
 				int result = 0;
 				struct dirent *d;
@@ -1724,7 +1711,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 					if(p->syscall_result<0)
 						divert_to_dummy(p, -errno);
 					else
-						p->syscall_dummy = 1; /* Fake a dummy "return" but allow the kernel to close the Parrot fd. */
+						p->syscall_dummy = 1; /* Fake a dummy "return" (so p->syscall_result is returned) but allow the kernel to close the Parrot fd. */
 				}
 			}
 			break;

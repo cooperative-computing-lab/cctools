@@ -23,7 +23,7 @@ int tracer_listen( struct tracer *t );
 int tracer_getevent( struct tracer *t, unsigned long *message );
 
 int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARGS_MAX] );
-int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS_MAX], int nargs );
+int tracer_args_set( struct tracer *t, INT64_T syscall, const INT64_T args[], int nargs );
 
 void		tracer_has_args5_bug( struct tracer *t );
 
