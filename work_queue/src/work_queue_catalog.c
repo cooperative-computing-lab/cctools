@@ -74,8 +74,12 @@ struct list * work_queue_catalog_query( const char *catalog_host, int catalog_po
 
 				// put the item in the list.
 				list_push_head(masters_list,nv);
+				continue;
 			}
 		}
+
+		// we reach here unless nv is push into masters_list
+		nvpair_delete(nv);
 	}
 
 	catalog_query_delete(q);
