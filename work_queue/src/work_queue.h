@@ -54,6 +54,9 @@ See the file COPYING for details.
 #define WORK_QUEUE_RESULT_INPUT_MISSING 1  /**< The task cannot be run due to a missing input file >**/
 #define WORK_QUEUE_RESULT_OUTPUT_MISSING 2 /**< The task ran but failed to generate a specified output file >**/ 
 #define WORK_QUEUE_RESULT_STDOUT_MISSING 4 /**< The task ran but its stdout has been truncated >**/
+#define WORK_QUEUE_RESULT_SIGNAL         8 /**< The task was terminated with a signal >**/
+#define WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION 16 /**< The task used more resources than requested >**/
+#define WORK_QUEUE_RESULT_TASK_TIMEOUT 32 /**< The task ran after specified end time. >**/
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 
@@ -95,6 +98,7 @@ struct work_queue_task {
 	int total_submissions;			   /**< The number of times the task has been submitted. */
 	timestamp_t total_cmd_execution_time;	/**< Time spent in microseconds for executing the command on any worker, including resubmittions of the task. */
 
+	int64_t maximum_end_time;                       
 	int64_t memory;                       
 	int64_t disk;
 	int cores;
@@ -277,6 +281,13 @@ void work_queue_task_specify_cores( struct work_queue_task *t, int cores );
 */
 
 void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus );
+
+/** Specify the maximum end time allowed for the task (in seconds since the Epoch). If seconds less than 1, then no end time is specified.
+@param t A task object.
+@param seconds Number of seconds since the Epoch.
+*/
+
+void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t seconds );
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the work queue, but is provided for the user's convenience

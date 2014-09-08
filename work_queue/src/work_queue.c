@@ -1160,6 +1160,46 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 }
 
 /*
+Expire tasks in the ready list.
+*/
+static void expire_waiting_task(struct work_queue *q, struct work_queue_task *t)
+{
+	t->result |= WORK_QUEUE_RESULT_TASK_TIMEOUT;
+
+	//add the task to complete list so it is given back to the application.
+	list_push_head(q->complete_list, t);
+
+	return;
+}
+
+static void expire_waiting_tasks(struct work_queue *q)
+{
+	struct work_queue_task *t;
+	int64_t current_time;
+	int count;
+
+	current_time = time(0);
+	count = list_size(q->ready_list);
+
+	while(count > 0)
+	{
+		count--;
+
+		t = list_pop_head(q->ready_list);
+
+		if(t->maximum_end_time > 0 && t->maximum_end_time <= current_time)
+		{
+			expire_waiting_task(q, t);
+		}
+		else
+		{
+			list_push_tail(q->ready_list, t);
+		}
+	}
+}
+
+
+/*
 This function handles app-level failures. It remove the task from WQ and marks
 the task as complete so it is returned to the application. 
 */
@@ -1314,7 +1354,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 	if(!q || !w || !line) return WORKER_FAILURE; 
 
-	int task_result;
+	int task_status, exit_status;
 	uint64_t taskid;
 	int64_t output_length, retrieved_output_length;
 	timestamp_t execution_time;
@@ -1324,17 +1364,18 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	timestamp_t effective_stoptime = 0;
 	time_t stoptime;
 
-	//Format: result, output length, execution time, taskid
-	char items[3][WORK_QUEUE_PROTOCOL_FIELD_MAX];
-	int n = sscanf(line, "result %s %s %s %" SCNd64, items[0], items[1], items[2], &taskid);
+	//Format: task completion status, exit status (exit code or signal), output length, execution time, taskid
+	char items[4][WORK_QUEUE_PROTOCOL_FIELD_MAX];
+	int n = sscanf(line, "result %s %s %s %s %" SCNd64, items[0], items[1], items[2], items[3], &taskid);
 
-	if(n < 4) {
+	if(n < 5) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		return WORKER_FAILURE;
 	}
 	
-	task_result = atoi(items[0]);
-	output_length = atoll(items[1]);
+	task_status = atoi(items[0]);
+	exit_status   = atoi(items[1]);
+	output_length = atoll(items[2]);
 	
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
@@ -1347,12 +1388,9 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t->time_receive_result_start = timestamp_get();
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 	
-	if(n >= 3) {
-		execution_time = atoll(items[2]);
-		t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
-	} else {
-		t->cmd_execution_time = observed_execution_time;
-	}
+	execution_time = atoll(items[3]);
+	t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
+
 	t->total_cmd_execution_time += t->cmd_execution_time;
 
 	if(q->bandwidth) {
@@ -1415,7 +1453,8 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	
 	t->time_receive_result_finish = timestamp_get();
 
-	t->return_status = task_result;
+	t->result        = task_status;
+	t->return_status = exit_status;
 
 	t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
 	q->stats->total_execute_time += t->cmd_execution_time;
@@ -3048,6 +3087,19 @@ void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
 	set_task_unlabel_flag(t);
 }
 
+void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t seconds )
+{
+	if(seconds < 1)
+	{
+		t->maximum_end_time = 0;
+	}
+	else
+	{
+		t->maximum_end_time = seconds;
+	}
+}
+
+
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 {
 	if(t->tag)
@@ -4112,6 +4164,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			break;
 
 		wait_loop_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active, tasks_transfered);
+
+		expire_waiting_tasks(q);
 
 		//We have the resources we have been waiting for; start task transfers
 		int known = known_workers(q);

@@ -220,6 +220,11 @@ class Task(_object):
         return work_queue_task_specify_disk(self._task,disk)
 
     ##
+    # Indicate the maximum end time (in seconds from the Epoch) of this task.
+    def specify_end_time( self, seconds ):
+        return work_queue_task_specify_end_time(self._task,seconds)
+
+    ##
     # Get the user-defined logical name for the task. 
     # 
     # @a Note: This is defined using property decorator. So it must be called without parentheses
