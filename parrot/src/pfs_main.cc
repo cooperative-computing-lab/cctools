@@ -298,24 +298,6 @@ static void pass_through( int sig )
 }
 
 /*
-We will be fighting with our child processes for control of 
-the terminal.  Whenever a we want to write to the terminal,
-we will get a SIGTTOU or SIGTTIN instructing us that its
-not our turn.  But, we are in charge!  So, upon receipt
-of these signals, grab control of the terminal.
-*/
-
-static void control_terminal( int sig )
-{
-	if(sig==SIGTTOU) {
-		tcsetpgrp(1,getpgrp());
-		tcsetpgrp(2,getpgrp());
-	} else {
-		tcsetpgrp(0,getpgrp());
-	}
-}
-
-/*
 Here is the meat and potatoes.  We have discovered that
 something interesting has happened to this pid. Decode
 the event and take the appropriate action.
@@ -426,15 +408,6 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 				 * IEEE Std 1003.1, 2004 Edition
 				 * Also mentioned in `man ptrace`.
 				 */
-				case SIGTTIN:
-					tcsetpgrp(STDIN_FILENO,pid);
-					signum = 0; /* suppress delivery */
-					break;
-				case SIGTTOU:
-					tcsetpgrp(STDOUT_FILENO,pid);
-					tcsetpgrp(STDERR_FILENO,pid);
-					signum = 0; /* suppress delivery */
-					break;
 				case SIGSTOP:
 					/* Black magic to get threads working on old Linux kernels... */
 
@@ -530,10 +503,30 @@ int main( int argc, char *argv[] )
 	install_handler(SIGTERM,pfs_process_kill_everyone);
 	install_handler(SIGHUP,pass_through);
 	install_handler(SIGINT,pass_through);
-	install_handler(SIGTTIN,control_terminal);
-	install_handler(SIGTTOU,control_terminal);
 	install_handler(SIGIO,handle_sigio);
 	install_handler(SIGXFSZ,ignore_signal);
+
+	/* For terminal stop signals, we ignore all.
+	 *
+	 * Parrot sometimes writes to the terminal using the debug library, we want
+	 * to *never* be the foreground process group so we do not call tcsetpgrp
+	 * to gain control. Instead we just ignore the terminal stop signals. If
+	 * the terminal is configured with "-tostop" (see stty(1)), then the writes
+	 * succeed even if we are not the foreground process group. Otherwise, the
+	 * writes will return with EIO which is fine also. Reading from a terminal
+	 * requires being the foreground process group (so far which we have never
+	 * needed to do), we will receive EIO for all reads since we ignore
+	 * SIGTTIN.
+	 *
+	 * SIGTSTOP occurs because the user suspends the foreground process group
+	 * using ^Z. If this occurs, we also ignore it. We should probably never
+	 * receive this signal since Parrot becomes a background process group as
+	 * soon as its root tracee starts.
+	 */
+
+	install_handler(SIGTSTP,SIG_IGN);
+	install_handler(SIGTTIN,SIG_IGN);
+	install_handler(SIGTTOU,SIG_IGN);
 
 	if(isatty(0)) {
 		pfs_master_timeout = 300;
@@ -1000,6 +993,13 @@ int main( int argc, char *argv[] )
 		pfs_paranoia_payload();
 		pfs_process_bootstrapfd();
 		setpgrp();
+		{
+			int fd = open("/dev/tty", O_RDWR);
+			if (fd >= 0) {
+				tcsetpgrp(fd, getpgrp());
+				close(fd);
+			}
+		}
 		signal(SIGUSR1, set_attached_and_ready);
 		raise(SIGSTOP); /* synchronize with parent, above */
 		while (!attached_and_ready) ; /* spin waiting to be traced (NO SLEEPING/STOPPING) */
