@@ -6,7 +6,7 @@ Work Queue framework for distributed execution.
 To run: 
 
 1. Install CCTools.
-2. Instal Bowtie and all its required dependencies. Bowtie can be download from:
+2. Install Bowtie and all its required dependencies. Bowtie can be download from:
 http://bowtie-bio.sourceforge.net/index.shtml
 3. Run './wq_bowtie <REFERENCE_FILE> <FASTQ_FILE>' to align sequences in <FASTQ_FILE>.
 4. Start workers: 
