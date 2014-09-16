@@ -16,6 +16,7 @@
 #include "list.h"
 #include "hash_table.h"
 #include "debug.h"
+#include "xxmalloc.h"
 
 #include "dag.h"
 #include "lexer.h"
@@ -28,6 +29,10 @@
 
 #define WHITE_SPACE          " \t"
 #define BUFFER_CHUNK_SIZE 1048576	// One megabyte
+
+#ifdef LEXER_TEST
+int verbose_parsing = 1;
+#endif
 
 struct token *lexer_pack_token(struct lexer_book *bk, enum token_t type)
 {
@@ -1015,7 +1020,7 @@ void lexer_free_token(struct token *t)
 	free(t);
 }
 
-void lexer_append_all_tokens(struct lexer_book *bk, struct lexer_book *bk_s)
+void lexer_preppend_all_tokens(struct lexer_book *bk, struct lexer_book *bk_s)
 {
 	struct token *head_s;
 
@@ -1053,7 +1058,25 @@ void lexer_append_all_tokens(struct lexer_book *bk, struct lexer_book *bk_s)
 		list_push_head(bk->token_queue, head_s);
 }
 
-struct token *lexer_next_token(struct lexer_book *bk, struct dag_lookup_set *s)
+void lexer_expand_substitution(struct lexer_book *bk, struct token *t, struct dag_lookup_set *s)
+{
+		char *substitution = dag_lookup_str(t->lexeme, s);
+		struct lexer_book *bk_s;
+
+		if(!substitution) {
+				debug(D_NOTICE, "Variable %s has not yet been defined at line % " PRId64 ".\n", t->lexeme, bk->line_number);
+				substitution = xxstrdup("");
+		}
+
+		bk_s = lexer_init_book(STRING, substitution, bk->line_number, bk->column_number);
+
+		lexer_preppend_all_tokens(bk, bk_s);
+
+		free(substitution);
+		lexer_free_book(bk_s);
+}
+
+struct token *lexer_peek_next_token(struct lexer_book *bk)
 {
 	struct token *head;
 	if(list_size(bk->token_queue) == 0) {
@@ -1061,49 +1084,46 @@ struct token *lexer_next_token(struct lexer_book *bk, struct dag_lookup_set *s)
 			return NULL;
 
 		lexer_read_line(bk);
-		return lexer_next_token(bk, s);
+		return lexer_peek_next_token(bk);
 	}
 
-	head = list_pop_head(bk->token_queue);
+	head = list_peek_head(bk->token_queue);
 
-	if(head->type == SUBSTITUTION) {
-		char *substitution = dag_lookup(head->lexeme, s);
-		struct lexer_book *bk_s;
+	return head;
+}
 
-		if(!substitution) {
-			debug(D_NOTICE, "Variable %s has not yet been defined at line %d.\n", head->lexeme, bk->line_number);
-			return lexer_next_token(bk, s);
-		}
-
-		bk_s = lexer_init_book(STRING, dag_lookup(head->lexeme, s), bk->line_number, bk->column_number);
-
-		lexer_append_all_tokens(bk, bk_s);
-
-		lexer_free_book(bk_s);
-		lexer_free_token(head);
-
-		head = list_pop_head(bk->token_queue);
+struct token *lexer_next_token(struct lexer_book *bk)
+{
+	struct token *head = lexer_peek_next_token(bk);
+	
+	if(head)
+	{
+	    list_pop_head(bk->token_queue);
 	}
 
 	return head;
 }
 
-int main_test(int argc, char **argv)
+#ifdef LEXER_TEST
+int main(int argc, char **argv)
 {
 	FILE *ff = fopen("../example/example.makeflow", "r");
 
 	struct lexer_book *bk = lexer_init_book(STREAM, ff, 1, 1);
 
-	debug_config(argv[0]);
+	//debug_config(argv[0]);
+	debug_config("lexer-test");
 	debug_flags_set("all");
 
 
 	struct token *t;
-	while((t = lexer_next_token(bk, NULL)) != NULL)
+	while((t = lexer_next_token(bk)) != NULL)
 		print_token(stderr, t);
 
 
 	return 0;
 }
+#endif
+
 
 /* vim: set noexpandtab tabstop=4: */
