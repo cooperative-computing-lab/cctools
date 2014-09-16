@@ -43,9 +43,11 @@ See the file COPYING for details.
 #include "rmonitor.h"
 #include "random_init.h"
 #include "path.h"
+#include "buffer.h"
 
 #include "dag.h"
 #include "visitors.h"
+#include "lexer.h"
 
 #include "makeflow_common.h"
 
@@ -53,8 +55,8 @@ char *makeflow_exe = NULL;
 
 char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n);
 int dag_parse(struct dag *d, FILE * dag_stream);
-int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line);
-int dag_parse_node(struct lexer_book *bk, char *line);
+int dag_parse_variable(struct lexer_book *bk, struct dag_node *n);
+int dag_parse_node(struct lexer_book *bk);
 int dag_parse_node_filelist(struct lexer_book *bk, struct dag_node *n, char *filelist, int source);
 int dag_parse_node_command(struct lexer_book *bk, struct dag_node *n, char *line);
 int dag_parse_node_makeflow_command(struct lexer_book *bk, struct dag_node *n, char *line);
@@ -441,45 +443,217 @@ void dag_close_over_environment(struct dag *d)
 
 }
 
-int dag_parse(struct dag *d, FILE * dag_stream)
+int dag_parse_syntax(struct lexer_book *bk)
+{
+	struct token *t = lexer_next_token(bk);
+	
+	lexer_free_token(t);
+
+	return 1;
+}
+
+char *dag_parse_concat_expandable(struct lexer_book *bk, struct dag_node *n)
+{
+	struct token *t;
+
+	struct dag_lookup_set s = { bk->d, bk->category, n, NULL };
+
+	struct buffer b;
+	buffer_init(&b);
+
+	char *result, *recursive;
+	
+	while((t = lexer_next_token(bk)))
+	{
+		switch(t->type)
+		{
+		case REXPANDABLE:
+			lexer_free_token(t);
+			result = xxstrdup(buffer_tostring(&b, NULL));
+			buffer_free(&b);
+			return result;
+			break;
+		case LEXPANDABLE:
+			recursive = dag_parse_concat_expandable(bk, n);
+			buffer_printf(&b, "%s", recursive);
+			free(recursive);
+			break;
+		case SUBSTITUTION:
+			lexer_expand_substitution(bk, t, &s);
+			break;
+		case LITERAL:
+			buffer_printf(&b, "%s", t->lexeme);
+			break;
+		default:
+			lexer_report_error(bk, "Error in expansion");
+			break;
+		}
+
+		lexer_free_token(t);
+	}
+}
+
+int dag_parse_variable(struct lexer_book *bk, struct dag_node *n)
+{
+	struct token *t = lexer_next_token(bk);
+	char mode       = t->lexeme[0];            //=, or + (assign or append)
+	lexer_free_token(t);
+
+	t = lexer_next_token(bk);
+
+if(t
+
+
+
+	struct hash_table *current_table;
+	int nodeid;
+	if(n)
+	{
+		current_table = n->variables;
+		nodeid        = n->nodeid;
+	}
+	else
+	{
+		current_table = bk->d->variables;
+		nodeid        = bk->d->nodeid_counter;
+	}
+	
+	int result;
+	
+	if(strcmp(t->lexeme, "=") == 0)
+	{
+		dag_variable_add_value(name, current_table, nodeid, value);
+		debug(D_DEBUG, "%s appending to variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
+		result = 1;
+	}
+	else if(strcmp(t->lexeme, "+") == 0)
+	{
+		dag_parse_append_variable(bk, nodeid, n, name, value);
+		debug(D_DEBUG, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
+
+		result = 1;
+	}
+	else
+	{
+		dag_parse_error(bk, "Unknown variable operator.");
+
+		result = 0;
+	}
+	
+	dag_parse_process_special_variable(bk, n, nodeid, name, value);
+
+
+	return result;
+}
+
+int dag_parse_node(struct lexer_book *bk)
+{
+	struct token *t = lexer_next_token(bk);
+	
+
+	lexer_free_token(t);
+
+	return 1;
+}
+
+int dag_parse(struct dag *d, FILE *stream)
 {
 	char *line = NULL;
-	struct lexer_book *bk = calloc(1, sizeof(struct lexer_book));	//Taking advantage that calloc zeroes memory
+	struct lexer_book *bk = lexer_init_book(STREAM, stream, 0, 0);
 
-	bk->d = d;
-	bk->stream = dag_stream;
-
+	bk->d        = d;
+	bk->stream   = stream;
 	bk->category = dag_task_category_lookup_or_create(d, "default");
 
-	while((line = dag_parse_readline(bk, NULL)) != NULL) {
+	struct dag_lookup_set s = { d, NULL, NULL, NULL };
+	
+	struct token *t;
 
-		if(strlen(line) == 0 || line[0] == '#') {
-			/* Skip blank lines and comments */
-			free(line);
-			continue;
+	while((t = lexer_peek_next_token(bk)))
+	{
+		switch (t->type) {
+		case NEWLINE:
+		case SPACE:
+			/* Skip newlines, spaces at top level. */
+			debug(D_DEBUG, "newline: %d. %s\n", t->type, t->lexeme);
+			lexer_free_token(lexer_next_token(bk));
+			break;
+		case SYNTAX:
+			fprintf(stdout, "syntax:  %d. %s\n", t->type, t->lexeme);
+			dag_parse_syntax(bk);
+			break;
+		case FILES:
+			fprintf(stdout, "files:  %d. %s\n", t->type, t->lexeme);
+			dag_parse_node(bk); 
+			break;
+		case VARIABLE:
+			fprintf(stdout, "variabl: %d. %s\n", t->type, t->lexeme);
+			dag_parse_variable(bk, NULL); 
+			break;
+		case SUBSTITUTION:
+			fprintf(stdout, "substit: %d. %s\n", t->type, t->lexeme);
+			t = lexer_next_token(bk);
+			lexer_expand_substitution(bk, t, &s);
+			lexer_free_token(t);
+			break;
+			/*
+		case COLON:
+			fprintf(stdout, "colon:  %d. %s\n", t->type, t->lexeme);
+			break;
+		case REMOTE_RENAME:
+			fprintf(stdout, "rename: %d. %s\n", t->type, t->lexeme);
+			break;
+		case COMMAND:
+			fprintf(stdout, "command: %d. %s\n", t->type, t->lexeme);
+			break;
+		case IO_REDIRECT:
+			fprintf(stdout, "redirec: %d. %s\n", t->type, t->lexeme);
+			break;
+		case LITERAL:
+			fprintf(stdout, "literal: %d. %s\n", t->type, t->lexeme);
+			break;
+		case LEXPANDABLE:
+			fprintf(stdout, "expandL: %d. %s\n", t->type, t->lexeme);
+			break;
+		case REXPANDABLE:
+			fprintf(stdout, "expandR: %d. %s\n", t->type, t->lexeme);
+			break;
+			*/
+		default:
+			lexer_next_token(bk);
+			fprintf(stdout, "unknown: %d. %s\n", t->type, t->lexeme);
 		}
-		if(strncmp(line, "export ", 7) == 0) {
-			if(!dag_parse_export(bk, line)) {
-				dag_parse_error(bk, "export");
-				goto failure;
-			}
-		} else if(strchr(line, '=')) {
-			if(!dag_parse_variable(bk, NULL, line)) {
-				dag_parse_error(bk, "variable");
-				goto failure;
-			}
-		} else if(strstr(line, ":")) {
-			if(!dag_parse_node(bk, line)) {
-				dag_parse_error(bk, "node");
-				goto failure;
-			}
-		} else {
-			dag_parse_error(bk, "syntax");
-			goto failure;
-		}
-
-		free(line);
 	}
+
+/* 	while((line = dag_parse_readline(bk, NULL)) != NULL) { */
+
+/* 		if(strlen(line) == 0 || line[0] == '#') { */
+/* 			/\* Skip blank lines and comments *\/ */
+/* 			free(line); */
+/* 			continue; */
+/* 		} */
+/* 		if(strncmp(line, "export ", 7) == 0) { */
+/* 			if(!dag_parse_export(bk, line)) { */
+/* 				dag_parse_error(bk, "export"); */
+/* 				goto failure; */
+/* 			} */
+/* 		} else if(strchr(line, '=')) { */
+/* 			if(!dag_parse_variable(bk, NULL, line)) { */
+/* 				dag_parse_error(bk, "variable"); */
+/* 				goto failure; */
+/* 			} */
+/* 		} else if(strstr(line, ":")) { */
+/* 			if(!dag_parse_node(bk, line)) { */
+/* 				dag_parse_error(bk, "node"); */
+/* 				goto failure; */
+/* 			} */
+/* 		} else { */
+/* 			dag_parse_error(bk, "syntax"); */
+/* 			goto failure; */
+/* 		} */
+
+/* 		free(line); */
+/* 	} */
 
 //ok
 	dag_close_over_environment(d);
@@ -487,7 +661,7 @@ int dag_parse(struct dag *d, FILE * dag_stream)
 	free(bk);
 	return 1;
 
-      failure:
+	//failure:
 	free(line);
 	free(bk);
 	return 0;
@@ -658,7 +832,7 @@ void dag_parse_append_variable(struct lexer_book *bk, int nodeid, struct dag_nod
 	}
 }
 
-int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
+int pdag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 {
 	struct dag *d = bk->d;
 	char *name = line + (n ? 1 : 0);	/* Node variables require offset of 1 */
@@ -718,7 +892,7 @@ int dag_parse_variable(struct lexer_book *bk, struct dag_node *n, char *line)
 	return 1;
 }
 
-int dag_parse_node(struct lexer_book *bk, char *line_org)
+int pdag_parse_node(struct lexer_book *bk, char *line_org)
 {
 	struct dag *d = bk->d;
 	char *line;
@@ -750,7 +924,7 @@ int dag_parse_node(struct lexer_book *bk, char *line_org)
 	//parse variables and comments
 	while((line = dag_parse_readline(bk, n)) != NULL) {
 		if(line[0] == '@' && strchr(line, '=')) {
-			ok = dag_parse_variable(bk, n, line);
+			ok = pdag_parse_variable(bk, n, line);
 			free(line);
 
 			if(ok) {
@@ -955,7 +1129,7 @@ int dag_parse_export(struct lexer_book *bk, char *line)
 	for(i = 0; i < argc; i++) {
 		equal = strchr(argv[i], '=');
 		if(equal) {
-			if(!dag_parse_variable(bk, NULL, argv[i])) {
+			if(!pdag_parse_variable(bk, NULL, argv[i])) {
 				return 0;
 			} else {
 				*equal = '\0';
@@ -970,3 +1144,5 @@ int dag_parse_export(struct lexer_book *bk, char *line)
 }
 
 /* vim: set noexpandtab tabstop=4: */
+
+
