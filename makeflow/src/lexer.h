@@ -10,7 +10,7 @@
    The lexer is implemented with as a hierarchy of functions. The entry
    points are:
 
-   bk = lexer_set_stream(stream); // Stream is of type FILE*;
+   bk = lexer_init_book(...);
    t  = lexer_next_token(bk);     // The next token in the series.
 
    When the end-of-file is reached, t == NULL. Each token has a type,
@@ -33,14 +33,14 @@
    value printed to stdout.
    SUBSTITUTION: A variable substitution signaled by $. t->lexeme
    records the variable name, which can be specified as
-   $name or $(name). All variable substituions are
-   expanded before the parser sees them by lexer_next_token.
+   $name or $(name). All variable substitutions are
+   left to the parser to expand.
    LITERAL: A literal string value, used as a variable name, a
    filename, or a command argument.
    LEXPANDABLE: Signals the beginning of a string that can be expanded:
    subsitutions are made, and special escapes, such as \n are
    transformed to newlines. The expandable string is a list of
-   substitution and literl tokens.
+   substitution and literal tokens.
    REXPANDABLE: Signals the end of a string that can be expanded.
    COMMAND: Signals the command line of a rule, described as a list of
    tokens. A command line always starts with a tab character
@@ -122,7 +122,13 @@ struct token
 /* type: is either STREAM or CHAR */
 struct lexer_book *lexer_init_book(int type, void *data, int line_number, int column_number);
 
-struct token *lexer_next_token(struct lexer_book *bk, struct dag_lookup_set *s);
+void lexer_expand_substitution(struct lexer_book *bk, struct token *t, struct dag_lookup_set *s);
+
+struct token *lexer_next_token(struct lexer_book *bk);
+
+void lexer_report_error(struct lexer_book *bk, char *message, ...);
+
+struct token *lexer_peek_next_token(struct lexer_book *bk);
 
 void lexer_free_book(struct lexer_book *bk);
 
