@@ -294,7 +294,7 @@ of our children for its consideration.
 
 static void pass_through( int sig )
 {
-	pfs_process_raise(root_pid, sig, 1 /* really send it */);
+	kill(root_pid, sig);
 }
 
 /*
@@ -449,11 +449,6 @@ struct timeval clock_to_timeval( clock_t c )
 	return result;
 }
 
-static void handle_sigio( int sig )
-{
-	pfs_process_sigio();
-}
-
 static volatile sig_atomic_t attached_and_ready = 0;
 static void set_attached_and_ready (int sig)
 {
@@ -503,7 +498,7 @@ int main( int argc, char *argv[] )
 	install_handler(SIGTERM,pfs_process_kill_everyone);
 	install_handler(SIGHUP,pass_through);
 	install_handler(SIGINT,pass_through);
-	install_handler(SIGIO,handle_sigio);
+	install_handler(SIGIO,pfs_process_sigio);
 	install_handler(SIGXFSZ,ignore_signal);
 
 	/* For terminal stop signals, we ignore all.

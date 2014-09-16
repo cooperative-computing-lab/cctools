@@ -65,18 +65,19 @@ void pfs_process_kill_everyone( int sig )
  * only on particular fds, however, we have limited mechanism for figuring out
  * which fds are ready.  Just signal everybody.
  */
-void pfs_process_sigio()
+extern "C" void pfs_process_sigio(int sig)
 {
 	UINT64_T pid;
 	struct pfs_process *p;
 
+	assert(sig == SIGIO);
 	debug(D_PROCESS,"SIGIO received");
 
 	itable_firstkey(pfs_process_table);
 	while(itable_nextkey(pfs_process_table,&pid,(void**)&p)) {
 		if(p && p->flags&PFS_PROCESS_FLAGS_ASYNC) {
 			debug(D_PROCESS,"SIGIO forwarded to pid %d",p->pid);
-			pfs_process_raise(p->pid,SIGIO,1);
+			kill(p->pid, SIGIO);
 		}
 	}
 }
@@ -176,7 +177,6 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	child->syscall_result = 0;
 	child->syscall_args_changed = 0;
 	/* to prevent accidental copy out */
-	child->interrupted = 0;
 	child->did_stream_warning = 0;
 	child->nsyscalls = 0;
 	child->scratch_used = 0;
@@ -194,7 +194,6 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 		}
 		strcpy(child->name,actual_parent->name);
 		child->umask = actual_parent->umask;
-		memcpy(child->signal_interruptible,actual_parent->signal_interruptible,sizeof(child->signal_interruptible));
 	} else {
 		child->table = new pfs_table;
 
@@ -206,7 +205,6 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 		}
 
 		child->umask = 000;
-		memset(child->signal_interruptible,0,sizeof(child->signal_interruptible));
 	}
 
 	itable_insert(pfs_process_table,pid,child);
@@ -222,10 +220,6 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 void pfs_process_exec( struct pfs_process *p )
 {
 	debug(D_PROCESS, "pid %d is completing exec", p->pid);
-	/* after a successful exec, signal handlers are reset */
-	memset(p->signal_interruptible,0,sizeof(p->signal_interruptible));
-
-	/* and certain files in the file table are closed */
 	p->table->close_on_exec();
 }
 
@@ -281,52 +275,22 @@ extern "C" char * pfs_process_name()
 
 extern const char *pfs_username;
 
-int pfs_process_raise( pid_t pid, int sig, int really_sendit )
+int pfs_process_cankill( pid_t pid )
 {
-	struct pfs_process *p;
-	int result;
-
-	if(pid==0) pid = pfs_process_getpid();
-
 	pid = ABS(pid);
 
-	p = pfs_process_lookup(pid);
-	if(!p) {
-		if(pfs_username) {
-			result = -1;
-			errno = EPERM;
-		} else {
-			debug(D_PROCESS,"sending signal %d (%s) to external pid %d",sig,string_signal(sig),pid);
-			if(pid==getpid()) {
-				debug(D_PROCESS,"ignoring attempt to send signal to parrot itself.");
-				result = 0;
-			} else {
-				if (really_sendit) {
-					result = kill(pid,sig);
-				} else {
-					result = 0;
-				}
-			}
-		}
+	if (pid == 0) {
+		return 0;
+	} else if (pid == getpid()) {
+		/* Parrot? naughty... */
+		debug(D_PROCESS,"ignoring attempt to send signal to parrot itself.");
+		return errno = EPERM, -1;
+	} else if (pfs_process_lookup(pid)) {
+		return 0;
+	} else if (pfs_username) {
+		return errno = EPERM, -1;
 	} else {
-		if(really_sendit) {
-			debug(D_PROCESS,"sending signal %d (%s) to pfs pid %d",sig,string_signal(sig),pid);
-			result = kill(pid,sig);
-		} else {
-			debug(D_PROCESS,"prepared pfs pid %d to receive signal %d (%s)",pid,sig,string_signal(sig));
-			result = 0;
-		}
-	}
-
-	return result;
-}
-
-void pfs_process_kill()
-{
-	if(pfs_current) {
-		pfs_process_raise(pfs_current->pid,SIGKILL,1);
-	} else {
-		kill(getpid(),SIGKILL);
+		return 0;
 	}
 }
 
