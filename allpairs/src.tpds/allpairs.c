@@ -637,7 +637,8 @@ int main(int argc, char** argv)
     while((cl=getopt(argc,argv,"+a:d:t:LRx:y:p:q:r:s:l:H:P:hv")) > -1) {
 	switch(cl) {
 	case 'a':
-	    auth_register_byname(optarg);
+		if (!auth_register_byname(optarg))
+			fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
 	    did_explicit_auth = 1;
 	    break;
 	case 'd':

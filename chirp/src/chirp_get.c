@@ -53,7 +53,8 @@ int main(int argc, char *argv[])
 	while((c = getopt(argc, argv, "a:d:i:t:vh")) > -1) {
 		switch (c) {
 		case 'a':
-			auth_register_byname(optarg);
+			if (!auth_register_byname(optarg))
+				fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
 			did_explicit_auth = 1;
 			break;
 		case 'd':

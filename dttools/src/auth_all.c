@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "auth_all.h"
 
+#include <errno.h>
 #include <string.h>
 
 int auth_register_byname(const char *name)
@@ -23,6 +24,7 @@ int auth_register_byname(const char *name)
 		return auth_address_register();
 	if(!strcmp(name, "ticket"))
 		return auth_ticket_register();
+	errno = EINVAL;
 	return 0;
 }
 

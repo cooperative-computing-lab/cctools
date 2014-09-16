@@ -1584,7 +1584,8 @@ int main(int argc, char *argv[])
 				// This option is deprecated. Capacity estimation is now on by default.
 				break;
 			case LONG_OPT_AUTH:
-				auth_register_byname(optarg);
+				if (!auth_register_byname(optarg))
+					fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
 				did_explicit_auth = 1;
 				break;
 			case LONG_OPT_TICKETS:

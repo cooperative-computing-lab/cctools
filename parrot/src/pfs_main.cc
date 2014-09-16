@@ -598,7 +598,8 @@ int main( int argc, char *argv[] )
 		char **args;
 		if(string_split(x,&nargs,&args)) {
 			for(int i=0;i<nargs;i++) {
-				auth_register_byname(args[i]);
+				if (!auth_register_byname(optarg))
+					fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
 				chose_auth = 1;
 			}
 		}
