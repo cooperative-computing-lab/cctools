@@ -32,9 +32,9 @@
    already set, and !  executes in the shell and assigns the
    value printed to stdout.
    SUBSTITUTION: A variable substitution signaled by $. t->lexeme
-   records the variable name, which can be specified as
-   $name or $(name). All variable substitutions are
-   left to the parser to expand.
+   records the variable name, which can be specified as $name or
+   $(name). All variable substitutions are done in place, that is, the
+   parser never sees them.
    LITERAL: A literal string value, used as a variable name, a
    filename, or a command argument.
    LEXPANDABLE: Signals the beginning of a string that can be expanded:
@@ -47,6 +47,8 @@
    in the makeflow file. The end of the list is signaled with
    a NEWLINE token. The parser is resposible for assembling
    the command line for execution.
+   COMMAND_MOD_END: LITERALs between COMMAND and COMMAND_MOD_END are
+   interpreted as a command modifiers, such as LOCAL or MAKEFLOW.
    SPACE: White space that separates arguments in a command line.
    IO_REDIRECT: Indicates input or output redirection in a command
    line. One of "<" or ">".
@@ -88,6 +90,7 @@ enum token_t
 	SPACE,
 
 	COMMAND,
+	COMMAND_MOD_END,
 	IO_REDIRECT,
 
 	FILES,
@@ -122,11 +125,10 @@ struct token
 /* type: is either STREAM or CHAR */
 struct lexer_book *lexer_init_book(int type, void *data, int line_number, int column_number);
 
-void lexer_expand_substitution(struct lexer_book *bk, struct token *t, struct dag_lookup_set *s);
-
 struct token *lexer_next_token(struct lexer_book *bk);
 
 void lexer_report_error(struct lexer_book *bk, char *message, ...);
+char *lexer_print_token(struct token *t);
 
 struct token *lexer_peek_next_token(struct lexer_book *bk);
 
