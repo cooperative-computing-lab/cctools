@@ -173,13 +173,33 @@ struct dag_file *dag_file_from_name(struct dag *d, const char *filename)
 }
 
 /* Returns the remotename used in rule n for local name filename */
-char *dag_file_remote_name(struct dag_node *n, const char *filename)
+const char *dag_file_remote_name(struct dag_node *n, const char *filename)
 {
 	struct dag_file *f;
 	char *name;
 
 	f = dag_file_from_name(n->d, filename);
 	name = (char *) itable_lookup(n->remote_names, (uintptr_t) f);
+
+	return name;
+}
+
+/* Returns the local name of filename */
+const char *dag_file_local_name(struct dag_node *n, const char *filename)
+{
+	struct dag_file *f;
+	const char *name;
+
+	f = hash_table_lookup(n->remote_names_inv, filename);
+	
+	if(!f)
+	{
+		name =  NULL;
+	}
+	else
+	{
+		name = f->filename;
+	}
 
 	return name;
 }

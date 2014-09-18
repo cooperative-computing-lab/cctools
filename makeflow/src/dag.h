@@ -98,6 +98,8 @@ struct lexer_book
 	struct list *column_numbers;
 
 	struct list *token_queue; 
+	
+	struct dag_lookup_set *environment;
 
 	char *linetext;   //This member will be removed once the new lexer is integrated.
 };
@@ -243,7 +245,8 @@ const char *dag_node_state_name(dag_node_state_t state);
 void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate);
 char *dag_node_translate_filename(struct dag_node *n, const char *filename);
 
-char *dag_file_remote_name(struct dag_node *n, const char *filename);
+const char *dag_file_remote_name(struct dag_node *n, const char *filename);
+const char *dag_file_local_name(struct dag_node *n, const char *filename);
 int dag_file_isabsolute(const struct dag_file *f);
 
 void dag_variable_add_value(const char *name, struct hash_table *current_table, int nodeid, const char *value);
