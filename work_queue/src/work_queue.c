@@ -2721,7 +2721,7 @@ static void start_task_on_worker( struct work_queue *q, struct work_queue_worker
 	}
 }
 
-static int send_one_task( struct work_queue *q, time_t stoptime )
+static int send_one_task( struct work_queue *q )
 {			
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
@@ -2729,10 +2729,6 @@ static int send_one_task( struct work_queue *q, time_t stoptime )
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
-
-		// Stop if we have run out of time.
-		// XXX Don't think this is necessary if we only send one task in this loop.
-		if( stoptime>0 && time(0)>stoptime ) break;
 
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
@@ -2750,7 +2746,7 @@ static int send_one_task( struct work_queue *q, time_t stoptime )
 	return 0;
 }
 
-static int receive_one_task(struct work_queue *q, time_t stoptime)
+static int receive_one_task( struct work_queue *q )
 {
 	struct work_queue_task *t;
 
@@ -4086,9 +4082,6 @@ static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 
 	do 
 	{
-		//Compute task_transfer_stoptime in some way...
-		time_t task_transfer_stoptime = stoptime;
-
 		task_sent     = 0;
 		task_received = 0;
 
@@ -4097,13 +4090,13 @@ static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 
 		if((list_size(q->ready_list) > 0) && (itable_size(q->finished_tasks) < 1 || send_decision))
 		{
-			task_sent         = send_one_task(q, task_transfer_stoptime);
+			task_sent         = send_one_task(q);
 			total_tasks_sent += task_sent;
 		}
 			
 		if(itable_size(q->finished_tasks) > 0 && (!task_sent || !send_decision))
 		{
-			task_received         = receive_one_task(q, task_transfer_stoptime);
+			task_received         = receive_one_task(q);
 			total_tasks_received += task_received;
 		}
 
