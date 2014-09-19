@@ -25,11 +25,13 @@
 #define CHAR_EOF 26		// ASCII for EOF
 
 #define LITERAL_LIMITS  "\\\"'$#\n\t \032"
-#define SYNTAX_LIMITS  LITERAL_LIMITS  ",.-(){},[]<>=+!?"
+#define SYNTAX_LIMITS  LITERAL_LIMITS  ",.-(){},[]<>=+!?/"
 #define FILENAME_LIMITS LITERAL_LIMITS  ":-"
 
 #define WHITE_SPACE          " \t"
 #define BUFFER_CHUNK_SIZE 1048576	// One megabyte
+
+#define MAX_SUBSTITUTION_DEPTH 32
 
 #ifdef LEXER_TEST
 int verbose_parsing = 1;
@@ -81,12 +83,6 @@ char *lexer_print_token(struct token *t)
 	case LITERAL:
 		snprintf(str, 1024, "LITERAL: %s\n", t->lexeme);
 		break;
-	case LEXPANDABLE:
-		snprintf(str, 1024, "LEXPANDABLE\n");
-		break;
-	case REXPANDABLE:
-		snprintf(str, 1024, "REXPANDABLE\n");
-		break;
 	case SUBSTITUTION:
 		snprintf(str, 1024, "SUBSTITUTION: %s\n", t->lexeme);
 		break;
@@ -110,6 +106,12 @@ char *lexer_print_token(struct token *t)
 int lexer_push_token(struct lexer_book *bk, struct token *t)
 {
 	list_push_tail(bk->token_queue, t);
+	return list_size(bk->token_queue);
+}
+
+int lexer_preppend_token(struct lexer_book *bk, struct token *t)
+{
+	list_push_head(bk->token_queue, t);
 	return list_size(bk->token_queue);
 }
 
@@ -222,6 +224,21 @@ void lexer_report_error(struct lexer_book *bk, char *message, ...)
 
 	va_end(ap);
 
+}
+
+//Useful for debugging:
+void lexer_print_queue(struct lexer_book *bk)
+{
+	struct token *t;
+	
+	debug(D_MFLEX, "Queue: ");
+
+	list_first_item(bk->token_queue);
+	while((t = list_next_item(bk->token_queue)))
+		debug(D_MFLEX, "%s", lexer_print_token(t));
+	list_first_item(bk->token_queue);
+
+	debug(D_MFLEX, "End queue.");
 }
 
 void lexer_load_chunk(struct lexer_book *bk)
@@ -365,7 +382,7 @@ void lexer_discard_comments(struct lexer_book *bk)
 }
 
 /* As lexer_read_until, but elements of char_set preceded by \ are
-   ignored as stops. */
+   ignored as stops, with \n replaced with spaces. */
 int lexer_read_escaped_until(struct lexer_book *bk, char *char_set)
 {
 	char *char_set_slash = string_format("\\%s", char_set);
@@ -380,8 +397,13 @@ int lexer_read_escaped_until(struct lexer_book *bk, char *char_set)
 			char c = lexer_next_char(bk);
 			count += 2;
 
-			if(lexer_next_peek(bk) != CHAR_EOF)
-				lexer_add_to_lexeme(bk, c);
+			if(lexer_next_peek(bk) != CHAR_EOF) {
+				if(c == '\n') {
+					lexer_add_to_lexeme(bk, ' ');
+				} else {
+					lexer_add_to_lexeme(bk, c);
+				}
+			}
 		} else
 			break;
 
@@ -395,36 +417,29 @@ int lexer_read_escaped_until(struct lexer_book *bk, char *char_set)
 	return count;
 }
 
-accept_t lexer_read_literal_unquoted(struct lexer_book * bk)
+int lexer_read_literal_unquoted(struct lexer_book * bk)
 {
-	int count = lexer_read_escaped_until(bk, LITERAL_LIMITS);
-
-	if(count > 0)
-		return YES;
-	else
-		return NO;
-
+	return lexer_read_escaped_until(bk, LITERAL_LIMITS);
 }
 
 /* Read everything between single quotes */
-accept_t lexer_read_literal_quoted(struct lexer_book * bk)
+int lexer_read_literal_quoted(struct lexer_book * bk)
 {
 	int c = lexer_next_peek(bk);
 
 	if(c != '\'')
-		return NO;
+		lexer_report_error(bk, "Missing opening quote.\n");
 
-	lexer_next_char(bk);	/* Jump first ' */
+	lexer_add_to_lexeme(bk, lexer_next_char(bk));	/* Add first ' */
 
 	int count = lexer_read_escaped_until(bk, "'");
-	if(count >= 0) {
-		lexer_next_char(bk);	/* Jump second ' */
-		return YES;
-	} else
-		return NO;
+
+	lexer_add_to_lexeme(bk, lexer_next_char(bk));	/* Add second ' */
+
+	return count;
 }
 
-accept_t lexer_read_literal(struct lexer_book * bk)
+int lexer_read_literal(struct lexer_book * bk)
 {
 	int c = lexer_next_peek(bk);
 
@@ -456,10 +471,13 @@ struct token *lexer_read_literal_in_expandable_until(struct lexer_book *bk, char
 			char n = lexer_next_char(bk);
 			count += 2;
 
-			if(lexer_special_escape(n))
-				lexer_add_to_lexeme(bk, lexer_special_to_code(n));
-			else
+			if(lexer_special_escape(n)) {
+					lexer_add_to_lexeme(bk, lexer_special_to_code(n));
+			} else if(n == '\n') {
+				lexer_add_to_lexeme(bk, ' ');
+			} else {
 				lexer_add_to_lexeme(bk, n);
+			}
 		} else if(c == '#') {
 			if(end_marker == '\n') {
 				lexer_discard_comments(bk);
@@ -518,7 +536,7 @@ struct token *lexer_read_syntax_name(struct lexer_book *bk)
 
 struct token *lexer_read_substitution(struct lexer_book *bk)
 {
-	int parenthesis = 0;
+	char closer = 0;                  //closer is either 0 (no closer), ) or }.
 	char c = lexer_next_peek(bk);
 
 	if(c != '$')
@@ -528,32 +546,40 @@ struct token *lexer_read_substitution(struct lexer_book *bk)
 
 	if(lexer_next_peek(bk) == '(') {
 		lexer_next_char(bk);	/* Jump ( */
-		parenthesis = 1;
+		closer = ')';
+	} else if(lexer_next_peek(bk) == '{') {
+		lexer_next_char(bk);	/* Jump { */
+		closer = '}';
 	}
 
 	struct token *name = lexer_read_syntax_name(bk);
 	name->type = SUBSTITUTION;
 
-	if(parenthesis) {
-		if(lexer_next_peek(bk) == ')')
+	if(closer) {
+		if(lexer_next_peek(bk) == closer)
 			lexer_next_char(bk);	/* Jump ) */
 		else
-			lexer_report_error(bk, "Expecting ) for closing variable substitution.");
+			lexer_report_error(bk, "Expecting %c for closing variable substitution.", closer);
 	}
 
 	return name;
 }
 
-void lexer_discard_white_space(struct lexer_book *bk)
+int lexer_discard_white_space(struct lexer_book *bk)
 {
-	while(strchr(WHITE_SPACE, lexer_next_peek(bk)))
+	int count = 0;
+	while(strchr(WHITE_SPACE, lexer_next_peek(bk))) {
 		lexer_next_char(bk);
+		count++;
+	}
+	
+	return count;
 }
 
 /* Consolidates a sequence of white space into a single SPACE token */
 struct token *lexer_read_white_space(struct lexer_book *bk)
 {
-	int count = 0;
+	int count = lexer_discard_white_space(bk);
 
 	while(strchr(WHITE_SPACE, lexer_next_peek(bk))) {
 		count++;
@@ -569,48 +595,121 @@ struct token *lexer_read_white_space(struct lexer_book *bk)
 	return NULL;
 }
 
-int lexer_read_expandable_recursive(struct lexer_book *bk, char end_marker)
+//opened tracks whether it is the opening (opened = 0) or closing (opened = 1) double quote we encounter.
+struct list *lexer_read_expandable_recursive(struct lexer_book *bk, char end_marker, int opened)
 {
-	int count = 0;
 	lexer_discard_white_space(bk);
+	
+	struct list *tokens = list_create();
 
 	while(!bk->eof) {
 		int c = lexer_next_peek(bk);
-
+		
 		if(c == '$') {
-			count++;
-			lexer_push_token(bk, lexer_read_substitution(bk));
-		}
+			list_push_tail(tokens, lexer_read_substitution(bk));
+		} 
+
 		if(c == '\'') {
 			lexer_read_literal(bk);
-			lexer_push_token(bk, lexer_pack_token(bk, LITERAL));
+			list_push_tail(tokens, lexer_pack_token(bk, LITERAL));
+		} else if(c == '"' && opened == 0) {
+				lexer_add_to_lexeme(bk, lexer_next_char(bk));
+				list_push_tail(tokens, lexer_pack_token(bk, LITERAL));     // Add first "
+				tokens = list_splice(tokens, lexer_read_expandable_recursive(bk, '"', 1));
+				lexer_add_to_lexeme(bk, '"');
+				list_push_tail(tokens, lexer_pack_token(bk, LITERAL));     // Add closing "
+				if(end_marker == '"')
+					return tokens;
+		} else if(c == '#' && end_marker != '"') {
+			lexer_discard_comments(bk);
 		} else if(c == end_marker) {
 			lexer_next_char(bk);	/* Jump end_marker */
-			return count;
-		} else if(c == '"')
-			count += lexer_read_expandable_recursive(bk, '"');
-		else if(c == '#' && end_marker != '"') {
-			lexer_discard_comments(bk);
-			return count;
+			return tokens;
 		} else {
-			count++;
-			lexer_push_token(bk, lexer_read_literal_in_expandable_until(bk, end_marker));
+			list_push_tail(tokens, lexer_read_literal_in_expandable_until(bk, end_marker));
 		}
 	}
-	/* Found eof before end_marker */
-	abort();
+
+	lexer_report_error(bk, "Found EOF before end marker: %c.\n", end_marker);
+	
+	return NULL;
+}
+
+struct token *lexer_concat_expandable(struct lexer_book *bk, struct list *tokens)
+{
+	struct token *t;
+
+	struct buffer b;
+	buffer_init(&b);
+
+	char *substitution;
+
+	list_first_item(tokens);
+	
+	while((t = list_pop_head(tokens))) {
+		switch(t->type) {
+		case SUBSTITUTION:
+			substitution = dag_lookup_str(t->lexeme, bk->environment);
+			if(!substitution)
+				fatal("Variable %s has not yet been defined at line % " PRId64 ".\n", t->lexeme, bk->line_number);
+			buffer_printf(&b, "%s", substitution);
+			free(substitution);
+			break;
+		case LITERAL:
+			if(strcmp(t->lexeme, "") != 0)           // Skip empty strings.
+				buffer_printf(&b, "%s", t->lexeme);
+			break;
+		default:
+			lexer_report_error(bk, "Error in expansion, got: %s.\n", lexer_print_token(t));
+			break;
+		}
+
+		lexer_free_token(t);
+	}
+	
+	t = lexer_pack_token(bk, LITERAL);
+	t->lexeme = xxstrdup(buffer_tostring(&b, NULL));
+	buffer_free(&b);
+	
+	return t;
 }
 
 struct token *lexer_read_expandable(struct lexer_book *bk, char end_marker)
 {
-	struct token *start = lexer_pack_token(bk, LEXPANDABLE);
-	lexer_push_token(bk, start);
-	lexer_read_expandable_recursive(bk, end_marker);
-	lexer_push_token(bk, lexer_pack_token(bk, REXPANDABLE));
+	struct list *tokens = lexer_read_expandable_recursive(bk, end_marker, 0);
+	
+	struct token *t = lexer_concat_expandable(bk, tokens); 
+	
+	list_delete(tokens);
 
-	return start;
+	return t;
 }
 
+
+int lexer_append_tokens(struct lexer_book *bk, struct list *tokens)
+{
+	struct token *t;
+	int count = 0;
+
+	list_first_item(tokens);
+	while((t = list_pop_head(tokens))) {
+		lexer_push_token(bk, t);
+		count++;
+	}
+
+	return count;
+}
+
+struct list *lexer_expand_substitution(struct lexer_book *bk, struct token *t, 
+							  struct list * (*list_reader)(struct lexer_book *))
+{
+	struct lexer_book *bk_s = lexer_init_substitution_book(bk, t);
+	struct list *tokens     = list_reader(bk_s);
+	
+	lexer_free_book(bk_s);
+
+	return tokens;
+}
 
 struct token *lexer_read_file(struct lexer_book *bk)
 {
@@ -618,7 +717,10 @@ struct token *lexer_read_file(struct lexer_book *bk)
 
 	switch (c) {
 	case CHAR_EOF:
-		lexer_report_error(bk, "Found end of file while completing file list.\n");
+		bk->lexeme_end++;
+		bk->eof = 1;
+		if(bk->depth == 0)
+			lexer_report_error(bk, "Found end of file while completing file list.\n");
 		return NULL;
 		break;
 	case '\n':
@@ -636,9 +738,9 @@ struct token *lexer_read_file(struct lexer_book *bk)
 		break;
 	case ' ':
 	case '\t':
-		/* Discard white-space and try again */
+		/* Discard white-space and add space token. */
 		lexer_discard_white_space(bk);
-		return lexer_read_file(bk);
+		return lexer_pack_token(bk, SPACE);
 		break;
 	case '$':
 		return lexer_read_substitution(bk);
@@ -662,31 +764,92 @@ struct token *lexer_read_file(struct lexer_book *bk)
 	}
 }
 
-accept_t lexer_read_file_list(struct lexer_book *bk)
+struct list *lexer_read_file_list_aux(struct lexer_book *bk)
 {
-	int count = 0;
+	struct list *tokens = list_create();
 
 	lexer_discard_white_space(bk);
 
 	struct token *t;
 	do {
 		t = lexer_read_file(bk);
-		if(t->type == NEWLINE && count == 0) {
-			return NO;
-		} else if(t->type != NEWLINE && count == 0) {
-			/* Add file list start marker */
-			lexer_push_token(bk, lexer_pack_token(bk, FILES));
-		}
+		if(!t)
+			break;
 
-		lexer_push_token(bk, t);
-		count++;
+		//Do substitution recursively
+		if(t->type == SUBSTITUTION) {
+			tokens = list_splice(tokens, lexer_expand_substitution(bk, t, lexer_read_file_list_aux));
+			lexer_free_token(t);
+		} else { 
+			list_push_tail(tokens, t);
+		}
 	} while(t->type != NEWLINE);
 
-	if(count > 1)
-		return YES;
-	else {
-		return NO;
+	return tokens;
+}
+
+void lexer_concatenate_consecutive_literals(struct list *tokens)
+{
+	struct list *tmp = list_create();
+	struct token *t, *prev  = NULL;
+	
+	list_first_item(tokens);
+	while((t = list_pop_head(tokens))) {
+		if(t->type != LITERAL) {
+			list_push_tail(tmp, t);
+			continue;
+		}
+		
+		prev = list_pop_tail(tmp);
+		
+		if(!prev) {
+			list_push_tail(tmp, t);
+			continue;
+		}
+		
+		if(prev->type != LITERAL) {
+			list_push_tail(tmp, prev);
+			list_push_tail(tmp, t);
+			continue;
+		}
+
+		char *merge = string_format("%s%s", prev->lexeme, t->lexeme);
+		lexer_free_token(t);
+		free(prev->lexeme);
+		prev->lexeme = merge;
+
+		list_push_tail(tmp, prev);
 	}
+
+	/* Copy to tokens, drop spaces. */
+	list_first_item(tmp);
+	while((t = list_pop_head(tmp)))
+		if(t->type != SPACE) {
+			list_push_tail(tokens, t);
+		} else {
+			lexer_free_token(t);
+		}
+	
+	list_delete(tmp);
+}
+
+int lexer_read_file_list(struct lexer_book *bk)
+{
+	/* Add file list start marker */
+	lexer_push_token(bk, lexer_pack_token(bk, FILES));
+	
+	struct list *tokens = lexer_read_file_list_aux(bk);
+	
+	lexer_concatenate_consecutive_literals(tokens);
+
+	int count = lexer_append_tokens(bk, tokens);
+
+	if(count < 1)
+		lexer_report_error(bk, "Rule files specification is empty.\n");
+	
+	list_delete(tokens);
+	
+	return count;
 }
 
 struct token *lexer_read_command_argument(struct lexer_book *bk)
@@ -699,10 +862,9 @@ struct token *lexer_read_command_argument(struct lexer_book *bk)
 		bk->lexeme_end++;
 		bk->eof = 1;
 
-		if(bk->stream)
-			return lexer_pack_token(bk, NEWLINE);
-		else
-			return NULL;
+		if(bk->depth == 0)
+			lexer_report_error(bk, "Found end of file while completing command.\n");
+		return NULL;
 		break;
 	case '\n':
 		lexer_next_char(bk);	/* Jump \n */
@@ -743,106 +905,95 @@ struct token *lexer_read_command_argument(struct lexer_book *bk)
 }
 
 /*
-  Command parsing is a little different, as we do not push tokens *
+  With command parsing we do not push tokens *
   immediatly to the main token queue. This is because a command may be
   modified by things such as LOCAL, and we want to be able to use these
   modifiers in variable substitutions (e.g., MODIF=LOCAL, or
   MODIF=""). Under the hard rule that the parser should not see any
   substitutions, we first construct a queue of command tokens, examine
-  it for modifiers, and then preppend the command tokens queue to the
+  it for modifiers, and then append the command tokens queue to the
   main tokens queue.
 */
 
-struct lexer_book *lexer_read_command_aux(struct lexer_book *bk)
+struct list *lexer_read_command_aux(struct lexer_book *bk)
 {
-	if(lexer_next_peek(bk) != '\t')
-		return NO;
+	int spaces_deleted = lexer_discard_white_space(bk);
+	
+	struct list *tokens = list_create(); 
 
-	lexer_discard_white_space(bk);
-	
-	/* Use bk_c as the queue for command. We do not read any characters from hehe. */
-	struct lexer_book *bk_c = lexer_init_book(STRING, "", bk->line_number, bk->column_number);
-	
-	bk_c->substitution_mode = COMMAND;
-	bk_c->environment       = bk->environment;
+	//Preserve space in substitutions.
+	if(spaces_deleted && bk->depth > 0) {
+		list_push_tail(tokens, lexer_pack_token(bk, SPACE)); 
+	}
 
 	/* Read all command tokens. Note that we read from bk, but put in bk_c. */
 	struct token *t;
 
-	do
-	{
+	do {
 		t = lexer_read_command_argument(bk);
-		
 		if(!t)
 			break;
 
-		lexer_push_token(bk_c, t);
+		if(t->type == SUBSTITUTION) {
+			tokens = list_splice(tokens, lexer_expand_substitution(bk, t, lexer_read_command_aux));
+			lexer_free_token(t);
+		} else { 
+			list_push_tail(tokens, t);
+		}
 	} while(t->type != NEWLINE);
 	
-	if(!t)
-	{
-		lexer_report_error(bk, "Command line is not terminated with a new line.");
-	}
-	
-	return bk_c;
+	return tokens;
 }
 
-accept_t lexer_read_command(struct lexer_book *bk)
+int lexer_read_command(struct lexer_book *bk)
 {
-	struct lexer_book *bk_c = lexer_read_command_aux(bk);
+	struct list *tokens = lexer_read_command_aux(bk);
 	
-	/* Add command start marker. Pack from bk_c, so we get original line and column info. */
-	lexer_push_token(bk, lexer_pack_token(bk_c, COMMAND));
+	/* Add command start marker.*/
+	lexer_push_token(bk, lexer_pack_token(bk, COMMAND));
 
 	struct token *t;
 
-	/* Merge command tokens into main queue. next_token takes care of substitutions. */
+	/* Merge command tokens into main queue. */
 	/* First merge command modifiers, if any. */
-	while((t = lexer_peek_next_token(bk_c)))
-	{
+	list_first_item(tokens);
+	while((t = list_peek_head(tokens))) {
 		if(t->type == LITERAL &&
 		   ((strcmp(t->lexeme, "LOCAL")    == 0) || 
-			(strcmp(t->lexeme, "MAKEFLOW") == 0)    ))
-		{
-			t = lexer_next_token(bk_c);
+			(strcmp(t->lexeme, "MAKEFLOW") == 0)    )) {
+			t = list_pop_head(tokens);
 			lexer_push_token(bk, t);
-		}
-		else if(t->type == SPACE)
-		{
+		} else if(t->type == SPACE) {
 			//Discard spaces between modifiers.
-			t = lexer_next_token(bk_c);
+			t = list_pop_head(tokens);
 			lexer_free_token(t);
-		}
-		else
-		{
+		} else {
 			break;
 		}
 	}
 
 	/* Mark end of modifiers. */
-	lexer_push_token(bk, lexer_pack_token(bk_c, COMMAND_MOD_END));
+	lexer_push_token(bk, lexer_pack_token(bk, COMMAND_MOD_END));
 	
 	/* Now merge tha actual command tokens */
 
 	/* Gives the number of actual command tokens, not taking into account command modifiers. */
 	int count = 0;
 
-	while((t = lexer_next_token(bk_c)))
-	{
+	while((t = list_pop_head(tokens))) {
 		count++;
 		lexer_push_token(bk, t);
 	}
 	
-	lexer_free_book(bk_c);
+	list_delete(tokens);
 	
-	if(count > 0)
-		return YES;
-	else {
-		return NO;
-	}
+	if(count < 1)
+		lexer_report_error(bk, "Command is empty.\n");
+	
+	return count;
 }
 
-accept_t lexer_read_variable(struct lexer_book * bk, struct token * name)
+int lexer_read_variable(struct lexer_book *bk, struct token *name)
 {
 	lexer_discard_white_space(bk);
 
@@ -852,7 +1003,7 @@ accept_t lexer_read_variable(struct lexer_book * bk, struct token * name)
 	} else {
 		int c = lexer_next_char(bk);
 		if(lexer_next_peek(bk) != '=')
-			return NO;
+			lexer_report_error(bk, "Missing = in variable definition.");
 		lexer_add_to_lexeme(bk, c);
 		lexer_next_char(bk);	/* Jump = */
 	}
@@ -862,18 +1013,19 @@ accept_t lexer_read_variable(struct lexer_book * bk, struct token * name)
 
 	lexer_discard_white_space(bk);
 
-	lexer_read_expandable(bk, '\n');
+	//Read variable value
+	lexer_push_token(bk, lexer_read_expandable(bk, '\n'));
 	lexer_roll_back(bk, 1);	//Recover '\n'
 
 	lexer_discard_white_space(bk);
 
 	if(lexer_next_char(bk) != '\n')
-		return NO;
+		lexer_report_error(bk, "Missing newline at end of variable definition.");
 
-	return YES;
+	return 1;
 }
 
-accept_t lexer_read_variable_list(struct lexer_book * bk)
+int lexer_read_variable_list(struct lexer_book * bk)
 {
 	int c;
 
@@ -886,13 +1038,12 @@ accept_t lexer_read_variable_list(struct lexer_book * bk)
 		}
 
 		lexer_push_token(bk, lexer_read_syntax_name(bk));
-
 	}
 
 	lexer_add_to_lexeme(bk, lexer_next_char(bk));	//Drop the newline
 	lexer_push_token(bk, lexer_pack_token(bk, NEWLINE));
 
-	return YES;
+	return 1;
 }
 
 int lexer_unquoted_look_ahead_count(struct lexer_book *bk, char *char_set)
@@ -942,26 +1093,25 @@ int lexer_unquoted_look_ahead_count(struct lexer_book *bk, char *char_set)
 
 }
 
-typedef accept_t(*read_syntax) (struct lexer_book * bk, struct token * name);
-
-accept_t lexer_read_syntax_export(struct lexer_book *bk, struct token *name)
+int lexer_read_syntax_export(struct lexer_book *bk, struct token *name)
 {
 	lexer_discard_white_space(bk);
 
+	//name->lexeme is "export"
 	name->type = SYNTAX;
 	lexer_push_token(bk, name);
 
 	if(lexer_unquoted_look_ahead_count(bk, "=") > -1)
-		return lexer_read_variable(bk, lexer_read_syntax_name(bk));
+		lexer_read_variable(bk, lexer_read_syntax_name(bk));
 	else
-		return lexer_read_variable_list(bk);
+		lexer_read_variable_list(bk);
 
+	lexer_push_token(bk, lexer_pack_token(bk, NEWLINE));
 
-
-	return YES;
+	return 1;
 }
 
-accept_t lexer_read_syntax(struct lexer_book * bk)
+int lexer_read_syntax_or_variable(struct lexer_book * bk)
 {
 	lexer_discard_white_space(bk);
 	struct token *name = lexer_read_syntax_name(bk);
@@ -974,39 +1124,32 @@ accept_t lexer_read_syntax(struct lexer_book * bk)
 		lexer_roll_back(bk, strlen(name->lexeme));
 		lexer_report_error(bk, "Unrecognized keyword: %s.", name->lexeme);
 	}
-
-	return NO;
+	
+	return 1;
 }
 
-
-
-accept_t lexer_read_line(struct lexer_book * bk)
+int lexer_read_line(struct lexer_book * bk)
 {
 	char c = lexer_next_peek(bk);
 
 	int colon, equal;
 
-	bk->substitution_mode = ROOT;
-
 	switch (c) {
 	case CHAR_EOF:
 		/* Found end of file */
-		lexer_next_char(bk);
-		return YES;
+		return lexer_next_char(bk);
 		break;
 	case '#':
 		lexer_discard_comments(bk);
-		return YES;
+		return 1;
 		break;
 	case '\t':
-		bk->substitution_mode = COMMAND;
 		return lexer_read_command(bk);
 		break;
 	case ' ':
 		/* Eat whitespace and try again */
 		lexer_discard_white_space(bk);
 		return lexer_read_line(bk);
-		break;
 	case '\n':
 		/* Ignore empty lines and try again */
 		lexer_next_char(bk);
@@ -1014,9 +1157,8 @@ accept_t lexer_read_line(struct lexer_book * bk)
 		break;
 	case '@':
 		/* Jump @ */
-		bk->substitution_mode = SYNTAX;
 		lexer_next_char(bk);
-		return lexer_read_syntax(bk);
+		return lexer_read_syntax_or_variable(bk);
 		break;
 	default:
 		/* Either makeflow keyword (e.g. export), a file list, or variable assignment */
@@ -1026,15 +1168,13 @@ accept_t lexer_read_line(struct lexer_book * bk)
 		equal = lexer_unquoted_look_ahead_count(bk, "=");
 
 		if((colon != -1) && (equal == -1 || colon < equal)) {
-			bk->substitution_mode = FILES;
-			return lexer_read_file_list(bk);
+			lexer_read_file_list(bk);
 		} else {
-			bk->substitution_mode = SYNTAX;
-			return lexer_read_syntax(bk);
+			lexer_read_syntax_or_variable(bk);
 		}
+		return 1;
 		break;
 	}
-
 }
 
 /* type: is either STREAM or CHAR */
@@ -1050,6 +1190,8 @@ struct lexer_book *lexer_init_book(int type, void *data, int line_number, int co
 	bk->stream = NULL;
 	bk->buffer = NULL;
 	bk->eof = 0;
+	
+	bk->depth = 0;
 
 	bk->lexeme = calloc(BUFFER_CHUNK_SIZE, sizeof(char));
 	bk->lexeme_size = 0;
@@ -1075,6 +1217,32 @@ struct lexer_book *lexer_init_book(int type, void *data, int line_number, int co
 	return bk;
 }
 
+struct lexer_book *lexer_init_substitution_book(struct lexer_book *bk, struct token *t)
+{
+	char *substitution = NULL;
+	
+	if(bk->environment) {
+		substitution = dag_lookup_str(t->lexeme, bk->environment);
+	}
+
+	struct lexer_book *bk_s;
+
+	if(!substitution) {
+		fatal("Variable %s has not yet been defined at line % " PRId64 ".\n", t->lexeme, bk->line_number);
+		substitution = xxstrdup("");
+	}
+
+	bk_s = lexer_init_book(STRING, substitution, bk->line_number, bk->column_number);
+	bk_s->depth = bk->depth + 1;
+	
+	if(bk_s->depth > MAX_SUBSTITUTION_DEPTH)
+		lexer_report_error(bk, "More than %d recursive subsitutions attempted.\n", MAX_SUBSTITUTION_DEPTH);
+
+	free(substitution);
+
+	return bk_s;
+}
+
 void lexer_free_book(struct lexer_book *bk)
 {
 
@@ -1095,114 +1263,8 @@ void lexer_free_token(struct token *t)
 	free(t);
 }
 
-/* Substitutions can only contain expandables, literals, or other substitutions */
-void lexer_preppend_all_substituted_tokens(struct lexer_book *bk, struct lexer_book *bk_s)
-{
-	struct token *head_s;
-
-	bk_s->substitution_mode = bk->substitution_mode;
-	while(!bk_s->eof) {
-		if(lexer_next_peek(bk_s) == CHAR_EOF) {
-			/* Found end of string while completing command */
-			bk_s->lexeme_end++;
-			bk_s->eof = 1;
-		} else {
-			switch (bk_s->substitution_mode) {
-			case CHAR_EOF:
-			case COMMAND:
-				head_s = lexer_read_command_argument(bk_s);
-				break;
-			case FILES:
-				head_s = lexer_read_file(bk_s);
-				break;
-			case SYNTAX:
-				lexer_read_expandable(bk_s, CHAR_EOF);
-				head_s = lexer_pack_token(bk_s, LITERAL);
-				break;
-			default:
-				lexer_read_line(bk_s);
-				continue;
-				break;
-			}
-
-			if(head_s)
-				lexer_push_token(bk_s, head_s);
-		}
-	}
-
-	while((head_s = list_pop_tail(bk_s->token_queue)) != NULL)
-		list_push_head(bk->token_queue, head_s);
-}
-
-void lexer_expand_substitution(struct lexer_book *bk, struct token *t)
-{
-	char *substitution = NULL;
-	
-	if(bk->environment)
-	{
-		substitution = dag_lookup_str(t->lexeme, bk->environment);
-	}
-
-	struct lexer_book *bk_s;
-
-	if(!substitution) {
-		debug(D_NOTICE, "Variable %s has not yet been defined at line % " PRId64 ".\n", t->lexeme, bk->line_number);
-		substitution = xxstrdup("");
-	}
-
-	bk_s = lexer_init_book(STRING, substitution, bk->line_number, bk->column_number);
-
-	lexer_preppend_all_substituted_tokens(bk, bk_s);
-
-	free(substitution);
-	lexer_free_book(bk_s);
-}
-
-char *lexer_concat_expandable(struct lexer_book *bk)
-{
-	struct token *t;
-
-	struct buffer b;
-	buffer_init(&b);
-
-	char *result, *recursive;
-	
-	while((t = lexer_next_token(bk)))
-	{
-		switch(t->type)
-		{
-		case REXPANDABLE:
-			lexer_free_token(t);
-			result = xxstrdup(buffer_tostring(&b, NULL));
-			buffer_free(&b);
-			return result;
-			break;
-		case LEXPANDABLE:
-			recursive = lexer_concat_expandable(bk);
-			buffer_printf(&b, "%s", recursive);
-			free(recursive);
-			break;
-		case SUBSTITUTION:
-			lexer_expand_substitution(bk, t);
-			break;
-		case LITERAL:
-			buffer_printf(&b, "%s", t->lexeme);
-			break;
-		default:
-			lexer_report_error(bk, "Error in expansion");
-			break;
-		}
-
-		lexer_free_token(t);
-	}
-	
-	return NULL;
-}
-
-
 struct token *lexer_peek_next_token(struct lexer_book *bk)
 {
-	struct token *head;
 	if(list_size(bk->token_queue) == 0) {
 		if(bk->eof)
 			return NULL;
@@ -1211,30 +1273,9 @@ struct token *lexer_peek_next_token(struct lexer_book *bk)
 		return lexer_peek_next_token(bk);
 	}
 
-	head = list_peek_head(bk->token_queue);
+	struct token *head = list_peek_head(bk->token_queue);
 	
-	switch(head->type)
-	{
-	case SUBSTITUTION:
-	    debug(D_DEBUG, "lexer: %s", lexer_print_token(head));
-	    list_pop_head(bk->token_queue);      //Jump head
-		lexer_expand_substitution(bk, head);
-		lexer_free_token(head);
-		return lexer_peek_next_token(bk);
-		break;
-	case LEXPANDABLE:
-	    debug(D_DEBUG, "lexer: %s", lexer_print_token(head));
-		//Modify head, so that we keep line and column information of original LEXPANDABLE.
-	    list_pop_head(bk->token_queue);     //Jump head
-		head->lexeme = lexer_concat_expandable(bk);
-		head->type   = LITERAL;
-		lexer_push_token(bk, head);
-		return lexer_peek_next_token(bk);
-		break;
-	default:
-		return head;
-		break;
-	}
+	return head;
 }
 
 struct token *lexer_next_token(struct lexer_book *bk)
@@ -1243,7 +1284,9 @@ struct token *lexer_next_token(struct lexer_book *bk)
 	
 	if(head)
 	{
-	    //debug(D_DEBUG, "lexer: %s", lexer_print_token(head));
+		if(bk->depth == 0)
+			debug(D_MFLEX, "%s", lexer_print_token(head));
+
 	    list_pop_head(bk->token_queue);
 	}
 
