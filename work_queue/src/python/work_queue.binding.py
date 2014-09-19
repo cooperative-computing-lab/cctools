@@ -224,6 +224,10 @@ class Task(_object):
     def specify_end_time( self, seconds ):
         return work_queue_task_specify_end_time(self._task,seconds)
 
+    # Indicate the disk space (in MB) required by this task.
+    def specify_priority( self, priority ):
+        return work_queue_task_specify_priority(self._task,priority)
+
     ##
     # Get the user-defined logical name for the task. 
     # 
