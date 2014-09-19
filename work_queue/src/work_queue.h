@@ -103,6 +103,7 @@ struct work_queue_task {
 	int unlabeled;
 	
 	timestamp_t time_app_delay;	 /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
+	int priority;			/**< The priority of this task relative to others in the queue: higher number run earlier. */
 };
 
 /** Statistics describing a work queue. */
@@ -286,6 +287,14 @@ in identifying tasks when they complete.
 @param tag The tag to attach to task t.
 */
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag);
+
+/** Specify the priority of this task relative to others in the queue.
+Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list, regardless of the priority.
+@param t A task object.
+@param priority The priority of the task.
+*/
+
+void work_queue_task_specify_priority(struct work_queue_task *t, int priority );
 
 /** Select the scheduling algorithm for a single task.
 To change the scheduling algorithm for all tasks, use @ref work_queue_specify_algorithm instead.

@@ -192,11 +192,12 @@ static void handle_failure(struct work_queue *q, struct work_queue_worker *w, st
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 
-static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w);
+static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
 static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
+static void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t );
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
@@ -617,8 +618,8 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		if(t->unlabeled) {
 			t->cores = t->memory = t->disk = t->gpus = -1;
 		}
-		list_push_head(q->ready_list, t);
 
+		push_task_to_ready_list(q,t);
 		reap_task_from_worker(q, w, t);
 		itable_firstkey(w->current_tasks);
 	}
@@ -2709,53 +2710,43 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	log_worker_stats(q);
 }
 
-static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w)
+static void start_task_on_worker( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
-	struct work_queue_task *t = list_pop_head(q->ready_list);
-	if(!t)
-		return;
-
 	commit_task_to_worker(q, w, t);
+
 	int result = start_one_task(q, w, t);
 	if(result != SUCCESS) {
 		debug(D_WQ, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
 	}
-	
-	return;
 }
 
-static int send_one_task(struct work_queue *q, time_t stoptime)
+static int send_one_task( struct work_queue *q )
 {			
-	//start as many tasks as possible
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
-	if(list_size(q->ready_list) > 0)
-	{
-		// Start at least one task, regardless of the stoptime value.
-		do {
-			t = list_peek_head(q->ready_list);
-			w = find_best_worker(q, t);
-			if(w) {
-				start_task_on_worker(q, w);
-				return 1;
-			} else {
-				//Move task to the end of queue when there is at least one available worker.  
-				//This prevents a resource-hungry task from clogging the entire queue.
-				if(available_workers(q) > 0) {
-					list_push_tail(q->ready_list, list_pop_head(q->ready_list));
-				}	
-				break;
-			}
-			//stoptime <= 0 means an infinite timeout
-		} while((stoptime <= 0 || time(0) < stoptime));
+	// Consider each task in the order of priority:
+	list_first_item(q->ready_list);
+	while( (t = list_next_item(q->ready_list))) {
+
+		// Find the best worker for the task at the head of the list
+		w = find_best_worker(q,t);
+
+		// If there is no suitable worker, consider the next task.
+		if(!w) continue;
+
+		// Otherwise, remove it from the ready list and start it:
+		list_remove(q->ready_list,t);		
+		start_task_on_worker(q,w,t);
+
+		return 1;
 	}
 
 	return 0;
 }
 
-static int receive_one_task(struct work_queue *q, time_t stoptime)
+static int receive_one_task( struct work_queue *q )
 {
 	struct work_queue_task *t;
 
@@ -2999,6 +2990,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->time_committed = 0;
 	t->time_execute_cmd_start = 0;
 	t->total_cmd_execution_time = 0;
+	t->priority = 0;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->memory = -1;
@@ -3529,6 +3521,11 @@ void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
 	t->worker_selection_algorithm = alg;
 }
 
+void work_queue_task_specify_priority( struct work_queue_task *t, int priority )
+{
+	t->priority = priority;
+}
+
 void work_queue_task_delete(struct work_queue_task *t)
 {
 	struct work_queue_file *tf;
@@ -3911,6 +3908,21 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 	return 0;
 }
 
+/* Put a given task on the ready list, taking into account the task priority and the queue schedule. */
+
+void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
+{
+	if(t->priority!=0) {
+		list_push_priority(q->ready_list,t,t->priority);
+	} else {
+		if(q->task_ordering == WORK_QUEUE_TASK_ORDER_LIFO) {
+			list_push_head(q->ready_list, t);
+		} else {
+			list_push_tail(q->ready_list, t);
+		}
+	}	
+}
+
 int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 {
 	/* If the task has been used before, clear out accumlated state. */
@@ -3935,13 +3947,7 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 	if(q->monitor_mode)
 		work_queue_monitor_wrap(q, t);
 
-	/* Then, add it to the ready list and mark it as submitted. */
-	if (q->task_ordering == WORK_QUEUE_TASK_ORDER_LIFO){
-		list_push_head(q->ready_list, t);
-	}	
-	else {
-		list_push_tail(q->ready_list, t);
-	}	
+	push_task_to_ready_list(q,t);
 
 	t->time_task_submit = timestamp_get();
 	q->stats->total_tasks_dispatched++;
@@ -4076,9 +4082,6 @@ static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 
 	do 
 	{
-		//Compute task_transfer_stoptime in some way...
-		time_t task_transfer_stoptime = stoptime;
-
 		task_sent     = 0;
 		task_received = 0;
 
@@ -4087,13 +4090,13 @@ static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 
 		if((list_size(q->ready_list) > 0) && (itable_size(q->finished_tasks) < 1 || send_decision))
 		{
-			task_sent         = send_one_task(q, task_transfer_stoptime);
+			task_sent         = send_one_task(q);
 			total_tasks_sent += task_sent;
 		}
 			
 		if(itable_size(q->finished_tasks) > 0 && (!task_sent || !send_decision))
 		{
-			task_received         = receive_one_task(q, task_transfer_stoptime);
+			task_received         = receive_one_task(q);
 			total_tasks_received += task_received;
 		}
 
