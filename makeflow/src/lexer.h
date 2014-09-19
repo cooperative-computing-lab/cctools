@@ -22,7 +22,7 @@
    NEWLINE: A newline, either explicitely terminating a line, or after
    discarding a comment. NEWLINE tokens signal the end of
    lists of other tokens, such as commands, file lists, or
-   variable substituions. New-line characters preceeded by \
+  variable substituions. New-line characters preceeded by \
    loose their special meaning.
    VARIABLE: A variable assignment of the form NAME=VALUE, NAME+=VALUE,
    NAME-=VALUE, NAME!=VALUE. NAME is any string consisting of
@@ -37,11 +37,6 @@
    parser never sees them.
    LITERAL: A literal string value, used as a variable name, a
    filename, or a command argument.
-   LEXPANDABLE: Signals the beginning of a string that can be expanded:
-   subsitutions are made, and special escapes, such as \n are
-   transformed to newlines. The expandable string is a list of
-   substitution and literal tokens.
-   REXPANDABLE: Signals the end of a string that can be expanded.
    COMMAND: Signals the command line of a rule, described as a list of
    tokens. A command line always starts with a tab character
    in the makeflow file. The end of the list is signaled with
@@ -85,8 +80,6 @@ enum token_t
 	VARIABLE,
 	SUBSTITUTION, 
 	LITERAL,
-	LEXPANDABLE,
-	REXPANDABLE,
 	SPACE,
 
 	COMMAND,
@@ -99,12 +92,6 @@ enum token_t
 
 	ROOT,
 };
-
-typedef enum
-{
-	NO,
-	YES,
-} accept_t;
 
 enum
 {
@@ -124,15 +111,19 @@ struct token
 
 /* type: is either STREAM or CHAR */
 struct lexer_book *lexer_init_book(int type, void *data, int line_number, int column_number);
+struct lexer_book *lexer_init_substitution_book(struct lexer_book *bk, struct token *subs_name); 
 
 struct token *lexer_next_token(struct lexer_book *bk);
+struct token *lexer_peek_next_token(struct lexer_book *bk);
 
 void lexer_report_error(struct lexer_book *bk, char *message, ...);
 char *lexer_print_token(struct token *t);
+void lexer_print_queue(struct lexer_book *bk);
 
-struct token *lexer_peek_next_token(struct lexer_book *bk);
+int lexer_push_token(struct lexer_book *bk, struct token *t);
+int lexer_preppend_token(struct lexer_book *bk, struct token *t);
+
 
 void lexer_free_book(struct lexer_book *bk);
-
 void lexer_free_token(struct token *t);
 

@@ -90,7 +90,6 @@ struct lexer_book
 	int   chunk_last_loaded;
 	char *buffer;
 
-	int substitution_mode;
 	int eof;
 
 	long int   line_number;
@@ -102,6 +101,8 @@ struct lexer_book
 	struct dag_lookup_set *environment;
 
 	char *linetext;   //This member will be removed once the new lexer is integrated.
+	
+	int depth;        //Levels of substitutions. Only depth=0 has stream != NULL.
 };
 
 
