@@ -85,9 +85,15 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_MPI      (1LL<<37)  /**< Debug MPI module for Makeflow */
 #define D_BATCH    (1LL<<38)  /**< Debug batch_job modules */
 #define D_RMON     (1LL<<39)  /**< Debug resource monitor */
+#define D_MFRUN    (1LL<<40)  /**< Debug makeflow's dag run */
+#define D_MFLEX    (1LL<<41)  /**< Debug makeflow's lexer */
+#define D_MFPAR    (1LL<<42)  /**< Debug makeflow's parser */
 
 /** Debug all remote I/O operations. */
 #define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD|D_CVMFS)
+	
+/** Debug all makeflow's operations. */
+#define D_MFLOW    (D_MFRUN|D_MFLEX|D_MFPAR)
 
 /** Show all debugging info. */
 #define D_ALL      (~(0LL))
