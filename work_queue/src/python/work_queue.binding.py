@@ -220,6 +220,11 @@ class Task(_object):
         return work_queue_task_specify_disk(self._task,disk)
 
     ##
+    # Indicate the disk space (in MB) required by this task.
+    def specify_priority( self, priority ):
+        return work_queue_task_specify_priority(self._task,priority)
+
+    ##
     # Get the user-defined logical name for the task. 
     # 
     # @a Note: This is defined using property decorator. So it must be called without parentheses
