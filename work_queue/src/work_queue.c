@@ -2999,6 +2999,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->time_committed = 0;
 	t->time_execute_cmd_start = 0;
 	t->total_cmd_execution_time = 0;
+	t->priority = 0;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->memory = -1;
@@ -3529,6 +3530,11 @@ void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
 	t->worker_selection_algorithm = alg;
 }
 
+void work_queue_task_specify_priority( struct work_queue_task *t, int priority )
+{
+	t->priority = priority;
+}
+
 void work_queue_task_delete(struct work_queue_task *t)
 {
 	struct work_queue_file *tf;
@@ -3935,11 +3941,11 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 	if(q->monitor_mode)
 		work_queue_monitor_wrap(q, t);
 
-	/* Then, add it to the ready list and mark it as submitted. */
 	if (q->task_ordering == WORK_QUEUE_TASK_ORDER_LIFO){
 		list_push_head(q->ready_list, t);
-	}	
-	else {
+	} else if(t->priority!=0) {
+		list_push_priority(q->ready_list,t,t->priority);
+	} else {
 		list_push_tail(q->ready_list, t);
 	}	
 
