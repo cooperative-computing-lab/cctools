@@ -51,7 +51,6 @@ See the file COPYING for details.
 
 #include "makeflow_common.h"
 
-char *dag_parse_readline(struct lexer_book *bk, struct dag_node *n);
 int dag_parse(struct dag *d, FILE * dag_stream);
 int dag_parse_variable(struct lexer_book *bk, struct dag_node *n);
 int dag_parse_node(struct lexer_book *bk);
