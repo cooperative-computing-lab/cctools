@@ -220,6 +220,11 @@ class Task(_object):
         return work_queue_task_specify_disk(self._task,disk)
 
     ##
+    # Indicate the the priority of this task (larger means better priority, default is 0).
+    def specify_priority( self, priority ):
+        return work_queue_task_specify_priority(self._task,priority)
+
+    ##
     # Get the user-defined logical name for the task. 
     # 
     # @a Note: This is defined using property decorator. So it must be called without parentheses
