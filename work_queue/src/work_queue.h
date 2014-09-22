@@ -31,9 +31,6 @@ See the file COPYING for details.
 #define WORK_QUEUE_SCHEDULE_RAND	 4 /**< Select a random worker. (default) */
 #define WORK_QUEUE_SCHEDULE_WORST	 5 /**< Select the worst fit worker (the worker with more unused resources). */
 
-#define WORK_QUEUE_TASK_ORDER_FIFO 0  /**< Retrieve tasks based on first-in-first-out order. */
-#define WORK_QUEUE_TASK_ORDER_LIFO 1  /**< Retrieve tasks based on last-in-first-out order. */
- 
 #define WORK_QUEUE_INPUT  0	/**< Specify an input object. */
 #define WORK_QUEUE_OUTPUT 1	/**< Specify an output object. */
 
@@ -467,9 +464,7 @@ int work_queue_activate_fast_abort(struct work_queue *q, double multiplier);
 int work_queue_send_receive_ratio(struct work_queue *q, double ratio);
 
 /** Change the worker selection algorithm.
-Note that this function controls which <b>worker</b> will be selected
-for a given task while @ref work_queue_specify_task_order controls which <b>task</b>
-will be executed next.
+This function controls which <b>worker</b> will be selected for a given task.
 @param q A work queue object.
 @param algo The algorithm to use in assigning a task to a worker:
 - @ref WORK_QUEUE_SCHEDULE_FCFS	 - Select worker on a first-come-first-serve basis.
@@ -478,17 +473,6 @@ will be executed next.
 - @ref WORK_QUEUE_SCHEDULE_RAND	 - Select a random worker (default).
 */
 void work_queue_specify_algorithm(struct work_queue *q, int algo);
-
-/** Specify how the submitted tasks should be ordered.
-Note that this function controls which <b>task</b> to execute next,
-while @ref work_queue_specify_algorithm controls which <b>worker</b>
-it should be assigned to.
-@param q A work queue object.
-@param order The ordering to use for dispatching submitted tasks:
-- @ref WORK_QUEUE_TASK_ORDER_LIFO
-- @ref WORK_QUEUE_TASK_ORDER_FIFO
-*/
-void work_queue_specify_task_order(struct work_queue *q, int order);
 
 /** Get the project name of the queue.
 @param q A work queue object.
@@ -604,6 +588,18 @@ int work_queue_tune(struct work_queue *q, const char *name, double value);
 /** @name Functions - Deprecated */
 
 //@{
+
+#define WORK_QUEUE_TASK_ORDER_FIFO 0  /**< Retrieve tasks based on first-in-first-out order. */
+#define WORK_QUEUE_TASK_ORDER_LIFO 1  /**< Retrieve tasks based on last-in-first-out order. */
+
+/** Specified how the submitted tasks should be ordered. It does not have any effect now.
+@param q A work queue object.
+@param order The ordering to use for dispatching submitted tasks:
+- @ref WORK_QUEUE_TASK_ORDER_LIFO
+- @ref WORK_QUEUE_TASK_ORDER_FIFO
+*/
+void work_queue_specify_task_order(struct work_queue *q, int order);
+
 
 #define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
 #define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
