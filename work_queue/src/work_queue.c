@@ -3639,7 +3639,6 @@ struct work_queue *work_queue_create(int port)
 
 	q->fast_abort_multiplier = wq_option_fast_abort_multiplier;
 	q->worker_selection_algorithm = wq_option_scheduler;
-	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	q->process_pending_check = 0;
 	q->workers_to_wait = 0;
 
@@ -3672,6 +3671,10 @@ struct work_queue *work_queue_create(int port)
 			q->bandwidth = 0;
 		}
 	}
+
+	//Deprecated:
+	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
+	//
 	
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
@@ -3894,15 +3897,7 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 
 void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 {
-	if(t->priority!=0) {
-		list_push_priority(q->ready_list,t,t->priority);
-	} else {
-		if(q->task_ordering == WORK_QUEUE_TASK_ORDER_LIFO) {
-			list_push_head(q->ready_list, t);
-		} else {
-			list_push_tail(q->ready_list, t);
-		}
-	}	
+	list_push_priority(q->ready_list,t,t->priority);
 }
 
 int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
