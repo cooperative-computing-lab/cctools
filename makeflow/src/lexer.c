@@ -59,40 +59,40 @@ char *lexer_print_token(struct token *t)
 	char str[1024]; 
 
 	switch (t->type) {
-	case SYNTAX:
+	case TOKEN_SYNTAX:
 		snprintf(str, 1024, "SYNTAX:  %s\n", t->lexeme);
 		break;
-	case NEWLINE:
+	case TOKEN_NEWLINE:
 		snprintf(str, 1024, "NEWLINE\n");
 		break;
-	case SPACE:
+	case TOKEN_SPACE:
 		snprintf(str, 1024, "SPACE\n");
 		break;
-	case FILES:
+	case TOKEN_FILES:
 		snprintf(str, 1024, "FILES:  %s\n", t->lexeme);
 		break;
-	case VARIABLE:
+	case TOKEN_VARIABLE:
 		snprintf(str, 1024, "VARIABLE: %s\n", t->lexeme);
 		break;
-	case COLON:
+	case TOKEN_COLON:
 		snprintf(str, 1024, "COLON\n");
 		break;
-	case REMOTE_RENAME:
+	case TOKEN_REMOTE_RENAME:
 		snprintf(str, 1024, "REMOTE_RENAME: %s\n", t->lexeme);
 		break;
-	case LITERAL:
+	case TOKEN_LITERAL:
 		snprintf(str, 1024, "LITERAL: %s\n", t->lexeme);
 		break;
-	case SUBSTITUTION:
+	case TOKEN_SUBSTITUTION:
 		snprintf(str, 1024, "SUBSTITUTION: %s\n", t->lexeme);
 		break;
-	case COMMAND:
+	case TOKEN_COMMAND:
 		snprintf(str, 1024, "COMMAND: %s\n", t->lexeme);
 		break;
-	case COMMAND_MOD_END:
+	case TOKEN_COMMAND_MOD_END:
 		snprintf(str, 1024, "COMMAND_MOD_END: %s\n", t->lexeme);
 		break;
-	case IO_REDIRECT:
+	case TOKEN_IO_REDIRECT:
 		snprintf(str, 1024, "IO_REDIRECT: %s\n", t->lexeme);
 		break;
 	default:
@@ -490,7 +490,7 @@ struct token *lexer_read_literal_in_expandable_until(struct lexer *lx, char end_
 	if(lx->eof && strchr(")\"'", end_marker))
 		lexer_report_error(lx, "Missing closing %c.\n", end_marker);
 
-	return lexer_pack_token(lx, LITERAL);
+	return lexer_pack_token(lx, TOKEN_LITERAL);
 }
 
 /* Read a filename, adding '-' to names when - is not followed by
@@ -519,7 +519,7 @@ struct token *lexer_read_filename(struct lexer *lx)
 	if(count < 1)
 		lexer_report_error(lx, "Expecting a filename.");
 
-	return lexer_pack_token(lx, LITERAL);
+	return lexer_pack_token(lx, TOKEN_LITERAL);
 }
 
 
@@ -531,7 +531,7 @@ struct token *lexer_read_syntax_name(struct lexer *lx)
 	if(count < 1)
 		lexer_report_error(lx, "Expecting a keyword or a variable name.");
 
-	return lexer_pack_token(lx, LITERAL);
+	return lexer_pack_token(lx, TOKEN_LITERAL);
 }
 
 struct token *lexer_read_substitution(struct lexer *lx)
@@ -553,7 +553,7 @@ struct token *lexer_read_substitution(struct lexer *lx)
 	}
 
 	struct token *name = lexer_read_syntax_name(lx);
-	name->type = SUBSTITUTION;
+	name->type = TOKEN_SUBSTITUTION;
 
 	if(closer) {
 		if(lexer_next_peek(lx) == closer)
@@ -588,7 +588,7 @@ struct token *lexer_read_white_space(struct lexer *lx)
 
 	if(count > 0) {
 		lexer_add_to_lexeme(lx, ' ');
-		return lexer_pack_token(lx, SPACE);
+		return lexer_pack_token(lx, TOKEN_SPACE);
 	} else
 		lexer_report_error(lx, "Expecting white space.");
 
@@ -611,13 +611,13 @@ struct list *lexer_read_expandable_recursive(struct lexer *lx, char end_marker, 
 
 		if(c == '\'') {
 			lexer_read_literal(lx);
-			list_push_tail(tokens, lexer_pack_token(lx, LITERAL));
+			list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));
 		} else if(c == '"' && opened == 0) {
 				lexer_add_to_lexeme(lx, lexer_next_char(lx));
-				list_push_tail(tokens, lexer_pack_token(lx, LITERAL));     // Add first "
+				list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));     // Add first "
 				tokens = list_splice(tokens, lexer_read_expandable_recursive(lx, '"', 1));
 				lexer_add_to_lexeme(lx, '"');
-				list_push_tail(tokens, lexer_pack_token(lx, LITERAL));     // Add closing "
+				list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));     // Add closing "
 				if(end_marker == '"')
 					return tokens;
 		} else if(c == '#' && end_marker != '"') {
@@ -648,14 +648,14 @@ struct token *lexer_concat_expandable(struct lexer *lx, struct list *tokens)
 	
 	while((t = list_pop_head(tokens))) {
 		switch(t->type) {
-		case SUBSTITUTION:
+		case TOKEN_SUBSTITUTION:
 			substitution = dag_lookup_str(t->lexeme, lx->environment);
 			if(!substitution)
 				fatal("Variable %s has not yet been defined at line % " PRId64 ".\n", t->lexeme, lx->line_number);
 			buffer_printf(&b, "%s", substitution);
 			free(substitution);
 			break;
-		case LITERAL:
+		case TOKEN_LITERAL:
 			if(strcmp(t->lexeme, "") != 0)           // Skip empty strings.
 				buffer_printf(&b, "%s", t->lexeme);
 			break;
@@ -667,7 +667,7 @@ struct token *lexer_concat_expandable(struct lexer *lx, struct list *tokens)
 		lexer_free_token(t);
 	}
 	
-	t = lexer_pack_token(lx, LITERAL);
+	t = lexer_pack_token(lx, TOKEN_LITERAL);
 	t->lexeme = xxstrdup(buffer_tostring(&b, NULL));
 	buffer_free(&b);
 	
@@ -726,21 +726,21 @@ struct token *lexer_read_file(struct lexer *lx)
 	case '\n':
 		lexer_next_char(lx);	/* Jump \n */
 		lexer_add_to_lexeme(lx, c);
-		return lexer_pack_token(lx, NEWLINE);
+		return lexer_pack_token(lx, TOKEN_NEWLINE);
 		break;
 	case '#':
 		lexer_discard_comments(lx);
 		lexer_add_to_lexeme(lx, '\n');
-		return lexer_pack_token(lx, NEWLINE);
+		return lexer_pack_token(lx, TOKEN_NEWLINE);
 	case ':':
 		lexer_next_char(lx);	/* Jump : */
-		return lexer_pack_token(lx, COLON);
+		return lexer_pack_token(lx, TOKEN_COLON);
 		break;
 	case ' ':
 	case '\t':
 		/* Discard white-space and add space token. */
 		lexer_discard_white_space(lx);
-		return lexer_pack_token(lx, SPACE);
+		return lexer_pack_token(lx, TOKEN_SPACE);
 		break;
 	case '$':
 		return lexer_read_substitution(lx);
@@ -749,13 +749,13 @@ struct token *lexer_read_file(struct lexer *lx)
 		lexer_add_to_lexeme(lx, '\'');
 		lexer_read_literal_quoted(lx);
 		lexer_add_to_lexeme(lx, '\'');
-		return lexer_pack_token(lx, LITERAL);
+		return lexer_pack_token(lx, TOKEN_LITERAL);
 		break;
 	case '-':
 		if(lexer_peek_remote_rename_syntax(lx)) {
 			lexer_next_char(lx);	/* Jump -> */
 			lexer_next_char(lx);
-			return lexer_pack_token(lx, REMOTE_RENAME);
+			return lexer_pack_token(lx, TOKEN_REMOTE_RENAME);
 		}
 		/* Else fall through */
 	default:
@@ -777,13 +777,13 @@ struct list *lexer_read_file_list_aux(struct lexer *lx)
 			break;
 
 		//Do substitution recursively
-		if(t->type == SUBSTITUTION) {
+		if(t->type == TOKEN_SUBSTITUTION) {
 			tokens = list_splice(tokens, lexer_expand_substitution(lx, t, lexer_read_file_list_aux));
 			lexer_free_token(t);
 		} else { 
 			list_push_tail(tokens, t);
 		}
-	} while(t->type != NEWLINE);
+	} while(t->type != TOKEN_NEWLINE);
 
 	return tokens;
 }
@@ -795,7 +795,7 @@ void lexer_concatenate_consecutive_literals(struct list *tokens)
 	
 	list_first_item(tokens);
 	while((t = list_pop_head(tokens))) {
-		if(t->type != LITERAL) {
+		if(t->type != TOKEN_LITERAL) {
 			list_push_tail(tmp, t);
 			continue;
 		}
@@ -807,7 +807,7 @@ void lexer_concatenate_consecutive_literals(struct list *tokens)
 			continue;
 		}
 		
-		if(prev->type != LITERAL) {
+		if(prev->type != TOKEN_LITERAL) {
 			list_push_tail(tmp, prev);
 			list_push_tail(tmp, t);
 			continue;
@@ -824,7 +824,7 @@ void lexer_concatenate_consecutive_literals(struct list *tokens)
 	/* Copy to tokens, drop spaces. */
 	list_first_item(tmp);
 	while((t = list_pop_head(tmp)))
-		if(t->type != SPACE) {
+		if(t->type != TOKEN_SPACE) {
 			list_push_tail(tokens, t);
 		} else {
 			lexer_free_token(t);
@@ -836,7 +836,7 @@ void lexer_concatenate_consecutive_literals(struct list *tokens)
 int lexer_read_file_list(struct lexer *lx)
 {
 	/* Add file list start marker */
-	lexer_push_token(lx, lexer_pack_token(lx, FILES));
+	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_FILES));
 	
 	struct list *tokens = lexer_read_file_list_aux(lx);
 	
@@ -869,12 +869,12 @@ struct token *lexer_read_command_argument(struct lexer *lx)
 	case '\n':
 		lexer_next_char(lx);	/* Jump \n */
 		lexer_add_to_lexeme(lx, c);
-		return lexer_pack_token(lx, NEWLINE);
+		return lexer_pack_token(lx, TOKEN_NEWLINE);
 		break;
 	case '#':
 		lexer_discard_comments(lx);
 		lexer_add_to_lexeme(lx, '\n');
-		return lexer_pack_token(lx, NEWLINE);
+		return lexer_pack_token(lx, TOKEN_NEWLINE);
 	case ' ':
 	case '\t':
 		return lexer_read_white_space(lx);
@@ -889,17 +889,17 @@ struct token *lexer_read_command_argument(struct lexer *lx)
 	case '>':
 		lexer_next_char(lx);	/* Jump <, > */
 		lexer_add_to_lexeme(lx, c);
-		return lexer_pack_token(lx, IO_REDIRECT);
+		return lexer_pack_token(lx, TOKEN_IO_REDIRECT);
 		break;
 	case '\'':
 		lexer_add_to_lexeme(lx, '\'');
 		lexer_read_literal(lx);
 		lexer_add_to_lexeme(lx, '\'');
-		return lexer_pack_token(lx, LITERAL);
+		return lexer_pack_token(lx, TOKEN_LITERAL);
 		break;
 	default:
 		lexer_read_literal(lx);
-		return lexer_pack_token(lx, LITERAL);
+		return lexer_pack_token(lx, TOKEN_LITERAL);
 		break;
 	}
 }
@@ -923,7 +923,7 @@ struct list *lexer_read_command_aux(struct lexer *lx)
 
 	//Preserve space in substitutions.
 	if(spaces_deleted && lx->depth > 0) {
-		list_push_tail(tokens, lexer_pack_token(lx, SPACE)); 
+		list_push_tail(tokens, lexer_pack_token(lx, TOKEN_SPACE)); 
 	}
 
 	/* Read all command tokens. Note that we read from lx, but put in lx_c. */
@@ -934,13 +934,13 @@ struct list *lexer_read_command_aux(struct lexer *lx)
 		if(!t)
 			break;
 
-		if(t->type == SUBSTITUTION) {
+		if(t->type == TOKEN_SUBSTITUTION) {
 			tokens = list_splice(tokens, lexer_expand_substitution(lx, t, lexer_read_command_aux));
 			lexer_free_token(t);
 		} else { 
 			list_push_tail(tokens, t);
 		}
-	} while(t->type != NEWLINE);
+	} while(t->type != TOKEN_NEWLINE);
 	
 	return tokens;
 }
@@ -961,19 +961,19 @@ int lexer_read_command(struct lexer *lx)
 	}
 	
 	/* Add command start marker.*/
-	lexer_push_token(lx, lexer_pack_token(lx, COMMAND));
+	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_COMMAND));
 
 
 	/* Merge command tokens into main queue. */
 	/* First merge command modifiers, if any. */
 	list_first_item(tokens);
 	while((t = list_peek_head(tokens))) {
-		if(t->type == LITERAL &&
+		if(t->type == TOKEN_LITERAL &&
 		   ((strcmp(t->lexeme, "LOCAL")    == 0) || 
 			(strcmp(t->lexeme, "MAKEFLOW") == 0)    )) {
 			t = list_pop_head(tokens);
 			lexer_push_token(lx, t);
-		} else if(t->type == SPACE) {
+		} else if(t->type == TOKEN_SPACE) {
 			//Discard spaces between modifiers.
 			t = list_pop_head(tokens);
 			lexer_free_token(t);
@@ -983,7 +983,7 @@ int lexer_read_command(struct lexer *lx)
 	}
 
 	/* Mark end of modifiers. */
-	lexer_push_token(lx, lexer_pack_token(lx, COMMAND_MOD_END));
+	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_COMMAND_MOD_END));
 	
 	/* Now merge tha actual command tokens */
 
@@ -1018,7 +1018,7 @@ int lexer_read_variable(struct lexer *lx, struct token *name)
 		lexer_next_char(lx);	/* Jump = */
 	}
 
-	lexer_push_token(lx, lexer_pack_token(lx, VARIABLE));
+	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_VARIABLE));
 	lexer_push_token(lx, name);
 
 	lexer_discard_white_space(lx);
@@ -1051,7 +1051,7 @@ int lexer_read_variable_list(struct lexer * lx)
 	}
 
 	lexer_add_to_lexeme(lx, lexer_next_char(lx));	//Drop the newline
-	lexer_push_token(lx, lexer_pack_token(lx, NEWLINE));
+	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_NEWLINE));
 
 	return 1;
 }
@@ -1108,7 +1108,7 @@ int lexer_read_syntax_export(struct lexer *lx, struct token *name)
 	lexer_discard_white_space(lx);
 
 	//name->lexeme is "export"
-	name->type = SYNTAX;
+	name->type = TOKEN_SYNTAX;
 	lexer_push_token(lx, name);
 
 	if(lexer_unquoted_look_ahead_count(lx, "=") > -1)
@@ -1116,7 +1116,7 @@ int lexer_read_syntax_export(struct lexer *lx, struct token *name)
 	else
 		lexer_read_variable_list(lx);
 
-	lexer_push_token(lx, lexer_pack_token(lx, NEWLINE));
+	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_NEWLINE));
 
 	return 1;
 }

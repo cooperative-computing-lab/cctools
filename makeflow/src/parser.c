@@ -68,20 +68,20 @@ int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
 	buffer_init(&b);
 
 	struct token *t;
-	while((t = lexer_next_token(bk)) && t->type != NEWLINE)
+	while((t = lexer_next_token(bk)) && t->type != TOKEN_NEWLINE)
 	{
 		const char *remote_name = NULL;
 		
 		switch(t->type)
 		{
-		case SPACE:
+		case TOKEN_SPACE:
 			buffer_printf(&b, " ");
 			break;
-		case LITERAL:
+		case TOKEN_LITERAL:
 			remote_name = dag_file_local_name(n, t->lexeme);
 			buffer_printf(&b, "%s", t->lexeme);
 			break;
-		case IO_REDIRECT:
+		case TOKEN_IO_REDIRECT:
 			buffer_printf(&b, "%s", t->lexeme);
 			break;
 		default:
@@ -188,18 +188,18 @@ int dag_parse(struct dag *d, FILE *stream)
 		s.table    = NULL;
 
 		switch (t->type) {
-		case NEWLINE:
-		case SPACE:
+		case TOKEN_NEWLINE:
+		case TOKEN_SPACE:
 			/* Skip newlines, spaces at top level. */
 			lexer_free_token(lexer_next_token(bk));
 			break;
-		case SYNTAX:
+		case TOKEN_SYNTAX:
 			dag_parse_syntax(bk);
 			break;
-		case FILES:
+		case TOKEN_FILES:
 			dag_parse_node(bk); 
 			break;
-		case VARIABLE:
+		case TOKEN_VARIABLE:
 			dag_parse_variable(bk, NULL); 
 			break;
 		default:
@@ -311,7 +311,7 @@ int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 	lexer_free_token(t);
 
 	t = lexer_next_token(bk);
-	if(t->type != LITERAL)
+	if(t->type != TOKEN_LITERAL)
 	{
 		lexer_report_error(bk, "Literal variable name expected.");
 	}
@@ -320,7 +320,7 @@ int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 	lexer_free_token(t);
 	
 	t = lexer_next_token(bk);
-	if(t->type != LITERAL)
+	if(t->type != TOKEN_LITERAL)
 	{
 		lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
 	}
@@ -379,23 +379,23 @@ int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
 		newname  = NULL;
 
 		switch (t->type) {
-		case COLON:
+		case TOKEN_COLON:
 			before_colon = 0;
 			lexer_free_token(t);
 			break;
-		case NEWLINE:
+		case TOKEN_NEWLINE:
 			/* Finished reading file list */
 			lexer_free_token(t);
 			return 1;
 			break;
-		case LITERAL:
+		case TOKEN_LITERAL:
 			rename = NULL;
 			arrow = lexer_peek_next_token(bk);
 			if(!arrow)
 			{
 				lexer_report_error(bk, "Rule specification is incomplete.");
 			} 
-			else if(arrow->type == REMOTE_RENAME)        //Is the arrow really an arrow?
+			else if(arrow->type == TOKEN_REMOTE_RENAME)        //Is the arrow really an arrow?
 			{
 				lexer_free_token(lexer_next_token(bk));  //Jump arrow.
 				rename = lexer_next_token(bk); 
@@ -434,7 +434,7 @@ int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
 int dag_parse_node(struct lexer *bk)
 {
 	struct token *t = lexer_next_token(bk);
-	if(t->type != FILES)
+	if(t->type != TOKEN_FILES)
 	{
 		lexer_report_error(bk, "Error reading rule.");
 	}
@@ -450,10 +450,10 @@ int dag_parse_node(struct lexer *bk)
 	bk->environment->node = n;
 	
 	/* Read variables, if any */
-	while((t = lexer_peek_next_token(bk)) && t->type != COMMAND)
+	while((t = lexer_peek_next_token(bk)) && t->type != TOKEN_COMMAND)
 	{
 		switch (t->type) {
-		case VARIABLE:
+		case TOKEN_VARIABLE:
 			dag_parse_variable(bk, n); 
 			break;
 		default:
@@ -497,7 +497,7 @@ int dag_parse_node_command(struct lexer *bk, struct dag_node *n)
 	}
 	
 	/* Read command modifiers. */
-	while((t = lexer_peek_next_token(bk)) && t->type != COMMAND_MOD_END)
+	while((t = lexer_peek_next_token(bk)) && t->type != TOKEN_COMMAND_MOD_END)
 	{
 		t = lexer_next_token(bk);
 
@@ -540,7 +540,7 @@ void dag_parse_drop_spaces(struct lexer *bk)
 {
 	struct token *t;
 
-	while((t = lexer_peek_next_token(bk)) && t->type == SPACE) {
+	while((t = lexer_peek_next_token(bk)) && t->type == TOKEN_SPACE) {
 		t = lexer_next_token(bk);
 		lexer_free_token(t);
 	}
@@ -569,7 +569,7 @@ int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 	//Get the dag's file name.
 	t = lexer_next_token(bk);
 
-	if(t->type == LITERAL) {
+	if(t->type == TOKEN_LITERAL) {
 		n->makeflow_dag = xxstrdup(t->lexeme);
 		start = t;
 	} else {
@@ -580,7 +580,7 @@ int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 
 	//Get dag's working directory.
 	t = lexer_peek_next_token(bk);
-	if(t->type == LITERAL) {
+	if(t->type == TOKEN_LITERAL) {
 		t = lexer_next_token(bk);
 		n->makeflow_cwd = xxstrdup(t->lexeme);
 		lexer_free_token(t);
@@ -593,7 +593,7 @@ int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 	//Get wrapper's name
 	char *wrapper = NULL;
 	t = lexer_peek_next_token(bk);
-	if(t->type == LITERAL) {
+	if(t->type == TOKEN_LITERAL) {
 		wrapper = xxstrdup(t->lexeme);
 		lexer_free_token(t);
 	} else {
@@ -621,14 +621,14 @@ int dag_parse_export(struct lexer *bk)
 	const char *name;
 
 	int count = 0;
-	while((t = lexer_peek_next_token(bk)) && t->type != NEWLINE)
+	while((t = lexer_peek_next_token(bk)) && t->type != TOKEN_NEWLINE)
 	{
 		switch(t->type)
 		{
-		case VARIABLE:
+		case TOKEN_VARIABLE:
 			vtoken = lexer_next_token(bk);     //Save VARIABLE token.
 			vname  = lexer_peek_next_token(bk);
-			if(vname->type == LITERAL) {
+			if(vname->type == TOKEN_LITERAL) {
 				name = xxstrdup(vname->lexeme);
 			} else {
 				lexer_report_error(bk, "Variable definition has name missing.\n");
@@ -637,7 +637,7 @@ int dag_parse_export(struct lexer *bk)
 			dag_parse_variable(bk, NULL);
 
 			break;
-		case LITERAL:
+		case TOKEN_LITERAL:
 			t = lexer_next_token(bk);
 			name = xxstrdup(t->lexeme);
 			lexer_free_token(t);
