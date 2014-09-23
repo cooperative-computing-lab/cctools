@@ -57,46 +57,48 @@ struct token *lexer_pack_token(struct lexer *lx, enum token_t type)
 char *lexer_print_token(struct token *t)
 {
 	char str[1024]; 
+	
+	int n = sizeof(str);
 
 	switch (t->type) {
 	case TOKEN_SYNTAX:
-		snprintf(str, 1024, "SYNTAX:  %s\n", t->lexeme);
+		snprintf(str, n, "SYNTAX:  %s\n", t->lexeme);
 		break;
 	case TOKEN_NEWLINE:
-		snprintf(str, 1024, "NEWLINE\n");
+		snprintf(str, n, "NEWLINE\n");
 		break;
 	case TOKEN_SPACE:
-		snprintf(str, 1024, "SPACE\n");
+		snprintf(str, n, "SPACE\n");
 		break;
 	case TOKEN_FILES:
-		snprintf(str, 1024, "FILES:  %s\n", t->lexeme);
+		snprintf(str, n, "FILES:  %s\n", t->lexeme);
 		break;
 	case TOKEN_VARIABLE:
-		snprintf(str, 1024, "VARIABLE: %s\n", t->lexeme);
+		snprintf(str, n, "VARIABLE: %s\n", t->lexeme);
 		break;
 	case TOKEN_COLON:
-		snprintf(str, 1024, "COLON\n");
+		snprintf(str, n, "COLON\n");
 		break;
 	case TOKEN_REMOTE_RENAME:
-		snprintf(str, 1024, "REMOTE_RENAME: %s\n", t->lexeme);
+		snprintf(str, n, "REMOTE_RENAME: %s\n", t->lexeme);
 		break;
 	case TOKEN_LITERAL:
-		snprintf(str, 1024, "LITERAL: %s\n", t->lexeme);
+		snprintf(str, n, "LITERAL: %s\n", t->lexeme);
 		break;
 	case TOKEN_SUBSTITUTION:
-		snprintf(str, 1024, "SUBSTITUTION: %s\n", t->lexeme);
+		snprintf(str, n, "SUBSTITUTION: %s\n", t->lexeme);
 		break;
 	case TOKEN_COMMAND:
-		snprintf(str, 1024, "COMMAND: %s\n", t->lexeme);
+		snprintf(str, n, "COMMAND: %s\n", t->lexeme);
 		break;
 	case TOKEN_COMMAND_MOD_END:
-		snprintf(str, 1024, "COMMAND_MOD_END: %s\n", t->lexeme);
+		snprintf(str, n, "COMMAND_MOD_END: %s\n", t->lexeme);
 		break;
 	case TOKEN_IO_REDIRECT:
-		snprintf(str, 1024, "IO_REDIRECT: %s\n", t->lexeme);
+		snprintf(str, n, "IO_REDIRECT: %s\n", t->lexeme);
 		break;
 	default:
-		snprintf(str, 1024, "unknown: %s\n", t->lexeme);
+		snprintf(str, n, "unknown: %s\n", t->lexeme);
 		break;
 	}
 	
