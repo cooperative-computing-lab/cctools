@@ -101,7 +101,7 @@ int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
 	
 	buffer_free(&b);
 
-	debug(D_MFPAR, "node command=%s", n->command);
+	debug(D_MAKEFLOW_PARSER, "node command=%s", n->command);
 
 	return 1;
 }
@@ -115,7 +115,7 @@ struct dag *dag_from_file(const char *filename)
 
 	dagfile = fopen(filename, "r");
 	if(dagfile == NULL)
-		debug(D_MFPAR, "makeflow: unable to open file %s: %s\n", filename, strerror(errno));
+		debug(D_MAKEFLOW_PARSER, "makeflow: unable to open file %s: %s\n", filename, strerror(errno));
 	else {
 		d = dag_create();
 		d->filename = xxstrdup(filename);
@@ -237,7 +237,7 @@ int dag_parse_process_special_variable(struct lexer *bk, struct dag_node *n, int
 			n->category = category;
 			/* and add it to the new one */
 			list_push_tail(n->category->nodes, n);
-			debug(D_MFPAR, "Updating category '%s' for rule %d.\n", value, n->nodeid);
+			debug(D_MAKEFLOW_PARSER, "Updating category '%s' for rule %d.\n", value, n->nodeid);
 		}
 		else
 			bk->category = category;
@@ -346,11 +346,11 @@ int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 	{
 	case '=':
 		dag_variable_add_value(name, current_table, nodeid, value);
-		debug(D_MFPAR, "%s appending to variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
+		debug(D_MAKEFLOW_PARSER, "%s appending to variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
 		break;
 	case '+':
 		dag_parse_append_variable(bk, nodeid, n, name, value);
-		debug(D_MFPAR, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
+		debug(D_MAKEFLOW_PARSER, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
 		break;
 	default:
 		lexer_report_error(bk, "Unknown variable operator.");
@@ -474,7 +474,7 @@ int dag_parse_node(struct lexer *bk)
 	bk->d->nodes = n;
 	itable_insert(bk->d->node_table, n->nodeid, n);
 
-	debug(D_MFPAR, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
+	debug(D_MAKEFLOW_PARSER, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
 	dag_task_fill_resources(n);
 	dag_task_print_debug_resources(n);
 	
@@ -650,7 +650,7 @@ int dag_parse_export(struct lexer *bk)
 
 		set_insert(bk->d->export_vars, name);
 		count++;
-		debug(D_MFPAR, "export variable: %s", name);
+		debug(D_MAKEFLOW_PARSER, "export variable: %s", name);
 	}
 	
 	if(t) {
