@@ -775,46 +775,31 @@ int link_putlstring(struct link *link, const char *data, size_t count, time_t st
 
 int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va)
 {
-	va_list va2;
-	ssize_t size = 65536;
-	char buffer[size];
-	char *b = buffer;
+	int rc;
+	size_t l;
+	const char *str;
+	buffer_t B;
 
-	va_copy(va2, va);
-	int n = vsnprintf(NULL, 0, fmt, va2);
-	va_end(va2);
-
-	if(n < 0)
+	buffer_init(&B);
+	if (buffer_putvfstring(&B, fmt, va) == -1)
 		return -1;
-	if(n > size - 1) {
-		b = (char *) malloc(n + 1);
-		if(b == NULL)
-			return -1;
-		size = n + 1;
-	}
+	str = buffer_tostring(&B, &l);
+	rc = link_putlstring(link, str, l, stoptime);
+	buffer_free(&B);
 
-	va_copy(va2, va);
-	n = vsnprintf(b, size, fmt, va2);
-	assert(n >= 0);
-	va_end(va2);
-
-	int r = link_putlstring(link, b, (size_t) n, stoptime);
-
-	if(b != buffer)
-		free(b);
-
-	return r;
+	return rc;
 }
 
 int link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...)
 {
+	int rc;
 	va_list va;
 
 	va_start(va, stoptime);
-	int result = link_putvfstring(link, fmt, stoptime, va);
+	rc = link_putvfstring(link, fmt, stoptime, va);
 	va_end(va);
 
-	return result;
+	return rc;
 }
 
 void link_close(struct link *link)
