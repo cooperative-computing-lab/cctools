@@ -73,6 +73,44 @@
 
 #include "dag.h"
 
+struct lexer
+{
+	struct dag *d;                      /* The dag being built. */
+
+	struct dag_task_category *category; /* Indicates the category to which the rules belong. The
+					       idea is to have rules that perform similar tasks, or
+					       use about the same resources, to belong to the
+					       same category. task_category is updated every time the
+					       value of the variable described in the macro
+					       MAKEFLOW_TASK_CATEGORY is changed in the makeflow file.
+					    */
+
+	FILE  *stream;                  /* The file pointer the rules are been read. */
+	char *lexeme_end;
+
+	char *lexeme;
+	uint64_t lexeme_max; 
+	uint64_t lexeme_size; 
+
+	int   chunk_last_loaded;
+	char *buffer;
+
+	int eof;
+
+	long int   line_number;
+	long int   column_number;
+	struct list *column_numbers;
+
+	struct list *token_queue; 
+	
+	struct dag_lookup_set *environment;
+
+	char *linetext;   //This member will be removed once the new lexer is integrated.
+	
+	int depth;        //Levels of substitutions. Only depth=0 has stream != NULL.
+};
+
+
 enum token_t
 {
 	SYNTAX,
