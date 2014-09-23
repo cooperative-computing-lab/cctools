@@ -233,14 +233,14 @@ void lexer_print_queue(struct lexer *lx)
 {
 	struct token *t;
 	
-	debug(D_MFLEX, "Queue: ");
+	debug(D_MAKEFLOW_LEXER, "Queue: ");
 
 	list_first_item(lx->token_queue);
 	while((t = list_next_item(lx->token_queue)))
-		debug(D_MFLEX, "%s", lexer_print_token(t));
+		debug(D_MAKEFLOW_LEXER, "%s", lexer_print_token(t));
 	list_first_item(lx->token_queue);
 
-	debug(D_MFLEX, "End queue.");
+	debug(D_MAKEFLOW_LEXER, "End queue.");
 }
 
 void lexer_load_chunk(struct lexer *lx)
@@ -1294,7 +1294,7 @@ struct token *lexer_next_token(struct lexer *lx)
 	if(head)
 	{
 		if(lx->depth == 0)
-			debug(D_MFLEX, "%s", lexer_print_token(head));
+			debug(D_MAKEFLOW_LEXER, "%s", lexer_print_token(head));
 
 	    list_pop_head(lx->token_queue);
 	}
