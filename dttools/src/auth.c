@@ -61,19 +61,19 @@ int auth_assert(struct link *link, char **type, char **subject, time_t stoptime)
 	struct auth_ops *a;
 
 	for(a = list; a; a = a->next) {
-
 		debug(D_AUTH, "requesting '%s' authentication", a->type);
 
-		link_putfstring(link, "%s\n", stoptime, a->type);
+		if (link_putfstring(link, "%s\n", stoptime, a->type) <= 0)
+			return 0;
 
 		if(!link_readline(link, line, AUTH_LINE_MAX, stoptime))
-			break;
+			return 0;
 		if(!strcmp(line, "yes")) {
 			debug(D_AUTH, "server agrees to try '%s'", a->type);
 			if(a->assert(link, stoptime)) {
 				debug(D_AUTH, "successfully authenticated");
 				if(!link_readline(link, line, AUTH_LINE_MAX, stoptime))
-					break;
+					return 0;
 				if(!strcmp(line, "yes")) {
 					debug(D_AUTH, "reading back auth info from server");
 					if(!link_readline(link, line, sizeof(line), stoptime))
@@ -97,11 +97,8 @@ int auth_assert(struct link *link, char **type, char **subject, time_t stoptime)
 		debug(D_AUTH, "still trying...");
 	}
 
-	if(!a) {
-		debug(D_AUTH, "ran out of authenticators");
-	} else {
-		debug(D_AUTH, "lost connection");
-	}
+	debug(D_AUTH, "ran out of authenticators");
+	errno = EACCES;
 
 	return 0;
 }
@@ -118,7 +115,6 @@ int auth_accept(struct link *link, char **typeout, char **subject, time_t stopti
 	link_address_remote(link, addr, &port);
 
 	while(link_readline(link, type, AUTH_TYPE_MAX, stoptime)) {
-
 		string_chomp(type);
 
 		debug(D_AUTH, "%s:%d requests '%s' authentication", addr, port, type);
@@ -126,10 +122,12 @@ int auth_accept(struct link *link, char **typeout, char **subject, time_t stopti
 		a = type_lookup(type);
 		if(a) {
 			debug(D_AUTH, "I agree to try '%s' ", type);
-			link_putliteral(link, "yes\n", stoptime);
+			if (link_putliteral(link, "yes\n", stoptime) <= 0)
+				return 0;
 		} else {
 			debug(D_AUTH, "I do not agree to '%s' ", type);
-			link_putliteral(link, "no\n", stoptime);
+			if (link_putliteral(link, "no\n", stoptime) <= 0)
+				return 0;
 			continue;
 		}
 
@@ -137,7 +135,8 @@ int auth_accept(struct link *link, char **typeout, char **subject, time_t stopti
 			auth_sanitize(*subject);
 			debug(D_AUTH, "'%s' authentication succeeded", type);
 			debug(D_AUTH, "%s:%d is %s:%s\n", addr, port, type, *subject);
-			link_putfstring(link, "yes\n%s\n%s\n", stoptime, type, *subject);
+			if (link_putfstring(link, "yes\n%s\n%s\n", stoptime, type, *subject) <= 0)
+				return 0;
 			*typeout = xxstrdup(type);
 			return 1;
 		} else {
@@ -156,7 +155,8 @@ int auth_barrier(struct link *link, const char *response, time_t stoptime)
 {
 	char line[AUTH_LINE_MAX];
 
-	link_putstring(link, response, stoptime);
+	if (link_putstring(link, response, stoptime) <= 0)
+		return 0;
 
 	if(link_readline(link, line, sizeof(line), stoptime)) {
 		if(!strcmp(line, "yes")) {

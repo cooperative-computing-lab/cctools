@@ -358,13 +358,10 @@ struct chirp_client *chirp_client_connect(const char *hostport, int negotiate_au
 					free(subject);
 					return c;
 				} else {
+					int save = errno;
 					chirp_client_disconnect(c);
-					c = 0;
-					if(time(0) >= stoptime) {
-						errno = ECONNRESET;
-					} else {
-						errno = EACCES;
-					}
+					errno = save;
+					return 0;
 				}
 			} else {
 				return c;
