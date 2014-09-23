@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include "cctools.h"
 #include "debug.h"
 #include "auth_all.h"
+#include "getopt_aux.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "full_io.h"
