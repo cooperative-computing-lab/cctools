@@ -133,7 +133,7 @@ static struct list_node *new_node(void *data, struct list_node *prev, struct lis
 	return node;
 }
 
-int list_push_priority(struct list *l, void *item, int priority)
+int list_push_priority(struct list *l, void *item, double priority)
 {
 	struct list_node *n;
 	struct list_node *node;
