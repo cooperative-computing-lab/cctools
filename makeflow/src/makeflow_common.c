@@ -90,7 +90,7 @@ int dag_width_guaranteed_max(struct dag *d)
 			tmp = f->target_of;
 			// if a source file is also a target file
 			if(tmp) {
-				debug(D_DEBUG, "%d depends on %d", n->nodeid, tmp->nodeid);
+				debug(D_MAKEFLOW_RUN, "%d depends on %d", n->nodeid, tmp->nodeid);
 				if(nodeid == -1) {
 					m = tmp;	// m holds the parent node
 					nodeid = m->nodeid;
