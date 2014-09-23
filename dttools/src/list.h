@@ -43,7 +43,7 @@ struct list_node {
 	void *data;
 	struct list_node *next;
 	struct list_node *prev;
-	int priority;
+	double priority;
 };
 
 struct list {
@@ -117,7 +117,7 @@ int list_size(struct list *list);
 @param prio The integer priority of the item.
 @return True on success, false on failure (due to out of memory.)
 */
-int list_push_priority(struct list *list, void *item, int prio);
+int list_push_priority(struct list *list, void *item, double prio);
 
 /** Push an item onto the list head.
 @param list The list to push onto.

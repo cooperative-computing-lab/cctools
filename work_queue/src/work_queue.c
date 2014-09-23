@@ -3521,7 +3521,7 @@ void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
 	t->worker_selection_algorithm = alg;
 }
 
-void work_queue_task_specify_priority( struct work_queue_task *t, int priority )
+void work_queue_task_specify_priority( struct work_queue_task *t, double priority )
 {
 	t->priority = priority;
 }

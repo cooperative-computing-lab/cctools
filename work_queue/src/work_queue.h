@@ -100,7 +100,7 @@ struct work_queue_task {
 	int unlabeled;
 	
 	timestamp_t time_app_delay;	 /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
-	int priority;			/**< The priority of this task relative to others in the queue: higher number run earlier. */
+	double priority;			/**< The priority of this task relative to others in the queue: higher number run earlier. */
 };
 
 /** Statistics describing a work queue. */
@@ -291,7 +291,7 @@ Tasks with a higher priority value run first. If no priority is given, a task is
 @param priority The priority of the task.
 */
 
-void work_queue_task_specify_priority(struct work_queue_task *t, int priority );
+void work_queue_task_specify_priority(struct work_queue_task *t, double priority );
 
 /** Select the scheduling algorithm for a single task.
 To change the scheduling algorithm for all tasks, use @ref work_queue_specify_algorithm instead.

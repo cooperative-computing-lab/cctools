@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
 		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE); 
 		work_queue_task_specify_tag(t, argv[i]);
 
-		work_queue_task_specify_priority(t, atoi(argv[i]));
+		work_queue_task_specify_priority(t, atof(argv[i]));
 
 		/* Once all files has been specified, we are ready to submit the task to the queue. */
 		taskid = work_queue_submit(q, t);
