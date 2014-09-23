@@ -79,18 +79,7 @@ int dag_parse_node_regular_command(struct lexer_book *bk, struct dag_node *n)
 			break;
 		case LITERAL:
 			remote_name = dag_file_local_name(n, t->lexeme);
-
-			if(!n->local_job && remote_name)
-			{
-				/* If job is remote, and file has a remote name, then
-				the symlinks at worker need ./, and we add it here. (WHY?) */
-				buffer_printf(&b, "./%s", t->lexeme);
-			} 
-			else 
-			{
-				buffer_printf(&b, "%s", t->lexeme);
-			}
-			lexer_free_token(t);
+			buffer_printf(&b, "%s", t->lexeme);
 			break;
 		case IO_REDIRECT:
 			buffer_printf(&b, "%s", t->lexeme);
@@ -99,6 +88,8 @@ int dag_parse_node_regular_command(struct lexer_book *bk, struct dag_node *n)
 			lexer_report_error(bk, "Unexpected command token: %s.\n", lexer_print_token(t));
 			break;
 		}
+
+		lexer_free_token(t);
 	}
 	
 	if(!t)
