@@ -10,8 +10,8 @@
    The lexer is implemented with as a hierarchy of functions. The entry
    points are:
 
-   bk = lexer_init_book(...);
-   t  = lexer_next_token(bk);     // The next token in the series.
+   lx = lexer_create(...);
+   t  = lexer_next_token(lx);     // The next token in the series.
 
    When the end-of-file is reached, t == NULL. Each token has a type,
    t->type, which is an element of enum token_t, and a value,
@@ -22,8 +22,8 @@
    NEWLINE: A newline, either explicitely terminating a line, or after
    discarding a comment. NEWLINE tokens signal the end of
    lists of other tokens, such as commands, file lists, or
-  variable substituions. New-line characters preceeded by \
-   loose their special meaning.
+   variable substituions. New-line characters preceeded by \
+   lose their special meaning.
    VARIABLE: A variable assignment of the form NAME=VALUE, NAME+=VALUE,
    NAME-=VALUE, NAME!=VALUE. NAME is any string consisting of
    alphanumeric characters and underscores. VALUE is an
@@ -52,7 +52,7 @@
    REMOTE_NAME: Signals the characters "->" to indicate remote renaming. 
 
   
-   The function lexer_next_token(bk) calls lexer_next_line, which
+   The function lexer_next_token(lx) calls lexer_next_line, which
    depending on some lookahead, calls lexer_read_command,
    lexer_read_file_list, or lexer_read_syntax. In turn, each of these
    functions call, respectively, lexer_read_command_argument,
@@ -62,12 +62,12 @@
    The lowest level function is lexer_next_char, which reads the stream
    char by char. For efficiency, the file chunks are read
    alternativetely into two buffers as needed. The current buffer
-   position is kept at bk->lexeme_end;
+   position is kept at lx->lexeme_end;
 
    As tokens are recognized, the function lexer_add_to_lexeme
    accumulates the current value of the token. The function
    lexer_pack_token creates a new token, resetting the values of
-   bk->lexeme, and bk->lexeme_end. A token is inserted
+   lx->lexeme, and lx->lexeme_end. A token is inserted
    in the token queue with lexer_push_token.
 */
 
@@ -110,20 +110,21 @@ struct token
 };
 
 /* type: is either STREAM or CHAR */
-struct lexer_book *lexer_init_book(int type, void *data, int line_number, int column_number);
-struct lexer_book *lexer_init_substitution_book(struct lexer_book *bk, struct token *subs_name); 
+struct lexer *lexer_create(int type, void *data, int line_number, int column_number);
+struct lexer *lexer_create_substitution(struct lexer *lx, struct token *subs_name); 
 
-struct token *lexer_next_token(struct lexer_book *bk);
-struct token *lexer_peek_next_token(struct lexer_book *bk);
+struct token *lexer_next_token(struct lexer *lx);
+struct token *lexer_peek_next_token(struct lexer *lx);
 
-void lexer_report_error(struct lexer_book *bk, char *message, ...);
+void lexer_report_error(struct lexer *lx, char *message, ...);
 char *lexer_print_token(struct token *t);
-void lexer_print_queue(struct lexer_book *bk);
+void lexer_print_queue(struct lexer *lx);
 
-int lexer_push_token(struct lexer_book *bk, struct token *t);
-int lexer_preppend_token(struct lexer_book *bk, struct token *t);
+int lexer_push_token(struct lexer *lx, struct token *t);
+int lexer_preppend_token(struct lexer *lx, struct token *t);
 
 
-void lexer_free_book(struct lexer_book *bk);
+void lexer_delete(struct lexer *lx);
 void lexer_free_token(struct token *t);
+
 

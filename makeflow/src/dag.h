@@ -68,7 +68,7 @@ struct dag {
     struct hash_table *task_categories;      /* Mapping from labels to category structures. */
 };
 
-struct lexer_book
+struct lexer
 {
 	struct dag *d;                      /* The dag being built. */
 
