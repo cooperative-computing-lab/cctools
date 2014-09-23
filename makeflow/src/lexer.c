@@ -949,10 +949,20 @@ int lexer_read_command(struct lexer_book *bk)
 {
 	struct list *tokens = lexer_read_command_aux(bk);
 	
+	struct token *t;
+
+	if(list_size(tokens) < 2) {
+		/* If the only token in the list is a NEWLINE, then this is an empty line. */
+		while((t = list_pop_head(tokens)))
+			lexer_free_token(t);
+		
+		list_delete(tokens);
+		return 1;
+	}
+	
 	/* Add command start marker.*/
 	lexer_push_token(bk, lexer_pack_token(bk, COMMAND));
 
-	struct token *t;
 
 	/* Merge command tokens into main queue. */
 	/* First merge command modifiers, if any. */
@@ -1144,12 +1154,9 @@ int lexer_read_line(struct lexer_book * bk)
 		return 1;
 		break;
 	case '\t':
+	case ' ':
 		return lexer_read_command(bk);
 		break;
-	case ' ':
-		/* Eat whitespace and try again */
-		lexer_discard_white_space(bk);
-		return lexer_read_line(bk);
 	case '\n':
 		/* Ignore empty lines and try again */
 		lexer_next_char(bk);
