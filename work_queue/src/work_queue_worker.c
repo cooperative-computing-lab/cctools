@@ -477,6 +477,22 @@ static void report_tasks_complete( struct link *master )
 	results_to_be_sent_msg = 0;
 }
 
+static void expire_procs_running() {
+	struct work_queue_process *p;
+	pid_t pid;
+
+	int64_t current_time = time(0);
+
+	itable_firstkey(procs_running);
+	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
+		if(p->task->maximum_end_time > 0 && current_time - p->task->maximum_end_time > 0)
+		{
+			kill(-1 * pid, SIGKILL);
+		}
+	}
+
+}
+
 /*
 Scan over all of the processes known by the worker,
 and if they have exited, move them into the procs_complete table
@@ -506,6 +522,11 @@ static int handle_tasks(struct link *master)
 			}
 			
 			p->execution_end = timestamp_get();
+
+			if(p->task->maximum_end_time > 0 && p->execution_end - p->task->maximum_end_time)
+			{
+				p->task->result |= WORK_QUEUE_RESULT_TASK_TIMEOUT;
+			}
 			
 			cores_allocated  -= p->task->cores;
 			memory_allocated -= p->task->memory;
@@ -1259,6 +1280,8 @@ static void work_for_master(struct link *master) {
 		if(master_activity) {
 			ok &= handle_master(master);
 		}
+
+		expire_procs_running();
 
 		ok &= handle_tasks(master);
 

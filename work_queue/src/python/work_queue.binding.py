@@ -224,6 +224,10 @@ class Task(_object):
     def specify_priority( self, priority ):
         return work_queue_task_specify_priority(self._task,priority)
 
+    # Indicate the maximum end time (in seconds from the Epoch) of this task.
+    def specify_end_time( self, seconds ):
+        return work_queue_task_specify_end_time(self._task,seconds)
+
     ##
     # Get the user-defined logical name for the task. 
     # 
