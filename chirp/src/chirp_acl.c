@@ -67,7 +67,7 @@ static int ticket_read(char *ticket_filename, struct chirp_ticket *ct)
 	}
 	cfs_fclose(tf);
 
-	int result = chirp_ticket_read(buffer_tostring(&B, NULL), ct);
+	int result = chirp_ticket_read(buffer_tostring(&B), ct);
 
 	buffer_free(&B);
 

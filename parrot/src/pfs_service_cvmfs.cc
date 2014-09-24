@@ -647,8 +647,8 @@ static void cvmfs_read_config()
 		buffer_putfstring(&B, "parrot-%d-%d-%s", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
 		if(getenv("CERNVM_UUID"))
 			buffer_putfstring(&B, "-%s", getenv("CERNVM_UUID")); /* can't use space since that is filtered, use '-' */
-		setenv("CERNVM_UUID", buffer_tostring(&B, NULL), 1);
-		debug(D_CVMFS, "setenv CERNVM_UUID=`%s'", buffer_tostring(&B, NULL));
+		setenv("CERNVM_UUID", buffer_tostring(&B), 1);
+		debug(D_CVMFS, "setenv CERNVM_UUID=`%s'", buffer_tostring(&B));
 		buffer_free(&B);
 	}
 

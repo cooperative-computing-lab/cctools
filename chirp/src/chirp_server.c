@@ -217,7 +217,7 @@ static int update_all_catalogs(const char *url)
 	buffer_printf(&B, "backend %s\n", url);
 	chirp_stats_summary(&B);
 
-	list_iterate(catalog_host_list, update_one_catalog, buffer_tostring(&B, NULL));
+	list_iterate(catalog_host_list, update_one_catalog, buffer_tostring(&B));
 
 	buffer_free(&B);
 
@@ -1695,7 +1695,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 							size_t len;
 							const char *status;
 
-							status = buffer_tostring(&B, &len);
+							status = buffer_tolstring(&B, &len);
 							if (len > 0) {
 								dataout = malloc(len);
 								if (dataout) {
@@ -1736,7 +1736,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				size_t len;
 				const char *status;
 
-				status = buffer_tostring(&B, &len);
+				status = buffer_tolstring(&B, &len);
 				if (len > 0) {
 					dataout = malloc(len);
 					if (dataout) {

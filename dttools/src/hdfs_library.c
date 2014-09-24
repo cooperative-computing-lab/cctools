@@ -66,13 +66,13 @@ int hdfs_library_envinit (void)
 			goto failure;
 		}
 		/* NUL padded */
-		for (path = buffer_tostring(&paths, NULL); *path; path = path+strlen(path)+1) {
+		for (path = buffer_tostring(&paths); *path; path = path+strlen(path)+1) {
 			buffer_printf(&B, ":%s", path);
 		}
 		buffer_free(&paths);
 	}
-	rc = setenv("CLASSPATH", buffer_tostring(&B, NULL), 1);
-	debug(D_HDFS, "CLASSPATH=`%s'", buffer_tostring(&B, NULL));
+	rc = setenv("CLASSPATH", buffer_tostring(&B), 1);
+	debug(D_HDFS, "CLASSPATH=`%s'", buffer_tostring(&B));
 	if (rc == -1)
 		goto failure;
 
@@ -117,7 +117,7 @@ static int load_lib (void **handle, const char *envpath, const char *envhome, co
 	}
 
 	/* NUL padded */
-	for (path = buffer_tostring(&B, NULL); *path; path += strlen(path)+1) {
+	for (path = buffer_tostring(&B); *path; path += strlen(path)+1) {
 		debug(D_HDFS, "trying to load `%s'", path);
 		*handle = dlopen(path, RTLD_LAZY);
 		if (*handle) {

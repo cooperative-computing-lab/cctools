@@ -184,11 +184,11 @@ static void do_debug(INT64_T flags, const char *fmt, va_list args)
 	buffer_putfstring(&B, "%s: ", debug_flags_to_name(flags));
 
 	buffer_putvfstring(&B, fmt, args);
-	while(isspace(buffer_tostring(&B, NULL)[buffer_pos(&B)-1]))
+	while(isspace(buffer_tostring(&B)[buffer_pos(&B)-1]))
 		buffer_rewind(&B, buffer_pos(&B)-1); /* chomp whitespace */
 	buffer_putliteral(&B, "\n");
 
-	debug_write(flags, buffer_tostring(&B, NULL));
+	debug_write(flags, buffer_tostring(&B));
 
 	buffer_free(&B);
 }

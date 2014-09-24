@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
 		buffer_printf(&B, "%s %s\n", name, value);
 	}
 
-        text = buffer_tostring(&B, &text_size);
+        text = buffer_tolstring(&B, &text_size);
 
 	char address[DATAGRAM_ADDRESS_MAX];
 	if (domain_name_cache_lookup(host, address)) {

@@ -783,7 +783,7 @@ int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_lis
 	buffer_init(&B);
 	if (buffer_putvfstring(&B, fmt, va) == -1)
 		return -1;
-	str = buffer_tostring(&B, &l);
+	str = buffer_tolstring(&B, &l);
 	rc = link_putlstring(link, str, l, stoptime);
 	buffer_free(&B);
 
