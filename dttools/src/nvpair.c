@@ -159,22 +159,20 @@ int nvpair_print(struct nvpair *n, char *text, int length)
 int nvpair_print_alloc(struct nvpair *n, char **text)
 {
 	size_t needed;
-
 	char *key;
 	void *value;
+	buffer_t B;
 
-	buffer_t b;
-	buffer_init(&b);
-	buffer_abortonfailure(&b, 0);
+	buffer_init(&B);
+	buffer_abortonfailure(&B, 1);
 
 	hash_table_firstkey(n->table);
 	while(hash_table_nextkey(n->table, &key, &value)) {
-		buffer_printf(&b, "%s %s\n", key, (char *) value);
+		buffer_putfstring(&B, "%s %s\n", key, (char *) value);
 	}
 
-	*text  = xxstrdup(buffer_tostring(&b, &needed));
-
-	buffer_free(&b);
+	buffer_dupl(&B, text, &needed);
+	buffer_free(&B);
 
 	return needed;
 }
