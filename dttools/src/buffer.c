@@ -41,7 +41,7 @@ void buffer_init(buffer_t * b)
 void buffer_ubuf(buffer_t * b, char *buf, size_t len)
 {
 	assert(b->buf == b->initial && b->buf == b->end);
-	if (buf && len >= sizeof(b->initial)) {
+	if (buf && len > sizeof(b->initial)) {
 		b->buf = b->end = b->ubuf.buf = buf;
 		b->len = b->ubuf.len = len;
 		b->end[0] = '\0'; /* initialize with empty string */
