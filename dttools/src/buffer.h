@@ -146,7 +146,15 @@ int buffer_putlstring(buffer_t * b, const char *str, size_t len);
     @param size The size of the string is placed in this variable. Can be NULL.
     @return The buffer as a string with a NUL terminator.
   */
-const char *buffer_tostring(buffer_t * b, size_t * size);
+const char *buffer_tolstring(buffer_t * b, size_t * size);
+
+/** Returns the buffer as a string. The string is no longer valid after
+    deleting the buffer. A final ASCII NUL character is guaranteed to terminate
+    the string.
+    @param b The buffer.
+    @return The buffer as a string with a NUL terminator.
+  */
+#define buffer_tostring(b) buffer_tolstring(b, NULL)
 
 /** Rewinds the buffer to position n.
 
