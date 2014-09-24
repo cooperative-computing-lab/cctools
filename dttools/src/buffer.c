@@ -168,4 +168,15 @@ void buffer_rewind(buffer_t * b, size_t n)
     b->end[0] = '\0';
 }
 
+int buffer_dupl(buffer_t *b, char **buf, size_t *l)
+{
+	size_t n = inuse(b);
+	*buf = malloc(n+1); /* include NUL */
+	checkerror(b, NULL, *buf);
+	if (l)
+		*l = n;
+	memcpy(*buf, b->buf, n+1); /* include NUL */
+	return 0;
+}
+
 /* vim: set noexpandtab tabstop=4: */

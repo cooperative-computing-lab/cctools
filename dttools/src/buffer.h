@@ -79,6 +79,21 @@ void buffer_abortonfailure(buffer_t * b, int abortonfailure);
   */
 void buffer_free(buffer_t * b);
 
+/** Make a heap allocated copy of the buffer.
+    @param b The buffer to copy.
+    @param buf A place to store the copy pointer.
+    @param l The length of the string.
+    @return -1 on error.
+  */
+int buffer_dupl(buffer_t *b, char **buf, size_t *l);
+
+/** Make a heap allocated copy of the buffer.
+    @param b The buffer to copy.
+    @param buf A place to store the copy pointer.
+    @return -1 on error.
+  */
+#define buffer_dup(b,buf) (buffer_dupl(b,buf,NULL))
+
 /** Print the formatted output to the buffer. The format string follows the
     same semantics as the UNIX vprintf function. buffer_putvfstring does not call
     the variable argument macros va_(start|end) on ap.
