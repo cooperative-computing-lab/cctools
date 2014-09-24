@@ -145,7 +145,7 @@ int cfs_fflush(CHIRP_FILE * file)
 	if(file->type == LOCAL)
 		return fflush(file->f.lfile);
 
-	content = buffer_tostring(&file->f.cfile.B, &size);
+	content = buffer_tolstring(&file->f.cfile.B, &size);
 
 	while((INT64_T) size > file->f.cfile.offset) {	/* finish all writes */
 		int w = cfs->pwrite(file->f.cfile.fd, content, size, file->f.cfile.offset);

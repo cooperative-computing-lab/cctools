@@ -893,7 +893,7 @@ restart:
 		}
 		buffer_putliteral(&Bstatus, "]");
 
-		J = json_parse(buffer_tostring(&Bstatus, NULL), buffer_pos(&Bstatus));
+		J = json_parse(buffer_tostring(&Bstatus), buffer_pos(&Bstatus));
 		assert(J);
 		buffer_free(&Bstatus);
 		CATCH(chirp_job_status(J, subject, B));

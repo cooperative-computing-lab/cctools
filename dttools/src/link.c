@@ -785,17 +785,10 @@ int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_lis
 
 	if(n < 0)
 		return -1;
-	if(n > size - 1) {
-		b = (char *) malloc(n + 1);
-		if(b == NULL)
-			return -1;
-		size = n + 1;
-	}
 
-	va_copy(va2, va);
-	n = vsnprintf(b, size, fmt, va2);
-	assert(n >= 0);
-	va_end(va2);
+	str = buffer_tolstring(&B, &l);
+	rc = link_putlstring(link, str, l, stoptime);
+	buffer_free(&B);
 
 	int r = link_putlstring(link, b, (size_t) n, stoptime);
 

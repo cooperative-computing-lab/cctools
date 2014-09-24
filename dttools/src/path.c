@@ -289,7 +289,7 @@ void path_split_multi (const char *input, char *first, char *rest)
 static int find (buffer_t *B, const size_t base, buffer_t *path, const char *pattern, int recursive)
 {
 	int rc = 0;
-	DIR *D = opendir(buffer_tostring(path, NULL));
+	DIR *D = opendir(buffer_tostring(path));
 	if (D) {
 		struct dirent *entry;
 		size_t current = buffer_pos(path);
@@ -298,11 +298,11 @@ static int find (buffer_t *B, const size_t base, buffer_t *path, const char *pat
 
 			if (buffer_putstring(path, entry->d_name) == -1) goto failure;
 			/* N.B. We don't use FNM_PATHNAME, so `*.c' matches `foo/bar.c' */
-			if (fnmatch(pattern, buffer_tostring(path, NULL)+base, 0) == 0) {
-				if (buffer_printf(B, "%s%c", buffer_tostring(path, NULL), 0) == -1) goto failure; /* NUL padded */
+			if (fnmatch(pattern, buffer_tostring(path)+base, 0) == 0) {
+				if (buffer_printf(B, "%s%c", buffer_tostring(path), 0) == -1) goto failure; /* NUL padded */
 				rc += 1;
 			}
-			if (recursive && strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..") && stat(buffer_tostring(path, NULL), &buf) == 0 && S_ISDIR(buf.st_mode)) {
+			if (recursive && strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..") && stat(buffer_tostring(path), &buf) == 0 && S_ISDIR(buf.st_mode)) {
 				if (buffer_putliteral(path, "/") == -1) goto failure;
 				int found = find(B, base, path, pattern, recursive);
 				if (found == -1)
