@@ -63,7 +63,6 @@ void chirp_ticket_free(struct chirp_ticket *ct)
 char *chirp_ticket_tostring(struct chirp_ticket *ct)
 {
 	size_t n;
-	const char *s;
 	char *result;
 	buffer_t B;
 
@@ -77,11 +76,7 @@ char *chirp_ticket_tostring(struct chirp_ticket *ct)
 		buffer_printf(&B, "rights \"%s\" \"%s\"\n", ct->rights[n].directory, ct->rights[n].acl);
 	}
 
-	s = buffer_tostring(&B, &n);
-	result = xxmalloc(n + 1);
-	memset(result, 0, n + 1);
-	memcpy(result, s, n);
-
+	buffer_dup(&B, &result);
 	buffer_free(&B);
 
 	return result;

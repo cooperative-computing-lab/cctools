@@ -113,6 +113,7 @@ double divide(double a, double b)
 
 char *make_field_names_str(char *separator)
 {
+	char *str;
 	struct buffer b;
 	buffer_init(&b);
 
@@ -121,7 +122,7 @@ char *make_field_names_str(char *separator)
 		if(f->active)
 			buffer_printf(&b, "%s: %s%s",  f->abbrev, f->name, separator);
 
-	char *str = xxstrdup(buffer_tostring(&b, NULL));
+	buffer_dup(&b, &str);
 	buffer_free(&b);
 
 	return str;
