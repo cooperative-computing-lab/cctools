@@ -272,6 +272,7 @@ static void batch_queue_chirp_option_update (struct batch_queue *q, const char *
 				batch_queue_set_option(q, "root", root);
 				*root = '\0'; /* remove root */
 				batch_queue_set_option(q, "host", hostportroot);
+				chirp_reli_mkdir_recursive(gethost(q), getroot(q), S_IRWXU, STOPTIME);
 			} else {
 				batch_queue_set_option(q, "root", "/");
 				batch_queue_set_option(q, "host", hostportroot);
