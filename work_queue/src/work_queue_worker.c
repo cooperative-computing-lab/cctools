@@ -1793,9 +1793,9 @@ int main(int argc, char *argv[])
 			exit(EXIT_SUCCESS);
 			break;
 		case 'P':
-		  	if(copy_file_to_buffer(optarg, &password) < 0) {
-			fprintf(stderr,"work_queue_worker: couldn't load password from %s: %s\n",optarg,strerror(errno));
-				return 1;
+			if(copy_file_to_buffer(optarg, &password, NULL) < 0) {
+				fprintf(stderr,"work_queue_worker: couldn't load password from %s: %s\n",optarg,strerror(errno));
+				exit(EXIT_FAILURE);
 			}
 			break;
 		case 'Z':

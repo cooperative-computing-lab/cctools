@@ -435,7 +435,7 @@ int worker_main() {
 			debug(D_MPI, "%s", op->buffer);
 			stream = popen(op->buffer, "r");
 			if(stream) {
-				op->output_length = copy_stream_to_buffer(stream, &op->output_buffer);
+				op->output_length = copy_stream_to_buffer(stream, &op->output_buffer, NULL);
 				if(op->output_length < 0)
 					op->output_length = 0;
 				op->result = pclose(stream);
