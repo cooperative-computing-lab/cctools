@@ -48,6 +48,19 @@ static const char *getroot (struct batch_queue *q)
 	return root;
 }
 
+static void addfile (struct batch_queue *q, buffer_t *B, const char *file, const char *type)
+{
+	if (file) {
+		buffer_putliteral(B, "{\"task_path\":\"./");
+		jsonA_escapestring(B, file);
+		buffer_putliteral(B, "\",\"serv_path\":\"");
+		jsonA_escapestring(B, getroot(q));
+		buffer_putliteral(B, "/");
+		jsonA_escapestring(B, file);
+		buffer_putfstring(B, "\",\"type\":\"%s\"},", type);
+	}
+}
+
 static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
 	buffer_t B;
@@ -61,32 +74,37 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 
 	buffer_putliteral(&B, "\"executable\":\"/bin/sh\",");
 
-	buffer_putfstring(&B, "\"arguments\":[\"sh\",\"-c\",\"{\\n%s", cmd);
-	if (args)
-		buffer_putfstring(&B, " %s", args);
+	buffer_putfstring(&B, "\"arguments\":[\"sh\",\"-c\",\"{\\n");
+	jsonA_escapestring(&B, cmd);
+	if (args) {
+		buffer_putliteral(&B, " ");
+		jsonA_escapestring(&B, args);
+	}
 	buffer_putliteral(&B, "\\n}");
-	if (infile)
-		buffer_putfstring(&B, " <%s", infile);
-	if (outfile)
-		buffer_putfstring(&B, " >%s", outfile);
-	if (errfile)
-		buffer_putfstring(&B, " 2>%s", errfile);
+	if (infile) {
+		buffer_putliteral(&B, " <");
+		jsonA_escapestring(&B, infile);
+	}
+	if (outfile) {
+		buffer_putliteral(&B, " >");
+		jsonA_escapestring(&B, outfile);
+	}
+	if (errfile) {
+		buffer_putliteral(&B, " 2>");
+		jsonA_escapestring(&B, errfile);
+	}
 	buffer_putliteral(&B, "\"],");
 
 	buffer_putliteral(&B, "\"files\":[");
-	if (infile)
-		buffer_putfstring(&B, "\"{\"task_path\":\"./%s\",\"serv_path\":\"%s/%s\",\"type\":\"INPUT\"},", infile, getroot(q), infile);
-	if (outfile)
-		buffer_putfstring(&B, "\"{\"task_path\":\"./%s\",\"serv_path\":\"%s/%s\",\"type\":\"OUTPUT\"},", outfile, getroot(q), outfile);
-	if (errfile)
-		buffer_putfstring(&B, "\"{\"task_path\":\"./%s\",\"serv_path\":\"%s/%s\",\"type\":\"OUTPUT\"},", errfile, getroot(q), errfile);
+	addfile(q, &B, infile, "INPUT");
+	addfile(q, &B, outfile, "OUTPUT");
+	addfile(q, &B, errfile, "OUTPUT");
 	if (extra_input_files) {
 		char *file;
 		char *list = xxstrdup(extra_input_files);
 		while ((file = strsep(&list, ","))) {
-			if (strlen(file)) {
-				buffer_putfstring(&B, "{\"task_path\":\"%s\",\"serv_path\":\"%s/%s\",\"type\":\"INPUT\"},", file, getroot(q), file);
-			}
+			if (strlen(file))
+				addfile(q, &B, file, "INPUT");
 		}
 		free(list);
 	}
@@ -94,9 +112,8 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 		char *file;
 		char *list = xxstrdup(extra_output_files);
 		while ((file = strsep(&list, ","))) {
-			if (strlen(file)) {
-				buffer_putfstring(&B, "{\"task_path\":\"%s\",\"serv_path\":\"%s/%s\",\"type\":\"OUTPUT\"},", file, getroot(q), file);
-			}
+			if (strlen(file))
+				addfile(q, &B, file, "OUTPUT");
 		}
 		free(list);
 	}
@@ -327,6 +344,7 @@ int batch_fs_chirp_stat (struct batch_queue *q, const char *path, struct stat *b
 	if (rc >= 0) {
 		COPY_STATC(cbuf, *buf);
 	}
+	debug(D_BATCH, "= %d", rc);
 	return rc;
 }
 
