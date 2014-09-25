@@ -139,7 +139,7 @@ static INT64_T convert_result(INT64_T result)
 	}
 }
 
-static INT64_T get_stat_result(struct chirp_client *c, struct chirp_stat *info, time_t stoptime)
+static INT64_T get_stat_result(struct chirp_client *c, const char *name, struct chirp_stat *info, time_t stoptime)
 {
 	char line[CHIRP_LINE_MAX];
 	INT64_T fields;
@@ -147,6 +147,7 @@ static INT64_T get_stat_result(struct chirp_client *c, struct chirp_stat *info, 
 	memset(info, 0, sizeof(*info));
 
 	if(!link_readline(c->link, line, CHIRP_LINE_MAX, stoptime)) {
+		debug(D_DEBUG, "link broken reading stat: %s", strerror(errno));
 		c->broken = 1;
 		errno = ECONNRESET;
 		return -1;
@@ -159,10 +160,16 @@ static INT64_T get_stat_result(struct chirp_client *c, struct chirp_stat *info, 
 	info->cst_rdev = 0;
 
 	if(fields != 13) {
+		debug(D_DEBUG, "did not get expected fields for stat result: `%s'", line);
 		c->broken = 1;
 		errno = ECONNRESET;
 		return -1;
 	}
+
+	if (name == NULL)
+		name = "(anon)";
+
+	debug(D_DEBUG, "\"%s\" = {dev = %"PRId64", ino = %"PRId64", mode = %"PRId64", nlink = %"PRId64", uid = %"PRId64", gid = %"PRId64", rdev = %"PRId64", size = %"PRId64", blksize = %"PRId64", blocks = %"PRId64", atime = %"PRId64", mtime = %"PRId64", ctime = %"PRId64"}", name, (int64_t)info->cst_dev, (int64_t)info->cst_ino, (int64_t)info->cst_mode, (int64_t)info->cst_nlink, (int64_t)info->cst_uid, (int64_t)info->cst_gid, (int64_t)info->cst_rdev, (int64_t)info->cst_size, (int64_t)info->cst_blksize, (int64_t)info->cst_blocks, (int64_t)info->cst_atime, (int64_t)info->cst_mtime, (int64_t)info->cst_ctime);
 
 	return 0;
 }
@@ -414,7 +421,7 @@ INT64_T chirp_client_getlongdir(struct chirp_client * c, const char *path, chirp
 		if(!name[0])
 			return 0;
 
-		if(get_stat_result(c, &info, stoptime) >= 0) {
+		if(get_stat_result(c, name, &info, stoptime) >= 0) {
 			callback(name, &info, arg);
 		} else {
 			break;
@@ -902,7 +909,7 @@ INT64_T chirp_client_open(struct chirp_client * c, const char *path, INT64_T fla
 
 	result = simple_command(c, stoptime, "open %s %s %lld\n", safepath, fstr, mode);
 	if(result >= 0) {
-		if(get_stat_result(c, info, stoptime) >= 0) {
+		if(get_stat_result(c, path, info, stoptime) >= 0) {
 			return result;
 		} else {
 			c->broken = 1;
@@ -1286,7 +1293,7 @@ INT64_T chirp_client_fstat_finish(struct chirp_client * c, INT64_T fd, struct ch
 {
 	INT64_T result = get_result(c, stoptime);
 	if(result >= 0)
-		return get_stat_result(c, info, stoptime);
+		return get_stat_result(c, NULL, info, stoptime);
 	return result;
 }
 
@@ -1304,7 +1311,7 @@ INT64_T chirp_client_stat(struct chirp_client * c, const char *path, struct chir
 	url_encode(path, safepath, sizeof(safepath));
 	INT64_T result = simple_command(c, stoptime, "stat %s\n", safepath);
 	if(result >= 0)
-		result = get_stat_result(c, info, stoptime);
+		result = get_stat_result(c, path, info, stoptime);
 	return result;
 }
 
@@ -1314,7 +1321,7 @@ INT64_T chirp_client_lstat(struct chirp_client * c, const char *path, struct chi
 	url_encode(path, safepath, sizeof(safepath));
 	INT64_T result = simple_command(c, stoptime, "lstat %s\n", safepath);
 	if(result >= 0)
-		result = get_stat_result(c, info, stoptime);
+		result = get_stat_result(c, path, info, stoptime);
 	return result;
 }
 
