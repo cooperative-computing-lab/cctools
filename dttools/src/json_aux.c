@@ -1,3 +1,4 @@
+#include "buffer.h"
 #include "json.h"
 #include "json_aux.h"
 
@@ -29,6 +30,42 @@ json_value *jsonA_getname (json_value *object, const char *name, json_type t)
         }
     }
     return NULL;
+}
+
+int jsonA_escapestring(buffer_t *B, const char *str)
+{
+	for (; *str; str++) {\
+		switch (*str) {\
+			case '/':
+				if (buffer_putliteral(B, "\\/") == -1) return -1;
+				break;
+			case '\\':
+				if (buffer_putliteral(B, "\\\\") == -1) return -1;
+				break;
+			case '\"':
+				if (buffer_putliteral(B, "\\\"") == -1) return -1;
+				break;
+			case '\b':
+				if (buffer_putliteral(B, "\\b") == -1) return -1;
+				break;
+			case '\f':
+				if (buffer_putliteral(B, "\\f") == -1) return -1;
+				break;
+			case '\n':
+				if (buffer_putliteral(B, "\\n") == -1) return -1;
+				break;
+			case '\r':
+				if (buffer_putliteral(B, "\\r") == -1) return -1;
+				break;
+			case '\t':
+				if (buffer_putliteral(B, "\\t") == -1) return -1;
+				break;
+			default:
+				if (buffer_putfstring(B, "%c", (int)*str) == -1) return -1;
+				break;
+		}
+	}
+	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */
