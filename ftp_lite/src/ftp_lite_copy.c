@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "ftp_lite.h"
 
+#include "copy_stream.h"
 #include "debug.h"
 #include "getopt.h"
 
@@ -135,7 +136,7 @@ int main( int argc, char *argv[] )
 			return 1;
 		}
 
-		if(ftp_lite_stream_to_stream(data,target_fp)<0) {
+		if(copy_stream_to_stream(data,target_fp)<0) {
 			fprintf(stderr,"%s: couldn't copy data: %s\n",argv[0],strerror(errno));
 			return 1;
 		}
@@ -148,7 +149,7 @@ int main( int argc, char *argv[] )
 			return 1;
 		}
 
-		if(ftp_lite_stream_to_stream(source_fp,data)<0) {
+		if(copy_stream_to_stream(source_fp,data)<0) {
 			fprintf(stderr,"%s: couldn't copy data: %s\n",argv[0],strerror(errno));
 			return 1;
 		}
@@ -156,7 +157,7 @@ int main( int argc, char *argv[] )
 		fclose(data);
 		ftp_lite_done(target);
 	} else {
-		if(ftp_lite_stream_to_stream(source_fp,target_fp)<0) {
+		if(copy_stream_to_stream(source_fp,target_fp)<0) {
 			fprintf(stderr,"%s: couldn't copy data: %s\n",argv[0],strerror(errno));
 			return 1;
 		}

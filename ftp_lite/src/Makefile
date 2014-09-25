@@ -4,7 +4,7 @@ include ../../rules.mk
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 HEADERS_PUBLIC = ftp_lite.h
 LIBRARIES = libftp_lite.a
-OBJECTS = ftp_lite.o error.o radix.o login.o stream.o network.o
+OBJECTS = ftp_lite.o error.o radix.o login.o network.o
 PROGRAMS = ftp_lite_test ftp_lite_copy
 TARGETS = $(PROGRAMS) $(LIBRARIES)
 
