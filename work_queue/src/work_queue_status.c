@@ -59,8 +59,9 @@ static struct nvpair_header queue_headers[] = {
 static struct nvpair_header task_headers[] = {
 	{"taskid",       "ID",      NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 8},
 	{"state",        "STATE",   NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,  8},
+	{"priority",     "PRIORITY",NVPAIR_MODE_STRING, NVPAIR_ALIGN_RIGHT, 8},
 	{"host",         "HOST",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 24},
-	{"command",      "COMMAND", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 38},
+	{"command",      "COMMAND", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 30},
 	{NULL,NULL,0,0,0}
 };
 
