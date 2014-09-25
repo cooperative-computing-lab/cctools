@@ -9,8 +9,9 @@ See the file COPYING for details.
 #define FULL_IO_H
 
 #include <sys/types.h>
+
+#include <stdint.h>
 #include <stdio.h>
-#include "int_sizes.h"
 
 /** @file full_io.h
 Perform complete I/O operations, retrying through failures and signals.
@@ -63,7 +64,7 @@ ssize_t full_pwrite(int fd, const void *buf, size_t count, off_t offset);
 @param offset The offset in the file to begin from.
 @return The number of bytes actually read, or less than zero indicating error.
 */
-INT64_T full_pread64(int fd, void *buf, INT64_T count, INT64_T offset);
+ssize_t full_pread64(int fd, void *buf, size_t count, int64_t offset);
 
 /** Write arbitrary bytes to a file descriptor.  (64 bit)
 @param fd File descriptor.
@@ -72,7 +73,7 @@ INT64_T full_pread64(int fd, void *buf, INT64_T count, INT64_T offset);
 @param offset The offset in the file to begin from.
 @return The number of bytes actually written, or less than zero indicating error.
 */
-INT64_T full_pwrite64(int fd, const void *buf, INT64_T count, INT64_T offset);
+ssize_t full_pwrite64(int fd, const void *buf, size_t count, int64_t offset);
 
 /** Read the next bytes from a file stream.
 @param file Standard file stream.

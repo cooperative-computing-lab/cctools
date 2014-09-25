@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include <sys/uio.h>
 
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "full_io.h"
@@ -86,7 +87,7 @@ ssize_t full_write(int fd, const void *buf, size_t count)
 	}
 }
 
-INT64_T full_pread64(int fd, void *buf, INT64_T count, INT64_T offset)
+ssize_t full_pread64(int fd, void *buf, size_t count, int64_t offset)
 {
 	ssize_t total = 0;
 	ssize_t chunk = 0;
@@ -124,7 +125,7 @@ INT64_T full_pread64(int fd, void *buf, INT64_T count, INT64_T offset)
 	}
 }
 
-INT64_T full_pwrite64(int fd, const void *buf, INT64_T count, INT64_T offset)
+ssize_t full_pwrite64(int fd, const void *buf, size_t count, int64_t offset)
 {
 	ssize_t total = 0;
 	ssize_t chunk = 0;
