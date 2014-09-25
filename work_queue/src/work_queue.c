@@ -1643,6 +1643,27 @@ struct nvpair * worker_to_nvpair( struct work_queue *q, struct work_queue_worker
 	return nv;
 }
 
+static void priority_add_to_nvpair(struct nvpair *nv, double priority)
+{
+	int decimals = 2;
+	int factor   = pow(10, decimals);
+
+	int dpart = ((int) (priority * factor)) - ((int) priority) * factor;
+
+	char *str;
+
+	if(dpart == 0)
+		str = string_format("%d", (int) priority);
+	else
+		str = string_format("%.2g", priority);
+	
+	nvpair_insert_string(nv, "priority", str);
+	
+	free(str);
+}
+
+
+
 struct nvpair * task_to_nvpair( struct work_queue_task *t, const char *state, const char *host )
 {
 	struct nvpair *nv = nvpair_create();
@@ -1653,6 +1674,9 @@ struct nvpair * task_to_nvpair( struct work_queue_task *t, const char *state, co
 	if(t->tag) nvpair_insert_string(nv,"tag",t->tag);
 	nvpair_insert_string(nv,"command",t->command_line);
 	if(host) nvpair_insert_string(nv,"host",host);
+
+	priority_add_to_nvpair(nv, t->priority);
+
 
 	return nv;
 }
