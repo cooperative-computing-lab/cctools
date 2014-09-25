@@ -14,7 +14,6 @@ int copy_stream_to_stream(FILE * input, FILE * output);
 int copy_stream_to_buffer(FILE * input, char **buffer);
 int copy_stream_to_fd(FILE * input, int fd);
 int copy_fd_to_stream(int fd, FILE * output);
-int copy_buffer_to_stream(char * buffer, FILE * output, int buffer_size);
 int copy_file_to_file(const char *input, const char *output);
 int copy_file_to_buffer(const char *filename, char **buffer);
 
