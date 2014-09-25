@@ -8,11 +8,13 @@ See the file COPYING for details.
 #define _XOPEN_SOURCE 500
 #define _LARGEFILE64_SOURCE 1
 
-#include <unistd.h>
 #include <fcntl.h>
-#include <errno.h>
-#include <sys/uio.h>
+#include <unistd.h>
+
 #include <sys/types.h>
+#include <sys/uio.h>
+
+#include <errno.h>
 #include <stdio.h>
 
 #include "full_io.h"
