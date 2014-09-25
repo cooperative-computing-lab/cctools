@@ -10,15 +10,20 @@ See the file COPYING for details.
 #include "create_dir.h"
 #include "path.h"
 
+#include <unistd.h>
+#include <sys/fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include <errno.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
-#include <unistd.h>
-#include <signal.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <string.h>
 
-#define COPY_BUFFER_SIZE 65536
+#define COPY_BUFFER_SIZE (1<<16)
 
 int copy_stream_to_stream(FILE * input, FILE * output)
 {
