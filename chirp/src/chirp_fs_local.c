@@ -568,7 +568,7 @@ static INT64_T chirp_fs_local_truncate(const char *path, INT64_T length)
 
 static INT64_T chirp_fs_local_utime(const char *path, time_t actime, time_t modtime)
 {
-	PREAMBLE("utime(`%s', actime = %" PRId64 " modtime = %" PRId64 ")", path, actime, modtime);
+	PREAMBLE("utime(`%s', actime = %" PRId64 " modtime = %" PRId64 ")", path, (int64_t)actime, (int64_t)modtime);
 	struct utimbuf ut;
 	RESOLVE(path)
 	ut.actime = actime;
