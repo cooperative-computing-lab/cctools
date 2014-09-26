@@ -8,12 +8,13 @@ See the file COPYING for details.
 #include "chirp_fs_local.h"
 #include "chirp_fs_local_scheduler.h"
 
+#include "create_dir.h"
 #include "debug.h"
-#include "xxmalloc.h"
+#include "delete_dir.h"
+#include "full_io.h"
 #include "int_sizes.h"
 #include "path.h"
-#include "full_io.h"
-#include "delete_dir.h"
+#include "xxmalloc.h"
 
 #include <dirent.h>
 #include <unistd.h>
@@ -121,6 +122,17 @@ static struct {
 	char path[CHIRP_PATH_MAX];
 } open_files[CHIRP_FILESYSTEM_MAXFD];
 
+#define PREAMBLE(fmt, ...) \
+	INT64_T rc = 0;\
+	debug(D_LOCAL, fmt, __VA_ARGS__);
+
+#define PROLOGUE \
+	if (rc == -1)\
+		debug(D_LOCAL, "= -1 (errno = %d; `%s')", errno, strerror(errno));\
+	else\
+		debug(D_LOCAL, "= %" PRId64, rc);\
+	return rc;
+
 #define fdvalid(fd) (0 <= fd && fd < CHIRP_FILESYSTEM_MAXFD && open_files[fd].fd >= 0)
 #define SETUP_FILE \
 if(!fdvalid(fd)) return (errno = EBADF, -1);\
@@ -146,8 +158,12 @@ path = resolved_##path;
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 {
+	PREAMBLE("init(`%s')", url);
 	int i;
 	char tmp[CHIRP_PATH_MAX];
+
+	for (i = 0; i < CHIRP_FILESYSTEM_MAXFD; i++)
+		open_files[i].fd = -1;
 
 	if (strprfx(url, "local://") || strprfx(url, "file://"))
 		strcpy(tmp, strstr(url, "//")+2);
@@ -155,27 +171,25 @@ static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 		strcpy(tmp, url);
 
 	path_collapse(tmp, local_root, 1);
+	rc = create_dir(local_root, 0711);
 
-	for (i = 0; i < CHIRP_FILESYSTEM_MAXFD; i++)
-		open_files[i].fd = -1;
-
-	return cfs_create_dir("/", 0711);
+	PROLOGUE
 }
 
 static int chirp_fs_local_fname (int fd, char path[CHIRP_PATH_MAX])
 {
+	PREAMBLE("fname(%d, `%s')", fd, path);
 	SETUP_FILE
 	strcpy(path, open_files[fd].path);
-	return 0;
+	PROLOGUE
 }
 
 int chirp_fs_local_resolve (const char *path, char resolved[CHIRP_PATH_MAX])
 {
-	int n;
 	char collapse[CHIRP_PATH_MAX];
 	char absolute[CHIRP_PATH_MAX];
 	path_collapse(path, collapse, 1);
-	n = snprintf(absolute, sizeof(absolute), "%s/%s", local_root, collapse);
+	int n = snprintf(absolute, sizeof(absolute), "%s/%s", local_root, collapse);
 	assert(n >= 0); /* this should never happen */
 	if ((size_t)n >= CHIRP_PATH_MAX) {
 		errno = ENAMETOOLONG;
@@ -199,87 +213,92 @@ static INT64_T getfd(void)
 
 static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode)
 {
+	PREAMBLE("open(`%s', 0x%" PRIx64 ", 0o%" PRIo64 ")", path, flags, mode);
 	const char *unresolved = path;
 	RESOLVE(path)
 	INT64_T fd = getfd();
 	if (fd == -1) return -1;
 	mode &= S_IXUSR|S_IRWXG|S_IRWXO;
 	mode |= S_IRUSR|S_IWUSR;
-	INT64_T lfd = open64(path, flags, mode);
-	if (lfd >= 0) {
-		open_files[fd].fd = lfd;
+	rc = open64(path, flags, (int) mode);
+	if (rc >= 0) {
+		open_files[fd].fd = rc;
 		strcpy(open_files[fd].path, unresolved);
-		return fd;
-	} else {
-		return -1;
+		rc = fd;
 	}
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_close(int fd)
 {
+	PREAMBLE("close(%d)", fd);
 	SETUP_FILE
-	if (close(lfd) == 0) {
+	rc = close(lfd);
+	if (rc == 0) {
 		open_files[fd].fd = -1;
 		open_files[fd].path[0] = '\0';
-		return 0;
-	} else {
-		return -1;
 	}
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_pread(int fd, void *buffer, INT64_T length, INT64_T offset)
 {
+	PREAMBLE("pread(%d, %p, %zu, %" PRId64 ")", fd, buffer, (size_t)length, offset);
 	SETUP_FILE
-	INT64_T result;
-	result = full_pread64(lfd, buffer, length, offset);
-	if(result < 0 && errno == ESPIPE) {
+	rc = full_pread64(lfd, buffer, length, offset);
+	if(rc < 0 && errno == ESPIPE) {
 		/* if this is a pipe, return whatever amount is available */
-		result = read(lfd, buffer, length);
+		rc = read(lfd, buffer, length);
 	}
-	return result;
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_pwrite(int fd, const void *buffer, INT64_T length, INT64_T offset)
 {
+	PREAMBLE("pwrite(%d, %p, %zu, %" PRId64 ")", fd, buffer, (size_t)length, offset);
 	SETUP_FILE
-	INT64_T result;
-	result = full_pwrite64(lfd, buffer, length, offset);
-	if(result < 0 && errno == ESPIPE) {
+	rc = full_pwrite64(lfd, buffer, length, offset);
+	if(rc < 0 && errno == ESPIPE) {
 		/* if this is a pipe, then just write without the offset. */
-		result = full_write(lfd, buffer, length);
+		rc = full_write(lfd, buffer, length);
 	}
-	return result;
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_lockf (int fd, int cmd, INT64_T len)
 {
+	PREAMBLE("lockf(%d, 0o%o, %" PRId64 ")", fd, cmd, len);
 	SETUP_FILE
-	return lockf(lfd, cmd, len);
+	rc = lockf(lfd, cmd, len);
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat *info)
 {
+	PREAMBLE("fstat(%d, %p)", fd, info);
 	SETUP_FILE
 	struct stat64 linfo;
-	int result = fstat64(lfd, &linfo);
-	if(result == 0)
+	rc = fstat64(lfd, &linfo);
+	if(rc == 0)
 		COPY_STAT_LOCAL_TO_CHIRP(*info, linfo);
-	return result;
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_fstatfs(int fd, struct chirp_statfs *info)
 {
+	PREAMBLE("fstatfs(%d, %p)", fd, info);
 	SETUP_FILE
 	struct statfs64 linfo;
-	int result = fstatfs64(lfd, &linfo);
-	if (result == 0)
+	rc = fstatfs64(lfd, &linfo);
+	if (rc == 0)
 		COPY_STATFS_LOCAL_TO_CHIRP(*info, linfo);
-	return result;
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_fchmod(int fd, INT64_T mode)
 {
 	struct stat64 linfo;
+	PREAMBLE("fchmod(%d, 0o%" PRIo64 ")", fd, mode);
 	SETUP_FILE
 	mode &= S_IXUSR|S_IRWXG|S_IRWXO; /* users can only set owner execute and group/other bits */
 	if (fstat64(lfd, &linfo) == -1)
@@ -289,26 +308,32 @@ static INT64_T chirp_fs_local_fchmod(int fd, INT64_T mode)
 	} else {
 		mode |= S_IRUSR|S_IWUSR; /* owner read/write must be set */
 	}
-	return fchmod(lfd, mode);
+	rc = fchmod(lfd, mode);
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_ftruncate(int fd, INT64_T length)
 {
+	PREAMBLE("ftruncate(%d, %" PRId64 ")", fd, length);
 	SETUP_FILE
-	return ftruncate64(lfd, length);
+	rc = ftruncate64(lfd, length);
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_fsync(int fd)
 {
+	PREAMBLE("fsync(%d)", fd);
 	SETUP_FILE
-	return fsync(lfd);
+	rc = fsync(lfd);
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_unlink(const char *path)
 {
+	PREAMBLE("unlink(`%s')", path);
 	RESOLVE(path)
 
-	int result = unlink(path);
+	rc = unlink(path);
 
 	/*
 	   On Solaris, an unlink on a directory
@@ -316,59 +341,72 @@ static INT64_T chirp_fs_local_unlink(const char *path)
 	   Check for this cast, and then fix it.
 	 */
 
-	if(result < 0 && errno == EPERM) {
+	if(rc < 0 && errno == EPERM) {
 		struct stat64 linfo;
-		result = stat64(path, &linfo);
-		if(result == 0 && S_ISDIR(linfo.st_mode)) {
-			result = -1;
+		rc = stat64(path, &linfo);
+		if(rc == 0 && S_ISDIR(linfo.st_mode)) {
+			rc = -1;
 			errno = EISDIR;
 		} else {
-			result = -1;
+			rc = -1;
 			errno = EPERM;
 		}
 	}
 
-	return result;
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_rmall(const char *path)
 {
-	return cfs_delete_dir(path);
+	PREAMBLE("rmall(`%s')", path);
+	RESOLVE(path)
+	rc = unlink_recursive(path);
+	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_rename(const char *path, const char *newpath)
+static INT64_T chirp_fs_local_rename(const char *old, const char *new)
 {
-	RESOLVE(path)
-	RESOLVE(newpath)
-	return rename(path, newpath);
+	PREAMBLE("rename(`%s', `%s')", old, new);
+	RESOLVE(old)
+	RESOLVE(new)
+	rc = rename(old, new);
+	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_link(const char *path, const char *newpath)
+static INT64_T chirp_fs_local_link(const char *target, const char *path)
 {
+	PREAMBLE("link(`%s', `%s')", target, path);
+	RESOLVE(target)
 	RESOLVE(path)
-	RESOLVE(newpath)
-	return link(path, newpath);
+	rc = link(target, path);
+	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_symlink(const char *path, const char *newpath)
+static INT64_T chirp_fs_local_symlink(const char *target, const char *path)
 {
+	PREAMBLE("symlink(`%s', `%s')", target, path);
+	RESOLVE(target)
 	RESOLVE(path)
-	RESOLVE(newpath)
-	return symlink(path, newpath);
+	rc = symlink(target, path);
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_readlink(const char *path, char *buf, INT64_T length)
 {
+	PREAMBLE("readlink(`%s', %p, %zu)", path, buf, (size_t)length);
 	RESOLVE(path)
-	return readlink(path, buf, length);
+	rc = readlink(path, buf, length);
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_mkdir(const char *path, INT64_T mode)
 {
+	PREAMBLE("mkdir(`%s', 0o%" PRIo64 ")", path, mode);
 	RESOLVE(path)
 	mode &= S_IRWXG|S_IRWXO; /* users can only set group/other bits */
 	mode |= S_IRWXU;
-	return mkdir(path, mode);
+	rc = mkdir(path, mode);
+	PROLOGUE
 }
 
 /*
@@ -380,6 +418,7 @@ Only delete the directory if it contains only those files.
 
 static INT64_T chirp_fs_local_rmdir(const char *path)
 {
+	PREAMBLE("rmdir(`%s')", path);
 	int empty = 1;
 	RESOLVE(path)
 
@@ -399,50 +438,56 @@ static INT64_T chirp_fs_local_rmdir(const char *path)
 		closedir(dir);
 
 		if(empty) {
-			return delete_dir(path);
+			rc = delete_dir(path);
 		} else {
 			errno = ENOTEMPTY;
-			return -1;
+			rc = -1;
 		}
 	} else {
-		return -1;
+		rc = -1;
 	}
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *info)
 {
+	PREAMBLE("stat(`%s', %p)", path, info);
 	RESOLVE(path)
 	struct stat64 linfo;
-	int result = stat64(path, &linfo);
-	if(result == 0)
+	rc = stat64(path, &linfo);
+	if(rc == 0)
 		COPY_STAT_LOCAL_TO_CHIRP(*info, linfo);
-	return result;
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *info)
 {
+	PREAMBLE("lstat(`%s', %p)", path, info);
 	RESOLVE(path)
 	struct stat64 linfo;
-	int result = lstat64(path, &linfo);
-	if(result == 0)
+	rc = lstat64(path, &linfo);
+	if(rc == 0)
 		COPY_STAT_LOCAL_TO_CHIRP(*info, linfo);
-	return result;
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs *info)
 {
+	PREAMBLE("statfs(`%s', %p)", path, info);
 	RESOLVE(path)
 	struct statfs64 linfo;
-	int result = statfs64(path, &linfo);
-	if (result == 0)
+	rc = statfs64(path, &linfo);
+	if (rc == 0)
 		COPY_STATFS_LOCAL_TO_CHIRP(*info, linfo);
-	return result;
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_access(const char *path, INT64_T amode)
 {
+	PREAMBLE("access(`%s', %" PRId64 ")", path, amode);
 	RESOLVE(path)
-	return access(path, amode);
+	rc = access(path, amode);
+	PROLOGUE
 }
 
 struct chirp_dir {
@@ -453,20 +498,24 @@ struct chirp_dir {
 
 static struct chirp_dir *chirp_fs_local_opendir(const char *path)
 {
+	debug(D_LOCAL, "opendir(`%s')", path);
 	RESOLVENULL(path)
 	DIR *dir = opendir(path);
 	if(dir) {
 		struct chirp_dir *cdir = xxmalloc(sizeof(*cdir));
 		cdir->dir = dir;
 		strcpy(cdir->path, path); /* N.B. readdir passes this to chirp_fs_local_lstat */
+		debug(D_LOCAL, "= %p", cdir);
 		return cdir;
 	} else {
+		debug(D_LOCAL, "= NULL (errno = %d; `%s')", errno, strerror(errno));
 		return 0;
 	}
 }
 
 static struct chirp_dirent *chirp_fs_local_readdir(struct chirp_dir *dir)
 {
+	debug(D_LOCAL, "readdir(%p [`%s'])", dir, dir->path);
 	struct dirent *d = readdir(dir->dir);
 	if(d) {
 		char path[CHIRP_PATH_MAX];
@@ -477,20 +526,24 @@ static struct chirp_dirent *chirp_fs_local_readdir(struct chirp_dir *dir)
 		dir->cd.lstatus = lstat64(path, &linfo);
 		if(dir->cd.lstatus == 0)
 			COPY_STAT_LOCAL_TO_CHIRP(dir->cd.info, linfo);
+		debug(D_LOCAL, "= %p [name = `%s']", &dir->cd, dir->cd.name);
 		return &dir->cd;
 	} else {
+		debug(D_LOCAL, "= NULL (errno = %d; `%s')", errno, strerror(errno));
 		return 0;
 	}
 }
 
 static void chirp_fs_local_closedir(struct chirp_dir *dir)
 {
+	debug(D_LOCAL, "closedir(%p [`%s'])", dir, dir->path);
 	closedir(dir->dir);
 	free(dir);
 }
 
 static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
 {
+	PREAMBLE("chmod(`%s', 0o%" PRIo64 ")", path, mode);
 	struct stat64 linfo;
 	RESOLVE(path)
 	mode &= S_IXUSR|S_IRWXG|S_IRWXO; /* users can only set owner execute and group/other bits */
@@ -501,22 +554,27 @@ static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
 	} else {
 		mode |= S_IRUSR|S_IWUSR; /* owner read/write must be set */
 	}
-	return chmod(path, mode);
+	rc = chmod(path, mode);
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_truncate(const char *path, INT64_T length)
 {
+	PREAMBLE("truncate(`%s', 0d%" PRId64 ")", path, length);
 	RESOLVE(path)
-	return truncate64(path, length);
+	rc = truncate64(path, length);
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_utime(const char *path, time_t actime, time_t modtime)
 {
+	PREAMBLE("utime(`%s', actime = %" PRId64 " modtime = %" PRId64 ")", path, actime, modtime);
 	struct utimbuf ut;
 	RESOLVE(path)
 	ut.actime = actime;
 	ut.modtime = modtime;
-	return utime(path, &ut);
+	rc = utime(path, &ut);
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_setrep(const char *path, int nreps)
@@ -528,122 +586,146 @@ static INT64_T chirp_fs_local_setrep(const char *path, int nreps)
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
 static INT64_T chirp_fs_local_getxattr(const char *path, const char *name, void *data, size_t size)
 {
+	PREAMBLE("getxattr(`%s', `%s', %p, %zu)", path, name, data, size);
 	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return getxattr(path, name, data, size, 0, 0);
+	rc = getxattr(path, name, data, size, 0, 0);
 #else
-	return getxattr(path, name, data, size);
+	rc = getxattr(path, name, data, size);
 #endif
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_fgetxattr(int fd, const char *name, void *data, size_t size)
 {
+	PREAMBLE("fgetxattr(%d, `%s', %p, %zu)", fd, name, data, size);
 	SETUP_FILE
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return fgetxattr(lfd, name, data, size, 0, 0);
+	rc = fgetxattr(lfd, name, data, size, 0, 0);
 #else
-	return fgetxattr(lfd, name, data, size);
+	rc = fgetxattr(lfd, name, data, size);
 #endif
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_lgetxattr(const char *path, const char *name, void *data, size_t size)
 {
+	PREAMBLE("lgetxattr(`%s', `%s', %p, %zu)", path, name, data, size);
 	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return getxattr(path, name, data, size, 0, XATTR_NOFOLLOW);
+	rc = getxattr(path, name, data, size, 0, XATTR_NOFOLLOW);
 #else
-	return lgetxattr(path, name, data, size);
+	rc = lgetxattr(path, name, data, size);
 #endif
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_listxattr(const char *path, char *list, size_t size)
 {
+	PREAMBLE("listxattr(`%s', %p, %zu)", path, list, size);
 	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return listxattr(path, list, size, 0);
+	rc = listxattr(path, list, size, 0);
 #else
-	return listxattr(path, list, size);
+	rc = listxattr(path, list, size);
 #endif
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_flistxattr(int fd, char *list, size_t size)
 {
+	PREAMBLE("flistxattr(%d, %p, %zu)", fd, list, size);
 	SETUP_FILE
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return flistxattr(lfd, list, size, 0);
+	rc = flistxattr(lfd, list, size, 0);
 #else
-	return flistxattr(lfd, list, size);
+	rc = flistxattr(lfd, list, size);
 #endif
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_llistxattr(const char *path, char *list, size_t size)
 {
+	PREAMBLE("llistxattr(`%s', %p, %zu)", path, list, size);
 	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return listxattr(path, list, size, XATTR_NOFOLLOW);
+	rc = listxattr(path, list, size, XATTR_NOFOLLOW);
 #else
-	return llistxattr(path, list, size);
+	rc = llistxattr(path, list, size);
 #endif
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
+	PREAMBLE("setxattr(`%s', `%s', %p, %zu, %d)", path, name, data, size, flags);
 	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return setxattr(path, name, data, size, 0, flags);
+	rc = setxattr(path, name, data, size, 0, flags);
 #else
-	return setxattr(path, name, data, size, flags);
+	rc = setxattr(path, name, data, size, flags);
 #endif
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_fsetxattr(int fd, const char *name, const void *data, size_t size, int flags)
 {
+	PREAMBLE("fsetxattr(%d, `%s', %p, %zu, %d)", fd, name, data, size, flags);
 	SETUP_FILE
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return fsetxattr(lfd, name, data, size, 0, flags);
+	rc = fsetxattr(lfd, name, data, size, 0, flags);
 #else
-	return fsetxattr(lfd, name, data, size, flags);
+	rc = fsetxattr(lfd, name, data, size, flags);
 #endif
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
+	PREAMBLE("lsetxattr(`%s', `%s', %p, %zu, %d)", path, name, data, size, flags);
 	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return setxattr(path, name, data, size, 0, XATTR_NOFOLLOW | flags);
+	rc = setxattr(path, name, data, size, 0, XATTR_NOFOLLOW | flags);
 #else
-	return lsetxattr(path, name, data, size, flags);
+	rc = lsetxattr(path, name, data, size, flags);
 #endif
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_removexattr(const char *path, const char *name)
 {
+	PREAMBLE("removexattr(`%s', `%s')", path, name);
 	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return removexattr(path, name, 0);
+	rc = removexattr(path, name, 0);
 #else
-	return removexattr(path, name);
+	rc = removexattr(path, name);
 #endif
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_fremovexattr(int fd, const char *name)
 {
+	PREAMBLE("fremovexattr(%d, `%s')", fd, name);
 	SETUP_FILE
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return fremovexattr(lfd, name, 0);
+	rc = fremovexattr(lfd, name, 0);
 #else
-	return fremovexattr(lfd, name);
+	rc = fremovexattr(lfd, name);
 #endif
+	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_lremovexattr(const char *path, const char *name)
 {
+	PREAMBLE("lremovexattr(`%s', `%s')", path, name);
 	RESOLVE(path)
 #ifdef CCTOOLS_OPSYS_DARWIN
-	return removexattr(path, name, XATTR_NOFOLLOW);
+	rc = removexattr(path, name, XATTR_NOFOLLOW);
 #else
-	return lremovexattr(path, name);
+	rc = lremovexattr(path, name);
 #endif
+	PROLOGUE
 }
 #endif
 
