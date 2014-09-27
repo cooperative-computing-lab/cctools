@@ -590,7 +590,7 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 			length -= ractual;
 			total += ractual;
 		}
-		result = 0;
+		result = MD5_DIGEST_LENGTH;
 		cfs->close(fd);
 		md5_final(digest, &ctx);
 	} else {
@@ -816,9 +816,9 @@ static int search_directory(const char *subject, const char * const base, char f
 							link_putfstring(l, "0:%s::\n", stoptime, matched); // FIXME is this a bug?
 							link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, matched);
 						} else {
-							char statenc[CHIRP_STAT_MAXENCODING];
-							chirp_stat_encode(statenc, &entry->info);
-							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, statenc);
+							BUFFER_STACK_ABORT(B, 4096)
+							chirp_stat_encode(&B, &entry->info);
+							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, buffer_tostring(&B));
 							if(stopatfirst) return 1;
 						}
 					} else {
