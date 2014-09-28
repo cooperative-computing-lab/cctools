@@ -812,13 +812,12 @@ static int search_directory(const char *subject, const char * const base, char f
 				if (access_flags == F_OK || cfs->access(fullpath, access_flags) == 0) {
 					if(metadata) {
 						/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
-						struct chirp_stat info;
 						if(entry->lstatus == -1) {
 							link_putfstring(l, "0:%s::\n", stoptime, matched); // FIXME is this a bug?
 							link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, matched);
 						} else {
 							char statenc[CHIRP_STAT_MAXENCODING];
-							chirp_stat_encode(statenc, &info);
+							chirp_stat_encode(statenc, &entry->info);
 							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, statenc);
 							if(stopatfirst) return 1;
 						}
