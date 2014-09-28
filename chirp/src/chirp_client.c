@@ -759,7 +759,7 @@ INT64_T chirp_client_ticket_get(struct chirp_client * c, const char *name, char 
 		}
 
 		return 0;
-	      failure:
+failure:
 		free(*subject);
 		free(*ticket);
 		if(*rights != NULL) {
