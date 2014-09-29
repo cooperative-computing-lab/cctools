@@ -1,0 +1,2 @@
+python spectool -c package.json -s test -m chroot run
+python run_cmd -c run_cmd.json -s test -m chroot setup
