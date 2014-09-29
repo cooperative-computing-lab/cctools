@@ -7,6 +7,9 @@ See the file COPYING for details.
 #ifndef SHA1_H
 #define SHA1_H
 
+#include <stdint.h>
+#include <stdlib.h>
+
 /** @file sha1.h
 Routines for computing SHA1 checksums.
 */
@@ -20,20 +23,18 @@ Routines for computing SHA1 checksums.
 #define sha1_file    dttools_sha1_file
 #define sha1_string  dttools_sha1_string
 
-#include "int_sizes.h"
-
 #define SHA1_DIGEST_LENGTH 20
 #define SHA1_DIGEST_ASCII_LENGTH 42
 
 typedef struct {
-	UINT32_T digest[5];
-	UINT32_T countLo, countHi;
-	UINT32_T data[16];
+	uint32_t digest[5];
+	size_t countLo, countHi;
+	uint32_t data[16];
 	int Endianness;
 } sha1_context_t;
 
 void sha1_init(sha1_context_t * ctx);
-void sha1_update(sha1_context_t * ctx, const unsigned char *, unsigned int);
+void sha1_update(sha1_context_t * ctx, const void *, size_t);
 void sha1_final(unsigned char digest[SHA1_DIGEST_LENGTH], sha1_context_t * ctx);
 
 /** Checksum a memory buffer.
@@ -44,7 +45,7 @@ which  must be converted to a human readable form with @ref sha1_string.
 @param digest Pointer to a buffer to store the digest.
 */
 
-void sha1_buffer(const char *buffer, int length, unsigned char digest[SHA1_DIGEST_LENGTH]);
+void sha1_buffer(const void *buffer, size_t length, unsigned char digest[SHA1_DIGEST_LENGTH]);
 
 /** Checksum a local file.
 Note that this function produces a digest in binary form

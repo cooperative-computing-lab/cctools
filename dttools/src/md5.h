@@ -7,23 +7,24 @@ See the file COPYING for details.
 #ifndef MD5_H
 #define MD5_H
 
+#include <stdint.h>
+#include <stdlib.h>
+
 /** @file md5.h
 Routines for computing MD5 checksums.
 */
-
-#include "int_sizes.h"
 
 #define MD5_DIGEST_LENGTH 16
 #define MD5_DIGEST_LENGTH_HEX (MD5_DIGEST_LENGTH<<1)
 
 typedef struct {
-	UINT32_T state[4];
-	UINT32_T count[2];
-	unsigned char buffer[64];
+	uint32_t state[4];
+	uint32_t count[2];
+	uint8_t buffer[64];
 } md5_context_t;
 
 void md5_init(md5_context_t * ctx);
-void md5_update(md5_context_t * ctx, const unsigned char *, unsigned int);
+void md5_update(md5_context_t * ctx, const void *, size_t);
 void md5_final(unsigned char digest[MD5_DIGEST_LENGTH], md5_context_t * ctx);
 
 /** Checksum a memory buffer.
@@ -34,7 +35,7 @@ which  must be converted to a human readable form with @ref md5_string.
 @param digest Pointer to a buffer to store the digest.
 */
 
-void md5_buffer(const char *buffer, int length, unsigned char digest[MD5_DIGEST_LENGTH]);
+void md5_buffer(const void *buffer, size_t length, unsigned char digest[MD5_DIGEST_LENGTH]);
 
 /** Checksum a local file.
 Note that this function produces a digest in binary form

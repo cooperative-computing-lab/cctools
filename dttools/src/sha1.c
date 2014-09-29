@@ -34,9 +34,15 @@ effort (for example the reengineering of a great many Capstone chips).
 #include "sha1.h"
 #include "xxmalloc.h"
 
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <sys/mman.h>
+#include <sys/stat.h>
+
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef unsigned char *POINTER;
 
@@ -44,10 +50,6 @@ typedef unsigned char *POINTER;
 #define FALSE	0
 #define TRUE	( !FALSE )
 #endif
-
-void endianTest(int *endianness);
-
-static void SHAtoByte(UINT8_T * output, UINT32_T * input, unsigned int len);
 
 /* The SHS block size and message digest sizes, in bytes */
 
@@ -121,6 +123,18 @@ static void SHAtoByte(UINT8_T * output, UINT32_T * input, unsigned int len);
 #define subRound(a, b, c, d, e, f, k, data) \
     ( e += ROTL( 5, a ) + f( b, c, d ) + k + data, b = ROTL( 30, b ) )
 
+static void endianTest(int *endian_ness)
+{
+	if((*(unsigned short *) ("#S") >> 8) == '#') {
+		/* printf("Big endian = no change\n"); */
+		*endian_ness = !(0);
+	} else {
+		/* printf("Little endian = swap\n"); */
+		*endian_ness = 0;
+	}
+}
+
+
 /* Initialize the SHS values */
 
 void sha1_init(sha1_context_t * shsInfo)
@@ -145,11 +159,10 @@ void sha1_init(sha1_context_t * shsInfo)
 
    Note that this corrupts the shsInfo->data area */
 
-static void SHSTransform(digest, data)
-     UINT32_T *digest, *data;
+static void SHSTransform(uint32_t *digest, uint32_t *data)
 {
-	UINT32_T A, B, C, D, E;	/* Local vars */
-	UINT32_T eData[16];	/* Expanded data */
+	uint32_t A, B, C, D, E;	/* Local vars */
+	uint32_t eData[16];	/* Expanded data */
 
 	/* Set up first buffer and local data buffer */
 	A = digest[0];
@@ -255,13 +268,13 @@ static void SHSTransform(digest, data)
 /* When run on a little-endian CPU we need to perform byte reversal on an
    array of long words. */
 
-static void longReverse(UINT32_T * buffer, int byteCount, int Endianness)
+static void longReverse(uint32_t * buffer, size_t byteCount, int Endianness)
 {
-	UINT32_T value;
+	uint32_t value;
 
 	if(Endianness == TRUE)
 		return;
-	byteCount /= sizeof(UINT32_T);
+	byteCount /= sizeof(uint32_t);
 	while(byteCount--) {
 		value = *buffer;
 		value = ((value & 0xFF00FF00L) >> 8) | ((value & 0x00FF00FFL) << 8);
@@ -271,14 +284,15 @@ static void longReverse(UINT32_T * buffer, int byteCount, int Endianness)
 
 /* Update SHS for a block of data */
 
-void sha1_update(sha1_context_t * shsInfo, const unsigned char *buffer, unsigned int count)
+void sha1_update(sha1_context_t * shsInfo, const void *buffer, size_t count)
 {
-	UINT32_T tmp;
-	unsigned int dataCount;
+	uint32_t tmp;
+	size_t dataCount;
+	uint8_t *uchars = (uint8_t *)buffer;
 
 	/* Update bitcount */
 	tmp = shsInfo->countLo;
-	if((shsInfo->countLo = tmp + ((UINT32_T) count << 3)) < tmp)
+	if((shsInfo->countLo = tmp + ((uint32_t) count << 3)) < tmp)
 		shsInfo->countHi++;	/* Carry from low to high */
 	shsInfo->countHi += count >> 29;
 
@@ -287,40 +301,52 @@ void sha1_update(sha1_context_t * shsInfo, const unsigned char *buffer, unsigned
 
 	/* Handle any leading odd-sized chunks */
 	if(dataCount) {
-		UINT8_T *p = (UINT8_T *) shsInfo->data + dataCount;
+		uint8_t *p = (uint8_t *) shsInfo->data + dataCount;
 
 		dataCount = SHS_DATASIZE - dataCount;
 		if(count < dataCount) {
-			memcpy(p, buffer, count);
+			memcpy(p, uchars, count);
 			return;
 		}
-		memcpy(p, buffer, dataCount);
+		memcpy(p, uchars, dataCount);
 		longReverse(shsInfo->data, SHS_DATASIZE, shsInfo->Endianness);
 		SHSTransform(shsInfo->digest, shsInfo->data);
-		buffer += dataCount;
+		uchars += dataCount;
 		count -= dataCount;
 	}
 
 	/* Process data in SHS_DATASIZE chunks */
 	while(count >= SHS_DATASIZE) {
-		memcpy((POINTER) shsInfo->data, (POINTER) buffer, SHS_DATASIZE);
+		memcpy((POINTER) shsInfo->data, (POINTER) uchars, SHS_DATASIZE);
 		longReverse(shsInfo->data, SHS_DATASIZE, shsInfo->Endianness);
 		SHSTransform(shsInfo->digest, shsInfo->data);
-		buffer += SHS_DATASIZE;
+		uchars += SHS_DATASIZE;
 		count -= SHS_DATASIZE;
 	}
 
 	/* Handle any remaining bytes of data. */
-	memcpy((POINTER) shsInfo->data, (POINTER) buffer, count);
+	memcpy((POINTER) shsInfo->data, (POINTER) uchars, count);
 }
 
 /* Final wrapup - pad to SHS_DATASIZE-byte boundary with the bit pattern
    1 0* (64-bit count of bits processed, MSB-first) */
 
+static void SHAtoByte(uint8_t * output, uint32_t * input, size_t len)
+{				/* Output SHA digest in byte array */
+	size_t i, j;
+
+	for(i = 0, j = 0; j < len; i++, j += 4) {
+		output[j + 3] = (uint8_t) (input[i] & 0xff);
+		output[j + 2] = (uint8_t) ((input[i] >> 8) & 0xff);
+		output[j + 1] = (uint8_t) ((input[i] >> 16) & 0xff);
+		output[j] = (uint8_t) ((input[i] >> 24) & 0xff);
+	}
+}
+
 void sha1_final(unsigned char output[2], sha1_context_t * shsInfo)
 {
-	int count;
-	UINT8_T *dataPtr;
+	size_t count;
+	uint8_t *dataPtr;
 
 	/* Compute number of bytes mod 64 */
 	count = (int) shsInfo->countLo;
@@ -328,7 +354,7 @@ void sha1_final(unsigned char output[2], sha1_context_t * shsInfo)
 
 	/* Set the first char of padding to 0x80.  This is safe since there is
 	   always at least one byte free */
-	dataPtr = (UINT8_T *) shsInfo->data + count;
+	dataPtr = (uint8_t *) shsInfo->data + count;
 	*dataPtr++ = 0x80;
 
 	/* Bytes of padding needed to make 64 bytes */
@@ -361,62 +387,50 @@ void sha1_final(unsigned char output[2], sha1_context_t * shsInfo)
 	memset((POINTER) shsInfo, 0, sizeof(shsInfo));
 }
 
-static void SHAtoByte(UINT8_T * output, UINT32_T * input, unsigned int len)
-{				/* Output SHA digest in byte array */
-	unsigned int i, j;
-
-	for(i = 0, j = 0; j < len; i++, j += 4) {
-		output[j + 3] = (UINT8_T) (input[i] & 0xff);
-		output[j + 2] = (UINT8_T) ((input[i] >> 8) & 0xff);
-		output[j + 1] = (UINT8_T) ((input[i] >> 16) & 0xff);
-		output[j] = (UINT8_T) ((input[i] >> 24) & 0xff);
-	}
-}
-
-void endianTest(int *endian_ness)
-{
-	if((*(unsigned short *) ("#S") >> 8) == '#') {
-		/* printf("Big endian = no change\n"); */
-		*endian_ness = !(0);
-	} else {
-		/* printf("Little endian = swap\n"); */
-		*endian_ness = 0;
-	}
-}
-
-#define BUFFER_SIZE 1048576
-
+#define BUFFER_SIZE (1<<20)
 int sha1_file(const char *filename, unsigned char digest[20])
 {
-	FILE *file;
+	int fd;
+	struct stat buf;
 	sha1_context_t context;
-	int actual;
-	unsigned char *buffer;
+	sha1_init(&context);
 
-	file = fopen(filename, "rb");
-	if(!file)
+	fd = open(filename, O_RDONLY);
+	if (fd == -1)
 		return 0;
 
-	buffer = xxmalloc(BUFFER_SIZE);
-
-	sha1_init(&context);
-	while((actual = fread(buffer, 1, BUFFER_SIZE, file))) {
-		sha1_update(&context, buffer, actual);
+	if (fstat(fd, &buf) == -1) {
+		close(fd);
+		return 0;
 	}
-	sha1_final(digest, &context);
 
-	free(buffer);
-	fclose(file);
+	void *data = mmap(NULL, buf.st_size, PROT_READ, MAP_SHARED, fd, 0);
+	if (data == MAP_FAILED) {
+		void *buffer = xxmalloc(BUFFER_SIZE);
+		ssize_t n;
+		while ((n = read(fd, buffer, BUFFER_SIZE)) > 0) {
+			sha1_update(&context, buffer, n);
+		}
+		free(buffer);
+		close(fd);
+	} else {
+		close(fd);
+		posix_madvise(data, buf.st_size, POSIX_MADV_SEQUENTIAL);
+		sha1_update(&context, data, buf.st_size);
+		munmap(data, buf.st_size);
+	}
+
+	sha1_final(digest, &context);
 
 	return 1;
 }
 
-void sha1_buffer(const char *buffer, int length, unsigned char digest[20])
+void sha1_buffer(const void *buffer, size_t length, unsigned char digest[20])
 {
 	sha1_context_t context;
 
 	sha1_init(&context);
-	sha1_update(&context, (const unsigned char *) buffer, length);
+	sha1_update(&context, buffer, length);
 	sha1_final(digest, &context);
 }
 
