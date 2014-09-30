@@ -35,7 +35,7 @@ The following major problems must be fixed:
 #include "link_nvpair.h"
 #include "rmonitor.h"
 #include "copy_stream.h"
-#include "random_init.h"
+#include "random.h"
 #include "process.h"
 #include "path.h"
 #include "md5.h"

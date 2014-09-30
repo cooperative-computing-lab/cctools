@@ -22,7 +22,7 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "macros.h"
 #include "path.h"
-#include "random_init.h"
+#include "random.h"
 #include "rmonitor.h"
 #include "stringtools.h"
 #include "work_queue.h"

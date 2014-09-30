@@ -59,6 +59,8 @@ SOURCES = \
 	md5.c \
 	memory_info.c \
 	mergesort.c \
+	mpi_queue.c \
+	mt19937-64.c \
 	nvpair.c \
 	nvpair_database.c \
 	password_cache.c \
@@ -66,7 +68,7 @@ SOURCES = \
 	pattern.c \
 	preadwrite.c \
 	process.c \
-	random_init.c \
+	random.c \
 	rmonitor.c \
 	rmsummary.c \
 	set.c \
