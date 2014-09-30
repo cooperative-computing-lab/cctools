@@ -61,7 +61,7 @@ setup(
     description  = 'High level distributed computing workflow framework in Python',
     author       = 'Peter Bui',
     author_email = 'pbui@cse.nd.edu',
-    url          = 'http://bitbucket.org/pbui/weaver',
+    url          = 'http://ccl.cse.nd.edu',
     packages     = ['weaver'],
     scripts      = ['weaver.py'],
     cmdclass     = {'test': TestCommand,

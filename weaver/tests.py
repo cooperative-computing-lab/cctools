@@ -111,7 +111,7 @@ TESTS = [
     ('allpairs',  test_allpairs),
     ('arguments', test_arguments),
     ('batch',     test_batch),
-    ('bxgrid',    test_bxgrid),
+    #('bxgrid',    test_bxgrid),
     ('collect',   test_collect),
     ('functions', test_functions),
     ('group',     test_group),
