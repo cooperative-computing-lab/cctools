@@ -240,6 +240,18 @@ class Task(_object):
     def tag(self):
         return self._task.tag
 
+    ##
+    # Get the priority of the task. 
+    # 
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.priority
+    # @endcode 
+    @property
+    def priority(self):
+        return self._task.priority
+
     ## 
     # Get the shell command executed by the task.
     # @a Note: This is defined using property decorator. So it must be called without parentheses
