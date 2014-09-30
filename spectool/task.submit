@@ -1,0 +1,11 @@
+universe = vanilla
+executable = task.sh
+arguments = 
+environment = CMS_VERSION=CMSSW_5_3_11 SCRAM_ARCH=slc5_amd64_gcc462
+requirements = TARGET.has_cvmfs == true && TARGET.Arch == "x86_64" && TARGET.OpSys == "linux"
+output = task.output
+error = task.error
+should_transfer_files = yes
+when_to_transfer_output = on_exit
+log = task.log 
+queue 
