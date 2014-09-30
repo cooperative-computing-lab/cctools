@@ -21,7 +21,7 @@ The -X option will delete the directory from all of the named hosts.
 #include "stringtools.h"
 #include "timestamp.h"
 #include "macros.h"
-#include "random_init.h"
+#include "random.h"
 #include "getopt_aux.h"
 
 #include <stdlib.h>

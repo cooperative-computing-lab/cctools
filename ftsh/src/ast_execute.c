@@ -21,7 +21,7 @@ See the file COPYING for details.
 #include "variable.h"
 #include "stringtools.h"
 #include "hash_table.h"
-#include "random_init.h"
+#include "random.h"
 
 #include <time.h>
 #include <sys/wait.h>

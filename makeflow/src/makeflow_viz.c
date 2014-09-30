@@ -40,7 +40,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "xxmalloc.h"
 #include "getopt_aux.h"
-#include "random_init.h"
+#include "random.h"
 #include "path.h"
 
 #include "dag.h"

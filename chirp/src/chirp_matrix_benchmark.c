@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "timestamp.h"
 #include "macros.h"
-#include "random_init.h"
+#include "random.h"
 
 #include <time.h>
 #include <stdio.h>
