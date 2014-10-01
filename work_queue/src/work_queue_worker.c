@@ -34,7 +34,7 @@ See the file COPYING for details.
 #include "create_dir.h"
 #include "delete_dir.h"
 #include "itable.h"
-#include "random_init.h"
+#include "random.h"
 #include "url_encode.h"
 
 #include <unistd.h>

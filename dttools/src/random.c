@@ -1,0 +1,86 @@
+/*
+ * Copyright (C) 2014- The University of Notre Dame
+ * This software is distributed under the GNU General Public License.
+ * See the file COPYING for details.
+ */
+
+#include "full_io.h"
+#include "random.h"
+
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <assert.h>
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+extern void twister_init_by_array64 (uint64_t *, size_t);
+extern void twister_init_genrand64 (uint64_t);
+extern int64_t twister_genrand64_int64 (void);
+extern int64_t twister_genrand64_real3 (void);
+
+void random_init (void)
+{
+	int fd = open("/dev/urandom", O_RDONLY);
+	if (fd == -1) {
+		fd = open("/dev/random", O_RDONLY);
+	}
+	if (fd >= 0) {
+		uint64_t seed[8];
+		if (full_read(fd, seed, sizeof(seed)) < (int64_t)sizeof(seed))
+			goto nasty_fallback;
+		srand(seed[0]);
+		twister_init_by_array64(seed, sizeof(seed)/sizeof(seed[0]));
+	} else {
+		uint64_t seed;
+nasty_fallback:
+		seed = (uint64_t)getpid() ^ (uint64_t)time(NULL);
+		seed |= (((uint64_t)(uintptr_t)&seed) << 32); /* using ASLR */
+		srand(seed);
+		twister_init_genrand64(seed);
+	}
+	close(fd);
+	return;
+}
+
+int64_t random_int64 (void)
+{
+	return twister_genrand64_int64();
+}
+
+double random_double (void)
+{
+	return twister_genrand64_real3();
+}
+
+void random_array (void *dest, size_t len)
+{
+	size_t i;
+	int64_t r;
+	uint8_t *out = dest;
+	for (i = 0; i < len/sizeof(r); i += sizeof(r)) {
+		r = twister_genrand64_int64();
+		memcpy(out+i, &r, sizeof(r));
+	}
+	assert((len-i) < sizeof(r));
+	if (i < len) {
+		r = twister_genrand64_int64();
+		memcpy(out+i, &r, (len-i));
+	}
+}
+
+void random_hex (char *str, size_t len)
+{
+	int64_t r;
+	size_t i = 0;
+	do {
+		r = twister_genrand64_int64();
+		snprintf(str+i, len-i, "%016" PRIx64, r);
+		i += sizeof(r)*2;
+	} while (i < len);
+}
+
+/* vim: set noexpandtab tabstop=4: */

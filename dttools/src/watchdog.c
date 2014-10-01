@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "cctools.h"
 #include "debug.h"
-#include "random_init.h"
+#include "random.h"
 
 #include <stdlib.h>
 #include <unistd.h>
