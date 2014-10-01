@@ -153,8 +153,8 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 			buffer_printf(&B, "User-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://ccl.cse.nd.edu/)\r\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
 		buffer_putliteral(&B, "\r\n"); /* header terminator */
 
-		debug(D_HTTP, "%s", buffer_tostring(&B, NULL));
-		link_putstring(link, buffer_tostring(&B, NULL), stoptime);
+		debug(D_HTTP, "%s", buffer_tostring(&B));
+		link_putstring(link, buffer_tostring(&B), stoptime);
 
 		buffer_free(&B);
 	}

@@ -35,7 +35,7 @@ int main (int argc, char *argv[])
 	/* test that buffer starts with empty string */
 	buffer_init(&B);
 	buffer_ubuf(&B, buf3, sizeof(buf3));
-	check(0, strcmp(buffer_tostring(&B, NULL), ""));
+	check(0, strcmp(buffer_tostring(&B), ""));
 	buffer_free(&B);
 
 	buffer_init(&B);
@@ -44,7 +44,7 @@ int main (int argc, char *argv[])
 	check(0, buffer_putstring(&B, "b"));
 	check(0, buffer_putlstring(&B, "cd", 1));
 	check(0, buffer_putstring(&B, "de"));
-	check(0, strcmp(buffer_tostring(&B, NULL), "abcde"));
+	check(0, strcmp(buffer_tostring(&B), "abcde"));
 	buffer_free(&B);
 
 	/* small buffer shouldn't be used */
@@ -55,7 +55,7 @@ int main (int argc, char *argv[])
 		check(0, buffer_putstring(&B, "a"));
 		strcat(test, "a");
 	}
-	check(0, strcmp(buffer_tostring(&B, &len), test));
+	check(0, strcmp(buffer_tolstring(&B, &len), test));
 	buffer_free(&B);
 
 	/* this buffer is equal to initial and won't be used */
@@ -66,7 +66,7 @@ int main (int argc, char *argv[])
 		check(0, buffer_putstring(&B, "a"));
 		strcat(test, "a");
 	}
-	check(0, strcmp(buffer_tostring(&B, &len), test));
+	check(0, strcmp(buffer_tolstring(&B, &len), test));
 	buffer_free(&B);
 
 	/* testing max */
@@ -88,7 +88,7 @@ int main (int argc, char *argv[])
 		check(0, buffer_putstring(&B, "a"));
 		strcat(test, "a");
 	}
-	check(0, strcmp(buffer_tostring(&B, &len), test));
+	check(0, strcmp(buffer_tolstring(&B, &len), test));
 	buffer_free(&B);
 
 	/* test max again */
@@ -109,7 +109,7 @@ int main (int argc, char *argv[])
 	for (i = 0; i < 1<<20; i++) {
 		check(0, buffer_putstring(&B, "a"));
 	}
-	check(0, strcmp(buffer_tostring(&B, &len), test));
+	check(0, strcmp(buffer_tolstring(&B, &len), test));
 	check(1<<20, len);
 	buffer_free(&B);
 

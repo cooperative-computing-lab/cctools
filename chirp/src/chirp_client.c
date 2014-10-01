@@ -1585,7 +1585,7 @@ CHIRP_SEARCH *chirp_client_opensearch(struct chirp_client * c, const char *path,
 			buffer_putliteral(&result->B, "");
 		}
 
-		result->current = buffer_tostring(&result->B, NULL);
+		result->current = buffer_tostring(&result->B);
 		return result;
 	} else {
 		return NULL;

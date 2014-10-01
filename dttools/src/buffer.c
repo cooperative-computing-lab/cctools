@@ -149,7 +149,7 @@ int buffer_putlstring(buffer_t * b, const char *str, size_t len)
 	return 0;
 }
 
-const char *buffer_tostring(buffer_t * b, size_t * size)
+const char *buffer_tolstring(buffer_t * b, size_t * size)
 {
 	if(size != NULL)
 		*size = inuse(b);

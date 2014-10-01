@@ -120,19 +120,19 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 	{
 		/* JSON does not allow trailing commas. */
 		size_t l;
-		const char *s = buffer_tostring(&B, &l);
+		const char *s = buffer_tolstring(&B, &l);
 		if (s[l-1] == ',')
 			buffer_rewind(&B, l-1);
 	}
 	buffer_putliteral(&B, "]}");
 
 	chirp_jobid_t id;
-	debug(D_DEBUG, "job = `%s'", buffer_tostring(&B, NULL));
-	int result = chirp_reli_job_create(gethost(q), buffer_tostring(&B, NULL), &id, STOPTIME);
+	debug(D_DEBUG, "job = `%s'", buffer_tostring(&B));
+	int result = chirp_reli_job_create(gethost(q), buffer_tostring(&B), &id, STOPTIME);
 
 	buffer_rewind(&B, 0);
 	buffer_putfstring(&B, "[%" PRICHIRP_JOBID_T "]", id);
-	if (result == 0 && (result = chirp_reli_job_commit(gethost(q), buffer_tostring(&B, NULL), STOPTIME)) == 0) {
+	if (result == 0 && (result = chirp_reli_job_commit(gethost(q), buffer_tostring(&B), STOPTIME)) == 0) {
 		itable_insert(q->job_table, id, &BATCH_JOB_CHIRP);
 		buffer_free(&B);
 		return (batch_job_id_t) id;
@@ -179,7 +179,7 @@ static batch_job_id_t batch_job_chirp_wait (struct batch_queue *q, struct batch_
 				buffer_init(&B);
 				buffer_abortonfailure(&B, 1);
 				buffer_putfstring(&B, "[%" PRICHIRP_JOBID_T "]", id);
-				reaprc = chirp_reli_job_reap(gethost(q), buffer_tostring(&B, NULL), STOPTIME);
+				reaprc = chirp_reli_job_reap(gethost(q), buffer_tostring(&B), STOPTIME);
 				buffer_free(&B);
 
 				if (reaprc == 0) {
@@ -239,11 +239,11 @@ static int batch_job_chirp_remove (struct batch_queue *q, batch_job_id_t jobid)
 
 		debug(D_BATCH, "removing job %" PRIbjid, jobid);
 
-		result = chirp_reli_job_kill(gethost(q), buffer_tostring(&B, NULL), STOPTIME);
+		result = chirp_reli_job_kill(gethost(q), buffer_tostring(&B), STOPTIME);
 		if (result == 0)
 			debug(D_BATCH, "forcibly killed job %" PRIbjid, jobid);
 
-		result = chirp_reli_job_reap(gethost(q), buffer_tostring(&B, NULL), STOPTIME);
+		result = chirp_reli_job_reap(gethost(q), buffer_tostring(&B), STOPTIME);
 		if (result == 0) {
 			debug(D_BATCH, "reaped job %" PRIbjid, jobid);
 			rc = jobid;
