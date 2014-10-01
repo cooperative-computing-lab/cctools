@@ -46,4 +46,4 @@ then
 fi
 
 # Finally, fork off parrot with a private environment and password file.
-exec /usr/bin/env -i HOME=${HOME} SHELL=${SHELL} LANG=${LANG} TERM=${TERM} ${parrot} -H -M/etc/passwd=${HOME}/.passwd -M/etc/group=${HOME}/.group -u $vid -- $command
+exec /usr/bin/env -i HOME=${HOME} SHELL=${SHELL} LANG=${LANG} TERM=${TERM} ${parrot} -H -M/etc/passwd=${HOME}/.passwd -M/etc/group=${HOME}/.group  -M/var/run/nscd/socket=ENOENT -u $vid -- $command
