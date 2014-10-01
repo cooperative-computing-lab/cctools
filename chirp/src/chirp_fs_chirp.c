@@ -205,18 +205,6 @@ static void chirp_fs_chirp_closedir(struct chirp_dir *dir)
 	chirp_reli_closedir(dir);
 }
 
-static INT64_T chirp_fs_chirp_getfile(const char *path, struct link *link, time_t stoptime)
-{
-	/* N.B. This calls up to chirp_filesystem.c, no RESOLVE necessary. */
-	return cfs_basic_getfile(path, link, stoptime);
-}
-
-static INT64_T chirp_fs_chirp_putfile(const char *path, struct link *link, INT64_T length, INT64_T mode, time_t stoptime)
-{
-	/* N.B. This calls up to chirp_filesystem.c, no RESOLVE necessary. */
-	return cfs_basic_putfile(path, link, length, mode, stoptime);
-}
-
 static INT64_T chirp_fs_chirp_unlink(const char *path)
 {
 	RESOLVE(path)
@@ -437,8 +425,8 @@ struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_readdir,
 	chirp_fs_chirp_closedir,
 
-	chirp_fs_chirp_getfile,
-	chirp_fs_chirp_putfile,
+	cfs_basic_getfile,
+	cfs_basic_putfile,
 
 	chirp_fs_chirp_unlink,
 	chirp_fs_chirp_rmall,
