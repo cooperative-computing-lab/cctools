@@ -378,7 +378,7 @@ static INT64_T do_ticket_get(int argc, char **argv)
 	time_t duration;
 	char **rights;
 	INT64_T result = chirp_reli_ticket_get(current_host, argv[1], &subject, &ticket, &duration, &rights, stoptime);
-	if(result == 0) {
+	if(result >= 0) {
 		printf("%s\n", subject);
 		free(subject);
 		/* base64 encode the ticket so it fits on one line */
