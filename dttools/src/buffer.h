@@ -20,6 +20,8 @@ See the file COPYING for details.
 #define __attribute__(x) /* do nothing */
 #endif
 
+#define BUFFER_INISIZ  (1<<12)
+
 typedef struct buffer {
 	char *buf; /* buf points to the start of the buffer, which may be a buffer on the stack or heap */
 	char *end; /* the current end of the buffer */
@@ -27,13 +29,12 @@ typedef struct buffer {
 	size_t max; /* maximum size of buffer */
 	int abort_on_failure; /* call debug.c fatal(...) on error instead of returning  */
 
-	char initial[1<<12]; /* a reasonably sized buffer to use initially so we avoid (numerous) heap allocations */
-
 	/* a user provided buffer which replaces initial if larger */
 	struct {
 		char *buf;
 		size_t len;
 	} ubuf;
+	char initial[BUFFER_INISIZ]; /* a reasonably sized buffer to use initially so we avoid (numerous) heap allocations */
 } buffer_t;
 
 /** Initialize a buffer.
@@ -160,5 +161,44 @@ void buffer_rewind(buffer_t * b, size_t n);
     @return The current position.
   */
 size_t buffer_pos(buffer_t * b);
+
+/** Allocate a buffer named `name' on the stack of at most `size' bytes.
+	Does not abort on failure, but hits the max size and drops further bytes
+	written. You can turn on aborts on failure manually using
+	buffer_abortonfailure or using BUFFER_STACK_ABORT. You do not need to call
+	buffer_free(name) because nothing is ever allocated on the heap. This is
+	defined as a macro.
+
+    @param name The name of the buffer.
+    @param size The maximum size of the buffer.
+  */
+#define BUFFER_STACK(name,size) \
+	buffer_t name;\
+	char name##_ubuf[size > BUFFER_INISIZ ? size : 1]; /* Unfortunately, we can't conditionally allocate this ubuf array. Use char[1] if less than BUFFER_INISIZ */\
+	buffer_init(&name);\
+	buffer_max(&name, size);\
+	buffer_ubuf(&name, name##_ubuf, size); /* if this is less than BUFFER_INISIZ, then B->initial is still used. */
+
+/** Allocate a buffer named `name' on the stack of at most `size' bytes.
+	This works the same as BUFFER_STACK but also sets the abort flag on the
+	buffer. This is defined as a macro.
+
+    @param name The name of the buffer.
+    @param size The maximum size of the buffer.
+  */
+#define BUFFER_STACK_ABORT(name,size) \
+	BUFFER_STACK(name,size);\
+	buffer_abortonfailure(&name, 1);
+
+/** Allocate and print to a buffer named `name' on the stack of at most `size' bytes.
+	This macro uses BUFFER_STACK to allocate the buffer. Variable arguments
+	are passed to buffer_putfstring, starting with the format string.
+
+    @param name The name of the buffer.
+    @param size The maximum size of the buffer.
+  */
+#define BUFFER_STACK_PRINT(name,size,...) \
+	BUFFER_STACK(name,size);\
+	buffer_putfstring(&name, __VA_ARGS__);
 
 #endif /* BUFFER_H */
