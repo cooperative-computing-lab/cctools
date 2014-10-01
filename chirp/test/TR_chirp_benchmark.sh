@@ -21,7 +21,7 @@ run()
 	fi
 	hostport=$(cat "$c")
 
-	../src/chirp_benchmark "$hostport" foo 2 2 2
+	../src/chirp_benchmark "$hostport" foo 1 1 1
 
 	return 0
 }

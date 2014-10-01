@@ -30,7 +30,7 @@ foo bar
 EOF
 	[ "$(../src/chirp "$proxy" cat /data/foo)" = 'foo bar' ]
 
-	../src/chirp_benchmark "$proxy" bench 2 2 2
+	../src/chirp_benchmark "$proxy" bench 1 1 1
 
 	return 0
 }
