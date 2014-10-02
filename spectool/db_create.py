@@ -1,4 +1,4 @@
-#! /usr/bin/python2.7
+#! /usr/bin/python
 
 import sqlite3
 conn = sqlite3.connect('software.db')
@@ -8,9 +8,11 @@ c = conn.cursor()
 # Create table
 # each dependency is stored in the archive as tar.gz format
 c.execute('''CREATE TABLE sw_table
-             (name text, version text, platform text)''')
+             (name text, version text, platform text, store text, store_type text, type text, checksum text)''')
 
-c.execute("INSERT INTO sw_table VALUES ('cmssw', 'CMSSW_5_3_11', 'slc5_amd64_gcc462')")
+c.execute("INSERT INTO sw_table VALUES ('cmssw', 'CMSSW_5_3_11', 'slc5_amd64_gcc462', 'cvmfs:cms.cern.ch', 'description', 'software', '')")
+c.execute("INSERT INTO sw_table VALUES ('cctools', '', 'x86_64', 'https://www3.nd.edu/~ccl/research/data/hep-case-study/cctools-x86_64-redhat5.tar.gz', 'url', 'software', '28c477f2a13c3b62c6af59dbe15d404d')")
+c.execute("INSERT INTO sw_table VALUES ('cms-siteconf-local-cvmfs', '', '', 'https://www3.nd.edu/~ccl/research/data/hep-case-study/SITECONF.tar.gz', 'url', 'data', '2efd5cbb3424fe6b4a74294c84d0fb43')")
 
 #
 #c.execute('''CREATE TABLE sw_table

@@ -1,4 +1,4 @@
-#! /usr/bin/python2.7
+#! /usr/bin/python
 
 import sqlite3
 conn = sqlite3.connect('software.db')

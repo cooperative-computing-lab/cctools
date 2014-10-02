@@ -1,7 +1,7 @@
 #!/bin/sh
-rm -rf cmsjob
-mkdir cmsjob
-cd cmsjob
+rm -rf ${CMS_VERSION}
+mkdir ${CMS_VERSION}
+cd ${CMS_VERSION}
 
 . /cvmfs/cms.cern.ch/cmsset_default.sh
 scramv1 project CMSSW ${CMS_VERSION}

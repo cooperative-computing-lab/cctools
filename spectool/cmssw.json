@@ -3,11 +3,6 @@
 		"execution-environment": {
 			"hardware-platform": "x86_64",
 			"os": "Linux",
-			"kernel-release": "2.6.18-371.4.1.el5",
-			"distribution-version": {
-				"dist-name": "Redhat",
-				"dist-version": "5.10"
-			},
 			"minimum-disk-space": "30GB"
 		},
 		"software-dependencies": {
