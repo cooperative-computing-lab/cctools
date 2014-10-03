@@ -13,8 +13,8 @@ prepare() {
 
 run() {
     cd linker
-    `../../src/makeflow_analyze -b "$out_dir" absolute.mf &> tmp`
-    `diff tmp expected/absolute.mf`
+    ../../src/makeflow_analyze -b "$out_dir" absolute.mf &> tmp
+    diff tmp expected/absolute.mf
     exit $?
 }
 

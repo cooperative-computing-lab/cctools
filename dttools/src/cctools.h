@@ -8,6 +8,7 @@ See the file COPYING for details.
 #define CCTOOLS_H
 
 #include <stdio.h>
+#include <stdint.h>
 
 /** @file cctools.h Common CCTools functions for version and common
     output management.
@@ -24,7 +25,7 @@ void cctools_version_print (FILE *stream, const char *cmd);
     @param type   The debug type.
     @param cmd    The name of the program running (argv[0]).
   */
-void cctools_version_debug (int type, const char *cmd);
+void cctools_version_debug (uint64_t type, const char *cmd);
 
 
 #endif /* CCTOOLS_H */

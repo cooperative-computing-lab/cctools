@@ -33,7 +33,7 @@ struct dag *dag_create()
 	struct dag *d = malloc(sizeof(*d));
 
 	if(!d) {
-		debug(D_DEBUG, "makeflow: could not allocate new dag : %s\n", strerror(errno));
+		debug(D_MAKEFLOW_RUN, "makeflow: could not allocate new dag : %s\n", strerror(errno));
 		return NULL;
 	} else {
 		memset(d, 0, sizeof(*d));
@@ -89,7 +89,7 @@ void dag_compile_ancestors(struct dag *d)
 
 		list_first_item(f->needed_by);
 		while((n = list_next_item(f->needed_by))) {
-			debug(D_DEBUG, "rule %d ancestor of %d\n", m->nodeid, n->nodeid);
+			debug(D_MAKEFLOW_RUN, "rule %d ancestor of %d\n", m->nodeid, n->nodeid);
 			set_insert(m->descendants, n);
 			set_insert(n->ancestors, m);
 		}
@@ -101,7 +101,7 @@ int get_ancestor_depth(struct dag_node *n)
 	int group_number = -1;
 	struct dag_node *ancestor = NULL;
 
-	debug(D_DEBUG, "n->ancestor_depth: %d", n->ancestor_depth);
+	debug(D_MAKEFLOW_RUN, "n->ancestor_depth: %d", n->ancestor_depth);
 
 	if(n->ancestor_depth >= 0) {
 		return n->ancestor_depth;
@@ -111,7 +111,7 @@ int get_ancestor_depth(struct dag_node *n)
 	while((ancestor = set_next_element(n->ancestors))) {
 
 		group_number = get_ancestor_depth(ancestor);
-		debug(D_DEBUG, "group: %d, n->ancestor_depth: %d", group_number, n->ancestor_depth);
+		debug(D_MAKEFLOW_RUN, "group: %d, n->ancestor_depth: %d", group_number, n->ancestor_depth);
 		if(group_number > n->ancestor_depth) {
 			n->ancestor_depth = group_number;
 		}
@@ -173,13 +173,33 @@ struct dag_file *dag_file_from_name(struct dag *d, const char *filename)
 }
 
 /* Returns the remotename used in rule n for local name filename */
-char *dag_file_remote_name(struct dag_node *n, const char *filename)
+const char *dag_file_remote_name(struct dag_node *n, const char *filename)
 {
 	struct dag_file *f;
 	char *name;
 
 	f = dag_file_from_name(n->d, filename);
 	name = (char *) itable_lookup(n->remote_names, (uintptr_t) f);
+
+	return name;
+}
+
+/* Returns the local name of filename */
+const char *dag_file_local_name(struct dag_node *n, const char *filename)
+{
+	struct dag_file *f;
+	const char *name;
+
+	f = hash_table_lookup(n->remote_names_inv, filename);
+	
+	if(!f)
+	{
+		name =  NULL;
+	}
+	else
+	{
+		name = f->filename;
+	}
 
 	return name;
 }
@@ -283,7 +303,7 @@ struct list *dag_input_files(struct dag *d)
 	hash_table_firstkey(d->file_table);
 	while((hash_table_nextkey(d->file_table, &filename, (void **) &f)))
 		if(!f->target_of) {
-			debug(D_DEBUG, "Found independent input file: %s", f->filename);
+			debug(D_MAKEFLOW_RUN, "Found independent input file: %s", f->filename);
 			list_push_tail(il, f);
 		}
 
@@ -541,7 +561,7 @@ const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, c
 	oldname = hash_table_lookup(n->remote_names_inv, remotename);
 
 	if(oldname && strcmp(oldname, filename) == 0)
-		debug(D_DEBUG, "Remote name %s for %s already in use for %s\n", remotename, filename, oldname);
+		debug(D_MAKEFLOW_RUN, "Remote name %s for %s already in use for %s\n", remotename, filename, oldname);
 
 	itable_insert(n->remote_names, (uintptr_t) f, remotename);
 	hash_table_insert(n->remote_names_inv, remotename, (void *) f);
@@ -606,7 +626,7 @@ void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
 {
 	static time_t last_fsync = 0;
 
-	debug(D_DEBUG, "node %d %s -> %s\n", n->nodeid, dag_node_state_name(n->state), dag_node_state_name(newstate));
+	debug(D_MAKEFLOW_RUN, "node %d %s -> %s\n", n->nodeid, dag_node_state_name(n->state), dag_node_state_name(newstate));
 
 	if(d->node_states[n->state] > 0) {
 		d->node_states[n->state]--;
@@ -691,13 +711,13 @@ void dag_task_fill_resources(struct dag_node *n)
 void dag_task_print_debug_resources(struct dag_node *n)
 {
 	if( n->resources->cores > -1 )
-		debug(D_DEBUG, "cores:  %"PRId64".\n",      n->resources->cores);
+		debug(D_MAKEFLOW_RUN, "cores:  %"PRId64".\n",      n->resources->cores);
 	if( n->resources->resident_memory > -1 )
-		debug(D_DEBUG, "memory:   %"PRId64" MB.\n", n->resources->resident_memory);
+		debug(D_MAKEFLOW_RUN, "memory:   %"PRId64" MB.\n", n->resources->resident_memory);
 	if( n->resources->workdir_footprint > -1 )
-		debug(D_DEBUG, "disk:     %"PRId64" MB.\n", n->resources->workdir_footprint);
+		debug(D_MAKEFLOW_RUN, "disk:     %"PRId64" MB.\n", n->resources->workdir_footprint);
 	if( n->resources->gpus > -1 )
-		debug(D_DEBUG, "gpus:  %"PRId64".\n", n->resources->gpus);
+		debug(D_MAKEFLOW_RUN, "gpus:  %"PRId64".\n", n->resources->gpus);
 }
 
 char *dag_task_resources_wrap_as_wq_options(struct dag_node *n, const char *default_options)
