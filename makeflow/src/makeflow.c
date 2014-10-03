@@ -1852,6 +1852,12 @@ int main(int argc, char *argv[])
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
 
+	// Makeflows running LOCAL batch type have only one queue that behaves as if remote
+	// This forces -J vs -j to behave correctly
+	if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
+		explicit_remote_jobs_max = explicit_local_jobs_max;
+	} 
+
 	if(explicit_local_jobs_max) {
 		d->local_jobs_max = explicit_local_jobs_max;
 	} else {
@@ -1912,7 +1918,9 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP || batch_queue_type == BATCH_QUEUE_TYPE_HADOOP) {
+	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP || 
+	   batch_queue_type == BATCH_QUEUE_TYPE_HADOOP ||
+	   batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
 		local_queue = 0; /* all local jobs must be run on Chirp */
 		if(dag_gc_method == DAG_GC_ON_DEMAND /* NYI */ ) {
 			dag_gc_method = DAG_GC_REF_COUNT;

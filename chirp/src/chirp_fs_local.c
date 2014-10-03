@@ -178,7 +178,7 @@ static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 
 static int chirp_fs_local_fname (int fd, char path[CHIRP_PATH_MAX])
 {
-	PREAMBLE("fname(%d, `%s')", fd, path);
+	PREAMBLE("fname(%d, %p)", fd, path);
 	SETUP_FILE
 	strcpy(path, open_files[fd].path);
 	PROLOGUE
@@ -484,7 +484,7 @@ static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs *info
 
 static INT64_T chirp_fs_local_access(const char *path, INT64_T amode)
 {
-	PREAMBLE("access(`%s', %" PRId64 ")", path, amode);
+	PREAMBLE("access(`%s', 0x%" PRIx64 ")", path, amode);
 	RESOLVE(path)
 	rc = access(path, amode);
 	PROLOGUE
