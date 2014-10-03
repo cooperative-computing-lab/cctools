@@ -22,6 +22,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "full_io.h"
+#include "getopt_aux.h"
 
 static int timeout = 3600;
 
