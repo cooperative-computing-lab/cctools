@@ -77,15 +77,17 @@ getenv = true
 EOF
 
 	if [ ! -z "$cores" ]; then
-		echo "request_cpus = ${cores}" >> condor_submit_file.$$
+	    echo "request_cpus = ${cores}" >> condor_submit_file.$$
 	fi
 
 	if [ ! -z "$memory" ]; then
-		echo "request_memory = ${memory}" >> condor_submit_file.$$
+	    #Memory in megabytes
+	    echo "request_memory = ${memory}" >> condor_submit_file.$$
 	fi
 
 	if [ ! -z "$disk" ]; then
-		echo "request_disk = ${disk}" >> condor_submit_file.$$
+	    #Disk in kilobytes
+	    echo "$disk" | awk '{ printf "request_disk =  %d\n", $1 * 1024 }' >> condor_submit_file.$$
 	fi
 
 	echo "queue $count" >> condor_submit_file.$$
