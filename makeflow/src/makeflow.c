@@ -515,7 +515,7 @@ void dag_prepare_gc(struct dag *d)
 	for(i = 0; i < argc; i++) {
 		f = dag_file_lookup_or_create(d, argv[i]);
 		set_insert(d->collect_table, f);
-		debug(D_DEBUG, "Added %s to garbage collection list", f->filename);
+		debug(D_MAKEFLOW_RUN, "Added %s to garbage collection list", f->filename);
 	}
 	free(argv);
 
@@ -525,7 +525,7 @@ void dag_prepare_gc(struct dag *d)
 		/* Must initialize to non-zero for hash_table functions to work properly. */
 		f = dag_file_lookup_or_create(d, argv[i]);
 		set_remove(d->collect_table, f);
-		debug(D_DEBUG, "Removed %s from garbage collection list", f->filename);
+		debug(D_MAKEFLOW_RUN, "Removed %s from garbage collection list", f->filename);
 	}
 	free(argv);
 
@@ -534,13 +534,13 @@ void dag_prepare_gc(struct dag *d)
 	while((hash_table_nextkey(d->file_table, &filename, (void **) &f)))
 		if(dag_file_is_source(f)) {
 			set_remove(d->collect_table, f);
-			debug(D_DEBUG, "Removed %s from garbage collection list", f->filename);
+			debug(D_MAKEFLOW_RUN, "Removed %s from garbage collection list", f->filename);
 		}
 
 	/* Print reference counts of files to be collected */
 	set_first_element(d->collect_table);
 	while((f = set_next_element(d->collect_table)))
-		debug(D_DEBUG, "Added %s to garbage collection list (%d)", f->filename, f->ref_count);
+		debug(D_MAKEFLOW_RUN, "Added %s to garbage collection list (%d)", f->filename, f->ref_count);
 }
 
 void dag_prepare_nested_jobs(struct dag *d)
@@ -590,7 +590,7 @@ int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, i
 				remotename = dag_node_add_remote_name(n, f->filename, NULL);
 
 			if(remotename) {
-				debug(D_DEBUG, "creating symlink \"./%s\" for file \"%s\"\n", remotename, f->filename);
+				debug(D_MAKEFLOW_RUN, "creating symlink \"./%s\" for file \"%s\"\n", remotename, f->filename);
 				if(symlink(f->filename, remotename) < 0) {
 					if(errno != EEXIST) {
 						fatal("makeflow: could not create symbolic link (%s)\n", strerror(errno));
@@ -627,7 +627,7 @@ int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, i
 			if(f->filename[0] == '/' && !remotename) {
 				/* Translate only explicit absolute paths for Work Queue tasks. */
 				remotename = dag_node_add_remote_name(n, f->filename, NULL);
-				debug(D_DEBUG, "translating work queue absolute path (%s) -> (%s)", f->filename, remotename);
+				debug(D_MAKEFLOW_RUN, "translating work queue absolute path (%s) -> (%s)", f->filename, remotename);
 			}
 			break;
 		default:
@@ -700,7 +700,7 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 		char *value = dag_lookup_str(key, &s);
 		if(value) {
 			setenv(key, value, 1);
-			debug(D_DEBUG, "export %s=%s", key, value);
+			debug(D_MAKEFLOW_RUN, "export %s=%s", key, value);
 		}
 	}
 }
@@ -840,7 +840,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 	free(batch_options_env);
 	if(batch_submit_options) {
-		debug(D_DEBUG, "Batch options: %s\n", batch_submit_options);
+		debug(D_MAKEFLOW_RUN, "Batch options: %s\n", batch_submit_options);
 		if(batch_queue_get_option(thequeue, "batch-options"))
 			old_batch_submit_options = xxstrdup(batch_queue_get_option(thequeue, "batch-options"));
 		batch_queue_set_option(thequeue, "batch-options", batch_submit_options);
@@ -972,7 +972,7 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 				job_failed = 1;
 			} else {
 				if(output_len_check && buf.st_size <= 0) {
-					debug(D_DEBUG, "%s created a file of length %ld\n", n->command, (long) buf.st_size);
+					debug(D_MAKEFLOW_RUN, "%s created a file of length %ld\n", n->command, (long) buf.st_size);
 					job_failed = 1;
 				}
 			}
@@ -1035,7 +1035,7 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 
 		set_first_element(d->collect_table);
 		while((f = set_next_element(d->collect_table))) {
-			debug(D_DEBUG, "%s: %d\n", f->filename, f->ref_count);
+			debug(D_MAKEFLOW_RUN, "%s: %d\n", f->filename, f->ref_count);
 		}
 
 		dag_node_state_change(d, n, DAG_NODE_STATE_COMPLETE);
@@ -1048,7 +1048,7 @@ int dag_check(struct dag *d)
 	struct dag_file *f;
 	int error = 0;
 
-	debug(D_DEBUG, "checking rules for consistency...\n");
+	debug(D_MAKEFLOW_RUN, "checking rules for consistency...\n");
 
 	for(n = d->nodes; n; n = n->next) {
 		list_first_item(n->source_files);
@@ -1089,7 +1089,7 @@ int dag_gc_file(struct dag *d, const struct dag_file *f)
 		debug(D_NOTICE, "makeflow: unable to collect %s: %s", f->filename, strerror(errno));
 		return 0;
 	} else {
-		debug(D_DEBUG, "Garbage collected %s\n", f->filename);
+		debug(D_MAKEFLOW_RUN, "Garbage collected %s\n", f->filename);
 		set_remove(d->collect_table, f);
 		return 1;
 	}
@@ -1161,13 +1161,13 @@ void dag_gc(struct dag *d)
 
 	switch (dag_gc_method) {
 	case DAG_GC_REF_COUNT:
-		debug(D_DEBUG, "Performing incremental file (%d) garbage collection", dag_gc_param);
+		debug(D_MAKEFLOW_RUN, "Performing incremental file (%d) garbage collection", dag_gc_param);
 		dag_gc_all(d, dag_gc_param);
 		break;
 	case DAG_GC_ON_DEMAND:
 		batch_fs_getcwd(remote_queue, cwd, PATH_MAX);
 		if(directory_inode_count(cwd) >= dag_gc_param || directory_low_disk(cwd)) {
-			debug(D_DEBUG, "Performing on demand (%d) garbage collection", dag_gc_param);
+			debug(D_MAKEFLOW_RUN, "Performing on demand (%d) garbage collection", dag_gc_param);
 			dag_gc_all(d, INT_MAX);
 		}
 		break;
@@ -1192,7 +1192,7 @@ void dag_run(struct dag *d)
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
-				debug(D_DEBUG, "Job %" PRIbjid " has returned.\n", jobid);
+				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
 				if(n)
 					dag_node_complete(d, n, &info);
@@ -1211,7 +1211,7 @@ void dag_run(struct dag *d)
 
 			jobid = batch_job_wait_timeout(local_queue, &info, stoptime);
 			if(jobid > 0) {
-				debug(D_DEBUG, "Job %" PRIbjid " has returned.\n", jobid);
+				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
 					dag_node_complete(d, n, &info);
@@ -1430,7 +1430,7 @@ int main(int argc, char *argv[])
 	set_makeflow_exe(argv[0]);
 	debug_config(get_makeflow_exe());
 
-	cctools_version_debug(D_DEBUG, get_makeflow_exe());
+	cctools_version_debug((long) D_MAKEFLOW_RUN, get_makeflow_exe());
 	const char *dagfile;
 
 	char *batchlogfilename = NULL;

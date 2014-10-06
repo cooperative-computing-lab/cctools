@@ -97,7 +97,7 @@ int dag_to_file_files(struct dag_node *n, struct list *fs, FILE * dag_stream, ch
 		if(rename)
 			fprintf(dag_stream, "%s ", rename(n, f->filename));
 		else {
-			char *remotename = dag_file_remote_name(n, f->filename);
+			const char *remotename = dag_file_remote_name(n, f->filename);
 			if(remotename)
 				fprintf(dag_stream, "%s->%s ", f->filename, remotename);
 			else

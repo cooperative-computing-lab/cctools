@@ -94,6 +94,11 @@ static struct flag_info table[] = {
 	{"remote", D_REMOTE},
 	{"batch", D_BATCH},
 	{"rmonitor", D_RMON},
+	{"makeflow", D_MAKEFLOW},
+	{"makeflow_run", D_MAKEFLOW_RUN},
+	{"makeflow_lexer",    D_MAKEFLOW_LEXER},
+	{"makeflow_parser",   D_MAKEFLOW_PARSER},
+	{"rmonitor", D_RMON},
 	{"all", D_ALL},
 	{"time", 0},		/* backwards compatibility */
 	{"pid", 0},		/* backwards compatibility */

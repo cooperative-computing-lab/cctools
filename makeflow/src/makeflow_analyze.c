@@ -226,7 +226,7 @@ int main(int argc, char *argv[])
 	debug_config(get_makeflow_exe());
 	int display_mode = 0;
 
-	cctools_version_debug(D_DEBUG, get_makeflow_exe());
+	cctools_version_debug(D_MAKEFLOW_RUN, get_makeflow_exe());
 	const char *dagfile;
 
 	char *bundle_directory = NULL;

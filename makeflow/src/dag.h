@@ -68,41 +68,6 @@ struct dag {
     struct hash_table *task_categories;      /* Mapping from labels to category structures. */
 };
 
-struct lexer_book
-{
-	struct dag *d;                      /* The dag being built. */
-
-	struct dag_task_category *category; /* Indicates the category to which the rules belong. The
-					       idea is to have rules that perform similar tasks, or
-					       use about the same resources, to belong to the
-					       same category. task_category is updated every time the
-					       value of the variable described in the macro
-					       MAKEFLOW_TASK_CATEGORY is changed in the makeflow file.
-					    */
-
-	FILE  *stream;                  /* The file pointer the rules are been read. */
-	char *lexeme_end;
-
-	char *lexeme;
-	uint64_t lexeme_max; 
-	uint64_t lexeme_size; 
-
-	int   chunk_last_loaded;
-	char *buffer;
-
-	int substitution_mode;
-	int eof;
-
-	long int   line_number;
-	long int   column_number;
-	struct list *column_numbers;
-
-	struct list *token_queue; 
-
-	char *linetext;   //This member will be removed once the new lexer is integrated.
-};
-
-
 /* Information of task categories. Label, number of tasks in this
    category, and maximum resources allowed. */
 struct dag_task_category
@@ -243,7 +208,8 @@ const char *dag_node_state_name(dag_node_state_t state);
 void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate);
 char *dag_node_translate_filename(struct dag_node *n, const char *filename);
 
-char *dag_file_remote_name(struct dag_node *n, const char *filename);
+const char *dag_file_remote_name(struct dag_node *n, const char *filename);
+const char *dag_file_local_name(struct dag_node *n, const char *filename);
 int dag_file_isabsolute(const struct dag_file *f);
 
 void dag_variable_add_value(const char *name, struct hash_table *current_table, int nodeid, const char *value);
