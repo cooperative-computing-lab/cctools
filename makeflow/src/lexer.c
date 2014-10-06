@@ -670,7 +670,7 @@ struct token *lexer_concat_expandable(struct lexer *lx, struct list *tokens)
 	}
 	
 	t = lexer_pack_token(lx, TOKEN_LITERAL);
-	t->lexeme = xxstrdup(buffer_tostring(&b, NULL));
+	t->lexeme = xxstrdup(buffer_tostring(&b));
 	buffer_free(&b);
 	
 	return t;

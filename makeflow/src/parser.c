@@ -41,7 +41,6 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "getopt_aux.h"
 #include "rmonitor.h"
-#include "random_init.h"
 #include "path.h"
 
 #include "dag.h"
@@ -97,7 +96,7 @@ int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
 		lexer_report_error(bk, "Command does not end with newline.\n");
 	}
 	
-	n->command = xxstrdup(buffer_tostring(&b, NULL));
+	n->command = xxstrdup(buffer_tostring(&b));
 	
 	buffer_free(&b);
 
