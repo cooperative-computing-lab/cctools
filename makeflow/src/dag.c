@@ -877,7 +877,6 @@ char *dag_task_resources_wrap_options(struct dag_node *n, const char *default_op
 	switch(batch_type)
 	{
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 			return dag_task_resources_wrap_as_wq_options(n, default_options);
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:

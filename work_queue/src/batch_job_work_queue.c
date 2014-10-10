@@ -79,71 +79,6 @@ static void specify_work_queue_task_files(struct work_queue_task *t, const char 
 	}
 }
 
-static void specify_work_queue_task_shared_files(struct work_queue_task *t, const char *input_files, const char *output_files)
-{
-	if(input_files) {
-		char *files = strdup(input_files);
-		char *file = strtok(files, " \t,");
-		while(file) {
-			file = strdup(file);
-			char *p = strchr(file, '=');
-			if(p) {
-				*p = 0;
-			}
-
-			if(file[0] != '/') {
-				char *cwd = path_getcwd();
-				char *new = string_format("%s/%s", cwd, file);
-				free(file);
-				free(cwd);
-				file = new;
-			}
-
-			if(p) {
-				work_queue_task_specify_file(t, file, p + 1, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE | WORK_QUEUE_THIRDGET);
-				debug(D_BATCH, "shared file %s is %s on remote system:", file, p + 1);
-				*p = '=';
-			} else {
-				work_queue_task_specify_file(t, file, file, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE | WORK_QUEUE_THIRDGET);
-			}
-			free(file);
-			file = strtok(0, " \t,");
-		}
-		free(files);
-	}
-
-	if(output_files) {
-		char *files = strdup(output_files);
-		char *file = strtok(files, " \t,");
-		while(file) {
-			file = strdup(file);
-			char *p = strchr(file, '=');
-			if(p) {
-				*p = 0;
-			}
-
-			if(file[0] != '/') {
-				char *cwd = path_getcwd();
-				char *new = string_format("%s/%s", cwd, file);
-				free(file);
-				free(cwd);
-				file = new;
-			}
-
-			if(p) {
-				work_queue_task_specify_file(t, file, p + 1, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
-				debug(D_BATCH, "shared file %s is %s on remote system:", file, p + 1);
-				*p = '=';
-			} else {
-				work_queue_task_specify_file(t, file, file, WORK_QUEUE_OUTPUT, WORK_QUEUE_THIRDPUT);
-			}
-			free(file);
-			file = strtok(0, " \t,");
-		}
-		free(files);
-	}
-}
-
 static struct rmsummary *parse_batch_options_resources(const char *options_text)
 {
 	if(!options_text)
@@ -186,21 +121,12 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cm
 
 	free(command);
 
-	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		if(infile)
-			work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE | WORK_QUEUE_THIRDGET);
-		if(cmd)
-			work_queue_task_specify_file(t, cmd, cmd, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE | WORK_QUEUE_THIRDGET);
+	if(infile)
+		work_queue_task_specify_input_file(t, infile, infile);
+	if(cmd)
+		work_queue_task_specify_input_file(t, cmd, cmd);
 
-		specify_work_queue_task_shared_files(t, extra_input_files, extra_output_files);
-	} else {
-		if(infile)
-			work_queue_task_specify_input_file(t, infile, infile);
-		if(cmd)
-			work_queue_task_specify_input_file(t, cmd, cmd);
-
-		specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching);
-	}
+	specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching);
 
 	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
 	if(resources)
@@ -224,12 +150,7 @@ static batch_job_id_t batch_job_wq_submit_simple (struct batch_queue * q, const 
 	int caching = string_istrue(hash_table_lookup(q->options, "caching"));
 
 	t = work_queue_task_create(cmd);
-
-	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		specify_work_queue_task_shared_files(t, extra_input_files, extra_output_files);
-	} else {
-		specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching);
-	}
+	specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching);
 
 	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
 	if(resources)
@@ -387,32 +308,6 @@ batch_fs_stub_unlink(wq);
 const struct batch_queue_module batch_queue_wq = {
 	BATCH_QUEUE_TYPE_WORK_QUEUE,
 	"wq",
-
-	batch_queue_wq_create,
-	batch_queue_wq_free,
-	batch_queue_wq_port,
-	batch_queue_wq_option_update,
-
-	{
-		batch_job_wq_submit,
-		batch_job_wq_submit_simple,
-		batch_job_wq_wait,
-		batch_job_wq_remove,
-	},
-
-	{
-		batch_fs_wq_chdir,
-		batch_fs_wq_getcwd,
-		batch_fs_wq_mkdir,
-		batch_fs_wq_putfile,
-		batch_fs_wq_stat,
-		batch_fs_wq_unlink,
-	},
-};
-
-const struct batch_queue_module batch_queue_wq_sharedfs = {
-	BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS,
-	"wq-sharedfs",
 
 	batch_queue_wq_create,
 	batch_queue_wq_free,
