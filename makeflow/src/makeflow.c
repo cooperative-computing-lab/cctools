@@ -731,88 +731,76 @@ const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
 	return n->monitor_command;
 }
 
+/*
+Given a file, return the string that identifies it appropriately
+for the given batch system, combining the local and remote name.
+*/
+
+char * dag_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue )
+{
+	const char *remotename = dag_file_remote_name(n, f->filename);
+	if(!remotename) remotename = f->filename;
+
+	switch (batch_queue_get_type(queue)) {
+		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+			return string_format("%s=%s,", f->filename, remotename);
+		case BATCH_QUEUE_TYPE_CONDOR:
+			return string_format("%s,", remotename);
+		default:
+			return string_format("%s,", f->filename);
+	}
+}
+
+/*
+Given a list of files, add the files to the given string.
+Returns the original string, realloced if necessary
+*/
+
+char * dag_file_list_format( struct dag_node *node, struct list * file_list, struct batch_queue *queue )
+{
+	struct dag_file *file;
+	char *result = 0;
+
+	list_first_item(file_list);
+	while((file=list_next_item(file_list))) {
+		char *str = dag_file_format(node,file,queue);
+		result = string_combine(result,str);
+		free(str);
+	}
+
+	return result;
+}
 
 void dag_node_submit(struct dag *d, struct dag_node *n)
 {
-	char *input_files  = NULL;
-	char *output_files = NULL;
-	struct dag_file *f;
-	const char *remotename;
-	char current_dir[PATH_MAX];
-	struct batch_queue *thequeue;
-	int len = 0, len_temp;
-	char *tmp;
+	struct batch_queue *queue;
 
 	if(n->local_job && local_queue) {
-		thequeue = local_queue;
+		queue = local_queue;
 	} else {
-		thequeue = remote_queue;
+		queue = remote_queue;
 	}
-
-	batch_fs_getcwd(remote_queue, current_dir, PATH_MAX);
 
 	printf("%s\n", n->command);
 
-	list_first_item(n->source_files);
-	while((f = list_next_item(n->source_files))) {
-		remotename = dag_file_remote_name(n, f->filename);
-		if(!remotename)
-			remotename = f->filename;
-
-		switch (batch_queue_get_type(thequeue)) {
-		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			tmp = string_format("%s=%s,", f->filename, remotename);
-			break;
-		case BATCH_QUEUE_TYPE_CONDOR:
-			tmp = string_format("%s,", remotename);
-			break;
-		default:
-			tmp = string_format("%s,", f->filename);
-		}
-		len_temp = strlen(tmp);
-		input_files = realloc(input_files, (len + len_temp + 1) * sizeof(char));
-		memcpy(input_files + len, tmp, len_temp + 1);
-		len += len_temp;
-	}
-
-
-	len = 0;
-	list_first_item(n->target_files);
-	while((f = list_next_item(n->target_files))) {
-		remotename = dag_file_remote_name(n, f->filename);
-		if(!remotename)
-			remotename = f->filename;
-
-		switch (batch_queue_get_type(thequeue)) {
-		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			tmp = string_format("%s=%s,", f->filename, remotename);
-			break;
-		case BATCH_QUEUE_TYPE_CONDOR:
-			tmp = string_format("%s,", remotename);
-			break;
-		default:
-			tmp = string_format("%s,", f->filename);
-		}
-		len_temp = strlen(tmp);
-		output_files = realloc(output_files, (len + len_temp + 1) * sizeof(char));
-		memcpy(output_files + len, tmp, len_temp + 1);
-		len += len_temp;
-	}
+	/* Create strings for all the files mentioned by this node. */
+	char *input_files = dag_file_list_format(n,n->source_files,queue);
+	char *output_files = dag_file_list_format(n,n->target_files,queue);
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
 	struct dag_lookup_set s = { d, n->category, n, NULL };
 	char *batch_options_env    = dag_lookup_str("BATCH_OPTIONS", &s);
-	char *batch_submit_options = dag_task_resources_wrap_options(n, batch_options_env, batch_queue_get_type(thequeue));
+	char *batch_submit_options = dag_task_resources_wrap_options(n, batch_options_env, batch_queue_get_type(queue));
 	char *old_batch_submit_options = NULL;
 
 	free(batch_options_env);
 	if(batch_submit_options) {
 		debug(D_MAKEFLOW_RUN, "Batch options: %s\n", batch_submit_options);
-		if(batch_queue_get_option(thequeue, "batch-options"))
-			old_batch_submit_options = xxstrdup(batch_queue_get_option(thequeue, "batch-options"));
-		batch_queue_set_option(thequeue, "batch-options", batch_submit_options);
+		if(batch_queue_get_option(queue, "batch-options"))
+			old_batch_submit_options = xxstrdup(batch_queue_get_option(queue, "batch-options"));
+		batch_queue_set_option(queue, "batch-options", batch_submit_options);
 		free(batch_submit_options);
 	}
 
@@ -832,7 +820,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		else
 			command = n->command;
 
-		n->jobid = batch_job_submit_simple(thequeue, command, input_files, output_files);
+		n->jobid = batch_job_submit_simple(queue, command, input_files, output_files);
 		if(n->jobid >= 0)
 			break;
 
@@ -854,7 +842,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 	/* Restore old batch job options. */
 	if(old_batch_submit_options) {
-		batch_queue_set_option(thequeue, "batch-options", old_batch_submit_options);
+		batch_queue_set_option(queue, "batch-options", old_batch_submit_options);
 		free(old_batch_submit_options);
 	}
 
