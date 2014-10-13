@@ -106,7 +106,6 @@ static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
 static int monitor_enable_list_files  = 0;
 
-
 /* Write a verbose transaction log with SYMBOL tags.
  * SYMBOLs are category labels (SYMBOLs should be deprecated
  * once weaver/pbui tools are updated.) */
@@ -116,6 +115,10 @@ static char *monitor_limits_name = NULL;
 static int monitor_interval = 1;	// in seconds
 static char *monitor_log_format = NULL;
 static char *monitor_log_dir = NULL;
+
+static char *wrapper_command = 0;
+static struct list *wrapper_input_files = 0;
+static struct list *wrapper_output_files = 0;
 
 int verbose_parsing = 0;
 
@@ -701,7 +704,12 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 	}
 }
 
-const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
+/*
+Wraps a given command with the appropriate resource monitor string.
+Returns a newly allocated string that must be freed.
+*/
+
+const char *dag_node_rmonitor_wrap_command( struct dag_node *n, const char *command )
 {
 	char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
 	char *limits_str = dag_task_resources_wrap_as_rmonitor_options(n);
@@ -712,10 +720,7 @@ const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
 
 	log_name_prefix     = monitor_log_name(monitor_log_dir, n->nodeid);
 
-	if(n->monitor_command)
-		free(n->monitor_command);
-
-	n->monitor_command  = resource_monitor_rewrite_command((char *) n->command,
+	char * result = resource_monitor_rewrite_command(command,
 			monitor_exe,
 			log_name_prefix,
 			monitor_limits_name,
@@ -728,7 +733,7 @@ const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
 	free(extra_options);
 	free(limits_str);
 
-	return n->monitor_command;
+	return result;
 }
 
 /*
@@ -756,19 +761,18 @@ Given a list of files, add the files to the given string.
 Returns the original string, realloced if necessary
 */
 
-char * dag_file_list_format( struct dag_node *node, struct list * file_list, struct batch_queue *queue )
+char * dag_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue )
 {
 	struct dag_file *file;
-	char *result = 0;
 
 	list_first_item(file_list);
 	while((file=list_next_item(file_list))) {
-		char *str = dag_file_format(node,file,queue);
-		result = string_combine(result,str);
-		free(str);
+		char *f = dag_file_format(node,file,queue);
+		file_str = string_combine(file_str,f);
+		free(f);
 	}
 
-	return result;
+	return file_str;
 }
 
 /*
@@ -805,6 +809,38 @@ batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *com
 }
 
 /*
+Apply a wrapper_command to a given command. If the wrapper_command contains {}, do the substitution there.
+Otherwise, just append the command to the wrapper with an extra space.
+
+Example:
+
+string_wrap( "ls -l", "strace -o trace" ) -> "strace -o trace ls -l"
+string_wrap( "ls -l", "strace {} > output" ) -> "strace ls -la > output"
+string_wrap( "ls -l", 0 ) -> "ls -l"
+*/
+
+static char * string_wrap( const char *command, const char *wrapper_command )
+{
+	if(!wrapper_command) return strdup(command);
+
+	char * result = malloc(strlen(command)+strlen(wrapper_command)+2);
+	char * braces = strstr(wrapper_command,"{}");
+
+	if(braces) {
+		strcpy(result,wrapper_command);
+		result[braces-wrapper_command] = 0;
+		strcat(result,command);
+		strcat(result,braces+2);
+	} else {
+		strcpy(result,wrapper_command);
+		strcat(result," ");
+		strcpy(result,command);
+	}
+
+	return result;
+}
+
+/*
 Submit a node to the appropriate batch system, after materializing
 the necessary list of input and output files, and applying all
 wrappers and options.
@@ -820,12 +856,23 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
-	/* XXX Perhaps we should display the output *after* applying wrappers? */
-	printf("%s\n", n->command);
-
 	/* Create strings for all the files mentioned by this node. */
-	char *input_files = dag_file_list_format(n,n->source_files,queue);
-	char *output_files = dag_file_list_format(n,n->target_files,queue);
+	char *input_files = dag_file_list_format(n,0,n->source_files,queue);
+	char *output_files = dag_file_list_format(n,0,n->target_files,queue);
+
+	/* Add the wrapper input and output files to the strings. */
+	input_files = dag_file_list_format(n,input_files,wrapper_input_files,queue);
+	output_files = dag_file_list_format(n,output_files,wrapper_output_files,queue);
+
+	/* Apply the wrapper string to the command, if it is enabled. */
+	const char * command = string_wrap(n->command,wrapper_command);
+
+	/* Wrap the command with the resource monitor, if it is enabled. */
+	if(monitor_mode) {
+		const char *newcommand = dag_node_rmonitor_wrap_command(n,command);
+		free(command);
+		command = newcommand;
+	}
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
@@ -849,15 +896,8 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	 * definitions. */
 	dag_export_variables(d, n);
 
-	/* Wrap the command with the resource monitor, if it is enabled. */
-	/* XXX will this wrap the command twice if the job should fail? */
-
-	const char *command;
-	if(monitor_mode) {
-		command = dag_node_rmonitor_wrap_command(n);
-	} else {
-		command = n->command;
-	}
+	/* Display the fully elaborated command, just like Make does. */
+	printf("%s\n", command);
 
 	/* Now submit the actual job, retrying failures as needed. */
 	n->jobid = dag_node_submit_retry(queue,command,input_files,output_files);
@@ -883,6 +923,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		dag_failed_flag = 1;
 	}
 
+	free(command);
 	free(input_files);
 	free(output_files);
 }
@@ -1479,6 +1520,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_LOG_VERBOSE_MODE,
 		LONG_OPT_WORKING_DIR,
 		LONG_OPT_WQ_WAIT_FOR_WORKERS,
+		LONG_OPT_WRAPPER,
+		LONG_OPT_WRAPPER_INPUT,
+		LONG_OPT_WRAPPER_OUTPUT
 	};
 
 	static struct option long_options_run[] = {
@@ -1526,6 +1570,9 @@ int main(int argc, char *argv[])
 		{"wq-keepalive-timeout", required_argument, 0, 't'},
 		{"wq-schedule", required_argument, 0, 'W'},
 		{"wq-wait-queue-size", required_argument, 0, LONG_OPT_WQ_WAIT_FOR_WORKERS},
+		{"wrapper", required_argument, 0, LONG_OPT_WRAPPER},
+		{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
+		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
 		{"zero-length-error", no_argument, 0, 'z'},
 		{0, 0, 0, 0}
 	};
@@ -1729,6 +1776,17 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_LOG_VERBOSE_MODE:
 				log_verbose_mode = 1;
+				break;
+			case LONG_OPT_WRAPPER:
+				wrapper_command = strdup(optarg);
+				break;
+			case LONG_OPT_WRAPPER_INPUT:
+				if(!wrapper_input_files) wrapper_input_files = list_create();
+				list_push_tail(wrapper_input_files,strdup(optarg));
+				break;
+			case LONG_OPT_WRAPPER_OUTPUT:
+				if(!wrapper_output_files) wrapper_output_files = list_create();
+				list_push_tail(wrapper_output_files,strdup(optarg));
 				break;
 			default:
 				show_help_run(get_makeflow_exe());
