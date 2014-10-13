@@ -23,9 +23,9 @@ COPYING for details.
 static char *monitor_exe  = NULL;
 
 //BUG: Too much code repetition!
-char *resource_monitor_locate(char *path_from_cmdline)
+char *resource_monitor_locate(const char *path_from_cmdline)
 {
-	char *monitor_path;
+	const char *monitor_path;
 	struct stat buf;	
 
 	debug(D_RMON,"locating resource monitor executable...\n");
@@ -86,7 +86,7 @@ void resource_monitor_delete_exe(void)
 	unlink(monitor_exe);
 }
 
-char *resource_monitor_copy_to_wd(char *path_from_cmdline)
+char *resource_monitor_copy_to_wd(const char *path_from_cmdline)
 {
 	char *mon_unique;
 	char *monitor_org;
@@ -113,7 +113,7 @@ char *resource_monitor_copy_to_wd(char *path_from_cmdline)
 
 //Using default sampling interval. We may want to add an option
 //to change it.
-char *resource_monitor_rewrite_command(char *cmdline, char *monitor_path, char *template_filename, char *limits_filename,
+char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_path, const char *template_filename, const char *limits_filename,
 				       const char *extra_monitor_options,
 				       int summary, int time_series, int opened_files)
 {
