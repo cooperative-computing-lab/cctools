@@ -771,6 +771,45 @@ char * dag_file_list_format( struct dag_node *node, struct list * file_list, str
 	return result;
 }
 
+/*
+Submit one fully formed job, retrying failures up to the dag_submit_timeout.
+This is necessary because busy batch systems occasionally do
+not accept a job submission.
+*/
+
+batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files )
+{
+	time_t stoptime = time(0) + dag_submit_timeout;
+	int waittime = 1;
+	batch_job_id_t jobid = 0;
+
+	while(1) {
+		jobid = batch_job_submit_simple(queue, command, input_files, output_files);
+		if(jobid >= 0) return jobid;
+
+		fprintf(stderr, "couldn't submit batch job, still trying...\n");
+
+		if(dag_abort_flag) break;
+
+		if(time(0) > stoptime) {
+			fprintf(stderr, "unable to submit job after %d seconds!\n", dag_submit_timeout);
+			break;
+		}
+
+		sleep(waittime);
+		waittime *= 2;
+		if(waittime > 60) waittime = 60;
+	}
+
+	return 0;
+}
+
+/*
+Submit a node to the appropriate batch system, after materializing
+the necessary list of input and output files, and applying all
+wrappers and options.
+*/
+
 void dag_node_submit(struct dag *d, struct dag_node *n)
 {
 	struct batch_queue *queue;
@@ -781,6 +820,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
+	/* XXX Perhaps we should display the output *after* applying wrappers? */
 	printf("%s\n", n->command);
 
 	/* Create strings for all the files mentioned by this node. */
@@ -804,41 +844,23 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		free(batch_submit_options);
 	}
 
-	time_t stoptime = time(0) + dag_submit_timeout;
-	int waittime = 1;
-
 	/* Export variables before each submit. We have to do this before each
 	 * node submission because each node may have local variables
 	 * definitions. */
 	dag_export_variables(d, n);
 
-	while(1) {
-		const char *command;
+	/* Wrap the command with the resource monitor, if it is enabled. */
+	/* XXX will this wrap the command twice if the job should fail? */
 
-		if(monitor_mode)
-			command = dag_node_rmonitor_wrap_command(n);
-		else
-			command = n->command;
-
-		n->jobid = batch_job_submit_simple(queue, command, input_files, output_files);
-		if(n->jobid >= 0)
-			break;
-
-		fprintf(stderr, "couldn't submit batch job, still trying...\n");
-
-		if(dag_abort_flag)
-			break;
-
-		if(time(0) > stoptime) {
-			fprintf(stderr, "unable to submit job after %d seconds!\n", dag_submit_timeout);
-			break;
-		}
-
-		sleep(waittime);
-		waittime *= 2;
-		if(waittime > 60)
-			waittime = 60;
+	const char *command;
+	if(monitor_mode) {
+		command = dag_node_rmonitor_wrap_command(n);
+	} else {
+		command = n->command;
 	}
+
+	/* Now submit the actual job, retrying failures as needed. */
+	n->jobid = dag_node_submit_retry(queue,command,input_files,output_files);
 
 	/* Restore old batch job options. */
 	if(old_batch_submit_options) {
@@ -846,6 +868,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		free(old_batch_submit_options);
 	}
 
+	/* Update all of the necessary data structures. */
 	if(n->jobid >= 0) {
 		dag_node_state_change(d, n, DAG_NODE_STATE_RUNNING);
 		if(n->local_job && local_queue) {
