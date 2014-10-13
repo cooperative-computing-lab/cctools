@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import sys
 from pprint import pprint
 import subprocess
@@ -16,6 +17,9 @@ common_mountfile = ""
 special_files = ""
 hardware_platform = ""
 os_type = ""
+linux_distro = ''
+dist_name = ''
+dist_version = ''
 mount_dict = {}
 task_path = ""
 condor_submit_path = ""
@@ -91,15 +95,15 @@ def download_dependency(url, checksum, checksum_tool, dest, format_remote_storag
 	if not os.path.exists(dir_dest):
 		os.makedirs(dir_dest)
 
-	if os.path.exists(dest):
-		if checksum_tool == "md5sum":
-			local_checksum = md5_cal(dest)
-		else:
-			sys.exit(checksum_tool + "is not supported currently!")
-		if not local_checksum == checksum:
-			os.remove(dest)
-			if os.path.exists(old_dest):
-				shutil.rmtree(old_dest)
+#	if os.path.exists(dest):
+#		if checksum_tool == "md5sum":
+#			local_checksum = md5_cal(dest)
+#		else:
+#			sys.exit(checksum_tool + "is not supported currently!")
+#		if not local_checksum == checksum:
+#			os.remove(dest)
+#			if os.path.exists(old_dest):
+#				shutil.rmtree(old_dest)
 
 	if not os.path.exists(dest):
 		try:
@@ -125,13 +129,13 @@ def download_dependency(url, checksum, checksum_tool, dest, format_remote_storag
 		tfile.extractall(dir_dest)
 
 #the db table itself does not understand the collaberation relationship between cvmfs, parrot, SITECONF
-def cvmfs_software(item, conn_cursor, package_dir, batch_type):
+def cvmfs_software(item, sw_conn_cursor, package_dir, batch_type):
 	if batch_type == "local":
 		#construct the parrot submit script
 		parrot_submit_file.write("#!/bin/sh\n")
 		parrot_submit_file.write("export HTTP_PROXY=http://cache01.hep.wisc.edu:3128\n")
 		#download cctools
-		cctools_item = db_search("cctools", "", "x86_64", conn_cursor) 
+		cctools_item = db_search("cctools", "redhat5", "x86_64", sw_conn_cursor) 
 		print cctools_item
 		dest = os.path.dirname(package_dir) + "/cache/cctools-x86_64-redhat5"
 		download_dependency(cctools_item[3], cctools_item[6], "md5sum", dest, "tgz")
@@ -153,29 +157,47 @@ def cvmfs_software(item, conn_cursor, package_dir, batch_type):
 			task_file.write(user_cmd[0] + '\n')
 			parrot_submit_file.write(dest + "/bin/parrot_run -M")
 			#download SITECONF
-			site_item = db_search("cms-siteconf-local-cvmfs", "", "", conn_cursor)
+			site_item = db_search("cms-siteconf-local-cvmfs", "", "", sw_conn_cursor)
 			dest = os.path.dirname(package_dir) + "/cache/cvmfs/cms.cern.ch/SITECONF"
 			download_dependency(site_item[3], site_item[6], "md5sum", dest, "tgz")
 			parrot_submit_file.write("/cvmfs/cms.cern.ch/SITECONF/local=" + dest + "/local /bin/sh task.sh\n" )
 	elif batch_type == "condor":
 		pass			
+	elif batch_type == "ec2":
+		pass
+	else:
+		pass
 
-def db_search(name, version, platform, conn_cursor):
+def db_search(name, version, platform, sw_conn_cursor):
 	sql_cmd = 'SELECT * FROM sw_table where name = "' + name + '" and version = "' + version + '" and platform = "' + platform + '"'
-	conn_cursor.execute(sql_cmd)
-	result = conn_cursor.fetchall()
+	sw_conn_cursor.execute(sql_cmd)
+	result = sw_conn_cursor.fetchall()
 	if len(result) == 0:
 		sys.exit(sql_cmd + " fails!\n")
 	item = result[0]
 	return item
 
-def dependency_process(name, version, platform, conn_cursor, package_dir, batch_type):
-	item = db_search(name, version, platform, conn_cursor)
+def dependency_process(name, version, platform, sw_conn_cursor, package_dir, batch_type):
+	item = db_search(name, version, platform, sw_conn_cursor)
 #table schema: (name text, version text, platform text, store text, store_type text, type text)
 	store = item[3] 
 	print store[0:5]
 	if store[0:5] == "cvmfs":
-		cvmfs_software(item, conn_cursor, package_dir, batch_type)	
+		cvmfs_software(item, sw_conn_cursor, package_dir, batch_type)	
+
+def ec2_execution_environment_check ( execution_environment ):
+	print "Execution ec2 environment checking ..."
+	global hardware_platform
+	hardware_platform = execution_environment["hardware-platform"]
+	distro_name = execution_environment["linux-distribution"]["dist-name"].lower()
+	distro_version = execution_environment["linux-distribution"]["dist-version"]
+	index = distro_version.find('.')
+	global dist_name
+	dist_name = distro_name
+	global dist_version
+	dist_version = distro_version
+	global linux_distro
+	linux_distro = distro_name + distro_version[:index]
 
 def execution_environment_check(execution_environment, package_dir, batch_type):
 	print "Execution environment checking ..."
@@ -214,17 +236,19 @@ def execution_environment_check(execution_environment, package_dir, batch_type):
 		global condor_requirements
 		condor_requirements = 'TARGET.Arch == "' + hardware_platform + '" && TARGET.OpSys == "' + os_type + '"'	
 		print condor_requirements
+	elif batch_type == "ec2":
+		pass
 	else:
 		sys.exit(batch_type + " is not supported currently!\n")
 
-def software_dependencies_installation(software_dependencies, conn_cursor, package_dir, batch_type):
+def software_dependencies_installation(software_dependencies, sw_conn_cursor, package_dir, batch_type):
 	print "Installing software dependencies ..."
 	i = 1
 	for item in software_dependencies:
 		name = software_dependencies[item]['name']
 		version = software_dependencies[item]['version']
 		platform = software_dependencies[item]['platform']
-		dependency_process(name, version, platform, conn_cursor, package_dir, batch_type)
+		dependency_process(name, version, platform, sw_conn_cursor, package_dir, batch_type)
 		i = i + 1
 
 def dynamic_linker_path():
@@ -299,10 +323,88 @@ def workflow_repeat(package_dir, batch_type, output_dir):
 		func1(cmd, output_dir)
 	elif batch_type == "condor":
 		pass
+	elif batch_type == "ec2":
+		pass
 	else:
 		pass
 
-def specification_process(json_package, package_dir, method, behavior, cmd, conn_cursor, batch_type, output_dir):
+def func_call(cmd):
+	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
+	(output, err) = p.communicate()
+	p_status = p.wait()
+
+
+def ec2_process(json_package, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type):
+	if json_package.has_key("execution-environment") and json_package["execution-environment"]:
+		ec2_execution_environment_check(json_package["execution-environment"])
+		print hardware_platform
+		print linux_distro
+	else:
+		print "this spec has no execution-environment"
+
+
+
+	batch_set = ['ec2_level1', 'ec2_level2', 'ec2_level3', 'ec2_level4']
+	if batch_type in batch_set:
+		cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'yum -y install wget\''
+		print cmd	
+		func_call(cmd)
+		
+		python_item = db_search("python", linux_distro, hardware_platform, sw_conn_cursor) 
+		python_url = python_item[3]
+		#get the url of python
+		cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'wget ' + python_url + '\''
+		print cmd	
+		func_call(cmd)
+		
+		scheme, netloc, path, query, fragment = urlparse.urlsplit(python_url)
+		python_url_filename = os.path.basename(path)
+		cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'tar zxvf ' + python_url_filename + '\''
+		print cmd	 
+		func_call(cmd)
+	
+	batch_set = ['ec2_level1', 'ec2_level2']
+	#another way to do this is to add the os information into the json file
+	if batch_type in batch_set:
+		os_item = db_search(dist_name, dist_version, hardware_platform, sw_conn_cursor)
+		os_url = os_item[3]
+		cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'wget ' + os_url + '\''
+		print cmd	
+		func_call(cmd)
+
+		#set the parrot_run -m parameter
+		scheme, netloc, path, query, fragment = urlparse.urlsplit(os_url)
+		os_url_filename = os.path.basename(path)
+		cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'tar zxvf ' + os_url_filename + '\''
+		print cmd	 
+		func_call(cmd)
+
+	#scp layer_cake, cmssw.json, software.db to vm
+	cmd = 'scp -i ' + ssh_key + ' layer_cake software.db ' + json_file + ' ' + user_name + '@' + public_dns + ':' 
+	print cmd
+	func_call(cmd)
+
+	python_dir = "python-%s_%s" % (hardware_platform, linux_distro) 
+	cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'' + python_dir + '/bin/python layer_cake -c ' + json_file + ' -s specification -o output run "' + user_cmd[0] + '"\''
+	print cmd	 
+	func_call(cmd)
+
+	cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'tar czf output.tar.gz -C output stdout\''
+	print cmd	 
+	func_call(cmd)
+
+	cmd = 'scp -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ':output.tar.gz .'
+	print cmd	 
+	func_call(cmd)
+
+	if not os.path.exists(output_dir):
+		os.makedirs(output_dir)
+
+	cmd = 'tar zxC ' + output_dir + ' -f output.tar.gz'
+	print cmd	 
+	func_call(cmd)
+
+def specification_process(json_package, package_dir, method, behavior, cmd, sw_conn_cursor, cloud_conn_cursor, batch_type, output_dir):
 	if not os.path.exists(package_dir):
 		os.makedirs(package_dir)
 	#if batch_type is local, create the task.sh based on the user's requirements, download parrot, download SITEINFO, create a clean environment, do the experiment.
@@ -313,12 +415,13 @@ def specification_process(json_package, package_dir, method, behavior, cmd, conn
 		print "this spec has no execution-environment"
 
 	if json_package.has_key("software-dependencies") and json_package["software-dependencies"]:
-		software_dependencies_installation(json_package["software-dependencies"], conn_cursor, package_dir, batch_type)
+		software_dependencies_installation(json_package["software-dependencies"], sw_conn_cursor, package_dir, batch_type)
 	else:
 		print "this spec has no software-dependencies"
 
 	workflow_repeat(package_dir, batch_type, output_dir)
-#
+
+
 def dependency_check(dependency_list):
 	for item in dependency_list:
 		print "dependency check -- ", item, " "
@@ -333,6 +436,38 @@ def get_sandbox_id(path):
 	while(os.path.exists(path + '/' + str(i))):
 		i = i + 1
 	return i
+
+def get_instance_id(image_id):
+	cmd = 'ec2-run-instances ' + image_id + ' -t t1.micro -k my-key-pair -g sg-24f96141 --associate-public-ip-address true'
+	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
+	(output, err) = p.communicate()
+	p_status = p.wait()
+	while True:
+		line = output.readline()
+		if line != '':
+			line = line.rstrip()	
+			if line[:8] == 'INSTANCE':
+				instance_id = line[9:19]
+				print instance_id
+				return instance_id
+
+def get_public_dns(instance_id):
+	public_dns = ''
+	while public_dns == '':
+		cmd = 'ec2-describe-instances ' + instance_id
+		p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
+		(output, err) = p.communicate()
+		p_status = p.wait()
+		while True:
+			line = output.readline()
+			if line != '':
+				line = line.rstrip()	
+				str1 = 'PRIVATEIPADDRESS' 
+				if line[:len(str1)] == str1:
+					index = line.find("ec2")
+					public_dns = line[index:-1]
+	print public_dns
+	return public_dns
 
 def main():
 	#Problem: extension support incremental download
@@ -353,7 +488,7 @@ def main():
 	parser.add_option("-T", "--batch_type",
 					action="store", # optional because action defaults to "store"
 					default="local",
-					help="Batch system type. One of: local, cloud, condor. (By default: local)",)
+					help="Batch system type. One of: local, ec2, condor. (By default: local)",)
 	parser.add_option("-m", "--method",
 					action="store", # optional because action defaults to "store"
 					default="parrot",
@@ -383,16 +518,7 @@ def main():
 		sandbox_no = get_sandbox_id(sandbox)
 		package_dir = sandbox + '/' + str(sandbox_no)
 		print package_dir
-#		if os.path.exists(package_dir):
-#			print "This sandbox already exists! Please choose another sandbox or first delete this sandbox!!\n"
-#			sys.exit(0)
 		method = options.method
-#		if method == "chroot" and os.getuid() != 0:
-#			print "chroot method needs root authority! Please first log in as the root account and then run the program again!!\n"
-#			sys.exit(0)
-#		if method != "chroot" and method != "parrot":
-#			print "spectool currently only support two methods: parrot and chroot.\n"
-#			sys.exit(0)
 
 		json_file = options.config
 		if not os.path.isfile(json_file):
@@ -402,10 +528,13 @@ def main():
 			json_spec = json.load(json_data)
 			package_spec = json_spec["package"]
 
-	conn = sqlite3.connect('software.db')
-	conn_cursor = conn.cursor()
+	sw_conn = sqlite3.connect('software.db')
+	sw_conn_cursor = sw_conn.cursor()
+
+	cloud_conn = sqlite3.connect('ec2.db')
+	cloud_conn_cursor = cloud_conn.cursor()
 	batch_type = options.batch_type
-	print "batch_type:", batch_type
+#	print "batch_type:", batch_type
 
 	global user_cmd
 	user_cmd = args[1:]
@@ -413,7 +542,37 @@ def main():
 	if behavior in ["run", "setup", "localize"]:
 		dependency_list = []
 		dependency_check(dependency_list)
-		specification_process(package_spec, package_dir, method, behavior, cmd, conn_cursor, batch_type, output_dir)
+		user_name = 'root'
+		ssh_key = 'my-key-pair.pem'
+		if batch_type == "ec2-level1":
+			#ec2-run-instances ami-15166c25 -t t1.micro -k my-key-pair -g sg-24f96141 --associate-public-ip-address true
+			#resolve the above result to get the instance id
+			#ec2-describe-instances to get the public DNS of the instance id
+			instance_id = get_instance_id('ami-15166c25')
+			public_dns = get_public_dns(instance_id)
+			ec2_process(package_spec, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type)
+
+		elif batch_type == "ec2-level2":
+			#ssh -i ...
+			public_dns = ''	
+			ec2_process(package_spec, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type)
+		elif batch_type == "ec2-level3":
+			#ec2-run-instances ami-d76a29e7 -t t1.micro -k my-key-pair -g sg-24f96141 --associate-public-ip-address true
+			#resolve the above result to get the instance id
+			#ec2-describe-instances to get the public DNS of the instance id
+			instance_id = get_instance_id('ami-d76a29e7')
+			public_dns = get_public_dns(instance_id)
+			ec2_process(package_spec, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type)
+		elif batch_type == "ec2-level4":
+			#ssh -i my-key-pair.pem root@ec2-54-186-101-95.us-west-2.compute.amazonaws.com
+			public_dns = ''	
+			ec2_process(package_spec, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type)
+		elif batch_type == "ec2-level5":
+			#ssh -i my-key-pair.pem root@ec2-54-186-101-95.us-west-2.compute.amazonaws.com
+			public_dns = 'ec2-54-186-101-95.us-west-2.compute.amazonaws.com'
+			ec2_process(package_spec, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type)
+		else:
+			specification_process(package_spec, package_dir, method, behavior, cmd, sw_conn_cursor, cloud_conn_cursor, batch_type, output_dir)
 
 	if behavior == "localize":
 		package_spec["package-location"] = package_dir
@@ -422,18 +581,11 @@ def main():
 		with open(outfile_name, "w") as outfile:
 			json.dump(json_spec, outfile, indent = 4)
 		print "The localized version of the specification is: " + new_json + '\n'
-		conn.close()
+
+	sw_conn.close()
+	cloud_conn.close()
 
 if __name__ == "__main__":
 	main()
-#	cmd = "/bin/sh " + "/afs/nd.edu/user20/hmeng/code-github/cctools/spectool/test/18" + "/local.sh"
-#	print cmd
-#	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
-#	(output, err) = p.communicate()
-#	p_status = p.wait()
-#	print "Command output : ", output
-#	print "Command exit status/return code : ", p_status
-	
-
 
 #set sts=4 sw=4 ts=4 expandtab ft=python
