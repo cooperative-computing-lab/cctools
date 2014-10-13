@@ -709,7 +709,7 @@ Wraps a given command with the appropriate resource monitor string.
 Returns a newly allocated string that must be freed.
 */
 
-const char *dag_node_rmonitor_wrap_command( struct dag_node *n, const char *command )
+char *dag_node_rmonitor_wrap_command( struct dag_node *n, const char *command )
 {
 	char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
 	char *limits_str = dag_task_resources_wrap_as_rmonitor_options(n);
@@ -764,6 +764,10 @@ Returns the original string, realloced if necessary
 char * dag_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue )
 {
 	struct dag_file *file;
+
+	if(!file_str) file_str = strdup("");
+
+	if(!file_list) return file_str;
 
 	list_first_item(file_list);
 	while((file=list_next_item(file_list))) {
@@ -834,7 +838,7 @@ static char * string_wrap( const char *command, const char *wrapper_command )
 	} else {
 		strcpy(result,wrapper_command);
 		strcat(result," ");
-		strcpy(result,command);
+		strcat(result,command);
 	}
 
 	return result;
@@ -865,11 +869,11 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	output_files = dag_file_list_format(n,output_files,wrapper_output_files,queue);
 
 	/* Apply the wrapper string to the command, if it is enabled. */
-	const char * command = string_wrap(n->command,wrapper_command);
+	char * command = string_wrap(n->command,wrapper_command);
 
 	/* Wrap the command with the resource monitor, if it is enabled. */
 	if(monitor_mode) {
-		const char *newcommand = dag_node_rmonitor_wrap_command(n,command);
+		char *newcommand = dag_node_rmonitor_wrap_command(n,command);
 		free(command);
 		command = newcommand;
 	}
@@ -1311,6 +1315,9 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Work Queue keepalive interval.              (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
 	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
+	fprintf(stdout, " %-30s Wrap all commands with this prefix.\n", "--wrapper=<cmd>");
+	fprintf(stdout, " %-30s Wrapper command requires this input file.\n", "--wrapper-input=<cmd>");
+	fprintf(stdout, " %-30s Wrapper command produces this output file.\n", "--wrapper-input=<cmd>");
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
 	fprintf(stdout, " %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
@@ -1778,15 +1785,19 @@ int main(int argc, char *argv[])
 				log_verbose_mode = 1;
 				break;
 			case LONG_OPT_WRAPPER:
-				wrapper_command = strdup(optarg);
+				if(!wrapper_command) {
+					wrapper_command = strdup(optarg);
+				} else {
+				  wrapper_command = string_wrap(wrapper_command,optarg);
+				}
 				break;
 			case LONG_OPT_WRAPPER_INPUT:
 				if(!wrapper_input_files) wrapper_input_files = list_create();
-				list_push_tail(wrapper_input_files,strdup(optarg));
+				list_push_tail(wrapper_input_files,dag_file_create(optarg));
 				break;
 			case LONG_OPT_WRAPPER_OUTPUT:
 				if(!wrapper_output_files) wrapper_output_files = list_create();
-				list_push_tail(wrapper_output_files,strdup(optarg));
+				list_push_tail(wrapper_input_files,dag_file_create(optarg));
 				break;
 			default:
 				show_help_run(get_makeflow_exe());

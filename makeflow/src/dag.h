@@ -184,7 +184,7 @@ struct dag_variable_value {
 
 struct dag *dag_create();
 struct dag_node *dag_node_create(struct dag *d, int linenum);
-struct dag_file *dag_file_create(struct dag_node *n, const char *filename, const char *remotename);
+struct dag_file *dag_file_create( const char *filename );
 struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename);
 
 struct list *dag_input_files(struct dag *d);
