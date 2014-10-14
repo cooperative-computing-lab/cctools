@@ -11,7 +11,10 @@ import hashlib
 import difflib
 import sqlite3
 import shutil
+import datetime
 
+needed_create_mountfile = 0
+sandbox_no = 0
 env_file = ""	
 common_mountfile = ""
 special_files = ""
@@ -41,6 +44,11 @@ if sys.version_info > (2,6,):
 	import json
 else:
 	import simplejson as json #json module is introduce in python 2.4.3
+
+def func_call(cmd):
+	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
+	(output, err) = p.communicate()
+	p_status = p.wait()
 
 def md5_cal(filename, block_size=2**20):
 	try:
@@ -95,6 +103,8 @@ def download_dependency(url, checksum, checksum_tool, dest, format_remote_storag
 	if not os.path.exists(dir_dest):
 		os.makedirs(dir_dest)
 
+	if os.path.exists(dest):
+		return
 #	if os.path.exists(dest):
 #		if checksum_tool == "md5sum":
 #			local_checksum = md5_cal(dest)
@@ -106,10 +116,14 @@ def download_dependency(url, checksum, checksum_tool, dest, format_remote_storag
 #				shutil.rmtree(old_dest)
 
 	if not os.path.exists(dest):
+#		cmd = 'wget -o ' + dest + ' ' + url 
+#		print cmd
+#		func_call(cmd)
+
 		try:
 			response = urllib2.urlopen(url)
 			data = response.read()
-		except URLerror as e:
+		except urllib2.URLerror as e:
 			print "URLerror({0}): {1}".format(e.errno, e.strerror)
 			sys.exit(0)
 		with open(dest, "wb") as code:
@@ -136,11 +150,11 @@ def cvmfs_software(item, sw_conn_cursor, package_dir, batch_type):
 		parrot_submit_file.write("export HTTP_PROXY=http://cache01.hep.wisc.edu:3128\n")
 		#download cctools
 		cctools_item = db_search("cctools", "redhat5", "x86_64", sw_conn_cursor) 
-		print cctools_item
+		#print cctools_item
 		dest = os.path.dirname(package_dir) + "/cache/cctools-x86_64-redhat5"
 		download_dependency(cctools_item[3], cctools_item[6], "md5sum", dest, "tgz")
 		cvmfs_repo = item[3][6:]
-		print cvmfs_repo
+		#print cvmfs_repo
 		if cvmfs_repo == "cms.cern.ch":
 			parrot_submit_file.write("export CMS_VERSION=" + item[1] + "\n")
 			parrot_submit_file.write("export SCRAM_ARCH=" + item[2] + "\n")
@@ -160,7 +174,7 @@ def cvmfs_software(item, sw_conn_cursor, package_dir, batch_type):
 			site_item = db_search("cms-siteconf-local-cvmfs", "", "", sw_conn_cursor)
 			dest = os.path.dirname(package_dir) + "/cache/cvmfs/cms.cern.ch/SITECONF"
 			download_dependency(site_item[3], site_item[6], "md5sum", dest, "tgz")
-			parrot_submit_file.write("/cvmfs/cms.cern.ch/SITECONF/local=" + dest + "/local /bin/sh task.sh\n" )
+			parrot_submit_file.write("/cvmfs/cms.cern.ch/SITECONF/local=" + dest + "/local /bin/sh " + package_dir + "/task.sh\n" )
 	elif batch_type == "condor":
 		pass			
 	elif batch_type == "ec2":
@@ -177,13 +191,30 @@ def db_search(name, version, platform, sw_conn_cursor):
 	item = result[0]
 	return item
 
-def dependency_process(name, version, platform, sw_conn_cursor, package_dir, batch_type):
+def dependency_process(name, version, platform, mountpoint, sw_conn_cursor, package_dir, batch_type):
 	item = db_search(name, version, platform, sw_conn_cursor)
+	#print "software **** : %s" % item[3]
 #table schema: (name text, version text, platform text, store text, store_type text, type text)
 	store = item[3] 
-	print store[0:5]
+	#print store[0:5]
+	global mount_dict
 	if store[0:5] == "cvmfs":
 		cvmfs_software(item, sw_conn_cursor, package_dir, batch_type)	
+		mount_dict[mountpoint] = mountpoint
+	else:
+		#dest = os.path.dirname(package_dir) + "/cache"
+		dest = os.path.dirname(package_dir) + "/cache/" + item[0] + '-' + item[1] + '-' + item[2]
+		download_dependency(store, item[6], "md5sum", dest, "tgz")
+		mount_dict[mountpoint] = dest
+	if item[5] == 'os':
+		global env_file
+		global common_mountfile
+		global special_files
+		env_file = dest + "/env_list"
+		common_mountfile = dest + "/common-mountlist"
+		special_files = dest + "/special_files"
+		global needed_create_mountfile
+		needed_create_mountfile = 1
 
 def ec2_execution_environment_check ( execution_environment ):
 	print "Execution ec2 environment checking ..."
@@ -201,8 +232,8 @@ def ec2_execution_environment_check ( execution_environment ):
 
 def execution_environment_check(execution_environment, package_dir, batch_type):
 	print "Execution environment checking ..."
-	print execution_environment["hardware-platform"]
-	print execution_environment["os"]
+#	print execution_environment["hardware-platform"]
+#	print execution_environment["os"]
 	global hardware_platform
 	global os_type
 	hardware_platform = execution_environment["hardware-platform"]
@@ -223,9 +254,9 @@ def execution_environment_check(execution_environment, package_dir, batch_type):
 
 	if batch_type == "local":
 		uname_list = platform.uname() #(system,node,release,version,machine,processor)
-		for i in range(len(uname_list)):
-			print uname_list[i]
-		print ''
+#		for i in range(len(uname_list)):
+#			print uname_list[i]
+#		print ''
 	
 		if execution_environment["hardware-platform"].lower() != uname_list[4].lower():
 			sys.exit("The specification requires " + execution_environment["hardware-platform"].lower() + ", but the machine is " + uname_list[4].lower() + "!\n")
@@ -248,7 +279,9 @@ def software_dependencies_installation(software_dependencies, sw_conn_cursor, pa
 		name = software_dependencies[item]['name']
 		version = software_dependencies[item]['version']
 		platform = software_dependencies[item]['platform']
-		dependency_process(name, version, platform, sw_conn_cursor, package_dir, batch_type)
+		mountpoint = software_dependencies[item]['mountpoint']
+		#print name, version, platform
+		dependency_process(name, version, platform, mountpoint, sw_conn_cursor, package_dir, batch_type)
 		i = i + 1
 
 def dynamic_linker_path():
@@ -257,34 +290,35 @@ def dynamic_linker_path():
 	else:
 		return "undefined platform type"
 
-def construct_mountfile(package_dir):
-	print mount_dict
-	mountfile = package_dir + "/mountlist"		
+def construct_mountfile(sandbox_dir):
+	#print mount_dict
+	mountfile = sandbox_dir + "/mountlist"		
 	new_root = mount_dict["/"]
 	del mount_dict["/"]
-	print mount_dict
+	#print mount_dict
 	with open(mountfile, "wb") as file1:
 		file1.write("/ " + new_root + "\n")	
 		file1.write(new_root + " " + new_root + "\n")	
 		for key in mount_dict:
 			file1.write(key + " " + mount_dict[key] + "\n")
 			file1.write(mount_dict[key] + " " + mount_dict[key] + "\n")
-		print "common_mountfile"	
-		print common_mountfile
+		#print "common_mountfile"	
+		#print common_mountfile
 		with open(common_mountfile, "rb") as file2:
 			for line in file2:
 				file1.write(line)
-				print line
-		print "special_files"
-		print special_files
+		#print "special_files"
+		#print special_files
+		file1.write(sandbox_dir + ' ' + sandbox_dir + '\n')
+		file1.write('/etc/hosts /etc/hosts\n')
+		file1.write('/etc/resolv.conf /etc/resolv.conf\n')
 		with open(special_files, "rb") as file3:
 			for line in file3:
 				file1.write(line)
-				print line
+		
 	return mountfile
 
-def construct_env():
-	print env_file
+def construct_env(package_dir):
 	with open(env_file, "rb") as file1:
 		env_dict = {}
 		for line in file1:
@@ -294,10 +328,10 @@ def construct_env():
 			key = line[:index] 
 			value = line[(index+1):-1] 
 			env_dict[key] = value	
+		env_dict['PWD'] = package_dir
 		return env_dict
 
 def func1(cmd, output_dir):
-	print cmd
 	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
 	(output, err) = p.communicate()
 	p_status = p.wait()
@@ -307,9 +341,18 @@ def func1(cmd, output_dir):
 	stdout = output_dir + "/stdout"
 	with open(stdout, 'w+') as file1:
 		file1.write(output)
-#	print "Command output : ", output
-#	print "Command exit status/return code : ", p_status
 	
+def func1_withenv(cmd, env_dict, output_dir):
+	p = subprocess.Popen(cmd, env = env_dict, stdout = subprocess.PIPE, shell = True)
+	(output, err) = p.communicate()
+	p_status = p.wait()
+
+	if not os.path.exists(output_dir):
+		os.makedirs(output_dir)
+	stdout = output_dir + "/stdout"
+	with open(stdout, 'w+') as file1:
+		file1.write(output)
+
 
 def workflow_repeat(package_dir, batch_type, output_dir):
 	os.chdir(package_dir)
@@ -317,21 +360,30 @@ def workflow_repeat(package_dir, batch_type, output_dir):
 	parrot_submit_file.close()
 	condor_submit_file.close()
 	if batch_type == "local":
+		if needed_create_mountfile == 1:
+			dynamic_linker = dynamic_linker_path()
+			mountfile = construct_mountfile(package_dir)
+			env_dict = construct_env(package_dir)
+			env_dict['PARROT_MOUNT_FILE'] = mountfile
+			#here, setting the linker will cause strange errors.
+			#env_dict['PARROT_LDSO_PATH'] = dynamic_linker
+			print env_dict
+			cmd = "/bin/sh " + package_dir + "/local.sh"
+			func1_withenv(cmd, env_dict, output_dir)
 		#set environment variables dict, ld-linux path throught -l parameter of parrot_run, set mountlist through -m parameter of parrot_run
 		#cmd = "/bin/sh local.sh" 
-		cmd = "/bin/sh " + package_dir + "/local.sh"
-		func1(cmd, output_dir)
+		else:
+			cmd = "/bin/sh " + package_dir + "/local.sh"
+			func1(cmd, output_dir)
+
+
+
 	elif batch_type == "condor":
 		pass
 	elif batch_type == "ec2":
 		pass
 	else:
 		pass
-
-def func_call(cmd):
-	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
-	(output, err) = p.communicate()
-	p_status = p.wait()
 
 
 def ec2_process(json_package, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type):
@@ -343,53 +395,59 @@ def ec2_process(json_package, json_file, sw_conn_cursor, ssh_key, user_name, pub
 		print "this spec has no execution-environment"
 
 
-
 	batch_set = ['ec2_level1', 'ec2_level2', 'ec2_level3', 'ec2_level4']
 	if batch_type in batch_set:
-		cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'yum -y install wget\''
+		print "Start install python on the VM: %s" % datetime.datetime.now()
+		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'yum -y install wget\''
 		print cmd	
 		func_call(cmd)
 		
 		python_item = db_search("python", linux_distro, hardware_platform, sw_conn_cursor) 
 		python_url = python_item[3]
 		#get the url of python
-		cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'wget ' + python_url + '\''
+		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'wget ' + python_url + '\''
 		print cmd	
 		func_call(cmd)
 		
 		scheme, netloc, path, query, fragment = urlparse.urlsplit(python_url)
 		python_url_filename = os.path.basename(path)
-		cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'tar zxvf ' + python_url_filename + '\''
+		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'tar zxvf ' + python_url_filename + '\''
 		print cmd	 
+		print "Finish install python on the VM: %s" % datetime.datetime.now()
 		func_call(cmd)
 	
 	batch_set = ['ec2_level1', 'ec2_level2']
 	#another way to do this is to add the os information into the json file
 	if batch_type in batch_set:
-		os_item = db_search(dist_name, dist_version, hardware_platform, sw_conn_cursor)
-		os_url = os_item[3]
-		cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'wget ' + os_url + '\''
-		print cmd	
-		func_call(cmd)
+		print "Start add os into json: %s" % datetime.datetime.now()
+		outfile_name = 'merged_' + json_file	
+		with open(outfile_name, "w") as outfile:
+			with open(json_file) as json_data: #python 2.4 does not support this syntax: with open () as
+				json_spec = json.load(json_data)
+				json_spec_copy = json_spec
+				dict1 = {'name': dist_name, 'version': dist_version, 'platform': hardware_platform, 'mountpoint': '/'}
+				json_spec_copy["package"]['software-dependencies'][linux_distro] = dict1
+			json.dump(json_spec_copy, outfile, indent = 4)
+		json_file = outfile_name
+		print "Finish add os into json: %s" % datetime.datetime.now()
 
-		#set the parrot_run -m parameter
-		scheme, netloc, path, query, fragment = urlparse.urlsplit(os_url)
-		os_url_filename = os.path.basename(path)
-		cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'tar zxvf ' + os_url_filename + '\''
-		print cmd	 
-		func_call(cmd)
 
 	#scp layer_cake, cmssw.json, software.db to vm
+	print "Start send layer_cake software.db json file: %s" % datetime.datetime.now()
 	cmd = 'scp -i ' + ssh_key + ' layer_cake software.db ' + json_file + ' ' + user_name + '@' + public_dns + ':' 
 	print cmd
 	func_call(cmd)
+	print "Finish send layer_cake software.db json file: %s" % datetime.datetime.now()
 
-	python_dir = "python-%s_%s" % (hardware_platform, linux_distro) 
-	cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'' + python_dir + '/bin/python layer_cake -c ' + json_file + ' -s specification -o output run "' + user_cmd[0] + '"\''
+	print "Start Execution on the VM: %s" % datetime.datetime.now()
+	python_dir = "python-%s-%s" % (hardware_platform, linux_distro) 
+	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'' + python_dir + '/bin/python layer_cake -c ' + json_file + ' -s specification -o output run "' + user_cmd[0] + '"\''
 	print cmd	 
 	func_call(cmd)
+	print "Finish Execution on the VM: %s" % datetime.datetime.now()
 
-	cmd = 'ssh -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'tar czf output.tar.gz -C output stdout\''
+	print "Start Post Processing: %s" % datetime.datetime.now()
+	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'tar czf output.tar.gz -C output stdout\''
 	print cmd	 
 	func_call(cmd)
 
@@ -403,6 +461,7 @@ def ec2_process(json_package, json_file, sw_conn_cursor, ssh_key, user_name, pub
 	cmd = 'tar zxC ' + output_dir + ' -f output.tar.gz'
 	print cmd	 
 	func_call(cmd)
+	print "Finish Post Processing: %s" % datetime.datetime.now()
 
 def specification_process(json_package, package_dir, method, behavior, cmd, sw_conn_cursor, cloud_conn_cursor, batch_type, output_dir):
 	if not os.path.exists(package_dir):
@@ -438,12 +497,13 @@ def get_sandbox_id(path):
 	return i
 
 def get_instance_id(image_id):
-	cmd = 'ec2-run-instances ' + image_id + ' -t t1.micro -k my-key-pair -g sg-24f96141 --associate-public-ip-address true'
+	#cmd = 'ec2-run-instances ' + image_id + ' -t t1.micro -k my-key-pair -g sg-24f96141 --associate-public-ip-address true'
+	cmd = 'ec2-run-instances ' + image_id + ' -t c3.large -k my-key-pair -g sg-24f96141 --associate-public-ip-address true'
+	print cmd
 	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
-	(output, err) = p.communicate()
 	p_status = p.wait()
 	while True:
-		line = output.readline()
+		line = p.stdout.readline()
 		if line != '':
 			line = line.rstrip()	
 			if line[:8] == 'INSTANCE':
@@ -453,20 +513,20 @@ def get_instance_id(image_id):
 
 def get_public_dns(instance_id):
 	public_dns = ''
-	while public_dns == '':
+	while public_dns == None or public_dns == '' or public_dns == 'l':
 		cmd = 'ec2-describe-instances ' + instance_id
 		p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
-		(output, err) = p.communicate()
 		p_status = p.wait()
 		while True:
-			line = output.readline()
+			line = p.stdout.readline()
 			if line != '':
 				line = line.rstrip()	
 				str1 = 'PRIVATEIPADDRESS' 
-				if line[:len(str1)] == str1:
+				if line[:16] == str1:
 					index = line.find("ec2")
-					public_dns = line[index:-1]
-	print public_dns
+					public_dns = line[index:]
+					#print public_dns
+					break
 	return public_dns
 
 def main():
@@ -515,6 +575,7 @@ def main():
 	if behavior in ["run", "setup", "localize", "merge"]:
 		sandbox = options.sandbox
 		sandbox = os.path.abspath(sandbox)
+		global sandbox_no
 		sandbox_no = get_sandbox_id(sandbox)
 		package_dir = sandbox + '/' + str(sandbox_no)
 		print package_dir
@@ -544,32 +605,37 @@ def main():
 		dependency_check(dependency_list)
 		user_name = 'root'
 		ssh_key = 'my-key-pair.pem'
-		if batch_type == "ec2-level1":
+		if batch_type == "ec2_level1":
+			print "ec2_level 1 Start a ec2 VM: %s" % datetime.datetime.now()
 			#ec2-run-instances ami-15166c25 -t t1.micro -k my-key-pair -g sg-24f96141 --associate-public-ip-address true
 			#resolve the above result to get the instance id
 			#ec2-describe-instances to get the public DNS of the instance id
-			instance_id = get_instance_id('ami-15166c25')
+			#instance_id = get_instance_id('ami-15166c25')
+			instance_id = get_instance_id('ami-16aecc26')
 			public_dns = get_public_dns(instance_id)
+			print instance_id, public_dns
+			print "ec2_level 1 finishing start a ec2 VM: %s" % datetime.datetime.now()
+			#public_dns = "dns"
 			ec2_process(package_spec, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type)
 
-		elif batch_type == "ec2-level2":
-			#ssh -i ...
-			public_dns = ''	
+		elif batch_type == "ec2_level2":
+			#public_dns = 'ec2-54-68-43-227.us-west-2.compute.amazonaws.com'
+			public_dns = 'ec2-54-68-203-165.us-west-2.compute.amazonaws.com'
 			ec2_process(package_spec, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type)
-		elif batch_type == "ec2-level3":
+		elif batch_type == "ec2_level3":
 			#ec2-run-instances ami-d76a29e7 -t t1.micro -k my-key-pair -g sg-24f96141 --associate-public-ip-address true
 			#resolve the above result to get the instance id
 			#ec2-describe-instances to get the public DNS of the instance id
 			instance_id = get_instance_id('ami-d76a29e7')
 			public_dns = get_public_dns(instance_id)
 			ec2_process(package_spec, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type)
-		elif batch_type == "ec2-level4":
-			#ssh -i my-key-pair.pem root@ec2-54-186-101-95.us-west-2.compute.amazonaws.com
-			public_dns = ''	
+		elif batch_type == "ec2_level4":
+			#ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-186-101-95.us-west-2.compute.amazonaws.com
+			public_dns = 'ec2-54-187-212-35.us-west-2.compute.amazonaws.com'
 			ec2_process(package_spec, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type)
-		elif batch_type == "ec2-level5":
-			#ssh -i my-key-pair.pem root@ec2-54-186-101-95.us-west-2.compute.amazonaws.com
-			public_dns = 'ec2-54-186-101-95.us-west-2.compute.amazonaws.com'
+		elif batch_type == "ec2_level5":
+			#ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-186-101-95.us-west-2.compute.amazonaws.com
+			public_dns = 'ec2-54-187-212-35.us-west-2.compute.amazonaws.com'
 			ec2_process(package_spec, json_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type)
 		else:
 			specification_process(package_spec, package_dir, method, behavior, cmd, sw_conn_cursor, cloud_conn_cursor, batch_type, output_dir)

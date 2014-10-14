@@ -1,0 +1,45 @@
+./layer_cake -T ec2_level3 -c cmssw.json -s ~/specification/ -o ~/specification/cmssw_output_level3 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+Number of arguments: 11 arguments.
+Argument List: ['./layer_cake', '-T', 'ec2_level3', '-c', 'cmssw.json', '-s', '/home/hmeng/specification/', '-o', '/home/hmeng/specification/cmssw_output_level3', 'run', 'cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output']
+/home/hmeng/specification/41
+ec2-run-instances ami-d76a29e7 -t c3.large -k my-key-pair -g sg-24f96141 --associate-public-ip-address true
+i-5da3cb52
+Execution ec2 environment checking ...
+x86_64
+redhat5
+Start install python on the VM: 2014-10-15 19:14:12.490487
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-187-212-35.us-west-2.compute.amazonaws.com 'yum -y install wget'
+Warning: Permanently added 'ec2-54-187-212-35.us-west-2.compute.amazonaws.com,54.187.212.35' (RSA) to the list of known hosts.
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-187-212-35.us-west-2.compute.amazonaws.com 'wget https://www3.nd.edu/~ccl/research/data/hep-case-study/python-x86_64-redhat5.tar.gz'
+--2014-10-15 19:15:28--  https://www3.nd.edu/~ccl/research/data/hep-case-study/python-x86_64-redhat5.tar.gz
+Resolving www3.nd.edu... 129.74.12.151
+Connecting to www3.nd.edu|129.74.12.151|:443... connected.
+HTTP request sent, awaiting response... 301 Moved Permanently
+Location: http://ccl.cse.nd.edu/research/data/hep-case-study/python-x86_64-redhat5.tar.gz [following]
+--2014-10-15 19:15:29--  http://ccl.cse.nd.edu/research/data/hep-case-study/python-x86_64-redhat5.tar.gz
+Resolving ccl.cse.nd.edu... 129.74.152.167
+Connecting to ccl.cse.nd.edu|129.74.152.167|:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 23026104 (22M) [application/x-gzip]
+Saving to: `python-x86_64-redhat5.tar.gz'
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-187-212-35.us-west-2.compute.amazonaws.com 'tar zxvf python-x86_64-redhat5.tar.gz'
+Finish install python on the VM: 2014-10-15 19:15:32.572893
+Start send layer_cake software.db json file: 2014-10-15 19:15:35.515257
+scp -i my-key-pair.pem layer_cake software.db cmssw.json root@ec2-54-187-212-35.us-west-2.compute.amazonaws.com:
+Finish send layer_cake software.db json file: 2014-10-15 19:15:37.992281
+Start Execution on the VM: 2014-10-15 19:15:37.992390
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-187-212-35.us-west-2.compute.amazonaws.com 'python-x86_64-redhat5/bin/python layer_cake -c cmssw.json -s specification -o output run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"'
+
+=============================================
+
+MessageLogger Summary
+
+Severity    # Occurrences   Total Occurrences
+--------    -------------   -----------------
+Finish Execution on the VM: 2014-10-15 19:21:12.682913
+Start Post Processing: 2014-10-15 19:21:12.682984
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-187-212-35.us-west-2.compute.amazonaws.com 'tar czf output.tar.gz -C output stdout'
+scp -i my-key-pair.pem root@ec2-54-187-212-35.us-west-2.compute.amazonaws.com:output.tar.gz .
+tar zxC /home/hmeng/specification/cmssw_output_level3 -f output.tar.gz
+Finish Post Processing: 2014-10-15 19:21:15.960999
+

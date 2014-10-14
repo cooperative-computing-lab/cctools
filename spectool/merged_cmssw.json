@@ -1,0 +1,43 @@
+{
+    "package": {
+        "software-dependencies": {
+            "redhat5": {
+                "platform": "x86_64", 
+                "version": "5.10", 
+                "name": "redhat", 
+                "mountpoint": "/"
+            }, 
+            "cmssw-cvmfs": {
+                "mountpoint": "/cvmfs/cms.cern.ch", 
+                "platform": "slc5_amd64_gcc462", 
+                "version": "CMSSW_5_3_11", 
+                "name": "cmssw-cvmfs", 
+                "distro": "redhat5"
+            }
+        }, 
+        "dataset": {
+            "checksum-tool": "md5sum", 
+            "checksum": "", 
+            "location-in-package": "hadoop/users/matze/ttH/v53/2012"
+        }, 
+        "package-info": {
+            "original-author": {
+                "department": "Department of Physics", 
+                "organization": "University of Notre Dame", 
+                "name": "Matthias Wolf", 
+                "email": "mwolf3@nd.edu"
+            }, 
+            "experiment-name": "Basic_FS_RedHat5.10"
+        }, 
+        "execution-environment": {
+            "hardware-platform": "x86_64", 
+            "linux-distribution": {
+                "dist-name": "Redhat", 
+                "dist-version": "5.10"
+            }, 
+            "os": "Linux", 
+            "minimum-disk-space": "30GB", 
+            "kernel": "2.6.18"
+        }
+    }
+}

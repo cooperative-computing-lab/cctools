@@ -1,0 +1,54 @@
+
+Level1:
+ec2_level 1 Start a ec2 VM: 2014-10-15 19:01:16.980575
+ec2-run-instances ami-16aecc26 -t c3.large -k my-key-pair -g sg-24f96141 --associate-public-ip-address true
+i-14a8c01b
+i-14a8c01b ec2-54-68-203-165.us-west-2.compute.amazonaws.com
+ec2_level 1 finishing start a ec2 VM: 2014-10-15 19:01:36.012285
+Execution ec2 environment checking ...
+x86_64
+redhat5
+
+from copy os until finish:
+x86_64
+redhat5
+Start install python on the VM: 2014-10-15 19:10:51.839646
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-68-203-165.us-west-2.compute.amazonaws.com 'yum -y install wget'
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-68-203-165.us-west-2.compute.amazonaws.com 'wget https://www3.nd.edu/~ccl/research/data/hep-case-study/python-x86_64-redhat5.tar.gz'
+--2014-10-15 19:10:56--  https://www3.nd.edu/~ccl/research/data/hep-case-study/python-x86_64-redhat5.tar.gz
+Resolving www3.nd.edu... 129.74.12.151
+Connecting to www3.nd.edu|129.74.12.151|:443... connected.
+HTTP request sent, awaiting response... 301 Moved Permanently
+Location: http://ccl.cse.nd.edu/research/data/hep-case-study/python-x86_64-redhat5.tar.gz [following]
+--2014-10-15 19:10:57--  http://ccl.cse.nd.edu/research/data/hep-case-study/python-x86_64-redhat5.tar.gz
+Resolving ccl.cse.nd.edu... 129.74.152.167
+Connecting to ccl.cse.nd.edu|129.74.152.167|:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 23026104 (22M) [application/x-gzip]
+Saving to: `python-x86_64-redhat5.tar.gz'
+2014-10-15 19:10:59 (9.60 MB/s) - `python-x86_64-redhat5.tar.gz' saved [23026104/23026104]
+
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-68-203-165.us-west-2.compute.amazonaws.com 'tar zxvf python-x86_64-redhat5.tar.gz'
+Finish install python on the VM: 2014-10-15 19:11:00.382569
+Start add os into json: 2014-10-15 19:11:02.835436
+Finish add os into json: 2014-10-15 19:11:02.836948
+Start send layer_cake software.db json file: 2014-10-15 19:11:02.837033
+scp -i my-key-pair.pem layer_cake software.db merged_cmssw.json root@ec2-54-68-203-165.us-west-2.compute.amazonaws.com:
+Finish send layer_cake software.db json file: 2014-10-15 19:11:05.323366
+Start Execution on the VM: 2014-10-15 19:11:05.323472
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-68-203-165.us-west-2.compute.amazonaws.com 'python-x86_64-redhat5/bin/python layer_cake -c merged_cmssw.json -s specification -o output run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"'
+/root/specification/1/task.sh: line 4: cd: CMSSW_5_3_11: No such file or directory
+
+=============================================
+
+MessageLogger Summary
+
+Severity    # Occurrences   Total Occurrences
+--------    -------------   -----------------
+Finish Execution on the VM: 2014-10-15 19:21:48.259669
+Start Post Processing: 2014-10-15 19:21:48.259731
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i my-key-pair.pem root@ec2-54-68-203-165.us-west-2.compute.amazonaws.com 'tar czf output.tar.gz -C output stdout'
+scp -i my-key-pair.pem root@ec2-54-68-203-165.us-west-2.compute.amazonaws.com:output.tar.gz .
+tar zxC /home/hmeng/specification/cmssw_output_level2 -f output.tar.gz
+Finish Post Processing: 2014-10-15 19:21:51.902836
+
