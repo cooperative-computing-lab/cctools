@@ -1,0 +1,19 @@
+
+[hmeng@ccl12 condor_umbrella_test]$ ./umbrella -T condor -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s umbrella_test -o umbrella_test/condor_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000" 
+['/tmp/hmeng/condor_umbrella_test/4_cubes.pov', '/tmp/hmeng/condor_umbrella_test/WRC_RubiksCube.inc']
+/tmp/hmeng/condor_umbrella_test/umbrella_test/1
+condor_process start: 2014-10-20 22:44:29.091261
+Execution ec2 environment checking ...
+
+condor_process environment checking end: 2014-10-20 22:44:29.091439
+condor_process construct submit file end: 2014-10-20 22:44:29.091628
+condor_submit condor_task.submit
+condor_process submit job end: 2014-10-20 22:44:29.227438
+Waiting for the job is done ...
+
+-- Failed to fetch ads from: <129.74.152.77:9657> : ccl12.cse.nd.edu
+CEDAR:6001:Failed to connect to <129.74.152.77:9657>
+CEDAR:6001:Failed to connect to <129.74.152.77:9657>
+condor_process job execution end: 2014-10-20 23:13:28.329680
+condor_process post processing end: 2014-10-20 23:13:28.329858
+

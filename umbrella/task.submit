@@ -1,0 +1,13 @@
+universe = vanilla
+executable = umbrella 
+arguments = "-c cmssw.json -s condor_spec/ -o condor_output run 'cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output'" 
+transfer_input_files = umbrella, cmssw.json, software.db
+#transfer_output_files = 
+#environment = CMS_VERSION=CMSSW_5_3_11 SCRAM_ARCH=slc5_amd64_gcc462
+requirements = TARGET.has_cvmfs == true && TARGET.Arch == "x86_64" && TARGET.OpSys == "linux"
+output = task.output
+error = task.error
+should_transfer_files = yes
+when_to_transfer_output = on_exit
+log = task.log 
+queue 

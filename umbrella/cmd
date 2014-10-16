@@ -1,0 +1,52 @@
+python spectool -c package.json -s test -m chroot run
+python run_cmd -c run_cmd.json -s test -m chroot setup
+./umbrella -T local -c merged_cmssw.json -s ~/specification/ -o ~/specification/cmssw_output run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T local -c merged_cmssw.json -s ~/umbrella_test/ -o ~/umbrella_test/cmssw_output run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T ec2_level1 -c cmssw.json -s ~/specification/ -o ~/specification/cmssw_output_level1 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T ec2_level2 -c cmssw.json -s ~/specification/ -o ~/specification/cmssw_output_level2 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T ec2_level3 -c cmssw.json -s ~/specification/ -o ~/specification/cmssw_output_level3 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T ec2_level4 -c cmssw.json -s ~/specification/ -o ~/specification/cmssw_output_level4 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T ec2_level5 -c cmssw.json -s ~/specification/ -o ~/specification/cmssw_output_level5 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+
+
+./umbrella -T condor -c git_redhat5.json -s ~/umbrella_test/ -o ~/umbrella_test/condor_git_redhat5 run "git clone https://github.com/hmeng-19/cctools.git"
+./umbrella -T local -c git_redhat5.json -s ~/umbrella_test/ -o ~/umbrella_test/parrot_git_redhat5 run "git clone https://github.com/hmeng-19/cctools.git"
+./umbrella -T chroot -c git_redhat5.json -s ~/umbrella_test/ -o ~/umbrella_test/chroot_git_redhat5 run "git clone https://github.com/hmeng-19/cctools.git"
+./umbrella -T docker -c git_redhat5.json -s ~/umbrella_test/ -o ~/umbrella_test/docker_git_redhat5 run "git clone https://github.com/hmeng-19/cctools.git"
+
+
+./umbrella -T condor -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s umbrella_test -o umbrella_test/condor_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+./umbrella -T local -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s ~/umbrella_test/ -o ~/umbrella_test/parrot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+./umbrella -T chroot -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s ~/umbrella_test/ -o ~/umbrella_test/chroot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+./umbrella -T docker -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s ~/umbrella_test/ -o ~/umbrella_test/docker_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+
+./umbrella -T ec2_level1 -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s ~/umbrella_test/ -o ~/umbrella_test/cmssw_output_level1 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+./umbrella -T ec2_level2 -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s ~/umbrella_test/ -o ~/umbrella_test/cmssw_output_level2 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+./umbrella -T ec2_level3 -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s ~/umbrella_test/ -o ~/umbrella_test/cmssw_output_level3 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+./umbrella -T ec2_level4 -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s ~/umbrella_test/ -o ~/umbrella_test/cmssw_output_level4 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+./umbrella -T ec2_level5 -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s ~/umbrella_test/ -o ~/umbrella_test/cmssw_output_level5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+
+
+
+
+
+
+
+
+
+
+
+
+
+./umbrella -T condor -c cmssw_redhat6.json -i '' -s umbrella_test -o umbrella_test/condor_cmssw_redhat6 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T local -c cmssw_redhat6.json -i '' -s ~/umbrella_test/ -o ~/umbrella_test/parrot_cmssw_redhat6 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T chroot -c cmssw_redhat6.json -i '' -s ~/umbrella_test/ -o ~/umbrella_test/chroot_cmssw_redhat6 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T docker -c cmssw_redhat6.json -i '' -s ~/umbrella_test/ -o ~/umbrella_test/docker_cmssw_redhat6 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+
+./umbrella -T ec2_level1 -c cmssw_redhat6.json -i '' -s ~/umbrella_test/ -o ~/umbrella_test/cmssw_output_level1 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T ec2_level2 -c cmssw_redhat6.json -i '' -s ~/umbrella_test/ -o ~/umbrella_test/cmssw_output_level2 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T ec2_level3 -c cmssw_redhat6.json -i '' -s ~/umbrella_test/ -o ~/umbrella_test/cmssw_output_level3 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T ec2_level4 -c cmssw_redhat6.json -i '' -s ~/umbrella_test/ -o ~/umbrella_test/cmssw_output_level4 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+./umbrella -T ec2_level5 -c cmssw_redhat6.json -i '' -s ~/umbrella_test/ -o ~/umbrella_test/cmssw_output_level5 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+
+

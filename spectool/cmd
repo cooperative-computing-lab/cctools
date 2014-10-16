@@ -1,8 +1,0 @@
-python spectool -c package.json -s test -m chroot run
-python run_cmd -c run_cmd.json -s test -m chroot setup
-./layer_cake -T local -c merged_cmssw.json -s ~/specification/ -o ~/specification/cmssw_output run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
-./layer_cake -T ec2_level1 -c cmssw.json -s ~/specification/ -o ~/specification/cmssw_output_level1 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
-./layer_cake -T ec2_level2 -c cmssw.json -s ~/specification/ -o ~/specification/cmssw_output_level2 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
-./layer_cake -T ec2_level3 -c cmssw.json -s ~/specification/ -o ~/specification/cmssw_output_level3 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
-./layer_cake -T ec2_level4 -c cmssw.json -s ~/specification/ -o ~/specification/cmssw_output_level4 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
-./layer_cake -T ec2_level5 -c cmssw.json -s ~/specification/ -o ~/specification/cmssw_output_level5 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"

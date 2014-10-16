@@ -1,0 +1,60 @@
+[ec2-user@ip-172-31-9-6 ~]$ sudo ./umbrella -T chroot -c cmssw_redhat6.json -i '' -s ~/umbrella_test/ -o ~/umbrella_test/chroot_cmssw_redhat6 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+[]
+/home/ec2-user/umbrella_test/1
+Specification_process start: 2014-10-21 17:16:24.871452
+Execution environment checking ...
+The information of the host machine is:
+Linux ip-172-31-9-6 2.6.32-431.17.1.el6.x86_64 #1 SMP Fri Apr 11 17:27:00 EDT 2014 x86_64 x86_64 
+execution_environment_check end: 2014-10-21 17:16:24.884499
+Installing software dependencies ...
+dependency_process(cmssw-cvmfs) start: 2014-10-21 17:16:24.884599
+Download software from https://www3.nd.edu/~ccl/research/data/hep-case-study/cctools-x86_64-redhat6.tar.gz into the dir (/home/ec2-user/umbrella_test/cache/cctools-x86_64-redhat6)
+Download software from https://www3.nd.edu/~ccl/research/data/hep-case-study/SITECONF.tar.gz into the dir (/home/ec2-user/umbrella_test/cache/cvmfs/cms.cern.ch/SITECONF)
+dependency_process(cmssw-cvmfs) end: 2014-10-21 17:16:24.885790
+linux_disto: redhat6
+host_linux_distro: redhat6
+software_dependencies_installation end: 2014-10-21 17:16:24.885852
+chroot ******
+does not need to create rootfs
+/bin/sh /home/ec2-user/umbrella_test/1/local.sh
+
+=============================================
+
+MessageLogger Summary
+
+Severity    # Occurrences   Total Occurrences
+--------    -------------   -----------------
+/bin/sh /home/ec2-user/umbrella_test/1/local.sh is done 
+workflow_repeat end: 2014-10-21 17:19:27.612158
+
+
+
+[ec2-user@ip-172-31-9-6 ~]$ sudo ./umbrella -T chroot -c cmssw_redhat6.json -i '' -s ~/umbrella_test/ -o ~/umbrella_test/chroot_cmssw_redhat6 run "cmsDriver.py TTbar_Tauola_7TeV_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 0 --relval 9000,50 --eventcontent RAWSIM --no_output"
+[]
+/home/ec2-user/umbrella_test/1
+Specification_process start: 2014-10-21 17:21:01.783367
+Execution environment checking ...
+The information of the host machine is:
+Linux ip-172-31-9-6 2.6.32-431.17.1.el6.x86_64 #1 SMP Fri Apr 11 17:27:00 EDT 2014 x86_64 x86_64 
+execution_environment_check end: 2014-10-21 17:21:01.790156
+Installing software dependencies ...
+dependency_process(cmssw-cvmfs) start: 2014-10-21 17:21:01.790250
+Download software from https://www3.nd.edu/~ccl/research/data/hep-case-study/cctools-x86_64-redhat6.tar.gz into the dir (/home/ec2-user/umbrella_test/cache/cctools-x86_64-redhat6)
+Download software from https://www3.nd.edu/~ccl/research/data/hep-case-study/SITECONF.tar.gz into the dir (/home/ec2-user/umbrella_test/cache/cvmfs/cms.cern.ch/SITECONF)
+dependency_process(cmssw-cvmfs) end: 2014-10-21 17:21:05.931104
+linux_disto: redhat6
+host_linux_distro: redhat6
+software_dependencies_installation end: 2014-10-21 17:21:05.931172
+chroot ******
+does not need to create rootfs
+/bin/sh /home/ec2-user/umbrella_test/1/local.sh
+
+=============================================
+
+MessageLogger Summary
+
+Severity    # Occurrences   Total Occurrences
+--------    -------------   -----------------
+/bin/sh /home/ec2-user/umbrella_test/1/local.sh is done 
+workflow_repeat end: 2014-10-21 17:24:09.723531
+

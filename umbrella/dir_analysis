@@ -1,4 +1,4 @@
-#! /usr/bin/python2.7
+#! /usr/bin/python
 import os
 import sys
 import subprocess
@@ -16,7 +16,7 @@ def main():
 		parser.error("wrong number of arguments!")
 	dirname = args[0]
 
-	list_location = "/home/hmeng/utility/list"
+	list_location = "/home/ec2-user/list"
 	dir_listfilename = list_location + "/dir.list"
 	file_listfilename = list_location + "/file.list"
 	symlink_listfilename = list_location + "/symlink.list"
@@ -41,45 +41,47 @@ def main():
 		if len(files) > 0:
 			for file in files:
 				name = root + '/' + file
-				mode = os.lstat(name).st_mode
-				if S_ISDIR(mode):
-					dir_listfile.write(name + "\n")		
-				elif S_ISREG(mode):
-					file_listfile.write(name + "\n")		
-				elif S_ISLNK(mode):
-					symlink_listfile.write(name + "\n")		
-				elif S_ISCHR(mode):
-					chr_listfile.write(name + "\n")		
-				elif S_ISBLK(mode):
-					blk_listfile.write(name + "\n")		
-				elif S_ISFIFO(mode):
-					fifo_listfile.write(name + "\n")		
-				elif S_ISSOCK(mode):
-					sock_listfile.write(name + "\n")		
-				else:
-					unknown_listfile.write(name + "\n")
-		
+				if os.path.exists(name):
+					mode = os.lstat(name).st_mode
+					if S_ISDIR(mode):
+						dir_listfile.write(name + "\n")		
+					elif S_ISREG(mode):
+						file_listfile.write(name + "\n")		
+					elif S_ISLNK(mode):
+						symlink_listfile.write(name + "\n")		
+					elif S_ISCHR(mode):
+						chr_listfile.write(name + "\n")		
+					elif S_ISBLK(mode):
+						blk_listfile.write(name + "\n")		
+					elif S_ISFIFO(mode):
+						fifo_listfile.write(name + "\n")		
+					elif S_ISSOCK(mode):
+						sock_listfile.write(name + "\n")		
+					else:
+						unknown_listfile.write(name + "\n")
+			
 		if len(dirs) > 0:
 			for dir in dirs:
 				name = root + '/' + dir
-				mode = os.lstat(name).st_mode
-				if S_ISDIR(mode):
-					dir_listfile.write(name + "\n")		
-				elif S_ISREG(mode):
-					file_listfile.write(name + "\n")		
-				elif S_ISLNK(mode):
-					symlink_listfile.write(name + "\n")		
-				elif S_ISCHR(mode):
-					chr_listfile.write(name + "\n")		
-				elif S_ISBLK(mode):
-					blk_listfile.write(name + "\n")		
-				elif S_ISFIFO(mode):
-					fifo_listfile.write(name + "\n")		
-				elif S_ISSOCK(mode):
-					sock_listfile.write(name + "\n")		
-				else:
-					unknown_listfile.write(name + "\n")
-
+				if os.path.exists(name):
+					mode = os.lstat(name).st_mode
+					if S_ISDIR(mode):
+						dir_listfile.write(name + "\n")		
+					elif S_ISREG(mode):
+						file_listfile.write(name + "\n")		
+					elif S_ISLNK(mode):
+						symlink_listfile.write(name + "\n")		
+					elif S_ISCHR(mode):
+						chr_listfile.write(name + "\n")		
+					elif S_ISBLK(mode):
+						blk_listfile.write(name + "\n")		
+					elif S_ISFIFO(mode):
+						fifo_listfile.write(name + "\n")		
+					elif S_ISSOCK(mode):
+						sock_listfile.write(name + "\n")		
+					else:
+						unknown_listfile.write(name + "\n")
+	
 	dir_listfile.close()
 	file_listfile.close()
 	symlink_listfile.close()

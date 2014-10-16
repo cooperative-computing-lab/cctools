@@ -1,0 +1,12 @@
+universe = vanilla
+executable = umbrella
+arguments = "-c povray_redhat5.json -s condor_umbrella -i '4_cubes.pov, WRC_RubiksCube.inc' -o condor_umbrella_output run 'povray +I4_cubes.pov +Oframe000.png +K.0'"
+transfer_input_files = umbrella, software.db, povray_redhat5.json, 4_cubes.pov, WRC_RubiksCube.inc
+transfer_output_files = condor_umbrella_output
+requirements = TARGET.Arch == "x86_64" && TARGET.OpSys == "Linux" && TARGET.OpSysAndVer == "redhat6"
+output = stdout
+error = stderr
+should_transfer_files = yes
+when_to_transfer_output = on_exit
+log = task.log
+queue

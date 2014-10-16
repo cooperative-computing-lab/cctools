@@ -1,0 +1,8 @@
+RESERVATION	r-36d5803b	477277093666	
+INSTANCE	i-45acb748	ami-d76a29e7	ec2-54-186-50-43.us-west-2.compute.amazonaws.com	ip-172-31-22-212.us-west-2.compute.internal	running	my-key-pair	0		t1.micro	2014-10-13T16:19:26+0000	us-west-2a	aki-fc8f11cc			monitoring-disabled	54.186.50.43	172.31.22.212	vpc-01ccd463	subnet-810600f5	ebs					paravirtual	xen		sg-24f96141	default	false	
+BLOCKDEVICE	/dev/sda1	vol-7583df70	2014-10-13T16:19:30.000Z	true		
+NIC	eni-952d29e2	subnet-810600f5	vpc-01ccd463	477277093666	in-use	172.31.22.212	ip-172-31-22-212.us-west-2.compute.internal	true
+NICATTACHMENT	eni-attach-aa67b9a3	0	attached	2014-10-13T12:19:26-0400	true
+NICASSOCIATION	54.186.50.43	amazon	172.31.22.212
+GROUP	sg-24f96141	hmeng-sg
+PRIVATEIPADDRESS	172.31.22.212	ip-172-31-22-212.us-west-2.compute.internal	ec2-54-186-50-43.us-west-2.compute.amazonaws.com

@@ -1,0 +1,42 @@
+
+[ec2-user@ip-172-31-8-223 ~]$ ./umbrella -T docker -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s ~/umbrella_test/ -o ~/umbrella_test/docker_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+['/home/ec2-user/4_cubes.pov', '/home/ec2-user/WRC_RubiksCube.inc']
+/home/ec2-user/umbrella_test/1
+Specification_process start: 2014-10-20 23:45:36.386215
+Execution environment checking ...
+The information of the host machine is:
+Linux ip-172-31-8-223 2.6.32-431.17.1.el6.x86_64 #1 SMP Fri Apr 11 17:27:00 EDT 2014 x86_64 x86_64 
+execution_environment_check end: 2014-10-20 23:45:36.393254
+Installing software dependencies ...
+dependency_process(povray) start: 2014-10-20 23:45:36.393357
+Download software from https://www3.nd.edu/~ccl/research/data/hep-case-study/povray-x86_64-redhat5.tar.gz into the dir (/home/ec2-user/umbrella_test/cache/povray-x86_64-redhat5)
+
+dependency_process(povray) end: 2014-10-20 23:45:38.471061
+linux_disto: redhat5
+host_linux_distro: redhat6
+The required linux distro specified in the specification is redhat5; the linux distro of the host machine is redhat6. The redhat5 os images will be downloaded.
+dependency_process(redhat) start: 2014-10-20 23:45:38.471144
+Download software from https://www3.nd.edu/~ccl/research/data/hep-case-study/redhat-5.10-x86_64.tar.gz into the dir (/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64)
+dependency_process(redhat) end: 2014-10-20 23:46:48.105527
+software_dependencies_installation end: 2014-10-20 23:46:48.113394
+local-docker import os image directory into a docker image start: 2014-10-20 23:46:48.113436
+docker *******
+uid: 500; gid: 500
+redhat5 redhat6 x86_64 redhat 5.10
+{u'/software/povray-x86_64-redhat5': u'/home/ec2-user/umbrella_test/cache/povray-x86_64-redhat5', '/': u'/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64'}
+docker images redhat-5.10-x86_64
+docker image does not exist
+cd /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64; tar --owner=root -c .|docker import - redhat-5.10-x86_64; cd -
+tar: ./usr/bin/sudoedit: Cannot open: Permission denied
+tar: ./usr/bin/sudo: Cannot open: Permission denied
+tar: ./usr/bin/staprun: Cannot open: Permission denied
+tar: Exiting with failure status due to previous errors
+local-docker import os image directory into a docker image end: 2014-10-20 23:48:13.355566
+ -v /home/ec2-user/umbrella_test/docker_povray_redhat5:/home/ec2-user/umbrella_test/docker_povray_redhat5   -v /home/ec2-user/umbrella_test/cache/povray-x86_64-redhat5:/software/povray-x86_64-redhat5  /software/povray-x86_64-redhat5/bin:/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin
+docker run --name git_redhat5_container1 -i -t  -v /home/ec2-user/umbrella_test/docker_povray_redhat5:/home/ec2-user/umbrella_test/docker_povray_redhat5   -v /home/ec2-user/umbrella_test/cache/povray-x86_64-redhat5:/software/povray-x86_64-redhat5  -e "PATH=/software/povray-x86_64-redhat5/bin:/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin" redhat-5.10-x86_64 /bin/sh -c "cd /home/ec2-user/umbrella_test/docker_povray_redhat5; povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000; chown -R 500:500 /home/ec2-user/umbrella_test/docker_povray_redhat5"
+
+local-docker docker run user_cmd end: 2014-10-21 00:17:35.470226
+docker rm git_redhat5_container1
+local-docker docker post processing end: 2014-10-21 00:17:37.604153
+workflow_repeat end: 2014-10-21 00:17:37.604403
+

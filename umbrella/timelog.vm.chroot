@@ -1,0 +1,92 @@
+[ec2-user@ip-172-31-8-10 ~]$ sudo ./umbrella -T chroot -c povray_redhat5.json -i '4_cubes.pov, WRC_RubiksCube.inc' -s ~/umbrella_test/ -o ~/umbrella_test/chroot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+['/home/ec2-user/4_cubes.pov', '/home/ec2-user/WRC_RubiksCube.inc']
+/home/ec2-user/umbrella_test/1
+Specification_process start: 2014-10-20 23:40:31.253638
+Execution environment checking ...
+The information of the host machine is:
+Linux ip-172-31-8-10 2.6.32-431.17.1.el6.x86_64 #1 SMP Fri Apr 11 17:27:00 EDT 2014 x86_64 x86_64 
+execution_environment_check end: 2014-10-20 23:40:31.261016
+Installing software dependencies ...
+dependency_process(povray) start: 2014-10-20 23:40:31.261105
+Download software from https://www3.nd.edu/~ccl/research/data/hep-case-study/povray-x86_64-redhat5.tar.gz into the dir (/home/ec2-user/umbrella_test/cache/povray-x86_64-redhat5)
+dependency_process(povray) end: 2014-10-20 23:40:33.337221
+linux_disto: redhat5
+host_linux_distro: redhat6
+The required linux distro specified in the specification is redhat5; the linux distro of the host machine is redhat6. The redhat5 os images will be downloaded.
+dependency_process(redhat) start: 2014-10-20 23:40:33.337297
+
+Download software from https://www3.nd.edu/~ccl/research/data/hep-case-study/redhat-5.10-x86_64.tar.gz into the dir (/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64)
+dependency_process(redhat) end: 2014-10-20 23:43:46.300440
+software_dependencies_installation end: 2014-10-20 23:43:46.308467
+chroot ******
+local-chroot rootfs construct and env setting start: 2014-10-20 23:43:46.308519
+function construct_chroot_mount_dict
+{'/dev': '/dev', '/home/ec2-user/umbrella_test/1': '/home/ec2-user/umbrella_test/1', '/proc': '/proc', '/home/ec2-user/umbrella_test/chroot_povray_redhat5': '/home/ec2-user/umbrella_test/chroot_povray_redhat5'}
+{u'/software/povray-x86_64-redhat5': u'/home/ec2-user/umbrella_test/cache/povray-x86_64-redhat5', '/': u'/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64'}
+{'/dev': '/dev', u'/home/ec2-user/umbrella_test/cache/povray-x86_64-redhat5': u'/software/povray-x86_64-redhat5', '/home/ec2-user/umbrella_test/1': '/home/ec2-user/umbrella_test/1', '/proc': '/proc', '/home/ec2-user/umbrella_test/chroot_povray_redhat5': '/home/ec2-user/umbrella_test/chroot_povray_redhat5'}
+{'/etc/hosts': '/etc/hosts', '/etc/group': '/etc/group', '/etc/resolv.conf': '/etc/resolv.conf', '/etc/passwd': '/etc/passwd'}
+mount --bind -o ro /dev /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/dev
+mount --bind -o ro /home/ec2-user/umbrella_test/cache/povray-x86_64-redhat5 /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/software/povray-x86_64-redhat5
+mount --bind -o ro /home/ec2-user/umbrella_test/1 /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/home/ec2-user/umbrella_test/1
+mount --bind -o ro /proc /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/proc
+mount --bind -o ro /home/ec2-user/umbrella_test/chroot_povray_redhat5 /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/home/ec2-user/umbrella_test/chroot_povray_redhat5
+mount --bind -o ro /etc/hosts /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/etc/hosts
+mount --bind -o ro /etc/group /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/etc/group
+mount --bind -o ro /etc/resolv.conf /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/etc/resolv.conf
+mount --bind -o ro /etc/passwd /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/etc/passwd
+chroot_path_env 
+{u'/software/povray-x86_64-redhat5': u'/home/ec2-user/umbrella_test/cache/povray-x86_64-redhat5', '/': u'/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64'}
+/software/povray-x86_64-redhat5/bin:
+{'LESSOPEN': '|/usr/bin/lesspipe.sh %s', 'SSH_CLIENT': '74.94.121.59 58370 22', 'CVS_RSH': 'ssh', 'LOGNAME': 'root', 'USER': 'root', 'INPUTRC': '/etc/inputrc', 'HOME': '/root', 'PATH': u'/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin:/software/povray-x86_64-redhat5/bin', 'LANG': 'en_US.UTF-8', 'TERM': 'xterm-color', 'SHELL': '/bin/bash', 'SHLVL': '1', 'G_BROKEN_FILENAMES': '1', 'HISTSIZE': '1000', '_': '/bin/env', 'SSH_CONNECTION': '74.94.121.59 58370 129.74.246.188 22', 'SSH_TTY': '/dev/pts/0', 'OLDPWD': '/root', 'HOSTNAME': 'ndcloudvm041', 'PWD': '/home/ec2-user/umbrella_test/1', 'MAIL': '/var/spool/mail/root', 'LS_COLORS': 'no=00:fi=00:di=01;34:ln=01;36:pi=40;33:so=01;35:bd=40;33;01:cd=40;33;01:or=01;05;37;41:mi=01;05;37;41:ex=01;32:*.cmd=01;32:*.exe=01;32:*.com=01;32:*.btm=01;32:*.bat=01;32:*.sh=01;32:*.csh=01;32:*.tar=01;31:*.tgz=01;31:*.arj=01;31:*.taz=01;31:*.lzh=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.gz=01;31:*.bz2=01;31:*.bz=01;31:*.tz=01;31:*.rpm=01;31:*.cpio=01;31:*.jpg=01;35:*.gif=01;35:*.bmp=01;35:*.xbm=01;35:*.xpm=01;35:*.png=01;35:*.tif=01;35:'}
+local-chroot rootfs construct and env setting end: 2014-10-20 23:43:51.557161
+chroot /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64 /bin/sh -c "cd /home/ec2-user/umbrella_test/1; povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"
+povray: cannot open the system configuration file /usr/local/etc/povray/3.6/povray.conf: No such file or directory
+povray: cannot open the user configuration file /root/.povray/3.6/povray.conf: No such file or directory
+povray: I/O restrictions are disabled.
+povray: cannot open an INI file, creating a temporary file '/home/ec2-user/umbr
+
+
+
+----------------------------------------------------------------------------
+Box                         2936898146       309596088     10.54
+Cone/Cylinder               1223434152       163795512     13.39
+Plane                       1151957188        25000000      2.17
+Sphere                        91976227        18542794     20.16
+Bounding Box               34395965287      9312054137     27.07
+Vista Buffer                1368617712       815901821     59.62
+----------------------------------------------------------------------------
+Calls to Noise:                   0   Calls to DNoise:       215398210
+----------------------------------------------------------------------------
+Shadow Ray Tests:        1822210870   Succeeded:             312821299
+Reflected Rays:           215398200
+----------------------------------------------------------------------------
+Smallest Alloc:                   9 bytes
+Largest  Alloc:              100028 bytes
+Peak memory used:           6101712 bytes
+Total Scene Processing Times
+  Parse Time:    0 hours  0 minutes  0 seconds (0 seconds)
+  Photon Time:   0 hours  0 minutes  0 seconds (0 seconds)
+  Render Time:   0 hours 25 minutes 33 seconds (1533 seconds)
+  Total Time:    0 hours 25 minutes 33 seconds (1533 seconds)
+local-chroot user_cmd execute end: 2014-10-21 00:09:25.477654
+umount -f /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/dev
+/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/dev is empty
+umount -f /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/software/povray-x86_64-redhat5
+/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/software/povray-x86_64-redhat5 is empty
+/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/software is empty
+umount -f /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/home/ec2-user/umbrella_test/1
+/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/home/ec2-user/umbrella_test/1 is empty
+umount -f /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/proc
+/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/proc is empty
+umount -f /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/home/ec2-user/umbrella_test/chroot_povray_redhat5
+/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/home/ec2-user/umbrella_test/chroot_povray_redhat5 is empty
+/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/home/ec2-user/umbrella_test is empty
+/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/home/ec2-user is empty
+/home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/home is empty
+umount -f /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/etc/hosts
+umount -f /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/etc/group
+umount -f /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/etc/resolv.conf
+umount -f /home/ec2-user/umbrella_test/cache/redhat-5.10-x86_64/etc/passwd
+local-chroot post processing end: 2014-10-21 00:09:25.848114
+workflow_repeat end: 2014-10-21 00:09:25.848262
+

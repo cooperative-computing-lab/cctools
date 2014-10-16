@@ -1,0 +1,27 @@
+[hmeng@ccl12 umbrella]$ cat timelog.level1 
+['/afs/nd.edu/user20/hmeng/git-development/cctools/umbrella/4_cubes.pov', '/afs/nd.edu/user20/hmeng/git-development/cctools/umbrella/WRC_RubiksCube.inc']
+/afs/nd.edu/user20/hmeng/umbrella_test/4
+ec2_level 1 Start a ec2 VM: 2014-10-20 21:47:21.420442
+ec2-run-instances ami-16aecc26 -t c3.large -k hmeng_key_1018 -g sg-24f96141 --associate-public-ip-address true
+i-e8c580e7
+i-e8c580e7 ec2-54-69-204-202.us-west-2.compute.amazonaws.com
+ec2_level 1 finishing start a ec2 VM: 2014-10-20 21:47:41.034912
+Execution ec2 environment checking ...
+x86_64
+redhat5
+Start install python on the VM: 2014-10-20 21:47:41.035065
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i hmeng_key_1018.pem root@ec2-54-69-204-202.us-west-2.compute.amazonaws.com 'yum -y install wget'
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i hmeng_key_1018.pem root@ec2-54-69-204-202.us-west-2.compute.amazonaws.com 'wget https://www3.nd.edu/~ccl/research/data/hep-case-study/python-x86_64-redhat5.tar.gz'
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i hmeng_key_1018.pem root@ec2-54-69-204-202.us-west-2.compute.amazonaws.com 'tar zxvf python-x86_64-redhat5.tar.gz'
+Finish install python on the VM: 2014-10-20 21:48:20.752064
+Start send umbrella software.db json file: 2014-10-20 21:48:25.097611
+scp -i hmeng_key_1018.pem umbrella software.db povray_redhat5.json /afs/nd.edu/user20/hmeng/git-development/cctools/umbrella/4_cubes.pov /afs/nd.edu/user20/hmeng/git-development/cctools/umbrella/WRC_RubiksCube.inc  root@ec2-54-69-204-202.us-west-2.compute.amazonaws.com:
+Finish send umbrella software.db json file: 2014-10-20 21:48:25.181882
+Start Execution on the VM: 2014-10-20 21:48:25.181919
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i hmeng_key_1018.pem root@ec2-54-69-204-202.us-west-2.compute.amazonaws.com 'python-x86_64-redhat5/bin/python umbrella -c povray_redhat5.json -s specification -i "4_cubes.pov, WRC_RubiksCube.inc" -o output run "povray +I4_cubes.pov +Oframe000.png +K.0  -H5000 -W5000"'
+Finish Execution on the VM: 2014-10-20 21:48:27.153304
+Start Post Processing: 2014-10-20 21:48:27.153361
+ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i hmeng_key_1018.pem root@ec2-54-69-204-202.us-west-2.compute.amazonaws.com 'tar cvzf output.tar.gz output'
+scp -i hmeng_key_1018.pem root@ec2-54-69-204-202.us-west-2.compute.amazonaws.com:output.tar.gz .
+tar zxvf output.tar.gz
+
