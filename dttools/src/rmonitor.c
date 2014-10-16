@@ -25,12 +25,12 @@ static char *monitor_exe  = NULL;
 //BUG: Too much code repetition!
 char *resource_monitor_locate(const char *path_from_cmdline)
 {
-	const char *monitor_path;
+	char *monitor_path;
 	struct stat buf;	
 
 	debug(D_RMON,"locating resource monitor executable...\n");
 
-	monitor_path = path_from_cmdline;
+	monitor_path = (char*) path_from_cmdline;
 	if(monitor_path)
 	{
 		debug(D_RMON,"trying executable from path provided at command line.\n");

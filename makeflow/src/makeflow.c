@@ -737,8 +737,35 @@ char *dag_node_rmonitor_wrap_command( struct dag_node *n, const char *command )
 }
 
 /*
+Look up the value of a variable with respect to one node.
+Returns a newly allocated string that must be freed.
+*/
+
+char * dag_node_lookup_str( struct dag_node *n, const char *key )
+{
+	struct dag_lookup_set s = { n->d, n->category, n, NULL };
+
+	if(!strcmp(key,"RULE") || !strcmp(key,"NODE")) {
+		return string_format("%d",n->nodeid);
+	}
+
+	return dag_lookup_str(key, &s);
+}
+
+/*
+Same as dag_node_lookup_str, but with the arguments reversed
+which makes it compatible with the string_subst function.
+*/
+
+char *dag_node_lookup_str_reverse( const char *key, void *vn )
+{
+	return dag_node_lookup_str(vn,key);
+}
+
+/*
 Given a file, return the string that identifies it appropriately
-for the given batch system, combining the local and remote name.
+for the given batch system, combining the local and remote name
+and making substitutions according to the node.
 */
 
 char * dag_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue )
@@ -781,8 +808,7 @@ char * dag_file_list_format( struct dag_node *node, char *file_str, struct list 
 
 /*
 Submit one fully formed job, retrying failures up to the dag_submit_timeout.
-This is necessary because busy batch systems occasionally do
-not accept a job submission.
+This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
 batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files )
@@ -818,12 +844,12 @@ Otherwise, just append the command to the wrapper with an extra space.
 
 Example:
 
-string_wrap( "ls -l", "strace -o trace" ) -> "strace -o trace ls -l"
-string_wrap( "ls -l", "strace {} > output" ) -> "strace ls -la > output"
-string_wrap( "ls -l", 0 ) -> "ls -l"
+string_wrap_command( "ls -l", "strace -o trace" ) -> "strace -o trace ls -l"
+string_wrap_command( "ls -l", "strace {} > output" ) -> "strace ls -la > output"
+string_wrap_command( "ls -l", 0 ) -> "ls -l"
 */
 
-static char * string_wrap( const char *command, const char *wrapper_command )
+static char * string_wrap_command( const char *command, const char *wrapper_command )
 {
 	if(!wrapper_command) return strdup(command);
 
@@ -865,11 +891,12 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	char *output_files = dag_file_list_format(n,0,n->target_files,queue);
 
 	/* Add the wrapper input and output files to the strings. */
+	/* This function may realloc input_files and output_files. */
 	input_files = dag_file_list_format(n,input_files,wrapper_input_files,queue);
 	output_files = dag_file_list_format(n,output_files,wrapper_output_files,queue);
 
-	/* Apply the wrapper string to the command, if it is enabled. */
-	char * command = string_wrap(n->command,wrapper_command);
+	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
+	char * command = string_wrap_command(n->command,wrapper_command);
 
 	/* Wrap the command with the resource monitor, if it is enabled. */
 	if(monitor_mode) {
@@ -899,6 +926,14 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	 * node submission because each node may have local variables
 	 * definitions. */
 	dag_export_variables(d, n);
+
+	/*
+	Just before execution, apply variable substitution to the command and the
+	file list, so that it applies to wrapper commands, files, and everything.
+	*/
+	command = string_subst( command, dag_node_lookup_str_reverse, n );
+	input_files = string_subst( input_files, dag_node_lookup_str_reverse, n );
+	output_files = string_subst( output_files, dag_node_lookup_str_reverse, n );
 
 	/* Display the fully elaborated command, just like Make does. */
 	printf("%s\n", command);
@@ -1788,7 +1823,7 @@ int main(int argc, char *argv[])
 				if(!wrapper_command) {
 					wrapper_command = strdup(optarg);
 				} else {
-				  wrapper_command = string_wrap(wrapper_command,optarg);
+					wrapper_command = string_wrap_command(wrapper_command,optarg);
 				}
 				break;
 			case LONG_OPT_WRAPPER_INPUT:
@@ -1797,7 +1832,7 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_WRAPPER_OUTPUT:
 				if(!wrapper_output_files) wrapper_output_files = list_create();
-				list_push_tail(wrapper_input_files,dag_file_create(optarg));
+				list_push_tail(wrapper_output_files,dag_file_create(optarg));
 				break;
 			default:
 				show_help_run(get_makeflow_exe());
