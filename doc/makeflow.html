@@ -339,8 +339,6 @@ the entire cluster, and the following environment variables must be set.</p>
 
 <p>The wrapper script is a shell script that reads the command to be run as an argument and handles bookkeeping operations necessary for Makeflow.</p>
 
-
-
 <h2 id="workqueue">Running Makeflow with Work Queue<a class="sectionlink" href="#workqueue" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>With the '-T wq' option, Makeflow runs as a master process that dispatches
@@ -417,6 +415,31 @@ make your masters and workers contact this catalog server, simply add the
 <code>% makeflow -T wq -C catalog.somewhere.edu:9097 -N MyProj example.makeflow
 % work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj 
 </code>
+
+
+<h2 id="wrappers">Wrapper Commands<a class="sectionlink" href="#wrappers" title="Link to this section.">&#x21d7;</a></h2>
+
+Makeflow allows a global wrapper command to be applied to every rule in the workflow.  This is particularly useful for applying troubleshooting tools, or for setting up a global environment without rewriting the entire workflow.  The <tt>--wrapper</tt> option will prefix a command in front of every rule, while the <tt>--wrapper-input</tt> and <tt>--wrapper-output</tt> options will specify input and output files related to the wrapper.
+<p>
+For example, suppose that you wish to apply <tt>/usr/bin/time</tt> to every rule in the workflow.  Instead of modifying the workflow, run it like this:
+
+<code>makeflow --wrapper '/usr/bin/time -p' example.makeflow</code>
+
+Suppose you want to apply <tt>strace</tt> to every rule, to obtain system call traces.  Since every rule would have to have its own output file for the trace, you could indicate output files like this:
+
+<code>makeflow --wrapper 'strace -o trace.$RULE' --wrapper-output 'trace.$RULE' example.makeflow</code>
+
+Suppose you want to wrap every command with a script that would set up an appropriate Java environment.  You might write a script called <tt>setupjava.sh</tt> like this:
+
+<code>#!/bin/sh
+export JAVA_HOME=/opt/java-9.8.3.6.7
+export PATH=${JAVA_HOME}/bin:$PATH
+exec "$@"
+</code>
+
+And then invoke Makeflow like this:
+
+<code>makeflow --wrapper ./setupjava.sh --wrapper-input setupjava.sh example.makeflow</code>
 
 
 <h2 id="resources">Resources and Categories<a class="sectionlink" href="#resources" title="Link to this section.">&#x21d7;</a></h2>
