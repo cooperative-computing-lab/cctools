@@ -398,6 +398,12 @@ INT64_T chirp_client_serial(struct chirp_client *c)
 
 INT64_T chirp_client_cookie(struct chirp_client * c, const char *cookie, time_t stoptime)
 {
+	/* chirp_client_cookie is an artifact from Condor's version of Chirp. They
+	 * use this for authentication with the Chirp server. We still support this
+	 * in our client as we want to be able to connect to Condor's Chirp server
+	 * (e.g. with Parrot + Condor RemoteIO). See also issue #582.
+	 */
+
 	return simple_command(c, stoptime, "cookie %s\n", cookie);
 }
 
