@@ -291,14 +291,17 @@ struct chirp_client *chirp_client_connect_condor(time_t stoptime)
 	int result;
 
 	/*
-	   Older versions of Condor use chirp.config.
-	   Start with Condor V8.X the file is .chirp.config.
-	   https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=3353
+	 * Older versions of Condor use chirp.config.
+	 * Start with Condor V8.X the file is .chirp.config.
+	 * In HTCondor commit c584a30022712292294e823fa99173bfa2ff6049, HTCondor accidentally renamed the file again to .chirp_config. This leaked into some stable releases so we look for that filename too. HTCondor reverted the filename change in 112d3b8ed85f78040acfb30ad47f52f944dae2f8.
+	 * https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=3353
 	 */
 
 	file = fopen("chirp.config", "r");
 	if(!file)
 		file = fopen(".chirp.config", "r");
+	if(!file)
+		file = fopen(".chirp_config", "r");
 	if(!file)
 		return 0;
 
