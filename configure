@@ -456,9 +456,9 @@ if [ $config_globus_path != no ]
 then
 	if check_file ${globus_path}/include/${globus_flavor}/globus_common.h
 	then
-		ccflags="${ccflags} -I${globus_path}/include/${globus_flavor} -DHAS_GLOBUS_GSS"
-		ldflags="${ldflags} -L${globus_path}/lib"
-		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
+		ccflags="${ccflags} -I${globus_path}/include -I${globus_path}/include/${globus_flavor} -DHAS_GLOBUS_GSS"
+		ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
+		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common
 		do
 			library_search ${library}_${globus_flavor} ${globus_path}
 		done
@@ -466,8 +466,8 @@ then
 	elif check_file ${globus_path}/include/globus/globus_common.h
 	then
 		ccflags="${ccflags} -I${globus_path}/lib/globus/include -I${globus_path}/include/globus -DHAS_GLOBUS_GSS"
-		ldflags="${ldflags} -L${globus_path}/lib"
-		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
+		ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
+		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common
 		do
 			library_search $library ${globus_path}
 		done
