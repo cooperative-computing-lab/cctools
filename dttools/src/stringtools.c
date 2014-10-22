@@ -845,4 +845,25 @@ int string_equal(const char *str1, const char *str2){
 	return !strcmp(str1, str2);
 }
 
+char * string_wrap_command( const char *command, const char *wrapper_command )
+{
+	if(!wrapper_command) return strdup(command);
+
+	char * result = malloc(strlen(command)+strlen(wrapper_command)+2);
+	char * braces = strstr(wrapper_command,"{}");
+
+	if(braces) {
+		strcpy(result,wrapper_command);
+		result[braces-wrapper_command] = 0;
+		strcat(result,command);
+		strcat(result,braces+2);
+	} else {
+		strcpy(result,wrapper_command);
+		strcat(result," ");
+		strcat(result,command);
+	}
+
+	return result;
+}
+
 /* vim: set noexpandtab tabstop=4: */

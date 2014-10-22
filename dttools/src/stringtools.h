@@ -84,6 +84,24 @@ char *string_trim_quotes(char *s);
  */
 int string_istrue(const char *str);
 
+/**
+Apply a wrapper to a given command. If the wrapper_command contains {}, do the substitution there. Otherwise, just append the command to the wrapper with an extra space.
+
+Example:
+
+<pre>
+string_wrap_command( "ls -l", "strace -o trace" ) -> "strace -o trace ls -l"
+string_wrap_command( "ls -l", "strace {} > output" ) -> "strace ls -la > output"
+string_wrap_command( "ls -l", 0 ) -> "ls -l"
+</pre>
+@param command The original command.
+@param wrapper_command The command to wrap around it.
+@result The combined command, returned as a newly allocated string.
+*/
+
+char * string_wrap_command( const char *command, const char *wrapper_command );
+
+
 #ifndef CCTOOLS_OPSYS_LINUX
 char *strsep(char **stringp, const char *delim);
 #endif

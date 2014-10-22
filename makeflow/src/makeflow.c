@@ -839,38 +839,6 @@ batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *com
 }
 
 /*
-Apply a wrapper_command to a given command. If the wrapper_command contains {}, do the substitution there.
-Otherwise, just append the command to the wrapper with an extra space.
-
-Example:
-
-string_wrap_command( "ls -l", "strace -o trace" ) -> "strace -o trace ls -l"
-string_wrap_command( "ls -l", "strace {} > output" ) -> "strace ls -la > output"
-string_wrap_command( "ls -l", 0 ) -> "ls -l"
-*/
-
-static char * string_wrap_command( const char *command, const char *wrapper_command )
-{
-	if(!wrapper_command) return strdup(command);
-
-	char * result = malloc(strlen(command)+strlen(wrapper_command)+2);
-	char * braces = strstr(wrapper_command,"{}");
-
-	if(braces) {
-		strcpy(result,wrapper_command);
-		result[braces-wrapper_command] = 0;
-		strcat(result,command);
-		strcat(result,braces+2);
-	} else {
-		strcpy(result,wrapper_command);
-		strcat(result," ");
-		strcat(result,command);
-	}
-
-	return result;
-}
-
-/*
 Submit a node to the appropriate batch system, after materializing
 the necessary list of input and output files, and applying all
 wrappers and options.
