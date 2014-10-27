@@ -88,9 +88,9 @@ class Makeflow(Engine):
         # Write debugging symbols if enabled
         if CurrentScript().include_symbols:
             if abstraction == SENTINEL:
-                self.dag_file.write('\t'.join(['', '# SYMBOL', str(function)]) + '\n')
+                self.dag_file.write('\t'.join(['', '# CATEGORY', str(function)]) + '\n')
             else:
-                self.dag_file.write('\t'.join(['', '# SYMBOL', str(abstraction)]) + '\n')
+                self.dag_file.write('\t'.join(['', '# CATEGORY', str(abstraction)]) + '\n')
 
         # Write environmental variables
         if options.local:
