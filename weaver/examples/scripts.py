@@ -17,5 +17,5 @@ Sum(outputs='sum.txt', arguments=[0, 1, 2, 3, 4, 5])
 Touch_SH = ShellFunction('touch $2 && chmod $1 $2', cmd_format='{EXE} {ARG} {OUT}')
 Touch_SH(outputs='touch.txt', arguments='600')
 
-GetPids = Pipeline(["ps aux", "grep {ARG}", "awk '{{print $$2}}' > {OUT}"], separator='|')
+GetPids = Pipeline(["ps aux", "grep {ARG}", "awk \"{{print \\$2}}\" > {OUT}"], separator='|')
 GetPids(outputs='makeflow.pids', arguments='makeflow')

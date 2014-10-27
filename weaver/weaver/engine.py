@@ -56,8 +56,11 @@ class Makeflow(Engine):
         self.outputs = set()
 
     def __call__(self, *args, **kwds):
-        self.cmd_format = 'MAKEFLOW "{0}" "{1}" "{2}"'.format(
-            self.dag_path, self.work_dir, self.wrapper)
+        self.cmd_format = 'MAKEFLOW "{0}" "{1}"'.format(
+            self.dag_path, self.work_dir)
+
+        if self.wrapper != "":
+            self.cmd_format += ' {0}'.format(self.wrapper)
 
         # Prune inputs of outputs (happens when we have a SubNest).
         self.inputs = [i for i in self.inputs if str(i) not in set(map(str, self.outputs))]
@@ -91,14 +94,14 @@ class Makeflow(Engine):
 
         # Write environmental variables
         if options.local:
-            self.dag_file.write('\t@BATCH_LOCAL=1\n')
+            self.dag_file.write('BATCH_LOCAL=1\n')
         if options.batch:
-            self.dag_file.write('\t@BATCH_OPTIONS={0}\n'.format(options.batch))
+            self.dag_file.write('BATCH_OPTIONS={0}\n'.format(options.batch))
         if options.collect:
-            self.dag_file.write('\t@_MAKEFLOW_COLLECT_LIST+={0}\n'.format(
+            self.dag_file.write('GC_COLLECT_LIST+={0}\n'.format(
                 ' '.join(map(str, options.collect))))
         for k, v in options.environment.items():
-            self.dag_file.write('\t@{0}={1}\n'.format(k, v))
+            self.dag_file.write('{0}={1}\n'.format(k, v))
 
         # Write task command
         self.dag_file.write('\t{0}\n'.format(command))
