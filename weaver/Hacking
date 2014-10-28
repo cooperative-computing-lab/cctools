@@ -1,0 +1,33 @@
+Hacking
+=======
+
+Rough guidelines for hacking on Weaver.
+
+General
+~~~~~~~
+
+- When possible, follow PEP8. 
+    * Classes, global objects, and class attributes are CamelCase.
+    * Methods, attributes, and functions should use underscores.
+    * Constants are in upper-case.
+
+- Check Python source with pylint.
+
+- Use the following vim style::
+
+  vim: set sts=4 sw=4 ts=8 expandtab ft=python:
+
+Classes
+~~~~~~~
+
+- Prefix internal attributes and methods with '_'.  By internal we mean
+  attributes and methods that end users should not use directly, but project
+  modules may take advantage of.  This also applies to internal global objects.
+
+Imports
+~~~~~~~
+
+- For internal modules, utilize ``from weaver.<module> import <object>``.
+
+- For standard and third-party modules, utilize ``import``.
+
