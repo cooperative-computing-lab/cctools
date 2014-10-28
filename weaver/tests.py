@@ -23,7 +23,7 @@ def run_weaver(script_path, execute=False, engine_arguments=None, engine_wrapper
     script_name = os.path.splitext(os.path.basename(script_path))[0]
     output_path = os.path.join(OUTPUT_DIR, '{0}'.format(script_name))
     log_path    = os.path.join(OUTPUT_DIR, '{0}.log'.format(script_name))
-    command     = './weaver.py {0} {1} {2} {3} {4} -f -d all -l {5} -o {6} {7} {8}'.format(
+    command     = './weaver.py {0} {1} {2} {3} {4} -d all -l {5} -o {6} {7} {8}'.format(
         '-a' if NESTED_ABSTRACTIONS else '',
         '-t ' + str(INLINE_TASKS),
         '-x' if execute else '',

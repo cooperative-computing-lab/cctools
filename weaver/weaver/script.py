@@ -51,8 +51,8 @@ class Script(object):
                 setattr(self, 'normalize_paths', False),
         '-d': lambda self, args:
                 weaver.logger.enable(args.popleft().split(',')),
-        '-f': lambda self, args:
-                setattr(self, 'force', True),
+        '-W': lambda self, args:
+                setattr(self, 'force', False),
         '-g': lambda self, args:
                 setattr(self, 'include_symbols', True),
         '-l': lambda self, args:
@@ -75,7 +75,7 @@ class Script(object):
 
     def __init__(self, args):
         self.path                = None
-        self.force               = False       # Ignore warnings
+        self.force               = True        # Ignore warnings
         self.import_builtins     = True        # Load built-ins
         self.output_directory    = os.curdir   # Where to create artifacts
         self.start_time          = time.time() # Record beginning of compiling
@@ -154,7 +154,7 @@ class Script(object):
 
 General Options:
   -h              Show this help message.
-  -f              Ignore warnings.
+  -W              Stop on warnings.
   -g              Include debugging symbols in DAG.
   -I              Do not automatically import built-ins.
   -N              Do not normalize paths.
