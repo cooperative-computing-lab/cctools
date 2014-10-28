@@ -1,5 +1,16 @@
 #!/bin/sh
 
+abspath() {
+	case "$1" in
+		/*)
+			echo -n "$1"
+			;;
+		*)
+			echo -n "$(pwd)/$1"
+			;;
+	esac
+}
+
 uname -a
 
 if [ -z "$USER" ]; then
@@ -180,7 +191,7 @@ do
 			;;
 		--prefix)
 			shift
-			install_path=$1
+			install_path=$(abspath "$1")
 			;;
 		--strict)
 			optstrict=1
