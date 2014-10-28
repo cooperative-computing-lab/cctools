@@ -16,8 +16,8 @@ Required:
     - Python <http://www.python.org> (2.6.x, 2.7.x, 3.x)
 
 Although other versions of Python may work, Weaver has only been tested with
-Python 2.7.x and 3.2.x.  In order to execute the DAGs produced by Weaver,
-makeflow is required.
+Python 2.6.x, Python 2.7.x and 3.2.x.  In order to execute the DAGs produced by
+Weaver, makeflow is required.
 
 Optional:
     - mysql-python <http://sourceforge.net/projects/mysql-python/>
