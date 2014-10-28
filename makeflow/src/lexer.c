@@ -507,6 +507,7 @@ int lexer_read_filename_recursive(struct lexer *lx)
 
 	if(lexer_next_peek(lx) == '-' && !lexer_peek_remote_rename_syntax(lx)) {
 		lexer_add_to_lexeme(lx, '-');
+		lexer_next_char(lx);
 		count++;
 		count += lexer_read_filename_recursive(lx);
 	}
