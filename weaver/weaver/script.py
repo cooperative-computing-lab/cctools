@@ -160,8 +160,8 @@ General Options:
   -N              Do not normalize paths.
   -b <options>    Set batch job options (cpu, memory, disk, batch, local, collect).
   -d <subsystem>  Enable debugging for subsystem.
-  -l <log_path>   Set log path (default: stderr).
-  -o <directory>  Set output directory.
+  -o <log_path>   Set log path (default: stderr).
+  -O <directory>  Set output directory.
 
 Optimization Options:
   -a              Automatically nest abstractions.
