@@ -20,7 +20,13 @@ INSTALL_TARGETS = $(TARGETS:%=install-%)
 $(INSTALL_TARGETS):
 	$(CCTOOLS_PYTHON) setup.py install_scripts -d $(CCTOOLS_INSTALL_DIR)/bin
 	$(CCTOOLS_PYTHON) setup.py install_lib     -d $(PYTHON_INSTALL_DIR)
-install: $(INSTALL_TARGETS)
+
+install-examples: examples
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/weaver_examples
+	cp examples/* $(CCTOOLS_INSTALL_DIR)/doc/weaver_examples
+
+install: $(INSTALL_TARGETS) install-examples
+
 
 TEST_TARGETS = $(TARGETS:%=test-%)
 $(TEST_TARGETS):
