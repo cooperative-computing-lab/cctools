@@ -1,12 +1,11 @@
 #!/bin/sh
 
-EXTERNAL="/afs/nd.edu/user37/ccl/software/external"
+EXTERNAL="/afs/nd.edu/user37/ccl/software/cctools-build-external-packages"
 
-# Our external packages are installed in $EXTERNAL/packagename-version/$SYS
-# Where $SYS is the output of the AFS `sys` command, usually something
-# like amd64_linux26 or i686_darwin_100.  In some cases, the AFS sys
-# does not sufficiently discriminate, so we add a subtype like
-# redhat5 or redhat6.
+# Our external packages are installed in
+# $EXTERNAL/$SYS/$SUBTYPE/packagename Where $SYS is the output of the
+# AFS `sys` command, usually something like amd64_linux26 or
+# i686_darwin_100, and $SUBTYPE is something like redhat5 or redhat6.
 
 function detect_packages()
 {
@@ -27,12 +26,7 @@ function detect_packages()
     PACKAGES_CONFIG=""
     for package in fuse irods mysql python globus openmpi swig xrootd cvmfs
     do
-	packagepath=$EXTERNAL/$package/`sys`_$subtype
-
-	if [ ! -d $packagepath ]
-	then
-		packagepath=$EXTERNAL/$package/`sys`
-	fi
+	packagepath=$EXTERNAL/`sys`/$subtype/$package
 
 	if [ -d $packagepath ]
         then
