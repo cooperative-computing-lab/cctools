@@ -47,23 +47,44 @@ extern "C" {
 #include <string.h>
 #include <time.h>
 
-#ifndef O_CLOEXEC
-#	define O_CLOEXEC 02000000
+#ifndef EFD_CLOEXEC
+#	define EFD_CLOEXEC 02000000
+#endif
+#ifndef EPOLL_CLOEXEC
+#	define EPOLL_CLOEXEC 02000000
+#endif
+#ifndef FAN_CLOEXEC
+#	define FAN_CLOEXEC 0x00000001
+#endif
+#ifndef FD_CLOEXEC
+#	define FD_CLOEXEC 1
 #endif
 #ifndef F_DUPFD_CLOEXEC
 #	define F_DUPFD_CLOEXEC 1030
 #endif
-#ifndef EFD_CLOEXEC
-#	define EFD_CLOEXEC 02000000
+#ifndef F_DUP2FD
+#	define F_DUP2FD F_DUPFD
+#endif
+#ifndef IN_CLOEXEC
+#	define IN_CLOEXEC 02000000
+#endif
+#ifndef O_CLOEXEC
+#	define O_CLOEXEC 02000000
+#endif
+#ifndef MSG_CMSG_CLOEXEC
+#	define MSG_CMSG_CLOEXEC 0x40000000
+#endif
+#ifndef PERF_FLAG_FD_CLOEXEC
+#	define PERF_FLAG_FD_CLOEXEC (1UL << 3)
 #endif
 #ifndef SFD_CLOEXEC
 #	define SFD_CLOEXEC 02000000
 #endif
+#ifndef SOCK_CLOEXEC
+#	define SOCK_CLOEXEC 02000000
+#endif
 #ifndef TFD_CLOEXEC
 #	define TFD_CLOEXEC 02000000
-#endif
-#ifndef F_DUP2FD
-#	define F_DUP2FD F_DUPFD
 #endif
 
 extern struct pfs_process *pfs_current;
@@ -576,6 +597,7 @@ void decode_socketcall( struct pfs_process *p, int entering, int syscall, const 
 			 *
 			 * These hacks are only necessary for 64 bit compiled Parrot with a 32 bit executable.
 			 */
+			/* FIXME handle MSG_CMSG_CLOEXEC */
 #undef CMSG_ALIGN
 #define CMSG_ALIGN(len) ( ((len)+sizeof(uint32_t)-1) & ~(sizeof(uint32_t)-1) )
 #undef CMSG_DATA
@@ -691,15 +713,19 @@ void decode_socketcall( struct pfs_process *p, int entering, int syscall, const 
 				INT64_T actual;
 				tracer_result_get(p->tracer, &actual);
 				if (actual >= 0) {
+					int fdflags = 0;
+					if ((syscall == SYS_SOCKET || syscall == SYS_SOCKETPAIR) && (a[1]&SOCK_CLOEXEC)) {
+						fdflags |= FD_CLOEXEC;
+					}
 					if (syscall == SYS_SOCKETPAIR) {
 						int fds[2];
 						tracer_copy_in(p->tracer, fds, POINTER(a[3]), sizeof(fds));
 						assert(fds[0] >= 0);
-						p->table->setnative(fds[0], 0);
+						p->table->setnative(fds[0], fdflags);
 						assert(fds[1] >= 0);
-						p->table->setnative(fds[1], 0);
+						p->table->setnative(fds[1], fdflags);
 					} else {
-						p->table->setnative(actual, 0);
+						p->table->setnative(actual, fdflags);
 					}
 				}
 				break;
@@ -1593,7 +1619,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 						p->table->setnative(fds[1], fdflags);
 					} else if (p->syscall == SYSCALL32_eventfd2 && (args[1]&EFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
-					} else if (p->syscall == SYSCALL32_epoll_create1 && (args[1]&EFD_CLOEXEC)) {
+					} else if (p->syscall == SYSCALL32_epoll_create1 && (args[1]&EPOLL_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL32_signalfd4 && (args[2]&SFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);

@@ -61,23 +61,44 @@ extern "C" {
 #include <string.h>
 #include <time.h>
 
-#ifndef O_CLOEXEC
-#	define O_CLOEXEC 02000000
+#ifndef EFD_CLOEXEC
+#	define EFD_CLOEXEC 02000000
+#endif
+#ifndef EPOLL_CLOEXEC
+#	define EPOLL_CLOEXEC 02000000
+#endif
+#ifndef FAN_CLOEXEC
+#	define FAN_CLOEXEC 0x00000001
+#endif
+#ifndef FD_CLOEXEC
+#	define FD_CLOEXEC 1
 #endif
 #ifndef F_DUPFD_CLOEXEC
 #	define F_DUPFD_CLOEXEC 1030
 #endif
-#ifndef EFD_CLOEXEC
-#	define EFD_CLOEXEC 02000000
+#ifndef F_DUP2FD
+#	define F_DUP2FD F_DUPFD
+#endif
+#ifndef IN_CLOEXEC
+#	define IN_CLOEXEC 02000000
+#endif
+#ifndef O_CLOEXEC
+#	define O_CLOEXEC 02000000
+#endif
+#ifndef MSG_CMSG_CLOEXEC
+#	define MSG_CMSG_CLOEXEC 0x40000000
+#endif
+#ifndef PERF_FLAG_FD_CLOEXEC
+#	define PERF_FLAG_FD_CLOEXEC (1UL << 3)
 #endif
 #ifndef SFD_CLOEXEC
 #	define SFD_CLOEXEC 02000000
 #endif
+#ifndef SOCK_CLOEXEC
+#	define SOCK_CLOEXEC 02000000
+#endif
 #ifndef TFD_CLOEXEC
 #	define TFD_CLOEXEC 02000000
-#endif
-#ifndef F_DUP2FD
-#	define F_DUP2FD F_DUPFD
 #endif
 
 extern struct pfs_process *pfs_current;
@@ -1316,16 +1337,22 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						else assert(0);
 						if (p->syscall == SYSCALL64_pipe2 && (args[1]&O_CLOEXEC)) {
 							fdflags |= FD_CLOEXEC;
+						} else if (p->syscall == SYSCALL64_socketpair && (args[1]&SOCK_CLOEXEC)) {
+							fdflags |= FD_CLOEXEC;
 						}
 						assert(fds[0] >= 0);
 						p->table->setnative(fds[0], fdflags);
 						assert(fds[1] >= 0);
 						p->table->setnative(fds[1], fdflags);
+					} else if (p->syscall == SYSCALL64_epoll_create1 && (args[1]&EPOLL_CLOEXEC)) {
+						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL64_eventfd2 && (args[1]&EFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
-					} else if (p->syscall == SYSCALL64_epoll_create1 && (args[1]&EFD_CLOEXEC)) {
+					} else if (p->syscall == SYSCALL64_perf_event_open && (args[2]&PERF_FLAG_FD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL64_signalfd4 && (args[2]&SFD_CLOEXEC)) {
+						p->table->setnative(actual, FD_CLOEXEC);
+					} else if (p->syscall == SYSCALL64_socket && (args[1]&SOCK_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL64_timerfd_create && (args[1]&TFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
@@ -1540,6 +1567,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					msg.msg_controllen = 0;
 				}
 
+				/* FIXME handle MSG_CMSG_CLOEXEC */
 				for (struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 					if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS) {
 						int *fd = (int *)CMSG_DATA(cmsg);
