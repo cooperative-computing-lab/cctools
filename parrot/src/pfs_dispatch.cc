@@ -203,7 +203,7 @@ static void decode_read( struct pfs_process *p, int entering, int syscall, const
 
 			if(syscall==SYSCALL32_read) {
 				p->syscall_result = pfs_read(fd,local_addr,length);
-			} else if(syscall==SYSCALL32_pread) {
+			} else if(syscall==SYSCALL32_pread64) {
 				p->syscall_result = pfs_pread(fd,local_addr,length,offset);
 			}
 
@@ -212,7 +212,7 @@ static void decode_read( struct pfs_process *p, int entering, int syscall, const
 			if(p->syscall_result==0) {
 				divert_to_dummy(p,0);
 			} else if(p->syscall_result>0) {
-				divert_to_channel(p,SYSCALL32_pread,POINTER(args[1]),p->syscall_result,p->io_channel_offset);
+				divert_to_channel(p,SYSCALL32_pread64,POINTER(args[1]),p->syscall_result,p->io_channel_offset);
 				pfs_read_count += p->syscall_result;
 			} else {
 				divert_to_dummy(p,-errno);
@@ -257,7 +257,7 @@ static void decode_write( struct pfs_process *p, int entering, int syscall, cons
 	if(entering) {
 		INT64_T length = args[2];
 		if(pfs_channel_alloc(0,length,&p->io_channel_offset)) {
-			divert_to_channel(p,SYSCALL32_pwrite,POINTER(args[1]),length,p->io_channel_offset);
+			divert_to_channel(p,SYSCALL32_pwrite64,POINTER(args[1]),length,p->io_channel_offset);
 		} else {
 			divert_to_dummy(p,-ENOMEM);
 		}
@@ -273,7 +273,7 @@ static void decode_write( struct pfs_process *p, int entering, int syscall, cons
 
 			if(syscall==SYSCALL32_write) {
 				p->syscall_result = pfs_write(fd,local_addr,actual);
-			} else if(syscall==SYSCALL32_pwrite) {
+			} else if(syscall==SYSCALL32_pwrite64) {
 				p->syscall_result = pfs_pwrite(fd,local_addr,actual,offset);
 			}
 
@@ -472,7 +472,7 @@ static void decode_stat( struct pfs_process *p, int entering, int syscall, const
 					memcpy(local_addr,&kbuf,sizeof(kbuf));
 					bufsize = sizeof(kbuf);
 				}
-				divert_to_channel(p,SYSCALL32_pread,POINTER(args[1]),bufsize,p->io_channel_offset);
+				divert_to_channel(p,SYSCALL32_pread64,POINTER(args[1]),bufsize,p->io_channel_offset);
 			} else {
 				divert_to_dummy(p,-ENOMEM);
 			}
@@ -1242,7 +1242,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_adjtimex:
 		case SYSCALL32_afs_syscall:
 		case SYSCALL32_alarm:
-		case SYSCALL32_alloc_hugepages:
 		case SYSCALL32_bdflush:
 		case SYSCALL32_brk:
 		case SYSCALL32_capget:
@@ -1254,7 +1253,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_delete_module:
 		case SYSCALL32_exit:
 		case SYSCALL32_exit_group:
-		case SYSCALL32_free_hugepages:
 		case SYSCALL32_futex:
 		case SYSCALL32_get_kernel_syms:
 		case SYSCALL32_get_robust_list:
@@ -1663,7 +1661,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL32_read:
-		case SYSCALL32_pread:
+		case SYSCALL32_pread64:
 			if (p->table->isnative(args[0])) {
 				if (entering) debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else {
@@ -1672,7 +1670,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL32_write:
-		case SYSCALL32_pwrite:
+		case SYSCALL32_pwrite64:
 			if (p->table->isnative(args[0])) {
 				if (entering) debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else {
@@ -2799,7 +2797,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
-		case SYSCALL32_search:
+		case SYSCALL32_parrot_search:
 			if (entering) {
 				char callsite[PFS_PATH_MAX];
 				tracer_copy_in_string(p->tracer, callsite, POINTER(args[5]), sizeof(callsite));
@@ -2987,7 +2985,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_io_setup:
 		case SYSCALL32_io_submit:
 		case SYSCALL32_ptrace:
-		case SYSCALL32_security:
 		case SYSCALL32_sendfile64:
 		case SYSCALL32_sendfile:
 			/* fallthrough */

@@ -26,6 +26,7 @@ endif
 all: $(TARGETS)
 
 $(OBJECTS_PARROT_RUN): tracer.table.h tracer.table.c tracer.table64.h tracer.table64.c
+tracer.table.h tracer.table.c tracer.table64.h tracer.table64.c: tracer.table.pl syscall_parrot.tbl
 libparrot_client.a: parrot_client.o
 
 libparrot_helper.$(CCTOOLS_DYNAMIC_SUFFIX): parrot_helper.c
@@ -38,17 +39,17 @@ lib/libparrot_helper.$(CCTOOLS_DYNAMIC_SUFFIX): parrot_helper.c
 	mkdir -p lib
 	gcc -m32 -shared -fPIC $< -o $@
 
-tracer.table64.c: tracer.table64.in tracer.table.process
-	perl tracer.table.process table 64 <$< >$@
+tracer.table64.c: syscall_64.tbl
+	cat $< syscall_parrot.tbl | perl tracer.table.pl table 64 > $@
 
-tracer.table64.h: tracer.table64.in tracer.table.process
-	perl tracer.table.process header 64 <$< >$@
+tracer.table64.h: syscall_64.tbl
+	cat $< syscall_parrot.tbl | perl tracer.table.pl header 64 > $@
 
-tracer.table.c: tracer.table.in tracer.table.process
-	perl tracer.table.process table 32 <$< >$@
+tracer.table.c: syscall_32.tbl
+	cat $< syscall_parrot.tbl | perl tracer.table.pl table 32  > $@
 
-tracer.table.h: tracer.table.in tracer.table.process
-	perl tracer.table.process header 32 <$< >$@
+tracer.table.h: syscall_32.tbl
+	cat $< syscall_parrot.tbl | perl tracer.table.pl header 32 > $@
 
 parrot_run: $(OBJECTS_PARROT_RUN)
 $(UTILITIES): libparrot_client.a
