@@ -984,6 +984,9 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 	args = p->syscall_args;
 
+	/* To get syscalls not in this switch:
+		(getsyscalls() { grep "$1" | grep -oE 'SYSCALL64_[[:alnum:]_]+' | grep -v MAX | sort | uniq; };  cat <(getsyscalls 'case SYSCALL64' < pfs_dispatch64.cc) <(getsyscalls '#define SYS' < tracer.table64.h)) | sort | uniq -c | grep '1 SYSCALL' | awk '{printf "\t\tcase %s:\n", $2}'
+	*/
 	switch(p->syscall) {
 		/* A wide variety of calls have no relation to file access, so we
 		 * simply send them along to the underlying OS.
@@ -2813,19 +2816,75 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		 * we aren't handling them.
 		 */
 
+		case SYSCALL64_accept4:
+		case SYSCALL64_add_key:
+		case SYSCALL64_clock_adjtime:
+		case SYSCALL64_fallocate:
+		case SYSCALL64_fanotify_init:
+		case SYSCALL64_fanotify_mark:
+		case SYSCALL64_finit_module:
+		case SYSCALL64_get_mempolicy:
+		case SYSCALL64_inotify_add_watch:
+		case SYSCALL64_inotify_init:
+		case SYSCALL64_inotify_init1:
+		case SYSCALL64_inotify_rm_watch:
 		case SYSCALL64_io_cancel:
 		case SYSCALL64_io_destroy:
 		case SYSCALL64_io_getevents:
+		case SYSCALL64_ioprio_get:
+		case SYSCALL64_ioprio_set:
 		case SYSCALL64_io_setup:
 		case SYSCALL64_io_submit:
+		case SYSCALL64_kexec_file_load:
+		case SYSCALL64_kexec_load:
+		case SYSCALL64_keyctl:
+		case SYSCALL64_mbind:
+		case SYSCALL64_mq_getsetattr:
+		case SYSCALL64_mq_notify:
+		case SYSCALL64_mq_open:
+		case SYSCALL64_mq_timedreceive:
+		case SYSCALL64_mq_timedsend:
+		case SYSCALL64_mq_unlink:
+		case SYSCALL64_msgctl:
+		case SYSCALL64_msgget:
+		case SYSCALL64_msgrcv:
+		case SYSCALL64_msgsnd:
+		case SYSCALL64_name_to_handle_at:
+		case SYSCALL64_nfsservctl:
+		case SYSCALL64_open_by_handle_at:
+		case SYSCALL64_pivot_root:
+		case SYSCALL64_preadv:
 		case SYSCALL64_ptrace:
+		case SYSCALL64_pwritev:
+		case SYSCALL64_recvmmsg:
+		case SYSCALL64_renameat2:
+		case SYSCALL64_request_key:
+		case SYSCALL64_rt_tgsigqueueinfo:
+		case SYSCALL64_seccomp:
 		case SYSCALL64_security:
+		case SYSCALL64_semctl:
+		case SYSCALL64_semget:
+		case SYSCALL64_semop:
+		case SYSCALL64_semtimedop:
 		case SYSCALL64_sendfile:
-			/* fallthrough */
+		case SYSCALL64_sendmmsg:
+		case SYSCALL64_set_mempolicy:
+		case SYSCALL64_setns:
+		case SYSCALL64_splice:
+		case SYSCALL64_sync_file_range:
+		case SYSCALL64_syncfs:
+		case SYSCALL64_tee:
+		case SYSCALL64_tuxcall:
+		case SYSCALL64_unshare:
+		case SYSCALL64_vmsplice:
+		case SYSCALL64_vserver:
+			/* fallthrough... */
+
+		/* If anything else escaped our attention, we must know about it in an
+		 * obvious way.
+		 */
+
 		default:
-			/* If anything else escaped our attention, we must know about it in an
-			 * obvious way.
-			 */
 			if(entering) {
 				debug(D_NOTICE,"warning: system call %"PRId64" (%s) not supported for program %s",p->syscall,tracer_syscall_name(p->tracer,p->syscall),p->name);
 				divert_to_dummy(p,-ENOSYS);

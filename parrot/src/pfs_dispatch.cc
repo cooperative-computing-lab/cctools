@@ -1239,6 +1239,9 @@ void decode_syscall( struct pfs_process *p, int entering )
 
 	args = p->syscall_args;
 
+	/* To get syscalls not in this switch:
+		(getsyscalls() { grep "$1" | grep -oE 'SYSCALL32_[[:alnum:]_]+' | grep -v MAX | sort | uniq; };  cat <(getsyscalls 'case SYSCALL32' < pfs_dispatch.cc) <(getsyscalls '#define SYS' < tracer.table.h)) | sort | uniq -c | grep '1 SYSCALL' | awk '{printf "\t\tcase %s:\n", $2}'
+	*/
 	switch(p->syscall) {
 		/* A wide variety of calls have no relation to file access, so we
 		 * simply send them along to the underlying OS.
@@ -3011,19 +3014,77 @@ void decode_syscall( struct pfs_process *p, int entering )
 		 * we aren't handling them.
 		 */
 
+		case SYSCALL32_add_key:
+		case SYSCALL32_clock_adjtime:
+		case SYSCALL32_clock_nanosleep:
+		case SYSCALL32_fadvise64_64:
+		case SYSCALL32_fallocate:
+		case SYSCALL32_fanotify_init:
+		case SYSCALL32_fanotify_mark:
+		case SYSCALL32_finit_module:
+		case SYSCALL32_get_mempolicy:
+		case SYSCALL32_inotify_add_watch:
+		case SYSCALL32_inotify_init:
+		case SYSCALL32_inotify_init1:
+		case SYSCALL32_inotify_rm_watch:
 		case SYSCALL32_io_cancel:
 		case SYSCALL32_io_destroy:
 		case SYSCALL32_io_getevents:
+		case SYSCALL32_ioprio_get:
+		case SYSCALL32_ioprio_set:
 		case SYSCALL32_io_setup:
 		case SYSCALL32_io_submit:
+		case SYSCALL32_kexec_load:
+		case SYSCALL32_keyctl:
+		case SYSCALL32_mbind:
+		case SYSCALL32_migrate_pages:
+		case SYSCALL32_move_pages:
+		case SYSCALL32_mq_getsetattr:
+		case SYSCALL32_mq_notify:
+		case SYSCALL32_mq_open:
+		case SYSCALL32_mq_timedreceive:
+		case SYSCALL32_mq_timedsend:
+		case SYSCALL32_mq_unlink:
+		case SYSCALL32_name_to_handle_at:
+		case SYSCALL32_nfsservctl:
+		case SYSCALL32_oldfstat:
+		case SYSCALL32_oldlstat:
+		case SYSCALL32_oldolduname:
+		case SYSCALL32_oldstat:
+		case SYSCALL32_open_by_handle_at:
+		case SYSCALL32_pivot_root:
+		case SYSCALL32_preadv:
+		case SYSCALL32_prof:
 		case SYSCALL32_ptrace:
-		case SYSCALL32_sendfile64:
+		case SYSCALL32_pwritev:
+		case SYSCALL32_readdir:
+		case SYSCALL32_recvmmsg:
+		case SYSCALL32_renameat2:
+		case SYSCALL32_request_key:
+		case SYSCALL32_restart_syscall:
+		case SYSCALL32_rt_tgsigqueueinfo:
+		case SYSCALL32_seccomp:
 		case SYSCALL32_sendfile:
+		case SYSCALL32_sendfile64:
+		case SYSCALL32_sendmmsg:
+		case SYSCALL32_setfsgid:
+		case SYSCALL32_setfsuid:
+		case SYSCALL32_set_mempolicy:
+		case SYSCALL32_setns:
+		case SYSCALL32_splice:
+		case SYSCALL32_sync_file_range:
+		case SYSCALL32_syncfs:
+		case SYSCALL32_tee:
+		case SYSCALL32_unshare:
+		case SYSCALL32_vmsplice:
+		case SYSCALL32_vserver:
 			/* fallthrough */
+
+		/* If anything else escaped our attention, we must know about it in an
+		 * obvious way.
+		 */
+
 		default:
-			/* If anything else escaped our attention, we must know about it in an
-			 * obvious way.
-			 */
 			if(entering) {
 				debug(D_NOTICE,"warning: system call %d (%s) not supported for program %s",(int)p->syscall,tracer_syscall_name(p->tracer,p->syscall),p->name);
 				divert_to_dummy(p,-ENOSYS);
