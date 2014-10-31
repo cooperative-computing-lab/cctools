@@ -56,6 +56,12 @@ extern "C" {
 #ifndef EFD_CLOEXEC
 #	define EFD_CLOEXEC 02000000
 #endif
+#ifndef SFD_CLOEXEC
+#	define SFD_CLOEXEC 02000000
+#endif
+#ifndef TFD_CLOEXEC
+#	define TFD_CLOEXEC 02000000
+#endif
 #ifndef F_DUP2FD
 #	define F_DUP2FD F_DUPFD
 #endif
@@ -1257,6 +1263,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_get_kernel_syms:
 		case SYSCALL32_get_robust_list:
 		case SYSCALL32_get_thread_area:
+		case SYSCALL32_getcpu:
 		case SYSCALL32_getgroups32:
 		case SYSCALL32_getgroups:
 		case SYSCALL32_getitimer:
@@ -1265,6 +1272,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_getpid:
 		case SYSCALL32_getppid:
 		case SYSCALL32_getpriority:
+		case SYSCALL32_getrandom:
 		case SYSCALL32_getrlimit:
 		case SYSCALL32_getrusage:
 		case SYSCALL32_getsid:
@@ -1275,6 +1283,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_ioperm:
 		case SYSCALL32_iopl:
 		case SYSCALL32_ipc:
+		case SYSCALL32_kcmp:
 		case SYSCALL32_madvise:
 		case SYSCALL32_mincore:
 		case SYSCALL32_mlock:
@@ -1290,6 +1299,9 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_olduname:
 		case SYSCALL32_pause:
 		case SYSCALL32_prctl:
+		case SYSCALL32_prlimit64:
+		case SYSCALL32_process_vm_readv:
+		case SYSCALL32_process_vm_writev:
 		case SYSCALL32_query_module:
 		case SYSCALL32_quotactl:
 		case SYSCALL32_reboot:
@@ -1303,10 +1315,12 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_sched_get_priority_max:
 		case SYSCALL32_sched_get_priority_min:
 		case SYSCALL32_sched_getaffinity:
+		case SYSCALL32_sched_getattr:
 		case SYSCALL32_sched_getparam:
 		case SYSCALL32_sched_getscheduler:
 		case SYSCALL32_sched_rr_get_interval:
 		case SYSCALL32_sched_setaffinity:
+		case SYSCALL32_sched_setattr:
 		case SYSCALL32_sched_setparam:
 		case SYSCALL32_sched_setscheduler:
 		case SYSCALL32_sched_yield:
@@ -1523,6 +1537,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
+		case SYSCALL32_dup3:
 		case SYSCALL32_dup2:
 			if (entering) {
 				if (p->table->isspecial(args[1])) {
@@ -1537,16 +1552,24 @@ void decode_syscall( struct pfs_process *p, int entering )
 				INT64_T actual;
 				tracer_result_get(p->tracer, &actual);
 				if (actual >= 0 && actual != args[0]) {
-					p->table->dup2(args[0], actual, 0);
+					if (p->syscall == SYSCALL64_dup3 && (args[2]&O_CLOEXEC))
+						p->table->dup2(args[0], actual, FD_CLOEXEC);
+					else
+						p->table->dup2(args[0], actual, 0);
 				}
 			}
 
-		case SYSCALL32_epoll_create:
 		case SYSCALL32_epoll_create1:
-		case SYSCALL32_eventfd:
+		case SYSCALL32_epoll_create:
 		case SYSCALL32_eventfd2:
-		case SYSCALL32_pipe:
+		case SYSCALL32_eventfd:
+		case SYSCALL32_memfd_create:
+		case SYSCALL32_perf_event_open:
 		case SYSCALL32_pipe2:
+		case SYSCALL32_pipe:
+		case SYSCALL32_signalfd4:
+		case SYSCALL32_signalfd:
+		case SYSCALL32_timerfd_create:
 			if (entering) {
 				debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else {
@@ -1557,16 +1580,20 @@ void decode_syscall( struct pfs_process *p, int entering )
 						int fds[2];
 						int fdflags = 0;
 						tracer_copy_in(p->tracer, fds, POINTER(args[0]), sizeof(fds));
-						if (p->syscall == SYSCALL32_pipe2 && args[1]&O_CLOEXEC) {
+						if (p->syscall == SYSCALL32_pipe2 && (args[1]&O_CLOEXEC)) {
 							fdflags |= FD_CLOEXEC;
 						}
 						assert(fds[0] >= 0);
 						p->table->setnative(fds[0], fdflags);
 						assert(fds[1] >= 0);
 						p->table->setnative(fds[1], fdflags);
-					} else if (p->syscall == SYSCALL32_eventfd2 && args[1]&EFD_CLOEXEC) {
+					} else if (p->syscall == SYSCALL32_eventfd2 && (args[1]&EFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
-					} else if (p->syscall == SYSCALL32_epoll_create1 && args[1]&EFD_CLOEXEC) {
+					} else if (p->syscall == SYSCALL32_epoll_create1 && (args[1]&EFD_CLOEXEC)) {
+						p->table->setnative(actual, FD_CLOEXEC);
+					} else if (p->syscall == SYSCALL32_signalfd4 && (args[2]&SFD_CLOEXEC)) {
+						p->table->setnative(actual, FD_CLOEXEC);
+					} else if (p->syscall == SYSCALL32_timerfd_create && (args[1]&TFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
 					} else {
 						p->table->setnative(actual, 0);
@@ -1695,8 +1722,10 @@ void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL32__newselect:
-		case SYSCALL32_select:
 		case SYSCALL32_poll:
+		case SYSCALL32_ppoll:
+		case SYSCALL32_pselect6:
+		case SYSCALL32_select:
 			/* For select and poll, we don't need to hook these because
 			 * sockets/pipes which the tracee might select/poll on are always
 			 * native fds. Any "Parrot fd" is a regular file, so select/poll on
@@ -1915,6 +1944,8 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_epoll_wait:
 		case SYSCALL32_epoll_pwait:
 		case SYSCALL32_ioctl:
+		case SYSCALL32_timerfd_gettime:
+		case SYSCALL32_timerfd_settime:
 			/* ioctl is only for I/O streams which are never Parrot files. */
 			if(entering && !p->table->isnative(args[0]))
 				divert_to_dummy(p,-EBADF);
