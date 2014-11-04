@@ -140,7 +140,7 @@ parse_arguments_common()
 			;;
 			-r)  
 			shift
-			requirements="$requirments $1"
+			requirements="$requirements $1"
 			;;
 			-h | --help)
 			show_help_common
