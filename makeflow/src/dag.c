@@ -266,6 +266,16 @@ char *dag_node_translate_filename(struct dag_node *n, const char *filename)
 	return newname_ptr;
 }
 
+struct dag_file * dag_file_create( const char *filename )
+{
+	struct dag_file *f = malloc(sizeof(*f));
+	f->filename = xxstrdup(filename);
+	f->needed_by = list_create();
+	f->target_of = 0;
+	f->ref_count = 0;
+	return f;
+}
+
 /* Return the dag_file associated with the local name filename.
  * If one does not exist, it is created. */
 struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
@@ -273,17 +283,9 @@ struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
 	struct dag_file *f;
 
 	f = hash_table_lookup(d->file_table, filename);
+	if(f) return f;
 
-	if(f)
-		return f;
-
-	f = malloc(sizeof(struct dag_file));
-
-	f->filename = xxstrdup(filename);
-	f->needed_by = list_create(0);
-	f->target_of = NULL;
-
-	f->ref_count = 0;
+	f = dag_file_create(filename);
 
 	hash_table_insert(d->file_table, f->filename, (void *) f);
 
@@ -877,7 +879,6 @@ char *dag_task_resources_wrap_options(struct dag_node *n, const char *default_op
 	switch(batch_type)
 	{
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 			return dag_task_resources_wrap_as_wq_options(n, default_options);
 			break;
 		case BATCH_QUEUE_TYPE_CONDOR:

@@ -106,7 +106,6 @@ static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
 static int monitor_enable_list_files  = 0;
 
-
 /* Write a verbose transaction log with SYMBOL tags.
  * SYMBOLs are category labels (SYMBOLs should be deprecated
  * once weaver/pbui tools are updated.) */
@@ -116,6 +115,10 @@ static char *monitor_limits_name = NULL;
 static int monitor_interval = 1;	// in seconds
 static char *monitor_log_format = NULL;
 static char *monitor_log_dir = NULL;
+
+static char *wrapper_command = 0;
+static struct list *wrapper_input_files = 0;
+static struct list *wrapper_output_files = 0;
 
 int verbose_parsing = 0;
 
@@ -620,10 +623,6 @@ int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, i
 			}
 			break;
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-				/* Note we do not fall with
-				 * BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS here, since we
-				 * do not want to rename absolute paths in such case.
-				 * */
 			if(f->filename[0] == '/' && !remotename) {
 				/* Translate only explicit absolute paths for Work Queue tasks. */
 				remotename = dag_node_add_remote_name(n, f->filename, NULL);
@@ -705,7 +704,12 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 	}
 }
 
-const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
+/*
+Wraps a given command with the appropriate resource monitor string.
+Returns a newly allocated string that must be freed.
+*/
+
+char *dag_node_rmonitor_wrap_command( struct dag_node *n, const char *command )
 {
 	char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
 	char *limits_str = dag_task_resources_wrap_as_rmonitor_options(n);
@@ -716,10 +720,7 @@ const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
 
 	log_name_prefix     = monitor_log_name(monitor_log_dir, n->nodeid);
 
-	if(n->monitor_command)
-		free(n->monitor_command);
-
-	n->monitor_command  = resource_monitor_rewrite_command((char *) n->command,
+	char * result = resource_monitor_rewrite_command(command,
 			monitor_exe,
 			log_name_prefix,
 			monitor_limits_name,
@@ -732,145 +733,97 @@ const char *dag_node_rmonitor_wrap_command(struct dag_node *n)
 	free(extra_options);
 	free(limits_str);
 
-	return n->monitor_command;
+	return result;
 }
 
+/*
+Look up the value of a variable with respect to one node.
+Returns a newly allocated string that must be freed.
+*/
 
-void dag_node_submit(struct dag *d, struct dag_node *n)
+char * dag_node_lookup_str( struct dag_node *n, const char *key )
 {
-	char *input_files  = NULL;
-	char *output_files = NULL;
-	struct dag_file *f;
-	const char *remotename;
-	char current_dir[PATH_MAX];
-	char abs_name[PATH_MAX];
-	struct batch_queue *thequeue;
-	int len = 0, len_temp;
-	char *tmp;
+	struct dag_lookup_set s = { n->d, n->category, n, NULL };
 
-	if(n->local_job && local_queue) {
-		thequeue = local_queue;
-	} else {
-		thequeue = remote_queue;
+	if(!strcmp(key,"RULE") || !strcmp(key,"NODE")) {
+		return string_format("%d",n->nodeid);
 	}
 
-	batch_fs_getcwd(remote_queue, current_dir, PATH_MAX);
+	return dag_lookup_str(key, &s);
+}
 
-	printf("%s\n", n->command);
+/*
+Same as dag_node_lookup_str, but with the arguments reversed
+which makes it compatible with the string_subst function.
+*/
 
-	list_first_item(n->source_files);
-	while((f = list_next_item(n->source_files))) {
-		remotename = dag_file_remote_name(n, f->filename);
-		if(!remotename)
-			remotename = f->filename;
+char *dag_node_lookup_str_reverse( const char *key, void *vn )
+{
+	return dag_node_lookup_str(vn,key);
+}
 
-		switch (batch_queue_get_type(thequeue)) {
+/*
+Given a file, return the string that identifies it appropriately
+for the given batch system, combining the local and remote name
+and making substitutions according to the node.
+*/
+
+char * dag_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue )
+{
+	const char *remotename = dag_file_remote_name(n, f->filename);
+	if(!remotename) remotename = f->filename;
+
+	switch (batch_queue_get_type(queue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			tmp = string_format("%s=%s,", f->filename, remotename);
-			break;
-		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
-			if(f->filename[0] == '/')
-			{
-				tmp = string_format("%s=%s,", f->filename, remotename);
-			}
-			else
-			{
-				char *tmp_name = string_format("%s/%s", current_dir, f->filename);
-				path_collapse(tmp_name, abs_name, 1);
-				free(tmp_name);
-				tmp = string_format("%s=%s,", abs_name, remotename);
-			}
-			break;
+			return string_format("%s=%s,", f->filename, remotename);
 		case BATCH_QUEUE_TYPE_CONDOR:
-			tmp = string_format("%s,", remotename);
-			break;
+			return string_format("%s,", remotename);
 		default:
-			tmp = string_format("%s,", f->filename);
-		}
-		len_temp = strlen(tmp);
-		input_files = realloc(input_files, (len + len_temp + 1) * sizeof(char));
-		memcpy(input_files + len, tmp, len_temp + 1);
-		len += len_temp;
+			return string_format("%s,", f->filename);
+	}
+}
+
+/*
+Given a list of files, add the files to the given string.
+Returns the original string, realloced if necessary
+*/
+
+char * dag_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue )
+{
+	struct dag_file *file;
+
+	if(!file_str) file_str = strdup("");
+
+	if(!file_list) return file_str;
+
+	list_first_item(file_list);
+	while((file=list_next_item(file_list))) {
+		char *f = dag_file_format(node,file,queue);
+		file_str = string_combine(file_str,f);
+		free(f);
 	}
 
+	return file_str;
+}
 
-	len = 0;
-	list_first_item(n->target_files);
-	while((f = list_next_item(n->target_files))) {
-		remotename = dag_file_remote_name(n, f->filename);
-		if(!remotename)
-			remotename = f->filename;
+/*
+Submit one fully formed job, retrying failures up to the dag_submit_timeout.
+This is necessary because busy batch systems occasionally do not accept a job submission.
+*/
 
-		switch (batch_queue_get_type(thequeue)) {
-		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			tmp = string_format("%s=%s,", f->filename, remotename);
-			break;
-		case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
-			if(f->filename[0] == '/')
-			{
-				tmp = string_format("%s=%s,", f->filename, remotename);
-			}
-			else
-			{
-				char *tmp_name = string_format("%s/%s", current_dir, f->filename);
-				path_collapse(tmp_name, abs_name, 1);
-				free(tmp_name);
-				tmp = string_format("%s=%s,", abs_name, remotename);
-			}
-			break;
-		case BATCH_QUEUE_TYPE_CONDOR:
-			tmp = string_format("%s,", remotename);
-			break;
-		default:
-			tmp = string_format("%s,", f->filename);
-		}
-		len_temp = strlen(tmp);
-		output_files = realloc(output_files, (len + len_temp + 1) * sizeof(char));
-		memcpy(output_files + len, tmp, len_temp + 1);
-		len += len_temp;
-	}
-
-	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
-	 * variable), we must save the previous global queue value, and then
-	 * restore it after we submit. */
-	struct dag_lookup_set s = { d, n->category, n, NULL };
-	char *batch_options_env    = dag_lookup_str("BATCH_OPTIONS", &s);
-	char *batch_submit_options = dag_task_resources_wrap_options(n, batch_options_env, batch_queue_get_type(thequeue));
-	char *old_batch_submit_options = NULL;
-
-	free(batch_options_env);
-	if(batch_submit_options) {
-		debug(D_MAKEFLOW_RUN, "Batch options: %s\n", batch_submit_options);
-		if(batch_queue_get_option(thequeue, "batch-options"))
-			old_batch_submit_options = xxstrdup(batch_queue_get_option(thequeue, "batch-options"));
-		batch_queue_set_option(thequeue, "batch-options", batch_submit_options);
-		free(batch_submit_options);
-	}
-
+batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files )
+{
 	time_t stoptime = time(0) + dag_submit_timeout;
 	int waittime = 1;
-
-	/* Export variables before each submit. We have to do this before each
-	 * node submission because each node may have local variables
-	 * definitions. */
-	dag_export_variables(d, n);
+	batch_job_id_t jobid = 0;
 
 	while(1) {
-		const char *command;
-
-		if(monitor_mode)
-			command = dag_node_rmonitor_wrap_command(n);
-		else
-			command = n->command;
-
-		n->jobid = batch_job_submit_simple(thequeue, command, input_files, output_files);
-		if(n->jobid >= 0)
-			break;
+		jobid = batch_job_submit_simple(queue, command, input_files, output_files);
+		if(jobid >= 0) return jobid;
 
 		fprintf(stderr, "couldn't submit batch job, still trying...\n");
 
-		if(dag_abort_flag)
-			break;
+		if(dag_abort_flag) break;
 
 		if(time(0) > stoptime) {
 			fprintf(stderr, "unable to submit job after %d seconds!\n", dag_submit_timeout);
@@ -879,16 +832,90 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
 		sleep(waittime);
 		waittime *= 2;
-		if(waittime > 60)
-			waittime = 60;
+		if(waittime > 60) waittime = 60;
 	}
+
+	return 0;
+}
+
+/*
+Submit a node to the appropriate batch system, after materializing
+the necessary list of input and output files, and applying all
+wrappers and options.
+*/
+
+void dag_node_submit(struct dag *d, struct dag_node *n)
+{
+	struct batch_queue *queue;
+
+	if(n->local_job && local_queue) {
+		queue = local_queue;
+	} else {
+		queue = remote_queue;
+	}
+
+	/* Create strings for all the files mentioned by this node. */
+	char *input_files = dag_file_list_format(n,0,n->source_files,queue);
+	char *output_files = dag_file_list_format(n,0,n->target_files,queue);
+
+	/* Add the wrapper input and output files to the strings. */
+	/* This function may realloc input_files and output_files. */
+	input_files = dag_file_list_format(n,input_files,wrapper_input_files,queue);
+	output_files = dag_file_list_format(n,output_files,wrapper_output_files,queue);
+
+	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
+	char * command = string_wrap_command(n->command,wrapper_command);
+
+	/* Wrap the command with the resource monitor, if it is enabled. */
+	if(monitor_mode) {
+		char *newcommand = dag_node_rmonitor_wrap_command(n,command);
+		free(command);
+		command = newcommand;
+	}
+
+	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
+	 * variable), we must save the previous global queue value, and then
+	 * restore it after we submit. */
+	struct dag_lookup_set s = { d, n->category, n, NULL };
+	char *batch_options_env    = dag_lookup_str("BATCH_OPTIONS", &s);
+	char *batch_submit_options = dag_task_resources_wrap_options(n, batch_options_env, batch_queue_get_type(queue));
+	char *old_batch_submit_options = NULL;
+
+	free(batch_options_env);
+	if(batch_submit_options) {
+		debug(D_MAKEFLOW_RUN, "Batch options: %s\n", batch_submit_options);
+		if(batch_queue_get_option(queue, "batch-options"))
+			old_batch_submit_options = xxstrdup(batch_queue_get_option(queue, "batch-options"));
+		batch_queue_set_option(queue, "batch-options", batch_submit_options);
+		free(batch_submit_options);
+	}
+
+	/* Export variables before each submit. We have to do this before each
+	 * node submission because each node may have local variables
+	 * definitions. */
+	dag_export_variables(d, n);
+
+	/*
+	Just before execution, apply variable substitution to the command and the
+	file list, so that it applies to wrapper commands, files, and everything.
+	*/
+	command = string_subst( command, dag_node_lookup_str_reverse, n );
+	input_files = string_subst( input_files, dag_node_lookup_str_reverse, n );
+	output_files = string_subst( output_files, dag_node_lookup_str_reverse, n );
+
+	/* Display the fully elaborated command, just like Make does. */
+	printf("%s\n", command);
+
+	/* Now submit the actual job, retrying failures as needed. */
+	n->jobid = dag_node_submit_retry(queue,command,input_files,output_files);
 
 	/* Restore old batch job options. */
 	if(old_batch_submit_options) {
-		batch_queue_set_option(thequeue, "batch-options", old_batch_submit_options);
+		batch_queue_set_option(queue, "batch-options", old_batch_submit_options);
 		free(old_batch_submit_options);
 	}
 
+	/* Update all of the necessary data structures. */
 	if(n->jobid >= 0) {
 		dag_node_state_change(d, n, DAG_NODE_STATE_RUNNING);
 		if(n->local_job && local_queue) {
@@ -903,6 +930,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		dag_failed_flag = 1;
 	}
 
+	free(command);
 	free(input_files);
 	free(output_files);
 }
@@ -1290,6 +1318,9 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Work Queue keepalive interval.              (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
 	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
+	fprintf(stdout, " %-30s Wrap all commands with this prefix.\n", "--wrapper=<cmd>");
+	fprintf(stdout, " %-30s Wrapper command requires this input file.\n", "--wrapper-input=<cmd>");
+	fprintf(stdout, " %-30s Wrapper command produces this output file.\n", "--wrapper-input=<cmd>");
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
 	fprintf(stdout, " %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
@@ -1499,6 +1530,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_LOG_VERBOSE_MODE,
 		LONG_OPT_WORKING_DIR,
 		LONG_OPT_WQ_WAIT_FOR_WORKERS,
+		LONG_OPT_WRAPPER,
+		LONG_OPT_WRAPPER_INPUT,
+		LONG_OPT_WRAPPER_OUTPUT
 	};
 
 	static struct option long_options_run[] = {
@@ -1546,6 +1580,9 @@ int main(int argc, char *argv[])
 		{"wq-keepalive-timeout", required_argument, 0, 't'},
 		{"wq-schedule", required_argument, 0, 'W'},
 		{"wq-wait-queue-size", required_argument, 0, LONG_OPT_WQ_WAIT_FOR_WORKERS},
+		{"wrapper", required_argument, 0, LONG_OPT_WRAPPER},
+		{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
+		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
 		{"zero-length-error", no_argument, 0, 'z'},
 		{0, 0, 0, 0}
 	};
@@ -1750,6 +1787,21 @@ int main(int argc, char *argv[])
 			case LONG_OPT_LOG_VERBOSE_MODE:
 				log_verbose_mode = 1;
 				break;
+			case LONG_OPT_WRAPPER:
+				if(!wrapper_command) {
+					wrapper_command = strdup(optarg);
+				} else {
+					wrapper_command = string_wrap_command(wrapper_command,optarg);
+				}
+				break;
+			case LONG_OPT_WRAPPER_INPUT:
+				if(!wrapper_input_files) wrapper_input_files = list_create();
+				list_push_tail(wrapper_input_files,dag_file_create(optarg));
+				break;
+			case LONG_OPT_WRAPPER_OUTPUT:
+				if(!wrapper_output_files) wrapper_output_files = list_create();
+				list_push_tail(wrapper_output_files,dag_file_create(optarg));
+				break;
 			default:
 				show_help_run(get_makeflow_exe());
 				return 1;
@@ -1778,7 +1830,7 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE || batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		if(strcmp(work_queue_master_mode, "catalog") == 0 && project == NULL) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
 			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", get_makeflow_exe());
@@ -1808,7 +1860,6 @@ int main(int argc, char *argv[])
 				batchlogfilename = string_format("%s.condorlog", dagfile);
 				break;
 			case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			case BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS:
 				batchlogfilename = string_format("%s.wqlog", dagfile);
 				break;
 			default:
@@ -1871,8 +1922,6 @@ int main(int argc, char *argv[])
 			d->remote_jobs_max = load_average_get_cpus();
 		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 			d->remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
-		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-			d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 		} else {
 			d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 		}

@@ -94,7 +94,6 @@ struct dag_node {
     const char *command;                /* The command line with files of the shell io redirection 
                                            with remote names. */
     const char *original_command;       /* The command line as in the makeflow file */
-    char *monitor_command;              /* The command line, wrapped for monitoring */
 
     int failure_count;                  /* How many times has this rule failed? (see -R and -r) */
     time_t previous_completion;
@@ -185,7 +184,7 @@ struct dag_variable_value {
 
 struct dag *dag_create();
 struct dag_node *dag_node_create(struct dag *d, int linenum);
-struct dag_file *dag_file_create(struct dag_node *n, const char *filename, const char *remotename);
+struct dag_file *dag_file_create( const char *filename );
 struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename);
 
 struct list *dag_input_files(struct dag *d);

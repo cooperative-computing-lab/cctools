@@ -27,7 +27,6 @@ extern const struct batch_queue_module batch_queue_mpi_queue;
 extern const struct batch_queue_module batch_queue_sge;
 extern const struct batch_queue_module batch_queue_torque;
 extern const struct batch_queue_module batch_queue_wq;
-extern const struct batch_queue_module batch_queue_wq_sharedfs;
 
 static struct batch_queue_module batch_queue_unknown = {
 	BATCH_QUEUE_TYPE_UNKNOWN, "unknown",
@@ -51,7 +50,6 @@ const struct batch_queue_module * const batch_queue_modules[] = {
     &batch_queue_sge,
     &batch_queue_torque,
     &batch_queue_wq,
-    &batch_queue_wq_sharedfs,
     &batch_queue_unknown
 };
 

@@ -25,7 +25,7 @@ the corresponding log file options.
 @return A new command line that runs the original command line wrapped with the resource monitor.
 */
 
-char *resource_monitor_rewrite_command(char *cmdline, char *monitor_path, char *template_filename, char *limits_filename,
+char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_path, const char *template_filename, const char *limits_filename,
 				       const char *extra_monitor_options,
 				       int summary, int time_series, int opened_files);
 
@@ -36,16 +36,15 @@ The resource monitor executable is searched, in order, in the following location
 @return The name of the monitor executable in the current working directory.
 */
 
-char *resource_monitor_copy_to_wd(char *path_from_cmdline);
+char *resource_monitor_copy_to_wd(const char *path_from_cmdline);
 
 /**  Reads a single resources file from filename **/
-struct rmsummary *resident_monitor_parse_resources_file(char *filename);
+struct rmsummary *resident_monitor_parse_resources_file(const char *filename);
 
 /** Looks for the path of the resource_monitor executable.
 @param path_from_cmdline The first path to look for the resource monitor executable.
 @return The path of the monitor executable.
 */
-char *resource_monitor_locate(char *path_from_cmdline);
-
+char *resource_monitor_locate(const char *path_from_cmdline);
 
 #endif
