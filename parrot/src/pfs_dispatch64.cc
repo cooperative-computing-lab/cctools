@@ -1100,6 +1100,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_ustat:
 		case SYSCALL64_vhangup:
 		case SYSCALL64_wait4:
+		case SYSCALL64_waitid:
 			break;
 
 		case SYSCALL64_execve:

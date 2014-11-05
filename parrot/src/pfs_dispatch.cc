@@ -1365,6 +1365,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_vm86:
 		case SYSCALL32_vm86old:
 		case SYSCALL32_wait4:
+		case SYSCALL32_waitid:
 		case SYSCALL32_waitpid:
 			break;
 
