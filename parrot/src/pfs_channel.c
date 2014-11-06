@@ -79,24 +79,40 @@ int pfs_channel_init( pfs_size_t size )
 {
 	char path[PATH_MAX];
 
-	sprintf(path,"%s/parrot-channel.XXXXXX",pfs_temp_dir);
+	close(channel_fd);
+	channel_fd = -1;
+
+	/* We use /dev/shm for the channel because we rely on POSIX semantics for
+	 * mmap. Some distributed file systems like GPFS do not handle this
+	 * correctly.
+	 *
+	 * See: https://github.com/cooperative-computing-lab/cctools/issues/305
+	 */
+	snprintf(path, sizeof(path), "%s/parrot-channel.XXXXXX", "/dev/shm");
 	channel_fd = mkstemp(path);
-	if(channel_fd<0) return 0;
+	if (channel_fd < 0) {
+		snprintf(path, sizeof(path), "%s/parrot-channel.XXXXXX", pfs_temp_dir);
+		channel_fd = mkstemp(path);
+	}
+	if (channel_fd < 0)
+		return 0;
 	unlink(path);
-	ftruncate(channel_fd,size);
 
 	channel_size = size;
+	ftruncate(channel_fd,channel_size);
 
-	channel_base = (char*) mmap(0,size,PROT_READ|PROT_WRITE,MAP_SHARED,channel_fd,0);
+	channel_base = (char*) mmap(0,channel_size,PROT_READ|PROT_WRITE,MAP_SHARED,channel_fd,0);
 	if(channel_base==MAP_FAILED) {
 		close(channel_fd);
+		channel_fd = -1;
 		return 0;
 	}
 
-	head = entry_create(0,0,size,0,0);
+	head = entry_create(0,0,channel_size,0,0);
 	if(!head) {
 		close(channel_fd);
-		munmap(channel_base,size);
+		channel_fd = -1;
+		munmap(channel_base,channel_size);
 		return 0;
 	}
 
