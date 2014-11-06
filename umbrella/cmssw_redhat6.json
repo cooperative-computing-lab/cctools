@@ -1,23 +1,27 @@
 {
-	"package": {
-		"execution-environment": {
-			"hardware-platform": "x86_64",
-			"os": "Linux",
-			"kernel" : "2.6.32",
-			"linux-distribution": {
-				"dist-name": "Redhat",
-				"dist-version": "6.5"
-			},
-			"minimum-disk-space": "30GB"
-		},
-		"software-dependencies": {
-			"cmssw-cvmfs": {
-				"name": "cmssw-cvmfs",
-				"version": "CMSSW_5_3_11",
-				"platform": "slc5_amd64_gcc462",
-				"distro": "redhat6",
-				"mountpoint": "/cvmfs/cms.cern.ch"
-			}
+	"hardware": {
+		"platform": "x86_64",
+		"cpu cores": "2",
+		"memory": "2GB",
+		"disk": "10GB"
+	},
+	"kernel" : {
+		"type": "linux",
+		"release": "2.6.32"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "6.5"
+	},
+	"software": {
+		"cmssw-cvmfs": {
+			"name": "cmssw-cvmfs",
+			"version": "CMSSW_5_3_11",
+			"platform": "slc5_amd64_gcc462",
+			"distro": "redhat6",
+			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
+	},
+	"data": {
 	}
 }
