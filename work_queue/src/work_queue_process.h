@@ -17,11 +17,11 @@ struct work_queue_process {
 	pid_t pid;
 	int task_status;                // Any of WORK_QUEUE_RESULT_*
 	int exit_status;                // Exit code, or signal number to task process.
-	
+
 	struct rusage rusage;
 	timestamp_t execution_start;
 	timestamp_t execution_end;
-	
+
 	char *sandbox;
 
 	char *output_file_name;

@@ -21,7 +21,7 @@
    License along with the GNU C Library; if not, write to the Free
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
-
+
 /*
 Slightly modified for the CCTools: remove unnecessary header mangling
 and skip internationalization of error messages.
@@ -88,7 +88,7 @@ int optopt = '?';
 
 static struct _getopt_data getopt_data;
 
-
+
 #ifndef __GNU_LIBRARY__
 
 /* Avoid depending on library functions or files
@@ -99,7 +99,7 @@ extern char *getenv ();
 #endif
 
 #endif /* not __GNU_LIBRARY__ */
-
+
 #ifdef _LIBC
 /* Stored original parameters.
    XXX This is no good solution.  We should rather copy the args so
@@ -283,7 +283,7 @@ _getopt_initialize (int argc, char *const *argv, const char *optstring,
 
   return optstring;
 }
-
+
 /* Scan elements of ARGV (whose length is ARGC) for option characters
    given in OPTSTRING.
 
@@ -1102,7 +1102,7 @@ getopt_long_only (int argc, char *const *argv, const char *optstring, const stru
 }
 
 
-
+
 #ifdef TEST
 
 /* Compile with -DTEST to make an executable for use in testing

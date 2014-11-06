@@ -74,7 +74,7 @@ int link_auth_password( struct link *link, const char *password, time_t stoptime
 	sprintf(expected_response,"%s %s",password,my_random_key);
 	sha1_buffer(expected_response,strlen(expected_response),digest);
 	strcpy(expected_response,sha1_string(digest));
-	
+
 	// Get the peer's actual response.
 	debug(D_AUTH,"getting peer's response");
 	char actual_response[LINK_AUTH_LINE_MAX];

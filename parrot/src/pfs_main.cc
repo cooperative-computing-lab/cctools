@@ -160,7 +160,7 @@ static void get_linux_version(const char *cmd)
 		fatal("this version of Parrot requires at least kernel version 2.5.60");
 }
 
-static void pfs_helper_init( const char *argv0 ) 
+static void pfs_helper_init( const char *argv0 )
 {
 	char helper_path[PFS_PATH_MAX];
 
@@ -272,7 +272,7 @@ void install_handler( int sig, void (*handler)(int sig))
 
 	s.sa_handler = handler;
 	sigfillset(&s.sa_mask);
-	s.sa_flags = 0; 
+	s.sa_flags = 0;
 
 	sigaction(sig,&s,0);
 }
@@ -528,7 +528,7 @@ int main( int argc, char *argv[] )
 	} else {
 		pfs_master_timeout = 3600;
 	}
-	
+
 	pfs_uid = getuid();
 	pfs_gid = getgid();
 
@@ -548,7 +548,7 @@ int main( int argc, char *argv[] )
 
 	s = getenv("PARROT_FORCE_CACHE");
 	if(s) pfs_force_cache = 1;
-	
+
 	s = getenv("PARROT_FOLLOW_SYMLINKS");
 	if(s) pfs_follow_symlinks = atoi(s);
 
@@ -745,7 +745,7 @@ int main( int argc, char *argv[] )
 			break;
 		case 'F':
 			pfs_force_cache = 1;
-			break;	
+			break;
 		case 'f':
 			pfs_follow_symlinks = 0;
 			break;
@@ -915,7 +915,7 @@ int main( int argc, char *argv[] )
 	}
 
 
-	if(!pfs_channel_init(channel_size*1024*1024)) fatal("couldn't establish I/O channel");	
+	if(!pfs_channel_init(channel_size*1024*1024)) fatal("couldn't establish I/O channel");
 
 	{
 		char buf[4096];
@@ -937,7 +937,7 @@ int main( int argc, char *argv[] )
 		} else {
 			debug(D_PROCESS,"watchdog PID %d",pfs_watchdog_pid);
 		}
-	} 
+	}
 
 	/*
 	For reasons I don't understand yet, parrot gets very confused when
@@ -1100,7 +1100,7 @@ int main( int argc, char *argv[] )
 		hash_table_delete(namelist_table);
 		fclose(namelist_file);
 	}
-	
+
 	if(WIFEXITED(root_exitstatus)) {
 		int status = WEXITSTATUS(root_exitstatus);
 		debug(D_PROCESS,"%s exited normally with status %d",argv[optind],status);

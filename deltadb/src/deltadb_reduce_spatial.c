@@ -108,7 +108,7 @@ static int log_play( struct deltadb *db, FILE *stream  )
 	int first_output = 1;
 
 	time_t previous_time = 0;
-	
+
 	while(fgets(line,sizeof(line),stream)) {
 		//debug(D_NOTICE,"Processed line: %s",line);
 

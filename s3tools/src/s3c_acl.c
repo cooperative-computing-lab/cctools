@@ -31,7 +31,7 @@ int s3_getacl(char* bucketname, char* filename, char* owner, struct hash_table* 
 	char * start;
 	char * temp;
 	int length;
- 
+
 	if(!s3_endpoint) return -1;
 	if(filename) sprintf(path, "%s?acl", filename);
 	else sprintf(path, "/?acl");
@@ -160,12 +160,12 @@ int s3_setacl(char* bucketname, char *filename, const char* owner, struct hash_t
 	//int length;
 	char *id;
 	struct s3_acl_object *acl;
- 
+
 	if(!s3_endpoint) return -1;
 	if(filename) sprintf(path, "%s?acl", filename);
 	else
 	sprintf(path, "/?acl");
- 
+
 
 	mesg.content_length = 39 + 32 + strlen(owner) + 32;
 	hash_table_firstkey(acls);

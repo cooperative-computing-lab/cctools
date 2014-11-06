@@ -9,9 +9,9 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
-	
+
 #ifndef HAS_PREAD
-	ssize_t pread(int fd, void *data, size_t length, off_t offset) 
+	ssize_t pread(int fd, void *data, size_t length, off_t offset)
 {
 	ssize_t result;
 	off_t save_offset;
@@ -28,9 +28,9 @@ See the file COPYING for details.
 
 
 #endif	/*  */
-	
+
 #ifndef HAS_PWRITE
-	ssize_t pwrite(int fd, const void *data, size_t length, off_t offset) 
+	ssize_t pwrite(int fd, const void *data, size_t length, off_t offset)
 {
 	ssize_t result;
 	off_t save_offset;
@@ -45,7 +45,7 @@ See the file COPYING for details.
 	return result;
 }
 
-
+
 #endif	/*  */
 
 /* vim: set noexpandtab tabstop=4: */

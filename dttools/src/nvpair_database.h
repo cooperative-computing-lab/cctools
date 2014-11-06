@@ -29,7 +29,7 @@ during that day, a corresponding log file records the individual changes.
 The state of the table at any time can be obtained by starting with
 the proper daily checkpoint, then playing the log of updates until
 the desired time is reached.  This could be used to creating arbitrary
-snapshots in time, or for running more complex queries that show the 
+snapshots in time, or for running more complex queries that show the
 change of a single entity over time.
 
 The log directory is broken down by year and day-of-year, so that

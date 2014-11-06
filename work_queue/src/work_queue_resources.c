@@ -58,7 +58,7 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 		r->gpus.largest = r->gpus.smallest = r->gpus.total;
 		gpu_check = 1;
 	}
-	
+
 	r->workers.total = 1;
 	r->workers.largest = r->workers.smallest = r->workers.total;
 }

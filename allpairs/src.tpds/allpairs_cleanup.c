@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
     char matrix_target[CHIRP_PATH_MAX];
     char finalize_file[CHIRP_PATH_MAX];
     time_t stoptime = time(0)+3600;
-    
+
     download=rm_local=rm_remote=rm_mat=file_provided=0;
 
     while((cl=getopt(argc,argv,"+a:d:hD:LRMF:")) > -1) {
@@ -61,9 +61,9 @@ int main(int argc, char** argv) {
 	case 'R': // force REMOTE state removal (chirp_distribute -X)
 	    rm_remote=1;
 	    break;
-	case 'M': // force REMOTE MATRIX state removal 
+	case 'M': // force REMOTE MATRIX state removal
 	    rm_mat=1;
-	    break; 
+	    break;
 	case 'F':
 	    file_provided=1;
 	    strcpy(finalize_file,optarg);
@@ -109,8 +109,8 @@ int main(int argc, char** argv) {
 	    exit(2);
 	}
     }
-    
-    
+
+
     // first item is local prefix -- remove everything.
     if(fscanf(fp, " local_dir=%zu ",&strlentmp) == 1) {
 	local_dir = (char*) malloc((strlentmp+1)*sizeof(char));
@@ -152,7 +152,7 @@ int main(int argc, char** argv) {
 	    exit(2);
 	}
     }
-    
+
 
     // 4th item is chirp_dirname
     if(fscanf(fp, " remote_dir=%zu ",&strlentmp) == 1) {
@@ -171,7 +171,7 @@ int main(int argc, char** argv) {
 	fprintf(stderr,"Asked to remove remote state, but there is no remote state specified.\n");
 	rm_remote_error = 1;
     }
-     
+
     // 7th item is full goodstring
     if(fscanf(fp, " node_list=%zu ",&strlentmp) == 1) {
 	node_list = (char *) malloc((strlentmp+1)*sizeof(char));
@@ -207,7 +207,7 @@ int main(int argc, char** argv) {
 	fprintf(stderr,"Asked to remove remote state, but there is no remote state specified.\n");
 	rm_remote_error = 1;
     }
-    
+
     // 10th item is full function directory -- remove tarball, exception list
     if(fscanf(fp, " fun_path=%zu ",&strlentmp) == 1) {
 	fun_path = (char *) malloc((strlentmp+1)*sizeof(char));
@@ -232,18 +232,18 @@ int main(int argc, char** argv) {
 	if(system(cmd)) { fprintf(stderr,"Could not remove %s/exclude.list\n",fun_path); exit(1);}
 	free(cmd);
 	cmd=NULL;
-	
+
     }
     else {
 	// internal function
 	fun_path = NULL;
     }
-    
-    
+
+
     // end parsing finalize file
-    
+
     // next, download if desired.
-   
+
     if(download) {
 	fprintf(stderr,"Download Matrix Mode\n");
 	FILE* mt = fopen(matrix_target, "w");
@@ -288,7 +288,7 @@ int main(int argc, char** argv) {
      if(rm_mat) {
 	fprintf(stderr,"Remove Matrix State Mode\n");
 	chirp_matrix_delete( mat_host, mat_path, time(0)+600 );
-	
+
     }
     // next, delete local if desired.
      if(rm_local) {
@@ -305,7 +305,7 @@ int main(int argc, char** argv) {
      }
 
      return 0;
-    
+
 }
 
 /* vim: set noexpandtab tabstop=4: */

@@ -26,7 +26,7 @@ static char *monitor_exe  = NULL;
 char *resource_monitor_locate(const char *path_from_cmdline)
 {
 	char *monitor_path;
-	struct stat buf;	
+	struct stat buf;
 
 	debug(D_RMON,"locating resource monitor executable...\n");
 
@@ -36,7 +36,7 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 		debug(D_RMON,"trying executable from path provided at command line.\n");
 		if(stat(monitor_path, &buf) == 0)
 			if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-				return xxstrdup(monitor_path);	
+				return xxstrdup(monitor_path);
 	}
 
 	monitor_path = getenv(RESOURCE_MONITOR_ENV_VAR);
@@ -45,7 +45,7 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 		debug(D_RMON,"trying executable from $%s.\n", RESOURCE_MONITOR_ENV_VAR);
 		if(stat(monitor_path, &buf) == 0)
 			if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-				return xxstrdup(monitor_path);	
+				return xxstrdup(monitor_path);
 	}
 
 	debug(D_RMON,"trying executable at local directory.\n");
@@ -53,14 +53,14 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 	monitor_path = string_format("./resource_monitor");
 	if(stat(monitor_path, &buf) == 0)
 		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return xxstrdup(monitor_path);	
+			return xxstrdup(monitor_path);
 
 	//static "vanilla" version
 	free(monitor_path);
 	monitor_path = string_format("./resource_monitorv");
 	if(stat(monitor_path, &buf) == 0)
 		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return xxstrdup(monitor_path);	
+			return xxstrdup(monitor_path);
 
 	debug(D_RMON,"trying executable at installed path location.\n");
 	//LD_CONFIG version.
@@ -68,13 +68,13 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 	monitor_path = string_format("%s/bin/resource_monitor", INSTALL_PATH);
 	if(stat(monitor_path, &buf) == 0)
 		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return xxstrdup(monitor_path);	
-	
+			return xxstrdup(monitor_path);
+
 	free(monitor_path);
 	monitor_path = string_format("%s/bin/resource_monitorv", INSTALL_PATH);
 	if(stat(monitor_path, &buf) == 0)
 		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return xxstrdup(monitor_path);	
+			return xxstrdup(monitor_path);
 
 	return NULL;
 }
@@ -119,7 +119,7 @@ char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_
 {
 	char cmd_builder[PATH_MAX];
 	int  index;
-	
+
 	if(!monitor_path && !monitor_exe)
 		monitor_exe = resource_monitor_copy_to_wd(NULL);
 

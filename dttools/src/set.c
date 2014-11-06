@@ -63,7 +63,7 @@ void set_clear(struct set *s)
 			e = f;
 		}
 	}
-	
+
 	for(i = 0; i < s->bucket_count; i++) {
 		s->buckets[i] = 0;
 	}
@@ -135,7 +135,7 @@ static int set_double_buckets(struct set *s)
 	s->buckets      = sn->buckets;
 	s->bucket_count = sn->bucket_count;
 	s->size         = sn->size;
-	
+
 	/* Delete reference to new, so old is safe */
 	free(sn);
 

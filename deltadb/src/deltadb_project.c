@@ -60,16 +60,16 @@ static int log_play( struct deltadb *db )
 	char name[NVPAIR_LINE_MAX];
 	char value[NVPAIR_LINE_MAX];
 	char oper;
-	
+
 	int notime = 1;
 	while(fgets(line,sizeof(line),stream)) {
 		line_number += 1;
-		
+
 		if (line[0]=='\n') return 0;
-		
+
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if(n<1) continue;
-		
+
 		int i,include;
 		switch(oper) {
 			case 'C':
@@ -156,14 +156,14 @@ static int parse_input( struct deltadb *db )
 int main( int argc, char *argv[] )
 {
 	struct deltadb *db = deltadb_create();
-	
+
 	int i;
 	db->attr_len = argc-1;
 	db->attr_list = malloc(sizeof(char*)*db->attr_len);
 	for (i=1; i<argc; i++){
 		db->attr_list[i-1] = argv[i];
 	}
-	
+
 
 	parse_input(db);
 

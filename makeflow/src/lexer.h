@@ -49,9 +49,9 @@
    line. One of "<" or ">".
    FILES: A list of literals, describing input or output files. Ends with a NEWLINE token.
    COLON: Signals the separation between input and output files.
-   REMOTE_NAME: Signals the characters "->" to indicate remote renaming. 
+   REMOTE_NAME: Signals the characters "->" to indicate remote renaming.
 
-  
+
    The function lexer_next_token(lx) calls lexer_next_line, which
    depending on some lookahead, calls lexer_read_command,
    lexer_read_file_list, or lexer_read_syntax. In turn, each of these
@@ -89,8 +89,8 @@ struct lexer
 	char *lexeme_end;
 
 	char *lexeme;
-	uint64_t lexeme_max; 
-	uint64_t lexeme_size; 
+	uint64_t lexeme_max;
+	uint64_t lexeme_size;
 
 	int   chunk_last_loaded;
 	char *buffer;
@@ -101,12 +101,12 @@ struct lexer
 	long int   column_number;
 	struct list *column_numbers;
 
-	struct list *token_queue; 
-	
+	struct list *token_queue;
+
 	struct dag_lookup_set *environment;
 
 	char *linetext;   //This member will be removed once the new lexer is integrated.
-	
+
 	int depth;        //Levels of substitutions. Only depth=0 has stream != NULL.
 };
 
@@ -116,7 +116,7 @@ enum token_t
 	TOKEN_SYNTAX,
 	TOKEN_NEWLINE,
 	TOKEN_VARIABLE,
-	TOKEN_SUBSTITUTION, 
+	TOKEN_SUBSTITUTION,
 	TOKEN_LITERAL,
 	TOKEN_SPACE,
 
@@ -137,7 +137,7 @@ enum
 	STREAM
 };
 
-struct token 
+struct token
 {
 	enum token_t type;
 	char        *lexeme;
@@ -149,7 +149,7 @@ struct token
 
 /* type: is either STREAM or CHAR */
 struct lexer *lexer_create(int type, void *data, int line_number, int column_number);
-struct lexer *lexer_create_substitution(struct lexer *lx, struct token *subs_name); 
+struct lexer *lexer_create_substitution(struct lexer *lx, struct token *subs_name);
 
 struct token *lexer_next_token(struct lexer *lx);
 struct token *lexer_peek_next_token(struct lexer *lx);

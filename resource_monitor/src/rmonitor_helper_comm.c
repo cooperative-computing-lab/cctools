@@ -70,24 +70,24 @@ char *monitor_helper_locate(char *default_path)
 
 	debug(D_RMON,"trying library from $%s.\n", RESOURCE_MONITOR_HELPER_ENV_VAR);
 	helper_path = getenv(RESOURCE_MONITOR_HELPER_ENV_VAR);
-	if(helper_path) 
+	if(helper_path)
 	{
-		if(access(helper_path, R_OK|X_OK) == 0)	
-			return xxstrdup(helper_path);	
+		if(access(helper_path, R_OK|X_OK) == 0)
+			return xxstrdup(helper_path);
 	}
 
 	if(default_path)
 	{
 		debug(D_RMON,"trying library at default path...\n");
-		if(access(default_path, R_OK|X_OK) == 0)	
+		if(access(default_path, R_OK|X_OK) == 0)
 			return xxstrdup(default_path);
 	}
 
 	debug(D_RMON,"trying library at default location.\n");
 	free(helper_path);
 	helper_path = string_format("%s/lib/librmonitor_helper.so", INSTALL_PATH);
-	if(access(helper_path, R_OK|X_OK) == 0)	
-		return helper_path;	
+	if(access(helper_path, R_OK|X_OK) == 0)
+		return helper_path;
 
 	return NULL;
 }
@@ -134,7 +134,7 @@ int send_monitor_msg(struct monitor_msg *msg)
 		return -1;
 	}
 
-	sscanf(socket_info, "%d", &port); 
+	sscanf(socket_info, "%d", &port);
 	debug(D_RMON, "found socket info at %d.\n", port);
 
 	find_localhost_addr(port, &addr);

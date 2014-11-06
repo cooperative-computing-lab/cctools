@@ -218,7 +218,7 @@ struct cluster *cluster_nearest_neighbor(struct itable *active_clusters, struct 
 		}
 	}
 
-	return nearest; 
+	return nearest;
 }
 
 struct rmDsummary *cluster_find_centroid(struct cluster *c)
@@ -330,7 +330,7 @@ static int summary_cmp_rule(const void *a, const void *b)
 	const struct rmDsummary **sa = (void *) a;
 	const struct rmDsummary **sb = (void *) b;
 
-	return ((*sa)->task_id - (*sb)->task_id); 
+	return ((*sa)->task_id - (*sb)->task_id);
 }
 
 void cluster_collect_summaries_recursive(struct cluster *c, struct list *accum)
@@ -379,7 +379,7 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters, doubl
 
 	/* Add all of the initial clusters as active clusters. */
 	active_clusters = itable_create(0);
-	while( (top = list_next_item(initial_clusters)) ) 
+	while( (top = list_next_item(initial_clusters)) )
 		itable_insert(active_clusters, (uintptr_t) top, (void *) top);
 
 	do
@@ -406,9 +406,9 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters, doubl
 		if( closest && subtop )
 		{
 			/* Use pointer address to systematically break ties. */
-			if(dclosest < dsubtop || ((dclosest == dsubtop) && (uintptr_t)closest < (uintptr_t)subtop)) 
+			if(dclosest < dsubtop || ((dclosest == dsubtop) && (uintptr_t)closest < (uintptr_t)subtop))
 				merge = 0;
-			else 
+			else
 				merge = 1;
 		}
 		else if( subtop )
@@ -435,7 +435,7 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters, doubl
 			list_push_head(stack, closest);
 		}
 
-		debug(D_DEBUG, "stack: %d  active: %d  closest: %lf subtop: %lf\n", 
+		debug(D_DEBUG, "stack: %d  active: %d  closest: %lf subtop: %lf\n",
 				list_size(stack), itable_size(active_clusters), dclosest, dsubtop);
 
 		/* If there are no more active_clusters, but there is not
@@ -503,13 +503,13 @@ struct list *collect_final_clusters(struct cluster *final, int max_clusters)
 		{
 			if(c == cmax)
 			{
-				if( c->right ) 
+				if( c->right )
 					list_push_tail(clusters_next, c->right);
 
-				if( c->left ) 
+				if( c->left )
 					list_push_tail(clusters_next, c->left);
 
-				if( !c->left || !c->right ) 
+				if( !c->left || !c->right )
 					list_push_tail(clusters_next, c);
 			}
 			else
@@ -580,7 +580,7 @@ void report_clusters_histograms(char *clusters_file, int max_clusters)
 	fprintf(fplot, "set style histogram rowstacked;\n");
 	fprintf(fplot, "set style fill solid;\n");
 	fprintf(fplot, "set boxwidth bw;\n");
-	fprintf(fplot, "set key invert box opaque;\n"); 
+	fprintf(fplot, "set key invert box opaque;\n");
 	fprintf(fplot, "set xtics nomirror; set ytics nomirror; set border front;\n");
 	fprintf(fplot, "unset border; set noytics; set xlabel \"number of tasks\"; set ylabel \" resource proportion to max used\";\n");
 	fprintf(fplot, "do for [clusters_index=0:%d] {\n", max_clusters - 1);
@@ -598,11 +598,11 @@ void report_clusters_histograms(char *clusters_file, int max_clusters)
 		if(f->active)
 		{
 			if(column == 2)
-				fprintf(fplot, " index clusters_index using %d:xticlabels(1) title '%s'", 
+				fprintf(fplot, " index clusters_index using %d:xticlabels(1) title '%s'",
 						column,
 						f->name);
 			else
-				fprintf(fplot, ", '' index clusters_index using %d title '%s'", 
+				fprintf(fplot, ", '' index clusters_index using %d title '%s'",
 						column,
 						f->name);
 			column++;
@@ -683,7 +683,7 @@ int main(int argc, char **argv)
 	char           *input_directory = NULL;
 	char           *input_list      = NULL;
 	FILE           *freport;
-	int             max_clusters = DEFAULT_MAX_CLUSTERS; 
+	int             max_clusters = DEFAULT_MAX_CLUSTERS;
 	struct list    *initial_clusters, *final_clusters;
 	struct cluster *final;
 

@@ -165,7 +165,7 @@ process to sleep and wait for actual input to become ready.
 					}
 				} else {
 					is_a_named_pipe = 0;
-				}	
+				}
 			}
 			if(is_a_named_pipe) {
 				result = -1;
@@ -521,7 +521,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *data, size_t size )
 	{
 		ssize_t result;
@@ -534,7 +534,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual ssize_t listxattr ( pfs_name *name, char *list, size_t size )
 	{
 		ssize_t result;
@@ -547,7 +547,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual ssize_t llistxattr ( pfs_name *name, char *list, size_t size )
 	{
 		ssize_t result;
@@ -560,7 +560,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual int setxattr ( pfs_name *name, const char *attrname, const void *data, size_t size, int flags )
 	{
 		int result;
@@ -573,7 +573,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *data, size_t size, int flags )
 	{
 		int result;
@@ -586,7 +586,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual int removexattr ( pfs_name *name, const char *attrname )
 	{
 		int result;
@@ -599,7 +599,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual int lremovexattr ( pfs_name *name, const char *attrname )
 	{
 		int result;

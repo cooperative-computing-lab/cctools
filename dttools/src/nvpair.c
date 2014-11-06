@@ -263,7 +263,7 @@ void nvpair_print_json(struct nvpair *n, FILE * s)
 			fprintf(s,"%s",(char*)value);
 		} else {
 			fprintf(s,"\"%s\"",(char*)value);
-		}		
+		}
 
 		i++;
 		if(i<count) fprintf(s,",\n");

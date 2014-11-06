@@ -14,7 +14,7 @@ See the file COPYING for details.
 
 enum monitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN, READ, WRITE };
 
-/* BRANCH: pid of parent 
+/* BRANCH: pid of parent
  * END:    pid of child that ended
  * CHDIR:  new working directory
  * OPEN:   path of the file opened, or "" if not a regular file.
@@ -27,9 +27,9 @@ struct monitor_msg
 	enum monitor_msg_type type;
 	pid_t                 origin;
 	union {
-		pid_t    p; 
+		pid_t    p;
 		uint64_t n;
-		char     s[1024]; 
+		char     s[1024];
 	}                     data;
 };
 

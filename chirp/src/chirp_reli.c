@@ -66,7 +66,7 @@ static struct chirp_client * connect_to_host( const char *host, time_t stoptime 
 
 	c = hash_table_lookup(table,host);
 	if(c) return c;
-	
+
 	if(!strncmp(host,"CONDOR",6)) {
 		c = chirp_client_connect_condor(stoptime);
 	} else {
@@ -1017,7 +1017,7 @@ void chirp_reli_cleanup_before_fork()
 	hash_table_firstkey(table);
 	while(hash_table_nextkey(table,&host,(void**)&value)) {
 		invalidate_host(host);
-	}		
+	}
 }
 
 /* vim: set noexpandtab tabstop=4: */

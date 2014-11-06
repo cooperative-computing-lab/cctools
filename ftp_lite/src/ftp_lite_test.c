@@ -67,7 +67,7 @@ static struct command list[] =
 };
 
 int main( int argc, char *argv[] )
-{	
+{
 	char line[LINE_MAX];
 	char command[LINE_MAX];
 	char arg1[LINE_MAX];
@@ -91,7 +91,7 @@ int main( int argc, char *argv[] )
 		command[0] = 0;
 		arg1[0] = 0;
 		arg2[0] = 0;
-		
+
 		fields = sscanf(line,"%s %s %s",command,arg1,arg2);
 		if(fields==0) continue;
 

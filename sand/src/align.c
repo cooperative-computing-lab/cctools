@@ -311,7 +311,7 @@ static struct alignment * alignment_traceback(struct matrix *m, int istart, int 
 	aln->length2 = m->height;
 	aln->score = matrix(m,istart,jstart).score;
 	aln->quality = (double)(aln->gap_count + aln->mismatch_count) / MIN(aln->end1-aln->start1,aln->end2-aln->start2);
-	
+
 	return aln;
 }
 

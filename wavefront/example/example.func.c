@@ -53,7 +53,7 @@ int main( int argc, char *argv[] )
 	double b1 = 1;
 	double b2 = 2;
 	double th1 = 1-1.0/X;
-	double th2 = 1-1.0/Y; 
+	double th2 = 1-1.0/Y;
 
 	double bestnash = 1000000000000.0;
 	double bestnash1 = 1000000000000.0;
@@ -70,14 +70,14 @@ int main( int argc, char *argv[] )
 
 			q1 = (double)i/size;
 			q2 = (double)j/size;
-    
+
 			nash1 =   4 - 12*pow(q1,2) - 8*pow(q1,3) + 4*q2 - 8*q1*q2 - 28*pow(q1,2)*q2 - 12*pow(q1,3)*q2 - 4*pow(q2,2) - 16*q1*pow(q2,2) - 18*pow(q1,2)*pow(q2,2) - 4*pow(q1,3)*pow(q2,2) - 4*pow(q2,3) - 8*q1*pow(q2,3) - 2*pow(q1,2)*pow(q2,3) - 4*b1*q1*th1 - 8*b1*pow(q1,2)*th1 - 4*b1*pow(q1,3)*th1 - 8*b1*q1*q2*th1 - 15*b1*pow(q1,2)*q2*th1 - 6*b1*pow(q1,3)*q2*th1 - 4*b1*q1*pow(q2,2)*th1 - 7*b1*pow(q1,2)*pow(q2,2)*th1 - 2*b1*pow(q1,3)*pow(q2,2)*th1 - 2*d->v1 - q2*d->v1 - 2*q2*y->v1 - pow(q2,2)*y->v1 + 2*x->v1 + 2*q2*x->v1;
 
 			nash2 =   4 + 4*q1 - 4*pow(q1,2) - 4*pow(q1,3) - 8*q1*q2 - 16*pow(q1,2)*q2 - 8*pow(q1,3)*q2 - 12*pow(q2,2) - 28*q1*pow(q2,2) - 18*pow(q1,2)*pow(q2,2) - 2*pow(q1,3)*pow(q2,2) - 8*pow(q2,3) - 12*q1*pow(q2,3) - 4*pow(q1,2)*pow(q2,3) - 4*b2*q2*th2 - 8*b2*q1*q2*th2 - 4*b2*pow(q1,2)*q2*th2 - 8*b2*pow(q2,2)*th2 - 15*b2*q1*pow(q2,2)*th2 - 7*b2*pow(q1,2)*pow(q2,2)*th2 - 4*b2*pow(q2,3)*th2 - 6*b2*q1*pow(q2,3)*th2 - 2*b2*pow(q1,2)*pow(q2,3)*th2 - 2*d->v2 - q1*d->v2 + 2*y->v2 + 2*q1*y->v2 - 2*q1*x->v2 - pow(q1,2)*x->v2;
 
 			nash = nash1*nash1 + nash2*nash2;
 
-			if(nash < bestnash) {	
+			if(nash < bestnash) {
 				bestnash = nash;
 				bestnash1 = nash1;
 				bestnash2 = nash2;

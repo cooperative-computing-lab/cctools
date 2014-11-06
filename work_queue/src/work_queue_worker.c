@@ -85,10 +85,10 @@ static const int active_timeout = 3600;
 static const int foreman_internal_timeout = 5;
 
 // Initial value for backoff interval (in seconds) when worker fails to connect to a master.
-static int init_backoff_interval = 1; 
+static int init_backoff_interval = 1;
 
 // Maximum value for backoff interval (in seconds) when worker fails to connect to a master.
-static int max_backoff_interval = 60; 
+static int max_backoff_interval = 60;
 
 // Chance that a worker will decide to shut down each minute without warning, to simulate failure.
 static double worker_volatility = 0.0;
@@ -111,7 +111,7 @@ static const char *master_host = 0;
 static char master_addr[LINK_ADDRESS_MAX];
 static int master_port;
 static char *workspace;
-static char *os_name = NULL; 
+static char *os_name = NULL;
 static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
 static time_t worker_start_time = 0;
@@ -167,14 +167,14 @@ static void send_master_message( struct link *master, const char *fmt, ... )
 	char debug_msg[2*WORK_QUEUE_LINE_MAX];
 	va_list va;
 	va_list debug_va;
-	
+
 	va_start(va,fmt);
 
 	sprintf(debug_msg, "tx to master: %s", fmt);
 	va_copy(debug_va, va);
 
 	vdebug(D_WQ, debug_msg, debug_va);
-	link_putvfstring(master, fmt, time(0)+active_timeout, va);	
+	link_putvfstring(master, fmt, time(0)+active_timeout, va);
 
 	va_end(va);
 }
@@ -210,15 +210,15 @@ void resources_measure_locally(struct work_queue_resources *r)
 		r->memory.total = 0;
 		r->gpus.total = 0;
 	} else {
-		if(manual_cores_option) 
+		if(manual_cores_option)
 			r->cores.total = manual_cores_option;
-		if(manual_memory_option) 
+		if(manual_memory_option)
 			r->memory.total = MIN(r->memory.total, manual_memory_option);
 		if(manual_gpus_option)
 			r->gpus.total = manual_gpus_option;
 	}
 
-	if(manual_disk_option)   
+	if(manual_disk_option)
 		r->disk.total = MIN(r->disk.total, manual_disk_option);
 
 	r->cores.smallest = r->cores.largest = r->cores.total;
@@ -327,25 +327,25 @@ int link_recursive( const char *source, const char *target )
 	struct stat info;
 
 	if(stat(source,&info)<0) return 0;
-	
+
 	if(S_ISDIR(info.st_mode)) {
 		DIR *dir = opendir(source);
 		if(!dir) return 0;
-		
+
 		mkdir(target, 0777);
 
 		struct dirent *d;
 		int result = 1;
-		
+
 		while((d = readdir(dir))) {
 			if(!strcmp(d->d_name,".")) continue;
 			if(!strcmp(d->d_name,"..")) continue;
 
 			char *subsource = string_format("%s/%s",source,d->d_name);
 			char *subtarget = string_format("%s/%s",target,d->d_name);
-			
+
 			result = link_recursive(subsource,subtarget);
-			
+
 			free(subsource);
 			free(subtarget);
 
@@ -364,13 +364,13 @@ int link_recursive( const char *source, const char *target )
 			be accidentally relative to the current directory.
 			*/
 
-			char *cwd = path_getcwd();	
+			char *cwd = path_getcwd();
 			char *absolute_source = string_format("%s/%s", cwd, source);
 
 			int result = symlink(absolute_source, target);
 
-			free(absolute_source);	
-			free(cwd);	
+			free(absolute_source);
+			free(cwd);
 
 			if(result==0) return 1;
 		}
@@ -392,7 +392,7 @@ static int start_process( struct work_queue_process *p )
 	itable_insert(procs_running,pid,p);
 
 	struct work_queue_task *t = p->task;
-		
+
 	cores_allocated += t->cores;
 	memory_allocated += t->memory;
 	disk_allocated += t->disk;
@@ -499,17 +499,17 @@ and if they have exited, move them into the procs_complete table
 for later processing.
 */
 
-static int handle_tasks(struct link *master) 
+static int handle_tasks(struct link *master)
 {
 	struct work_queue_process *p;
 	pid_t pid;
 	int status;
-	
+
 	itable_firstkey(procs_running);
 	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
 		int result = wait4(pid, &status, WNOHANG, &p->rusage);
 		if(result==0) {
-			// pid is still going 
+			// pid is still going
 		} else if(result<0) {
 			debug(D_WQ, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
 		} else if(result>0) {
@@ -520,14 +520,14 @@ static int handle_tasks(struct link *master)
 				p->exit_status = WEXITSTATUS(status);
 				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
 			}
-			
+
 			p->execution_end = timestamp_get();
 
 			if(p->task->maximum_end_time > 0 && p->execution_end - p->task->maximum_end_time)
 			{
 				p->task->result |= WORK_QUEUE_RESULT_TASK_TIMEOUT;
 			}
-			
+
 			cores_allocated  -= p->task->cores;
 			memory_allocated -= p->task->memory;
 			disk_allocated   -= p->task->disk;
@@ -555,7 +555,7 @@ static int handle_tasks(struct link *master)
 			itable_insert(procs_complete, p->task->taskid, p);
 
 		}
-		
+
 	}
 	return 1;
 }
@@ -565,7 +565,7 @@ static int check_disk_space_for_filesize(int64_t file_size) {
 
 	if(disk_avail_threshold > 0) {
 		disk_info_get(".", &disk_avail, &disk_total);
-		if(file_size > 0) {	
+		if(file_size > 0) {
 			if((uint64_t)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
 				debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
 				return 0;
@@ -574,8 +574,8 @@ static int check_disk_space_for_filesize(int64_t file_size) {
 			if(disk_avail < disk_avail_threshold) {
 				debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
 				return 0;
-			}	
-		}	
+			}
+		}
     }
 
 	return 1;
@@ -639,7 +639,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 			goto failure;
 		}
 		send_master_message(master, "dir %s 0\n", filename);
-		
+
 		while(recursive && (dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
 				continue;
@@ -825,13 +825,13 @@ static int do_put( struct link *master, char *filename, int64_t length, int mode
 {
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	char *cur_pos;
-	
+
 	debug(D_WQ, "Putting file %s into workspace\n", filename);
 	if(!check_disk_space_for_filesize(length)) {
 		debug(D_WQ, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
 		return 0;
 	}
-	
+
 
 	mode = mode | 0600;
 
@@ -874,7 +874,7 @@ static int file_from_url(const char *url, const char *filename) {
         debug(D_WQ, "Retrieving %s from (%s)\n", filename, url);
         char command[WORK_QUEUE_LINE_MAX];
         snprintf(command, WORK_QUEUE_LINE_MAX, "curl -f -o \"%s\" \"%s\"", filename, url);
-		
+
 	if (system(command) == 0) {
                 debug(D_WQ, "Success, file retrieved from %s\n", url);
         } else {
@@ -899,8 +899,8 @@ static int do_url(struct link* master, const char *filename, int length, int mod
 static int do_unlink(const char *path) {
 	char cached_path[WORK_QUEUE_LINE_MAX];
 	sprintf(cached_path, "cache/%s", path);
-	//Use delete_dir() since it calls unlink() if path is a file.	
-	if(delete_dir(cached_path) != 0) { 
+	//Use delete_dir() since it calls unlink() if path is a file.
+	if(delete_dir(cached_path) != 0) {
 		struct stat buf;
 		if(stat(cached_path, &buf) != 0) {
 			if(errno == ENOENT) {
@@ -910,7 +910,7 @@ static int do_unlink(const char *path) {
 		}
 		// Failed to do unlink
 		return 0;
-	}	
+	}
 	return 1;
 }
 
@@ -942,7 +942,7 @@ static int do_thirdget(int mode, char *filename, const char *path) {
 	while(!strncmp(cur_pos, "./", 2)) {
 		cur_pos += 2;
 	}
-	
+
 	sprintf(cached_filename, "cache/%s", cur_pos);
 
 	cur_pos = strrchr(cached_filename, '/');
@@ -991,7 +991,7 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 	while(!strncmp(cur_pos, "./", 2)) {
 		cur_pos += 2;
 	}
-	
+
 	sprintf(cached_filename, "cache/%s", cur_pos);
 
 
@@ -1000,7 +1000,7 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 		result = 0;
 	}
 
-	
+
 	switch (mode) {
 	case WORK_QUEUE_FS_SYMLINK:
 	case WORK_QUEUE_FS_PATH:
@@ -1033,9 +1033,9 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 		}
 		break;
 	}
-	
+
 	send_master_message(master, "thirdput-complete %d\n", result);
-	
+
 	return result;
 
 }
@@ -1057,7 +1057,7 @@ static int do_kill(int taskid)
 		debug(D_WQ,"master requested kill of task %d which does not exist!",taskid);
 		return 1;
 	}
-	
+
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		work_queue_cancel_by_taskid(foreman_q, taskid);
 	} else {
@@ -1129,10 +1129,10 @@ static void disconnect_master(struct link *master) {
 	kill_all_tasks();
 
 	//KNOWN HACK: We remove all workers on a master disconnection to avoid
-	//returning old tasks to a new master. 
+	//returning old tasks to a new master.
 	if(foreman_q) {
 		debug(D_WQ, "Disconnecting all workers...\n");
-		release_all_workers(foreman_q); 
+		release_all_workers(foreman_q);
 
 		if(project_regex) {
 			update_catalog(foreman_q, master, 1);
@@ -1207,7 +1207,7 @@ static int handle_master(struct link *master) {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
 		}
-		
+
 	} else {
 		debug(D_WQ, "Failed to read from master.\n");
 		r = 0;
@@ -1241,7 +1241,7 @@ static void work_for_master(struct link *master) {
 
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
-	
+
 	reset_idle_timer();
 
 	time_t volatile_stoptime = time(0) + 60;
@@ -1252,7 +1252,7 @@ static void work_for_master(struct link *master) {
 			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", master_addr,master_port,idle_timeout);
 			break;
 		}
-		
+
 		if(worker_volatility && time(0) > volatile_stoptime) {
 			if( (double)rand()/(double)RAND_MAX < worker_volatility) {
 				debug(D_NOTICE, "work_queue_worker: disconnect from master due to volatility check.\n");
@@ -1261,7 +1261,7 @@ static void work_for_master(struct link *master) {
 				volatile_stoptime = time(0) + 60;
 			}
 		}
-		
+
 		// There is a race condition where if a child finishes while the worker is handling tasks, SIGCHLD is lost and does not interrupt
 		// the poll in link_usleep_mask().  For short-running tasks this can cause a drastic slowdown.  This adapts the amount of time
 		// spent in the link to be close to the average runtime for short tasks, so short-running tasks aren't unduly impacted.
@@ -1275,7 +1275,7 @@ static void work_for_master(struct link *master) {
 		int master_activity = link_usleep_mask(master, msec*1000, &mask, 1, 0);
 
 		if(master_activity < 0) break;
-		
+
 		int ok = 1;
 		if(master_activity) {
 			ok &= handle_master(master);
@@ -1298,7 +1298,7 @@ static void work_for_master(struct link *master) {
 			int visited = 0;
 			while(list_size(procs_waiting) > visited && cores_allocated < local_resources->cores.total) {
 				struct work_queue_process *p;
-				
+
 				p = list_pop_head(procs_waiting);
 				if(p && check_for_resources(p->task)) {
 					start_process(p);
@@ -1354,7 +1354,7 @@ static void foreman_for_master(struct link *master) {
 		}
 
 		task = work_queue_wait_internal(foreman_q, foreman_internal_timeout, master, &master_active);
-		
+
 		if(task) {
 			struct work_queue_process *p;
 			p = itable_lookup(procs_table,task->taskid);
@@ -1371,7 +1371,7 @@ static void foreman_for_master(struct link *master) {
 
 		send_stats_update(master,0);
 		send_resource_update(master,0);
-		
+
 		if(master_active) {
 			result &= handle_master(master);
 			reset_idle_timer();
@@ -1389,7 +1389,7 @@ static int workspace_create() {
 	// Setup working space(dir)
 	const char *workdir;
 	if (user_specified_workdir){
-		workdir = user_specified_workdir;	
+		workdir = user_specified_workdir;
 	} else if(getenv("_CONDOR_SCRATCH_DIR")) {
 		workdir = getenv("_CONDOR_SCRATCH_DIR");
 	} else if(getenv("TEMP")) {
@@ -1462,7 +1462,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	if(!domain_name_cache_lookup(host,master_addr)) {
 		fprintf(stderr,"couldn't resolve hostname %s",host);
 		return 0;
-	}		
+	}
 
 	/*
 	For a single connection attempt, we use the short single_connect_timeout.
@@ -1506,7 +1506,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 			link_close(master);
 			return 0;
 		}
- 
+
 		if(strcmp(line,verify_project)) {
 			fprintf(stderr, "work_queue_worker: master has project %s instead of %s\n", line, verify_project);
 			link_close(master);
@@ -1536,7 +1536,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 static int serve_master_by_name( const char *catalog_host, int catalog_port, const char *project_regex )
 {
 	struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
-	
+
 	debug(D_WQ,"project name %s matches %d masters",project_regex,list_size(masters_list));
 
 	if(list_size(masters_list)==0) return 0;
@@ -1573,7 +1573,7 @@ static void show_help(const char *cmd)
 {
 	printf( "Use: %s [options] <masterhost> <port>\n", cmd);
 	printf( "where options are:\n");
-	printf( " %-30s Name of master (project) to contact.  May be a regular expression.\n", "-N,-M,--master-name=<name>"); 
+	printf( " %-30s Name of master (project) to contact.  May be a regular expression.\n", "-N,-M,--master-name=<name>");
 	printf( " %-30s Catalog server to query for masters.  (default: %s:%d) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
 	printf( " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf( " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
@@ -1706,16 +1706,16 @@ int main(int argc, char *argv[])
 		case LONG_OPT_FOREMAN_PORT:
 		{	char *low_port = optarg;
 			char *high_port= strchr(optarg, ':');
-			
+
 			worker_mode = WORKER_MODE_FOREMAN;
-			
+
 			if(high_port) {
 				*high_port = '\0';
 				high_port++;
 			} else {
 				foreman_port = atoi(low_port);
 				break;
-			} 
+			}
 			setenv("WORK_QUEUE_LOW_PORT", low_port, 0);
 			setenv("WORK_QUEUE_HIGH_PORT", high_port, 0);
 			foreman_port = -1;
@@ -1723,13 +1723,13 @@ int main(int argc, char *argv[])
 		}
 		case 'c':
 			// This option is deprecated. Capacity estimation is now on by default for the foreman.
-			enable_capacity = 1; 
+			enable_capacity = 1;
 			break;
 		case 'F':
-			fast_abort_multiplier = atof(optarg); 
+			fast_abort_multiplier = atof(optarg);
 			break;
 		case LONG_OPT_SPECIFY_LOG:
-			foreman_stats_filename = xxstrdup(optarg); 
+			foreman_stats_filename = xxstrdup(optarg);
 			break;
 		case 't':
 			connect_timeout = idle_timeout = string_time_parse(optarg);
@@ -1782,12 +1782,12 @@ int main(int argc, char *argv[])
 			os_name = xxstrdup(optarg);
 			break;
 		case 's':
-		{	
+		{
 			char temp_abs_path[PATH_MAX];
 			path_absolute(optarg, temp_abs_path, 1);
 			user_specified_workdir = xxstrdup(temp_abs_path);
 			break;
-		}	
+		}
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);
@@ -1914,14 +1914,14 @@ int main(int argc, char *argv[])
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		char foreman_string[WORK_QUEUE_LINE_MAX];
-		
+
 		free(os_name); //free the os string obtained from uname
 		os_name = xxstrdup("foreman");
-		
+
 		sprintf(foreman_string, "%s-foreman", argv[0]);
 		debug_config(foreman_string);
 		foreman_q = work_queue_create(foreman_port);
-		
+
 		if(!foreman_q) {
 			fprintf(stderr, "work_queue_worker-foreman: failed to create foreman queue.  Terminating.\n");
 			exit(1);
@@ -1931,7 +1931,7 @@ int main(int argc, char *argv[])
 
 		if(port_file)
 		{	opts_write_port_file(port_file, work_queue_port(foreman_q));	}
-		
+
 		if(foreman_name) {
 			work_queue_specify_name(foreman_q, foreman_name);
 			work_queue_specify_master_mode(foreman_q, WORK_QUEUE_MASTER_MODE_CATALOG);
@@ -1942,7 +1942,7 @@ int main(int argc, char *argv[])
 		}
 
 		work_queue_specify_estimate_capacity_on(foreman_q, enable_capacity);
-		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);	
+		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);
 		work_queue_specify_log(foreman_q, foreman_stats_filename);
 
 	}

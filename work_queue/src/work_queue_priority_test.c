@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 		t = work_queue_task_create(command);
 
 		work_queue_task_specify_file(t, infile, "sleep", WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
-		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE); 
+		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 		work_queue_task_specify_tag(t, argv[i]);
 
 		work_queue_task_specify_priority(t, atof(argv[i]));

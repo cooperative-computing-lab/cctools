@@ -143,7 +143,7 @@ static int hash_table_double_buckets(struct hash_table *h)
 	h->buckets      = hn->buckets;
 	h->bucket_count = hn->bucket_count;
 	h->size         = hn->size;
-	
+
 	/* Delete reference to new, so old is safe */
 	free(hn);
 

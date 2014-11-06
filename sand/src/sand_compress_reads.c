@@ -23,7 +23,7 @@ static void show_help(const char *cmd)
 	printf(" -q  Quiet mode: suppress summary line.\n");
 	printf(" -v  Show version string.\n");
 	printf(" -c  Remove Celera read_ids if file came from Celera's gatekeeper\n");
-	printf(" -i  Remove read_ids but leave the Celera internal ids if the file came from Celera's gatekeeper\n"); 
+	printf(" -i  Remove read_ids but leave the Celera internal ids if the file came from Celera's gatekeeper\n");
 	printf(" -h  Show this help screen\n");
 }
 
@@ -37,7 +37,7 @@ int main(int argc, char ** argv)
 	struct cseq *c;
 	signed char d;
 	int clip = 0;
-	int internal = 0; 
+	int internal = 0;
 	char tmp_id[128];
 	int count = 0;
 
@@ -48,7 +48,7 @@ int main(int argc, char ** argv)
 			break;
 		case 'i':
 			internal = 1;
-			break; 
+			break;
 		case 'q':
 			quiet_mode = 1;
 			break;

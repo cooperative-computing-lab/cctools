@@ -200,7 +200,7 @@ static void add_to_acl( const char *entry, void *vbuf )
 class pfs_service_chirp : public pfs_service {
 public:
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
-		struct chirp_file *file;		
+		struct chirp_file *file;
 		chirp_dircache_invalidate();
 		file = chirp_global_open(name->hostport,name->rest,flags,mode,time(0)+pfs_master_timeout);
 		if(file) {
@@ -211,7 +211,7 @@ public:
 	}
 
 	static int search_chirp_stat_pack( struct chirp_stat c_info, char *buffer, size_t *i, size_t buffer_length ) {
-		struct stat info;	
+		struct stat info;
 		COPY_CSTAT(c_info, info);
 		size_t n = snprintf(
 			buffer + *i,
@@ -257,9 +257,9 @@ public:
 
 			n += 1;
 
-			if (res->err) 
-				l = snprintf(buffer+*i, buffer_length-*i,  "%s%d|%d|%s", *i==0 ? "" : "|", res->err, res->errsource, res->path); 
-			else 
+			if (res->err)
+				l = snprintf(buffer+*i, buffer_length-*i,  "%s%d|%d|%s", *i==0 ? "" : "|", res->err, res->errsource, res->path);
+			else
 				l = snprintf(buffer+*i, buffer_length-*i, "%s0|%s", *i==0 ? "" : "|", res->path);
 
 			if (l >= buffer_length-*i) {
@@ -416,37 +416,37 @@ public:
 	{
 		return chirp_global_getxattr(name->hostport,name->rest,attrname,value,size,time(0)+pfs_master_timeout);
 	}
-	
+
 	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
 	{
 		return chirp_global_lgetxattr(name->hostport,name->rest,attrname,value,size,time(0)+pfs_master_timeout);
 	}
-	
+
 	virtual ssize_t listxattr ( pfs_name *name, char *attrlist, size_t size )
 	{
 		return chirp_global_listxattr(name->hostport,name->rest,attrlist,size,time(0)+pfs_master_timeout);
 	}
-	
+
 	virtual ssize_t llistxattr ( pfs_name *name, char *attrlist, size_t size )
 	{
 		return chirp_global_llistxattr(name->hostport,name->rest,attrlist,size,time(0)+pfs_master_timeout);
 	}
-	
+
 	virtual int setxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
 	{
 		return chirp_global_setxattr(name->hostport,name->rest,attrname,value,size,flags,time(0)+pfs_master_timeout);
 	}
-	
+
 	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
 	{
 		return chirp_global_lsetxattr(name->hostport,name->rest,attrname,value,size,flags,time(0)+pfs_master_timeout);
 	}
-	
+
 	virtual int removexattr ( pfs_name *name, const char *attrname )
 	{
 		return chirp_global_removexattr(name->hostport,name->rest,attrname,time(0)+pfs_master_timeout);
 	}
-	
+
 	virtual int lremovexattr ( pfs_name *name, const char *attrname )
 	{
 		return chirp_global_lremovexattr(name->hostport,name->rest,attrname,time(0)+pfs_master_timeout);
@@ -463,7 +463,7 @@ public:
 				errno = ENOTDIR;
 				result = -1;
 			}
-		}	
+		}
 		return result;
 	}
 
@@ -532,7 +532,7 @@ public:
 
 		fclose(sourcefile);
 
-		return result;		
+		return result;
 	}
 
 	virtual pfs_ssize_t getfile( pfs_name *source, pfs_name *target )
@@ -553,7 +553,7 @@ public:
 		if(result<0) ::unlink(target->logical_name);
 
 		errno = save_errno;
-		return result;		
+		return result;
 	}
 
 	virtual pfs_ssize_t thirdput( pfs_name *source, pfs_name *target )
@@ -594,13 +594,13 @@ public:
 		chirp_dircache_invalidate();
 		return chirp_global_setacl(name->hostport,name->rest,subject,rights,time(0)+pfs_master_timeout);
 	}
-	
+
 	virtual pfs_location* locate( pfs_name *name ) {
 		int result = -1;
 		pfs_location *loc = new pfs_location();
-		
+
 		result = chirp_global_locate(name->host,name->path,add_to_loc,(void*)loc,time(0)+pfs_master_timeout);
-		
+
 		if(result>=0) {
 			return loc;
 		} else {

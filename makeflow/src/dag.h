@@ -33,37 +33,37 @@ typedef enum {
 struct dag {
     char *filename;                          /* Source makeflow file path. */
     struct dag_node *nodes;                  /* Linked list of all production rules, without ordering. */
-    struct itable *node_table;               /* Mapping from unique integers dag_node->nodeid 
+    struct itable *node_table;               /* Mapping from unique integers dag_node->nodeid
                                                 to nodes. */
-    struct itable *local_job_table;          /* Mapping from unique integers dag_node->jobid  
+    struct itable *local_job_table;          /* Mapping from unique integers dag_node->jobid
                                                 to nodes, rules with prefix LOCAL. */
-    struct itable *remote_job_table;         /* Mapping from unique integers dag_node->jobid  
+    struct itable *remote_job_table;         /* Mapping from unique integers dag_node->jobid
                                                 to nodes. */
     struct hash_table *file_table;           /* Maps every filename to a struct dag_file. */
-    struct hash_table *completed_files;      /* Records which target files have been 
+    struct hash_table *completed_files;      /* Records which target files have been
                                                 updated/generated. */
-    struct list *symlinks_created;           /* Remote filenames for which a symlink was 
-                                                created (used now only for Condor, and only for 
+    struct list *symlinks_created;           /* Remote filenames for which a symlink was
+                                                created (used now only for Condor, and only for
                                                 the final cleanup). */
 	struct hash_table *variables;            /* Mappings between variable names
 												defined in the makeflow file
 												and their values. */
     struct set *collect_table;               /* Keeps files that are garbage collectable. */
-    struct set *export_vars;                /* List of variables with prefix export. 
+    struct set *export_vars;                /* List of variables with prefix export.
                                                 (these are setenv'ed eventually). */
 	struct set *special_vars;                /* List of special variables,
 												such as, category, disk,
 												memory, etc. */
     FILE *logfile;
-    int node_states[DAG_NODE_STATE_MAX];     /* node_states[STATE] keeps the count of nodes that 
+    int node_states[DAG_NODE_STATE_MAX];     /* node_states[STATE] keeps the count of nodes that
                                                 have state STATE \in dag_node_state_t. */
     int local_jobs_running;                  /* Count of jobs running locally. */
-    int local_jobs_max;                      /* Maximum number of jobs that can run 
+    int local_jobs_max;                      /* Maximum number of jobs that can run
                                                 locally (default load_average_get_cpus)*/
     int remote_jobs_running;                 /* Count of jobs running remotelly. */
-    int remote_jobs_max;                     /* Maximum number of jobs that can run remotelly 
+    int remote_jobs_max;                     /* Maximum number of jobs that can run remotelly
                                                 (default at least max_remote_jobs_default)*/
-    int nodeid_counter;                      /* Keeps a count of production rules read so far 
+    int nodeid_counter;                      /* Keeps a count of production rules read so far
                                                 (used for the value of dag_node->nodeid). */
     struct hash_table *task_categories;      /* Mapping from labels to category structures. */
 };
@@ -87,11 +87,11 @@ struct dag_task_category
 struct dag_node {
     struct dag *d;                      /* Dag this node belongs too. */
     int nodeid;                         /* The ordinal number as the rule appears in the makeflow file */
-    batch_job_id_t jobid;               /* The id this node get, either from the local or remote 
+    batch_job_id_t jobid;               /* The id this node get, either from the local or remote
                                            batch system. */
     dag_node_state_t state;             /* Enum: DAG_NODE_STATE_{WAITING,RUNNING,...} */
 
-    const char *command;                /* The command line with files of the shell io redirection 
+    const char *command;                /* The command line with files of the shell io redirection
                                            with remote names. */
     const char *original_command;       /* The command line as in the makeflow file */
 
@@ -103,27 +103,27 @@ struct dag_node {
     int local_job;                      /* Flag: does this node runs locally? */
 
     struct set *descendants;           /* The nodes this node is an immediate ancestor */
-    struct set *ancestors;             /* The nodes this node is an immediate descendant */ 
+    struct set *ancestors;             /* The nodes this node is an immediate descendant */
     int ancestor_depth;                /* The depth of the ancestor tree for this node */
 
     /* Support for recursive calls to makeflow. If this node calls makeflow
      * recursively, makeflow_dag is the name of the makeflow file to run, and
-     * makeflow_cwd is the working directory. See * dag_parse_node_makeflow_command 
+     * makeflow_cwd is the working directory. See * dag_parse_node_makeflow_command
      * (why is this here?) */
     int nested_job;                     /* Flag: Is this a recursive call to
                                            makeflow? */
     const char *makeflow_dag;
-    const char *makeflow_cwd;           
+    const char *makeflow_cwd;
 
     struct itable *remote_names;        /* Mapping from struct *dag_files to remotenames (char *) */
-    struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing 
+    struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing
                                            the local file. */
 
     struct list   *source_files;        /* list of dag_files of the node's requirements */
     struct list   *target_files;        /* list of dag_files of the node's productions */
 
-    struct dag_task_category *category; /* The set of task this node belongs too. Ideally, the makeflow 
-                                           file labeled which tasks have comparable resource usage. */ 
+    struct dag_task_category *category; /* The set of task this node belongs too. Ideally, the makeflow
+                                           file labeled which tasks have comparable resource usage. */
 
 
     struct hash_table *variables;       /* This node settings for variables with @ syntax */

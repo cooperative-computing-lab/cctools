@@ -85,7 +85,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 /* Default: When there is a choice, send a task rather than receive 1 out of 2 times.
  * Classical WQ:   1.0 (always prefer to send)
  * Evictionphobic: 0.0 (always prefer to receive completed tasks) */
-double wq_option_send_receive_ratio    = 0.5; 
+double wq_option_send_receive_ratio    = 0.5;
 
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
@@ -203,7 +203,7 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static void process_available_results(struct work_queue *q, struct work_queue_worker *w);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
-static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line); 
+static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
 
 static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink );
 
@@ -251,9 +251,9 @@ static int known_workers(struct work_queue *q) {
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown")){
 			known_workers++;
-		}	
+		}
 	}
-	
+
 	return known_workers;
 }
 
@@ -275,7 +275,7 @@ static int available_workers(struct work_queue *q) {
 			else if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->cores_allocated || w->resources->disk.total > w->disk_allocated || overcommitted_resource_total(q, w->resources->memory.total, 0) > w->memory_allocated){
 				available_workers++;
 			}
-		}	
+		}
 	}
 
 	return available_workers;
@@ -293,28 +293,28 @@ static int workers_with_tasks(struct work_queue *q) {
 			if(itable_size(w->current_tasks)){
 				workers_with_tasks++;
 			}
-		}	
+		}
 	}
-	
+
 	return workers_with_tasks;
 }
 
 static void log_worker_stats(struct work_queue *q)
 {
 	struct work_queue_stats s;
-	
+
 	debug(D_WQ, "workers status -- total: %d, active: %d, available: %d.",
 		hash_table_size(q->worker_table),
 		known_workers(q),
 		available_workers(q));
-		
+
 	if(!q->logfile) return;
-	
+
 	work_queue_get_stats(q, &s);
 
 	//print in the order described by the headers in specify_log().
-	fprintf(q->logfile, "%" PRIu64 " ", timestamp_get()); 
-	fprintf(q->logfile, "%d %d %d %d %d %d ", s.total_workers_connected, s.workers_init, s.workers_idle, s.workers_busy, s.total_workers_joined, s.total_workers_removed);	
+	fprintf(q->logfile, "%" PRIu64 " ", timestamp_get());
+	fprintf(q->logfile, "%d %d %d %d %d %d ", s.total_workers_connected, s.workers_init, s.workers_idle, s.workers_busy, s.total_workers_joined, s.total_workers_removed);
 	fprintf(q->logfile, "%d %d %d %d %d %d ", s.tasks_waiting, s.tasks_running, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_tasks_cancelled);
 	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %f %f %d ", s.start_time, s.total_send_time, s.total_receive_time, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity);
 	fprintf(q->logfile, "%f %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " ", s.bandwidth, s.total_cores, s.total_memory, s.total_disk, s.total_gpus);
@@ -329,16 +329,16 @@ static void link_to_hash_key(struct link *link, char *key)
 }
 
 /**
- * This function sends a message to the worker and records the time the message is 
+ * This function sends a message to the worker and records the time the message is
  * successfully sent. This timestamp is used to determine when to send keepalive checks.
  */
 __attribute__ (( format(printf,3,4) ))
-static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, const char *fmt, ... ) 
+static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, const char *fmt, ... )
 {
 	char debug_msg[2*WORK_QUEUE_LINE_MAX];
 	va_list va;
 	va_list debug_va;
-	
+
 	va_start(va,fmt);
 
 	time_t stoptime;
@@ -348,16 +348,16 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 		stoptime = time(0) + q->long_timeout;
 	else
 		stoptime = time(0) + q->short_timeout;
-	
+
 	sprintf(debug_msg, "tx to %s (%s): ", w->hostname, w->addrport);
 	strcat(debug_msg, fmt);
 	va_copy(debug_va, va);
 	vdebug(D_WQ, debug_msg, debug_va);
-	
-	int result = link_putvfstring(w->link, fmt, stoptime, va);	
+
+	int result = link_putvfstring(w->link, fmt, stoptime, va);
 	va_end(va);
 
-	return result;  
+	return result;
 }
 
 int process_name(struct work_queue *q, struct work_queue_worker *w, char *line)
@@ -378,7 +378,7 @@ int process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 	int n = sscanf(line,"info %s %[^\n]", field, value);
 	debug(D_WQ, "Receiving %s info from worker (%s)", field, w->addrport);
 
-	if(n != 2) 
+	if(n != 2)
 		return -1;
 
 	if(string_prefix_is(field, "total_workers_joined")) {
@@ -403,17 +403,17 @@ int process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 
 
 /**
- * This function receives a message from worker and records the time a message is successfully 
- * received. This timestamp is used in keepalive timeout computations. 
+ * This function receives a message from worker and records the time a message is successfully
+ * received. This timestamp is used in keepalive timeout computations.
  * Its return value is:
- *  0 : a message was received and processed 
- *  1 : a message was received but NOT processed 
+ *  0 : a message was received and processed
+ *  1 : a message was received but NOT processed
  * -1 : failure to read from link or in processing received message
  */
-static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, char *line, size_t length ) 
+static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, char *line, size_t length )
 {
 	time_t stoptime;
-	
+
 	//If foreman, then we wait until foreman gives the master some attention.
 	if(w->foreman)
 		stoptime = time(0) + q->long_timeout;
@@ -421,23 +421,23 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 		stoptime = time(0) + q->short_timeout;
 
 	int result = link_readline(w->link, line, length, stoptime);
-	
+
 	if (result <= 0) {
 		return -1;
 	}
-	
+
 	w->last_msg_recv_time = timestamp_get();
 
 	debug(D_WQ, "rx from %s (%s): %s", w->hostname, w->addrport, line);
-	
+
 	// Check for status updates that can be consumed here.
 	if(string_prefix_is(line, "alive")) {
-		result = 0;	
+		result = 0;
 	} else if(string_prefix_is(line, "workqueue")) {
 		result = process_workqueue(q, w, line);
 	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status")) {
 		result = process_queue_status(q, w, line, stoptime);
-	} else if (string_prefix_is(line, "available_results")) { 
+	} else if (string_prefix_is(line, "available_results")) {
 		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
 		result = 0;
 	} else if (string_prefix_is(line, "resource")) {
@@ -457,7 +457,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 		return 1;
 	}
 
-	return result; 
+	return result;
 }
 
 
@@ -478,7 +478,7 @@ int recv_worker_msg_retry( struct work_queue *q, struct work_queue_worker *w, ch
 	return result;
 }
 
-static double get_queue_transfer_rate(struct work_queue *q, char **data_source) 
+static double get_queue_transfer_rate(struct work_queue *q, char **data_source)
 {
 	double queue_transfer_rate; // bytes per second
 	int64_t     q_total_bytes_transferred = q->stats->total_bytes_sent + q->stats->total_bytes_received;
@@ -489,12 +489,12 @@ static double get_queue_transfer_rate(struct work_queue *q, char **data_source)
 		queue_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
 		if (data_source) {
 			*data_source = xxstrdup("overall queue");
-		}	
+		}
 	} else {
 		queue_transfer_rate = q->default_transfer_rate;
 		if (data_source) {
 			*data_source = xxstrdup("conservative default");
-		}	
+		}
 	}
 
 	return queue_transfer_rate;
@@ -528,7 +528,7 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	} else {
 		avg_transfer_rate = get_queue_transfer_rate(q, &data_source);
 	}
-	
+
 	debug(D_WQ,"%s (%s) using %s average transfer rate of %.2lf MB/s\n", w->hostname, w->addrport, data_source, avg_transfer_rate/MEGABYTE);
 
 	double tolerable_transfer_rate = avg_transfer_rate / q->transfer_outlier_factor; // bytes per second
@@ -558,7 +558,7 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	if(!q->name) return;
 
 	// Only advertise every last_update_time seconds.
-	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_UPDATE_INTERVAL) 
+	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_UPDATE_INTERVAL)
 		return;
 
 	// If host and port are not set, pick defaults.
@@ -594,7 +594,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 	uint64_t taskid;
 
 	if(!q || !w) return;
-	
+
 	hash_table_firstkey(w->current_files);
 	while(hash_table_nextkey(w->current_files, &key, (void **) &value)) {
 		hash_table_remove(w->current_files, key);
@@ -604,7 +604,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	itable_firstkey(w->current_tasks);
 	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
-		t->result = 0;	
+		t->result = 0;
 		t->total_bytes_transferred = 0;
 		t->total_transfer_time = 0;
 		t->cmd_execution_time = 0;
@@ -658,10 +658,10 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	hash_table_remove(q->worker_table, w->hashkey);
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
-	
+
 	record_removed_worker_stats(q, w);
 	log_worker_stats(q);
-	
+
 	if(w->link)
 		link_close(w->link);
 
@@ -742,7 +742,7 @@ static void add_worker(struct work_queue *q)
 	q->stats->total_workers_joined++;
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
-	
+
 	return;
 }
 
@@ -831,8 +831,8 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 		int errnum;
 
 		if(recv_worker_msg_retry(q, w, line, sizeof(line)) < 0) {
-			result = WORKER_FAILURE; 
-			break;	
+			result = WORKER_FAILURE;
+			break;
 		}
 
 		if(sscanf(line,"dir %s", tmp_remote_path)==1) {
@@ -849,7 +849,7 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
 			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
 			free(tmp_local_name);
-			//Return if worker failure. Else wait for end message from worker.	
+			//Return if worker failure. Else wait for end message from worker.
 			if(result == WORKER_FAILURE) break;
 		} else if(sscanf(line,"missing %s %d",tmp_remote_path,&errnum)==2) {
 			// If the output file is missing, we make a note of that in the task result,
@@ -866,7 +866,7 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 			}
 		} else {
 			debug(D_WQ, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
-			result = WORKER_FAILURE; //signal sys-level failure	
+			result = WORKER_FAILURE; //signal sys-level failure
 			break;
 		}
 	}
@@ -934,12 +934,12 @@ Returns 1 on success at worker and 0 on invalid message from worker.
 static int do_thirdput( struct work_queue *q, struct work_queue_worker *w,  const char *cached_name, const char *payload, int command )
 {
 	char line[WORK_QUEUE_LINE_MAX];
-	int result; 
+	int result;
 
 	send_worker_msg(q,w,"thirdput %d %s %s\n",command,cached_name,payload);
 
 	if(recv_worker_msg_retry(q, w, line, WORK_QUEUE_LINE_MAX) < 0) return WORKER_FAILURE;
-				
+
 	if(sscanf(line, "thirdput-complete %d", &result)) {
 		return result;
 	} else {
@@ -956,7 +956,7 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 {
 	int64_t total_bytes = 0;
 	int result = SUCCESS; //return success unless something fails below.
-			
+
 	timestamp_t open_time = timestamp_get();
 
 	if(f->flags & WORK_QUEUE_THIRDPUT) {
@@ -998,7 +998,7 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 			memcpy(remote_info, &local_info, sizeof(local_info));
 			hash_table_insert(w->current_files, cached_name, remote_info);
 		} else {
-			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno)); 
+			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno));
 		}
 	}
 
@@ -1014,14 +1014,14 @@ static int get_output_files( struct work_queue *q, struct work_queue_worker *w, 
 		list_first_item(t->output_files);
 		while((f = list_next_item(t->output_files))) {
 			char * cached_name = make_cached_name(t,f);
-			result = get_output_file(q,w,t,f,cached_name); 
-			
+			result = get_output_file(q,w,t,f,cached_name);
+
 			//if success or app-level failure, continue to get other files.
 			//if worker failure, return.
 			if(result == 0) {
 				break;
-			} 
-					
+			}
+
 			free(cached_name);
 		}
 	}
@@ -1035,7 +1035,7 @@ static int get_output_files( struct work_queue *q, struct work_queue_worker *w, 
 // Sends "unlink file" for every file in the list except those that match one or more of the "except_flags"
 static void delete_worker_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct list *files, int except_flags ) {
 	struct work_queue_file *tf;
-	
+
 	if(!files) return;
 
 	list_first_item(files);
@@ -1049,7 +1049,7 @@ static void delete_worker_files( struct work_queue *q, struct work_queue_worker 
 	}
 }
 
-static void delete_task_output_files(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) 
+static void delete_task_output_files(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
 	delete_worker_files(q, w, t, t->output_files, 0);
 }
@@ -1065,7 +1065,7 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 	struct flock lock;
 	FILE        *fsummary;
 	char        *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME ".summary", getpid(), t->taskid);
-	char        *msg; 
+	char        *msg;
 
 	lock.l_type   = F_WRLCK;
 	lock.l_start  = 0;
@@ -1073,7 +1073,7 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 	lock.l_len    = 0;
 
 	fcntl(q->monitor_fd, F_SETLKW, &lock);
-	
+
 	msg = string_format("# Work Queue pid: %d Task: %d summary:\n", getpid(), t->taskid);
 	write(q->monitor_fd, msg, strlen(msg));
 	free(msg);
@@ -1087,7 +1087,7 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 	else
 	{
 		copy_stream_to_fd(fsummary, q->monitor_fd);
-		fclose(fsummary);	
+		fclose(fsummary);
 	}
 
 	write(q->monitor_fd, "\n\n", 2);
@@ -1107,8 +1107,8 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
 		debug(D_WQ, "Failed to find task %d at worker %s (%s).", taskid, w->hostname, w->addrport);
-		handle_failure(q, w, t, 0); 
-		return;	
+		handle_failure(q, w, t, 0);
+		return;
 	}
 
 	// Receiving output ...
@@ -1116,8 +1116,8 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	result = get_output_files(q,w,t);
 	if(result <= 0) {
 		debug(D_WQ, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
-		handle_failure(q, w, t, result); 
-		return;	
+		handle_failure(q, w, t, result);
+		return;
 	}
 	t->time_receive_output_finish = timestamp_get();
 
@@ -1137,7 +1137,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	// Record statistics information for capacity estimation
 	add_task_report(q,t);
-		
+
 	// Update completed tasks and the total task execution time.
 	q->stats->total_tasks_complete++;
 	w->total_tasks_complete++;
@@ -1156,7 +1156,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		(t->time_receive_output_finish - t->time_send_input_start) / 1000000.0,
 		(long long) w->total_tasks_complete,
 		w->total_task_time / w->total_tasks_complete / 1000000.0);
-	
+
 	return;
 }
 
@@ -1202,16 +1202,16 @@ static void expire_waiting_tasks(struct work_queue *q)
 
 /*
 This function handles app-level failures. It remove the task from WQ and marks
-the task as complete so it is returned to the application. 
+the task as complete so it is returned to the application.
 */
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
 	//add the task to complete list so it is given back to the application.
 	list_push_head(q->complete_list, t);
 
-	//remove the task from tables that track dispatched tasks. 
+	//remove the task from tables that track dispatched tasks.
 	reap_task_from_worker(q, w, t);
-	
+
 	/*If the failure happened after a task execution, we remove all the output
 	files specified for that task from the worker's cache.  This is because the
 	application may resubmit the task and the resubmitted task may produce
@@ -1219,13 +1219,13 @@ static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w
 	if(t) {
 		if(t->time_execute_cmd_start > 0) {
 			delete_task_output_files(q,w,t);
-		}	
+		}
 	}
 
 	return;
 }
 
-static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w) 
+static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w)
 {
 	//WQ failures happen in the master-worker interactions. In this case, we
 	//remove the worker and retry the tasks dispatched to it elsewhere.
@@ -1273,11 +1273,11 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 
 	log_worker_stats(q);
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
-	
+
 	if(strcmp(CCTOOLS_VERSION, w->version)) {
 		debug(D_DEBUG, "Warning: potential worker version mismatch: worker %s (%s) is version %s, and master is version %s", w->hostname, w->addrport, w->version, CCTOOLS_VERSION);
 	}
-	
+
 	return 0;
 }
 
@@ -1303,7 +1303,7 @@ static int process_update( struct work_queue *q, struct work_queue_worker *w, co
 		return WORKER_FAILURE;
 	}
 
-	
+
 	struct work_queue_task *t = itable_lookup(w->current_tasks,taskid);
 	if(!t) {
 		debug(D_WQ,"worker %s (%s) sent output for unassigned task %"PRId64, w->hostname, w->addrport, taskid);
@@ -1329,7 +1329,7 @@ static int process_update( struct work_queue *q, struct work_queue_worker *w, co
 		debug(D_WQ,"worker %s (%s) sent output for unwatched file %s",w->hostname,w->addrport,path);
 		link_soak(w->link,length,stoptime);
 		return SUCCESS;
-	}	
+	}
 
 	int fd = open(local_name,O_WRONLY|O_CREAT,0777);
 	if(fd<0) {
@@ -1346,14 +1346,14 @@ static int process_update( struct work_queue *q, struct work_queue_worker *w, co
 	return SUCCESS;
 }
 
-/* 
+/*
 Returns 1 on success,  0 on failure to receive.
 Failure to store result is treated as success so we continue to retrieve the
-output files of the task. 
+output files of the task.
 */
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line) {
 
-	if(!q || !w || !line) return WORKER_FAILURE; 
+	if(!q || !w || !line) return WORKER_FAILURE;
 
 	int task_status, exit_status;
 	uint64_t taskid;
@@ -1373,22 +1373,22 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		return WORKER_FAILURE;
 	}
-	
+
 	task_status = atoi(items[0]);
 	exit_status   = atoi(items[1]);
 	output_length = atoll(items[2]);
-	
+
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
 		debug(D_WQ, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
 		stoptime = time(0) + get_transfer_wait_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
-		return SUCCESS; 
+		return SUCCESS;
 	}
-	
+
 	t->time_receive_result_start = timestamp_get();
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
-	
+
 	execution_time = atoll(items[3]);
 	t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
 
@@ -1399,9 +1399,9 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	}
 
 	if(output_length <= MAX_TASK_STDOUT_STORAGE) {
-		retrieved_output_length = output_length; 
+		retrieved_output_length = output_length;
 	} else {
-		retrieved_output_length = MAX_TASK_STDOUT_STORAGE; 
+		retrieved_output_length = MAX_TASK_STDOUT_STORAGE;
 		fprintf(stderr, "warning: stdout of task %"PRId64" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retreived.\n", taskid, ((double) output_length)/MAX_TASK_STDOUT_STORAGE, MAX_TASK_STDOUT_STORAGE/GIGABYTE, MAX_TASK_STDOUT_STORAGE/GIGABYTE);
 		t->result |= WORK_QUEUE_RESULT_STDOUT_MISSING;
 	}
@@ -1409,16 +1409,16 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t->output = malloc(retrieved_output_length+1);
 	if(t->output == NULL) {
 		fprintf(stderr, "error: allocating memory of size %"PRId64" bytes failed for storing stdout of task %"PRId64".\n", retrieved_output_length, taskid);
-		//drop the entire length of stdout on the link	
+		//drop the entire length of stdout on the link
 		stoptime = time(0) + get_transfer_wait_time(q, w, t, output_length);
 		link_soak(w->link, output_length, stoptime);
-		retrieved_output_length = 0; 
+		retrieved_output_length = 0;
 		t->result |= WORK_QUEUE_RESULT_STDOUT_MISSING;
-	} 
+	}
 
 	if(retrieved_output_length > 0) {
 		debug(D_WQ, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, retrieved_output_length, w->addrport, w->hostname);
-		
+
 		//First read the bytes we keep.
 		stoptime = time(0) + get_transfer_wait_time(q, w, t, retrieved_output_length);
 		actual = link_read(w->link, t->output, retrieved_output_length, stoptime);
@@ -1428,19 +1428,19 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 			return WORKER_FAILURE;
 		}
 		debug(D_WQ, "Retrieved %"PRId64" bytes from %s (%s)", actual, w->hostname, w->addrport);
-		
+
 		//Then read the bytes we need to throw away.
 		if(output_length > retrieved_output_length) {
 			debug(D_WQ, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_STORAGE), taskid, MAX_TASK_STDOUT_STORAGE);
 			stoptime = time(0) + get_transfer_wait_time(q, w, t, (output_length-retrieved_output_length));
 			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
-		
+
 			//overwrite the last few bytes of buffer to signal truncated stdout.
-			char *truncate_msg = string_format("\n>>>>>> WORK QUEUE HAS TRUNCATED THE STDOUT AFTER THIS POINT.\n>>>>>> MAXIMUM OF %d BYTES REACHED, %" PRId64 " BYTES TRUNCATED.", MAX_TASK_STDOUT_STORAGE, output_length - retrieved_output_length);	
+			char *truncate_msg = string_format("\n>>>>>> WORK QUEUE HAS TRUNCATED THE STDOUT AFTER THIS POINT.\n>>>>>> MAXIMUM OF %d BYTES REACHED, %" PRId64 " BYTES TRUNCATED.", MAX_TASK_STDOUT_STORAGE, output_length - retrieved_output_length);
 			strncpy(t->output+MAX_TASK_STDOUT_STORAGE-strlen(truncate_msg), truncate_msg, strlen(truncate_msg));
 			free(truncate_msg);
 		}
-		
+
 		timestamp_t current_time = timestamp_get();
 		if(effective_stoptime && effective_stoptime > current_time) {
 			usleep(effective_stoptime - current_time);
@@ -1448,10 +1448,10 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	} else {
 		actual = 0;
 	}
-	
-	if(t->output)	
+
+	if(t->output)
 		t->output[actual] = 0;
-	
+
 	t->time_receive_result_finish = timestamp_get();
 
 	t->result        = task_status;
@@ -1470,25 +1470,25 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 
 static void process_available_results(struct work_queue *q, struct work_queue_worker *w)
 {
-	
+
 	//max_count == -1, tells the worker to send all available results.
 	send_worker_msg(q, w, "send_results %d\n", -1);
 	debug(D_WQ, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
 	char line[WORK_QUEUE_LINE_MAX];
 	int i = 0;
-	
+
 	int result = SUCCESS; //return success unless something fails below.
 
 	while(1) {
 		if(recv_worker_msg_retry(q, w, line, sizeof(line)) < 0) {
-			result = WORKER_FAILURE; 
-			break; 
+			result = WORKER_FAILURE;
+			break;
 		}
-		
+
 		if(string_prefix_is(line,"result")) {
 			result = process_result(q, w, line);
-			if(result != SUCCESS) break; 
+			if(result != SUCCESS) break;
 			i++;
 		} else if(string_prefix_is(line,"update")) {
 			result = process_update(q,w,line);
@@ -1502,7 +1502,7 @@ static void process_available_results(struct work_queue *q, struct work_queue_wo
 			break;
 		}
 	}
-	
+
 	if(result != SUCCESS) {
 		handle_worker_failure(q, w);
 	}
@@ -1538,13 +1538,13 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_integer(nv,"total_workers_connected",info.total_workers_connected);
 	nvpair_insert_integer(nv,"total_workers_joined",info.total_workers_joined);
 	nvpair_insert_integer(nv,"total_workers_removed",info.total_workers_removed);
-	
+
 	//send info on tasks
 	nvpair_insert_integer(nv,"tasks_waiting",info.tasks_waiting);
 	nvpair_insert_integer(nv,"tasks_running",info.tasks_running);
 	// KNOWN HACK: The following line is inconsistent but kept for compatibility reasons.
 	// Everyone wants to know total_tasks_complete, but few are interested in tasks_complete.
-	nvpair_insert_integer(nv,"tasks_complete",info.total_tasks_complete); 
+	nvpair_insert_integer(nv,"tasks_complete",info.total_tasks_complete);
 	nvpair_insert_integer(nv,"total_tasks_complete",info.total_tasks_complete);
 	nvpair_insert_integer(nv,"total_tasks_dispatched",info.total_tasks_dispatched);
 	nvpair_insert_integer(nv,"total_tasks_cancelled",info.total_tasks_cancelled);
@@ -1633,7 +1633,7 @@ struct nvpair * worker_to_nvpair( struct work_queue *q, struct work_queue_worker
 	nvpair_insert_integer(nv,"total_bytes_transferred",w->total_bytes_transferred);
 	nvpair_insert_integer(nv,"total_transfer_time",w->total_transfer_time);
 	nvpair_insert_integer(nv,"start_time",w->start_time);
-	nvpair_insert_integer(nv,"current_time",timestamp_get()); 
+	nvpair_insert_integer(nv,"current_time",timestamp_get());
 
 
 	work_queue_resources_add_to_nvpair(w->resources,nv);
@@ -1656,9 +1656,9 @@ static void priority_add_to_nvpair(struct nvpair *nv, double priority)
 		str = string_format("%d", (int) priority);
 	else
 		str = string_format("%.2g", priority);
-	
+
 	nvpair_insert_string(nv, "priority", str);
-	
+
 	free(str);
 }
 
@@ -1685,14 +1685,14 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 {
 	char request[WORK_QUEUE_LINE_MAX];
 	struct link *l = target->link;
-	
+
 	free(target->hostname);
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
 	if(!sscanf(line, "%[^_]_status", request) == 1) {
 		return -1;
 	}
-	
+
 	if(!strcmp(request, "queue")) {
 		struct nvpair *nv = queue_to_nvpair( q, 0 );
 		if(nv) {
@@ -1715,11 +1715,11 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 					// address and port, workspace
 					nvpair_insert_string(nv, "address_port", w->addrport);
 
-					// Timestamps on running task related events 
-					nvpair_insert_integer(nv, "submit_to_queue_time", t->time_task_submit); 
+					// Timestamps on running task related events
+					nvpair_insert_integer(nv, "submit_to_queue_time", t->time_task_submit);
 					nvpair_insert_integer(nv, "send_input_start_time", t->time_send_input_start);
 					nvpair_insert_integer(nv, "execute_cmd_start_time", t->time_execute_cmd_start);
-					nvpair_insert_integer(nv, "current_time", timestamp_get()); 
+					nvpair_insert_integer(nv, "current_time", timestamp_get());
 
 					link_nvpair_write(l,nv,stoptime);
 					nvpair_delete(nv);
@@ -1776,7 +1776,7 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 	struct work_queue_resource r;
 
 	int n = sscanf(line, "resource %s %"PRId64 " %"PRId64" %"PRId64" %"PRId64" %"PRId64, category, &r.inuse,&r.committed,&r.total,&r.smallest,&r.largest);
-		
+
 	if(n == 2 && !strcmp(category,"tag"))
 	{
 		/* Shortcut, inuse has the tag, as "resources tag" only sends one value */
@@ -1888,24 +1888,24 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	time_t stoptime;
 	timestamp_t effective_stoptime = 0;
 	int64_t actual = 0;
-	
+
 	if(stat(localname, &local_info) < 0) {
-		debug(D_NOTICE, "Cannot stat file %s: %s", localname, strerror(errno)); 
+		debug(D_NOTICE, "Cannot stat file %s: %s", localname, strerror(errno));
 		return APP_FAILURE;
 	}
 
 	/* normalize the mode so as not to set up invalid permissions */
 	local_info.st_mode |= 0600;
 	local_info.st_mode &= 0777;
-	
+
 	if(!length) {
 		length = local_info.st_size;
 	}
-	
+
 	debug(D_WQ, "%s (%s) needs file %s bytes %lld:%lld as '%s'", w->hostname, w->addrport, localname, (long long) offset, (long long) offset+length, remotename);
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0) {
-		debug(D_NOTICE, "Cannot open file %s: %s", localname, strerror(errno)); 
+		debug(D_NOTICE, "Cannot open file %s: %s", localname, strerror(errno));
 		return APP_FAILURE;
 	}
 
@@ -1921,26 +1921,26 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 		close(fd);
 		return APP_FAILURE;
 	}
-	
+
 	if(q->bandwidth) {
 		effective_stoptime = (length/q->bandwidth)*1000000 + timestamp_get();
 	}
-	
+
 	stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
 	send_worker_msg(q,w, "put %s %"PRId64" 0%o %d\n",remotename, length, local_info.st_mode, flags);
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
-	
+
 	*total_bytes += actual;
-	
-	if(actual != length) 
+
+	if(actual != length)
 		return WORKER_FAILURE;
-		
+
 	timestamp_t current_time = timestamp_get();
 	if(effective_stoptime && effective_stoptime > current_time) {
 		usleep(effective_stoptime - current_time);
 	}
-	
+
 	return SUCCESS;
 }
 
@@ -1952,7 +1952,7 @@ static int send_directory( struct work_queue *q, struct work_queue_worker *w, st
 {
 	DIR *dir = opendir(dirname);
 	if(!dir) {
-		debug(D_NOTICE, "Cannot open dir %s: %s", dirname, strerror(errno)); 
+		debug(D_NOTICE, "Cannot open dir %s: %s", dirname, strerror(errno));
 		return APP_FAILURE;
 	}
 
@@ -1966,16 +1966,16 @@ static int send_directory( struct work_queue *q, struct work_queue_worker *w, st
 
 		char *localpath = string_format("%s/%s",dirname,d->d_name);
 		char *remotepath = string_format("%s/%s",remotedirname,d->d_name);
-	
+
 		struct stat local_info;
 		if(stat(localpath, &local_info)>=0) {
 			if(S_ISDIR(local_info.st_mode))  {
 				result = send_directory( q, w, t, localpath, remotepath, total_bytes, flags );
 			} else {
 				result = send_file( q, w, t, localpath, remotepath, 0, 0, total_bytes, flags );
-			}	
+			}
 		} else {
-			debug(D_NOTICE, "Cannot stat file %s: %s", localpath, strerror(errno)); 
+			debug(D_NOTICE, "Cannot stat file %s: %s", localpath, strerror(errno));
 			result = APP_FAILURE;
 		}
 
@@ -1984,7 +1984,7 @@ static int send_directory( struct work_queue *q, struct work_queue_worker *w, st
 
 		if(result != SUCCESS) break;
 	}
-	
+
 	closedir(dir);
 	return result;
 }
@@ -2000,10 +2000,10 @@ static int send_file_or_directory( struct work_queue *q, struct work_queue_worke
 	struct stat *remote_info;
 
 	if(stat(expanded_local_name, &local_info) < 0) {
-		debug(D_NOTICE, "Cannot stat file %s: %s", expanded_local_name, strerror(errno)); 
+		debug(D_NOTICE, "Cannot stat file %s: %s", expanded_local_name, strerror(errno));
 		return APP_FAILURE;
-	}	
-	
+	}
+
 	int result = SUCCESS;
 
 	// Look in the current files hash to see if the file is already cached.
@@ -2039,10 +2039,10 @@ static int send_file_or_directory( struct work_queue *q, struct work_queue_worke
 	return result;
 }
 
-/** 
+/**
  *	This function expands Work Queue environment variables such as
- * 	$OS, $ARCH, that are specified in the definition of Work Queue 
- * 	input files. It expands these variables based on the info reported 
+ * 	$OS, $ARCH, that are specified in the definition of Work Queue
+ * 	input files. It expands these variables based on the info reported
  *	by each connected worker.
  *	Will always return a non-empty string. That is if no match is found
  *	for any of the environment variables, it will return the input string
@@ -2128,8 +2128,8 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 		send_worker_msg(q,w, "put %s %d %o %d\n",cached_name, f->length, 0777, f->flags);
 		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
 		if(actual!=f->length) {
-			result = WORKER_FAILURE;	
-		}	
+			result = WORKER_FAILURE;
+		}
 		total_bytes = actual;
 		break;
 
@@ -2164,7 +2164,7 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 			}
 		} else {
 			char *expanded_payload = expand_envnames(w, f->payload);
-			if(expanded_payload) { 
+			if(expanded_payload) {
 				result = send_file_or_directory(q,w,t,f,expanded_payload,&total_bytes);
 				free(expanded_payload);
 			} else {
@@ -2207,10 +2207,10 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 			w->addrport,
 			f->type == WORK_QUEUE_BUFFER ? "literal data" : f->payload,
 			total_bytes);
-	
+
 		if(result == APP_FAILURE) t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
 	}
-	
+
 	free(cached_name);
 	return result;
 }
@@ -2230,8 +2230,8 @@ static int send_input_files( struct work_queue *q, struct work_queue_worker *w, 
 				char * expanded_payload = expand_envnames(w, f->payload);
 				if(!expanded_payload) {
 					t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
-					return APP_FAILURE;	
-				}	
+					return APP_FAILURE;
+				}
 				if(stat(expanded_payload, &s) != 0) {
 					debug(D_WQ,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
 					free(expanded_payload);
@@ -2259,7 +2259,7 @@ static int send_input_files( struct work_queue *q, struct work_queue_worker *w, 
 static int start_one_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
 	t->time_send_input_start = timestamp_get();
-	int result = send_input_files(q, w, t);  
+	int result = send_input_files(q, w, t);
 	if (result != SUCCESS) {
 		t->time_send_input_finish = timestamp_get();
 		return result;
@@ -2268,7 +2268,7 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 	t->time_execute_cmd_start = timestamp_get();
 	t->hostname = xxstrdup(w->hostname);
 	t->host = xxstrdup(w->addrport);
-	
+
 	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid);
 	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(t->command_line), t->command_line);
 	send_worker_msg(q,w, "cores %d\n",   t->cores );
@@ -2387,8 +2387,8 @@ static int check_foreman_against_task(struct work_queue *q, struct work_queue_wo
 	if(t->unlabeled)
 	{
 		// Unlabeled tasks run alone in a worker. Return immediately if foreman
-		// does not have workers free. 
-		if(w->unlabeled_allocated + 1 > overcommitted_resource_total(q, w->resources->workers.total, 1)) 
+		// does not have workers free.
+		if(w->unlabeled_allocated + 1 > overcommitted_resource_total(q, w->resources->workers.total, 1))
 		{
 			ok = 0;
 			return ok;
@@ -2397,9 +2397,9 @@ static int check_foreman_against_task(struct work_queue *q, struct work_queue_wo
 		// Assume unlabeled tasks use an average worker at the foreman.
 
 		cores_used = overcommitted_resource_total(q, w->resources->cores.total, 1) / w->resources->workers.total;
-		mem_used   = overcommitted_resource_total(q, w->resources->memory.total, 1) / w->resources->workers.total;  
-		disk_used  = w->resources->disk.total / w->resources->workers.total;  
-		gpus_used  = overcommitted_resource_total(q, w->resources->gpus.total, 1) / w->resources->workers.total;  
+		mem_used   = overcommitted_resource_total(q, w->resources->memory.total, 1) / w->resources->workers.total;
+		disk_used  = w->resources->disk.total / w->resources->workers.total;
+		gpus_used  = overcommitted_resource_total(q, w->resources->gpus.total, 1) / w->resources->workers.total;
 
 	}
 	else
@@ -2437,7 +2437,7 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 
 	if(t->unlabeled)
 	{
-		if(w->unlabeled_allocated + 1 > overcommitted_resource_total(q, w->resources->workers.total, 1)) 
+		if(w->unlabeled_allocated + 1 > overcommitted_resource_total(q, w->resources->workers.total, 1))
 		{
 			ok = 0;
 		}
@@ -2472,7 +2472,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	{
 		return check_foreman_against_task(q, w, t);
 	}
-	else 
+	else
 	{
 		if (hash_table_lookup(q->worker_blacklist,w->hostname) && !w->foreman) {
 			return 0;
@@ -2483,7 +2483,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		}
 	}
 }
-	
+
 static struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
@@ -2733,7 +2733,7 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	t->time_committed = timestamp_get();
 
 	itable_insert(w->current_tasks, t->taskid, t);
-	itable_insert(q->running_tasks, t->taskid, t); 
+	itable_insert(q->running_tasks, t->taskid, t);
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
 
 	t->total_submissions += 1;
@@ -2741,9 +2741,9 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	if(t->unlabeled) {
 		w->unlabeled_allocated++;
 	}
-	
+
 	count_worker_resources(w);
-	
+
 	log_worker_stats(q);
 }
 
@@ -2758,10 +2758,10 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 
 	//update tables.
 	itable_remove(w->current_tasks, t->taskid);
-	itable_remove(q->running_tasks, t->taskid); 
+	itable_remove(q->running_tasks, t->taskid);
 	itable_remove(q->finished_tasks, t->taskid);
 	itable_remove(q->worker_task_map, t->taskid);
-	
+
 	if(t->unlabeled)
 	{
 		w->unlabeled_allocated--;
@@ -2785,7 +2785,7 @@ static void start_task_on_worker( struct work_queue *q, struct work_queue_worker
 }
 
 static int send_one_task( struct work_queue *q )
-{			
+{
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
@@ -2800,7 +2800,7 @@ static int send_one_task( struct work_queue *q )
 		if(!w) continue;
 
 		// Otherwise, remove it from the ready list and start it:
-		list_remove(q->ready_list,t);		
+		list_remove(q->ready_list,t);
 		start_task_on_worker(q,w,t);
 
 		return 1;
@@ -2826,7 +2826,7 @@ static int receive_one_task( struct work_queue *q )
 		// fetch_output removes the resolved task from the itable, thus
 		// potentially corrupting our current location.  This resets it to the
 		// top.
-		itable_firstkey(q->finished_tasks);  
+		itable_firstkey(q->finished_tasks);
 
 		return 1;
 	}
@@ -2835,39 +2835,39 @@ static int receive_one_task( struct work_queue *q )
 }
 
 
-//Sends keepalives to check if connected workers are responsive. If not, removes those workers. 
+//Sends keepalives to check if connected workers are responsive. If not, removes those workers.
 static void remove_unresponsive_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
 	char *key;
 	int last_recv_elapsed_time;
 	timestamp_t current_time = timestamp_get();
-	
+
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 		if(q->keepalive_interval > 0) {
-			if(!strcmp(w->hostname, "unknown")){ 
+			if(!strcmp(w->hostname, "unknown")){
 				last_recv_elapsed_time = (int)(current_time - w->start_time)/1000000;
 			} else {
 				last_recv_elapsed_time = (int)(current_time - w->last_msg_recv_time)/1000000;
 			}
-		
-			// send new keepalive check only (1) if we received a response since last keepalive check AND 
-			// (2) we are past keepalive interval 
-			if(w->last_msg_recv_time >= w->keepalive_check_sent_time) {	
+
+			// send new keepalive check only (1) if we received a response since last keepalive check AND
+			// (2) we are past keepalive interval
+			if(w->last_msg_recv_time >= w->keepalive_check_sent_time) {
 				if(last_recv_elapsed_time >= q->keepalive_interval) {
 					if(send_worker_msg(q,w, "check\n")<0) {
 						debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
 						handle_worker_failure(q, w);
 					} else {
 						debug(D_WQ, "Sent keepalive check to worker %s (%s)", w->hostname, w->addrport);
-						w->keepalive_check_sent_time = current_time;	
-					}	
+						w->keepalive_check_sent_time = current_time;
+					}
 				}
-			} else { 
-				// we haven't received a message from worker since its last keepalive check. Check if time 
+			} else {
+				// we haven't received a message from worker since its last keepalive check. Check if time
 				// since we last polled link for responses has exceeded keepalive timeout. If so, remove worker.
 				if (q->link_poll_end > w->keepalive_check_sent_time) {
-					if ((int)((q->link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) { 
+					if ((int)((q->link_poll_end - w->keepalive_check_sent_time)/1000000) >= q->keepalive_timeout) {
 						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
 						handle_worker_failure(q, w);
 					}
@@ -2922,7 +2922,7 @@ static int taskid_comparator(void *t, const void *r) {
 
 	if (task_in_queue->taskid == *taskid) {
 		return 1;
-	}	
+	}
 	return 0;
 }
 
@@ -2934,7 +2934,7 @@ static int tasktag_comparator(void *t, const void *r) {
 
 	if (!strcmp(task_in_queue->tag, tasktag)) {
 		return 1;
-	}	
+	}
 	return 0;
 }
 
@@ -2942,12 +2942,12 @@ static int tasktag_comparator(void *t, const void *r) {
 static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
 
 	struct work_queue_worker *w = itable_lookup(q->worker_task_map, t->taskid);
-	
+
 	if (w) {
 		//send message to worker asking to kill its task.
 		send_worker_msg(q,w, "kill %d\n",t->taskid);
 		debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
-			
+
 		//Delete any input files that are not to be cached.
 		delete_worker_files(q, w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 
@@ -2959,29 +2959,29 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 
 		return 1;
 	}
-	
+
 	return 0;
 }
 
 static struct work_queue_task *find_running_task_by_id(struct work_queue *q, int taskid) {
-	
+
 	struct work_queue_task *t;
 
 	t=itable_lookup(q->running_tasks, taskid);
 	if (t){
 		return t;
 	}
-	
+
 	t = itable_lookup(q->finished_tasks, taskid);
 	if(t) {
 		return t;
 	}
-	
+
 	return NULL;
 }
 
 static struct work_queue_task *find_running_task_by_tag(struct work_queue *q, const char *tasktag) {
-	
+
 	struct work_queue_task *t;
 	uint64_t taskid;
 
@@ -2998,7 +2998,7 @@ static struct work_queue_task *find_running_task_by_tag(struct work_queue *q, co
 			return t;
 		}
 	}
-	
+
 	return NULL;
 }
 
@@ -3006,13 +3006,13 @@ static struct work_queue_task *find_running_task_by_tag(struct work_queue *q, co
 static struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file) {
   const int file_t_size = sizeof(struct work_queue_file);
   struct work_queue_file *new = xxmalloc(file_t_size);
-  
+
   memcpy(new, file, file_t_size);
   //allocate new memory for strings so we don't segfault when the original
-  //memory is freed. 
+  //memory is freed.
   new->payload = xxstrdup(file->payload);
   new->remote_name = xxstrdup(file->remote_name);
-  
+
   return new;
 }
 
@@ -3070,28 +3070,28 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   struct work_queue_task *new = xxmalloc(sizeof(*new));
   memcpy(new, task, sizeof(*new));
 
-  //allocate new memory so we don't segfault when original memory is freed. 
-  if(task->tag) { 
-	new->tag = xxstrdup(task->tag); 
+  //allocate new memory so we don't segfault when original memory is freed.
+  if(task->tag) {
+	new->tag = xxstrdup(task->tag);
   }
-  
-  if(task->command_line) { 
-	new->command_line = xxstrdup(task->command_line); 
+
+  if(task->command_line) {
+	new->command_line = xxstrdup(task->command_line);
   }
 
   new->input_files = work_queue_task_file_list_clone(task->input_files);
   new->output_files = work_queue_task_file_list_clone(task->output_files);
 
-  if(task->output) { 
-	new->output = xxstrdup(task->output); 
+  if(task->output) {
+	new->output = xxstrdup(task->output);
   }
-  
-  if(task->host) { 
-	new->host = xxstrdup(task->host); 
+
+  if(task->host) {
+	new->host = xxstrdup(task->host);
   }
-  
-  if(task->hostname) { 
-	new->hostname = xxstrdup(task->hostname); 
+
+  if(task->hostname) {
+	new->hostname = xxstrdup(task->hostname);
   }
 
   return new;
@@ -3196,7 +3196,7 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 struct work_queue_file * work_queue_file_create(const char * remote_name, int type, int flags)
 {
 	struct work_queue_file *f;
-	
+
 	f = malloc(sizeof(*f));
 	if(!f) {
 		debug(D_NOTICE, "Cannot allocate memory for file %s.\n", remote_name);
@@ -3204,11 +3204,11 @@ struct work_queue_file * work_queue_file_create(const char * remote_name, int ty
 	}
 
 	memset(f, 0, sizeof(*f));
-	
+
 	f->remote_name = xxstrdup(remote_name);
 	f->type = type;
 	f->flags = flags;
-	
+
 	return f;
 }
 
@@ -3228,41 +3228,41 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 
 	if(type == WORK_QUEUE_INPUT) {
 		files = t->input_files;
-		
-		//check if two different urls map to the same remote name for inputs. 	
+
+		//check if two different urls map to the same remote name for inputs.
 		list_first_item(t->input_files);
 		while((tf = (struct work_queue_file*)list_next_item(files))) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(file_url, tf->payload)) {
 				fprintf(stderr, "Error: input url %s conflicts with another input pointing to same remote name (%s).\n", file_url, remote_name);
-				return 0;       
+				return 0;
 			}
 		}
-		//check if there is an output file with the same remote name. 
+		//check if there is an output file with the same remote name.
 		list_first_item(t->output_files);
 		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: input url %s conflicts with an output pointing to same remote name (%s).\n", file_url, remote_name);
-				return 0;	
+				return 0;
 			}
 		}
 	} else {
 		files = t->output_files;
-		
-		//check if two different different remote names map to the same url for outputs. 	
+
+		//check if two different different remote names map to the same url for outputs.
 		list_first_item(t->output_files);
 		while((tf = (struct work_queue_file*)list_next_item(files))) {
 			if(!strcmp(file_url, tf->payload) && strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: output url remote name %s conflicts with another output pointing to same url (%s).\n", remote_name, file_url);
-				return 0;       
+				return 0;
 			}
 		}
-		
-		//check if there is an input file with the same remote name. 
+
+		//check if there is an input file with the same remote name.
 		list_first_item(t->input_files);
 		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: output url %s conflicts with an input pointing to same remote name (%s).\n", file_url, remote_name);
-				return 0;	
+				return 0;
 			}
 		}
 	}
@@ -3282,7 +3282,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 {
 	struct list *files;
 	struct work_queue_file *tf;
-	
+
 	if(!t || !local_name || !remote_name) {
 		fprintf(stderr, "Error: Null arguments for task, local name, and remote name not allowed in specify_file.\n");
 		return 0;
@@ -3297,50 +3297,50 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
 		return 0;
 	}
-	
-	
+
+
 	if(type == WORK_QUEUE_INPUT) {
 		files = t->input_files;
-		
-		//check if two different local names map to the same remote name for inputs.	
+
+		//check if two different local names map to the same remote name for inputs.
 		list_first_item(t->input_files);
 		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
 				fprintf(stderr, "Error: input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;	
+				return 0;
 			}
-		} 
-		
-		//check if there is an output file with the same remote name. 
+		}
+
+		//check if there is an output file with the same remote name.
 		list_first_item(t->output_files);
 		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;	
+				return 0;
 			}
-		} 	
+		}
 	} else {
 		files = t->output_files;
-		
-		//check if two different different remote names map to the same local name for outputs. 	
+
+		//check if two different different remote names map to the same local name for outputs.
 		list_first_item(files);
 		while((tf = (struct work_queue_file*)list_next_item(files))) {
 			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;       
+				return 0;
 			}
 		}
-		
-		//check if there is an input file with the same remote name. 
+
+		//check if there is an input file with the same remote name.
 		list_first_item(t->input_files);
 		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;	
+				return 0;
 			}
 		}
 	}
-	
+
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_FILE, flags);
 	if(!tf) return 0;
 
@@ -3354,7 +3354,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags, int recursive) {
 	struct list *files;
 	struct work_queue_file *tf;
-	
+
 	if(!t || !remote_name) {
 		fprintf(stderr, "Error: Null arguments for task and remote name not allowed in specify_directory.\n");
 		return 0;
@@ -3373,9 +3373,9 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	if(type == WORK_QUEUE_OUTPUT || recursive) {
 		return work_queue_task_specify_file(t, local_name, remote_name, type, flags);
 	}
-	
+
 	files = t->input_files;
-	
+
 	list_first_item(files);
 	while((tf = (struct work_queue_file*)list_next_item(files))) {
 		if(!strcmp(remote_name, tf->remote_name))
@@ -3398,7 +3398,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 
 	list_push_tail(files, tf);
 	return 1;
-	
+
 }
 
 int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags)
@@ -3424,46 +3424,46 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 
 	if(type == WORK_QUEUE_INPUT) {
 		files = t->input_files;
-		
-		//check if two different local names map to the same remote name for inputs.	
+
+		//check if two different local names map to the same remote name for inputs.
 		list_first_item(t->input_files);
 		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
 				fprintf(stderr, "Error: piece of input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;	
+				return 0;
 			}
-		} 
-		
-		//check if there is an output file with the same remote name. 
+		}
+
+		//check if there is an output file with the same remote name.
 		list_first_item(t->output_files);
 		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: piece of input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;	
+				return 0;
 			}
 		}
 	} else {
 		files = t->output_files;
-		
-		//check if two different different remote names map to the same local name for outputs. 	
+
+		//check if two different different remote names map to the same local name for outputs.
 		list_first_item(files);
 		while((tf = (struct work_queue_file*)list_next_item(files))) {
 			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: piece of output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;       
+				return 0;
 			}
 		}
-		
-		//check if there is an input file with the same remote name. 
+
+		//check if there is an input file with the same remote name.
 		list_first_item(t->input_files);
 		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: piece of output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;	
+				return 0;
 			}
 		}
 	}
-	
+
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_FILE_PIECE, flags);
 	if(!tf) return 0;
 
@@ -3493,30 +3493,30 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 
 	list_first_item(t->input_files);
 	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
-		if(!strcmp(remote_name, tf->remote_name)) {	
+		if(!strcmp(remote_name, tf->remote_name)) {
 			fprintf(stderr, "Error: buffer conflicts with another input pointing to same remote name (%s).\n", remote_name);
-			return 0;	
+			return 0;
 		}
 	}
-	
+
 	list_first_item(t->output_files);
 	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
-		if(!strcmp(remote_name, tf->remote_name)) {	
+		if(!strcmp(remote_name, tf->remote_name)) {
 			fprintf(stderr, "Error: buffer conflicts with an output pointing to same remote name (%s).\n", remote_name);
-			return 0;	
+			return 0;
 		}
-	}	
-	
+	}
+
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_BUFFER, flags);
 	if(!tf) return 0;
-	
+
 	tf->length = length;
 	tf->payload = malloc(length);
 	if(!tf->payload) {
 		fprintf(stderr, "Error: failed to allocate memory for buffer with remote name %s and length %d bytes.\n", remote_name, length);
-		return 0;	
+		return 0;
 	}
-	
+
 	memcpy(tf->payload, data, length);
 	list_push_tail(t->input_files, tf);
 
@@ -3541,46 +3541,46 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 
 	if(type == WORK_QUEUE_INPUT) {
 		files = t->input_files;
-		
-		//check if two different local names map to the same remote name for inputs.	
+
+		//check if two different local names map to the same remote name for inputs.
 		list_first_item(t->input_files);
 		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name) && strcmp(cmd, tf->payload)){
 				fprintf(stderr, "Error: input file command %s conflicts with another input pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;	
+				return 0;
 			}
-		} 
-		
-		//check if there is an output file with the same remote name. 
+		}
+
+		//check if there is an output file with the same remote name.
 		list_first_item(t->output_files);
 	    while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: input file command %s conflicts with an output pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;	
+				return 0;
 			}
-		} 	
+		}
 	} else {
 		files = t->output_files;
-		
-		//check if two different different remote names map to the same local name for outputs. 	
+
+		//check if two different different remote names map to the same local name for outputs.
 		list_first_item(files);
 		while((tf = (struct work_queue_file*)list_next_item(files))) {
 			if(!strcmp(cmd, tf->payload) && strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: output file command %s conflicts with another output pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;       
+				return 0;
 			}
 		}
-		
-		//check if there is an input file with the same remote name. 
+
+		//check if there is an input file with the same remote name.
 		list_first_item(t->input_files);
 	    while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: output file command %s conflicts with an input pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;	
+				return 0;
 			}
 		}
 	}
-	
+
 	tf = work_queue_file_create(remote_name, WORK_QUEUE_REMOTECMD, flags);
 	if(!tf) return 0;
 
@@ -3588,7 +3588,7 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 	tf->payload = xxstrdup(cmd);
 
 	list_push_tail(files, tf);
-	
+
 	return 1;
 }
 
@@ -3722,9 +3722,9 @@ struct work_queue *work_queue_create(int port)
 
 	q->stats                      = calloc(1, sizeof(struct work_queue_stats));
 	q->stats_disconnected_workers = calloc(1, sizeof(struct work_queue_stats));
-	
+
 	q->workers_with_available_results = hash_table_create(0, 0);
-	
+
 	// The poll table is initially null, and will be created
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
@@ -3746,11 +3746,11 @@ struct work_queue *work_queue_create(int port)
 	q->catalog_port = 0;
 
 	q->keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
-	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT; 
+	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
 
 	q->monitor_mode   =  0;
 	q->password = 0;
-	
+
 	q->asynchrony_multiplier = 1.0;
 	q->asynchrony_modifier = 0;
 
@@ -3758,7 +3758,7 @@ struct work_queue *work_queue_create(int port)
 	q->foreman_transfer_timeout = 3600;
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1*MEGABYTE;
-	
+
 	if( (envstring  = getenv("WORK_QUEUE_BANDWIDTH")) ) {
 		q->bandwidth = string_metric_parse(envstring);
 		if(q->bandwidth < 0) {
@@ -3769,7 +3769,7 @@ struct work_queue *work_queue_create(int port)
 	//Deprecated:
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	//
-	
+
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
 }
@@ -3943,20 +3943,20 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_delete(q->worker_table);
 		hash_table_delete(q->worker_blacklist);
 		itable_delete(q->worker_task_map);
-		
+
 		list_delete(q->ready_list);
 		itable_delete(q->running_tasks);
 		itable_delete(q->finished_tasks);
 		list_delete(q->complete_list);
 
 		hash_table_delete(q->workers_with_available_results);
-		
+
 		list_free(q->task_reports);
 		list_delete(q->task_reports);
 
 		free(q->stats);
 		free(q->stats_disconnected_workers);
- 
+
 		free(q->poll_table);
 		link_close(q->master_link);
 		if(q->logfile) {
@@ -3968,10 +3968,10 @@ void work_queue_delete(struct work_queue *q)
 
 int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 {
-	char *wrap_cmd; 
+	char *wrap_cmd;
 	char *template = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
 	char *summary  = string_format("%s.summary", template);
-	
+
 	wrap_cmd = resource_monitor_rewrite_command(t->command_line, NULL, template, NULL, NULL, 1, 0, 0);
 
 	//BUG: what if user changes current working directory?
@@ -4014,7 +4014,7 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 	t->total_transfer_time = 0;
 	t->cmd_execution_time = 0;
 	t->result = 0;
-	
+
 	if(q->monitor_mode)
 		work_queue_monitor_wrap(q, t);
 
@@ -4090,7 +4090,7 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 	// If workers are available and tasks waiting to be dispatched, don't wait
 	// on a message. However, take care of not busy waiting, if no available
 	// worker can execute a task in the ready list.
-	
+
 	if( (last_tasks_transfered || !busy_waiting) && available_workers(q) > 0 && (list_size(q->ready_list)>0 || itable_size(q->finished_tasks)>0) ) {
 		msec = 0;
 		busy_waiting = 1;        //Mark that we may be busy waiting, so that if no task are transfered, we force a wait next cycle.
@@ -4140,7 +4140,7 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 			process_available_results(q, w);
 			hash_table_remove(q->workers_with_available_results, key);
 			hash_table_firstkey(q->workers_with_available_results);
-		}	
+		}
 	}
 
 	return result;
@@ -4151,7 +4151,7 @@ static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 	int task_sent = 0, total_tasks_sent = 0;
 	int task_received = 0, total_tasks_received = 0;
 
-	do 
+	do
 	{
 		task_sent     = 0;
 		task_received = 0;
@@ -4164,7 +4164,7 @@ static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 			task_sent         = send_one_task(q);
 			total_tasks_sent += task_sent;
 		}
-			
+
 		if(itable_size(q->finished_tasks) > 0 && (!task_sent || !send_decision))
 		{
 			task_received         = receive_one_task(q);
@@ -4235,8 +4235,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(q->name) {
 			update_catalog(q, foreman_uplink, 0);
 		}
-		
-		remove_unresponsive_workers(q);	
+
+		remove_unresponsive_workers(q);
 
 		t = list_pop_head(q->complete_list);
 		if(t) {
@@ -4248,7 +4248,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 			return t;
 		}
-		
+
 		if( q->process_pending_check && process_pending() )
 			break;
 
@@ -4270,12 +4270,12 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(q->fast_abort_multiplier > 0) {
 			abort_slow_workers(q);
 		}
-		
+
 		// If the foreman_uplink is active then break so the caller can handle it.
 		if(foreman_uplink) {
 			break;
 		}
-		
+
 		// If nothing was awake, restart the loop or return without a task.
 		if(stoptime && time(0) >= stoptime) {
 			break;
@@ -4301,7 +4301,7 @@ int work_queue_hungry(struct work_queue *q)
 	//i = 1.1 * number of current workers
 	//j = # of queued tasks.
 	//i-j = # of tasks to queue to re-reach the status quo.
-	i = (1.1 * hash_table_size(q->worker_table)); 
+	i = (1.1 * hash_table_size(q->worker_table));
 	j = list_size(q->ready_list);
 	return MAX(i - j, 0);
 }
@@ -4329,9 +4329,9 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 
 /**
  * Cancel submitted task as long as it has not been retrieved through wait().
- * This is non-blocking and has a worst-case running time of O(n) where n is 
+ * This is non-blocking and has a worst-case running time of O(n) where n is
  * number of submitted tasks.
- * This returns the work_queue_task struct corresponding to specified task and 
+ * This returns the work_queue_task struct corresponding to specified task and
  * null if the task is not found.
  */
 struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int taskid) {
@@ -4342,27 +4342,27 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int ta
 		//see if task is executing at a worker (in running_tasks or finished_tasks).
 		if ((matched_task = find_running_task_by_id(q, taskid))) {
 			if (cancel_running_task(q, matched_task)) {
-				q->stats->total_tasks_cancelled++;	
+				q->stats->total_tasks_cancelled++;
 				return matched_task;
-			}	
+			}
 		} //if not, see if task is in ready list.
 		else if ((matched_task = list_find(q->ready_list, taskid_comparator, &taskid))) {
 			list_remove(q->ready_list, matched_task);
 			debug(D_WQ, "Task with id %d is removed from ready list.", matched_task->taskid);
-			q->stats->total_tasks_cancelled++;	
+			q->stats->total_tasks_cancelled++;
 			return matched_task;
 		} //if not, see if task is in complete list.
 		else if ((matched_task = list_find(q->complete_list, taskid_comparator, &taskid))) {
 			list_remove(q->complete_list, matched_task);
 			debug(D_WQ, "Task with id %d is removed from complete list.", matched_task->taskid);
-			q->stats->total_tasks_cancelled++;	
+			q->stats->total_tasks_cancelled++;
 			return matched_task;
-		} 
-		else { 
+		}
+		else {
 			debug(D_WQ, "Task with id %d is not found in queue.", taskid);
-		}	
+		}
 	}
-	
+
 	return NULL;
 }
 
@@ -4374,27 +4374,27 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 		//see if task is executing at a worker (in running_tasks or finished_tasks).
 		if ((matched_task = find_running_task_by_tag(q, tasktag))) {
 			if (cancel_running_task(q, matched_task)) {
-				q->stats->total_tasks_cancelled++;	
+				q->stats->total_tasks_cancelled++;
 				return matched_task;
 			}
 		} //if not, see if task is in ready list.
 		else if ((matched_task = list_find(q->ready_list, tasktag_comparator, tasktag))) {
 			list_remove(q->ready_list, matched_task);
 			debug(D_WQ, "Task with tag %s and id %d is removed from ready list.", matched_task->tag, matched_task->taskid);
-			q->stats->total_tasks_cancelled++;	
+			q->stats->total_tasks_cancelled++;
 			return matched_task;
 		} //if not, see if task is in complete list.
 		else if ((matched_task = list_find(q->complete_list, tasktag_comparator, tasktag))) {
 			list_remove(q->complete_list, matched_task);
 			debug(D_WQ, "Task with tag %s and id %d is removed from complete list.", matched_task->tag, matched_task->taskid);
-			q->stats->total_tasks_cancelled++;	
+			q->stats->total_tasks_cancelled++;
 			return matched_task;
-		} 
-		else { 
+		}
+		else {
 			debug(D_WQ, "Task with tag %s is not found in queue.", tasktag);
 		}
 	}
-	
+
 	return NULL;
 }
 
@@ -4404,14 +4404,14 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 	struct work_queue_worker *w;
 	uint64_t taskid;
 	char *key;
-	
+
 	while( (t = list_pop_head(q->ready_list)) ) {
 		list_push_tail(l, t);
-		q->stats->total_tasks_cancelled++;	
+		q->stats->total_tasks_cancelled++;
 	}
 	while( (t = list_pop_head(q->complete_list)) ) {
 		list_push_tail(l, t);
-		q->stats->total_tasks_cancelled++;	
+		q->stats->total_tasks_cancelled++;
 	}
 
 
@@ -4419,13 +4419,13 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 	while(hash_table_nextkey(q->workers_with_available_results, &key, (void **) &w)) {
 		hash_table_remove(q->workers_with_available_results, key);
 		hash_table_firstkey(q->workers_with_available_results);
-	}	
+	}
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		
+
 		send_worker_msg(q,w,"kill -1\n");
-		
+
 		itable_firstkey(w->current_tasks);
 		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
 			//Delete any input files that are not to be cached.
@@ -4436,7 +4436,7 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 			reap_task_from_worker(q, w, t);
 
 			list_push_tail(l, t);
-			q->stats->total_tasks_cancelled++;	
+			q->stats->total_tasks_cancelled++;
 			itable_firstkey(w->current_tasks);
 		}
 	}
@@ -4446,7 +4446,7 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 void release_all_workers(struct work_queue *q) {
 	struct work_queue_worker *w;
 	char *key;
-	
+
 	if(!q) return;
 
 	hash_table_firstkey(q->worker_table);
@@ -4460,54 +4460,54 @@ int work_queue_empty(struct work_queue *q)
 	return ((list_size(q->ready_list) + itable_size(q->running_tasks) + itable_size(q->finished_tasks) + list_size(q->complete_list)) == 0);
 }
 
-void work_queue_specify_keepalive_interval(struct work_queue *q, int interval) 
+void work_queue_specify_keepalive_interval(struct work_queue *q, int interval)
 {
 	q->keepalive_interval = interval;
 }
 
-void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout) 
+void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 {
 	q->keepalive_timeout = timeout;
 }
 
 int work_queue_tune(struct work_queue *q, const char *name, double value)
 {
-	
+
 	if(!strcmp(name, "asynchrony-multiplier")) {
 		q->asynchrony_multiplier = MAX(value, 1.0);
-		
+
 	} else if(!strcmp(name, "asynchrony-modifier")) {
 		q->asynchrony_modifier = MAX(value, 0);
-		
+
 	} else if(!strcmp(name, "min-transfer-timeout")) {
 		q->minimum_transfer_timeout = (int)value;
-	
+
 	} else if(!strcmp(name, "foreman-transfer-timeout")) {
 		q->foreman_transfer_timeout = (int)value;
-		
+
 	} else if(!strcmp(name, "default-transfer-rate")) {
 		q->default_transfer_rate = value;
 
 	} else if(!strcmp(name, "transfer-outlier-factor")) {
 		q->transfer_outlier_factor = value;
-		
+
 	} else if(!strcmp(name, "fast-abort-multiplier")) {
 		work_queue_activate_fast_abort(q, value);
 
 	} else if(!strcmp(name, "keepalive-interval")) {
 		q->keepalive_interval = MAX(0, (int)value);
-		
+
 	} else if(!strcmp(name, "keepalive-timeout")) {
 		q->keepalive_timeout = MAX(0, (int)value);
 
 	} else if(!strcmp(name, "short-timeout")) {
 		q->short_timeout = MAX(1, (int)value);
-		
+
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
 	}
-	
+
 	return 0;
 }
 
@@ -4529,7 +4529,7 @@ void work_queue_set_bandwidth_limit(struct work_queue *q, const char *bandwidth)
 double work_queue_get_effective_bandwidth(struct work_queue *q)
 {
 	double queue_bandwidth = get_queue_transfer_rate(q, NULL)/MEGABYTE; //return in MB per second
-	return queue_bandwidth; 
+	return queue_bandwidth;
 }
 
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
@@ -4539,11 +4539,11 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 
 	memset(s, 0, sizeof(*s));
 
-	//info about workers 
+	//info about workers
 	s->total_workers_connected = hash_table_size(q->worker_table);
 	s->workers_init = hash_table_size(q->worker_table) - known_workers(q);
 	s->workers_idle = known_workers(q) - workers_with_tasks(q); //returns workers that are not running any tasks.
-	s->workers_busy = workers_with_tasks(q); 
+	s->workers_busy = workers_with_tasks(q);
 	s->total_workers_joined = qs->total_workers_joined;
 	s->total_workers_removed = qs->total_workers_removed;
 
@@ -4554,7 +4554,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_tasks_dispatched = qs->total_tasks_dispatched;
 	s->total_tasks_complete = qs->total_tasks_complete;
 	s->total_tasks_cancelled = qs->total_tasks_cancelled;
-	
+
 	//info about queue
 	s->start_time = qs->start_time;
 	s->total_send_time = qs->total_send_time;
@@ -4573,7 +4573,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->capacity = compute_capacity(q);
 
 	//info about resources
-	s->bandwidth = work_queue_get_effective_bandwidth(q); 
+	s->bandwidth = work_queue_get_effective_bandwidth(q);
 	struct work_queue_resources r;
 	aggregate_workers_resources(q,&r);
 	s->total_cores = r.cores.total;
@@ -4592,9 +4592,9 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	//deprecated fields
 	s->port = q->port;
 	s->priority = q->priority;
-	s->workers_ready = s->workers_idle; 
+	s->workers_ready = s->workers_idle;
 	s->workers_full = 0;
-	s->total_worker_slots = s->tasks_running; 
+	s->total_worker_slots = s->tasks_running;
 	s->avg_capacity = s->capacity;
 }
 
@@ -4695,7 +4695,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 		fprintf(q->logfile,
 				// start with a comment
 				"#"
-			// time:	
+			// time:
 			"timestamp "
 			//workers:
 			"total_workers_connected workers_init workers_idle workers_busy total_workers_joined total_workers_removed "
@@ -4718,7 +4718,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 	}
 	else
 	{
-		debug(D_NOTICE | D_WQ, "couldn't open logfile %s: %s\n", logfile, strerror(errno)); 
+		debug(D_NOTICE | D_WQ, "couldn't open logfile %s: %s\n", logfile, strerror(errno));
 		return 0;
 	}
 }

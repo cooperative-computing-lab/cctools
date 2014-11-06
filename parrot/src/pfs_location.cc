@@ -13,7 +13,7 @@ extern "C" {
 #include "stringtools.h"
 }
 
-#include <errno.h> 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -38,7 +38,7 @@ int pfs_location::append( const char *srcname )
 
 	/* Create data list if it doesn't already exist */
 	if(!data) data = list_create();
-	
+
 	return list_push_tail(data, (void*)strdup(name));
 
 }

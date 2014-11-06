@@ -224,7 +224,7 @@ void ast_word_print( FILE *file, struct ast_word *w )
 
 void ast_redirect_print( FILE *file, struct ast_redirect *r )
 {
-	if(r) {	
+	if(r) {
 		char *s;
 		switch(r->kind) {
 			case AST_REDIRECT_FILE:
@@ -271,7 +271,7 @@ void ast_redirect_print( FILE *file, struct ast_redirect *r )
 		fprintf(file,"%d%s %s ",r->source,s,r->target->text);
 		ast_redirect_print(file,r->next);
 	}
-}		
+}
 
 
 /* vim: set noexpandtab tabstop=4: */

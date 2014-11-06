@@ -56,8 +56,8 @@ struct token *lexer_pack_token(struct lexer *lx, enum token_t type)
 
 char *lexer_print_token(struct token *t)
 {
-	char str[1024]; 
-	
+	char str[1024];
+
 	int n = sizeof(str);
 
 	switch (t->type) {
@@ -101,7 +101,7 @@ char *lexer_print_token(struct token *t)
 		snprintf(str, n, "unknown: %s\n", t->lexeme);
 		break;
 	}
-	
+
 	return xxstrdup(str);
 }
 
@@ -232,7 +232,7 @@ void lexer_report_error(struct lexer *lx, char *message, ...)
 void lexer_print_queue(struct lexer *lx)
 {
 	struct token *t;
-	
+
 	debug(D_MAKEFLOW_LEXER, "Queue: ");
 
 	list_first_item(lx->token_queue);
@@ -575,7 +575,7 @@ int lexer_discard_white_space(struct lexer *lx)
 		lexer_next_char(lx);
 		count++;
 	}
-	
+
 	return count;
 }
 
@@ -602,15 +602,15 @@ struct token *lexer_read_white_space(struct lexer *lx)
 struct list *lexer_read_expandable_recursive(struct lexer *lx, char end_marker, int opened)
 {
 	lexer_discard_white_space(lx);
-	
+
 	struct list *tokens = list_create();
 
 	while(!lx->eof) {
 		int c = lexer_next_peek(lx);
-		
+
 		if(c == '$') {
 			list_push_tail(tokens, lexer_read_substitution(lx));
-		} 
+		}
 
 		if(c == '\'') {
 			lexer_read_literal(lx);
@@ -634,7 +634,7 @@ struct list *lexer_read_expandable_recursive(struct lexer *lx, char end_marker, 
 	}
 
 	lexer_report_error(lx, "Found EOF before end marker: %c.\n", end_marker);
-	
+
 	return NULL;
 }
 
@@ -648,7 +648,7 @@ struct token *lexer_concat_expandable(struct lexer *lx, struct list *tokens)
 	char *substitution;
 
 	list_first_item(tokens);
-	
+
 	while((t = list_pop_head(tokens))) {
 		switch(t->type) {
 		case TOKEN_SUBSTITUTION:
@@ -669,20 +669,20 @@ struct token *lexer_concat_expandable(struct lexer *lx, struct list *tokens)
 
 		lexer_free_token(t);
 	}
-	
+
 	t = lexer_pack_token(lx, TOKEN_LITERAL);
 	t->lexeme = xxstrdup(buffer_tostring(&b));
 	buffer_free(&b);
-	
+
 	return t;
 }
 
 struct token *lexer_read_expandable(struct lexer *lx, char end_marker)
 {
 	struct list *tokens = lexer_read_expandable_recursive(lx, end_marker, 0);
-	
-	struct token *t = lexer_concat_expandable(lx, tokens); 
-	
+
+	struct token *t = lexer_concat_expandable(lx, tokens);
+
 	list_delete(tokens);
 
 	return t;
@@ -703,12 +703,12 @@ int lexer_append_tokens(struct lexer *lx, struct list *tokens)
 	return count;
 }
 
-struct list *lexer_expand_substitution(struct lexer *lx, struct token *t, 
+struct list *lexer_expand_substitution(struct lexer *lx, struct token *t,
 							  struct list * (*list_reader)(struct lexer *))
 {
 	struct lexer *lx_s  = lexer_create_substitution(lx, t);
 	struct list *tokens = list_reader(lx_s);
-	
+
 	lexer_delete(lx_s);
 
 	return tokens;
@@ -783,7 +783,7 @@ struct list *lexer_read_file_list_aux(struct lexer *lx)
 		if(t->type == TOKEN_SUBSTITUTION) {
 			tokens = list_splice(tokens, lexer_expand_substitution(lx, t, lexer_read_file_list_aux));
 			lexer_free_token(t);
-		} else { 
+		} else {
 			list_push_tail(tokens, t);
 		}
 	} while(t->type != TOKEN_NEWLINE);
@@ -795,21 +795,21 @@ void lexer_concatenate_consecutive_literals(struct list *tokens)
 {
 	struct list *tmp = list_create();
 	struct token *t, *prev  = NULL;
-	
+
 	list_first_item(tokens);
 	while((t = list_pop_head(tokens))) {
 		if(t->type != TOKEN_LITERAL) {
 			list_push_tail(tmp, t);
 			continue;
 		}
-		
+
 		prev = list_pop_tail(tmp);
-		
+
 		if(!prev) {
 			list_push_tail(tmp, t);
 			continue;
 		}
-		
+
 		if(prev->type != TOKEN_LITERAL) {
 			list_push_tail(tmp, prev);
 			list_push_tail(tmp, t);
@@ -832,7 +832,7 @@ void lexer_concatenate_consecutive_literals(struct list *tokens)
 		} else {
 			lexer_free_token(t);
 		}
-	
+
 	list_delete(tmp);
 }
 
@@ -840,18 +840,18 @@ int lexer_read_file_list(struct lexer *lx)
 {
 	/* Add file list start marker */
 	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_FILES));
-	
+
 	struct list *tokens = lexer_read_file_list_aux(lx);
-	
+
 	lexer_concatenate_consecutive_literals(tokens);
 
 	int count = lexer_append_tokens(lx, tokens);
 
 	if(count < 1)
 		lexer_report_error(lx, "Rule files specification is empty.\n");
-	
+
 	list_delete(tokens);
-	
+
 	return count;
 }
 
@@ -921,12 +921,12 @@ struct token *lexer_read_command_argument(struct lexer *lx)
 struct list *lexer_read_command_aux(struct lexer *lx)
 {
 	int spaces_deleted = lexer_discard_white_space(lx);
-	
-	struct list *tokens = list_create(); 
+
+	struct list *tokens = list_create();
 
 	//Preserve space in substitutions.
 	if(spaces_deleted && lx->depth > 0) {
-		list_push_tail(tokens, lexer_pack_token(lx, TOKEN_SPACE)); 
+		list_push_tail(tokens, lexer_pack_token(lx, TOKEN_SPACE));
 	}
 
 	/* Read all command tokens. Note that we read from lx, but put in lx_c. */
@@ -940,29 +940,29 @@ struct list *lexer_read_command_aux(struct lexer *lx)
 		if(t->type == TOKEN_SUBSTITUTION) {
 			tokens = list_splice(tokens, lexer_expand_substitution(lx, t, lexer_read_command_aux));
 			lexer_free_token(t);
-		} else { 
+		} else {
 			list_push_tail(tokens, t);
 		}
 	} while(t->type != TOKEN_NEWLINE);
-	
+
 	return tokens;
 }
 
 int lexer_read_command(struct lexer *lx)
 {
 	struct list *tokens = lexer_read_command_aux(lx);
-	
+
 	struct token *t;
 
 	if(list_size(tokens) < 2) {
 		/* If the only token in the list is a NEWLINE, then this is an empty line. */
 		while((t = list_pop_head(tokens)))
 			lexer_free_token(t);
-		
+
 		list_delete(tokens);
 		return 1;
 	}
-	
+
 	/* Add command start marker.*/
 	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_COMMAND));
 
@@ -972,7 +972,7 @@ int lexer_read_command(struct lexer *lx)
 	list_first_item(tokens);
 	while((t = list_peek_head(tokens))) {
 		if(t->type == TOKEN_LITERAL &&
-		   ((strcmp(t->lexeme, "LOCAL")    == 0) || 
+		   ((strcmp(t->lexeme, "LOCAL")    == 0) ||
 			(strcmp(t->lexeme, "MAKEFLOW") == 0)    )) {
 			t = list_pop_head(tokens);
 			lexer_push_token(lx, t);
@@ -987,7 +987,7 @@ int lexer_read_command(struct lexer *lx)
 
 	/* Mark end of modifiers. */
 	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_COMMAND_MOD_END));
-	
+
 	/* Now merge tha actual command tokens */
 
 	/* Gives the number of actual command tokens, not taking into account command modifiers. */
@@ -997,12 +997,12 @@ int lexer_read_command(struct lexer *lx)
 		count++;
 		lexer_push_token(lx, t);
 	}
-	
+
 	list_delete(tokens);
-	
+
 	if(count < 1)
 		lexer_report_error(lx, "Command is empty.\n");
-	
+
 	return count;
 }
 
@@ -1137,7 +1137,7 @@ int lexer_read_syntax_or_variable(struct lexer * lx)
 		lexer_roll_back(lx, strlen(name->lexeme));
 		lexer_report_error(lx, "Unrecognized keyword: %s.", name->lexeme);
 	}
-	
+
 	return 1;
 }
 
@@ -1200,7 +1200,7 @@ struct lexer *lexer_create(int type, void *data, int line_number, int column_num
 	lx->stream = NULL;
 	lx->buffer = NULL;
 	lx->eof = 0;
-	
+
 	lx->depth = 0;
 
 	lx->lexeme = calloc(BUFFER_CHUNK_SIZE, sizeof(char));
@@ -1230,7 +1230,7 @@ struct lexer *lexer_create(int type, void *data, int line_number, int column_num
 struct lexer *lexer_create_substitution(struct lexer *lx, struct token *t)
 {
 	char *substitution = NULL;
-	
+
 	if(lx->environment) {
 		substitution = dag_lookup_str(t->lexeme, lx->environment);
 	}
@@ -1244,7 +1244,7 @@ struct lexer *lexer_create_substitution(struct lexer *lx, struct token *t)
 
 	lx_s = lexer_create(STRING, substitution, lx->line_number, lx->column_number);
 	lx_s->depth = lx->depth + 1;
-	
+
 	if(lx_s->depth > MAX_SUBSTITUTION_DEPTH)
 		lexer_report_error(lx, "More than %d recursive subsitutions attempted.\n", MAX_SUBSTITUTION_DEPTH);
 
@@ -1284,14 +1284,14 @@ struct token *lexer_peek_next_token(struct lexer *lx)
 	}
 
 	struct token *head = list_peek_head(lx->token_queue);
-	
+
 	return head;
 }
 
 struct token *lexer_next_token(struct lexer *lx)
 {
 	struct token *head = lexer_peek_next_token(lx);
-	
+
 	if(head)
 	{
 		if(lx->depth == 0)

@@ -52,13 +52,13 @@ static time_t start_time = 0;
 static time_t last_display_time = 0;
 
 static const time_t long_wait = 60;
-static const time_t short_wait = 5; 
+static const time_t short_wait = 5;
 
 static int task_consider( int x, int y )
 {
 	char command[WAVEFRONT_LINE_MAX];
 	char tag[WAVEFRONT_LINE_MAX];
-	
+
 	struct work_queue_task* t;
 
 	if(x>=xsize) return 1;
@@ -79,7 +79,7 @@ static int task_consider( int x, int y )
 
 	sprintf(command,"./%s %d %d xfile yfile dfile",function,x,y);
 	sprintf(tag,"%d %d",x,y);
-	
+
 	t = work_queue_task_create(command);
 	work_queue_task_specify_tag(t,tag);
 	work_queue_task_specify_input_file(t, function, function);
@@ -87,7 +87,7 @@ static int task_consider( int x, int y )
 	work_queue_task_specify_input_buf(t, bottom, strlen(bottom), "yfile");
 	work_queue_task_specify_input_buf(t, diag, strlen(diag), "dfile");
 	work_queue_submit(queue,t);
-	
+
 	if(bmap)
 		bitmap_set(bmap, x, y, WAVEFRONT_TASK_STATE_READY);
 
@@ -100,7 +100,7 @@ static void task_complete( int x, int y )
 	task_consider(x+1,y);
 	task_consider(x,y+1);
 
-	
+
 	if(bmap)
 		bitmap_set(bmap, x, y, WAVEFRONT_TASK_STATE_COMPLETE);
 }
@@ -250,7 +250,7 @@ int main( int argc, char *argv[] )
 	last_display_time = 0;
 
 	cells_total = xsize*ysize;
-	
+
 	xsize++;
 	ysize++;
 
@@ -262,7 +262,7 @@ int main( int argc, char *argv[] )
 
 	int count = text_array_load(array,outfile);
 	if(count>0) printf("recovered %d results from %s\n",count,outfile);
-	
+
 	logfile = fopen(outfile,"a");
 	if(!logfile) {
 		fprintf(stderr,"couldn't open %s for append: %s\n",outfile,strerror(errno));
@@ -279,7 +279,7 @@ int main( int argc, char *argv[] )
 
 	//Read the port the queue is actually running, in case we just called
 	//work_queue_create(LINK_PORT_ANY)
-	port  = work_queue_port(queue); 
+	port  = work_queue_port(queue);
 
 	if(!queue) {
 		fprintf(stderr,"%s: could not create work queue on port %d: %s\n",progname,port,strerror(errno));
@@ -301,7 +301,7 @@ int main( int argc, char *argv[] )
 		bmap = bitmap_create(xsize,ysize);
 		wavefront_bitmap_initialize(bmap);
 	}
-		
+
 
 	task_prime();
 
@@ -312,7 +312,7 @@ int main( int argc, char *argv[] )
 
 		t = work_queue_wait(queue,WORK_QUEUE_WAITFORTASK);
 		if(!t) break;
-		
+
 		if(t->return_status==0) {
 			int x,y;
 			if(sscanf(t->tag,"%d %d",&x,&y)==2) {

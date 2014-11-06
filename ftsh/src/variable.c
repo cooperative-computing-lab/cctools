@@ -172,7 +172,7 @@ char * variable_subst( char *value, int line )
 	int length;
 	int withquotes = 0;
 	int escape = 0;
- 
+
 	while(1) {
 
 		/* Find a non-escaped dollar */
@@ -234,14 +234,14 @@ char * variable_subst( char *value, int line )
 
 		oldend = *end;
 		*end = 0;
- 
+
 		subvalue = variable_get(start,line,withquotes);
 		*end = oldend;
 
 		if(!subvalue) {
 			subvalue = xxstrdup("");
 		}
- 
+
 		length = strlen(value) - (end-dollar) + strlen(subvalue) + 1;
 
 		newvalue = malloc(length);

@@ -630,7 +630,7 @@ int main(int argc, char *argv[])
 		There is the possibility that the UDP listen will
 		fail because that port is in use.
 		*/
-	  
+
 		if(port==0) {
 			char addr[LINK_ADDRESS_MAX];
 			link_address_local(list_port,addr,&port);

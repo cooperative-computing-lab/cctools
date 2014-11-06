@@ -232,7 +232,7 @@ int copy_file_to_file(const char *input, const char *output)
 	in  = fopen(input, "r");
 	if(!in)
 		return -1;
-	
+
 	char out_dir[COPY_BUFFER_SIZE];
 	path_dirname(output, out_dir);
 	create_dir(out_dir, st.st_mode);
@@ -246,9 +246,9 @@ int copy_file_to_file(const char *input, const char *output)
 
 	fclose(in);
 	fclose(out);
-	
+
 	chmod(output, st.st_mode);
-	return count;	
+	return count;
 }
 
 int copy_file_to_buffer(const char *filename, char **buffer)

@@ -190,21 +190,21 @@ FILE *fopen64(const char *path, const char *mode)
 {
 	FILE *file;
 	typeof(fopen64) *original_fopen64 = dlsym(RTLD_NEXT, "fopen64");
-	
+
 	debug(D_DEBUG, "fopen64 %s mode %s from %d.\n", path, mode, getpid());
 	file = original_fopen64(path, mode);
-	
+
 	if(file)
 	{
 		struct monitor_msg msg;
-			
+
 		msg.type   = OPEN;
 		msg.origin = getpid();
 		strcpy(msg.data.s, path);
-			
+
 		send_monitor_msg(&msg);
 	}
-	
+
 	return file;
 }
 
@@ -213,27 +213,27 @@ int open64(const char *path, int flags, ...)
 	va_list ap;
 	int     fd;
 	int     mode;
-	
+
 	typeof(open64) *original_open64 = dlsym(RTLD_NEXT, "open64");
-	
+
 	va_start(ap, flags);
 	mode = va_arg(ap, int);
 	va_end(ap);
-	
+
 	debug(D_DEBUG, "open64 %s from %d.\n", path, getpid());
 	fd = original_open64(path, flags, mode);
-	
+
 	if(fd > -1)
 	{
 		struct monitor_msg msg;
-			
+
 		msg.type   = OPEN;
 		msg.origin = getpid();
 		strcpy(msg.data.s, path);
-			
+
 		send_monitor_msg(&msg);
 	}
-	
+
 	return fd;
 }
 #endif /* defined linux && __USE_LARGEFILE64 */
@@ -248,7 +248,7 @@ void exit_wrapper_preamble(void)
 {
 	sigset_t set_cont, set_prev;
 	void (*prev_handler)(int signum);
-	struct timespec timeout = {.tv_sec = 10, .tv_nsec = 0}; 
+	struct timespec timeout = {.tv_sec = 10, .tv_nsec = 0};
 
 	debug(D_DEBUG, "%s from %d.\n", str_msgtype(END_WAIT), getpid());
 
@@ -268,7 +268,7 @@ void exit_wrapper_preamble(void)
 	debug(D_DEBUG, "Waiting for monitoring: %d.\n", getpid());
 	pselect(0, NULL, NULL, NULL, &timeout, &set_prev);
 	signal(SIGCONT, prev_handler);
-	sigprocmask(SIG_SETMASK, &set_prev, NULL); 
+	sigprocmask(SIG_SETMASK, &set_prev, NULL);
 
 	debug(D_DEBUG, "Continue with %s: %d.\n", str_msgtype(END_WAIT), getpid());
 }

@@ -165,7 +165,7 @@ static pfs_resolve_t mount_entry_check( const char *logical_name, const char *pr
 			local_prefix = &redirect[7];
 			local_prefix_len = (int)(prefix_sep-local_prefix);
 			/* anything in the local_prefix tree and the PFS cache is local */
-			if ((!strncmp(logical_name, local_prefix, local_prefix_len)) || 
+			if ((!strncmp(logical_name, local_prefix, local_prefix_len)) ||
                             (!strncmp(logical_name, pfs_temp_dir, strlen(pfs_temp_dir))) )
 			{
 				strcpy(physical_name,logical_name);
@@ -186,7 +186,7 @@ static pfs_resolve_t mount_entry_check( const char *logical_name, const char *pr
 					if(llen>plen) {
 						strcat(physical_name,"/");
 						strcat(physical_name,&logical_name[plen]);
-						
+
 					}
 				}
 				result = PFS_RESOLVE_CHANGED;
@@ -270,7 +270,7 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, time_t
 		case PFS_RESOLVE_FAILED:
 			debug(D_RESOLVE,"%s failed",logical_name);
 			break;
-		case PFS_RESOLVE_ENOENT:	
+		case PFS_RESOLVE_ENOENT:
 			debug(D_RESOLVE,"%s ENOENT",logical_name);
 			break;
 		case PFS_RESOLVE_DENIED:

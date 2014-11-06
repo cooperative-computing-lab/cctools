@@ -120,7 +120,7 @@ static void chomp_slashes( char *s )
 }
 
 class pfs_file_nest : public pfs_file {
-public: 
+public:
 	pfs_file_nest( pfs_name *n ) : pfs_file(n) {
 	}
 
@@ -197,7 +197,7 @@ public:
 	}
 };
 
-static void list_buffer_append( NestFileInfo *finfo, void *arg ) 
+static void list_buffer_append( NestFileInfo *finfo, void *arg )
 {
 	pfs_dir *dir = (pfs_dir *) arg;
 	dir->append(finfo->name);
@@ -212,7 +212,7 @@ public:
 		debug(D_NEST,"connecting to %s",name->host);
 		result = NestOpenConnection(fd,name->host);
 		if(result!=NEST_SUCCESS) result = NestOpenAnonymously(fd,name->host);
-			
+
 		if(result==NEST_SUCCESS) {
 			return (void*)fd;
 		} else {
@@ -280,7 +280,7 @@ public:
 		}
 
 		forgetit:
-		
+
 		int invalid = (result==NEST_NO_CONNECTION);
 		pfs_service_disconnect_cache(name,(void*)fd,invalid);
 

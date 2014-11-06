@@ -131,12 +131,12 @@ void sort_by_field(struct histogram *h, struct field *f)
 	qsort(h->summaries_sorted, h->total_count, sizeof(struct rmDsummary *), less_than);
 }
 
-int index_of_p(struct histogram *h, double p) 
+int index_of_p(struct histogram *h, double p)
 {
 	return (int) ceil((h->total_count - 1) * p);
 }
 
-double value_of_p(struct histogram *h, double p) 
+double value_of_p(struct histogram *h, double p)
 {
 	return value_at_index(h, index_of_p(h, p));
 }
@@ -159,7 +159,7 @@ uint64_t get_bucket_count(struct histogram *h, uint64_t bucket)
 
 double get_bucket_value(struct histogram *h, uint64_t bucket)
 {
-	return h->bin_size * (bucket); 
+	return h->bin_size * (bucket);
 }
 
 uint64_t bucket_of(struct histogram *h, double value)
@@ -167,7 +167,7 @@ uint64_t bucket_of(struct histogram *h, double value)
 	return (uint64_t) floor(value/h->bin_size);
 }
 
-uint64_t increment_bucket(struct histogram *h, double value) 
+uint64_t increment_bucket(struct histogram *h, double value)
 {
 	uint64_t bucket = bucket_of(h, value);
 	uint64_t count = get_bucket_count(h, bucket);
@@ -413,7 +413,7 @@ void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 	FILE *f     = open_file(fname);
 	free(fname);
 
-	fprintf(f, "set terminal pngcairo truecolor rounded size %d,%d enhanced font \"times,10\"\n", 
+	fprintf(f, "set terminal pngcairo truecolor rounded size %d,%d enhanced font \"times,10\"\n",
 			width_thumb, height_thumb);
 
 	fname = path_of_thumbnail_image(h, 1);
@@ -429,11 +429,11 @@ void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 	fprintf(f, "set bmargin 2\n");
 	fprintf(f, "unset tics\n");
 
-	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n", 
+	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n",
 			h->min_value, value_of_p(h, 0.25));
-	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n", 
+	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n",
 			value_of_p(h, 0.75), h->max_value);
-	fprintf(f, "set label \"\" at %lf,graph -0.01 tc ls 1 center front point pt 5\n", 
+	fprintf(f, "set label \"\" at %lf,graph -0.01 tc ls 1 center front point pt 5\n",
 			value_of_p(h, 0.5));
 
 	fprintf(f, "set label \"%.0lf\" at %lf,graph -0.01 tc ls 1 center front point pt 27 offset 0,character -0.90\n", h->value_at_max_count, h->value_at_max_count);
@@ -458,7 +458,7 @@ void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 
 	char *table_name = path_of_table(h, 1);
 
-	if(h->max_count > 100*h->min_count && 0) 
+	if(h->max_count > 100*h->min_count && 0)
 	{
 		fprintf(f, "set yrange [0:(log10(%lf))]\n", 1.0*h->max_count);
 		fprintf(f, "set label \"%" PRIu64 "\" at %lf,(log10(%lf)) tc ls 1 left front nopoint offset 0,character 0.5\n",
@@ -487,7 +487,7 @@ void write_image_gnuplot(struct histogram *h, struct histogram *all)
 	FILE *f     = open_file(fname);
 	free(fname);
 
-	fprintf(f, "set terminal pngcairo truecolor rounded size %d,%d enhanced font \"times,12\"\n", 
+	fprintf(f, "set terminal pngcairo truecolor rounded size %d,%d enhanced font \"times,12\"\n",
 			width, height);
 
 	fname = path_of_image(h, 1);
@@ -503,11 +503,11 @@ void write_image_gnuplot(struct histogram *h, struct histogram *all)
 	fprintf(f, "set bmargin 2\n");
 	fprintf(f, "unset tics\n");
 
-	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n", 
+	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n",
 			h->min_value, value_of_p(h, 0.25));
-	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n", 
+	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n",
 			value_of_p(h, 0.75), h->max_value);
-	fprintf(f, "set label \"\" at %lf,graph -0.01 tc ls 1 center front point pt 5\n", 
+	fprintf(f, "set label \"\" at %lf,graph -0.01 tc ls 1 center front point pt 5\n",
 			value_of_p(h, 0.5));
 
 	fprintf(f, "set label \"%.0lf\" at %lf,graph -0.01 tc ls 1 center front point pt 27 offset 0,character -0.90\n", h->value_at_max_count, h->value_at_max_count);
@@ -633,11 +633,11 @@ struct histogram *histogram_of_field(struct rmDsummary_set *source, struct field
 
 void write_histogram_stats_header(FILE *stream)
 {
-	fprintf(stream, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
-			"resource", 
-			"n", 
-			"mean", "std_dev", "skewd", "kurtos", 
-			"max", "min", 
+	fprintf(stream, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n",
+			"resource",
+			"n",
+			"mean", "std_dev", "skewd", "kurtos",
+			"max", "min",
 			"p_25", "p_50", "p_75", "p_95", "p_99",
 			"z_95", "z_99"
 		   );
@@ -646,16 +646,16 @@ void write_histogram_stats_header(FILE *stream)
 void write_histogram_stats(FILE *stream, struct histogram *h)
 {
 	char *resource_no_spaces = sanitize_path_name(h->resource->name);
-	fprintf(stream, "%s %d %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n", 
+	fprintf(stream, "%s %d %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
 			resource_no_spaces,
 			h->total_count,
 			h->mean, h->std_dev, h->skewdness, h->kurtosis,
 			h->max_value, h->min_value,
-			value_of_p(h, 0.25), 
-			value_of_p(h, 0.50), 
-			value_of_p(h, 0.75), 
-			value_of_p(h, 0.95), 
-			value_of_p(h, 0.99), 
+			value_of_p(h, 0.25),
+			value_of_p(h, 0.50),
+			value_of_p(h, 0.75),
+			value_of_p(h, 0.95),
+			value_of_p(h, 0.99),
 			h->z_95,
 			h->z_99);
 
@@ -665,8 +665,8 @@ void write_histogram_stats(FILE *stream, struct histogram *h)
 void histograms_of_category(struct rmDsummary_set *ss)
 {
 	/* construct histograms of category across all resources */
-	struct field *f; 
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++) 
+	struct field *f;
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
 		if(!f->active)
 			continue;
@@ -680,8 +680,8 @@ void plots_of_category(struct rmDsummary_set *s)
 	struct histogram     *h;
 
 	/* construct histograms of category across all resources */
-	struct field *f; 
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++) 
+	struct field *f;
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
 		if(!f->active)
 			continue;
@@ -719,8 +719,8 @@ void write_stats_of_category(struct rmDsummary_set *s)
 	write_histogram_stats_header(f_stats);
 
 	struct histogram *h;
-	struct field *f; 
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++) 
+	struct field *f;
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
 		if(!f->active)
 			continue;
@@ -743,9 +743,9 @@ void write_limits_of_category(struct rmDsummary_set *s, double p_cut)
 	free(filename);
 	free(f_stats_raw);
 
-	struct field *f; 
+	struct field *f;
 	struct histogram *h;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++) 
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
 		if(!f->active)
 			continue;
@@ -798,7 +798,7 @@ void write_outlier(FILE *stream, struct rmDsummary *s, struct field *f, char *pr
 
 void write_css_style(FILE *stream)
 {
-	fprintf(stream, 
+	fprintf(stream,
 			"\n<style media=\"screen\" type=\"text/css\">\n"
 			"table { font-size: small; border-collapse: collapse; }\n"
 			"td    { text-align: right; padding: 5px; border: 1px solid rgb(216,216,216); }\n"
@@ -1013,7 +1013,7 @@ void write_webpage(char *workflow_name)
 
 	struct rmDsummary_set *s;
 	list_first_item(all_sets);
-	while((s = list_next_item(all_sets))) 
+	while((s = list_next_item(all_sets)))
 	{
 		struct histogram *h;
 		struct field *f;
@@ -1139,7 +1139,7 @@ int main(int argc, char **argv)
 		/* construct histograms across all categories/resources. */
 		struct rmDsummary_set *s;
 		list_first_item(all_sets);
-		while((s = list_next_item(all_sets))) 
+		while((s = list_next_item(all_sets)))
 		{
 			histograms_of_category(s);
 			write_stats_of_category(s);

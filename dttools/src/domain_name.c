@@ -53,7 +53,7 @@ int domain_name_lookup_reverse(const char *addr, char *name)
 	}
 	strcpy(name, host);
 	debug(D_DNS, "%s is %s", addr, name);
-	
+
 	return 1;
 }
 
@@ -63,9 +63,9 @@ int domain_name_lookup(const char *name, char *addr)
 	struct addrinfo *result, *resultptr;
 	char ipstr[LINK_ADDRESS_MAX];
 	int err;
-	
+
 	debug(D_DNS, "looking up name %s", name);
-	
+
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
@@ -77,21 +77,21 @@ int domain_name_lookup(const char *name, char *addr)
 
 	for (resultptr = result; resultptr != NULL; resultptr = resultptr->ai_next) {
 		void *ipaddr;
-		
+
 		/* For ipv4 use struct sockaddr_in and sin_addr field;
 		   for ipv6 use struct sockaddr_in6 and sin6_addr field. */
 		// But right now, only find ipv4 address.
-		if (resultptr->ai_family == AF_INET) { 
+		if (resultptr->ai_family == AF_INET) {
 			struct sockaddr_in *addr_ipv4 = (struct sockaddr_in *)resultptr->ai_addr;
 			ipaddr = &(addr_ipv4->sin_addr);
 			inet_ntop(resultptr->ai_family, ipaddr, ipstr, sizeof(ipstr));
 			debug(D_DNS, "%s is %s", name, ipstr);
-			break;	
+			break;
 		}
 	}
 	strcpy(addr, ipstr);
 	freeaddrinfo(result);
-	
+
 	return 1;
 }
 

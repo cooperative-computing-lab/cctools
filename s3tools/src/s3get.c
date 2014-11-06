@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
 	char remotename[FILENAME_MAX];
 
 	s3_initialize(&argc, argv);
-	
+
 	if(argc < 2) {
 		fprintf(stderr, "usage: s3get <bucket> <filename>\n");
 		return -1;

@@ -88,7 +88,7 @@ char *rmsummary_read_single_chunk(FILE *stream)
 
 	/* Skip comments and blank lines before the summary */
 	char c;
-	while( (c = getc(stream)) == '#' || isblank(c) ) 
+	while( (c = getc(stream)) == '#' || isblank(c) )
 	{
 		ungetc(c, stream);
 		/* Make sure we read complete comment lines */
@@ -113,7 +113,7 @@ char *rmsummary_read_single_chunk(FILE *stream)
 		ungetc(c, stream);
 		if(c == '#' || c == '\n')
 			break;
-		
+
 		fgets(line, nline, stream);
 		n = strlen(line);
 
@@ -122,12 +122,12 @@ char *rmsummary_read_single_chunk(FILE *stream)
 			nmax = ntotal + n + nline;
 			summ = realloc(summ, nmax * sizeof(char) );
 			if(!summ)
-				fatal("Could not read summary file : %s.\n", strerror(errno)); 
+				fatal("Could not read summary file : %s.\n", strerror(errno));
 
             fprintf(stderr, "::::: %s\n", line);
 
 		}
-		memcpy((summ + ntotal), line, n); 
+		memcpy((summ + ntotal), line, n);
 		ntotal += n;
 	}
 
@@ -147,14 +147,14 @@ struct rmsummary *rmsummary_parse_from_str(char *buffer, char separator)
 
 	buffer = xxstrdup(buffer);
 
-	const char delim[] = { separator, '\n', '\0'}; 
+	const char delim[] = { separator, '\n', '\0'};
 
 	struct rmsummary *s = make_rmsummary(-1);
 
 	token = strtok_r(buffer, delim, &saveptr);
 	while(token)
 	{
-		if(sscanf(token, "%[^:]:%*[ \t]%[^\n]", key, value) >= 2) 
+		if(sscanf(token, "%[^:]:%*[ \t]%[^\n]", key, value) >= 2)
 		{
 			char *key_trim   = string_trim_spaces(key);
 			char *value_trim = string_trim_spaces(value);
@@ -166,7 +166,7 @@ struct rmsummary *rmsummary_parse_from_str(char *buffer, char separator)
 				if(space)
 					*space = '\0';
 			}
-			
+
 			rmsummary_assign_field(s, key_trim, value_trim);
 		}
 		token = strtok_r(NULL, delim, &saveptr);
@@ -370,10 +370,10 @@ void rmsummary_bin_op(struct rmsummary *dest, struct rmsummary *src, rm_bin_op f
 	rmsummary_apply_op(dest, src, fn, fs_nodes);
 }
 
-/* Copy the value for all the fields in src > -1 to dest */ 
+/* Copy the value for all the fields in src > -1 to dest */
 static int64_t override_field(int64_t d, int64_t s)
 {
-	return (s > -1) ? s : d; 
+	return (s > -1) ? s : d;
 }
 
 void rmsummary_merge_override(struct rmsummary *dest, struct rmsummary *src)
@@ -385,7 +385,7 @@ void rmsummary_merge_override(struct rmsummary *dest, struct rmsummary *src)
 /* Select the max of the fields */
 static int64_t max_field(int64_t d, int64_t s)
 {
-	return (d > s) ? d : s; 
+	return (d > s) ? d : s;
 }
 
 void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src)

@@ -20,13 +20,13 @@ extern "C" {
 #include <sys/mman.h>
 #include <string.h>
 
-pfs_dircache::pfs_dircache() 
+pfs_dircache::pfs_dircache()
 {
 	dircache_table = 0;
 	dircache_path  = 0;
 }
 
-pfs_dircache::~pfs_dircache() 
+pfs_dircache::~pfs_dircache()
 {
 	invalidate();
 
@@ -66,7 +66,7 @@ void pfs_dircache::insert( const char *name, struct pfs_stat *buf, pfs_dir *dir 
 {
 	char path[PFS_PATH_MAX];
 	struct pfs_stat *copy;
-	
+
 	if (!dircache_table) dircache_table = hash_table_create(0, 0);
 
 	dir->append(name);

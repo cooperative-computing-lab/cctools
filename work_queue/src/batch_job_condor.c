@@ -62,7 +62,7 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 		fprintf(file, "%s\n", options);
 
 	const char *resource = NULL;
-	
+
 	resource = hash_table_lookup(q->options, "cores");
 	if(resource)
 		fprintf(file, "request_cpus = %s\n", resource);

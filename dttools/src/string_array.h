@@ -14,7 +14,7 @@ See the file COPYING for details.
 */
 
 /** Create a new empty string array.
- 
+
     @return New string array.
   */
 char **string_array_new (void);

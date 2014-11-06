@@ -62,7 +62,7 @@ typedef int (*list_op_t) (void *item, const void *arg);
 struct list *list_create();
 
 /** Duplicate a linked list
-Returns a copy of the linked list.  Note that the 
+Returns a copy of the linked list.  Note that the
 pointers in both lists point to the same places.
 @param list The list to be duplicated
 @return A pointer to the duplicate list

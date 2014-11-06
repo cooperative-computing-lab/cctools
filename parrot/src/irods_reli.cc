@@ -508,7 +508,7 @@ int irods_reli_getdir( const char *host, const char *path, void (*callback) ( co
 		if(!value) break;
 
 		char *subname = value->value;
-			
+
 		for(i=0;i<query_out->rowCnt;i++) {
 			callback(subname,arg);
 			subname += value->len;
@@ -545,9 +545,9 @@ int irods_reli_getdir( const char *host, const char *path, void (*callback) ( co
 	while(result>=0) {
 		value = getSqlResultByInx(query_out,COL_COLL_NAME);
 		if(!value) break;
-	
+
 		char *subname = value->value;
-			
+
 		for(i=0;i<query_out->rowCnt;i++) {
 			callback(subname,arg);
 			subname += value->len;
@@ -656,7 +656,7 @@ int irods_reli_rmdir ( const char *host, const char *path )
 	collInp_t request;
 	int result;
 	CLEAN(path)
- 
+
         /*
         Note that an irods rmdir will fail silently if you
         attempt to remove a non-directory.  So, first we must
@@ -719,7 +719,7 @@ int irods_reli_rename   ( const char *host, const char *path, const char *newpat
 
 	debug(D_IRODS,"rcDataObjRename %s %s %s",host,path,newpath);
 	result = rcDataObjRename(server->conn,&request);
-	debug(D_IRODS,"= %d",result);	
+	debug(D_IRODS,"= %d",result);
 
 	if(result<0) {
 		errno = irods_reli_errno(result);
@@ -827,7 +827,7 @@ static unsigned char hex_to_nybble( char h )
 		case '4':	return 4;
 		case '5':	return 5;
 		case '6':	return 6;
-		case '7':	return 7;	
+		case '7':	return 7;
 		case '8':	return 8;
 		case '9':	return 9;
 		case 'a':	return 10;
@@ -842,8 +842,8 @@ static unsigned char hex_to_nybble( char h )
 
 static unsigned char hex_to_byte( char hex[2] )
 {
-	return (hex_to_nybble(hex[0])<<4) | hex_to_nybble(hex[1]); 
-	
+	return (hex_to_nybble(hex[0])<<4) | hex_to_nybble(hex[1]);
+
 }
 
 int irods_reli_md5( const char *host, const char *path, char *digest )
@@ -858,7 +858,7 @@ int irods_reli_md5( const char *host, const char *path, char *digest )
 
 	memset(&request,0,sizeof(request));
 	strcpy(request.objPath,path);
-	
+
 	debug(D_IRODS,"rcDataObjChksum %s %s",host,path);
 	result = rcDataObjChksum(server->conn,&request,&str);
 	debug(D_IRODS,"= %d",result);

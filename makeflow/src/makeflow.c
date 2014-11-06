@@ -109,7 +109,7 @@ static int monitor_enable_list_files  = 0;
 /* Write a verbose transaction log with SYMBOL tags.
  * SYMBOLs are category labels (SYMBOLs should be deprecated
  * once weaver/pbui tools are updated.) */
-static int log_verbose_mode = 0; 
+static int log_verbose_mode = 0;
 
 static char *monitor_limits_name = NULL;
 static int monitor_interval = 1;	// in seconds
@@ -1907,7 +1907,7 @@ int main(int argc, char *argv[])
 	// This forces -J vs -j to behave correctly
 	if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
 		explicit_remote_jobs_max = explicit_local_jobs_max;
-	} 
+	}
 
 	if(explicit_local_jobs_max) {
 		d->local_jobs_max = explicit_local_jobs_max;
@@ -1967,7 +1967,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP || 
+	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP ||
 	   batch_queue_type == BATCH_QUEUE_TYPE_HADOOP ||
 	   batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
 		local_queue = 0; /* all local jobs must be run on Chirp */

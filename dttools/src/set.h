@@ -69,7 +69,7 @@ void set_delete(struct set *s);
 int set_size(struct set *s);
 
 /** Insert a element to the set.
-This call will return 0 if element was already in the set. 
+This call will return 0 if element was already in the set.
 You must call @ref set_remove to remove it.
 Also note that you cannot insert a null element into the set.
 @param s A pointer to a set.

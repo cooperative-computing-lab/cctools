@@ -26,7 +26,7 @@ extern int _getopt_internal (int ___argc, char *const *___argv,
 		             const struct option *__longopts, int *__longind,
 			     int __long_only);
 
-
+
 /* Reentrant versions which can handle parsing multiple argument
    vectors at the same time.  */
 

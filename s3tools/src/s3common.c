@@ -22,7 +22,7 @@ inline const char* s3_key() { return key; }
 int process_userpass(char *userpass, char **username, char **password) {
 	int nargs;
 	char **args;
-	
+
 	if(string_split(userpass,&nargs,&args)) {
 		if(!*username) *username = strdup(args[0]);
 		if(!*password) *password = strdup(args[1]);
@@ -87,7 +87,7 @@ void s3_initialize(int* argc, char** argv) {
 	}
 
 	mod = 0;
-	
+
 	argv2 = malloc(*argc * sizeof(*argv2));
 	for(i = 0; i < *argc; i++) {
 		if(argv[i][0] == '-') {
@@ -133,7 +133,7 @@ void s3_initialize(int* argc, char** argv) {
 		fprintf(stderr, "Error: no username or password specified\n");
 		exit(result);
 	}
-	
+
 	if(endpoint || (endpoint = getenv("S3_ENDPOINT"))) {
 		s3_set_endpoint(endpoint);
 	}

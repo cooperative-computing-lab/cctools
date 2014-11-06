@@ -28,7 +28,7 @@
 #define RMONITOR_TYPES_H
 
 #define ONE_MEGABYTE 1048576  /* this many bytes */
-#define ONE_SECOND   1000000  /* this many usecs */    
+#define ONE_SECOND   1000000  /* this many usecs */
 
 #define MAX_FILE_DESCRIPTOR_COUNT 500 /* maximum depth of file tree walking */
 
@@ -41,7 +41,7 @@ struct cpu_time_info
 
 struct mem_info
 {
-	uint64_t virtual; 
+	uint64_t virtual;
 	uint64_t resident;
 	uint64_t swap;
 	uint64_t shared;

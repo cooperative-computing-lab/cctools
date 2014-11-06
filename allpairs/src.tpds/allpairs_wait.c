@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
 	return 1;
     }
     char* command = (char *) malloc((strlen("condor_wait   ")+strlen(argv[1]))*sizeof(char));
-    sprintf(command,"condor_wait %s",argv[1]); 
+    sprintf(command,"condor_wait %s",argv[1]);
     system(command);
     return 0;
 }

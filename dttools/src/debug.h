@@ -91,7 +91,7 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 
 /** Debug all remote I/O operations. */
 #define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD|D_CVMFS)
-	
+
 /** Debug all makeflow's operations. */
 #define D_MAKEFLOW    (D_MAKEFLOW_RUN|D_MAKEFLOW_LEXER|D_MAKEFLOW_PARSER)
 

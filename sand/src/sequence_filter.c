@@ -287,10 +287,10 @@ candidate_t * retrieve_candidates(int * total_cand_ret)
 
 	for (curr_index = 0; curr_index < CAND_TABLE_BUCKETS; curr_index++)
 	{
-		cle = candidates[curr_index];	
+		cle = candidates[curr_index];
 		while (cle)
 		{
-			if (cle->count >= 1) 
+			if (cle->count >= 1)
 			{
 				candidate_list[total_output].cand1 = cle->cand1;
 				candidate_list[total_output].cand2 = cle->cand2;
@@ -671,7 +671,7 @@ int get_next_minimizer(int seq_num, minimizer * next_minimizer )
 
 mer_t get_kmer(struct cseq *c, int curr)
 {
-	// Which mer does this kmer start in? 
+	// Which mer does this kmer start in?
 	int which_mer = curr/8;
 	int which_base = curr%8;
 	unsigned short curr_mer = 0;
@@ -792,7 +792,7 @@ void add_sequence_to_mer(mer_t mer, int seq_num, char dir, short loc)
 	new_mle->next = mle;
 	mhe->mle = new_mle;
 	mhe->count++;
-	
+
 }
 
 mer_list_element * create_mer_list_element(int seq_num, char dir, short loc)

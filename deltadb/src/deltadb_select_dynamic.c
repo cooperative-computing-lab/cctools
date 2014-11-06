@@ -138,7 +138,7 @@ static int checkpoint_read( struct deltadb *db )
 				nvpair_delete( hash_table_remove(db->table,key) );
 				hash_table_insert(db->table,key,nv);
 				//printf("Created %p %p for %s\n",nv,nv1,key);
-				
+
 			} else debug(D_NOTICE,"no key in object create.");
 		} else if (num_pairs == -1) {
 			nvpair_delete(nv);
@@ -167,19 +167,19 @@ static int log_play( struct deltadb *db )
 	char name[NVPAIR_LINE_MAX];
 	char value[NVPAIR_LINE_MAX];
 	char oper;
-	
+
 	int notime = 1;
 	while(fgets(line,sizeof(line),stream)) {
 		//printf("(%s",line);
 		//fflush(stdout);
-		
+
 		line_number += 1;
-		
+
 		if (line[0]=='.') return 0;
-		
+
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if(n<1) continue;
-		
+
 		switch(oper) {
 			case 'C':
 				nv = nvpair_create();
@@ -282,15 +282,15 @@ checkpoint file and working ahead in the various log files.
 */
 
 static int parse_input( struct deltadb *db )
-{      
+{
 	checkpoint_read(db);
-	
+
 	printf(".Checkpoint End.\n");
-	
+
 	while(1) {
 
 		int keepgoing = log_play(db);
-		
+
 		if(!keepgoing) break;
 
 	}
@@ -303,7 +303,7 @@ static int parse_input( struct deltadb *db )
 int main( int argc, char *argv[] )
 {
 	struct deltadb *db = deltadb_create(NULL);
-	
+
 	int i;
 	for (i=1; i<argc; i++){
 		struct argument arg;
@@ -327,9 +327,9 @@ int main( int argc, char *argv[] )
 		arg.next = db->args;
 		db->args = &arg;
 	}
-  
 
-	
+
+
 	parse_input(db);
 
 	deltadb_delete(db);

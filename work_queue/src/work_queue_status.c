@@ -1,4 +1,4 @@
-/* 
+/*
 Copyright (C) 2010- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
@@ -176,7 +176,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 
 	if(query_mode == NO_QUERY)
 		query_mode = QUERY_QUEUE;
-	
+
 	if(needs_explicit_master && optind >= argc)
 		fatal("Options -T and -W need an explicit master to query.");
 
@@ -244,7 +244,7 @@ int get_masters(time_t stoptime)
 
 void global_catalog_cleanup()
 {
-	
+
 	int i = 0;
 	while(global_catalog[i] != NULL)
 	{
@@ -259,7 +259,7 @@ void add_child_relation(const char *name, int spaces, char *buffer, size_t max_s
 {
 	if(spaces < 1)
 		return;
-	
+
 	memset(buffer, '-', spaces - 1);
 	buffer[spaces - 1] = '>';
 	buffer[spaces]     = '\0';
@@ -287,20 +287,20 @@ int find_child_relations(int spaces, const char *host, int port, time_t stoptime
 		if(temp_my_master && !strcmp(temp_my_master, full_address))
 		{
 			const char *project_name = nvpair_lookup_string(global_catalog[i], "project");
-			int branch_len = strlen(project_name) + spaces + 2; 
+			int branch_len = strlen(project_name) + spaces + 2;
 
 			char *branch = malloc(branch_len);
 			add_child_relation(project_name, spaces, branch, branch_len);
 
 			// update project_name
-			nvpair_remove(global_catalog[i], project_name); 
+			nvpair_remove(global_catalog[i], project_name);
 			nvpair_insert_string(global_catalog[i], "project", branch);
 
 			if(resource_mode)
 				nvpair_print_table(global_catalog[i], stdout, master_resource_headers);
 			else if(format_mode == FORMAT_TABLE)
 				nvpair_print_table(global_catalog[i], stdout, queue_headers);
-			
+
 			find_child_relations(spaces + 1,
 					nvpair_lookup_string(global_catalog[i], "name"),
 					atoi(nvpair_lookup_string(global_catalog[i], "port")),
@@ -308,7 +308,7 @@ int find_child_relations(int spaces, const char *host, int port, time_t stoptime
 		}
 		i++;
 	}
-	
+
 	return 1;
 }
 
@@ -331,15 +331,15 @@ int do_catalog_query( time_t stoptime )
 				}else if(format_mode == FORMAT_TABLE){
 					nvpair_print_table(global_catalog[i], stdout, queue_headers);
 				}
-				find_child_relations(1, 
-						nvpair_lookup_string(global_catalog[i], "name"), 
-						atoi(nvpair_lookup_string(global_catalog[i], "port")), 
+				find_child_relations(1,
+						nvpair_lookup_string(global_catalog[i], "name"),
+						atoi(nvpair_lookup_string(global_catalog[i], "port")),
 						stoptime);
 			}
 		}
-		i++;	
+		i++;
 	}
-	
+
 	if(format_mode == FORMAT_TABLE){
 		nvpair_print_table_footer(stdout, queue_headers);
 	}else if(resource_mode){

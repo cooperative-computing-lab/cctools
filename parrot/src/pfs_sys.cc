@@ -500,7 +500,7 @@ int	pfs_mmap_delete( pfs_size_t logical_address, pfs_size_t length )
 	result = pfs_current->table->mmap_delete(logical_address,length);
 	END
 }
- 
+
 int pfs_get_local_name( const char *rpath, char *lpath, char *firstline, int length )
 {
 	int fd;

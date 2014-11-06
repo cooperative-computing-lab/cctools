@@ -73,7 +73,7 @@ struct mpi_queue_job {
 	int jobid;
 	int worker_rank;
 	int status;
-	
+
 	int result;
 	int output_length;
 	char *output;
@@ -100,7 +100,7 @@ void mpi_queue_job_delete(struct mpi_queue_job *job) {
 	if(job->output_length) {
 		free(job->output);
 	}
-	
+
 	while(list_size(job->operations)) {
 		struct mpi_queue_operation *tmp = list_pop_head(job->operations);
 		if(tmp->buffer_length)
@@ -126,8 +126,8 @@ int master_main(const char *host, int port, const char *addr) {
 	MPI_Comm_size(MPI_COMM_WORLD, &num_workers);
 
 	workers = malloc(num_workers * sizeof(*workers));
-	memset(workers, 0, num_workers * sizeof(*workers));	
-	
+	memset(workers, 0, num_workers * sizeof(*workers));
+
 	idle_stoptime = time(0) + idle_timeout;
 
 	while(!abort_flag) {
@@ -152,7 +152,7 @@ int master_main(const char *host, int port, const char *addr) {
 			}
 
 			link_tune(master, LINK_TUNE_INTERACTIVE);
-			
+
 			link_readline(master, line, sizeof(line), time(0) + active_timeout);
 
 			memset(working_dir, 0, MPI_QUEUE_LINE_MAX);
@@ -164,7 +164,7 @@ int master_main(const char *host, int port, const char *addr) {
 				continue;
 			}
 		}
-		
+
 		if(link_readline(master, line, sizeof(line), time(0) + short_timeout)) {
 			struct mpi_queue_operation *op;
 			int jobid;
@@ -172,7 +172,7 @@ int master_main(const char *host, int port, const char *addr) {
 			INT64_T length;
 			char path[MPI_QUEUE_LINE_MAX];
 			op = NULL;
-			
+
 			debug(D_MPI, "received: %s\n", line);
 
 			if(!strcmp(line, "get results")) {
@@ -197,34 +197,34 @@ int master_main(const char *host, int port, const char *addr) {
 				op->buffer[op->buffer_length-1] = 0;
 				link_read(master, op->buffer, length, time(0) + active_timeout);
 				op->result = -1;
-				
+
 			} else if(sscanf(line, "stat %d %s", &jobid, path) == 2) {
 				op = malloc(sizeof(*op));
 				memset(op, 0, sizeof(*op));
 				op->type = MPI_QUEUE_OP_STAT;
 				sprintf(op->args, "%s", path);
 				op->result = -1;
-				
+
 			} else if(sscanf(line, "unlink %d %s", &jobid, path) == 2) {
 				op = malloc(sizeof(*op));
 				memset(op, 0, sizeof(*op));
 				op->type = MPI_QUEUE_OP_UNLINK;
 				sprintf(op->args, "%s", path);
 				op->result = -1;
-				
+
 			} else if(sscanf(line, "mkdir %d %s %o", &jobid, path, &mode) == 3) {
 				op = malloc(sizeof(*op));
 				memset(op, 0, sizeof(*op));
 				op->type = MPI_QUEUE_OP_MKDIR;
 				sprintf(op->args, "%s %o", path, mode);
 				op->result = -1;
-				
+
 			} else if(sscanf(line, "close %d", &jobid) == 1) {
 				op = malloc(sizeof(*op));
 				memset(op, 0, sizeof(*op));
 				op->type = MPI_QUEUE_OP_CLOSE;
 				op->result = -1;
-				
+
 //			} else if(sscanf(line, "symlink %d %s %s", &jobid, path, filename) == 3) {
 //			} else if(sscanf(line, "put %d %s %lld %o", &jobid, filename, &length, &mode) == 4) {
 //			} else if(sscanf(line, "rget %d %s", &jobid, filename) == 2) {
@@ -260,7 +260,7 @@ int master_main(const char *host, int port, const char *addr) {
 			master = 0;
 			sleep(5);
 		}
-		
+
 		int num_waiting_jobs = itable_size(waiting_jobs);
 		int num_unvisited_jobs = itable_size(active_jobs);
 		for(i = 1; i < num_workers && (num_unvisited_jobs > 0 || num_waiting_jobs > 0); i++) {
@@ -292,7 +292,7 @@ int master_main(const char *host, int port, const char *addr) {
 							op->output_buffer = malloc(op->output_length);
 							MPI_Recv(op->output_buffer, op->output_length, MPI_BYTE, workers[i]->worker_rank, 0, MPI_COMM_WORLD, &workers[i]->mpi_status);
 						}
-						
+
 						workers[i]->status = MPI_QUEUE_JOB_READY;
 
 						if(op->type == MPI_QUEUE_OP_WORK || op->result < 0) {
@@ -319,10 +319,10 @@ int master_main(const char *host, int port, const char *addr) {
 					}
 				}
 			}
-			
+
 			if( workers[i]->status != MPI_QUEUE_JOB_BUSY && list_size(workers[i]->operations)) {
 				op = list_peek_head(workers[i]->operations);
-				
+
 				if(op->type == MPI_QUEUE_OP_CLOSE) {
 					itable_remove(active_jobs, workers[i]->jobid);
 					list_push_tail(complete_jobs, workers[i]);
@@ -332,7 +332,7 @@ int master_main(const char *host, int port, const char *addr) {
 					i--;
 					continue;
 				}
-				
+
 				MPI_Send(op, sizeof(*op), MPI_BYTE, workers[i]->worker_rank, 0, MPI_COMM_WORLD);
 				if(op->buffer_length) {
 					MPI_Send(op->buffer, op->buffer_length, MPI_BYTE, workers[i]->worker_rank, 0, MPI_COMM_WORLD);
@@ -362,12 +362,12 @@ int master_main(const char *host, int port, const char *addr) {
 		struct mpi_queue_operation *op, close;
 		memset(&close, 0, sizeof(close));
 		close.type = MPI_QUEUE_OP_EXIT;
-		
+
 		if(workers[i]) {
 			if(workers[i]->status == MPI_QUEUE_JOB_BUSY) {
 				MPI_Wait(&workers[i]->request, &workers[i]->mpi_status);
 				op = list_peek_head(workers[i]->operations);
-				
+
 				if(op->output_length) {
 					op->output_buffer = malloc(op->output_length);
 					MPI_Recv(op->output_buffer, op->output_length, MPI_BYTE, workers[i]->worker_rank, 0, MPI_COMM_WORLD, &workers[i]->mpi_status);
@@ -404,9 +404,9 @@ int worker_main() {
 	struct stat st;
 
 	op = malloc(sizeof(*op));
-	
+
 	MPI_Bcast(line, MPI_QUEUE_LINE_MAX, MPI_CHAR, 0, MPI_COMM_WORLD);
-	
+
 	if(strlen(line)) {
 		if(stat(line, &st)) {
 			debug(D_MPI, "Working directory (%s) does not exist\n", line);
@@ -424,7 +424,7 @@ int worker_main() {
 
 		memset(op, 0, sizeof(*op));
 		MPI_Recv(op, sizeof(*op), MPI_BYTE, 0, 0, MPI_COMM_WORLD, &mpi_status);
-		
+
 		switch(op->type) {
 			case MPI_QUEUE_OP_WORK:
 
@@ -444,10 +444,10 @@ int worker_main() {
 				op->output_length = 0;
 				op->output_buffer = 0;
 			}
-			
+
 			break;
 			case MPI_QUEUE_OP_STAT:
-			
+
 			if(!stat(op->args, &st)) {
 				op->result = 1;
 				op->output_length = MPI_QUEUE_LINE_MAX;
@@ -459,7 +459,7 @@ int worker_main() {
 				op->output_buffer = malloc(op->output_length);
 				sprintf(op->output_buffer, "0 0");
 			}
-		
+
 			break;
 			case MPI_QUEUE_OP_UNLINK:
 
@@ -472,13 +472,13 @@ int worker_main() {
 
 			break;
 			case MPI_QUEUE_OP_MKDIR:
-			
+
 			if(sscanf(op->args, "%s %o", filename, &mode) == 2 && create_dir(filename, mode | 0700)) {
 				op->result = 1;
 			} else {
 				op->result = -1;
 			}
-			
+
 			break;
 //		} else if(sscanf(line, "symlink %s %s", path, filename) == 2) {
 //		} else if(sscanf(line, "put %s %lld %o", filename, &length, &mode) == 3) {
@@ -491,14 +491,14 @@ int worker_main() {
 			free(op);
 			MPI_Finalize();
 			return 0;
-			
+
 			break;
 			default:
 
 			abort_flag = 1;
 		}
 		if(abort_flag) break;
-		
+
 		if(op->buffer_length) {
 			free(op->buffer);
 			op->buffer = NULL;
@@ -506,16 +506,16 @@ int worker_main() {
 		}
 
 		MPI_Send(op, sizeof(*op), MPI_BYTE, 0, 0, MPI_COMM_WORLD);
-	
+
 		if(op->output_length) {
 			MPI_Send(op->output_buffer, op->output_length, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
 			free(op->output_buffer);
 		}
-		
+
 		memset(op, 0, sizeof(*op));
 
 	}
-	
+
 	free(op);
 	MPI_Finalize();
 	return 1;
@@ -605,7 +605,7 @@ int main(int argc, char *argv[])
 	} else {
 		return master_main(host, port, addr);
 	}
-	
+
 }
 
 

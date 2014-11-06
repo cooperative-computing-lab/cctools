@@ -238,7 +238,7 @@ static int ast_try_body_execute( struct ast_try *t, time_t stoptime )
 			result = 0;
 			break;
 		}
-	
+
 		if(loops && (i>=loops)) {
 			ftsh_error(FTSH_ERROR_FAILURE,t->try_line,"TRY loop limit reached");
 			result = 0;
@@ -441,7 +441,7 @@ int ast_forloop_execute( struct ast_forloop *f, time_t stoptime )
 				ftsh_error(FTSH_ERROR_FAILURE,f->for_line,"out of memory!");
 				result = 0;
 			}
-			free(line);		
+			free(line);
 		}
 		free(name);
 	} else {
@@ -491,7 +491,7 @@ int ast_assign_execute( struct ast_assign *a, time_t stoptime )
 int ast_shift_execute( struct ast_shift *s, time_t stoptime )
 {
 	ftsh_integer_t value;
-	
+
 	if(s->expr) {
 		if(!expr_to_integer(s->expr,&value,stoptime)) {
 			return 0;
@@ -547,7 +547,7 @@ static int ast_redirect_open( struct ast_redirect *r, int line, int fds[3] )
 				case AST_REDIRECT_INPUT:
 					fd = buffer_open_input(target);
 					break;
-				case AST_REDIRECT_OUTPUT:	
+				case AST_REDIRECT_OUTPUT:
 					fd = buffer_open_output(target);
 					break;
 				case AST_REDIRECT_APPEND:

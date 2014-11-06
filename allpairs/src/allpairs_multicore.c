@@ -75,7 +75,7 @@ int block_size_estimate( struct text_list *seta )
 	}
 
 	total_mem = total_mem/2;
-	
+
 	if(total_data>=total_mem) {
 		block_size = text_list_size(seta) * total_mem / total_data;
 		if(block_size<1) block_size = 1;

@@ -92,7 +92,7 @@ static sha1_context_t grow_filesystem_checksum;
 A grow_filesystem structure represents an entire
 filesystem rooted at a given host and path.
 All known filesystem are kept in a linked list
-rooted at grow_filesystem_list 
+rooted at grow_filesystem_list
 */
 
 struct grow_filesystem {
@@ -188,7 +188,7 @@ struct grow_dirent * grow_dirent_create_from_file( FILE *file, struct grow_diren
 	char linkname[GROW_LINE_MAX];
 	char type;
 	static INT64_T inode=2;
-	
+
 	while(fgets(line,sizeof(line),file)) {
 		sha1_update(&grow_filesystem_checksum,(unsigned char*)line,strlen(line));
 		sha1_update(&grow_filesystem_checksum,(unsigned char*)"\n",1);
@@ -443,7 +443,7 @@ struct grow_filesystem * grow_filesystem_create( const char *hostport, const cha
 		debug(D_GROW,"couldn't checksum %s: %s",filename,strerror(errno));
 		goto sleep_retry;
 	}
-	
+
 	debug(D_GROW,"local checksum: %s",sha1_string(digest));
 
 	if(strcmp((char*)checksum,sha1_string(digest))) {
@@ -467,7 +467,7 @@ struct grow_filesystem * grow_filesystem_create( const char *hostport, const cha
 	}
 
 	fclose(file);
-	
+
 	f = (struct grow_filesystem *) malloc(sizeof(*f));
 	strcpy(f->hostport,hostport);
 	strcpy(f->path,path);
@@ -499,7 +499,7 @@ void grow_filesystem_delete( struct grow_filesystem *f )
 	if(!f) return;
 	grow_dirent_delete(f->root);
 	grow_filesystem_delete(f->next);
-	free(f);	
+	free(f);
 }
 
 /*
@@ -626,7 +626,7 @@ public:
 	This is a compatibility hack.
 	This filesystem is read only, so locks make no sense.
 	This simply satisfies some programs that insist upon it.
-	*/	
+	*/
 	virtual int flock( int op ) {
 		return 0;
 	}

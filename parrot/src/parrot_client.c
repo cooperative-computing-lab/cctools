@@ -99,7 +99,7 @@ int parrot_timeout( const char *time )
 #endif
 }
 
-SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags) 
+SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags)
 {
 	int err;
 	size_t buffer_size = 16384;
@@ -117,7 +117,7 @@ SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags)
 			err = syscall(SYSCALL32_parrot_search,path,pattern,flags,buffer,buffer_size,"parrot_opensearch");
 		#else
 			err = syscall(SYSCALL64_parrot_search,path,pattern,flags,buffer,buffer_size,"parrot_opensearch");
-		#endif	
+		#endif
 
 		buffer_size*=2;
 	} while (err==-1 && errno==ERANGE);
@@ -131,7 +131,7 @@ SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags)
 	result->entry->path = NULL;
 	result->data = buffer;
 	result->i = 0;
-	
+
 	return result;
 }
 
@@ -158,12 +158,12 @@ static char *readsearch_next(char *data, int *i) {
 
 static struct stat *readsearch_unpack_stat(char *stat_str) {
 	if (stat_str==NULL) return NULL;
-	
+
 	struct stat *info = (struct stat*) calloc(1, sizeof(struct stat));
 	long dev, ino, mode, nlink, uid, gid, rdev, size, atime, mtime, ctime, blksize, blocks;
 	sscanf(
-		stat_str, 
-		"%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld", 
+		stat_str,
+		"%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld",
 		&dev, &ino, &mode, &nlink, &uid, &gid, &rdev, &size, &atime, &mtime, &ctime, &blksize, &blocks
 	);
 
@@ -206,7 +206,7 @@ struct searchent *parrot_readsearch(SEARCH *search) {
 		errsource = 0;
 		path = readsearch_next(data, &i);
 		info = readsearch_unpack_stat(readsearch_next(data, &i));
-	} 
+	}
 
 	search->entry->path = path;
 	search->entry->info = info;

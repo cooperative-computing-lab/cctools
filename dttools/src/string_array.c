@@ -32,7 +32,7 @@ char **string_array_append (char **oarray, const char *str)
 	char **narray, **tmp;
 	for (tmp = oarray; *tmp; tmp++) ;
 	tmp++; /* advance past NULL pointer */
-	size_t olength = *((size_t *) tmp); 
+	size_t olength = *((size_t *) tmp);
 	size_t nlength = olength + strlen(str)+1 + sizeof(char *);
 	narray = xxrealloc(oarray, nlength);
 	ptrdiff_t offset = ((char *)narray)-((char *)oarray)+sizeof(char *); /* difference including extra pointer */

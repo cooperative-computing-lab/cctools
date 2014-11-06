@@ -60,20 +60,20 @@ struct ragged_array ragged_array_populate(const char *path,const char *prefix, c
 	addstr = (char*) malloc((len)*sizeof(char));
 	if(addstr == NULL) {fprintf(stderr,"Allocating input string failed!\n"); return nullset;}
     }
-    
+
     FILE*  pathFID = fopen(path, "r");
-    if(!pathFID) {fprintf(stderr,"Couldn't open %s!\n",path); return nullset;}    
+    if(!pathFID) {fprintf(stderr,"Couldn't open %s!\n",path); return nullset;}
     fgets(tmpstr, len, pathFID);
     if (tmpstr != NULL) {
 	size_t last = strlen (tmpstr) - 1;
 	if (tmpstr[last] == '\n') tmpstr[last] = '\0';
     }
-    
+
     if(prefix != NULL)
 	sprintf(addstr,"%s/%s",prefix,tmpstr);
     else
 	sprintf(addstr,"%s",tmpstr);
-    
+
     while(!feof(pathFID)) {
 	if(ragged_array_add_line(&retset,addstr) < 0) {
 	    fprintf(stderr,"Could not add line %i: %s\n",retset.row_count,addstr);

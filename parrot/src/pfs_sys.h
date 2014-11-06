@@ -116,7 +116,7 @@ int		pfs_search( const char *path, const char *pattern, int flags, char *buffer,
 pfs_size_t	pfs_mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
 int		pfs_mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
 int		pfs_mmap_delete( pfs_size_t logical_address, pfs_size_t length );
- 
+
 #ifdef __cplusplus
 }
 #endif

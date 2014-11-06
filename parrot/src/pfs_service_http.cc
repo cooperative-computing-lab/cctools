@@ -93,7 +93,7 @@ public:
 			errno = EROFS;
 			return 0;
 		}
- 
+
 		link = http_fetch(name,"GET",&size);
 		if(link) {
 			return new pfs_file_http(name,link,size);
@@ -115,7 +115,7 @@ public:
 			return 0;
 		} else {
 			return -1;
-		}	
+		}
 	}
 
 	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {

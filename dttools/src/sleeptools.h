@@ -10,7 +10,7 @@ See the file COPYING for details.
 
 #include <time.h>
 
-/** @file sleeptools.h 
+/** @file sleeptools.h
 Sleep for a specified amount of time.
 Note that the standard Unix sleep() may be interrupted for a number of reasons.
 These routines will retry sleep() until the desired condition is reached.

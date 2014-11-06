@@ -17,7 +17,7 @@ void opts_write_port_file(const char *port_file, const int port)
 {
 	if(port_file) {
 		FILE *file = fopen(port_file,"w");
-	
+
 		if(!file)
 			fatal("couldn't write to %s: %s\n", port_file, strerror(errno));
 

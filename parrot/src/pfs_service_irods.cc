@@ -113,7 +113,7 @@ public:
 		} else {
 			return dir;
 		}
-		
+
 	}
 
 	virtual int statfs( pfs_name *name, struct pfs_statfs *info ) {
@@ -176,7 +176,7 @@ public:
 				errno = ENOTDIR;
 				result = -1;
 			}
-		}	
+		}
 		return result;
 	}
 

@@ -120,11 +120,11 @@ int main(int argc, char ** argv)
 		int start2 = 0;
 		char* tmp = strdup(s2->metadata);
 		int metadata_valid = 0;
-		
+
 		char* token = strtok(tmp, "	 ");
 		start2 = atoi(token);
 		metadata_valid++;
-		while((token = strtok(NULL, "	 "))) 
+		while((token = strtok(NULL, "	 ")))
 		{
 			dir = start1;
 			start1 = start2;
@@ -177,8 +177,8 @@ int main(int argc, char ** argv)
 		if(aln->quality <= min_qual) {
 			if(!strcmp(output_format,"ovl")) {
 				overlap_write_v5(stdout, aln, s1->name, s2->name);
-			} else if(!strcmp(output_format, "ovl_new")) { 
-				overlap_write_v7(stdout, aln, s1->name, s2->name); 
+			} else if(!strcmp(output_format, "ovl_new")) {
+				overlap_write_v7(stdout, aln, s1->name, s2->name);
 			} else if(!strcmp(output_format,"matrix")) {
 				printf("*** %s alignment of sequences %s and %s (quality %lf):\n\n",align_type,s1->name,s2->name,aln->quality);
 				matrix_print(m,s1->data,s2->data);
@@ -190,7 +190,7 @@ int main(int argc, char ** argv)
 				exit(1);
 			}
 		}
-		
+
 		matrix_delete(m);
 		seq_free(s2);
 		alignment_delete(aln);

@@ -31,7 +31,7 @@ struct work_queue_process * work_queue_process_create( int taskid )
 		return 0;
 	}
 
-	
+
 	return p;
 }
 
@@ -61,7 +61,7 @@ static const char task_output_template[] = "./worker.stdout.XXXXXX";
 pid_t work_queue_process_execute( struct work_queue_process *p )
 {
 	fflush(NULL); /* why is this necessary? */
-	
+
 	p->output_file_name = strdup(task_output_template);
 	p->output_fd = mkstemp(p->output_file_name);
 	if (p->output_fd == -1) {
@@ -72,13 +72,13 @@ pid_t work_queue_process_execute( struct work_queue_process *p )
 	p->execution_start = timestamp_get();
 
 	p->pid = fork();
-	
+
 	if(p->pid > 0) {
 		// Make child process the leader of its own process group. This allows
 		// signals to also be delivered to processes forked by the child process.
-		// This is currently used by kill_task(). 
-		setpgid(p->pid, 0); 
-		
+		// This is currently used by kill_task().
+		setpgid(p->pid, 0);
+
 		debug(D_WQ, "started process %d: %s", p->pid, p->task->command_line);
 		return p->pid;
 	} else if(p->pid < 0) {
@@ -90,7 +90,7 @@ pid_t work_queue_process_execute( struct work_queue_process *p )
 		if(chdir(p->sandbox)) {
 			fatal("could not change directory into %s: %s", p->sandbox, strerror(errno));
 		}
-		
+
 		int fd = open("/dev/null", O_RDONLY);
 		if (fd == -1) fatal("could not open /dev/null: %s", strerror(errno));
 		int result = dup2(fd, STDIN_FILENO);
@@ -112,19 +112,19 @@ pid_t work_queue_process_execute( struct work_queue_process *p )
 
 void  work_queue_process_kill( struct work_queue_process *p )
 {
-	//make sure a few seconds have passed since child process was created to avoid sending a signal 
-	//before it has been fully initialized. Else, the signal sent to that process gets lost.	
+	//make sure a few seconds have passed since child process was created to avoid sending a signal
+	//before it has been fully initialized. Else, the signal sent to that process gets lost.
 	timestamp_t elapsed_time_execution_start = timestamp_get() - p->execution_start;
-	
+
 	if (elapsed_time_execution_start/1000000 < 3)
-		sleep(3 - (elapsed_time_execution_start/1000000));	
-	
+		sleep(3 - (elapsed_time_execution_start/1000000));
+
 	debug(D_WQ, "terminating task %d pid %d",p->task->taskid,p->pid);
 
 	// Send signal to process group of child which is denoted by -ve value of child pid.
-	// This is done to ensure delivery of signal to processes forked by the child. 
+	// This is done to ensure delivery of signal to processes forked by the child.
 	kill((-1*p->pid), SIGKILL);
-	
+
 	// Reap the child process to avoid zombies.
 	waitpid(p->pid, NULL, 0);
 }

@@ -23,11 +23,11 @@ int main(int argc, char** argv) {
     char event[256];
     int j, k;
     int tjobs = atoi(argv[2]);
-        
-    sprintf(command,"condor_userlog_job_counter %s",argv[1]); 
+
+    sprintf(command,"condor_userlog_job_counter %s",argv[1]);
     statusPipe = popen(command, "r");
     if(statusPipe == NULL) {fprintf(stderr,"Popen failed!\n"); return 1;}
-    
+
     while(!feof(statusPipe)) {
 	//fscanf(fname,"%c",&in);
 	k = fscanf(statusPipe, " Log event: %s",event);

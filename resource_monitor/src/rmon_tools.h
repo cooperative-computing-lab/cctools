@@ -57,9 +57,9 @@ struct rmDsummary
 	double  total_processes;
 	double  max_concurrent_processes;
 	double  cpu_time;
-	double  virtual_memory; 
-	double  resident_memory; 
-	double  swap_memory; 
+	double  virtual_memory;
+	double  resident_memory;
+	double  swap_memory;
 	double  bytes_read;
 	double  bytes_written;
 	double  workdir_num_files;

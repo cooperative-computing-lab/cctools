@@ -102,7 +102,7 @@ static void log_select( struct nvpair_database *db )
 	char filename[NVPAIR_LINE_MAX];
 	sprintf(filename,"%s/%d",db->logdir,db->logyear);
 	mkdir(filename,0777);
-	
+
 	// Open the new file.
 	sprintf(filename,"%s/%d/%d.log",db->logdir,db->logyear,db->logday);
 	db->logfile = fopen(filename,"a");
@@ -120,12 +120,12 @@ static void log_select( struct nvpair_database *db )
 
 static void log_time( struct nvpair_database *db )
 {
-	time_t current = time(0);	
+	time_t current = time(0);
 	if(db->last_log_time!=current) {
 		db->last_log_time = current;
 		fprintf(db->logfile,"T %ld\n",(long)current);
 	}
-} 
+}
 
 /* Log an event indicating that an object was created, followed by the list of values. */
 
@@ -161,7 +161,7 @@ static void log_updates( struct nvpair_database *db, const char *key, struct nvp
 		if(bvalue) {
 			if(!strcmp(avalue,bvalue)) {
 				// items match, do nothing.
-			} else { 
+			} else {
 				log_time(db);
 				fprintf(db->logfile,"U %s %s %s\n",key,name,bvalue);
 			}
@@ -182,7 +182,7 @@ static void log_updates( struct nvpair_database *db, const char *key, struct nvp
 			fprintf(db->logfile,"U %s %s %s\n",key,name,bvalue);
 		}
 	}
-} 
+}
 
 /* Log an event indicating an entire object was deleted. */
 
@@ -209,7 +209,7 @@ static int log_replay( struct nvpair_database *db, const char *filename, time_t 
 {
 	FILE *file = fopen(filename,"r");
 	if(!file) return 0;
-	
+
 	time_t current = 0;
 	struct nvpair *nv;
 
@@ -218,7 +218,7 @@ static int log_replay( struct nvpair_database *db, const char *filename, time_t 
 	char name[NVPAIR_LINE_MAX];
 	char value[NVPAIR_LINE_MAX];
 	char oper;
-	
+
 	while(fgets(line,sizeof(line),file)) {
 
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
@@ -252,7 +252,7 @@ static int log_replay( struct nvpair_database *db, const char *filename, time_t 
 				break;
 		}
 	}
-	
+
 	fclose(file);
 
 	return 1;
@@ -265,7 +265,7 @@ Returns true if successful, false if files could not be played.
 */
 
 static int log_recover( struct nvpair_database *db, time_t snapshot )
-{      
+{
 	char filename[NVPAIR_LINE_MAX];
 
 	struct tm *t = gmtime(&snapshot);
@@ -303,7 +303,7 @@ struct nvpair_database * nvpair_database_create( const char *logdir )
 	}
 
 	return db;
-} 
+}
 
 void nvpair_database_insert( struct nvpair_database *db, const char *key, struct nvpair *nv )
 {
@@ -315,18 +315,18 @@ void nvpair_database_insert( struct nvpair_database *db, const char *key, struct
 		if(old) {
 			log_updates(db,key,old,nv);
 			nvpair_delete(old);
-		} else { 
+		} else {
 			log_create(db,key,nv);
 		}
 	}
 
 	log_flush(db);
-} 
+}
 
 struct nvpair * nvpair_database_lookup( struct nvpair_database *db, const char *key )
 {
 	return hash_table_lookup(db->table,key);
-} 
+}
 
 struct nvpair * nvpair_database_remove( struct nvpair_database *db, const char *key )
 {
@@ -338,7 +338,7 @@ struct nvpair * nvpair_database_remove( struct nvpair_database *db, const char *
 		log_flush(db);
 	}
 	return nv;
-} 
+}
 
 void nvpair_database_firstkey( struct nvpair_database *db )
 {

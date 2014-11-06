@@ -33,7 +33,7 @@ See the file COPYING for details.
  * filesystem. Each field is separated by \t.
  *
  * Currently, the columns are:
- * 
+ *
  * wall:          wall time (in usecs).
  * no.proc:       number of processes
  * cpu-time:      user-mode time + kernel-mode time.
@@ -62,7 +62,7 @@ See the file COPYING for details.
  *
  * The process tree is summarized from the struct *_info into
  * struct rmsummary. For each time interval there are three
- * struct rmsummary: current, maximum, and minimum. 
+ * struct rmsummary: current, maximum, and minimum.
  *
  * Grandchildren processes are tracked via the helper library,
  * which wraps the family of fork functions.
@@ -151,7 +151,7 @@ See the file COPYING for details.
 #define RESOURCES_EXCEEDED_EXIT_CODE 147
 
 #define ONE_MEGABYTE 1048576  /* this many bytes */
-#define ONE_SECOND   1000000  /* this many usecs */    
+#define ONE_SECOND   1000000  /* this many usecs */
 
 #define DEFAULT_INTERVAL       ONE_SECOND        /* in useconds */
 
@@ -183,12 +183,12 @@ struct itable *wdirs_rc;        /* Counts how many process_info use a wdir_info.
 struct itable *filesys_rc;      /* Counts how many wdir_info use a filesys_info. */
 
 
-char *lib_helper_name = NULL;  /* Name of the helper library that is 
+char *lib_helper_name = NULL;  /* Name of the helper library that is
                                   automatically extracted */
 
 int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
                                    helper library was automatically extracted
-                                   */ 
+                                   */
 
 #if defined(CCTOOLS_OPSYS_FREEBSD)
 kvm_t *kd_fbsd;
@@ -198,14 +198,14 @@ struct rmsummary *summary;
 struct rmsummary *resources_limits;
 struct rmsummary *resources_flags;
 
-/*** 
+/***
  * Utility functions (open log files, proc files, measure time)
  ***/
 
 uint64_t usecs_since_epoch()
 {
     uint64_t usecs;
-    struct timeval time; 
+    struct timeval time;
 
     gettimeofday(&time, NULL);
 
@@ -323,7 +323,7 @@ int dec_fs_count(struct filesys_info *f)
     {
         debug(D_DEBUG, "filesystem %d is not monitored anymore.\n", f->id);
         free(f->path);
-        free(f);    
+        free(f);
     }
 
     return count;
@@ -333,7 +333,7 @@ int inc_wd_count(struct wdir_info *d)
 {
     int count = itable_addto_count(wdirs_rc, d, 1);
 
-    debug(D_DEBUG, "working directory '%s' reference count +1, now %d references.\n", d->path, count); 
+    debug(D_DEBUG, "working directory '%s' reference count +1, now %d references.\n", d->path, count);
 
     return count;
 }
@@ -342,17 +342,17 @@ int dec_wd_count(struct wdir_info *d)
 {
     int count = itable_addto_count(wdirs_rc, d, -1);
 
-    debug(D_DEBUG, "working directory '%s' reference count -1, now %d references.\n", d->path, count); 
+    debug(D_DEBUG, "working directory '%s' reference count -1, now %d references.\n", d->path, count);
 
     if(count < 1)
     {
         debug(D_DEBUG, "working directory '%s' is not monitored anymore.\n", d->path);
 
-        hash_table_remove(wdirs, d->path); 
+        hash_table_remove(wdirs, d->path);
 
         dec_fs_count((void *) d->fs);
         free(d->path);
-        free(d);    
+        free(d);
     }
 
     return count;
@@ -380,7 +380,7 @@ struct filesys_info *lookup_or_create_fs(char *path)
     uint64_t dev_id = get_device_id(path);
     struct filesys_info *inventory = itable_lookup(filesysms, dev_id);
 
-    if(!inventory) 
+    if(!inventory)
     {
         debug(D_DEBUG, "filesystem %"PRId64" added to monitor.\n", dev_id);
 
@@ -398,14 +398,14 @@ struct filesys_info *lookup_or_create_fs(char *path)
 
 struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
 {
-    struct wdir_info *inventory; 
+    struct wdir_info *inventory;
 
     if(strlen(path) < 1 || access(path, F_OK) != 0)
         return previous;
 
     inventory = hash_table_lookup(wdirs, path);
 
-    if(!inventory) 
+    if(!inventory)
     {
         debug(D_DEBUG, "working directory '%s' added to monitor.\n", path);
 
@@ -514,7 +514,7 @@ void monitor_log_row(struct rmsummary *tr)
 		}
 
 		fprintf(log_series, "\n");
-                               
+
 		/* are we going to keep monitoring the whole filesystem? */
 		// fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
 	}
@@ -527,7 +527,7 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 		debug(D_DEBUG, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(wait_status));
 		summary->exit_type = xxstrdup("normal");
 		summary->exit_status = WEXITSTATUS(first_process_sigchild_status);
-	} 
+	}
 	else if ( WIFSIGNALED(wait_status) || WIFSTOPPED(wait_status) )
 	{
 		debug(D_DEBUG, "process %d terminated: %s.\n",
@@ -541,7 +541,7 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 			summary->signal    = WTERMSIG(wait_status);
 		else
 			summary->signal    = WSTOPSIG(wait_status);
-	} 
+	}
 
 	if(summary->limits_exceeded)
 	{
@@ -571,7 +571,7 @@ int monitor_file_io_summaries()
 
 			if(finfo->size_on_close < 0 && stat(fname, &buf) == 0)
 				finfo->size_on_close = buf.st_size;
-			
+
 			fprintf(log_opened, "%-15s\n%-15s ", fname, "");
 			fprintf(log_opened, "%6" PRId64 " %20lld %20lld",
 				finfo->device,
@@ -598,7 +598,7 @@ int monitor_final_summary()
 
 	if(summary->exit_status == 0 && summary->limits_exceeded)
 		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
-	
+
 	if(log_summary)
 	{
 		rmsummary_print(log_summary, summary);
@@ -615,7 +615,7 @@ void monitor_inotify_add_watch(char *filename)
 {
 	/* Perhaps here we can do something more to the files, like a
 	 * final stat */
-	
+
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct file_info *finfo;
 	char **new_inotify_watches;
@@ -646,8 +646,8 @@ void monitor_inotify_add_watch(char *filename)
 	hash_table_insert(files, filename, finfo);
 	if (monitor_inotify_fd >= 0)
 	{
-		if ((iwd = inotify_add_watch(monitor_inotify_fd, 
-					     filename, 
+		if ((iwd = inotify_add_watch(monitor_inotify_fd,
+					     filename,
 					     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|
 					     IN_ACCESS|IN_MODIFY)) < 0)
 		{
@@ -673,7 +673,7 @@ void monitor_inotify_add_watch(char *filename)
 				debug(D_DEBUG, "Out of memory: Removing inotify watch for %s", filename);
 				inotify_rm_watch(monitor_inotify_fd, iwd);
 			}
-		} 
+		}
 	}
 #endif
 }
@@ -691,8 +691,8 @@ int ping_process(pid_t pid)
 void monitor_track_process(pid_t pid)
 {
 	char *newpath;
-	struct process_info *p; 
-    
+	struct process_info *p;
+
 	if(!ping_process(pid))
 		return;
 
@@ -807,7 +807,7 @@ struct rmsummary *monitor_rusage_tree(void)
 /* sigchild signal handler */
 void monitor_check_child(const int signal)
 {
-    uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status, 
+    uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status,
                            WNOHANG | WCONTINUED | WUNTRACED);
 
     if(pid != (uint64_t) first_process_pid)
@@ -829,7 +829,7 @@ void monitor_check_child(const int signal)
 
       switch(WSTOPSIG(first_process_sigchild_status))
       {
-        case SIGTTIN: 
+        case SIGTTIN:
           debug(D_NOTICE, "Process asked for input from the terminal, try the -f option to bring the child process in foreground.\n");
           break;
         case SIGTTOU:
@@ -967,7 +967,7 @@ int monitor_check_limits(struct rmsummary *tr)
 ***/
 
 void write_helper_lib(void)
-{    
+{
     uint64_t n;
 
     lib_helper_name = xxstrdup("librmonitor_helper.so.XXXXXX");
@@ -1020,7 +1020,7 @@ void monitor_handle_inotify(void)
 				if (finfo == NULL) continue;
 				if (evdata[i].mask & IN_ACCESS) (finfo->n_reads)++;
 				if (evdata[i].mask & IN_MODIFY) (finfo->n_writes)++;
-				if ((evdata[i].mask & IN_CLOSE_WRITE) || 
+				if ((evdata[i].mask & IN_CLOSE_WRITE) ||
 				    (evdata[i].mask & IN_CLOSE_NOWRITE))
 				{
 					(finfo->n_closes)++;
@@ -1152,7 +1152,7 @@ int wait_for_messages(int interval)
 /***
  * Functions to fork the very first process. This process is
  * created and suspended before execv, until a SIGCONT is sent
- * from the monitor. 
+ * from the monitor.
 ***/
 
 //Very first process signal handler.
@@ -1263,12 +1263,12 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Include this string verbatim in a line in the summary. \n", "-V,--verbatim-to-summary=<str>");
     fprintf(stdout, "%-30s (Could be specified multiple times.)\n", "");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Do not write the summary log file.\n", "--without-summary-file"); 
-    fprintf(stdout, "%-30s Do not write the time series log file.\n", "--without-time-series"); 
-    fprintf(stdout, "%-30s Do not write the list of opened files.\n", "--without-opened-files"); 
+    fprintf(stdout, "%-30s Do not write the summary log file.\n", "--without-summary-file");
+    fprintf(stdout, "%-30s Do not write the time series log file.\n", "--without-time-series");
+    fprintf(stdout, "%-30s Do not write the list of opened files.\n", "--without-opened-files");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Measure working directory footprint (potentially slow).\n", "--with-disk-footprint"); 
-    fprintf(stdout, "%-30s Do not measure working directory footprint (default).\n", "--without-disk-footprint"); 
+    fprintf(stdout, "%-30s Measure working directory footprint (potentially slow).\n", "--with-disk-footprint");
+    fprintf(stdout, "%-30s Do not measure working directory footprint (default).\n", "--without-disk-footprint");
 }
 
 
@@ -1282,14 +1282,14 @@ int monitor_resources(long int interval /*in microseconds */)
 
     struct rmsummary    *resources_now = calloc(1, sizeof(struct rmsummary));
 
-    // Loop while there are processes to monitor, that is 
+    // Loop while there are processes to monitor, that is
     // itable_size(processes) > 0). The check is done again in a
     // if/break pair below to mitigate a race condition in which
     // the last process exits after the while(...) is tested, but
     // before we reach select.
     round = 1;
     while(itable_size(processes) > 0)
-    { 
+    {
         ping_processes();
 
         monitor_poll_all_processes_once(processes, p_acc);
@@ -1314,7 +1314,7 @@ int monitor_resources(long int interval /*in microseconds */)
         //If no more process are alive, break out of loop.
         if(itable_size(processes) < 1)
             break;
-        
+
         wait_for_messages(interval);
 
         //cleanup processes which by terminating may have awaken
@@ -1376,15 +1376,15 @@ int main(int argc, char **argv) {
 		    {"limits-file",required_argument, 0, 'l'},
 
 		    {"verbatim-to-summary",required_argument, 0, 'V'},
-	
+
 		    {"with-output-files", required_argument, 0,  'O'},
 
 		    {"with-summary-file", required_argument, 0,  0},
-		    {"with-time-series",  required_argument, 0,  1 }, 
+		    {"with-time-series",  required_argument, 0,  1 },
 		    {"with-opened-files", required_argument, 0,  2 },
 
 		    {"without-summary",      no_argument, 0, 3},
-		    {"without-time-series",  no_argument, 0, 4}, 
+		    {"without-time-series",  no_argument, 0, 4},
 		    {"without-opened-files", no_argument, 0, 5},
 
 		    {"with-disk-footprint",    no_argument, 0, 6},
@@ -1541,7 +1541,7 @@ int main(int argc, char **argv) {
     processes = itable_create(0);
     wdirs     = hash_table_create(0,0);
     filesysms = itable_create(0);
-    files     = hash_table_create(0,0); 
+    files     = hash_table_create(0,0);
 
     wdirs_rc   = itable_create(0);
     filesys_rc = itable_create(0);
@@ -1560,7 +1560,7 @@ int main(int argc, char **argv) {
     summary->command = xxstrdup(command_line);
     summary->start   = usecs_since_epoch();
 
-    
+
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
     if(log_opened)
     {

@@ -348,10 +348,10 @@ static int log_play( struct deltadb *db  )
 	void *sp;
 	void *valp;
 	int finishUp = 0;
-	
+
 	while(1) {
 		line_number += 1;
-		
+
 		if (fgets(line,sizeof(line),stream)){
 			//debug(D_NOTICE,"Processed line: %s",line);
 			int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);

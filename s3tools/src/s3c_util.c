@@ -89,10 +89,10 @@ int sign_message(struct s3_message* mesg, const char* user, const char * key) {
 	memset(string, 0, SHA1_DIGEST_LENGTH*2);
 
 	switch(mesg->type) {
-		case S3_MESG_GET: 
+		case S3_MESG_GET:
 			sign_str_len += 4;
 			break;
-		case S3_MESG_POST: 
+		case S3_MESG_POST:
 			sign_str_len += 5;
 			break;
 		case S3_MESG_PUT:
@@ -119,7 +119,7 @@ int sign_message(struct s3_message* mesg, const char* user, const char * key) {
 	strftime(date, 1024, "%a, %d %b %Y %H:%M:%S %Z", gmtime(&mesg->date));
 	sign_str_len += strlen(date) + 1;
 
-	if(mesg->amz_headers) {	
+	if(mesg->amz_headers) {
 		list_first_item(mesg->amz_headers);
 		while( (amz = (struct s3_header_object *)list_next_item(mesg->amz_headers)) ) {
 			if(amz->type < S3_HEADER_CUSTOM) continue;
@@ -140,16 +140,16 @@ int sign_message(struct s3_message* mesg, const char* user, const char * key) {
 		return -1;
 	}
 	sign_str_len += 1 + strlen(mesg->bucket) + 1 + strlen(mesg->path) + 1;
-	
+
 	sign_str = malloc(sign_str_len);
 	if(!sign_str) return -1;
 	memset(sign_str, 0, sign_str_len);
 
 	switch(mesg->type) {
-		case S3_MESG_GET: 
+		case S3_MESG_GET:
 			sprintf(sign_str, "GET\n");
 			break;
-		case S3_MESG_POST: 
+		case S3_MESG_POST:
 			sprintf(sign_str, "POST\n");
 			break;
 		case S3_MESG_PUT:
@@ -211,33 +211,33 @@ struct link * s3_send_message(struct s3_message *mesg, struct link *server, time
 	char *message_text;
 	char address[16];
 	int message_length, data_sent;
-	
+
 	if(!server) {
 		if(!domain_name_cache_lookup(s3_endpoint, address))
 			return NULL;
 
 		server = link_connect(address, 80, stoptime);
 	}
-	
+
 	if(!server)
 		return NULL;
 
 	message_length = s3_message_to_string(mesg, &message_text);
-	
+
 	if(message_length <= 0) {
 		link_close(server);
 		return NULL;
 	}
-	
+
 	data_sent = link_write(server, message_text, message_length, stoptime);
 	debug(D_TCP, "S3 Message Sent:\n%s\n", message_text);
 	free(message_text);
-	
+
 	if(data_sent < message_length) {
 		link_close(server);
 		server = NULL;
 	}
-	
+
 	return server;
 }
 
@@ -248,10 +248,10 @@ int s3_message_to_string(struct s3_message *mesg, char** text) {
 	struct s3_header_object *amz;
 
 	switch(mesg->type) {
-		case S3_MESG_GET: 
+		case S3_MESG_GET:
 			msg_str_len = 4 + 11;
 			break;
-		case S3_MESG_POST: 
+		case S3_MESG_POST:
 			msg_str_len = 5 + 11;
 			break;
 		case S3_MESG_PUT:
@@ -332,10 +332,10 @@ int s3_message_to_string(struct s3_message *mesg, char** text) {
 	memset(msg_str, 0, msg_str_len);
 
 	switch(mesg->type) {
-		case S3_MESG_GET: 
+		case S3_MESG_GET:
 			sprintf(msg_str, "GET ");
 			break;
-		case S3_MESG_POST: 
+		case S3_MESG_POST:
 			sprintf(msg_str, "POST ");
 			break;
 		case S3_MESG_PUT:
@@ -377,7 +377,7 @@ int s3_message_to_string(struct s3_message *mesg, char** text) {
 	if(mesg->expect) sprintf(msg_str, "%sExpect: 100-continue\r\n", msg_str);
 	sprintf(msg_str, "%s\r\n", msg_str);
 	*text = msg_str;
-	
+
 	return msg_str_len;
 
 }

@@ -10,19 +10,19 @@
 uint64_t write_h_file(char *path_h, char *str_var, char *path_lib)
 {
 	FILE *fh, *fl;
-	struct stat buf;	
+	struct stat buf;
 	unsigned char *lib_data;
 	int empty = 0;
-	int n;  
+	int n;
 
 	if(!path_lib || stat(path_lib, &buf) != 0 || !(fl = fopen(path_lib, "r")))
 	{
 		n = 0;
 		empty = 1;
-	}	
+	}
 	else
 		n = buf.st_size;
-			
+
 	fh = fopen(path_h,   "w");
 	if(!fh)
 	{

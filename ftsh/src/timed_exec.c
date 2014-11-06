@@ -86,7 +86,7 @@ timed_exec_t timed_exec( int line, const char *path, char **argv, int fds[3], pi
 		close(pfds[1]);
 		actual = full_read(pfds[0],&child_errno,sizeof(int));
 		close(pfds[0]);
-	
+
 		*status = s.status;
 		*pid = s.pid;
 

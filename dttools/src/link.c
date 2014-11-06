@@ -187,7 +187,7 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, sigse
 	}
 
 	if(reading && link->buffer_length) {
-		return 1;		
+		return 1;
 	}
 
 	while (1) {
@@ -196,11 +196,11 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, sigse
 
 		if (reading) pfd.events = POLLIN;
 		if (writing) pfd.events = POLLOUT;
-		
+
 		sigprocmask(SIG_UNBLOCK, mask, &cmask);
 		result = poll(&pfd, 1, msec);
 		sigprocmask(SIG_SETMASK, &cmask, NULL);
-		
+
 		if (result > 0) {
 			if (reading && (pfd.revents & POLLIN)) {
 				return 1;
@@ -261,7 +261,7 @@ int link_usleep_mask(struct link *link, int usec, sigset_t *mask, int reading, i
 
 	tm.tv_sec = 0;
 	tm.tv_usec = usec;
-	
+
 	if(!mask) {
 		sigemptyset(&emptymask);
 		mask = &emptymask;
@@ -312,7 +312,7 @@ struct link *link_attach_to_file(FILE *f)
 {
 	struct link *l = link_create();
 	int fd = fileno(f);
-	
+
 	if(fd < 0) {
 		link_close(l);
 		return NULL;
@@ -326,7 +326,7 @@ struct link *link_attach_to_file(FILE *f)
 struct link *link_attach_to_fd(int fd)
 {
 	struct link *l = link_create();
-	
+
 	if(fd < 0) {
 		link_close(l);
 		return NULL;
@@ -396,11 +396,11 @@ struct link *link_serve_address(const char *addr, int port)
 		if(success == -1) {
 			if(errno == EADDRINUSE) {
 				//If a port is specified, fail!
-				if (low == high) { 
+				if (low == high) {
 					goto failure;
-				} else {	
+				} else {
 					continue;
-				}	
+				}
 			} else {
 				goto failure;
 			}

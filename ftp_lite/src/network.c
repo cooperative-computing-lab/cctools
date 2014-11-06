@@ -155,7 +155,7 @@ int network_connect_local( const char *path )
 		close(fd);
 		return -1;
 	}
-        
+
 	return fd;
 }
 
@@ -175,7 +175,7 @@ int network_tune( int fd, network_tune_mode mode )
 			return 0;
 	}
 
-	success = setsockopt( fd, IPPROTO_TCP, TCP_NODELAY, (void*)&onoff, sizeof(onoff) ); 
+	success = setsockopt( fd, IPPROTO_TCP, TCP_NODELAY, (void*)&onoff, sizeof(onoff) );
 	if(success!=0) return 0;
 
 	return 1;
@@ -299,7 +299,7 @@ void network_close( int fd )
 int network_address_local( int fd, network_address *host, int *port )
 {
 	struct sockaddr_in addr;
-	SOCKLEN_T length;  
+	SOCKLEN_T length;
 	int result;
 
 	length = sizeof(addr);
@@ -335,7 +335,7 @@ int network_address_remote( int fd, network_address *host, int *port )
 		*host = ntohl(addr.sin_addr.s_addr);
 	}
 
-	return 1; 
+	return 1;
 }
 
 void network_address_to_string( network_address addr, char *str )
@@ -438,7 +438,7 @@ static int network_nameaddr_init()
 
 	/*
 	An improperly configured machine may have the loopback
-	address (127.0.0.1) bound to the hostname, which gives us a 
+	address (127.0.0.1) bound to the hostname, which gives us a
 	practically unusable address.  Warn once if this happens.
 	*/
 

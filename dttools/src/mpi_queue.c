@@ -64,7 +64,7 @@ struct mpi_queue {
 	INT64_T total_task_time;
 	INT64_T total_bytes_sent;
 	INT64_T total_bytes_received;
-	
+
 	timestamp_t total_send_time;
 	timestamp_t total_receive_time;
 };
@@ -214,19 +214,19 @@ void mpi_queue_delete(struct mpi_queue *q)
 	if(q) {
 		UINT64_T key;
 		void *value;
-		
+
 		list_free(q->ready_list);
 		list_delete(q->ready_list);
 		list_free(q->complete_list);
 		list_delete(q->complete_list);
-		
+
 		itable_firstkey(q->active_list);
 		while(itable_nextkey(q->active_list, &key, &value)) {
 			free(value);
 			itable_remove(q->active_list, key);
 		}
 		itable_delete(q->active_list);
-		
+
 		link_close(q->master_link);
 		free(q);
 	}
@@ -269,7 +269,7 @@ int mpi_queue_submit(struct mpi_queue *q, struct mpi_queue_task *t)
 
 	//Increment taskid. So we get a unique taskid for every submit.
 	t->taskid = next_taskid++;
-	
+
 	/* Then, add it to the ready list and mark it as submitted. */
 	list_push_tail(q->ready_list, t);
 	t->submit_time = timestamp_get();
@@ -320,7 +320,7 @@ int get_results(struct link *mpi_link, struct itable *active_list, struct list *
 	while(n++ < num_results && link_readline(mpi_link, line, sizeof(line), stoptime)) {
 		struct mpi_queue_task *t;
 		int taskid, status, result, result_length;
-		
+
 		sscanf(line, "result %d %d %d %d", &taskid, &status, &result, &result_length);
 		t = itable_remove(active_list, taskid);
 		if(!t) {

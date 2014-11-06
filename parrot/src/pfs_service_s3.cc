@@ -177,7 +177,7 @@ public:
 			int fd;
 			local_name = new char[L_tmpnam];
 			strcpy(local_name, "local_name-XXXXXX");
-			fd = mkstemp(local_name); 
+			fd = mkstemp(local_name);
 			close(fd);               // Ensures the local_name is reserved.
 
 			hash_table_insert(s3_file_cache, path, local_name);
@@ -226,7 +226,7 @@ public:
 		struct list *dirents;
 		struct s3_dirent_object *d;
 		char bucket[PFS_PATH_MAX];
-		
+
 		if(!pfs_password_cache) {
 			errno = EACCES;
 			return NULL;

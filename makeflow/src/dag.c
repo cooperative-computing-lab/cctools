@@ -191,7 +191,7 @@ const char *dag_file_local_name(struct dag_node *n, const char *filename)
 	const char *name;
 
 	f = hash_table_lookup(n->remote_names_inv, filename);
-	
+
 	if(!f)
 	{
 		name =  NULL;
@@ -666,7 +666,7 @@ void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
 		 * short running tasks, while having the desired effect for long
 		 * running workflows. */
 
-		fsync(fileno(d->logfile)); 
+		fsync(fileno(d->logfile));
 		last_fsync = time(NULL);
 	}
 }
@@ -844,7 +844,7 @@ char *dag_task_resources_wrap_as_condor_options(struct dag_node *n, const char *
 	}
 
 	/* else, requirements have been specified also at default_options*/
-	char *equal_sign = strchr(req_pos, '='); 
+	char *equal_sign = strchr(req_pos, '=');
 	if(!equal_sign)
 	{
 	/* Possibly malformed, not much we can do. */
@@ -852,8 +852,8 @@ char *dag_task_resources_wrap_as_condor_options(struct dag_node *n, const char *
 		free(scratch);
 		return xxstrdup(default_options);
 	}
-	
-	char *newline = strchr(scratch, '\n'); 
+
+	char *newline = strchr(scratch, '\n');
 	if(!newline)
 		newline = (scratch + strlen(default_options) - 1); /* end of string */
 

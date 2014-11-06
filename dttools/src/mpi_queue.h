@@ -83,14 +83,14 @@ Users may modify the behavior of @ref mpi_queue_create by setting the following 
 - <b>MPI_QUEUE_PORT</b>: This sets the default port of the queue (if unset, the default is 9123).
 - <b>MPI_QUEUE_LOW_PORT</b>: If the user requests a random port, then this sets the first port number in the scan range (if unset, the default is 1024).
 - <b>MPI_QUEUE_HIGH_PORT</b>: If the user requests a random port, then this sets the last port number in the scan range (if unset, the default is 32767).
-- <b>MPI_QUEUE_NAME</b>: This sets the project name of the queue, which is reported to a catalog server (by default this is unset).  
+- <b>MPI_QUEUE_NAME</b>: This sets the project name of the queue, which is reported to a catalog server (by default this is unset).
 - <b>MPI_QUEUE_PRIORITY</b>: This sets the priority of the queue, which is used by workers to sort masters such that higher priority masters will be served first (if unset, the default is 10).
 
 If the queue has a project name, then queue statistics and information will be
 reported to a catalog server.  To specify the catalog server, the user may set
 the <b>CATALOG_HOST</b> and <b>CATALOG_PORT</b> environmental variables as described in @ref catalog_query_create.
 
-@param port The port number to listen on.  If zero is specified, then the default is chosen, and if -1 is specified, a random port is chosen.  
+@param port The port number to listen on.  If zero is specified, then the default is chosen, and if -1 is specified, a random port is chosen.
 @return A new work queue, or null if it could not be created.
 */
 struct mpi_queue *mpi_queue_create(int port);

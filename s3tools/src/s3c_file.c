@@ -128,7 +128,7 @@ int s3_get_file(const char* localname, struct s3_dirent_object *dirent, char* re
 	server = s3_send_message(&mesg, NULL, stoptime);
 	if(!server)
 		return -1;
-	
+
 	//length = s3_message_to_string(&mesg, &text);
 
 	//link_putlstring(server, text, length, stoptime);

@@ -315,7 +315,7 @@ If short_path is an absolute path, copy it to full path.
 Otherwise, tack the current directory on to the front
 of short_path, and copy it to full_path.
 */
- 
+
 void pfs_table::complete_path( const char *short_path, char *full_path )
 {
 	if( short_path[0]=='/' ) {
@@ -379,7 +379,7 @@ void pfs_table::follow_symlink( struct pfs_name *pname, int depth )
 				int dirname_len = basename_start - pname->path;
 				snprintf(absolute_link_target,
 					PFS_PATH_MAX, "%*.*s%s",
-					dirname_len, dirname_len, pname->path, 
+					dirname_len, dirname_len, pname->path,
 					link_target);
 				name_to_resolve = absolute_link_target;
 			}
@@ -477,7 +477,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 			} else {
 				path_split(tmp,pname->host,pname->rest);
 			}
-			
+
 			if(!pname->host[0]) {
 				pname->hostport[0] = 0;
 				pname->rest[0] = 0;
@@ -491,7 +491,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 				pname->port = pname->service->get_default_port();
 			}
 			sprintf(pname->hostport,"%s:%d",pname->host,pname->port);
-		
+
 			if(!strcmp(pname->service_name,"multi")) {
 				strcpy(tmp,pname->rest);
 				path_split(tmp,&pname->hostport[strlen(pname->hostport)],pname->rest); // reconstruct hostport as host:port@volume; path goes in rest.
@@ -1834,7 +1834,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 
 	int done = 0;
 
-	do {	
+	do {
 		if (strlen(start)==0) break;
 
 		char path[PFS_PATH_MAX+1];
@@ -1913,7 +1913,7 @@ int pfs_table::search( const char *paths, const char *patt, int flags, char *buf
 					result = search_directory(this, directory+strlen(directory), directory, pattern, flags, buffer, buffer_length, i);
 				}
 				debug(D_DEBUG, "= %d (`%s' search)", result, pname.service_name);
-			} else 
+			} else
 				result = -1;
 		}
 
@@ -1958,16 +1958,16 @@ int pfs_table::locate( const char *n, char *buf, int length )
 	pfs_name pname;
 
 	debug(D_SYSCALL, "locating \"%s\"", n);
-	
+
 	if(n && strlen(n)) {
 		if(loc) delete(loc);
 		loc = 0;
-		
+
 		if(resolve_name(0, n, &pname)) {
 			loc = pname.service->locate(&pname);
 		}
 	}
-	
+
 	if(loc) {
 		int result = 0;
 		char path[PFS_PATH_MAX];
@@ -2324,7 +2324,7 @@ int pfs_table::mmap_delete( pfs_size_t logical_addr, pfs_size_t length )
 	This happens particularly for anonymous mmaps, which are not recorded here.
 	In this case, simply return succcess;
 	*/
-	
+
 	return 0;
 }
 

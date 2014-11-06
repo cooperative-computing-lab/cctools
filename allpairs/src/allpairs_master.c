@@ -72,7 +72,7 @@ static void show_help(const char *cmd)
 /*
 Run the comparison program repeatedly until five seconds have elapsed,
 in order to get a rough measurement of the execution time.
-No very accurate for embedded functions. 
+No very accurate for embedded functions.
 */
 
 double estimate_run_time( struct text_list *seta, struct text_list *setb )
@@ -105,7 +105,7 @@ double estimate_run_time( struct text_list *seta, struct text_list *setb )
 			fast_pclose(file);
 
 			stoptime = timestamp_get();
-		
+
 			if(stoptime-starttime>5000000) break;
 		}
 		if(stoptime-starttime>5000000) break;
@@ -162,7 +162,7 @@ char * text_list_string( struct text_list *t, int a, int b )
 	char *buffer = malloc(buffer_size);
 	int buffer_pos = 0;
 	int i;
-		
+
 	for(i=a;i<b;i++) {
 		const char *str = text_list_get(t,i);
 		if(!str) break;
@@ -220,7 +220,7 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 	buf = text_list_string(seta,xcurrent,xcurrent+xblock);
 	if(!work_queue_task_specify_buffer(task,buf,strlen(buf),"A",WORK_QUEUE_NOCACHE)) {
 		free(buf);
-		return 0;		
+		return 0;
 	}
 
 	free(buf);
@@ -230,9 +230,9 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 		free(buf);
 		return 0;
 	}
-	
+
 	free(buf);
-	
+
 	for(x=xcurrent;x<(xcurrent+xblock);x++) {
 		name = text_list_get(seta,x);
 		if(!name) break;
@@ -402,7 +402,7 @@ int main(int argc, char **argv)
 	}
 
 	debug(D_DEBUG,"using multicore executable %s",allpairs_multicore_program);
-	
+
 	xstop = text_list_size(seta);
 	ystop = text_list_size(setb);
 
@@ -446,7 +446,7 @@ int main(int argc, char **argv)
 		opts_write_port_file(port_file, port);
 
 	if(wqstats_filename)
-		work_queue_specify_log(q, wqstats_filename);	
+		work_queue_specify_log(q, wqstats_filename);
 
 	// advanced work queue options
 	work_queue_specify_master_mode(q, work_queue_master_mode);

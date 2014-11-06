@@ -273,7 +273,7 @@ INT64_T chirp_reli_putfile_buffer(const char *host, const char *path, const char
 Performs a search operation on the Chirp server and stores its results to be read via readsearch
 @param host The name and port of the Chirp server to access.
 @param paths The pathnames of the directories to search.
-@param pattern The pattern to search for 
+@param pattern The pattern to search for
 @param flags Bit flags controlling various aspects of the search
 @param stoptime The absolute time at which to abort.
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
@@ -380,7 +380,7 @@ INT64_T chirp_reli_setacl(const char *host, const char *path, const char *subjec
 
 INT64_T chirp_reli_resetacl(const char *host, const char *path, const char *rights, time_t stoptime);
 
-/** Identify the true location of a path. 
+/** Identify the true location of a path.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the file to locate.
 @param callback A function to call for each location of the file.
@@ -629,7 +629,7 @@ Sets the number of replicas desired for the indicated file or for all newly crea
 This only has an effect if the server backend supports replication, currently only with HDFS.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the file to modify.  If the pathname is <tt>"@@@"</tt>, then this call sets the replication factor for all files created by this process.
-@param nreps The number of replicas desired.  Zero indicates the server should use the default replication value. 
+@param nreps The number of replicas desired.  Zero indicates the server should use the default replication value.
 @param stoptime The absolute time at which to abort.
 @return On success, returns greater than or equal to zero.  On failure, returns less than zero  and sets errno.
 */

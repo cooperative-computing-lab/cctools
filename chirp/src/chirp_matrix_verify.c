@@ -580,7 +580,7 @@ int main(int argc, char *argv[])
 
 
 			rval = (double) compare_two_files(param_fileA, param_fileB);
-			//printf(" compare: %s and %s \nresult: %f, while in matrix[%d] it was: %f\n", param_fileA, param_fileB, rval, cntr, resbuff[cntr]);            
+			//printf(" compare: %s and %s \nresult: %f, while in matrix[%d] it was: %f\n", param_fileA, param_fileB, rval, cntr, resbuff[cntr]);
 			if(rval != resbuff[cntr]) {
 				printf("Verification failed at [%d, %d] !\n", x1 + setACount, y1 + setBCount);
 				exit(0);
@@ -681,7 +681,7 @@ INT64_T get_local_path(char *local_path, char *path, time_t stoptime)
 	debug(D_CHIRP, "chirp_path: %s\n", chirp_path);
 	debug(D_CHIRP, "local_path before resolve: %s\n", local_path);
 
-	// get local path for the given chirp path on current machine   
+	// get local path for the given chirp path on current machine
 	retval = chirp_reli_localpath(hostname, chirp_path, local_path, CHIRP_PATH_MAX, stoptime);
 	if(retval < 0) {
 		return retval;

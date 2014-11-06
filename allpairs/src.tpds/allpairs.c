@@ -108,7 +108,7 @@ static INT64_T do_put_one_dir( const char *source_file, const char *target_host,
 	work_list = list_create();
 
 	result = chirp_reli_mkdir(target_host,target_file,mode,stoptime);
-		
+
 	if(result==0 || errno==EEXIST ) {
 		result = 0;
 		dir = opendir(source_file);
@@ -264,7 +264,7 @@ struct ragged_array predist_hosts(double constraint) {
     const char * catalog_host = 0;
     int i;
     int count=0;
-    
+
     struct nvpair *table[10000];
     INT64_T minavail=constraint;
 
@@ -275,7 +275,7 @@ struct ragged_array predist_hosts(double constraint) {
 
     struct ragged_array retset = ragged_array_initialize(10);
     if(retset.array_size == 0) {fprintf(stderr,"Allocating set failed!\n"); return nullset;}
-    
+
     stoptime = time(0)+timeout;
 
     q = catalog_query_create(catalog_host,0,stoptime);
@@ -308,7 +308,7 @@ struct ragged_array predist_hosts(double constraint) {
 	    }
 	}
     }
-	
+
     return retset;
 }
 
@@ -316,7 +316,7 @@ struct ragged_array postdist_hosts(FILE* fd) {
 
     int len = MAXRESULTLINE;
     char* line;
-    
+
     struct ragged_array nullset;
     nullset.arr = NULL;
     nullset.row_count = 0;
@@ -324,7 +324,7 @@ struct ragged_array postdist_hosts(FILE* fd) {
 
     struct ragged_array retset = ragged_array_initialize(10);
     if(retset.array_size == 0) {fprintf(stderr,"Allocating set failed!\n"); return nullset;}
-    
+
     line = (char *) malloc(MAXFILENAME * sizeof(char));
     if(line == NULL) {fprintf(stderr,"Allocating line failed!\n"); return retset;}
     fgets(line, len, fd);
@@ -376,7 +376,7 @@ double getTime() {
 
 #define LOG2(x) ( log(x) / log(2) )
 
-double findT(double n,double m,double t,double b,double s,double d, int c, int h) 
+double findT(double n,double m,double t,double b,double s,double d, int c, int h)
 {
 
     if(h <= 0 || c <= 0 || h > 400 || (h*c) > (n*m) || (c*t) > limit) return -1;
@@ -387,7 +387,7 @@ double findT(double n,double m,double t,double b,double s,double d, int c, int h
 
 int getbest(double arr[],double T)
 {
-    
+
     int i;
     double provT = T;
     int provi = -1;
@@ -413,7 +413,7 @@ int getch(int *chosen_h, int *chosen_c, double *predicted_T, int n, int m, doubl
     double T=-1;
     int done;
     while(T == -1) {
-    
+
 	// find initial T.
 	T=findT(n,m,t,b,s,d,c, h);
 
@@ -456,7 +456,7 @@ int getch(int *chosen_h, int *chosen_c, double *predicted_T, int n, int m, doubl
     *predicted_T = T;
 
     return 0;
-    
+
 }
 
 int getchLocal(double *predicted_T, int n, int m, double t) {
@@ -465,7 +465,7 @@ int getchLocal(double *predicted_T, int n, int m, double t) {
     *predicted_T = T;
 
     return 0;
-   
+
 }
 
 
@@ -529,7 +529,7 @@ int makeRemoteCleanupScript(char* id, char* local_dir, char* mat_host, char* mat
     fprintf(fp,"mat_path=%i %s\n",(int) strlen(mat_path), mat_path);
     fprintf(fp,"remote_dir=%i %s\n",(int) strlen(remote_dir), remote_dir);
     fprintf(fp,"node_list=%i %s\n",(int) strlen(node_list), node_list);
-    fprintf(fp,"host=%i %s\n",(int) strlen(hostname), hostname);    
+    fprintf(fp,"host=%i %s\n",(int) strlen(hostname), hostname);
     if(fun_path[0])
 	fprintf(fp,"fun_path=%i %s\n",(int) strlen(fun_path), fun_path);
 
@@ -545,7 +545,7 @@ int main(int argc, char** argv)
       main function Section 0
       General Declarations, Initializations, Environment, and Command Line Options
     ****************************************************************************************/
-    
+
     int i; // multipurpose counters.
     signed char cl; // command line argument selector
     int retval; // multipurpose return value
@@ -557,7 +557,7 @@ int main(int argc, char** argv)
     int abaseend, bbaseend;  // ending indices into the set files
     blacoord = blbcoord = 0;
     abase = bbase = 0;
-    abaseend = bbaseend = -1; 
+    abaseend = bbaseend = -1;
 
     /*
       declare and initialize the environment: hostname
@@ -585,7 +585,7 @@ int main(int argc, char** argv)
     { fprintf(stderr, "Warning: no IP information. Hostname (%s) may not have a domain name!\n", hostname); }
     free(addr);
     addr=NULL;
-    
+
     /*
       declare and initialize the environment: userid
     */
@@ -600,27 +600,27 @@ int main(int argc, char** argv)
     }
     //postcondition: pw->pw_name contains the userid of the user executing this program.
 
-    
+
     int local_prefix_chosen = 0; // flag for whether the location of local state is specified
     char* local_prefix = (char*) malloc(CHIRP_PATH_MAX*sizeof(char));     // /var/tmp for example ... where to place local state?
     if(local_prefix == NULL) {
 	fprintf(stderr,"Allocating local prefix path string  memory failed!\n");
 	return 1;
     }
-    
+
     int matrix_host_chosen = 0;  // flag for whether the host of the remote matrix is specified
     char* matrix_host = (char*) malloc(CHIRP_PATH_MAX*sizeof(char)); // a hostname
     if(matrix_host == NULL) {
 	fprintf(stderr,"Allocating matrix host string  memory failed!\n");
 	return 1;
     }
-    
+
     char* dateString =  (char*) malloc(6*sizeof(char)); // a string to store a date of the form MMMdd
     if(dateString == NULL) {
 	fprintf(stderr,"Allocating date string  memory failed!\n");
 	return 1;
     }
-    if(getDateString(dateString) != 1) { // Store the current date, sub in a default value if this fails 
+    if(getDateString(dateString) != 1) { // Store the current date, sub in a default value if this fails
 	fprintf(stderr,"Warning, getting date failed. Jan0 will be used instead.\n");
 	strcpy(dateString,"Jan00");
     }
@@ -713,35 +713,35 @@ int main(int argc, char** argv)
     int setB_index = base_index+2;       // the name of the set file for set 2
     int funcdir_index = base_index+3;    // the directory defining the function
     int workloadID_index = base_index+4;      // the workload name identifier
-    
-    
+
+
     if(local_prefix_chosen == 0) // if the local state wasn't specified via command line argument
 	sprintf(local_prefix,"/tmp/%s/",argv[workloadID_index]); // default value: /tmp/WORKLOADID
     for(i=1; i < (int)strlen(local_prefix); i++)  // create the prefix hierarchy as necessary
 	if(local_prefix[i] == '/') {
 	    local_prefix[i] = '\0';
-	    mkdir(local_prefix, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH); 
+	    mkdir(local_prefix, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 	    local_prefix[i] = '/';
 	}
-    
+
     if(matrix_host_chosen == 0) // if the remote matrix host wasn't specified via command line argument
 	strcpy(matrix_host, "sc0-00.cse.nd.edu"); // default value: a well-known ND host -- sc0-00.cse.nd.edu
-    
+
     if(matrix_path_chosen == 0) // if the remote matrix path wasn't specified via command line argument
 	sprintf(matrix_path,"%s/matrixmeta/%s_%s_%s",pw->pw_name,hostname,dateString,argv[workloadID_index]);// default value: /USERID/matrixmeta/HOSTNAME_DATE_WORKLOADID
-    
+
     if(matrix_host_chosen != matrix_path_chosen) // if one of the two matrix properties was specified, warn the user, as thy may have made a mistake
 	fprintf(stderr,"Warning: Only one of output host or output path was specified. The matrix metadata will be stored at: /chirp/%s/%s\n",matrix_host,matrix_path);
-    
+
     if(argc != optind+4) {
 	fprintf(stderr,"After all options, there must be the names of the two sets, the directory defining the function, and the workload ID.\n");
 	show_help(argv[0]);
 	return 4;
     }
 
-    
+
     // FIXME: other checks: prefix dir must already exist.
-    stoptime = time(0) + 3600; // initial stoptime for general operations: 1 hour 
+    stoptime = time(0) + 3600; // initial stoptime for general operations: 1 hour
     debug_config(argv[0]); // indicate what string to use as the executable name when printing debugging information
     if(!did_explicit_auth) auth_register_all(); // if an authentication mechanism wasn't chosen, default register all.
 
@@ -754,11 +754,11 @@ int main(int argc, char** argv)
       Determine function directory and function name
       Create Matrix using proper environments, etc. or default values.
     ****************************************************************************************/
-    
+
     struct stat64 abuf; // a buffer for stat calls
     double tsize = 0.0; // total size of a set
     double asize = 0.0; // size of a set element
-    
+
     // read aset into ragged array
     struct ragged_array setA = getsetarray(argv[setA_index]);
     if(setA.arr == NULL) { // if no lines in the array
@@ -771,13 +771,13 @@ int main(int argc, char** argv)
     }
     if(abaseend == -1)
 	abaseend = setA.row_count - 1;
-    const int WL_HEIGHT = abaseend - abase + 1; 
+    const int WL_HEIGHT = abaseend - abase + 1;
     // Get the total/average size of the items.
     for(i=abase; i <= abaseend; i++) {
 	stat64(setA.arr[i], &abuf); // stat each item
 	tsize+=abuf.st_size; // add each item's size to the total size
     }
-    
+
 
     // read bset into array
     struct ragged_array setB = getsetarray(argv[setB_index]);
@@ -791,7 +791,7 @@ int main(int argc, char** argv)
     }
     if(bbaseend == -1)
 	bbaseend = setB.row_count - 1;
-    const int WL_WIDTH = bbaseend - bbase + 1; 
+    const int WL_WIDTH = bbaseend - bbase + 1;
     // Get the total/average size of the items.
     for(i=bbase; i <= bbaseend; i++) {
 	stat64(setB.arr[i], &abuf);  // stat each item
@@ -828,9 +828,9 @@ int main(int argc, char** argv)
 	fprintf(stderr,"Allocating fq_func_name string memory failed!\n");
 	return 1;
     }
-    
+
     short INTERNAL_FUNCTION;
-    
+
     if( stat64(argv[funcdir_index], &abuf) ) { // no such directory ... must be an internal function, copy it exactly.
 	INTERNAL_FUNCTION=1;
 	strcpy(fq_func_name,argv[funcdir_index]);
@@ -847,16 +847,16 @@ int main(int argc, char** argv)
 	    function_directory[strlen(function_directory)-1] = '\0'; // change the trailing slash to a null byte.
 	/* determine function name (without the path) */
 	int last_slash_index = strrpos(function_directory,'/'); // determine position of the final slash in function directory
-	if(last_slash_index == -1) // if no slash, function name IS the function directory name  
+	if(last_slash_index == -1) // if no slash, function name IS the function directory name
 	    strcpy(func_name,function_directory);
-	else // otherwise, function name is what comes after the final slash. Ex: quux in /foo/bar/baz/quux 
+	else // otherwise, function name is what comes after the final slash. Ex: quux in /foo/bar/baz/quux
 	    strcpy(func_name,&(function_directory[last_slash_index+1]));
 	strcat(func_name,".exe"); //quux.exe
 
 	sprintf(fq_func_name,"%s/%s",function_directory,func_name); // /foo/bar/baz/quux/quux.exe
     }
-   
-	
+
+
     /* Determine Chirp Servers to Use for Matrix and Create Matrix*/
     struct chirp_matrix *mat = NULL;
     mat=chirp_matrix_open( matrix_host, matrix_path, stoptime);
@@ -891,7 +891,7 @@ int main(int argc, char** argv)
 		fprintf(stderr,"HOME undefined, using %s\n",host_file);
 	    }
 	}
-	
+
 	if(stat64(host_file, &abuf)) { // it's not defined.
 	    fprintf(stderr,"%s doesn't exist, creating it\n",host_file);
 	    FILE* hfp = fopen(host_file,"w");
@@ -928,7 +928,7 @@ int main(int argc, char** argv)
 	}
 	chirp_matrix_close(mat, stoptime);
     }
-        
+
 
     /****************************************************************************************
       main function Section 2
@@ -953,7 +953,7 @@ int main(int argc, char** argv)
 	retval = system(localexecute);
 	exit(retval);
     }
-    
+
 
     char full_function_directory[CHIRP_PATH_MAX];
     if(INTERNAL_FUNCTION == 0) {
@@ -986,7 +986,7 @@ int main(int argc, char** argv)
     }
 
     sprintf(localexecute,"allpairs_multicore -w %i -i %i -X %i -Y %i -p %i -q %i -r %i -s %i %s %s %s %s %s",blbcoord+WL_WIDTH,blacoord+WL_HEIGHT,blbcoord,blacoord,abase,bbase,abase+3,bbase+3,argv[setA_index],argv[setB_index],fq_func_name,matrix_host,matrix_path);
-    
+
     bench_start = getTime(); // get the starting mark
     retval = system(localexecute);
     bench_end = getTime(); // get the starting mark
@@ -998,17 +998,17 @@ int main(int argc, char** argv)
     localexecute=NULL;
     if(full_function_directory[0]) // if not an internal function, move back to the function directory.
 	chdir(full_function_directory);
-    
-    
-    
+
+
+
     func_time = (bench_end-bench_start)/16;
     fprintf(stderr,"Function time: %lf\n",func_time);
     if(func_time < .001) func_time = .001;
     bandwidth = 1000;
     element_size = ((asize * 8)/(1024*1024));
     dispatch = 10;
-    
-    
+
+
     int h, c;
     double T,TL;
     getch(&h, &c, &T, WL_HEIGHT, WL_WIDTH, func_time, bandwidth, element_size, dispatch);
@@ -1024,12 +1024,12 @@ int main(int argc, char** argv)
     /* GET BOX SIZE PER JOB*/
     int apj = (int) sqrt(c);
     apj++; // casting on the line above truncates, incrementing "overassigns" amount of work to do per job, rather than underassigning.
-	
+
     getchLocal(&TL, WL_HEIGHT, WL_WIDTH, func_time);
 
     fprintf(stderr,"H: %i\nCPJ: %i\nAPJ: %i\nRT: %.2f\nLT: %.2f\n",h,c,apj,T,TL);
-    
-    
+
+
     if( (LOCALorREMOTE!=1) && (TL <= T)) {
 	// run local tool
 	fprintf(stderr,"Local execution chosen (%.2f < %.2f)\n",TL,T);
@@ -1052,7 +1052,7 @@ int main(int argc, char** argv)
       main function Section 3
       Copy the two sets onto the local chirp server
       Distribute the sets from the local chirp server to the pool
-      Determine which servers have the data 
+      Determine which servers have the data
     ****************************************************************************************/
 
     int chirp_acl_string_len = strlen(hostname)+strlen("hostname:*.nd.edu"); // determine maximum length of an ACL identity
@@ -1066,7 +1066,7 @@ int main(int argc, char** argv)
 	fprintf(stderr,"Allocating chirp directory name string memory failed!\n");
 	return 1;
     }
-    
+
     sprintf(chirp_dirname,"/%s_%s",pw->pw_name,argv[workloadID_index]); // initialize the directory name string to the "parent" directory: USERID_WORKLOADID
     printf("Chirp_dirname:%s\n",chirp_dirname);
     chirp_reli_mkdir(hostname,chirp_dirname,0700,stoptime); // create the parent directory
@@ -1109,7 +1109,7 @@ int main(int argc, char** argv)
     chirp_reli_setacl(hostname,chirp_dirname,chirp_acl_string,"rl",stoptime);
     strcpy(chirp_acl_string,"system:localuser");
     chirp_reli_setacl(hostname,chirp_dirname,chirp_acl_string,"rl",stoptime);
-    
+
 
     // distribute, starting from the the parent directory, to hosts in the hostset.
     // determine the available hosts from the catalogue
@@ -1168,7 +1168,7 @@ int main(int argc, char** argv)
       main function Section 4
       Build strings to specify lists of prestaged hosts
       If not internal function:
-      Create function tarball of all items necessary to actually complete the comparison 
+      Create function tarball of all items necessary to actually complete the comparison
     ****************************************************************************************/
     // Build string of nodes with prestaged data -- one forward, one backward. Each has a limit of 2047 characters.
     char* shortstring = (char *) malloc(2048*sizeof(char));
@@ -1189,7 +1189,7 @@ int main(int argc, char** argv)
 	    strcat(goodstring1,",");
 	}
     }
-    
+
     char* goodstring2 = (char *) malloc(2048*sizeof(char)); // backward list of all prestaged hosts
     if(goodstring2 == NULL) {
 	fprintf(stderr,"Allocating backward list string memory failed!\n");
@@ -1208,13 +1208,13 @@ int main(int argc, char** argv)
     fprintf(stderr,"GS2: %s\n",goodstring2);
 
 
-    
+
     char* goodstring = (char *) malloc(2048*sizeof(char)); // allocate string for list of hosts (may not be full list due to space constraints)
     char* reqstring = (char *) malloc(2048*sizeof(char));  // allocate string for entire requirements clause
     char* reqclose = (char *) malloc(2048*sizeof(char));   // allocate string for post-hosts requirements
-    char* tokenstring = (char *) malloc(2048*sizeof(char));   // allocate string for tokenizing 
+    char* tokenstring = (char *) malloc(2048*sizeof(char));   // allocate string for tokenizing
     char* nexthost; // pointer to the next host
-        
+
     if(goodstring == NULL || reqstring == NULL || reqclose == NULL || tokenstring == NULL) {
 	fprintf(stderr,"Allocating requirements string memory failed!\n");
 	return 1;
@@ -1230,8 +1230,8 @@ int main(int argc, char** argv)
 	fprintf(excludep,"exclude.list\n"); // write the exclude list into itself. Duh.
 	fprintf(excludep,"%s.func.tar\n",argv[workloadID_index]); // write the function tarball itself into the exclude list.
 	fclose(excludep);
-	
-	
+
+
 	// allocate and fill strings for command to create the function tarball, then do it
 	command = (char *) malloc((strlen("tar -X exclude.list -f   .func.tar -r ./* 2> /dev/null")+strlen(argv[workloadID_index]))*sizeof(char));
 	if(command == NULL) {
@@ -1241,7 +1241,7 @@ int main(int argc, char** argv)
 	sprintf(command,"tar -X exclude.list -f %s.func.tar -r ./* 2> /dev/null",argv[workloadID_index]);
 	system(command); // actually create the function tarball
 	free(command); // free the command string
-	command = NULL; // reset the command string 
+	command = NULL; // reset the command string
     }
 
 
@@ -1252,7 +1252,7 @@ int main(int argc, char** argv)
       Create the submit file, including custom list of hosts for requirements limits
       Actually Submit Job!!!
     ****************************************************************************************/
-    
+
     int a, b; // counters for setA (a) and setB (b)
     //int bpj = WL_WIDTH; // items in set 2 per job ... initialize as 1 full row.
     int bpj = apj; // square box.
@@ -1279,7 +1279,7 @@ int main(int argc, char** argv)
     int token_counter = 0;
     int jobcount = 0;
     int jobdircount = -1;
-   
+
     // for each job, build a submit file and submit the job
     for(a=abase; a<=abaseend; a+=apj) { // for each element in set a, incrementing by the number of those elements per job
 	for(b=bbase; b<=bbaseend; b+=bpj) { // for each element in set b, incrementing by the number of those elements per job
@@ -1289,7 +1289,7 @@ int main(int argc, char** argv)
 		sprintf(job_directory,"%s/%i/",local_prefix, jobdircount); // initialize the name of the job superdirectory: PREFIX/COUNT/
 		mkdir(job_directory, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);       // make that directory
 	    }
-	    
+
 	    sprintf(job_directory,"%s/%i/%s.%i.%i",local_prefix, jobdircount, argv[workloadID_index], a , b); // initialize the name of the job directory: PREFIX/COUNT/WORKLOADID.A.B
 	    mkdir(job_directory, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);       // make that directory
 
@@ -1301,23 +1301,23 @@ int main(int argc, char** argv)
 		diskreq = abuf.st_size; // initialize the overall disk requirement to the size of the function tarball, as this is really all that's transferred
 		diskreq /= 1000; // convert to KB.
 	    }
-	    
+
 	    diskreq += 100000; //100MB cushion for safety and output and what have you
 	    //printf("dr:%lld ; dr2: %lld\n",diskreq,diskreq2);
-	    
+
 	    // move to the newly created job directory
 	    chdir(job_directory);
-	    
+
 	    // create a file called WORKLOADID.submit and begin filling it.
 	    sprintf(command,"%s.submit",argv[workloadID_index]);
 	    FILE *subp = fopen(command,"w");
 	    fprintf(subp,"universe = vanilla\n"); // set condor universe
 	    fprintf(subp,"executable = %s/allpairs_wrapper.sh\n",starting_directory); // set executable -- it's a wrapper.
 	    if(strcmp(argv[setA_index],argv[setB_index])) { // if setA != setB
-		fprintf(subp,"arguments = %s %s /chirp/localhost/%s/set1 /chirp/localhost/%s/set2 %s %s %i %i %i %i %i %i %i %i\n",argv[workloadID_index],func_name,chirp_dirname,chirp_dirname,matrix_host,matrix_path,blacoord+WL_HEIGHT,blbcoord+WL_WIDTH,blacoord,blbcoord,a,b,MIN((a+apj-1),abaseend),MIN((b+bpj-1),bbaseend)); 
+		fprintf(subp,"arguments = %s %s /chirp/localhost/%s/set1 /chirp/localhost/%s/set2 %s %s %i %i %i %i %i %i %i %i\n",argv[workloadID_index],func_name,chirp_dirname,chirp_dirname,matrix_host,matrix_path,blacoord+WL_HEIGHT,blbcoord+WL_WIDTH,blacoord,blbcoord,a,b,MIN((a+apj-1),abaseend),MIN((b+bpj-1),bbaseend));
 	    }
 	    else { // setA == SetB, so we only distributed one copy.
-		fprintf(subp,"arguments = %s %s /chirp/localhost/%s/set1 /chirp/localhost/%s/set1 %s %s %i %i %i %i %i %i %i %i\n",argv[workloadID_index],func_name,chirp_dirname,chirp_dirname,matrix_host,matrix_path,blacoord+WL_HEIGHT,blbcoord+WL_WIDTH,blacoord,blbcoord,a,b,MIN((a+apj-1),abaseend),MIN((b+bpj-1),bbaseend)); 
+		fprintf(subp,"arguments = %s %s /chirp/localhost/%s/set1 /chirp/localhost/%s/set1 %s %s %i %i %i %i %i %i %i %i\n",argv[workloadID_index],func_name,chirp_dirname,chirp_dirname,matrix_host,matrix_path,blacoord+WL_HEIGHT,blbcoord+WL_WIDTH,blacoord,blbcoord,a,b,MIN((a+apj-1),abaseend),MIN((b+bpj-1),bbaseend));
 	    }
 	    // set first "third" of requirements string
 	    /*
@@ -1329,12 +1329,12 @@ int main(int argc, char** argv)
 
 	    sprintf(reqclose,"\") )\n"); // set third "third" of requirements string
 	    rsl = strlen(reqstring)+2+strlen(reqclose); // measure the length of the requirements string's 1st and 3rd parts
-	    
+
 	    if(token_counter++%2 == 0)  // if "forward" job
 		strcpy(tokenstring,goodstring1);
 	    else
 		strcpy(tokenstring,goodstring2);
-	    
+
 	    goodstring[0]='\0';
 	    nexthost = strtok(tokenstring,","); // go through "forward" full set until we exhaust the character limit.
 	    while(nexthost != NULL && ((strlen(nexthost)+1+rsl)<2046)) {
@@ -1345,12 +1345,12 @@ int main(int argc, char** argv)
 		nexthost = strtok(NULL,",");
 	    }
 	    nexthost = NULL;
-	
+
 	    printf("Goodstring:%s\n",goodstring);
 	    strcat(reqstring,goodstring); // build full reqstring from three thirds.
 	    strcat(reqstring,reqclose);
 	    fprintf(subp,"%s\n",reqstring); // print it to the submit file
-	    
+
 	    // finish off the submit file
 	    fprintf(subp, "Rank = Memory\n");
 	    if(full_function_directory[0])
@@ -1365,9 +1365,9 @@ int main(int argc, char** argv)
 	    fprintf(subp, "notification = never\n");
 	    fprintf(subp, "getenv = true\n");
 	    fprintf(subp, "queue\n");
-	    
+
 	    fclose(subp); // close the submit file
-	    
+
 	    sprintf(command,"condor_submit %s.submit",argv[workloadID_index]); // build job submission command
 	    system(command); // FINALLY SUBMIT JOB!
 	    printf("Cluster: %i:%i %i:%i\n",a,b,MIN((a+apj-1),abaseend),MIN((b+bpj-1),bbaseend)); // print job submission notification
@@ -1377,7 +1377,7 @@ int main(int argc, char** argv)
 		chdir(full_function_directory); // change to the fully qualified function directory to go again.
 	}
     }
-	
+
     chdir(starting_directory);
     makeStatusScript(argv[workloadID_index], jobcount);
     makeWaitScript(argv[workloadID_index]);
@@ -1416,7 +1416,7 @@ int main(int argc, char** argv)
 
 /*     echo "notification = never" >> $fname.submit # don't e-tase me, bro. */
 /*     echo "queue" >> $fname.submit  */
-    
+
 /*     submitout=`condor_submit $fname.submit` #Go! */
 /*     echo $submitout */
 /*     cluster=${submitout##*cluster } */

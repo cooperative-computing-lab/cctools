@@ -39,7 +39,7 @@ void monitor_poll_all_processes_once(struct itable *processes, struct process_in
 		monitor_poll_process_once(p);
 
 		acc_mem_usage(&acc->mem, &p->mem);
-        
+
 		acc_cpu_time_usage(&acc->cpu, &p->cpu);
 
 		acc_sys_io_usage(&acc->io, &p->io);
@@ -115,14 +115,14 @@ int monitor_poll_fs_once(struct filesys_info *f)
 	return 0;
 }
 
-/*** 
+/***
  * Utility functions (open log files, proc files, measure time)
  ***/
 
 FILE *open_proc_file(pid_t pid, char *filename)
 {
         FILE *fproc;
-        char fproc_path[PATH_MAX];    
+        char fproc_path[PATH_MAX];
 
 #if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
         return NULL;
@@ -201,7 +201,7 @@ int get_cpu_time_linux(pid_t pid, uint64_t *accum)
 	       /* .... */,
 	       &kernel, &user);
 
-	*accum = clicks_to_usecs(kernel) + clicks_to_usecs(user); 
+	*accum = clicks_to_usecs(kernel) + clicks_to_usecs(user);
 
 	fclose(fstat);
 
@@ -266,7 +266,7 @@ int get_swap_linux(pid_t pid, struct mem_info *mem)
 	uint64_t value = 0;
 
 	while(get_int_attribute(fsmaps, "Swap:", &value, 0) == 0)
-		accum += value; 
+		accum += value;
 
 	mem->swap = accum;
 
@@ -277,8 +277,8 @@ int get_swap_linux(pid_t pid, struct mem_info *mem)
 
 int get_mem_linux(pid_t pid, struct mem_info *mem)
 {
-	// /dev/proc/[pid]/status: 
-    
+	// /dev/proc/[pid]/status:
+
 	FILE *fmem = open_proc_file(pid, "status");
 	if(!fmem)
 		return 1;
@@ -312,7 +312,7 @@ int get_mem_freebsd(pid_t pid, struct mem_info *mem)
 
 	if((kp == NULL) || (count < 1))
 		return 1;
-	
+
 	/* in MB */
 	mem->resident = kp->ki_rssize * sysconf(_SC_PAGESIZE); //Multiply pages by pages size.
 	mem->virtual = kp->ki_size;
@@ -352,7 +352,7 @@ int get_sys_io_usage(pid_t pid, struct io_info *io)
 	   then info is lost, as if the process did not read or write
 	   any characters.
 	*/
-    
+
 	FILE *fio = open_proc_file(pid, "io");
 	uint64_t cread, cwritten;
 	int rstatus, wstatus;
@@ -407,16 +407,16 @@ int get_map_io_usage(pid_t pid, struct io_info *io)
 	}
 
 	char dummy_line[1024];
-    
+
 	/* Look for next mmap file */
-	while(fgets(dummy_line, 1024, fsmaps)) 
+	while(fgets(dummy_line, 1024, fsmaps))
 		if(strchr(dummy_line, '/'))
 			if(get_int_attribute(fsmaps, "Rss:", &kbytes_resident, 0) == 0)
 				kbytes_resident_accum += kbytes_resident;
 
 	if((kbytes_resident_accum * 1024) > io->bytes_faulted)
 		io->delta_bytes_faulted = (kbytes_resident_accum * 1024) - io->bytes_faulted;
-    
+
 	/* in bytes */
 	io->bytes_faulted = (kbytes_resident_accum * 1024);
 

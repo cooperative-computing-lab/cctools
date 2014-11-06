@@ -640,7 +640,7 @@ static void expr_print_list( FILE *file, struct expr *e, int with_commas )
 			fprintf(file,"(");
 			expr_print_list(file,e->a,1);
 			fprintf(file,")");
-			break;			
+			break;
 		case EXPR_LITERAL:
 			ast_word_print(file,e->literal);
 			break;

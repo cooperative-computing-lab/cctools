@@ -30,15 +30,15 @@ static void specify_work_queue_task_files(struct work_queue_task *t, const char 
 					caching = WORK_QUEUE_NOCACHE;
 				else
 					caching = WORK_QUEUE_CACHE;
-			
+
 				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, caching);
 				debug(D_BATCH, "local file %s is %s on remote system:", f, p + 1);
 				*p = '=';
 			} else {
 
-				if(caching_directive == WORK_QUEUE_NOCACHE) 
+				if(caching_directive == WORK_QUEUE_NOCACHE)
 					caching = WORK_QUEUE_NOCACHE;
-				else 
+				else
 					caching = WORK_QUEUE_CACHE;
 
 				work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching);
@@ -66,9 +66,9 @@ static void specify_work_queue_task_files(struct work_queue_task *t, const char 
 				*p = '=';
 			} else {
 
-				if(caching_directive == WORK_QUEUE_NOCACHE) 
+				if(caching_directive == WORK_QUEUE_NOCACHE)
 					caching = WORK_QUEUE_NOCACHE;
-				else 
+				else
 					caching = WORK_QUEUE_CACHE;
 
 				work_queue_task_specify_file(t, f, f, WORK_QUEUE_OUTPUT, caching);
@@ -83,7 +83,7 @@ static struct rmsummary *parse_batch_options_resources(const char *options_text)
 {
 	if(!options_text)
 		return NULL;
-	
+
 	char *resources = strstr(options_text, "resources:");
 
 	if(!resources)

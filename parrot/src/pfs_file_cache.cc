@@ -178,7 +178,7 @@ pfs_file * pfs_cache_open( pfs_name *name, int flags, mode_t mode )
 	int sleep_time = 1;
 
 	retry:
- 
+
 	buf.st_ctime = time(0);
 	buf.st_size = 0;
 	buf.st_ino = hash_string(name->rest);
@@ -203,7 +203,7 @@ pfs_file * pfs_cache_open( pfs_name *name, int flags, mode_t mode )
 		}
 	}
 
-	
+
 	fd = file_cache_open(pfs_file_cache,name->path,txn,buf.st_size,0);
 	if(fd>=0) {
 		if(flags&O_TRUNC) ftruncate(fd,0);

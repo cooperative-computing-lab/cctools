@@ -10,7 +10,7 @@ See the file COPYING for details.
  * Setup paranoia mode.  Launch an external watchdog process, share a process
  * table with it.
  * Returns the PID of the watchdog process, -1 on failure
- * 
+ *
  * If this fails, all subsequent pfs_paranoia_* commands will fail.
  */
 int pfs_paranoia_setup(void);

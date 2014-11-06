@@ -118,18 +118,18 @@ static int log_play( struct deltadb *db )
 	char name[NVPAIR_LINE_MAX];
 	char value[NVPAIR_LINE_MAX];
 	char oper;
-	
+
 	int notime = 1;
 	while(fgets(line,sizeof(line),stream)) {
 		//debug(D_NOTICE,"Processed line: %s",line);
-		
+
 		line_number += 1;
 
 		if (line[0]=='\n') return 0;
 
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if(n<1) continue;
-		
+
 		switch(oper) {
 			case 'C':
 				nv = nvpair_create();
@@ -225,7 +225,7 @@ static int parse_input( struct deltadb *db )
 int main( int argc, char *argv[] )
 {
 	struct deltadb *db = deltadb_create(NULL);
-	
+
 	int i;
 	for (i=1; i<argc; i++){
 		struct argument arg;
@@ -249,9 +249,9 @@ int main( int argc, char *argv[] )
 		arg.next = db->args;
 		db->args = &arg;
 	}
-  
 
-	
+
+
 	parse_input(db);
 
 	deltadb_delete(db);

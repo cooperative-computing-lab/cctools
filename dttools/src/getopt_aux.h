@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 /* Auxiliary functions for common processing of options */
-						  
+
 #include "getopt.h"
 
 /** Writes port to port_file. Use when calling -Z file, when the application

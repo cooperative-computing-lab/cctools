@@ -189,7 +189,7 @@ int tracer_is_64bit( struct tracer *t )
 			return -1;
 		t->gotregs = 1;
 	}
-	
+
 	if(t->regs.regs64.cs==0x33) {
 		return 1;
 	} else {
@@ -404,7 +404,7 @@ static ssize_t tracer_copy_out_slow( struct tracer *t, const void *data, const v
 	size_t size = length;
 	long word;
 
-	/* first, copy whole words */ 
+	/* first, copy whole words */
 
 	while(size>=sizeof(word)) {
 		word = *(long*)bdata;
@@ -472,7 +472,7 @@ static ssize_t tracer_copy_in_slow( struct tracer *t, void *data, const void *ua
 	size_t total = 0;
 	long word;
 
-	/* first, copy whole words */ 
+	/* first, copy whole words */
 
 	while((length-total)>=sizeof(word)) {
 		errno = 0;

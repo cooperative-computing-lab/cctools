@@ -59,7 +59,7 @@ char *sanitize_path_name(char *name)
 }
 
 struct rmDsummary *summary_bin_op(struct rmDsummary *s, struct rmDsummary *a, struct rmDsummary *b, double (*op)(double, double))
-{ 
+{
 	struct field *f;
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
@@ -267,9 +267,9 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 	s->total_processes = so->total_processes;
 	s->max_concurrent_processes = so->max_concurrent_processes;
 
-	s->virtual_memory = so->virtual_memory; 
-	s->resident_memory = so->resident_memory; 
-	s->swap_memory = so->swap_memory; 
+	s->virtual_memory = so->virtual_memory;
+	s->resident_memory = so->resident_memory;
+	s->swap_memory = so->swap_memory;
 
 	s->bytes_read    = bytes_to_Mbytes(so->bytes_read);
 	s->bytes_written = bytes_to_Mbytes(so->bytes_written);
@@ -283,7 +283,7 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 		s->task_id = get_rule_number(filename);
 	}
 
-	struct field *f;	
+	struct field *f;
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
 		if(value_of_field(s, f) < 0)

@@ -107,7 +107,7 @@ static int ftsh_main( int argc, char *argv[] )
 
 	s = getenv("FTSH_KILL_TIMEOUT");
 	if(s) kill_timeout = atoi(s);
-		
+
 	s = getenv("FTSH_KILL_MODE");
 	if(s) kill_mode = s;
 

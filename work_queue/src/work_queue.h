@@ -50,7 +50,7 @@ See the file COPYING for details.
 
 #define WORK_QUEUE_RESULT_SUCCESS 0		   /**< The task ran successfully >**/
 #define WORK_QUEUE_RESULT_INPUT_MISSING 1  /**< The task cannot be run due to a missing input file >**/
-#define WORK_QUEUE_RESULT_OUTPUT_MISSING 2 /**< The task ran but failed to generate a specified output file >**/ 
+#define WORK_QUEUE_RESULT_OUTPUT_MISSING 2 /**< The task ran but failed to generate a specified output file >**/
 #define WORK_QUEUE_RESULT_STDOUT_MISSING 4 /**< The task ran but its stdout has been truncated >**/
 #define WORK_QUEUE_RESULT_SIGNAL         8 /**< The task was terminated with a signal >**/
 #define WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION 16 /**< The task used more resources than requested >**/
@@ -73,7 +73,7 @@ struct work_queue_task {
 	int return_status;		/**< The exit code of the command line. */
 	int result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
 	char *host;			/**< The address and port of the host on which it ran. */
-	char *hostname;			/**< The name of the host on which it ran. */		
+	char *hostname;			/**< The name of the host on which it ran. */
 
 	timestamp_t time_committed;	/**< The time at which a task was committed to a worker. */
 
@@ -96,13 +96,13 @@ struct work_queue_task {
 	int total_submissions;			   /**< The number of times the task has been submitted. */
 	timestamp_t total_cmd_execution_time;	/**< Time spent in microseconds for executing the command on any worker, including resubmittions of the task. */
 
-	int64_t maximum_end_time;                       
-	int64_t memory;                       
+	int64_t maximum_end_time;
+	int64_t memory;
 	int64_t disk;
 	int cores;
 	int gpus;
 	int unlabeled;
-	
+
 	timestamp_t time_app_delay;	 /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 	double priority;			/**< The priority of this task relative to others in the queue: higher number run earlier. */
 };
@@ -136,7 +136,7 @@ struct work_queue_stats {
 
 	int64_t total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
 	int64_t total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
-	double efficiency;              /**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */  
+	double efficiency;              /**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */
 	double idle_percentage;         /**< The fraction of time that the master is idle waiting for workers to respond. */
 	int capacity;                   /**< The estimated number of workers that this master can effectively support. */
 
@@ -152,16 +152,16 @@ struct work_queue_stats {
 	int64_t min_cores;              /**< The lowest number of cores observed among the connected workers. */
 	int64_t max_cores;              /**< The highest number of cores observed among the connected workers. */
 	int64_t min_memory;             /**< The smallest memory size in MB observed among the connected workers. */
-	int64_t max_memory;             /**< The largest memory size in MB observed among the connected workers. */ 
+	int64_t max_memory;             /**< The largest memory size in MB observed among the connected workers. */
 	int64_t min_disk;               /**< The smallest disk space in MB observed among the connected workers. */
 	int64_t max_disk;               /**< The largest disk space in MB observed among the connected workers. */
 	int64_t min_gpus;               /**< The lowest number of GPUs observed among the connected workers. */
 	int64_t max_gpus;               /**< The highest number of GPUs observed among the connected workers. */
-	int port;						
-	int priority;					
+	int port;
+	int priority;
 	int workers_ready;              /**< @deprecated Use @ref workers_idle instead. */
 	int workers_full;               /**< @deprecated Use @ref workers_busy insead. */
-	int total_worker_slots;         /**< @deprecated Use @ref tasks_running instead. */	
+	int total_worker_slots;         /**< @deprecated Use @ref tasks_running instead. */
 	int avg_capacity;               /**< @deprecated Use @ref capacity instead. */
 };
 
@@ -175,7 +175,7 @@ Once created and elaborated with functions such as @ref work_queue_task_specify_
 and @ref work_queue_task_specify_buffer, the task should be passed to @ref work_queue_submit.
 @param full_command The shell command line to be executed by the task.  If null,
 the command will be given later by @ref work_queue_task_specify_command
-@return A new task object, or null if it could not be created. 
+@return A new task object, or null if it could not be created.
 */
 struct work_queue_task *work_queue_task_create(const char *full_command);
 
@@ -333,7 +333,7 @@ Users may modify the behavior of @ref work_queue_create by setting the following
 - <b>WORK_QUEUE_PORT</b>: This sets the default port of the queue (if unset, the default is 9123).
 - <b>WORK_QUEUE_LOW_PORT</b>: If the user requests a random port, then this sets the first port number in the scan range (if unset, the default is 1024).
 - <b>WORK_QUEUE_HIGH_PORT</b>: If the user requests a random port, then this sets the last port number in the scan range (if unset, the default is 32767).
-- <b>WORK_QUEUE_NAME</b>: This sets the project name of the queue, which is reported to a catalog server (by default this is unset).  
+- <b>WORK_QUEUE_NAME</b>: This sets the project name of the queue, which is reported to a catalog server (by default this is unset).
 - <b>WORK_QUEUE_PRIORITY</b>: This sets the priority of the queue, which is used by workers to sort masters such that higher priority masters will be served first (if unset, the default is 10).
 
 If the queue has a project name, then queue statistics and information will be
@@ -360,7 +360,7 @@ control and should not be inspected until returned via @ref work_queue_wait.
 Once returned, it is safe to re-submit the same take object via @ref work_queue_submit.
 @param q A work queue object.
 @param t A task object returned from @ref work_queue_task_create.
-@return An integer taskid assigned to the submitted task. 
+@return An integer taskid assigned to the submitted task.
 */
 int work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 
@@ -615,10 +615,10 @@ void work_queue_specify_task_order(struct work_queue *q, int order);
 #define WORK_QUEUE_MASTER_MODE_STANDALONE 0 /**< Work Queue master does not report to the catalog server. */
 #define WORK_QUEUE_MASTER_MODE_CATALOG 1    /**< Work Queue master reports to catalog server. */
 
-/** Specify the master mode for a given queue. 
+/** Specify the master mode for a given queue.
 @param q A work queue object.
-@param mode 
-- @ref WORK_QUEUE_MASTER_MODE_STANDALONE - standalone mode. In this mode the master would not report its information to a catalog server; 
+@param mode
+- @ref WORK_QUEUE_MASTER_MODE_STANDALONE - standalone mode. In this mode the master would not report its information to a catalog server;
 - @ref WORK_QUEUE_MASTER_MODE_CATALOG - catalog mode. In this mode the master report itself to a catalog server where workers get masters' information and select a master to serve.
 @deprecated Enabled automatically when @ref work_queue_specify_name is used.
 */
@@ -681,9 +681,9 @@ int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, 
 
 /* Experimental feature - intentionally left undocumented.
 This feature exists to simplify performance evaulation and is not recommended
-for production use since it delays execution of the workload. 
+for production use since it delays execution of the workload.
 Force the master to wait for the given number of workers to connect before
-starting to dispatch tasks.  
+starting to dispatch tasks.
 @param q A work queue object.
 @param worker The number of workers to wait before tasks are dispatched.*/
 void work_queue_activate_worker_waiting(struct work_queue *q, int resources);

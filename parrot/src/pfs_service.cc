@@ -94,7 +94,7 @@ int pfs_service::lstat( pfs_name *name, struct pfs_stat *buf )
 	return 0;
 }
 
-int pfs_service::access( pfs_name *name, mode_t mode ) 
+int pfs_service::access( pfs_name *name, mode_t mode )
 {
 	if( mode&X_OK ) {
 		errno = EACCES;
@@ -114,7 +114,7 @@ trying to set the right mode.  Same comments apply to
 utime and such.
 */
 
-int pfs_service::chmod( pfs_name *name, mode_t mode ) 
+int pfs_service::chmod( pfs_name *name, mode_t mode )
 {
 	return 0;
 }

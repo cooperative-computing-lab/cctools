@@ -31,10 +31,10 @@ int ftp_lite_radix_encode( const unsigned char * inbuf, unsigned char * outbuf, 
 	int i;
 	int j;
 	unsigned char c=0;
-	
+
 	for (i=0,j=0; i < *length; i++)
 	{
-		switch (i%3) 
+		switch (i%3)
 		{
 		case 0:
 			outbuf[j++] = radixN[inbuf[i]>>2];
@@ -50,20 +50,20 @@ int ftp_lite_radix_encode( const unsigned char * inbuf, unsigned char * outbuf, 
 			c = 0;
 		}
 	}
-	
-	if (i%3) 
+
+	if (i%3)
 	{
 		outbuf[j++] = radixN[c];
 	}
-	
-	switch (i%3) 
+
+	switch (i%3)
 	{
-	case 1: 
+	case 1:
 		outbuf[j++] = pad;
-	case 2: 
+	case 2:
 		outbuf[j++] = pad;
 	}
-	
+
 	outbuf[*length = j] = '\0';
 
 	return 1;
@@ -76,16 +76,16 @@ int ftp_lite_radix_decode( const unsigned char *inbuf, unsigned char *outbuf, in
 	int D;
 	char *p;
 
-	for (i=0,j=0; inbuf[i] && inbuf[i] != pad; i++) 
+	for (i=0,j=0; inbuf[i] && inbuf[i] != pad; i++)
 	{
 
-		if ((p = strchr(radixN, inbuf[i])) == NULL) 
+		if ((p = strchr(radixN, inbuf[i])) == NULL)
 		{
 			return 0;
 		}
 
 		D = p - radixN;
-		switch (i&3) 
+		switch (i&3)
 		{
 		case 0:
 			outbuf[j] = D<<2;
@@ -102,11 +102,11 @@ int ftp_lite_radix_decode( const unsigned char *inbuf, unsigned char *outbuf, in
 			outbuf[j++] |= D;
 		}
 	}
-	switch (i&3) 
+	switch (i&3)
 	{
-	case 1: 
+	case 1:
 		return 0;
-	case 2: 
+	case 2:
 		if (D&15)
 		{
 			return 0;
@@ -116,12 +116,12 @@ int ftp_lite_radix_decode( const unsigned char *inbuf, unsigned char *outbuf, in
 			return 0;
 		}
 		break;
-	case 3: 
-		if (D&3) 
+	case 3:
+		if (D&3)
 		{
 			return 0;
 		}
-		if (strcmp((char *)&inbuf[i], "=")) 
+		if (strcmp((char *)&inbuf[i], "="))
 		{
 			return 0;
 		}

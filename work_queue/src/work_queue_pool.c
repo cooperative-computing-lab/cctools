@@ -216,7 +216,7 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 		requested = requested > 0 ? requested : 0;
 
 		fprintf(stdout, "%04d/%02d/%02d %02d:%02d:%02d: "
-				"|submitted: %d |needed: %d |requested: %d \n", 
+				"|submitted: %d |needed: %d |requested: %d \n",
 				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
 				submitted, needed, requested);
 
@@ -346,7 +346,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 					debug(D_WQ,"worker job %"PRId64" exited",jobid);
 					workers_submitted--;
 				} else {
-					// it may have been a job from a previous run.					
+					// it may have been a job from a previous run.
 				}
 			} else {
 				break;
@@ -373,7 +373,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
 	printf(" %-30s Maximum workers running.  (default=%d)\n", "-W,--max-workers", workers_max);
-	printf(" %-30s Average tasks per worker. (default=one task per core)\n", "--tasks-per-worker"); 
+	printf(" %-30s Average tasks per worker. (default=one task per core)\n", "--tasks-per-worker");
 	printf(" %-30s Workers abort after this amount of idle time. (default=%d)\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
 	printf(" %-30s Set the number of cores requested per worker.\n", "--cores=<n>");

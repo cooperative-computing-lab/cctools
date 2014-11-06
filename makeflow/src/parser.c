@@ -63,7 +63,7 @@ int dag_parse_export(struct lexer *bk);
 int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
 {
 	struct buffer b;
-	
+
 	buffer_init(&b);
 
 	struct token *t;
@@ -88,14 +88,14 @@ int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
 
 		lexer_free_token(t);
 	}
-	
+
 	if(!t)
 	{
 		lexer_report_error(bk, "Command does not end with newline.\n");
 	}
-	
+
 	n->command = xxstrdup(buffer_tostring(&b));
-	
+
 	buffer_free(&b);
 
 	debug(D_MAKEFLOW_PARSER, "node command=%s", n->command);
@@ -175,7 +175,7 @@ int dag_parse(struct dag *d, FILE *stream)
 
 	struct dag_lookup_set s = { d, NULL, NULL, NULL };
 	bk->environment = &s;
-	
+
 	struct token *t;
 
 	while((t = lexer_peek_next_token(bk)))
@@ -194,10 +194,10 @@ int dag_parse(struct dag *d, FILE *stream)
 			dag_parse_syntax(bk);
 			break;
 		case TOKEN_FILES:
-			dag_parse_node(bk); 
+			dag_parse_node(bk);
 			break;
 		case TOKEN_VARIABLE:
-			dag_parse_variable(bk, NULL); 
+			dag_parse_variable(bk, NULL);
 			break;
 		default:
 			lexer_report_error(bk, "Unexpected token. Expected one of NEWLINE, SPACE, SYNTAX, FILES, or VARIABLE, but got: %s\n:", lexer_print_token(t));
@@ -289,14 +289,14 @@ void dag_parse_append_variable(struct lexer *bk, int nodeid, struct dag_node *n,
 int dag_parse_syntax(struct lexer *bk)
 {
 	struct token *t = lexer_next_token(bk);
-	
+
 	if(strcmp(t->lexeme, "export") == 0) {
 		lexer_free_token(t);
 		dag_parse_export(bk);
 	} else {
 		lexer_report_error(bk, "Unknown syntax keyboard.\n");
 	}
-	
+
 
 	return 1;
 }
@@ -315,13 +315,13 @@ int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 
 	char *name = xxstrdup(t->lexeme);
 	lexer_free_token(t);
-	
+
 	t = lexer_next_token(bk);
 	if(t->type != TOKEN_LITERAL)
 	{
 		lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
 	}
-	
+
 	char *value = xxstrdup(t->lexeme);
 	lexer_free_token(t);
 
@@ -337,7 +337,7 @@ int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 		current_table = bk->d->variables;
 		nodeid        = bk->d->nodeid_counter;
 	}
-	
+
 	int result = 1;
 	switch(mode)
 	{
@@ -353,9 +353,9 @@ int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 		lexer_report_error(bk, "Unknown variable operator.");
 		result = 0;
 	}
-	
+
 	dag_parse_process_special_variable(bk, n, nodeid, name, value);
-	
+
 	free(name);
 	free(value);
 
@@ -365,7 +365,7 @@ int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
 {
 	int before_colon = 1;
-	
+
 	char *filename;
 	char *newname;
 
@@ -391,17 +391,17 @@ int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
 			if(!arrow)
 			{
 				lexer_report_error(bk, "Rule specification is incomplete.");
-			} 
+			}
 			else if(arrow->type == TOKEN_REMOTE_RENAME)        //Is the arrow really an arrow?
 			{
 				lexer_free_token(lexer_next_token(bk));  //Jump arrow.
-				rename = lexer_next_token(bk); 
+				rename = lexer_next_token(bk);
 				if(!rename)
 				{
 					lexer_report_error(bk, "Remote name specification is incomplete.");
 				}
 			}
-			
+
 			filename = t->lexeme;
 			newname  = rename ? rename->lexeme : NULL;
 
@@ -409,7 +409,7 @@ int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
 				dag_node_add_target_file(n, filename, newname);
 			else
 				dag_node_add_source_file(n, filename, newname);
-			
+
 			lexer_free_token(t);
 
 			if(rename)
@@ -422,9 +422,9 @@ int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
 			lexer_report_error(bk, "Error reading file list. %s", lexer_print_token(t));
 			break;
 		}
-		
+
 	}
-	
+
 	return 0;
 }
 
@@ -443,22 +443,22 @@ int dag_parse_node(struct lexer *bk)
 	list_push_tail(n->category->nodes, n);
 
 	dag_parse_node_filelist(bk, n);
-	
+
 	bk->environment->node = n;
-	
+
 	/* Read variables, if any */
 	while((t = lexer_peek_next_token(bk)) && t->type != TOKEN_COMMAND)
 	{
 		switch (t->type) {
 		case TOKEN_VARIABLE:
-			dag_parse_variable(bk, n); 
+			dag_parse_variable(bk, n);
 			break;
 		default:
 			lexer_report_error(bk, "Expected COMMAND or VARIABLE, got: %s", lexer_print_token(t));
 			break;
 		}
 	}
-	
+
 	if(!t)
 	{
 		lexer_report_error(bk, "Rule does not have a command.\n");
@@ -474,7 +474,7 @@ int dag_parse_node(struct lexer *bk)
 	debug(D_MAKEFLOW_PARSER, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
 	dag_task_fill_resources(n);
 	dag_task_print_debug_resources(n);
-	
+
 	return 1;
 }
 
@@ -485,14 +485,14 @@ int dag_parse_node_command(struct lexer *bk, struct dag_node *n)
 	//Jump COMMAND token.
 	t = lexer_next_token(bk);
 	lexer_free_token(t);
-	
+
 	char *local = dag_lookup_str("BATCH_LOCAL", bk->environment);
 	if(local) {
 		if(string_istrue(local))
 			n->local_job = 1;
 		free(local);
 	}
-	
+
 	/* Read command modifiers. */
 	while((t = lexer_peek_next_token(bk)) && t->type != TOKEN_COMMAND_MOD_END)
 	{
@@ -501,7 +501,7 @@ int dag_parse_node_command(struct lexer *bk, struct dag_node *n)
 		if(strcmp(t->lexeme, "LOCAL") == 0)
 		{
 			n->local_job = 1;
-		} 
+		}
 		else if(strcmp(t->lexeme, "MAKEFLOW") == 0)
 		{
 			n->nested_job = 1;
@@ -513,20 +513,20 @@ int dag_parse_node_command(struct lexer *bk, struct dag_node *n)
 
 		lexer_free_token(t);
 	}
-	
+
 	if(!t)
 	{
 		lexer_report_error(bk, "Malformed command.");
 	}
-	
+
 	//Free COMMAND_MOD_END token.
 	t = lexer_next_token(bk);
 	lexer_free_token(t);
-	
+
 	if(n->nested_job)
 	{
 		return dag_parse_node_nested_makeflow(bk, n);
-	} 
+	}
 	else
 	{
 		return dag_parse_node_regular_command(bk, n);
@@ -560,9 +560,9 @@ void dag_parse_drop_spaces(struct lexer *bk)
 int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 {
 	struct token *t, *start;
-	
+
 	dag_parse_drop_spaces(bk);
-	
+
 	//Get the dag's file name.
 	t = lexer_next_token(bk);
 
@@ -572,7 +572,7 @@ int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 	} else {
 		lexer_report_error(bk, "At least the name of the Makeflow file should be specified in a recursive call.\n");
 	}
-	
+
 	dag_parse_drop_spaces(bk);
 
 	//Get dag's working directory.
@@ -596,10 +596,10 @@ int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 	} else {
 		wrapper = xxstrdup("");
 	}
-	
+
 	free(start->lexeme);
-	start->lexeme = string_format("cd %s && %s %s %s", 
-							  n->makeflow_cwd, 
+	start->lexeme = string_format("cd %s && %s %s %s",
+							  n->makeflow_cwd,
 							  wrapper,
 							  get_makeflow_exe(),
 							  n->makeflow_dag);
@@ -607,14 +607,14 @@ int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 
 	dag_parse_drop_spaces(bk);
 	lexer_preppend_token(bk, start);
-	
+
 	return dag_parse_node_regular_command(bk, n);
 }
 
 int dag_parse_export(struct lexer *bk)
 {
-	struct token *t, *vtoken, *vname; 
-	
+	struct token *t, *vtoken, *vname;
+
 	const char *name;
 
 	int count = 0;
@@ -649,13 +649,13 @@ int dag_parse_export(struct lexer *bk)
 		count++;
 		debug(D_MAKEFLOW_PARSER, "export variable: %s", name);
 	}
-	
+
 	if(t) {
 		//Free newline
 		t = lexer_next_token(bk);
 		lexer_free_token(t);
 	}
-	
+
 	if(count < 1) {
 		lexer_report_error(bk, "The export syntax needs the explicit name of the variables to be exported.\n");
 	}

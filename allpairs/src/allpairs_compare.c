@@ -95,7 +95,7 @@ static void allpairs_compare_IRIS( const char *name1, const char *data1, int siz
 	int size, band, inner, outer, quality;
 	const int power2[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
-	// Start processing data in mmap1       
+	// Start processing data in mmap1
 	sscanf(data1, "%d %d %d %d %d", &size, &band, &inner, &outer, &quality);
 	data1 = strchr(data1, '\n');
 

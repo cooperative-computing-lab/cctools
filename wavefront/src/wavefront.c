@@ -130,7 +130,7 @@ int wavefront_task_submit_recursive( struct wavefront_task *n )
 
 	batch_job_id_t job_id = batch_job_submit_simple(batch_q,command,extra_input_files,extra_output_files);
 	free(extra_input_files);
-	
+
 	return job_id;
 }
 
@@ -227,7 +227,7 @@ static double wavefront_multicore_model( int size, int cpus, double tasktime )
 		}
 	}
 
-	return runtime;		
+	return runtime;
 }
 
 static double wavefront_distributed_model( int size, int nodes, int cpus_per_node, double tasktime, int blocksize, double dispatchtime )
@@ -312,7 +312,7 @@ static int check_configuration( const char *function, int xsize, int ysize )
 			fprintf(stderr, "Cannot access initial file %s: %s\n",path,strerror(errno));
 			return 0;
 		}
-	}  
+	}
 
 	return 1;
 }
@@ -571,7 +571,7 @@ int main( int argc, char *argv[] )
 
 			task = list_pop_tail(ready_list);
 			if(!task) break;
-			
+
 			jobid = wavefront_task_submit(task);
 			if(jobid>0) {
 				itable_insert(running_table,jobid,task);

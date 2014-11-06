@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
 	int port = WORK_QUEUE_DEFAULT_PORT;
 	int taskid;
 	int i;
-	char *gzip_path; 
+	char *gzip_path;
 
 	if(argc < 2) {
 		printf("work_queue_example <file1> [file2] [file3] ...\n");
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 	   the location of gzip in 'gzip_path', which is usually found in /bin/gzip
 	   or /usr/bin/gzip. We use the 'access' function (from unistd.h standard C
 	   library), and test the path for execution (X_OK) and reading (R_OK)
-	   permissions. 
+	   permissions.
 	 */
 	gzip_path = "/bin/gzip";
 	if(access(gzip_path, X_OK | R_OK) != 0) {
@@ -79,13 +79,13 @@ int main(int argc, char *argv[])
 		 * workers. Note that when specifying a file, we have to name its local
 		 * name (e.g. gzip_path), and its remote name (e.g. "gzip"). Unlike the
 		 * following line, more often than not these are the same. */
-		work_queue_task_specify_file(t, gzip_path, "gzip", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE); 
+		work_queue_task_specify_file(t, gzip_path, "gzip", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 
 		/* files to be compressed are different across all tasks, so we do not
 		 * cache them. This is, of course, application specific. Sometimes you
 		 * may want to cache an output file if is the input of a later task.*/
 		work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
-		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE); 
+		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 
 		/* Once all files has been specified, we are ready to submit the task to the queue. */
 		taskid = work_queue_submit(q, t);

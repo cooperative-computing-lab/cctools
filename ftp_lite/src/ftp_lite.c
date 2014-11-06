@@ -136,7 +136,7 @@ static int ftp_lite_get_response( struct ftp_lite_server *s, int accept_note, ch
 					result = 0;
 					errno = ECONNRESET;
 				} else if(c=='6') {
-					result = ftp_lite_get_response_gss(s,buffer);				
+					result = ftp_lite_get_response_gss(s,buffer);
 				} else {
 					result = ftp_lite_get_response_raw(s,buffer);
 				}
@@ -171,7 +171,7 @@ static int ftp_lite_get_response( struct ftp_lite_server *s, int accept_note, ch
 				}
 			}
 
-			if( (response/100)==1 ) { 
+			if( (response/100)==1 ) {
 				if(accept_note) {
 					return response;
 				} else {
@@ -208,7 +208,7 @@ static int ftp_lite_send_active( struct ftp_lite_server *s, char *addr, int port
 
 	fields = sscanf(addr,"%d.%d.%d.%d",&a,&b,&c,&d);
 	if(fields!=4) return 0;
-	
+
 	sprintf(buffer,"PORT %d,%d,%d,%d,%d,%d",a,b,c,d,port/256,port&0xff);
 	return ftp_lite_send_command(s,buffer);
 }
@@ -903,16 +903,16 @@ static int ftp_lite_get_response_gss( struct ftp_lite_server *s, char *outbuffer
 }
 
 static int ftp_lite_get_adat( void *arg, void **outbuf, size_t *length )
-{	
+{
 	char buffer[FTP_LITE_LINE_MAX];
 	struct ftp_lite_server *s = (struct ftp_lite_server *)arg;
 	int response;
 
 	response = ftp_lite_get_response(s,0,buffer);
 	if(response/100!=3) return -1;
-	
+
 	if(strncmp(buffer,"335 ADAT=",9)) return -1;
-	
+
 	*length = strlen(buffer)-9;
 	*outbuf = malloc(*length+1);
 	if(!*outbuf) return -1;
@@ -935,7 +935,7 @@ static int ftp_lite_put_adat( void *arg, void *buf, size_t size )
 
 	int ilength = size;
 	if(!ftp_lite_radix_encode((unsigned char *)buf,(unsigned char*)buffer,&ilength)) return -1;
-	
+
 	ftp_lite_send_command(s,"ADAT %s",buffer);
 	return 0;
 }
@@ -946,7 +946,7 @@ int ftp_lite_data_channel_auth( struct ftp_lite_server *s, FILE *data )
 	int token;
 
 	if(!s->data_channel_authentication) return 1;
-	
+
 	setbuf(data,0);
 
 	debug(D_FTP,"data channel authentication in progress...");
@@ -979,10 +979,10 @@ int ftp_lite_auth_globus( struct ftp_lite_server *s )
 	network_address addr;
 	int token,port;
 	int response;
-	
+
 	if(s->auth_done) return 1;
-	
-	major = globus_gss_assist_acquire_cred(&minor,GSS_C_INITIATE,&s->credential); 
+
+	major = globus_gss_assist_acquire_cred(&minor,GSS_C_INITIATE,&s->credential);
 	if(major!=GSS_S_COMPLETE) {
 		errno = EACCES;
 		return 0;

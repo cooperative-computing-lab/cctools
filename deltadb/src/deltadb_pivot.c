@@ -88,18 +88,18 @@ static int log_play( struct deltadb *db, FILE *stream )
 	char name[NVPAIR_LINE_MAX];
 	char value[NVPAIR_LINE_MAX];
 	char oper;
-	
+
 	while(fgets(line,sizeof(line),stream)) {
 		//debug(D_NOTICE,"Processed line: %s",line);
 		line_number += 1;
-		
+
 		if (line[0]=='\n') break;
-		
+
 		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
 		if(n<1) continue;
-		
+
 		struct nvpair *nv;
-		
+
 		switch(oper) {
 			case 'C':
 				nv = nvpair_create();

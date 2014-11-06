@@ -45,7 +45,7 @@ static batch_job_id_t batch_job_local_submit_simple (struct batch_queue *q, cons
 		 * not, in fact, work properly from programs with set-user-ID or
 		 * set-group-ID privileges on systems on which /bin/sh is bash version
 		 * 2, since bash 2 drops privileges on startup. (Debian uses a modified
-		 * bash which does not do this when invoked as sh.) 
+		 * bash which does not do this when invoked as sh.)
 		 */
 		execlp("sh", "sh", "-c", cmd, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.

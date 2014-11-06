@@ -108,7 +108,7 @@ static void add_to_acl( const char *entry, void *vbuf )
 class pfs_service_multi : public pfs_service {
 public:
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
-		struct chirp_file *file;		
+		struct chirp_file *file;
 		file = chirp_multi_open(name->hostport,name->rest,flags,mode,time(0)+pfs_master_timeout);
 		if(file) {
 			return new pfs_file_multi(name,file);
@@ -196,7 +196,7 @@ public:
 				errno = ENOTDIR;
 				result = -1;
 			}
-		}	
+		}
 		return result;
 	}
 
@@ -246,12 +246,12 @@ public:
 		return chirp_multi_setacl(name->hostport,name->rest,subject,rights,time(0)+pfs_master_timeout);
 	}
 
-	virtual pfs_location* locate( pfs_name *name) {	
+	virtual pfs_location* locate( pfs_name *name) {
 		int result = -1;
 		pfs_location *loc = new pfs_location();
-		
+
 		result = chirp_multi_locate(name->hostport,name->rest,add_to_loc,(void*)loc,time(0)+pfs_master_timeout);
-		
+
 		if(result>=0) {
 			return loc;
 		} else {

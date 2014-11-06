@@ -44,7 +44,7 @@ int create_dir(const char *path, int mode)
 				free(temp);
 				// use errno from mkdir
 				return 0;
-			}		
+			}
 		} else {
 			free(temp);
 			return 0;

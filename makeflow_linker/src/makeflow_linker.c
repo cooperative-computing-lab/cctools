@@ -464,7 +464,7 @@ int main(int argc, char *argv[]){
 	if(!output) output = xxstrdup("output_dir");
 	if((argc - optind) != 1)
 		fatal("makeflow_linker: No workflow description specified.\n");
-	
+
 	input = argv[optind];
 
 	struct list *dependencies;
@@ -480,7 +480,7 @@ int main(int argc, char *argv[]){
 
 	char input_wd[PATH_MAX];
 	path_dirname(input, input_wd);
-	chdir(input_wd); 
+	chdir(input_wd);
 
 	find_drivers(dependencies);
 	find_dependencies(dependencies);

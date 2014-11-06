@@ -63,7 +63,7 @@ void itable_clear(struct itable *h)
 			e = f;
 		}
 	}
-	
+
 	for(i = 0; i < h->bucket_count; i++) {
 		h->buckets[i] = 0;
 	}
@@ -134,7 +134,7 @@ static int itable_double_buckets(struct itable *h)
 	h->buckets      = hn->buckets;
 	h->bucket_count = hn->bucket_count;
 	h->size         = hn->size;
-	
+
 	/* Delete reference to new, so old is safe */
 	free(hn);
 

@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 			cctools_version_print(stdout, argv[0]);
 			return 0;
 			break;
-		case 'h':			
+		case 'h':
 			show_help(path_basename(argv[0]));
 			return 0;
 		default:
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
-		       
+
 
 	struct work_queue *q = work_queue_create(port);
 	if(!q) fatal("couldn't listen on any port!");

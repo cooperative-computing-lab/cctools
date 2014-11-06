@@ -319,7 +319,7 @@ int main(int argc, char *argv[])
 
 		setAPos = x1;
 		for(setAPos = x1; !feof(setA) && setAPos <= x2; setAPos++) {	// Set A- row of matrix
-			// Threshhold comparison        
+			// Threshhold comparison
 			cntr = ((setBPos - y1) * (x2 - x1 + 1)) + (setAPos - x1);
 
 			subject_equal = isSubjectIdEqual(setAfilename, setBfilename);
@@ -369,7 +369,7 @@ int main(int argc, char *argv[])
 	}
 	debug(D_CHIRP, "\n");
 
-	// Transform roc_data to ROC curve data 
+	// Transform roc_data to ROC curve data
 	for(i = 0; i < count_thresholds; i++) {
 		roc_data[i][1] = 1 - (roc_data[i][1] / count_genuine);	// 1 - FRR
 		roc_data[i][2] = roc_data[i][2] / count_impostar;	// FAR
@@ -485,7 +485,7 @@ INT64_T get_local_path(char *local_path, char *path, time_t stoptime)
 	debug(D_CHIRP, "chirp_path: %s\n", chirp_path);
 	debug(D_CHIRP, "local_path before resolve: %s\n", local_path);
 
-	// get local path for the given chirp path on current machine   
+	// get local path for the given chirp path on current machine
 	retval = chirp_reli_localpath(hostname, chirp_path, local_path, CHIRP_PATH_MAX, stoptime);
 	if(retval < 0) {
 		return retval;

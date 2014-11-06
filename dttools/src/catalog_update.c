@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
 
 	struct utsname name;
 	int cpus;
-	int uptime;	
+	int uptime;
 	double load[3];
 	UINT64_T memory_total, memory_avail;
 	char owner[USERNAME_MAX];

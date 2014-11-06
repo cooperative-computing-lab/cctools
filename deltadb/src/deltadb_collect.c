@@ -84,7 +84,7 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 	char name[NVPAIR_LINE_MAX];
 	char value[NVPAIR_LINE_MAX];
 	char oper;
-	
+
 	int updates = 0;
 	int creating = 0;
 	int bad = 0;
@@ -178,7 +178,7 @@ static int log_play( struct hash_table *table, FILE *stream, const char *filenam
 				if(started==0 && current>=start_time){
 					hash_table_firstkey(table);
 					char *object_key;
-					
+
 					while(hash_table_nextkey(table, &object_key, (void **)&nv)) {
 
 						printf("C %s\n",nvpair_lookup_string(nv,"key"));
@@ -208,7 +208,7 @@ checkpoint file and working ahead in the various log files.
 */
 
 static int log_play_time( struct deltadb *db, time_t start_time, time_t end_time )
-{      
+{
 	char filename[NVPAIR_LINE_MAX];
 	int file_errors = 0;
 
@@ -258,8 +258,8 @@ int main( int argc, char *argv[] )
 
 	memset(&t1,0,sizeof(t1));
 	memset(&t2,0,sizeof(t2));
-	
-	
+
+
 
 	int start_year, start_month, start_day, start_hour, start_minute, start_second;
 	sscanf(argv[2], "%d-%d-%d@%d:%d:%d", &start_year, &start_month, &start_day, &start_hour, &start_minute, &start_second);

@@ -48,7 +48,7 @@ struct pfs_process * pfs_process_lookup( pid_t pid )
  * and then kill ourselves.
  */
 void pfs_process_kill_everyone( int sig )
-{   
+{
 	debug(D_NOTICE,"received signal %d (%s), killing all my children...",sig,string_signal(sig));
 	pfs_process_killall();
 	debug(D_NOTICE,"sending myself %d (%s), goodbye!",sig,string_signal(sig));
@@ -58,7 +58,7 @@ void pfs_process_kill_everyone( int sig )
 		kill(getpid(),sig);
 		kill(getpid(),SIGKILL);
 	}
-}   
+}
 
 /* For every process interested in asynchronous events, send a SIGIO.  Note
  * that is is more coarse than it should be.  Most processes register interest
@@ -150,7 +150,7 @@ void pfs_process_bootstrapfd( void )
 }
 
 struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table )
-{  
+{
 	struct pfs_process *actual_parent;
 	struct pfs_process *child;
 
@@ -213,7 +213,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	nprocs++;
 
 	debug(D_PSTREE,"%d %s %d", ppid, share_table ? "newthread" : "fork", pid);
-	
+
 	return child;
 }
 

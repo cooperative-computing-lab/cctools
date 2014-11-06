@@ -29,7 +29,7 @@ int main(const int argc, const char **argv) {
 	do
 	{
 		j++;
-		if( j%10000000 != 0) 
+		if( j%10000000 != 0)
 			continue;
 
 		buffer = realloc(buffer, size*1024);

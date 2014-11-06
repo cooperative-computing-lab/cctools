@@ -72,7 +72,7 @@ void overlap_write_v5(FILE * file, struct alignment *aln, const char *id1, const
 	// Orientation
 	fprintf(file, "ori:%c\n", aln->ori);
 
-	arh = aln->length1 - aln->end1;	// determine the right portions of sequences that 
+	arh = aln->length1 - aln->end1;	// determine the right portions of sequences that
 	brh = aln->length2 - aln->end2;	// are not in the alignment
 
 	// calculate overhangs assuming A is on the left
@@ -99,7 +99,7 @@ void overlap_write_v5(FILE * file, struct alignment *aln, const char *id1, const
 		}
 
 		if(brh >= arh)
-			fprintf(file, "olt:C\n");	// a is contained in B 
+			fprintf(file, "olt:C\n");	// a is contained in B
 		else
 			fprintf(file, "olt:D\n");	// dovetail - suffix/prefix alignment
 

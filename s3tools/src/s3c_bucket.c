@@ -139,7 +139,7 @@ int s3_ls_bucket(char* bucketname, struct list* dirents, const char* access_key_
 		char trunc[25];
 		int keys;
 		sign_message(&mesg, access_key_id, access_key);
-		
+
 		server = s3_send_message(&mesg, server, stoptime);
 		if(!server)
 			return -1;

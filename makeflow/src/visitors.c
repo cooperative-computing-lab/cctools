@@ -221,7 +221,7 @@ void dag_to_dax_header(const char *name, FILE *output)
 	fprintf(output, "name=\"%s\">\n", name);
 }
 
-/* Write list of files in DAX format for a given node 
+/* Write list of files in DAX format for a given node
  * @param type 0 for input 1 for output
  */
 void dag_to_dax_files(struct list *fs, int type, FILE *output)
@@ -296,7 +296,7 @@ void dag_to_dax_nodes(const struct dag *d, FILE *output)
 void dag_to_dax_parents(const struct dag_node *n, FILE *output)
 {
 	struct dag_node *p;
-	
+
 	if(set_size(n->ancestors) > 0){
 		fprintf(output, "\t<child ref=\"ID%07d\">\n", n->nodeid);
 		set_first_element(n->ancestors);
@@ -311,7 +311,7 @@ void dag_to_dax_relationships(const struct dag *d, FILE *output)
 {
 	struct dag_node *n;
 	UINT64_T node_id;
-	
+
 	itable_firstkey(d->node_table);
 	while(itable_nextkey(d->node_table, &node_id, (void *) &n))
 		dag_to_dax_parents(n, output);
