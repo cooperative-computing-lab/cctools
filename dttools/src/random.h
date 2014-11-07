@@ -22,13 +22,13 @@ void    random_init (void);
  *
  * @return a random int.
  */
-#define random_int   ((int) random_int64())
+#define random_int()   ((int) random_int64())
 
 /** Get a random int32_t.
  *
  * @return a random int32_t.
  */
-#define random_int32 ((int32_t) random_int64())
+#define random_int32() ((int32_t) random_int64())
 
 /** Get a random int64_t.
  *

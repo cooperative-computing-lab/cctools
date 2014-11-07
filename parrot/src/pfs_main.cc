@@ -35,6 +35,7 @@ extern "C" {
 #include "md5.h"
 #include "password_cache.h"
 #include "pfs_resolve.h"
+#include "random.h"
 #include "stringtools.h"
 #include "tracer.h"
 #include "xxmalloc.h"
@@ -475,7 +476,7 @@ int main( int argc, char *argv[] )
 	int c;
 	char *tickets = NULL;
 
-	srand(time(0)*(getpid()+getuid()));
+	random_init();
 
 	debug_config(argv[0]);
 	debug_config_file_size(0); /* do not rotate debug file by default */
