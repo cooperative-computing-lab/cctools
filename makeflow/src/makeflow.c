@@ -1601,11 +1601,12 @@ int main(int argc, char *argv[])
 		{"wrapper", required_argument, 0, LONG_OPT_WRAPPER},
 		{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
+		{"change_directory", required_argument, 0, 'X'},
 		{"zero-length-error", no_argument, 0, 'z'},
 		{0, 0, 0, 0}
 	};
 
-	static const char option_string_run[] = "aAB:cC:d:EfF:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:";
+	static const char option_string_run[] = "aAB:cC:d:EfF:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:X:zZ:";
 	while((c = getopt_long(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
 		switch (c) {
 			case 'a':
@@ -1773,6 +1774,9 @@ int main(int argc, char *argv[])
 					fprintf(stderr, "makeflow: unknown scheduling mode %s\n", optarg);
 					return 1;
 				}
+				break;
+			case 'X':
+				chdir(optarg);
 				break;
 			case 'z':
 				output_len_check = 1;
