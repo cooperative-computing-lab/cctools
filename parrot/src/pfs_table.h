@@ -126,6 +126,7 @@ public:
 	int	       mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
 	int	       mmap_delete( pfs_size_t logical_address, pfs_size_t length );
 	void       mmap_print();
+	void       mmap_proc(pid_t pid, char *path);
 
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
 

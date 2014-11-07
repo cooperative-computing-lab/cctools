@@ -19,16 +19,18 @@ See the file COPYING for details.
 #include "pfs_file_cache.h"
 
 extern "C" {
+#include "pfs_channel.h"
+#include "pfs_resolve.h"
+
 #include "debug.h"
-#include "stringtools.h"
-#include "macros.h"
 #include "full_io.h"
 #include "get_canonical_path.h"
-#include "path.h"
-#include "pfs_resolve.h"
-#include "pfs_channel.h"
-#include "md5.h"
 #include "hash_table.h"
+#include "macros.h"
+#include "md5.h"
+#include "path.h"
+#include "pattern.h"
+#include "stringtools.h"
 }
 
 #include <fcntl.h>
@@ -539,7 +541,18 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 		if(flags&O_DIRECTORY) {
 			file = pname.service->getdir(&pname);
 		} else if(pname.service->is_local()) {
-			file = pname.service->open(&pname,flags,mode);
+			char *pid = NULL;
+			if (pattern_match(pname.rest, "^/proc/(%d+)/maps$", &pid) >= 0) {
+				char tmpfd[PATH_MAX];
+				mmap_proc(atoi(pid), tmpfd);
+				resolve_name(0, tmpfd, &pname);
+				file = pname.service->open(&pname, O_RDONLY, 0);
+				assert(file);
+				unlink(tmpfd);
+			} else {
+				file = pname.service->open(&pname,flags,mode);
+			}
+			free(pid);
 		} else if(pname.service->is_seekable()) {
 			if(force_cache) {
 				file = pfs_cache_open(&pname,flags,mode);
@@ -2139,6 +2152,50 @@ int pfs_table::md5_slow( const char *path, unsigned char *digest )
 	} else {
 		return -1;
 	}
+}
+
+void pfs_table::mmap_proc (pid_t pid, char *path)
+{
+	struct pfs_mmap *m;
+	snprintf(path, PATH_MAX, "/proc/%d/maps", (int)pid);
+	FILE *maps = fopen(path, "r");
+
+	snprintf(path, PATH_MAX, "/dev/shm/parrot-tmp-fd.XXXXXX");
+	FILE *file = fdopen(mkstemp(path), "w");
+	if (file == NULL) {
+		snprintf(path, PATH_MAX, "/dev/null");
+		return;
+	}
+
+	for(m = mmap_list; m; m = m->next) {
+		fprintf(file, "%08" PRIx64 "-%08" PRIx64, (uint64_t)(uintptr_t)m->logical_addr, (uint64_t)(uintptr_t)m->logical_addr+(uint64_t)m->map_length);
+		fprintf(file, " ");
+		fprintf(file, "%c", m->prot & PROT_READ ? 'r' : '-');
+		fprintf(file, "%c", m->prot & PROT_WRITE ? 'w' : '-');
+		fprintf(file, "%c", m->prot & PROT_EXEC ? 'w' : '-');
+		fprintf(file, "%c", m->flags & MAP_PRIVATE ? 'p' : '-');
+		fprintf(file, " ");
+		fprintf(file, "%08" PRIx64, m->file_offset);
+		fprintf(file, " ");
+		fprintf(file, "%02" PRIx32 ":%02" PRIx32, major(m->finfo.st_dev), minor(m->finfo.st_dev));
+		fprintf(file, " ");
+		fprintf(file, "%08" PRIu64, m->finfo.st_ino);
+		fprintf(file, " ");
+		fprintf(file, "%s", m->fpath);
+		fprintf(file, "\n");
+	}
+
+	if (maps) {
+		char line[4096];
+		while (fgets(line, sizeof(line), maps)) {
+			if (pattern_match(line, "%[%w+%]%s*$") >= 0)
+				fprintf(file, "%s", line);
+			else if (pattern_match(line, "%x+%-%x+ %S+ %x+ 00:00 0") >= 0)
+				fprintf(file, "%s", line);
+		}
+		fclose(maps);
+	}
+	fclose(file);
 }
 
 void pfs_table::mmap_print()
