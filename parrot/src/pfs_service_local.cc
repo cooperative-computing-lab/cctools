@@ -365,7 +365,7 @@ public:
 			result = new pfs_dir(name);
 			while((d=::readdir(dir))) {
 				if(!strcmp(d->d_name,IBOX_ACL_BASE_NAME)) continue;
-				result->append(d->d_name);
+				result->append(d);
 			}
 			if(!strcmp(name->rest,"/")) {
 				result->append("chirp");

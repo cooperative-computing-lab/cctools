@@ -93,19 +93,14 @@ struct pfs_kernel_statfs {
 };
 
 struct pfs_kernel_dirent {
-        UINT64_T d_ino;
-        UINT64_T d_off;
-        UINT16_T d_reclen;
-        char     d_name[PFS_PATH_MAX];
-};
+	UINT64_T d_ino;
+	UINT64_T d_off;
+	UINT16_T d_reclen;
+	char     d_name[PFS_PATH_MAX];
+	UINT8_T  d_type;
+} __attribute__((packed));
 
-struct pfs_kernel_dirent64 {
-        UINT64_T d_ino;
-        UINT64_T d_off;
-        UINT16_T d_reclen;
-        UINT8_T  d_type;
-        char     d_name[PFS_PATH_MAX];
-};
+#define pfs_kernel_dirent64 pfs_kernel_dirent
 
 struct pfs_kernel_iovec {
 	void     *iov_base;
@@ -121,7 +116,7 @@ defined sigaction puts sa_mask last as follows:
 
 struct pfs_kernel_sigaction {
 	UINT64_T pfs_sa_handler;
-        INT64_T  pfs_sa_flags;
+	INT64_T  pfs_sa_flags;
 	UINT64_T pfs_sa_restorer;
 	UINT8_T  pfs_sa_mask[128];
 };
@@ -159,14 +154,26 @@ without the name field, plus the actual length
 of the null-terminated name, rounded up to 8-byte alignment.
 */
 
-#define DIRENT_SIZE( x ) \
-	ROUND_UP(((char*)&(x).d_name[0]-(char*)&(x)) + strlen((x).d_name) + 2)
-
 #define COPY_DIRENT( a, b ) \
-	memset(&(b),0,sizeof((b))); \
-	strcpy((b).d_name,(a).d_name);\
-	(b).d_ino = (a).d_ino;\
-	(b).d_off = (a).d_off;\
-	(b).d_reclen = DIRENT_SIZE(b);
+	do {\
+		memset(&(b),0,sizeof((b)));\
+		strcpy((b).d_name,(a).d_name);\
+		(b).d_ino = (a).d_ino;\
+		(b).d_off = (a).d_off;\
+		(b).d_reclen = sizeof(b);\
+		(b).d_type = (a).d_type;\
+	} while (0)
+
+#define COPY_DIRENT64( a, b ) \
+	do {\
+		memset(&(b),0,sizeof((b)));\
+		strcpy((b).d_name,(a).d_name);\
+		(b).d_ino = (a).d_ino;\
+		(b).d_off = (a).d_off;\
+		(b).d_reclen = sizeof(b);\
+		(b).d_type = (a).d_type;\
+	} while (0)
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

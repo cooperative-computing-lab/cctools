@@ -1389,7 +1389,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					if (p->syscall == SYSCALL64_getdents) {
 						struct pfs_kernel_dirent buf;
 						COPY_DIRENT(*d,buf);
-						if(DIRENT_SIZE(buf)>length) {
+						if(buf.d_reclen>length) {
 							pfs_lseek(fd,d->d_off,SEEK_SET);
 							errno = EINVAL; /* if no results, EINVAL */
 							break;
@@ -1400,8 +1400,8 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						result += buf.d_reclen;
 					} else if (p->syscall == SYSCALL64_getdents64) {
 						struct pfs_kernel_dirent64 buf64;
-						COPY_DIRENT(*d,buf64);
-						if(DIRENT_SIZE(buf64)>length) {
+						COPY_DIRENT64(*d,buf64);
+						if(buf64.d_reclen>length) {
 							pfs_lseek(fd,d->d_off,SEEK_SET);
 							errno = EINVAL; /* if no results, EINVAL */
 							break;
