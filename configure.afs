@@ -24,7 +24,7 @@ function detect_packages()
     echo "$0: Detecting packages ..."
 
     PACKAGES_CONFIG=""
-    for package in fuse irods mysql python globus openmpi swig xrootd cvmfs
+    for package in fuse irods mysql python perl globus openmpi swig xrootd cvmfs
     do
 	packagepath=$EXTERNAL/`sys`/$subtype/$package
 
