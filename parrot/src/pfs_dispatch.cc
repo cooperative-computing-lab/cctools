@@ -695,10 +695,12 @@ void decode_socketcall( struct pfs_process *p, int entering, int syscall, const 
 			case SYS_SHUTDOWN:
 			case SYS_SETSOCKOPT:
 			case SYS_GETSOCKOPT:
-				if (p->table->isnative(a[0])) {
-					debug(D_DEBUG, "fallthrough 32bit socket op(%" PRId64 ", %" PRId64 ", %" PRId64 ")", a[0], a[1], a[2]);
-				} else {
+				if (p->table->isparrot(a[0])) {
+					divert_to_dummy(p,-ENOTSOCK); /* You'd be suprised what you can live through... */
+				} else if (!p->table->isnative(a[0])) {
 					divert_to_dummy(p,-EBADF);
+				} else {
+					debug(D_DEBUG, "fallthrough 32bit socket op(%" PRId64 ", %" PRId64 ", %" PRId64 ")", a[0], a[1], a[2]);
 				}
 				break;
 			default:
@@ -1973,12 +1975,27 @@ void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_epoll_ctl:
 		case SYSCALL32_epoll_wait:
 		case SYSCALL32_epoll_pwait:
-		case SYSCALL32_ioctl:
 		case SYSCALL32_timerfd_gettime:
 		case SYSCALL32_timerfd_settime:
-			/* ioctl is only for I/O streams which are never Parrot files. */
-			if(entering && !p->table->isnative(args[0]))
-				divert_to_dummy(p,-EBADF);
+			if (entering) {
+				if (p->table->isparrot(args[0])) {
+					divert_to_dummy(p,-EINVAL); /* You'd be suprised what you can live through... */
+				} else if (!p->table->isnative(args[0])) {
+					divert_to_dummy(p,-EBADF);
+				}
+			}
+			break;
+
+		/* ioctl is only for I/O streams which are never Parrot files. */
+
+		case SYSCALL32_ioctl:
+			if (entering) {
+				if (p->table->isparrot(args[0])) {
+					divert_to_dummy(p,-ENOTTY);
+				} else if (!p->table->isnative(args[0])) {
+					divert_to_dummy(p,-EBADF);
+				}
+			}
 			break;
 
 		/* fcntl operations are rather generic and operate on the file table

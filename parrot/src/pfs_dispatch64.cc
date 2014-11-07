@@ -1598,20 +1598,42 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_epoll_wait:
 		case SYSCALL64_epoll_wait_old:
 		case SYSCALL64_epoll_pwait:
+		case SYSCALL64_timerfd_gettime:
+		case SYSCALL64_timerfd_settime:
+			if (entering) {
+				if (p->table->isparrot(args[0])) {
+					divert_to_dummy(p,-EINVAL); /* You'd be suprised what you can live through... */
+				} else if (!p->table->isnative(args[0])) {
+					divert_to_dummy(p,-EBADF);
+				}
+			}
+			break;
+
 		case SYSCALL64_getpeername:
 		case SYSCALL64_getsockname:
 		case SYSCALL64_getsockopt:
-		case SYSCALL64_ioctl:
-			/* ioctl is only for I/O streams which are never Parrot files. */
 		case SYSCALL64_listen:
 		case SYSCALL64_recvfrom:
 		case SYSCALL64_sendto:
 		case SYSCALL64_setsockopt:
 		case SYSCALL64_shutdown:
-		case SYSCALL64_timerfd_gettime:
-		case SYSCALL64_timerfd_settime:
-			if(entering && !p->table->isnative(args[0]))
-				divert_to_dummy(p,-EBADF);
+			if (entering) {
+				if (p->table->isparrot(args[0])) {
+					divert_to_dummy(p,-ENOTSOCK); /* You'd be suprised what you can live through... */
+				} else if (!p->table->isnative(args[0])) {
+					divert_to_dummy(p,-EBADF);
+				}
+			}
+			break;
+
+		case SYSCALL64_ioctl:
+			if (entering) {
+				if (p->table->isparrot(args[0])) {
+					divert_to_dummy(p,-ENOTTY);
+				} else if (!p->table->isnative(args[0])) {
+					divert_to_dummy(p,-EBADF);
+				}
+			}
 			break;
 
 		case SYSCALL64_poll:

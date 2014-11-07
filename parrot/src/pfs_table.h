@@ -28,6 +28,7 @@ public:
 
 	int isvalid( int fd );
 	int isnative( int fd );
+	int isparrot( int fd );
 	int isspecial( int fd );
 	void recvfd( pid_t pid, int fd );
 	void sendfd( int fd, int errored );

@@ -245,6 +245,11 @@ int pfs_table::isnative( int fd )
 	return VALID_FD(fd) && pointers[fd] == NATIVE;
 }
 
+int pfs_table::isparrot( int fd )
+{
+	return PARROT_FD(fd);
+}
+
 int pfs_table::isspecial( int fd )
 {
 	return VALID_FD(fd) && pointers[fd] == SPECIAL;
