@@ -489,11 +489,17 @@ int main( int argc, char *argv[] )
 	int chose_auth = 0;
 	const char *s;
 	char *tickets = NULL;
+
 	char *http_proxy = NULL;
 	pid_t pid;
 	struct pfs_process *p;
 	char envlist[PATH_MAX] = "";
 	int valgrind = 0;
+
+	random_init();
+
+	debug_config(argv[0]);
+	debug_config_file_size(0); /* do not rotate debug file by default */
 
 	if(getenv("PARROT_ENABLED")) {
 		fprintf(stderr,"sorry, parrot_run cannot be run inside of itself.\n");
