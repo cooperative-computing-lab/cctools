@@ -16,6 +16,7 @@ Christophe Blanchet, IBCP
 
 extern "C" {
 #include "debug.h"
+#include "random.h"
 #include "stringtools.h"
 
 #include "lcg_util.h"

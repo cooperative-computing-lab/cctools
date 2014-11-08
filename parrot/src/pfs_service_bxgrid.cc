@@ -15,6 +15,7 @@ extern "C" {
 #include "domain_name.h"
 #include "hash_table.h"
 #include "path.h"
+#include "random.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 }
