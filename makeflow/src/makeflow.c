@@ -1766,7 +1766,7 @@ int main(int argc, char *argv[])
 				port_set = 1;	//WQ is going to set the port, so we continue as if already set.
 				break;
 			case LONG_OPT_PASSWORD:
-				if(copy_file_to_buffer(optarg, &work_queue_password) < 0) {
+				if(copy_file_to_buffer(optarg, &work_queue_password, NULL) < 0) {
 					fprintf(stderr, "makeflow: couldn't open %s: %s\n", optarg, strerror(errno));
 					return 1;
 				}

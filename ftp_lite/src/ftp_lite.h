@@ -48,9 +48,6 @@ int ftp_lite_nop( struct ftp_lite_server *s );
 
 int ftp_lite_third_party_transfer( struct ftp_lite_server *source, const char *source_file, struct ftp_lite_server *target, const char *target_file );
 
-ftp_lite_size_t ftp_lite_stream_to_stream( FILE *input, FILE *output );
-ftp_lite_size_t ftp_lite_stream_to_buffer( FILE *input, char **buffer );
-
 int ftp_lite_login( const char *prompt, char *name, int namelen, char *pass, int passlen );
 
 #endif

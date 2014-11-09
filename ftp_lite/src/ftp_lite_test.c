@@ -10,8 +10,9 @@ See the file COPYING for details.
 #include <string.h>
 #include <stdlib.h>
 
-#include "ftp_lite.h"
+#include "copy_stream.h"
 #include "debug.h"
+#include "ftp_lite.h"
 
 #define LINE_MAX 1024
 #define BUFFER_SIZE 32768
@@ -168,7 +169,7 @@ static void do_get( const char *rfile, const char *lfile )
 		return;
 	}
 
-	length = ftp_lite_stream_to_stream(data,file);
+	length = copy_stream_to_stream(data,file);
 	if(length>=0) {
 		printf("got %lld bytes\n",length);
 	} else {
@@ -199,7 +200,7 @@ static void do_put( const char *lfile, const char *rfile )
 		return;
 	}
 
-	length = ftp_lite_stream_to_stream(file,data);
+	length = copy_stream_to_stream(file,data);
 	if(length>=0) {
 		printf("put %lld bytes\n",length);
 	} else {
@@ -223,7 +224,7 @@ static void do_ls( const char *path, const char *y )
 		return;
 	}
 
-	length = ftp_lite_stream_to_stream(data,stdout);
+	length = copy_stream_to_stream(data,stdout);
 	if(length<0) {
 		printf("couldn't read list: %s\n",strerror(errno));
 	}

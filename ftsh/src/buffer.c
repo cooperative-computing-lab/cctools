@@ -106,7 +106,7 @@ char * buffer_load( const char *tag )
 
 	stream = fdopen(nfd,"r");
 	if(!stream) goto failure;
-	if(!copy_stream_to_buffer(stream,&buffer)) goto failure;
+	if(!copy_stream_to_buffer(stream,&buffer,NULL)) goto failure;
 	fclose(stream);
 
 	return buffer;

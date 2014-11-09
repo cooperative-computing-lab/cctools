@@ -3923,7 +3923,7 @@ void work_queue_specify_password( struct work_queue *q, const char *password )
 
 int work_queue_specify_password_file( struct work_queue *q, const char *file )
 {
-	return copy_file_to_buffer(file,&(q->password))>0;
+	return copy_file_to_buffer(file,&q->password,NULL)>0;
 }
 
 void work_queue_delete(struct work_queue *q)
