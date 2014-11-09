@@ -308,13 +308,6 @@ int pfs_table::find_empty( int lowest )
 	return -1;
 }
 
-/* Remove multiple slashes and /. from a path */
-
-void pfs_table::collapse_path( const char *l, char *s, int remove_dotdot )
-{
-	path_collapse(l,s,remove_dotdot);
-}
-
 /*
 If short_path is an absolute path, copy it to full path.
 Otherwise, tack the current directory on to the front
@@ -451,7 +444,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 		strcpy(full_logical_name,tmp);
 	}
 
-	collapse_path(full_logical_name,pname->logical_name,1);
+	path_collapse(full_logical_name,pname->logical_name,1);
 	result = pfs_resolve(pname->logical_name,pname->path,time(0)+pfs_master_timeout);
 
 	if(namelist_table) {
@@ -1033,7 +1026,7 @@ int pfs_table::chdir( const char *path )
 	if(resolve_name(0,path,&pname)) {
 		result = pname.service->chdir(&pname,newpath);
 		if(result>=0) {
-			collapse_path(pname.logical_name,working_dir,1);
+			path_collapse(pname.logical_name,working_dir,1);
 			result = 0;
 		}
 	}
@@ -1443,7 +1436,7 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 				/* Fill in the target->name for readlink. */
 				char complete_target_path[PFS_PATH_MAX];
 				complete_path(target->name,complete_target_path);
-				collapse_path(complete_target_path, pname.path, 1);
+				path_collapse(complete_target_path, pname.path, 1);
 			}
 			result = pname.service->readlink(&pname,buf,size);
 		} else {

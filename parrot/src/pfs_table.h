@@ -136,7 +136,6 @@ private:
 	int count_pointer_uses( pfs_pointer *p );
 	int count_file_uses( pfs_file *f );
 
-	void collapse_path( const char *short_path, char *long_path, int remove_dotdot );
 	void complete_path( const char *short_path, char *long_path );
 
 	pfs_size_t mmap_create_object( pfs_file *file, pfs_size_t channel_offset, pfs_size_t map_length, pfs_size_t file_offset, int prot, int flags );
