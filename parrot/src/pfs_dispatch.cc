@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include "pfs_sysdeps.h"
 
 extern "C" {
+#include "buffer.h"
 #include "debug.h"
 #include "int_sizes.h"
 #include "macros.h"
@@ -1649,45 +1650,61 @@ void decode_syscall( struct pfs_process *p, int entering )
 			if (p->table->isnative(args[0])) {
 				if (entering) debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else if (entering) {
-				int fd = args[0];
+				INT64_T fd = args[0];
 				uintptr_t uaddr = args[1];
 				size_t length = args[2];
-				int result = 0;
-				struct dirent *d;
 
+				BUFFER_STACK_ABORT(B, (1<<16)+1);
+				length = MIN(length, 1<<16);
+
+				struct dirent *d;
 				errno = 0;
-				while((d=pfs_fdreaddir(fd))) {
+				while((d = pfs_fdreaddir(fd))) {
+					uint32_t ino32 = d->d_ino;
+					uint32_t off32 = d->d_off;
+					uint64_t ino64 = d->d_ino;
+					uint64_t off64 = d->d_off;
+					uint16_t reclen;
+					const char *name = d->d_name;
+					uint8_t type = d->d_type;
+					if (p->syscall == SYSCALL32_getdents)
+						reclen = sizeof(ino32) + sizeof(off32);
+					else if (p->syscall == SYSCALL32_getdents64)
+						reclen = sizeof(ino64) + sizeof(off64);
+					else assert(0);
+					reclen += sizeof(reclen) + strlen(name) + 1 /* NUL */ + /* padding + */ sizeof(type);
+					size_t padding = ALIGN(uint64_t, reclen)-reclen;
+					reclen += padding;
+
+					if(reclen>length) {
+						pfs_lseek(fd,d->d_off,SEEK_SET);
+						errno = EINVAL;
+						break;
+					}
+
+					int rc = 0;
 					if (p->syscall == SYSCALL32_getdents) {
-						struct pfs_kernel_dirent buf;
-						COPY_DIRENT(*d,buf);
-						if(buf.d_reclen>length) {
-							pfs_lseek(fd,d->d_off,SEEK_SET);
-							errno = EINVAL; /* if no results, EINVAL */
-							break;
-						}
-						tracer_copy_out(p->tracer,&buf,POINTER(uaddr),buf.d_reclen);
-						uaddr  += buf.d_reclen;
-						length -= buf.d_reclen;
-						result += buf.d_reclen;
+						rc += buffer_putlstring(&B, (char *)&ino32, sizeof(ino32));
+						rc += buffer_putlstring(&B, (char *)&off32, sizeof(off32));
 					} else if (p->syscall == SYSCALL32_getdents64) {
-						struct pfs_kernel_dirent64 buf64;
-						COPY_DIRENT64(*d,buf64);
-						if(buf64.d_reclen>length) {
-							pfs_lseek(fd,d->d_off,SEEK_SET);
-							errno = EINVAL; /* if no results, EINVAL */
-							break;
-						}
-						tracer_copy_out(p->tracer,&buf64,POINTER(uaddr),buf64.d_reclen);
-						uaddr  += buf64.d_reclen;
-						length -= buf64.d_reclen;
-						result += buf64.d_reclen;
+						rc += buffer_putlstring(&B, (char *)&ino64, sizeof(ino64));
+						rc += buffer_putlstring(&B, (char *)&off64, sizeof(off64));
 					} else assert(0);
+					rc += buffer_putlstring(&B, (char *)&reclen, sizeof(reclen));
+					rc += buffer_putstring(&B, name);
+					rc += buffer_putliteral(&B, "\0"); /* NUL terminator for d_name */
+					rc += buffer_putlstring(&B, "\0\0\0\0\0\0\0\0", padding); /* uint64_t alignment padding */
+					rc += buffer_putlstring(&B, (char *)&type, sizeof(type));
+					assert(rc == (int)reclen);
+					length -= rc;
 				}
 
-				if(result == 0 && errno)
+				if (buffer_pos(&B)) {
+					tracer_copy_out(p->tracer,buffer_tostring(&B),POINTER(uaddr),buffer_pos(&B));
+					divert_to_dummy(p, buffer_pos(&B));
+				} else {
 					divert_to_dummy(p, -errno);
-				else
-					divert_to_dummy(p, result);
+				}
 			}
 			break;
 
