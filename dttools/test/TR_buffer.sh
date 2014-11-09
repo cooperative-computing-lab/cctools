@@ -16,10 +16,11 @@ prepare()
 #include <stdlib.h>
 #include <string.h>
 
-#define check(expected,rc) \
+#define check(cmp,expr) \
 	do {\
-		if (expected != rc)\
-			fatal("[%s:%d]: unexpected failure: %d -> %d '%s'", __FILE__, __LINE__, expected, rc, strerror(errno));\
+		int rc = (expr);\
+		if (!(cmp rc))\
+			fatal("[%s:%d]: unexpected failure: %s %d '%s'", __FILE__, __LINE__, #cmp, rc, strerror(errno));\
 	} while (0)
 
 int main (int argc, char *argv[])
@@ -35,16 +36,16 @@ int main (int argc, char *argv[])
 	/* test that buffer starts with empty string */
 	buffer_init(&B);
 	buffer_ubuf(&B, buf3, sizeof(buf3));
-	check(0, strcmp(buffer_tostring(&B), ""));
+	check(0 ==, strcmp(buffer_tostring(&B), ""));
 	buffer_free(&B);
 
 	buffer_init(&B);
 	buffer_ubuf(&B, buf1, sizeof(buf1));
-	check(0, buffer_putliteral(&B, "a"));
-	check(0, buffer_putstring(&B, "b"));
-	check(0, buffer_putlstring(&B, "cd", 1));
-	check(0, buffer_putstring(&B, "de"));
-	check(0, strcmp(buffer_tostring(&B), "abcde"));
+	check(1 ==, buffer_putliteral(&B, "a"));
+	check(1 ==, buffer_putstring(&B, "b"));
+	check(1 ==, buffer_putlstring(&B, "cd", 1));
+	check(2 ==, buffer_putstring(&B, "de"));
+	check(0 ==, strcmp(buffer_tostring(&B), "abcde"));
 	buffer_free(&B);
 
 	/* small buffer shouldn't be used */
@@ -52,10 +53,10 @@ int main (int argc, char *argv[])
 	buffer_ubuf(&B, buf1, sizeof(buf1));
 	strcpy(test, "");
 	for (i = 0; i < 1<<12; i++) {
-		check(0, buffer_putstring(&B, "a"));
+		check(1 ==, buffer_putstring(&B, "a"));
 		strcat(test, "a");
 	}
-	check(0, strcmp(buffer_tolstring(&B, &len), test));
+	check(0 ==, strcmp(buffer_tolstring(&B, &len), test));
 	buffer_free(&B);
 
 	/* this buffer is equal to initial and won't be used */
@@ -63,10 +64,10 @@ int main (int argc, char *argv[])
 	buffer_ubuf(&B, buf2, sizeof(buf2));
 	strcpy(test, "");
 	for (i = 0; i < 1<<12; i++) {
-		check(0, buffer_putstring(&B, "a"));
+		check(1 ==, buffer_putstring(&B, "a"));
 		strcat(test, "a");
 	}
-	check(0, strcmp(buffer_tolstring(&B, &len), test));
+	check(0 ==, strcmp(buffer_tolstring(&B, &len), test));
 	buffer_free(&B);
 
 	/* testing max */
@@ -74,9 +75,9 @@ int main (int argc, char *argv[])
 	buffer_ubuf(&B, buf2, sizeof(buf2));
 	buffer_max(&B, 1<<12);
 	for (i = 0; i < (1<<12)-1; i++) {
-		check(0, buffer_putstring(&B, "a"));
+		check(1 ==, buffer_putstring(&B, "a"));
 	}
-	check(-1, buffer_putstring(&B, "a"));
+	check(-1 ==, buffer_putstring(&B, "a"));
 	buffer_free(&B);
 
 	/* this buffer should be used */
@@ -85,10 +86,10 @@ int main (int argc, char *argv[])
 	buffer_max(&B, 1<<13);
 	strcpy(test, "");
 	for (i = 0; i < 1<<12; i++) {
-		check(0, buffer_putstring(&B, "a"));
+		check(1 ==, buffer_putstring(&B, "a"));
 		strcat(test, "a");
 	}
-	check(0, strcmp(buffer_tolstring(&B, &len), test));
+	check(0 ==, strcmp(buffer_tolstring(&B, &len), test));
 	buffer_free(&B);
 
 	/* test max again */
@@ -96,9 +97,9 @@ int main (int argc, char *argv[])
 	buffer_ubuf(&B, buf3, sizeof(buf3));
 	buffer_max(&B, 1<<14);
 	for (i = 0; i < (1<<14)-1; i++) {
-		check(0, buffer_putstring(&B, "a"));
+		check(1 ==, buffer_putstring(&B, "a"));
 	}
-	check(-1, buffer_putstring(&B, "a"));
+	check(-1 ==, buffer_putstring(&B, "a"));
 	buffer_free(&B);
 
 	/* testing heap growth */
@@ -107,10 +108,10 @@ int main (int argc, char *argv[])
 	for (i = 0; i < 1<<20; i++)
 		test[i] = 'a';
 	for (i = 0; i < 1<<20; i++) {
-		check(0, buffer_putstring(&B, "a"));
+		check(1 ==, buffer_putstring(&B, "a"));
 	}
-	check(0, strcmp(buffer_tolstring(&B, &len), test));
-	check(1<<20, len);
+	check(0 ==, strcmp(buffer_tolstring(&B, &len), test));
+	check(1<<20 ==, len);
 	buffer_free(&B);
 
 	return 0;

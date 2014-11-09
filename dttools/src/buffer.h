@@ -100,7 +100,7 @@ int buffer_dupl(buffer_t *b, char **buf, size_t *l);
     @param b The buffer to fill.
     @param format The format string.
     @param ap The variable argument list for the format string.
-    @return -1 on error.
+    @return bytes added (excluding NUL) or -1 on error.
   */
 
 int buffer_putvfstring(buffer_t * b, const char *format, va_list ap);
@@ -111,7 +111,7 @@ int buffer_putvfstring(buffer_t * b, const char *format, va_list ap);
     @param b The buffer to fill.
     @param format The format string.
     @param ... The variable arguments for the format string.
-    @return -1 on error.
+    @return bytes added (excluding NUL) or -1 on error.
   */
 int buffer_putfstring(buffer_t * b, const char *format, ...)
 __attribute__ (( format(printf,2,3) )) ;
@@ -121,21 +121,21 @@ __attribute__ (( format(printf,2,3) )) ;
     @param b The buffer to fill.
     @param str The string to append.
     @param len The length of the string.
-    @return -1 on error.
+    @return bytes added (excluding NUL) or -1 on error.
   */
 int buffer_putlstring(buffer_t * b, const char *str, size_t len);
 
 /** Appends the string to the end of the buffer. Length derived via strlen.
     @param b The buffer to fill.
     @param s The string to append.
-    @return -1 on error.
+    @return bytes added (excluding NUL) or -1 on error.
   */
 #define buffer_putstring(b,s)  (buffer_putlstring(b,s,strlen(s)))
 
 /** Appends the string literal to the end of the buffer. Length derived via sizeof.
     @param b The buffer to fill.
     @param l The literal string to append.
-    @return -1 on error.
+    @return bytes added (excluding NUL) or -1 on error.
   */
 #define buffer_putliteral(b,l)  (buffer_putlstring(b,l "",sizeof(l)-1))
 

@@ -133,9 +133,9 @@ int buffer_putfstring(buffer_t * b, const char *format, ...)
 {
 	va_list va;
 	va_start(va, format);
-	int r = buffer_vprintf(b, format, va);
+	int rc = buffer_vprintf(b, format, va);
 	va_end(va);
-	return r;
+	return rc;
 }
 
 int buffer_putlstring(buffer_t * b, const char *str, size_t len)
@@ -143,10 +143,10 @@ int buffer_putlstring(buffer_t * b, const char *str, size_t len)
 	if (avail(b) <= len && grow(b, len+1) == -1) {
 		return -1;
 	}
-	strncpy(b->end, str, len);
+	memcpy(b->end, str, len);
 	b->end += len;
 	b->end[0] = '\0';
-	return 0;
+	return (int)len;
 }
 
 const char *buffer_tolstring(buffer_t * b, size_t * size)
