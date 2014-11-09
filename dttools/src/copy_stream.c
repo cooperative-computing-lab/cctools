@@ -208,13 +208,7 @@ int64_t copy_stream_to_buffer(FILE *input, char **buffer, size_t *len)
 		total += actual_read;
 	}
 
-	buffer_tostring(&B, len);
-	*buffer = malloc(*len);
-	if (*buffer == NULL) {
-		buffer_free(&B);
-		return -1;
-	}
-	memcpy(*buffer, buffer_tostring(&B, NULL), *len);
+	buffer_dupl(&B, buffer, len);
 	buffer_free(&B);
 
 	return total;
