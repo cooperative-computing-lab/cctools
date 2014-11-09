@@ -2156,7 +2156,6 @@ int pfs_table::md5_slow( const char *path, unsigned char *digest )
 
 void pfs_table::mmap_proc (pid_t pid, char *path)
 {
-	struct pfs_mmap *m;
 	snprintf(path, PATH_MAX, "/proc/%d/maps", (int)pid);
 	FILE *maps = fopen(path, "r");
 
@@ -2167,22 +2166,25 @@ void pfs_table::mmap_proc (pid_t pid, char *path)
 		return;
 	}
 
-	for(m = mmap_list; m; m = m->next) {
-		fprintf(file, "%08" PRIx64 "-%08" PRIx64, (uint64_t)(uintptr_t)m->logical_addr, (uint64_t)(uintptr_t)m->logical_addr+(uint64_t)m->map_length);
-		fprintf(file, " ");
-		fprintf(file, "%c", m->prot & PROT_READ ? 'r' : '-');
-		fprintf(file, "%c", m->prot & PROT_WRITE ? 'w' : '-');
-		fprintf(file, "%c", m->prot & PROT_EXEC ? 'w' : '-');
-		fprintf(file, "%c", m->flags & MAP_PRIVATE ? 'p' : '-');
-		fprintf(file, " ");
-		fprintf(file, "%08" PRIx64, m->file_offset);
-		fprintf(file, " ");
-		fprintf(file, "%02" PRIx32 ":%02" PRIx32, major(m->finfo.st_dev), minor(m->finfo.st_dev));
-		fprintf(file, " ");
-		fprintf(file, "%08" PRIu64, m->finfo.st_ino);
-		fprintf(file, " ");
-		fprintf(file, "%s", m->fpath);
-		fprintf(file, "\n");
+	struct pfs_process *p = pfs_process_lookup(pid);
+	if (p) {
+		for(struct pfs_mmap *m = p->table->mmap_list; m; m = m->next) {
+			fprintf(file, "%08" PRIx64 "-%08" PRIx64, (uint64_t)(uintptr_t)m->logical_addr, (uint64_t)(uintptr_t)m->logical_addr+(uint64_t)m->map_length);
+			fprintf(file, " ");
+			fprintf(file, "%c", m->prot & PROT_READ ? 'r' : '-');
+			fprintf(file, "%c", m->prot & PROT_WRITE ? 'w' : '-');
+			fprintf(file, "%c", m->prot & PROT_EXEC ? 'w' : '-');
+			fprintf(file, "%c", m->flags & MAP_PRIVATE ? 'p' : '-');
+			fprintf(file, " ");
+			fprintf(file, "%08" PRIx64, m->file_offset);
+			fprintf(file, " ");
+			fprintf(file, "%02" PRIx32 ":%02" PRIx32, major(m->finfo.st_dev), minor(m->finfo.st_dev));
+			fprintf(file, " ");
+			fprintf(file, "%08" PRIu64, m->finfo.st_ino);
+			fprintf(file, " ");
+			fprintf(file, "%s", m->fpath);
+			fprintf(file, "\n");
+		}
 	}
 
 	if (maps) {

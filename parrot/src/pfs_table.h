@@ -126,7 +126,6 @@ public:
 	int	       mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
 	int	       mmap_delete( pfs_size_t logical_address, pfs_size_t length );
 	void       mmap_print();
-	void       mmap_proc(pid_t pid, char *path);
 
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
 
@@ -139,6 +138,7 @@ private:
 	void collapse_path( const char *short_path, char *long_path, int remove_dotdot );
 	void complete_path( const char *short_path, char *long_path );
 
+	static void mmap_proc(pid_t pid, char *path);
 	pfs_size_t mmap_create_object( pfs_file *file, pfs_size_t channel_offset, pfs_size_t map_length, pfs_size_t file_offset, int prot, int flags );
 
 	int         pointer_count;
