@@ -886,6 +886,13 @@ EOF
 	fi
 fi
 
+# If python is not found, then leave out weaver.
+
+if [ $python = 0 ]
+then
+	packages=`echo ${packages} | sed 's/weaver//g'`
+fi
+
 if [ $config_python3_path != no ]
 then
 	if [ -n "$PYTHON3" ] && check_file ${PYTHON3}
