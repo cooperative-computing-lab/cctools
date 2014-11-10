@@ -1184,7 +1184,7 @@ void dag_run(struct dag *d)
     /*copy the list of nodes*/
 	struct list *copy;
 	copy = list_create();
-	for (n = d-> nodes; n; n->next)
+	for (n = d-> nodes; n; n = n->next)
 		list_push_head(copy, n);
 
 	while(!dag_abort_flag) {
