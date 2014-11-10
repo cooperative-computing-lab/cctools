@@ -736,30 +736,27 @@ char *dag_node_rmonitor_wrap_command( struct dag_node *n, const char *command )
 	return result;
 }
 
+
 /*
-Look up the value of a variable with respect to one node.
-Returns a newly allocated string that must be freed.
+For each instance of "pattern" found in "str", replace "pattern" with the string "replace". 
+This function will realloc a new string and return it.
+It may return the original string if no changes are made.
 */
 
-char * dag_node_lookup_str( struct dag_node *n, const char *key )
+static char * string_replace( char *str, char *pattern, char *replace )
 {
-	struct dag_lookup_set s = { n->d, n->category, n, NULL };
-
-	if(!strcmp(key,"RULE") || !strcmp(key,"NODE")) {
-		return string_format("%d",n->nodeid);
+	while(1) {
+		char *found = strstr(str,pattern);
+		if(found) {
+			*found = 0;
+			char *newstr = string_format("%s%s%s",str,replace,found+strlen(pattern));
+			free(str);
+			str = newstr;
+		} else {
+			break;
+		}
 	}
-
-	return dag_lookup_str(key, &s);
-}
-
-/*
-Same as dag_node_lookup_str, but with the arguments reversed
-which makes it compatible with the string_subst function.
-*/
-
-char *dag_node_lookup_str_reverse( const char *key, void *vn )
-{
-	return dag_node_lookup_str(vn,key);
+	return str;
 }
 
 /*
@@ -896,12 +893,14 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	dag_export_variables(d, n);
 
 	/*
-	Just before execution, apply variable substitution to the command and the
-	file list, so that it applies to wrapper commands, files, and everything.
+	Just before execution, replace double-percents with the nodeid.
+	This is used for substituting in the nodeid into a wrapper command or file.
 	*/
-	command = string_subst( command, dag_node_lookup_str_reverse, n );
-	input_files = string_subst( input_files, dag_node_lookup_str_reverse, n );
-	output_files = string_subst( output_files, dag_node_lookup_str_reverse, n );
+	char *nodeid = string_format("%d",n->nodeid);
+	command = string_replace(command,"%%",nodeid);
+	input_files = string_replace(input_files,"%%",nodeid);
+	output_files = string_replace(output_files,"%%",nodeid);
+	free(nodeid);
 
 	/* Display the fully elaborated command, just like Make does. */
 	printf("%s\n", command);
