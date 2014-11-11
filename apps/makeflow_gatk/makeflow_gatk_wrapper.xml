@@ -1,0 +1,480 @@
+<tool id="makeflow_gatk" name="Makeflow-GATK" version="1.0.0">
+  <description> A Distributed version of GATK using Makeflow</description>
+  <requirements>
+      <requirement type="package" version="1.4">gatk</requirement>
+      <requirement type="package">samtools</requirement>
+      <requirement type="package">picard</requirement>
+  </requirements>
+  <command interpreter="python">
+    makeflow_gatk_wrapper.py
+
+    -T $algo
+	
+    --input_file=$INPUT
+		
+    --reference_sequence=$REFERENCE
+	
+    --cctools_install=${GALAXY_DATA_INDEX_DIR}/shared/cctools
+    --samtools=${GALAXY_DATA_INDEX_DIR}/shared/samtools/samtools
+    --gatk_jar=${GALAXY_DATA_INDEX_DIR}/shared/jars/gatk/GenomeAnalysisTK_2_5.jar
+    --dict_jar=${GALAXY_DATA_INDEX_DIR}/shared/jars/picard/CreateSequenceDictionary.jar
+    --java_zip=${GALAXY_DATA_INDEX_DIR}/shared/java/jre.zip
+	
+    --user_id=$__user_id__
+    --pwfile=${GALAXY_DATA_INDEX_DIR}/mypwfile
+		
+	--num-seq-part=$numreads
+
+    --out=$VCF_File
+    #if $Makeflow_Log:
+        --mf_log=$Makeflow_Log
+    #end if
+    #if $Work_Queue_Log:
+        --wq_log=$Work_Queue_Log
+    #end if
+    #if $Debug_Log:
+        --output_dblog=$Debug_Log
+    #end if
+
+    #if $checkparams.useparam=="full":	
+		#if $BQSR:
+			--BQSR=$BQSR
+		#end if	
+		#if $EXCLUDE_INTERVALS:
+			--excludeIntervals=$EXCLUDE_INTERVALS
+		#end if	
+		#if $INTERVALS:
+			--intervals=$$INTERVALS
+		#end if	
+		#if $RG_BLACK_LIST:
+			--read_group_black_list=$RG_BLACK_LIST
+		#end if
+
+		
+		#if $BAQ:
+			--baq=$BAQ
+		#end if
+		#if $BAQ_GOP:
+			--baqGapOpenPenalty=$BAQ_GOP	
+		#end if
+		#if $DEF_BASE_QUALITY:
+			--defaultBaseQualities=$DEF_BASE_QUALITY
+		#end if
+		#if $DOWNSAMPLE_COVERAGE:
+			--downsample_to_coverage=$DOWNSAMPLE_COVERAGE
+		#end if
+		#if $DOWNSAMPLE_FRACTION:
+			--downsample_to_fraction=$DOWNSAMPLE_FRACTION
+		#end if
+		#if $DOWNSAMPLE_TYPE:
+			--downsampling_type=$DOWNSAMPLE_TYPE
+		#end if
+		#if $GATK_KEY:
+			--gatk_key=$GATK_KEY
+		#end if
+		#if $QSCORE_PRIOR:
+			--globalQScorePrior=$QSCORE_PRIOR
+		#end if
+		#if $INTERVAL_MERGING:
+			--interval_merging=$INTERVAL_MERGING
+		#end if
+		#if $INTERVAL_PADDING:
+			--interval_padding=$INTERVAL_PADDING
+		#end if
+		#if $INTERVAL_RULE:
+			--interval_set_rule=$INTERVAL_RULE
+		#end if
+		#if $LOG_LEVEL:
+			--logging_level=$LOG_LEVEL
+		#end if
+		#if $MAX_RUN:
+			--maxRuntime=$MAX_RUN
+		#end if
+		#if $MAX_RUN_UNIT:
+			--maxRuntimeUnits=$MAX_RUN_UNIT
+		#end if
+		#if $CTHREADS_PER_DTHREADS:
+			--num_cpu_threads_per_data_thread=$CTHREADS_PER_DTHREADS
+		#end if
+		#if $NUM_THREADS:
+			--num_threads=$NUM_THREADS
+		#end if
+		#if $PEDIGREE:
+			--pedigree=$PEDIGREE
+		#end if
+		#if $PEDI_STR:
+			--pedigreeString=$PEDI_STR
+		#end if
+		#if $PEDI_VALID:
+			--pedigreeValidationType=$PEDI_VALID
+		#end if
+		#if $ET:
+			--phone_home=$ET
+		#end if
+		#if $PRES_LOW_QSCORE:
+			--preserve_qscores_less_than=$PRES_LOW_QSCORE
+		#end if
+		#if $BUFF_SIZE:
+			--read_buffer_size=$BUFF_SIZE
+		#end if
+		#if $BUFF_FILT:
+			--read_filter=$BUFF_FILT
+		#end if
+		#if $TAG:
+			--tag=$TAG
+		#end if
+		#if $UNSAFE:
+			--unsafe=$UNSAFE
+		#end if
+		#if $VALID_STRICT
+			--validation_strictness=$VALID_STRICT
+		#end if
+		#if $HETER
+			--heterozygosity=$HETER
+		#end if
+		#if $INDEL_HETER
+			--indel_heterozygosity=$INDEL_HETER
+		#end if
+		
+		
+		#if $ALLOW_MISENCOD:
+			--allow_potentially_misencoded_quality_scores
+		#end if
+		#if $DISABLE_INDEL_Q:
+			--disable_indel_quals
+		#end if
+		#if	$EMIT_ORIG:
+			--emit_original_quals
+		#end if
+		#if $FIX_MISENCOD:
+			--fix_misencoded_quality_scores
+		#end if
+		#if	$KEEP_RECORDS:
+			--keep_program_records
+		#end if
+		#if	$MON_THREADS:
+			--monitorThreadEfficiency
+		#end if
+		#if	$RAND_SEED:
+			--nonDeterministicRandomSeed
+		#end if
+		#if	$REMOVE_RECORDS:
+			--remove_program_records
+		#end if
+		#if	$ORIG_QUALS:
+			--useOriginalQualities
+		#end if
+		#if	$VERSION:
+			--version
+		#end if
+		
+		
+		#if	$MAPPING:
+			--sample_rename_mapping_file=$MAPPING
+		#end if
+		
+		#if	$ALLOW_BQSR:
+			--allow_bqsr_on_reduced_bams_despite_repeated_warnings
+		#end if
+
+    #end if
+
+
+</command>
+<inputs>
+
+	<param format="bam" name="INPUT" type="data" label="Input BAM file" />
+
+	<param format="fasta" name="REFERENCE" type="data"  metadata_name="dbkey" label="Input Reference" />
+
+	<param name="algo" type="select" label="GATK Algorithm">
+		<option value="HaplotypeCaller">HaplotypeCaller</option>
+    </param>
+
+	<param name="numreads" type="integer" value="10000" label="Number of Sequences per Partition" />
+
+	<conditional name="checkparams">
+		<param name="useparam" type="select" label="Other options" help="Select other flags and their values">
+			<option value="pre_set">Default settings</option>
+			<option value="full">View list</option>
+		</param>
+		<when value="pre_set" />
+		<when value="full">
+			<param name="BQSR" type="data" label="BQSR" help="The input covariates table file which enables on-the-fly base quality score recalibration (intended for use with BaseRecalibrator and PrintReads)" />
+			<param name="EXCLUDE_INTERVALS" type="data" label="excludeIntervals" help="One or more genomic intervals to exclude from processing. Can be explicitly specified on the command line or in a file (including a rod file)" />
+			<param name="INTERVALS" type="data" label="intervals" help="One or more genomic intervals over which to operate. Can be explicitly specified on the command line or in a file (including a rod file)" />
+			<param name="RG_BLACK_LIST" type="data" label="read_group_black_list" help="Filters out read groups matching : or a .txt file containing the filter strings one per line." />
+
+			<param name="BAQ" type="text" label="baq" help="Type of BAQ calculation to apply in the engine" />
+			<param name="BAQ_GOP" type="text" label="baqGapOpenPenalty" help="BAQ gap open penalty (Phred Scaled). Default value is 40. 30 is perhaps better for whole genome call sets" />
+			<param name="DEF_BASE_QUALITY" type="text" label="defaultBaseQualities" help="If reads are missing some or all base quality scores, this value will be used for all base quality scores" />
+			<param name="DOWNSAMPLE_COVERAGE" type="text" label="downsample_to_coverage" help="Coverage [integer] to downsample to. For locus-based traversals (eg., LocusWalkers and ActiveRegionWalkers),this controls the maximum depth of coverage at each locus. For non-locus-based traversals (eg., ReadWalkers), this controls the maximum number of reads sharing the same alignment start position. Note that this downsampling option does NOT produce an unbiased random sampling from all available reads at each locus: instead, the primary goal of the to-coverage downsampler is to maintain an even representation of reads from all alignment start positions when removing excess coverage. For a true across-the-board unbiased random sampling of reads, use -dfrac instead. Also note that the coverage target is an approximate goal that is not guaranteed to be met exactly: the downsampling algorithm will under some circumstances retain slightly more coverage than requested." />
+			<param name="DOWNSAMPLE_FRACTION" type="text" label="downsample_to_fraction" help="Fraction [0.0-1.0] of reads to downsample to" />
+			<param name="DOWNSAMPLE_TYPE" type="text" label="downsampling_type" help="Type of reads downsampling to employ at a given locus. Reads will be selected randomly to be removed from the pile based on the method described here" />
+			<param name="GATK_KEY" type="data" label="gatk_key" help="GATK Key file. Required if running with -et NO_ET." />
+			<param name="QSCORE_PRIOR" type="text" label="globalQScorePrior" help="The global Qscore Bayesian prior to use in the BQSR. If specified, this value will be used as the prior for all mismatch quality scores instead of the actual reported quality score" />
+			<param name="INTERVAL_MERGING" type="text" label="interval_merging" help="Indicates the interval merging rule we should use for abutting intervals" />
+			<param name="INTERVAL_PADDING" type="text" label="interval_padding" help="Indicates how many basepairs of padding to include around each of the intervals specified with the -L/--intervals argument" />
+			<param name="INTERVAL_RULE" type="text" label="interval_set_rule" help="Indicates the set merging approach the interval parser should use to combine the various -L or -XL inputs" />
+			<param name="LOG_LEVEL" type="text" label="logging_level" help="Set the minimum level of logging, i.e. setting INFO get's you INFO up to FATAL, setting ERROR gets you ERROR and FATAL level logging." />
+			<param name="MAX_RUN" type="text" label="maxRuntime" help="If provided, that GATK will stop execution cleanly as soon after maxRuntime has been exceeded, truncating the run but not exiting with a failure. By default the value is interpreted in minutes, but this can be changed by maxRuntimeUnits" />
+			<param name="MAX_RUN_UNIT" type="text" label="maxRuntimeUnits" help="The TimeUnit for maxRuntime [MINUTES]" />
+			<param name="CTHREADS_PER_DTHREADS" type="text" label="num_cpu_threads_per_data_thread" help="How many CPU threads should be allocated per data thread to running this analysis?" />
+			<param name="NUM_THREADS" type="text" label="num_threads" help="How many data threads should be allocated to running this analysis." />
+			<param name="PEDIGREE" type="data" label="pedigree" help="Pedigree files for samples" />
+			<param name="PEDI_STR" type="text" label="pedigreeString" help="Pedigree string for samples" />
+			<param name="PEDI_VALID" type="text" label="pedigreeValidationType" help="How strict should we be in validating the pedigree information?" />
+			<param name="ET" type="text" label="phone_home" help="What kind of GATK run report should we generate? AWS is the default, can be NO_ET so nothing is posted to the run repository. " />
+			<param name="PRES_LOW_QSCORE" type="text" label="preserve_qscores_less_than" help="Bases with quality scores less than this threshold won't be recalibrated (with -BQSR)" />
+			<param name="BUFF_SIZE" type="text" label="read_buffer_size" help="Number of reads per SAM file to buffer in memory" />
+			<param name="BUFF_FILT" type="text" label="read_filter" help="Specify filtration criteria to apply to each read individually" />
+			<param name="TAG" type="text" label="tag" help="Arbitrary tag string to identify this GATK run as part of a group of runs, for later analysis" />
+			<param name="VALID_STRICT" type="text" label="validation_strictness" help="How strict should we be with validation" />
+			<param name="HETER" type="text" label="heterozygosity" help="Heterozygosity value used to compute prior likelihoods for any locus. See the GATKDocs for full details on the meaning of this population genetics concept" />
+			<param name="INDEL_HETER" type="text" label="indel_heterozygosity" help="Heterozygosity for indel calling. See the GATKDocs for heterozygosity for full details on the meaning of this population genetics concept" />
+	
+			<param name="UNSAFE" type="boolean" checked="true" label="unsafe" help="If set, enables unsafe operations: nothing will be checked at runtime. For expert users only who know what they are doing. We do not support usage of this argument." />	
+	  
+			<param name="ALLOW_MISENCOD" type="boolean" checked="true" label="allow_potentially_misencoded_quality_scores" help="Do not fail when encountering base qualities that are too high and that seemingly indicate a problem with the base quality encoding of the BAM file" />
+			<param name="DISABLE_INDEL_Q" type="boolean" checked="true" label="disable_indel_quals" help="If true, disables printing of base insertion and base deletion tags (with -BQSR)" />
+			<param name="EMIT_ORIG" type="boolean" checked="true" label="emit_original_quals" help="If true, enables printing of the OQ tag with the original base qualities (with -BQSR)" />
+			<param name="FIX_MISENCOD" type="boolean" checked="true" label="fix_misencoded_quality_scores" help="Fix mis-encoded base quality scores" />
+			<param name="KEEP_RECORDS" type="boolean" checked="true" label="keep_program_records" help="Should we override the Walker's default and keep program records from the SAM header" />
+			<param name="MON_THREADS" type="boolean" checked="true" label="monitorThreadEfficiency" help="Enable GATK threading efficiency monitoring" />
+			<param name="RAND_SEED" type="boolean" checked="true" label="nonDeterministicRandomSeed" help="Makes the GATK behave non deterministically, that is, the random numbers generated will be different in every run" />
+			<param name="REMOVE_RECORDS" type="boolean" checked="true" label="remove_program_records" help="Should we override the Walker's default and remove program records from the SAM header" />
+			<param name="ORIG_QUALS" type="boolean" checked="true" label="useOriginalQualities" help="If set, use the original base quality scores from the OQ tag when present instead of the standard scores" />
+			<param name="VERSION" type="boolean" checked="true" label="version" help="Version Information" />
+	  
+			<param name="MAPPING" type="data" label="sample_rename_mapping_file" help="Rename sample IDs on-the-fly at runtime using the provided mapping file. This option requires that each BAM file listed in the mapping file have only a single sample specified in its header (though there may be multiple read groups for that sample). Each line of the mapping file must contain the absolute path to a BAM file, followed by whitespace, followed by the new sample name for that BAM file." />
+	  
+			<param name="ALLOW_BQSR" type="boolean" checked="true" label="allow_bqsr_on_reduced_bams_despite_repeated_warnings" help="Do not fail when running base quality score recalibration on a reduced BAM file even though we highly recommend against it" />
+		</when>
+	</conditional>
+   
+    <param name="log_outputs" type="select" label="Select Optional Outputs" display="checkboxes" multiple="true">
+		<option value="OUTPUT_MFLOG">Makeflow Log</option>
+		<option value="OUTPUT_WQLOG">Work Queue Log</option>
+		<option value="OUTPUT_DBLOG">Debug Log</option>
+    </param>
+  </inputs>
+
+
+  <outputs>
+    <data format="vcf" name="VCF_File" label="Haplotype-MF VCF File">
+      <actions>
+        <action type="metadata" name="dbkey">
+          <option type="from_param" name="REFERENCE" param_attribute="dbkey" />
+        </action>
+      </actions>
+    </data>
+    <data format="mklog" name="Makeflow_Log" label="Haplotype-MF Makeflow Log">
+      <filter>"OUTPUT_MFLOG" in log_outputs</filter>
+    </data>
+    <data format="text" name="Work_Queue_Log" label="Haplotype-MF Work Queue Log">
+      <filter>"OUTPUT_WQLOG" in log_outputs</filter>
+    </data>
+    <data format="text" name="Debug_Log" label="Haplotype-MF Debug Log">
+      <filter>"OUTPUT_DBLOG" in log_outputs</filter>
+    </data>
+  </outputs>
+ <help>
+
+  Required Parameters:
+    -T TYPE, --analysis_type=TYPE
+                        Type of analysis to run
+
+  Optional Inputs:
+    --BQSR=BQSR         The input covariates table file which enables on-the-
+                        fly base quality score recalibration (intended for use
+                        with BaseRecalibrator and PrintReads)
+    --excludeIntervals=EXCLUDEINTERVALS
+                        One or more genomic intervals to exclude from
+                        processing. Can be explicitly specified on the command
+                        line or in a file (including a rod file)
+    --input_file=INPUT  SAM or BAM file(s)
+    --intervals=INTERVALS
+                        One or more genomic intervals over which to operate.
+                        Can be explicitly specified on the command line or in
+                        a file (including a rod file)
+    --read_group_black_list=READ_GROUP_BLACK_LIST
+                        Filters out read groups matching : or a .txt file
+                        containing the filter strings one per line.
+    --reference_sequence=REF
+                        Reference sequence file
+    --reference_index=REF_INDEX
+                        Reference sequence file
+    --reference_dict=REF_DICT
+                        Reference sequence file
+
+  Optional Outputs:
+    --log_to_file=LOG   Set the logging location
+    --out=OUTPUT        Output name
+
+  Optional Parameters:
+    --baq=BAQ           Type of BAQ calculation to apply in the engine
+    --baqGapOpenPenalty=BAQGAPOPENPENALTY
+                        BAQ gap open penalty (Phred Scaled). Default value is
+                        40. 30 is perhaps better for whole genome call sets
+    --defaultBaseQualities=DEFAULTBASEQUALITIES
+                        If reads are missing some or all base quality scores,
+                        this value will be used for all base quality scores
+    --downsample_to_coverage=DOWNSAMPLE_TO_COVERAGE
+                        Coverage [integer] to downsample to. For locus-based
+                        traversals (eg., LocusWalkers and
+                        ActiveRegionWalkers),this controls the maximum depth
+                        of coverage at each locus. For non-locus-based
+                        traversals (eg., ReadWalkers), this controls the
+                        maximum number of reads sharing the same alignment
+                        start position. Note that this downsampling option
+                        does NOT produce an unbiased random sampling from all
+                        available reads at each locus: instead, the primary
+                        goal of the to-coverage downsampler is to maintain an
+                        even representation of reads from all alignment start
+                        positions when removing excess coverage. For a true
+                        across-the-board unbiased random sampling of reads,
+                        use -dfrac instead. Also note that the coverage target
+                        is an approximate goal that is not guaranteed to be
+                        met exactly: the downsampling algorithm will under
+                        some circumstances retain slightly more coverage than
+                        requested.
+    --downsample_to_fraction=DOWNSAMPLE_TO_FRACTION
+                        Fraction [0.0-1.0] of reads to downsample to
+    --downsampling_type=DOWNSAMPLING_TYPE
+                        Type of reads downsampling to employ at a given locus.
+                        Reads will be selected randomly to be removed from the
+                        pile based on the method described here
+    --gatk_key=GATK_KEY
+                        GATK Key file. Required if running with -et NO_ET.
+                        Please see
+                        http://gatkforums.broadinstitute.org/discussion/1250
+                        /what-is-phone-home-and-how-does-it-affect-me#latest
+                        for details.
+    --globalQScorePrior=GLOBALQSCOREPRIOR
+                        The global Qscore Bayesian prior to use in the BQSR.
+                        If specified, this value will be used as the prior for
+                        all mismatch quality scores instead of the actual
+                        reported quality score
+    --interval_merging=INTERVAL_MERGING
+                        Indicates the interval merging rule we should use for
+                        abutting intervals
+    --interval_padding=INTERVAL_PADDING
+                        Indicates how many basepairs of padding to include
+                        around each of the intervals specified with the
+                        -L/--intervals argument
+    --interval_set_rule=INTERVAL_SET_RULE
+                        Indicates the set merging approach the interval parser
+                        should use to combine the various -L or -XL inputs
+    --logging_level=LOGGING_LEVEL
+                        Set the minimum level of logging, i.e. setting INFO
+                        get's you INFO up to FATAL, setting ERROR gets you
+                        ERROR and FATAL level logging.
+    --maxRuntime=MAXRUNTIME
+                        If provided, that GATK will stop execution cleanly as
+                        soon after maxRuntime has been exceeded, truncating
+                        the run but not exiting with a failure. By default the
+                        value is interpreted in minutes, but this can be
+                        changed by maxRuntimeUnits
+    --maxRuntimeUnits=MAXRUNTIMEUNITS
+                        The TimeUnit for maxRuntime [MINUTES]
+    --num_cpu_threads_per_data_thread=NUM_CPU_THREADS_PER_DATA_THREAD
+                        How many CPU threads should be allocated per data
+                        thread to running this analysis?
+    --num_bam_file_handles=NUM_BAM_FILE_HANDLES
+                        The total number of BAM file handles to keep open
+                        simultaneously
+    --num_threads=NUM_THREADS
+                        How many data threads should be allocated to running
+                        this analysis.
+    --pedigree=PEDIGREE
+                        Pedigree files for samples
+    --pedigreeString=PEDIGREESTRING
+                        Pedigree string for samples
+    --pedigreeValidationType=PEDIGREEVALIDATIONTYPE
+                        How strict should we be in validating the pedigree
+                        information?
+    --performanceLog=PLOG
+                        If provided, a GATK runtime performance log will be
+                        written to this file
+    --phone_home=PHONE_HOME
+                        What kind of GATK run report should we generate? AWS
+                        is the default, can be NO_ET so nothing is posted to
+                        the run repository. Please see
+                        http://gatkforums.broadinstitute.org/discussion/1250
+                        /what-is-phone-home-and-how-does-it-affect-me#latest
+                        for details.
+    --preserve_qscores_less_than=PRESERVE_QSCORES_LESS_THAN
+                        Bases with quality scores less than this threshold
+                        won't be recalibrated (with -BQSR)
+    --read_buffer_size=READ_BUFFER_SIZE
+                        Number of reads per SAM file to buffer in memory
+    --read_filter=READ_FILTER
+                        Specify filtration criteria to apply to each read
+                        individually
+    --tag=TAG           Arbitrary tag string to identify this GATK run as part
+                        of a group of runs, for later analysis
+    --unsafe=UNSAFE     If set, enables unsafe operations: nothing will be
+                        checked at runtime. For expert users only who know
+                        what they are doing. We do not support usage of this
+                        argument.
+    --validation_strictness=VALIDATION_STRICTNESS
+                        How strict should we be with validation
+    --heterozygosity=HETEROZYGOSITY
+                        Heterozygosity value used to compute prior likelihoods
+                        for any locus. See the GATKDocs for full details on
+                        the meaning of this population genetics concept
+    --indel_heterozygosity=INDEL_HETEROZYGOSITY
+                        Heterozygosity for indel calling. See the GATKDocs for
+                        heterozygosity for full details on the meaning of this
+                        population genetics concept
+
+  Optional Flags:
+    --allow_potentially_misencoded_quality_scores
+                        Do not fail when encountering base qualities that are
+                        too high and that seemingly indicate a problem with
+                        the base quality encoding of the BAM file
+    --disable_indel_quals
+                        If true, disables printing of base insertion and base
+                        deletion tags (with -BQSR)
+    --emit_original_quals
+                        If true, enables printing of the OQ tag with the
+                        original base qualities (with -BQSR)
+    --fix_misencoded_quality_scores
+                        Fix mis-encoded base quality scores
+    --keep_program_records
+                        Should we override the Walker's default and keep
+                        program records from the SAM header
+    --monitorThreadEfficiency
+                        Enable GATK threading efficiency monitoring
+    --nonDeterministicRandomSeed
+                        Makes the GATK behave non deterministically, that is,
+                        the random numbers generated will be different in
+                        every run
+    --remove_program_records
+                        Should we override the Walker's default and remove
+                        program records from the SAM header
+    --useOriginalQualities
+                        If set, use the original base quality scores from the
+                        OQ tag when present instead of the standard scores
+    --version           Output version information
+
+  Advanced Parameters:
+    --sample_rename_mapping_file=SAMPLE_RENAME_MAPPING_FILE
+                        Rename sample IDs on-the-fly at runtime using the
+                        provided mapping file. This option requires that each
+                        BAM file listed in the mapping file have only a single
+                        sample specified in its header (though there may be
+                        multiple read groups for that sample). Each line of
+                        the mapping file must contain the absolute path to a
+                        BAM file, followed by whitespace, followed by the new
+                        sample name for that BAM file.
+
+  Advanced Flags:
+    --allow_bqsr_on_reduced_bams_despite_repeated_warnings
+                        Do not fail when running base quality score
+                        recalibration on a reduced BAM file even though we
+                        highly recommend against it
+
+
+ </help>
+</tool>

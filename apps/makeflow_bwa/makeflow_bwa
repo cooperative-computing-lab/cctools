@@ -161,7 +161,9 @@ def parse_main_options(parser):
 	group.add_option('--fastq', dest='fastq', help='The (forward) fastq file to use for the mapping')
 	group.add_option('--rfastq', dest='rfastq', help='The reverse fastq file to use for mapping if paired-end data')
 	group.add_option('--output_SAM', dest='output_SAM', help='The file to save the output (SAM format) [bwa_results.sam]')
+	group.add_option('--output_err', dest='output_err', help='The file to save the output (SAM format) [bwa_results.sam]')
 	group.add_option('--algoalign', dest='algoalign', help='The type of Alignment Algorithm (backtrack, bwasw, mem) [mem]')
+	group.add_option('--num_seq', dest='num_seq', help='Number of Sequences per partition [50000]')
 	parser.add_option_group(group)	
 
 def parse_makeflow_options(parser):
@@ -330,6 +332,9 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 			config = open(configuration, 'r')
 			makeflow.write(config.read())
 	
+		makeflow.write("CATEGORY=\"analysis\"\n")
+		makeflow.write("CORES=1")
+
 		splits = count_splits(options.fastq)
 		rsplits = 0
 		inputlist = ""
@@ -337,7 +342,7 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 			inputlist = inputlist + options.fastq + "." + str(i) + " "
 	
 		makeflow.write("\n\n"+inputlist + ": " + fastq_name + " " + options.fastq);
-		makeflow.write("\n\t./" + fastq_name + " "+options.fastq+" > numsplits.txt 2>&1")
+		makeflow.write("\n\tLOCAL ./" + fastq_name + " "+options.fastq)
 	
 		if options.rfastq:
 
@@ -347,7 +352,7 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 				rinputlist = rinputlist + options.rfastq + "." + str(i) + " "
 	
 			makeflow.write("\n\n"+rinputlist+": " + fastq_name + " "+options.rfastq);
-			makeflow.write("\n\t./" + fastq_name + " "+options.rfastq+" > rnumsplits.txt")
+			makeflow.write("\n\tLOCAL ./" + fastq_name + " "+options.rfastq)
 
 	 # Rule and Command for Indexing FASTA File
 		ref = options.ref
@@ -359,10 +364,11 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 		index = ref+".bwt "+ref+".pac "+ref+".amb "+ref+".ann "+ref+".sa "
 
 		makeflow.write("\n\n"+index+ ": bwa "+options.ref)
-		makeflow.write("\n\t./bwa index " + index_a + options.ref + " 2>&1")
+		makeflow.write("\n\tLOCAL ./bwa index " + index_a + options.ref)
 
 		index = options.ref + " " + index
 		results_to_cat = ""
+		errors_to_cat = ""
     
 		for c in range(splits):
 			sc=str(c)
@@ -377,20 +383,23 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 			output = "BWAMF.output." + sc + " "
 			results_to_cat += output
 
+			error = "BWAMF.error." + sc + " "
+			errors_to_cat += error
+
 			if options.algoalign=="bwa_backtrack":
 			
 				makeflow.write("\n\n"+sai1+" : bwa "+index+query1)
-				makeflow.write("\n\t./bwa aln "+aln_a+ref+" "+query1+"> "+sai1+" 2>&1")
+				makeflow.write("\n\t./bwa aln "+aln_a+ref+" "+query1+"> "+sai1)
 
 				if options.rfastq:
 					makeflow.write("\n\n"+sai2+" : bwa "+index+query2)
-					makeflow.write("\n\t./bwa aln "+aln_a+ref+" "+query2+"> "+sai2+" 2>&1")
+					makeflow.write("\n\t./bwa aln "+aln_a+ref+" "+query2+"> "+sai2)
 
-					makeflow.write("\n\n"+output+": bwa "+index+query1+query2+sai1+sai2)
-					makeflow.write("\n\t./bwa sampe "+pe_a+ref+" "+sai1+sai2+query1+query2+" > "+output+" 2>&1")
+					makeflow.write("\n\n"+output+" "+error+": bwa "+index+query1+query2+sai1+sai2)
+					makeflow.write("\n\t./bwa sampe "+pe_a+ref+" "+sai1+sai2+query1+query2+" > "+output+" 2>"+error)
 				else:
-					makeflow.write("\n\n"+output+": bwa "+index+query1+sai1)
-					makeflow.write("\n\t./bwa samse "+se_a+ ref+" "+sai1+guery1+" > "+output+" 2>&1")
+					makeflow.write("\n\n"+output+" "+error+": bwa "+index+query1+sai1)
+					makeflow.write("\n\t./bwa samse "+se_a+ ref+" "+sai1+query1+" > "+output+" 2>"+error)
 	
 			else:
 				algo = "mem "
@@ -399,15 +408,22 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 					algo = "bwasw "
 					args = sw_a
       	
-				makeflow.write("\n\n"+output+": bwa "+ index + query1 + query2)
-				makeflow.write("\n\t./bwa "+algo+args+ref+" "+query1+query2+" > "+output+" 2>&1")
+				makeflow.write("\n\n"+output+" "+error+": bwa "+ index + query1 + query2)
+				makeflow.write("\n\t./bwa "+algo+args+ref+" "+query1+query2+" > "+output+" 2>"+error)
 
 		output = "bwa_results.sam "
 		if options.output_SAM:
 			output = options.output_SAM + " "
+
+		error = "bwa_errors.txt "
+		if options.output_err:
+			error = options.output_err + " "
 		
 		makeflow.write("\n\n"+output+": " + cat_name +" "+results_to_cat)
-		makeflow.write("\n\t./" + cat_name +" "+output+results_to_cat)	
+		makeflow.write("\n\tLOCAL ./" + cat_name +" "+output+results_to_cat)	
+
+		makeflow.write("\n\n"+error+": "+errors_to_cat)
+		makeflow.write("\n\tLOCAL cat "+errors_to_cat+" > "+error)	
 
 	finally:
 		if options.makeflow is not None:
@@ -441,6 +457,9 @@ if not options.ref:
 
 if not options.fastq:
 	log.error("No query file: --fastq required")
+
+if options.num_seq:
+	num_reads_per_split = int(options.num_seq)
 
 if os.path.exists(fastq_name):
     os.remove(fastq_name)
