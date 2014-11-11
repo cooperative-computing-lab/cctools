@@ -24,13 +24,13 @@ run()
 	fi
 	proxy=$(cat "$p")
 
-	../src/chirp "$proxy" mkdir /data
-	../src/chirp "$proxy" put /dev/stdin /data/foo <<EOF
+	chirp "$proxy" mkdir /data
+	chirp "$proxy" put /dev/stdin /data/foo <<EOF
 foo bar
 EOF
-	[ "$(../src/chirp "$proxy" cat /data/foo)" = 'foo bar' ]
+	[ "$(chirp "$proxy" cat /data/foo)" = 'foo bar' ]
 
-	../src/chirp_benchmark "$proxy" bench 1 1 1
+	chirp_benchmark "$proxy" bench 1 1 1
 
 	return 0
 }

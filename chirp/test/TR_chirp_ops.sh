@@ -21,7 +21,7 @@ run()
 	fi
 	hostport=$(cat "$c")
 
-	../src/chirp "$hostport" <<EOF
+	chirp "$hostport" <<EOF
 help
 df -g
 mkdir foo

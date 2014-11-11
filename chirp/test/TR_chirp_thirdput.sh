@@ -33,20 +33,20 @@ run()
 	hostport1=$(cat "$c1")
 	hostport2=$(cat "$c2")
 
-	../src/chirp "$hostport2" setacl / address:127.0.0.1 rwlda
+	chirp "$hostport2" setacl / address:127.0.0.1 rwlda
 
-	../src/chirp "$hostport1" mkdir data
-	../src/chirp "$hostport1" mkdir data/stuff
-	dd if=/dev/zero bs=1M count=1 | ../src/chirp "$hostport1" put /dev/stdin /data/foo > /dev/null 2> /dev/null
+	chirp "$hostport1" mkdir data
+	chirp "$hostport1" mkdir data/stuff
+	dd if=/dev/zero bs=1M count=1 | chirp "$hostport1" put /dev/stdin /data/foo > /dev/null 2> /dev/null
 	dd if=/dev/urandom bs=1M | for i in $ITERATE; do
-		head -c $i | ../src/chirp "$hostport1" put /dev/stdin /data/stuff/$i > /dev/null 2> /dev/null
+		head -c $i | chirp "$hostport1" put /dev/stdin /data/stuff/$i > /dev/null 2> /dev/null
 	done
 
-	../src/chirp "$hostport1" thirdput /data "$hostport2" /data2
+	chirp "$hostport1" thirdput /data "$hostport2" /data2
 
-	[ "$(../src/chirp "$hostport1" md5 /data/foo | head -c32)" = "$(../src/chirp "$hostport2" md5 /data2/foo | head -c32)" ]
+	[ "$(chirp "$hostport1" md5 /data/foo | head -c32)" = "$(chirp "$hostport2" md5 /data2/foo | head -c32)" ]
 	for i in $ITERATE; do
-		[ "$(../src/chirp "$hostport1" md5 /data/stuff/$i | head -c32)" = "$(../src/chirp "$hostport2" md5 /data2/stuff/$i | head -c32)" ]
+		[ "$(chirp "$hostport1" md5 /data/stuff/$i | head -c32)" = "$(chirp "$hostport2" md5 /data2/stuff/$i | head -c32)" ]
 	done
 
 	return 0

@@ -1,7 +1,19 @@
-CHIRP_SERVER=../src/chirp_server
+chirp() {
+	echo ../src/chirp -d chirp "$@" >&2
+	../src/chirp -d chirp "$@"
+}
 
-chirp_start()
-{
+chirp_benchmark() {
+	echo ../src/chirp_benchmark "$@" >&2
+	../src/chirp_benchmark "$@"
+}
+
+chirp_server() {
+	echo ../src/chirp "$@" >&2
+	../src/chirp_server "$@"
+}
+
+chirp_start() {
 	debug=`mktemp ./chirp.debug.XXXXXX`
 	pid=`mktemp ./chirp.pid.XXXXXX`
 	port=`mktemp ./chirp.port.XXXXXX`
@@ -12,8 +24,7 @@ chirp_start()
 		root="$1"
 	fi
 	shift
-	echo "$CHIRP_SERVER" --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"
-	if "$CHIRP_SERVER" --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"; then
+	if chirp_server --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"; then
 		for ((i = 0; i < 10; i++)); do
 			if [ -s "$pid" -a -s "$port" ]; then
 				hostport="127.0.0.1:$(cat "$port")"
@@ -32,8 +43,7 @@ chirp_start()
 	return 1
 }
 
-chirp_clean()
-{
+chirp_clean() {
 	for pid in ./chirp.pid.*; do
 		pid=$(cat "$pid")
 		echo kill $pid

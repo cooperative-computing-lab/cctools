@@ -25,29 +25,29 @@ run()
 	hostport=$(cat "$c")
 	root=$(cat "$cr")
 
-	../src/chirp -a unix "$hostport" mkdir -p /users/$(whoami)/data
-	../src/chirp -a unix "$hostport" mkdir /users/$(whoami)/data/a
+	chirp -a unix "$hostport" mkdir -p /users/$(whoami)/data
+	chirp -a unix "$hostport" mkdir /users/$(whoami)/data/a
 	mkdir "$root"/users/$(whoami)/data/b
 
-	../src/chirp -a unix "$hostport" listacl /users/$(whoami)/data/a
-	../src/chirp -a unix "$hostport" listacl /users/$(whoami)/data/b
+	chirp -a unix "$hostport" listacl /users/$(whoami)/data/a
+	chirp -a unix "$hostport" listacl /users/$(whoami)/data/b
 
-	../src/chirp -a unix "$hostport" setacl /users/$(whoami)/data unix:$(whoami) a
-	../src/chirp -a unix "$hostport" listacl /users/$(whoami)/data/b # should be nil!
-	../src/chirp -a unix "$hostport" setacl /users/$(whoami)/data unix:$(whoami) rla
+	chirp -a unix "$hostport" setacl /users/$(whoami)/data unix:$(whoami) a
+	chirp -a unix "$hostport" listacl /users/$(whoami)/data/b # should be nil!
+	chirp -a unix "$hostport" setacl /users/$(whoami)/data unix:$(whoami) rla
 	mkdir "$root"/users/$(whoami)/data/b/c
-	../src/chirp -a unix "$hostport" listacl /users/$(whoami)/data/b/c
-	../src/chirp -a address "$hostport" ls /users/$(whoami)/data/b/c
+	chirp -a unix "$hostport" listacl /users/$(whoami)/data/b/c
+	chirp -a address "$hostport" ls /users/$(whoami)/data/b/c
 
 	mkdir "$root"/foo
 	rm "$root"/.__acl && return 1 # should fail, we've been using the default ACL
-	../src/chirp -a address "$hostport" listacl /foo
-	../src/chirp -a address "$hostport" ls /foo
-	../src/chirp -a unix "$hostport" setacl / address:127.0.0.1 none
-	../src/chirp -a address "$hostport" ls /foo && return 1
+	chirp -a address "$hostport" listacl /foo
+	chirp -a address "$hostport" ls /foo
+	chirp -a unix "$hostport" setacl / address:127.0.0.1 none
+	chirp -a address "$hostport" ls /foo && return 1
 	mkdir "$root"/bar
-	../src/chirp -a address "$hostport" ls /bar && return 1
-	../src/chirp -a unix "$hostport" ls /bar
+	chirp -a address "$hostport" ls /bar && return 1
+	chirp -a unix "$hostport" ls /bar
 
 	return 0
 }

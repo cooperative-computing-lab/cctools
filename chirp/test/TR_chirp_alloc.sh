@@ -21,22 +21,22 @@ run()
 	fi
 	hostport1=$(cat "$c1")
 
-	../src/chirp "$hostport1" mkdir data
-	dd if=/dev/zero bs=64k count=1 | ../src/chirp "$hostport1" put /dev/stdin /data/foo || return 1
-	dd if=/dev/zero bs=64k count=1 | ../src/chirp "$hostport1" put /dev/stdin /data/foo || return 1
-	dd if=/dev/zero bs=65k count=1 | ../src/chirp "$hostport1" put /dev/stdin /data/foo && return 1
-	dd if=/dev/zero bs=64k count=2 | ../src/chirp "$hostport1" put /dev/stdin /data/foo && return 1
-	dd if=/dev/zero bs=64k count=2 | ../src/chirp "$hostport1" put /dev/stdin /data/foo && return 1
-	../src/chirp "$hostport1" lsalloc /data
-	../src/chirp "$hostport1" rm /data/foo
+	chirp "$hostport1" mkdir data
+	dd if=/dev/zero bs=64k count=1 | chirp "$hostport1" put /dev/stdin /data/foo || return 1
+	dd if=/dev/zero bs=64k count=1 | chirp "$hostport1" put /dev/stdin /data/foo || return 1
+	dd if=/dev/zero bs=65k count=1 | chirp "$hostport1" put /dev/stdin /data/foo && return 1
+	dd if=/dev/zero bs=64k count=2 | chirp "$hostport1" put /dev/stdin /data/foo && return 1
+	dd if=/dev/zero bs=64k count=2 | chirp "$hostport1" put /dev/stdin /data/foo && return 1
+	chirp "$hostport1" lsalloc /data
+	chirp "$hostport1" rm /data/foo
 
-	../src/chirp "$hostport1" mkalloc /data/mydata 4096
-	../src/chirp "$hostport1" lsalloc /data/mydata
-	dd if=/dev/zero bs=64k count=1 | ../src/chirp "$hostport1" put /dev/stdin /data/foo && return 1
-	dd if=/dev/zero bs=61440 count=1 | ../src/chirp "$hostport1" put /dev/stdin /data/foo || return 1
-	dd if=/dev/zero bs=61441 count=1 | ../src/chirp "$hostport1" put /dev/stdin /data/foo && return 1
-	dd if=/dev/zero bs=4k count=1 | ../src/chirp "$hostport1" put /dev/stdin /data/mydata/foo1 || return 1
-	dd if=/dev/zero bs=4k count=1 | ../src/chirp "$hostport1" put /dev/stdin /data/mydata/foo2 && return 1
+	chirp "$hostport1" mkalloc /data/mydata 4096
+	chirp "$hostport1" lsalloc /data/mydata
+	dd if=/dev/zero bs=64k count=1 | chirp "$hostport1" put /dev/stdin /data/foo && return 1
+	dd if=/dev/zero bs=61440 count=1 | chirp "$hostport1" put /dev/stdin /data/foo || return 1
+	dd if=/dev/zero bs=61441 count=1 | chirp "$hostport1" put /dev/stdin /data/foo && return 1
+	dd if=/dev/zero bs=4k count=1 | chirp "$hostport1" put /dev/stdin /data/mydata/foo1 || return 1
+	dd if=/dev/zero bs=4k count=1 | chirp "$hostport1" put /dev/stdin /data/mydata/foo2 && return 1
 
 	return 0
 }

@@ -59,37 +59,37 @@ run()
 	fi
 	hostport=$(cat "$c")
 
-	../src/chirp "$hostport" mkdir foo
-	../src/chirp "$hostport" mkdir foo/a
-	../src/chirp "$hostport" mkdir foo/a/bar
-	../src/chirp "$hostport" mkdir foo/b
-	../src/chirp "$hostport" mkdir foo/b/bar
+	chirp "$hostport" mkdir foo
+	chirp "$hostport" mkdir foo/a
+	chirp "$hostport" mkdir foo/a/bar
+	chirp "$hostport" mkdir foo/b
+	chirp "$hostport" mkdir foo/b/bar
 
 	{
 		echo ++
-		../src/chirp "$hostport" search     'foo' 'bar' | sort
+		chirp "$hostport" search     'foo' 'bar' | sort
 		echo ++
-		../src/chirp "$hostport" search -s  'foo' 'bar' | wc -l
+		chirp "$hostport" search -s  'foo' 'bar' | wc -l
 		echo ++
-		../src/chirp "$hostport" search     'foo' 'a/bar' | sort
+		chirp "$hostport" search     'foo' 'a/bar' | sort
 		echo ++
-		../src/chirp "$hostport" search -i  'foo' 'a/bar' | sort
+		chirp "$hostport" search -i  'foo' 'a/bar' | sort
 		echo ++
-		../src/chirp "$hostport" search     'foo' '/foo/a/bar' | sort
+		chirp "$hostport" search     'foo' '/foo/a/bar' | sort
 		echo ++
-		../src/chirp "$hostport" search     '/' '/foo/a/bar' | sort
+		chirp "$hostport" search     '/' '/foo/a/bar' | sort
 		echo ++
-		../src/chirp "$hostport" search     '/' '/foo/*/bar' | sort
+		chirp "$hostport" search     '/' '/foo/*/bar' | sort
 		echo ++
-		../src/chirp "$hostport" search     '/foo' '/*/bar' | sort
+		chirp "$hostport" search     '/foo' '/*/bar' | sort
 		echo ++
-		../src/chirp "$hostport" search     '/foo' '*/bar' | sort
+		chirp "$hostport" search     '/foo' '*/bar' | sort
 		echo ++
-		../src/chirp "$hostport" search -i  '/foo' '*/bar' | sort
+		chirp "$hostport" search -i  '/foo' '*/bar' | sort
 		echo ++
-		../src/chirp "$hostport" search -i  '/foo' '*' | sort
+		chirp "$hostport" search -i  '/foo' '*' | sort
 		echo ++
-		../src/chirp "$hostport" search -i  '/' '/foo/b/bar' | sort
+		chirp "$hostport" search -i  '/' '/foo/b/bar' | sort
 		echo ++
 	} | tr -d ' ' > "$output"
 	diff "$expected" "$output"

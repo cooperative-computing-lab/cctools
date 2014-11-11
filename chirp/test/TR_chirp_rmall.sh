@@ -25,10 +25,10 @@ run()
 	hostport=$(cat "$c")
 	root=$(cat "$cr")
 
-	../src/chirp -a address "$hostport" mkdir /127.0.0.1
-	../src/chirp -a address "$hostport" put /etc/hosts /127.0.0.1/hosts
-	../src/chirp -a unix "$hostport" ls /127.0.0.1 && return 1
-	../src/chirp -a unix "$hostport" rm /127.0.0.1
+	chirp -a address "$hostport" mkdir /127.0.0.1
+	chirp -a address "$hostport" put /etc/hosts /127.0.0.1/hosts
+	chirp -a unix "$hostport" ls /127.0.0.1 && return 1
+	chirp -a unix "$hostport" rm /127.0.0.1
 
 	return 0
 }

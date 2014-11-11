@@ -28,13 +28,13 @@ run()
 	hostport1=$(cat "$c1")
 	hostport2=$(cat "$c2")
 
-	../src/chirp "$hostport1" mkdir "$VOLUME"
-	../src/chirp "$hostport1" mkdir "$VOLUME"/root
-	../src/chirp "$hostport1" put /dev/stdin "$VOLUME"/hosts <<EOF
+	chirp "$hostport1" mkdir "$VOLUME"
+	chirp "$hostport1" mkdir "$VOLUME"/root
+	chirp "$hostport1" put /dev/stdin "$VOLUME"/hosts <<EOF
 $hostport1
 $hostport2
 EOF
-	../src/chirp "$hostport1" put /dev/stdin "$VOLUME"/key <<EOF
+	chirp "$hostport1" put /dev/stdin "$VOLUME"/key <<EOF
 $VOLUME_KEY
 EOF
 

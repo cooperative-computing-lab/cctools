@@ -30,14 +30,14 @@ run()
 	fi
 	hostport=$(cat "$c")
 
-	../src/chirp "$hostport" mkdir /data
-	../src/chirp "$hostport" put /dev/stdin /data/foo <<EOF
+	chirp "$hostport" mkdir /data
+	chirp "$hostport" put /dev/stdin /data/foo <<EOF
 foo bar
 EOF
-	[ "$(../src/chirp "$hostport" cat /data/foo)" = 'foo bar' ]
+	[ "$(chirp "$hostport" cat /data/foo)" = 'foo bar' ]
 
-	../src/chirp_benchmark "$hostport" bench 1 1 1
-	../src/chirp "$hostport" rm /
+	chirp_benchmark "$hostport" bench 1 1 1
+	chirp "$hostport" rm /
 
 	return 0
 }

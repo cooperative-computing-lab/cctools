@@ -23,14 +23,14 @@ run()
 	fi
 	hostport=$(cat "$c")
 
-	../src/chirp -a unix "$hostport" mkdir /data
-	../src/chirp -a unix "$hostport" put /dev/stdin /data/foo <<EOF
+	chirp -a unix "$hostport" mkdir /data
+	chirp -a unix "$hostport" put /dev/stdin /data/foo <<EOF
 foo bar
 EOF
 
-	../src/chirp -d all -a unix "$hostport" ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` /data rwl
+	chirp -d all -a unix "$hostport" ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` /data rwl
 
-	../src/chirp -d all -a ticket --tickets="$ticket" "$hostport" ls /data
+	chirp -d all -a ticket --tickets="$ticket" "$hostport" ls /data
 
 	return 0
 }
