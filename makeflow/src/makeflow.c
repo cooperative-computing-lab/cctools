@@ -934,17 +934,18 @@ int dag_node_ready(struct dag *d, struct dag_node *n)
 	return 1;
 }
 
-void dag_dispatch_ready_jobs(struct dag *d, struct list *l)
+void dag_dispatch_ready_jobs(struct dag *d, struct set *s)
 {
-	struct list_node *n;
-
-	for(n = l->head; n; n = n->next) {
+	struct dag_node *n;
+	set_first_element(s);
+	while((n = set_next_element(s)))
+	 {
 
 		if(d->remote_jobs_running >= d->remote_jobs_max && d->local_jobs_running >= d->local_jobs_max)
 			break;
 
-		if(dag_node_ready(d, n->data)) {
-			dag_node_submit(d, n->data);
+		if(dag_node_ready(d, n)) {
+			dag_node_submit(d, n);
 		}
 	}
 }
@@ -1181,11 +1182,16 @@ void dag_run(struct dag *d)
 	struct dag_node *n;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
-    /*copy the list of nodes*/
-	struct list *copy;
-	copy = list_create();
+	
+	/*count the total number of nodes*/
+	int count = 0;
+	for (n = d-> nodes; n; n = n->next, count++);
+	
+    /*copy the nodes into the set structure*/
+	struct set *copy;
+	copy = set_create(count);
 	for (n = d-> nodes; n; n = n->next)
-		list_push_head(copy, n);
+		set_push(copy, n);
 
 	while(!dag_abort_flag) {
 		dag_dispatch_ready_jobs(d, copy);
@@ -1203,7 +1209,7 @@ void dag_run(struct dag *d)
 					dag_node_complete(d, n, &info);
 						/*remove the complete node*/
 					if(n->state == DAG_NODE_STATE_COMPLETE)
-						list_remove(copy, n);
+						set_remove(copy, n);
 				}
 			}
 		}
@@ -1226,7 +1232,7 @@ void dag_run(struct dag *d)
 					dag_node_complete(d, n, &info);
 						/*remove the complete node*/
 					if(n->state == DAG_NODE_STATE_COMPLETE)
-						list_remove(copy, n);
+						set_remove(copy, n);
 				}
 			}
 		}
