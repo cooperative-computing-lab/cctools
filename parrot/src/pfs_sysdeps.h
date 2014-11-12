@@ -8,6 +8,8 @@ See the file COPYING for details.
 #ifndef PFS_SYSDEPS_H
 #define PFS_SYSDEPS_H
 
+#define ALIGN(type,size)  ((size+((sizeof(type))-1))&(~((sizeof(type)-1))))
+
 /*
 In this file, we establish all of the definitions
 and feature activations that are dependent upon
@@ -171,21 +173,6 @@ struct pfs_kernel_statfs64 {
         UINT32_T f_spare[5];
 } __attribute__((packed));
 
-struct pfs_kernel_dirent {
-        UINT32_T d_ino;
-        UINT32_T d_off;
-        UINT16_T d_reclen;
-        char     d_name[PFS_PATH_MAX];
-} __attribute__((packed));
-
-struct pfs_kernel_dirent64 {
-        UINT64_T d_ino;
-        UINT64_T d_off;
-        UINT16_T d_reclen;
-	UINT8_T  d_type;
-        char     d_name[PFS_PATH_MAX];
-} __attribute__((packed));
-
 struct pfs_kernel_iovec {
 	UINT32_T iov_base;
 	UINT32_T iov_len;
@@ -258,35 +245,6 @@ struct pfs_kernel_flock64 {
 
 #define PFS_TIOCGPGRP   0x540F
 
-/*
-Many data structures must be aligned on 8 byte boundaries.
-This rounds up values to multiples of 8.
-*/
-
-#ifndef _ROUND_UP
-#define _ROUND_UP(x,n) (((x)+(n)-1u) & ~((n)-1u))
-#endif
-
-#ifndef ROUND_UP
-#define ROUND_UP(x) _ROUND_UP(x,8LL)
-#endif
-
-/*
-The size of a dirent is the size of the structure
-without the name field, plus the actual length
-of the null-terminated name, rounded up to 8-byte alignment.
-*/
-
-#define DIRENT_SIZE( x ) \
-	ROUND_UP(((char*)&(x).d_name[0]-(char*)&(x)) + strlen((x).d_name) + 2)
-
-#define COPY_DIRENT( a, b ) \
-	memset(&(b),0,sizeof((b))); \
-	strcpy((b).d_name,(a).d_name);\
-	(b).d_ino = (a).d_ino;\
-	(b).d_off = (a).d_off;\
-	(b).d_reclen = DIRENT_SIZE(b);
-
 #define COPY_RUSAGE( s, t ) \
 	t.ru_utime = s.ru_utime;\
 	t.ru_utime = s.ru_stime;\
@@ -321,3 +279,5 @@ of the null-terminated name, rounded up to 8-byte alignment.
 	t.modtime = s.modtime;
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */
