@@ -1,16 +1,16 @@
 chirp() {
-	echo ../src/chirp -d chirp "$@" >&2
-	../src/chirp -d chirp "$@"
+	echo ../../chirp/src/chirp -d chirp "$@" >&2
+	../../chirp/src/chirp -d chirp "$@"
 }
 
 chirp_benchmark() {
-	echo ../src/chirp_benchmark "$@" >&2
-	../src/chirp_benchmark "$@"
+	echo ../../chirp/src/chirp_benchmark "$@" >&2
+	../../chirp/src/chirp_benchmark "$@"
 }
 
 chirp_server() {
-	echo ../src/chirp "$@" >&2
-	../src/chirp_server "$@"
+	echo ../../chirp/src/chirp "$@" >&2
+	../../chirp/src/chirp_server "$@"
 }
 
 chirp_start() {
