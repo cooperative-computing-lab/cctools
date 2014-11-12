@@ -427,7 +427,7 @@ For example, suppose that you wish to apply <tt>/usr/bin/time</tt> to every rule
 
 Suppose you want to apply <tt>strace</tt> to every rule, to obtain system call traces.  Since every rule would have to have its own output file for the trace, you could indicate output files like this:
 
-<code>makeflow --wrapper 'strace -o trace.$RULE' --wrapper-output 'trace.$RULE' example.makeflow</code>
+<code>makeflow --wrapper 'strace -o trace.%%' --wrapper-output 'trace.%%' example.makeflow</code>
 
 Suppose you want to wrap every command with a script that would set up an appropriate Java environment.  You might write a script called <tt>setupjava.sh</tt> like this:
 

@@ -736,30 +736,46 @@ char *dag_node_rmonitor_wrap_command( struct dag_node *n, const char *command )
 	return result;
 }
 
+
 /*
-Look up the value of a variable with respect to one node.
-Returns a newly allocated string that must be freed.
+Replace instances of %% in a string with the string 'replace'.
+To escape this behavior, %%%% becomes %%.
+(Backslash it not used as the escape, as it would interfere with shell escapes.)
+This function works like realloc: the string str must be created by malloc
+and may be freed and reallocated.  Therefore, always invoke it like this:
+x = replace_percents(x,replace);
 */
 
-char * dag_node_lookup_str( struct dag_node *n, const char *key )
+static char * replace_percents( char *str, const char *replace )
 {
-	struct dag_lookup_set s = { n->d, n->category, n, NULL };
+	/* Common case: do nothing if no percents. */
+	if(!strchr(str,'%')) return str;
 
-	if(!strcmp(key,"RULE") || !strcmp(key,"NODE")) {
-		return string_format("%d",n->nodeid);
+	buffer_t buffer;
+	buffer_init(&buffer);
+
+	char *s;
+	for(s=str;*s;s++) {
+		if(*s=='%' && *(s+1)=='%' ) {
+			if( *(s+2)=='%' && *(s+3)=='%') {
+				buffer_putlstring(&buffer,"%%",2);
+				s+=3;
+			} else {
+				buffer_putstring(&buffer,replace);
+				s++;
+			}
+		} else {
+			buffer_putlstring(&buffer,s,1);
+		}
 	}
 
-	return dag_lookup_str(key, &s);
-}
+	char *result;
+	buffer_dup(&buffer,&result);
+	buffer_free(&buffer);
 
-/*
-Same as dag_node_lookup_str, but with the arguments reversed
-which makes it compatible with the string_subst function.
-*/
+	free(str);
 
-char *dag_node_lookup_str_reverse( const char *key, void *vn )
-{
-	return dag_node_lookup_str(vn,key);
+	return result;
 }
 
 /*
@@ -896,12 +912,14 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	dag_export_variables(d, n);
 
 	/*
-	Just before execution, apply variable substitution to the command and the
-	file list, so that it applies to wrapper commands, files, and everything.
+	Just before execution, replace double-percents with the nodeid.
+	This is used for substituting in the nodeid into a wrapper command or file.
 	*/
-	command = string_subst( command, dag_node_lookup_str_reverse, n );
-	input_files = string_subst( input_files, dag_node_lookup_str_reverse, n );
-	output_files = string_subst( output_files, dag_node_lookup_str_reverse, n );
+	char *nodeid = string_format("%d",n->nodeid);
+	command = replace_percents(command,nodeid);
+	input_files = replace_percents(input_files,nodeid);
+	output_files = replace_percents(output_files,nodeid);
+	free(nodeid);
 
 	/* Display the fully elaborated command, just like Make does. */
 	printf("%s\n", command);
