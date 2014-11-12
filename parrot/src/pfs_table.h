@@ -140,6 +140,7 @@ private:
 	void collapse_path( const char *short_path, char *long_path, int remove_dotdot );
 	void complete_path( const char *short_path, char *long_path );
 
+	static void mmap_proc(pid_t pid, char *path);
 	pfs_size_t mmap_create_object( pfs_file *file, pfs_size_t channel_offset, pfs_size_t map_length, pfs_size_t file_offset, int prot, int flags );
 
 	int         pointer_count;

@@ -11,6 +11,7 @@ See the file COPYING for details.
 
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "pfs_channel.h"
 #include "pfs_types.h"
@@ -18,8 +19,24 @@ See the file COPYING for details.
 
 class pfs_mmap {
 public:
+	struct pfs_stat finfo;
+	char fpath[PFS_PATH_MAX];
+	pfs_file   *file;
+	pfs_size_t logical_addr;
+	pfs_size_t channel_offset;
+	pfs_size_t map_length;
+	pfs_size_t file_offset;
+	int	   prot;
+	int	   flags;
+	pfs_mmap   *next;
+
 	pfs_mmap( pfs_file *_file, pfs_size_t _logical_addr, pfs_size_t _channel_offset, pfs_size_t _map_length, pfs_size_t _file_offset, int _prot, int _flags )
 	{
+		if (_file->fstat(&finfo) == -1) {
+			finfo.st_dev = 0;
+			finfo.st_ino = 0;
+		}
+		strncpy(fpath, _file->get_name()->path, sizeof(fpath)-1);
 		if(_flags&MAP_SHARED && _prot&PROT_WRITE)
 			file = _file; /* we only keep the reference if we need to write back */
 		else
@@ -36,6 +53,8 @@ public:
 	}
 
 	pfs_mmap( pfs_mmap * m ) {
+		finfo = m->finfo;
+		memcpy(fpath, m->fpath, sizeof(fpath));
 		file = m->file;
 		logical_addr = m->logical_addr;
 		channel_offset = m->channel_offset;
@@ -59,15 +78,6 @@ public:
 		}
 		pfs_channel_free(channel_offset);
 	}
-
-	pfs_file   *file;
-	pfs_size_t logical_addr;
-	pfs_size_t channel_offset;
-	pfs_size_t map_length;
-	pfs_size_t file_offset;
-	int	   prot;
-	int	   flags;
-	pfs_mmap   *next;
 };
 
 #endif
