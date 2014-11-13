@@ -1915,8 +1915,6 @@ int main(int argc, char *argv[])
 
 	struct dag *d = dag_from_file(dagfile);
 	if(!d) {
-		if(logfilename) free(logfilename);
-		if(batchlogfilename) free(batchlogfilename);
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
 
@@ -2012,14 +2010,10 @@ int main(int argc, char *argv[])
 		dag_clean(d);
 		unlink(logfilename);
 		unlink(batchlogfilename);
-		free(logfilename);
-		free(batchlogfilename);
 		return 0;
 	}
 
 	if(!dag_check(d)) {
-		free(logfilename);
-		free(batchlogfilename);
 		return 1;
 	}
 
@@ -2057,10 +2051,6 @@ int main(int argc, char *argv[])
 
 	if(write_summary_to || email_summary_to)
 		create_summary(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile);
-	free(logfilename);
-	free(batchlogfilename);
-	free(write_summary_to);
-	free(email_summary_to);
 
 	if(dag_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
