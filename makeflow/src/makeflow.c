@@ -2014,11 +2014,11 @@ int main(int argc, char *argv[])
 		dag_clean(d);
 		unlink(logfilename);
 		unlink(batchlogfilename);
-		return 0;
+		exit(0);
 	}
 
 	if(!dag_check(d)) {
-		return 1;
+		exit(EXIT_FAILURE);
 	}
 
 	fprintf(stdout, "\r     Total rules: %d", d->nodeid_counter);
