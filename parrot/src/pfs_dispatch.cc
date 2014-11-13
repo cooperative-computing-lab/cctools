@@ -15,13 +15,14 @@ See the file COPYING for details.
 #include "pfs_dispatch.h"
 
 extern "C" {
-#include "tracer.h"
-#include "stringtools.h"
+#include "buffer.h"
+#include "debug.h"
 #include "full_io.h"
-#include "xxmalloc.h"
 #include "int_sizes.h"
 #include "macros.h"
-#include "debug.h"
+#include "stringtools.h"
+#include "tracer.h"
+#include "xxmalloc.h"
 }
 
 #include <unistd.h>
@@ -1666,7 +1667,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 								changed = i+1;
 							}
 						}
-						changed = _ROUND_UP(changed,sizeof(int));
+						changed = ALIGN(int, changed);
 						tracer_copy_out(p->tracer,buffer,uaddr,changed);
 					}
 				}
@@ -2119,69 +2120,66 @@ void decode_syscall( struct pfs_process *p, int entering )
 		*/
 
 		case SYSCALL32_getdents:
-			if(entering) {
-				int fd = args[0];
-				char *uaddr = (char*) POINTER(args[1]);
-				int length = args[2];
-				int result = 0;
-
-				struct dirent *d;
-				struct pfs_kernel_dirent buf;
-
-				errno = 0;
-				while((d=pfs_fdreaddir(fd))) {
-					COPY_DIRENT(*d,buf);
-					if(DIRENT_SIZE(buf)>(unsigned)length) {
-						pfs_lseek(fd,d->d_off,SEEK_SET);
-						errno = EINVAL;
-						break;
-					}
-					tracer_copy_out(p->tracer,&buf,(void*)uaddr,buf.d_reclen);
-					uaddr  += buf.d_reclen;
-					length -= buf.d_reclen;
-					result += buf.d_reclen;
-				}
-
-				if(result==0 && errno!=0) {
-					p->syscall_result = -errno;
-				} else {
-					p->syscall_result = result;
-				}
-				divert_to_dummy(p,p->syscall_result);
-			}
-			break;
-
-
 		case SYSCALL32_getdents64:
-			if(entering) {
-				int fd = args[0];
-				char *uaddr = (char*) POINTER(args[1]);
-				int length = args[2];
-				int result = 0;
+			if (entering) {
+				INT64_T fd = args[0];
+				uintptr_t uaddr = args[1];
+				size_t length = args[2];
+
+				buffer_t B;
+				buffer_init(&B);
+				buffer_max(&B, (1<<16)+1);
+				length = MIN(length, 1<<16);
 
 				struct dirent *d;
-				struct pfs_kernel_dirent64 buf;
-
 				errno = 0;
-				while((d=pfs_fdreaddir(fd))) {
-					COPY_DIRENT(*d,buf);
-					if(DIRENT_SIZE(buf)>(unsigned)length) {
+				while((d = pfs_fdreaddir(fd))) {
+					uint32_t ino32 = d->d_ino;
+					uint32_t off32 = d->d_off;
+					uint64_t ino64 = d->d_ino;
+					uint64_t off64 = d->d_off;
+					uint16_t reclen;
+					const char *name = d->d_name;
+					uint8_t type = d->d_type;
+					if (p->syscall == SYSCALL32_getdents)
+						reclen = sizeof(ino32) + sizeof(off32);
+					else if (p->syscall == SYSCALL32_getdents64)
+						reclen = sizeof(ino64) + sizeof(off64);
+					else assert(0);
+					reclen += sizeof(reclen) + strlen(name) + 1 /* NUL */ + /* padding + */ sizeof(type);
+					size_t padding = ALIGN(uint64_t, reclen)-reclen;
+					reclen += padding;
+
+					if(reclen>length) {
 						pfs_lseek(fd,d->d_off,SEEK_SET);
 						errno = EINVAL;
 						break;
 					}
-					tracer_copy_out(p->tracer,&buf,(void*)uaddr,buf.d_reclen);
-					uaddr  += buf.d_reclen;
-					length -= buf.d_reclen;
-					result += buf.d_reclen;
+
+					size_t pos = buffer_pos(&B);
+					if (p->syscall == SYSCALL32_getdents) {
+						buffer_putlstring(&B, (char *)&ino32, sizeof(ino32));
+						buffer_putlstring(&B, (char *)&off32, sizeof(off32));
+					} else if (p->syscall == SYSCALL32_getdents64) {
+						buffer_putlstring(&B, (char *)&ino64, sizeof(ino64));
+						buffer_putlstring(&B, (char *)&off64, sizeof(off64));
+					} else assert(0);
+					buffer_putlstring(&B, (char *)&reclen, sizeof(reclen));
+					buffer_putstring(&B, name);
+					buffer_putliteral(&B, "\0"); /* NUL terminator for d_name */
+					buffer_putlstring(&B, "\0\0\0\0\0\0\0\0", padding); /* uint64_t alignment padding */
+					buffer_putlstring(&B, (char *)&type, sizeof(type));
+					assert(buffer_pos(&B)-pos == reclen);
+					length -= buffer_pos(&B)-pos;
 				}
 
-				if(result==0 && errno!=0) {
-					p->syscall_result = -errno;
+				if (buffer_pos(&B)) {
+					tracer_copy_out(p->tracer,buffer_tostring(&B, NULL),POINTER(uaddr),buffer_pos(&B));
+					divert_to_dummy(p, buffer_pos(&B));
 				} else {
-					p->syscall_result = result;
+					divert_to_dummy(p, -errno);
 				}
-				divert_to_dummy(p,p->syscall_result);
+				buffer_free(&B);
 			}
 			break;
 

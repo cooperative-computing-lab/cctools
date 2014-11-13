@@ -70,15 +70,13 @@ int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
 	struct token *t;
 	while((t = lexer_next_token(bk)) && t->type != TOKEN_NEWLINE)
 	{
-		const char *remote_name = NULL;
-		
 		switch(t->type)
 		{
 		case TOKEN_SPACE:
 			buffer_printf(&b, " ");
 			break;
 		case TOKEN_LITERAL:
-			remote_name = dag_file_local_name(n, t->lexeme);
+			dag_file_local_name(n, t->lexeme);
 			buffer_printf(&b, "%s", t->lexeme);
 			break;
 		case TOKEN_IO_REDIRECT:

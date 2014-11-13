@@ -26,13 +26,14 @@ int pfs_dispatch64( struct pfs_process *p, INT64_T signum )
 #include "pfs_service.h"
 
 extern "C" {
-#include "tracer.h"
-#include "stringtools.h"
+#include "buffer.h"
+#include "debug.h"
 #include "full_io.h"
-#include "xxmalloc.h"
 #include "int_sizes.h"
 #include "macros.h"
-#include "debug.h"
+#include "stringtools.h"
+#include "tracer.h"
+#include "xxmalloc.h"
 }
 
 #include <unistd.h>
@@ -1549,7 +1550,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 								changed = i+1;
 							}
 						}
-						changed = _ROUND_UP(changed,sizeof(INT64_T));
+						changed = ALIGN(INT64_T, changed);
 						tracer_copy_out(p->tracer,buffer,uaddr,changed);
 					}
 				}
@@ -1954,70 +1955,56 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		*/
 
 		case SYSCALL64_getdents:
-			if(entering) {
+		case SYSCALL64_getdents64:
+			if (entering) {
 				INT64_T fd = args[0];
-				char *uaddr = (char*) args[1];
-				INT64_T length = args[2];
-				INT64_T result = 0;
+				uintptr_t uaddr = args[1];
+				size_t length = args[2];
+
+				buffer_t B;
+				buffer_init(&B);
+				buffer_max(&B, (1<<16)+1);
+				length = MIN(length, 1<<16);
 
 				struct dirent *d;
-				struct pfs_kernel_dirent buf;
-
 				errno = 0;
-				while((d=pfs_fdreaddir(fd))) {
-					COPY_DIRENT(*d,buf);
-					if(DIRENT_SIZE(buf)>(UINT64_T)length) {
+				while((d = pfs_fdreaddir(fd))) {
+					uint64_t ino = d->d_ino;
+					uint64_t off = d->d_off;
+					uint16_t reclen;
+					const char *name = d->d_name;
+					uint8_t type = d->d_type;
+					reclen = sizeof(ino) + sizeof(off) + sizeof(reclen) + strlen(name) + 1 /* NUL */ + /* padding + */ sizeof(type);
+					size_t padding = ALIGN(uint64_t, reclen)-reclen;
+					reclen += padding;
+
+					if(reclen>length) {
 						pfs_lseek(fd,d->d_off,SEEK_SET);
 						errno = EINVAL;
 						break;
 					}
-					tracer_copy_out(p->tracer,&buf,(void*)uaddr,buf.d_reclen);
-					uaddr  += buf.d_reclen;
-					length -= buf.d_reclen;
-					result += buf.d_reclen;
+
+					size_t pos = buffer_pos(&B);
+					buffer_putlstring(&B, (char *)&ino, sizeof(ino));
+					buffer_putlstring(&B, (char *)&off, sizeof(off));
+					buffer_putlstring(&B, (char *)&reclen, sizeof(reclen));
+					buffer_putstring(&B, name);
+					buffer_putliteral(&B, "\0"); /* NUL terminator for d_name */
+					buffer_putlstring(&B, "\0\0\0\0\0\0\0\0", padding); /* uint64_t alignment padding */
+					buffer_putlstring(&B, (char *)&type, sizeof(type));
+					assert(buffer_pos(&B)-pos == reclen);
+					length -= buffer_pos(&B)-pos;
 				}
 
-				if(result==0 && errno!=0) {
-					p->syscall_result = -errno;
+				if (buffer_pos(&B)) {
+					tracer_copy_out(p->tracer,buffer_tostring(&B, NULL),POINTER(uaddr),buffer_pos(&B));
+					divert_to_dummy(p, buffer_pos(&B));
 				} else {
-					p->syscall_result = result;
+					divert_to_dummy(p, -errno);
 				}
-				divert_to_dummy(p,p->syscall_result);
+				buffer_free(&B);
 			}
 			break;
-
-		case SYSCALL64_getdents64:
-                        if(entering) {
-                                INT64_T fd = args[0];
-                                char *uaddr = (char*) args[1];
-                                INT64_T length = args[2];
-                                INT64_T result = 0;
-                                                                                                                   
-                                struct dirent *d;
-                                struct pfs_kernel_dirent64 buf;
-                                                                                                                   
-                                errno = 0;
-                                while((d=pfs_fdreaddir(fd))) {
-                                        COPY_DIRENT(*d,buf);
-                                        if(DIRENT_SIZE(buf)>(UINT64_T)length) {
-                                                pfs_lseek(fd,d->d_off,SEEK_SET);
-                                                errno = EINVAL;
-                                                break;
-                                        }
-                                        tracer_copy_out(p->tracer,&buf,(void*)uaddr,buf.d_reclen);
-                                        uaddr  += buf.d_reclen;
-                                        length -= buf.d_reclen;
-                                        result += buf.d_reclen;
-                                }
-                                                                                                                   
-                                if(result==0 && errno!=0) {
-                                        p->syscall_result = -errno;
-                                } else {
-                                        p->syscall_result = result;
-                                }
-                                divert_to_dummy(p,p->syscall_result);
-                        }
-                        break;
 
 		case SYSCALL64_utime:
 			if(entering) {
