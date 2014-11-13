@@ -13,10 +13,11 @@ See the file COPYING for details.
 #include "pfs_service.h"
 #include "pfs_file.h"
 
+#include <vector>
+
 class pfs_dir : public pfs_file {
 public:
 	pfs_dir( pfs_name *n );
-	virtual ~pfs_dir();
 
 	virtual int fstat( struct pfs_stat *buf );
 	virtual int fstatfs( struct pfs_statfs *buf );
@@ -24,15 +25,16 @@ public:
 	virtual int fchown( uid_t uid, gid_t gid );
 
 	virtual int append( const char *name );
+	virtual int append( const struct dirent *d );
 	virtual struct dirent * fdreaddir( pfs_off_t offset, pfs_off_t *next_offset );
 
 	virtual int is_seekable();
 
 private:
-	char *data;
-	pfs_off_t length;
-	pfs_off_t maxlength;
-	int total_iterations;
+	unsigned long iterations;
+	std::vector<struct dirent> entries;
 };
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */
