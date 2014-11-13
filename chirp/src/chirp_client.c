@@ -719,7 +719,7 @@ INT64_T chirp_client_ticket_get(struct chirp_client * c, const char *name, char 
 
 	result = simple_command(c, stoptime, "ticket_get %s\n", ticket_subject);
 
-	if(result == 0) {
+	if(result >= 0) {
 		char line[CHIRP_LINE_MAX];
 		size_t length;
 		size_t nrights = 0;

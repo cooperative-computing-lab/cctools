@@ -540,7 +540,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 	debug(D_TCP, "connection to %s:%d failed (%s)", addr, port, strerror(errno));
 
-      failure:
+failure:
 	save_errno = errno;
 	if(link)
 		link_close(link);
@@ -550,13 +550,11 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 static int fill_buffer(struct link *link, time_t stoptime)
 {
-	int chunk;
-
 	if(link->buffer_length > 0)
 		return link->buffer_length;
 
 	while(1) {
-		chunk = read(link->fd, link->buffer, BUFFER_SIZE);
+		ssize_t chunk = read(link->fd, link->buffer, BUFFER_SIZE);
 		if(chunk > 0) {
 			link->buffer_start = 0;
 			link->buffer_length = chunk;

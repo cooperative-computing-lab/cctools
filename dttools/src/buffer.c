@@ -74,9 +74,15 @@ static int grow(buffer_t * b, size_t n)
 	/* simple solution to find next power of 2 */
 	while (newlen < used+n) newlen <<= 1;
 
-	if (b->max > 0 && newlen > b->max) {
-		errno = ENOBUFS;
-		checkerror(b, 0, 0);
+	/* too big? */
+	if (0 < b->max && b->max < newlen) {
+		if (used+n <= b->max) {
+			/* This handles the case where b->max is not a power of 2. */
+			newlen = b->max;
+		} else {
+			errno = ENOBUFS;
+			checkerror(b, 0, 0);
+		}
 	}
 
 	if (b->buf == b->ubuf.buf || b->buf == b->initial) {
@@ -92,7 +98,7 @@ static int grow(buffer_t * b, size_t n)
 	b->end = b->buf+used;
 	b->end[0] = '\0';
 	b->len = newlen;
-	assert(avail(b) > n);
+	assert(avail(b) >= n);
 	return 0;
 }
 
