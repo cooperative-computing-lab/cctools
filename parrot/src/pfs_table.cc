@@ -30,9 +30,11 @@ extern "C" {
 #include "md5.h"
 #include "path.h"
 #include "pattern.h"
+#include "random.h"
 #include "stringtools.h"
 }
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <unistd.h>
@@ -427,41 +429,55 @@ void namelist_table_insert(const char *content, int is_special_syscall) {
 
 int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pfs_name *pname, bool do_follow_symlink, int depth ) {
 	char full_logical_name[PFS_PATH_MAX];
-	char tmp[PFS_PATH_MAX];
 	pfs_resolve_t result;
+	size_t n;
 
-	if (depth > PFS_MAX_RESOLVE_DEPTH) {
-	    return ELOOP;
-	}
+	if (depth > PFS_MAX_RESOLVE_DEPTH)
+	    return errno = ELOOP, 0;
 
-	if(strlen(cname) == 0) {
-		errno = ENOENT;
-		return 0;
-	}
+	if(strlen(cname) == 0)
+		return errno = ENOENT, 0;
 
 	complete_path(cname,full_logical_name);
-
-	if(!strncmp(full_logical_name,"/proc/self",10)) {
-		sprintf(tmp,"/proc/%d%s",pfs_process_getpid(),&full_logical_name[10]);
-		strcpy(full_logical_name,tmp);
-	}
-
 	path_collapse(full_logical_name,pname->logical_name,1);
-	result = pfs_resolve(pname->logical_name,pname->path,time(0)+pfs_master_timeout);
+
+	if(pattern_match(full_logical_name, "^/proc/self/()", &n) >= 0) {
+		snprintf(pname->logical_name, sizeof(pname->logical_name), "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n-1]);
+		strcpy(pname->path, pname->logical_name);
+		pname->service = pfs_service_lookup_default();
+		strcpy(pname->service_name,"local");
+		strcpy(pname->host,"localhost");
+		strcpy(pname->hostport,"localhost");
+		strcpy(pname->rest,pname->path);
+		pname->is_local = 1;
+		return 1;
+	} else if (pattern_match(full_logical_name, "^/dev/fd/()", &n) >= 0) {
+		snprintf(pname->logical_name, sizeof(pname->logical_name), "/proc/%d/fd/%s", pfs_process_getpid(), &full_logical_name[n-1]);
+		strcpy(pname->path, pname->logical_name);
+		pname->service = pfs_service_lookup_default();
+		strcpy(pname->service_name,"local");
+		strcpy(pname->host,"localhost");
+		strcpy(pname->hostport,"localhost");
+		strcpy(pname->rest,pname->path);
+		pname->is_local = 1;
+		return 1;
+	} else {
+		result = pfs_resolve(pname->logical_name,pname->path,time(0)+pfs_master_timeout);
+	}
 
 	if(namelist_table) {
 		namelist_table_insert(pname->path, is_special_syscall);
 	}
+
 	if(result==PFS_RESOLVE_DENIED) {
-		errno = EACCES;
-		return 0;
+		return errno = EACCES, 0;
 	} else if(result==PFS_RESOLVE_ENOENT) {
-		errno = ENOENT;
-		return 0;
+		return errno = ENOENT, 0;
 	} else if(result==PFS_RESOLVE_FAILED) {
 		fatal("unable to resolve file %s",pname->logical_name);
 		return 0;
 	} else {
+		char tmp[PFS_PATH_MAX];
 		path_split(pname->path,pname->service_name,tmp);
 		pname->service = pfs_service_lookup(pname->service_name);
 		if(!pname->service) {
@@ -536,11 +552,48 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 	}
 
 	if(resolve_name(1,lname,&pname)) {
+		char *pid = NULL;
 		if(flags&O_DIRECTORY) {
-			file = pname.service->getdir(&pname);
+			if (pattern_match(pname.rest, "^/proc/(%d+)/fd$", &pid) >= 0) {
+				int i;
+				pfs_dir *dir = new pfs_dir(&pname);
+				for (i = 0; i < pointer_count; i++) {
+					/* idea here is to not include a SPECIAL fd in this directory */
+					if (pointers[i] == NATIVE || PARROT_POINTER(pointers[i])) {
+						struct dirent dirent;
+						dirent.d_ino = random_int();
+						dirent.d_off = 0;
+						dirent.d_reclen = sizeof(dirent);
+						snprintf(dirent.d_name, sizeof(dirent.d_name), "%d", i);
+						dirent.d_type = DT_LNK;
+						dir->append(&dirent);
+					}
+				}
+				file = dir;
+			} else {
+				file = pname.service->getdir(&pname);
+			}
 		} else if(pname.service->is_local()) {
-			char *pid = NULL;
-			if (pattern_match(pname.rest, "^/proc/(%d+)/maps$", &pid) >= 0) {
+			char *fd = NULL;
+			if (pattern_match(pname.rest, "^/proc/(%d+)/fd/(%d+)$", &pid, &fd) >= 0) {
+				int ifd = atoi(fd);
+				if (!VALID_FD(ifd)) {
+					errno = ENOENT;
+					file = NULL;
+				} else {
+					if (PARROT_POINTER(pointers[ifd])) {
+						pointers[ifd]->file->addref();
+						return pointers[ifd]->file; /* open will create a duplicate file description (pfs_pointer) */
+					} else if (pointers[ifd] == NATIVE) {
+						errno = ECHILD; /* hack, allow open to proceed natively */
+						file = NULL;
+					} else {
+						assert(pointers[ifd] == SPECIAL || pointers[ifd] == NULL);
+						errno = ENOENT;
+						file = NULL;
+					}
+				}
+			} else if (pattern_match(pname.rest, "^/proc/(%d+)/maps$", &pid) >= 0) {
 				char tmpfd[PATH_MAX];
 				mmap_proc(atoi(pid), tmpfd);
 				resolve_name(0, tmpfd, &pname);
@@ -550,7 +603,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 			} else {
 				file = pname.service->open(&pname,flags,mode);
 			}
-			free(pid);
+			free(fd);
 		} else if(pname.service->is_seekable()) {
 			if(force_cache) {
 				file = pfs_cache_open(&pname,flags,mode);
@@ -564,6 +617,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 				file = pfs_cache_open(&pname,flags,mode);
 			}
 		}
+		free(pid);
 	} else {
 		file = 0;
 	}
@@ -604,6 +658,9 @@ int pfs_table::open( const char *lname, int flags, mode_t mode, int force_cache,
 					fd_flags[result] |= FD_CLOEXEC;
 				if(flags&O_APPEND) this->lseek(result,0,SEEK_END);
 			}
+		} else if (errno == ECHILD /* hack: indicates to open natively */) {
+			snprintf(path, len, "%s", lname);
+			return -2;
 		} else {
 			result = -1;
 		}
@@ -1426,14 +1483,14 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 	int result=-1;
 
 	if(resolve_name(0,n,&pname,false)) {
-		int pid, fd;
-		if(sscanf(pname.path,"/proc/%d/fd/%d",&pid,&fd)==2) {
-			struct pfs_process *target = pfs_process_lookup(pid);
+		char *pid = NULL, *fd = NULL;
+		if(pattern_match(pname.path, "^/proc/(%d+)/fd/(%d+)$",&pid,&fd) >= 0) {
+			struct pfs_process *target = pfs_process_lookup(atoi(pid));
 			if(target && target->table) {
-				if(target->table->isnative(fd)) {
+				if(target->table->isnative(atoi(fd))) {
 					result = ::readlink(pname.path,buf,size);
 				} else {
-					if(target->table->get_full_name(fd,buf)==0) {
+					if(target->table->get_full_name(atoi(fd),buf)==0) {
 						result = strlen(buf);
 					} else {
 						result = -1;
@@ -1443,8 +1500,8 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 				errno = ENOENT;
 				result = -1;
 			}
-		} else if(sscanf(pname.path,"/proc/%d/exe",&pid)==1) {
-			struct pfs_process *target = pfs_process_lookup(pid);
+		} else if(pattern_match(pname.path, "^/proc/(%d+)/exe", &pid) >= 0) {
+			struct pfs_process *target = pfs_process_lookup(atoi(pid));
 			if(target) {
 				/* Fill in the target->name for readlink. */
 				char complete_target_path[PFS_PATH_MAX];
@@ -1455,6 +1512,8 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 		} else {
 			result = pname.service->readlink(&pname,buf,size);
 		}
+		free(pid);
+		free(fd);
 	} else {
 		result = -1;
 		errno = ENOENT;
