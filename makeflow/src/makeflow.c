@@ -1900,9 +1900,7 @@ int main(int argc, char *argv[])
 
 	if(monitor_mode) {
 		if(!monitor_log_dir)
-		{
 			fatal("Monitor mode was enabled, but a log output directory was not specified (use -M<dir>)");
-		}
 
 		monitor_exe = resource_monitor_copy_to_wd(NULL);
 
@@ -1965,7 +1963,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
 		if(port != 0)
 			fprintf(stderr, "makeflow: perhaps port %d is already in use?\n", port);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
@@ -1992,8 +1990,7 @@ int main(int argc, char *argv[])
 	} else {
 		local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
 		if(!local_queue) {
-			fprintf(stderr, "makeflow: couldn't create local job queue.\n");
-			exit(1);
+			fatal("couldn't create local job queue.");
 		}
 	}
 
@@ -2010,11 +2007,11 @@ int main(int argc, char *argv[])
 		dag_clean(d);
 		unlink(logfilename);
 		unlink(batchlogfilename);
-		return 0;
+		exit(0);
 	}
 
 	if(!dag_check(d)) {
-		return 1;
+		exit(EXIT_FAILURE);
 	}
 
 	fprintf(stdout, "\r     Total rules: %d", d->nodeid_counter);
@@ -2055,15 +2052,15 @@ int main(int argc, char *argv[])
 	if(dag_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "workflow was aborted.\n");
-		return 1;
+		exit(EXIT_FAILURE);
 	} else if(dag_failed_flag) {
 		fprintf(d->logfile, "# FAILED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "workflow failed.\n");
-		return 1;
+		exit(EXIT_FAILURE);
 	} else {
 		fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "nothing left to do.\n");
-		return 0;
+		exit(EXIT_SUCCESS);
 	}
 
 	return 0;
