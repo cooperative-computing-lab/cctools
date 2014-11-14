@@ -231,14 +231,14 @@ before the rule's command, and prepending the name of the variable with
 
 <code>SOME_VARIABLE=original_value
 
-#rule 1 target_1: source_1
+target_1: source_1
 	command_1
 
-#rule 2 target_2: source_2
+target_2: source_2
 @SOME_VARIABLE=local_value_for_2
 	command_2
 
-#rule 3 target_3: source_3
+target_3: source_3
 	command_3 </code>
 
 In this example, SOME_VARIABLE has the value 'original_value' for rules 1 and
