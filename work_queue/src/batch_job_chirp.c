@@ -61,9 +61,14 @@ static void addfile (struct batch_queue *q, buffer_t *B, const char *file, const
 	}
 }
 
-static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	buffer_t B;
+
+	if(envlist) {
+		debug(D_NOTICE|D_BATCH,"sorry, the mpi_queue driver does not support environment variables.");
+		return -1;
+	}
 
 	debug(D_DEBUG, "%s(%p, `%s', `%s', `%s', `%s', `%s', `%s', `%s')", __func__, q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
 
@@ -142,10 +147,10 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 	}
 }
 
-static batch_job_id_t batch_job_chirp_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_chirp_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist)
 {
 	/* Here we exploit that batch_job_chirp_submit(...) just concatenates cmd and args, passed to /bin/sh. */
-	return batch_job_chirp_submit(q, cmd, NULL, NULL, NULL, NULL, extra_input_files, extra_output_files);
+	return batch_job_chirp_submit(q, cmd, NULL, NULL, NULL, NULL, extra_input_files, extra_output_files,envlist);
 }
 
 static batch_job_id_t batch_job_chirp_wait (struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)

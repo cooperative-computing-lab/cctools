@@ -2274,6 +2274,12 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 	send_worker_msg(q,w, "disk %"PRId64"\n",    t->disk );
 	send_worker_msg(q,w, "gpus %d\n",    t->gpus );
 
+	char *var;
+	list_first_item(t->env_list);
+	while((var=list_next_item(t->env_list))) {
+		send_worker_msg(q,w,"env %d\n%s\n",(int)strlen(var),var);
+	}
+
 	char remote_name_encoded[PATH_MAX];
 
 	if(t->input_files) {
@@ -3046,6 +3052,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->worker_selection_algorithm = WORK_QUEUE_SCHEDULE_UNSET;
 	t->input_files = list_create();
 	t->output_files = list_create();
+	t->env_list = list_create();
 	t->return_status = -1;
 
 	t->time_committed = 0;
@@ -3104,6 +3111,10 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
+void work_queue_task_specify_env( struct work_queue_task *t, const char *name, const char *value )
+{
+	list_push_tail(t->env_list,string_format("%s=%s",name,value));
+}
 
 static void set_task_unlabel_flag( struct work_queue_task *t )
 {
@@ -3632,6 +3643,14 @@ void work_queue_task_delete(struct work_queue_task *t)
 			}
 			list_delete(t->output_files);
 		}
+		if(t->env_list) {
+			char *var;
+			while((var=list_pop_tail(t->env_list))) {
+				free(var);
+			}
+			list_delete(t->env_list);
+		}
+
 		if(t->hostname)
 			free(t->hostname);
 		if(t->host)
