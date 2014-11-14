@@ -34,7 +34,11 @@ extern "C" {
 #include <sys/statfs.h>
 
 extern "C" {
+#if defined(HAS_MYSQL_MYSQL_H)
 #include <mysql/mysql.h>
+#elif defined(HAS_MYSQL_H)
+#include <mysql.h>
+#endif
 }
 
 #define	BXGRID_TIMEOUT	2

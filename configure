@@ -567,6 +567,19 @@ then
 	fi
 
 	ccflags="${ccflags} -DHAS_MYSQL -DHAS_BXGRID"
+
+	# It seems that the various versions move around the key include file,
+	# so we check for it in several places here.
+
+	if [ -f ${mysql_path}/include/mysql.h ]
+	then
+		ccflags="${ccflags} -DHAS_MYSQL_H"
+	fi
+
+	if [ -f ${mysql_path}/include/mysql/mysql.h ]
+	then
+		ccflags="${ccflags} -DHAS_MYSQL_MYSQL_H"
+	fi
 else
 	if [ $config_mysql_path = yes ]
 	then
