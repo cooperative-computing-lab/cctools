@@ -7,6 +7,7 @@
 #include "stringtools.h"
 #include "create_dir.h"
 #include "delete_dir.h"
+#include "list.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,6 +94,7 @@ pid_t work_queue_process_execute( struct work_queue_process *p )
 
 		int fd = open("/dev/null", O_RDONLY);
 		if (fd == -1) fatal("could not open /dev/null: %s", strerror(errno));
+
 		int result = dup2(fd, STDIN_FILENO);
 		if (result == -1) fatal("could not dup /dev/null to stdin: %s", strerror(errno));
 
@@ -103,6 +105,17 @@ pid_t work_queue_process_execute( struct work_queue_process *p )
 		if (result == -1) fatal("could not dup pipe to stderr: %s", strerror(errno));
 
 		close(p->output_fd);
+
+		char *var;
+		list_first_item(p->task->env_list);
+		while((var=list_next_item(p->task->env_list))) {
+			char *value = strchr(var,'=');
+			if(value) {
+				*value = 0;
+				setenv(var,value+1,1);
+				*value='=';
+			}
+		}
 
 		execlp("sh", "sh", "-c", p->task->command_line, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.

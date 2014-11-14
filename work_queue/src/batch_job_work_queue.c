@@ -52,6 +52,25 @@ static void specify_work_queue_task_files(struct work_queue_task *t, const char 
 	}
 }
 
+static void specify_envlist( struct work_queue_task *t, const char *envlist )
+{
+	if(envlist) {
+		char *list = strdup(envlist);
+		char *e = strtok(list,";");
+		while(e) {
+			char *name = e;
+			char *value = strchr(name,'=');
+			if(value) {
+				*value = 0;
+				value++;
+				work_queue_task_specify_env(t,name,value);
+			}
+			e = strtok(0,";");
+		}
+		free(list);
+	}
+}
+
 static struct rmsummary *parse_batch_options_resources(const char *options_text)
 {
 	if(!options_text)
@@ -79,7 +98,7 @@ static void work_queue_task_specify_resources(struct work_queue_task *t, struct 
 			work_queue_task_specify_disk(t, resources->workdir_footprint);
 }
 
-static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	int caching_flag = WORK_QUEUE_CACHE;
 
@@ -105,7 +124,12 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cm
 	if(cmd)
 		work_queue_task_specify_input_file(t, cmd, cmd);
 
+<<<<<<< HEAD
 	specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching_flag);
+=======
+	specify_envlist(t,envlist);
+	specify_files(t, extra_input_files, extra_output_files, caching);
+>>>>>>> Implemented environment variable propagation in makeflow,
 
 	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
 	if(resources)
@@ -123,7 +147,7 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cm
 	return t->taskid;
 }
 
-static batch_job_id_t batch_job_wq_submit_simple (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_wq_submit_simple (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	struct work_queue_task *t;
 
@@ -136,7 +160,12 @@ static batch_job_id_t batch_job_wq_submit_simple (struct batch_queue * q, const 
     }
 
 	t = work_queue_task_create(cmd);
+<<<<<<< HEAD
 	specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching_flag);
+=======
+	specify_files(t, extra_input_files, extra_output_files, caching);
+	specify_envlist(t,envlist);
+>>>>>>> Implemented environment variable propagation in makeflow,
 
 	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
 	if(resources)
