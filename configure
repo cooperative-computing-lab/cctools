@@ -3,10 +3,10 @@
 abspath() {
 	case "$1" in
 		/*)
-			echo -n "$1"
+			echo "$1"
 			;;
 		*)
-			echo -n "$(pwd)/$1"
+			echo "$(pwd)/$1"
 			;;
 	esac
 }
