@@ -359,6 +359,8 @@ void dag_log_recover(struct dag *d, const char *filename)
 		int linenum = 0;
 		first_run = 0;
 
+		printf("recovering from log file %s...\n",filename);
+
 		while((line = get_line(d->logfile))) {
 			linenum++;
 
@@ -898,9 +900,15 @@ batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *com
 	int waittime = 1;
 	batch_job_id_t jobid = 0;
 
+	/* Display the fully elaborated command, just like Make does. */
+	printf("submitting job: %s\n", command);
+
 	while(1) {
 		jobid = batch_job_submit_simple(queue, command, input_files, output_files, envlist );
-		if(jobid >= 0) return jobid;
+		if(jobid >= 0) {
+			printf("submitted job %"PRIbjid"\n", jobid);
+			return jobid;
+		}
 
 		fprintf(stderr, "couldn't submit batch job, still trying...\n");
 
@@ -983,9 +991,6 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	input_files = replace_percents(input_files,nodeid);
 	output_files = replace_percents(output_files,nodeid);
 	free(nodeid);
-
-	/* Display the fully elaborated command, just like Make does. */
-	printf("%s\n", command);
 
 	/* Now submit the actual job, retrying failures as needed. */
 	n->jobid = dag_node_submit_retry(queue,command,input_files,output_files,envlist);
@@ -1303,6 +1308,7 @@ void dag_run(struct dag *d)
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
+				printf("job %"PRIbjid" completed\n",jobid);
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
 				if(n)
@@ -1981,6 +1987,7 @@ int main(int argc, char *argv[])
 			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
 	}
 
+	printf("parsing %s...\n",dagfile);
 	struct dag *d = dag_from_file(dagfile);
 	if(!d) {
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
@@ -2076,23 +2083,26 @@ int main(int argc, char *argv[])
 	chdir(change_dir);
 
 	if(clean_mode) {
+		printf("cleaning filesystem...\n");
 		dag_clean(d);
 		unlink(logfilename);
 		unlink(batchlogfilename);
 		exit(0);
 	}
 
+	printf("checking %s for consistency...\n",dagfile);
 	if(!dag_check(d)) {
 		exit(EXIT_FAILURE);
 	}
 
-	fprintf(stdout, "\r     Total rules: %d", d->nodeid_counter);
-	fprintf(stdout, "\nStarting execution of workflow: %s.\n", dagfile);
+	printf("%s has %d rules.\n",dagfile,d->nodeid_counter);
 
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
 	dag_log_recover(d, logfilename);
+
+	printf("starting workflow....\n");
 
 	port = batch_queue_port(remote_queue);
 	if(work_queue_port_file)
@@ -2131,7 +2141,7 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	} else {
 		fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
-		fprintf(stderr, "nothing left to do.\n");
+		printf("nothing left to do.\n");
 		exit(EXIT_SUCCESS);
 	}
 
