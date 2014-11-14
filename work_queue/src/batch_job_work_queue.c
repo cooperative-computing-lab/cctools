@@ -200,15 +200,17 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cm
 static batch_job_id_t batch_job_wq_submit_simple (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
 	struct work_queue_task *t;
-	int caching = string_istrue(hash_table_lookup(q->options, "caching"));
+
+    int caching_flag = WORK_QUEUE_CACHE;
+
+    if(string_istrue(hash_table_lookup(q->options, "caching"))) {
+        caching_flag = WORK_QUEUE_CACHE;
+    } else {
+        caching_flag = WORK_QUEUE_NOCACHE;
+    }
 
 	t = work_queue_task_create(cmd);
-
-	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		specify_work_queue_task_shared_files(t, extra_input_files, extra_output_files);
-	} else {
-		specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching);
-	}
+	specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching_flag);
 
 	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
 	if(resources)
