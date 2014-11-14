@@ -13,7 +13,7 @@
 #include <string.h>
 #include <errno.h>
 
-static void specify_work_queue_task_files(struct work_queue_task *t, const char *input_files, const char *output_files, int caching_flag )
+static void specify_files(struct work_queue_task *t, const char *input_files, const char *output_files, int caching_flag )
 {
 	char *f, *p, *files;
 
@@ -124,12 +124,8 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cm
 	if(cmd)
 		work_queue_task_specify_input_file(t, cmd, cmd);
 
-<<<<<<< HEAD
-	specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching_flag);
-=======
 	specify_envlist(t,envlist);
-	specify_files(t, extra_input_files, extra_output_files, caching);
->>>>>>> Implemented environment variable propagation in makeflow,
+	specify_files(t, extra_input_files, extra_output_files, caching_flag);
 
 	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
 	if(resources)
@@ -160,12 +156,8 @@ static batch_job_id_t batch_job_wq_submit_simple (struct batch_queue * q, const 
     }
 
 	t = work_queue_task_create(cmd);
-<<<<<<< HEAD
-	specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching_flag);
-=======
-	specify_files(t, extra_input_files, extra_output_files, caching);
+	specify_files(t, extra_input_files, extra_output_files, caching_flag);
 	specify_envlist(t,envlist);
->>>>>>> Implemented environment variable propagation in makeflow,
 
 	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
 	if(resources)
