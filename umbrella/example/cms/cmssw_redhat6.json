@@ -23,5 +23,8 @@
 		}
 	},
 	"data": {
+	},
+	"environ": {
+		"FAKEPWD": "/tmp/test"
 	}
 }
