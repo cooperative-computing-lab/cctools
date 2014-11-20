@@ -1001,7 +1001,8 @@ int main( int argc, char *argv[] )
 		raise(SIGSTOP); /* synchronize with parent, above */
 		while (!attached_and_ready) ; /* spin waiting to be traced (NO SLEEPING/STOPPING) */
 		execvp(argv[optind],&argv[optind]);
-		debug(D_NOTICE,"unable to execute %s: %s",argv[optind],strerror(errno));
+		fprintf(stderr, "unable to execute %s: %s\n", argv[optind], strerror(errno));
+		fflush(stderr);
 		if(pfs_write_rval) {
 			write_rval("noexec", 0);
 		}
