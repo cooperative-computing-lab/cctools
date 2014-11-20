@@ -389,12 +389,12 @@ class MakeflowLog( cctools ):
 
 	def sniff( self, filename ):
 		"""
-		Determines whether the file is in SAM format
+		Determines whether the file is in MakeflowLog format
 
 		>>> fname = get_test_fname( 'sequence.maf' )
 		>>> MakeflowLog().sniff( fname )
 		False
-		>>> fname = get_test_fname( '1.mklog' )
+		>>> fname = get_test_fname( '1.makeflowlog' )
 		>>> MakeflowLog().sniff( fname )
 		True
 		"""
@@ -460,7 +460,7 @@ class MakeflowLog( cctools ):
 			dataset_fh.close()
 			dataset.metadata.comment_lines = comment_lines
 			dataset.metadata.columns = 10
-			dataset.metadata.column_types = ['int', 'int', 'int', 'int', 'int', 'int', 'int', 'int', 'int', 'int']
+			dataset.metadata.column_types = ['str', 'int', 'int', 'int', 'int', 'int', 'int', 'int', 'int', 'int']
 
 
 
@@ -490,12 +490,12 @@ class WorkQueueLog( cctools ):
 
 	def sniff( self, filename ):
 		"""
-		Determines whether the file is in SAM format
+		Determines whether the file is in WorkQueue log format
 
-		>>> fname = get_test_fname( 'sequence.maf' )
+		>>> fname = get_test_fname( 'sequence.wq' )
 		>>> WorkQueueLog().sniff( fname )
 		False
-		>>> fname = get_test_fname( '1.sam' )
+		>>> fname = get_test_fname( '1.wqlog' )
 		>>> WorkQueueLog().sniff( fname )
 		True
 		"""
