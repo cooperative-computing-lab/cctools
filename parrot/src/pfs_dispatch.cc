@@ -263,7 +263,7 @@ static void decode_read( struct pfs_process *p, int entering, int syscall, const
 		the ugly slow copy out instead.
 		*/
 
-		if( (actual==-EINTR) && (p->diverted_length>0) ) {
+		if(actual == -EINTR) {
 			tracer_copy_out(p->tracer,pfs_channel_base()+p->io_channel_offset,POINTER(args[1]),p->diverted_length);
 			p->syscall_result = p->diverted_length;
 			tracer_result_set(p->tracer,p->syscall_result);

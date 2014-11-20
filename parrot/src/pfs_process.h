@@ -50,6 +50,7 @@ struct pfs_process {
 	struct tracer *tracer;
 	struct timeval seltime;
 
+	size_t diverted_length;
 	pfs_size_t io_channel_offset;
 
 	char scratch_data[PFS_SCRATCH_SIZE];
@@ -66,7 +67,6 @@ struct pfs_process {
 
 	int completing_execve;
 	int did_stream_warning;
-	int diverted_length;
 };
 
 struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table );
