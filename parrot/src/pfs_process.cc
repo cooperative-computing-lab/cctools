@@ -170,7 +170,6 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	child->tgid = pid;
 	child->state = PFS_PROCESS_STATE_KERNEL;
 	child->flags = PFS_PROCESS_FLAGS_STARTUP;
-	child->seltime.tv_sec = 0;
 	child->syscall = SYSCALL32_fork;
 	child->syscall_dummy = 0;
 	child->syscall_parrotfd = -1;

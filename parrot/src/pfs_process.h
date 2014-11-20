@@ -48,7 +48,6 @@ struct pfs_process {
 	uint64_t nsyscalls;
 	pfs_table *table;
 	struct tracer *tracer;
-	struct timeval seltime;
 
 	size_t diverted_length;
 	pfs_size_t io_channel_offset;
@@ -63,7 +62,6 @@ struct pfs_process {
 	INT64_T syscall_result;
 	INT64_T syscall_args[TRACER_ARGS_MAX];
 	INT64_T syscall_args_changed;
-	INT64_T actual_result;
 
 	int completing_execve;
 	int did_stream_warning;
