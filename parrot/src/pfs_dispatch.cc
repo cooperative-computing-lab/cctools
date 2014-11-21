@@ -112,7 +112,7 @@ extern void handle_specific_process( pid_t pid );
 Divert this incoming system call to a read or write on the I/O channel
 */
 
-static void divert_to_channel( struct pfs_process *p, int syscall, const void *uaddr, size_t length, pfs_size_t channel_offset )
+static void divert_to_channel( struct pfs_process *p, INT64_T syscall, const void *uaddr, size_t length, pfs_size_t channel_offset )
 {
 	INT64_T args[] = {pfs_channel_fd(), (INT64_T)(uintptr_t)uaddr, (INT64_T)length, (INT64_T)(channel_offset&0xffffffff), (INT64_T)(((UINT64_T)channel_offset) >> 32)};
 	debug(D_DEBUG, "divert_to_channel(%d, %s, %p, %zu, %" PRId64 ")", p->pid, tracer_syscall_name(p->tracer,syscall), uaddr, length, (INT64_T)channel_offset);
@@ -127,7 +127,7 @@ static void divert_to_channel( struct pfs_process *p, int syscall, const void *u
 Divert this incoming system call to something harmless with the given result.
 */
 
-static void divert_to_dummy( struct pfs_process *p, int result )
+static void divert_to_dummy( struct pfs_process *p, INT64_T result )
 {
 	p->syscall_dummy = 1;
 	p->syscall_result = result;
@@ -173,7 +173,7 @@ static void divert_to_parrotfd( struct pfs_process *p, INT64_T fd, char *path, c
 {
 	pathtofilename(path);
 	debug(D_DEBUG, "diverting to openat(%d, `%s', O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR)", parrot_dir_fd, path);
-	INT64_T args[] = {parrot_dir_fd, (INT64_T)(uintptr_t)pfs_process_scratch_set(p, path, strlen(path)+1), O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR};
+	INT64_T args[] = {parrot_dir_fd, (INT64_T)pfs_process_scratch_set(p, path, strlen(path)+1), O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR};
 	if (flags & O_CLOEXEC)
 		args[2] |= O_CLOEXEC;
 	tracer_args_set(p->tracer,SYSCALL32_openat,args,sizeof(args)/sizeof(args[0]));
@@ -182,7 +182,7 @@ static void divert_to_parrotfd( struct pfs_process *p, INT64_T fd, char *path, c
 	trace_this_pid = p->pid; /* this handles two processes racing to create the same file, also see comment for pfs_table::setparrot. */
 }
 
-static void handle_parrotfd( struct pfs_process *p)
+static void handle_parrotfd( struct pfs_process *p )
 {
 	INT64_T actual;
 	tracer_result_get(p->tracer, &actual);
@@ -217,14 +217,15 @@ into the channel, and then redirecting the system call
 to read from the channel fd.
 */
 
-static void decode_read( struct pfs_process *p, int entering, int syscall, const INT64_T *args )
+static void decode_read( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	int fd = args[0];
+	void *uaddr = POINTER(args[1]);
 	pfs_size_t length = args[2];
 	pfs_off_t offset = args[3];
 
 	if(entering) {
-		debug(D_DEBUG, "read(%" PRId64 ", %p, %" PRId64 ")", args[0], POINTER(args[1]), args[2]);
+		debug(D_DEBUG, "read(%" PRId64 ", %p, %" PRId64 ")", args[0], uaddr, args[2]);
 
 		if(pfs_channel_alloc(0,length,&p->io_channel_offset)) {
 			char *local_addr = pfs_channel_base() + p->io_channel_offset;
@@ -240,7 +241,7 @@ static void decode_read( struct pfs_process *p, int entering, int syscall, const
 			if(p->syscall_result==0) {
 				divert_to_dummy(p,0);
 			} else if(p->syscall_result>0) {
-				divert_to_channel(p,SYSCALL32_pread64,POINTER(args[1]),p->syscall_result,p->io_channel_offset);
+				divert_to_channel(p,SYSCALL32_pread64,uaddr,p->syscall_result,p->io_channel_offset);
 				pfs_read_count += p->syscall_result;
 			} else {
 				divert_to_dummy(p,-errno);
@@ -264,7 +265,7 @@ static void decode_read( struct pfs_process *p, int entering, int syscall, const
 		*/
 
 		if(actual == -EINTR) {
-			tracer_copy_out(p->tracer,pfs_channel_base()+p->io_channel_offset,POINTER(args[1]),p->diverted_length);
+			tracer_copy_out(p->tracer,pfs_channel_base()+p->io_channel_offset,uaddr,p->diverted_length);
 			p->syscall_result = p->diverted_length;
 			tracer_result_set(p->tracer,p->syscall_result);
 		}
@@ -280,12 +281,13 @@ to it.  When the syscall completes, we write the data
 to its destination and then set the result.
 */
 
-static void decode_write( struct pfs_process *p, int entering, int syscall, const INT64_T *args )
+static void decode_write( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
+		void *uaddr = POINTER(args[1]);
 		INT64_T length = args[2];
 		if(pfs_channel_alloc(0,length,&p->io_channel_offset)) {
-			divert_to_channel(p,SYSCALL32_pwrite64,POINTER(args[1]),length,p->io_channel_offset);
+			divert_to_channel(p,SYSCALL32_pwrite64,uaddr,length,p->io_channel_offset);
 		} else {
 			divert_to_dummy(p,-ENOMEM);
 		}
@@ -380,7 +382,7 @@ they do seem to appear sporadically in X11, the dynamic linker,
 and sporadically in networking utilities.
 */
 
-static void decode_readv( struct pfs_process *p, int entering, int syscall, const INT64_T *args )
+static void decode_readv( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
 		int fd = args[0];
@@ -390,7 +392,7 @@ static void decode_readv( struct pfs_process *p, int entering, int syscall, cons
 		struct pfs_kernel_iovec *v;
 		int size;
 		char *buffer;
-		int result;
+		INT64_T result;
 
 		if(!uv || count<=0) {
 			divert_to_dummy(p,-EINVAL);
@@ -420,17 +422,17 @@ static void decode_readv( struct pfs_process *p, int entering, int syscall, cons
 	}
 }
 
-static void decode_writev( struct pfs_process *p, int entering, int syscall, const INT64_T *args )
+static void decode_writev( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
 		int fd = args[0];
-		struct pfs_kernel_iovec *uv = (struct pfs_kernel_iovec *)POINTER(args[1]);
+		struct pfs_kernel_iovec *uv = (struct pfs_kernel_iovec *) POINTER(args[1]);
 		int count = args[2];
 
 		struct pfs_kernel_iovec *v;
 		int size;
 		char *buffer;
-		int result;
+		INT64_T result;
 
 		if(!uv || count<=0) {
 			divert_to_dummy(p,-EINVAL);
@@ -460,7 +462,7 @@ static void decode_writev( struct pfs_process *p, int entering, int syscall, con
 	}
 }
 
-static void decode_stat( struct pfs_process *p, int entering, int syscall, const INT64_T *args, int sixty_four )
+static void decode_stat( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args, int sixty_four )
 {
 	if(entering) {
 		char path[PFS_PATH_MAX];
@@ -516,7 +518,7 @@ static void decode_stat( struct pfs_process *p, int entering, int syscall, const
 	}
 }
 
-static void decode_statfs( struct pfs_process *p, int entering, int syscall, const INT64_T *args, int sixty_four )
+static void decode_statfs( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args, int sixty_four )
 {
 	if(entering) {
 		struct pfs_statfs lbuf;
@@ -554,7 +556,7 @@ On Linux, all of the socket related system calls are
 multiplexed through one system call.
 */
 
-void decode_socketcall( struct pfs_process *p, int entering, int syscall, const INT64_T *a )
+void decode_socketcall( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *a )
 {
 	if (p->syscall_dummy)
 		return;
@@ -961,7 +963,7 @@ around with the job's argv to indicate that.  Then, we do much the same as the
 first case.
 */
 
-static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
 		char path[PFS_PATH_MAX] = "";
@@ -1144,20 +1146,24 @@ void decode_mmap( struct pfs_process *p, int entering, const INT64_T *args )
 		} else {
 			pfs_mmap_delete(0,0);
 		}
-		return;
 	}
 }
 
-void decode_syscall( struct pfs_process *p, int entering )
+static void decode_syscall( struct pfs_process *p, int entering )
 {
 	const INT64_T *args;
 
 	char path[PFS_PATH_MAX];
 	char path2[PFS_PATH_MAX];
 
+	/* SYSCALL_execve has a different value in 32 and 64 bit modes. When an
+	 * execve forces a switch between execution modes, the old system call
+	 * number is retained, even though the mode has changed.  So, we must
+	 * explicitly check for this condition and fix up the system call number to
+	 * end up in the right code.
+	 */
 	if(p->completing_execve) {
-		if(p->syscall != SYSCALL32_execve)
-		{
+		if(p->syscall != SYSCALL32_execve) {
 			debug(D_PROCESS, "Changing execve code number from 64 to 32 bit mode.\n");
 			p->syscall = SYSCALL32_execve;
 		}
@@ -1168,14 +1174,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 		p->state = PFS_PROCESS_STATE_KERNEL;
 		p->syscall_dummy = 0;
 		tracer_args_get(p->tracer,&p->syscall,p->syscall_args);
-
-		/*
-		SYSCALL_execve has a different value in 32 and 64 bit modes.
-		When an execve forces a switch between execution modes, the
-		old system call number is retained, even though the mode has
-		changed.  So, we must explicitly check for this condition
-		and fix up the system call number to end up in the right code.
-		*/
 
 		debug(D_SYSCALL,"%s",tracer_syscall_name(p->tracer,p->syscall));
 		p->syscall_original = p->syscall;
@@ -1556,7 +1554,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 				tracer_result_get(p->tracer, &actual);
 				if (actual >= 0) {
 					if (p->syscall == SYSCALL32_pipe || p->syscall == SYSCALL32_pipe2) {
-						int fds[2];
+						int32_t fds[2];
 						int fdflags = 0;
 						tracer_copy_in(p->tracer, fds, POINTER(args[0]), sizeof(fds));
 						if (p->syscall == SYSCALL32_pipe2 && (args[1]&O_CLOEXEC)) {
@@ -1566,9 +1564,9 @@ void decode_syscall( struct pfs_process *p, int entering )
 						p->table->setnative(fds[0], fdflags);
 						assert(fds[1] >= 0);
 						p->table->setnative(fds[1], fdflags);
-					} else if (p->syscall == SYSCALL32_eventfd2 && (args[1]&EFD_CLOEXEC)) {
-						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL32_epoll_create1 && (args[1]&EPOLL_CLOEXEC)) {
+						p->table->setnative(actual, FD_CLOEXEC);
+					} else if (p->syscall == SYSCALL32_eventfd2 && (args[1]&EFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL32_signalfd4 && (args[2]&SFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
@@ -2004,14 +2002,10 @@ void decode_syscall( struct pfs_process *p, int entering )
 					}
 				}
 			} else if (entering) {
+				pid_t pid;
 				int fd = args[0];
 				int cmd = args[1];
 				void *uaddr = POINTER(args[2]);
-				struct pfs_kernel_flock kfl;
-				struct pfs_kernel_flock64 kfl64;
-				struct flock fl;
-				struct flock64 fl64;
-				PTRINT_T pid;
 
 				switch(cmd) {
 					case F_GETFD:
@@ -2031,7 +2025,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 						if(cmd==F_SETFL) {
 							int flags = (int)args[2];
 							if(flags&O_ASYNC) {
-								debug(D_PROCESS,"pid %d requests O_ASYNC on fd %d",(int)pfs_current->pid,(int)fd);
+								debug(D_PROCESS,"pid %d requests O_ASYNC on fd %d",(int)pfs_current->pid,fd);
 								p->flags |= PFS_PROCESS_FLAGS_ASYNC;
 							}
 						}
@@ -2039,7 +2033,10 @@ void decode_syscall( struct pfs_process *p, int entering )
 
 					case PFS_GETLK:
 					case PFS_SETLK:
-					case PFS_SETLKW:
+					case PFS_SETLKW: {
+						struct flock fl;
+						struct pfs_kernel_flock kfl;
+
 						tracer_copy_in(p->tracer,&kfl,uaddr,sizeof(kfl));
 						COPY_FLOCK(kfl,fl);
 						p->syscall_result = pfs_fcntl(fd,cmd,&fl);
@@ -2051,10 +2048,14 @@ void decode_syscall( struct pfs_process *p, int entering )
 						}
 						divert_to_dummy(p,p->syscall_result);
 						break;
+					}
 
 					case PFS_GETLK64:
 					case PFS_SETLK64:
-					case PFS_SETLKW64:
+					case PFS_SETLKW64: {
+						struct flock64 fl64;
+						struct pfs_kernel_flock64 kfl64;
+
 						tracer_copy_in(p->tracer,&kfl64,uaddr,sizeof(kfl64));
 						COPY_FLOCK(kfl64,fl64);
 						p->syscall_result = pfs_fcntl(fd,cmd,&fl64);
@@ -2066,6 +2067,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 						}
 						divert_to_dummy(p,p->syscall_result);
 						break;
+					}
 
 					/* Pretend that the caller is the signal recipient */
 					case F_GETOWN:
@@ -2074,7 +2076,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 
 					/* But we always get the signal. */
 					case F_SETOWN:
-						debug(D_PROCESS,"pid %d requests F_SETOWN on fd %d",(int)pfs_current->pid,(int)fd);
+						debug(D_PROCESS,"pid %d requests F_SETOWN on fd %d",pfs_current->pid,fd);
 						p->flags |= PFS_PROCESS_FLAGS_ASYNC;
 						pid = getpid();
 						pfs_fcntl(fd,F_SETOWN,POINTER(pid));
@@ -2535,7 +2537,6 @@ void decode_syscall( struct pfs_process *p, int entering )
 					INT64_T nargs[] = {(INT64_T)pfs_process_scratch_set(p, native_path, strlen(native_path)+1), args[2], args[3]};
 					tracer_args_set(p->tracer,SYSCALL32_open,nargs,sizeof(nargs)/sizeof(nargs[0]));
 					p->syscall_args_changed = 1;
-					break;
 				} else {
 					divert_to_parrotfd(p,p->syscall_result,path,POINTER(args[1]),args[2]);
 				}
@@ -3092,7 +3093,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 
 		default:
 			if(entering) {
-				debug(D_NOTICE,"warning: system call %d (%s) not supported for program %s",(int)p->syscall,tracer_syscall_name(p->tracer,p->syscall),p->name);
+				debug(D_NOTICE,"warning: system call %" PRId64 " (%s) not supported for program %s", p->syscall, tracer_syscall_name(p->tracer, p->syscall), p->name);
 				divert_to_dummy(p,-ENOSYS);
 			}
 			break;
@@ -3133,8 +3134,7 @@ void pfs_dispatch32( struct pfs_process *p )
 			decode_syscall(p,1);
 			break;
 		default:
-			debug(D_PROCESS,"process %d in unexpected state %d",(int)p->pid,(int)p->state);
-			break;
+			assert(0);
 	}
 
 	switch(p->state) {
@@ -3143,8 +3143,7 @@ void pfs_dispatch32( struct pfs_process *p )
 			tracer_continue(p->tracer,0);
 			break;
 		default:
-			debug(D_PROCESS,"process %d in unexpected state %d",(int)p->pid,(int)p->state);
-			break;
+			assert(0);
 	}
 
 	pfs_current = oldcurrent;

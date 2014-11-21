@@ -128,7 +128,7 @@ Divert this incoming system call to a read or write on the I/O channel
 
 static void divert_to_channel( struct pfs_process *p, INT64_T syscall, const void *uaddr, size_t length, pfs_size_t channel_offset )
 {
-	INT64_T args[] = {pfs_channel_fd(), (INT64_T)(UPTRINT_T)uaddr, (INT64_T)length, channel_offset};
+	INT64_T args[] = {pfs_channel_fd(), (INT64_T)(uintptr_t)uaddr, (INT64_T)length, channel_offset};
 	debug(D_DEBUG, "divert_to_channel(%d, %s, %p, %zu, %" PRId64 ")", p->pid, tracer_syscall_name(p->tracer,syscall), uaddr, length, (INT64_T)channel_offset);
 	debug(D_DEBUG, "--> %s(%" PRId64 ", 0x%" PRIx64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,syscall), args[0], args[1], args[2], args[3]);
 	tracer_args_set(p->tracer,syscall,args,sizeof(args)/sizeof(args[0]));
@@ -233,15 +233,15 @@ the same as read, but only the first chunk is actually
 read.  The caller must examine the result and then keep reading.
 */
 
-static void decode_read( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_read( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
-	INT64_T fd = args[0];
+	int fd = args[0];
 	void *uaddr = POINTER(args[1]);
 	pfs_size_t length = args[2];
 	pfs_off_t offset = args[3];
 
 	if(entering) {
-		debug(D_DEBUG, "read(%" PRId64 ", %p, %" PRId64 ")", args[0], POINTER(args[1]), args[2]);
+		debug(D_DEBUG, "read(%" PRId64 ", %p, %" PRId64 ")", args[0], uaddr, args[2]);
 
 		if(pfs_channel_alloc(0,length,&p->io_channel_offset)) {
 			char *local_addr = pfs_channel_base() + p->io_channel_offset;
@@ -297,7 +297,7 @@ to it.  When the syscall completes, we write the data
 to its destination and then set the result.
 */
 
-static void decode_write( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_write( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
 		void *uaddr = POINTER(args[1]);
@@ -313,7 +313,7 @@ static void decode_write( struct pfs_process *p, INT64_T entering, INT64_T sysca
 		debug(D_DEBUG, "channel wrote %" PRId64, actual);
 
 		if(actual>0) {
-			INT64_T fd = args[0];
+			int fd = args[0];
 			pfs_off_t offset = args[3];
 			char *local_addr = pfs_channel_base() + p->io_channel_offset;
 
@@ -327,11 +327,11 @@ static void decode_write( struct pfs_process *p, INT64_T entering, INT64_T sysca
 				debug(D_SYSCALL,"write returned %"PRId64" instead of %"PRId64,p->syscall_result, actual);
 			}
 
-			if (p->syscall_result >= 0)
+			if(p->syscall_result>=0)
 				pfs_write_count += p->syscall_result;
 			else
 				p->syscall_result = -errno;
-			tracer_result_set(p->tracer, p->syscall_result);
+			tracer_result_set(p->tracer,p->syscall_result);
 		}
 		pfs_channel_free(p->io_channel_offset);
 	}
@@ -398,15 +398,15 @@ they do seem to appear sporadically in X11, the dynamic linker,
 and sporadically in networking utilities.
 */
 
-static void decode_readv( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_readv( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
-		INT64_T fd = args[0];
-		struct pfs_kernel_iovec *uv = (struct pfs_kernel_iovec *) args[1];
-		INT64_T count = args[2];
+		int fd = args[0];
+		struct pfs_kernel_iovec *uv = (struct pfs_kernel_iovec *) POINTER(args[1]);
+		int count = args[2];
 
 		struct pfs_kernel_iovec *v;
-		INT64_T size;
+		int size;
 		char *buffer;
 		INT64_T result;
 
@@ -438,15 +438,15 @@ static void decode_readv( struct pfs_process *p, INT64_T entering, INT64_T sysca
 	}
 }
 
-static void decode_writev( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_writev( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
-		INT64_T fd = args[0];
-		struct pfs_kernel_iovec *uv = (struct pfs_kernel_iovec *) args[1];
-		INT64_T count = args[2];
+		int fd = args[0];
+		struct pfs_kernel_iovec *uv = (struct pfs_kernel_iovec *) POINTER(args[1]);
+		int count = args[2];
 
 		struct pfs_kernel_iovec *v;
-		INT64_T size;
+		int size;
 		char *buffer;
 		INT64_T result;
 
@@ -478,7 +478,7 @@ static void decode_writev( struct pfs_process *p, INT64_T entering, INT64_T sysc
 	}
 }
 
-static void decode_stat( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_stat( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
 		char path[PFS_PATH_MAX];
@@ -517,7 +517,7 @@ static void decode_stat( struct pfs_process *p, INT64_T entering, INT64_T syscal
 	}
 }
 
-static void decode_statfs( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_statfs( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
 		struct pfs_statfs lbuf;
@@ -766,7 +766,7 @@ around with the job's argv to indicate that.  Then, we do much the same as the
 first case.
 */
 
-static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
 		char path[PFS_PATH_MAX] = "";
@@ -850,7 +850,7 @@ the whole file regardless of what portion is actually
 mapped.  The channel cache keeps a reference count.
 */
 
-static void decode_mmap( struct pfs_process *p, INT64_T entering, const INT64_T *args )
+static void decode_mmap( struct pfs_process *p, int entering, const INT64_T *args )
 {
 	INT64_T addr = args[0];
 	pfs_size_t length = args[1];
@@ -907,7 +907,7 @@ static void decode_mmap( struct pfs_process *p, INT64_T entering, const INT64_T 
 	}
 }
 
-static void decode_syscall( struct pfs_process *p, INT64_T entering )
+static void decode_syscall( struct pfs_process *p, int entering )
 {
 	const INT64_T *args;
 
@@ -1401,7 +1401,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					if(p->syscall_result<0)
 						divert_to_dummy(p, -errno);
 					else
-						p->syscall_dummy = 1; /* Fake a dummy "return" but allow the kernel to close the Parrot fd. */
+						p->syscall_dummy = 1; /* Fake a dummy "return" (so p->syscall_result is returned) but allow the kernel to close the Parrot fd. */
 				}
 			}
 			break;
@@ -1616,6 +1616,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			 * we want anyway, so we don't need to do anything special.
 			 *
 			 * If however we *did* want to do something special, we could do
+			 * something like sending one of a new socketpair to the tracee. We can
 			 * perhaps send one of a new socketpair to the tracee. We can use the
 			 * recvmsg system call to receive the socket via an existent socket we
 			 * setup ahead of time.
@@ -1849,11 +1850,10 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					}
 				}
 			} else if (entering) {
-				PTRINT_T pid;
+				pid_t pid;
 				int fd = args[0];
-				INT64_T cmd = args[1];
+				int cmd = args[1];
 				void *uaddr = POINTER(args[2]);
-				struct flock fl;
 
 				switch(cmd) {
 					case F_GETFD:
@@ -1871,9 +1871,9 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						divert_to_dummy(p,p->syscall_result);
 
 						if(cmd==F_SETFL) {
-							INT64_T flags = (int)args[2];
+							int flags = (int)args[2];
 							if(flags&O_ASYNC) {
-							  debug(D_PROCESS,"pid %d requests O_ASYNC on fd %d",pfs_current->pid,fd);
+								debug(D_PROCESS,"pid %d requests O_ASYNC on fd %d",(int)pfs_current->pid,fd);
 								p->flags |= PFS_PROCESS_FLAGS_ASYNC;
 							}
 						}
@@ -1881,7 +1881,8 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 					case PFS_GETLK:
 					case PFS_SETLK:
-					case PFS_SETLKW:
+					case PFS_SETLKW: {
+						struct flock fl;
 						tracer_copy_in(p->tracer,&fl,uaddr,sizeof(fl));
 						p->syscall_result = pfs_fcntl(fd,cmd,&fl);
 						if(p->syscall_result<0) {
@@ -1891,6 +1892,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						}
 						divert_to_dummy(p,p->syscall_result);
 						break;
+					}
 
 					/* Pretend that the caller is the signal recipient */
 					case F_GETOWN:
@@ -2897,7 +2899,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_unshare:
 		case SYSCALL64_vmsplice:
 		case SYSCALL64_vserver:
-			/* fallthrough... */
+			/* fallthrough */
 
 		/* If anything else escaped our attention, we must know about it in an
 		 * obvious way.
@@ -2905,7 +2907,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 		default:
 			if(entering) {
-				debug(D_NOTICE,"warning: system call %"PRId64" (%s) not supported for program %s",p->syscall,tracer_syscall_name(p->tracer,p->syscall),p->name);
+				debug(D_NOTICE,"warning: system call %" PRId64 " (%s) not supported for program %s", p->syscall, tracer_syscall_name(p->tracer, p->syscall), p->name);
 				divert_to_dummy(p,-ENOSYS);
 			}
 			break;
