@@ -1536,6 +1536,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 						p->table->dup2(args[0], actual, 0);
 				}
 			}
+			break;
 
 		case SYSCALL32_epoll_create1:
 		case SYSCALL32_epoll_create:
