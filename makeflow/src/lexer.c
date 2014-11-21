@@ -1157,7 +1157,6 @@ int lexer_read_line(struct lexer * lx)
 		return 1;
 		break;
 	case '\t':
-	case ' ':
 		return lexer_read_command(lx);
 		break;
 	case '\n':
@@ -1177,11 +1176,19 @@ int lexer_read_line(struct lexer * lx)
 		colon = lexer_unquoted_look_ahead_count(lx, ":");
 		equal = lexer_unquoted_look_ahead_count(lx, "=");
 
+		/* If there is a colon and it appears before any existing
+		 * equal sign read the line as a file list. */
 		if((colon != -1) && (equal == -1 || colon < equal)) {
 			lexer_read_file_list(lx);
-		} else {
+		}
+		else if(c == ' ' && equal == -1) {
+			/* A command starting with a space.. for backwards compatibility. */
+			return lexer_read_command(lx);
+		}
+		else {
 			lexer_read_syntax_or_variable(lx);
 		}
+			
 		return 1;
 		break;
 	}
