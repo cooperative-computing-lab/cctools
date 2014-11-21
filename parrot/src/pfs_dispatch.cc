@@ -2042,7 +2042,7 @@ void decode_syscall( struct pfs_process *p, int entering )
 					case PFS_SETLKW:
 						tracer_copy_in(p->tracer,&kfl,uaddr,sizeof(kfl));
 						COPY_FLOCK(kfl,fl);
-						p->syscall_result = pfs_fcntl(fd,cmd,&kfl);
+						p->syscall_result = pfs_fcntl(fd,cmd,&fl);
 						if(p->syscall_result<0) {
 							p->syscall_result=-errno;
 						} else {
