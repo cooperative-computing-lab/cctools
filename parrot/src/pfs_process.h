@@ -33,27 +33,23 @@ enum pfs_process_state {
 	PFS_PROCESS_STATE_USER,
 };
 
-#define PFS_SCRATCH_SIZE 4096
-
+#define PFS_SCRATCH_SPACE (8*4096)
 struct pfs_process {
-	enum pfs_process_state state;
-
 	char name[PFS_PATH_MAX];
-	char new_logical_name[PFS_PATH_MAX];
-	char new_physical_name[PFS_PATH_MAX];
-
+	pid_t pid, ppid, tgid;
 	mode_t umask;
-	pid_t  pid, ppid, tgid;
 	int flags;
+
+	enum pfs_process_state state;
 	uint64_t nsyscalls;
 	pfs_table *table;
 	struct tracer *tracer;
-	struct timeval seltime;
 
+	size_t diverted_length;
 	pfs_size_t io_channel_offset;
-
-	char scratch_data[PFS_SCRATCH_SIZE];
-	size_t scratch_used;
+	int completing_execve;
+	int did_stream_warning;
+	char new_logical_name[PFS_PATH_MAX]; /* saved during execve */
 
 	INT64_T syscall;
 	INT64_T syscall_original;
@@ -62,11 +58,8 @@ struct pfs_process {
 	INT64_T syscall_result;
 	INT64_T syscall_args[TRACER_ARGS_MAX];
 	INT64_T syscall_args_changed;
-	INT64_T actual_result;
 
-	int completing_execve;
-	int did_stream_warning;
-	int diverted_length;
+	char tmp[4096];
 };
 
 struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table );

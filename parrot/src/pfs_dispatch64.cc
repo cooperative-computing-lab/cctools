@@ -32,6 +32,7 @@ extern "C" {
 #include "debug.h"
 #include "int_sizes.h"
 #include "macros.h"
+#include "pattern.h"
 #include "stringtools.h"
 #include "tracer.h"
 #include "xxmalloc.h"
@@ -115,7 +116,6 @@ extern INT64_T pfs_read_count;
 extern INT64_T pfs_write_count;
 
 extern int parrot_dir_fd;
-extern char *pfs_ldso_path;
 extern int *pfs_syscall_totals64;
 
 extern void handle_specific_process( pid_t pid );
@@ -128,7 +128,7 @@ Divert this incoming system call to a read or write on the I/O channel
 
 static void divert_to_channel( struct pfs_process *p, INT64_T syscall, const void *uaddr, size_t length, pfs_size_t channel_offset )
 {
-	INT64_T args[] = {pfs_channel_fd(), (INT64_T)(UPTRINT_T)uaddr, (INT64_T)length, channel_offset};
+	INT64_T args[] = {pfs_channel_fd(), (INT64_T)(uintptr_t)uaddr, (INT64_T)length, channel_offset};
 	debug(D_DEBUG, "divert_to_channel(%d, %s, %p, %zu, %" PRId64 ")", p->pid, tracer_syscall_name(p->tracer,syscall), uaddr, length, (INT64_T)channel_offset);
 	debug(D_DEBUG, "--> %s(%" PRId64 ", 0x%" PRIx64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,syscall), args[0], args[1], args[2], args[3]);
 	tracer_args_set(p->tracer,syscall,args,sizeof(args)/sizeof(args[0]));
@@ -233,15 +233,15 @@ the same as read, but only the first chunk is actually
 read.  The caller must examine the result and then keep reading.
 */
 
-static void decode_read( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_read( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
-	INT64_T fd = args[0];
+	int fd = args[0];
 	void *uaddr = POINTER(args[1]);
 	pfs_size_t length = args[2];
 	pfs_off_t offset = args[3];
 
 	if(entering) {
-		debug(D_DEBUG, "read(%" PRId64 ", %p, %" PRId64 ")", args[0], POINTER(args[1]), args[2]);
+		debug(D_DEBUG, "read(%" PRId64 ", %p, %" PRId64 ")", args[0], uaddr, args[2]);
 
 		if(pfs_channel_alloc(0,length,&p->io_channel_offset)) {
 			char *local_addr = pfs_channel_base() + p->io_channel_offset;
@@ -280,7 +280,7 @@ static void decode_read( struct pfs_process *p, INT64_T entering, INT64_T syscal
 		the ugly slow copy out instead.
 		*/
 
-		if( (actual==-EINTR) && (p->diverted_length>0) ) {
+		if(actual == -EINTR) {
 			tracer_copy_out(p->tracer,pfs_channel_base()+p->io_channel_offset,uaddr,p->diverted_length);
 			p->syscall_result = p->diverted_length;
 			tracer_result_set(p->tracer,p->syscall_result);
@@ -297,7 +297,7 @@ to it.  When the syscall completes, we write the data
 to its destination and then set the result.
 */
 
-static void decode_write( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_write( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
 		void *uaddr = POINTER(args[1]);
@@ -313,7 +313,7 @@ static void decode_write( struct pfs_process *p, INT64_T entering, INT64_T sysca
 		debug(D_DEBUG, "channel wrote %" PRId64, actual);
 
 		if(actual>0) {
-			INT64_T fd = args[0];
+			int fd = args[0];
 			pfs_off_t offset = args[3];
 			char *local_addr = pfs_channel_base() + p->io_channel_offset;
 
@@ -327,11 +327,11 @@ static void decode_write( struct pfs_process *p, INT64_T entering, INT64_T sysca
 				debug(D_SYSCALL,"write returned %"PRId64" instead of %"PRId64,p->syscall_result, actual);
 			}
 
-			if (p->syscall_result >= 0)
+			if(p->syscall_result>=0)
 				pfs_write_count += p->syscall_result;
 			else
 				p->syscall_result = -errno;
-			tracer_result_set(p->tracer, p->syscall_result);
+			tracer_result_set(p->tracer,p->syscall_result);
 		}
 		pfs_channel_free(p->io_channel_offset);
 	}
@@ -398,15 +398,15 @@ they do seem to appear sporadically in X11, the dynamic linker,
 and sporadically in networking utilities.
 */
 
-static void decode_readv( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_readv( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
-		INT64_T fd = args[0];
-		struct pfs_kernel_iovec *uv = (struct pfs_kernel_iovec *) args[1];
-		INT64_T count = args[2];
+		int fd = args[0];
+		struct pfs_kernel_iovec *uv = (struct pfs_kernel_iovec *) POINTER(args[1]);
+		int count = args[2];
 
 		struct pfs_kernel_iovec *v;
-		INT64_T size;
+		int size;
 		char *buffer;
 		INT64_T result;
 
@@ -438,15 +438,15 @@ static void decode_readv( struct pfs_process *p, INT64_T entering, INT64_T sysca
 	}
 }
 
-static void decode_writev( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_writev( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
-		INT64_T fd = args[0];
-		struct pfs_kernel_iovec *uv = (struct pfs_kernel_iovec *) args[1];
-		INT64_T count = args[2];
+		int fd = args[0];
+		struct pfs_kernel_iovec *uv = (struct pfs_kernel_iovec *) POINTER(args[1]);
+		int count = args[2];
 
 		struct pfs_kernel_iovec *v;
-		INT64_T size;
+		int size;
 		char *buffer;
 		INT64_T result;
 
@@ -478,7 +478,7 @@ static void decode_writev( struct pfs_process *p, INT64_T entering, INT64_T sysc
 	}
 }
 
-static void decode_stat( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_stat( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
 		char path[PFS_PATH_MAX];
@@ -517,7 +517,7 @@ static void decode_stat( struct pfs_process *p, INT64_T entering, INT64_T syscal
 	}
 }
 
-static void decode_statfs( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_statfs( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
 		struct pfs_statfs lbuf;
@@ -581,99 +581,168 @@ static int is_executable( const char *path )
 	}
 }
 
-static void redirect_ldso( struct pfs_process *p, const char *ldso, const INT64_T *args, char * const start_of_available_scratch )
+static int redirect_ldso( const char *exe, char *ldso_physical_name )
 {
-	pid_t child_pid;
-	int child_status;
-	char real_physical_name[PFS_PATH_MAX];
-	char ldso_physical_name[PFS_PATH_MAX];
-	char *argv[PFS_ARG_MAX], *ext_argv;
-	char *ext_real_logical_name;
-	char *ext_ldso_physical_name;
-	char *ext_real_physical_name;
-	INT64_T i, argc;
+	extern char pfs_ldso_path[PFS_PATH_MAX];
 
-	strcpy(real_physical_name, p->new_physical_name);
-	debug(D_PROCESS,"redirect_ldso: called on %s (%s)", p->new_logical_name, real_physical_name);
+	if (pfs_ldso_path[0] == '\0') {
+		ldso_physical_name[0] = '\0';
+		return 0;
+	}
 
-	if(pfs_get_local_name(ldso,ldso_physical_name,0,0)!=0) {
-		debug(D_PROCESS,"redirect_ldso: cannot get physical name of %s",ldso);
+	debug(D_PROCESS, "redirect_ldso: called on %s", exe);
 
-		return;
+	if(pfs_get_local_name(pfs_ldso_path, ldso_physical_name, 0, 0) < 0) {
+		debug(D_PROCESS, "redirect_ldso: cannot get physical name of %s", pfs_ldso_path);
+		return errno = ENOENT, -1;
 	}
 
 	/* Unwise to check ldso recursively */
-	if (strcmp(real_physical_name, ldso_physical_name) == 0) return;
-
-	/* Test whether loading with ldso would work by */
-	/* running ldso --verify on the executable (may be static) */
-
-	child_pid = fork();
-	if (child_pid < 0) {
-		debug(D_PROCESS,"redirect_ldso: cannot fork");
-		return;
+	if (strcmp(exe, ldso_physical_name) == 0) {
+		ldso_physical_name[0] = '\0';
+		return 0;
 	}
-	if (child_pid == 0) {
-		int fd = open("/dev/null", O_WRONLY);
-		if (fd >= 0) {
-			close(1);
-			close(2);
-			dup(fd);
-			dup(fd);
+
+	/* Test whether loading with ldso would work by running ldso --verify on
+	 * the executable (may be static).
+	 */
+
+	pid_t child = fork();
+	if (child == -1) {
+		debug(D_PROCESS,"redirect_ldso: cannot fork: %s", strerror(errno));
+		return errno = EIO, -1;
+	} else if (child == 0) {
+		int fd = open("/dev/null", O_RDWR);
+		if (fd == -1)
+			_exit(EXIT_FAILURE);
+		dup2(fd, STDIN_FILENO);
+		dup2(fd, STDOUT_FILENO);
+		dup2(fd, STDERR_FILENO);
+		execlp(ldso_physical_name, ldso_physical_name, "--verify", exe, NULL);
+		_exit(EXIT_FAILURE);
+	}
+
+	int status;
+	if (waitpid(child, &status, 0) == -1) {
+		debug(D_PROCESS, "redirect_ldso: couldn't wait: %s", strerror(errno));
+		kill(child, SIGKILL);
+		return errno = EIO, -1;
+	}
+	if (!WIFEXITED(status)) {
+		debug(D_PROCESS,"redirect_ldso: %s --verify %s didn't exit normally. status == %d", ldso_physical_name, exe, status);
+		return errno = EIO, -1;
+	}
+	if (WEXITSTATUS(status) != 0) {
+		debug(D_PROCESS,"redirect_ldso: %s --verify %s exited with status %d", ldso_physical_name, exe, WEXITSTATUS(status));
+		return errno = EIO, -1;
+	}
+
+	debug(D_PROCESS, "redirect_ldso: will execute %s %s", ldso_physical_name, exe);
+	return 0;
+}
+
+static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const char *exe, const char *replace_arg0, const char *arg1, const char *arg2 )
+{
+	uintptr_t scratch = pfs_process_scratch_address(p);
+
+	char ldso[PFS_PATH_MAX] = "";
+	if (redirect_ldso(exe, ldso) == -1)
+		return -1;
+
+	/* "exe" + '\0' + [new "arg0" + '\0' + ... ] + padding + new argv array */
+	buffer_t B;
+	buffer_init(&B);
+	buffer_abortonfailure(&B, 1);
+
+	/* if we redirect ldso, then exe becomes arg1 and ldso becomes exe */
+	uintptr_t user_ldso = buffer_pos(&B)+scratch;
+	if (ldso[0])
+		buffer_putlstring(&B, ldso, strlen(ldso)+1);
+
+	uintptr_t user_exe = buffer_pos(&B)+scratch;
+	assert(exe);
+	buffer_putlstring(&B, exe, strlen(exe)+1);
+
+	/* if we are changing arg0, then the user provided arg0 is replaced */
+	uintptr_t user_arg0 = buffer_pos(&B)+scratch;
+	if (replace_arg0)
+		buffer_putlstring(&B, replace_arg0, strlen(replace_arg0)+1);
+
+	uintptr_t user_arg1 = buffer_pos(&B)+scratch;
+	if (arg1)
+		buffer_putlstring(&B, arg1, strlen(arg1)+1);
+
+	uintptr_t user_arg2 = buffer_pos(&B)+scratch;
+	if (arg2)
+		buffer_putlstring(&B, arg2, strlen(arg2)+1);
+
+	/* align the upcoming argv array */
+	{
+		uint64_t dummy = 0;
+		size_t padding = ALIGN(uint64_t, buffer_pos(&B))-buffer_pos(&B);
+		assert(padding <= sizeof(dummy));
+		buffer_putlstring(&B, (char *)&dummy, padding);
+	}
+
+	uintptr_t user_argv = buffer_pos(&B)+scratch;
+	if (replace_arg0) {
+		debug(D_DEBUG, "replacing argv0: `%s'", replace_arg0);
+		buffer_putlstring(&B, (char *)&user_arg0, sizeof(user_arg0));
+	} else {
+		uintptr_t old_user_argv0;
+		if (tracer_copy_in(p->tracer, &old_user_argv0, POINTER(old_user_argv), sizeof(old_user_argv0)) == -1) {
+			buffer_free(&B);
+			return errno = EFAULT, -1;
 		}
-		execlp(ldso_physical_name, ldso_physical_name, "--verify", real_physical_name, NULL);
-		return;
+		buffer_putlstring(&B, (char *)&old_user_argv0, sizeof(old_user_argv0));
 	}
-	waitpid(child_pid, &child_status, 0);
-
-	if (!WIFEXITED(child_status)) {
-		debug(D_PROCESS,"redirect_ldso: %s --verify %s didn't exit normally. status == %d", ldso_physical_name, real_physical_name, child_status);
-		return;
+	if (ldso[0]) {
+		debug(D_DEBUG, "wrapping execution with ldso, argv[1]: `%s'", exe);
+		buffer_putlstring(&B, (char *)&user_exe, sizeof(user_exe)); /* exe is arg1 when wrapped by ldso */
 	}
-	if (WEXITSTATUS(child_status) != 0) {
-		debug(D_PROCESS,"redirect_ldso: %s --verify %s exited with status %d", ldso_physical_name, real_physical_name, WEXITSTATUS(child_status));
-		return;
+	if (arg1) {
+		debug(D_DEBUG, "argv[next]: `%s'", arg1);
+		buffer_putlstring(&B, (char *)&user_arg1, sizeof(user_arg1));
+	}
+	if (arg2) {
+		debug(D_DEBUG, "argv[next]: `%s'", arg2);
+		buffer_putlstring(&B, (char *)&user_arg2, sizeof(user_arg2));
+	}
+	/* copy in the rest of the user argv array... */
+	old_user_argv += sizeof(uintptr_t); /* skip user argv[0] */
+	while (1) {
+		size_t i;
+		uintptr_t user_argva[1024];
+		tracer_copy_in(p->tracer, user_argva, POINTER(old_user_argv), sizeof(user_argva));
+		for (i = 0; i < sizeof(user_argva)/sizeof(uintptr_t) && user_argva[i]; i++, old_user_argv += sizeof(uintptr_t))
+			buffer_putlstring(&B, (char *)&user_argva[i], sizeof(user_argva[i]));
+		if (i < sizeof(user_argva)/sizeof(uintptr_t))
+			break;
+	}
+	{
+		uintptr_t sentinel = 0;
+		buffer_putlstring(&B, (char *)&sentinel, sizeof(sentinel));
 	}
 
-	/* Start with the physical name of ldso  */
-	ext_ldso_physical_name = start_of_available_scratch;
+#if 0
+	for (size_t i = 0; i < buffer_pos(&B); i+=sizeof(uintptr_t))
+		debug(D_DEBUG, "%" PRIx64 " %016" PRIx64, (uint64_t)i+scratch, *(uintptr_t *)(buffer_tostring(&B)+i));
+#endif
 
-	/* strcpy(p->new_logical_name,ldso); */
-	strcpy(p->new_physical_name,ldso_physical_name);
-
-	/* then the "real" physical name */
-	ext_real_physical_name = ext_ldso_physical_name + strlen(ldso_physical_name) + 1;
-	/* and the "real" logical name */
-	ext_real_logical_name = ext_real_physical_name + strlen(real_physical_name) + 1;
-
-	/* the new argv goes in the scratch area next */
-	ext_argv = ext_real_logical_name + strlen(p->new_logical_name) + 1;
-
-	/* load in the arguments given by the program and count them up */
-	tracer_copy_in(p->tracer,argv,POINTER(args[1]),sizeof(argv));
-	for(argc=0;argv[argc] && argc<PFS_ARG_MAX;argc++) {}
-
-	/* The original scratch area should have already been saved */
-
-	/* write out the new exe, logical and physical names */
-	tracer_copy_out(p->tracer,p->new_logical_name,ext_real_logical_name,strlen(p->new_logical_name)+1);
-	tracer_copy_out(p->tracer,ldso_physical_name,ext_ldso_physical_name,strlen(ldso_physical_name)+1);
-	tracer_copy_out(p->tracer,real_physical_name,ext_real_physical_name,strlen(real_physical_name)+1);
-	/* rebuild the argv copy it out */
-	for(i=argc;i>0;i--) argv[i] = argv[i-1];
-	argc+=1;
-	argv[0] = ext_real_logical_name;
-	argv[1] = ext_real_physical_name;
-	argv[argc] = 0;
-	for(i=0;i<=argc;i++) {
-		tracer_copy_out(p->tracer,&argv[i],ext_argv+sizeof(char*)*i,sizeof(char*));
+	if (buffer_pos(&B) > PFS_SCRATCH_SPACE) {
+		debug(D_NOTICE, "cannot handle too many arguments for `%s'", exe);
+		buffer_free(&B);
+		return errno = E2BIG, -1;
 	}
+
+	pfs_process_scratch_set(p, buffer_tostring(&B), buffer_pos(&B));
+	buffer_free(&B);
 
 	/* change the registers to reflect argv */
-	INT64_T nargs[] = {(INT64_T)(uintptr_t)ext_ldso_physical_name, (INT64_T)(uintptr_t)ext_argv};
+	INT64_T nargs[] = {(INT64_T) (ldso[0] ? user_ldso : user_exe), (INT64_T)user_argv};
 	tracer_args_set(p->tracer,p->syscall,nargs,sizeof(nargs)/sizeof(nargs[0]));
-
-	debug(D_PROCESS,"redirect_ldso: will execute %s %s",ldso,real_physical_name);
+	p->syscall_args_changed = 1;
+	return 0;
 }
 
 /*
@@ -697,197 +766,91 @@ around with the job's argv to indicate that.  Then, we do much the same as the
 first case.
 */
 
-static void decode_execve( struct pfs_process *p, INT64_T entering, INT64_T syscall, const INT64_T *args )
+static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
-	char *scratch_addr  = (char*)pfs_process_scratch_address(p);
-	int   scratch_size  = PFS_SCRATCH_SIZE;
-	char *scratch_avail = scratch_addr;
-
 	if(entering) {
-		char path[PFS_PATH_MAX];
-		char firstline[PFS_PATH_MAX];
+		char path[PFS_PATH_MAX] = "";
+		char physical_name[PFS_PATH_MAX] = "";
+		char firstline[PFS_PATH_MAX] = "";
+		char *interp_exe = NULL, *interp_arg = NULL;
+		const uintptr_t old_user_argv = args[1];
 
 		tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+		strncpy(p->new_logical_name, path, sizeof(p->new_logical_name)-1);
 
-		if(!is_executable(path)) {
-			divert_to_dummy(p, -errno);
-			return;
+		if(!is_executable(path))
+			goto failure;
+
+		if (pfs_get_local_name(path,physical_name,firstline,sizeof(firstline))<0)
+			goto failure;
+
+		/* force to single line: */
+		{
+			char *c = strchr(firstline, '\n');
+			if (c)
+				*c = 0;
 		}
 
-		p->new_logical_name[0] = 0;
-		p->new_physical_name[0] = 0;
-		firstline[0] = 0;
+		if(pattern_match(firstline, "^#!%s*(%S+)%s*(.-)%s*$", &interp_exe, &interp_arg) >= 0) {
+			debug(D_PROCESS, "execve: %s (%s) is an interpreted executable", p->new_logical_name, physical_name);
+			if (strlen(interp_arg))
+				debug(D_PROCESS, "execve: instead do %s \"%s\" %s", interp_exe, interp_arg, path);
+			else
+				debug(D_PROCESS, "execve: instead do %s %s", interp_exe, path);
 
-		strcpy(p->new_logical_name,path);
+			/* make sure the new interp_exe is loaded */
+			strcpy(p->new_logical_name, interp_exe);
+			if (pfs_get_local_name(interp_exe, physical_name, 0, 0) < 0)
+				goto failure;
 
-		if (pfs_get_local_name(path,p->new_physical_name,firstline,sizeof(firstline))<0) {
-			divert_to_dummy(p, -errno);
-			return;
-		}
-
-		/* remove any newlines or spaces at the end */
-
-		char *c = firstline;
-
-		while(*c) c++;
-		if(c>firstline) c--;
-
-		while( *c=='\n' || *c==' ' ) {
-			*c = 0;
-			c--;
-		}
-
-		if(!strncmp(firstline,"#!",2)) {
-			char *argv[PFS_ARG_MAX], *ext_argv;
-			char *interp, *ext_interp;
-			char *interparg, *ext_interparg;
-			char *scriptarg, *ext_scriptarg;
-			char *ext_physical_name;
-			INT64_T i, argc, shiftargs;
-
-			debug(D_PROCESS,"execve: %s is an interpreted executable",p->new_logical_name);
-
-			/* interp points to the interpreter */
-			/* store it in the scratch area */
-
-			interp = &firstline[2];
-			while(isspace(*interp)) interp++;
-			ext_interp = scratch_addr;
-
-			/* interparg points to the internal argument */
-			/* scriptarg points to the script itself */
-			interparg = strchr(interp,' ');
-			if(interparg) {
-				*interparg = 0;
-				interparg++;
-				while(isspace(*interparg)) interparg++;
-				ext_interparg = ext_interp + strlen(interp) + 1;
-				scriptarg = path;
-				ext_scriptarg = ext_interparg + strlen(interparg) + 1;
-				debug(D_PROCESS,"execve: instead do %s %s %s",interp,interparg,scriptarg);
-				shiftargs = 2;
+			if (strlen(interp_arg)) {
+				if (fix_execve(p, old_user_argv, physical_name, interp_exe, interp_arg, path) == -1)
+					goto failure;
 			} else {
-				interparg = 0;
-				ext_interparg = ext_interp + strlen(interp) + 1; /* BUG ??? Why shoudln't it skip interp ? */
-				scriptarg = path;
-				ext_scriptarg = ext_interparg;
-				shiftargs = 1;
-				debug(D_PROCESS,"execve: instead do %s %s",interp,scriptarg);
+				if (fix_execve(p, old_user_argv, physical_name, interp_exe, path, NULL) == -1)
+					goto failure;
 			}
-
-
-			/* make sure the new interp is loaded */
-			strcpy(p->new_logical_name,interp);
-			if(pfs_get_local_name(interp,p->new_physical_name,0,0)!=0) {
-				p->new_physical_name[0] = 0;
-				return;
-			}
-
-			/* the physical name of the interp is next */
-			ext_physical_name = ext_scriptarg + strlen(scriptarg) + 1;
-
-			/* make sure redirect_ldso doesn't clobber arguments */
-			scratch_avail = ext_physical_name;
-
-			/* the new argv goes in the scratch area next */
-			ext_argv = ext_physical_name + strlen(p->new_physical_name) + 1;
-
-			/* load in the arguments given by the program and count them up */
-			tracer_copy_in(p->tracer,argv,POINTER(args[1]),sizeof(argv));
-			for(argc=0;argv[argc] && argc<PFS_ARG_MAX;argc++) {}
-
-			/* save the scratch area */
-			tracer_copy_in(p->tracer,p->scratch_data,scratch_addr,scratch_size);
-
-			/* write out the new interp, arg, and physical name */
-			tracer_copy_out(p->tracer,interp,ext_interp,strlen(interp)+1);
-			if(interparg) tracer_copy_out(p->tracer,interparg,ext_interparg,strlen(interparg)+1);
-			tracer_copy_out(p->tracer,scriptarg,ext_scriptarg,strlen(scriptarg)+1);
-			tracer_copy_out(p->tracer,p->new_physical_name,ext_physical_name,strlen(p->new_physical_name)+1);
-			/* rebuild the argv copy it out */
-			for(i=argc-1+shiftargs;i>0;i--) argv[i] = argv[i-shiftargs];
-			argc+=shiftargs;
-			argv[0] = ext_interp;
-			if(interparg) {
-				argv[1] = ext_interparg;
-				argv[2] = ext_scriptarg;
-			} else {
-				argv[1] = ext_scriptarg;
-			}
-			argv[argc] = 0;
-			for(i=0;i<=argc;i++) {
-				tracer_copy_out(p->tracer,&argv[i],ext_argv+sizeof(char*)*i,sizeof(char*));
-			}
-
-			/* change the registers to reflect argv */
-			INT64_T nargs[] = {(INT64_T)(uintptr_t)ext_physical_name, (INT64_T)(uintptr_t)ext_argv};
-			tracer_args_set(p->tracer,p->syscall,nargs,sizeof(nargs)/sizeof(nargs[0]));
 		} else {
-			debug(D_PROCESS,"execve: %s is an ordinary executable",p->new_logical_name);
-
-			/* save all of the data we are going to clobber */
-			tracer_copy_in(p->tracer,p->scratch_data,scratch_addr,scratch_size);
-
-			/* store the new local path */
-			tracer_copy_out(p->tracer,p->new_physical_name,scratch_addr,strlen(p->new_physical_name)+1);
-
-			/* set the new program name to the logical name */
-			INT64_T nargs[] = {(INT64_T)(uintptr_t)scratch_addr};
-			tracer_args_set(p->tracer,p->syscall,nargs,sizeof(nargs)/sizeof(nargs[0]));
-		}
-
-		if (pfs_ldso_path) {
-			redirect_ldso(p, pfs_ldso_path, args, scratch_avail);
+			debug(D_PROCESS, "execve: %s (%s) is an ordinary executable", p->new_logical_name, physical_name);
+			if (fix_execve(p, old_user_argv, physical_name, NULL, NULL, NULL) == -1)
+				goto failure;
 		}
 
 		/* This forces the next call to return to decode_execve, see comment at top of decode_syscall */
 		p->completing_execve = 1;
 
-		debug(D_PROCESS,"execve: %s about to start",p->new_logical_name);
+		debug(D_PROCESS,"execve: %s about to start", p->new_logical_name);
+		goto done;
+failure:
+		divert_to_dummy(p, -errno);
+done:
+		free(interp_exe);
+		free(interp_arg);
 	} else if (p->syscall_dummy) {
-		debug(D_PROCESS, "execve: %s failed: %s", p->new_logical_name, strerror(-p->syscall_result));
-	} else { /* That is, we are not entering */
+		debug(D_PROCESS, "execve: failed: %s", strerror(-p->syscall_result));
+	} else /* That is, we are not entering */ {
 		INT64_T actual;
 		tracer_result_get(p->tracer,&actual);
 
 		p->completing_execve = 0;
-		if(actual==0) {
-			debug(D_PROCESS,"execve: %s succeeded in 64 bit mode",p->new_logical_name);
-			strcpy(p->name,p->new_logical_name);
-		} else if(p->new_physical_name[0]){
-			/* If we did not succeed and we are not
-			entering, then the exec must have
-			failed. Since new_physical_name is defined,
-			that means the scratch was modified too, so we
-			need to restore it. */
-
-			debug(D_PROCESS,"execve: %s failed: %s",p->new_logical_name,strerror(-actual));
-			debug(D_PROCESS,"execve: restoring scratch area at %p",scratch_addr);
-
-			tracer_copy_out(p->tracer,p->scratch_data,POINTER(scratch_addr),scratch_size);
+		if (actual == 0) {
+			debug(D_PROCESS, "execve: %s succeeded in 64-bit mode", p->new_logical_name);
+			strcpy(p->name, p->new_logical_name);
+			/* We do not need to restore the scratch space as the process image has been replaced. */
 		} else {
-
-			/* If we get here, then we are not entering,
-			   and p->new_physical_name was never set because
-			   is_executable(path) failed. This could
-			   happen when the executable is being
-			   searched in the PATH directories. Here we
-			   do nothing, as nothing has been modified,
-			   and the third call to execve never occurs,
-			   from which parrot concludes there was an
-			   error. */
-
-			debug(D_PROCESS,"execve: %s failed: %s\n",p->new_logical_name,strerror(-actual));
+			debug(D_PROCESS, "execve: failed: %s", strerror(-actual));
+			pfs_process_scratch_restore(p);
 		}
 	}
 }
+
 /*
 Memory mapped files are loaded into the channel,
 the whole file regardless of what portion is actually
 mapped.  The channel cache keeps a reference count.
 */
 
-static void decode_mmap( struct pfs_process *p, INT64_T entering, const INT64_T *args )
+static void decode_mmap( struct pfs_process *p, int entering, const INT64_T *args )
 {
 	INT64_T addr = args[0];
 	pfs_size_t length = args[1];
@@ -944,7 +907,7 @@ static void decode_mmap( struct pfs_process *p, INT64_T entering, const INT64_T 
 	}
 }
 
-static void decode_syscall( struct pfs_process *p, INT64_T entering )
+static void decode_syscall( struct pfs_process *p, int entering )
 {
 	const INT64_T *args;
 
@@ -1438,7 +1401,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					if(p->syscall_result<0)
 						divert_to_dummy(p, -errno);
 					else
-						p->syscall_dummy = 1; /* Fake a dummy "return" but allow the kernel to close the Parrot fd. */
+						p->syscall_dummy = 1; /* Fake a dummy "return" (so p->syscall_result is returned) but allow the kernel to close the Parrot fd. */
 				}
 			}
 			break;
@@ -1508,6 +1471,9 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 				addr.sun_path[sizeof(addr.sun_path)-1] = '\0';
 
 				if (addr.sun_family == AF_UNIX) {
+					assert(sizeof(p->tmp) >= sizeof(addr));
+					memcpy(p->tmp, &addr, sizeof(addr)); /* save a copy of original addr structure */
+
 					p->syscall_result = p->table->bind(args[0], addr.sun_path, sizeof(addr.sun_path));
 					if (p->syscall_result == -1) {
 						divert_to_dummy(p, -errno);
@@ -1515,8 +1481,6 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					}
 
 					p->syscall_result = 1;
-					assert(sizeof(p->scratch_data) >= sizeof(addr));
-					memcpy(p->scratch_data, &addr, sizeof(addr));
 					tracer_copy_out(p->tracer, &addr, POINTER(args[1]), sizeof(addr)); /* fix the path */
 					/* let the kernel perform the bind/connect... */
 				} else {
@@ -1526,7 +1490,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			} else if (!p->syscall_dummy && p->syscall_result == 1) {
 				/* We aren't changing/reading the *actual* result, we're just restoring the tracee's addr structure. */
 				struct sockaddr_un addr;
-				memcpy(&addr, p->scratch_data, sizeof(addr));
+				memcpy(&addr, p->tmp, sizeof(addr));
 				tracer_copy_out(p->tracer, &addr, POINTER(args[1]), sizeof(addr)); /* restore the original path */
 				p->syscall_result = 0; /* no actual effect... */
 			}
@@ -1652,6 +1616,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 			 * we want anyway, so we don't need to do anything special.
 			 *
 			 * If however we *did* want to do something special, we could do
+			 * something like sending one of a new socketpair to the tracee. We can
 			 * perhaps send one of a new socketpair to the tracee. We can use the
 			 * recvmsg system call to receive the socket via an existent socket we
 			 * setup ahead of time.
@@ -1885,11 +1850,10 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 					}
 				}
 			} else if (entering) {
-				PTRINT_T pid;
+				pid_t pid;
 				int fd = args[0];
-				INT64_T cmd = args[1];
+				int cmd = args[1];
 				void *uaddr = POINTER(args[2]);
-				struct flock fl;
 
 				switch(cmd) {
 					case F_GETFD:
@@ -1907,9 +1871,9 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						divert_to_dummy(p,p->syscall_result);
 
 						if(cmd==F_SETFL) {
-							INT64_T flags = (int)args[2];
+							int flags = (int)args[2];
 							if(flags&O_ASYNC) {
-							  debug(D_PROCESS,"pid %d requests O_ASYNC on fd %d",pfs_current->pid,fd);
+								debug(D_PROCESS,"pid %d requests O_ASYNC on fd %d",(int)pfs_current->pid,fd);
 								p->flags |= PFS_PROCESS_FLAGS_ASYNC;
 							}
 						}
@@ -1917,7 +1881,8 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 					case PFS_GETLK:
 					case PFS_SETLK:
-					case PFS_SETLKW:
+					case PFS_SETLKW: {
+						struct flock fl;
 						tracer_copy_in(p->tracer,&fl,uaddr,sizeof(fl));
 						p->syscall_result = pfs_fcntl(fd,cmd,&fl);
 						if(p->syscall_result<0) {
@@ -1927,6 +1892,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 						}
 						divert_to_dummy(p,p->syscall_result);
 						break;
+					}
 
 					/* Pretend that the caller is the signal recipient */
 					case F_GETOWN:
@@ -2933,7 +2899,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 		case SYSCALL64_unshare:
 		case SYSCALL64_vmsplice:
 		case SYSCALL64_vserver:
-			/* fallthrough... */
+			/* fallthrough */
 
 		/* If anything else escaped our attention, we must know about it in an
 		 * obvious way.
@@ -2941,7 +2907,7 @@ static void decode_syscall( struct pfs_process *p, INT64_T entering )
 
 		default:
 			if(entering) {
-				debug(D_NOTICE,"warning: system call %"PRId64" (%s) not supported for program %s",p->syscall,tracer_syscall_name(p->tracer,p->syscall),p->name);
+				debug(D_NOTICE,"warning: system call %" PRId64 " (%s) not supported for program %s", p->syscall, tracer_syscall_name(p->tracer, p->syscall), p->name);
 				divert_to_dummy(p,-ENOSYS);
 			}
 			break;

@@ -162,15 +162,13 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 		free(child);
 		return 0;
 	}
-	child->name[0] = 0;
-	child->new_logical_name[0] = 0;
-	child->new_physical_name[0] = 0;
+	memset(child->name, 0, sizeof(child->name));
+	memset(child->new_logical_name, 0, sizeof(child->new_logical_name));
 	child->pid = pid;
 	child->ppid = ppid;
 	child->tgid = pid;
 	child->state = PFS_PROCESS_STATE_KERNEL;
 	child->flags = PFS_PROCESS_FLAGS_STARTUP;
-	child->seltime.tv_sec = 0;
 	child->syscall = SYSCALL32_fork;
 	child->syscall_dummy = 0;
 	child->syscall_parrotfd = -1;
@@ -179,7 +177,6 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	/* to prevent accidental copy out */
 	child->did_stream_warning = 0;
 	child->nsyscalls = 0;
-	child->scratch_used = 0;
 	child->completing_execve = 0;
 
 	actual_parent = pfs_process_lookup(ppid);
@@ -312,41 +309,31 @@ uintptr_t pfs_process_scratch_address( struct pfs_process *p )
 {
 	uintptr_t stack;
 	tracer_stack_get(p->tracer, &stack);
-	stack -= sizeof(p->scratch_data);
-	stack &= ~0x3; /* ensure it is aligned for most things */
+	/* Add red zone... (x86 ABI mandates 128 bytes) */
+	stack -= (PFS_SCRATCH_SPACE + 128);
+	stack &= ~0xfff; /* align at page */
 	return stack;
 }
 
 void pfs_process_scratch_get( struct pfs_process *p, void *data, size_t len )
 {
-	assert(p->scratch_used <= len);
 	uintptr_t scratch = pfs_process_scratch_address(p);
-	if (tracer_copy_in(p->tracer, data, (const void *)scratch, p->scratch_used) == -1)
+	if (tracer_copy_in(p->tracer, data, (const void *)scratch, len) == -1)
 		fatal("could not copy in scratch: %s", strerror(errno));
-	//debug(D_DEBUG, "%s: `%.*s':%zu", __func__, (int)len, (char *)data, p->scratch_used);
 }
 
 uintptr_t pfs_process_scratch_set( struct pfs_process *p, const void *data, size_t len )
 {
-	assert(len <= sizeof(p->scratch_data));
+	assert(len <= PFS_SCRATCH_SPACE);
 	uintptr_t scratch = pfs_process_scratch_address(p);
-	if (tracer_copy_in(p->tracer, p->scratch_data, (const void *)scratch, len) == -1)
-		fatal("could not copy in scratch: %s", strerror(errno));
 	if (tracer_copy_out(p->tracer, data, (const void *)scratch, len) == -1)
 		fatal("could not set scratch: %s", strerror(errno));
-	//debug(D_DEBUG, "%s: `%.*s':%zu", __func__, (int)len, (char *)p->scratch_data, len);
-	p->scratch_used = len;
 	return scratch;
 }
 
 void pfs_process_scratch_restore( struct pfs_process *p )
 {
-	assert(p->scratch_used > 0);
-	uintptr_t scratch = pfs_process_scratch_address(p);
-	if (tracer_copy_out(p->tracer, p->scratch_data, (const void *)scratch, p->scratch_used) == -1)
-		fatal("could not restore scratch: %s", strerror(errno));
-	//debug(D_DEBUG, "%s: `%.*s':%zu", __func__, (int)p->scratch_used, (char *)p->scratch_data, p->scratch_used);
-	p->scratch_used = 0;
+	/* do nothing */
 }
 
 /* vim: set noexpandtab tabstop=4: */

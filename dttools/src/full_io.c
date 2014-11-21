@@ -30,6 +30,8 @@ See the file COPYING for details.
 					continue;\
 				} else if (total == 0) {\
 					return -1;\
+				} else {\
+					break;\
 				}\
 			} else if(chunk == 0) {\
 				break;\
