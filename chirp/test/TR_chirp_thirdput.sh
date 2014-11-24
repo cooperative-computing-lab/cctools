@@ -18,7 +18,7 @@ prepare()
 }
 
 ITERATE=""
-for ((i = 0; i < 1024; i++)); do
+for ((i = 1; i < 1024; i*=2)); do
 	ITERATE="$ITERATE $i"
 done
 for ((i = 2048; i < 1024*1024; i*=2)); do
