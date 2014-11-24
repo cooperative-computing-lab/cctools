@@ -17,6 +17,9 @@ prepare()
 			CONVERT=/usr/local/bin/convert
 		elif [ -f /opt/local/bin/convert ]; then
 			CONVERT=/opt/local/bin/convert
+		else
+			echo "No convert program available, quitting!"
+			return 1
 		fi
 	fi
 
