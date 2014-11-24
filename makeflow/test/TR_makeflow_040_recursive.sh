@@ -11,12 +11,15 @@ prepare()
 	CONVERT=`which convert`
 
 	if [ -z "$CONVERT" ]; then
-		if   [ -f /usr/bin/convert ]; then
+		if [ -f /usr/bin/convert ]; then
 			CONVERT=/usr/bin/convert
-			elif [ -f /usr/local/bin/convert ]; then
+		elif [ -f /usr/local/bin/convert ]; then
 			CONVERT=/usr/local/bin/convert
-			elif [ -f /opt/local/bin/convert ]; then
+		elif [ -f /opt/local/bin/convert ]; then
 			CONVERT=/opt/local/bin/convert
+		else
+			echo "No convert program available, quitting!"
+			return 1
 		fi
 	fi
 
@@ -28,21 +31,22 @@ prepare()
 
 	ln -sf ../syntax/recursive.makeflow Makeflow
 	ln -sf ../syntax/options.makeflow .
-	exit 0
+	return 0
 }
 
 run()
 {
-    cd $test_dir
-    exec ../../src/makeflow -dall
+	cd $test_dir
+	../../src/makeflow -dall
+	return $?
 }
 
 clean()
 {
-    rm -fr $test_dir
-    exit 0
+	rm -fr $test_dir
+	return 0
 }
 
-dispatch $@
+dispatch "$@"
 
 # vim: set noexpandtab tabstop=4:
