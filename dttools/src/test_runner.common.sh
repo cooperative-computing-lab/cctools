@@ -90,7 +90,7 @@ run_local_worker()
 		exit 1
 	fi
 	echo "Running worker."
-	if ! "$WORK_QUEUE_WORKER" --timeout=2s --debug=all --debug-file="$log" localhost $(cat "$port_file"); then
+	if ! "$WORK_QUEUE_WORKER" --single-shot --timeout=10s --debug=all --debug-file="$log" localhost $(cat "$port_file"); then
 		echo "ERROR: could not start worker"
 		exit 1
 	fi

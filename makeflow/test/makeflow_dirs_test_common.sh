@@ -27,8 +27,8 @@ run()
 
 	run_local_worker $PORT_FILE worker.log
 
-	# wait at most two seconds for makeflow to exit.
-	wait_for_file_creation $STATUS_FILE 2
+	# wait for makeflow to exit.
+	wait_for_file_creation $STATUS_FILE 10
 
 	# retrieve makeflow exit status
 	status=`cat $STATUS_FILE`

@@ -66,6 +66,10 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_MODE_WORKER  1
 #define WORKER_MODE_FOREMAN 2
 
+// In single shot mode, immediately quit when disconnected.
+// Useful for accelerating the test suite.
+static int single_shot_mode = 0;
+
 // Maximum time to stay connected to a single master without any work.
 static int idle_timeout = 900;
 
@@ -1613,13 +1617,14 @@ static void show_help(const char *cmd)
 	printf( " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
 	printf( " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
+	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf( " %-30s Show this help screen\n", "-h,--help");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
       LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
-      LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT};
+      LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_SINGLE_SHOT };
 
 struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1641,7 +1646,9 @@ struct option long_options[] = {
 	{"connect-timeout",     required_argument,  0,  LONG_OPT_CONNECT_TIMEOUT},
 	{"tcp-window-size",     required_argument,  0,  'w'},
 	{"min-backoff",         required_argument,  0,  'i'},
-	{"max-mackoff",         required_argument,  0,  'b'},
+	{"max-backoff",         required_argument,  0,  'b'},
+	{"single-shot",		no_argument,        0,  LONG_OPT_SINGLE_SHOT },
+	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
 	{"disk-threshold",      required_argument,  0,  'z'},
 	{"arch",                required_argument,  0,  'A'},
 	{"os",                  required_argument,  0,  'O'},
@@ -1654,7 +1661,6 @@ struct option long_options[] = {
 	{"gpus",                required_argument,  0,  LONG_OPT_GPUS},
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
-	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
 	{0,0,0,0}
 };
 
@@ -1842,6 +1848,9 @@ int main(int argc, char *argv[])
 		case LONG_OPT_DISABLE_SYMLINKS:
 			symlinks_enabled = 0;
 			break;
+		case LONG_OPT_SINGLE_SHOT:
+			single_shot_mode = 1;
+			break;
 		case 'h':
 			show_help(argv[0]);
 			return 0;
@@ -1984,6 +1993,10 @@ int main(int argc, char *argv[])
 		*/
 
 		if(result) {
+			if(single_shot_mode) {
+				debug(D_NOTICE,"stopping: single shot mode");
+				break;
+			}
 			backoff_interval = init_backoff_interval;
 			connect_stoptime = time(0) + connect_timeout;
 
