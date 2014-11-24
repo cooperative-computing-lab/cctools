@@ -90,13 +90,13 @@ print "waiting for tasks to complete...\n";
 while (not work_queue_empty($q)) {
     my $t = work_queue_wait($q, 5);
 
-    if(defined($t)) {
-		print "task (id# $t->{taskid}) complete: $t->{command_line} (return code $t->{return_status})\n";
-		if($t->{return_status} != 0) {
-			# Task failed. Error handling here.
-		}
-		work_queue_task_delete($t);
+    if($t) {
+	print 'task (id# ', $t->id, ') complete: ', $t->command, '(return code ', $t->return_status, ")\n";
+	
+	if($t->return_status != 0) {
+	    # Task failed. Error handling here.
 	}
+    }
 }
 
 print "all tasks complete!\n";
