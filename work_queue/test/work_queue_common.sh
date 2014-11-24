@@ -27,18 +27,18 @@ EOF
 	if [ X$FOREMAN = X1 ]
 	then
 		echo "starting foreman"
-		work_queue_worker -d all -o foreman.log --foreman -Z foreman.port localhost `cat master.port` --idle-timeout 15 --connect-timeout 3 &
+		work_queue_worker -d all -o foreman.log --foreman -Z foreman.port localhost `cat master.port` --timeout 10 --single-shot &
 		foremanpid=$!
 		wait_for_file_creation foreman.port 5
 
 		echo "starting worker"
-		work_queue_worker -d all -o worker.log localhost `cat foreman.port` --idle-timeout 15 --connect-timeout 3 --cores $CORES
+		work_queue_worker -d all -o worker.log localhost `cat foreman.port` --timeout 10 --cores $CORES --single-shot
 
 		echo "killing foreman"
 		kill -9 $foremanpid
 	else
 		echo "starting worker"
-		work_queue_worker -d all -o worker.log localhost `cat master.port` --timeout 3 --cores $CORES
+		work_queue_worker -d all -o worker.log localhost `cat master.port` --timeout 10 --cores $CORES --single-shot
 	fi
 
 	echo "killing master"
