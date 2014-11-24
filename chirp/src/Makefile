@@ -5,9 +5,8 @@ include ../../rules.mk
 # SQLITE_THREADSAFE. This disables somewhat costly mutex locks.
 LOCAL_CCFLAGS = -DSQLITE_THREADSAFE=0
 
-CHIRPSO = libchirp_client.$(CCTOOLS_DYNAMIC_SUFFIX)
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
-LIBRARIES = libchirp.a $(CHIRPSO)
+LIBRARIES = libchirp.a
 OBJECTS = chirp_tool.o $(OBJECTS_LIBRARY) $(OBJECTS_SERVER)
 OBJECTS_LIBRARY = $(SOURCES_LIBRARY:%.c=%.o)
 OBJECTS_SERVER = $(SOURCES_SERVER:%.c=%.o)
@@ -20,22 +19,13 @@ TARGETS = $(PROGRAMS) $(LIBRARIES)
 
 all: $(TARGETS)
 
-# This object exists primarily to get a linkable object for use by ROOT and
-# other systems that want to load Chirp dynamically.  Note that we explicitly
-# include auth_all.o to force the inclusion of the various authentication
-# infrastructures. We remove $(CCTOOLS_EXTERNAL_LINKAGE) because many archives
-# we use were not compiled with -fPIC, which is required for shared object
-# creation.
-$(CHIRPSO): $(OBJECTS_LIBRARY) ../../dttools/src/auth_all.o $(EXTERNAL_DEPENDENCIES)
-#	$(CCTOOLS_LD) -o $@ -fPIC $(CCTOOLS_DYNAMIC_FLAG) $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(CCTOOLS_DYNAMIC_AUTH_LIBS)
-
 chirp: chirp_tool.o
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE) $(CCTOOLS_READLINE_LDFLAGS)
 
-# This is the library intended to be used by clients of the system.
 libchirp.a: $(OBJECTS_LIBRARY)
 
 chirp_server: $(OBJECTS_SERVER)
+
 $(PROGRAMS): libchirp.a $(EXTERNAL_DEPENDENCIES)
 
 clean:
