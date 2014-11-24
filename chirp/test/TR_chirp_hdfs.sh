@@ -36,8 +36,8 @@ foo bar
 EOF
 	[ "$(../src/chirp "$hostport" cat /data/foo)" = 'foo bar' ]
 
-	../src/chirp_benchmark "$hostport" bench 2 2 2
-	../src/chirp "$hostport" rm /
+	chirp_benchmark "$hostport" bench 10 10 0
+	chirp "$hostport" rm /
 
 	return 0
 }
