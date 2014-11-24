@@ -24,19 +24,14 @@ function detect_packages()
     echo "$0: Detecting packages ..."
 
     PACKAGES_CONFIG=""
-    for package in fuse irods mysql python perl globus openmpi swig xrootd cvmfs
+    for package in fuse irods mysql python globus swig xrootd cvmfs
     do
 	packagepath=$EXTERNAL/`sys`/$subtype/$package
 
 	if [ -d $packagepath ]
         then
             echo "$package -> $packagepath"
-            if [ $package = openmpi ]
-            then
-                PACKAGES_CONFIG="$PACKAGES_CONFIG --with-mpi-path $packagepath"
-            else
-                PACKAGES_CONFIG="$PACKAGES_CONFIG --with-$package-path $packagepath"
-            fi
+            PACKAGES_CONFIG="$PACKAGES_CONFIG --with-$package-path $packagepath"
 	else
             echo "$package -> NOTFOUND"
         fi

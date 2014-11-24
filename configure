@@ -121,7 +121,6 @@ python_path="/usr"
 python3_path="/usr"
 xrootd_path="/usr"
 cvmfs_path="/usr"
-mpi_path="/usr/local"
 zlib_path="/usr"
 swig_path="/usr"
 
@@ -130,7 +129,6 @@ globus_flavor=auto
 
 ccompiler=gcc
 cxxcompiler=g++
-mpicompiler=mpicc
 
 ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-deprecated-declarations"
 
@@ -160,7 +158,6 @@ config_krb5_path=no
 config_irods_path=no
 config_xrootd_path=no
 config_cvmfs_path=no
-config_mpi_path=no
 config_swig_path=auto
 
 if [ "X${GLOBUS_LOCATION}" != "X" ]
@@ -248,11 +245,6 @@ do
 			shift
 			zlib_path=$1
 			config_zlib_path=yes
-			;;
-		--with-mpi-path)
-			shift
-			mpi_path=$1
-			config_mpi_path=yes
 			;;
 		--with-swig-path)
 			shift
@@ -561,23 +553,6 @@ else
 		exit 1
 	else
 		echo "*** skipping mysql support"
-	fi
-fi
-
-if [ $config_mpi_path != no ] && check_file ${mpi_path}/bin/mpicc && check_file ${mpi_path}/include/mpi.h
-then
-        mpilinker=${mpi_path}/bin/mpicc
-        usempi="true"
-        ccflags="${ccflags} -I${mpi_path}/include -DHAS_MPI"
-else
-	usempi="false"
-	if [ $config_mpi_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find mpicc or mpi.h in $mpi_path"
-		echo "*** Check --with-mpi-path and try again."
-		exit 1
-	else
-		echo "*** skipping mpi support"
 	fi
 fi
 
@@ -1159,12 +1134,10 @@ if [ "$optdebug" = 1 ]; then
 	CCTOOLS_CC="${ccompiler}"
 	CCTOOLS_CXX="${cxxcompiler}"
 	CCTOOLS_LD="${linker}"
-	CCTOOLS_MPI_LD="${mpilinker}"
 else
 	CCTOOLS_CC='@echo COMPILE $@;'"${ccompiler}"
 	CCTOOLS_CXX='@echo COMPILE $@;'"${cxxcompiler}"
 	CCTOOLS_LD='@echo LINK $@;'"${linker}"
-	CCTOOLS_MPI_LD='@echo MPI_LINK $@;'"${mpilinker}"
 fi
 
 cat <<EOF >>config.mk
@@ -1199,9 +1172,6 @@ CCTOOLS_EXTERNAL_LINKAGE = ${external_archives} ${external_dynlibs}
 
 CCTOOLS_LDFLAGS = -L\$(CCTOOLS_INSTALL_DIR)/lib \$(CCTOOLS_BASE_LDFLAGS)
 
-CCTOOLS_MPI_LD=${CCTOOLS_MPI_LD}
-CCTOOLS_USE_MPI=$usempi
-
 CCTOOLS_READLINE_LDFLAGS=${cctools_readline_ldflags}
 
 CCTOOLS_DYNAMIC_SUFFIX=${cctools_dynamic_suffix}
@@ -1213,7 +1183,6 @@ LD=\$(CCTOOLS_LD)
 LDFLAGS=\$(CCTOOLS_LDFLAGS)
 CXX=\$(CCTOOLS_CXX)
 CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
-MPILD=\$(CCTOOLS_MPI_LD)
 
 CCTOOLS_AR=ar
 

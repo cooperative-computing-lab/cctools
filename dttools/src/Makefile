@@ -58,7 +58,6 @@ SOURCES = \
 	md5.c \
 	memory_info.c \
 	mergesort.c \
-	mpi_queue.c \
 	nvpair.c \
 	nvpair_database.c \
 	password_cache.c \

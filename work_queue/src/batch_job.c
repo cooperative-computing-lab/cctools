@@ -23,7 +23,6 @@ extern const struct batch_queue_module batch_queue_condor;
 extern const struct batch_queue_module batch_queue_hadoop;
 extern const struct batch_queue_module batch_queue_local;
 extern const struct batch_queue_module batch_queue_moab;
-extern const struct batch_queue_module batch_queue_mpi_queue;
 extern const struct batch_queue_module batch_queue_sge;
 extern const struct batch_queue_module batch_queue_torque;
 extern const struct batch_queue_module batch_queue_wq;
@@ -39,7 +38,7 @@ static struct batch_queue_module batch_queue_unknown = {
 	{NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
-#define BATCH_JOB_SYSTEMS  "local, chirp, cluster, condor, hadoop, moab, sge, torque, mpi-queue, wq"
+#define BATCH_JOB_SYSTEMS  "local, chirp, cluster, condor, hadoop, moab, sge, torque, wq"
 const struct batch_queue_module * const batch_queue_modules[] = {
     &batch_queue_chirp,
     &batch_queue_cluster,
@@ -47,7 +46,6 @@ const struct batch_queue_module * const batch_queue_modules[] = {
     &batch_queue_hadoop,
     &batch_queue_local,
     &batch_queue_moab,
-    &batch_queue_mpi_queue,
     &batch_queue_sge,
     &batch_queue_torque,
     &batch_queue_wq,
