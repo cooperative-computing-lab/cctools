@@ -111,7 +111,6 @@ To use these, you must download and install them separately:
 <li> <a href="http://hadoop.apache.org">Hadoop</a> (Optional)
 <li> <a href="http://xrootd.slac.stanford.edu">xRootD</a> (Optional)
 <li> <a href="http://www.irods.org">iRODS</a> (Optional)
-<li> <a href="http://web.mit.edu/kerberos">Kerberos</a> (Optional)
 <li> <a href="http://www.globus.org">Globus</a> (Optional) (Tested with Globus 2.2, 2.4, and 4.0.)
 </dir>
 
@@ -122,7 +121,7 @@ installations.  Then, make and install.  For example:
 <code>% gunzip cctools-xxx.tar.gz
 % tar xvf cctools-xxx.tar
 % cd cctools-xxx
-% ./configure --with-krb5-path /usr/kerberos --with-globus-path /usr/local/globus ...
+% ./configure --with-globus-path /usr/local/globus ...
 % make
 % make install
 % setenv PATH ${HOME}/cctools/bin:$PATH

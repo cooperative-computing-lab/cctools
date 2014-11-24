@@ -110,7 +110,6 @@ fi
 
 install_path="$HOME/cctools"
 
-krb5_path="/usr"
 readline_path="/usr"
 globus_path="/usr"
 fuse_path="/usr"
@@ -154,7 +153,6 @@ config_python_path=auto
 config_python3_path=auto
 config_zlib_path=yes
 
-config_krb5_path=no
 config_irods_path=no
 config_xrootd_path=no
 config_cvmfs_path=no
@@ -190,11 +188,6 @@ do
 		--globus-flavor)
 			shift
 			globus_flavor=$1
-			;;
-		--with-krb5-path)
-			shift
-			krb5_path=$1
-			config_krb5_path=yes
 			;;
 		--with-readline-path)
 			shift
@@ -328,7 +321,6 @@ Where options are:
 
 Where PACKAGE may be:
     readline
-    krb5
     fuse
     globus
     irods
@@ -673,35 +665,6 @@ then
         fi
 else
 	echo "*** skipping fuse support"
-fi
-
-# Solaris places kerberos includes in a strange place.
-
-if [ -d ${krb5_path}/include/kerberosv5 ]
-then
-	krb5_include_path=${krb5_path}/include/kerberosv5
-else
-	krb5_include_path=${krb5_path}/include
-fi
-
-if [ $config_krb5_path != no ] && check_file ${krb5_include_path}/krb5.h && library_search krb5 "${krb5_path}"
-then
-	if [ ${krb5_include_path} != /usr/include ]
-	then
-		ccflags="${ccflags} -I${krb5_include_path}"
-	fi
-
-	ldflags="${ldflags} -L${krb5_path}/lib"
-	ccflags="${ccflags} -DHAS_KRB5"
-else
-	if [ $config_krb5_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find Kerberos in $krb5_path"
-		echo "*** Check --with-krb5-path and try again."
-		exit 1
-	else
-		echo "*** skipping krb5 support"
-	fi
 fi
 
 if [ $config_perl_path != no ]
