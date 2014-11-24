@@ -8,6 +8,17 @@ EOF
 chmod 755 configure.rerun
 }
 
+abspath() {
+	case "$1" in
+		/*)
+			echo "$1"
+			;;
+		*)
+			echo "$(pwd)/$1"
+			;;
+	esac
+}
+
 check_file ()
 {
 	echo -n "checking for $1..."
