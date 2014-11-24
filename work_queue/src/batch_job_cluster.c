@@ -18,7 +18,7 @@ static char * cluster_submit_cmd = NULL;
 static char * cluster_remove_cmd = NULL;
 static char * cluster_options = NULL;
 
-static int setup_batch_wrapper(struct batch_queue *q, const char *sysname, const char *envlist )
+static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 {
 	char *wrapperfile = string_format("%s.wrapper", sysname);
 
@@ -65,7 +65,7 @@ static batch_job_id_t batch_job_cluster_submit_simple (struct batch_queue * q, c
 	struct batch_job_info *info;
 	const char *options = hash_table_lookup(q->options, "batch-options");
 
-	if(setup_batch_wrapper(q, cluster_name,envlist) < 0)
+	if(setup_batch_wrapper(q, cluster_name) < 0)
 		return -1;
 
 	char *name = xxstrdup(cmd);
