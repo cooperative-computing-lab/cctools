@@ -231,18 +231,26 @@ before the rule's command, and prepending the name of the variable with
 
 <code>SOME_VARIABLE=original_value
 
-#rule 1 target_1: source_1
+target_1: source_1
 	command_1
 
-#rule 2 target_2: source_2
+target_2: source_2
 @SOME_VARIABLE=local_value_for_2
 	command_2
 
-#rule 3 target_3: source_3
+target_3: source_3
 	command_3 </code>
 
 In this example, SOME_VARIABLE has the value 'original_value' for rules 1 and
 3, and the value 'local_value_for_2' for rule 2.
+
+<h3 id="details.environment">Environment Variables<a class="sectionlink" href="#details.environment" title="Link to this section.">&#x21d7;</a></h3>
+
+Environment variables can be defined with the <tt>export</tt> keyword inside a workflow.  Makeflow will communicate explicitly named environment variables
+to remote batch systems, where they will override whatever local setting is present.  For example, suppose you want to modify the PATH for every job in the makeflow:
+
+<code>export PATH=/opt/tools/bin:${PATH}
+</code>
 
 <h3 id="details.refinement">Batch Job Refinement<a class="sectionlink" href="#details.refinement" title="Link to this section.">&#x21d7;</a></h3>
 
@@ -434,6 +442,7 @@ Suppose you want to wrap every command with a script that would set up an approp
 <code>#!/bin/sh
 export JAVA_HOME=/opt/java-9.8.3.6.7
 export PATH=${JAVA_HOME}/bin:$PATH
+echo "using java in $JAVA_HOME"
 exec "$@"
 </code>
 

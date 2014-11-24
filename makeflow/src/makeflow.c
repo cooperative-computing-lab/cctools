@@ -122,8 +122,6 @@ static struct list *wrapper_output_files = 0;
 
 int verbose_parsing = 0;
 
-void dag_export_variables(struct dag *d, struct dag_node *n);
-
 void dag_abort_all(struct dag *d)
 {
 	UINT64_T jobid;
@@ -161,6 +159,8 @@ void file_clean(const char *filename, int silent)
 	}
 }
 
+static void dag_node_export_variables( struct dag *d, struct dag_node *n );
+
 void dag_node_clean(struct dag *d, struct dag_node *n)
 {
 	struct dag_file *f;
@@ -184,7 +184,7 @@ void dag_node_clean(struct dag *d, struct dag_node *n)
 		sprintf(command, "%s -c", n->command);
 		/* Export environment variables in case nested Makeflow
 		 * requires them. */
-		dag_export_variables(d, n);
+		dag_node_export_variables(d, n);
 		system(command);
 		free(command);
 	}
@@ -358,6 +358,8 @@ void dag_log_recover(struct dag *d, const char *filename)
 	if(d->logfile) {
 		int linenum = 0;
 		first_run = 0;
+
+		printf("recovering from log file %s...\n",filename);
 
 		while((line = get_line(d->logfile))) {
 			linenum++;
@@ -689,7 +691,32 @@ int dag_prepare_for_monitoring(struct dag *d)
 	return 1;
 }
 
-void dag_export_variables(struct dag *d, struct dag_node *n)
+void environment_list_apply( const char *envlist )
+{
+	if(!envlist) return;
+
+	char *list = strdup(envlist);
+	char *name = strtok(list,";");
+	while(name) {
+		char *value = strchr(name,'=');
+		if(value) {
+			*value=0;
+			value++;
+			setenv(name,value,1);
+			*value='=';
+		}
+		name = strtok(0,";");
+	}
+	free(list);
+}
+
+/*
+For a given dag node, export all variables into the environment.
+This is currently only used when cleaning a makeflow recurisvely,
+and would be better handled by invoking batch_job_local.
+*/
+
+static void dag_node_export_variables( struct dag *d, struct dag_node *n )
 {
 	struct dag_lookup_set s = { d, n->category, n, NULL };
 	char *key;
@@ -698,10 +725,50 @@ void dag_export_variables(struct dag *d, struct dag_node *n)
 	while((key = set_next_element(d->export_vars))) {
 		char *value = dag_lookup_str(key, &s);
 		if(value) {
-			setenv(key, value, 1);
+			setenv(key,value,1);
 			debug(D_MAKEFLOW_RUN, "export %s=%s", key, value);
 		}
 	}
+}
+
+/*
+Returns an environment string of the form a=b;c=d;...
+that describes the explicit environment for this node.
+The returned string must be freed.
+If nothing has been set, this function may return null.
+*/
+
+char * dag_node_env_string( struct dag *d, struct dag_node *n )
+{
+	struct dag_lookup_set s = { d, n->category, n, NULL };
+	char *key;
+
+	buffer_t buffer;
+	buffer_init(&buffer);
+
+	set_first_element(d->export_vars);
+	while((key = set_next_element(d->export_vars))) {
+		char *value = dag_lookup_str(key, &s);
+		if(value) {
+			if(buffer_pos(&buffer)>0) {
+				buffer_putstring(&buffer,";");
+			}
+			buffer_printf(&buffer,"%s=%s",key,value);
+			debug(D_MAKEFLOW_RUN, "export %s=%s", key, value);
+		}
+	}
+
+	char *result;
+
+	if(buffer_pos(&buffer)>0) {
+		buffer_dup(&buffer,&result);
+	} else {
+		result = 0;
+	}
+
+	buffer_free(&buffer);
+
+	return result;
 }
 
 /*
@@ -827,15 +894,21 @@ Submit one fully formed job, retrying failures up to the dag_submit_timeout.
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files )
+batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files, const char *envlist )
 {
 	time_t stoptime = time(0) + dag_submit_timeout;
 	int waittime = 1;
 	batch_job_id_t jobid = 0;
 
+	/* Display the fully elaborated command, just like Make does. */
+	printf("submitting job: %s\n", command);
+
 	while(1) {
-		jobid = batch_job_submit_simple(queue, command, input_files, output_files);
-		if(jobid >= 0) return jobid;
+		jobid = batch_job_submit_simple(queue, command, input_files, output_files, envlist );
+		if(jobid >= 0) {
+			printf("submitted job %"PRIbjid"\n", jobid);
+			return jobid;
+		}
 
 		fprintf(stderr, "couldn't submit batch job, still trying...\n");
 
@@ -906,10 +979,8 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		free(batch_submit_options);
 	}
 
-	/* Export variables before each submit. We have to do this before each
-	 * node submission because each node may have local variables
-	 * definitions. */
-	dag_export_variables(d, n);
+	/* Generate the environment vars specific to this node. */
+	char *envlist = dag_node_env_string(d,n);
 
 	/*
 	Just before execution, replace double-percents with the nodeid.
@@ -921,11 +992,8 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	output_files = replace_percents(output_files,nodeid);
 	free(nodeid);
 
-	/* Display the fully elaborated command, just like Make does. */
-	printf("%s\n", command);
-
 	/* Now submit the actual job, retrying failures as needed. */
-	n->jobid = dag_node_submit_retry(queue,command,input_files,output_files);
+	n->jobid = dag_node_submit_retry(queue,command,input_files,output_files,envlist);
 
 	/* Restore old batch job options. */
 	if(old_batch_submit_options) {
@@ -951,6 +1019,8 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	free(command);
 	free(input_files);
 	free(output_files);
+	free(envlist);
+
 }
 
 int dag_node_ready(struct dag *d, struct dag_node *n)
@@ -1238,6 +1308,7 @@ void dag_run(struct dag *d)
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
+				printf("job %"PRIbjid" completed\n",jobid);
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
 				if(n)
@@ -1911,6 +1982,7 @@ int main(int argc, char *argv[])
 			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
 	}
 
+	printf("parsing %s...\n",dagfile);
 	struct dag *d = dag_from_file(dagfile);
 	if(!d) {
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
@@ -2004,23 +2076,26 @@ int main(int argc, char *argv[])
 	dag_prepare_nested_jobs(d);
 
 	if(clean_mode) {
+		printf("cleaning filesystem...\n");
 		dag_clean(d);
 		unlink(logfilename);
 		unlink(batchlogfilename);
 		exit(0);
 	}
 
+	printf("checking %s for consistency...\n",dagfile);
 	if(!dag_check(d)) {
 		exit(EXIT_FAILURE);
 	}
 
-	fprintf(stdout, "\r     Total rules: %d", d->nodeid_counter);
-	fprintf(stdout, "\nStarting execution of workflow: %s.\n", dagfile);
+	printf("%s has %d rules.\n",dagfile,d->nodeid_counter);
 
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
 	dag_log_recover(d, logfilename);
+
+	printf("starting workflow....\n");
 
 	port = batch_queue_port(remote_queue);
 	if(work_queue_port_file)
@@ -2059,7 +2134,7 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	} else {
 		fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
-		fprintf(stderr, "nothing left to do.\n");
+		printf("nothing left to do.\n");
 		exit(EXIT_SUCCESS);
 	}
 

@@ -69,6 +69,7 @@ struct work_queue_task {
 	char *output;			/**< The standard output of the task. */
 	struct list *input_files;	/**< The files to transfer to the worker and place in the executing directory. */
 	struct list *output_files;	/**< The output files (other than the standard output stream) created by the program expected to be retrieved from the task. */
+	struct list *env_list;		/**< Environment variables applied to the task. */
 	int taskid;			/**< A unique task id number. */
 	int return_status;		/**< The exit code of the command line. */
 	int result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
@@ -303,6 +304,14 @@ Tasks with a higher priority value run first. If no priority is given, a task is
 */
 
 void work_queue_task_specify_priority(struct work_queue_task *t, double priority );
+
+/**
+Specify an environment variable to be added to the task.
+@param t A task object
+@param name Name of the variable.
+@param value Value of the variable.
+ */
+void work_queue_task_specify_env( struct work_queue_task *t, const char *name, const char *value );
 
 /** Select the scheduling algorithm for a single task.
 To change the scheduling algorithm for all tasks, use @ref work_queue_specify_algorithm instead.

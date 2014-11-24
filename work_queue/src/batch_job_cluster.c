@@ -18,8 +18,7 @@ static char * cluster_submit_cmd = NULL;
 static char * cluster_remove_cmd = NULL;
 static char * cluster_options = NULL;
 
-
-static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
+static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 {
 	char *wrapperfile = string_format("%s.wrapper", sysname);
 
@@ -60,7 +59,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
 	return 0;
 }
 
-static batch_job_id_t batch_job_cluster_submit_simple (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_cluster_submit_simple (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist)
 {
 	batch_job_id_t jobid;
 	struct batch_job_info *info;
@@ -75,19 +74,54 @@ static batch_job_id_t batch_job_cluster_submit_simple (struct batch_queue * q, c
 		if(s)
 			*s = 0;
 	}
-	char *command = NULL;
+
+	/*
+	Convert envlist="a=b;c=d;..." from the caller
+	into env_options="-v a=b -v c=d ..." which can be passed to qsub.
+	*/
+
+	char *env_options = strdup("");
+	if(envlist) {
+		char *list = strdup(envlist);
+		char *e = strtok(list,";");
+		while(e) {
+			char *temp = string_format("%s -v %s",env_options,e);
+			free(env_options);
+			env_options = temp;
+			e = strtok(0,";");
+		}
+		free(list);
+	}
+
+	char *command;
+
 	switch(q->type) {
 		case BATCH_QUEUE_TYPE_TORQUE:
-			command = string_format("%s %s '%s' %s %s.wrapper", cluster_submit_cmd, cluster_options, path_basename(name), options ? options : "", cluster_name);
+			command = string_format("%s %s %s -N '%s' %s %s.wrapper",
+				cluster_submit_cmd,
+				cluster_options,
+				env_options,
+				path_basename(name),
+				options ? options : "",
+				cluster_name);
 			break;
 		case BATCH_QUEUE_TYPE_SGE:
 		case BATCH_QUEUE_TYPE_MOAB:
 		case BATCH_QUEUE_TYPE_CLUSTER:
 		default:
-			command = string_format("%s %s '%s' %s %s.wrapper \"%s\"", cluster_submit_cmd, cluster_options, path_basename(name), options ? options : "", cluster_name, cmd);
+			command = string_format("%s %s %s -N '%s' %s %s.wrapper \"%s\"",
+				cluster_submit_cmd,
+				cluster_options,
+				env_options,
+				path_basename(name),
+				options ? options : "",
+				cluster_name,
+				cmd);
 			break;
 	}
+
 	free(name);
+	free(env_options);
 
 	debug(D_BATCH, "%s", command);
 
@@ -122,7 +156,7 @@ static batch_job_id_t batch_job_cluster_submit_simple (struct batch_queue * q, c
 	return -1;
 }
 
-static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	char *command = string_format("%s %s", cmd, args);
 	if (infile) {
@@ -141,7 +175,7 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 		command = new;
 	}
 
-	batch_job_id_t status = batch_job_cluster_submit_simple(q, command, extra_input_files, extra_output_files);
+	batch_job_id_t status = batch_job_cluster_submit_simple(q, command, extra_input_files, extra_output_files,envlist);
 	free(command);
 	return status;
 }
@@ -245,19 +279,19 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 			cluster_name = strdup("sge");
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
-			cluster_options = strdup("-cwd -o /dev/null -j y -N");
+			cluster_options = strdup("-cwd -o /dev/null -j y");
 			break;
 		case BATCH_QUEUE_TYPE_MOAB:
 			cluster_name = strdup("moab");
 			cluster_submit_cmd = strdup("msub");
 			cluster_remove_cmd = strdup("mdel");
-			cluster_options = strdup("-d . -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
+			cluster_options = strdup("-d . -o /dev/null -v BATCH_JOB_COMMAND -j oe");
 			break;
 		case BATCH_QUEUE_TYPE_TORQUE:
 			cluster_name = strdup("torque");
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
-			cluster_options = strdup("-d . -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
+			cluster_options = strdup("-d . -o /dev/null -v BATCH_JOB_COMMAND -j oe");
 			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:
 			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");

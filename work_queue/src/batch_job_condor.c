@@ -13,7 +13,7 @@
 #include <signal.h>
 #include <sys/stat.h>
 
-static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	FILE *file;
 	int njobs;
@@ -39,7 +39,6 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 
 	fprintf(file, "universe = vanilla\n");
 	fprintf(file, "executable = %s\n", cmd);
-	fprintf(file, "getenv = true\n");
 	if(args)
 		fprintf(file, "arguments = %s\n", args);
 	if(infile)
@@ -58,6 +57,11 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "copy_to_spool = true\n");
 	fprintf(file, "transfer_executable = true\n");
 	fprintf(file, "log = %s\n", q->logfile);
+
+	if(envlist) {
+		fprintf(file, "environment = %s\n",envlist);
+	}
+
 	if(options)
 		fprintf(file, "%s\n", options);
 
@@ -122,14 +126,14 @@ static int setup_condor_wrapper(const char *wrapperfile)
 	return 0;
 }
 
-static batch_job_id_t batch_job_condor_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_condor_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	if(setup_condor_wrapper("condor.sh") < 0) {
 		debug(D_BATCH, "could not create condor.sh: %s", strerror(errno));
 		return -1;
 	}
 
-	return batch_job_condor_submit(q, "condor.sh", cmd, 0, 0, 0, extra_input_files, extra_output_files);
+	return batch_job_condor_submit(q, "condor.sh", cmd, 0, 0, 0, extra_input_files, extra_output_files, envlist);
 }
 
 static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)

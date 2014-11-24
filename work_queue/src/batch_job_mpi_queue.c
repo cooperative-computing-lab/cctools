@@ -10,7 +10,7 @@
 #include <string.h>
 #include <errno.h>
 
-static void specify_mpi_queue_task_files(struct mpi_queue_task *t, const char *input_files, const char *output_files)
+static void specify_mpi_queue_task_files(struct mpi_queue_task *t, const char *input_files, const char *output_files )
 {
 	char *f, *p, *files;
 
@@ -49,9 +49,14 @@ static void specify_mpi_queue_task_files(struct mpi_queue_task *t, const char *i
 	}
 }
 
-static batch_job_id_t batch_job_mpi_queue_submit_simple ( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files )
+static batch_job_id_t batch_job_mpi_queue_submit_simple ( struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	struct mpi_queue_task *t;
+
+	if(envlist) {
+		debug(D_NOTICE|D_BATCH,"sorry, the mpi_queue driver does not support environment variables.");
+		return -1;
+	}
 
 	t = mpi_queue_task_create(cmd);
 
@@ -62,8 +67,13 @@ static batch_job_id_t batch_job_mpi_queue_submit_simple ( struct batch_queue *q,
 	return t->taskid;
 }
 
-static batch_job_id_t batch_job_mpi_queue_submit ( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files )
+static batch_job_id_t batch_job_mpi_queue_submit ( struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
+	if(envlist) {
+		debug(D_NOTICE|D_BATCH,"sorry, the mpi_queue driver does not support environment variables.");
+		return -1;
+	}
+
 	char *command = string_format("%s %s", cmd, args);
 	if(infile) {
 		char *new = string_format("%s <%s", cmd, infile);
