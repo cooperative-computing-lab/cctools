@@ -2,6 +2,16 @@
 
 EXTERNAL="/afs/nd.edu/user37/ccl/software/cctools-build-external-packages"
 
+# Odd hack: When the build is run under condor on crc machines, it may
+# run with a UID that does not have a corresponding entry in /etc/passwd
+# and so $HOME is not set.  This causes some python code to break, so
+# we set HOME manually here.
+
+if [ X$HOME = X ]
+then
+    export HOME=/afs/nd.edu/user37/ccl
+fi
+
 # Our external packages are installed in
 # $EXTERNAL/$SYS/$SUBTYPE/packagename Where $SYS is the output of the
 # AFS `sys` command, usually something like amd64_linux26 or
