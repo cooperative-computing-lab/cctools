@@ -4,7 +4,6 @@
 
 TEST_INPUT=set.list
 TEST_OUTPUT=master.out
-PIDMASTER_FILE=master.pid
 PORT_FILE=worker.port
 
 export PATH=.:../src:../../work_queue/src:$PATH
@@ -12,7 +11,6 @@ export PATH=.:../src:../../work_queue/src:$PATH
 cleanfiles()
 {
 	rm -f $TEST_OUTPUT
-	rm -f $PIDMASTER_FILE
 	rm -f $PORT_FILE
 	rm -f allpairs_multicore
 
@@ -29,9 +27,6 @@ run()
 
 	echo "starting master"	
 	allpairs_master -x 1 -y 1 --output-file $TEST_OUTPUT -Z $PORT_FILE $TEST_INPUT $TEST_INPUT BITWISE &
-
-	pid=$!
-	echo $pid > $PIDMASTER_FILE
 
 	echo "waiting for $PORT_FILE to be created"
 	wait_for_file_creation $PORT_FILE 5
@@ -63,10 +58,6 @@ run()
 
 clean()
 {
-	if [ -f master.pid ]
-	then
-		kill -9 `cat $PIDMASTER_FILE`
-	fi
 	cleanfiles
 	exit 0
 }
