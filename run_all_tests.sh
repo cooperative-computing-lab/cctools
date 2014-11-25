@@ -28,7 +28,16 @@ for package in ${CCTOOLS_PACKAGES}; do
 			if [ -x "$script" ]; then
 				printf "%-72s" "--- Testing ${package}/test/${script} ... "
 				TEST_START_TIME=$(date +%s)
-				"./${script}" doit >> "$CCTOOLS_TEST_LOG" 2>&1
+				(
+					echo "======== ${script} PREPARE ========"	
+					"./${script}" prepare
+					echo "======== ${script} RUN ========"	
+					"./${script}" run
+					result=$?
+					echo "======== ${script} CLEAN ========"	
+					"./${script}" clean
+					exit $result
+				) >> "$CCTOOLS_TEST_LOG" 2>&1
 				TEST_STOP_TIME=$(date +%s)
 				TEST_ELAPSED=$(($TEST_STOP_TIME-$TEST_START_TIME))
 				if [ "$?" -eq 0 ]; then
