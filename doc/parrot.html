@@ -395,6 +395,21 @@ disabled by giving the <tt>-k</tt> option to either Parrot or
 <tt>make_growfs</tt>.
 </dir>
 
+<h3 id="notes.irods">iRODS<a class="sectionlink" href="#notes.cvmfs" title="Link to this section.">&#x21d7;</a></h3>
+
+To use Parrot with <a href=irods.org>iRODS</a>, you must first follow the <a href=install.html#irods>special build instructions</a>.
+<p>
+Then, use the <tt>iinit</tt> command to log into the desired iRODS service,
+and verify that you are connected with the <tt>ils</tt> command.  If those
+work, then you can use Parrot to access files under the scheme
+<tt>/irods/server/zone/path</tt>.  For example, to access the iPlant data service:
+
+<pre>
+parrot_run bash
+cd /irods/data.iplantcollaborative.org/iplant/home/username
+cp /tmp/mydata .
+</pre>
+
 <h3 id="notes.cvmfs">CVMFS - CernVM-FS<a class="sectionlink" href="#notes.cvmfs" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>CVMFS is a read-only filesystem, which was initially based on GROW.

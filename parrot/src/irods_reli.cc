@@ -329,6 +329,16 @@ int irods_reli_pread ( struct irods_file *file, char *data, int length, INT64_T 
 	result = rcDataObjRead(server->conn,&request,&response);
 	debug(D_IRODS,"= %d",result);
 
+	/*
+	The iRODS API semantics have changed!
+	In 3.x, rcDataObjRead would use the pointer supplied.
+	In 4.x, rcDataObjRead allocates a buffer that must be freed.
+	*/
+
+	if(result>0 && data!=response.buf) {
+		memcpy(data,response.buf,response.len);
+	}
+
 	if(result<0) {
 		errno = irods_reli_errno(result);
 		return -1;
