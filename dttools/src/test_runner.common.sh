@@ -15,19 +15,9 @@ dispatch()
 		clean)
 			clean $@
 			;;
-		doit)
-			echo "======== $0 PREPARE ========"
-			prepare
-			echo "======== $0 RUN ========"
-			run
-			result=$?
-			echo "======== $0 CLEAN ========"
-			clean
-			exit $result
-            ;;
 		*)
 			echo "unknown command: $1"
-			echo "use: $0 [prepare|run|clean|doit]"
+			echo "use: $0 [prepare|run|clean]"
 			exit 1
 			;;
 	esac
