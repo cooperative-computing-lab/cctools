@@ -4,7 +4,6 @@
 # "random_revcom.seq" respectively.
 use strict;
 use warnings;
-use Switch;
 
 my $sequence_length = 100000;
 my $filename = "random.seq";
@@ -13,7 +12,6 @@ my $filename_revcom = "random_revcom.seq";
 my $random_number;
 my $char;
 my $i;
-
 
 # Check sequence_length argument
 my $numArgs;
@@ -25,14 +23,7 @@ if ($numArgs == 1) {
 # Generate a random sequence and write it to file
 open MYFILE, ">$filename" or die $!;
 for($i = 0; $i < $sequence_length; $i++) {
-	$random_number = int(rand(4));
-	switch($random_number) {
-		case 0 	{$char = 'A'}
-		case 1	{$char = 'T'}
-		case 2 	{$char = 'G'}
-		case 3 	{$char = 'C'}
-		else 	{print "Something is wrong with the random number generator...";exit(1)}
-	}
+	$char = substr("ATGC",int(rand(4)),1);
 	print MYFILE $char;
 }
 close(MYFILE);
