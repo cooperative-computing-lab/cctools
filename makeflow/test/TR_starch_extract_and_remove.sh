@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ../../dttools/src/test_runner.common.sh
+. ../../dttools/test/test_runner_common.sh
 
 sfxfile=extract_and_remove.sfx
 tarfile=starch.tar.gz

@@ -4,7 +4,7 @@ set -e
 
 files="port.file random.cfa random.cand random.cand.output filter.log worker.log"
 
-. ../../dttools/src/test_runner.common.sh
+. ../../dttools/test/test_runner_common.sh
 
 prepare()
 {
