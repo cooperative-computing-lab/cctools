@@ -473,7 +473,7 @@ if [ $config_irods_path != no ]
 then
 	if library_search RodsAPIs "${irods_path}/lib/core/obj"
 	then
-		# detected irods 3.x installation
+		echo "detected irods 3.x installation"
 
 		ccflags="${ccflags} -DHAS_IRODS"
 
@@ -484,7 +484,7 @@ then
 
 	elif library_search RodsAPIs "${irods_path}/iRODS/lib/core/obj"
 	then
-		# detected irods 4.x installation
+		echo "detected irods 4.x installation"
 
 		# irods 4.x uses .so plugins which are found in /var/lib/irods.
 		# These require the parrot is linked with -rdynamic so that
@@ -513,9 +513,27 @@ then
 		fi
 
 		echo "found irods boost in $boost_path"
-		ccflags="${ccflags} -I${boost_path}"
 		boost_lib="${boost_path}/stage/lib"
-		external_archives="${external_archives} ${boost_lib}/libboost_filesystem.a ${boost_lib}/libboost_thread.a ${boost_lib}/libboost_system.a"
+		for subtype in system thread chrono filesystem regex
+		do
+			lib=${boost_lib}/libboost_${subtype}.a
+			if [ -f $lib ]
+			then
+				echo "found $lib"
+				external_archives="${external_archives} $lib"
+			fi
+		done
+
+		jansson_path=`ls -d ${irods_path}/external/jansson-*`
+		if [ ! -d ${jansson_path} ]
+		then
+			echo "*** Could not find irods jansson in ${irods_path}/external !"
+			exit 1
+		fi
+
+		echo "found irods jansson in $jansson_path"
+		jansson_lib="${jansson_path}/src/.libs"
+		external_archives="${external_archives} ${jansson_lib}/libjansson.a"
 
 	elif [ $config_irods_path = yes ]
 	then
