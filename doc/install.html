@@ -12,19 +12,24 @@
 <div id="manual">
 <h1>Installing the Cooperative Computing Tools</h1>
 
-<p style="text-align: right;"><b>Last edited: February 2014</b></p>
+<p style="text-align: right;"><b>Last edited: November 2014</b></p>
 
-<p>The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005- The University of Notre Dame.<br>
+<p>
+The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain<br>
+and Copyright (C) 2005- The University of Notre Dame.<br>
 All rights reserved.<br>
 This software is distributed under the GNU General Public License.<br>
-See the file COPYING for details.</p>
-
+See the file COPYING for details.
+</p>
 
 <h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
 
-The Cooperative Computing Tools (cctools) are a collection of programs designed to
-assist users with the difficulties of building and managing complex,
-fault-prone distributed systems.  The components of the cctools are:
+The Cooperative Computing Tools (cctools) are a collection of programs
+that enable large scale distributed computing on systems such as 
+clusters, clouds, and grids.  These tools are commonly used in fields
+of science and engineering that rely on large amounts of computing.
+<p>
+The components of the cctools are:
 
 <dir>
 <li> <a href=parrot.html>Parrot</a> - A personal virtual file system.
@@ -36,69 +41,52 @@ fault-prone distributed systems.  The components of the cctools are:
 <li> <a href=wavefront.html>Wavefront</a> - A computational abstraction.
 </dir>
 
-This short manual describes how to install the cctools.
-For more information about the tools themselves, see the links above.
+<h3 id="installing.frombinaryunix">Installing From a Binary Package<a class="sectionlink" href="#installing.frombinaryunix" title="Link to this section.">&#x21d7;</a></h3>
 
-<h2 id="installing">Installing<a class="sectionlink" href="#installing" title="Link to this section.">&#x21d7;</a></h2>
-
-The cctools may already be installed on your system.
-Simply run <tt>chirp -v</tt>.  If you see something like
-
-<code>chirp version 4.1.0rc3-RELEASE (released 02/11/2014)
-        Built by btovar@cclws00 on Feb 11 2014 at 09:20:32
-        System: Linux cclws00 2.6.18-348.16.1.el5 #1 SMP Sat Jul 27 01:05:23 EDT 2013 x86_64 x86_64 x86_64 GNU/Linux
-        Configuration: --strict --tcp-low-port 9000
-</code>
-
-then the cctools are installed, and you are ready to go.  Otherwise, you must
-install the cctools yourself.
-
-<h3 id="installing.frombinaryunix">Installation From a Binary Package (UNIX)<a class="sectionlink" href="#installing.frombinaryunix" title="Link to this section.">&#x21d7;</a></h3>
-
-From any other location, we recommend that you install a binary
-package from the <a href="http://ccl.cse.nd.edu/software/download.shtml">cctools web page</a>
+Binary packages are available for several operating systems at the 
+<a href="http://ccl.cse.nd.edu/software/download.shtml">download page</a>
 Simply unpack the tarball in any directory that you like,
 and then add the <tt>bin</tt> directory to your path.
-For example, to install in $HOME/cctools:
+For example, to install cctools 4.2.2 for RHEL6 in your home directory:
 
-<code>% cd $HOME
-% gunzip cctools-xxx-yyy.tar.gz
-% tar xvf cctools-xxx-yyy.tar
-% setenv PATH $HOME/cctools/bin:$PATH
+<code>cd $HOME
+wget http://ccl.cse.nd.edu/software/files/cctools-4.2.2-x86_64-redhat6.tar.gz
+gunzip cctools-4.2.2-x86_64-redhat6.tar.gz
+tar xvf cctools-4.2.2-x86_64-redhat6.tar
+export PATH=$HOME/cctools-4.2.2-x86_64-redhat6/bin:$PATH
 </code>
 
-<h3 id="installing.frombinarydos">Installation From a Binary Package (DOS)<a class="sectionlink" href="#installing.frombinarydos" title="Link to this section.">&#x21d7;</a></h3>
+On Windows, the procedure is similar:
 
-From any other location, we recommend that you install the binary package for
-the Windows operating system from the <a href="http://ccl.cse.nd.edu/software/download.shtml">cctools web page</a>
-Simply unzip the zipfile in any directory that you like, and then add the
-<tt>bin</tt> directory to your path.  For example, to install in
-%UserProfile%\cctools using the DOS shell:
-
-<code>% cd %UserProfile%
-% winzip32 -e cctools-xxx-yyy.zip 
-% set PATH=%UserProfile%\cctools\bin;%PATH%
+<code>cd %UserProfile%
+winzip32 -e cctools-xxx-yyy.zip 
+set PATH=%UserProfile%\cctools\bin;%PATH%
 </code>
 
+<h3 id="installing.fromsource">Installing From Source<a class="sectionlink" href="#installing.fromsource" title="Link to this section.">&#x21d7;</a></h3>
 
-<h3 id="installing.fromsource">Installation From a Source Package <a class="sectionlink" href="#installing.fromsource" title="Link to this section.">&#x21d7;</a></h3>
-
-Building the CCTools from source is very easy.
-Just download a source package:
-
-<dir>
-<li> <a href="http://ccl.cse.nd.edu/software/download.shtml">CCTools Download</a>(Required)
-</dir>
-
+Download a source package from the <a href="http://ccl.cse.nd.edu/software/download.shtml">download page</a>.
 And follow this recipe while logged in as any ordinary user:
 
-<code>% gunzip cctools-xxx-src.tar.gz
-% tar xvf cctools-xxx-src.tar
-% cd cctools-xxx-src
-% ./configure
-% make
-% make install
-% setenv PATH ${HOME}/cctools/bin:$PATH
+<code>wget http://ccl.cse.nd.edu/software/files/cctools-4.2.2-source.tar.gz
+gunzip cctools-4.2.2-source.tar.gz
+tar xvf cctools-4.2.2-source.tar
+cd cctools-4.2.2-source
+./configure
+make
+make install
+setenv PATH ${HOME}/cctools/bin:$PATH
+</code>
+
+Or, you can directly build the latest version from our git repository:
+
+<code>
+git clone https://github.com/cooperative-computing-lab/cctools cctools-source
+cd cctools-source
+./configure
+make
+make install
+setenv PATH ${HOME}/cctools/bin:$PATH
 </code>
 
 The software will happily build and run without installing
@@ -107,29 +95,48 @@ with a variety of external packages for security and data access.
 To use these, you must download and install them separately:
 
 <dir>
-<li> <a href="http://fuse.sourceforge.net">FUSE</a> (Optional)
-<li> <a href="http://hadoop.apache.org">Hadoop</a> (Optional)
-<li> <a href="http://xrootd.slac.stanford.edu">xRootD</a> (Optional)
-<li> <a href="http://www.irods.org">iRODS</a> (Optional)
-<li> <a href="http://www.globus.org">Globus</a> (Optional) (Tested with Globus 2.2, 2.4, and 4.0.)
+<li> <a href="http://www.irods.org">iRODS</a> (version 4.0.3)
+<li> <a href="http://www.globus.org">Globus</a> (version 5.0.3)
+<li> <a href="http://fuse.sourceforge.net">FUSE</a>
+<li> <a href="http://hadoop.apache.org">Hadoop</a>
+<li> <a href="http://xrootd.slac.stanford.edu">xRootD</a>
 </dir>
 
 Once the desired packages are correctly installed, unpack the cctools and
 then issue a configure command that points to all of the other
-installations.  Then, make and install.  For example:
+installations.  Then, make and install as before.  For example:
 
-<code>% gunzip cctools-xxx.tar.gz
-% tar xvf cctools-xxx.tar
-% cd cctools-xxx
-% ./configure --with-globus-path /usr/local/globus ...
-% make
-% make install
-% setenv PATH ${HOME}/cctools/bin:$PATH
+<code>./configure --with-globus-path /usr/local/globus ...
+make
+make install
+setenv PATH ${HOME}/cctools/bin:$PATH
 </code>
 
-<dir>
-	<li> <a href="index.html">Cooperative Computing Tools Documentation Index</a>
-</dir>
+<h2 id="irods">Build Instructions for iRODS<a class="sectionlink" href="#irods" title="Link to this section.">&#x21d7;</a></h2>
+
+Building Parrot with support for the iRODS service requires
+some custom build instructions, since Parrot requires access
+to some internals of iRODS that are not usually available.
+To do this, first make a source build of iRODS in your home directory:
+<p>
+
+<code> cd $HOME
+git clone https://github.com/irods/irods-source
+cd irods-source
+git checkout 4.0.3
+packaging/build.sh --run-in-place icommands
+</code>
+
+Then, configure and build cctools relative to that installation:
+
+<code>git clone https://github.com/cooperative-computing-lab/cctools cctools-source
+cd cctools-source
+./configure <b>--with-irods-path $HOME/irods-src ...</b>
+make
+make install
+</code>
+
+<li> <a href="index.html">Cooperative Computing Tools Documentation Index</a>
 
 </div>
 </body>
