@@ -101,6 +101,9 @@ static double worker_volatility = 0.0;
 // This can be set by Ctrl-C or by any condition that prevents further progress.
 static int abort_flag = 0;
 
+// Flag used to indicate a child must be waited for.
+static int sigchld_received_flag = 0;
+
 // Threshold for available disk space (MB) beyond which clean up and restart.
 static uint64_t disk_avail_threshold = 100;
 
@@ -1234,12 +1237,7 @@ static int check_for_resources(struct work_queue_task *t)
 }
 
 static void work_for_master(struct link *master) {
-	timestamp_t msec;
 	sigset_t mask;
-
-	if(!master) {
-		return;
-	}
 
 	debug(D_WQ, "working for master at %s:%d.\n", master_addr, master_port);
 
@@ -1266,18 +1264,27 @@ static void work_for_master(struct link *master) {
 			}
 		}
 
-		// There is a race condition where if a child finishes while the worker is handling tasks, SIGCHLD is lost and does not interrupt
-		// the poll in link_usleep_mask().  For short-running tasks this can cause a drastic slowdown.  This adapts the amount of time
-		// spent in the link to be close to the average runtime for short tasks, so short-running tasks aren't unduly impacted.
-		if(total_tasks_executed > 0) {
-			msec = MAX(10, total_task_execution_time/total_tasks_executed);  // minimum check time of 10 milliseconds
-			msec = MIN(msec, 5000);  // maximum wait time of 5 seconds in between checks.
-		} else {
-			msec = 1000;
+
+		/*
+		link_usleep will cause the worker to sleep for a time until
+		interrupted by a SIGCHILD signal.  However, the signal could
+		have been delivered while we were outside of the wait function,
+		setting sigchld_received_flag.  In that case, do not block
+		but proceed with the 
+
+		There is a still a (very small) race condition in that the
+		signal could be received between the check and link_usleep,
+		hence a maximum wait time of five seconds is enforced.
+		*/
+ 
+		int wait_msec = 5000;
+
+		if(sigchld_received_flag) {
+			wait_msec = 0;
+			sigchld_received_flag = 0;
 		}
-
-		int master_activity = link_usleep_mask(master, msec*1000, &mask, 1, 0);
-
+ 
+		int master_activity = link_usleep_mask(master, wait_msec*1000, &mask, 1, 0);
 		if(master_activity < 0) break;
 
 		int ok = 1;
@@ -1570,7 +1577,7 @@ static void handle_abort(int sig)
 
 static void handle_sigchld(int sig)
 {
-	return;
+	sigchld_received_flag = 1;
 }
 
 static void show_help(const char *cmd)
