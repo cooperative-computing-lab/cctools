@@ -2,7 +2,7 @@
 
 set -ex
 
-. ../../dttools/src/test_runner.common.sh
+. ../../dttools/test/test_runner_common.sh
 . ./chirp-common.sh
 
 me=$(whoami)
@@ -36,7 +36,7 @@ foo bar
 EOF
 	[ "$(chirp "$hostport" cat /data/foo)" = 'foo bar' ]
 
-	chirp_benchmark "$hostport" bench 1 1 1
+	chirp_benchmark "$hostport" bench 10 10 0
 	chirp "$hostport" rm /
 
 	return 0

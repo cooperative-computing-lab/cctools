@@ -37,7 +37,6 @@ typedef enum {
 	BATCH_QUEUE_TYPE_CLUSTER,             /**< Batch jobs will be sent to a user-defined cluster manager. */
 	BATCH_QUEUE_TYPE_WORK_QUEUE,          /**< Batch jobs will be sent to the Work Queue. */
 	BATCH_QUEUE_TYPE_HADOOP,              /**< Batch jobs will be sent to Hadoop. */
-	BATCH_QUEUE_TYPE_MPI_QUEUE,           /**< Batch jobs will be sent to the MPI Queue. */
 	BATCH_QUEUE_TYPE_CHIRP,               /**< Batch jobs will be sent to Chirp. */
 	BATCH_QUEUE_TYPE_UNKNOWN = -1         /**< An invalid batch queue type. */
 } batch_queue_type_t;

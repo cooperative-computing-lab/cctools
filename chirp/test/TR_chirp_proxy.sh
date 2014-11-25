@@ -2,7 +2,7 @@
 
 set -e
 
-. ../../dttools/src/test_runner.common.sh
+. ../../dttools/test/test_runner_common.sh
 . ./chirp-common.sh
 
 c="./hostport.$PPID"
@@ -30,7 +30,7 @@ foo bar
 EOF
 	[ "$(chirp "$proxy" cat /data/foo)" = 'foo bar' ]
 
-	chirp_benchmark "$proxy" bench 1 1 1
+	chirp_benchmark "$proxy" bench 10 10 0
 
 	return 0
 }

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ../../dttools/src/test_runner.common.sh
+. ../../dttools/test/test_runner_common.sh
 
 test_dir=`basename $0 .sh`.dir
 test_output=`basename $0 .sh`.output

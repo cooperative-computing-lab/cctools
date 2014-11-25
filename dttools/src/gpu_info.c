@@ -17,14 +17,14 @@ See the file COPYING for details.
 
 int gpu_info_get()
 {
-	pid_t pid;
 	int pipefd[2];
 	pipe(pipefd);
 
-	switch (pid = fork()) {
-	case -1:
+	pid_t pid = fork();
+
+	if(pid<0) {
 		return 0;
-	case 0:
+	} else if(pid==0) {
 		close(pipefd[0]);
 		dup2(pipefd[1], fileno(stdout));
 		char *args[] = {GPU_AUTODETECT, NULL};
@@ -33,8 +33,8 @@ int gpu_info_get()
 		} else {
 			execvp(GPU_AUTODETECT, args);
 		}
-		return 0;
-	default:
+		_exit(0);
+	} else {
 		close(pipefd[1]);
 		int status = 0;
 		int gpu_count = 0;
