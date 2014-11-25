@@ -6,7 +6,6 @@ TEST_INPUT=integer.list
 TEST_OUTPUT_STEP=composite_step.output
 TEST_OUTPUT=composite.output
 TEST_TRUTH=composites.txt
-PIDMASTER_FILE=master.pid
 PORT_FILE=worker.port
 
 export PATH=.:../src:../../work_queue/src:$PATH
@@ -21,7 +20,6 @@ cleanfiles()
 	rm -f $TEST_INPUT
 	rm -f $TEST_OUTPUT_STEP
 	rm -f $TEST_OUTPUT
-	rm -f $PIDMASTER_FILE
 	rm -f $PORT_FILE
 	rm -f allpairs_multicore
 }
@@ -37,7 +35,6 @@ run()
 {
 	echo "starting master"
 	allpairs_master -x 1 -y 1 --output-file $TEST_OUTPUT_STEP -Z $PORT_FILE $TEST_INPUT $TEST_INPUT ./divisible.sh -d all &
-	echo $! > $PIDMASTER_FILE
 
 	echo "waiting for $PORT_FILE to be created"
 	wait_for_file_creation $PORT_FILE 5
@@ -54,11 +51,6 @@ run()
 
 clean()
 {
-	if [ -f $PIDMASTER_FILE ]
-	then
-		kill -9 `cat $PIDMASTER_FILE`
-	fi
-
     	cleanfiles
 	exit 0
 }
