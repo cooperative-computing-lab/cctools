@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ../../dttools/src/test_runner.common.sh
+. ../../dttools/test/test_runner_common.sh
 
 # target and source files are both directories
 MAKE_FILE=dirs/testcase.subdir.04.makeflow

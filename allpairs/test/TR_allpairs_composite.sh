@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ../../dttools/src/test_runner.common.sh
+. ../../dttools/test/test_runner_common.sh
 
 TEST_INPUT=integer.list
 TEST_OUTPUT_STEP=composite_step.output
