@@ -36,7 +36,7 @@ prepare()
 run()
 {
 	echo "starting master"
-	allpairs_master --output-file $TEST_OUTPUT_STEP -Z $PORT_FILE $TEST_INPUT $TEST_INPUT ./divisible.sh -d all &
+	allpairs_master -x 1 -y 1 --output-file $TEST_OUTPUT_STEP -Z $PORT_FILE $TEST_INPUT $TEST_INPUT ./divisible.sh -d all &
 	echo $! > $PIDMASTER_FILE
 
 	echo "waiting for $PORT_FILE to be created"
