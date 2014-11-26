@@ -510,7 +510,7 @@ sub priority {
 sub command {
     my ($self) = @_;
 
-    $self->{_task}->{command};
+    $self->{_task}->{command_line};
 }
 
 sub algorithm {
