@@ -190,7 +190,7 @@ struct rmsummary *rmsummary_parse_file_single(char *filename)
 void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits)
 {
 	if(s->command)
-		fprintf(stream, "%-15s%s\n",  "command:", s->command);
+		fprintf(stream, "%s %s\n",  "command:", s->command);
 
 	if(s->category)
 		fprintf(stream, "%-15s%s\n",  "category:", s->category);
@@ -226,10 +226,10 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits
 void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix)
 {
 	if(s->cores > -1)
-		fprintf(stream, "%s%-20s%15" PRId64 "\n", prefix,  "cores:", s->cores);
+		fprintf(stream, "%s%-20s%20" PRId64 "\n", prefix,  "cores:", s->cores);
 
 	if(s->gpus > -1)
-		fprintf(stream, "%-20s%20" PRId64 "\n",  "gpus:", s->gpus);
+		fprintf(stream, "%s%-20s%20" PRId64 "\n",  prefix, "gpus:", s->gpus);
 
 	if(s->wall_time > -1)
 		fprintf(stream, "%s%-20s%20lf s\n", prefix, "wall_time:", s->wall_time >= 0 ? s->wall_time / 1000000e0 : -1);
