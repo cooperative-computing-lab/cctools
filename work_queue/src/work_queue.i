@@ -6,6 +6,7 @@
     #include "int_sizes.h"
     #include "timestamp.h"
     #include "work_queue.h"
+    #include "rmsummary.h"
 %}
 
 %typemap(in) off_t = int;
@@ -25,3 +26,4 @@
 %include "int_sizes.h"
 %include "timestamp.h"
 %include "work_queue.h"
+%include "rmsummary.h"

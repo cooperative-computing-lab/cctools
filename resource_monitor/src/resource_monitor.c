@@ -601,8 +601,7 @@ int monitor_final_summary()
 
 	if(log_summary)
 	{
-		rmsummary_print(log_summary, summary);
-		rmsummary_print_only_resources(log_summary, resources_limits, "limit_");
+		rmsummary_print(log_summary, summary, resources_limits);
 	}
 
 	if(log_opened)
