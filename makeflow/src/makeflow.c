@@ -1043,7 +1043,7 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 
 			if(s)
 			{
-				rmsummary_print(stderr, s);
+				rmsummary_print(stderr, s, NULL);
 				free(s);
 				fprintf(stderr, "\n");
 			}

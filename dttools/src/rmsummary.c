@@ -74,8 +74,7 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 }
 
 /** Reads a single summary from stream. Summaries are not parsed, here
-    we simply read between comments (#) and blank lines for the lines
-    describing the summary.**/
+    we simply read between markers (--) **/
 char *rmsummary_read_single_chunk(FILE *stream)
 {
 	int nmax   = 1024;
@@ -86,9 +85,9 @@ char *rmsummary_read_single_chunk(FILE *stream)
 	char *line = malloc( nline * sizeof(char) );
 	char *summ = malloc( nmax  * sizeof(char) );
 
-	/* Skip comments and blank lines before the summary */
+	/* Skip comments, blank lines, and markers before the summary */
 	char c;
-	while( (c = getc(stream)) == '#' || isblank(c) )
+	while( (c = getc(stream)) == '#' || isblank(c) || c == '-' )
 	{
 		ungetc(c, stream);
 		/* Make sure we read complete comment lines */
@@ -112,6 +111,9 @@ char *rmsummary_read_single_chunk(FILE *stream)
 	{
 		ungetc(c, stream);
 		if(c == '#' || c == '\n')
+			continue;
+
+		if(c == '-')
 			break;
 
 		fgets(line, nline, stream);
@@ -198,7 +200,7 @@ struct rmsummary *rmsummary_parse_file_single(char *filename)
 	return s;
 }
 
-void rmsummary_print(FILE *stream, struct rmsummary *s)
+void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits)
 {
 	if(s->command)
 		fprintf(stream, "%-15s%s\n",  "command:", s->command);
@@ -226,6 +228,12 @@ void rmsummary_print(FILE *stream, struct rmsummary *s)
 	}
 
 	rmsummary_print_only_resources(stream, s, "");
+
+	if(limits) {
+		rmsummary_print_only_resources(stream, limits, "limits_");
+	}
+
+	fprintf(stream, "--\n\n");
 }
 
 void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix)
