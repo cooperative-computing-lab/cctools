@@ -1082,7 +1082,7 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 	{
 		msg = string_format("# Summary for task %d:%d was not available.\n", getpid(), t->taskid);
 		write(q->monitor_fd, msg, strlen(msg));
-		free(msg);
+ 		free(msg);
 	}
 	else
 	{
@@ -1097,6 +1097,8 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 
 	if(unlink(summary) != 0)
 		debug(D_NOTICE, "Summary %s could not be removed.\n", summary);
+
+	free(summary);
 }
 
 static void fetch_output_from_worker(struct work_queue *q, struct work_queue_worker *w, int taskid)

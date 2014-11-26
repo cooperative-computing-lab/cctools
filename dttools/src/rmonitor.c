@@ -53,14 +53,14 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 	monitor_path = string_format("./resource_monitor");
 	if(stat(monitor_path, &buf) == 0)
 		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return xxstrdup(monitor_path);
+			return monitor_path;
 
 	//static "vanilla" version
 	free(monitor_path);
 	monitor_path = string_format("./resource_monitorv");
 	if(stat(monitor_path, &buf) == 0)
 		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return xxstrdup(monitor_path);
+			return monitor_path;
 
 	debug(D_RMON,"trying executable at installed path location.\n");
 	//LD_CONFIG version.
@@ -68,13 +68,13 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 	monitor_path = string_format("%s/bin/resource_monitor", INSTALL_PATH);
 	if(stat(monitor_path, &buf) == 0)
 		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return xxstrdup(monitor_path);
+			return monitor_path;
 
 	free(monitor_path);
 	monitor_path = string_format("%s/bin/resource_monitorv", INSTALL_PATH);
 	if(stat(monitor_path, &buf) == 0)
 		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return xxstrdup(monitor_path);
+			return monitor_path;
 
 	return NULL;
 }
