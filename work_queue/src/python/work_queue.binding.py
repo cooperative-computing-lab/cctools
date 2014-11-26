@@ -537,7 +537,19 @@ class Task(_object):
     def total_cmd_execution_time(self):
         return self._task.total_cmd_execution_time 
 
-
+    ## 
+    # Get the resources measured for the task execution if resource monitoring is enabled.
+    # Must be called only after the task completes execution.
+    # @code
+    # >>> print t.resources_measured('resident_memory')
+    # @endcode
+    @property
+    def resources_measured(self):
+        if not self._task.resources_measured:
+            return None
+        
+        return self._task.resources_measured
+    
 ##
 # Python Work Queue object
 #
