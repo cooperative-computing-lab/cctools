@@ -7,6 +7,7 @@ COPYING for details.
 #ifndef __RMSUMMARY_H
 #define __RMSUMMARY_H
 
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "int_sizes.h"
