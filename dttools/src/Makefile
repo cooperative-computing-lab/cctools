@@ -100,6 +100,7 @@ HEADERS_PUBLIC = \
 	int_sizes.h \
 	link.h \
 	md5.h \
+	rmsummary.h \
 	timestamp.h
 
 LIBRARIES = libdttools.a

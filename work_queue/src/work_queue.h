@@ -19,6 +19,7 @@ See the file COPYING for details.
 
 #include <sys/types.h>
 #include "timestamp.h"
+#include "rmsummary.h"
 
 #define WORK_QUEUE_DEFAULT_PORT 9123  /**< Default Work Queue port number. */
 #define WORK_QUEUE_RANDOM_PORT  0    /**< Indicates that any port number may be chosen. */
@@ -103,8 +104,12 @@ struct work_queue_task {
 	int gpus;
 	int unlabeled;
 
-	timestamp_t time_app_delay;	 /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 	double priority;			/**< The priority of this task relative to others in the queue: higher number run earlier. */
+
+	struct rmsummary *resources_measured;   /**< When monitoring is enabled, it points to the measured resources used by the task. */
+
+	timestamp_t time_app_delay;	 /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
+
 };
 
 /** Statistics describing a work queue. */
