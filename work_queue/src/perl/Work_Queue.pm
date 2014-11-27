@@ -1,31 +1,50 @@
 ######################################################################
-# Copyright (C) 2008- The University of Notre Dame
+# Copyright (C) 2014- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 #    See the file COPYING for details.
 ######################################################################
 
-
 package Work_Queue;
 use work_queue;
 
-sub Work_Queue::new {
-    my ($class, $port) = @_;
+use Data::Dumper;
 
-    my $_work_queue = work_queue::work_queue_create($port);
+sub Work_Queue::new {
+    my $class = shift;
+
+    unshift @_, 'port' if @_ == 1;
+
+    my %args = @_;
+
+    $args{port} //= $Work_Queue::WORK_QUEUE_DEFAULT_PORT;
+
+    my $_work_queue = work_queue::work_queue_create($args{port});
 
     die "Could not create a work queue on port $port" unless $_work_queue;
 
     my $_stats           = work_queuec::new_work_queue_stats();
     my $_stats_hierarchy = work_queuec::new_work_queue_stats();
 
-    bless {_work_queue => $_work_queue, _task_table => {}, _stats => $_stats, _stats_hierarchy => $_stats_hierarchy}, $class;
+    my $q = bless {
+	_work_queue      => $_work_queue, 
+	_task_table      => {}, 
+	_stats           => $_stats, 
+	_stats_hierarchy => $_stats_hierarchy, 
+	_shutdown        => $args{shutdown} // 0 
+    }, $class;
+
+    $q->specify_name($args{name})           if $args{name};
+    $q->specify_master_mode($args{catalog}) if $args{catalog};
+
+    $q;
 }
 
 sub DESTROY {
     my ($self) = @_;
-    
-    work_queue_delete($self->{_work__queue});
 
+    $q->shutdown_workers(0) if $self->{_shutdown};
+
+    work_queue_delete($self->{_work__queue});
 }
 
 sub set_debug_flag {
