@@ -13,10 +13,9 @@
 #include <string.h>
 #include <errno.h>
 
-static void specify_work_queue_task_files(struct work_queue_task *t, const char *input_files, const char *output_files, int caching_directive)
+static void specify_work_queue_task_files(struct work_queue_task *t, const char *input_files, const char *output_files, int caching_flag )
 {
 	char *f, *p, *files;
-	int caching;
 
 	if(input_files) {
 		files = strdup(input_files);
@@ -25,23 +24,10 @@ static void specify_work_queue_task_files(struct work_queue_task *t, const char 
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-
-				if(strcmp(f, p+1) || !caching_directive)
-					caching = WORK_QUEUE_NOCACHE;
-				else
-					caching = WORK_QUEUE_CACHE;
-			
-				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, caching);
-				debug(D_BATCH, "local file %s is %s on remote system:", f, p + 1);
+				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, caching_flag);
 				*p = '=';
 			} else {
-
-				if(caching_directive == WORK_QUEUE_NOCACHE) 
-					caching = WORK_QUEUE_NOCACHE;
-				else 
-					caching = WORK_QUEUE_CACHE;
-
-				work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching);
+				work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching_flag);
 			}
 			f = strtok(0, " \t,");
 		}
@@ -55,23 +41,10 @@ static void specify_work_queue_task_files(struct work_queue_task *t, const char 
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-
-				if(strcmp(f, p+1) || !caching_directive)
-					caching = WORK_QUEUE_NOCACHE;
-				else
-					caching = WORK_QUEUE_CACHE;
-
-				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_OUTPUT, caching);
-				debug(D_BATCH, "remote file %s is %s on local system:", p + 1, f);
+				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_OUTPUT, caching_flag);
 				*p = '=';
 			} else {
-
-				if(caching_directive == WORK_QUEUE_NOCACHE) 
-					caching = WORK_QUEUE_NOCACHE;
-				else 
-					caching = WORK_QUEUE_CACHE;
-
-				work_queue_task_specify_file(t, f, f, WORK_QUEUE_OUTPUT, caching);
+				work_queue_task_specify_file(t, f, f, WORK_QUEUE_OUTPUT, caching_flag);
 			}
 			f = strtok(0, " \t,");
 		}
@@ -173,7 +146,13 @@ static void work_queue_task_specify_resources(struct work_queue_task *t, struct 
 
 static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
 {
-	int caching = string_istrue(hash_table_lookup(q->options, "caching"));
+	int caching_flag = WORK_QUEUE_CACHE;
+
+	if(string_istrue(hash_table_lookup(q->options, "caching"))) {
+		caching_flag = WORK_QUEUE_CACHE;
+	} else {
+		caching_flag = WORK_QUEUE_NOCACHE;
+	}
 
 	char *command = string_format("%s %s", cmd, args);
 	if(infile) {
@@ -199,7 +178,7 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cm
 		if(cmd)
 			work_queue_task_specify_input_file(t, cmd, cmd);
 
-		specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching);
+		specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching_flag);
 	}
 
 	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
@@ -221,15 +200,17 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cm
 static batch_job_id_t batch_job_wq_submit_simple (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
 {
 	struct work_queue_task *t;
-	int caching = string_istrue(hash_table_lookup(q->options, "caching"));
+
+    int caching_flag = WORK_QUEUE_CACHE;
+
+    if(string_istrue(hash_table_lookup(q->options, "caching"))) {
+        caching_flag = WORK_QUEUE_CACHE;
+    } else {
+        caching_flag = WORK_QUEUE_NOCACHE;
+    }
 
 	t = work_queue_task_create(cmd);
-
-	if(q->type == BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS) {
-		specify_work_queue_task_shared_files(t, extra_input_files, extra_output_files);
-	} else {
-		specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching);
-	}
+	specify_work_queue_task_files(t, extra_input_files, extra_output_files, caching_flag);
 
 	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
 	if(resources)
