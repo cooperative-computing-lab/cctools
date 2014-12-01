@@ -27,26 +27,26 @@ for package in ${CCTOOLS_PACKAGES}; do
 		for script in TR_*; do
 			if [ -x "$script" ]; then
 				printf "%-72s" "--- Testing ${package}/test/${script} ... "
+				TEST_START_TIME=$(date +%s)
 				(
-					set -e
-					echo "./${script}" prepare
+					echo "======== ${script} PREPARE ========"	
 					"./${script}" prepare
-					set +e
-					echo "./${script}" run
+					echo "======== ${script} RUN ========"	
 					"./${script}" run
 					result=$?
-					set -e
-					echo "./${script}" clean
+					echo "======== ${script} CLEAN ========"	
 					"./${script}" clean
 					exit $result
 				) >> "$CCTOOLS_TEST_LOG" 2>&1
+				TEST_STOP_TIME=$(date +%s)
+				TEST_ELAPSED=$(($TEST_STOP_TIME-$TEST_START_TIME))
 				if [ "$?" -eq 0 ]; then
 					SUCCESS=$((SUCCESS+1))
-					echo "success."
+					echo "success ${TEST_ELAPSED}s"
 					echo "=== Test ${package}/test/${script}: success." >> $CCTOOLS_TEST_LOG
 				else
 					FAILURE=$((FAILURE+1))
-					echo "failure."
+					echo "failure ${TEST_ELAPSED}s"
 					echo "=== Test ${package}/test/${script}: failure." >> $CCTOOLS_TEST_LOG
 				fi
 			fi

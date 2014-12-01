@@ -2,7 +2,7 @@
 
 set -e
 
-. ../../dttools/src/test_runner.common.sh
+. ../../dttools/test/test_runner_common.sh
 . ./chirp-common.sh
 
 c1="./hostport.1.$PPID"
@@ -18,7 +18,7 @@ prepare()
 }
 
 ITERATE=""
-for ((i = 0; i < 1024; i++)); do
+for ((i = 1; i < 1024; i*=2)); do
 	ITERATE="$ITERATE $i"
 done
 for ((i = 2048; i < 1024*1024; i*=2)); do

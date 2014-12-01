@@ -12,8 +12,7 @@ chirp_start()
 		root="$1"
 	fi
 	shift
-	echo "$CHIRP_SERVER" --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"
-	if "$CHIRP_SERVER" --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"; then
+	if chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"; then
 		for ((i = 0; i < 10; i++)); do
 			if [ -s "$pid" -a -s "$port" ]; then
 				hostport="127.0.0.1:$(cat "$port")"

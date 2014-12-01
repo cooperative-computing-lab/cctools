@@ -39,7 +39,6 @@ typedef enum {
 	BATCH_QUEUE_TYPE_WORK_QUEUE_SHAREDFS, /**< Batch jobs will be sent to the Work Queue, all files are stored on a shared filesystem. */
 	BATCH_QUEUE_TYPE_XGRID,	              /**< Batch jobs will be sent to the Xgrid. */
 	BATCH_QUEUE_TYPE_HADOOP,              /**< Batch jobs will be sent to Hadoop. */
-	BATCH_QUEUE_TYPE_MPI_QUEUE,           /**< Batch jobs will be sent to the MPI Queue. */
 	BATCH_QUEUE_TYPE_CHIRP,               /**< Batch jobs will be sent to Chirp. */
 	BATCH_QUEUE_TYPE_UNKNOWN = -1         /**< An invalid batch queue type. */
 } batch_queue_type_t;

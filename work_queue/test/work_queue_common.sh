@@ -19,7 +19,6 @@ EOF
 
 	echo "starting master"
 	work_queue_test -d all -o master.log -Z master.port < master.script &
-	masterpid=$!
 
 	echo "waiting for master to get ready"
 	wait_for_file_creation master.port 5
@@ -27,22 +26,16 @@ EOF
 	if [ X$FOREMAN = X1 ]
 	then
 		echo "starting foreman"
-		work_queue_worker -d all -o foreman.log --foreman -Z foreman.port localhost `cat master.port` --idle-timeout 15 --connect-timeout 3 &
-		foremanpid=$!
+		work_queue_worker -d all -o foreman.log --foreman -Z foreman.port localhost `cat master.port` --timeout 10 --single-shot &
 		wait_for_file_creation foreman.port 5
 
-		echo "starting worker"
-		work_queue_worker -d all -o worker.log localhost `cat foreman.port` --idle-timeout 15 --connect-timeout 3 --cores $CORES
-
-		echo "killing foreman"
-		kill -9 $foremanpid
+		port=`cat foreman.port`
 	else
-		echo "starting worker"
-		work_queue_worker -d all -o worker.log localhost `cat master.port` --timeout 3 --cores $CORES
+		port=`cat master.port`
 	fi
 
-	echo "killing master"
-	kill -9 $masterpid
+	echo "starting worker"
+	work_queue_worker -d all -o worker.log localhost $port --timeout 10 --cores $CORES --single-shot
 
 	echo "checking for output"
 	for (( i=0; i<count; i++ ))

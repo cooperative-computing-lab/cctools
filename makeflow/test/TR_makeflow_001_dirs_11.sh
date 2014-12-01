@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ../../dttools/src/test_runner.common.sh
+. ../../dttools/test/test_runner_common.sh
 
 # many directories. Prove on redundant transfer with debug on!
 MAKE_FILE=dirs/testcase.subdir.11.makeflow

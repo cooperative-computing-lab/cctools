@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ../../dttools/src/test_runner.common.sh
+. ../../dttools/test/test_runner_common.sh
 
 # second rule should not have to create 'mydir' in its command
 MAKE_FILE=dirs/testcase.subdir.07.makeflow

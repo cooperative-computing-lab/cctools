@@ -2,7 +2,7 @@
 
 set -e
 
-. ../../dttools/src/test_runner.common.sh
+. ../../dttools/test/test_runner_common.sh
 . ./chirp-common.sh
 
 c="./hostport.$PPID"

@@ -12,7 +12,6 @@ SOURCES_LIBRARY = \
 	batch_job_condor.c \
 	batch_job_hadoop.c \
 	batch_job_local.c \
-	batch_job_mpi_queue.c \
 	batch_job_work_queue.c \
 	work_queue.c \
 	work_queue_catalog.c \
@@ -30,7 +29,7 @@ EXTERNALS = $(LIBDTTOOLS) $(LIBCHIRP)
 
 EXTERNAL_DEPENDENCIES = ../../chirp/src/libchirp.a ../../dttools/src/libdttools.a
 LIBRARIES = libwork_queue.a
-OBJECTS = $(OBJECTS_LIBRARY) $(OBJECTS_WORKER) work_queue_test_main.o mpi_queue_worker.o
+OBJECTS = $(OBJECTS_LIBRARY) $(OBJECTS_WORKER) work_queue_test_main.o
 OBJECTS_LIBRARY = $(SOURCES_LIBRARY:%.c=%.o)
 OBJECTS_WORKER = $(SOURCES_WORKER:%.c=%.o)
 PROGRAMS = work_queue_worker work_queue_status work_queue_example work_queue_pool
@@ -39,19 +38,12 @@ SCRIPTS = wq_submit_workers.common condor_submit_workers sge_submit_workers torq
 TEST_PROGRAMS = work_queue_example work_queue_test work_queue_test_watch work_queue_priority_test
 TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) bindings
 
-ifeq ($(CCTOOLS_USE_MPI),true)
-	PROGRAMS += mpi_queue_worker
-endif
-
 all: $(TARGETS)
 
 libwork_queue.a: $(OBJECTS_LIBRARY)
 work_queue_test work_queue_test_watch: work_queue_test_main.o
 work_queue_worker: $(OBJECTS_WORKER)
 $(PROGRAMS) $(TEST_PROGRAMS) bindings: libwork_queue.a $(EXTERNAL_DEPENDENCIES)
-
-mpi_queue_worker: mpi_queue_worker.o
-	$(CCTOOLS_MPI_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 bindings: $(CCTOOLS_WORK_QUEUE_BINDINGS)
 $(CCTOOLS_WORK_QUEUE_BINDINGS): libwork_queue.a work_queue.i
