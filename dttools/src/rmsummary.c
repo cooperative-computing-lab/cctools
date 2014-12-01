@@ -20,6 +20,7 @@
 
 #include <ctype.h>
 
+#include "buffer.h"
 #include "int_sizes.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -28,6 +29,7 @@
 #include "rmsummary.h"
 
 #define ONE_MEGABYTE 1048576 /* this many bytes */
+#define MAX_LINE 1024
 
 #define rmsummary_assign_as_int_field(s, key, value, field)	\
 	if(!strcmp(#field, key)){				\
@@ -42,6 +44,7 @@
 
 #define rmsummary_assign_as_string_field(s, key, value, field)	\
 	if(!strcmp(#field, key)){				\
+     	if(s->field) free(s->field);        \
 		s->field = xxstrdup(value);			\
 		return 1;}
 
@@ -74,70 +77,55 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 }
 
 /** Reads a single summary from stream. Summaries are not parsed, here
-    we simply read between comments (#) and blank lines for the lines
-    describing the summary.**/
+    we simply read between markers (--) **/
 char *rmsummary_read_single_chunk(FILE *stream)
 {
-	int nmax   = 1024;
-	int ntotal = 0;
-	int nline  = 1024;
-	int n;
+	struct buffer b;
+	char   line[MAX_LINE];
 
-	char *line = malloc( nline * sizeof(char) );
-	char *summ = malloc( nmax  * sizeof(char) );
-
-	/* Skip comments and blank lines before the summary */
+	/* Skip comments, blank lines, and markers before the summary */
 	char c;
-	while( (c = getc(stream)) == '#' || isblank(c) ) 
+	while( (c = getc(stream)) == '#' || isblank(c) || c == '-' )
 	{
 		ungetc(c, stream);
+		
 		/* Make sure we read complete comment lines */
-		n = nline;
-		while( n >= (nline - 1) )
-		{
-			fgets(line, nline, stream);
-			n = strlen(line);
-		}
+		do {
+			line[MAX_LINE - 1] = '\0';
+			fgets(line, MAX_LINE, stream);
+		} while(line[MAX_LINE - 1]);
 	}
 
 	if(feof(stream))
 	{
-		free(line);
-		free(summ);
 		return NULL;
 	}
+
+	buffer_init(&b);
 
 	ungetc(c, stream);
 	while( (c = getc(stream)) != EOF )
 	{
 		ungetc(c, stream);
 		if(c == '#' || c == '\n')
+			continue;
+
+		if(c == '-')
 			break;
-		
-		fgets(line, nline, stream);
-		n = strlen(line);
 
-		if( ntotal + n > nmax )
-		{
-			nmax = ntotal + n + nline;
-			summ = realloc(summ, nmax * sizeof(char) );
-			if(!summ)
-				fatal("Could not read summary file : %s.\n", strerror(errno)); 
-
-            fprintf(stderr, "::::: %s\n", line);
-
-		}
-		memcpy((summ + ntotal), line, n); 
-		ntotal += n;
+		fgets(line, MAX_LINE, stream);
+		buffer_printf(&b, "%s", line);
 	}
 
-	free(line);
+	char *summ = xxstrdup(buffer_tostring(&b));
+
+	buffer_free(&b);
+
 	return summ;
 }
 
 /* Parse a string for summary fields. Separator is usually '\n' or ',' */
-#define MAX_LINE 1024
-struct rmsummary *rmsummary_parse_from_str(char *buffer, char separator)
+struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separator)
 {
 	char key[MAX_LINE], value[MAX_LINE];
 	char *token, *saveptr;
@@ -145,13 +133,14 @@ struct rmsummary *rmsummary_parse_from_str(char *buffer, char separator)
 	if(!buffer)
 		return NULL;
 
-	buffer = xxstrdup(buffer);
+	// strtok does not work with const char.
+	char *buffer_copy = xxstrdup(buffer);
 
 	const char delim[] = { separator, '\n', '\0'}; 
 
 	struct rmsummary *s = make_rmsummary(-1);
 
-	token = strtok_r(buffer, delim, &saveptr);
+	token = strtok_r(buffer_copy, delim, &saveptr);
 	while(token)
 	{
 		if(sscanf(token, "%[^:]:%*[ \t]%[^\n]", key, value) >= 2) 
@@ -172,7 +161,7 @@ struct rmsummary *rmsummary_parse_from_str(char *buffer, char separator)
 		token = strtok_r(NULL, delim, &saveptr);
 	}
 
-	free(buffer);
+	free(buffer_copy);
 
 	return s;
 }
@@ -198,10 +187,10 @@ struct rmsummary *rmsummary_parse_file_single(char *filename)
 	return s;
 }
 
-void rmsummary_print(FILE *stream, struct rmsummary *s)
+void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits)
 {
 	if(s->command)
-		fprintf(stream, "%-15s%s\n",  "command:", s->command);
+		fprintf(stream, "%s %s\n",  "command:", s->command);
 
 	if(s->category)
 		fprintf(stream, "%-15s%s\n",  "category:", s->category);
@@ -226,15 +215,21 @@ void rmsummary_print(FILE *stream, struct rmsummary *s)
 	}
 
 	rmsummary_print_only_resources(stream, s, "");
+
+	if(limits) {
+		rmsummary_print_only_resources(stream, limits, "limits_");
+	}
+
+	fprintf(stream, "--\n\n");
 }
 
 void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix)
 {
 	if(s->cores > -1)
-		fprintf(stream, "%s%-20s%15" PRId64 "\n", prefix,  "cores:", s->cores);
+		fprintf(stream, "%s%-20s%20" PRId64 "\n", prefix,  "cores:", s->cores);
 
 	if(s->gpus > -1)
-		fprintf(stream, "%-20s%20" PRId64 "\n",  "gpus:", s->gpus);
+		fprintf(stream, "%s%-20s%20" PRId64 "\n",  prefix, "gpus:", s->gpus);
 
 	if(s->wall_time > -1)
 		fprintf(stream, "%s%-20s%20lf s\n", prefix, "wall_time:", s->wall_time >= 0 ? s->wall_time / 1000000e0 : -1);

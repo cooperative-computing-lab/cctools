@@ -148,7 +148,7 @@ struct work_queue {
 	timestamp_t link_poll_end;	//tracks when we poll link; used to timeout unacknowledged keepalive checks
 
 	int monitor_mode;
-	int monitor_fd;
+	FILE *monitor_file;
 	char *monitor_exe;
 
 	char *password;
@@ -1063,40 +1063,37 @@ static void delete_uncacheable_files( struct work_queue *q, struct work_queue_wo
 void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
 {
 	struct flock lock;
-	FILE        *fsummary;
 	char        *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME ".summary", getpid(), t->taskid);
-	char        *msg; 
+
+	t->resources_measured = rmsummary_parse_file_single(summary);
+	int monitor_fd = fileno(q->monitor_file);
 
 	lock.l_type   = F_WRLCK;
 	lock.l_start  = 0;
 	lock.l_whence = SEEK_SET;
 	lock.l_len    = 0;
 
-	fcntl(q->monitor_fd, F_SETLKW, &lock);
-	
-	msg = string_format("# Work Queue pid: %d Task: %d summary:\n", getpid(), t->taskid);
-	write(q->monitor_fd, msg, strlen(msg));
-	free(msg);
+	fcntl(monitor_fd, F_SETLKW, &lock);
+	fprintf(q->monitor_file, "# Work Queue pid: %d Task: %d summary:\n", getpid(), t->taskid);
 
-	if( (fsummary = fopen(summary, "r")) == NULL )
+	if(t->resources_measured)
 	{
-		msg = string_format("# Summary for task %d:%d was not available.\n", getpid(), t->taskid);
-		write(q->monitor_fd, msg, strlen(msg));
-		free(msg);
+		rmsummary_print(q->monitor_file, t->resources_measured, NULL);
 	}
 	else
 	{
-		copy_stream_to_fd(fsummary, q->monitor_fd);
-		fclose(fsummary);	
+		fprintf(q->monitor_file, "# Summary for task %d:%d was not available.\n", getpid(), t->taskid);
 	}
 
-	write(q->monitor_fd, "\n\n", 2);
+	fprintf(q->monitor_file, "\n\n");
 
 	lock.l_type   = F_ULOCK;
-	fcntl(q->monitor_fd, F_SETLK, &lock);
+	fcntl(monitor_fd, F_SETLK, &lock);
 
 	if(unlink(summary) != 0)
 		debug(D_NOTICE, "Summary %s could not be removed.\n", summary);
+
+	free(summary);
 }
 
 static void fetch_output_from_worker(struct work_queue *q, struct work_queue_worker *w, int taskid)
@@ -1131,7 +1128,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	t->time_task_finish = timestamp_get();
 
 	/* if q is monitoring, append the task summary to the single
-	 * queue summary, and delete the task summary. */
+	 * queue summary, update t->resources_used, and delete the task summary. */
 	if(q->monitor_mode)
 		work_queue_monitor_append_report(q, t);
 
@@ -2985,6 +2982,8 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->total_cmd_execution_time = 0;
 	t->priority = 0;
 
+	t->resources_measured = NULL;
+
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->memory = -1;
 	t->disk = -1;
@@ -3566,6 +3565,8 @@ void work_queue_task_delete(struct work_queue_task *t)
 			free(t->hostname);
 		if(t->host)
 			free(t->host);
+		if(t->resources_measured)
+			free(t->resources_measured);
 		free(t);
 	}
 }
@@ -3712,7 +3713,7 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_fil
   if(q->monitor_mode)
   {
     debug(D_NOTICE, "Monitoring already enabled. Closing old logfile and opening (perhaps) new one.\n");
-    if(close(q->monitor_fd))
+    if(fclose(q->monitor_file))
       debug(D_NOTICE, "Error closing logfile: %s\n", strerror(errno));
   }
 
@@ -3730,10 +3731,10 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_fil
   else
     monitor_summary_file = string_format("wq-%d-resource-usage", getpid());
 
-  q->monitor_fd = open(monitor_summary_file, O_CREAT | O_WRONLY | O_APPEND, 00666);
+  q->monitor_file = fopen(monitor_summary_file, "w+");
   free(monitor_summary_file);
 
-  if(q->monitor_fd < 0)
+  if(!q->monitor_file)
   {
     debug(D_NOTICE, "Could not open monitor log file. Disabling monitor mode.\n");
     return 0;
@@ -3886,7 +3887,10 @@ void work_queue_delete(struct work_queue *q)
 
 		free(q->stats);
 		free(q->stats_disconnected_workers);
- 
+
+		if(q->monitor_mode)
+			fclose(q->monitor_file);
+
 		free(q->poll_table);
 		link_close(q->master_link);
 		if(q->logfile) {
