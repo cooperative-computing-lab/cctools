@@ -29,7 +29,7 @@ test: all
 
 install: all
 	mkdir -p $(PERL_INSTALL_DIR)
-	cp $(LIBRARIES) $(PERL_INSTALL_DIR)/
+	cp $(LIBRARIES) Work_Queue.pm $(PERL_INSTALL_DIR)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 	chmod 755 work_queue_example.pl
 	cp work_queue_example.pl $(CCTOOLS_INSTALL_DIR)/doc/
