@@ -117,7 +117,7 @@ char *rmsummary_read_single_chunk(FILE *stream)
 		buffer_printf(&b, "%s", line);
 	}
 
-	char *summ = xxstrdup(buffer_tostring(&b));
+	char *summ = xxstrdup(buffer_tostring(&b, NULL));
 
 	buffer_free(&b);
 
