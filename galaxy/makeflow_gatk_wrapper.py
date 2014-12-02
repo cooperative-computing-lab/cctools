@@ -41,9 +41,10 @@ parser.add_option('--user_id',dest='uid',type='string')
 parser.add_option('--user_job',dest='ujob',type='string')
 
 parser.add_option('--samtools',dest='samtools',type='string')
-parser.add_option('--gatk_jar',dest='gatk_jar',type='string')
-parser.add_option('--dict_jar',dest='dict_jar',type='string')
-parser.add_option('--java_zip',dest='java_zip',type='string')
+parser.add_option('--gatk',dest='gatk',type='string')
+parser.add_option('--picard',dest='picard',type='string')
+parser.add_option('--java',dest='java',type='string')
+parser.add_option('--vcf-tools',dest='vcftools',type='string')
 
 
 (options, args) = parser.parse_args()
@@ -89,15 +90,17 @@ shutil.copyfile(options.input, cur_dir+"/cur_bam.bam")
 #	os.symlink(options.input, cur_dir+"/cur_bam.bam")
 inputs += "--input_file cur_bam.bam "
 
-shutil.copyfile(options.samtools, cur_dir+"/samtools")
+shutil.copyfile(options.samtools+"/samtools", cur_dir+"/samtools")
 os.chmod(cur_dir+"/samtools", os.stat(cur_dir+"/samtools").st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 shutil.copyfile("/usr/bin/java", cur_dir+"/java")
 os.chmod(cur_dir+"/java", os.stat(cur_dir+"/java").st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-shutil.copyfile(options.gatk_jar, cur_dir+"/GenomeAnalysisTK.jar")
-shutil.copyfile(options.dict_jar, cur_dir+"/CreateSequenceDictionary.jar")
-shutil.copyfile(options.java_zip, cur_dir+"/jre.zip")
+shutil.copyfile(options.gatk+"/GenomeAnalysisTK.jar", cur_dir+"/GenomeAnalysisTK.jar")
+shutil.copyfile(options.picard+"/picard.jar", cur_dir+"/picard.jar")
+shutil.copyfile(options.java+"/jre.zip", cur_dir+"/jre.zip")
+shutil.copyfile(options.vcftools+"/vcf-concat", cur_dir+"/vcf-concat")
+os.chmod(cur_dir+"/vcf-concat", os.stat(cur_dir+"/vcf-concat").st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 os.chdir(cur_dir)
 

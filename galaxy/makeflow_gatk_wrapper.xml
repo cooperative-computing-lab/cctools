@@ -15,10 +15,10 @@
     --reference_sequence=$REFERENCE
 	
     --cctools_install=${GALAXY_DATA_INDEX_DIR}/shared/cctools
-    --samtools=${GALAXY_DATA_INDEX_DIR}/shared/samtools/samtools
-    --gatk_jar=${GALAXY_DATA_INDEX_DIR}/shared/jars/gatk/GenomeAnalysisTK_2_5.jar
-    --dict_jar=${GALAXY_DATA_INDEX_DIR}/shared/jars/picard/CreateSequenceDictionary.jar
-    --java_zip=${GALAXY_DATA_INDEX_DIR}/shared/java/jre.zip
+    --samtools=${GALAXY_DATA_INDEX_DIR}/shared/samtools
+    --gatk=${GALAXY_DATA_INDEX_DIR}/shared/jars/gatk
+    --picard=${GALAXY_DATA_INDEX_DIR}/shared/picard/dist
+    --vcftools=${GALAXY_DATA_INDEX_DIR}/shared/vcftools/bin
 	
     --user_id=$__user_id__
     --pwfile=${GALAXY_DATA_INDEX_DIR}/mypwfile

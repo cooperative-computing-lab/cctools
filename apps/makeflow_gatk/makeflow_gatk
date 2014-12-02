@@ -383,8 +383,8 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 			makeflow.write("\n\n"+index+" : samtools "+ref_sp)
 			makeflow.write("\n\t./samtools faidx "+ref_sp)
 
-			makeflow.write("\n\n"+dict+" : java_run jre.zip CreateSequenceDictionary.jar "+ref_sp)
-			makeflow.write("\n\tpython java_run --java jre.zip --inputs \"-jar CreateSequenceDictionary.jar R="+ref_sp+" O="+dict+"\"")
+			makeflow.write("\n\n"+dict+" : java_run jre.zip picard.jar "+ref_sp)
+			makeflow.write("\n\tpython java_run --java jre.zip --inputs \"-jar picard.jar CreateSequenceDictionary R="+ref_sp+" O="+dict+"\"")
 
 			ref_index = ref_sp+" "+index+" "+dict+" "			
 			input_sam = input+str(i)+".sam"
@@ -415,7 +415,7 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 			merge_files += input_vcf+" "+input_idx+" "
 			merge_inputs += input_vcf+" " 
 				
-			makeflow.write("\n\n"+ log + plog +input_vcf+" "+input_idx+ " : java_run jre.zip "+ref_index+query+"GenomeAnalysisTK.jar ")
+			makeflow.write("\n\n"+ log + plog +input_vcf+" "+input_idx+ " : java_run jre.zip "+ref_index+query+" GenomeAnalysisTK.jar ")
 			makeflow.write("\n\tpython java_run --java jre.zip --inputs \""+xmx+"-jar GenomeAnalysisTK.jar -T " + options.type +" -R "+ref_sp+" -I "+input_bam+" -o "+input_vcf+" "+arguments+added+"\"")
 
 
