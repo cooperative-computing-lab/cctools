@@ -632,13 +632,18 @@ static int redirect_ldso( const char *exe, char *ldso_physical_name )
 		debug(D_PROCESS,"redirect_ldso: %s --verify %s didn't exit normally. status == %d", ldso_physical_name, exe, status);
 		return errno = EIO, -1;
 	}
-	if (WEXITSTATUS(status) != 0) {
-		debug(D_PROCESS,"redirect_ldso: %s --verify %s exited with status %d", ldso_physical_name, exe, WEXITSTATUS(status));
-		return errno = EIO, -1;
+	switch (WEXITSTATUS(status)) {
+		case 0:
+			debug(D_PROCESS, "redirect_ldso: will execute %s %s", ldso_physical_name, exe);
+			return 0;
+		case 1:
+			debug(D_DEBUG, "redirect_ldso: %s is probably a static binary and will be executed directly", exe);
+			ldso_physical_name[0] = '\0';
+			return 0;
+		default:
+			debug(D_PROCESS,"redirect_ldso: %s --verify %s exited with status %d", ldso_physical_name, exe, WEXITSTATUS(status));
+			return errno = EIO, -1;
 	}
-
-	debug(D_PROCESS, "redirect_ldso: will execute %s %s", ldso_physical_name, exe);
-	return 0;
 }
 
 static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const char *exe, const char *replace_arg0, const char *arg1, const char *arg2 )
