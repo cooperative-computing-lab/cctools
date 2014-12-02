@@ -572,6 +572,7 @@ int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 		start = t;
 	} else {
 		lexer_report_error(bk, "At least the name of the Makeflow file should be specified in a recursive call.\n");
+		return 0; // not reached, silences warning
 	}
 	
 	dag_parse_drop_spaces(bk);

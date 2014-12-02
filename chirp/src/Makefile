@@ -3,7 +3,7 @@ include ../../rules.mk
 
 # We only use sqlite3 multi-process (i.e. no threads). So we can turn off
 # SQLITE_THREADSAFE. This disables somewhat costly mutex locks.
-LOCAL_CCFLAGS = -DSQLITE_THREADSAFE=0
+LOCAL_CCFLAGS = -DSQLITE_THREADSAFE=0 -Wno-unused-const-variable
 
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = libchirp.a
