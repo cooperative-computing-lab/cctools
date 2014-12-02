@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef URL_DECODE_H
+#ifndef URL_ENCODE_H
 #define URL_ENCODE_H
 
 /** @file url_encode.h provides routines for encoding strings according to RFC-2396.
