@@ -1481,7 +1481,8 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug((long) D_MAKEFLOW_RUN, get_makeflow_exe());
 	const char *dagfile;
-
+	char *change_dir = NULL;
+	int chdir_mode = 0;
 	char *batchlogfilename = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	char *catalog_host;
@@ -1601,8 +1602,8 @@ int main(int argc, char *argv[])
 		{"wrapper", required_argument, 0, LONG_OPT_WRAPPER},
 		{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
-		{"change_directory", required_argument, 0, 'X'},
 		{"zero-length-error", no_argument, 0, 'z'},
+		{"change-directory", required_argument, 0, 'X'},
 		{0, 0, 0, 0}
 	};
 
@@ -1775,9 +1776,6 @@ int main(int argc, char *argv[])
 					return 1;
 				}
 				break;
-			case 'X':
-				chdir(optarg);
-				break;
 			case 'z':
 				output_len_check = 1;
 				break;
@@ -1826,6 +1824,10 @@ int main(int argc, char *argv[])
 			default:
 				show_help_run(get_makeflow_exe());
 				return 1;
+			case 'X':
+				change_dir = optarg;
+				chdir_mode = 1;
+				break;
 		}
 	}
 
@@ -2006,6 +2008,9 @@ int main(int argc, char *argv[])
 		dag_prepare_gc(d);
 
 	dag_prepare_nested_jobs(d);
+	
+	if (chdir_mode == 1)
+	 	chdir(change_dir);
 
 	if(clean_mode) {
 		dag_clean(d);
