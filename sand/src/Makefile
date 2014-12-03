@@ -1,7 +1,7 @@
 include ../../config.mk
 include ../../rules.mk
 
-LOCAL_CCFLAGS = -O4
+LOCAL_CCFLAGS = -O3
 
 EXTERNAL_DEPENDENCIES = ../../work_queue/src/libwork_queue.a ../../dttools/src/libdttools.a
 LIBRARIES = libsandtools.a

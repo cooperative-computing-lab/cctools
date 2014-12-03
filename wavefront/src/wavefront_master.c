@@ -51,9 +51,6 @@ static double sequential_run_time = 7.75;
 static time_t start_time = 0;
 static time_t last_display_time = 0;
 
-static const time_t long_wait = 60;
-static const time_t short_wait = 5;
-
 static int task_consider( int x, int y )
 {
 	char command[WAVEFRONT_LINE_MAX];

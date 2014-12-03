@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef URL_DECODE_H
-#define URL_ENCODE_H
+#ifndef B64_ENCODE_H
+#define B64_ENCODE_H
 
 #include <stddef.h>
 
