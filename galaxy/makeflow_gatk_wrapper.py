@@ -90,12 +90,9 @@ inputs += "--input_file cur_bam.bam "
 shutil.copyfile(options.samtools+"/samtools", cur_dir+"/samtools")
 os.chmod(cur_dir+"/samtools", os.stat(cur_dir+"/samtools").st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-shutil.copyfile("/usr/bin/java", cur_dir+"/java")
-os.chmod(cur_dir+"/java", os.stat(cur_dir+"/java").st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
 shutil.copyfile(options.gatk+"/GenomeAnalysisTK.jar", cur_dir+"/GenomeAnalysisTK.jar")
 shutil.copyfile(options.picard+"/picard.jar", cur_dir+"/picard.jar")
-shutil.copyfile(cctools_dir+"/apps/makeflow_gatk/jre.zip", cur_dir+"/jre.zip")
+shutil.copyfile(options.java+"/jre.zip", cur_dir+"/jre.zip")
 shutil.copyfile(options.vcftools+"/vcf-concat", cur_dir+"/vcf-concat")
 os.chmod(cur_dir+"/vcf-concat", os.stat(cur_dir+"/vcf-concat").st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 

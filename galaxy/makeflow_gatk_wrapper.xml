@@ -18,6 +18,7 @@
     --samtools=${GALAXY_DATA_INDEX_DIR}/shared/samtools
     --gatk=${GALAXY_DATA_INDEX_DIR}/shared/jars/gatk
     --picard=${GALAXY_DATA_INDEX_DIR}/shared/picard/dist
+    --java=${GALAXY_DATA_INDEX_DIR}/shared/java
     --vcftools=${GALAXY_DATA_INDEX_DIR}/shared/vcftools/bin
 	
     --user_id=$__user_id__

@@ -300,9 +300,9 @@ if not java_opt or java_opt == \"NULL\":
 
 cwd = os.getcwd()
 
-os.environ['PATH'] = cwd+\"/jre-1.7.0/bin/:\"+path
-os.environ['JAVA_HOME'] = cwd+\"/jre-1.7.0/\"
-os.environ['LD_LIBRARY_PATH'] = cwd+\"/jre-1.7.0/lib\"
+os.environ['PATH'] = cwd+\"/jre/bin/:\"+path
+os.environ['JAVA_HOME'] = cwd+\"/jre/\"
+os.environ['LD_LIBRARY_PATH'] = cwd+\"/jre/lib\"
 os.environ['_JAVA_OPTIONS'] = java_opt+\"-Djava.io.tmpdir=\"+cwd
 
 os.system('java ' + options.inputs + output)
