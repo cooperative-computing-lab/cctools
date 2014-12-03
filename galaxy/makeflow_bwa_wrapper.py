@@ -46,9 +46,6 @@ parser.add_option('', '--user_job', dest="ujob", type="string")
 cur_dir = os.getcwd()
 job_num = os.path.basename(cur_dir);
 
-os.environ['TCP_LOW_PORT'] = '9123'
-os.environ['TCP_HIGH_PORT'] = '9173'
-
 cctools_dir = options.cctools
 
 makeflow='Makeflow'
@@ -86,9 +83,6 @@ inputs += "--fastq fastq.fq "
 if options.rfastq:
 	os.symlink(options.rfastq, "./rfastq.fq")
 	inputs += "--rfastq rfastq.fq "
-
-shutil.copyfile("/usr/bin/bwa", "./bwa")
-os.chmod("bwa", os.stat("bwa").st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 os.system('python ./makeflow_bwa --algoalign bwa_backtrack ' + inputs + 
 	  '--makeflow ' +  makeflow + ' --output_SAM ' + output_sam +' '+ ' '.join(args))
