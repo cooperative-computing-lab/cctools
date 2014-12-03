@@ -2,7 +2,7 @@
 # Within galaxy-dist
 cd tool-data/shared/
 # Get recent cctools distribution:  
-# wget https://github.com/cooperative-computing-lab/cctools/archive/master.zip
+wget https://github.com/cooperative-computing-lab/cctools/archive/master.zip
 unzip master.zip
 mkdir cctools
 mv cctools-*/* cctools
@@ -18,10 +18,10 @@ perl ./tool-data/shared/cctools/galaxy/modify_registry.pl ./lib/galaxy/datatypes
 mv tmp_registry ./lib/galaxy/datatypes/registry.py
 
 mkdir tools/ndBioapps
-cp tool-data/shared/cctools/galaxy/makeflow* tools/ndBioapps
+cp ./tool-data/shared/cctools/galaxy/makeflow* ./tools/ndBioapps
 
-perl modify_tool_conf.pl ./config/tool_conf.xml.sample
-mv tmp_tool_config ./config/tool_conf.xml.sample
+perl ./tool-data/shared/cctools/galaxy/modify_tool_conf.pl ./config/tool_conf.xml.sample
+mv tmp_tool_conf ./config/tool_conf.xml.sample
 
 echo "galaxy_pass" > tool-data/mypwfile
 
@@ -35,7 +35,6 @@ mv broadinstitute-picard-*/* broadinstitute-picard-*/.[^.]* picard
 cd picard
 git clone https://github.com/samtools/htsjdk.git
 ant
-
 # Clean
 cd ..
 rm master
