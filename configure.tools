@@ -60,7 +60,7 @@ check_path ()
 
 check_function()
 {
-	echo -n "checking for $1 in $2..."
+	echon "checking for $1 in $2..."
 	if grep $1 $2 >/dev/null 2>&1
 	then
 		echo "yes"
@@ -73,7 +73,7 @@ check_function()
 
 check_compiler_flag()
 {
-	echo -n "checking if ${ccompiler} supports $1..."
+	echon "checking if ${ccompiler} supports $1..."
 cat > .configure.tmp.c << EOF
 #include <stdlib.h>
 EOF
@@ -273,7 +273,7 @@ optional_include()
 	header="$1"
 	shift
 
-	echo -n "checking for header ${header}..."
+	echon "checking for header ${header}..."
 
 cat > .configure.tmp.c << EOF
 #include <stdlib.h>
@@ -296,7 +296,7 @@ optional_library()
 	library="$1"
 	shift
 
-	echo -n "checking for library ${library}..."
+	echon "checking for library ${library}..."
 
 	if echo 'int main;' | gcc -o /dev/null -x c - "-l${library}" >/dev/null 2>/dev/null; then
 		echo yes
@@ -317,7 +317,7 @@ optional_library_function()
 	shift
 	shift
 
-	echo -n "checking for library function ${f}..."
+	echon "checking for library function ${f}..."
 
 	gcc -o /dev/null -x c - "-l${l}" >/dev/null 2>/dev/null <<EOF
 #include <stdlib.h>
@@ -343,7 +343,7 @@ check_gnu_make()
 {
 	if check_path $1
 	then
-		echo -n "checking if $1 is GNU make..."
+		echon "checking if $1 is GNU make..."
 		kind=`$1 -v 2>&1| head -1 | awk '{print $1}'`
 		if [ X$kind = XGNU ]
 		then
@@ -385,7 +385,7 @@ check_perl_version()
 {
 	if check_path "perl"
 	then
-		echo -n "checking perl version..."
+		echon "checking perl version..."
 		cat >configure.perl-test <<EOF
 print "\$]\n";
  
@@ -484,7 +484,7 @@ check_for_globus_flavors()
 
 check_for_globus()
 {
-	echo -n "checking for globus package $2 flavor $3 in $1..."
+	echon "checking for globus package $2 flavor $3 in $1..."
 
 	GLOBUS_LOCATION=$1
 	export GLOBUS_LOCATION
@@ -542,7 +542,7 @@ check_for_globus()
 
 check_multiarch()
 {
-	echo -n "checking for multiarch environment..." 
+	echon "checking for multiarch environment..." 
 	if [ -r /etc/debian_version ]; then
 		HOST_MULTIARCH=`dpkg-architecture -qDEB_HOST_MULTIARCH 2> /dev/null`
 		echo "$HOST_MULTIARCH"
