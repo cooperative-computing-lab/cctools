@@ -63,6 +63,22 @@ check_function()
 	fi
 }
 
+check_compiler_flag()
+{
+	echo -n "checking if ${ccompiler} supports $1..."
+cat > .configure.tmp.c << EOF
+#include <stdlib.h>
+EOF
+	if ${ccompiler} $1 .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1
+	then
+		echo "yes"
+		return 0
+	else
+		echo "no"
+		return 1
+	fi
+}
+
 require_file ()
 {
 	if check_file $1

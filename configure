@@ -129,20 +129,7 @@ globus_flavor=auto
 ccompiler=gcc
 cxxcompiler=g++
 
-ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -Wno-deprecated-declarations"
-
-# Cygwin has some compiler oddities.
-# 1 - Sloppy definitions of the ctype.h functions cause spurious warnings
-# about char -> int conversions.
-# 2 - All code is PIC by default, and adding the flag causes more warnings.
-
-if [ ${build_sys} = CYGWIN ]
-then
-	ccflags="${ccflags} -Wno-char-subscripts"
-else
-	ccflags="${ccflags} -fPIC"
-fi
-
+ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra"
 
 config_readline_path=auto
 config_globus_path=auto
@@ -388,6 +375,30 @@ done
 require_path ${ccompiler}
 require_path ${cxxcompiler}
 require_gnu_make
+
+# Lots of warnings are enabled by default, but several are too strict
+# and crop up in third-party code, so we disable those checks.
+# However, not all compilers support these flags, so we check each one.
+
+for flag in no-unused-parameter no-unknown-pragmas no-deprecated-declarations no-unused-const-variable
+do
+	if check_compiler_flag -W$flag
+	then
+		ccflags="${ccflags} -W$flag"
+	fi
+done
+
+# Cygwin has some compiler oddities.
+# 1 - Sloppy definitions of the ctype.h functions cause spurious warnings
+# about char -> int conversions.
+# 2 - All code is PIC by default, and adding the flag causes more warnings.
+
+if [ ${build_sys} = CYGWIN ]
+then
+	ccflags="${ccflags} -Wno-char-subscripts"
+else
+	ccflags="${ccflags} -fPIC"
+fi
 
 #
 # Currently, we rely on the linker --as-needed flag to sort out
