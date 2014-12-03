@@ -26,6 +26,9 @@ mv tmp_tool_conf ./config/tool_conf.xml.sample
 echo "galaxy_pass" > tool-data/mypwfile
 
 
+# Get GATK from https://www.broadinstitute.org/gatk/download
+# Move to tool-data/shared/jars/gatk/GenomeAnalysisTK.jar
+
 # INSTALL Picard
 cd tool-data/shared
 wget https://github.com/broadinstitute/picard/zipball/master
