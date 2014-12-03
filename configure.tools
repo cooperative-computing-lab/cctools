@@ -8,6 +8,14 @@ EOF
 chmod 755 configure.rerun
 }
 
+# Some shells (like /bin/sh on osx) do not support echo -n,
+# so we use this function as an alias instead.
+
+echon()
+{
+	printf "%s" "$@"
+}
+
 abspath() {
 	case "$1" in
 		/*)
@@ -21,7 +29,7 @@ abspath() {
 
 check_file ()
 {
-	echo -n "checking for $1..."
+	echon "checking for $1..."
 	if [ -f $1 ]
 	then
 		echo "yes"
@@ -34,7 +42,7 @@ check_file ()
 
 check_path ()
 {
-	echo -n "checking for $1..."
+	echon "checking for $1..."
 	IFS=":"
 	for dir in $PATH
 	do
