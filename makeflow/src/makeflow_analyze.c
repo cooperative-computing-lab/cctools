@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
 		{"version", no_argument, 0, 'v'},
 		{0, 0, 0, 0}
 	};
-	const char *option_string_analyze = "b:hiIkOv";
+	const char *option_string_analyze = "b:hiIkOd:v";
 
 	while((c = getopt_long(argc, argv, option_string_analyze, long_options_analyze, NULL)) >= 0) {
 		switch (c) {
@@ -263,6 +263,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'O':
 				display_mode = SHOW_OUTPUT_FILES;
+				break;
+			case 'd':
+				debug_flags_set(optarg);
 				break;
 			case 'v':
 				cctools_version_print(stdout, get_makeflow_exe());
