@@ -2,10 +2,10 @@
 # Within galaxy-dist
 cd tool-data/shared/
 # Get recent cctools distribution:  
-wget https://github.com/cooperative-computing-lab/cctools/archive/master.zip
+# wget https://github.com/cooperative-computing-lab/cctools/archive/master.zip
 unzip master.zip
 mkdir cctools
-mv cctools-master/* cctools
+mv cctools-*/* cctools
 cd cctools
 ./configure --prefix $PWD
 make install
