@@ -1602,7 +1602,6 @@ int main(int argc, char *argv[])
 		{"wrapper", required_argument, 0, LONG_OPT_WRAPPER},
 		{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
-		{"change_directory", required_argument, 0, 'X'},
 		{"zero-length-error", no_argument, 0, 'z'},
 		{"change-directory", required_argument, 0, 'X'},
 		{0, 0, 0, 0}
@@ -1776,9 +1775,6 @@ int main(int argc, char *argv[])
 					fprintf(stderr, "makeflow: unknown scheduling mode %s\n", optarg);
 					return 1;
 				}
-				break;
-			case 'X':
-				chdir(optarg);
 				break;
 			case 'z':
 				output_len_check = 1;
