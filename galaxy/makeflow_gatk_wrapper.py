@@ -56,9 +56,6 @@ job_num = os.path.basename(cur_dir)
 
 cctools_dir = options.cctools
 
-os.environ['TCP_LOW_PORT'] = '9123'
-os.environ['TCP_HIGH_PORT'] = '9173'
-
 makeflow='Makeflow'
 wq_project_name="galaxy_gatk_"+options.uid+"_"+job_num
 wq_password=options.pwfile

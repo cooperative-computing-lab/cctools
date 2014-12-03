@@ -421,6 +421,7 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 
 		makeflow.write("\n\n"+options.output+" :  "+merge_files)
 		makeflow.write("\n\tLOCAL vcf-concat "+merge_inputs+" > "+options.output) 
+		makeflow.write("\n") 
 
 			
 	finally:

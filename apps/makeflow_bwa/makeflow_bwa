@@ -424,6 +424,7 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 
 		makeflow.write("\n\n"+error+": "+errors_to_cat)
 		makeflow.write("\n\tLOCAL cat "+errors_to_cat+" > "+error)	
+		makeflow.write("\n")	
 
 	finally:
 		if options.makeflow is not None:

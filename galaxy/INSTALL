@@ -5,7 +5,7 @@ cd tool-data/shared/
 wget https://github.com/cooperative-computing-lab/cctools/archive/master.zip
 unzip master.zip
 mkdir cctools
-mv cctools-*/* cctools
+mv cctools-*/* cctools-*/.[^.]* cctools
 cd cctools
 ./configure --prefix $PWD
 make install
@@ -71,3 +71,15 @@ cd ..
 rm download
 rmdir vcftools_*/
 cd ../..
+
+# INSTALL Java 1.7
+cd tool-data/shared
+mkdir java
+cd java
+wget http://javadl.sun.com/webapps/download/AutoDL?BundleId=97800
+tar zxf AutoDL*
+mkdir jre 
+mv jre1*/* jre
+rmdir jre1*
+zip -r jre.zip jre/*
+cd ../../..
