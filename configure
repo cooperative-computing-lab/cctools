@@ -714,10 +714,10 @@ then
         then
                 if [ x${fuse_path} != x/ -a x${fuse_path} != x/usr ]
                 then
-                        ccflags="${ccflags} -I${fuse_path}/include"
+                        fuse_ccflags="-I${fuse_path}/include"
                 fi
                 ccflags="${ccflags} -DHAS_FUSE"
-				external_libraries="${external_libraries} ${library_search_result}"
+				fuse_ldflags="${library_search_result}"
         else
                 if [ $config_fuse_path = yes ]
                 then
@@ -1271,6 +1271,9 @@ CCTOOLS_XROOTD_CCFLAGS=${xrootd_ccflags}
 
 CCTOOLS_CVMFS_LDFLAGS=${cvmfs_ldflags}
 CCTOOLS_CVMFS_CCFLAGS=${cvmfs_ccflags}
+
+CCTOOLS_FUSE_LDFLAGS=${fuse_ldflags}
+CCTOOLS_FUSE_CCFLAGS=${fuse_ccflags}
 EOF
 
 echo ""
