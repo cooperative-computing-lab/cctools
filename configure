@@ -71,8 +71,6 @@ include_package_makeflow="makeflow"
 include_package_ftplite="ftp_lite"
 include_package_chirp="chirp"
 include_package_resource_monitor="resource_monitor"
-include_package_resource_monitor_visualizer="resource_monitor_visualizer"
-include_package_makeflow_linker="makeflow_linker"
 include_package_weaver="weaver"
 include_package_doc="doc"
 
@@ -259,12 +257,6 @@ do
 		--without-system-resource_monitor)
 			include_package_resource_monitor=""
 			;;
-		--without-system-resource_monitor_visualizer)
-			include_package_resource_monitor_visualizer=""
-			;;
-		--without-system-makeflow-linker)
-			include_package_makeflow_linker=""
-			;;
 		--without-system-weaver)
 		        include_package_weaver=""
 		        ;;
@@ -325,8 +317,6 @@ And SYSTEM may be:
     chirp
     parrot
     resource_monitor
-    resource_monitor_visualizer
-    makeflow_linker
     doc
 EOF
 			exit 0
@@ -346,7 +336,7 @@ fi
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_resource_monitor_visualizer} ${include_package_makeflow_linker} ${include_package_chirp} ${include_package_weaver} ${include_package_doc}"
+potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_doc}"
 
 check_multiarch
 
@@ -445,19 +435,27 @@ if [ $config_globus_path != no ]
 then
 	if check_file ${globus_path}/include/${globus_flavor}/globus_common.h
 	then
-		ccflags="${ccflags} -I${globus_path}/include -I${globus_path}/include/${globus_flavor} -DHAS_GLOBUS_GSS"
-		ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
+		ccflags="${ccflags} -DHAS_GLOBUS_GSS"
+		globus_ccflags="-I${globus_path}/include -I${globus_path}/include/${globus_flavor}"
+		#ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
 		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
 		do
-			library_search ${library}_${globus_flavor} ${globus_path}
+			if library_search ${library}_${globus_flavor} ${globus_path}
+			then
+				globus_ldflags="${globus_ldflags} ${library_search_result}"
+			fi
 		done
 	elif check_file ${globus_path}/include/globus/globus_common.h
 	then
-		ccflags="${ccflags} -I${globus_path}/lib/globus/include -I${globus_path}/include/globus -DHAS_GLOBUS_GSS"
-		ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
+		ccflags="${ccflags} -DHAS_GLOBUS_GSS"
+		globus_ccflags="-I${globus_path}/lib/globus/include -I${globus_path}/include/globus"
+		#ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
 		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
 		do
-			library_search $library ${globus_path}
+			if library_search $library ${globus_path}
+			then
+				globus_ldflags="${globus_ldflags} ${library_search_result}"
+			fi
 		done
 	else
 		if [ $config_globus_path = yes ]
@@ -485,8 +483,10 @@ then
 
 		for d in ${irods_path}/lib/*/include ${irods_path}/server/*/include
 		do
-			ccflags="${ccflags} -I$d"
+			irods_ccflags="${irods_ccflags} -I$d"
 		done
+
+		irods_ldflags="${library_search_result}"
 
 	elif library_search RodsAPIs "${irods_path}/iRODS/lib/core/obj"
 	then
@@ -500,14 +500,16 @@ then
 		# for .hpp files instead of .h files.
 
 		ccflags="${ccflags} -DHAS_IRODS -DIRODS_USES_PLUGINS -DIRODS_USES_HPP"
-		ldflags="-rdynamic"
+		ldflags="${ldflags} -rdynamic"
 
 		echo "*** warning: irods 4.0 requires plugins installed in /var/lib"
 
 		for d in ${irods_path}/iRODS/lib/*/include ${irods_path}/iRODS/server/*/include
 		do
-			ccflags="${ccflags} -I$d"
+			irods_ccflags="${irods_ccflags} -I$d"
 		done
+
+		irods_ldflags="${library_search_result}"
 
 		# irods 4.x depends on a specific version of boost:
 
@@ -526,7 +528,7 @@ then
 			if [ -f $lib ]
 			then
 				echo "found $lib"
-				external_archives="${external_archives} $lib"
+				irods_ldflags="${irods_ldflags} $lib"
 			fi
 		done
 
@@ -539,7 +541,7 @@ then
 
 		echo "found irods jansson in $jansson_path"
 		jansson_lib="${jansson_path}/src/.libs"
-		external_archives="${external_archives} ${jansson_lib}/libjansson.a"
+		irods_ldflags="${irods_ldflags} ${jansson_lib}/libjansson.a"
 
 	elif [ $config_irods_path = yes ]
 	then
@@ -555,9 +557,11 @@ fi
 
 if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql
 then
+	mysql_ldflags="${library_search_result}"
+
 	if [ ${mysql_path} != /usr ]
 	then
-		ccflags="${ccflags} -I${mysql_path}/include"
+		mysql_ccflags="-I${mysql_path}/include"
 	fi
 
 	ccflags="${ccflags} -DHAS_MYSQL -DHAS_BXGRID"
@@ -599,12 +603,15 @@ then
 
 	echo "using an xrootd arch of '$xrootd_arch' (if this is wrong, use the --xrootd-arch argument)"
 
-	ccflags="${ccflags} -I${xrootd_path}/include/xrootd -DHAS_XROOTD"
+	ccflags="${ccflags} -DHAS_XROOTD"
+	xrootd_ccflags="-I${xrootd_path}/include/xrootd"
 
 	for library in XrdPosix XrdClient XrdSys XrdNet XrdNetUtil XrdOuc
 	do
-		if ! library_search $library ${xrootd_path} ${xrootd_arch}
+		if library_search $library ${xrootd_path} ${xrootd_arch}
 		then
+			xrootd_ldflags="${xrootd_ldflags} ${library_search_result}"
+		else
 			echo "*** Couldn't find $library in ${xrootd_path}"
 			exit 1
 		fi
@@ -623,16 +630,16 @@ fi
 
 if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/include/libcvmfs.h
 then
-	ccflags="${ccflags} -I${cvmfs_path}/include -DHAS_CVMFS"
+	ccflags="${ccflags} -DHAS_CVMFS"
+	cvmfs_ccflags="-I${cvmfs_path}/include"
 
-	for library in cvmfs 
-	do
-		if ! library_search $library ${cvmfs_path}
-		then
-			echo "*** Couldn't find $library in ${cvmfs_path}"
-			exit 1
-		fi
-	done
+	if library_search cvmfs ${cvmfs_path}
+	then
+		cvmfs_ldflags="${library_search_result}"
+	else
+		echo "*** Couldn't find $library in ${cvmfs_path}"
+		exit 1
+	fi
 else
 	if [ $config_cvmfs_path = yes ]
 	then
@@ -652,6 +659,8 @@ library_search_mode=prefer_dynamic
 
 if [ $config_readline_path != no ] && library_search readline ${readline_path}
 then
+	external_libraries="${external_libraries} ${library_search_result}"
+
 	if [ ${readline_path} != /usr ]
 	then
 		ccflags="${ccflags} -I${readline_path}/include"
@@ -667,14 +676,25 @@ then
 	if [ $build_sys = LINUX ]
 	then
 		# Remove the -lreadline that was added by "library_search readline" above
-		ldflags=`echo $ldflags | sed "s/-lreadline//"`
+		external_libraries=`echo $external_libraries | sed "s/-lreadline//"`
 
 		# Put the readline flags in a separate variable to be used only where needed.
 		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
 	else 
-		library_search ncurses ${readline_path}
-		library_search termcap ${readline_path}
-		library_search history ${readline_path}
+		if library_search ncurses ${readline_path}
+		then
+			external_libraries="${external_libraries} ${library_search_result}"
+		fi
+
+		if library_search termcap ${readline_path}
+		then
+			external_libraries="${external_libraries} ${library_search_result}"
+		fi
+
+		if library_search history ${readline_path}
+		then
+			external_libraries="${external_libraries} ${library_search_result}"
+		fi
 	fi
 else	
 	echo "*** skipping readline..."
@@ -686,9 +706,10 @@ then
         then
                 if [ x${fuse_path} != x/ -a x${fuse_path} != x/usr ]
                 then
-                        ccflags="${ccflags} -I${fuse_path}/include"
+                        fuse_ccflags="-I${fuse_path}/include"
                 fi
                 ccflags="${ccflags} -DHAS_FUSE"
+				fuse_ldflags="${library_search_result}"
         else
                 if [ $config_fuse_path = yes ]
                 then
@@ -858,8 +879,11 @@ fi
 
 # If python is not found, then leave out weaver.
 
-if [ $python = 0 ]
+if [ $python != 0 -a $python_major_version = 2 -a $python_minor_version -ge 6 ]
 then
+	echo "python version is suitable for weaver"
+else
+	echo "weaver requires python >= 2.6"
 	packages=`echo ${packages} | sed 's/weaver//g'`
 fi
 
@@ -999,29 +1023,37 @@ fi
 
 linker="gcc"
 
-library_search ssl	/usr
-library_search crypto	/usr
-library_search resolv   /usr
-library_search socket   /usr
-library_search nsl      /usr
+library_search_standard()
+{
+	if library_search "$@"
+	then
+		external_libraries="${external_libraries} ${library_search_result}"
+	fi
+}
+
+library_search_standard ssl /usr
+library_search_standard crypto /usr
+library_search_standard resolv /usr
+library_search_standard socket /usr
+library_search_standard nsl /usr
 
 # Finally, add in standard system libraries found everywhere
 
 if [ $build_sys != DARWIN ]
 then
-	external_dynlibs="${external_dynlibs} -lrt"
+	external_libraries="${external_libraries} -lrt"
 fi
 
 if [ $build_sys != FREEBSD ]
 then
-	external_dynlibs="${external_dynlibs} -ldl"
+	external_libraries="${external_libraries} -ldl"
 fi
 
 if library_search z ${zlib_path}
 then
+	external_libraries="${external_libraries} ${library_search_result}"
 	if [ X${zlib_path} != X/usr ]
-	then
-		    
+	then   
 		ccflags="${ccflags} -I${zlib_path}/include"
 		ldflags="${ldflags} -L${zlib_path}/lib"
 	fi
@@ -1033,9 +1065,9 @@ fi
 
 if [ ${build_sys} != CYGWIN ]
 then
-	external_dynlibs="${external_dynlibs} -lstdc++ -lpthread -lz -lc -lm"
+	external_libraries="${external_libraries} -lstdc++ -lpthread -lz -lc -lm"
 else
-	external_dynlibs="${external_dynlibs} -lstdc++ -lpthread -lz -lm"
+	external_libraries="${external_libraries} -lstdc++ -lpthread -lz -lm"
 fi
 
 if [ $build_sys = DARWIN ]
@@ -1065,9 +1097,8 @@ optional_include sys/statvfs.h HAS_SYS_STATVFS_H
 optional_include sys/xattr.h HAS_SYS_XATTR_H
 optional_include syslog.h HAS_SYSLOG_H
 
-
 #if optional_library_function systemd/sd-journal.h sd_journal_print systemd HAS_SYSTEMD_JOURNAL_H; then
-#	external_dynlibs="${external_dynlibs} -lsystemd"
+#	external_libraries="${external_libraries} -lsystemd"
 #fi
 
 cctools_doctargets=
@@ -1164,9 +1195,9 @@ CCTOOLS_CCFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CCFLAG
 
 CCTOOLS_CXX=${CCTOOLS_CXX}
 
-CCTOOLS_BASE_CXXFLAGS=${ccflags}
+CCTOOLS_BASE_CXXFLAGS=\${CCTOOLS_BASE_CCFLAGS}
 
-CCTOOLS_INTERNAL_CXXFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CXXFLAGS}
+CCTOOLS_INTERNAL_CXXFLAGS=\${CCTOOLS_INTERNAL_CCFLAGS}
 
 CCTOOLS_CXXFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CXXFLAGS}
 
@@ -1176,7 +1207,7 @@ CCTOOLS_BASE_LDFLAGS = ${ldflags}
 
 CCTOOLS_INTERNAL_LDFLAGS = \$(CCTOOLS_BASE_LDFLAGS) ${internal_ldflags}
 
-CCTOOLS_EXTERNAL_LINKAGE = ${external_archives} ${external_dynlibs}
+CCTOOLS_EXTERNAL_LINKAGE = ${external_libraries}
 
 CCTOOLS_LDFLAGS = -L\$(CCTOOLS_INSTALL_DIR)/lib \$(CCTOOLS_BASE_LDFLAGS)
 
@@ -1224,6 +1255,23 @@ CCTOOLS_BUILD_LIB32PARROT_HELPER=${build_lib32parrot_helper}
 CCTOOLS_VERSION=${version}
 CCTOOLS_RELEASEDATE=${release_date}
 
+CCTOOLS_IRODS_LDFLAGS=${irods_ldflags}
+CCTOOLS_IRODS_CCFLAGS=${irods_ccflags}
+
+CCTOOLS_MYSQL_LDFLAGS=${mysql_ldflags}
+CCTOOLS_MYSQL_CCFLAGS=${mysql_ccflags}
+
+CCTOOLS_XROOTD_LDFLAGS=${xrootd_ldflags}
+CCTOOLS_XROOTD_CCFLAGS=${xrootd_ccflags}
+
+CCTOOLS_CVMFS_LDFLAGS=${cvmfs_ldflags}
+CCTOOLS_CVMFS_CCFLAGS=${cvmfs_ccflags}
+
+CCTOOLS_FUSE_LDFLAGS=${fuse_ldflags}
+CCTOOLS_FUSE_CCFLAGS=${fuse_ccflags}
+
+CCTOOLS_GLOBUS_LDFLAGS=${globus_ldflags}
+CCTOOLS_GLOBUS_CCFLAGS=${globus_ccflags}
 EOF
 
 echo ""
@@ -1233,5 +1281,6 @@ echo "To build and install, type '${MAKE} install'"
 echo ""
 
 exit 0
+
 
 # vim: set noexpandtab tabstop=4:
