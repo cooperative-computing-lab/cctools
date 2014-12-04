@@ -50,10 +50,13 @@ tracer.table.h: syscall_32.tbl
 	cat $< syscall_parrot.tbl | perl tracer.table.pl header 32 > $@
 
 parrot_run: $(OBJECTS_PARROT_RUN)
-	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(CCTOOLS_IRODS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
+	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(CCTOOLS_IRODS_LDFLAGS) $(CCTOOLS_MYSQL_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 irods_reli.o: irods_reli.cc irods_reli.h
 	$(CCTOOLS_CXX) -o $@ -c $(CCTOOLS_INTERNAL_CXXFLAGS) $< $(CCTOOLS_IRODS_CCFLAGS)
+
+pfs_service_bxgrid.o: pfs_service_bxgrid.cc
+	$(CCTOOLS_CXX) -o $@ -c $(CCTOOLS_INTERNAL_CXXFLAGS) $< $(CCTOOLS_MYSQL_CCFLAGS)
 
 $(UTILITIES): libparrot_client.a
 
