@@ -879,8 +879,11 @@ fi
 
 # If python is not found, then leave out weaver.
 
-if [ $python = 0 ]
+if [ $python != 0 -a $python_major_version = 2 -a $python_minor_version -ge 6 ]
 then
+	echo "python version is suitable for weaver"
+else
+	echo "weaver requires python >= 2.6"
 	packages=`echo ${packages} | sed 's/weaver//g'`
 fi
 
