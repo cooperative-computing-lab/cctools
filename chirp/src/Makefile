@@ -3,8 +3,10 @@ include ../../rules.mk
 
 # We only use sqlite3 multi-process (i.e. no threads). So we can turn off
 # SQLITE_THREADSAFE. This disables somewhat costly mutex locks.
-LOCAL_CCFLAGS = -DSQLITE_THREADSAFE=0 $(CCTOOLS_FUSE_CCFLAGS)
-LOCAL_LINKAGE = $(CCTOOLS_FUSE_LDFLAGS) $(CCTOOLS_GLOBUS_LDFLAGS)
+LOCAL_CCFLAGS = -DSQLITE_THREADSAFE=0
+
+# Globus is needed by all executables via libdttools.a/auth_globus.o
+LOCAL_LINKAGE = $(CCTOOLS_GLOBUS_LDFLAGS)
 
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = libchirp.a
@@ -21,7 +23,13 @@ TARGETS = $(PROGRAMS) $(LIBRARIES)
 all: $(TARGETS)
 
 chirp: chirp_tool.o
-	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE) $(CCTOOLS_READLINE_LDFLAGS)
+	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_READLINE_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE) $(CCTOOLS_READLINE_LDFLAGS)
+
+chirp_fuse: chirp_fuse.o
+	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_FUSE_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
+
+chirp_fuse.o: chirp_fuse.c
+	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $(CCTOOLS_FUSE_CCFLAGS) $<
 
 libchirp.a: $(OBJECTS_LIBRARY)
 
