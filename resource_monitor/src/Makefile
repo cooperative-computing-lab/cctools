@@ -60,7 +60,7 @@ install: all
 	cp $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
-	cp resource_monitor_visualizer_static $(CCTOOLS_INSTALL_DIR)/lib
+	cp -r resource_monitor_visualizer_static $(CCTOOLS_INSTALL_DIR)/lib
 
 test: all
 
