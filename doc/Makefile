@@ -14,16 +14,16 @@ htmlpages: ${HTMLFILES}
 
 manpages: ${ZIPFILES}
 
-apipages: api/html/index.html api/html/work_queue_perl.html api/html/work_queue_task_perl.html
+apipages: api/html/index.html api/html/namespaceWorkQueuePerl.html
 
 api/html/index.html:
 	doxygen cctools.doxygen.config
 
-api/html/work_queue_perl.html:
-	pod2html ../work_queue/src/perl/Work_Queue.pm > $@
-
-api/html/work_queue_task_perl.html:
-	pod2html ../work_queue/src/perl/Work_Queue/Task.pm > $@
+api/html/namespaceWorkQueuePerl.html:
+	mkdir -p api/html
+	cp ../work_queue/src/perl/Work_Queue/namespaceWorkQueuePerl.html $@
+	pod2html ../work_queue/src/perl/Work_Queue/Queue.pm > api/html/work_queue_perl.html
+	pod2html ../work_queue/src/perl/Work_Queue/Task.pm  > api/html/work_queue_task_perl.html
 
 %.html: %.m4
 	m4 -DHTML ${CCTOOLS_M4_ARGS} $< > $@

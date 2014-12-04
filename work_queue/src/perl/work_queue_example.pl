@@ -11,7 +11,7 @@
 use strict;
 use warnings;
 
-use Work_Queue;
+use Work_Queue::Queue;
 
 
 # Main program:
@@ -30,8 +30,8 @@ my $gzip_path = find_executable('gzip') || die "Could not find gzip anywhere in 
 # been used by another program, you can try setting port = 0 to use an
 # available port.
 
-my $port = $Work_Queue::WORK_QUEUE_DEFAULT_PORT;
-my $q    = Work_Queue->new($port) || die "Instantiation of Work Queue failed! ($!)\n";
+my $port = $WORK_QUEUE_DEFAULT_PORT;
+my $q    = Work_Queue::Queue->new($port) || die "Instantiation of Work Queue failed! ($!)\n";
 
 print "listening on port $port...\n"; 
 
@@ -56,8 +56,8 @@ for my $infile (@ARGV) {
     # specific. Sometimes you may want to cache an output file if is
     # the input of a later task. Note that remote_name defaults to
     # local_name when absent.
-    $t->specify_input_file(local_name => $infile,   cache => $Work_Queue::WORK_QUEUE_NOCACHE);
-    $t->specify_output_file(local_name => $outfile, cache => $Work_Queue::WORK_QUEUE_NOCACHE);
+    $t->specify_input_file(local_name => $infile,   cache => $WORK_QUEUE_NOCACHE);
+    $t->specify_output_file(local_name => $outfile, cache => $WORK_QUEUE_NOCACHE);
     
     # Once all files has been specified, we are ready to submit the
     # task to the queue.

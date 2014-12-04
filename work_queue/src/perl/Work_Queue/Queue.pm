@@ -15,7 +15,7 @@ use Carp qw(croak);
 use work_queue;
 use Work_Queue::Task;
 
-use Exporter;
+use Exporter qw(import);
 
 our $VERSION = 4.3.0;
 
