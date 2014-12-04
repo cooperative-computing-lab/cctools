@@ -122,6 +122,11 @@ require_function ()
 
 library_search_mode=prefer_dynamic
 
+#
+# library search looks for libraries according to a variety of rules,
+# then returns the result in the global variable library_search_result
+#
+
 library_search()
 {
 	if library_search_normal $@;
@@ -148,6 +153,13 @@ library_search_multiarch()
 
 library_search_normal()
 {
+	local basedir
+	local libdir
+	local dynamic_suffix
+
+	# Must clear out any previous values from the global
+	library_search_result=""
+
 	# If the second argument is root, and we are not careful,
 	# we will end up with a path that has two slashes, which
 	# means something unintended in Windows
@@ -197,7 +209,7 @@ library_search_normal()
 	then
 		if check_file $libdir/lib$1.a
 		then
-			external_libraries="${external_libraries} $libdir/lib$1.a"
+			library_search_result="$libdir/lib$1.a"
 			return 0
 		fi
 	fi
@@ -210,9 +222,10 @@ library_search_normal()
 			# (Adding standard directories to the path has unintended effects.)
 			if [ $libdir != /lib -a $libdir != /lib64 -a $libdir != /usr/lib -a $libdir != /usr/lib64 ]
 			then
-				ldflags="${ldflags} -L$libdir"
+				library_search_result="-L$libdir -l$1"
+			else
+				library_search_result="-l$1"
 			fi
-			external_libraries="${external_libraries} -l$1"
 			return 0
 		fi
 	fi
@@ -221,7 +234,7 @@ library_search_normal()
 	then
 		if check_file $libdir/lib$1.a
 		then
-			external_libraries="${external_libraries} $libdir/lib$1.a"
+			library_search_result="$libdir/lib$1.a"
 			return 0
 		fi
 	fi

@@ -446,18 +446,24 @@ then
 	if check_file ${globus_path}/include/${globus_flavor}/globus_common.h
 	then
 		ccflags="${ccflags} -I${globus_path}/include -I${globus_path}/include/${globus_flavor} -DHAS_GLOBUS_GSS"
-		ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
+		#ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
 		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
 		do
-			library_search ${library}_${globus_flavor} ${globus_path}
+			if library_search ${library}_${globus_flavor} ${globus_path}
+			then
+				external_libraries="${external_libraries} ${library_search_result}"
+			fi
 		done
 	elif check_file ${globus_path}/include/globus/globus_common.h
 	then
 		ccflags="${ccflags} -I${globus_path}/lib/globus/include -I${globus_path}/include/globus -DHAS_GLOBUS_GSS"
-		ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
+		#ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
 		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
 		do
-			library_search $library ${globus_path}
+			if library_search $library ${globus_path}
+			then
+				external_libraries="${external_libraries} ${library_search_result}"
+			fi
 		done
 	else
 		if [ $config_globus_path = yes ]
@@ -485,8 +491,10 @@ then
 
 		for d in ${irods_path}/lib/*/include ${irods_path}/server/*/include
 		do
-			ccflags="${ccflags} -I$d"
+			irods_ccflags="${irods_ccflags} -I$d"
 		done
+
+		irods_ldflags="${library_search_result}"
 
 	elif library_search RodsAPIs "${irods_path}/iRODS/lib/core/obj"
 	then
@@ -500,14 +508,16 @@ then
 		# for .hpp files instead of .h files.
 
 		ccflags="${ccflags} -DHAS_IRODS -DIRODS_USES_PLUGINS -DIRODS_USES_HPP"
-		ldflags="-rdynamic"
+		ldflags="${ldflags} -rdynamic"
 
 		echo "*** warning: irods 4.0 requires plugins installed in /var/lib"
 
 		for d in ${irods_path}/iRODS/lib/*/include ${irods_path}/iRODS/server/*/include
 		do
-			ccflags="${ccflags} -I$d"
+			irods_ccflags="${irods_ccflags} -I$d"
 		done
+
+		irods_ldflags="${library_search_result}"
 
 		# irods 4.x depends on a specific version of boost:
 
@@ -526,7 +536,7 @@ then
 			if [ -f $lib ]
 			then
 				echo "found $lib"
-				external_libraries="${external_libraries} $lib"
+				irods_ldflags="${irods_ldflags} $lib"
 			fi
 		done
 
@@ -539,7 +549,7 @@ then
 
 		echo "found irods jansson in $jansson_path"
 		jansson_lib="${jansson_path}/src/.libs"
-		external_libraries="${external_libraries} ${jansson_lib}/libjansson.a"
+		irods_ldflags="${irods_ldflags} ${jansson_lib}/libjansson.a"
 
 	elif [ $config_irods_path = yes ]
 	then
@@ -555,6 +565,8 @@ fi
 
 if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql
 then
+	external_libraries="${external_libraries} ${library_search_result}"
+
 	if [ ${mysql_path} != /usr ]
 	then
 		ccflags="${ccflags} -I${mysql_path}/include"
@@ -603,8 +615,10 @@ then
 
 	for library in XrdPosix XrdClient XrdSys XrdNet XrdNetUtil XrdOuc
 	do
-		if ! library_search $library ${xrootd_path} ${xrootd_arch}
+		if library_search $library ${xrootd_path} ${xrootd_arch}
 		then
+			external_libraries="${external_libraries} ${library_search_result}"
+		else
 			echo "*** Couldn't find $library in ${xrootd_path}"
 			exit 1
 		fi
@@ -625,14 +639,13 @@ if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/include/libcvmfs.h
 then
 	ccflags="${ccflags} -I${cvmfs_path}/include -DHAS_CVMFS"
 
-	for library in cvmfs 
-	do
-		if ! library_search $library ${cvmfs_path}
-		then
-			echo "*** Couldn't find $library in ${cvmfs_path}"
-			exit 1
-		fi
-	done
+	if library_search cvmfs ${cvmfs_path}
+	then
+		external_libraries="${external_libraries} ${library_search_result}"
+	else
+		echo "*** Couldn't find $library in ${cvmfs_path}"
+		exit 1
+	fi
 else
 	if [ $config_cvmfs_path = yes ]
 	then
@@ -652,6 +665,8 @@ library_search_mode=prefer_dynamic
 
 if [ $config_readline_path != no ] && library_search readline ${readline_path}
 then
+	external_libraries="${external_libraries} ${library_search_result}"
+
 	if [ ${readline_path} != /usr ]
 	then
 		ccflags="${ccflags} -I${readline_path}/include"
@@ -667,14 +682,25 @@ then
 	if [ $build_sys = LINUX ]
 	then
 		# Remove the -lreadline that was added by "library_search readline" above
-		ldflags=`echo $ldflags | sed "s/-lreadline//"`
+		external_libraries=`echo $external_libraries | sed "s/-lreadline//"`
 
 		# Put the readline flags in a separate variable to be used only where needed.
 		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
 	else 
-		library_search ncurses ${readline_path}
-		library_search termcap ${readline_path}
-		library_search history ${readline_path}
+		if library_search ncurses ${readline_path}
+		then
+			external_libraries="${external_libraries} ${library_search_result}"
+		fi
+
+		if library_search termcap ${readline_path}
+		then
+			external_libraries="${external_libraries} ${library_search_result}"
+		fi
+
+		if library_search history ${readline_path}
+		then
+			external_libraries="${external_libraries} ${library_search_result}"
+		fi
 	fi
 else	
 	echo "*** skipping readline..."
@@ -689,6 +715,7 @@ then
                         ccflags="${ccflags} -I${fuse_path}/include"
                 fi
                 ccflags="${ccflags} -DHAS_FUSE"
+				external_libraries="${external_libraries} ${library_search_result}"
         else
                 if [ $config_fuse_path = yes ]
                 then
@@ -999,11 +1026,19 @@ fi
 
 linker="gcc"
 
-library_search ssl	/usr
-library_search crypto	/usr
-library_search resolv   /usr
-library_search socket   /usr
-library_search nsl      /usr
+library_search_standard()
+{
+	if library_search "$@"
+	then
+		external_libraries="${external_libraries} ${library_search_result}"
+	fi
+}
+
+library_search_standard ssl /usr
+library_search_standard crypto /usr
+library_search_standard resolv /usr
+library_search_standard socket /usr
+library_search_standard nsl /usr
 
 # Finally, add in standard system libraries found everywhere
 
@@ -1019,9 +1054,9 @@ fi
 
 if library_search z ${zlib_path}
 then
+	external_libraries="${external_libraries} ${library_search_result}"
 	if [ X${zlib_path} != X/usr ]
-	then
-		    
+	then   
 		ccflags="${ccflags} -I${zlib_path}/include"
 		ldflags="${ldflags} -L${zlib_path}/lib"
 	fi
@@ -1066,7 +1101,7 @@ optional_include sys/xattr.h HAS_SYS_XATTR_H
 optional_include syslog.h HAS_SYSLOG_H
 
 #if optional_library_function systemd/sd-journal.h sd_journal_print systemd HAS_SYSTEMD_JOURNAL_H; then
-#	external_dynlibs="${external_dynlibs} -lsystemd"
+#	external_libraries="${external_libraries} -lsystemd"
 #fi
 
 cctools_doctargets=
@@ -1222,6 +1257,9 @@ CCTOOLS_BUILD_LIB32PARROT_HELPER=${build_lib32parrot_helper}
 
 CCTOOLS_VERSION=${version}
 CCTOOLS_RELEASEDATE=${release_date}
+
+CCTOOLS_IRODS_LDFLAGS=${irods_ldflags}
+CCTOOLS_IRODS_CCFLAGS=${irods_ccflags}
 
 EOF
 
