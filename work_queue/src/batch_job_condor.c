@@ -23,9 +23,9 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	if(!string_istrue(hash_table_lookup(q->options, "skip-afs-check"))) {
 		char *cwd = path_getcwd();
 		if(!strncmp(cwd, "/afs", 4)) {
-			debug(D_NOTICE|D_BATCH, "makeflow: This won't work because Condor is not able to write to files in AFS.\n");
-			debug(D_NOTICE|D_BATCH, "makeflow: Instead, run makeflow from a local disk like /tmp.\n");
-			debug(D_NOTICE|D_BATCH, "makeflow: Or, use the Work Queue with -T wq and condor_submit_workers.\n");
+			debug(D_NOTICE|D_BATCH, "This won't work because Condor is not able to write to files in AFS.");
+			debug(D_NOTICE|D_BATCH, "Instead, run makeflow from a local disk like /tmp.");
+			debug(D_NOTICE|D_BATCH, "Or, use the Work Queue with -T wq and condor_submit_workers.");
 			return -1;
 		}
 		free(cwd);
