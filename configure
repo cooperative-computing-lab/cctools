@@ -638,11 +638,12 @@ fi
 
 if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/include/libcvmfs.h
 then
-	ccflags="${ccflags} -I${cvmfs_path}/include -DHAS_CVMFS"
+	ccflags="${ccflags} -DHAS_CVMFS"
+	cvmfs_ccflags="-I${cvmfs_path}/include"
 
 	if library_search cvmfs ${cvmfs_path}
 	then
-		external_libraries="${external_libraries} ${library_search_result}"
+		cvmfs_ldflags="${library_search_result}"
 	else
 		echo "*** Couldn't find $library in ${cvmfs_path}"
 		exit 1
@@ -1267,6 +1268,9 @@ CCTOOLS_MYSQL_CCFLAGS=${mysql_ccflags}
 
 CCTOOLS_XROOTD_LDFLAGS=${xrootd_ldflags}
 CCTOOLS_XROOTD_CCFLAGS=${xrootd_ccflags}
+
+CCTOOLS_CVMFS_LDFLAGS=${cvmfs_ldflags}
+CCTOOLS_CVMFS_CCFLAGS=${cvmfs_ccflags}
 EOF
 
 echo ""
