@@ -1065,9 +1065,10 @@ optional_include sys/statvfs.h HAS_SYS_STATVFS_H
 optional_include sys/xattr.h HAS_SYS_XATTR_H
 optional_include syslog.h HAS_SYSLOG_H
 
-if optional_library_function systemd/sd-journal.h sd_journal_print systemd HAS_SYSTEMD_JOURNAL_H; then
-	external_dynlibs="${external_dynlibs} -lsystemd"
-fi
+
+#if optional_library_function systemd/sd-journal.h sd_journal_print systemd HAS_SYSTEMD_JOURNAL_H; then
+#	external_dynlibs="${external_dynlibs} -lsystemd"
+#fi
 
 cctools_doctargets=
 
