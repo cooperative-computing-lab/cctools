@@ -526,7 +526,7 @@ then
 			if [ -f $lib ]
 			then
 				echo "found $lib"
-				external_archives="${external_archives} $lib"
+				external_libraries="${external_libraries} $lib"
 			fi
 		done
 
@@ -539,7 +539,7 @@ then
 
 		echo "found irods jansson in $jansson_path"
 		jansson_lib="${jansson_path}/src/.libs"
-		external_archives="${external_archives} ${jansson_lib}/libjansson.a"
+		external_libraries="${external_libraries} ${jansson_lib}/libjansson.a"
 
 	elif [ $config_irods_path = yes ]
 	then
@@ -1009,12 +1009,12 @@ library_search nsl      /usr
 
 if [ $build_sys != DARWIN ]
 then
-	external_dynlibs="${external_dynlibs} -lrt"
+	external_libraries="${external_libraries} -lrt"
 fi
 
 if [ $build_sys != FREEBSD ]
 then
-	external_dynlibs="${external_dynlibs} -ldl"
+	external_libraries="${external_libraries} -ldl"
 fi
 
 if library_search z ${zlib_path}
@@ -1033,9 +1033,9 @@ fi
 
 if [ ${build_sys} != CYGWIN ]
 then
-	external_dynlibs="${external_dynlibs} -lstdc++ -lpthread -lz -lc -lm"
+	external_libraries="${external_libraries} -lstdc++ -lpthread -lz -lc -lm"
 else
-	external_dynlibs="${external_dynlibs} -lstdc++ -lpthread -lz -lm"
+	external_libraries="${external_libraries} -lstdc++ -lpthread -lz -lm"
 fi
 
 if [ $build_sys = DARWIN ]
@@ -1064,7 +1064,6 @@ optional_include sys/statfs.h HAS_SYS_STATFS_H
 optional_include sys/statvfs.h HAS_SYS_STATVFS_H
 optional_include sys/xattr.h HAS_SYS_XATTR_H
 optional_include syslog.h HAS_SYSLOG_H
-
 
 #if optional_library_function systemd/sd-journal.h sd_journal_print systemd HAS_SYSTEMD_JOURNAL_H; then
 #	external_dynlibs="${external_dynlibs} -lsystemd"
@@ -1176,7 +1175,7 @@ CCTOOLS_BASE_LDFLAGS = ${ldflags}
 
 CCTOOLS_INTERNAL_LDFLAGS = \$(CCTOOLS_BASE_LDFLAGS) ${internal_ldflags}
 
-CCTOOLS_EXTERNAL_LINKAGE = ${external_archives} ${external_dynlibs}
+CCTOOLS_EXTERNAL_LINKAGE = ${external_libraries}
 
 CCTOOLS_LDFLAGS = -L\$(CCTOOLS_INSTALL_DIR)/lib \$(CCTOOLS_BASE_LDFLAGS)
 
