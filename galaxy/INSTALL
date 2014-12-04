@@ -37,7 +37,10 @@ mkdir picard
 mv broadinstitute-picard-*/* broadinstitute-picard-*/.[^.]* picard
 cd picard
 git clone https://github.com/samtools/htsjdk.git
+
+# $JAVA_HOME must be pointing to a JDK, preferrably for 1.6, but it is compatible with 1.7
 ant
+
 # Clean
 cd ..
 rm master
