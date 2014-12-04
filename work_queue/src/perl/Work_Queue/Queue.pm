@@ -6,7 +6,7 @@
 
 ### See module documentation at the end of this file.
 
-package Work_Queue;
+package Work_Queue::Queue;
 
 use strict;
 use warnings;
@@ -15,19 +15,23 @@ use Carp qw(croak);
 use work_queue;
 use Work_Queue::Task;
 
+use Exporter;
+
 our $VERSION = 4.3.0;
+
+our @EXPORT = qw($WORK_QUEUE_DEFAULT_PORT $WORK_QUEUE_RANDOM_PORT $WORK_QUEUE_WAITFORTASK $WORK_QUEUE_SCHEDULE_UNSET $WORK_QUEUE_SCHEDULE_FCFS $WORK_QUEUE_SCHEDULE_FILES $WORK_QUEUE_SCHEDULE_TIME $WORK_QUEUE_SCHEDULE_RAND $WORK_QUEUE_INPUT $WORK_QUEUE_OUTPUT $WORK_QUEUE_NOCACHE $WORK_QUEUE_CACHE $WORK_QUEUE_SYMLINK $WORK_QUEUE_PREEXIST $WORK_QUEUE_THIRDGET $WORK_QUEUE_THIRDPUT $WORK_QUEUE_WATCH $WORK_QUEUE_RESET_ALL $WORK_QUEUE_RESET_KEEP_TASKS $WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL $WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT $WORK_QUEUE_RESULT_SUCCESS $WORK_QUEUE_RESULT_INPUT_MISSING $WORK_QUEUE_RESULT_OUTPUT_MISSING $WORK_QUEUE_RESULT_STDOUT_MISSING $WORK_QUEUE_RESULT_SIGNAL $WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION $WORK_QUEUE_RESULT_TASK_TIMEOUT);
 
 local $SIG{INT} = sub {
     croak "Got terminate signal!\n";
 };
 
-sub Work_Queue::new {
+sub Work_Queue::Queue::new {
     my $class = shift;
 
     unshift @_, 'port' if @_ == 1;
     my %args = @_;
 
-    $args{port} //= $Work_Queue::WORK_QUEUE_DEFAULT_PORT;
+    $args{port} //= $WORK_QUEUE_DEFAULT_PORT;
 
     my $_work_queue = work_queue::work_queue_create($args{port});
     croak "Could not create a work queue on port $args{port}" unless $_work_queue;
@@ -233,7 +237,7 @@ The SWIG-based Perl bindings provide a higher-level interface, such as:
 
         use Work_Queue;
 
-        my $q = Work_Queue->new( port => $port, name => 'my_queue_name');
+        my $q = Work_Queue::Queue->new( port => $port, name => 'my_queue_name');
 
         my $t = Work_Queue::Task->new($command);
         $t->specify_input_file(local_name => 'some_name', remote_name => 'some_other_name');
@@ -363,13 +367,13 @@ One of the following algorithms to use in assigning a task to a worker:
 
 =over 24
 
-=item $Work_Queue::WORK_QUEUE_SCHEDULE_FCFS
+=item $WORK_QUEUE_SCHEDULE_FCFS
 
-=item $Work_Queue::WORK_QUEUE_SCHEDULE_FILES
+=item $WORK_QUEUE_SCHEDULE_FILES
 
-=item $Work_Queue::WORK_QUEUE_SCHEDULE_TIME
+=item $WORK_QUEUE_SCHEDULE_TIME
 
-=item $Work_Queue::WORK_QUEUE_SCHEDULE_RAND
+=item $WORK_QUEUE_SCHEDULE_RAND
 
 =back
 
@@ -387,9 +391,9 @@ One of the following algorithms to use in dispatching
 
 =over 24
 
-=item $Work_Queue::WORK_QUEUE_TASK_ORDER_FIFO
+=item $WORK_QUEUE_TASK_ORDER_FIFO
 
-=item $Work_Queue::WORK_QUEUE_TASK_ORDER_LIFO
+=item $WORK_QUEUE_TASK_ORDER_LIFO
 
 =back
 
@@ -431,9 +435,9 @@ This may be one of the following values:
 
 =over 24
 
-=item $Work_Queue::WORK_QUEUE_MASTER_MODE_STANDALONE
+=item $WORK_QUEUE_MASTER_MODE_STANDALONE
 
-=item $Work_Queue::WORK_QUEUE_MASTER_MODE_CATALOG.
+=item $WORK_QUEUE_MASTER_MODE_CATALOG.
 
 =back
 
@@ -639,7 +643,7 @@ This call will block until the timeout has elapsed
 
 The number of seconds to wait for a completed task back before
 returning.  Use an integer to set the timeout or the constant
-$Work_Queue::WORK_QUEUE_WAITFORTASK to block until a task has
+$WORK_QUEUE_WAITFORTASK to block until a task has
 completed.
 
 =back
@@ -653,5 +657,4 @@ completed.
                 }
                 ...
         }
-=cut
 
