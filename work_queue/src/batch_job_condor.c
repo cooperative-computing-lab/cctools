@@ -59,6 +59,7 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "notification = never\n");
 	fprintf(file, "copy_to_spool = true\n");
 	fprintf(file, "transfer_executable = true\n");
+	fprintf(file, "keep_claim_idle = 30\n");
 	fprintf(file, "log = %s\n", q->logfile);
 	if(options)
 		fprintf(file, "%s\n", options);
