@@ -112,7 +112,14 @@ TEST_PROGRAMS = auth_test microbench multirun
 all: $(TARGETS)
 
 libdttools.a: $(OBJECTS)
+
 $(PROGRAMS) $(TEST_PROGRAMS): $(LIBRARIES)
+
+auth_globus.o: auth_globus.c
+	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $(CCTOOLS_GLOBUS_CCFLAGS) $<
+
+auth_test: auth_test.o libdttools.a
+	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 clean:
 	rm -f $(OBJECTS) $(TARGETS)

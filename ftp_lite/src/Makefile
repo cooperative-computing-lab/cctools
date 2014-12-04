@@ -1,6 +1,9 @@
 include ../../config.mk
 include ../../rules.mk
 
+LOCAL_CCFLAGS=$(CCTOOLS_GLOBUS_CCFLAGS)
+LOCAL_LINKAGE=$(CCTOOLS_GLOBUS_LDFLAGS)
+
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 HEADERS_PUBLIC = ftp_lite.h
 LIBRARIES = libftp_lite.a
