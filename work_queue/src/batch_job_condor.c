@@ -28,7 +28,7 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 			debug(D_NOTICE|D_BATCH, "Instead, run makeflow from a local disk like /tmp.");
 			debug(D_NOTICE|D_BATCH, "Or, use the Work Queue with -T wq and condor_submit_workers.");
 			free(cwd);
-			return -1;
+			exit(EXIT_FAILURE);
 		}
 		free(cwd);
 	}
