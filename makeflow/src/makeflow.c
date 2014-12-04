@@ -1479,9 +1479,10 @@ int main(int argc, char *argv[])
 	set_makeflow_exe(argv[0]);
 	debug_config(get_makeflow_exe());
 
-	cctools_version_debug((long) D_MAKEFLOW_RUN, get_makeflow_exe());
+	cctools_version_debug(D_DEBUG, get_makeflow_exe());
 	const char *dagfile;
-
+	char *change_dir = NULL;
+	int chdir_mode = 0;
 	char *batchlogfilename = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	char *catalog_host;
@@ -1602,10 +1603,11 @@ int main(int argc, char *argv[])
 		{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
 		{"zero-length-error", no_argument, 0, 'z'},
+		{"change-directory", required_argument, 0, 'X'},
 		{0, 0, 0, 0}
 	};
 
-	static const char option_string_run[] = "aAB:cC:d:EfF:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:";
+	static const char option_string_run[] = "aAB:cC:d:EfF:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:X:zZ:";
 	while((c = getopt_long(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
 		switch (c) {
 			case 'a':
@@ -1638,8 +1640,7 @@ int main(int argc, char *argv[])
 				// This option is deprecated. Capacity estimation is now on by default.
 				break;
 			case LONG_OPT_AUTH:
-				if (!auth_register_byname(optarg))
-					fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
+				auth_register_byname(optarg);
 				did_explicit_auth = 1;
 				break;
 			case LONG_OPT_TICKETS:
@@ -1774,6 +1775,7 @@ int main(int argc, char *argv[])
 					return 1;
 				}
 				break;
+			
 			case 'z':
 				output_len_check = 1;
 				break;
@@ -1822,11 +1824,19 @@ int main(int argc, char *argv[])
 			default:
 				show_help_run(get_makeflow_exe());
 				return 1;
+			case 'X':
+				change_dir = optarg;
+				chdir_mode = 1;
+				break;
+			
 		}
 	}
 
 	if(!did_explicit_auth)
-		auth_register_all();
+		{
+			auth_register_all();
+		}
+	
 	if(chirp_tickets) {
 		auth_ticket_load(chirp_tickets);
 		free(chirp_tickets);
@@ -1834,7 +1844,7 @@ int main(int argc, char *argv[])
 		auth_ticket_load(NULL);
 	}
 
-	if((argc - optind) != 1) {
+	if((argc - optind) != 1) {	
 		int rv = access("./Makeflow", R_OK);
 		if(rv < 0) {
 			fprintf(stderr, "makeflow: No makeflow specified and file \"./Makeflow\" could not be found.\n");
@@ -1870,7 +1880,11 @@ int main(int argc, char *argv[])
 	}
 
 	if(!logfilename)
-		logfilename = string_format("%s.makeflowlog", dagfile);
+		
+			logfilename = string_format("%s.makeflowlog", dagfile);
+			
+		
+	
 	if(!batchlogfilename) {
 		switch (batch_queue_type) {
 			case BATCH_QUEUE_TYPE_CONDOR:
@@ -1882,6 +1896,7 @@ int main(int argc, char *argv[])
 			default:
 				batchlogfilename = string_format("%s.batchlog", dagfile);
 				break;
+		
 		}
 
 		// In clean mode, delete all existing log files
@@ -1898,6 +1913,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
+		
+	
 	if(monitor_mode) {
 		if(!monitor_log_dir)
 			fatal("Monitor mode was enabled, but a log output directory was not specified (use -M<dir>)");
@@ -1911,7 +1928,9 @@ int main(int argc, char *argv[])
 			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
 	}
 
+	
 	struct dag *d = dag_from_file(dagfile);
+	/*dag_from_file fopen in makeflow.commom.c*/
 	if(!d) {
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
@@ -1965,7 +1984,8 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "makeflow: perhaps port %d is already in use?\n", port);
 		exit(EXIT_FAILURE);
 	}
-
+	
+	
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
 	batch_queue_set_option(remote_queue, "batch-options", batch_submit_options);
 	batch_queue_set_option(remote_queue, "skip-afs-check", skip_afs_check ? "yes" : "no");
@@ -1980,9 +2000,13 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 
+<<<<<<< HEAD
 	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP ||
 	   batch_queue_type == BATCH_QUEUE_TYPE_HADOOP ||
 	   batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
+=======
+	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP || batch_queue_type == BATCH_QUEUE_TYPE_HADOOP) {
+>>>>>>> Continued editing on makeflow_chdir_added
 		local_queue = 0; /* all local jobs must be run on Chirp */
 		if(dag_gc_method == DAG_GC_ON_DEMAND /* NYI */ ) {
 			dag_gc_method = DAG_GC_REF_COUNT;
@@ -2003,12 +2027,16 @@ int main(int argc, char *argv[])
 
 	dag_prepare_nested_jobs(d);
 
+<<<<<<< HEAD
 	if(clean_mode) {
 		dag_clean(d);
 		unlink(logfilename);
 		unlink(batchlogfilename);
 		exit(0);
 	}
+=======
+
+>>>>>>> Continued editing on makeflow_chdir_added
 
 	if(!dag_check(d)) {
 		exit(EXIT_FAILURE);
@@ -2019,9 +2047,26 @@ int main(int argc, char *argv[])
 
 	setlinebuf(stdout);
 	setlinebuf(stderr);
+	
+	if(write_summary_to || email_summary_to)
+		
+		create_summary(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile);
+	
+	if (chdir_mode == 1)
+	 	chdir(change_dir);
+	 	
+	if(clean_mode) {
+		dag_clean(d);
+		unlink(logfilename);
+		unlink(batchlogfilename);
+		free(logfilename);
+		free(batchlogfilename);
+		return 0;
+	}
 
+		
 	dag_log_recover(d, logfilename);
-
+	
 	port = batch_queue_port(remote_queue);
 	if(work_queue_port_file)
 		opts_write_port_file(work_queue_port_file, port);
@@ -2046,8 +2091,18 @@ int main(int argc, char *argv[])
 		clean_symlinks(d, 0);
 	}
 
+<<<<<<< HEAD
 	if(write_summary_to || email_summary_to)
 		create_summary(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile);
+=======
+
+		
+	
+	free(logfilename);
+	free(batchlogfilename);
+	free(write_summary_to);
+	free(email_summary_to);
+>>>>>>> Continued editing on makeflow_chdir_added
 
 	if(dag_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
@@ -2056,11 +2111,21 @@ int main(int argc, char *argv[])
 	} else if(dag_failed_flag) {
 		fprintf(d->logfile, "# FAILED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "workflow failed.\n");
+<<<<<<< HEAD
 		exit(EXIT_FAILURE);
 	} else {
 		fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "nothing left to do.\n");
 		exit(EXIT_SUCCESS);
+=======
+	
+		return 1;
+	} else {
+		fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
+		fprintf(stderr, "nothing left to do.\n");
+		return 0;
+		
+>>>>>>> Continued editing on makeflow_chdir_added
 	}
 
 	return 0;
