@@ -347,7 +347,7 @@ int lexer_peek_remote_rename_syntax(struct lexer *lx)
 /* Read characters until a character in char_set is found. (exclusive) */
 /* Returns the count of characters that we would have to roll-back to
    undo the read. */
-int lexer_read_until(struct lexer *lx, char *char_set)
+int lexer_read_until(struct lexer *lx, const char *char_set )
 {
 	int count = 0;
 	char c;
@@ -458,7 +458,7 @@ int lexer_read_literal(struct lexer * lx)
 
 struct token *lexer_read_literal_in_expandable_until(struct lexer *lx, char end_marker)
 {
-	char end_markers[7] = { end_marker, '$', '\\', '"', '\'', '#', CHAR_EOF };
+	const char end_markers[8] = { end_marker, '$', '\\', '"', '\'', '#', CHAR_EOF ,0};
 
 	int count = 0;
 	do {
@@ -773,20 +773,20 @@ struct list *lexer_read_file_list_aux(struct lexer *lx)
 
 	lexer_discard_white_space(lx);
 
-	struct token *t;
-	do {
-		t = lexer_read_file(lx);
-		if(!t)
-			break;
+	while(1) {
+		struct token *t = lexer_read_file(lx);
+		if(!t) break;
 
 		//Do substitution recursively
 		if(t->type == TOKEN_SUBSTITUTION) {
 			tokens = list_splice(tokens, lexer_expand_substitution(lx, t, lexer_read_file_list_aux));
 			lexer_free_token(t);
+			continue;
 		} else {
 			list_push_tail(tokens, t);
+			if(t->type==TOKEN_NEWLINE) break;
 		}
-	} while(t->type != TOKEN_NEWLINE);
+	}
 
 	return tokens;
 }
@@ -930,20 +930,20 @@ struct list *lexer_read_command_aux(struct lexer *lx)
 	}
 
 	/* Read all command tokens. Note that we read from lx, but put in lx_c. */
-	struct token *t;
-
-	do {
-		t = lexer_read_command_argument(lx);
+	while(1) {
+		struct token *t = lexer_read_command_argument(lx);
 		if(!t)
 			break;
 
 		if(t->type == TOKEN_SUBSTITUTION) {
 			tokens = list_splice(tokens, lexer_expand_substitution(lx, t, lexer_read_command_aux));
 			lexer_free_token(t);
+			continue;
 		} else {
 			list_push_tail(tokens, t);
+			if(t->type==TOKEN_NEWLINE) break;
 		}
-	} while(t->type != TOKEN_NEWLINE);
+	}
 
 	return tokens;
 }
