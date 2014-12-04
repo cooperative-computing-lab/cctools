@@ -71,7 +71,6 @@ include_package_makeflow="makeflow"
 include_package_ftplite="ftp_lite"
 include_package_chirp="chirp"
 include_package_resource_monitor="resource_monitor"
-include_package_makeflow_linker="makeflow_linker"
 include_package_weaver="weaver"
 include_package_doc="doc"
 
@@ -258,9 +257,6 @@ do
 		--without-system-resource_monitor)
 			include_package_resource_monitor=""
 			;;
-		--without-system-makeflow-linker)
-			include_package_makeflow_linker=""
-			;;
 		--without-system-weaver)
 		        include_package_weaver=""
 		        ;;
@@ -321,7 +317,6 @@ And SYSTEM may be:
     chirp
     parrot
     resource_monitor
-    makeflow_linker
     doc
 EOF
 			exit 0
@@ -341,7 +336,7 @@ fi
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_makeflow_linker} ${include_package_chirp} ${include_package_weaver} ${include_package_doc}"
+potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_doc}"
 
 check_multiarch
 
