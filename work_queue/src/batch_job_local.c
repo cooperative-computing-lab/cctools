@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <signal.h>
 
-static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
+static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct list *envlist )
 {
 	batch_job_id_t jobid;
 
@@ -39,24 +39,22 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 
 		/*
 		Add the desired environment to the child process.
-		Note that envlist is a const argument, so we strdup
-		to be sure we have a writable string. setenv copies
-		the values into the environment.
+		setenv copies the values into the environment.
 		*/
 
 		if(envlist) {
-			char *list = strdup(envlist);
-			char *name = strtok(list,";");
-			while(name) {
+			char *e;
+			list_first_item(envlist);
+			while((e=list_next_item(envlist))) {
+				char *name = strdup(e);
 				char *value = strchr(name,'=');
 				if(value) {
 					*value = 0;
-					setenv(name,value+1,1);
-					*value = '=';
+					value++;
+					setenv(name,value,1);
 				}
-				name = strtok(0,";");
+				free(name);
 			}
-			free(list);
 		}
 
 		/** A note from "man system 3" as of Jan 2012:
