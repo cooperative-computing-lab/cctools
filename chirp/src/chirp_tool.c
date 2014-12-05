@@ -1302,7 +1302,7 @@ int main(int argc, char *argv[])
 
 				if(user_argv)
 					free(user_argv);
-				string_split(start, &user_argc, &user_argv);
+				string_split_quotes(start, &user_argc, &user_argv);
 				if(user_argc == 0) {
 					start++;
 					continue;
