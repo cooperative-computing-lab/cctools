@@ -32,7 +32,7 @@ static struct batch_queue_module batch_queue_unknown = {
 
 	NULL, NULL, NULL, NULL,
 
-	{NULL, NULL, NULL, NULL},
+	{NULL, NULL, NULL},
 
 	{NULL, NULL, NULL, NULL, NULL, NULL},
 };
@@ -160,11 +160,6 @@ const char *batch_queue_type_string()
 	return BATCH_JOB_SYSTEMS;
 }
 
-
-batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files, const char *envlist )
-{
-	return q->module->job.submit(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files, envlist );
-}
 
 batch_job_id_t batch_job_submit_simple(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist)
 {

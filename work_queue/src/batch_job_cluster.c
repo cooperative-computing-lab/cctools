@@ -156,30 +156,6 @@ static batch_job_id_t batch_job_cluster_submit_simple (struct batch_queue * q, c
 	return -1;
 }
 
-static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files, const char *envlist )
-{
-	char *command = string_format("%s %s", cmd, args);
-	if (infile) {
-		char *new = string_format("%s <%s", command, infile);
-		free(command);
-		command = new;
-	}
-	if (outfile) {
-		char *new = string_format("%s >%s", command, outfile);
-		free(command);
-		command = new;
-	}
-	if (errfile) {
-		char *new = string_format("%s 2>%s", command, errfile);
-		free(command);
-		command = new;
-	}
-
-	batch_job_id_t status = batch_job_cluster_submit_simple(q, command, extra_input_files, extra_output_files,envlist);
-	free(command);
-	return status;
-}
-
 static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	struct batch_job_info *info;
@@ -340,7 +316,6 @@ const struct batch_queue_module batch_queue_cluster = {
 	batch_queue_cluster_option_update,
 
 	{
-		batch_job_cluster_submit,
 		batch_job_cluster_submit_simple,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,
@@ -366,7 +341,6 @@ const struct batch_queue_module batch_queue_moab = {
 	batch_queue_cluster_option_update,
 
 	{
-		batch_job_cluster_submit,
 		batch_job_cluster_submit_simple,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,
@@ -392,7 +366,6 @@ const struct batch_queue_module batch_queue_sge = {
 	batch_queue_cluster_option_update,
 
 	{
-		batch_job_cluster_submit,
 		batch_job_cluster_submit_simple,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,
@@ -418,7 +391,6 @@ const struct batch_queue_module batch_queue_torque = {
 	batch_queue_cluster_option_update,
 
 	{
-		batch_job_cluster_submit,
 		batch_job_cluster_submit_simple,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,

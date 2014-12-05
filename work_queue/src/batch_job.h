@@ -66,20 +66,6 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type);
 */
 batch_job_id_t batch_job_submit_simple(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, const char *envlist );
 
-/** Submit a batch job.
-@param q The queue to submit to.
-@param cmd The command to execute.
-@param args The command line arguments.
-@param infile The standard input file.
-@param outfile The standard output file.
-@param errfile The standard error file.
-@param extra_input_files A comma separated list of extra input files that will be required by the job.  Null pointer is equivalent to empty string.
-@param extra_output_files A comma separated list of extra output files to retrieve from the job.  Null pointer is equivalent to empty string.
-@param envlist A semicolon separated list of environment variables to be applied to the job. PARAM=10;PLATFORM=linux
-@return On success, returns a unique positive jobid.  Zero or a negative number indicates a failure to submit this job.
-*/
-batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files, const char *envlist );
-
 /** Wait for any batch job to complete.
 Blocks until a batch job completes.
 @param q The queue to wait on.

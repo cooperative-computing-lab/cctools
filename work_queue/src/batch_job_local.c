@@ -76,26 +76,6 @@ static batch_job_id_t batch_job_local_submit_simple (struct batch_queue *q, cons
 	return -1;
 }
 
-static batch_job_id_t batch_job_local_submit (struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files, const char *envlist )
-{
-	if(cmd == NULL)
-		cmd = "/bin/false";
-	if(args == NULL)
-		args = "";
-	if(infile == NULL)
-		infile = "/dev/null";
-	if(outfile == NULL)
-		outfile = "/dev/null";
-	if(errfile == NULL)
-		errfile = "/dev/null";
-
-	char *command = string_format("%s %s <%s >%s 2>%s", cmd, args, infile, outfile, errfile);
-
-	batch_job_id_t status = batch_job_local_submit_simple(q, command, extra_input_files, extra_output_files, envlist );
-	free(command);
-	return status;
-}
-
 static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	while(1) {
@@ -182,7 +162,6 @@ const struct batch_queue_module batch_queue_local = {
 	batch_queue_local_option_update,
 
 	{
-		batch_job_local_submit,
 		batch_job_local_submit_simple,
 		batch_job_local_wait,
 		batch_job_local_remove,
