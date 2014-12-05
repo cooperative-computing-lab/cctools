@@ -1305,6 +1305,7 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
 	fprintf(stdout, "Frequently used options:\n\n");
 	fprintf(stdout, " %-30s Clean up: remove logfile and all targets.\n", "-c,--clean");
+	fprintf(stdout, " %-30s Change directory: chdir to enable executing the Makefile in other directory.\n", "-X,--change-directory");
 	fprintf(stdout, " %-30s Batch system type: (default is local)\n", "-T,--batch-type=<type>");
 	fprintf(stdout, " %-30s %s\n\n", "", batch_queue_type_string());
 	fprintf(stdout, "Other options are:\n");
