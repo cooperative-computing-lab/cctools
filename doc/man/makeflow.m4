@@ -38,6 +38,7 @@ OPTION_TRIPLET(-f, summary-log, file)Write summary of workflow to file.
 OPTION_ITEM(`-h, --help')Show this help screen.
 OPTION_TRIPLET(-m, email, email)Email summary of workflow to address.
 OPTION_ITEM(`-v, --version')Show version string.
+OPTION_TRIPLET(-X, chdir, directory)Chdir to enable executing the Makefile in other directory.
 OPTIONS_END
 
 SUBSECTION(Batch Options)

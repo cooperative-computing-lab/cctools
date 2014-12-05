@@ -1305,6 +1305,7 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
 	fprintf(stdout, "Frequently used options:\n\n");
 	fprintf(stdout, " %-30s Clean up: remove logfile and all targets.\n", "-c,--clean");
+	fprintf(stdout, " %-30s Change directory: chdir to enable executing the Makefile in other directory.\n", "-X,--change-directory");
 	fprintf(stdout, " %-30s Batch system type: (default is local)\n", "-T,--batch-type=<type>");
 	fprintf(stdout, " %-30s %s\n\n", "", batch_queue_type_string());
 	fprintf(stdout, "Other options are:\n");
@@ -1481,7 +1482,7 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug((long) D_MAKEFLOW_RUN, get_makeflow_exe());
 	const char *dagfile;
-
+	char *change_dir;
 	char *batchlogfilename = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	char *catalog_host;
@@ -1602,10 +1603,11 @@ int main(int argc, char *argv[])
 		{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
 		{"zero-length-error", no_argument, 0, 'z'},
+		{"change-directory", required_argument, 0, 'X'},
 		{0, 0, 0, 0}
 	};
 
-	static const char option_string_run[] = "aAB:cC:d:EfF:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:";
+	static const char option_string_run[] = "aAB:cC:d:EfF:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:X:zZ:";
 	while((c = getopt_long(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
 		switch (c) {
 			case 'a':
@@ -1822,6 +1824,9 @@ int main(int argc, char *argv[])
 			default:
 				show_help_run(get_makeflow_exe());
 				return 1;
+			case 'X':
+				change_dir = optarg;
+				break;
 		}
 	}
 
@@ -2002,6 +2007,8 @@ int main(int argc, char *argv[])
 		dag_prepare_gc(d);
 
 	dag_prepare_nested_jobs(d);
+	
+	chdir(change_dir);
 
 	if(clean_mode) {
 		dag_clean(d);
