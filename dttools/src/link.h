@@ -262,7 +262,7 @@ readline can usually complete with zero or one system calls.
 @param line A pointer to a buffer to fill with data.
 @param length The length of the buffer in bytes.
 @param stoptime The absolute time at which to abort.
-@return If greater than zero, a line was read, and the return value indicates the length in bytes.  If equal to zero, end of stream was reached.  If less than zero, an error occurred.
+@return True if a line was successfully read.  False if end of stream was reach or an error occured.
 */
 int link_readline(struct link *link, char *line, size_t length, time_t stoptime);
 
