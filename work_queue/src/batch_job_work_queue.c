@@ -98,8 +98,10 @@ static void work_queue_task_specify_resources(struct work_queue_task *t, struct 
 			work_queue_task_specify_disk(t, resources->workdir_footprint);
 }
 
-static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files, const char *envlist )
+static batch_job_id_t batch_job_wq_submit_simple (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
+	struct work_queue_task *t;
+
 	int caching_flag = WORK_QUEUE_CACHE;
 
 	if(string_istrue(hash_table_lookup(q->options, "caching"))) {
@@ -107,53 +109,6 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue *q, const char *cm
 	} else {
 		caching_flag = WORK_QUEUE_NOCACHE;
 	}
-
-	char *command = string_format("%s %s", cmd, args);
-	if(infile) {
-		char *new = string_format("%s <%s", command, infile);
-		free(command);
-		command = new;
-	}
-
-	struct work_queue_task *t = work_queue_task_create(command);
-
-	free(command);
-
-	if(infile)
-		work_queue_task_specify_input_file(t, infile, infile);
-	if(cmd)
-		work_queue_task_specify_input_file(t, cmd, cmd);
-
-	specify_envlist(t,envlist);
-	specify_files(t, extra_input_files, extra_output_files, caching_flag);
-
-	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
-	if(resources)
-	{
-		work_queue_task_specify_resources(t, resources);
-		free(resources);
-	}
-
-	work_queue_submit(q->data, t);
-
-	if(outfile) {
-		itable_insert(q->output_table, t->taskid, strdup(outfile));
-	}
-
-	return t->taskid;
-}
-
-static batch_job_id_t batch_job_wq_submit_simple (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
-{
-	struct work_queue_task *t;
-
-    int caching_flag = WORK_QUEUE_CACHE;
-
-    if(string_istrue(hash_table_lookup(q->options, "caching"))) {
-        caching_flag = WORK_QUEUE_CACHE;
-    } else {
-        caching_flag = WORK_QUEUE_NOCACHE;
-    }
 
 	t = work_queue_task_create(cmd);
 	specify_files(t, extra_input_files, extra_output_files, caching_flag);
@@ -322,7 +277,6 @@ const struct batch_queue_module batch_queue_wq = {
 	batch_queue_wq_option_update,
 
 	{
-		batch_job_wq_submit,
 		batch_job_wq_submit_simple,
 		batch_job_wq_wait,
 		batch_job_wq_remove,
