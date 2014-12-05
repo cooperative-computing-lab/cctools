@@ -98,7 +98,7 @@ static void work_queue_task_specify_resources(struct work_queue_task *t, struct 
 			work_queue_task_specify_disk(t, resources->workdir_footprint);
 }
 
-static batch_job_id_t batch_job_wq_submit_simple (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
+static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	struct work_queue_task *t;
 
@@ -277,7 +277,7 @@ const struct batch_queue_module batch_queue_wq = {
 	batch_queue_wq_option_update,
 
 	{
-		batch_job_wq_submit_simple,
+		batch_job_wq_submit,
 		batch_job_wq_wait,
 		batch_job_wq_remove,
 	},

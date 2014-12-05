@@ -34,7 +34,7 @@ static int setup_condor_wrapper(const char *wrapperfile)
 	return 0;
 }
 
-static batch_job_id_t batch_job_condor_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
+static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	FILE *file;
 	int njobs;
@@ -280,7 +280,7 @@ const struct batch_queue_module batch_queue_condor = {
 	batch_queue_condor_option_update,
 
 	{
-		batch_job_condor_submit_simple,
+		batch_job_condor_submit,
 		batch_job_condor_wait,
 		batch_job_condor_remove,
 	},

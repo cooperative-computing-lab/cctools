@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <signal.h>
 
-static batch_job_id_t batch_job_local_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
+static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	batch_job_id_t jobid;
 
@@ -162,7 +162,7 @@ const struct batch_queue_module batch_queue_local = {
 	batch_queue_local_option_update,
 
 	{
-		batch_job_local_submit_simple,
+		batch_job_local_submit,
 		batch_job_local_wait,
 		batch_job_local_remove,
 	},
