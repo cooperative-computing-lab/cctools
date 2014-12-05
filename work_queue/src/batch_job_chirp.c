@@ -61,7 +61,7 @@ static void addfile (struct batch_queue *q, buffer_t *B, const char *file, const
 	}
 }
 
-static batch_job_id_t batch_job_chirp_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
+static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	buffer_t B;
 
@@ -346,7 +346,7 @@ const struct batch_queue_module batch_queue_chirp = {
 	batch_queue_chirp_option_update,
 
 	{
-		batch_job_chirp_submit_simple,
+		batch_job_chirp_submit,
 		batch_job_chirp_wait,
 		batch_job_chirp_remove,
 	},

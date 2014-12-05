@@ -88,7 +88,7 @@ static batch_job_id_t fork_hadoop(struct batch_queue *q, char *hadoop_streaming_
 	}
 }
 
-static batch_job_id_t batch_job_hadoop_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
+static batch_job_id_t batch_job_hadoop_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
 {
 	int i;
 
@@ -461,7 +461,7 @@ const struct batch_queue_module batch_queue_hadoop = {
 	batch_queue_hadoop_option_update,
 
 	{
-		batch_job_hadoop_submit_simple,
+		batch_job_hadoop_submit,
 		batch_job_hadoop_wait,
 		batch_job_hadoop_remove,
 	},

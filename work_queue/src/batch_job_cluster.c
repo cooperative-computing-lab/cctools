@@ -59,7 +59,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	return 0;
 }
 
-static batch_job_id_t batch_job_cluster_submit_simple (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist)
+static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist)
 {
 	batch_job_id_t jobid;
 	struct batch_job_info *info;
@@ -316,7 +316,7 @@ const struct batch_queue_module batch_queue_cluster = {
 	batch_queue_cluster_option_update,
 
 	{
-		batch_job_cluster_submit_simple,
+		batch_job_cluster_submit,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,
 	},
@@ -341,7 +341,7 @@ const struct batch_queue_module batch_queue_moab = {
 	batch_queue_cluster_option_update,
 
 	{
-		batch_job_cluster_submit_simple,
+		batch_job_cluster_submit,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,
 	},
@@ -366,7 +366,7 @@ const struct batch_queue_module batch_queue_sge = {
 	batch_queue_cluster_option_update,
 
 	{
-		batch_job_cluster_submit_simple,
+		batch_job_cluster_submit,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,
 	},
@@ -391,7 +391,7 @@ const struct batch_queue_module batch_queue_torque = {
 	batch_queue_cluster_option_update,
 
 	{
-		batch_job_cluster_submit_simple,
+		batch_job_cluster_submit,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,
 	},

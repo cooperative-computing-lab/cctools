@@ -159,7 +159,7 @@ static int submit_worker( struct batch_queue *queue, const char *master_regex )
 
 	debug(D_WQ,"submitting worker: %s",cmd);
 
-	return batch_job_submit_simple(queue,cmd,extra_input_files,"output.log",0);
+	return batch_job_submit(queue,cmd,extra_input_files,"output.log",0);
 }
 
 static int submit_workers( struct batch_queue *queue, struct itable *job_table, int count, const char *master_regex )
