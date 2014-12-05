@@ -1481,8 +1481,7 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug((long) D_MAKEFLOW_RUN, get_makeflow_exe());
 	const char *dagfile;
-	char *change_dir = NULL;
-	int chdir_mode = 0;
+	char *change_dir;
 	char *batchlogfilename = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	char *catalog_host;
@@ -1826,7 +1825,6 @@ int main(int argc, char *argv[])
 				return 1;
 			case 'X':
 				change_dir = optarg;
-				chdir_mode = 1;
 				break;
 		}
 	}
@@ -2009,8 +2007,7 @@ int main(int argc, char *argv[])
 
 	dag_prepare_nested_jobs(d);
 	
-	if (chdir_mode == 1)
-	 	chdir(change_dir);
+	chdir(change_dir);
 
 	if(clean_mode) {
 		dag_clean(d);
