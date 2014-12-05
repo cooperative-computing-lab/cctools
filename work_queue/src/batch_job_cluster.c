@@ -59,7 +59,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	return 0;
 }
 
-static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist)
+static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct list *envlist )
 {
 	batch_job_id_t jobid;
 	struct batch_job_info *info;
@@ -76,21 +76,19 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	}
 
 	/*
-	Convert envlist="a=b;c=d;..." from the caller
-	into env_options="-v a=b -v c=d ..." which can be passed to qsub.
+	Convert the linked list from the caller into
+	env_options="-v a=b -v c=d ..." which can be passed to qsub.
 	*/
 
 	char *env_options = strdup("");
 	if(envlist) {
-		char *list = strdup(envlist);
-		char *e = strtok(list,";");
-		while(e) {
+		char *e;
+		list_first_item(envlist);
+		while((e=list_next_item(envlist))) {
 			char *temp = string_format("%s -v %s",env_options,e);
 			free(env_options);
 			env_options = temp;
-			e = strtok(0,";");
 		}
-		free(list);
 	}
 
 	char *command;

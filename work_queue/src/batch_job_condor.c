@@ -34,7 +34,7 @@ static int setup_condor_wrapper(const char *wrapperfile)
 	return 0;
 }
 
-static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
+static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct list *envlist )
 {
 	FILE *file;
 	int njobs;
@@ -81,7 +81,13 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "log = %s\n", q->logfile);
 
 	if(envlist) {
-		fprintf(file, "environment = %s\n",envlist);
+		fprintf(file, "environment = ");
+		char *e;
+		list_first_item(envlist);
+		while((e=list_next_item(envlist))) {
+			fprintf(file,"%s;",e);
+		}
+		fprintf(file,"\n");
 	}
 
 	if(options)

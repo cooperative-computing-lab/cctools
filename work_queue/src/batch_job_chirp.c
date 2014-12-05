@@ -61,12 +61,12 @@ static void addfile (struct batch_queue *q, buffer_t *B, const char *file, const
 	}
 }
 
-static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *envlist )
+static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct list *envlist )
 {
 	buffer_t B;
 
 	if(envlist) {
-		debug(D_NOTICE|D_BATCH,"sorry, the mpi_queue driver does not support environment variables.");
+		debug(D_NOTICE|D_BATCH,"sorry, the chirp driver does not support environment variables.");
 		return -1;
 	}
 

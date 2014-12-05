@@ -14,6 +14,8 @@ See the file COPYING for details.
 #include <stdint.h>
 #include <time.h>
 
+#include "list.h"
+
 /** @file batch_job.h Batch job submission.
 This module implements batch job submission to multiple systems,
 including Condor, SGE, Work Queue, Xgrid, and local Unix processes.
@@ -64,7 +66,7 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type);
 @param output_files A comma separated list of all output files to retrieve from the job.  Null pointer is equivalent to empty string.
 @return On success, returns a unique identifier for the batch job.  On failure, returns a negative number.
 */
-batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, const char *envlist );
+batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct list *env_list );
 
 /** Wait for any batch job to complete.
 Blocks until a batch job completes.
