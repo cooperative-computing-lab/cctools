@@ -59,11 +59,12 @@ struct batch_job_info {
 */
 struct batch_queue *batch_queue_create(batch_queue_type_t type);
 
-/** Submit a simple batch job.
+/** Submit a batch job.
 @param q The queue to submit to.
 @param cmdline The command line to execute.  This line will be interpreted by the shell, so it may include output redirection, multiple commands, pipes, and so forth.
 @param input_files A comma separated list of all input files that will be required by the job.  Null pointer is equivalent to empty string.  This must also include the executable and any dependent programs.
 @param output_files A comma separated list of all output files to retrieve from the job.  Null pointer is equivalent to empty string.
+@param env_list The list of environment variables to set for the job.  Each entry in the struct list is a string of the form name=value.
 @return On success, returns a unique identifier for the batch job.  On failure, returns a negative number.
 */
 batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct list *env_list );
