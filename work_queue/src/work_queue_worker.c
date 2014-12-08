@@ -486,7 +486,7 @@ static void report_tasks_complete( struct link *master )
 
 static void expire_procs_running() {
 	struct work_queue_process *p;
-	pid_t pid;
+	uint64_t pid;
 
 	int64_t current_time = time(0);
 
