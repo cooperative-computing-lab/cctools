@@ -41,7 +41,6 @@ def parse_in(parser):
         group.add_option('--BQSR',type="string",help="The input covariates table file which enables on-the-fly base quality score recalibration (intended for use with BaseRecalibrator and PrintReads)",action="callback",callback=make_inputs)
         group.add_option('--excludeIntervals',type="string",help="One or more genomic intervals to exclude from processing. Can be explicitly specified on the command line or in a file (including a rod file)",action="callback",callback=make_inputs)
         group.add_option('--input_file',dest='input',type="string",help="SAM or BAM file(s)")
-        group.add_option('--progeny_list',dest='progeny_list',type="string",help="List of SAM or BAM files. Each line represents a -I option for a run.")
         group.add_option('--intervals',type="string",help="One or more genomic intervals over which to operate. Can be explicitly specified on the command line or in a file (including a rod file)",action="callback",callback=make_inputs)
         group.add_option('--read_group_black_list',type="string",help="Filters out read groups matching : or a .txt file containing the filter strings one per line.",action="callback",callback=make_inputs)
         group.add_option('--reference_sequence',dest='ref',type="string",help="Reference sequence file")
@@ -409,8 +408,8 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 				plog = options.plog
 				arguments += "-log " + plog + "."+ input + " "
 			
-			added = "--heterozygosity 0.1 --indel_heterozygosity 0.05 --unsafe -fixMisencodedQuals "
-			#added = ""
+			#added = "--heterozygosity 0.1 --indel_heterozygosity 0.05 --unsafe -fixMisencodedQuals "
+			added = ""
 	
 			merge_files += input_vcf+" "+input_idx+" "
 			merge_inputs += input_vcf+" " 
