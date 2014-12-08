@@ -651,6 +651,31 @@ else
 	fi
 fi
 
+if [ $config_fuse_path != no ]
+then
+        if library_search fuse ${fuse_path} || library_search fuse /
+        then
+                if [ x${fuse_path} != x/ -a x${fuse_path} != x/usr ]
+                then
+                        fuse_ccflags="-I${fuse_path}/include"
+                fi
+                ccflags="${ccflags} -DHAS_FUSE"
+				fuse_ldflags="${library_search_result}"
+        else
+                if [ $config_fuse_path = yes ]
+                then
+
+        		echo "*** Sorry, I couldn't find Fuse in $fuse_path"
+        		echo "*** Check --with-fuse-path and try again."
+        		exit 1
+                else
+                        echo "*** skipping fuse support"
+                fi
+        fi
+else
+	echo "*** skipping fuse support"
+fi
+
 ##########################################################################
 # SWITCH BACK TO DYNAMIC LINKING FOR COMMON SYSTEM LIBRARIES
 ##########################################################################
@@ -698,31 +723,6 @@ then
 	fi
 else	
 	echo "*** skipping readline..."
-fi
-
-if [ $config_fuse_path != no ]
-then
-        if library_search fuse ${fuse_path} || library_search fuse /
-        then
-                if [ x${fuse_path} != x/ -a x${fuse_path} != x/usr ]
-                then
-                        fuse_ccflags="-I${fuse_path}/include"
-                fi
-                ccflags="${ccflags} -DHAS_FUSE"
-				fuse_ldflags="${library_search_result}"
-        else
-                if [ $config_fuse_path = yes ]
-                then
-
-        		echo "*** Sorry, I couldn't find Fuse in $fuse_path"
-        		echo "*** Check --with-fuse-path and try again."
-        		exit 1
-                else
-                        echo "*** skipping fuse support"
-                fi
-        fi
-else
-	echo "*** skipping fuse support"
 fi
 
 if [ $config_perl_path != no ]
