@@ -631,29 +631,29 @@ else
 	fi
 fi
 
-if [ $config_fuse_path != no ]
+if [ $config_fuse_path != no ] && check_file ${fuse_path}/include/fuse.h
 then
-        if library_search fuse ${fuse_path} || library_search fuse /
-        then
-                if [ x${fuse_path} != x/ -a x${fuse_path} != x/usr ]
-                then
-                        fuse_ccflags="-I${fuse_path}/include"
-                fi
-                ccflags="${ccflags} -DHAS_FUSE"
-				fuse_ldflags="${library_search_result}"
-        else
-                if [ $config_fuse_path = yes ]
-                then
+	ccflags="${ccflags} -I${fuse_path}/include -DHAS_FUSE"
 
-        		echo "*** Sorry, I couldn't find Fuse in $fuse_path"
-        		echo "*** Check --with-fuse-path and try again."
-        		exit 1
-                else
-                        echo "*** skipping fuse support"
-                fi
-        fi
+	if library_search fuse ${fuse_path} || library_search fuse /
+	then
+		if [ x${fuse_path} != x/ -a x${fuse_path} != x/usr ]
+		then
+			fuse_ldflags="${library_search_result}"
+		else
+			echo "*** Couldn't find $library in ${fuse_path}"
+			exit 1
+		fi
+	fi
 else
-	echo "*** skipping fuse support"
+	if [ $config_fuse_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find Fuse in $fuse_path"
+		echo "*** Check --with-fuse-path and try again."
+		exit 1
+	else
+		echo "*** skipping fuse support"
+	fi
 fi
 
 ##########################################################################
