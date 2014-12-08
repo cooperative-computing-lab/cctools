@@ -1,18 +1,19 @@
 #!/bin/sh
 
-EXTERNAL="/afs/nd.edu/user37/ccl/software/cctools-build-external-packages"
+EXTERNAL="/afs/crc.nd.edu/group/ccl/software/cctools-dependencies"
 
-# Our external packages are installed in
-# $EXTERNAL/$SYS/$SUBTYPE/packagename Where $SYS is the output of the
-# AFS `sys` command, usually something like amd64_linux26 or
-# i686_darwin_100, and $SUBTYPE is something like redhat5 or redhat6.
+# Our external packages are installed in $EXTERNAL/$SYS/$SUBTYPE/packagename
+# Where $SYS is the output of `uname -m` usually something like x86_64 or i686,
+# and $SUBTYPE is something like redhat5 or redhat6.
+
+SYS=`uname -m`
 
 function detect_packages()
 {
     unset GLOBUS_LOCATION
     export GLOBUS_LOCATION
     
-    echo "platform is `sys`"
+    echo "platform is ${SYS}"
 
     if [ -f /etc/redhat-release ]
     then
@@ -26,7 +27,7 @@ function detect_packages()
     PACKAGES_CONFIG=""
     for package in fuse irods mysql python perl globus swig xrootd cvmfs
     do
-	packagepath=$EXTERNAL/`sys`/$subtype/$package
+	packagepath=$EXTERNAL/${SYS}/$subtype/$package
 
 	if [ -d $packagepath ]
         then
