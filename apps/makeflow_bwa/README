@@ -10,7 +10,7 @@ To build Makeflow:
 http://sourceforge.net/projects/bio-bwa/files/
 2. Install CCTools. 
 3. Copy makeflow_bwa from cctools/apps to the location the makeflow will be executed.
-4. Run './makeflow_bwa --ref test_ref.fa --fastq test_pe_1.fq --output_SAM output.sam --algoalign backtrack --makeflow Makeflow' 
+4. Run './makeflow_bwa --ref test_ref.fa --fastq test_query.fq --output_SAM output.sam --algoalign bwa_{backtrack|bwasw|mem} --makeflow Makeflow' 
 This produces a file called Makeflow.
 
 To run:

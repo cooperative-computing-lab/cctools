@@ -64,6 +64,7 @@ case "$build_cpu" in
 	;;
 esac
 
+include_package_apps="apps"
 include_package_sand="sand"
 include_package_allpairs="allpairs"
 include_package_wavefront="wavefront"
@@ -236,6 +237,9 @@ do
 				include_package_allpairs=""
 			fi
 			;;
+		--without-system-apps)
+			include_package_apps=""
+			;;
 		--without-system-allpairs)
 			include_package_allpairs=""
 			;;
@@ -336,7 +340,7 @@ fi
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_doc}"
+potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_doc}"
 
 check_multiarch
 
