@@ -65,11 +65,6 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 {
 	buffer_t B;
 
-	if(envlist) {
-		debug(D_NOTICE|D_BATCH,"sorry, the chirp driver does not support environment variables.");
-		return -1;
-	}
-
 	debug(D_DEBUG, "%s(%p, `%s', `%s', `%s')", __func__, q, cmd, extra_input_files, extra_output_files);
 
 	buffer_init(&B);
@@ -83,6 +78,28 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 	jsonA_escapestring(&B, cmd);
 	buffer_putliteral(&B, "\\n}");
 	buffer_putliteral(&B, "\"],");
+
+	if(envlist) {
+		char *e;
+		int first=1;
+		buffer_putfstring(&B,"\"environment\":[");
+		list_first_item(envlist);
+		while((e=list_next_item(envlist))) {
+			char *name = strdup(e);
+			char *value = strchr(name,'=');
+			if(value) {
+				*value = 0;
+				value++;
+				if(first) {
+					buffer_putfstring(&B,",");
+					first=0;
+				}
+				buffer_putfstring(&B,"\"%s\":\"%s\"",name,value);
+			}
+			free(name);
+		}
+		buffer_putfstring(&B,"],");
+	}
 
 	buffer_putliteral(&B, "\"files\":[");
 	if (extra_input_files) {
