@@ -1369,7 +1369,7 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
 	fprintf(stdout, " %-30s Wrap all commands with this prefix.\n", "--wrapper=<cmd>");
 	fprintf(stdout, " %-30s Wrapper command requires this input file.\n", "--wrapper-input=<cmd>");
-	fprintf(stdout, " %-30s Wrapper command produces this output file.\n", "--wrapper-input=<cmd>");
+	fprintf(stdout, " %-30s Wrapper command produces this output file.\n", "--wrapper-output=<cmd>");
 	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
 	fprintf(stdout, " %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
