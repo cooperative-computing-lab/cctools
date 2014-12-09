@@ -108,18 +108,25 @@ INT64_T nvpair_lookup_integer(struct nvpair *n, const char *name);
 */
 double nvpair_lookup_float(struct nvpair *n, const char *name);
 
+/**
+Export all items in the nvpair to the environment with setenv.
+@param nv The nvpair to be exported.
+*/
+void nvpair_export( struct nvpair *nv );
+
+
 /** Begin iteration over all items.
 This function begins a new iteration over an nvpair,
 allowing you to visit every name and value in the table.
 Next, invoke @ref nvpair_next_item to retrieve each value in order.
-@param h A pointer to an nvpair..
+@param nv A pointer to an nvpair.
 */
 
 void nvpair_first_item(struct nvpair *nv);
 
 /** Continue iteration over all items.
 This function returns the next name and value in the iteration.
-@param h A pointer to an nvpair.
+@param nv A pointer to an nvpair.
 @param name A pointer to a name pointer.
 @param value A pointer to a value pointer.
 @return Zero if there are no more elements to visit, one otherwise.
