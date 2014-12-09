@@ -785,9 +785,9 @@ int main( int argc, char *argv[] )
 	pfs_uid = getuid();
 	pfs_gid = getgid();
 
-	if (http_proxy[0])
+	if (http_proxy)
 		setenv("HTTP_PROXY", http_proxy, 1);
-	http_proxy = realloc(http_proxy, 0);
+	http_proxy = (char *)realloc(http_proxy, 0);
 
 	s = getenv("PARROT_BLOCK_SIZE");
 	if(s) pfs_service_set_block_size(string_metric_parse(s));
@@ -904,7 +904,7 @@ int main( int argc, char *argv[] )
 
 	if(tickets) {
 		auth_ticket_load(tickets);
-		tickets = realloc(tickets, 0);
+		tickets = (char *)realloc(tickets, 0);
 	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
 		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
 	} else {
