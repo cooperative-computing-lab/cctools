@@ -675,7 +675,7 @@ int main( int argc, char *argv[] )
 			fprintf(namelist_file, "/bin/sh\n");
 			break;
 		case 'N':
-			pfs_false_uname = optarg;
+			pfs_false_uname = xxstrdup(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -826,7 +826,7 @@ int main( int argc, char *argv[] )
 	if(s) pfs_session_cache = 1;
 
 	s = getenv("PARROT_HOST_NAME");
-	if(s) pfs_false_uname = s;
+	if(s && !pfs_false_uname) pfs_false_uname = xxstrdup(pfs_false_uname);
 
 	s = getenv("PARROT_UID");
 	if(s) pfs_uid = atoi(s);
