@@ -1482,7 +1482,7 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug((long) D_MAKEFLOW_RUN, get_makeflow_exe());
 	const char *dagfile;
-	char *change_dir;
+	char *change_dir = NULL;
 	char *batchlogfilename = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	char *catalog_host;
@@ -2007,8 +2007,9 @@ int main(int argc, char *argv[])
 		dag_prepare_gc(d);
 
 	dag_prepare_nested_jobs(d);
-	
-	chdir(change_dir);
+
+	if (change_dir)
+		chdir(change_dir);
 
 	if(clean_mode) {
 		dag_clean(d);
