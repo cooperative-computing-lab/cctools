@@ -487,6 +487,7 @@ int main( int argc, char *argv[] )
 	char *http_proxy = NULL;
 	pid_t pid;
 	struct pfs_process *p;
+	char envlist[PATH_MAX] = "";
 
 	if(getenv("PARROT_ENABLED")) {
 		fprintf(stderr,"sorry, parrot_run cannot be run inside of itself.\n");
@@ -615,30 +616,7 @@ int main( int argc, char *argv[] )
 			pfs_enable_small_file_optimizations = 0;
 			break;
 		case 'e':
-			if(access(optarg, F_OK) != -1) {
-				fprintf(stderr, "The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", optarg);
-				return 1;
-			}
-			int count;
-			count = 0;
-			FILE *fp;
-			fp = fopen(optarg, "w");
-			if(!fp) {
-				debug(D_DEBUG, "Can not open envlist file: %s", optarg);
-				return 1;
-			}
-			while(environ[count] != NULL) {
-				fprintf(fp, "%s\n", environ[count]);
-				count++;
-			}
-			char working_dir[PFS_PATH_MAX];
-			::getcwd(working_dir,sizeof(working_dir));
-			if(working_dir == NULL) {
-				debug(D_DEBUG, "Can not obtain the current working directory!");
-				return 1;
-			}
-			fprintf(fp, "PWD=%s\n", working_dir);
-			fclose(fp);
+			strncpy(envlist, optarg, sizeof(envlist)-1);
 			break;
 		case 'F':
 			pfs_force_cache = 1;
@@ -797,6 +775,23 @@ int main( int argc, char *argv[] )
 	}
 
 	get_linux_version(argv[0]);
+
+	if (envlist[0]) {
+		extern char **environ;
+		if(access(optarg, F_OK) == 0)
+			fatal("The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", optarg);
+		FILE *fp = fopen(optarg, "w");
+		if(!fp)
+			fatal("Can not open envlist file: %s", optarg);
+		for (int i = 0; environ[i]; i++)
+			fprintf(fp, "%s\n", environ[i]);
+		char working_dir[PFS_PATH_MAX];
+		::getcwd(working_dir,sizeof(working_dir));
+		if(working_dir == NULL)
+			fatal("Can not obtain the current working directory!");
+		fprintf(fp, "PWD=%s\n", working_dir);
+		fclose(fp);
+	}
 
 	if(isatty(0)) {
 		pfs_master_timeout = 300;
