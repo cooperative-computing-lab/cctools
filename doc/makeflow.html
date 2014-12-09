@@ -328,8 +328,11 @@ In this example, SOME_VARIABLE has the value 'original_value' for rules 1 and
 Environment variables can be defined with the <tt>export</tt> keyword inside a workflow.  Makeflow will communicate explicitly named environment variables
 to remote batch systems, where they will override whatever local setting is present.  For example, suppose you want to modify the PATH for every job in the makeflow:
 
-<code>export PATH=/opt/tools/bin:${PATH}
-</code>
+<code>export PATH=/opt/tools/bin:${PATH}</code>
+
+If no value is given, then the current value of the environment variable is passed along to the job:
+
+<code>export USER</code>
 
 <h3 id="details.refinement">Batch Job Refinement<a class="sectionlink" href="#details.refinement" title="Link to this section.">&#x21d7;</a></h3>
 

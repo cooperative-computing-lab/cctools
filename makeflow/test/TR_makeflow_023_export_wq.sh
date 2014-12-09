@@ -18,7 +18,7 @@ prepare()
 	cd $TEST_DIR
 	cat > test.mf <<EOF
 export HELLO=hello makeflow
-export GOODBYE=goodbye makeflow
+export GOODBYE
 output.txt:
 	echo \\\$HELLO \\\$GOODBYE > output.txt
 EOF
@@ -33,6 +33,7 @@ run()
 {
 	cd $TEST_DIR
 
+	export GOODBYE="goodbye makeflow"
 	../../src/makeflow -d all -T wq -Z master.port test.mf &
 
 	wait_for_file_creation master.port 5
