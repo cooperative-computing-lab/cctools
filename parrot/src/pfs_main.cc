@@ -161,7 +161,7 @@ static void get_linux_version(const char *cmd)
 		fatal("this version of Parrot requires at least kernel version 2.5.60");
 }
 
-static void pfs_helper_init( const char *argv0 )
+static void pfs_helper_init( void )
 {
 	char helper_path[PFS_PATH_MAX];
 
@@ -928,8 +928,6 @@ int main( int argc, char *argv[] )
 			fatal("could not open tempdir: %s", strerror(errno));
 	}
 
-	if(pfs_use_helper) pfs_helper_init(argv[0]);
-
 	pid_t pfs_watchdog_pid = -2;
 	if (pfs_paranoid_mode) {
 		pfs_watchdog_pid = pfs_paranoia_setup();
@@ -987,6 +985,8 @@ int main( int argc, char *argv[] )
 		if (!WIFCONTINUED(status))
 			fatal("child did not continue as expected!");
 	} else if(pid==0) {
+		if (pfs_use_helper)
+			pfs_helper_init();
 		pfs_paranoia_payload();
 		pfs_process_bootstrapfd();
 		setpgrp();
