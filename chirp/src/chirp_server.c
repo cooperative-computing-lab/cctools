@@ -1471,6 +1471,12 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			json_value *J = json_parse(buffer, length);
 			if (J) {
 				result = chirp_job_status(J, subject, &B);
+				if (result) {
+					errno = result;
+					goto failure;
+				} else {
+					result = buffer_pos(&B);
+				}
 				json_value_free(J);
 			} else {
 				debug(D_DEBUG, "does not parse as json!");
@@ -1479,6 +1485,12 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			}
 		} else if(sscanf(line, "job_wait %" SCNCHIRP_JOBID_T " %" SCNd64, &id, &length) == 2) {
 			result = chirp_job_wait(id, subject, length, &B);
+			if (result) {
+				errno = result;
+				goto failure;
+			} else {
+				result = buffer_pos(&B);
+			}
 		} else if(sscanf(line, "job_reap %" PRId64, &length) == 1) {
 			if ((length = getvarstring(l, stalltime, buffer, length, 0)) == -1)
 				goto failure;
