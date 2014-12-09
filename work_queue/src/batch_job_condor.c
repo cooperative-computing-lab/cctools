@@ -34,7 +34,7 @@ static int setup_condor_wrapper(const char *wrapperfile)
 	return 0;
 }
 
-static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct list *envlist )
+static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	FILE *file;
 	int njobs;
@@ -80,14 +80,23 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "keep_claim_idle = 30\n");
 	fprintf(file, "log = %s\n", q->logfile);
 
+	/*
+	Getting environment variables formatted for a condor submit
+	file is very hairy, due to some strange quoting rules.
+	To avoid problems, we simply export vars to the environment,
+	and then tell condor getenv=true, which pulls in the environment.
+	*/
+
+	fprintf(file, "getenv = true\n");
+
+	nvpair_export(envlist);
+
 	if(envlist) {
-		fprintf(file, "environment = ");
-		char *e;
-		list_first_item(envlist);
-		while((e=list_next_item(envlist))) {
-			fprintf(file,"%s;",e);
+		char *name, *value;
+		nvpair_first_item(envlist);
+		while((nvpair_next_item(envlist,&name,&value))) {
+			setenv(name,value,1);
 		}
-		fprintf(file,"\n");
 	}
 
 	if(options)

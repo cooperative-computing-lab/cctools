@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <signal.h>
 
-static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct list *envlist )
+static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	batch_job_id_t jobid;
 
@@ -37,25 +37,7 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 			_exit(1);
 		}*/
 
-		/*
-		Add the desired environment to the child process.
-		setenv copies the values into the environment.
-		*/
-
-		if(envlist) {
-			char *e;
-			list_first_item(envlist);
-			while((e=list_next_item(envlist))) {
-				char *name = strdup(e);
-				char *value = strchr(name,'=');
-				if(value) {
-					*value = 0;
-					value++;
-					setenv(name,value,1);
-				}
-				free(name);
-			}
-		}
+		nvpair_export(envlist);
 
 		/** A note from "man system 3" as of Jan 2012:
 		 * Do not use system() from a program with set-user-ID or set-group-ID

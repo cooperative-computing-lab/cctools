@@ -5,6 +5,7 @@
 #include "stringtools.h"
 #include "process.h"
 #include "xxmalloc.h"
+#include "nvpair.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -59,7 +60,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	return 0;
 }
 
-static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct list *envlist )
+static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	batch_job_id_t jobid;
 	struct batch_job_info *info;
@@ -76,29 +77,22 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	}
 
 	/*
-	Convert the linked list from the caller into
-	env_options="-v a=b -v c=d ..." which can be passed to qsub.
+	Experiment shows that passing environment variables
+	through the command-line doesn't work, due to multiple
+	levels of quote interpretation.  So, we export all
+	variables into the environment, and rely upon the -V
+	option to load the environment into the job.
 	*/
 
-	char *env_options = strdup("");
-	if(envlist) {
-		char *e;
-		list_first_item(envlist);
-		while((e=list_next_item(envlist))) {
-			char *temp = string_format("%s -v %s",env_options,e);
-			free(env_options);
-			env_options = temp;
-		}
-	}
+	nvpair_export(envlist);
 
 	char *command;
 
 	switch(q->type) {
 		case BATCH_QUEUE_TYPE_TORQUE:
-			command = string_format("%s %s %s -N '%s' %s %s.wrapper",
+			command = string_format("%s %s -N '%s' -V %s %s.wrapper",
 				cluster_submit_cmd,
 				cluster_options,
-				env_options,
 				path_basename(name),
 				options ? options : "",
 				cluster_name);
@@ -107,10 +101,9 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 		case BATCH_QUEUE_TYPE_MOAB:
 		case BATCH_QUEUE_TYPE_CLUSTER:
 		default:
-			command = string_format("%s %s %s -N '%s' %s %s.wrapper \"%s\"",
+			command = string_format("%s %s -N '%s' -V %s %s.wrapper \"%s\"",
 				cluster_submit_cmd,
 				cluster_options,
-				env_options,
 				path_basename(name),
 				options ? options : "",
 				cluster_name,
@@ -119,7 +112,6 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	}
 
 	free(name);
-	free(env_options);
 
 	debug(D_BATCH, "%s", command);
 
