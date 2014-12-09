@@ -883,6 +883,9 @@ int main( int argc, char *argv[] )
 	if(optind>=argc) show_help(argv[0]);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
+
+	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
+
 	get_linux_version(argv[0]);
 
 	if(pfs_temp_dir[PFS_PATH_MAX - 1] != '\0')
@@ -937,23 +940,6 @@ int main( int argc, char *argv[] )
 			debug(D_PROCESS,"watchdog PID %d",pfs_watchdog_pid);
 		}
 	}
-
-	/*
-	For reasons I don't understand yet, parrot gets very confused when
-	it is the session leader.  This happens when it is run as the first
-	process in a pty, for example in an xterm or when run from a server.
-	So, when we are the session leader, disconnect from the terminal .
-	This disables features such as line editing and job control, but
-	prevents triggering some ugly bugs.
-	*/
-
-	if(getsid(0)==getpid()) {
-		debug(D_PROCESS, "disconnecting from terminal");
-		::ioctl(0,TIOCNOTTY,0);
-	}
-
-	setpgrp();
-	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
 
 	/* XXX Notes on strange code ahead:
 	 *
