@@ -20,7 +20,6 @@ See the file COPYING for details.
 extern const struct batch_queue_module batch_queue_chirp;
 extern const struct batch_queue_module batch_queue_cluster;
 extern const struct batch_queue_module batch_queue_condor;
-extern const struct batch_queue_module batch_queue_hadoop;
 extern const struct batch_queue_module batch_queue_local;
 extern const struct batch_queue_module batch_queue_moab;
 extern const struct batch_queue_module batch_queue_sge;
@@ -37,12 +36,12 @@ static struct batch_queue_module batch_queue_unknown = {
 	{NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
-#define BATCH_JOB_SYSTEMS  "local, chirp, cluster, condor, hadoop, moab, sge, torque, wq"
+#define BATCH_JOB_SYSTEMS  "local, wq, condor, sge, torque, moab, chirp"
+
 const struct batch_queue_module * const batch_queue_modules[] = {
     &batch_queue_chirp,
     &batch_queue_cluster,
     &batch_queue_condor,
-    &batch_queue_hadoop,
     &batch_queue_local,
     &batch_queue_moab,
     &batch_queue_sge,
