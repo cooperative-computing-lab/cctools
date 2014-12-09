@@ -1482,7 +1482,7 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug((long) D_MAKEFLOW_RUN, get_makeflow_exe());
 	const char *dagfile;
-	char *change_dir;
+	char *change_dir = NULL;
 	char *batchlogfilename = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	char *catalog_host;
