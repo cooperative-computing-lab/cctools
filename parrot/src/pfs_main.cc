@@ -160,7 +160,7 @@ static void get_linux_version(const char *cmd)
 		fatal("this version of Parrot requires at least kernel version 2.5.60");
 }
 
-static void pfs_helper_init( const char *argv0 ) 
+static void pfs_helper_init( void )
 {
 	char helper_path[PFS_PATH_MAX];
 
@@ -910,8 +910,6 @@ int main( int argc, char *argv[] )
 
 	if(!pfs_channel_init(channel_size*1024*1024)) fatal("couldn't establish I/O channel");	
 
-	if(pfs_use_helper) pfs_helper_init(argv[0]);
-
 	pid_t pfs_watchdog_pid = -2;
 	if (pfs_paranoid_mode) {
 		pfs_watchdog_pid = pfs_paranoia_setup();
@@ -940,30 +938,46 @@ int main( int argc, char *argv[] )
 
 	setpgrp();
 	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
+	/* XXX Notes on strange code ahead:
+	 *
+	 * Previously we had a really simple synchronization mechanism whereby the
+	 * child would raise(SIGSTOP) and wait for the parent to attach. Apparently
+	 * this does not work on obscure Linux flavors (Cray Linux 2.6.32) so we
+	 * need to be more fancy. The exact problem appears to be that we cannot
+	 * PTRACE_ATTACH a stopped process and then do PTRACE_SETOPTIONS.
+	 *
+	 * So the solution is: only attach when the child is spinning.
+	 *
+	 * This requires awkward signal gymnastics:
+	 */
 
-	if(pid==0) {
-		pid = fork();
-		if(pid>0) {
-			pid_t wpid;
-			int status;
-			debug(D_PROCESS,"pid %d started",pid);
-			do {
-				wpid = waitpid(pid, &status, WUNTRACED);
-			} while (wpid != pid);
-			if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGSTOP)
-				fatal("child did not stop as expected!");
-		} else if(pid==0) {
-			pfs_paranoia_payload();
-			setpgrp();
-			raise(SIGSTOP); /* wait to be traced */
-			getpid();
-			// This call is necessary to force the kernel to report the current heap
-			// size, so that Parrot can observe it in order to rewrite the following exec.
-			sbrk(4096);
-			execvp(argv[optind],&argv[optind]);
-			debug(D_NOTICE,"unable to execute %s: %s",argv[optind],strerror(errno));
-			if(pfs_write_rval) {
-				write_rval("noexec", 0);
+	pid = fork();
+	if(pid>0) {
+		pid_t wpid;
+		int status;
+		debug(D_PROCESS,"pid %d started",pid);
+		do {
+			wpid = waitpid(pid, &status, WUNTRACED);
+		} while (wpid != pid);
+		if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGSTOP)
+			fatal("child did not stop as expected!");
+		kill(pid, SIGCONT);
+		do {
+			wpid = waitpid(pid, &status, WCONTINUED);
+		} while (wpid != pid);
+		if (!WIFCONTINUED(status))
+			fatal("child did not continue as expected!");
+	} else if(pid==0) {
+		if (pfs_use_helper)
+			pfs_helper_init();
+		pfs_paranoia_payload();
+		pfs_process_bootstrapfd();
+		setpgrp();
+		{
+			int fd = open("/dev/tty", O_RDWR);
+			if (fd >= 0) {
+				tcsetpgrp(fd, getpgrp());
+				close(fd);
 			}
 			_exit(1);
 		} else {
