@@ -766,6 +766,20 @@ int main( int argc, char *argv[] )
 	cctools_version_debug(D_DEBUG, argv[0]);
 
 	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
+	{
+		extern char **environ;
+		int i;
+		buffer_t B;
+		buffer_init(&B);
+		buffer_putfstring(&B, "command: %s", argv[0]);
+		for (i = 1; argv[i]; i++)
+			buffer_putfstring(&B, " \"%s\"", argv[i]);
+		debug(D_DEBUG, "%s", buffer_tostring(&B));
+		debug(D_DEBUG, "environment:");
+		for (i = 0; environ[i]; i++)
+			debug(D_DEBUG, "%s", environ[i]);
+		buffer_free(&B);
+	}
 
 	get_linux_version(argv[0]);
 
