@@ -2007,8 +2007,9 @@ int main(int argc, char *argv[])
 		dag_prepare_gc(d);
 
 	dag_prepare_nested_jobs(d);
-	
-	chdir(change_dir);
+
+	if (change_dir)
+		chdir(change_dir);
 
 	if(clean_mode) {
 		dag_clean(d);
