@@ -233,6 +233,15 @@ double nvpair_lookup_float(struct nvpair * n, const char *name)
 	}
 }
 
+void nvpair_export( struct nvpair *nv )
+{
+	char *name, *value;
+	nvpair_first_item(nv);
+	while(nvpair_next_item(nv,&name,&value)) {
+		setenv(name,value,1);
+	}
+}
+
 void nvpair_first_item(struct nvpair *nv)
 {
 	hash_table_firstkey(nv->table);
