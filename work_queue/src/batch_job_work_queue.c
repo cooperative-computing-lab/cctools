@@ -52,20 +52,13 @@ static void specify_files(struct work_queue_task *t, const char *input_files, co
 	}
 }
 
-static void specify_envlist( struct work_queue_task *t, struct list *envlist )
+static void specify_envlist( struct work_queue_task *t, struct nvpair *envlist )
 {
 	if(envlist) {
-		char *e;
-		list_first_item(envlist);
-		while((e=list_next_item(envlist))) {
-			char *name = strdup(e);
-			char *value = strchr(name,'=');
-			if(value) {
-				*value = 0;
-				value++;
-				work_queue_task_specify_env(t,name,value);
-			}
-			free(name);
+		char *name, *value;
+		nvpair_first_item(envlist);
+		while(nvpair_next_item(envlist,&name,&value)) {
+			work_queue_task_specify_env(t,name,value);
 		}
 	}
 }
@@ -97,7 +90,7 @@ static void work_queue_task_specify_resources(struct work_queue_task *t, struct 
 			work_queue_task_specify_disk(t, resources->workdir_footprint);
 }
 
-static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct list *envlist )
+static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	struct work_queue_task *t;
 
@@ -110,6 +103,7 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *c
 	}
 
 	t = work_queue_task_create(cmd);
+
 	specify_files(t, extra_input_files, extra_output_files, caching_flag);
 	specify_envlist(t,envlist);
 

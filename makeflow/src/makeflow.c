@@ -732,32 +732,30 @@ static void dag_node_export_variables( struct dag *d, struct dag_node *n )
 }
 
 /*
-Returns a linked list containing the explicit environment
+Creates an nvpair containing the explicit environment
 strings for this given node.  Each element of the list
 is a string of the form name=value.
 If nothing has been set, this function may return null.
-The list and its items must be freed with list_free();list_delete();
 */
 
-struct list * dag_node_env_list( struct dag *d, struct dag_node *n )
+struct nvpair * dag_node_env_create( struct dag *d, struct dag_node *n )
 {
 	struct dag_lookup_set s = { d, n->category, n, NULL };
 	char *key;
 
-	struct list *env_list = 0;
+	struct nvpair *nv = 0;
 
 	set_first_element(d->export_vars);
 	while((key = set_next_element(d->export_vars))) {
 		char *value = dag_lookup_str(key, &s);
 		if(value) {
-
-			if(!env_list) env_list = list_create();
-			list_push_tail(env_list,string_format("%s=%s",key,value));
+			if(!nv) nv = nvpair_create();
+			nvpair_insert_string(nv,key,value);
 			debug(D_MAKEFLOW_RUN, "export %s=%s", key, value);
 		}
 	}
 
-	return env_list;
+	return nv;
 }
 
 /*
@@ -883,7 +881,7 @@ Submit one fully formed job, retrying failures up to the dag_submit_timeout.
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files, struct list *envlist )
+batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files, struct nvpair *envlist )
 {
 	time_t stoptime = time(0) + dag_submit_timeout;
 	int waittime = 1;
@@ -969,7 +967,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	}
 
 	/* Generate the environment vars specific to this node. */
-	struct list *env_list = dag_node_env_list(d,n);
+	struct nvpair *envlist = dag_node_env_create(d,n);
 
 	/*
 	Just before execution, replace double-percents with the nodeid.
@@ -982,7 +980,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	free(nodeid);
 
 	/* Now submit the actual job, retrying failures as needed. */
-	n->jobid = dag_node_submit_retry(queue,command,input_files,output_files,env_list);
+	n->jobid = dag_node_submit_retry(queue,command,input_files,output_files,envlist);
 
 	/* Restore old batch job options. */
 	if(old_batch_submit_options) {
@@ -1008,11 +1006,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 	free(command);
 	free(input_files);
 	free(output_files);
-
-	if(env_list) {
-		list_free(env_list);
-		list_delete(env_list);
-	}
+	nvpair_delete(envlist);
 }
 
 int dag_node_ready(struct dag *d, struct dag_node *n)

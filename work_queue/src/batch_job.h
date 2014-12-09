@@ -14,7 +14,7 @@ See the file COPYING for details.
 #include <stdint.h>
 #include <time.h>
 
-#include "list.h"
+#include "nvpair.h"
 
 /** @file batch_job.h Batch job submission.
 This module implements batch job submission to multiple systems,
@@ -64,10 +64,10 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type);
 @param cmdline The command line to execute.  This line will be interpreted by the shell, so it may include output redirection, multiple commands, pipes, and so forth.
 @param input_files A comma separated list of all input files that will be required by the job.  Null pointer is equivalent to empty string.  This must also include the executable and any dependent programs.
 @param output_files A comma separated list of all output files to retrieve from the job.  Null pointer is equivalent to empty string.
-@param env_list The list of environment variables to set for the job.  Each entry in the struct list is a string of the form name=value.
+@param envlist The set of environment variables for the job, in an nvpair object.
 @return On success, returns a unique identifier for the batch job.  On failure, returns a negative number.
 */
-batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct list *env_list );
+batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct nvpair *envlist );
 
 /** Wait for any batch job to complete.
 Blocks until a batch job completes.

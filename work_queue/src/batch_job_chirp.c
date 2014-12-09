@@ -61,7 +61,7 @@ static void addfile (struct batch_queue *q, buffer_t *B, const char *file, const
 	}
 }
 
-static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct list *envlist )
+static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	buffer_t B;
 
@@ -80,23 +80,17 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 	buffer_putliteral(&B, "\"],");
 
 	if(envlist) {
-		char *e;
+		char *name, *value;
 		int first=1;
 		buffer_putfstring(&B,"\"environment\":[");
-		list_first_item(envlist);
-		while((e=list_next_item(envlist))) {
-			char *name = strdup(e);
-			char *value = strchr(name,'=');
-			if(value) {
-				*value = 0;
-				value++;
-				if(first) {
-					buffer_putfstring(&B,",");
-					first=0;
-				}
-				buffer_putfstring(&B,"\"%s\":\"%s\"",name,value);
+		nvpair_first_item(envlist);
+		while(nvpair_next_item(envlist,&name,&value)) {
+			if(first) {
+				first=0;
+			} else {
+				buffer_putfstring(&B,",");
 			}
-			free(name);
+			buffer_putfstring(&B,"\"%s\":\"%s\"",name,value);
 		}
 		buffer_putfstring(&B,"],");
 	}

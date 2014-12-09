@@ -88,7 +88,7 @@ static batch_job_id_t fork_hadoop(struct batch_queue *q, char *hadoop_streaming_
 	}
 }
 
-static batch_job_id_t batch_job_hadoop_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct list *envlist )
+static batch_job_id_t batch_job_hadoop_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	int i;
 
