@@ -9,3 +9,8 @@ install:
 	chmod 755 $(SCRIPTS)
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
 
+doc:
+
+clean:
+
+test:

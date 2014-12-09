@@ -13,12 +13,38 @@
 #include <signal.h>
 #include <sys/stat.h>
 
-static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+static int setup_condor_wrapper(const char *wrapperfile)
+{
+	FILE *file;
+
+	if(access(wrapperfile, R_OK | X_OK) == 0)
+		return 0;
+
+	file = fopen(wrapperfile, "w");
+	if(!file)
+		return -1;
+
+	fprintf(file, "#!/bin/sh\n");
+	fprintf(file, "eval \"$@\"\n");
+	fprintf(file, "exit $?\n");
+	fclose(file);
+
+	chmod(wrapperfile, 0755);
+
+	return 0;
+}
+
+static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	FILE *file;
 	int njobs;
 	int jobid;
 	const char *options = hash_table_lookup(q->options, "batch-options");
+
+	if(setup_condor_wrapper("condor.sh") < 0) {
+		debug(D_BATCH, "could not create condor.sh: %s", strerror(errno));
+		return -1;
+	}
 
 	if(!string_istrue(hash_table_lookup(q->options, "skip-afs-check"))) {
 		char *cwd = path_getcwd();
@@ -40,16 +66,8 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	}
 
 	fprintf(file, "universe = vanilla\n");
-	fprintf(file, "executable = %s\n", cmd);
-	fprintf(file, "getenv = true\n");
-	if(args)
-		fprintf(file, "arguments = %s\n", args);
-	if(infile)
-		fprintf(file, "input = %s\n", infile);
-	if(outfile)
-		fprintf(file, "output = %s\n", outfile);
-	if(errfile)
-		fprintf(file, "error = %s\n", errfile);
+	fprintf(file, "executable = condor.sh\n");
+	fprintf(file, "arguments = %s\n",cmd);
 	if(extra_input_files)
 		fprintf(file, "transfer_input_files = %s\n", extra_input_files);
 	// Note that we do not use transfer_output_files, because that causes the job
@@ -61,6 +79,26 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "transfer_executable = true\n");
 	fprintf(file, "keep_claim_idle = 30\n");
 	fprintf(file, "log = %s\n", q->logfile);
+
+	/*
+	Getting environment variables formatted for a condor submit
+	file is very hairy, due to some strange quoting rules.
+	To avoid problems, we simply export vars to the environment,
+	and then tell condor getenv=true, which pulls in the environment.
+	*/
+
+	fprintf(file, "getenv = true\n");
+
+	nvpair_export(envlist);
+
+	if(envlist) {
+		char *name, *value;
+		nvpair_first_item(envlist);
+		while((nvpair_next_item(envlist,&name,&value))) {
+			setenv(name,value,1);
+		}
+	}
+
 	if(options)
 		fprintf(file, "%s\n", options);
 
@@ -102,37 +140,6 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	pclose(file);
 	debug(D_BATCH, "failed to submit job to condor!");
 	return -1;
-}
-
-static int setup_condor_wrapper(const char *wrapperfile)
-{
-	FILE *file;
-
-	if(access(wrapperfile, R_OK | X_OK) == 0)
-		return 0;
-
-	file = fopen(wrapperfile, "w");
-	if(!file)
-		return -1;
-
-	fprintf(file, "#!/bin/sh\n");
-	fprintf(file, "eval \"$@\"\n");
-	fprintf(file, "exit $?\n");
-	fclose(file);
-
-	chmod(wrapperfile, 0755);
-
-	return 0;
-}
-
-static batch_job_id_t batch_job_condor_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
-{
-	if(setup_condor_wrapper("condor.sh") < 0) {
-		debug(D_BATCH, "could not create condor.sh: %s", strerror(errno));
-		return -1;
-	}
-
-	return batch_job_condor_submit(q, "condor.sh", cmd, 0, 0, 0, extra_input_files, extra_output_files);
 }
 
 static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
@@ -289,7 +296,6 @@ const struct batch_queue_module batch_queue_condor = {
 
 	{
 		batch_job_condor_submit,
-		batch_job_condor_submit_simple,
 		batch_job_condor_wait,
 		batch_job_condor_remove,
 	},

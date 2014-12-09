@@ -88,9 +88,15 @@ static batch_job_id_t fork_hadoop(struct batch_queue *q, char *hadoop_streaming_
 	}
 }
 
-static batch_job_id_t batch_job_hadoop_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_hadoop_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	int i;
+
+	if(envlist) {
+		debug(D_NOTICE|D_BATCH,"sorry, the hadoop driver does not support environment variables.");
+		return -1;
+	}
+
 	struct hadoop_job *job = xxmalloc(sizeof(struct hadoop_job));
 	strcpy(job->wrapper, WRAPPER_TEMPLATE);
 	int fd = mkstemp(job->wrapper);
@@ -133,30 +139,6 @@ static batch_job_id_t batch_job_hadoop_submit_simple (struct batch_queue *q, con
 	batch_job_id_t status = fork_hadoop(q, hadoop_streaming_command, job);
 	for (i = 0; hadoop_streaming_command[i]; i++)
 		free(hadoop_streaming_command[i]);
-	return status;
-}
-
-static batch_job_id_t batch_job_hadoop_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
-{
-	char *command = string_format("%s %s", cmd, args);
-	if (infile) {
-		char *new = string_format("%s <%s", command, infile);
-		free(command);
-		command = new;
-	}
-	if (outfile) {
-		char *new = string_format("%s >%s", command, outfile);
-		free(command);
-		command = new;
-	}
-	if (errfile) {
-		char *new = string_format("%s 2>%s", command, errfile);
-		free(command);
-		command = new;
-	}
-
-	batch_job_id_t status = batch_job_hadoop_submit_simple(q, command, extra_input_files, extra_output_files);
-	free(command);
 	return status;
 }
 
@@ -480,7 +462,6 @@ const struct batch_queue_module batch_queue_hadoop = {
 
 	{
 		batch_job_hadoop_submit,
-		batch_job_hadoop_submit_simple,
 		batch_job_hadoop_wait,
 		batch_job_hadoop_remove,
 	},

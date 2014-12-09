@@ -61,11 +61,11 @@ static void addfile (struct batch_queue *q, buffer_t *B, const char *file, const
 	}
 }
 
-static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	buffer_t B;
 
-	debug(D_DEBUG, "%s(%p, `%s', `%s', `%s', `%s', `%s', `%s', `%s')", __func__, q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
+	debug(D_DEBUG, "%s(%p, `%s', `%s', `%s')", __func__, q, cmd, extra_input_files, extra_output_files);
 
 	buffer_init(&B);
 	buffer_abortonfailure(&B, 1);
@@ -76,29 +76,31 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 
 	buffer_putfstring(&B, "\"arguments\":[\"sh\",\"-c\",\"{\\n");
 	jsonA_escapestring(&B, cmd);
-	if (args) {
-		buffer_putliteral(&B, " ");
-		jsonA_escapestring(&B, args);
-	}
 	buffer_putliteral(&B, "\\n}");
-	if (infile) {
-		buffer_putliteral(&B, " <");
-		jsonA_escapestring(&B, infile);
-	}
-	if (outfile) {
-		buffer_putliteral(&B, " >");
-		jsonA_escapestring(&B, outfile);
-	}
-	if (errfile) {
-		buffer_putliteral(&B, " 2>");
-		jsonA_escapestring(&B, errfile);
-	}
 	buffer_putliteral(&B, "\"],");
 
+	if(envlist) {
+		char *name, *value;
+		int first=1;
+		buffer_putfstring(&B,"\"environment\":{");
+		nvpair_first_item(envlist);
+		while(nvpair_next_item(envlist,&name,&value)) {
+			if(first) {
+				first=0;
+			} else {
+				buffer_putliteral(&B,",");
+			}
+
+			buffer_putliteral(&B,"\"");
+			jsonA_escapestring(&B,name);
+			buffer_putliteral(&B,"\":\"");
+			jsonA_escapestring(&B,value);
+			buffer_putliteral(&B,"\"");
+		}
+		buffer_putfstring(&B,"},");
+	}
+
 	buffer_putliteral(&B, "\"files\":[");
-	addfile(q, &B, infile, "INPUT");
-	addfile(q, &B, outfile, "OUTPUT");
-	addfile(q, &B, errfile, "OUTPUT");
 	if (extra_input_files) {
 		char *file;
 		char *list = xxstrdup(extra_input_files);
@@ -140,12 +142,6 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 		buffer_free(&B);
 		return (batch_job_id_t) result;
 	}
-}
-
-static batch_job_id_t batch_job_chirp_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
-{
-	/* Here we exploit that batch_job_chirp_submit(...) just concatenates cmd and args, passed to /bin/sh. */
-	return batch_job_chirp_submit(q, cmd, NULL, NULL, NULL, NULL, extra_input_files, extra_output_files);
 }
 
 static batch_job_id_t batch_job_chirp_wait (struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
@@ -367,7 +363,6 @@ const struct batch_queue_module batch_queue_chirp = {
 
 	{
 		batch_job_chirp_submit,
-		batch_job_chirp_submit_simple,
 		batch_job_chirp_wait,
 		batch_job_chirp_remove,
 	},

@@ -20,7 +20,6 @@ See the file COPYING for details.
 extern const struct batch_queue_module batch_queue_chirp;
 extern const struct batch_queue_module batch_queue_cluster;
 extern const struct batch_queue_module batch_queue_condor;
-extern const struct batch_queue_module batch_queue_hadoop;
 extern const struct batch_queue_module batch_queue_local;
 extern const struct batch_queue_module batch_queue_moab;
 extern const struct batch_queue_module batch_queue_sge;
@@ -32,17 +31,17 @@ static struct batch_queue_module batch_queue_unknown = {
 
 	NULL, NULL, NULL, NULL,
 
-	{NULL, NULL, NULL, NULL},
+	{NULL, NULL, NULL},
 
 	{NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
-#define BATCH_JOB_SYSTEMS  "local, chirp, cluster, condor, hadoop, moab, sge, torque, wq"
+#define BATCH_JOB_SYSTEMS  "local, wq, condor, sge, torque, moab, chirp"
+
 const struct batch_queue_module * const batch_queue_modules[] = {
     &batch_queue_chirp,
     &batch_queue_cluster,
     &batch_queue_condor,
-    &batch_queue_hadoop,
     &batch_queue_local,
     &batch_queue_moab,
     &batch_queue_sge,
@@ -161,14 +160,9 @@ const char *batch_queue_type_string()
 }
 
 
-batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
+batch_job_id_t batch_job_submit(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
-	return q->module->job.submit(q, cmd, args, infile, outfile, errfile, extra_input_files, extra_output_files);
-}
-
-batch_job_id_t batch_job_submit_simple(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
-{
-	return q->module->job.submit_simple(q, cmd, extra_input_files, extra_output_files);
+	return q->module->job.submit(q, cmd, extra_input_files, extra_output_files, envlist);
 }
 
 batch_job_id_t batch_job_wait(struct batch_queue * q, struct batch_job_info * info)
