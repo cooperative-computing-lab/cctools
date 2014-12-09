@@ -182,8 +182,8 @@ void dag_node_clean(struct dag *d, struct dag_node *n)
 	if(n->nested_job) {
 		char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
 		sprintf(command, "%s -c", n->command);
-		/* Export environment variables in case nested Makeflow
-		 * requires them. */
+
+		/* XXX this should use the batch job interface for consistency */
 		dag_node_export_variables(d, n);
 		system(command);
 		free(command);
@@ -691,46 +691,6 @@ int dag_prepare_for_monitoring(struct dag *d)
 	return 1;
 }
 
-void environment_list_apply( const char *envlist )
-{
-	if(!envlist) return;
-
-	char *list = strdup(envlist);
-	char *name = strtok(list,";");
-	while(name) {
-		char *value = strchr(name,'=');
-		if(value) {
-			*value=0;
-			value++;
-			setenv(name,value,1);
-			*value='=';
-		}
-		name = strtok(0,";");
-	}
-	free(list);
-}
-
-/*
-For a given dag node, export all variables into the environment.
-This is currently only used when cleaning a makeflow recurisvely,
-and would be better handled by invoking batch_job_local.
-*/
-
-static void dag_node_export_variables( struct dag *d, struct dag_node *n )
-{
-	struct dag_lookup_set s = { d, n->category, n, NULL };
-	char *key;
-
-	set_first_element(d->export_vars);
-	while((key = set_next_element(d->export_vars))) {
-		char *value = dag_lookup_str(key, &s);
-		if(value) {
-			setenv(key,value,1);
-			debug(D_MAKEFLOW_RUN, "export %s=%s", key, value);
-		}
-	}
-}
-
 /*
 Creates an nvpair containing the explicit environment
 strings for this given node.  Each element of the list
@@ -756,6 +716,19 @@ struct nvpair * dag_node_env_create( struct dag *d, struct dag_node *n )
 	}
 
 	return nv;
+}
+
+/*
+For a given dag node, export all variables into the environment.
+This is currently only used when cleaning a makeflow recurisvely,
+and would be better handled by invoking batch_job_local.
+*/
+
+static void dag_node_export_variables( struct dag *d, struct dag_node *n )
+{
+	struct nvpair *nv = dag_node_env_create(d,n);
+	nvpair_export(nv);
+	nvpair_delete(nv);
 }
 
 /*
