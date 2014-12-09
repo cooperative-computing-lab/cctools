@@ -889,16 +889,13 @@ int main( int argc, char *argv[] )
 	get_linux_version(argv[0]);
 
 	if(pfs_temp_dir[PFS_PATH_MAX - 1] != '\0')
-	{
 		fatal("temporary files directory pathname larger than %d characters\n", PFS_PATH_MAX - 1);
-	}
 
 	//if alien cache dir has not been set, use default based on final value of pfs_temp_dir.
 	if(strlen(pfs_cvmfs_alien_cache_dir) < 1)
 	{
 		sprintf(pfs_cvmfs_alien_cache_dir,"%s/cvmfs", pfs_temp_dir);
 	}
-
 
 	pfs_file_cache = file_cache_init(pfs_temp_dir);
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
@@ -911,18 +908,17 @@ int main( int argc, char *argv[] )
 
 	if(tickets) {
 		auth_ticket_load(tickets);
-		free(tickets);
+		tickets = realloc(tickets, 0);
 	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
 		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
 	} else {
 		auth_ticket_load(NULL);
 	}
 
-
 	if(!pfs_channel_init(channel_size*1024*1024)) fatal("couldn't establish I/O channel");
 
 	{
-		char buf[4096];
+		char buf[PATH_MAX];
 		snprintf(buf, sizeof(buf), "%s/parrot-fd.XXXXXX", pfs_temp_dir);
 		if (mkdtemp(buf) == NULL)
 			fatal("could not create parrot-fd temporary directory: %s", strerror(errno));
