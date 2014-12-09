@@ -747,13 +747,14 @@ int main( int argc, char *argv[] )
 		extern char **environ;
 		buffer_t B;
 		buffer_init(&B);
-		buffer_putfstring(&B, "command: %s", argv[0]);
+		debug(D_DEBUG, "command:");
+		buffer_putfstring(&B, " - %s", argv[0]);
 		for (int i = 1; argv[i]; i++)
 			buffer_putfstring(&B, " \"%s\"", argv[i]);
 		debug(D_DEBUG, "%s", buffer_tostring(&B));
 		debug(D_DEBUG, "environment:");
 		for (int i = 0; environ[i]; i++)
-			debug(D_DEBUG, "%s", environ[i]);
+			debug(D_DEBUG, " - %s", environ[i]);
 		buffer_free(&B);
 	}
 
