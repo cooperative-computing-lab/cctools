@@ -17,12 +17,15 @@ manpages: ${ZIPFILES}
 apipages: api/html/index.html api/html/work_queue_perl.html api/html/work_queue_task_perl.html
 
 api/html/index.html:
+	mkdir -p api/html
 	doxygen cctools.doxygen.config
 
 api/html/work_queue_perl.html:
+	mkdir -p api/html
 	pod2html ../work_queue/src/perl/Work_Queue.pm > $@
 
 api/html/work_queue_task_perl.html:
+	mkdir -p api/html
 	pod2html ../work_queue/src/perl/Work_Queue/Task.pm > $@
 
 %.html: %.m4
