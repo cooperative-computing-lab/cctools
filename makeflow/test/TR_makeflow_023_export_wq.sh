@@ -4,7 +4,8 @@
 # and then propagated all the way to a work queue task, where
 # it is evaluated.  Note that HELLO is set within the makeflow,
 # while GOODBYE is simply exported, and its value is taken from
-# the environment in effect when makeflow runs.
+# the environment in effect when makeflow runs.  The backslashes
+# ensure that the variables are evaluated by the task, not by makeflow.
 
 . ../../dttools/test/test_runner_common.sh
 
@@ -21,7 +22,7 @@ prepare()
 export HELLO=hello makeflow
 export GOODBYE
 output.txt:
-	echo \$HELLO \$GOODBYE > output.txt
+	echo \\\$HELLO \\\$GOODBYE > output.txt
 EOF
 
 	cat > expected.txt <<EOF
