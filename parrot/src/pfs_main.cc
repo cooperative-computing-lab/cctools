@@ -62,7 +62,6 @@ extern "C" {
 
 #define SIG_ISSTOP(s) (s == SIGTTIN || s == SIGTTOU || s == SIGSTOP || s == SIGTSTP)
 
-extern char **environ;
 FILE *namelist_file;
 struct hash_table *namelist_table;
 int linux_major;
@@ -746,15 +745,14 @@ int main( int argc, char *argv[] )
 	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
 	{
 		extern char **environ;
-		int i;
 		buffer_t B;
 		buffer_init(&B);
 		buffer_putfstring(&B, "command: %s", argv[0]);
-		for (i = 1; argv[i]; i++)
+		for (int i = 1; argv[i]; i++)
 			buffer_putfstring(&B, " \"%s\"", argv[i]);
 		debug(D_DEBUG, "%s", buffer_tostring(&B));
 		debug(D_DEBUG, "environment:");
-		for (i = 0; environ[i]; i++)
+		for (int i = 0; environ[i]; i++)
 			debug(D_DEBUG, "%s", environ[i]);
 		buffer_free(&B);
 	}
@@ -1051,7 +1049,7 @@ int main( int argc, char *argv[] )
 		printf("%" PRId64 " bytes written\n",pfs_write_count);
 
 		printf("\n32-bit System Calls:\n");
-		for(i=0;i<SYSCALL32_MAX;i++) {
+		for(int i=0;i<SYSCALL32_MAX;i++) {
 			if(pfs_syscall_totals32[i]) {
 				printf("%-20s %d\n",tracer_syscall32_name(i),pfs_syscall_totals32[i]);
 			}
@@ -1060,7 +1058,7 @@ int main( int argc, char *argv[] )
 		#ifdef CCTOOLS_CPU_X86_64
 
 		printf("\n64-bit System Calls:\n");
-		for(i=0;i<SYSCALL64_MAX;i++) {
+		for(int i=0;i<SYSCALL64_MAX;i++) {
 			if(pfs_syscall_totals64[i]) {
 				printf("%-20s %d\n",tracer_syscall64_name(i),pfs_syscall_totals64[i]);
 			}
