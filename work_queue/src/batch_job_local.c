@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <signal.h>
 
-static batch_job_id_t batch_job_local_submit_simple (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	batch_job_id_t jobid;
 
@@ -37,6 +37,8 @@ static batch_job_id_t batch_job_local_submit_simple (struct batch_queue *q, cons
 			_exit(1);
 		}*/
 
+		nvpair_export(envlist);
+
 		/** A note from "man system 3" as of Jan 2012:
 		 * Do not use system() from a program with set-user-ID or set-group-ID
 		 * privileges, because strange values for some environment variables
@@ -47,30 +49,11 @@ static batch_job_id_t batch_job_local_submit_simple (struct batch_queue *q, cons
 		 * 2, since bash 2 drops privileges on startup. (Debian uses a modified
 		 * bash which does not do this when invoked as sh.)
 		 */
+
 		execlp("sh", "sh", "-c", cmd, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return -1;
-}
-
-static batch_job_id_t batch_job_local_submit (struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
-{
-	if(cmd == NULL)
-		cmd = "/bin/false";
-	if(args == NULL)
-		args = "";
-	if(infile == NULL)
-		infile = "/dev/null";
-	if(outfile == NULL)
-		outfile = "/dev/null";
-	if(errfile == NULL)
-		errfile = "/dev/null";
-
-	char *command = string_format("%s %s <%s >%s 2>%s", cmd, args, infile, outfile, errfile);
-
-	batch_job_id_t status = batch_job_local_submit_simple(q, command, extra_input_files, extra_output_files);
-	free(command);
-	return status;
 }
 
 static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
@@ -160,7 +143,6 @@ const struct batch_queue_module batch_queue_local = {
 
 	{
 		batch_job_local_submit,
-		batch_job_local_submit_simple,
 		batch_job_local_wait,
 		batch_job_local_remove,
 	},

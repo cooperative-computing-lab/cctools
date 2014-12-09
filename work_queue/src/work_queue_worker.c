@@ -790,6 +790,17 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		       	work_queue_task_specify_disk(task, n);
 		} else if(sscanf(line,"gpus %d",&n)) {
 			work_queue_task_specify_gpus(task, n);
+	  	} else if(sscanf(line,"env %d",&length)==1) {
+			char *env = malloc(length+1);
+			link_read(master,env,length,stoptime);
+			env[length] = 0;
+			char *value = strchr(env,'=');
+			if(value) {
+				*value = 0;
+				value++;
+				work_queue_task_specify_env(task,env,value);
+			}
+			free(env);
 		} else if(!strcmp(line,"end")) {
 		       	break;
 		} else {

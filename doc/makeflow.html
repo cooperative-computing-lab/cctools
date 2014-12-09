@@ -12,7 +12,7 @@
 <div id="manual">
 <h1>Makeflow User's Manual</h1>
 
-<p style="text-align: right;"><b>Last edited: July 2014</b></p>
+<p style="text-align: right;"><b>Last edited: December 2014</b></p>
 
 <p>Makeflow is Copyright (C) 2009 The University of Notre Dame.<br>
 This software is distributed under the GNU General Public License.<br>
@@ -30,10 +30,23 @@ Makeflow.</p>
 
 <p>You can run a Makeflow on your local machine to test it out.  If you have a
 multi-core machine, then you can run multiple tasks simultaneously.  If you
-have a Condor pool or a Sun Grid Engine batch system, then you can send your
+have a cluster or a batch system, then you can send your
 jobs there to run.  If you don't already have a batch system, Makeflow comes
 with a system called Work Queue that will let you distribute the load across
 any collection of machines, large or small.</p>
+
+<p>Makeflow currently supports the following batch systems:
+<table>
+<tr><td>local    <td> Local execution on the submitting machine, using multiple cores if available.
+<tr><td>wq       <td> <a href=http://ccl.cse.nd.edu/software/workqueue>Work Queue</a> distributed application system, included with Makeflow.
+<tr><td>condor   <td> <a href=http://www.cs.wisc.edu/htcondor>HTCondor</a> distributed computing system.
+<tr><td>sge      <td> <a href=http://gridscheduler.sourceforge.net>Open Grid Scheduler</a>, Univa Grid Engine, Oracle Grid Engine, all derived from Sun Grid Engine (SGE).
+<tr><td>torque   <td> <a href=http://www.adaptivecomputing.com/products/open-source/torque>Torque Resource Manager</a>
+<tr><td>moab     <td> <a href="http://www.adaptivecomputing.com/resources/docs/mwm/6-0/index.php">Moab Workload Manager</a></li>
+<tr><td>cluster  <td> Custom-defined batch submission commands, see <a href=#custom.drivers>custom drivers</a> below for details.
+<tr><td>chirp    <td> Active storage jobs on the <a href=http://ccl.cse.nd.edu/software/chirp>Chirp filesystem</a>.
+</table>
+</p>
 
 <p> Makeflow is part of the <a
 href="http://ccl.cse.nd.edu/software">Cooperating Computing Tools</a>.  You can
@@ -81,45 +94,44 @@ capitol.jpg: $CURL
         LOCAL $CURL -o capitol.jpg $URL
 </code>
 
-<p>Note that Makeflow differs from Make in a few important ways.  Read section
-4 below to get all of the details.</p>
+<p>Note that Makeflow differs from Make in a few important ways.
+The <a href=#details>complete details</a> are given below.</p>
 
 <h2 id="running">Running Makeflow<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>To try out the example above, copy and paste it into a file named
 <tt>example.makeflow</tt>.  To run it on your local machine:</p>
 
-<code>% makeflow example.makeflow</code>
+<code>makeflow example.makeflow</code>
 
 <p>Note that if you run it a second time, nothing will happen, because all of
 the files are built:</p>
 
-<code>% makeflow example.makeflow
+<code>makeflow example.makeflow
 makeflow: nothing left to do
 </code>
 
 <p>Use the <tt>-c</tt> option to clean everything up before trying it
 again:</p>
 
-<code>% makeflow -c example.makeflow</code>
+<code>makeflow -c example.makeflow</code>
 
-<p>If you have access to a batch system running <a
-href="http://www.sun.com/software/sge">SGE</a>, then you can direct Makeflow to
-run your jobs there:</p>
+<p>If you have access to a batch system like Condor, SGE, Torque, or Moab,
+you can direct Makeflow to run your jobs there:</p>
 
-<code>% makeflow -T sge example.makeflow</code>
+<code>
+makeflow -T condor example.makeflow
+# or:
+makeflow -T sge example.makeflow
+# or:
+makeflow -T torque example.makeflow
+...
+</code>
 
-<p>Or, if you have a <a href="http://www.cs.wisc.edu/condor">Condor Pool</a>,
-then you can direct Makeflow to run your jobs there:</p>
+<h2 id="workqueue">Running Makeflow with Work Queue<a class="sectionlink" href="#workqueue" title="Link to this section.">&#x21d7;</a></h2>
 
-<code>% makeflow -T condor example.makeflow</code>
-
-<p>To submit Makeflow as a Condor job that submits more Condor jobs:</p>
-
-<code>% condor_submit_makeflow example.makeflow</code>
-
-<p>You will notice that a workflow can run very slowly if you submit each batch
-job to SGE or Condor, because it typically takes 30 seconds or so to start each
+<p>You will notice that a workflow can run very slowly if you submit each task
+in the usual way, because it typically takes 30 seconds or so to start each
 batch job running.  To get around this limitation, we provide the Work Queue
 system.  This allows Makeflow to function as a master process that quickly
 dispatches work to remote worker processes.</p>
@@ -127,11 +139,11 @@ dispatches work to remote worker processes.</p>
 <p>To begin, let's assume that you are logged into a machine named
 <tt>barney.nd.edu</tt>. start your Makeflow like this:</p>
 
-<code>% makeflow -T wq example.makeflow</code>
+<code>makeflow -T wq example.makeflow</code>
 
 <p>Then, submit 10 worker processes to Condor like this:</p>
 
-<code>% condor_submit_workers barney.nd.edu 9123 10
+<code>condor_submit_workers barney.nd.edu 9123 10
 Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
@@ -139,11 +151,11 @@ Logging submit event(s)..........
 
 <p>Or, submit 10 worker processes to SGE like this:</p>
 
-<code>% sge_submit_workers barney.nd.edu 9123 10</code>
+<code>sge_submit_workers barney.nd.edu 9123 10</code>
 
 <p>Or, you can start workers manually on any other machine you can log into:</p>
 
-<code>% work_queue_worker barney.nd.edu 9123</code>
+<code>work_queue_worker barney.nd.edu 9123</code>
 
 <p>Once the workers begin running, Makeflow will dispatch multiple tasks to
 each one very quickly.  If a worker should fail, Makeflow will retry the work
@@ -158,7 +170,74 @@ they will automatically exit.</p>
 are simple shell scripts, so you can edit them directly if you would like to
 change batch options or other details.</p>
 
-<h2 id="details">The Fine Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
+<h3 id="workqueue.port">Port Numbers<a class="sectionlink" href="#workqueue.port" title="Link to this section.">&#x21d7;</a></h3>
+
+<p>Makeflow listens on a port which the remote workers would connect to.  The
+default port number is 9123.  Sometimes, however, the port number might be not
+available on your system. You can change the default port via the <tt>-p
+&lt;port number&gt;</tt> option. For example, if you want the master to listen
+on port 9567 by default, you can run the following command:</p>
+
+<code>makeflow -T wq -p 9567 example.makeflow</code>
+
+<h3 id="workqueue.projectnames">Project Names<a class="sectionlink" href="#workqueue.projectnames" title="Link to this section.">&#x21d7;</a></h3>
+
+<p>A simpler way to match workers to masters is to use the project name
+matching. You can give the master a project name with the -N option.</p>
+
+<code>makeflow -T wq -N MyProj example.makeflow </code> 
+
+<p>The -N option gives the master a project name called 'MyProj',
+and will cause it to advertise its information
+such as the project name, running status, hostname and port number, to a catalog server.
+Then a worker can simply identify the workload by its project name.
+By default, makeflow will use the global catalog server at <a href=http://catalog.cse.nd.edu>catalog.cse.nd.edu</a>
+but this can be changed, as described below.
+</p>
+
+<p>To start a worker that automatically finds MyProj's master via the default
+Notre Dame catalog server:</p>
+
+<code>work_queue_worker -N MyProj </code>
+
+<p>You can also give multiple -N options to a worker. The worker will find out
+which ones of the specified projects are running from the catalog server and
+randomly select one to work for. When one project is done, the worker would
+repeat this process.  Thus, the worker can work for a different master without
+being stopped and given the different master's hostname and port. An example of
+specifying multiple projects:</p>
+
+<code>work_queue_worker -N proj1 -N proj2 -N proj3</code>
+
+<h3 id="workqueue.password">Setting a Password<a class="sectionlink" href="#workqueue.password" title="Link to this section.">&#x21d7;</a></h3>
+
+<p>We recommend that any workflow that uses a project name also set a password.
+To do this, select any password and write it to a file called
+<tt>mypwfile</tt>.  Then, run Makeflow and each worker with the
+<tt>--password</tt> option to indicate the password file:</p>
+
+<code>makeflow <b>--password</b> mypwfile ...
+work_queue_worker <b>--password</b> mypwfile ...
+</code>
+
+<h3 id="workqueue.catalog">Catalog Server<a class="sectionlink" href="#workqueue.catalog" title="Link to this section.">&#x21d7;</a></h3>
+
+<p>Now let's look at how to set up your own catalog server. Say you want to
+run your catalog server on a machine named <tt>catalog.somewhere.edu</tt>.
+The default port that the catalog server will be listening on is 9097, you can
+change it via the '-p' option.</p>
+
+<code>catalog_server</code>
+
+<p>Now you have a catalog server listening at catalog.somewhere.edu:9097. To
+make your masters and workers contact this catalog server, simply add the
+<tt>-C hostname:port</tt> option to both of your master and worker:</p>
+
+<code>makeflow -T wq -C catalog.somewhere.edu:9097 -N MyProj example.makeflow
+work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj 
+</code>
+
+<h2 id="details">More Language Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>The Makeflow language is very similar to Make, but it does have a few important differences that you should be aware of.</p>
 
@@ -231,18 +310,26 @@ before the rule's command, and prepending the name of the variable with
 
 <code>SOME_VARIABLE=original_value
 
-#rule 1 target_1: source_1
+target_1: source_1
 	command_1
 
-#rule 2 target_2: source_2
+target_2: source_2
 @SOME_VARIABLE=local_value_for_2
 	command_2
 
-#rule 3 target_3: source_3
+target_3: source_3
 	command_3 </code>
 
 In this example, SOME_VARIABLE has the value 'original_value' for rules 1 and
 3, and the value 'local_value_for_2' for rule 2.
+
+<h3 id="details.environment">Environment Variables<a class="sectionlink" href="#details.environment" title="Link to this section.">&#x21d7;</a></h3>
+
+Environment variables can be defined with the <tt>export</tt> keyword inside a workflow.  Makeflow will communicate explicitly named environment variables
+to remote batch systems, where they will override whatever local setting is present.  For example, suppose you want to modify the PATH for every job in the makeflow:
+
+<code>export PATH=/opt/tools/bin:${PATH}
+</code>
 
 <h3 id="details.refinement">Batch Job Refinement<a class="sectionlink" href="#details.refinement" title="Link to this section.">&#x21d7;</a></h3>
 
@@ -288,134 +375,18 @@ did not need to rename the file <tt>b.out</tt>. Without remote file renaming,
 we would have to create either a symbolic link, or a copy of the files with the
 expected correct names.</p>
 
-<h3 id="details.displaying">Displaying a Makeflow<a class="sectionlink" href="#details.displaying" title="Link to this section.">&#x21d7;</a></h3>
+<h2 id="details.displaying">Displaying a Makeflow<a class="sectionlink" href="#details.displaying" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>When run with the <tt>-D</tt> option, Makeflow will emit a diagram of the
 Makeflow in the <a href="http://www.graphviz.org">Graphviz DOT</a> format. If you
 have <tt>dot</tt> installed, then you can generate an image of your workload
 like this:</p>
 
-<code>% makeflow -D example.makeflow | dot -T gif &gt; example.gif</code>
+<code>makeflow -D example.makeflow | dot -T gif &gt; example.gif</code>
 
 <p>To observe how a makeflow runs over time, use <tt>makeflow_graph_log</tt> to convert a log file into a timeline that shows the number of tasks ready, running, and complete over time:</p>
 
 <code>makeflow_graph_log example.makeflowlog example.png</code>
-
-<h2 id="workqueue.drivers">Supported Makeflow Drivers<a class="sectionlink" href="#workqueue.drivers" title="Link to this section.">&#x21d7;</a></h2>
-
-<p>The full list of supported Makeflow drivers include:</p>
-
-<ul>
-	<li>Local - local execution on a single multicore system</li>
-	<li>Condor - execution on a campus grid via the local <a href="http://www.cs.wisc.edu/condor">Condor Pool</a></li>
-	<li>SGE - execution on a high-performance cluster using the <a href="http://www.oracle.com/us/products/tools/oracle-grid-engine-075549.html">Oracle Grid Engine</a> (formerly the Sun Grid Engine).</li>
-	<li>Moab - execution on a high-performance cluster using the <a href="http://www.adaptivecomputing.com/resources/docs/mwm/6-0/index.php">Moab Workload Manager</a></li>
-	<li>Cluster - execution on a high-performance cluster using a user-defined cluster manager</li>
-	<li>Work Queue - execution on a lightweight, scalable master-worker <a href="http://ccl.cse.nd.edu/software/workqueue/">framework</a> managed directly by Makeflow</li>
-	<li>Hadoop - execution on a cluster managed by the <a href="http://hadoop.apache.org/">Hadoop</a> framework, using data stored in <a href="http://hadoop.apache.org/hdfs">HDFS</a>.</li>
-</ul>
-
-<h4 id="workqueue.drivers.clusters">User-defined Clusters<a class="sectionlink" href="#workqueue.drivers.clusters" title="Link to this section.">&#x21d7;</a></h4>
-
-<p>For clusters that are not directly supported by Makeflow we strongly suggest
-using the <a href="http://ccl.cse.nd.edu/software/workqueue">Work Queue</a> system
-and submitting workers via the cluster's normal submission mechanism.</p>
-
-<p>For clusters using managers similar to SGE or Moab that are configured to
-preclude the use of Work Queue we have the "Cluster" custom driver.  To use the
-"Cluster" driver the Makeflow must be run in a parallel filesystem available to
-the entire cluster, and the following environment variables must be set.</p>
-
-<ul>
-	<li>BATCH_QUEUE_CLUSTER_NAME: The name of the cluster, used in debugging messages and as the name for the wrapper script.</li>
-	<li>BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND: The submit command for the cluster (such as qsub or msub)</li>
-	<li>BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS: The command-line arguments that must be passed to the submit command.  This string should end with the argument used to set the name of the task (usually -N).</li>
-	<li>BATCH_QUEUE_CLUSTER_REMOVE_COMMAND: The delete command for the cluster (such as qdel or mdel)</li>
-</ul>
-
-<p>These will be used to construct a task submission for each makeflow rule that consists of:</p>
-
-<code>% $SUBMIT_COMMAND $SUBMIT_OPTIONS "&lt;rule name&gt;" $CLUSTER_NAME.wrapper "&lt;rule commandline&gt;"</code>
-
-<p>The wrapper script is a shell script that reads the command to be run as an argument and handles bookkeeping operations necessary for Makeflow.</p>
-
-<h2 id="workqueue">Running Makeflow with Work Queue<a class="sectionlink" href="#workqueue" title="Link to this section.">&#x21d7;</a></h2>
-
-<p>With the '-T wq' option, Makeflow runs as a master process that dispatches
-tasks to remote worker processes using the <a href="workqueue.html">Work
-Queue</a> framework.</p>
-
-<h3 id="workqueue.port">Selecting a Port<a class="sectionlink" href="#workqueue.port" title="Link to this section.">&#x21d7;</a></h3>
-
-<p>Makeflow listens on a port which the remote workers would connect to.  The
-default port number is 9123.  Sometimes, however, the port number might be not
-available on your system. You can change the default port via the <tt>-p
-&lt;port number&gt;</tt> option. For example, if you want the master to listen
-on port 9567 by default, you can run the following command:</p>
-
-<code>% makeflow -T wq -p 9567 example.makeflow</code>
-
-<h3 id="workqueue.projectnames">Project Names<a class="sectionlink" href="#workqueue.projectnames" title="Link to this section.">&#x21d7;</a></h3>
-
-<p>A simpler way to match workers to masters is to use the project name
-matching. You can give the master a project name with the -N option.</p>
-
-<code> % makeflow -T wq -a -N MyProj example.makeflow </code> 
-
-<p>The -N option gives the master a project name called 'MyProj'. The -a option
-enables the catalog mode of the master.  Only in the catalog mode a master
-would advertise its information, such as the project name, running status,
-hostname and port number, to a catalog server. Then a worker could retrieve
-these information from the same catalog server.  The above command uses the
-default catalog server at Notre Dame which runs 24/7. We will talk about how to
-set up your own catalog server later.</p>
-
-<p>To start a worker that automatically finds MyProj's master via the default
-Notre Dame catalog server:</p>
-
-<code>% work_queue_worker -a -N MyProj </code>
-
-<p>The <tt>-a</tt> option enables the catalog mode on the worker, which tells the worker
-to contact a catalog server to find out a project's (specified by -N option)
-hostname and port.</p>
-
-<p>You can also give multiple -N options to a worker. The worker will find out
-which ones of the specified projects are running from the catalog server and
-randomly select one to work for. When one project is done, the worker would
-repeat this process.  Thus, the worker can work for a different master without
-being stopped and given the different master's hostname and port. An example of
-specifying multiple projects:</p>
-
-<code>% work_queue_worker -a -N proj1 -N proj2 -N proj3</code>
-
-<h3 id="workqueue.password">Setting a Password<a class="sectionlink" href="#workqueue.password" title="Link to this section.">&#x21d7;</a></h3>
-
-<p>We recommend that any workflow that uses a project name also set a password.
-To do this, select any passphrase and write it to a file called
-<tt>mypwfile</tt>.  Then, run Makeflow and each worker with the
-<tt>--password</tt> option to indicate the password file:</p>
-
-<code>% makeflow <b>--password</b> mypwfile ...
-% work_queue_worker <b>--password</b> mypwfile ...
-</code>
-
-<h3 id="workqueue.catalog">Catalog Server<a class="sectionlink" href="#workqueue.catalog" title="Link to this section.">&#x21d7;</a></h3>
-
-<p>Now let's look at how to set up your own catalog server. Say you want to
-run your catalog server on a machine named <tt>catalog.somewhere.edu</tt>.
-The default port that the catalog server will be listening on is 9097, you can
-change it via the '-p' option.</p>
-
-<code>% catalog_server</code>
-
-<p>Now you have a catalog server listening at catalog.somewhere.edu:9097. To
-make your masters and workers contact this catalog server, simply add the
-<tt>-C hostname:port</tt> option to both of your master and worker:</p>
-
-<code>% makeflow -T wq -C catalog.somewhere.edu:9097 -N MyProj example.makeflow
-% work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj 
-</code>
-
 
 <h2 id="wrappers">Wrapper Commands<a class="sectionlink" href="#wrappers" title="Link to this section.">&#x21d7;</a></h2>
 
@@ -434,6 +405,7 @@ Suppose you want to wrap every command with a script that would set up an approp
 <code>#!/bin/sh
 export JAVA_HOME=/opt/java-9.8.3.6.7
 export PATH=${JAVA_HOME}/bin:$PATH
+echo "using java in $JAVA_HOME"
 exec "$@"
 </code>
 
@@ -465,11 +437,8 @@ environment variables CORES, MEMORY, and DISK.
 
 Consider the following example:
 
-<code> 
-
-
-#Following tasks are assigned to the category preprocessing. MEMORY and CORES
-are read from the environment, if defined.  
+<code> # These tasks are assigned to the category preprocessing.
+# MEMORY and CORES are read from the environment, if defined.  
 
 CATEGORY="preprocessing"
 DISK=500
@@ -480,10 +449,9 @@ one: src
 two: src
     cmd
 
-#Switch to category simulation. Note that now CORES, MEMORY, and DISK are specified.
+# These tasks have the category "simulation". Note that now CORES, MEMORY, and DISK are specified.
 
 CATEGORY="simulation"
-
 CORES=1
 MEMORY=400
 DISK=400
@@ -494,7 +462,7 @@ three: src
 four: src
     cmd
 
-#Another category switch. MEMORY is read from the environment.
+# Another category switch. MEMORY is read from the environment.
 
 CATEGORY="analysis"
 CORES=4
@@ -516,7 +484,7 @@ makeflow ...
 <tr><td> analysis </td> <td> 4 </td> <td> 800  (from environment)</td> <td> 600 </td> </tr>
 </table>
 
-<h2 id="linking">Linking Workflow Dependencies<a class="sectionlink" href="#linking" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="linking">Linking Dependencies<a class="sectionlink" href="#linking" title="Link to this section.">&#x21d7;</a></h2>
 
 <p><tt>Makeflow</tt> provides a tool to collect all of the dependencies for a
 given workflow into one directory. By collecting all of the input files and
@@ -541,9 +509,9 @@ path are renamed when copied into the bundle:</p>
 
 <p>Example usage:</p>
 
-<code>% makeflow -b some_output_directory example.makeflow</code>
+<code>makeflow -b some_output_directory example.makeflow</code>
 
-<h2 id="garbage">Makeflow Garbage Collection<a class="sectionlink" href="#garbage" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="garbage">Garbage Collection<a class="sectionlink" href="#garbage" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>As the workflow execution progresses, Makeflow can automatically delete
 intermediate files that are no longer needed. In this context, an intermediate
@@ -574,7 +542,7 @@ below a given threshold.</p>
 
 <code>makeflow -gon_demand -G500000000</code>
 
-<h2 id="logformat">Makeflow Log File Format<a class="sectionlink" href="#logformat" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="logformat">Log File Format<a class="sectionlink" href="#logformat" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>After you  have executed the <tt>example.makeflow</tt> Makeflow script, you
 should see a log file named <tt>example.makeflow.makeflowlog</tt> under the
@@ -657,6 +625,33 @@ during a garbage collection cycle:</p>
 	<li><b>time_spent</b> - the length of time this cycle took.</li>
 	<li><b>dag_gc_collected</b> - the total number of files has been collected so far since the start this Makeflow execution.</li>
 </ul>
+
+<h2 id="custom.drivers">Custom Drivers<a class="sectionlink" href="#custom.drivers" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>For clusters that are not directly supported by Makeflow we strongly suggest
+using the <a href="http://ccl.cse.nd.edu/software/workqueue">Work Queue</a> system
+and submitting workers via the cluster's normal submission mechanism.</p>
+
+<p>For clusters using managers similar to Torque, SGE, and PBS that submit
+jobs with commands like "qsub", you can inform makeflow of those commands
+and use the <tt>cluster</tt> driver.  For this to work, it is assumed
+there is a distributed filesystem shared (like NFS) shared across all 
+nodes of the cluster.</p>
+
+<p>To configure a custom driver, set the following environment variables:
+
+<ul>
+	<li>BATCH_QUEUE_CLUSTER_NAME: The name of the cluster, used in debugging messages and as the name for the wrapper script.</li>
+	<li>BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND: The submit command for the cluster (such as qsub or msub)</li>
+	<li>BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS: The command-line arguments that must be passed to the submit command.  This string should end with the argument used to set the name of the task (usually -N).</li>
+	<li>BATCH_QUEUE_CLUSTER_REMOVE_COMMAND: The delete command for the cluster (such as qdel or mdel)</li>
+</ul>
+
+<p>These will be used to construct a task submission for each makeflow rule that consists of:</p>
+
+<code>$SUBMIT_COMMAND $SUBMIT_OPTIONS $CLUSTER_NAME.wrapper "&lt;rule commandline&gt;"</code>
+
+<p>The wrapper script is a shell script that reads the command to be run as an argument and handles bookkeeping operations necessary for Makeflow.</p>
 
 <h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 

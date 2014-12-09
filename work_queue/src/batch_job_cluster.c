@@ -5,6 +5,7 @@
 #include "stringtools.h"
 #include "process.h"
 #include "xxmalloc.h"
+#include "nvpair.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,34 +19,56 @@ static char * cluster_submit_cmd = NULL;
 static char * cluster_remove_cmd = NULL;
 static char * cluster_options = NULL;
 
+/*
+Principle of operation:
+Each batch job that we submit uses a wrapper file.
+The wrapper file is kept the same for each job, so
+that we do not unduly pollute the filesystem.
 
-static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
+The command line to run is passed as the environment
+variable BATCH_JOB_COMMAND, because not all batch systems
+support precise passing of command line arguments.
+
+The wrapper then writes a status file, which indicates the
+starting and ending time of the task to a known log file,
+which batch_job_cluster_wait then periodically polls to observe completion.
+While this is not particularly elegant, there is no widely
+portable API for querying the state of a batch job in PBS-like systems.
+This method is simple, cheap, and reasonably effective.
+*/
+
+/*
+setup_batch_wrapper creates the wrapper file if necessary,
+returning true on success and false on failure.
+*/
+
+static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 {
 	char *wrapperfile = string_format("%s.wrapper", sysname);
 
-	if(access(wrapperfile, R_OK | X_OK) == 0)
-		return 0;
+	if(access(wrapperfile, R_OK | X_OK) == 0) return 1;
 
 	FILE *file = fopen(wrapperfile, "w");
 	if(!file) {
 		free(wrapperfile);
-		return -1;
+		return 0;
 	}
 
 	fprintf(file, "#!/bin/sh\n");
-	if(q->type == BATCH_QUEUE_TYPE_MOAB || q->type == BATCH_QUEUE_TYPE_TORQUE) {
-		fprintf(file, "CMD=${BATCH_JOB_COMMAND}\n");
-		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
-	} else {
-		fprintf(file, "CMD=$@\n");
-	}
 
+	// Some systems set PBS_JOBID, some set JOBID.
+	fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
+
+	// Each job writes out to its own log file.
 	fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
 	fprintf(file, "starttime=`date +%%s`\n");
 	fprintf(file, "cat > $logfile <<EOF\n");
 	fprintf(file, "start $starttime\n");
 	fprintf(file, "EOF\n\n");
-	fprintf(file, "eval \"$CMD\"\n\n");
+	// The command to run is taken from the environment.
+	fprintf(file, "eval \"$BATCH_JOB_COMMAND\"\n\n");
+
+	// When done, write the status and time to the logfile.
 	fprintf(file, "status=$?\n");
 	fprintf(file, "stoptime=`date +%%s`\n");
 	fprintf(file, "cat >> $logfile <<EOF\n");
@@ -57,17 +80,21 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname)
 
 	free(wrapperfile);
 
-	return 0;
+	return 1;
 }
 
-static batch_job_id_t batch_job_cluster_submit_simple (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	batch_job_id_t jobid;
 	struct batch_job_info *info;
 	const char *options = hash_table_lookup(q->options, "batch-options");
 
-	if(setup_batch_wrapper(q, cluster_name) < 0)
-		return -1;
+	if(!setup_batch_wrapper(q, cluster_name)) {
+		debug(D_NOTICE|D_BATCH,"couldn't setup wrapper file: %s",strerror(errno));
+		return 0;
+	}
+
+	/* Use the first word in the command line as a name for the job. */
 
 	char *name = xxstrdup(cmd);
 	{
@@ -75,23 +102,32 @@ static batch_job_id_t batch_job_cluster_submit_simple (struct batch_queue * q, c
 		if(s)
 			*s = 0;
 	}
-	char *command = NULL;
-	switch(q->type) {
-		case BATCH_QUEUE_TYPE_TORQUE:
-			command = string_format("%s %s '%s' %s %s.wrapper", cluster_submit_cmd, cluster_options, path_basename(name), options ? options : "", cluster_name);
-			break;
-		case BATCH_QUEUE_TYPE_SGE:
-		case BATCH_QUEUE_TYPE_MOAB:
-		case BATCH_QUEUE_TYPE_CLUSTER:
-		default:
-			command = string_format("%s %s '%s' %s %s.wrapper \"%s\"", cluster_submit_cmd, cluster_options, path_basename(name), options ? options : "", cluster_name, cmd);
-			break;
-	}
+
+	/*
+	Experiment shows that passing environment variables
+	through the command-line doesn't work, due to multiple
+	levels of quote interpretation.  So, we export all
+	variables into the environment, and rely upon the -V
+	option to load the environment into the job.
+	*/
+
+	nvpair_export(envlist);
+
+	/*
+	Pass the command to run through the environment as well.
+	*/
+	setenv("BATCH_JOB_COMMAND", cmd, 1);
+
+	char *command = string_format("%s %s -N '%s' %s %s.wrapper",
+		cluster_submit_cmd,
+		cluster_options,
+		path_basename(name),
+		options ? options : "",
+		cluster_name);
+
 	free(name);
 
 	debug(D_BATCH, "%s", command);
-
-	setenv("BATCH_JOB_COMMAND", cmd, 1);
 
 	FILE *file = popen(command, "r");
 	free(command);
@@ -120,30 +156,6 @@ static batch_job_id_t batch_job_cluster_submit_simple (struct batch_queue * q, c
 	}
 	pclose(file);
 	return -1;
-}
-
-static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *args, const char *infile, const char *outfile, const char *errfile, const char *extra_input_files, const char *extra_output_files)
-{
-	char *command = string_format("%s %s", cmd, args);
-	if (infile) {
-		char *new = string_format("%s <%s", command, infile);
-		free(command);
-		command = new;
-	}
-	if (outfile) {
-		char *new = string_format("%s >%s", command, outfile);
-		free(command);
-		command = new;
-	}
-	if (errfile) {
-		char *new = string_format("%s 2>%s", command, errfile);
-		free(command);
-		command = new;
-	}
-
-	batch_job_id_t status = batch_job_cluster_submit_simple(q, command, extra_input_files, extra_output_files);
-	free(command);
-	return status;
 }
 
 static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
@@ -245,19 +257,19 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 			cluster_name = strdup("sge");
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
-			cluster_options = strdup("-cwd -o /dev/null -j y -N");
+			cluster_options = strdup("-cwd -o /dev/null -j y -V");
 			break;
 		case BATCH_QUEUE_TYPE_MOAB:
 			cluster_name = strdup("moab");
 			cluster_submit_cmd = strdup("msub");
 			cluster_remove_cmd = strdup("mdel");
-			cluster_options = strdup("-d . -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
+			cluster_options = strdup("-d . -o /dev/null -j oe -V");
 			break;
 		case BATCH_QUEUE_TYPE_TORQUE:
 			cluster_name = strdup("torque");
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
-			cluster_options = strdup("-d . -o /dev/null -v BATCH_JOB_COMMAND -j oe -N");
+			cluster_options = strdup("-d . -o /dev/null -j oe -V");
 			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:
 			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
@@ -307,7 +319,6 @@ const struct batch_queue_module batch_queue_cluster = {
 
 	{
 		batch_job_cluster_submit,
-		batch_job_cluster_submit_simple,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,
 	},
@@ -333,7 +344,6 @@ const struct batch_queue_module batch_queue_moab = {
 
 	{
 		batch_job_cluster_submit,
-		batch_job_cluster_submit_simple,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,
 	},
@@ -359,7 +369,6 @@ const struct batch_queue_module batch_queue_sge = {
 
 	{
 		batch_job_cluster_submit,
-		batch_job_cluster_submit_simple,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,
 	},
@@ -385,7 +394,6 @@ const struct batch_queue_module batch_queue_torque = {
 
 	{
 		batch_job_cluster_submit,
-		batch_job_cluster_submit_simple,
 		batch_job_cluster_wait,
 		batch_job_cluster_remove,
 	},
