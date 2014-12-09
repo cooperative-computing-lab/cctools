@@ -26,6 +26,15 @@ the Makeflow framework for distributed execution on available resources.
 The README file in makeflow_bwa/ contains instructions on how to run this
 application.
 
+makeflow_gatk
+--------------------
+The makeflow_gatk program that uses walkers to traverse genome sequences in a
+SAM/BAM file given a fasta reference performing variant calling. The program uses
+the Makeflow framework for distributed execution on available resources. 
+
+The README file in makeflow_gatk/ contains instructions on how to run this
+application.
+
 parrot_atlas
 --------------------
 This program is an example of running a ATLAS simulation job using
