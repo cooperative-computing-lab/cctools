@@ -85,7 +85,7 @@ int pfs_paranoid_mode = 0;
 const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
 
-char sys_temp_dir[PFS_PATH_MAX];
+char sys_temp_dir[PFS_PATH_MAX] = "/tmp";
 char pfs_temp_dir[PFS_PATH_MAX];
 
 int *pfs_syscall_totals32 = 0;
@@ -480,24 +480,23 @@ void write_rval(const char* message, int status) {
 
 int main( int argc, char *argv[] )
 {
-	pid_t pid=0;
-	struct pfs_process *p;
-	char *s;
-	int i;
-	int chose_auth=0;
 	int c;
+	int chose_auth = 0;
+	const char *s;
 	char *tickets = NULL;
-
-	srand(time(0)*(getpid()+getuid()));
-
-	debug_config(argv[0]);
-	debug_config_file_size(0); /* do not rotate debug file by default */
+	char *http_proxy = NULL;
+	pid_t pid;
+	struct pfs_process *p;
 
 	if(getenv("PARROT_ENABLED")) {
 		fprintf(stderr,"sorry, parrot_run cannot be run inside of itself.\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
+	random_init();
+
+	debug_config(argv[0]);
+	debug_config_file_size(0); /* do not rotate debug file by default */
 	debug_config_fatal(pfs_process_killall);
 	debug_config_getpid(pfs_process_getpid);
 
@@ -517,122 +516,27 @@ int main( int argc, char *argv[] )
 	install_handler(SIGIO,handle_sigio);
 	install_handler(SIGXFSZ,ignore_signal);
 
-	if(isatty(0)) {
-		pfs_master_timeout = 300;
-	} else {
-		pfs_master_timeout = 3600;
-	}
-	
-	pfs_uid = getuid();
-	pfs_gid = getgid();
+	/* For terminal stop signals, we ignore all.
+	 *
+	 * Parrot sometimes writes to the terminal using the debug library, we want
+	 * to *never* be the foreground process group so we do not call tcsetpgrp
+	 * to gain control. Instead we just ignore the terminal stop signals. If
+	 * the terminal is configured with "-tostop" (see stty(1)), then the writes
+	 * succeed even if we are not the foreground process group. Otherwise, the
+	 * writes will return with EIO which is fine also. Reading from a terminal
+	 * requires being the foreground process group (so far which we have never
+	 * needed to do), we will receive EIO for all reads since we ignore
+	 * SIGTTIN.
+	 *
+	 * SIGTSTOP occurs because the user suspends the foreground process group
+	 * using ^Z. If this occurs, we also ignore it. We should probably never
+	 * receive this signal since Parrot becomes a background process group as
+	 * soon as its root tracee starts.
+	 */
 
-	putenv((char *)"PARROT_ENABLED=TRUE");
-
-	s = getenv("PARROT_BLOCK_SIZE");
-	if(s) pfs_service_set_block_size(string_metric_parse(s));
-
-	s = getenv("PARROT_MOUNT_FILE");
-	if(s) pfs_resolve_file_config(s);
-
-	s = getenv("PARROT_MOUNT_STRING");
-	if(s) pfs_resolve_manual_config(s);
-
-	s = getenv("PARROT_FORCE_STREAM");
-	if(s) pfs_force_stream = 1;
-
-	s = getenv("PARROT_FORCE_CACHE");
-	if(s) pfs_force_cache = 1;
-	
-	s = getenv("PARROT_FOLLOW_SYMLINKS");
-	if(s) pfs_follow_symlinks = atoi(s);
-
-	s = getenv("PARROT_SESSION_CACHE");
-	if(s) pfs_session_cache = 1;
-
-	s = getenv("PARROT_HOST_NAME");
-	if(s) pfs_false_uname = s;
-
-	s = getenv("PARROT_UID");
-	if(s) pfs_uid = atoi(s);
-
-	s = getenv("PARROT_GID");
-	if(s) pfs_gid = atoi(s);
-
-	s = getenv("PARROT_TIMEOUT");
-	if(s) pfs_master_timeout = string_time_parse(s);
-
-	s = getenv("PARROT_FORCE_SYNC");
-	if(s) pfs_force_sync = 1;
-
-	s = getenv("PARROT_LDSO_PATH");
-	if(s) pfs_ldso_path = s;
-
-	s = getenv("PARROT_DEBUG_FLAGS");
-	if(s) {
-		char *x = xxstrdup(s);
-		int nargs;
-		char **args;
-		if(string_split(x,&nargs,&args)) {
-			for(int i=0;i<nargs;i++) {
-				debug_flags_set(args[i]);
-			}
-		}
-		free(x);
-	}
-
-	s = getenv("PARROT_CHIRP_AUTH");
-	if(s) {
-		char *x = xxstrdup(s);
-		int nargs;
-		char **args;
-		if(string_split(x,&nargs,&args)) {
-			for(int i=0;i<nargs;i++) {
-				auth_register_byname(args[i]);
-				chose_auth = 1;
-			}
-		}
-		free(x);
-	}
-
-	s = getenv("PARROT_USER_PASS");
-	if(s) {
-		char *x = xxstrdup(s);
-		int nargs;
-		char **args;
-		if(string_split(x,&nargs,&args)) {
-			pfs_password_cache = password_cache_init(args[0], args[1]);
-		}
-	}
-
-	s = getenv("TMPDIR");
-	if(s) {
-		if(strlen(s) < PFS_PATH_MAX) {
-			strcpy(sys_temp_dir, s);
-		}
-		else {
-			fatal("temporary files directory from $TMPDIR pathname longer than %d characters\n", PFS_PATH_MAX - 1);
-		}
-	}
-	else {
-		strcpy(sys_temp_dir, "/tmp");
-	}
-
-	pfs_temp_dir[PFS_PATH_MAX - 1] = '\0';
-	s = getenv("PARROT_TEMP_DIR");
-	if(s && strlen(s) > 0) {
-		strncpy(pfs_temp_dir, s, PFS_PATH_MAX);
-	}
-	else
-	{
-		sprintf(pfs_temp_dir,"%s/parrot.%d",sys_temp_dir, getuid());
-	}
-
-	pfs_cvmfs_alien_cache_dir[0]                = '\0';
-	pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX - 1] = '\0';
-	s = getenv("PARROT_CVMFS_ALIEN_CACHE");
-	if(s && strlen(s) > 0) {
-		strncpy(pfs_cvmfs_alien_cache_dir, s, PFS_PATH_MAX);
-	}
+	install_handler(SIGTSTP,SIG_IGN);
+	install_handler(SIGTTIN,SIG_IGN);
+	install_handler(SIGTTOU,SIG_IGN);
 
 	static const struct option long_options[] = {
 		{"auto-decompress", no_argument, 0, 'Z'},
@@ -803,7 +707,7 @@ int main( int argc, char *argv[] )
 			debug_config_file_size(string_metric_parse(optarg));
 			break;
 		case 'p':
-			setenv("HTTP_PROXY",optarg,1);
+			http_proxy = xxstrdup(optarg);
 			break;
 		case 'P':
 			pfs_paranoid_mode = 1;
@@ -838,7 +742,7 @@ int main( int argc, char *argv[] )
 			pfs_session_cache = 1;
 			break;
 		case 't':
-			strncpy(pfs_temp_dir,optarg,PFS_PATH_MAX);
+			strncpy(pfs_temp_dir,optarg,sizeof(pfs_temp_dir)-1);
 			break;
 		case 'T':
 			pfs_master_timeout = string_time_parse(optarg);
@@ -879,6 +783,114 @@ int main( int argc, char *argv[] )
 	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
 
 	get_linux_version(argv[0]);
+
+	if(isatty(0)) {
+		pfs_master_timeout = 300;
+	} else {
+		pfs_master_timeout = 3600;
+	}
+
+	pfs_uid = getuid();
+	pfs_gid = getgid();
+
+	if (http_proxy[0])
+		setenv("HTTP_PROXY", http_proxy, 1);
+	http_proxy = realloc(http_proxy, 0);
+
+	s = getenv("PARROT_BLOCK_SIZE");
+	if(s) pfs_service_set_block_size(string_metric_parse(s));
+
+	s = getenv("PARROT_MOUNT_FILE");
+	if(s) pfs_resolve_file_config(s);
+
+	s = getenv("PARROT_MOUNT_STRING");
+	if(s) pfs_resolve_manual_config(s);
+
+	s = getenv("PARROT_FORCE_STREAM");
+	if(s) pfs_force_stream = 1;
+
+	s = getenv("PARROT_FORCE_CACHE");
+	if(s) pfs_force_cache = 1;
+
+	s = getenv("PARROT_FOLLOW_SYMLINKS");
+	if(s) pfs_follow_symlinks = atoi(s);
+
+	s = getenv("PARROT_SESSION_CACHE");
+	if(s) pfs_session_cache = 1;
+
+	s = getenv("PARROT_HOST_NAME");
+	if(s) pfs_false_uname = s;
+
+	s = getenv("PARROT_UID");
+	if(s) pfs_uid = atoi(s);
+
+	s = getenv("PARROT_GID");
+	if(s) pfs_gid = atoi(s);
+
+	s = getenv("PARROT_TIMEOUT");
+	if(s) pfs_master_timeout = string_time_parse(s);
+
+	s = getenv("PARROT_FORCE_SYNC");
+	if(s) pfs_force_sync = 1;
+
+	s = getenv("PARROT_LDSO_PATH");
+	if(s) strncpy(pfs_ldso_path, s, sizeof(pfs_ldso_path)-1);
+
+	s = getenv("PARROT_DEBUG_FLAGS");
+	if(s) {
+		char *x = xxstrdup(s);
+		int nargs;
+		char **args;
+		if(string_split(x,&nargs,&args)) {
+			for(int i=0;i<nargs;i++) {
+				debug_flags_set(args[i]);
+			}
+		}
+		free(x);
+	}
+
+	s = getenv("PARROT_CHIRP_AUTH");
+	if(s) {
+		char *x = xxstrdup(s);
+		int nargs;
+		char **args;
+		if(string_split(x,&nargs,&args)) {
+			for(int i=0;i<nargs;i++) {
+				if (!auth_register_byname(optarg))
+					fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
+				chose_auth = 1;
+			}
+		}
+		free(x);
+	}
+
+	s = getenv("PARROT_USER_PASS");
+	if(s) {
+		char *x = xxstrdup(s);
+		int nargs;
+		char **args;
+		if(string_split(x,&nargs,&args)) {
+			pfs_password_cache = password_cache_init(args[0], args[1]);
+		}
+	}
+
+	if (getenv("TMPDIR"))
+		strncpy(sys_temp_dir, getenv("TMPDIR"), sizeof(sys_temp_dir)-1);
+
+	if (!pfs_temp_dir[0]) {
+		char *t = getenv("PARROT_TEMP_DIR");
+		if(t && t[0]) {
+			strncpy(pfs_temp_dir, t, sizeof(pfs_temp_dir)-1);
+		} else {
+			snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s/parrot.%d", sys_temp_dir, getuid());
+		}
+	}
+
+	pfs_cvmfs_alien_cache_dir[0]                = '\0';
+	pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX - 1] = '\0';
+	s = getenv("PARROT_CVMFS_ALIEN_CACHE");
+	if(s && strlen(s) > 0)
+		strncpy(pfs_cvmfs_alien_cache_dir, s, PFS_PATH_MAX);
 
 	if(pfs_temp_dir[PFS_PATH_MAX - 1] != '\0')
 		fatal("temporary files directory pathname larger than %d characters\n", PFS_PATH_MAX - 1);
@@ -961,6 +973,7 @@ int main( int argc, char *argv[] )
 		if (!WIFCONTINUED(status))
 			fatal("child did not continue as expected!");
 	} else if(pid==0) {
+		setenv("PARROT_ENABLED", "TRUE", 1);
 		if (pfs_use_helper)
 			pfs_helper_init();
 		pfs_paranoia_payload();
