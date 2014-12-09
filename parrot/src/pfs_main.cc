@@ -634,7 +634,7 @@ int main( int argc, char *argv[] )
 		strncpy(pfs_cvmfs_alien_cache_dir, s, PFS_PATH_MAX);
 	}
 
-	struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"auto-decompress", no_argument, 0, 'Z'},
 		{"block-size", required_argument, 0, 'b'},
 		{"channel-auth", no_argument, 0, 'C'},
