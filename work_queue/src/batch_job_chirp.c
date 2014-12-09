@@ -82,17 +82,22 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 	if(envlist) {
 		char *name, *value;
 		int first=1;
-		buffer_putfstring(&B,"\"environment\":[");
+		buffer_putfstring(&B,"\"environment\":{");
 		nvpair_first_item(envlist);
 		while(nvpair_next_item(envlist,&name,&value)) {
 			if(first) {
 				first=0;
 			} else {
-				buffer_putfstring(&B,",");
+				buffer_putliteral(&B,",");
 			}
-			buffer_putfstring(&B,"\"%s\":\"%s\"",name,value);
+
+			buffer_putliteral(&B,"\"");
+			jsonA_escapestring(&B,name);
+			buffer_putliteral(&B,"\":\"");
+			jsonA_escapestring(&B,value);
+			buffer_putliteral(&B,"\"");
 		}
-		buffer_putfstring(&B,"],");
+		buffer_putfstring(&B,"},");
 	}
 
 	buffer_putliteral(&B, "\"files\":[");
