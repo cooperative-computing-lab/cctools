@@ -65,6 +65,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define WORKER_MODE_WORKER  1
 #define WORKER_MODE_FOREMAN 2
+#define WORKER_MODE_DOCKER 3
 
 // In single shot mode, immediately quit when disconnected.
 // Useful for accelerating the test suite.
@@ -393,7 +394,7 @@ accounting for the resources as necessary.
 
 static int start_process( struct work_queue_process *p )
 {
-	pid_t pid = work_queue_process_execute(p);
+	pid_t pid = work_queue_process_execute(p, worker_mode);
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
 	itable_insert(procs_running,pid,p);
@@ -419,7 +420,7 @@ static void report_task_complete( struct link *master, struct work_queue_process
 	int64_t output_length;
 	struct stat st;
 
-	if(worker_mode==WORKER_MODE_WORKER) {
+	if(worker_mode==WORKER_MODE_WORKER || worker_mode==WORKER_MODE_DOCKER) {
 		fstat(p->output_fd, &st);
 		output_length = st.st_size;
 		lseek(p->output_fd, 0, SEEK_SET);
@@ -761,7 +762,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char taskname_encoded[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
 
-	struct work_queue_process *p = work_queue_process_create(taskid);
+	struct work_queue_process *p = work_queue_process_create(taskid, worker_mode);
 	struct work_queue_task *task = p->task;
 
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
@@ -805,7 +806,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		       	break;
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
-			work_queue_process_delete(p);
+			work_queue_process_delete(p, worker_mode);
 			return 0;
 		}
 	}
@@ -822,7 +823,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		// so that it can be returned cleanly as a failure to execute.
 		if(!setup_sandbox(p)) {
 			itable_remove(procs_table,taskid);
-			work_queue_process_delete(p);
+			work_queue_process_delete(p, worker_mode);
 			return 0;
 		}
 		normalize_resources(p);
@@ -1093,7 +1094,7 @@ static int do_kill(int taskid)
 
 	work_queue_watcher_remove_process(watcher,p);
 
-	work_queue_process_delete(p);
+	work_queue_process_delete(p, worker_mode);
 
 	return 1;
 }
@@ -1419,9 +1420,11 @@ static int workspace_create() {
 	} else {
 		workdir = "/tmp";
 	}
-
-
-	workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
+	//}
+	
+	if(!workspace) {
+		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
+	}
 
 	printf( "work_queue_worker: creating workspace %s\n", workspace);
 	if(!create_dir(workspace,0777)) return 0;
@@ -1642,7 +1645,7 @@ static void show_help(const char *cmd)
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
       LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
-      LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_SINGLE_SHOT };
+      LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_SINGLE_SHOT};
 
 struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1679,6 +1682,8 @@ struct option long_options[] = {
 	{"gpus",                required_argument,  0,  LONG_OPT_GPUS},
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
+	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
+	{"run-in-docker",       no_argument,        0,  LONG_OPT_RUN_DOCKER},
 	{0,0,0,0}
 };
 
@@ -1872,6 +1877,9 @@ int main(int argc, char *argv[])
 		case 'h':
 			show_help(argv[0]);
 			return 0;
+		case LONG_OPT_RUN_DOCKER:
+			worker_mode = WORKER_MODE_DOCKER;
+			break;
 		default:
 			show_help(argv[0]);
 			return 1;
