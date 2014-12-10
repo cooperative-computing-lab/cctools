@@ -62,7 +62,6 @@ extern "C" {
 
 #define SIG_ISSTOP(s) (s == SIGTTIN || s == SIGTTOU || s == SIGSTOP || s == SIGTSTP)
 
-extern char **environ;
 FILE *namelist_file;
 struct hash_table *namelist_table;
 int linux_major;
@@ -86,7 +85,7 @@ int pfs_paranoid_mode = 0;
 const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
 
-char sys_temp_dir[PFS_PATH_MAX];
+char sys_temp_dir[PFS_PATH_MAX] = "/tmp";
 char pfs_temp_dir[PFS_PATH_MAX];
 
 int *pfs_syscall_totals32 = 0;
@@ -161,7 +160,7 @@ static void get_linux_version(const char *cmd)
 		fatal("this version of Parrot requires at least kernel version 2.5.60");
 }
 
-static void pfs_helper_init( const char *argv0 )
+static void pfs_helper_init( void )
 {
 	char helper_path[PFS_PATH_MAX];
 
@@ -468,24 +467,24 @@ void write_rval(const char* message, int status) {
 
 int main( int argc, char *argv[] )
 {
+	int c;
+	int chose_auth = 0;
+	const char *s;
+	char *tickets = NULL;
+	char *http_proxy = NULL;
 	pid_t pid;
 	struct pfs_process *p;
-	char *s;
-	int i;
-	int chose_auth=0;
-	int c;
-	char *tickets = NULL;
+	char envlist[PATH_MAX] = "";
+
+	if(getenv("PARROT_ENABLED")) {
+		fprintf(stderr,"sorry, parrot_run cannot be run inside of itself.\n");
+		exit(EXIT_FAILURE);
+	}
 
 	random_init();
 
 	debug_config(argv[0]);
 	debug_config_file_size(0); /* do not rotate debug file by default */
-
-	if(getenv("PARROT_ENABLED")) {
-		fprintf(stderr,"sorry, parrot_run cannot be run inside of itself.\n");
-		exit(1);
-	}
-
 	debug_config_fatal(pfs_process_killall);
 	debug_config_getpid(pfs_process_getpid);
 
@@ -524,125 +523,7 @@ int main( int argc, char *argv[] )
 	install_handler(SIGTTIN,SIG_IGN);
 	install_handler(SIGTTOU,SIG_IGN);
 
-	if(isatty(0)) {
-		pfs_master_timeout = 300;
-	} else {
-		pfs_master_timeout = 3600;
-	}
-
-	pfs_uid = getuid();
-	pfs_gid = getgid();
-
-	putenv((char *)"PARROT_ENABLED=TRUE");
-
-	s = getenv("PARROT_BLOCK_SIZE");
-	if(s) pfs_service_set_block_size(string_metric_parse(s));
-
-	s = getenv("PARROT_MOUNT_FILE");
-	if(s) pfs_resolve_file_config(s);
-
-	s = getenv("PARROT_MOUNT_STRING");
-	if(s) pfs_resolve_manual_config(s);
-
-	s = getenv("PARROT_FORCE_STREAM");
-	if(s) pfs_force_stream = 1;
-
-	s = getenv("PARROT_FORCE_CACHE");
-	if(s) pfs_force_cache = 1;
-
-	s = getenv("PARROT_FOLLOW_SYMLINKS");
-	if(s) pfs_follow_symlinks = atoi(s);
-
-	s = getenv("PARROT_SESSION_CACHE");
-	if(s) pfs_session_cache = 1;
-
-	s = getenv("PARROT_HOST_NAME");
-	if(s) pfs_false_uname = s;
-
-	s = getenv("PARROT_UID");
-	if(s) pfs_uid = atoi(s);
-
-	s = getenv("PARROT_GID");
-	if(s) pfs_gid = atoi(s);
-
-	s = getenv("PARROT_TIMEOUT");
-	if(s) pfs_master_timeout = string_time_parse(s);
-
-	s = getenv("PARROT_FORCE_SYNC");
-	if(s) pfs_force_sync = 1;
-
-	s = getenv("PARROT_LDSO_PATH");
-	if(s) strncpy(pfs_ldso_path, s, sizeof(pfs_ldso_path)-1);
-
-	s = getenv("PARROT_DEBUG_FLAGS");
-	if(s) {
-		char *x = xxstrdup(s);
-		int nargs;
-		char **args;
-		if(string_split(x,&nargs,&args)) {
-			for(int i=0;i<nargs;i++) {
-				debug_flags_set(args[i]);
-			}
-		}
-		free(x);
-	}
-
-	s = getenv("PARROT_CHIRP_AUTH");
-	if(s) {
-		char *x = xxstrdup(s);
-		int nargs;
-		char **args;
-		if(string_split(x,&nargs,&args)) {
-			for(int i=0;i<nargs;i++) {
-				if (!auth_register_byname(optarg))
-					fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
-				chose_auth = 1;
-			}
-		}
-		free(x);
-	}
-
-	s = getenv("PARROT_USER_PASS");
-	if(s) {
-		char *x = xxstrdup(s);
-		int nargs;
-		char **args;
-		if(string_split(x,&nargs,&args)) {
-			pfs_password_cache = password_cache_init(args[0], args[1]);
-		}
-	}
-
-	s = getenv("TMPDIR");
-	if(s) {
-		if(strlen(s) < PFS_PATH_MAX) {
-			strcpy(sys_temp_dir, s);
-		}
-		else {
-			fatal("temporary files directory from $TMPDIR pathname longer than %d characters\n", PFS_PATH_MAX - 1);
-		}
-	}
-	else {
-		strcpy(sys_temp_dir, "/tmp");
-	}
-
-	pfs_temp_dir[PFS_PATH_MAX - 1] = '\0';
-	s = getenv("PARROT_TEMP_DIR");
-	if(s && strlen(s) > 0) {
-		strncpy(pfs_temp_dir, s, PFS_PATH_MAX);
-	}
-	else
-	{
-		sprintf(pfs_temp_dir,"%s/parrot.%d",sys_temp_dir, getuid());
-	}
-
-	pfs_cvmfs_alien_cache_dir[0]                = '\0';
-	pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX - 1] = '\0';
-	s = getenv("PARROT_CVMFS_ALIEN_CACHE");
-	if(s && strlen(s) > 0) {
-		strncpy(pfs_cvmfs_alien_cache_dir, s, PFS_PATH_MAX);
-	}
-
-	struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"auto-decompress", no_argument, 0, 'Z'},
 		{"block-size", required_argument, 0, 'b'},
 		{"channel-auth", no_argument, 0, 'C'},
@@ -719,30 +600,7 @@ int main( int argc, char *argv[] )
 			pfs_enable_small_file_optimizations = 0;
 			break;
 		case 'e':
-			if(access(optarg, F_OK) != -1) {
-				fprintf(stderr, "The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", optarg);
-				return 1;
-			}
-			int count;
-			count = 0;
-			FILE *fp;
-			fp = fopen(optarg, "w");
-			if(!fp) {
-				debug(D_DEBUG, "Can not open envlist file: %s", optarg);
-				return 1;
-			}
-			while(environ[count] != NULL) {
-				fprintf(fp, "%s\n", environ[count]);
-				count++;
-			}
-			char working_dir[PFS_PATH_MAX];
-			::getcwd(working_dir,sizeof(working_dir));
-			if(working_dir == NULL) {
-				debug(D_DEBUG, "Can not obtain the current working directory!");
-				return 1;
-			}
-			fprintf(fp, "PWD=%s\n", working_dir);
-			fclose(fp);
+			strncpy(envlist, optarg, sizeof(envlist)-1);
 			break;
 		case 'F':
 			pfs_force_cache = 1;
@@ -802,7 +660,7 @@ int main( int argc, char *argv[] )
 			fprintf(namelist_file, "/bin/sh\n");
 			break;
 		case 'N':
-			pfs_false_uname = optarg;
+			pfs_false_uname = xxstrdup(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);
@@ -811,7 +669,7 @@ int main( int argc, char *argv[] )
 			debug_config_file_size(string_metric_parse(optarg));
 			break;
 		case 'p':
-			setenv("HTTP_PROXY",optarg,1);
+			http_proxy = xxstrdup(optarg);
 			break;
 		case 'P':
 			pfs_paranoid_mode = 1;
@@ -846,7 +704,7 @@ int main( int argc, char *argv[] )
 			pfs_session_cache = 1;
 			break;
 		case 't':
-			strncpy(pfs_temp_dir,optarg,PFS_PATH_MAX);
+			strncpy(pfs_temp_dir,optarg,sizeof(pfs_temp_dir)-1);
 			break;
 		case 'T':
 			pfs_master_timeout = string_time_parse(optarg);
@@ -883,19 +741,158 @@ int main( int argc, char *argv[] )
 	if(optind>=argc) show_help(argv[0]);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
+
+	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
+	{
+		extern char **environ;
+		buffer_t B;
+		buffer_init(&B);
+		debug(D_DEBUG, "command:");
+		buffer_putfstring(&B, " - %s", argv[0]);
+		for (int i = 1; argv[i]; i++)
+			buffer_putfstring(&B, " \"%s\"", argv[i]);
+		debug(D_DEBUG, "%s", buffer_tostring(&B));
+		debug(D_DEBUG, "environment:");
+		for (int i = 0; environ[i]; i++)
+			debug(D_DEBUG, " - %s", environ[i]);
+		buffer_free(&B);
+	}
+
 	get_linux_version(argv[0]);
 
-	if(pfs_temp_dir[PFS_PATH_MAX - 1] != '\0')
-	{
-		fatal("temporary files directory pathname larger than %d characters\n", PFS_PATH_MAX - 1);
+	if (envlist[0]) {
+		extern char **environ;
+		if(access(optarg, F_OK) == 0)
+			fatal("The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", optarg);
+		FILE *fp = fopen(optarg, "w");
+		if(!fp)
+			fatal("Can not open envlist file: %s", optarg);
+		for (int i = 0; environ[i]; i++)
+			fprintf(fp, "%s\n", environ[i]);
+		char working_dir[PFS_PATH_MAX];
+		::getcwd(working_dir,sizeof(working_dir));
+		if(working_dir == NULL)
+			fatal("Can not obtain the current working directory!");
+		fprintf(fp, "PWD=%s\n", working_dir);
+		fclose(fp);
 	}
+
+	if(isatty(0)) {
+		pfs_master_timeout = 300;
+	} else {
+		pfs_master_timeout = 3600;
+	}
+
+	pfs_uid = getuid();
+	pfs_gid = getgid();
+
+	if (http_proxy)
+		setenv("HTTP_PROXY", http_proxy, 1);
+	http_proxy = (char *)realloc(http_proxy, 0);
+
+	s = getenv("PARROT_BLOCK_SIZE");
+	if(s) pfs_service_set_block_size(string_metric_parse(s));
+
+	s = getenv("PARROT_MOUNT_FILE");
+	if(s) pfs_resolve_file_config(s);
+
+	s = getenv("PARROT_MOUNT_STRING");
+	if(s) pfs_resolve_manual_config(s);
+
+	s = getenv("PARROT_FORCE_STREAM");
+	if(s) pfs_force_stream = 1;
+
+	s = getenv("PARROT_FORCE_CACHE");
+	if(s) pfs_force_cache = 1;
+
+	s = getenv("PARROT_FOLLOW_SYMLINKS");
+	if(s) pfs_follow_symlinks = atoi(s);
+
+	s = getenv("PARROT_SESSION_CACHE");
+	if(s) pfs_session_cache = 1;
+
+	s = getenv("PARROT_HOST_NAME");
+	if(s && !pfs_false_uname) pfs_false_uname = xxstrdup(pfs_false_uname);
+
+	s = getenv("PARROT_UID");
+	if(s) pfs_uid = atoi(s);
+
+	s = getenv("PARROT_GID");
+	if(s) pfs_gid = atoi(s);
+
+	s = getenv("PARROT_TIMEOUT");
+	if(s) pfs_master_timeout = string_time_parse(s);
+
+	s = getenv("PARROT_FORCE_SYNC");
+	if(s) pfs_force_sync = 1;
+
+	s = getenv("PARROT_LDSO_PATH");
+	if(s) strncpy(pfs_ldso_path, s, sizeof(pfs_ldso_path)-1);
+
+	s = getenv("PARROT_DEBUG_FLAGS");
+	if(s) {
+		char *x = xxstrdup(s);
+		int nargs;
+		char **args;
+		if(string_split(x,&nargs,&args)) {
+			for(int i=0;i<nargs;i++) {
+				debug_flags_set(args[i]);
+			}
+		}
+		free(x);
+	}
+
+	s = getenv("PARROT_CHIRP_AUTH");
+	if(s) {
+		char *x = xxstrdup(s);
+		int nargs;
+		char **args;
+		if(string_split(x,&nargs,&args)) {
+			for(int i=0;i<nargs;i++) {
+				if (!auth_register_byname(optarg))
+					fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
+				chose_auth = 1;
+			}
+		}
+		free(x);
+	}
+
+	s = getenv("PARROT_USER_PASS");
+	if(s) {
+		char *x = xxstrdup(s);
+		int nargs;
+		char **args;
+		if(string_split(x,&nargs,&args)) {
+			pfs_password_cache = password_cache_init(args[0], args[1]);
+		}
+	}
+
+	if (getenv("TMPDIR"))
+		strncpy(sys_temp_dir, getenv("TMPDIR"), sizeof(sys_temp_dir)-1);
+
+	if (!pfs_temp_dir[0]) {
+		char *t = getenv("PARROT_TEMP_DIR");
+		if(t && t[0]) {
+			strncpy(pfs_temp_dir, t, sizeof(pfs_temp_dir)-1);
+		} else {
+			snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s/parrot.%d", sys_temp_dir, getuid());
+		}
+	}
+
+	pfs_cvmfs_alien_cache_dir[0]                = '\0';
+	pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX - 1] = '\0';
+	s = getenv("PARROT_CVMFS_ALIEN_CACHE");
+	if(s && strlen(s) > 0)
+		strncpy(pfs_cvmfs_alien_cache_dir, s, PFS_PATH_MAX);
+
+	if(pfs_temp_dir[PFS_PATH_MAX - 1] != '\0')
+		fatal("temporary files directory pathname larger than %d characters\n", PFS_PATH_MAX - 1);
 
 	//if alien cache dir has not been set, use default based on final value of pfs_temp_dir.
 	if(strlen(pfs_cvmfs_alien_cache_dir) < 1)
 	{
 		sprintf(pfs_cvmfs_alien_cache_dir,"%s/cvmfs", pfs_temp_dir);
 	}
-
 
 	pfs_file_cache = file_cache_init(pfs_temp_dir);
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
@@ -908,18 +905,17 @@ int main( int argc, char *argv[] )
 
 	if(tickets) {
 		auth_ticket_load(tickets);
-		free(tickets);
+		tickets = (char *)realloc(tickets, 0);
 	} else if(getenv(CHIRP_CLIENT_TICKETS)) {
 		auth_ticket_load(getenv(CHIRP_CLIENT_TICKETS));
 	} else {
 		auth_ticket_load(NULL);
 	}
 
-
 	if(!pfs_channel_init(channel_size*1024*1024)) fatal("couldn't establish I/O channel");
 
 	{
-		char buf[4096];
+		char buf[PATH_MAX];
 		snprintf(buf, sizeof(buf), "%s/parrot-fd.XXXXXX", pfs_temp_dir);
 		if (mkdtemp(buf) == NULL)
 			fatal("could not create parrot-fd temporary directory: %s", strerror(errno));
@@ -927,8 +923,6 @@ int main( int argc, char *argv[] )
 		if (parrot_dir_fd == -1)
 			fatal("could not open tempdir: %s", strerror(errno));
 	}
-
-	if(pfs_use_helper) pfs_helper_init(argv[0]);
 
 	pid_t pfs_watchdog_pid = -2;
 	if (pfs_paranoid_mode) {
@@ -939,23 +933,6 @@ int main( int argc, char *argv[] )
 			debug(D_PROCESS,"watchdog PID %d",pfs_watchdog_pid);
 		}
 	}
-
-	/*
-	For reasons I don't understand yet, parrot gets very confused when
-	it is the session leader.  This happens when it is run as the first
-	process in a pty, for example in an xterm or when run from a server.
-	So, when we are the session leader, disconnect from the terminal .
-	This disables features such as line editing and job control, but
-	prevents triggering some ugly bugs.
-	*/
-
-	if(getsid(0)==getpid()) {
-		debug(D_PROCESS, "disconnecting from terminal");
-		::ioctl(0,TIOCNOTTY,0);
-	}
-
-	setpgrp();
-	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
 
 	/* XXX Notes on strange code ahead:
 	 *
@@ -987,6 +964,9 @@ int main( int argc, char *argv[] )
 		if (!WIFCONTINUED(status))
 			fatal("child did not continue as expected!");
 	} else if(pid==0) {
+		setenv("PARROT_ENABLED", "TRUE", 1);
+		if (pfs_use_helper)
+			pfs_helper_init();
 		pfs_paranoia_payload();
 		pfs_process_bootstrapfd();
 		setpgrp();
@@ -1070,7 +1050,7 @@ int main( int argc, char *argv[] )
 		printf("%" PRId64 " bytes written\n",pfs_write_count);
 
 		printf("\n32-bit System Calls:\n");
-		for(i=0;i<SYSCALL32_MAX;i++) {
+		for(int i=0;i<SYSCALL32_MAX;i++) {
 			if(pfs_syscall_totals32[i]) {
 				printf("%-20s %d\n",tracer_syscall32_name(i),pfs_syscall_totals32[i]);
 			}
@@ -1079,7 +1059,7 @@ int main( int argc, char *argv[] )
 		#ifdef CCTOOLS_CPU_X86_64
 
 		printf("\n64-bit System Calls:\n");
-		for(i=0;i<SYSCALL64_MAX;i++) {
+		for(int i=0;i<SYSCALL64_MAX;i++) {
 			if(pfs_syscall_totals64[i]) {
 				printf("%-20s %d\n",tracer_syscall64_name(i),pfs_syscall_totals64[i]);
 			}
