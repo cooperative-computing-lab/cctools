@@ -14,8 +14,6 @@ from distutils.command import install_scripts
 from glob import glob
 from stat import ST_MODE
 
-from subprocess import check_call
-
 import os
 import sys
 
@@ -45,7 +43,7 @@ class InstallScripts(install_scripts.install_scripts):
                 if self.dry_run:
                     log.info("changing mode of %s", file)
                 else:
-                    mode = ((os.stat(file)[ST_MODE]) | 0o555) & 0o7777
+                    mode = ((os.stat(file)[ST_MODE]) | 0555) & 07777
                     log.info("changing mode of %s to %o", file, mode)
                     os.chmod(file, mode)
                     file_new = '.'.join(file.split('.')[:-1])
