@@ -572,7 +572,8 @@ else
 	fi
 fi
 
-if [ $config_xrootd_path != no ] && check_file ${xrootd_path}/include/xrootd/XrdVersion.hh
+config_xrootd_success=1
+if [ $config_xrootd_path != no ]
 then
 	if [ x$xrootd_arch = xauto ]
 	then
@@ -583,66 +584,96 @@ then
 			xrootd_arch=i386_linux26
 		fi
 	fi
-
+	
 	echo "using an xrootd arch of '$xrootd_arch' (if this is wrong, use the --xrootd-arch argument)"
-
-	ccflags="${ccflags} -I${xrootd_path}/include/xrootd -DHAS_XROOTD"
-
-	for library in XrdPosix XrdClient XrdSys XrdNet XrdNetUtil XrdOuc
-	do
+	if check_file ${xrootd_path}/include/xrootd/XrdVersion.hh
+	then
+	    for library in XrdPosix XrdClient XrdSys XrdNet XrdNetUtil XrdOuc
+	    do
 		if ! library_search $library ${xrootd_path} ${xrootd_arch}
 		then
-			echo "*** Couldn't find $library in ${xrootd_path}"
-			exit 1
+		    echo "*** Couldn't find $library in ${xrootd_path}"
+		    config_xrootd_success=0
 		fi
-			
-	done
-else
-	if [ $config_xrootd_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find xrootd in ${xrootd_path}"
-		echo "*** Check --with-xrootd-path and try again."
-		exit 1
+	    done
 	else
-		echo "*** skipping xrootd support"
+	    config_xrootd_success=0
 	fi
+else
+    config_xrootd_success=0
 fi
 
-if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/include/libcvmfs.h
+if [ $config_xrootd_success = 1 ]
 then
-	ccflags="${ccflags} -I${cvmfs_path}/include -DHAS_CVMFS"
+    ccflags="${ccflags} -I${xrootd_path}/include/xrootd -DHAS_XROOTD"
+else
+    echo "*** skipping xrootd support"
+    
+    if [ $config_xrootd_path = yes ]
+    then
+	echo "*** Sorry, I couldn't find xrootd in ${xrootd_path}"
+	echo "*** Check --with-xrootd-path and try again."
+	exit 1
+    fi
+fi
 
+config_cvmfs_success=1
+if [ $config_cvmfs_path != no ]
+then
+    if check_file ${cvmfs_path}/include/libcvmfs.h
+    then
 	for library in cvmfs 
 	do
 		if ! library_search $library ${cvmfs_path}
 		then
 			echo "*** Couldn't find $library in ${cvmfs_path}"
-			exit 1
+			config_cvmfs_success=0
 		fi
 	done
+    else
+	config_cvmfs_success=0
+    fi
 else
-	if [ $config_cvmfs_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find cvmfs in ${cvmfs_path}"
-		echo "*** Check --with-cvmfs-path and try again."
-		exit 1
-	else
-		echo "*** skipping cvmfs support"
-	fi
+    config_cvmfs_success=0
 fi
 
-if [ $config_fuse_path != no ] && check_file ${fuse_path}/include/fuse.h
+if [ $config_cvmfs_success = 1 ]
 then
-	ccflags="${ccflags} -I${fuse_path}/include -DHAS_FUSE"
+   ccflags="${ccflags} -I${cvmfs_path}/include -DHAS_CVMFS"
+else
+    if [ $config_cvmfs_path = yes ]
+    then
+	echo "*** Sorry, I couldn't find cvmfs in ${cvmfs_path}"
+	echo "*** Check --with-cvmfs-path and try again."
+	exit 1
+    else
+	echo "*** skipping cvmfs support"
+    fi
+fi
 
+config_fuse_success=1
+if [ $config_fuse_path != no ]
+then
+    if check_file ${fuse_path}/include/fuse.h
+    then
 	for library in fuse
 	do
 		if ! library_search $library ${fuse_path}
 		then
-			echo "*** Couldn't find $library in ${fuse_path}"
-			exit 1
+		    echo "*** Couldn't find $library in ${fuse_path}"
+		    config_fuse_success=0
 		fi
 	done
+    else
+	config_fuse_success=0
+    fi
+else
+    config_fuse_success=0
+fi
+
+if [ $config_fuse_success = 1 ]
+then
+    ccflags="${ccflags} -I${fuse_path}/include -DHAS_FUSE"
 else
 	if [ $config_fuse_path = yes ]
 	then
