@@ -2258,8 +2258,9 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 {
 	t->time_send_input_start = timestamp_get();
 	int result = send_input_files(q, w, t);
+	t->time_send_input_finish = timestamp_get(); //record end time in case we return prematurely below.
+	
 	if (result != SUCCESS) {
-		t->time_send_input_finish = timestamp_get();
 		return result;
 	}
 
@@ -2312,6 +2313,7 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 	// zero to indicate errors. We are lazy here, we only check the last
 	// message we sent to the worker (other messages may have failed above).
 	result = send_worker_msg(q,w, "end\n");
+	t->time_send_input_finish = timestamp_get();
 
 	if(result > -1)
 	{
