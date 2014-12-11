@@ -219,7 +219,7 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int worker_mode 
 
                 execl("/usr/bin/docker", "/usr/bin/docker", "run", "-v", \
                         mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, "--cidfile", \
-                        CONTAINER_ID_FN, DEFAULT_IMG, run_cmd, (char *) 0);
+                        CONTAINER_ID_FN, "-m", "100m", DEFAULT_IMG, run_cmd, (char *) 0);
                 _exit(127); // Failed to execute the cmd.
 
             } else {
