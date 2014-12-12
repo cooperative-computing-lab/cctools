@@ -509,6 +509,26 @@ is given to <tt>parrot_run</tt>, then Parrot will switch repositories at
 run-time by re-initializing the CVMFS library.  This feature is experimental.
 </p>
 
+<h3 id="notes.cache">Parrot Cache<a class="sectionlink" href="#notes.cache" title="Link to this section.">&#x21d7;</a></h3>
+
+<p>If a service does not allow partial reads of a file (e.g. the HTTP protocol:
+<tt>/http/foo.com/a.txt</tt>), then Parrot will cache an entire copy of the
+file in its temporary directory (<tt>-t</tt> or <tt>$PARROT_TEMP_DIR</tt> or
+<tt>$TMPDIR/parrot.&lt;pid&gt;</tt>, in order). Cached files are named based on
+the hash of the canonical file name.</p>
+
+<p>You can also force Parrot to cache all non-local files using the
+<tt>-F/--with-snapshots</tt> option. This is not usually recommended because
+Parrot will download the entire copy of the file when opened by the
+application. This also means that updates to the file during run-time are
+ignored (hence the name, "snapshot")!</p>
+
+<p>Some services have their own cache, like <tt>cvmfs</tt>. This is a cache
+independent of the regular Parrot cache. <b>It is important to note that some
+versions of CVMFS may not correctly operate on the same cache. In that case, it
+is essential to run concurrent instances of Parrot with different temporary
+directories.</b></p>
+
 <h3 id="notes.hdfs">Hadoop Distributed File System (HDFS)<a class="sectionlink" href="#notes.hdfs" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>
