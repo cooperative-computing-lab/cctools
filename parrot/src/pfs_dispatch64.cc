@@ -646,12 +646,26 @@ static int redirect_ldso( const char *exe, char *ldso_physical_name )
 	}
 }
 
-static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const char *exe, const char *replace_arg0, const char *arg1, const char *arg2 )
+static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const char *physical_exe, const char *logical_exe, const char *replace_arg0, const char *arg1, const char *arg2 )
 {
 	uintptr_t scratch = pfs_process_scratch_address(p);
 
+	/* XXX
+	 *
+	 * physical_exe is only used if we are doing execve directly without
+	 * wrapping with ldso, it becomes the exe argument for:
+	 *
+	 * execve(exe, argv, envp)
+	 *
+	 * The reason for that is the *kernel* needs to know the physical name. On
+	 * the other hand, ld-linux is a regular executable that will allow us to
+	 * do another translation of logical_exe -> physical_exe. XXX This is
+	 * important to get argv[0] right!!! XXX ld-linux replaces argv[0] with
+	 * its first argument!
+	 */
+
 	char ldso[PFS_PATH_MAX] = "";
-	if (redirect_ldso(exe, ldso) == -1)
+	if (redirect_ldso(physical_exe, ldso) == -1)
 		return -1;
 
 	/* "exe" + '\0' + [new "arg0" + '\0' + ... ] + padding + new argv array */
@@ -659,14 +673,17 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 	buffer_init(&B);
 	buffer_abortonfailure(&B, 1);
 
-	/* if we redirect ldso, then exe becomes arg1 and ldso becomes exe */
+	/* if we redirect ldso, then logical_exe becomes arg1 and ldso becomes exe */
 	uintptr_t user_ldso = buffer_pos(&B)+scratch;
 	if (ldso[0])
 		buffer_putlstring(&B, ldso, strlen(ldso)+1);
 
 	uintptr_t user_exe = buffer_pos(&B)+scratch;
-	assert(exe);
-	buffer_putlstring(&B, exe, strlen(exe)+1);
+	if (ldso[0]) {
+		buffer_putlstring(&B, logical_exe, strlen(logical_exe)+1);
+	} else {
+		buffer_putlstring(&B, physical_exe, strlen(physical_exe)+1);
+	}
 
 	/* if we are changing arg0, then the user provided arg0 is replaced */
 	uintptr_t user_arg0 = buffer_pos(&B)+scratch;
@@ -702,7 +719,7 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 		buffer_putlstring(&B, (char *)&old_user_argv0, sizeof(old_user_argv0));
 	}
 	if (ldso[0]) {
-		debug(D_DEBUG, "wrapping execution with ldso, argv[1]: `%s'", exe);
+		debug(D_DEBUG, "wrapping execution with ldso, argv[1]: `%s'", logical_exe);
 		buffer_putlstring(&B, (char *)&user_exe, sizeof(user_exe)); /* exe is arg1 when wrapped by ldso */
 	}
 	if (arg1) {
@@ -735,7 +752,7 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 #endif
 
 	if (buffer_pos(&B) > PFS_SCRATCH_SPACE) {
-		debug(D_NOTICE, "cannot handle too many arguments for `%s'", exe);
+		debug(D_NOTICE, "cannot handle too many arguments for `%s'", logical_exe);
 		buffer_free(&B);
 		return errno = E2BIG, -1;
 	}
@@ -774,19 +791,19 @@ first case.
 static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
 	if(entering) {
-		char path[PFS_PATH_MAX] = "";
+		char logical_name[PFS_PATH_MAX] = "";
 		char physical_name[PFS_PATH_MAX] = "";
 		char firstline[PFS_PATH_MAX] = "";
 		char *interp_exe = NULL, *interp_arg = NULL;
 		const uintptr_t old_user_argv = args[1];
 
-		tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
-		strncpy(p->new_logical_name, path, sizeof(p->new_logical_name)-1);
+		tracer_copy_in_string(p->tracer,logical_name,POINTER(args[0]),sizeof(logical_name));
+		strncpy(p->new_logical_name, logical_name, sizeof(p->new_logical_name)-1);
 
-		if(!is_executable(path))
+		if(!is_executable(logical_name))
 			goto failure;
 
-		if (pfs_get_local_name(path,physical_name,firstline,sizeof(firstline))<0)
+		if (pfs_get_local_name(logical_name,physical_name,firstline,sizeof(firstline))<0)
 			goto failure;
 
 		/* force to single line: */
@@ -799,9 +816,9 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 		if(pattern_match(firstline, "^#!%s*(%S+)%s*(.-)%s*$", &interp_exe, &interp_arg) >= 0) {
 			debug(D_PROCESS, "execve: %s (%s) is an interpreted executable", p->new_logical_name, physical_name);
 			if (strlen(interp_arg))
-				debug(D_PROCESS, "execve: instead do %s \"%s\" %s", interp_exe, interp_arg, path);
+				debug(D_PROCESS, "execve: instead do %s \"%s\" %s", interp_exe, interp_arg, logical_name);
 			else
-				debug(D_PROCESS, "execve: instead do %s %s", interp_exe, path);
+				debug(D_PROCESS, "execve: instead do %s %s", interp_exe, logical_name);
 
 			/* make sure the new interp_exe is loaded */
 			strcpy(p->new_logical_name, interp_exe);
@@ -809,15 +826,15 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 				goto failure;
 
 			if (strlen(interp_arg)) {
-				if (fix_execve(p, old_user_argv, physical_name, interp_exe, interp_arg, path) == -1)
+				if (fix_execve(p, old_user_argv, physical_name, logical_name, interp_exe, interp_arg, logical_name) == -1)
 					goto failure;
 			} else {
-				if (fix_execve(p, old_user_argv, physical_name, interp_exe, path, NULL) == -1)
+				if (fix_execve(p, old_user_argv, physical_name, logical_name, interp_exe, logical_name, NULL) == -1)
 					goto failure;
 			}
 		} else {
 			debug(D_PROCESS, "execve: %s (%s) is an ordinary executable", p->new_logical_name, physical_name);
-			if (fix_execve(p, old_user_argv, physical_name, NULL, NULL, NULL) == -1)
+			if (fix_execve(p, old_user_argv, physical_name, logical_name, NULL, NULL, NULL) == -1)
 				goto failure;
 		}
 
