@@ -89,7 +89,9 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 
 	fprintf(file, "getenv = true\n");
 
-	nvpair_export(envlist);
+	if(envlist) {
+		nvpair_export(envlist);
+	}
 
 	if(options)
 		fprintf(file, "%s\n", options);

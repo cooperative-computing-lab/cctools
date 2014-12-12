@@ -37,7 +37,9 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 			_exit(1);
 		}*/
 
-		nvpair_export(envlist);
+		if(envlist) {
+			nvpair_export(envlist);
+		}
 
 		/** A note from "man system 3" as of Jan 2012:
 		 * Do not use system() from a program with set-user-ID or set-group-ID
