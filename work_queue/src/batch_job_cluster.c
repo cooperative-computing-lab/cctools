@@ -111,7 +111,9 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	option to load the environment into the job.
 	*/
 
-	nvpair_export(envlist);
+	if(envlist) {
+		nvpair_export(envlist);
+	}
 
 	/*
 	Pass the command to run through the environment as well.
