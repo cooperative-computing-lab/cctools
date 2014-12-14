@@ -174,7 +174,7 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int container_mo
 
                 execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", \
 			mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, \
-			"-m", "1g", CONVERT_IMG, run_cmd, (char *) 0);
+			"-m", "1g", DEFAULT_IMG, run_cmd, (char *) 0);
 
                 _exit(127); // Failed to execute the cmd.
 
