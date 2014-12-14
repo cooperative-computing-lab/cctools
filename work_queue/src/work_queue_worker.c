@@ -65,7 +65,10 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define WORKER_MODE_WORKER  1
 #define WORKER_MODE_FOREMAN 2
-#define WORKER_MODE_DOCKER 3
+
+#define NONE 1 
+#define DOCKER 2
+#define UMBRELLA 3
 
 // In single shot mode, immediately quit when disconnected.
 // Useful for accelerating the test suite.
@@ -115,6 +118,10 @@ char *password = 0;
 static int symlinks_enabled = 1;
 
 static int worker_mode = WORKER_MODE_WORKER;
+
+// Do not run any container by default
+static int container_mode = NONE;
+
 static const char *master_host = 0;
 static char master_addr[LINK_ADDRESS_MAX];
 static int master_port;
@@ -394,7 +401,7 @@ accounting for the resources as necessary.
 
 static int start_process( struct work_queue_process *p )
 {
-	pid_t pid = work_queue_process_execute(p, worker_mode);
+	pid_t pid = work_queue_process_execute(p, container_mode);
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
 	itable_insert(procs_running,pid,p);
@@ -420,7 +427,7 @@ static void report_task_complete( struct link *master, struct work_queue_process
 	int64_t output_length;
 	struct stat st;
 
-	if(worker_mode==WORKER_MODE_WORKER || worker_mode==WORKER_MODE_DOCKER) {
+	if(worker_mode==WORKER_MODE_WORKER) {
 		fstat(p->output_fd, &st);
 		output_length = st.st_size;
 		lseek(p->output_fd, 0, SEEK_SET);
@@ -762,7 +769,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char taskname_encoded[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
 
-	struct work_queue_process *p = work_queue_process_create(taskid, worker_mode);
+	struct work_queue_process *p = work_queue_process_create(taskid);
 	struct work_queue_task *task = p->task;
 
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
@@ -806,7 +813,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		       	break;
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
-			work_queue_process_delete(p, worker_mode);
+			work_queue_process_delete(p);
 			return 0;
 		}
 	}
@@ -823,7 +830,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		// so that it can be returned cleanly as a failure to execute.
 		if(!setup_sandbox(p)) {
 			itable_remove(procs_table,taskid);
-			work_queue_process_delete(p, worker_mode);
+			work_queue_process_delete(p);
 			return 0;
 		}
 		normalize_resources(p);
@@ -1094,7 +1101,7 @@ static int do_kill(int taskid)
 
 	work_queue_watcher_remove_process(watcher,p);
 
-	work_queue_process_delete(p, worker_mode);
+	work_queue_process_delete(p);
 
 	return 1;
 }
@@ -1683,7 +1690,7 @@ struct option long_options[] = {
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
 	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
-	{"run-in-docker",       no_argument,        0,  LONG_OPT_RUN_DOCKER},
+	{"docker",              no_argument,        0,  LONG_OPT_RUN_DOCKER},
 	{0,0,0,0}
 };
 
@@ -1878,7 +1885,7 @@ int main(int argc, char *argv[])
 			show_help(argv[0]);
 			return 0;
 		case LONG_OPT_RUN_DOCKER:
-			worker_mode = WORKER_MODE_DOCKER;
+			container_mode = DOCKER;
 			break;
 		default:
 			show_help(argv[0]);

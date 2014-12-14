@@ -28,18 +28,18 @@
 #define CONVERT_IMG "ubuntu/convert"
 #define TMP_SCRIPT "tmp.sh"
 #define DEFAULT_EXE_APP "#!/bin/sh"
-#define CONTAINER_ID_FN "containerID"
 
 // flag value used for switching 
 // between docker mode and 
 // normal mode
 
-#define WORKER_MODE_WORKER 1
-#define WORKER_MODE_DOCKER 3
+#define NONE 1
+#define DOCKER 2
+#define UMBRELLA 3
 
 // TODO check work_queue/src/barch_job_condor.c
 
-struct work_queue_process * work_queue_process_create( int taskid, int worker_mode )
+struct work_queue_process * work_queue_process_create( int taskid )
 {
 	struct work_queue_process *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
@@ -49,60 +49,15 @@ struct work_queue_process * work_queue_process_create( int taskid, int worker_mo
 	p->sandbox = string_format("t.%d",taskid);
 
 	if(!create_dir(p->sandbox,0777)) {
-		work_queue_process_delete(p, worker_mode);
-		return 0;
+            work_queue_process_delete(p);
+	    return 0;
 	}
 	
 	return p;
 }
 
-void work_queue_process_delete( struct work_queue_process *p, int worker_mode )
+void work_queue_process_delete( struct work_queue_process *p )
 {  
-
-    if(worker_mode == WORKER_MODE_DOCKER) {
-
-        // Get conatiner ID from the file
-        char fn_path[SMALL_BUFFER_SIZE];
-        sprintf(fn_path, "%s/%s", p->sandbox,CONTAINER_ID_FN);
-
-        // TODO disable debug, can the parent process
-        // just be hold? 
-        debug(D_WQ, "The fn_path is %s\n", fn_path);
-
-        if ( access(fn_path, F_OK) == -1 )
-            fatal("The file holds the container ID does not exist. ");
-
-        FILE *cont_ID_fn = fopen(fn_path, "r");
-        
-        fgets(p->container_id, sizeof(p->container_id)/sizeof(char), \
-                cont_ID_fn); 
-        
-        close(fileno(cont_ID_fn));
-    
-        char check_status[MAX_BUFFER_SIZE];
-        
-		debug(D_WQ, "THE CONTAINER ID IS: %s", p->container_id);
-        sprintf (check_status, "docker inspect --format \"{{.State.Pid}}\" %s", p->container_id);
-
-		debug(D_WQ, "THE CHECK STATUS CMD IS: %s", check_status);
-
-        FILE *container_pid = popen(check_status, "r");
-        int dk_pid;
-        dk_pid=fgetc(container_pid);
-         
-        if (dk_pid != '0') {
-            // stop the container
-            char stop_cmd[MAX_BUFFER_SIZE];
-            sprintf (stop_cmd, "docker stop %s", p->container_id);
-            system(stop_cmd);
-        }
-        
-        // delete the container
-        char delete_cmd[MAX_BUFFER_SIZE];
-        sprintf (delete_cmd, "docker rm %s", p->container_id);
-        system(delete_cmd);
-    }
-
     if(p->task) work_queue_task_delete(p->task);
 
 	if(p->output_fd) {
@@ -124,7 +79,7 @@ void work_queue_process_delete( struct work_queue_process *p, int worker_mode )
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
-pid_t work_queue_process_execute( struct work_queue_process *p, int worker_mode )
+pid_t work_queue_process_execute( struct work_queue_process *p, int container_mode )
 {   
     // make warning 
 
@@ -182,7 +137,7 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int worker_mode 
             
             close(p->output_fd);
 
-	    if(worker_mode == WORKER_MODE_DOCKER) {
+	    if(container_mode == DOCKER) {
 
 	        debug(D_WQ, "CHECKPOINT%d\n", 1);
                 // Get path to sandbox
@@ -217,9 +172,10 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int worker_mode 
                 char uid_str[MAX_BUFFER_SIZE];
                 sprintf(uid_str, "%d", uid);
 
-                execl("/usr/bin/docker", "/usr/bin/docker", "run", "-v", \
-                        mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, "--cidfile", \
-                        CONTAINER_ID_FN, "-m", "100m", DEFAULT_IMG, run_cmd, (char *) 0);
+                execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", \
+			mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, \
+			"-m", "1g", CONVERT_IMG, run_cmd, (char *) 0);
+
                 _exit(127); // Failed to execute the cmd.
 
             } else {
