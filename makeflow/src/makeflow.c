@@ -106,9 +106,9 @@ static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
 static int monitor_enable_list_files  = 0;
 
-static int file_creation_patience_mode = 0;
-#define FILE_CREATION_PATIENCE_TRIES     5  /* recheck file creation five times if mode enabled. */
-#define FILE_CREATION_PATIENCE_WAIT_TIME 1  /* wait one second between checks. */
+static int file_creation_patience_mode      = 0;
+static int file_creation_patience_tries     = 5; /* recheck file creation five times if mode enabled. */
+static int file_creation_patience_wait_time = 1; /* wait one second between checks. */
 
 /* Write a verbose transaction log with SYMBOL tags.
  * SYMBOLs are category labels (SYMBOLs should be deprecated
@@ -1032,7 +1032,7 @@ int dag_node_check_file_was_created(struct dag_node *n, struct dag_file *f) {
 	struct stat buf;
 	int file_created = 0;
 
-	int file_creation_patience_tries = file_creation_patience_mode ? FILE_CREATION_PATIENCE_TRIES : 0;
+	int patience_tries = file_creation_patience_mode ? file_creation_patience_tries : 0;
 
 	while(!file_created) {
 		if(batch_fs_stat(remote_queue, f->filename, &buf) < 0) {
@@ -1048,11 +1048,11 @@ int dag_node_check_file_was_created(struct dag_node *n, struct dag_file *f) {
 			break;
 		}
 		
-		if(file_creation_patience_tries > 0) {
+		if(patience_tries > 0) {
 			/* Failed to see the file. Sleep and try again. */
 			debug(D_MAKEFLOW_RUN, "Checking again for file %s (%d tries left).\n", f->filename, file_creation_patience_tries);
-			sleep(FILE_CREATION_PATIENCE_WAIT_TIME);
-			file_creation_patience_tries--;
+			sleep(file_creation_patience_wait_time);
+			patience_tries--;
 		} else {
 			/* Failed was not seen by makeflow in the aloted tries. */
 			debug(D_MAKEFLOW_RUN, "File %s was not created by rule %d.\n", f->filename, n->nodeid);
@@ -1397,6 +1397,8 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", dag_retry_max);
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to n times.\n", "-r,--retry-count=<n>");
 	fprintf(stdout, " %-30s Do not fail if an output file is not immediately created (e.g., using NFS).\n", "--recheck-file-creation");
+	fprintf(stdout, " %-30s When rechecking file creation, try this many times (default is %d).\n", "--recheck-file-attempts", file_creation_patience_tries);
+	fprintf(stdout, " %-30s When rechecking file creation, wait this many seconds between attempts (default is %d).\n", "--recheck-wait-time", file_creation_patience_wait_time);
 	fprintf(stdout, " %-30s Time to retry failed batch job submission.  (default is %ds)\n", "-S,--submission-timeout=<#>", dag_submit_timeout);
 	fprintf(stdout, " %-30s Work Queue keepalive timeout.               (default is %ds)\n", "-t,--wq-keepalive-timeout=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
 	fprintf(stdout, " %-30s Work Queue keepalive interval.              (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
@@ -1604,6 +1606,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_DISABLE_BATCH_CACHE,
 		LONG_OPT_DOT_CONDENSE,
 		LONG_OPT_FILE_CREATION_PATIENCE_MODE,
+		LONG_OPT_FILE_CREATION_PATIENCE_TRIES,
+		LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME,
 		LONG_OPT_MONITOR_INTERVAL,
 		LONG_OPT_MONITOR_LIMITS,
 		LONG_OPT_MONITOR_LOG_NAME,
@@ -1635,6 +1639,8 @@ int main(int argc, char *argv[])
 		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
 		{"email", required_argument, 0, 'm'},
 		{"recheck-file-creation", no_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_MODE},
+		{"recheck-file-attempts", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_TRIES},
+		{"recheck-file-wait-time", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
 		{"help", no_argument, 0, 'h'},
 		{"makeflow-log", required_argument, 0, 'l'},
 		{"max-local", required_argument, 0, 'j'},
@@ -1741,6 +1747,14 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_FILE_CREATION_PATIENCE_MODE:
 				file_creation_patience_mode = 1;
+				break;
+			case LONG_OPT_FILE_CREATION_PATIENCE_TRIES:
+				file_creation_patience_mode  = 1;
+				file_creation_patience_tries = MAX(0,atoi(optarg));
+				break;
+			case LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME:
+				file_creation_patience_mode      = 1;
+				file_creation_patience_wait_time = MAX(0,atoi(optarg));
 				break;
 			case 'h':
 				show_help_run(get_makeflow_exe());
