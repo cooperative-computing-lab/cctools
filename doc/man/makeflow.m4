@@ -50,6 +50,7 @@ OPTION_TRIPLET(-l, makeflow-log, logfile)Use this file for the makeflow log. (de
 OPTION_TRIPLET(-L, batch-log, logfile)Use this file for the batch system log. (default is X.PARAM(type)log)
 OPTION_ITEM(`-R, --retry')Automatically retry failed batch jobs up to 100 times.
 OPTION_TRIPLET(-r, retry-count, n)Automatically retry failed batch jobs up to n times.
+OPTION_ITEM(`--recheck-file-creation')Do not fail if an output file is not immediately created.
 OPTION_TRIPLET(-S, submission-timeout, timeout)Time to retry failed batch job submission. (default is 3600s)
 OPTION_TRIPLET(-T, batch-type, type)Batch system type: local, condor, sge, moab, cluster, wq, hadoop, mpi-queue. (default is local)
 OPTIONS_END

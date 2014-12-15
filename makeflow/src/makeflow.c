@@ -106,6 +106,10 @@ static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
 static int monitor_enable_list_files  = 0;
 
+static int file_creation_patience_mode = 0;
+#define FILE_CREATION_PATIENCE_TRIES     5  /* recheck file creation five times if mode enabled. */
+#define FILE_CREATION_PATIENCE_WAIT_TIME 1  /* wait one second between checks. */
+
 /* Write a verbose transaction log with SYMBOL tags.
  * SYMBOLs are category labels (SYMBOLs should be deprecated
  * once weaver/pbui tools are updated.) */
@@ -1024,6 +1028,42 @@ void dag_dispatch_ready_jobs(struct dag *d)
 	}
 }
 
+int dag_node_check_file_was_created(struct dag_node *n, struct dag_file *f) {
+	struct stat buf;
+	int file_created = 0;
+
+	int file_creation_patience_tries = file_creation_patience_mode ? FILE_CREATION_PATIENCE_TRIES : 0;
+
+	while(!file_created) {
+		if(batch_fs_stat(remote_queue, f->filename, &buf) < 0) {
+			fprintf(stderr, "%s did not create file %s\n", n->command, f->filename);
+		}
+		else if(output_len_check && buf.st_size <= 0) {
+			debug(D_MAKEFLOW_RUN, "%s created a file of length %ld\n", n->command, (long) buf.st_size);
+		}
+		else {
+			/* File was created and has length larger than zero. */
+			debug(D_MAKEFLOW_RUN, "File %s created by rule %d.\n", f->filename, n->nodeid);
+			file_created = 1;
+			break;
+		}
+		
+		if(file_creation_patience_tries > 0) {
+			/* Failed to see the file. Sleep and try again. */
+			debug(D_MAKEFLOW_RUN, "Checking again for file %s (%d tries left).\n", f->filename, file_creation_patience_tries);
+			sleep(FILE_CREATION_PATIENCE_WAIT_TIME);
+			file_creation_patience_tries--;
+		} else {
+			/* Failed was not seen by makeflow in the aloted tries. */
+			debug(D_MAKEFLOW_RUN, "File %s was not created by rule %d.\n", f->filename, n->nodeid);
+			file_created = 0;
+			break;
+		}
+	}
+
+	return file_created;
+}
+
 void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info)
 {
 	struct dag_file *f;
@@ -1041,15 +1081,9 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 	if(info->exited_normally && info->exit_code == 0) {
 		list_first_item(n->target_files);
 		while((f = list_next_item(n->target_files))) {
-			struct stat buf;
-			if(batch_fs_stat(remote_queue, f->filename, &buf) < 0) {
-				fprintf(stderr, "%s did not create file %s\n", n->command, f->filename);
+			if(!dag_node_check_file_was_created(n, f))
+			{
 				job_failed = 1;
-			} else {
-				if(output_len_check && buf.st_size <= 0) {
-					debug(D_MAKEFLOW_RUN, "%s created a file of length %ld\n", n->command, (long) buf.st_size);
-					job_failed = 1;
-				}
 			}
 		}
 	} else {
@@ -1362,6 +1396,7 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", dag_retry_max);
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to n times.\n", "-r,--retry-count=<n>");
+	fprintf(stdout, " %-30s Do not fail if an output file is not immediately created (e.g., using NFS).\n", "--recheck-file-creation");
 	fprintf(stdout, " %-30s Time to retry failed batch job submission.  (default is %ds)\n", "-S,--submission-timeout=<#>", dag_submit_timeout);
 	fprintf(stdout, " %-30s Work Queue keepalive timeout.               (default is %ds)\n", "-t,--wq-keepalive-timeout=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
 	fprintf(stdout, " %-30s Work Queue keepalive interval.              (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
@@ -1568,6 +1603,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_DEBUG_ROTATE_MAX,
 		LONG_OPT_DISABLE_BATCH_CACHE,
 		LONG_OPT_DOT_CONDENSE,
+		LONG_OPT_FILE_CREATION_PATIENCE_MODE,
 		LONG_OPT_MONITOR_INTERVAL,
 		LONG_OPT_MONITOR_LIMITS,
 		LONG_OPT_MONITOR_LOG_NAME,
@@ -1598,6 +1634,7 @@ int main(int argc, char *argv[])
 		{"disable-afs-check", no_argument, 0, 'A'},
 		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
 		{"email", required_argument, 0, 'm'},
+		{"recheck-file-creation", no_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_MODE},
 		{"help", no_argument, 0, 'h'},
 		{"makeflow-log", required_argument, 0, 'l'},
 		{"max-local", required_argument, 0, 'j'},
@@ -1701,6 +1738,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'G':
 				dag_gc_param = atoi(optarg);
+				break;
+			case LONG_OPT_FILE_CREATION_PATIENCE_MODE:
+				file_creation_patience_mode = 1;
 				break;
 			case 'h':
 				show_help_run(get_makeflow_exe());
