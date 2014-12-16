@@ -13,31 +13,6 @@ import optparse, os, sys, tempfile, shutil, stat, re, string
 
 split_name = "query_r"
 
-class PassThroughParser(optparse.OptionParser):
-    def _process_args(self, largs, rargs, values):
-        while rargs:
-            try:
-                optparse.OptionParser._process_args(self,largs,rargs,values)
-            except (optparse.BadOptionError,optparse.AmbiguousOptionError), e:
-                largs.append(e.opt_str)
-                
-#Initialize Global Variable
-blasr_args = ""
-
-def callback_blasr_args(option, opt_str, value, parser):
-	global blasr_args
-        blasr_args += opt_str + " " + value + " "
-
-#Parse Command Line
-parser = PassThroughParser()
-parser.add_option('--ref', dest="reference", type="string", help='The reference input file')
-parser.add_option('--query', dest="query", type="string", help='The query input file')
-parser.add_option('--output', dest="output", type="string", help='the final output of blasr alignment')
-parser.add_option('--makeflow', dest="makeflow", type="string", help='the file name of the makeflow script generated')
-parser.add_option('--split_gran', help='Determines number of sequences per search',default=50000,type=int)
-
-(options, args) = parser.parse_args()
-
 def count_splits(split_gran, query):
 
 	num_reads=split_gran
@@ -145,8 +120,8 @@ def write_makeflow(destination):
 		outputlist = ""
 		num_splits = count_splits(options.split_gran, options.query)
 		for i in range(num_splits):
-	        	inputlist = inputlist + "input." + str(i) + " "
-	        	outputlist = outputlist + "output." + str(i) + " "
+	        	inputlist = inputlist + options.query + "." + str(i) + " "
+	        	outputlist = outputlist + options.query + "." + str(i) + " "
 		#Here we actually start generating the Makeflow
 		#How to get inputs
 		makeflow.write(inputlist+ ": " + options.query + " "+ split_name + "\n")
@@ -155,12 +130,12 @@ def write_makeflow(destination):
 		#How to get outputs
 		for i in range(num_splits):
 			
-	        	makeflow.write("output." + str(i) + ": input." + str(i) + " " + "blasr ./lib/ \n")
+	        	makeflow.write("output." + str(i) + ":"+ options.query +"." + str(i) + " " + "blasr ./lib/ \n")
 	        	makeflow.write("\t LD_LIBRARY_PATH=\"./lib/\""
-					+ " input." + str(i)
+					+ options.query + "." + str(i)
 					+ " " + options.reference
 					+" "+ ' '.join(args)
-					+ " > output." + str(i)
+					+ " > " + options.query + "." + str(i)
                   	                + "\n")
 
 		#How to concatenate outputs
@@ -173,7 +148,25 @@ def write_makeflow(destination):
 
 def main():
 			
-	
+	class PassThroughParser(optparse.OptionParser):
+    	def _process_args(self, largs, rargs, values):
+        while rargs:
+            try:
+                optparse.OptionParser._process_args(self,largs,rargs,values)
+            except (optparse.BadOptionError,optparse.AmbiguousOptionError), e:
+                largs.append(e.opt_str)
+                
+
+
+	#Parse Command Line
+	parser = PassThroughParser()
+	parser.add_option('--ref', dest="reference", type="string", help='The reference input file')
+	parser.add_option('--query', dest="query", type="string", help='The query input file')
+	parser.add_option('--output', dest="output", type="string", help='the final output of blasr alignment')
+	parser.add_option('--makeflow', dest="makeflow", type="string", help='the file name of the makeflow script generated')
+	parser.add_option('--split_gran', help='Determines number of sequences per search',default=50000,type=int)
+
+	(options, args) = parser.parse_args()
 	write_makeflow(options.makeflow)
 	write_split_name_reduce(split_name)
 	
