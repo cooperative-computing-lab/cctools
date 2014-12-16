@@ -6,13 +6,15 @@ To build Makeflow:
 
 https://github.com/PacificBiosciences/blasr
 
-2. The Blasr must be run with HDF5 library, include this library in the same directory of the blasr executable.
+2. Blasr only support hdf5 1.8.4, 1.8.11 and 1.8.12. Make sure to have the correct version of HDF5 installed.
 
-3. Install CCTools. 
+3. Blasr must be run with HDF5. Make sure to include the "lib" directory inside of installed HDF5 in the same folder of your query, reference and other input file.
 
-4. Copy makeflow_blasr from cctools/apps to the location the makeflow will be executed.
+4. Install CCTools. 
 
-5. Run 'makeflow_blasr.py --ref test_ref.fasta --query test.fastq --output result --makeflow Makeflow --split_gran 50000'
+5. Copy makeflow_blasr from cctools/apps to the location the makeflow will be executed.
+
+6. Run './makeflow_blasr --ref test_ref.fasta --query test.fastq --output result --makeflow Makeflow --split_gran 50000'
 
 This produces a file called Makeflow
 
