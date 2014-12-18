@@ -151,7 +151,8 @@ static int send_resources_interval = 30;
 static int send_stats_interval     = 60;
 
 static struct work_queue *foreman_q = NULL;
-
+// docker image name
+static char *img_name = NULL;
 // Table of all processes in any state, indexed by taskid.
 // Processes should be created/deleted when added/removed from this table.
 static struct itable *procs_table = NULL;
@@ -401,7 +402,13 @@ accounting for the resources as necessary.
 
 static int start_process( struct work_queue_process *p )
 {
-	pid_t pid = work_queue_process_execute(p, container_mode);
+
+    pid_t pid;
+    if (container_mode == 2) 
+	    pid = work_queue_process_execute_docker(p, img_name);
+    else
+	    pid = work_queue_process_execute(p);
+    
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
 	itable_insert(procs_running,pid,p);
@@ -1675,7 +1682,7 @@ struct option long_options[] = {
 	{"tcp-window-size",     required_argument,  0,  'w'},
 	{"min-backoff",         required_argument,  0,  'i'},
 	{"max-backoff",         required_argument,  0,  'b'},
-	{"single-shot",		no_argument,        0,  LONG_OPT_SINGLE_SHOT },
+	{"single-shot",		    no_argument,        0,  LONG_OPT_SINGLE_SHOT },
 	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
 	{"disk-threshold",      required_argument,  0,  'z'},
 	{"arch",                required_argument,  0,  'A'},
@@ -1690,7 +1697,7 @@ struct option long_options[] = {
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
 	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
-	{"docker",              no_argument,        0,  LONG_OPT_RUN_DOCKER},
+	{"docker",              required_argument,        0,  LONG_OPT_RUN_DOCKER},
 	{0,0,0,0}
 };
 
@@ -1886,6 +1893,7 @@ int main(int argc, char *argv[])
 			return 0;
 		case LONG_OPT_RUN_DOCKER:
 			container_mode = DOCKER;
+            img_name = optarg; 
 			break;
 		default:
 			show_help(argv[0]);
