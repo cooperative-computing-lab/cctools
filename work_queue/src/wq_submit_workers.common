@@ -140,7 +140,7 @@ parse_arguments_common()
 			;;
 			-r)  
 			shift
-			requirements="$requirements $1"
+			requirements="$requirments $1"
 			;;
 			-h | --help)
 			show_help_common
@@ -221,6 +221,7 @@ set_up_working_directory()
 
 	cd ${submit_dir}
 	cp $worker .
+        cp /afs/crc.nd.edu/user/c/czheng2/Work/cctools/work_queue/src/wq_in_container ${submit_dir}
 }
 
 set_up_password_file()
