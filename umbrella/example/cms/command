@@ -1,4 +1,4 @@
-umbrella -T local -c cmssw_redhat6.json -i 'cms_cmd1=cms_cmd' -l ~/umbrella_test/ -o ~/umbrella_test/cmssw_output --softwaredb ../../src/software.db --clouddb ../../src/ec2.db run '/bin/bash cms_cmd1'
+umbrella -T local -c cmssw_redhat6.json -i 'cms_cmd1=cms_cmd' -l ~/umbrella_test/ -o ~/umbrella_test/cmssw_output run '/bin/bash cms_cmd1'
 
 #use the default localdir and output options:
-umbrella -T local -c cmssw_redhat6.json -i 'cms_cmd1=cms_cmd' -l ~/umbrella_test/ -o ~/umbrella_test/cmssw_output run '/bin/bash cms_cmd1'
+umbrella -T local -c cmssw_redhat6.json -i 'cms_cmd1=cms_cmd' run '/bin/bash cms_cmd1'

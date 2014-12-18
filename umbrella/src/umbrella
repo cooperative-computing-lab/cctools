@@ -23,8 +23,11 @@ import datetime
 import time
 import getpass
 import grp
+import logging
 
 Is_CVMFS_Parrot_App = 0
+
+Parrot_Mount_String = ''
 
 #If the current user name and group can not be found in /etc/passwd and /etc/group, a fake passwd and group file will be constructed.
 Need_Fake_Passwd_File = 0
@@ -45,6 +48,7 @@ Host_Linux_Distro = '' #the linux distribution info of the host machine
 #the following five items comes from the specification file
 Hardware_Platform = ""
 Kernel_Type = "" #Options: linux, windows or Mac.
+Kernel_Version = ""
 Linux_Distro = '' #linux distribution info specified in the specification file.
 Distro_Name = ''
 Distro_Version = ''
@@ -80,6 +84,7 @@ Parameter cmd: the command needs to execute using the subprocess module
 Return: the output of the execution.
 """
 def func_call(cmd):
+	logging.debug("Start to execute command: %s", cmd)
 	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
 	(output, err) = p.communicate()
 	p_status = p.wait()
@@ -90,16 +95,21 @@ def func_call_output(cmd, output_dir):
 	if not os.path.exists(output_dir):
 		os.makedirs(output_dir)
 	stdout = output_dir + "/stdout"
+	logging.debug("Writing the output of the command into %s ....", stdout)
 	with open(stdout, 'w+') as file1:
 		file1.write(output)
 	
 def func_call_output_withenv(cmd, env_dict, output_dir):
+	logging.debug("Start to execute command: %s", cmd)
+	logging.debug("The environment variables for executing the command is:")
+	logging.debug(env_dict)
 	p = subprocess.Popen(cmd, env = env_dict, stdout = subprocess.PIPE, shell = True)
 	(output, err) = p.communicate()
 	p_status = p.wait()
 	if not os.path.exists(output_dir):
 		os.makedirs(output_dir)
 	stdout = output_dir + "/stdout"
+	logging.debug("Writing the output of the command into %s ....", stdout)
 	with open(stdout, 'w+') as file1:
 		file1.write(output)
 
@@ -119,6 +129,7 @@ def md5_cal(filename, block_size=2**20):
 				md5.update(data)
 			return md5.hexdigest()
 	except:
+		logging.debug("Computing the checksum of %s fails.", filename)
 		sys.exit("md5_cal(" + filename + ") failed.\n")
 
 """ Check whether a url is broken or not.
@@ -133,6 +144,19 @@ def url_check(url):
 		return 1
 	return 0
 
+''' Download url into dest
+'''
+def url_download(url, dest):
+	try:
+		logging.debug("Start to download %s ....", url)
+		response = urllib2.urlopen(url)
+		data = response.read()
+	except urllib2.URLerror as e:
+		logging.critical("URLerror (%d): %s", e.errno, e.strerror)
+		sys.exit("URLerror({0}): {1}".format(e.errno, e.strerror))
+	with open(dest, "wb") as code:
+		code.write(data)
+
 """ Download each dependency from the url and verify its integrity.
 Parameter url: the storage location of the dependency
 Parameter checksum: the checksum of the dependency
@@ -141,7 +165,7 @@ Parameter dest: the destination of the dependency where the downloaded dependenc
 Parameter format_remote_storage: the file format of the dependency, such as .tgz.
 """
 def dependency_download(url, checksum, checksum_tool, dest, format_remote_storage):
-	print "Download software from %s into the dir (%s)" % (url, dest)
+	logging.debug("Download software from %s into the dir (%s)", url, dest)
 	dest_dir = os.path.dirname(dest)
 	dest_uncompress = dest #dest_uncompress is the path of the uncompressed-version dependency
 
@@ -156,49 +180,64 @@ def dependency_download(url, checksum, checksum_tool, dest, format_remote_storag
 		#download the dependency from the url
 		#this method currently will fail when the data size is larger than the memory size, use subprocess + wget can solve it
 		try:
+			logging.debug("Start to download ....")
 			response = urllib2.urlopen(url)
 			data = response.read()
 		except urllib2.URLerror as e:
+			logging.critical("URLerror (%d): %s", e.errno, e.strerror)
 			sys.exit("URLerror({0}): {1}".format(e.errno, e.strerror))
 		with open(dest, "wb") as code:
 			code.write(data)
 		#if it exists, the uncompressed-version directory will be deleted first
 		if os.path.exists(dest_uncompress):
 			shutil.rmtree(dest_uncompress)
+			logging.debug("the uncompressed-version directory exists already, first delete it")
 
 	#calculate the checkusm of the compressed-version dependency
 	if checksum_tool == "md5sum":
 		local_checksum = md5_cal(dest)
+		logging.debug("The checksum of %s is: %s", dest, local_checksum)
 	else:
+		logging.critical("%s is not supported currently!", checksum_tool)
 		sys.exit(checksum_tool + "is not supported currently!")
 
 	if not local_checksum == checksum:
-		sys.exit("the version of " + url + " is incorrect!\n")
+		logging.critical("The version of %s is incorrect! Please first delete it and its unpacked directory!!", dest)
+		sys.exit("the version of " + dest + " is incorrect! Please first delete it and its unpacked directory!!\n")
 	
 	#if the uncompressed-version dependency does not exist, uncompress the dependency
 	if not os.path.exists(dest_uncompress):
+		logging.debug("Uncompressing %s into %s ....", dest, dest_uncompress)
 		tfile = tarfile.open(dest, "r:gz")
 		tfile.extractall(dest_dir)
 
-def cctools_download(sandbox_dir, sw_conn_cursor):
-	cctools_item = db_search("cctools", Host_Linux_Distro, Hardware_Platform, sw_conn_cursor) 
-	dest = os.path.dirname(sandbox_dir) + "/cache/cctools-" + Hardware_Platform + "-" + Host_Linux_Distro
-	name = "cctools"
-	print "dependency_process(%s) start: %s" % (name, datetime.datetime.now())
-	dependency_download(cctools_item[3], cctools_item[6], "md5sum", dest, "tgz")
-	print "dependency_process(%s) end: %s" % (name, datetime.datetime.now())
+def package_search(packages, name):
+	if packages.has_key(name):
+		return packages[name]
+	else:
+		logging.debug("packages does not include %s", name)
+		sys.exit("packages does not include %s\n" % name)
+
+def cctools_download(sandbox_dir, packages):
+	name = "cctools-%s-%s" % (Host_Linux_Distro, Hardware_Platform)
+	item = package_search(packages, name)
+	dest = os.path.dirname(sandbox_dir) + "/cache/" + name
+	dependency_download(item['source'][0], item["checksum"], "md5sum", dest, "tgz")
 	return dest
 
 #the db table itself does not understand the collaberation relationship between cvmfs, parrot, SITECONF
-def cvmfs_software(item, sw_conn_cursor, sandbox_dir, batch_type):
+def cvmfs_software(item, name, packages, sandbox_dir, batch_type):
 	global Is_CVMFS_Parrot_App 
 	Is_CVMFS_Parrot_App = 1
 	#construct the parrot submit script
+	logging.debug("Construct parrot submit file for using CVMFS ....")
 	Parrot_Submit_File.write("#!/bin/sh\n")
 	Parrot_Submit_File.write("export HTTP_PROXY=http://cache01.hep.wisc.edu:3128\n")
-	cctools_download(sandbox_dir, sw_conn_cursor)
-	cvmfs_repo = item[3][6:]
+	logging.debug("To access cvmfs, cctools binary is needed")
+	cctools_download(sandbox_dir, packages)
+	cvmfs_repo = item["source"][0][6:]
 	if cvmfs_repo == "cms.cern.ch":
+		logging.debug("Construct parrot task file for CMS applications ....")
 		Parrot_Task_File.write('#!/bin/sh\n')
 		Parrot_Task_File.write('rm -rf ${CMS_VERSION}\n\n')
 		Parrot_Task_File.write('. /cvmfs/cms.cern.ch/cmsset_default.sh\n')
@@ -208,54 +247,37 @@ def cvmfs_software(item, sw_conn_cursor, sandbox_dir, batch_type):
 		Parrot_Task_File.write('cd ..\n')
 		Parrot_Task_File.write('cd ' + CWD_Setting + '; ' + User_Cmd[0] + '\n')
 
-		Parrot_Submit_File.write("export CMS_VERSION=" + item[1] + "\n")
-		Parrot_Submit_File.write("export SCRAM_ARCH=" + item[2] + "\n")
+		list1 = name.split('-')
+		Parrot_Submit_File.write("export CMS_VERSION=" + list1[1] + "\n")
+		Parrot_Submit_File.write("export SCRAM_ARCH=" + list1[2] + "\n")
 
 		#download SITECONF
-		site_item = db_search("cms-siteconf-local-cvmfs", "", "", sw_conn_cursor)
+		site_item = package_search(packages, "cms_siteconf_local_cvmfs")
 		dest = os.path.dirname(sandbox_dir) + "/cache/cvmfs/cms.cern.ch/SITECONF"
-		dependency_download(site_item[3], site_item[6], "md5sum", dest, "tgz")
-		parrot_dest = "%s/cache/cctools-%s-%s/bin/parrot_run" % (os.path.dirname(sandbox_dir), Hardware_Platform, Host_Linux_Distro)
+		dependency_download(site_item["source"][0], site_item["checksum"], "md5sum", dest, "tgz")
+		global Parrot_Mount_String
+		Parrot_Mount_String = '/cvmfs/cms.cern.ch/SITECONF/local %s/local' % dest
+		parrot_dest = "%s/cache/cctools-%s-%s/bin/parrot_run" % (os.path.dirname(sandbox_dir), Host_Linux_Distro, Hardware_Platform)
 		#Parrot_Submit_File.write('env; ' + parrot_dest + " -d all -o log -M /cvmfs/cms.cern.ch/SITECONF/local=" + dest + "/local /bin/sh " + sandbox_dir + "/task.sh\n" )
-		Parrot_Submit_File.write('env; ' + parrot_dest + " -M /cvmfs/cms.cern.ch/SITECONF/local=" + dest + "/local /bin/sh " + sandbox_dir + "/task.sh\n" )
+		Parrot_Submit_File.write('env; ' + parrot_dest + " --no-set-foreground --cvmfs-repo-switching /bin/sh " + sandbox_dir + "/task.sh\n" )
 
 		global Has_Parrot_Localfile
 		Has_Parrot_Localfile = 1
 
-""" Search a software given the name, version, platform information
-"""
-def db_search(name, version, platform, db_conn_cursor):
-	sql_cmd = 'SELECT * FROM sw_table where name = "' + name + '" and version = "' + version + '" and platform = "' + platform + '"'
-	db_conn_cursor.execute(sql_cmd)
-	result = db_conn_cursor.fetchall()
-	if len(result) == 0:
-		sys.exit(sql_cmd + " fails!\n")
-	#if multiple items satisfy the requirements, the first one will be used.
-	item = result[0]
-	return item
-
-def dependency_process(name, version, platform, mountpoint, sw_conn_cursor, sandbox_dir, batch_type):
-	item = db_search(name, version, platform, sw_conn_cursor)
+def dependency_process(name, mountpoint, packages, sandbox_dir, batch_type):
+	item = package_search(packages, name)
 	#table schema: (name text, version text, platform text, store text, store_type text, type text)
-	store = item[3] 
+	store = item["source"][0] 
 	global Mount_Dict 
 	if store[0:5] == "cvmfs":
-		cvmfs_software(item, sw_conn_cursor, sandbox_dir, batch_type)	
+		logging.debug("Software dependency: cvmfs")
+		cvmfs_software(item, name, packages, sandbox_dir, batch_type)	
+		logging.debug("Add mountpoint (%s:%s) into Mount_Dict", mountpoint, mountpoint)
 		Mount_Dict[mountpoint] = mountpoint
 	else:
-		if item[5] == 'os':
-			dest = os.path.dirname(sandbox_dir) + "/cache/" + item[0] + '-' + item[1] + '-' + item[2]
-			global Env_File_Path
-			global Common_Mountfile_Path
-			global Special_File_Path
-			global Need_Separate_Rootfs
-			Env_File_Path = dest + "/env_list"
-			Common_Mountfile_Path = dest + "/common-mountlist"
-			Special_File_Path = dest + "/special_files"
-			Need_Separate_Rootfs = 1
-		else:
-			dest = os.path.dirname(sandbox_dir) + "/cache/" + item[0] + '-' + item[2] + '-' + item[1]
-		dependency_download(store, item[6], "md5sum", dest, "tgz")
+		dest = os.path.dirname(sandbox_dir) + "/cache/" + name 
+		dependency_download(store, item['checksum'], "md5sum", dest, "tgz")
+		logging.debug("Add mountpoint (%s:%s) into Mount_Dict", mountpoint, dest)
 		Mount_Dict[mountpoint] = dest
 	
 ''' Set the global environment parameters according to the specification file
@@ -263,20 +285,84 @@ def dependency_process(name, version, platform, mountpoint, sw_conn_cursor, sand
 def env_parameter_init(hardware_spec, kernel_spec, os_spec):
 	global Hardware_Platform
 	global Kernel_Type
+	global Kernel_Version
 	global Distro_Name
 	global Distro_Version
 	global Linux_Distro
-	Hardware_Platform = hardware_spec["platform"].lower()
-	Kernel_Type = kernel_spec["type"].lower()
+	Hardware_Platform = hardware_spec["arch"].lower()
+	Kernel_Type = kernel_spec["name"].lower()
+	Kernel_Version = kernel_spec["version"].lower()
 	Distro_Name = os_spec["name"].lower()
 	Distro_Version = os_spec["version"].lower()
 	index = Distro_Version.find('.')
 	Linux_Distro = Distro_Name + Distro_Version[:index]
 
+''' Compare two versions, the format of version is: X.X.X
+Parameter v1: a version
+Parameter v2: a version
+Return: 0 if v1 == v2; 1 if v1 is newer than v2; -1 if v1 is older than v2.
+'''
+def compare_versions(v1, v2):
+	list1 = v1.split('.')
+	list2 = v2.split('.')
+	for i in range(len(list1)):
+		list1[i] = int(list1[i])
+	for i in range(len(list2)):
+		list2[i] = int(list2[i])
+	if list1[0] == list2[0]:
+		if list1[1] == list2[1]:
+			if list1[2] == list2[2]:
+				return 0
+			elif list1[2] > list2[2]:
+				return 1
+			else:
+				return -1
+		elif list1[1] > list2[1]:
+			return 1
+		else:
+			return -1
+
+	elif list1[0] > list2[0]:
+		return 1
+	else:
+		return -1
+
+def	verify_kernel(kernel_name, kernel_version):
+	global Kernel_Version 
+	if kernel_name != Kernel_Type:
+		logging.critical("The required kernel name is %s, the kernel name of the host machine is %s!" % (Kernel_Type, kernel_name))
+		sys.exit("The required kernel name is %s, the kernel name of the host machine is %s!\n" % (Kernel_Type, kernel_name))	
+	if Kernel_Version[0] == '[':
+		list1 = Kernel_Version[1:-1].split(',')
+		if compare_versions(kernel_version, list1[0]) >= 0 and compare_versions(kernel_version, list1[1]) <= 0:
+			logging.debug("The kernel version matches!")
+		else:
+			logging.debug("The required kernel version is %s, the kernel version of the host machine is %s!" % (Kernel_Version, kernel_version))
+			sys.exit("The required kernel version is %s, the kernel version of the host machine is %s!\n" % (Kernel_Version, kernel_version))
+	elif Kernel_Version[0] == '>':
+		if compare_versions(kernel_version, Kernel_Version[2:]) >= 0:
+			logging.debug("The kernel version matches!")
+		else:
+			logging.debug("The required kernel version is %s, the kernel version of the host machine is %s!" % (Kernel_Version, kernel_version))
+			sys.exit("The required kernel version is %s, the kernel version of the host machine is %s!\n" % (Kernel_Version, kernel_version))
+	elif Kernel_Version[0] == '<':
+		if compare_versions(kernel_version, Kernel_Version[2:]) <= 0:
+			logging.debug("The kernel version matches!")
+		else:
+			logging.debug("The required kernel version is %s, the kernel version of the host machine is %s!" % (Kernel_Version, kernel_version))
+			sys.exit("The required kernel version is %s, the kernel version of the host machine is %s!\n" % (Kernel_Version, kernel_version))
+	else: #the kernel version is a single value 
+		if compare_versions(kernel_version, Kernel_Version[2:]) == 0:
+			logging.debug("The kernel version matches!")
+		else:
+			logging.critical("The required kernel version is %s, the kernel version of the host machine is %s!" % (Kernel_Version, kernel_version))
+			sys.exit("The required kernel version is %s, the kernel version of the host machine is %s!\n" % (Kernel_Version, kernel_version))	
+	
 def env_check(sandbox_dir, batch_type):
 	print "Execution environment checking ..."
 	
 	if batch_type != "docker" and batch_type != "chroot" and batch_type != "local":
+		logging.critical("Currently local execution engine only support three sandbox techniques: docker, chroot or local!")
 		sys.exit("Currently local execution engine only support three sandbox techniques: docker, chroot or local!\n")
 
 	global Parrot_Task_Path
@@ -287,14 +373,20 @@ def env_check(sandbox_dir, batch_type):
 	Parrot_Submit_Path = sandbox_dir + "/local.sh"
 	Parrot_Task_File = open(Parrot_Task_Path, "wb")
 	Parrot_Submit_File = open(Parrot_Submit_Path, "wb")
-
+	logging.debug("Create parrot submit file (%s) and parrot task file (%s)", Parrot_Submit_Path, Parrot_Task_Path)
 	uname_list = platform.uname() #format of uname_list: (system,node,release,version,machine,processor)
 #	for i in range(len(uname_list)):
 #		print uname_list[i],
 #	print ''
+	kernel_name = uname_list[0].lower()
+	index = uname_list[2].find('-')
+	kernel_version = uname_list[2][:index]
+	print kernel_version
+	verify_kernel(kernel_name, kernel_version)
 	
 	dist_list = platform.dist()
-	print "The hardware information of the local machine:", dist_list
+	logging.debug("The hardware information of the local machine:")
+	logging.debug(dist_list)
 	global Host_Linux_Distro
 	arch_index = uname_list[2].find('ARCH')
 	if arch_index != -1:
@@ -307,47 +399,55 @@ def env_check(sandbox_dir, batch_type):
 			Host_Linux_Distro = 'centos' + dist_version
 		else:
 			Host_Linux_Distro = 'redhat' + dist_version		
-	print "The OS distribution information of the local machine:", Host_Linux_Distro
+	logging.debug("The OS distribution information of the local machine: %s", Host_Linux_Distro)
 
 	if Hardware_Platform != uname_list[4].lower():
+		logging.critical("The specification requires %s, but the local machine is %s", Hardware_Platform, uname_list[4].lower())
 		sys.exit("The specification requires " + Hardware_Platform + ", but the local machine is " + uname_list[4].lower() + "!\n")
 
 	if Kernel_Type != uname_list[0].lower():
+		logging.critical("The specification requires %s, but the local machine is %s", Kernel_Type, uname_list[0].lower())
 		sys.exit("The specification requires " + Kernel_Type + ", but the local machine is " + uname_list[0].lower() + "!\n")
 
 """ Installation each software dependency specified in the software section of the specification
 Parameter software_spec: the software section of the specification
-Parameter sw_conn_cursor: the cursor of the connection to software.db
 Parameter sandbox_dir: the sandbox directory
 Parameter batch_type: the batch type
 """
-def software_install(software_spec, sw_conn_cursor, sandbox_dir, batch_type):
+def software_install(software_spec, packages, sandbox_dir, batch_type):
 	print "Installing software dependencies ..."
-	i = 1
 	for item in software_spec:
-		name = software_spec[item]['name']
-		version = software_spec[item]['version']
-		platform = software_spec[item]['platform']
 		mountpoint = software_spec[item]['mountpoint']
-		print "dependency_process(%s) start: %s" % (name, datetime.datetime.now())
-		dependency_process(name, version, platform, mountpoint, sw_conn_cursor, sandbox_dir, batch_type)
-		print "dependency_process(%s) end: %s" % (name, datetime.datetime.now())
-		i = i + 1
+		dependency_process(item, mountpoint, packages, sandbox_dir, batch_type)
 
 	#if the OS distribution does not match, add the OS image into the dependency list of the application and download it into the local machine
 	if Linux_Distro != Host_Linux_Distro:
 		print "The required linux distro specified in the specification is %s; the linux distro of the host machine is %s. The %s os images will be downloaded." % (Linux_Distro, Host_Linux_Distro, Linux_Distro)
+		logging.debug("The required linux distro specified in the specification is %s; the linux distro of the host machine is %s. The %s os images will be downloaded.", Linux_Distro, Host_Linux_Distro, Linux_Distro)
 		name = Distro_Name
 		version = Distro_Version 
+		item = '%s-%s-%s' % (name, version, Hardware_Platform)
+		
 		mountpoint = '/'	
-		print "dependency_process(%s) start: %s" % (name, datetime.datetime.now())
-		dependency_process(name, version, Hardware_Platform, mountpoint, sw_conn_cursor, sandbox_dir, batch_type)
-		print "dependency_process(%s) end: %s" % (name, datetime.datetime.now())
+
+		global Env_File_Path
+		global Common_Mountfile_Path
+		global Special_File_Path
+		global Need_Separate_Rootfs
+		dest = "%s/cache/%s" % (os.path.dirname(sandbox_dir), item)
+		logging.debug("A separate OS (%s) is needed!", dest)
+		Env_File_Path = dest + "/env_list"
+		Common_Mountfile_Path = dest + "/common-mountlist"
+		Special_File_Path = dest + "/special_files"
+		Need_Separate_Rootfs = 1
+	
+		dependency_process(item, mountpoint, packages, sandbox_dir, batch_type)
 
 	#if the batch_type is local, add cctools into the dependency list to guarantee parrot can be used to create sandbox for the worst case (No root access authority and no docker).
 	if batch_type == "local":
 		global Host_CCTOOLS_Path
-		Host_CCTOOLS_Path = cctools_download(sandbox_dir, sw_conn_cursor)
+		Host_CCTOOLS_Path = cctools_download(sandbox_dir, packages)
+		logging.debug("To support local execution engine, cctools binary (%s) is needed.", Host_CCTOOLS_Path)
 
 """ Return the path of ld-linux.so within the downloaded os image dependency
 """
@@ -398,7 +498,6 @@ def transfer_env_para_docker(env_para_dict):
 """
 def collect_software_bin():
 	extra_path = ""
-	print "collect_software_bin(): Mount_Dict: ", Mount_Dict 
 	for key in Mount_Dict:
 		if key != '/':
 			extra_path += '%s/bin:' % key
@@ -413,8 +512,9 @@ def In_local_passwd():
 	with open('/etc/passwd') as f:
 		for line in f:
 			if line[:len(user_name)] == user_name:
-				print "%s is included in /etc/passwd!" % user_name
+				logging.debug("%s is included in /etc/passwd!", user_name)
 				return 'yes'
+	logging.debug("%s is not included in /etc/passwd!", user_name)
 	return 'no'
 
 """ Judge whether a group exists in /etc/group
@@ -424,8 +524,9 @@ def In_local_group():
 	with open('/etc/group') as f:
 		for line in f:
 			if line[:len(group_name)] == group_name:
-				print "%s is included in /etc/group!" % group_name
+				logging.debug("%s is included in /etc/group!", group_name)
 				return 'yes'
+	logging.debug("%s is not included in /etc/group!", group_name)
 	return 'no'
 
 """ Create the mountfile if parrot is used to create a sandbox for the application
@@ -438,26 +539,33 @@ def construct_mountfile(sandbox_dir, input_dict):
 		mountfile.write("/ " + new_root + "\n")	
 		del Mount_Dict["/"]
 		mountfile.write(new_root + " " + new_root + "\n")	
+		logging.debug("Adding items from Mount_Dict into %s", mountfile_path)
 		for key in Mount_Dict:
 			mountfile.write(key + " " + Mount_Dict[key] + "\n")
 			mountfile.write(Mount_Dict[key] + " " + Mount_Dict[key] + "\n")
 
+		logging.debug("Adding items from %s into %s", Common_Mountfile_Path, mountfile_path)
 		with open(Common_Mountfile_Path, "rb") as f:
 			for line in f:
 				mountfile.write(line)
+		logging.debug("Add %s into %s", sandbox_dir, mountfile_path)
 		mountfile.write(sandbox_dir + ' ' + sandbox_dir + '\n')
+
+		logging.debug("Add /etc/hosts and /etc/resolv.conf into %s", mountfile_path)
 		mountfile.write('/etc/hosts /etc/hosts\n')
 		mountfile.write('/etc/resolv.conf /etc/resolv.conf\n')
 		#nd workstation uses NSCD (Name Service Cache Daemon) to deal with passwd, group, hosts services. Here first check whether the current uid and gid is in the /etc/passwd and /etc/group, if yes, use them. Otherwise, construct separate passwd and group files.
 		existed_user = In_local_passwd()
 		if existed_user == 'yes':
+			logging.debug("Add /etc/passwd into %s", mountfile_path)
 			mountfile.write('/etc/passwd /etc/passwd\n')
 		else:
-			print 'the user is not included in the /etc/passwd!'
+			logging.debug("Construct a fake passwd file: .passwd, add .passwd into %s", mountfile_path)
 			with open('.passwd', 'w+') as f:
 				f.write('%s:x:%d:%d:unknown:%s:%s\n' % (getpass.getuser(), os.getuid(), os.getgid(), sandbox_dir + '/' + getpass.getuser(), os.environ['SHELL']))
 			mountfile.write('/etc/passwd %s/.passwd\n' % (sandbox_dir))
 
+			logging.debug("Construct a fake acl file: .__acl, add .__acl into %s", mountfile_path)
 			with open('.__acl', 'w+') as acl_file:
 				acl_file.write('%s rwlax\n' % getpass.getuser())
 
@@ -469,9 +577,10 @@ def construct_mountfile(sandbox_dir, input_dict):
 
 		existed_group = In_local_group()
 		if existed_group == 'yes':
+			logging.debug("Add /etc/group into %s", mountfile_path)
 			mountfile.write('/etc/group /etc/group\n')
 		else:
-			print 'the group is not included in the /etc/group!'
+			logging.debug("Construct a fake group file: .group, add .group into %s", mountfile_path)
 			with open('.group', 'w+') as f:
 				f.write('%s:x:%d:%d\n' % (grp.getgrgid(os.getgid())[0], os.getgid(), os.getuid()))
 			mountfile.write('/etc/group %s/.group\n' % (sandbox_dir))
@@ -482,17 +591,25 @@ def construct_mountfile(sandbox_dir, input_dict):
 		#add /var/run/nscd/socket into mountlist
 		mountfile.write('/var/run/nscd/socket ENOENT\n')
 		mountfile.write('/tmp /tmp\n')
-		dest = "%s/cache/cctools-%s-%s/bin" % (os.path.dirname(sandbox_dir), Hardware_Platform, Host_Linux_Distro)
+		dest = "%s/cache/cctools-%s-%s/bin" % (os.path.dirname(sandbox_dir), Host_Linux_Distro, Hardware_Platform)
+		logging.debug("Add cctools binary (%s) into %s", dest, mountfile_path)
 		mountfile.write(dest + ' ' + dest + '\n')
 
+		logging.debug("Add %s into %s", Special_File_Path, mountfile_path)
 		with open(Special_File_Path, "rb") as f:
 			for line in f:
 				mountfile.write(line)
 
 		#add the input_dict into mountflie 
+		logging.debug("Add items from input_dict into %s", mountfile_path)
 		for key in input_dict:
 			mountfile.write(key + " " + input_dict[key] + "\n")
 
+		if Parrot_Mount_String == '':
+			logging.debug('Parrot_Mount_String is null')
+		else:
+			mountfile.write(Parrot_Mount_String + '\n')
+			logging.debug('Parrot_Mount_String is not null: %s', Parrot_Mount_String)
 	return mountfile_path
 
 """ Add the input files into the mountfile
@@ -506,6 +623,13 @@ def add_inputs_to_mountfile(sandbox_dir, input_dict):
 		for key in Mount_Dict:
 			f.write(key + " " + Mount_Dict[key] + "\n")
 			f.write(Mount_Dict[key] + " " + Mount_Dict[key] + "\n")
+
+		if Parrot_Mount_String == '':
+			logging.debug('Parrot_Mount_String is null')
+		else:
+			f.write(Parrot_Mount_String + '\n')
+			logging.debug('Parrot_Mount_String is not null: %s', Parrot_Mount_String)
+
 	return mountfile_path
 
 """ Read Env_File_Path and save all the environment variables into a dictionary
@@ -527,6 +651,7 @@ def construct_env(sandbox_dir):
 def has_docker_image():
 	name = "%s-%s-%s" %(Distro_Name, Distro_Version, Hardware_Platform)
 	cmd = 'docker images ' + name
+	logging.debug("Start to run the command: %s", cmd)
 	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
 	p_status = p.wait()
 	while True:
@@ -545,6 +670,7 @@ def create_docker_image(sandbox_dir):
 	location = os.path.dirname(sandbox_dir) + '/cache/' + name
 	#docker container runs as root user, so use the owner option of tar command to set the owner of the docker image
 	cmd = 'cd ' + location + '; tar --owner=root -c .|docker import - ' + name + '; cd -'
+	logging.debug("Start to run the command: %s", cmd)
 	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
 	p_status = p.wait()
 
@@ -552,15 +678,18 @@ def create_docker_image(sandbox_dir):
 Return: a tuple includes the directory mount list and the file mount list
 """
 def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separate_rootfs):
-	dir_dirct = {}
+	dir_dict = {}
 	file_dict = {}
+	logging.debug("need_separate_rootfs: %d", need_separate_rootfs)
 	if need_separate_rootfs == 1:
+		logging.debug("Add %s into dir_dict of chroot", Common_Mountfile_Path)
 		with open(Common_Mountfile_Path) as f:
 			for line in f:
 				index = line.find(' ')
 				item = line[:index]
-				dir_dirct[item] = item	
+				dir_dict[item] = item	
 	
+		logging.debug("Add %s into dir_dict of chroot", Special_File_Path)
 		with open(Special_File_Path) as f:
 			for line in f:
 				index = line.find(' ')
@@ -570,49 +699,57 @@ def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separa
 	
 	if Is_CVMFS_Parrot_App == 1:
 		cctools_path = os.path.dirname(sandbox_dir) + '/cache/cctools-x86_64-' + Host_Linux_Distro 
-		dir_dirct[cctools_path] = cctools_path
-		
-	dir_dirct[sandbox_dir] = sandbox_dir
-	dir_dirct[output_dir] = output_dir 
+		logging.debug("Add cctools binary (%s) into dir_dict of chroot", cctools_path)
+		dir_dict[cctools_path] = cctools_path
+	
+	logging.debug("Add sandbox_dir and output_dir into dir_dict of chroot")	
+	dir_dict[sandbox_dir] = sandbox_dir
+	dir_dict[output_dir] = output_dir 
 	for key in Mount_Dict:
 		if key != '/':
-			dir_dirct[Mount_Dict[key]] = key
+			dir_dict[Mount_Dict[key]] = key
 
+	logging.debug("Add /etc/passwd /etc/group /etc/hosts /etc/resolv.conf into file_dict of chroot")
 	file_dict['/etc/passwd'] = '/etc/passwd'
 	file_dict['/etc/group'] = '/etc/group'
 	file_dict['/etc/hosts'] = '/etc/hosts'
 	file_dict['/etc/resolv.conf'] = '/etc/resolv.conf'
 
+	logging.debug("Add input_dict into file_dict of chroot")
 	for key in input_dict:
 		value = input_dict[key]
 		mode = os.lstat(value).st_mode
 		if S_ISDIR(mode):
-			dir_dirct[value] = key
+			dir_dict[value] = key
 		else:
 			file_dict[value] = key
 
-	return (dir_dirct, file_dict)
+	logging.debug("dir_dict:")
+	logging.debug(dir_dict)
+	logging.debug("file_dict:")
+	logging.debug(file_dict)
+	return (dir_dict, file_dict)
 
 """ Create each target mountpoint under the cached os image directory, `mount --bind`
 """
-def chroot_mount_bind(dir_dirct, file_dict, sandbox_dir, need_separate_rootfs):
+def chroot_mount_bind(dir_dict, file_dict, sandbox_dir, need_separate_rootfs):
+	logging.debug("Use mount --bind to redirect mountpoints")
 	if need_separate_rootfs == 1:
 		os_image_name = "%s-%s-%s" %(Distro_Name, Distro_Version, Hardware_Platform)
 		os_image_path = os.path.dirname(sandbox_dir) + '/cache/' + os_image_name
 	else:
 		os_image_path = '/'
 	#mount --bind -o ro hostdir sandboxdir
-	for key in dir_dirct:
+	for key in dir_dict:
 		if key == '/cvmfs/cms.cern.ch':
 			jaildir = '%s%s/cache/cvmfs/cms.cern.ch/SITECONF/local' % (os_image_path, os.path.dirname(sandbox_dir))
 			hostdir = '%s/cache/cvmfs/cms.cern.ch/SITECONF/local' % (os.path.dirname(sandbox_dir))
 		else:	
-			jaildir = '%s%s' % (os_image_path, dir_dirct[key]) 
+			jaildir = '%s%s' % (os_image_path, dir_dict[key]) 
 			hostdir = key
 		if not os.path.exists(jaildir):
 			os.makedirs(jaildir)
 		cmd = 'mount --bind -o ro %s %s' % (hostdir, jaildir)
-		print cmd
 		func_call(cmd)
 
 	for key in file_dict:
@@ -625,38 +762,33 @@ def chroot_mount_bind(dir_dirct, file_dict, sandbox_dir, need_separate_rootfs):
 			with open(jailfile, 'w+') as f:
 				pass
 		cmd = 'mount --bind -o ro %s %s' % (hostfile, jailfile)
-		print cmd
 		func_call(cmd)
 
 """ Remove all the created target mountpoints within the cached os image directory
 It is not necessary to change the mode of the output dir, because only the root user can use the chroot method.
 """
-def chroot_post_process(dir_dirct, file_dict, sandbox_dir, need_separate_rootfs):
+def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs):
+	logging.debug("post process of chroot")
 	if need_separate_rootfs == 1:
 		os_image_name = "%s-%s-%s" %(Distro_Name, Distro_Version, Hardware_Platform)
 		os_image_path = os.path.dirname(sandbox_dir) + '/cache/' + os_image_name
 	else:
 		os_image_path = '/'
-	print "chroot_post_process"
-	print "dir_dirct:", dir_dirct
-	print "file_dict:", file_dict 
 
-	#file_dict must be processed ahead of dir_dirct, because we can not umount a directory if there is another mountpoints created for files under it.
+	#file_dict must be processed ahead of dir_dict, because we can not umount a directory if there is another mountpoints created for files under it.
 	for key in file_dict:
 		jailfile = '%s%s' % (os_image_path, file_dict[key]) 
 		if os.path.exists(jailfile):
 			cmd = 'umount -f %s' % (jailfile)
-			print cmd
 			func_call(cmd)
 
-	for key in dir_dirct:
+	for key in dir_dict:
 		if key == '/cvmfs/cms.cern.ch':
 			jaildir = '%s%s/cache/cvmfs/cms.cern.ch/SITECONF/local' % (os_image_path, os.path.dirname(sandbox_dir))
 		else:	
-			jaildir = '%s%s' % (os_image_path, dir_dirct[key]) 
+			jaildir = '%s%s' % (os_image_path, dir_dict[key]) 
 		if os.path.exists(jaildir):
 			cmd = 'umount -f %s' % (jaildir)
-			print cmd
 			func_call(cmd)
 			#remove all the empty ancestor directory
 			parent_dir = jaildir
@@ -669,16 +801,17 @@ def chroot_post_process(dir_dirct, file_dict, sandbox_dir, need_separate_rootfs)
 """ Run user task directory on the host's rootfs
 """
 def execute_task_host_rootfs(sandbox_dir, env_dict, batch_type):
+	logging.debug("Close parrot submit file (%s) and parrot task file (%s)", Parrot_Task_Path, Parrot_Submit_Path)
 	Parrot_Task_File.close()
 	Parrot_Submit_File.close()
 	#need to construct the local.sh
+	logging.debug("Is_CVMFS_Parrot_App: %d", Is_CVMFS_Parrot_App)
 	if Is_CVMFS_Parrot_App == 1:
 		cmd = "/bin/sh " + sandbox_dir + "/local.sh"
 		func_call_output_withenv(cmd, env_dict, sandbox_dir)
-		print "%s is done " % cmd
 	else:
 		if batch_type == 'local':
-			cmd = "parrot_run " + User_Cmd[0]
+			cmd = "parrot_run --no-set-foreground " + User_Cmd[0]
 		elif batch_type == 'chroot':
 			cmd = 'chroot / /bin/sh -c "cd %s; %s"' %(sandbox_dir, User_Cmd[0]) 
 		print "cmd:", cmd
@@ -687,30 +820,35 @@ def execute_task_host_rootfs(sandbox_dir, env_dict, batch_type):
 
 """ Run user's task with the help of the sandbox techniques, which currently inculde chroot, parrot, docker.
 """
-def workflow_repeat(sandbox_dir, batch_type, output_dir, sw_conn_cursor, input_dict, env_para_dict):
+def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_dict):
 	#sandbox_dir will be the home directory of the sandbox
+	print 'Executing the application ....'
+	logging.debug("chdir(%s)", sandbox_dir)
 	os.chdir(sandbox_dir)
 	#at this point, all the software should be under the cache dir, all the mountpoint of the software should be in Mount_Dict 
 	if batch_type == "chroot":
-		print "chroot ******"
+		logging.debug("chroot execution engine")
+		logging.debug("Need_Separate_Rootfs: %d", Need_Separate_Rootfs)
 		if Need_Separate_Rootfs == 1:
 			#traverse the common-mountlist file to create the mountpoint and mount --bind -o ro
 			#traverse the special file to create the mountpoint and mount --bind
 			#remount /etc/passwd /etc/group /etc/hosts /etc/resolv.conf
-			print "local-chroot rootfs construct and env setting start: %s" % datetime.datetime.now()
-			(dir_dirct, file_dict) = construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, 1)
-			chroot_mount_bind(dir_dirct, file_dict, sandbox_dir, 1)
+			(dir_dict, file_dict) = construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, 1)
+			chroot_mount_bind(dir_dict, file_dict, sandbox_dir, 1)
 			#redirect outputdir
+			logging.debug("Construct environment variables ....")
 			env_dict = construct_env(sandbox_dir)
+			logging.debug("Add software binary into PATH")
 			extra_path = collect_software_bin()
 			env_dict['PATH'] = '%s:%s' % (env_dict['PATH'], extra_path[:-1])
+			logging.debug("Add env_para_dict into environment variables")
 			for key in env_para_dict:
 				env_dict[key] = env_para_dict[key]
-			print "local-chroot rootfs construct and env setting end: %s" % datetime.datetime.now()
 
 			#run User_Cmd
 			os_image_name = "%s-%s-%s" %(Distro_Name, Distro_Version, Hardware_Platform)
 			os_image_path = os.path.dirname(sandbox_dir) + '/cache/' + os_image_name
+			logging.debug("Is_CVMFS_Parrot_App: %d", Is_CVMFS_Parrot_App)
 			if Is_CVMFS_Parrot_App == 1:
 				Parrot_Task_File.close()
 				Parrot_Submit_File.close()
@@ -719,39 +857,43 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, sw_conn_cursor, input_d
 			else:
 				cmd = 'chroot %s /bin/sh -c "cd %s; %s"' % (os_image_path, sandbox_dir, User_Cmd[0])
 			func_call_output_withenv(cmd, env_dict, sandbox_dir)
-			print "local-chroot User_Cmd execute end: %s" % datetime.datetime.now()
 			
 			#post-process to clean up
-			chroot_post_process(dir_dirct, file_dict, sandbox_dir, 1)
-			print "local-chroot post processing end: %s" % datetime.datetime.now()
+			chroot_post_process(dir_dict, file_dict, sandbox_dir, 1)
 		else:
-			print "chroot does not seprate rootfs"
-			(dir_dirct, file_dict) = construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, 0)
-			chroot_mount_bind(dir_dirct, file_dict, sandbox_dir, 0)
+			(dir_dict, file_dict) = construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, 0)
+			chroot_mount_bind(dir_dict, file_dict, sandbox_dir, 0)
+			logging.debug("Construct environment variables ....")
 			env_dict = os.environ
-			for key in env_para_dict:
-				env_dict[key] = env_para_dict[key]
+			logging.debug("Add software binary into PATH")
 			extra_path = collect_software_bin()
 			env_dict['PATH'] = '%s:%s' % (env_dict['PATH'], extra_path[:-1])
+			logging.debug("Add env_para_dict into environment variables")
+			for key in env_para_dict:
+				env_dict[key] = env_para_dict[key]
 			execute_task_host_rootfs(sandbox_dir, env_dict, 'chroot')
-			chroot_post_process(dir_dirct, file_dict, sandbox_dir, 0)
+			chroot_post_process(dir_dict, file_dict, sandbox_dir, 0)
 		#rename the sandbox_dir to output_dir
+		logging.debug("Rename sandbox_dir (%s) to output_dir (%s)", sandbox_dir, output_dir)
 		os.rename(sandbox_dir, output_dir)
 	elif batch_type == "docker":
-		print "local-docker import os image directory into a docker image start: %s" % datetime.datetime.now()
-		print "docker *******"
-		print "uid: %s; gid: %d" % (os.getuid(), os.getgid())
+		logging.debug("docker execution engine")
+		logging.debug("Need_Separate_Rootfs: %d", Need_Separate_Rootfs)
 		if Need_Separate_Rootfs == 1:
 			if has_docker_image() == 'no':
+				logging.debug("Start to construct a docker image from the os image")
 				create_docker_image(sandbox_dir)
-			print "local-docker import os image directory into a docker image end: %s" % datetime.datetime.now()
+				logging.debug("Finish constructing a docker image from the os image")
 
+			logging.debug("Add a volume item (%s:%s)", sandbox_dir, sandbox_dir)
 			#-v /home/hmeng/umbrella_test/output:/home/hmeng/umbrella_test/output 
 			volume_output = " -v %s:%s " % (sandbox_dir, sandbox_dir)
 			#-v /home/hmeng/umbrella_test/cache/git-x86_64-redhat5:/software/git-x86_64-redhat5/ 
+			logging.debug("Start to construct other volumes from input_dict")
 			volume_parameters = construct_docker_volume(sandbox_dir, input_dict)
 
 			#-e "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/software/git-x86_64-redhat5/bin" 
+			logging.debug("Set the environment variables ....")
 			path_env = obtain_path() 
 			other_envs = transfer_env_para_docker(env_para_dict)
 			docker_image_name = "%s-%s-%s" %(Distro_Name, Distro_Version, Hardware_Platform)
@@ -760,91 +902,83 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, sw_conn_cursor, input_d
 			#to count the post processing time, this cmd is split into two commands
 			container_name = "container_%s" % docker_image_name
 			cmd = 'docker run --name %s -i -t %s %s -e "PATH=%s" %s %s /bin/sh -c "cd %s; %s; %s"' % (container_name, volume_output, volume_parameters, path_env, other_envs, docker_image_name, sandbox_dir, User_Cmd[0], chown_cmd)
-			print cmd
 			func_call(cmd)
-			print "local-docker docker run User_Cmd end: %s" % datetime.datetime.now()
-			print "Rename the sandbox dir(%s) to the output directory(%s)" % (sandbox_dir, output_dir)
+			logging.debug("Rename the sandbox dir(%s) to the output directory(%s)", sandbox_dir, output_dir)
 			os.rename(sandbox_dir, output_dir)
 			cmd = 'docker rm %s' % container_name
+			logging.debug("Remove docker container: %s", container_name)
 			func_call(cmd)
-			print "local-docker docker post processing end: %s" % datetime.datetime.now()
 		else:
 			#if a separate rootfs is not needed to execute the user's cmd, should forcely use other execution engine to run the user cmd.
-			execute_task_host_rootfs(sandbox_dir) #need to midify
-			os.rename(sandbox_dir, output_dir)
+			logging.debug("Docker execution engine can only be used when a separate rootfs is needed.")
+			sys.exit("Docker execution engine can only be used when a separate rootfs is needed.\n")
 	elif batch_type == "local":
-		print "local *******"
-		print "local-parrot pre-processing start: %s" % datetime.datetime.now()
-		print "uid: %s(%s); gid: %d(%s)" % (os.getuid(), getpass.getuser(), os.getgid(), grp.getgrgid(os.getgid())[0])
-
+		logging.debug("local execution engine")
+		logging.debug("Need_Separate_Rootfs: %d", Need_Separate_Rootfs)
 		if Need_Separate_Rootfs == 1:
+			logging.debug("Construct environment variables ....")
 			env_dict = construct_env(sandbox_dir)
+			logging.debug("Construct mounfile ....")
 			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile(sandbox_dir, input_dict)
-			#here, setting the linker will cause strange errors.
+		#here, setting the linker will cause strange errors.
+			logging.debug("Construct dynamic linker path ....")
 			env_dict['PARROT_LDSO_PATH'] = get_linker_path() 
 			env_dict['USER'] = getpass.getuser()
 			env_dict['HOME'] = sandbox_dir + '/' + getpass.getuser()
+			logging.debug("Add software binary into PATH")
 			extra_path = collect_software_bin()
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
 			if Has_Parrot_Localfile == 0:
 				Parrot_Submit_File.write("#!/bin/sh\n")
 
-				dest = "%s/cache/cctools-%s-%s" % (os.path.dirname(sandbox_dir), Hardware_Platform, Host_Linux_Distro)
-				Parrot_Submit_File.write(dest + '/bin/parrot_run ')
+				dest = "%s/cache/cctools-%s-%s" % (os.path.dirname(sandbox_dir), Host_Linux_Distro, Hardware_Platform)
+				Parrot_Submit_File.write(dest + '/bin/parrot_run --no-set-foreground ')
 				Parrot_Submit_File.write(User_Cmd[0] + '\n')
 				
 			Parrot_Task_File.close()
 			Parrot_Submit_File.close()
-			print "local-parrot pre-processing end: %s" % datetime.datetime.now()
 			cmd = "/bin/sh " + sandbox_dir + "/local.sh"
 			func_call_output_withenv(cmd, env_dict, sandbox_dir)
 
-			print "local-parrot User_Cmd execution end: %s" % datetime.datetime.now()
 		else:
-			print "local does not seprate rootfs"
 			env_dict = os.environ
 			env_dict['PARROT_MOUNT_FILE'] = add_inputs_to_mountfile(sandbox_dir, input_dict)
 			for key in env_para_dict:
 				env_dict[key] = env_para_dict[key]
+			logging.debug("Add software binary into PATH")
 			extra_path = collect_software_bin()
 			#print "extra_path: ", extra_path
 			if 'PATH' not in env_dict: #if we run umbrella on Condor, Condor will not set PATH by default.
 				env_dict['PATH'] = '/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin'
+				logging.debug("PATH is empty, forcely set it to be %s", env_dict['PATH'])
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
-			#print "env_dict: ", env_dict 
 
 			execute_task_host_rootfs(sandbox_dir, env_dict, 'local')
-		print "Rename the sandbox dir(%s) to the output directory(%s)" % (sandbox_dir, output_dir)
+		logging.debug("Rename sandbox_dir (%s) to output_dir (%s)", sandbox_dir, output_dir)
 		os.rename(sandbox_dir, output_dir)
-		print "local-parrot post processing end: %s" % datetime.datetime.now()
 	else:
 		pass
 
 """ the process of specification when condor execution engine is chosen
 """
-def condor_process(spec, spec_file, spec_file_basename, sandbox_dir, output_dir, input_options):
-	print "condor_process start: %s" % (datetime.datetime.now())
+def condor_process(spec, spec_file, spec_file_basename, sandbox_dir, output_dir, input_list_origin):
 	if not os.path.exists(sandbox_dir):
 		os.makedirs(sandbox_dir)
-	if spec.has_key("hardware") and spec["hardware"]:
+
+	if spec.has_key("hardware") and spec["hardware"] and spec.has_key("kernel") and spec["kernel"] and spec.has_key("os") and spec["os"]:
+		logging.debug("Setting the global environment parameters (hardware, kernle and os) according to the specification file ....")
 		env_parameter_init(spec["hardware"], spec["kernel"], spec["os"])
 	else:
+		logging.critical("this specification is not complete! You must have a hardware section, a kernel section and a os section!")
 		sys.exit("this spec has no hardware section\n")
 
-	print "condor_process environment checking end: %s" % (datetime.datetime.now())
 	global Condor_Submit_Path
-	Condor_Submit_Path = "condor_task.submit"
-
-	input_files = input_options
-	input_files = re.sub( '\s+', '', input_files).strip() #remove all the whitespaces within the inputs option
-	if input_files == '':
-			input_list_origin = ''
-	else:
-		input_list_origin = input_files.split(',') 
+	Condor_Submit_Path = sandbox_dir + "/condor_task.submit"
 
 	transfer_inputs = ''
 	new_input_options = ''
+	logging.debug("Transform input_list_origin into condor attributes ....")
 	for item in input_list_origin:
 		index_equal = item.find('=')
 		access_path = item[:index_equal]
@@ -853,15 +987,15 @@ def condor_process(spec, spec_file, spec_file_basename, sandbox_dir, output_dir,
 		new_input_options += '%s=%s,' % (access_path, os.path.basename(actual_path))
 	if new_input_options[-1] == ',':
 		new_input_options = new_input_options[:-1]
-	print transfer_inputs 
-	print new_input_options
+	logging.debug("transfer_input_files: %s, %s", spec_file, transfer_inputs)
+	logging.debug("The new_input_options of Umbrella: %s", new_input_options)
 
 	global Condor_Submit_File
 	Condor_Submit_File = open(Condor_Submit_Path, "w+")
 	Condor_Submit_File.write('universe = vanilla\n')
 	Condor_Submit_File.write('executable = umbrella\n')
 	Condor_Submit_File.write('arguments = "-c %s -l condor_umbrella -i \'%s\' -o condor_umbrella_output run \'%s\'"\n' % (spec_file_basename, new_input_options, User_Cmd[0]))
-	Condor_Submit_File.write('transfer_input_files = umbrella, software.db, %s%s\n' % (spec_file, transfer_inputs))
+	Condor_Submit_File.write('transfer_input_files = umbrella, %s%s\n' % (spec_file, transfer_inputs))
 	Condor_Submit_File.write('transfer_output_files = condor_umbrella_output\n')
 	if Linux_Distro == "redhat5":
 		Condor_Submit_File.write('requirements = TARGET.Arch == "%s" && TARGET.OpSys == "%s" && TARGET.OpSysAndVer == "redhat6"\n' % (Hardware_Platform, Kernel_Type))
@@ -874,12 +1008,10 @@ def condor_process(spec, spec_file, spec_file_basename, sandbox_dir, output_dir,
 	Condor_Submit_File.write('log = task.log\n')
 	Condor_Submit_File.write('queue\n')
 	Condor_Submit_File.close()
-	print "condor_process construct submit file end: %s" % (datetime.datetime.now())
 
 	#submit condor job
-	cmd = 'condor_submit condor_task.submit'
+	cmd = 'condor_submit ' + Condor_Submit_Path
 	func_call(cmd)
-	print "condor_process submit job end: %s" % (datetime.datetime.now())
 	#keep tracking whether condor job is done
 	user_name = getpass.getuser()
 	job_running = 1
@@ -895,13 +1027,11 @@ def condor_process(spec, spec_file, spec_file_basename, sandbox_dir, output_dir,
 				if job_running == 0:
 					break
 		time.sleep(5)
-	print "condor_process job execution end: %s" % (datetime.datetime.now())
 	#check until the condor job is done, post-processing (put the output back into the output directory)
 	os.rename('condor_umbrella_output', output_dir)
-	print "condor_process post processing end: %s" % (datetime.datetime.now())
 
-def ec2_process(spec, spec_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, input_options):
-	if spec.has_key("hardware") and spec["hardware"]:
+def ec2_process(spec, spec_file, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, input_options):
+	if spec.has_key("hardware") and spec["hardware"] and spec.has_key("kernel") and spec["kernel"] and spec.has_key("os") and spec["os"]:
 		env_parameter_init(spec["hardware"], spec["kernel"], spec["os"])
 	else:
 		sys.exit("this spec has no hardware section!\n")
@@ -912,7 +1042,7 @@ def ec2_process(spec, spec_file, sw_conn_cursor, ssh_key, user_name, public_dns,
 		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'yum -y install wget\''
 		func_call(cmd)
 		
-		python_item = db_search("python", Linux_Distro, Hardware_Platform, sw_conn_cursor) 
+		python_item = db_search("python", Linux_Distro, Hardware_Platform) 
 		python_url = python_item[3]
 		#get the url of python
 		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i ' + ssh_key + ' ' + user_name + '@' + public_dns + ' \'wget ' + python_url + '\''
@@ -956,9 +1086,9 @@ def ec2_process(spec, spec_file, sw_conn_cursor, ssh_key, user_name, public_dns,
 
 """ Create the execution environment specified in the specification file and run the task on it.
 """
-def specification_process(spec, sandbox_dir, behavior, sw_conn_cursor, cloud_conn_cursor, batch_type, output_dir, input_dict, env_para_dict):
-	print "specification_process start: %s" % datetime.datetime.now()
+def specification_process(spec, sandbox_dir, behavior, packages, batch_type, output_dir, input_dict, env_para_dict):
 	if not os.path.exists(sandbox_dir):
+		logging.debug("Create the sandbox_dir: %s", sandbox_dir)
 		os.makedirs(sandbox_dir)
 
 	#copying input files is expensive, so mounting mechanism based on redirection the access_path to the actual_path is a better solution
@@ -969,22 +1099,20 @@ def specification_process(spec, sandbox_dir, behavior, sw_conn_cursor, cloud_con
 	#if batch_type is local, create the task.sh based on the user's requirements, download parrot, download SITEINFO, create a clean environment, do the experiment.
 	#if batch_type is condor, create the task.sh based on the user's requirements, create condor submit file, submit condor job.
 	if spec.has_key("hardware") and spec["hardware"] and spec.has_key("kernel") and spec["kernel"] and spec.has_key("os") and spec["os"]:
+		logging.debug("Setting the global environment parameters (hardware, kernle and os) according to the specification file ....")
 		env_parameter_init(spec["hardware"], spec["kernel"], spec["os"])
 	else:
+		logging.critical("this specification is not complete! You must have a hardware section, a kernel section and a os section!")
 		sys.exit("this specification is not complete! You must have a hardware section, a kernel section and a os section!\n")
 
 	env_check(sandbox_dir, batch_type)
-	print "env_check end: %s" % datetime.datetime.now()
 
-	print "software_install start: %s" % datetime.datetime.now()
 	if spec.has_key("software") and spec["software"]:
-		software_install(spec["software"], sw_conn_cursor, sandbox_dir, batch_type)
+		software_install(spec["software"], packages, sandbox_dir, batch_type)
 	else:
-		print "this spec does not have software section!\n"
-	print "software_install end: %s" % datetime.datetime.now()
+		logging.debug("this spec does not have software section!")
 
-	workflow_repeat(sandbox_dir, batch_type, output_dir, sw_conn_cursor, input_dict, env_para_dict)
-	print "workflow_repeat end: %s" % datetime.datetime.now()
+	workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_dict)
 
 def dependency_check(dep_list):
 	for item in dep_list:
@@ -1070,36 +1198,46 @@ def main():
 					default="local",
 					choices=['local', 'chroot', 'docker', 'condor',],
 					help="Batch system type, which can be local, chroot, docker, condor. (By default: local)",)
-	parser.add_option("--softwaredb",
+	parser.add_option("--packages",
 					action="store", 
-					default="./software.db",
-					help="The path of software db. (By default: ./software.db)",)
-	parser.add_option("--clouddb",
+					default='./packages.json',
+					help="The source of packages information. (By default: ./packages.json)",)
+	parser.add_option("--log",
 					action="store", 
-					default="./cloud.db",
-					help="The path of cloud db. (By default: ./cloud.db)",)
+					default="./umbrella.log",
+					help="The path of umbrella log file. (By default: ./umbrella.log)",)
 
 	(options, args) = parser.parse_args()
 
-#	print 'Number of arguments:', len(sys.argv), 'arguments.'
-#	print 'Argument List:', str(sys.argv)
+	logfilename = options.log
+	logging.basicConfig(filename=logfilename, level=logging.DEBUG,
+        format='%(asctime)s.%(msecs)d %(levelname)s %(module)s - %(funcName)s: %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
+	logging.debug("*******Welcome to Umbrella*******")
+	logging.debug("Arguments: ")
+	logging.debug(sys.argv)
+
+	logging.debug("Check the validity of the command ....")
 	if not args:
+		logging.critical("You must provide the behavior and the command!")
 		print "You must provide the behavior and the command!\n"
 		parser.print_help()
 		sys.exit()
+
 	behavior = args[0]
+	logging.debug("Check the validity of the behavior: %s", behavior)
 	behavior_list = ["run"]
 	if behavior not in behavior_list:
+		logging.critical("%s is not supported by umbrella!", behavior)
 		print behavior + " is not supported by umbrella!\n"
 		parser.print_help()
 		sys.exit()
 
-	#cmd = sys.argv[-1]
-
 	batch_type = options.batch_type
+	logging.debug("Check the batch_type option: %s", batch_type)
 	if batch_type == 'chroot':
 		if getpass.getuser() != 'root':
+			logging.critical("You must be root to use chroot method.")
 			print 'You must be root to use chroot method.\n'
 			parser.print_help()
 			sys.exit()
@@ -1108,32 +1246,39 @@ def main():
 	#to allow the reuse the local cache, the localdir can be a dir which already exists.
 	localdir = options.localdir
 	localdir = os.path.abspath(localdir)
+	logging.debug("Check the localdir option: %s", localdir)
 
 	#get a sandbox number, which will become the name of the sandbox directory
 	global Sandbox_ID #modification of a global variable within a function must declare the variable using `global` directive
 	Sandbox_ID = get_sandbox_id(localdir)
 	sandbox_dir = localdir + '/' + str(Sandbox_ID)
+	logging.debug("Allocate %d as the sandbox ID, %s as the sanbox_dir", Sandbox_ID, sandbox_dir)
 #	print sandbox_dir
 
 	#transfer options.env into a dictionary, env_para_dict
-	env_para_dict = {}
 	env_para = options.env
-	if env_para is None:
+	env_para_dict = {}
+	if env_para == '':
+		logging.debug("The env option is null")
 		env_para_list = ''
+		env_para_dict = {}
 	else:
+		logging.debug("Process the env option: %s", env_para)
 		env_para = re.sub('\s+', '', env_para).strip()
 		env_para_list = env_para.split(',')
-
-	for item in env_para_list:
-		index = item.find('=')
-		name = item[:index]	
-		value = item[(index+1):]
-		env_para_dict[name] = value
+		for item in env_para_list:
+			index = item.find('=')
+			name = item[:index]	
+			value = item[(index+1):]
+			env_para_dict[name] = value
+		logging.debug("the dictionary format of the env options (env_para_dict):")
+		logging.debug(env_para_dict)
 
 	spec_file = options.config
 	spec_file_basename = os.path.basename(spec_file)
-	print "spec_file", spec_file
+	logging.debug("Start to read the specification file: %s", spec_file)
 	if not os.path.isfile(spec_file):
+		logging.critical("The specification json file (%s) does not exist! Please refer the -c option.", spec_file)
 		print "The specification json file does not exist! Please refer the -c option.\n"
 		parser.print_help()
 		sys.exit()
@@ -1143,68 +1288,82 @@ def main():
 
 		#if the spec file has environ seciton, merge the variables defined in it into env_para_dict
 		if specification.has_key("environ") and specification["environ"]:
+			logging.debug("The specification file has environ section, update env_para_dict ....")
 			spec_env = specification["environ"]
 			for key in spec_env:
 				env_para_dict[key] = spec_env[key]
+			logging.debug("env_para_dict:")
+			logging.debug(env_para_dict)
 
 #	print env_para_dict
 
 	global CWD_Setting
 	if 'PWD' in env_para_dict:
 		CWD_Setting = env_para_dict['PWD']
+		logging.debug("CWD environment variable is set explicitly: %s", CWD_Setting)
 	else:
 		CWD_Setting = sandbox_dir
+		logging.debug("CWD is not set explicitly, use sandbox_dir (%s) as CWD", CWD_Setting)
 
 	#get the absolute path of each input file
 	input_files = options.inputs
 	input_files = re.sub( '\s+', '', input_files).strip() #remove all the whitespaces within the inputs option
-	if input_files == '':
-		input_list_origin = ''
-	else:
-		input_list_origin = input_files.split(',') 
 
 	input_list = []
 	input_dict = {}
-	for item in input_list_origin:
-		index = item.find('=')
-		access_path = item[:index]
-		actual_path = item[(index+1):]
-		if access_path[0] != '/':
-			access_path = os.path.join(CWD_Setting, access_path)
-		actual_path = os.path.abspath(actual_path)
-		input_dict[access_path] = actual_path
-		input_list.append(actual_path) #get the absolute path of each input file and add it into input_list
+
+	if input_files == '':
+		input_list_origin = ''
+		input_list = []
+		input_dict = {}
+		logging.debug("the inputs options is null")
+	else:
+		logging.debug("The inputs option: %s", input_files)
+		input_list_origin = input_files.split(',') 
+		for item in input_list_origin:
+			index = item.find('=')
+			access_path = item[:index]
+			actual_path = item[(index+1):]
+			if access_path[0] != '/':
+				access_path = os.path.join(CWD_Setting, access_path)
+			actual_path = os.path.abspath(actual_path)
+			input_dict[access_path] = actual_path
+			input_list.append(actual_path) #get the absolute path of each input file and add it into input_list
+		logging.debug("The list version of the inputs option: ")
+		logging.debug(input_list)
+		logging.debug("The dict version of the inputs option: ")
+		logging.debug(input_dict)
 
 	#get the absolute path of each output file	
 	output_dir = options.output
 	output_dir = os.path.abspath(output_dir)
 
 	if not os.path.exists(output_dir):
+		logging.debug("create the output_dir: %s", output_dir)
 		os.makedirs(output_dir)
 	elif len(os.listdir(output_dir)) != 0:
+		logging.critical("output_dir (%s) is not empty!", output_dir)
 		sys.exit("%s is not empty! Please clean the output directory first or specify another directory!\n" % output_dir)
 	else:
 		pass
-	#create a connection to the software.db, which includes the name, version, platform, storage location url, checksum, type of each dependency (OS, software, data)
-	software_db = options.softwaredb
-	if not os.path.exists(software_db):
-		print 'the software db does not exist. Please refer the --softwaredb option.\n'
-		parser.print_help()
-		sys.exit()
-	sw_conn = sqlite3.connect(software_db)
-	sw_conn_cursor = sw_conn.cursor()
+	
+	packages_path = options.packages
+	packages_path = os.path.abspath(packages_path)
+	logging.debug("Check the packages information file: %s", packages_path)
 
-	#create a connection to the ec2.db, which includes the metadata information of ec2 resources.
-	cloud_db = options.clouddb
-	if not os.path.exists(cloud_db):
-		print 'the cloud db does not exist. Please refer the --clouddb option.\n'
-		parser.print_help()
-		sys.exit()
-	cloud_conn = sqlite3.connect(cloud_db)
-	cloud_conn_cursor = cloud_conn.cursor()
+	if not os.path.exists(packages_path):
+		path1 = packages_path
+		url = 'http://ccl.cse.nd.edu/software/umbrella/database/packages.json'
+		packages_path = '%s/packages.json' % (os.getcwd())	
+		logging.debug("The provided packages info (%s) does not exist, download from %s into %s", path1, url, packages_path)
+		url_download(url, packages_path)
+
+	with open(packages_path) as f: #python 2.4 does not support this syntax: with open () as
+		packages = json.load(f)
 	
 	global User_Cmd
 	User_Cmd = args[1:]
+	logging.debug("The user's command is: %s", User_Cmd)
 
 	if behavior in ["run"]:
 		dep_list = []
@@ -1219,28 +1378,24 @@ def main():
 			#get the public DNS of the instance_id
 			public_dns = get_public_dns(instance_id)
 			print "ec2_level 1 finishing start a ec2 VM: %s" % datetime.datetime.now()
-			ec2_process(specification, spec_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, options.inputs)
+			ec2_process(specification, spec_file, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, options.inputs)
 		elif batch_type == "ec2_level2":
 			public_dns = 'ec2-54-69-37-113.us-west-2.compute.amazonaws.com'
-			ec2_process(specification, spec_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, options.inputs)
+			ec2_process(specification, spec_file, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, options.inputs)
 		elif batch_type == "ec2_level3":
 			instance_id = get_instance_id('ami-d76a29e7') ##RHEL-5.10_GA-x86_64-8-Hourly2-GP2; for povray
 			public_dns = get_public_dns(instance_id)
-			ec2_process(specification, spec_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, options.inputs)
+			ec2_process(specification, spec_file, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, options.inputs)
 		elif batch_type == "ec2_level4":
 			public_dns = 'ec2-54-69-219-28.us-west-2.compute.amazonaws.com'
-			ec2_process(specification, spec_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, options.inputs)
+			ec2_process(specification, spec_file, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, options.inputs)
 		elif batch_type == "ec2_level5":
 			public_dns = 'ec2-54-69-219-28.us-west-2.compute.amazonaws.com'
-			ec2_process(specification, spec_file, sw_conn_cursor, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, options.inputs)
+			ec2_process(specification, spec_file, ssh_key, user_name, public_dns, output_dir, batch_type, input_list, options.inputs)
 		elif batch_type == "condor":
-			condor_process(specification, spec_file, spec_file_basename, sandbox_dir, output_dir, options.inputs)
+			condor_process(specification, spec_file, spec_file_basename, sandbox_dir, output_dir, input_list_origin)
 		else:
-			specification_process(specification, sandbox_dir, behavior, sw_conn_cursor, cloud_conn_cursor, batch_type, output_dir, input_dict, env_para_dict)
-
-	#close the connections to databases
-	sw_conn.close()
-	cloud_conn.close()
+			specification_process(specification, sandbox_dir, behavior, packages, batch_type, output_dir, input_dict, env_para_dict)
 
 if __name__ == "__main__":
 	main()

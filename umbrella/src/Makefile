@@ -5,7 +5,7 @@ EXTERNAL_DEPENDENCIES =
 LIBRARIES = 
 OBJECTS =
 PROGRAMS = 
-SCRIPTS = umbrella sw_db_create.py sw_db_select.py ec2_db_create.py ec2_db_select.py
+SCRIPTS = umbrella 
 TARGETS = $(PROGRAMS) $(LIBRARIES)
 
 all: $(TARGETS)
@@ -17,7 +17,6 @@ install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	chmod 755 $(SCRIPTS)
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
-	cp software.db ec2.db $(CCTOOLS_INSTALL_DIR)/bin/
 
 test: all
 

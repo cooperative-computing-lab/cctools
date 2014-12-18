@@ -1,24 +1,22 @@
 {
 	"hardware": {
-		"platform": "x86_64",
-		"cpu cores": "2",
+		"arch": "x86_64",
+		"cores": "2",
 		"memory": "2GB",
 		"disk": "10GB"
 	},
 	"kernel" : {
-		"type": "linux",
-		"release": "2.6.18"
+		"name": "linux",
+		"version": ">=2.6.18"
 	},
 	"os": {
 		"name": "Redhat",
 		"version": "5.10"
 	},
 	"software": {
-		"povray": {
-			"name": "povray",
-			"version": "redhat5",
-			"platform": "x86_64",
-			"mountpoint": "/software/povray-x86_64-redhat5"
+		"povray-redhat5-x86_64": {
+			"mountpoint": "/software/povray-x86_64-redhat5",
+			"action": "unpack"
 		}
 	},
 	"data": {

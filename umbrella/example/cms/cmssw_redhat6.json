@@ -1,24 +1,20 @@
 {
 	"hardware": {
-		"platform": "x86_64",
-		"cpu cores": "2",
+		"arch": "x86_64",
+		"cores": "2",
 		"memory": "2GB",
 		"disk": "10GB"
 	},
 	"kernel" : {
-		"type": "linux",
-		"release": "2.6.32"
+		"name": "linux",
+		"version": "2.6.32"
 	},
 	"os": {
 		"name": "Redhat",
 		"version": "6.5"
 	},
 	"software": {
-		"cmssw-cvmfs": {
-			"name": "cmssw-cvmfs",
-			"version": "CMSSW_5_3_11",
-			"platform": "slc5_amd64_gcc462",
-			"distro": "redhat6",
+		"cmssw_cvmfs-CMSSW_5_3_11-slc5_amd64_gcc462": {
 			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
 	},
