@@ -36,6 +36,7 @@ OPTION_TRIPLET(-m, ftab-file, file)Use this file as a mountlist.
 OPTION_TRIPLET(-M, mount, /foo=/bar)Mount (redirect) /foo to /bar.
 OPTION_TRIPLET(-e, env-list, path)Record the environment variables.
 OPTION_TRIPLET(-n, name-list, path)Record all the file names.
+OPTION_ITEM(`    --no-set-foreground')Disable changing the foreground process group of the session.
 OPTION_TRIPLET(-N, hostname, name)Pretend that this is my hostname.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_TRIPLET(-O, debug-rotate-max, bytes)Rotate debug files of this size.
