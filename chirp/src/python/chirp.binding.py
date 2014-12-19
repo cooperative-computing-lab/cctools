@@ -88,6 +88,12 @@ class Client:
                             source, destination,
                             self.__stoptime(absolute_stop_time, timeout))
 
+    def rm(self, path, absolute_stop_time=None, timeout=None):
+        status = chirp_reli_rmall(self.host, path, self.__stoptime(absolute_stop_time, timeout))
+
+        if status < 0:
+            raise IOError(path)
+
 class Stat:
     def __init__(self, path, cstat):
         self._path = path
