@@ -12,10 +12,12 @@ LOCAL_LINKAGE = $(CCTOOLS_PYTHON_LDFLAGS)
 EXTERNAL_DEPENDENCIES = ../libchirp.a ../../../dttools/src/libdttools.a
 CHIRPPYTHONSO = _CChirp.$(CCTOOLS_DYNAMIC_SUFFIX)
 LIBRARIES = $(CHIRPPYTHONSO)
-OBJECTS = chirp_wrap.o
-TARGETS = $(LIBRARIES)
+OBJECTS = chirp_wrap.o ../chirp_swig_wrap.o
+TARGETS = Chirp.py $(LIBRARIES)
 
 all: $(TARGETS)
+
+Chirp.py: chirp_wrap.c CChirp.py
 
 # The odd symlink in the following rule is necessary to overcome a problem
 # in the framework search path emitted by the Python configuration on macOS.
@@ -26,7 +28,7 @@ chirp_wrap.c CChirp.py: chirp.i chirp.binding.py
 	@cat chirp.binding.py >> Chirp.py
 	ln -sf /System/Library/Frameworks/Python.framework .
 
-$(CHIRPPYTHONSO): chirp_wrap.o $(EXTERNAL_DEPENDENCIES)
+$(CHIRPPYTHONSO): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
 
 clean:
 	rm -f $(OBJECTS) $(TARGETS) Python.framework Chirp.py CChirp.py chirp_wrap.c *.pyc

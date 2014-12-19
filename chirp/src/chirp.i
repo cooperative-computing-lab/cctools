@@ -11,6 +11,8 @@
 	#include "chirp_recursive.h"
     #include "chirp_reli.h"
     #include "chirp_types.h"
+
+	#include "chirp_swig_wrap.h"
 %}
 
 %typemap(in) off_t = int;
@@ -24,17 +26,16 @@
 	else if (PyFloat_Check($input))
 		$1 = (time_t) PyFloat_AsDouble($input);
 	else {
-		PyErr_SetString(PyExc_TypeError,"Expected a large number");
+		PyErr_SetString(PyExc_TypeError,"Expected a number");
 		return NULL;
 	}
 }
-
 
 /* vdebug() takes va_list as arg but SWIG can't wrap such functions. */
 %ignore vdebug;  
 %ignore debug;
 
-/* %ignore output_files; */
+/* %ignore fname..; */
 
 %include "stdint.i"
 %include "debug.h"
@@ -46,6 +47,7 @@
 %include "chirp_recursive.h"
 %include "chirp_types.h"
 %include "chirp_recursive.h"
+%include "chirp_swig_wrap.h"
 
 
 
