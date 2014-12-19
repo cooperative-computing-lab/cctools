@@ -70,6 +70,10 @@ class Client:
             raise IOError(path)
         return files
 
+    def stat(self, path, absolute_stop_time=None, timeout=None):
+        info = chirp_wrap_stat(self.host, path, self.__stoptime(absolute_stop_time, timeout))
+        return Stat(path, info)
+
     def put(self, source, destination=None, absolute_stop_time=None, timeout=None):
         if destination is None:
             destination = source

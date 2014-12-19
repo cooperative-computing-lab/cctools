@@ -1,5 +1,6 @@
 #include "buffer.h"
 #include "chirp_reli.h"
+#include "chirp_types.h"
 #include "xxmalloc.h"
 
 static void accumulate_one_acl(char *line, void *args)
@@ -11,6 +12,19 @@ static void accumulate_one_acl(char *line, void *args)
 	}
 	
 	buffer_printf(b, line);
+}
+
+struct chirp_stat *chirp_wrap_stat(const char *hostname, const char *path, time_t stoptime) {
+
+	struct chirp_stat *info = malloc(sizeof(struct chirp_stat));
+	
+	int status = chirp_reli_stat(hostname, path, info, stoptime);
+
+	if(status < 0) {
+		return NULL;
+	}
+
+	return info;
 }
 
 char *chirp_wrap_listacl(const char *hostname, const char *path, time_t stoptime)
@@ -44,3 +58,6 @@ char *chirp_wrap_whoami(const char *hostname, time_t stoptime)
 
 	return xxstrdup(id);
 }
+
+
+
