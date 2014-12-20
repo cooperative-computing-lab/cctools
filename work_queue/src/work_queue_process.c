@@ -25,7 +25,7 @@
 #define MAX_BUFFER_SIZE 4096
 #define DEFAULT_WORK_DIR "/home/worker"
 #define DEFAULT_IMG "debian"
-#define CONVERT_IMG "ubuntu/convert"
+#define CONVERT_IMG "ubuntu/mf_wq"
 #define TMP_SCRIPT "tmp.sh"
 #define DEFAULT_EXE_APP "#!/bin/sh"
 
@@ -244,7 +244,7 @@ pid_t work_queue_process_execute_docker( struct work_queue_process *p, const cha
 
             execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", \
 	    	mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, \
-	    	"-m", "1g", img_name, run_cmd, (char *) 0);
+	    	"-m", "1g", docker_img, run_cmd, (char *) 0);
 
             _exit(127); // Failed to execute the cmd.
             
