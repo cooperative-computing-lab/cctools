@@ -25,7 +25,7 @@
 #define MAX_BUFFER_SIZE 4096
 #define DEFAULT_WORK_DIR "/home/worker"
 #define DEFAULT_IMG "debian"
-#define CONVERT_IMG "ubuntu/convert"
+#define CONVERT_IMG "ubuntu/mf_wq"
 #define TMP_SCRIPT "tmp.sh"
 #define DEFAULT_EXE_APP "#!/bin/sh"
 
@@ -79,9 +79,9 @@ void work_queue_process_delete( struct work_queue_process *p )
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
-pid_t work_queue_process_execute( struct work_queue_process *p, int container_mode )
+pid_t work_queue_process_execute( struct work_queue_process *p )
 {   
-    // make warning 
+        // make warning 
 
 	fflush(NULL); /* why is this necessary? */
    
@@ -137,53 +137,117 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int container_mo
             
             close(p->output_fd);
 
-	    if(container_mode == DOCKER) {
+	    execlp("sh", "sh", "-c", p->task->command_line, (char *) 0);
+	    _exit(127);	// Failed to execute the cmd.
 
-	        debug(D_WQ, "CHECKPOINT%d\n", 1);
-                // Get path to sandbox
-                char curr_wrk_dir[MAX_BUFFER_SIZE];
-                char *wrk_space;
-                if ((wrk_space = getenv("WORK_QUEUE_SANDBOX")) != NULL) {
-                    // TODO disable debug
-                    sprintf(curr_wrk_dir, "%s/%s", wrk_space, p->sandbox);
-                } else
-                    perror("getenv() error");
-                
-                
-                char mnt_flg_val[MAX_BUFFER_SIZE];
-                sprintf(mnt_flg_val, "%s:%s", curr_wrk_dir, DEFAULT_WORK_DIR);
-                
-                // Write task command into a shell script
-                char *tmp_ptr = p->task->command_line;
-                int cmd_line_size = 0;
-                while(*(++tmp_ptr) != '\0')
-                    cmd_line_size ++;
+            
+	}
+	return 0;
+}
 
-                FILE *script_fn = fopen(TMP_SCRIPT, "w");
-                fprintf(script_fn, "%s\n%s", DEFAULT_EXE_APP, p->task->command_line);
-                fclose(script_fn);
-                chmod(TMP_SCRIPT, 0755);
+pid_t work_queue_process_execute_docker( struct work_queue_process *p, const char *img_name )
+{
+	// make warning 
 
-                // cmd for running the shell script
-                char run_cmd[SMALL_BUFFER_SIZE];
-                sprintf(run_cmd, "./%s", TMP_SCRIPT);
+	fflush(NULL); /* why is this necessary? */
+   
+        p->output_file_name = strdup(task_output_template);
+	p->output_fd = mkstemp(p->output_file_name);
+	if (p->output_fd == -1) {
+		debug(D_WQ, "Could not open worker stdout: %s", strerror(errno));
+		return 0;
+	}
 
-                uid_t uid = getuid();
-                char uid_str[MAX_BUFFER_SIZE];
-                sprintf(uid_str, "%d", uid);
+	p->execution_start = timestamp_get();
 
-                execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", \
-			mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, \
-			"-m", "1g", DEFAULT_IMG, run_cmd, (char *) 0);
+	p->pid = fork();
+	
+	if(p->pid > 0) {
+            // Make child process the leader of its own process group. This allows
+	    // signals to also be delivered to processes forked by the child process.
+            // This is currently used by kill_task().
+            setpgid(p->pid, 0);
 
-                _exit(127); // Failed to execute the cmd.
+            debug(D_WQ, "started process %d: %s", p->pid, p->task->command_line);
+            return p->pid;
 
-            } else {
+	} else if(p->pid < 0) {
 
-	        execlp("sh", "sh", "-c", p->task->command_line, (char *) 0);
-	        _exit(127);	// Failed to execute the cmd.
+	    debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
+	    unlink(p->output_file_name);
+	    close(p->output_fd);
+	    return p->pid;
 
-            }
+	} else { 
+
+	    debug(D_WQ, "CHECKPOINT%d\n", 2);
+	    if(chdir(p->sandbox)) {
+                printf("The sandbox dir is %s", p->sandbox);
+			fatal("could not change directory into %s: %s", \
+                        p->sandbox, strerror(errno));
+	    }
+
+            int fd = open("/dev/null", O_RDONLY);
+            if (fd == -1) fatal("could not open /dev/null: %s", strerror(errno));
+            int result = dup2(fd, STDIN_FILENO);
+            if (result == -1) fatal("could not dup /dev/null to stdin: %s", \
+            strerror(errno));
+            
+            result = dup2(p->output_fd, STDOUT_FILENO);
+            if (result == -1) fatal("could not dup pipe to stdout: %s", \
+            strerror(errno));
+            
+            result = dup2(p->output_fd, STDERR_FILENO);
+            if (result == -1) fatal("could not dup pipe to stderr: %s", \
+            strerror(errno));
+            
+            close(p->output_fd);
+
+            // Get path to sandbox
+            char curr_wrk_dir[MAX_BUFFER_SIZE];
+            char *wrk_space;
+
+            if ((wrk_space = getenv("WORK_QUEUE_SANDBOX")) != NULL) {
+                // TODO disable debug
+                sprintf(curr_wrk_dir, "%s/%s", wrk_space, p->sandbox);
+            } else
+                perror("getenv() error");
+            
+            
+            char mnt_flg_val[MAX_BUFFER_SIZE];
+            sprintf(mnt_flg_val, "%s:%s", curr_wrk_dir, DEFAULT_WORK_DIR);
+            
+            // Write task command into a shell script
+            char *tmp_ptr = p->task->command_line;
+            int cmd_line_size = 0;
+            while(*(++tmp_ptr) != '\0')
+                cmd_line_size ++;
+
+            FILE *script_fn = fopen(TMP_SCRIPT, "w");
+            fprintf(script_fn, "%s\n%s", DEFAULT_EXE_APP, p->task->command_line);
+            fclose(script_fn);
+            chmod(TMP_SCRIPT, 0755);
+
+            // cmd for running the shell script
+            char run_cmd[SMALL_BUFFER_SIZE];
+            sprintf(run_cmd, "./%s", TMP_SCRIPT);
+
+            uid_t uid = getuid();
+            char uid_str[MAX_BUFFER_SIZE];
+            sprintf(uid_str, "%d", uid);
+
+            char *docker_img;
+            if (img_name == NULL)
+                docker_img = DEFAULT_IMG;	
+            else
+	        docker_img = img_name;
+
+            execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", \
+	    	mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, \
+	    	"-m", "1g", docker_img, run_cmd, (char *) 0);
+
+            _exit(127); // Failed to execute the cmd.
+            
 	}
 	return 0;
 }
