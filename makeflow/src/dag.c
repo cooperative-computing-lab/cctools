@@ -58,11 +58,11 @@ struct dag *dag_create()
 
 		/* Add GC_*_LIST to variables table to ensure it is in
 		 * global DAG scope. */
-		hash_table_insert(d->variables, GC_COLLECT_LIST,  dag_variable_create(NULL, ""));
-		hash_table_insert(d->variables, GC_PRESERVE_LIST, dag_variable_create(NULL, ""));
+		hash_table_insert(d->variables,"GC_COLLECT_LIST",  dag_variable_create(NULL, ""));
+		hash_table_insert(d->variables,"GC_PRESERVE_LIST", dag_variable_create(NULL, ""));
 
 		/* Declare special variables */
-		set_insert(d->special_vars, RESOURCES_CATEGORY);
+		set_insert(d->special_vars, "CATEGORY");
 		set_insert(d->special_vars, RESOURCES_CORES);
 		set_insert(d->special_vars, RESOURCES_MEMORY);
 		set_insert(d->special_vars, RESOURCES_DISK);
