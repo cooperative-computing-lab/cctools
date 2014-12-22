@@ -204,26 +204,11 @@ void dag_node_clean(struct dag *d, struct dag_node *n)
 	}
 }
 
-void clean_symlinks(struct dag *d, int silent)
-{
-	char *filename;
-
-	if(batch_queue_type != BATCH_QUEUE_TYPE_CONDOR)
-		return;
-
-	while((filename = list_pop_head(d->symlinks_created))) {
-		file_clean(filename, silent);
-	}
-}
-
 void dag_clean(struct dag *d)
 {
 	struct dag_node *n;
 	for(n = d->nodes; n; n = n->next)
 		dag_node_clean(d, n);
-
-	/* Since we are in clean mode, remove symlinks verbosely */
-	clean_symlinks(d, 0);
 }
 
 void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
@@ -392,7 +377,6 @@ void dag_log_recover(struct dag *d, const char *filename)
 			}
 
 			fprintf(stderr, "makeflow: %s appears to be corrupted on line %d\n", filename, linenum);
-			clean_symlinks(d, 1);
 			exit(1);
 		}
 		fclose(d->logfile);
@@ -401,12 +385,10 @@ void dag_log_recover(struct dag *d, const char *filename)
 	d->logfile = fopen(filename, "a");
 	if(!d->logfile) {
 		fprintf(stderr, "makeflow: couldn't open logfile %s: %s\n", filename, strerror(errno));
-		clean_symlinks(d, 1);
 		exit(1);
 	}
 	if(setvbuf(d->logfile, NULL, _IOLBF, BUFSIZ) != 0) {
 		fprintf(stderr, "makeflow: couldn't set line buffer on logfile %s: %s\n", filename, strerror(errno));
-		clean_symlinks(d, 1);
 		exit(1);
 	}
 
@@ -593,81 +575,6 @@ char *monitor_log_name(char *dirname, int nodeid)
 	free(name);
 
 	return path;
-}
-
-int dag_prepare_for_batch_system_files(struct dag_node *n, struct list *files, int source_flag)
-{
-	struct dag_file *f;
-	list_first_item(files);
-
-	while((f = list_next_item(files))) {
-		const char *remotename = dag_file_remote_name(n, f->filename);
-
-		switch (batch_queue_type) {
-		case BATCH_QUEUE_TYPE_CONDOR:
-			if(strchr(f->filename, '/') && !remotename)
-				remotename = dag_node_add_remote_name(n, f->filename, NULL);
-
-			if(remotename) {
-				debug(D_MAKEFLOW_RUN, "creating symlink \"./%s\" for file \"%s\"\n", remotename, f->filename);
-				if(symlink(f->filename, remotename) < 0) {
-					if(errno != EEXIST) {
-						fatal("makeflow: could not create symbolic link (%s)\n", strerror(errno));
-					} else {
-						int link_size = strlen(f->filename) + 2;
-						char *link_contents = malloc(link_size);
-
-						link_size = readlink(remotename, link_contents, link_size);
-						if(!link_size || strncmp(f->filename, link_contents, link_size)) {
-							free(link_contents);
-							fatal("makeflow: symbolic link %s points to wrong file (\"%s\" instead of \"%s\")\n", remotename, link_contents, f->filename);
-						}
-						free(link_contents);
-					}
-				} else {
-					list_push_tail(n->d->symlinks_created, (void *) remotename);
-				}
-
-				/* Create symlink target  stub for output files, otherwise Condor will fail on write-back */
-				if(!source_flag && access(f->filename, R_OK) < 0) {
-					int fd = open(f->filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
-					if(fd < 0) {
-						fatal("makeflow: could not create symbolic link target (%s): %s\n", f->filename, strerror(errno));
-					}
-					close(fd);
-				}
-			}
-			break;
-		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			if(f->filename[0] == '/' && !remotename) {
-				/* Translate only explicit absolute paths for Work Queue tasks. */
-				remotename = dag_node_add_remote_name(n, f->filename, NULL);
-				debug(D_MAKEFLOW_RUN, "translating work queue absolute path (%s) -> (%s)", f->filename, remotename);
-			}
-			break;
-		default:
-			if(remotename)
-				fprintf(stderr, "makeflow: automatic file renaming (%s->%s) only works with Condor or Work Queue drivers\n", f->filename, remotename);
-			break;
-
-		}
-	}
-	return 1;
-}
-
-int dag_prepare_for_batch_system(struct dag *d)
-{
-
-	struct dag_node *n;
-
-	for(n = d->nodes; n; n = n->next) {
-		if(!dag_prepare_for_batch_system_files(n, n->source_files, 1 /* source_flag */ ))
-			return 0;
-		if(!dag_prepare_for_batch_system_files(n, n->target_files, 0))
-			return 0;
-	}
-
-	return 1;
 }
 
 int dag_prepare_for_monitoring(struct dag *d)
@@ -1231,10 +1138,10 @@ int dag_check(struct dag *d)
 	}
 
 	if(error) {
-		clean_symlinks(d, 1);
 		return 0;
+	} else {
+		return 1;
 	}
-	return 1;
 }
 
 int dag_gc_file(struct dag *d, const struct dag_file *f)
@@ -1430,7 +1337,6 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Max number of local jobs to run at once.    (default is # of cores)\n", "-j,--max-local=<#>");
 	fprintf(stdout, " %-30s Max number of remote jobs to run at once.\n", "-J,--max-remote=<#>");
 	fprintf(stdout, "                                                            (default %d for -Twq, %d otherwise.)\n", 10*MAX_REMOTE_JOBS_DEFAULT, MAX_REMOTE_JOBS_DEFAULT );
-	fprintf(stdout, " %-30s Preserve (i.e., do not clean intermediate symbolic links)\n", "-K,--preserve-links");
 	fprintf(stdout, " %-30s Use this file for the makeflow log.         (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
 	fprintf(stdout, " %-30s Use this file for the batch system log.     (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
 	fprintf(stdout, " %-30s Send summary of workflow to this email address upon success or failure.\n", "-m,--email=<email>");
@@ -1486,7 +1392,6 @@ int main(int argc, char *argv[])
 	int explicit_local_jobs_max = 0;
 	char *logfilename = NULL;
 	int port_set = 0;
-	int preserve_symlinks = 0;
 	timestamp_t runtime = 0;
 	int skip_afs_check = 0;
 	timestamp_t time_completed = 0;
@@ -1577,7 +1482,6 @@ int main(int argc, char *argv[])
 		{"password", required_argument, 0, LONG_OPT_PASSWORD},
 		{"port", required_argument, 0, 'p'},
 		{"port-file", required_argument, 0, 'Z'},
-		{"preserve-links", no_argument, 0, 'K'},
 		{"priority", required_argument, 0, 'P'},
 		{"project-name", required_argument, 0, 'N'},
 		{"retry", no_argument, 0, 'R'},
@@ -1604,7 +1508,7 @@ int main(int argc, char *argv[])
 		{0, 0, 0, 0}
 	};
 
-	static const char option_string_run[] = "aAB:cC:d:Ef:F:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:X:zZ:";
+	static const char option_string_run[] = "aAB:cC:d:Ef:F:g:G:hj:J:l:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:X:zZ:";
 
 	while((c = getopt_long(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
 		switch (c) {
@@ -1681,9 +1585,6 @@ int main(int argc, char *argv[])
 				break;
 			case 'J':
 				explicit_remote_jobs_max = atoi(optarg);
-				break;
-			case 'K':
-				preserve_symlinks = 1;
 				break;
 			case 'l':
 				logfilename = xxstrdup(optarg);
@@ -2005,10 +1906,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(!dag_prepare_for_batch_system(d)) {
-		fatal("Could not prepare for submission to batch system.\n");
-	}
-
 	if(dag_gc_method != DAG_GC_NONE)
 		dag_prepare_gc(d);
 
@@ -2058,10 +1955,6 @@ int main(int argc, char *argv[])
 	if(local_queue)
 		batch_queue_delete(local_queue);
 	batch_queue_delete(remote_queue);
-
-	if(!preserve_symlinks && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
-		clean_symlinks(d, 0);
-	}
 
 	if(write_summary_to || email_summary_to)
 		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue );

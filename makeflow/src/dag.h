@@ -4,6 +4,9 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#ifndef MAKEFLOW_DAG_H
+#define MAKEFLOW_DAG_H
+
 #include <stdio.h>
 
 #include "itable.h"
@@ -11,9 +14,6 @@ See the file COPYING for details.
 
 #include "timestamp.h"
 #include "batch_job.h"
-
-#ifndef MAKEFLOW_DAG_H
-#define MAKEFLOW_DAG_H
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
@@ -42,9 +42,6 @@ struct dag {
     struct hash_table *file_table;           /* Maps every filename to a struct dag_file. */
     struct hash_table *completed_files;      /* Records which target files have been
                                                 updated/generated. */
-    struct list *symlinks_created;           /* Remote filenames for which a symlink was
-                                                created (used now only for Condor, and only for
-                                                the final cleanup). */
 	struct hash_table *variables;            /* Mappings between variable names
 												defined in the makeflow file
 												and their values. */
