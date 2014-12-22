@@ -68,7 +68,11 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define NONE 1 
 #define DOCKER 2
-#define UMBRELLA 3
+#define DOCKER_PRESERVE 3
+#define UMBRELLA 4
+
+#define DEFAULT_WORK_DIR "/home/worker"
+#define DEFAULT_IMG "debian"
 
 // In single shot mode, immediately quit when disconnected.
 // Useful for accelerating the test suite.
@@ -153,6 +157,7 @@ static int send_stats_interval     = 60;
 static struct work_queue *foreman_q = NULL;
 // docker image name
 static char *img_name = NULL;
+static char container_name[1024]; 
 // Table of all processes in any state, indexed by taskid.
 // Processes should be created/deleted when added/removed from this table.
 static struct itable *procs_table = NULL;
@@ -404,8 +409,11 @@ static int start_process( struct work_queue_process *p )
 {
 
     pid_t pid;
+
     if (container_mode == 2) 
-	    pid = work_queue_process_execute_docker(p, img_name);
+	    pid = work_queue_process_execute_container(p, container_mode, img_name);
+    else if (container_mode == 3)
+	    pid = work_queue_process_execute_container(p, container_mode, container_name);
     else
 	    pid = work_queue_process_execute(p);
     
@@ -1332,6 +1340,9 @@ static void work_for_master(struct link *master) {
 		ok &= check_disk_space_for_filesize(0);
 
 		if(ok) {
+            
+            
+             
 			int visited = 0;
 			while(list_size(procs_waiting) > visited && cores_allocated < local_resources->cores.total) {
 				struct work_queue_process *p;
@@ -1360,6 +1371,9 @@ static void work_for_master(struct link *master) {
 				debug(D_WQ, "No task can be executed with the available resources.\n");
 				ok = 0;
 			}
+
+            
+             
 		}
 
 		if(!ok) break;
@@ -1565,7 +1579,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	last_task_received  = -1;
 	results_to_be_sent_msg = 0;
 
-	workspace_cleanup();
+	//workspace_cleanup();
 	disconnect_master(master);
 	printf("disconnected from master %s:%d\n", host, port );
 
@@ -1659,7 +1673,8 @@ static void show_help(const char *cmd)
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
       LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
-      LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_SINGLE_SHOT};
+      LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE, 
+      LONG_OPT_SINGLE_SHOT};
 
 struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1697,7 +1712,8 @@ struct option long_options[] = {
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
 	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
-	{"docker",              required_argument,        0,  LONG_OPT_RUN_DOCKER},
+	{"docker",              required_argument,  0,  LONG_OPT_RUN_DOCKER},
+	{"docker-preserve",     required_argument,  0,  LONG_OPT_RUN_DOCKER_PRESERVE},
 	{0,0,0,0}
 };
 
@@ -1713,7 +1729,7 @@ int main(int argc, char *argv[])
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
 	char * catalog_host = CATALOG_HOST;
-        int catalog_port = CATALOG_PORT;
+    int catalog_port = CATALOG_PORT;
 
 	worker_start_time = time(0);
 
@@ -1895,6 +1911,10 @@ int main(int argc, char *argv[])
 			container_mode = DOCKER;
             img_name = optarg; 
 			break;
+        case LONG_OPT_RUN_DOCKER_PRESERVE:
+            container_mode = DOCKER_PRESERVE;
+            img_name = optarg;
+            break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -1997,6 +2017,19 @@ int main(int argc, char *argv[])
 
 	}
 
+    if(container_mode == DOCKER_PRESERVE) {
+        // XXX Dec-21 new feature
+        // 1. assign container_name
+        sprintf(container_name, "worker-%d-%d", (int) getuid(), (int) getpid());
+        // 2. running container on background
+        char container_mnt_point[1024];
+        char start_container_cmd[1024];
+        sprintf(container_mnt_point, "%s:%s", workspace, DEFAULT_WORK_DIR);
+        sprintf(start_container_cmd, "docker run -i -d --name=\"%s\" -v %s -w %s %s", container_name, container_mnt_point, DEFAULT_WORK_DIR, img_name);
+	    debug(D_WQ, "+++++++++++++++%s.\n", start_container_cmd);
+        system(start_container_cmd);
+    } 
+
 	procs_running  = itable_create(0);
 	procs_table    = itable_create(0);
 	procs_waiting  = list_create();
@@ -2062,7 +2095,25 @@ int main(int argc, char *argv[])
 		sleep(backoff_interval);
 	}
 
-	workspace_delete();
+    if(container_mode == DOCKER_PRESERVE) {
+        //XXX Dec-21 new feature 
+        char stop_container_cmd[1024];
+        char rm_container_cmd[1024];
+        char rm_img_cmd[1024];
+        
+        sprintf(stop_container_cmd, "docker stop %s", container_name);
+        sprintf(rm_container_cmd, "docker rm %s", container_name);
+        sprintf(rm_img_cmd, "docker rmi %s", img_name);
+
+        //1. stop the container
+        system(stop_container_cmd); 
+        //2. remove the container
+        system(rm_container_cmd);
+        //3. remove the image
+        system(rm_img_cmd);
+    } 
+
+	//workspace_delete();
 
 	return 0;
 }

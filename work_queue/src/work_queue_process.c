@@ -8,6 +8,8 @@
 #include "create_dir.h"
 #include "delete_dir.h"
 #include "list.h"
+// XXX dec-21 import xxmalloc  
+#include "xxmalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,7 +37,8 @@
 
 #define NONE 1
 #define DOCKER 2
-#define UMBRELLA 3
+#define DOCKER_PRESERVE 3
+#define UMBRELLA 4
 
 // TODO check work_queue/src/barch_job_condor.c
 
@@ -145,7 +148,7 @@ pid_t work_queue_process_execute( struct work_queue_process *p )
 	return 0;
 }
 
-pid_t work_queue_process_execute_docker( struct work_queue_process *p, const char *img_name )
+pid_t work_queue_process_execute_container( struct work_queue_process *p, int container_mode, const char *arg_3 )
 {
 	// make warning 
 
@@ -154,8 +157,8 @@ pid_t work_queue_process_execute_docker( struct work_queue_process *p, const cha
         p->output_file_name = strdup(task_output_template);
 	p->output_fd = mkstemp(p->output_file_name);
 	if (p->output_fd == -1) {
-		debug(D_WQ, "Could not open worker stdout: %s", strerror(errno));
-		return 0;
+	    debug(D_WQ, "Could not open worker stdout: %s", strerror(errno));
+	    return 0;
 	}
 
 	p->execution_start = timestamp_get();
@@ -180,7 +183,6 @@ pid_t work_queue_process_execute_docker( struct work_queue_process *p, const cha
 
 	} else { 
 
-	    debug(D_WQ, "CHECKPOINT%d\n", 2);
 	    if(chdir(p->sandbox)) {
                 printf("The sandbox dir is %s", p->sandbox);
 			fatal("could not change directory into %s: %s", \
@@ -203,20 +205,6 @@ pid_t work_queue_process_execute_docker( struct work_queue_process *p, const cha
             
             close(p->output_fd);
 
-            // Get path to sandbox
-            char curr_wrk_dir[MAX_BUFFER_SIZE];
-            char *wrk_space;
-
-            if ((wrk_space = getenv("WORK_QUEUE_SANDBOX")) != NULL) {
-                // TODO disable debug
-                sprintf(curr_wrk_dir, "%s/%s", wrk_space, p->sandbox);
-            } else
-                perror("getenv() error");
-            
-            
-            char mnt_flg_val[MAX_BUFFER_SIZE];
-            sprintf(mnt_flg_val, "%s:%s", curr_wrk_dir, DEFAULT_WORK_DIR);
-            
             // Write task command into a shell script
             char *tmp_ptr = p->task->command_line;
             int cmd_line_size = 0;
@@ -228,23 +216,71 @@ pid_t work_queue_process_execute_docker( struct work_queue_process *p, const cha
             fclose(script_fn);
             chmod(TMP_SCRIPT, 0755);
 
-            // cmd for running the shell script
-            char run_cmd[SMALL_BUFFER_SIZE];
-            sprintf(run_cmd, "./%s", TMP_SCRIPT);
-
             uid_t uid = getuid();
             char uid_str[MAX_BUFFER_SIZE];
             sprintf(uid_str, "%d", uid);
 
-            char *docker_img;
-            if (img_name == NULL)
-                docker_img = DEFAULT_IMG;	
-            else
-	        docker_img = img_name;
+            // Get path to sandbox
+            char curr_wrk_dir[MAX_BUFFER_SIZE];
+            char *wrk_space;
 
-            execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", \
-	    	mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, \
-	    	"-m", "1g", docker_img, run_cmd, (char *) 0);
+            if ((wrk_space = getenv("WORK_QUEUE_SANDBOX")) != NULL) {
+                sprintf(curr_wrk_dir, "%s/%s", wrk_space, p->sandbox);
+            } else
+                perror("getenv() error");
+
+            if(container_mode == 2) {
+                
+            
+            
+                char mnt_flg_val[MAX_BUFFER_SIZE];
+                sprintf(mnt_flg_val, "%s:%s", curr_wrk_dir, DEFAULT_WORK_DIR);
+
+                char *img_name;
+                if (arg_3 == NULL)
+                    img_name = xxstrdup(DEFAULT_IMG);	
+                else
+	            img_name = xxstrdup(arg_3);
+
+                // cmd for running the shell script
+                char run_cmd[SMALL_BUFFER_SIZE];
+                sprintf(run_cmd, "./%s", TMP_SCRIPT);
+
+                execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", \
+	        	mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, \
+	        	"-m", "1g", img_name, run_cmd, (char *) 0);
+
+                free(img_name);
+            }
+
+            if(container_mode == DOCKER_PRESERVE) {
+                // TODO exec new process inside existing container 
+                char *container_name;
+                container_name = xxstrdup(arg_3);
+
+                // TODO create wrk_space/tmp_t.3.sh
+                // #!/bin/sh
+                // cd t.3
+                // ./tmp.sh
+                
+                char sub_proc_sh_fn[MAX_BUFFER_SIZE];
+                char sub_proc_sh_fn_path[MAX_BUFFER_SIZE];
+                sprintf(sub_proc_sh_fn, "tmp_%s.sh", p->sandbox);
+                sprintf(sub_proc_sh_fn_path, "%s/%s", wrk_space, sub_proc_sh_fn);
+                
+                FILE *sub_proc_script_fn = fopen(sub_proc_sh_fn_path, "w");
+                fprintf(sub_proc_script_fn, "%s\ncd %s\n./%s", DEFAULT_EXE_APP, p->sandbox, TMP_SCRIPT);
+                fclose(sub_proc_script_fn);
+                chmod(sub_proc_sh_fn_path, 0755);
+
+                char run_sh_fn[MAX_BUFFER_SIZE];
+                sprintf(run_sh_fn, "./%s", sub_proc_sh_fn);
+
+                execl("/usr/bin/docker", "/usr/bin/docker", "exec", \
+                      container_name, run_sh_fn, (char *) 0);
+
+                free(container_name);
+            }
 
             _exit(127); // Failed to execute the cmd.
             
