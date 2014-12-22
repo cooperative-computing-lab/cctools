@@ -179,8 +179,8 @@ int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename) (stru
 		return 1;
 
 	// For the collect list, use the their final value (the value at node with id nodeid_counter).
-	dag_to_file_var(GC_COLLECT_LIST, d->variables, d->nodeid_counter, dag_stream, "");
-	dag_to_file_var(GC_PRESERVE_LIST, d->variables, d->nodeid_counter, dag_stream, "");
+	dag_to_file_var("GC_COLLECT_LIST", d->variables, d->nodeid_counter, dag_stream, "");
+	dag_to_file_var("GC_PRESERVE_LIST", d->variables, d->nodeid_counter, dag_stream, "");
 
 	dag_to_file_exports(d, dag_stream, "");
 
