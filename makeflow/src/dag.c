@@ -44,7 +44,6 @@ struct dag *dag_create()
 		d->remote_job_table = itable_create(0);
 		d->file_table = hash_table_create(0, 0);
 		d->completed_files = hash_table_create(0, 0);
-		d->symlinks_created = list_create();
 		d->variables = hash_table_create(0, 0);
 		d->local_jobs_running = 0;
 		d->local_jobs_max = 1;
