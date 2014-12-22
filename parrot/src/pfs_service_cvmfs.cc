@@ -569,7 +569,7 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 		// make a note to fix up the repo name later
 		// Order of the following is important! Substitute in reverse order as
 		// they appear in buf.
-		if(repo_name_in_alien_cachedir_offset >= 0) {
+		if(enable_alien_on_this_repository && repo_name_in_alien_cachedir_offset >= 0) {
 			f->wildcard_subst.push_back(repo_name_in_alien_cachedir_offset - f->subst_offset);
 		}
 		if(repo_name_in_cachedir_offset >= 0) {
