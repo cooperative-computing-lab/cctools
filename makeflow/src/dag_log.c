@@ -64,7 +64,7 @@ void dag_log_recover(struct dag *d, const char *filename, int verbose_mode )
 		struct dag_node *p;
 		for(n = d->nodes; n; n = n->next) {
 			/* Record node information to log */
-			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->original_command);
+			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->command);
 
 			/* Record the node category to the log */
 			fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->category->label);
