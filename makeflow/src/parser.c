@@ -138,7 +138,7 @@ void dag_close_over_environment(struct dag *d)
 	set_first_element(d->special_vars);
 	while((name = set_next_element(d->special_vars)))
 	{
-		v = dag_get_variable_value(name, d->variables, d->nodeid_counter);
+		v = dag_variable_get_value(name, d->variables, d->nodeid_counter);
 		if(!v)
 		{
 			char *value_env = getenv(name);
@@ -152,7 +152,7 @@ void dag_close_over_environment(struct dag *d)
 	set_first_element(d->export_vars);
 	while((name = set_next_element(d->export_vars)))
 	{
-		v = dag_get_variable_value(name, d->variables, d->nodeid_counter);
+		v = dag_variable_get_value(name, d->variables, d->nodeid_counter);
 		if(!v)
 		{
 			char *value_env = getenv(name);
@@ -173,7 +173,7 @@ int dag_parse(struct dag *d, FILE *stream)
 	bk->stream   = stream;
 	bk->category = dag_task_category_lookup_or_create(d, "default");
 
-	struct dag_lookup_set s = { d, NULL, NULL, NULL };
+	struct dag_variable_lookup_set s = { d, NULL, NULL, NULL };
 	bk->environment = &s;
 
 	struct token *t;
@@ -247,13 +247,13 @@ int dag_parse_process_special_variable(struct lexer *bk, struct dag_node *n, int
 
 void dag_parse_append_variable(struct lexer *bk, int nodeid, struct dag_node *n, const char *name, const char *value)
 {
-	struct dag_lookup_set      sd = { bk->d, NULL, NULL, NULL };
-	struct dag_variable_value *vd = dag_lookup(name, &sd);
+	struct dag_variable_lookup_set      sd = { bk->d, NULL, NULL, NULL };
+	struct dag_variable_value *vd = dag_variable_lookup(name, &sd);
 
 	struct dag_variable_value *v;
 	if(n)
 	{
-		v = dag_get_variable_value(name, n->variables, nodeid);
+		v = dag_variable_get_value(name, n->variables, nodeid);
 		if(v)
 		{
 			dag_variable_value_append_or_create(v, value);
@@ -486,7 +486,7 @@ int dag_parse_node_command(struct lexer *bk, struct dag_node *n)
 	t = lexer_next_token(bk);
 	lexer_free_token(t);
 
-	char *local = dag_lookup_str("BATCH_LOCAL", bk->environment);
+	char *local = dag_variable_lookup_string("BATCH_LOCAL", bk->environment);
 	if(local) {
 		if(string_istrue(local))
 			n->local_job = 1;
