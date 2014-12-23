@@ -622,7 +622,7 @@ and making substitutions according to the node.
 
 char * dag_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue )
 {
-	const char *remotename = dag_file_remote_name(n, f->filename);
+	const char *remotename = dag_node_get_remote_name(n, f->filename);
 	if(!remotename) remotename = f->filename;
 
 	switch (batch_queue_get_type(queue)) {

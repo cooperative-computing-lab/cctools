@@ -28,45 +28,39 @@ struct dag *dag_create()
 {
 	struct dag *d = malloc(sizeof(*d));
 
-	if(!d) {
-		debug(D_MAKEFLOW_RUN, "makeflow: could not allocate new dag : %s\n", strerror(errno));
-		return NULL;
-	} else {
-		memset(d, 0, sizeof(*d));
-		d->nodes = 0;
-		d->filename = NULL;
-		d->node_table = itable_create(0);
-		d->local_job_table = itable_create(0);
-		d->remote_job_table = itable_create(0);
-		d->file_table = hash_table_create(0, 0);
-		d->completed_files = hash_table_create(0, 0);
-		d->variables = hash_table_create(0, 0);
-		d->local_jobs_running = 0;
-		d->local_jobs_max = 1;
-		d->remote_jobs_running = 0;
-		d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
-		d->nodeid_counter = 0;
-		d->collect_table = set_create(0);
-		d->export_vars  = set_create(0);
-		d->special_vars = set_create(0);
+	memset(d, 0, sizeof(*d));
+	d->nodes = 0;
+	d->filename = NULL;
+	d->node_table = itable_create(0);
+	d->local_job_table = itable_create(0);
+	d->remote_job_table = itable_create(0);
+	d->file_table = hash_table_create(0, 0);
+	d->completed_files = hash_table_create(0, 0);
+	d->variables = hash_table_create(0, 0);
+	d->local_jobs_running = 0;
+	d->local_jobs_max = 1;
+	d->remote_jobs_running = 0;
+	d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
+	d->nodeid_counter = 0;
+	d->collect_table = set_create(0);
+	d->export_vars  = set_create(0);
+	d->special_vars = set_create(0);
+	d->task_categories = hash_table_create(0, 0);
 
-		d->task_categories = hash_table_create(0, 0);
+	/* Add GC_*_LIST to variables table to ensure it is in
+	 * global DAG scope. */
+	hash_table_insert(d->variables,"GC_COLLECT_LIST",  dag_variable_create(NULL, ""));
+	hash_table_insert(d->variables,"GC_PRESERVE_LIST", dag_variable_create(NULL, ""));
 
-		/* Add GC_*_LIST to variables table to ensure it is in
-		 * global DAG scope. */
-		hash_table_insert(d->variables,"GC_COLLECT_LIST",  dag_variable_create(NULL, ""));
-		hash_table_insert(d->variables,"GC_PRESERVE_LIST", dag_variable_create(NULL, ""));
+	/* Declare special variables */
+	set_insert(d->special_vars, "CATEGORY");
+	set_insert(d->special_vars, RESOURCES_CORES);
+	set_insert(d->special_vars, RESOURCES_MEMORY);
+	set_insert(d->special_vars, RESOURCES_DISK);
+	set_insert(d->special_vars, RESOURCES_GPUS);
 
-		/* Declare special variables */
-		set_insert(d->special_vars, "CATEGORY");
-		set_insert(d->special_vars, RESOURCES_CORES);
-		set_insert(d->special_vars, RESOURCES_MEMORY);
-		set_insert(d->special_vars, RESOURCES_DISK);
-		set_insert(d->special_vars, RESOURCES_GPUS);
-
-		memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
-		return d;
-	}
+	memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
+	return d;
 }
 
 void dag_compile_ancestors(struct dag *d)
@@ -91,7 +85,7 @@ void dag_compile_ancestors(struct dag *d)
 	}
 }
 
-int get_ancestor_depth(struct dag_node *n)
+static int get_ancestor_depth(struct dag_node *n)
 {
 	int group_number = -1;
 	struct dag_node *ancestor = NULL;
@@ -147,94 +141,6 @@ struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
 struct dag_file *dag_file_from_name(struct dag *d, const char *filename)
 {
 	return (struct dag_file *) hash_table_lookup(d->file_table, filename);
-}
-
-/* Returns the remotename used in rule n for local name filename */
-const char *dag_file_remote_name(struct dag_node *n, const char *filename)
-{
-	struct dag_file *f;
-	char *name;
-
-	f = dag_file_from_name(n->d, filename);
-	name = (char *) itable_lookup(n->remote_names, (uintptr_t) f);
-
-	return name;
-}
-
-/* Returns the local name of filename */
-const char *dag_file_local_name(struct dag_node *n, const char *filename)
-{
-	struct dag_file *f;
-	const char *name;
-
-	f = hash_table_lookup(n->remote_names_inv, filename);
-
-	if(!f)
-	{
-		name =  NULL;
-	}
-	else
-	{
-		name = f->filename;
-	}
-
-	return name;
-}
-
-/* Translate an absolute filename into a unique slash-less name to allow for the
-   sending of any file to remote systems. The function allows for upto a million name collisions. */
-char *dag_node_translate_filename(struct dag_node *n, const char *filename)
-{
-	int len;
-	char *newname_ptr;
-
-	len = strlen(filename);
-
-	/* If there are no slashes in path, then we don't need to translate. */
-	if(!strchr(filename, '/')) {
-		newname_ptr = xxstrdup(filename);
-		return newname_ptr;
-	}
-
-	/* If the filename is in the current directory and doesn't contain any
-	 * additional slashes, then we can also skip translation.
-	 *
-	 * Note: this doesn't handle redundant ./'s such as ./././././foo/bar */
-	if(!strncmp(filename, "./", 2) && !strchr(filename + 2, '/')) {
-		newname_ptr = xxstrdup(filename);
-		return newname_ptr;
-	}
-
-	/* Make space for the new filename + a hyphen + a number to
-	 * handle upto a million name collisions */
-	newname_ptr = calloc(len + 8, sizeof(char));
-	strcpy(newname_ptr, filename);
-
-	char *c;
-	for(c = newname_ptr; *c; ++c) {
-		switch (*c) {
-		case '/':
-		case '.':
-			*c = '_';
-			break;
-		default:
-			break;
-		}
-	}
-
-	if(!n)
-		return newname_ptr;
-
-	int i = 0;
-	char *newname_org = xxstrdup(newname_ptr);
-	while(hash_table_lookup(n->remote_names_inv, newname_ptr)) {
-		sprintf(newname_ptr, "%06d-%s", i, newname_org);
-		i++;
-	}
-
-	free(newname_org);
-
-	return newname_ptr;
 }
 
 /* Returns the list of dag_file's which are not the target of any

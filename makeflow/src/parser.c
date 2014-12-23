@@ -75,7 +75,7 @@ int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
 			buffer_printf(&b, " ");
 			break;
 		case TOKEN_LITERAL:
-			dag_file_local_name(n, t->lexeme);
+			dag_node_get_local_name(n, t->lexeme);
 			buffer_printf(&b, "%s", t->lexeme);
 			break;
 		case TOKEN_IO_REDIRECT:

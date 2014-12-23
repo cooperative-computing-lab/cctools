@@ -40,6 +40,7 @@ struct dag {
 	struct set *special_vars;                /* List of special variables,
 												such as, category, disk,
 												memory, etc. */
+ 
     FILE *logfile;
     int node_states[DAG_NODE_STATE_MAX];     /* node_states[STATE] keeps the count of nodes that
                                                 have state STATE \in dag_node_state_t. */
@@ -97,10 +98,7 @@ void dag_find_ancestor_depth(struct dag *d);
 void dag_count_states(struct dag *d);
 
 struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename);
-
-char *dag_node_translate_filename(struct dag_node *n, const char *filename);
-const char *dag_file_remote_name(struct dag_node *n, const char *filename);
-const char *dag_file_local_name(struct dag_node *n, const char *filename);
+struct dag_file *dag_file_from_name(struct dag *d, const char *filename);
 
 void dag_variable_add_value(const char *name, struct hash_table *current_table, int nodeid, const char *value);
 struct dag_variable_value *dag_get_variable_value(const char *name, struct hash_table *t, int node_id);
