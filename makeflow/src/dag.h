@@ -8,6 +8,7 @@ See the file COPYING for details.
 #define MAKEFLOW_DAG_H
 
 #include "dag_node.h"
+#include "dag_file.h"
 
 #include "itable.h"
 #include "set.h"
@@ -61,22 +62,6 @@ struct dag_task_category
 	struct list *nodes;
 };
 
-/* struct dag_file represents a file, inpur or output, of the
- * workflow. filename is the path given in the makeflow file,
- * that is the local name of the file. Additionaly, dag_file
- * keeps track which nodes use the file as a source, and the
- * unique node, if any, that produces the file.
- */
-
-struct dag_file {
-    const char *filename;
-
-    struct list     *needed_by;              /* List of nodes that have this file as a source */
-    struct dag_node *target_of;              /* The node (if any) that created the file */
-
-	int    ref_count;                        /* How many nodes still to run need this file */
-};
-
 struct dag_lookup_set {
     struct dag *dag;
     struct dag_task_category *category;
@@ -103,23 +88,19 @@ struct dag_variable_value {
 };
 
 struct dag *dag_create();
-struct dag_file *dag_file_create( const char *filename );
-struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename);
 
 struct list *dag_input_files(struct dag *d);
 
 void dag_compile_ancestors(struct dag *d);
 void dag_find_ancestor_depth(struct dag *d);
 
-int dag_file_is_source(struct dag_file *f);
-int dag_file_is_sink(struct dag_file *f);
-
 void dag_count_states(struct dag *d);
-char *dag_node_translate_filename(struct dag_node *n, const char *filename);
 
+struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename);
+
+char *dag_node_translate_filename(struct dag_node *n, const char *filename);
 const char *dag_file_remote_name(struct dag_node *n, const char *filename);
 const char *dag_file_local_name(struct dag_node *n, const char *filename);
-int dag_file_isabsolute(const struct dag_file *f);
 
 void dag_variable_add_value(const char *name, struct hash_table *current_table, int nodeid, const char *value);
 struct dag_variable_value *dag_get_variable_value(const char *name, struct hash_table *t, int node_id);

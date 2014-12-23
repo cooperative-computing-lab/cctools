@@ -127,6 +127,22 @@ void dag_find_ancestor_depth(struct dag *d)
 	}
 }
 
+/* Return the dag_file associated with the local name filename.
+ * If one does not exist, it is created. */
+struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
+{
+	struct dag_file *f;
+
+	f = hash_table_lookup(d->file_table, filename);
+	if(f) return f;
+
+	f = dag_file_create(filename);
+
+	hash_table_insert(d->file_table, f->filename, (void *) f);
+
+	return f;
+}
+
 /* Returns the struct dag_file for the local filename */
 struct dag_file *dag_file_from_name(struct dag *d, const char *filename)
 {
@@ -163,12 +179,6 @@ const char *dag_file_local_name(struct dag_node *n, const char *filename)
 	}
 
 	return name;
-}
-
-/* True if the local file is specified as an absolute path */
-int dag_file_isabsolute(const struct dag_file *f)
-{
-	return f->filename[0] == '/';
 }
 
 /* Translate an absolute filename into a unique slash-less name to allow for the
@@ -225,32 +235,6 @@ char *dag_node_translate_filename(struct dag_node *n, const char *filename)
 	free(newname_org);
 
 	return newname_ptr;
-}
-
-struct dag_file * dag_file_create( const char *filename )
-{
-	struct dag_file *f = malloc(sizeof(*f));
-	f->filename = xxstrdup(filename);
-	f->needed_by = list_create();
-	f->target_of = 0;
-	f->ref_count = 0;
-	return f;
-}
-
-/* Return the dag_file associated with the local name filename.
- * If one does not exist, it is created. */
-struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
-{
-	struct dag_file *f;
-
-	f = hash_table_lookup(d->file_table, filename);
-	if(f) return f;
-
-	f = dag_file_create(filename);
-
-	hash_table_insert(d->file_table, f->filename, (void *) f);
-
-	return f;
 }
 
 /* Returns the list of dag_file's which are not the target of any
@@ -580,22 +564,6 @@ struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, cons
 	}
 
 	return category;
-}
-
-int dag_file_is_source(struct dag_file *f)
-{
-	if(f->target_of)
-		return 0;
-	else
-		return 1;
-}
-
-int dag_file_is_sink(struct dag_file *f)
-{
-	if(list_size(f->needed_by) > 0)
-		return 0;
-	else
-		return 1;
 }
 
 /* vim: set noexpandtab tabstop=4: */
