@@ -548,7 +548,7 @@ Returns a newly allocated string that must be freed.
 char *dag_node_rmonitor_wrap_command( struct dag_node *n, const char *command )
 {
 	char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
-	char *limits_str = dag_task_resources_wrap_as_rmonitor_options(n);
+	char *limits_str = dag_node_resources_wrap_as_rmonitor_options(n);
 	char *extra_options = string_format("%s -V '%-15s%s'",
 			limits_str ? limits_str : "",
 			"category:",
@@ -773,7 +773,7 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 	 * restore it after we submit. */
 	struct dag_lookup_set s = { d, n->category, n, NULL };
 	char *batch_options_env    = dag_lookup_str("BATCH_OPTIONS", &s);
-	char *batch_submit_options = dag_task_resources_wrap_options(n, batch_options_env, batch_queue_get_type(queue));
+	char *batch_submit_options = dag_node_resources_wrap_options(n, batch_options_env, batch_queue_get_type(queue));
 	char *old_batch_submit_options = NULL;
 
 	free(batch_options_env);
