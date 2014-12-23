@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include "dag_node.h"
 #include "dag_file.h"
+#include "dag_variable.h"
 
 #include "itable.h"
 #include "set.h"
@@ -55,42 +56,8 @@ struct dag {
     struct hash_table *task_categories;      /* Mapping from labels to category structures. */
 };
 
-/* Information of task categories. Label, number of tasks in this
-   category, and maximum resources allowed. */
-struct dag_task_category
-{
-	char *label;
-	struct list *nodes;
-};
-
-struct dag_lookup_set {
-    struct dag *dag;
-    struct dag_task_category *category;
-    struct dag_node *node;
-    struct hash_table *table;
-};
-
-/* A makeflow variable may have different bindings, depending on where it was
- * defined. struct dag_variable keeps track of these values. When a
- * substitution is required in a rule, we look for the value binded just before
- * the rule (using binary search on either n->nodeid or d->nodeid_counter).
- */
-struct dag_variable {
-	int    count;
-	struct dag_variable_value **values;
-};
-
-struct dag_variable_value {
-	int   nodeid;                           /* The nodeid of the rule to which
-	                                           this value binding takes effect. */
-	int   size;                             /* memory size allocated for value */
-	int   len;                              /* records strlen(value) */
-	char *value;
-};
-
 struct dag *dag_create();
-
-struct list *dag_input_files(struct dag *d);
+struct list *dag_input_files( struct dag *d );
 
 void dag_compile_ancestors(struct dag *d);
 void dag_find_ancestor_depth(struct dag *d);
@@ -100,17 +67,14 @@ void dag_count_states(struct dag *d);
 struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename);
 struct dag_file *dag_file_from_name(struct dag *d, const char *filename);
 
-void dag_variable_add_value(const char *name, struct hash_table *current_table, int nodeid, const char *value);
-struct dag_variable_value *dag_get_variable_value(const char *name, struct hash_table *t, int node_id);
-struct dag_variable_value *dag_lookup(const char *name, void *arg);
-
-char *dag_lookup_set(const char *name, void *arg);
-char *dag_lookup_str(const char *name, void *arg);
+/* Information of task categories. Label, number of tasks in this
+   category, and maximum resources allowed. */
+struct dag_task_category
+{
+	char *label;
+	struct list *nodes;
+};
 
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label);
-
-struct dag_variable_value *dag_variable_value_create(const char *value);
-void dag_variable_value_free(struct dag_variable_value *v);
-struct dag_variable_value *dag_variable_value_append_or_create(struct dag_variable_value *v, const char *value);
 
 #endif

@@ -652,7 +652,7 @@ struct token *lexer_concat_expandable(struct lexer *lx, struct list *tokens)
 	while((t = list_pop_head(tokens))) {
 		switch(t->type) {
 		case TOKEN_SUBSTITUTION:
-			substitution = dag_lookup_str(t->lexeme, lx->environment);
+			substitution = dag_variable_lookup_string(t->lexeme, lx->environment);
 			if(!substitution)
 				fatal("Variable %s has not yet been defined at line % " PRId64 ".\n", t->lexeme, lx->line_number);
 			buffer_printf(&b, "%s", substitution);
@@ -1239,7 +1239,7 @@ struct lexer *lexer_create_substitution(struct lexer *lx, struct token *t)
 	char *substitution = NULL;
 
 	if(lx->environment) {
-		substitution = dag_lookup_str(t->lexeme, lx->environment);
+		substitution = dag_variable_lookup_string(t->lexeme, lx->environment);
 	}
 
 	struct lexer *lx_s;

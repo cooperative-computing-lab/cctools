@@ -383,8 +383,8 @@ void dag_prepare_gc(struct dag *d)
 
 	/* Parse GC_*_LIST and record which target files should be
 	 * garbage collected. */
-	char *collect_list  = dag_lookup_set("GC_COLLECT_LIST", d);
-	char *preserve_list = dag_lookup_set("GC_PRESERVE_LIST", d);
+	char *collect_list  = dag_variable_lookup_global_string("GC_COLLECT_LIST", d);
+	char *preserve_list = dag_variable_lookup_global_string("GC_PRESERVE_LIST", d);
 
 	struct dag_file *f;
 	char *filename;
@@ -509,14 +509,14 @@ If nothing has been set, this function may return null.
 
 struct nvpair * dag_node_env_create( struct dag *d, struct dag_node *n )
 {
-	struct dag_lookup_set s = { d, n->category, n, NULL };
+	struct dag_variable_lookup_set s = { d, n->category, n, NULL };
 	char *key;
 
 	struct nvpair *nv = 0;
 
 	set_first_element(d->export_vars);
 	while((key = set_next_element(d->export_vars))) {
-		char *value = dag_lookup_str(key, &s);
+		char *value = dag_variable_lookup_string(key, &s);
 		if(value) {
 			if(!nv) nv = nvpair_create();
 			nvpair_insert_string(nv,key,value);
@@ -771,8 +771,8 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
-	struct dag_lookup_set s = { d, n->category, n, NULL };
-	char *batch_options_env    = dag_lookup_str("BATCH_OPTIONS", &s);
+	struct dag_variable_lookup_set s = { d, n->category, n, NULL };
+	char *batch_options_env    = dag_variable_lookup_string("BATCH_OPTIONS", &s);
 	char *batch_submit_options = dag_node_resources_wrap_options(n, batch_options_env, batch_queue_get_type(queue));
 	char *old_batch_submit_options = NULL;
 

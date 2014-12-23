@@ -27,6 +27,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 
 #include "dag.h"
+#include "dag_variable.h"
 #include "rmsummary.h"
 #include "visitors.h"
 
@@ -39,7 +40,7 @@ See the file COPYING for details.
 int dag_to_file_var(const char *name, struct hash_table *vars, int nodeid, FILE * dag_stream, const char *prefix)
 {
 	struct dag_variable_value *v;
-	v = dag_get_variable_value(name, vars, nodeid);
+	v = dag_variable_get_value(name, vars, nodeid);
 	if(v && !string_null_or_empty(v->value))
 		fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, name, (char *) v->value);
 
