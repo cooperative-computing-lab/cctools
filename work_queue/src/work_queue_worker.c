@@ -1579,7 +1579,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	last_task_received  = -1;
 	results_to_be_sent_msg = 0;
 
-	//workspace_cleanup();
+	workspace_cleanup();
 	disconnect_master(master);
 	printf("disconnected from master %s:%d\n", host, port );
 
@@ -2113,7 +2113,7 @@ int main(int argc, char *argv[])
         system(rm_img_cmd);
     } 
 
-	//workspace_delete();
+	workspace_delete();
 
 	return 0;
 }
