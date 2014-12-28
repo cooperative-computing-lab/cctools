@@ -60,6 +60,10 @@ int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n);
 int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n);
 int dag_parse_export(struct lexer *bk);
 
+int verbose_parsing=0;
+
+static const int parsing_rule_mod_counter = 250;
+
 int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
 {
 	struct buffer b;
@@ -438,6 +442,13 @@ int dag_parse_node(struct lexer *bk)
 
 	struct dag_node *n;
 	n = dag_node_create(bk->d, bk->line_number);
+
+	if(verbose_parsing && bk->d->nodeid_counter % parsing_rule_mod_counter == 0)
+	{
+		fprintf(stdout, "\rRules parsed: %d", bk->d->nodeid_counter + 1);
+		fflush(stdout);
+	}
+
 	n->category = bk->category;
 	list_push_tail(n->category->nodes, n);
 

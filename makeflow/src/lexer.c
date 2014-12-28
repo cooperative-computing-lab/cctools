@@ -34,7 +34,7 @@
 #define MAX_SUBSTITUTION_DEPTH 32
 
 #ifdef LEXER_TEST
-int verbose_parsing = 1;
+extern int verbose_parsing;
 #endif
 
 struct token *lexer_pack_token(struct lexer *lx, enum token_t type)
@@ -1321,6 +1321,7 @@ int main(int argc, char **argv)
 	debug_config("lexer-test");
 	debug_flags_set("all");
 
+	verbose_parsing = 1;
 
 	struct token *t;
 	while((t = lexer_next_token(lx)) != NULL)

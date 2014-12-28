@@ -135,8 +135,6 @@ static char *wrapper_command = 0;
 static struct list *wrapper_input_files = 0;
 static struct list *wrapper_output_files = 0;
 
-int verbose_parsing = 0;
-
 void dag_abort_all(struct dag *d)
 {
 	UINT64_T jobid;
@@ -182,13 +180,6 @@ void dag_node_clean(struct dag *d, struct dag_node *n)
 	list_first_item(n->target_files);
 	while((f = list_next_item(n->target_files))) {
 		file_clean(f->filename, 0);
-
-		/* Make sure to clobber the original file too if it exists */
-		char *name = (char *) hash_table_lookup(n->remote_names_inv, f->filename);
-
-		if(name)
-			file_clean(name, 0);
-
 		hash_table_remove(d->completed_files, f->filename);
 	}
 

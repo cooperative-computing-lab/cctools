@@ -17,10 +17,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <unistd.h>
 
-#define PARSING_RULE_MOD_COUNTER 250
-
-extern int verbose_parsing;
-
 struct dag_node *dag_node_create(struct dag *d, int linenum)
 {
 	struct dag_node *n;
@@ -45,12 +41,6 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->ancestor_depth = -1;
 
 	n->resources = make_rmsummary(-1);
-
-	if(verbose_parsing && d->nodeid_counter % PARSING_RULE_MOD_COUNTER == 0)
-	{
-		fprintf(stdout, "\rRules parsed: %d", d->nodeid_counter + 1);
-		fflush(stdout);
-	}
 
 	return n;
 }
