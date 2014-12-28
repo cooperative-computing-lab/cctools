@@ -22,39 +22,26 @@ See the file COPYING for details.
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
 struct dag {
-    char *filename;                          /* Source makeflow file path. */
-    struct dag_node *nodes;                  /* Linked list of all production rules, without ordering. */
-    struct itable *node_table;               /* Mapping from unique integers dag_node->nodeid
-                                                to nodes. */
-    struct itable *local_job_table;          /* Mapping from unique integers dag_node->jobid
-                                                to nodes, rules with prefix LOCAL. */
-    struct itable *remote_job_table;         /* Mapping from unique integers dag_node->jobid
-                                                to nodes. */
-    struct hash_table *file_table;           /* Maps every filename to a struct dag_file. */
-    struct hash_table *completed_files;      /* Records which target files have been
-                                                updated/generated. */
-	struct hash_table *variables;            /* Mappings between variable names
-												defined in the makeflow file
-												and their values. */
-    struct set *collect_table;               /* Keeps files that are garbage collectable. */
-    struct set *export_vars;                /* List of variables with prefix export.
-                                                (these are setenv'ed eventually). */
-	struct set *special_vars;                /* List of special variables,
-												such as, category, disk,
-												memory, etc. */
- 
-    FILE *logfile;
-    int node_states[DAG_NODE_STATE_MAX];     /* node_states[STATE] keeps the count of nodes that
-                                                have state STATE \in dag_node_state_t. */
-    int local_jobs_running;                  /* Count of jobs running locally. */
-    int local_jobs_max;                      /* Maximum number of jobs that can run
-                                                locally (default load_average_get_cpus)*/
-    int remote_jobs_running;                 /* Count of jobs running remotelly. */
-    int remote_jobs_max;                     /* Maximum number of jobs that can run remotelly
-                                                (default at least max_remote_jobs_default)*/
-    int nodeid_counter;                      /* Keeps a count of production rules read so far
-                                                (used for the value of dag_node->nodeid). */
-    struct hash_table *task_categories;      /* Mapping from labels to category structures. */
+	char *filename;                          /* Source makeflow file path. */
+	struct dag_node *nodes;             /* Linked list of all production rules, without ordering. */
+	struct itable *node_table;          /* Mapping from unique integers dag_node->nodeid to nodes. */
+	struct itable *local_job_table;     /* Mapping from unique integers dag_node->jobid to nodes, rules with prefix LOCAL. */
+	struct itable *remote_job_table;    /* Mapping from unique integers dag_node->jobid to nodes. */
+	struct hash_table *file_table;      /* Maps every filename to a struct dag_file. */
+	struct hash_table *completed_files; /* Records which target files have been updated/generated. */
+	struct hash_table *variables;       /* Mappings between variable names defined in the makeflow file and their values. */
+	struct set *collect_table;          /* Keeps files that are garbage collectable. */
+	struct set *export_vars;            /* List of variables with prefix export. (these are setenv'ed eventually). */
+	struct set *special_vars;           /* List of special variables, such as category, cores, memory, etc. */
+
+	FILE *logfile;
+	int node_states[DAG_NODE_STATE_MAX];/* node_states[STATE] keeps the count of nodes that have state STATE \in dag_node_state_t. */
+	int local_jobs_running;             /* Count of jobs running locally. */
+	int local_jobs_max;                 /* Maximum number of jobs that can run locally (default load_average_get_cpus)*/
+	int remote_jobs_running;            /* Count of jobs running remotelly. */
+	int remote_jobs_max;                /* Maximum number of jobs that can run remotelly (default at least max_remote_jobs_default)*/
+	int nodeid_counter;                 /* Keeps a count of production rules read so far (used for the value of dag_node->nodeid). */
+	struct hash_table *task_categories; /* Mapping from labels to category structures. */
 };
 
 struct dag *dag_create();
