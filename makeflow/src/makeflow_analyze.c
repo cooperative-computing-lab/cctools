@@ -99,9 +99,6 @@ void collect_input_files(struct dag *d, char *bundle_dir, char *(*rename) (struc
 
 	struct dag_file *f;
 
-	if(!rename)
-		rename = dag_node_translate_filename;
-
 	list_first_item(il);
 	while((f = list_next_item(il))) {
 		new_name = rename(NULL, f->filename);
