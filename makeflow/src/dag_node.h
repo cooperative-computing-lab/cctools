@@ -82,9 +82,6 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, char *re
 const char *dag_node_get_remote_name(struct dag_node *n, const char *filename);
 const char *dag_node_get_local_name(struct dag_node *n, const char *filename);
 
-int dag_node_is_source(struct dag_node *n);
-int dag_node_is_sink(struct dag_node *n);
-
 char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type);
 char *dag_node_resources_wrap_as_rmonitor_options(struct dag_node *n);
 
