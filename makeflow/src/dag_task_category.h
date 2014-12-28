@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2014- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #ifndef DAG_TASK_CATEGORY_H
 #define DAG_TASK_CATEGORY_H
 
