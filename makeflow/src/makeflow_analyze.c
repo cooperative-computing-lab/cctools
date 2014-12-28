@@ -62,12 +62,6 @@ enum { SHOW_INPUT_FILES = 2,
 
 #define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
 
-/* Unique integers for long options. */
-
-enum { LONG_OPT_VERBOSE_PARSING, };
-
-int verbose_parsing = 0;
-
 void dag_show_analysis(struct dag *d)
 {
 	printf("num_of_tasks\t%d\n", itable_size(d->node_table));

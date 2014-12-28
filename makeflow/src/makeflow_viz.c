@@ -65,10 +65,7 @@ enum { LONG_OPT_PPM_ROW,
        LONG_OPT_PPM_EXE,
        LONG_OPT_PPM_LEVELS,
        LONG_OPT_DOT_PROPORTIONAL,
-       LONG_OPT_VERBOSE_PARSING,
        LONG_OPT_DOT_CONDENSE };
-
-int verbose_parsing = 0;
 
 static void show_help_viz(const char *cmd)
 {
