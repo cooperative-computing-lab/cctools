@@ -481,16 +481,3 @@ char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_op
 				return NULL;
 	}
 }
-
-int dag_node_is_source(struct dag_node *n)
-{
-	return (set_size(n->ancestors) == 0);
-}
-
-int dag_node_is_sink(struct dag_node *n)
-{
-	return (set_size(n->descendants) == 0);
-}
-
-
-
