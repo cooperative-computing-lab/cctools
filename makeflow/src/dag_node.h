@@ -79,11 +79,8 @@ struct dag_node *dag_node_create(struct dag *d, int linenum);
 void dag_node_add_source_file(struct dag_node *n, const char *filename, char *remotename);
 void dag_node_add_target_file(struct dag_node *n, const char *filename, char *remotename);
 
-char *dag_node_translate_filename(struct dag_node *n, const char *filename);
 const char *dag_node_get_remote_name(struct dag_node *n, const char *filename);
 const char *dag_node_get_local_name(struct dag_node *n, const char *filename);
-
-const char *dag_node_add_remote_name(struct dag_node *n, const char *filename, const char *remotename);
 
 int dag_node_is_source(struct dag_node *n);
 int dag_node_is_sink(struct dag_node *n);
