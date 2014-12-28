@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "dag_node.h"
 #include "dag_file.h"
 #include "dag_variable.h"
+#include "dag_task_category.h"
 
 #include "itable.h"
 #include "set.h"
@@ -66,14 +67,6 @@ void dag_count_states(struct dag *d);
 
 struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename);
 struct dag_file *dag_file_from_name(struct dag *d, const char *filename);
-
-/* Information of task categories. Label, number of tasks in this
-   category, and maximum resources allowed. */
-struct dag_task_category
-{
-	char *label;
-	struct list *nodes;
-};
 
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label);
 

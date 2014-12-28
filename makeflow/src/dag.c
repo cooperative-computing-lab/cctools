@@ -252,9 +252,7 @@ struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, cons
 
 	category = hash_table_lookup(d->task_categories, label);
 	if(!category) {
-		category = malloc(sizeof(struct dag_task_category));
-		category->label = xxstrdup(label);
-		category->nodes = list_create();
+		category = dag_task_category_create(label);
 		hash_table_insert(d->task_categories, label, category);
 	}
 
