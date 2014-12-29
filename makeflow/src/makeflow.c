@@ -62,15 +62,9 @@ See the file COPYING for details.
  *   an example.
  */
 
-#define RANDOM_PORT_RETRY_TIME 300
-
-#define MAKEFLOW_AUTO_WIDTH 1
-#define MAKEFLOW_AUTO_GROUP 2
-
 #define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
 
 #define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
-
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 #define DEFAULT_MONITOR_INTERVAL   1
 
