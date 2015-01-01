@@ -42,7 +42,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(CCTOOLS_OPSYS_CYGWIN) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
+#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_DRAGONFLY
 /* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
 #define fopen64 fopen
 #define open64 open

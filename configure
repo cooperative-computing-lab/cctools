@@ -1048,7 +1048,7 @@ then
 	external_libraries="${external_libraries} -lrt"
 fi
 
-if [ $build_sys != FREEBSD ]
+if [ $build_sys != FREEBSD ] || [ $build_sys != DRAGONFLY ]
 then
 	external_libraries="${external_libraries} -ldl"
 fi
