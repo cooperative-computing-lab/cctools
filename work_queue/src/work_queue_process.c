@@ -245,6 +245,11 @@ pid_t work_queue_process_execute_container( struct work_queue_process *p, int co
                 // cmd for running the shell script
                 char run_cmd[SMALL_BUFFER_SIZE];
                 sprintf(run_cmd, "./%s", TMP_SCRIPT);
+                
+                // make sure each node has required images 
+                char pull_cmd[SMALL_BUFFER_SIZE];
+                sprintf(pull_cmd, "flock /tmp/lockfile docker pull %s", img_name);
+                system(pull_cmd);
 
                 execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", \
 	        	mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, \
