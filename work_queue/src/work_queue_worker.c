@@ -2017,6 +2017,12 @@ int main(int argc, char *argv[])
 
 	}
 
+    if(container_mode == DOCKER) {
+ 		char pull_cmd[1024];
+        sprintf(pull_cmd, "docker pull %s", img_name);
+        system(pull_cmd);
+    }
+
     if(container_mode == DOCKER_PRESERVE) {
         // XXX Dec-21 new feature
         // 1. assign container_name
@@ -2026,7 +2032,6 @@ int main(int argc, char *argv[])
         char start_container_cmd[1024];
         sprintf(container_mnt_point, "%s:%s", workspace, DEFAULT_WORK_DIR);
         sprintf(start_container_cmd, "docker run -i -d --name=\"%s\" -v %s -w %s %s", container_name, container_mnt_point, DEFAULT_WORK_DIR, img_name);
-	    debug(D_WQ, "+++++++++++++++%s.\n", start_container_cmd);
         system(start_container_cmd);
     } 
 
@@ -2095,7 +2100,7 @@ int main(int argc, char *argv[])
 		sleep(backoff_interval);
 	}
 
-    if(container_mode == DOCKER_PRESERVE) {
+    if(container_mode == DOCKER_PRESERVE || container_mode == DOCKER) {
         //XXX Dec-21 new feature 
         char stop_container_cmd[1024];
         char rm_container_cmd[1024];
@@ -2105,10 +2110,13 @@ int main(int argc, char *argv[])
         sprintf(rm_container_cmd, "docker rm %s", container_name);
         sprintf(rm_img_cmd, "docker rmi %s", img_name);
 
-        //1. stop the container
-        system(stop_container_cmd); 
-        //2. remove the container
-        system(rm_container_cmd);
+        if(container_mode == DOCKER_PRESERVE) {
+            //1. stop the container
+            system(stop_container_cmd); 
+            //2. remove the container
+            system(rm_container_cmd);
+        }
+
         //3. remove the image
         system(rm_img_cmd);
     } 
