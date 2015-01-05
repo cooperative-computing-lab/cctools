@@ -17,6 +17,8 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
+void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n );
+
 void dag_log_recover(struct dag *d, const char *filename, int verbose_mode )
 {
 	char *line;
