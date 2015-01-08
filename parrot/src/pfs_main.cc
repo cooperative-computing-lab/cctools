@@ -769,11 +769,11 @@ int main( int argc, char *argv[] )
 
 	if (envlist[0]) {
 		extern char **environ;
-		if(access(optarg, F_OK) == 0)
-			fatal("The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", optarg);
-		FILE *fp = fopen(optarg, "w");
+		if(access(envlist, F_OK) == 0)
+			fatal("The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", envlist);
+		FILE *fp = fopen(envlist, "w");
 		if(!fp)
-			fatal("Can not open envlist file: %s", optarg);
+			fatal("Can not open envlist file: %s", envlist);
 		for (int i = 0; environ[i]; i++)
 			fprintf(fp, "%s\n", environ[i]);
 		char working_dir[PFS_PATH_MAX];
