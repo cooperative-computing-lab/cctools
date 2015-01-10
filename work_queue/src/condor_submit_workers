@@ -61,7 +61,7 @@ submit_workers_command()
 	cat > condor_submit_file.$$ <<EOF
 universe = vanilla
 executable = work_queue_worker
-arguments = $arguments $host $port --docker-preserve chaozheng/cctools
+arguments = $arguments $host $port
 transfer_input_files = ${transfer_input_files}
 should_transfer_files = yes
 when_to_transfer_output = on_exit

@@ -229,9 +229,7 @@ pid_t work_queue_process_execute_container( struct work_queue_process *p, int co
             } else
                 perror("getenv() error");
 
-            if(container_mode == 2) {
-                
-            
+            if(container_mode == DOCKER) {
             
                 char mnt_flg_val[MAX_BUFFER_SIZE];
                 sprintf(mnt_flg_val, "%s:%s", curr_wrk_dir, DEFAULT_WORK_DIR);
