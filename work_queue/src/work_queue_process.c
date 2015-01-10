@@ -252,15 +252,9 @@ pid_t work_queue_process_execute_container( struct work_queue_process *p, int co
             }
 
             if(container_mode == DOCKER_PRESERVE) {
-                // TODO exec new process inside existing container 
                 char *container_name;
                 container_name = xxstrdup(arg_3);
 
-                // TODO create wrk_space/tmp_t.3.sh
-                // #!/bin/sh
-                // cd t.3
-                // ./tmp.sh
-                
                 char sub_proc_sh_fn[MAX_BUFFER_SIZE];
                 char sub_proc_sh_fn_path[MAX_BUFFER_SIZE];
                 sprintf(sub_proc_sh_fn, "tmp_%s.sh", p->sandbox);
