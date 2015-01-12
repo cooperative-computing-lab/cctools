@@ -534,6 +534,7 @@ int post_process( ) {
 		(fputs("/proc /proc\n", file) == EOF) ||
 		(fputs("/sys /sys\n", file) == EOF) ||
 		(fputs("/var /var\n", file) == EOF) ||
+		(fputs("/tmp /tmp\n", file) == EOF) ||
 		(fputs("/selinux /selinux\n", file) == EOF)) {
 			debug(D_DEBUG, "fputs fails: %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
