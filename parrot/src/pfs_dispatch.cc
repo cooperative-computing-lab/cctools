@@ -1023,10 +1023,10 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 				goto failure;
 
 			if (strlen(interp_arg)) {
-				if (fix_execve(p, old_user_argv, physical_name, logical_name, interp_exe, interp_arg, logical_name) == -1)
+				if (fix_execve(p, old_user_argv, physical_name, interp_exe, interp_exe, interp_arg, logical_name) == -1)
 					goto failure;
 			} else {
-				if (fix_execve(p, old_user_argv, physical_name, logical_name, interp_exe, logical_name, NULL) == -1)
+				if (fix_execve(p, old_user_argv, physical_name, interp_exe, interp_exe, logical_name, NULL) == -1)
 					goto failure;
 			}
 		} else {
