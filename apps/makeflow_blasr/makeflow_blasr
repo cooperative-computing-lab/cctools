@@ -26,13 +26,14 @@ def parse_blasr_options(parser):
 	group = optparse.OptionGroup(parser, "Blasr Options")
 	group.add_option('--ref', dest="ref", type="string", help='The reference input file')
 	group.add_option('--query', dest="query", type="string", help='The query input file')
-	parser.add_option('--output', dest="output", type="string", help='the final output of blasr alignment')
-	parser.add_option('--num_seq', help='determine the number of sequences per split', default=50000, type = int )
+	group.add_option('--output', dest="output", type="string", help='the final output of blasr alignment')
+
 	parser.add_option_group(group)
 
 def parse_makeflow_options(parser):
 	group = optparse.OptionGroup(parser, "Makeflow Preparation Options")
 	group.add_option('--makeflow', dest='makeflow', type='string', help='Makeflow destination file [stdout]')
+	group.add_option('--num_seq', help='determine the number of sequences per split', default=50000, type = int )	
 	group.add_option('--makeflow-config', dest='config', help='Makeflow configurations')
 	group.add_option('--verbose', dest='verbose', help='Show verbose level output', action='store_true',default="False")
 	parser.add_option_group(group)
@@ -166,7 +167,7 @@ def write_makeflow(destination, configuration, num_reads_per_split, split_name):
 			
 
 		#Here we actually start generating the Makeflow		
-		makeflow.write("export LD_LIBRARY_PATH=lib")
+		makeflow.write("export LD_LIBRARY_PATH=hdf5")
 		log.info("Writing Partitioning Rules")
 		#How to get inputs
 		makeflow.write("\n{0} : {1} {2}".format(inputlist, options.query, split_name))
@@ -175,8 +176,8 @@ def write_makeflow(destination, configuration, num_reads_per_split, split_name):
 		#How to get outputs
 		for i in range(num_splits):
 
-	        	makeflow.write("\noutput." + str(i) + "." + options.query + ":"+ options.query + "." + str(i) + " " + options.ref+ " blasr ./lib/ \n")
-	        	makeflow.write("\t blasr "
+	        	makeflow.write("\noutput." + str(i) + "." + options.query + ":"+ options.query + "." + str(i) + " " + options.ref+ " blasr ./hdf5/ \n")
+	        	makeflow.write("\t LD_LIBRARY_PATH=\"./hdf5/\" blasr "
 					+ options.query + "." + str(i)
 					+ " " + options.ref
 					+" "+ ' '.join(args)
