@@ -2,7 +2,11 @@ umbrella -T local -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksC
 
 sudo ~hmeng/cctools/bin/umbrella -T chroot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/chroot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
+umbrella -T parrot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/parrot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+
 umbrella -T docker -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/docker_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+
+umbrella -T ec2 -k key -g group -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/docker_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 #use the default localdir and output options:
 umbrella -T local -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"

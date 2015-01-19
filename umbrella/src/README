@@ -1,5 +1,60 @@
 Umbrella is a tool for specifying and materializing comprehensive execution environments, from the hardware all the way up to software and data.  A user simply invokes Umbrella with the desired task, and Umbrella determines the minimum mechanism necessary to run the task, whether it be direct execution, a system container, a local virtual machine, or submission to a cloud or grid environment.  We present the overall design of Umbrella and demonstrate its use to precisely execute a high energy physics application and a ray-tracing application across many platforms using a combination of Parrot, Chroot, Docker, VMware, Condor, and Amazon EC2.
 
+Usage: umbrella [options] run "command"
+
+Options:
+  --version             show program's version number and exit
+  -h, --help            show this help message and exit
+  -c CONFIG, --config=CONFIG
+                        The specification json file. (By default: ./spec.json)
+  -l LOCALDIR, --localdir=LOCALDIR
+                        The path of directory used for all the cached data and all the sandboxes. (By default: ./umbrella_test)
+  -i INPUTS, --inputs=INPUTS
+                        The path of input files in the format of access_path=actual_path. i.e, -i '/home/hmeng/file1=/tmp/file2'. access_path must be consistent with the semantics of the provided command, actual_path can be relative or absolute. (By default: '')
+  -e ENV, --env=ENV     The environment variable. I.e., -e 'PWD=/tmp'. (By default: '')
+  -o OUTPUT, --output=OUTPUT
+                        The path of output. (By default: ./umbrella_output)
+  -T BATCH_TYPE, --batch_type=BATCH_TYPE
+                        Batch system type, which can be local, chroot, docker, condor, ec2. (By default: local)
+  --packages=PACKAGES   The source of packages information. (By default: ./packages.json)
+  --ec2=EC2             The source of ec2 information. (By default: ./ec2.json)
+  --log=LOG             The path of umbrella log file. (By default: ./umbrella.log)
+  -g GROUP, --group=GROUP
+                        the security group within which an instance should be run.
+  -k KEY, --key=KEY     the name of the key pair to use when launching an instance.
+
+Example:
+umbrella -T local -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/local_povray_redhat5  run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+
+In this example, the batch type is local; the application specification json file is povray_redhat5.json; there are two input files: 4_cubes.pov and WRC_RubiksCube.inc. Both of these two files are located in the current directory currently and will be put directory under the CWD directory within the constructed sandbox; the localdir is set to ~/umbrella_test/; the output directory is ~/umbrella_test/local_povray_redhat5; the command which will be executed within the constructed sandbox is povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50. The logging information of Umbrella will be put into ./umbrella.log.
+
+Execution Engine
+Currently, Umbrella supports three execution engines: local, condor, ec2. 
+Local execution engine can be further devided into three categories: parrot, docker, chroot.
+Parrot execution engine can be used without any special authority on the host machine; Docker execution engine requires Docker is installed on the host machine and the user is given the right authority to use Docker; Chroot execution engine requires the user to be the root user.
+
+Take an ray-tracing application as an example, the usage of different execution engines is shown as follows:
+Local execution engine:
+umbrella -T local -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/local_povray_redhat5  run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+Note: In this case, Umbrella first check whether Docker exists on the host machine, if yes, use docker execution engine; if not, use parrot execution engine.
+
+Parrot execution engine:
+umbrella -T parrot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/parrot_povray_redhat5  run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+
+Docker execution engine:
+umbrella -T docker -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/docker_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+
+Chroot execution engine:
+sudo ~hmeng/cctools/bin/umbrella -T chroot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/chroot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+
+Condor execution engine:
+umbrella -T condor -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -o condor_povray run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+Note: 1). Condor is not compatible with AFS, so ensure your test is not running on AFS. 2). --localdir option is not useful for condor execution engine, because the specification file will be mapped into a condor submit file directly without creating any sandbox on the host machine. However, the --output directory is still necessary to hold the output returned from condor.
+
+Cloud execution engine:
+umbrella -T ec2 --key abc.pem --group sg-24f96141 -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -o condor_povray run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+Note: --key and --group are only meaningful for cloud execution engine. According to the given specification file, the AMI and the instance type can be identified. The user of Umbrella needs to specify the security group within which an instance should be run and the name of the key pair to use when launching an instance.
+
 Here is the specification JSON file for a Ray-Tracing application:
 	
 	{
@@ -34,43 +89,43 @@ A specification includes 6 parts: hardware, kernel, os, software, data, and envi
 
 `hardware` Section (Required):
 
-`arch` (Required): the hardware architecture the application needs to run on. Options: x86_64, i386, i686. Current support options: x86_64
+`arch` (Required): the hardware architecture the application needs to run on. Options: x86_64, i386, i686. Current support options: x86_64. Not case sensitive.
 
 `cores` (Optional): the number of cores the applications needs. Options: 1, 2, 3, 4, ...
 
-`memory` (Optional): the memory space the application needs. Options: 1GB, 2GB, ...
+`memory` (Optional): the memory space the application needs in the unit of GB. Options: 1GB, 2GB, .... Not case sensitive.
 
-`disk` (Optional): the disk space the application needs. Options: 1GB, 2GB, ...
+`disk` (Optional): the disk space the application needs in the unit of GB. Options: 1GB, 2GB, .... Not case sensitive.
 
 `kernel` Section (Required):
 
-`name` (Required): the kernel type the application requires. Options: linux, windows. Current support options: linux
+`name` (Required): the kernel type the application requires. Options: linux, windows. Current support options: linux. Not case sensitive.
 
-`version` (Required): the kernel version. You can specify this attribute to a single value like `2.6.18` or a range like >=2.6.18 or a range like [2.6.18, 2.6.32].
+`version` (Required): the kernel version in the format of 'A.B.C' (A: kernel version; B: major revision of the kernel; C: the minor revision of the kernel). You can specify this attribute to a single value like `2.6.18` or a range like >=2.6.18 or a range like [2.6.18, 2.6.32].
 
 `os` Section (Required):
 
-`name` (Required): the OS name. Options: redhat, centos, arch, .... 
+`name` (Required): the OS name. Options: redhat, centos, arch, .... Not case sensitive.
 
-`version` (Required): the OS version which includes two parts: the main version number and the minor version number. Exmaples: 5.10, 6.5. 
+`version` (Required): the OS version in the format of 'A. B': A is the main version number and B is the minor version number. Exmaples: 5.10, 6.5. 
 
 `software` Section (Optional):
 
 Each software dependency has a name, which corresponds to the name included in packages.json (which will be explained in the following part).
 
-`mountpoint` (Required): the mountpoint of the software.
+`mountpoint` (Required): the mountpoint of the software. Case sensitive.
 
-`action` (Required): the action on the downloaded software dependencies. Options: none, unpack. `none` leaves the downloaded dedendency as it is. `unpack` uncompresses the depedency.
+`action` (Required): the action on the downloaded software dependencies. Options: none, unpack. `none` leaves the downloaded dedendency as it is. `unpack` uncompresses the depedency. Case sensitive.
 
 `data` Section (Optional):
 
-`mountpoint` (Required): the mountpoint of the data dependency.
+`mountpoint` (Required): the mountpoint of the data dependency. Case sensitive.
 
-`action` (Required): the action on the downloaded data dependencies. Options: none, unpack. `none` leaves the downloaded dedendency as it is. `unpack` uncompresses the dependency.
+`action` (Required): the action on the downloaded data dependencies. Options: none, unpack. `none` leaves the downloaded dedendency as it is. `unpack` uncompresses the dependency. Case sensitive.
 
 `environ` Section (Optional):
 
-Each item is a key-value pair. For example, "HOME": "/home/hmeng", which sets the HOME environment variable used by the sandbox to execute the applicition.
+Each item is a key-value pair. For example, "HOME": "/home/hmeng", which sets the HOME environment variable used by the sandbox to execute the applicition. Case sensitive.
 
 By default, metadata of all the software, data and OS dependencies is stored in http://ccl.cse.nd.edu/software/umbrella/database/packages.json. You can download this file using `wget` utility to check the currently supported dependencies.
 
@@ -93,13 +148,13 @@ Here is an example of packages.json, which contains two dependencies.
 	    }
 	}
 
-Each dependency includes three attributes: source, checksum, size.
+The dependency name is in the format of 'A-B-C', where A is the software/data name, B is OS distro name, C is hardware architecture. Each dependency includes three attributes: source, checksum, size.
 
-`source`: a list of storage location of the dependency, which includes one or more resource url. Each url can be a local file path like "file:///etc/hosts", or a https/http urlas shown in the example.
+`source`: a list of storage location of the dependency, which includes one or more resource url. Each url can be a local file path like "file:///etc/hosts", or a https/http urlas shown in the example. Case sensitive.
 
-`checksum`: the checksum of the dependencies. Currently Umbrella only supports md5 checksum.
+`checksum`: the checksum of the dependencies. Currently Umbrella only supports md5 checksum. 
 
-`size`: the size of the compressed version of each dependencies.
+`size`: the size of the compressed version of each dependencies. Not case sensitive.
 
 If you want to customize your own packages.json, follow the requirement and then tell umbrella using `--packages` option to use your own pacakges information.
 
