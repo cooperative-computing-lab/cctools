@@ -105,7 +105,7 @@ my $line_count= 0;
 open(INPUT, $file);
 
 my $read_count = 0;
-open (OUTPUT,\">$file.$num_splits\");
+open (OUTPUT,\">$num_splits.$file\");
 $num_splits++;
 while (my $line = <INPUT>) {
 	chomp $line;
@@ -115,7 +115,7 @@ while (my $line = <INPUT>) {
 		#Check if the new sequence should be placed in a new file, otherwise place it in same file
 		if ($read_count == $num_reads){
 			close(OUTPUT);
-			open(OUTPUT, \">$file.$num_splits\");
+			open(OUTPUT, \">$num_splits.$file\");
 			print OUTPUT $line;
 			print OUTPUT \"\\n\";
 			$num_splits++;
@@ -162,7 +162,7 @@ def write_makeflow(destination, configuration, num_reads_per_split, split_name):
 		num_splits = count_splits(options.num_seq, options.query)
 
 		for i in range(num_splits):
-			inputlist = inputlist + options.query + "."+ str(i) + " "
+			inputlist = inputlist + str(i) + "."+ options.query + " "
 			outputlist = outputlist + "output." + str(i)+ "."+ options.query + " "
 			
 
@@ -176,9 +176,9 @@ def write_makeflow(destination, configuration, num_reads_per_split, split_name):
 		#How to get outputs
 		for i in range(num_splits):
 
-	        	makeflow.write("\noutput." + str(i) + "." + options.query + ":"+ options.query + "." + str(i) + " " + options.ref+ " blasr ./hdf5/ \n")
-	        	makeflow.write("\t LD_LIBRARY_PATH=\"./hdf5/\" blasr "
-					+ options.query + "." + str(i)
+	        	makeflow.write("\noutput." + str(i) + "." + options.query + ": "+ str(i) + "." + options.query + " "+  options.ref+ " blasr ./hdf5/ \n")
+	        	makeflow.write("\t LD_LIBRARY_PATH=\"./hdf5/\" ./blasr "
+					+ str(i)+ "."+ options.query
 					+ " " + options.ref
 					+" "+ ' '.join(args)
 					+ " > " + "output."+ str(i)+ "." + options.query)
@@ -186,7 +186,7 @@ def write_makeflow(destination, configuration, num_reads_per_split, split_name):
 		#How to concatenate outputs
 		log.info("Writing Join Rules")
 		makeflow.write("\n{0} : {1}".format(options.output, outputlist))
-		makeflow.write("\n\tLOCAL cat {0} > {1}".format(outputlist, options.output))
+		makeflow.write("\n\tLOCAL cat {0} > {1}\n".format(outputlist, options.output))
 
 	finally:
 		if options.makeflow is not None:
