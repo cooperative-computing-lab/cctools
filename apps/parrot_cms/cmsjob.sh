@@ -1,5 +1,8 @@
 #!/bin/sh
 
+export CMS_VERSION=CMSSW_5_3_11
+export SCRAM_ARCH=slc5_amd64_gcc462
+
 rm -rf cmsjob
 mkdir cmsjob
 cd cmsjob
