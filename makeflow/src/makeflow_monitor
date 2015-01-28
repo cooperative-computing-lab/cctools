@@ -51,7 +51,7 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
             if slist[1] in ['STARTED']:
                 makeflow['start_time'] = int(slist[2])/1000000.0
             elif slist[1] in ['FAILED', 'ABORTED', 'COMPLETED']:
-                makeflow['finished'] = True
+                makeflow['finished'] = slist[1]
                 makeflow['elapsed_time'] = int(slist[2])/1000000.0 - makeflow['start_time'] 
                 makeflow['average_task_rate'] = makeflow['total'] / makeflow['elapsed_time']
             continue
@@ -113,7 +113,7 @@ def emit_text(makeflow, field_width=13, progress_width=55):
     if 'start_time' not in makeflow:
         tlist.append(('status', 'waiting for events...'))
     elif makeflow['finished']:
-        tlist.append(('status', 'finished'))
+        tlist.append(('status', 'finished: %s' % makeflow['finished']))
         tlist.append(('time',
                       ', '.join(['start: '   + time_ctime(makeflow['start_time']),
                                  'elapsed: ' + time_format(makeflow['elapsed_time'])])))
