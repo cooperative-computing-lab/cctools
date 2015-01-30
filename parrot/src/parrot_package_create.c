@@ -365,9 +365,11 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 			if(target_stat.st_size) {
 				debug(D_DEBUG, "`%s`: fullcopy exist! pass!\n", path);
 			} else {
-				if(remove(new_path) == -1) {
-					debug(D_DEBUG, "remove(`%s`) fails: %s\n", new_path, strerror(errno));
-					return -1;
+				if(access(new_path, F_OK) == 0) {
+					if(remove(new_path) == -1) {
+						debug(D_DEBUG, "remove(`%s`) fails: %s\n", new_path, strerror(errno));
+						return -1;
+					}
 				}
 				if(copy_file_to_file(path, new_path) < 0) {
 					debug(D_DEBUG, "copy_file_to_file from %s to %s fails.\n", path, new_path);
@@ -384,6 +386,12 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 				line_process(dir_name, "metadatacopy", 1, 0, special_file);
 			}
 			if(fullcopy) {
+				if(access(new_path, F_OK) == 0) {
+					if(remove(new_path) == -1) {
+						debug(D_DEBUG, "remove(`%s`) fails: %s\n", new_path, strerror(errno));
+						return -1;
+					}
+				}
 				if(copy_file_to_file(path, new_path) < 0) {
 					debug(D_DEBUG, "copy_file_to_file from %s to %s fails.\n", path, new_path);
 					return -1;
@@ -526,6 +534,7 @@ int post_process( ) {
 		(fputs("/proc /proc\n", file) == EOF) ||
 		(fputs("/sys /sys\n", file) == EOF) ||
 		(fputs("/var /var\n", file) == EOF) ||
+		(fputs("/tmp /tmp\n", file) == EOF) ||
 		(fputs("/selinux /selinux\n", file) == EOF)) {
 			debug(D_DEBUG, "fputs fails: %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
