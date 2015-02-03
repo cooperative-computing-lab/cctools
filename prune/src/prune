@@ -6,202 +6,74 @@
 
 import os, sys, traceback, os.path
 import time, threading
-import tty, termios, select
 
+import readline
 
 from work_queue import *
 import prunelib
 prunedb = prunelib.getdb()
 
 
-home = os.path.expanduser("~")
+HOME = os.path.expanduser("~")
+CWD = os.getcwd()
 
-def peek(*arguments):
-	line = ''
-	for arg in arguments:
-		line += ' '+str(arg)
-	sys.stdout.write(line[1:])
-	sys.stdout.flush()
-
-
-forever_back = '\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b'
-history = []
-block = 0
-current_line = ''
 terminate = False
-buffered_line = 0
+block = False
+hadoop_data = False
+
+config_file = CWD+'/.prune.conf'
+if os.path.isfile(config_file):
+	with open(config_file) as f:
+		for line in f.readlines():
+			(meta_type,value) = line[:-1].split('\t')
+			if meta_type=='sandbox':
+				sandbox_prefix = value
+			elif meta_type=='database':
+				db_pathname = value
+			elif meta_type=='data_folder':
+				data_folder = value
+else:
+	data_folder = '/tmp/prune/data/'
+	db_pathname = '/tmp/prune/___prune.db'
+	sandbox_prefix = '/tmp/prune/sandbox/'
+
+	line = raw_input('Enter location for data files: [%s]'%data_folder)
+	if len(line)>0:
+		data_folder = line
+	line = raw_input('Enter filepath for the database: [%s]'%db_pathname)
+	if len(line)>0:
+		db_pathname = line
+	line = raw_input('Enter location for execution sandboxes: [%s]'%sandbox_prefix)
+	if len(line)>0:
+		sandbox_prefix = line
 
 
 def prompt():
 	return 'PRUNE$ '
 
 
-
-def isBlockingLine(line):
-	return True
-	# Use the following if you want to make some of the lines unblocking
-	ar = line.split(' ')
-	first = ar[0]
-	last = ar[-1]
-	if first in ['WAIT','LOCATE','USE','PUT','RUN','STATUS'] or last == 'NOW':
-		return True
-	return False
-
-
-	
-resetAll = False
-for arg in sys.argv:
-	if arg=='--reset':
-		resetAll = True
-
-
-class Console():
-	def __enter__(self):
-		self.old_settings = termios.tcgetattr(sys.stdin)
-		tty.setcbreak(sys.stdin.fileno())
-		return self
-	def __exit__(self, type, value, traceback):
-		termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_settings)
-	def get_data(self,blocking=True):
-		if blocking:
-			return sys.stdin.read(1)
-		else:
-			if select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], []):
-				return sys.stdin.read(1)
-			return False
-def getch():
-	with Console() as c:
-		ch = c.get_data()
-		return ch
-
-
-# This function only prints when the system is not blocking
-def special_print(string):
-	global block
-	if block==0:
-		sys.stdout.write(string)
-		sys.stdout.flush()
-
-def user_interface_new():
+def user_interface():
 	global block, terminate
-	try:
-		prunelib.initialize(resetAll)
-	except Exception as e:
-		print e
-
+	backs = '\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b'
+	spaces = '                                        '
 	while not terminate:
 		try:
-			sys.stdout.write(prompt())
+			line = raw_input(prompt())
+			block = True
+			process_line(line)
+			block = False
+			sys.stdout.write(backs+spaces+backs)
 			sys.stdout.flush()
-
-			line = sys.stdin.readline()[:-1]
-			while not process_line(line):
-				block = 1
-			block = 0
-
 		except KeyboardInterrupt:
-			terminate = True
-			print 'Exiting'
+			print 'PRUNE exiting.'
+			return
 		except Exception:
 			print traceback.format_exc()
-
-def user_interface():
-	global history, current_line, block, buffered_line, processed_cnt
-	try:
-		ch = getch()
-		key = ord(ch)
-		lines_back = 0
-		chars_back = 0
-		while key!=3:
-			if key==10: #Enter
-				special_print('\n')
-				chars_back = 0
-				lines_back = 0
-
-				if len(current_line)>0 and current_line[0]!='#':
-					history.append(current_line)
-					if isBlockingLine(current_line):
-						block += 1
-					if block == 0:
-						buffered_line += 1
-
-				if block == 0:
-					special_print( prompt() )
-
-				current_line = ''
-			elif key==27:
-				ch = getch()
-				key = ord(ch)
-				if key==91:
-					ch = getch()
-					key = ord(ch)
-					if key==65: #Up arrow
-						for c in current_line:
-							special_print( '\b \b' )
-						if lines_back<len(history):
-							current_line = history[-lines_back]
-							special_print( current_line )
-							lines_back += 1
-						else:
-							current_line = ''
-					elif key==66: #Down arrow
-						for c in current_line:
-							special_print( '\b \b' )
-						if lines_back>1:
-							lines_back -= 1
-							current_line = history[-lines_back]
-							special_print( current_line )
-						else:
-							current_line = ''
-					elif key==68: #Left arrow
-						if chars_back<len(current_line):
-							special_print( '\b' )
-							chars_back += 1
-					elif key==67: #Right arrow
-						if chars_back>0:
-							special_print( current_line[len(current_line)-chars_back] )
-							chars_back -= 1
-			elif key==127: #Backspace
-				if chars_back==0:
-					if len(current_line)>0:
-						current_line = current_line[:-1]
-						special_print( '\b \b' )
-				else:
-					l = len(current_line)
-					current_line = current_line[:l-chars_back-1] + current_line[l-chars_back:]
-					special_print( '\b'+current_line[l-chars_back-1:]+' \b' )
-					for b in range(0,chars_back):
-						special_print( '\b' )
-			else:
-				if chars_back>0:
-					current_line = current_line[0:len(current_line)-chars_back] + ch + current_line[len(current_line)-chars_back:]
-					special_print( ch+current_line[len(current_line)-chars_back:] )
-					for i in range(0,chars_back):
-						special_print( '\b' )
-				else:
-					current_line += ch
-					special_print( ch )
-
-			ch = getch()
-			key = ord(ch)
-		special_print('\n')
-	except KeyboardInterrupt:
-		print ''
-		if block>0:
-			special_print('\n')
-			chars_back = 0
-			lines_back = 0
-			current_line = ''
-		else:
-			return
-	except Exception, e:
-		print traceback.format_exc()
-
 
 
 wait_start = None
 def process_line(line):
-	global block, done_wq_tasks, wait_start, history
+	global block, wait_start, hadoop_data
 	try:
 		
 		if len(line)==0 or line[0]=='#':
@@ -246,6 +118,7 @@ def process_line(line):
 
 
 		elif line.startswith('GET'):
+			prunelib.wq_check()
 			wait = True
 			filename = expr = None
 			ar = line.split(' ')
@@ -261,17 +134,20 @@ def process_line(line):
 					wait = False
 				i += 1
 			if prunelib.getFile(line,expr,filename,wait)!=0:
-				print 'There was an error transferring the file.'
+				return False
+				#print 'There was an error transferring the file.'
 			return True
 			
 
-		elif line.startswith('GO'):
+		elif line.startswith('WORK'):
 			if not wait_start:
 				wait_start = time.time()
 
 			if not prunelib.wq_check():
+				print 'No work to assign to compute resources.'
 				return True
 
+			print 'work'
 			ar = line.split(' ')
 			name = None
 			if len(ar)>2:
@@ -284,6 +160,7 @@ def process_line(line):
 				if len(ar)>1:
 					name = ar[1]
 				timeout = 9999999999.0
+				print timeout
 			
 			done = False
 			if name:
@@ -368,6 +245,10 @@ def process_line(line):
 			return True
 		elif line.startswith('FLOW'):
 			return True
+		elif line.startswith('RESET'):
+			prunelib.truncate()
+			prunedb.truncate()
+			return True
 		else:
 			res = prunelib.eval(line)
 			return True
@@ -375,78 +256,6 @@ def process_line(line):
 	except Exception, e:
 		print traceback.format_exc()
 		return True
-
-
-processed_cnt = 0
-class bgThread (threading.Thread):
-	def __init__(self, threadID, name):
-		threading.Thread.__init__(self)
-		self.threadID = threadID
-		self.name = name
-	def run(self):
-		global wq, block, buffered_line, processed_cnt, done_wq_tasks, processed_wq_tasks
-		#This is where you could lock if needed: threadLock.acquire()
-		simulateProcessing = False
-		try:
-			prunelib.initialize(resetAll)
-		except Exception as e:
-			print e
-		peek( prompt() )
-		
-		next_poll = 0
-		while not terminate:
-			was_blocking = block
-			now = time.time()
-			if processed_cnt<len(history):
-				line = history[processed_cnt]
-				if line[0]!='#':
-					blocking_line = isBlockingLine(line)
-					if buffered_line<processed_cnt:
-						print forever_back+prompt()+line
-						buffered_line += 1
-					
-					if simulateProcessing:
-						processed = True
-					else:
-						try:
-							processed = process_line(line)
-						except Exception, e:
-							print traceback.format_exc()
-							processed = True
-
-					if processed:
-						#TODO: Reconstruct the command with ids not names for the preserved command (2nd arg)
-						prunelib.cmd_log(line,'')
-
-						if isBlockingLine(line):
-							if simulateProcessing:
-								time.sleep(3)
-							block -= 1
-						processed_cnt += 1
-			if was_blocking and block == 0:
-				if processed_cnt==len(history):
-					peek( forever_back+prompt()+current_line )
-					buffered_line += 1
-			
-			if False and now > next_poll:
-				print 'do'
-				t = prunelib.wq_do()
-				if t:
-					done_wq_tasks.append(t)
-					next_poll = now + 0.1
-				else:
-					next_poll = now + 30
-			prunelib.check_transfers()
-			time.sleep(0.001)
-			prunelib.local_check()
-
-			sys.stdout.flush()
-			time.sleep(0.1)
-
-		#This is where you could unlock if needed: threadLock.release()
-#Setup a lock if needed: threadLock = threading.Lock()
-bg = bgThread(1, "Background processing")
-bg.start()
 
 
 
@@ -472,7 +281,19 @@ spinner.start()
 
 
 
+try:
 
+	prunedb.initialize(db_pathname)
+	#Be sure to initialize the database first!
+	prunelib.initialize(data_folder, sandbox_prefix, hadoop_data)
+	with open(config_file,'w') as f:
+		f.write('data_folder\t%s\n'%data_folder)
+		f.write('database\t%s\n'%db_pathname)
+		f.write('sandbox\t%s\n'%sandbox_prefix)
+
+
+except Exception as e:
+	print traceback.format_exc()
 
 user_interface()
 terminate = True

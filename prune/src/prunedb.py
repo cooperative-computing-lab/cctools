@@ -8,25 +8,46 @@ import os, sys, time
 import string, random, hashlib
 import subprocess, sqlite3
 
-HOME = os.path.expanduser("~")
-CWD = os.getcwd()
-
-db_path = '/tmp/prune.db'
-
-def peek(*arguments):
-	line = ''
-	for arg in arguments:
-		line += ' '+str(arg)
-	sys.stdout.write(line[1:])
-	sys.stdout.flush()
-
 creates = []
 meta_db = None
+meta_data = None
+db_pathname = None
 
-def database_truncate():
-	subprocess.call('rm -rf '+db_path,shell=True)
-	print 'Database truncated'
 
+def truncate():
+	global db_pathname
+	subprocess.call('rm -rf '+db_pathname,shell=True)
+	print 'Database truncated at:%s'%db_pathname
+	initialize(db_pathname)
+
+
+def initialize(new_db_pathname):
+	global creates, meta_db, meta_data, db_pathname
+
+	db_pathname = new_db_pathname
+
+	meta_data = sqlite3.connect(db_pathname, detect_types=sqlite3.PARSE_DECLTYPES)
+	def dict_factory(cursor, row):
+	    d = {}
+	    for idx, col in enumerate(cursor.description):
+	        d[col[0]] = row[idx]
+	    return d
+	meta_data.row_factory = dict_factory
+	meta_db = meta_data.cursor()
+	meta_data.text_factory = str
+
+
+	for create in creates:
+		meta_db.execute(create)
+	meta_data.commit()
+	
+	qs = run_get_by_queue('RunningLocally')
+	for q in qs:
+		run_upd(q['id'],'Run',None,'')
+
+	qs = run_get_by_queue('Running')
+	for q in qs:
+		run_upd(q['id'],'Run',None,'')
 
 
 
@@ -347,32 +368,6 @@ def hashfile(fname, hasher=hashlib.sha1(), blocksize=65536):
         buf = afile.read(blocksize)
     return hasher.hexdigest()
 
-
-def init():
-	global creates, meta_db, meta_data
-
-	meta_data = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
-	def dict_factory(cursor, row):
-	    d = {}
-	    for idx, col in enumerate(cursor.description):
-	        d[col[0]] = row[idx]
-	    return d
-	meta_data.row_factory = dict_factory
-	meta_db = meta_data.cursor()
-	meta_data.text_factory = str
-
-
-	for create in creates:
-		meta_db.execute(create)
-	meta_data.commit()
-	
-	qs = run_get_by_queue('RunningLocally')
-	for q in qs:
-		run_upd(q['id'],'Run',None,'')
-
-	qs = run_get_by_queue('Running')
-	for q in qs:
-		run_upd(q['id'],'Run',None,'')
 
 
 

@@ -20,73 +20,63 @@ import prunedb
 HOME = os.path.expanduser("~")
 CWD = os.getcwd()
 ENVID = None
-NEXTID = None
 transfers = []
-hadoop_data = False
 concurrency = 0
 terminate = False
+data_folder = None
+sandbox_prefix = None
+hadoop_data = None
 
 
-if hadoop_data:
-	cache_folder = '/users/pivie/prune_cache/'
-else:
-	cache_folder = '/pscratch/pivie/prune_cache/'
-	try: 
-		os.makedirs(cache_folder)
-	except OSError:
-		if not os.path.isdir(cache_folder):
-			raise
-
-sandbox_prefix = '/tmp/prune_sandbox/'
-try: 
-	os.makedirs(sandbox_prefix)
-except OSError:
-	if not os.path.isdir(sandbox_prefix):
-		raise
-
-def resetAll():
+def truncate():
+	global data_folder, sandbox_prefix, hadoop_data
 	if hadoop_data:
-		p = subprocess.Popen(['hadoop','fs','-rmr',cache_folder], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=False)
+		p = subprocess.Popen(['hadoop','fs','-rmr',data_folder], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=False)
 		(stdout, stderr) = p.communicate()
 		p_status = p.wait()
-		print 'Data reset'
+		print 'Data reset at:%s'%data_folder
 	else:
-		p = subprocess.Popen(['rm','-rf',cache_folder], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=False)
+		p = subprocess.Popen(['rm','-rf',data_folder], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=False)
 		(stdout, stderr) = p.communicate()
 		p_status = p.wait()
 		if (len(stdout)+len(stderr))>0:
 			print stdout,stderr
-		print 'Data reset'
+		print 'Data reset at:%s'%data_folder
+	p = subprocess.Popen(['rm','-rf',sandbox_prefix], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=False)
+	(stdout, stderr) = p.communicate()
+	p_status = p.wait()
+	if (len(stdout)+len(stderr))>0:
+		print stdout,stderr
+	print 'Sandboxes erased at:%s'%sandbox_prefix
+	initialize(data_folder,sandbox_prefix)
 
+
+
+def initialize(new_data_folder, new_sandbox_prefix, hadoop=False):
+	global ENVID, data_folder, sandbox_prefix
+	data_folder = new_data_folder
+	sandbox_prefix = new_sandbox_prefix
+	hadoop_data = hadoop
+
+	if not hadoop:
 		try: 
-			os.makedirs(cache_folder)
+			os.makedirs(data_folder)
 		except OSError:
-			if not os.path.isdir(cache_folder):
+			if not os.path.isdir(data_folder):
 				raise
-
-	prunedb.database_truncate()
-	
-
-
-if not hadoop_data:
 	try: 
-		os.makedirs(cache_folder)
+		os.makedirs(sandbox_prefix)
 	except OSError:
-		if not os.path.isdir(cache_folder):
+		if not os.path.isdir(sandbox_prefix):
 			raise
-
-
-
-def initialize(reset):
-	global ENVID, NEXTID
-	if reset:
-		resetAll()
-	prunedb.init()
-
 
 	ENVID = prunedb.var_get('_ENV')
 	if not ENVID:
-		raise Exception('No Environments!')
+		print 'Warning: No Environments defined!'
+
+
+
+
 
 def terminate_now():
 	terminate = True
@@ -96,9 +86,9 @@ def terminate_now():
 
 
 def putFile(line, filename, wait=True, pname=None):
-	global transfers
+	global transfers, data_folder
 	id = prunedb.file_ins(filename)
-	cache_filename = cache_folder+str(id)
+	cache_filename = data_folder+str(id)
 
 	if hadoop_data:
 		location = 'hadoop'
@@ -121,22 +111,25 @@ def putFile(line, filename, wait=True, pname=None):
 def getFile(line, name, filename, wait=True):
 	global transfers
 	cache_filename = locate(name)
-	id = cache_filename.split('/')[-1]
-	
-	if hadoop_data:
-		location = 'hadoop'
-		cmd = ['hadoop','fs','-copyToLocal',cache_filename,filename]
+	if cache_filename:
+		id = cache_filename.split('/')[-1]
+		
+		if hadoop_data:
+			location = 'hadoop'
+			cmd = ['hadoop','fs','-copyToLocal',cache_filename,filename]
+		else:
+			location = 'local_cache'
+			cmd = ['cp',cache_filename,filename]
+		p = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=False)
+		if wait:
+			(stdout, stderr) = p.communicate()
+			p_status = p.wait()
+			return p_status
+		else:
+			transfers += [p,line,id,location,cache_filename]
+			return 0
 	else:
-		location = 'local_cache'
-		cmd = ['cp',cache_filename,filename]
-	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=False)
-	if wait:
-		(stdout, stderr) = p.communicate()
-		p_status = p.wait()
-		return p_status
-	else:
-		transfers += [p,line,id,location,cache_filename]
-		return 0
+		return 1
 
 
 # This was was designed to track the progress of non-blocking file transfers.
@@ -177,6 +170,7 @@ def isNameDone(name):
 
 
 def eval(expr, depth=0, expect=[]):
+	global data_folder
 	function = name = None
 	lparen = expr.find('(')
 	assign = expr.find('=')
@@ -207,7 +201,7 @@ def eval(expr, depth=0, expect=[]):
 		if not func:
 
 			# This needs to be updated to handle hadoop, etc. at some point.
-			with open(cache_folder+str(function_id)) as f:
+			with open(data_folder+str(function_id)) as f:
 				out_name_ar = []
 				for line in f:
 					if line.startswith('#PRUNE_INPUTS'):
@@ -317,7 +311,7 @@ def useWQ(name):
 
 
 def wq_task(op_id):
-	global cache_folder
+	global data_folder
 	op = prunedb.ops_get(op_id)
 	ios = prunedb.ios_get(op_id)
 	out_ids = []
@@ -340,19 +334,19 @@ def wq_task(op_id):
 	command = "./prune_cmd %s > stdout.txt 2> stderr.txt" % ( op['in_str'] )
 	t = Task(command)
 	
-	t.specify_file(cache_folder+str(function_id), 'prune_cmd', WORK_QUEUE_INPUT, cache=True)
-	t.specify_file(cache_folder+str(function_id)+'.stdout', 'stdout.txt', WORK_QUEUE_OUTPUT, cache=False)
-	t.specify_file(cache_folder+str(function_id)+'.stderr', 'stderr.txt', WORK_QUEUE_OUTPUT, cache=False)
+	t.specify_file(data_folder+str(function_id), 'prune_cmd', WORK_QUEUE_INPUT, cache=True)
+	t.specify_file(data_folder+str(function_id)+'.stdout', 'stdout.txt', WORK_QUEUE_OUTPUT, cache=False)
+	t.specify_file(data_folder+str(function_id)+'.stderr', 'stderr.txt', WORK_QUEUE_OUTPUT, cache=False)
 
 	for i, filename in enumerate(out_files):
-		t.specify_file(cache_folder+str(out_ids[i]), filename, WORK_QUEUE_OUTPUT, cache=False)
+		t.specify_file(data_folder+str(out_ids[i]), filename, WORK_QUEUE_OUTPUT, cache=False)
 	for i, arg in enumerate(needed_files):
-		t.specify_file(cache_folder+str(arg), './'+str(arg), WORK_QUEUE_INPUT, cache=True)
+		t.specify_file(data_folder+str(arg), './'+str(arg), WORK_QUEUE_INPUT, cache=True)
 	
 	return t
 
 def wq_check():
-	global wq, wq_task_cnt
+	global wq, wq_task_cnt, data_folder
 	if wq:
 		# Add new tasks first so that they are scheduled while waiting
 		left = wq.hungry()
@@ -379,7 +373,7 @@ def wq_check():
 				ios = prunedb.ios_get(op_id)
 				for io in ios:
 					if io['pos']<0:
-						pathname = cache_folder+str(io['file_id'])
+						pathname = data_folder+str(io['file_id'])
 						try:
 							file_size = os.stat(pathname).st_size
 							chksum = hashfile(pathname)
@@ -417,8 +411,9 @@ def useLocal(concurrency):
 
 
 def file_data_put(path,id):
+	global data_folder
 	if hadoop_data:
-		args = ['hadoop','fs','-copyFromLocal',path,cache_folder+str(id)]
+		args = ['hadoop','fs','-copyFromLocal',path,data_folder+str(id)]
 		p = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=False)
 		(stdout, stderr) = p.communicate()
 		p_status = p.wait()
@@ -427,17 +422,18 @@ def file_data_put(path,id):
 
 
 def file_data_get(id,path):
+	global data_folder
 	if hadoop_data:
-		args = ['hadoop','fs','-copyToLocal',cache_folder+str(id), path]
+		args = ['hadoop','fs','-copyToLocal',data_folder+str(id), path]
 		p = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=False)
 		(stdout, stderr) = p.communicate()
 		p_status = p.wait()
 	else:
-		shutil.copy( cache_folder+str(id), path )
+		shutil.copy( data_folder+str(id), path )
 
 
 def local_task(op_id):
-	global cache_folder
+	global sandbox_prefix
 	ios = prunedb.ios_get(op_id)
 	in_args = []
 	out_ids = []
@@ -489,7 +485,7 @@ def local_task(op_id):
 	return {'sandbox':sandbox_folder, 'cmd':command, 'out':copy_out}
 
 def umbrella_task(op_id):
-	global cache_folder
+	global data_folder
 	ios = prunedb.ios_get(op_id)
 	in_args = []
 	out_ids = []
@@ -562,7 +558,7 @@ def umbrella_task(op_id):
 
 
 def local_check():
-	global local_workers
+	global local_workers, data_folder
 	w = 0
 	while w<len(local_workers):
 		(op,t,p) = local_workers[w]
@@ -572,7 +568,7 @@ def local_check():
 			for cp in t['out']:
 				(sb_filename,id) = cp
 				file_data_put(sb_filename,id)
-				pathname = cache_folder+str(id)
+				pathname = data_folder+str(id)
 				try:
 					file_size = os.stat(pathname).st_size
 					chksum = hashfile(pathname)
