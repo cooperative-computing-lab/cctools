@@ -653,7 +653,6 @@ def construct_mountfile(sandbox_dir, input_dict, hardware_platform, host_linux_d
 
 		#add /var/run/nscd/socket into mountlist
 		mountfile.write('/var/run/nscd/socket ENOENT\n')
-		mountfile.write('/tmp /tmp\n')
 		dest = "%s/cache/cctools-%s-%s/bin" % (os.path.dirname(sandbox_dir), host_linux_distro, hardware_platform)
 		logging.debug("Add cctools binary (%s) into %s", dest, mountfile_path)
 		mountfile.write(dest + ' ' + dest + '\n')
