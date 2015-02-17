@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "copy_stream.h"
 #include "memory_info.h"
 #include "disk_info.h"
+#include "cwd_disk_info.h"
 #include "hash_cache.h"
 #include "link.h"
 #include "link_auth.h"
@@ -148,6 +149,7 @@ static int64_t gpus_allocated = 0;
 
 static int send_resources_interval = 30;
 static int send_stats_interval     = 60;
+static int measure_wd_interval     = 180;
 
 static struct work_queue *foreman_q = NULL;
 
@@ -309,6 +311,29 @@ static int check_disk_workspace(int64_t *workspace_usage, int force) {
 		return 1;
 	}
 }
+
+/* faster disk check, overall with statfs */
+static int check_disk_space_for_filesize(int64_t file_size) {
+	uint64_t disk_avail, disk_total;
+
+	if(disk_avail_threshold > 0) {
+		disk_info_get(".", &disk_avail, &disk_total);
+		if(file_size > 0) {	
+			if((uint64_t)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
+				debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
+				return 0;
+			}
+		} else {
+			if(disk_avail < disk_avail_threshold) {
+				debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
+				return 0;
+			}	
+		}	
+    }
+
+	return 1;
+}
+
 
 
 /*
@@ -606,28 +631,6 @@ static int handle_tasks(struct link *master)
 		}
 		
 	}
-	return 1;
-}
-
-/* faster disk check, overall with statfs */
-static int check_disk_space_for_filesize(int64_t file_size) {
-	uint64_t disk_avail, disk_total;
-
-	if(disk_avail_threshold > 0) {
-		disk_info_get(".", &disk_avail, &disk_total);
-		if(file_size > 0) {	
-			if((uint64_t)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
-				debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
-				return 0;
-			}
-		} else {
-			if(disk_avail < disk_avail_threshold) {
-				debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
-				return 0;
-			}	
-		}	
-    }
-
 	return 1;
 }
 
@@ -1348,6 +1351,14 @@ static void work_for_master(struct link *master) {
 
 		ok &= check_disk_space_for_filesize(0);
 
+		int64_t disk_usage;
+		if(!check_disk_workspace(&disk_usage, 0)) {
+			fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n",workspace, manual_cores_option, disk_usage);
+			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_usage);
+			ok = 0;
+		}
+
+
 		if(ok) {
 			int visited = 0;
 			while(list_size(procs_waiting) > visited && cores_allocated < local_resources->cores.total) {
@@ -1569,6 +1580,8 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	}
 
 	workspace_prepare();
+
+	check_disk_workspace(NULL, 1);
 	report_worker_ready(master);
 
 	send_master_message(master, "info worker-id %s\n", worker_id);
