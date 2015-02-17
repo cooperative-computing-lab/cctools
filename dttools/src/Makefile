@@ -21,6 +21,7 @@ SOURCES = \
 	console_login.c \
 	copy_stream.c \
 	create_dir.c \
+	cwd_disk_info.c \
 	daemon.c \
 	datagram.c \
 	debug.c \
