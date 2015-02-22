@@ -438,6 +438,229 @@ struct file_node {
 	double size;
 };
 
+void write_node_to_xgmml(FILE *f, char *id, char* nodename, int process)
+{
+	//file *f must already be open!
+
+	fprintf(f,"\t<node id=\"%s\" label=\"%s\">\n", id, nodename);
+    fprintf(f,"\t\t<att name=\"shared name\" value=\"%s\" type=\"string\"/>\n", nodename);
+    fprintf(f,"\t\t<att name=\"name\" value=\"%s\" type=\"string\"/>\n", nodename);
+    fprintf(f,"\t\t<att name=\"process\" value=\"%d\" type=\"boolean\"/>\n", process);
+    fprintf(f,"\t</node>\n");
+}
+
+void write_edge_to_xgmml(FILE *f, char* edgeid, char* sourceid, char* targetid, int directed)
+{
+	//file *f must already be open!
+	fprintf(f, "\t<edge id=\"%s\" label=\"%s-%s\" source=\"%s\" target=\"%s\" cy:directed=\"%d\">\n", edgeid, sourceid, targetid, sourceid, targetid, directed);
+    fprintf(f,"\t\t<att name=\"shared name\" value=\"%s\" type=\"string\"/>\n", edgeid);
+    fprintf(f,"\t\t<att name=\"shared interaction\" value=\"\" type=\"string\"/>\n");
+    fprintf(f,"\t\t<att name=\"name\" value=\"%s\" type=\"string\"/>\n", edgeid);
+    fprintf(f,"\t\t<att name=\"selected\" value=\"0\" type=\"boolean\"/>\n");
+	fprintf(f,"\t\t<att name=\"interaction\" value=\"\" type=\"string\"/>\n");
+    fprintf(f,"\t\t<att name=\"weight\" value=\"8\" type=\"integer\"/>\n");
+	fprintf(f,"\t</edge>\n");
+}
+
+void dag_to_cyto(struct dag *d, int condense_display, int change_size)
+{
+	struct dag_node *n;
+	struct dag_file *f;
+	struct hash_table *h, *g;
+	struct dot_node *t;
+
+	struct file_node *e;
+
+	struct stat st;
+	const char *fn;
+
+	char *name;
+	char *label;
+
+	double average = 0;
+	double width = 0;
+
+	FILE *cytograph = fopen("cytoscape.xgmml", "w");
+	
+	
+	fprintf(cytograph, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n");
+	fprintf(cytograph, "<graph id=\"1\" label=\"small example\" directed=\"1\" cy:documentVersion=\"3.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\" xmlns:cy=\"http://www.cytoscape.org/\" xmlns=\"http://www.cs.rpi.edu/XGMML\">\n");
+	fprintf(cytograph, "\t<att name=\"networkMetadata\">\n");
+	fprintf(cytograph, "\t\t<rdf:RDF>\n");
+	fprintf(cytograph, "\t\t\t<rdf:Description rdf:about=\"http://ccl.cse.nd.edu/\">\n");
+	fprintf(cytograph, "\t\t\t\t<dc:type>Makeflow Structure</dc:type>\n");
+	fprintf(cytograph, "\t\t\t\t<dc:description>N/A</dc:description>\n");
+	fprintf(cytograph, "\t\t\t\t<dc:identifier>N/A</dc:identifier>\n");
+
+	time_t timer;
+	time(&timer);
+	struct tm* currenttime = localtime(&timer);
+	char timestring[20];
+	strftime(timestring, sizeof(timestring), "%Y-%m-%d %H:%M:%S", currenttime);
+	fprintf(cytograph, "\t\t\t\t<dc:date>%s</dc:date>\n", timestring);
+
+	fprintf(cytograph, "\t\t\t\t<dc:title>Makeflow Visualization</dc:title>\n");
+	fprintf(cytograph, "\t\t\t\t<dc:source>http://ccl.cse.nd.edu/</dc:source>\n");
+	fprintf(cytograph, "\t\t\t\t<dc:format>Cytoscape-XGMML</dc:format>\n");
+	fprintf(cytograph, "\t\t\t</rdf:Description>\n");
+	fprintf(cytograph, "\t\t</rdf:RDF>\n");
+	fprintf(cytograph, "\t</att>\n");
+
+	fprintf(cytograph, "\t<att name=\"shared name\" value=\"Makeflow Visualization\" type=\"string\"/>\n");
+	fprintf(cytograph, "\t<att name=\"name\" value=\"Makeflow Visualization\" type=\"string\"/>\n");
+	fprintf(cytograph, "\t<att name=\"selected\" value=\"1\" type=\"boolean\"/>\n");
+	fprintf(cytograph, "\t<att name=\"__Annotations\" type=\"list\">\n");
+	fprintf(cytograph, "\t</att>\n");
+	fprintf(cytograph, "\t<att name = \"layoutAlgorithm\" value = \"Grid Layout\" type = \"string\" cy:hidden = \"1\"/>\n");
+
+	if(change_size) {
+		hash_table_firstkey(d->completed_files);
+		while(hash_table_nextkey(d->completed_files, &label, (void **) &name)) {
+			stat(label, &st);
+			average += ((double) st.st_size) / ((double) hash_table_size(d->completed_files));
+		}
+	}
+
+
+	h = hash_table_create(0, 0); 
+	
+	for(n = d->nodes; n; n = n->next) {
+		name = xxstrdup(n->command);
+		label = strtok(name, " \t\n");
+		t = hash_table_lookup(h, label);
+		if(!t) {
+			t = malloc(sizeof(*t));
+			t->id = n->nodeid;
+			t->count = 1;
+			t->print = 1;
+			hash_table_insert(h, label, t);
+		} else {
+			t->count++;
+		}
+
+		free(name);
+	}
+
+
+	for(n = d->nodes; n; n = n->next) {
+		name = xxstrdup(n->command);
+		label = strtok(name, " \t\n");
+		t = hash_table_lookup(h, label);
+		if(!condense_display || t->print) {
+			t->print = 0;
+		}
+		char cytoid[6];
+		sprintf(cytoid, "N%d", n->nodeid);
+		write_node_to_xgmml(cytograph, cytoid, label,1);
+		free(name);
+	}
+	
+	g = hash_table_create(0, 0);
+
+	for(n = d->nodes; n; n = n->next) {
+		list_first_item(n->source_files);
+		while((f = list_next_item(n->source_files))) {
+			fn = f->filename;
+			e = hash_table_lookup(g, fn);
+			if(!e) {
+				e = malloc(sizeof(*e));
+				e->id = hash_table_size(g);
+				e->name = xxstrdup(fn);
+				if(stat(fn, &st) == 0) {
+					e->size = (double) (st.st_size);
+				} else
+					e->size = -1;
+				hash_table_insert(g, fn, e);
+			}
+		}
+		list_first_item(n->target_files);
+		while((f = list_next_item(n->target_files))) {
+			fn = f->filename;
+			e = hash_table_lookup(g, fn);
+			if(!e) {
+				e = malloc(sizeof(*e));
+				e->id = hash_table_size(g);
+				e->name = xxstrdup(fn);
+				if(stat(fn, &st) == 0) {
+					e->size = (double) (st.st_size);
+				} else
+					e->size = -1;
+				hash_table_insert(g, fn, e);
+			}
+		}
+	}
+
+	hash_table_firstkey(g);
+	while(hash_table_nextkey(g, &label, (void **) &e)) {
+		fn = e->name;
+		char cytoid[6];
+		sprintf(cytoid, "F%d", e->id);
+		write_node_to_xgmml(cytograph, cytoid, (char *)fn, 0);
+		if(change_size) {
+			if(e->size >= 0) {
+				width = 5 * (e->size / average);
+				if(width < 2.5)
+					width = 2.5;
+				if(width > 25)
+					width = 25;
+			}
+		} 
+	}
+
+	for(n = d->nodes; n; n = n->next) {
+
+		name = xxstrdup(n->command);
+		label = strtok(name, " \t\n");
+		t = hash_table_lookup(h, label);
+
+
+		list_first_item(n->source_files);
+		while((f = list_next_item(n->source_files))) {
+			e = hash_table_lookup(g, f->filename);
+			char sourceid[6];
+			char targetid[6];
+			sprintf(sourceid, "F%d", e->id);
+			sprintf(targetid, "N%d", n->nodeid);
+			char edgeid[13];
+			sprintf(edgeid, "%s-%s", sourceid, targetid);
+			write_edge_to_xgmml(cytograph, edgeid, sourceid, targetid, 1);
+		}
+
+		list_first_item(n->target_files);
+		while((f = list_next_item(n->target_files))) {
+			e = hash_table_lookup(g, f->filename);
+			char sourceid[6];
+			char targetid[6];
+			sprintf(sourceid, "N%d", n->nodeid);
+			sprintf(targetid, "F%d", e->id);
+			char edgeid[13];
+			sprintf(edgeid, "%s-%s", sourceid, targetid);
+			write_edge_to_xgmml(cytograph, edgeid, sourceid, targetid, 1);
+		}
+
+		free(name);
+	}
+
+	fprintf(cytograph, "</graph>\n");
+	fclose(cytograph);
+
+	hash_table_firstkey(h);
+	while(hash_table_nextkey(h, &label, (void **) &t)) {
+		free(t);
+		hash_table_remove(h, label);
+	}
+
+	hash_table_firstkey(g);
+	while(hash_table_nextkey(g, &label, (void **) &e)) {
+		free(e);
+		hash_table_remove(g, label);
+	}
+
+	hash_table_delete(g);
+	hash_table_delete(h);
+}
+
+
 void dag_to_dot(struct dag *d, int condense_display, int change_size)
 {
 	struct dag_node *n;
@@ -457,6 +680,12 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size)
 	double width = 0;
 
 	fprintf(stdout, "digraph {\n");
+
+	time_t timer;
+	time(&timer);
+	struct tm* currenttime = localtime(&timer);
+	char timestring[20];
+	strftime(timestring, sizeof(timestring), "%Y-%m-%d %H:%M:%S", currenttime);
 
 	if(change_size) {
 		hash_table_firstkey(d->completed_files);
@@ -545,7 +774,8 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size)
 	while(hash_table_nextkey(g, &label, (void **) &e)) {
 		fn = e->name;
 		fprintf(stdout, "F%d [label = \"%s", e->id, fn);
-
+		char cytoid[6];
+		sprintf(cytoid, "F%d", e->id);
 		if(change_size) {
 			if(e->size >= 0) {
 				width = 5 * (e->size / average);
