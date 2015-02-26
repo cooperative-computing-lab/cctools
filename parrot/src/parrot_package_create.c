@@ -516,6 +516,16 @@ int post_process( ) {
 	char new_envlist[PATH_MAX], common_mountlist[PATH_MAX], size_cmd[PATH_MAX], cmd_rv[100];
 	FILE *file, *cmd_fp;
 
+	//create a tmp dir under the package if it does not exist
+	char tmp_path[PATH_MAX];
+	snprintf(tmp_path, PATH_MAX, "%s/tmp", packagepath);
+	if(access(tmp_path, F_OK) == -1) {
+		if(mkdir(tmp_path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == -1) {
+			debug(D_DEBUG, "Create tmp dir under the package (%s) fails: %s\n", tmp_path, strerror(errno));
+			return -1;
+		}
+	}
+
 	snprintf(new_envlist, PATH_MAX, "%s/%s", packagepath, "env_list");
 	if(copy_file_to_file(envlist, new_envlist) == -1) {
 		debug(D_DEBUG, "copy_file_to_file(`%s`) fails.\n", envlist);
@@ -534,7 +544,6 @@ int post_process( ) {
 		(fputs("/proc /proc\n", file) == EOF) ||
 		(fputs("/sys /sys\n", file) == EOF) ||
 		(fputs("/var /var\n", file) == EOF) ||
-		(fputs("/tmp /tmp\n", file) == EOF) ||
 		(fputs("/selinux /selinux\n", file) == EOF)) {
 			debug(D_DEBUG, "fputs fails: %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
