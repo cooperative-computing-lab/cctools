@@ -84,6 +84,7 @@ int pfs_write_rval = 0;
 int pfs_paranoid_mode = 0;
 const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
+int set_foreground = 1;
 
 char sys_temp_dir[PFS_PATH_MAX] = "/tmp";
 char pfs_temp_dir[PFS_PATH_MAX];
@@ -129,6 +130,7 @@ enum {
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
 	LONG_OPT_CVMFS_ALIEN_CACHE,
 	LONG_OPT_HELPER,
+	LONG_OPT_NO_SET_FOREGROUND,
 };
 
 static void get_linux_version(const char *cmd)
@@ -208,6 +210,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Do not checksum files.\n", "-k,--no-checksums");
 	fprintf(stdout, " %-30s Path to ld.so to use.                      (PARROT_LDSO_PATH)\n", "-l,--ld-path=<path>");
 	fprintf(stdout, " %-30s Record all the file names.\n", "-n,--name-list=<path>");
+	fprintf(stdout, " %-30s Disable changing the foreground process group of the session.\n","   --no-set-foreground");
 	fprintf(stdout, " %-30s Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n", "-m,--ftab-file=<file>");
 	fprintf(stdout, " %-30s Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
 	fprintf(stdout, " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
@@ -550,6 +553,7 @@ int main( int argc, char *argv[] )
 		{"no-follow-symlinks", no_argument, 0, 'f'},
 		{"no-helper", no_argument, 0, 'H'},
 		{"no-optimize", no_argument, 0, 'D'},
+		{"no-set-foreground", no_argument, 0, LONG_OPT_NO_SET_FOREGROUND},
 		{"paranoid", no_argument, 0, 'P'},
 		{"proxy", required_argument, 0, 'p'},
 		{"root-checksum", required_argument, 0, 'R'},
@@ -729,6 +733,9 @@ int main( int argc, char *argv[] )
 			pfs_syscall_totals32 = (int*) calloc(SYSCALL32_MAX,sizeof(int));
 			pfs_syscall_totals64 = (int*) calloc(SYSCALL64_MAX,sizeof(int));
 			break;
+		case LONG_OPT_NO_SET_FOREGROUND:
+			set_foreground = 0;
+			break;
 		case LONG_OPT_HELPER:
 			pfs_use_helper = 1;
 			break;
@@ -762,11 +769,11 @@ int main( int argc, char *argv[] )
 
 	if (envlist[0]) {
 		extern char **environ;
-		if(access(optarg, F_OK) == 0)
-			fatal("The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", optarg);
-		FILE *fp = fopen(optarg, "w");
+		if(access(envlist, F_OK) == 0)
+			fatal("The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", envlist);
+		FILE *fp = fopen(envlist, "w");
 		if(!fp)
-			fatal("Can not open envlist file: %s", optarg);
+			fatal("Can not open envlist file: %s", envlist);
 		for (int i = 0; environ[i]; i++)
 			fprintf(fp, "%s\n", environ[i]);
 		char working_dir[PFS_PATH_MAX];
@@ -969,8 +976,8 @@ int main( int argc, char *argv[] )
 			pfs_helper_init();
 		pfs_paranoia_payload();
 		pfs_process_bootstrapfd();
-		setpgrp();
-		{
+		if(set_foreground) {
+			setpgrp();
 			int fd = open("/dev/tty", O_RDWR);
 			if (fd >= 0) {
 				tcsetpgrp(fd, getpgrp());

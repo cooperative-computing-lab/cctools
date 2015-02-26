@@ -365,9 +365,11 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 			if(target_stat.st_size) {
 				debug(D_DEBUG, "`%s`: fullcopy exist! pass!\n", path);
 			} else {
-				if(remove(new_path) == -1) {
-					debug(D_DEBUG, "remove(`%s`) fails: %s\n", new_path, strerror(errno));
-					return -1;
+				if(access(new_path, F_OK) == 0) {
+					if(remove(new_path) == -1) {
+						debug(D_DEBUG, "remove(`%s`) fails: %s\n", new_path, strerror(errno));
+						return -1;
+					}
 				}
 				if(copy_file_to_file(path, new_path) < 0) {
 					debug(D_DEBUG, "copy_file_to_file from %s to %s fails.\n", path, new_path);
@@ -384,6 +386,12 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 				line_process(dir_name, "metadatacopy", 1, 0, special_file);
 			}
 			if(fullcopy) {
+				if(access(new_path, F_OK) == 0) {
+					if(remove(new_path) == -1) {
+						debug(D_DEBUG, "remove(`%s`) fails: %s\n", new_path, strerror(errno));
+						return -1;
+					}
+				}
 				if(copy_file_to_file(path, new_path) < 0) {
 					debug(D_DEBUG, "copy_file_to_file from %s to %s fails.\n", path, new_path);
 					return -1;
@@ -507,6 +515,16 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 int post_process( ) {
 	char new_envlist[PATH_MAX], common_mountlist[PATH_MAX], size_cmd[PATH_MAX], cmd_rv[100];
 	FILE *file, *cmd_fp;
+
+	//create a tmp dir under the package if it does not exist
+	char tmp_path[PATH_MAX];
+	snprintf(tmp_path, PATH_MAX, "%s/tmp", packagepath);
+	if(access(tmp_path, F_OK) == -1) {
+		if(mkdir(tmp_path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == -1) {
+			debug(D_DEBUG, "Create tmp dir under the package (%s) fails: %s\n", tmp_path, strerror(errno));
+			return -1;
+		}
+	}
 
 	snprintf(new_envlist, PATH_MAX, "%s/%s", packagepath, "env_list");
 	if(copy_file_to_file(envlist, new_envlist) == -1) {
