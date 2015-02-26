@@ -102,6 +102,8 @@ struct work_queue {
 	struct link_info *poll_table;
 	int poll_table_size;
 
+	struct itable  *task_status_map;        // taskid -> status
+
 	struct list    *ready_list;      // ready to be sent to a worker
 	struct itable  *running_tasks;   // running on a worker
 	struct itable  *finished_tasks;  // have output waiting on a worker
@@ -198,6 +200,9 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t );
+
+/* returns old status */
+static uintptr_t change_task_status( struct work_queue *q, struct work_queue_task *t, uintptr_t new_status );
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
@@ -1164,6 +1169,7 @@ Expire tasks in the ready list.
 static void expire_waiting_task(struct work_queue *q, struct work_queue_task *t)
 {
 	t->result |= WORK_QUEUE_RESULT_TASK_TIMEOUT;
+
 
 	//add the task to complete list so it is given back to the application.
 	list_push_head(q->complete_list, t);
@@ -3739,6 +3745,8 @@ struct work_queue *work_queue_create(int port)
 	q->finished_tasks = itable_create(0);
 	q->complete_list = list_create();
 
+	q->task_status_map = itable_create(0);
+
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_blacklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
@@ -3972,6 +3980,8 @@ void work_queue_delete(struct work_queue *q)
 		itable_delete(q->finished_tasks);
 		list_delete(q->complete_list);
 
+		itable_delete(q->task_status_map);
+
 		hash_table_delete(q->workers_with_available_results);
 
 		list_free(q->task_reports);
@@ -4018,6 +4028,20 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 {
 	list_push_priority(q->ready_list,t,t->priority);
+}
+
+int work_queue_task_status( struct work_queue *q, int taskid) {
+	return (int) ((uint64_t) itable_lookup(q->task_status_map, taskid));
+}
+
+/* Changes task status. Returns old status */
+/* State of the task. One of WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE) */
+static uintptr_t change_task_status( struct work_queue *q, struct work_queue_task *t, uintptr_t new_status ) {
+	uintptr_t old_status = (uintptr_t) itable_lookup(q->task_status_map, t->taskid);
+
+	itable_insert(q->task_status_map, t->taskid, (void *) new_status);
+
+	return old_status;
 }
 
 int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
@@ -4272,7 +4296,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			{
 				q->stats->total_tasks_failed++;
 			}
+
 			return t;
+
 		}
 
 		if( q->process_pending_check && process_pending() )
