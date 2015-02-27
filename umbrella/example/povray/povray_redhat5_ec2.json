@@ -3,7 +3,7 @@
 		"arch": "x86_64",
 		"cores": "2",
 		"memory": "2GB",
-		"disk": "10GB"
+		"disk": "3GB"
 	},
 	"kernel" : {
 		"name": "linux",

@@ -6,7 +6,9 @@ umbrella -T parrot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_Rubiks
 
 umbrella -T docker -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/docker_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
-umbrella -T ec2 --sshkey ~/bin/feb272015.pem -k feb272015 -g 'sg-24f96141' -c povray_redhat5_ec2.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/docker_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+umbrella -T ec2 --sshkey ~/bin/feb272015.pem -k feb272015 -g 'sg-24f96141' -c povray_redhat5_ec2.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/ec2_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+
+umbrella -T condor --remotelog umbrella.log.condor  -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/condor_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 #use the default localdir and output options:
 umbrella -T local -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"

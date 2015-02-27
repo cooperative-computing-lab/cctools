@@ -26,6 +26,7 @@ import grp
 import logging
 import multiprocessing
 import resource
+import tempfile
 
 if sys.version_info >= (3,):
 	import urllib.request as urllib2
@@ -45,45 +46,21 @@ Return: the output of the execution.
 """
 def func_call(cmd):
 	logging.debug("Start to execute command: %s", cmd)
-	print "Start to execute command: ", cmd
 	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
 	(output, err) = p.communicate()
-	p_status = p.wait()
-	print output
+	rc = p.returncode
+	logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, output, err)
 	return output, err
 
-def func_call_output(cmd, output_dir):
-	output, err = func_call(cmd)
-	if not os.path.exists(output_dir):
-		os.makedirs(output_dir)
-	stdout = output_dir + "/umbrella_stdout"
-	logging.debug("Writing the output of the command into %s ....", stdout)
-	with open(stdout, 'w+') as file1:
-		file1.write(output)
-	if err:
-		stderr = output_dir + "/umbrella_stderr"
-		logging.debug("Writing the stderr of the command into %s ....", stderr)
-		with open(stderr, 'w+') as file1:
-			file1.write(err)
-	
 def func_call_output_withenv(cmd, env_dict, output_dir):
 	logging.debug("Start to execute command: %s", cmd)
-	print "Start to execute command: ", cmd
 	logging.debug("The environment variables for executing the command is:")
 	logging.debug(env_dict)
+
 	p = subprocess.Popen(cmd, env = env_dict, stdout = subprocess.PIPE, shell = True)
 	(output, err) = p.communicate()
-	p_status = p.wait()
-	print "\n func_call_output_withenv"
-	print "p_status: ", p_status
-	print "output: ", output
-	print "err: ", err
-	if not os.path.exists(output_dir):
-		os.makedirs(output_dir)
-	stdout = output_dir + "/umbrella_stdout"
-	logging.debug("Writing the output of the command into %s ....", stdout)
-	with open(stdout, 'w+') as file1:
-		file1.write(output)
+	rc = p.returncode
+	logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, output, err)
 
 """ Calculate the md5sum of a file
 Parameter filename: the name of the file 
@@ -1049,7 +1026,7 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 
 """ the process of specification when condor execution engine is chosen
 """
-def condor_process(spec_path, spec, spec_path_basename, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting):
+def condor_process(spec_path, spec, spec_path_basename, packages_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, remotelog_path):
 	if not os.path.exists(sandbox_dir):
 		os.makedirs(sandbox_dir)
 
@@ -1076,26 +1053,23 @@ def condor_process(spec_path, spec, spec_path_basename, sandbox_dir, output_dir,
 	logging.debug("transfer_input_files: %s, %s", spec_path, transfer_inputs)
 	logging.debug("The new_input_options of Umbrella: %s", new_input_options)
 
-	condor_output_dir = os.path.basename(output_dir)
+	condor_output_dir = tempfile.mkdtemp(dir=".")
+	condor_output_dir = os.path.abspath(condor_output_dir)
 	condor_log_path = sandbox_dir + '/condor_task.log'
 	
 	condor_submit_file = open(condor_submit_path, "w+")
 	condor_submit_file.write('universe = vanilla\n')
 	condor_submit_file.write('executable = umbrella\n')
-	condor_submit_file.write('arguments = "-T local -c %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, new_input_options, condor_output_dir, user_cmd[0]))
-	condor_submit_file.write('transfer_input_files = umbrella, %s%s\n' % (spec_path, transfer_inputs))
-	condor_submit_file.write('transfer_output_files = %s\n' % condor_output_dir)
+	condor_submit_file.write('arguments = "-T local -c %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(packages_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
+	condor_submit_file.write('transfer_input_files = umbrella, %s, %s%s\n' % (packages_path, spec_path, transfer_inputs))
+	condor_submit_file.write('transfer_output_files = %s, condor_umbrella.log\n' % os.path.basename(condor_output_dir))
+	condor_submit_file.write('transfer_output_remaps = "condor_umbrella.log=%s"\n' % remotelog_path) 
 	if linux_distro == "redhat5":
 		condor_submit_file.write('requirements = TARGET.Arch == "%s" && TARGET.OpSys == "%s" && TARGET.OpSysAndVer == "redhat6"\n' % (hardware_platform, kernel_name))
 	else:
 		#condor_submit_file.write('requirements = TARGET.Arch == "%s" && TARGET.OpSys == "%s" && TARGET.OpSysAndVer == "%s" && TARGET.has_docker == true\n' % (hardware_platform, kernel_name, linux_distro))
 		condor_submit_file.write('requirements = TARGET.Arch == "%s" && TARGET.OpSys == "%s" && TARGET.OpSysAndVer == "%s"\n' % (hardware_platform, kernel_name, linux_distro))
 	condor_submit_file.write('environment = PATH=/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin\n')
-
-#	sandbox_id = os.path.basename(sandbox_dir)
-#	condor_submit_file.write('output = condor_stdout_%s\n' % sandbox_id) 
-#	condor_submit_file.write('error = condor_stderr_%s\n' % sandbox_id)
-#	condor_submit_file.write('log = condor_log_%s\n' % sandbox_id)
 
 	condor_submit_file.write('output = %s/condor_stdout\n' % sandbox_dir) 
 	condor_submit_file.write('error = %s/condor_stderr\n' % sandbox_dir)
@@ -1109,21 +1083,22 @@ def condor_process(spec_path, spec, spec_path_basename, sandbox_dir, output_dir,
 	#submit condor job
 	cmd = 'condor_submit ' + condor_submit_path
 	func_call(cmd)
-	#keep tracking whether condor job is done
 
-#	print "Waiting for the job is done ..."
-#	logging.debug("Waiting for the job is done ...")
-#	cmd = 'condor_wait %s' % condor_log_path 
-#	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
-#	p_status = p.wait()
-#	logging.debug("the condor jos is done, put the output back into the output directory!")
-#	print "the condor jos is done, put the output back into the output directory!"
-#	#check until the condor job is done, post-processing (put the output back into the output directory)
-#	os.rename(condor_output_dir, output_dir)
-#	#copy all the stuff inside the sandbox_dir into output)dir, and then remove the sandbox_dir
+	#keep tracking whether condor job is done
+	print "Waiting for the job is done ..."
+	logging.debug("Waiting for the job is done ...")
+	cmd = 'condor_wait %s' % condor_log_path 
+	func_call(cmd)
+
+	logging.debug("the condor jos is done, put the output back into the output directory!")
+	print "the condor jobs is done, put the output back into the output directory!"
+	#check until the condor job is done, post-processing (put the output back into the output directory)
+	os.rename(condor_output_dir, output_dir)
+
+	#copy all the stuff inside the sandbox_dir into output)dir, and then remove the sandbox_dir
 #	cmd = 'cp -r %s/* %s' % (sandbox_dir, output_dir)
 #	func_call(cmd)
-#	shutil.rmtree(sandbox_dir)
+	shutil.rmtree(sandbox_dir)
 
 ''' Compare the required hardware configurations with each instance type, and return the first matched instance type, return 'no' if no matched instance type exist.
 Note: We can rank each instance type in the future, so that in the case of multiple matches exit, the closest matched instance type is returned.
@@ -1140,7 +1115,7 @@ def decide_instance_type(cpu_cores, memory_size, disk_size, instances):
 			return item
 	return 'no' 
 
-def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ssh_key, key_pair, security_group, output_dir, batch_type, input_list, input_list_origin, env_options, user_cmd, cwd_setting):
+def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ssh_key, key_pair, security_group, sandbox_dir, output_dir, batch_type, input_list, input_list_origin, env_options, user_cmd, cwd_setting, remotelog_path):
 	if spec.has_key("hardware") and spec["hardware"] and spec.has_key("kernel") and spec["kernel"] and spec.has_key("os") and spec["os"]:
 		hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id = env_parameter_init(spec["hardware"], spec["kernel"], spec["os"])
 	else:
@@ -1183,12 +1158,13 @@ def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ss
 	
 	#start the instance and obtain the instance id
 	instance_id = get_instance_id(ami, r, key_pair, security_group)
-	logging.debug("Start the instance and obtain the instance id: ", instance_id)
+	logging.debug("Start the instance and obtain the instance id: %s", instance_id)
 
 	#get the public DNS of the instance_id
 	public_dns = get_public_dns(instance_id)
-	logging.debug("Get the public DNS of the instance_id: ", public_dns)
+	logging.debug("Get the public DNS of the instance_id: %s", public_dns)
 
+	public_dns = "ec2-52-11-98-91.us-west-2.compute.amazonaws.com"
 	#install wget on the instance	
 	logging.debug("Install wget on the instance")
 	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'yum -y install wget\'' % (ssh_key, user_name, public_dns)
@@ -1230,9 +1206,9 @@ def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ss
 	#execute the command on the instance 
 	logging.debug("Execute the command on the instance ...")
 	if env_options == '':
-		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'%s/bin/python umbrella -T local -c %s -l ec2_umbrella -o output -i \'%s\'  -p %s run \'%s\'' % (ssh_key, user_name, public_dns, python_name, os.path.basename(spec_path), new_input_options, os.path.basename(packages_path), user_cmd[0])
+		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -T local -c %s --log ec2_umbrella.log --packages %s -l ec2_umbrella -o output -i \'%s\' run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, user_cmd[0])
 	else:
-		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'%s/bin/python umbrella -T local -c %s -l ec2_umbrella -o output -i \'%s\' -p %s -e %s run \'%s\'' % (ssh_key, user_name, public_dns, python_name, os.path.basename(spec_path), new_input_options, os.path.basename(packages_path), env_options, user_cmd[0])
+		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -T local -c %s --packages %s -l ec2_umbrella -o output -i \'%s\' -e %s run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, env_options, user_cmd[0])
 	func_call(cmd)
 
 	#postprocessing
@@ -1241,17 +1217,20 @@ def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ss
 	func_call(cmd)
 
 	logging.debug("The instance returns the output.tar.gz to the local machine.")
-	cmd = 'scp -i %s %s@%s:output.tar.gz .' % (ssh_key, user_name, public_dns)
+	cmd = 'scp -i %s %s@%s:output.tar.gz %s/' % (ssh_key, user_name, public_dns, sandbox_dir)
 	func_call(cmd)
 
-	if not os.path.exists(output_dir):
-		os.makedirs(output_dir)
-
-	logging.debug("Uncompress output.tar.gz.")
-	cmd = 'tar zxvf output.tar.gz'
+	logging.debug("The instance returns the remote umbrella log file to the local machine.")
+	cmd = 'scp -i %s %s@%s:ec2_umbrella.log %s' % (ssh_key, user_name, public_dns, remotelog_path)
 	func_call(cmd)
-	logging.debug("Rename output to the output_dir (%s).", output_dir)
-	#os.rename('output', output_dir)
+
+	logging.debug("Uncompress output.tar.gz to the output_dir (%s).", output_dir)
+	cmd = 'tar zxvf %s/output.tar.gz -C %s' % (sandbox_dir, sandbox_dir)
+	func_call(cmd)
+
+	logging.debug("Rename %s/output to the output_dir (%s).", sandbox_dir, output_dir)
+	os.rename('%s/output' % sandbox_dir, output_dir)
+	shutil.rmtree(sandbox_dir)
 
 """ Create the execution environment specified in the specification file and run the task on it.
 """
@@ -1406,27 +1385,34 @@ def main():
 					action="store", 
 					default="./umbrella.log",
 					help="The path of umbrella log file. (By default: ./umbrella.log)",)
+	parser.add_option("--remotelog",
+					action="store", 
+					help="The path of the remote umbrella log file. (only for ec2 and condor execution engines)",)
 	parser.add_option("-g", "--group",
 					action="store", 
-					help="the security group within which an instance should be run.",)
+					help="the security group within which an instance should be run. (only for ec2)",)
 	parser.add_option("-k", "--key",
 					action="store", 
-					help="the name of the key pair to use when launching an instance.",)
+					help="the name of the key pair to use when launching an instance. (only for ec2)",)
 	parser.add_option("--sshkey",
 					action="store", 
-					help="the name of the private key file to use when connecting to an instance.",)
+					help="the name of the private key file to use when connecting to an instance. (only for ec2)",)
 
 	(options, args) = parser.parse_args()
-
 	logfilename = options.log
-	print "logfilename: ", logfilename
+	if os.path.exists(logfilename) and not os.path.isfile(logfilename):
+		sys.exit("The --log option <%s> is not a file!" % logfilename)
+
 	logging.basicConfig(filename=logfilename, level=logging.DEBUG,
         format='%(asctime)s.%(msecs)d %(levelname)s %(module)s - %(funcName)s: %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
 	logging.debug("*******Welcome to Umbrella*******")
 	logging.debug("Arguments: ")
 	logging.debug(sys.argv)
+
 	start = datetime.datetime.now()
+	logging.debug("Start time: %s", start)
+
 	logging.debug("Check the validity of the command ....")
 	if not args:
 		logging.critical("You must provide the behavior and the command!")
@@ -1458,16 +1444,12 @@ def main():
 	localdir = os.path.abspath(localdir)
 	logging.debug("Check the localdir option: %s", localdir)
 
-	#get a sandbox number, which will become the name of the sandbox directory
-	sandbox_id = get_sandbox_id(localdir)
-	sandbox_dir = localdir + '/' + str(sandbox_id)
-	logging.debug("Allocate %d as the sandbox ID, %s as the sanbox_dir", sandbox_id, sandbox_dir)
+	if not os.path.exists(localdir):
+		logging.debug("create the localdir: %s", localdir)
+		os.makedirs(localdir)
 	
-	if not os.path.exists(sandbox_dir):
-		logging.debug("Create the sandbox_dir: %s", sandbox_dir)
-		os.makedirs(sandbox_dir)
-
-#	print sandbox_dir
+	sandbox_dir = tempfile.mkdtemp(dir=localdir)
+	logging.debug("Create the sandbox_dir: %s", sandbox_dir)
 
 	#transfer options.env into a dictionary, env_para_dict
 	env_para = options.env
@@ -1508,8 +1490,6 @@ def main():
 				env_para_dict[key] = spec_env[key]
 			logging.debug("env_para_dict:")
 			logging.debug(env_para_dict)
-
-#	print env_para_dict
 
 	if 'PWD' in env_para_dict:
 		cwd_setting = env_para_dict['PWD']
@@ -1559,8 +1539,11 @@ def main():
 		sys.exit("%s is not empty! Please clean the output directory first or specify another directory!\n" % output_dir)
 	else:
 		pass
+#       if os.path.exists(output_dir):
+#               logging.critical("the output_dir should be a non-existent directory!")
+#               sys.exit("the output_dir should be a non-existent directory!")
 
-	#obtain packages.json	
+	#packages_path always refers to the local path of the packages json file.
 	packages_path = options.packages
 	packages_path = os.path.abspath(packages_path)
 	logging.debug("Check the packages information file: %s", packages_path)
@@ -1578,11 +1561,17 @@ def main():
 	user_cmd = args[1:]
 	logging.debug("The user's command is: %s", user_cmd)
 
+	if batch_type == "ec2" or batch_type == "condor":
+		remotelog_path = options.remotelog
+		remotelog_path = os.path.abspath(remotelog_path)
+		if os.path.exists(remotelog_path):
+			sys.exit("The --remotelog option <%s> already exists!" % remotelog_path)
+
 	if behavior in ["run"]:
 #		user_name = 'root' #username who can access the VM instances from Amazon EC2
 #		ssh_key = 'hmeng_key_1018.pem' #the pem key file used to access the VM instances from Amazon EC2
 		if batch_type == "ec2":
-			#obtain ec2.json
+			#ec2_path always refers to the local path of the ec2 resource json file.
 			ec2_path = options.ec2
 			ec2_path = os.path.abspath(ec2_path)	
 			logging.debug("Check the ec2 information file: %s", ec2_path)
@@ -1601,9 +1590,9 @@ def main():
 			security_group = options.group
 			ssh_key = options.sshkey
 				
-			ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec2_json, ssh_key, key_pair, security_group, output_dir, batch_type, input_list, input_list_origin, env_para, user_cmd, cwd_setting)
+			ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec2_json, ssh_key, key_pair, security_group, sandbox_dir, output_dir, batch_type, input_list, input_list_origin, env_para, user_cmd, cwd_setting, remotelog_path)
 		elif batch_type == "condor":
-			condor_process(spec_path, spec_json, spec_path_basename, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting)
+			condor_process(spec_path, spec_json, spec_path_basename, packages_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, remotelog_path)
 		elif batch_type == "local":
 			#first check whether Docker exists, if yes, use docker execution engine; if not, use parrot execution engine.
 			if dependency_check('docker') == 0:
@@ -1617,11 +1606,11 @@ def main():
 				logging.critical('Docker is not installed on the host machine, please try other execution engines!')
 				sys.exit('Docker is not installed on the host machine, please try other execution engines!')
 			specification_process(spec_json, sandbox_dir, behavior, packages_json, batch_type, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting)
+
 	end = datetime.datetime.now()
 	diff = end - start
-	print "Start time: ", start
-	print "End time: ", end
-	print "execution time: ", diff.seconds
+	logging.debug("End time: %s", end)
+	logging.debug("execution time: %d seconds", diff.seconds)
 
 if __name__ == "__main__":
 	main()

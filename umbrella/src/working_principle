@@ -1,0 +1,83 @@
+Options:
+  -c CONFIG, --config=CONFIG
+                        The specification json file. (By default: spec.json)
+  -l LOCALDIR, --localdir=LOCALDIR
+                        The path of directory used for all the cached data and all the sandboxes. (By default: ./umbrella_test)
+						this directory must be empty or non-existent.
+  -i INPUTS, --inputs=INPUTS
+                        The path of input files in the format of access_path=actual_path. i.e, -i '/home/hmeng/file1=/tmp/file2'. access_path must be consistent with the semantics of the provided command, actual_path can be relative or absolute. (By default:
+                        '')
+  -e ENV, --env=ENV     The environment variable. I.e., -e 'PWD=/tmp'. (By default: '')
+  -o OUTPUT, --output=OUTPUT
+                        The path of output. (By default: ./umbrella_output)
+						this directory must be empty.
+
+  -T BATCH_TYPE, --batch_type=BATCH_TYPE
+                        Batch system type, which can be local, parrot, chroot, docker, condor, ec2. (By default: local)
+
+  --packages=PACKAGES   The source of packages information. (By default: ./packages.json)
+						If the value of this option does not exist, one copy of packages.json will be downloaded into the sandbox from the ccl website.
+
+  --ec2=EC2             The source of ec2 information. (By default: ./ec2.json)
+						If the value of this option does not exist, one copy of ec2.json will be downloaded into the sandbox from the ccl website.
+
+  --log=LOG             The path of umbrella log file. (By default: ./umbrella.log)
+
+  -g GROUP, --group=GROUP
+                        the security group within which an instance should be run. (only for ec2)
+  -k KEY, --key=KEY     the name of the key pair to use when launching an instance. (only for ec2)
+  --sshkey=SSHKEY       the name of the private key file to use when connecting to an instance. (only for ec2)
+
+inputs of local execution engine: 
+all the inputs are mounted into the sandbox without being copied into the sandbox in all these three container techniques (chroot, parrot and docker).
+The usage of the mounting mechanism on the execution node allows Umbrella to treat all the stuff created in the sandbox during the execution of the application as the output.
+
+inputs of cloud execution engine:
+Umbrella transfers the packages.json, the specification file, the input files to the home directory of the execution node through `scp`;
+Umbrella changes the Umbrella command to be executed on the remote execution node: 
+Required changes:
+	use a python from the archive if the remote execution node does not have the correct python to execute umbrella (not finished)
+	force the usage of the packages.json transferred to the execution node
+	change -c to use the specification under the home directory
+	change -T to be local
+	change -i to set all the actual paths to be the home directory
+Optional changes:
+	change -l to ~/ec2_umbrella
+	change -o to ~/output 
+	change --log to ec2_umbrella.log 
+Then the local umbrella calls the remote umbrella command through `ssh`.
+
+inputs of grid execution engine:
+Umbrella transfer the packages.json, the specification file, the input files to the scratch directory of the execution node through the `transfer_input_files` attribute of Condor;
+Umbrella changes the Umbrella command to be executed on the remote execution node: 
+Required changes:
+	use a python from the archive if the remote execution node does not have the correct python to execute umbrella (not finished)
+	force the usage of the packages.json transferred to the execution node
+	change -c to use the specification under the scratch directory of the condor job
+	change -T to be local
+	change -i to set all the actual paths to be the scratch directory of the condor job
+Optional changes:
+	change -l to condor_umbrella
+	change -o to os.path.basename(tempfile.mkdtemp(dir=os.path.dirname(sandbox_dir))): the limitation of the `transfer_output_files` attribute for transferring a directory forces this change.
+	change --log to condor_umbrella.log
+Then the local umbrella calls`condor_submit`.
+
+outputs of local execution engine: 
+all the stuff created in the sandbox during the execution of the application will be finally put into the output_dir.
+Parrot and chroot: rename sandbox_dir to output_dir
+Docker: cp sandbox_dir/* into output_dir/
+
+outputs of cloud execution engine:
+the output_dir on the remote execution node is transferred back to the local machine and put into the output_dir set by the user.
+the sandbox on the local machine will be deleted.
+
+outputs of grid execution engine:
+the output_dir on the remote execution node is transferred back to the local machine and put into the output_dir set by the user.
+the sandbox on the local machine will be deleted.
+
+the execution result (return code, stdout data, stderr data) of all the subprocesses called by Umbrella are written into the umbrella log file.
+
+
+
+Following work:
+Add more behavior support: check, download

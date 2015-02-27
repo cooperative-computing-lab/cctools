@@ -9,19 +9,24 @@ Options:
                         The specification json file. (By default: ./spec.json)
   -l LOCALDIR, --localdir=LOCALDIR
                         The path of directory used for all the cached data and all the sandboxes. (By default: ./umbrella_test)
+						this directory must be empty.
   -i INPUTS, --inputs=INPUTS
                         The path of input files in the format of access_path=actual_path. i.e, -i '/home/hmeng/file1=/tmp/file2'. access_path must be consistent with the semantics of the provided command, actual_path can be relative or absolute. (By default: '')
   -e ENV, --env=ENV     The environment variable. I.e., -e 'PWD=/tmp'. (By default: '')
   -o OUTPUT, --output=OUTPUT
                         The path of output. (By default: ./umbrella_output)
   -T BATCH_TYPE, --batch_type=BATCH_TYPE
-                        Batch system type, which can be local, chroot, docker, condor, ec2. (By default: local)
+                        Batch system type, which can be local, parrot, chroot, docker, condor, ec2. (By default: local)
   --packages=PACKAGES   The source of packages information. (By default: ./packages.json)
+						If the value of this option does not exist, one copy of packages.json will be downloaded into the sandbox from the ccl website.
   --ec2=EC2             The source of ec2 information. (By default: ./ec2.json)
+						If the value of this option does not exist, one copy of ec2.json will be downloaded into the sandbox from the ccl website.
   --log=LOG             The path of umbrella log file. (By default: ./umbrella.log)
+  --remotelog=REMOTELOG The path of the remote umbrella log file. (only for ec2 and condor execution engines)
   -g GROUP, --group=GROUP
-                        the security group within which an instance should be run.
-  -k KEY, --key=KEY     the name of the key pair to use when launching an instance.
+                        the security group within which an instance should be run. (only for ec2)
+  -k KEY, --key=KEY     the name of the key pair to use when launching an instance. (only for ec2)
+  --sshkey=SSHKEY       the name of the private key file to use when connecting to an instance. (only for ec2)
 
 Example:
 umbrella -T local -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/local_povray_redhat5  run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
@@ -48,42 +53,45 @@ Chroot execution engine:
 sudo ~hmeng/cctools/bin/umbrella -T chroot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/chroot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 Condor execution engine:
-umbrella -T condor -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -o condor_povray run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
-Note: 1). Condor is not compatible with AFS, so ensure your test is not running on AFS. 2). --localdir option is not useful for condor execution engine, because the specification file will be mapped into a condor submit file directly without creating any sandbox on the host machine. However, the --output directory is still necessary to hold the output returned from condor.
+umbrella -T condor -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o condor_povray --log umbrella.log --remotelog condor_umbrella.log run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+Note: 1). Condor is not compatible with AFS, so ensure your test is not running on AFS. 
+2). --localdir option is not still needed here for the potential usage to hold the packages.json. 
 
 Cloud execution engine:
-umbrella -T ec2 --key abc.pem --group sg-24f96141 -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -o condor_povray run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
-Note: --key and --group are only meaningful for cloud execution engine. According to the given specification file, the AMI and the instance type can be identified. The user of Umbrella needs to specify the security group within which an instance should be run and the name of the key pair to use when launching an instance.
+umbrella -T ec2 --sshkey abc.pem --key ecw_key --group sg-24f96141 -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ec2_povray --log umbrella.log --remotelog ec2_umbrella.log run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+Note: --sshkey, --key and --group are only meaningful for cloud execution engine. According to the given specification file, the AMI and the instance type can be identified. The user of Umbrella needs to specify the security group within which an instance should be run and the name of the key pair to use when launching an instance.
 
 Here is the specification JSON file for a Ray-Tracing application:
-	
-	{
-		"hardware": {
-			"arch": "x86_64",
-			"cores": "2",
-			"memory": "2GB",
-			"disk": "10GB"
-		},
-		"kernel" : {
-			"name": "linux",
-			"version": "2.6.18"
-		},
-		"os": {
-			"name": "Redhat",
-			"version": "5.10"
-		},
-		"software": {
-			"povray-redhat5-x86_64": {
-				"mountpoint": "/software/povray-x86_64-redhat5",
-				"action": "unpack"
-			}
-		},
-		"data": {
-		},
-		"environ": {
-			"FAKEPWD": "/tmp/test"
+
+{
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "10GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.18"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "5.10",
+		"id": "62aa9bc37afe3f738052da5545832c80"
+	},
+	"software": {
+		"povray-3.6.1-redhat5-x86_64": {
+			"id": "9b7f2362e6b927c8ef08c3f92599e47c",
+			"mountpoint": "/software/povray-3.6.1-redhat5-x86_64",
+			"action": "unpack"
 		}
+	},
+	"data": {
+	},
+	"environ": {
+		"FAKEPWD": "/tmp/test"
 	}
+}
 
 A specification includes 6 parts: hardware, kernel, os, software, data, and environ.
 
@@ -109,15 +117,23 @@ A specification includes 6 parts: hardware, kernel, os, software, data, and envi
 
 `version` (Required): the OS version in the format of 'A. B': A is the main version number and B is the minor version number. Exmaples: 5.10, 6.5. 
 
+`id` (Optional): the id of the OS image. There may exist multiple OS images for redhat 5.10, the id attribute uniquely identify a OS image. If this attribute is not provided in the specification and the OS version is redhat 5.10, the first OS image whose version is redhat 5.10 found in the packages.json will be used.
+
 `software` Section (Optional):
 
 Each software dependency has a name, which corresponds to the name included in packages.json (which will be explained in the following part).
+
+`id` (Optional): the id of the software. There may exist multiple versions of a software like `povray-3.6.1-redhat5-x86_64` due to the difference of complication settings. the id attribute uniquely identify a software. If If this attribute is not provided in the specification, the first version found in the packages.json will be used. 
 
 `mountpoint` (Required): the mountpoint of the software. Case sensitive.
 
 `action` (Required): the action on the downloaded software dependencies. Options: none, unpack. `none` leaves the downloaded dedendency as it is. `unpack` uncompresses the depedency. Case sensitive.
 
 `data` Section (Optional):
+
+Each data dependency has a name, which corresponds to the name included in packages.json (which will be explained in the following part).
+
+`id` (Optional): the id of the data. There may exist multiple versions of a data. the id attribute uniquely identify a data. If If this attribute is not provided in the specification, the first version found in the packages.json will be used. 
 
 `mountpoint` (Required): the mountpoint of the data dependency. Case sensitive.
 
@@ -131,32 +147,85 @@ By default, metadata of all the software, data and OS dependencies is stored in 
 
 Here is an example of packages.json, which contains two dependencies. 
 
-	{
-	    "cctools-centos6-x86_64": {
-	        "source": [
-	            "https://www3.nd.edu/~ccl/research/data/hep-case-study/cctools-centos6-x86_64.tar.gz"
-	        ],
-	        "checksum": "1eb75182f0aa577c68c4884a12d922b5",
-	        "size": "22MB"
-	    },
-	    "cctools-arch-x86_64": {
-	        "source": [
-	            "https://www3.nd.edu/~ccl/research/data/hep-case-study/cctools-arch-x86_64.tar.gz"
-	        ],
-	        "checksum": "be80fa184341e565803cae385e28d687",
-	        "size": "7.1MB"
-	    }
-	}
+{
+	"cctools-4.4.0-centos6-x86_64": {
+		"7b32c36052c75b01182bbdb1656199c2": {
+			"source": [
+				"https://www3.nd.edu/~ccl/research/data/hep-case-study/cctools-4.4.0-centos6-x86_64.tar.gz"
+				"https://...cctools-4.4.0-centos6-x86_64.tar.gz"
+			],
+			"format": "tgz",
+			"checksum": "7b32c36052c75b01182bbdb1656199c2",
+			"size": "8.4MB"
+		}
+	},
+	"redhat-5.10-x86_64": {
+		"62aa9bc37afe3f738052da5545832c80": {
+			"source": [
+				"https://www3.nd.edu/~ccl/research/data/hep-case-study/redhat-5.10-x86_64.tar.gz"
+			],
+			"format": "tgz",
+			"checksum": "62aa9bc37afe3f738052da5545832c80",
+			"size": "480MB"
+		}
+	},
+	...
+}
+	
+The name of a software dependency is in the format of 'A-B-C-D', where A is the software name, B is the software version, C is OS distro name, D is hardware architecture. 
 
-The dependency name is in the format of 'A-B-C', where A is the software/data name, B is OS distro name, C is hardware architecture. Each dependency includes three attributes: source, checksum, size.
+The name of an OS image dependency is in the format of 'A-B-C', where A is the OS name, B is the OS version, C is hardware architecture.
 
-`source`: a list of storage location of the dependency, which includes one or more resource url. Each url can be a local file path like "file:///etc/hosts", or a https/http urlas shown in the example. Case sensitive.
+There is no special limitation on the name of a data dependency.
+
+Each dependency (OS, software and datat) includes four attributes: source, checksum, size and format.
+
+`source`: a list of storage location of the dependency, which includes one or more resource url. Each url can be a local file path like "file:///etc/hosts", or a https/http urlas shown in the example. Case sensitive. The first source will be first tried, if fails, then the second source will be tried, and so on.
 
 `checksum`: the checksum of the dependencies. Currently Umbrella only supports md5 checksum. 
 
 `size`: the size of the compressed version of each dependencies. Not case sensitive.
 
+`format`: the perservation format of the dependency. Currently Umbrella supports two formats: tgz (gzip compressed tarball) and plain (plain text).
+
 If you want to customize your own packages.json, follow the requirement and then tell umbrella using `--packages` option to use your own pacakges information.
+
+When the ec2 execution engine is used, Umbrella tries to map the specification into an AMI and an EC2 instance type with the help of the JSON file specified by the --ec2 option.
+Note: The `id` attribute of the `os` section should be an AMI.
+Here is an example of an ec2.json file:
+{
+	"redhat-5.10-x86_64": {
+		"ami-d76a29e7": {
+			"ami": "ami-d76a29e7",
+			"root_device_type": "ebs",
+			"virtualization_type": "hvm",
+			"user": "root"
+		}
+	},
+	"instances": {
+		"m1.large": {
+			"cores": "4",
+			"memory": "2GB",
+			"disk": "20GB"
+		}
+	}
+	...
+}
+There are two types of items in ec2.json: OS image and instance types.
+The name of an OS image shares the same specification with the name used in packages.json. There may exist multiple versions of images for an OS like redhat-5.10-x86_64. An identifier of each version is needed to differentiate these versions. Currently, the AMI is used as the identifier. So the `id` attribute of the `os` section of an specification should also be an AMI.
+An OS image includes four attributes:
+`AMI` (Required): the Amazon Machine Image.
+`root_device_type` (Optional): the type of the root device of the AMI.
+`virtualization_type` (Optional): the type of virtualization technique used for the AMI. Currently Amazon supports two types of virtualization: paravirtual (PV) or hardware virtual machine (HVM).
+`user` (Required): the user name used to connect to an instance.
+
+The name of each instance type is the same provided by Amazon EC2 (e.g., m1.large). Each instance type has three attributes:
+`cores` (Required): the number of cores.
+`memory` (Required): the memory space.
+`Disk` (Required): the disk space.
+
+Tips of using Umbrella:
+The first step of using Umbrella is to compose an specification for your application. Double check the packages.json you are using to guarantee each dependency of your package is specified correctly.
 
 In the application specification JSON file, you also can add `source`, `checksum`, and `size` attributes to the dependencies in the software and data section which you want to customize. Be sure to follow the semantics of `source`, `checksum`, and `size` attributes.
 
