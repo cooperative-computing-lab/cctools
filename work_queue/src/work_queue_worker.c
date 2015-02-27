@@ -66,10 +66,10 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_MODE_WORKER  1
 #define WORKER_MODE_FOREMAN 2
 
-#define NONE 1 
-#define DOCKER 2
-#define DOCKER_PRESERVE 3
-#define UMBRELLA 4
+#define NONE 0 
+#define DOCKER 1
+#define DOCKER_PRESERVE 2
+#define UMBRELLA 3
 
 #define DEFAULT_WORK_DIR "/home/worker"
 #define DEFAULT_IMG "debian"
@@ -410,12 +410,12 @@ static int start_process( struct work_queue_process *p )
 
     pid_t pid;
 
-    if (container_mode == 2) 
-	    pid = work_queue_process_execute_container(p, container_mode, img_name);
-    else if (container_mode == 3)
-	    pid = work_queue_process_execute_container(p, container_mode, container_name);
+    if (container_mode == DOCKER) 
+	    pid = work_queue_process_execute(p, container_mode, img_name);
+    else if (container_mode == DOCKER_PRESERVE)
+	    pid = work_queue_process_execute(p, container_mode, container_name);
     else
-	    pid = work_queue_process_execute(p);
+	    pid = work_queue_process_execute(p, container_mode);
     
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
