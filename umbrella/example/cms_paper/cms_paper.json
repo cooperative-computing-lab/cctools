@@ -11,10 +11,12 @@
 	},
 	"os": {
 		"name": "Redhat",
-		"version": "6.5"
+		"version": "6.5",
+		"id": "669ab5ef94af84d273f8f92a86b7907a"
 	},
 	"software": {
-		"cmssw_cvmfs-CMSSW_5_2_5-slc5_amd64_gcc462": {
+		"cmssw-5.2.5-slc5_amd64": {
+			"id": "8c1aa6254e0723ad1bde8c599a41da91",
 			"mountpoint": "/cvmfs/cms.cern.ch",
 			"action": "unpack"
 		}
