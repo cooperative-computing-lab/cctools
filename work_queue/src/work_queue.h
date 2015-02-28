@@ -463,6 +463,14 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s);
 */
 void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stats *s);
 
+
+/** Get the current state of the task.
+@param q A work queue object.
+@param taskid The taskid of the task.
+@return One of: WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE)
+*/
+int work_queue_task_status(struct work_queue *q, int taskid);
+
 /** Limit the queue bandwidth when transferring files to and from workers.
 @param q A work queue object.
 @param bandwidth The bandwidth limit in bytes per second.
