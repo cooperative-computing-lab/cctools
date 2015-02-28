@@ -262,7 +262,7 @@ class Task(_object):
     @property
     def command(self):
         return self._task.command_line
-    
+
     ##
     # Get the algorithm for choosing worker to run the task.	 
     # @a Note: This is defined using property decorator. So it must be called without parentheses
@@ -654,6 +654,13 @@ class WorkQueue(_object):
         work_queue_get_stats_hierarchy(self._work_queue, self._stats_hierarchy)
         return self._stats_hierarchy
 
+    ##
+    # Get current task status
+    # @code
+    # >>> print q.task_status(taskid)
+    # @endcode
+    def task_status(self, taskid):
+        return work_queue_task_status(self._work_queue, taskid)
 
     ## Enables resource monitoring of tasks in the queue. And writes a summary of the monitored information to a file.
     #
