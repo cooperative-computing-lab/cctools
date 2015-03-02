@@ -466,18 +466,21 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 
 	fd = cfs->open(path, O_WRONLY | O_CREAT | O_TRUNC, (int) mode);
 	if(fd >= 0) {
-		char buffer[65536];
 		INT64_T total = 0;
+		int serrno;
 
 		link_putliteral(link, "0\n", stoptime);
 
 		while(length > 0) {
+			char buffer[65536];
 			INT64_T ractual, wactual;
 			INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 			ractual = link_read(link, buffer, chunk, stoptime);
-			if(ractual <= 0)
+			if(ractual <= 0) {
+				debug(D_DEBUG, "putfile: read failed (%s), expected %" PRId64 " more bytes", strerror(errno), length);
 				break;
+			}
 
 			wactual = cfs->pwrite(fd, buffer, ractual, total);
 			if(wactual != ractual) {
@@ -488,15 +491,19 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 			total += ractual;
 			length -= ractual;
 		}
+		serrno = errno;
+		cfs->close(fd);
 
 		result = total;
 
 		if(length != 0) {
 			if(result >= 0)
 				link_soak(link, length - result, stoptime);
+			if (cfs->unlink(path) == -1)
+				debug(D_DEBUG, "putfile: could not unlink '%s' due to failure because of failed putfile: %s", path, strerror(errno));
 			result = -1;
+			errno = serrno;
 		}
-		cfs->close(fd);
 	} else {
 		result = -1;
 	}
@@ -521,14 +528,14 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 
 	fd = cfs->open(path, O_RDONLY, 0);
 	if(fd >= 0) {
-		char buffer[65536];
 		INT64_T total = 0;
-		INT64_T ractual, wactual;
 		INT64_T length = info.cst_size;
 
 		link_putfstring(link, "%" PRId64 "\n", stoptime, length);
 
 		while(length > 0) {
+			char buffer[65536];
+			INT64_T ractual, wactual;
 			INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 			ractual = cfs->pread(fd, buffer, chunk, total);
@@ -537,6 +544,7 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 
 			wactual = link_putlstring(link, buffer, ractual, stoptime);
 			if(wactual != ractual) {
+				debug(D_DEBUG, "getfile: write failed (%s), expected to write %" PRId64 " more bytes", strerror(errno), length);
 				total = -1;
 				break;
 			}
@@ -544,8 +552,9 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 			total += ractual;
 			length -= ractual;
 		}
-		result = total;
 		cfs->close(fd);
+
+		result = total;
 	} else {
 		result = -1;
 	}
@@ -570,8 +579,6 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 
 	fd = cfs->open(path, O_RDONLY, 0);
 	if(fd >= 0) {
-		char buffer[65536];
-		INT64_T ractual;
 		INT64_T total = 0;
 		INT64_T length = info.cst_size;
 		md5_context_t ctx;
@@ -579,9 +586,10 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 		md5_init(&ctx);
 
 		while(length > 0) {
+			char buffer[65536];
 			INT64_T chunk = MIN((int) sizeof(buffer), length);
 
-			ractual = cfs->pread(fd, buffer, chunk, total);
+			INT64_T ractual = cfs->pread(fd, buffer, chunk, total);
 			if(ractual <= 0)
 				break;
 
@@ -590,8 +598,9 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 			length -= ractual;
 			total += ractual;
 		}
-		result = MD5_DIGEST_LENGTH;
 		cfs->close(fd);
+
+		result = MD5_DIGEST_LENGTH;
 		md5_final(digest, &ctx);
 	} else {
 		result = -1;
