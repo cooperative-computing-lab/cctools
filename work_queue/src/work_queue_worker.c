@@ -69,10 +69,9 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define NONE 0 
 #define DOCKER 1
 #define DOCKER_PRESERVE 2
-#define UMBRELLA 3
+#define UMBRELLA 3 
 
 #define DEFAULT_WORK_DIR "/home/worker"
-#define DEFAULT_IMG "debian"
 
 // In single shot mode, immediately quit when disconnected.
 // Useful for accelerating the test suite.
@@ -125,6 +124,7 @@ static int worker_mode = WORKER_MODE_WORKER;
 
 // Do not run any container by default
 static int container_mode = NONE;
+static int load_from_tar = 0;
 
 static const char *master_host = 0;
 static char master_addr[LINK_ADDRESS_MAX];
@@ -158,6 +158,7 @@ static struct work_queue *foreman_q = NULL;
 // docker image name
 static char *img_name = NULL;
 static char container_name[1024]; 
+static char *tar_fn = NULL;
 // Table of all processes in any state, indexed by taskid.
 // Processes should be created/deleted when added/removed from this table.
 static struct itable *procs_table = NULL;
@@ -1667,6 +1668,9 @@ static void show_help(const char *cmd)
 	printf( " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
+	printf(" %-30s docker mode -- run each task with a docker container.\n", "--doker=<image name>");
+	printf(" %-30s docker-preserve mode -- tasks execute by a worker share a container.\n", "--docker-preserve=<image name>");
+	printf(" %-30s docker-tar mode -- build docker image from tarball, this mode must be used with --docker or --docker-preserve.\n", "--docker-tar=<path>");
 	printf( " %-30s Show this help screen\n", "-h,--help");
 }
 
@@ -1674,7 +1678,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
       LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
       LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE, 
-      LONG_OPT_SINGLE_SHOT};
+      LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT};
 
 struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1714,6 +1718,7 @@ struct option long_options[] = {
 	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
 	{"docker",              required_argument,  0,  LONG_OPT_RUN_DOCKER},
 	{"docker-preserve",     required_argument,  0,  LONG_OPT_RUN_DOCKER_PRESERVE},
+	{"docker-tar",          required_argument,  0,  LONG_OPT_BUILD_FROM_TAR},
 	{0,0,0,0}
 };
 
@@ -1915,6 +1920,10 @@ int main(int argc, char *argv[])
             container_mode = DOCKER_PRESERVE;
             img_name = optarg;
             break;
+        case LONG_OPT_BUILD_FROM_TAR:
+            load_from_tar = 1;
+            tar_fn = optarg;
+            break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -2017,17 +2026,20 @@ int main(int argc, char *argv[])
 
 	}
 
-    if(container_mode == DOCKER) {
- 		char pull_cmd[1024];
-        sprintf(pull_cmd, "docker pull %s", img_name);
-        system(pull_cmd);
+    if(container_mode == DOCKER && load_from_tar == 1) {
+ 		char load_cmd[1024];
+        sprintf(load_cmd, "docker load < %s", tar_fn);
+        system(load_cmd);
     }
 
     if(container_mode == DOCKER_PRESERVE) {
-        // XXX Dec-21 new feature
-        // 1. assign container_name
+        if (load_from_tar == 1) {
+            char load_cmd[1024];
+            sprintf(load_cmd, "docker load < %s", tar_fn);
+            system(load_cmd);
+        }
+
         sprintf(container_name, "worker-%d-%d", (int) getuid(), (int) getpid());
-        // 2. running container on background
         char container_mnt_point[1024];
         char start_container_cmd[1024];
         sprintf(container_mnt_point, "%s:%s", workspace, DEFAULT_WORK_DIR);
@@ -2101,14 +2113,11 @@ int main(int argc, char *argv[])
 	}
 
     if(container_mode == DOCKER_PRESERVE || container_mode == DOCKER) {
-        //XXX Dec-21 new feature 
         char stop_container_cmd[1024];
         char rm_container_cmd[1024];
-        char rm_img_cmd[1024];
         
         sprintf(stop_container_cmd, "docker stop %s", container_name);
         sprintf(rm_container_cmd, "docker rm %s", container_name);
-        sprintf(rm_img_cmd, "docker rmi %s", img_name);
 
         if(container_mode == DOCKER_PRESERVE) {
             //1. stop the container
@@ -2117,8 +2126,6 @@ int main(int argc, char *argv[])
             system(rm_container_cmd);
         }
 
-        //3. remove the image
-        system(rm_img_cmd);
     } 
 
 	workspace_delete();
