@@ -466,12 +466,12 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 
 	fd = cfs->open(path, O_WRONLY | O_CREAT | O_TRUNC, (int) mode);
 	if(fd >= 0) {
-		char buffer[65536];
 		INT64_T total = 0;
 
 		link_putliteral(link, "0\n", stoptime);
 
 		while(length > 0) {
+			char buffer[65536];
 			INT64_T ractual, wactual;
 			INT64_T chunk = MIN((int) sizeof(buffer), length);
 
@@ -521,14 +521,14 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 
 	fd = cfs->open(path, O_RDONLY, 0);
 	if(fd >= 0) {
-		char buffer[65536];
 		INT64_T total = 0;
-		INT64_T ractual, wactual;
 		INT64_T length = info.cst_size;
 
 		link_putfstring(link, "%" PRId64 "\n", stoptime, length);
 
 		while(length > 0) {
+			char buffer[65536];
+			INT64_T ractual, wactual;
 			INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 			ractual = cfs->pread(fd, buffer, chunk, total);
@@ -570,8 +570,6 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 
 	fd = cfs->open(path, O_RDONLY, 0);
 	if(fd >= 0) {
-		char buffer[65536];
-		INT64_T ractual;
 		INT64_T total = 0;
 		INT64_T length = info.cst_size;
 		md5_context_t ctx;
@@ -579,9 +577,10 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 		md5_init(&ctx);
 
 		while(length > 0) {
+			char buffer[65536];
 			INT64_T chunk = MIN((int) sizeof(buffer), length);
 
-			ractual = cfs->pread(fd, buffer, chunk, total);
+			INT64_T ractual = cfs->pread(fd, buffer, chunk, total);
 			if(ractual <= 0)
 				break;
 
