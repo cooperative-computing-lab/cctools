@@ -91,9 +91,9 @@ sub stats_hierarchy {
     return $self->{_stats_hierarchy};
 }
 
-sub task_status {
+sub task_state {
     my ($self, $taskid) = @_
-    return work_queue_task_status($self->{_work_queue}, taskid)
+    return work_queue_task_state($self->{_work_queue}, taskid)
 }
 
 sub enable_monitoring {
