@@ -488,6 +488,7 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 			total += ractual;
 			length -= ractual;
 		}
+		cfs->close(fd);
 
 		result = total;
 
@@ -496,7 +497,6 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 				link_soak(link, length - result, stoptime);
 			result = -1;
 		}
-		cfs->close(fd);
 	} else {
 		result = -1;
 	}
@@ -544,8 +544,9 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 			total += ractual;
 			length -= ractual;
 		}
-		result = total;
 		cfs->close(fd);
+
+		result = total;
 	} else {
 		result = -1;
 	}
@@ -589,8 +590,9 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 			length -= ractual;
 			total += ractual;
 		}
-		result = MD5_DIGEST_LENGTH;
 		cfs->close(fd);
+
+		result = MD5_DIGEST_LENGTH;
 		md5_final(digest, &ctx);
 	} else {
 		result = -1;
