@@ -476,8 +476,10 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 			INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 			ractual = link_read(link, buffer, chunk, stoptime);
-			if(ractual <= 0)
+			if(ractual <= 0) {
+				debug(D_DEBUG, "putfile: read failed (%s), expected %" PRId64 " more bytes", strerror(errno), length);
 				break;
+			}
 
 			wactual = cfs->pwrite(fd, buffer, ractual, total);
 			if(wactual != ractual) {
@@ -537,6 +539,7 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 
 			wactual = link_putlstring(link, buffer, ractual, stoptime);
 			if(wactual != ractual) {
+				debug(D_DEBUG, "getfile: write failed (%s), expected to write %" PRId64 " more bytes", strerror(errno), length);
 				total = -1;
 				break;
 			}
