@@ -655,12 +655,12 @@ class WorkQueue(_object):
         return self._stats_hierarchy
 
     ##
-    # Get current task status
+    # Get current task state
     # @code
-    # >>> print q.task_status(taskid)
+    # >>> print q.task_state(taskid)
     # @endcode
-    def task_status(self, taskid):
-        return work_queue_task_status(self._work_queue, taskid)
+    def task_state(self, taskid):
+        return work_queue_task_state(self._work_queue, taskid)
 
     ## Enables resource monitoring of tasks in the queue. And writes a summary of the monitored information to a file.
     #

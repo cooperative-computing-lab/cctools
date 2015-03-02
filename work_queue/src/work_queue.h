@@ -56,6 +56,7 @@ See the file COPYING for details.
 #define WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION 16 /**< The task used more resources than requested >**/
 #define WORK_QUEUE_RESULT_TASK_TIMEOUT 32 /**< The task ran after specified end time. >**/
 
+/** Task states **/
 #define WORK_QUEUE_TASK_UNKNOWN   0  /**< There is no such task >**/
 #define WORK_QUEUE_TASK_READY     1  /**< Task is ready to be run, waiting in queue >**/
 #define WORK_QUEUE_TASK_RUNNING   2  /**< Task has been dispatched to some worker >**/
@@ -458,7 +459,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 @param taskid The taskid of the task.
 @return One of: WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE)
 */
-int work_queue_task_status(struct work_queue *q, int taskid);
+int work_queue_task_state(struct work_queue *q, int taskid);
 
 /** Limit the queue bandwidth when transferring files to and from workers.
 @param q A work queue object.
