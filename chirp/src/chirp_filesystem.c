@@ -467,6 +467,7 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 	fd = cfs->open(path, O_WRONLY | O_CREAT | O_TRUNC, (int) mode);
 	if(fd >= 0) {
 		INT64_T total = 0;
+		int serrno;
 
 		link_putliteral(link, "0\n", stoptime);
 
@@ -490,6 +491,7 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 			total += ractual;
 			length -= ractual;
 		}
+		serrno = errno;
 		cfs->close(fd);
 
 		result = total;
@@ -497,7 +499,10 @@ INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, 
 		if(length != 0) {
 			if(result >= 0)
 				link_soak(link, length - result, stoptime);
+			if (cfs->unlink(path) == -1)
+				debug(D_DEBUG, "putfile: could not unlink '%s' due to failure because of failed putfile: %s", path, strerror(errno));
 			result = -1;
+			errno = serrno;
 		}
 	} else {
 		result = -1;
