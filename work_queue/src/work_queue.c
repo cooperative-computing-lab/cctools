@@ -4026,6 +4026,8 @@ int work_queue_task_state( struct work_queue *q, int taskid) {
 static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task *t, uintptr_t new_state ) {
 	uintptr_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 
+	debug(D_WQ, "Task %d state change: %d to %d\n", t->taskid, (int) old_state, (int) new_state);
+
 	switch(new_state) {
 		case WORK_QUEUE_TASK_READY:
 			break;
