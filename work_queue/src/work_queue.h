@@ -57,13 +57,13 @@ See the file COPYING for details.
 #define WORK_QUEUE_RESULT_TASK_TIMEOUT 32 /**< The task ran after specified end time. >**/
 
 /** Task states **/
-#define WORK_QUEUE_TASK_UNKNOWN   0  /**< There is no such task >**/
-#define WORK_QUEUE_TASK_READY     1  /**< Task is ready to be run, waiting in queue >**/
-#define WORK_QUEUE_TASK_RUNNING   2  /**< Task has been dispatched to some worker >**/
-#define WORK_QUEUE_TASK_RESULTS   3  /**< Task results are available at the worker >**/
-#define WORK_QUEUE_TASK_RETRIEVED 4  /**< Task results are available at the master >**/
-#define WORK_QUEUE_TASK_DONE      5  /**< Task is done, and has been returned through work_queue_wait >**/
-#define WORK_QUEUE_TASK_CANCELED  6  /**< Task was canceled before completion >**/
+#define WORK_QUEUE_TASK_UNKNOWN           0  /**< There is no such task >**/
+#define WORK_QUEUE_TASK_READY             1  /**< Task is ready to be run, waiting in queue >**/
+#define WORK_QUEUE_TASK_RUNNING           2  /**< Task has been dispatched to some worker >**/
+#define WORK_QUEUE_TASK_WAITING_RETRIEVAL 3  /**< Task results are available at the worker >**/
+#define WORK_QUEUE_TASK_RETRIEVED         4  /**< Task results are available at the master >**/
+#define WORK_QUEUE_TASK_DONE              5  /**< Task is done, and has been returned through work_queue_wait >**/
+#define WORK_QUEUE_TASK_CANCELED          6  /**< Task was canceled before completion >**/
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 
