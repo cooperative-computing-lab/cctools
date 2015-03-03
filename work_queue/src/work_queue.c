@@ -4044,6 +4044,8 @@ static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task
 		list_remove(q->retrieved_list, t);
 
 	// insert to corresponding table
+	debug(D_WQ, "Task %d state change: %d to %d\n", t->taskid, (int) old_state, (int) new_state);
+
 	switch(new_state) {
 		case WORK_QUEUE_TASK_READY:
 			list_push_priority(q->ready_list,t,t->priority);
