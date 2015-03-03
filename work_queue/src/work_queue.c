@@ -624,8 +624,8 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 			t->cores = t->memory = t->disk = t->gpus = -1;
 		}
 
-		push_task_to_ready_list(q,t);
 		reap_task_from_worker(q, w, t);
+		push_task_to_ready_list(q, t);
 		itable_firstkey(w->current_tasks);
 	}
 
@@ -1131,7 +1131,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	delete_uncacheable_files(q,w,t);
 
 	// At this point, a task is completed.
-	list_push_head(q->complete_list, t);
+	change_task_status(q, t, WORK_QUEUE_TASK_RETRIEVED); 
 	reap_task_from_worker(q, w, t);
 
 	w->finished_tasks--;
@@ -1176,7 +1176,7 @@ static void expire_waiting_task(struct work_queue *q, struct work_queue_task *t)
 
 
 	//add the task to complete list so it is given back to the application.
-	list_push_head(q->complete_list, t);
+	change_task_status(q, t, WORK_QUEUE_TASK_RETRIEVED);
 
 	return;
 }
@@ -1214,12 +1214,12 @@ the task as complete so it is returned to the application.
 */
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
-	//add the task to complete list so it is given back to the application.
-	list_push_head(q->complete_list, t);
-
-	//remove the task from tables that track dispatched tasks. 
+	//remove the task from tables that track dispatched tasks.
 	reap_task_from_worker(q, w, t);
-	
+
+	//add the task to complete list so it is given back to the application.
+	change_task_status(q, t, WORK_QUEUE_TASK_RETRIEVED);
+
 	/*If the failure happened after a task execution, we remove all the output
 	files specified for that task from the worker's cache.  This is because the
 	application may resubmit the task and the resubmitted task may produce
@@ -1468,8 +1468,7 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
 	q->stats->total_execute_time += t->cmd_execution_time;
 
-	itable_remove(q->running_tasks, taskid);
-	itable_insert(q->finished_tasks, taskid, (void*)t);
+	change_task_status(q, t, WORK_QUEUE_TASK_RESULTS);
 
 	w->finished_tasks++;
 
@@ -2661,8 +2660,8 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 {
 	t->time_committed = timestamp_get();
 
+	change_task_status(q, t, WORK_QUEUE_TASK_RUNNING);
 	itable_insert(w->current_tasks, t->taskid, t);
-	itable_insert(q->running_tasks, t->taskid, t); 
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
 
 	t->total_submissions += 1;
@@ -2687,8 +2686,7 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 
 	//update tables.
 	itable_remove(w->current_tasks, t->taskid);
-	itable_remove(q->running_tasks, t->taskid); 
-	itable_remove(q->finished_tasks, t->taskid);
+	itable_remove(q->running_tasks, t->taskid);
 	itable_remove(q->worker_task_map, t->taskid);
 	
 	if(t->unlabeled)
@@ -2729,7 +2727,6 @@ static int send_one_task( struct work_queue *q )
 		if(!w) continue;
 
 		// Otherwise, remove it from the ready list and start it:
-		list_remove(q->ready_list,t);		
 		start_task_on_worker(q,w,t);
 
 		return 1;
@@ -2885,6 +2882,7 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 
 		//update tables.
 		reap_task_from_worker(q, w, t);
+		change_task_status(q, t, WORK_QUEUE_TASK_CANCELED);
 
 		return 1;
 	}
@@ -3925,6 +3923,7 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 
 void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 {
+	change_task_status(q, t, WORK_QUEUE_TASK_READY);
 	list_push_priority(q->ready_list,t,t->priority);
 }
 
@@ -3936,6 +3935,27 @@ int work_queue_task_status( struct work_queue *q, int taskid) {
 /* State of the task. One of WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE) */
 static uintptr_t change_task_status( struct work_queue *q, struct work_queue_task *t, uintptr_t new_status ) {
 	uintptr_t old_status = (uintptr_t) itable_lookup(q->task_status_map, t->taskid);
+
+	switch(new_status) {
+		case WORK_QUEUE_TASK_READY:
+			break;
+		case WORK_QUEUE_TASK_RUNNING: 
+			list_remove(q->ready_list,t);
+			itable_insert(q->running_tasks, t->taskid, t);
+			break;
+		case WORK_QUEUE_TASK_RESULTS:
+			itable_remove(q->running_tasks, t->taskid);
+			itable_insert(q->finished_tasks, t->taskid, (void*)t);
+			break;
+		case WORK_QUEUE_TASK_RETRIEVED:
+			itable_remove(q->finished_tasks, t->taskid);
+			list_push_head(q->complete_list, t);
+			break;
+		case WORK_QUEUE_TASK_DONE:
+			break;
+		case WORK_QUEUE_TASK_CANCELED:
+			break;
+	}
 
 	itable_insert(q->task_status_map, t->taskid, (void *) new_status);
 
@@ -4200,6 +4220,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		t = list_pop_head(q->complete_list);
 		if(t) {
+			change_task_status(q, t, WORK_QUEUE_TASK_DONE);
+
 			last_left_time = timestamp_get();
 
 			if( t->result != SUCCESS )
@@ -4396,6 +4418,7 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 			//Delete all output files since they are not needed as the task was aborted.
 			delete_worker_files(q, w, t, t->output_files, 0);
 			reap_task_from_worker(q, w, t);
+			change_task_status(q, t, WORK_QUEUE_TASK_CANCELED);
 
 			list_push_tail(l, t);
 			q->stats->total_tasks_cancelled++;	
