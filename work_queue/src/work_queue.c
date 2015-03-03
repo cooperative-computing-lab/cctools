@@ -3954,6 +3954,14 @@ static uintptr_t change_task_status( struct work_queue *q, struct work_queue_tas
 		case WORK_QUEUE_TASK_DONE:
 			break;
 		case WORK_QUEUE_TASK_CANCELED:
+			if( old_status == WORK_QUEUE_TASK_RUNNING )
+				itable_remove(q->running_tasks, t->taskid);
+			else if( old_status == WORK_QUEUE_TASK_READY )
+				itable_remove(q->finished_tasks, t->taskid);
+			else if( old_status == WORK_QUEUE_TASK_RESULTS )
+				list_remove(q->ready_list, t);
+			else if( old_status == WORK_QUEUE_TASK_RETRIEVED )
+				list_remove(q->complete_list, t);
 			break;
 	}
 
@@ -4320,66 +4328,59 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
  */
 struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int taskid) {
 
-	struct work_queue_task *matched_task;
+	struct work_queue_task *matched_task = NULL;
 
 	if (taskid > 0){
 		//see if task is executing at a worker (in running_tasks or finished_tasks).
 		if ((matched_task = find_running_task_by_id(q, taskid))) {
-			if (cancel_running_task(q, matched_task)) {
-				q->stats->total_tasks_cancelled++;	
-				return matched_task;
-			}	
+			cancel_running_task(q, matched_task);
 		} //if not, see if task is in ready list.
 		else if ((matched_task = list_find(q->ready_list, taskid_comparator, &taskid))) {
-			list_remove(q->ready_list, matched_task);
 			debug(D_WQ, "Task with id %d is removed from ready list.", matched_task->taskid);
-			q->stats->total_tasks_cancelled++;	
-			return matched_task;
 		} //if not, see if task is in complete list.
 		else if ((matched_task = list_find(q->complete_list, taskid_comparator, &taskid))) {
-			list_remove(q->complete_list, matched_task);
 			debug(D_WQ, "Task with id %d is removed from complete list.", matched_task->taskid);
-			q->stats->total_tasks_cancelled++;	
-			return matched_task;
 		} 
 		else { 
+		}
+
+		if(matched_task) {
+			q->stats->total_tasks_cancelled++;
+			change_task_status(q, matched_task, WORK_QUEUE_TASK_CANCELED);
+		}
+		else {
 			debug(D_WQ, "Task with id %d is not found in queue.", taskid);
 		}	
 	}
-	
-	return NULL;
+	return matched_task;
 }
 
 struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const char* tasktag) {
 
-	struct work_queue_task *matched_task;
+	struct work_queue_task *matched_task = NULL;
 
 	if (tasktag){
 		//see if task is executing at a worker (in running_tasks or finished_tasks).
 		if ((matched_task = find_running_task_by_tag(q, tasktag))) {
-			if (cancel_running_task(q, matched_task)) {
-				q->stats->total_tasks_cancelled++;	
-				return matched_task;
-			}
+			cancel_running_task(q, matched_task);
 		} //if not, see if task is in ready list.
 		else if ((matched_task = list_find(q->ready_list, tasktag_comparator, tasktag))) {
-			list_remove(q->ready_list, matched_task);
 			debug(D_WQ, "Task with tag %s and id %d is removed from ready list.", matched_task->tag, matched_task->taskid);
-			q->stats->total_tasks_cancelled++;	
-			return matched_task;
 		} //if not, see if task is in complete list.
 		else if ((matched_task = list_find(q->complete_list, tasktag_comparator, tasktag))) {
-			list_remove(q->complete_list, matched_task);
 			debug(D_WQ, "Task with tag %s and id %d is removed from complete list.", matched_task->tag, matched_task->taskid);
-			q->stats->total_tasks_cancelled++;	
-			return matched_task;
-		} 
-		else { 
+		}
+
+		if(matched_task) {
+			q->stats->total_tasks_cancelled++;
+			change_task_status(q, matched_task, WORK_QUEUE_TASK_CANCELED);
+		}
+		else {
 			debug(D_WQ, "Task with tag %s is not found in queue.", tasktag);
 		}
 	}
-	
-	return NULL;
+
+	return matched_task;
 }
 
 struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
