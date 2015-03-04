@@ -796,7 +796,7 @@ int main( int argc, char *argv[] )
 		if(!fp)
 			fatal("Can not open envlist file: %s", envlist);
 		for (int i = 0; environ[i]; i++)
-			fprintf(fp, "%s\n", environ[i]);
+			fprintf(fp, "%s%c", environ[i], '\0');
 		char working_dir[PATH_MAX];
 		::getcwd(working_dir,sizeof(working_dir));
 		if(working_dir == NULL)
