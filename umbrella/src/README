@@ -151,7 +151,7 @@ Here is an example of packages.json, which contains two dependencies.
 	"cctools-4.4.0-centos6-x86_64": {
 		"7b32c36052c75b01182bbdb1656199c2": {
 			"source": [
-				"https://www3.nd.edu/~ccl/research/data/hep-case-study/cctools-4.4.0-centos6-x86_64.tar.gz"
+				"https://www3.nd.edu/~ccl/research/data/hep-case-study/7b32c36052c75b01182bbdb1656199c2/cctools-4.4.0-centos6-x86_64.tar.gz"
 				"https://...cctools-4.4.0-centos6-x86_64.tar.gz"
 			],
 			"format": "tgz",
@@ -162,7 +162,7 @@ Here is an example of packages.json, which contains two dependencies.
 	"redhat-5.10-x86_64": {
 		"62aa9bc37afe3f738052da5545832c80": {
 			"source": [
-				"https://www3.nd.edu/~ccl/research/data/hep-case-study/redhat-5.10-x86_64.tar.gz"
+				"https://www3.nd.edu/~ccl/research/data/hep-case-study/62aa9bc37afe3f738052da5545832c80/redhat-5.10-x86_64.tar.gz"
 			],
 			"format": "tgz",
 			"checksum": "62aa9bc37afe3f738052da5545832c80",
@@ -187,6 +187,11 @@ Each dependency (OS, software and datat) includes four attributes: source, check
 `size`: the size of the compressed version of each dependencies. Not case sensitive.
 
 `format`: the perservation format of the dependency. Currently Umbrella supports two formats: tgz (gzip compressed tarball) and plain (plain text).
+
+Relationship of id and checksum: 
+The id and checksum of each package in the archive are identical. Take cctools-4.4.0-centos6-x86_64 shown in the above packages.json as an example, the checksum of cctools-4.4.0-centos6-x86_64.tar.gz is 7b32c36052c75b01182bbdb1656199c2. 
+Within the local cache, the id of each package dependency will be used to create a directory under the <localdir>/cache, then the package will be put into <localdir>/cache/<id>/<name>. Therefore, <localdir>/cache/7b32c36052c75b01182bbdb1656199c2/cctools-4.4.0-centos6-x86_64.tar.gz will be the local location of the above package.
+Within the remote archive, to differentiate multiple packages on one software, a directory with the name of the checksum of each package will be created and functions as the direct parent directory of the package. Therefore, in the romote archive, there is a directory named 7b32c36052c75b01182bbdb1656199c2, under which exists cctools-4.4.0-centos6-x86_64.tar.gz. However, the organization of the remote archive can be in other format. 
 
 If you want to customize your own packages.json, follow the requirement and then tell umbrella using `--packages` option to use your own pacakges information.
 

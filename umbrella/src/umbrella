@@ -178,7 +178,7 @@ def package_search(packages, name, id):
 def cctools_download(sandbox_dir, packages, hardware_platform, host_linux_distro, action):
 	name = "cctools-4.4.0-%s-%s" % (host_linux_distro, hardware_platform)
 	item = package_search(packages, name, '')
-	dest = os.path.dirname(sandbox_dir) + "/cache/" + name
+	dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
 	dependency_download(item['source'][0], item["checksum"], "md5sum", dest, item["format"], action)
 	return dest
 
@@ -200,7 +200,9 @@ def cmssw_cvmfs_parrot(name, action, packages, sandbox_dir, batch_type, user_cmd
 #	dependency_download(site_item["source"][0], site_item["checksum"], "md5sum", dest, site_item["format"], action)
 #	cvmfs_siteinfo_mountpoint = '/cvmfs/cms.cern.ch/SITECONF/local %s/local' % dest
 
-	parrot_dest = "%s/cache/cctools-4.4.0-%s-%s/bin/parrot_run" % (os.path.dirname(sandbox_dir), host_linux_distro, hardware_platform)
+	name = 'cctools-4.4.0-%s-%s' % (host_linux_distro, hardware_platform)
+	id = package_search(packages, name, '')["checksum"]
+	parrot_dest = "%s/cache/%s/%s/bin/parrot_run" % (os.path.dirname(sandbox_dir), id, name)
 	parrot_submit_file.write('env; ' + parrot_dest + " --no-set-foreground /bin/sh -c 'cd " + sandbox_dir + "; " + user_cmd[0] + "'\n" )
 
 	has_parrot_localfile = 1
@@ -210,7 +212,7 @@ def data_dependency_process(name, id, packages_json, sandbox_dir, action):
 	item = package_search(packages_json, name, id)
 	#table schema: (name text, version text, platform text, store text, store_type text, type text)
 	store = item["source"][0] 
-	dest = os.path.dirname(sandbox_dir) + "/cache/" + name 
+	dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
 	dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
 	mount_value = dest
 	return mount_value
@@ -255,7 +257,7 @@ def dependency_process(name, id, mountpoint, action, packages, sandbox_dir, batc
 				item = package_search(packages, name, id)
 				store = item ['source'][0]
 		
-				dest = os.path.dirname(sandbox_dir) + "/cache/" + name
+				dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
 				dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
 				mount_value = '-%s/cvmfs' % dest
 			logging.debug('Parrot cmssw cvmfs mount source: %s', mount_value)
@@ -269,7 +271,7 @@ def dependency_process(name, id, mountpoint, action, packages, sandbox_dir, batc
 				item = package_search(packages, name, id)
 				store = item ['source'][0]
 		
-				dest = os.path.dirname(sandbox_dir) + "/cache/" + name
+				dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
 				dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
 				mount_value = '-%s/cvmfs' % dest
 			logging.debug('Docker cmssw cvmfs mount source: %s', mount_value)
@@ -280,7 +282,7 @@ def dependency_process(name, id, mountpoint, action, packages, sandbox_dir, batc
 		#table schema: (name text, version text, platform text, store text, store_type text, type text)
 		store = item["source"][0] 
 	
-		dest = os.path.dirname(sandbox_dir) + "/cache/" + name 
+		dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
 		dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
 		mount_value = dest
 	return has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_value, local_cvmfs
@@ -600,7 +602,7 @@ def In_local_group():
 """ Create the mountfile if parrot is used to create a sandbox for the application
 Return the path of the mountfile
 """
-def construct_mountfile(sandbox_dir, input_dict, hardware_platform, host_linux_distro, os_image_dir, cvmfs_siteinfo_mountpoint, mount_dict):
+def construct_mountfile(sandbox_dir, input_dict, hardware_platform, host_linux_distro, os_image_dir, cvmfs_siteinfo_mountpoint, mount_dict, packages):
 	mountfile_path = sandbox_dir + "/mountlist"		
 	with open(mountfile_path, "wb") as mountfile:
 		new_root = mount_dict["/"]
@@ -654,7 +656,10 @@ def construct_mountfile(sandbox_dir, input_dict, hardware_platform, host_linux_d
 
 		#add /var/run/nscd/socket into mountlist
 		mountfile.write('/var/run/nscd/socket ENOENT\n')
-		dest = "%s/cache/cctools-4.4.0-%s-%s/bin" % (os.path.dirname(sandbox_dir), host_linux_distro, hardware_platform)
+
+		name = 'cctools-4.4.0-%s-%s' % (host_linux_distro, hardware_platform)
+		id = package_search(packages, name, '')["checksum"]
+		dest = "%s/cache/%s/%s/bin" % (os.path.dirname(sandbox_dir), id, name)
 		logging.debug("Add cctools binary (%s) into %s", dest, mountfile_path)
 		mountfile.write(dest + ' ' + dest + '\n')
 
@@ -760,7 +765,9 @@ def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separa
 					file_dict[item] = item	
 	
 	if is_cvmfs_parrot_app == 1:
-		cctools_path = os.path.dirname(sandbox_dir) + '/cache/cctools-4.4.0-x86_64-' + host_linux_distro 
+		name = 'cctools-4.4.0-%s-%s' % (host_linux_distro, hardware_platform)
+		id = package_search(packages, name, '')["checksum"]
+		cctools_path = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
 		logging.debug("Add cctools binary (%s) into dir_dict of chroot", cctools_path)
 		dir_dict[cctools_path] = cctools_path
 	
@@ -881,7 +888,7 @@ def execute_task_host_rootfs(sandbox_dir, env_dict, batch_type, user_cmd, is_cvm
 
 """ Run user's task with the help of the sandbox techniques, which currently inculde chroot, parrot, docker.
 """
-def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, parrot_submit_path, parrot_submit_file, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict):
+def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, parrot_submit_path, parrot_submit_file, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict, packages):
 	#sandbox_dir will be the home directory of the sandbox
 	print 'Executing the application ....'
 	logging.debug("chdir(%s)", sandbox_dir)
@@ -984,7 +991,7 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 			logging.debug("Construct environment variables ....")
 			env_dict = construct_env(sandbox_dir, os_image_dir)
 			logging.debug("Construct mounfile ....")
-			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile(sandbox_dir, input_dict, hardware_platform, host_linux_distro, os_image_dir, cvmfs_siteinfo_mountpoint, mount_dict)
+			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile(sandbox_dir, input_dict, hardware_platform, host_linux_distro, os_image_dir, cvmfs_siteinfo_mountpoint, mount_dict, packages)
 		#here, setting the linker will cause strange errors.
 			logging.debug("Construct dynamic linker path ....")
 			env_dict['PARROT_LDSO_PATH'] = get_linker_path(hardware_platform, os_image_dir) 
@@ -996,8 +1003,9 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 
 			if has_parrot_localfile == 0:
 				parrot_submit_file.write("#!/bin/sh\n")
-
-				dest = "%s/cache/cctools-4.4.0-%s-%s" % (os.path.dirname(sandbox_dir), host_linux_distro, hardware_platform)
+				name = 'cctools-4.4.0-%s-%s' % (host_linux_distro, hardware_platform)
+				id = package_search(packages, name, '')["checksum"]
+				dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
 				parrot_submit_file.write(dest + '/bin/parrot_run --no-set-foreground ')
 				parrot_submit_file.write(user_cmd[0] + '\n')
 				
@@ -1258,7 +1266,12 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch
 		logging.debug("The required linux distro specified in the specification is %s; the linux distro of the host machine is %s. The %s os images will be downloaded.", linux_distro, host_linux_distro, linux_distro)
 		need_separate_rootfs = 1
 		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
-		dest = "%s/cache/%s" % (os.path.dirname(sandbox_dir), item)
+		if os_id == '':
+			packages_item = package_search(packages_json, item, '')
+			id = packages_item["checksum"]
+		else:
+			id = os_id
+		dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, item)
 		os_image_dir = dest
 		logging.debug("A separate OS (%s) is needed!", dest)
 	
@@ -1280,7 +1293,7 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch
 	else:
 		logging.debug("this spec does not have dat section!")
 	
-	workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, parrot_submit_path, parrot_submit_file, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict)
+	workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, parrot_submit_path, parrot_submit_file, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict, packages_json)
 
 '''Check whether an executable exists or not. If yes, return 0; if not, return -1
 '''
