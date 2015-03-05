@@ -521,7 +521,7 @@ ssize_t tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, s
 			*bdata = worddata[i];
 			total++;
 			length--;
-			if(!*bdata) {
+			if(!*bdata || length == 0) {
 				return total;
 			} else {
 				bdata++;
