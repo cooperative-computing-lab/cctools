@@ -40,6 +40,9 @@ if sys.version_info > (2,6,):
 else:
 	import simplejson as json #json module is introduce in python 2.4.3
 
+def subprocess_error(cmd, rc, stdout, stderr):
+	sys.exit("`%s` fails with the return code of %d, \nstdout: %s, \nstderr: %s\n" % (cmd, rc, stdout, stderr))
+
 """ Execute a command and return the standard output.
 Parameter cmd: the command needs to execute using the subprocess module
 Return: the output of the execution.
@@ -50,7 +53,7 @@ def func_call(cmd):
 	(output, err) = p.communicate()
 	rc = p.returncode
 	logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, output, err)
-	return output, err
+	return rc, output, err
 
 def func_call_output_withenv(cmd, env_dict, output_dir):
 	logging.debug("Start to execute command: %s", cmd)
@@ -61,6 +64,7 @@ def func_call_output_withenv(cmd, env_dict, output_dir):
 	(output, err) = p.communicate()
 	rc = p.returncode
 	logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, output, err)
+	return rc, output, err
 
 """ Calculate the md5sum of a file
 Parameter filename: the name of the file 
@@ -194,6 +198,7 @@ def cmssw_cvmfs_parrot(name, action, packages, sandbox_dir, batch_type, user_cmd
 	cctools_download(sandbox_dir, packages, hardware_platform, host_linux_distro, action)
 	has_parrot_localfile = 0
 	cvmfs_siteinfo_mountpoint = ''
+
 	#download SITECONF
 #	site_item = package_search(packages, "cms_siteconf_local_cvmfs")
 #	dest = os.path.dirname(sandbox_dir) + "/cache/cvmfs/cms.cern.ch/SITECONF"
@@ -222,8 +227,11 @@ def data_dependency_process(name, id, packages_json, sandbox_dir, action):
 def check_cms():
 	logging.debug("Check whether cvmfs is installed on the host or not")
 	cmd = "df -h|grep '^cvmfs'|grep cms.cern.ch|rev| cut -d' '  -f1|rev"
-	stdout, stderr = func_call(cmd)
-	return stdout
+	rc, stdout, stderr = func_call(cmd)
+	if rc == 0:
+		return stdout
+	else:
+		return ''
 
 '''
 Parameter name: the item name in the software section
@@ -402,11 +410,14 @@ def env_check(sandbox_dir, batch_type, hardware_platform, cpu_cores, memory_size
 	memory_size = float(memory_size[:-2])
 
 	cmd = "free -tg|grep Total|sed 's/\s\+/ /g'|cut -d' ' -f2"
-	stdout, stderr = func_call(cmd)
-	host_memory_size = float(stdout)
-	if memory_size > host_memory_size:
-		logging.critical("The specification requires %.2f GB memory space, but the local machine only has %.2f GB free memory space!", memory_size, host_memory_size)
-		sys.exit("The specification requires %.2f GB memory space, but the local machine only has %.2f GB free memory space!" % (memory_size, host_memory_size))
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		logging.critical("The return code is %d, memory check fail!", rc)
+	else:
+		host_memory_size = float(stdout)
+		if memory_size > host_memory_size:
+			logging.critical("The specification requires %.2f GB memory space, but the local machine only has %.2f GB free memory space!", memory_size, host_memory_size)
+			sys.exit("The specification requires %.2f GB memory space, but the local machine only has %.2f GB free memory space!" % (memory_size, host_memory_size))
 
 	logging.debug("Disk space checking ...")
 	disk_size = re.sub('\s+', '', disk_size).strip()
@@ -533,9 +544,6 @@ def get_linker_path(hardware_platform, os_image_dir):
 def construct_docker_volume(sandbox_dir, input_dict, is_cvmfs_parrot_app, mount_dict):
 	del mount_dict["/"] #remove "/" from the mount_dict to avoid messing the root directory of the host machine
 	volume_paras = ""
-#	if is_cvmfs_parrot_app == 1:
-#		cvmfs_data_path = os.path.dirname(sandbox_dir) + '/cache/cvmfs/cms.cern.ch/SITECONF/local'
-#		mount_dict[cvmfs_data_path] = '/cvmfs/cms.cern.ch/SITECONF/local'
 	for key in mount_dict:
 		volume_paras = volume_paras + " -v " + mount_dict[key] + ":" + key + " "
 
@@ -721,15 +729,16 @@ def has_docker_image(hardware_platform, distro_name, distro_version):
 	cmd = 'docker images ' + name
 	logging.debug("Start to run the command: %s", cmd)
 	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
-	p_status = p.wait()
-	while True:
-		line = p.stdout.readline()
-		if line != '':
-			line = line.rstrip()	
-			if line[:len(name)] == name:
-				return 'yes'
-		else:
-			return 'no'
+	(output, err) = p.communicate()
+	rc = p.returncode
+	logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, output, err)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
+	str = "\n%s\s+" % (name)
+	if output.find(str) == -1:
+		return 'yes'
+	else:
+		return 'no'
 
 """ Create a docker image based on the cached os image directory
 """
@@ -738,7 +747,9 @@ def create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_vers
 	location = os.path.dirname(sandbox_dir) + '/cache/' + name
 	#docker container runs as root user, so use the owner option of tar command to set the owner of the docker image
 	cmd = 'cd ' + location + '; tar --owner=root -c .|docker import - ' + name + '; cd -'
-	func_call(cmd)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 """ Construct directory mount list and file mount list for chroot. chroot requires the target mountpoint must be created within the chroot jail.
 Return: a tuple includes the directory mount list and the file mount list
@@ -819,7 +830,9 @@ def chroot_mount_bind(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, ha
 		if not os.path.exists(jaildir):
 			os.makedirs(jaildir)
 		cmd = 'mount --bind -o ro %s %s' % (hostdir, jaildir)
-		func_call(cmd)
+		rc, stdout, stderr = func_call(cmd)
+		if rc != 0:
+			subprocess_error(cmd, rc, stdout, stderr)
 
 	for key in file_dict:
 		jailfile = '%s%s' % (os_image_path, file_dict[key]) 
@@ -831,7 +844,9 @@ def chroot_mount_bind(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, ha
 			with open(jailfile, 'w+') as f:
 				pass
 		cmd = 'mount --bind -o ro %s %s' % (hostfile, jailfile)
-		func_call(cmd)
+		rc, stdout, stderr = func_call(cmd)
+		if rc != 0:
+			subprocess_error(cmd, rc, stdout, stderr)
 
 """ Remove all the created target mountpoints within the cached os image directory
 It is not necessary to change the mode of the output dir, because only the root user can use the chroot method.
@@ -849,7 +864,9 @@ def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, 
 		jailfile = '%s%s' % (os_image_path, file_dict[key]) 
 		if os.path.exists(jailfile):
 			cmd = 'umount -f %s' % (jailfile)
-			func_call(cmd)
+			rc, stdout, stderr = func_call(cmd)
+			if rc != 0:
+				subprocess_error(cmd, rc, stdout, stderr)
 
 	for key in dir_dict:
 		if key == '/cvmfs/cms.cern.ch':
@@ -858,8 +875,11 @@ def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, 
 			jaildir = '%s%s' % (os_image_path, dir_dict[key]) 
 		if os.path.exists(jaildir):
 			cmd = 'umount -f %s' % (jaildir)
-			func_call(cmd)
-			#remove all the empty ancestor directory
+			rc, stdout, stderr = func_call(cmd)
+			if rc != 0:
+				subprocess_error(cmd, rc, stdout, stderr)
+
+		#remove all the empty ancestor directory
 			parent_dir = jaildir
 			mode = os.lstat(parent_dir).st_mode
 			if S_ISDIR(mode):
@@ -876,14 +896,18 @@ def execute_task_host_rootfs(sandbox_dir, env_dict, batch_type, user_cmd, is_cvm
 	logging.debug("is_cvmfs_parrot_app: %d", is_cvmfs_parrot_app)
 	if is_cvmfs_parrot_app == 1:
 		cmd = "/bin/sh " + parrot_submit_path
-		func_call_output_withenv(cmd, env_dict, sandbox_dir)
+		rc, stdout, stderr = func_call_output_withenv(cmd, env_dict, sandbox_dir)
+#		if rc != 0:
+#			subprocess_error(cmd, rc, stdout, stderr)
 	else:
 		if batch_type == 'parrot':
 			cmd = "parrot_run --no-set-foreground " + user_cmd[0]
 		elif batch_type == 'chroot':
 			cmd = 'chroot / /bin/sh -c "cd %s; %s"' %(sandbox_dir, user_cmd[0]) 
 		print "cmd:", cmd
-		func_call_output_withenv(cmd, env_dict, sandbox_dir)
+		rc, stdout, stderr = func_call_output_withenv(cmd, env_dict, sandbox_dir)
+#		if rc != 0:
+#			subprocess_error(cmd, rc, stdout, stderr)
 
 
 """ Run user's task with the help of the sandbox techniques, which currently inculde chroot, parrot, docker.
@@ -923,7 +947,9 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 				cmd = 'env; strace -o strace.log chroot %s /bin/sh -c "cd %s; %s"' % (os_image_path, sandbox_dir, user_cmd[0])
 			else:
 				cmd = 'chroot %s /bin/sh -c "cd %s; %s"' % (os_image_path, sandbox_dir, user_cmd[0])
-			func_call_output_withenv(cmd, env_dict, sandbox_dir)
+			rc, stdout, stderr = func_call_output_withenv(cmd, env_dict, sandbox_dir)
+#			if rc != 0:
+#				subprocess_error(cmd, rc, stdout, stderr)
 			
 			#post-process to clean up
 			chroot_post_process(dir_dict, file_dict, sandbox_dir, 1, hardware_platform, distro_name, distro_version)
@@ -975,10 +1001,14 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 				cmd = 'docker run --rm %s %s -e "PATH=%s" %s %s /bin/sh -c "cd %s; %s; %s"' % (volume_output, volume_parameters, path_env, other_envs, docker_image_name, sandbox_dir, user_cmd[0], chown_cmd)
 			else:
 				cmd = 'docker run --rm %s %s -e "PATH=%s" %s %s /bin/sh -c "cd %s; %s; %s"' % (volume_output, volume_parameters, path_env, other_envs, docker_image_name, sandbox_dir, user_cmd[0], chown_cmd)
-			func_call(cmd)
+			rc, stdout, stderr = func_call(cmd)
+			if rc != 0:
+				subprocess_error(cmd, rc, stdout, stderr)
 			logging.debug("Rename the sandbox dir(%s) to the output directory(%s)", sandbox_dir, output_dir)
 			cmd = 'cp -r %s/* %s' % (sandbox_dir, output_dir)
-			func_call(cmd)
+			rc, stdout, stderr = func_call(cmd)
+			if rc != 0:
+				subprocess_error(cmd, rc, stdout, stderr)
 			shutil.rmtree(sandbox_dir)
 		else:
 			#if a separate rootfs is not needed to execute the user's cmd, should forcely use other execution engine to run the user cmd.
@@ -994,7 +1024,11 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile(sandbox_dir, input_dict, hardware_platform, host_linux_distro, os_image_dir, cvmfs_siteinfo_mountpoint, mount_dict, packages)
 		#here, setting the linker will cause strange errors.
 			logging.debug("Construct dynamic linker path ....")
-			env_dict['PARROT_LDSO_PATH'] = get_linker_path(hardware_platform, os_image_dir) 
+			result = get_linker_path(hardware_platform, os_image_dir) 
+			if result == "undefined platform type":
+				logging.critical("the OS image does not include ld-linux!")
+				sys.exit("the OS image does not include ld-linux!")
+			env_dict['PARROT_LDSO_PATH'] = result 
 			env_dict['USER'] = getpass.getuser()
 			env_dict['HOME'] = sandbox_dir + '/' + getpass.getuser()
 			logging.debug("Add software binary into PATH")
@@ -1011,8 +1045,9 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 				
 			parrot_submit_file.close()
 			cmd = "/bin/sh " + parrot_submit_path
-			func_call_output_withenv(cmd, env_dict, sandbox_dir)
-
+			rc, stdout, stderr = func_call_output_withenv(cmd, env_dict, sandbox_dir)
+#			if rc != 0:
+#				subprocess_error(cmd, rc, stdout, stderr)
 		else:
 			env_dict = os.environ
 			env_dict['PARROT_MOUNT_FILE'] = add_inputs_to_mountfile(sandbox_dir, input_dict, cvmfs_siteinfo_mountpoint, mount_dict)
@@ -1090,13 +1125,16 @@ def condor_process(spec_path, spec, spec_path_basename, packages_path, sandbox_d
 
 	#submit condor job
 	cmd = 'condor_submit ' + condor_submit_path
-	func_call(cmd)
-
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 	#keep tracking whether condor job is done
 	print "Waiting for the job is done ..."
 	logging.debug("Waiting for the job is done ...")
 	cmd = 'condor_wait %s' % condor_log_path 
-	func_call(cmd)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("the condor jos is done, put the output back into the output directory!")
 	print "the condor jobs is done, put the output back into the output directory!"
@@ -1105,7 +1143,9 @@ def condor_process(spec_path, spec, spec_path_basename, packages_path, sandbox_d
 
 	#copy all the stuff inside the sandbox_dir into output)dir, and then remove the sandbox_dir
 #	cmd = 'cp -r %s/* %s' % (sandbox_dir, output_dir)
-#	func_call(cmd)
+#	rc, stdout, stderr = func_call(cmd)
+#	if rc != 0:
+#		subprocess_error(cmd, rc, stdout, stderr)
 	shutil.rmtree(sandbox_dir)
 
 ''' Compare the required hardware configurations with each instance type, and return the first matched instance type, return 'no' if no matched instance type exist.
@@ -1162,8 +1202,6 @@ def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ss
 	else:
 		logging.debug("the matched instance type exists: %s", r)
 
-	print ami, user_name, r, key_pair, security_group, ssh_key
-	
 	#start the instance and obtain the instance id
 	instance_id = get_instance_id(ami, r, key_pair, security_group)
 	logging.debug("Start the instance and obtain the instance id: %s", instance_id)
@@ -1176,19 +1214,25 @@ def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ss
 	#install wget on the instance	
 	logging.debug("Install wget on the instance")
 	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'yum -y install wget\'' % (ssh_key, user_name, public_dns)
-	func_call(cmd)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("Install python 2.6.9 on the instance.")
 	python_name = 'python-2.6.9-%s-%s' % (linux_distro, hardware_platform)
 	python_item = package_search(packages, python_name, '')
 	python_url = python_item["source"][0] #get the url of python
 	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s  \'wget %s\'' % (ssh_key, user_name, public_dns, python_url)
-	func_call(cmd)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 	scheme, netloc, path, query, fragment = urlparse.urlsplit(python_url)
 	python_url_filename = os.path.basename(path)
 	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s  \'tar zxvf %s\'' % (ssh_key, user_name, public_dns, python_url_filename)
-	func_call(cmd)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 	#scp umbrella, packages.json and input files to the instance 
 	logging.debug("scp relevant files into the HOME dir of the instance.")
@@ -1196,7 +1240,9 @@ def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ss
 	for input_file in input_list:
 		input_file_string += input_file + ' ' 
 	cmd = 'scp -i %s umbrella %s %s %s %s@%s:' % (ssh_key, spec_path, packages_path, input_file_string, user_name, public_dns)
-	func_call(cmd)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 	#change the --inputs option to put all the inputs directory in the home dir of the instance
 	logging.debug("change the --inputs option to put all the inputs directory in the home dir of the instance")	
@@ -1217,24 +1263,34 @@ def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ss
 		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -T local -c %s --log ec2_umbrella.log --packages %s -l ec2_umbrella -o output -i \'%s\' run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, user_cmd[0])
 	else:
 		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -T local -c %s --packages %s -l ec2_umbrella -o output -i \'%s\' -e %s run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, env_options, user_cmd[0])
-	func_call(cmd)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 	#postprocessing
 	logging.debug("Create a tarball for the output dir on the instance.")
 	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'tar cvzf output.tar.gz output\'' % (ssh_key, user_name, public_dns)
-	func_call(cmd)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("The instance returns the output.tar.gz to the local machine.")
 	cmd = 'scp -i %s %s@%s:output.tar.gz %s/' % (ssh_key, user_name, public_dns, sandbox_dir)
-	func_call(cmd)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("The instance returns the remote umbrella log file to the local machine.")
 	cmd = 'scp -i %s %s@%s:ec2_umbrella.log %s' % (ssh_key, user_name, public_dns, remotelog_path)
-	func_call(cmd)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("Uncompress output.tar.gz to the output_dir (%s).", output_dir)
 	cmd = 'tar zxvf %s/output.tar.gz -C %s' % (sandbox_dir, sandbox_dir)
-	func_call(cmd)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("Rename %s/output to the output_dir (%s).", sandbox_dir, output_dir)
 	os.rename('%s/output' % sandbox_dir, output_dir)
@@ -1289,7 +1345,6 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch
 
 	if spec_json.has_key("data") and spec_json["data"]:
 		data_install(spec_json["data"], packages_json, sandbox_dir, mount_dict)
-		pass
 	else:
 		logging.debug("this spec does not have dat section!")
 	
@@ -1300,16 +1355,17 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch
 def dependency_check(item):
 	print "dependency check -- ", item, " "
 	cmd = 'which %s' % item
-	stdout, stderr = func_call(cmd)
-	if stdout:
-		logging.debug("command `which %s` found.", item)
-		print "command `which %s` found." % item
-		return 0
-	else:
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
 		logging.debug("command `which %s` failed.", item)
 		print "command `which %s` failed." % item
 		return -1
-
+		#subprocess_error(cmd, rc, stdout, stderr)
+	else:
+		logging.debug("command `which %s` found.", item)
+		print "command `which %s` found." % item
+		return 0
+	
 """ Get the minimum integer for the sandbox name
 Parameter path: the path of the localdir
 Return: the minimum integer which is not occupied by the current directories under the path
@@ -1328,15 +1384,19 @@ def get_instance_id(image_id, instance_type, key_pair, security_group):
 	cmd = 'ec2-run-instances %s -t %s -k %s -g %s --associate-public-ip-address true' % (image_id, instance_type, key_pair, security_group)
 	logging.debug("Starting an instance: %s", cmd)
 	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
-	p_status = p.wait()
-	while True:
-		line = p.stdout.readline()
-		if line != '':
-			line = line.rstrip()	
-			if line[:8] == 'INSTANCE':
-				instance_id = line[9:19]
-				return instance_id
-
+	(output, err) = p.communicate()
+	rc = p.returncode
+	logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, output, err)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
+	str = "\nINSTANCE"
+	index = output.find(str)
+	if index == -1:
+		sys.exit("Fail to get the instance id!")
+	else:
+		instance_id = output[(index+9):(index+19)]
+		return instance_id
+			
 """ Get the public dns of one VM instance from Amazon EC2, `ec2-run-instances` can not directly return the public dns of the instance, so this function is needed to check the result of `ec2-describe-instances` to obtain the public dns of the instance.
 Parameter: the id of the VM instance
 Return: the public dns of the instance
@@ -1346,16 +1406,18 @@ def get_public_dns(instance_id):
 	while public_dns == None or public_dns == '' or public_dns == 'l':
 		cmd = 'ec2-describe-instances ' + instance_id
 		p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
-		p_status = p.wait()
-		while True:
-			line = p.stdout.readline()
-			if line != '':
-				line = line.rstrip()	
-				str1 = 'PRIVATEIPADDRESS' 
-				if line[:16] == str1:
-					index = line.find("ec2")
-					public_dns = line[index:]
-					break
+		(output, err) = p.communicate()
+		rc = p.returncode
+		logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, output, err)
+		if rc != 0:
+			subprocess_error(cmd, rc, stdout, stderr)
+
+		str = "\nPRIVATEIPADDRESS"
+		index = output.find(str)
+		if index >= 0:
+			index1 = output.find("ec2", index + 1)
+			public_dns = line[index1:]
+			break
 	return public_dns
 
 def main():
@@ -1431,7 +1493,7 @@ def main():
 		logging.critical("You must provide the behavior and the command!")
 		print "You must provide the behavior and the command!\n"
 		parser.print_help()
-		sys.exit()
+		sys.exit(1)
 
 	behavior = args[0]
 	logging.debug("Check the validity of the behavior: %s", behavior)
@@ -1440,7 +1502,7 @@ def main():
 		logging.critical("%s is not supported by umbrella!", behavior)
 		print behavior + " is not supported by umbrella!\n"
 		parser.print_help()
-		sys.exit()
+		sys.exit(1)
 
 	batch_type = options.batch_type
 	logging.debug("Check the batch_type option: %s", batch_type)
@@ -1449,7 +1511,7 @@ def main():
 			logging.critical("You must be root to use chroot method.")
 			print 'You must be root to use chroot method.\n'
 			parser.print_help()
-			sys.exit()
+			sys.exit(1)
 
 	#get the absolute path of the localdir directory, which will cache all the data, and store all the sandboxes.
 	#to allow the reuse the local cache, the localdir can be a dir which already exists.
@@ -1490,7 +1552,7 @@ def main():
 		logging.critical("The specification json file (%s) does not exist! Please refer the -c option.", spec_path)
 		print "The specification json file does not exist! Please refer the -c option.\n"
 		parser.print_help()
-		sys.exit()
+		sys.exit(1)
 
 	with open(spec_path) as f: #python 2.4 does not support this syntax: with open () as
 		spec_json = json.load(f)
@@ -1552,9 +1614,6 @@ def main():
 		sys.exit("%s is not empty! Please clean the output directory first or specify another directory!\n" % output_dir)
 	else:
 		pass
-#       if os.path.exists(output_dir):
-#               logging.critical("the output_dir should be a non-existent directory!")
-#               sys.exit("the output_dir should be a non-existent directory!")
 
 	#packages_path always refers to the local path of the packages json file.
 	packages_path = options.packages
