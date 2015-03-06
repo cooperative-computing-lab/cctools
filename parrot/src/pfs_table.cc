@@ -2235,14 +2235,14 @@ void pfs_table::mmap_proc (pid_t pid, buffer_t *B)
 	struct pfs_process *p = pfs_process_lookup(pid);
 	if (p) {
 		for(struct pfs_mmap *m = p->table->mmap_list; m; m = m->next) {
-			buffer_putfstring(B, "%08" PRIx64 "-%08" PRIx64, (uint64_t)(uintptr_t)m->logical_addr, (uint64_t)(uintptr_t)m->logical_addr+(uint64_t)m->map_length);
+			buffer_putfstring(B, "%016" PRIx64 "-%016" PRIx64, (uint64_t)(uintptr_t)m->logical_addr, (uint64_t)(uintptr_t)m->logical_addr+(uint64_t)m->map_length);
 			buffer_putfstring(B, " ");
 			buffer_putfstring(B, "%c", m->prot & PROT_READ ? 'r' : '-');
 			buffer_putfstring(B, "%c", m->prot & PROT_WRITE ? 'w' : '-');
 			buffer_putfstring(B, "%c", m->prot & PROT_EXEC ? 'w' : '-');
 			buffer_putfstring(B, "%c", m->flags & MAP_PRIVATE ? 'p' : '-');
 			buffer_putfstring(B, " ");
-			buffer_putfstring(B, "%08" PRIx64, m->file_offset);
+			buffer_putfstring(B, "%016" PRIx64, m->file_offset);
 			buffer_putfstring(B, " ");
 			buffer_putfstring(B, "%02" PRIx32 ":%02" PRIx32, major(m->finfo.st_dev), minor(m->finfo.st_dev));
 			buffer_putfstring(B, " ");
@@ -2260,9 +2260,9 @@ void pfs_table::mmap_proc (pid_t pid, buffer_t *B)
 			char *start = NULL, *end = NULL, *perm = NULL, *off = NULL, *dev = NULL, *ino = NULL, *path = NULL;
 			if (pattern_match(line, "^(%x+)%-(%x+)%s+(%S+)%s+(%x+)%s+([%d:]+)%s+(%d+)%s+(.-)%s*$", &start, &end, &perm, &off, &dev, &ino, &path) >= 0) {
 				size_t current = buffer_pos(B);
-				buffer_putfstring(B, "%08" PRIx64 "-%08" PRIx64, (uint64_t)strtoul(start, NULL, 16), (uint64_t)strtoul(end, NULL, 16));
+				buffer_putfstring(B, "%016" PRIx64 "-%016" PRIx64, (uint64_t)strtoul(start, NULL, 16), (uint64_t)strtoul(end, NULL, 16));
 				buffer_putfstring(B, " %s", perm);
-				buffer_putfstring(B, " %08" PRIx64, (uint64_t)strtoul(off, NULL, 16));
+				buffer_putfstring(B, " %016" PRIx64, (uint64_t)strtoul(off, NULL, 16));
 				buffer_putfstring(B, " %s", dev);
 				buffer_putfstring(B, " %08" PRIu64, (uint64_t)strtoul(ino, NULL, 16));
 				buffer_putfstring(B, " %s", path);
