@@ -8,6 +8,10 @@ See the file COPYING for details.
 #ifndef PFS_TABLE_H
 #define PFS_TABLE_H
 
+extern "C" {
+#include "buffer.h"
+}
+
 #include "pfs_mmap.h"
 #include "pfs_name.h"
 #include "pfs_refcount.h"
@@ -123,10 +127,11 @@ public:
 	int	resolve_name( int is_special_syscall, const char *cname, pfs_name *pname, bool do_follow_symlink = true, int depth = 0 );
 
 	/* mmap operations */
-	pfs_size_t mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
-	int	       mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
-	int	       mmap_delete( pfs_size_t logical_address, pfs_size_t length );
-	void       mmap_print();
+	pfs_size_t  mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
+	int         mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
+	int         mmap_delete( pfs_size_t logical_address, pfs_size_t length );
+	void        mmap_print();
+	static void mmap_proc(pid_t pid, buffer_t *B);
 
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
 
@@ -138,7 +143,6 @@ private:
 
 	void complete_path( const char *short_path, char *long_path );
 
-	static void mmap_proc(pid_t pid, char *path);
 	pfs_size_t mmap_create_object( pfs_file *file, pfs_size_t channel_offset, pfs_size_t map_length, pfs_size_t file_offset, int prot, int flags );
 
 	int         pointer_count;

@@ -22,6 +22,7 @@ extern "C" {
 #include "pfs_channel.h"
 #include "pfs_resolve.h"
 
+#include "buffer.h"
 #include "debug.h"
 #include "full_io.h"
 #include "get_canonical_path.h"
@@ -595,11 +596,25 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 				}
 			} else if (pattern_match(pname.rest, "^/proc/(%d+)/maps$", &pid) >= 0) {
 				char tmpfd[PATH_MAX];
-				mmap_proc(atoi(pid), tmpfd);
+				buffer_t B[1];
+				buffer_init(B);
+
+				mmap_proc(atoi(pid), B);
+
+				snprintf(tmpfd, sizeof(tmpfd), "/dev/shm/parrot-tmp-fd.XXXXXX");
+				int fd = mkstemp(tmpfd);
+				if (fd >= 0) {
+					full_write(fd, buffer_tostring(B), buffer_pos(B));
+				} else {
+					strcpy(tmpfd, "/dev/null");
+				}
+
 				resolve_name(0, tmpfd, &pname);
 				file = pname.service->open(&pname, O_RDONLY, 0);
 				assert(file);
+				close(fd);
 				unlink(tmpfd);
+				buffer_free(B);
 			} else {
 				file = pname.service->open(&pname,flags,mode);
 			}
@@ -2211,50 +2226,60 @@ int pfs_table::md5_slow( const char *path, unsigned char *digest )
 	}
 }
 
-void pfs_table::mmap_proc (pid_t pid, char *path)
+void pfs_table::mmap_proc (pid_t pid, buffer_t *B)
 {
-	snprintf(path, PATH_MAX, "/proc/%d/maps", (int)pid);
+	char path[PATH_MAX];
+	snprintf(path, sizeof(path), "/proc/%d/maps", (int)pid);
 	FILE *maps = fopen(path, "r");
-
-	snprintf(path, PATH_MAX, "/dev/shm/parrot-tmp-fd.XXXXXX");
-	FILE *file = fdopen(mkstemp(path), "w");
-	if (file == NULL) {
-		snprintf(path, PATH_MAX, "/dev/null");
-		return;
-	}
 
 	struct pfs_process *p = pfs_process_lookup(pid);
 	if (p) {
 		for(struct pfs_mmap *m = p->table->mmap_list; m; m = m->next) {
-			fprintf(file, "%08" PRIx64 "-%08" PRIx64, (uint64_t)(uintptr_t)m->logical_addr, (uint64_t)(uintptr_t)m->logical_addr+(uint64_t)m->map_length);
-			fprintf(file, " ");
-			fprintf(file, "%c", m->prot & PROT_READ ? 'r' : '-');
-			fprintf(file, "%c", m->prot & PROT_WRITE ? 'w' : '-');
-			fprintf(file, "%c", m->prot & PROT_EXEC ? 'w' : '-');
-			fprintf(file, "%c", m->flags & MAP_PRIVATE ? 'p' : '-');
-			fprintf(file, " ");
-			fprintf(file, "%08" PRIx64, m->file_offset);
-			fprintf(file, " ");
-			fprintf(file, "%02" PRIx32 ":%02" PRIx32, major(m->finfo.st_dev), minor(m->finfo.st_dev));
-			fprintf(file, " ");
-			fprintf(file, "%08" PRIu64, m->finfo.st_ino);
-			fprintf(file, " ");
-			fprintf(file, "%s", m->fpath);
-			fprintf(file, "\n");
+			buffer_putfstring(B, "%08" PRIx64 "-%08" PRIx64, (uint64_t)(uintptr_t)m->logical_addr, (uint64_t)(uintptr_t)m->logical_addr+(uint64_t)m->map_length);
+			buffer_putfstring(B, " ");
+			buffer_putfstring(B, "%c", m->prot & PROT_READ ? 'r' : '-');
+			buffer_putfstring(B, "%c", m->prot & PROT_WRITE ? 'w' : '-');
+			buffer_putfstring(B, "%c", m->prot & PROT_EXEC ? 'w' : '-');
+			buffer_putfstring(B, "%c", m->flags & MAP_PRIVATE ? 'p' : '-');
+			buffer_putfstring(B, " ");
+			buffer_putfstring(B, "%08" PRIx64, m->file_offset);
+			buffer_putfstring(B, " ");
+			buffer_putfstring(B, "%02" PRIx32 ":%02" PRIx32, major(m->finfo.st_dev), minor(m->finfo.st_dev));
+			buffer_putfstring(B, " ");
+			buffer_putfstring(B, "%08" PRIu64, m->finfo.st_ino);
+			buffer_putfstring(B, " ");
+			buffer_putfstring(B, "%s", m->fpath);
+			buffer_putfstring(B, "\n");
 		}
 	}
 
 	if (maps) {
 		char line[4096];
 		while (fgets(line, sizeof(line), maps)) {
-			if (pattern_match(line, "%[%w+%]%s*$") >= 0)
-				fprintf(file, "%s", line);
-			else if (pattern_match(line, "%x+%-%x+ %S+ %x+ 00:00 0") >= 0)
-				fprintf(file, "%s", line);
+			/* we reformat some entries for consistency */
+			char *start = NULL, *end = NULL, *perm = NULL, *off = NULL, *dev = NULL, *ino = NULL, *path = NULL;
+			if (pattern_match(line, "^(%x+)%-(%x+)%s+(%S+)%s+(%x+)%s+([%d:]+)%s+(%d+)%s+(.-)%s*$", &start, &end, &perm, &off, &dev, &ino, &path) >= 0) {
+				size_t current = buffer_pos(B);
+				buffer_putfstring(B, "%08" PRIx64 "-%08" PRIx64, (uint64_t)strtoul(start, NULL, 16), (uint64_t)strtoul(end, NULL, 16));
+				buffer_putfstring(B, " %s", perm);
+				buffer_putfstring(B, " %08" PRIx64, (uint64_t)strtoul(off, NULL, 16));
+				buffer_putfstring(B, " %s", dev);
+				buffer_putfstring(B, " %08" PRIu64, (uint64_t)strtoul(ino, NULL, 16));
+				buffer_putfstring(B, " %s", path);
+				buffer_putliteral(B, "\n");
+				if (pattern_match(path, "%[%w+%]%s*$") >= 0) {
+					/* OKAY: heap/stack/etc. */
+				} else if (pattern_match(dev, "0+:0+") >= 0) {
+					/* OKAY: anonymous mapping */
+				} else {
+					/* not printed */
+					buffer_rewind(B, current);
+				}
+			}
+			free(start); free(end); free(perm); free(off); free(dev); free(ino); free(path);
 		}
 		fclose(maps);
 	}
-	fclose(file);
 }
 
 void pfs_table::mmap_print()
