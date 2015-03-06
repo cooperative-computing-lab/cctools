@@ -960,7 +960,6 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 	/* change the registers to reflect argv */
 	INT64_T nargs[] = {(INT64_T) (ldso[0] ? user_ldso : user_exe), (INT64_T)user_argv};
 	tracer_args_set(p->tracer,p->syscall,nargs,sizeof(nargs)/sizeof(nargs[0]));
-	p->syscall_args_changed = 1;
 	return 0;
 }
 
