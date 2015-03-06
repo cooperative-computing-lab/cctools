@@ -896,13 +896,23 @@ including a hash and a name where one is known, or another
 unique identifier where no name is available.
 */
 
-char * make_cached_name( struct work_queue_task *t, struct work_queue_file *f )
+char *make_cached_name( const struct work_queue_task *t, const struct work_queue_file *f )
 {
-	unsigned char digest[MD5_DIGEST_LENGTH];
-	md5_buffer(f->payload,strlen(f->payload),digest);
+	static int buffer_count = 0;
 
+	/* Default of payload is remote name (needed only for directories) */
+	char *payload = f->payload ? f->payload : f->remote_name;
+
+	unsigned char digest[MD5_DIGEST_LENGTH];
 	char payload_enc[PATH_MAX];
-	url_encode(path_basename(f->payload), payload_enc, PATH_MAX);
+
+	if(f->type == WORK_QUEUE_BUFFER) {
+		//dummy digest for buffers
+		md5_buffer("buffer", 6, digest);
+	} else {
+		md5_buffer(payload,strlen(payload),digest);
+		url_encode(path_basename(payload), payload_enc, PATH_MAX);
+	}
 
 	switch(f->type) {
 		case WORK_QUEUE_FILE:
@@ -920,7 +930,8 @@ char * make_cached_name( struct work_queue_task *t, struct work_queue_file *f )
 			break;
 		case WORK_QUEUE_BUFFER:
 		default:
-			return string_format("buffer-%s",md5_string(digest));
+			buffer_count++;
+			return string_format("buffer-%d-%s", buffer_count, md5_string(digest));
 			break;
 	}
 }
@@ -952,7 +963,7 @@ static int do_thirdput( struct work_queue *q, struct work_queue_worker *w,  cons
 Get a single output file, located at the worker under 'cached_name'.
 Returns 1 on success, 0 on failure to get, -1 on failure to access file.
 */
-static int get_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f, const char *cached_name )
+static int get_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f )
 {
 	int64_t total_bytes = 0;
 	int result = SUCCESS; //return success unless something fails below.
@@ -960,16 +971,16 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 	timestamp_t open_time = timestamp_get();
 
 	if(f->flags & WORK_QUEUE_THIRDPUT) {
-		if(!strcmp(cached_name, f->payload)) {
-			debug(D_WQ, "output file %s already on shared filesystem", cached_name);
+		if(!strcmp(f->cached_name, f->payload)) {
+			debug(D_WQ, "output file %s already on shared filesystem", f->cached_name);
 			f->flags |= WORK_QUEUE_PREEXIST;
 		} else {
-			result = do_thirdput(q,w,cached_name,f->payload,WORK_QUEUE_FS_PATH);
+			result = do_thirdput(q,w,f->cached_name,f->payload,WORK_QUEUE_FS_PATH);
 		}
 	} else if(f->type == WORK_QUEUE_REMOTECMD) {
-		result = do_thirdput(q,w,cached_name,f->payload,WORK_QUEUE_FS_CMD);
+		result = do_thirdput(q,w,f->cached_name,f->payload,WORK_QUEUE_FS_CMD);
 	} else {
-		result = get_file_or_directory(q, w, t, cached_name, f->payload, &total_bytes);
+		result = get_file_or_directory(q, w, t, f->cached_name, f->payload, &total_bytes);
 	}
 
 	timestamp_t close_time = timestamp_get();
@@ -996,7 +1007,7 @@ static int get_output_file( struct work_queue *q, struct work_queue_worker *w, s
 				return APP_FAILURE;
 			}
 			memcpy(remote_info, &local_info, sizeof(local_info));
-			hash_table_insert(w->current_files, cached_name, remote_info);
+			hash_table_insert(w->current_files, f->cached_name, remote_info);
 		} else {
 			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno));
 		}
@@ -1013,16 +1024,12 @@ static int get_output_files( struct work_queue *q, struct work_queue_worker *w, 
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((f = list_next_item(t->output_files))) {
-			char * cached_name = make_cached_name(t,f);
-			result = get_output_file(q,w,t,f,cached_name);
-
+			result = get_output_file(q,w,t,f); 
 			//if success or app-level failure, continue to get other files.
 			//if worker failure, return.
 			if(result == 0) {
 				break;
-			}
-
-			free(cached_name);
+			} 
 		}
 	}
 
@@ -1041,10 +1048,8 @@ static void delete_worker_files( struct work_queue *q, struct work_queue_worker 
 	list_first_item(files);
 	while((tf = list_next_item(files))) {
 		if(!(tf->flags & except_flags)) {
-			char *cached_name = make_cached_name(t,tf);
-			send_worker_msg(q,w, "unlink %s\n",cached_name);
-			hash_table_remove(w->current_files, cached_name);
-			free(cached_name);
+			send_worker_msg(q,w, "unlink %s\n", tf->cached_name);
+			hash_table_remove(w->current_files, tf->cached_name);
 		}
 	}
 }
@@ -2005,35 +2010,33 @@ static int send_file_or_directory( struct work_queue *q, struct work_queue_worke
 	int result = SUCCESS;
 
 	// Look in the current files hash to see if the file is already cached.
-	char *cached_name = make_cached_name(t,tf);
-	remote_info = hash_table_lookup(w->current_files, cached_name);
+	remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
 	// If not cached, or the metadata has changed, then send the item.
 	if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size) {
 
 		if(remote_info) {
-			hash_table_remove(w->current_files, cached_name);
+			hash_table_remove(w->current_files, tf->cached_name);
 			free(remote_info);
 		}
 
 		if(S_ISDIR(local_info.st_mode)) {
-			result = send_directory(q, w, t, expanded_local_name, cached_name, total_bytes, tf->flags);
+			result = send_directory(q, w, t, expanded_local_name, tf->cached_name, total_bytes, tf->flags);
 		} else {
-			result = send_file(q, w, t, expanded_local_name, cached_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
+			result = send_file(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
 		}
 
 		if(result && tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = malloc(sizeof(*remote_info));
 			if(remote_info) {
 				memcpy(remote_info, &local_info, sizeof(local_info));
-				hash_table_insert(w->current_files, cached_name, remote_info);
+				hash_table_insert(w->current_files, tf->cached_name, remote_info);
 			} else {
 				debug(D_NOTICE, "Cannot allocate memory for cache entry for input file %s at %s (%s)", expanded_local_name, w->hostname, w->addrport);
 			}
 		}
 	}
 
-	free(cached_name);
 	return result;
 }
 
@@ -2114,8 +2117,6 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 	int64_t actual = 0;
 	int result = SUCCESS; //return success unless something fails below
 
-	char *cached_name = make_cached_name(t,f);
-
 	timestamp_t open_time = timestamp_get();
 
 	switch (f->type) {
@@ -2123,7 +2124,7 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 	case WORK_QUEUE_BUFFER:
 		debug(D_WQ, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
 		time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, f->length);
-		send_worker_msg(q,w, "put %s %d %o %d\n",cached_name, f->length, 0777, f->flags);
+		send_worker_msg(q,w, "put %s %d %o %d\n",f->cached_name, f->length, 0777, f->flags);
 		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
 		if(actual!=f->length) {
 			result = WORKER_FAILURE;
@@ -2133,12 +2134,12 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 
 	case WORK_QUEUE_REMOTECMD:
 		debug(D_WQ, "%s (%s) needs %s from remote filesystem using %s", w->hostname, w->addrport, f->remote_name, f->payload);
-		send_worker_msg(q,w, "thirdget %d %s %s\n",WORK_QUEUE_FS_CMD, cached_name, f->payload);
+		send_worker_msg(q,w, "thirdget %d %s %s\n",WORK_QUEUE_FS_CMD, f->cached_name, f->payload);
 		break;
 
 	case WORK_QUEUE_URL:
-		debug(D_WQ, "%s (%s) needs %s from the url, %s %d", w->hostname, w->addrport, cached_name, f->payload, f->length);
-		send_worker_msg(q,w, "url %s %d 0%o %d\n",cached_name, f->length, 0777, f->flags);
+		debug(D_WQ, "%s (%s) needs %s from the url, %s %d", w->hostname, w->addrport, f->cached_name, f->payload, f->length);
+		send_worker_msg(q,w, "url %s %d 0%o %d\n",f->cached_name, f->length, 0777, f->flags);
 		link_putlstring(w->link, f->payload, f->length, time(0) + q->short_timeout);
 		break;
 
@@ -2155,9 +2156,9 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 				f->flags |= WORK_QUEUE_PREEXIST;
 			} else {
 				if(f->flags & WORK_QUEUE_SYMLINK) {
-					send_worker_msg(q,w, "thirdget %d %s %s\n", WORK_QUEUE_FS_SYMLINK, cached_name, f->payload);
+					send_worker_msg(q,w, "thirdget %d %s %s\n", WORK_QUEUE_FS_SYMLINK, f->cached_name, f->payload);
 				} else {
-					send_worker_msg(q,w, "thirdget %d %s %s\n", WORK_QUEUE_FS_PATH, cached_name, f->payload);
+					send_worker_msg(q,w, "thirdget %d %s %s\n", WORK_QUEUE_FS_PATH, f->cached_name, f->payload);
 				}
 			}
 		} else {
@@ -2209,7 +2210,6 @@ static int send_input_file(struct work_queue *q, struct work_queue_worker *w, st
 		if(result == APP_FAILURE) t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
 	}
 
-	free(cached_name);
 	return result;
 }
 
@@ -2290,10 +2290,8 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 			if(tf->type == WORK_QUEUE_DIRECTORY) {
 				send_worker_msg(q,w, "dir %s\n", tf->remote_name);
 			} else {
-				char *cached_name = make_cached_name(t,tf);
 				url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
-				send_worker_msg(q,w, "infile %s %s %d\n", cached_name, remote_name_encoded, tf->flags);
-				free(cached_name);
+				send_worker_msg(q,w, "infile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
 			}
 		}
 	}
@@ -2302,10 +2300,8 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 		struct work_queue_file *tf;
 		list_first_item(t->output_files);
 		while((tf = list_next_item(t->output_files))) {
-			char *cached_name = make_cached_name(t,tf);
 			url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
-			send_worker_msg(q,w, "outfile %s %s %d\n", cached_name, remote_name_encoded, tf->flags);
-			free(cached_name);
+			send_worker_msg(q,w, "outfile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
 		}
 	}
 
@@ -2507,11 +2503,9 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 			list_first_item(t->input_files);
 			while((tf = list_next_item(t->input_files))) {
 				if((tf->type == WORK_QUEUE_FILE || tf->type == WORK_QUEUE_FILE_PIECE) && (tf->flags & WORK_QUEUE_CACHE)) {
-					char *cached_name = make_cached_name(t,tf);
-					remote_info = hash_table_lookup(w->current_files, cached_name);
+					remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 					if(remote_info)
 						task_cached_bytes += remote_info->st_size;
-					free(cached_name);
 				}
 			}
 
@@ -3206,7 +3200,7 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 	t->tag = xxstrdup(tag);
 }
 
-struct work_queue_file * work_queue_file_create(const char * remote_name, int type, int flags)
+struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, int type, int flags)
 {
 	struct work_queue_file *f;
 
@@ -3221,6 +3215,14 @@ struct work_queue_file * work_queue_file_create(const char * remote_name, int ty
 	f->remote_name = xxstrdup(remote_name);
 	f->type = type;
 	f->flags = flags;
+
+	/* WORK_QUEUE_BUFFER needs to set these after the current function returns */
+	if(payload) {
+		f->payload = xxstrdup(payload);
+		f->length  = strlen(payload);
+	}
+
+	f->cached_name = make_cached_name(t, f);
 
 	return f;
 }
@@ -3280,11 +3282,8 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 		}
 	}
 
-	tf = work_queue_file_create(remote_name, WORK_QUEUE_URL, flags);
+	tf = work_queue_file_create(t, file_url, remote_name, WORK_QUEUE_URL, flags);
 	if(!tf) return 0;
-
-	tf->length = strlen(file_url);
-	tf->payload = xxstrdup(file_url);
 
 	list_push_tail(files, tf);
 
@@ -3354,11 +3353,8 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		}
 	}
 
-	tf = work_queue_file_create(remote_name, WORK_QUEUE_FILE, flags);
+	tf = work_queue_file_create(t, local_name, remote_name, WORK_QUEUE_FILE, flags);
 	if(!tf) return 0;
-
-	tf->length = strlen(local_name);
-	tf->payload = xxstrdup(local_name);
 
 	list_push_tail(files, tf);
 	return 1;
@@ -3395,19 +3391,13 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 		{	return 0;	}
 	}
 
-	tf = work_queue_file_create(remote_name, WORK_QUEUE_DIRECTORY, flags);
-	if(!tf) return 0;
-
 	//KNOWN HACK: Every file passes through make_cached_name() which expects the
 	//payload field to be set. So we simply set the payload to remote name if
 	//local name is null. This doesn't affect the behavior of the file transfers.
-	if(local_name) {
-		tf->length = strlen(local_name);
-		tf->payload = xxstrdup(local_name);
-	} else {
-		tf->length = strlen(remote_name);
-		tf->payload = xxstrdup(remote_name);
-	}
+	const char *payload = local_name ? local_name : remote_name;
+
+	tf = work_queue_file_create(t, payload, remote_name, WORK_QUEUE_DIRECTORY, flags);
+	if(!tf) return 0;
 
 	list_push_tail(files, tf);
 	return 1;
@@ -3476,14 +3466,12 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 			}
 		}
 	}
-
-	tf = work_queue_file_create(remote_name, WORK_QUEUE_FILE_PIECE, flags);
+	
+	tf = work_queue_file_create(t, local_name, remote_name, WORK_QUEUE_FILE_PIECE, flags);
 	if(!tf) return 0;
 
-	tf->length = strlen(local_name);
 	tf->offset = start_byte;
 	tf->piece_length = end_byte - start_byte + 1;
-	tf->payload = xxstrdup(local_name);
 
 	list_push_tail(files, tf);
 	return 1;
@@ -3518,17 +3506,18 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 			fprintf(stderr, "Error: buffer conflicts with an output pointing to same remote name (%s).\n", remote_name);
 			return 0;
 		}
-	}
-
-	tf = work_queue_file_create(remote_name, WORK_QUEUE_BUFFER, flags);
+	}	
+	
+	tf = work_queue_file_create(t, NULL, remote_name, WORK_QUEUE_BUFFER, flags);
 	if(!tf) return 0;
 
-	tf->length = length;
 	tf->payload = malloc(length);
 	if(!tf->payload) {
 		fprintf(stderr, "Error: failed to allocate memory for buffer with remote name %s and length %d bytes.\n", remote_name, length);
 		return 0;
 	}
+	
+	tf->length  = length;
 
 	memcpy(tf->payload, data, length);
 	list_push_tail(t->input_files, tf);
@@ -3593,12 +3582,9 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 			}
 		}
 	}
-
-	tf = work_queue_file_create(remote_name, WORK_QUEUE_REMOTECMD, flags);
+	
+	tf = work_queue_file_create(t, cmd, remote_name, WORK_QUEUE_REMOTECMD, flags);
 	if(!tf) return 0;
-
-	tf->length = strlen(cmd);
-	tf->payload = xxstrdup(cmd);
 
 	list_push_tail(files, tf);
 
@@ -3615,6 +3601,16 @@ void work_queue_task_specify_priority( struct work_queue_task *t, double priorit
 	t->priority = priority;
 }
 
+void work_queue_file_delete(struct work_queue_file *tf) {
+	if(tf->payload)
+		free(tf->payload);
+	if(tf->remote_name)
+		free(tf->remote_name);
+	if(tf->cached_name)
+		free(tf->cached_name);
+	free(tf);
+}
+
 void work_queue_task_delete(struct work_queue_task *t)
 {
 	struct work_queue_file *tf;
@@ -3627,21 +3623,13 @@ void work_queue_task_delete(struct work_queue_task *t)
 			free(t->output);
 		if(t->input_files) {
 			while((tf = list_pop_tail(t->input_files))) {
-				if(tf->payload)
-					free(tf->payload);
-				if(tf->remote_name)
-					free(tf->remote_name);
-				free(tf);
+				work_queue_file_delete(tf);
 			}
 			list_delete(t->input_files);
 		}
 		if(t->output_files) {
 			while((tf = list_pop_tail(t->output_files))) {
-				if(tf->payload)
-					free(tf->payload);
-				if(tf->remote_name)
-					free(tf->remote_name);
-				free(tf);
+				work_queue_file_delete(tf);
 			}
 			list_delete(t->output_files);
 		}
