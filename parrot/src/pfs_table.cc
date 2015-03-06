@@ -2271,6 +2271,8 @@ void pfs_table::mmap_proc (pid_t pid, buffer_t *B)
 					/* OKAY: heap/stack/etc. */
 				} else if (pattern_match(dev, "0+:0+") >= 0) {
 					/* OKAY: anonymous mapping */
+				} else if (pattern_match(path, ".-parrot%-channel") < 0) {
+					/* OKAY: ! parrot mapping */
 				} else {
 					/* not printed */
 					buffer_rewind(B, current);
