@@ -72,6 +72,10 @@ See the file COPYING for details.
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 #define DEFAULT_MONITOR_INTERVAL   1
 
+#define WITHOUT_CONTAINER 0
+#define WITH_DOCKER 1
+#define WRAPPER_SH "tmp_wrapper.sh"
+
 typedef enum {
 	DAG_GC_NONE,
 	DAG_GC_REF_COUNT,
@@ -105,6 +109,9 @@ static char *monitor_exe  = "resource_monitor_cctools";
 static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
 static int monitor_enable_list_files  = 0;
+
+static int container_mode = 0;
+static char *img_name = NULL;
 
 /* wait upto this many seconds for an output file of a succesfull task
  * to appear on the local filesystem (e.g, to deal with NFS
@@ -908,6 +915,35 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
+    if (container_mode == WITH_DOCKER) {
+ 
+      	FILE *wrapper_fn;
+      	wrapper_fn = fopen(WRAPPER_SH, "w");
+ 
+      	char str_content[4096];
+      	sprintf(str_content, "#!/bin/sh\n\
+curr_dir=`pwd`\n\
+default_dir=/root/worker\n\
+echo \"#!/bin/sh\" > tmp.sh\n\
+echo \"$@\" >> tmp.sh\n\
+chmod 755 tmp.sh\n\
+flock /tmp/lockfile /usr/bin/docker pull %s\n\
+docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
+%s $default_dir/tmp.sh", img_name, img_name);
+ 
+      fprintf(wrapper_fn, str_content);
+      fclose(wrapper_fn);
+
+      chmod(WRAPPER_SH, 0755);
+
+      if(!wrapper_input_files) wrapper_input_files = list_create();
+	  list_push_tail(wrapper_input_files,dag_file_create(WRAPPER_SH)); 
+
+      if(!wrapper_command) wrapper_command = strdup("./tmp_wrapper.sh");
+	  else wrapper_command = string_wrap_command(wrapper_command,optarg);
+
+    }
+
 	/* Create strings for all the files mentioned by this node. */
 	char *input_files = dag_file_list_format(n,0,n->source_files,queue);
 	char *output_files = dag_file_list_format(n,0,n->target_files,queue);
@@ -1409,6 +1445,7 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
 	fprintf(stdout, " %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
 	fprintf(stdout, " %-30s Add node id symbol tags in the makeflow log.        (default is false)\n", "   --log-verbose");
+	fprintf(stdout, " %-30s Run each task inside this docker container.\n", "--docker=<image name>");
 
 	fprintf(stdout, "\n*Monitor Options:\n\n");
 	fprintf(stdout, " %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
@@ -1617,7 +1654,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_WQ_WAIT_FOR_WORKERS,
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
-		LONG_OPT_WRAPPER_OUTPUT
+		LONG_OPT_WRAPPER_OUTPUT,
+        LONG_OPT_DOCKER
 	};
 
 	static struct option long_options_run[] = {
@@ -1671,6 +1709,7 @@ int main(int argc, char *argv[])
 		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
 		{"zero-length-error", no_argument, 0, 'z'},
 		{"change-directory", required_argument, 0, 'X'},
+		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{0, 0, 0, 0}
 	};
 
@@ -1892,6 +1931,10 @@ int main(int argc, char *argv[])
 				if(!wrapper_output_files) wrapper_output_files = list_create();
 				list_push_tail(wrapper_output_files,dag_file_create(optarg));
 				break;
+            case LONG_OPT_DOCKER:
+                container_mode = WITH_DOCKER; 
+                img_name = xxstrdup(optarg);
+                break;
 			default:
 				show_help_run(get_makeflow_exe());
 				return 1;

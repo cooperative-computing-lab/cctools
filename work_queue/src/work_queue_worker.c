@@ -1914,15 +1914,15 @@ int main(int argc, char *argv[])
 			return 0;
 		case LONG_OPT_RUN_DOCKER:
 			container_mode = DOCKER;
-            img_name = optarg; 
+            img_name = xxstrdup(optarg); 
 			break;
         case LONG_OPT_RUN_DOCKER_PRESERVE:
             container_mode = DOCKER_PRESERVE;
-            img_name = optarg;
+            img_name = xxstrdup(optarg);
             break;
         case LONG_OPT_BUILD_FROM_TAR:
             load_from_tar = 1;
-            tar_fn = optarg;
+            tar_fn = xxstrdup(optarg);
             break;
 		default:
 			show_help(argv[0]);
