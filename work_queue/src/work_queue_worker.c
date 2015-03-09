@@ -37,6 +37,7 @@ See the file COPYING for details.
 #include "itable.h"
 #include "random.h"
 #include "url_encode.h"
+#include "md5.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -120,6 +121,9 @@ char *password = 0;
 
 // Allow worker to use symlinks when link() fails.  Enabled by default.
 static int symlinks_enabled = 1;
+
+// Worker id. A unique id for this worker instance.
+static char *worker_id;
 
 static int worker_mode = WORKER_MODE_WORKER;
 
@@ -1617,6 +1621,8 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	check_disk_workspace(NULL, 1);
 	report_worker_ready(master);
 
+	send_master_message(master, "info worker-id %s\n", worker_id);
+
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		foreman_for_master(master);
 	} else {
@@ -1657,6 +1663,16 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 	debug(D_WQ,"selected master with project=%s name=%s addr=%s port=%d",project,name,addr,port);
 
 	return serve_master_by_hostport(addr,port,project);
+}
+
+void set_worker_id() {
+	srand(time(NULL));
+
+	char *salt_and_pepper = string_format("%d%d%d", getpid(), getppid(), rand());
+	unsigned char digest[MD5_DIGEST_LENGTH];
+
+	md5_buffer(salt_and_pepper, strlen(salt_and_pepper), digest);
+	worker_id = string_format("worker-%s", md5_string(digest));
 }
 
 static void handle_abort(int sig)
@@ -1783,6 +1799,8 @@ int main(int argc, char *argv[])
     int catalog_port = CATALOG_PORT;
 
 	worker_start_time = time(0);
+
+	set_worker_id();
 
 	//obtain the architecture and os on which worker is running.
 	uname(&uname_data);
