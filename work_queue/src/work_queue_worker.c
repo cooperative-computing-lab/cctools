@@ -1267,6 +1267,7 @@ static void work_for_master(struct link *master) {
 
 		if(time(0) > idle_stoptime) {
 			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", master_addr,master_port,idle_timeout);
+			send_master_message(master, "info idle-disconnecting %lld\n", (long long) idle_timeout);
 			break;
 		}
 
