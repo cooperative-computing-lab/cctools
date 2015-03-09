@@ -960,6 +960,7 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 	/* change the registers to reflect argv */
 	INT64_T nargs[] = {(INT64_T) (ldso[0] ? user_ldso : user_exe), (INT64_T)user_argv};
 	tracer_args_set(p->tracer,p->syscall,nargs,sizeof(nargs)/sizeof(nargs[0]));
+	p->syscall_args_changed = 1;
 	return 0;
 }
 
@@ -1054,6 +1055,8 @@ done:
 		if (actual == 0) {
 			debug(D_PROCESS, "execve: %s succeeded in 32-bit mode", p->new_logical_name);
 			strcpy(p->name, p->new_logical_name);
+			/* Undo "syscall_args_changed = 1" because execve returns multiple results in syscall argument registers. */
+			p->syscall_args_changed = 0;
 			/* We do not need to restore the scratch space as the process image has been replaced. */
 		} else {
 			debug(D_PROCESS, "execve: failed: %s", strerror(-actual));
