@@ -85,6 +85,9 @@ static int idle_timeout = 900;
 // Current time at which we will give up if no work is received.
 static time_t idle_stoptime = 0;
 
+// Current time at which we will give up if no master is found.
+static time_t connect_stoptime = 0;
+
 // Maximum time to attempt connecting to all available masters before giving up.
 static int connect_timeout = 900;
 
@@ -1642,6 +1645,9 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 static int serve_master_by_name( const char *catalog_host, int catalog_port, const char *project_regex )
 {
+	static char *last_addr = NULL; 
+	static int   last_port = -1; 
+
 	struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
 
 	debug(D_WQ,"project name %s matches %d masters",project_regex,list_size(masters_list));
@@ -1655,15 +1661,38 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 		list_push_tail(masters_list,list_pop_head(masters_list));
 	}
 
-	struct nvpair *nv = list_peek_head(masters_list);
-	const char *project = nvpair_lookup_string(nv,"project");
-	const char *name = nvpair_lookup_string(nv,"name");
-	const char *addr = nvpair_lookup_string(nv,"address");
-	int port = nvpair_lookup_integer(nv,"port");
+	while(1) {
+		struct nvpair *nv = list_peek_head(masters_list);
+		const char *project = nvpair_lookup_string(nv,"project");
+		const char *name = nvpair_lookup_string(nv,"name");
+		const char *addr = nvpair_lookup_string(nv,"address");
+		int port = nvpair_lookup_integer(nv,"port");
 
-	debug(D_WQ,"selected master with project=%s name=%s addr=%s port=%d",project,name,addr,port);
+		/* Do not connect to the same master after idle disconnection. */
+		if(last_addr) {
+			if( time(0) > idle_stoptime && strcmp(addr, last_addr) == 0 && port == last_port) {
+				if(list_size(masters_list) < 2) {
+					free(last_addr);
+					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
+					connect_stoptime = idle_stoptime;
+					debug(D_WQ,"Previous idle disconnection from only master available project=%s name=%s addr=%s port=%d",project,name,addr,port);
+					return 0;
+				} else {
+					list_push_tail(masters_list,list_pop_head(masters_list));
+					continue;
+				}
+			}
 
-	return serve_master_by_hostport(addr,port,project);
+			free(last_addr);
+		}
+
+		last_addr = xxstrdup(addr);
+		last_port = port;
+
+		debug(D_WQ,"selected master with project=%s name=%s addr=%s port=%d",project,name,addr,port);
+
+		return serve_master_by_hostport(addr,port,project);
+	}
 }
 
 void set_worker_id() {
@@ -2131,7 +2160,7 @@ int main(int argc, char *argv[])
 	resources_measure_locally(local_resources);
 
 	int backoff_interval = init_backoff_interval;
-	time_t connect_stoptime = time(0) + connect_timeout;
+	connect_stoptime = time(0) + connect_timeout;
 
 	while(1) {
 		int result;
@@ -2170,7 +2199,7 @@ int main(int argc, char *argv[])
 		}
 
 		if(time(0)>connect_stoptime) {
-			debug(D_NOTICE,"stopping: could not connect after %d seconds (--connect-timeout)",connect_timeout);
+			debug(D_NOTICE,"stopping: could not connect after %d seconds.",connect_timeout);
 			break;
 		}
 
