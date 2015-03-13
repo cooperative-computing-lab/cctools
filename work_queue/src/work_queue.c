@@ -3979,6 +3979,18 @@ void work_queue_blacklist_add(struct work_queue *q, const char *hostname)
 	if (!hash_table_lookup(q->worker_blacklist, hostname)) {
 		hash_table_insert(q->worker_blacklist, hostname, (uintptr_t *) 1);
 	}
+
+	char *key;
+	struct work_queue_worker *w;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		if( strcmp(hostname, w->hostname) == 0 ) {
+
+			debug(D_WQ, "Host %s blacklisted, removing tasks from worker (%s)", w->hostname, w->addrport);
+			cleanup_worker(q, w);
+		}
+	}
 }
 
 void work_queue_blacklist_remove(struct work_queue *q, const char *hostname)
