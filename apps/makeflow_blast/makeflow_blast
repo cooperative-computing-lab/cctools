@@ -12,12 +12,12 @@
 import sys, re, string, optparse, subprocess, os, logging as log, stat
 
 class PassThroughParser(optparse.OptionParser):
-    def _process_args(self, largs, rargs, values):
-        while rargs:
-            try:
-                optparse.OptionParser._process_args(self,largs,rargs,values)
-            except (optparse.BadOptionError,optparse.AmbiguousOptionError), e:
-                largs.append(e.opt_str)
+	def _process_args(self, largs, rargs, values):
+		while rargs:
+			try:
+				optparse.OptionParser._process_args(self,largs,rargs,values)
+			except (optparse.BadOptionError,optparse.AmbiguousOptionError), e:
+				largs.append(e.opt_str)
 
 #Parser initialization
 def initialize_blast_parser(parser):
@@ -38,36 +38,36 @@ def initialize_makeflow_parser(parser):
 
 #Helper function to find executables in path
 def search_file(filename, search_path, pathsep=os.pathsep):
-    """ Given a search path, find file with requested name """
-    for path in string.split(search_path, pathsep):
-        candidate = os.path.join(path, filename)
-        if os.path.exists(candidate): return os.path.abspath(candidate)
-    return None
+	""" Given a search path, find file with requested name """
+	for path in string.split(search_path, pathsep):
+		candidate = os.path.join(path, filename)
+		if os.path.exists(candidate): return os.path.abspath(candidate)
+	return None
 
 #Counts number of splits that will be made for makeflow creation
 def count_splits(num_seq, query):
-        log.info("Counting Number of Partitions")
-        FILE = open(query, "r")
-        num_chars = 0
-        num_queries = 0
-        num_jobs = 1
-        for line in FILE:
-                if(re.search('^>', line)):
-                        if(num_queries > (num_seq - 1)):
-                                num_jobs = num_jobs + 1
-                                num_queries = 1
+		log.info("Counting Number of Partitions")
+		FILE = open(query, "r")
+		num_chars = 0
+		num_queries = 0
+		num_jobs = 1
+		for line in FILE:
+				if(re.search('^>', line)):
+						if(num_queries > (num_seq - 1)):
+								num_jobs = num_jobs + 1
+								num_queries = 1
 								if ( num_jobs % 10 == 0 ):
 									log.info("\tCurrent Number of Partitions : {0}".format(num_jobs))
-                        else:
-                                num_queries = num_queries + 1
-        FILE.close()
+						else:
+								num_queries = num_queries + 1
+		FILE.close()
 		log.info("\tTotal Number of Partitions : {0}".format(num_jobs))
-        return num_jobs
+		return num_jobs
 
 def write_split_fasta(destination):
 	split_fasta = open(destination, "w")
 	try:
-        log.info("\tWriting Partitioning Script to : {0}".format(destination))
+		log.info("\tWriting Partitioning Script to : {0}".format(destination))
 		split_fasta.write('''#! /usr/bin/env python
 
 # Copyright (C) 2011- The University of Notre Dame
@@ -113,7 +113,7 @@ sys.exit(0)
 def write_cat_blast(destination):
 	cat_blast = open(destination, "w")
 	try:
-        log.info("\tWriting Joingin Script to : {0}".format(destination))
+		log.info("\tWriting Joingin Script to : {0}".format(destination))
 		cat_blast.write('''#!/usr/bin/perl
 
 # Copyright (C) 2013- The University of Notre Dame
@@ -173,16 +173,16 @@ def write_makeflow(destination):
 		errors = []
 		num_splits = count_splits(options.num_seq, options.query)
 		for i in range(num_splits):
-	        	inputs.append("{0}.{1}".format(options.query,i))
-	        	outputs.append("{0}.{1}.out".format(options.query,i))
-	        	errors.append("{0}.{1}.err".format(options.query,i))
+				inputs.append("{0}.{1}".format(options.query,i))
+				outputs.append("{0}.{1}.out".format(options.query,i))
+				errors.append("{0}.{1}.err".format(options.query,i))
 
 		log.info("Writing Partitioning Rules")
 
 		#Here we actually start generating the Makeflow
 		#How to get inputs
-		makeflow.write("{0} : {1} {2}".format(' '.join(inputs), options.query, split_name))
-		makeflow.write("\tLOCAL ./{0} {1} {2}".format(split_name, options.num_seq, options.query))
+		makeflow.write("\n\n{0} : {1} {2}".format(' '.join(inputs), options.query, split_name))
+		makeflow.write("\n\tLOCAL ./{0} {1} {2}".format(split_name, options.num_seq, options.query))
 
 		log.info("Writing BLAST Rules")
 
@@ -190,24 +190,23 @@ def write_makeflow(destination):
 		db_split = re.split("/",options.database)
 		database = db_split[0]
 		for i in range(num_splits):
-	        	temp_cmd = blast_args
-	        	makeflow.write("{0} {1} : legacy_blast.pl {2} {3} {4}".format(
+				makeflow.write("\n\n{0} {1} : legacy_blast.pl {2} {3} {4}/".format(
 								outputs[i], errors[i], options.process, inputs[i], 
 								options.database))
-	        	makeflow.write("\tperl legacy_blast.pl blastall " + 
-								"-p {0} -d {1} -i {2} -o {3} {4} 2> {5}".format(
+				makeflow.write("\n\tperl legacy_blast.pl blastall --path . " + 
+								"-p {0} -d {1}/{1} -i {2} -o {3} 2> {4}".format(
 								options.process, options.database, inputs[i], 
-								outputs[i], blast_args, errors[i]))
+								outputs[i], errors[i]))
 
 		log.info("Writing Joining Rules")
 
 		#How to concatenate and cleanup outputs (very naive)
-		makeflow.write("{0} : {1} {2}".format(options.output, cat_name, ' '.join(outputs)))
-		makeflow.write("\tLOCAL ./{0} {1} {2}".format(cat_name, options.output, ' '.join(outputs)))
+		makeflow.write("\n\n{0} : {1} {2}".format(options.output, cat_name, ' '.join(outputs)))
+		makeflow.write("\n\tLOCAL ./{0} {1} {2}".format(cat_name, options.output, ' '.join(outputs)))
 		
 		#How to concatenate and cleanup errors (very naive)
-		makeflow.write("{0} : {1}".format(options.error, ' '.join(errors)))
-		makeflow.write("\tLOCAL cat {0} > {1}".format(' '.join(errors), options.error))
+		makeflow.write("\n\n{0}.err : {1}".format(options.output, ' '.join(errors)))
+		makeflow.write("\n\tLOCAL cat {0} > {1}.err\n".format(' '.join(errors), options.output))
 
 	finally:
 		if options.makeflow is not None:
@@ -245,13 +244,12 @@ if not options.process:
 else: 
 	log.info("Selected Process : {0}".format(options.process))
 
-log.info("Partition Size : {0}".format(options.num_reads))
+log.info("Partition Size : {0}".format(options.num_seq))
 
 #find blast process and legacy_blast.py
 path = os.getenv("PATH")
-path += os.pathsep + options.path
 
-log.info("Searching PATH for {0}".format(options.process)
+log.info("Searching PATH for {0}".format(options.process))
 process = search_file(options.process, path)
 if os.path.exists("./{0}".format(options.process)):
 	log.info("{0} found locally")
@@ -262,7 +260,7 @@ elif not os.path.exists("./{0}".format(options.process)):
 	log.error("Unable to find process : {0}".format(options.process))
 	sys.exit(5)
 
-log.info("Searching PATH for {0}".format("legacy_blast.pl")
+log.info("Searching PATH for {0}".format("legacy_blast.pl"))
 legacy = search_file("legacy_blast.pl", path)
 if os.path.exists("./legacy_blast.pl"):
 	log.info("legacy_blast.pl found locally")
@@ -279,19 +277,26 @@ if os.getenv("BLASTDB"):
 	dbpath += os.pathsep + os.getenv("BLASTDB")
 
 log.info("Searching PATH and BLASTDB for database {0}".format(options.database))
-db = search_file(options.database, dbpath)
 if os.path.exists("./{0}".format(options.database)):
 	log.info("Database {0} found locally".format(options.database))
-if db and not os.path.exists("./{0}".format(options.database)):
-	os.symlink(db, options.database)
-	log.info("Databse linked from : {0}".format(db))
-elif not os.path.exists("./{0}".format(options.database)):
-	log.error("Unable to find database : {0}".format(options.database))
-	sys.exit(5)
+else:
+	db = search_file("{0}.nal".format(options.database), dbpath)
+	os.mkdir(options.database)
+	if db and not os.path.exists("./{0}.nal".format(options.database)):
+		dbpath = os.path.dirname(db)
+		for fn in os.listdir(dbpath):
+			oloc = "{0}/{1}\n".format(dbpath, fn) 
+			print "{0}\n".format(oloc)
+			if options.database in fn:
+				os.symlink(oloc, "{0}/{1}".format(options.database, fn))
+		log.info("Databse linked from : {0}/{1}".format(dbpath, options.database))
+	elif not os.path.exists("./{0}".format(options.database)):
+		log.error("Unable to find database : {0}".format(options.database))
+		sys.exit(5)
 
 split_name = "split_fasta"
 if os.path.exists(split_name):
-    os.remove(split_name)
+	os.remove(split_name)
 write_split_fasta(split_name)
 st = os.stat(split_name)
 os.chmod(split_name, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
@@ -299,12 +304,10 @@ log.info("{0} made executable".format(split_name))
 
 cat_name = "cat_blast"
 if os.path.exists(cat_name):
-    os.remove(cat_name)
+	os.remove(cat_name)
 write_cat_blast(cat_name)
 st = os.stat(cat_name)
 os.chmod(cat_name, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 log.info("{0} made executable".format(cat_name))
-
-blast_args += " --path . "
 
 write_makeflow(options.makeflow)
