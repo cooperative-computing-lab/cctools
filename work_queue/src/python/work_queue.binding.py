@@ -795,6 +795,25 @@ class WorkQueue(_object):
         return work_queue_shut_down_workers(self._work_queue, n)
 
     ##
+    # Blacklist workers running on host.
+    #
+    # @param self   Reference to the current work queue object.
+    # @param host   The hostname the host running the workers.
+    def blacklist(self, host):
+        return work_queue_blacklist_add(self._work_queue, host)
+
+    ##
+    # Remove host from blacklist. Clear all blacklist if host not provided.
+    #
+    # @param self   Reference to the current work queue object.
+    # @param host   The of the hostname the host.
+    def blacklist_clear(self, host=None):
+        if host is None:
+            return work_queue_blacklist_clear(self._work_queue)
+        else:
+            return work_queue_blacklist_remove(self._work_queue, host)
+
+    ##
     # Change keepalive interval for a given queue.
     #
     # @param self     Reference to the current work queue object.
