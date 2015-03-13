@@ -805,7 +805,8 @@ class WorkQueue(_object):
     # @param self   Reference to the current work queue object.
     # @param host   The hostname the host running the workers.
     def blacklist(self, host):
-        return work_queue_blacklist_add(self._work_queue, host)
+        # Note the "%s" % host below, so that C gets a correct string.
+        return work_queue_blacklist_add(self._work_queue, "%s" % host)
 
     ##
     # Remove host from blacklist. Clear all blacklist if host not provided.
@@ -816,7 +817,8 @@ class WorkQueue(_object):
         if host is None:
             return work_queue_blacklist_clear(self._work_queue)
         else:
-            return work_queue_blacklist_remove(self._work_queue, host)
+            # Note the "%s" % host below, so that C gets a correct string.
+            return work_queue_blacklist_remove(self._work_queue, "%s" % host)
 
     ##
     # Change keepalive interval for a given queue.
