@@ -644,6 +644,14 @@ then
 		echo "*** Couldn't find $library in ${cvmfs_path}"
 		exit 1
 	fi
+  
+	if library_search uuid "/usr"
+	then
+		cvmfs_ldflags="${cvmfs_ldflags} ${library_search_result}"
+	else
+		echo "*** Couldn't find libuuid"
+		exit 1
+	fi
 else
 	if [ $config_cvmfs_path = yes ]
 	then
