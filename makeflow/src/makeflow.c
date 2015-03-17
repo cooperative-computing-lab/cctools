@@ -928,8 +928,7 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
         char tmp_sh_name[4096];
         sprintf(tmp_sh_name, "%s.%d", TMP_SH_PREFIX, n->nodeid); 
  
-      	char str_content[4096];
-      	sprintf(str_content, "#!/bin/sh\n\
+      	fprintf(wrapper_fn, "#!/bin/sh\n\
 curr_dir=`pwd`\n\
 default_dir=/root/worker\n\
 echo \"#!/bin/sh\" > %s\n\
@@ -939,7 +938,6 @@ flock /tmp/lockfile /usr/bin/docker pull %s\n\
 docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 %s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, img_name, img_name, tmp_sh_name);
  
-      	fprintf(wrapper_fn, str_content);
       	fclose(wrapper_fn);
 
         chmod(wrapper_fn_name, 0755);
