@@ -74,8 +74,8 @@ See the file COPYING for details.
 
 #define WITHOUT_CONTAINER 0
 #define WITH_DOCKER 1
-#define WRAPPER_SH "tmp_wrapper"
-#define TMP_SH "tmp"
+#define WRAPPER_SH_PREFIX "tmp_wrapper"
+#define TMP_SH_PREFIX "tmp"
 
 typedef enum {
 	DAG_GC_NONE,
@@ -920,7 +920,13 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 
       	FILE *wrapper_fn;
         
-      	wrapper_fn = fopen(WRAPPER_SH, "w"); 
+        char wrapper_fn_name[4096];
+        sprintf(wrapper_fn_name, "%s.%d", WRAPPER_SH_PREFIX, n->nodeid);
+    
+      	wrapper_fn = fopen(wrapper_fn_name, "w"); 
+
+        char tmp_sh_name[4096];
+        sprintf(tmp_sh_name, "%s.%d", TMP_SH_PREFIX, n->nodeid); 
  
       	char str_content[4096];
       	sprintf(str_content, "#!/bin/sh\n\
@@ -931,18 +937,18 @@ echo \"$@\" >> %s\n\
 chmod 755 %s\n\
 flock /tmp/lockfile /usr/bin/docker pull %s\n\
 docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
-%s $default_dir/%s", TMP_SH, TMP_SH, TMP_SH, img_name, img_name, TMP_SH);
+%s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, img_name, img_name, tmp_sh_name);
  
       	fprintf(wrapper_fn, str_content);
       	fclose(wrapper_fn);
 
-        chmod(WRAPPER_SH, 0755);
+        chmod(wrapper_fn_name, 0755);
 
         if(!wrapper_input_files) wrapper_input_files = list_create();
-	    list_push_tail(wrapper_input_files,dag_file_create(WRAPPER_SH)); 
+	    list_push_tail(wrapper_input_files,dag_file_create(wrapper_fn_name)); 
 
         char wrap_cmd[4096]; 
-        sprintf(wrap_cmd, "./%s", WRAPPER_SH);
+        sprintf(wrap_cmd, "./%s.%%%%", WRAPPER_SH_PREFIX);
         
         if(!wrapper_command) wrapper_command = strdup(wrap_cmd);
 	    else wrapper_command = string_wrap_command(wrapper_command,optarg);
@@ -2179,6 +2185,15 @@ int main(int argc, char *argv[])
 	if(write_summary_to || email_summary_to)
 		create_summary(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile);
 
+    if (container_mode == WITH_DOCKER) {
+            char rm_wrapper_cmd[4096];
+            char rm_sh_script_cmd[4096];
+            sprintf(rm_wrapper_cmd, "rm %s*", WRAPPER_SH_PREFIX);
+            sprintf(rm_sh_script_cmd, "rm %s*", TMP_SH_PREFIX);
+            system(rm_wrapper_cmd);
+            system(rm_sh_script_cmd);
+    }
+
 	if(dag_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "workflow was aborted.\n");
@@ -2189,14 +2204,12 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	} else {
 		fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
+        
       	printf("nothing left to do.\n");
 		exit(EXIT_SUCCESS);
 	}
 
-    if (container_mode == WITH_DOCKER) {
-        remove(WRAPPER_SH);
-        remove("tmp.sh");
-    }
+    
 
 	return 0;
 }
