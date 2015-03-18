@@ -1668,9 +1668,9 @@ static void show_help(const char *cmd)
 	printf( " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
-	printf(" %-30s docker mode -- run each task with a docker container.\n", "--doker=<image name>");
-	printf(" %-30s docker-preserve mode -- tasks execute by a worker share a container.\n", "--docker-preserve=<image name>");
-	printf(" %-30s docker-tar mode -- build docker image from tarball, this mode must be used with --docker or --docker-preserve.\n", "--docker-tar=<path>");
+	printf(" %-30s docker mode -- run each task with a container based on this docker image.\n", "--doker=<image>");
+	printf(" %-30s docker-preserve mode -- tasks execute by a worker share a container based on this docker image.\n", "--docker-preserve=<image>");
+	printf(" %-30s docker-tar mode -- build docker image from tarball, this mode must be used with --docker or --docker-preserve.\n", "--docker-tar=<tarball>");
 	printf( " %-30s Show this help screen\n", "-h,--help");
 }
 
