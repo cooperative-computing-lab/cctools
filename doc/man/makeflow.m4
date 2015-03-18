@@ -93,7 +93,8 @@ OPTION_ITEM(`-K, --preserve-links')Preserve (i.e., do not clean) intermediate sy
 OPTION_ITEM(`-z, --zero-length-error')Force failure on zero-length output files.
 OPTION_PAIR(--wrapper,command) Wrap all commands with this prefix.
 OPTION_PAIR(--wrapper-input,file) Wrapper command requires this input file.
-OPTION_PAIR(--wrapper-output,file) Wrapper command produces this output file.
+OPTION_PAIR(--wrapper-input,file) Wrapper command produces this output file.
+OPTION_PAIR(--docker,image) Run each task with a container based on this docker image.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
