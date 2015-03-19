@@ -279,6 +279,38 @@ static void send_resource_update( struct link *master, int force_update )
 	last_send_time = time(0);
 }
 
+/* slower disk check, poor man's du on workspace */
+static int check_disk_workspace(int64_t *workspace_usage, int force) {
+	static time_t  last_cwd_measure_time = 0;
+	static int64_t last_workspace_usage  = 0;
+
+	if(manual_disk_option < 1)
+		return 1;
+
+	if( force || (time(0) - last_cwd_measure_time) >= measure_wd_interval ) {
+		cwd_disk_info_get(workspace, &last_workspace_usage);
+		debug(D_WQ, "worker disk usage: %" PRId64 "\n", last_workspace_usage);
+		last_cwd_measure_time = time(0);
+	}
+
+	if(workspace_usage) {
+		*workspace_usage = last_workspace_usage;
+	}
+
+	// Use thershold only if smaller than specified disk size.
+	int64_t disk_limit = manual_disk_option - disk_avail_threshold; 
+	if(disk_limit < 0)
+		disk_limit = manual_disk_option;
+
+	if(last_workspace_usage > disk_limit) {
+		debug(D_WQ, "worker disk usage %"PRId64 " larger than: %" PRId64 "!\n", last_workspace_usage + disk_avail_threshold, manual_disk_option);
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+
 /*
 Send a message to the master with my current statistics information.
 */
@@ -304,8 +336,11 @@ static void send_stats_update( struct link *master, int force_update)
 		send_master_message(master, "info total_execute_time %lld\n", (long long) s.total_execute_time);
 		send_master_message(master, "info total_bytes_sent %lld\n", (long long) s.total_bytes_sent);
 		send_master_message(master, "info total_bytes_received %lld\n", (long long) s.total_bytes_received);
+	} else {
+		int64_t disk_usage;
+		check_disk_workspace(&disk_usage, 0);
+		send_master_message(master, "info disk_space_used %lld\n", (long long) disk_usage);
 	}
-
 	last_send_time = time(0);
 }
 
@@ -574,6 +609,7 @@ static int handle_tasks(struct link *master)
 	return 1;
 }
 
+/* faster disk check, overall with statfs */
 static int check_disk_space_for_filesize(int64_t file_size) {
 	uint64_t disk_avail, disk_total;
 
