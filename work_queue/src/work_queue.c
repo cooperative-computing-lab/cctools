@@ -48,14 +48,14 @@ The following major problems must be fixed:
 #include <sys/wait.h>
 
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <stdlib.h>
-#include <limits.h>
 
 #ifdef CCTOOLS_OPSYS_SUNOS
 extern int setenv(const char *name, const char *value, int overwrite);
@@ -4018,7 +4018,7 @@ void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 }
 
 int work_queue_task_state( struct work_queue *q, int taskid) {
-	return (int) ((uint64_t) itable_lookup(q->task_state_map, taskid));
+	return (int)(uintptr_t)itable_lookup(q->task_state_map, taskid);
 }
 
 /* Changes task state. Returns old state */
