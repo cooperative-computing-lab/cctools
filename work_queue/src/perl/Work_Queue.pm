@@ -91,6 +91,11 @@ sub stats_hierarchy {
     return $self->{_stats_hierarchy};
 }
 
+sub task_state {
+    my ($self, $taskid) = @_;
+    return work_queue_task_state($self->{_work_queue}, $taskid);
+}
+
 sub enable_monitoring {
     my ($self, $summary_file) = @_;
     return work_queue_enable_monitoring($self->{_work_queue}, $summary_file);
@@ -169,6 +174,22 @@ sub cancel_by_tasktag {
 sub shutdown_workers {
     my ($self, $n) = @_;
     return work_queue_shut_down_workers($self->{_work_queue}, $n);
+}
+
+sub blacklist {
+    my ($self, $host) = @_;
+    return work_queue_blacklist_add($self->{_work_queue}, $host);
+}
+
+sub blacklist_clear {
+    my ($self, $host) = @_;
+
+	if($host) {
+		return work_queue_blacklist_remove($self->{_work_queue}, $host);
+	}
+	else {
+		return work_queue_blacklist_clear($self->{_work_queue});
+	}
 }
 
 sub specify_keepalive_interval {
@@ -525,6 +546,30 @@ Shutdown workers connected to queue. Gives a best effort and then returns the nu
 =item n
 
 The number to shutdown.  To shut down all workers, specify 0.
+
+=back
+
+=head3 C<blacklist>
+
+Blacklist workers running on host.
+
+=over 12
+
+=item host
+
+The hostname the host running the workers.
+
+=back
+
+=head3 C<blacklist_clear>
+
+Remove host from blacklist. Clear all blacklist if host not provided.
+
+=over 12
+
+=item host
+
+The of the hostname the host.
 
 =back
 

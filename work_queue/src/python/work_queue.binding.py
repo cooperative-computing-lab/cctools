@@ -250,7 +250,7 @@ class Task(_object):
     @property
     def command(self):
         return self._task.command_line
-    
+
     ##
     # Get the algorithm for choosing worker to run the task.	 
     # @a Note: This is defined using property decorator. So it must be called without parentheses
@@ -642,6 +642,13 @@ class WorkQueue(_object):
         work_queue_get_stats_hierarchy(self._work_queue, self._stats_hierarchy)
         return self._stats_hierarchy
 
+    ##
+    # Get current task state
+    # @code
+    # >>> print q.task_state(taskid)
+    # @endcode
+    def task_state(self, taskid):
+        return work_queue_task_state(self._work_queue, taskid)
 
     ## Enables resource monitoring of tasks in the queue. And writes a summary of the monitored information to a file.
     #
@@ -786,6 +793,25 @@ class WorkQueue(_object):
     # @param n      The number to shutdown.  To shut down all workers, specify "0".
     def shutdown_workers(self, n):
         return work_queue_shut_down_workers(self._work_queue, n)
+
+    ##
+    # Blacklist workers running on host.
+    #
+    # @param self   Reference to the current work queue object.
+    # @param host   The hostname the host running the workers.
+    def blacklist(self, host):
+        return work_queue_blacklist_add(self._work_queue, host)
+
+    ##
+    # Remove host from blacklist. Clear all blacklist if host not provided.
+    #
+    # @param self   Reference to the current work queue object.
+    # @param host   The of the hostname the host.
+    def blacklist_clear(self, host=None):
+        if host is None:
+            return work_queue_blacklist_clear(self._work_queue)
+        else:
+            return work_queue_blacklist_remove(self._work_queue, host)
 
     ##
     # Change keepalive interval for a given queue.

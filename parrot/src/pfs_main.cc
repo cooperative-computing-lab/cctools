@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "pfs_paranoia.h"
 #include "pfs_process.h"
 #include "pfs_service.h"
+#include "pfs_table.h"
 #include "ptrace.h"
 
 #ifndef PTRACE_EVENT_STOP
@@ -422,7 +423,9 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 					break;
 				case SIGTSTP:
 					break;
-				case SIGSEGV:
+				case SIGSEGV: {
+					buffer_t B[1];
+					buffer_init(B);
 					if (ptrace(PTRACE_GETSIGINFO, pid, 0, &info) == 0) {
 						if (info.si_code == SEGV_MAPERR) {
 							debug(D_PROCESS, "pid %d faulted on address %p (unmapped)", pid, info.si_addr);
@@ -434,7 +437,11 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 					} else {
 						debug(D_DEBUG, "couldn't get signal info: %s", strerror(errno));
 					}
+					pfs_table::mmap_proc(pid, B);
+					debug(D_DEBUG, "%d maps:\n%s", pid, buffer_tostring(B));
+					buffer_free(B);
 					break;
+				}
 			}
 			if (tracer_continue(p->tracer,signum) == -1) /* deliver (or not) the signal */
 				return;
