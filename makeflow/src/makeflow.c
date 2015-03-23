@@ -2184,12 +2184,12 @@ int main(int argc, char *argv[])
 		create_summary(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile);
 
     if (container_mode == WITH_DOCKER) {
-            char rm_wrapper_cmd[4096];
-            char rm_sh_script_cmd[4096];
-            sprintf(rm_wrapper_cmd, "rm %s*", WRAPPER_SH_PREFIX);
-            sprintf(rm_sh_script_cmd, "rm %s*", TMP_SH_PREFIX);
-            system(rm_wrapper_cmd);
-            system(rm_sh_script_cmd);
+        char rm_wrapper_cmd[4096];
+        char rm_sh_script_cmd[4096];
+        sprintf(rm_wrapper_cmd, "rm %s*", WRAPPER_SH_PREFIX);
+        sprintf(rm_sh_script_cmd, "rm %s*", TMP_SH_PREFIX);
+        system(rm_wrapper_cmd);
+        system(rm_sh_script_cmd);
     }
 
 	if(dag_abort_flag) {
