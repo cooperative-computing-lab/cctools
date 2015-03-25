@@ -395,6 +395,8 @@ like this:</p>
 
 Makeflow allows a global wrapper command to be applied to every rule in the workflow.  This is particularly useful for applying troubleshooting tools, or for setting up a global environment without rewriting the entire workflow.  The <tt>--wrapper</tt> option will prefix a command in front of every rule, while the <tt>--wrapper-input</tt> and <tt>--wrapper-output</tt> options will specify input and output files related to the wrapper.
 <p>
+A few special characters are supported by wrappers.  If the wrapper command or wrapper files contain two percents (<tt>%%</tt>), then the number of the current rule will be substituted there.  If the command contains curly braces (<tt>{}</tt>) the original command will be substituted at that point, instead of at the end of the command.
+<p>
 For example, suppose that you wish to apply <tt>/usr/bin/time</tt> to every rule in the workflow.  Instead of modifying the workflow, run it like this:
 
 <code>makeflow --wrapper '/usr/bin/time -p' example.makeflow</code>
