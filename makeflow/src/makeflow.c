@@ -1523,7 +1523,7 @@ int main(int argc, char *argv[])
 		{"retry-count", required_argument, 0, 'r'},
 		{"show-output", no_argument, 0, 'O'},
 		{"submission-timeout", required_argument, 0, 'S'},
-		{"summary-log", no_argument, 0, 'f'},
+		{"summary-log", required_argument, 0, 'f'},
 		{"tickets", required_argument, 0, LONG_OPT_TICKETS},
 		{"version", no_argument, 0, 'v'},
 		{"log-verbose", no_argument, 0, LONG_OPT_LOG_VERBOSE_MODE},
