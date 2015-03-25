@@ -1538,7 +1538,7 @@ int main(int argc, char *argv[])
 		{0, 0, 0, 0}
 	};
 
-	const char *option_string_run = "aAB:cC:d:EfF:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:";
+	const char *option_string_run = "aAB:cC:d:Ef:F:g:G:hj:J:Kl:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:zZ:";
 
 	while((c = getopt_long(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
 		switch (c) {
