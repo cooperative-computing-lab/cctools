@@ -942,7 +942,7 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 
 			if(sscanf(link_target, "/cvmfs/%[^/]%[^\n]", xpath->host, path_head) < 1)
 			{
-				errno = EXDEV;
+				errno = ENOENT;
 				return false;
 			}
 
