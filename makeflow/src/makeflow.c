@@ -72,6 +72,11 @@ See the file COPYING for details.
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 #define DEFAULT_MONITOR_INTERVAL   1
 
+#define WITHOUT_CONTAINER 0
+#define WITH_DOCKER 1
+#define WRAPPER_SH_PREFIX "tmp_wrapper"
+#define TMP_SH_PREFIX "tmp"
+
 typedef enum {
 	DAG_GC_NONE,
 	DAG_GC_REF_COUNT,
@@ -105,6 +110,9 @@ static char *monitor_exe  = "resource_monitor_cctools";
 static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
 static int monitor_enable_list_files  = 0;
+
+static int container_mode = 0;
+static char *img_name = NULL;
 
 /* wait upto this many seconds for an output file of a succesfull task
  * to appear on the local filesystem (e.g, to deal with NFS
@@ -908,6 +916,43 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
+    if (container_mode == WITH_DOCKER) {
+
+      	FILE *wrapper_fn;
+        
+        char wrapper_fn_name[4096];
+        sprintf(wrapper_fn_name, "%s.%d", WRAPPER_SH_PREFIX, n->nodeid);
+    
+      	wrapper_fn = fopen(wrapper_fn_name, "w"); 
+
+        char tmp_sh_name[4096];
+        sprintf(tmp_sh_name, "%s.%d", TMP_SH_PREFIX, n->nodeid); 
+ 
+      	fprintf(wrapper_fn, "#!/bin/sh\n\
+curr_dir=`pwd`\n\
+default_dir=/root/worker\n\
+echo \"#!/bin/sh\" > %s\n\
+echo \"$@\" >> %s\n\
+chmod 755 %s\n\
+flock /tmp/lockfile /usr/bin/docker pull %s\n\
+docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
+%s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, img_name, img_name, tmp_sh_name);
+ 
+      	fclose(wrapper_fn);
+
+        chmod(wrapper_fn_name, 0755);
+
+        if(!wrapper_input_files) wrapper_input_files = list_create();
+	    list_push_tail(wrapper_input_files,dag_file_create(wrapper_fn_name)); 
+
+        char wrap_cmd[4096]; 
+        sprintf(wrap_cmd, "./%s.%%%%", WRAPPER_SH_PREFIX);
+        
+        if(!wrapper_command) wrapper_command = strdup(wrap_cmd);
+	    else wrapper_command = string_wrap_command(wrapper_command,optarg);
+
+    }
+
 	/* Create strings for all the files mentioned by this node. */
 	char *input_files = dag_file_list_format(n,0,n->source_files,queue);
 	char *output_files = dag_file_list_format(n,0,n->target_files,queue);
@@ -1409,6 +1454,7 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
 	fprintf(stdout, " %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
 	fprintf(stdout, " %-30s Add node id symbol tags in the makeflow log.        (default is false)\n", "   --log-verbose");
+	fprintf(stdout, " %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
 
 	fprintf(stdout, "\n*Monitor Options:\n\n");
 	fprintf(stdout, " %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
@@ -1617,7 +1663,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_WQ_WAIT_FOR_WORKERS,
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
-		LONG_OPT_WRAPPER_OUTPUT
+		LONG_OPT_WRAPPER_OUTPUT,
+        LONG_OPT_DOCKER
 	};
 
 	static struct option long_options_run[] = {
@@ -1671,6 +1718,7 @@ int main(int argc, char *argv[])
 		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
 		{"zero-length-error", no_argument, 0, 'z'},
 		{"change-directory", required_argument, 0, 'X'},
+		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{0, 0, 0, 0}
 	};
 
@@ -1892,6 +1940,10 @@ int main(int argc, char *argv[])
 				if(!wrapper_output_files) wrapper_output_files = list_create();
 				list_push_tail(wrapper_output_files,dag_file_create(optarg));
 				break;
+            case LONG_OPT_DOCKER:
+                container_mode = WITH_DOCKER; 
+                img_name = xxstrdup(optarg);
+                break;
 			default:
 				show_help_run(get_makeflow_exe());
 				return 1;
@@ -2132,6 +2184,15 @@ int main(int argc, char *argv[])
 	if(write_summary_to || email_summary_to)
 		create_summary(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile);
 
+    if (container_mode == WITH_DOCKER) {
+            char rm_wrapper_cmd[4096];
+            char rm_sh_script_cmd[4096];
+            sprintf(rm_wrapper_cmd, "rm %s*", WRAPPER_SH_PREFIX);
+            sprintf(rm_sh_script_cmd, "rm %s*", TMP_SH_PREFIX);
+            system(rm_wrapper_cmd);
+            system(rm_sh_script_cmd);
+    }
+
 	if(dag_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "workflow was aborted.\n");
@@ -2142,9 +2203,12 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	} else {
 		fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
-		printf("nothing left to do.\n");
+        
+      	printf("nothing left to do.\n");
 		exit(EXIT_SUCCESS);
 	}
+
+    
 
 	return 0;
 }

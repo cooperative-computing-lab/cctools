@@ -66,6 +66,13 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_MODE_WORKER  1
 #define WORKER_MODE_FOREMAN 2
 
+#define NONE 0 
+#define DOCKER 1
+#define DOCKER_PRESERVE 2
+#define UMBRELLA 3 
+
+#define DEFAULT_WORK_DIR "/home/worker"
+
 // In single shot mode, immediately quit when disconnected.
 // Useful for accelerating the test suite.
 static int single_shot_mode = 0;
@@ -114,6 +121,11 @@ char *password = 0;
 static int symlinks_enabled = 1;
 
 static int worker_mode = WORKER_MODE_WORKER;
+
+// Do not run any container by default
+static int container_mode = NONE;
+static int load_from_tar = 0;
+
 static const char *master_host = 0;
 static char master_addr[LINK_ADDRESS_MAX];
 static int master_port;
@@ -143,7 +155,10 @@ static int send_resources_interval = 30;
 static int send_stats_interval     = 60;
 
 static struct work_queue *foreman_q = NULL;
-
+// docker image name
+static char *img_name = NULL;
+static char container_name[1024]; 
+static char *tar_fn = NULL;
 // Table of all processes in any state, indexed by taskid.
 // Processes should be created/deleted when added/removed from this table.
 static struct itable *procs_table = NULL;
@@ -393,7 +408,16 @@ accounting for the resources as necessary.
 
 static int start_process( struct work_queue_process *p )
 {
-	pid_t pid = work_queue_process_execute(p);
+
+    pid_t pid;
+
+    if (container_mode == DOCKER) 
+	    pid = work_queue_process_execute(p, container_mode, img_name);
+    else if (container_mode == DOCKER_PRESERVE)
+	    pid = work_queue_process_execute(p, container_mode, container_name);
+    else
+	    pid = work_queue_process_execute(p, container_mode);
+    
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
 	itable_insert(procs_running,pid,p);
@@ -1317,6 +1341,9 @@ static void work_for_master(struct link *master) {
 		ok &= check_disk_space_for_filesize(0);
 
 		if(ok) {
+            
+            
+             
 			int visited = 0;
 			while(list_size(procs_waiting) > visited && cores_allocated < local_resources->cores.total) {
 				struct work_queue_process *p;
@@ -1345,6 +1372,9 @@ static void work_for_master(struct link *master) {
 				debug(D_WQ, "No task can be executed with the available resources.\n");
 				ok = 0;
 			}
+
+            
+             
 		}
 
 		if(!ok) break;
@@ -1419,9 +1449,11 @@ static int workspace_create() {
 	} else {
 		workdir = "/tmp";
 	}
-
-
-	workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
+	//}
+	
+	if(!workspace) {
+		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
+	}
 
 	printf( "work_queue_worker: creating workspace %s\n", workspace);
 	if(!create_dir(workspace,0777)) return 0;
@@ -1636,13 +1668,17 @@ static void show_help(const char *cmd)
 	printf( " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
+	printf(" %-30s docker mode -- run each task with a container based on this docker image.\n", "--doker=<image>");
+	printf(" %-30s docker-preserve mode -- tasks execute by a worker share a container based on this docker image.\n", "--docker-preserve=<image>");
+	printf(" %-30s docker-tar mode -- build docker image from tarball, this mode must be used with --docker or --docker-preserve.\n", "--docker-tar=<tarball>");
 	printf( " %-30s Show this help screen\n", "-h,--help");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
       LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
-      LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_SINGLE_SHOT };
+      LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE, 
+      LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT};
 
 struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1665,7 +1701,7 @@ struct option long_options[] = {
 	{"tcp-window-size",     required_argument,  0,  'w'},
 	{"min-backoff",         required_argument,  0,  'i'},
 	{"max-backoff",         required_argument,  0,  'b'},
-	{"single-shot",		no_argument,        0,  LONG_OPT_SINGLE_SHOT },
+	{"single-shot",		    no_argument,        0,  LONG_OPT_SINGLE_SHOT },
 	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
 	{"disk-threshold",      required_argument,  0,  'z'},
 	{"arch",                required_argument,  0,  'A'},
@@ -1679,6 +1715,10 @@ struct option long_options[] = {
 	{"gpus",                required_argument,  0,  LONG_OPT_GPUS},
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
+	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
+	{"docker",              required_argument,  0,  LONG_OPT_RUN_DOCKER},
+	{"docker-preserve",     required_argument,  0,  LONG_OPT_RUN_DOCKER_PRESERVE},
+	{"docker-tar",          required_argument,  0,  LONG_OPT_BUILD_FROM_TAR},
 	{0,0,0,0}
 };
 
@@ -1694,7 +1734,7 @@ int main(int argc, char *argv[])
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
 	char * catalog_host = CATALOG_HOST;
-        int catalog_port = CATALOG_PORT;
+    int catalog_port = CATALOG_PORT;
 
 	worker_start_time = time(0);
 
@@ -1872,6 +1912,18 @@ int main(int argc, char *argv[])
 		case 'h':
 			show_help(argv[0]);
 			return 0;
+		case LONG_OPT_RUN_DOCKER:
+			container_mode = DOCKER;
+            img_name = xxstrdup(optarg); 
+			break;
+        case LONG_OPT_RUN_DOCKER_PRESERVE:
+            container_mode = DOCKER_PRESERVE;
+            img_name = xxstrdup(optarg);
+            break;
+        case LONG_OPT_BUILD_FROM_TAR:
+            load_from_tar = 1;
+            tar_fn = xxstrdup(optarg);
+            break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -1974,6 +2026,27 @@ int main(int argc, char *argv[])
 
 	}
 
+    if(container_mode == DOCKER && load_from_tar == 1) {
+ 		char load_cmd[1024];
+        sprintf(load_cmd, "docker load < %s", tar_fn);
+        system(load_cmd);
+    }
+
+    if(container_mode == DOCKER_PRESERVE) {
+        if (load_from_tar == 1) {
+            char load_cmd[1024];
+            sprintf(load_cmd, "docker load < %s", tar_fn);
+            system(load_cmd);
+        }
+
+        sprintf(container_name, "worker-%d-%d", (int) getuid(), (int) getpid());
+        char container_mnt_point[1024];
+        char start_container_cmd[1024];
+        sprintf(container_mnt_point, "%s:%s", workspace, DEFAULT_WORK_DIR);
+        sprintf(start_container_cmd, "docker run -i -d --name=\"%s\" -v %s -w %s %s", container_name, container_mnt_point, DEFAULT_WORK_DIR, img_name);
+        system(start_container_cmd);
+    } 
+
 	procs_running  = itable_create(0);
 	procs_table    = itable_create(0);
 	procs_waiting  = list_create();
@@ -2038,6 +2111,22 @@ int main(int argc, char *argv[])
 
 		sleep(backoff_interval);
 	}
+
+    if(container_mode == DOCKER_PRESERVE || container_mode == DOCKER) {
+        char stop_container_cmd[1024];
+        char rm_container_cmd[1024];
+        
+        sprintf(stop_container_cmd, "docker stop %s", container_name);
+        sprintf(rm_container_cmd, "docker rm %s", container_name);
+
+        if(container_mode == DOCKER_PRESERVE) {
+            //1. stop the container
+            system(stop_container_cmd); 
+            //2. remove the container
+            system(rm_container_cmd);
+        }
+
+    } 
 
 	workspace_delete();
 

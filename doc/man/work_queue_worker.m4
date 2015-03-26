@@ -58,6 +58,9 @@ OPTION_PAIR(--memory, mb)Manually set the amount of memory (in MB) reported by t
 OPTION_PAIR(--disk, mb)Manually set the amount of disk space (in MB) reported by this worker.
 OPTION_ITEM(-v, --version')Show version string.
 OPTION_ITEM(-h, --help')Show this help message.
+OPTION_PAIR(--docker, image) Enable the worker to run each task with a container based on this image. 
+OPTION_PAIR(--docker-preserve, image) Enable the worker to run all tasks with a shared container based on this image. 
+OPTION_PAIR(--docker-tar, tarball) Load docker image from this tarball.  
 OPTIONS_END
 
 SECTION(FOREMAN MODE)
@@ -72,6 +75,18 @@ BOLD(Foreman) mode is enabled by either specifying a port to listen on using the
 setting the mode directly with the BOLD(--foreman) option.  The foreman can be directed to advertise its
 presence on the MANPAGE(catalog_server) with the BOLD(-N PARAM(project name)) flag, which other workers can use to
 contact the foreman.
+
+SECTION(CONTAINER MODE)
+BOLD(work_queue_worker) can be run with container. Docker is the default management tool and docker deamon should be enabled 
+in computing nodes. Tasks received from master can be run with container based on user specified docker image. 
+
+PARA
+
+BOLD(Container) mode is enable by either specifying a image name using the BOLD(--docker PARAM(image)) option, which enable workers 
+running each tasks with an independent container or by using the BOLD(--docker-preserve PARAM(image)) option, which enable workers 
+running all tasks with a shared container. The default way to manage the image is using docker hub, which means user 
+has to push the container image into the docker hub in advance. If the image is saved in a tarball and cached in the
+computing node, BOLD(--docker-tar PARAM(tarball)) option can be adopted to load the image from the tarball. 
 
 SECTION(EXIT STATUS)
 On success, returns zero.  On failure, returns non-zero.
