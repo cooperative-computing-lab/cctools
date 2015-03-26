@@ -943,6 +943,7 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 			if(sscanf(link_target, "/cvmfs/%[^/]%[^\n]", xpath->host, path_head) < 1)
 			{
 				/* The path points outside of cvmfs, we do not allow that. */
+				debug(D_CVMFS, "refusing to follow path outside of cvmfs: '%s' -> '%s'", path->path, link_target);
 				errno = ENOENT;
 				return false;
 			}
