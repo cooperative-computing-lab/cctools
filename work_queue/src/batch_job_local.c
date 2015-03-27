@@ -5,11 +5,51 @@
 #include "macros.h"
 #include "stringtools.h"
 
+#include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/stat.h>
+#include <dirent.h>
+
+int link_recur( const char *source, const char *target ) {
+    struct stat info;
+
+    if(stat(source,&info)<0) return 0;
+
+    if(S_ISDIR(info.st_mode)) {
+        DIR *dir = opendir(source);
+        if(!dir) return 0;
+
+        mkdir(target, 0777);
+
+        struct dirent *d;
+        int result = 1;
+
+        while((d = readdir(dir))) {
+            if(!strcmp(d->d_name,".")) continue;
+            if(!strcmp(d->d_name,"..")) continue;
+
+            char *subsource = string_format("%s/%s",source,d->d_name);
+            char *subtarget = string_format("%s/%s",target,d->d_name);
+
+            result = link_recur(subsource,subtarget);
+
+            free(subsource);
+            free(subtarget);
+
+            if(!result) break;
+        }
+        closedir(dir);
+
+        return result;
+    } else {
+        if(link(source, target)==0) return 1;
+        return 0;
+    }
+}
 
 static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
@@ -29,16 +69,60 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
 		return -1;
 	} else {
-
+        
+        //TODO how to name the sandbox?
+        
         int sub_proc_id = fork();
 
+        srand(time(NULL));
+        int r = rand();
+
+        char sandbox_name[4096]; 
+        sprintf(sandbox_name, "t-%d", r);
+		debug(D_BATCH, "===================SANDBOX NAME IS: %s\n", sandbox_name);
+
         if (sub_proc_id > 0) {
+
             int return_status;
             waitpid(sub_proc_id, &return_status, 0);  // Parent process waits here for child to terminate.
 
             if (return_status == 0)  {// Verify child process terminated without error.  
             	debug(D_BATCH, "SUB PROCESS SUCCESS FINISHED");
+
+                char cwd[4096];
+                getcwd(cwd, sizeof(cwd));
+
+            	debug(D_BATCH, "Current working dir: %s\n", cwd);
+
+                char *oup_f, *oup_p, *oup_files;
+
+                printf("Output files are:\n");
+                char src_fn[4096];
+                char dst_fn[4096];
+
+                if(extra_output_files) {
+                    oup_files = strdup(extra_output_files);
+                    oup_f = strtok(oup_files, " \t,");
+                    while(oup_f) {
+                        sprintf(src_fn, "%s/%s", sandbox_name, oup_f);
+                        sprintf(dst_fn, "%s/%s", cwd, oup_f);
+            	        debug(D_BATCH, "SOURCE FILE IS: %s\n", src_fn);
+            	        debug(D_BATCH, "DESTINATION FILE IS: %s\n", dst_fn);
+
+                        oup_p = strchr(oup_f, '=');
+                        if(oup_p) {
+                            *oup_p = 0;
+                            rename(src_fn, dst_fn);
+                            *oup_p = '=';
+                        } else {
+                            rename(src_fn, dst_fn);
+                        }
+                        oup_f = strtok(0, " \t,");
+                    }
+                    free(oup_files);
+                }
                 exit(0);
+
             } else {     
 		        debug(D_BATCH, "SUB PROCESS TERMINATED WITH ERROR: %s\n", strerror(errno));
                 _exit(127);
@@ -48,68 +132,57 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		    debug(D_BATCH, "couldn't create new sub process: %s\n", strerror(errno));
 			return -1;
 		} else {
-		    /** The following code works but would duplicates the current process because of the system() function.
-		    int result = system(cmd);
-		    if(WIFEXITED(result)) {
-		    	_exit(WEXITSTATUS(result));
-		    } else {
-		    	_exit(1);
-		    }*/
+
+            srand(time(NULL));
+            int r_1 = rand();
+
+		    debug(D_BATCH, "+=+=+=+=+=+=+=current random value is: %d\n", r_1);
 
 		    if(envlist) {
 		    	nvpair_export(envlist);
 		    }
 
-		    /** A note from "man system 3" as of Jan 2012:
-		     * Do not use system() from a program with set-user-ID or set-group-ID
-		     * privileges, because strange values for some environment variables
-		     * might be used to subvert system integrity. Use the exec(3) family of
-		     * functions instead, but not execlp(3) or execvp(3). system() will
-		     * not, in fact, work properly from programs with set-user-ID or
-		     * set-group-ID privileges on systems on which /bin/sh is bash version
-		     * 2, since bash 2 drops privileges on startup. (Debian uses a modified
-		     * bash which does not do this when invoked as sh.)
-		     */
+		    debug(D_BATCH, "CURRENT CMD is %s\n", cmd);
+            mkdir(sandbox_name, 0777) == -1;
             char *f, *p, *files;
 
-            printf("Input files are:\n");
+            char link_fn_path[4096];
             if(extra_input_files) {
                 files = strdup(extra_input_files);
                 f = strtok(files, " \t,");
+
                 while(f) {
                     p = strchr(f, '=');
+                    debug(D_BATCH, "+++++++++++++++INPUT FILE: %s\n", f);
+                    if (*f == '/')
+                    	sprintf(link_fn_path, "%s%s", sandbox_name, f);
+                    else
+                		sprintf(link_fn_path, "%s/%s", sandbox_name, f);
+
                     if(p) {
                         *p = 0;
-                        printf("%s\n", f);
+                	    debug(D_BATCH, "LINK INPUT FILE: %s\n", link_fn_path);
+                        link_recur(f, link_fn_path);
                         *p = '=';
                     } else {
-                        printf("%s\n", f);
+                	    debug(D_BATCH, "LINK INPUT FILE: %s\n", link_fn_path);
+                        link_recur(f, link_fn_path);
                     }
                     f = strtok(0, " \t,");
                 }
                 free(files);
-            }
+            }   
 
-            printf("Output files are:\n");
-            if(extra_output_files) {
-                files = strdup(extra_output_files);
-                f = strtok(files, " \t,");
-                while(f) {
-                    p = strchr(f, '=');
-                    if(p) {
-                        *p = 0;
-                        printf("%s\n", f);
-                        *p = '=';
-                    } else {
-                        printf("%s\n", f);
-                    }
-                    f = strtok(0, " \t,");
-                }
-                free(files);
-            }
+            /*if(mkdir(sandbox_name, 0777) == -1) {
+                debug(D_BATCH, "Sandbox exists: %s\n", strerror(errno));
+                _exit(127);
+        	}*/
 
-		    debug(D_BATCH, "JOBID is %d\n", jobid);
-		    debug(D_BATCH, "CURRENT CMD is %s\n", cmd);
+            chdir(sandbox_name);
+            /*if(chdir(sandbox_name)) {
+		        debug(D_BATCH, "couldn't get into sandbox: %s\n", strerror(errno));
+		        _exit(127);	 
+            }*/
 		    execlp("sh", "sh", "-c", cmd, (char *) 0);
 		    _exit(127);	// Failed to execute the cmd. 
         }
