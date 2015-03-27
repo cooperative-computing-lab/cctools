@@ -29,90 +29,31 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
 		return -1;
 	} else {
-
-        int sub_proc_id = fork();
-
-        if (sub_proc_id > 0) {
-            int return_status;
-            waitpid(sub_proc_id, &return_status, 0);  // Parent process waits here for child to terminate.
-
-            if (return_status == 0)  {// Verify child process terminated without error.  
-            	debug(D_BATCH, "SUB PROCESS SUCCESS FINISHED");
-                exit(0);
-            } else {     
-		        debug(D_BATCH, "SUB PROCESS TERMINATED WITH ERROR: %s\n", strerror(errno));
-                _exit(127);
-            }
-
-        } else if (sub_proc_id < 0) {
-		    debug(D_BATCH, "couldn't create new sub process: %s\n", strerror(errno));
-			return -1;
+		/** The following code works but would duplicates the current process because of the system() function.
+		int result = system(cmd);
+		if(WIFEXITED(result)) {
+			_exit(WEXITSTATUS(result));
 		} else {
-		    /** The following code works but would duplicates the current process because of the system() function.
-		    int result = system(cmd);
-		    if(WIFEXITED(result)) {
-		    	_exit(WEXITSTATUS(result));
-		    } else {
-		    	_exit(1);
-		    }*/
+			_exit(1);
+		}*/
 
-		    if(envlist) {
-		    	nvpair_export(envlist);
-		    }
+		if(envlist) {
+			nvpair_export(envlist);
+		}
 
-		    /** A note from "man system 3" as of Jan 2012:
-		     * Do not use system() from a program with set-user-ID or set-group-ID
-		     * privileges, because strange values for some environment variables
-		     * might be used to subvert system integrity. Use the exec(3) family of
-		     * functions instead, but not execlp(3) or execvp(3). system() will
-		     * not, in fact, work properly from programs with set-user-ID or
-		     * set-group-ID privileges on systems on which /bin/sh is bash version
-		     * 2, since bash 2 drops privileges on startup. (Debian uses a modified
-		     * bash which does not do this when invoked as sh.)
-		     */
-            char *f, *p, *files;
+		/** A note from "man system 3" as of Jan 2012:
+		 * Do not use system() from a program with set-user-ID or set-group-ID
+		 * privileges, because strange values for some environment variables
+		 * might be used to subvert system integrity. Use the exec(3) family of
+		 * functions instead, but not execlp(3) or execvp(3). system() will
+		 * not, in fact, work properly from programs with set-user-ID or
+		 * set-group-ID privileges on systems on which /bin/sh is bash version
+		 * 2, since bash 2 drops privileges on startup. (Debian uses a modified
+		 * bash which does not do this when invoked as sh.)
+		 */
 
-            printf("Input files are:\n");
-            if(extra_input_files) {
-                files = strdup(extra_input_files);
-                f = strtok(files, " \t,");
-                while(f) {
-                    p = strchr(f, '=');
-                    if(p) {
-                        *p = 0;
-                        printf("%s\n", f);
-                        *p = '=';
-                    } else {
-                        printf("%s\n", f);
-                    }
-                    f = strtok(0, " \t,");
-                }
-                free(files);
-            }
-
-            printf("Output files are:\n");
-            if(extra_output_files) {
-                files = strdup(extra_output_files);
-                f = strtok(files, " \t,");
-                while(f) {
-                    p = strchr(f, '=');
-                    if(p) {
-                        *p = 0;
-                        printf("%s\n", f);
-                        *p = '=';
-                    } else {
-                        printf("%s\n", f);
-                    }
-                    f = strtok(0, " \t,");
-                }
-                free(files);
-            }
-
-		    debug(D_BATCH, "JOBID is %d\n", jobid);
-		    debug(D_BATCH, "CURRENT CMD is %s\n", cmd);
-		    execlp("sh", "sh", "-c", cmd, (char *) 0);
-		    _exit(127);	// Failed to execute the cmd. 
-        }
+		execlp("sh", "sh", "-c", cmd, (char *) 0);
+		_exit(127);	// Failed to execute the cmd.
 	}
 	return -1;
 }
