@@ -15,9 +15,10 @@ SECTION(OPTIONS)
 SUBSECTION(Commands)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-D, display, opt)Display the Makefile as a Dot graph or a PPM completion graph. <opt> is one of:
-   dot      Standard Dot graph
-   file     Display the file as interpreted by Makeflow
-   ppm      Display a completion graph in PPM format
+   dot      	Standard Dot graph
+   file     	Display the file as interpreted by Makeflow
+   ppm      	Display a completion graph in PPM format
+   cytoscape	Display the file as a graph in Cytoscape
 OPTION_ITEM(`--dot-merge-similar')Condense similar boxes
 OPTION_ITEM(`--dot-proportional')Change the size of the boxes proportional to file size
 OPTION_ITEM(` ')The following options for ppm generation are mutually exclusive:
@@ -34,6 +35,11 @@ SECTION(EXAMPLES)
 To produce a DOT representation of the workflow
 LONGCODE_BEGIN
 makeflow_viz -D dot Makeflow
+LONGCODE_END
+
+To produce a cytoscape representation of the workflow
+LONGCODE_BEGIN
+makeflow_viz -D cytoscape Makeflow
 LONGCODE_END
 
 SECTION(COPYRIGHT)
