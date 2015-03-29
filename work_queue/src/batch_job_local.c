@@ -113,10 +113,10 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
                         oup_p = strchr(oup_f, '=');
                         if(oup_p) {
                             *oup_p = 0;
-                            rename(src_fn, dst_fn);
+                            link_recur(src_fn, dst_fn);
                             *oup_p = '=';
                         } else {
-                            rename(src_fn, dst_fn);
+                            link_recur(src_fn, dst_fn);
                         }
                         oup_f = strtok(0, " \t,");
                     }
