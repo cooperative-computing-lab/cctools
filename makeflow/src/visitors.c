@@ -438,24 +438,24 @@ struct file_node {
 	double size;
 };
 
-void write_node_to_xgmml(FILE *f, char *id, char* nodename, int process)
+void write_node_to_xgmml(FILE *f, char idheader, int id, char* nodename, int process)
 {
 	//file *f must already be open!
 
-	fprintf(f,"\t<node id=\"%s\" label=\"%s\">\n", id, nodename);
+	fprintf(f,"\t<node id=\"%c%d\" label=\"%s\">\n", idheader, id, nodename);
     fprintf(f,"\t\t<att name=\"shared name\" value=\"%s\" type=\"string\"/>\n", nodename);
     fprintf(f,"\t\t<att name=\"name\" value=\"%s\" type=\"string\"/>\n", nodename);
     fprintf(f,"\t\t<att name=\"process\" value=\"%d\" type=\"boolean\"/>\n", process);
     fprintf(f,"\t</node>\n");
 }
 
-void write_edge_to_xgmml(FILE *f, char* edgeid, char* sourceid, char* targetid, int directed)
+void write_edge_to_xgmml(FILE *f, char sourceheader, int sourceid, char targetheader, int targetid, int directed)
 {
 	//file *f must already be open!
-	fprintf(f, "\t<edge id=\"%s\" label=\"%s-%s\" source=\"%s\" target=\"%s\" cy:directed=\"%d\">\n", edgeid, sourceid, targetid, sourceid, targetid, directed);
-    fprintf(f,"\t\t<att name=\"shared name\" value=\"%s\" type=\"string\"/>\n", edgeid);
+	fprintf(f, "\t<edge id=\"%c%d-%c%d\" label=\"%c%d-%c%d\" source=\"%c%d\" target=\"%c%d\" cy:directed=\"%d\">\n", sourceheader, sourceid, targetheader, targetid, sourceheader, sourceid, targetheader, targetid, sourceheader, sourceid, targetheader, targetid, directed);
+    fprintf(f,"\t\t<att name=\"shared name\" value=\"%c%d-%c%d\" type=\"string\"/>\n", sourceheader, sourceid, targetheader, targetid);
     fprintf(f,"\t\t<att name=\"shared interaction\" value=\"\" type=\"string\"/>\n");
-    fprintf(f,"\t\t<att name=\"name\" value=\"%s\" type=\"string\"/>\n", edgeid);
+    fprintf(f,"\t\t<att name=\"name\" value=\"%c%d-%c%d\" type=\"string\"/>\n", sourceheader, sourceid, targetheader, targetid);
     fprintf(f,"\t\t<att name=\"selected\" value=\"0\" type=\"boolean\"/>\n");
 	fprintf(f,"\t\t<att name=\"interaction\" value=\"\" type=\"string\"/>\n");
     fprintf(f,"\t\t<att name=\"weight\" value=\"8\" type=\"integer\"/>\n");
@@ -557,9 +557,7 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 		if(!condense_display || t->print) {
 			t->print = 0;
 		}
-		char cytoid[6];
-		sprintf(cytoid, "N%d", n->nodeid);
-		write_node_to_xgmml(cytograph, cytoid, label,1);
+		write_node_to_xgmml(cytograph, 'N', n->nodeid, label,1);
 		free(name);
 	}
 	
@@ -601,9 +599,8 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 	hash_table_firstkey(g);
 	while(hash_table_nextkey(g, &label, (void **) &e)) {
 		fn = e->name;
-		char cytoid[6];
-		sprintf(cytoid, "F%d", e->id);
-		write_node_to_xgmml(cytograph, cytoid, (char *)fn, 0);
+		write_node_to_xgmml(cytograph, 'F', e->id, (char *)fn, 0);
+
 		if(change_size) {
 			if(e->size >= 0) {
 				width = 5 * (e->size / average);
@@ -625,25 +622,13 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
 			e = hash_table_lookup(g, f->filename);
-			char sourceid[6];
-			char targetid[6];
-			sprintf(sourceid, "F%d", e->id);
-			sprintf(targetid, "N%d", n->nodeid);
-			char edgeid[13];
-			sprintf(edgeid, "%s-%s", sourceid, targetid);
-			write_edge_to_xgmml(cytograph, edgeid, sourceid, targetid, 1);
+			write_edge_to_xgmml(cytograph, 'F', e->id, 'N', n->nodeid, 1);
 		}
 
 		list_first_item(n->target_files);
 		while((f = list_next_item(n->target_files))) {
 			e = hash_table_lookup(g, f->filename);
-			char sourceid[6];
-			char targetid[6];
-			sprintf(sourceid, "N%d", n->nodeid);
-			sprintf(targetid, "F%d", e->id);
-			char edgeid[13];
-			sprintf(edgeid, "%s-%s", sourceid, targetid);
-			write_edge_to_xgmml(cytograph, edgeid, sourceid, targetid, 1);
+			write_edge_to_xgmml(cytograph, 'N', n->nodeid, 'F', e->id, 1);
 		}
 
 		free(name);
