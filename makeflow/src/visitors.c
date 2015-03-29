@@ -678,12 +678,6 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size)
 
 	fprintf(stdout, "digraph {\n");
 
-	time_t timer;
-	time(&timer);
-	struct tm* currenttime = localtime(&timer);
-	char timestring[20];
-	strftime(timestring, sizeof(timestring), "%Y-%m-%d %H:%M:%S", currenttime);
-
 	if(change_size) {
 		hash_table_firstkey(d->completed_files);
 		while(hash_table_nextkey(d->completed_files, &label, (void **) &name)) {
