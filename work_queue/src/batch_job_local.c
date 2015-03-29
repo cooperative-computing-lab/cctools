@@ -4,6 +4,7 @@
 #include "process.h"
 #include "macros.h"
 #include "stringtools.h"
+#include "unlink_recursive.h"
 
 #include <time.h>
 #include <stdlib.h>
@@ -13,6 +14,9 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <dirent.h>
+
+//TODO how to name the sandbox directory
+static int count = 0;
 
 int link_recur( const char *source, const char *target ) {
     struct stat info;
@@ -54,6 +58,12 @@ int link_recur( const char *source, const char *target ) {
 static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	batch_job_id_t jobid;
+    count = count + 1;
+
+    //TODO how to name the sandbox?
+    char sandbox_name[4096]; 
+    sprintf(sandbox_name, "t-%d", count);
+	debug(D_BATCH, "===================SANDBOX NAME IS: %s\n", sandbox_name);
 
 	fflush(NULL);
 	jobid = fork();
@@ -70,16 +80,7 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		return -1;
 	} else {
         
-        //TODO how to name the sandbox?
-        
         int sub_proc_id = fork();
-
-        srand(time(NULL));
-        int r = rand();
-
-        char sandbox_name[4096]; 
-        sprintf(sandbox_name, "t-%d", r);
-		debug(D_BATCH, "===================SANDBOX NAME IS: %s\n", sandbox_name);
 
         if (sub_proc_id > 0) {
 
@@ -121,6 +122,9 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
                     }
                     free(oup_files);
                 }
+
+            	debug(D_BATCH, "REMOVING SANDBOX: %s\n", sandbox_name);
+                unlink_recursive(sandbox_name);
                 exit(0);
 
             } else {     
@@ -132,11 +136,6 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		    debug(D_BATCH, "couldn't create new sub process: %s\n", strerror(errno));
 			return -1;
 		} else {
-
-            srand(time(NULL));
-            int r_1 = rand();
-
-		    debug(D_BATCH, "+=+=+=+=+=+=+=current random value is: %d\n", r_1);
 
 		    if(envlist) {
 		    	nvpair_export(envlist);
