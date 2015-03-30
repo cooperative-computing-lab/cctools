@@ -113,6 +113,8 @@ static int monitor_enable_list_files  = 0;
 static int container_mode = 0;
 static char *img_name = NULL;
 
+static char *local_dir_name = "makeflow_tmp";
+
 /* wait upto this many seconds for an output file of a succesfull task
  * to appear on the local filesystem (e.g, to deal with NFS
  * semantics. . */
@@ -874,7 +876,10 @@ batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *com
 
 	/* Display the fully elaborated command, just like Make does. */
 	printf("submitting job: %s\n", command);
+    printf("################LOCAL DIR NAME IS: %s\n", local_dir_name);
 
+   // This will cause segment fault
+   // nvpair_insert_string(envlist, "sandbox_name", local_dir_name);
 	while(1) {
 		jobid = batch_job_submit(queue, command, input_files, output_files, envlist );
 		if(jobid >= 0) {
@@ -982,6 +987,10 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 
 	/* Generate the environment vars specific to this node. */
 	struct nvpair *envlist = dag_node_env_create(d,n);
+    
+    //TODO pass local-task-dir to dag_node_submit()
+    //char *key_name = "sandbox_name";
+    //nvpair_insert_string(envlist, key_name, local_dir_name);
 
 	/*
 	Just before execution, replace double-percents with the nodeid.
@@ -1655,7 +1664,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WRAPPER_OUTPUT,
-        LONG_OPT_DOCKER
+        LONG_OPT_DOCKER,
+        LONG_OPT_LOCAL_TASK_DIR
 	};
 
 	static struct option long_options_run[] = {
@@ -1710,6 +1720,7 @@ int main(int argc, char *argv[])
 		{"zero-length-error", no_argument, 0, 'z'},
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
+		{"local-task-dir", required_argument, 0, LONG_OPT_LOCAL_TASK_DIR},
 		{0, 0, 0, 0}
 	};
 
@@ -1933,6 +1944,9 @@ int main(int argc, char *argv[])
             case LONG_OPT_DOCKER:
                 container_mode = WITH_DOCKER; 
                 img_name = xxstrdup(optarg);
+                break;
+            case LONG_OPT_LOCAL_TASK_DIR:
+                local_dir_name = xxstrdup(optarg);
                 break;
 			default:
 				show_help_run(get_makeflow_exe());

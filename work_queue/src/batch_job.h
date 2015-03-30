@@ -32,6 +32,7 @@ typedef int64_t batch_job_id_t;
 /* Must be kept in sync with batch_job_subsystems. */
 typedef enum {
 	BATCH_QUEUE_TYPE_LOCAL,	              /**< Batch jobs will run as local processes. */
+        BATCH_QUEUE_TYPE_SANDBOX,             /**< Batch jobs will run with sandbox. */
 	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
 	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine. */
 	BATCH_QUEUE_TYPE_MOAB,                /**< Batch jobs will be sent to the Moab Workload Manager. */
