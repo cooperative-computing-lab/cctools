@@ -75,28 +75,70 @@ static void entry_delete( struct entry *e )
 	free(e);
 }
 
+static int channel_create (const char *dir)
+{
+	int fd;
+	char path[PATH_MAX];
+	snprintf(path, sizeof(path), "%s/parrot-channel.XXXXXX", dir);
+
+	/* FIXME Future Work: use memfd_create for channel. */
+
+	debug(D_DEBUG, "trying to create channel '%s'", path);
+	fd = mkstemp(path);
+	if (fd < 0) {
+		debug(D_DEBUG, "could not create channel: %s", strerror(errno));
+		return -1;
+	}
+	unlink(path);
+
+	/* test if we can use it for executable data (i.e. is dir on a file system mounted with the 'noexec' option) */
+	{
+		size_t l = getpagesize();
+		if (ftruncate(fd, l) == -1) {
+			debug(D_DEBUG, "could not grow channel: %s", strerror(errno));
+			close(fd);
+			return errno = EINVAL, -1;
+		}
+		void *addr = mmap(NULL, l, PROT_READ|PROT_EXEC, MAP_SHARED, fd, 0);
+		if (addr == MAP_FAILED) {
+			debug(D_DEBUG, "failed executable mapping: %s", strerror(errno));
+			close(fd);
+			return errno = EINVAL, -1;
+		}
+		munmap(addr, l);
+		ftruncate(fd, 0);
+	}
+
+	return fd;
+}
+
 int pfs_channel_init( pfs_size_t size )
 {
-	char path[PATH_MAX];
+	/* We try to use /dev/shm for the channel because we rely on POSIX
+	 * semantics for mmap. Some distributed file systems like GPFS do not
+	 * handle this correctly.
+	 *
+	 * See: https://github.com/cooperative-computing-lab/cctools/issues/305
+	 */
+	const char *channel_dirs[] = {
+		"/dev/shm",
+		"/tmp",
+		"/var/tmp",
+		pfs_temp_dir,
+	};
+	int i;
 
 	close(channel_fd);
 	channel_fd = -1;
 
-	/* We use /dev/shm for the channel because we rely on POSIX semantics for
-	 * mmap. Some distributed file systems like GPFS do not handle this
-	 * correctly.
-	 *
-	 * See: https://github.com/cooperative-computing-lab/cctools/issues/305
-	 */
-	snprintf(path, sizeof(path), "%s/parrot-channel.XXXXXX", "/dev/shm");
-	channel_fd = mkstemp(path);
-	if (channel_fd < 0) {
-		snprintf(path, sizeof(path), "%s/parrot-channel.XXXXXX", pfs_temp_dir);
-		channel_fd = mkstemp(path);
+	for (i = 0; i < (int)(sizeof(channel_dirs)/sizeof(channel_dirs[0])); i++) {
+		channel_fd = channel_create(channel_dirs[i]);
+		if (channel_fd >= 0)
+			break;
 	}
-	if (channel_fd < 0)
-		return 0;
-	unlink(path);
+	if (channel_fd < 0) {
+		fatal("could not create a channel!");
+	}
 
 	channel_size = size;
 	ftruncate(channel_fd,channel_size);
