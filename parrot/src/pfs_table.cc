@@ -2440,20 +2440,23 @@ int pfs_table::mmap_delete( pfs_size_t logical_addr, pfs_size_t length )
 				save_file_from_channel(m->file,m->file_offset,m->channel_offset,m->map_length,1024*1024);
 			}
 
-			// If there is a fragment left over before the unmap, add it as a new map
-			// This will increase the reference count of both the file and the memory object.
+			/* If we are deleting a mapping that has no logical address, then mmap failed. Don't attempt to split the mapping. */
+			if (!(logical_addr == 0 && length == 0)) {
+				// If there is a fragment left over before the unmap, add it as a new map
+				// This will increase the reference count of both the file and the memory object.
 
-			if(logical_addr>m->logical_addr) {
-				mmap_create_object(m->file, m->channel_offset, logical_addr-m->logical_addr, m->file_offset, m->prot, m->flags);
-				mmap_update(m->logical_addr,0);
-			}
+				if(logical_addr>m->logical_addr) {
+					mmap_create_object(m->file, m->channel_offset, logical_addr-m->logical_addr, m->file_offset, m->prot, m->flags);
+					mmap_update(m->logical_addr,0);
+				}
 
-			// If there is a fragment left over after the unmap, add it as a new map
-			// This will increase the reference count of both the file and the memory object.
+				// If there is a fragment left over after the unmap, add it as a new map
+				// This will increase the reference count of both the file and the memory object.
 
-			if((logical_addr+length) < (m->logical_addr+m->map_length)) {
-				mmap_create_object(m->file, m->channel_offset, m->map_length-length-(logical_addr-m->logical_addr), m->file_offset+m->map_length-(m->logical_addr-logical_addr), m->prot, m->flags);
-				mmap_update(logical_addr+length,0);
+				if((logical_addr+length) < (m->logical_addr+m->map_length)) {
+					mmap_create_object(m->file, m->channel_offset, m->map_length-length-(logical_addr-m->logical_addr), m->file_offset+m->map_length-(m->logical_addr-logical_addr), m->prot, m->flags);
+					mmap_update(logical_addr+length,0);
+				}
 			}
 
 			delete m; // Delete the mapping, which may also delete the file object and free the channel.
