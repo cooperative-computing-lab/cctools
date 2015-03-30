@@ -1165,10 +1165,11 @@ void decode_mmap( struct pfs_process *p, int entering, const INT64_T *args )
 
 		tracer_result_get(p->tracer,&p->syscall_result);
 
-		if(p->syscall_result!=-1) {
-			pfs_mmap_update(p->syscall_result,0);
-		} else {
+		if(0 > p->syscall_result && p->syscall_result > -4096) {
+			debug(D_DEBUG, "result = %" PRId64, p->syscall_result);
 			pfs_mmap_delete(0,0);
+		} else {
+			pfs_mmap_update(p->syscall_result,0);
 		}
 	}
 }
