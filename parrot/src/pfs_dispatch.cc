@@ -1996,9 +1996,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			/* special case for fcntl dup */
 			if (args[1] == F_DUPFD || args[1] == F_DUP2FD || args[1] == F_DUPFD_CLOEXEC) {
 				if (entering) {
-					if (p->table->isspecial(args[2])) {
-						divert_to_dummy(p, -EIO); /* best errno we can give */
-					} else if (!p->table->isvalid(args[2])) {
+					if (!p->table->isvalid(args[2])) {
 						divert_to_dummy(p, -EBADF);
 					}
 				} else if (!p->syscall_dummy) {
