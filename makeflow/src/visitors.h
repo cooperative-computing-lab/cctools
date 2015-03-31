@@ -32,3 +32,4 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option);
  * file, giving a graphical presentation of the makeflow for use in Cytoscape
  */
 void dag_to_cyto(struct dag *d, int condense_display, int change_size);
+
