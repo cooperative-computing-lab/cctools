@@ -58,13 +58,16 @@ int mf_sandbox_link_recursive( const char *source, const char *target ) {
 static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
 	batch_job_id_t jobid;
-    char dir_name_template[] = "t-XXXXXX";
 
-    //TODO how to name the sandbox?
+    char *public_sandbox;
+    public_sandbox = nvpair_lookup_string(envlist, "local_task_dir");
+
+    char dir_name_template[2048];
+    sprintf(dir_name_template, "%s/t-XXXXXX", public_sandbox);
+
     char *sandbox_name; 
     sandbox_name = mkdtemp(dir_name_template);
-	debug(D_BATCH, "===================SANDBOX NAME IS: %s\n", sandbox_name);
-
+    
 	fflush(NULL);
 	jobid = fork();
 	if(jobid > 0) {
@@ -87,8 +90,7 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
             int return_status;
             waitpid(sub_proc_id, &return_status, 0);  // Parent process waits here for child to terminate.
 
-            if (return_status == 0)  {// Verify child process terminated without error.  
-            	debug(D_BATCH, "SUB PROCESS SUCCESS FINISHED");
+            if (return_status == 0)  { // Verify child process terminated without error.  
 
                 char cwd[4096];
                 getcwd(cwd, sizeof(cwd));
@@ -97,7 +99,6 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 
                 char *oup_f, *oup_p, *oup_files;
 
-                printf("Output files are:\n");
                 char src_fn[4096];
                 char dst_fn[4096];
 
@@ -128,7 +129,7 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
                 exit(0);
 
             } else {     
-		        debug(D_BATCH, "SUB PROCESS TERMINATED WITH ERROR: %s\n", strerror(errno));
+		        debug(D_BATCH, "Sub-process terminated with error: %s\n", strerror(errno));
                 _exit(127);
             }
 
@@ -141,8 +142,7 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 		    	nvpair_export(envlist);
 		    }
 
-		    debug(D_BATCH, "CURRENT CMD is %s\n", cmd);
-            mkdir(sandbox_name, 0777) == -1;
+            mkdir(sandbox_name, 0777);
             char *f, *p, *files;
 
             char link_fn_path[4096];
@@ -152,7 +152,6 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 
                 while(f) {
                     p = strchr(f, '=');
-                    debug(D_BATCH, "+++++++++++++++INPUT FILE: %s\n", f);
                     if (*f == '/')
                     	sprintf(link_fn_path, "%s%s", sandbox_name, f);
                     else
@@ -160,11 +159,9 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 
                     if(p) {
                         *p = 0;
-                	    debug(D_BATCH, "LINK INPUT FILE: %s\n", link_fn_path);
                         mf_sandbox_link_recursive(f, link_fn_path);
                         *p = '=';
                     } else {
-                	    debug(D_BATCH, "LINK INPUT FILE: %s\n", link_fn_path);
                         mf_sandbox_link_recursive(f, link_fn_path);
                     }
                     f = strtok(0, " \t,");
@@ -172,20 +169,10 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
                 free(files);
             }   
 
-            /*if(mkdir(sandbox_name, 0777) == -1) {
-                debug(D_BATCH, "Sandbox exists: %s\n", strerror(errno));
-                _exit(127);
-        	}*/
 
             chdir(sandbox_name);
             char test_cwd[1024];
             getcwd(test_cwd, sizeof(test_cwd));
-		    debug(D_BATCH, "--------------------------CURRENT WORKING SPACE IS: %s\n", test_cwd);
-
-            /*if(chdir(sandbox_name)) {
-		        debug(D_BATCH, "couldn't get into sandbox: %s\n", strerror(errno));
-		        _exit(127);	 
-            }*/
 
 		    execlp("sh", "sh", "-c", cmd, (char *) 0);
 		    _exit(127);	// Failed to execute the cmd. 

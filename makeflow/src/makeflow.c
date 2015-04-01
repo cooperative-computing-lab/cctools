@@ -113,7 +113,7 @@ static int monitor_enable_list_files  = 0;
 static int container_mode = 0;
 static char *img_name = NULL;
 
-static char *local_dir_name = "makeflow_tmp";
+static char *local_task_dir = "makeflow_tmp";
 
 /* wait upto this many seconds for an output file of a succesfull task
  * to appear on the local filesystem (e.g, to deal with NFS
@@ -876,10 +876,14 @@ batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *com
 
 	/* Display the fully elaborated command, just like Make does. */
 	printf("submitting job: %s\n", command);
-    printf("################LOCAL DIR NAME IS: %s\n", local_dir_name);
 
-   // This will cause segment fault
-   // nvpair_insert_string(envlist, "sandbox_name", local_dir_name);
+    //TODO has to pass the dir_name to the batch_job_sandbox
+    if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
+        envlist = nvpair_create();
+    	nvpair_insert_string(envlist, "local_task_dir", local_task_dir);
+        mkdir(local_task_dir, 0777);
+    }
+
 	while(1) {
 		jobid = batch_job_submit(queue, command, input_files, output_files, envlist );
 		if(jobid >= 0) {
@@ -987,10 +991,10 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 
 	/* Generate the environment vars specific to this node. */
 	struct nvpair *envlist = dag_node_env_create(d,n);
-    
+   
     //TODO pass local-task-dir to dag_node_submit()
     //char *key_name = "sandbox_name";
-    //nvpair_insert_string(envlist, key_name, local_dir_name);
+    //nvpair_insert_string(envlist, key_name, local_task_dir);
 
 	/*
 	Just before execution, replace double-percents with the nodeid.
@@ -1416,6 +1420,7 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Clean up: remove logfile and all targets.\n", "-c,--clean");
 	fprintf(stdout, " %-30s Change directory: chdir to enable executing the Makefile in other directory.\n", "-X,--change-directory");
 	fprintf(stdout, " %-30s Batch system type: (default is local)\n", "-T,--batch-type=<type>");
+	fprintf(stdout, " %-30s Specify the name of sandbox for sandbox batch system.\n", "--local-task-dir");
 	fprintf(stdout, " %-30s %s\n\n", "", batch_queue_type_string());
 	fprintf(stdout, "Other options are:\n");
 	fprintf(stdout, " %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
@@ -1946,7 +1951,7 @@ int main(int argc, char *argv[])
                 img_name = xxstrdup(optarg);
                 break;
             case LONG_OPT_LOCAL_TASK_DIR:
-                local_dir_name = xxstrdup(optarg);
+                local_task_dir = xxstrdup(optarg);
                 break;
 			default:
 				show_help_run(get_makeflow_exe());
