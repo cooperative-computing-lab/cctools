@@ -28,6 +28,7 @@ See the file COPYING for details.
 #include "work_queue.h"
 #include "work_queue_catalog.h"
 #include "xxmalloc.h"
+#include "unlink_recursive.h"
 
 #include "dag.h"
 #include "visitors.h"
@@ -2032,6 +2033,15 @@ int main(int argc, char *argv[])
 			buffer_rewind(&B, 0);
 			buffer_putfstring(&B, "%s.batchlog", dagfile);
 			unlink(buffer_tostring(&B));
+            // TODO recursively remove the sandbox
+            // how to cache the name of the local_task_dir
+            if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
+                DIR* dir = opendir(local_task_dir);
+                if (dir) {
+                    closedir(dir);
+                    unlink_recursive(local_task_dir);
+                }
+			} 
 		}
 	}
 
@@ -2149,6 +2159,14 @@ int main(int argc, char *argv[])
 		dag_clean(d);
 		unlink(logfilename);
 		unlink(batchlogfilename);
+        //TODO recursively remove the sandbox
+        if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
+            DIR* dir = opendir(local_task_dir);
+            if (dir) {
+                closedir(dir);
+                unlink_recursive(local_task_dir);
+            }
+   		}
 		exit(0);
 	}
 
