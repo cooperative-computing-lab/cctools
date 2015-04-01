@@ -64,7 +64,7 @@ sub set_debug_flag {
     my $self = shift;
 
     foreach my $flag (@_) {
-	cctools_debug_flags_set($flag);
+		cctools_debug_flags_set($flag);
     }
 }
 
@@ -72,6 +72,12 @@ sub set_debug_config_file {
     my ($self, $filename) = @_;
     return cctools_debug_config_file($filename);
 }
+
+sub set_debug_config_file_size {
+    my ($self, $size) = @_;
+    return cctools_debug_config_file_size($size);
+}
+
 
 sub name {
     my $self = shift;
