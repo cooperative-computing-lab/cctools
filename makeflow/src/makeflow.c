@@ -2156,17 +2156,32 @@ int main(int argc, char *argv[])
 
 	if(clean_mode) {
 		printf("cleaning filesystem...\n");
-		dag_clean(d);
+		dag_clean(d); 
+        
+        //TODO get the batch_queue_mode from the log file
+        char line[1024]; 
+        char comment_symbol[512], str_2[512], str_3[512];
+        FILE *tmp_log_fn;
+
+        tmp_log_fn = fopen(logfilename, "r+");
+        if(fgets(line, sizeof line, tmp_log_fn) != NULL) {
+            sscanf(line, "%s %s\t%s", comment_symbol, str_2, str_3);
+             
+            if (!strcmp(str_2, "SANDBOX")) {
+                 
+		        printf("sandbox_name is: %s\n", str_3);
+                
+                DIR* dir = opendir(str_3);
+                if (dir) {
+                    closedir(dir);
+                    unlink_recursive(str_3);
+                }
+   		    }
+        }
+        fclose(tmp_log_fn);
+
 		unlink(logfilename);
 		unlink(batchlogfilename);
-        //TODO recursively remove the sandbox
-        if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
-            DIR* dir = opendir(local_task_dir);
-            if (dir) {
-                closedir(dir);
-                unlink_recursive(local_task_dir);
-            }
-   		}
 		exit(0);
 	}
 
@@ -2194,7 +2209,12 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, handle_abort);
 	signal(SIGTERM, handle_abort);
 
+    // TODO put the sandbox name into the log file
+    if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX)
+        fprintf(d->logfile, "# SANDBOX\t%s\n", local_task_dir);
+
 	fprintf(d->logfile, "# STARTED\t%" PRIu64 "\n", timestamp_get());
+
 	runtime = timestamp_get();
 	dag_run(d);
 	time_completed = timestamp_get();
