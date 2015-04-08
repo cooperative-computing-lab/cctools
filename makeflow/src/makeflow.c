@@ -878,7 +878,7 @@ batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *com
 	/* Display the fully elaborated command, just like Make does. */
 	printf("submitting job: %s\n", command);
 
-    //TODO has to pass the dir_name to the batch_job_sandbox
+    // put the local_task_dir into the envlist, which can be passed to batch_job_submit
     if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
         envlist = nvpair_create();
     	nvpair_insert_string(envlist, "local_task_dir", local_task_dir);
@@ -993,10 +993,6 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 	/* Generate the environment vars specific to this node. */
 	struct nvpair *envlist = dag_node_env_create(d,n);
    
-    //TODO pass local-task-dir to dag_node_submit()
-    //char *key_name = "sandbox_name";
-    //nvpair_insert_string(envlist, key_name, local_task_dir);
-
 	/*
 	Just before execution, replace double-percents with the nodeid.
 	This is used for substituting in the nodeid into a wrapper command or file.
@@ -2033,15 +2029,6 @@ int main(int argc, char *argv[])
 			buffer_rewind(&B, 0);
 			buffer_putfstring(&B, "%s.batchlog", dagfile);
 			unlink(buffer_tostring(&B));
-            // TODO recursively remove the sandbox
-            // how to cache the name of the local_task_dir
-            if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
-                DIR* dir = opendir(local_task_dir);
-                if (dir) {
-                    closedir(dir);
-                    unlink_recursive(local_task_dir);
-                }
-			} 
 		}
 	}
 
@@ -2158,7 +2145,7 @@ int main(int argc, char *argv[])
 		printf("cleaning filesystem...\n");
 		dag_clean(d); 
         
-        //TODO get the batch_queue_mode from the log file
+        // check the batch_queue_mode, if it is sandbox mode, remove sandbox
         char line[1024]; 
         char comment_symbol[512], str_2[512], str_3[512];
         FILE *tmp_log_fn;
@@ -2169,8 +2156,6 @@ int main(int argc, char *argv[])
              
             if (!strcmp(str_2, "SANDBOX")) {
                  
-		        printf("sandbox_name is: %s\n", str_3);
-                
                 DIR* dir = opendir(str_3);
                 if (dir) {
                     closedir(dir);
@@ -2209,7 +2194,7 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, handle_abort);
 	signal(SIGTERM, handle_abort);
 
-    // TODO put the sandbox name into the log file
+    // put the sandbox name into the log file
     if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX)
         fprintf(d->logfile, "# SANDBOX\t%s\n", local_task_dir);
 

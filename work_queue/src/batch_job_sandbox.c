@@ -15,9 +15,6 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-//TODO how to name the sandbox directory
-static int count = 0;
-
 int mf_sandbox_link_recursive( const char *source, const char *target ) {
     struct stat info;
 
@@ -82,20 +79,22 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
 		return -1;
 	} else {
-        
+       
+        // sub-subprocess for running each task in sandbox mode
+ 
         int sub_proc_id = fork();
 
         if (sub_proc_id > 0) {
 
-            int return_status;
-            waitpid(sub_proc_id, &return_status, 0);  // Parent process waits here for child to terminate.
+            // parent process for copying output file and cleaning up workspace
 
-            if (return_status == 0)  { // Verify child process terminated without error.  
+            int return_status;
+            waitpid(sub_proc_id, &return_status, 0);  
+
+            if (return_status == 0)  {
 
                 char cwd[4096];
                 getcwd(cwd, sizeof(cwd));
-
-            	debug(D_BATCH, "Current working dir: %s\n", cwd);
 
                 char *oup_f, *oup_p, *oup_files;
 
@@ -103,13 +102,14 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
                 char dst_fn[4096];
 
                 if(extra_output_files) {
+
+                    // link each output files back to public sandbox
+                    
                     oup_files = strdup(extra_output_files);
                     oup_f = strtok(oup_files, " \t,");
                     while(oup_f) {
                         sprintf(src_fn, "%s/%s", sandbox_name, oup_f);
                         sprintf(dst_fn, "%s/%s", cwd, oup_f);
-            	        debug(D_BATCH, "SOURCE FILE IS: %s\n", src_fn);
-            	        debug(D_BATCH, "DESTINATION FILE IS: %s\n", dst_fn);
 
                         oup_p = strchr(oup_f, '=');
                         if(oup_p) {
@@ -124,7 +124,7 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
                     free(oup_files);
                 }
 
-            	debug(D_BATCH, "REMOVING SANDBOX: %s\n", sandbox_name);
+                // remove the sandbox 
                 //unlink_recursive(sandbox_name);
                 exit(0);
 
@@ -137,6 +137,8 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 		    debug(D_BATCH, "couldn't create new sub process: %s\n", strerror(errno));
 			return -1;
 		} else {
+
+            // child process for creating sandbox and start each task in its own sandbox 
 
 		    if(envlist) {
 		    	nvpair_export(envlist);
@@ -152,6 +154,7 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 
                 while(f) {
                     p = strchr(f, '=');
+
                     if (*f == '/')
                     	sprintf(link_fn_path, "%s%s", sandbox_name, f);
                     else
@@ -171,8 +174,6 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 
 
             chdir(sandbox_name);
-            char test_cwd[1024];
-            getcwd(test_cwd, sizeof(test_cwd));
 
 		    execlp("sh", "sh", "-c", cmd, (char *) 0);
 		    _exit(127);	// Failed to execute the cmd. 
