@@ -612,6 +612,8 @@ else
     fi
 fi
 
+
+
 config_cvmfs_success=1
 if [ $config_cvmfs_path != no ]
 then
@@ -630,6 +632,19 @@ then
     fi
 else
     config_cvmfs_success=0
+fi
+
+if [ $config_cvmfs_success = 1 ]
+then
+	cvmfs_version=$(sed -En 's/^#define LIBCVMFS_VERSION +([0-9]+)/\1/p' ${cvmfs_path}/include/libcvmfs.h)
+	if [ $cvmfs_version -gt 1 ] 
+	then
+		if ! library_search uuid "/usr"
+		then
+			echo "*** Couldn't find uuid library in /usr"
+			config_cvmfs_success=0
+		fi
+	fi
 fi
 
 if [ $config_cvmfs_success = 1 ]
