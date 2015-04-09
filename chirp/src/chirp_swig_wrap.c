@@ -3,15 +3,15 @@
 #include "chirp_types.h"
 #include "xxmalloc.h"
 
-static void accumulate_one_acl(char *line, void *args)
+static void accumulate_one_acl(const char *line, void *args)
 {
-	struct buffer *b = (struct buffer *) args;
+	buffer_t *B = (struct buffer *) args;
 
-	if(buffer_pos(b) > 0) {
-		buffer_printf(b, "\n");
+	if(buffer_pos(B) > 0) {
+		buffer_printf(B, "\n");
 	}
 
-	buffer_printf(b, line);
+	buffer_putstring(B, line);
 }
 
 struct chirp_stat *chirp_wrap_stat(const char *hostname, const char *path, time_t stoptime) {
@@ -30,32 +30,26 @@ struct chirp_stat *chirp_wrap_stat(const char *hostname, const char *path, time_
 
 char *chirp_wrap_listacl(const char *hostname, const char *path, time_t stoptime)
 {
-	struct buffer b;
-	buffer_init(&b);
+	buffer_t B[1];
+	buffer_init(B);
+	buffer_abortonfailure(B, 1);
 
-	int status = chirp_reli_getacl(hostname, path, accumulate_one_acl, &b, stoptime);
+	int status = chirp_reli_getacl(hostname, path, accumulate_one_acl, B, stoptime);
 
-	char *acls;
+	char *acls = NULL;
 	if(status >= 0) {
-		acls = xxstrdup(buffer_tostring(&b));
+		buffer_dup(B, &acls);
 	}
-	else {
-		acls = NULL;
-	}
-
-	buffer_free(&b);
+	buffer_free(B);
 
 	return acls;
 }
 
 char *chirp_wrap_whoami(const char *hostname, time_t stoptime)
 {
-	static int max_id_len = 1024;
-	char id[max_id_len];
+	char id[4096] = "";
 
-	id[0] = '\0';
-
-	chirp_reli_whoami(hostname, id, max_id_len, stoptime);
+	chirp_reli_whoami(hostname, id, sizeof(id), stoptime);
 
 	return xxstrdup(id);
 }
