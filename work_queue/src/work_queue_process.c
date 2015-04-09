@@ -60,7 +60,7 @@ void work_queue_process_delete( struct work_queue_process *p )
 	}
 
 	if(p->sandbox) {
-		//delete_dir(p->sandbox);
+		delete_dir(p->sandbox);
 		free(p->sandbox);
 	}
 

@@ -57,6 +57,15 @@ See the file COPYING for details.
 #define WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION 16 /**< The task used more resources than requested >**/
 #define WORK_QUEUE_RESULT_TASK_TIMEOUT 32 /**< The task ran after specified end time. >**/
 
+/** Task states **/
+#define WORK_QUEUE_TASK_UNKNOWN           0  /**< There is no such task >**/
+#define WORK_QUEUE_TASK_READY             1  /**< Task is ready to be run, waiting in queue >**/
+#define WORK_QUEUE_TASK_RUNNING           2  /**< Task has been dispatched to some worker >**/
+#define WORK_QUEUE_TASK_WAITING_RETRIEVAL 3  /**< Task results are available at the worker >**/
+#define WORK_QUEUE_TASK_RETRIEVED         4  /**< Task results are available at the master >**/
+#define WORK_QUEUE_TASK_DONE              5  /**< Task is done, and has been returned through work_queue_wait >**/
+#define WORK_QUEUE_TASK_CANCELED          6  /**< Task was canceled before completion >**/
+
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 
 extern int wq_option_scheduler;	/**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
@@ -454,6 +463,14 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s);
 @param s A pointer to a buffer that will be filed with statistics.
 */
 void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stats *s);
+
+
+/** Get the current state of the task.
+@param q A work queue object.
+@param taskid The taskid of the task.
+@return One of: WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE)
+*/
+int work_queue_task_state(struct work_queue *q, int taskid);
 
 /** Limit the queue bandwidth when transferring files to and from workers.
 @param q A work queue object.
