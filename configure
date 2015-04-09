@@ -75,7 +75,7 @@ include_package_resource_monitor="resource_monitor"
 include_package_weaver="weaver"
 include_package_doc="doc"
 
-work_queue_bindings=""
+swig_bindings=""
 
 echo "checking for package compatibility..."
 
@@ -782,7 +782,7 @@ then
 				perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
 			fi
 
-			work_queue_bindings="$work_queue_bindings perl"
+			swig_bindings="$swig_bindings perl"
 		else
 			perl=0
 		fi
@@ -870,7 +870,7 @@ EOF
 				    python_ldflags="$python_ldflags -undefined dynamic_lookup"
 				fi
 
-				work_queue_bindings="$work_queue_bindings python"
+				swig_bindings="$swig_bindings python"
 			else
 				python=0
 			fi
@@ -959,7 +959,7 @@ then
 				    python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
 				fi
 
-				work_queue_bindings="$work_queue_bindings python3"
+				swig_bindings="$swig_bindings python3"
 			else
 				python3=0
 			fi
@@ -1034,7 +1034,7 @@ fi
 
 if [ $found_swig != yes ]
 then
-	work_queue_bindings=""
+	swig_bindings=""
 fi
 
 linker="gcc"
@@ -1259,7 +1259,7 @@ CCTOOLS_PYTHON3_LDFLAGS=${python3_ldflags}
 CCTOOLS_PYTHON3_VERSION=${python3_major_version}.${python3_minor_version}
 CCTOOLS_PYTHON3_2TO3=${python3_2to3}
 
-CCTOOLS_WORK_QUEUE_BINDINGS=${work_queue_bindings}
+CCTOOLS_SWIG_BINDINGS=${swig_bindings}
 
 CCTOOLS_DOCTARGETS=${cctools_doctargets}
 

@@ -1,0 +1,7 @@
+*.pyc
+*.so
+CChirp.py
+Chirp.py
+Python.framework
+cctools.test.log
+chirp_wrap.*
