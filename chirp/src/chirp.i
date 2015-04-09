@@ -2,16 +2,15 @@
 %module CChirp
 
 %{
-    #include <time.h>
-    #include "debug.h"
-    #include "int_sizes.h"
-    #include "timestamp.h"
+	#include <time.h>
+	#include "debug.h"
+	#include "int_sizes.h"
+	#include "timestamp.h"
 	#include "auth_all.h"
 	#include "auth_ticket.h"
 	#include "chirp_recursive.h"
-    #include "chirp_reli.h"
-    #include "chirp_types.h"
-
+	#include "chirp_reli.h"
+	#include "chirp_types.h"
 	#include "chirp_swig_wrap.h"
 %}
 
@@ -32,7 +31,7 @@
 }
 
 /* vdebug() takes va_list as arg but SWIG can't wrap such functions. */
-%ignore vdebug;  
+%ignore vdebug;
 %ignore debug;
 
 /* %ignore fname..; */
@@ -49,12 +48,4 @@
 %include "chirp_recursive.h"
 %include "chirp_swig_wrap.h"
 
-
-
-
-
-
-
-
-
-
+/* vim: set noexpandtab tabstop=4: */

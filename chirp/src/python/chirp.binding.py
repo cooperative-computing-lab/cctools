@@ -31,7 +31,7 @@ class Client:
 
         if absolute_stop_time is None:
             absolute_stop_time = time.time() + timeout
-                
+
         return absolute_stop_time
 
     def set_tickets(self, tickets):
@@ -49,7 +49,7 @@ class Client:
 
     def whoami(self, absolute_stop_time=None, timeout=None):
         return chirp_wrap_whoami(self.host, self.__stoptime(absolute_stop_time, timeout))
-                                                        
+
     def listacl(self, path='/', absolute_stop_time=None, timeout=None):
         acls = chirp_wrap_listacl(self.host, path, self.__stoptime(absolute_stop_time, timeout))
 
@@ -142,11 +142,11 @@ class Stat:
     @property
     def blocks(self):
         return self._info.cst_blocks
-    
+
     @property
     def atime(self):
         return self._info.cst_atime
-    
+
     @property
     def mtime(self):
         return self._info.cst_mtime

@@ -6,18 +6,18 @@
 static void accumulate_one_acl(char *line, void *args)
 {
 	struct buffer *b = (struct buffer *) args;
-	
+
 	if(buffer_pos(b) > 0) {
 		buffer_printf(b, "\n");
 	}
-	
+
 	buffer_printf(b, line);
 }
 
 struct chirp_stat *chirp_wrap_stat(const char *hostname, const char *path, time_t stoptime) {
 
 	struct chirp_stat *info = malloc(sizeof(struct chirp_stat));
-	
+
 	int status = chirp_reli_stat(hostname, path, info, stoptime);
 
 	if(status < 0) {
@@ -31,7 +31,7 @@ char *chirp_wrap_listacl(const char *hostname, const char *path, time_t stoptime
 {
 	struct buffer b;
 	buffer_init(&b);
-	
+
 	int status = chirp_reli_getacl(hostname, path, accumulate_one_acl, &b, stoptime);
 
 	char *acls;
@@ -59,5 +59,4 @@ char *chirp_wrap_whoami(const char *hostname, time_t stoptime)
 	return xxstrdup(id);
 }
 
-
-
+/* vim: set noexpandtab tabstop=4: */
