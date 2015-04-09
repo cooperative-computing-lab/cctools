@@ -21,6 +21,7 @@ struct chirp_stat *chirp_wrap_stat(const char *hostname, const char *path, time_
 	int status = chirp_reli_stat(hostname, path, info, stoptime);
 
 	if(status < 0) {
+		free(info);
 		return NULL;
 	}
 
