@@ -113,16 +113,16 @@ int         cfs_isdir(const char *filename);
 int         cfs_isnotdir(const char *filename);
 
 /* "basic" implementation made of primitives for operations the backend FS does not implement */
+INT64_T cfs_basic_chown(const char *path, INT64_T uid, INT64_T gid);
+INT64_T cfs_basic_fchown(int fd, INT64_T uid, INT64_T gid);
+INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime );
 INT64_T cfs_basic_hash (const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX]);
+INT64_T cfs_basic_lchown(const char *path, INT64_T uid, INT64_T gid);
+INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime);
 INT64_T cfs_basic_rmall(const char *path);
+INT64_T cfs_basic_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime);
 INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
 INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
-INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime);
-INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime );
-INT64_T cfs_basic_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime);
-INT64_T cfs_basic_chown(const char *path, INT64_T uid, INT64_T gid);
-INT64_T cfs_basic_lchown(const char *path, INT64_T uid, INT64_T gid);
-INT64_T cfs_basic_fchown(int fd, INT64_T uid, INT64_T gid);
 
 /* stubs for operations not implemented in the backend FS */
 INT64_T cfs_stub_lockf (int fd, int cmd, INT64_T len);
