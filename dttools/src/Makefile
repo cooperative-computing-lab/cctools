@@ -71,6 +71,7 @@ SOURCES = \
 	rmsummary.c \
 	set.c \
 	sha1.c \
+	sigdef.c \
 	sleeptools.c \
 	sort_dir.c \
 	string_array.c \
