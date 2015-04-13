@@ -96,7 +96,6 @@ void cfs_normalize ( char url[CHIRP_PATH_MAX] );
 
 /* CFS implementation for many stdio.h things */
 int         cfs_create_dir(const char *path, int mode);
-int         cfs_delete_dir(const char *path);
 int         cfs_exists( const char *path );
 int         cfs_fclose(CHIRP_FILE * file);
 INT64_T     cfs_fd_size( int fd );
@@ -115,6 +114,7 @@ int         cfs_isnotdir(const char *filename);
 
 /* "basic" implementation made of primitives for operations the backend FS does not implement */
 INT64_T cfs_basic_hash (const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX]);
+INT64_T cfs_basic_rmall(const char *path);
 INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
 INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
 INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime);

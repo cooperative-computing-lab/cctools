@@ -319,34 +319,6 @@ int cfs_create_dir(const char *path, int mode)
 	}
 }
 
-int cfs_delete_dir(const char *path)
-{
-	int result = 1;
-	struct chirp_dir *dir;
-	struct chirp_dirent *d;
-
-	if(cfs->unlink(path) == 0)	/* Handle files and symlinks here */
-		return 0;
-
-	dir = cfs->opendir(path);
-	if(!dir) {
-		return errno == ENOENT;
-	}
-	while((d = cfs->readdir(dir))) {
-		char subdir[PATH_MAX];
-		if(!strcmp(d->name, "."))
-			continue;
-		if(!strcmp(d->name, ".."))
-			continue;
-		sprintf(subdir, "%s/%s", path, d->name);
-		if(!cfs_delete_dir(subdir)) {
-			result = 0;
-		}
-	}
-	cfs->closedir(dir);
-	return cfs->rmdir(path) == 0 ? result : 0;
-}
-
 int cfs_freadall(CHIRP_FILE * f, buffer_t *B)
 {
 	size_t n;
@@ -626,6 +598,32 @@ INT64_T cfs_basic_hash (const char *path, const char *algorithm, unsigned char d
 		} else assert(0);
 	}
 	return -1;
+}
+
+INT64_T cfs_basic_rmall (const char *path)
+{
+	INT64_T rc = cfs->unlink(path);
+	if(rc == -1 && (errno == EISDIR || errno == EPERM)) {
+		struct chirp_dir *dir = cfs->opendir(path);
+		if (dir) {
+			struct chirp_dirent *d;
+			rc = 0;
+			while(rc == 0 && (d = cfs->readdir(dir))) {
+				if(strcmp(d->name, ".") != 0 && strcmp(d->name, "..") != 0) {
+					char subpath[PATH_MAX];
+					snprintf(subpath, sizeof(subpath), "%s/%s", path, d->name);
+					rc = cfs_basic_rmall(subpath);
+					if (rc == -1) {
+						cfs->closedir(dir);
+						return -1;
+					}
+				}
+			}
+			cfs->closedir(dir);
+			rc = cfs->rmdir(path);
+		}
+	}
+	return rc;
 }
 
 INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
