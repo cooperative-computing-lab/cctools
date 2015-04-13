@@ -18,7 +18,6 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "full_io.h"
 #include "macros.h"
-#include "md5.h"
 #include "debug.h"
 #include "copy_stream.h"
 #include "list.h"
@@ -1471,7 +1470,7 @@ INT64_T chirp_client_lchown(struct chirp_client * c, char const *path, INT64_T u
 	return simple_command(c, stoptime, "lchown %s %lld %lld\n", safepath, uid, gid);
 }
 
-INT64_T chirp_client_md5(struct chirp_client * c, const char *path, unsigned char digest[16], time_t stoptime)
+INT64_T chirp_client_hash(struct chirp_client * c, const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime)
 {
 	INT64_T result;
 	INT64_T actual;
@@ -1479,20 +1478,24 @@ INT64_T chirp_client_md5(struct chirp_client * c, const char *path, unsigned cha
 	char safepath[CHIRP_LINE_MAX];
 	url_encode(path, safepath, sizeof(safepath));
 
-	result = simple_command(c, stoptime, "md5 %s\n", path);
+	result = simple_command(c, stoptime, "hash %s %s\n", algorithm, path);
 
-	if(result == 16) {
-		actual = link_read(c->link, (char *) digest, 16, stoptime);
+	if(result > 0) {
+		actual = link_read(c->link, (char *) digest, result, stoptime);
 		if(actual != result) {
 			errno = ECONNRESET;
 			result = -1;
 		}
-
 	} else if(result >= 0) {
 		result = -1;
 		errno = ECONNRESET;
 	}
 	return result;
+}
+
+INT64_T chirp_client_md5(struct chirp_client * c, const char *path, unsigned char digest[16], time_t stoptime)
+{
+	return chirp_client_hash(c, path, "md5", digest, stoptime); /* digest has wrong length, but it is okay for md5 */
 }
 
 INT64_T chirp_client_setrep(struct chirp_client * c, char const *path, int nreps, time_t stoptime)

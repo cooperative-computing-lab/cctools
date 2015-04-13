@@ -685,6 +685,11 @@ INT64_T chirp_reli_utime( const char *host, const char *path, time_t actime, tim
 	RETRY_ATOMIC( result = chirp_client_utime(client,path,actime,modtime,stoptime); )
 }
 
+INT64_T chirp_reli_hash( const char *host, const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime )
+{
+	RETRY_ATOMIC( result = chirp_client_hash(client,path,algorithm,digest,stoptime); )
+}
+
 INT64_T chirp_reli_md5( const char *host, const char *path, unsigned char digest[16], time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_md5(client,path,digest,stoptime); )

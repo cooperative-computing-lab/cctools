@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "path.h"
 #include "xxmalloc.h"
 #include "md5.h"
+#include "sha1.h"
 
 #include <fnmatch.h>
 
@@ -562,11 +563,27 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 	return result;
 }
 
-INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
+INT64_T cfs_basic_hash (const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX])
 {
 	int fd;
 	INT64_T result;
 	struct chirp_stat info;
+
+	union {
+		md5_context_t md5;
+		sha1_context_t sha1;
+	} context;
+	enum {MD5, SHA1} type;
+
+	if (strcmp(algorithm, "md5") == 0) {
+		type = MD5;
+		md5_init(&context.md5);
+	} else if (strcmp(algorithm, "sha1") == 0) {
+		type = SHA1;
+		sha1_init(&context.sha1);
+	} else {
+		return (errno = EINVAL, -1);
+	}
 
 	result = cfs->stat(path, &info);
 	if(result < 0)
@@ -581,9 +598,6 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 	if(fd >= 0) {
 		INT64_T total = 0;
 		INT64_T length = info.cst_size;
-		md5_context_t ctx;
-
-		md5_init(&ctx);
 
 		while(length > 0) {
 			char buffer[65536];
@@ -593,20 +607,25 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 			if(ractual <= 0)
 				break;
 
-			md5_update(&ctx, (unsigned char *) buffer, ractual);
+			if (type == MD5)
+				md5_update(&context.md5, buffer, ractual);
+			else if (type == SHA1)
+				sha1_update(&context.sha1, buffer, ractual);
 
 			length -= ractual;
 			total += ractual;
 		}
 		cfs->close(fd);
 
-		result = MD5_DIGEST_LENGTH;
-		md5_final(digest, &ctx);
-	} else {
-		result = -1;
+		if (type == MD5) {
+			md5_final(digest, &context.md5);
+			return MD5_DIGEST_LENGTH;
+		} else if (type == SHA1) {
+			sha1_final(digest, &context.sha1);
+			return SHA1_DIGEST_LENGTH;
+		} else assert(0);
 	}
-
-	return result;
+	return -1;
 }
 
 INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)

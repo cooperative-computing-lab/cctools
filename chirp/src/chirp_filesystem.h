@@ -67,7 +67,7 @@ struct chirp_filesystem {
 	INT64_T (*lchown)    ( const char *path, INT64_T uid, INT64_T gid );
 	INT64_T (*truncate)  ( const char *path, INT64_T length );
 	INT64_T (*utime)     ( const char *path, time_t atime, time_t mtime  );
-	INT64_T (*md5)       ( const char *path, unsigned char digest[16] );
+	INT64_T (*hash)      ( const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX] );
 	INT64_T (*setrep)    ( const char *path, int nreps );
 
     INT64_T (*getxattr)  ( const char *path, const char *name, void *data, size_t size );
@@ -114,11 +114,11 @@ int         cfs_isdir(const char *filename);
 int         cfs_isnotdir(const char *filename);
 
 /* "basic" implementation made of primitives for operations the backend FS does not implement */
+INT64_T cfs_basic_hash (const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX]);
 INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
 INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
 INT64_T cfs_basic_putfile(const char *path, struct link * link, INT64_T length, INT64_T mode, time_t stoptime);
 INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime );
-INT64_T cfs_basic_md5(const char *path, unsigned char digest[16]);
 INT64_T cfs_basic_search(const char *subject, const char *dir, const char *patt, int flags, struct link *l, time_t stoptime);
 INT64_T cfs_basic_chown(const char *path, INT64_T uid, INT64_T gid);
 INT64_T cfs_basic_lchown(const char *path, INT64_T uid, INT64_T gid);

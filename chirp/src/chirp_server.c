@@ -1353,14 +1353,27 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			}
 		} else if(sscanf(line, "md5 %s", path) == 1) {
-			unsigned char digest[16];
+			/* backwards compatibility */
+			unsigned char digest[CHIRP_DIGEST_MAX];
 			path_fix(path);
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
-			result = cfs->md5(path, digest);
+			result = cfs->hash(path, "md5", digest);
 			if (result >= 0) {
-				assert((size_t)result == sizeof(digest));
-				buffer_putlstring(&B, (char *)digest, sizeof(digest));
+				buffer_putlstring(&B, (char *)digest, result);
+			} else {
+				result = errno_to_chirp(errno);
+			}
+		} else if(sscanf(line, "hash %s %s", chararg1, path) == 2) {
+			unsigned char digest[CHIRP_DIGEST_MAX];
+			path_fix(path);
+			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
+				goto failure;
+			result = cfs->hash(path, chararg1, digest);
+			if (result >= 0) {
+				buffer_putlstring(&B, (char *)digest, result);
+			} else {
+				result = errno_to_chirp(errno);
 			}
 		} else if(sscanf(line, "setrep %s %" SCNd64, path, &length) == 2) {
 			if (length < 0) {

@@ -720,7 +720,7 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	cfs_basic_lchown,
 	chirp_fs_hdfs_truncate,
 	chirp_fs_hdfs_utime,
-	cfs_basic_md5,
+	cfs_basic_hash,
 	chirp_fs_hdfs_setrep,
 
 	cfs_stub_getxattr,

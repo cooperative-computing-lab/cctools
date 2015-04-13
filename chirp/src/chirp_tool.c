@@ -35,7 +35,6 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "list.h"
 #include "domain_name_cache.h"
-#include "md5.h"
 #include "getopt_aux.h"
 #include "path.h"
 
@@ -698,18 +697,34 @@ static INT64_T do_whoareyou(int argc, char **argv)
 	return result;
 }
 
+static INT64_T do_hash(int argc, char **argv)
+{
+	INT64_T result;
+	char full_path[CHIRP_LINE_MAX];
+	unsigned char digest[CHIRP_DIGEST_MAX];
+
+	complete_remote_path(argv[2], full_path);
+
+	result = chirp_reli_hash(current_host, full_path, argv[1], digest, stoptime);
+	if(result > 0) {
+		int i;
+		for (i = 0; i < result; i++)
+			printf("%02X", (unsigned)digest[i]);
+		printf("\t%s\n", full_path);
+	}
+	return result;
+
+}
+
 static INT64_T do_md5(int argc, char **argv)
 {
-	unsigned char digest[16];
-	char full_path[CHIRP_LINE_MAX];
-	INT64_T result;
-
-	complete_remote_path(argv[1], full_path);
-
-	result = chirp_reli_md5(current_host, full_path, digest, stoptime);
-	if(result > 0)
-		printf("%s %s\n", md5_string(digest), full_path);
-	return result;
+	char *nargv[] = {
+		"hash",
+		"md5",
+		argv[1],
+		NULL
+	};
+	return do_hash(3, nargv);
 }
 
 static INT64_T do_setrep(int argc, char **argv)
@@ -1088,6 +1103,7 @@ static struct command list[] = {
 	{"matrix_create", 1, 4, 4, "<path> <width> <height> <nhosts>", do_matrix_create},
 	{"matrix_delete", 1, 1, 1, "<path>", do_matrix_delete},
 	{"matrix_list", 1, 1, 1, "<path>", do_matrix_list},
+	{"hash", 1, 2, 2, "<algorithm> <path>", do_hash},
 	{"md5", 1, 1, 1, "<path>", do_md5},
 	{"mkalloc", 1, 2, 2, "<path> <size>", do_mkalloc},
 	{"mkdir", 1, 1, 2, "[-p] <dir>", do_mkdir},
