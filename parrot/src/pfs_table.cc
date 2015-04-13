@@ -443,7 +443,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 	path_collapse(full_logical_name,pname->logical_name,1);
 
 	if(pattern_match(full_logical_name, "^/proc/self/()", &n) >= 0) {
-		snprintf(pname->logical_name, sizeof(pname->logical_name), "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n-1]);
+		snprintf(pname->logical_name, sizeof(pname->logical_name), "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n]);
 		strcpy(pname->path, pname->logical_name);
 		pname->service = pfs_service_lookup_default();
 		strcpy(pname->service_name,"local");
@@ -453,7 +453,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 		pname->is_local = 1;
 		return 1;
 	} else if (pattern_match(full_logical_name, "^/dev/fd/()", &n) >= 0) {
-		snprintf(pname->logical_name, sizeof(pname->logical_name), "/proc/%d/fd/%s", pfs_process_getpid(), &full_logical_name[n-1]);
+		snprintf(pname->logical_name, sizeof(pname->logical_name), "/proc/%d/fd/%s", pfs_process_getpid(), &full_logical_name[n]);
 		strcpy(pname->path, pname->logical_name);
 		pname->service = pfs_service_lookup_default();
 		strcpy(pname->service_name,"local");
