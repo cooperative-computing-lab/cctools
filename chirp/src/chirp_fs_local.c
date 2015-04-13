@@ -736,6 +736,7 @@ static int chirp_fs_do_acl_check()
 
 struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_init,
+	cfs_stub_destroy,
 
 	chirp_fs_local_fname,
 

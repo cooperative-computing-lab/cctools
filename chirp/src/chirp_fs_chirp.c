@@ -401,6 +401,7 @@ static int chirp_fs_chirp_do_acl_check()
 
 struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_init,
+	cfs_stub_destroy,
 
 	chirp_fs_chirp_fname,
 

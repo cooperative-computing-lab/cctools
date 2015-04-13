@@ -897,6 +897,11 @@ INT64_T cfs_basic_search(const char *subject, const char *dir, const char *patte
 	return search_directory(subject, fullpath + strlen(fullpath), fullpath, pattern, flags, l, stoptime);
 }
 
+void cfs_stub_destroy(void)
+{
+	return;
+}
+
 INT64_T cfs_stub_lockf(int fd, int cmd, INT64_T len)
 {
 	errno = ENOSYS;

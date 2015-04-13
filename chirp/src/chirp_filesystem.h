@@ -24,6 +24,7 @@ typedef struct CHIRP_FILE CHIRP_FILE;
 
 struct chirp_filesystem {
 	int (*init) ( const char url[CHIRP_PATH_MAX] );
+	void (*destroy) ( void );
 
 	int (*fname) ( int fd, char path[CHIRP_PATH_MAX] );
 
@@ -125,6 +126,7 @@ INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_le
 INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset);
 
 /* stubs for operations not implemented in the backend FS */
+void cfs_stub_destroy(void);
 INT64_T cfs_stub_lockf (int fd, int cmd, INT64_T len);
 INT64_T cfs_stub_getxattr (const char *path, const char *name, void *data, size_t size);
 INT64_T cfs_stub_fgetxattr (int fd, const char *name, void *data, size_t size);

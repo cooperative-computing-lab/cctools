@@ -164,6 +164,8 @@ static int gc_tickets(const char *url)
 
 	chirp_acl_gctickets();
 
+	cfs->destroy();
+
 	return 0;
 }
 
@@ -219,6 +221,8 @@ static int update_all_catalogs(const char *url)
 	list_iterate(catalog_host_list, update_one_catalog, buffer_tostring(&B));
 
 	buffer_free(&B);
+
+	cfs->destroy();
 
 	return 0;
 }
@@ -1607,6 +1611,8 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 	}
 
 	link_close(link);
+
+	cfs->destroy();
 }
 
 void killeveryone (int sig)
@@ -2040,6 +2046,7 @@ int main(int argc, char *argv[])
 		change_process_title("chirp_server [scheduler]");
 		backend_setup(chirp_url);
 		rc = chirp_job_schedule();
+		cfs->destroy();
 		if(rc == 0) {
 			/* normal exit, parent probably died */
 			_exit(EXIT_SUCCESS);
