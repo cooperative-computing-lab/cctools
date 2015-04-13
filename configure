@@ -118,6 +118,7 @@ python_path="/usr"
 python3_path="/usr"
 xrootd_path="/usr"
 cvmfs_path="/usr"
+uuid_path="/usr"
 zlib_path="/usr"
 swig_path="/usr"
 
@@ -219,6 +220,10 @@ do
 			cvmfs_path=$1
 			config_cvmfs_path=yes
 			;;
+		--with-uuid-path)
+			shift
+			uuid_path=$1
+			;;
 		--with-zlib-path)
 			shift
 			zlib_path=$1
@@ -310,6 +315,7 @@ Where PACKAGE may be:
     xrootd
     zlib
     cvmfs
+    uuid
     swig
 
 And SYSTEM may be:
@@ -648,11 +654,12 @@ then
 	cvmfs_version=$(sed -En 's/^#define LIBCVMFS_VERSION +([0-9]+)/\1/p' ${cvmfs_path}/include/libcvmfs.h)
 	if [ $cvmfs_version -gt 1 ]
 	then
-		if library_search uuid "/usr"
+		if library_search uuid $uuid_path
 		then
 			cvmfs_ldflags="${cvmfs_ldflags} ${library_search_result}"
 		else
 			echo "*** Couldn't find libuuid"
+			echo "*** Check --with-uuid-path and try again."
 			exit 1
 		fi
 	fi
