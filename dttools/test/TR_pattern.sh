@@ -43,11 +43,11 @@ int main (int argc, char *argv[])
 	check(pattern_match("foo", "bar"), -1);
 	check(pattern_match("foo", "(foo)()", &cap1, &ncap), 0);
 	check(strcmp(cap1, "foo"), 0);
-	check(ncap, 4);
+	check(ncap, 3);
 	free(cap1);
 	check(pattern_match("foobar", "(foo)()b(.*)", &cap1, &ncap, &cap2), 0);
 	check(strcmp(cap1, "foo"), 0);
-	check(ncap, 4);
+	check(ncap, 3);
 	check(strcmp(cap2, "ar"), 0);
 	free(cap1);
 	free(cap2);

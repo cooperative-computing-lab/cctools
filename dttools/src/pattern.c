@@ -51,7 +51,7 @@ ptrdiff_t pattern_vmatch (const char *str, const char *patt, va_list va)
 					luaL_error(ms.L, "unfinished capture");
 				else if (l == CAP_POSITION) {
 					size_t *capture = va_arg(va, size_t *);
-					*capture = ms.capture[i].init - ms.src_init + 1;
+					*capture = ms.capture[i].init - ms.src_init;
 				} else {
 					char **capture = va_arg(va, char **);
 					*capture = malloc(l+1);
