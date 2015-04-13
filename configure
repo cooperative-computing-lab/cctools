@@ -1124,9 +1124,16 @@ else
 fi
 
 # sqlite3 uses define "HAVE_*"
+optional_function gmtime_r /usr/include/time.h HAVE_GMTIME_R
+optional_function fdatasync /usr/include/unistd.h HAVE_FDATASYNC
 optional_function isnan /usr/include/math.h HAS_ISNAN HAVE_ISNAN SQLITE_HAVE_ISNAN
-optional_function pread /usr/include/unistd.h HAS_PREAD
-optional_function pwrite /usr/include/unistd.h HAS_PWRITE
+optional_function localtime_r /usr/include/time.h HAVE_LOCALTIME_R
+optional_function localtime_s /usr/include/time.h HAVE_LOCALTIME_S
+optional_function pread /usr/include/unistd.h HAS_PREAD USE_PREAD
+optional_function pread64 /usr/include/unistd.h USE_PREAD64
+optional_function pwrite /usr/include/unistd.h HAS_PWRITE USE_PWRITE
+optional_function pwrite64 /usr/include/unistd.h USE_PWRITE64
+optional_function strchrnul /usr/include/string.h HAVE_STRCHRNUL
 optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
 optional_function usleep /usr/include/unistd.h HAS_USLEEP HAVE_USLEEP
 optional_function utime /usr/include/utime.h HAS_UTIME HAVE_UTIME
