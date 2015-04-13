@@ -127,6 +127,7 @@ static struct irods_server * connect_to_host( const char *hostport )
 			rcDisconnect(server->conn);
 			free(server);
 			server = 0;
+			hash_table_remove(connect_cache, hostport);
 		} else {
 			server->lastused = current;
 			return server;
