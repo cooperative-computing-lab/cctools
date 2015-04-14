@@ -748,6 +748,18 @@ else
 	echo "*** skipping readline..."
 fi
 
+if [ $build_sys = DARWIN ]
+then
+	if [ ! -d "/usr/include" ]
+	then
+		# The version of getopt.h packaged in cctools appears to cause a SIGBUS on Darwin.
+		# Mac OS X Command Line Tools need to be installed to obtain a getopt.h that works.
+		echo "*** Sorry, I can't proceed without Mac OS X Command Line Tools."
+		echo "*** Please refer to the installation instructions."
+		exit 1
+	fi
+fi
+
 if [ $config_perl_path != no ]
 then
 	if check_file ${perl_path}/bin/perl
