@@ -102,6 +102,9 @@ extern "C" {
 #ifndef TFD_CLOEXEC
 #	define TFD_CLOEXEC 02000000
 #endif
+#ifndef MFD_CLOEXEC
+#	define MFD_CLOEXEC 0x0001U
+#endif
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_temp_dir;
@@ -186,11 +189,34 @@ static void pathtofilename( char *path )
 static void divert_to_parrotfd( struct pfs_process *p, INT64_T fd, char *path, const void *uaddr, int flags )
 {
 	pathtofilename(path);
-	debug(D_DEBUG, "diverting to openat(%d, `%s', O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR)", parrot_dir_fd, path);
-	INT64_T args[] = {parrot_dir_fd, (INT64_T)pfs_process_scratch_set(p, path, strlen(path)+1), O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR};
-	if (flags & O_CLOEXEC)
-		args[2] |= O_CLOEXEC;
-	tracer_args_set(p->tracer,SYSCALL64_openat,args,sizeof(args)/sizeof(args[0]));
+
+	/* If possible, use memfd_create for the new Parrot FD file. This has a few
+	 * advantages:
+	 *
+	 * o A memfd can be created irrespective of currently mounted (tmpfs) file
+	 *   systems.
+	 * o The FD is always in an anonymous tmpfs file system, it is never "on
+	 *   disk". [This means that Parrot fd is not referring to a file under the
+	 *   temporary Parrot directory. So, we never allocate an inode on a disk
+	 *   file system.]
+	 * o We don't need to unlink the file after the tracee creates it. A memfd
+	 *   is already anonymous.
+	 */
+
+	if (linux_available(3,17,0)) {
+		INT64_T args[] = {(INT64_T)pfs_process_scratch_set(p, path, strlen(path)+1), 0};
+		if (flags & O_CLOEXEC)
+			args[2] |= MFD_CLOEXEC;
+		tracer_args_set(p->tracer,SYSCALL64_memfd_create,args,sizeof(args)/sizeof(args[0]));
+		debug(D_DEBUG, "diverting to memfd_create(`%s', 0)", path);
+	} else {
+		INT64_T args[] = {parrot_dir_fd, (INT64_T)pfs_process_scratch_set(p, path, strlen(path)+1), O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR};
+		if (flags & O_CLOEXEC)
+			args[2] |= O_CLOEXEC;
+		tracer_args_set(p->tracer,SYSCALL64_openat,args,sizeof(args)/sizeof(args[0]));
+		debug(D_DEBUG, "diverting to openat(%d, `%s', O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR)", parrot_dir_fd, path);
+	}
+
 	p->syscall_args_changed = 1;
 	p->syscall_parrotfd = fd;
 	trace_this_pid = p->pid; /* this handles two processes racing to create the same file, also see comment for pfs_table::setparrot. */
@@ -207,8 +233,11 @@ static void handle_parrotfd( struct pfs_process *p )
 			fatal("could not stat %d: %s", actual, strerror(errno));
 		p->table->setparrot(p->syscall_parrotfd, actual, &buf);
 		pfs_process_scratch_get(p, path, sizeof(path));
-		if (unlinkat(parrot_dir_fd, path, 0) == -1)
-			fatal("could not unlink `%s': %s", path, strerror(errno));
+		if (!linux_available(3,17,0)) {
+			/* We only need to unlinkat if it is not a memfd (see divert_to_parrotfd comment). */
+			if (unlinkat(parrot_dir_fd, path, 0) == -1)
+				fatal("could not unlink `%s': %s", path, strerror(errno));
+		}
 	} else {
 		/* could not allocate parrotfd? */
 		debug(D_DEBUG, "could not allocate parrotfd: %s", strerror(-actual));
