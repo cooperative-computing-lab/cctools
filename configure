@@ -734,7 +734,7 @@ then
 	if [ ! -d "/usr/include" ]
 	then
 		# The version of getopt.h packaged in cctools appears to cause a SIGBUS on Darwin.
-		# Mac OS X Command Line Tools need to be installed to obtain a getopt.h that works.	
+		# Mac OS X Command Line Tools need to be installed to obtain a getopt.h that works.
 		echo "*** Sorry, I can't proceed without Mac OS X Command Line Tools."
 		echo "*** Please refer to the installation instructions."
 		exit 1
