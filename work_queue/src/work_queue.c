@@ -3930,7 +3930,9 @@ void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 }
 
 int work_queue_task_state( struct work_queue *q, int taskid) {
-	return (int) ((uint64_t) itable_lookup(q->task_state_map, taskid));
+	int state = ((uintptr_t) itable_lookup(q->task_state_map, taskid));
+
+	return state;
 }
 
 /* Changes task state. Returns old state */
