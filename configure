@@ -636,7 +636,7 @@ fi
 
 if [ $config_cvmfs_success = 1 ]
 then
-	cvmfs_version=$(sed -En 's/^#define LIBCVMFS_VERSION +([0-9]+)/\1/p' ${cvmfs_path}/include/libcvmfs.h)
+	cvmfs_version=$(sed -n 's/^#define LIBCVMFS_VERSION \+\([0-9]\+\)/\1/p' ${cvmfs_path}/include/libcvmfs.h)
 	if [ $cvmfs_version -gt 1 ] 
 	then
 		if ! library_search uuid "/usr"
