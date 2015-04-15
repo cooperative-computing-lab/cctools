@@ -27,7 +27,8 @@ static off_t file_size_max = 1<<20;
 void debug_file_reopen (void)
 {
 	if (strlen(file_path)) {
-		file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY|O_NOCTTY, 0660);
+		close(file_fd);
+		file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY|O_NOCTTY, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
 		if (file_fd == -1){
 			fprintf(stderr, "could not access log file `%s' for writing: %s\n", file_path, strerror(errno));
 			exit(EXIT_FAILURE);
@@ -74,7 +75,6 @@ void debug_file_write (INT64_T flags, const char *str)
 void debug_file_path (const char *path)
 {
 	path_absolute(path, file_path, 0);
-	close(file_fd);
 	debug_file_reopen();
 }
 
@@ -88,7 +88,6 @@ void debug_file_rename (const char *suffix)
 	if (strlen(file_path)) {
 		char old[PATH_MAX] = "";
 
-		close(file_fd);
 		snprintf(old, sizeof(old)-1, "%s.%s", file_path, suffix);
 		rename(file_path, old);
 		debug_file_reopen();
