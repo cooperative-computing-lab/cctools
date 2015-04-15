@@ -53,12 +53,9 @@ void debug_file_write (INT64_T flags, const char *str)
 		rc = fstat(file_fd, &info);
 		if (rc == 0) {
 			if (info.st_size >= file_size_max) {
-				close(file_fd);
-				if(stat(file_path, &info) == 0 && info.st_size >= file_size_max) {
-					char old[PATH_MAX] = "";
-					snprintf(old, sizeof(old)-1, "%s.old", file_path);
-					rename(file_path, old);
-				}
+				char old[PATH_MAX];
+				snprintf(old, sizeof(old), "%s.old", file_path);
+				rename(file_path, old);
 				debug_file_reopen();
 			}
 		} else {
