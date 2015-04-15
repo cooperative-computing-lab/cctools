@@ -43,6 +43,15 @@ void debug_file_reopen (void)
 			fprintf(stderr, "could not set file flags: %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
+		/* canonicalize the debug_file path for future operations */
+		{
+			char tmp[PATH_MAX] = "";
+			if (realpath(file_path, tmp) == NULL) {
+				fprintf(stderr, "could not resolve '%s'\n", file_path);
+				exit(EXIT_FAILURE);
+			}
+			memcpy(file_path, tmp, sizeof(file_path));
+		}
 	}
 }
 
@@ -74,7 +83,7 @@ void debug_file_write (INT64_T flags, const char *str)
 
 void debug_file_path (const char *path)
 {
-	path_absolute(path, file_path, 0);
+	strncpy(file_path, path, sizeof(file_path)-1);
 	debug_file_reopen();
 }
 
