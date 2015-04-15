@@ -5,12 +5,12 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include <stdlib.h>
-
 #ifndef STRINGTOOLS_H
 #define STRINGTOOLS_H
 
-#include "int_sizes.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include <time.h>
 
 typedef char *(*string_subst_lookup_t) (const char *name, void *arg);
 
@@ -24,9 +24,9 @@ int string_match_regex(const char *text, char *pattern);
 int string_match(const char *pattern, const char *text);
 char *string_front(const char *str, int max);
 const char *string_back(const char *str, int max);
-char *string_metric(double invalue, int power_needed, char *buffer);
-INT64_T string_metric_parse(const char *str);
-int string_time_parse(const char *str);
+char *string_metric(double value, int power_needed, char *buffer);
+int64_t string_metric_parse(const char *str);
+time_t string_time_parse(const char *str);
 int string_split(char *str, int *argc, char ***argv);
 int string_split_quotes(char *str, int *argc, char ***argv);
 char *string_pad_right(char *str, unsigned int length);
