@@ -1035,7 +1035,7 @@ INT64_T chirp_client_getfile_buffer(struct chirp_client * c, const char *path, c
 
 	result = link_read(c->link, *buffer, length, stoptime);
 	if(result < 0) {
-		free(*buffer);
+		*buffer = realloc(*buffer, 0);
 		c->broken = 1;
 		return -1;
 	}
@@ -2005,7 +2005,7 @@ INT64_T chirp_client_job_status (struct chirp_client *c, const char *json, char 
 	if(result > 0) {
 		INT64_T actual;
 
-		if(result >= MAX_BUFFER_SIZE || (*status = malloc(result+1)) == NULL) {
+		if(result >= MAX_BUFFER_SIZE || (*status = realloc(NULL, result+1)) == NULL) {
 			errno = ENOMEM;
 			return -1;
 		}
@@ -2013,7 +2013,7 @@ INT64_T chirp_client_job_status (struct chirp_client *c, const char *json, char 
 		memset(*status, 0, result+1);
 		actual = link_read(c->link, *status, result, stoptime);
 		if(actual != result) {
-			free(*status);
+			*status = realloc(*status, 0);
 			errno = ECONNRESET;
 			return -1;
 		}
@@ -2030,7 +2030,7 @@ INT64_T chirp_client_job_wait (struct chirp_client *c, chirp_jobid_t id, INT64_T
 	if(result > 0) {
 		INT64_T actual;
 
-		if(result >= MAX_BUFFER_SIZE || (*status = malloc(result+1)) == NULL) {
+		if(result >= MAX_BUFFER_SIZE || (*status = realloc(NULL, result+1)) == NULL) {
 			errno = ENOMEM;
 			return -1;
 		}
@@ -2038,7 +2038,7 @@ INT64_T chirp_client_job_wait (struct chirp_client *c, chirp_jobid_t id, INT64_T
 		memset(*status, 0, result+1);
 		actual = link_read(c->link, *status, result, stoptime);
 		if(actual != result) {
-			free(*status);
+			*status = realloc(*status, 0);
 			errno = ECONNRESET;
 			return -1;
 		}
