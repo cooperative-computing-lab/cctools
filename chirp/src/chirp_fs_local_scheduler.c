@@ -23,11 +23,17 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+#if defined(__linux__)
+#	include <sys/syscall.h>
+#	include "ioprio.h"
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
+
 
 extern char chirp_hostname[DOMAIN_NAME_MAX];
 extern int chirp_port;
@@ -358,7 +364,21 @@ static void bootstrap (const char *sandbox, const char *path, char *const argv[]
 	CATCH(fd_null(STDERR_FILENO, O_WRONLY));
 	CATCHUNIX(chdir(sandbox));
 	CATCHUNIX(setpgid(0, 0)); /* create new process group */
+#if defined(__linux__) && defined(SYS_ioprio_get)
+	/* Reduce the iopriority of jobs below the scheduler. */
+	CATCHUNIX(syscall(SYS_ioprio_get, IOPRIO_WHO_PROCESS, 0));
+	debug(D_CHIRP, "iopriority: %d:%d", (int)IOPRIO_PRIO_CLASS(rc), (int)IOPRIO_PRIO_DATA(rc));
+	CATCHUNIX(syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, 0, IOPRIO_PRIO_VALUE(IOPRIO_CLASS_BE, 1)));
+	if (rc == 0)
+		debug(D_CHIRP, "iopriority set: %d:%d", (int)IOPRIO_CLASS_BE, 1);
+	else assert(0);
+	CATCHUNIX(syscall(SYS_ioprio_get, IOPRIO_WHO_PROCESS, 0));
+	assert(IOPRIO_PRIO_CLASS(rc) == IOPRIO_CLASS_BE && IOPRIO_PRIO_DATA(rc) == 1);
+#endif /* defined(__linux__) && defined(SYS_ioprio_get) */
 	CATCHUNIX(execve(path, argv, envp));
+
+	rc = 0;
+	goto out;
 out:
 	signal(SIGUSR1, SIG_DFL);
 	raise(SIGUSR1);

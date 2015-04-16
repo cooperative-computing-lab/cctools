@@ -16,6 +16,11 @@
 #include "macros.h"
 #include "path.h"
 
+#if defined(__linux__)
+#	include <sys/syscall.h>
+#	include "ioprio.h"
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <float.h>
@@ -962,10 +967,24 @@ int chirp_job_schedule (void)
 {
 	int rc;
 	sqlite3 *db = NULL;
+
 	if (!chirp_job_enabled) return ENOSYS;
+
+#if defined(__linux__) && defined(SYS_ioprio_get)
+	/* The scheduler requires higher IO priority for access to the SQLite db. */
+	CATCHUNIX(syscall(SYS_ioprio_get, IOPRIO_WHO_PROCESS, 0));
+	debug(D_CHIRP, "iopriority: %d:%d", (int)IOPRIO_PRIO_CLASS(rc), (int)IOPRIO_PRIO_DATA(rc));
+	CATCHUNIX(syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, 0, IOPRIO_PRIO_VALUE(IOPRIO_CLASS_BE, 0)));
+	if (rc == 0)
+		debug(D_CHIRP, "iopriority set: %d:%d", (int)IOPRIO_CLASS_BE, 0);
+	else assert(0);
+	CATCHUNIX(syscall(SYS_ioprio_get, IOPRIO_WHO_PROCESS, 0));
+	assert(IOPRIO_PRIO_CLASS(rc) == IOPRIO_CLASS_BE && IOPRIO_PRIO_DATA(rc) == 0);
+#endif /* defined(__linux__) && defined(SYS_ioprio_get) */
+
 	CATCH(db_get(&db));
 
-	debug(D_DEBUG, "scheduler running with concurrency: %d", chirp_job_concurrency);
+	debug(D_DEBUG, "scheduler running with concurrency: %u", chirp_job_concurrency);
 	debug(D_DEBUG, "scheduler running with time limit: %d", chirp_job_time_limit);
 
 	CATCH(cfs->job_schedule(db));
