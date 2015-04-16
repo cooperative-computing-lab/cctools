@@ -325,7 +325,8 @@ int cfs_freadall(CHIRP_FILE * f, buffer_t * B)
 	char buf[BUFSIZ];
 
 	while((n = cfs_fread(buf, sizeof(char), sizeof(buf), f)) > 0) {
-		buffer_putlstring(B, buf, n);
+		if(buffer_putlstring(B, buf, n) == -1)
+			return 0;
 	}
 
 	return cfs_ferror(f) ? 0 : 1;
