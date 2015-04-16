@@ -1614,6 +1614,15 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 
 void killeveryone (int sig)
 {
+	int i;
+	int n = sysconf(_SC_OPEN_MAX);
+
+	/* This process sleeps for a short time in between kills, immediately close
+	 * all fds to free up (bound) sockets.
+	 */
+	for (i = 0; i < n; i++)
+		close(i);
+
 	/* start with sig */
 	kill(0, sig);
 	sleep(1);
