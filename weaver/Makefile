@@ -15,7 +15,7 @@ CLEAN_TARGETS = $(TARGETS:%=clean-%)
 $(CLEAN_TARGETS):
 	$(CCTOOLS_PYTHON) setup.py clean
 	-rm -rf build
-	-rm weaver/*pyc
+	-rm -f weaver/*pyc
 
 clean: $(CLEAN_TARGETS)
 
