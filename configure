@@ -355,8 +355,7 @@ if [ -f config.mk ]; then
 	if make clean; then
 		echo 'make clean - ok'
 	else
-		echo "*** make clean failed ($?), very strange"
-		exit 1
+		echo "make clean failed ($?); continuing"
 	fi
 fi
 
