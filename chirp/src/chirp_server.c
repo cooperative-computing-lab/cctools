@@ -240,10 +240,12 @@ static int run_in_child_process(int (*func) (const char *a), const char *args, c
 		}
 		debug(D_PROCESS, "*** %s complete ***", name);
 		if(WIFEXITED(status)) {
+			debug(D_PROCESS, "pid %d exited with %d", pid, WEXITSTATUS(status));
 			return WEXITSTATUS(status);
-		} else {
+		} else if(WIFSIGNALED(status)) {
+			debug(D_PROCESS, "pid %d failed due to signal %d (%s)", pid, WTERMSIG(status), string_signal(WTERMSIG(status)));
 			return -1;
-		}
+		} else assert(0);
 	} else {
 		debug(D_PROCESS, "couldn't fork: %s", strerror(errno));
 		return -1;
