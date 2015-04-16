@@ -1,0 +1,69 @@
+#!/bin/bash
+
+CCTOOLS_INSTALL="${HOME}/cctools/bin"
+WEAVER=/afs/nd.edu/user31/pdonnel3/weaver/usr/bin/weaver
+
+if [ "$(whoami)" = pdonnel3 ]; then
+	PORT=9123
+elif [ "$(whoami)" = nhazekam ]; then
+	PORT=9223
+else
+	PORT=9523
+fi
+
+CHIRP="${CCTOOLS_INSTALL}/chirp"
+CHIRP_SERVER="${CCTOOLS_INSTALL}/chirp_server"
+MAKEFLOW="${CCTOOLS_INSTALL}/makeflow"
+PYTHON="/afs/nd.edu/user37/ccl/software/external/python/bin/python"
+#WEAVER="$(which weaver)"
+
+DIR="$(pwd)/load-balance.workflow"
+MAKEFLOW_FILE="$DIR"/Makeflow
+
+run () {
+	echo "$@"
+	time "$@"
+}
+
+runbg () {
+	echo "$@" '&'
+	"$@" &
+}
+
+#if ! [ -d "$DIR/" ]; then
+#	run tar xzf "$ARCHIVE"
+#fi
+
+if ! [ -d "$DIR" ]; then
+	env PYTHONPATH="$(dirname "$WEAVER")/../lib/python2.6/site-packages/" ~/pdonnel3/weaver/usr/bin/weaver -N -o "$DIR" "$(dirname "$0")/pull-tests.py"
+fi
+
+. "$(dirname "$0")/chirps-ssh.sh"
+sleep 5
+
+for concurrency in 20 16 12 08 04 02 01; do
+	for scheduler in fifo-4 fifo-2 fifo-1; do
+		for replication in push-async-4 push-async-2 push-sync-1; do
+			if [ "$replication" = 'push-sync-1' -a ! \( "$scheduler" = 'fifo-1' \) ]; then
+				continue;
+			fi
+			base="$(pwd)/test.${concurrency}.${scheduler}.${replication}"
+			mkdir "$base" || exit 1
+			echo "$CONFUGA_NODE_LIST" > "${base}/nodes.lst"
+
+			eval "$CONFUGA_NODE_NUKE"
+			runbg "$CHIRP_SERVER" --auth=unix --catalog-update=30s --challenge-dir="${base}/" --debug=all --debug-file="${base}/confuga.debug" --debug-rotate-max=0 --interface=127.0.0.1 --jobs --job-concurrency="$concurrency" --pid-file="${base}/confuga.pid" --port="$PORT" --root="confuga://${base}/confuga.root?scheduler=${scheduler}&replication=${replication}&nodes=file:${base}/nodes.lst" --superuser="unix:$(whoami)" --transient="${base}/confuga.transient"
+
+			run "$CHIRP" --auth=unix --debug=chirp --debug-file="${base}/chirp.debug" --timeout=60m localhost:"$PORT" put "$DIR/"
+
+			run cp "$MAKEFLOW_FILE" "${base}/Makeflow"
+			run "$MAKEFLOW" --batch-type=chirp --debug=all --debug-file="${base}/makeflow.debug" --debug-rotate-max=0 --working-dir="chirp://localhost:${PORT}/$(basename "$DIR")" "${base}/Makeflow"
+
+			kill %1
+			wait
+			sleep 10
+		done
+	done
+done
+
+# vim: set noexpandtab tabstop=4:

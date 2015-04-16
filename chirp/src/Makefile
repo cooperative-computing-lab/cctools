@@ -74,6 +74,8 @@ install: all install-bindings
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/cctools/chirp/
+	cp -r ../tools/workflows/ $(CCTOOLS_INSTALL_DIR)/share/cctools/chirp/
 
 test: all
 
