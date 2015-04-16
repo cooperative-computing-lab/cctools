@@ -1791,7 +1791,7 @@ int main(int argc, char *argv[])
 
 	catalog_host_list = list_create();
 
-	debug_config(argv[0]);
+	debug_config("chirp_server");
 
 	/* Ensure that all files are created private by default. */
 	umask(0077);
