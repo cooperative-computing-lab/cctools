@@ -1702,7 +1702,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Superuser for all directories. (default: none)\n", "-P,--superuser=<user>");
-	fprintf(stdout, " %-30s Listen on this port. (default: %d)\n", "-p,--port=<port>", chirp_port);
+	fprintf(stdout, " %-30s Listen on this port. (default: %d; arbitrary: 0)\n", "-p,--port=<port>", chirp_port);
 	fprintf(stdout, " %-30s Enforce this root quota in software.\n", "-Q,--root-quota=<size>");
 	fprintf(stdout, " %-30s Read-only mode.\n", "-R,--read-only");
 	fprintf(stdout, " %-30s Abort stalled operations after this long. (default: %ds)\n", "-s,--stalled=<time>", stall_timeout);

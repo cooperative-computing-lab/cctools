@@ -41,7 +41,7 @@ OPTION_TRIPLET(-n, catalog-name,name)Use this name when reporting to the catalog
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_TRIPLET(-O, debug-rotate-max,bytes)Rotate debug file once it reaches this size.
 OPTION_TRIPLET(-P,superuser,user)Superuser for all directories. (default is none)
-OPTION_TRIPLET(-p,port,port)Listen on this port (default is 9094)
+OPTION_TRIPLET(-p,port,port)Listen on this port (default is 9094, arbitrary is 0)
 OPTION_TRIPLET(-Q,root-quota,size)Enforce this root quota in software.
 OPTION_ITEM(`-R, --read-only')Read-only mode.
 OPTION_TRIPLET(-r, root,url)URL of storage directory, like file://path or hdfs://host:port/path.
