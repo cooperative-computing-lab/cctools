@@ -192,7 +192,7 @@ size_t cfs_fwrite(const void *ptr, size_t size, size_t nitems, CHIRP_FILE * file
 	if(file->type == LOCAL)
 		return fwrite(ptr, size, nitems, file->f.lfile);
 	for(; bytes < nbytes; bytes++)
-		buffer_printf(&file->f.cfile.B, "%c", (int) (((const char *) ptr)[bytes]));
+		buffer_putfstring(&file->f.cfile.B, "%c", (int) (((const char *) ptr)[bytes]));
 	return nbytes;
 }
 

@@ -69,11 +69,11 @@ char *chirp_ticket_tostring(struct chirp_ticket *ct)
 	buffer_init(&B);
 	buffer_abortonfailure(&B, 1);
 
-	buffer_printf(&B, "subject \"%s\"\n", ct->subject);
-	buffer_printf(&B, "ticket \"%s\"\n", ct->ticket);
-	buffer_printf(&B, "expiration \"%lu\"\n", (unsigned long) ct->expiration);
+	buffer_putfstring(&B, "subject \"%s\"\n", ct->subject);
+	buffer_putfstring(&B, "ticket \"%s\"\n", ct->ticket);
+	buffer_putfstring(&B, "expiration \"%lu\"\n", (unsigned long) ct->expiration);
 	for(n = 0; n < ct->nrights; n++) {
-		buffer_printf(&B, "rights \"%s\" \"%s\"\n", ct->rights[n].directory, ct->rights[n].acl);
+		buffer_putfstring(&B, "rights \"%s\" \"%s\"\n", ct->rights[n].directory, ct->rights[n].acl);
 	}
 
 	buffer_dup(&B, &result);
