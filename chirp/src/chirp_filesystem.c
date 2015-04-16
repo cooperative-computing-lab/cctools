@@ -199,23 +199,31 @@ size_t cfs_fwrite(const void *ptr, size_t size, size_t nitems, CHIRP_FILE * file
 /* WARNING: fread does not use the fgets buffer!! */
 size_t cfs_fread(void *ptr, size_t size, size_t nitems, CHIRP_FILE * file)
 {
-	size_t nitems_read = 0;
-
-	if(file->type == LOCAL)
+	if(file->type == LOCAL) {
 		return fread(ptr, size, nitems, file->f.lfile);
+	} else {
+		size_t btotal = size * nitems;
+		size_t bavail = btotal;
 
-	if(size == 0 || nitems == 0)
-		return 0;
-
-	while(nitems_read < nitems) {
-		INT64_T t = cfs->pread(file->f.cfile.fd, ptr, size, file->f.cfile.offset);
-		if(t == -1 || t == 0)
-			return nitems_read;
-		file->f.cfile.offset += t;
-		ptr = (char *) ptr + size;	//Previously void arithmetic!
-		nitems_read++;
+		while(bavail > size) {
+			INT64_T t = cfs->pread(file->f.cfile.fd, ptr, bavail, file->f.cfile.offset);
+			if(t == -1) {
+				if(errno == EINTR) {
+					continue;
+				} else {
+					file->f.cfile.error = errno;
+					break;
+				}
+			} else if(t == 0) {
+				break;
+			}
+			assert(0 < t && t < (INT64_T) bavail);
+			file->f.cfile.offset += t;
+			bavail -= t;
+			ptr = (char *) ptr + size;
+		}
+		return (btotal - bavail) / size;
 	}
-	return nitems_read;
 }
 
 char *cfs_fgets(char *s, int n, CHIRP_FILE * file)
