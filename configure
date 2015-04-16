@@ -350,6 +350,16 @@ potential_packages="dttools ${include_package_makeflow} work_queue ${include_pac
 
 check_multiarch
 
+if [ -f config.mk ]; then
+    echo "we are reconfiguring - prepare with make clean..."
+    if make clean; then
+	echo 'make clean - ok';
+    else
+	echo "*** make clean failed ($?), very strange"
+	exit 1
+    fi
+fi
+
 rm -f config.mk
 echo "checking for all the things I know how to build..."
 for p in $potential_packages
