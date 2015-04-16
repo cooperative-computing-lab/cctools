@@ -526,29 +526,34 @@ const char *chirp_client_readacl(struct chirp_client *c, time_t stoptime)
 static int ticket_translate(const char *name, char *ticket_subject)
 {
 	char command[PATH_MAX * 2 + 4096];
+	char pk[4096] = ""; /* max size of public key */
 	const char *dummy;
 
 	if(chirp_ticket_isticketsubject(name, &dummy)) {
 		strcpy(ticket_subject, name);
-		return 1;
-	}
-
-	char *pk = xxmalloc(65536);	/* max size of public key */
-	sprintf(command, "sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null", name);
-	FILE *pkf = popen(command, "r");
-	int length = fread(pk, sizeof(char), 65536, pkf);
-	if(length <= 0) {
-		pclose(pkf);
 		return 0;
 	}
-	pk[length] = 0;
+
+	if (access(name, R_OK) == -1)
+		return -1;
+
+	sprintf(command, "sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null", name);
+	FILE *pkf = popen(command, "r");
+	size_t length = fread(pk, sizeof(char), sizeof(pk)/sizeof(char), pkf);
+	if(length == 0) {
+		errno = ferror(pkf);
+		if (errno == 0) /* empty file? */
+			errno = EINVAL;
+		pclose(pkf);
+		return -1;
+	}
 	pclose(pkf);
 
 	/* load the digest */
 	const char *digest = chirp_ticket_digest(pk);
 
 	sprintf(ticket_subject, "ticket:%s", digest);
-	return 1;
+	return 0;
 }
 
 /* Some versions of gcc emit a silly error about the use of %c.  This suppresses that error. */
@@ -566,10 +571,11 @@ INT64_T chirp_client_ticket_register(struct chirp_client * c, const char *name, 
 	FILE *shell;
 	int status;
 
-	if(access(name, R_OK) != 0)
+	if(access(name, R_OK) == -1)
 		return -1;	/* the 'name' argument must be a client ticket filename */
 
-	ticket_translate(name, ticket_subject);
+	if (ticket_translate(name, ticket_subject) == -1)
+		return -1;
 
 	/* BEWARE: we don't bother to escape the filename, a user could
 	 * provide a malicious filename that makes us execute code we don't want to.
@@ -696,7 +702,8 @@ INT64_T chirp_client_ticket_delete(struct chirp_client * c, const char *name, ti
 {
 	char ticket_subject[CHIRP_LINE_MAX];
 
-	ticket_translate(name, ticket_subject);
+	if (ticket_translate(name, ticket_subject) == -1)
+		return -1;
 
 	INT64_T result = simple_command(c, stoptime, "ticket_delete %s\n", ticket_subject);
 
@@ -714,7 +721,8 @@ INT64_T chirp_client_ticket_get(struct chirp_client * c, const char *name, char 
 	*subject = *ticket = NULL;
 	*rights = NULL;
 
-	ticket_translate(name, ticket_subject);
+	if (ticket_translate(name, ticket_subject) == -1)
+		return -1;
 
 	result = simple_command(c, stoptime, "ticket_get %s\n", ticket_subject);
 
@@ -836,7 +844,8 @@ INT64_T chirp_client_ticket_modify(struct chirp_client * c, const char *name, co
 {
 	char ticket_subject[CHIRP_LINE_MAX];
 	char safepath[CHIRP_LINE_MAX];
-	ticket_translate(name, ticket_subject);
+	if (ticket_translate(name, ticket_subject) == -1)
+		return -1;
 	url_encode(path, safepath, sizeof(safepath));
 	INT64_T result = simple_command(c, stoptime, "ticket_modify %s %s %s\n", ticket_subject, safepath, aclmask);
 	if(result == 0) {
