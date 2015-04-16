@@ -149,6 +149,7 @@ static struct irods_server * connect_to_host( const char *hostport )
 
 	conn = rcConnect(host,port,irods_env.rodsUserName,irods_env.rodsZone,1,&errmsg);
 	if(!conn) {
+		/* iRODS returns EINPROGRESS when the server closes the connection during connect. */
 		if(errno==EINPROGRESS) {
 			errno = ECONNREFUSED;
 		}
