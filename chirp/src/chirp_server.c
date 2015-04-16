@@ -827,11 +827,6 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "thirdput %s %s %s", path, chararg1, newpath) == 3) {
 			const char *hostname = chararg1;
 			path_fix(path);
-			if(cfs == &chirp_fs_hdfs) {
-				errno = ENOSYS;
-				goto failure;
-			}
-
 			/* ACL check will occur inside of chirp_thirdput */
 
 			result = chirp_thirdput(subject, path, hostname, newpath, stalltime);
