@@ -737,7 +737,9 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
 
-			result = cfs->getfile(path, l, stalltime);
+			time_t transmission_stalltime = time(NULL)+(length / 1024)+30; /* 1KB/s minimum */
+			transmission_stalltime = MAX(stalltime, transmission_stalltime);
+			result = cfs->getfile(path, l, transmission_stalltime);
 
 			if(result >= 0) {
 				chirp_stats_update(0, result, 0);
@@ -774,7 +776,9 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 			INT64_T current;
 			if ((result = chirp_alloc_realloc(path, length, &current)) == 0) {
-				result = cfs->putfile(path, l, length, mode, stalltime);
+				time_t transmission_stalltime = time(NULL)+(length / 1024)+30; /* 1KB/s minimum */
+				transmission_stalltime = MAX(stalltime, transmission_stalltime);
+				result = cfs->putfile(path, l, length, mode, transmission_stalltime);
 				if (result == -1) {
 					chirp_alloc_realloc(path, current, NULL);
 				} else if (result < length) {
