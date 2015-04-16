@@ -83,7 +83,7 @@ char        chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
 static char        address[LINK_ADDRESS_MAX];
 static time_t      advertise_alarm = 0;
 static int         advertise_timeout = 300; /* five minutes */
-static int         config_pipe[2];
+static int         config_pipe[2] = {-1, -1};
 static struct      datagram *catalog_port;
 static char        hostname[DOMAIN_NAME_MAX];
 static int         idle_timeout = 60; /* one minute */
@@ -2043,6 +2043,10 @@ int main(int argc, char *argv[])
 	chirp_job_schedd = fork();
 	if (chirp_job_schedd == 0) {
 		int rc;
+
+		close(config_pipe[0]);
+		config_pipe[0] = -1;
+
 		change_process_title("chirp_server [scheduler]");
 		backend_setup(chirp_url);
 		rc = chirp_job_schedule();
@@ -2123,6 +2127,8 @@ int main(int argc, char *argv[])
 
 			pid = fork();
 			if(pid == 0) {
+				close(config_pipe[0]);
+				config_pipe[0] = -1;
 				chirp_receive(l, chirp_url);
 				_exit(0);
 			} else if(pid > 0) {
