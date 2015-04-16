@@ -42,7 +42,7 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 			return -1;
 
 		// create the directory, but do not fail if it already exists
-		result = chirp_reli_mkdir(hostname, rpath, 0700, stoptime);
+		result = chirp_reli_mkdir(hostname, rpath, S_IRWXU, stoptime);
 		if(result < 0 && errno != EEXIST)
 			return result;
 

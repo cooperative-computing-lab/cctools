@@ -358,7 +358,7 @@ static INT64_T getstream(const char *path, struct link * l, time_t stoptime)
 	INT64_T fd, total = 0;
 	char buffer[65536];
 
-	fd = cfs->open(path, O_RDONLY, 0700);
+	fd = cfs->open(path, O_RDONLY, S_IRWXU);
 	if(fd == -1)
 		return fd;
 
@@ -388,7 +388,7 @@ static INT64_T putstream(const char *path, struct link * l, time_t stoptime)
 {
 	INT64_T fd, total = 0;
 
-	fd = cfs->open(path, O_CREAT | O_TRUNC | O_WRONLY, 0700);
+	fd = cfs->open(path, O_CREAT | O_TRUNC | O_WRONLY, S_IRWXU);
 	if(fd < 0) {
 		return -1;
 	}
@@ -1585,7 +1585,7 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 
 		if(safe_username) {
 			cfs->chown("/", safe_uid, safe_gid);
-			cfs->chmod("/", 0700);
+			cfs->chmod("/", S_IRWXU);
 			debug(D_AUTH, "changing to uid %d gid %d", safe_uid, safe_gid);
 			setgid(safe_gid);
 			setuid(safe_uid);

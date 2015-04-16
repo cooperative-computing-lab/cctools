@@ -845,7 +845,7 @@ static INT64_T do_mkalloc(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], full_path);
-	return chirp_reli_mkalloc(current_host, full_path, string_metric_parse(argv[2]), 0700, stoptime);
+	return chirp_reli_mkalloc(current_host, full_path, string_metric_parse(argv[2]), S_IRWXU, stoptime);
 }
 
 static INT64_T do_lsalloc(int argc, char **argv)
