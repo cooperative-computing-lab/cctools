@@ -4,6 +4,7 @@
  * See the file COPYING for details.
 */
 
+#include "catch.h"
 #include "chirp_filesystem.h"
 #include "chirp_job.h"
 #include "chirp_sqlite.h"
@@ -38,36 +39,6 @@ int   chirp_job_concurrency = 1;
 int   chirp_job_enabled = 0;
 pid_t chirp_job_schedd = 0;
 int   chirp_job_time_limit = 3600; /* 1 hour */
-
-#define CATCH(expr) \
-	do {\
-		rc = (expr);\
-		if (rc) {\
-			if (rc == -1) {\
-				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(errno));\
-				rc = errno;\
-			} else {\
-				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(rc));\
-			}\
-			goto out;\
-		}\
-	} while (0)
-
-#define CATCHCODE(expr, code) \
-	do {\
-		rc = (expr);\
-		if (rc == (code)) {\
-			if (rc == -1) {\
-				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(errno));\
-				rc = errno;\
-			} else {\
-				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(rc));\
-			}\
-			goto out;\
-		}\
-	} while (0)
-
-
 
 #define IMMUTABLE(T) \
 		"CREATE TRIGGER " T "ImmutableI BEFORE INSERT ON " T " FOR EACH ROW" \
@@ -606,38 +577,41 @@ static int jsonify (sqlite3 *db, sqlite3_stmt *stmt, int n, buffer_t *B)
 	int rc = 0;
 	switch (sqlite3_column_type(stmt, n)) {
 		case SQLITE_NULL:
-			CATCHCODE(buffer_putliteral(B, "null"), -1);
+			CATCHUNIX(buffer_putliteral(B, "null"));
 			break;
 		case SQLITE_INTEGER:
-			CATCHCODE(buffer_printf(B, "%" PRId64, (int64_t) sqlite3_column_int64(stmt, n)), -1);
+			CATCHUNIX(buffer_printf(B, "%" PRId64, (int64_t) sqlite3_column_int64(stmt, n)));
 			break;
 		case SQLITE_FLOAT:
-			CATCHCODE(buffer_printf(B, "%.*e", DBL_DIG, sqlite3_column_double(stmt, n)), -1);
+			CATCHUNIX(buffer_printf(B, "%.*e", DBL_DIG, sqlite3_column_double(stmt, n)));
 			break;
 		case SQLITE_TEXT: {
 			const unsigned char *str;
 
-			CATCHCODE(buffer_putliteral(B, "\""), -1);
+			CATCHUNIX(buffer_putliteral(B, "\""));
 			for (str = sqlite3_column_text(stmt, n); *str; str++) {
 				switch (*str) {
-					case '\\': CATCHCODE(buffer_putliteral(B, "\\\\"), -1); break;
-					case '"':  CATCHCODE(buffer_putliteral(B, "\\\""), -1); break;
-					case '/':  CATCHCODE(buffer_putliteral(B, "\\/"), -1); break;
-					case '\b': CATCHCODE(buffer_putliteral(B, "\\b"), -1); break;
-					case '\f': CATCHCODE(buffer_putliteral(B, "\\f"), -1); break;
-					case '\n': CATCHCODE(buffer_putliteral(B, "\\n"), -1); break;
-					case '\r': CATCHCODE(buffer_putliteral(B, "\\r"), -1); break;
-					case '\t': CATCHCODE(buffer_putliteral(B, "\\t"), -1); break;
-					default:   CATCHCODE(buffer_printf(B, "%c", (int)*str), -1); break;
+					case '\\': CATCHUNIX(buffer_putliteral(B, "\\\\")); break;
+					case '"':  CATCHUNIX(buffer_putliteral(B, "\\\"")); break;
+					case '/':  CATCHUNIX(buffer_putliteral(B, "\\/")); break;
+					case '\b': CATCHUNIX(buffer_putliteral(B, "\\b")); break;
+					case '\f': CATCHUNIX(buffer_putliteral(B, "\\f")); break;
+					case '\n': CATCHUNIX(buffer_putliteral(B, "\\n")); break;
+					case '\r': CATCHUNIX(buffer_putliteral(B, "\\r")); break;
+					case '\t': CATCHUNIX(buffer_putliteral(B, "\\t")); break;
+					default:   CATCHUNIX(buffer_printf(B, "%c", (int)*str)); break;
 				}
 			}
-			CATCHCODE(buffer_putliteral(B, "\""), -1);
+			CATCHUNIX(buffer_putliteral(B, "\""));
 			break;
 		}
 		case SQLITE_BLOB:
 		default:
 			assert(0); /* we don't handle this */
 	}
+
+	rc = 0;
+	goto out;
 out:
 	return rc;
 }
@@ -671,7 +645,7 @@ restart:
 
 	sqlcatchexec(db, "BEGIN TRANSACTION;");
 
-	CATCHCODE(buffer_putliteral(B, "["), -1);
+	CATCHUNIX(buffer_putliteral(B, "["));
 	for (i = 0; i < (int)J->u.array.length; i++) {
 		const char *current;
 		chirp_jobid_t id;
@@ -691,13 +665,13 @@ restart:
 		{
 			int j;
 
-			CATCHCODE(buffer_putliteral(B, "{"), -1); /* NOTE: this is matched at the end... */
+			CATCHUNIX(buffer_putliteral(B, "{")); /* NOTE: this is matched at the end... */
 			for (j = 0; j < sqlite3_column_count(stmt); j++) {
 				if (first1) {
 					first1 = 0;
-					CATCHCODE(buffer_printf(B, "\"%s\":", sqlite3_column_name(stmt, j)), -1);
+					CATCHUNIX(buffer_printf(B, "\"%s\":", sqlite3_column_name(stmt, j)));
 				} else {
-					CATCHCODE(buffer_printf(B, ",\"%s\":", sqlite3_column_name(stmt, j)), -1);
+					CATCHUNIX(buffer_printf(B, ",\"%s\":", sqlite3_column_name(stmt, j)));
 				}
 				jsonify(db, stmt, j, B);
 			}
@@ -713,25 +687,25 @@ restart:
 		first1 = 1;
 		sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
 		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
-		CATCHCODE(buffer_putliteral(B, ",\"arguments\":["), -1);
+		CATCHUNIX(buffer_putliteral(B, ",\"arguments\":["));
 		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
 		{
 			assert(sqlite3_column_count(stmt) == 1);
 			if (first1) {
 				first1 = 0;
 			} else {
-				CATCHCODE(buffer_putliteral(B, ","), -1);
+				CATCHUNIX(buffer_putliteral(B, ","));
 			}
 			jsonify(db, stmt, 0, B);
 		}
 		sqlcatchcode(rc, SQLITE_DONE);
 		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-		CATCHCODE(buffer_putliteral(B, "]"), -1);
+		CATCHUNIX(buffer_putliteral(B, "]"));
 
 		first1 = 1;
 		sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
 		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
-		CATCHCODE(buffer_putliteral(B, ",\"environment\":{"), -1);
+		CATCHUNIX(buffer_putliteral(B, ",\"environment\":{"));
 		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
 		{
 			assert(sqlite3_column_count(stmt) == 2);
@@ -739,20 +713,20 @@ restart:
 			if (first1) {
 				first1 = 0;
 			} else {
-				CATCHCODE(buffer_putliteral(B, ","), -1);
+				CATCHUNIX(buffer_putliteral(B, ","));
 			}
 			jsonify(db, stmt, 0, B);
-			CATCHCODE(buffer_putliteral(B, ":"), -1);
+			CATCHUNIX(buffer_putliteral(B, ":"));
 			jsonify(db, stmt, 1, B);
 		}
 		sqlcatchcode(rc, SQLITE_DONE);
 		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-		CATCHCODE(buffer_putliteral(B, "}"), -1);
+		CATCHUNIX(buffer_putliteral(B, "}"));
 
 		first1 = 1;
 		sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
 		sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
-		CATCHCODE(buffer_putliteral(B, ",\"files\":["), -1);
+		CATCHUNIX(buffer_putliteral(B, ",\"files\":["));
 		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
 		{
 			int j;
@@ -760,27 +734,27 @@ restart:
 
 			if (first1) {
 				first1 = 0;
-				CATCHCODE(buffer_putliteral(B, "{"), -1);
+				CATCHUNIX(buffer_putliteral(B, "{"));
 			} else {
-				CATCHCODE(buffer_putliteral(B, ",{"), -1);
+				CATCHUNIX(buffer_putliteral(B, ",{"));
 			}
 			for (j = 0; j < sqlite3_column_count(stmt); j++) {
 				if (first2) {
 					first2 = 0;
-					CATCHCODE(buffer_printf(B, "\"%s\":", sqlite3_column_name(stmt, j)), -1);
+					CATCHUNIX(buffer_printf(B, "\"%s\":", sqlite3_column_name(stmt, j)));
 				} else {
-					CATCHCODE(buffer_printf(B, ",\"%s\":", sqlite3_column_name(stmt, j)), -1);
+					CATCHUNIX(buffer_printf(B, ",\"%s\":", sqlite3_column_name(stmt, j)));
 				}
 				jsonify(db, stmt, j, B);
 			}
-			CATCHCODE(buffer_putliteral(B, "}"), -1);
+			CATCHUNIX(buffer_putliteral(B, "}"));
 		}
 		sqlcatchcode(rc, SQLITE_DONE);
 		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-		CATCHCODE(buffer_putliteral(B, "]}"), -1);
+		CATCHUNIX(buffer_putliteral(B, "]}"));
 	}
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-	CATCHCODE(buffer_putliteral(B, "]"), -1);
+	CATCHUNIX(buffer_putliteral(B, "]"));
 
 	sqlcatchexec(db, "END TRANSACTION;");
 

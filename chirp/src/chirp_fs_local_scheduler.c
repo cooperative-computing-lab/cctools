@@ -4,6 +4,7 @@
  * See the file COPYING for details.
 */
 
+#include "catch.h"
 #include "chirp_acl.h"
 #include "chirp_job.h"
 #include "chirp_fs_local.h"
@@ -28,34 +29,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#define CATCH(expr) \
-	do {\
-		rc = (expr);\
-		if (rc) {\
-			if (rc == -1) {\
-				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(errno));\
-				rc = errno;\
-			} else {\
-				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(rc));\
-			}\
-			goto out;\
-		}\
-	} while (0)
-
-#define CATCHCODE(expr, code) \
-	do {\
-		rc = (expr);\
-		if (rc == (code)) {\
-			if (rc == -1) {\
-				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(errno));\
-				rc = errno;\
-			} else {\
-				debug(D_DEBUG, "[%s:%d] generic error: %d `%s'", __FILE__, __LINE__, rc, strerror(rc));\
-			}\
-			goto out;\
-		}\
-	} while (0)
-
 extern char chirp_hostname[DOMAIN_NAME_MAX];
 extern int chirp_port;
 extern char chirp_transient_path[PATH_MAX];
@@ -74,6 +47,7 @@ int chirp_fs_local_job_dbinit (sqlite3 *db)
 	sqlcatchexec(db, Init);
 
 	rc = 0;
+	goto out;
 out:
 	return rc;
 }
@@ -86,11 +60,11 @@ static int kill_kindly (pid_t pid)
 	 * may be ignoring the kinder termination signals. We have to go through
 	 * the whole thing. However, if we get ESRCH (or any other error), this is
 	 * indication no process matches the group -pid. */
-	CATCHCODE(kill(-pid, SIGTERM), -1);
+	CATCHUNIX(kill(-pid, SIGTERM));
 	usleep(50);
-	CATCHCODE(kill(-pid, SIGQUIT), -1);
+	CATCHUNIX(kill(-pid, SIGQUIT));
 	usleep(50);
-	CATCHCODE(kill(-pid, SIGKILL), -1);
+	CATCHUNIX(kill(-pid, SIGKILL));
 out:
 	return rc;
 }
@@ -109,7 +83,8 @@ static int sandbox_create (char sandbox[PATH_MAX])
 static int sandbox_delete (const char *sandbox)
 {
 	int rc;
-	CATCHCODE(unlink_recursive(sandbox), -1);
+
+	CATCHUNIX(unlink_recursive(sandbox));
 
 	rc = 0;
 	goto out;
@@ -128,28 +103,28 @@ static int bindfile (const char *subject, const char *sandbox, const char *task_
 	/* TODO in future work, this path resolution is done at the FS layer transparently. */
 	CATCH(chirp_fs_local_resolve(serv_path, serv_path_resolved));
 	debug(D_DEBUG, "`%s' --> `%s'", serv_path, serv_path_resolved);
-	CATCHCODE(snprintf(task_path_resolved, sizeof(task_path_resolved), "%s/%s", sandbox, task_path), -1);
+	CATCHUNIX(snprintf(task_path_resolved, sizeof(task_path_resolved), "%s/%s", sandbox, task_path));
 	if ((size_t)rc >= sizeof(task_path_resolved))
-		return ENAMETOOLONG;
+		CATCH(ENAMETOOLONG);
 	path_dirname(task_path_resolved, task_path_dir);
 	if (mode == BOOTSTRAP) {
 		debug(D_DEBUG, "binding `%s' as `%s'", task_path, serv_path);
-		CATCHCODE(create_dir(task_path_dir, 0700), 0);
+
+		CATCHUNIX(create_dir(task_path_dir, S_IRWXU) ? 0 : -1);
+
 		if (strcmp(type, "INPUT") == 0) {
 			CATCH(chirp_acl_check(serv_path, subject, CHIRP_ACL_READ) ? 0 : -1);
 			if (strcmp(binding, "SYMLINK") == 0) {
-				CATCHCODE(symlink(serv_path_resolved, task_path_resolved), -1);
+				CATCHUNIX(symlink(serv_path_resolved, task_path_resolved));
 			} else if (strcmp(binding, "LINK") == 0) {
-				CATCHCODE(link(serv_path_resolved, task_path_resolved), -1);
+				CATCHUNIX(link(serv_path_resolved, task_path_resolved));
 			} else if (strcmp(binding, "COPY") == 0) {
-				CATCHCODE(copy_file_to_file(serv_path_resolved, task_path_resolved), -1);
-			} else {
-				assert(0);
-			}
+				CATCHUNIX(copy_file_to_file(serv_path_resolved, task_path_resolved));
+			} else assert(0);
 		} else if (strcmp(type, "OUTPUT") == 0) {
 			CATCH(chirp_acl_check(serv_path, subject, CHIRP_ACL_WRITE) ? 0 : -1);
 			if (strcmp(binding, "SYMLINK") == 0) {
-				CATCHCODE(symlink(serv_path_resolved, task_path_resolved), -1);
+				CATCHUNIX(symlink(serv_path_resolved, task_path_resolved));
 			}
 		} else {
 			assert(0);
@@ -159,13 +134,14 @@ static int bindfile (const char *subject, const char *sandbox, const char *task_
 			debug(D_DEBUG, "binding output file `%s' as `%s'", task_path, serv_path);
 			CATCH(chirp_acl_check(serv_path, subject, CHIRP_ACL_WRITE) ? 0 : -1);
 			if (strcmp(binding, "LINK") == 0) {
-				CATCHCODE(link(task_path_resolved, serv_path_resolved), -1);
+				CATCHUNIX(link(task_path_resolved, serv_path_resolved));
 			} else if (strcmp(binding, "COPY") == 0) {
-				CATCHCODE(copy_file_to_file(task_path_resolved, serv_path_resolved), -1);
+				CATCHUNIX(copy_file_to_file(task_path_resolved, serv_path_resolved));
 			}
 		}
 	}
 	rc = 0;
+	goto out;
 out:
 	return rc;
 }
@@ -194,7 +170,9 @@ static int jbindfiles (sqlite3 *db, chirp_jobid_t id, const char *subject, const
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
 	rc = 0;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	return rc;
@@ -227,7 +205,9 @@ static int jgetargs (sqlite3 *db, chirp_jobid_t id, char ***args)
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
 	rc = 0;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	if (rc) {
@@ -252,19 +232,20 @@ static int envinsert (char ***env, const char *name, const char *fmt, ...)
 		va_list ap;
 		char buf[1<<15];
 
-		CATCHCODE(snprintf(buf, sizeof(buf), "%s=", name), -1);
+		CATCHUNIX(snprintf(buf, sizeof(buf), "%s=", name));
 		if ((size_t)rc >= sizeof(buf))
 			return ENAMETOOLONG;
 
 		va_start(ap, fmt);
 		vsnprintf(buf+strlen(buf), sizeof(buf)-strlen(buf), fmt, ap);
 		va_end(ap);
-		CATCHCODE(rc, -1);
+		CATCHUNIX(rc);
 		if ((size_t)rc >= sizeof(buf))
 			return ENAMETOOLONG;
 		*env = string_array_append(*env, buf);
 	}
 	rc = 0;
+	goto out;
 out:
 	return rc;
 }
@@ -325,6 +306,7 @@ static int jgetenv (sqlite3 *db, chirp_jobid_t id, const char *subject, const ch
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 	CATCH(envdefaults(env, id, subject, sandbox)); /* ideally these would be set at the start and then replaced but it's awkward to replace entries in the char *[] */
 	rc = 0;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	return rc;
@@ -357,7 +339,9 @@ static int jgetcontext (sqlite3 *db, chirp_jobid_t id, char **executable, char *
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
 	rc = 0;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	return rc;
@@ -372,9 +356,9 @@ static void bootstrap (const char *sandbox, const char *path, char *const argv[]
 	CATCH(fd_null(STDIN_FILENO, O_RDONLY));
 	CATCH(fd_null(STDOUT_FILENO, O_WRONLY));
 	CATCH(fd_null(STDERR_FILENO, O_WRONLY));
-	CATCHCODE(chdir(sandbox), -1);
-	CATCHCODE(setpgid(0, 0), -1); /* create new process group */
-	CATCHCODE(execve(path, argv, envp), -1);
+	CATCHUNIX(chdir(sandbox));
+	CATCHUNIX(setpgid(0, 0)); /* create new process group */
+	CATCHUNIX(execve(path, argv, envp));
 out:
 	signal(SIGUSR1, SIG_DFL);
 	raise(SIGUSR1);
@@ -423,6 +407,7 @@ static int jstarted (sqlite3 *db, chirp_jobid_t id, pid_t pid, const char *sandb
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	rc = 0;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
@@ -446,6 +431,7 @@ static int jerrored (sqlite3 *db, chirp_jobid_t id, const char *errmsg)
 	debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " entered error state: `%s'", id, errmsg);
 
 	rc = 0;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	return rc;
@@ -513,6 +499,7 @@ static int jwaited (sqlite3 *db, chirp_jobid_t id)
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	rc = 0;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	return rc;
@@ -560,6 +547,7 @@ static int jfinished (sqlite3 *db, chirp_jobid_t id, int status)
 	debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " entered finished state: %d", id, status);
 
 	rc = 0;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	return rc;
@@ -640,6 +628,7 @@ static int job_wait (sqlite3 *db, int *count)
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	rc = 0;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
@@ -734,6 +723,7 @@ static int job_kill (sqlite3 *db, int *count)
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	rc = 0;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	sqlend(db);
@@ -758,7 +748,9 @@ static int job_schedule_fifo (sqlite3 *db, int *count)
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
 	rc = 0;
+	goto out;
 out:
 	sqlite3_finalize(stmt);
 	return rc;
