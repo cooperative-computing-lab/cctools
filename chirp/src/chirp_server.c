@@ -8,9 +8,7 @@
 #include "chirp_alloc.h"
 #include "chirp_audit.h"
 #include "chirp_filesystem.h"
-#include "chirp_fs_chirp.h"
-#include "chirp_fs_hdfs.h"
-#include "chirp_fs_local.h"
+#include "chirp_fs_confuga.h"
 #include "chirp_group.h"
 #include "chirp_job.h"
 #include "chirp_protocol.h"
@@ -38,6 +36,7 @@
 #include "macros.h"
 #include "memory_info.h"
 #include "path.h"
+#include "random.h"
 #include "stringtools.h"
 #include "url_encode.h"
 #include "username.h"
@@ -75,10 +74,12 @@
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
-char        chirp_hostname[DOMAIN_NAME_MAX] = "";
-char        chirp_owner[USERNAME_MAX] = "";
-int         chirp_port = CHIRP_PORT;
-char        chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
+struct list *catalog_host_list;
+char         chirp_hostname[DOMAIN_NAME_MAX] = "";
+char         chirp_owner[USERNAME_MAX] = "";
+int          chirp_port = CHIRP_PORT;
+char         chirp_project_name[128];
+char         chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
 
 static char        address[LINK_ADDRESS_MAX];
 static time_t      advertise_alarm = 0;
@@ -87,7 +88,6 @@ static int         config_pipe[2] = {-1, -1};
 static struct      datagram *catalog_port;
 static char        hostname[DOMAIN_NAME_MAX];
 static int         idle_timeout = 60; /* one minute */
-static struct      list *catalog_host_list;
 static UINT64_T    minimum_space_free = 0;
 static UINT64_T    root_quota = 0;
 static gid_t       safe_gid = 0;
@@ -212,6 +212,8 @@ static int update_all_catalogs(const char *url)
 	buffer_putfstring(&B, "opsysversion %s\n", name.release);
 	buffer_putfstring(&B, "owner %s\n", chirp_owner);
 	buffer_putfstring(&B, "port %d\n", chirp_port);
+	if (strlen(chirp_project_name))
+		buffer_putfstring(&B, "project %s\n", chirp_project_name);
 	buffer_putfstring(&B, "starttime %lu\n", (unsigned long) starttime);
 	buffer_putfstring(&B, "total %" PRIu64 "\n", info.f_blocks * info.f_bsize);
 	buffer_putfstring(&B, "url chirp://%s:%d\n", hostname, chirp_port);
@@ -347,6 +349,8 @@ static int errno_to_chirp(int e)
 		return CHIRP_ERROR_NO_SUCH_JOB;
 	case ESPIPE:
 		return CHIRP_ERROR_IS_A_PIPE;
+	case ENAMETOOLONG:
+		return CHIRP_ERROR_NAME_TOO_LONG;
 	case ENOTSUP:
 		return CHIRP_ERROR_NOT_SUPPORTED;
 	default:
@@ -831,10 +835,15 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "thirdput %s %s %s", path, chararg1, newpath) == 3) {
 			const char *hostname = chararg1;
 			path_fix(path);
+			if (cfs == &chirp_fs_confuga) {
+				/* Confuga cannot support thirdput because of auth problems,
+				 * see Authentication comment in chirp_receive.
+				 */
+				errno = EACCES;
+				goto failure;
+			}
 			/* ACL check will occur inside of chirp_thirdput */
-
 			result = chirp_thirdput(subject, path, hostname, newpath, stalltime);
-
 		} else if(sscanf(line, "open %s %s %" SCNd64, path, newpath, &mode) == 3) {
 			flags = 0;
 
@@ -1567,17 +1576,45 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 
 	change_process_title("chirp_server [authenticating]");
 
+	/* Authentication problems:
+	 *
+	 * Confuga and the thirdput RPC both use the auth module when acting as
+	 * Chirp clients. This conflicts with the Chirp server's authentication
+	 * (auth_accept, below) because auth uses static data structures for both
+	 * the client and server. So, we need to separate them somehow. Ideally, we
+	 * would have an auth context that is passed around for all operations
+	 * involving authentication, including the chirp_reli API. Unfortunately
+	 * this would be a very invasive change and we have to account for two
+	 * different clients (Confuga and chirp_thirdput) both using the chirp_reli
+	 * interface but should be using different authentication systems on
+	 * connect. Additionally, one's connection to one Chirp server should be
+	 * separate from another, as they use different authentication mechanisms.
+	 *
+	 * The intermediate solution is to disable thirdput for Confuga and add a
+	 * simple "clone" and "swap" method for auth which allows us to switch
+	 * between client and server auth. This is still somewhat messy because
+	 * ticket authentication requires looking up tickets in the backend file
+	 * system. Fortunately, these are metadata files in Confuga so it does not
+	 * require talking to a storage node.
+	 */
+	struct auth_state *server_state = auth_clone();
+
 	/* Chirp's backend file system must be loaded here. HDFS loads in the JVM
 	 * which does not play nicely with fork. So, we only manipulate the backend
 	 * file system in a child process which actually handles client requests.
 	 * */
 	backend_setup(url);
 
+	struct auth_state *backend_state = auth_clone();
+	auth_replace(server_state);
+
 	link_address_remote(link, addr, &port);
 
 	auth_ticket_server_callback(chirp_acl_ticket_callback);
 
 	if(auth_accept(link, &atype, &asubject, time(0) + idle_timeout)) {
+		auth_replace(backend_state);
+
 		sprintf(typesubject, "%s:%s", atype, asubject);
 		free(atype);
 		free(asubject);
@@ -1591,14 +1628,18 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 			setgid(safe_gid);
 			setuid(safe_uid);
 		}
-		/* Enable only globus, hostname, and address authentication for third-party transfers. */
-		auth_clear();
-		if(auth_globus_has_delegated_credential()) {
-			auth_globus_use_delegated_credential(1);
-			auth_globus_register();
+
+		/* See above comment concerning authentication. */
+		if (cfs != &chirp_fs_confuga) {
+			/* Enable only globus, hostname, and address authentication for third-party transfers. */
+			auth_clear();
+			if(auth_globus_has_delegated_credential()) {
+				auth_globus_use_delegated_credential(1);
+				auth_globus_register();
+			}
+			auth_hostname_register();
+			auth_address_register();
 		}
-		auth_hostname_register();
-		auth_address_register();
 
 		change_process_title("chirp_server [%s:%d] [%s]", addr, port, typesubject);
 
@@ -1707,6 +1748,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Superuser for all directories. (default: none)\n", "-P,--superuser=<user>");
 	fprintf(stdout, " %-30s Listen on this port. (default: %d; arbitrary: 0)\n", "-p,--port=<port>", chirp_port);
+	fprintf(stdout, " %-30s Project this Chirp server belongs to.\n", "   --project-name=<name>");
 	fprintf(stdout, " %-30s Enforce this root quota in software.\n", "-Q,--root-quota=<size>");
 	fprintf(stdout, " %-30s Read-only mode.\n", "-R,--read-only");
 	fprintf(stdout, " %-30s Abort stalled operations after this long. (default: %ds)\n", "-s,--stalled=<time>", stall_timeout);
@@ -1731,6 +1773,7 @@ int main(int argc, char *argv[])
 		LONGOPT_JOB_CONCURRENCY                  = INT_MAX-1,
 		LONGOPT_JOB_TIME_LIMIT                   = INT_MAX-2,
 		LONGOPT_INHERIT_DEFAULT_ACL              = INT_MAX-3,
+		LONGOPT_PROJECT_NAME                     = INT_MAX-4,
 	};
 
 	static const struct option long_options[] = {
@@ -1762,6 +1805,7 @@ int main(int argc, char *argv[])
 		{"pid-file", required_argument, 0, 'B'},
 		{"port", required_argument, 0, 'p'},
 		{"port-file", required_argument, 0, 'Z'},
+		{"project-name", required_argument, 0, LONGOPT_PROJECT_NAME},
 		{"read-only", no_argument, 0, 'R'},
 		{"root", required_argument, 0, 'r'},
 		{"root-quota", required_argument, 0, 'Q'},
@@ -1790,6 +1834,7 @@ int main(int argc, char *argv[])
 	int did_explicit_auth = 0;
 	char port_file[PATH_MAX] = "";
 
+	random_init();
 	change_process_title_init(argv);
 	change_process_title("chirp_server");
 
@@ -1927,10 +1972,13 @@ int main(int argc, char *argv[])
 			chirp_job_enabled = 1;
 			break;
 		case LONGOPT_JOB_CONCURRENCY:
-			chirp_job_concurrency = atoi(optarg);
+			chirp_job_concurrency = strtoul(optarg, NULL, 10);
 			break;
 		case LONGOPT_JOB_TIME_LIMIT:
 			chirp_job_time_limit = atoi(optarg);
+			break;
+		case LONGOPT_PROJECT_NAME:
+			strncpy(chirp_project_name, optarg, sizeof(chirp_project_name)-1);
 			break;
 		case 'h':
 		default:
@@ -2058,15 +2106,17 @@ int main(int argc, char *argv[])
 		config_pipe[0] = -1;
 
 		change_process_title("chirp_server [scheduler]");
+
 		backend_setup(chirp_url);
 		rc = chirp_job_schedule();
 		cfs->destroy();
+
 		if(rc == 0) {
 			/* normal exit, parent probably died */
-			_exit(EXIT_SUCCESS);
+			exit(EXIT_SUCCESS);
 		} else if(rc == ENOSYS) {
 			debug(D_DEBUG, "no scheduler available, quitting!");
-			_exit(EXIT_SUCCESS);
+			exit(EXIT_SUCCESS);
 		} else {
 			fatal("schedule rc = %d: %s", rc, strerror(rc));
 		}

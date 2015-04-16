@@ -127,6 +127,9 @@ static INT64_T convert_result(INT64_T result)
 		case CHIRP_ERROR_NOT_SUPPORTED:
 			errno = ENOTSUP;
 			break;
+		case CHIRP_ERROR_NAME_TOO_LONG:
+			errno = ENAMETOOLONG;
+			break;
 		case CHIRP_ERROR_GRP_UNREACHABLE:
 		case CHIRP_ERROR_TIMED_OUT:
 		case CHIRP_ERROR_DISCONNECTED:

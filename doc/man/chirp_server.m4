@@ -42,6 +42,7 @@ OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By defaul
 OPTION_TRIPLET(-O, debug-rotate-max,bytes)Rotate debug file once it reaches this size.
 OPTION_TRIPLET(-P,superuser,user)Superuser for all directories. (default is none)
 OPTION_TRIPLET(-p,port,port)Listen on this port (default is 9094, arbitrary is 0)
+OPTION_PAIR(--project-name,name)Project name this Chirp server belongs to.
 OPTION_TRIPLET(-Q,root-quota,size)Enforce this root quota in software.
 OPTION_ITEM(`-R, --read-only')Read-only mode.
 OPTION_TRIPLET(-r, root,url)URL of storage directory, like file://path or hdfs://host:port/path.

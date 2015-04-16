@@ -293,6 +293,30 @@ int chirp_acl_check(const char *filename, const char *subject, int flags)
 	return do_chirp_acl_check(filename, subject, flags, 1);
 }
 
+int chirp_acl_check_recursive(const char *path, const char *subject, int flags)
+{
+	int rc = do_chirp_acl_check(path, subject, flags, 1);
+	if (rc) {
+		struct chirp_dir *dir = cfs->opendir(path);
+		if (dir) {
+			struct chirp_dirent *dirent;
+			while ((dirent = cfs->readdir(dir))) {
+				if (strcmp(dirent->name, ".") == 0 || strcmp(dirent->name, "..") == 0)
+					continue;
+				if (dirent->lstatus == 0 && S_ISDIR(dirent->info.cst_mode)) {
+					char subpath[CHIRP_PATH_MAX];
+					snprintf(subpath, sizeof(subpath), "%s/%s", path, dirent->name);
+					rc = chirp_acl_check_recursive(subpath, subject, flags);
+					if (!rc)
+						break;
+				}
+			}
+			cfs->closedir(dir);
+		}
+	}
+	return rc;
+}
+
 int chirp_acl_check_link(const char *filename, const char *subject, int flags)
 {
 	return do_chirp_acl_check(filename, subject, flags, 0);

@@ -9,6 +9,7 @@ See the file COPYING for details.
 #define CHIRP_CLIENT_H
 
 #include "int_sizes.h"
+
 #include "chirp_protocol.h"
 #include "chirp_types.h"
 

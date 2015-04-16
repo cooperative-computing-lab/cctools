@@ -148,6 +148,24 @@ int     cfs_stub_job_schedule (sqlite3 *db);
 extern struct chirp_filesystem *cfs;
 extern char   chirp_url[CHIRP_PATH_MAX];
 
+#define STAT_TO_CSTAT(cbuf, buf)\
+	do {\
+		memset(&(cbuf),0,sizeof(cbuf));\
+		(cbuf).cst_dev = (buf).st_dev;\
+		(cbuf).cst_ino = (buf).st_ino;\
+		(cbuf).cst_mode = (buf).st_mode;\
+		(cbuf).cst_nlink = (buf).st_nlink;\
+		(cbuf).cst_uid = (buf).st_uid;\
+		(cbuf).cst_gid = (buf).st_gid;\
+		(cbuf).cst_rdev = (buf).st_rdev;\
+		(cbuf).cst_size = (buf).st_size;\
+		(cbuf).cst_blksize = (buf).st_blksize;\
+		(cbuf).cst_blocks = (buf).st_blocks;\
+		(cbuf).cst_atime = (buf).st_atime;\
+		(cbuf).cst_mtime = (buf).st_mtime;\
+		(cbuf).cst_ctime = (buf).st_ctime;\
+	} while (0)
+
 #endif /* CHIRP_FILESYSTEM_H */
 
 /* vim: set noexpandtab tabstop=4: */

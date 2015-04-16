@@ -11,6 +11,8 @@
 #include "debug.h"
 #include "json.h"
 #include "json_aux.h"
+#include "random.h"
+#include "sigdef.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
@@ -72,17 +74,17 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 
 	buffer_putliteral(&B, "{");
 
-	buffer_putliteral(&B, "\"executable\":\"/bin/sh\",");
+	buffer_putliteral(&B, "\"executable\":\"/bin/sh\"");
 
-	buffer_putfstring(&B, "\"arguments\":[\"sh\",\"-c\",\"{\\n");
+	buffer_putfstring(&B, ",\"arguments\":[\"sh\",\"-c\",\"{\\n");
 	jsonA_escapestring(&B, cmd);
 	buffer_putliteral(&B, "\\n}");
-	buffer_putliteral(&B, "\"],");
+	buffer_putliteral(&B, "\"]");
 
 	if(envlist) {
 		char *name, *value;
 		int first=1;
-		buffer_putfstring(&B,"\"environment\":{");
+		buffer_putliteral(&B,",\"environment\":{");
 		nvpair_first_item(envlist);
 		while(nvpair_next_item(envlist,&name,&value)) {
 			if(first) {
@@ -97,10 +99,11 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 			jsonA_escapestring(&B,value);
 			buffer_putliteral(&B,"\"");
 		}
-		buffer_putfstring(&B,"},");
+		buffer_putliteral(&B,"}");
 	}
 
-	buffer_putliteral(&B, "\"files\":[");
+	buffer_putliteral(&B, ",\"files\":[");
+
 	if (extra_input_files) {
 		char *file;
 		char *list = xxstrdup(extra_input_files);
@@ -126,7 +129,11 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 		if (s[l-1] == ',')
 			buffer_rewind(&B, l-1);
 	}
-	buffer_putliteral(&B, "]}");
+	buffer_putliteral(&B, "]");
+
+	buffer_putfstring(&B, ",\"tag\":\"%s\"", (const char *)hash_table_lookup(q->options, "tag"));
+
+	buffer_putliteral(&B, "}");
 
 	chirp_jobid_t id;
 	debug(D_DEBUG, "job = `%s'", buffer_tostring(&B));
@@ -193,11 +200,11 @@ static batch_job_id_t batch_job_chirp_wait (struct batch_queue *q, struct batch_
 							info_out->exited_normally = 1;
 							info_out->exit_code = exit_code->u.integer;
 						} else {
-							json_value *exit_signal = jsonA_getname(job, "exit_signal", json_integer);
+							json_value *exit_signal = jsonA_getname(job, "exit_signal", json_string);
 							assert(exit_signal);
-							debug(D_BATCH, "job finished with signal %d", (int)exit_signal->u.integer);
+							debug(D_BATCH, "job finished with signal %s", exit_signal->u.string.ptr);
 							info_out->exited_normally = 0;
-							info_out->exit_signal = exit_signal->u.integer;
+							info_out->exit_signal = sigdefint(exit_signal->u.string.ptr);
 						}
 					} else {
 						json_value *error = jsonA_getname(job, "error", json_string);
@@ -254,7 +261,17 @@ static int batch_job_chirp_remove (struct batch_queue *q, batch_job_id_t jobid)
 	return rc;
 }
 
-batch_queue_stub_create(chirp);
+static int batch_queue_chirp_create (struct batch_queue *q)
+{
+	BUFFER_STACK(B, 128)
+	char tag[21];
+
+	random_hex(tag, sizeof(tag));
+	buffer_putfstring(&B, "unknown-project:%s", tag);
+	batch_queue_set_option(q, "tag", buffer_tostring(&B));
+	return 0;
+}
+
 batch_queue_stub_free(chirp);
 batch_queue_stub_port(chirp);
 
@@ -277,6 +294,16 @@ static void batch_queue_chirp_option_update (struct batch_queue *q, const char *
 		} else {
 			fatal("`%s' is not a valid working-dir", value);
 		}
+	} else if (strcmp(what, "name") == 0) {
+		char tag[21];
+		BUFFER_STACK(B, 128)
+
+		random_hex(tag, sizeof(tag));
+		buffer_putfstring(&B, "%.32s:%s", value == NULL ? "unknown-project" : value, tag);
+		batch_queue_set_option(q, "tag", buffer_tostring(&B));
+	} else if (strcmp(what, "tag") == 0) {
+		if (value == NULL)
+			fatal("tag value must be set!");
 	}
 }
 

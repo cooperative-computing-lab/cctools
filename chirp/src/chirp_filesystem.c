@@ -11,11 +11,13 @@ See the file COPYING for details.
 #include "chirp_fs_chirp.h"
 #include "chirp_fs_hdfs.h"
 #include "chirp_fs_local.h"
+#include "chirp_fs_confuga.h"
 
 #include "debug.h"
 #include "macros.h"
 #include "buffer.h"
 #include "path.h"
+#include "pattern.h"
 #include "xxmalloc.h"
 #include "md5.h"
 #include "sha1.h"
@@ -61,6 +63,8 @@ struct chirp_filesystem *cfs_lookup(const char *url)
 		return &chirp_fs_chirp;
 	} else if(strprfx(url, "hdfs://")) {
 		return &chirp_fs_hdfs;
+	} else if(strprfx(url, "confuga://")) {
+		return &chirp_fs_confuga;
 	} else {
 		/* always interpret as a local url */
 		return &chirp_fs_local;
@@ -69,10 +73,18 @@ struct chirp_filesystem *cfs_lookup(const char *url)
 
 void cfs_normalize(char url[CHIRP_PATH_MAX])
 {
+	char *root = NULL;
+	char *rest = NULL;
+
 	if(strprfx(url, "chirp:")) {
 		return;
 	} else if(strprfx(url, "hdfs:")) {
 		return;
+	} else if(pattern_match(url, "^confuga://([^?]*)(.*)", &root, &rest) >= 0) {
+		char absolute[PATH_MAX];
+		path_absolute(root, absolute, 0);
+		debug(D_CHIRP, "normalizing url `%s' as `confuga://%s%s'", url, absolute, rest);
+		snprintf(url, CHIRP_PATH_MAX, "confuga://%s%s", absolute, rest);
 	} else {
 		char absolute[PATH_MAX];
 		if(strprfx(url, "file:") || strprfx(url, "local:"))
@@ -83,6 +95,8 @@ void cfs_normalize(char url[CHIRP_PATH_MAX])
 		strcpy(url, "local://");
 		strcat(url, absolute);
 	}
+	free(root);
+	free(rest);
 }
 
 CHIRP_FILE *cfs_fopen(const char *path, const char *mode)

@@ -171,7 +171,7 @@ INT64_T chirp_thirdput(const char *subject, const char *lpath, const char *hostn
 	if(result < 0)
 		return result;
 
-	debug(D_DEBUG, "thirdput: sending %s to /chirp/%s/%s", lpath, hostname, rpath);
+	debug(D_DEBUG, "thirdput: sending %s to chirp://%s/%s", lpath, hostname, rpath);
 
 	start = time(0);
 	result = chirp_thirdput_recursive(subject, lpath, hostname, rpath, hostsubject, stoptime);

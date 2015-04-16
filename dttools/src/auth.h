@@ -10,6 +10,8 @@ See the file COPYING for details.
 
 #include "link.h"
 
+struct auth_state;
+
 #define AUTH_SUBJECT_MAX 1024
 #define AUTH_TYPE_MAX 1024
 #define AUTH_LINE_MAX (AUTH_SUBJECT_MAX+AUTH_TYPE_MAX)
@@ -24,5 +26,8 @@ int auth_barrier(struct link *l, const char *response, time_t stoptime);
 int auth_register(char *type, auth_assert_t assert, auth_accept_t accept);
 
 void auth_clear(void);
+
+struct auth_state *auth_clone(void);
+void auth_replace(struct auth_state *);
 
 #endif

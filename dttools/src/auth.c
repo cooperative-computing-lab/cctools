@@ -24,13 +24,17 @@ struct auth_ops {
 	struct auth_ops *next;
 };
 
-static struct auth_ops *list = 0;
+struct auth_state {
+	struct auth_ops *ops;
+};
+
+static struct auth_state state;
 
 static struct auth_ops *type_lookup(char *type)
 {
 	struct auth_ops *a;
 
-	for(a = list; a; a = a->next) {
+	for(a = state.ops; a; a = a->next) {
 		if(!strcmp(a->type, type))
 			return a;
 	}
@@ -60,7 +64,7 @@ int auth_assert(struct link *link, char **type, char **subject, time_t stoptime)
 	char line[AUTH_LINE_MAX];
 	struct auth_ops *a;
 
-	for(a = list; a; a = a->next) {
+	for(a = state.ops; a; a = a->next) {
 		debug(D_AUTH, "requesting '%s' authentication", a->type);
 
 		if (link_putfstring(link, "%s\n", stoptime, a->type) <= 0)
@@ -169,22 +173,20 @@ int auth_barrier(struct link *link, const char *response, time_t stoptime)
 
 int auth_register(char *type, auth_assert_t assert, auth_accept_t accept)
 {
-	struct auth_ops *a, *l;
-
-	a = (struct auth_ops *) malloc(sizeof(struct auth_ops));
+	struct auth_ops *a = (struct auth_ops *) malloc(sizeof(struct auth_ops));
 	if(!a)
 		return 0;
-
 
 	a->type = type;
 	a->assert = assert;
 	a->accept = accept;
 	a->next = 0;
 
-	if(!list) {
-		list = a;
+	if(!state.ops) {
+		state.ops = a;
 	} else {
-		l = list;
+		/* inserts go at the tail of the list */
+		struct auth_ops *l = state.ops;
 		while(l->next) {
 			l = l->next;
 		}
@@ -196,13 +198,30 @@ int auth_register(char *type, auth_assert_t assert, auth_accept_t accept)
 
 void auth_clear()
 {
-	struct auth_ops *n;
-
-	while(list) {
-		n = list->next;
-		free(list);
-		list = n;
+	while(state.ops) {
+		struct auth_ops *n = state.ops->next;
+		free(state.ops);
+		state.ops = n;
 	}
+}
+
+struct auth_state *auth_clone (void)
+{
+	struct auth_state *clone = xxmalloc(sizeof(struct auth_state));
+	struct auth_ops **opsp;
+	*clone = state;
+	for (opsp = &clone->ops; *opsp; opsp = &(*opsp)->next) {
+		struct auth_ops *copy = xxmalloc(sizeof(struct auth_ops));
+		*copy = **opsp;
+		*opsp = copy;
+	}
+	return clone;
+}
+
+void auth_replace (struct auth_state *new)
+{
+	auth_clear();
+	state = *new;
 }
 
 /* vim: set noexpandtab tabstop=4: */

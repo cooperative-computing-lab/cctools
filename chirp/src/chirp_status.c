@@ -89,6 +89,7 @@ int main(int argc, char *argv[])
 {
 	enum {
 		LONGOPT_SERVER_LASTHEARDFROM = INT_MAX-0,
+		LONGOPT_SERVER_PROJECT       = INT_MAX-1,
 	};
 
 	static const struct option long_options[] = {
@@ -100,6 +101,7 @@ int main(int argc, char *argv[])
 		{"debug-rotate-max", required_argument, 0, 'O'},
 		{"help", no_argument, 0, 'h'},
 		{"server-lastheardfrom", required_argument, 0, LONGOPT_SERVER_LASTHEARDFROM},
+		{"server-project", required_argument, 0, LONGOPT_SERVER_PROJECT},
 		{"server-space", required_argument, 0, 'A'},
 		{"timeout", required_argument, 0, 't'},
 		{"totals", no_argument, 0, 'T'},
@@ -121,6 +123,7 @@ int main(int argc, char *argv[])
 	const char *filter_value = 0;
 	int show_all_types = 0;
 
+	const char *server_project = NULL;
 	time_t      server_lastheardfrom = 0;
 	uint64_t    server_avail = 0;
 
@@ -163,6 +166,9 @@ int main(int argc, char *argv[])
 			break;
 		case LONGOPT_SERVER_LASTHEARDFROM:
 			server_lastheardfrom = time(0)-string_time_parse(optarg);
+			break;
+		case LONGOPT_SERVER_PROJECT:
+			server_project = xxstrdup(optarg);
 			break;
 		case 'h':
 		default:
@@ -224,6 +230,10 @@ int main(int argc, char *argv[])
 
 		const char *avail = nvpair_lookup_string(table[i], "avail");
 		if (avail && strtoul(avail, NULL, 10) < server_avail)
+			continue;
+
+		const char *project = nvpair_lookup_string(table[i], "project");
+		if (server_project && (project == NULL || !(strcmp(project, server_project) == 0)))
 			continue;
 
 		if(filter_name) {
