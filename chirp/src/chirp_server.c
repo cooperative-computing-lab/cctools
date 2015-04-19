@@ -1163,6 +1163,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					free(tr[0]);
 					free(tr[1]);
 				}
+				buffer_putliteral(&B, "0\n");
 				free(ticket_rights);
 			}
 		} else if(sscanf(line, "ticket_list %s", chararg1) == 1) {
@@ -1182,6 +1183,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					buffer_putfstring(&B, "%zu\n%s", strlen(ts[0]), ts[0]);
 					free(ts[0]);
 				}
+				buffer_putliteral(&B, "0\n");
 				free(ticket_subjects);
 			}
 		} else if(sscanf(line, "mkdir %s %" SCNd64, path, &mode) == 2) {
