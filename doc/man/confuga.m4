@@ -122,6 +122,7 @@ chirp_server --advertise=localhost \\
              --root=./root.1 \\
              --port=9001 \\
              --project-name=test \\
+             --transient=./tran.1 \\
              &
 # start storage node 2 in the background
 chirp_server --advertise=localhost \\
@@ -133,6 +134,7 @@ chirp_server --advertise=localhost \\
              --root=./root.2 \\
              --port=9002 \\
              --project-name=test \\
+             --transient=./tran.2 \\
              &
 # sleep for a time so catalog can receive storage node status
 sleep 5
