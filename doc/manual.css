@@ -68,7 +68,7 @@ th {
   padding: 10px;
 }
 tt {
-  font: normal normal normal 16px "Courier New", Courier, monospace;
+  font-family: "Courier New", Courier, monospace;
 }
 code {
   background: #ffffcc;
@@ -107,4 +107,8 @@ h1:hover .sectionlink, h2:hover .sectionlink, h3:hover .sectionlink, h4:hover .s
   border-radius: 8px;
   font-weight: bold;
   padding: 10px;
+}
+.man {
+    font-weight: bold;
+    font-family: monospace;
 }
