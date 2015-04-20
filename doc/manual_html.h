@@ -7,6 +7,7 @@ define(LINK,<a href=$2>$1</a>)dnl
 define(MANUAL,LINK($1,$2))dnl
 define(MANPAGE,LINK($1($2),$1.html))dnl
 define(BOLD,<b>$1</b>)dnl
+define(ITALIC,<i>$1</i>)dnl
 define(CODE,<tt>$1</tt>)dnl
 
 define(LIST_BEGIN,<dir>)
