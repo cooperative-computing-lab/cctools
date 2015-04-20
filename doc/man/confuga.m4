@@ -99,9 +99,9 @@ save ITALIC(stdout) and ITALIC(stderr):
 LONGCODE_BEGIN
 makeflow --batch-type=chirp \\
          --working-dir=chirp://localhost:9094/ \\
-         --wrapper=$'{\\n{}\\n} > stdout.$NODE 2> stderr.$NODE' \\
-         --wrapper-output='stdout.$NODE' \\
-         --wrapper-output='stderr.$NODE'
+         --wrapper=$'{\\n{}\\n} > stdout.%% 2> stderr.%%' \\
+         --wrapper-output='stdout.%%' \\
+         --wrapper-output='stderr.%%'
 LONGCODE_END
 
 SECTION(EXAMPLES)
