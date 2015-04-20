@@ -19,14 +19,12 @@ For complete details with examples, see the LINK(Confuga User's Manual,http://cc
 SECTION(OPTIONS)
 
 PARA
-
 A Chirp server acting as the Confuga head node uses normal
 MANPAGE(chirp_server,1) options. In order to run the Chirp server as the
 Confuga head node, use the BOLD(--root) switch with the Confuga URI. You must
 also enable job execution with the BOLD(--jobs) switch.
 
 PARA
-
 The format for the Confuga URI is:
 BOLD(confuga:///path/to/workspace?option1=value&option2=value). Passing Confuga
 specific options is done through this URI. Confuga's options are documented
@@ -43,6 +41,7 @@ OPTIONS_END
 
 SECTION(STORAGE NODES)
 
+PARA
 Confuga uses regular Chirp servers as storage nodes. Each storage node is
 specified using the BOLD(nodes) Confuga option. All storage node Chirp server
 should be run with job execution enabled (BOLD(--jobs)) and a job concurrency
@@ -54,6 +53,7 @@ hosted catalog server.
 
 SECTION(EXECUTING WORKFLOWS)
 
+PARA
 The easiest way to execute workflows on Confuga is through using
 MANPAGE(makeflow,1). Only two options to Makeflow are required,
 BOLD(--batch-type) and BOLD(--working-dir). Confuga uses the Chirp job
@@ -65,6 +65,7 @@ LONGCODE_BEGIN
 makeflow --batch-type=chirp --working-dir=chirp://confuga.example.com:9094/path/to/workflow
 LONGCODE_END
 
+PARA
 The workflow namespace is logically prepended to all file paths defined in the
 Makeflow specification. So for example, if you have this Makeflow file:
 
@@ -73,8 +74,10 @@ a: exe
     ./exe > a
 LONGCODE_END
 
+PARA
 Confuga will execute BOLD(/path/to/workflow/exe) and produce the output file BOLD(/path/to/workflow/a).
 
+PARA
 Unlike other batch systems used with Makeflow like Condor or Work Queue,
 ITALIC(all files used by a workflow must be in the Confuga file system). Condor
 and Work Queue both stage workflow files from the submission site to the
@@ -87,6 +90,7 @@ LONGCODE_BEGIN
 chirp confuga.example.com:9094 put workflow/ /path/to/
 LONGCODE_END
 
+PARA
 Side-note: Confuga does not save the ITALIC(stdout) or ITALIC(stderr) of jobs.
 If you want these files for debugging purposes, you must explicitly save them.
 To streamline the process, you may use Makeflow's BOLD(--wrapper) options to
@@ -102,18 +106,21 @@ LONGCODE_END
 
 SECTION(EXAMPLES)
 
+PARA
 Launch a head node with workspace BOLD(./confuga.root), replication mode of BOLD(push-async-1), and a storage node list in file BOLD(nodes.lst):
 
 LONGCODE_BEGIN
 chirp_server --jobs --root='confuga://./confuga.root/?replication=push-async-1&nodes=file:nodes.lst'
 LONGCODE_END
 
+PARA
 Launch a head node with workspace BOLD(/tmp/confuga.root) using storage nodes BOLD(chirp://localhost:10000/) and BOLD(chirp://localhost:10001/):
 
 LONGCODE_BEGIN
 chirp_server --jobs --root='confuga:///tmp/confuga.root/?nodes=node:chirp://localhost:10000/,chirp://localhost:10001/'
 LONGCODE_END
 
+PARA
 Run a simple test cluster on your workstation:
 
 LONGCODE_BEGIN
