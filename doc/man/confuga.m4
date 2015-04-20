@@ -41,6 +41,53 @@ OPTION_PAIR(replication,type)Sets the replication mode for satisfying job depend
 OPTION_PAIR(scheduler,type)Sets the scheduler used to assign jobs to storage nodes. The default is BOLD(fifo-0).
 OPTIONS_END
 
+SECTION(STORAGE NODES)
+
+Confuga uses regular Chirp servers as storage nodes. Each storage node is
+specified using the BOLD(nodes) Confuga option. All storage node Chirp server
+should be run with job execution enabled (BOLD(--jobs)) and a job concurrency
+of at least 2 (BOLD(--job-concurrency=2)). You must also ensure that the
+storage nodes and the Confuga head node are using the same catalog service
+(MANPAGE(catalog_server,1)). By default, this should be the case. The
+BOLD(EXAMPLES) section below includes an example cluster using a manually
+hosted catalog server.
+
+SECTION(EXECUTING WORKFLOWS)
+
+The easiest way to execute workflows on Confuga is through using
+MANPAGE(makeflow,1). Only two options to Makeflow are required,
+BOLD(--batch-type) and BOLD(--working-dir). Confuga uses the Chirp job
+protocol, so the batch type is BOLD(chirp). It is also necessary to define the
+executing server -- the Confuga Head Node -- and the ITALIC(namespace) the
+workflow executes in. For example:
+
+LONGCODE_BEGIN
+makeflow --batch-type=chirp --working-dir=chirp://confuga.example.com:9094/path/to/workflow
+LONGCODE_END
+
+The workflow namespace is logically prepended to all file paths defined in the
+Makeflow specification. So for example, if you have this Makeflow file:
+
+LONGCODE_BEGIN
+a: exe
+    ./exe > a
+LONGCODE_END
+
+Confuga will execute BOLD(/path/to/workflow/exe) and produce the output file BOLD(/path/to/workflow/a).
+
+Side-note: Confuga does not save the ITALIC(stdout) or ITALIC(stderr) of jobs.
+If you want these files for debugging purposes, you must explicitly save them.
+To streamline the process, you may use Makeflow's BOLD(--wrapper) options to
+save ITALIC(stdout) and ITALIC(stderr):
+
+LONGCODE_BEGIN
+makeflow --batch-type=chirp \\
+         --working-dir=chirp://localhost:9094/ \\
+         --wrapper=$'{\\n{}\\n} > stdout.$NODE 2> stderr.$NODE' \\
+         --wrapper-output='stdout.$NODE' \\
+         --wrapper-output='stderr.$NODE'
+LONGCODE_END
+
 SECTION(EXAMPLES)
 
 Launch a head node with workspace BOLD(./confuga.root), replication mode of BOLD(push-async-1), and a storage node list in file BOLD(nodes.lst):
