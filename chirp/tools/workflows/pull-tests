@@ -51,7 +51,7 @@ for pull in $(for g in $((1+32*2**10)) $((1+1*2**20)) $((1+1*2**30)) $((1+2*2**3
 			run "$CHIRP" --auth=unix --debug=chirp --debug-file="${base}/chirp.debug" --timeout=60m localhost:"$PORT" put "$DIR/"
 
 			run cp "$MAKEFLOW_FILE" "${base}/Makeflow"
-			run "$MAKEFLOW" --project-name=pull-tests --batch-type=chirp --debug=all --debug-file="${base}/makeflow.debug" --debug-rotate-max=0 --working-dir="chirp://localhost:${PORT}/" "${base}/Makeflow"
+			run "$MAKEFLOW" --batch-type=chirp --debug=all --debug-file="${base}/makeflow.debug" --debug-rotate-max=0 --working-dir="chirp://localhost:${PORT}/$(basename "$DIR")" --wrapper=$'{\n {}\n} > stdout.%% 2> stderr.%%' --wrapper-output='stdout.%%' --wrapper-output='stderr.%%' "${base}/Makeflow"
 
 			kill %1
 			wait

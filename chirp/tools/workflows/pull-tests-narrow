@@ -53,7 +53,7 @@ for pull in $(for exp in 20 32 31 30 22 24 26 28; do printf '%012d\t' $((1+1*2**
 			run "$CHIRP" --auth=unix --debug=chirp --debug-file="${base}/chirp.debug" --timeout=60m localhost:"$PORT" put "$DIR/"
 
 			run cp "$MAKEFLOW_FILE" "${base}/Makeflow"
-			run "$MAKEFLOW" --project-name=pull-tests-narrow --batch-type=chirp --debug=all --debug-file="${base}/makeflow.debug" --debug-rotate-max=0 --working-dir="chirp://localhost:${PORT}/" "${base}/Makeflow"
+			run "$MAKEFLOW" --batch-type=chirp --debug=all --debug-file="${base}/makeflow.debug" --debug-rotate-max=0 --working-dir="chirp://localhost:${PORT}/$(basename "$DIR")" --wrapper=$'{\n {}\n} > stdout.%% 2> stderr.%%' --wrapper-output='stdout.%%' --wrapper-output='stderr.%%' "${base}/Makeflow"
 
 			kill %1
 			wait
