@@ -58,7 +58,7 @@ The easiest way to execute workflows on Confuga is through using
 MANPAGE(makeflow,1). Only two options to Makeflow are required,
 BOLD(--batch-type) and BOLD(--working-dir). Confuga uses the Chirp job
 protocol, so the batch type is BOLD(chirp). It is also necessary to define the
-executing server -- the Confuga Head Node -- and the ITALIC(namespace) the
+executing server, the Confuga Head Node, and the ITALIC(namespace) the
 workflow executes in. For example:
 
 LONGCODE_BEGIN
@@ -74,6 +74,18 @@ a: exe
 LONGCODE_END
 
 Confuga will execute BOLD(/path/to/workflow/exe) and produce the output file BOLD(/path/to/workflow/a).
+
+Unlike other batch systems used with Makeflow like Condor or Work Queue,
+ITALIC(all files used by a workflow must be in the Confuga file system). Condor
+and Work Queue both stage workflow files from the submission site to the
+execution sites. In Confuga, the entire workflow dataset, including
+executables, is already resident.  So when executing a new workflow, you need
+to upload the workflow dataset to Confuga. The easiest way to do this is using
+the Chirp command line tools (MANPAGE(chirp,1)):
+
+LONGCODE_BEGIN
+chirp confuga.example.com:9094 put workflow/ /path/to/
+LONGCODE_END
 
 Side-note: Confuga does not save the ITALIC(stdout) or ITALIC(stderr) of jobs.
 If you want these files for debugging purposes, you must explicitly save them.
