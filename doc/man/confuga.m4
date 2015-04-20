@@ -58,12 +58,44 @@ LONGCODE_END
 Run a simple test cluster on your workstation:
 
 LONGCODE_BEGIN
-catalog_server --history=catalog.history --update-log=catalog.update --interface=127.0.0.1 &
-sleep 1 # time for catalog to start
-chirp_server --advertise=localhost --catalog-name=localhost --catalog-update=10s --interface=127.0.0.1 --jobs --job-concurrency=10 --root=./root.1 --port=9001 --project-name=test &
-chirp_server --advertise=localhost --catalog-name=localhost --catalog-update=10s --interface=127.0.0.1 --jobs --job-concurrency=10 --root=./root.2 --port=9002 --project-name=test &
-sleep 5 # time for catalog to receive storage node status
-chirp_server --advertise=localhost --catalog-name=localhost --catalog-update=30s --debug=confuga --jobs --root='confuga://./confuga.root/?auth=unix&nodes=node:chirp://localhost:9001/,chirp://localhost:9002/'
+# start a catalog server in the background
+catalog_server --history=catalog.history \\
+               --update-log=catalog.update \\
+               --interface=127.0.0.1 \\
+               &
+# sleep for a time so catalog can start
+sleep 1
+# start storage node 1 in the background
+chirp_server --advertise=localhost \\
+             --catalog-name=localhost \\
+             --catalog-update=10s \\
+             --interface=127.0.0.1 \\
+             --jobs \\
+             --job-concurrency=10 \\
+             --root=./root.1 \\
+             --port=9001 \\
+             --project-name=test \\
+             &
+# start storage node 2 in the background
+chirp_server --advertise=localhost \\
+             --catalog-name=localhost \\
+             --catalog-update=10s \\
+             --interface=127.0.0.1 \\
+             --jobs \\
+             --job-concurrency=10 \\
+             --root=./root.2 \\
+             --port=9002 \\
+             --project-name=test \\
+             &
+# sleep for a time so catalog can receive storage node status
+sleep 5
+# start the Confuga head node
+chirp_server --advertise=localhost \\
+             --catalog-name=localhost \\
+             --catalog-update=30s \\
+             --debug=confuga \\
+             --jobs \\
+             --root='confuga://./confuga.root/?auth=unix&nodes=node:chirp://localhost:9001/,chirp://localhost:9002/'
 LONGCODE_END
 
 SECTION(COPYRIGHT)
