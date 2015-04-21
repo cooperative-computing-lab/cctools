@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(Confuga)
+HEADER(confuga)
 
 SECTION(NAME)
 BOLD(Confuga) - An active storage cluster file system.
@@ -31,7 +31,7 @@ specific options is done through this URI. Confuga's options are documented
 here, with examples at the end of this manual.
 
 OPTIONS_BEGIN
-OPTION_PAIR(auth,method)Enable this method for Head Node to Storage Node authentication.
+OPTION_PAIR(auth,method)Enable this method for Head Node to Storage Node authentication. The default is to enable all available authentication mechanisms.
 OPTION_PAIR(concurrency,limit)Limits the number of concurrent jobs executed by the cluster. The default is 0 for limitless.
 OPTION_PAIR(nodes,node-list)Sets the list of storage nodes to use for the cluster. May be specified directly as a list BOLD(`node:<node1,node2,...>') or as a file BOLD(`file:<node file>').
 OPTION_PAIR(pull-threshold,bytes)Sets the threshold for pull transfers. The default is 128MB.
@@ -43,23 +43,22 @@ SECTION(STORAGE NODES)
 
 PARA
 Confuga uses regular Chirp servers as storage nodes. Each storage node is
-specified using the BOLD(nodes) Confuga option. All storage node Chirp server
+specified using the BOLD(nodes) Confuga option. All storage node Chirp servers
 should be run with job execution enabled (BOLD(--jobs)) and a job concurrency
 of at least 2 (BOLD(--job-concurrency=2)). You must also ensure that the
-storage nodes and the Confuga head node are using the same catalog service
-(MANPAGE(catalog_server,1)). By default, this should be the case. The
+storage nodes and the Confuga head node are using the
+MANPAGE(catalog_server,1).  By default, this should be the case. The
 BOLD(EXAMPLES) section below includes an example cluster using a manually
 hosted catalog server.
 
 SECTION(EXECUTING WORKFLOWS)
 
 PARA
-The easiest way to execute workflows on Confuga is through using
-MANPAGE(makeflow,1). Only two options to Makeflow are required,
-BOLD(--batch-type) and BOLD(--working-dir). Confuga uses the Chirp job
-protocol, so the batch type is BOLD(chirp). It is also necessary to define the
-executing server, the Confuga Head Node, and the ITALIC(namespace) the
-workflow executes in. For example:
+The easiest way to execute workflows on Confuga is through MANPAGE(makeflow,1).
+Only two options to Makeflow are required, BOLD(--batch-type) and
+BOLD(--working-dir). Confuga uses the Chirp job protocol, so the batch type is
+BOLD(chirp). It is also necessary to define the executing server, the Confuga
+Head Node, and the ITALIC(namespace) the workflow executes in. For example:
 
 LONGCODE_BEGIN
 makeflow --batch-type=chirp --working-dir=chirp://confuga.example.com:9094/path/to/workflow
@@ -78,20 +77,20 @@ PARA
 Confuga will execute BOLD(/path/to/workflow/exe) and produce the output file BOLD(/path/to/workflow/a).
 
 PARA
-Unlike other batch systems used with Makeflow like Condor or Work Queue,
+Unlike other batch systems used with Makeflow, like Condor or Work Queue,
 ITALIC(all files used by a workflow must be in the Confuga file system). Condor
 and Work Queue both stage workflow files from the submission site to the
 execution sites. In Confuga, the entire workflow dataset, including
 executables, is already resident.  So when executing a new workflow, you need
 to upload the workflow dataset to Confuga. The easiest way to do this is using
-the Chirp command line tools (MANPAGE(chirp,1)):
+the MANPAGE(chirp,1) command line tool:
 
 LONGCODE_BEGIN
 chirp confuga.example.com:9094 put workflow/ /path/to/
 LONGCODE_END
 
 PARA
-Side-note: Confuga does not save the ITALIC(stdout) or ITALIC(stderr) of jobs.
+Finally, Confuga does not save the ITALIC(stdout) or ITALIC(stderr) of jobs.
 If you want these files for debugging purposes, you must explicitly save them.
 To streamline the process, you may use Makeflow's BOLD(--wrapper) options to
 save ITALIC(stdout) and ITALIC(stderr):
