@@ -301,8 +301,10 @@ void pfs_channel_free( pfs_size_t start )
 				if((e->start <= next->start) && next->inuse == 0) {
 					e->length += next->length;
 					entry_delete(next);
+					if (next == prev)
+						prev = NULL;
 				}
-				if((prev->start <= e->start) && prev->inuse == 0) {
+				if(prev && (prev->start <= e->start) && prev->inuse == 0) {
 					prev->length += e->length;
 					entry_delete(e);
 				}
