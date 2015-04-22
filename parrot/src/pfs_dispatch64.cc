@@ -206,7 +206,7 @@ static void divert_to_parrotfd( struct pfs_process *p, INT64_T fd, char *path, c
 	if (linux_available(3,17,0)) {
 		INT64_T args[] = {(INT64_T)pfs_process_scratch_set(p, path, strlen(path)+1), 0};
 		if (flags & O_CLOEXEC)
-			args[2] |= MFD_CLOEXEC;
+			args[1] |= MFD_CLOEXEC;
 		tracer_args_set(p->tracer,SYSCALL64_memfd_create,args,sizeof(args)/sizeof(args[0]));
 		debug(D_DEBUG, "diverting to memfd_create(`%s', 0)", path);
 	} else {
