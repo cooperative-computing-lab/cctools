@@ -61,8 +61,6 @@ enum { SHOW_INPUT_FILES = 2,
 #define MAKEFLOW_AUTO_WIDTH 1
 #define MAKEFLOW_AUTO_GROUP 2
 
-#define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
-
 void dag_show_analysis(struct dag *d)
 {
 	printf("num_of_tasks\t%d\n", itable_size(d->node_table));

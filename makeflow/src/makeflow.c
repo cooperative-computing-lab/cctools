@@ -29,26 +29,21 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 #include "xxmalloc.h"
 
-#include "dag_log.h"
 #include "dag.h"
+#include "dag_log.h"
+#include "dag_gc.h"
 #include "dag_visitors.h"
 #include "makeflow_common.h"
 #include "makeflow_summary.h"
 #include "parser.h"
 
-#include <dirent.h>
 #include <fcntl.h>
-#include <unistd.h>
-
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
-#include <limits.h>
 #include <signal.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,8 +58,6 @@ See the file COPYING for details.
  *   an example.
  */
 
-#define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
-
 #define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 #define DEFAULT_MONITOR_INTERVAL   1
@@ -74,12 +67,6 @@ See the file COPYING for details.
 #define WRAPPER_SH_PREFIX "tmp_wrapper"
 #define TMP_SH_PREFIX "tmp"
 
-typedef enum {
-	DAG_GC_NONE,
-	DAG_GC_REF_COUNT,
-	DAG_GC_ON_DEMAND,
-} dag_gc_method_t;
-
 sig_atomic_t dag_abort_flag = 0;
 int dag_failed_flag = 0;
 static int dag_submit_timeout = 3600;
@@ -88,7 +75,6 @@ static int dag_retry_max = 100;
 
 static dag_gc_method_t dag_gc_method = DAG_GC_NONE;
 static int dag_gc_param = -1;
-static int dag_gc_collected = 0;
 static int dag_gc_barrier = 1;
 static double dag_gc_task_ratio = 0.05;
 
@@ -364,63 +350,6 @@ int copy_monitor(void)
 	free(monitor_orig);
 
 	return 1;
-}
-
-void dag_prepare_gc(struct dag *d)
-{
-	/* Files to be collected:
-	 * ((all_files \minus sink_files)) \union collect_list) \minus preserve_list) \minus source_files
-	 */
-
-	/* Parse GC_*_LIST and record which target files should be
-	 * garbage collected. */
-	char *collect_list  = dag_variable_lookup_global_string("GC_COLLECT_LIST", d);
-	char *preserve_list = dag_variable_lookup_global_string("GC_PRESERVE_LIST", d);
-
-	struct dag_file *f;
-	char *filename;
-
-	/* add all files, but sink_files */
-	hash_table_firstkey(d->file_table);
-	while((hash_table_nextkey(d->file_table, &filename, (void **) &f)))
-		if(!dag_file_is_sink(f)) {
-			set_insert(d->collect_table, f);
-		}
-
-	int i, argc;
-	char **argv;
-
-	/* add collect_list, for sink_files that should be removed */
-	string_split_quotes(collect_list, &argc, &argv);
-	for(i = 0; i < argc; i++) {
-		f = dag_file_lookup_or_create(d, argv[i]);
-		set_insert(d->collect_table, f);
-		debug(D_MAKEFLOW_RUN, "Added %s to garbage collection list", f->filename);
-	}
-	free(argv);
-
-	/* remove files from preserve_list */
-	string_split_quotes(preserve_list, &argc, &argv);
-	for(i = 0; i < argc; i++) {
-		/* Must initialize to non-zero for hash_table functions to work properly. */
-		f = dag_file_lookup_or_create(d, argv[i]);
-		set_remove(d->collect_table, f);
-		debug(D_MAKEFLOW_RUN, "Removed %s from garbage collection list", f->filename);
-	}
-	free(argv);
-
-	/* remove source_files from collect_table */
-	hash_table_firstkey(d->file_table);
-	while((hash_table_nextkey(d->file_table, &filename, (void **) &f)))
-		if(dag_file_is_source(f)) {
-			set_remove(d->collect_table, f);
-			debug(D_MAKEFLOW_RUN, "Removed %s from garbage collection list", f->filename);
-		}
-
-	/* Print reference counts of files to be collected */
-	set_first_element(d->collect_table);
-	while((f = set_next_element(d->collect_table)))
-		debug(D_MAKEFLOW_RUN, "Added %s to garbage collection list (%d)", f->filename, f->ref_count);
 }
 
 void dag_prepare_nested_jobs(struct dag *d)
@@ -1023,100 +952,6 @@ int dag_check(struct dag *d)
 	}
 }
 
-int dag_gc_file(struct dag *d, const struct dag_file *f)
-{
-	struct stat buf;
-	if(batch_fs_stat(remote_queue, f->filename, &buf) == 0 && batch_fs_unlink(remote_queue, f->filename) == -1) {
-		debug(D_NOTICE, "makeflow: unable to collect %s: %s", f->filename, strerror(errno));
-		return 0;
-	} else {
-		debug(D_MAKEFLOW_RUN, "Garbage collected %s\n", f->filename);
-		set_remove(d->collect_table, f);
-		return 1;
-	}
-}
-
-void dag_gc_all(struct dag *d, int maxfiles)
-{
-	int collected = 0;
-	struct dag_file *f;
-	timestamp_t start_time, stop_time;
-
-	/* This will walk the table of files to collect and will remove any
-	 * that are below or equal to the threshold. */
-	start_time = timestamp_get();
-	set_first_element(d->collect_table);
-	while((f = set_next_element(d->collect_table)) && collected < maxfiles) {
-		if(f->ref_count < 1 && dag_gc_file(d, f))
-			collected++;
-	}
-
-	stop_time = timestamp_get();
-
-	/* Record total amount of files collected to Makeflowlog. */
-	if(collected > 0) {
-		dag_gc_collected += collected;
-		/** Line format: # GC timestamp collected time_spent dag_gc_collected
-		 *
-		 * timestamp - the unix time (in microseconds) when this line is written to the log file.
-		 * collected - the number of files were collected in this garbage collection cycle.
-		 * time_spent - the length of time this cycle took.
-		 * dag_gc_collected - the total number of files has been collected so far since the start this makeflow execution.
-		 *
-		 */
-		fprintf(d->logfile, "# GC\t%" PRIu64 "\t%d\t%" PRIu64 "\t%d\n", timestamp_get(), collected, stop_time - start_time, dag_gc_collected);
-	}
-}
-
-/* TODO: move this to a more appropriate location? */
-int directory_inode_count(const char *dirname)
-{
-	DIR *dir;
-	struct dirent *d;
-	int inode_count = 0;
-
-	dir = opendir(dirname);
-	if(dir == NULL)
-		return INT_MAX;
-
-	while((d = readdir(dir)))
-		inode_count++;
-	closedir(dir);
-
-	return inode_count;
-}
-
-int directory_low_disk(const char *path)
-{
-	UINT64_T avail, total;
-
-	if(disk_info_get(path, &avail, &total) >= 0)
-		return avail <= MAKEFLOW_MIN_SPACE;
-
-	return 0;
-}
-
-void dag_gc(struct dag *d)
-{
-	char cwd[PATH_MAX];
-
-	switch (dag_gc_method) {
-	case DAG_GC_REF_COUNT:
-		debug(D_MAKEFLOW_RUN, "Performing incremental file (%d) garbage collection", dag_gc_param);
-		dag_gc_all(d, dag_gc_param);
-		break;
-	case DAG_GC_ON_DEMAND:
-		batch_fs_getcwd(remote_queue, cwd, PATH_MAX);
-		if(directory_inode_count(cwd) >= dag_gc_param || directory_low_disk(cwd)) {
-			debug(D_MAKEFLOW_RUN, "Performing on demand (%d) garbage collection", dag_gc_param);
-			dag_gc_all(d, INT_MAX);
-		}
-		break;
-	default:
-		break;
-	}
-}
-
 void dag_run(struct dag *d)
 {
 	struct dag_node *n;
@@ -1165,7 +1000,7 @@ void dag_run(struct dag *d)
 		 * amount of tasks have passed. */
 		dag_gc_barrier--;
 		if(dag_gc_method != DAG_GC_NONE && dag_gc_barrier == 0) {
-			dag_gc(d);
+			dag_gc(d,dag_gc_method,dag_gc_param);
 			dag_gc_barrier = MAX(d->nodeid_counter * dag_gc_task_ratio, 1);
 		}
 	}
@@ -1174,7 +1009,7 @@ void dag_run(struct dag *d)
 		dag_abort_all(d);
 	} else {
 		if(!dag_failed_flag && dag_gc_method != DAG_GC_NONE) {
-			dag_gc_all(d, INT_MAX);
+			dag_gc(d,DAG_GC_FORCE,0);
 		}
 	}
 }
@@ -1771,13 +1606,12 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 
+	/* Do not create a local queue for systems where local and remote are the same. */
+
 	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP ||
 	   batch_queue_type == BATCH_QUEUE_TYPE_HADOOP ||
 	   batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
-		local_queue = 0; /* all local jobs must be run on Chirp */
-		if(dag_gc_method == DAG_GC_ON_DEMAND /* NYI */ ) {
-			dag_gc_method = DAG_GC_REF_COUNT;
-		}
+		local_queue = 0;
 	} else {
 		local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
 		if(!local_queue) {
@@ -1785,8 +1619,16 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	/* Remote storage modes do not (yet) support measuring storage for garbage collection. */
+	
+	if(batch_queue_type==BATCH_QUEUE_TYPE_CHIRP || batch_queue_type==BATCH_QUEUE_TYPE_HADOOP) {
+		if(dag_gc_method == DAG_GC_ON_DEMAND) {
+			dag_gc_method = DAG_GC_REF_COUNT;
+		}
+	}
+
 	if(dag_gc_method != DAG_GC_NONE)
-		dag_prepare_gc(d);
+		dag_gc_prepare(d);
 
 	dag_prepare_nested_jobs(d);
 
