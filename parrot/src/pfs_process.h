@@ -81,6 +81,7 @@ void pfs_process_scratch_get( struct pfs_process *p, void *data, size_t len );
 uintptr_t pfs_process_scratch_set( struct pfs_process *p, const void *data, size_t len );
 void pfs_process_scratch_restore( struct pfs_process *p );
 
+void pfs_process_pathtofilename( char *path );
 int pfs_process_stat( pid_t pid, int fd, struct stat *buf );
 void pfs_process_bootstrapfd( void );
 
