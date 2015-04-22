@@ -711,6 +711,35 @@ cancelled and immediately retrieved without waiting for Work Queue to return the
 This cancels a task with <tt>tag</tt> named 'task3'. Note that in the presence of tasks with 
 the same tag, <tt>work_queue_cancel_by_tasktag</tt> will cancel and retrieve only one of the 
 matching tasks.
+
+<p>
+<li><b>Blacklist workers.</b> You may find that certain hosts are not correctly
+configured to run your tasks. The master can be directed to ignore certain
+workers with the blacklist feature. For example:
+
+<div class="code_area">
+<h4 class="code_header">C</h4>
+<pre class="code_snip">
+ t = work_queue_wait(q, SECONDS);
+ //if t fails given a worker misconfiguration:
+ work_queue_blacklist_add(q, t->hostname);
+</pre>
+
+<h4 class="code_header">Python</h4>
+<pre class="code_snip">
+ t = q.wait(SECONDS)
+ # if t fails given a worker misconfiguration:
+ q.blacklist(t.hostname)
+</pre>
+
+<h4 class="code_header">Perl</h4>
+<pre class="code_snip">
+ t = work_queue_wait(q, SECONDS);
+ # if t fails given a worker misconfiguration:
+ work_queue_blacklist_add(q, t->{hostname});
+</pre>
+</div>
+
 <p>
 <li><b>Statistics.</b>  The queue tracks a fair number of statistics that count the number
 of tasks, number of workers, number of failures, and so forth.  Obtain this data with <tt>work_queue_get_stats</tt>
