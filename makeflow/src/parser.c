@@ -44,7 +44,7 @@ See the file COPYING for details.
 #include "path.h"
 
 #include "dag.h"
-#include "visitors.h"
+#include "dag_visitors.h"
 #include "lexer.h"
 #include "buffer.h"
 

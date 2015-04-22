@@ -18,7 +18,6 @@ See the file COPYING for details.
 #include <unistd.h>
 
 #include "dag.h"
-#include "visitors.h"
 
 #ifndef MAKEFLOW_COMMON_H
 #define MAKEFLOW_COMMON_H

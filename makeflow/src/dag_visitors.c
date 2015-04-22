@@ -28,8 +28,8 @@ See the file COPYING for details.
 
 #include "dag.h"
 #include "dag_variable.h"
+#include "dag_visitors.h"
 #include "rmsummary.h"
-#include "visitors.h"
 
 /*
  * BUG: Error handling is not very good.
