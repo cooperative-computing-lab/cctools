@@ -63,53 +63,6 @@ const char *dag_node_state_name(dag_node_state_t state)
 	}
 }
 
-void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
-{
-	static time_t last_fsync = 0;
-
-	debug(D_MAKEFLOW_RUN, "node %d %s -> %s\n", n->nodeid, dag_node_state_name(n->state), dag_node_state_name(newstate));
-
-	if(d->node_states[n->state] > 0) {
-		d->node_states[n->state]--;
-	}
-	n->state = newstate;
-	d->node_states[n->state]++;
-
-	/**
-	 * Line format : timestamp node_id new_state job_id nodes_waiting nodes_running nodes_complete nodes_failed nodes_aborted node_id_counter
-	 *
-	 * timestamp - the unix time (in microseconds) when this line is written to the log file.
-	 * node_id - the id of this node (task).
-	 * new_state - a integer represents the new state this node (whose id is in the node_id column) has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:
-	 *	0. waiting
-	 *	1. running
-	 *	2. complete
-	 *	3. failed
-	 *	4. aborted
-	 * job_id - the job id of this node in the underline execution system (local or batch system). If the makeflow is executed locally, the job id would be the process id of the process that executes this node. If the underline execution system is a batch system, such as Condor or SGE, the job id would be the job id assigned by the batch system when the task was sent to the batch system for execution.
-	 * nodes_waiting - the number of nodes are waiting to be executed.
-	 * nodes_running - the number of nodes are being executed.
-	 * nodes_complete - the number of nodes has been completed.
-	 * nodes_failed - the number of nodes has failed.
-	 * nodes_aborted - the number of nodes has been aborted.
-	 * node_id_counter - total number of nodes in this makeflow.
-	 *
-	 */
-	fprintf(d->logfile, "%" PRIu64 " %d %d %" PRIbjid " %d %d %d %d %d %d\n", timestamp_get(), n->nodeid, newstate, n->jobid, d->node_states[0], d->node_states[1], d->node_states[2], d->node_states[3], d->node_states[4], d->nodeid_counter);
-
-	if(time(NULL) - last_fsync > 60) {
-		/* We use fsync here to gurantee that the log is syncronized in AFS,
-		 * even if something goes wrong with the node running makeflow. Using
-		 * fsync comes with an overhead, so we do not fsync more than once per
-		 * minute. This avoids hammering AFS, and reduces the overhead for
-		 * short running tasks, while having the desired effect for long
-		 * running workflows. */
-
-		fsync(fileno(d->logfile));
-		last_fsync = time(NULL);
-	}
-}
-
 /* Returns the remotename used in rule n for local name filename */
 const char *dag_node_get_remote_name(struct dag_node *n, const char *filename)
 {
@@ -253,8 +206,8 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, char *re
 {
 	struct dag_file *target = dag_file_lookup_or_create(n->d, filename);
 
-	if(target->target_of && target->target_of != n)
-		fatal("%s is defined multiple times at %s:%d and %s:%d\n", filename, filename, target->target_of->linenum, filename, n->linenum);
+	if(target->created_by && target->created_by != n)
+		fatal("%s is defined multiple times at %s:%d and %s:%d\n", filename, filename, target->created_by->linenum, filename, n->linenum);
 
 	if(remotename)
 		dag_node_add_remote_name(n, filename, remotename);
@@ -263,7 +216,7 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, char *re
 	list_push_head(n->target_files, target);
 
 	/* register this node as the creator of the file */
-	target->target_of = n;
+	target->created_by = n;
 }
 
 void dag_node_fill_resources(struct dag_node *n)

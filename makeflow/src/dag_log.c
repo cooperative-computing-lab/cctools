@@ -10,6 +10,7 @@ See the file COPYING for details.
 
 #include "timestamp.h"
 #include "list.h"
+#include "debug.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -17,7 +18,55 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
+/**
+ * Line format : timestamp node_id new_state job_id nodes_waiting nodes_running nodes_complete nodes_failed nodes_aborted node_id_counter
+ *
+ * timestamp - the unix time (in microseconds) when this line is written to the log file.
+ * node_id - the id of this node (task).
+ * new_state - a integer represents the new state this node (whose id is in the node_id column) has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:
+ *	0. waiting
+ *	1. running
+ *	2. complete
+ *	3. failed
+ *	4. aborted
+ * job_id - the job id of this node in the underline execution system (local or batch system). If the makeflow is executed locally, the job id would be the process id of the process that executes this node. If the underline execution system is a batch system, such as Condor or SGE, the job id would be the job id assigned by the batch system when the task was sent to the batch system for execution.
+ * nodes_waiting - the number of nodes are waiting to be executed.
+ * nodes_running - the number of nodes are being executed.
+ * nodes_complete - the number of nodes has been completed.
+ * nodes_failed - the number of nodes has failed.
+ * nodes_aborted - the number of nodes has been aborted.
+ * node_id_counter - total number of nodes in this makeflow.
+ *
+ */
+
 void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n );
+
+void dag_log_state_change( struct dag *d, struct dag_node *n, int newstate )
+{
+	static time_t last_fsync = 0;
+
+	debug(D_MAKEFLOW_RUN, "node %d %s -> %s\n", n->nodeid, dag_node_state_name(n->state), dag_node_state_name(newstate));
+
+	if(d->node_states[n->state] > 0) {
+		d->node_states[n->state]--;
+	}
+	n->state = newstate;
+	d->node_states[n->state]++;
+
+	fprintf(d->logfile, "%" PRIu64 " %d %d %" PRIbjid " %d %d %d %d %d %d\n", timestamp_get(), n->nodeid, newstate, n->jobid, d->node_states[0], d->node_states[1], d->node_states[2], d->node_states[3], d->node_states[4], d->nodeid_counter);
+
+	if(time(NULL) - last_fsync > 60) {
+		/* We use fsync here to gurantee that the log is syncronized in AFS,
+		 * even if something goes wrong with the node running makeflow. Using
+		 * fsync comes with an overhead, so we do not fsync more than once per
+		 * minute. This avoids hammering AFS, and reduces the overhead for
+		 * short running tasks, while having the desired effect for long
+		 * running workflows. */
+
+		fsync(fileno(d->logfile));
+		last_fsync = time(NULL);
+	}
+}
 
 void dag_log_recover(struct dag *d, const char *filename, int verbose_mode )
 {
@@ -80,7 +129,7 @@ void dag_log_recover(struct dag *d, const char *filename, int verbose_mode )
 			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
 			list_first_item(n->source_files);
 			while( (f = list_next_item(n->source_files)) ) {
-				p = f->target_of;
+				p = f->created_by;
 				if(p)
 					fprintf(d->logfile, "\t%d", p->nodeid);
 			}

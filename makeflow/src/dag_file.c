@@ -16,19 +16,14 @@ struct dag_file * dag_file_create( const char *filename )
 	struct dag_file *f = malloc(sizeof(*f));
 	f->filename = xxstrdup(filename);
 	f->needed_by = list_create();
-	f->target_of = 0;
+	f->created_by = 0;
 	f->ref_count = 0;
 	return f;
 }
 
-int dag_file_is_absolute( const struct dag_file *f )
-{
-	return f->filename[0] == '/';
-}
-
 int dag_file_is_source( const struct dag_file *f )
 {
-	if(f->target_of)
+	if(f->created_by)
 		return 0;
 	else
 		return 1;

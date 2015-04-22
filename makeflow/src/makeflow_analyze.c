@@ -193,7 +193,7 @@ void dag_show_output_files(struct dag *d)
 
 	hash_table_firstkey(d->file_table);
 	while(hash_table_nextkey(d->file_table, &filename, (void **) &f)) {
-		if(f->target_of)
+		if(f->created_by)
 			fprintf(stdout, "%s\n", filename);
 	}
 }

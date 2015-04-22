@@ -130,6 +130,11 @@ static char *wrapper_command = 0;
 static struct list *wrapper_input_files = 0;
 static struct list *wrapper_output_files = 0;
 
+void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
+{
+	dag_log_state_change(d,n,newstate);
+}
+
 void dag_abort_all(struct dag *d)
 {
 	UINT64_T jobid;
@@ -235,7 +240,7 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 				goto rerun;	// rerun this node
 			}
 		} else {
-			if(!f->target_of) {
+			if(!f->created_by) {
 				fprintf(stderr, "makeflow: input file %s does not exist and is not created by any rule.\n", f->filename);
 				exit(1);
 			} else {
@@ -304,7 +309,7 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 		if(!set_lookup(d->collect_table, f1))
 			continue;
 
-		p = f1->target_of;
+		p = f1->created_by;
 		if(p) {
 			dag_node_force_rerun(rerun_table, d, p);
 			f1->ref_count += 1;
@@ -1000,7 +1005,7 @@ int dag_check(struct dag *d)
 				continue;
 			}
 
-			if(f->target_of) {
+			if(f->created_by) {
 				continue;
 			}
 
