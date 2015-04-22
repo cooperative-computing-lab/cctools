@@ -62,11 +62,6 @@ See the file COPYING for details.
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 #define DEFAULT_MONITOR_INTERVAL   1
 
-#define WITHOUT_CONTAINER 0
-#define WITH_DOCKER 1
-#define WRAPPER_SH_PREFIX "tmp_wrapper"
-#define TMP_SH_PREFIX "tmp"
-
 sig_atomic_t dag_abort_flag = 0;
 int dag_failed_flag = 0;
 static int dag_submit_timeout = 3600;
@@ -94,8 +89,17 @@ static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
 static int monitor_enable_list_files  = 0;
 
-static int container_mode = 0;
-static char *img_name = NULL;
+#define CONTAINER_SH_PREFIX "docker.wrapper"
+#define CONTAINER_TMP_SH_PREFIX "docker.tmp"
+
+typedef enum {
+	CONTAINER_MODE_NONE,
+	CONTAINER_MODE_DOCKER,
+	// CONTAINER_MODE_ROCKET etc
+} container_mode_t;
+
+static container_mode_t container_mode = CONTAINER_MODE_NONE;
+static char *container_image = NULL;
 
 /* wait upto this many seconds for an output file of a succesfull task
  * to appear on the local filesystem (e.g, to deal with NFS
@@ -632,19 +636,26 @@ void dag_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
-    if (container_mode == WITH_DOCKER) {
+	/*
+	XXX this code has several problems:
+	1 - It should be abstracted away in a function.
+	2 - It should use string_format() to generate strings of appropriate size.
+	3 - It should not modify the global list wrapper_input_files.
+	*/
 
-      	FILE *wrapper_fn;
-        
-        char wrapper_fn_name[4096];
-        sprintf(wrapper_fn_name, "%s.%d", WRAPPER_SH_PREFIX, n->nodeid);
-    
-      	wrapper_fn = fopen(wrapper_fn_name, "w"); 
+	if (container_mode == CONTAINER_MODE_DOCKER) {
 
-        char tmp_sh_name[4096];
-        sprintf(tmp_sh_name, "%s.%d", TMP_SH_PREFIX, n->nodeid); 
+	  	FILE *wrapper_fn;
+		
+		char wrapper_fn_name[4096];
+		sprintf(wrapper_fn_name, "%s.%d", CONTAINER_SH_PREFIX, n->nodeid);
+	
+	  	wrapper_fn = fopen(wrapper_fn_name, "w"); 
+
+		char tmp_sh_name[4096];
+		sprintf(tmp_sh_name, "%s.%d", CONTAINER_TMP_SH_PREFIX, n->nodeid); 
  
-      	fprintf(wrapper_fn, "#!/bin/sh\n\
+	  	fprintf(wrapper_fn, "#!/bin/sh\n\
 curr_dir=`pwd`\n\
 default_dir=/root/worker\n\
 echo \"#!/bin/sh\" > %s\n\
@@ -652,22 +663,25 @@ echo \"$@\" >> %s\n\
 chmod 755 %s\n\
 flock /tmp/lockfile /usr/bin/docker pull %s\n\
 docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
-%s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, img_name, img_name, tmp_sh_name);
+%s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, container_image, container_image, tmp_sh_name);
  
-      	fclose(wrapper_fn);
+	  	fclose(wrapper_fn);
 
-        chmod(wrapper_fn_name, 0755);
+		chmod(wrapper_fn_name, 0755);
 
-        if(!wrapper_input_files) wrapper_input_files = list_create();
-	    list_push_tail(wrapper_input_files,dag_file_create(wrapper_fn_name)); 
+		/* XXX this is badly incorrect: it is adding files to the global wrapper list on each job submission. */
+		/* We must either do that once at startup, or do it every time to the local variable input_files. */
 
-        char wrap_cmd[4096]; 
-        sprintf(wrap_cmd, "./%s.%%%%", WRAPPER_SH_PREFIX);
-        
-        if(!wrapper_command) wrapper_command = strdup(wrap_cmd);
-	    else wrapper_command = string_wrap_command(wrapper_command,optarg);
+		if(!wrapper_input_files) wrapper_input_files = list_create();
+		list_push_tail(wrapper_input_files,dag_file_create(wrapper_fn_name)); 
 
-    }
+		char wrap_cmd[4096]; 
+		sprintf(wrap_cmd, "./%s.%%%%", CONTAINER_SH_PREFIX);
+		
+		if(!wrapper_command) wrapper_command = strdup(wrap_cmd);
+		else wrapper_command = string_wrap_command(wrapper_command,optarg);
+
+	}
 
 	/* Create strings for all the files mentioned by this node. */
 	char *input_files = dag_file_list_format(n,0,n->source_files,queue);
@@ -1437,10 +1451,10 @@ int main(int argc, char *argv[])
 				if(!wrapper_output_files) wrapper_output_files = list_create();
 				list_push_tail(wrapper_output_files,dag_file_create(optarg));
 				break;
-            case LONG_OPT_DOCKER:
-                container_mode = WITH_DOCKER; 
-                img_name = xxstrdup(optarg);
-                break;
+			case LONG_OPT_DOCKER:
+				container_mode = CONTAINER_MODE_DOCKER; 
+				container_image = xxstrdup(optarg);
+				break;
 			default:
 				show_help_run(get_makeflow_exe());
 				return 1;
@@ -1680,14 +1694,13 @@ int main(int argc, char *argv[])
 	if(write_summary_to || email_summary_to)
 		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue );
 
-    if (container_mode == WITH_DOCKER) {
-            char rm_wrapper_cmd[4096];
-            char rm_sh_script_cmd[4096];
-            sprintf(rm_wrapper_cmd, "rm %s*", WRAPPER_SH_PREFIX);
-            sprintf(rm_sh_script_cmd, "rm %s*", TMP_SH_PREFIX);
-            system(rm_wrapper_cmd);
-            system(rm_sh_script_cmd);
-    }
+	/* XXX better to write created files to log, then delete those listed in log. */
+
+	if (container_mode == CONTAINER_MODE_DOCKER) {
+		char *cmd = string_format("rm %s.* %s.*",CONTAINER_SH_PREFIX,CONTAINER_TMP_SH_PREFIX);
+		system(cmd);
+		free(cmd);
+	}
 
 	if(dag_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
