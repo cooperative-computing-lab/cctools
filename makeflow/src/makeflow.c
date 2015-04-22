@@ -31,9 +31,10 @@ See the file COPYING for details.
 
 #include "dag_log.h"
 #include "dag.h"
-#include "visitors.h"
+#include "dag_visitors.h"
 #include "makeflow_common.h"
 #include "makeflow_summary.h"
+#include "parser.h"
 
 #include <dirent.h>
 #include <fcntl.h>
