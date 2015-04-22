@@ -59,4 +59,10 @@ struct dag_file *dag_file_from_name(struct dag *d, const char *filename);
 
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label);
 
+int dag_width( struct dag *d, int nested );
+int dag_depth( struct dag *d );
+int dag_width_guaranteed_max( struct dag *d );
+int dag_width_uniform_task( struct dag *d );
+
+
 #endif

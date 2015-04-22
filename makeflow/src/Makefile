@@ -23,7 +23,7 @@ lexer_test.o: lexer.c
 	$(CCTOOLS_CC) -DLEXER_TEST -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) lexer_test*
+	rm -f *.o $(TARGETS) lexer_test*
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin

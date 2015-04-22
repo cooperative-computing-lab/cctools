@@ -48,23 +48,24 @@ See the file COPYING for details.
 #include "lexer.h"
 #include "buffer.h"
 
+#include "parser.h"
 #include "makeflow_common.h"
 
-int dag_parse(struct dag *d, FILE * dag_stream);
-int dag_parse_variable(struct lexer *bk, struct dag_node *n);
-int dag_parse_node(struct lexer *bk);
-int dag_parse_syntax(struct lexer *bk);
-int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n);
-int dag_parse_node_command(struct lexer *bk, struct dag_node *n);
-int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n);
-int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n);
-int dag_parse_export(struct lexer *bk);
+static int dag_parse(struct dag *d, FILE * dag_stream);
+static int dag_parse_variable(struct lexer *bk, struct dag_node *n);
+static int dag_parse_node(struct lexer *bk);
+static int dag_parse_syntax(struct lexer *bk);
+static int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n);
+static int dag_parse_node_command(struct lexer *bk, struct dag_node *n);
+static int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n);
+static int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n);
+static int dag_parse_export(struct lexer *bk);
 
 int verbose_parsing=0;
 
 static const int parsing_rule_mod_counter = 250;
 
-int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
+static int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
 {
 	struct buffer b;
 
@@ -168,7 +169,7 @@ void dag_close_over_environment(struct dag *d)
 
 }
 
-int dag_parse(struct dag *d, FILE *stream)
+static int dag_parse(struct dag *d, FILE *stream)
 {
 	struct lexer *bk = lexer_create(STREAM, stream, 1, 1);
 
@@ -216,7 +217,7 @@ int dag_parse(struct dag *d, FILE *stream)
 }
 
 //return 1 if name was processed as special variable, 0 otherwise
-int dag_parse_process_special_variable(struct lexer *bk, struct dag_node *n, int nodeid, char *name, const char *value)
+static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node *n, int nodeid, char *name, const char *value)
 {
 	struct dag *d = bk->d;
 	int   special = 0;
@@ -289,7 +290,7 @@ void dag_parse_append_variable(struct lexer *bk, int nodeid, struct dag_node *n,
 	}
 }
 
-int dag_parse_syntax(struct lexer *bk)
+static int dag_parse_syntax(struct lexer *bk)
 {
 	struct token *t = lexer_next_token(bk);
 
@@ -304,7 +305,7 @@ int dag_parse_syntax(struct lexer *bk)
 	return 1;
 }
 
-int dag_parse_variable(struct lexer *bk, struct dag_node *n)
+static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 {
 	struct token *t = lexer_next_token(bk);
 	char mode       = t->lexeme[0];            //=, or + (assign or append)
@@ -365,7 +366,7 @@ int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 	return result;
 }
 
-int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
+static int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
 {
 	int before_colon = 1;
 
@@ -431,7 +432,7 @@ int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
 	return 0;
 }
 
-int dag_parse_node(struct lexer *bk)
+static int dag_parse_node(struct lexer *bk)
 {
 	struct token *t = lexer_next_token(bk);
 	if(t->type != TOKEN_FILES)
@@ -488,7 +489,7 @@ int dag_parse_node(struct lexer *bk)
 	return 1;
 }
 
-int dag_parse_node_command(struct lexer *bk, struct dag_node *n)
+static int dag_parse_node_command(struct lexer *bk, struct dag_node *n)
 {
 	struct token *t;
 
@@ -567,7 +568,7 @@ void dag_parse_drop_spaces(struct lexer *bk)
  *
  * */
 
-int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
+static int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 {
 	struct token *t, *start;
 
@@ -622,7 +623,7 @@ int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 	return dag_parse_node_regular_command(bk, n);
 }
 
-int dag_parse_export(struct lexer *bk)
+static int dag_parse_export(struct lexer *bk)
 {
 	struct token *t, *vtoken, *vname;
 
