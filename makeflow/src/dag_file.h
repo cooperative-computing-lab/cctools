@@ -19,13 +19,12 @@ See the file COPYING for details.
 struct dag_file {
 	const char *filename;
 	struct list     *needed_by;              /* List of nodes that have this file as a source */
-	struct dag_node *target_of;              /* The node (if any) that created the file */
+	struct dag_node *created_by;             /* The node (if any) that created the file */
 	int    ref_count;                        /* How many nodes still to run need this file */
 };
 
 struct dag_file *dag_file_create( const char *filename );
 
-int dag_file_is_absolute( const struct dag_file *f );
 int dag_file_is_source( const struct dag_file *f );
 int dag_file_is_sink( const struct dag_file *f );
 

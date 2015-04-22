@@ -71,7 +71,7 @@ void dag_compile_ancestors(struct dag *d)
 
 	hash_table_firstkey(d->file_table);
 	while(hash_table_nextkey(d->file_table, &name, (void **) &f)) {
-		m = f->target_of;
+		m = f->created_by;
 
 		if(!m)
 			continue;
@@ -155,7 +155,7 @@ struct list *dag_input_files(struct dag *d)
 
 	hash_table_firstkey(d->file_table);
 	while((hash_table_nextkey(d->file_table, &filename, (void **) &f)))
-		if(!f->target_of) {
+		if(!f->created_by) {
 			debug(D_MAKEFLOW_RUN, "Found independent input file: %s", f->filename);
 			list_push_tail(il, f);
 		}
@@ -215,7 +215,7 @@ int dag_width_guaranteed_max(struct dag *d)
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
 			// get the node (tmp) that outputs current source file
-			tmp = f->target_of;
+			tmp = f->created_by;
 			// if a source file is also a target file
 			if(tmp) {
 				debug(D_MAKEFLOW_RUN, "%d depends on %d", n->nodeid, tmp->nodeid);
@@ -258,7 +258,7 @@ int dag_depth(struct dag *d)
 		n->level = 0;
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
-			if((parent = f->target_of) != NULL) {
+			if((parent = f->created_by) != NULL) {
 				n->level = -1;
 				list_push_tail(level_unsolved_nodes, n);
 				break;
@@ -270,7 +270,7 @@ int dag_depth(struct dag *d)
 	while((n = (struct dag_node *) list_pop_head(level_unsolved_nodes)) != NULL) {
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
-			if((parent = f->target_of) != NULL) {
+			if((parent = f->created_by) != NULL) {
 				if(parent->level == -1) {
 					n->level = -1;
 					list_push_tail(level_unsolved_nodes, n);
@@ -342,7 +342,7 @@ int dag_width(struct dag *d, int nested_jobs)
 		n->level = 0;	// initialize 'level' value to 0 because other functions might have modified this value.
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
-			parent = f->target_of;
+			parent = f->created_by;
 			if(parent)
 				parent->children++;
 		}
@@ -370,7 +370,7 @@ int dag_width(struct dag *d, int nested_jobs)
 
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
-			parent = f->target_of;
+			parent = f->created_by;
 			if(!parent)
 				continue;
 
