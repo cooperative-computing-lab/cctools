@@ -8,6 +8,7 @@ See the file COPYING for details.
 #define DAG_LOG_H
 
 #include "dag.h"
+#include "timestamp.h"
 
 /*
 Each dag is associated with a log file that records each operation that
@@ -17,7 +18,7 @@ the state to recover the dag.
 */
 
 void dag_log_state_change( struct dag *d, struct dag_node *n, int newstate );
-
+void dag_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected );
 void dag_log_recover( struct dag *d, const char *filename, int verbose_mode );
 
 #endif

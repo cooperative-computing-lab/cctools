@@ -68,6 +68,19 @@ void dag_log_state_change( struct dag *d, struct dag_node *n, int newstate )
 	}
 }
 
+void dag_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected )
+{
+	/** Line format: # GC timestamp collected time_spent total_collected
+	 *
+	 * timestamp - the unix time (in microseconds) when this line is written to the log file.
+	 * collected - the number of files were collected in this garbage collection cycle.
+	 * time_spent - the length of time this cycle took.
+	 * total_collected - the total number of files has been collected so far since the start this makeflow execution.
+	 *
+	 */
+	fprintf(d->logfile, "# GC\t%" PRIu64 "\t%d\t%" PRIu64 "\t%d\n", timestamp_get(), collected, elapsed, total_collected);
+}
+
 void dag_log_recover(struct dag *d, const char *filename, int verbose_mode )
 {
 	char *line;
