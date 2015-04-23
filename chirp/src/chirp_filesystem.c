@@ -535,15 +535,14 @@ INT64_T cfs_basic_getfile(const char *path, struct link * link, time_t stoptime)
 
 		while(length > 0) {
 			char buffer[65536];
-			INT64_T ractual, wactual;
+			INT64_T ractual;
 			INT64_T chunk = MIN((int) sizeof(buffer), length);
 
 			ractual = cfs->pread(fd, buffer, chunk, total);
 			if(ractual <= 0)
 				break;
 
-			wactual = link_putlstring(link, buffer, ractual, stoptime);
-			if(wactual != ractual) {
+			if(link_putlstring(link, buffer, ractual, stoptime) == -1) {
 				debug(D_DEBUG, "getfile: write failed (%s), expected to write %" PRId64 " more bytes", strerror(errno), length);
 				total = -1;
 				break;

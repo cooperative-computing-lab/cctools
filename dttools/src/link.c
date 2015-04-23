@@ -769,14 +769,21 @@ int link_write(struct link *link, const char *data, size_t count, time_t stoptim
 int link_putlstring(struct link *link, const char *data, size_t count, time_t stoptime)
 {
 	ssize_t total = 0;
-	ssize_t written = 0;
 
-	while(count > 0 && (written = link_write(link, data, count, stoptime)) > 0) {
-		count -= written;
-		total += written;
-		data += written;
+	if (!link)
+		return errno = EINVAL, -1;
+
+	/* Loop because, unlike link_write, we do not allow partial writes. */
+	while (count > 0) {
+		ssize_t w = link_write(link, data, count, stoptime);
+		if (w == -1)
+			return -1;
+		count -= w;
+		total += w;
+		data += w;
 	}
-	return written < 0 ? written : total;
+
+	return total;
 }
 
 int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va)
