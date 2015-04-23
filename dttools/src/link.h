@@ -299,7 +299,7 @@ int link_address_local(struct link *link, char *addr, int *port);
 */
 int link_address_remote(struct link *link, char *addr, int *port);
 
-int64_t link_stream_to_buffer(struct link *link, char **buffer, time_t stoptime);
+ssize_t link_stream_to_buffer(struct link *link, char **buffer, time_t stoptime);
 
 int64_t link_stream_to_fd(struct link *link, int fd, int64_t length, time_t stoptime);
 int64_t link_stream_to_file(struct link *link, FILE * file, int64_t length, time_t stoptime);
