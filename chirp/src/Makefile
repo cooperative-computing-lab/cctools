@@ -10,7 +10,7 @@ LOCAL_LINKAGE = $(CCTOOLS_GLOBUS_LDFLAGS)
 
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = libchirp.a
-OBJECTS = chirp_tool.o $(OBJECTS_LIBRARY) $(OBJECTS_SERVER)
+OBJECTS = chirp_tool.o chirp_fuse.o $(OBJECTS_LIBRARY) $(OBJECTS_SERVER)
 OBJECTS_LIBRARY = $(SOURCES_LIBRARY:%.c=%.o)
 OBJECTS_SERVER = $(SOURCES_SERVER:%.c=%.o)
 PROGRAMS = chirp chirp_get chirp_put chirp_server chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute
