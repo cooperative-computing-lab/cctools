@@ -731,9 +731,11 @@ int link_write(struct link *link, const char *data, size_t count, time_t stoptim
 	ssize_t total = 0;
 	ssize_t chunk = 0;
 
+	if (!link)
+		return errno = EINVAL, -1;
+
 	while(count > 0) {
-		if(link)
-			chunk = write(link->fd, data, count);
+		chunk = write(link->fd, data, count);
 		if(chunk < 0) {
 			if(errno_is_temporary(errno)) {
 				if(link_sleep(link, stoptime, 0, 1)) {
