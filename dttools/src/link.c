@@ -226,13 +226,12 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, sigse
 
 int link_sleep(struct link *link, time_t stoptime, int reading, int writing)
 {
-	int timeout;
 	struct timeval tm, *tptr;
 
 	if(stoptime == LINK_FOREVER) {
 		tptr = 0;
 	} else {
-		timeout = stoptime - time(0);
+		time_t timeout = stoptime - time(0);
 		if(timeout <= 0) {
 			errno = ECONNRESET;
 			return 0;
