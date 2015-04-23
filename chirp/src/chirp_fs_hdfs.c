@@ -703,9 +703,6 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_readdir,
 	chirp_fs_hdfs_closedir,
 
-	cfs_basic_getfile,
-	cfs_basic_putfile,
-
 	chirp_fs_hdfs_unlink,
 	chirp_fs_hdfs_rmall,
 	chirp_fs_hdfs_rename,
