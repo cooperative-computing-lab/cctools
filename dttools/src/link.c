@@ -45,17 +45,15 @@ See the file COPYING for details.
 #define TCP_HIGH_PORT_DEFAULT 32767
 #endif
 
-#define BUFFER_SIZE 65536
-
 #define LINK_TYPE_STANDARD  1
 #define LINK_TYPE_FILE      2
 
 struct link {
 	int fd;
-	char buffer[BUFFER_SIZE];
 	uint64_t read, written;
-	size_t buffer_start;
+	char *buffer_start;
 	size_t buffer_length;
+	char buffer[1<<16];
 	char raddr[LINK_ADDRESS_MAX];
 	int rport;
 	int type;
@@ -277,7 +275,7 @@ static struct link *link_create()
 
 	link->read = link->written = 0;
 	link->fd = -1;
-	link->buffer_start = 0;
+	link->buffer_start = link->buffer;
 	link->buffer_length = 0;
 	link->raddr[0] = 0;
 	link->rport = 0;
@@ -557,14 +555,14 @@ static int fill_buffer(struct link *link, time_t stoptime)
 		return link->buffer_length;
 
 	while(1) {
-		ssize_t chunk = read(link->fd, link->buffer, BUFFER_SIZE);
+		ssize_t chunk = read(link->fd, link->buffer, sizeof(link->buffer));
 		if(chunk > 0) {
 			link->read += chunk;
-			link->buffer_start = 0;
+			link->buffer_start = link->buffer;
 			link->buffer_length = chunk;
 			return chunk;
 		} else if(chunk == 0) {
-			link->buffer_start = 0;
+			link->buffer_start = link->buffer;
 			link->buffer_length = 0;
 			return 0;
 		} else {
@@ -592,7 +590,7 @@ int link_read(struct link *link, char *data, size_t count, time_t stoptime)
 		return 0;
 
 	/* If this is a small read, attempt to fill the buffer */
-	if(count < BUFFER_SIZE) {
+	if(count < sizeof(link->buffer)) {
 		chunk = fill_buffer(link, stoptime);
 		if(chunk <= 0)
 			return chunk;
@@ -602,7 +600,7 @@ int link_read(struct link *link, char *data, size_t count, time_t stoptime)
 
 	if(link->buffer_length > 0) {
 		chunk = MIN(link->buffer_length, count);
-		memcpy(data, &link->buffer[link->buffer_start], chunk);
+		memcpy(data, link->buffer_start, chunk);
 		data += chunk;
 		total += chunk;
 		count -= chunk;
@@ -656,7 +654,7 @@ int link_read_avail(struct link *link, char *data, size_t count, time_t stoptime
 
 	if(link->buffer_length > 0) {
 		chunk = MIN(link->buffer_length, count);
-		memcpy(data, &link->buffer[link->buffer_start], chunk);
+		memcpy(data, link->buffer_start, chunk);
 		data += chunk;
 		total += chunk;
 		count -= chunk;
@@ -704,7 +702,7 @@ int link_readline(struct link *link, char *line, size_t length, time_t stoptime)
 {
 	while(1) {
 		while(length > 0 && link->buffer_length > 0) {
-			*line = link->buffer[link->buffer_start];
+			*line = *link->buffer_start;
 			link->buffer_start++;
 			link->buffer_length--;
 			if(*line == '\n') {
