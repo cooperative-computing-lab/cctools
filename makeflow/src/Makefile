@@ -13,8 +13,8 @@ TARGETS = $(PROGRAMS)
 
 all: $(TARGETS)
 
-$(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 makeflow makeflow_viz makeflow_analyze: $(OBJECTS)
+$(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 
 lexer_test: dag.o visitors.o makeflow_common.o lexer_test.o $(EXTERNAL_DEPENDENCIES)
 
