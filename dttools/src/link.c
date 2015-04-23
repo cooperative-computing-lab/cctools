@@ -52,9 +52,8 @@ See the file COPYING for details.
 
 struct link {
 	int fd;
-	int read;
-	int written;
 	char buffer[BUFFER_SIZE];
+	uint64_t read, written;
 	size_t buffer_start;
 	size_t buffer_length;
 	char raddr[LINK_ADDRESS_MAX];
@@ -560,6 +559,7 @@ static int fill_buffer(struct link *link, time_t stoptime)
 	while(1) {
 		ssize_t chunk = read(link->fd, link->buffer, BUFFER_SIZE);
 		if(chunk > 0) {
+			link->read += chunk;
 			link->buffer_start = 0;
 			link->buffer_length = chunk;
 			return chunk;
@@ -627,6 +627,7 @@ int link_read(struct link *link, char *data, size_t count, time_t stoptime)
 		} else if(chunk == 0) {
 			break;
 		} else {
+			link->read += chunk;
 			total += chunk;
 			count -= chunk;
 			data += chunk;
@@ -681,6 +682,7 @@ int link_read_avail(struct link *link, char *data, size_t count, time_t stoptime
 		} else if(chunk == 0) {
 			break;
 		} else {
+			link->read += chunk;
 			total += chunk;
 			count -= chunk;
 			data += chunk;
@@ -747,6 +749,7 @@ int link_write(struct link *link, const char *data, size_t count, time_t stoptim
 		} else if(chunk == 0) {
 			break;
 		} else {
+			link->written += chunk;
 			total += chunk;
 			count -= chunk;
 			data += chunk;
