@@ -891,34 +891,26 @@ int link_address_remote(struct link *link, char *addr, int *port)
 
 INT64_T link_stream_to_buffer(struct link * link, char **buffer, time_t stoptime)
 {
-	INT64_T buffer_size = 8192;
 	INT64_T total = 0;
 	INT64_T actual;
-	char *newbuffer;
-
-	*buffer = malloc(buffer_size);
-	if(!*buffer)
-		return -1;
+	buffer_t B;
+	buffer_init(&B);
 
 	while(1) {
-		actual = link_read(link, &(*buffer)[total], buffer_size - total, stoptime);
+		char buf[1<<16];
+		actual = link_read(link, buf, sizeof(buf), stoptime);
 		if(actual <= 0)
 			break;
-
-		total += actual;
-
-		if((buffer_size - total) < 1) {
-			buffer_size *= 2;
-			newbuffer = realloc(*buffer, buffer_size);
-			if(!newbuffer) {
-				free(*buffer);
-				return -1;
-			}
-			*buffer = newbuffer;
+		if (buffer_putlstring(&B, buf, actual) == -1) {
+			buffer_free(&B);
+			return -1;
 		}
+		total += actual;
 	}
 
-	(*buffer)[total] = 0;
+	if (buffer_dup(&B, buffer) == -1)
+		total = -1;
+	buffer_free(&B);
 
 	return total;
 }
