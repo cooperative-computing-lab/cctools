@@ -161,14 +161,18 @@ out:
 	return rc;
 }
 
-static int update (confuga *C, const char *path, confuga_fid_t fid, confuga_off_t size)
+static int update (confuga *C, const char *path, confuga_fid_t fid, confuga_off_t size, int flags)
 {
 	int rc;
 	int fd = -1;
 	int n;
 	char header[HEADER_LENGTH+1] = "";
+	int oflags = O_CREAT|O_WRONLY|O_TRUNC|O_SYNC;
 
-	fd = open(path, O_CREAT|O_WRONLY|O_TRUNC|O_SYNC, S_IRUSR|S_IWUSR);
+	if (flags & CONFUGA_O_EXCL)
+		oflags |= O_EXCL;
+
+	fd = open(path, oflags, S_IRUSR|S_IWUSR);
 	CATCHUNIX(fd);
 	n = snprintf(header, sizeof(header), "file:" CONFUGA_FID_PRIFMT ":%0*" PRIxCONFUGA_OFF_T "\n", CONFUGA_FID_PRIARGS(fid), (int)sizeof(confuga_off_t)*2, (confuga_off_t)size);
 	assert((size_t)n == HEADER_LENGTH);
@@ -471,7 +475,7 @@ CONFUGA_API int confuga_truncate(confuga *C, const char *path, confuga_off_t len
 	CATCH(lookup(C, path, &fid, &size, &type));
 	if (length > 0)
 		CATCH(EINVAL);
-	CATCH(update(C, path, empty, 0));
+	CATCH(update(C, path, empty, 0, 0));
 	PROLOGUE
 }
 
@@ -574,12 +578,12 @@ CONFUGA_API int confuga_lookup (confuga *C, const char *path, confuga_fid_t *fid
 	PROLOGUE
 }
 
-CONFUGA_API int confuga_update (confuga *C, const char *path, confuga_fid_t fid, confuga_off_t size)
+CONFUGA_API int confuga_update (confuga *C, const char *path, confuga_fid_t fid, confuga_off_t size, int flags)
 {
 	int rc;
 	RESOLVE(path)
-	debug(D_CONFUGA, "update(`%s', fid = " CONFUGA_FID_PRIFMT ", size = %" PRIuCONFUGA_OFF_T ")", unresolved_path, CONFUGA_FID_PRIARGS(fid), size);
-	CATCH(update(C, path, fid, size));
+	debug(D_CONFUGA, "update(`%s', fid = " CONFUGA_FID_PRIFMT ", size = %" PRIuCONFUGA_OFF_T ", flags = %d)", unresolved_path, CONFUGA_FID_PRIARGS(fid), size, flags);
+	CATCH(update(C, path, fid, size, flags));
 	PROLOGUE
 }
 

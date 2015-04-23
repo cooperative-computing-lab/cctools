@@ -408,26 +408,31 @@ CONFUGA_API int confuga_file_truncate (confuga_file *file, confuga_off_t length,
 
 	if (file->stream == NULL)
 		CATCH(EINVAL);
-	if (length < file->size)
+	if (0 < length && length < file->size)
 		CATCH(EINVAL);
 
 	debug(D_CONFUGA, "file_truncate(stream = '%s%s', length = %" PRIuCONFUGA_OFF_T ")", file->host.hostport, file->path, length);
 	CATCHUNIX(chirp_reli_ftruncate(file->stream, length, stoptime));
-	/* now update internal structure */
-	length -= file->size;
-	file->size += length;
-	while (length > 0) {
-		/* ANSI C standard requires this be initialized with 0.
-		*
-		* Also note, despite its large size, the executable size does not increase
-		* as this is put in the "uninitialized" .bss section. [Putting it in
-		* .rodata would increase the executable size.]
-		*/
-		static const unsigned char zeroes[1<<20];
+	if (length == 0) {
+		file->size = 0;
+		sha1_init(&file->context);
+	} else {
+		/* now update internal structure */
+		length -= file->size;
+		file->size += length;
+		while (length > 0) {
+			/* ANSI C standard requires this be initialized with 0.
+			*
+			* Also note, despite its large size, the executable size does not increase
+			* as this is put in the "uninitialized" .bss section. [Putting it in
+			* .rodata would increase the executable size.]
+			*/
+			static const unsigned char zeroes[1<<20];
 
-		confuga_off_t chunksize = sizeof(zeroes) < length ? sizeof(zeroes) : length;
-		sha1_update(&file->context, zeroes, chunksize);
-		length -= chunksize;
+			confuga_off_t chunksize = sizeof(zeroes) < length ? sizeof(zeroes) : length;
+			sha1_update(&file->context, zeroes, chunksize);
+			length -= chunksize;
+		}
 	}
 	rc = 0;
 	goto out;

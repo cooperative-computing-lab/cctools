@@ -74,6 +74,7 @@ static struct {
 		struct {
 			confuga_file *file;
 			confuga_off_t size; /* current offset for pwrite */
+			int flags;
 		} file;
 		confuga_replica *replica;
 		buffer_t metadata;
@@ -164,6 +165,9 @@ static INT64_T chirp_fs_confuga_open (const char *path, INT64_T flags, INT64_T m
 			} else {
 				CATCH_CONFUGA(confuga_file_create(C, &open_files[fd].f.file.file, STOPTIME));
 				open_files[fd].f.file.size = 0;
+				open_files[fd].f.file.flags = 0;
+				if (flags & O_EXCL)
+					open_files[fd].f.file.flags |= CONFUGA_O_EXCL;
 				open_files[fd].type = CHIRP_FS_CONFUGA_FILE_WRITE;
 			}
 			break;
@@ -198,7 +202,7 @@ static INT64_T chirp_fs_confuga_close (int fd)
 			confuga_off_t size;
 			CATCH_CONFUGA(confuga_file_close(open_files[fd].f.file.file, &fid, &size, STOPTIME));
 			assert(open_files[fd].f.file.size == size);
-			CATCH_CONFUGA(confuga_update(C, open_files[fd].path, fid, size));
+			CATCH_CONFUGA(confuga_update(C, open_files[fd].path, fid, size, open_files[fd].f.file.flags));
 			break;
 		}
 		case CHIRP_FS_CONFUGA_META_READ:
@@ -561,12 +565,17 @@ static INT64_T chirp_fs_confuga_ftruncate(int fd, INT64_T length)
 {
 	int rc;
 	SETUP_FILE
-	if (open_files[fd].type != CHIRP_FS_CONFUGA_FILE_WRITE)
-		CATCH(EBADF);
 	if (length < 0)
 		CATCH(EINVAL);
-	CATCH_CONFUGA(confuga_file_truncate(open_files[fd].f.file.file, length, STOPTIME));
-	open_files[fd].f.file.size = length-open_files[fd].f.file.size;
+	if (open_files[fd].type == CHIRP_FS_CONFUGA_META_WRITE) {
+		if (buffer_pos(&open_files[fd].f.metadata) <= (size_t)length)
+			buffer_rewind(&open_files[fd].f.metadata, length);
+		else
+			CATCH(EINVAL);
+	} else if (open_files[fd].type == CHIRP_FS_CONFUGA_FILE_WRITE) {
+		CATCH_CONFUGA(confuga_file_truncate(open_files[fd].f.file.file, length, STOPTIME));
+		open_files[fd].f.file.size = length;
+	} else CATCH(EBADF);
 	PROLOGUE
 }
 

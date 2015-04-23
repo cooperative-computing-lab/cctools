@@ -128,8 +128,9 @@ CONFUGA_API int confuga_replication_strategy (confuga *C, int strategy, uint64_t
 CONFUGA_API int confuga_metadata_lookup(confuga *C, const char *path, char **data, size_t *size);
 CONFUGA_API int confuga_metadata_update(confuga *C, const char *path, const char *data, size_t size);
 
+#define CONFUGA_O_EXCL (1L<<0)
 CONFUGA_API int confuga_lookup(confuga *C, const char *path, confuga_fid_t *fid, confuga_off_t *size);
-CONFUGA_API int confuga_update(confuga *C, const char *path, confuga_fid_t fid, confuga_off_t size);
+CONFUGA_API int confuga_update(confuga *C, const char *path, confuga_fid_t fid, confuga_off_t size, int flags);
 CONFUGA_API int confuga_opendir(confuga *C, const char *path, confuga_dir **dir);
 CONFUGA_API int confuga_readdir(confuga_dir *dir, struct confuga_dirent **dirent);
 CONFUGA_API int confuga_closedir(confuga_dir *dir);

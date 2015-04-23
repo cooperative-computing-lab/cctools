@@ -1513,7 +1513,7 @@ static int bindoutputs (confuga *C, chirp_jobid_t id, const char *tag)
 		assert(sqlite3_column_type(stmt, 1) == SQLITE_BLOB && (size_t)sqlite3_column_bytes(stmt, 1) == sizeof(fid.id));
 		memcpy(fid.id, sqlite3_column_blob(stmt, 1), sizeof(fid.id));
 		size = (confuga_off_t)sqlite3_column_int64(stmt, 2);
-		CATCH(confuga_update(C, path, fid, size));
+		CATCH(confuga_update(C, path, fid, size, 0));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
