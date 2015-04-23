@@ -54,7 +54,6 @@ struct link {
 	int fd;
 	int read;
 	int written;
-	time_t last_used;
 	char buffer[BUFFER_SIZE];
 	size_t buffer_start;
 	size_t buffer_length;
@@ -278,7 +277,6 @@ static struct link *link_create()
 		return 0;
 
 	link->read = link->written = 0;
-	link->last_used = time(0);
 	link->fd = -1;
 	link->buffer_start = 0;
 	link->buffer_length = 0;
