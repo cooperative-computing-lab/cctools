@@ -45,18 +45,20 @@ See the file COPYING for details.
 #define TCP_HIGH_PORT_DEFAULT 32767
 #endif
 
-#define LINK_TYPE_STANDARD  1
-#define LINK_TYPE_FILE      2
+enum link_type {
+	LINK_TYPE_STANDARD,
+	LINK_TYPE_FILE,
+};
 
 struct link {
 	int fd;
+	enum link_type type;
 	uint64_t read, written;
 	char *buffer_start;
 	size_t buffer_length;
 	char buffer[1<<16];
 	char raddr[LINK_ADDRESS_MAX];
 	int rport;
-	int type;
 };
 
 static int link_send_window = 65536;
