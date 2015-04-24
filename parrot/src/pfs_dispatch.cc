@@ -137,36 +137,6 @@ static void divert_to_dummy( struct pfs_process *p, INT64_T result )
 	tracer_args_set(p->tracer,SYSCALL32_getpid,0,0);
 }
 
-/* The point of this function is to make a nice readable path for
- * /proc/self/fd/[0-9]+ to make debugging easier. We could just as easily use a
- * static name like "p".
- */
-
-#define MAX_PATHTOFILENAME 32
-static void pathtofilename( char *path )
-{
-	char filename[PATH_MAX] = "pfs@";
-
-	char *current = strchr(filename, '\0');
-	const char *next = path;
-	do {
-		if (*next == '/') {
-			*current++ = '-';
-			while (*(next+1) == '/')
-				next++; /* skip redundant slashes */
-		} else {
-			*current++ = *next;
-		}
-	} while (*next++);
-
-	/* make it a reasonable (safer) size... */
-	if (strlen(filename) >= MAX_PATHTOFILENAME) {
-		snprintf(path, MAX_PATHTOFILENAME, "%.*s...%.*s", MAX_PATHTOFILENAME/2-2, filename, MAX_PATHTOFILENAME/2-2, filename+strlen(filename)-(MAX_PATHTOFILENAME/2-2));
-	} else {
-		strcpy(path, filename);
-	}
-}
-
 /* The purpose of this is to allocate a unique file and use up an fd so it
  * isn't used in the future. We also need the inode # to get its unique
  * identifier.
@@ -174,7 +144,7 @@ static void pathtofilename( char *path )
 
 static void divert_to_parrotfd( struct pfs_process *p, INT64_T fd, char *path, const void *uaddr, int flags )
 {
-	pathtofilename(path);
+	pfs_process_pathtofilename(path);
 
 	/* If possible, use memfd_create for the new Parrot FD file. This has a few
 	 * advantages:
@@ -192,7 +162,7 @@ static void divert_to_parrotfd( struct pfs_process *p, INT64_T fd, char *path, c
 	if (linux_available(3,17,0)) {
 		INT64_T args[] = {(INT64_T)pfs_process_scratch_set(p, path, strlen(path)+1), 0};
 		if (flags & O_CLOEXEC)
-			args[2] |= MFD_CLOEXEC;
+			args[1] |= MFD_CLOEXEC;
 		tracer_args_set(p->tracer,SYSCALL32_memfd_create,args,sizeof(args)/sizeof(args[0]));
 		debug(D_DEBUG, "diverting to memfd_create(`%s', 0)", path);
 	} else {

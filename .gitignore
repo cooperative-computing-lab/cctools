@@ -2,7 +2,6 @@
 *.dylib
 *.dSYM
 *.gz
-*.html
 *.o
 *.swp
 cctools.test.log

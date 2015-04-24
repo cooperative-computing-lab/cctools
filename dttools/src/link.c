@@ -45,22 +45,20 @@ See the file COPYING for details.
 #define TCP_HIGH_PORT_DEFAULT 32767
 #endif
 
-#define BUFFER_SIZE 65536
-
-#define LINK_TYPE_STANDARD  1
-#define LINK_TYPE_FILE      2
+enum link_type {
+	LINK_TYPE_STANDARD,
+	LINK_TYPE_FILE,
+};
 
 struct link {
 	int fd;
-	int read;
-	int written;
-	time_t last_used;
-	char buffer[BUFFER_SIZE];
-	size_t buffer_start;
+	enum link_type type;
+	uint64_t read, written;
+	char *buffer_start;
 	size_t buffer_length;
+	char buffer[1<<16];
 	char raddr[LINK_ADDRESS_MAX];
 	int rport;
-	int type;
 };
 
 static int link_send_window = 65536;
@@ -226,13 +224,12 @@ static int link_internal_sleep(struct link *link, struct timeval *timeout, sigse
 
 int link_sleep(struct link *link, time_t stoptime, int reading, int writing)
 {
-	int timeout;
 	struct timeval tm, *tptr;
 
 	if(stoptime == LINK_FOREVER) {
 		tptr = 0;
 	} else {
-		timeout = stoptime - time(0);
+		time_t timeout = stoptime - time(0);
 		if(timeout <= 0) {
 			errno = ECONNRESET;
 			return 0;
@@ -279,9 +276,8 @@ static struct link *link_create()
 		return 0;
 
 	link->read = link->written = 0;
-	link->last_used = time(0);
 	link->fd = -1;
-	link->buffer_start = 0;
+	link->buffer_start = link->buffer;
 	link->buffer_length = 0;
 	link->raddr[0] = 0;
 	link->rport = 0;
@@ -555,19 +551,20 @@ failure:
 	return 0;
 }
 
-static int fill_buffer(struct link *link, time_t stoptime)
+static ssize_t fill_buffer(struct link *link, time_t stoptime)
 {
 	if(link->buffer_length > 0)
 		return link->buffer_length;
 
 	while(1) {
-		ssize_t chunk = read(link->fd, link->buffer, BUFFER_SIZE);
+		ssize_t chunk = read(link->fd, link->buffer, sizeof(link->buffer));
 		if(chunk > 0) {
-			link->buffer_start = 0;
+			link->read += chunk;
+			link->buffer_start = link->buffer;
 			link->buffer_length = chunk;
 			return chunk;
 		} else if(chunk == 0) {
-			link->buffer_start = 0;
+			link->buffer_start = link->buffer;
 			link->buffer_length = 0;
 			return 0;
 		} else {
@@ -586,7 +583,7 @@ static int fill_buffer(struct link *link, time_t stoptime)
 
 /* link_read blocks until all the requested data is available */
 
-int link_read(struct link *link, char *data, size_t count, time_t stoptime)
+ssize_t link_read(struct link *link, char *data, size_t count, time_t stoptime)
 {
 	ssize_t total = 0;
 	ssize_t chunk = 0;
@@ -595,7 +592,7 @@ int link_read(struct link *link, char *data, size_t count, time_t stoptime)
 		return 0;
 
 	/* If this is a small read, attempt to fill the buffer */
-	if(count < BUFFER_SIZE) {
+	if(count < sizeof(link->buffer)) {
 		chunk = fill_buffer(link, stoptime);
 		if(chunk <= 0)
 			return chunk;
@@ -605,7 +602,7 @@ int link_read(struct link *link, char *data, size_t count, time_t stoptime)
 
 	if(link->buffer_length > 0) {
 		chunk = MIN(link->buffer_length, count);
-		memcpy(data, &link->buffer[link->buffer_start], chunk);
+		memcpy(data, link->buffer_start, chunk);
 		data += chunk;
 		total += chunk;
 		count -= chunk;
@@ -630,6 +627,7 @@ int link_read(struct link *link, char *data, size_t count, time_t stoptime)
 		} else if(chunk == 0) {
 			break;
 		} else {
+			link->read += chunk;
 			total += chunk;
 			count -= chunk;
 			data += chunk;
@@ -649,7 +647,7 @@ int link_read(struct link *link, char *data, size_t count, time_t stoptime)
 
 /* link_read_avail returns whatever is available, blocking only if nothing is */
 
-int link_read_avail(struct link *link, char *data, size_t count, time_t stoptime)
+ssize_t link_read_avail(struct link *link, char *data, size_t count, time_t stoptime)
 {
 	ssize_t total = 0;
 	ssize_t chunk = 0;
@@ -658,7 +656,7 @@ int link_read_avail(struct link *link, char *data, size_t count, time_t stoptime
 
 	if(link->buffer_length > 0) {
 		chunk = MIN(link->buffer_length, count);
-		memcpy(data, &link->buffer[link->buffer_start], chunk);
+		memcpy(data, link->buffer_start, chunk);
 		data += chunk;
 		total += chunk;
 		count -= chunk;
@@ -684,6 +682,7 @@ int link_read_avail(struct link *link, char *data, size_t count, time_t stoptime
 		} else if(chunk == 0) {
 			break;
 		} else {
+			link->read += chunk;
 			total += chunk;
 			count -= chunk;
 			data += chunk;
@@ -705,7 +704,7 @@ int link_readline(struct link *link, char *line, size_t length, time_t stoptime)
 {
 	while(1) {
 		while(length > 0 && link->buffer_length > 0) {
-			*line = link->buffer[link->buffer_start];
+			*line = *link->buffer_start;
 			link->buffer_start++;
 			link->buffer_length--;
 			if(*line == '\n') {
@@ -727,14 +726,16 @@ int link_readline(struct link *link, char *line, size_t length, time_t stoptime)
 	return 0;
 }
 
-int link_write(struct link *link, const char *data, size_t count, time_t stoptime)
+ssize_t link_write(struct link *link, const char *data, size_t count, time_t stoptime)
 {
 	ssize_t total = 0;
 	ssize_t chunk = 0;
 
+	if (!link)
+		return errno = EINVAL, -1;
+
 	while(count > 0) {
-		if(link)
-			chunk = write(link->fd, data, count);
+		chunk = write(link->fd, data, count);
 		if(chunk < 0) {
 			if(errno_is_temporary(errno)) {
 				if(link_sleep(link, stoptime, 0, 1)) {
@@ -748,6 +749,7 @@ int link_write(struct link *link, const char *data, size_t count, time_t stoptim
 		} else if(chunk == 0) {
 			break;
 		} else {
+			link->written += chunk;
 			total += chunk;
 			count -= chunk;
 			data += chunk;
@@ -765,22 +767,29 @@ int link_write(struct link *link, const char *data, size_t count, time_t stoptim
 	}
 }
 
-int link_putlstring(struct link *link, const char *data, size_t count, time_t stoptime)
+ssize_t link_putlstring(struct link *link, const char *data, size_t count, time_t stoptime)
 {
 	ssize_t total = 0;
-	ssize_t written = 0;
 
-	while(count > 0 && (written = link_write(link, data, count, stoptime)) > 0) {
-		count -= written;
-		total += written;
-		data += written;
+	if (!link)
+		return errno = EINVAL, -1;
+
+	/* Loop because, unlike link_write, we do not allow partial writes. */
+	while (count > 0) {
+		ssize_t w = link_write(link, data, count, stoptime);
+		if (w == -1)
+			return -1;
+		count -= w;
+		total += w;
+		data += w;
 	}
-	return written < 0 ? written : total;
+
+	return total;
 }
 
-int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va)
+ssize_t link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va)
 {
-	int rc;
+	ssize_t rc;
 	size_t l;
 	const char *str;
 	buffer_t B;
@@ -795,9 +804,9 @@ int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_lis
 	return rc;
 }
 
-int link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...)
+ssize_t link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...)
 {
-	int rc;
+	ssize_t rc;
 	va_list va;
 
 	va_start(va, stoptime);
@@ -880,54 +889,44 @@ int link_address_remote(struct link *link, char *addr, int *port)
 	return 1;
 }
 
-INT64_T link_stream_to_buffer(struct link * link, char **buffer, time_t stoptime)
+ssize_t link_stream_to_buffer(struct link * link, char **buffer, time_t stoptime)
 {
-	INT64_T buffer_size = 8192;
-	INT64_T total = 0;
-	INT64_T actual;
-	char *newbuffer;
-
-	*buffer = malloc(buffer_size);
-	if(!*buffer)
-		return -1;
+	ssize_t total = 0;
+	buffer_t B;
+	buffer_init(&B);
 
 	while(1) {
-		actual = link_read(link, &(*buffer)[total], buffer_size - total, stoptime);
+		char buf[1<<16];
+		ssize_t actual = link_read(link, buf, sizeof(buf), stoptime);
 		if(actual <= 0)
 			break;
-
+		if (buffer_putlstring(&B, buf, actual) == -1) {
+			buffer_free(&B);
+			return -1;
+		}
 		total += actual;
-
-		if((buffer_size - total) < 1) {
-			buffer_size *= 2;
-			newbuffer = realloc(*buffer, buffer_size);
-			if(!newbuffer) {
-				free(*buffer);
-				return -1;
-			}
-			*buffer = newbuffer;
-		}
 	}
 
-	(*buffer)[total] = 0;
+	if (buffer_dup(&B, buffer) == -1)
+		total = -1;
+	buffer_free(&B);
 
 	return total;
 }
 
-INT64_T link_stream_to_fd(struct link * link, int fd, INT64_T length, time_t stoptime)
+int64_t link_stream_to_fd(struct link * link, int fd, int64_t length, time_t stoptime)
 {
-	char buffer[65536];
-	INT64_T total = 0;
-	INT64_T ractual, wactual;
+	int64_t total = 0;
 
 	while(length > 0) {
-		INT64_T chunk = MIN((int) sizeof(buffer), length);
+		char buffer[1<<16];
+		size_t chunk = MIN(sizeof(buffer), (size_t)length);
 
-		ractual = link_read(link, buffer, chunk, stoptime);
+		ssize_t ractual = link_read(link, buffer, chunk, stoptime);
 		if(ractual <= 0)
 			break;
 
-		wactual = full_write(fd, buffer, ractual);
+		ssize_t wactual = full_write(fd, buffer, ractual);
 		if(wactual != ractual) {
 			total = -1;
 			break;
@@ -940,20 +939,19 @@ INT64_T link_stream_to_fd(struct link * link, int fd, INT64_T length, time_t sto
 	return total;
 }
 
-INT64_T link_stream_to_file(struct link * link, FILE * file, INT64_T length, time_t stoptime)
+int64_t link_stream_to_file(struct link * link, FILE * file, int64_t length, time_t stoptime)
 {
-	char buffer[65536];
-	INT64_T total = 0;
-	INT64_T ractual, wactual;
+	int64_t total = 0;
 
 	while(length > 0) {
-		INT64_T chunk = MIN((int) sizeof(buffer), length);
+		char buffer[1<<16];
+		size_t chunk = MIN(sizeof(buffer), (size_t)length);
 
-		ractual = link_read(link, buffer, chunk, stoptime);
+		ssize_t ractual = link_read(link, buffer, chunk, stoptime);
 		if(ractual <= 0)
 			break;
 
-		wactual = full_fwrite(file, buffer, ractual);
+		ssize_t wactual = full_fwrite(file, buffer, ractual);
 		if(wactual != ractual) {
 			total = -1;
 			break;
@@ -966,20 +964,19 @@ INT64_T link_stream_to_file(struct link * link, FILE * file, INT64_T length, tim
 	return total;
 }
 
-INT64_T link_stream_from_fd(struct link * link, int fd, INT64_T length, time_t stoptime)
+int64_t link_stream_from_fd(struct link * link, int fd, int64_t length, time_t stoptime)
 {
-	char buffer[65536];
-	INT64_T total = 0;
-	INT64_T ractual, wactual;
+	int64_t total = 0;
 
 	while(length > 0) {
-		INT64_T chunk = MIN((int) sizeof(buffer), length);
+		char buffer[1<<16];
+		size_t chunk = MIN(sizeof(buffer), (size_t)length);
 
-		ractual = full_read(fd, buffer, chunk);
+		ssize_t ractual = full_read(fd, buffer, chunk);
 		if(ractual <= 0)
 			break;
 
-		wactual = link_write(link, buffer, ractual, stoptime);
+		ssize_t wactual = link_write(link, buffer, ractual, stoptime);
 		if(wactual != ractual) {
 			total = -1;
 			break;
@@ -992,20 +989,19 @@ INT64_T link_stream_from_fd(struct link * link, int fd, INT64_T length, time_t s
 	return total;
 }
 
-INT64_T link_stream_from_file(struct link * link, FILE * file, INT64_T length, time_t stoptime)
+int64_t link_stream_from_file(struct link * link, FILE * file, int64_t length, time_t stoptime)
 {
-	char buffer[65536];
-	INT64_T total = 0;
-	INT64_T ractual, wactual;
+	int64_t total = 0;
 
 	while(1) {
-		INT64_T chunk = MIN((int) sizeof(buffer), length);
+		char buffer[1<<16];
+		size_t chunk = MIN(sizeof(buffer), (size_t)length);
 
-		ractual = full_fread(file, buffer, chunk);
+		ssize_t ractual = full_fread(file, buffer, chunk);
 		if(ractual <= 0)
 			break;
 
-		wactual = link_write(link, buffer, ractual, stoptime);
+		ssize_t wactual = link_write(link, buffer, ractual, stoptime);
 		if(wactual != ractual) {
 			total = -1;
 			break;
@@ -1018,16 +1014,15 @@ INT64_T link_stream_from_file(struct link * link, FILE * file, INT64_T length, t
 	return total;
 }
 
-INT64_T link_soak(struct link * link, INT64_T length, time_t stoptime)
+int64_t link_soak(struct link * link, int64_t length, time_t stoptime)
 {
-	char buffer[65536];
-	INT64_T total = 0;
-	INT64_T ractual;
+	int64_t total = 0;
 
 	while(length > 0) {
-		INT64_T chunk = MIN((int) sizeof(buffer), length);
+		char buffer[1<<16];
+		size_t chunk = MIN(sizeof(buffer), (size_t)length);
 
-		ractual = link_read(link, buffer, chunk, stoptime);
+		ssize_t ractual = link_read(link, buffer, chunk, stoptime);
 		if(ractual <= 0)
 			break;
 

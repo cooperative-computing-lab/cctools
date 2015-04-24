@@ -653,9 +653,6 @@ struct chirp_filesystem chirp_fs_confuga = {
 	chirp_fs_confuga_readdir,
 	chirp_fs_confuga_closedir,
 
-	cfs_basic_getfile,
-	cfs_basic_putfile,
-
 	chirp_fs_confuga_unlink,
 	cfs_basic_rmall,
 	chirp_fs_confuga_rename,

@@ -41,14 +41,14 @@ link_close(link);
 
 */
 
-#include "int_sizes.h"
-
-#include <time.h>
-#include <limits.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <signal.h>
 #include <sys/types.h>
+
+#include <limits.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <time.h>
 
 /** Maximum number of characters in the text representation of a link address.  This must be large enough to accomodate ipv6 in the future. */
 #define LINK_ADDRESS_MAX 48
@@ -129,7 +129,7 @@ or the connection is dropped.
 @param stoptime The time at which to abort.
 @return The number of bytes actually read, or zero if the connection is closed, or less than zero on error.
 */
-int link_read(struct link *link, char *data, size_t length, time_t stoptime);
+ssize_t link_read(struct link *link, char *data, size_t length, time_t stoptime);
 
 /** Read available data from a connection.
 This call will read whatever data is immediately available, and then
@@ -140,7 +140,7 @@ return without blocking.
 @param stoptime The time at which to abort.
 @return The number of bytes actually read, or zero if the connection is closed, or less than zero on error.
 */
-int link_read_avail(struct link *link, char *data, size_t length, time_t stoptime);
+ssize_t link_read_avail(struct link *link, char *data, size_t length, time_t stoptime);
 
 /** Write data to a connection.
 @param link The link to write.
@@ -149,7 +149,7 @@ int link_read_avail(struct link *link, char *data, size_t length, time_t stoptim
 @param stoptime The time at which to abort.
 @return The number of bytes actually written, or less than zero on error.
 */
-int link_write(struct link *link, const char *data, size_t length, time_t stoptime);
+ssize_t link_write(struct link *link, const char *data, size_t length, time_t stoptime);
 
 /* Write a string of length len to a connection. All data is written until
  * finished or an error is encountered.
@@ -159,7 +159,7 @@ int link_write(struct link *link, const char *data, size_t length, time_t stopti
 @param stoptime The time at which to abort.
 @return The number of bytes actually written, or less than zero on error.
 */
-int link_putlstring(struct link *link, const char *str, size_t len, time_t stoptime);
+ssize_t link_putlstring(struct link *link, const char *str, size_t len, time_t stoptime);
 
 /* Write a C string to a connection. All data is written until finished or an
    error is encountered. It is defined as a macro.
@@ -187,7 +187,7 @@ int link_putlstring(struct link *link, const char *str, size_t len, time_t stopt
 @param ... Format arguments.
 @return The number of bytes actually written, or less than zero on error.
 */
-int link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...)
+ssize_t link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...)
   __attribute__ (( format(printf,2,4) )) ;
 
 /** Write formatted data to a connection. All data is written until finished
@@ -198,7 +198,7 @@ int link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...)
 @param va Format arguments.
 @return The number of bytes actually written, or less than zero on error.
 */
-int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va);
+ssize_t link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va);
 
 /** Block until a link is readable or writable.
 @param link The link to wait on.
@@ -299,15 +299,15 @@ int link_address_local(struct link *link, char *addr, int *port);
 */
 int link_address_remote(struct link *link, char *addr, int *port);
 
-INT64_T link_stream_to_buffer(struct link *link, char **buffer, time_t stoptime);
+ssize_t link_stream_to_buffer(struct link *link, char **buffer, time_t stoptime);
 
-INT64_T link_stream_to_fd(struct link *link, int fd, INT64_T length, time_t stoptime);
-INT64_T link_stream_to_file(struct link *link, FILE * file, INT64_T length, time_t stoptime);
+int64_t link_stream_to_fd(struct link *link, int fd, int64_t length, time_t stoptime);
+int64_t link_stream_to_file(struct link *link, FILE * file, int64_t length, time_t stoptime);
 
-INT64_T link_stream_from_fd(struct link *link, int fd, INT64_T length, time_t stoptime);
-INT64_T link_stream_from_file(struct link *link, FILE * file, INT64_T length, time_t stoptime);
+int64_t link_stream_from_fd(struct link *link, int fd, int64_t length, time_t stoptime);
+int64_t link_stream_from_file(struct link *link, FILE * file, int64_t length, time_t stoptime);
 
-INT64_T link_soak(struct link *link, INT64_T length, time_t stoptime);
+int64_t link_soak(struct link *link, int64_t length, time_t stoptime);
 
 /** Options for link performance tuning. */
 typedef enum {
