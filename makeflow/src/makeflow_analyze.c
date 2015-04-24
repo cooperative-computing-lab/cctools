@@ -48,15 +48,12 @@ See the file COPYING for details.
 #include "dag_visitors.h"
 #include "parser.h"
 
-#include "makeflow_common.h"
-
 /* Display options */
 enum { SHOW_INPUT_FILES = 2,
        SHOW_OUTPUT_FILES,
        SHOW_MAKEFLOW_ANALYSIS,
        SHOW_DAG_FILE
 };
-
 
 #define MAKEFLOW_AUTO_WIDTH 1
 #define MAKEFLOW_AUTO_GROUP 2
@@ -212,11 +209,10 @@ int main(int argc, char *argv[])
 {
 	int c;
 	random_init();
-	set_makeflow_exe(argv[0]);
-	debug_config(get_makeflow_exe());
+	debug_config(argv[0]);
 	int display_mode = 0;
 
-	cctools_version_debug(D_MAKEFLOW_RUN, get_makeflow_exe());
+	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 	const char *dagfile;
 
 	char *bundle_directory = NULL;
@@ -240,7 +236,7 @@ int main(int argc, char *argv[])
 				bundle_directory = xxstrdup(optarg);
 				break;
 			case 'h':
-				show_help_analyze(get_makeflow_exe());
+				show_help_analyze(argv[0]);
 				return 0;
 			case 'i':
 				display_mode = SHOW_MAKEFLOW_ANALYSIS;
@@ -258,10 +254,10 @@ int main(int argc, char *argv[])
 				debug_flags_set(optarg);
 				break;
 			case 'v':
-				cctools_version_print(stdout, get_makeflow_exe());
+				cctools_version_print(stdout, argv[0]);
 				return 0;
 			default:
-				show_help_analyze(get_makeflow_exe());
+				show_help_analyze(argv[0]);
 				return 1;
 		}
 	}
@@ -269,8 +265,8 @@ int main(int argc, char *argv[])
 	if((argc - optind) != 1) {
 		int rv = access("./Makeflow", R_OK);
 		if(rv < 0) {
-			fprintf(stderr, "makeflow: No makeflow specified and file \"./Makeflow\" could not be found.\n");
-			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", get_makeflow_exe());
+			fprintf(stderr, "makeflow_analyze: No makeflow specified and file \"./Makeflow\" could not be found.\n");
+			fprintf(stderr, "makeflow_analyze: Run \"%s -h\" for help with options.\n", argv[0]);
 			return 1;
 		}
 
@@ -281,7 +277,7 @@ int main(int argc, char *argv[])
 
 	struct dag *d = dag_from_file(dagfile);
 	if(!d) {
-		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
+		fatal("makeflow_analyze: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
 
 	if(syntax_check) {
