@@ -18,33 +18,102 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
-/**
- * Line format : timestamp node_id new_state job_id nodes_waiting nodes_running nodes_complete nodes_failed nodes_aborted node_id_counter
- *
- * timestamp - the unix time (in microseconds) when this line is written to the log file.
- * node_id - the id of this node (task).
- * new_state - a integer represents the new state this node (whose id is in the node_id column) has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:
- *	0. waiting
- *	1. running
- *	2. complete
- *	3. failed
- *	4. aborted
- * job_id - the job id of this node in the underline execution system (local or batch system). If the makeflow is executed locally, the job id would be the process id of the process that executes this node. If the underline execution system is a batch system, such as Condor or SGE, the job id would be the job id assigned by the batch system when the task was sent to the batch system for execution.
- * nodes_waiting - the number of nodes are waiting to be executed.
- * nodes_running - the number of nodes are being executed.
- * nodes_complete - the number of nodes has been completed.
- * nodes_failed - the number of nodes has failed.
- * nodes_aborted - the number of nodes has been aborted.
- * node_id_counter - total number of nodes in this makeflow.
- *
- */
+/*
+The makeflow log file records every essential event in the execution of a workflow,
+so that after a failure, the workflow can either be continued or aborted cleanly,
+without leaving behind stranded jobs in the batch system, temporary files,
+and so forth.  As a secondary purpose, the log file is also easy to feed into
+gnuplot for the purpose of visualizing the progress of the workflow over time.
+
+Various items have been added to the log over time, so it contains several kinds
+of records.  The original record type only logged a change in state of a single
+task, and begins with a timestamp, followed by node information.  The other event
+types begin with a hash (#) so as to clearly distinguish them from the original
+event type.
+
+The current log format is showing its age as its purpose has evolved.
+A redesign of the log is in order, to include events for indicating the
+creation and deletion of files for caching, monitoring, wrapping, etc,
+so that they can be automatically deleted.
+
+----
+
+Line format : timestamp node_id new_state job_id nodes_waiting nodes_running nodes_complete nodes_failed nodes_aborted node_id_counter
+
+timestamp - the unix time (in microseconds) when this line is written to the log file.
+node_id - the id of this node (task).
+new_state - a integer represents the new state this node (whose id is in the node_id column) has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:
+   0. waiting
+   1. running
+   2. complete
+   3. failed
+   4. aborted
+job_id - the job id of this node in the underline execution system (local or batch system). If the makeflow is executed locally, the job id would be the process id of the process that executes this node. If the underline execution system is a batch system, such as Condor or SGE, the job id would be the job id assigned by the batch system when the task was sent to the batch system for execution.
+nodes_waiting - the number of nodes are waiting to be executed.
+nodes_running - the number of nodes are being executed.
+nodes_complete - the number of nodes has been completed.
+nodes_failed - the number of nodes has failed.
+nodes_aborted - the number of nodes has been aborted.
+node_id_counter - total number of nodes in this makeflow.
+
+Line format: # GC timestamp collected time_spent total_collected
+
+timestamp - the unix time (in microseconds) when this line is written to the log file.
+collected - the number of files were collected in this garbage collection cycle.
+time_spent - the length of time this cycle took.
+total_collected - the total number of files has been collected so far since the start this makeflow execution.
+
+Line format: # STARTED timestamp
+Line format: # ABORTED timestamp
+Line format: # FAILED timestamp
+Line format: # COMPLETED timestamp
+
+These event types indicate that the workflow as a whole has started or completed in the indicated manner.
+*/
 
 void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n );
 
-void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate )
+/*
+To balance between performance and consistency, we sync the log every 60 seconds
+on ordinary events, but sync immediately on important events like a makeflow restart.
+*/
+
+static void makeflow_log_sync( struct dag *d, int force )
 {
 	static time_t last_fsync = 0;
 
+	if(force || (time(NULL)-last_fsync) > 60) {
+		fsync(fileno(d->logfile));
+		last_fsync = time(NULL);
+	}
+}
+
+void makeflow_log_started_event( struct dag *d )
+{
+	fprintf(d->logfile, "# STARTED\t%" PRIu64 "\n", timestamp_get());
+	makeflow_log_sync(d,1);
+}
+
+void makeflow_log_aborted_event( struct dag *d )
+{
+	fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
+	makeflow_log_sync(d,1);
+}
+
+void makeflow_log_failed_event( struct dag *d )
+{
+	fprintf(d->logfile, "# FAILED\t%" PRIu64 "\n", timestamp_get());
+	makeflow_log_sync(d,1);
+}
+
+void makeflow_log_completed_event( struct dag *d )
+{
+	fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
+	makeflow_log_sync(d,1);
+}
+
+void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate )
+{
 	debug(D_MAKEFLOW_RUN, "node %d %s -> %s\n", n->nodeid, dag_node_state_name(n->state), dag_node_state_name(newstate));
 
 	if(d->node_states[n->state] > 0) {
@@ -55,30 +124,13 @@ void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate 
 
 	fprintf(d->logfile, "%" PRIu64 " %d %d %" PRIbjid " %d %d %d %d %d %d\n", timestamp_get(), n->nodeid, newstate, n->jobid, d->node_states[0], d->node_states[1], d->node_states[2], d->node_states[3], d->node_states[4], d->nodeid_counter);
 
-	if(time(NULL) - last_fsync > 60) {
-		/* We use fsync here to gurantee that the log is syncronized in AFS,
-		 * even if something goes wrong with the node running makeflow. Using
-		 * fsync comes with an overhead, so we do not fsync more than once per
-		 * minute. This avoids hammering AFS, and reduces the overhead for
-		 * short running tasks, while having the desired effect for long
-		 * running workflows. */
-
-		fsync(fileno(d->logfile));
-		last_fsync = time(NULL);
-	}
+	makeflow_log_sync(d,0);
 }
 
 void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected )
 {
-	/** Line format: # GC timestamp collected time_spent total_collected
-	 *
-	 * timestamp - the unix time (in microseconds) when this line is written to the log file.
-	 * collected - the number of files were collected in this garbage collection cycle.
-	 * time_spent - the length of time this cycle took.
-	 * total_collected - the total number of files has been collected so far since the start this makeflow execution.
-	 *
-	 */
 	fprintf(d->logfile, "# GC\t%" PRIu64 "\t%d\t%" PRIu64 "\t%d\n", timestamp_get(), collected, elapsed, total_collected);
+	makeflow_log_sync(d,0);
 }
 
 void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode )

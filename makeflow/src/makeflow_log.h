@@ -17,6 +17,10 @@ to the log.  Upon recovery from a crash, makeflow_log_recover plays back
 the state to recover the dag.
 */
 
+void makeflow_log_started_event( struct dag *d );
+void makeflow_log_aborted_event( struct dag *d );
+void makeflow_log_failed_event( struct dag *d );
+void makeflow_log_completed_event( struct dag *d );
 void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate );
 void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected );
 void makeflow_log_recover( struct dag *d, const char *filename, int verbose_mode );
