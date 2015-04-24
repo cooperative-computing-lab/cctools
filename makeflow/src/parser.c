@@ -49,7 +49,6 @@ See the file COPYING for details.
 #include "buffer.h"
 
 #include "parser.h"
-#include "makeflow_common.h"
 
 static int dag_parse(struct dag *d, FILE * dag_stream);
 static int dag_parse_variable(struct lexer *bk, struct dag_node *n);
@@ -613,7 +612,7 @@ static int dag_parse_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 	start->lexeme = string_format("cd %s && %s %s %s",
 							  n->makeflow_cwd,
 							  wrapper,
-							  get_makeflow_exe(),
+							  "makeflow",
 							  n->makeflow_dag);
 	free(wrapper);
 

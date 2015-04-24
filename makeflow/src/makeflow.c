@@ -33,7 +33,6 @@ See the file COPYING for details.
 #include "dag_log.h"
 #include "dag_gc.h"
 #include "dag_visitors.h"
-#include "makeflow_common.h"
 #include "makeflow_summary.h"
 #include "parser.h"
 
@@ -1104,10 +1103,9 @@ int main(int argc, char *argv[])
 {
 	int c;
 	random_init();
-	set_makeflow_exe(argv[0]);
-	debug_config(get_makeflow_exe());
+	debug_config(argv[0]);
 
-	cctools_version_debug((long) D_MAKEFLOW_RUN, get_makeflow_exe());
+	cctools_version_debug((long) D_MAKEFLOW_RUN, argv[0]);
 	const char *dagfile;
 	char *change_dir = NULL;
 	char *batchlogfilename = NULL;
@@ -1306,7 +1304,7 @@ int main(int argc, char *argv[])
 				file_creation_patience_wait_time = MAX(0,atoi(optarg));
 				break;
 			case 'h':
-				show_help_run(get_makeflow_exe());
+				show_help_run(argv[0]);
 				return 0;
 			case 'j':
 				explicit_local_jobs_max = atoi(optarg);
@@ -1392,7 +1390,7 @@ int main(int argc, char *argv[])
 				work_queue_keepalive_interval = optarg;
 				break;
 			case 'v':
-				cctools_version_print(stdout, get_makeflow_exe());
+				cctools_version_print(stdout, argv[0]);
 				return 0;
 			case 'W':
 				if(!strcmp(optarg, "files")) {
@@ -1456,7 +1454,7 @@ int main(int argc, char *argv[])
 				container_image = xxstrdup(optarg);
 				break;
 			default:
-				show_help_run(get_makeflow_exe());
+				show_help_run(argv[0]);
 				return 1;
 			case 'X':
 				change_dir = optarg;
@@ -1477,7 +1475,7 @@ int main(int argc, char *argv[])
 		int rv = access("./Makeflow", R_OK);
 		if(rv < 0) {
 			fprintf(stderr, "makeflow: No makeflow specified and file \"./Makeflow\" could not be found.\n");
-			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", get_makeflow_exe());
+			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", argv[0]);
 			return 1;
 		}
 
@@ -1489,7 +1487,7 @@ int main(int argc, char *argv[])
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		if(strcmp(work_queue_master_mode, "catalog") == 0 && project == NULL) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
-			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", get_makeflow_exe());
+			fprintf(stderr, "makeflow: Run \"makeflow -h\" for help with options.\n");
 			return 1;
 		}
 		// Use Work Queue default port in standalone mode when port is not
