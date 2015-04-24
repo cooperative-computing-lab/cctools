@@ -37,8 +37,6 @@ struct dag *dag_create()
 	d->files = hash_table_create(0, 0);
 	d->completed_files = hash_table_create(0, 0);
 	d->variables = hash_table_create(0, 0);
-	d->local_jobs_running = 0;
-	d->remote_jobs_running = 0;
 	d->nodeid_counter = 0;
 	d->collect_table = set_create(0);
 	d->export_vars  = set_create(0);
@@ -409,5 +407,16 @@ int dag_width(struct dag *d, int nested_jobs)
 	free(level_count);
 	return max;
 }
+
+int dag_remote_jobs_running( struct dag *d )
+{
+	return itable_size(d->remote_job_table);
+}
+
+int dag_local_jobs_running( struct dag *d )
+{
+	return itable_size(d->local_job_table);
+}
+
 
 /* vim: set noexpandtab tabstop=4: */

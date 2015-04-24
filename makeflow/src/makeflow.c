@@ -277,7 +277,6 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 		// Reconnect the Condor jobs
 		fprintf(stderr, "rule still running: %s\n", n->command);
 		itable_insert(d->remote_job_table, n->jobid, n);
-		d->remote_jobs_running++;
 
 		// Otherwise, we cannot reconnect to the job, so rerun it
 	} else if(n->state == DAG_NODE_STATE_RUNNING || n->state == DAG_NODE_STATE_FAILED || n->state == DAG_NODE_STATE_ABORTED) {
@@ -347,14 +346,10 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	if(n->state == DAG_NODE_STATE_RUNNING) {
 		if(n->local_job && local_queue) {
 			batch_job_remove(local_queue, n->jobid);
-			if(itable_remove(d->local_job_table, n->jobid)) {
-				d->local_jobs_running--;
-			}
+			itable_remove(d->local_job_table, n->jobid);
 		} else {
 			batch_job_remove(remote_queue, n->jobid);
-			if(itable_remove(d->remote_job_table, n->jobid)) {
-				d->remote_jobs_running--;
-			}
+			itable_remove(d->remote_job_table, n->jobid);
 		}
 	}
 	// Clean up things associated with this node
@@ -749,10 +744,8 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
 		if(n->local_job && local_queue) {
 			itable_insert(d->local_job_table, n->jobid, n);
-			d->local_jobs_running++;
 		} else {
 			itable_insert(d->remote_job_table, n->jobid, n);
-			d->remote_jobs_running++;
 		}
 	} else {
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
@@ -773,10 +766,10 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 		return 0;
 
 	if(n->local_job && local_queue) {
-		if(d->local_jobs_running >= local_jobs_max)
+		if(dag_local_jobs_running(d) >= local_jobs_max)
 			return 0;
 	} else {
-		if(d->remote_jobs_running >= remote_jobs_max)
+		if(dag_remote_jobs_running(d) >= remote_jobs_max)
 			return 0;
 	}
 
@@ -802,7 +795,7 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 
 	for(n = d->nodes; n; n = n->next) {
 
-		if(d->remote_jobs_running >= remote_jobs_max && d->local_jobs_running >= local_jobs_max)
+		if(dag_remote_jobs_running(d) >= remote_jobs_max && dag_local_jobs_running(d) >= local_jobs_max)
 			break;
 
 		if(makeflow_node_ready(d, n)) {
@@ -862,12 +855,6 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
-
-	if(n->local_job && local_queue) {
-		d->local_jobs_running--;
-	} else {
-		d->remote_jobs_running--;
-	}
 
 	if(info->exited_normally && info->exit_code == 0) {
 		list_first_item(n->target_files);
@@ -999,10 +986,10 @@ static void makeflow_run( struct dag *d )
 	while(!makeflow_abort_flag) {
 		makeflow_dispatch_ready_jobs(d);
 
-		if(d->local_jobs_running == 0 && d->remote_jobs_running == 0)
+		if(dag_local_jobs_running(d)==0 && dag_remote_jobs_running(d)==0 )
 			break;
 
-		if(d->remote_jobs_running) {
+		if(dag_remote_jobs_running(d)) {
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
@@ -1014,11 +1001,11 @@ static void makeflow_run( struct dag *d )
 			}
 		}
 
-		if(d->local_jobs_running) {
+		if(dag_local_jobs_running(d)) {
 			time_t stoptime;
 			int tmp_timeout = 5;
 
-			if(d->remote_jobs_running) {
+			if(dag_remote_jobs_running(d)) {
 				stoptime = time(0);
 			} else {
 				stoptime = time(0) + tmp_timeout;
