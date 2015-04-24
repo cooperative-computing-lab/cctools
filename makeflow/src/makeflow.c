@@ -1514,6 +1514,7 @@ int main(int argc, char *argv[])
 
 	if(!logfilename)
 		logfilename = string_format("%s.makeflowlog", dagfile);
+
 	if(!batchlogfilename) {
 		switch (batch_queue_type) {
 			case BATCH_QUEUE_TYPE_CONDOR:
@@ -1685,7 +1686,8 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, handle_abort);
 	signal(SIGTERM, handle_abort);
 
-	fprintf(d->logfile, "# STARTED\t%" PRIu64 "\n", timestamp_get());
+	makeflow_log_started_event(d);
+
 	runtime = timestamp_get();
 	makeflow_run(d);
 	time_completed = timestamp_get();
@@ -1707,15 +1709,15 @@ int main(int argc, char *argv[])
 	}
 
 	if(makeflow_abort_flag) {
-		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
+		makeflow_log_aborted_event(d);
 		fprintf(stderr, "workflow was aborted.\n");
 		exit(EXIT_FAILURE);
 	} else if(makeflow_failed_flag) {
-		fprintf(d->logfile, "# FAILED\t%" PRIu64 "\n", timestamp_get());
+		makeflow_log_failed_event(d);
 		fprintf(stderr, "workflow failed.\n");
 		exit(EXIT_FAILURE);
 	} else {
-		fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
+		makeflow_log_completed_event(d);
 		printf("nothing left to do.\n");
 		exit(EXIT_SUCCESS);
 	}
