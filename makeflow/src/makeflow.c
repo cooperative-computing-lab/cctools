@@ -79,6 +79,8 @@ an example.
 #define CONTAINER_SH_PREFIX "docker.wrapper"
 #define CONTAINER_TMP_SH_PREFIX "docker.tmp"
 
+#define MAX_REMOTE_JOBS_DEFAULT 100
+
 typedef enum {
 	CONTAINER_MODE_NONE,
 	CONTAINER_MODE_DOCKER,
@@ -89,7 +91,7 @@ sig_atomic_t makeflow_abort_flag = 0;
 int makeflow_failed_flag = 0;
 static int makeflow_submit_timeout = 3600;
 static int makeflow_retry_flag = 0;
-static int makeflow_retry_max = 100;
+static int makeflow_retry_max = MAX_REMOTE_JOBS_DEFAULT;
 
 static makeflow_gc_method_t makeflow_gc_method = MAKEFLOW_GC_NONE;
 static int makeflow_gc_param = -1;
@@ -99,6 +101,9 @@ static double makeflow_gc_task_ratio = 0.05;
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
+
+static int local_jobs_max = 1;
+static int remote_jobs_max = 100;
 
 static char *project = NULL;
 static int port = 0;
@@ -400,12 +405,12 @@ static void makeflow_prepare_nested_jobs(struct dag *d)
 		update_dag_nests = atoi(s);
 
 	if(dag_nested_width > 0 && update_dag_nests) {
-		dag_nested_width = MIN(dag_nested_width, d->local_jobs_max);
+		dag_nested_width = MIN(dag_nested_width, local_jobs_max);
 		struct dag_node *n;
 		for(n = d->nodes; n; n = n->next) {
 			if(n->nested_job && ((n->local_job && local_queue) || batch_queue_type == BATCH_QUEUE_TYPE_LOCAL)) {
 				char *command = xxmalloc(strlen(n->command) + 20);
-				sprintf(command, "%s -j %d", n->command, d->local_jobs_max / dag_nested_width);
+				sprintf(command, "%s -j %d", n->command, local_jobs_max / dag_nested_width);
 				free((char *) n->command);
 				n->command = command;
 			}
@@ -768,10 +773,10 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 		return 0;
 
 	if(n->local_job && local_queue) {
-		if(d->local_jobs_running >= d->local_jobs_max)
+		if(d->local_jobs_running >= local_jobs_max)
 			return 0;
 	} else {
-		if(d->remote_jobs_running >= d->remote_jobs_max)
+		if(d->remote_jobs_running >= remote_jobs_max)
 			return 0;
 	}
 
@@ -797,7 +802,7 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 
 	for(n = d->nodes; n; n = n->next) {
 
-		if(d->remote_jobs_running >= d->remote_jobs_max && d->local_jobs_running >= d->local_jobs_max)
+		if(d->remote_jobs_running >= remote_jobs_max && d->local_jobs_running >= local_jobs_max)
 			break;
 
 		if(makeflow_node_ready(d, n)) {
@@ -1579,34 +1584,34 @@ int main(int argc, char *argv[])
 	}
 
 	if(explicit_local_jobs_max) {
-		d->local_jobs_max = explicit_local_jobs_max;
+		local_jobs_max = explicit_local_jobs_max;
 	} else {
-		d->local_jobs_max = load_average_get_cpus();
+		local_jobs_max = load_average_get_cpus();
 	}
 
 	if(explicit_remote_jobs_max) {
-		d->remote_jobs_max = explicit_remote_jobs_max;
+		remote_jobs_max = explicit_remote_jobs_max;
 	} else {
 		if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
-			d->remote_jobs_max = load_average_get_cpus();
+			remote_jobs_max = load_average_get_cpus();
 		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-			d->remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
+			remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
 		} else {
-			d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
+			remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 		}
 	}
 
 	s = getenv("MAKEFLOW_MAX_REMOTE_JOBS");
 	if(s) {
-		d->remote_jobs_max = MIN(d->remote_jobs_max, atoi(s));
+		remote_jobs_max = MIN(remote_jobs_max, atoi(s));
 	}
 
 	s = getenv("MAKEFLOW_MAX_LOCAL_JOBS");
 	if(s) {
 		int n = atoi(s);
-		d->local_jobs_max = MIN(d->local_jobs_max, n);
+		local_jobs_max = MIN(local_jobs_max, n);
 		if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
-			d->remote_jobs_max = MIN(d->local_jobs_max, n);
+			remote_jobs_max = MIN(local_jobs_max, n);
 		}
 	}
 

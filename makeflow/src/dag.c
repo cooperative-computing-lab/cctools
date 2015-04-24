@@ -38,9 +38,7 @@ struct dag *dag_create()
 	d->completed_files = hash_table_create(0, 0);
 	d->variables = hash_table_create(0, 0);
 	d->local_jobs_running = 0;
-	d->local_jobs_max = 1;
 	d->remote_jobs_running = 0;
-	d->remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 	d->nodeid_counter = 0;
 	d->collect_table = set_create(0);
 	d->export_vars  = set_create(0);
