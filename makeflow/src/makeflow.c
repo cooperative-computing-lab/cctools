@@ -1690,7 +1690,7 @@ int main(int argc, char *argv[])
 	batch_queue_delete(remote_queue);
 
 	if(write_summary_to || email_summary_to)
-		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue );
+		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue, dag_abort_flag, dag_failed_flag );
 
 	/* XXX better to write created files to log, then delete those listed in log. */
 

@@ -13,9 +13,6 @@ See the file COPYING for details.
 #include <stdarg.h>
 #include <string.h>
 
-extern int dag_abort_flag;
-extern int dag_failed_flag;
-
 static void summarize(FILE * file, FILE * email, const char *format, ...)
 {
 	va_list args;
@@ -31,7 +28,7 @@ static void summarize(FILE * file, FILE * email, const char *format, ...)
 	}
 }
 
-void makeflow_summary_create(struct dag *d, const char *filename, const char *email_summary_to, timestamp_t runtime, timestamp_t time_completed, int argc, char *argv[], const char *dagfile, struct batch_queue *remote_queue )
+void makeflow_summary_create(struct dag *d, const char *filename, const char *email_summary_to, timestamp_t runtime, timestamp_t time_completed, int argc, char *argv[], const char *dagfile, struct batch_queue *remote_queue, int abort_flag, int failed_flag )
 {
 	char buffer[50];
 
@@ -55,9 +52,9 @@ void makeflow_summary_create(struct dag *d, const char *filename, const char *em
 
 	summarize(summary_file, summary_email, "\n");
 
-	if(dag_abort_flag)
+	if(abort_flag)
 		summarize(summary_file, summary_email, "Workflow aborted:\t ");
-	else if(dag_failed_flag)
+	else if(failed_flag)
 		summarize(summary_file, summary_email, "Workflow failed:\t ");
 	else
 		summarize(summary_file, summary_email, "Workflow completed:\t ");
