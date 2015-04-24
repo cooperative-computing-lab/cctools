@@ -1716,12 +1716,9 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	} else {
 		fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
-        
-      	printf("nothing left to do.\n");
+		printf("nothing left to do.\n");
 		exit(EXIT_SUCCESS);
 	}
-
-    
 
 	return 0;
 }
