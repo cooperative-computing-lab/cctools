@@ -74,9 +74,16 @@ in Batch Job using batch_queue_set_option. See batch_job_work_queue.c for
 an example.
 */
 
-#define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
-#define DEFAULT_MONITOR_INTERVAL   1
+
+#define CONTAINER_SH_PREFIX "docker.wrapper"
+#define CONTAINER_TMP_SH_PREFIX "docker.tmp"
+
+typedef enum {
+	CONTAINER_MODE_NONE,
+	CONTAINER_MODE_DOCKER,
+	// CONTAINER_MODE_ROCKET etc
+} container_mode_t;
 
 sig_atomic_t makeflow_abort_flag = 0;
 int makeflow_failed_flag = 0;
@@ -105,14 +112,10 @@ static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
 static int monitor_enable_list_files  = 0;
 
-#define CONTAINER_SH_PREFIX "docker.wrapper"
-#define CONTAINER_TMP_SH_PREFIX "docker.tmp"
-
-typedef enum {
-	CONTAINER_MODE_NONE,
-	CONTAINER_MODE_DOCKER,
-	// CONTAINER_MODE_ROCKET etc
-} container_mode_t;
+static char *monitor_limits_name = NULL;
+static int   monitor_interval = 1;	// in seconds
+static char *monitor_log_format = NULL;
+static char *monitor_log_dir = NULL;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
@@ -126,11 +129,6 @@ static int file_creation_patience_wait_time = 0;
  * SYMBOLs are category labels (SYMBOLs should be deprecated
  * once weaver/pbui tools are updated.) */
 static int log_verbose_mode = 0;
-
-static char *monitor_limits_name = NULL;
-static int monitor_interval = 1;	// in seconds
-static char *monitor_log_format = NULL;
-static char *monitor_log_dir = NULL;
 
 static char *wrapper_command = 0;
 static struct list *wrapper_input_files = 0;
