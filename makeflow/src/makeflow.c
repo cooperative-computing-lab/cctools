@@ -7,13 +7,10 @@ See the file COPYING for details.
 #include "auth_all.h"
 #include "auth_ticket.h"
 #include "batch_job.h"
-#include "catalog_query.h"
 #include "cctools.h"
 #include "copy_stream.h"
 #include "debug.h"
-#include "disk_info.h"
 #include "getopt_aux.h"
-#include "get_line.h"
 #include "hash_table.h"
 #include "int_sizes.h"
 #include "itable.h"
@@ -40,7 +37,6 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <ctype.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
