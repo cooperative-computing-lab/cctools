@@ -39,7 +39,7 @@ See the file COPYING for details.
  *
  */
 
-void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n );
+void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n );
 
 void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate )
 {
@@ -176,7 +176,7 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode 
 	if(!first_run) {
 		struct itable *rerun_table = itable_create(0);
 		for(n = d->nodes; n; n = n->next) {
-			dag_node_decide_rerun(rerun_table, d, n);
+			makeflow_node_decide_rerun(rerun_table, d, n);
 		}
 		itable_delete(rerun_table);
 	}

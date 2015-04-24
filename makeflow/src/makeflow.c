@@ -136,7 +136,7 @@ static char *wrapper_command = 0;
 static struct list *wrapper_input_files = 0;
 static struct list *wrapper_output_files = 0;
 
-void makeflow_abort_all(struct dag *d)
+static void makeflow_abort_all(struct dag *d)
 {
 	UINT64_T jobid;
 	struct dag_node *n;
@@ -158,7 +158,7 @@ void makeflow_abort_all(struct dag *d)
 	}
 }
 
-void file_clean(const char *filename, int silent)
+static void makeflow_file_clean(const char *filename, int silent)
 {
 	if(!filename)
 		return;
@@ -173,14 +173,30 @@ void file_clean(const char *filename, int silent)
 	}
 }
 
-static void dag_node_export_variables( struct dag *d, struct dag_node *n );
+/*
+For a given dag node, export all variables into the environment.
+This is currently only used when cleaning a makeflow recurisvely,
+and would be better handled by invoking batch_job_local.
+*/
 
-void dag_node_clean(struct dag *d, struct dag_node *n)
+static void makeflow_node_export_variables( struct dag *d, struct dag_node *n )
+{
+	struct nvpair *nv = dag_node_env_create(d,n);
+	nvpair_export(nv);
+	nvpair_delete(nv);
+}
+
+/*
+Clean a node of a dag by cleaning all of its output dependencies,
+or by cleaning it recursively if it is a Makeflow itself.
+*/
+
+static void makeflow_node_clean(struct dag *d, struct dag_node *n)
 {
 	struct dag_file *f;
 	list_first_item(n->target_files);
 	while((f = list_next_item(n->target_files))) {
-		file_clean(f->filename, 0);
+		makeflow_file_clean(f->filename, 0);
 		hash_table_remove(d->completed_files, f->filename);
 	}
 
@@ -191,25 +207,30 @@ void dag_node_clean(struct dag *d, struct dag_node *n)
 		sprintf(command, "%s -c", n->command);
 
 		/* XXX this should use the batch job interface for consistency */
-		dag_node_export_variables(d, n);
+		makeflow_node_export_variables(d, n);
 		system(command);
 		free(command);
 	}
 }
 
-void dag_clean(struct dag *d)
+/*
+Clean the entire dag by cleaning all nodes.
+*/
+
+static void makeflow_clean(struct dag *d)
 {
 	struct dag_node *n;
 	for(n = d->nodes; n; n = n->next)
-		dag_node_clean(d, n);
+		makeflow_node_clean(d, n);
 }
 
-void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
+static void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
 
-/**
- * Decide whether to rerun a node based on file system status
- */
-void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n)
+/*
+Decide whether to rerun a node based on batch and file system status.
+*/
+
+void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n)
 {
 	struct stat filestat;
 	struct dag_file *f;
@@ -270,10 +291,14 @@ void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag
 	return;
 
       rerun:
-	dag_node_force_rerun(rerun_table, d, n);
+	makeflow_node_force_rerun(rerun_table, d, n);
 }
 
-void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n)
+/*
+Reset all state to cause a node to be re-run.
+*/
+
+void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n)
 {
 	struct dag_node *p;
 	struct dag_file *f1;
@@ -301,7 +326,7 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 		}
 	}
 	// Clean up things associated with this node
-	dag_node_clean(d, n);
+	makeflow_node_clean(d, n);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 
 	// For each parent node, rerun it if input file was garbage collected
@@ -312,7 +337,7 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 
 		p = f1->created_by;
 		if(p) {
-			dag_node_force_rerun(rerun_table, d, p);
+			makeflow_node_force_rerun(rerun_table, d, p);
 			f1->ref_count += 1;
 		}
 	}
@@ -331,43 +356,13 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 				}
 			}
 			if(child_node_found) {
-				dag_node_force_rerun(rerun_table, d, p);
+				makeflow_node_force_rerun(rerun_table, d, p);
 			}
 		}
 	}
 }
 
-int copy_monitor(void)
-{
-	char *monitor_orig = resource_monitor_locate(NULL);
-
-	if(!monitor_orig)
-	{
-		fatal("Could not locate resource_monitor executable");
-	}
-
-	struct stat original;
-	struct stat current;
-
-	if(stat(monitor_orig, &original))
-	{
-		fatal("Could not stat resource_monitor executable");
-	}
-
-	if(batch_fs_stat(remote_queue, monitor_exe, &current) == -1 || difftime(original.st_mtime, current.st_mtime) > 0)
-	{
-		if(batch_fs_putfile(remote_queue, monitor_orig, monitor_exe) < original.st_size)
-		{
-			fatal("Could not copy resource_monitor executable");
-		}
-	}
-
-	free(monitor_orig);
-
-	return 1;
-}
-
-void dag_prepare_nested_jobs(struct dag *d)
+static void makeflow_prepare_nested_jobs(struct dag *d)
 {
 	/* Update nested jobs with appropriate number of local jobs (total
 	 * local jobs max / maximum number of concurrent nests). */
@@ -391,7 +386,7 @@ void dag_prepare_nested_jobs(struct dag *d)
 	}
 }
 
-char *monitor_log_name(char *dirname, int nodeid)
+static char *monitor_log_name(char *dirname, int nodeid)
 {
 	char *name = string_format(monitor_log_format, nodeid);
 	char *path = string_format("%s/%s", dirname, name);
@@ -400,7 +395,12 @@ char *monitor_log_name(char *dirname, int nodeid)
 	return path;
 }
 
-int dag_prepare_for_monitoring(struct dag *d)
+/*
+Prepare a node for monitoring by wrapping the command and attaching the 
+appropriate input and output dependencies.
+*/
+
+static int makeflow_prepare_for_monitoring(struct dag *d)
 {
 	struct dag_node *n;
 
@@ -436,51 +436,11 @@ int dag_prepare_for_monitoring(struct dag *d)
 }
 
 /*
-Creates an nvpair containing the explicit environment
-strings for this given node.  Each element of the list
-is a string of the form name=value.
-If nothing has been set, this function may return null.
-*/
-
-struct nvpair * dag_node_env_create( struct dag *d, struct dag_node *n )
-{
-	struct dag_variable_lookup_set s = { d, n->category, n, NULL };
-	char *key;
-
-	struct nvpair *nv = 0;
-
-	set_first_element(d->export_vars);
-	while((key = set_next_element(d->export_vars))) {
-		char *value = dag_variable_lookup_string(key, &s);
-		if(value) {
-			if(!nv) nv = nvpair_create();
-			nvpair_insert_string(nv,key,value);
-			debug(D_MAKEFLOW_RUN, "export %s=%s", key, value);
-		}
-	}
-
-	return nv;
-}
-
-/*
-For a given dag node, export all variables into the environment.
-This is currently only used when cleaning a makeflow recurisvely,
-and would be better handled by invoking batch_job_local.
-*/
-
-static void dag_node_export_variables( struct dag *d, struct dag_node *n )
-{
-	struct nvpair *nv = dag_node_env_create(d,n);
-	nvpair_export(nv);
-	nvpair_delete(nv);
-}
-
-/*
 Wraps a given command with the appropriate resource monitor string.
 Returns a newly allocated string that must be freed.
 */
 
-char *dag_node_rmonitor_wrap_command( struct dag_node *n, const char *command )
+static char *makeflow_node_rmonitor_wrap_command( struct dag_node *n, const char *command )
 {
 	char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
 	char *limits_str = dag_node_resources_wrap_as_rmonitor_options(n);
@@ -555,7 +515,7 @@ for the given batch system, combining the local and remote name
 and making substitutions according to the node.
 */
 
-char * dag_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue )
+static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue )
 {
 	const char *remotename = dag_node_get_remote_name(n, f->filename);
 	if(!remotename) remotename = f->filename;
@@ -575,7 +535,7 @@ Given a list of files, add the files to the given string.
 Returns the original string, realloced if necessary
 */
 
-char * dag_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue )
+static char * makeflow_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue )
 {
 	struct dag_file *file;
 
@@ -585,7 +545,7 @@ char * dag_file_list_format( struct dag_node *node, char *file_str, struct list 
 
 	list_first_item(file_list);
 	while((file=list_next_item(file_list))) {
-		char *f = dag_file_format(node,file,queue);
+		char *f = makeflow_file_format(node,file,queue);
 		file_str = string_combine(file_str,f);
 		free(f);
 	}
@@ -598,7 +558,7 @@ Submit one fully formed job, retrying failures up to the makeflow_submit_timeout
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files, struct nvpair *envlist )
+static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files, struct nvpair *envlist )
 {
 	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
@@ -637,7 +597,7 @@ the necessary list of input and output files, and applying all
 wrappers and options.
 */
 
-void dag_node_submit(struct dag *d, struct dag_node *n)
+static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 {
 	struct batch_queue *queue;
 
@@ -695,20 +655,20 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 	}
 
 	/* Create strings for all the files mentioned by this node. */
-	char *input_files = dag_file_list_format(n,0,n->source_files,queue);
-	char *output_files = dag_file_list_format(n,0,n->target_files,queue);
+	char *input_files = makeflow_file_list_format(n,0,n->source_files,queue);
+	char *output_files = makeflow_file_list_format(n,0,n->target_files,queue);
 
 	/* Add the wrapper input and output files to the strings. */
 	/* This function may realloc input_files and output_files. */
-	input_files = dag_file_list_format(n,input_files,wrapper_input_files,queue);
-	output_files = dag_file_list_format(n,output_files,wrapper_output_files,queue);
+	input_files = makeflow_file_list_format(n,input_files,wrapper_input_files,queue);
+	output_files = makeflow_file_list_format(n,output_files,wrapper_output_files,queue);
 
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
 	char * command = string_wrap_command(n->command,wrapper_command);
 
 	/* Wrap the command with the resource monitor, if it is enabled. */
 	if(monitor_mode) {
-		char *newcommand = dag_node_rmonitor_wrap_command(n,command);
+		char *newcommand = makeflow_node_rmonitor_wrap_command(n,command);
 		free(command);
 		command = newcommand;
 	}
@@ -744,7 +704,7 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 	free(nodeid);
 
 	/* Now submit the actual job, retrying failures as needed. */
-	n->jobid = dag_node_submit_retry(queue,command,input_files,output_files,envlist);
+	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist);
 
 	/* Restore old batch job options. */
 	if(old_batch_submit_options) {
@@ -773,7 +733,7 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 	nvpair_delete(envlist);
 }
 
-int dag_node_ready(struct dag *d, struct dag_node *n)
+static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 {
 	struct dag_file *f;
 
@@ -800,7 +760,11 @@ int dag_node_ready(struct dag *d, struct dag_node *n)
 	return 1;
 }
 
-void dag_dispatch_ready_jobs(struct dag *d)
+/*
+Find all jobs ready to be run, then submit them.
+*/
+
+static void makeflow_dispatch_ready_jobs(struct dag *d)
 {
 	struct dag_node *n;
 
@@ -809,13 +773,18 @@ void dag_dispatch_ready_jobs(struct dag *d)
 		if(d->remote_jobs_running >= d->remote_jobs_max && d->local_jobs_running >= d->local_jobs_max)
 			break;
 
-		if(dag_node_ready(d, n)) {
-			dag_node_submit(d, n);
+		if(makeflow_node_ready(d, n)) {
+			makeflow_node_submit(d, n);
 		}
 	}
 }
 
-int dag_node_check_file_was_created(struct dag_node *n, struct dag_file *f) {
+/*
+Check the the indicated file was created and log, error, or retry as appropriate.
+*/
+
+int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
+{
 	struct stat buf;
 	int file_created = 0;
 
@@ -850,7 +819,11 @@ int dag_node_check_file_was_created(struct dag_node *n, struct dag_file *f) {
 	return file_created;
 }
 
-void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info)
+/*
+Mark the given task as completing, using the batch_job_info completion structure provided by batch_job.
+*/
+
+static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info)
 {
 	struct dag_file *f;
 	int job_failed = 0;
@@ -867,7 +840,7 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 	if(info->exited_normally && info->exit_code == 0) {
 		list_first_item(n->target_files);
 		while((f = list_next_item(n->target_files))) {
-			if(!dag_node_check_file_was_created(n, f))
+			if(!makeflow_node_check_file_was_created(n, f))
 			{
 				job_failed = 1;
 			}
@@ -937,7 +910,11 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 	}
 }
 
-int dag_check(struct dag *d)
+/*
+Check the dag for consistency, and emit errors if input dependencies, etc are missing.
+*/
+
+static int makeflow_check(struct dag *d)
 {
 	struct dag_node *n;
 	struct dag_file *f;
@@ -977,7 +954,11 @@ int dag_check(struct dag *d)
 	}
 }
 
-void dag_run(struct dag *d)
+/*
+Main loop for running a makeflow: submit jobs, wait for completion, keep going until everything done.
+*/
+
+static void makeflow_run( struct dag *d )
 {
 	struct dag_node *n;
 	batch_job_id_t jobid;
@@ -997,7 +978,7 @@ void dag_run(struct dag *d)
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
 				if(n)
-					dag_node_complete(d, n, &info);
+					makeflow_node_complete(d, n, &info);
 			}
 		}
 
@@ -1016,7 +997,7 @@ void dag_run(struct dag *d)
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
-					dag_node_complete(d, n, &info);
+					makeflow_node_complete(d, n, &info);
 			}
 		}
 
@@ -1039,6 +1020,10 @@ void dag_run(struct dag *d)
 	}
 }
 
+/*
+Signal handler to catch abort signals.  Note that permissible actions in signal handlers are very limited, so we emit a message to the terminal and update a global variable noticed by makeflow_run.
+*/
+
 static void handle_abort(int sig)
 {
 	static int abort_count_to_exit = 5;
@@ -1058,57 +1043,57 @@ static void handle_abort(int sig)
 
 static void show_help_run(const char *cmd)
 {
-	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
-	fprintf(stdout, "Frequently used options:\n\n");
-	fprintf(stdout, " %-30s Clean up: remove logfile and all targets.\n", "-c,--clean");
-	fprintf(stdout, " %-30s Change directory: chdir to enable executing the Makefile in other directory.\n", "-X,--change-directory");
-	fprintf(stdout, " %-30s Batch system type: (default is local)\n", "-T,--batch-type=<type>");
-	fprintf(stdout, " %-30s %s\n\n", "", batch_queue_type_string());
-	fprintf(stdout, "Other options are:\n");
-	fprintf(stdout, " %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
-	fprintf(stdout, " %-30s Disable the check for AFS. (experts only.)\n", "-A,--disable-afs-check");
-	fprintf(stdout, " %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
-	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog-server=<catalog>");
-	fprintf(stdout, " %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
-	fprintf(stdout, " %-30s Write summary of workflow to this file upon success or failure.\n", "-f,--summary-log=<file>");
-	fprintf(stdout, " %-30s Work Queue fast abort multiplier.           (default is deactivated)\n", "-F,--wq-fast-abort=<#>");
-	fprintf(stdout, " %-30s Show this help screen.\n", "-h,--help");
-	fprintf(stdout, " %-30s Max number of local jobs to run at once.    (default is # of cores)\n", "-j,--max-local=<#>");
-	fprintf(stdout, " %-30s Max number of remote jobs to run at once.\n", "-J,--max-remote=<#>");
-	fprintf(stdout, "                                                            (default %d for -Twq, %d otherwise.)\n", 10*MAX_REMOTE_JOBS_DEFAULT, MAX_REMOTE_JOBS_DEFAULT );
-	fprintf(stdout, " %-30s Use this file for the makeflow log.         (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
-	fprintf(stdout, " %-30s Use this file for the batch system log.     (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
-	fprintf(stdout, " %-30s Send summary of workflow to this email address upon success or failure.\n", "-m,--email=<email>");
-	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
-	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
-	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "   --debug-rotate-max=<bytes>");
-	fprintf(stdout, " %-30s Password file for authenticating workers.\n", "   --password");
-	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
-	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
-	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", makeflow_retry_max);
-	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to n times.\n", "-r,--retry-count=<n>");
-	fprintf(stdout, " %-30s Wait for output files to be created upto n seconds (e.g., to deal with NFS semantics).", "--wait-for-files-upto=<n>");
-	fprintf(stdout, " %-30s Time to retry failed batch job submission.  (default is %ds)\n", "-S,--submission-timeout=<#>", makeflow_submit_timeout);
-	fprintf(stdout, " %-30s Work Queue keepalive timeout.               (default is %ds)\n", "-t,--wq-keepalive-timeout=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
-	fprintf(stdout, " %-30s Work Queue keepalive interval.              (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
-	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
-	fprintf(stdout, " %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
-	fprintf(stdout, " %-30s Wrap all commands with this prefix.\n", "--wrapper=<cmd>");
-	fprintf(stdout, " %-30s Wrapper command requires this input file.\n", "--wrapper-input=<cmd>");
-	fprintf(stdout, " %-30s Wrapper command produces this output file.\n", "--wrapper-output=<cmd>");
-	fprintf(stdout, " %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
-	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
-	fprintf(stdout, " %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
-	fprintf(stdout, " %-30s Add node id symbol tags in the makeflow log.        (default is false)\n", "   --log-verbose");
-	fprintf(stdout, " %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
+	printf("Use: %s [options] <dagfile>\n", cmd);
+	printf("Frequently used options:\n\n");
+	printf(" %-30s Clean up: remove logfile and all targets.\n", "-c,--clean");
+	printf(" %-30s Change directory: chdir to enable executing the Makefile in other directory.\n", "-X,--change-directory");
+	printf(" %-30s Batch system type: (default is local)\n", "-T,--batch-type=<type>");
+	printf(" %-30s %s\n\n", "", batch_queue_type_string());
+	printf("Other options are:\n");
+	printf(" %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
+	printf(" %-30s Disable the check for AFS. (experts only.)\n", "-A,--disable-afs-check");
+	printf(" %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
+	printf(" %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog-server=<catalog>");
+	printf(" %-30s Enable debugging for this subsystem\n", "-d,--debug=<subsystem>");
+	printf(" %-30s Write summary of workflow to this file upon success or failure.\n", "-f,--summary-log=<file>");
+	printf(" %-30s Work Queue fast abort multiplier.           (default is deactivated)\n", "-F,--wq-fast-abort=<#>");
+	printf(" %-30s Show this help screen.\n", "-h,--help");
+	printf(" %-30s Max number of local jobs to run at once.    (default is # of cores)\n", "-j,--max-local=<#>");
+	printf(" %-30s Max number of remote jobs to run at once.\n", "-J,--max-remote=<#>");
+	printf("                                                            (default %d for -Twq, %d otherwise.)\n", 10*MAX_REMOTE_JOBS_DEFAULT, MAX_REMOTE_JOBS_DEFAULT );
+	printf(" %-30s Use this file for the makeflow log.         (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
+	printf(" %-30s Use this file for the batch system log.     (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
+	printf(" %-30s Send summary of workflow to this email address upon success or failure.\n", "-m,--email=<email>");
+	printf(" %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
+	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	printf(" %-30s Rotate debug file once it reaches this size.\n", "   --debug-rotate-max=<bytes>");
+	printf(" %-30s Password file for authenticating workers.\n", "   --password");
+	printf(" %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
+	printf(" %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
+	printf(" %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", makeflow_retry_max);
+	printf(" %-30s Automatically retry failed batch jobs up to n times.\n", "-r,--retry-count=<n>");
+	printf(" %-30s Wait for output files to be created upto n seconds (e.g., to deal with NFS semantics).", "--wait-for-files-upto=<n>");
+	printf(" %-30s Time to retry failed batch job submission.  (default is %ds)\n", "-S,--submission-timeout=<#>", makeflow_submit_timeout);
+	printf(" %-30s Work Queue keepalive timeout.               (default is %ds)\n", "-t,--wq-keepalive-timeout=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
+	printf(" %-30s Work Queue keepalive interval.              (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
+	printf(" %-30s Show version string\n", "-v,--version");
+	printf(" %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
+	printf(" %-30s Wrap all commands with this prefix.\n", "--wrapper=<cmd>");
+	printf(" %-30s Wrapper command requires this input file.\n", "--wrapper-input=<cmd>");
+	printf(" %-30s Wrapper command produces this output file.\n", "--wrapper-output=<cmd>");
+	printf(" %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
+	printf(" %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
+	printf(" %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
+	printf(" %-30s Add node id symbol tags in the makeflow log.        (default is false)\n", "   --log-verbose");
+	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
 
-	fprintf(stdout, "\n*Monitor Options:\n\n");
-	fprintf(stdout, " %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
-	fprintf(stdout, " %-30s Use <file> as value-pairs for resource limits.\n", "--monitor-limits=<file>");
-	fprintf(stdout, " %-30s Set monitor interval to <#> seconds.        (default is 1 second)\n", "--monitor-interval=<#>");
-	fprintf(stdout, " %-30s Enable monitor time series.                 (default is disabled)\n", "--monitor-with-time-series");
-	fprintf(stdout, " %-30s Enable monitoring of openened files.        (default is disabled)\n", "--monitor-with-opened-files");
-	fprintf(stdout, " %-30s Format for monitor logs.                    (default %s)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
+	printf("\n*Monitor Options:\n\n");
+	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
+	printf(" %-30s Use <file> as value-pairs for resource limits.\n", "--monitor-limits=<file>");
+	printf(" %-30s Set monitor interval to <#> seconds.        (default is 1 second)\n", "--monitor-interval=<#>");
+	printf(" %-30s Enable monitor time series.                 (default is disabled)\n", "--monitor-with-time-series");
+	printf(" %-30s Enable monitoring of openened files.        (default is disabled)\n", "--monitor-with-opened-files");
+	printf(" %-30s Format for monitor logs.                    (default %s)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
 }
 
 int main(int argc, char *argv[])
@@ -1604,7 +1589,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(monitor_mode && !dag_prepare_for_monitoring(d)) {
+	if(monitor_mode && !makeflow_prepare_for_monitoring(d)) {
 		fatal("Could not prepare for monitoring.\n");
 	}
 
@@ -1654,21 +1639,21 @@ int main(int argc, char *argv[])
 	if(makeflow_gc_method != MAKEFLOW_GC_NONE)
 		makeflow_gc_prepare(d);
 
-	dag_prepare_nested_jobs(d);
+	makeflow_prepare_nested_jobs(d);
 
 	if (change_dir)
 		chdir(change_dir);
 
 	if(clean_mode) {
 		printf("cleaning filesystem...\n");
-		dag_clean(d);
+		makeflow_clean(d);
 		unlink(logfilename);
 		unlink(batchlogfilename);
 		exit(0);
 	}
 
 	printf("checking %s for consistency...\n",dagfile);
-	if(!dag_check(d)) {
+	if(!makeflow_check(d)) {
 		exit(EXIT_FAILURE);
 	}
 
