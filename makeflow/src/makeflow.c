@@ -30,10 +30,10 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 
 #include "dag.h"
-#include "dag_log.h"
-#include "dag_gc.h"
 #include "dag_visitors.h"
 #include "makeflow_summary.h"
+#include "makeflow_log.h"
+#include "makeflow_gc.h"
 #include "parser.h"
 
 #include <fcntl.h>
@@ -47,30 +47,47 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+/*
+Code organization notes:
 
-/* Notes:
- *
- * o Makeflow now uses batch_fs_* functions to access DAG files. This is mostly
- *   important for Chirp where the files are all remote.
- * o APIs like work_queue_* should be indirectly accessed by setting options
- *   in Batch Job using batch_queue_set_option. See batch_job_work_queue.c for
- *   an example.
- */
+- The modules dag/dag_node/dag_file etc contain the data structures that
+represent the dag structure by itself.  Functions named dag_*() create
+and manipulate those data structures, but do not execute the dag itself.
+These are shared between makeflow and other tools that read and manipulate
+the dag, like makeflow_viz, makeflow_linker, and so forth.
+
+- The modules makeflow/makeflow_log/makeflow_gc etc contain the functions
+that execute the dag by invoking batch operations, processing the log, etc.
+These are all functions named makeflow_*() to distinguish them from dag_*().
+
+- The separation between dag structure and execution state is imperfect,
+because some of the execution state (note states, node counts, etc)
+is stored in struct dag and struct dag_node.  Perhaps this can be improved.
+
+- All operations on files should use the batch_fs_*() functions, rather
+than invoking Unix I/O directly.  This is because some batch systems 
+(Hadoop, Confuga, etc) also include the storage where the files to be 
+accessed are located.
+
+- APIs like work_queue_* should be indirectly accessed by setting options
+in Batch Job using batch_queue_set_option. See batch_job_work_queue.c for
+an example.
+*/
 
 #define MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 #define DEFAULT_MONITOR_INTERVAL   1
 
-sig_atomic_t dag_abort_flag = 0;
-int dag_failed_flag = 0;
-static int dag_submit_timeout = 3600;
-static int dag_retry_flag = 0;
-static int dag_retry_max = 100;
+sig_atomic_t makeflow_abort_flag = 0;
+int makeflow_failed_flag = 0;
+static int makeflow_submit_timeout = 3600;
+static int makeflow_retry_flag = 0;
+static int makeflow_retry_max = 100;
 
-static dag_gc_method_t dag_gc_method = DAG_GC_NONE;
-static int dag_gc_param = -1;
-static int dag_gc_barrier = 1;
-static double dag_gc_task_ratio = 0.05;
+static makeflow_gc_method_t makeflow_gc_method = MAKEFLOW_GC_NONE;
+static int makeflow_gc_param = -1;
+static int makeflow_gc_barrier = 1;
+static double makeflow_gc_task_ratio = 0.05;
 
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
@@ -119,12 +136,7 @@ static char *wrapper_command = 0;
 static struct list *wrapper_input_files = 0;
 static struct list *wrapper_output_files = 0;
 
-void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate)
-{
-	dag_log_state_change(d,n,newstate);
-}
-
-void dag_abort_all(struct dag *d)
+void makeflow_abort_all(struct dag *d)
 {
 	UINT64_T jobid;
 	struct dag_node *n;
@@ -135,14 +147,14 @@ void dag_abort_all(struct dag *d)
 	while(itable_nextkey(d->local_job_table, &jobid, (void **) &n)) {
 		printf("aborting local job %" PRIu64 "\n", jobid);
 		batch_job_remove(local_queue, jobid);
-		dag_node_state_change(d, n, DAG_NODE_STATE_ABORTED);
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
 	}
 
 	itable_firstkey(d->remote_job_table);
 	while(itable_nextkey(d->remote_job_table, &jobid, (void **) &n)) {
 		printf("aborting remote job %" PRIu64 "\n", jobid);
 		batch_job_remove(remote_queue, jobid);
-		dag_node_state_change(d, n, DAG_NODE_STATE_ABORTED);
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
 	}
 }
 
@@ -290,7 +302,7 @@ void dag_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_
 	}
 	// Clean up things associated with this node
 	dag_node_clean(d, n);
-	dag_node_state_change(d, n, DAG_NODE_STATE_WAITING);
+	makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 
 	// For each parent node, rerun it if input file was garbage collected
 	list_first_item(n->source_files);
@@ -582,13 +594,13 @@ char * dag_file_list_format( struct dag_node *node, char *file_str, struct list 
 }
 
 /*
-Submit one fully formed job, retrying failures up to the dag_submit_timeout.
+Submit one fully formed job, retrying failures up to the makeflow_submit_timeout.
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
 batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files, struct nvpair *envlist )
 {
-	time_t stoptime = time(0) + dag_submit_timeout;
+	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
 	batch_job_id_t jobid = 0;
 
@@ -604,10 +616,10 @@ batch_job_id_t dag_node_submit_retry( struct batch_queue *queue, const char *com
 
 		fprintf(stderr, "couldn't submit batch job, still trying...\n");
 
-		if(dag_abort_flag) break;
+		if(makeflow_abort_flag) break;
 
 		if(time(0) > stoptime) {
-			fprintf(stderr, "unable to submit job after %d seconds!\n", dag_submit_timeout);
+			fprintf(stderr, "unable to submit job after %d seconds!\n", makeflow_submit_timeout);
 			break;
 		}
 
@@ -742,7 +754,7 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 
 	/* Update all of the necessary data structures. */
 	if(n->jobid >= 0) {
-		dag_node_state_change(d, n, DAG_NODE_STATE_RUNNING);
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
 		if(n->local_job && local_queue) {
 			itable_insert(d->local_job_table, n->jobid, n);
 			d->local_jobs_running++;
@@ -751,8 +763,8 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 			d->remote_jobs_running++;
 		}
 	} else {
-		dag_node_state_change(d, n, DAG_NODE_STATE_FAILED);
-		dag_failed_flag = 1;
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
+		makeflow_failed_flag = 1;
 	}
 
 	free(command);
@@ -870,7 +882,7 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 	}
 
 	if(job_failed) {
-		dag_node_state_change(d, n, DAG_NODE_STATE_FAILED);
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
 		if(monitor_mode && info->exit_code == 147)
 		{
 			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
@@ -888,21 +900,21 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 			free(log_name_prefix);
 			free(summary_name);
 
-			dag_failed_flag = 1;
+			makeflow_failed_flag = 1;
 		}
-		else if(dag_retry_flag || info->exit_code == 101) {
+		else if(makeflow_retry_flag || info->exit_code == 101) {
 			n->failure_count++;
-			if(n->failure_count > dag_retry_max) {
+			if(n->failure_count > makeflow_retry_max) {
 				fprintf(stderr, "job %s failed too many times.\n", n->command);
-				dag_failed_flag = 1;
+				makeflow_failed_flag = 1;
 			} else {
 				fprintf(stderr, "will retry failed job %s\n", n->command);
-				dag_node_state_change(d, n, DAG_NODE_STATE_WAITING);
+				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 			}
 		}
 		else
 		{
-			dag_failed_flag = 1;
+			makeflow_failed_flag = 1;
 		}
 	} else {
 		/* Record which target files have been generated by this node. */
@@ -921,7 +933,7 @@ void dag_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info 
 			debug(D_MAKEFLOW_RUN, "%s: %d\n", f->filename, f->ref_count);
 		}
 
-		dag_node_state_change(d, n, DAG_NODE_STATE_COMPLETE);
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
 }
 
@@ -971,7 +983,7 @@ void dag_run(struct dag *d)
 	batch_job_id_t jobid;
 	struct batch_job_info info;
 
-	while(!dag_abort_flag) {
+	while(!makeflow_abort_flag) {
 		dag_dispatch_ready_jobs(d);
 
 		if(d->local_jobs_running == 0 && d->remote_jobs_running == 0)
@@ -1011,18 +1023,18 @@ void dag_run(struct dag *d)
 		/* Rather than try to garbage collect after each time in this
 		 * wait loop, perform garbage collection after a proportional
 		 * amount of tasks have passed. */
-		dag_gc_barrier--;
-		if(dag_gc_method != DAG_GC_NONE && dag_gc_barrier == 0) {
-			dag_gc(d,dag_gc_method,dag_gc_param);
-			dag_gc_barrier = MAX(d->nodeid_counter * dag_gc_task_ratio, 1);
+		makeflow_gc_barrier--;
+		if(makeflow_gc_method != MAKEFLOW_GC_NONE && makeflow_gc_barrier == 0) {
+			makeflow_gc(d,makeflow_gc_method,makeflow_gc_param);
+			makeflow_gc_barrier = MAX(d->nodeid_counter * makeflow_gc_task_ratio, 1);
 		}
 	}
 
-	if(dag_abort_flag) {
-		dag_abort_all(d);
+	if(makeflow_abort_flag) {
+		makeflow_abort_all(d);
 	} else {
-		if(!dag_failed_flag && dag_gc_method != DAG_GC_NONE) {
-			dag_gc(d,DAG_GC_FORCE,0);
+		if(!makeflow_failed_flag && makeflow_gc_method != MAKEFLOW_GC_NONE) {
+			makeflow_gc(d,MAKEFLOW_GC_FORCE,0);
 		}
 	}
 }
@@ -1041,7 +1053,7 @@ static void handle_abort(int sig)
 	}
 	if (abort_count_to_exit == 1)
 		signal(sig, SIG_DFL);
-	dag_abort_flag = 1;
+	makeflow_abort_flag = 1;
 }
 
 static void show_help_run(const char *cmd)
@@ -1073,10 +1085,10 @@ static void show_help_run(const char *cmd)
 	fprintf(stdout, " %-30s Password file for authenticating workers.\n", "   --password");
 	fprintf(stdout, " %-30s Port number to use with Work Queue.       (default is %d, 0=arbitrary)\n", "-p,--port=<port>", WORK_QUEUE_DEFAULT_PORT);
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
-	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", dag_retry_max);
+	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", makeflow_retry_max);
 	fprintf(stdout, " %-30s Automatically retry failed batch jobs up to n times.\n", "-r,--retry-count=<n>");
 	fprintf(stdout, " %-30s Wait for output files to be created upto n seconds (e.g., to deal with NFS semantics).", "--wait-for-files-upto=<n>");
-	fprintf(stdout, " %-30s Time to retry failed batch job submission.  (default is %ds)\n", "-S,--submission-timeout=<#>", dag_submit_timeout);
+	fprintf(stdout, " %-30s Time to retry failed batch job submission.  (default is %ds)\n", "-S,--submission-timeout=<#>", makeflow_submit_timeout);
 	fprintf(stdout, " %-30s Work Queue keepalive timeout.               (default is %ds)\n", "-t,--wq-keepalive-timeout=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
 	fprintf(stdout, " %-30s Work Queue keepalive interval.              (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
@@ -1283,22 +1295,22 @@ int main(int argc, char *argv[])
 				break;
 			case 'g':
 				if(strcasecmp(optarg, "none") == 0) {
-					dag_gc_method = DAG_GC_NONE;
+					makeflow_gc_method = MAKEFLOW_GC_NONE;
 				} else if(strcasecmp(optarg, "ref_count") == 0) {
-					dag_gc_method = DAG_GC_REF_COUNT;
-					if(dag_gc_param < 0)
-						dag_gc_param = 16;	/* Try to collect at most 16 files. */
+					makeflow_gc_method = MAKEFLOW_GC_REF_COUNT;
+					if(makeflow_gc_param < 0)
+						makeflow_gc_param = 16;	/* Try to collect at most 16 files. */
 				} else if(strcasecmp(optarg, "on_demand") == 0) {
-					dag_gc_method = DAG_GC_ON_DEMAND;
-					if(dag_gc_param < 0)
-						dag_gc_param = 1 << 14;	/* Inode threshold of 2^14. */
+					makeflow_gc_method = MAKEFLOW_GC_ON_DEMAND;
+					if(makeflow_gc_param < 0)
+						makeflow_gc_param = 1 << 14;	/* Inode threshold of 2^14. */
 				} else {
 					fprintf(stderr, "makeflow: invalid garbage collection method: %s\n", optarg);
 					exit(1);
 				}
 				break;
 			case 'G':
-				dag_gc_param = atoi(optarg);
+				makeflow_gc_param = atoi(optarg);
 				break;
 			case LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME:
 				file_creation_patience_wait_time = MAX(0,atoi(optarg));
@@ -1367,14 +1379,14 @@ int main(int argc, char *argv[])
 				priority = optarg;
 				break;
 			case 'r':
-				dag_retry_flag = 1;
-				dag_retry_max = atoi(optarg);
+				makeflow_retry_flag = 1;
+				makeflow_retry_max = atoi(optarg);
 				break;
 			case 'R':
-				dag_retry_flag = 1;
+				makeflow_retry_flag = 1;
 				break;
 			case 'S':
-				dag_submit_timeout = atoi(optarg);
+				makeflow_submit_timeout = atoi(optarg);
 				break;
 			case 't':
 				work_queue_keepalive_timeout = optarg;
@@ -1634,13 +1646,13 @@ int main(int argc, char *argv[])
 	/* Remote storage modes do not (yet) support measuring storage for garbage collection. */
 	
 	if(batch_queue_type==BATCH_QUEUE_TYPE_CHIRP || batch_queue_type==BATCH_QUEUE_TYPE_HADOOP) {
-		if(dag_gc_method == DAG_GC_ON_DEMAND) {
-			dag_gc_method = DAG_GC_REF_COUNT;
+		if(makeflow_gc_method == MAKEFLOW_GC_ON_DEMAND) {
+			makeflow_gc_method = MAKEFLOW_GC_REF_COUNT;
 		}
 	}
 
-	if(dag_gc_method != DAG_GC_NONE)
-		dag_gc_prepare(d);
+	if(makeflow_gc_method != MAKEFLOW_GC_NONE)
+		makeflow_gc_prepare(d);
 
 	dag_prepare_nested_jobs(d);
 
@@ -1665,7 +1677,7 @@ int main(int argc, char *argv[])
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	dag_log_recover(d, logfilename, log_verbose_mode );
+	makeflow_log_recover(d, logfilename, log_verbose_mode );
 
 	printf("starting workflow....\n");
 
@@ -1690,7 +1702,7 @@ int main(int argc, char *argv[])
 	batch_queue_delete(remote_queue);
 
 	if(write_summary_to || email_summary_to)
-		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue, dag_abort_flag, dag_failed_flag );
+		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue, makeflow_abort_flag, makeflow_failed_flag );
 
 	/* XXX better to write created files to log, then delete those listed in log. */
 
@@ -1700,11 +1712,11 @@ int main(int argc, char *argv[])
 		free(cmd);
 	}
 
-	if(dag_abort_flag) {
+	if(makeflow_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "workflow was aborted.\n");
 		exit(EXIT_FAILURE);
-	} else if(dag_failed_flag) {
+	} else if(makeflow_failed_flag) {
 		fprintf(d->logfile, "# FAILED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "workflow failed.\n");
 		exit(EXIT_FAILURE);

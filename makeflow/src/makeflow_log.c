@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "dag_log.h"
+#include "makeflow_log.h"
 #include "dag.h"
 #include "get_line.h"
 
@@ -41,7 +41,7 @@ See the file COPYING for details.
 
 void dag_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n );
 
-void dag_log_state_change( struct dag *d, struct dag_node *n, int newstate )
+void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate )
 {
 	static time_t last_fsync = 0;
 
@@ -68,7 +68,7 @@ void dag_log_state_change( struct dag *d, struct dag_node *n, int newstate )
 	}
 }
 
-void dag_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected )
+void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected )
 {
 	/** Line format: # GC timestamp collected time_spent total_collected
 	 *
@@ -81,7 +81,7 @@ void dag_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int to
 	fprintf(d->logfile, "# GC\t%" PRIu64 "\t%d\t%" PRIu64 "\t%d\n", timestamp_get(), collected, elapsed, total_collected);
 }
 
-void dag_log_recover(struct dag *d, const char *filename, int verbose_mode )
+void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode )
 {
 	char *line;
 	int nodeid, state, jobid;
