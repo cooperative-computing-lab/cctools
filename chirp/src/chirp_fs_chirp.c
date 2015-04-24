@@ -425,9 +425,6 @@ struct chirp_filesystem chirp_fs_chirp = {
 	chirp_fs_chirp_readdir,
 	chirp_fs_chirp_closedir,
 
-	cfs_basic_getfile,
-	cfs_basic_putfile,
-
 	chirp_fs_chirp_unlink,
 	chirp_fs_chirp_rmall,
 	chirp_fs_chirp_rename,

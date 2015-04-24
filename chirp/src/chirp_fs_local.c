@@ -759,9 +759,6 @@ struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_readdir,
 	chirp_fs_local_closedir,
 
-	cfs_basic_getfile,
-	cfs_basic_putfile,
-
 	chirp_fs_local_unlink,
 	chirp_fs_local_rmall,
 	chirp_fs_local_rename,

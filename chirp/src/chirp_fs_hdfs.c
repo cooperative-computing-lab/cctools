@@ -322,6 +322,9 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 		return -1;
 	}
 
+	if(file_exists && (flags & O_EXCL))
+		return errno = EEXIST, -1;
+
 	mode &= S_IXUSR|S_IRWXG|S_IRWXO;
 	mode |= S_IRUSR|S_IWUSR;
 
@@ -699,9 +702,6 @@ struct chirp_filesystem chirp_fs_hdfs = {
 	chirp_fs_hdfs_opendir,
 	chirp_fs_hdfs_readdir,
 	chirp_fs_hdfs_closedir,
-
-	cfs_basic_getfile,
-	cfs_basic_putfile,
 
 	chirp_fs_hdfs_unlink,
 	chirp_fs_hdfs_rmall,
