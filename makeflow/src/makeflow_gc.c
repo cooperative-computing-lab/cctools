@@ -85,8 +85,8 @@ void makeflow_gc_prepare( struct dag *d )
 	char *filename;
 
 	/* add all files, but sink_files */
-	hash_table_firstkey(d->file_table);
-	while((hash_table_nextkey(d->file_table, &filename, (void **) &f)))
+	hash_table_firstkey(d->files);
+	while((hash_table_nextkey(d->files, &filename, (void **) &f)))
 		if(!dag_file_is_sink(f)) {
 			set_insert(d->collect_table, f);
 		}
@@ -114,8 +114,8 @@ void makeflow_gc_prepare( struct dag *d )
 	free(argv);
 
 	/* remove source_files from collect_table */
-	hash_table_firstkey(d->file_table);
-	while((hash_table_nextkey(d->file_table, &filename, (void **) &f)))
+	hash_table_firstkey(d->files);
+	while((hash_table_nextkey(d->files, &filename, (void **) &f)))
 		if(dag_file_is_source(f)) {
 			set_remove(d->collect_table, f);
 			debug(D_MAKEFLOW_RUN, "Removed %s from garbage collection list", f->filename);

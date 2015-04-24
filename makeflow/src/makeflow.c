@@ -134,6 +134,31 @@ static char *wrapper_command = 0;
 static struct list *wrapper_input_files = 0;
 static struct list *wrapper_output_files = 0;
 
+static void makeflow_wrapper_add_command( const char *cmd )
+{
+	if(!wrapper_command) {
+		wrapper_command = strdup(cmd);
+	} else {
+		wrapper_command = string_wrap_command(wrapper_command,cmd);
+	}
+}
+
+static void makeflow_wrapper_add_input_file( const char *file )
+{
+ 	if(!wrapper_input_files) wrapper_input_files = list_create();
+	list_push_tail(wrapper_input_files,dag_file_create(optarg));
+}
+
+static void makeflow_wrapper_add_output_file( const char *file )
+{
+	if(!wrapper_input_files) wrapper_input_files = list_create();
+	list_push_tail(wrapper_input_files,dag_file_create(optarg));
+}
+
+/*
+Abort the dag by removing all batch jobs from all queues.
+*/
+
 static void makeflow_abort_all(struct dag *d)
 {
 	UINT64_T jobid;
@@ -155,6 +180,10 @@ static void makeflow_abort_all(struct dag *d)
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
 	}
 }
+
+/*
+Clean a specific file, while emitting an appropriate message.
+*/
 
 static void makeflow_file_clean(const char *filename, int silent)
 {
@@ -1430,19 +1459,13 @@ int main(int argc, char *argv[])
 				log_verbose_mode = 1;
 				break;
 			case LONG_OPT_WRAPPER:
-				if(!wrapper_command) {
-					wrapper_command = strdup(optarg);
-				} else {
-					wrapper_command = string_wrap_command(wrapper_command,optarg);
-				}
+				makeflow_wrapper_add_command(optarg);
 				break;
 			case LONG_OPT_WRAPPER_INPUT:
-				if(!wrapper_input_files) wrapper_input_files = list_create();
-				list_push_tail(wrapper_input_files,dag_file_create(optarg));
+				makeflow_wrapper_add_input_file(optarg);
 				break;
 			case LONG_OPT_WRAPPER_OUTPUT:
-				if(!wrapper_output_files) wrapper_output_files = list_create();
-				list_push_tail(wrapper_output_files,dag_file_create(optarg));
+				makeflow_wrapper_add_output_file(optarg);
 				break;
 			case LONG_OPT_DOCKER:
 				container_mode = CONTAINER_MODE_DOCKER; 

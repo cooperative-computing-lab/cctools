@@ -34,7 +34,7 @@ struct dag *dag_create()
 	d->node_table = itable_create(0);
 	d->local_job_table = itable_create(0);
 	d->remote_job_table = itable_create(0);
-	d->file_table = hash_table_create(0, 0);
+	d->files = hash_table_create(0, 0);
 	d->completed_files = hash_table_create(0, 0);
 	d->variables = hash_table_create(0, 0);
 	d->local_jobs_running = 0;
@@ -69,8 +69,8 @@ void dag_compile_ancestors(struct dag *d)
 	struct dag_file *f;
 	char *name;
 
-	hash_table_firstkey(d->file_table);
-	while(hash_table_nextkey(d->file_table, &name, (void **) &f)) {
+	hash_table_firstkey(d->files);
+	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 		m = f->created_by;
 
 		if(!m)
@@ -127,12 +127,12 @@ struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
 {
 	struct dag_file *f;
 
-	f = hash_table_lookup(d->file_table, filename);
+	f = hash_table_lookup(d->files, filename);
 	if(f) return f;
 
 	f = dag_file_create(filename);
 
-	hash_table_insert(d->file_table, f->filename, (void *) f);
+	hash_table_insert(d->files, f->filename, (void *) f);
 
 	return f;
 }
@@ -140,7 +140,7 @@ struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename)
 /* Returns the struct dag_file for the local filename */
 struct dag_file *dag_file_from_name(struct dag *d, const char *filename)
 {
-	return (struct dag_file *) hash_table_lookup(d->file_table, filename);
+	return (struct dag_file *) hash_table_lookup(d->files, filename);
 }
 
 /* Returns the list of dag_file's which are not the target of any
@@ -153,8 +153,8 @@ struct list *dag_input_files(struct dag *d)
 
 	il = list_create(0);
 
-	hash_table_firstkey(d->file_table);
-	while((hash_table_nextkey(d->file_table, &filename, (void **) &f)))
+	hash_table_firstkey(d->files);
+	while((hash_table_nextkey(d->files, &filename, (void **) &f)))
 		if(!f->created_by) {
 			debug(D_MAKEFLOW_RUN, "Found independent input file: %s", f->filename);
 			list_push_tail(il, f);

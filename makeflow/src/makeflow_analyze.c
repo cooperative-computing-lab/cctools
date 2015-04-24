@@ -186,8 +186,8 @@ void dag_show_output_files(struct dag *d)
 	struct dag_file *f;
 	char *filename;
 
-	hash_table_firstkey(d->file_table);
-	while(hash_table_nextkey(d->file_table, &filename, (void **) &f)) {
+	hash_table_firstkey(d->files);
+	while(hash_table_nextkey(d->files, &filename, (void **) &f)) {
 		if(f->created_by)
 			fprintf(stdout, "%s\n", filename);
 	}
