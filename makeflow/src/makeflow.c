@@ -965,7 +965,7 @@ static void makeflow_run( struct dag *d )
 	struct batch_job_info info;
 
 	while(!makeflow_abort_flag) {
-		dag_dispatch_ready_jobs(d);
+		makeflow_dispatch_ready_jobs(d);
 
 		if(d->local_jobs_running == 0 && d->remote_jobs_running == 0)
 			break;
@@ -1678,7 +1678,7 @@ int main(int argc, char *argv[])
 
 	fprintf(d->logfile, "# STARTED\t%" PRIu64 "\n", timestamp_get());
 	runtime = timestamp_get();
-	dag_run(d);
+	makeflow_run(d);
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
 
