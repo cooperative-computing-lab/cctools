@@ -33,8 +33,6 @@ struct dag {
 	/* Dynamic states related to execution via Makeflow. */
 	FILE *logfile;
 	int node_states[DAG_NODE_STATE_MAX];/* node_states[STATE] keeps the count of nodes that have state STATE \in dag_node_state_t. */
-	int local_jobs_running;             /* Count of jobs running locally. */
-	int remote_jobs_running;            /* Count of jobs running remotelly. */
 	int nodeid_counter;                 /* Keeps a count of production rules read so far (used for the value of dag_node->nodeid). */
 
 	struct itable *local_job_table;     /* Mapping from unique integers dag_node->jobid to nodes, rules with prefix LOCAL. */
@@ -59,5 +57,8 @@ int dag_width( struct dag *d, int nested );
 int dag_depth( struct dag *d );
 int dag_width_guaranteed_max( struct dag *d );
 int dag_width_uniform_task( struct dag *d );
+
+int dag_remote_jobs_running( struct dag *d );
+int dag_local_jobs_running( struct dag *d );
 
 #endif
