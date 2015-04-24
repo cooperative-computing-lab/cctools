@@ -87,8 +87,8 @@ typedef enum {
 	// CONTAINER_MODE_ROCKET etc
 } container_mode_t;
 
-sig_atomic_t makeflow_abort_flag = 0;
-int makeflow_failed_flag = 0;
+static sig_atomic_t makeflow_abort_flag = 0;
+static int makeflow_failed_flag = 0;
 static int makeflow_submit_timeout = 3600;
 static int makeflow_retry_flag = 0;
 static int makeflow_retry_max = MAX_REMOTE_JOBS_DEFAULT;
