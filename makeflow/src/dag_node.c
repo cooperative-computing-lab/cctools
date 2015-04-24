@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "nvpair.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -424,3 +425,31 @@ char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_op
 				return NULL;
 	}
 }
+
+/*
+Creates an nvpair containing the explicit environment
+strings for this given node.  Each element of the list
+is a string of the form name=value.
+If nothing has been set, this function may return null.
+*/
+
+struct nvpair * dag_node_env_create( struct dag *d, struct dag_node *n )
+{
+	struct dag_variable_lookup_set s = { d, n->category, n, NULL };
+	char *key;
+
+	struct nvpair *nv = 0;
+
+	set_first_element(d->export_vars);
+	while((key = set_next_element(d->export_vars))) {
+		char *value = dag_variable_lookup_string(key, &s);
+		if(value) {
+			if(!nv) nv = nvpair_create();
+			nvpair_insert_string(nv,key,value);
+			debug(D_MAKEFLOW_RUN, "export %s=%s", key, value);
+		}
+	}
+
+	return nv;
+}
+
