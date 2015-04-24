@@ -15,7 +15,7 @@ all: $(TARGETS)
 
 makeflow makeflow_viz makeflow_analyze: $(OBJECTS)
 
-makeflow: makeflow_summary.o dag_gc.o dag_log.o
+makeflow: makeflow_summary.o makeflow_gc.o makeflow_log.o
 
 $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 

@@ -5,8 +5,8 @@ See the file COPYING for details.
 */
 
 #include "dag.h"
-#include "dag_gc.h"
-#include "dag_log.h"
+#include "makeflow_gc.h"
+#include "makeflow_log.h"
 
 #include "debug.h"
 #include "set.h"
@@ -32,7 +32,7 @@ include measuring available space and inodes consumed.
 /* XXX this should be configurable. */
 #define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
 
-static int dag_gc_collected = 0;
+static int makeflow_gc_collected = 0;
 
 /* Count the number of items in a directory.  (expensive!) */
 
@@ -70,7 +70,7 @@ static int directory_low_disk( const char *path )
 
 /* Prepare the dag for garbage collection by identifying which files may or may not be gcd. */
 
-void dag_gc_prepare( struct dag *d )
+void makeflow_gc_prepare( struct dag *d )
 {
 	/* Files to be collected:
 	 * ((all_files \minus sink_files)) \union collect_list) \minus preserve_list) \minus source_files
@@ -129,7 +129,7 @@ void dag_gc_prepare( struct dag *d )
 
 /* Clean up one file and mark it as such in the dag. */
 
-static int dag_gc_file( struct dag *d, const struct dag_file *f )
+static int makeflow_gc_file( struct dag *d, const struct dag_file *f )
 {
 	struct stat buf;
 	if(stat(f->filename, &buf) == 0 && unlink(f->filename)<0) {
@@ -144,7 +144,7 @@ static int dag_gc_file( struct dag *d, const struct dag_file *f )
 
 /* Collect available garbage, up to a limit of maxfiles. */
 
-static void dag_gc_all( struct dag *d, int maxfiles )
+static void makeflow_gc_all( struct dag *d, int maxfiles )
 {
 	int collected = 0;
 	struct dag_file *f;
@@ -155,7 +155,7 @@ static void dag_gc_all( struct dag *d, int maxfiles )
 	start_time = timestamp_get();
 	set_first_element(d->collect_table);
 	while((f = set_next_element(d->collect_table)) && collected < maxfiles) {
-		if(f->ref_count < 1 && dag_gc_file(d, f))
+		if(f->ref_count < 1 && makeflow_gc_file(d, f))
 			collected++;
 	}
 
@@ -163,30 +163,30 @@ static void dag_gc_all( struct dag *d, int maxfiles )
 
 	/* Record total amount of files collected to Makeflowlog. */
 	if(collected > 0) {
-		dag_gc_collected += collected;
-		dag_log_gc_event(d,collected,stop_time-start_time,dag_gc_collected);
+		makeflow_gc_collected += collected;
+		makeflow_log_gc_event(d,collected,stop_time-start_time,makeflow_gc_collected);
 	}
 }
 
 /* Collect garbage only if conditions warrant. */
 
-void dag_gc( struct dag *d, dag_gc_method_t method, int count )
+void makeflow_gc( struct dag *d, makeflow_gc_method_t method, int count )
 {
 	switch (method) {
-	case DAG_GC_NONE:
+	case MAKEFLOW_GC_NONE:
 		break;
-	case DAG_GC_REF_COUNT:
+	case MAKEFLOW_GC_REF_COUNT:
 		debug(D_MAKEFLOW_RUN, "Performing incremental file (%d) garbage collection", count);
-		dag_gc_all(d, count);
+		makeflow_gc_all(d, count);
 		break;
-	case DAG_GC_ON_DEMAND:
+	case MAKEFLOW_GC_ON_DEMAND:
 		if(directory_inode_count(".") >= count || directory_low_disk(".")) {
 			debug(D_MAKEFLOW_RUN, "Performing on demand (%d) garbage collection", count);
-			dag_gc_all(d, INT_MAX);
+			makeflow_gc_all(d, INT_MAX);
 		}
 		break;
-	case DAG_GC_FORCE:
-		dag_gc_all(d,INT_MAX);
+	case MAKEFLOW_GC_FORCE:
+		makeflow_gc_all(d,INT_MAX);
 		break;
 	}
 }
