@@ -23,10 +23,10 @@ See the file COPYING for details.
 
 struct dag {
 	/* Static properties of the DAG */
-	char *filename;                          /* Source makeflow file path. */
+	char *filename;                     /* Source makeflow file path. */
 	struct dag_node *nodes;             /* Linked list of all production rules, without ordering. */
 	struct itable *node_table;          /* Mapping from unique integers dag_node->nodeid to nodes. */
-	struct hash_table *file_table;      /* Maps every filename to a struct dag_file. */
+	struct hash_table *files;           /* Maps every filename to a struct dag_file. */
 	struct hash_table *variables;       /* Mappings between variable names defined in the makeflow file and their values. */
 	struct hash_table *task_categories; /* Mapping from labels to category structures. */
 	struct set *export_vars;            /* List of variables with prefix export. (these are setenv'ed eventually). */

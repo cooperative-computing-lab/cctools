@@ -680,8 +680,8 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size)
 	fprintf(stdout, "digraph {\n");
 
 	if(change_size) {
-		hash_table_firstkey(d->file_table);
-		while(hash_table_nextkey(d->file_table, &name, (void**)&f )) {
+		hash_table_firstkey(d->files);
+		while(hash_table_nextkey(d->files, &name, (void**)&f )) {
 			if(stat(name,&st)==0) {
 				average += ((double) st.st_size) / ((double) hash_table_size(d->completed_files));
 			}
