@@ -1395,10 +1395,13 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					rc += buffer_putlstring(&B, (char *)&ino, sizeof(ino));
 					rc += buffer_putlstring(&B, (char *)&off, sizeof(off));
 					rc += buffer_putlstring(&B, (char *)&reclen, sizeof(reclen));
+					if (p->syscall == SYSCALL64_getdents64)
+						rc += buffer_putlstring(&B, (char *)&type, sizeof(type));
 					rc += buffer_putstring(&B, name);
 					rc += buffer_putliteral(&B, "\0"); /* NUL terminator for d_name */
 					rc += buffer_putlstring(&B, "\0\0\0\0\0\0\0\0", padding); /* uint64_t alignment padding */
-					rc += buffer_putlstring(&B, (char *)&type, sizeof(type));
+					if (p->syscall == SYSCALL64_getdents)
+						rc += buffer_putlstring(&B, (char *)&type, sizeof(type));
 					assert(rc == (int)reclen);
 					length -= rc;
 				}
