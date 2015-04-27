@@ -54,7 +54,8 @@ enum { SHOW_INPUT_FILES = 2,
        SHOW_MAKEFLOW_ANALYSIS,
        SHOW_DAG_DOT,
        SHOW_DAG_PPM,
-       SHOW_DAG_FILE
+       SHOW_DAG_FILE,
+	   SHOW_DAG_CYTO
 };
 
 /* Unique integers for long options. */
@@ -127,6 +128,8 @@ int main(int argc, char *argv[])
 					display_mode = SHOW_DAG_DOT;
 				else if (strcasecmp(optarg, "ppm") == 0)
 					display_mode = SHOW_DAG_PPM;
+				else if (strcasecmp(optarg, "cytoscape") == 0)
+					display_mode = SHOW_DAG_CYTO;
 				else
 					fatal("Unknown display option: %s\n", optarg);
 				break;
@@ -202,11 +205,12 @@ int main(int argc, char *argv[])
 			case SHOW_DAG_DOT:
 				dag_to_dot(d, condense_display, change_size);
 				break;
-
 			case SHOW_DAG_PPM:
 				dag_to_ppm(d, ppm_mode, ppm_option);
 				break;
-
+			case SHOW_DAG_CYTO:
+				dag_to_cyto(d, condense_display, change_size);
+				break;
 			default:
 				fatal("Unknown display option.");
 				break;

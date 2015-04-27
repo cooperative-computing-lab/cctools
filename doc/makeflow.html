@@ -391,6 +391,10 @@ like this:</p>
 
 <code>makeflow_graph_log example.makeflowlog example.png</code>
 
+<p>To view a graph of a makeflow's data flow, use <tt>makeflow_viz</tt> to emit a <a href="http://www.cytoscape.org">Cytoscape XGMML</a> file.  When run, a Cytoscape <tt>style.xml</tt> file will also be generated:</p>
+
+<code>makeflow_viz -D cytoscape example.makeflow > example.xgmml</code>
+
 <h2 id="wrappers">Wrapper Commands<a class="sectionlink" href="#wrappers" title="Link to this section.">&#x21d7;</a></h2>
 
 Makeflow allows a global wrapper command to be applied to every rule in the workflow.  This is particularly useful for applying troubleshooting tools, or for setting up a global environment without rewriting the entire workflow.  The <tt>--wrapper</tt> option will prefix a command in front of every rule, while the <tt>--wrapper-input</tt> and <tt>--wrapper-output</tt> options will specify input and output files related to the wrapper.

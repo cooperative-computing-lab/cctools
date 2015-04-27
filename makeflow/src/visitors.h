@@ -27,3 +27,9 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size);
  * file, giving a graphical presentation of the makeflow
  */
 void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option);
+
+/* The dag_to_cyto function writes a struct dag in memory to a xgmml
+ * file, giving a graphical presentation of the makeflow for use in Cytoscape
+ */
+void dag_to_cyto(struct dag *d, int condense_display, int change_size);
+
