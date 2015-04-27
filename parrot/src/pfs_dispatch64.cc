@@ -280,7 +280,7 @@ static void decode_read( struct pfs_process *p, int entering, INT64_T syscall, c
 		*/
 
 		if(actual == -EINTR) {
-			tracer_copy_out(p->tracer,pfs_channel_base()+p->io_channel_offset,uaddr,p->diverted_length);
+			tracer_copy_out(p->tracer,pfs_channel_base()+p->io_channel_offset,uaddr,p->diverted_length,0);
 			p->syscall_result = p->diverted_length;
 			tracer_result_set(p->tracer,p->syscall_result);
 		}
@@ -343,7 +343,7 @@ static struct pfs_kernel_iovec * iovec_alloc_in( struct pfs_process *p, struct p
 
 	v = (struct pfs_kernel_iovec *) malloc(size);
 	if(v) {
-		tracer_copy_in(p->tracer,v,uv,size);
+		tracer_copy_in(p->tracer,v,uv,size,0);
 		return v;
 	} else {
 		return 0;
@@ -363,7 +363,7 @@ static int iovec_copy_in( struct pfs_process *p, char *buf, struct pfs_kernel_io
 {
 	int i, pos=0;
 	for(i=0;i<count;i++) {
-		tracer_copy_in(p->tracer,&buf[pos],POINTER(v[i].iov_base),v[i].iov_len);
+		tracer_copy_in(p->tracer,&buf[pos],POINTER(v[i].iov_base),v[i].iov_len,0);
 		pos += v[i].iov_len;
 	}
 	return pos;
@@ -376,11 +376,11 @@ static int iovec_copy_out( struct pfs_process *p, void *buf, struct pfs_kernel_i
 
 	while (current < total) {
 		if (v[i].iov_len <= (total-current)) {
-			tracer_copy_out(p->tracer,((char *)buf)+current,POINTER(v[i].iov_base),v[i].iov_len);
+			tracer_copy_out(p->tracer,((char *)buf)+current,POINTER(v[i].iov_base),v[i].iov_len,0);
 			current += v[i].iov_len;
 			i += 1;
 		} else {
-			tracer_copy_out(p->tracer,((char *)buf)+current,POINTER(v[i].iov_base),total-current);
+			tracer_copy_out(p->tracer,((char *)buf)+current,POINTER(v[i].iov_base),total-current,0);
 			current += (total-current);
 			assert(current == total);
 		}
@@ -484,10 +484,10 @@ static void decode_stat( struct pfs_process *p, int entering, INT64_T syscall, c
 		struct pfs_stat lbuf;
 
 		if(syscall==SYSCALL64_stat) {
-			tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+			tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 			p->syscall_result = pfs_stat(path,&lbuf);
 		} else if(syscall==SYSCALL64_lstat) {
-			tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+			tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 			p->syscall_result = pfs_lstat(path,&lbuf);
 		} else if(syscall==SYSCALL64_fstat) {
 			p->syscall_result = pfs_fstat(args[0],&lbuf);
@@ -523,7 +523,7 @@ static void decode_statfs( struct pfs_process *p, int entering, INT64_T syscall,
 
 		if(syscall==SYSCALL64_statfs) {
 			char path[PFS_PATH_MAX];
-			tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+			tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 			p->syscall_result = pfs_statfs(path,&lbuf);
 		} else if(syscall==SYSCALL64_fstatfs) {
 			p->syscall_result = pfs_fstatfs(args[0],&lbuf);
@@ -711,7 +711,7 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 		buffer_putlstring(&B, (char *)&user_arg0, sizeof(user_arg0));
 	} else {
 		uintptr_t old_user_argv0;
-		if (tracer_copy_in(p->tracer, &old_user_argv0, POINTER(old_user_argv), sizeof(old_user_argv0)) == -1) {
+		if (tracer_copy_in(p->tracer, &old_user_argv0, POINTER(old_user_argv), sizeof(old_user_argv0), 0) == -1) {
 			buffer_free(&B);
 			return errno = EFAULT, -1;
 		}
@@ -734,7 +734,7 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 	while (1) {
 		size_t i;
 		uintptr_t user_argva[1024];
-		tracer_copy_in(p->tracer, user_argva, POINTER(old_user_argv), sizeof(user_argva));
+		tracer_copy_in(p->tracer, user_argva, POINTER(old_user_argv), sizeof(user_argva),0);
 		for (i = 0; i < sizeof(user_argva)/sizeof(uintptr_t) && user_argva[i]; i++, old_user_argv += sizeof(uintptr_t))
 			buffer_putlstring(&B, (char *)&user_argva[i], sizeof(user_argva[i]));
 		if (i < sizeof(user_argva)/sizeof(uintptr_t))
@@ -796,7 +796,7 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 		char *interp_exe = NULL, *interp_arg = NULL;
 		const uintptr_t old_user_argv = args[1];
 
-		tracer_copy_in_string(p->tracer,logical_name,POINTER(args[0]),sizeof(logical_name));
+		tracer_copy_in_string(p->tracer,logical_name,POINTER(args[0]),sizeof(logical_name),0);
 		strncpy(p->new_logical_name, logical_name, sizeof(p->new_logical_name)-1);
 
 		if(!is_executable(logical_name))
@@ -1184,18 +1184,18 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_getresuid:
 			if (entering) {
-				tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[0]),sizeof(pfs_uid));
-				tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[1]),sizeof(pfs_uid));
-				tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[2]),sizeof(pfs_uid));
+				tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[0]),sizeof(pfs_uid),0);
+				tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[1]),sizeof(pfs_uid),0);
+				tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[2]),sizeof(pfs_uid),0);
 				divert_to_dummy(p,0);
 			}
 			break;
 
 		case SYSCALL64_getresgid:
 			if (entering) {
-				tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[0]),sizeof(pfs_uid));
-				tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[1]),sizeof(pfs_uid));
-				tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[2]),sizeof(pfs_uid));
+				tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[0]),sizeof(pfs_uid),0);
+				tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[1]),sizeof(pfs_uid),0);
+				tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[2]),sizeof(pfs_uid),0);
 				divert_to_dummy(p,0);
 			}
 			break;
@@ -1227,7 +1227,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_open:
 		case SYSCALL64_creat:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				if(strlen(path) == 0) {
 					divert_to_dummy(p, -ENOENT);
 					break;
@@ -1319,9 +1319,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 						int fds[2];
 						int fdflags = 0;
 						if (p->syscall == SYSCALL64_socketpair)
-							tracer_copy_in(p->tracer, fds, POINTER(args[3]), sizeof(fds));
+							tracer_copy_in(p->tracer, fds, POINTER(args[3]), sizeof(fds),0);
 						else if (p->syscall == SYSCALL64_pipe || p->syscall == SYSCALL64_pipe2)
-							tracer_copy_in(p->tracer, fds, POINTER(args[0]), sizeof(fds));
+							tracer_copy_in(p->tracer, fds, POINTER(args[0]), sizeof(fds),0);
 						else assert(0);
 						if (p->syscall == SYSCALL64_pipe2 && (args[1]&O_CLOEXEC)) {
 							fdflags |= FD_CLOEXEC;
@@ -1407,7 +1407,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				}
 
 				if (buffer_pos(&B)) {
-					tracer_copy_out(p->tracer,buffer_tostring(&B),POINTER(uaddr),buffer_pos(&B));
+					tracer_copy_out(p->tracer,buffer_tostring(&B),POINTER(uaddr),buffer_pos(&B),0);
 					divert_to_dummy(p, buffer_pos(&B));
 				} else {
 					divert_to_dummy(p, -errno);
@@ -1490,7 +1490,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 				struct sockaddr_un addr;
 				memset(&addr, 0, sizeof(addr));
-				INT64_T len = tracer_copy_in(p->tracer, &addr, POINTER(args[1]), MIN(sizeof(addr),(size_t)args[2]));
+				INT64_T len = tracer_copy_in(p->tracer, &addr, POINTER(args[1]), MIN(sizeof(addr),(size_t)args[2]),0);
 				if (len <= (INT64_T)sizeof(addr.sun_family)) {
 					divert_to_dummy(p, -EINVAL);
 					break;
@@ -1508,7 +1508,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					}
 
 					p->syscall_result = 1;
-					tracer_copy_out(p->tracer, &addr, POINTER(args[1]), sizeof(addr)); /* fix the path */
+					tracer_copy_out(p->tracer, &addr, POINTER(args[1]), sizeof(addr),0); /* fix the path */
 					/* let the kernel perform the bind/connect... */
 				} else {
 					/* We only care about AF_UNIX sockets. */
@@ -1518,7 +1518,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				/* We aren't changing/reading the *actual* result, we're just restoring the tracee's addr structure. */
 				struct sockaddr_un addr;
 				memcpy(&addr, p->tmp, sizeof(addr));
-				tracer_copy_out(p->tracer, &addr, POINTER(args[1]), sizeof(addr)); /* restore the original path */
+				tracer_copy_out(p->tracer, &addr, POINTER(args[1]), sizeof(addr),0); /* restore the original path */
 				p->syscall_result = 0; /* no actual effect... */
 			}
 			break;
@@ -1552,12 +1552,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				struct msghdr msg;
 
 				/* Copy in parts of msghdr structure we want. */
-				tracer_copy_in(p->tracer,&umsg,POINTER(args[1]),sizeof(umsg));
+				tracer_copy_in(p->tracer,&umsg,POINTER(args[1]),sizeof(umsg),0);
 
 				if(umsg.msg_control && umsg.msg_controllen>0) {
 					msg.msg_control = xxmalloc(umsg.msg_controllen);
 					msg.msg_controllen = umsg.msg_controllen;
-					tracer_copy_in(p->tracer,msg.msg_control,POINTER(umsg.msg_control),umsg.msg_controllen);
+					tracer_copy_in(p->tracer,msg.msg_control,POINTER(umsg.msg_control),umsg.msg_controllen,0);
 				} else {
 					msg.msg_control = 0;
 					msg.msg_controllen = 0;
@@ -1752,7 +1752,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				void *value; /* args[2] */
 				size_t size = args[3]; /* args[3] */
 
-				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name));
+				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0);
 				value = malloc(size);
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
@@ -1761,7 +1761,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 				p->syscall_result = pfs_fgetxattr(fd,name,value,size);
 				if(p->syscall_result>=0)
-					tracer_copy_out(p->tracer,value,POINTER(args[2]),size);
+					tracer_copy_out(p->tracer,value,POINTER(args[2]),size,0);
 				else
 					p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -1785,7 +1785,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 				p->syscall_result = pfs_flistxattr(fd,list,size);
 				if(p->syscall_result>=0)
-					tracer_copy_out(p->tracer,list,POINTER(args[1]),size);
+					tracer_copy_out(p->tracer,list,POINTER(args[1]),size,0);
 				else
 					p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -1803,13 +1803,13 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				size_t size = args[3]; /* args[3] */
 				int flags = args[4]; /* args[4] */
 
-				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name));
+				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0);
 				value = malloc(size);
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
 				}
-				tracer_copy_in(p->tracer,value,POINTER(args[2]),size);
+				tracer_copy_in(p->tracer,value,POINTER(args[2]),size,0);
 
 				p->syscall_result = pfs_fsetxattr(fd,name,value,size,flags);
 				if(p->syscall_result<0)
@@ -1826,7 +1826,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				int fd = args[0]; /* args[0] */
 				char name[4096]; /* args[1] */
 
-				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name));
+				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0);
 
 				p->syscall_result = pfs_fremovexattr(fd,name);
 				if(p->syscall_result<0)
@@ -1908,12 +1908,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					case PFS_SETLK:
 					case PFS_SETLKW: {
 						struct flock fl;
-						tracer_copy_in(p->tracer,&fl,uaddr,sizeof(fl));
+						tracer_copy_in(p->tracer,&fl,uaddr,sizeof(fl),0);
 						p->syscall_result = pfs_fcntl(fd,cmd,&fl);
 						if(p->syscall_result<0) {
 							p->syscall_result=-errno;
 						} else {
-							tracer_copy_out(p->tracer,&fl,uaddr,sizeof(fl));
+							tracer_copy_out(p->tracer,&fl,uaddr,sizeof(fl),0);
 						}
 						divert_to_dummy(p,p->syscall_result);
 						break;
@@ -1963,7 +1963,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_chdir:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_chdir(path);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -1977,7 +1977,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					if(p->syscall_result>args[1]) {
 						p->syscall_result = -ERANGE;
 					} else {
-						tracer_copy_out(p->tracer,path,POINTER(args[0]),p->syscall_result);
+						tracer_copy_out(p->tracer,path,POINTER(args[0]),p->syscall_result,0);
 					}
 				} else {
 					p->syscall_result = -errno;
@@ -2005,7 +2005,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_access:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_access(path,args[1]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2014,7 +2014,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_chmod:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_chmod(path,args[1]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2023,7 +2023,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_chown:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_chown(path,args[1],args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2032,7 +2032,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_lchown:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_lchown(path,args[1],args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2041,7 +2041,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_truncate:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_truncate(path,args[1]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2050,7 +2050,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_unlink:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_unlink(path);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2059,8 +2059,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_rename:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
-				tracer_copy_in_string(p->tracer,path2,POINTER(args[1]),sizeof(path2));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
+				tracer_copy_in_string(p->tracer,path2,POINTER(args[1]),sizeof(path2),0);
 				p->syscall_result = pfs_rename(path,path2);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2069,8 +2069,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_link:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
-				tracer_copy_in_string(p->tracer,path2,POINTER(args[1]),sizeof(path2));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
+				tracer_copy_in_string(p->tracer,path2,POINTER(args[1]),sizeof(path2),0);
 				p->syscall_result = pfs_link(path,path2);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2079,8 +2079,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_symlink:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
-				tracer_copy_in_string(p->tracer,path2,POINTER(args[1]),sizeof(path2));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
+				tracer_copy_in_string(p->tracer,path2,POINTER(args[1]),sizeof(path2),0);
 				p->syscall_result = pfs_symlink(path,path2);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2089,13 +2089,13 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_readlink:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_readlink(path,path2,sizeof(path2));
 				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
 				} else {
 					p->syscall_result = MIN(p->syscall_result, args[2]);
-					tracer_copy_out(p->tracer,path2,POINTER(args[1]),p->syscall_result);
+					tracer_copy_out(p->tracer,path2,POINTER(args[1]),p->syscall_result,0);
 				}
 				divert_to_dummy(p,p->syscall_result);
 			}
@@ -2103,7 +2103,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_mknod:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_mknod(path,args[1],args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2112,7 +2112,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_mkdir:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_mkdir(path,args[1]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2121,7 +2121,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_rmdir:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_rmdir(path);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2131,9 +2131,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_utime:
 			if(entering) {
 				struct utimbuf ut;
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				if(args[1]) {
-					tracer_copy_in(p->tracer,&ut,POINTER(args[1]),sizeof(ut));
+					tracer_copy_in(p->tracer,&ut,POINTER(args[1]),sizeof(ut),0);
 				} else {
 					ut.actime = ut.modtime = time(0);
 				}
@@ -2147,9 +2147,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if(entering) {
 				struct timeval times[2];
 				struct utimbuf ut;
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				if(args[1]) {
-					tracer_copy_in(p->tracer,times,POINTER(args[1]),sizeof(times));
+					tracer_copy_in(p->tracer,times,POINTER(args[1]),sizeof(times),0);
 					ut.actime = times[0].tv_sec;
 					ut.modtime = times[1].tv_sec;
 				} else {
@@ -2178,12 +2178,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_getxattr:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path)); /* args[0] */
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0); /* args[0] */
 				char name[4096]; /* args[1] */
 				void *value; /* args[2] */
 				size_t size = args[3]; /* args[3] */
 
-				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name));
+				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0);
 				value = malloc(size);
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
@@ -2192,7 +2192,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 				p->syscall_result = pfs_getxattr(path,name,value,size);
 				if(p->syscall_result>=0)
-					tracer_copy_out(p->tracer,value,POINTER(args[2]),size);
+					tracer_copy_out(p->tracer,value,POINTER(args[2]),size,0);
 				else
 					p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2202,12 +2202,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_lgetxattr:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path)); /* args[0] */
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0); /* args[0] */
 				char name[4096]; /* args[1] */
 				void *value; /* args[2] */
 				size_t size = args[3]; /* args[3] */
 
-				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name));
+				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0);
 				value = malloc(size);
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
@@ -2216,7 +2216,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 				p->syscall_result = pfs_lgetxattr(path,name,value,size);
 				if(p->syscall_result>=0)
-					tracer_copy_out(p->tracer,value,POINTER(args[2]),size);
+					tracer_copy_out(p->tracer,value,POINTER(args[2]),size,0);
 				else
 					p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2226,7 +2226,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_listxattr:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path)); /* args[0] */
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0); /* args[0] */
 				char *list; /* args[1] */
 				size_t size = args[2]; /* args[2] */
 
@@ -2238,7 +2238,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 				p->syscall_result = pfs_listxattr(path,list,size);
 				if(p->syscall_result>=0)
-					tracer_copy_out(p->tracer,list,POINTER(args[1]),size);
+					tracer_copy_out(p->tracer,list,POINTER(args[1]),size,0);
 				else
 					p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2248,7 +2248,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_llistxattr:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path)); /* args[0] */
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0); /* args[0] */
 				char *list; /* args[1] */
 				size_t size = args[2]; /* args[2] */
 
@@ -2260,7 +2260,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 				p->syscall_result = pfs_llistxattr(path,list,size);
 				if(p->syscall_result>=0)
-					tracer_copy_out(p->tracer,list,POINTER(args[1]),size);
+					tracer_copy_out(p->tracer,list,POINTER(args[1]),size,0);
 				else
 					p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2270,19 +2270,19 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_setxattr:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path)); /* args[0] */
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0); /* args[0] */
 				char name[4096]; /* args[1] */
 				void *value; /* args[2] */
 				size_t size = args[3]; /* args[3] */
 				int flags = args[4]; /* args[4] */
 
-				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name));
+				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0);
 				value = malloc(size);
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
 				}
-				tracer_copy_in(p->tracer,value,POINTER(args[2]),size);
+				tracer_copy_in(p->tracer,value,POINTER(args[2]),size,0);
 
 				p->syscall_result = pfs_setxattr(path,name,value,size,flags);
 				if(p->syscall_result<0)
@@ -2294,19 +2294,19 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_lsetxattr:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path)); /* args[0] */
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0); /* args[0] */
 				char name[4096]; /* args[1] */
 				void *value; /* args[2] */
 				size_t size = args[3]; /* args[3] */
 				int flags = args[4]; /* args[4] */
 
-				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name));
+				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0);
 				value = malloc(size);
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
 				}
-				tracer_copy_in(p->tracer,value,POINTER(args[2]),size);
+				tracer_copy_in(p->tracer,value,POINTER(args[2]),size,0);
 
 				p->syscall_result = pfs_lsetxattr(path,name,value,size,flags);
 				if(p->syscall_result<0)
@@ -2318,10 +2318,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_removexattr:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path)); /* args[0] */
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0); /* args[0] */
 				char name[4096]; /* args[1] */
 
-				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name));
+				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0);
 
 				p->syscall_result = pfs_removexattr(path,name);
 				if(p->syscall_result<0)
@@ -2332,10 +2332,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_lremovexattr:
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path)); /* args[0] */
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0); /* args[0] */
 				char name[4096]; /* args[1] */
 
-				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name));
+				tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0);
 
 				p->syscall_result = pfs_lremovexattr(path,name);
 				if(p->syscall_result<0)
@@ -2356,7 +2356,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				break;
 			}
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
 				if(strlen(path) == 0) {
 					divert_to_dummy(p, -ENOENT);
 					break;
@@ -2401,7 +2401,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				break;
 			}
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
 				p->syscall_result = pfs_mkdirat(args[0],path,args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2418,7 +2418,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				break;
 			}
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
 				p->syscall_result = pfs_mknodat(args[0],path,args[2],args[3]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2435,7 +2435,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				break;
 			}
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
 				p->syscall_result = pfs_fchownat(args[0],path,args[2],args[3],args[4]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2453,9 +2453,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			if(entering) {
 				struct timeval times[2];
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
 				if(args[2]) {
-					tracer_copy_in(p->tracer,times,POINTER(args[2]),sizeof(times));
+					tracer_copy_in(p->tracer,times,POINTER(args[2]),sizeof(times),0);
 				} else {
 					gettimeofday(&times[0],0);
 					times[1] = times[0];
@@ -2479,13 +2479,13 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				struct pfs_stat lbuf;
 				struct pfs_kernel_stat kbuf;
 
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
 				p->syscall_result = pfs_fstatat(args[0],path,&lbuf,args[3]);
 				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
 				} else {
 					COPY_STAT(lbuf,kbuf);
-					tracer_copy_out(p->tracer,&kbuf,POINTER(args[2]),sizeof(kbuf));
+					tracer_copy_out(p->tracer,&kbuf,POINTER(args[2]),sizeof(kbuf),0);
 				}
 				divert_to_dummy(p,p->syscall_result);
 			}
@@ -2501,7 +2501,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				break;
 			}
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
 				p->syscall_result = pfs_unlinkat(args[0],path,args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2518,8 +2518,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				break;
 			}
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
-				tracer_copy_in_string(p->tracer,path2,POINTER(args[3]),sizeof(path2));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
+				tracer_copy_in_string(p->tracer,path2,POINTER(args[3]),sizeof(path2),0);
 				p->syscall_result = pfs_renameat(args[0],path,args[2],path2);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2536,8 +2536,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				break;
 			}
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
-				tracer_copy_in_string(p->tracer,path2,POINTER(args[3]),sizeof(path2));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
+				tracer_copy_in_string(p->tracer,path2,POINTER(args[3]),sizeof(path2),0);
 				p->syscall_result = pfs_linkat(args[0],path,args[2],path2,args[4]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2554,8 +2554,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				break;
 			}
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
-				tracer_copy_in_string(p->tracer,path2,POINTER(args[2]),sizeof(path2));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
+				tracer_copy_in_string(p->tracer,path2,POINTER(args[2]),sizeof(path2),0);
 				p->syscall_result = pfs_symlinkat(path,args[1],path2);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2572,13 +2572,13 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				break;
 			}
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
 				p->syscall_result = pfs_readlinkat(args[0],path,path2,sizeof(path2));
 				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
 				} else {
 					p->syscall_result = MIN(p->syscall_result, args[3]);
-					tracer_copy_out(p->tracer,path2,POINTER(args[2]),p->syscall_result);
+					tracer_copy_out(p->tracer,path2,POINTER(args[2]),p->syscall_result,0);
 				}
 				divert_to_dummy(p,p->syscall_result);
 			}
@@ -2594,7 +2594,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				break;
 			}
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
 				p->syscall_result = pfs_fchmodat(args[0],path,args[2],args[3]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2611,7 +2611,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				break;
 			}
 			if(entering) {
-				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
 				p->syscall_result = pfs_faccessat(args[0],path,args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2621,9 +2621,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_uname:
 			if(pfs_false_uname) {
 				struct utsname u;
-				tracer_copy_in(p->tracer,&u,POINTER(args[0]),sizeof(struct utsname));
+				tracer_copy_in(p->tracer,&u,POINTER(args[0]),sizeof(struct utsname),0);
 				strcpy(u.nodename,pfs_false_uname);
-				tracer_copy_out(p->tracer,&u,POINTER(args[0]),sizeof(struct utsname));
+				tracer_copy_out(p->tracer,&u,POINTER(args[0]),sizeof(struct utsname),0);
 			}
 			break;
 
@@ -2639,10 +2639,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if(entering) {
 				int dirfd = args[0];
 				if (POINTER(args[1])) /* pathname may be NULL */
-					tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path));
+					tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
 				struct timespec times[2];
 				if (args[2]) {
-					tracer_copy_in(p->tracer,times,POINTER(args[2]),sizeof(times));
+					tracer_copy_in(p->tracer,times,POINTER(args[2]),sizeof(times),0);
 				} else {
 #ifdef UTIME_NOW
 					times[0].tv_nsec = UTIME_NOW;
@@ -2666,12 +2666,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if(entering) {
 				char alloc_path[PFS_PATH_MAX];
 				pfs_ssize_t avail, inuse;
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_lsalloc(path,alloc_path,&avail,&inuse);
 				if(p->syscall_result>=0) {
-					tracer_copy_out(p->tracer,alloc_path,POINTER(args[1]),strlen(alloc_path));
-					tracer_copy_out(p->tracer,&avail,POINTER(args[2]),sizeof(avail));
-					tracer_copy_out(p->tracer,&inuse,POINTER(args[3]),sizeof(inuse));
+					tracer_copy_out(p->tracer,alloc_path,POINTER(args[1]),strlen(alloc_path),0);
+					tracer_copy_out(p->tracer,&avail,POINTER(args[2]),sizeof(avail),0);
+					tracer_copy_out(p->tracer,&inuse,POINTER(args[3]),sizeof(inuse),0);
 				} else {
 					p->syscall_result = -errno;
 				}
@@ -2682,8 +2682,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_parrot_mkalloc:
 			if(entering) {
 				pfs_ssize_t size;
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
-				tracer_copy_in(p->tracer,&size,POINTER(args[1]),sizeof(size));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
+				tracer_copy_in(p->tracer,&size,POINTER(args[1]),sizeof(size),0);
 				p->syscall_result = pfs_mkalloc(path,size,args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2693,7 +2693,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_parrot_search:
 			if (entering) {
 				char callsite[PFS_PATH_MAX];
-				tracer_copy_in_string(p->tracer, callsite, POINTER(args[5]), sizeof(callsite));
+				tracer_copy_in_string(p->tracer, callsite, POINTER(args[5]), sizeof(callsite),0);
 				debug(D_SYSCALL, "search %s", callsite);
 
 				char path[2*PFS_PATH_MAX];
@@ -2708,13 +2708,13 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				}
 
 				size_t i = 0;
-				tracer_copy_in_string(p->tracer, path, POINTER(args[0]), sizeof(path));
-				tracer_copy_in_string(p->tracer, pattern, POINTER(args[1]), sizeof(pattern));
+				tracer_copy_in_string(p->tracer, path, POINTER(args[0]), sizeof(path),0);
+				tracer_copy_in_string(p->tracer, pattern, POINTER(args[1]), sizeof(pattern),0);
 				p->syscall_result = pfs_search(path, pattern, flags, buffer, buffer_length, &i);
 
 				if (i==0) *buffer = '\0';
 
-				tracer_copy_out(p->tracer, buffer, POINTER(args[3]), i+1);
+				tracer_copy_out(p->tracer, buffer, POINTER(args[3]), i+1,0);
 				divert_to_dummy(p,p->syscall_result);
 			}
 			break;
@@ -2724,9 +2724,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				char path[PFS_PATH_MAX];
 				char subject[PFS_PATH_MAX];
 				char rights[PFS_PATH_MAX];
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
-				tracer_copy_in_string(p->tracer,subject,POINTER(args[1]),sizeof(subject));
-				tracer_copy_in_string(p->tracer,rights,POINTER(args[2]),sizeof(rights));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
+				tracer_copy_in_string(p->tracer,subject,POINTER(args[1]),sizeof(subject),0);
+				tracer_copy_in_string(p->tracer,rights,POINTER(args[2]),sizeof(rights),0);
 				p->syscall_result = pfs_setacl(path,subject,rights);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
@@ -2740,7 +2740,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				char buffer[4096];
 				unsigned size=args[2];
 
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				if(size>sizeof(buffer)) size = sizeof(buffer);
 
 				if(p->syscall==SYSCALL64_parrot_getacl) {
@@ -2750,7 +2750,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				}
 
 				if(p->syscall_result>=0) {
-					tracer_copy_out(p->tracer,buffer,POINTER(args[1]),p->syscall_result);
+					tracer_copy_out(p->tracer,buffer,POINTER(args[1]),p->syscall_result,0);
 				} else {
 					p->syscall_result = -errno;
 				}
@@ -2765,7 +2765,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				unsigned size=args[2];
 
 				if (args[0]) {
-					tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+					tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 					if(size>sizeof(buffer)) size = sizeof(buffer);
 				} else {
 					path[0] = 0;
@@ -2774,7 +2774,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				p->syscall_result = pfs_locate(path,buffer,sizeof(buffer));
 
 				if(p->syscall_result>=0) {
-					tracer_copy_out(p->tracer,buffer,POINTER(args[1]),p->syscall_result);
+					tracer_copy_out(p->tracer,buffer,POINTER(args[1]),p->syscall_result,0);
 				} else {
 					p->syscall_result = -errno;
 				}
@@ -2786,7 +2786,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if(entering) {
 				char buffer[1024];
 				if (args[0]) {
-					tracer_copy_in_string(p->tracer,buffer,POINTER(args[0]),sizeof(buffer));
+					tracer_copy_in_string(p->tracer,buffer,POINTER(args[0]),sizeof(buffer),0);
 					p->syscall_result = pfs_timeout(buffer);
 				} else {
 					p->syscall_result = pfs_timeout(NULL);
@@ -2804,8 +2804,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				char source[PFS_PATH_MAX];
 				char target[PFS_PATH_MAX];
 
-				tracer_copy_in_string(p->tracer,source,POINTER(args[0]),sizeof(source));
-				tracer_copy_in_string(p->tracer,target,POINTER(args[1]),sizeof(target));
+				tracer_copy_in_string(p->tracer,source,POINTER(args[0]),sizeof(source),0);
+				tracer_copy_in_string(p->tracer,target,POINTER(args[1]),sizeof(target),0);
 
 				p->syscall_result = pfs_copyfile(source,target);
 				if(p->syscall_result<0) p->syscall_result = -errno;
@@ -2816,10 +2816,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_parrot_md5:
 			if(entering) {
 				char digest[16];
-				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path));
+				tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0);
 				p->syscall_result = pfs_md5(path,(unsigned char*)digest);
 				if(p->syscall_result>=0)
-					tracer_copy_out(p->tracer,digest,POINTER(args[1]),sizeof(digest));
+					tracer_copy_out(p->tracer,digest,POINTER(args[1]),sizeof(digest),0);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
 			}
