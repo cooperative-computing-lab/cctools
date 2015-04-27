@@ -1552,7 +1552,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				INT64_T actual;
 				tracer_result_get(p->tracer, &actual);
 				if (actual >= 0 && actual != args[0]) {
-					if (p->syscall == SYSCALL64_dup3 && (args[2]&O_CLOEXEC))
+					if (p->syscall == SYSCALL32_dup3 && (args[2]&O_CLOEXEC))
 						p->table->dup2(args[0], actual, FD_CLOEXEC);
 					else
 						p->table->dup2(args[0], actual, 0);
