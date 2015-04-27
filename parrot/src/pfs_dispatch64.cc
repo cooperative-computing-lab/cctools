@@ -236,33 +236,55 @@ static void decode_read( struct pfs_process *p, int entering, INT64_T syscall, c
 {
 	int fd = args[0];
 	void *uaddr = POINTER(args[1]);
-	pfs_size_t length = args[2];
+	size_t length = args[2];
 	pfs_off_t offset = args[3];
 
 	if(entering) {
-		debug(D_DEBUG, "read(%" PRId64 ", %p, %" PRId64 ")", args[0], uaddr, args[2]);
+		char _buf[65536];
+		char *buf = NULL;
+		size_t l;
 
-		if(pfs_channel_alloc(0,length,&p->io_channel_offset)) {
-			char *local_addr = pfs_channel_base() + p->io_channel_offset;
+		if (length > sizeof(_buf)) {
+			buf = (char *)malloc(length);
+			l = length;
+		}
+		if (buf == NULL) {
+			buf = _buf;
+			l = MIN(length, sizeof(_buf));
+		}
 
-			if(syscall==SYSCALL64_read) {
-				p->syscall_result = pfs_read(fd,local_addr,length);
-			} else if(syscall==SYSCALL64_pread64) {
-				p->syscall_result = pfs_pread(fd,local_addr,length,offset);
+		if(syscall==SYSCALL64_read) {
+			p->syscall_result = pfs_read(fd,buf,l);
+		} else if(syscall==SYSCALL64_pread64) {
+			p->syscall_result = pfs_pread(fd,buf,l,offset);
+		} else assert(0);
+
+		if (p->syscall_result >= 0) {
+			if (p->syscall_result == 0) {
+				divert_to_dummy(p, 0);
 			}
-
-			p->diverted_length = 0;
-
-			if(p->syscall_result==0) {
-				divert_to_dummy(p,0);
-			} else if(p->syscall_result>0) {
+			ssize_t count = tracer_copy_out(p->tracer, buf, uaddr, p->syscall_result, TRACER_O_ATOMIC|TRACER_O_FAST);
+			assert(count == p->syscall_result || count == -1);
+			if (count == p->syscall_result) {
+				divert_to_dummy(p, p->syscall_result);
+			} else if (count == -1 && errno != ENOSYS) {
+				debug(D_DEBUG, "tracer memory write failed: %s", strerror(errno));\
+				divert_to_dummy(p, -errno);
+			} else if(pfs_channel_alloc(0,length,&p->io_channel_offset)) {
+				char *local_addr = pfs_channel_base() + p->io_channel_offset;
+				memcpy(local_addr, buf, p->syscall_result);
+				p->diverted_length = 0;
 				divert_to_channel(p,SYSCALL64_pread64,uaddr,p->syscall_result,p->io_channel_offset);
 				pfs_read_count += p->syscall_result;
 			} else {
-				divert_to_dummy(p,-errno);
+				divert_to_dummy(p,-ENOMEM);
 			}
 		} else {
-			divert_to_dummy(p,-ENOMEM);
+			divert_to_dummy(p,-errno);
+		}
+
+		if (buf != _buf) {
+			free(buf);
 		}
 	} else if (!p->syscall_dummy) {
 		INT64_T actual;
@@ -298,10 +320,44 @@ to its destination and then set the result.
 
 static void decode_write( struct pfs_process *p, int entering, INT64_T syscall, const INT64_T *args )
 {
+	int fd = args[0];
+	void *uaddr = POINTER(args[1]);
+	size_t length = args[2];
+	pfs_off_t offset = args[3];
+
 	if(entering) {
-		void *uaddr = POINTER(args[1]);
-		INT64_T length = args[2];
-		if(pfs_channel_alloc(0,length,&p->io_channel_offset)) {
+		char _buf[65536];
+		char *buf = NULL;
+		size_t l;
+
+		if (length > sizeof(_buf)) {
+			buf = (char *)malloc(length);
+			l = length;
+		}
+		if (buf == NULL) {
+			buf = _buf;
+			l = MIN(length, sizeof(_buf));
+		}
+
+		ssize_t count = tracer_copy_in(p->tracer, buf, uaddr, l, TRACER_O_ATOMIC|TRACER_O_FAST);
+		assert(count == p->syscall_result || count == -1);
+		if (count == p->syscall_result) {
+			if(syscall==SYSCALL64_write) {
+				p->syscall_result = pfs_write(fd,buf,l);
+			} else if(syscall==SYSCALL64_pwrite64) {
+				p->syscall_result = pfs_pwrite(fd,buf,l,offset);
+			} else assert(0);
+
+			if(p->syscall_result>=0)
+				pfs_write_count += p->syscall_result;
+			else
+				p->syscall_result = -errno;
+
+			divert_to_dummy(p, p->syscall_result);
+		} else if (count == -1 && errno != ENOSYS) {
+			debug(D_DEBUG, "tracer memory read failed: %s", strerror(errno));\
+			divert_to_dummy(p, -errno);
+		} else if(pfs_channel_alloc(0,length,&p->io_channel_offset)) {
 			divert_to_channel(p,SYSCALL64_pwrite64,uaddr,length,p->io_channel_offset);
 		} else {
 			divert_to_dummy(p,-ENOMEM);
@@ -312,8 +368,6 @@ static void decode_write( struct pfs_process *p, int entering, INT64_T syscall, 
 		debug(D_DEBUG, "channel wrote %" PRId64, actual);
 
 		if(actual>0) {
-			int fd = args[0];
-			pfs_off_t offset = args[3];
 			char *local_addr = pfs_channel_base() + p->io_channel_offset;
 
 			if(syscall==SYSCALL64_write) {
@@ -330,6 +384,7 @@ static void decode_write( struct pfs_process *p, int entering, INT64_T syscall, 
 				pfs_write_count += p->syscall_result;
 			else
 				p->syscall_result = -errno;
+
 			tracer_result_set(p->tracer,p->syscall_result);
 		}
 		pfs_channel_free(p->io_channel_offset);
@@ -494,11 +549,17 @@ static void decode_stat( struct pfs_process *p, int entering, INT64_T syscall, c
 		}
 
 		if(p->syscall_result>=0) {
-			p->io_channel_offset = 0;
-			if(pfs_channel_alloc(0,sizeof(struct pfs_kernel_stat),&p->io_channel_offset)) {
-				struct pfs_kernel_stat kbuf;
+			struct pfs_kernel_stat kbuf;
+			COPY_STAT(lbuf,kbuf);
+			ssize_t count = tracer_copy_out(p->tracer, &kbuf, POINTER(args[1]), sizeof(kbuf), TRACER_O_ATOMIC|TRACER_O_FAST);
+			assert(count == sizeof(kbuf)  || count == -1);
+			if (count == p->syscall_result) {
+				divert_to_dummy(p, 0);
+			} else if (count == -1 && errno != ENOSYS) {
+				debug(D_DEBUG, "tracer memory write failed: %s", strerror(errno));\
+				divert_to_dummy(p, -errno);
+			} else if(pfs_channel_alloc(0,sizeof(struct pfs_kernel_stat),&p->io_channel_offset)) {
 				char *local_addr = pfs_channel_base() + p->io_channel_offset;
-				COPY_STAT(lbuf,kbuf);
 				memcpy(local_addr,&kbuf,sizeof(kbuf));
 				divert_to_channel(p,SYSCALL64_pread64,POINTER(args[1]),sizeof(kbuf),p->io_channel_offset);
 			} else {
@@ -531,10 +592,17 @@ static void decode_statfs( struct pfs_process *p, int entering, INT64_T syscall,
 
 		if(p->syscall_result>=0) {
 			struct pfs_kernel_statfs kbuf;
-			p->io_channel_offset = 0;
-			if(pfs_channel_alloc(0,sizeof(kbuf),&p->io_channel_offset)) {
+			COPY_STATFS(lbuf,kbuf);
+
+			ssize_t count = tracer_copy_out(p->tracer, &kbuf, POINTER(args[1]), sizeof(kbuf), TRACER_O_ATOMIC|TRACER_O_FAST);
+			assert(count == sizeof(kbuf)  || count == -1);
+			if (count == p->syscall_result) {
+				divert_to_dummy(p, 0);
+			} else if (count == -1 && errno != ENOSYS) {
+				debug(D_DEBUG, "tracer memory write failed: %s", strerror(errno));\
+				divert_to_dummy(p, -errno);
+			} else if(pfs_channel_alloc(0,sizeof(kbuf),&p->io_channel_offset)) {
 				char *local_addr = pfs_channel_base() + p->io_channel_offset;
-				COPY_STATFS(lbuf,kbuf);
 				memcpy(local_addr,&kbuf,sizeof(kbuf));
 				divert_to_channel(p,SYSCALL64_pread64,POINTER(args[1]),sizeof(kbuf),p->io_channel_offset);
 			} else {
