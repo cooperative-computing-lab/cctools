@@ -200,7 +200,7 @@ static struct irods_server * connect_to_host( const char *hostport )
 					break;\
 				else {\
 					errno = irods_reli_errno(result);\
-					if (errno == ECONNRESET || errno == EINPROGRESS) {\
+					if (errno == ECONNRESET || errno == EINPROGRESS || errno == EPIPE) {\
 						/* iRODS returns EINPROGRESS when the server closes the connection during connect. */\
 						invalidate_host(host, server);\
 					} else if (errno == EAGAIN) {\
