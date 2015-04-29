@@ -62,9 +62,9 @@ OPTIONS_END
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM()CODE(BOLD(CATALOG_HOST)) Hostname of catalog server (same as CODE(-u)).
-LIST_ITEM()CODE(BOLD(TCP_LOW_PORT)) Inclusive low port in range used with CODE(-Z).
-LIST_ITEM()CODE(BOLD(TCP_HIGH_PORT)) Inclusive high port in range used with CODE(-Z).
+LIST_ITEM(CODE(BOLD(CATALOG_HOST)) Hostname of catalog server (same as CODE(-u)).)
+LIST_ITEM(CODE(BOLD(TCP_LOW_PORT)) Inclusive low port in range used with CODE(-Z).)
+LIST_ITEM(CODE(BOLD(TCP_HIGH_PORT)) Inclusive high port in range used with CODE(-Z).)
 LIST_END
 
 SECTION(EXIT STATUS)

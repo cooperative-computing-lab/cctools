@@ -26,26 +26,26 @@ By default, the CODE(catalog_update) tool includes the following field entries
 in its update packet:
 
 LIST_BEGIN
-LIST_ITEM()CODE(BOLD(type)) This describes the node type (default is "node").
-LIST_ITEM()CODE(BOLD(version)) This is the version of CCTools.
-LIST_ITEM()CODE(BOLD(cpu)) This is CPU architecture of the machine.
-LIST_ITEM()CODE(BOLD(opsys)) This is operating system of the machine.
-LIST_ITEM()CODE(BOLD(opsysversion)) This is operating system version of the machine.
-LIST_ITEM()CODE(BOLD(load1)) This is 1-minute load of the machine.
-LIST_ITEM()CODE(BOLD(load5)) This is 5-minute load of the machine.
-LIST_ITEM()CODE(BOLD(load15)) This is 15-minute load of the machine.
-LIST_ITEM()CODE(BOLD(memory_total)) This is total amount of memory on the machine
-LIST_ITEM()CODE(BOLD(memory_avail)) This is amount of available memory on the machine
-LIST_ITEM()CODE(BOLD(cpus)) This is number of detected CPUs on the machine.
-LIST_ITEM()CODE(BOLD(uptime)) This how long the machine has been running.
-LIST_ITEM()CODE(BOLD(owner)) This is user who sent the update.
+LIST_ITEM(CODE(BOLD(type)) This describes the node type (default is "node").)
+LIST_ITEM(CODE(BOLD(version)) This is the version of CCTools.)
+LIST_ITEM(CODE(BOLD(cpu)) This is CPU architecture of the machine.)
+LIST_ITEM(CODE(BOLD(opsys)) This is operating system of the machine.)
+LIST_ITEM(CODE(BOLD(opsysversion)) This is operating system version of the machine.)
+LIST_ITEM(CODE(BOLD(load1)) This is 1-minute load of the machine.)
+LIST_ITEM(CODE(BOLD(load5)) This is 5-minute load of the machine.)
+LIST_ITEM(CODE(BOLD(load15)) This is 15-minute load of the machine.)
+LIST_ITEM(CODE(BOLD(memory_total)) This is total amount of memory on the machine)
+LIST_ITEM(CODE(BOLD(memory_avail)) This is amount of available memory on the machine)
+LIST_ITEM(CODE(BOLD(cpus)) This is number of detected CPUs on the machine.)
+LIST_ITEM(CODE(BOLD(uptime)) This how long the machine has been running.)
+LIST_ITEM(CODE(BOLD(owner)) This is user who sent the update.)
 LIST_END
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM()CODE(BOLD(CATALOG_HOST)) Hostname of catalog server (same as CODE(-c)).
+LIST_ITEM(CODE(BOLD(CATALOG_HOST)) Hostname of catalog server (same as CODE(-c)).)
 LIST_END
 
 SECTION(EXIT STATUS)

@@ -33,9 +33,9 @@ LONGCODE_END
 SECTION(BUGS)
 
 LIST_BEGIN
-LIST_ITEM x-axis labels can overlap when using older versions of gnuplot.
-LIST_ITEM Aggregate time series plots are noisy.
-LIST_ITEM The layout is optimized for large displays and can become cluttered on smaller monitors.
+LIST_ITEM(x-axis labels can overlap when using older versions of gnuplot.)
+LIST_ITEM(Aggregate time series plots are noisy.)
+LIST_ITEM(The layout is optimized for large displays and can become cluttered on smaller monitors.)
 LIST_END
 
 SECTION(COPYRIGHT)

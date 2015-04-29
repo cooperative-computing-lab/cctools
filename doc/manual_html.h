@@ -10,9 +10,9 @@ define(BOLD,<b>$1</b>)dnl
 define(ITALIC,<i>$1</i>)dnl
 define(CODE,<tt>$1</tt>)dnl
 
-define(LIST_BEGIN,<dir>)
-define(LIST_ITEM,<li>)
-define(LIST_END,</dir>)
+define(LIST_BEGIN,<ul>)
+define(LIST_ITEM,<li>$1</li>)
+define(LIST_END,</ul>)
 
 define(SPACE,&nbsp;)
 define(HALFTAB,SPACE()SPACE()SPACE()SPACE())

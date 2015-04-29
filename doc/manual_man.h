@@ -11,9 +11,8 @@ define(LINK,$1 (BOLD($2)))dnl
 define(MANUAL,BOLD($1))dnl
 define(MANPAGE,BOLD($1($2)))dnl
 define(LIST_BEGIN)dnl
-define(LIST_ITEM,`.IP \(bu 4'
-.
-)dnl
+define(LIST_ITEM,`.IP \(bu 4
+$1')dnl
 define(LIST_END)dnl
 define(PARAM,<$1>)dnl
 define(OPTIONS_BEGIN,.LP)dnl

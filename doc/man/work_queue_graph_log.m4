@@ -72,7 +72,7 @@ LONGCODE_END
 SECTION(BUGS)
 
 LIST_BEGIN
-LIST_ITEM Some formats need a special setup for their gnuplot output terminal. `-T' blindly passes the output format, which may cause gnuplot to fail.
+LIST_ITEM(Some formats need a special setup for their gnuplot output terminal. `-T' blindly passes the output format, which may cause gnuplot to fail.)
 LIST_END
 
 SECTION(COPYRIGHT)
