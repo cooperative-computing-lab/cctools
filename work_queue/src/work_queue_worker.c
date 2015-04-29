@@ -141,7 +141,7 @@ static struct work_queue_watcher * watcher = 0;
 static struct work_queue_resources * local_resources = 0;
 static struct work_queue_resources * total_resources = 0;
 static struct work_queue_resources * total_resources_last = 0;
-static int64_t last_task_received  = -1;
+static int64_t last_task_received  = 0;
 static int64_t manual_cores_option = 1;
 static int64_t manual_disk_option = 0;
 static int64_t manual_memory_option = 0;
@@ -284,6 +284,7 @@ static void send_resource_update( struct link *master, int force_update )
 	total_resources->tag = last_task_received;
 
 	work_queue_resources_send(master,total_resources,stoptime);
+	send_master_message(master, "info end_of_resource_update %d\n", 0);
 
 	memcpy(total_resources_last,total_resources,sizeof(*total_resources));
 	last_send_time = time(0);

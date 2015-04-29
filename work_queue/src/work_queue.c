@@ -2475,6 +2475,10 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
+	/* worker has no reported any resources yet */
+	if(w->resources->tag < 0)
+		return 0;
+
 	if(w->foreman)
 	{
 		return check_foreman_against_task(q, w, t);
