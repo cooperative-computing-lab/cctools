@@ -199,7 +199,7 @@ static int db_init (confuga *C)
 		"CREATE VIEW Confuga.StorageNodeAlive AS"
 		"	SELECT *"
 		"		FROM StorageNode"
-		"		WHERE lastheardfrom IS NOT NULL AND strftime('%s', 'now', '-5 minutes') <= lastheardfrom;"
+		"		WHERE lastheardfrom IS NOT NULL AND strftime('%s', 'now', '-15 minutes') <= lastheardfrom;"
 		"CREATE VIEW Confuga.StorageNodeActive AS"
 		"	SELECT *"
 		"		FROM StorageNodeAlive"
