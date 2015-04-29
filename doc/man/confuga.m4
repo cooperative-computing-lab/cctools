@@ -26,14 +26,16 @@ also enable job execution with the BOLD(--jobs) switch.
 
 PARA
 The format for the Confuga URI is:
-BOLD(confuga:///path/to/workspace?option1=value&option2=value). Passing Confuga
-specific options is done through this URI. Confuga's options are documented
-here, with examples at the end of this manual.
+BOLD(confuga:///path/to/workspace?option1=value&option2=value). The workspace
+path is the location Confuga maintains metadata and databases for the head
+node. Confuga specific options are also passed through the URI, documented
+below.  Examples demonstrating how to start Confuga and a small cluster are at
+the end of this manual.
 
 OPTIONS_BEGIN
 OPTION_PAIR(auth,method)Enable this method for Head Node to Storage Node authentication. The default is to enable all available authentication mechanisms.
 OPTION_PAIR(concurrency,limit)Limits the number of concurrent jobs executed by the cluster. The default is 0 for limitless.
-OPTION_PAIR(nodes,node-list)Sets the list of storage nodes to use for the cluster. May be specified directly as a list BOLD(`node:<node1,node2,...>') or as a file BOLD(`file:<node file>').
+OPTION_PAIR(nodes,node-list)Sets the whitespace or comma delimited list of storage nodes to use for the cluster. May be specified directly as a list BOLD(`node:<node1,node2,...>') or as a file BOLD(`file:<node file>').
 OPTION_PAIR(pull-threshold,bytes)Sets the threshold for pull transfers. The default is 128MB.
 OPTION_PAIR(replication,type)Sets the replication mode for satisfying job dependencies. BOLD(type) may be BOLD(push-sync) or BOLD(push-async-N). The default is BOLD(push-async-1).
 OPTION_PAIR(scheduler,type)Sets the scheduler used to assign jobs to storage nodes. The default is BOLD(fifo-0).
@@ -44,10 +46,25 @@ SECTION(STORAGE NODES)
 PARA
 Confuga uses regular Chirp servers as storage nodes. Each storage node is
 specified using the BOLD(nodes) Confuga option. All storage node Chirp servers
-should be run with job execution enabled (BOLD(--jobs)) and a job concurrency
-of at least 2 (BOLD(--job-concurrency=2)). You must also ensure that the
-storage nodes and the Confuga head node are using the
-MANPAGE(catalog_server,1).  By default, this should be the case. The
+must be run with:
+
+LIST_BEGIN
+LIST_ITEM(Ticket authentication enabled (BOLD(--auth=ticket)). Remember by default all authentication mechanisms are enabled.)
+LIST_ITEM(Job execution enabled (BOLD(--jobs)).)
+LIST_ITEM(Job concurrency of at least two (BOLD(--job-concurrency=2)).)
+LIST_END
+
+PARA
+These options are also suggested but not required:
+
+LIST_BEGIN
+LIST_ITEM(More frequent Catalog updates (BOLD(--catalog-update=30s)).)
+LIST_ITEM(Project name for the cluster (BOLD(--project-name=foo)).)
+LIST_END
+
+PARA
+You must also ensure that the storage nodes and the Confuga head node are using
+the same MANPAGE(catalog_server,1). By default, this should be the case. The
 BOLD(EXAMPLES) section below includes an example cluster using a manually
 hosted catalog server.
 
@@ -61,7 +78,7 @@ BOLD(chirp). It is also necessary to define the executing server, the Confuga
 Head Node, and the ITALIC(namespace) the workflow executes in. For example:
 
 LONGCODE_BEGIN
-makeflow --batch-type=chirp --working-dir=chirp://confuga.example.com:9094/path/to/workflow
+makeflow --batch-type=chirp --working-dir=chirp://confuga.example.com:9094/BOLD(path/to/workflow)
 LONGCODE_END
 
 PARA
@@ -86,7 +103,7 @@ to upload the workflow dataset to Confuga. The easiest way to do this is using
 the MANPAGE(chirp,1) command line tool:
 
 LONGCODE_BEGIN
-chirp confuga.example.com:9094 put workflow/ /path/to/
+chirp confuga.example.com put workflow/ /path/to/
 LONGCODE_END
 
 PARA
@@ -97,7 +114,7 @@ save ITALIC(stdout) and ITALIC(stderr):
 
 LONGCODE_BEGIN
 makeflow --batch-type=chirp \\
-         --working-dir=chirp://localhost:9094/ \\
+         --working-dir=chirp://confuga.example.com/ \\
          --wrapper=$'{\\n{}\\n} > stdout.%% 2> stderr.%%' \\
          --wrapper-output='stdout.%%' \\
          --wrapper-output='stderr.%%'
