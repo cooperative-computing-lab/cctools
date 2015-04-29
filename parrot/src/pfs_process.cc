@@ -370,7 +370,7 @@ uintptr_t pfs_process_scratch_address( struct pfs_process *p )
 void pfs_process_scratch_get( struct pfs_process *p, void *data, size_t len )
 {
 	uintptr_t scratch = pfs_process_scratch_address(p);
-	if (tracer_copy_in(p->tracer, data, (const void *)scratch, len) == -1)
+	if (tracer_copy_in(p->tracer, data, (const void *)scratch, len, TRACER_O_ATOMIC) == -1)
 		fatal("could not copy in scratch: %s", strerror(errno));
 }
 
@@ -378,7 +378,7 @@ uintptr_t pfs_process_scratch_set( struct pfs_process *p, const void *data, size
 {
 	assert(len <= PFS_SCRATCH_SPACE);
 	uintptr_t scratch = pfs_process_scratch_address(p);
-	if (tracer_copy_out(p->tracer, data, (const void *)scratch, len) == -1)
+	if (tracer_copy_out(p->tracer, data, (const void *)scratch, len, TRACER_O_ATOMIC) == -1)
 		fatal("could not set scratch: %s", strerror(errno));
 	return scratch;
 }
