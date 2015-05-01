@@ -1,0 +1,38 @@
+2015/05/01 12:44:23.41 [25324] tcp: listening on port 1026
+2015/05/01 12:44:23.41 [25324] wq: Work Queue is listening on port 1026.
+2015/05/01 12:44:24.43 [25324] tcp: got connection from 127.0.0.1:53772
+2015/05/01 12:44:24.43 [25324] wq: worker 127.0.0.1:53772 connected
+2015/05/01 12:44:24.43 [25324] wq: workers status -- total: 1, active: 0, available: 0.
+2015/05/01 12:44:24.43 [25324] wq: 1 workers are connected in total now
+2015/05/01 12:44:24.43 [25324] wq: rx from unknown (127.0.0.1:53772): workqueue 3 cclws15.cse.nd.edu foreman x86_64 4.4.0-TRUNK
+2015/05/01 12:44:24.43 [25324] wq: workers status -- total: 1, active: 1, available: 0.
+2015/05/01 12:44:24.43 [25324] wq: cclws15.cse.nd.edu (127.0.0.1:53772) running CCTools version 4.4.0-TRUNK on foreman (operating system) with architecture x86_64 is ready
+2015/05/01 12:44:24.43 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): resource workers 0 0 0 0 0
+2015/05/01 12:44:24.43 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): resource disk 0 0 42255 0 0
+2015/05/01 12:44:24.43 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): resource memory 0 0 0 0 0
+2015/05/01 12:44:24.43 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): resource gpus 0 0 0 0 0
+2015/05/01 12:44:24.43 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): resource unlabeled 0 0 0 0 0
+2015/05/01 12:44:24.43 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): resource cores 0 0 0 0 0
+2015/05/01 12:44:24.43 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): resource tag 0
+2015/05/01 12:44:24.43 [25324] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 12:44:24.43 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): info end_of_resource_update 0
+2015/05/01 12:44:24.43 [25324] wq: Receiving end_of_resource_update info from worker (127.0.0.1:53772)
+2015/05/01 12:44:25.42 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): info total_workers_joined 1
+2015/05/01 12:44:25.42 [25324] wq: Receiving total_workers_joined info from worker (127.0.0.1:53772)
+2015/05/01 12:44:25.42 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): info total_workers_removed 0
+2015/05/01 12:44:25.42 [25324] wq: Receiving total_workers_removed info from worker (127.0.0.1:53772)
+2015/05/01 12:44:25.42 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): info total_send_time 0
+2015/05/01 12:44:25.42 [25324] wq: Receiving total_send_time info from worker (127.0.0.1:53772)
+2015/05/01 12:44:25.42 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): info total_receive_time 0
+2015/05/01 12:44:25.42 [25324] wq: Receiving total_receive_time info from worker (127.0.0.1:53772)
+2015/05/01 12:44:25.42 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): info total_execute_time 0
+2015/05/01 12:44:25.42 [25324] wq: Receiving total_execute_time info from worker (127.0.0.1:53772)
+2015/05/01 12:44:25.42 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): info total_bytes_sent 0
+2015/05/01 12:44:25.42 [25324] wq: Receiving total_bytes_sent info from worker (127.0.0.1:53772)
+2015/05/01 12:44:25.42 [25324] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53772): info total_bytes_received 0
+2015/05/01 12:44:25.42 [25324] wq: Receiving total_bytes_received info from worker (127.0.0.1:53772)
+2015/05/01 12:44:35.43 [25324] wq: Failed to read from worker cclws15.cse.nd.edu (127.0.0.1:53772)
+2015/05/01 12:44:35.43 [25324] wq: worker cclws15.cse.nd.edu (127.0.0.1:53772) removed
+2015/05/01 12:44:35.43 [25324] wq: workers status -- total: 0, active: 0, available: 0.
+2015/05/01 12:44:35.43 [25324] tcp: disconnected from 127.0.0.1:53772
+2015/05/01 12:44:35.43 [25324] wq: 0 workers are connected in total now

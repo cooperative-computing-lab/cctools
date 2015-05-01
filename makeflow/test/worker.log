@@ -1,0 +1,172 @@
+2015/05/01 14:00:51.80 work_queue_worker[18343] debug: /afs/nd.edu/user18/dthain/work/cctools/work_queue/src/work_queue_worker version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 14:00:51.80 work_queue_worker[18343] debug: Built by dthain@cclws15 on May  1 2015 at 13:59:51
+2015/05/01 14:00:51.80 work_queue_worker[18343] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 14:00:51.80 work_queue_worker[18343] debug: Configuration:
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq: WORK_QUEUE_SANDBOX set to /tmp/worker-102744-18343.
+2015/05/01 14:00:51.80 work_queue_worker[18343] dns: looking up name localhost
+2015/05/01 14:00:51.80 work_queue_worker[18343] dns: localhost is 127.0.0.1
+2015/05/01 14:00:51.80 work_queue_worker[18343] tcp: connecting to 127.0.0.1:1048
+2015/05/01 14:00:51.80 work_queue_worker[18343] tcp: made connection to 127.0.0.1:1048
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq: connected to master localhost:1048
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq: preparing workspace /tmp/worker-102744-18343
+2015/05/01 14:00:51.80 work_queue_worker[18343] dns: looking up name cclws15
+2015/05/01 14:00:51.80 work_queue_worker[18343] dns: cclws15 is 129.74.155.71
+2015/05/01 14:00:51.80 work_queue_worker[18343] dns: looking up addr 129.74.155.71
+2015/05/01 14:00:51.80 work_queue_worker[18343] dns: 129.74.155.71 is cclws15.cse.nd.edu
+2015/05/01 14:00:51.80 work_queue_worker[18343] dns: finding my hostname: uname = cclws15, address = 129.74.155.71, hostname = cclws15.cse.nd.edu
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq: tx to master: workqueue 3 cclws15.cse.nd.edu Linux x86_64 4.4.0-TRUNK
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq: Sending resource description to master:
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq:  workers      0 inuse      0 committed      1 total      1 smallest      1 largest
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq:     disk      0 inuse      0 committed  42237 total  42237 smallest  42237 largest
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq:   memory      0 inuse      0 committed   2381 total   2381 smallest   2381 largest
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq:     gpus      0 inuse      0 committed      0 total      0 smallest      0 largest
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq: unlabeled      0 inuse      0 committed      0 total      0 smallest      0 largest
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq:    cores      0 inuse      0 committed      1 total      1 smallest      1 largest
+2015/05/01 14:00:51.80 work_queue_worker[18343] wq: tx to master: info end_of_resource_update 0
+2015/05/01 14:00:51.81 work_queue_worker[18343] wq: working for master at 127.0.0.1:1048.
+2015/05/01 14:00:51.81 work_queue_worker[18343] wq: rx from master: task 1
+2015/05/01 14:00:51.81 work_queue_worker[18343] wq: rx from master: cmd 69
+2015/05/01 14:00:51.81 work_queue_worker[18343] wq: rx from master: /usr/bin/curl -o capitol.jpg http://ccl.cse.nd.edu/images/capitol.jpg
+2015/05/01 14:00:51.81 work_queue_worker[18343] wq: rx from master: cores -1
+2015/05/01 14:00:51.81 work_queue_worker[18343] wq: rx from master: memory -1
+2015/05/01 14:00:51.81 work_queue_worker[18343] wq: rx from master: disk -1
+2015/05/01 14:00:51.81 work_queue_worker[18343] wq: rx from master: gpus -1
+2015/05/01 14:00:51.81 work_queue_worker[18343] wq: rx from master: outfile file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg capitol.jpg 1
+2015/05/01 14:00:51.81 work_queue_worker[18343] wq: rx from master: end
+2015/05/01 14:00:51.81 work_queue_worker[18343] wq: started process 18350: /usr/bin/curl -o capitol.jpg http://ccl.cse.nd.edu/images/capitol.jpg
+2015/05/01 14:00:51.83 work_queue_worker[18343] wq: task 1 (pid 18350) exited normally with exit code 0
+2015/05/01 14:00:51.83 work_queue_worker[18343] wq: moving output file from t.1/capitol.jpg to cache/file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg
+2015/05/01 14:00:51.83 work_queue_worker[18343] wq: tx to master: available_results
+2015/05/01 14:00:51.83 work_queue_worker[18343] wq: rx from master: send_results -1
+2015/05/01 14:00:51.83 work_queue_worker[18343] wq: tx to master: result 0 0 317 29278 1
+2015/05/01 14:00:51.83 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:51.84 work_queue_worker[18343] wq: rx from master: get file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg 1
+2015/05/01 14:00:51.84 work_queue_worker[18343] wq: tx to master: file file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg 51274
+2015/05/01 14:00:51.84 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: rx from master: kill 1
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: rx from master: task 2
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: rx from master: cmd 89
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: rx from master: /afs/nd.edu/user37/ccl/software/bxgrid/bin/convert -swirl 360 capitol.jpg capitol.360.jpg
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: rx from master: cores -1
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: rx from master: memory -1
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: rx from master: disk -1
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: rx from master: gpus -1
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: rx from master: infile file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg capitol.jpg 1
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: rx from master: outfile file-dbec5beb5947ed54fc6a02b134a0f2de-capitol.360.jpg capitol.360.jpg 1
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: rx from master: end
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: linking cache/file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg to t.2/capitol.jpg
+2015/05/01 14:00:51.85 work_queue_worker[18343] wq: started process 18352: /afs/nd.edu/user37/ccl/software/bxgrid/bin/convert -swirl 360 capitol.jpg capitol.360.jpg
+2015/05/01 14:00:51.87 work_queue_worker[18343] wq: task 2 (pid 18352) exited normally with exit code 0
+2015/05/01 14:00:51.87 work_queue_worker[18343] wq: moving output file from t.2/capitol.360.jpg to cache/file-dbec5beb5947ed54fc6a02b134a0f2de-capitol.360.jpg
+2015/05/01 14:00:51.87 work_queue_worker[18343] wq: tx to master: available_results
+2015/05/01 14:00:51.87 work_queue_worker[18343] wq: rx from master: send_results -1
+2015/05/01 14:00:51.87 work_queue_worker[18343] wq: tx to master: result 0 0 0 23041 2
+2015/05/01 14:00:51.87 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:51.87 work_queue_worker[18343] wq: rx from master: get file-dbec5beb5947ed54fc6a02b134a0f2de-capitol.360.jpg 1
+2015/05/01 14:00:51.87 work_queue_worker[18343] wq: tx to master: file file-dbec5beb5947ed54fc6a02b134a0f2de-capitol.360.jpg 70714
+2015/05/01 14:00:51.87 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: rx from master: kill 2
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: rx from master: task 3
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: rx from master: cmd 89
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: rx from master: /afs/nd.edu/user37/ccl/software/bxgrid/bin/convert -swirl 270 capitol.jpg capitol.270.jpg
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: rx from master: cores -1
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: rx from master: memory -1
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: rx from master: disk -1
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: rx from master: gpus -1
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: rx from master: infile file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg capitol.jpg 1
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: rx from master: outfile file-18422caf36bba25ac917c900ae5ed17a-capitol.270.jpg capitol.270.jpg 1
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: rx from master: end
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: linking cache/file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg to t.3/capitol.jpg
+2015/05/01 14:00:51.88 work_queue_worker[18343] wq: started process 18356: /afs/nd.edu/user37/ccl/software/bxgrid/bin/convert -swirl 270 capitol.jpg capitol.270.jpg
+2015/05/01 14:00:51.90 work_queue_worker[18343] wq: task 3 (pid 18356) exited normally with exit code 0
+2015/05/01 14:00:51.90 work_queue_worker[18343] wq: moving output file from t.3/capitol.270.jpg to cache/file-18422caf36bba25ac917c900ae5ed17a-capitol.270.jpg
+2015/05/01 14:00:51.90 work_queue_worker[18343] wq: tx to master: available_results
+2015/05/01 14:00:51.90 work_queue_worker[18343] wq: rx from master: send_results -1
+2015/05/01 14:00:51.90 work_queue_worker[18343] wq: tx to master: result 0 0 0 20160 3
+2015/05/01 14:00:51.90 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:51.90 work_queue_worker[18343] wq: rx from master: get file-18422caf36bba25ac917c900ae5ed17a-capitol.270.jpg 1
+2015/05/01 14:00:51.90 work_queue_worker[18343] wq: tx to master: file file-18422caf36bba25ac917c900ae5ed17a-capitol.270.jpg 68337
+2015/05/01 14:00:51.90 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: rx from master: kill 3
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: rx from master: task 4
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: rx from master: cmd 89
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: rx from master: /afs/nd.edu/user37/ccl/software/bxgrid/bin/convert -swirl 180 capitol.jpg capitol.180.jpg
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: rx from master: cores -1
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: rx from master: memory -1
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: rx from master: disk -1
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: rx from master: gpus -1
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: rx from master: infile file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg capitol.jpg 1
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: rx from master: outfile file-6e804f737e2977784299fd2b34dc8657-capitol.180.jpg capitol.180.jpg 1
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: rx from master: end
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: linking cache/file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg to t.4/capitol.jpg
+2015/05/01 14:00:51.91 work_queue_worker[18343] wq: started process 18360: /afs/nd.edu/user37/ccl/software/bxgrid/bin/convert -swirl 180 capitol.jpg capitol.180.jpg
+2015/05/01 14:00:51.93 work_queue_worker[18343] wq: task 4 (pid 18360) exited normally with exit code 0
+2015/05/01 14:00:51.93 work_queue_worker[18343] wq: moving output file from t.4/capitol.180.jpg to cache/file-6e804f737e2977784299fd2b34dc8657-capitol.180.jpg
+2015/05/01 14:00:51.93 work_queue_worker[18343] wq: tx to master: available_results
+2015/05/01 14:00:51.93 work_queue_worker[18343] wq: rx from master: send_results -1
+2015/05/01 14:00:51.93 work_queue_worker[18343] wq: tx to master: result 0 0 0 19305 4
+2015/05/01 14:00:51.93 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:51.93 work_queue_worker[18343] wq: rx from master: get file-6e804f737e2977784299fd2b34dc8657-capitol.180.jpg 1
+2015/05/01 14:00:51.93 work_queue_worker[18343] wq: tx to master: file file-6e804f737e2977784299fd2b34dc8657-capitol.180.jpg 64979
+2015/05/01 14:00:51.93 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: rx from master: kill 4
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: rx from master: task 5
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: rx from master: cmd 87
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: rx from master: /afs/nd.edu/user37/ccl/software/bxgrid/bin/convert -swirl 90 capitol.jpg capitol.90.jpg
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: rx from master: cores -1
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: rx from master: memory -1
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: rx from master: disk -1
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: rx from master: gpus -1
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: rx from master: infile file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg capitol.jpg 1
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: rx from master: outfile file-a448e38b0a8ca6614c1bbe21a2a2ead9-capitol.90.jpg capitol.90.jpg 1
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: rx from master: end
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: linking cache/file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg to t.5/capitol.jpg
+2015/05/01 14:00:51.94 work_queue_worker[18343] wq: started process 18364: /afs/nd.edu/user37/ccl/software/bxgrid/bin/convert -swirl 90 capitol.jpg capitol.90.jpg
+2015/05/01 14:00:51.96 work_queue_worker[18343] wq: task 5 (pid 18364) exited normally with exit code 0
+2015/05/01 14:00:51.96 work_queue_worker[18343] wq: moving output file from t.5/capitol.90.jpg to cache/file-a448e38b0a8ca6614c1bbe21a2a2ead9-capitol.90.jpg
+2015/05/01 14:00:51.96 work_queue_worker[18343] wq: tx to master: available_results
+2015/05/01 14:00:51.96 work_queue_worker[18343] wq: rx from master: send_results -1
+2015/05/01 14:00:51.96 work_queue_worker[18343] wq: tx to master: result 0 0 0 18356 5
+2015/05/01 14:00:51.96 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:51.96 work_queue_worker[18343] wq: rx from master: get file-a448e38b0a8ca6614c1bbe21a2a2ead9-capitol.90.jpg 1
+2015/05/01 14:00:51.96 work_queue_worker[18343] wq: tx to master: file file-a448e38b0a8ca6614c1bbe21a2a2ead9-capitol.90.jpg 62174
+2015/05/01 14:00:51.96 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: kill 5
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: task 6
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: cmd 210
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: /afs/nd.edu/user37/ccl/software/bxgrid/bin/convert -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: cores -1
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: memory -1
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: disk -1
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: gpus -1
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: infile file-dbec5beb5947ed54fc6a02b134a0f2de-capitol.360.jpg capitol.360.jpg 1
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: infile file-18422caf36bba25ac917c900ae5ed17a-capitol.270.jpg capitol.270.jpg 1
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: infile file-6e804f737e2977784299fd2b34dc8657-capitol.180.jpg capitol.180.jpg 1
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: infile file-a448e38b0a8ca6614c1bbe21a2a2ead9-capitol.90.jpg capitol.90.jpg 1
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: infile file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg capitol.jpg 1
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: outfile file-186de0bc8b12f456ac09184ed87d50ae-capitol.montage.gif capitol.montage.gif 1
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: rx from master: end
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: linking cache/file-dbec5beb5947ed54fc6a02b134a0f2de-capitol.360.jpg to t.6/capitol.360.jpg
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: linking cache/file-18422caf36bba25ac917c900ae5ed17a-capitol.270.jpg to t.6/capitol.270.jpg
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: linking cache/file-6e804f737e2977784299fd2b34dc8657-capitol.180.jpg to t.6/capitol.180.jpg
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: linking cache/file-a448e38b0a8ca6614c1bbe21a2a2ead9-capitol.90.jpg to t.6/capitol.90.jpg
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: linking cache/file-70fd5829a3df43629f28d0fb4c5ed190-capitol.jpg to t.6/capitol.jpg
+2015/05/01 14:00:51.97 work_queue_worker[18343] wq: started process 18368: /afs/nd.edu/user37/ccl/software/bxgrid/bin/convert -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
+2015/05/01 14:00:53.12 work_queue_worker[18343] wq: task 6 (pid 18368) exited normally with exit code 0
+2015/05/01 14:00:53.12 work_queue_worker[18343] wq: moving output file from t.6/capitol.montage.gif to cache/file-186de0bc8b12f456ac09184ed87d50ae-capitol.montage.gif
+2015/05/01 14:00:53.12 work_queue_worker[18343] wq: tx to master: available_results
+2015/05/01 14:00:53.12 work_queue_worker[18343] wq: rx from master: send_results -1
+2015/05/01 14:00:53.12 work_queue_worker[18343] wq: tx to master: result 0 0 0 1144259 6
+2015/05/01 14:00:53.12 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:53.12 work_queue_worker[18343] wq: rx from master: get file-186de0bc8b12f456ac09184ed87d50ae-capitol.montage.gif 1
+2015/05/01 14:00:53.12 work_queue_worker[18343] wq: tx to master: file file-186de0bc8b12f456ac09184ed87d50ae-capitol.montage.gif 926675
+2015/05/01 14:00:53.12 work_queue_worker[18343] wq: tx to master: end
+2015/05/01 14:00:53.21 work_queue_worker[18343] wq: rx from master: kill 6
+2015/05/01 14:00:53.21 work_queue_worker[18343] wq: rx from master: release
+2015/05/01 14:00:53.21 work_queue_worker[18343] wq: released by master 127.0.0.1:1048.
+2015/05/01 14:00:53.21 work_queue_worker[18343] wq: cleaning workspace /tmp/worker-102744-18343
+2015/05/01 14:00:53.21 work_queue_worker[18343] wq: disconnecting from master 127.0.0.1:1048
+2015/05/01 14:00:53.21 work_queue_worker[18343] tcp: disconnected from 127.0.0.1:1048
+2015/05/01 14:00:53.21 work_queue_worker[18343] wq: killing all outstanding tasks
+2015/05/01 14:00:53.21 work_queue_worker[18343] wq: all data structures are clean
+2015/05/01 14:00:53.21 work_queue_worker[18343] notice: stopping: single shot mode

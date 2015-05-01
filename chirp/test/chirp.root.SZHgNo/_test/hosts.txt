@@ -1,0 +1,7 @@
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+127.0.0.1	slashdot.com www.slashdot.com slashdot.org www.slashdot.org
+127.0.0.1	cnn.com www.cnn.com
+127.0.0.1	slate.com www.slate.com
+127.0.0.1	salon.com www.salon.com

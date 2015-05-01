@@ -1,0 +1,425 @@
+2015/05/01 13:26:03.82 chirp_server[12586] auth: address: registered
+2015/05/01 13:26:03.82 chirp_server[12588] debug: ../../chirp/src/chirp_server version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 13:26:03.82 chirp_server[12588] debug: Built by dthain@cclws15 on May  1 2015 at 12:43:12
+2015/05/01 13:26:03.82 chirp_server[12588] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 13:26:03.82 chirp_server[12588] debug: Configuration:
+2015/05/01 13:26:03.82 chirp_server[12588] chirp: normalizing url `./chirp.root.JrA6Fc' as `local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc'
+2015/05/01 13:26:03.82 chirp_server[12588] chirp: transient directory: `/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.transient.REYShL'
+2015/05/01 13:26:03.82 chirp_server[12588] notice: *** ../../chirp/src/chirp_server starting at Fri May  1 13:26:03 2015
+2015/05/01 13:26:03.82 chirp_server[12588] process: *** backend setup starting ***
+2015/05/01 13:26:03.82 chirp_server[12590] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:26:03.82 chirp_server[12590] local: = 1
+2015/05/01 13:26:03.82 chirp_server[12590] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:26:03.82 chirp_server[12590] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:03.82 chirp_server[12588] process: *** backend setup complete ***
+2015/05/01 13:26:03.82 chirp_server[12588] tcp: listening on port 1043
+2015/05/01 13:26:03.82 chirp_server[12588] debug: now listening port on port 1043
+2015/05/01 13:26:03.83 chirp_server[12588] dns: looking up name cclws15
+2015/05/01 13:26:03.83 chirp_server[12588] dns: cclws15 is 129.74.155.71
+2015/05/01 13:26:03.83 chirp_server[12588] dns: looking up addr 129.74.155.71
+2015/05/01 13:26:03.83 chirp_server[12588] dns: 129.74.155.71 is cclws15.cse.nd.edu
+2015/05/01 13:26:03.83 chirp_server[12588] dns: finding my hostname: uname = cclws15, address = 129.74.155.71, hostname = cclws15.cse.nd.edu
+2015/05/01 13:26:03.83 chirp_server[12588] chirp: forked scheduler 12591
+2015/05/01 13:26:03.83 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 13:26:03.83 chirp_server[12591] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:26:03.83 chirp_server[12592] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:26:03.83 chirp_server[12591] local: = 1
+2015/05/01 13:26:03.83 chirp_server[12591] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:26:03.83 chirp_server[12591] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:03.83 chirp_server[12591] debug: no scheduler available, quitting!
+2015/05/01 13:26:03.83 chirp_server[12592] local: = 1
+2015/05/01 13:26:03.83 chirp_server[12592] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:26:03.83 chirp_server[12592] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:03.83 chirp_server[12592] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 13:26:03.83 chirp_server[12592] local: = 0
+2015/05/01 13:26:03.83 chirp_server[12592] dns: looking up name localhost
+2015/05/01 13:26:03.83 chirp_server[12592] dns: localhost is 127.0.0.1
+2015/05/01 13:26:03.83 chirp_server[12592] debug: sending update to localhost:9097
+2015/05/01 13:26:03.83 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 13:26:03.83 chirp_server[12588] process: *** ticket cleanup starting ***
+2015/05/01 13:26:03.83 chirp_server[12593] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:26:03.83 chirp_server[12593] local: = 1
+2015/05/01 13:26:03.83 chirp_server[12593] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:26:03.83 chirp_server[12593] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:03.83 chirp_server[12593] local: opendir(`/')
+2015/05/01 13:26:03.83 chirp_server[12593] local: = 0x2217370
+2015/05/01 13:26:03.83 chirp_server[12593] local: readdir(0x2217370 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc/'])
+2015/05/01 13:26:03.83 chirp_server[12593] local: = 0x2217778 [name = `.']
+2015/05/01 13:26:03.83 chirp_server[12593] local: readdir(0x2217370 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc/'])
+2015/05/01 13:26:03.83 chirp_server[12593] local: = 0x2217778 [name = `..']
+2015/05/01 13:26:03.83 chirp_server[12593] local: readdir(0x2217370 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc/'])
+2015/05/01 13:26:03.83 chirp_server[12593] local: = NULL (errno = 2; `No such file or directory')
+2015/05/01 13:26:03.83 chirp_server[12593] local: closedir(0x2217370 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc/'])
+2015/05/01 13:26:03.83 chirp_server[12588] process: *** ticket cleanup complete ***
+2015/05/01 13:26:03.84 chirp_server[12588] process: pid 12591 exited with 0 (0 total child procs)
+2015/05/01 13:26:04.85 chirp_server[12588] tcp: got connection from 127.0.0.1:37799
+2015/05/01 13:26:04.85 chirp_server[12588] process: created pid 12604 (0 total child procs)
+2015/05/01 13:26:04.85 chirp_server[12588] tcp: disconnected from 127.0.0.1:37799
+2015/05/01 13:26:04.85 chirp_server[12604] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:26:04.85 chirp_server[12604] local: = 1
+2015/05/01 13:26:04.85 chirp_server[12604] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:26:04.85 chirp_server[12604] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.85 chirp_server[12604] auth: 127.0.0.1:37799 requests 'address' authentication
+2015/05/01 13:26:04.85 chirp_server[12604] auth: I agree to try 'address'
+2015/05/01 13:26:04.85 chirp_server[12604] auth: 'address' authentication succeeded
+2015/05/01 13:26:04.85 chirp_server[12604] auth: 127.0.0.1:37799 is address:127.0.0.1
+2015/05/01 13:26:04.85 chirp_server[12604] login: address:127.0.0.1 from 127.0.0.1:37799
+2015/05/01 13:26:04.85 chirp_server[12604] auth: hostname: registered
+2015/05/01 13:26:04.85 chirp_server[12604] auth: address: registered
+2015/05/01 13:26:04.85 chirp_server[12604] chirp: whoami 1024
+2015/05/01 13:26:04.85 chirp_server[12604] chirp: = 17
+2015/05/01 13:26:04.85 chirp_server[12604] chirp: mkdir /127.0.0.1 511
+2015/05/01 13:26:04.85 chirp_server[12604] local: readlink(`/127.0.0.1', 0x7fff1d34e270, 1024)
+2015/05/01 13:26:04.85 chirp_server[12604] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.85 chirp_server[12604] local: stat(`/127.0.0.1', 0x7fff1d34d9d0)
+2015/05/01 13:26:04.85 chirp_server[12604] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.85 chirp_server[12604] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:26:04.85 chirp_server[12604] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.85 chirp_server[12604] local: mkdir(`/127.0.0.1', 0o777)
+2015/05/01 13:26:04.86 chirp_server[12604] local: = 0
+2015/05/01 13:26:04.86 chirp_server[12604] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:26:04.86 chirp_server[12604] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.86 chirp_server[12604] local: open(`/127.0.0.1/.__acl', 0x241, 0o600)
+2015/05/01 13:26:04.87 chirp_server[12604] local: = 0
+2015/05/01 13:26:04.87 chirp_server[12604] local: pwrite(0, 0x22414d0, 24, 0)
+2015/05/01 13:26:04.87 chirp_server[12604] local: = 24
+2015/05/01 13:26:04.87 chirp_server[12604] local: close(0)
+2015/05/01 13:26:04.87 chirp_server[12604] local: = 0
+2015/05/01 13:26:04.87 chirp_server[12604] chirp: = 0
+2015/05/01 13:26:04.87 chirp_server[12604] chirp: timeout: client idle too long
+2015/05/01 13:26:04.87 chirp_server[12604] debug: sending stats: stats 127.0.0.1 address:127.0.0.1 2 0 0
+2015/05/01 13:26:04.87 chirp_server[12604] login: disconnected
+2015/05/01 13:26:04.87 chirp_server[12604] tcp: disconnected from 127.0.0.1:37799
+2015/05/01 13:26:04.87 chirp_server[12588] debug: config message: stats 127.0.0.1 address:127.0.0.1 2 0 0
+2015/05/01 13:26:04.87 chirp_server[12588] tcp: got connection from 127.0.0.1:37800
+2015/05/01 13:26:04.87 chirp_server[12588] process: created pid 12606 (1 total child procs)
+2015/05/01 13:26:04.87 chirp_server[12588] tcp: disconnected from 127.0.0.1:37800
+2015/05/01 13:26:04.87 chirp_server[12588] process: pid 12604 exited with 0 (1 total child procs)
+2015/05/01 13:26:04.87 chirp_server[12606] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:26:04.87 chirp_server[12606] local: = 1
+2015/05/01 13:26:04.87 chirp_server[12606] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:26:04.87 chirp_server[12606] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.87 chirp_server[12606] auth: 127.0.0.1:37800 requests 'address' authentication
+2015/05/01 13:26:04.87 chirp_server[12606] auth: I agree to try 'address'
+2015/05/01 13:26:04.87 chirp_server[12606] auth: 'address' authentication succeeded
+2015/05/01 13:26:04.87 chirp_server[12606] auth: 127.0.0.1:37800 is address:127.0.0.1
+2015/05/01 13:26:04.87 chirp_server[12606] login: address:127.0.0.1 from 127.0.0.1:37800
+2015/05/01 13:26:04.87 chirp_server[12606] auth: hostname: registered
+2015/05/01 13:26:04.87 chirp_server[12606] auth: address: registered
+2015/05/01 13:26:04.88 chirp_server[12606] chirp: whoami 1024
+2015/05/01 13:26:04.88 chirp_server[12606] chirp: = 17
+2015/05/01 13:26:04.88 chirp_server[12606] chirp: putfile /127.0.0.1/hosts 33188 327
+2015/05/01 13:26:04.88 chirp_server[12606] local: stat(`/127.0.0.1/hosts', 0x7fff1d34e660)
+2015/05/01 13:26:04.88 chirp_server[12606] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.88 chirp_server[12606] local: readlink(`/127.0.0.1/hosts', 0x7fff1d34e270, 1024)
+2015/05/01 13:26:04.88 chirp_server[12606] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.88 chirp_server[12606] local: stat(`/127.0.0.1/hosts', 0x7fff1d34d9d0)
+2015/05/01 13:26:04.88 chirp_server[12606] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.88 chirp_server[12606] local: open(`/127.0.0.1/.__acl', 0x0, 0o600)
+2015/05/01 13:26:04.88 chirp_server[12606] local: = 0
+2015/05/01 13:26:04.88 chirp_server[12606] local: pread(0, 0x2220470, 65535, 0)
+2015/05/01 13:26:04.88 chirp_server[12606] local: = 24
+2015/05/01 13:26:04.88 chirp_server[12606] local: pread(0, 0x2220470, 65535, 24)
+2015/05/01 13:26:04.88 chirp_server[12606] local: = 0
+2015/05/01 13:26:04.88 chirp_server[12606] local: close(0)
+2015/05/01 13:26:04.88 chirp_server[12606] local: = 0
+2015/05/01 13:26:04.88 chirp_server[12606] local: open(`/127.0.0.1/hosts', 0x41, 0o100644)
+2015/05/01 13:26:04.88 chirp_server[12606] local: = 0
+2015/05/01 13:26:04.88 chirp_server[12606] local: fstat(0, 0x7fff1d35e710)
+2015/05/01 13:26:04.88 chirp_server[12606] local: = 0
+2015/05/01 13:26:04.88 chirp_server[12606] local: ftruncate(0, 0)
+2015/05/01 13:26:04.88 chirp_server[12606] local: = 0
+2015/05/01 13:26:04.88 chirp_server[12606] local: pwrite(0, 0x7fff1d34e710, 327, 0)
+2015/05/01 13:26:04.88 chirp_server[12606] local: = 327
+2015/05/01 13:26:04.88 chirp_server[12606] local: close(0)
+2015/05/01 13:26:04.89 chirp_server[12606] local: = 0
+2015/05/01 13:26:04.89 chirp_server[12606] chirp: = 327
+2015/05/01 13:26:04.89 chirp_server[12606] chirp: timeout: client idle too long
+2015/05/01 13:26:04.89 chirp_server[12606] debug: sending stats: stats 127.0.0.1 address:127.0.0.1 2 0 327
+2015/05/01 13:26:04.89 chirp_server[12606] login: disconnected
+2015/05/01 13:26:04.89 chirp_server[12588] debug: config message: stats 127.0.0.1 address:127.0.0.1 2 0 327
+2015/05/01 13:26:04.89 chirp_server[12606] tcp: disconnected from 127.0.0.1:37800
+2015/05/01 13:26:04.89 chirp_server[12588] tcp: got connection from 127.0.0.1:37801
+2015/05/01 13:26:04.89 chirp_server[12588] process: created pid 12608 (1 total child procs)
+2015/05/01 13:26:04.89 chirp_server[12588] tcp: disconnected from 127.0.0.1:37801
+2015/05/01 13:26:04.89 chirp_server[12588] process: pid 12606 exited with 0 (1 total child procs)
+2015/05/01 13:26:04.89 chirp_server[12608] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:26:04.89 chirp_server[12608] local: = 1
+2015/05/01 13:26:04.89 chirp_server[12608] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:26:04.89 chirp_server[12608] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.89 chirp_server[12608] auth: 127.0.0.1:37801 requests 'unix' authentication
+2015/05/01 13:26:04.89 chirp_server[12608] auth: I agree to try 'unix'
+2015/05/01 13:26:04.89 chirp_server[12608] auth: unix: generating challenge
+2015/05/01 13:26:04.89 chirp_server[12608] auth: unix: challenge path is /tmp/challenge.12608.1804289383
+2015/05/01 13:26:04.89 chirp_server[12608] auth: unix: waiting for response
+2015/05/01 13:26:04.95 chirp_server[12608] auth: unix: got response
+2015/05/01 13:26:04.95 chirp_server[12608] auth: unix: client is uid 102744
+2015/05/01 13:26:04.95 chirp_server[12608] auth: unix: client is subject dthain
+2015/05/01 13:26:04.95 chirp_server[12608] auth: 'unix' authentication succeeded
+2015/05/01 13:26:04.95 chirp_server[12608] auth: 127.0.0.1:37801 is unix:dthain
+2015/05/01 13:26:04.95 chirp_server[12608] login: unix:dthain from 127.0.0.1:37801
+2015/05/01 13:26:04.95 chirp_server[12608] auth: hostname: registered
+2015/05/01 13:26:04.95 chirp_server[12608] auth: address: registered
+2015/05/01 13:26:04.95 chirp_server[12608] chirp: whoami 1024
+2015/05/01 13:26:04.95 chirp_server[12608] chirp: = 11
+2015/05/01 13:26:04.95 chirp_server[12608] chirp: getlongdir /127.0.0.1
+2015/05/01 13:26:04.95 chirp_server[12608] local: open(`/127.0.0.1/.__acl', 0x0, 0o600)
+2015/05/01 13:26:04.95 chirp_server[12608] local: = 0
+2015/05/01 13:26:04.95 chirp_server[12608] local: pread(0, 0x2220470, 65535, 0)
+2015/05/01 13:26:04.95 chirp_server[12608] local: = 24
+2015/05/01 13:26:04.95 chirp_server[12608] local: pread(0, 0x2220470, 65535, 24)
+2015/05/01 13:26:04.95 chirp_server[12608] local: = 0
+2015/05/01 13:26:04.95 chirp_server[12608] local: close(0)
+2015/05/01 13:26:04.95 chirp_server[12608] local: = 0
+2015/05/01 13:26:04.95 chirp_server[12608] chirp: = -2 (Permission denied)
+2015/05/01 13:26:04.95 chirp_server[12608] chirp: timeout: client idle too long
+2015/05/01 13:26:04.95 chirp_server[12608] debug: sending stats: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:26:04.95 chirp_server[12608] login: disconnected
+2015/05/01 13:26:04.95 chirp_server[12588] debug: config message: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:26:04.95 chirp_server[12608] tcp: disconnected from 127.0.0.1:37801
+2015/05/01 13:26:04.95 chirp_server[12588] tcp: got connection from 127.0.0.1:37802
+2015/05/01 13:26:04.95 chirp_server[12588] process: created pid 12610 (1 total child procs)
+2015/05/01 13:26:04.95 chirp_server[12588] tcp: disconnected from 127.0.0.1:37802
+2015/05/01 13:26:04.95 chirp_server[12588] process: pid 12608 exited with 0 (1 total child procs)
+2015/05/01 13:26:04.95 chirp_server[12610] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:26:04.95 chirp_server[12610] local: = 1
+2015/05/01 13:26:04.95 chirp_server[12610] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:26:04.95 chirp_server[12610] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.95 chirp_server[12610] auth: 127.0.0.1:37802 requests 'unix' authentication
+2015/05/01 13:26:04.95 chirp_server[12610] auth: I agree to try 'unix'
+2015/05/01 13:26:04.95 chirp_server[12610] auth: unix: generating challenge
+2015/05/01 13:26:04.95 chirp_server[12610] auth: unix: challenge path is /tmp/challenge.12610.1804289383
+2015/05/01 13:26:04.95 chirp_server[12610] auth: unix: waiting for response
+2015/05/01 13:26:04.97 chirp_server[12610] auth: unix: got response
+2015/05/01 13:26:04.97 chirp_server[12610] auth: unix: client is uid 102744
+2015/05/01 13:26:04.97 chirp_server[12610] auth: unix: client is subject dthain
+2015/05/01 13:26:04.97 chirp_server[12610] auth: 'unix' authentication succeeded
+2015/05/01 13:26:04.97 chirp_server[12610] auth: 127.0.0.1:37802 is unix:dthain
+2015/05/01 13:26:04.97 chirp_server[12610] login: unix:dthain from 127.0.0.1:37802
+2015/05/01 13:26:04.97 chirp_server[12610] auth: hostname: registered
+2015/05/01 13:26:04.97 chirp_server[12610] auth: address: registered
+2015/05/01 13:26:04.97 chirp_server[12610] chirp: whoami 1024
+2015/05/01 13:26:04.97 chirp_server[12610] chirp: = 11
+2015/05/01 13:26:04.98 chirp_server[12610] chirp: rmall /127.0.0.1
+2015/05/01 13:26:04.98 chirp_server[12610] local: stat(`/127.0.0.1', 0x7fff1d34d9d0)
+2015/05/01 13:26:04.98 chirp_server[12610] local: = 0
+2015/05/01 13:26:04.98 chirp_server[12610] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:26:04.98 chirp_server[12610] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:26:04.98 chirp_server[12610] local: rmall(`/127.0.0.1')
+2015/05/01 13:26:04.98 chirp_server[12610] local: = 0
+2015/05/01 13:26:04.98 chirp_server[12610] chirp: = 0
+2015/05/01 13:26:04.99 chirp_server[12610] chirp: timeout: client idle too long
+2015/05/01 13:26:04.99 chirp_server[12610] debug: sending stats: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:26:04.99 chirp_server[12610] login: disconnected
+2015/05/01 13:26:04.99 chirp_server[12588] debug: config message: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:26:04.99 chirp_server[12610] tcp: disconnected from 127.0.0.1:37802
+2015/05/01 13:26:04.99 chirp_server[12588] process: pid 12610 exited with 0 (0 total child procs)
+2015/05/01 13:31:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 13:31:03.00 chirp_server[13231] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:31:03.00 chirp_server[13231] local: = 1
+2015/05/01 13:31:03.00 chirp_server[13231] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:31:03.00 chirp_server[13231] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:31:03.00 chirp_server[13231] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 13:31:03.00 chirp_server[13231] local: = 0
+2015/05/01 13:31:03.00 chirp_server[13231] dns: looking up name localhost
+2015/05/01 13:31:03.00 chirp_server[13231] dns: localhost is 127.0.0.1
+2015/05/01 13:31:03.00 chirp_server[13231] debug: sending update to localhost:9097
+2015/05/01 13:31:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 13:36:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 13:36:03.00 chirp_server[13294] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:36:03.00 chirp_server[13294] local: = 1
+2015/05/01 13:36:03.00 chirp_server[13294] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:36:03.00 chirp_server[13294] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:36:03.00 chirp_server[13294] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 13:36:03.00 chirp_server[13294] local: = 0
+2015/05/01 13:36:03.00 chirp_server[13294] dns: looking up name localhost
+2015/05/01 13:36:03.00 chirp_server[13294] dns: localhost is 127.0.0.1
+2015/05/01 13:36:03.00 chirp_server[13294] debug: sending update to localhost:9097
+2015/05/01 13:36:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 13:41:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 13:41:03.00 chirp_server[13412] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:41:03.00 chirp_server[13412] local: = 1
+2015/05/01 13:41:03.00 chirp_server[13412] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:41:03.00 chirp_server[13412] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:41:03.00 chirp_server[13412] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 13:41:03.00 chirp_server[13412] local: = 0
+2015/05/01 13:41:03.00 chirp_server[13412] dns: looking up name localhost
+2015/05/01 13:41:03.00 chirp_server[13412] dns: localhost is 127.0.0.1
+2015/05/01 13:41:03.00 chirp_server[13412] debug: sending update to localhost:9097
+2015/05/01 13:41:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 13:46:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 13:46:03.00 chirp_server[13466] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:46:03.00 chirp_server[13466] local: = 1
+2015/05/01 13:46:03.00 chirp_server[13466] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:46:03.00 chirp_server[13466] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:46:03.00 chirp_server[13466] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 13:46:03.00 chirp_server[13466] local: = 0
+2015/05/01 13:46:03.00 chirp_server[13466] dns: looking up name localhost
+2015/05/01 13:46:03.00 chirp_server[13466] dns: localhost is 127.0.0.1
+2015/05/01 13:46:03.00 chirp_server[13466] debug: sending update to localhost:9097
+2015/05/01 13:46:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 13:51:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 13:51:03.00 chirp_server[13500] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:51:03.00 chirp_server[13500] local: = 1
+2015/05/01 13:51:03.00 chirp_server[13500] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:51:03.00 chirp_server[13500] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:51:03.00 chirp_server[13500] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 13:51:03.00 chirp_server[13500] local: = 0
+2015/05/01 13:51:03.00 chirp_server[13500] dns: looking up name localhost
+2015/05/01 13:51:03.00 chirp_server[13500] dns: localhost is 127.0.0.1
+2015/05/01 13:51:03.00 chirp_server[13500] debug: sending update to localhost:9097
+2015/05/01 13:51:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 13:56:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 13:56:03.00 chirp_server[13532] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 13:56:03.00 chirp_server[13532] local: = 1
+2015/05/01 13:56:03.00 chirp_server[13532] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:56:03.00 chirp_server[13532] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:56:03.00 chirp_server[13532] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 13:56:03.00 chirp_server[13532] local: = 0
+2015/05/01 13:56:03.00 chirp_server[13532] dns: looking up name localhost
+2015/05/01 13:56:03.00 chirp_server[13532] dns: localhost is 127.0.0.1
+2015/05/01 13:56:03.00 chirp_server[13532] debug: sending update to localhost:9097
+2015/05/01 13:56:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:01:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:01:03.00 chirp_server[18649] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:01:03.00 chirp_server[18649] local: = 1
+2015/05/01 14:01:03.00 chirp_server[18649] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:01:03.00 chirp_server[18649] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:01:03.00 chirp_server[18649] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:01:03.00 chirp_server[18649] local: = 0
+2015/05/01 14:01:03.00 chirp_server[18649] dns: looking up name localhost
+2015/05/01 14:01:03.00 chirp_server[18649] dns: localhost is 127.0.0.1
+2015/05/01 14:01:03.00 chirp_server[18649] debug: sending update to localhost:9097
+2015/05/01 14:01:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:06:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:06:03.00 chirp_server[18884] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:06:03.00 chirp_server[18884] local: = 1
+2015/05/01 14:06:03.00 chirp_server[18884] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:06:03.00 chirp_server[18884] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:06:03.00 chirp_server[18884] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:06:03.00 chirp_server[18884] local: = 0
+2015/05/01 14:06:03.00 chirp_server[18884] dns: looking up name localhost
+2015/05/01 14:06:03.00 chirp_server[18884] dns: localhost is 127.0.0.1
+2015/05/01 14:06:03.00 chirp_server[18884] debug: sending update to localhost:9097
+2015/05/01 14:06:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:11:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:11:03.00 chirp_server[18919] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:11:03.00 chirp_server[18919] local: = 1
+2015/05/01 14:11:03.00 chirp_server[18919] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:11:03.00 chirp_server[18919] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:11:03.00 chirp_server[18919] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:11:03.00 chirp_server[18919] local: = 0
+2015/05/01 14:11:03.00 chirp_server[18919] dns: looking up name localhost
+2015/05/01 14:11:03.00 chirp_server[18919] dns: localhost is 127.0.0.1
+2015/05/01 14:11:03.00 chirp_server[18919] debug: sending update to localhost:9097
+2015/05/01 14:11:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:16:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:16:03.00 chirp_server[18966] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:16:03.00 chirp_server[18966] local: = 1
+2015/05/01 14:16:03.00 chirp_server[18966] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:16:03.00 chirp_server[18966] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:16:03.00 chirp_server[18966] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:16:03.00 chirp_server[18966] local: = 0
+2015/05/01 14:16:03.00 chirp_server[18966] dns: looking up name localhost
+2015/05/01 14:16:03.00 chirp_server[18966] dns: localhost is 127.0.0.1
+2015/05/01 14:16:03.00 chirp_server[18966] debug: sending update to localhost:9097
+2015/05/01 14:16:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:21:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:21:03.00 chirp_server[18999] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:21:03.00 chirp_server[18999] local: = 1
+2015/05/01 14:21:03.00 chirp_server[18999] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:21:03.00 chirp_server[18999] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:21:03.00 chirp_server[18999] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:21:03.00 chirp_server[18999] local: = 0
+2015/05/01 14:21:03.00 chirp_server[18999] dns: looking up name localhost
+2015/05/01 14:21:03.00 chirp_server[18999] dns: localhost is 127.0.0.1
+2015/05/01 14:21:03.00 chirp_server[18999] debug: sending update to localhost:9097
+2015/05/01 14:21:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:26:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:26:03.00 chirp_server[19028] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:26:03.00 chirp_server[19028] local: = 1
+2015/05/01 14:26:03.00 chirp_server[19028] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:26:03.00 chirp_server[19028] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:26:03.00 chirp_server[19028] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:26:03.00 chirp_server[19028] local: = 0
+2015/05/01 14:26:03.00 chirp_server[19028] dns: looking up name localhost
+2015/05/01 14:26:03.00 chirp_server[19028] dns: localhost is 127.0.0.1
+2015/05/01 14:26:03.00 chirp_server[19028] debug: sending update to localhost:9097
+2015/05/01 14:26:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:31:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:31:03.00 chirp_server[19079] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:31:03.00 chirp_server[19079] local: = 1
+2015/05/01 14:31:03.00 chirp_server[19079] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:31:03.00 chirp_server[19079] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:31:03.00 chirp_server[19079] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:31:03.00 chirp_server[19079] local: = 0
+2015/05/01 14:31:03.00 chirp_server[19079] dns: looking up name localhost
+2015/05/01 14:31:03.00 chirp_server[19079] dns: localhost is 127.0.0.1
+2015/05/01 14:31:03.00 chirp_server[19079] debug: sending update to localhost:9097
+2015/05/01 14:31:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:36:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:36:03.00 chirp_server[19108] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:36:03.00 chirp_server[19108] local: = 1
+2015/05/01 14:36:03.00 chirp_server[19108] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:36:03.00 chirp_server[19108] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:36:03.00 chirp_server[19108] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:36:03.00 chirp_server[19108] local: = 0
+2015/05/01 14:36:03.00 chirp_server[19108] dns: looking up name localhost
+2015/05/01 14:36:03.00 chirp_server[19108] dns: localhost is 127.0.0.1
+2015/05/01 14:36:03.00 chirp_server[19108] debug: sending update to localhost:9097
+2015/05/01 14:36:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:41:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:41:03.00 chirp_server[19141] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:41:03.00 chirp_server[19141] local: = 1
+2015/05/01 14:41:03.00 chirp_server[19141] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:41:03.00 chirp_server[19141] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:41:03.00 chirp_server[19141] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:41:03.00 chirp_server[19141] local: = 0
+2015/05/01 14:41:03.00 chirp_server[19141] dns: looking up name localhost
+2015/05/01 14:41:03.00 chirp_server[19141] dns: localhost is 127.0.0.1
+2015/05/01 14:41:03.00 chirp_server[19141] debug: sending update to localhost:9097
+2015/05/01 14:41:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:46:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:46:03.00 chirp_server[19188] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:46:03.00 chirp_server[19188] local: = 1
+2015/05/01 14:46:03.00 chirp_server[19188] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:46:03.00 chirp_server[19188] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:46:03.00 chirp_server[19188] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:46:03.00 chirp_server[19188] local: = 0
+2015/05/01 14:46:03.00 chirp_server[19188] dns: looking up name localhost
+2015/05/01 14:46:03.00 chirp_server[19188] dns: localhost is 127.0.0.1
+2015/05/01 14:46:03.00 chirp_server[19188] debug: sending update to localhost:9097
+2015/05/01 14:46:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:51:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:51:03.00 chirp_server[19223] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:51:03.00 chirp_server[19223] local: = 1
+2015/05/01 14:51:03.00 chirp_server[19223] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:51:03.00 chirp_server[19223] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:51:03.00 chirp_server[19223] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:51:03.00 chirp_server[19223] local: = 0
+2015/05/01 14:51:03.00 chirp_server[19223] dns: looking up name localhost
+2015/05/01 14:51:03.00 chirp_server[19223] dns: localhost is 127.0.0.1
+2015/05/01 14:51:03.00 chirp_server[19223] debug: sending update to localhost:9097
+2015/05/01 14:51:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 14:56:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 14:56:03.00 chirp_server[19257] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 14:56:03.00 chirp_server[19257] local: = 1
+2015/05/01 14:56:03.00 chirp_server[19257] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:56:03.00 chirp_server[19257] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 14:56:03.00 chirp_server[19257] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 14:56:03.00 chirp_server[19257] local: = 0
+2015/05/01 14:56:03.00 chirp_server[19257] dns: looking up name localhost
+2015/05/01 14:56:03.00 chirp_server[19257] dns: localhost is 127.0.0.1
+2015/05/01 14:56:03.00 chirp_server[19257] debug: sending update to localhost:9097
+2015/05/01 14:56:03.00 chirp_server[12588] process: *** catalog update complete ***
+2015/05/01 15:01:03.00 chirp_server[12588] process: *** catalog update starting ***
+2015/05/01 15:01:03.00 chirp_server[19341] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.JrA6Fc')
+2015/05/01 15:01:03.00 chirp_server[19341] local: = 1
+2015/05/01 15:01:03.00 chirp_server[19341] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 15:01:03.00 chirp_server[19341] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 15:01:03.00 chirp_server[19341] local: statfs(`/', 0x7fff1d360980)
+2015/05/01 15:01:03.00 chirp_server[19341] local: = 0
+2015/05/01 15:01:03.00 chirp_server[19341] dns: looking up name localhost
+2015/05/01 15:01:03.00 chirp_server[19341] dns: localhost is 127.0.0.1
+2015/05/01 15:01:03.00 chirp_server[19341] debug: sending update to localhost:9097
+2015/05/01 15:01:03.00 chirp_server[12588] process: *** catalog update complete ***

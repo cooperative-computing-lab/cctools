@@ -1,0 +1,1736 @@
+2015/05/01 13:25:31.00 chirp_server[11780] debug: ../../chirp/src/chirp_server version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 13:25:31.00 chirp_server[11780] debug: Built by dthain@cclws15 on May  1 2015 at 12:43:12
+2015/05/01 13:25:31.00 chirp_server[11780] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 13:25:31.00 chirp_server[11780] debug: Configuration:
+2015/05/01 13:25:31.00 chirp_server[11780] chirp: normalizing url `./chirp.root.Ukn66g' as `local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g'
+2015/05/01 13:25:31.00 chirp_server[11780] chirp: transient directory: `/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.transient.N7e0ly'
+2015/05/01 13:25:31.00 chirp_server[11780] notice: *** ../../chirp/src/chirp_server starting at Fri May  1 13:25:31 2015
+2015/05/01 13:25:31.00 chirp_server[11780] process: *** backend setup starting ***
+2015/05/01 13:25:31.00 chirp_server[11782] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:25:31.00 chirp_server[11782] local: = 1
+2015/05/01 13:25:31.00 chirp_server[11782] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:31.00 chirp_server[11782] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:31.00 chirp_server[11782] local: open(`//.__acl', 0x241, 0o600)
+2015/05/01 13:25:31.00 chirp_server[11782] local: = 0
+2015/05/01 13:25:31.00 chirp_server[11782] local: pwrite(0, 0x2001290, 18, 0)
+2015/05/01 13:25:31.00 chirp_server[11782] local: = 18
+2015/05/01 13:25:31.00 chirp_server[11782] local: close(0)
+2015/05/01 13:25:31.01 chirp_server[11782] local: = 0
+2015/05/01 13:25:31.01 chirp_server[11780] process: *** backend setup complete ***
+2015/05/01 13:25:31.01 chirp_server[11780] tcp: listening on port 1030
+2015/05/01 13:25:31.01 chirp_server[11780] debug: now listening port on port 1030
+2015/05/01 13:25:31.01 chirp_server[11780] dns: looking up name cclws15
+2015/05/01 13:25:31.01 chirp_server[11780] dns: cclws15 is 129.74.155.71
+2015/05/01 13:25:31.01 chirp_server[11780] dns: looking up addr 129.74.155.71
+2015/05/01 13:25:31.01 chirp_server[11780] dns: 129.74.155.71 is cclws15.cse.nd.edu
+2015/05/01 13:25:31.01 chirp_server[11780] dns: finding my hostname: uname = cclws15, address = 129.74.155.71, hostname = cclws15.cse.nd.edu
+2015/05/01 13:25:31.01 chirp_server[11780] chirp: forked scheduler 11783
+2015/05/01 13:25:31.01 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 13:25:31.01 chirp_server[11783] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:25:31.01 chirp_server[11783] local: = 1
+2015/05/01 13:25:31.01 chirp_server[11783] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:31.01 chirp_server[11784] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:25:31.01 chirp_server[11783] local: = 0
+2015/05/01 13:25:31.01 chirp_server[11783] local: close(0)
+2015/05/01 13:25:31.01 chirp_server[11783] local: = 0
+2015/05/01 13:25:31.01 chirp_server[11783] debug: no scheduler available, quitting!
+2015/05/01 13:25:31.01 chirp_server[11784] local: = 1
+2015/05/01 13:25:31.01 chirp_server[11784] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:31.01 chirp_server[11784] local: = 0
+2015/05/01 13:25:31.01 chirp_server[11784] local: close(0)
+2015/05/01 13:25:31.01 chirp_server[11784] local: = 0
+2015/05/01 13:25:31.01 chirp_server[11784] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 13:25:31.01 chirp_server[11784] local: = 0
+2015/05/01 13:25:31.01 chirp_server[11784] dns: looking up name localhost
+2015/05/01 13:25:31.01 chirp_server[11784] dns: localhost is 127.0.0.1
+2015/05/01 13:25:31.01 chirp_server[11784] debug: sending update to localhost:9097
+2015/05/01 13:25:31.01 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 13:25:31.01 chirp_server[11780] process: *** ticket cleanup starting ***
+2015/05/01 13:25:31.01 chirp_server[11785] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:25:31.01 chirp_server[11785] local: = 1
+2015/05/01 13:25:31.01 chirp_server[11785] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:31.01 chirp_server[11785] local: = 0
+2015/05/01 13:25:31.01 chirp_server[11785] local: close(0)
+2015/05/01 13:25:31.01 chirp_server[11785] local: = 0
+2015/05/01 13:25:31.01 chirp_server[11785] local: opendir(`/')
+2015/05/01 13:25:31.01 chirp_server[11785] local: = 0x201a020
+2015/05/01 13:25:31.01 chirp_server[11785] local: readdir(0x201a020 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g/'])
+2015/05/01 13:25:31.01 chirp_server[11785] local: = 0x201a428 [name = `.']
+2015/05/01 13:25:31.01 chirp_server[11785] local: readdir(0x201a020 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g/'])
+2015/05/01 13:25:31.01 chirp_server[11785] local: = 0x201a428 [name = `..']
+2015/05/01 13:25:31.01 chirp_server[11785] local: readdir(0x201a020 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g/'])
+2015/05/01 13:25:31.01 chirp_server[11785] local: = 0x201a428 [name = `.__acl']
+2015/05/01 13:25:31.01 chirp_server[11785] local: readdir(0x201a020 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g/'])
+2015/05/01 13:25:31.01 chirp_server[11785] local: = NULL (errno = 98; `Address already in use')
+2015/05/01 13:25:31.01 chirp_server[11785] local: closedir(0x201a020 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g/'])
+2015/05/01 13:25:31.01 chirp_server[11780] process: *** ticket cleanup complete ***
+2015/05/01 13:25:31.02 chirp_server[11780] process: pid 11783 exited with 0 (0 total child procs)
+2015/05/01 13:25:32.12 chirp_server[11780] tcp: got connection from 127.0.0.1:56808
+2015/05/01 13:25:32.12 chirp_server[11780] process: created pid 11799 (0 total child procs)
+2015/05/01 13:25:32.12 chirp_server[11780] tcp: disconnected from 127.0.0.1:56808
+2015/05/01 13:25:32.12 chirp_server[11799] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:25:32.12 chirp_server[11799] local: = 1
+2015/05/01 13:25:32.12 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.12 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.12 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.12 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.12 chirp_server[11799] auth: 127.0.0.1:56808 requests 'unix' authentication
+2015/05/01 13:25:32.12 chirp_server[11799] auth: I agree to try 'unix'
+2015/05/01 13:25:32.12 chirp_server[11799] auth: unix: generating challenge
+2015/05/01 13:25:32.12 chirp_server[11799] auth: unix: challenge path is /tmp/challenge.11799.1804289383
+2015/05/01 13:25:32.12 chirp_server[11799] auth: unix: waiting for response
+2015/05/01 13:25:32.14 chirp_server[11799] auth: unix: got response
+2015/05/01 13:25:32.14 chirp_server[11799] auth: unix: client is uid 102744
+2015/05/01 13:25:32.14 chirp_server[11799] auth: unix: client is subject dthain
+2015/05/01 13:25:32.14 chirp_server[11799] auth: 'unix' authentication succeeded
+2015/05/01 13:25:32.14 chirp_server[11799] auth: 127.0.0.1:56808 is unix:dthain
+2015/05/01 13:25:32.14 chirp_server[11799] login: unix:dthain from 127.0.0.1:56808
+2015/05/01 13:25:32.14 chirp_server[11799] auth: hostname: registered
+2015/05/01 13:25:32.14 chirp_server[11799] auth: address: registered
+2015/05/01 13:25:32.14 chirp_server[11799] chirp: stat /
+2015/05/01 13:25:32.14 chirp_server[11799] local: readlink(`/', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.14 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.14 chirp_server[11799] local: stat(`/', 0x7fff889cf5d0)
+2015/05/01 13:25:32.14 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.14 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.14 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.14 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.14 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.14 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.14 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.14 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.14 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.14 chirp_server[11799] local: stat(`/', 0x7fff889e0310)
+2015/05/01 13:25:32.14 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.14 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.17 chirp_server[11799] chirp: stat /
+2015/05/01 13:25:32.17 chirp_server[11799] local: readlink(`/', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.17 chirp_server[11799] local: stat(`/', 0x7fff889cf5d0)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.17 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.17 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.17 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.17 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.17 chirp_server[11799] local: stat(`/', 0x7fff889e0310)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.17 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.17 chirp_server[11799] chirp: readlink /a.py 1023
+2015/05/01 13:25:32.17 chirp_server[11799] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.17 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.17 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.17 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.17 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.17 chirp_server[11799] local: readlink(`/a.py', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.17 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.17 chirp_server[11799] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.18 chirp_server[11799] chirp: open /a.py wct 438
+2015/05/01 13:25:32.18 chirp_server[11799] local: stat(`/a.py', 0x7fff889d0260)
+2015/05/01 13:25:32.18 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.18 chirp_server[11799] local: readlink(`/a.py', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.18 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.18 chirp_server[11799] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.18 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.18 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.18 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.18 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.18 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.18 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.18 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.18 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.18 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.18 chirp_server[11799] local: open(`/a.py', 0x241, 0o666)
+2015/05/01 13:25:32.18 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.18 chirp_server[11799] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.18 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.18 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.20 chirp_server[11799] chirp: fstat 0
+2015/05/01 13:25:32.20 chirp_server[11799] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.20 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.20 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.20 chirp_server[11799] chirp: pwrite 0 70 0
+2015/05/01 13:25:32.20 chirp_server[11799] local: fstat(0, 0x7fff889d0260)
+2015/05/01 13:25:32.20 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.20 chirp_server[11799] local: fname(0, 0x7fff889cfed0)
+2015/05/01 13:25:32.20 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.20 chirp_server[11799] local: pwrite(0, 0x7f9c6affa010, 70, 0)
+2015/05/01 13:25:32.20 chirp_server[11799] local: = 70
+2015/05/01 13:25:32.20 chirp_server[11799] chirp: = 70
+2015/05/01 13:25:32.21 chirp_server[11799] chirp: close 0
+2015/05/01 13:25:32.21 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.21 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.21 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.22 chirp_server[11799] chirp: stat /
+2015/05/01 13:25:32.22 chirp_server[11799] local: readlink(`/', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.22 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.22 chirp_server[11799] local: stat(`/', 0x7fff889cf5d0)
+2015/05/01 13:25:32.22 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.22 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.22 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.22 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.22 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.22 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.22 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.22 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.22 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.22 chirp_server[11799] local: stat(`/', 0x7fff889e0310)
+2015/05/01 13:25:32.22 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.22 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.26 chirp_server[11799] chirp: stat /
+2015/05/01 13:25:32.26 chirp_server[11799] local: readlink(`/', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.26 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.26 chirp_server[11799] local: stat(`/', 0x7fff889cf5d0)
+2015/05/01 13:25:32.26 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.26 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.26 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.26 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.26 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.26 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.26 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.26 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.26 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.26 chirp_server[11799] local: stat(`/', 0x7fff889e0310)
+2015/05/01 13:25:32.26 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.26 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] chirp: readlink /python 1023
+2015/05/01 13:25:32.27 chirp_server[11799] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.27 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: readlink(`/python', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.27 chirp_server[11799] chirp: stat /python
+2015/05/01 13:25:32.27 chirp_server[11799] local: readlink(`/python', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.27 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: stat(`/python', 0x7fff889e0310)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.27 chirp_server[11799] chirp: lstat /python
+2015/05/01 13:25:32.27 chirp_server[11799] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.27 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: lstat(`/python', 0x7fff889e0310)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.27 chirp_server[11799] chirp: readlink /python 1023
+2015/05/01 13:25:32.27 chirp_server[11799] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.27 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: readlink(`/python', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.27 chirp_server[11799] chirp: open /python wcx 493
+2015/05/01 13:25:32.27 chirp_server[11799] local: stat(`/python', 0x7fff889d0260)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] local: readlink(`/python', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.27 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.27 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.27 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.27 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.28 chirp_server[11799] local: open(`/python', 0xc1, 0o755)
+2015/05/01 13:25:32.28 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.28 chirp_server[11799] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.28 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.28 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.28 chirp_server[11799] chirp: fstat 0
+2015/05/01 13:25:32.28 chirp_server[11799] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.28 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.28 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.28 chirp_server[11799] chirp: pwrite 0 9032 0
+2015/05/01 13:25:32.28 chirp_server[11799] local: fstat(0, 0x7fff889d0260)
+2015/05/01 13:25:32.28 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.28 chirp_server[11799] local: fname(0, 0x7fff889cfed0)
+2015/05/01 13:25:32.28 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.28 chirp_server[11799] local: pwrite(0, 0x7f9c6affa010, 9032, 0)
+2015/05/01 13:25:32.28 chirp_server[11799] local: = 9032
+2015/05/01 13:25:32.28 chirp_server[11799] chirp: = 9032
+2015/05/01 13:25:32.29 chirp_server[11799] chirp: close 0
+2015/05/01 13:25:32.29 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] chirp: lstat /python
+2015/05/01 13:25:32.29 chirp_server[11799] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.29 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] local: lstat(`/python', 0x7fff889e0310)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] chirp: readlink /sh 1023
+2015/05/01 13:25:32.29 chirp_server[11799] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.29 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.29 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] local: readlink(`/sh', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.29 chirp_server[11799] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.29 chirp_server[11799] chirp: stat /sh
+2015/05/01 13:25:32.29 chirp_server[11799] local: readlink(`/sh', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.29 chirp_server[11799] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.29 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.29 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.29 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.30 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: stat(`/sh', 0x7fff889e0310)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.30 chirp_server[11799] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.30 chirp_server[11799] chirp: lstat /sh
+2015/05/01 13:25:32.30 chirp_server[11799] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.30 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.30 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: lstat(`/sh', 0x7fff889e0310)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.30 chirp_server[11799] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.30 chirp_server[11799] chirp: readlink /sh 1023
+2015/05/01 13:25:32.30 chirp_server[11799] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.30 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.30 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: readlink(`/sh', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.30 chirp_server[11799] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.30 chirp_server[11799] chirp: open /sh wcx 493
+2015/05/01 13:25:32.30 chirp_server[11799] local: stat(`/sh', 0x7fff889d0260)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.30 chirp_server[11799] local: readlink(`/sh', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.30 chirp_server[11799] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.30 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.30 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: open(`/sh', 0xc1, 0o755)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.30 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.30 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.31 chirp_server[11799] chirp: fstat 0
+2015/05/01 13:25:32.31 chirp_server[11799] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.31 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.31 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.31 chirp_server[11799] chirp: pwrite 0 940416 0
+2015/05/01 13:25:32.31 chirp_server[11799] local: fstat(0, 0x7fff889d0260)
+2015/05/01 13:25:32.31 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.31 chirp_server[11799] local: fname(0, 0x7fff889cfed0)
+2015/05/01 13:25:32.31 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.31 chirp_server[11799] local: pwrite(0, 0x7f9c6affa010, 940416, 0)
+2015/05/01 13:25:32.31 chirp_server[11799] local: = 940416
+2015/05/01 13:25:32.31 chirp_server[11799] chirp: = 940416
+2015/05/01 13:25:32.31 chirp_server[11799] chirp: close 0
+2015/05/01 13:25:32.31 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] chirp: lstat /sh
+2015/05/01 13:25:32.40 chirp_server[11799] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.40 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] local: lstat(`/sh', 0x7fff889e0310)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] chirp: stat /
+2015/05/01 13:25:32.40 chirp_server[11799] local: readlink(`/', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.40 chirp_server[11799] local: stat(`/', 0x7fff889cf5d0)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.40 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] local: stat(`/', 0x7fff889e0310)
+2015/05/01 13:25:32.40 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.40 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] chirp: readlink /a.py 1023
+2015/05/01 13:25:32.42 chirp_server[11799] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.42 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: readlink(`/a.py', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.42 chirp_server[11799] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.42 chirp_server[11799] chirp: stat /a.py
+2015/05/01 13:25:32.42 chirp_server[11799] local: readlink(`/a.py', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.42 chirp_server[11799] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.42 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: stat(`/a.py', 0x7fff889e0310)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] chirp: readlink /a.py 1023
+2015/05/01 13:25:32.42 chirp_server[11799] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.42 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.42 chirp_server[11799] local: readlink(`/a.py', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.42 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.42 chirp_server[11799] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.43 chirp_server[11799] chirp: chmod /a.py 448
+2015/05/01 13:25:32.43 chirp_server[11799] local: open(`/a.py/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = -1 (errno = 20; `Not a directory')
+2015/05/01 13:25:32.43 chirp_server[11799] local: stat(`/a.py', 0x7fff889cfe20)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: readlink(`/a.py', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.43 chirp_server[11799] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.43 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: chmod(`/a.py', 0o700)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] chirp: readlink /python 1023
+2015/05/01 13:25:32.43 chirp_server[11799] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.43 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: readlink(`/python', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.43 chirp_server[11799] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.43 chirp_server[11799] chirp: stat /python
+2015/05/01 13:25:32.43 chirp_server[11799] local: readlink(`/python', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.43 chirp_server[11799] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.43 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: stat(`/python', 0x7fff889e0310)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] chirp: readlink /python 1023
+2015/05/01 13:25:32.43 chirp_server[11799] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.43 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.43 chirp_server[11799] local: readlink(`/python', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.43 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.43 chirp_server[11799] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.44 chirp_server[11799] chirp: chmod /python 448
+2015/05/01 13:25:32.44 chirp_server[11799] local: open(`/python/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = -1 (errno = 20; `Not a directory')
+2015/05/01 13:25:32.44 chirp_server[11799] local: stat(`/python', 0x7fff889cfe20)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: readlink(`/python', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.44 chirp_server[11799] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.44 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: chmod(`/python', 0o700)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] chirp: readlink /sh 1023
+2015/05/01 13:25:32.44 chirp_server[11799] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.44 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: readlink(`/sh', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.44 chirp_server[11799] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.44 chirp_server[11799] chirp: stat /sh
+2015/05/01 13:25:32.44 chirp_server[11799] local: readlink(`/sh', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.44 chirp_server[11799] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.44 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: stat(`/sh', 0x7fff889e0310)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] chirp: readlink /sh 1023
+2015/05/01 13:25:32.44 chirp_server[11799] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.44 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.44 chirp_server[11799] local: readlink(`/sh', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.44 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.44 chirp_server[11799] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.45 chirp_server[11799] chirp: chmod /sh 448
+2015/05/01 13:25:32.45 chirp_server[11799] local: open(`/sh/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.45 chirp_server[11799] local: = -1 (errno = 20; `Not a directory')
+2015/05/01 13:25:32.45 chirp_server[11799] local: stat(`/sh', 0x7fff889cfe20)
+2015/05/01 13:25:32.45 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.45 chirp_server[11799] local: readlink(`/sh', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.45 chirp_server[11799] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.45 chirp_server[11799] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:32.45 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.45 chirp_server[11799] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.45 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.45 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 0)
+2015/05/01 13:25:32.45 chirp_server[11799] local: = 18
+2015/05/01 13:25:32.45 chirp_server[11799] local: pread(0, 0x20230a0, 65535, 18)
+2015/05/01 13:25:32.45 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.45 chirp_server[11799] local: close(0)
+2015/05/01 13:25:32.45 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.45 chirp_server[11799] local: chmod(`/sh', 0o700)
+2015/05/01 13:25:32.45 chirp_server[11799] local: = 0
+2015/05/01 13:25:32.45 chirp_server[11799] chirp: = 0
+2015/05/01 13:25:32.52 chirp_server[11799] chirp: timeout: client idle too long
+2015/05/01 13:25:32.52 chirp_server[11799] debug: sending stats: stats 127.0.0.1 unix:dthain 40 0 949518
+2015/05/01 13:25:32.52 chirp_server[11799] login: disconnected
+2015/05/01 13:25:32.52 chirp_server[11799] tcp: disconnected from 127.0.0.1:56808
+2015/05/01 13:25:32.52 chirp_server[11780] debug: config message: stats 127.0.0.1 unix:dthain 40 0 949518
+2015/05/01 13:25:32.52 chirp_server[11780] process: pid 11799 exited with 0 (0 total child procs)
+2015/05/01 13:25:32.54 chirp_server[11780] tcp: got connection from 127.0.0.1:56809
+2015/05/01 13:25:32.54 chirp_server[11780] process: created pid 11809 (0 total child procs)
+2015/05/01 13:25:32.54 chirp_server[11780] tcp: disconnected from 127.0.0.1:56809
+2015/05/01 13:25:32.54 chirp_server[11809] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:25:32.54 chirp_server[11809] local: = 1
+2015/05/01 13:25:32.54 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.54 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.54 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.54 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.54 chirp_server[11809] auth: 127.0.0.1:56809 requests 'unix' authentication
+2015/05/01 13:25:32.54 chirp_server[11809] auth: I agree to try 'unix'
+2015/05/01 13:25:32.54 chirp_server[11809] auth: unix: generating challenge
+2015/05/01 13:25:32.54 chirp_server[11809] auth: unix: challenge path is /tmp/challenge.11809.1804289383
+2015/05/01 13:25:32.54 chirp_server[11809] auth: unix: waiting for response
+2015/05/01 13:25:32.56 chirp_server[11809] auth: unix: got response
+2015/05/01 13:25:32.56 chirp_server[11809] auth: unix: client is uid 102744
+2015/05/01 13:25:32.56 chirp_server[11809] auth: unix: client is subject dthain
+2015/05/01 13:25:32.56 chirp_server[11809] auth: 'unix' authentication succeeded
+2015/05/01 13:25:32.56 chirp_server[11809] auth: 127.0.0.1:56809 is unix:dthain
+2015/05/01 13:25:32.56 chirp_server[11809] login: unix:dthain from 127.0.0.1:56809
+2015/05/01 13:25:32.56 chirp_server[11809] auth: hostname: registered
+2015/05/01 13:25:32.56 chirp_server[11809] auth: address: registered
+2015/05/01 13:25:32.56 chirp_server[11809] chirp: readlink /a.py 1023
+2015/05/01 13:25:32.56 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.56 chirp_server[11809] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: readlink(`/a.py', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.56 chirp_server[11809] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.56 chirp_server[11809] chirp: stat /a.py
+2015/05/01 13:25:32.56 chirp_server[11809] local: readlink(`/a.py', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.56 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.56 chirp_server[11809] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: stat(`/a.py', 0x7fff889e0310)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] chirp: readlink /a.py 1023
+2015/05/01 13:25:32.56 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.56 chirp_server[11809] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: readlink(`/a.py', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.56 chirp_server[11809] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.56 chirp_server[11809] chirp: stat /a.py
+2015/05/01 13:25:32.56 chirp_server[11809] local: readlink(`/a.py', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.56 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.56 chirp_server[11809] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] local: stat(`/a.py', 0x7fff889e0310)
+2015/05/01 13:25:32.56 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.56 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: open /a.py r 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: stat(`/a.py', 0x7fff889d0260)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: readlink(`/a.py', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.57 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: open(`/a.py', 0x0, 0o0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: pread 0 65536 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 70
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: = 70
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: pread 0 65536 70
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 70)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: pread 0 65536 70
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 70)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: close 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: readlink /python 1023
+2015/05/01 13:25:32.57 chirp_server[11809] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: readlink(`/python', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: stat /python
+2015/05/01 13:25:32.57 chirp_server[11809] local: readlink(`/python', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.57 chirp_server[11809] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: stat(`/python', 0x7fff889e0310)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: open /python r 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: stat(`/python', 0x7fff889d0260)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: readlink(`/python', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.57 chirp_server[11809] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: open(`/python', 0x0, 0o0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: pread 0 65536 0
+2015/05/01 13:25:32.57 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 0)
+2015/05/01 13:25:32.57 chirp_server[11809] local: = 9032
+2015/05/01 13:25:32.57 chirp_server[11809] chirp: = 9032
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: pread 0 65536 9032
+2015/05/01 13:25:32.58 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 9032)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: pread 0 65536 9032
+2015/05/01 13:25:32.58 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 9032)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: close 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: readlink /python 1023
+2015/05/01 13:25:32.58 chirp_server[11809] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.58 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: readlink(`/python', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: open /python r 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: stat(`/python', 0x7fff889d0260)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: readlink(`/python', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.58 chirp_server[11809] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.58 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: open(`/python', 0x0, 0o0)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: pread 0 65536 0
+2015/05/01 13:25:32.58 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 0)
+2015/05/01 13:25:32.58 chirp_server[11809] local: = 9032
+2015/05/01 13:25:32.58 chirp_server[11809] chirp: = 9032
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: fstat 0
+2015/05/01 13:25:32.59 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.59 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: fstat 0
+2015/05/01 13:25:32.59 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.59 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: pread 0 65536 0
+2015/05/01 13:25:32.59 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 0)
+2015/05/01 13:25:32.59 chirp_server[11809] local: = 9032
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: = 9032
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: fstat 0
+2015/05/01 13:25:32.59 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.59 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: fstat 0
+2015/05/01 13:25:32.59 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.59 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: fstat 0
+2015/05/01 13:25:32.59 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.59 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: close 0
+2015/05/01 13:25:32.59 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.59 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.59 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.62 chirp_server[11809] chirp: readlink /python 1024
+2015/05/01 13:25:32.62 chirp_server[11809] local: stat(`/python', 0x7fff889cf5d0)
+2015/05/01 13:25:32.62 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.62 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.62 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.62 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.62 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.62 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.62 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.62 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.62 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.62 chirp_server[11809] local: readlink(`/python', 0x7f9c6affa010, 1024)
+2015/05/01 13:25:32.62 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.62 chirp_server[11809] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.63 chirp_server[11809] chirp: readlink /Modules/Setup 1023
+2015/05/01 13:25:32.63 chirp_server[11809] local: stat(`/Modules/Setup', 0x7fff889cf5d0)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: open(`/Modules/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: stat(`/Modules', 0x7fff889cf190)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.63 chirp_server[11809] chirp: stat /Modules/Setup
+2015/05/01 13:25:32.63 chirp_server[11809] local: readlink(`/Modules/Setup', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: stat(`/Modules/Setup', 0x7fff889cf5d0)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: open(`/Modules/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: stat(`/Modules', 0x7fff889cf190)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.63 chirp_server[11809] chirp: readlink /lib64/python2.6/os.py 1023
+2015/05/01 13:25:32.63 chirp_server[11809] local: stat(`/lib64/python2.6/os.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: open(`/lib64/python2.6/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: stat(`/lib64/python2.6', 0x7fff889cf190)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.63 chirp_server[11809] chirp: stat /lib64/python2.6/os.py
+2015/05/01 13:25:32.63 chirp_server[11809] local: readlink(`/lib64/python2.6/os.py', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: stat(`/lib64/python2.6/os.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: open(`/lib64/python2.6/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: stat(`/lib64/python2.6', 0x7fff889cf190)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.63 chirp_server[11809] chirp: readlink /lib64/python2.6/os.pyc 1023
+2015/05/01 13:25:32.63 chirp_server[11809] local: stat(`/lib64/python2.6/os.pyc', 0x7fff889cf5d0)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: open(`/lib64/python2.6/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] local: stat(`/lib64/python2.6', 0x7fff889cf190)
+2015/05/01 13:25:32.63 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.63 chirp_server[11809] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.64 chirp_server[11809] chirp: stat /lib64/python2.6/os.pyc
+2015/05/01 13:25:32.64 chirp_server[11809] local: readlink(`/lib64/python2.6/os.pyc', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: stat(`/lib64/python2.6/os.pyc', 0x7fff889cf5d0)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: open(`/lib64/python2.6/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: stat(`/lib64/python2.6', 0x7fff889cf190)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.64 chirp_server[11809] chirp: readlink /Modules/Setup 1023
+2015/05/01 13:25:32.64 chirp_server[11809] local: stat(`/Modules/Setup', 0x7fff889cf5d0)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: open(`/Modules/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: stat(`/Modules', 0x7fff889cf190)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.64 chirp_server[11809] chirp: stat /Modules/Setup
+2015/05/01 13:25:32.64 chirp_server[11809] local: readlink(`/Modules/Setup', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: stat(`/Modules/Setup', 0x7fff889cf5d0)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: open(`/Modules/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: stat(`/Modules', 0x7fff889cf190)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.64 chirp_server[11809] chirp: readlink /lib64/python2.6/lib-dynload 1023
+2015/05/01 13:25:32.64 chirp_server[11809] local: stat(`/lib64/python2.6/lib-dynload', 0x7fff889cf5d0)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: open(`/lib64/python2.6/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: stat(`/lib64/python2.6', 0x7fff889cf190)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.64 chirp_server[11809] chirp: stat /lib64/python2.6/lib-dynload
+2015/05/01 13:25:32.64 chirp_server[11809] local: readlink(`/lib64/python2.6/lib-dynload', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: stat(`/lib64/python2.6/lib-dynload', 0x7fff889cf5d0)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: open(`/lib64/python2.6/.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] local: stat(`/lib64/python2.6', 0x7fff889cf190)
+2015/05/01 13:25:32.64 chirp_server[11809] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:32.64 chirp_server[11809] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:32.83 chirp_server[11809] chirp: readlink /a.py 1024
+2015/05/01 13:25:32.83 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.83 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: readlink(`/a.py', 0x7f9c6affa010, 1024)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.83 chirp_server[11809] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.83 chirp_server[11809] chirp: lstat /a.py
+2015/05/01 13:25:32.83 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.83 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: lstat(`/a.py', 0x7fff889e0310)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] chirp: readlink /a.py 1023
+2015/05/01 13:25:32.83 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.83 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: readlink(`/a.py', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.83 chirp_server[11809] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.83 chirp_server[11809] chirp: stat /a.py
+2015/05/01 13:25:32.83 chirp_server[11809] local: readlink(`/a.py', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.83 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.83 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] local: stat(`/a.py', 0x7fff889e0310)
+2015/05/01 13:25:32.83 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.83 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: readlink /a.py 1023
+2015/05/01 13:25:32.84 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.84 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: readlink(`/a.py', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: open /a.py r 438
+2015/05/01 13:25:32.84 chirp_server[11809] local: stat(`/a.py', 0x7fff889d0260)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: readlink(`/a.py', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.84 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.84 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: open(`/a.py', 0x0, 0o666)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: fstat 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: fstat 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: pread 0 65536 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 0)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 70
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: = 70
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: pread 0 65536 70
+2015/05/01 13:25:32.84 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 70)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: close 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: readlink /a.py 1023
+2015/05/01 13:25:32.84 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.84 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.84 chirp_server[11809] local: readlink(`/a.py', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.84 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.84 chirp_server[11809] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: stat /a.py
+2015/05/01 13:25:32.85 chirp_server[11809] local: readlink(`/a.py', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.85 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.85 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: stat(`/a.py', 0x7fff889e0310)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: readlink /a.py 1023
+2015/05/01 13:25:32.85 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.85 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: readlink(`/a.py', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: open /a.py r 438
+2015/05/01 13:25:32.85 chirp_server[11809] local: stat(`/a.py', 0x7fff889d0260)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: readlink(`/a.py', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:32.85 chirp_server[11809] local: stat(`/a.py', 0x7fff889cf5d0)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: pread(0, 0x2027140, 65535, 0)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 18
+2015/05/01 13:25:32.85 chirp_server[11809] local: pread(0, 0x2027140, 65535, 18)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: open(`/a.py', 0x0, 0o666)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: fstat 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: fstat 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: pread 0 65536 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 0)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 70
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: = 70
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: pread 0 65536 70
+2015/05/01 13:25:32.85 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 70)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: pread 0 65536 70
+2015/05/01 13:25:32.85 chirp_server[11809] local: pread(0, 0x7f9c6affa010, 65536, 70)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: close 0
+2015/05/01 13:25:32.85 chirp_server[11809] local: close(0)
+2015/05/01 13:25:32.85 chirp_server[11809] local: = 0
+2015/05/01 13:25:32.85 chirp_server[11809] chirp: = 0
+2015/05/01 13:25:32.94 chirp_server[11809] chirp: timeout: client idle too long
+2015/05/01 13:25:32.94 chirp_server[11809] debug: sending stats: stats 127.0.0.1 unix:dthain 58 27306 0
+2015/05/01 13:25:32.94 chirp_server[11809] login: disconnected
+2015/05/01 13:25:32.94 chirp_server[11780] debug: config message: stats 127.0.0.1 unix:dthain 58 27306 0
+2015/05/01 13:25:32.94 chirp_server[11809] tcp: disconnected from 127.0.0.1:56809
+2015/05/01 13:25:32.95 chirp_server[11780] process: pid 11809 exited with 0 (0 total child procs)
+2015/05/01 13:25:32.96 chirp_server[11780] tcp: got connection from 127.0.0.1:56810
+2015/05/01 13:25:32.96 chirp_server[11780] process: created pid 11817 (0 total child procs)
+2015/05/01 13:25:32.96 chirp_server[11780] tcp: disconnected from 127.0.0.1:56810
+2015/05/01 13:25:32.96 chirp_server[11817] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:25:32.96 chirp_server[11817] local: = 1
+2015/05/01 13:25:32.96 chirp_server[11817] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:32.96 chirp_server[11817] local: = 0
+2015/05/01 13:25:32.96 chirp_server[11817] local: close(0)
+2015/05/01 13:25:32.96 chirp_server[11817] local: = 0
+2015/05/01 13:25:32.96 chirp_server[11817] auth: 127.0.0.1:56810 requests 'unix' authentication
+2015/05/01 13:25:32.96 chirp_server[11817] auth: I agree to try 'unix'
+2015/05/01 13:25:32.96 chirp_server[11817] auth: unix: generating challenge
+2015/05/01 13:25:32.96 chirp_server[11817] auth: unix: challenge path is /tmp/challenge.11817.1804289383
+2015/05/01 13:25:32.96 chirp_server[11817] auth: unix: waiting for response
+2015/05/01 13:25:33.01 chirp_server[11817] auth: unix: got response
+2015/05/01 13:25:33.01 chirp_server[11817] auth: unix: client is uid 102744
+2015/05/01 13:25:33.01 chirp_server[11817] auth: unix: client is subject dthain
+2015/05/01 13:25:33.01 chirp_server[11817] auth: 'unix' authentication succeeded
+2015/05/01 13:25:33.01 chirp_server[11817] auth: 127.0.0.1:56810 is unix:dthain
+2015/05/01 13:25:33.01 chirp_server[11817] login: unix:dthain from 127.0.0.1:56810
+2015/05/01 13:25:33.01 chirp_server[11817] auth: hostname: registered
+2015/05/01 13:25:33.01 chirp_server[11817] auth: address: registered
+2015/05/01 13:25:33.01 chirp_server[11817] chirp: readlink /sh 1023
+2015/05/01 13:25:33.01 chirp_server[11817] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 18
+2015/05/01 13:25:33.01 chirp_server[11817] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: close(0)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: readlink(`/sh', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:33.01 chirp_server[11817] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:33.01 chirp_server[11817] chirp: stat /sh
+2015/05/01 13:25:33.01 chirp_server[11817] local: readlink(`/sh', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:33.01 chirp_server[11817] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 18
+2015/05/01 13:25:33.01 chirp_server[11817] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: close(0)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: stat(`/sh', 0x7fff889e0310)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] chirp: readlink /sh 1023
+2015/05/01 13:25:33.01 chirp_server[11817] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 18
+2015/05/01 13:25:33.01 chirp_server[11817] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: close(0)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.01 chirp_server[11817] local: readlink(`/sh', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:33.01 chirp_server[11817] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:33.01 chirp_server[11817] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: stat /sh
+2015/05/01 13:25:33.02 chirp_server[11817] local: readlink(`/sh', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:33.02 chirp_server[11817] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 18
+2015/05/01 13:25:33.02 chirp_server[11817] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: close(0)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: stat(`/sh', 0x7fff889e0310)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: open /sh r 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: stat(`/sh', 0x7fff889d0260)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: readlink(`/sh', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:33.02 chirp_server[11817] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 18
+2015/05/01 13:25:33.02 chirp_server[11817] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: close(0)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: open(`/sh', 0x0, 0o0)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: pread 0 65536 0
+2015/05/01 13:25:33.02 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 0)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: pread 0 65536 65536
+2015/05/01 13:25:33.02 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 65536)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: pread 0 65536 131072
+2015/05/01 13:25:33.02 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 131072)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: pread 0 65536 196608
+2015/05/01 13:25:33.02 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 196608)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: pread 0 65536 262144
+2015/05/01 13:25:33.02 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 262144)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: pread 0 65536 327680
+2015/05/01 13:25:33.02 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 327680)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: pread 0 65536 393216
+2015/05/01 13:25:33.02 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 393216)
+2015/05/01 13:25:33.02 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.02 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: pread 0 65536 458752
+2015/05/01 13:25:33.03 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 458752)
+2015/05/01 13:25:33.03 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: pread 0 65536 524288
+2015/05/01 13:25:33.03 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 524288)
+2015/05/01 13:25:33.03 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: pread 0 65536 589824
+2015/05/01 13:25:33.03 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 589824)
+2015/05/01 13:25:33.03 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: pread 0 65536 655360
+2015/05/01 13:25:33.03 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 655360)
+2015/05/01 13:25:33.03 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: pread 0 65536 720896
+2015/05/01 13:25:33.03 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 720896)
+2015/05/01 13:25:33.03 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: pread 0 65536 786432
+2015/05/01 13:25:33.03 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 786432)
+2015/05/01 13:25:33.03 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: pread 0 65536 851968
+2015/05/01 13:25:33.03 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 851968)
+2015/05/01 13:25:33.03 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: pread 0 65536 917504
+2015/05/01 13:25:33.03 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 917504)
+2015/05/01 13:25:33.03 chirp_server[11817] local: = 22912
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: = 22912
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: pread 0 65536 940416
+2015/05/01 13:25:33.03 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 940416)
+2015/05/01 13:25:33.03 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: pread 0 65536 940416
+2015/05/01 13:25:33.03 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 940416)
+2015/05/01 13:25:33.03 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.03 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] chirp: close 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: close(0)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] chirp: readlink /sh 1023
+2015/05/01 13:25:33.04 chirp_server[11817] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: pread(0, 0x2043140, 65535, 0)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 18
+2015/05/01 13:25:33.04 chirp_server[11817] local: pread(0, 0x2043140, 65535, 18)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: close(0)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: readlink(`/sh', 0x7f9c6affa010, 1023)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:33.04 chirp_server[11817] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:33.04 chirp_server[11817] chirp: open /sh r 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: stat(`/sh', 0x7fff889d0260)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: readlink(`/sh', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:33.04 chirp_server[11817] local: stat(`/sh', 0x7fff889cf5d0)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: pread(0, 0x2043140, 65535, 0)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 18
+2015/05/01 13:25:33.04 chirp_server[11817] local: pread(0, 0x2043140, 65535, 18)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: close(0)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: open(`/sh', 0x0, 0o0)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] chirp: pread 0 65536 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 65536, 0)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 65536
+2015/05/01 13:25:33.04 chirp_server[11817] chirp: = 65536
+2015/05/01 13:25:33.04 chirp_server[11817] chirp: fstat 0
+2015/05/01 13:25:33.04 chirp_server[11817] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:33.04 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.04 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: fstat 0
+2015/05/01 13:25:33.05 chirp_server[11817] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:33.05 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: pread 0 940416 0
+2015/05/01 13:25:33.05 chirp_server[11817] local: pread(0, 0x7f9c6affa010, 940416, 0)
+2015/05/01 13:25:33.05 chirp_server[11817] local: = 940416
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: = 940416
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: fstat 0
+2015/05/01 13:25:33.05 chirp_server[11817] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:33.05 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: fstat 0
+2015/05/01 13:25:33.05 chirp_server[11817] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:33.05 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: fstat 0
+2015/05/01 13:25:33.05 chirp_server[11817] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:33.05 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: fstat 0
+2015/05/01 13:25:33.05 chirp_server[11817] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:33.05 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: fstat 0
+2015/05/01 13:25:33.05 chirp_server[11817] local: fstat(0, 0x7fff889e0310)
+2015/05/01 13:25:33.05 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: close 0
+2015/05/01 13:25:33.05 chirp_server[11817] local: close(0)
+2015/05/01 13:25:33.05 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.05 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.12 chirp_server[11817] chirp: stat /
+2015/05/01 13:25:33.12 chirp_server[11817] local: readlink(`/', 0x7fff889cfe70, 1024)
+2015/05/01 13:25:33.12 chirp_server[11817] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:33.12 chirp_server[11817] local: stat(`/', 0x7fff889cf5d0)
+2015/05/01 13:25:33.12 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.12 chirp_server[11817] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.12 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.12 chirp_server[11817] local: pread(0, 0x2023130, 65535, 0)
+2015/05/01 13:25:33.12 chirp_server[11817] local: = 18
+2015/05/01 13:25:33.12 chirp_server[11817] local: pread(0, 0x2023130, 65535, 18)
+2015/05/01 13:25:33.12 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.12 chirp_server[11817] local: close(0)
+2015/05/01 13:25:33.12 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.12 chirp_server[11817] local: stat(`/', 0x7fff889e0310)
+2015/05/01 13:25:33.12 chirp_server[11817] local: = 0
+2015/05/01 13:25:33.12 chirp_server[11817] chirp: = 0
+2015/05/01 13:25:33.18 chirp_server[11817] chirp: timeout: client idle too long
+2015/05/01 13:25:33.18 chirp_server[11817] debug: sending stats: stats 127.0.0.1 unix:dthain 36 1946368 0
+2015/05/01 13:25:33.18 chirp_server[11817] login: disconnected
+2015/05/01 13:25:33.18 chirp_server[11780] debug: config message: stats 127.0.0.1 unix:dthain 36 1946368 0
+2015/05/01 13:25:33.18 chirp_server[11817] tcp: disconnected from 127.0.0.1:56810
+2015/05/01 13:25:33.19 chirp_server[11780] process: pid 11817 exited with 0 (0 total child procs)
+2015/05/01 13:30:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 13:30:31.00 chirp_server[13212] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:30:31.00 chirp_server[13212] local: = 1
+2015/05/01 13:30:31.00 chirp_server[13212] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:30:31.00 chirp_server[13212] local: = 0
+2015/05/01 13:30:31.00 chirp_server[13212] local: close(0)
+2015/05/01 13:30:31.00 chirp_server[13212] local: = 0
+2015/05/01 13:30:31.00 chirp_server[13212] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 13:30:31.00 chirp_server[13212] local: = 0
+2015/05/01 13:30:31.00 chirp_server[13212] dns: looking up name localhost
+2015/05/01 13:30:31.00 chirp_server[13212] dns: localhost is 127.0.0.1
+2015/05/01 13:30:31.00 chirp_server[13212] debug: sending update to localhost:9097
+2015/05/01 13:30:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 13:35:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 13:35:31.00 chirp_server[13274] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:35:31.00 chirp_server[13274] local: = 1
+2015/05/01 13:35:31.00 chirp_server[13274] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:35:31.00 chirp_server[13274] local: = 0
+2015/05/01 13:35:31.00 chirp_server[13274] local: close(0)
+2015/05/01 13:35:31.00 chirp_server[13274] local: = 0
+2015/05/01 13:35:31.00 chirp_server[13274] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 13:35:31.00 chirp_server[13274] local: = 0
+2015/05/01 13:35:31.00 chirp_server[13274] dns: looking up name localhost
+2015/05/01 13:35:31.00 chirp_server[13274] dns: localhost is 127.0.0.1
+2015/05/01 13:35:31.00 chirp_server[13274] debug: sending update to localhost:9097
+2015/05/01 13:35:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 13:40:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 13:40:31.00 chirp_server[13398] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:40:31.00 chirp_server[13398] local: = 1
+2015/05/01 13:40:31.00 chirp_server[13398] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:40:31.00 chirp_server[13398] local: = 0
+2015/05/01 13:40:31.00 chirp_server[13398] local: close(0)
+2015/05/01 13:40:31.00 chirp_server[13398] local: = 0
+2015/05/01 13:40:31.00 chirp_server[13398] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 13:40:31.00 chirp_server[13398] local: = 0
+2015/05/01 13:40:31.00 chirp_server[13398] dns: looking up name localhost
+2015/05/01 13:40:31.00 chirp_server[13398] dns: localhost is 127.0.0.1
+2015/05/01 13:40:31.00 chirp_server[13398] debug: sending update to localhost:9097
+2015/05/01 13:40:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 13:45:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 13:45:31.00 chirp_server[13452] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:45:31.00 chirp_server[13452] local: = 1
+2015/05/01 13:45:31.00 chirp_server[13452] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:45:31.00 chirp_server[13452] local: = 0
+2015/05/01 13:45:31.00 chirp_server[13452] local: close(0)
+2015/05/01 13:45:31.00 chirp_server[13452] local: = 0
+2015/05/01 13:45:31.00 chirp_server[13452] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 13:45:31.00 chirp_server[13452] local: = 0
+2015/05/01 13:45:31.00 chirp_server[13452] dns: looking up name localhost
+2015/05/01 13:45:31.00 chirp_server[13452] dns: localhost is 127.0.0.1
+2015/05/01 13:45:31.00 chirp_server[13452] debug: sending update to localhost:9097
+2015/05/01 13:45:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 13:50:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 13:50:31.00 chirp_server[13486] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:50:31.00 chirp_server[13486] local: = 1
+2015/05/01 13:50:31.00 chirp_server[13486] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:50:31.00 chirp_server[13486] local: = 0
+2015/05/01 13:50:31.00 chirp_server[13486] local: close(0)
+2015/05/01 13:50:31.00 chirp_server[13486] local: = 0
+2015/05/01 13:50:31.00 chirp_server[13486] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 13:50:31.00 chirp_server[13486] local: = 0
+2015/05/01 13:50:31.00 chirp_server[13486] dns: looking up name localhost
+2015/05/01 13:50:31.00 chirp_server[13486] dns: localhost is 127.0.0.1
+2015/05/01 13:50:31.00 chirp_server[13486] debug: sending update to localhost:9097
+2015/05/01 13:50:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 13:55:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 13:55:31.00 chirp_server[13518] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 13:55:31.00 chirp_server[13518] local: = 1
+2015/05/01 13:55:31.00 chirp_server[13518] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:55:31.00 chirp_server[13518] local: = 0
+2015/05/01 13:55:31.00 chirp_server[13518] local: close(0)
+2015/05/01 13:55:31.00 chirp_server[13518] local: = 0
+2015/05/01 13:55:31.00 chirp_server[13518] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 13:55:31.00 chirp_server[13518] local: = 0
+2015/05/01 13:55:31.00 chirp_server[13518] dns: looking up name localhost
+2015/05/01 13:55:31.00 chirp_server[13518] dns: localhost is 127.0.0.1
+2015/05/01 13:55:31.00 chirp_server[13518] debug: sending update to localhost:9097
+2015/05/01 13:55:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:00:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:00:31.00 chirp_server[16696] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:00:31.00 chirp_server[16696] local: = 1
+2015/05/01 14:00:31.00 chirp_server[16696] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:00:31.00 chirp_server[16696] local: = 0
+2015/05/01 14:00:31.00 chirp_server[16696] local: close(0)
+2015/05/01 14:00:31.00 chirp_server[16696] local: = 0
+2015/05/01 14:00:31.00 chirp_server[16696] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:00:31.00 chirp_server[16696] local: = 0
+2015/05/01 14:00:31.00 chirp_server[16696] dns: looking up name localhost
+2015/05/01 14:00:31.00 chirp_server[16696] dns: localhost is 127.0.0.1
+2015/05/01 14:00:31.00 chirp_server[16696] debug: sending update to localhost:9097
+2015/05/01 14:00:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:00:59.21 chirp_server[11780] tcp: got connection from 127.0.0.1:57121
+2015/05/01 14:00:59.21 chirp_server[11780] process: created pid 18619 (0 total child procs)
+2015/05/01 14:00:59.21 chirp_server[11780] tcp: disconnected from 127.0.0.1:57121
+2015/05/01 14:00:59.21 chirp_server[18619] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:00:59.21 chirp_server[18619] local: = 1
+2015/05/01 14:00:59.21 chirp_server[18619] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:00:59.21 chirp_server[18619] local: = 0
+2015/05/01 14:00:59.21 chirp_server[18619] local: close(0)
+2015/05/01 14:00:59.21 chirp_server[18619] local: = 0
+2015/05/01 14:00:59.21 chirp_server[18619] auth: 127.0.0.1:57121 requests 'workqueue 3 cclws15.cse.nd.edu Linux x86_64 4.4.0-TRUNK' authentication
+2015/05/01 14:00:59.21 chirp_server[18619] auth: I do not agree to 'workqueue 3 cclws15.cse.nd.edu Linux x86_64 4.4.0-TRUNK'
+2015/05/01 14:00:59.21 chirp_server[18619] auth: 127.0.0.1:57121 requests 'resource workers 0 0 1 1 1' authentication
+2015/05/01 14:00:59.21 chirp_server[18619] auth: I do not agree to 'resource workers 0 0 1 1 1'
+2015/05/01 14:00:59.21 chirp_server[18619] auth: 127.0.0.1:57121 requests 'resource disk 0 0 42249 42249 42249' authentication
+2015/05/01 14:00:59.21 chirp_server[18619] auth: I do not agree to 'resource disk 0 0 42249 42249 42249'
+2015/05/01 14:00:59.21 chirp_server[18619] auth: 127.0.0.1:57121 requests 'resource memory 0 0 2404 2404 2404' authentication
+2015/05/01 14:00:59.21 chirp_server[18619] auth: I do not agree to 'resource memory 0 0 2404 2404 2404'
+2015/05/01 14:00:59.21 chirp_server[18619] auth: 127.0.0.1:57121 requests 'resource gpus 0 0 0 0 0' authentication
+2015/05/01 14:00:59.21 chirp_server[18619] auth: I do not agree to 'resource gpus 0 0 0 0 0'
+2015/05/01 14:00:59.21 chirp_server[18619] auth: 127.0.0.1:57121 requests 'resource unlabeled 0 0 0 0 0' authentication
+2015/05/01 14:00:59.21 chirp_server[18619] auth: I do not agree to 'resource unlabeled 0 0 0 0 0'
+2015/05/01 14:00:59.21 chirp_server[18619] auth: 127.0.0.1:57121 requests 'resource cores 0 0 4 4 4' authentication
+2015/05/01 14:00:59.21 chirp_server[18619] auth: I do not agree to 'resource cores 0 0 4 4 4'
+2015/05/01 14:00:59.21 chirp_server[18619] login: authentication failed from 127.0.0.1:57121
+2015/05/01 14:00:59.21 chirp_server[18619] tcp: disconnected from 127.0.0.1:57121
+2015/05/01 14:00:59.22 chirp_server[11780] process: pid 18619 exited with 0 (0 total child procs)
+2015/05/01 14:05:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:05:31.00 chirp_server[18871] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:05:31.00 chirp_server[18871] local: = 1
+2015/05/01 14:05:31.00 chirp_server[18871] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:05:31.00 chirp_server[18871] local: = 0
+2015/05/01 14:05:31.00 chirp_server[18871] local: close(0)
+2015/05/01 14:05:31.00 chirp_server[18871] local: = 0
+2015/05/01 14:05:31.00 chirp_server[18871] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:05:31.00 chirp_server[18871] local: = 0
+2015/05/01 14:05:31.00 chirp_server[18871] dns: looking up name localhost
+2015/05/01 14:05:31.00 chirp_server[18871] dns: localhost is 127.0.0.1
+2015/05/01 14:05:31.00 chirp_server[18871] debug: sending update to localhost:9097
+2015/05/01 14:05:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:10:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:10:31.00 chirp_server[18906] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:10:31.00 chirp_server[18906] local: = 1
+2015/05/01 14:10:31.00 chirp_server[18906] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:10:31.00 chirp_server[18906] local: = 0
+2015/05/01 14:10:31.00 chirp_server[18906] local: close(0)
+2015/05/01 14:10:31.00 chirp_server[18906] local: = 0
+2015/05/01 14:10:31.00 chirp_server[18906] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:10:31.00 chirp_server[18906] local: = 0
+2015/05/01 14:10:31.00 chirp_server[18906] dns: looking up name localhost
+2015/05/01 14:10:31.00 chirp_server[18906] dns: localhost is 127.0.0.1
+2015/05/01 14:10:31.00 chirp_server[18906] debug: sending update to localhost:9097
+2015/05/01 14:10:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:15:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:15:31.00 chirp_server[18953] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:15:31.00 chirp_server[18953] local: = 1
+2015/05/01 14:15:31.00 chirp_server[18953] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:15:31.00 chirp_server[18953] local: = 0
+2015/05/01 14:15:31.00 chirp_server[18953] local: close(0)
+2015/05/01 14:15:31.00 chirp_server[18953] local: = 0
+2015/05/01 14:15:31.00 chirp_server[18953] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:15:31.00 chirp_server[18953] local: = 0
+2015/05/01 14:15:31.00 chirp_server[18953] dns: looking up name localhost
+2015/05/01 14:15:31.00 chirp_server[18953] dns: localhost is 127.0.0.1
+2015/05/01 14:15:31.00 chirp_server[18953] debug: sending update to localhost:9097
+2015/05/01 14:15:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:20:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:20:31.00 chirp_server[18986] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:20:31.00 chirp_server[18986] local: = 1
+2015/05/01 14:20:31.00 chirp_server[18986] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:20:31.00 chirp_server[18986] local: = 0
+2015/05/01 14:20:31.00 chirp_server[18986] local: close(0)
+2015/05/01 14:20:31.00 chirp_server[18986] local: = 0
+2015/05/01 14:20:31.00 chirp_server[18986] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:20:31.00 chirp_server[18986] local: = 0
+2015/05/01 14:20:31.00 chirp_server[18986] dns: looking up name localhost
+2015/05/01 14:20:31.00 chirp_server[18986] dns: localhost is 127.0.0.1
+2015/05/01 14:20:31.00 chirp_server[18986] debug: sending update to localhost:9097
+2015/05/01 14:20:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:25:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:25:31.00 chirp_server[19015] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:25:31.00 chirp_server[19015] local: = 1
+2015/05/01 14:25:31.00 chirp_server[19015] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:25:31.00 chirp_server[19015] local: = 0
+2015/05/01 14:25:31.00 chirp_server[19015] local: close(0)
+2015/05/01 14:25:31.00 chirp_server[19015] local: = 0
+2015/05/01 14:25:31.00 chirp_server[19015] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:25:31.00 chirp_server[19015] local: = 0
+2015/05/01 14:25:31.00 chirp_server[19015] dns: looking up name localhost
+2015/05/01 14:25:31.00 chirp_server[19015] dns: localhost is 127.0.0.1
+2015/05/01 14:25:31.00 chirp_server[19015] debug: sending update to localhost:9097
+2015/05/01 14:25:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:30:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:30:31.00 chirp_server[19066] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:30:31.00 chirp_server[19066] local: = 1
+2015/05/01 14:30:31.00 chirp_server[19066] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:30:31.00 chirp_server[19066] local: = 0
+2015/05/01 14:30:31.00 chirp_server[19066] local: close(0)
+2015/05/01 14:30:31.00 chirp_server[19066] local: = 0
+2015/05/01 14:30:31.00 chirp_server[19066] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:30:31.00 chirp_server[19066] local: = 0
+2015/05/01 14:30:31.00 chirp_server[19066] dns: looking up name localhost
+2015/05/01 14:30:31.00 chirp_server[19066] dns: localhost is 127.0.0.1
+2015/05/01 14:30:31.00 chirp_server[19066] debug: sending update to localhost:9097
+2015/05/01 14:30:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:35:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:35:31.00 chirp_server[19094] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:35:31.00 chirp_server[19094] local: = 1
+2015/05/01 14:35:31.00 chirp_server[19094] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:35:31.00 chirp_server[19094] local: = 0
+2015/05/01 14:35:31.00 chirp_server[19094] local: close(0)
+2015/05/01 14:35:31.00 chirp_server[19094] local: = 0
+2015/05/01 14:35:31.00 chirp_server[19094] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:35:31.00 chirp_server[19094] local: = 0
+2015/05/01 14:35:31.00 chirp_server[19094] dns: looking up name localhost
+2015/05/01 14:35:31.00 chirp_server[19094] dns: localhost is 127.0.0.1
+2015/05/01 14:35:31.00 chirp_server[19094] debug: sending update to localhost:9097
+2015/05/01 14:35:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:40:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:40:31.00 chirp_server[19127] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:40:31.00 chirp_server[19127] local: = 1
+2015/05/01 14:40:31.00 chirp_server[19127] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:40:31.00 chirp_server[19127] local: = 0
+2015/05/01 14:40:31.00 chirp_server[19127] local: close(0)
+2015/05/01 14:40:31.00 chirp_server[19127] local: = 0
+2015/05/01 14:40:31.00 chirp_server[19127] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:40:31.00 chirp_server[19127] local: = 0
+2015/05/01 14:40:31.00 chirp_server[19127] dns: looking up name localhost
+2015/05/01 14:40:31.00 chirp_server[19127] dns: localhost is 127.0.0.1
+2015/05/01 14:40:31.00 chirp_server[19127] debug: sending update to localhost:9097
+2015/05/01 14:40:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:45:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:45:31.00 chirp_server[19174] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:45:31.00 chirp_server[19174] local: = 1
+2015/05/01 14:45:31.00 chirp_server[19174] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:45:31.00 chirp_server[19174] local: = 0
+2015/05/01 14:45:31.00 chirp_server[19174] local: close(0)
+2015/05/01 14:45:31.00 chirp_server[19174] local: = 0
+2015/05/01 14:45:31.00 chirp_server[19174] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:45:31.00 chirp_server[19174] local: = 0
+2015/05/01 14:45:31.00 chirp_server[19174] dns: looking up name localhost
+2015/05/01 14:45:31.00 chirp_server[19174] dns: localhost is 127.0.0.1
+2015/05/01 14:45:31.00 chirp_server[19174] debug: sending update to localhost:9097
+2015/05/01 14:45:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:50:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:50:31.00 chirp_server[19209] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:50:31.00 chirp_server[19209] local: = 1
+2015/05/01 14:50:31.00 chirp_server[19209] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:50:31.00 chirp_server[19209] local: = 0
+2015/05/01 14:50:31.00 chirp_server[19209] local: close(0)
+2015/05/01 14:50:31.00 chirp_server[19209] local: = 0
+2015/05/01 14:50:31.00 chirp_server[19209] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:50:31.00 chirp_server[19209] local: = 0
+2015/05/01 14:50:31.00 chirp_server[19209] dns: looking up name localhost
+2015/05/01 14:50:31.00 chirp_server[19209] dns: localhost is 127.0.0.1
+2015/05/01 14:50:31.00 chirp_server[19209] debug: sending update to localhost:9097
+2015/05/01 14:50:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 14:55:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 14:55:31.00 chirp_server[19238] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 14:55:31.00 chirp_server[19238] local: = 1
+2015/05/01 14:55:31.00 chirp_server[19238] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:55:31.00 chirp_server[19238] local: = 0
+2015/05/01 14:55:31.00 chirp_server[19238] local: close(0)
+2015/05/01 14:55:31.00 chirp_server[19238] local: = 0
+2015/05/01 14:55:31.00 chirp_server[19238] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 14:55:31.00 chirp_server[19238] local: = 0
+2015/05/01 14:55:31.00 chirp_server[19238] dns: looking up name localhost
+2015/05/01 14:55:31.00 chirp_server[19238] dns: localhost is 127.0.0.1
+2015/05/01 14:55:31.00 chirp_server[19238] debug: sending update to localhost:9097
+2015/05/01 14:55:31.00 chirp_server[11780] process: *** catalog update complete ***
+2015/05/01 15:00:31.00 chirp_server[11780] process: *** catalog update starting ***
+2015/05/01 15:00:31.00 chirp_server[19302] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.root.Ukn66g')
+2015/05/01 15:00:31.00 chirp_server[19302] local: = 1
+2015/05/01 15:00:31.00 chirp_server[19302] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 15:00:31.00 chirp_server[19302] local: = 0
+2015/05/01 15:00:31.00 chirp_server[19302] local: close(0)
+2015/05/01 15:00:31.00 chirp_server[19302] local: = 0
+2015/05/01 15:00:31.00 chirp_server[19302] local: statfs(`/', 0x7fff889e2580)
+2015/05/01 15:00:31.00 chirp_server[19302] local: = 0
+2015/05/01 15:00:31.00 chirp_server[19302] dns: looking up name localhost
+2015/05/01 15:00:31.00 chirp_server[19302] dns: localhost is 127.0.0.1
+2015/05/01 15:00:31.00 chirp_server[19302] debug: sending update to localhost:9097
+2015/05/01 15:00:31.00 chirp_server[11780] process: *** catalog update complete ***

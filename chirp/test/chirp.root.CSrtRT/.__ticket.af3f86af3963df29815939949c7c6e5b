@@ -1,0 +1,11 @@
+subject "unix:dthain"
+ticket "-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDhm4xq8PyZPbgow0Gp8tLKZcuG
+S9yEy30sES5BBke11v8MxN+jqGG1Atg/9N1OXbNbWuH/ffumrCFGmYQ+tJt2Xcpr
+GbHf5AhGba37QZKL02wKufmsBq8AUOI5LG14oqwC2uxCu+qwNDAi56tS0K9heBA3
+tMlNA/1vd4ysC/oP8QIDAQAB
+-----END PUBLIC KEY-----
+"
+expiration "1430587573"
+rights "/" "n"
+rights "/data" "rwl"

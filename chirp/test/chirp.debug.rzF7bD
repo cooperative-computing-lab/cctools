@@ -1,0 +1,11 @@
+2015/05/01 13:25:42.30 chirp_server[12237] debug: ../../chirp/src/chirp_server version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 13:25:42.30 chirp_server[12237] debug: Built by dthain@cclws15 on May  1 2015 at 12:43:12
+2015/05/01 13:25:42.30 chirp_server[12237] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 13:25:42.30 chirp_server[12237] debug: Configuration:
+2015/05/01 13:25:42.30 chirp_server[12237] chirp: transient directory: `/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.transient.gZ18Xn'
+2015/05/01 13:25:42.30 chirp_server[12237] notice: *** ../../chirp/src/chirp_server starting at Fri May  1 13:25:42 2015
+2015/05/01 13:25:42.30 chirp_server[12237] process: *** backend setup starting ***
+2015/05/01 13:25:42.30 chirp_server[12239] hdfs: sorry, you must set JAVA_HOME to point to your Java installation.
+2015/05/01 13:25:42.30 chirp_server[12239] fatal: could not initialize hdfs:///users/dthain/.chirp.test/./TR_chirp_hdfs.sh.cclws15.12222 backend filesystem: Invalid argument
+2015/05/01 13:25:42.31 chirp_server[12237] process: *** backend setup complete ***
+2015/05/01 13:25:42.31 chirp_server[12237] fatal: couldn't setup hdfs:///users/dthain/.chirp.test/./TR_chirp_hdfs.sh.cclws15.12222
