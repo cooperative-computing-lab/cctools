@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 
 #include "cctools.h"
 #include "debug.h"
@@ -47,6 +48,11 @@ static int xblock = 0;
 static int yblock = 0;
 static int xstop = 0;
 static int ystop = 0;
+static int is_symmetric = 0;
+
+enum {
+	LONG_OPT_SYMMETRIC=UCHAR_MAX+1,
+};
 
 static void show_help(const char *cmd)
 {
@@ -64,6 +70,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Set the project name to <project>\n", "-N,--project-name=<project>");
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.  (Try -d all to start.)\n", "-d,--debug=<flag>");
+	fprintf(stdout, " %-30s Compute half of a symmetric matrix.\n", "   --symmetric");
 	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
 	fprintf(stdout, " %-30s Display this message.\n", "-h,--help");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--random-port=<file>");
@@ -93,7 +100,6 @@ double estimate_run_time( struct text_list *seta, struct text_list *setb )
 				text_list_get(seta,x),
 				text_list_get(setb,y)
 				);
-
 			FILE *file = fast_popen(line);
 			if(!file)
 				fatal("%s: couldn't execute %s: %s\n",progname,line,strerror(errno));
@@ -199,7 +205,11 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 	if(ycurrent>=ystop) return 0;
 
 	char cmd[ALLPAIRS_LINE_MAX];
-	sprintf(cmd,"./%s -e \"%s\" A B %s%s",path_basename(allpairs_multicore_program),extra_arguments,use_external_program ? "./" : "",path_basename(allpairs_compare_program));
+	if(is_symmetric)
+		sprintf(cmd,"./%s --index \"%d %d\" -e \"%s\" A B %s%s",path_basename(allpairs_multicore_program), xcurrent, ycurrent, extra_arguments,use_external_program ? "./" : "",path_basename(allpairs_compare_program));
+	else
+		sprintf(cmd,"./%s -e \"%s\" A B %s%s",path_basename(allpairs_multicore_program), extra_arguments,use_external_program ? "./" : "",path_basename(allpairs_compare_program));
+	fprintf(stdout, "%s\n", cmd);
 	struct work_queue_task *task = work_queue_task_create(cmd);
 
 	if(use_external_program) {
@@ -277,7 +287,7 @@ void task_complete( struct work_queue_task *t )
 
 int main(int argc, char **argv)
 {
-	signed char c;
+	int c;
 	struct work_queue *q;
 	int port = WORK_QUEUE_DEFAULT_PORT;
 	static const char *port_file = NULL;
@@ -306,6 +316,7 @@ int main(int argc, char **argv)
 		{"input-file", required_argument, 0, 'f'},
 		{"estimated-time", required_argument, 0, 't'},
 		{"priority", required_argument, 0, 'P'},
+		{"symmetric", no_argument, 0, LONG_OPT_SYMMETRIC},
         {0,0,0,0}
 	};
 
@@ -352,6 +363,9 @@ int main(int argc, char **argv)
 			break;
 		case 't':
 			compare_program_time = atof(optarg);
+			break;
+		case LONG_OPT_SYMMETRIC:
+			is_symmetric = 1;
 			break;
 		case 'v':
 			cctools_version_print(stdout, progname);
