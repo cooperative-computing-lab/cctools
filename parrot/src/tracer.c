@@ -473,9 +473,9 @@ more:
 	}
 
 #ifdef CCTOOLS_CPU_I386
-	ssize_t n = syscall(SYSCALL32_process_vm_writev, t->pid, &local, 1, remote, rn, 0);
+	ssize_t n = syscall(SYSCALL32_process_vm_writev, t->pid, &local, (int32_t)1, remote, rn, (int32_t)0);
 #else
-	ssize_t n = syscall(SYSCALL64_process_vm_writev, t->pid, &local, 1, remote, rn, 0);
+	ssize_t n = syscall(SYSCALL64_process_vm_writev, t->pid, &local, (int64_t)1, remote, rn, (int64_t)0);
 #endif
 
 	/* There is a bug in the implementation, allowing a split remote iovec. The
@@ -603,9 +603,9 @@ more:
 	}
 
 #ifdef CCTOOLS_CPU_I386
-	ssize_t n = syscall(SYSCALL32_process_vm_readv, t->pid, &local, 1, remote, rn, 0);
+	ssize_t n = syscall(SYSCALL32_process_vm_readv, (int32_t)t->pid, &local, (int32_t)1, remote, rn, (int32_t)0);
 #else
-	ssize_t n = syscall(SYSCALL64_process_vm_readv, t->pid, &local, 1, remote, rn, 0);
+	ssize_t n = syscall(SYSCALL64_process_vm_readv, (int64_t)t->pid, &local, (int64_t)1, remote, rn, (int64_t)0);
 #endif
 
 	/* There is a bug in the implementation, allowing a split remote iovec. The
