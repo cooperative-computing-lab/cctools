@@ -36,6 +36,7 @@ install: $(INSTALL_PACKAGES)
 	cp config.mk ${CCTOOLS_INSTALL_DIR}/etc/
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/doc
 	cp COPYING ${CCTOOLS_INSTALL_DIR}/doc/
+	cp README ${CCTOOLS_INSTALL_DIR}/doc/
 
 test: $(CCTOOLS_PACKAGES)
 	./run_all_tests.sh
