@@ -38,9 +38,10 @@ for package in ${CCTOOLS_PACKAGES}; do
 					"./${script}" clean
 					exit $result
 				) >> "$CCTOOLS_TEST_LOG" 2>&1
+				result=$?
 				TEST_STOP_TIME=$(date +%s)
 				TEST_ELAPSED=$(($TEST_STOP_TIME-$TEST_START_TIME))
-				if [ "$?" -eq 0 ]; then
+				if [ "$result" -eq 0 ]; then
 					SUCCESS=$((SUCCESS+1))
 					echo "success ${TEST_ELAPSED}s"
 					echo "=== Test ${package}/test/${script}: success." >> $CCTOOLS_TEST_LOG
