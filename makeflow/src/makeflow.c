@@ -1059,11 +1059,12 @@ int dag_node_ready(struct dag *d, struct dag_node *n)
 	return 1;
 }
 
-void dag_dispatch_ready_jobs(struct dag *d)
+void dag_dispatch_ready_jobs(struct dag *d, struct set *s)
 {
 	struct dag_node *n;
-
-	for(n = d->nodes; n; n = n->next) {
+	set_first_element(s);
+	while((n = set_next_element(s)))
+	 {
 
 		if(d->remote_jobs_running >= d->remote_jobs_max && d->local_jobs_running >= d->local_jobs_max)
 			break;
@@ -1335,9 +1336,19 @@ void dag_run(struct dag *d)
 	struct dag_node *n;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
+	
+	/*count the total number of nodes*/
+	int count = 0;
+	for (n = d-> nodes; n; n = n->next, count++);
+	
+    /*copy the nodes into the set structure*/
+	struct set *copy;
+	copy = set_create(count);
+	for (n = d-> nodes; n; n = n->next)
+		set_push(copy, n);
 
 	while(!dag_abort_flag) {
-		dag_dispatch_ready_jobs(d);
+		dag_dispatch_ready_jobs(d, copy);
 
 		if(d->local_jobs_running == 0 && d->remote_jobs_running == 0)
 			break;
@@ -1349,8 +1360,12 @@ void dag_run(struct dag *d)
 				printf("job %"PRIbjid" completed\n",jobid);
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
-				if(n)
+				if(n){
 					dag_node_complete(d, n, &info);
+						/*remove the complete node*/
+					if(n->state == DAG_NODE_STATE_COMPLETE)
+						set_remove(copy, n);
+				}
 			}
 		}
 
@@ -1368,8 +1383,12 @@ void dag_run(struct dag *d)
 			if(jobid > 0) {
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
-				if(n)
+				if(n){
 					dag_node_complete(d, n, &info);
+						/*remove the complete node*/
+					if(n->state == DAG_NODE_STATE_COMPLETE)
+						set_remove(copy, n);
+				}
 			}
 		}
 
