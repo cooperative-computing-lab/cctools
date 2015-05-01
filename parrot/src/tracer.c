@@ -521,6 +521,7 @@ ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, 
 	ssize_t rc = copy_out_fast(t,data,uaddr,length,flags);
 	if (rc == -1 && errno == ENOSYS && !(flags & TRACER_O_FAST))
 		rc = tracer_copy_out_slow(t,data,uaddr,length,flags);
+	assert(!(flags & TRACER_O_ATOMIC) || (rc == -1 || (size_t)rc == length));
 	return rc;
 }
 
@@ -650,6 +651,7 @@ ssize_t tracer_copy_in( struct tracer *t, void *data, const void *uaddr, size_t 
 	ssize_t rc = copy_in_fast(t,data,uaddr,length,flags);
 	if (rc == -1 && errno == ENOSYS && !(flags & TRACER_O_FAST))
 		rc = tracer_copy_in_slow(t,data,uaddr,length,flags);
+	assert(!(flags & TRACER_O_ATOMIC) || (rc == -1 || (size_t)rc == length));
 	return rc;
 }
 

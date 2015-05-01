@@ -248,7 +248,6 @@ static void decode_read( struct pfs_process *p, int entering, INT64_T syscall, c
 				divert_to_dummy(p, 0);
 			}
 			ssize_t count = tracer_copy_out(p->tracer, buf, uaddr, p->syscall_result, TRACER_O_ATOMIC|TRACER_O_FAST);
-			assert(count == p->syscall_result || count == -1);
 			if (count == p->syscall_result) {
 				divert_to_dummy(p, p->syscall_result);
 			} else if (count == -1 && errno != ENOSYS) {
@@ -324,8 +323,7 @@ static void decode_write( struct pfs_process *p, int entering, INT64_T syscall, 
 		}
 
 		ssize_t count = tracer_copy_in(p->tracer, buf, uaddr, l, TRACER_O_ATOMIC|TRACER_O_FAST);
-		assert(count == p->syscall_result || count == -1);
-		if (count == p->syscall_result) {
+		if ((size_t)count == l) {
 			if(syscall==SYSCALL32_write) {
 				p->syscall_result = pfs_write(fd,buf,l);
 			} else if(syscall==SYSCALL32_pwrite64) {

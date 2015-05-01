@@ -264,7 +264,6 @@ static void decode_read( struct pfs_process *p, int entering, INT64_T syscall, c
 				divert_to_dummy(p, 0);
 			}
 			ssize_t count = tracer_copy_out(p->tracer, buf, uaddr, p->syscall_result, TRACER_O_ATOMIC|TRACER_O_FAST);
-			assert(count == p->syscall_result || count == -1);
 			if (count == p->syscall_result) {
 				divert_to_dummy(p, p->syscall_result);
 			} else if (count == -1 && errno != ENOSYS) {
@@ -340,8 +339,7 @@ static void decode_write( struct pfs_process *p, int entering, INT64_T syscall, 
 		}
 
 		ssize_t count = tracer_copy_in(p->tracer, buf, uaddr, l, TRACER_O_ATOMIC|TRACER_O_FAST);
-		assert(count == p->syscall_result || count == -1);
-		if (count == p->syscall_result) {
+		if ((size_t)count == l) {
 			if(syscall==SYSCALL64_write) {
 				p->syscall_result = pfs_write(fd,buf,l);
 			} else if(syscall==SYSCALL64_pwrite64) {
@@ -552,7 +550,6 @@ static void decode_stat( struct pfs_process *p, int entering, INT64_T syscall, c
 			struct pfs_kernel_stat kbuf;
 			COPY_STAT(lbuf,kbuf);
 			ssize_t count = tracer_copy_out(p->tracer, &kbuf, POINTER(args[1]), sizeof(kbuf), TRACER_O_ATOMIC|TRACER_O_FAST);
-			assert(count == sizeof(kbuf)  || count == -1);
 			if (count == p->syscall_result) {
 				divert_to_dummy(p, 0);
 			} else if (count == -1 && errno != ENOSYS) {
@@ -595,7 +592,6 @@ static void decode_statfs( struct pfs_process *p, int entering, INT64_T syscall,
 			COPY_STATFS(lbuf,kbuf);
 
 			ssize_t count = tracer_copy_out(p->tracer, &kbuf, POINTER(args[1]), sizeof(kbuf), TRACER_O_ATOMIC|TRACER_O_FAST);
-			assert(count == sizeof(kbuf)  || count == -1);
 			if (count == p->syscall_result) {
 				divert_to_dummy(p, 0);
 			} else if (count == -1 && errno != ENOSYS) {
