@@ -491,11 +491,11 @@ more:
 		return errno = EFAULT, -1;
 	}
 
-	if (n < 0) {
-		if (n == -EFAULT && written) {
+	if (n == -1) {
+		if (errno == EFAULT && written) {
 			return written;
 		}
-		return errno = -n, -1;
+		return -1;
 	}
 
 	written += n;
@@ -621,11 +621,11 @@ more:
 		return errno = EFAULT, -1;
 	}
 
-	if (n < 0) {
-		if (n == -EFAULT && read) {
+	if (n == -1) {
+		if (errno == EFAULT && read) {
 			return read;
 		}
-		return errno = -n, -1;
+		return -1;
 	}
 
 	read += n;

@@ -97,11 +97,7 @@ static int channel_create (void)
 		fd = syscall(SYSCALL64_memfd_create, "parrot-channel", 0);
 #endif
 	} else {
-		fd = -ENOSYS;
-	}
-
-	if (fd < 0) {
-		errno = -fd;
+		errno = ENOSYS;
 		fd = -1;
 	}
 
