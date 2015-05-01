@@ -68,6 +68,20 @@ void work_queue_process_delete(struct work_queue_process *p)
 	free(p);
 }
 
+static void export_environment( struct list *env_list )
+{
+	char *name;
+	list_first_item(env_list);
+	while((name=list_next_item(env_list))) {
+		char *value = strchr(name,'=');
+		if(value) {
+			*value = 0;
+			setenv(name,value+1,1);
+			*value='=';
+		}
+	}
+}
+
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
 pid_t work_queue_process_execute(struct work_queue_process *p, int container_mode, ...)
@@ -126,6 +140,8 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 			fatal("could not dup pipe to stderr: %s", strerror(errno));
 
 		close(p->output_fd);
+
+		export_environment(p->task->env_list);
 
 		va_list arg_lst;
 		if(container_mode == NONE) {
