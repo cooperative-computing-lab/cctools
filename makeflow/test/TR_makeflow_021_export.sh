@@ -2,8 +2,8 @@
 
 . ../../dttools/test/test_runner_common.sh
 
-test_dir=`basename $0 .sh`.dir
-test_output=`basename $0 .sh`.output
+test_dir=export.dir
+test_output=export.output
 
 prepare()
 {
