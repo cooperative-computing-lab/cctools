@@ -2242,11 +2242,11 @@ void pfs_table::mmap_proc (pid_t pid, buffer_t *B)
 			buffer_putfstring(B, "%c", m->prot & PROT_EXEC ? 'w' : '-');
 			buffer_putfstring(B, "%c", m->flags & MAP_PRIVATE ? 'p' : '-');
 			buffer_putfstring(B, " ");
-			buffer_putfstring(B, "%016" PRIx64, m->file_offset);
+			buffer_putfstring(B, "%16" PRIx64, m->file_offset);
 			buffer_putfstring(B, " ");
 			buffer_putfstring(B, "%02" PRIx32 ":%02" PRIx32, major(m->finfo.st_dev), minor(m->finfo.st_dev));
 			buffer_putfstring(B, " ");
-			buffer_putfstring(B, "%08" PRIu64, m->finfo.st_ino);
+			buffer_putfstring(B, "%8" PRIu64, m->finfo.st_ino);
 			buffer_putfstring(B, " ");
 			buffer_putfstring(B, "%s", m->fpath);
 			buffer_putfstring(B, "\n");
@@ -2262,9 +2262,9 @@ void pfs_table::mmap_proc (pid_t pid, buffer_t *B)
 				size_t current = buffer_pos(B);
 				buffer_putfstring(B, "%016" PRIx64 "-%016" PRIx64, (uint64_t)strtoul(start, NULL, 16), (uint64_t)strtoul(end, NULL, 16));
 				buffer_putfstring(B, " %s", perm);
-				buffer_putfstring(B, " %016" PRIx64, (uint64_t)strtoul(off, NULL, 16));
+				buffer_putfstring(B, " %16" PRIx64, (uint64_t)strtoul(off, NULL, 16));
 				buffer_putfstring(B, " %s", dev);
-				buffer_putfstring(B, " %08" PRIu64, (uint64_t)strtoul(ino, NULL, 16));
+				buffer_putfstring(B, " %8" PRIu64, (uint64_t)strtoul(ino, NULL, 16));
 				buffer_putfstring(B, " %s", path);
 				buffer_putliteral(B, "\n");
 				if (pattern_match(path, "%[%w+%]%s*$") >= 0) {

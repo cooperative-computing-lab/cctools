@@ -473,9 +473,9 @@ more:
 	}
 
 #ifdef CCTOOLS_CPU_I386
-	ssize_t n = syscall(SYSCALL32_process_vm_writev, t->pid, &local, 1, remote, rn, 0);
+	ssize_t n = syscall(SYSCALL32_process_vm_writev, t->pid, &local, (int32_t)1, remote, rn, (int32_t)0);
 #else
-	ssize_t n = syscall(SYSCALL64_process_vm_writev, t->pid, &local, 1, remote, rn, 0);
+	ssize_t n = syscall(SYSCALL64_process_vm_writev, t->pid, &local, (int64_t)1, remote, rn, (int64_t)0);
 #endif
 
 	/* There is a bug in the implementation, allowing a split remote iovec. The
@@ -491,11 +491,11 @@ more:
 		return errno = EFAULT, -1;
 	}
 
-	if (n < 0) {
-		if (n == -EFAULT && written) {
+	if (n == -1) {
+		if (errno == EFAULT && written) {
 			return written;
 		}
-		return errno = -n, -1;
+		return -1;
 	}
 
 	written += n;
@@ -521,6 +521,7 @@ ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, 
 	ssize_t rc = copy_out_fast(t,data,uaddr,length,flags);
 	if (rc == -1 && errno == ENOSYS && !(flags & TRACER_O_FAST))
 		rc = tracer_copy_out_slow(t,data,uaddr,length,flags);
+	assert(!(flags & TRACER_O_ATOMIC) || (rc == -1 || (size_t)rc == length));
 	return rc;
 }
 
@@ -602,9 +603,9 @@ more:
 	}
 
 #ifdef CCTOOLS_CPU_I386
-	ssize_t n = syscall(SYSCALL32_process_vm_readv, t->pid, &local, 1, remote, rn, 0);
+	ssize_t n = syscall(SYSCALL32_process_vm_readv, (int32_t)t->pid, &local, (int32_t)1, remote, rn, (int32_t)0);
 #else
-	ssize_t n = syscall(SYSCALL64_process_vm_readv, t->pid, &local, 1, remote, rn, 0);
+	ssize_t n = syscall(SYSCALL64_process_vm_readv, (int64_t)t->pid, &local, (int64_t)1, remote, rn, (int64_t)0);
 #endif
 
 	/* There is a bug in the implementation, allowing a split remote iovec. The
@@ -620,11 +621,11 @@ more:
 		return errno = EFAULT, -1;
 	}
 
-	if (n < 0) {
-		if (n == -EFAULT && read) {
+	if (n == -1) {
+		if (errno == EFAULT && read) {
 			return read;
 		}
-		return errno = -n, -1;
+		return -1;
 	}
 
 	read += n;
@@ -650,6 +651,7 @@ ssize_t tracer_copy_in( struct tracer *t, void *data, const void *uaddr, size_t 
 	ssize_t rc = copy_in_fast(t,data,uaddr,length,flags);
 	if (rc == -1 && errno == ENOSYS && !(flags & TRACER_O_FAST))
 		rc = tracer_copy_in_slow(t,data,uaddr,length,flags);
+	assert(!(flags & TRACER_O_ATOMIC) || (rc == -1 || (size_t)rc == length));
 	return rc;
 }
 
