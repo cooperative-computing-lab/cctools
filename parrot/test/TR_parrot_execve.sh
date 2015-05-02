@@ -35,7 +35,7 @@ EOF2
 cp "$(which python)" "$(which sh)" .
 chmod 700 a.py python sh
 EOF1
-	for loader in `find /lib /lib64 -name 'ld-linux*.so*'`; do
+	for loader in `find -L /lib /lib64 -name 'ld-linux*.so*' 2>/dev/null`; do
 		[ "$(parrot --ld-path="$loader" -- ./a.py 1 2 | tee /dev/tty)" = './a.py 1 2' ]
 		[ "$(parrot --ld-path="$loader" -- ./sh -c 'echo "$0"' | tee /dev/tty)" = './sh' ]
 		return 0
