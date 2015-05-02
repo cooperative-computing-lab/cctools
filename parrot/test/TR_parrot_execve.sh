@@ -40,6 +40,7 @@ EOF1
 		[ "$(parrot --ld-path="$loader" -- ./sh -c 'echo "$0"' | tee /dev/tty)" = './sh' ]
 		return 0
 	done
+	echo No loader found!
 	return 1
 }
 
