@@ -58,9 +58,9 @@ install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
 	cp $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
-	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
-	cp -r resource_monitor_visualizer_static $(CCTOOLS_INSTALL_DIR)/lib
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib/cctools
+	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/cctools/
+	cp -r resource_monitor_visualizer_static $(CCTOOLS_INSTALL_DIR)/lib/cctools/
 
 test: all
 

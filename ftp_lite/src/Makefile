@@ -20,8 +20,8 @@ clean:
 	rm -f $(OBJECTS) $(TARGETS)
 
 install: all
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
-	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib/cctools
+	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/cctools/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(HEADERS_PUBLIC) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 

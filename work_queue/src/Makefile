@@ -62,10 +62,10 @@ install: all install-bindings
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	chmod 755 $(SCRIPTS)
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
-	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp work_queue_example.c $(CCTOOLS_INSTALL_DIR)/doc/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib/cctools
+	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/cctools/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/doc/cctools
+	cp work_queue_example.c $(CCTOOLS_INSTALL_DIR)/share/doc/cctools/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 

@@ -59,8 +59,8 @@ install: all install-bindings
 	if [ -f $(CCTOOLS_INSTALL_DIR)/bin/chirp_server ]; then mv $(CCTOOLS_INSTALL_DIR)/bin/chirp_server $(CCTOOLS_INSTALL_DIR)/bin/chirp_server.old; fi
 	chmod 755 $(SCRIPTS)
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
-	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib/cctools
+	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/cctools/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 

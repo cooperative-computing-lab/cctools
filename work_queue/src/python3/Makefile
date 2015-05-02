@@ -43,5 +43,5 @@ clean:
 install: all
 	mkdir -p $(PYTHON_INSTALL_DIR)
 	cp work_queue.py _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(PYTHON_INSTALL_DIR)/
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp work_queue_example.py3 $(CCTOOLS_INSTALL_DIR)/doc/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/doc/cctools
+	cp work_queue_example.py3 $(CCTOOLS_INSTALL_DIR)/share/doc/cctools/

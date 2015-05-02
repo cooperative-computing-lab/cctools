@@ -25,8 +25,8 @@ $(INSTALL_TARGETS):
 	$(CCTOOLS_PYTHON) setup.py install_lib     -d $(PYTHON_INSTALL_DIR)
 
 install-examples: examples
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/weaver_examples
-	cp examples/* $(CCTOOLS_INSTALL_DIR)/doc/weaver_examples
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/doc/cctools/weaver_examples
+	cp examples/* $(CCTOOLS_INSTALL_DIR)/share/doc/cctools/weaver_examples/
 
 install: $(INSTALL_TARGETS) install-examples
 

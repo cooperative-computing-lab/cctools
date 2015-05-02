@@ -43,15 +43,15 @@ api/html/work_queue_task_perl.html:
 	gzip < $< > $@
 
 install: all
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/man
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/images
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/doc/cctools
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/doc/cctools/man
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/doc/cctools/images
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/man/man1
-	cp *.html manual.css $(CCTOOLS_INSTALL_DIR)/doc
-	if [ -f man/chirp.html ]; then cp man/*.html $(CCTOOLS_INSTALL_DIR)/doc/man; fi
-	if [ -f man/chirp.1.gz ]; then cp man/*.1.gz $(CCTOOLS_INSTALL_DIR)/share/man/man1; fi
-	if [ -d api ]; then cp -rp api $(CCTOOLS_INSTALL_DIR)/doc; fi
-	if [ -d images ]; then cp images/*.gif $(CCTOOLS_INSTALL_DIR)/doc/images; fi
+	cp *.html manual.css $(CCTOOLS_INSTALL_DIR)/share/doc/cctools/
+	if [ -f man/chirp.html ]; then cp man/*.html $(CCTOOLS_INSTALL_DIR)/share/doc/cctools/man/; fi
+	if [ -f man/chirp.1.gz ]; then cp man/*.1.gz $(CCTOOLS_INSTALL_DIR)/share/man/man1/; fi
+	if [ -d api ]; then cp -rp api $(CCTOOLS_INSTALL_DIR)/share/doc/cctools/; fi
+	if [ -d images ]; then cp images/*.gif $(CCTOOLS_INSTALL_DIR)/share/doc/cctools/images/; fi
 
 test:
 
