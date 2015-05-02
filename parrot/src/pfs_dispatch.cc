@@ -340,7 +340,7 @@ static void decode_write( struct pfs_process *p, int entering, INT64_T syscall, 
 			debug(D_DEBUG, "tracer memory read failed: %s", strerror(errno));\
 			divert_to_dummy(p, -errno);
 		} else if(pfs_channel_alloc(0,length,&p->io_channel_offset)) {
-			divert_to_channel(p,SYSCALL64_pwrite64,uaddr,length,p->io_channel_offset);
+			divert_to_channel(p,SYSCALL32_pwrite64,uaddr,length,p->io_channel_offset);
 		} else {
 			divert_to_dummy(p,-ENOMEM);
 		}
