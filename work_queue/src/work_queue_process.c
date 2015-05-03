@@ -23,7 +23,7 @@
 #include <sys/types.h>
 
 #define SMALL_BUFFER_SIZE 256
-#define MAX_BUFFER_SIZE 4096
+#define LARGE_BUFFER_SIZE 4096
 #define DEFAULT_WORK_DIR "/home/worker"
 #define CONVERT_IMG "ubuntu/mf_wq"
 #define TMP_SCRIPT "tmp.sh"
@@ -147,11 +147,11 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int container_mo
                 chmod(TMP_SCRIPT, 0755);
 
                 uid_t uid = getuid();
-                char uid_str[MAX_BUFFER_SIZE];
+                char uid_str[LARGE_BUFFER_SIZE];
                 sprintf(uid_str, "%d", uid);
 
                 // Get path to sandbox
-                char curr_wrk_dir[MAX_BUFFER_SIZE];
+                char curr_wrk_dir[LARGE_BUFFER_SIZE];
                 char *wrk_space;
 
                 if ((wrk_space = getenv("WORK_QUEUE_SANDBOX")) != NULL) {
@@ -161,11 +161,11 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int container_mo
 
                 if (container_mode == DOCKER) {
                     va_start(arg_lst, container_mode);
-                    char img_name[MAX_BUFFER_SIZE];
-	            strncpy(img_name, va_arg(arg_lst, const char*), MAX_BUFFER_SIZE);
+                    char img_name[LARGE_BUFFER_SIZE];
+	            strncpy(img_name, va_arg(arg_lst, const char*), LARGE_BUFFER_SIZE);
                     va_end(arg_lst);
 
-                    char mnt_flg_val[MAX_BUFFER_SIZE];
+                    char mnt_flg_val[LARGE_BUFFER_SIZE];
                     sprintf(mnt_flg_val, "%s:%s", curr_wrk_dir, DEFAULT_WORK_DIR);
                     // cmd for running the shell script
                     char run_cmd[SMALL_BUFFER_SIZE];
@@ -179,12 +179,12 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int container_mo
                 } else {
                     // DOCKER_PRESERVE mode
                     va_start(arg_lst, container_mode);
-                    char container_name[MAX_BUFFER_SIZE];
-                    strncpy(container_name, va_arg(arg_lst, const char*), MAX_BUFFER_SIZE);
+                    char container_name[LARGE_BUFFER_SIZE];
+                    strncpy(container_name, va_arg(arg_lst, const char*), LARGE_BUFFER_SIZE);
                     va_end(arg_lst);
 
-                    char sub_proc_sh_fn[MAX_BUFFER_SIZE];
-                    char sub_proc_sh_fn_path[MAX_BUFFER_SIZE];
+                    char sub_proc_sh_fn[LARGE_BUFFER_SIZE];
+                    char sub_proc_sh_fn_path[LARGE_BUFFER_SIZE];
                     sprintf(sub_proc_sh_fn, "tmp_%s.sh", p->sandbox);
                     sprintf(sub_proc_sh_fn_path, "%s/%s", wrk_space, sub_proc_sh_fn);
                 
@@ -193,7 +193,7 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int container_mo
                     fclose(sub_proc_script_fn);
                     chmod(sub_proc_sh_fn_path, 0755);
 
-                    char run_sh_fn[MAX_BUFFER_SIZE];
+                    char run_sh_fn[LARGE_BUFFER_SIZE];
                     sprintf(run_sh_fn, "./%s", sub_proc_sh_fn);
 
                     execl("/usr/bin/docker", "/usr/bin/docker", "exec", \
