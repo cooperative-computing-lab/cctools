@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Recursive makeflow requires that you have makeflow in your path.
+export PATH=`pwd`/../../makeflow/src:$PATH
+
 . ../../dttools/test/test_runner_common.sh
 
 test_dir=`basename $0 .sh`.dir

@@ -4,6 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#ifndef DAG_VISITORS_H
+#define DAG_VISITORS_H
 
 #include "dag.h"
 
@@ -33,3 +35,4 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option);
  */
 void dag_to_cyto(struct dag *d, int condense_display, int change_size);
 
+#endif
