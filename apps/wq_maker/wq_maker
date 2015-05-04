@@ -16,13 +16,35 @@
 # IEEE International Conference on Computational Advances in Bio and Medical
 # Sciences, February, 2012.
 
-use strict "vars";
 use strict "refs";
+use strict "vars";
 use warnings;
-use Time::HiRes qw(gettimeofday); 
+
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 use lib "$FindBin::Bin/../perl/lib";
+use lib "$FindBin::Bin/../src/inc/perl/lib";
+
+use vars qw($RANK);
+
+use Cwd;
+use Cwd qw(abs_path);
+use ds_utility;
+use Error qw(:try);
+use Error::Simple;
+use Fasta;
+use Getopt::Long qw(:config no_ignore_case);
+use GFFDB;
+use GI;
+use Iterator::Any;
+use POSIX;
+use Process::MpiChunk;
+use Process::MpiTiers;
+use Proc::Signal;
+use runlog;
+use Storable qw(nfreeze thaw nstore retrieve);
+use Time::HiRes qw(gettimeofday); 
+use work_queue;
 
 #Record starting time.
 my $start_time = time; 
@@ -51,15 +73,6 @@ my %task_failures;
 my $actual_transfer_time = 0;
 
 my $common_dependency_size = 0; 
-
-#Global variables
-my %CTL_OPT;
-my $DS_CTL;
-my $GFF_DB;
-my $build;
-my $iterator;
-my $wkdir = get_wkdir();
-
 
 BEGIN{
    if (not ($ENV{CGL_SO_SOURCE})) {
@@ -120,25 +133,18 @@ Work Queue Options:
      -tcc                  Setup TCC configuration for bandwidth adaptations.
 ";
 
-#load required libraries
-use Cwd;
-use Cwd qw(abs_path); 
-use Getopt::Long qw(:config no_ignore_case);
-use Iterator::Any;
-use Error qw(:try);
-use Error::Simple;
-use Storable qw(nstore retrieve);
-use work_queue;
-use POSIX qw(ceil floor);
+#Global variables
+my %CTL_OPT;
+my $DS_CTL;
+my $GFF_DB;
+my $build;
+my $iterator;
+my $fasta_iterator;
+my $g_index;
+my $gdbfile;
+my $wkdir = get_wkdir();
 
-#external libraries
-use Proc::Signal;
-use GI;
-use Fasta;
-use ds_utility;
-use GFFDB;
-use Process::MpiChunk;
-use Process::MpiTiers;
+$RANK = 0;
 
 #---Process options on the command line 
 my %OPT;
@@ -149,6 +155,7 @@ try{
 	       "est|E=s" => \$OPT{est},
 	       "estr|S=s" => \$OPT{estr},
 	       "protein|P=s" => \$OPT{protein},
+		  "fix_nucleotides" => \$OPT{fix_nucleotides},
 	       "snaphmm|H=s" => \$OPT{snaphmm},
 	       "cpus|c=i" => \$OPT{cpus},
 	       "predictor=s" =>\$OPT{predictor},
@@ -189,8 +196,8 @@ try{
 };
 
 if(!defined($OPT{"genome"})) {
-	print "Please specify the genome file that you want to annotate and run again!\n";
-	exit (0);
+	print "Genome file not specified. Using the specification in the CTL files.\n";
+	#exit (0);
 }
 my $contigs_file = $OPT{genome};
 
@@ -206,11 +213,52 @@ try{
 			exit(0);
 		}
     }
-    
+	
     #--Control file processing
     #set up control options from control files
     %CTL_OPT = GI::load_control_files(\@ctlfiles, \%OPT, 1);
-    
+
+    my $tmp = GI::new_instance_temp($CTL_OPT{TMP});
+    my $mount = GI::mount_check($tmp =~ /(.*\/)[^\/]*$/);
+
+    GI::set_global_temp($tmp);
+
+    #---set up blast databases and indexes for analyisis
+    print STDERR "STATUS: Processing and indexing input FASTA files...\n";
+
+    my @to_do;
+    my @ins = qw(genome protein est altest repeat_protein);
+    foreach my $in (@ins){
+        my @files = split(/\,/, $CTL_OPT{$in});
+        my %uniq = map {/^([^\:]+)\:?(.*)?/} @files;
+        @files = map {($uniq{$_}) ? GI::s_abs_path($_).":$_" : $_} keys %uniq;
+
+    	#print STDERR "CTL Files: @files\n";
+        my $key  = ($in =~ /protein/) ? 'protein' : 'nucleotide';
+        my $bins = ($in eq 'genome') ? 1 : 10;
+        my $bdir = $CTL_OPT{mpi_blastdb};
+        my $alt  = $CTL_OPT{alt_peptide};
+
+        push(@to_do, map {['split_db', $_, $key, $bins, $bdir, $alt]} @files);
+    }
+    @to_do = List::Util::shuffle(@to_do); #shuffle the order (efficiency)
+
+    my $split_count = @to_do;	
+    while((my $args = shift @to_do) || $split_count > 0){
+        shift @$args;
+        
+	my $split = GI::split_db(@$args);
+        GI::build_fasta_index($split);
+        $split_count--;
+        next;
+    }
+ 
+    print STDERR "STATUS: Creating Blast DB...\n";
+    GI::create_blastdb(\%CTL_OPT);
+    $gdbfile = $CTL_OPT{_g_db}[0];
+ 
+    $g_index = GI::build_fasta_index([$gdbfile]);
+ 
     #--open datastructure controller
     #This is where the output directory must be set
     $DS_CTL = ds_utility->new(\%CTL_OPT);
@@ -220,7 +268,9 @@ try{
     $build = $GFF_DB->next_build;
     
     #---load genome multifasta/GFF3 file
-    $iterator = new Iterator::Any( -fasta => $CTL_OPT{'genome'}, -gff => $CTL_OPT{'genome_gff'},);
+    $iterator = new Iterator::Fasta($CTL_OPT{_g_db}->[0]); 
+    
+    $fasta_iterator = new Iterator::Any( -fasta => $CTL_OPT{'genome'}, -gff => $CTL_OPT{'genome_gff'},);
 } catch Error::Simple with{
     my $E = shift;
     print STDERR $E->{-text};
@@ -294,6 +344,8 @@ sub main {
 	}
 	print localtime()." :: Total number of tiers is $total_tiers \n";
 	
+	create_worker_prog();
+	
 	my $tiers_to_annotate = $total_tiers;
 	
 	my $start_tier = 0;
@@ -336,7 +388,6 @@ sub main {
 		exit(0);	
 	}
 
-	create_worker_prog();
 	create_task_setup_script();
 
 	###Begin WorkQueue section
@@ -539,18 +590,35 @@ sub generate_tiers {
 	# $iterator is implicitly global
 	my $tier_ds;
 	my $numTiers = 0;
-	while (my $fasta = $iterator->nextFasta() ) {
-		$tier_ds = Process::MpiTiers->new({fasta =>$fasta,
-			CTL_OPT => \%CTL_OPT,
-			DS_CTL  => $DS_CTL,
-			GFF_DB  => $GFF_DB,
-			build   => $build},
-		   '0',
-		   'Process::MpiChunk'
-		   );
+
+	while( (my $q_def = $iterator->nextDef()) && (my $fasta = $fasta_iterator->nextFasta()) ) {
+        	$tier_ds = Process::MpiTiers->new({q_def   => $q_def,
+                                    g_index => $g_index,
+				    fasta => $fasta,
+                                    CTL_OPT => \%CTL_OPT,
+                                    DS_CTL  => $DS_CTL,
+                                    dbfile  => $GFF_DB->dbfile,
+                                    build   => $build},
+                                   '0',
+                                   'Process::MpiChunk'
+            	                   );
 		nstore \$tier_ds, ($numTiers."_todo.tier");
 		$numTiers++;
 	}
+
+	#while (my $fasta = $iterator->nextFasta() ) {
+	#	$tier_ds = Process::MpiTiers->new({fasta =>$fasta,
+	#		CTL_OPT => \%CTL_OPT,
+	#		DS_CTL  => $DS_CTL,
+	#		GFF_DB  => $GFF_DB,
+	#		build   => $build},
+	#	   '0',
+	#	   'Process::MpiChunk'
+	#	   );
+	#	nstore \$tier_ds, ($numTiers."_todo.tier");
+	#	$numTiers++;
+	#}
+	
 	return $numTiers;
 }
 
@@ -584,8 +652,9 @@ sub compute_submission_params {
 }
 
 sub create_worker_prog {
+
 	my $worker_prog_name = "maker_wq_worker";	
-	open (my $file_h, ">", $worker_prog_name); 
+	open (my $file_h, ">", $worker_prog_name) or die "Couldn't open $worker_prog_name: $!"; 
 
 	print $file_h <<'END';
 #!/usr/bin/env perl
@@ -594,7 +663,6 @@ use strict "refs";
 use warnings;
 
 use FindBin;
-use vars qw($RANK $LOG);
 
 BEGIN{
    if (not ($ENV{CGL_SO_SOURCE})) {
@@ -616,6 +684,8 @@ if ($numArgs < 1) {
 my $counter = $ARGV[0];
 my $tier;
 
+use Cwd;
+use Cwd qw(abs_path);
 use lib "./lib"; 
 use Storable qw(retrieve);
 use ds_utility;
@@ -625,27 +695,78 @@ use Error::Simple;
 use Process::MpiTiers;
 use Proc::Signal;
 
+my $pwd = cwd();
+
 my @ts = @ARGV; 
+my $total = scalar(@ts); 
 foreach my $c (@ts) {
 	my $inFile = $c."_todo.tier";
-	my $total = scalar(@ts); 
 	print "On component $c of $#ts, $total, $counter\n"; 
 
 	#tier files were generated with the nstore command from the Storable Perl module
 	#This simply stores a hash to disk in a convenient format. 
 	$tier = ${retrieve($inFile)};
-	$tier->CTL_OPT->{out_name} = "."; 
-	$tier->CTL_OPT->{out_base} = "."; 
-	$tier->CTL_OPT->{the_void} = ".";
-	$tier->{the_void} = ".";  
+	$tier->CTL_OPT->{out_name} = $pwd . "/"; 
+        $tier->CTL_OPT->{out_base} = $pwd . "/"; 
+        $tier->CTL_OPT->{the_void} = $pwd . "/"; 
+        my $file = $tier->DS_CTL->{log};
+        my @fields = split(/\//, $file);
+        $file = $fields[scalar(@fields) - 1];
+	print STDERR "File is $file\n";
 
+        $tier->DS_CTL->{log} = "./$file";
+        my $root = $tier->DS_CTL->{root};
+        $tier->DS_CTL->{root} = $pwd . "/";
+        $tier->DS_CTL->{ds_object}->{_root} = $pwd . "/";
+        $tier->{the_void} = $pwd . "/";
+        $tier->CTL_OPT->{CWD} = $pwd . "/"; 
+        $tier->{dbfile} = $pwd . "/"; 
+        $tier->CTL_OPT->{_TMP} = $pwd . "/"; 
+
+	my @inputs = ("_e_db","_p_db","_d_db","_r_db","_a_db");
+	for (@inputs) {
+		print "$_ : Working\n";
+		if (defined $tier->CTL_OPT->{$_}){ 
+			my @files = @{$tier->CTL_OPT->{$_}}; 	
+			for(my $j = 0; $j < scalar(@files); $j++){
+				my $file = $files[$j];
+				my $newfile = abs_path($file); 
+				$files[$j] = $newfile; 
+				print "New file : $newfile\n";
+			}
+			$tier->CTL_OPT->{$_} = \@files; 
+		}	
+	}
+	my @files = ('snaphmm',  'SEEN_file', 'rmlib');
+	foreach my $x (@files){ 
+		my $file = $tier->CTL_OPT->{$x}; 
+		my @fields = split(/\//, $file); 
+		my $newfile = $fields[scalar(@fields) - 1]; 
+		if(-e $file){
+			$file = abs_path($file); 
+			$tier->CTL_OPT->{$x} = "$file"; 
+		}
+	}
+
+
+	my @execs = ('formatdb', 'blastall', '_formater', '_tblastx', 'tblastx', 'blastx', 'xdformat', 'exonerate', 'snap', 'RepeatMasker', 'blastn', 'formatdb', 'gmhmme3', '_blastx', '_blastn', 'probuild', 'augustus', 'gmhmme3', 'gmhmmp', 'fgenesh', 'twinscan');
+        foreach my $v (@execs){
+                my $file = $tier->CTL_OPT->{$v};
+                if (! -e $file){
+                        next;
+                }
+		print time." :: $v: $file\n";
+                $tier->CTL_OPT->{$v} = "$pwd/$file";
+        }	
+
+	
 	#use Process::MpiTiers;
 	print time." :: Worker $counter :: starting \n";
-	$tier->run_all;
+	$tier->run_all(0); #rank is 0.
 	print time." :: Worker $counter :: finished \n";
 
 	if($tier->failed) { print "EXIT:-1 \n"; last; }
-	elsif($tier->terminated) { print "EXIT:1 \n"; next; }
+	elsif($tier->terminated) { print "EXIT:0 \n"; next; }
 }
 END
 		
@@ -751,7 +872,7 @@ sub submit_task {
 		exit(0);
 	}
 	
-	my $task_command .= "time ./task_env_setup.sh; time ./maker_wq_worker";
+	my $task_command .= "time ./task_env_setup.sh; time ./maker_wq_worker ";
 	
 	my $query_seqs = ""; 
 	for(my $tier_num = $start_tier; $tier_num < $start_tier+$tiers_in_task; $tier_num++) {
@@ -768,6 +889,7 @@ sub submit_task {
 	submit_input_base_files($task, $start_tier);
 	
 	for(my $tier_num = $start_tier; $tier_num < ($start_tier+$tiers_in_task); $tier_num++){
+		submit_executables($task, $tier_num);
 		submit_input_tier_files($task, $tier_num);
 		configure_remote_tier_annotation($tier_num);	
 		specify_output_tier_files($task, $tier_num);
@@ -805,6 +927,14 @@ sub submit_input_base_files {
 	submit_rdb_input_files($task, \$tier_ds);	
 	submit_adb_input_files($task, \$tier_ds);	
 	submit_input_files($task, \$tier_ds);	
+	nstore \$tier_ds, ($tierFile);
+}
+
+sub submit_executables{
+	my ($task, $tier) = @_;
+	
+	my $tierFile = $tier."_todo.tier";
+	my $tier_ds = ${retrieve($tierFile)}; #$tier_ds holds all the information for task 
 	submit_executable_files($task, \$tier_ds);	
 	nstore \$tier_ds, ($tierFile);
 }
@@ -999,7 +1129,7 @@ sub configure_remote_tier_annotation{
 	$tier_ds->DS_CTL->{ds_object}->{_root} = "./"; 
 	$tier_ds->{the_void} = "."; 
 	$tier_ds->CTL_OPT->{CWD} = ".";  
-	$tier_ds->GFF_DB->{dbfile} = "./";
+	$tier_ds->{dbfile} = "./";
 	$tier_ds->CTL_OPT->{_TMP} = "./";  
 	
 	nstore \$tier_ds, ($tierFile); #store the modified variables to the tier file that is transmitted to workers	
@@ -1010,12 +1140,23 @@ sub specify_output_tier_files {
 	
 	my $tierFile = $tier."_todo.tier";
 	my $tier_ds = ${retrieve($tierFile)}; #$tier_ds holds all the information for task 
+
 	if(!exists($tier_ds->{VARS}->{fasta})){
-		print STDERR "Fasta doesn't exist\n"; 
-		exit(0);
-	}
+        	print STDERR "Fasta doesn't exist\n";
+        	exit(0);
+    	}
+    
 	#need to know the remote directory name, this is generated from the sequence header
-	my $fasta = Fasta::ucFasta(\$tier_ds->{VARS}->{fasta}); #build uppercase fasta
+    	my $fasta = Fasta::ucFasta(\$tier_ds->{VARS}->{fasta}); #build uppercase fasta
+
+	#if(!exists($tier_ds->CTL_OPT->{genome})){
+	#	print STDERR "Fasta doesn't exist\n"; 
+	#	exit(0);
+	#}
+	##need to know the remote directory name, this is generated from the sequence header
+	#my $fasta = Fasta::ucFasta(\$tier_ds->CTL_OPT->{genome}); #build uppercase fasta
+	#print STDERR "Fasta is $fasta\n";	
+	
 	my $q_def = Fasta::getDef(\$fasta); #Get fasta header
 	my $seq_id = Fasta::def2SeqID($q_def); #Get sequence identifier
 	my $root = $tier_ds->DS_CTL->{root}; 
