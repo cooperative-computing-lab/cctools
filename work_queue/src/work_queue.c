@@ -228,7 +228,7 @@ static struct list *work_queue_task_file_list_clone(struct list *list);
 
 static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total, int cores_flag) {
 	int64_t r = 0;
-	if(total > 0)
+	if(total != 0)
 	{
 		r = ceil(total * q->asynchrony_multiplier);
 
@@ -733,7 +733,15 @@ static void add_worker(struct work_queue *q)
 	w->current_tasks = itable_create(0);
 	w->finished_tasks = 0;
 	w->start_time = timestamp_get();
-	w->resources = work_queue_resources_create();
+//	w->resources = work_queue_resources_create();
+
+	struct work_queue_resources *r = work_queue_resources_create();
+    r->cores.smallest = r->cores.largest = r->cores.total = -1;//default_resource_value;
+    r->memory.smallest = r->memory.largest = r->memory.total = -1;//default_resource_value;
+    r->disk.smallest = r->disk.largest = r->disk.total = -1;//default_resource_value;
+    r->gpus.smallest = r->gpus.largest = r->gpus.total = -1;//default_resource_value;
+	w->resources = r;
+
 	w->stats     = calloc(1, sizeof(struct work_queue_stats));
 	link_to_hash_key(link, w->hashkey);
 	sprintf(w->addrport, "%s:%d", addr, port);
@@ -2110,6 +2118,7 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 
 static int send_input_file(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f)
 {
+	
 	int64_t total_bytes = 0;
 	int64_t actual = 0;
 	int result = SUCCESS; //return success unless something fails below

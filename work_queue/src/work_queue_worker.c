@@ -234,6 +234,7 @@ void resources_measure_locally(struct work_queue_resources *r)
 	r->gpus.smallest = r->gpus.largest = r->gpus.total;
 }
 
+
 /*
 Send a message to the master with my current resources, if they have changed.
 Don't send a message more than every send_resources_interval seconds.
