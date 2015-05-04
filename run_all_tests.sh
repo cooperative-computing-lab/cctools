@@ -23,7 +23,7 @@ FAILURE=0
 START_TIME=$(date +%s)
 for package in ${CCTOOLS_PACKAGES}; do
 	if [ -d "${package}/test" ]; then
-		cd "${package}/test"
+		cd "./${package}/test"
 		for script in TR_*; do
 			if [ -x "$script" ]; then
 				printf "%-66s" "--- Testing ${package}/test/${script} ... "
