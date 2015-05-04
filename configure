@@ -149,8 +149,8 @@ then
 	globus_path=${GLOBUS_LOCATION}
 fi
 
-IFS=" ="
-export IFS
+IFS=' ='
+set -- $*
 
 while [ $# -gt 0 ]
 do
