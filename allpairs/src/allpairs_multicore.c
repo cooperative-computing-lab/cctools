@@ -35,7 +35,6 @@ static int block_size = 0;
 static int num_cores = 0;
 static int is_symmetric = 0;
 static int nindex = 0;
-static char **index_str;
 static int index_array[2];
 
 enum {
@@ -318,7 +317,6 @@ int main(int argc, char *argv[])
 {
 	int c;
 	int result;
-	int i;
 
 	debug_config(progname);
 
@@ -349,16 +347,11 @@ int main(int argc, char *argv[])
 			debug_flags_set(optarg);
 			break;
 		case LONG_OPT_INDEX:
-			//remove spaces within optarg, and split it by space.
-			string_split(optarg, &nindex, &index_str);
+			nindex = sscanf(optarg, "%d %d", &index_array[0], &index_array[1]);
 			if(nindex != 2) {
 				fprintf(stderr, "You must provide two indexes: xstart and ystart.\n");
 				show_help(progname);
 				exit(0);
-			} else {
-				for(i = 0; i < nindex; i++) {
-					index_array[i] = atoi(index_str[i]);
-				}
 			}
 			break;
 		case LONG_OPT_SYMMETRIC:
