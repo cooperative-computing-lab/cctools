@@ -1,0 +1,64 @@
+2015/05/01 13:25:10.91 sand_align_master[10170] debug: sand_align_master version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 13:25:10.91 sand_align_master[10170] debug: Built by dthain@cclws15 on May  1 2015 at 12:43:12
+2015/05/01 13:25:10.91 sand_align_master[10170] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 13:25:10.91 sand_align_master[10170] debug: Configuration:
+2015/05/01 13:25:10.91 sand_align_master[10170] tcp: listening on port 1033
+2015/05/01 13:25:10.91 sand_align_master[10170] wq: Work Queue is listening on port 1033.
+2015/05/01 13:25:10.92 sand_align_master[10170] debug: created task of 20 sequences and 10 comparisons
+2015/05/01 13:25:11.90 sand_align_master[10170] tcp: got connection from 127.0.0.1:56111
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: worker 127.0.0.1:56111 connected
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: workers status -- total: 1, active: 0, available: 0.
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: 1 workers are connected in total now
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: rx from unknown (127.0.0.1:56111): workqueue 3 cclws15.cse.nd.edu Linux x86_64 4.4.0-TRUNK
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: workers status -- total: 1, active: 1, available: 0.
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) running CCTools version 4.4.0-TRUNK on Linux (operating system) with architecture x86_64 is ready
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56111): resource workers 0 0 1 1 1
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56111): resource disk 0 0 42215 42215 42215
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56111): resource memory 0 0 2333 2333 2333
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56111): resource gpus 0 0 0 0 0
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56111): resource unlabeled 0 0 0 0 0
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56111): resource cores 0 0 1 1 1
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56111): resource tag 0
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: workers status -- total: 1, active: 1, available: 0.
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) needs file ../src/sand_align_kernel bytes 0:134046 as 'file-c31956222b203fc6603acfeb94d3dda3-sand_align_kernel'
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) will try up to 10 seconds to transfer this 0.13 MB file.
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): put file-c31956222b203fc6603acfeb94d3dda3-sand_align_kernel 134046 0755 1
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) received 0.13 MB in 0.00s (876.12s MB/s) average 876.12s MB/s
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) needs literal as aligndata
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): put buffer-1-7f2db423a49b305459147332fb01cf87 4887 777 0
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) received 0.00 MB in 0.00s (85.74s MB/s) average 661.59s MB/s
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): task 1
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): cmd 23
+./align -a sw aligndata
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): cores -1
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): memory -1
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): disk -1
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): gpus -1
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): infile file-c31956222b203fc6603acfeb94d3dda3-sand_align_kernel align 1
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): infile buffer-1-7f2db423a49b305459147332fb01cf87 aligndata 0
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): end
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) busy on './align -a sw aligndata'
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56111): info end_of_resource_update 0
+2015/05/01 13:25:11.90 sand_align_master[10170] wq: Receiving end_of_resource_update info from worker (127.0.0.1:56111)
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56111): available_results
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): send_results -1
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: Reading result(s) from cclws15.cse.nd.edu (127.0.0.1:56111)
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56111): result 0 0 1044 40638 1
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: Receiving stdout of task 1 (size: 1044 bytes) from 127.0.0.1:56111 (cclws15.cse.nd.edu) ...
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: Retrieved 1044 bytes from cclws15.cse.nd.edu (127.0.0.1:56111)
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56111): end
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): kill 1
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): unlink buffer-1-7f2db423a49b305459147332fb01cf87
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: cclws15.cse.nd.edu (127.0.0.1:56111) done in 0.04s total tasks 1 average 0.04s
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56111): release
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: worker cclws15.cse.nd.edu (127.0.0.1:56111) removed
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: workers status -- total: 0, active: 0, available: 0.
+2015/05/01 13:25:11.94 sand_align_master[10170] tcp: disconnected from 127.0.0.1:56111
+2015/05/01 13:25:11.94 sand_align_master[10170] wq: 0 workers are connected in total now

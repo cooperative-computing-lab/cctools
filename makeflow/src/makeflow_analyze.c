@@ -45,9 +45,8 @@ See the file COPYING for details.
 #include "path.h"
 
 #include "dag.h"
-#include "visitors.h"
-
-#include "makeflow_common.h"
+#include "dag_visitors.h"
+#include "parser.h"
 
 /* Display options */
 enum { SHOW_INPUT_FILES = 2,
@@ -56,17 +55,8 @@ enum { SHOW_INPUT_FILES = 2,
        SHOW_DAG_FILE
 };
 
-
 #define MAKEFLOW_AUTO_WIDTH 1
 #define MAKEFLOW_AUTO_GROUP 2
-
-#define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
-
-/* Unique integers for long options. */
-
-enum { LONG_OPT_VERBOSE_PARSING, };
-
-int verbose_parsing = 0;
 
 void dag_show_analysis(struct dag *d)
 {
@@ -98,9 +88,6 @@ void collect_input_files(struct dag *d, char *bundle_dir, char *(*rename) (struc
 	il = dag_input_files(d);
 
 	struct dag_file *f;
-
-	if(!rename)
-		rename = dag_node_translate_filename;
 
 	list_first_item(il);
 	while((f = list_next_item(il))) {
@@ -199,9 +186,9 @@ void dag_show_output_files(struct dag *d)
 	struct dag_file *f;
 	char *filename;
 
-	hash_table_firstkey(d->file_table);
-	while(hash_table_nextkey(d->file_table, &filename, (void **) &f)) {
-		if(f->target_of)
+	hash_table_firstkey(d->files);
+	while(hash_table_nextkey(d->files, &filename, (void **) &f)) {
+		if(f->created_by)
 			fprintf(stdout, "%s\n", filename);
 	}
 }
@@ -222,11 +209,10 @@ int main(int argc, char *argv[])
 {
 	int c;
 	random_init();
-	set_makeflow_exe(argv[0]);
-	debug_config(get_makeflow_exe());
+	debug_config(argv[0]);
 	int display_mode = 0;
 
-	cctools_version_debug(D_MAKEFLOW_RUN, get_makeflow_exe());
+	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 	const char *dagfile;
 
 	char *bundle_directory = NULL;
@@ -250,7 +236,7 @@ int main(int argc, char *argv[])
 				bundle_directory = xxstrdup(optarg);
 				break;
 			case 'h':
-				show_help_analyze(get_makeflow_exe());
+				show_help_analyze(argv[0]);
 				return 0;
 			case 'i':
 				display_mode = SHOW_MAKEFLOW_ANALYSIS;
@@ -268,10 +254,10 @@ int main(int argc, char *argv[])
 				debug_flags_set(optarg);
 				break;
 			case 'v':
-				cctools_version_print(stdout, get_makeflow_exe());
+				cctools_version_print(stdout, argv[0]);
 				return 0;
 			default:
-				show_help_analyze(get_makeflow_exe());
+				show_help_analyze(argv[0]);
 				return 1;
 		}
 	}
@@ -279,8 +265,8 @@ int main(int argc, char *argv[])
 	if((argc - optind) != 1) {
 		int rv = access("./Makeflow", R_OK);
 		if(rv < 0) {
-			fprintf(stderr, "makeflow: No makeflow specified and file \"./Makeflow\" could not be found.\n");
-			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", get_makeflow_exe());
+			fprintf(stderr, "makeflow_analyze: No makeflow specified and file \"./Makeflow\" could not be found.\n");
+			fprintf(stderr, "makeflow_analyze: Run \"%s -h\" for help with options.\n", argv[0]);
 			return 1;
 		}
 
@@ -291,7 +277,7 @@ int main(int argc, char *argv[])
 
 	struct dag *d = dag_from_file(dagfile);
 	if(!d) {
-		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
+		fatal("makeflow_analyze: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
 
 	if(syntax_check) {

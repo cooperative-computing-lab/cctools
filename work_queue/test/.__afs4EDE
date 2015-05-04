@@ -1,0 +1,431 @@
+2015/05/01 11:54:58.27 [13172] tcp: listening on port 1025
+2015/05/01 11:54:58.27 [13172] wq: Work Queue is listening on port 1025.
+2015/05/01 11:54:59.29 [13172] tcp: got connection from 127.0.0.1:43005
+2015/05/01 11:54:59.29 [13172] wq: worker 127.0.0.1:43005 connected
+2015/05/01 11:54:59.29 [13172] wq: workers status -- total: 1, active: 0, available: 0.
+2015/05/01 11:54:59.29 [13172] wq: 1 workers are connected in total now
+2015/05/01 11:54:59.29 [13172] wq: rx from unknown (127.0.0.1:43005): workqueue 3 cclws15.cse.nd.edu foreman x86_64 4.4.0-TRUNK
+2015/05/01 11:54:59.29 [13172] wq: workers status -- total: 1, active: 1, available: 0.
+2015/05/01 11:54:59.29 [13172] wq: cclws15.cse.nd.edu (127.0.0.1:43005) running CCTools version 4.4.0-TRUNK on foreman (operating system) with architecture x86_64 is ready
+2015/05/01 11:54:59.29 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): resource workers 0 0 0 0 0
+2015/05/01 11:54:59.29 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): resource disk 0 0 42225 0 0
+2015/05/01 11:54:59.29 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): resource memory 0 0 0 0 0
+2015/05/01 11:54:59.29 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): resource gpus 0 0 0 0 0
+2015/05/01 11:54:59.29 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): resource unlabeled 0 0 0 0 0
+2015/05/01 11:54:59.29 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): resource cores 0 0 0 0 0
+2015/05/01 11:54:59.29 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): resource tag 0
+2015/05/01 11:54:59.29 [13172] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:54:59.29 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): info end_of_resource_update 0
+2015/05/01 11:54:59.29 [13172] wq: Receiving end_of_resource_update info from worker (127.0.0.1:43005)
+2015/05/01 11:55:00.28 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): info total_workers_joined 1
+2015/05/01 11:55:00.28 [13172] wq: Receiving total_workers_joined info from worker (127.0.0.1:43005)
+2015/05/01 11:55:00.28 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): info total_workers_removed 0
+2015/05/01 11:55:00.28 [13172] wq: Receiving total_workers_removed info from worker (127.0.0.1:43005)
+2015/05/01 11:55:00.28 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): info total_send_time 0
+2015/05/01 11:55:00.28 [13172] wq: Receiving total_send_time info from worker (127.0.0.1:43005)
+2015/05/01 11:55:00.28 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): info total_receive_time 0
+2015/05/01 11:55:00.28 [13172] wq: Receiving total_receive_time info from worker (127.0.0.1:43005)
+2015/05/01 11:55:00.28 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): info total_execute_time 0
+2015/05/01 11:55:00.28 [13172] wq: Receiving total_execute_time info from worker (127.0.0.1:43005)
+2015/05/01 11:55:00.28 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): info total_bytes_sent 0
+2015/05/01 11:55:00.28 [13172] wq: Receiving total_bytes_sent info from worker (127.0.0.1:43005)
+2015/05/01 11:55:00.28 [13172] wq: rx from cclws15.cse.nd.edu (127.0.0.1:43005): info total_bytes_received 0
+2015/05/01 11:55:00.28 [13172] wq: Receiving total_bytes_received info from worker (127.0.0.1:43005)
+2015/05/01 11:55:10.29 [13172] wq: Failed to read from worker cclws15.cse.nd.edu (127.0.0.1:43005)
+2015/05/01 11:55:10.29 [13172] wq: worker cclws15.cse.nd.edu (127.0.0.1:43005) removed
+2015/05/01 11:55:10.29 [13172] wq: workers status -- total: 0, active: 0, available: 0.
+2015/05/01 11:55:10.29 [13172] tcp: disconnected from 127.0.0.1:43005
+2015/05/01 11:55:10.29 [13172] wq: 0 workers are connected in total now
+2015/05/01 11:55:49.37 [15171] tcp: listening on port 1026
+2015/05/01 11:55:49.37 [15171] wq: Work Queue is listening on port 1026.
+2015/05/01 11:55:49.47 [15171] tcp: got connection from 127.0.0.1:53270
+2015/05/01 11:55:49.47 [15171] wq: worker 127.0.0.1:53270 connected
+2015/05/01 11:55:49.47 [15171] wq: workers status -- total: 1, active: 0, available: 0.
+2015/05/01 11:55:49.47 [15171] wq: 1 workers are connected in total now
+2015/05/01 11:55:49.47 [15171] wq: rx from unknown (127.0.0.1:53270): workqueue 3 cclws15.cse.nd.edu Linux x86_64 4.4.0-TRUNK
+2015/05/01 11:55:49.47 [15171] wq: workers status -- total: 1, active: 1, available: 0.
+2015/05/01 11:55:49.47 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) running CCTools version 4.4.0-TRUNK on Linux (operating system) with architecture x86_64 is ready
+2015/05/01 11:55:49.47 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): resource workers 0 0 1 1 1
+2015/05/01 11:55:49.47 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): resource disk 0 0 42279 42279 42279
+2015/05/01 11:55:49.47 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): resource memory 0 0 2476 2476 2476
+2015/05/01 11:55:49.47 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): resource gpus 0 0 0 0 0
+2015/05/01 11:55:49.47 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): resource unlabeled 0 0 0 0 0
+2015/05/01 11:55:49.47 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): resource cores 0 0 4 4 4
+2015/05/01 11:55:49.47 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): resource tag 0
+2015/05/01 11:55:49.47 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.47 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.47 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) needs file input.0 bytes 0:1048576 as 'file-00be8ab629f6bc77afd844c925a2daa3-input.0'
+2015/05/01 11:55:49.47 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.47 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): put file-00be8ab629f6bc77afd844c925a2daa3-input.0 1048576 0644 1
+2015/05/01 11:55:49.47 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) received 1.05 MB in 0.00s (1044.40s MB/s) average 1044.40s MB/s
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-827c8c9291ea4eba86b33bfa9041ffad-output.0 outfile 0
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.47 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:49.47 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 2
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-af7db45a81010dbef11b913852bd120c-output.1 outfile 0
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.47 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:49.47 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 3
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-7d4458fec8039639e41ba910f97b21d3-output.2 outfile 0
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.47 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:49.47 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 4
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-c1e379accd891be3767e8d4b12e9a733-output.3 outfile 0
+2015/05/01 11:55:49.47 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.47 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:49.47 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): info end_of_resource_update 0
+2015/05/01 11:55:49.47 [15171] wq: Receiving end_of_resource_update info from worker (127.0.0.1:53270)
+2015/05/01 11:55:49.48 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): available_results
+2015/05/01 11:55:49.48 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): send_results -1
+2015/05/01 11:55:49.48 [15171] wq: Reading result(s) from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:49.48 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 6332 1
+2015/05/01 11:55:49.48 [15171] wq: Receiving stdout of task 1 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.48 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.48 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:49.48 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:49.48 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 5790 2
+2015/05/01 11:55:49.48 [15171] wq: Receiving stdout of task 2 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.48 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.48 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:49.48 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:49.48 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 5236 3
+2015/05/01 11:55:49.48 [15171] wq: Receiving stdout of task 3 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.48 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.48 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:49.48 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:49.48 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 4879 4
+2015/05/01 11:55:49.48 [15171] wq: Receiving stdout of task 4 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.48 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.48 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:49.48 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:49.48 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.48 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-827c8c9291ea4eba86b33bfa9041ffad-output.0 to output.0
+2015/05/01 11:55:49.48 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-827c8c9291ea4eba86b33bfa9041ffad-output.0 1
+2015/05/01 11:55:49.48 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-827c8c9291ea4eba86b33bfa9041ffad-output.0 1048576
+2015/05/01 11:55:49.48 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.48 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:49.48 [15171] wq: Receiving file output.0 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.58 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.58 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.10s (10.69s MB/s) average 21.17s MB/s
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 1
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-827c8c9291ea4eba86b33bfa9041ffad-output.0
+2015/05/01 11:55:49.58 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.58 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 0.11s total tasks 1 average 0.01s
+2015/05/01 11:55:49.58 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 5
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-2a0bcc70b8cea555f785d3c5363c6ad6-output.4 outfile 0
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.58 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:49.58 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-af7db45a81010dbef11b913852bd120c-output.1 to output.1
+2015/05/01 11:55:49.58 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-af7db45a81010dbef11b913852bd120c-output.1 1
+2015/05/01 11:55:49.58 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-af7db45a81010dbef11b913852bd120c-output.1 1048576
+2015/05/01 11:55:49.58 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.58 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:49.58 [15171] wq: Receiving file output.1 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.68 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.68 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.10s (10.14s MB/s) average 15.53s MB/s
+2015/05/01 11:55:49.68 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 2
+2015/05/01 11:55:49.68 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-af7db45a81010dbef11b913852bd120c-output.1
+2015/05/01 11:55:49.68 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.68 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 0.21s total tasks 2 average 0.01s
+2015/05/01 11:55:49.68 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-7d4458fec8039639e41ba910f97b21d3-output.2 to output.2
+2015/05/01 11:55:49.68 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-7d4458fec8039639e41ba910f97b21d3-output.2 1
+2015/05/01 11:55:49.68 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): available_results
+2015/05/01 11:55:49.68 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-7d4458fec8039639e41ba910f97b21d3-output.2 1048576
+2015/05/01 11:55:49.68 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.68 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:49.68 [15171] wq: Receiving file output.2 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.78 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.78 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.10s (10.54s MB/s) average 13.89s MB/s
+2015/05/01 11:55:49.78 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 3
+2015/05/01 11:55:49.78 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-7d4458fec8039639e41ba910f97b21d3-output.2
+2015/05/01 11:55:49.78 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.78 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 0.31s total tasks 3 average 0.01s
+2015/05/01 11:55:49.78 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-c1e379accd891be3767e8d4b12e9a733-output.3 to output.3
+2015/05/01 11:55:49.78 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-c1e379accd891be3767e8d4b12e9a733-output.3 1
+2015/05/01 11:55:49.78 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-c1e379accd891be3767e8d4b12e9a733-output.3 1048576
+2015/05/01 11:55:49.78 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.78 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:49.78 [15171] wq: Receiving file output.3 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.88 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.88 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.10s (10.42s MB/s) average 13.02s MB/s
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 4
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-c1e379accd891be3767e8d4b12e9a733-output.3
+2015/05/01 11:55:49.88 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.88 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 0.41s total tasks 4 average 0.01s
+2015/05/01 11:55:49.88 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 6
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-ca2831f8e8c5993977ca45022a354cb8-output.5 outfile 0
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.88 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:49.88 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 7
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-ab3f01c0d689418c4696b7786478a7a9-output.6 outfile 0
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.88 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:49.88 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 8
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-af6cd128e1faf76cfb62beaec668f868-output.7 outfile 0
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.88 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:49.88 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): send_results -1
+2015/05/01 11:55:49.88 [15171] wq: Reading result(s) from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:49.89 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 7230 5
+2015/05/01 11:55:49.89 [15171] wq: Receiving stdout of task 5 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.89 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.89 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:49.89 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:49.89 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.89 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-2a0bcc70b8cea555f785d3c5363c6ad6-output.4 to output.4
+2015/05/01 11:55:49.89 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-2a0bcc70b8cea555f785d3c5363c6ad6-output.4 1
+2015/05/01 11:55:49.89 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-2a0bcc70b8cea555f785d3c5363c6ad6-output.4 1048576
+2015/05/01 11:55:49.89 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.89 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:49.89 [15171] wq: Receiving file output.4 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.99 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.10s (10.33s MB/s) average 12.48s MB/s
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 5
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-2a0bcc70b8cea555f785d3c5363c6ad6-output.4
+2015/05/01 11:55:49.99 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 0.41s total tasks 5 average 0.01s
+2015/05/01 11:55:49.99 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 9
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-43f5d9f19d1282f79cd1771515662145-output.8 outfile 0
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:49.99 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): available_results
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): send_results -1
+2015/05/01 11:55:49.99 [15171] wq: Reading result(s) from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:49.99 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 6183 6
+2015/05/01 11:55:49.99 [15171] wq: Receiving stdout of task 6 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:49.99 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:49.99 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 5500 7
+2015/05/01 11:55:49.99 [15171] wq: Receiving stdout of task 7 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:49.99 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:49.99 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 5056 8
+2015/05/01 11:55:49.99 [15171] wq: Receiving stdout of task 8 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:49.99 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:49.99 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-ca2831f8e8c5993977ca45022a354cb8-output.5 to output.5
+2015/05/01 11:55:49.99 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-ca2831f8e8c5993977ca45022a354cb8-output.5 1
+2015/05/01 11:55:49.99 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-ca2831f8e8c5993977ca45022a354cb8-output.5 1048576
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:49.99 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:49.99 [15171] wq: Receiving file output.5 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:50.09 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:50.09 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.10s (10.27s MB/s) average 12.11s MB/s
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 6
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-ca2831f8e8c5993977ca45022a354cb8-output.5
+2015/05/01 11:55:50.09 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:50.09 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 0.21s total tasks 6 average 0.01s
+2015/05/01 11:55:50.09 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 10
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-c979f0586ebfcf3668feee5f53c8907e-output.9 outfile 0
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:50.09 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:50.09 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-ab3f01c0d689418c4696b7786478a7a9-output.6 to output.6
+2015/05/01 11:55:50.09 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-ab3f01c0d689418c4696b7786478a7a9-output.6 1
+2015/05/01 11:55:50.09 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): available_results
+2015/05/01 11:55:50.09 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-ab3f01c0d689418c4696b7786478a7a9-output.6 1048576
+2015/05/01 11:55:50.09 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:50.09 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:50.09 [15171] wq: Receiving file output.6 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:50.19 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:50.19 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.10s (10.39s MB/s) average 11.86s MB/s
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 7
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-ab3f01c0d689418c4696b7786478a7a9-output.6
+2015/05/01 11:55:50.19 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:50.19 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 0.31s total tasks 7 average 0.01s
+2015/05/01 11:55:50.19 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 11
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-35b8664d621058ab756fdec8298d3786-output.10 outfile 0
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:50.19 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:50.19 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-af6cd128e1faf76cfb62beaec668f868-output.7 to output.7
+2015/05/01 11:55:50.19 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-af6cd128e1faf76cfb62beaec668f868-output.7 1
+2015/05/01 11:55:50.19 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-af6cd128e1faf76cfb62beaec668f868-output.7 1048576
+2015/05/01 11:55:50.19 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:50.19 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:50.19 [15171] wq: Receiving file output.7 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:50.30 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:50.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.11s (9.95s MB/s) average 11.61s MB/s
+2015/05/01 11:55:50.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 8
+2015/05/01 11:55:50.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-af6cd128e1faf76cfb62beaec668f868-output.7
+2015/05/01 11:55:50.30 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:50.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 0.41s total tasks 8 average 0.01s
+2015/05/01 11:55:50.30 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:50.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): task 12
+2015/05/01 11:55:50.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cmd 49
+dd if=/dev/zero of=outfile bs=1M count=1; sleep 0
+2015/05/01 11:55:50.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): cores 1
+2015/05/01 11:55:50.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): memory -1
+2015/05/01 11:55:50.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): disk -1
+2015/05/01 11:55:50.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): gpus -1
+2015/05/01 11:55:50.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): infile file-00be8ab629f6bc77afd844c925a2daa3-input.0 infile 1
+2015/05/01 11:55:50.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): outfile file-8cf04bacfabc0e2b26c0a0c6fb9a8738-output.11 outfile 0
+2015/05/01 11:55:50.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:50.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) busy on 'dd if=/dev/zero of=outfile bs=1M count=1; sleep 0'
+2015/05/01 11:55:55.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): send_results -1
+2015/05/01 11:55:55.30 [15171] wq: Reading result(s) from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:55.30 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 7359 9
+2015/05/01 11:55:55.30 [15171] wq: Receiving stdout of task 9 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:55.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:55.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:55.30 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:55.30 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 7497 10
+2015/05/01 11:55:55.30 [15171] wq: Receiving stdout of task 10 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:55.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:55.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:55.30 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:55.30 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 7407 11
+2015/05/01 11:55:55.30 [15171] wq: Receiving stdout of task 11 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:55.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:55.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:55.30 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:55.30 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): result 0 0 85 7235 12
+2015/05/01 11:55:55.30 [15171] wq: Receiving stdout of task 12 (size: 85 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:55.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:55.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 11:55:55.30 [15171] wq: Retrieved 85 bytes from cclws15.cse.nd.edu (127.0.0.1:53270)
+2015/05/01 11:55:55.30 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:55.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-43f5d9f19d1282f79cd1771515662145-output.8 to output.8
+2015/05/01 11:55:55.30 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-43f5d9f19d1282f79cd1771515662145-output.8 1
+2015/05/01 11:55:55.30 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-43f5d9f19d1282f79cd1771515662145-output.8 1048576
+2015/05/01 11:55:55.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:55.30 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:55.30 [15171] wq: Receiving file output.8 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:55.40 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:55.40 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.10s (10.53s MB/s) average 11.50s MB/s
+2015/05/01 11:55:55.40 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 9
+2015/05/01 11:55:55.40 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-43f5d9f19d1282f79cd1771515662145-output.8
+2015/05/01 11:55:55.40 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:55.40 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 5.42s total tasks 9 average 0.01s
+2015/05/01 11:55:55.40 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-c979f0586ebfcf3668feee5f53c8907e-output.9 to output.9
+2015/05/01 11:55:55.40 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-c979f0586ebfcf3668feee5f53c8907e-output.9 1
+2015/05/01 11:55:55.40 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-c979f0586ebfcf3668feee5f53c8907e-output.9 1048576
+2015/05/01 11:55:55.40 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 11:55:55.40 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:55.40 [15171] wq: Receiving file output.9 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:55.50 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:55.50 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.10s (10.51s MB/s) average 11.40s MB/s
+2015/05/01 11:55:55.50 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 10
+2015/05/01 11:55:55.50 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-c979f0586ebfcf3668feee5f53c8907e-output.9
+2015/05/01 11:55:55.50 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:55.50 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 5.41s total tasks 10 average 0.01s
+2015/05/01 11:55:55.50 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-35b8664d621058ab756fdec8298d3786-output.10 to output.10
+2015/05/01 11:55:55.50 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-35b8664d621058ab756fdec8298d3786-output.10 1
+2015/05/01 11:55:55.50 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-35b8664d621058ab756fdec8298d3786-output.10 1048576
+2015/05/01 11:55:55.50 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using worker's observed average transfer rate of 10.87 MB/s
+2015/05/01 11:55:55.50 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:55.50 [15171] wq: Receiving file output.10 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:55.60 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:55.60 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.10s (10.55s MB/s) average 11.32s MB/s
+2015/05/01 11:55:55.60 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 11
+2015/05/01 11:55:55.60 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-35b8664d621058ab756fdec8298d3786-output.10
+2015/05/01 11:55:55.60 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:55.60 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 5.41s total tasks 11 average 0.01s
+2015/05/01 11:55:55.60 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sending back file-8cf04bacfabc0e2b26c0a0c6fb9a8738-output.11 to output.11
+2015/05/01 11:55:55.60 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): get file-8cf04bacfabc0e2b26c0a0c6fb9a8738-output.11 1
+2015/05/01 11:55:55.60 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): file file-8cf04bacfabc0e2b26c0a0c6fb9a8738-output.11 1048576
+2015/05/01 11:55:55.60 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) using worker's observed average transfer rate of 10.80 MB/s
+2015/05/01 11:55:55.60 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) will try up to 10 seconds to transfer this 1.05 MB file.
+2015/05/01 11:55:55.60 [15171] wq: Receiving file output.11 (size: 1048576 bytes) from 127.0.0.1:53270 (cclws15.cse.nd.edu) ...
+2015/05/01 11:55:55.70 [15171] wq: rx from cclws15.cse.nd.edu (127.0.0.1:53270): end
+2015/05/01 11:55:55.70 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) sent 1.05 MB in 0.10s (10.51s MB/s) average 11.26s MB/s
+2015/05/01 11:55:55.70 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): kill 12
+2015/05/01 11:55:55.70 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): unlink file-8cf04bacfabc0e2b26c0a0c6fb9a8738-output.11
+2015/05/01 11:55:55.70 [15171] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 11:55:55.70 [15171] wq: cclws15.cse.nd.edu (127.0.0.1:53270) done in 5.40s total tasks 12 average 0.01s
+2015/05/01 11:55:55.70 [15171] wq: tx to cclws15.cse.nd.edu (127.0.0.1:53270): release
+2015/05/01 11:55:55.70 [15171] wq: worker cclws15.cse.nd.edu (127.0.0.1:53270) removed
+2015/05/01 11:55:55.70 [15171] wq: workers status -- total: 0, active: 0, available: 0.
+2015/05/01 11:55:55.70 [15171] tcp: disconnected from 127.0.0.1:53270
+2015/05/01 11:55:55.70 [15171] wq: 0 workers are connected in total now

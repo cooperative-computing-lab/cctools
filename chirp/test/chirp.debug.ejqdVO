@@ -1,0 +1,840 @@
+2015/05/01 13:25:57.91 chirp_server[12491] auth: hostname: registered
+2015/05/01 13:25:57.91 chirp_server[12493] debug: ../../chirp/src/chirp_server version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 13:25:57.91 chirp_server[12493] debug: Built by dthain@cclws15 on May  1 2015 at 12:43:12
+2015/05/01 13:25:57.91 chirp_server[12493] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 13:25:57.91 chirp_server[12493] debug: Configuration:
+2015/05/01 13:25:57.91 chirp_server[12493] chirp: normalizing url `./chirp.root.SZHgNo' as `local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo'
+2015/05/01 13:25:57.91 chirp_server[12493] chirp: transient directory: `/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.transient.TrYdDL'
+2015/05/01 13:25:57.91 chirp_server[12493] notice: *** ../../chirp/src/chirp_server starting at Fri May  1 13:25:57 2015
+2015/05/01 13:25:57.91 chirp_server[12493] process: *** backend setup starting ***
+2015/05/01 13:25:57.92 chirp_server[12495] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:25:57.92 chirp_server[12495] local: = 1
+2015/05/01 13:25:57.92 chirp_server[12495] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:57.92 chirp_server[12495] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:57.92 chirp_server[12495] local: open(`//.__acl', 0x241, 0o600)
+2015/05/01 13:25:57.92 chirp_server[12495] local: = 0
+2015/05/01 13:25:57.92 chirp_server[12495] local: pwrite(0, 0x17012d0, 18, 0)
+2015/05/01 13:25:57.92 chirp_server[12495] local: = 18
+2015/05/01 13:25:57.92 chirp_server[12495] local: close(0)
+2015/05/01 13:25:57.92 chirp_server[12495] local: = 0
+2015/05/01 13:25:57.92 chirp_server[12493] process: *** backend setup complete ***
+2015/05/01 13:25:57.92 chirp_server[12493] tcp: listening on port 1040
+2015/05/01 13:25:57.92 chirp_server[12493] debug: now listening port on port 1040
+2015/05/01 13:25:57.93 chirp_server[12493] dns: looking up name cclws15
+2015/05/01 13:25:57.93 chirp_server[12493] dns: cclws15 is 129.74.155.71
+2015/05/01 13:25:57.93 chirp_server[12493] dns: looking up addr 129.74.155.71
+2015/05/01 13:25:57.93 chirp_server[12493] dns: 129.74.155.71 is cclws15.cse.nd.edu
+2015/05/01 13:25:57.93 chirp_server[12493] dns: finding my hostname: uname = cclws15, address = 129.74.155.71, hostname = cclws15.cse.nd.edu
+2015/05/01 13:25:57.93 chirp_server[12493] chirp: forked scheduler 12496
+2015/05/01 13:25:57.93 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 13:25:57.93 chirp_server[12496] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:25:57.93 chirp_server[12496] local: = 1
+2015/05/01 13:25:57.93 chirp_server[12497] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:25:57.93 chirp_server[12496] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:57.93 chirp_server[12496] local: = 0
+2015/05/01 13:25:57.93 chirp_server[12496] local: close(0)
+2015/05/01 13:25:57.93 chirp_server[12496] local: = 0
+2015/05/01 13:25:57.93 chirp_server[12496] debug: no scheduler available, quitting!
+2015/05/01 13:25:57.93 chirp_server[12497] local: = 1
+2015/05/01 13:25:57.93 chirp_server[12497] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:57.93 chirp_server[12497] local: = 0
+2015/05/01 13:25:57.93 chirp_server[12497] local: close(0)
+2015/05/01 13:25:57.93 chirp_server[12497] local: = 0
+2015/05/01 13:25:57.93 chirp_server[12497] local: statfs(`/', 0x7fff05584550)
+2015/05/01 13:25:57.93 chirp_server[12497] local: = 0
+2015/05/01 13:25:57.93 chirp_server[12497] dns: looking up name localhost
+2015/05/01 13:25:57.93 chirp_server[12497] dns: localhost is 127.0.0.1
+2015/05/01 13:25:57.93 chirp_server[12497] debug: sending update to localhost:9097
+2015/05/01 13:25:57.93 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 13:25:57.93 chirp_server[12493] process: *** ticket cleanup starting ***
+2015/05/01 13:25:57.93 chirp_server[12498] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:25:57.93 chirp_server[12498] local: = 1
+2015/05/01 13:25:57.93 chirp_server[12498] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:57.93 chirp_server[12498] local: = 0
+2015/05/01 13:25:57.93 chirp_server[12498] local: close(0)
+2015/05/01 13:25:57.93 chirp_server[12498] local: = 0
+2015/05/01 13:25:57.93 chirp_server[12498] local: opendir(`/')
+2015/05/01 13:25:57.93 chirp_server[12498] local: = 0x171a080
+2015/05/01 13:25:57.93 chirp_server[12498] local: readdir(0x171a080 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:57.93 chirp_server[12498] local: = 0x171a488 [name = `.']
+2015/05/01 13:25:57.93 chirp_server[12498] local: readdir(0x171a080 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:57.93 chirp_server[12498] local: = 0x171a488 [name = `..']
+2015/05/01 13:25:57.93 chirp_server[12498] local: readdir(0x171a080 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:57.93 chirp_server[12498] local: = 0x171a488 [name = `.__acl']
+2015/05/01 13:25:57.93 chirp_server[12498] local: readdir(0x171a080 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:57.93 chirp_server[12498] local: = NULL (errno = 98; `Address already in use')
+2015/05/01 13:25:57.93 chirp_server[12498] local: closedir(0x171a080 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:57.93 chirp_server[12493] process: *** ticket cleanup complete ***
+2015/05/01 13:25:57.93 chirp_server[12493] process: pid 12496 exited with 0 (0 total child procs)
+2015/05/01 13:25:58.93 chirp_server[12493] tcp: got connection from 127.0.0.1:37146
+2015/05/01 13:25:58.93 chirp_server[12493] process: created pid 12508 (0 total child procs)
+2015/05/01 13:25:58.93 chirp_server[12493] tcp: disconnected from 127.0.0.1:37146
+2015/05/01 13:25:58.93 chirp_server[12508] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:25:58.93 chirp_server[12508] local: = 1
+2015/05/01 13:25:58.93 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:58.93 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.93 chirp_server[12508] local: close(0)
+2015/05/01 13:25:58.93 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.93 chirp_server[12508] auth: 127.0.0.1:37146 requests 'unix' authentication
+2015/05/01 13:25:58.93 chirp_server[12508] auth: I agree to try 'unix'
+2015/05/01 13:25:58.93 chirp_server[12508] auth: unix: generating challenge
+2015/05/01 13:25:58.93 chirp_server[12508] auth: unix: challenge path is /tmp/challenge.12508.1804289383
+2015/05/01 13:25:58.93 chirp_server[12508] auth: unix: waiting for response
+2015/05/01 13:25:58.98 chirp_server[12508] auth: unix: got response
+2015/05/01 13:25:58.98 chirp_server[12508] auth: unix: client is uid 102744
+2015/05/01 13:25:58.98 chirp_server[12508] auth: unix: client is subject dthain
+2015/05/01 13:25:58.98 chirp_server[12508] auth: 'unix' authentication succeeded
+2015/05/01 13:25:58.98 chirp_server[12508] auth: 127.0.0.1:37146 is unix:dthain
+2015/05/01 13:25:58.98 chirp_server[12508] login: unix:dthain from 127.0.0.1:37146
+2015/05/01 13:25:58.98 chirp_server[12508] auth: hostname: registered
+2015/05/01 13:25:58.98 chirp_server[12508] auth: address: registered
+2015/05/01 13:25:58.99 chirp_server[12508] chirp: whoami 1024
+2015/05/01 13:25:58.99 chirp_server[12508] chirp: = 11
+2015/05/01 13:25:58.99 chirp_server[12508] chirp: statfs /
+2015/05/01 13:25:58.99 chirp_server[12508] local: readlink(`/', 0x7fff05571e40, 1024)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:58.99 chirp_server[12508] local: stat(`/', 0x7fff055715a0)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 18
+2015/05/01 13:25:58.99 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] local: close(0)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] local: statfs(`/', 0x7fff055822e0)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] chirp: mkdir /foo 511
+2015/05/01 13:25:58.99 chirp_server[12508] local: readlink(`/foo', 0x7fff05571e40, 1024)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:58.99 chirp_server[12508] local: stat(`/foo', 0x7fff055715a0)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:58.99 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 18
+2015/05/01 13:25:58.99 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] local: close(0)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] local: readlink(`/foo', 0x7fff05571e40, 1024)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:58.99 chirp_server[12508] local: stat(`/foo', 0x7fff055715a0)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:58.99 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 18
+2015/05/01 13:25:58.99 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] local: close(0)
+2015/05/01 13:25:58.99 chirp_server[12508] local: = 0
+2015/05/01 13:25:58.99 chirp_server[12508] local: mkdir(`/foo', 0o777)
+2015/05/01 13:25:59.00 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.00 chirp_server[12508] local: open(`/foo/../.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.00 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.00 chirp_server[12508] local: open(`/foo/.__acl', 0x241, 0o600)
+2015/05/01 13:25:59.00 chirp_server[12508] local: = 1
+2015/05/01 13:25:59.00 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:59.00 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.00 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:59.00 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.00 chirp_server[12508] local: pwrite(1, 0x1733170, 18, 0)
+2015/05/01 13:25:59.00 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.00 chirp_server[12508] local: close(1)
+2015/05/01 13:25:59.00 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.00 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.00 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.00 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:59.01 chirp_server[12508] chirp: mkdir /bar 511
+2015/05/01 13:25:59.01 chirp_server[12508] local: readlink(`/bar', 0x7fff05571e40, 1024)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.01 chirp_server[12508] local: stat(`/bar', 0x7fff055715a0)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.01 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.01 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.01 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.01 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.01 chirp_server[12508] local: readlink(`/bar', 0x7fff05571e40, 1024)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.01 chirp_server[12508] local: stat(`/bar', 0x7fff055715a0)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.01 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.01 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.01 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.01 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.01 chirp_server[12508] local: mkdir(`/bar', 0o777)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.01 chirp_server[12508] local: open(`/bar/../.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.01 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.01 chirp_server[12508] local: open(`/bar/.__acl', 0x241, 0o600)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 1
+2015/05/01 13:25:59.02 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.02 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: pwrite(1, 0x1733170, 18, 0)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.02 chirp_server[12508] local: close(1)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] chirp: rename /foo /bar/foo
+2015/05/01 13:25:59.02 chirp_server[12508] local: stat(`/foo', 0x7fff055715a0)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.02 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: open(`/foo/.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.02 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: readlink(`/bar/foo', 0x7fff05571e40, 1024)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.02 chirp_server[12508] local: stat(`/bar/foo', 0x7fff055715a0)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.02 chirp_server[12508] local: open(`/bar/.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.02 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: stat(`/foo', 0x7fff05572230)
+2015/05/01 13:25:59.02 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.02 chirp_server[12508] local: rename(`/foo', `/bar/foo')
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] chirp: getlongdir /bar/foo
+2015/05/01 13:25:59.03 chirp_server[12508] local: open(`/bar/foo/.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.03 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: opendir(`/bar/foo')
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x172a0f0
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x172a0f0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar/foo'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x172a4f8 [name = `.']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x172a0f0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar/foo'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x172a4f8 [name = `..']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x172a0f0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar/foo'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x172a4f8 [name = `.__acl']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x172a0f0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar/foo'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:59.03 chirp_server[12508] local: closedir(0x172a0f0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar/foo'])
+2015/05/01 13:25:59.03 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] chirp: audit /
+2015/05/01 13:25:59.03 chirp_server[12508] local: readlink(`/', 0x7fff05571e40, 1024)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:59.03 chirp_server[12508] local: stat(`/', 0x7fff055715a0)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: pread(0, 0x1723100, 65535, 0)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.03 chirp_server[12508] local: pread(0, 0x1723100, 65535, 18)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: audit: starting
+2015/05/01 13:25:59.03 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: pread(0, 0x1723500, 65535, 0)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.03 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: opendir(`/')
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x172a930
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x172a930 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x172ad38 [name = `.']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x172a930 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x172ad38 [name = `..']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x172a930 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x172ad38 [name = `.__acl']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x172a930 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x172ad38 [name = `bar']
+2015/05/01 13:25:59.03 chirp_server[12508] local: open(`//bar/.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: pread(0, 0x172be10, 65535, 0)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.03 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: opendir(`//bar')
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x1732e00
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x1732e00 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x1733208 [name = `.']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x1732e00 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x1733208 [name = `..']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x1732e00 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x1733208 [name = `.__acl']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x1732e00 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x1733208 [name = `foo']
+2015/05/01 13:25:59.03 chirp_server[12508] local: open(`//bar/foo/.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: pread(0, 0x17342e0, 65535, 0)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.03 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.03 chirp_server[12508] local: opendir(`//bar/foo')
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x173b2d0
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x173b2d0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar/foo'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x173b6d8 [name = `.']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x173b2d0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar/foo'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x173b6d8 [name = `..']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x173b2d0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar/foo'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = 0x173b6d8 [name = `.__acl']
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x173b2d0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar/foo'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:59.03 chirp_server[12508] local: closedir(0x173b2d0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar/foo'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x1732e00 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:59.03 chirp_server[12508] local: closedir(0x1732e00 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/bar'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: readdir(0x172a930 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:59.03 chirp_server[12508] local: closedir(0x172a930 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.03 chirp_server[12508] local: audit: completed 2 items in 1 seconds (2 items/sec)
+2015/05/01 13:25:59.04 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:59.04 chirp_server[12508] chirp: whoami 1024
+2015/05/01 13:25:59.04 chirp_server[12508] chirp: = 11
+2015/05/01 13:25:59.04 chirp_server[12508] chirp: whoareyou 127.0.0.1:1040 1024
+2015/05/01 13:25:59.04 chirp_server[12508] dns: looking up name 127.0.0.1
+2015/05/01 13:25:59.04 chirp_server[12508] dns: 127.0.0.1 is 127.0.0.1
+2015/05/01 13:25:59.04 chirp_server[12508] tcp: connecting to 127.0.0.1:1040
+2015/05/01 13:25:59.04 chirp_server[12508] tcp: made connection to 127.0.0.1:1040
+2015/05/01 13:25:59.04 chirp_server[12508] auth: requesting 'hostname' authentication
+2015/05/01 13:25:59.04 chirp_server[12493] tcp: got connection from 127.0.0.1:37147
+2015/05/01 13:25:59.04 chirp_server[12493] process: created pid 12509 (1 total child procs)
+2015/05/01 13:25:59.04 chirp_server[12493] tcp: disconnected from 127.0.0.1:37147
+2015/05/01 13:25:59.04 chirp_server[12509] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:25:59.04 chirp_server[12509] local: = 1
+2015/05/01 13:25:59.04 chirp_server[12509] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.04 chirp_server[12509] local: = 0
+2015/05/01 13:25:59.04 chirp_server[12509] local: close(0)
+2015/05/01 13:25:59.04 chirp_server[12509] local: = 0
+2015/05/01 13:25:59.04 chirp_server[12509] auth: 127.0.0.1:37147 requests 'hostname' authentication
+2015/05/01 13:25:59.04 chirp_server[12509] auth: I agree to try 'hostname'
+2015/05/01 13:25:59.04 chirp_server[12509] dns: looking up addr 127.0.0.1
+2015/05/01 13:25:59.04 chirp_server[12508] auth: server agrees to try 'hostname'
+2015/05/01 13:25:59.04 chirp_server[12509] dns: 127.0.0.1 is localhost
+2015/05/01 13:25:59.04 chirp_server[12509] auth: 'hostname' authentication succeeded
+2015/05/01 13:25:59.04 chirp_server[12508] auth: hostname: accepted
+2015/05/01 13:25:59.04 chirp_server[12509] auth: 127.0.0.1:37147 is hostname:localhost
+2015/05/01 13:25:59.04 chirp_server[12508] auth: successfully authenticated
+2015/05/01 13:25:59.04 chirp_server[12508] auth: reading back auth info from server
+2015/05/01 13:25:59.04 chirp_server[12509] login: hostname:localhost from 127.0.0.1:37147
+2015/05/01 13:25:59.04 chirp_server[12508] auth: server thinks I am hostname:localhost
+2015/05/01 13:25:59.04 chirp_server[12509] auth: hostname: registered
+2015/05/01 13:25:59.04 chirp_server[12509] auth: address: registered
+2015/05/01 13:25:59.04 chirp_server[12508] chirp: 127.0.0.1:1040: whoami 1024
+2015/05/01 13:25:59.05 chirp_server[12509] chirp: whoami 1024
+2015/05/01 13:25:59.05 chirp_server[12509] chirp: = 18
+2015/05/01 13:25:59.05 chirp_server[12508] chirp:  = 18
+2015/05/01 13:25:59.05 chirp_server[12508] chirp: = 18
+2015/05/01 13:25:59.05 chirp_server[12508] chirp: getlongdir /
+2015/05/01 13:25:59.05 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.05 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.05 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.05 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.05 chirp_server[12508] local: opendir(`/')
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0x173aa40
+2015/05/01 13:25:59.05 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0x173ae48 [name = `.']
+2015/05/01 13:25:59.05 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0x173ae48 [name = `..']
+2015/05/01 13:25:59.05 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0x173ae48 [name = `.__acl']
+2015/05/01 13:25:59.05 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0x173ae48 [name = `bar']
+2015/05/01 13:25:59.05 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.05 chirp_server[12508] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:59.05 chirp_server[12508] local: closedir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.05 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:59.05 chirp_server[12508] chirp: mkdir /_test 511
+2015/05/01 13:25:59.05 chirp_server[12508] local: readlink(`/_test', 0x7fff05571e40, 1024)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.05 chirp_server[12508] local: stat(`/_test', 0x7fff055715a0)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.05 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.05 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.05 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.05 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.05 chirp_server[12508] local: readlink(`/_test', 0x7fff05571e40, 1024)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.05 chirp_server[12508] local: stat(`/_test', 0x7fff055715a0)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.05 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.05 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.05 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.05 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.05 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.05 chirp_server[12508] local: mkdir(`/_test', 0o777)
+2015/05/01 13:25:59.06 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.06 chirp_server[12508] local: open(`/_test/../.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.06 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.06 chirp_server[12508] local: open(`/_test/.__acl', 0x241, 0o600)
+2015/05/01 13:25:59.06 chirp_server[12508] local: = 1
+2015/05/01 13:25:59.06 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.06 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.06 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.06 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.06 chirp_server[12508] local: pwrite(1, 0x1743ac0, 18, 0)
+2015/05/01 13:25:59.06 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.06 chirp_server[12508] local: close(1)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] chirp: getlongdir /
+2015/05/01 13:25:59.07 chirp_server[12508] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.07 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] local: opendir(`/')
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0x173aa40
+2015/05/01 13:25:59.07 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0x173ae48 [name = `.']
+2015/05/01 13:25:59.07 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0x173ae48 [name = `..']
+2015/05/01 13:25:59.07 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0x173ae48 [name = `.__acl']
+2015/05/01 13:25:59.07 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0x173ae48 [name = `_test']
+2015/05/01 13:25:59.07 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0x173ae48 [name = `bar']
+2015/05/01 13:25:59.07 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.07 chirp_server[12508] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:59.07 chirp_server[12508] local: closedir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/'])
+2015/05/01 13:25:59.07 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] chirp: stat /_test
+2015/05/01 13:25:59.07 chirp_server[12508] local: readlink(`/_test', 0x7fff05571e40, 1024)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:59.07 chirp_server[12508] local: stat(`/_test', 0x7fff055715a0)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] local: open(`/_test/.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.07 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] local: stat(`/_test', 0x7fff055822e0)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] chirp: getlongdir /_test/
+2015/05/01 13:25:59.07 chirp_server[12508] local: open(`/_test//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.07 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.07 chirp_server[12508] local: opendir(`/_test/')
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0x173aa40
+2015/05/01 13:25:59.07 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/_test/'])
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0x173ae48 [name = `.']
+2015/05/01 13:25:59.07 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/_test/'])
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0x173ae48 [name = `..']
+2015/05/01 13:25:59.07 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/_test/'])
+2015/05/01 13:25:59.07 chirp_server[12508] local: = 0x173ae48 [name = `.__acl']
+2015/05/01 13:25:59.07 chirp_server[12508] local: readdir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/_test/'])
+2015/05/01 13:25:59.07 chirp_server[12508] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:59.07 chirp_server[12508] local: closedir(0x173aa40 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo/_test/'])
+2015/05/01 13:25:59.07 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] chirp: putfile /_test/hosts.txt 33188 327
+2015/05/01 13:25:59.08 chirp_server[12508] local: stat(`/_test/hosts.txt', 0x7fff05572230)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.08 chirp_server[12508] local: readlink(`/_test/hosts.txt', 0x7fff05571e40, 1024)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.08 chirp_server[12508] local: stat(`/_test/hosts.txt', 0x7fff055715a0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:59.08 chirp_server[12508] local: open(`/_test/.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.08 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: open(`/_test/hosts.txt', 0x41, 0o100644)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: fstat(0, 0x7fff055822e0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: ftruncate(0, 0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: pwrite(0, 0x7fff055722e0, 327, 0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 327
+2015/05/01 13:25:59.08 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] chirp: = 327
+2015/05/01 13:25:59.08 chirp_server[12508] chirp: getfile /_test/hosts.txt
+2015/05/01 13:25:59.08 chirp_server[12508] local: stat(`/_test/hosts.txt', 0x7fff05572230)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: readlink(`/_test/hosts.txt', 0x7fff05571e40, 1024)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:59.08 chirp_server[12508] local: stat(`/_test/hosts.txt', 0x7fff055715a0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: open(`/_test/.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.08 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: open(`/_test/hosts.txt', 0x0, 0o0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: fstat(0, 0x7fff055822e0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] local: pread(0, 0x7fff055722e0, 327, 0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 327
+2015/05/01 13:25:59.08 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.08 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.08 chirp_server[12508] chirp: = 327
+2015/05/01 13:25:59.09 chirp_server[12508] chirp: md5 /_test/hosts.txt
+2015/05/01 13:25:59.09 chirp_server[12508] local: readlink(`/_test/hosts.txt', 0x7fff05571e40, 1024)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:59.09 chirp_server[12508] local: stat(`/_test/hosts.txt', 0x7fff055715a0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: open(`/_test/.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.09 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: stat(`/_test/hosts.txt', 0x7fff055721f0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: open(`/_test/hosts.txt', 0x0, 0o0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: pread(0, 0x7fff05562190, 327, 0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 327
+2015/05/01 13:25:59.09 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] chirp: = 16
+2015/05/01 13:25:59.09 chirp_server[12508] chirp: getacl /_test/
+2015/05/01 13:25:59.09 chirp_server[12508] local: open(`/_test//.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.09 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] chirp: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] chirp: localpath /_test/hosts.txt
+2015/05/01 13:25:59.09 chirp_server[12508] local: readlink(`/_test/hosts.txt', 0x7fff05571e40, 1024)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:59.09 chirp_server[12508] local: stat(`/_test/hosts.txt', 0x7fff055715a0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: open(`/_test/.__acl', 0x0, 0o600)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 18
+2015/05/01 13:25:59.09 chirp_server[12508] local: pread(0, 0x1733a50, 65535, 18)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: close(0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] local: stat(`/_test/hosts.txt', 0x7fff055822e0)
+2015/05/01 13:25:59.09 chirp_server[12508] local: = 0
+2015/05/01 13:25:59.09 chirp_server[12508] chirp: = 16
+2015/05/01 13:25:59.09 chirp_server[12508] chirp: timeout: client idle too long
+2015/05/01 13:25:59.09 chirp_server[12508] debug: sending stats: stats 127.0.0.1 unix:dthain 19 327 327
+2015/05/01 13:25:59.09 chirp_server[12508] login: disconnected
+2015/05/01 13:25:59.09 chirp_server[12493] debug: config message: stats 127.0.0.1 unix:dthain 19 327 327
+2015/05/01 13:25:59.09 chirp_server[12508] tcp: disconnected from 127.0.0.1:37146
+2015/05/01 13:25:59.09 chirp_server[12509] chirp: timeout: client idle too long
+2015/05/01 13:25:59.09 chirp_server[12509] debug: sending stats: stats 127.0.0.1 hostname:localhost 1 0 0
+2015/05/01 13:25:59.09 chirp_server[12509] login: disconnected
+2015/05/01 13:25:59.09 chirp_server[12493] debug: config message: stats 127.0.0.1 hostname:localhost 1 0 0
+2015/05/01 13:25:59.09 chirp_server[12509] tcp: disconnected from 127.0.0.1:37147
+2015/05/01 13:25:59.09 chirp_server[12493] process: pid 12508 exited with 0 (1 total child procs)
+2015/05/01 13:25:59.10 chirp_server[12493] process: pid 12509 exited with 0 (0 total child procs)
+2015/05/01 13:30:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 13:30:57.00 chirp_server[13227] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:30:57.00 chirp_server[13227] local: = 1
+2015/05/01 13:30:57.00 chirp_server[13227] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:30:57.00 chirp_server[13227] local: = 0
+2015/05/01 13:30:57.00 chirp_server[13227] local: close(0)
+2015/05/01 13:30:57.00 chirp_server[13227] local: = 0
+2015/05/01 13:30:57.00 chirp_server[13227] local: statfs(`/', 0x7fff05584550)
+2015/05/01 13:30:57.00 chirp_server[13227] local: = 0
+2015/05/01 13:30:57.00 chirp_server[13227] dns: looking up name localhost
+2015/05/01 13:30:57.00 chirp_server[13227] dns: localhost is 127.0.0.1
+2015/05/01 13:30:57.00 chirp_server[13227] debug: sending update to localhost:9097
+2015/05/01 13:30:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 13:35:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 13:35:57.00 chirp_server[13285] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:35:57.00 chirp_server[13285] local: = 1
+2015/05/01 13:35:57.00 chirp_server[13285] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:35:57.00 chirp_server[13285] local: = 0
+2015/05/01 13:35:57.00 chirp_server[13285] local: close(0)
+2015/05/01 13:35:57.00 chirp_server[13285] local: = 0
+2015/05/01 13:35:57.00 chirp_server[13285] local: statfs(`/', 0x7fff05584550)
+2015/05/01 13:35:57.00 chirp_server[13285] local: = 0
+2015/05/01 13:35:57.00 chirp_server[13285] dns: looking up name localhost
+2015/05/01 13:35:57.00 chirp_server[13285] dns: localhost is 127.0.0.1
+2015/05/01 13:35:57.00 chirp_server[13285] debug: sending update to localhost:9097
+2015/05/01 13:35:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 13:40:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 13:40:57.00 chirp_server[13407] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:40:57.00 chirp_server[13407] local: = 1
+2015/05/01 13:40:57.00 chirp_server[13407] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:40:57.00 chirp_server[13407] local: = 0
+2015/05/01 13:40:57.00 chirp_server[13407] local: close(0)
+2015/05/01 13:40:57.00 chirp_server[13407] local: = 0
+2015/05/01 13:40:57.00 chirp_server[13407] local: statfs(`/', 0x7fff05584550)
+2015/05/01 13:40:57.00 chirp_server[13407] local: = 0
+2015/05/01 13:40:57.00 chirp_server[13407] dns: looking up name localhost
+2015/05/01 13:40:57.00 chirp_server[13407] dns: localhost is 127.0.0.1
+2015/05/01 13:40:57.00 chirp_server[13407] debug: sending update to localhost:9097
+2015/05/01 13:40:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 13:45:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 13:45:57.00 chirp_server[13462] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:45:57.00 chirp_server[13462] local: = 1
+2015/05/01 13:45:57.00 chirp_server[13462] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:45:57.00 chirp_server[13462] local: = 0
+2015/05/01 13:45:57.00 chirp_server[13462] local: close(0)
+2015/05/01 13:45:57.00 chirp_server[13462] local: = 0
+2015/05/01 13:45:57.00 chirp_server[13462] local: statfs(`/', 0x7fff05584550)
+2015/05/01 13:45:57.00 chirp_server[13462] local: = 0
+2015/05/01 13:45:57.00 chirp_server[13462] dns: looking up name localhost
+2015/05/01 13:45:57.00 chirp_server[13462] dns: localhost is 127.0.0.1
+2015/05/01 13:45:57.00 chirp_server[13462] debug: sending update to localhost:9097
+2015/05/01 13:45:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 13:50:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 13:50:57.00 chirp_server[13496] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:50:57.00 chirp_server[13496] local: = 1
+2015/05/01 13:50:57.00 chirp_server[13496] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:50:57.00 chirp_server[13496] local: = 0
+2015/05/01 13:50:57.00 chirp_server[13496] local: close(0)
+2015/05/01 13:50:57.00 chirp_server[13496] local: = 0
+2015/05/01 13:50:57.00 chirp_server[13496] local: statfs(`/', 0x7fff05584550)
+2015/05/01 13:50:57.00 chirp_server[13496] local: = 0
+2015/05/01 13:50:57.00 chirp_server[13496] dns: looking up name localhost
+2015/05/01 13:50:57.00 chirp_server[13496] dns: localhost is 127.0.0.1
+2015/05/01 13:50:57.00 chirp_server[13496] debug: sending update to localhost:9097
+2015/05/01 13:50:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 13:55:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 13:55:57.00 chirp_server[13528] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 13:55:57.00 chirp_server[13528] local: = 1
+2015/05/01 13:55:57.00 chirp_server[13528] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:55:57.00 chirp_server[13528] local: = 0
+2015/05/01 13:55:57.00 chirp_server[13528] local: close(0)
+2015/05/01 13:55:57.00 chirp_server[13528] local: = 0
+2015/05/01 13:55:57.00 chirp_server[13528] local: statfs(`/', 0x7fff05584550)
+2015/05/01 13:55:57.00 chirp_server[13528] local: = 0
+2015/05/01 13:55:57.00 chirp_server[13528] dns: looking up name localhost
+2015/05/01 13:55:57.00 chirp_server[13528] dns: localhost is 127.0.0.1
+2015/05/01 13:55:57.00 chirp_server[13528] debug: sending update to localhost:9097
+2015/05/01 13:55:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:00:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:00:57.00 chirp_server[18519] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:00:57.00 chirp_server[18519] local: = 1
+2015/05/01 14:00:57.00 chirp_server[18519] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:00:57.00 chirp_server[18519] local: = 0
+2015/05/01 14:00:57.00 chirp_server[18519] local: close(0)
+2015/05/01 14:00:57.00 chirp_server[18519] local: = 0
+2015/05/01 14:00:57.00 chirp_server[18519] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:00:57.00 chirp_server[18519] local: = 0
+2015/05/01 14:00:57.00 chirp_server[18519] dns: looking up name localhost
+2015/05/01 14:00:57.00 chirp_server[18519] dns: localhost is 127.0.0.1
+2015/05/01 14:00:57.00 chirp_server[18519] debug: sending update to localhost:9097
+2015/05/01 14:00:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:05:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:05:57.00 chirp_server[18880] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:05:57.00 chirp_server[18880] local: = 1
+2015/05/01 14:05:57.00 chirp_server[18880] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:05:57.00 chirp_server[18880] local: = 0
+2015/05/01 14:05:57.00 chirp_server[18880] local: close(0)
+2015/05/01 14:05:57.00 chirp_server[18880] local: = 0
+2015/05/01 14:05:57.00 chirp_server[18880] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:05:57.00 chirp_server[18880] local: = 0
+2015/05/01 14:05:57.00 chirp_server[18880] dns: looking up name localhost
+2015/05/01 14:05:57.00 chirp_server[18880] dns: localhost is 127.0.0.1
+2015/05/01 14:05:57.00 chirp_server[18880] debug: sending update to localhost:9097
+2015/05/01 14:05:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:10:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:10:57.00 chirp_server[18915] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:10:57.00 chirp_server[18915] local: = 1
+2015/05/01 14:10:57.00 chirp_server[18915] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:10:57.00 chirp_server[18915] local: = 0
+2015/05/01 14:10:57.00 chirp_server[18915] local: close(0)
+2015/05/01 14:10:57.00 chirp_server[18915] local: = 0
+2015/05/01 14:10:57.00 chirp_server[18915] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:10:57.00 chirp_server[18915] local: = 0
+2015/05/01 14:10:57.00 chirp_server[18915] dns: looking up name localhost
+2015/05/01 14:10:57.00 chirp_server[18915] dns: localhost is 127.0.0.1
+2015/05/01 14:10:57.00 chirp_server[18915] debug: sending update to localhost:9097
+2015/05/01 14:10:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:15:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:15:57.00 chirp_server[18962] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:15:57.00 chirp_server[18962] local: = 1
+2015/05/01 14:15:57.00 chirp_server[18962] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:15:57.00 chirp_server[18962] local: = 0
+2015/05/01 14:15:57.00 chirp_server[18962] local: close(0)
+2015/05/01 14:15:57.00 chirp_server[18962] local: = 0
+2015/05/01 14:15:57.00 chirp_server[18962] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:15:57.00 chirp_server[18962] local: = 0
+2015/05/01 14:15:57.00 chirp_server[18962] dns: looking up name localhost
+2015/05/01 14:15:57.00 chirp_server[18962] dns: localhost is 127.0.0.1
+2015/05/01 14:15:57.00 chirp_server[18962] debug: sending update to localhost:9097
+2015/05/01 14:15:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:20:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:20:57.00 chirp_server[18995] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:20:57.00 chirp_server[18995] local: = 1
+2015/05/01 14:20:57.00 chirp_server[18995] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:20:57.00 chirp_server[18995] local: = 0
+2015/05/01 14:20:57.00 chirp_server[18995] local: close(0)
+2015/05/01 14:20:57.00 chirp_server[18995] local: = 0
+2015/05/01 14:20:57.00 chirp_server[18995] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:20:57.00 chirp_server[18995] local: = 0
+2015/05/01 14:20:57.00 chirp_server[18995] dns: looking up name localhost
+2015/05/01 14:20:57.00 chirp_server[18995] dns: localhost is 127.0.0.1
+2015/05/01 14:20:57.00 chirp_server[18995] debug: sending update to localhost:9097
+2015/05/01 14:20:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:25:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:25:57.00 chirp_server[19024] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:25:57.00 chirp_server[19024] local: = 1
+2015/05/01 14:25:57.00 chirp_server[19024] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:25:57.00 chirp_server[19024] local: = 0
+2015/05/01 14:25:57.00 chirp_server[19024] local: close(0)
+2015/05/01 14:25:57.00 chirp_server[19024] local: = 0
+2015/05/01 14:25:57.00 chirp_server[19024] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:25:57.00 chirp_server[19024] local: = 0
+2015/05/01 14:25:57.00 chirp_server[19024] dns: looking up name localhost
+2015/05/01 14:25:57.00 chirp_server[19024] dns: localhost is 127.0.0.1
+2015/05/01 14:25:57.00 chirp_server[19024] debug: sending update to localhost:9097
+2015/05/01 14:25:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:30:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:30:57.00 chirp_server[19075] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:30:57.00 chirp_server[19075] local: = 1
+2015/05/01 14:30:57.00 chirp_server[19075] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:30:57.00 chirp_server[19075] local: = 0
+2015/05/01 14:30:57.00 chirp_server[19075] local: close(0)
+2015/05/01 14:30:57.00 chirp_server[19075] local: = 0
+2015/05/01 14:30:57.00 chirp_server[19075] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:30:57.00 chirp_server[19075] local: = 0
+2015/05/01 14:30:57.00 chirp_server[19075] dns: looking up name localhost
+2015/05/01 14:30:57.00 chirp_server[19075] dns: localhost is 127.0.0.1
+2015/05/01 14:30:57.00 chirp_server[19075] debug: sending update to localhost:9097
+2015/05/01 14:30:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:35:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:35:57.00 chirp_server[19104] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:35:57.00 chirp_server[19104] local: = 1
+2015/05/01 14:35:57.00 chirp_server[19104] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:35:57.00 chirp_server[19104] local: = 0
+2015/05/01 14:35:57.00 chirp_server[19104] local: close(0)
+2015/05/01 14:35:57.00 chirp_server[19104] local: = 0
+2015/05/01 14:35:57.00 chirp_server[19104] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:35:57.00 chirp_server[19104] local: = 0
+2015/05/01 14:35:57.00 chirp_server[19104] dns: looking up name localhost
+2015/05/01 14:35:57.00 chirp_server[19104] dns: localhost is 127.0.0.1
+2015/05/01 14:35:57.00 chirp_server[19104] debug: sending update to localhost:9097
+2015/05/01 14:35:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:40:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:40:57.00 chirp_server[19137] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:40:57.00 chirp_server[19137] local: = 1
+2015/05/01 14:40:57.00 chirp_server[19137] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:40:57.00 chirp_server[19137] local: = 0
+2015/05/01 14:40:57.00 chirp_server[19137] local: close(0)
+2015/05/01 14:40:57.00 chirp_server[19137] local: = 0
+2015/05/01 14:40:57.00 chirp_server[19137] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:40:57.00 chirp_server[19137] local: = 0
+2015/05/01 14:40:57.00 chirp_server[19137] dns: looking up name localhost
+2015/05/01 14:40:57.00 chirp_server[19137] dns: localhost is 127.0.0.1
+2015/05/01 14:40:57.00 chirp_server[19137] debug: sending update to localhost:9097
+2015/05/01 14:40:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:45:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:45:57.00 chirp_server[19184] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:45:57.00 chirp_server[19184] local: = 1
+2015/05/01 14:45:57.00 chirp_server[19184] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:45:57.00 chirp_server[19184] local: = 0
+2015/05/01 14:45:57.00 chirp_server[19184] local: close(0)
+2015/05/01 14:45:57.00 chirp_server[19184] local: = 0
+2015/05/01 14:45:57.00 chirp_server[19184] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:45:57.00 chirp_server[19184] local: = 0
+2015/05/01 14:45:57.00 chirp_server[19184] dns: looking up name localhost
+2015/05/01 14:45:57.00 chirp_server[19184] dns: localhost is 127.0.0.1
+2015/05/01 14:45:57.00 chirp_server[19184] debug: sending update to localhost:9097
+2015/05/01 14:45:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:50:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:50:57.00 chirp_server[19219] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:50:57.00 chirp_server[19219] local: = 1
+2015/05/01 14:50:57.00 chirp_server[19219] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:50:57.00 chirp_server[19219] local: = 0
+2015/05/01 14:50:57.00 chirp_server[19219] local: close(0)
+2015/05/01 14:50:57.00 chirp_server[19219] local: = 0
+2015/05/01 14:50:57.00 chirp_server[19219] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:50:57.00 chirp_server[19219] local: = 0
+2015/05/01 14:50:57.00 chirp_server[19219] dns: looking up name localhost
+2015/05/01 14:50:57.00 chirp_server[19219] dns: localhost is 127.0.0.1
+2015/05/01 14:50:57.00 chirp_server[19219] debug: sending update to localhost:9097
+2015/05/01 14:50:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 14:55:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 14:55:57.00 chirp_server[19247] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 14:55:57.00 chirp_server[19247] local: = 1
+2015/05/01 14:55:57.00 chirp_server[19247] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:55:57.00 chirp_server[19247] local: = 0
+2015/05/01 14:55:57.00 chirp_server[19247] local: close(0)
+2015/05/01 14:55:57.00 chirp_server[19247] local: = 0
+2015/05/01 14:55:57.00 chirp_server[19247] local: statfs(`/', 0x7fff05584550)
+2015/05/01 14:55:57.00 chirp_server[19247] local: = 0
+2015/05/01 14:55:57.00 chirp_server[19247] dns: looking up name localhost
+2015/05/01 14:55:57.00 chirp_server[19247] dns: localhost is 127.0.0.1
+2015/05/01 14:55:57.00 chirp_server[19247] debug: sending update to localhost:9097
+2015/05/01 14:55:57.00 chirp_server[12493] process: *** catalog update complete ***
+2015/05/01 15:00:57.00 chirp_server[12493] process: *** catalog update starting ***
+2015/05/01 15:00:57.00 chirp_server[19311] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/chirp/test/chirp.root.SZHgNo')
+2015/05/01 15:00:57.00 chirp_server[19311] local: = 1
+2015/05/01 15:00:57.00 chirp_server[19311] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 15:00:57.00 chirp_server[19311] local: = 0
+2015/05/01 15:00:57.00 chirp_server[19311] local: close(0)
+2015/05/01 15:00:57.00 chirp_server[19311] local: = 0
+2015/05/01 15:00:57.00 chirp_server[19311] local: statfs(`/', 0x7fff05584550)
+2015/05/01 15:00:57.00 chirp_server[19311] local: = 0
+2015/05/01 15:00:57.00 chirp_server[19311] dns: looking up name localhost
+2015/05/01 15:00:57.00 chirp_server[19311] dns: localhost is 127.0.0.1
+2015/05/01 15:00:57.00 chirp_server[19311] debug: sending update to localhost:9097
+2015/05/01 15:00:57.00 chirp_server[12493] process: *** catalog update complete ***

@@ -1,0 +1,1620 @@
+2015/05/01 13:25:33.90 chirp_server[11906] debug: ../../chirp/src/chirp_server version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 13:25:33.90 chirp_server[11906] debug: Built by dthain@cclws15 on May  1 2015 at 12:43:12
+2015/05/01 13:25:33.90 chirp_server[11906] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 13:25:33.90 chirp_server[11906] debug: Configuration:
+2015/05/01 13:25:33.90 chirp_server[11906] chirp: normalizing url `./fixtures' as `local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures'
+2015/05/01 13:25:33.90 chirp_server[11906] chirp: transient directory: `/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/chirp.transient.c1twSw'
+2015/05/01 13:25:33.90 chirp_server[11906] notice: *** ../../chirp/src/chirp_server starting at Fri May  1 13:25:33 2015
+2015/05/01 13:25:33.90 chirp_server[11906] process: *** backend setup starting ***
+2015/05/01 13:25:33.90 chirp_server[11908] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:33.90 chirp_server[11908] local: = 1
+2015/05/01 13:25:33.90 chirp_server[11908] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.90 chirp_server[11908] local: = 0
+2015/05/01 13:25:33.90 chirp_server[11908] local: close(0)
+2015/05/01 13:25:33.90 chirp_server[11908] local: = 0
+2015/05/01 13:25:33.90 chirp_server[11906] process: *** backend setup complete ***
+2015/05/01 13:25:33.90 chirp_server[11906] tcp: listening on port 1033
+2015/05/01 13:25:33.90 chirp_server[11906] debug: now listening port on port 1033
+2015/05/01 13:25:33.91 chirp_server[11906] dns: looking up name cclws15
+2015/05/01 13:25:33.91 chirp_server[11906] dns: cclws15 is 129.74.155.71
+2015/05/01 13:25:33.91 chirp_server[11906] dns: looking up addr 129.74.155.71
+2015/05/01 13:25:33.91 chirp_server[11906] dns: 129.74.155.71 is cclws15.cse.nd.edu
+2015/05/01 13:25:33.91 chirp_server[11906] dns: finding my hostname: uname = cclws15, address = 129.74.155.71, hostname = cclws15.cse.nd.edu
+2015/05/01 13:25:33.91 chirp_server[11906] chirp: forked scheduler 11909
+2015/05/01 13:25:33.91 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 13:25:33.91 chirp_server[11909] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:33.91 chirp_server[11909] local: = 1
+2015/05/01 13:25:33.91 chirp_server[11909] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.91 chirp_server[11910] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:33.91 chirp_server[11909] local: = 0
+2015/05/01 13:25:33.91 chirp_server[11909] local: close(0)
+2015/05/01 13:25:33.91 chirp_server[11909] local: = 0
+2015/05/01 13:25:33.91 chirp_server[11909] debug: no scheduler available, quitting!
+2015/05/01 13:25:33.91 chirp_server[11910] local: = 1
+2015/05/01 13:25:33.91 chirp_server[11910] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.91 chirp_server[11910] local: = 0
+2015/05/01 13:25:33.91 chirp_server[11910] local: close(0)
+2015/05/01 13:25:33.91 chirp_server[11910] local: = 0
+2015/05/01 13:25:33.91 chirp_server[11910] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 13:25:33.91 chirp_server[11910] local: = 0
+2015/05/01 13:25:33.91 chirp_server[11910] dns: looking up name localhost
+2015/05/01 13:25:33.91 chirp_server[11910] dns: localhost is 127.0.0.1
+2015/05/01 13:25:33.91 chirp_server[11910] debug: sending update to localhost:9097
+2015/05/01 13:25:33.91 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 13:25:33.91 chirp_server[11906] process: *** ticket cleanup starting ***
+2015/05/01 13:25:33.91 chirp_server[11911] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:33.91 chirp_server[11911] local: = 1
+2015/05/01 13:25:33.91 chirp_server[11911] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:33.91 chirp_server[11911] local: = 0
+2015/05/01 13:25:33.91 chirp_server[11911] local: close(0)
+2015/05/01 13:25:33.91 chirp_server[11911] local: = 0
+2015/05/01 13:25:33.91 chirp_server[11911] local: opendir(`/')
+2015/05/01 13:25:33.91 chirp_server[11911] local: = 0x2199010
+2015/05/01 13:25:33.91 chirp_server[11911] local: readdir(0x2199010 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:33.91 chirp_server[11911] local: = 0x2199418 [name = `.']
+2015/05/01 13:25:33.91 chirp_server[11911] local: readdir(0x2199010 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:33.91 chirp_server[11911] local: = 0x2199418 [name = `..']
+2015/05/01 13:25:33.91 chirp_server[11911] local: readdir(0x2199010 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:33.91 chirp_server[11911] local: = 0x2199418 [name = `.__acl']
+2015/05/01 13:25:33.91 chirp_server[11911] local: readdir(0x2199010 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:33.91 chirp_server[11911] local: = 0x2199418 [name = `a']
+2015/05/01 13:25:33.91 chirp_server[11911] local: readdir(0x2199010 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:33.91 chirp_server[11911] local: = NULL (errno = 98; `Address already in use')
+2015/05/01 13:25:33.91 chirp_server[11911] local: closedir(0x2199010 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:33.91 chirp_server[11906] process: *** ticket cleanup complete ***
+2015/05/01 13:25:33.91 chirp_server[11906] process: pid 11909 exited with 0 (0 total child procs)
+2015/05/01 13:25:34.98 chirp_server[11906] tcp: got connection from 127.0.0.1:56122
+2015/05/01 13:25:34.98 chirp_server[11906] process: created pid 11926 (0 total child procs)
+2015/05/01 13:25:34.98 chirp_server[11906] tcp: disconnected from 127.0.0.1:56122
+2015/05/01 13:25:34.98 chirp_server[11926] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:34.98 chirp_server[11926] local: = 1
+2015/05/01 13:25:34.98 chirp_server[11926] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:34.98 chirp_server[11926] local: = 0
+2015/05/01 13:25:34.98 chirp_server[11926] local: close(0)
+2015/05/01 13:25:34.98 chirp_server[11926] local: = 0
+2015/05/01 13:25:34.98 chirp_server[11926] auth: 127.0.0.1:56122 requests 'unix' authentication
+2015/05/01 13:25:34.98 chirp_server[11926] auth: I agree to try 'unix'
+2015/05/01 13:25:34.98 chirp_server[11926] auth: unix: generating challenge
+2015/05/01 13:25:34.98 chirp_server[11926] auth: unix: challenge path is /tmp/challenge.11926.1804289383
+2015/05/01 13:25:34.98 chirp_server[11926] auth: unix: waiting for response
+2015/05/01 13:25:35.02 chirp_server[11926] auth: unix: got response
+2015/05/01 13:25:35.02 chirp_server[11926] auth: unix: client is uid 102744
+2015/05/01 13:25:35.02 chirp_server[11926] auth: unix: client is subject dthain
+2015/05/01 13:25:35.02 chirp_server[11926] auth: 'unix' authentication succeeded
+2015/05/01 13:25:35.02 chirp_server[11926] auth: 127.0.0.1:56122 is unix:dthain
+2015/05/01 13:25:35.02 chirp_server[11926] login: unix:dthain from 127.0.0.1:56122
+2015/05/01 13:25:35.02 chirp_server[11926] auth: hostname: registered
+2015/05/01 13:25:35.02 chirp_server[11926] auth: address: registered
+2015/05/01 13:25:35.02 chirp_server[11926] chirp: search bar / 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: access(`/', 0x0)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: readlink(`/', 0x7fffa189eb90, 1024)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:35.02 chirp_server[11926] local: stat(`/', 0x7fffa189e2f0)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: pread(0, 0x21a2090, 65535, 0)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 11
+2015/05/01 13:25:35.02 chirp_server[11926] local: pread(0, 0x21a2090, 65535, 11)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: close(0)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] debug: cfs_basic_search(subject = `unix:dthain', dir = `/', pattern = `bar', flags = 0, ...)
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_directory(subject = `unix:dthain', base = `', fullpath = `/', pattern = `bar', flags = 0, ...)
+2015/05/01 13:25:35.02 chirp_server[11926] local: opendir(`/')
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21a9080
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21a9080 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21a9488 [name = `.']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21a9080 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21a9488 [name = `..']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21a9080 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21a9488 [name = `.__acl']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21a9080 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21a9488 [name = `a']
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_match_file(`bar', `/a')
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `/a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] local: stat(`//a', 0x7fffa189da40)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_should_recurse(base = `/a', pattern = `bar')
+2015/05/01 13:25:35.02 chirp_server[11926] local: open(`//a/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: pread(0, 0x21aa560, 65535, 0)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 11
+2015/05/01 13:25:35.02 chirp_server[11926] local: pread(0, 0x21aa560, 65535, 11)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: close(0)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_directory(subject = `unix:dthain', base = `/a', fullpath = `//a', pattern = `bar', flags = 0, ...)
+2015/05/01 13:25:35.02 chirp_server[11926] local: opendir(`//a')
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b1550
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b1550 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b1958 [name = `.']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b1550 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b1958 [name = `..']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b1550 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b1958 [name = `.__acl']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b1550 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b1958 [name = `b']
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_match_file(`bar', `/a/b')
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `/a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] local: stat(`//a/b', 0x7fffa189c960)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_should_recurse(base = `/a/b', pattern = `bar')
+2015/05/01 13:25:35.02 chirp_server[11926] local: open(`//a/b/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: pread(0, 0x21b2a30, 65535, 0)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 11
+2015/05/01 13:25:35.02 chirp_server[11926] local: pread(0, 0x21b2a30, 65535, 11)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: close(0)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_directory(subject = `unix:dthain', base = `/a/b', fullpath = `//a/b', pattern = `bar', flags = 0, ...)
+2015/05/01 13:25:35.02 chirp_server[11926] local: opendir(`//a/b')
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b9a20
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b9a20 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b9e28 [name = `.']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b9a20 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b9e28 [name = `..']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b9a20 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b9e28 [name = `.__acl']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b9a20 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b9e28 [name = `bar']
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_match_file(`bar', `/a/b/bar')
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `/a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `bar', FNM_PATHNAME) = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: stat(`//a/b/bar', 0x7fffa189b880)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b9a20 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b9e28 [name = `c']
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_match_file(`bar', `/a/b/c')
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `/a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] local: stat(`//a/b/c', 0x7fffa189b880)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_should_recurse(base = `/a/b/c', pattern = `bar')
+2015/05/01 13:25:35.02 chirp_server[11926] local: open(`//a/b/c/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: pread(0, 0x21baf00, 65535, 0)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 11
+2015/05/01 13:25:35.02 chirp_server[11926] local: pread(0, 0x21baf00, 65535, 11)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: close(0)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_directory(subject = `unix:dthain', base = `/a/b/c', fullpath = `//a/b/c', pattern = `bar', flags = 0, ...)
+2015/05/01 13:25:35.02 chirp_server[11926] local: opendir(`//a/b/c')
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21c1ef0
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21c1ef0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21c22f8 [name = `.']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21c1ef0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21c22f8 [name = `..']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21c1ef0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21c22f8 [name = `.__acl']
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21c1ef0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21c22f8 [name = `bar']
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_match_file(`bar', `/a/b/c/bar')
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `/a/b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `a/b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `bar', FNM_PATHNAME) = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: stat(`//a/b/c/bar', 0x7fffa189a7a0)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21c1ef0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.02 chirp_server[11926] local: closedir(0x21c1ef0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b9a20 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0x21b9e28 [name = `foo']
+2015/05/01 13:25:35.02 chirp_server[11926] debug: search_match_file(`bar', `/a/b/foo')
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `/a/b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `a/b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] debug: fnmatch(`bar', `foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.02 chirp_server[11926] local: stat(`//a/b/foo', 0x7fffa189b880)
+2015/05/01 13:25:35.02 chirp_server[11926] local: = 0
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b9a20 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.02 chirp_server[11926] local: closedir(0x21b9a20 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21b1550 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.02 chirp_server[11926] local: closedir(0x21b1550 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: readdir(0x21a9080 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.02 chirp_server[11926] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.02 chirp_server[11926] local: closedir(0x21a9080 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.02 chirp_server[11926] chirp: = -1 (Success)
+2015/05/01 13:25:35.06 chirp_server[11926] chirp: timeout: client idle too long
+2015/05/01 13:25:35.06 chirp_server[11926] debug: sending stats: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.06 chirp_server[11926] login: disconnected
+2015/05/01 13:25:35.06 chirp_server[11906] debug: config message: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.06 chirp_server[11926] tcp: disconnected from 127.0.0.1:56122
+2015/05/01 13:25:35.07 chirp_server[11906] process: pid 11926 exited with 0 (0 total child procs)
+2015/05/01 13:25:35.10 chirp_server[11906] tcp: got connection from 127.0.0.1:56123
+2015/05/01 13:25:35.10 chirp_server[11906] process: created pid 11930 (0 total child procs)
+2015/05/01 13:25:35.10 chirp_server[11906] tcp: disconnected from 127.0.0.1:56123
+2015/05/01 13:25:35.10 chirp_server[11930] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:35.10 chirp_server[11930] local: = 1
+2015/05/01 13:25:35.10 chirp_server[11930] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.10 chirp_server[11930] local: = 0
+2015/05/01 13:25:35.10 chirp_server[11930] local: close(0)
+2015/05/01 13:25:35.10 chirp_server[11930] local: = 0
+2015/05/01 13:25:35.10 chirp_server[11930] auth: 127.0.0.1:56123 requests 'unix' authentication
+2015/05/01 13:25:35.10 chirp_server[11930] auth: I agree to try 'unix'
+2015/05/01 13:25:35.10 chirp_server[11930] auth: unix: generating challenge
+2015/05/01 13:25:35.10 chirp_server[11930] auth: unix: challenge path is /tmp/challenge.11930.1804289383
+2015/05/01 13:25:35.10 chirp_server[11930] auth: unix: waiting for response
+2015/05/01 13:25:35.12 chirp_server[11930] auth: unix: got response
+2015/05/01 13:25:35.12 chirp_server[11930] auth: unix: client is uid 102744
+2015/05/01 13:25:35.12 chirp_server[11930] auth: unix: client is subject dthain
+2015/05/01 13:25:35.12 chirp_server[11930] auth: 'unix' authentication succeeded
+2015/05/01 13:25:35.12 chirp_server[11930] auth: 127.0.0.1:56123 is unix:dthain
+2015/05/01 13:25:35.12 chirp_server[11930] login: unix:dthain from 127.0.0.1:56123
+2015/05/01 13:25:35.12 chirp_server[11930] auth: hostname: registered
+2015/05/01 13:25:35.12 chirp_server[11930] auth: address: registered
+2015/05/01 13:25:35.12 chirp_server[11930] chirp: readlink /bar 1023
+2015/05/01 13:25:35.12 chirp_server[11930] local: stat(`/bar', 0x7fffa189e2f0)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.13 chirp_server[11930] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = 0
+2015/05/01 13:25:35.13 chirp_server[11930] local: pread(0, 0x21a2120, 65535, 0)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = 11
+2015/05/01 13:25:35.13 chirp_server[11930] local: pread(0, 0x21a2120, 65535, 11)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = 0
+2015/05/01 13:25:35.13 chirp_server[11930] local: close(0)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = 0
+2015/05/01 13:25:35.13 chirp_server[11930] local: readlink(`/bar', 0x7f211a280010, 1023)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.13 chirp_server[11930] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:35.13 chirp_server[11930] chirp: stat /bar
+2015/05/01 13:25:35.13 chirp_server[11930] local: readlink(`/bar', 0x7fffa189eb90, 1024)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.13 chirp_server[11930] local: stat(`/bar', 0x7fffa189e2f0)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.13 chirp_server[11930] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = 0
+2015/05/01 13:25:35.13 chirp_server[11930] local: pread(0, 0x21a2120, 65535, 0)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = 11
+2015/05/01 13:25:35.13 chirp_server[11930] local: pread(0, 0x21a2120, 65535, 11)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = 0
+2015/05/01 13:25:35.13 chirp_server[11930] local: close(0)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = 0
+2015/05/01 13:25:35.13 chirp_server[11930] local: stat(`/bar', 0x7fffa18af030)
+2015/05/01 13:25:35.13 chirp_server[11930] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.13 chirp_server[11930] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:35.17 chirp_server[11930] chirp: timeout: client idle too long
+2015/05/01 13:25:35.17 chirp_server[11930] debug: sending stats: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:25:35.17 chirp_server[11930] login: disconnected
+2015/05/01 13:25:35.17 chirp_server[11906] debug: config message: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:25:35.17 chirp_server[11930] tcp: disconnected from 127.0.0.1:56123
+2015/05/01 13:25:35.18 chirp_server[11906] process: pid 11930 exited with 0 (0 total child procs)
+2015/05/01 13:25:35.20 chirp_server[11906] tcp: got connection from 127.0.0.1:56124
+2015/05/01 13:25:35.20 chirp_server[11906] process: created pid 11934 (0 total child procs)
+2015/05/01 13:25:35.20 chirp_server[11906] tcp: disconnected from 127.0.0.1:56124
+2015/05/01 13:25:35.20 chirp_server[11934] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:35.20 chirp_server[11934] local: = 1
+2015/05/01 13:25:35.20 chirp_server[11934] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.20 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.20 chirp_server[11934] local: close(0)
+2015/05/01 13:25:35.20 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.20 chirp_server[11934] auth: 127.0.0.1:56124 requests 'unix' authentication
+2015/05/01 13:25:35.20 chirp_server[11934] auth: I agree to try 'unix'
+2015/05/01 13:25:35.20 chirp_server[11934] auth: unix: generating challenge
+2015/05/01 13:25:35.20 chirp_server[11934] auth: unix: challenge path is /tmp/challenge.11934.1804289383
+2015/05/01 13:25:35.20 chirp_server[11934] auth: unix: waiting for response
+2015/05/01 13:25:35.22 chirp_server[11934] auth: unix: got response
+2015/05/01 13:25:35.22 chirp_server[11934] auth: unix: client is uid 102744
+2015/05/01 13:25:35.22 chirp_server[11934] auth: unix: client is subject dthain
+2015/05/01 13:25:35.22 chirp_server[11934] auth: 'unix' authentication succeeded
+2015/05/01 13:25:35.22 chirp_server[11934] auth: 127.0.0.1:56124 is unix:dthain
+2015/05/01 13:25:35.22 chirp_server[11934] login: unix:dthain from 127.0.0.1:56124
+2015/05/01 13:25:35.22 chirp_server[11934] auth: hostname: registered
+2015/05/01 13:25:35.22 chirp_server[11934] auth: address: registered
+2015/05/01 13:25:35.23 chirp_server[11934] chirp: search c/bar / 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: access(`/', 0x0)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: readlink(`/', 0x7fffa189eb90, 1024)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:35.23 chirp_server[11934] local: stat(`/', 0x7fffa189e2f0)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: pread(0, 0x21a2120, 65535, 0)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 11
+2015/05/01 13:25:35.23 chirp_server[11934] local: pread(0, 0x21a2120, 65535, 11)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: close(0)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] debug: cfs_basic_search(subject = `unix:dthain', dir = `/', pattern = `c/bar', flags = 0, ...)
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_directory(subject = `unix:dthain', base = `', fullpath = `/', pattern = `c/bar', flags = 0, ...)
+2015/05/01 13:25:35.23 chirp_server[11934] local: opendir(`/')
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21a9110
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21a9518 [name = `.']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21a9518 [name = `..']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21a9518 [name = `.__acl']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21a9518 [name = `a']
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_match_file(`c/bar', `/a')
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `/a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] local: stat(`//a', 0x7fffa189da40)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_should_recurse(base = `/a', pattern = `c/bar')
+2015/05/01 13:25:35.23 chirp_server[11934] local: open(`//a/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: pread(0, 0x21aa5f0, 65535, 0)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 11
+2015/05/01 13:25:35.23 chirp_server[11934] local: pread(0, 0x21aa5f0, 65535, 11)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: close(0)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_directory(subject = `unix:dthain', base = `/a', fullpath = `//a', pattern = `c/bar', flags = 0, ...)
+2015/05/01 13:25:35.23 chirp_server[11934] local: opendir(`//a')
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b15e0
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b19e8 [name = `.']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b19e8 [name = `..']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b19e8 [name = `.__acl']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b19e8 [name = `b']
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_match_file(`c/bar', `/a/b')
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `/a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] local: stat(`//a/b', 0x7fffa189c960)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_should_recurse(base = `/a/b', pattern = `c/bar')
+2015/05/01 13:25:35.23 chirp_server[11934] local: open(`//a/b/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: pread(0, 0x21b2ac0, 65535, 0)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 11
+2015/05/01 13:25:35.23 chirp_server[11934] local: pread(0, 0x21b2ac0, 65535, 11)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: close(0)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_directory(subject = `unix:dthain', base = `/a/b', fullpath = `//a/b', pattern = `c/bar', flags = 0, ...)
+2015/05/01 13:25:35.23 chirp_server[11934] local: opendir(`//a/b')
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b9ab0
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b9eb8 [name = `.']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b9eb8 [name = `..']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b9eb8 [name = `.__acl']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b9eb8 [name = `bar']
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_match_file(`c/bar', `/a/b/bar')
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `/a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] local: stat(`//a/b/bar', 0x7fffa189b880)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b9eb8 [name = `c']
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_match_file(`c/bar', `/a/b/c')
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `/a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] local: stat(`//a/b/c', 0x7fffa189b880)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_should_recurse(base = `/a/b/c', pattern = `c/bar')
+2015/05/01 13:25:35.23 chirp_server[11934] local: open(`//a/b/c/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: pread(0, 0x21baf90, 65535, 0)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 11
+2015/05/01 13:25:35.23 chirp_server[11934] local: pread(0, 0x21baf90, 65535, 11)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: close(0)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_directory(subject = `unix:dthain', base = `/a/b/c', fullpath = `//a/b/c', pattern = `c/bar', flags = 0, ...)
+2015/05/01 13:25:35.23 chirp_server[11934] local: opendir(`//a/b/c')
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21c1f80
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21c2388 [name = `.']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21c2388 [name = `..']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21c2388 [name = `.__acl']
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21c2388 [name = `bar']
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_match_file(`c/bar', `/a/b/c/bar')
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `/a/b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `a/b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `c/bar', FNM_PATHNAME) = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: stat(`//a/b/c/bar', 0x7fffa189a7a0)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.23 chirp_server[11934] local: closedir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0x21b9eb8 [name = `foo']
+2015/05/01 13:25:35.23 chirp_server[11934] debug: search_match_file(`c/bar', `/a/b/foo')
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `/a/b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `a/b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] debug: fnmatch(`c/bar', `foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.23 chirp_server[11934] local: stat(`//a/b/foo', 0x7fffa189b880)
+2015/05/01 13:25:35.23 chirp_server[11934] local: = 0
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.23 chirp_server[11934] local: closedir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.23 chirp_server[11934] local: closedir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.23 chirp_server[11934] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.23 chirp_server[11934] local: closedir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.23 chirp_server[11934] chirp: = -1 (Success)
+2015/05/01 13:25:35.28 chirp_server[11934] chirp: timeout: client idle too long
+2015/05/01 13:25:35.28 chirp_server[11934] debug: sending stats: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.28 chirp_server[11934] login: disconnected
+2015/05/01 13:25:35.28 chirp_server[11906] debug: config message: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.28 chirp_server[11934] tcp: disconnected from 127.0.0.1:56124
+2015/05/01 13:25:35.28 chirp_server[11906] process: pid 11934 exited with 0 (0 total child procs)
+2015/05/01 13:25:35.31 chirp_server[11906] tcp: got connection from 127.0.0.1:56125
+2015/05/01 13:25:35.31 chirp_server[11906] process: created pid 11938 (0 total child procs)
+2015/05/01 13:25:35.31 chirp_server[11906] tcp: disconnected from 127.0.0.1:56125
+2015/05/01 13:25:35.31 chirp_server[11938] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:35.31 chirp_server[11938] local: = 1
+2015/05/01 13:25:35.31 chirp_server[11938] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.31 chirp_server[11938] local: = 0
+2015/05/01 13:25:35.31 chirp_server[11938] local: close(0)
+2015/05/01 13:25:35.31 chirp_server[11938] local: = 0
+2015/05/01 13:25:35.32 chirp_server[11938] auth: 127.0.0.1:56125 requests 'unix' authentication
+2015/05/01 13:25:35.32 chirp_server[11938] auth: I agree to try 'unix'
+2015/05/01 13:25:35.32 chirp_server[11938] auth: unix: generating challenge
+2015/05/01 13:25:35.32 chirp_server[11938] auth: unix: challenge path is /tmp/challenge.11938.1804289383
+2015/05/01 13:25:35.32 chirp_server[11938] auth: unix: waiting for response
+2015/05/01 13:25:35.33 chirp_server[11938] auth: unix: got response
+2015/05/01 13:25:35.33 chirp_server[11938] auth: unix: client is uid 102744
+2015/05/01 13:25:35.33 chirp_server[11938] auth: unix: client is subject dthain
+2015/05/01 13:25:35.33 chirp_server[11938] auth: 'unix' authentication succeeded
+2015/05/01 13:25:35.33 chirp_server[11938] auth: 127.0.0.1:56125 is unix:dthain
+2015/05/01 13:25:35.33 chirp_server[11938] login: unix:dthain from 127.0.0.1:56125
+2015/05/01 13:25:35.33 chirp_server[11938] auth: hostname: registered
+2015/05/01 13:25:35.33 chirp_server[11938] auth: address: registered
+2015/05/01 13:25:35.33 chirp_server[11938] chirp: readlink /c/bar 1023
+2015/05/01 13:25:35.33 chirp_server[11938] local: stat(`/c/bar', 0x7fffa189e2f0)
+2015/05/01 13:25:35.33 chirp_server[11938] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.33 chirp_server[11938] local: open(`/c/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.33 chirp_server[11938] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.33 chirp_server[11938] local: stat(`/c', 0x7fffa189deb0)
+2015/05/01 13:25:35.33 chirp_server[11938] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.33 chirp_server[11938] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:35.33 chirp_server[11938] chirp: stat /c/bar
+2015/05/01 13:25:35.33 chirp_server[11938] local: readlink(`/c/bar', 0x7fffa189eb90, 1024)
+2015/05/01 13:25:35.33 chirp_server[11938] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.33 chirp_server[11938] local: stat(`/c/bar', 0x7fffa189e2f0)
+2015/05/01 13:25:35.33 chirp_server[11938] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.33 chirp_server[11938] local: open(`/c/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.33 chirp_server[11938] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.33 chirp_server[11938] local: stat(`/c', 0x7fffa189deb0)
+2015/05/01 13:25:35.33 chirp_server[11938] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.33 chirp_server[11938] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:35.39 chirp_server[11938] chirp: timeout: client idle too long
+2015/05/01 13:25:35.39 chirp_server[11938] debug: sending stats: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:25:35.39 chirp_server[11938] login: disconnected
+2015/05/01 13:25:35.39 chirp_server[11906] debug: config message: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:25:35.39 chirp_server[11938] tcp: disconnected from 127.0.0.1:56125
+2015/05/01 13:25:35.39 chirp_server[11906] process: pid 11938 exited with 0 (0 total child procs)
+2015/05/01 13:25:35.42 chirp_server[11906] tcp: got connection from 127.0.0.1:56126
+2015/05/01 13:25:35.42 chirp_server[11906] process: created pid 11942 (0 total child procs)
+2015/05/01 13:25:35.42 chirp_server[11906] tcp: disconnected from 127.0.0.1:56126
+2015/05/01 13:25:35.42 chirp_server[11942] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:35.42 chirp_server[11942] local: = 1
+2015/05/01 13:25:35.42 chirp_server[11942] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.42 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.42 chirp_server[11942] local: close(0)
+2015/05/01 13:25:35.42 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.43 chirp_server[11942] auth: 127.0.0.1:56126 requests 'unix' authentication
+2015/05/01 13:25:35.43 chirp_server[11942] auth: I agree to try 'unix'
+2015/05/01 13:25:35.43 chirp_server[11942] auth: unix: generating challenge
+2015/05/01 13:25:35.43 chirp_server[11942] auth: unix: challenge path is /tmp/challenge.11942.1804289383
+2015/05/01 13:25:35.43 chirp_server[11942] auth: unix: waiting for response
+2015/05/01 13:25:35.44 chirp_server[11942] auth: unix: got response
+2015/05/01 13:25:35.44 chirp_server[11942] auth: unix: client is uid 102744
+2015/05/01 13:25:35.44 chirp_server[11942] auth: unix: client is subject dthain
+2015/05/01 13:25:35.44 chirp_server[11942] auth: 'unix' authentication succeeded
+2015/05/01 13:25:35.44 chirp_server[11942] auth: 127.0.0.1:56126 is unix:dthain
+2015/05/01 13:25:35.44 chirp_server[11942] login: unix:dthain from 127.0.0.1:56126
+2015/05/01 13:25:35.44 chirp_server[11942] auth: hostname: registered
+2015/05/01 13:25:35.44 chirp_server[11942] auth: address: registered
+2015/05/01 13:25:35.44 chirp_server[11942] chirp: search b/bar / 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: access(`/', 0x0)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: readlink(`/', 0x7fffa189eb90, 1024)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:35.44 chirp_server[11942] local: stat(`/', 0x7fffa189e2f0)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: pread(0, 0x21a2120, 65535, 0)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 11
+2015/05/01 13:25:35.44 chirp_server[11942] local: pread(0, 0x21a2120, 65535, 11)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: close(0)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] debug: cfs_basic_search(subject = `unix:dthain', dir = `/', pattern = `b/bar', flags = 0, ...)
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_directory(subject = `unix:dthain', base = `', fullpath = `/', pattern = `b/bar', flags = 0, ...)
+2015/05/01 13:25:35.44 chirp_server[11942] local: opendir(`/')
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21a9110
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21a9518 [name = `.']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21a9518 [name = `..']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21a9518 [name = `.__acl']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21a9518 [name = `a']
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_match_file(`b/bar', `/a')
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `/a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] local: stat(`//a', 0x7fffa189da40)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_should_recurse(base = `/a', pattern = `b/bar')
+2015/05/01 13:25:35.44 chirp_server[11942] local: open(`//a/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: pread(0, 0x21aa5f0, 65535, 0)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 11
+2015/05/01 13:25:35.44 chirp_server[11942] local: pread(0, 0x21aa5f0, 65535, 11)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: close(0)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_directory(subject = `unix:dthain', base = `/a', fullpath = `//a', pattern = `b/bar', flags = 0, ...)
+2015/05/01 13:25:35.44 chirp_server[11942] local: opendir(`//a')
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b15e0
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b19e8 [name = `.']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b19e8 [name = `..']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b19e8 [name = `.__acl']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b19e8 [name = `b']
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_match_file(`b/bar', `/a/b')
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `/a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] local: stat(`//a/b', 0x7fffa189c960)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_should_recurse(base = `/a/b', pattern = `b/bar')
+2015/05/01 13:25:35.44 chirp_server[11942] local: open(`//a/b/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: pread(0, 0x21b2ac0, 65535, 0)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 11
+2015/05/01 13:25:35.44 chirp_server[11942] local: pread(0, 0x21b2ac0, 65535, 11)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: close(0)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_directory(subject = `unix:dthain', base = `/a/b', fullpath = `//a/b', pattern = `b/bar', flags = 0, ...)
+2015/05/01 13:25:35.44 chirp_server[11942] local: opendir(`//a/b')
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b9ab0
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b9eb8 [name = `.']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b9eb8 [name = `..']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b9eb8 [name = `.__acl']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b9eb8 [name = `bar']
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_match_file(`b/bar', `/a/b/bar')
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `/a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `b/bar', FNM_PATHNAME) = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: stat(`//a/b/bar', 0x7fffa189b880)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b9eb8 [name = `c']
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_match_file(`b/bar', `/a/b/c')
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `/a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] local: stat(`//a/b/c', 0x7fffa189b880)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_should_recurse(base = `/a/b/c', pattern = `b/bar')
+2015/05/01 13:25:35.44 chirp_server[11942] local: open(`//a/b/c/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: pread(0, 0x21baf90, 65535, 0)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 11
+2015/05/01 13:25:35.44 chirp_server[11942] local: pread(0, 0x21baf90, 65535, 11)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: close(0)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_directory(subject = `unix:dthain', base = `/a/b/c', fullpath = `//a/b/c', pattern = `b/bar', flags = 0, ...)
+2015/05/01 13:25:35.44 chirp_server[11942] local: opendir(`//a/b/c')
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21c1f80
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21c2388 [name = `.']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21c2388 [name = `..']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21c2388 [name = `.__acl']
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21c2388 [name = `bar']
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_match_file(`b/bar', `/a/b/c/bar')
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `/a/b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `a/b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] local: stat(`//a/b/c/bar', 0x7fffa189a7a0)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.44 chirp_server[11942] local: closedir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0x21b9eb8 [name = `foo']
+2015/05/01 13:25:35.44 chirp_server[11942] debug: search_match_file(`b/bar', `/a/b/foo')
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `/a/b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `a/b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] debug: fnmatch(`b/bar', `foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.44 chirp_server[11942] local: stat(`//a/b/foo', 0x7fffa189b880)
+2015/05/01 13:25:35.44 chirp_server[11942] local: = 0
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.44 chirp_server[11942] local: closedir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.44 chirp_server[11942] local: closedir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.44 chirp_server[11942] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.44 chirp_server[11942] local: closedir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.44 chirp_server[11942] chirp: = -1 (Success)
+2015/05/01 13:25:35.45 chirp_server[11942] chirp: timeout: client idle too long
+2015/05/01 13:25:35.45 chirp_server[11942] debug: sending stats: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.45 chirp_server[11942] login: disconnected
+2015/05/01 13:25:35.45 chirp_server[11906] debug: config message: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.45 chirp_server[11942] tcp: disconnected from 127.0.0.1:56126
+2015/05/01 13:25:35.46 chirp_server[11906] process: pid 11942 exited with 0 (0 total child procs)
+2015/05/01 13:25:35.49 chirp_server[11906] tcp: got connection from 127.0.0.1:56127
+2015/05/01 13:25:35.49 chirp_server[11906] process: created pid 11946 (0 total child procs)
+2015/05/01 13:25:35.49 chirp_server[11906] tcp: disconnected from 127.0.0.1:56127
+2015/05/01 13:25:35.49 chirp_server[11946] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:35.49 chirp_server[11946] local: = 1
+2015/05/01 13:25:35.49 chirp_server[11946] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.49 chirp_server[11946] local: = 0
+2015/05/01 13:25:35.49 chirp_server[11946] local: close(0)
+2015/05/01 13:25:35.49 chirp_server[11946] local: = 0
+2015/05/01 13:25:35.49 chirp_server[11946] auth: 127.0.0.1:56127 requests 'unix' authentication
+2015/05/01 13:25:35.49 chirp_server[11946] auth: I agree to try 'unix'
+2015/05/01 13:25:35.49 chirp_server[11946] auth: unix: generating challenge
+2015/05/01 13:25:35.49 chirp_server[11946] auth: unix: challenge path is /tmp/challenge.11946.1804289383
+2015/05/01 13:25:35.49 chirp_server[11946] auth: unix: waiting for response
+2015/05/01 13:25:35.51 chirp_server[11946] auth: unix: got response
+2015/05/01 13:25:35.51 chirp_server[11946] auth: unix: client is uid 102744
+2015/05/01 13:25:35.51 chirp_server[11946] auth: unix: client is subject dthain
+2015/05/01 13:25:35.51 chirp_server[11946] auth: 'unix' authentication succeeded
+2015/05/01 13:25:35.51 chirp_server[11946] auth: 127.0.0.1:56127 is unix:dthain
+2015/05/01 13:25:35.51 chirp_server[11946] login: unix:dthain from 127.0.0.1:56127
+2015/05/01 13:25:35.51 chirp_server[11946] auth: hostname: registered
+2015/05/01 13:25:35.51 chirp_server[11946] auth: address: registered
+2015/05/01 13:25:35.51 chirp_server[11946] chirp: readlink /b/bar 1023
+2015/05/01 13:25:35.51 chirp_server[11946] local: stat(`/b/bar', 0x7fffa189e2f0)
+2015/05/01 13:25:35.51 chirp_server[11946] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.51 chirp_server[11946] local: open(`/b/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.51 chirp_server[11946] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.51 chirp_server[11946] local: stat(`/b', 0x7fffa189deb0)
+2015/05/01 13:25:35.51 chirp_server[11946] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.51 chirp_server[11946] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:35.51 chirp_server[11946] chirp: stat /b/bar
+2015/05/01 13:25:35.51 chirp_server[11946] local: readlink(`/b/bar', 0x7fffa189eb90, 1024)
+2015/05/01 13:25:35.51 chirp_server[11946] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.51 chirp_server[11946] local: stat(`/b/bar', 0x7fffa189e2f0)
+2015/05/01 13:25:35.51 chirp_server[11946] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.51 chirp_server[11946] local: open(`/b/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.51 chirp_server[11946] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.51 chirp_server[11946] local: stat(`/b', 0x7fffa189deb0)
+2015/05/01 13:25:35.51 chirp_server[11946] local: = -1 (errno = 2; `No such file or directory')
+2015/05/01 13:25:35.51 chirp_server[11946] chirp: = -3 (No such file or directory)
+2015/05/01 13:25:35.53 chirp_server[11946] chirp: timeout: client idle too long
+2015/05/01 13:25:35.53 chirp_server[11946] debug: sending stats: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:25:35.53 chirp_server[11946] login: disconnected
+2015/05/01 13:25:35.53 chirp_server[11906] debug: config message: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:25:35.53 chirp_server[11946] tcp: disconnected from 127.0.0.1:56127
+2015/05/01 13:25:35.53 chirp_server[11906] process: pid 11946 exited with 0 (0 total child procs)
+2015/05/01 13:25:35.56 chirp_server[11906] tcp: got connection from 127.0.0.1:56128
+2015/05/01 13:25:35.56 chirp_server[11906] process: created pid 11950 (0 total child procs)
+2015/05/01 13:25:35.56 chirp_server[11906] tcp: disconnected from 127.0.0.1:56128
+2015/05/01 13:25:35.56 chirp_server[11950] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:35.56 chirp_server[11950] local: = 1
+2015/05/01 13:25:35.56 chirp_server[11950] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.56 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.56 chirp_server[11950] local: close(0)
+2015/05/01 13:25:35.56 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.56 chirp_server[11950] auth: 127.0.0.1:56128 requests 'unix' authentication
+2015/05/01 13:25:35.56 chirp_server[11950] auth: I agree to try 'unix'
+2015/05/01 13:25:35.56 chirp_server[11950] auth: unix: generating challenge
+2015/05/01 13:25:35.56 chirp_server[11950] auth: unix: challenge path is /tmp/challenge.11950.1804289383
+2015/05/01 13:25:35.56 chirp_server[11950] auth: unix: waiting for response
+2015/05/01 13:25:35.58 chirp_server[11950] auth: unix: got response
+2015/05/01 13:25:35.58 chirp_server[11950] auth: unix: client is uid 102744
+2015/05/01 13:25:35.58 chirp_server[11950] auth: unix: client is subject dthain
+2015/05/01 13:25:35.58 chirp_server[11950] auth: 'unix' authentication succeeded
+2015/05/01 13:25:35.58 chirp_server[11950] auth: 127.0.0.1:56128 is unix:dthain
+2015/05/01 13:25:35.58 chirp_server[11950] login: unix:dthain from 127.0.0.1:56128
+2015/05/01 13:25:35.58 chirp_server[11950] auth: hostname: registered
+2015/05/01 13:25:35.58 chirp_server[11950] auth: address: registered
+2015/05/01 13:25:35.58 chirp_server[11950] chirp: search b/foo / 0
+2015/05/01 13:25:35.58 chirp_server[11950] local: access(`/', 0x0)
+2015/05/01 13:25:35.58 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.58 chirp_server[11950] local: readlink(`/', 0x7fffa189eb90, 1024)
+2015/05/01 13:25:35.58 chirp_server[11950] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:35.58 chirp_server[11950] local: stat(`/', 0x7fffa189e2f0)
+2015/05/01 13:25:35.58 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: pread(0, 0x21a2120, 65535, 0)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 11
+2015/05/01 13:25:35.59 chirp_server[11950] local: pread(0, 0x21a2120, 65535, 11)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: close(0)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] debug: cfs_basic_search(subject = `unix:dthain', dir = `/', pattern = `b/foo', flags = 0, ...)
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_directory(subject = `unix:dthain', base = `', fullpath = `/', pattern = `b/foo', flags = 0, ...)
+2015/05/01 13:25:35.59 chirp_server[11950] local: opendir(`/')
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21a9110
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21a9518 [name = `.']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21a9518 [name = `..']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21a9518 [name = `.__acl']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21a9518 [name = `a']
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_match_file(`b/foo', `/a')
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `/a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] local: stat(`//a', 0x7fffa189da40)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_should_recurse(base = `/a', pattern = `b/foo')
+2015/05/01 13:25:35.59 chirp_server[11950] local: open(`//a/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: pread(0, 0x21aa5f0, 65535, 0)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 11
+2015/05/01 13:25:35.59 chirp_server[11950] local: pread(0, 0x21aa5f0, 65535, 11)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: close(0)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_directory(subject = `unix:dthain', base = `/a', fullpath = `//a', pattern = `b/foo', flags = 0, ...)
+2015/05/01 13:25:35.59 chirp_server[11950] local: opendir(`//a')
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b15e0
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b19e8 [name = `.']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b19e8 [name = `..']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b19e8 [name = `.__acl']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b19e8 [name = `b']
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_match_file(`b/foo', `/a/b')
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `/a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] local: stat(`//a/b', 0x7fffa189c960)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_should_recurse(base = `/a/b', pattern = `b/foo')
+2015/05/01 13:25:35.59 chirp_server[11950] local: open(`//a/b/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: pread(0, 0x21b2ac0, 65535, 0)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 11
+2015/05/01 13:25:35.59 chirp_server[11950] local: pread(0, 0x21b2ac0, 65535, 11)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: close(0)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_directory(subject = `unix:dthain', base = `/a/b', fullpath = `//a/b', pattern = `b/foo', flags = 0, ...)
+2015/05/01 13:25:35.59 chirp_server[11950] local: opendir(`//a/b')
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b9ab0
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b9eb8 [name = `.']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b9eb8 [name = `..']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b9eb8 [name = `.__acl']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b9eb8 [name = `bar']
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_match_file(`b/foo', `/a/b/bar')
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `/a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] local: stat(`//a/b/bar', 0x7fffa189b880)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b9eb8 [name = `c']
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_match_file(`b/foo', `/a/b/c')
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `/a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] local: stat(`//a/b/c', 0x7fffa189b880)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_should_recurse(base = `/a/b/c', pattern = `b/foo')
+2015/05/01 13:25:35.59 chirp_server[11950] local: open(`//a/b/c/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: pread(0, 0x21baf90, 65535, 0)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 11
+2015/05/01 13:25:35.59 chirp_server[11950] local: pread(0, 0x21baf90, 65535, 11)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: close(0)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_directory(subject = `unix:dthain', base = `/a/b/c', fullpath = `//a/b/c', pattern = `b/foo', flags = 0, ...)
+2015/05/01 13:25:35.59 chirp_server[11950] local: opendir(`//a/b/c')
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21c1f80
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21c2388 [name = `.']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21c2388 [name = `..']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21c2388 [name = `.__acl']
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21c2388 [name = `bar']
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_match_file(`b/foo', `/a/b/c/bar')
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `/a/b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `a/b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] local: stat(`//a/b/c/bar', 0x7fffa189a7a0)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.59 chirp_server[11950] local: closedir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0x21b9eb8 [name = `foo']
+2015/05/01 13:25:35.59 chirp_server[11950] debug: search_match_file(`b/foo', `/a/b/foo')
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `/a/b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `a/b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.59 chirp_server[11950] debug: fnmatch(`b/foo', `b/foo', FNM_PATHNAME) = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: stat(`//a/b/foo', 0x7fffa189b880)
+2015/05/01 13:25:35.59 chirp_server[11950] local: = 0
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.59 chirp_server[11950] local: closedir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.59 chirp_server[11950] local: closedir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.59 chirp_server[11950] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.59 chirp_server[11950] local: closedir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.59 chirp_server[11950] chirp: = -1 (Success)
+2015/05/01 13:25:35.60 chirp_server[11950] chirp: timeout: client idle too long
+2015/05/01 13:25:35.60 chirp_server[11950] debug: sending stats: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.60 chirp_server[11950] login: disconnected
+2015/05/01 13:25:35.60 chirp_server[11906] debug: config message: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.60 chirp_server[11950] tcp: disconnected from 127.0.0.1:56128
+2015/05/01 13:25:35.61 chirp_server[11906] process: pid 11950 exited with 0 (0 total child procs)
+2015/05/01 13:25:35.64 chirp_server[11906] tcp: got connection from 127.0.0.1:56129
+2015/05/01 13:25:35.64 chirp_server[11906] process: created pid 11954 (0 total child procs)
+2015/05/01 13:25:35.64 chirp_server[11906] tcp: disconnected from 127.0.0.1:56129
+2015/05/01 13:25:35.64 chirp_server[11954] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:35.64 chirp_server[11954] local: = 1
+2015/05/01 13:25:35.64 chirp_server[11954] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.64 chirp_server[11954] local: = 0
+2015/05/01 13:25:35.64 chirp_server[11954] local: close(0)
+2015/05/01 13:25:35.64 chirp_server[11954] local: = 0
+2015/05/01 13:25:35.64 chirp_server[11954] auth: 127.0.0.1:56129 requests 'unix' authentication
+2015/05/01 13:25:35.64 chirp_server[11954] auth: I agree to try 'unix'
+2015/05/01 13:25:35.64 chirp_server[11954] auth: unix: generating challenge
+2015/05/01 13:25:35.64 chirp_server[11954] auth: unix: challenge path is /tmp/challenge.11954.1804289383
+2015/05/01 13:25:35.64 chirp_server[11954] auth: unix: waiting for response
+2015/05/01 13:25:35.66 chirp_server[11954] auth: unix: got response
+2015/05/01 13:25:35.66 chirp_server[11954] auth: unix: client is uid 102744
+2015/05/01 13:25:35.66 chirp_server[11954] auth: unix: client is subject dthain
+2015/05/01 13:25:35.66 chirp_server[11954] auth: 'unix' authentication succeeded
+2015/05/01 13:25:35.66 chirp_server[11954] auth: 127.0.0.1:56129 is unix:dthain
+2015/05/01 13:25:35.66 chirp_server[11954] login: unix:dthain from 127.0.0.1:56129
+2015/05/01 13:25:35.66 chirp_server[11954] auth: hostname: registered
+2015/05/01 13:25:35.66 chirp_server[11954] auth: address: registered
+2015/05/01 13:25:35.66 chirp_server[11954] chirp: readlink /a/b/foo 1023
+2015/05/01 13:25:35.66 chirp_server[11954] local: stat(`/a/b/foo', 0x7fffa189e2f0)
+2015/05/01 13:25:35.66 chirp_server[11954] local: = 0
+2015/05/01 13:25:35.66 chirp_server[11954] local: open(`/a/b/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.66 chirp_server[11954] local: = 0
+2015/05/01 13:25:35.66 chirp_server[11954] local: pread(0, 0x21a2120, 65535, 0)
+2015/05/01 13:25:35.66 chirp_server[11954] local: = 11
+2015/05/01 13:25:35.66 chirp_server[11954] local: pread(0, 0x21a2120, 65535, 11)
+2015/05/01 13:25:35.66 chirp_server[11954] local: = 0
+2015/05/01 13:25:35.66 chirp_server[11954] local: close(0)
+2015/05/01 13:25:35.66 chirp_server[11954] local: = 0
+2015/05/01 13:25:35.66 chirp_server[11954] local: readlink(`/a/b/foo', 0x7f211a280010, 1023)
+2015/05/01 13:25:35.66 chirp_server[11954] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:35.66 chirp_server[11954] chirp: = -8 (Invalid argument)
+2015/05/01 13:25:35.67 chirp_server[11954] chirp: stat /a/b/foo
+2015/05/01 13:25:35.67 chirp_server[11954] local: readlink(`/a/b/foo', 0x7fffa189eb90, 1024)
+2015/05/01 13:25:35.67 chirp_server[11954] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:35.67 chirp_server[11954] local: stat(`/a/b/foo', 0x7fffa189e2f0)
+2015/05/01 13:25:35.67 chirp_server[11954] local: = 0
+2015/05/01 13:25:35.67 chirp_server[11954] local: open(`/a/b/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.67 chirp_server[11954] local: = 0
+2015/05/01 13:25:35.67 chirp_server[11954] local: pread(0, 0x21a2120, 65535, 0)
+2015/05/01 13:25:35.67 chirp_server[11954] local: = 11
+2015/05/01 13:25:35.67 chirp_server[11954] local: pread(0, 0x21a2120, 65535, 11)
+2015/05/01 13:25:35.67 chirp_server[11954] local: = 0
+2015/05/01 13:25:35.67 chirp_server[11954] local: close(0)
+2015/05/01 13:25:35.67 chirp_server[11954] local: = 0
+2015/05/01 13:25:35.67 chirp_server[11954] local: stat(`/a/b/foo', 0x7fffa18af030)
+2015/05/01 13:25:35.67 chirp_server[11954] local: = 0
+2015/05/01 13:25:35.67 chirp_server[11954] chirp: = 0
+2015/05/01 13:25:35.69 chirp_server[11954] chirp: timeout: client idle too long
+2015/05/01 13:25:35.69 chirp_server[11954] debug: sending stats: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:25:35.69 chirp_server[11906] debug: config message: stats 127.0.0.1 unix:dthain 2 0 0
+2015/05/01 13:25:35.69 chirp_server[11954] login: disconnected
+2015/05/01 13:25:35.69 chirp_server[11954] tcp: disconnected from 127.0.0.1:56129
+2015/05/01 13:25:35.69 chirp_server[11906] process: pid 11954 exited with 0 (0 total child procs)
+2015/05/01 13:25:35.73 chirp_server[11906] tcp: got connection from 127.0.0.1:56130
+2015/05/01 13:25:35.73 chirp_server[11906] process: created pid 11958 (0 total child procs)
+2015/05/01 13:25:35.73 chirp_server[11906] tcp: disconnected from 127.0.0.1:56130
+2015/05/01 13:25:35.73 chirp_server[11958] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:35.73 chirp_server[11958] local: = 1
+2015/05/01 13:25:35.73 chirp_server[11958] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.73 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.73 chirp_server[11958] local: close(0)
+2015/05/01 13:25:35.73 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.73 chirp_server[11958] auth: 127.0.0.1:56130 requests 'unix' authentication
+2015/05/01 13:25:35.73 chirp_server[11958] auth: I agree to try 'unix'
+2015/05/01 13:25:35.73 chirp_server[11958] auth: unix: generating challenge
+2015/05/01 13:25:35.73 chirp_server[11958] auth: unix: challenge path is /tmp/challenge.11958.1804289383
+2015/05/01 13:25:35.73 chirp_server[11958] auth: unix: waiting for response
+2015/05/01 13:25:35.74 chirp_server[11958] auth: unix: got response
+2015/05/01 13:25:35.74 chirp_server[11958] auth: unix: client is uid 102744
+2015/05/01 13:25:35.74 chirp_server[11958] auth: unix: client is subject dthain
+2015/05/01 13:25:35.74 chirp_server[11958] auth: 'unix' authentication succeeded
+2015/05/01 13:25:35.74 chirp_server[11958] auth: 127.0.0.1:56130 is unix:dthain
+2015/05/01 13:25:35.74 chirp_server[11958] login: unix:dthain from 127.0.0.1:56130
+2015/05/01 13:25:35.74 chirp_server[11958] auth: hostname: registered
+2015/05/01 13:25:35.74 chirp_server[11958] auth: address: registered
+2015/05/01 13:25:35.75 chirp_server[11958] chirp: search /*/foo / 0
+2015/05/01 13:25:35.75 chirp_server[11958] local: access(`/', 0x0)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.75 chirp_server[11958] local: readlink(`/', 0x7fffa189eb90, 1024)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:35.75 chirp_server[11958] local: stat(`/', 0x7fffa189e2f0)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.75 chirp_server[11958] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.75 chirp_server[11958] local: pread(0, 0x21a2120, 65535, 0)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 11
+2015/05/01 13:25:35.75 chirp_server[11958] local: pread(0, 0x21a2120, 65535, 11)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.75 chirp_server[11958] local: close(0)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.75 chirp_server[11958] debug: cfs_basic_search(subject = `unix:dthain', dir = `/', pattern = `/*/foo', flags = 0, ...)
+2015/05/01 13:25:35.75 chirp_server[11958] debug: search_directory(subject = `unix:dthain', base = `', fullpath = `/', pattern = `/*/foo', flags = 0, ...)
+2015/05/01 13:25:35.75 chirp_server[11958] local: opendir(`/')
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0x21a9110
+2015/05/01 13:25:35.75 chirp_server[11958] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0x21a9518 [name = `.']
+2015/05/01 13:25:35.75 chirp_server[11958] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0x21a9518 [name = `..']
+2015/05/01 13:25:35.75 chirp_server[11958] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0x21a9518 [name = `.__acl']
+2015/05/01 13:25:35.75 chirp_server[11958] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0x21a9518 [name = `a']
+2015/05/01 13:25:35.75 chirp_server[11958] debug: search_match_file(`/*/foo', `/a')
+2015/05/01 13:25:35.75 chirp_server[11958] debug: fnmatch(`/*/foo', `/a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.75 chirp_server[11958] debug: fnmatch(`/*/foo', `a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.75 chirp_server[11958] local: stat(`//a', 0x7fffa189da40)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.75 chirp_server[11958] debug: search_should_recurse(base = `/a', pattern = `/*/foo')
+2015/05/01 13:25:35.75 chirp_server[11958] debug: fnmatch(`/*/foo', `/a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.75 chirp_server[11958] debug: fnmatch(`/*', `/a', FNM_PATHNAME) = 0
+2015/05/01 13:25:35.75 chirp_server[11958] local: open(`//a/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.75 chirp_server[11958] local: pread(0, 0x21aa5f0, 65535, 0)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 11
+2015/05/01 13:25:35.75 chirp_server[11958] local: pread(0, 0x21aa5f0, 65535, 11)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.75 chirp_server[11958] local: close(0)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.75 chirp_server[11958] debug: search_directory(subject = `unix:dthain', base = `/a', fullpath = `//a', pattern = `/*/foo', flags = 0, ...)
+2015/05/01 13:25:35.75 chirp_server[11958] local: opendir(`//a')
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0x21b15e0
+2015/05/01 13:25:35.75 chirp_server[11958] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0x21b19e8 [name = `.']
+2015/05/01 13:25:35.75 chirp_server[11958] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0x21b19e8 [name = `..']
+2015/05/01 13:25:35.75 chirp_server[11958] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0x21b19e8 [name = `.__acl']
+2015/05/01 13:25:35.75 chirp_server[11958] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0x21b19e8 [name = `b']
+2015/05/01 13:25:35.75 chirp_server[11958] debug: search_match_file(`/*/foo', `/a/b')
+2015/05/01 13:25:35.75 chirp_server[11958] debug: fnmatch(`/*/foo', `/a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.75 chirp_server[11958] debug: fnmatch(`/*/foo', `a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.75 chirp_server[11958] debug: fnmatch(`/*/foo', `b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.75 chirp_server[11958] local: stat(`//a/b', 0x7fffa189c960)
+2015/05/01 13:25:35.75 chirp_server[11958] local: = 0
+2015/05/01 13:25:35.75 chirp_server[11958] debug: search_should_recurse(base = `/a/b', pattern = `/*/foo')
+2015/05/01 13:25:35.75 chirp_server[11958] debug: fnmatch(`/*/foo', `/a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.75 chirp_server[11958] debug: fnmatch(`/*', `/a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.75 chirp_server[11958] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.75 chirp_server[11958] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.75 chirp_server[11958] local: closedir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.75 chirp_server[11958] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.75 chirp_server[11958] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.75 chirp_server[11958] local: closedir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.75 chirp_server[11958] chirp: = -1 (Success)
+2015/05/01 13:25:35.77 chirp_server[11958] chirp: timeout: client idle too long
+2015/05/01 13:25:35.77 chirp_server[11958] debug: sending stats: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.77 chirp_server[11958] login: disconnected
+2015/05/01 13:25:35.77 chirp_server[11906] debug: config message: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.77 chirp_server[11958] tcp: disconnected from 127.0.0.1:56130
+2015/05/01 13:25:35.78 chirp_server[11906] process: pid 11958 exited with 0 (0 total child procs)
+2015/05/01 13:25:35.80 chirp_server[11906] tcp: got connection from 127.0.0.1:56131
+2015/05/01 13:25:35.80 chirp_server[11906] process: created pid 11962 (0 total child procs)
+2015/05/01 13:25:35.80 chirp_server[11906] tcp: disconnected from 127.0.0.1:56131
+2015/05/01 13:25:35.80 chirp_server[11962] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:35.80 chirp_server[11962] local: = 1
+2015/05/01 13:25:35.80 chirp_server[11962] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.80 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.80 chirp_server[11962] local: close(0)
+2015/05/01 13:25:35.80 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.80 chirp_server[11962] auth: 127.0.0.1:56131 requests 'unix' authentication
+2015/05/01 13:25:35.80 chirp_server[11962] auth: I agree to try 'unix'
+2015/05/01 13:25:35.80 chirp_server[11962] auth: unix: generating challenge
+2015/05/01 13:25:35.80 chirp_server[11962] auth: unix: challenge path is /tmp/challenge.11962.1804289383
+2015/05/01 13:25:35.80 chirp_server[11962] auth: unix: waiting for response
+2015/05/01 13:25:35.82 chirp_server[11962] auth: unix: got response
+2015/05/01 13:25:35.82 chirp_server[11962] auth: unix: client is uid 102744
+2015/05/01 13:25:35.82 chirp_server[11962] auth: unix: client is subject dthain
+2015/05/01 13:25:35.82 chirp_server[11962] auth: 'unix' authentication succeeded
+2015/05/01 13:25:35.82 chirp_server[11962] auth: 127.0.0.1:56131 is unix:dthain
+2015/05/01 13:25:35.82 chirp_server[11962] login: unix:dthain from 127.0.0.1:56131
+2015/05/01 13:25:35.82 chirp_server[11962] auth: hostname: registered
+2015/05/01 13:25:35.82 chirp_server[11962] auth: address: registered
+2015/05/01 13:25:35.82 chirp_server[11962] chirp: search /*/*/foo / 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: access(`/', 0x0)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: readlink(`/', 0x7fffa189eb90, 1024)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:35.82 chirp_server[11962] local: stat(`/', 0x7fffa189e2f0)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: pread(0, 0x21a2120, 65535, 0)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 11
+2015/05/01 13:25:35.82 chirp_server[11962] local: pread(0, 0x21a2120, 65535, 11)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: close(0)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] debug: cfs_basic_search(subject = `unix:dthain', dir = `/', pattern = `/*/*/foo', flags = 0, ...)
+2015/05/01 13:25:35.82 chirp_server[11962] debug: search_directory(subject = `unix:dthain', base = `', fullpath = `/', pattern = `/*/*/foo', flags = 0, ...)
+2015/05/01 13:25:35.82 chirp_server[11962] local: opendir(`/')
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21a9110
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21a9518 [name = `.']
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21a9518 [name = `..']
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21a9518 [name = `.__acl']
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21a9518 [name = `a']
+2015/05/01 13:25:35.82 chirp_server[11962] debug: search_match_file(`/*/*/foo', `/a')
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `/a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] local: stat(`//a', 0x7fffa189da40)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] debug: search_should_recurse(base = `/a', pattern = `/*/*/foo')
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `/a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*', `/a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*', `/a', FNM_PATHNAME) = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: open(`//a/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: pread(0, 0x21aa5f0, 65535, 0)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 11
+2015/05/01 13:25:35.82 chirp_server[11962] local: pread(0, 0x21aa5f0, 65535, 11)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: close(0)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] debug: search_directory(subject = `unix:dthain', base = `/a', fullpath = `//a', pattern = `/*/*/foo', flags = 0, ...)
+2015/05/01 13:25:35.82 chirp_server[11962] local: opendir(`//a')
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b15e0
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b19e8 [name = `.']
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b19e8 [name = `..']
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b19e8 [name = `.__acl']
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b19e8 [name = `b']
+2015/05/01 13:25:35.82 chirp_server[11962] debug: search_match_file(`/*/*/foo', `/a/b')
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `/a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] local: stat(`//a/b', 0x7fffa189c960)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] debug: search_should_recurse(base = `/a/b', pattern = `/*/*/foo')
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `/a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*', `/a/b', FNM_PATHNAME) = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: open(`//a/b/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: pread(0, 0x21b2ac0, 65535, 0)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 11
+2015/05/01 13:25:35.82 chirp_server[11962] local: pread(0, 0x21b2ac0, 65535, 11)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: close(0)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] debug: search_directory(subject = `unix:dthain', base = `/a/b', fullpath = `//a/b', pattern = `/*/*/foo', flags = 0, ...)
+2015/05/01 13:25:35.82 chirp_server[11962] local: opendir(`//a/b')
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b9ab0
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b9eb8 [name = `.']
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b9eb8 [name = `..']
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b9eb8 [name = `.__acl']
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b9eb8 [name = `bar']
+2015/05/01 13:25:35.82 chirp_server[11962] debug: search_match_file(`/*/*/foo', `/a/b/bar')
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `/a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] local: stat(`//a/b/bar', 0x7fffa189b880)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b9eb8 [name = `c']
+2015/05/01 13:25:35.82 chirp_server[11962] debug: search_match_file(`/*/*/foo', `/a/b/c')
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `/a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] local: stat(`//a/b/c', 0x7fffa189b880)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] debug: search_should_recurse(base = `/a/b/c', pattern = `/*/*/foo')
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `/a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*', `/a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*', `/a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0x21b9eb8 [name = `foo']
+2015/05/01 13:25:35.82 chirp_server[11962] debug: search_match_file(`/*/*/foo', `/a/b/foo')
+2015/05/01 13:25:35.82 chirp_server[11962] debug: fnmatch(`/*/*/foo', `/a/b/foo', FNM_PATHNAME) = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: stat(`//a/b/foo', 0x7fffa189b880)
+2015/05/01 13:25:35.82 chirp_server[11962] local: = 0
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.82 chirp_server[11962] local: closedir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.82 chirp_server[11962] local: closedir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.82 chirp_server[11962] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.82 chirp_server[11962] local: closedir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.82 chirp_server[11962] chirp: = -1 (Success)
+2015/05/01 13:25:35.85 chirp_server[11962] chirp: timeout: client idle too long
+2015/05/01 13:25:35.85 chirp_server[11906] debug: config message: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.85 chirp_server[11962] debug: sending stats: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.85 chirp_server[11962] login: disconnected
+2015/05/01 13:25:35.85 chirp_server[11962] tcp: disconnected from 127.0.0.1:56131
+2015/05/01 13:25:35.86 chirp_server[11906] process: pid 11962 exited with 0 (0 total child procs)
+2015/05/01 13:25:35.89 chirp_server[11906] tcp: got connection from 127.0.0.1:56132
+2015/05/01 13:25:35.89 chirp_server[11906] process: created pid 11968 (0 total child procs)
+2015/05/01 13:25:35.89 chirp_server[11906] tcp: disconnected from 127.0.0.1:56132
+2015/05/01 13:25:35.89 chirp_server[11968] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:25:35.89 chirp_server[11968] local: = 1
+2015/05/01 13:25:35.89 chirp_server[11968] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.89 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.89 chirp_server[11968] local: close(0)
+2015/05/01 13:25:35.89 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.89 chirp_server[11968] auth: 127.0.0.1:56132 requests 'unix' authentication
+2015/05/01 13:25:35.89 chirp_server[11968] auth: I agree to try 'unix'
+2015/05/01 13:25:35.89 chirp_server[11968] auth: unix: generating challenge
+2015/05/01 13:25:35.89 chirp_server[11968] auth: unix: challenge path is /tmp/challenge.11968.1804289383
+2015/05/01 13:25:35.89 chirp_server[11968] auth: unix: waiting for response
+2015/05/01 13:25:35.91 chirp_server[11968] auth: unix: got response
+2015/05/01 13:25:35.91 chirp_server[11968] auth: unix: client is uid 102744
+2015/05/01 13:25:35.91 chirp_server[11968] auth: unix: client is subject dthain
+2015/05/01 13:25:35.91 chirp_server[11968] auth: 'unix' authentication succeeded
+2015/05/01 13:25:35.91 chirp_server[11968] auth: 127.0.0.1:56132 is unix:dthain
+2015/05/01 13:25:35.91 chirp_server[11968] login: unix:dthain from 127.0.0.1:56132
+2015/05/01 13:25:35.91 chirp_server[11968] auth: hostname: registered
+2015/05/01 13:25:35.91 chirp_server[11968] auth: address: registered
+2015/05/01 13:25:35.91 chirp_server[11968] chirp: search */*r / 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: access(`/', 0x0)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: readlink(`/', 0x7fffa189eb90, 1024)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = -1 (errno = 22; `Invalid argument')
+2015/05/01 13:25:35.91 chirp_server[11968] local: stat(`/', 0x7fffa189e2f0)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: pread(0, 0x21a2120, 65535, 0)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 11
+2015/05/01 13:25:35.91 chirp_server[11968] local: pread(0, 0x21a2120, 65535, 11)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: close(0)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] debug: cfs_basic_search(subject = `unix:dthain', dir = `/', pattern = `*/*r', flags = 0, ...)
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_directory(subject = `unix:dthain', base = `', fullpath = `/', pattern = `*/*r', flags = 0, ...)
+2015/05/01 13:25:35.91 chirp_server[11968] local: opendir(`/')
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21a9110
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21a9518 [name = `.']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21a9518 [name = `..']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21a9518 [name = `.__acl']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21a9518 [name = `a']
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_match_file(`*/*r', `/a')
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `/a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `a', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] local: stat(`//a', 0x7fffa189da40)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_should_recurse(base = `/a', pattern = `*/*r')
+2015/05/01 13:25:35.91 chirp_server[11968] local: open(`//a/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: pread(0, 0x21aa5f0, 65535, 0)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 11
+2015/05/01 13:25:35.91 chirp_server[11968] local: pread(0, 0x21aa5f0, 65535, 11)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: close(0)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_directory(subject = `unix:dthain', base = `/a', fullpath = `//a', pattern = `*/*r', flags = 0, ...)
+2015/05/01 13:25:35.91 chirp_server[11968] local: opendir(`//a')
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b15e0
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b19e8 [name = `.']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b19e8 [name = `..']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b19e8 [name = `.__acl']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b19e8 [name = `b']
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_match_file(`*/*r', `/a/b')
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `/a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `a/b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `b', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] local: stat(`//a/b', 0x7fffa189c960)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_should_recurse(base = `/a/b', pattern = `*/*r')
+2015/05/01 13:25:35.91 chirp_server[11968] local: open(`//a/b/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: pread(0, 0x21b2ac0, 65535, 0)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 11
+2015/05/01 13:25:35.91 chirp_server[11968] local: pread(0, 0x21b2ac0, 65535, 11)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: close(0)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_directory(subject = `unix:dthain', base = `/a/b', fullpath = `//a/b', pattern = `*/*r', flags = 0, ...)
+2015/05/01 13:25:35.91 chirp_server[11968] local: opendir(`//a/b')
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b9ab0
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b9eb8 [name = `.']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b9eb8 [name = `..']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b9eb8 [name = `.__acl']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b9eb8 [name = `bar']
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_match_file(`*/*r', `/a/b/bar')
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `/a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `a/b/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `b/bar', FNM_PATHNAME) = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: stat(`//a/b/bar', 0x7fffa189b880)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b9eb8 [name = `c']
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_match_file(`*/*r', `/a/b/c')
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `/a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `a/b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `b/c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `c', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] local: stat(`//a/b/c', 0x7fffa189b880)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_should_recurse(base = `/a/b/c', pattern = `*/*r')
+2015/05/01 13:25:35.91 chirp_server[11968] local: open(`//a/b/c/.__acl', 0x0, 0o600)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: pread(0, 0x21baf90, 65535, 0)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 11
+2015/05/01 13:25:35.91 chirp_server[11968] local: pread(0, 0x21baf90, 65535, 11)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: close(0)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_directory(subject = `unix:dthain', base = `/a/b/c', fullpath = `//a/b/c', pattern = `*/*r', flags = 0, ...)
+2015/05/01 13:25:35.91 chirp_server[11968] local: opendir(`//a/b/c')
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21c1f80
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21c2388 [name = `.']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21c2388 [name = `..']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21c2388 [name = `.__acl']
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21c2388 [name = `bar']
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_match_file(`*/*r', `/a/b/c/bar')
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `/a/b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `a/b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `b/c/bar', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `c/bar', FNM_PATHNAME) = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: stat(`//a/b/c/bar', 0x7fffa189a7a0)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.91 chirp_server[11968] local: closedir(0x21c1f80 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b/c'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0x21b9eb8 [name = `foo']
+2015/05/01 13:25:35.91 chirp_server[11968] debug: search_match_file(`*/*r', `/a/b/foo')
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `/a/b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `a/b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `b/foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] debug: fnmatch(`*/*r', `foo', FNM_PATHNAME) = 1
+2015/05/01 13:25:35.91 chirp_server[11968] local: stat(`//a/b/foo', 0x7fffa189b880)
+2015/05/01 13:25:35.91 chirp_server[11968] local: = 0
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.91 chirp_server[11968] local: closedir(0x21b9ab0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a/b'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.91 chirp_server[11968] local: closedir(0x21b15e0 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/a'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: readdir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.91 chirp_server[11968] local: = NULL (errno = 0; `Success')
+2015/05/01 13:25:35.91 chirp_server[11968] local: closedir(0x21a9110 [`/afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures/'])
+2015/05/01 13:25:35.91 chirp_server[11968] chirp: = -1 (Success)
+2015/05/01 13:25:35.95 chirp_server[11968] chirp: timeout: client idle too long
+2015/05/01 13:25:35.95 chirp_server[11968] debug: sending stats: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.95 chirp_server[11968] login: disconnected
+2015/05/01 13:25:35.95 chirp_server[11906] debug: config message: stats 127.0.0.1 unix:dthain 1 0 0
+2015/05/01 13:25:35.95 chirp_server[11968] tcp: disconnected from 127.0.0.1:56132
+2015/05/01 13:25:35.95 chirp_server[11906] process: pid 11968 exited with 0 (0 total child procs)
+2015/05/01 13:30:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 13:30:33.00 chirp_server[13213] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:30:33.00 chirp_server[13213] local: = 1
+2015/05/01 13:30:33.00 chirp_server[13213] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:30:33.00 chirp_server[13213] local: = 0
+2015/05/01 13:30:33.00 chirp_server[13213] local: close(0)
+2015/05/01 13:30:33.00 chirp_server[13213] local: = 0
+2015/05/01 13:30:33.00 chirp_server[13213] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 13:30:33.00 chirp_server[13213] local: = 0
+2015/05/01 13:30:33.00 chirp_server[13213] dns: looking up name localhost
+2015/05/01 13:30:33.00 chirp_server[13213] dns: localhost is 127.0.0.1
+2015/05/01 13:30:33.00 chirp_server[13213] debug: sending update to localhost:9097
+2015/05/01 13:30:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 13:35:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 13:35:33.00 chirp_server[13275] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:35:33.00 chirp_server[13275] local: = 1
+2015/05/01 13:35:33.00 chirp_server[13275] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:35:33.00 chirp_server[13275] local: = 0
+2015/05/01 13:35:33.00 chirp_server[13275] local: close(0)
+2015/05/01 13:35:33.00 chirp_server[13275] local: = 0
+2015/05/01 13:35:33.00 chirp_server[13275] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 13:35:33.00 chirp_server[13275] local: = 0
+2015/05/01 13:35:33.00 chirp_server[13275] dns: looking up name localhost
+2015/05/01 13:35:33.00 chirp_server[13275] dns: localhost is 127.0.0.1
+2015/05/01 13:35:33.00 chirp_server[13275] debug: sending update to localhost:9097
+2015/05/01 13:35:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 13:40:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 13:40:33.00 chirp_server[13399] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:40:33.00 chirp_server[13399] local: = 1
+2015/05/01 13:40:33.00 chirp_server[13399] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:40:33.00 chirp_server[13399] local: = 0
+2015/05/01 13:40:33.00 chirp_server[13399] local: close(0)
+2015/05/01 13:40:33.00 chirp_server[13399] local: = 0
+2015/05/01 13:40:33.00 chirp_server[13399] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 13:40:33.00 chirp_server[13399] local: = 0
+2015/05/01 13:40:33.00 chirp_server[13399] dns: looking up name localhost
+2015/05/01 13:40:33.00 chirp_server[13399] dns: localhost is 127.0.0.1
+2015/05/01 13:40:33.00 chirp_server[13399] debug: sending update to localhost:9097
+2015/05/01 13:40:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 13:45:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 13:45:33.00 chirp_server[13453] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:45:33.00 chirp_server[13453] local: = 1
+2015/05/01 13:45:33.00 chirp_server[13453] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:45:33.00 chirp_server[13453] local: = 0
+2015/05/01 13:45:33.00 chirp_server[13453] local: close(0)
+2015/05/01 13:45:33.00 chirp_server[13453] local: = 0
+2015/05/01 13:45:33.00 chirp_server[13453] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 13:45:33.00 chirp_server[13453] local: = 0
+2015/05/01 13:45:33.00 chirp_server[13453] dns: looking up name localhost
+2015/05/01 13:45:33.00 chirp_server[13453] dns: localhost is 127.0.0.1
+2015/05/01 13:45:33.00 chirp_server[13453] debug: sending update to localhost:9097
+2015/05/01 13:45:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 13:50:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 13:50:33.00 chirp_server[13487] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:50:33.00 chirp_server[13487] local: = 1
+2015/05/01 13:50:33.00 chirp_server[13487] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:50:33.00 chirp_server[13487] local: = 0
+2015/05/01 13:50:33.00 chirp_server[13487] local: close(0)
+2015/05/01 13:50:33.00 chirp_server[13487] local: = 0
+2015/05/01 13:50:33.00 chirp_server[13487] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 13:50:33.00 chirp_server[13487] local: = 0
+2015/05/01 13:50:33.00 chirp_server[13487] dns: looking up name localhost
+2015/05/01 13:50:33.00 chirp_server[13487] dns: localhost is 127.0.0.1
+2015/05/01 13:50:33.00 chirp_server[13487] debug: sending update to localhost:9097
+2015/05/01 13:50:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 13:55:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 13:55:33.00 chirp_server[13519] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 13:55:33.00 chirp_server[13519] local: = 1
+2015/05/01 13:55:33.00 chirp_server[13519] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 13:55:33.00 chirp_server[13519] local: = 0
+2015/05/01 13:55:33.00 chirp_server[13519] local: close(0)
+2015/05/01 13:55:33.00 chirp_server[13519] local: = 0
+2015/05/01 13:55:33.00 chirp_server[13519] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 13:55:33.00 chirp_server[13519] local: = 0
+2015/05/01 13:55:33.00 chirp_server[13519] dns: looking up name localhost
+2015/05/01 13:55:33.00 chirp_server[13519] dns: localhost is 127.0.0.1
+2015/05/01 13:55:33.00 chirp_server[13519] debug: sending update to localhost:9097
+2015/05/01 13:55:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:00:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:00:33.00 chirp_server[16954] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:00:33.00 chirp_server[16954] local: = 1
+2015/05/01 14:00:33.00 chirp_server[16954] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:00:33.00 chirp_server[16954] local: = 0
+2015/05/01 14:00:33.00 chirp_server[16954] local: close(0)
+2015/05/01 14:00:33.00 chirp_server[16954] local: = 0
+2015/05/01 14:00:33.00 chirp_server[16954] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:00:33.00 chirp_server[16954] local: = 0
+2015/05/01 14:00:33.00 chirp_server[16954] dns: looking up name localhost
+2015/05/01 14:00:33.00 chirp_server[16954] dns: localhost is 127.0.0.1
+2015/05/01 14:00:33.00 chirp_server[16954] debug: sending update to localhost:9097
+2015/05/01 14:00:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:05:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:05:33.00 chirp_server[18872] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:05:33.00 chirp_server[18872] local: = 1
+2015/05/01 14:05:33.00 chirp_server[18872] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:05:33.00 chirp_server[18872] local: = 0
+2015/05/01 14:05:33.00 chirp_server[18872] local: close(0)
+2015/05/01 14:05:33.00 chirp_server[18872] local: = 0
+2015/05/01 14:05:33.00 chirp_server[18872] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:05:33.00 chirp_server[18872] local: = 0
+2015/05/01 14:05:33.00 chirp_server[18872] dns: looking up name localhost
+2015/05/01 14:05:33.00 chirp_server[18872] dns: localhost is 127.0.0.1
+2015/05/01 14:05:33.00 chirp_server[18872] debug: sending update to localhost:9097
+2015/05/01 14:05:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:10:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:10:33.00 chirp_server[18907] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:10:33.00 chirp_server[18907] local: = 1
+2015/05/01 14:10:33.00 chirp_server[18907] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:10:33.00 chirp_server[18907] local: = 0
+2015/05/01 14:10:33.00 chirp_server[18907] local: close(0)
+2015/05/01 14:10:33.00 chirp_server[18907] local: = 0
+2015/05/01 14:10:33.00 chirp_server[18907] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:10:33.00 chirp_server[18907] local: = 0
+2015/05/01 14:10:33.00 chirp_server[18907] dns: looking up name localhost
+2015/05/01 14:10:33.00 chirp_server[18907] dns: localhost is 127.0.0.1
+2015/05/01 14:10:33.00 chirp_server[18907] debug: sending update to localhost:9097
+2015/05/01 14:10:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:15:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:15:33.00 chirp_server[18954] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:15:33.00 chirp_server[18954] local: = 1
+2015/05/01 14:15:33.00 chirp_server[18954] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:15:33.00 chirp_server[18954] local: = 0
+2015/05/01 14:15:33.00 chirp_server[18954] local: close(0)
+2015/05/01 14:15:33.00 chirp_server[18954] local: = 0
+2015/05/01 14:15:33.00 chirp_server[18954] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:15:33.00 chirp_server[18954] local: = 0
+2015/05/01 14:15:33.00 chirp_server[18954] dns: looking up name localhost
+2015/05/01 14:15:33.00 chirp_server[18954] dns: localhost is 127.0.0.1
+2015/05/01 14:15:33.00 chirp_server[18954] debug: sending update to localhost:9097
+2015/05/01 14:15:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:20:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:20:33.00 chirp_server[18987] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:20:33.00 chirp_server[18987] local: = 1
+2015/05/01 14:20:33.00 chirp_server[18987] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:20:33.00 chirp_server[18987] local: = 0
+2015/05/01 14:20:33.00 chirp_server[18987] local: close(0)
+2015/05/01 14:20:33.00 chirp_server[18987] local: = 0
+2015/05/01 14:20:33.00 chirp_server[18987] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:20:33.00 chirp_server[18987] local: = 0
+2015/05/01 14:20:33.00 chirp_server[18987] dns: looking up name localhost
+2015/05/01 14:20:33.00 chirp_server[18987] dns: localhost is 127.0.0.1
+2015/05/01 14:20:33.00 chirp_server[18987] debug: sending update to localhost:9097
+2015/05/01 14:20:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:25:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:25:33.00 chirp_server[19016] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:25:33.00 chirp_server[19016] local: = 1
+2015/05/01 14:25:33.00 chirp_server[19016] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:25:33.00 chirp_server[19016] local: = 0
+2015/05/01 14:25:33.00 chirp_server[19016] local: close(0)
+2015/05/01 14:25:33.00 chirp_server[19016] local: = 0
+2015/05/01 14:25:33.00 chirp_server[19016] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:25:33.00 chirp_server[19016] local: = 0
+2015/05/01 14:25:33.00 chirp_server[19016] dns: looking up name localhost
+2015/05/01 14:25:33.00 chirp_server[19016] dns: localhost is 127.0.0.1
+2015/05/01 14:25:33.00 chirp_server[19016] debug: sending update to localhost:9097
+2015/05/01 14:25:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:30:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:30:33.00 chirp_server[19067] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:30:33.00 chirp_server[19067] local: = 1
+2015/05/01 14:30:33.00 chirp_server[19067] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:30:33.00 chirp_server[19067] local: = 0
+2015/05/01 14:30:33.00 chirp_server[19067] local: close(0)
+2015/05/01 14:30:33.00 chirp_server[19067] local: = 0
+2015/05/01 14:30:33.00 chirp_server[19067] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:30:33.00 chirp_server[19067] local: = 0
+2015/05/01 14:30:33.00 chirp_server[19067] dns: looking up name localhost
+2015/05/01 14:30:33.00 chirp_server[19067] dns: localhost is 127.0.0.1
+2015/05/01 14:30:33.00 chirp_server[19067] debug: sending update to localhost:9097
+2015/05/01 14:30:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:35:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:35:33.00 chirp_server[19095] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:35:33.00 chirp_server[19095] local: = 1
+2015/05/01 14:35:33.00 chirp_server[19095] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:35:33.00 chirp_server[19095] local: = 0
+2015/05/01 14:35:33.00 chirp_server[19095] local: close(0)
+2015/05/01 14:35:33.00 chirp_server[19095] local: = 0
+2015/05/01 14:35:33.00 chirp_server[19095] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:35:33.00 chirp_server[19095] local: = 0
+2015/05/01 14:35:33.00 chirp_server[19095] dns: looking up name localhost
+2015/05/01 14:35:33.00 chirp_server[19095] dns: localhost is 127.0.0.1
+2015/05/01 14:35:33.00 chirp_server[19095] debug: sending update to localhost:9097
+2015/05/01 14:35:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:40:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:40:33.00 chirp_server[19128] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:40:33.00 chirp_server[19128] local: = 1
+2015/05/01 14:40:33.00 chirp_server[19128] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:40:33.00 chirp_server[19128] local: = 0
+2015/05/01 14:40:33.00 chirp_server[19128] local: close(0)
+2015/05/01 14:40:33.00 chirp_server[19128] local: = 0
+2015/05/01 14:40:33.00 chirp_server[19128] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:40:33.00 chirp_server[19128] local: = 0
+2015/05/01 14:40:33.00 chirp_server[19128] dns: looking up name localhost
+2015/05/01 14:40:33.00 chirp_server[19128] dns: localhost is 127.0.0.1
+2015/05/01 14:40:33.00 chirp_server[19128] debug: sending update to localhost:9097
+2015/05/01 14:40:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:45:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:45:33.00 chirp_server[19175] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:45:33.00 chirp_server[19175] local: = 1
+2015/05/01 14:45:33.00 chirp_server[19175] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:45:33.00 chirp_server[19175] local: = 0
+2015/05/01 14:45:33.00 chirp_server[19175] local: close(0)
+2015/05/01 14:45:33.00 chirp_server[19175] local: = 0
+2015/05/01 14:45:33.00 chirp_server[19175] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:45:33.00 chirp_server[19175] local: = 0
+2015/05/01 14:45:33.00 chirp_server[19175] dns: looking up name localhost
+2015/05/01 14:45:33.00 chirp_server[19175] dns: localhost is 127.0.0.1
+2015/05/01 14:45:33.00 chirp_server[19175] debug: sending update to localhost:9097
+2015/05/01 14:45:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:50:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:50:33.00 chirp_server[19210] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:50:33.00 chirp_server[19210] local: = 1
+2015/05/01 14:50:33.00 chirp_server[19210] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:50:33.00 chirp_server[19210] local: = 0
+2015/05/01 14:50:33.00 chirp_server[19210] local: close(0)
+2015/05/01 14:50:33.00 chirp_server[19210] local: = 0
+2015/05/01 14:50:33.00 chirp_server[19210] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:50:33.00 chirp_server[19210] local: = 0
+2015/05/01 14:50:33.00 chirp_server[19210] dns: looking up name localhost
+2015/05/01 14:50:33.00 chirp_server[19210] dns: localhost is 127.0.0.1
+2015/05/01 14:50:33.00 chirp_server[19210] debug: sending update to localhost:9097
+2015/05/01 14:50:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 14:55:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 14:55:33.00 chirp_server[19239] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 14:55:33.00 chirp_server[19239] local: = 1
+2015/05/01 14:55:33.00 chirp_server[19239] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 14:55:33.00 chirp_server[19239] local: = 0
+2015/05/01 14:55:33.00 chirp_server[19239] local: close(0)
+2015/05/01 14:55:33.00 chirp_server[19239] local: = 0
+2015/05/01 14:55:33.00 chirp_server[19239] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 14:55:33.00 chirp_server[19239] local: = 0
+2015/05/01 14:55:33.00 chirp_server[19239] dns: looking up name localhost
+2015/05/01 14:55:33.00 chirp_server[19239] dns: localhost is 127.0.0.1
+2015/05/01 14:55:33.00 chirp_server[19239] debug: sending update to localhost:9097
+2015/05/01 14:55:33.00 chirp_server[11906] process: *** catalog update complete ***
+2015/05/01 15:00:33.00 chirp_server[11906] process: *** catalog update starting ***
+2015/05/01 15:00:33.00 chirp_server[19303] local: init(`local:///afs/nd.edu/user37/ccl/work/dthain/cctools/parrot/test/fixtures')
+2015/05/01 15:00:33.00 chirp_server[19303] local: = 1
+2015/05/01 15:00:33.00 chirp_server[19303] local: open(`//.__acl', 0x0, 0o600)
+2015/05/01 15:00:33.00 chirp_server[19303] local: = 0
+2015/05/01 15:00:33.00 chirp_server[19303] local: close(0)
+2015/05/01 15:00:33.00 chirp_server[19303] local: = 0
+2015/05/01 15:00:33.00 chirp_server[19303] local: statfs(`/', 0x7fffa18b12a0)
+2015/05/01 15:00:33.00 chirp_server[19303] local: = 0
+2015/05/01 15:00:33.00 chirp_server[19303] dns: looking up name localhost
+2015/05/01 15:00:33.00 chirp_server[19303] dns: localhost is 127.0.0.1
+2015/05/01 15:00:33.00 chirp_server[19303] debug: sending update to localhost:9097
+2015/05/01 15:00:33.00 chirp_server[11906] process: *** catalog update complete ***

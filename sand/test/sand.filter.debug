@@ -1,0 +1,118 @@
+2015/05/01 13:25:09.85 sand_filter_master[10157] debug: sand_filter_master version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 13:25:09.85 sand_filter_master[10157] debug: Built by dthain@cclws15 on May  1 2015 at 12:43:12
+2015/05/01 13:25:09.85 sand_filter_master[10157] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 13:25:09.85 sand_filter_master[10157] debug: Configuration:
+2015/05/01 13:25:09.86 sand_filter_master[10157] tcp: listening on port 1033
+2015/05/01 13:25:09.86 sand_filter_master[10157] wq: Work Queue is listening on port 1033.
+2015/05/01 13:25:09.87 sand_filter_master[10157] debug: rectangle size: 10
+2015/05/01 13:25:09.88 sand_filter_master[10157] debug: Rectangle 0 has been created.
+2015/05/01 13:25:09.89 sand_filter_master[10157] debug: Rectangle 1 has been created.
+2015/05/01 13:25:09.89 sand_filter_master[10157] debug: Sequence loaded.
+2015/05/01 13:25:09.89 sand_filter_master[10157] debug: Submitted task for rectangle (0, 0)
+2015/05/01 13:25:09.89 sand_filter_master[10157] debug: Submitted task for rectangle (0, 1)
+2015/05/01 13:25:09.89 sand_filter_master[10157] debug: Submitted task for rectangle (1, 1)
+2015/05/01 13:25:10.85 sand_filter_master[10157] tcp: got connection from 127.0.0.1:56110
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: worker 127.0.0.1:56110 connected
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: workers status -- total: 1, active: 0, available: 0.
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: 1 workers are connected in total now
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: rx from unknown (127.0.0.1:56110): workqueue 3 cclws15.cse.nd.edu Linux x86_64 4.4.0-TRUNK
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: workers status -- total: 1, active: 1, available: 0.
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) running CCTools version 4.4.0-TRUNK on Linux (operating system) with architecture x86_64 is ready
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): resource workers 0 0 1 1 1
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): resource disk 0 0 42214 42214 42214
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): resource memory 0 0 2364 2364 2364
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): resource gpus 0 0 0 0 0
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): resource unlabeled 0 0 0 0 0
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): resource cores 0 0 1 1 1
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): resource tag 0
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: workers status -- total: 1, active: 1, available: 0.
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) needs file ../src/sand_filter_kernel bytes 0:151520 as 'file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel'
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) will try up to 10 seconds to transfer this 0.15 MB file.
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): put file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel 151520 0755 1
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) received 0.15 MB in 0.00s (479.49s MB/s) average 479.49s MB/s
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) needs file test.cand.filter.tmp/rect000.cfa bytes 0:2371 as 'file-f491ecc54af61fd81da89208df308fc9-rect000.cfa'
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): put file-f491ecc54af61fd81da89208df308fc9-rect000.cfa 2371 0644 1
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) received 0.00 MB in 0.00s (16.02s MB/s) average 331.66s MB/s
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): task 1
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): cmd 50
+./sand_filter_kernel -k 22 -w 22 -s d rect000.cfa
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): cores -1
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): memory -1
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): disk -1
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): gpus -1
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): infile file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel sand_filter_kernel 1
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): infile file-f491ecc54af61fd81da89208df308fc9-rect000.cfa rect000.cfa 1
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): end
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) busy on './sand_filter_kernel -k 22 -w 22 -s d rect000.cfa '
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): info end_of_resource_update 0
+2015/05/01 13:25:10.85 sand_filter_master[10157] wq: Receiving end_of_resource_update info from worker (127.0.0.1:56110)
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): available_results
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): send_results -1
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: Reading result(s) from cclws15.cse.nd.edu (127.0.0.1:56110)
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): result 0 0 0 4662 1
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): end
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): kill 1
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) done in 0.01s total tasks 1 average 0.00s
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: workers status -- total: 1, active: 1, available: 0.
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) needs file test.cand.filter.tmp/rect001.cfa bytes 0:2381 as 'file-6c16355c17d1a4d10db23862aa52e0eb-rect001.cfa'
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): put file-6c16355c17d1a4d10db23862aa52e0eb-rect001.cfa 2381 0644 1
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) received 0.00 MB in 0.00s (16.89s MB/s) average 255.76s MB/s
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): task 2
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): cmd 61
+./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa rect000.cfa
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): cores -1
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): memory -1
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): disk -1
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): gpus -1
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): infile file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel sand_filter_kernel 1
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): infile file-6c16355c17d1a4d10db23862aa52e0eb-rect001.cfa rect001.cfa 1
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): infile file-f491ecc54af61fd81da89208df308fc9-rect000.cfa rect000.cfa 1
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): end
+2015/05/01 13:25:10.86 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) busy on './sand_filter_kernel -k 22 -w 22 -s d rect001.cfa rect000.cfa'
+2015/05/01 13:25:10.86 sand_filter_master[10157] debug: task complete: 000-000: ./sand_filter_kernel -k 22 -w 22 -s d rect000.cfa
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): available_results
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): send_results -1
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: Reading result(s) from cclws15.cse.nd.edu (127.0.0.1:56110)
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): result 0 0 388 5605 2
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: Receiving stdout of task 2 (size: 388 bytes) from 127.0.0.1:56110 (cclws15.cse.nd.edu) ...
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) using conservative default average transfer rate of 1.00 MB/s
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: Retrieved 388 bytes from cclws15.cse.nd.edu (127.0.0.1:56110)
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): end
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): kill 2
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) done in 0.01s total tasks 2 average 0.01s
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: workers status -- total: 1, active: 1, available: 0.
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): task 3
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): cmd 50
+./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): cores -1
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): memory -1
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): disk -1
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): gpus -1
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): infile file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel sand_filter_kernel 1
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): infile file-6c16355c17d1a4d10db23862aa52e0eb-rect001.cfa rect001.cfa 1
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): end
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) busy on './sand_filter_kernel -k 22 -w 22 -s d rect001.cfa '
+2015/05/01 13:25:10.87 sand_filter_master[10157] debug: task complete: 000-001: ./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa rect000.cfa
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): available_results
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): send_results -1
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: Reading result(s) from cclws15.cse.nd.edu (127.0.0.1:56110)
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): result 0 0 0 4636 3
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: rx from cclws15.cse.nd.edu (127.0.0.1:56110): end
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): kill 3
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: cclws15.cse.nd.edu (127.0.0.1:56110) done in 0.01s total tasks 3 average 0.00s
+2015/05/01 13:25:10.87 sand_filter_master[10157] debug: task complete: 001-001: ./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: tx to cclws15.cse.nd.edu (127.0.0.1:56110): release
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: worker cclws15.cse.nd.edu (127.0.0.1:56110) removed
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: workers status -- total: 0, active: 0, available: 0.
+2015/05/01 13:25:10.87 sand_filter_master[10157] tcp: disconnected from 127.0.0.1:56110
+2015/05/01 13:25:10.87 sand_filter_master[10157] wq: 0 workers are connected in total now

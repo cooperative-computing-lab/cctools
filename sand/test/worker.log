@@ -1,0 +1,314 @@
+2015/05/01 13:25:09.66 work_queue_worker[10130] debug: /afs/nd.edu/user18/dthain/work/cctools/work_queue/src/work_queue_worker version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 13:25:09.66 work_queue_worker[10130] debug: Built by dthain@cclws15 on May  1 2015 at 12:43:12
+2015/05/01 13:25:09.66 work_queue_worker[10130] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 13:25:09.66 work_queue_worker[10130] debug: Configuration:
+2015/05/01 13:25:09.66 work_queue_worker[10130] wq: WORK_QUEUE_SANDBOX set to /tmp/worker-102744-10130.
+2015/05/01 13:25:09.67 work_queue_worker[10130] dns: looking up name localhost
+2015/05/01 13:25:09.67 work_queue_worker[10130] dns: localhost is 127.0.0.1
+2015/05/01 13:25:09.67 work_queue_worker[10130] tcp: connecting to 127.0.0.1:9000
+2015/05/01 13:25:09.67 work_queue_worker[10130] tcp: made connection to 127.0.0.1:9000
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: connected to master localhost:9000
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: preparing workspace /tmp/worker-102744-10130
+2015/05/01 13:25:09.67 work_queue_worker[10130] dns: looking up name cclws15
+2015/05/01 13:25:09.67 work_queue_worker[10130] dns: cclws15 is 129.74.155.71
+2015/05/01 13:25:09.67 work_queue_worker[10130] dns: looking up addr 129.74.155.71
+2015/05/01 13:25:09.67 work_queue_worker[10130] dns: 129.74.155.71 is cclws15.cse.nd.edu
+2015/05/01 13:25:09.67 work_queue_worker[10130] dns: finding my hostname: uname = cclws15, address = 129.74.155.71, hostname = cclws15.cse.nd.edu
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: tx to master: workqueue 3 cclws15.cse.nd.edu Linux x86_64 4.4.0-TRUNK
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: Sending resource description to master:
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq:  workers      0 inuse      0 committed      1 total      1 smallest      1 largest
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq:     disk      0 inuse      0 committed  42214 total  42214 smallest  42214 largest
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq:   memory      0 inuse      0 committed   2364 total   2364 smallest   2364 largest
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq:     gpus      0 inuse      0 committed      0 total      0 smallest      0 largest
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: unlabeled      0 inuse      0 committed      0 total      0 smallest      0 largest
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq:    cores      0 inuse      0 committed      1 total      1 smallest      1 largest
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: tx to master: info end_of_resource_update 0
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: working for master at 127.0.0.1:9000.
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: put file-4d0a10eac03a0c513458be13b030008b-sand_filter_kernel 161337 0755 1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: Putting file file-4d0a10eac03a0c513458be13b030008b-sand_filter_kernel into workspace
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: put file-ba1fc8bb11ee162a4463ec0acdbbab22-rect000.cfa 3892 0644 1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: Putting file file-ba1fc8bb11ee162a4463ec0acdbbab22-rect000.cfa into workspace
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: task 1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: cmd 50
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: ./sand_filter_kernel -k 22 -w 22 -s d rect000.cfa
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: cores -1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: memory -1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: disk -1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: gpus -1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: infile file-4d0a10eac03a0c513458be13b030008b-sand_filter_kernel sand_filter_kernel 1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: infile file-ba1fc8bb11ee162a4463ec0acdbbab22-rect000.cfa rect000.cfa 1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: end
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: linking cache/file-4d0a10eac03a0c513458be13b030008b-sand_filter_kernel to t.1/sand_filter_kernel
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: linking cache/file-ba1fc8bb11ee162a4463ec0acdbbab22-rect000.cfa to t.1/rect000.cfa
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: started process 10134: ./sand_filter_kernel -k 22 -w 22 -s d rect000.cfa
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: task 1 (pid 10134) exited normally with exit code 0
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: tx to master: available_results
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: send_results -1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: tx to master: result 0 0 11062 5548 1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: tx to master: end
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: kill 1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: put file-01a24212e9a3455055504a4f2903e3a4-rect001.cfa 4092 0644 1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: Putting file file-01a24212e9a3455055504a4f2903e3a4-rect001.cfa into workspace
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: task 2
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: cmd 61
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: ./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa rect000.cfa
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: cores -1
+2015/05/01 13:25:09.67 work_queue_worker[10130] wq: rx from master: memory -1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: disk -1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: gpus -1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: infile file-4d0a10eac03a0c513458be13b030008b-sand_filter_kernel sand_filter_kernel 1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: infile file-01a24212e9a3455055504a4f2903e3a4-rect001.cfa rect001.cfa 1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: infile file-ba1fc8bb11ee162a4463ec0acdbbab22-rect000.cfa rect000.cfa 1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: end
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: linking cache/file-4d0a10eac03a0c513458be13b030008b-sand_filter_kernel to t.2/sand_filter_kernel
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: linking cache/file-01a24212e9a3455055504a4f2903e3a4-rect001.cfa to t.2/rect001.cfa
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: linking cache/file-ba1fc8bb11ee162a4463ec0acdbbab22-rect000.cfa to t.2/rect000.cfa
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: started process 10135: ./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa rect000.cfa
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: task 2 (pid 10135) exited normally with exit code 0
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: tx to master: available_results
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: send_results -1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: tx to master: result 0 0 25013 7362 2
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: tx to master: end
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: kill 2
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: task 3
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: cmd 50
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: ./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: cores -1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: memory -1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: disk -1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: gpus -1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: infile file-4d0a10eac03a0c513458be13b030008b-sand_filter_kernel sand_filter_kernel 1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: infile file-01a24212e9a3455055504a4f2903e3a4-rect001.cfa rect001.cfa 1
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: rx from master: end
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: linking cache/file-4d0a10eac03a0c513458be13b030008b-sand_filter_kernel to t.3/sand_filter_kernel
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: linking cache/file-01a24212e9a3455055504a4f2903e3a4-rect001.cfa to t.3/rect001.cfa
+2015/05/01 13:25:09.68 work_queue_worker[10130] wq: started process 10136: ./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa
+2015/05/01 13:25:09.69 work_queue_worker[10130] wq: task 3 (pid 10136) exited normally with exit code 0
+2015/05/01 13:25:09.69 work_queue_worker[10130] wq: tx to master: available_results
+2015/05/01 13:25:09.69 work_queue_worker[10130] wq: rx from master: send_results -1
+2015/05/01 13:25:09.69 work_queue_worker[10130] wq: tx to master: result 0 0 13742 5469 3
+2015/05/01 13:25:09.69 work_queue_worker[10130] wq: tx to master: end
+2015/05/01 13:25:09.69 work_queue_worker[10130] wq: rx from master: kill 3
+2015/05/01 13:25:09.70 work_queue_worker[10130] wq: rx from master: release
+2015/05/01 13:25:09.70 work_queue_worker[10130] wq: released by master 127.0.0.1:9000.
+2015/05/01 13:25:09.70 work_queue_worker[10130] wq: cleaning workspace /tmp/worker-102744-10130
+2015/05/01 13:25:09.70 work_queue_worker[10130] wq: disconnecting from master 127.0.0.1:9000
+2015/05/01 13:25:09.70 work_queue_worker[10130] tcp: disconnected from 127.0.0.1:9000
+2015/05/01 13:25:09.70 work_queue_worker[10130] wq: killing all outstanding tasks
+2015/05/01 13:25:09.70 work_queue_worker[10130] wq: all data structures are clean
+2015/05/01 13:25:09.70 work_queue_worker[10130] notice: stopping: single shot mode
+2015/05/01 13:25:10.85 work_queue_worker[10161] debug: /afs/nd.edu/user18/dthain/work/cctools/work_queue/src/work_queue_worker version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 13:25:10.85 work_queue_worker[10161] debug: Built by dthain@cclws15 on May  1 2015 at 12:43:12
+2015/05/01 13:25:10.85 work_queue_worker[10161] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 13:25:10.85 work_queue_worker[10161] debug: Configuration:
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: WORK_QUEUE_SANDBOX set to /tmp/worker-102744-10161.
+2015/05/01 13:25:10.85 work_queue_worker[10161] dns: looking up name localhost
+2015/05/01 13:25:10.85 work_queue_worker[10161] dns: localhost is 127.0.0.1
+2015/05/01 13:25:10.85 work_queue_worker[10161] tcp: connecting to 127.0.0.1:1033
+2015/05/01 13:25:10.85 work_queue_worker[10161] tcp: made connection to 127.0.0.1:1033
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: connected to master localhost:1033
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: preparing workspace /tmp/worker-102744-10161
+2015/05/01 13:25:10.85 work_queue_worker[10161] dns: looking up name cclws15
+2015/05/01 13:25:10.85 work_queue_worker[10161] dns: cclws15 is 129.74.155.71
+2015/05/01 13:25:10.85 work_queue_worker[10161] dns: looking up addr 129.74.155.71
+2015/05/01 13:25:10.85 work_queue_worker[10161] dns: 129.74.155.71 is cclws15.cse.nd.edu
+2015/05/01 13:25:10.85 work_queue_worker[10161] dns: finding my hostname: uname = cclws15, address = 129.74.155.71, hostname = cclws15.cse.nd.edu
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: tx to master: workqueue 3 cclws15.cse.nd.edu Linux x86_64 4.4.0-TRUNK
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: Sending resource description to master:
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq:  workers      0 inuse      0 committed      1 total      1 smallest      1 largest
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq:     disk      0 inuse      0 committed  42214 total  42214 smallest  42214 largest
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq:   memory      0 inuse      0 committed   2364 total   2364 smallest   2364 largest
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq:     gpus      0 inuse      0 committed      0 total      0 smallest      0 largest
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: unlabeled      0 inuse      0 committed      0 total      0 smallest      0 largest
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq:    cores      0 inuse      0 committed      1 total      1 smallest      1 largest
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: tx to master: info end_of_resource_update 0
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: working for master at 127.0.0.1:1033.
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: put file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel 151520 0755 1
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: Putting file file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel into workspace
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: put file-f491ecc54af61fd81da89208df308fc9-rect000.cfa 2371 0644 1
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: Putting file file-f491ecc54af61fd81da89208df308fc9-rect000.cfa into workspace
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: task 1
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: cmd 50
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: ./sand_filter_kernel -k 22 -w 22 -s d rect000.cfa
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: cores -1
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: memory -1
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: disk -1
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: gpus -1
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: infile file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel sand_filter_kernel 1
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: infile file-f491ecc54af61fd81da89208df308fc9-rect000.cfa rect000.cfa 1
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: rx from master: end
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: linking cache/file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel to t.1/sand_filter_kernel
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: linking cache/file-f491ecc54af61fd81da89208df308fc9-rect000.cfa to t.1/rect000.cfa
+2015/05/01 13:25:10.85 work_queue_worker[10161] wq: started process 10165: ./sand_filter_kernel -k 22 -w 22 -s d rect000.cfa
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: task 1 (pid 10165) exited normally with exit code 0
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: tx to master: available_results
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: send_results -1
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: tx to master: result 0 0 0 4662 1
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: tx to master: end
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: kill 1
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: put file-6c16355c17d1a4d10db23862aa52e0eb-rect001.cfa 2381 0644 1
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: Putting file file-6c16355c17d1a4d10db23862aa52e0eb-rect001.cfa into workspace
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: task 2
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: cmd 61
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: ./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa rect000.cfa
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: cores -1
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: memory -1
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: disk -1
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: gpus -1
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: infile file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel sand_filter_kernel 1
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: infile file-6c16355c17d1a4d10db23862aa52e0eb-rect001.cfa rect001.cfa 1
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: infile file-f491ecc54af61fd81da89208df308fc9-rect000.cfa rect000.cfa 1
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: rx from master: end
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: linking cache/file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel to t.2/sand_filter_kernel
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: linking cache/file-6c16355c17d1a4d10db23862aa52e0eb-rect001.cfa to t.2/rect001.cfa
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: linking cache/file-f491ecc54af61fd81da89208df308fc9-rect000.cfa to t.2/rect000.cfa
+2015/05/01 13:25:10.86 work_queue_worker[10161] wq: started process 10166: ./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa rect000.cfa
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: task 2 (pid 10166) exited normally with exit code 0
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: tx to master: available_results
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: send_results -1
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: tx to master: result 0 0 388 5605 2
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: tx to master: end
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: kill 2
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: task 3
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: cmd 50
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: ./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: cores -1
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: memory -1
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: disk -1
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: gpus -1
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: infile file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel sand_filter_kernel 1
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: infile file-6c16355c17d1a4d10db23862aa52e0eb-rect001.cfa rect001.cfa 1
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: end
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: linking cache/file-81ba0c0ef4525ce58d4a600aad1a9cab-sand_filter_kernel to t.3/sand_filter_kernel
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: linking cache/file-6c16355c17d1a4d10db23862aa52e0eb-rect001.cfa to t.3/rect001.cfa
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: started process 10167: ./sand_filter_kernel -k 22 -w 22 -s d rect001.cfa
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: task 3 (pid 10167) exited normally with exit code 0
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: tx to master: available_results
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: send_results -1
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: tx to master: result 0 0 0 4636 3
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: tx to master: end
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: kill 3
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: rx from master: release
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: released by master 127.0.0.1:1033.
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: cleaning workspace /tmp/worker-102744-10161
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: disconnecting from master 127.0.0.1:1033
+2015/05/01 13:25:10.87 work_queue_worker[10161] tcp: disconnected from 127.0.0.1:1033
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: killing all outstanding tasks
+2015/05/01 13:25:10.87 work_queue_worker[10161] wq: all data structures are clean
+2015/05/01 13:25:10.87 work_queue_worker[10161] notice: stopping: single shot mode
+2015/05/01 13:25:11.90 work_queue_worker[10174] debug: /afs/nd.edu/user18/dthain/work/cctools/work_queue/src/work_queue_worker version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 13:25:11.90 work_queue_worker[10174] debug: Built by dthain@cclws15 on May  1 2015 at 12:43:12
+2015/05/01 13:25:11.90 work_queue_worker[10174] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 13:25:11.90 work_queue_worker[10174] debug: Configuration:
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: WORK_QUEUE_SANDBOX set to /tmp/worker-102744-10174.
+2015/05/01 13:25:11.90 work_queue_worker[10174] dns: looking up name localhost
+2015/05/01 13:25:11.90 work_queue_worker[10174] dns: localhost is 127.0.0.1
+2015/05/01 13:25:11.90 work_queue_worker[10174] tcp: connecting to 127.0.0.1:1033
+2015/05/01 13:25:11.90 work_queue_worker[10174] tcp: made connection to 127.0.0.1:1033
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: connected to master localhost:1033
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: preparing workspace /tmp/worker-102744-10174
+2015/05/01 13:25:11.90 work_queue_worker[10174] dns: looking up name cclws15
+2015/05/01 13:25:11.90 work_queue_worker[10174] dns: cclws15 is 129.74.155.71
+2015/05/01 13:25:11.90 work_queue_worker[10174] dns: looking up addr 129.74.155.71
+2015/05/01 13:25:11.90 work_queue_worker[10174] dns: 129.74.155.71 is cclws15.cse.nd.edu
+2015/05/01 13:25:11.90 work_queue_worker[10174] dns: finding my hostname: uname = cclws15, address = 129.74.155.71, hostname = cclws15.cse.nd.edu
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: tx to master: workqueue 3 cclws15.cse.nd.edu Linux x86_64 4.4.0-TRUNK
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: Sending resource description to master:
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq:  workers      0 inuse      0 committed      1 total      1 smallest      1 largest
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq:     disk      0 inuse      0 committed  42215 total  42215 smallest  42215 largest
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq:   memory      0 inuse      0 committed   2333 total   2333 smallest   2333 largest
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq:     gpus      0 inuse      0 committed      0 total      0 smallest      0 largest
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: unlabeled      0 inuse      0 committed      0 total      0 smallest      0 largest
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq:    cores      0 inuse      0 committed      1 total      1 smallest      1 largest
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: tx to master: info end_of_resource_update 0
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: working for master at 127.0.0.1:1033.
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: put file-c31956222b203fc6603acfeb94d3dda3-sand_align_kernel 134046 0755 1
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: Putting file file-c31956222b203fc6603acfeb94d3dda3-sand_align_kernel into workspace
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: put buffer-1-7f2db423a49b305459147332fb01cf87 4887 777 0
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: Putting file buffer-1-7f2db423a49b305459147332fb01cf87 into workspace
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: task 1
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: cmd 23
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: ./align -a sw aligndata
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: cores -1
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: memory -1
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: disk -1
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: gpus -1
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: infile file-c31956222b203fc6603acfeb94d3dda3-sand_align_kernel align 1
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: infile buffer-1-7f2db423a49b305459147332fb01cf87 aligndata 0
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: rx from master: end
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: linking cache/file-c31956222b203fc6603acfeb94d3dda3-sand_align_kernel to t.1/align
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: linking cache/buffer-1-7f2db423a49b305459147332fb01cf87 to t.1/aligndata
+2015/05/01 13:25:11.90 work_queue_worker[10174] wq: started process 10178: ./align -a sw aligndata
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: task 1 (pid 10178) exited normally with exit code 0
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: tx to master: available_results
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: rx from master: send_results -1
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: tx to master: result 0 0 1044 40638 1
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: tx to master: end
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: rx from master: kill 1
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: rx from master: unlink buffer-1-7f2db423a49b305459147332fb01cf87
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: rx from master: release
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: released by master 127.0.0.1:1033.
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: cleaning workspace /tmp/worker-102744-10174
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: disconnecting from master 127.0.0.1:1033
+2015/05/01 13:25:11.94 work_queue_worker[10174] tcp: disconnected from 127.0.0.1:1033
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: killing all outstanding tasks
+2015/05/01 13:25:11.94 work_queue_worker[10174] wq: all data structures are clean
+2015/05/01 13:25:11.94 work_queue_worker[10174] notice: stopping: single shot mode
+2015/05/01 13:25:12.96 work_queue_worker[10185] debug: /afs/nd.edu/user18/dthain/work/cctools/work_queue/src/work_queue_worker version 4.4.0-TRUNK (released 05/01/2015)
+2015/05/01 13:25:12.96 work_queue_worker[10185] debug: Built by dthain@cclws15 on May  1 2015 at 12:43:12
+2015/05/01 13:25:12.96 work_queue_worker[10185] debug: System: Linux cclws15 2.6.32-504.3.3.el6.x86_64 #1 SMP Fri Dec 12 16:05:43 EST 2014 x86_64 x86_64 x86_64 GNU/Linux
+2015/05/01 13:25:12.96 work_queue_worker[10185] debug: Configuration:
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: WORK_QUEUE_SANDBOX set to /tmp/worker-102744-10185.
+2015/05/01 13:25:12.96 work_queue_worker[10185] dns: looking up name localhost
+2015/05/01 13:25:12.96 work_queue_worker[10185] dns: localhost is 127.0.0.1
+2015/05/01 13:25:12.96 work_queue_worker[10185] tcp: connecting to 127.0.0.1:1033
+2015/05/01 13:25:12.96 work_queue_worker[10185] tcp: made connection to 127.0.0.1:1033
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: connected to master localhost:1033
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: preparing workspace /tmp/worker-102744-10185
+2015/05/01 13:25:12.96 work_queue_worker[10185] dns: looking up name cclws15
+2015/05/01 13:25:12.96 work_queue_worker[10185] dns: cclws15 is 129.74.155.71
+2015/05/01 13:25:12.96 work_queue_worker[10185] dns: looking up addr 129.74.155.71
+2015/05/01 13:25:12.96 work_queue_worker[10185] dns: 129.74.155.71 is cclws15.cse.nd.edu
+2015/05/01 13:25:12.96 work_queue_worker[10185] dns: finding my hostname: uname = cclws15, address = 129.74.155.71, hostname = cclws15.cse.nd.edu
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: tx to master: workqueue 3 cclws15.cse.nd.edu Linux x86_64 4.4.0-TRUNK
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: Sending resource description to master:
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq:  workers      0 inuse      0 committed      1 total      1 smallest      1 largest
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq:     disk      0 inuse      0 committed  42214 total  42214 smallest  42214 largest
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq:   memory      0 inuse      0 committed   2329 total   2329 smallest   2329 largest
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq:     gpus      0 inuse      0 committed      0 total      0 smallest      0 largest
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: unlabeled      0 inuse      0 committed      0 total      0 smallest      0 largest
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq:    cores      0 inuse      0 committed      1 total      1 smallest      1 largest
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: tx to master: info end_of_resource_update 0
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: working for master at 127.0.0.1:1033.
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: put file-c31956222b203fc6603acfeb94d3dda3-sand_align_kernel 134046 0755 1
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: Putting file file-c31956222b203fc6603acfeb94d3dda3-sand_align_kernel into workspace
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: put buffer-1-7f2db423a49b305459147332fb01cf87 4887 777 0
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: Putting file buffer-1-7f2db423a49b305459147332fb01cf87 into workspace
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: task 1
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: cmd 27
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: ./align -a banded aligndata
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: cores -1
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: memory -1
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: disk -1
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: gpus -1
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: infile file-c31956222b203fc6603acfeb94d3dda3-sand_align_kernel align 1
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: infile buffer-1-7f2db423a49b305459147332fb01cf87 aligndata 0
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: rx from master: end
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: linking cache/file-c31956222b203fc6603acfeb94d3dda3-sand_align_kernel to t.1/align
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: linking cache/buffer-1-7f2db423a49b305459147332fb01cf87 to t.1/aligndata
+2015/05/01 13:25:12.96 work_queue_worker[10185] wq: started process 10189: ./align -a banded aligndata
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: task 1 (pid 10189) exited normally with exit code 0
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: tx to master: available_results
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: rx from master: send_results -1
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: tx to master: result 0 0 1044 30438 1
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: tx to master: end
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: rx from master: kill 1
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: rx from master: unlink buffer-1-7f2db423a49b305459147332fb01cf87
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: rx from master: release
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: released by master 127.0.0.1:1033.
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: cleaning workspace /tmp/worker-102744-10185
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: disconnecting from master 127.0.0.1:1033
+2015/05/01 13:25:12.99 work_queue_worker[10185] tcp: disconnected from 127.0.0.1:1033
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: killing all outstanding tasks
+2015/05/01 13:25:12.99 work_queue_worker[10185] wq: all data structures are clean
+2015/05/01 13:25:12.99 work_queue_worker[10185] notice: stopping: single shot mode
