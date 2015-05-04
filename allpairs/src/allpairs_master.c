@@ -49,6 +49,7 @@ static int yblock = 0;
 static int xstop = 0;
 static int ystop = 0;
 static int is_symmetric = 0;
+static int empty_task = 0;
 
 enum {
 	LONG_OPT_SYMMETRIC=UCHAR_MAX+1,
@@ -196,6 +197,7 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 {
 	int x,y;
 	char *buf, *name;
+	empty_task = 0;
 
 	if(xcurrent>=xstop) {
 		xcurrent=0;
@@ -205,10 +207,19 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 	if(ycurrent>=ystop) return 0;
 
 	char cmd[ALLPAIRS_LINE_MAX];
-	if(is_symmetric)
-		sprintf(cmd,"./%s --index \"%d %d\" -e \"%s\" A B %s%s",path_basename(allpairs_multicore_program), xcurrent, ycurrent, extra_arguments,use_external_program ? "./" : "",path_basename(allpairs_compare_program));
-	else
+	if(is_symmetric) {
+		/* if the whole task locates on the "wrong" side of the diagonal, ignore the task and move on to next task. */
+		if(xcurrent > (ycurrent + yblock - 1)) {
+			empty_task = 1;
+			xcurrent += xblock;
+			return 0;
+		}
+		else {
+			sprintf(cmd,"./%s --index \"%d %d\" -e \"%s\" A B %s%s",path_basename(allpairs_multicore_program), xcurrent, ycurrent, extra_arguments,use_external_program ? "./" : "",path_basename(allpairs_compare_program));
+		}
+	} else {
 		sprintf(cmd,"./%s -e \"%s\" A B %s%s",path_basename(allpairs_multicore_program), extra_arguments,use_external_program ? "./" : "",path_basename(allpairs_compare_program));
+	}
 	fprintf(stdout, "%s\n", cmd);
 	struct work_queue_task *task = work_queue_task_create(cmd);
 
@@ -475,6 +486,8 @@ int main(int argc, char **argv)
 			task = ap_task_create(seta,setb);
 			if(task) {
 				work_queue_submit(q, task);
+			} else if(empty_task) {
+				continue;
 			} else {
 				break;
 			}
