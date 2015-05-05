@@ -532,7 +532,7 @@ class Machine_Task_Display(object):
 		self.draw.line( [x1, y1, x1+self.in_machine_space, y1], fill=BLACK, width = 1)
 
 		#write exe name and task number
-		disp_string = str(task_no) +": " + self.tasks_to_exes[task_no]
+		disp_string = self.tasks_to_exes[task_no]
 		self.draw.text( (x1+2*MACHINE_BORDER_WIDTH, y1), disp_string, font=font, fill=WHITE)
 
 
@@ -1124,13 +1124,6 @@ def main():
 		print "gifsicle is a tool required by this visualization tool. Please install it before use."
 		os.system("rmdir " + dirname)
 		sys.exit()
-
-#	if x == 0:
-#		print "got it"
-#	else:
-#		print "need it"
-#
-#	sys.exit()
 
 	numFrames = 0 #counter of number of frames total
 
