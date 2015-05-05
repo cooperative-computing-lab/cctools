@@ -210,6 +210,11 @@ pfs_file * pfs_cache_open( pfs_name *name, int flags, mode_t mode )
 		return new pfs_file_cached(name,fd,mode,buf.st_ctime,buf.st_ino);
 	}
 
+	if( errno == ETXTBSY ) {
+		fprintf(stderr, "WE GOT A ETXTBSY FROM PARROT\n");
+		fprintf(stderr, "ETXTBSY: %s\n", name->path);
+	}
+
 	debug(D_CACHE,"loading %s",name->path);
 
 	fd = file_cache_begin(pfs_file_cache,name->path,txn);
