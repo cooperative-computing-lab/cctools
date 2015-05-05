@@ -48,20 +48,20 @@ struct work_queue_process * work_queue_process_create( int taskid )
 
 void work_queue_process_delete( struct work_queue_process *p )
 {  
-    if(p->task) work_queue_task_delete(p->task);
+        if(p->task) work_queue_task_delete(p->task);
 
 	if(p->output_fd) {
-		close(p->output_fd);
+	    close(p->output_fd);
 	}
 
 	if(p->output_file_name) {
-		unlink(p->output_file_name);
-		free(p->output_file_name);
+	    unlink(p->output_file_name);
+	    free(p->output_file_name);
 	}
 
 	if(p->sandbox) {
-		delete_dir(p->sandbox);
-		free(p->sandbox);
+	    delete_dir(p->sandbox);
+	    free(p->sandbox);
 	}
 
 	free(p);
@@ -78,8 +78,8 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int container_mo
         p->output_file_name = strdup(task_output_template);
 	p->output_fd = mkstemp(p->output_file_name);
 	if (p->output_fd == -1) {
-		debug(D_WQ, "Could not open worker stdout: %s", strerror(errno));
-		return 0;
+	    debug(D_WQ, "Could not open worker stdout: %s", strerror(errno));
+	    return 0;
 	}
 
 	p->execution_start = timestamp_get();
@@ -88,8 +88,8 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int container_mo
 	
 	if(p->pid > 0) {
         // Make child process the leader of its own process group. This allows
-		// signals to also be delivered to processes forked by the child process.
-		// This is currently used by kill_task().
+	// signals to also be delivered to processes forked by the child process.
+	// This is currently used by kill_task().
             setpgid(p->pid, 0);
 
             debug(D_WQ, "started process %d: %s", p->pid, p->task->command_line);
@@ -212,7 +212,7 @@ void  work_queue_process_kill( struct work_queue_process *p )
 	timestamp_t elapsed_time_execution_start = timestamp_get() - p->execution_start;
 	
 	if (elapsed_time_execution_start/1000000 < 3)
-		sleep(3 - (elapsed_time_execution_start/1000000));	
+	    sleep(3 - (elapsed_time_execution_start/1000000));	
 	
 	debug(D_WQ, "terminating task %d pid %d",p->task->taskid,p->pid);
 
