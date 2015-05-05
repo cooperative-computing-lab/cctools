@@ -59,11 +59,10 @@ that the number of cores is represented in the frames. This is the most urgent
 future improvement if the tool is going to fulfill its PURPOSE.
 
 An outside package, 'gifsicle', was used to create the gif and must be
-installed on any machine wishing to run visualize.py. We might be able to ship
-this with cctools but I'm not sure for copyright and other purposes.
+installed on any machine wishing to run visualize.py. 
 
 The Python Imaging Library (PIL) is also imported by visualizer.py, and thus
-needs to be present or must be in cctools.
+needs to be present on your machine to run the visualization tool.
 
 ----- VIABLE LOGS -------------------------------------------------------------
 Only full logs from cctools versions 4.4 and up are able to be run through

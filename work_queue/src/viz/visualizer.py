@@ -6,12 +6,16 @@
 
 #This will work for all logs created after it is required that worker resource reports be handled all at once by the master, rather than one line at a time. It banks on the resource report arriving on consecutive lines so that the workers' size is representative of its resources.
 
-from PIL import Image, ImageDraw, ImageFont
+
 import re
 import sys
 import subprocess
 import os
 import math
+try:
+	from PIL import Image, ImageDraw, ImageFont
+except:
+	print sys.argv[0] + " requires the Python Imaging Library to run"
 
 #variables in pixels
 MACHINE_WIDTH = 40
@@ -441,7 +445,10 @@ class Machine_Task_Display(object):
 		self.tasks_to_status[task_info.num] = "running"
 	
 		#all tasks need at least one core, although sometimes log gives us -1 or 0	
-		needed_cores = max(1, task_info.resources.cores)
+		needed_cores = task_info.resources.cores
+		if needed_cores < 1:
+			#this was an unlabeled task, use all cores on the machine
+			needed_cores = self.total_cores
 
 		cores_to_use = [] #all the machines cores that will be used for this task, which task boxes to fill for this task
 		i = 0
@@ -524,8 +531,9 @@ class Machine_Task_Display(object):
 		#Draw the top core separator
 		self.draw.line( [x1, y1, x1+self.in_machine_space, y1], fill=BLACK, width = 1)
 
-		#write exe name
-		self.draw.text( (x1+2*MACHINE_BORDER_WIDTH, y1), self.tasks_to_exes[task_no], font=font, fill=WHITE)
+		#write exe name and task number
+		disp_string = str(task_no) +": " + self.tasks_to_exes[task_no]
+		self.draw.text( (x1+2*MACHINE_BORDER_WIDTH, y1), disp_string, font=font, fill=WHITE)
 
 
 #Controls the display of files on a given machine
@@ -1109,6 +1117,20 @@ def main():
 	if(os.system("mkdir "+dirname) != 0):
 		print "Could not create a temporary file storage directory " + dirname +"."
 		sys.exit()
+
+	try:
+		subprocess.check_output(["gifsicle", "--version"])
+	except:
+		print "gifsicle is a tool required by this visualization tool. Please install it before use."
+		os.system("rmdir " + dirname)
+		sys.exit()
+
+#	if x == 0:
+#		print "got it"
+#	else:
+#		print "need it"
+#
+#	sys.exit()
 
 	numFrames = 0 #counter of number of frames total
 
