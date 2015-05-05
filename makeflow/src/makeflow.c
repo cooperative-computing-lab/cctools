@@ -2153,28 +2153,32 @@ int main(int argc, char *argv[])
 	if(clean_mode) {
 		printf("cleaning filesystem...\n");
 		dag_clean(d); 
-        
+
         // check the batch_queue_mode, if it is sandbox mode, remove sandbox
         char line[1024]; 
         char comment_symbol[512], str_2[512], str_3[512];
         FILE *tmp_log_fn;
 
         tmp_log_fn = fopen(logfilename, "r+");
-        if(fgets(line, sizeof line, tmp_log_fn) != NULL) {
-            sscanf(line, "%s %s\t%s", comment_symbol, str_2, str_3);
-             
-            if (!strcmp(str_2, "SANDBOX")) {
-                 
-                DIR* dir = opendir(str_3);
-                if (dir) {
-                    closedir(dir);
-                    unlink_recursive(str_3);
-                }
-   		    }
-        }
-        fclose(tmp_log_fn);
 
-		unlink(logfilename);
+        if(tmp_log_fn != NULL) {
+            if(fgets(line, sizeof line, tmp_log_fn) != NULL) {
+                sscanf(line, "%s %s\t%s", comment_symbol, str_2, str_3);
+                 
+                if (!strcmp(str_2, "SANDBOX")) {
+                     
+                    DIR* dir = opendir(str_3);
+                    if (dir) {
+                        closedir(dir);
+                        unlink_recursive(str_3);
+                    }
+   		        }
+            }
+            fclose(tmp_log_fn);
+
+		    unlink(logfilename);
+        }
+
 		unlink(batchlogfilename);
 		exit(0);
 	}
