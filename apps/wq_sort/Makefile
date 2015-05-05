@@ -19,4 +19,4 @@ test: all
 
 install: all
 	mkdir -p ${CCTOOLS_INSTALL_DIR}/bin
-	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin
+	cp ${PROGRAMS} ${CCTOOLS_INSTALL_DIR}/bin/

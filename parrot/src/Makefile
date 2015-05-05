@@ -80,14 +80,14 @@ install: all
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(HEADERS_PUBLIC) $(CCTOOLS_INSTALL_DIR)/include/cctools/
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib/cctools
 ifeq ($(CCTOOLS_BUILD_LIB64PARROT_HELPER),yes)
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib/lib64
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib/cctools/lib64
 endif
 ifeq ($(CCTOOLS_BUILD_LIB32PARROT_HELPER),yes)
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib/lib
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib/cctools/lib
 endif
-	for lib in $(LIBRARIES); do cp $$lib $(CCTOOLS_INSTALL_DIR)/lib/$$lib; done
+	for lib in $(LIBRARIES); do cp $$lib $(CCTOOLS_INSTALL_DIR)/lib/cctools/$$lib; done
 
 test: all
 
