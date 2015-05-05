@@ -219,7 +219,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s CVMFS common configuration.               (PARROT_CVMFS_CONFIG)\n", "   --cvmfs-config=<config>");
 	fprintf(stdout, " %-30s CVMFS repositories to enable.             (PARROT_CVMFS_REPO)\n", "-r,--cvmfs-repos=<repos>");
 	fprintf(stdout, " %-30s Allow repository switching when using CVMFS.\n","   --cvmfs-repo-switching");
-	fprintf(stdout, " %-30s Set CVMFS common cache directory.         (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache");
+	fprintf(stdout, " %-30s Set CVMFS common cache directory.         (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache=<dir>");
 	fprintf(stdout, " %-30s Disable CVMFS common cache directory.\n","   --cvmfs-disable-alien-cache");
 	fprintf(stdout, " %-30s Enforce this root filesystem checksum, where available.\n", "-R,--root-checksum=<cksum>");
 	fprintf(stdout, " %-30s Use streaming protocols without caching.(PARROT_FORCE_STREAM)\n", "-s,--stream-no-cache");
