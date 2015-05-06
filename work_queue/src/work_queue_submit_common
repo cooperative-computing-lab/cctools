@@ -256,6 +256,8 @@ submit_workers_command()
 
 submit_workers()
 {
+	local IFS='= '
+	set -- "$@"
 	parse_arguments_common "$@"
 	set_up_working_directory
 	set_up_password_file_common
