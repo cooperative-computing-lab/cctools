@@ -43,6 +43,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 
 /*
 Code organization notes:
@@ -127,6 +128,7 @@ static char *monitor_log_dir = NULL;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
+static char *local_task_dir = "makeflow.sandbox";
 
 /* wait upto this many seconds for an output file of a succesfull task
  * to appear on the local filesystem (e.g, to deal with NFS
@@ -672,7 +674,6 @@ echo \"$@\" >> %s\n\
 chmod 755 %s\n\
 flock /tmp/lockfile /usr/bin/docker pull %s\n\
 docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
-
 %s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, container_image, container_image, tmp_sh_name);
  
 	  	fclose(wrapper_fn);
@@ -1479,10 +1480,6 @@ int main(int argc, char *argv[])
 				container_mode = CONTAINER_MODE_DOCKER; 
 				container_image = xxstrdup(optarg);
 				break;
-            case LONG_OPT_DOCKER:
-                container_mode = WITH_DOCKER; 
-                img_name = xxstrdup(optarg);
-                break;
             case LONG_OPT_LOCAL_TASK_DIR:
                 local_task_dir = xxstrdup(optarg);
                 break;
@@ -1683,7 +1680,7 @@ int main(int argc, char *argv[])
 
 	if(clean_mode) {
 		printf("cleaning filesystem...\n");
-		dag_clean(d); 
+		makeflow_clean(d); 
 
         // check the batch_queue_mode, if it is sandbox mode, remove sandbox
         char line[1024]; 
@@ -1765,16 +1762,7 @@ int main(int argc, char *argv[])
 		free(cmd);
 	}
 
-    if (container_mode == WITH_DOCKER) {
-        char rm_wrapper_cmd[4096];
-        char rm_sh_script_cmd[4096];
-        sprintf(rm_wrapper_cmd, "rm %s*", WRAPPER_SH_PREFIX);
-        sprintf(rm_sh_script_cmd, "rm %s*", TMP_SH_PREFIX);
-        system(rm_wrapper_cmd);
-        system(rm_sh_script_cmd);
-    }
-
-	if(dag_abort_flag) {
+	if(makeflow_abort_flag) {
 		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "workflow was aborted.\n");
 		exit(EXIT_FAILURE);
@@ -1789,7 +1777,6 @@ int main(int argc, char *argv[])
 	}
 
     
-
 	return 0;
 }
 
