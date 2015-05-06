@@ -16,7 +16,7 @@ struct file_cache *file_cache_init(const char *root);
 void file_cache_fini(struct file_cache *c);
 void file_cache_cleanup(struct file_cache *c);
 
-int file_cache_open(struct file_cache *c, const char *path, char *lpath, INT64_T size, time_t mtime);
+int file_cache_open(struct file_cache *c, const char *path, int flags, char *lpath, INT64_T size, time_t mtime);
 int file_cache_delete(struct file_cache *f, const char *path);
 int file_cache_contains(struct file_cache *f, const char *path, char *lpath);
 
