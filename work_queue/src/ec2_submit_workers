@@ -1,9 +1,10 @@
 #!/bin/sh 
 
-SUBMIT_COMMON=`which wq_submit_workers.common`
+SUBMIT_COMMON=$(which work_queue_submit_common)
 if [ -z "$SUBMIT_COMMON" ];
 then
-	echo "Please add 'wq_submit_workers.common' to your PATH."
+	echo "Please add 'work_queue_submit_common' to your PATH." 1>&2
+    exit 1
 else
 	. $SUBMIT_COMMON
 fi
