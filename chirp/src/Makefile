@@ -10,7 +10,7 @@ LOCAL_LINKAGE = $(CCTOOLS_GLOBUS_LDFLAGS)
 
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = libchirp.a
-OBJECTS = chirp_tool.o $(OBJECTS_LIBRARY) $(OBJECTS_SERVER)
+OBJECTS = chirp_tool.o chirp_fuse.o $(OBJECTS_LIBRARY) $(OBJECTS_SERVER)
 OBJECTS_LIBRARY = $(SOURCES_LIBRARY:%.c=%.o)
 OBJECTS_SERVER = $(SOURCES_SERVER:%.c=%.o)
 PROGRAMS = chirp chirp_get chirp_put chirp_server chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute
@@ -18,7 +18,7 @@ PUBLIC_HEADERS = chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_
 SCRIPTS = chirp_audit_cluster chirp_server_hdfs
 SOURCES_LIBRARY = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_ticket.c
 SOURCES_SERVER = sqlite3.c chirp_stats.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chirp_acl.c chirp_group.c chirp_filesystem.c chirp_fs_hdfs.c chirp_fs_local.c chirp_fs_local_scheduler.c chirp_fs_chirp.c chirp_job.c
-TARGETS = $(PROGRAMS) $(LIBRARIES)
+TARGETS = $(PROGRAMS) $(LIBRARIES) bindings
 
 all: $(TARGETS)
 
@@ -35,12 +35,26 @@ libchirp.a: $(OBJECTS_LIBRARY)
 
 chirp_server: $(OBJECTS_SERVER)
 
-$(PROGRAMS): libchirp.a $(EXTERNAL_DEPENDENCIES)
+$(PROGRAMS) $(CCTOOLS_SWIG_BINDINGS): libchirp.a $(EXTERNAL_DEPENDENCIES)
 
-clean:
+bindings: $(CCTOOLS_SWIG_BINDINGS)
+$(CCTOOLS_SWIG_BINDINGS): chirp_swig_wrap.o
+	@$(MAKE) -C $@
+
+CCTOOLS_SWIG_BINDINGS_INSTALL = $(CCTOOLS_SWIG_BINDINGS:%=install-%)
+install-bindings: $(CCTOOLS_SWIG_BINDINGS_INSTALL)
+$(CCTOOLS_SWIG_BINDINGS_INSTALL): $(CCTOOLS_SWIG_BINDINGS)
+	@$(MAKE) -C $(@:install-%=%) install
+
+CCTOOLS_SWIG_BINDINGS_CLEAN = $(CCTOOLS_SWIG_BINDINGS:%=clean-%)
+clean-bindings: $(CCTOOLS_SWIG_BINDINGS_CLEAN)
+$(CCTOOLS_SWIG_BINDINGS_CLEAN):
+	@$(MAKE) -C $(@:clean-%=%) clean
+
+clean: clean-bindings
 	rm -f $(OBJECTS) $(TARGETS)
 
-install: all
+install: all install-bindings
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	if [ -f $(CCTOOLS_INSTALL_DIR)/bin/chirp_server ]; then mv $(CCTOOLS_INSTALL_DIR)/bin/chirp_server $(CCTOOLS_INSTALL_DIR)/bin/chirp_server.old; fi
 	chmod 755 $(SCRIPTS)
@@ -52,4 +66,4 @@ install: all
 
 test: all
 
-.PHONY: all clean install test
+.PHONY: all clean install test $(CCTOOLS_SWIG_BINDINGS) bindings $(CCTOOLS_SWIG_BINDINGS_INSTALL) install-bindings $(CCTOOLS_SWIG_BINDINGS_CLEAN) clean-bindings

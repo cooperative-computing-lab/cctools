@@ -25,11 +25,14 @@ int unlink_recursive (const char *path)
 			struct dirent *d;
 			rc = 0;
 			while(rc == 0 && (d = readdir(dir))) {
-				if(strcmp(d->d_name, ".") != 0 && strcmp(d->d_name, "..") != 0) {
+				if(!(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0)) {
 					char subpath[PATH_MAX];
 					snprintf(subpath, sizeof(subpath), "%s/%s", path, d->d_name);
 					rc = unlink_recursive(subpath);
-					if (rc == -1) return -1;
+					if (rc == -1) {
+						closedir(dir);
+						return -1;
+					}
 				}
 			}
 			closedir(dir);
@@ -46,11 +49,14 @@ int unlink_dir_contents (const char *dirname)
 		struct dirent *d;
 		int rc = 0;
 		while (rc == 0 && (d = readdir(dir))) {
-			if(strcmp(d->d_name, ".") != 0 && strcmp(d->d_name, "..") != 0) {
+			if(!(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0)) {
 				char subpath[PATH_MAX];
 				snprintf(subpath, sizeof(subpath), "%s/%s", dirname, d->d_name);
 				rc = unlink_recursive(subpath);
-				if (rc == -1) return -1;
+				if (rc == -1) {
+					closedir(dir);
+					return -1;
+				}
 			}
 		}
 		closedir(dir);

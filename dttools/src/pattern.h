@@ -16,6 +16,8 @@
  * Captures are passed through C varargs. String captures are heap
  * allocated and must be freed.
  *
+ * Note: position captures are C offsets in the string (based 0).
+ *
  * @return offset in str where match occurred or -1 if no match.
  * @see http://www.lua.org/manual/5.2/manual.html#6.4.1
  */

@@ -107,7 +107,7 @@ public:
 	virtual int canbenative (char *path, size_t len) {
 		struct stat64 buf;
 		if (::fstat64(fd, &buf) == 0 && (S_ISSOCK(buf.st_mode) || S_ISBLK(buf.st_mode) || S_ISCHR(buf.st_mode) || S_ISFIFO(buf.st_mode))) {
-			snprintf(path, len, name.rest);
+			snprintf(path, len, "%s", name.rest);
 			return 1;
 		}
 		return 0;

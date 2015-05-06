@@ -44,9 +44,8 @@ See the file COPYING for details.
 #include "path.h"
 
 #include "dag.h"
-#include "visitors.h"
-
-#include "makeflow_common.h"
+#include "dag_visitors.h"
+#include "parser.h"
 
 /* Display options */
 enum { SHOW_INPUT_FILES = 2,
@@ -54,7 +53,8 @@ enum { SHOW_INPUT_FILES = 2,
        SHOW_MAKEFLOW_ANALYSIS,
        SHOW_DAG_DOT,
        SHOW_DAG_PPM,
-       SHOW_DAG_FILE
+       SHOW_DAG_FILE,
+	   SHOW_DAG_CYTO
 };
 
 /* Unique integers for long options. */
@@ -64,10 +64,7 @@ enum { LONG_OPT_PPM_ROW,
        LONG_OPT_PPM_EXE,
        LONG_OPT_PPM_LEVELS,
        LONG_OPT_DOT_PROPORTIONAL,
-       LONG_OPT_VERBOSE_PARSING,
        LONG_OPT_DOT_CONDENSE };
-
-int verbose_parsing = 0;
 
 static void show_help_viz(const char *cmd)
 {
@@ -92,11 +89,10 @@ int main(int argc, char *argv[])
 {
 	int c;
 	random_init();
-	set_makeflow_exe(argv[0]);
-	debug_config(get_makeflow_exe());
+	debug_config(argv[0]);
 	int display_mode = 0;
 
-	cctools_version_debug(D_MAKEFLOW_RUN, get_makeflow_exe());
+	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 	const char *dagfile;
 
 	int condense_display = 0;
@@ -127,6 +123,8 @@ int main(int argc, char *argv[])
 					display_mode = SHOW_DAG_DOT;
 				else if (strcasecmp(optarg, "ppm") == 0)
 					display_mode = SHOW_DAG_PPM;
+				else if (strcasecmp(optarg, "cytoscape") == 0)
+					display_mode = SHOW_DAG_CYTO;
 				else
 					fatal("Unknown display option: %s\n", optarg);
 				break;
@@ -161,13 +159,13 @@ int main(int argc, char *argv[])
 				export_as_dax = 1;
 				break;
 			case 'h':
-				show_help_viz(get_makeflow_exe());
+				show_help_viz(argv[0]);
 				return 0;
 			case 'v':
-				cctools_version_print(stdout, get_makeflow_exe());
+				cctools_version_print(stdout, argv[0]);
 				return 0;
 			default:
-				show_help_viz(get_makeflow_exe());
+				show_help_viz(argv[0]);
 				return 1;
 		}
 	}
@@ -175,8 +173,8 @@ int main(int argc, char *argv[])
 	if((argc - optind) != 1) {
 		int rv = access("./Makeflow", R_OK);
 		if(rv < 0) {
-			fprintf(stderr, "makeflow: No makeflow specified and file \"./Makeflow\" could not be found.\n");
-			fprintf(stderr, "makeflow: Run \"%s -h\" for help with options.\n", get_makeflow_exe());
+			fprintf(stderr, "makeflow_viz: No makeflow specified and file \"./Makeflow\" could not be found.\n");
+			fprintf(stderr, "makeflow_viz: Run \"%s -h\" for help with options.\n", argv[0]);
 			return 1;
 		}
 
@@ -187,7 +185,7 @@ int main(int argc, char *argv[])
 
 	struct dag *d = dag_from_file(dagfile);
 	if(!d) {
-		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
+		fatal("makeflow_viz: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
 
 	if(export_as_dax) {
@@ -202,11 +200,12 @@ int main(int argc, char *argv[])
 			case SHOW_DAG_DOT:
 				dag_to_dot(d, condense_display, change_size);
 				break;
-
 			case SHOW_DAG_PPM:
 				dag_to_ppm(d, ppm_mode, ppm_option);
 				break;
-
+			case SHOW_DAG_CYTO:
+				dag_to_cyto(d, condense_display, change_size);
+				break;
 			default:
 				fatal("Unknown display option.");
 				break;

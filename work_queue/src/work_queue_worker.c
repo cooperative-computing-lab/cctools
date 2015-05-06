@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "copy_stream.h"
 #include "memory_info.h"
 #include "disk_info.h"
+#include "cwd_disk_info.h"
 #include "hash_cache.h"
 #include "link.h"
 #include "link_auth.h"
@@ -36,6 +37,7 @@ See the file COPYING for details.
 #include "itable.h"
 #include "random.h"
 #include "url_encode.h"
+#include "md5.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -83,6 +85,9 @@ static int idle_timeout = 900;
 // Current time at which we will give up if no work is received.
 static time_t idle_stoptime = 0;
 
+// Current time at which we will give up if no master is found.
+static time_t connect_stoptime = 0;
+
 // Maximum time to attempt connecting to all available masters before giving up.
 static int connect_timeout = 900;
 
@@ -120,6 +125,9 @@ char *password = 0;
 // Allow worker to use symlinks when link() fails.  Enabled by default.
 static int symlinks_enabled = 1;
 
+// Worker id. A unique id for this worker instance.
+static char *worker_id;
+
 static int worker_mode = WORKER_MODE_WORKER;
 
 // Do not run any container by default
@@ -140,7 +148,7 @@ static struct work_queue_watcher * watcher = 0;
 static struct work_queue_resources * local_resources = 0;
 static struct work_queue_resources * total_resources = 0;
 static struct work_queue_resources * total_resources_last = 0;
-static int64_t last_task_received  = -1;
+static int64_t last_task_received  = 0;
 static int64_t manual_cores_option = 1;
 static int64_t manual_disk_option = 0;
 static int64_t manual_memory_option = 0;
@@ -153,6 +161,7 @@ static int64_t gpus_allocated = 0;
 
 static int send_resources_interval = 30;
 static int send_stats_interval     = 60;
+static int measure_wd_interval     = 180;
 
 static struct work_queue *foreman_q = NULL;
 // docker image name
@@ -282,6 +291,7 @@ static void send_resource_update( struct link *master, int force_update )
 	total_resources->tag = last_task_received;
 
 	work_queue_resources_send(master,total_resources,stoptime);
+	send_master_message(master, "info end_of_resource_update %d\n", 0);
 
 	memcpy(total_resources_last,total_resources,sizeof(*total_resources));
 	last_send_time = time(0);
@@ -591,6 +601,39 @@ static int handle_tasks(struct link *master)
 	return 1;
 }
 
+/* slower disk check, poor man's du on workspace */
+static int check_disk_workspace(int64_t *workspace_usage, int force) {
+	static time_t  last_cwd_measure_time = 0;
+	static int64_t last_workspace_usage  = 0;
+
+	if(manual_disk_option < 1)
+		return 1;
+
+	if( force || (time(0) - last_cwd_measure_time) >= measure_wd_interval ) {
+		cwd_disk_info_get(workspace, &last_workspace_usage);
+		debug(D_WQ, "worker disk usage: %" PRId64 "\n", last_workspace_usage);
+		last_cwd_measure_time = time(0);
+	}
+
+	if(workspace_usage) {
+		*workspace_usage = last_workspace_usage;
+	}
+
+	// Use thershold only if smaller than specified disk size.
+	int64_t disk_limit = manual_disk_option - disk_avail_threshold; 
+	if(disk_limit < 0)
+		disk_limit = manual_disk_option;
+
+	if(last_workspace_usage > disk_limit) {
+		debug(D_WQ, "worker disk usage %"PRId64 " larger than: %" PRId64 "!\n", last_workspace_usage + disk_avail_threshold, manual_disk_option);
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+
+/* faster disk check, overall with statfs */
 static int check_disk_space_for_filesize(int64_t file_size) {
 	uint64_t disk_avail, disk_total;
 
@@ -1287,6 +1330,7 @@ static void work_for_master(struct link *master) {
 
 		if(time(0) > idle_stoptime) {
 			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", master_addr,master_port,idle_timeout);
+			send_master_message(master, "info idle-disconnecting %lld\n", (long long) idle_timeout);
 			break;
 		}
 
@@ -1339,6 +1383,14 @@ static void work_for_master(struct link *master) {
 		}
 
 		ok &= check_disk_space_for_filesize(0);
+
+		int64_t disk_usage;
+		if(!check_disk_workspace(&disk_usage, 0)) {
+			fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n",workspace, manual_cores_option, disk_usage);
+			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_usage);
+			ok = 0;
+		}
+
 
 		if(ok) {
             
@@ -1569,7 +1621,11 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	}
 
 	workspace_prepare();
+
+	check_disk_workspace(NULL, 1);
 	report_worker_ready(master);
+
+	send_master_message(master, "info worker-id %s\n", worker_id);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		foreman_for_master(master);
@@ -1589,6 +1645,9 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 static int serve_master_by_name( const char *catalog_host, int catalog_port, const char *project_regex )
 {
+	static char *last_addr = NULL; 
+	static int   last_port = -1; 
+
 	struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
 
 	debug(D_WQ,"project name %s matches %d masters",project_regex,list_size(masters_list));
@@ -1602,15 +1661,48 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 		list_push_tail(masters_list,list_pop_head(masters_list));
 	}
 
-	struct nvpair *nv = list_peek_head(masters_list);
-	const char *project = nvpair_lookup_string(nv,"project");
-	const char *name = nvpair_lookup_string(nv,"name");
-	const char *addr = nvpair_lookup_string(nv,"address");
-	int port = nvpair_lookup_integer(nv,"port");
+	while(1) {
+		struct nvpair *nv = list_peek_head(masters_list);
+		const char *project = nvpair_lookup_string(nv,"project");
+		const char *name = nvpair_lookup_string(nv,"name");
+		const char *addr = nvpair_lookup_string(nv,"address");
+		int port = nvpair_lookup_integer(nv,"port");
 
-	debug(D_WQ,"selected master with project=%s name=%s addr=%s port=%d",project,name,addr,port);
+		/* Do not connect to the same master after idle disconnection. */
+		if(last_addr) {
+			if( time(0) > idle_stoptime && strcmp(addr, last_addr) == 0 && port == last_port) {
+				if(list_size(masters_list) < 2) {
+					free(last_addr);
+					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
+					connect_stoptime = idle_stoptime;
+					debug(D_WQ,"Previous idle disconnection from only master available project=%s name=%s addr=%s port=%d",project,name,addr,port);
+					return 0;
+				} else {
+					list_push_tail(masters_list,list_pop_head(masters_list));
+					continue;
+				}
+			}
 
-	return serve_master_by_hostport(addr,port,project);
+			free(last_addr);
+		}
+
+		last_addr = xxstrdup(addr);
+		last_port = port;
+
+		debug(D_WQ,"selected master with project=%s name=%s addr=%s port=%d",project,name,addr,port);
+
+		return serve_master_by_hostport(addr,port,project);
+	}
+}
+
+void set_worker_id() {
+	srand(time(NULL));
+
+	char *salt_and_pepper = string_format("%d%d%d", getpid(), getppid(), rand());
+	unsigned char digest[MD5_DIGEST_LENGTH];
+
+	md5_buffer(salt_and_pepper, strlen(salt_and_pepper), digest);
+	worker_id = string_format("worker-%s", md5_string(digest));
 }
 
 static void handle_abort(int sig)
@@ -1737,6 +1829,8 @@ int main(int argc, char *argv[])
     int catalog_port = CATALOG_PORT;
 
 	worker_start_time = time(0);
+
+	set_worker_id();
 
 	//obtain the architecture and os on which worker is running.
 	uname(&uname_data);
@@ -2066,7 +2160,7 @@ int main(int argc, char *argv[])
 	resources_measure_locally(local_resources);
 
 	int backoff_interval = init_backoff_interval;
-	time_t connect_stoptime = time(0) + connect_timeout;
+	connect_stoptime = time(0) + connect_timeout;
 
 	while(1) {
 		int result;
@@ -2105,7 +2199,7 @@ int main(int argc, char *argv[])
 		}
 
 		if(time(0)>connect_stoptime) {
-			debug(D_NOTICE,"stopping: could not connect after %d seconds (--connect-timeout)",connect_timeout);
+			debug(D_NOTICE,"stopping: could not connect after %d seconds.",connect_timeout);
 			break;
 		}
 

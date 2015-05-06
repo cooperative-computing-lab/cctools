@@ -2475,6 +2475,10 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
+	/* worker has no reported any resources yet */
+	if(w->resources->tag < 0)
+		return 0;
+
 	if(w->foreman)
 	{
 		return check_foreman_against_task(q, w, t);
@@ -2765,7 +2769,8 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	itable_remove(w->current_tasks, t->taskid);
 	itable_remove(q->running_tasks, t->taskid);
 	itable_remove(q->worker_task_map, t->taskid);
-
+	itable_remove(q->tasks_waiting_retrieval, t->taskid);
+	
 	if(t->unlabeled)
 	{
 		w->unlabeled_allocated--;
@@ -2824,6 +2829,7 @@ static int receive_one_task( struct work_queue *q )
 		itable_firstkey(q->tasks_waiting_retrieval);
 		itable_nextkey(q->tasks_waiting_retrieval, &taskid, (void **)&t);
 		w = itable_lookup(q->worker_task_map, taskid);
+
 		fetch_output_from_worker(q, w, taskid);
 
 		// fetch_output removes the resolved task from the itable, thus
@@ -4014,7 +4020,6 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 {
 	change_task_state(q, t, WORK_QUEUE_TASK_READY);
-	list_push_priority(q->ready_list,t,t->priority);
 }
 
 int work_queue_task_state( struct work_queue *q, int taskid) {
@@ -4024,38 +4029,41 @@ int work_queue_task_state( struct work_queue *q, int taskid) {
 /* Changes task state. Returns old state */
 /* State of the task. One of WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE) */
 static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task *t, uintptr_t new_state ) {
+
 	uintptr_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
+	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
+
+	// remove from current tables:
+	if( old_state == WORK_QUEUE_TASK_RUNNING )
+		itable_remove(q->running_tasks, t->taskid);
+	else if( old_state == WORK_QUEUE_TASK_READY )
+		list_remove(q->ready_list, t);
+	else if( old_state == WORK_QUEUE_TASK_WAITING_RETRIEVAL )
+		itable_remove(q->tasks_waiting_retrieval, t->taskid);
+	else if( old_state == WORK_QUEUE_TASK_RETRIEVED )
+		list_remove(q->retrieved_list, t);
+
+	// insert to corresponding table
+	debug(D_WQ, "Task %d state change: %d to %d\n", t->taskid, (int) old_state, (int) new_state);
 
 	switch(new_state) {
 		case WORK_QUEUE_TASK_READY:
+			list_push_priority(q->ready_list,t,t->priority);
 			break;
 		case WORK_QUEUE_TASK_RUNNING: 
-			list_remove(q->ready_list,t);
 			itable_insert(q->running_tasks, t->taskid, t);
 			break;
 		case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
-			itable_remove(q->running_tasks, t->taskid);
 			itable_insert(q->tasks_waiting_retrieval, t->taskid, (void*)t);
 			break;
 		case WORK_QUEUE_TASK_RETRIEVED:
-			itable_remove(q->tasks_waiting_retrieval, t->taskid);
 			list_push_head(q->retrieved_list, t);
 			break;
 		case WORK_QUEUE_TASK_DONE:
 			break;
 		case WORK_QUEUE_TASK_CANCELED:
-			if( old_state == WORK_QUEUE_TASK_RUNNING )
-				itable_remove(q->running_tasks, t->taskid);
-			else if( old_state == WORK_QUEUE_TASK_READY )
-				list_remove(q->ready_list, t);
-			else if( old_state == WORK_QUEUE_TASK_WAITING_RETRIEVAL )
-				itable_remove(q->tasks_waiting_retrieval, t->taskid);
-			else if( old_state == WORK_QUEUE_TASK_RETRIEVED )
-				list_remove(q->retrieved_list, t);
 			break;
 	}
-
-	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
 
 	return old_state;
 }

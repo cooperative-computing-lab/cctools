@@ -798,7 +798,6 @@ INT64_T chirp_client_ticket_list(struct chirp_client * c, const char *subject, c
 	result = simple_command(c, stoptime, "ticket_list %s\n", subject);
 
 	if(result == 0) {
-
 		while(1) {
 			char line[CHIRP_LINE_MAX];
 			size_t length;
@@ -818,22 +817,20 @@ INT64_T chirp_client_ticket_list(struct chirp_client * c, const char *subject, c
 			(*list)[size - 1][length] = '\0';
 			(*list)[size] = NULL;
 		}
-
-		return 0;
-	      failure:
-		if(*list != NULL) {
-			char **tmp = *list;
-			while(tmp[0]) {
-				free(tmp[0]);
-			}
-			free(*list);
-		}
-		c->broken = 1;
-		errno = ECONNRESET;
-		return -1;
 	}
 
-	return result;
+	return 0;
+failure:
+	if(*list != NULL) {
+		char **tmp = *list;
+		while(tmp[0]) {
+			free(tmp[0]);
+		}
+		free(*list);
+	}
+	c->broken = 1;
+	errno = ECONNRESET;
+	return -1;
 }
 
 INT64_T chirp_client_ticket_modify(struct chirp_client * c, const char *name, const char *path, const char *aclmask, time_t stoptime)

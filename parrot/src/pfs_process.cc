@@ -12,6 +12,7 @@ See the file COPYING for details.
 extern "C" {
 #include "debug.h"
 #include "itable.h"
+#include "linux-version.h"
 #include "macros.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -127,6 +128,36 @@ static void initfd( pfs_process *p, int fd )
 	}
 }
 
+/* The point of this function is to make a nice readable path for
+ * /proc/self/fd/[0-9]+ to make debugging easier. We could just as easily use a
+ * static name like "p".
+ */
+
+#define MAX_PATHTOFILENAME 32
+void pfs_process_pathtofilename( char *path )
+{
+	char filename[PATH_MAX] = "pfs@";
+
+	char *current = strchr(filename, '\0');
+	const char *next = path;
+	do {
+		if (*next == '/') {
+			*current++ = '-';
+			while (*(next+1) == '/')
+				next++; /* skip redundant slashes */
+		} else {
+			*current++ = *next;
+		}
+	} while (*next++);
+
+	/* make it a reasonable (safer) size... */
+	if (strlen(filename) >= MAX_PATHTOFILENAME) {
+		snprintf(path, MAX_PATHTOFILENAME, "%.*s...%.*s", MAX_PATHTOFILENAME/2-2, filename, MAX_PATHTOFILENAME/2-2, filename+strlen(filename)-(MAX_PATHTOFILENAME/2-2));
+	} else {
+		strcpy(path, filename);
+	}
+}
+
 void pfs_process_bootstrapfd( void )
 {
 	int count = sysconf(_SC_OPEN_MAX);
@@ -134,12 +165,33 @@ void pfs_process_bootstrapfd( void )
 		if (!(i == parrot_dir_fd || i == pfs_channel_fd())) {
 			struct stat buf;
 			if (fstat(i, &buf) == 0 && !(fcntl(i, F_GETFD)&FD_CLOEXEC) && !bootnative(buf.st_mode)) {
+				int fd;
+				char path[PATH_MAX] = "";
+				char fdlink[PATH_MAX];
+
 				debug(D_DEBUG, "[root tracee] bootstrapping non-native fd as Parrot fd: %d", i);
-				int fd = openat(parrot_dir_fd, "p", O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR);
-				if (fd == -1)
-					fatal("could not open Parrot fd: %s", strerror(errno));
-				if (unlinkat(parrot_dir_fd, "p", 0) == -1)
-					fatal("could not unlink Parrot fd file: %s", strerror(errno));
+
+				snprintf(fdlink, sizeof(fdlink), "/proc/self/fd/%d", i);
+				if (readlink(fdlink, path, sizeof(path)-1) == -1)
+					strcpy(path, "p"); /* dummy name */
+
+				pfs_process_pathtofilename(path);
+
+				if (linux_available(3,17,0)) {
+#ifdef CCTOOLS_CPU_I386
+					fd = syscall(SYSCALL32_memfd_create, path, 0);
+#else
+					fd = syscall(SYSCALL64_memfd_create, path, 0);
+#endif
+					if (fd == -1)
+						fatal("could not create memfd: %s", strerror(errno));
+				} else {
+					fd = openat(parrot_dir_fd, path, O_CREAT|O_EXCL|O_WRONLY, S_IRUSR|S_IWUSR);
+					if (fd == -1)
+						fatal("could not open Parrot fd: %s", strerror(errno));
+					if (unlinkat(parrot_dir_fd, path, 0) == -1)
+						fatal("could not unlink Parrot fd file: %s", strerror(errno));
+				}
 				if (dup2(fd, i) == -1)
 					fatal("could not dup2 Parrot fd: %s", strerror(errno));
 				if (close(fd) == -1)
@@ -318,7 +370,7 @@ uintptr_t pfs_process_scratch_address( struct pfs_process *p )
 void pfs_process_scratch_get( struct pfs_process *p, void *data, size_t len )
 {
 	uintptr_t scratch = pfs_process_scratch_address(p);
-	if (tracer_copy_in(p->tracer, data, (const void *)scratch, len) == -1)
+	if (tracer_copy_in(p->tracer, data, (const void *)scratch, len, TRACER_O_ATOMIC) == -1)
 		fatal("could not copy in scratch: %s", strerror(errno));
 }
 
@@ -326,7 +378,7 @@ uintptr_t pfs_process_scratch_set( struct pfs_process *p, const void *data, size
 {
 	assert(len <= PFS_SCRATCH_SPACE);
 	uintptr_t scratch = pfs_process_scratch_address(p);
-	if (tracer_copy_out(p->tracer, data, (const void *)scratch, len) == -1)
+	if (tracer_copy_out(p->tracer, data, (const void *)scratch, len, TRACER_O_ATOMIC) == -1)
 		fatal("could not set scratch: %s", strerror(errno));
 	return scratch;
 }

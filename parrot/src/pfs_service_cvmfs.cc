@@ -60,7 +60,7 @@ static const char *default_cvmfs_repo =
  *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/*";
 
 #if LIBCVMFS_VERSION > 1
-static const char *default_cvmfs_global_config = "cache_directory=/tmp/libcvmfs-defaultcache,max_open_files=500,change_to_cache_directory,log_prefix=libcvmfs";
+static const char *default_cvmfs_global_config = "max_open_files=500,change_to_cache_directory,log_prefix=libcvmfs";
 #endif
 
 static bool wrote_cern_key;
@@ -658,7 +658,10 @@ static void cvmfs_read_config()
 		cvmfs_global_options = getenv("PARROT_CVMFS_CONFIG");
 	}
 	if ( !cvmfs_global_options ) {
-		cvmfs_global_options = default_cvmfs_global_config;
+		cvmfs_global_options = string_format("cache_directory=%s,%s%s",
+				pfs_cvmfs_alien_cache_dir,
+				pfs_cvmfs_enable_alien  ?  "alien_cache," : "",
+				default_cvmfs_global_config);
 	}
 	if ( !cvmfs_global_options || !cvmfs_global_options[0] ) {
 		debug(D_CVMFS|D_NOTICE, "No global CVMFS configuration found. To enable CVMFS access, you must configure PARROT_CVMFS_CONFIG.");
@@ -942,7 +945,9 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 
 			if(sscanf(link_target, "/cvmfs/%[^/]%[^\n]", xpath->host, path_head) < 1)
 			{
-				errno = EXDEV;
+				/* The path points outside of cvmfs, we do not allow that. */
+				debug(D_CVMFS, "refusing to follow path outside of cvmfs: '%s' -> '%s'", path->path, link_target);
+				errno = ENOENT;
 				return false;
 			}
 

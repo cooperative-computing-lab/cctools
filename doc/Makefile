@@ -23,10 +23,12 @@ api/html/index.html:
 api/html/work_queue_perl.html:
 	mkdir -p api/html
 	pod2html ../work_queue/src/perl/Work_Queue.pm > $@
+	@rm -f pod2htmd.tmp
 
 api/html/work_queue_task_perl.html:
 	mkdir -p api/html
 	pod2html ../work_queue/src/perl/Work_Queue/Task.pm > $@
+	@rm -f pod2htmd.tmp
 
 %.html: %.m4
 	m4 -DHTML ${CCTOOLS_M4_ARGS} $< > $@

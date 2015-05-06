@@ -32,13 +32,19 @@ run()
 
 	# retrieve makeflow exit status
 	status=`cat $STATUS_FILE`
-
-	[ $status != 0 ] && exit 1
+	if [ $status -ne 0 ]
+	then
+		exit 1
+	fi
 
 	# verify that makeflow created the required files from
 	# $MAKE_FILE
-	for file in $PRODUCTS; do
-		[ ! -f $file ] && exit 1
+	for file in $PRODUCTS
+	do
+		if [ ! -f $file ]
+		then
+			exit 1
+		fi
 	done
 
 	exit 0

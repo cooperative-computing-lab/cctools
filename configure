@@ -75,7 +75,7 @@ include_package_resource_monitor="resource_monitor"
 include_package_weaver="weaver"
 include_package_doc="doc"
 
-work_queue_bindings=""
+swig_bindings=""
 
 echo "checking for package compatibility..."
 
@@ -118,6 +118,7 @@ python_path="/usr"
 python3_path="/usr"
 xrootd_path="/usr"
 cvmfs_path="/usr"
+uuid_path="/usr"
 zlib_path="/usr"
 swig_path="/usr"
 
@@ -148,8 +149,8 @@ then
 	globus_path=${GLOBUS_LOCATION}
 fi
 
-IFS=" ="
-export IFS
+IFS=' ='
+set -- $*
 
 while [ $# -gt 0 ]
 do
@@ -218,6 +219,10 @@ do
 			shift
 			cvmfs_path=$1
 			config_cvmfs_path=yes
+			;;
+		--with-uuid-path)
+			shift
+			uuid_path=$1
 			;;
 		--with-zlib-path)
 			shift
@@ -310,6 +315,7 @@ Where PACKAGE may be:
     xrootd
     zlib
     cvmfs
+    uuid
     swig
 
 And SYSTEM may be:
@@ -343,6 +349,15 @@ export IFS
 potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_doc}"
 
 check_multiarch
+
+if [ -f config.mk ]; then
+	echo "we are reconfiguring - prepare with make clean..."
+	if make clean; then
+		echo 'make clean - ok'
+	else
+		echo "make clean failed ($?); continuing"
+	fi
+fi
 
 rm -f config.mk
 echo "checking for all the things I know how to build..."
@@ -644,6 +659,19 @@ then
 		echo "*** Couldn't find $library in ${cvmfs_path}"
 		exit 1
 	fi
+  
+	cvmfs_version=$(sed -n 's/^#define LIBCVMFS_VERSION \+\([0-9]\+\)/\1/p' ${cvmfs_path}/include/libcvmfs.h)
+	if [ $cvmfs_version -gt 1 ]
+	then
+		if library_search uuid $uuid_path
+		then
+			cvmfs_ldflags="${cvmfs_ldflags} ${library_search_result}"
+		else
+			echo "*** Couldn't find libuuid"
+			echo "*** Check --with-uuid-path and try again."
+			exit 1
+		fi
+	fi
 else
 	if [ $config_cvmfs_path = yes ]
 	then
@@ -729,6 +757,18 @@ else
 	echo "*** skipping readline..."
 fi
 
+if [ $build_sys = DARWIN ]
+then
+	if [ ! -d "/usr/include" ]
+	then
+		# The version of getopt.h packaged in cctools appears to cause a SIGBUS on Darwin.
+		# Mac OS X Command Line Tools need to be installed to obtain a getopt.h that works.
+		echo "*** Sorry, I can't proceed without Mac OS X Command Line Tools."
+		echo "*** Please refer to the installation instructions."
+		exit 1
+	fi
+fi
+
 if [ $config_perl_path != no ]
 then
 	if check_file ${perl_path}/bin/perl
@@ -770,7 +810,7 @@ then
 				perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
 			fi
 
-			work_queue_bindings="$work_queue_bindings perl"
+			swig_bindings="$swig_bindings perl"
 		else
 			perl=0
 		fi
@@ -858,7 +898,7 @@ EOF
 				    python_ldflags="$python_ldflags -undefined dynamic_lookup"
 				fi
 
-				work_queue_bindings="$work_queue_bindings python"
+				swig_bindings="$swig_bindings python"
 			else
 				python=0
 			fi
@@ -947,7 +987,7 @@ then
 				    python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
 				fi
 
-				work_queue_bindings="$work_queue_bindings python3"
+				swig_bindings="$swig_bindings python3"
 			else
 				python3=0
 			fi
@@ -1022,7 +1062,7 @@ fi
 
 if [ $found_swig != yes ]
 then
-	work_queue_bindings=""
+	swig_bindings=""
 fi
 
 linker="gcc"
@@ -1247,7 +1287,7 @@ CCTOOLS_PYTHON3_LDFLAGS=${python3_ldflags}
 CCTOOLS_PYTHON3_VERSION=${python3_major_version}.${python3_minor_version}
 CCTOOLS_PYTHON3_2TO3=${python3_2to3}
 
-CCTOOLS_WORK_QUEUE_BINDINGS=${work_queue_bindings}
+CCTOOLS_SWIG_BINDINGS=${swig_bindings}
 
 CCTOOLS_DOCTARGETS=${cctools_doctargets}
 

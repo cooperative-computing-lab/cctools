@@ -223,8 +223,8 @@ static INT64_T do_get(int argc, char **argv)
 	elapsed = (double)(stop - start) / 1000000.0;
 
 	if(result > 0) {
-		printf("%sB read in %.2fs ", string_metric(result, -1, 0), elapsed);
-		printf("(%sB/s)\n", string_metric(result / elapsed, -1, 0));
+		fprintf(stderr, "%sB read in %.2fs ", string_metric(result, -1, 0), elapsed);
+		fprintf(stderr, "(%sB/s)\n", string_metric(result / elapsed, -1, 0));
 	}
 
 	return result;
@@ -251,8 +251,8 @@ static INT64_T do_put(int argc, char **argv)
 	elapsed = (stop - start) / 1000000.0;
 
 	if(result > 0) {
-		printf("%sB written in %.2fs ", string_metric(result, -1, 0), elapsed);
-		printf("(%sB/s)\n", string_metric(result / elapsed, -1, 0));
+		fprintf(stderr, "%sB written in %.2fs ", string_metric(result, -1, 0), elapsed);
+		fprintf(stderr, "(%sB/s)\n", string_metric(result / elapsed, -1, 0));
 	}
 
 	return result;
@@ -778,7 +778,7 @@ static INT64_T do_audit(int argc, char **argv)
 static INT64_T do_timeout(int argc, char **argv)
 {
 	timeout = atoi(argv[1]);
-	printf("Timeout is %d seconds.\n", timeout);
+	fprintf(stderr, "Timeout is %d seconds.\n", timeout);
 	return 0;
 }
 
@@ -819,8 +819,8 @@ static INT64_T do_thirdput(int argc, char **argv)
 		stop++;
 
 	if(result > 0) {
-		printf("%" PRId64 " bytes transferred in %d seconds ", result, (int) (stop - start));
-		printf("(%.1lfMB/s)\n", result / (double) (stop - start) / 1024.0 / 1024.0);
+		fprintf(stderr, "%" PRId64 " bytes transferred in %d seconds ", result, (int) (stop - start));
+		fprintf(stderr, "(%.1lfMB/s)\n", result / (double) (stop - start) / 1024.0 / 1024.0);
 	}
 
 	return result;

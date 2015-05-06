@@ -32,7 +32,7 @@ prepare() {
 }
 
 run() {
-	../src/makeflow_linker --use-named -o $out_dir input/001/$workflow_description
+	../src/makeflow_linker --use-named -o $out_dir linker/001/$workflow_description
 	named_dependency=$(cat $out_dir/named | awk '{print $1}')
 	if [ "$named_dependency" != "Python" ]; then
 		exit 1

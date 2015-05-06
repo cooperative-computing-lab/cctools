@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 
 /** @file buffer.h String Buffer Operations.
     You can use the buffer in the same way you would print to a file. Use the

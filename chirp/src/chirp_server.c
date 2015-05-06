@@ -731,12 +731,52 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
 
-			result = cfs->getfile(path, l, stalltime);
+			INT64_T fd = cfs->open(path, O_RDONLY, 0);
+			if (fd == -1)
+				goto failure;
 
-			if(result >= 0) {
-				chirp_stats_update(0, result, 0);
-				goto done;
+			struct chirp_stat info;
+			if (cfs->fstat(fd, &info) == -1) {
+				int saved = errno;
+				cfs->close(fd);
+				errno = saved;
+				goto failure;
 			}
+
+			if (S_ISDIR(info.cst_mode)) {
+				cfs->close(fd);
+				errno = EISDIR;
+				goto failure;
+			}
+
+			length = info.cst_size;
+
+			time_t transmission_stalltime = time(NULL)+(length/1024)+30; /* 1KB/s minimum */
+			transmission_stalltime = MAX(stalltime, transmission_stalltime);
+
+			link_putfstring(l, "%" PRId64 "\n", transmission_stalltime, length);
+
+			INT64_T total = 0;
+			while (total < length) {
+				char b[65536];
+				size_t chunk = MIN(sizeof(b), (size_t)(length-total));
+
+				INT64_T ractual = cfs->pread(fd, b, chunk, total);
+				if(ractual <= 0)
+					break;
+
+				if(link_putlstring(l, b, ractual, transmission_stalltime) == -1) {
+					debug(D_DEBUG, "getfile: write failed (%s), expected to write %" PRId64 " more bytes", strerror(errno), length);
+					break;
+				}
+
+				total += ractual;
+			}
+			cfs->close(fd);
+
+			chirp_stats_update(0, total, 0);
+			result = total;
+			goto done;
 		} else if(sscanf(line, "putfile %s %" SCNd64 " %" SCNd64, path, &mode, &length) == 3) {
 			if (length < 0) {
 				errno = EINVAL;
@@ -747,37 +787,97 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if(!cfs_isnotdir(path))
 				goto failure;
 
+			flags = O_CREAT|O_WRONLY;
+
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_WRITE)) {
 				if(chirp_acl_check(path, subject, CHIRP_ACL_PUT)) {
-					if(cfs_exists(path)) {
-						errno = EEXIST;
-						goto failure;
-					} else {
-						/* ok to proceed */
-					}
+					flags |= O_EXCL;
 				} else {
 					errno = EACCES;
 					goto failure;
 				}
 			}
 
-			/* FIXME should call unlink before space_available check, and 0 allocation? What if putfile fails but truncated original? */
-
-			if(!space_available(length))
+			fd = cfs->open(path, flags, mode);
+			if (fd < 0)
 				goto failure;
 
-			INT64_T current;
-			if ((result = chirp_alloc_realloc(path, length, &current)) == 0) {
-				result = cfs->putfile(path, l, length, mode, stalltime);
-				if (result == -1) {
-					chirp_alloc_realloc(path, current, NULL);
-				} else if (result < length) {
-					chirp_alloc_realloc(path, result, NULL);
-				}
-				if(result >= 0) {
-					chirp_stats_update(0, 0, length);
-				}
+			struct chirp_stat info;
+			if (cfs->fstat(fd, &info) == -1) {
+				int saved = errno;
+				cfs->close(fd);
+				errno = saved;
+				goto failure;
 			}
+
+			if(!space_available(length - info.cst_size)) {
+				int saved = errno;
+				cfs->close(fd);
+				errno = saved;
+				goto failure;
+			}
+
+			INT64_T current;
+			if (chirp_alloc_realloc(path, length, &current) == -1) {
+				int saved = errno;
+				cfs->close(fd);
+				errno = saved;
+				goto failure;
+			}
+
+			if (cfs->ftruncate(fd, 0) == -1) {
+				int saved = errno;
+				chirp_alloc_realloc(path, current, NULL);
+				cfs->close(fd);
+				errno = saved;
+				goto failure;
+			}
+
+			time_t transmission_stalltime = time(NULL)+(length/1024)+30; /* 1KB/s minimum */
+			transmission_stalltime = MAX(stalltime, transmission_stalltime);
+
+			link_putliteral(l, "0\n", transmission_stalltime);
+
+			INT64_T total = 0;
+			while (total < length) {
+				char b[65536];
+				size_t chunk = MIN(sizeof(b), (size_t)(length-total));
+
+				INT64_T ractual = link_read(l, b, chunk, transmission_stalltime);
+
+				INT64_T wactual = -1;
+				if (ractual > 0)
+					wactual = cfs->pwrite(fd, b, ractual, total);
+
+				if(ractual <= 0 || wactual < ractual) {
+					int saved = errno;
+					if (ractual <= 0)
+						debug(D_DEBUG, "putfile: socket read failed (%s), expected %" PRId64 " more bytes", strerror(errno), length-total);
+					else
+						debug(D_DEBUG, "putfile: file write failed: (%s)", strerror(errno));
+					cfs->close(fd);
+					if(cfs->unlink(path) == -1)
+						debug(D_DEBUG, "putfile: failed to unlink remnant file '%s': %s", path, strerror(errno));
+					chirp_alloc_realloc(path, 0, NULL);
+					link_soak(l, length - total - MAX(ractual, 0), transmission_stalltime);
+					errno = saved;
+					goto failure;
+				}
+
+				total += ractual;
+			}
+
+			chirp_stats_update(0, 0, total);
+
+			if (cfs->close(fd) == -1) {
+				/* Confuga does O_EXCL check at close. */
+				if (errno == EEXIST) {
+					chirp_alloc_realloc(path, current, NULL); /* restore current, nothing was ever changed */
+					errno = EEXIST;
+				}
+				goto failure;
+			}
+			result = total;
 		} else if(sscanf(line, "getstream %s", path) == 1) {
 			path_fix(path);
 			if(!cfs_isnotdir(path))
@@ -1163,6 +1263,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					free(tr[0]);
 					free(tr[1]);
 				}
+				buffer_putliteral(&B, "0\n");
 				free(ticket_rights);
 			}
 		} else if(sscanf(line, "ticket_list %s", chararg1) == 1) {
@@ -1182,6 +1283,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					buffer_putfstring(&B, "%zu\n%s", strlen(ts[0]), ts[0]);
 					free(ts[0]);
 				}
+				buffer_putliteral(&B, "0\n");
 				free(ticket_subjects);
 			}
 		} else if(sscanf(line, "mkdir %s %" SCNd64, path, &mode) == 2) {

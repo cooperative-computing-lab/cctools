@@ -38,6 +38,7 @@ extern "C" {
 #include "pfs_resolve.h"
 #include "random.h"
 #include "stringtools.h"
+#include "string_array.h"
 #include "tracer.h"
 #include "xxmalloc.h"
 #include "hash_table.h"
@@ -132,6 +133,7 @@ enum {
 	LONG_OPT_CVMFS_ALIEN_CACHE,
 	LONG_OPT_HELPER,
 	LONG_OPT_NO_SET_FOREGROUND,
+	LONG_OPT_VALGRIND,
 };
 
 static void get_linux_version(const char *cmd)
@@ -223,7 +225,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s CVMFS common configuration.               (PARROT_CVMFS_CONFIG)\n", "   --cvmfs-config=<config>");
 	fprintf(stdout, " %-30s CVMFS repositories to enable.             (PARROT_CVMFS_REPO)\n", "-r,--cvmfs-repos=<repos>");
 	fprintf(stdout, " %-30s Allow repository switching when using CVMFS.\n","   --cvmfs-repo-switching");
-	fprintf(stdout, " %-30s Set CVMFS common cache directory.         (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache");
+	fprintf(stdout, " %-30s Set CVMFS common cache directory.         (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache=<dir>");
 	fprintf(stdout, " %-30s Disable CVMFS common cache directory.\n","   --cvmfs-disable-alien-cache");
 	fprintf(stdout, " %-30s Enforce this root filesystem checksum, where available.\n", "-R,--root-checksum=<cksum>");
 	fprintf(stdout, " %-30s Use streaming protocols without caching.(PARROT_FORCE_STREAM)\n", "-s,--stream-no-cache");
@@ -233,6 +235,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Fake this unix uid; Real uid stays the same.     (PARROT_UID)\n", "-U,--uid=<num>");
 	fprintf(stdout, " %-30s Use this extended username.                 (PARROT_USERNAME)\n", "-u,--username=<name>");
 	fprintf(stdout, " %-30s Display version number.\n", "-v,--version");
+	fprintf(stdout, " %-30s Enable valgrind support for Parrot.\n", "   --valgrind");
 	fprintf(stdout, " %-30s Initial working directory.\n", "-w,--work-dir=<dir>");
 	fprintf(stdout, " %-30s Display table of system calls trapped.\n", "-W,--syscall-table");
 	fprintf(stdout, " %-30s Force synchronous disk writes.            (PARROT_FORCE_SYNC)\n", "-Y,--sync-write");
@@ -485,6 +488,7 @@ int main( int argc, char *argv[] )
 	pid_t pid;
 	struct pfs_process *p;
 	char envlist[PATH_MAX] = "";
+	int valgrind = 0;
 
 	if(getenv("PARROT_ENABLED")) {
 		fprintf(stderr,"sorry, parrot_run cannot be run inside of itself.\n");
@@ -575,6 +579,7 @@ int main( int argc, char *argv[] )
 		{"timeout", required_argument, 0, 'T'},
 		{"uid", required_argument, 0, 'U'},
 		{"username", required_argument, 0, 'u'},
+		{"valgrind", no_argument, 0, LONG_OPT_VALGRIND},
 		{"version", no_argument, 0, 'v'},
 		{"with-checksums", no_argument, 0, 'K'},
 		{"with-snapshots", no_argument, 0, 'F'},
@@ -745,6 +750,9 @@ int main( int argc, char *argv[] )
 			break;
 		case LONG_OPT_HELPER:
 			pfs_use_helper = 1;
+			break;
+		case LONG_OPT_VALGRIND:
+			valgrind = 1;
 			break;
 		default:
 			show_help(argv[0]);
@@ -991,10 +999,23 @@ int main( int argc, char *argv[] )
 				close(fd);
 			}
 		}
-		signal(SIGUSR1, set_attached_and_ready);
-		raise(SIGSTOP); /* synchronize with parent, above */
-		while (!attached_and_ready) ; /* spin waiting to be traced (NO SLEEPING/STOPPING) */
-		execvp(argv[optind],&argv[optind]);
+		if (valgrind) {
+			int i;
+			char **nargv = string_array_new();
+			nargv = string_array_append(nargv, "sh");
+			nargv = string_array_append(nargv, "-c");
+			nargv = string_array_append(nargv, "trap 'exec \"$@\"' USR1; kill -STOP $$; while true; do true; done;");
+			nargv = string_array_append(nargv, "--");
+			for (i = optind; argv[i]; i++)
+				nargv = string_array_append(nargv, argv[i]);
+			debug(D_DEBUG, "execvp(\"sh\", [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", ...])", nargv[0], nargv[1], nargv[2], nargv[3], nargv[4]);
+			execvp("sh", (char *const *)nargv);
+		} else {
+			signal(SIGUSR1, set_attached_and_ready);
+			raise(SIGSTOP); /* synchronize with parent, above */
+			while (!attached_and_ready) ; /* spin waiting to be traced (NO SLEEPING/STOPPING) */
+			execvp(argv[optind],&argv[optind]);
+		}
 		fprintf(stderr, "unable to execute %s: %s\n", argv[optind], strerror(errno));
 		fflush(stderr);
 		if(pfs_write_rval) {

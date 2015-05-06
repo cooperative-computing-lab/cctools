@@ -5,7 +5,11 @@ if [ ! -r config.mk ]; then
     exit 1
 fi
 
-CCTOOLS_PACKAGES=$(grep CCTOOLS_PACKAGES config.mk | cut -d = -f 2)
+if [ -z "$CCTOOLS_PACKAGES_TEST" ]
+then
+	CCTOOLS_PACKAGES_TEST=$(grep CCTOOLS_PACKAGES config.mk | cut -d = -f 2)
+fi
+
 if [ -z "$CCTOOLS_TEST_LOG" ]; then
 	CCTOOLS_TEST_LOG="./cctools.test.log"
 fi
@@ -21,9 +25,9 @@ echo "[$(date)] Testing on $(uname -a)." > "$CCTOOLS_TEST_LOG"
 SUCCESS=0
 FAILURE=0
 START_TIME=$(date +%s)
-for package in ${CCTOOLS_PACKAGES}; do
+for package in ${CCTOOLS_PACKAGES_TEST}; do
 	if [ -d "${package}/test" ]; then
-		cd "${package}/test"
+		cd "./${package}/test"
 		for script in TR_*; do
 			if [ -x "$script" ]; then
 				printf "%-66s" "--- Testing ${package}/test/${script} ... "
@@ -38,9 +42,10 @@ for package in ${CCTOOLS_PACKAGES}; do
 					"./${script}" clean
 					exit $result
 				) >> "$CCTOOLS_TEST_LOG" 2>&1
+				result=$?
 				TEST_STOP_TIME=$(date +%s)
 				TEST_ELAPSED=$(($TEST_STOP_TIME-$TEST_START_TIME))
-				if [ "$?" -eq 0 ]; then
+				if [ "$result" -eq 0 ]; then
 					SUCCESS=$((SUCCESS+1))
 					echo "success ${TEST_ELAPSED}s"
 					echo "=== Test ${package}/test/${script}: success." >> $CCTOOLS_TEST_LOG
