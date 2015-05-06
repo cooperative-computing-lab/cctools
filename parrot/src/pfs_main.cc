@@ -90,6 +90,7 @@ int set_foreground = 1;
 
 char sys_temp_dir[PFS_PATH_MAX] = "/tmp";
 char pfs_temp_dir[PFS_PATH_MAX];
+char pfs_temp_per_instance_dir[PFS_PATH_MAX];
 
 int *pfs_syscall_totals32 = 0;
 int *pfs_syscall_totals64 = 0;
@@ -906,6 +907,10 @@ int main( int argc, char *argv[] )
 		}
 	}
 
+	snprintf(pfs_temp_per_instance_dir, PFS_PATH_MAX-1, "%s/parrot-instance.XXXXXX", pfs_temp_dir);
+	if (mkdtemp(pfs_temp_per_instance_dir) == NULL)
+		fatal("could not create a parrot instance temporary directory: %s", strerror(errno));
+
 	pfs_cvmfs_alien_cache_dir[0]                = '\0';
 	pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX - 1] = '\0';
 	s = getenv("PARROT_CVMFS_ALIEN_CACHE");
@@ -925,8 +930,9 @@ int main( int argc, char *argv[] )
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
 	file_cache_cleanup(pfs_file_cache);
 
-	sprintf(pfs_cvmfs_locks_dir, "%s/cvmfs_locks_XXXXXX", pfs_temp_dir);
-	mkdtemp(pfs_cvmfs_locks_dir);
+	sprintf(pfs_cvmfs_locks_dir, "%s/cvmfs_locks_XXXXXX", pfs_temp_per_instance_dir);
+	if(mkdtemp(pfs_cvmfs_locks_dir) == NULL)
+		fatal("could not create a cvmfs locks temporary directory: %s", strerror(errno));
 
 	if(!chose_auth) auth_register_all();
 
@@ -943,7 +949,7 @@ int main( int argc, char *argv[] )
 
 	{
 		char buf[PATH_MAX];
-		snprintf(buf, sizeof(buf), "%s/parrot-fd.XXXXXX", pfs_temp_dir);
+		snprintf(buf, sizeof(buf), "%s/parrot-fd.XXXXXX", pfs_temp_per_instance_dir);
 		if (mkdtemp(buf) == NULL)
 			fatal("could not create parrot-fd temporary directory: %s", strerror(errno));
 		parrot_dir_fd = open(buf, O_RDONLY|O_DIRECTORY);
@@ -1110,7 +1116,7 @@ int main( int argc, char *argv[] )
 
 	if(pfs_paranoid_mode) pfs_paranoia_cleanup();
 
-	delete_dir(pfs_cvmfs_locks_dir);
+	delete_dir(pfs_temp_per_instance_dir);
 
 	if(namelist_table && namelist_file) {
 		char *key;
