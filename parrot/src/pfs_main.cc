@@ -263,7 +263,12 @@ static void show_help( const char *cmd )
 	if(pfs_service_lookup("s3"))		fprintf(stdout, " s3");
 	if(pfs_service_lookup("root"))      fprintf(stdout, " root");
 	if(pfs_service_lookup("xrootd"))    fprintf(stdout, " xrootd");
-	if(pfs_service_lookup("cvmfs"))		fprintf(stdout, " cvmfs");
+	if(pfs_service_lookup("cvmfs"))     fprintf(stdout, " cvmfs");
+
+	if(pfs_service_lookup("cvmfs")) {
+		fprintf(stdout, "\ncvmfs compilation flags: " CCTOOLS_CVMFS_BUILD_FLAGS);
+	}
+
 	fprintf(stdout, "\n");
 	exit(1);
 }
