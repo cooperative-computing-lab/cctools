@@ -173,8 +173,8 @@ set_up_master_address()
 {
 	if [ $use_master_name = 0 ]; then
 		if [ $# -ne 3 ] ; then
-			echo "3 arguments (<servername> <port> <num-workers>) are expected while $# are present: \"$@\"."
-			echo "To view the help message, type: $script_name -h"
+			echo "3 arguments (<servername> <port> <num-workers>) are expected while $# are present: \"$@\"." 1>&2
+			echo "To view the help message, type: $script_name -h" 1>&2
 			exit 1
 		fi
 		host=$1
@@ -183,8 +183,8 @@ set_up_master_address()
 	else
 		if [ $# -ne 1 ]
 		then
-			echo "1 argument (<num-workers>) is expected while $# is present: \"$@\"."
-			echo "To view the help message, type: $script_name -h"
+			echo "1 argument (<num-workers>) is expected while $# is present: \"$@\"." 1>&2
+			echo "To view the help message, type: $script_name -h" 1>&2
 			exit 1
 		fi
 		host=
@@ -207,14 +207,14 @@ set_up_working_directory()
 	worker=`which work_queue_worker 2>/dev/null`
 	if [ $? != 0 ]
 	then
-		echo "$0: please add 'work_queue_worker' to your PATH."
+		echo "$0: please add 'work_queue_worker' to your PATH." 1>&2
 		exit 1
 	fi
 
 	gpu_detection=`which cctools_gpu_autodetect 2>/dev/null`
 	if [ $? != 0 ]
 	then
-		echo "$0: could not find cctools_gpu_autodetect in PATH. gpus will not be automatically detected."
+		echo "$0: could not find cctools_gpu_autodetect in PATH. gpus will not be automatically detected." 1>&2
 	else
 		cp $gpu_detection ${submit_dir}
 	fi
@@ -239,7 +239,7 @@ set_up_password_file_common()
 	then
 		if [ ! -f $pwfile ]
 		then
-			echo "$script_name password file $pwfile not found"
+			echo "$script_name password file $pwfile not found" 1>&2
 			exit 1
 		fi
 
@@ -251,7 +251,7 @@ set_up_password_file_common()
 
 submit_workers_command()
 {
-	echo "Please define a submit_workers_command function in your script"
+	echo "Please define a submit_workers_command function in your script" 1>&2
 }
 
 submit_workers()
@@ -263,4 +263,10 @@ submit_workers()
 
 	exit $?
 }
+
+if [ "${script_name##*/}" = work_queue_submit_common ]
+then
+    echo "This script provides support functions for the work queue"
+    echo "workers submission scripts, and cannot be executed by itself."
+fi
 
