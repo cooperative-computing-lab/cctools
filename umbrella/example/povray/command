@@ -7,7 +7,8 @@ umbrella -T parrot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_Rubiks
 #Don't do the docker test under your afs, it will fail due to the ACL of your afs.
 umbrella -T docker -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/docker_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
-umbrella -T ec2 --sshkey ~/bin/feb272015.pem -k feb272015 -g 'sg-24f96141' -c povray_redhat5_ec2.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/ec2_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+#there is only one difference between the specification for ec2 execution engine and the specification for the local execution engine (parrot/docker/chroot): the `id` attribute of the os section is an AMI in the ec2 specification; the `id` attribute of the os section is the checksum of the os image.
+umbrella -T ec2 --sshkey ~/bin/feb272015.pem -k feb272015 -g 'sg-24f96141' -c povray_redhat5_ec2.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/ec2_povray_redhat5 --remotelog umbrella.log.ec2 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 umbrella -T condor --remotelog umbrella.log.condor  -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/condor_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 

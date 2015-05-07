@@ -1,4 +1,4 @@
-umbrella -T parrot -c cms_paper.json -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/cmssw_output run '/bin/sh cms_analysis_short.sh'
-umbrella -T docker -c cms_paper.json -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/cmssw_output run '/bin/sh cms_analysis_short.sh'
-umbrella -T local -c cms_paper.json -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/cmssw_output run '/bin/sh cms_analysis_short.sh'
-umbrella -T condor -c cms_paper.json -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/cmssw_output run '/bin/sh cms_analysis_short.sh'
+umbrella -T parrot -c cms_paper.json -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/parrot_cms_paper_output run '/bin/sh cms_analysis_short.sh'
+umbrella -T docker -c cms_paper.json -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/docker_cms_paper_output run '/bin/sh cms_analysis_short.sh'
+umbrella -T local -c cms_paper.json -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/local_cms_paper_output run '/bin/sh cms_analysis_short.sh'
+umbrella -T condor --remotelog umbrella.log.condor -c cms_paper.json -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/condor_cms_paper_output run '/bin/sh cms_analysis_short.sh'

@@ -3,14 +3,14 @@ Options:
                         The specification json file. (By default: spec.json)
   -l LOCALDIR, --localdir=LOCALDIR
                         The path of directory used for all the cached data and all the sandboxes. (By default: ./umbrella_test)
-						this directory must be empty or non-existent.
+						this directory can be an existing dir.
   -i INPUTS, --inputs=INPUTS
                         The path of input files in the format of access_path=actual_path. i.e, -i '/home/hmeng/file1=/tmp/file2'. access_path must be consistent with the semantics of the provided command, actual_path can be relative or absolute. (By default:
                         '')
   -e ENV, --env=ENV     The environment variable. I.e., -e 'PWD=/tmp'. (By default: '')
   -o OUTPUT, --output=OUTPUT
                         The path of output. (By default: ./umbrella_output)
-						this directory must be empty.
+						this directory must be non-existing or empty.
 
   -T BATCH_TYPE, --batch_type=BATCH_TYPE
                         Batch system type, which can be local, parrot, chroot, docker, condor, ec2. (By default: local)
@@ -22,7 +22,7 @@ Options:
 						If the value of this option does not exist, one copy of ec2.json will be downloaded into the sandbox from the ccl website.
 
   --log=LOG             The path of umbrella log file. (By default: ./umbrella.log)
-
+  --remotelog=REMOTELOG The path of the remote umbrella log file. Required for ec2 and condor execution engines.
   -g GROUP, --group=GROUP
                         the security group within which an instance should be run. (only for ec2)
   -k KEY, --key=KEY     the name of the key pair to use when launching an instance. (only for ec2)
@@ -64,15 +64,15 @@ Then the local umbrella calls`condor_submit`.
 
 outputs of local execution engine: 
 all the stuff created in the sandbox during the execution of the application will be finally put into the output_dir.
-Parrot and chroot: rename sandbox_dir to output_dir
-Docker: cp sandbox_dir/* into output_dir/
+Parrot and chroot and Docker: rename sandbox_dir to output_dir
 
 outputs of cloud execution engine:
 the output_dir on the remote execution node is transferred back to the local machine and put into the output_dir set by the user.
 the sandbox on the local machine will be deleted.
 
 outputs of grid execution engine:
-the output_dir on the remote execution node is transferred back to the local machine and put into the output_dir set by the user.
+the output_dir on the remote execution node is transferred back to the dir1 the local machine and then dir1 is rename into the output_dir set by the user.
+The semantics of condor_output_files only supports transferring a dir from the execution node back to the current working dir, so we need a two-steps output dir setting.
 the sandbox on the local machine will be deleted.
 
 the execution result (return code, stdout data, stderr data) of all the subprocesses called by Umbrella are written into the umbrella log file.
@@ -108,5 +108,3 @@ umbrella: error: no such option: -r
 hmeng@ccl12 ~/git-development/cctools/umbrella/example/povray$ echo $?
 2
 
-Following work:
-Add more behavior support: check, download

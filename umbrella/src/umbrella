@@ -66,6 +66,15 @@ def func_call_output_withenv(cmd, env_dict, output_dir):
 	logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, output, err)
 	return rc, output, err
 
+"""The implementation of shell which command
+"""
+def which_exec(name):
+	for path in os.environ["PATH"].split(":"):
+		fullpath = path + '/' + name
+		if os.path.exists(fullpath) and os.path.isfile(fullpath):
+			return fullpath
+	return None
+
 """ Calculate the md5sum of a file
 Parameter filename: the name of the file 
 Parameter block_size: the size of each block
@@ -295,7 +304,7 @@ def dependency_process(name, id, mountpoint, action, packages, sandbox_dir, batc
 		mount_value = dest
 	return has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_value, local_cvmfs
 	
-''' Set the global environment parameters according to the specification file
+''' Set the environment parameters according to the specification file
 '''	
 def env_parameter_init(hardware_spec, kernel_spec, os_spec):
 	hardware_platform = hardware_spec["arch"].lower()
@@ -733,18 +742,19 @@ def has_docker_image(hardware_platform, distro_name, distro_version):
 	rc = p.returncode
 	logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, output, err)
 	if rc != 0:
-		subprocess_error(cmd, rc, stdout, stderr)
-	str = "\n%s\s+" % (name)
-	if output.find(str) == -1:
-		return 'yes'
-	else:
+		subprocess_error(cmd, rc, output, err)
+	#str = "\n%s\s+" % (name)
+	if output.find(name) == -1:
 		return 'no'
+	else:
+		return 'yes'
 
 """ Create a docker image based on the cached os image directory
 """
-def create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_version):
+def create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_version, packages):
 	name = "%s-%s-%s" %(distro_name, distro_version, hardware_platform)
-	location = os.path.dirname(sandbox_dir) + '/cache/' + name
+	id = package_search(packages, name, '')["checksum"]
+	location = os.path.dirname(sandbox_dir) + '/cache/' + id + '/' + name
 	#docker container runs as root user, so use the owner option of tar command to set the owner of the docker image
 	cmd = 'cd ' + location + '; tar --owner=root -c .|docker import - ' + name + '; cd -'
 	rc, stdout, stderr = func_call(cmd)
@@ -971,11 +981,16 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 		os.rename(sandbox_dir, output_dir)
 	elif batch_type == "docker":
 		logging.debug("docker execution engine")
+
+		logging.debug("Removing the parrot submit file from the sandbox")
+		if os.path.exists(parrot_submit_path):
+			os.remove(parrot_submit_path)
+
 		logging.debug("need_separate_rootfs: %d", need_separate_rootfs)
 		if need_separate_rootfs == 1:
 			if has_docker_image(hardware_platform, distro_name, distro_version) == 'no':
 				logging.debug("Start to construct a docker image from the os image")
-				create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_version)
+				create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_version, packages)
 				logging.debug("Finish constructing a docker image from the os image")
 
 			logging.debug("Add a volume item (%s:%s)", sandbox_dir, sandbox_dir)
@@ -1005,11 +1020,7 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 			if rc != 0:
 				subprocess_error(cmd, rc, stdout, stderr)
 			logging.debug("Rename the sandbox dir(%s) to the output directory(%s)", sandbox_dir, output_dir)
-			cmd = 'cp -r %s/* %s' % (sandbox_dir, output_dir)
-			rc, stdout, stderr = func_call(cmd)
-			if rc != 0:
-				subprocess_error(cmd, rc, stdout, stderr)
-			shutil.rmtree(sandbox_dir)
+			os.rename(sandbox_dir, output_dir)
 		else:
 			#if a separate rootfs is not needed to execute the user's cmd, should forcely use other execution engine to run the user cmd.
 			logging.debug("Docker execution engine can only be used when a separate rootfs is needed.")
@@ -1062,6 +1073,13 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
 			execute_task_host_rootfs(sandbox_dir, env_dict, 'parrot', user_cmd, is_cvmfs_parrot_app, parrot_submit_path,  parrot_submit_file)
+
+		logging.debug("Removing the parrot mountlist file and the parrot submit file from the sandbox")
+		if os.path.exists(env_dict['PARROT_MOUNT_FILE']):
+			os.remove(env_dict['PARROT_MOUNT_FILE'])
+		if os.path.exists(parrot_submit_path):
+			os.remove(parrot_submit_path)
+
 		logging.debug("Rename sandbox_dir (%s) to output_dir (%s)", sandbox_dir, output_dir)
 		os.rename(sandbox_dir, output_dir)
 	else:
@@ -1074,7 +1092,7 @@ def condor_process(spec_path, spec, spec_path_basename, packages_path, sandbox_d
 		os.makedirs(sandbox_dir)
 
 	if spec.has_key("hardware") and spec["hardware"] and spec.has_key("kernel") and spec["kernel"] and spec.has_key("os") and spec["os"]:
-		logging.debug("Setting the global environment parameters (hardware, kernle and os) according to the specification file ....")
+		logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
 		hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id = env_parameter_init(spec["hardware"], spec["kernel"], spec["os"])
 	else:
 		logging.critical("this specification is not complete! You must have a hardware section, a kernel section and a os section!")
@@ -1100,11 +1118,18 @@ def condor_process(spec_path, spec, spec_path_basename, packages_path, sandbox_d
 	condor_output_dir = os.path.abspath(condor_output_dir)
 	condor_log_path = sandbox_dir + '/condor_task.log'
 	
+	umbrella_fullpath = which_exec("umbrella")
+	if umbrella_fullpath == None:
+		logging.critical("Failed to find the executable umbrella. Please modify your $PATH.")
+		sys.exit("Failed to find the executable umbrella. Please modify your $PATH.\n")
+
+	logging.debug("The full path of umbrella is: %s" % umbrella_fullpath)
+
 	condor_submit_file = open(condor_submit_path, "w+")
 	condor_submit_file.write('universe = vanilla\n')
-	condor_submit_file.write('executable = umbrella\n')
+	condor_submit_file.write('executable = %s\n' % umbrella_fullpath)
 	condor_submit_file.write('arguments = "-T local -c %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(packages_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
-	condor_submit_file.write('transfer_input_files = umbrella, %s, %s%s\n' % (packages_path, spec_path, transfer_inputs))
+	condor_submit_file.write('transfer_input_files = %s, %s, %s%s\n' % (umbrella_fullpath, packages_path, spec_path, transfer_inputs))
 	condor_submit_file.write('transfer_output_files = %s, condor_umbrella.log\n' % os.path.basename(condor_output_dir))
 	condor_submit_file.write('transfer_output_remaps = "condor_umbrella.log=%s"\n' % remotelog_path) 
 	if linux_distro == "redhat5":
@@ -1136,17 +1161,14 @@ def condor_process(spec_path, spec, spec_path_basename, packages_path, sandbox_d
 	if rc != 0:
 		subprocess_error(cmd, rc, stdout, stderr)
 
+	logging.debug("Remove the sandbox")
+	shutil.rmtree(sandbox_dir)
+
 	logging.debug("the condor jos is done, put the output back into the output directory!")
 	print "the condor jobs is done, put the output back into the output directory!"
 	#check until the condor job is done, post-processing (put the output back into the output directory)
+	#the semantics of condor_output_files only supports transferring a dir from the execution node back to the current working dir (here it is condor_output_dir). 
 	os.rename(condor_output_dir, output_dir)
-
-	#copy all the stuff inside the sandbox_dir into output)dir, and then remove the sandbox_dir
-#	cmd = 'cp -r %s/* %s' % (sandbox_dir, output_dir)
-#	rc, stdout, stderr = func_call(cmd)
-#	if rc != 0:
-#		subprocess_error(cmd, rc, stdout, stderr)
-	shutil.rmtree(sandbox_dir)
 
 ''' Compare the required hardware configurations with each instance type, and return the first matched instance type, return 'no' if no matched instance type exist.
 Note: We can rank each instance type in the future, so that in the case of multiple matches exit, the closest matched instance type is returned.
@@ -1210,26 +1232,37 @@ def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ss
 	public_dns = get_public_dns(instance_id)
 	logging.debug("Get the public DNS of the instance_id: %s", public_dns)
 
-	public_dns = "ec2-52-11-98-91.us-west-2.compute.amazonaws.com"
+	#public_dns = "ec2-52-11-98-91.us-west-2.compute.amazonaws.com"
 	#install wget on the instance	
 	logging.debug("Install wget on the instance")
-	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'yum -y install wget\'' % (ssh_key, user_name, public_dns)
-	rc, stdout, stderr = func_call(cmd)
-	if rc != 0:
-		subprocess_error(cmd, rc, stdout, stderr)
+	#here we should judge the os type, yum is used by Fedora, CentOS, and REHL.
+	#without `-t` option of ssh, if the username is not root, `ssh + sudo` will get the following error: sudo: sorry, you must have a tty to run sudo.
 
+	#ssh exit code 255: the remote node is down or unavailable
+	rc = 300
+	while rc != 0:
+		if distro_name in ["fedora", "centos", "redhat"]:
+			cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo yum -y install wget\'' % (ssh_key, user_name, public_dns)
+		else:
+			sys.exit("Currently the supported Linux distributions are redhat, centos and fedora.\n")
+		rc, stdout, stderr = func_call(cmd)
+		if rc != 0:
+			logging.debug("`%s` fails with the return code of %d, \nstdout: %s, \nstderr: %s" % (cmd, rc, stdout, stderr))
+			time.sleep(5)
+
+	#python, the python is needed to execute umbrella itself
 	logging.debug("Install python 2.6.9 on the instance.")
 	python_name = 'python-2.6.9-%s-%s' % (linux_distro, hardware_platform)
 	python_item = package_search(packages, python_name, '')
 	python_url = python_item["source"][0] #get the url of python
-	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s  \'wget %s\'' % (ssh_key, user_name, public_dns, python_url)
+	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'wget %s\'' % (ssh_key, user_name, public_dns, python_url)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	scheme, netloc, path, query, fragment = urlparse.urlsplit(python_url)
 	python_url_filename = os.path.basename(path)
-	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s  \'tar zxvf %s\'' % (ssh_key, user_name, public_dns, python_url_filename)
+	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'tar zxvf %s\'' % (ssh_key, user_name, public_dns, python_url_filename)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
 		subprocess_error(cmd, rc, stdout, stderr)
@@ -1239,7 +1272,9 @@ def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ss
 	input_file_string = ''
 	for input_file in input_list:
 		input_file_string += input_file + ' ' 
-	cmd = 'scp -i %s umbrella %s %s %s %s@%s:' % (ssh_key, spec_path, packages_path, input_file_string, user_name, public_dns)
+
+	umbrella_fullpath = which_exec("umbrella")
+	cmd = 'scp -i %s %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, packages_path, input_file_string, user_name, public_dns)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
 		subprocess_error(cmd, rc, stdout, stderr)
@@ -1307,7 +1342,7 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch
 	#if batch_type is local, download parrot, download SITEINFO, create a clean environment, do the experiment.
 	#if batch_type is condor, create condor submit file, submit condor job.
 	if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
-		logging.debug("Setting the global environment parameters (hardware, kernle and os) according to the specification file ....")
+		logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
 		hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
 	else:
 		logging.critical("this specification is not complete! You must have a hardware section, a kernel section and a os section!")
@@ -1318,8 +1353,12 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch
 	need_separate_rootfs = 0
 	os_image_dir = ''
 	if linux_distro != host_linux_distro or batch_type == 'docker':
-		print "The required linux distro specified in the specification is %s; the linux distro of the host machine is %s. The %s os images will be downloaded." % (linux_distro, host_linux_distro, linux_distro)
-		logging.debug("The required linux distro specified in the specification is %s; the linux distro of the host machine is %s. The %s os images will be downloaded.", linux_distro, host_linux_distro, linux_distro)
+		if linux_distro != host_linux_distro:
+			print "The required linux distro specified in the specification is %s; the linux distro of the host machine is %s. The %s os images will be downloaded." % (linux_distro, host_linux_distro, linux_distro)
+			logging.debug("The required linux distro specified in the specification is %s; the linux distro of the host machine is %s. The %s os images will be downloaded.", linux_distro, host_linux_distro, linux_distro)
+		elif batch_type == 'docker':
+			print "Using Docker execution engine requires a separate root filesystem."
+			logging.debug("Using Docker execution engine requires a separate root filesystem.")
 		need_separate_rootfs = 1
 		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
 		if os_id == '':
@@ -1346,7 +1385,7 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch
 	if spec_json.has_key("data") and spec_json["data"]:
 		data_install(spec_json["data"], packages_json, sandbox_dir, mount_dict)
 	else:
-		logging.debug("this spec does not have dat section!")
+		logging.debug("this spec does not have data section!")
 	
 	workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, parrot_submit_path, parrot_submit_file, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict, packages_json)
 
@@ -1354,16 +1393,15 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch
 '''
 def dependency_check(item):
 	print "dependency check -- ", item, " "
-	cmd = 'which %s' % item
-	rc, stdout, stderr = func_call(cmd)
-	if rc != 0:
-		logging.debug("command `which %s` failed.", item)
-		print "command `which %s` failed." % item
+	result = which_exec(item)
+	if result == None:
+		logging.debug("Failed to find the executable `%s` through $PATH.", item)
+		print "Failed to find the executable `%s` through $PATH." % item
 		return -1
 		#subprocess_error(cmd, rc, stdout, stderr)
 	else:
-		logging.debug("command `which %s` found.", item)
-		print "command `which %s` found." % item
+		logging.debug("Find the executable `%s` through $PATH.", item)
+		print "Find the executable `%s` through $PATH." % item
 		return 0
 	
 """ Get the minimum integer for the sandbox name
@@ -1388,13 +1426,13 @@ def get_instance_id(image_id, instance_type, key_pair, security_group):
 	rc = p.returncode
 	logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, output, err)
 	if rc != 0:
-		subprocess_error(cmd, rc, stdout, stderr)
+		subprocess_error(cmd, rc, output, err)
 	str = "\nINSTANCE"
 	index = output.find(str)
 	if index == -1:
 		sys.exit("Fail to get the instance id!")
 	else:
-		instance_id = output[(index+9):(index+19)]
+		instance_id = output[(index+9):(index+20)]
 		return instance_id
 			
 """ Get the public dns of one VM instance from Amazon EC2, `ec2-run-instances` can not directly return the public dns of the instance, so this function is needed to check the result of `ec2-describe-instances` to obtain the public dns of the instance.
@@ -1410,13 +1448,16 @@ def get_public_dns(instance_id):
 		rc = p.returncode
 		logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, output, err)
 		if rc != 0:
-			subprocess_error(cmd, rc, stdout, stderr)
+			subprocess_error(cmd, rc, output, err)
 
 		str = "\nPRIVATEIPADDRESS"
 		index = output.find(str)
 		if index >= 0:
 			index1 = output.find("ec2", index + 1)
-			public_dns = line[index1:]
+			if index1 == -1:
+				time.sleep(5)
+				continue	
+			public_dns = output[index1:-1]
 			break
 	return public_dns
 
@@ -1430,7 +1471,7 @@ def main():
 	parser.add_option("-l", "--localdir",
 					action="store", 
 					default="./umbrella_test",
-					help="The path of directory used for all the cached data and all the sandboxes. (By default: ./umbrella_test)",)
+					help="The path of directory used for all the cached data and all the sandboxes, the directory can be an existing dir. (By default: ./umbrella_test)",)
 	parser.add_option("-i", "--inputs",
 					action="store", 
 					default='',
@@ -1442,7 +1483,7 @@ def main():
 	parser.add_option("-o", "--output",
 					action="store", 
 					default="./umbrella_output",
-					help="The path of output. (By default: ./umbrella_output)",)
+					help="The path of output directory, which must be non-existing or empty. (By default: ./umbrella_output)",)
 	parser.add_option("-T", "--batch_type",
 					action="store", 
 					default="parrot",
@@ -1462,7 +1503,7 @@ def main():
 					help="The path of umbrella log file. (By default: ./umbrella.log)",)
 	parser.add_option("--remotelog",
 					action="store", 
-					help="The path of the remote umbrella log file. (only for ec2 and condor execution engines)",)
+					help="The path of the remote umbrella log file. Required for ec2 and condor execution engines.",)
 	parser.add_option("-g", "--group",
 					action="store", 
 					help="the security group within which an instance should be run. (only for ec2)",)

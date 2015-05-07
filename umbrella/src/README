@@ -9,12 +9,13 @@ Options:
                         The specification json file. (By default: ./spec.json)
   -l LOCALDIR, --localdir=LOCALDIR
                         The path of directory used for all the cached data and all the sandboxes. (By default: ./umbrella_test)
-						this directory must be empty.
+						this directory can be an existing dir.
   -i INPUTS, --inputs=INPUTS
                         The path of input files in the format of access_path=actual_path. i.e, -i '/home/hmeng/file1=/tmp/file2'. access_path must be consistent with the semantics of the provided command, actual_path can be relative or absolute. (By default: '')
   -e ENV, --env=ENV     The environment variable. I.e., -e 'PWD=/tmp'. (By default: '')
   -o OUTPUT, --output=OUTPUT
                         The path of output. (By default: ./umbrella_output)
+						this directory must be non-existing or empty.
   -T BATCH_TYPE, --batch_type=BATCH_TYPE
                         Batch system type, which can be local, parrot, chroot, docker, condor, ec2. (By default: local)
   --packages=PACKAGES   The source of packages information. (By default: ./packages.json)
@@ -22,7 +23,7 @@ Options:
   --ec2=EC2             The source of ec2 information. (By default: ./ec2.json)
 						If the value of this option does not exist, one copy of ec2.json will be downloaded into the sandbox from the ccl website.
   --log=LOG             The path of umbrella log file. (By default: ./umbrella.log)
-  --remotelog=REMOTELOG The path of the remote umbrella log file. (only for ec2 and condor execution engines)
+  --remotelog=REMOTELOG The path of the remote umbrella log file. Required for ec2 and condor execution engines.
   -g GROUP, --group=GROUP
                         the security group within which an instance should be run. (only for ec2)
   -k KEY, --key=KEY     the name of the key pair to use when launching an instance. (only for ec2)
@@ -40,25 +41,27 @@ Parrot execution engine can be used without any special authority on the host ma
 
 Take an ray-tracing application as an example, the usage of different execution engines is shown as follows:
 Local execution engine:
-umbrella -T local -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/local_povray_redhat5  run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+umbrella -T local -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/local_povray_redhat5  run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 Note: In this case, Umbrella first check whether Docker exists on the host machine, if yes, use docker execution engine; if not, use parrot execution engine.
+Here setting the -T option to be local just focuses on docker and parrot, ignoring chroot, because to render a task includes lots of mount and umount oprations, which are dangerous. If you really want to use chroot to finish your task, please set the -T option to be chroot. 
 
 Parrot execution engine:
-umbrella -T parrot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/parrot_povray_redhat5  run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+umbrella -T parrot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/parrot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 Docker execution engine:
-umbrella -T docker -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/docker_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+umbrella -T docker -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/docker_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+Note: Do not try the docker test under your afs, it will fail due to the ACL of your afs.
 
 Chroot execution engine:
-sudo ~hmeng/cctools/bin/umbrella -T chroot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/chroot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+sudo /tmphmeng/cctools/bin/umbrella -T chroot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/chroot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 Condor execution engine:
-umbrella -T condor -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o condor_povray --log umbrella.log --remotelog condor_umbrella.log run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+umbrella -T condor --remotelog umbrella.log.condor  -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/condor_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 Note: 1). Condor is not compatible with AFS, so ensure your test is not running on AFS. 
-2). --localdir option is not still needed here for the potential usage to hold the packages.json. 
+2). --localdir option is still needed here for the potential usage to hold the packages.json. 
 
 Cloud execution engine:
-umbrella -T ec2 --sshkey abc.pem --key ecw_key --group sg-24f96141 -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ec2_povray --log umbrella.log --remotelog ec2_umbrella.log run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+umbrella -T ec2 --sshkey ~/bin/feb272015.pem -k feb272015 -g 'sg-24f96141' -c povray_redhat5_ec2.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/ec2_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 Note: --sshkey, --key and --group are only meaningful for cloud execution engine. According to the given specification file, the AMI and the instance type can be identified. The user of Umbrella needs to specify the security group within which an instance should be run and the name of the key pair to use when launching an instance.
 
 Here is the specification JSON file for a Ray-Tracing application:
@@ -117,13 +120,13 @@ A specification includes 6 parts: hardware, kernel, os, software, data, and envi
 
 `version` (Required): the OS version in the format of 'A. B': A is the main version number and B is the minor version number. Exmaples: 5.10, 6.5. 
 
-`id` (Optional): the id of the OS image. There may exist multiple OS images for redhat 5.10, the id attribute uniquely identify a OS image. If this attribute is not provided in the specification and the OS version is redhat 5.10, the first OS image whose version is redhat 5.10 found in the packages.json will be used.
+`id` (Optional): the id of the OS image. There may exist multiple OS images for redhat 5.10, the id attribute uniquely identifies a OS image. If this attribute is not provided in the specification and the OS version is redhat 5.10, the first OS image whose version is redhat 5.10 found in the packages.json will be used.
 
 `software` Section (Optional):
 
 Each software dependency has a name, which corresponds to the name included in packages.json (which will be explained in the following part).
 
-`id` (Optional): the id of the software. There may exist multiple versions of a software like `povray-3.6.1-redhat5-x86_64` due to the difference of complication settings. the id attribute uniquely identify a software. If If this attribute is not provided in the specification, the first version found in the packages.json will be used. 
+`id` (Optional): the id of the software. There may exist multiple versions of a software like `povray-3.6.1-redhat5-x86_64` due to the difference of complication settings. the id attribute uniquely identifies a software. If this attribute is not provided in the specification, the first version found in the packages.json will be used. 
 
 `mountpoint` (Required): the mountpoint of the software. Case sensitive.
 
@@ -133,7 +136,7 @@ Each software dependency has a name, which corresponds to the name included in p
 
 Each data dependency has a name, which corresponds to the name included in packages.json (which will be explained in the following part).
 
-`id` (Optional): the id of the data. There may exist multiple versions of a data. the id attribute uniquely identify a data. If If this attribute is not provided in the specification, the first version found in the packages.json will be used. 
+`id` (Optional): the id of the data. There may exist multiple versions of a data. the id attribute uniquely identifies a data. If this attribute is not provided in the specification, the first version found in the packages.json will be used. 
 
 `mountpoint` (Required): the mountpoint of the data dependency. Case sensitive.
 
@@ -178,13 +181,13 @@ The name of an OS image dependency is in the format of 'A-B-C', where A is the O
 
 There is no special limitation on the name of a data dependency.
 
-Each dependency (OS, software and datat) includes four attributes: source, checksum, size and format.
+Each dependency (OS, software and data) includes four attributes: source, checksum, size and format.
 
-`source`: a list of storage location of the dependency, which includes one or more resource url. Each url can be a local file path like "file:///etc/hosts", or a https/http urlas shown in the example. Case sensitive. The first source will be first tried, if fails, then the second source will be tried, and so on.
+`source`: a list of storage location of the dependency, which includes one or more resource URL. Each URL can be a local file path like "file:///etc/hosts", or a https/http URL as shown in the example. Case sensitive. The first source will be first tried, if fails, then the second source will be tried, and so on.
 
 `checksum`: the checksum of the dependencies. Currently Umbrella only supports md5 checksum. 
 
-`size`: the size of the compressed version of each dependencies. Not case sensitive.
+`size`: the size of the dependency. Not case sensitive.
 
 `format`: the perservation format of the dependency. Currently Umbrella supports two formats: tgz (gzip compressed tarball) and plain (plain text).
 
@@ -193,7 +196,7 @@ The id and checksum of each package in the archive are identical. Take cctools-4
 Within the local cache, the id of each package dependency will be used to create a directory under the <localdir>/cache, then the package will be put into <localdir>/cache/<id>/<name>. Therefore, <localdir>/cache/7b32c36052c75b01182bbdb1656199c2/cctools-4.4.0-centos6-x86_64.tar.gz will be the local location of the above package.
 Within the remote archive, to differentiate multiple packages on one software, a directory with the name of the checksum of each package will be created and functions as the direct parent directory of the package. Therefore, in the romote archive, there is a directory named 7b32c36052c75b01182bbdb1656199c2, under which exists cctools-4.4.0-centos6-x86_64.tar.gz. However, the organization of the remote archive can be in other format. 
 
-If you want to customize your own packages.json, follow the requirement and then tell umbrella using `--packages` option to use your own pacakges information.
+If you want to customize your own packages.json, follow the requirement and then tell umbrella through `--packages` option to use your own pacakges information.
 
 When the ec2 execution engine is used, Umbrella tries to map the specification into an AMI and an EC2 instance type with the help of the JSON file specified by the --ec2 option.
 Note: The `id` attribute of the `os` section should be an AMI.
@@ -231,6 +234,4 @@ The name of each instance type is the same provided by Amazon EC2 (e.g., m1.larg
 
 Tips of using Umbrella:
 The first step of using Umbrella is to compose an specification for your application. Double check the packages.json you are using to guarantee each dependency of your package is specified correctly.
-
-In the application specification JSON file, you also can add `source`, `checksum`, and `size` attributes to the dependencies in the software and data section which you want to customize. Be sure to follow the semantics of `source`, `checksum`, and `size` attributes.
 
