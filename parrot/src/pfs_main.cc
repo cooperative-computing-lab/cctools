@@ -906,6 +906,8 @@ int main( int argc, char *argv[] )
 			snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s/parrot.%d", sys_temp_dir, getuid());
 		}
 	}
+	if (!create_dir(pfs_temp_dir, S_IRWXU))
+		fatal("could not create directory '%s': %s", pfs_temp_dir, strerror(errno));
 
 	snprintf(pfs_temp_per_instance_dir, PFS_PATH_MAX-1, "%s/parrot-instance.XXXXXX", pfs_temp_dir);
 	if (mkdtemp(pfs_temp_per_instance_dir) == NULL)
