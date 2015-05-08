@@ -63,7 +63,7 @@ public:
 	}
 
 	virtual int fsync() {
-		int result; 
+		int result;
 
 		hdfs_dircache.invalidate();
 
@@ -79,7 +79,7 @@ public:
 		result = hdfs->pread(fs, handle, offset, data, length);
 		HDFS_END
 	}
-	
+
 	virtual pfs_ssize_t write( const void *data, pfs_size_t length, pfs_off_t offset ) {
 		pfs_ssize_t result;
 
@@ -132,7 +132,7 @@ public:
 
 	int get_uid_from_name( const char *name ) {
 		int key;
-		
+
 		key = (PTRINT_T)hash_table_lookup(uid_table, name);
 		if (key) {
 			return key;
@@ -148,10 +148,10 @@ public:
 			}
 		}
 	}
-	
+
 	int get_gid_from_name( const char *name ) {
 		int key;
-		
+
 		key = (PTRINT_T)hash_table_lookup(gid_table, name);
 		if (key) {
 			return key;
@@ -246,7 +246,7 @@ public:
 				errno = ENOTSUP;
 				return 0;
 		}
-			
+
 		struct pfs_stat buf;
 		if (!this->_stat(fs, name, &buf) && S_ISDIR(buf.st_mode)) {
 			errno = EISDIR;
@@ -303,21 +303,21 @@ public:
 					dir->append(file_list[i].mName);
 				}
 			}
-			
+
 			hdfs->free_stat(file_list, num_entries);
 		}
-		
+
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		return dir;
 	}
-	
+
 	virtual int stat( pfs_name *name, struct pfs_stat *buf ) {
 		int result;
 		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
-		
+
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
-		
+
 		debug(D_HDFS, "stat %s", name->rest);
 		result = this->_stat(fs, name, buf);
 		buf->st_mode |= (S_IXUSR | S_IXGRP);
@@ -325,14 +325,14 @@ public:
 
 		HDFS_END
 	}
-	
+
 	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {
 		int result;
 		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
-		
+
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
-		
+
 		debug(D_HDFS, "lstat %s", name->rest);
 		result = this->_stat(fs, name, buf);
 		buf->st_mode |= (S_IXUSR | S_IXGRP);
@@ -359,20 +359,20 @@ public:
 				result = -1;
 			}
 		}
-		
+
 		HDFS_END
 	}
 
 	virtual int access( pfs_name *name, mode_t mode ) {
 		int result = -1;
 		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
-		
+
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
 
 		debug(D_HDFS, "access %s", name->rest);
 		result = hdfs->exists(fs, name->rest);
-		
+
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		HDFS_END
 	}
@@ -381,7 +381,7 @@ public:
 		int result = -1;
 		struct pfs_stat buf;
 		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
-		
+
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
 
@@ -403,44 +403,44 @@ public:
 	virtual int mkdir( pfs_name *name, mode_t mode ) {
 		int result;
 		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
-		
+
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
-		
+
 		hdfs_dircache.invalidate();
-		
+
 		debug(D_HDFS, "mkdir %s", name->rest);
 		result = hdfs->mkdir(fs, name->rest);
 
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		HDFS_END
 	}
-	
+
 	virtual int rmdir( pfs_name *name ) {
 		int result;
 		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
-		
+
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
-		
+
 		hdfs_dircache.invalidate();
-		
+
 		debug(D_HDFS, "rmdir %s", name->rest);
 		result = hdfs->unlink(fs, name->rest,1);
 
 		pfs_service_disconnect_cache(name, (void*)fs, (errno == HDFS_EINTERNAL));
 		HDFS_END
 	}
-	
+
 	virtual int unlink( pfs_name *name ) {
 		int result;
 		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
-		
+
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
 
 		hdfs_dircache.invalidate();
-		
+
 		debug(D_HDFS, "unlink %s", name->rest);
 		result = hdfs->unlink(fs, name->rest,0);
 
@@ -451,12 +451,12 @@ public:
 	virtual int rename( pfs_name *name, pfs_name *newname ) {
 		int result;
 		hdfsFS fs = (hdfsFS)pfs_service_connect_cache(name);
-		
+
 		HDFS_CHECK_INIT(-1)
 		HDFS_CHECK_FS(-1)
 
 		hdfs_dircache.invalidate();
-		
+
 		debug(D_HDFS, "rename %s to %s", name->rest, newname->rest);
 		result = hdfs->rename(fs, name->rest, newname->rest);
 
@@ -475,7 +475,7 @@ public:
 		char ***hosts;
 
 		HDFS_CHECK_FS(NULL)
-		
+
 		debug(D_HDFS, "locate %s", name->rest);
 		if (this->_stat(fs, name, &buf) >= 0) {
 			if (S_ISDIR(buf.st_mode)) {

@@ -5,17 +5,21 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "linux-version.h"
 #include "pfs_channel.h"
 
-#include "xxmalloc.h"
 #include "debug.h"
+#include "tracer.h"
+#include "xxmalloc.h"
 
-#include <stdlib.h>
+#include <syscall.h>
 #include <unistd.h>
+
 #include <sys/mman.h>
-#include <bits/mman.h>
-#include <string.h>
+
 #include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 
 extern char pfs_temp_dir[];
 
@@ -27,6 +31,9 @@ struct entry {
 	struct entry *prev;
 	struct entry *next;
 };
+
+#define CHANNEL_FMT "`%s':%" PRIx64 ":%zu"
+#define CHANNEL_FMT_ARGS(e) e->name, (uint64_t)e->start, (size_t)e->length
 
 static struct entry *head=0;
 static int channel_fd=-1;
@@ -40,11 +47,7 @@ static struct entry * entry_create( const char *name, pfs_size_t start, pfs_size
 	e = malloc(sizeof(*e));
 	if(!e) return 0;
 
-	if(name) {
-		e->name = xxstrdup(name);
-	} else {
-		e->name = 0;
-	}
+	e->name = name ? xxstrdup(name) : NULL;
 
 	e->start = start;
 	e->length = length;
@@ -72,32 +75,81 @@ static void entry_delete( struct entry *e )
 	if(head==e) head = e->next;
 	if(e->prev) e->prev->next = e->next;
 	if(e->next) e->next->prev = e->prev;
-	if(e->name) free(e->name);
+	free(e->name);
 	free(e);
+}
+
+static int channel_create (void)
+{
+	int fd;
+
+	/* We try to use memory file for the channel because we rely on POSIX
+	 * semantics for mmap. Some distributed file systems like GPFS do not
+	 * handle this correctly.
+	 *
+	 * See: https://github.com/cooperative-computing-lab/cctools/issues/305
+	 */
+
+	if (linux_available(3,17,0)) {
+#ifdef CCTOOLS_CPU_I386
+		fd = syscall(SYSCALL32_memfd_create, "parrot-channel", 0);
+#else
+		fd = syscall(SYSCALL64_memfd_create, "parrot-channel", 0);
+#endif
+	} else {
+		errno = ENOSYS;
+		fd = -1;
+	}
+
+	if (fd == -1 && errno == ENOSYS) {
+		const char *channel_dirs[] = {
+			"/dev/shm",
+			"/tmp",
+			"/var/tmp",
+			pfs_temp_dir,
+		};
+		int i;
+		for (i = 0; i < (int)(sizeof(channel_dirs)/sizeof(channel_dirs[0])); i++) {
+			char path[PATH_MAX];
+			snprintf(path, sizeof(path), "%s/parrot-channel.XXXXXX", channel_dirs[i]);
+
+			debug(D_DEBUG, "trying to create channel '%s'", path);
+			fd = mkstemp(path);
+			if (fd >= 0) {
+				unlink(path);
+
+				/* test if we can use it for executable data (i.e. is dir on a file system mounted with the 'noexec' option) */
+				size_t l = getpagesize();
+				if (ftruncate(fd, l) == -1) {
+					debug(D_DEBUG, "could not grow channel: %s", strerror(errno));
+					close(fd);
+					continue;
+				}
+				void *addr = mmap(NULL, l, PROT_READ|PROT_EXEC, MAP_SHARED, fd, 0);
+				if (addr == MAP_FAILED) {
+					debug(D_DEBUG, "failed executable mapping: %s", strerror(errno));
+					close(fd);
+					continue;
+				}
+				munmap(addr, l);
+				ftruncate(fd, 0);
+				break;
+			} else {
+				debug(D_DEBUG, "could not create channel: %s", strerror(errno));
+			}
+		}
+	}
+	return fd;
 }
 
 int pfs_channel_init( pfs_size_t size )
 {
-	char path[PATH_MAX];
-
 	close(channel_fd);
-	channel_fd = -1;
 
-	/* We use /dev/shm for the channel because we rely on POSIX semantics for
-	 * mmap. Some distributed file systems like GPFS do not handle this
-	 * correctly.
-	 *
-	 * See: https://github.com/cooperative-computing-lab/cctools/issues/305
-	 */
-	snprintf(path, sizeof(path), "%s/parrot-channel.XXXXXX", "/dev/shm");
-	channel_fd = mkstemp(path);
+	channel_fd = channel_create();
 	if (channel_fd < 0) {
-		snprintf(path, sizeof(path), "%s/parrot-channel.XXXXXX", pfs_temp_dir);
-		channel_fd = mkstemp(path);
+		fatal("could not create a channel!");
 	}
-	if (channel_fd < 0)
-		return 0;
-	unlink(path);
 
 	channel_size = size;
 	ftruncate(channel_fd,channel_size);
@@ -164,6 +216,7 @@ int pfs_channel_alloc( const char *name, pfs_size_t length, pfs_size_t *start )
 				e->inuse = 1;
 				*start = e->start;
 				memset(channel_base+*start+length-page_size,0,page_size);
+				debug(D_DEBUG, "allocated channel " CHANNEL_FMT, CHANNEL_FMT_ARGS(e));
 				return 1;
 			} else {
 				/* not big enough */
@@ -200,7 +253,6 @@ int pfs_channel_lookup( const char *name, pfs_size_t *start )
 
 	do {
 		if(e->name && !strcmp(e->name,name)) {
-			e->inuse++;
 			*start = e->start;
 			return 1;
 		}
@@ -217,6 +269,7 @@ int pfs_channel_addref( pfs_size_t start )
 	do {
 		if(e->start==start) {
 			e->inuse++;
+			debug(D_DEBUG, "increasing refcount to %d for channel " CHANNEL_FMT, e->inuse, CHANNEL_FMT_ARGS(e));
 			return 1;
 		}
 		e = e->next;
@@ -227,15 +280,12 @@ int pfs_channel_addref( pfs_size_t start )
 int pfs_channel_update_name( const char *oldname, const char *newname )
 {
 	struct entry *e = head;
-	debug(D_CHANNEL,"updating channel for file '%s'",oldname);
+	debug(D_CHANNEL,"updating channel for file '%s' to '%s'",oldname,newname);
 	do {
 		if(e->name && !strcmp(e->name,oldname)) {
-			if(e->name)
-				free(e->name);
-			if(newname)
-				e->name = xxstrdup(newname);
-			else
-				e->name = 0;
+			free(e->name);
+			e->name = newname ? xxstrdup(newname) : 0;
+			debug(D_DEBUG, "channel is now " CHANNEL_FMT, CHANNEL_FMT_ARGS(e));
 			return 1;
 		}
 		e = e->next;
@@ -251,24 +301,23 @@ void pfs_channel_free( pfs_size_t start )
 	do {
 		if(e->start==start) {
 			e->inuse--;
+			debug(D_DEBUG, "decreasing refcount to %d for channel " CHANNEL_FMT, e->inuse, CHANNEL_FMT_ARGS(e));
 			if(e->inuse<=0) {
-				e->inuse=0;
-				if(e->name) {
-					free(e->name);
-					e->name = 0;
+				struct entry *prev = e->prev;
+				struct entry *next = e->next;
+
+				debug(D_DEBUG, "freeing channel " CHANNEL_FMT, CHANNEL_FMT_ARGS(e));
+				e->inuse = 0;
+				/* collapse adjacent free blocks */
+				if((e->start <= next->start) && next->inuse == 0) {
+					e->length += next->length;
+					entry_delete(next);
+					if (next == prev)
+						prev = NULL;
 				}
-				if( (e->prev->start < e->start) && !e->prev->inuse) {
-					struct entry *f = e->prev;
-					f->length += e->length;
+				if(prev && (prev->start <= e->start) && prev->inuse == 0) {
+					prev->length += e->length;
 					entry_delete(e);
-					e = f;
-				}
-				if( (e->next->start>e->start) && !e->next->inuse) {
-					struct entry *f = e->next;
-					f->start = e->start;
-					f->length += e->length;
-					entry_delete(e);
-					e = f;
 				}
 			}
 			return;
@@ -276,7 +325,5 @@ void pfs_channel_free( pfs_size_t start )
 		e = e->next;
 	} while(e!=head);
 }
-
-
 
 /* vim: set noexpandtab tabstop=4: */

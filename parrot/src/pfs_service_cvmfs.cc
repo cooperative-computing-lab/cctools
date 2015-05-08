@@ -647,8 +647,8 @@ static void cvmfs_read_config()
 		buffer_putfstring(&B, "parrot-%d-%d-%s", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
 		if(getenv("CERNVM_UUID"))
 			buffer_putfstring(&B, "-%s", getenv("CERNVM_UUID")); /* can't use space since that is filtered, use '-' */
-		setenv("CERNVM_UUID", buffer_tostring(&B, NULL), 1);
-		debug(D_CVMFS, "setenv CERNVM_UUID=`%s'", buffer_tostring(&B, NULL));
+		setenv("CERNVM_UUID", buffer_tostring(&B), 1);
+		debug(D_CVMFS, "setenv CERNVM_UUID=`%s'", buffer_tostring(&B));
 		buffer_free(&B);
 	}
 
@@ -945,7 +945,9 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 
 			if(sscanf(link_target, "/cvmfs/%[^/]%[^\n]", xpath->host, path_head) < 1)
 			{
-				errno = EXDEV;
+				/* The path points outside of cvmfs, we do not allow that. */
+				debug(D_CVMFS, "refusing to follow path outside of cvmfs: '%s' -> '%s'", path->path, link_target);
+				errno = ENOENT;
 				return false;
 			}
 

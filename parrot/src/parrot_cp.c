@@ -230,7 +230,7 @@ int main( int argc, char *argv[] )
 		{"update-only", no_argument, 0, 'u'},
         {0,0,0,0}
 	};
-	
+
 	while((c=getopt_long(argc,argv,"firRsluvh", long_options, NULL)) > -1) {
 		switch(c) {
 		case 'f':
@@ -271,7 +271,7 @@ int main( int argc, char *argv[] )
 
 	// Set and check target
 	target = argv[argc-1];
-	
+
 	if(stat(target, &statbuf)>=0) {
 		if(S_ISDIR(statbuf.st_mode)) {
 			target_is_dir=1;
@@ -283,7 +283,7 @@ int main( int argc, char *argv[] )
 		printf("%s: copying multiple files, but last argument '%s' is not a directory\n", argv[0], target);
 		return 1;
 	}
-	
+
 	for(i=optind; i<=argc-2; i++) {
 		if(target_is_dir) {
 			char *basename = strrchr(argv[i],'/');
@@ -297,7 +297,7 @@ int main( int argc, char *argv[] )
 		}
 		nerrors += copypath(argv[i],newtarget);
 	}
-	
+
 	return nerrors!=0;
 }
 

@@ -5,15 +5,20 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "tracer.h"
-#include "stringtools.h"
-#include "full_io.h"
-#include "xxmalloc.h"
-#include "debug.h"
+/* Included with Parrot... */
 #include "linux-version.h"
 #include "ptrace.h"
+#include "tracer.h"
+
+#include "buffer.h"
+#include "debug.h"
+#include "full_io.h"
+#include "macros.h"
+#include "stringtools.h"
+#include "xxmalloc.h"
 
 #include <fcntl.h>
+#include <syscall.h>
 #include <unistd.h>
 
 #include <sys/wait.h>
@@ -31,13 +36,18 @@ See the file COPYING for details.
 
 #define ERROR \
 	do {\
-		debug(D_DEBUG, "%s: ptrace error: %s", __func__, strerror(errno));\
+		debug(D_DEBUG, "%s (%s:%d): ptrace error: %s", __func__, __FILE__, __LINE__, strerror(errno));\
 		return -1;\
 	} while (0)
+
+#define VOID_MATH(p,op) ((void *)(((uintptr_t)p)op))
 
 #ifndef PTRACE_OLDSETOPTIONS
 #	define PTRACE_OLDSETOPTIONS 21
 #endif
+
+#include "tracer.table.c"
+#include "tracer.table64.c"
 
 /*
 Note that we would normally get such register definitions
@@ -49,12 +59,12 @@ so we can be independent of the system headers.
 */
 
 struct i386_registers {
-        INT32_T ebx, ecx, edx, esi, edi, ebp, eax;
-        INT16_T ds, __ds, es, __es;
-        INT16_T fs, __fs, gs, __gs;
-        INT32_T orig_eax, eip;
-        INT16_T cs, __cs;
-        INT32_T eflags, esp;
+	INT32_T ebx, ecx, edx, esi, edi, ebp, eax;
+	INT16_T ds, __ds, es, __es;
+	INT16_T fs, __fs, gs, __gs;
+	INT32_T orig_eax, eip;
+	INT16_T cs, __cs;
+	INT32_T eflags, esp;
 	INT16_T ss, __ss;
 };
 
@@ -69,8 +79,8 @@ struct x86_64_registers {
 
 struct tracer {
 	pid_t pid;
-	int memory_file;
 	int gotregs;
+	int setregs;
 	union {
 		struct i386_registers regs32;
 		struct x86_64_registers regs64;
@@ -94,8 +104,14 @@ int tracer_attach (pid_t pid)
 		if (ptrace(PTRACE_SEIZE, pid, 0, (void *)options) == -1)
 			ERROR;
 	} else {
+		int status;
 		if (ptrace(PTRACE_ATTACH, pid, 0, 0) == -1)
 			ERROR;
+		/* wait for the signal-delivery-stop for the PTRACE_ATTACH bootstrap SIGSTOP */
+		if (waitpid(pid, &status, WUNTRACED|__WALL) == -1)
+			ERROR;
+		assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP);
+		/* The SIGSTOP will be supressed in the upcoming PTRACE_SYSCALL */
 		if (linux_available(2,6,0)) {
 			if (ptrace(PTRACE_SETOPTIONS, pid, 0, (void *)options) == -1)
 				ERROR;
@@ -103,16 +119,21 @@ int tracer_attach (pid_t pid)
 			if (ptrace(PTRACE_OLDSETOPTIONS, pid, 0, (void *)options) == -1)
 				ERROR;
 		}
+		/* suppress delivery */
+		if (ptrace(PTRACE_SYSCALL, pid, NULL, (void *)0) == -1)
+			ERROR;
 	}
-
-	if (ptrace(PTRACE_SYSCALL, pid, NULL, (void *)SIGCONT) == -1)
-		ERROR;
 
 	return 0;
 }
 
 int tracer_listen (struct tracer *t)
 {
+	if(t->setregs) {
+		if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
+			return -1;
+		t->setregs = 0;
+	}
 	if (linux_available(3,4,0)) {
 		if (ptrace(PTRACE_LISTEN, t->pid, NULL, NULL) == -1)
 			ERROR;
@@ -126,21 +147,13 @@ int tracer_listen (struct tracer *t)
 
 struct tracer *tracer_init (pid_t pid)
 {
-	char path[PATH_MAX];
-
 	struct tracer *t = malloc(sizeof(*t));
 	if(!t) return 0;
 
 	t->pid = pid;
 	t->gotregs = 0;
+	t->setregs = 0;
 	t->has_args5_bug = 0;
-
-	sprintf(path,"/proc/%d/mem",pid);
-	t->memory_file = open64(path,O_RDWR);
-	if(t->memory_file<0) {
-		free(t);
-		return 0;
-	}
 
 	memset(&t->regs,0,sizeof(t->regs));
 
@@ -157,10 +170,11 @@ int tracer_getevent( struct tracer *t, unsigned long *message )
 int tracer_is_64bit( struct tracer *t )
 {
 	if(!t->gotregs) {
-		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs)!=0) FATAL;
+		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
+			return -1;
 		t->gotregs = 1;
 	}
-	
+
 	if(t->regs.regs64.cs==0x33) {
 		return 1;
 	} else {
@@ -170,14 +184,22 @@ int tracer_is_64bit( struct tracer *t )
 
 void tracer_detach( struct tracer *t )
 {
+	if(t->setregs) {
+		ptrace(PTRACE_SETREGS,t->pid,0,&t->regs); /* ignore failure */
+		t->setregs = 0;
+	}
 	ptrace(PTRACE_DETACH,t->pid,0,0); /* ignore failure */
-	close(t->memory_file);
 	free(t);
 }
 
 int tracer_continue( struct tracer *t, int signum )
 {
 	t->gotregs = 0;
+	if(t->setregs) {
+		if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
+			return -1;
+		t->setregs = 0;
+	}
 	if (ptrace(PTRACE_SYSCALL,t->pid,0,signum) == -1)
 		ERROR;
 	return 0;
@@ -222,6 +244,9 @@ int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARG
 		else                  args[5] = t->regs.regs64.rbp;
 	}
 #endif
+#if 0 /* Enable this for extreme debugging... */
+	debug(D_DEBUG, "GET args[] = {%"PRId64", %"PRId64", %"PRId64", %"PRId64", %"PRId64", %"PRId64"}", args[0], args[1], args[2], args[3], args[4], args[5]);
+#endif
 
 	return 1;
 }
@@ -236,13 +261,27 @@ void tracer_has_args5_bug( struct tracer *t )
 	t->has_args5_bug = 1;
 }
 
-int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS_MAX], int nargs )
+int tracer_args_set( struct tracer *t, INT64_T syscall, const INT64_T *args, int nargs )
 {
 	if(!t->gotregs) {
 		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
 			ERROR;
 		t->gotregs = 1;
 	}
+
+#if 0 /* Enable this for extreme debugging... */
+	{
+		int i;
+		buffer_t B;
+		buffer_init(&B);
+		buffer_putfstring(&B, "SET args[%zu] = {", (size_t)nargs);
+		for (i = 0; i < nargs; i++)
+			buffer_putfstring(&B, "%" PRId64 ", ", args[i]);
+		buffer_putliteral(&B, "}");
+		debug(D_DEBUG, "%s", buffer_tostring(&B, NULL));
+		buffer_free(&B);
+	}
+#endif
 
 #ifdef CCTOOLS_CPU_I386
 	t->regs.regs32.orig_eax = syscall;
@@ -275,8 +314,7 @@ int tracer_args_set( struct tracer *t, INT64_T syscall, INT64_T args[TRACER_ARGS
 	}
 #endif
 
-	if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
-		ERROR;
+	t->setregs = 1;
 
 	return 1;
 }
@@ -312,10 +350,26 @@ int tracer_result_set( struct tracer *t, INT64_T result )
 	t->regs.regs64.rax = result;
 #endif
 
-	if(ptrace(PTRACE_SETREGS,t->pid,0,&t->regs) == -1)
-		ERROR;
+	t->setregs = 1;
 
 	return 1;
+}
+
+int tracer_stack_get( struct tracer *t, uintptr_t *ptr )
+{
+	if(!t->gotregs) {
+		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
+			return -1;
+		t->gotregs = 1;
+	}
+
+#ifdef CCTOOLS_CPU_I386
+	*ptr = t->regs.regs32.esp;
+#else
+	*ptr = t->regs.regs64.rsp;
+#endif
+
+	return 0;
 }
 
 /*
@@ -327,20 +381,26 @@ in and out of the target process.  We use a long here because
 that represents the natural type of the target platform.
 */
 
-static ssize_t tracer_copy_out_slow( struct tracer *t, const void *data, const void *uaddr, size_t length )
+static ssize_t tracer_copy_out_slow( struct tracer *t, const void *data, const void *uaddr, size_t length, int flags )
 {
 	const uint8_t *bdata = data;
 	const uint8_t *buaddr = uaddr;
 	size_t size = length;
 	long word;
 
-	/* first, copy whole words */ 
+	/* first, copy whole words */
 
 	while(size>=sizeof(word)) {
 		word = *(long*)bdata;
 		errno = 0;
-		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1 && errno)
-			ERROR;
+		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1 && errno) {
+			size_t total = length-size;
+			if (!(flags & TRACER_O_ATOMIC) && total) {
+				return total;
+			} else {
+				ERROR;
+			}
+		}
 		size -= sizeof(word);
 		buaddr += sizeof(word);
 		bdata += sizeof(word);
@@ -350,64 +410,134 @@ static ssize_t tracer_copy_out_slow( struct tracer *t, const void *data, const v
 
 	if(size>0) {
 		errno = 0;
-		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno)
-			ERROR;
+		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno) {
+			size_t total = length-size;
+			if (!(flags & TRACER_O_ATOMIC) && total) {
+				return total;
+			} else {
+				ERROR;
+			}
+		}
 		memcpy(&word,bdata,size);
 		errno = 0;
-		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1 && errno)
-			ERROR;
+		if (ptrace(PTRACE_POKEDATA,t->pid,buaddr,word) == -1 && errno) {
+			size_t total = length-size;
+			if (!(flags & TRACER_O_ATOMIC) && total) {
+				return total;
+			} else {
+				ERROR;
+			}
+		}
 	}
 
 	return length;
 }
 
-ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, size_t length )
+static ssize_t copy_out_fast( struct tracer *t, const void *data, const void *uaddr, size_t length, int flags )
 {
-	static int has_fast_write=1;
-	uintptr_t iuaddr = (uintptr_t)uaddr;
+	int i;
+	size_t pgsize = (size_t)getpagesize();
+	struct iovec local;
+	struct iovec remote[IOV_MAX];
+	size_t rn;
+	size_t count;
+	size_t written = 0;
 
+	if (!linux_available(3,2,0))
+		return errno = ENOSYS, -1;
+
+more:
+	local.iov_base = (void *)data;
+	local.iov_len = length;
+
+	if (flags & TRACER_O_ATOMIC) {
+		/* do the whole write */
+		count = length;
+	} else {
+		/* first (partial) page */
+		count = MIN(pgsize-(((uintptr_t)uaddr)&(pgsize-1)), length);
+	}
+	remote[0].iov_base = (void *)uaddr;
+	remote[0].iov_len = count;
+	uaddr = VOID_MATH(uaddr, +count);
+	length -= count;
+	rn = 1;
+
+	for (i = 1; length && i < IOV_MAX; i++) {
+		count = MIN(length, pgsize);
+		remote[i].iov_base = (void *)uaddr;
+		remote[i].iov_len = count;
+		uaddr = VOID_MATH(uaddr, +count);
+		length -= count;
+		rn += 1;
+	}
+
+#ifdef CCTOOLS_CPU_I386
+	ssize_t n = syscall(SYSCALL32_process_vm_writev, t->pid, &local, (int32_t)1, remote, rn, (int32_t)0);
+#else
+	ssize_t n = syscall(SYSCALL64_process_vm_writev, t->pid, &local, (int64_t)1, remote, rn, (int64_t)0);
+#endif
+
+	/* There is a bug in the implementation, allowing a split remote iovec. The
+	 * manual says this should not be possible:
+	 *
+	 *     "(Partial transfers apply at the granularity of iovec elements.
+	 *     These system calls won't perform a partial transfer that splits a
+	 *     single iovec element.)"
+	 *
+	 * So we need to check for this explicitly if doing an atomic read.
+	 */
+	if (n > 0 && (size_t)n != local.iov_len && flags & TRACER_O_ATOMIC) {
+		return errno = EFAULT, -1;
+	}
+
+	if (n == -1) {
+		if (errno == EFAULT && written) {
+			return written;
+		}
+		return -1;
+	}
+
+	written += n;
+	data = VOID_MATH(data, +n);
+
+	/* we may need to copy out more, since remote is limited by IOV_MAX */
+	if (length && n)
+		goto more;
+
+	return written;
+}
+
+ssize_t tracer_copy_out( struct tracer *t, const void *data, const void *uaddr, size_t length, int flags )
+{
 	if(length==0) return 0;
 
 #if !defined(CCTOOLS_CPU_I386)
-	if(!tracer_is_64bit(t)) iuaddr &= 0xffffffff;
+	if(!tracer_is_64bit(t)) {
+		uaddr = VOID_MATH(uaddr, & 0xffffffff);
+	}
 #endif
 
-	if(has_fast_write) {
-		ssize_t result = full_pwrite64(t->memory_file,data,length,iuaddr);
-		if ((size_t)result == length) {
-			return length;
-		} else {
-			/* this may be because execve caused a remapping, we need to reopen */
-			close(t->memory_file);
-			char path[PATH_MAX];
-			sprintf(path,"/proc/%d/mem",t->pid);
-			t->memory_file = open64(path,O_RDWR);
-			result = full_pwrite64(t->memory_file,data,length,iuaddr);
-			if ((size_t)result == length) {
-				return result;
-			} else {
-				has_fast_write = 0;
-				debug(D_SYSCALL,"writing to /proc/%d/mem failed, falling back to slow ptrace write", t->pid);
-			}
-		}
-	}
-
-	return tracer_copy_out_slow(t,data,(const void *)iuaddr,length);
+	ssize_t rc = copy_out_fast(t,data,uaddr,length,flags);
+	if (rc == -1 && errno == ENOSYS && !(flags & TRACER_O_FAST))
+		rc = tracer_copy_out_slow(t,data,uaddr,length,flags);
+	assert(!(flags & TRACER_O_ATOMIC) || (rc == -1 || (size_t)rc == length));
+	return rc;
 }
 
-static ssize_t tracer_copy_in_slow( struct tracer *t, void *data, const void *uaddr, size_t length )
+static ssize_t tracer_copy_in_slow( struct tracer *t, void *data, const void *uaddr, size_t length, int flags )
 {
 	uint8_t *bdata = data;
 	const uint8_t *buaddr = uaddr;
 	size_t total = 0;
 	long word;
 
-	/* first, copy whole words */ 
+	/* first, copy whole words */
 
 	while((length-total)>=sizeof(word)) {
 		errno = 0;
 		if ((*((long*)bdata) = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno) {
-			if (total)
+			if (!(flags & TRACER_O_ATOMIC) && total)
 				return total;
 			else
 				ERROR;
@@ -422,7 +552,7 @@ static ssize_t tracer_copy_in_slow( struct tracer *t, void *data, const void *ua
 	if((length-total)>0) {
 		errno = 0;
 		if ((word = ptrace(PTRACE_PEEKDATA,t->pid,buaddr,0)) == -1 && errno) {
-			if (total)
+			if (!(flags & TRACER_O_ATOMIC) && total)
 				return total;
 			else
 				ERROR;
@@ -433,7 +563,99 @@ static ssize_t tracer_copy_in_slow( struct tracer *t, void *data, const void *ua
 	return total;
 }
 
-ssize_t tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, size_t length )
+ssize_t copy_in_fast( struct tracer *t, void *data, const void *uaddr, size_t length, int flags )
+{
+	int i;
+	size_t pgsize = (size_t)getpagesize();
+	struct iovec local;
+	struct iovec remote[IOV_MAX];
+	size_t rn;
+	size_t count;
+	size_t read = 0;
+
+	if (!linux_available(3,2,0))
+		return errno = ENOSYS, -1;
+
+more:
+	local.iov_base = data;
+	local.iov_len = length;
+
+	if (flags & TRACER_O_ATOMIC) {
+		/* do the whole write */
+		count = length;
+	} else {
+		/* first (partial) page */
+		count = MIN(pgsize-(((uintptr_t)uaddr)&(pgsize-1)), length);
+	}
+	remote[0].iov_base = (void *)uaddr;
+	remote[0].iov_len = count;
+	uaddr = VOID_MATH(uaddr, +count);
+	length -= count;
+	rn = 1;
+
+	for (i = 1; length && i < IOV_MAX; i++) {
+		count = MIN(length, pgsize);
+		remote[i].iov_base = (void *)uaddr;
+		remote[i].iov_len = count;
+		uaddr = VOID_MATH(uaddr, +count);
+		length -= count;
+		rn += 1;
+	}
+
+#ifdef CCTOOLS_CPU_I386
+	ssize_t n = syscall(SYSCALL32_process_vm_readv, (int32_t)t->pid, &local, (int32_t)1, remote, rn, (int32_t)0);
+#else
+	ssize_t n = syscall(SYSCALL64_process_vm_readv, (int64_t)t->pid, &local, (int64_t)1, remote, rn, (int64_t)0);
+#endif
+
+	/* There is a bug in the implementation, allowing a split remote iovec. The
+	 * manual says this should not be possible:
+	 *
+	 *     "(Partial transfers apply at the granularity of iovec elements.
+	 *     These system calls won't perform a partial transfer that splits a
+	 *     single iovec element.)"
+	 *
+	 * So we need to check for this explicitly if doing an atomic read.
+	 */
+	if (n > 0 && (size_t)n != local.iov_len && flags & TRACER_O_ATOMIC) {
+		return errno = EFAULT, -1;
+	}
+
+	if (n == -1) {
+		if (errno == EFAULT && read) {
+			return read;
+		}
+		return -1;
+	}
+
+	read += n;
+	data = VOID_MATH(data, +n);
+
+	/* we may need to copy in more, since remote is limited by IOV_MAX */
+	if (length && n)
+		goto more;
+
+	return read;
+}
+
+ssize_t tracer_copy_in( struct tracer *t, void *data, const void *uaddr, size_t length, int flags )
+{
+	if(length==0) return 0;
+
+#if !defined(CCTOOLS_CPU_I386)
+	if(!tracer_is_64bit(t)) {
+		uaddr = VOID_MATH(uaddr, & 0xffffffff);
+	}
+#endif
+
+	ssize_t rc = copy_in_fast(t,data,uaddr,length,flags);
+	if (rc == -1 && errno == ENOSYS && !(flags & TRACER_O_FAST))
+		rc = tracer_copy_in_slow(t,data,uaddr,length,flags);
+	assert(!(flags & TRACER_O_ATOMIC) || (rc == -1 || (size_t)rc == length));
+	return rc;
+}
+
+static ssize_t copy_in_string_slow( struct tracer *t, char *str, const void *uaddr, size_t length, int flags )
 {
 	uint8_t *bdata = (uint8_t *)str;
 	const uint8_t *buaddr = uaddr;
@@ -451,7 +673,7 @@ ssize_t tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, s
 			*bdata = worddata[i];
 			total++;
 			length--;
-			if(!*bdata) {
+			if(!*bdata || length == 0) {
 				return total;
 			} else {
 				bdata++;
@@ -463,67 +685,32 @@ ssize_t tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, s
 	return total;
 }
 
-/*
-Notes on tracer_copy_in:
-1 - The various versions of the Linux kernel disagree on when and
-where it is possible to read from /proc/pid/mem.  Some disallow
-entirely, some allow only for certain address ranges, and some
-allow it completely.  For example, on Ubuntu 12.02 with Linux 3.2,
-we see successes intermixed with failures with no apparent pattern.
-
-We don't want to retry a failing method unnecessarily, so we keep
-track of the number of successes and failures.  If the fast read
-has succeeded at any point, we keep trying it.  If we have 100 failures
-with no successes, then we stop trying it.  In any case, if the fast
-read fails, we fall back to the slow method.
-
-2 - pread64 is necessary regardless of whether the target process
-is 32 or 64 bit, since the 32-bit pread() cannot read above the 2GB
-limit on a 32-bit process.
-*/
-
-ssize_t tracer_copy_in( struct tracer *t, void *data, const void *uaddr, size_t length )
+ssize_t tracer_copy_in_string( struct tracer *t, char *str, const void *uaddr, size_t length, int flags )
 {
-	static int fast_read_success = 0;
-	static int fast_read_failure = 0;
-	static int fast_read_attempts = 100;
-
-	uintptr_t iuaddr = (uintptr_t)uaddr;
+	if(length==0) return 0;
 
 #if !defined(CCTOOLS_CPU_I386)
-	if(!tracer_is_64bit(t)) iuaddr &= 0xffffffff;
+	if(!tracer_is_64bit(t)) {
+		uaddr = VOID_MATH(uaddr, & 0xffffffff);
+	}
 #endif
 
-	if(fast_read_success>0 || fast_read_failure<fast_read_attempts) {
-		ssize_t result = full_pread64(t->memory_file,data,length,iuaddr);
-		if(result>0) {
-			fast_read_success++;
-			return result;
+	ssize_t rc = copy_in_fast(t,str,uaddr,length,flags);
+	if (rc == -1 && errno == ENOSYS && !(flags & TRACER_O_FAST))
+		rc = copy_in_string_slow(t,str,uaddr,length,flags);
+	/* check for NUL */
+	if (rc > 0) {
+		void *nul = memchr(str,'\0',length);
+		if (nul) {
+			rc = (ssize_t)((uintptr_t)nul-(uintptr_t)str);
 		} else {
-			/* this may be because execve caused a remapping, we need to reopen */
-			close(t->memory_file);
-			char path[PATH_MAX];
-			sprintf(path,"/proc/%d/mem",t->pid);
-			t->memory_file = open64(path,O_RDWR);
-			result = full_pread64(t->memory_file,data,length,iuaddr);
-			if ((size_t)result > 0) {
-				return result;
-			} else {
-				fast_read_failure++;
-				// fall through to slow method, print message on the last attempt.
-				if(fast_read_success==0 && fast_read_failure>=fast_read_attempts) {
-					debug(D_SYSCALL,"reading from /proc/%d/mem failed, falling back to slow ptrace read", t->pid);
-				}
-			}
+			*str = '\0';
+			errno = EINVAL;
+			rc = -1;
 		}
 	}
-
-	return tracer_copy_in_slow(t,data,(const void *)iuaddr,length);
+	return rc;
 }
-
-#include "tracer.table.c"
-#include "tracer.table64.c"
-
 
 const char * tracer_syscall32_name( int syscall )
 {

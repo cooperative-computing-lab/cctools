@@ -1,13 +1,10 @@
 include ../../config.mk
 include ../../rules.mk
 
-LOCAL_LDFLAGS = -fPIC
-LOCAL_LINKAGE = -ldl
-
 EXTERNAL_DEPENDENCIES = ../../ftp_lite/src/libftp_lite.a ../../chirp/src/libchirp.a ../../dttools/src/libdttools.a
 LIBRARIES = libparrot_helper.$(CCTOOLS_DYNAMIC_SUFFIX) libparrot_client.a
 OBJECTS = $(OBJECTS_PARROT_RUN) parrot_client.o
-OBJECTS_PARROT_RUN = pfs_poll.o tracer.o pfs_paranoia.o pfs_dispatch.o pfs_dispatch64.o pfs_process.o pfs_channel.o pfs_sys.o pfs_table.o pfs_resolve.o pfs_service.o pfs_file.o pfs_file_cache.o pfs_dir.o pfs_dircache.o pfs_pointer.o pfs_location.o ibox_acl.o pfs_service_local.o pfs_service_http.o pfs_service_grow.o pfs_service_chirp.o pfs_service_multi.o pfs_service_nest.o pfs_service_ftp.o pfs_service_irods.o irods_reli.o pfs_service_hdfs.o pfs_service_bxgrid.o pfs_service_xrootd.o pfs_service_cvmfs.o
+OBJECTS_PARROT_RUN = pfs_main.o tracer.o pfs_paranoia.o pfs_dispatch.o pfs_dispatch64.o pfs_process.o pfs_channel.o pfs_sys.o pfs_table.o pfs_resolve.o pfs_service.o pfs_file.o pfs_file_cache.o pfs_dir.o pfs_dircache.o pfs_pointer.o pfs_location.o ibox_acl.o pfs_service_local.o pfs_service_http.o pfs_service_grow.o pfs_service_chirp.o pfs_service_multi.o pfs_service_nest.o pfs_service_ftp.o pfs_service_irods.o irods_reli.o pfs_service_hdfs.o pfs_service_bxgrid.o pfs_service_xrootd.o pfs_service_cvmfs.o
 PROGRAMS = parrot_run $(UTILITIES)
 HEADERS_PUBLIC = parrot_client.h
 SCRIPTS = make_growfs parrot_identity_box parrot_run_hdfs parrot_package_run chroot_package_run
@@ -25,6 +22,9 @@ endif
 all: $(TARGETS)
 
 $(OBJECTS_PARROT_RUN): tracer.table.h tracer.table.c tracer.table64.h tracer.table64.c
+
+tracer.table.h tracer.table.c tracer.table64.h tracer.table64.c: tracer.table.pl syscall_parrot.tbl
+
 libparrot_client.a: parrot_client.o
 
 libparrot_helper.$(CCTOOLS_DYNAMIC_SUFFIX): parrot_helper.c
@@ -37,20 +37,38 @@ lib/libparrot_helper.$(CCTOOLS_DYNAMIC_SUFFIX): parrot_helper.c
 	mkdir -p lib
 	gcc -m32 -shared -fPIC $< -o $@
 
-tracer.table64.c: tracer.table64.in tracer.table.process
-	perl tracer.table.process table 64 <$< >$@
+tracer.table64.c: syscall_64.tbl
+	cat $< syscall_parrot.tbl | perl tracer.table.pl table 64 > $@
 
-tracer.table64.h: tracer.table64.in tracer.table.process
-	perl tracer.table.process header 64 <$< >$@
+tracer.table64.h: syscall_64.tbl
+	cat $< syscall_parrot.tbl | perl tracer.table.pl header 64 > $@
 
-tracer.table.c: tracer.table.in tracer.table.process
-	perl tracer.table.process table 32 <$< >$@
+tracer.table.c: syscall_32.tbl
+	cat $< syscall_parrot.tbl | perl tracer.table.pl table 32  > $@
 
-tracer.table.h: tracer.table.in tracer.table.process
-	perl tracer.table.process header 32 <$< >$@
+tracer.table.h: syscall_32.tbl
+	cat $< syscall_parrot.tbl | perl tracer.table.pl header 32 > $@
 
 parrot_run: $(OBJECTS_PARROT_RUN)
+	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(CCTOOLS_IRODS_LDFLAGS) $(CCTOOLS_MYSQL_LDFLAGS) $(CCTOOLS_XROOTD_LDFLAGS) $(CCTOOLS_CVMFS_LDFLAGS) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
+
+irods_reli.o: irods_reli.cc irods_reli.h
+	$(CCTOOLS_CXX) -o $@ -c $(CCTOOLS_INTERNAL_CXXFLAGS) $< $(CCTOOLS_IRODS_CCFLAGS)
+
+pfs_service_bxgrid.o: pfs_service_bxgrid.cc
+	$(CCTOOLS_CXX) -o $@ -c $(CCTOOLS_INTERNAL_CXXFLAGS) $< $(CCTOOLS_MYSQL_CCFLAGS)
+
+pfs_service_xrootd.o: pfs_service_xrootd.cc
+	$(CCTOOLS_CXX) -o $@ -c $(CCTOOLS_INTERNAL_CXXFLAGS) $< $(CCTOOLS_XROOTD_CCFLAGS)
+
+pfs_service_cvmfs.o: pfs_service_cvmfs.cc
+	$(CCTOOLS_CXX) -o $@ -c $(CCTOOLS_INTERNAL_CXXFLAGS) $< $(CCTOOLS_CVMFS_CCFLAGS)
+
+pfs_service_ftp.o: pfs_service_ftp.cc
+	$(CCTOOLS_CXX) -o $@ -c $(CCTOOLS_INTERNAL_CXXFLAGS) $< $(CCTOOLS_GLOBUS_CCFLAGS)
+
 $(UTILITIES): libparrot_client.a
+
 $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 
 clean:

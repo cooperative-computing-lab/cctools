@@ -194,7 +194,7 @@ public:
 
 		debug(D_GLITE,"got stat for %s - guid = %s",glite_name,out._getLfnStatReturn->__ptr[0]->guid);
 		return 0;
-	  
+
 	}
 
 	virtual pfs_ssize_t get_size() {

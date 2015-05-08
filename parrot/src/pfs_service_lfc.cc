@@ -16,6 +16,7 @@ Christophe Blanchet, IBCP
 
 extern "C" {
 #include "debug.h"
+#include "random.h"
 #include "stringtools.h"
 
 #include "lcg_util.h"
@@ -164,7 +165,7 @@ public:
 			debug(D_LFC,"replica: %s",replicas[n]);
 			n++;
 		}
-		return rand()%n;
+		return random_int()%n;
 	}
 
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
@@ -193,7 +194,7 @@ public:
 		struct lfc_filestatg statbuf;
 
 		debug(D_LFC,"stat %s",name->path);
-		
+
 		pfs_service_emulate_stat(name,buf);
 
 		if(lfc_statg(name->path+4,NULL,&statbuf)<0) {

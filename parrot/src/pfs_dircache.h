@@ -29,7 +29,7 @@ public:
 
 protected:
 	struct hash_table *dircache_table;
-	char *dircache_path;	
+	char *dircache_path;
 };
 
 #endif

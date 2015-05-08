@@ -24,13 +24,11 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/mman.h>
-#include <sys/ioctl.h>
 #include <sys/vfs.h>
 #include <sys/file.h>
 #include <sys/time.h>
 #include <utime.h>
 #include <dirent.h>
-#include <sys/poll.h>
 
 #if defined(HAS_ATTR_XATTR_H)
 #include <attr/xattr.h>
@@ -99,10 +97,20 @@ private:
 
 public:
 	pfs_file_local( pfs_name *name, int f, int i ) : pfs_file(name) {
+		assert(f >= 0);
 		fd = f;
 		last_offset = 0;
 		is_a_pipe = i;
 		is_a_named_pipe = -1;
+	}
+
+	virtual int canbenative (char *path, size_t len) {
+		struct stat64 buf;
+		if (::fstat64(fd, &buf) == 0 && (S_ISSOCK(buf.st_mode) || S_ISBLK(buf.st_mode) || S_ISCHR(buf.st_mode) || S_ISFIFO(buf.st_mode))) {
+			snprintf(path, len, "%s", name.rest);
+			return 1;
+		}
+		return 0;
 	}
 
 	virtual int close() {
@@ -139,7 +147,7 @@ process to sleep and wait for actual input to become ready.
 	virtual pfs_ssize_t read( void *data, pfs_size_t length, pfs_off_t offset ) {
 		pfs_ssize_t result;
 
-		debug(D_LOCAL,"read %d 0x%p %lld %lld",fd,data,(long long)length,(long long)offset);
+		debug(D_LOCAL,"read %d %p %lld %lld",fd,data,(long long)length,(long long)offset);
 
 		if(offset!=last_offset) ::lseek64(fd,offset,SEEK_SET);
 		result = ::read(fd,data,length);
@@ -157,7 +165,7 @@ process to sleep and wait for actual input to become ready.
 					}
 				} else {
 					is_a_named_pipe = 0;
-				}	
+				}
 			}
 			if(is_a_named_pipe) {
 				result = -1;
@@ -169,7 +177,7 @@ process to sleep and wait for actual input to become ready.
 
 	virtual pfs_ssize_t write( const void *data, pfs_size_t length, pfs_off_t offset ) {
 		pfs_ssize_t result;
-		debug(D_LOCAL,"write %d 0x%p %lld %lld",fd,data,(long long)length,(long long)offset);
+		debug(D_LOCAL,"write %d %p %lld %lld",fd,data,(long long)length,(long long)offset);
 		if(offset!=last_offset) ::lseek64(fd,offset,SEEK_SET);
 		result = ::write(fd,data,length);
 		if(result>0) last_offset = offset+result;
@@ -179,7 +187,7 @@ process to sleep and wait for actual input to become ready.
 	virtual int fstat( struct pfs_stat *buf ) {
 		int result;
 		struct stat64 lbuf;
-		debug(D_LOCAL,"fstat %d 0x%p",fd,buf);
+		debug(D_LOCAL,"fstat %d %p",fd,buf);
 		result = ::fstat64(fd,&lbuf);
 		if(result>=0) COPY_STAT(lbuf,*buf);
 		END
@@ -188,7 +196,7 @@ process to sleep and wait for actual input to become ready.
 	virtual int fstatfs( struct pfs_statfs *buf ) {
 		int result;
 		struct statfs64 lbuf;
-		debug(D_LOCAL,"fstatfs %d 0x%p",fd,buf);
+		debug(D_LOCAL,"fstatfs %d %p",fd,buf);
 		result = ::fstatfs64(fd,&lbuf);
 		if(result>=0) COPY_STATFS(lbuf,*buf);
 		END
@@ -210,7 +218,7 @@ process to sleep and wait for actual input to become ready.
 
 	virtual int fcntl( int cmd, void *arg ) {
 		int result;
-		debug(D_LOCAL,"fcntl %d %d 0x%p",fd,cmd,arg);
+		debug(D_LOCAL,"fcntl %d %d %p",fd,cmd,arg);
 		if(cmd==F_SETFL) arg = (void*)(((PTRINT_T)arg)|O_NONBLOCK);
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(CCTOOLS_CPU_X86_64)
 		if (cmd == PFS_GETLK64) cmd = F_GETLK;
@@ -218,13 +226,6 @@ process to sleep and wait for actual input to become ready.
 		if (cmd == PFS_SETLKW64) cmd = F_SETLKW;
 #endif
 		result = ::fcntl(fd,cmd,arg);
-		END
-	}
-
-	virtual int ioctl( int cmd, void *arg ) {
-		int result;
-		debug(D_LOCAL,"ioctl %d 0x%x 0x%p",fd,cmd,arg);
-		result = ::ioctl(fd,cmd,arg);
 		END
 	}
 
@@ -327,30 +328,6 @@ process to sleep and wait for actual input to become ready.
 	{
 		return !is_a_pipe;
 	}
-	
-	virtual void poll_register( int which ) {
-		pfs_poll_wakeon(fd,which);
-	}
-
-	virtual int poll_ready() {
-		struct pollfd pfd;
-		int result=0, flags =0;
-
-		pfd.fd = fd;
-		pfd.events = POLLIN|POLLOUT|POLLERR|POLLHUP|POLLPRI;
-		pfd.revents = 0;
-
-		result = ::poll(&pfd,1,0);
-		if(result>0) {
-			if(pfd.revents&POLLIN) flags |= PFS_POLL_READ;
-			if(pfd.revents&POLLHUP) flags |= PFS_POLL_READ;
-			if(pfd.revents&POLLOUT) flags |= PFS_POLL_WRITE;
-			if(pfd.revents&POLLERR) flags |= PFS_POLL_READ;
-			if(pfd.revents&POLLERR) flags |= PFS_POLL_WRITE;
-			if(pfd.revents&POLLPRI) flags |= PFS_POLL_EXCEPT;
-		}
-		return flags;
-	}
 };
 
 class pfs_service_local : public pfs_service {
@@ -362,7 +339,7 @@ public:
 
 		flags |= O_NONBLOCK;
 		debug(D_LOCAL,"open %s %d %d",name->rest,flags,(flags&O_CREAT) ? mode : 0);
-		int fd = ::open64(name->rest,flags,mode);
+		int fd = ::open64(name->rest,flags|O_NOCTTY,mode);
 		if(fd>=0) {
 			result = new pfs_file_local(name,fd,0);
 		} else {
@@ -408,7 +385,7 @@ public:
 		int result;
 		struct stat64 lbuf;
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
-		debug(D_LOCAL,"stat %s 0x%p",name->rest,buf);
+		debug(D_LOCAL,"stat %s %p",name->rest,buf);
 		result = ::stat64(name->rest,&lbuf);
 		if(result>=0) COPY_STAT(lbuf,*buf);
 		END
@@ -417,7 +394,7 @@ public:
 		int result;
 		struct statfs64 lbuf;
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
-		debug(D_LOCAL,"statfs %s 0x%p",name->rest,buf);
+		debug(D_LOCAL,"statfs %s %p",name->rest,buf);
 		result = ::statfs64(name->rest,&lbuf);
 		if(result>=0) COPY_STATFS(lbuf,*buf);
 		END
@@ -426,7 +403,7 @@ public:
 		int result;
 		struct stat64 lbuf;
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
-		debug(D_LOCAL,"lstat %s 0x%p",name->rest,buf);
+		debug(D_LOCAL,"lstat %s %p",name->rest,buf);
 		result = ::lstat64(name->rest,&lbuf);
 		if(result>=0) COPY_STAT(lbuf,*buf);
 		END
@@ -469,7 +446,7 @@ public:
 	virtual int utime( pfs_name *name, struct utimbuf *buf ) {
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
-		debug(D_LOCAL,"utime %s 0x%p",name->rest,buf);
+		debug(D_LOCAL,"utime %s %p",name->rest,buf);
 		result = ::utime(name->rest,buf);
 		END
 	}
@@ -544,7 +521,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *data, size_t size )
 	{
 		ssize_t result;
@@ -557,7 +534,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual ssize_t listxattr ( pfs_name *name, char *list, size_t size )
 	{
 		ssize_t result;
@@ -570,7 +547,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual ssize_t llistxattr ( pfs_name *name, char *list, size_t size )
 	{
 		ssize_t result;
@@ -583,7 +560,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual int setxattr ( pfs_name *name, const char *attrname, const void *data, size_t size, int flags )
 	{
 		int result;
@@ -596,7 +573,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *data, size_t size, int flags )
 	{
 		int result;
@@ -609,7 +586,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual int removexattr ( pfs_name *name, const char *attrname )
 	{
 		int result;
@@ -622,7 +599,7 @@ public:
 #endif
 		END
 	}
-	
+
 	virtual int lremovexattr ( pfs_name *name, const char *attrname )
 	{
 		int result;
@@ -670,7 +647,7 @@ public:
 	virtual int readlink( pfs_name *name, char *buf, pfs_size_t size ) {
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
-		debug(D_LOCAL,"readlink %s 0x%p %d",name->rest,buf,(int)size);
+		debug(D_LOCAL,"readlink %s %p %d",name->rest,buf,(int)size);
 		result = ::readlink(name->rest,buf,size);
 		END
 	}

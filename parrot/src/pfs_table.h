@@ -8,10 +8,14 @@ See the file COPYING for details.
 #ifndef PFS_TABLE_H
 #define PFS_TABLE_H
 
-#include "pfs_types.h"
-#include "pfs_refcount.h"
-#include "pfs_name.h"
+extern "C" {
+#include "buffer.h"
+}
+
 #include "pfs_mmap.h"
+#include "pfs_name.h"
+#include "pfs_refcount.h"
+#include "pfs_types.h"
 
 class pfs_file;
 class pfs_pointer;
@@ -26,10 +30,19 @@ public:
 	pfs_table * fork();
 	void close_on_exec();
 
+	int isvalid( int fd );
+	int isnative( int fd );
+	int isparrot( int fd );
+	int isspecial( int fd );
+	void recvfd( pid_t pid, int fd );
+	void sendfd( int fd, int errored );
+
 	/* file descriptor creation */
-	int	open( const char *path, int flags, mode_t mode, int force_cache );
-	int	pipe( int *fds );
-	void	attach( int logical, int physical, int flags, mode_t mode, const char *name );
+	int open( const char *path, int flags, mode_t mode, int force_cache, char *native_path, size_t len );
+	void attach( int logical, int physical, int flags, mode_t mode, const char *name, struct stat *buf );
+	void setnative( int fd, int fdflags );
+	void setspecial( int fd );
+	void setparrot(int fd, int rfd, struct stat *buf);
 
 	/* operations on open files */
 	int		close( int fd );
@@ -47,18 +60,15 @@ public:
 	int		fsync( int fd );
 	int		fchdir( int fd );
 	int		fcntl( int fd, int cmd, void *arg );
-	int		ioctl( int fd, int cmd, void *arg );
 	int		fchmod( int fd, mode_t mode );
 	int		fchown( int fd, uid_t uid, gid_t gid );
 	int		flock( int fd, int op );
+	int		bind( int fd, char *lpath, size_t len );
 
 	/* operations on the table itself */
-	int     select( int n, fd_set *rfds, fd_set *wfds, fd_set *efds, struct timeval *timeout );
-	int	poll( struct pollfd *ufds, unsigned int nfds, int timeout );  
 	int	chdir( const char *path );
 	char *	getcwd( char *path, pfs_size_t size );
-	int	dup( int old );
-	int	dup2( int old, int nfd );
+	int	dup2( int old, int nfd, int flags );
 
 	int	get_real_fd( int fd );
 	int	get_full_name( int fd, char *name );
@@ -112,35 +122,27 @@ public:
 	int	md5( const char *path, unsigned char *digest );
 	int	md5_slow( const char *path, unsigned char *digest );
 	int 	search( const char *paths, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i);
-	
-	/* network operations */
-	int	socket( int domain, int type, int protocol );
-	int	socketpair( int domain, int type, int protocol, int *fds );
-	int	accept( int fd, struct sockaddr *addr, int * addrlen );
 
 	void	follow_symlink( struct pfs_name *pname, int depth = 0 );
 	int	resolve_name( int is_special_syscall, const char *cname, pfs_name *pname, bool do_follow_symlink = true, int depth = 0 );
 
 	/* mmap operations */
-	pfs_size_t mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
-	int	       mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
-	int	       mmap_delete( pfs_size_t logical_address, pfs_size_t length );
-	void       mmap_print();
+	pfs_size_t  mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
+	int         mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
+	int         mmap_delete( pfs_size_t logical_address, pfs_size_t length );
+	void        mmap_print();
+	static void mmap_proc(pid_t pid, buffer_t *B);
 
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
 
 	int find_empty( int lowest );
-	void complete_at_path( int dirfd, const char *short_path, char *long_path );
+	int complete_at_path( int dirfd, const char *short_path, char *long_path );
 private:
-	int search_dup2( int ofd, int search );
-
 	int count_pointer_uses( pfs_pointer *p );
 	int count_file_uses( pfs_file *f );
 
-	void collapse_path( const char *short_path, char *long_path, int remove_dotdot );
 	void complete_path( const char *short_path, char *long_path );
 
-	static void mmap_proc(pid_t pid, char *path);
 	pfs_size_t mmap_create_object( pfs_file *file, pfs_size_t channel_offset, pfs_size_t map_length, pfs_size_t file_offset, int prot, int flags );
 
 	int         pointer_count;

@@ -128,16 +128,16 @@ struct pfs_kernel_stat64 {
 	UINT32_T st_gid;
 	UINT64_T st_rdev;
 	UINT32_T st_pad2;
-	UINT64_T st_size;
+	INT64_T st_size;
 	UINT32_T st_blksize;
 	UINT64_T st_blocks;
 #if !defined(st_atime)
-        INT32_T st_atime;
-        INT32_T st_atime_nsec;
-        INT32_T st_mtime;
-        INT32_T st_mtime_nsec;
-        INT32_T st_ctime;
-        INT32_T st_ctime_nsec;
+        UINT32_T st_atime;
+        UINT32_T st_atime_nsec;
+        UINT32_T st_mtime;
+        UINT32_T st_mtime_nsec;
+        UINT32_T st_ctime;
+        UINT32_T st_ctime_nsec;
 #else
         struct pfs_kernel_timespec st_atim;
         struct pfs_kernel_timespec st_mtim;
@@ -186,6 +186,17 @@ struct pfs_kernel_msghdr {
 	UINT32_T msg_control;
 	UINT32_T msg_controllen;
 	UINT32_T msg_flags;
+} __attribute__((packed));
+
+struct pfs_kernel_cmsghdr {
+    UINT32_T cmsg_len;
+    INT32_T cmsg_level;
+    INT32_T cmsg_type;
+} __attribute__((packed));
+
+struct pfs_kernel_sockaddr_un {
+    UINT16_T sun_family;
+    char sun_path[108];
 } __attribute__((packed));
 
 struct pfs_kernel_sigaction {

@@ -17,7 +17,7 @@ extern "C" {
 }
 
 #include <unistd.h>
-#include <errno.h> 
+#include <errno.h>
 #include <stdlib.h>
 #include <dirent.h>
 #include <string.h>

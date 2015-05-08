@@ -15,7 +15,6 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/statfs.h>
 #include <sys/file.h>
-#include <sys/poll.h>
 #include <utime.h>
 
 #ifdef __cplusplus
@@ -24,8 +23,7 @@ extern "C" {
 
 struct pfs_name;
 
-int		pfs_open( const char *path, int flags, mode_t mode );
-int		pfs_pipe( int *fds );
+int		pfs_open( const char *path, int flags, mode_t mode, char *native_path, size_t len );
 
 int		pfs_close( int fd );
 pfs_ssize_t	pfs_read( int fd, void *data, pfs_size_t length );
@@ -42,17 +40,12 @@ int		pfs_fstatfs( int fd, struct pfs_statfs *buf );
 int		pfs_fsync( int fd );
 int		pfs_fchdir( int fd );
 int		pfs_fcntl( int fd, int cmd, void *arg );
-int		pfs_ioctl( int fd, int cmd, void *arg );
 int		pfs_fchmod( int fd, mode_t mode );
 int		pfs_fchown( int fd, uid_t uid, gid_t gid );
 int		pfs_flock( int fd, int op );
 
-int		pfs_select( int n, fd_set *rfds, fd_set *wfds, fd_set *efds, struct timeval *timeout );
-int		pfs_poll( struct pollfd *ufds, unsigned nfds, int timeout );
 int		pfs_chdir( const char *path );
 char *		pfs_getcwd( char *path, pfs_size_t size );
-int		pfs_dup( int old );
-int		pfs_dup2( int old, int nfd );
 
 int		pfs_stat( const char *name, struct pfs_stat *buf );
 int		pfs_statfs( const char *path, struct pfs_statfs *buf );
@@ -74,7 +67,7 @@ int		pfs_mkdir( const char *path, mode_t mode );
 int		pfs_rmdir( const char *path );
 struct dirent *	pfs_fdreaddir( int fd );
 
-int		pfs_openat( int dirfd, const char *path, int flags, mode_t mode );
+int		pfs_openat( int dirfd, const char *path, int flags, mode_t mode, char *native_path, size_t len );
 int		pfs_mkdirat( int dirfd, const char *path, mode_t mode);
 int		pfs_mknodat( int dirfd, const char *path, mode_t mode, dev_t dev );
 int		pfs_fchownat( int dirfd, const char *path, uid_t owner, gid_t group, int flags );
@@ -102,24 +95,6 @@ int pfs_removexattr (const char *path, const char *name);
 int pfs_lremovexattr (const char *path, const char *name);
 int pfs_fremovexattr (int fd, const char *name);
 
-int		pfs_socket( int domain, int type, int protocol );
-int		pfs_socketpair( int domain, int type, int protocol, int *fds );
-int		pfs_accept( int fd, struct sockaddr *addr, int * addrlen );
-int		pfs_bind( int fd, const struct sockaddr *addr, int addrlen );
-int		pfs_connect( int fd, const struct sockaddr *addr, int addrlen );
-int		pfs_getpeername( int fd, struct sockaddr *addr, int * addrlen );
-int		pfs_getsockname( int fd, struct sockaddr *addr, int * addrlen );
-int		pfs_getsockopt( int fd, int level, int option, void *value, int * length );
-int		pfs_listen( int fd, int backlog );
-int		pfs_recv( int fd, void *data, int length, int flags );
-int		pfs_recvfrom( int fd, void *data, int length, int flags, struct sockaddr *addr, int * addrlength);
-int		pfs_recvmsg( int fd,  struct msghdr *msg, int flags );
-int		pfs_send( int fd, const void *data, int length, int flags );
-int		pfs_sendmsg( int fd, const struct msghdr *msg, int flags );
-int		pfs_sendto( int fd, const void *data, int length, int flags, const struct sockaddr *addr, int addrlength );
-int		pfs_setsockopt( int fd, int level, int option, const void *value, int length );
-int		pfs_shutdown( int fd, int how );
-
 int		pfs_mkalloc( const char *path, pfs_ssize_t size, mode_t mode );
 int		pfs_lsalloc( const char *path, char *alloc_path, pfs_ssize_t *avail, pfs_ssize_t *inuse );
 
@@ -134,15 +109,14 @@ int		pfs_timeout( const char *str );
 int		pfs_get_real_fd( int fd );
 int		pfs_get_full_name( int fd, char *name );
 int		pfs_get_local_name( const char *rpath, char *lpath, char *firstline, int length );
-int		pfs_is_nonblocking( int fd );
 int		pfs_resolve_name( int is_special_syscall, const char *path, struct pfs_name *pname );
 
 int		pfs_search( const char *path, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i);
 
-  pfs_size_t	pfs_mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
+pfs_size_t	pfs_mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
 int		pfs_mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
 int		pfs_mmap_delete( pfs_size_t logical_address, pfs_size_t length );
- 
+
 #ifdef __cplusplus
 }
 #endif

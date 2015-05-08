@@ -33,7 +33,6 @@ extern "C" {
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <sys/ioctl.h>
 
 class pfs_file_rfio : public pfs_file
 {
@@ -138,14 +137,14 @@ private:
 	void convert_name( pfs_name *name, char *path ) {
 		if (!strcmp(name->service_name, "castor")) {
 			sprintf(path, "/castor/%s/%s", name->host, name->rest);
-		} else {	
+		} else {
 			if(name->host[0]) {
 				sprintf(path,"%s:%s",name->host,name->rest);
 			} else {
 				strcpy(path,"/");
 			}
 		}
-	}	
+	}
 
 public:
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {

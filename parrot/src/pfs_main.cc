@@ -10,9 +10,9 @@ See the file COPYING for details.
 #include "pfs_critical.h"
 #include "pfs_dispatch.h"
 #include "pfs_paranoia.h"
-#include "pfs_poll.h"
 #include "pfs_process.h"
 #include "pfs_service.h"
+#include "pfs_table.h"
 #include "ptrace.h"
 
 #ifndef PTRACE_EVENT_STOP
@@ -36,7 +36,9 @@ extern "C" {
 #include "md5.h"
 #include "password_cache.h"
 #include "pfs_resolve.h"
+#include "random.h"
 #include "stringtools.h"
+#include "string_array.h"
 #include "tracer.h"
 #include "xxmalloc.h"
 #include "hash_table.h"
@@ -47,6 +49,7 @@ extern "C" {
 #include <termios.h>
 #include <unistd.h>
 
+#include <sys/stat.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
@@ -83,6 +86,7 @@ int pfs_write_rval = 0;
 int pfs_paranoid_mode = 0;
 const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
+int set_foreground = 1;
 
 char sys_temp_dir[PFS_PATH_MAX] = "/tmp";
 char pfs_temp_dir[PFS_PATH_MAX];
@@ -94,7 +98,7 @@ const char *pfs_root_checksum=0;
 const char *pfs_initial_working_directory=0;
 
 char *pfs_false_uname = 0;
-char *pfs_ldso_path = 0;
+char pfs_ldso_path[PFS_PATH_MAX];
 uid_t pfs_uid = 0;
 gid_t pfs_gid = 0;
 const char * pfs_username = 0;
@@ -128,6 +132,8 @@ enum {
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
 	LONG_OPT_CVMFS_ALIEN_CACHE,
 	LONG_OPT_HELPER,
+	LONG_OPT_NO_SET_FOREGROUND,
+	LONG_OPT_VALGRIND,
 };
 
 static void get_linux_version(const char *cmd)
@@ -207,6 +213,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Do not checksum files.\n", "-k,--no-checksums");
 	fprintf(stdout, " %-30s Path to ld.so to use.                      (PARROT_LDSO_PATH)\n", "-l,--ld-path=<path>");
 	fprintf(stdout, " %-30s Record all the file names.\n", "-n,--name-list=<path>");
+	fprintf(stdout, " %-30s Disable changing the foreground process group of the session.\n","   --no-set-foreground");
 	fprintf(stdout, " %-30s Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n", "-m,--ftab-file=<file>");
 	fprintf(stdout, " %-30s Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
 	fprintf(stdout, " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
@@ -228,6 +235,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s Fake this unix uid; Real uid stays the same.     (PARROT_UID)\n", "-U,--uid=<num>");
 	fprintf(stdout, " %-30s Use this extended username.                 (PARROT_USERNAME)\n", "-u,--username=<name>");
 	fprintf(stdout, " %-30s Display version number.\n", "-v,--version");
+	fprintf(stdout, " %-30s Enable valgrind support for Parrot.\n", "   --valgrind");
 	fprintf(stdout, " %-30s Initial working directory.\n", "-w,--work-dir=<dir>");
 	fprintf(stdout, " %-30s Display table of system calls trapped.\n", "-W,--syscall-table");
 	fprintf(stdout, " %-30s Force synchronous disk writes.            (PARROT_FORCE_SYNC)\n", "-Y,--sync-write");
@@ -255,7 +263,12 @@ static void show_help( const char *cmd )
 	if(pfs_service_lookup("s3"))		fprintf(stdout, " s3");
 	if(pfs_service_lookup("root"))      fprintf(stdout, " root");
 	if(pfs_service_lookup("xrootd"))    fprintf(stdout, " xrootd");
-	if(pfs_service_lookup("cvmfs"))		fprintf(stdout, " cvmfs");
+	if(pfs_service_lookup("cvmfs"))     fprintf(stdout, " cvmfs");
+
+	if(pfs_service_lookup("cvmfs")) {
+		fprintf(stdout, "\ncvmfs compilation flags: " CCTOOLS_CVMFS_BUILD_FLAGS);
+	}
+
 	fprintf(stdout, "\n");
 	exit(1);
 }
@@ -271,7 +284,7 @@ void install_handler( int sig, void (*handler)(int sig))
 
 	s.sa_handler = handler;
 	sigfillset(&s.sa_mask);
-	s.sa_flags = 0; 
+	s.sa_flags = 0;
 
 	sigaction(sig,&s,0);
 }
@@ -293,25 +306,7 @@ of our children for its consideration.
 
 static void pass_through( int sig )
 {
-	pfs_process_raise(root_pid, sig, 1 /* really send it */);
-}
-
-/*
-We will be fighting with our child processes for control of 
-the terminal.  Whenever a we want to write to the terminal,
-we will get a SIGTTOU or SIGTTIN instructing us that its
-not our turn.  But, we are in charge!  So, upon receipt
-of these signals, grab control of the terminal.
-*/
-
-static void control_terminal( int sig )
-{
-	if(sig==SIGTTOU) {
-		tcsetpgrp(1,getpgrp());
-		tcsetpgrp(2,getpgrp());
-	} else {
-		tcsetpgrp(0,getpgrp());
-	}
+	kill(root_pid, sig);
 }
 
 /*
@@ -325,6 +320,8 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 	struct pfs_process *p;
 	unsigned long message;
 
+	trace_this_pid = -1; /* now always trace any process at all */
+
 	p = pfs_process_lookup(pid);
 	if(!p) {
 		debug(D_PROCESS,"ignoring event %d for unknown pid %d",status,pid);
@@ -333,8 +330,7 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 
 	if (WIFSTOPPED(status) && WSTOPSIG(status) == (SIGTRAP|0x80)) {
 		/* The common case, a syscall delivery stop. */
-		p->nsyscalls++;
-		pfs_dispatch(p, 0);
+		pfs_dispatch(p);
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
 		pid_t cpid;
 		struct pfs_process *child;
@@ -355,12 +351,12 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 		if(p->syscall_args[0]&CLONE_THREAD)
 			child->tgid = p->tgid;
 		child->state = PFS_PROCESS_STATE_USER;
-		tracer_continue(p->tracer,0); /* child starts stopped. */
-
-		trace_this_pid = -1; /* now trace any process at all */
+		if (tracer_continue(p->tracer,0) == -1) /* child starts stopped. */
+			return;
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXEC<<8))) {
-		debug(D_PROCESS, "pid %d is completing exec", (int)pid);
-		tracer_continue(p->tracer, 0);
+		pfs_process_exec(p);
+		if (tracer_continue(p->tracer,0) == -1)
+			return;
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8)) || WIFEXITED(status) || WIFSIGNALED(status)) {
 		/* In my own testing, if we use PTRACE_O_TRACEEXIT then we never get
 		 * WIFEXITED(status) || WIFSIGNALED(status).  There may be corner cases
@@ -400,7 +396,8 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 			 *     attached  using  PTRACE_SEIZE), or PTRACE_EVENT_STOP if
 			 *     PTRACE_SEIZE was used.
 			 */
-			tracer_continue(p->tracer, 0);
+			if (tracer_continue(p->tracer, 0) == -1)
+				return;
 		} else if((linux_available(3,4,0) && ((status>>16) == PTRACE_EVENT_STOP)) || (!linux_available(3,4,0) && SIG_ISSTOP(signum) && ptrace(PTRACE_GETSIGINFO, pid, 0, &info) == -1 && errno == EINVAL)) {
 			/* group-stop, `man ptrace` for more information */
 			debug(D_PROCESS, "process %d has group-stopped due to signal %d (%s) (state %d)",pid,signum,string_signal(signum),p->state);
@@ -412,7 +409,8 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 					notified = 1;
 				}
 			}
-			tracer_listen(p->tracer);
+			if (tracer_listen(p->tracer) == -1)
+				return;
 		} else {
 			/* signal-delivery-stop */
 			debug(D_PROCESS,"pid %d received signal %d (%s) (state %d)",pid,signum,string_signal(signum),p->state);
@@ -422,15 +420,6 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 				 * IEEE Std 1003.1, 2004 Edition
 				 * Also mentioned in `man ptrace`.
 				 */
-				case SIGTTIN:
-					tcsetpgrp(STDIN_FILENO,pid);
-					signum = 0; /* suppress delivery */
-					break;
-				case SIGTTOU:
-					tcsetpgrp(STDOUT_FILENO,pid);
-					tcsetpgrp(STDERR_FILENO,pid);
-					signum = 0; /* suppress delivery */
-					break;
 				case SIGSTOP:
 					/* Black magic to get threads working on old Linux kernels... */
 
@@ -442,8 +431,28 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 					break;
 				case SIGTSTP:
 					break;
+				case SIGSEGV: {
+					buffer_t B[1];
+					buffer_init(B);
+					if (ptrace(PTRACE_GETSIGINFO, pid, 0, &info) == 0) {
+						if (info.si_code == SEGV_MAPERR) {
+							debug(D_PROCESS, "pid %d faulted on address %p (unmapped)", pid, info.si_addr);
+						} else if (info.si_code == SEGV_ACCERR) {
+							debug(D_PROCESS, "pid %d faulted on address %p (permissions)", pid, info.si_addr);
+						} else {
+							debug(D_PROCESS, "pid %d faulted on address %p", pid, info.si_addr);
+						}
+					} else {
+						debug(D_DEBUG, "couldn't get signal info: %s", strerror(errno));
+					}
+					pfs_table::mmap_proc(pid, B);
+					debug(D_DEBUG, "%d maps:\n%s", pid, buffer_tostring(B));
+					buffer_free(B);
+					break;
+				}
 			}
-			tracer_continue(p->tracer,signum); /* deliver (or not) the signal */
+			if (tracer_continue(p->tracer,signum) == -1) /* deliver (or not) the signal */
+				return;
 		}
 	} else {
 		fatal("pid %d stopped with strange status %d",pid,status);
@@ -458,14 +467,11 @@ struct timeval clock_to_timeval( clock_t c )
 	return result;
 }
 
-void handle_sigchld( int sig  )
+static volatile sig_atomic_t attached_and_ready = 0;
+static void set_attached_and_ready (int sig)
 {
-	pfs_poll_abort();
-}
-
-static void handle_sigio( int sig )
-{
-	pfs_process_sigio();
+	assert(sig == SIGUSR1);
+	attached_and_ready = 1;
 }
 
 void write_rval(const char* message, int status) {
@@ -487,6 +493,7 @@ int main( int argc, char *argv[] )
 	pid_t pid;
 	struct pfs_process *p;
 	char envlist[PATH_MAX] = "";
+	int valgrind = 0;
 
 	if(getenv("PARROT_ENABLED")) {
 		fprintf(stderr,"sorry, parrot_run cannot be run inside of itself.\n");
@@ -510,10 +517,7 @@ int main( int argc, char *argv[] )
 	install_handler(SIGTERM,pfs_process_kill_everyone);
 	install_handler(SIGHUP,pass_through);
 	install_handler(SIGINT,pass_through);
-	install_handler(SIGTTIN,control_terminal);
-	install_handler(SIGTTOU,control_terminal);
-	install_handler(SIGCHLD,handle_sigchld);
-	install_handler(SIGIO,handle_sigio);
+	install_handler(SIGIO,pfs_process_sigio);
 	install_handler(SIGXFSZ,ignore_signal);
 
 	/* For terminal stop signals, we ignore all.
@@ -565,6 +569,7 @@ int main( int argc, char *argv[] )
 		{"no-follow-symlinks", no_argument, 0, 'f'},
 		{"no-helper", no_argument, 0, 'H'},
 		{"no-optimize", no_argument, 0, 'D'},
+		{"no-set-foreground", no_argument, 0, LONG_OPT_NO_SET_FOREGROUND},
 		{"paranoid", no_argument, 0, 'P'},
 		{"proxy", required_argument, 0, 'p'},
 		{"root-checksum", required_argument, 0, 'R'},
@@ -579,6 +584,7 @@ int main( int argc, char *argv[] )
 		{"timeout", required_argument, 0, 'T'},
 		{"uid", required_argument, 0, 'U'},
 		{"username", required_argument, 0, 'u'},
+		{"valgrind", no_argument, 0, LONG_OPT_VALGRIND},
 		{"version", no_argument, 0, 'v'},
 		{"with-checksums", no_argument, 0, 'K'},
 		{"with-snapshots", no_argument, 0, 'F'},
@@ -619,7 +625,7 @@ int main( int argc, char *argv[] )
 			break;
 		case 'F':
 			pfs_force_cache = 1;
-			break;	
+			break;
 		case 'f':
 			pfs_follow_symlinks = 0;
 			break;
@@ -642,7 +648,7 @@ int main( int argc, char *argv[] )
 			pfs_checksum_files = 1;
 			break;
 		case 'l':
-			pfs_ldso_path = optarg;
+			strncpy(pfs_ldso_path, optarg, sizeof(pfs_ldso_path)-1);
 			break;
 		case 'm':
 			pfs_resolve_file_config(optarg);
@@ -744,8 +750,14 @@ int main( int argc, char *argv[] )
 			pfs_syscall_totals32 = (int*) calloc(SYSCALL32_MAX,sizeof(int));
 			pfs_syscall_totals64 = (int*) calloc(SYSCALL64_MAX,sizeof(int));
 			break;
+		case LONG_OPT_NO_SET_FOREGROUND:
+			set_foreground = 0;
+			break;
 		case LONG_OPT_HELPER:
 			pfs_use_helper = 1;
+			break;
+		case LONG_OPT_VALGRIND:
+			valgrind = 1;
 			break;
 		default:
 			show_help(argv[0]);
@@ -777,11 +789,11 @@ int main( int argc, char *argv[] )
 
 	if (envlist[0]) {
 		extern char **environ;
-		if(access(optarg, F_OK) == 0)
-			fatal("The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", optarg);
-		FILE *fp = fopen(optarg, "w");
+		if(access(envlist, F_OK) == 0)
+			fatal("The envlist file (%s) has already existed. Please delete it first or refer to another envlist file!!\n", envlist);
+		FILE *fp = fopen(envlist, "w");
 		if(!fp)
-			fatal("Can not open envlist file: %s", optarg);
+			fatal("Can not open envlist file: %s", envlist);
 		for (int i = 0; environ[i]; i++)
 			fprintf(fp, "%s\n", environ[i]);
 		char working_dir[PFS_PATH_MAX];
@@ -947,9 +959,7 @@ int main( int argc, char *argv[] )
 		} else {
 			debug(D_PROCESS,"watchdog PID %d",pfs_watchdog_pid);
 		}
-	} 
-
-	pfs_poll_init();
+	}
 
 	/* XXX Notes on strange code ahead:
 	 *
@@ -986,21 +996,43 @@ int main( int argc, char *argv[] )
 			pfs_helper_init();
 		pfs_paranoia_payload();
 		pfs_process_bootstrapfd();
-		setpgrp();
-		{
+		if(set_foreground) {
+			setpgrp();
 			int fd = open("/dev/tty", O_RDWR);
 			if (fd >= 0) {
 				tcsetpgrp(fd, getpgrp());
 				close(fd);
 			}
-			_exit(1);
-		} else {
-			debug(D_NOTICE,"unable to fork %s: %s",argv[optind],strerror(errno));
-			if(pfs_write_rval) {
-				write_rval("nofork", 0);
-			}
-			exit(1);
 		}
+		if (valgrind) {
+			int i;
+			char **nargv = string_array_new();
+			nargv = string_array_append(nargv, "sh");
+			nargv = string_array_append(nargv, "-c");
+			nargv = string_array_append(nargv, "trap 'exec \"$@\"' USR1; kill -STOP $$; while true; do true; done;");
+			nargv = string_array_append(nargv, "--");
+			for (i = optind; argv[i]; i++)
+				nargv = string_array_append(nargv, argv[i]);
+			debug(D_DEBUG, "execvp(\"sh\", [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", ...])", nargv[0], nargv[1], nargv[2], nargv[3], nargv[4]);
+			execvp("sh", (char *const *)nargv);
+		} else {
+			signal(SIGUSR1, set_attached_and_ready);
+			raise(SIGSTOP); /* synchronize with parent, above */
+			while (!attached_and_ready) ; /* spin waiting to be traced (NO SLEEPING/STOPPING) */
+			execvp(argv[optind],&argv[optind]);
+		}
+		fprintf(stderr, "unable to execute %s: %s\n", argv[optind], strerror(errno));
+		fflush(stderr);
+		if(pfs_write_rval) {
+			write_rval("noexec", 0);
+		}
+		_exit(1);
+	} else {
+		debug(D_NOTICE,"unable to fork %s: %s",argv[optind],strerror(errno));
+		if(pfs_write_rval) {
+			write_rval("nofork", 0);
+		}
+		exit(1);
 	}
 
 	CRITICAL_BEGIN
@@ -1009,6 +1041,7 @@ int main( int argc, char *argv[] )
 	debug(D_PROCESS,"attaching to pid %d",pid);
 	if (tracer_attach(pid) == -1)
 		fatal("could not trace child");
+	kill(pid, SIGUSR1);
 	p = pfs_process_create(pid,getpid(),0);
 	if(!p) {
 		if(pfs_write_rval) {
@@ -1023,10 +1056,12 @@ int main( int argc, char *argv[] )
 
 	while(pfs_process_count()>0) {
 		while(1) {
-			int status, flags;
+			int flags = WUNTRACED|__WALL;
+			int status;
 			struct rusage usage;
 
-			flags = WUNTRACED|__WALL|WNOHANG;
+			if(trace_this_pid != -1)
+				debug(D_PROCESS, "Waiting for process %d\n", trace_this_pid);
 			pid = wait4(trace_this_pid,&status,flags,&usage);
 #if 0 /* Enable this for extreme debugging... */
 			debug(D_DEBUG, "%d = wait4(%d, %p, %d, %p)", (int)pid, (int)trace_this_pid, &status, flags, &usage);
@@ -1040,16 +1075,12 @@ int main( int argc, char *argv[] )
 				}
 			} else if(pid>0) {
 				handle_event(pid,status,&usage);
-			} else if(trace_this_pid > 0) {
-				debug(D_PROCESS, "Waiting for process %d\n", trace_this_pid);
-				usleep(100);       //Avoid busy waiting while the process gives signs of live.
 			} else {
 				break;
 			}
 		}
 
 		if(pid==-1 && errno==ECHILD) break;
-		if(pfs_process_count()>0) pfs_poll_sleep();
 	}
 
 	if(pfs_syscall_totals32) {
@@ -1091,7 +1122,7 @@ int main( int argc, char *argv[] )
 		hash_table_delete(namelist_table);
 		fclose(namelist_file);
 	}
-	
+
 	if(WIFEXITED(root_exitstatus)) {
 		int status = WEXITSTATUS(root_exitstatus);
 		debug(D_PROCESS,"%s exited normally with status %d",argv[optind],status);

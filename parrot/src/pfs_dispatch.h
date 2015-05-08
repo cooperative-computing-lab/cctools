@@ -10,8 +10,8 @@ See the file COPYING for details.
 
 #include "pfs_process.h"
 
-void pfs_dispatch( struct pfs_process *p, INT64_T signum );
-void pfs_dispatch32( struct pfs_process *p, INT64_T signum );
-void pfs_dispatch64( struct pfs_process *p, INT64_T signum );
+void pfs_dispatch( struct pfs_process *p );
+void pfs_dispatch32( struct pfs_process *p );
+void pfs_dispatch64( struct pfs_process *p );
 
 #endif
