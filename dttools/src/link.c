@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "full_io.h"
 #include "debug.h"
+#include "buffer.h"
 
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -774,28 +775,19 @@ int link_putlstring(struct link *link, const char *data, size_t count, time_t st
 
 int link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va)
 {
-	va_list va2;
-	ssize_t size = 65536;
-	char buffer[size];
-	char *b = buffer;
+	ssize_t rc;
+	size_t l;
+	const char *str;
+	buffer_t B;
 
-	va_copy(va2, va);
-	int n = vsnprintf(NULL, 0, fmt, va2);
-	va_end(va2);
-
-	if(n < 0)
+	buffer_init(&B);
+	if (buffer_putvfstring(&B, fmt, va) == -1)
 		return -1;
-
 	str = buffer_tolstring(&B, &l);
 	rc = link_putlstring(link, str, l, stoptime);
 	buffer_free(&B);
 
-	int r = link_putlstring(link, b, (size_t) n, stoptime);
-
-	if(b != buffer)
-		free(b);
-
-	return r;
+	return rc;
 }
 
 int link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...)
