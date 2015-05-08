@@ -562,6 +562,16 @@ then
 	fi
 
 	ccflags="${ccflags} -DHAS_MYSQL -DHAS_BXGRID"
+
+	if [ -f ${mysql_path}/include/mysql.h ]
+	then
+		ccflags="${ccflags} -DHAS_MYSQL_H"
+	fi
+
+	if [ -f ${mysql_path}/include/mysql/mysql.h ]
+	then
+		ccflags="${ccflags} -DHAS_MYSQL_MYSQL_H"
+	fi
 else
 	if [ $config_mysql_path = yes ]
 	then
