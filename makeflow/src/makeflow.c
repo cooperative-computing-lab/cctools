@@ -72,7 +72,7 @@ an example.
 
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 
-#define CONTAINER_SH_PREFIX "docker.wrapper"
+#define CONTAINER_SH "docker.wrapper.sh"
 #define CONTAINER_TMP_SH_PREFIX "docker.tmp"
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
@@ -637,46 +637,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	3 - It should not modify the global list wrapper_input_files.
 	*/
 
-	if (container_mode == CONTAINER_MODE_DOCKER) {
-
-	  	FILE *wrapper_fn;
-		
-		char wrapper_fn_name[4096];
-		sprintf(wrapper_fn_name, "%s.%d", CONTAINER_SH_PREFIX, n->nodeid);
-	
-	  	wrapper_fn = fopen(wrapper_fn_name, "w"); 
-
-		char tmp_sh_name[4096];
-		sprintf(tmp_sh_name, "%s.%d", CONTAINER_TMP_SH_PREFIX, n->nodeid); 
- 
-	  	fprintf(wrapper_fn, "#!/bin/sh\n\
-curr_dir=`pwd`\n\
-default_dir=/root/worker\n\
-echo \"#!/bin/sh\" > %s\n\
-echo \"$@\" >> %s\n\
-chmod 755 %s\n\
-flock /tmp/lockfile /usr/bin/docker pull %s\n\
-docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
-%s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, container_image, container_image, tmp_sh_name);
- 
-	  	fclose(wrapper_fn);
-
-		chmod(wrapper_fn_name, 0755);
-
-		/* XXX this is badly incorrect: it is adding files to the global wrapper list on each job submission. */
-		/* We must either do that once at startup, or do it every time to the local variable input_files. */
-
-		if(!wrapper_input_files) wrapper_input_files = list_create();
-		list_push_tail(wrapper_input_files,dag_file_create(wrapper_fn_name)); 
-
-		char wrap_cmd[4096]; 
-		sprintf(wrap_cmd, "./%s.%%%%", CONTAINER_SH_PREFIX);
-		
-		if(!wrapper_command) wrapper_command = strdup(wrap_cmd);
-		else wrapper_command = string_wrap_command(wrapper_command,optarg);
-
-	}
-
 	/* Create strings for all the files mentioned by this node. */
 	char *input_files = makeflow_file_list_format(n,0,n->source_files,queue);
 	char *output_files = makeflow_file_list_format(n,0,n->target_files,queue);
@@ -686,6 +646,21 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 	input_files = makeflow_file_list_format(n,input_files,wrapper_input_files,queue);
 	output_files = makeflow_file_list_format(n,output_files,wrapper_output_files,queue);
 
+    if (container_mode == CONTAINER_MODE_DOCKER) {
+
+        char *task_sh;      
+        task_sh = makeflow_create_task_sh(n->command, n->nodeid);
+
+        char *wrap_cmd[4096];
+		sprintf(wrap_cmd, "./%s %s", CONTAINER_SH, task_sh);
+
+	    /*if(!input_files) input_files = list_create();
+            list_push_tail(input_files,dag_file_create(task_sh));
+		makeflow_wrapper_add_command(wrap_cmd);
+       
+        char *command = wrap_cmd;
+        */
+	}  
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
 	char * command = string_wrap_command(n->command,wrapper_command);
 
@@ -978,6 +953,15 @@ static void makeflow_run( struct dag *d )
 	struct dag_node *n;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
+   
+    /* XXX for docker mode 
+     * 1. create a global script for running docker container
+     * 2. add this script to the global wrapper list
+     */
+    if (container_mode == CONTAINER_MODE_DOCKER) {
+        makeflow_create_docker_sh();
+        makeflow_wrapper_add_input_file(CONTAINER_SH);
+    }
 
 	while(!makeflow_abort_flag) {
 		makeflow_dispatch_ready_jobs(d);
@@ -1054,6 +1038,65 @@ static void handle_abort(int sig)
 	if (abort_count_to_exit == 1)
 		signal(sig, SIG_DFL);
 	makeflow_abort_flag = 1;
+}
+
+
+/*
+ * write task command into a shell script 
+ */
+
+static char *makeflow_create_task_sh(const char *task_cmd, int nodeid) 
+{
+    char *task_sh;
+    string_format(task_sh, "%s.%d", CONTAINER_TMP_SH_PREFIX, nodeid);
+
+    FILE *fn = fopen(fn_name, "w");
+    if(fn == NULL) {
+	   fprintf(stderr, "makeflow_container: cannot create sh for node: %d\n", nodeid);
+       exit(1);
+    }
+
+    fprintf(fn, "!/bin/sh\n%s\n", task_cmd);
+    fclose(fn);
+   
+    chmod(task_sh, 07555);
+ 
+    return task_sh;
+}
+
+/*
+ * creates a general shell script for running each task with a 
+ * docker container 
+ */
+
+static void makeflow_create_docker_sh() 
+{       
+    FILE *wrapper_fn;
+	
+    char wrapper_fn_name[4096];
+	sprintf(wrapper_fn_name, "%s.%d", CONTAINER_SH_PREFIX, n->nodeid);
+
+  	wrapper_fn = fopen(wrapper_fn_name, "w"); 
+
+	char tmp_sh_name[4096];
+	sprintf(tmp_sh_name, "%s.%d", CONTAINER_TMP_SH_PREFIX, n->nodeid); 
+ 
+  	fprintf(wrapper_fn, "#!/bin/sh\n\
+curr_dir=`pwd`\n\
+default_dir=/root/worker\n\
+echo \"#!/bin/sh\" > %s\n\
+echo \"$@\" >> %s\n\
+chmod 755 %s\n\
+flock /tmp/lockfile /usr/bin/docker pull %s\n\
+docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
+%s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, container_image, container_image, tmp_sh_name);
+ 
+  	fclose(wrapper_fn);
+
+	chmod(wrapper_fn_name, 0755);   
+
+    if(!wrapper_input_files) wrapper_input_files = list_create();
+	list_push_tail(wrapper_input_files,dag_file_create(wrapper_fn_name));
 }
 
 static void show_help_run(const char *cmd)
@@ -1702,11 +1745,11 @@ int main(int argc, char *argv[])
 
 	/* XXX better to write created files to log, then delete those listed in log. */
 
-	if (container_mode == CONTAINER_MODE_DOCKER) {
+	/*if (container_mode == CONTAINER_MODE_DOCKER) {
 		char *cmd = string_format("rm %s.* %s.*",CONTAINER_SH_PREFIX,CONTAINER_TMP_SH_PREFIX);
 		system(cmd);
 		free(cmd);
-	}
+	}*/
 
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
