@@ -1,0 +1,27 @@
+{
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "10GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.32"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "6.5"
+	},
+	"software": {
+		"cmssw-5.3.11-slc5_amd64": {
+			"mountpoint": "/cvmfs/cms.cern.ch",
+			"action": "unpack"
+		}
+	},
+	"data": {
+	},
+	"environ": {
+		"FAKEPWD": "/tmp/test"
+	}
+}
