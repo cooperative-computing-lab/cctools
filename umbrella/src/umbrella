@@ -40,6 +40,8 @@ if sys.version_info > (2,6,):
 else:
 	import simplejson as json #json module is introduce in python 2.4.3
 
+#cctools-version: based on http://www3.nd.edu/~ccl/software/files/cctools-4.4.0-x86_64-redhat6.tar.gz
+
 def subprocess_error(cmd, rc, stdout, stderr):
 	sys.exit("`%s` fails with the return code of %d, \nstdout: %s, \nstderr: %s\n" % (cmd, rc, stdout, stderr))
 
@@ -195,32 +197,16 @@ def cctools_download(sandbox_dir, packages, hardware_platform, host_linux_distro
 	dependency_download(item['source'][0], item["checksum"], "md5sum", dest, item["format"], action)
 	return dest
 
-#the db table itself does not understand the collaberation relationship between cvmfs, parrot, SITECONF
 ''' cms_parrot
 '''
-def cmssw_cvmfs_parrot(name, action, packages, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, parrot_submit_file):
-	#construct the parrot submit script
-	logging.debug("Construct parrot submit file for using CVMFS ....")
-	parrot_submit_file.write("#!/bin/sh\n")
-	parrot_submit_file.write("export HTTP_PROXY=http://cache01.hep.wisc.edu:3128\n")
-	logging.debug("To access cvmfs, cctools binary is needed")
-	cctools_download(sandbox_dir, packages, hardware_platform, host_linux_distro, action)
-	has_parrot_localfile = 0
+def set_cvmfs_siteinfo(name, action, packages, sandbox_dir):
 	cvmfs_siteinfo_mountpoint = ''
-
 	#download SITECONF
-#	site_item = package_search(packages, "cms_siteconf_local_cvmfs")
-#	dest = os.path.dirname(sandbox_dir) + "/cache/cvmfs/cms.cern.ch/SITECONF"
-#	dependency_download(site_item["source"][0], site_item["checksum"], "md5sum", dest, site_item["format"], action)
-#	cvmfs_siteinfo_mountpoint = '/cvmfs/cms.cern.ch/SITECONF/local %s/local' % dest
-
-	name = 'cctools-4.4.0-%s-%s' % (host_linux_distro, hardware_platform)
-	id = package_search(packages, name, '')["checksum"]
-	parrot_dest = "%s/cache/%s/%s/bin/parrot_run" % (os.path.dirname(sandbox_dir), id, name)
-	parrot_submit_file.write('env; ' + parrot_dest + " --no-set-foreground /bin/sh -c 'cd " + sandbox_dir + "; " + user_cmd[0] + "'\n" )
-
-	has_parrot_localfile = 1
-	return has_parrot_localfile, cvmfs_siteinfo_mountpoint
+	site_item = package_search(packages, "cms_siteconf_local_cvmfs", '')
+	dest = os.path.dirname(sandbox_dir) + "/cache/" + site_item['checksum'] + "/SITECONF"
+	dependency_download(site_item["source"][0], site_item["checksum"], "md5sum", dest, site_item["format"], action)
+	cvmfs_siteinfo_mountpoint = '/cvmfs/cms.cern.ch/SITECONF/local %s/local' % dest
+	return cvmfs_siteinfo_mountpoint
 
 def data_dependency_process(name, id, packages_json, sandbox_dir, action):
 	item = package_search(packages_json, name, id)
@@ -233,7 +219,7 @@ def data_dependency_process(name, id, packages_json, sandbox_dir, action):
 
 ''' Check whether cvmfs is installed on the host or not
 '''
-def check_cms():
+def check_cvmfs_cms():
 	logging.debug("Check whether cvmfs is installed on the host or not")
 	cmd = "df -h|grep '^cvmfs'|grep cms.cern.ch|rev| cut -d' '  -f1|rev"
 	rc, stdout, stderr = func_call(cmd)
@@ -245,55 +231,42 @@ def check_cms():
 '''
 Parameter name: the item name in the software section
 '''
-def dependency_process(name, id, mountpoint, action, packages, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, parrot_submit_file):
+def dependency_process(env_para_dict, name, id, mountpoint, action, packages, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro):
 	#this part should changed. First check whether name is in the format of `cmssw_...`. If yes, check the batch type: if parrot, run it using the current mechanism; if docker, download a cvmfs-cmssw package, and mount it as a volume into the docker container. If it is not cmssw software dependency, process it normally.
-	has_parrot_localfile = 0
-	is_cvmfs_parrot_app = 0
+	is_cms_app = 0
 	cvmfs_siteinfo_mountpoint = ''
 	mount_value = ''
 	local_cvmfs = ''
 	if name[:5] == 'cmssw':
-		local_cms = check_cms()
+		is_cms_app = 1
+
+		local_cms = check_cvmfs_cms()
 		if local_cms:
 			local_cvmfs = os.path.dirname(local_cms)
 			logging.debug("The cvmfs is installed on the local host, and its mountpoint is: %s", local_cvmfs)
 		else:
 			logging.debug("The cvmfs is not installed on the local host.")
-			#if batch_type is parrot, we need a cctools version specially compiled for cvmfs
-			#if batch_type is cvmfs, we need add a special volume
-		if batch_type == 'parrot':
-			is_cvmfs_parrot_app = 1
-			logging.debug("Software dependency: %s", name)
-			r1, r2 = cmssw_cvmfs_parrot(name, action, packages, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, parrot_submit_file)	
-			if r1 == 1:
-				has_parrot_localfile = 1
-				cvmfs_siteinfo_mountpoint = r2
-			if local_cvmfs:
-				mount_value = local_cvmfs
-			else:
-				item = package_search(packages, name, id)
-				store = item ['source'][0]
-		
-				dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
-				dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
-				mount_value = '-%s/cvmfs' % dest
-			logging.debug('Parrot cmssw cvmfs mount source: %s', mount_value)
-		
-		elif batch_type == 'docker':
-			is_cvmfs_parrot_app = 1
-			logging.debug("Software dependency: %s", name)
-			if local_cvmfs:
-				mount_value = local_cvmfs
-			else:
-				item = package_search(packages, name, id)
-				store = item ['source'][0]
-		
-				dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
-				dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
-				mount_value = '-%s/cvmfs' % dest
-			logging.debug('Docker cmssw cvmfs mount source: %s', mount_value)
+
+		#if local_cvmfs is empty, set $HTTP_PROXY, download cctools package, set cvmfs_siteinfo_mountpoint, and call parrotize_user_cmd.
+		if not local_cvmfs:
+			logging.debug("Add env variable HTTP_PROXY = http://cache01.hep.wisc.edu:3128 into env_para_dict")
+			env_para_dict["HTTP_PROXY"] = "http://cache01.hep.wisc.edu:3128"
+
+			logging.debug("To access cvmfs, cctools binary is needed")
+			cctools_download(sandbox_dir, packages, hardware_platform, host_linux_distro, action)
+
+			cvmfs_siteinfo_mountpoint = set_cvmfs_siteinfo(name, action, packages, sandbox_dir)
+
+			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages)
+
+			mount_value = "PARROT_CVMFS"
 		else:
-			pass
+			mount_value = local_cvmfs
+			logging.debug('cvmfs is already installed on the machine, and its mountpoint on the machine: %s', mount_value)
+
+			if batch_type == 'parrot':
+				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages)
+	
 	else:
 		item = package_search(packages, name, id)
 		#table schema: (name text, version text, platform text, store text, store_type text, type text)
@@ -302,7 +275,7 @@ def dependency_process(name, id, mountpoint, action, packages, sandbox_dir, batc
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
 		dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
 		mount_value = dest
-	return has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_value, local_cvmfs
+	return is_cms_app, cvmfs_siteinfo_mountpoint, mount_value, local_cvmfs
 	
 ''' Set the environment parameters according to the specification file
 '''	
@@ -393,10 +366,6 @@ def env_check(sandbox_dir, batch_type, hardware_platform, cpu_cores, memory_size
 		logging.critical("Currently local execution engine only support three sandbox techniques: docker, chroot or parrot!")
 		sys.exit("Currently local execution engine only support three sandbox techniques: docker, chroot or parrot!\n")
 
-	parrot_submit_path = sandbox_dir + "/parrot_submit.sh"
-	parrot_submit_file = open(parrot_submit_path, "wb")
-	logging.debug("Create parrot submit file (%s)", parrot_submit_path)
-
 	uname_list = platform.uname() #format of uname_list: (system,node,release,version,machine,processor)
 #	for i in range(len(uname_list)):
 #		print uname_list[i],
@@ -448,7 +417,8 @@ def env_check(sandbox_dir, batch_type, hardware_platform, cpu_cores, memory_size
 	logging.debug("The hardware information of the local machine:")
 	logging.debug(dist_list)
 
-	#set host_linux_distro
+	#set host_linux_distro. Examples: redhat6, centos6.
+	#potential problem: maybe in the future, we need a finer control about the host_linux_distro, like redhat6.5, centos6.5.
 	arch_index = uname_list[2].find('ARCH')
 	if arch_index != -1:
 		host_linux_distro = 'arch'		
@@ -462,37 +432,55 @@ def env_check(sandbox_dir, batch_type, hardware_platform, cpu_cores, memory_size
 			host_linux_distro = 'redhat' + dist_version		
 	logging.debug("The OS distribution information of the local machine: %s", host_linux_distro)
 
-	return host_linux_distro, parrot_submit_path, parrot_submit_file
+	return host_linux_distro
 
-""" Installation each software dependency specified in the software section of the specification
+"""Modify the user's command into `parrot_run + the user's command`. 
+The cases when this function should be called: (1) non-cms app & batch_type == parrot; (2) cms app & cvmfs is not installed on the execution node.
+"""
+def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages):
+	#Here we use the cctools package from the local cache (which includes all the packages including cvmfs, globus, fuse and so on). Even if the user may install cctools by himself on the machine, the configuration of the local installation may be not what we want. For example, the user may just configure like this `./configure --prefix ~/cctools`.
+	name = 'cctools-4.4.0-%s-%s' % (host_linux_distro, hardware_platform)
+	id = package_search(packages, name, '')["checksum"]
+	dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
+	#user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
+	user_cmd[0] = dest + "/bin/parrot_run /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
+	logging.debug("The parrotized user_cmd: %s" % user_cmd[0])
+	return user_cmd
+
+"""Modify the user's command when the batch_type is chroot. This check should be done after `parrotize_user_cmd`.
+The cases when this function should be called: batch_type == chroot
+"""
+def chrootize_user_cmd(user_cmd, cwd_setting):
+	#By default, the directory of entering chroot is /. So before executing the user's command, first change the directory to the $CWD environment variable.
+	user_cmd[0] = 'chroot / /bin/sh -c "cd %s; %s"' %(cwd_setting, user_cmd[0]) 
+	return user_cmd
+	
+
+""" Installation each software dependency specified in the software section of the specification. If the application is a CMS app and the execution node does not have cvmfs installed, change `user_cmd` to `parrot_run ... user_cmd` and set HTTP_PROXY and cvmfs_siteinfo_mountpoint.
 Parameter software_spec: the software section of the specification
 Parameter sandbox_dir: the sandbox directory
 Parameter batch_type: the batch type
 """
-def software_install(os_id, software_spec, packages, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, parrot_submit_file, need_separate_rootfs, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict, host_cctools_path):
+def software_install(env_para_dict, os_id, software_spec, packages, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, is_cms_app, cvmfs_siteinfo_mountpoint, mount_dict, host_cctools_path):
 	print "Installing software dependencies ..."
 	for item in software_spec:
+		id = ''
 		if software_spec[item].has_key('id'):
 			id = software_spec[item]['id']
-		else:
-			id = ''
 		mountpoint = software_spec[item]['mountpoint']
 		action = software_spec[item]['action']
-		r1, r2, r3, r4, r5 = dependency_process(item, id, mountpoint, action, packages, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, parrot_submit_file)
-		if r1 == 1 and has_parrot_localfile == 0:
-			has_parrot_localfile = 1
-			cvmfs_siteinfo_mountpoint = r3
-		if r2 == 1 and is_cvmfs_parrot_app == 0:
-			is_cvmfs_parrot_app = 1
-		if r5:
-			mountpoint =  os.path.dirname(mountpoint)
-			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, r5)
-			mount_dict[mountpoint] = r5
+
+		r1, r2, r3, r4 = dependency_process(env_para_dict, item, id, mountpoint, action, packages, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro)
+		if r1 == 1 and is_cms_app == 0:
+			is_cms_app = 1
+		if not cvmfs_siteinfo_mountpoint:
+			cvmfs_siteinfo_mountpoint = r2
+		if r3 != 'PARROT_CVMFS':
+			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, r3)
+			mount_dict[mountpoint] = r3
 		if r4:
-			if r4[0] == '-':
-				mountpoint = '/cvmfs'	
-				r4 = r4[1:]
-			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, r4)
+			mountpoint =  os.path.dirname(mountpoint)
+			logging.debug("Add mountpoint (%s:%s) into mount_dict for accessing local cvmfs", mountpoint, r4)
 			mount_dict[mountpoint] = r4
 
 	#if the OS distribution does not match, add the OS image into the dependency list of the application and download it into the local machine
@@ -500,28 +488,32 @@ def software_install(os_id, software_spec, packages, sandbox_dir, batch_type, us
 		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
 		mountpoint = '/'	
 		action = 'unpack'
-		r1, r2, r3, r4, r5 = dependency_process(item, os_id, mountpoint, action, packages, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, parrot_submit_file)
-		if r1 == 1 and has_parrot_localfile == 0:
-			has_parrot_localfile = 1
-			cvmfs_siteinfo_mountpoint = r3
-		if r2 == 1 and is_cvmfs_parrot_app == 0:
-			is_cvmfs_parrot_app = 1
-		if r5:
-			mountpoint =  os.path.dirname(mountpoint)
-			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, r5)
-			mount_dict[mountpoint] = r5
+	#return is_cms_app, cvmfs_siteinfo_mountpoint, mount_value, local_cvmfs
+		r1, r2, r3, r4 = dependency_process(env_para_dict, item, os_id, mountpoint, action, packages, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro)
+		if r1 == 1 and is_cms_app == 0:
+			is_cms_app = 1
+		if not cvmfs_siteinfo_mountpoint:
+			cvmfs_siteinfo_mountpoint = r2
+		if r3 != 'PARROT_CVMFS':
+			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, r3)
+			mount_dict[mountpoint] = r3
 		if r4:
-			if r4[0] == '-':
-				mountpoint = '/cvmfs'	
-				r4 = r4[1:]
-			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, r4)
+			mountpoint =  os.path.dirname(mountpoint)
+			logging.debug("Add mountpoint (%s:%s) into mount_dict for accessing local cvmfs", mountpoint, r4)
 			mount_dict[mountpoint] = r4
 
 	#if the batch_type is parrot, add cctools into the dependency list to guarantee parrot can be used to create sandbox for the worst case (No root access authority and no docker).
 	if batch_type == "parrot":
+		logging.debug("To support Parrot execution engine, cctools binary (%s) is needed.", host_cctools_path)
 		host_cctools_path = cctools_download(sandbox_dir, packages, hardware_platform, host_linux_distro, 'unpack')
-		logging.debug("To support local execution engine, cctools binary (%s) is needed.", host_cctools_path)
-	return host_cctools_path, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict
+
+		if is_cms_app == 0:
+			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages)
+
+	if batch_type == "chroot":
+		chrootize_user_cmd(user_cmd, cwd_setting)
+
+	return host_cctools_path, is_cms_app, cvmfs_siteinfo_mountpoint, mount_dict
 
 ''' Process data section of the specification
 '''
@@ -550,7 +542,7 @@ def get_linker_path(hardware_platform, os_image_dir):
 
 """ Construct the docker volume parameters based on mount_dict 
 """
-def construct_docker_volume(sandbox_dir, input_dict, is_cvmfs_parrot_app, mount_dict):
+def construct_docker_volume(sandbox_dir, input_dict, mount_dict):
 	del mount_dict["/"] #remove "/" from the mount_dict to avoid messing the root directory of the host machine
 	volume_paras = ""
 	for key in mount_dict:
@@ -764,7 +756,7 @@ def create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_vers
 """ Construct directory mount list and file mount list for chroot. chroot requires the target mountpoint must be created within the chroot jail.
 Return: a tuple includes the directory mount list and the file mount list
 """
-def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separate_rootfs, os_image_dir, is_cvmfs_parrot_app, mount_dict):
+def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separate_rootfs, os_image_dir, is_cms_app, mount_dict):
 	dir_dict = {}
 	file_dict = {}
 	logging.debug("need_separate_rootfs: %d", need_separate_rootfs)
@@ -785,7 +777,7 @@ def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separa
 				if os.path.exists(item):
 					file_dict[item] = item	
 	
-	if is_cvmfs_parrot_app == 1:
+	if is_cms_app == 1:
 		name = 'cctools-4.4.0-%s-%s' % (host_linux_distro, hardware_platform)
 		id = package_search(packages, name, '')["checksum"]
 		cctools_path = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
@@ -897,32 +889,15 @@ def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, 
 					os.rmdir(parent_dir)
 					parent_dir = os.path.dirname(parent_dir)
 
-""" Run user task directory on the host's rootfs
+""" Run user task directory on the host's rootfs. Used by Parrot and chroot execution engine. Docker execution engine uses `docker run ...` instead.
 """
-def execute_task_host_rootfs(sandbox_dir, env_dict, batch_type, user_cmd, is_cvmfs_parrot_app, parrot_submit_path, parrot_submit_file):
-	logging.debug("Close parrot submit file (%s)", parrot_submit_path)
-	parrot_submit_file.close()
-	#need to construct the parrot_submit.sh
-	logging.debug("is_cvmfs_parrot_app: %d", is_cvmfs_parrot_app)
-	if is_cvmfs_parrot_app == 1:
-		cmd = "/bin/sh " + parrot_submit_path
-		rc, stdout, stderr = func_call_output_withenv(cmd, env_dict, sandbox_dir)
-#		if rc != 0:
-#			subprocess_error(cmd, rc, stdout, stderr)
-	else:
-		if batch_type == 'parrot':
-			cmd = "parrot_run --no-set-foreground " + user_cmd[0]
-		elif batch_type == 'chroot':
-			cmd = 'chroot / /bin/sh -c "cd %s; %s"' %(sandbox_dir, user_cmd[0]) 
-		print "cmd:", cmd
-		rc, stdout, stderr = func_call_output_withenv(cmd, env_dict, sandbox_dir)
-#		if rc != 0:
-#			subprocess_error(cmd, rc, stdout, stderr)
+def execute_task_host_rootfs(sandbox_dir, env_dict, user_cmd):
+	rc, stdout, stderr = func_call_output_withenv(user_cmd[0], env_dict, sandbox_dir)
 
 
 """ Run user's task with the help of the sandbox techniques, which currently inculde chroot, parrot, docker.
 """
-def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, parrot_submit_path, parrot_submit_file, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict, packages):
+def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, is_cms_app, cvmfs_siteinfo_mountpoint, mount_dict, packages):
 	#sandbox_dir will be the home directory of the sandbox
 	print 'Executing the application ....'
 	logging.debug("chdir(%s)", sandbox_dir)
@@ -935,7 +910,7 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 			#traverse the common-mountlist file to create the mountpoint and mount --bind -o ro
 			#traverse the special file to create the mountpoint and mount --bind
 			#remount /etc/passwd /etc/group /etc/hosts /etc/resolv.conf
-			(dir_dict, file_dict) = construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, 1, os_image_dir, is_cvmfs_parrot_app, mount_dict)
+			(dir_dict, file_dict) = construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, 1, os_image_dir, is_cms_app, mount_dict)
 			chroot_mount_bind(dir_dict, file_dict, sandbox_dir, 1, hardware_platform, distro_name, distro_version)
 			#redirect outputdir
 			logging.debug("Construct environment variables ....")
@@ -948,23 +923,12 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 				env_dict[key] = env_para_dict[key]
 
 			#run user_cmd
-			os_image_name = "%s-%s-%s" %(distro_name, distro_version, hardware_platform)
-			os_image_path = os.path.dirname(sandbox_dir) + '/cache/' + os_image_name
-			logging.debug("is_cvmfs_parrot_app: %d", is_cvmfs_parrot_app)
-			if is_cvmfs_parrot_app == 1:
-				parrot_submit_file.close()
-				sub_cmd = "/bin/sh " + parrot_submit_path
-				cmd = 'env; strace -o strace.log chroot %s /bin/sh -c "cd %s; %s"' % (os_image_path, sandbox_dir, user_cmd[0])
-			else:
-				cmd = 'chroot %s /bin/sh -c "cd %s; %s"' % (os_image_path, sandbox_dir, user_cmd[0])
-			rc, stdout, stderr = func_call_output_withenv(cmd, env_dict, sandbox_dir)
-#			if rc != 0:
-#				subprocess_error(cmd, rc, stdout, stderr)
+			execute_task_host_rootfs(sandbox_dir, env_dict, user_cmd)
 			
 			#post-process to clean up
 			chroot_post_process(dir_dict, file_dict, sandbox_dir, 1, hardware_platform, distro_name, distro_version)
 		else:
-			(dir_dict, file_dict) = construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, 0, os_image_dir, is_cvmfs_parrot_app, mount_dict)
+			(dir_dict, file_dict) = construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, 0, os_image_dir, is_cms_app, mount_dict)
 			chroot_mount_bind(dir_dict, file_dict, sandbox_dir, 0, hardware_platform, distro_name, distro_version)
 			logging.debug("Construct environment variables ....")
 			env_dict = os.environ
@@ -974,17 +938,13 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 			logging.debug("Add env_para_dict into environment variables")
 			for key in env_para_dict:
 				env_dict[key] = env_para_dict[key]
-			execute_task_host_rootfs(sandbox_dir, env_dict, 'chroot', user_cmd, is_cvmfs_parrot_app, parrot_submit_path, parrot_submit_file)
+			execute_task_host_rootfs(sandbox_dir, env_dict, user_cmd)
 			chroot_post_process(dir_dict, file_dict, sandbox_dir, 0, hardware_platform, distro_name, distro_version)
 		#rename the sandbox_dir to output_dir
 		logging.debug("Rename sandbox_dir (%s) to output_dir (%s)", sandbox_dir, output_dir)
 		os.rename(sandbox_dir, output_dir)
 	elif batch_type == "docker":
 		logging.debug("docker execution engine")
-
-		logging.debug("Removing the parrot submit file from the sandbox")
-		if os.path.exists(parrot_submit_path):
-			os.remove(parrot_submit_path)
 
 		logging.debug("need_separate_rootfs: %d", need_separate_rootfs)
 		if need_separate_rootfs == 1:
@@ -998,7 +958,7 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 			volume_output = " -v %s:%s " % (sandbox_dir, sandbox_dir)
 			#-v /home/hmeng/umbrella_test/cache/git-x86_64-redhat5:/software/git-x86_64-redhat5/ 
 			logging.debug("Start to construct other volumes from input_dict")
-			volume_parameters = construct_docker_volume(sandbox_dir, input_dict, is_cvmfs_parrot_app, mount_dict)
+			volume_parameters = construct_docker_volume(sandbox_dir, input_dict, is_cms_app, mount_dict)
 
 			#-e "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/software/git-x86_64-redhat5/bin" 
 			logging.debug("Set the environment variables ....")
@@ -1010,12 +970,7 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 			#to count the post processing time, this cmd is split into two commands
 			container_name = "container_%s" % docker_image_name
 			#do not enable `-i` and `-t` option of Docker, it will fail when condor execution engine is chosen.
-			if is_cvmfs_parrot_app == 1:
-				parrot_submit_file.close()
-				#cmd = 'docker run --rm --name %s %s %s -e "PATH=%s" %s %s /bin/sh -c "cd %s; %s>docker_stdout 2>docker_stderr; %s"' % (container_name, volume_output, volume_parameters, path_env, other_envs, docker_image_name, sandbox_dir, user_cmd[0], chown_cmd)
-				cmd = 'docker run --rm %s %s -e "PATH=%s" %s %s /bin/sh -c "cd %s; %s; %s"' % (volume_output, volume_parameters, path_env, other_envs, docker_image_name, sandbox_dir, user_cmd[0], chown_cmd)
-			else:
-				cmd = 'docker run --rm %s %s -e "PATH=%s" %s %s /bin/sh -c "cd %s; %s; %s"' % (volume_output, volume_parameters, path_env, other_envs, docker_image_name, sandbox_dir, user_cmd[0], chown_cmd)
+			cmd = 'docker run --rm %s %s -e "PATH=%s" %s %s /bin/sh -c "cd %s; %s; %s"' % (volume_output, volume_parameters, path_env, other_envs, docker_image_name, sandbox_dir, user_cmd[0], chown_cmd)
 			rc, stdout, stderr = func_call(cmd)
 			if rc != 0:
 				subprocess_error(cmd, rc, stdout, stderr)
@@ -1046,19 +1001,7 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 			extra_path = collect_software_bin(host_cctools_path, mount_dict)
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
-			if has_parrot_localfile == 0:
-				parrot_submit_file.write("#!/bin/sh\n")
-				name = 'cctools-4.4.0-%s-%s' % (host_linux_distro, hardware_platform)
-				id = package_search(packages, name, '')["checksum"]
-				dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
-				parrot_submit_file.write(dest + '/bin/parrot_run --no-set-foreground ')
-				parrot_submit_file.write(user_cmd[0] + '\n')
-				
-			parrot_submit_file.close()
-			cmd = "/bin/sh " + parrot_submit_path
-			rc, stdout, stderr = func_call_output_withenv(cmd, env_dict, sandbox_dir)
-#			if rc != 0:
-#				subprocess_error(cmd, rc, stdout, stderr)
+			execute_task_host_rootfs(sandbox_dir, env_dict, user_cmd)
 		else:
 			env_dict = os.environ
 			env_dict['PARROT_MOUNT_FILE'] = add_inputs_to_mountfile(sandbox_dir, input_dict, cvmfs_siteinfo_mountpoint, mount_dict)
@@ -1072,13 +1015,11 @@ def workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_di
 				logging.debug("PATH is empty, forcely set it to be %s", env_dict['PATH'])
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
-			execute_task_host_rootfs(sandbox_dir, env_dict, 'parrot', user_cmd, is_cvmfs_parrot_app, parrot_submit_path,  parrot_submit_file)
+			execute_task_host_rootfs(sandbox_dir, env_dict, user_cmd)
 
-		logging.debug("Removing the parrot mountlist file and the parrot submit file from the sandbox")
-		if os.path.exists(env_dict['PARROT_MOUNT_FILE']):
-			os.remove(env_dict['PARROT_MOUNT_FILE'])
-		if os.path.exists(parrot_submit_path):
-			os.remove(parrot_submit_path)
+#		logging.debug("Removing the parrot mountlist file and the parrot submit file from the sandbox")
+#		if os.path.exists(env_dict['PARROT_MOUNT_FILE']):
+#			os.remove(env_dict['PARROT_MOUNT_FILE'])
 
 		logging.debug("Rename sandbox_dir (%s) to output_dir (%s)", sandbox_dir, output_dir)
 		os.rename(sandbox_dir, output_dir)
@@ -1334,13 +1275,7 @@ def ec2_process(spec_path, spec, packages_path, packages, ec2_path, ec2_json, ss
 """ Create the execution environment specified in the specification file and run the task on it.
 """
 def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch_type, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting):
-	#copying input files is expensive, so mounting mechanism based on redirection the access_path to the actual_path is a better solution
-	#copy all the input files into the sandbox	
-#	for input_file in input_list: 
-#		shutil.copy(input_file, sandbox_dir)
-
-	#if batch_type is local, download parrot, download SITEINFO, create a clean environment, do the experiment.
-	#if batch_type is condor, create condor submit file, submit condor job.
+	
 	if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
 		logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
 		hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
@@ -1348,7 +1283,7 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch
 		logging.critical("this specification is not complete! You must have a hardware section, a kernel section and a os section!")
 		sys.exit("this specification is not complete! You must have a hardware section, a kernel section and a os section!\n")
 
-	host_linux_distro, parrot_submit_path, parrot_submit_file = env_check(sandbox_dir, batch_type, hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version)
+	host_linux_distro =  env_check(sandbox_dir, batch_type, hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version)
 	
 	need_separate_rootfs = 0
 	os_image_dir = ''
@@ -1359,35 +1294,37 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch
 		elif batch_type == 'docker':
 			print "Using Docker execution engine requires a separate root filesystem."
 			logging.debug("Using Docker execution engine requires a separate root filesystem.")
+
 		need_separate_rootfs = 1
-		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
+
+		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform) #e.g., redhat-6.5-x86_64
 		if os_id == '':
-			packages_item = package_search(packages_json, item, '')
+			packages_item = package_search(packages_json, item, '')["checksum"]
 			id = packages_item["checksum"]
 		else:
 			id = os_id
+
 		dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, item)
 		os_image_dir = dest
 		logging.debug("A separate OS (%s) is needed!", dest)
 	
-	has_parrot_localfile = 0
-	is_cvmfs_parrot_app = 0
+	is_cms_app = 0 
 	cvmfs_siteinfo_mountpoint = ''
 	mount_dict = {}
 	host_cctools_path = '' #the path of the cctools binary which is compatible with the host machine under the umbrella cache 
 
 	if spec_json.has_key("software") and spec_json["software"]:
-		host_cctools_path, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict = software_install(os_id, spec_json["software"], packages_json, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, parrot_submit_file, need_separate_rootfs, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict, host_cctools_path)
+		host_cctools_path, is_cms_app, cvmfs_siteinfo_mountpoint, mount_dict = software_install(env_para_dict, os_id, spec_json["software"], packages_json, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, is_cms_app, cvmfs_siteinfo_mountpoint, mount_dict, host_cctools_path)
 	else:
 		logging.debug("this spec does not have software section!")
-		host_cctools_path, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict = software_install(os_id, "", packages_json, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, parrot_submit_file, need_separate_rootfs, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict, host_cctools_path)
+		host_cctools_path, is_cms_app, cvmfs_siteinfo_mountpoint, mount_dict = software_install(env_para_dict, os_id, "", packages_json, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, is_cms_app, cvmfs_siteinfo_mountpoint, mount_dict, host_cctools_path)
 
 	if spec_json.has_key("data") and spec_json["data"]:
 		data_install(spec_json["data"], packages_json, sandbox_dir, mount_dict)
 	else:
 		logging.debug("this spec does not have data section!")
 	
-	workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, parrot_submit_path, parrot_submit_file, has_parrot_localfile, is_cvmfs_parrot_app, cvmfs_siteinfo_mountpoint, mount_dict, packages_json)
+	workflow_repeat(sandbox_dir, batch_type, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, is_cms_app, cvmfs_siteinfo_mountpoint, mount_dict, packages_json)
 
 '''Check whether an executable exists or not. If yes, return 0; if not, return -1
 '''

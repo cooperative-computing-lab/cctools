@@ -16,7 +16,6 @@
 	},
 	"software": {
 		"cmssw-5.2.5-slc5_amd64": {
-			"id": "8c1aa6254e0723ad1bde8c599a41da91",
 			"mountpoint": "/cvmfs/cms.cern.ch",
 			"action": "unpack"
 		}
