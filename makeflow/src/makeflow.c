@@ -615,6 +615,63 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 }
 
 /*
+ * write task command into a shell script 
+ */
+
+static char *makeflow_create_task_sh(const char *task_cmd, int nodeid) 
+{
+
+    char task_sh[4096];
+    sprintf(task_sh, "%s.%d", CONTAINER_TMP_SH_PREFIX, nodeid);
+
+    FILE *fn = fopen(task_sh, "w");
+    if(fn == NULL) {
+	   fprintf(stderr, "makeflow_container: cannot create sh for node: %d\n", nodeid);
+       exit(1);
+    }
+
+    fprintf(fn, "#!/bin/sh\n%s\n", task_cmd);
+    fclose(fn);
+   
+    chmod(task_sh, 0755);
+ 
+    return task_sh;
+}
+
+/*
+ * creates a general shell script for running each task with a 
+ * docker container 
+ */ 
+
+static void makeflow_create_docker_sh() 
+{       
+    FILE *wrapper_fn;
+	
+  	wrapper_fn = fopen(CONTAINER_SH, "w"); 
+
+  	/*fprintf(wrapper_fn, "#!/bin/sh\n\
+curr_dir=`pwd`\n\
+default_dir=/root/worker\n\
+echo \"#!/bin/sh\" > %s\n\
+echo \"$@\" >> %s\n\
+chmod 755 %s\n\
+flock /tmp/lockfile /usr/bin/docker pull %s\n\
+docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
+%s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, container_image, container_image, tmp_sh_name);
+    */ 
+
+    fprintf(wrapper_fn, "#!/bin/sh\n\
+\"$@\" \n");
+
+  	fclose(wrapper_fn);
+
+	chmod(CONTAINER_SH, 0755);   
+
+    if(!wrapper_input_files) wrapper_input_files = list_create();
+	list_push_tail(wrapper_input_files,dag_file_create(CONTAINER_SH));
+}
+
+/*
 Submit a node to the appropriate batch system, after materializing
 the necessary list of input and output files, and applying all
 wrappers and options.
@@ -624,6 +681,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 {
 	struct batch_queue *queue;
 
+debug(D_MAKEFLOW_RUN, "------2-----");
 	if(n->local_job && local_queue) {
 		queue = local_queue;
 	} else {
@@ -645,24 +703,30 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	/* This function may realloc input_files and output_files. */
 	input_files = makeflow_file_list_format(n,input_files,wrapper_input_files,queue);
 	output_files = makeflow_file_list_format(n,output_files,wrapper_output_files,queue);
-
+    char *command;
     if (container_mode == CONTAINER_MODE_DOCKER) {
 
+debug(D_MAKEFLOW_RUN, "------3-----");
         char *task_sh;      
         task_sh = makeflow_create_task_sh(n->command, n->nodeid);
 
-        char *wrap_cmd[4096];
-		sprintf(wrap_cmd, "./%s %s", CONTAINER_SH, task_sh);
+        char wrap_cmd[64];
+		//sprintf(wrap_cmd, "./%s %s", CONTAINER_SH, task_sh);
+		sprintf(wrap_cmd, "./%s", task_sh);
 
-	    /*if(!input_files) input_files = list_create();
-            list_push_tail(input_files,dag_file_create(task_sh));
-		makeflow_wrapper_add_command(wrap_cmd);
+debug(D_MAKEFLOW_RUN, "------4-----");
+	    //if(!input_files) input_files = list_create();
+         //   list_push_tail(input_files,dag_file_create(task_sh));
        
-        char *command = wrap_cmd;
-        */
-	}  
-	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
-	char * command = string_wrap_command(n->command,wrapper_command);
+debug(D_MAKEFLOW_RUN, "------5-----");
+        command = (char *)malloc(64);
+        strcpy(command, wrap_cmd);
+        debug(D_MAKEFLOW_RUN, "++++++++++++%s %s", command, wrapper_command);
+	    command = string_wrap_command(command, wrapper_command);
+        debug(D_MAKEFLOW_RUN, "------------%s", command);
+	} else 
+	    /* Apply the wrapper(s) to the command, if it is (they are) enabled. */
+	    command = string_wrap_command(n->command, wrapper_command);
 
 	/* Wrap the command with the resource monitor, if it is enabled. */
 	if(monitor_mode) {
@@ -763,7 +827,8 @@ Find all jobs ready to be run, then submit them.
 static void makeflow_dispatch_ready_jobs(struct dag *d)
 {
 	struct dag_node *n;
-
+  
+debug(D_MAKEFLOW_RUN, "------1-----");
 	for(n = d->nodes; n; n = n->next) {
 
 		if(dag_remote_jobs_running(d) >= remote_jobs_max && dag_local_jobs_running(d) >= local_jobs_max)
@@ -957,13 +1022,18 @@ static void makeflow_run( struct dag *d )
     /* XXX for docker mode 
      * 1. create a global script for running docker container
      * 2. add this script to the global wrapper list
-     */
+     */ 
+
     if (container_mode == CONTAINER_MODE_DOCKER) {
         makeflow_create_docker_sh();
-        makeflow_wrapper_add_input_file(CONTAINER_SH);
+        //makeflow_wrapper_add_input_file(CONTAINER_SH);
+        char global_cmd[64];         
+        sprintf(global_cmd, "./%s", CONTAINER_SH);
+        makeflow_wrapper_add_command(global_cmd);
     }
 
 	while(!makeflow_abort_flag) {
+debug(D_MAKEFLOW_RUN, "------------");
 		makeflow_dispatch_ready_jobs(d);
 
 		if(dag_local_jobs_running(d)==0 && dag_remote_jobs_running(d)==0 )
@@ -1041,63 +1111,9 @@ static void handle_abort(int sig)
 }
 
 
-/*
- * write task command into a shell script 
- */
 
-static char *makeflow_create_task_sh(const char *task_cmd, int nodeid) 
-{
-    char *task_sh;
-    string_format(task_sh, "%s.%d", CONTAINER_TMP_SH_PREFIX, nodeid);
 
-    FILE *fn = fopen(fn_name, "w");
-    if(fn == NULL) {
-	   fprintf(stderr, "makeflow_container: cannot create sh for node: %d\n", nodeid);
-       exit(1);
-    }
 
-    fprintf(fn, "!/bin/sh\n%s\n", task_cmd);
-    fclose(fn);
-   
-    chmod(task_sh, 07555);
- 
-    return task_sh;
-}
-
-/*
- * creates a general shell script for running each task with a 
- * docker container 
- */
-
-static void makeflow_create_docker_sh() 
-{       
-    FILE *wrapper_fn;
-	
-    char wrapper_fn_name[4096];
-	sprintf(wrapper_fn_name, "%s.%d", CONTAINER_SH_PREFIX, n->nodeid);
-
-  	wrapper_fn = fopen(wrapper_fn_name, "w"); 
-
-	char tmp_sh_name[4096];
-	sprintf(tmp_sh_name, "%s.%d", CONTAINER_TMP_SH_PREFIX, n->nodeid); 
- 
-  	fprintf(wrapper_fn, "#!/bin/sh\n\
-curr_dir=`pwd`\n\
-default_dir=/root/worker\n\
-echo \"#!/bin/sh\" > %s\n\
-echo \"$@\" >> %s\n\
-chmod 755 %s\n\
-flock /tmp/lockfile /usr/bin/docker pull %s\n\
-docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
-%s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, container_image, container_image, tmp_sh_name);
- 
-  	fclose(wrapper_fn);
-
-	chmod(wrapper_fn_name, 0755);   
-
-    if(!wrapper_input_files) wrapper_input_files = list_create();
-	list_push_tail(wrapper_input_files,dag_file_create(wrapper_fn_name));
-}
 
 static void show_help_run(const char *cmd)
 {
