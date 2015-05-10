@@ -716,8 +716,11 @@ debug(D_MAKEFLOW_RUN, "------3-----");
 
 debug(D_MAKEFLOW_RUN, "------4-----");
 	    //if(!input_files) input_files = list_create();
-         //   list_push_tail(input_files,dag_file_create(task_sh));
-       
+        //   list_push_tail(input_files,dag_file_create(task_sh));
+		input_files = string_combine(input_files, task_sh);
+
+debug(D_MAKEFLOW_RUN, "------input_files-----:%s", input_files);
+
 debug(D_MAKEFLOW_RUN, "------5-----");
         command = (char *)malloc(64);
         strcpy(command, wrap_cmd);
