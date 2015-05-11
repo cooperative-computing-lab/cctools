@@ -649,19 +649,11 @@ static void makeflow_create_docker_sh()
 	
   	wrapper_fn = fopen(CONTAINER_SH, "w"); 
 
-  	/*fprintf(wrapper_fn, "#!/bin/sh\n\
+    fprintf(wrapper_fn, "#!/bin/sh\n\
 curr_dir=`pwd`\n\
 default_dir=/root/worker\n\
-echo \"#!/bin/sh\" > %s\n\
-echo \"$@\" >> %s\n\
-chmod 755 %s\n\
 flock /tmp/lockfile /usr/bin/docker pull %s\n\
-docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
-%s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, container_image, container_image, tmp_sh_name);
-    */ 
-
-    fprintf(wrapper_fn, "#!/bin/sh\n\
-\"$@\" \n");
+docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s $default_dir/$@\n", container_image, container_image);
 
   	fclose(wrapper_fn);
 
@@ -669,6 +661,7 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 
     if(!wrapper_input_files) wrapper_input_files = list_create();
 	list_push_tail(wrapper_input_files,dag_file_create(CONTAINER_SH));
+
 }
 
 /*
