@@ -204,10 +204,12 @@ pfs_file * pfs_cache_open( pfs_name *name, int flags, mode_t mode )
 	}
 
 
-	fd = file_cache_open(pfs_file_cache,name->path,txn,buf.st_size,0);
+	fd = file_cache_open(pfs_file_cache,name->path,flags,txn,buf.st_size,0);
 	if(fd>=0) {
 		if(flags&O_TRUNC) ftruncate(fd,0);
 		return new pfs_file_cached(name,fd,mode,buf.st_ctime,buf.st_ino);
+	} else {
+		debug(D_DEBUG, "file cache lookup failed: %s", strerror(errno));
 	}
 
 	debug(D_CACHE,"loading %s",name->path);
