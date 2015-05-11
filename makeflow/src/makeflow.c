@@ -144,6 +144,11 @@ static void makeflow_wrapper_add_command( const char *cmd )
 	}
 }
 
+/* XXX 
+ * makeflow_wrapper_add_input_file() and
+ * makeflow_wrapper_add_output_file() do not work.
+ * replace "optarg" by "file" ?
+ */
 static void makeflow_wrapper_add_input_file( const char *file )
 {
  	if(!wrapper_input_files) wrapper_input_files = list_create();
@@ -674,7 +679,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 {
 	struct batch_queue *queue;
 
-debug(D_MAKEFLOW_RUN, "------2-----");
 	if(n->local_job && local_queue) {
 		queue = local_queue;
 	} else {
@@ -698,28 +702,18 @@ debug(D_MAKEFLOW_RUN, "------2-----");
 	output_files = makeflow_file_list_format(n,output_files,wrapper_output_files,queue);
     char *command;
     if (container_mode == CONTAINER_MODE_DOCKER) {
-
-debug(D_MAKEFLOW_RUN, "------3-----");
+        /* XXX 2. for each task if docker mode is on
+         * 1) create a unique unique shell script for each task 
+         * 2) write task command into the shell script 
+         * 3) generate a general shell command by combining the
+         *    global shell script and the local script
+         */
         char *task_sh;      
         task_sh = makeflow_create_task_sh(n->command, n->nodeid);
 
-        char wrap_cmd[64];
-		//sprintf(wrap_cmd, "./%s %s", CONTAINER_SH, task_sh);
-		sprintf(wrap_cmd, "./%s", task_sh);
-
-debug(D_MAKEFLOW_RUN, "------4-----");
-	    //if(!input_files) input_files = list_create();
-        //   list_push_tail(input_files,dag_file_create(task_sh));
 		input_files = string_combine(input_files, task_sh);
 
-debug(D_MAKEFLOW_RUN, "------input_files-----:%s", input_files);
-
-debug(D_MAKEFLOW_RUN, "------5-----");
-        command = (char *)malloc(64);
-        strcpy(command, wrap_cmd);
-        debug(D_MAKEFLOW_RUN, "++++++++++++%s %s", command, wrapper_command);
-	    command = string_wrap_command(command, wrapper_command);
-        debug(D_MAKEFLOW_RUN, "------------%s", command);
+	    command = string_wrap_command(task_sh, wrapper_command);
 	} else 
 	    /* Apply the wrapper(s) to the command, if it is (they are) enabled. */
 	    command = string_wrap_command(n->command, wrapper_command);
@@ -824,7 +818,6 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 {
 	struct dag_node *n;
   
-debug(D_MAKEFLOW_RUN, "------1-----");
 	for(n = d->nodes; n; n = n->next) {
 
 		if(dag_remote_jobs_running(d) >= remote_jobs_max && dag_local_jobs_running(d) >= local_jobs_max)
@@ -1015,13 +1008,13 @@ static void makeflow_run( struct dag *d )
 	batch_job_id_t jobid;
 	struct batch_job_info info;
    
-    /* XXX for docker mode 
-     * 1. create a global script for running docker container
-     * 2. add this script to the global wrapper list
-     */ 
-
     if (container_mode == CONTAINER_MODE_DOCKER) {
+    /* XXX 1. for the workflow if docker mode is on 
+     * 1) create a global script for running docker container
+     * 2) add this script to the global wrapper list
+     */
         makeflow_create_docker_sh();
+        
         //makeflow_wrapper_add_input_file(CONTAINER_SH);
         char global_cmd[64];         
         sprintf(global_cmd, "./%s", CONTAINER_SH);
@@ -1029,7 +1022,6 @@ static void makeflow_run( struct dag *d )
     }
 
 	while(!makeflow_abort_flag) {
-debug(D_MAKEFLOW_RUN, "------------");
 		makeflow_dispatch_ready_jobs(d);
 
 		if(dag_local_jobs_running(d)==0 && dag_remote_jobs_running(d)==0 )
