@@ -5,18 +5,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include <assert.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <stdlib.h>
-#include <dirent.h>
-#include <termios.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <ctype.h>
-
 #include "chirp_client.h"
 #include "chirp_reli.h"
 #include "chirp_recursive.h"
@@ -43,6 +31,19 @@ See the file COPYING for details.
 #include "readline/readline.h"
 #include "readline/history.h"
 #endif
+
+#include <dirent.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <termios.h>
+#include <unistd.h>
+
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD
 #define fopen64 fopen
