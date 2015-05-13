@@ -618,7 +618,7 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, ha
 	name = 'cctools-4.4.0-%s-%s' % (host_linux_distro, hardware_platform)
 	id = package_search(packages_json, name)["checksum"]
 	dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
-	#4.4.0 and 4.4.1 does not support --no-set-foreground feature.
+	#4.4 and 4.4 does not support --no-set-foreground feature.
 	#user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
 	user_cmd[0] = dest + "/bin/parrot_run /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
 	logging.debug("The parrotized user_cmd: %s" % user_cmd[0])
@@ -678,7 +678,10 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		if software_spec[item].has_key('id'):
 			id = software_spec[item]['id']
 		mountpoint = software_spec[item]['mountpoint']
-		action = software_spec[item]['action'].lower()
+		if software_spec[item].has_key('action'):
+			action = software_spec[item]['action'].lower()
+		else:
+			action = 'none'
 
 		r1, r2, r3, r4 = dependency_process(env_para_dict, item, id, mountpoint, action, packages_json, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro)
 		if r1 == 1 and is_cms_app == 0:
@@ -1339,7 +1342,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, batch_type, output_dir, input_dict
 				logging.debug("Adding the siteconf package (%s) into mount_dict", item)
 				mount_dict[item] = item
 				logging.debug("Create a parrot mountfile for the siteconf package (%s)", item)
-				env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_siteconf(sandbox_dir, cvmfs_siteconf_mountpoint)
+				env_para_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_siteconf(sandbox_dir, cvmfs_siteconf_mountpoint)
 
 			logging.debug("Add a volume item (%s:%s) for the sandbox_dir", sandbox_dir, sandbox_dir)
 			#-v /home/hmeng/umbrella_test/output:/home/hmeng/umbrella_test/output 
@@ -1359,12 +1362,18 @@ def workflow_repeat(cwd_setting, sandbox_dir, batch_type, output_dir, input_dict
 			#to count the post processing time, this cmd is split into two commands
 			container_name = "container_%s" % docker_image_name
 			#do not enable `-i` and `-t` option of Docker, it will fail when condor execution engine is chosen.
-			cmd = 'docker run --rm %s %s -e "PATH=%s" %s %s /bin/sh -c "cd %s; %s; %s"' % (volume_output, volume_parameters, path_env, other_envs, docker_image_name, sandbox_dir, user_cmd[0], chown_cmd)
+			#to allow the exit code of user_cmd to be transferred back, seperate the user_cmd and the chown command.
+			cmd = 'docker run --rm %s %s -e "PATH=%s" %s %s /bin/sh -c "cd %s; %s"' % (volume_output, volume_parameters, path_env, other_envs, docker_image_name, sandbox_dir, user_cmd[0])
 			rc, stdout, stderr = func_call(cmd)
-			if rc != 0:
-				subprocess_error(cmd, rc, stdout, stderr)
+
+			cmd1 = 'docker run --rm %s %s -e "PATH=%s" %s %s %s' % (volume_output, volume_parameters, path_env, other_envs, docker_image_name, chown_cmd)
+			func_call(cmd1)
+
 			logging.debug("Rename the sandbox dir(%s) to the output directory(%s)", sandbox_dir, output_dir)
 			os.rename(sandbox_dir, output_dir)
+
+			if rc != 0:
+				subprocess_error(cmd, rc, stdout, stderr)
 		else:
 			#if a separate rootfs is not needed to execute the user's cmd, should forcely use other execution engine to run the user cmd.
 			logging.debug("Docker execution engine can only be used when a separate rootfs is needed.")
@@ -1482,9 +1491,13 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 	condor_submit_file.write('universe = vanilla\n')
 	condor_submit_file.write('executable = %s\n' % umbrella_fullpath)
 	condor_submit_file.write('arguments = "-T local -c %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(packages_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
+#	condor_submit_file.write('PostCmd = "echo"\n')
+#	condor_submit_file.write('PostArguments = "$?>%s/condor_rc"\n' % os.path.basename(condor_output_dir))
 	condor_submit_file.write('transfer_input_files = %s, %s, %s%s\n' % (umbrella_fullpath, packages_path, spec_path, transfer_inputs))
 	condor_submit_file.write('transfer_output_files = %s, condor_umbrella.log\n' % os.path.basename(condor_output_dir))
 	condor_submit_file.write('transfer_output_remaps = "condor_umbrella.log=%s"\n' % remotelog_path) 
+
+	#the python on the redhat5 machines in the ND condor pool is 2.4. However, umbrella requires python 2.6.* or 2.7*.
 	if linux_distro == "redhat5":
 		condor_submit_file.write('requirements = TARGET.Arch == "%s" && TARGET.OpSys == "%s" && TARGET.OpSysAndVer == "redhat6"\n' % (hardware_platform, kernel_name))
 	else:
@@ -1514,14 +1527,37 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 	if rc != 0:
 		subprocess_error(cmd, rc, stdout, stderr)
 
-	logging.debug("Remove the sandbox")
-	shutil.rmtree(sandbox_dir)
+	#check the content of condor log file to figure out the exit code of the remote executed umbrella 
+	remote_rc = 500 
+	with open(condor_log_path, 'rb') as f:
+		content = f.read()
+		str = "Normal termination (return value "
+		index1 = content.rfind(str)
+		index2 = content.find(')', index1)
+		remote_rc = int(content[(index1 + len(str)):index2])
+
+	logging.debug("The exit code of the remote executed umbrella found in the condor log file (%s) is %d!", condor_log_path, remote_rc)
+
+	if remote_rc == 500:
+		logging.critical("Can not find the exit code of the remote executed umbrella inside the condor log file (%s)!", condor_log_path)
+		sys.exit("Can not find the exit code of the remote executed umbrella inside the condor log file (%s)!" % condor_log_path)
+	elif remote_rc != 0:
+		logging.critical("The remote umbrella fails and the exit code is %d.", remote_rc)
+		sys.exit("The remote umbrella fails and the exit code is %d." % remote_rc)
 
 	logging.debug("the condor jos is done, put the output back into the output directory!")
 	print "the condor jobs is done, put the output back into the output directory!"
 	#check until the condor job is done, post-processing (put the output back into the output directory)
 	#the semantics of condor_output_files only supports transferring a dir from the execution node back to the current working dir (here it is condor_output_dir). 
 	os.rename(condor_output_dir, output_dir)
+
+	logging.debug("move condor_stdout, condor_stderr and condor_task.log from sandbox_dir to output_dir.")
+	os.rename(sandbox_dir + '/condor_stdout', output_dir + '/condor_stdout')
+	os.rename(sandbox_dir + '/condor_stderr', output_dir + '/condor_stderr')
+	os.rename(sandbox_dir + '/condor_task.log', output_dir + '/condor_task.log')
+
+	logging.debug("Remove the sandbox_dir.")
+	shutil.rmtree(sandbox_dir)
 
 def decide_instance_type(cpu_cores, memory_size, disk_size, instances):
 	""" Compare the required hardware configurations with each instance type, and return the first matched instance type, return 'no' if no matched instance type exist.

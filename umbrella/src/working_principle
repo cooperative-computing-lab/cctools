@@ -91,6 +91,9 @@ Exit code from sys.exit([arg]):
 https://docs.python.org/2/library/sys.html
 sys.exit("error msg") sets the exit code to be 1.
 
+The maintainer of umbrella needs the error msgs to figure out where the program got stuck.
+The user of umbrella (like Prune) may just need to know 1 for failure or 0 for success.
+
 hmeng@ccl12 ~/git-development/cctools/umbrella/example/povray$ umbrella -h
 ...
 hmeng@ccl12 ~/git-development/cctools/umbrella/example/povray$ echo $?

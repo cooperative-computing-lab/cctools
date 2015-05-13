@@ -5,6 +5,7 @@ umbrella -T local -c cmssw_redhat6.json -i 'cms_cmd1=cms_cmd' -l /tmp/umbrella_t
 #there is only one difference between the specification for ec2 execution engine and the specification for the local execution engine (parrot/docker/chroot): the `id` attribute of the os section is an AMI in the ec2 specification; the `id` attribute of the os section is the checksum of the os image.
 umbrella -T ec2 --remotelog umbrella.log.ec2 --sshkey ~/bin/feb272015.pem -k feb272015 -g 'sg-24f96141' -c cmssw_redhat6_ec2.json -i 'cms_cmd1=cms_cmd' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/local_cms_output run '/bin/bash cms_cmd1'
 
+umbrella -T condor --remotelog umbrella.log.condor -c cmssw_redhat6.json -i 'cms_cmd1=cms_cmd' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/condor_cms_output run '/bin/bash cms_cmd1'
 
 #use the default localdir and output options:
 umbrella -T local -c cmssw_redhat6.json -i 'cms_cmd1=cms_cmd' run '/bin/bash cms_cmd1'
