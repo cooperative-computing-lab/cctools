@@ -152,13 +152,13 @@ static void makeflow_wrapper_add_command( const char *cmd )
 static void makeflow_wrapper_add_input_file( const char *file )
 {
  	if(!wrapper_input_files) wrapper_input_files = list_create();
-	list_push_tail(wrapper_input_files,dag_file_create(optarg));
+	list_push_tail(wrapper_input_files,dag_file_create(file));
 }
 
 static void makeflow_wrapper_add_output_file( const char *file )
 {
-	if(!wrapper_input_files) wrapper_input_files = list_create();
-	list_push_tail(wrapper_input_files,dag_file_create(optarg));
+	if(!wrapper_output_files) wrapper_output_files = list_create();
+	list_push_tail(wrapper_output_files,dag_file_create(file));
 }
 
 /*

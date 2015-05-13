@@ -23,7 +23,7 @@ run() {
   ../../src/makeflow_analyze -b "$out_dir" complex.mf &> tmp
   cat tmp | awk '{print $2}' | sort > tmp2
 
-  `diff tmp2 expected/complex.mf`
+  diff tmp2 expected/complex.mf
   exit $?
 }
 

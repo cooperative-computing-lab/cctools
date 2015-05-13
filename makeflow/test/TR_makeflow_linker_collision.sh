@@ -19,7 +19,7 @@ run() {
   ../../src/makeflow_analyze -b "$out_dir" collision.mf &> tmp
   cat tmp | awk '{print $2}' | sort > tmp2
 
-  `diff tmp2 expected/collision.mf`
+  diff tmp2 expected/collision.mf
   exit $?
 }
 
