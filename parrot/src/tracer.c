@@ -558,6 +558,7 @@ static ssize_t tracer_copy_in_slow( struct tracer *t, void *data, const void *ua
 				ERROR;
 		}
 		memcpy(bdata,&word,(length-total));
+		total = length;
 	}
 
 	return total;
