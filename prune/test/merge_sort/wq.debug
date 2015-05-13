@@ -1,0 +1,432 @@
+2015/05/12 12:18:40.09 work_queue_python[14985] dns: looking up name catalog.cse.nd.edu
+2015/05/12 12:18:40.10 work_queue_python[14985] dns: catalog.cse.nd.edu is 129.74.152.166
+2015/05/12 12:18:40.10 work_queue_python[14985] wq: Advertising master status to the catalog server at catalog.cse.nd.edu:9097 ...
+2015/05/12 12:19:15.11 work_queue_python[15762] dns: looking up name catalog.cse.nd.edu
+2015/05/12 12:19:15.11 work_queue_python[15762] dns: catalog.cse.nd.edu is 129.74.152.166
+2015/05/12 12:19:15.11 work_queue_python[15762] wq: Advertising master status to the catalog server at catalog.cse.nd.edu:9097 ...
+2015/05/12 12:20:28.88 work_queue_python[15810] dns: looking up name catalog.cse.nd.edu
+2015/05/12 12:20:28.88 work_queue_python[15810] dns: catalog.cse.nd.edu is 129.74.152.166
+2015/05/12 12:20:28.89 work_queue_python[15810] wq: Advertising master status to the catalog server at catalog.cse.nd.edu:9097 ...
+2015/05/12 12:21:19.02 work_queue_python[16296] dns: looking up name catalog.cse.nd.edu
+2015/05/12 12:21:19.02 work_queue_python[16296] dns: catalog.cse.nd.edu is 129.74.152.166
+2015/05/12 12:21:19.02 work_queue_python[16296] wq: Advertising master status to the catalog server at catalog.cse.nd.edu:9097 ...
+2015/05/12 12:22:28.86 work_queue_python[16359] dns: looking up name catalog.cse.nd.edu
+2015/05/12 12:22:28.87 work_queue_python[16359] dns: catalog.cse.nd.edu is 129.74.152.166
+2015/05/12 12:22:28.87 work_queue_python[16359] wq: Advertising master status to the catalog server at catalog.cse.nd.edu:9097 ...
+2015/05/12 12:22:34.28 work_queue_python[16545] dns: looking up name catalog.cse.nd.edu
+2015/05/12 12:22:34.28 work_queue_python[16545] dns: catalog.cse.nd.edu is 129.74.152.166
+2015/05/12 12:22:34.28 work_queue_python[16545] wq: Advertising master status to the catalog server at catalog.cse.nd.edu:9097 ...
+2015/05/12 12:23:34.35 work_queue_python[16545] wq: Advertising master status to the catalog server at catalog.cse.nd.edu:9097 ...
+2015/05/12 12:24:34.42 work_queue_python[16545] wq: Advertising master status to the catalog server at catalog.cse.nd.edu:9097 ...
+2015/05/12 12:25:34.49 work_queue_python[16545] wq: Advertising master status to the catalog server at catalog.cse.nd.edu:9097 ...
+2015/05/12 12:25:40.61 work_queue_python[16545] tcp: got connection from 10.32.8.64:33002
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: worker 10.32.8.64:33002 connected
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: workers status -- total: 1, active: 0, available: 0.
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: 1 workers are connected in total now
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: rx from unknown (10.32.8.64:33002): name
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: Sending project name to worker (10.32.8.64:33002)
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to unknown (10.32.8.64:33002): prune
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: rx from unknown (10.32.8.64:33002): workqueue 3 cclvm05.crc.nd.edu Linux x86_64 4.4.1-RELEASE
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 0.
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) running CCTools version 4.4.1-RELEASE on Linux (operating system) with architecture x86_64 is ready
+2015/05/12 12:25:40.61 work_queue_python[16545] debug: Warning: potential worker version mismatch: worker cclvm05.crc.nd.edu (10.32.8.64:33002) is version 4.4.1-RELEASE, and master is version 4.4.0-TRUNK
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): resource workers 0 0 1 1 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): resource disk 0 0 14382 14382 14382
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): resource memory 0 0 901 901 901
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): resource gpus 0 0 0 0 0
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): resource unlabeled 0 0 0 0 0
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): resource cores 0 0 1 1 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs file /tmp/pivie-prune-test/data/6cd580a9-6d54-4317-8022-61f07afb2b22 bytes 0:88 as 'file-e85aae3313ac7cad71b555db16778bfc-6cd580a9-6d54-4317-8022-61f07afb2b22'
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put file-e85aae3313ac7cad71b555db16778bfc-6cd580a9-6d54-4317-8022-61f07afb2b22 88 0644 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (0.95s MB/s) average 0.95s MB/s
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs file /tmp/pivie-prune-test/data/55c1d6ed-74f8-422b-bd0f-a69bac69e9d2 bytes 0:144 as 'file-d1fdb5a0f206477b4f2b15b50987f5f5-55c1d6ed-74f8-422b-bd0f-a69bac69e9d2'
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put file-d1fdb5a0f206477b4f2b15b50987f5f5-55c1d6ed-74f8-422b-bd0f-a69bac69e9d2 144 0644 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (1.60s MB/s) average 1.27s MB/s
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs file /tmp/pivie-prune-test/data/PRUNE_EXECUTOR bytes 0:3473 as 'file-77fd8aa9ab3b638d3e54df2106f1c2c0-PRUNE_EXECUTOR'
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put file-77fd8aa9ab3b638d3e54df2106f1c2c0-PRUNE_EXECUTOR 3473 0644 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (33.39s MB/s) average 12.91s MB/s
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs literal as PRUNE_RUN
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put buffer-1-7f2db423a49b305459147332fb01cf87 46 777 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (0.71s MB/s) average 10.66s MB/s
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): task 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): cmd 32
+chmod 755 PRUNE_RUN; ./PRUNE_RUN
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): cores 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): memory -1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): disk -1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): gpus -1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-e85aae3313ac7cad71b555db16778bfc-6cd580a9-6d54-4317-8022-61f07afb2b22 sort 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-d1fdb5a0f206477b4f2b15b50987f5f5-55c1d6ed-74f8-422b-bd0f-a69bac69e9d2 nouns 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-77fd8aa9ab3b638d3e54df2106f1c2c0-PRUNE_EXECUTOR PRUNE_EXECUTOR 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile buffer-1-7f2db423a49b305459147332fb01cf87 PRUNE_RUN 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): outfile file-1a7e1e2742c19f8dd5af71f82086bacc-c55e4fa7-55be-42c9-b94a-a9f2eeb5f29d sorted_data.txt 1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): outfile file-2757abfbe4e81bf7925193e3896e9200-5.debug prune_debug.log 0
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) busy on 'chmod 755 PRUNE_RUN; ./PRUNE_RUN'
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): resource tag -1
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): info worker-id worker-0969e03af736ea169587c7426ff5e027
+2015/05/12 12:25:40.61 work_queue_python[16545] wq: Receiving worker-id info from worker (10.32.8.64:33002)
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): available_results
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): send_results -1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: Reading result(s) from cclvm05.crc.nd.edu (10.32.8.64:33002)
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): result 0 0 13 88924 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: Receiving stdout of task 1 (size: 13 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: Retrieved 13 bytes from cclvm05.crc.nd.edu (10.32.8.64:33002)
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): info disk_space_used 13
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: Receiving disk_space_used info from worker (10.32.8.64:33002)
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sending back file-1a7e1e2742c19f8dd5af71f82086bacc-c55e4fa7-55be-42c9-b94a-a9f2eeb5f29d to /tmp/pivie-prune-test/data/c55e4fa7-55be-42c9-b94a-a9f2eeb5f29d
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): get file-1a7e1e2742c19f8dd5af71f82086bacc-c55e4fa7-55be-42c9-b94a-a9f2eeb5f29d 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): file file-1a7e1e2742c19f8dd5af71f82086bacc-c55e4fa7-55be-42c9-b94a-a9f2eeb5f29d 144
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: Receiving file /tmp/pivie-prune-test/data/c55e4fa7-55be-42c9-b94a-a9f2eeb5f29d (size: 144 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sent 0.00 MB in 0.00s (0.35s MB/s) average 5.14s MB/s
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sending back file-2757abfbe4e81bf7925193e3896e9200-5.debug to /tmp/pivie-prune-test/data/5.debug
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): get file-2757abfbe4e81bf7925193e3896e9200-5.debug 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): file file-2757abfbe4e81bf7925193e3896e9200-5.debug 11561
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.01 MB file.
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: Receiving file /tmp/pivie-prune-test/data/5.debug (size: 11561 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sent 0.01 MB in 0.00s (25.46s MB/s) average 12.75s MB/s
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): kill 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): unlink file-2757abfbe4e81bf7925193e3896e9200-5.debug
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) done in 0.09s total tasks 1 average 0.09s
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs file /tmp/pivie-prune-test/data/0af88595-6431-4006-af45-ad6626cd03cf bytes 0:115 as 'file-f9e6994ef62e4a52ba72ed4f8c6afd69-0af88595-6431-4006-af45-ad6626cd03cf'
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put file-f9e6994ef62e4a52ba72ed4f8c6afd69-0af88595-6431-4006-af45-ad6626cd03cf 115 0644 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (1.13s MB/s) average 11.82s MB/s
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs literal as PRUNE_RUN
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put buffer-2-7f2db423a49b305459147332fb01cf87 46 777 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (0.64s MB/s) average 11.22s MB/s
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): task 2
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): cmd 32
+chmod 755 PRUNE_RUN; ./PRUNE_RUN
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): cores 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): memory -1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): disk -1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): gpus -1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-e85aae3313ac7cad71b555db16778bfc-6cd580a9-6d54-4317-8022-61f07afb2b22 sort 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-f9e6994ef62e4a52ba72ed4f8c6afd69-0af88595-6431-4006-af45-ad6626cd03cf verbs 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-77fd8aa9ab3b638d3e54df2106f1c2c0-PRUNE_EXECUTOR PRUNE_EXECUTOR 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile buffer-2-7f2db423a49b305459147332fb01cf87 PRUNE_RUN 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): outfile file-a884fca9992123d8aad8a540a8ec5438-a6dbdf25-0ccd-4106-b601-adae41c4a8c2 sorted_data.txt 1
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): outfile file-7548d9b72e17e1135118d6408d68b482-6.debug prune_debug.log 0
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.70 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) busy on 'chmod 755 PRUNE_RUN; ./PRUNE_RUN'
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): available_results
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): send_results -1
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: Reading result(s) from cclvm05.crc.nd.edu (10.32.8.64:33002)
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): result 0 0 13 85098 2
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: Receiving stdout of task 2 (size: 13 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: Retrieved 13 bytes from cclvm05.crc.nd.edu (10.32.8.64:33002)
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): info disk_space_used 13
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: Receiving disk_space_used info from worker (10.32.8.64:33002)
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sending back file-a884fca9992123d8aad8a540a8ec5438-a6dbdf25-0ccd-4106-b601-adae41c4a8c2 to /tmp/pivie-prune-test/data/a6dbdf25-0ccd-4106-b601-adae41c4a8c2
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): get file-a884fca9992123d8aad8a540a8ec5438-a6dbdf25-0ccd-4106-b601-adae41c4a8c2 1
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): file file-a884fca9992123d8aad8a540a8ec5438-a6dbdf25-0ccd-4106-b601-adae41c4a8c2 115
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: Receiving file /tmp/pivie-prune-test/data/a6dbdf25-0ccd-4106-b601-adae41c4a8c2 (size: 115 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sent 0.00 MB in 0.00s (0.31s MB/s) average 8.92s MB/s
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sending back file-7548d9b72e17e1135118d6408d68b482-6.debug to /tmp/pivie-prune-test/data/6.debug
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): get file-7548d9b72e17e1135118d6408d68b482-6.debug 1
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): file file-7548d9b72e17e1135118d6408d68b482-6.debug 11561
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.01 MB file.
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: Receiving file /tmp/pivie-prune-test/data/6.debug (size: 11561 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sent 0.01 MB in 0.00s (25.63s MB/s) average 12.32s MB/s
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): kill 2
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): unlink file-7548d9b72e17e1135118d6408d68b482-6.debug
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) done in 0.09s total tasks 2 average 0.09s
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs file /tmp/pivie-prune-test/data/3565e4d0-16f7-40be-8ea3-32f8ffaa5bed bytes 0:97 as 'file-f09c591989326c065d67fe11f2d7e029-3565e4d0-16f7-40be-8ea3-32f8ffaa5bed'
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.79 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put file-f09c591989326c065d67fe11f2d7e029-3565e4d0-16f7-40be-8ea3-32f8ffaa5bed 97 0644 1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (1.04s MB/s) average 11.87s MB/s
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs literal as PRUNE_RUN
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put buffer-3-7f2db423a49b305459147332fb01cf87 45 777 1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (0.59s MB/s) average 11.46s MB/s
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): task 3
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): cmd 32
+chmod 755 PRUNE_RUN; ./PRUNE_RUN
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): cores 1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): memory -1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): disk -1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): gpus -1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-f09c591989326c065d67fe11f2d7e029-3565e4d0-16f7-40be-8ea3-32f8ffaa5bed merge 1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-1a7e1e2742c19f8dd5af71f82086bacc-c55e4fa7-55be-42c9-b94a-a9f2eeb5f29d n 1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-a884fca9992123d8aad8a540a8ec5438-a6dbdf25-0ccd-4106-b601-adae41c4a8c2 v 1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-77fd8aa9ab3b638d3e54df2106f1c2c0-PRUNE_EXECUTOR PRUNE_EXECUTOR 1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile buffer-3-7f2db423a49b305459147332fb01cf87 PRUNE_RUN 1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): outfile file-57a4e7322a91fbdd31cce99741fb6229-31ff6173-58ef-4f31-a09f-3fc656cfa13d merged_output.txt 1
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): outfile file-3f344286cf099c0d03419b44a2588e13-7.debug prune_debug.log 0
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.80 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) busy on 'chmod 755 PRUNE_RUN; ./PRUNE_RUN'
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): available_results
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): send_results -1
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: Reading result(s) from cclvm05.crc.nd.edu (10.32.8.64:33002)
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): result 0 0 12 88484 3
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: Receiving stdout of task 3 (size: 12 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: Retrieved 12 bytes from cclvm05.crc.nd.edu (10.32.8.64:33002)
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): info disk_space_used 12
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: Receiving disk_space_used info from worker (10.32.8.64:33002)
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sending back file-57a4e7322a91fbdd31cce99741fb6229-31ff6173-58ef-4f31-a09f-3fc656cfa13d to /tmp/pivie-prune-test/data/31ff6173-58ef-4f31-a09f-3fc656cfa13d
+2015/05/12 12:25:40.88 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): get file-57a4e7322a91fbdd31cce99741fb6229-31ff6173-58ef-4f31-a09f-3fc656cfa13d 1
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): file file-57a4e7322a91fbdd31cce99741fb6229-31ff6173-58ef-4f31-a09f-3fc656cfa13d 259
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: Receiving file /tmp/pivie-prune-test/data/31ff6173-58ef-4f31-a09f-3fc656cfa13d (size: 259 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sent 0.00 MB in 0.00s (0.68s MB/s) average 9.97s MB/s
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sending back file-3f344286cf099c0d03419b44a2588e13-7.debug to /tmp/pivie-prune-test/data/7.debug
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): get file-3f344286cf099c0d03419b44a2588e13-7.debug 1
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): file file-3f344286cf099c0d03419b44a2588e13-7.debug 11574
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.01 MB file.
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: Receiving file /tmp/pivie-prune-test/data/7.debug (size: 11574 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sent 0.01 MB in 0.00s (25.33s MB/s) average 12.14s MB/s
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): kill 3
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): unlink file-3f344286cf099c0d03419b44a2588e13-7.debug
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/12 12:25:40.89 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) done in 0.09s total tasks 3 average 0.09s
+2015/05/12 12:39:44.85 work_queue_python[16545] dns: looking up name catalog.cse.nd.edu
+2015/05/12 12:39:44.86 work_queue_python[16545] dns: catalog.cse.nd.edu is 129.74.152.166
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Advertising master status to the catalog server at catalog.cse.nd.edu:9097 ...
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): check
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Sent keepalive check to worker cclvm05.crc.nd.edu (10.32.8.64:33002)
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: got connection from 129.74.20.154:33130
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker 129.74.20.154:33130 connected
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 2, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 2 workers are connected in total now
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: got connection from 129.74.20.154:33131
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker 129.74.20.154:33131 connected
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 3, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 3 workers are connected in total now
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: got connection from 129.74.20.154:33132
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker 129.74.20.154:33132 connected
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 4, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 4 workers are connected in total now
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: got connection from 129.74.20.154:33134
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker 129.74.20.154:33134 connected
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 5, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 5 workers are connected in total now
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: got connection from 129.74.20.154:33135
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker 129.74.20.154:33135 connected
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 6, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 6 workers are connected in total now
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: got connection from 129.74.20.154:33137
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker 129.74.20.154:33137 connected
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 7, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 7 workers are connected in total now
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 7, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs file /tmp/pivie-prune-test/data/2e382236-15b9-47b8-9936-9c95f75697ba bytes 0:88 as 'file-c4ef615e385717604e56208f8738e84d-2e382236-15b9-47b8-9936-9c95f75697ba'
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put file-c4ef615e385717604e56208f8738e84d-2e382236-15b9-47b8-9936-9c95f75697ba 88 0644 1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (0.86s MB/s) average 11.80s MB/s
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs file /tmp/pivie-prune-test/data/a6757f6d-4b7e-4baa-88a7-0c0b244a89fd bytes 0:144 as 'file-52665fa6b0dc35d6c5c23821bf5b6b1e-a6757f6d-4b7e-4baa-88a7-0c0b244a89fd'
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put file-52665fa6b0dc35d6c5c23821bf5b6b1e-a6757f6d-4b7e-4baa-88a7-0c0b244a89fd 144 0644 1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (1.57s MB/s) average 11.52s MB/s
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs file /tmp/pivie-prune-test/data/PRUNE_EXECUTOR bytes 0:3473 as 'file-77fd8aa9ab3b638d3e54df2106f1c2c0-PRUNE_EXECUTOR'
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put file-77fd8aa9ab3b638d3e54df2106f1c2c0-PRUNE_EXECUTOR 3473 0644 1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (35.44s MB/s) average 12.19s MB/s
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs literal as PRUNE_RUN
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put buffer-4-7f2db423a49b305459147332fb01cf87 46 777 1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (0.48s MB/s) average 11.88s MB/s
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): task 4
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): cmd 32
+chmod 755 PRUNE_RUN; ./PRUNE_RUN
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): cores 1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): memory -1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): disk -1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): gpus -1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-c4ef615e385717604e56208f8738e84d-2e382236-15b9-47b8-9936-9c95f75697ba sort 1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-52665fa6b0dc35d6c5c23821bf5b6b1e-a6757f6d-4b7e-4baa-88a7-0c0b244a89fd nouns 1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-77fd8aa9ab3b638d3e54df2106f1c2c0-PRUNE_EXECUTOR PRUNE_EXECUTOR 1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile buffer-4-7f2db423a49b305459147332fb01cf87 PRUNE_RUN 1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): outfile file-8bd6ffa977d624bdaa7fe6600786d2b3-8eb3fb4f-4558-4353-b142-e46bbbb937f1 sorted_data.txt 1
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): outfile file-7548d9b72e17e1135118d6408d68b482-6.debug prune_debug.log 0
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) busy on 'chmod 755 PRUNE_RUN; ./PRUNE_RUN'
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: rx from unknown (129.74.20.154:33131): name
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Sending project name to worker (129.74.20.154:33131)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to unknown (129.74.20.154:33131): prune
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: rx from unknown (129.74.20.154:33132): name
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Sending project name to worker (129.74.20.154:33132)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to unknown (129.74.20.154:33132): prune
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): alive
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: rx from unknown (129.74.20.154:33130): name
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Sending project name to worker (129.74.20.154:33130)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to unknown (129.74.20.154:33130): prune
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: rx from unknown (129.74.20.154:33137): name
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Sending project name to worker (129.74.20.154:33137)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to unknown (129.74.20.154:33137): prune
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: rx from unknown (129.74.20.154:33135): name
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Sending project name to worker (129.74.20.154:33135)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to unknown (129.74.20.154:33135): prune
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: rx from unknown (129.74.20.154:33134): name
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Sending project name to worker (129.74.20.154:33134)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: tx to unknown (129.74.20.154:33134): prune
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Failed to read from worker unknown (129.74.20.154:33131)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker unknown (129.74.20.154:33131) removed
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 6, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: disconnected from 129.74.20.154:33131
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 6 workers are connected in total now
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Failed to read from worker unknown (129.74.20.154:33132)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker unknown (129.74.20.154:33132) removed
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 5, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: disconnected from 129.74.20.154:33132
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 5 workers are connected in total now
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Failed to read from worker unknown (129.74.20.154:33130)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker unknown (129.74.20.154:33130) removed
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 4, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: disconnected from 129.74.20.154:33130
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 4 workers are connected in total now
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Failed to read from worker unknown (129.74.20.154:33137)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker unknown (129.74.20.154:33137) removed
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 3, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: disconnected from 129.74.20.154:33137
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 3 workers are connected in total now
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Failed to read from worker unknown (129.74.20.154:33135)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker unknown (129.74.20.154:33135) removed
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 2, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: disconnected from 129.74.20.154:33135
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 2 workers are connected in total now
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: Failed to read from worker unknown (129.74.20.154:33134)
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: worker unknown (129.74.20.154:33134) removed
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/12 12:39:44.86 work_queue_python[16545] tcp: disconnected from 129.74.20.154:33134
+2015/05/12 12:39:44.86 work_queue_python[16545] wq: 1 workers are connected in total now
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): available_results
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): send_results -1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: Reading result(s) from cclvm05.crc.nd.edu (10.32.8.64:33002)
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): result 0 0 13 91807 4
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: Receiving stdout of task 4 (size: 13 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: Retrieved 13 bytes from cclvm05.crc.nd.edu (10.32.8.64:33002)
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): info disk_space_used 13
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: Receiving disk_space_used info from worker (10.32.8.64:33002)
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sending back file-8bd6ffa977d624bdaa7fe6600786d2b3-8eb3fb4f-4558-4353-b142-e46bbbb937f1 to /tmp/pivie-prune-test/data/8eb3fb4f-4558-4353-b142-e46bbbb937f1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): get file-8bd6ffa977d624bdaa7fe6600786d2b3-8eb3fb4f-4558-4353-b142-e46bbbb937f1 1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): file file-8bd6ffa977d624bdaa7fe6600786d2b3-8eb3fb4f-4558-4353-b142-e46bbbb937f1 144
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: Receiving file /tmp/pivie-prune-test/data/8eb3fb4f-4558-4353-b142-e46bbbb937f1 (size: 144 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sent 0.00 MB in 0.00s (0.36s MB/s) average 10.73s MB/s
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sending back file-7548d9b72e17e1135118d6408d68b482-6.debug to /tmp/pivie-prune-test/data/6.debug
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): get file-7548d9b72e17e1135118d6408d68b482-6.debug 1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): file file-7548d9b72e17e1135118d6408d68b482-6.debug 11561
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.01 MB file.
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: Receiving file /tmp/pivie-prune-test/data/6.debug (size: 11561 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sent 0.01 MB in 0.00s (25.92s MB/s) average 12.25s MB/s
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): kill 4
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): unlink file-7548d9b72e17e1135118d6408d68b482-6.debug
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) done in 0.09s total tasks 4 average 0.09s
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs file /tmp/pivie-prune-test/data/8ba230ed-2ceb-4661-a3e8-58126b0f85ee bytes 0:115 as 'file-ecaaa76b1d474306685b544f9943ad5b-8ba230ed-2ceb-4661-a3e8-58126b0f85ee'
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put file-ecaaa76b1d474306685b544f9943ad5b-8ba230ed-2ceb-4661-a3e8-58126b0f85ee 115 0644 1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (1.14s MB/s) average 11.99s MB/s
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) needs literal as PRUNE_RUN
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): put buffer-5-7f2db423a49b305459147332fb01cf87 46 777 1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) received 0.00 MB in 0.00s (0.63s MB/s) average 11.81s MB/s
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): task 5
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): cmd 32
+chmod 755 PRUNE_RUN; ./PRUNE_RUN
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): cores 1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): memory -1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): disk -1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): gpus -1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-c4ef615e385717604e56208f8738e84d-2e382236-15b9-47b8-9936-9c95f75697ba sort 1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-ecaaa76b1d474306685b544f9943ad5b-8ba230ed-2ceb-4661-a3e8-58126b0f85ee verbs 1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile file-77fd8aa9ab3b638d3e54df2106f1c2c0-PRUNE_EXECUTOR PRUNE_EXECUTOR 1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): infile buffer-5-7f2db423a49b305459147332fb01cf87 PRUNE_RUN 1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): outfile file-5dda562dbf71aa4f49fc9185c917e0ed-847bdb2c-7211-40b5-a359-026db8454fe7 sorted_data.txt 1
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): outfile file-3f344286cf099c0d03419b44a2588e13-7.debug prune_debug.log 0
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:39:44.95 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) busy on 'chmod 755 PRUNE_RUN; ./PRUNE_RUN'
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): available_results
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): send_results -1
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: Reading result(s) from cclvm05.crc.nd.edu (10.32.8.64:33002)
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): result 0 0 13 81010 5
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: Receiving stdout of task 5 (size: 13 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: Retrieved 13 bytes from cclvm05.crc.nd.edu (10.32.8.64:33002)
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): info disk_space_used 13
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: Receiving disk_space_used info from worker (10.32.8.64:33002)
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sending back file-5dda562dbf71aa4f49fc9185c917e0ed-847bdb2c-7211-40b5-a359-026db8454fe7 to /tmp/pivie-prune-test/data/847bdb2c-7211-40b5-a359-026db8454fe7
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): get file-5dda562dbf71aa4f49fc9185c917e0ed-847bdb2c-7211-40b5-a359-026db8454fe7 1
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): file file-5dda562dbf71aa4f49fc9185c917e0ed-847bdb2c-7211-40b5-a359-026db8454fe7 115
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.00 MB file.
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: Receiving file /tmp/pivie-prune-test/data/847bdb2c-7211-40b5-a359-026db8454fe7 (size: 115 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sent 0.00 MB in 0.00s (0.35s MB/s) average 11.04s MB/s
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sending back file-3f344286cf099c0d03419b44a2588e13-7.debug to /tmp/pivie-prune-test/data/7.debug
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): get file-3f344286cf099c0d03419b44a2588e13-7.debug 1
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): file file-3f344286cf099c0d03419b44a2588e13-7.debug 11560
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) using conservative default average transfer rate of 1.00 MB/s
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) will try up to 10 seconds to transfer this 0.01 MB file.
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: Receiving file /tmp/pivie-prune-test/data/7.debug (size: 11560 bytes) from 10.32.8.64:33002 (cclvm05.crc.nd.edu) ...
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: rx from cclvm05.crc.nd.edu (10.32.8.64:33002): end
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) sent 0.01 MB in 0.00s (23.79s MB/s) average 12.18s MB/s
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): kill 5
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): unlink file-3f344286cf099c0d03419b44a2588e13-7.debug
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: workers status -- total: 1, active: 1, available: 1.
+2015/05/12 12:39:45.03 work_queue_python[16545] wq: cclvm05.crc.nd.edu (10.32.8.64:33002) done in 0.08s total tasks 5 average 0.09s
+2015/05/12 12:42:40.65 work_queue_python[16545] wq: tx to cclvm05.crc.nd.edu (10.32.8.64:33002): release
+2015/05/12 12:42:40.65 work_queue_python[16545] wq: worker cclvm05.crc.nd.edu (10.32.8.64:33002) removed
+2015/05/12 12:42:40.65 work_queue_python[16545] wq: workers status -- total: 0, active: 0, available: 0.
+2015/05/12 12:42:40.65 work_queue_python[16545] tcp: disconnected from 10.32.8.64:33002
+2015/05/12 12:42:40.65 work_queue_python[16545] wq: 0 workers are connected in total now
+2015/05/12 12:42:40.65 work_queue_python[16545] wq: Advertising master status to the catalog server at catalog.cse.nd.edu:9097 ...
