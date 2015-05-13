@@ -87,6 +87,13 @@ BEGIN{
 
 $| = 1; #turn on autoflush.
 
+my $version = `maker -v`;
+if( $version != '2.28'){
+	print "WQ_MAKER supports version 2.28. Current version : $version\n";
+	exit(5)
+}
+
+
 my $maker_help = `maker -h`;
 
 my $usage = "$maker_help
@@ -706,56 +713,83 @@ foreach my $c (@ts) {
 	#tier files were generated with the nstore command from the Storable Perl module
 	#This simply stores a hash to disk in a convenient format. 
 	$tier = ${retrieve($inFile)};
-	$tier->CTL_OPT->{out_name} = $pwd . "/"; 
         $tier->CTL_OPT->{out_base} = $pwd . "/"; 
         $tier->CTL_OPT->{the_void} = $pwd . "/"; 
         my $file = $tier->DS_CTL->{log};
         my @fields = split(/\//, $file);
         $file = $fields[scalar(@fields) - 1];
-	print STDERR "File is $file\n";
-
-        $tier->DS_CTL->{log} = "./$file";
+        $tier->DS_CTL->{log} = "$pwd/$file";
         my $root = $tier->DS_CTL->{root};
-        $tier->DS_CTL->{root} = $pwd . "/";
-        $tier->DS_CTL->{ds_object}->{_root} = $pwd . "/";
-        $tier->{the_void} = $pwd . "/";
-        $tier->CTL_OPT->{CWD} = $pwd . "/"; 
-        $tier->{dbfile} = $pwd . "/"; 
-        $tier->CTL_OPT->{_TMP} = $pwd . "/"; 
+        $tier->DS_CTL->{root} = "$pwd/";
+        $tier->DS_CTL->{ds_object}->{_root} = "$pwd/";
+        $tier->{the_void} = "$pwd/";
+        $tier->CTL_OPT->{CWD} = "$pwd/"; 
+        $file = $tier->dbfile;
+        @fields = split(/\//, $file);
+        $file = $fields[scalar(@fields) - 1];
+        $tier->{dbfile} = "$pwd/$file"; 
+        $tier->{VARS}{dbfile} = "$pwd/$file"; 
+        $tier->CTL_OPT->{_dbfile} = "$pwd/$file"; 
+        $tier->CTL_OPT->{_TMP} = "$pwd/"; 
+        $tier->CTL_OPT->{TMP} = "$pwd/"; 
 
-	my @inputs = ("_e_db","_p_db","_d_db","_r_db","_a_db");
+	my @inputs = ("_e_db","_p_db","_d_db","_r_db","_a_db","_g_db");
 	for (@inputs) {
 		print "$_ : Working\n";
 		if (defined $tier->CTL_OPT->{$_}){ 
 			my @files = @{$tier->CTL_OPT->{$_}}; 	
 			for(my $j = 0; $j < scalar(@files); $j++){
-				my $file = $files[$j];
-				my $newfile = abs_path($file); 
+				$file = $files[$j];
+				@fields = split(/\//, $file); 
+				my $newfile = $fields[scalar(@fields) - 1]; 
+				$newfile = abs_path($newfile); 
 				$files[$j] = $newfile; 
-				print "New file : $newfile\n";
 			}
 			$tier->CTL_OPT->{$_} = \@files; 
 		}	
 	}
-	my @files = ('snaphmm',  'SEEN_file', 'rmlib');
+	my @files = ('snaphmm',  'rmlib');
 	foreach my $x (@files){ 
 		my $file = $tier->CTL_OPT->{$x}; 
-		my @fields = split(/\//, $file); 
-		my $newfile = $fields[scalar(@fields) - 1]; 
 		if(-e $file){
 			$file = abs_path($file); 
 			$tier->CTL_OPT->{$x} = "$file"; 
 		}
 	}
+	@files = ('SEEN_file');
+	foreach my $x (@files){ 
+		my $file = $tier->DS_CTL->{$x}; 
+		if(-e $file){
+			$file = abs_path($file); 
+			$tier->DS_CTL->{$x} = "$file"; 
+		}
+	}
 
+        @inputs = ("_est", "_altest", "_repeat_protein", "_protein", "_est_reads", "protein", "repeat_protein", "genome", "est", "est_reads", "altest", "dbfile", "_dbfile" );
+        foreach my $input (@inputs){
+                if (! defined $tier->CTL_OPT->{$input}){next;}
+                my $file = $tier->CTL_OPT->{$input};
+                if(-e $file){
+                        $file = abs_path($file);
+                }
+                $tier->CTL_OPT->{$input} = $file;
+        }
+        foreach my $input (@inputs){
+                if (! defined $tier->{$input}){next;}
+                my $file = $tier->{$input};
+                if(-e $file){
+                        $file = abs_path($file);
+                }
+                $tier->{$input} = $file;
+        }
 
 	my @execs = ('formatdb', 'blastall', '_formater', '_tblastx', 'tblastx', 'blastx', 'xdformat', 'exonerate', 'snap', 'RepeatMasker', 'blastn', 'formatdb', 'gmhmme3', '_blastx', '_blastn', 'probuild', 'augustus', 'gmhmme3', 'gmhmmp', 'fgenesh', 'twinscan');
         foreach my $v (@execs){
                 my $file = $tier->CTL_OPT->{$v};
+		if (! defined $file){ next; }
                 if (! -e $file){
                         next;
                 }
-		print time." :: $v: $file\n";
                 $tier->CTL_OPT->{$v} = "$pwd/$file";
         }	
 
@@ -926,6 +960,7 @@ sub submit_input_base_files {
 	submit_ddb_input_files($task, \$tier_ds);	
 	submit_rdb_input_files($task, \$tier_ds);	
 	submit_adb_input_files($task, \$tier_ds);	
+	submit_gdb_input_files($task, \$tier_ds);	
 	submit_input_files($task, \$tier_ds);	
 	nstore \$tier_ds, ($tierFile);
 }
@@ -963,7 +998,6 @@ sub submit_edb_input_files {
 				$ests[$j] = $newfile;  
 			}
 		}
-		$tier_ds->CTL_OPT->{_e_db} = \@ests;
 	}
 }
 
@@ -985,7 +1019,6 @@ sub submit_pdb_input_files {
 				$proteins[$j] = $newfile; 
 			}
 		}
-		$tier_ds->CTL_OPT->{_p_db} = \@proteins; 
 	}	
 }
 
@@ -1007,7 +1040,6 @@ sub submit_ddb_input_files {
 				$d[$j] = $newfile; 
 			}
 		}
-		$tier_ds->CTL_OPT->{_d_db} = \@d; 
 	}		
 }
 
@@ -1029,7 +1061,6 @@ sub submit_rdb_input_files {
 				$r[$j] = $newfile; 
 			}
 		}
-		$tier_ds->CTL_OPT->{_r_db} = \@r; 
 	}
 }
 
@@ -1052,14 +1083,36 @@ sub submit_adb_input_files {
 				$a[$j] = $newfile; 
 			}
 		}
-		$tier_ds->CTL_OPT->{_a_db} = \@a; 
+	}
+}
+
+
+sub submit_gdb_input_files {
+	my($task, $tier_ds) = @_;
+	$tier_ds = $$tier_ds; #dereference $tier_ds since it is passed by reference 
+	if (defined $tier_ds->CTL_OPT->{_g_db}){
+		my @g = @{$tier_ds->CTL_OPT->{_g_db}}; 	
+		for(my $j = 0; $j < scalar(@g); $j++){
+			my $file = $g[$j];
+			my @fields = split(/\//, $file);
+			if ($#fields > 1){
+				$file = abs_path($file); 
+			}
+			@fields = split(/\//, $file); 
+			my $newfile = $fields[scalar(@fields) - 1]; 
+			work_queue::work_queue_task_specify_file($task, $file, "$newfile", 0, 1); 
+			
+			if ($#fields > 1){
+				$g[$j] = $newfile; 
+			}
+		}
 	}
 }
 
 sub submit_input_files {
 	my($task, $tier_ds) = @_;
 	$tier_ds = $$tier_ds; #dereference $tier_ds since it is passed by reference 
-	my @inputs = ("_est", "_altest", "_repeat_protein", "_protein", "_est_reads", "protein", "repeat_protein", "genome", "est", "est_reads", "altest" ); 
+	my @inputs = ("_est", "_altest", "_repeat_protein", "_protein", "_est_reads", "protein", "repeat_protein", "genome", "est", "est_reads", "altest", "dbfile", "_dbfile" ); 
 	foreach my $input (@inputs){
 		if (! defined $tier_ds->CTL_OPT->{$input}){next;}
 		my $file = $tier_ds->CTL_OPT->{$input}; 
@@ -1069,14 +1122,24 @@ sub submit_input_files {
 			$file = abs_path($file); 
 			work_queue::work_queue_task_specify_file($task, $file, "$newfile", 0, 1); 
 		}
-		$tier_ds->CTL_OPT->{$input} = $newfile; 
 	}
+	foreach my $input (@inputs){
+		if (! defined $tier_ds->{$input}){next;}
+		my $file = $tier_ds->{$input}; 
+		my @fields = split(/\//, $file); 
+		my $newfile = $fields[scalar(@fields) - 1]; 
+		if(-e $file){
+			$file = abs_path($file); 
+			work_queue::work_queue_task_specify_file($task, $file, "$newfile", 0, 1); 
+		}
+	}
+
 }
 
 sub submit_executable_files {	
 	my($task, $tier_ds) = @_;
 	$tier_ds = $$tier_ds; #dereference $tier_ds since it is passed by reference 
-	my @files = ('snaphmm',  'SEEN_file', 'rmlib');
+	my @files = ('snaphmm', 'rmlib');
 	foreach my $x (@files){ 
 		my $file = $tier_ds->CTL_OPT->{$x}; 
 		my @fields = split(/\//, $file); 
@@ -1084,7 +1147,20 @@ sub submit_executable_files {
 		if(-e $file){
 			$file = abs_path($file); 
 			work_queue::work_queue_task_specify_file($task, $file, "$newfile", 0, 1);
-			$tier_ds->CTL_OPT->{$x} = "./$newfile"; 
+			$tier_ds->CTL_OPT->{$x} = "$newfile"; 
+		}
+
+	}	 
+	
+	@files = ('SEEN_file');
+	foreach my $x (@files){ 
+		my $file = $tier_ds->DS_CTL->{$x}; 
+		my @fields = split(/\//, $file); 
+		my $newfile = $fields[scalar(@fields) - 1]; 
+		if(-e $file){
+			$file = abs_path($file); 
+			work_queue::work_queue_task_specify_file($task, $file, "$newfile", 0, 1);
+			$tier_ds->DS_CTL->{$x} = "$newfile"; 
 		}
 
 	}	 
@@ -1117,7 +1193,6 @@ sub configure_remote_tier_annotation{
 	my($tier) = @_;
 	my $tierFile = $tier."_todo.tier";
 	my $tier_ds = ${retrieve($tierFile)};
-	$tier_ds->CTL_OPT->{out_name} = "."; 
 	$tier_ds->CTL_OPT->{out_base} = "."; 
 	$tier_ds->CTL_OPT->{the_void} = ".";
 	my $file = $tier_ds->DS_CTL->{log}; 
@@ -1129,7 +1204,7 @@ sub configure_remote_tier_annotation{
 	$tier_ds->DS_CTL->{ds_object}->{_root} = "./"; 
 	$tier_ds->{the_void} = "."; 
 	$tier_ds->CTL_OPT->{CWD} = ".";  
-	$tier_ds->{dbfile} = "./";
+	$tier_ds->{dbfile} = $tier_ds->CTL_OPT->{_dbfile}; 
 	$tier_ds->CTL_OPT->{_TMP} = "./";  
 	
 	nstore \$tier_ds, ($tierFile); #store the modified variables to the tier file that is transmitted to workers	
