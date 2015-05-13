@@ -31,13 +31,13 @@ int submit_tasks(struct work_queue *q, int input_size, int run_time, int output_
 	char command[256];
 	char gen_input_cmd[256];
 
-	sprintf(gen_input_cmd, "dd if=/dev/zero of=input.0 bs=1M count=%d",input_size);
+	sprintf(gen_input_cmd, "dd if=/dev/zero of=input.0 bs=1m count=%d",input_size);
 	system(gen_input_cmd);
 
 	int i;
 	for(i=0;i<count;i++) {
 		sprintf(output_file, "output.%d",ntasks++);
-		sprintf(command, "dd if=/dev/zero of=outfile bs=1M count=%d; sleep %d", output_size, run_time );
+		sprintf(command, "dd if=/dev/zero of=outfile bs=1m count=%d; sleep %d", output_size, run_time );
 
 		struct work_queue_task *t = work_queue_task_create(command);
 		work_queue_task_specify_file(t, "input.0", "infile", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
