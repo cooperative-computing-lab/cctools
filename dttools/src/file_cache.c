@@ -27,6 +27,7 @@ See the file COPYING for details.
 /* Cygwin does not have 64-bit I/O, while Darwin has it by default. */
 
 #if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_DRAGONFLY
+#define fstat64 fstat
 #define stat64 stat
 #define open64 open
 #define mkstemp64 mkstemp
@@ -228,17 +229,39 @@ int file_cache_contains(struct file_cache *c, const char *path, char *lpath)
 	}
 }
 
-int file_cache_open(struct file_cache *c, const char *path, char *lpath, INT64_T size, time_t mtime)
+int file_cache_open(struct file_cache *c, const char *path, int flags, char *lpath, INT64_T size, time_t mtime)
 {
-	struct stat64 info;
+	int fd;
+	cached_name(c, path, lpath);
 
-	if(file_cache_stat(c, path, lpath, &info) == 0) {
-		if((size == 0 || (size == info.st_size)) && ((mtime == 0) || (info.st_mtime >= mtime))) {
-			debug(D_CACHE, "hit %s %s", path, lpath);
-			return open64(lpath, O_RDWR, 0);
+	flags &= (O_RDONLY|O_WRONLY|O_RDWR);
+
+	debug(D_DEBUG, "open('%s', %d)", lpath, flags);
+	fd = open64(lpath, flags, 0);
+	if (fd == -1) {
+		debug(D_DEBUG, "waiting for txn('%s')", path);
+		if(!wait_for_running_txn(c, path))
+			return -1;
+		fd = open64(lpath, flags, 0);
+	}
+
+	if (fd >= 0) {
+		struct stat64 info;
+
+		if (fstat64(fd, &info) == 0) {
+			if((size == 0 || (size == info.st_size)) && ((mtime == 0) || (info.st_mtime >= mtime))) {
+				debug(D_CACHE, "hit %s %s", path, lpath);
+				return fd;
+			} else {
+				debug(D_CACHE, "stale %s %s", path, lpath);
+				close(fd);
+				errno = ENOENT;
+				return -1;
+			}
 		} else {
-			debug(D_CACHE, "stale %s %s", path, lpath);
-			errno = ENOENT;
+			int s = errno;
+			close(fd);
+			errno = s;
 			return -1;
 		}
 	} else {

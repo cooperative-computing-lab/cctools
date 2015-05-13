@@ -103,7 +103,7 @@ struct lexer
 
 	struct list *token_queue;
 
-	struct dag_lookup_set *environment;
+	struct dag_variable_lookup_set *environment;
 
 	char *linetext;   //This member will be removed once the new lexer is integrated.
 

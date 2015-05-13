@@ -38,7 +38,8 @@ EOF
 	work_queue_worker -d all -o worker.log localhost $port --timeout 10 --cores $CORES --single-shot
 
 	echo "checking for output"
-	for (( i=0; i<count; i++ ))
+	i=0
+	while [ $i -lt $TASKS ]
 	do
 		file=output.$i
 		if [ ! -f $file ]
@@ -46,6 +47,7 @@ EOF
 			echo "$file is missing!"
 			return 1
 		fi
+		i=$((i+1))
 	done
 
 	echo "all output present"

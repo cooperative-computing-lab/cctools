@@ -27,8 +27,9 @@ See the file COPYING for details.
 #include "stringtools.h"
 
 #include "dag.h"
+#include "dag_variable.h"
+#include "dag_visitors.h"
 #include "rmsummary.h"
-#include "visitors.h"
 
 /*
  * BUG: Error handling is not very good.
@@ -39,7 +40,7 @@ See the file COPYING for details.
 int dag_to_file_var(const char *name, struct hash_table *vars, int nodeid, FILE * dag_stream, const char *prefix)
 {
 	struct dag_variable_value *v;
-	v = dag_get_variable_value(name, vars, nodeid);
+	v = dag_variable_get_value(name, vars, nodeid);
 	if(v && !string_null_or_empty(v->value))
 		fprintf(dag_stream, "%s%s=\"%s\"\n", prefix, name, (char *) v->value);
 
@@ -97,7 +98,7 @@ int dag_to_file_files(struct dag_node *n, struct list *fs, FILE * dag_stream, ch
 		if(rename)
 			fprintf(dag_stream, "%s ", rename(n, f->filename));
 		else {
-			const char *remotename = dag_file_remote_name(n, f->filename);
+			const char *remotename = dag_node_get_remote_name(n, f->filename);
 			if(remotename)
 				fprintf(dag_stream, "%s->%s ", f->filename, remotename);
 			else
@@ -179,8 +180,8 @@ int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename) (stru
 		return 1;
 
 	// For the collect list, use the their final value (the value at node with id nodeid_counter).
-	dag_to_file_var(GC_COLLECT_LIST, d->variables, d->nodeid_counter, dag_stream, "");
-	dag_to_file_var(GC_PRESERVE_LIST, d->variables, d->nodeid_counter, dag_stream, "");
+	dag_to_file_var("GC_COLLECT_LIST", d->variables, d->nodeid_counter, dag_stream, "");
+	dag_to_file_var("GC_PRESERVE_LIST", d->variables, d->nodeid_counter, dag_stream, "");
 
 	dag_to_file_exports(d, dag_stream, "");
 
@@ -679,10 +680,11 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size)
 	fprintf(stdout, "digraph {\n");
 
 	if(change_size) {
-		hash_table_firstkey(d->completed_files);
-		while(hash_table_nextkey(d->completed_files, &label, (void **) &name)) {
-			stat(label, &st);
-			average += ((double) st.st_size) / ((double) hash_table_size(d->completed_files));
+		hash_table_firstkey(d->files);
+		while(hash_table_nextkey(d->files, &name, (void**)&f )) {
+			if(stat(name,&st)==0) {
+				average += ((double) st.st_size) / ((double) hash_table_size(d->completed_files));
+			}
 		}
 	}
 

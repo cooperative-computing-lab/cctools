@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <fcntl.h>
 #include <time.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pthread.h>
@@ -32,6 +33,14 @@ static const char *progname = "allpairs_multicore";
 static const char *extra_arguments = "";
 static int block_size = 0;
 static int num_cores = 0;
+static int is_symmetric = 0;
+static int nindex = 0;
+static int index_array[2];
+
+enum {
+	LONG_OPT_SYMMETRIC=UCHAR_MAX+1,
+	LONG_OPT_INDEX,
+};
 
 static void show_help(const char *cmd)
 {
@@ -41,6 +50,9 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Number of cores to be used. (default: # of cores in machine)\n", "-c,--cores=<cores>");
 	fprintf(stdout, " %-30s Extra arguments to pass to the comparison program.\n", "-e,--extra-args=<args>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<flag>");
+	/* --index and --symmetric can not be used concurrently. */
+	fprintf(stdout, " %-30s Specify the indexes of a matrix (used by allpairs_master to specify the indexes of the submatrix for each task).\n", "   --index=\"<xstart> <ystart>\"");
+	fprintf(stdout, " %-30s Compute half of a symmetric matrix.\n", "   --symmetric");
 	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
 	fprintf(stdout, " %-30s Display this message.\n", "-h,--help");
 }
@@ -128,9 +140,11 @@ struct thread_args {
 	char **xname;
 	char **xdata;
 	int   *xdata_length;
+	int   *xdata_id; //the index array of xdata in the matrix constructed by seta and setb
 	char  *yname;
 	char  *ydata;
 	int    ydata_length;
+	int ydata_id; //the index of ydata in the matrix constructed by seta and setb
 };
 
 /*
@@ -142,8 +156,20 @@ static void * row_loop_threaded( void *args )
 {
 	int i;
 	struct thread_args *targs = args;
-	for(i=0;i<block_size;i++) {
-		targs->func(targs->xname[i],targs->xdata[i],targs->xdata_length[i],targs->yname,targs->ydata,targs->ydata_length);
+	if(nindex == 2) {
+		for(i=0;i<block_size;i++) {
+			if((index_array[0] + targs->xdata_id[i]) <= (index_array[1] + targs->ydata_id)) //calcuate xindex and yindex of the unit in the original matrix of allpairs_master
+				targs->func(targs->xname[i],targs->xdata[i],targs->xdata_length[i],targs->yname,targs->ydata,targs->ydata_length);
+		}
+	} else if (is_symmetric) {
+		for(i=0;i<block_size;i++) {
+			if(targs->xdata_id[i] <= targs->ydata_id)
+				targs->func(targs->xname[i],targs->xdata[i],targs->xdata_length[i],targs->yname,targs->ydata,targs->ydata_length);
+		}
+	} else {
+		for(i=0;i<block_size;i++) {
+			targs->func(targs->xname[i],targs->xdata[i],targs->xdata_length[i],targs->yname,targs->ydata,targs->ydata_length);
+		}
 	}
 	return 0;
 }
@@ -161,11 +187,13 @@ static int main_loop_threaded( allpairs_compare_t funcptr, struct text_list *set
 
 	char *xname[block_size];
 	char *xdata[block_size];
+	int xdata_id[block_size];
 	int xdata_length[block_size];
 
 	char *yname[num_cores];
 	char *ydata[num_cores];
 	int ydata_length[num_cores];
+	int ydata_id[num_cores];
 
 	struct thread_args args[num_cores];
 	pthread_t thread[num_cores];
@@ -175,6 +203,7 @@ static int main_loop_threaded( allpairs_compare_t funcptr, struct text_list *set
 
 		/* load the horizontal members of the stripe */
 		for(i=0;i<block_size;i++) {
+			xdata_id[i] = x + i;
 			xname[i] = text_list_get(seta,x+i);
 			xdata[i] = load_one_file(text_list_get(seta,x+i),&xdata_length[i]);
 		}
@@ -188,15 +217,18 @@ static int main_loop_threaded( allpairs_compare_t funcptr, struct text_list *set
 			/* start one thread working on a whole row. */
 			for(c=0;c<n;c++) {
 				yname[c] = text_list_get(setb,j+c);
+				ydata_id[c] = j + c;
 				ydata[c] = load_one_file(text_list_get(setb,j+c),&ydata_length[c]);
 
 				args[c].func         = funcptr;
 				args[c].xname        = xname;
 				args[c].xdata        = xdata;
 				args[c].xdata_length = xdata_length;
+				args[c].xdata_id = xdata_id;
 				args[c].yname	     = yname[c];
 				args[c].ydata        = ydata[c];
 				args[c].ydata_length = ydata_length[c];
+				args[c].ydata_id = ydata_id[c];
 				pthread_create(&thread[c],0,row_loop_threaded,&args[c]);
 			}
 
@@ -245,25 +277,34 @@ static int main_loop_program( const char *funcpath, struct text_list *seta, stru
 				n = MIN(n,xstop-i);
 
 				/* start one process for each core */
+				/* if nindex = 2, the real xindex = index_array[0] + i; the real yindex = index_array[1] + j. */
 				for(c=0;c<n;c++) {
-					sprintf(line,"%s %s %s %s\n",funcpath,extra_arguments,text_list_get(seta,i+c),text_list_get(setb,j));
-					proc[c] = fast_popen(line);
-					if(!proc[c]) {
-						fprintf(stderr,"%s: couldn't execute %s: %s\n",progname,line,strerror(errno));
-						return 1;
+					if((nindex == 2 && (index_array[0] + i + c) <= (index_array[1] + j)) || //calcuate xindex and yindex of the unit in the original matrix of allpairs_master
+						(is_symmetric == 0 && nindex == 0) ||
+						(is_symmetric && (i+c) <= j)) {
+							sprintf(line,"%s %s %s %s\n",funcpath,extra_arguments,text_list_get(seta,i+c),text_list_get(setb,j));
+							proc[c] = fast_popen(line);
+							if(!proc[c]) {
+								fprintf(stderr,"%s: couldn't execute %s: %s\n",progname,line,strerror(errno));
+								return 1;
+							}
 					}
 				}
 
 				/* then finish one process for each core */
 				for(c=0;c<n;c++) {
-					printf("%s\t%s\t",text_list_get(seta,i+c),text_list_get(setb,j));
-					int lines = 0;
-					while(fgets(line,sizeof(line),proc[c])) {
-						printf("%s",line);
-						lines++;
+					if((nindex == 2 && (index_array[0] + i + c) <= (index_array[1] + j)) ||
+						(is_symmetric == 0 && nindex == 0) ||
+						(is_symmetric && (i+c) <= j)) {
+							printf("%s\t%s\t",text_list_get(seta,i+c),text_list_get(setb,j));
+							int lines = 0;
+							while(fgets(line,sizeof(line),proc[c])) {
+								printf("%s",line);
+								lines++;
+							}
+							if(lines==0) printf("\n");
+							fast_pclose(proc[c]);
 					}
-					if(lines==0) printf("\n");
-					fast_pclose(proc[c]);
 				}
 			}
 		}
@@ -274,7 +315,7 @@ static int main_loop_program( const char *funcpath, struct text_list *seta, stru
 
 int main(int argc, char *argv[])
 {
-	signed char c;
+	int c;
 	int result;
 
 	debug_config(progname);
@@ -286,6 +327,8 @@ int main(int argc, char *argv[])
 		{"block-size", required_argument, 0, 'b'},
 		{"cores", required_argument, 0, 'c'},
 		{"extra-args", required_argument, 0, 'e'},
+		{"symmetric", no_argument, 0, LONG_OPT_SYMMETRIC},
+		{"index", required_argument, 0, LONG_OPT_INDEX},
         {0,0,0,0}
 	};
 
@@ -302,6 +345,17 @@ int main(int argc, char *argv[])
 			break;
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case LONG_OPT_INDEX:
+			nindex = sscanf(optarg, "%d %d", &index_array[0], &index_array[1]);
+			if(nindex != 2) {
+				fprintf(stderr, "You must provide two indexes: xstart and ystart.\n");
+				show_help(progname);
+				exit(0);
+			}
+			break;
+		case LONG_OPT_SYMMETRIC:
+			is_symmetric = 1;
 			break;
 		case 'v':
 			cctools_version_print(stdout, progname);
@@ -352,7 +406,6 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "%s: %s is neither an executable program nor an internal function.\n",progname,funcpath);
 			return 1;
 		}
-
 		result = main_loop_program(funcpath,seta,setb);
 	}
 

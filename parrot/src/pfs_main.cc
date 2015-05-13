@@ -88,8 +88,9 @@ const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
 int set_foreground = 1;
 
-char sys_temp_dir[PFS_PATH_MAX] = "/tmp";
-char pfs_temp_dir[PFS_PATH_MAX];
+char sys_temp_dir[PATH_MAX] = "/tmp";
+char pfs_temp_dir[PATH_MAX];
+char pfs_temp_per_instance_dir[PATH_MAX];
 
 int *pfs_syscall_totals32 = 0;
 int *pfs_syscall_totals64 = 0;
@@ -98,7 +99,7 @@ const char *pfs_root_checksum=0;
 const char *pfs_initial_working_directory=0;
 
 char *pfs_false_uname = 0;
-char pfs_ldso_path[PFS_PATH_MAX];
+char pfs_ldso_path[PATH_MAX];
 uid_t pfs_uid = 0;
 gid_t pfs_gid = 0;
 const char * pfs_username = 0;
@@ -110,8 +111,8 @@ INT64_T pfs_write_count = 0;
 const char * pfs_cvmfs_repo_arg = 0;
 const char * pfs_cvmfs_config_arg = 0;
 bool pfs_cvmfs_repo_switching = false;
-char pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX];
-char pfs_cvmfs_locks_dir[PFS_PATH_MAX];
+char pfs_cvmfs_alien_cache_dir[PATH_MAX];
+char pfs_cvmfs_locks_dir[PATH_MAX];
 bool pfs_cvmfs_enable_alien  = true;
 
 int pfs_irods_debug_level = 0;
@@ -167,16 +168,16 @@ static void get_linux_version(const char *cmd)
 
 static void pfs_helper_init( void )
 {
-	char helper_path[PFS_PATH_MAX];
+	char helper_path[PATH_MAX];
 
 	debug(D_DEBUG,"locating helper library...");
 
-	sprintf(helper_path,"%s/lib/libparrot_helper.so",INSTALL_PATH);
+	snprintf(helper_path, sizeof(helper_path),"%s/lib/libparrot_helper.so",INSTALL_PATH);
 
 	char * s = getenv("PARROT_HELPER");
 	if(s) {
 		debug(D_DEBUG,"PARROT_HELPER=%s",s);
-		strcpy(helper_path,s);
+		snprintf(helper_path,sizeof(helper_path),"%s",s);
 	} else {
 		debug(D_DEBUG,"PARROT_HELPER is not set");
 	}
@@ -225,7 +226,7 @@ static void show_help( const char *cmd )
 	fprintf(stdout, " %-30s CVMFS common configuration.               (PARROT_CVMFS_CONFIG)\n", "   --cvmfs-config=<config>");
 	fprintf(stdout, " %-30s CVMFS repositories to enable.             (PARROT_CVMFS_REPO)\n", "-r,--cvmfs-repos=<repos>");
 	fprintf(stdout, " %-30s Allow repository switching when using CVMFS.\n","   --cvmfs-repo-switching");
-	fprintf(stdout, " %-30s Set CVMFS common cache directory.         (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache");
+	fprintf(stdout, " %-30s Set CVMFS common cache directory.         (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache=<dir>");
 	fprintf(stdout, " %-30s Disable CVMFS common cache directory.\n","   --cvmfs-disable-alien-cache");
 	fprintf(stdout, " %-30s Enforce this root filesystem checksum, where available.\n", "-R,--root-checksum=<cksum>");
 	fprintf(stdout, " %-30s Use streaming protocols without caching.(PARROT_FORCE_STREAM)\n", "-s,--stream-no-cache");
@@ -263,7 +264,12 @@ static void show_help( const char *cmd )
 	if(pfs_service_lookup("s3"))		fprintf(stdout, " s3");
 	if(pfs_service_lookup("root"))      fprintf(stdout, " root");
 	if(pfs_service_lookup("xrootd"))    fprintf(stdout, " xrootd");
-	if(pfs_service_lookup("cvmfs"))		fprintf(stdout, " cvmfs");
+	if(pfs_service_lookup("cvmfs"))     fprintf(stdout, " cvmfs");
+
+	if(pfs_service_lookup("cvmfs")) {
+		fprintf(stdout, "\ncvmfs compilation flags: " CCTOOLS_CVMFS_BUILD_FLAGS);
+	}
+
 	fprintf(stdout, "\n");
 	exit(1);
 }
@@ -616,7 +622,7 @@ int main( int argc, char *argv[] )
 			pfs_enable_small_file_optimizations = 0;
 			break;
 		case 'e':
-			strncpy(envlist, optarg, sizeof(envlist)-1);
+			snprintf(envlist, sizeof(envlist), "%s", optarg);
 			break;
 		case 'F':
 			pfs_force_cache = 1;
@@ -643,7 +649,7 @@ int main( int argc, char *argv[] )
 			pfs_checksum_files = 1;
 			break;
 		case 'l':
-			strncpy(pfs_ldso_path, optarg, sizeof(pfs_ldso_path)-1);
+			snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", optarg);
 			break;
 		case 'm':
 			pfs_resolve_file_config(optarg);
@@ -666,8 +672,8 @@ int main( int argc, char *argv[] )
 				debug(D_DEBUG, "Failed to create hash table for namelist!\n");
 				return 1;
 			}
-			char cmd[PFS_PATH_MAX];
-			if(snprintf(cmd, PFS_PATH_MAX, "find /lib*/ -name ld-linux*>>%s 2>/dev/null", optarg) >= 0)
+			char cmd[PATH_MAX];
+			if(snprintf(cmd, sizeof(cmd), "find /lib*/ -name ld-linux*>>%s 2>/dev/null", optarg) >= 0)
 				system(cmd);
 			else {
 				debug(D_DEBUG, "writing ld-linux* into namelist file failed.");
@@ -703,7 +709,7 @@ int main( int argc, char *argv[] )
 			pfs_cvmfs_repo_switching = true;
 			break;
 		case LONG_OPT_CVMFS_ALIEN_CACHE:
-			strncpy(pfs_cvmfs_alien_cache_dir,optarg,PFS_PATH_MAX);
+			snprintf(pfs_cvmfs_alien_cache_dir,sizeof(pfs_cvmfs_alien_cache_dir),"%s",optarg);
 			break;
 		case LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE:
 			pfs_cvmfs_enable_alien = false;
@@ -720,7 +726,7 @@ int main( int argc, char *argv[] )
 			pfs_session_cache = 1;
 			break;
 		case 't':
-			strncpy(pfs_temp_dir,optarg,sizeof(pfs_temp_dir)-1);
+			snprintf(pfs_temp_dir,sizeof(pfs_temp_dir),"%s",optarg);
 			break;
 		case 'T':
 			pfs_master_timeout = string_time_parse(optarg);
@@ -791,7 +797,7 @@ int main( int argc, char *argv[] )
 			fatal("Can not open envlist file: %s", envlist);
 		for (int i = 0; environ[i]; i++)
 			fprintf(fp, "%s\n", environ[i]);
-		char working_dir[PFS_PATH_MAX];
+		char working_dir[PATH_MAX];
 		::getcwd(working_dir,sizeof(working_dir));
 		if(working_dir == NULL)
 			fatal("Can not obtain the current working directory!");
@@ -849,7 +855,7 @@ int main( int argc, char *argv[] )
 	if(s) pfs_force_sync = 1;
 
 	s = getenv("PARROT_LDSO_PATH");
-	if(s) strncpy(pfs_ldso_path, s, sizeof(pfs_ldso_path)-1);
+	if(s) snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", s);
 
 	s = getenv("PARROT_DEBUG_FLAGS");
 	if(s) {
@@ -890,38 +896,40 @@ int main( int argc, char *argv[] )
 	}
 
 	if (getenv("TMPDIR"))
-		strncpy(sys_temp_dir, getenv("TMPDIR"), sizeof(sys_temp_dir)-1);
+		snprintf(sys_temp_dir, sizeof(sys_temp_dir), "%s", getenv("TMPDIR"));
 
 	if (!pfs_temp_dir[0]) {
 		char *t = getenv("PARROT_TEMP_DIR");
 		if(t && t[0]) {
-			strncpy(pfs_temp_dir, t, sizeof(pfs_temp_dir)-1);
+			snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s", t);
 		} else {
 			snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s/parrot.%d", sys_temp_dir, getuid());
 		}
 	}
+	if (!create_dir(pfs_temp_dir, S_IRWXU))
+		fatal("could not create directory '%s': %s", pfs_temp_dir, strerror(errno));
+
+	snprintf(pfs_temp_per_instance_dir, sizeof(pfs_temp_per_instance_dir), "%s/parrot-instance.XXXXXX", pfs_temp_dir);
+	if (mkdtemp(pfs_temp_per_instance_dir) == NULL)
+		fatal("could not create directory '%s': %s", pfs_temp_per_instance_dir, strerror(errno));
 
 	pfs_cvmfs_alien_cache_dir[0]                = '\0';
-	pfs_cvmfs_alien_cache_dir[PFS_PATH_MAX - 1] = '\0';
+	pfs_cvmfs_alien_cache_dir[PATH_MAX - 1] = '\0';
 	s = getenv("PARROT_CVMFS_ALIEN_CACHE");
 	if(s && strlen(s) > 0)
-		strncpy(pfs_cvmfs_alien_cache_dir, s, PFS_PATH_MAX);
-
-	if(pfs_temp_dir[PFS_PATH_MAX - 1] != '\0')
-		fatal("temporary files directory pathname larger than %d characters\n", PFS_PATH_MAX - 1);
+		snprintf(pfs_cvmfs_alien_cache_dir, sizeof(pfs_cvmfs_alien_cache_dir), "%s", s);
 
 	//if alien cache dir has not been set, use default based on final value of pfs_temp_dir.
 	if(strlen(pfs_cvmfs_alien_cache_dir) < 1)
-	{
-		sprintf(pfs_cvmfs_alien_cache_dir,"%s/cvmfs", pfs_temp_dir);
-	}
+		snprintf(pfs_cvmfs_alien_cache_dir,sizeof(pfs_cvmfs_alien_cache_dir),"%s/cvmfs", pfs_temp_dir);
 
 	pfs_file_cache = file_cache_init(pfs_temp_dir);
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
 	file_cache_cleanup(pfs_file_cache);
 
-	sprintf(pfs_cvmfs_locks_dir, "%s/cvmfs_locks_XXXXXX", pfs_temp_dir);
-	mkdtemp(pfs_cvmfs_locks_dir);
+	snprintf(pfs_cvmfs_locks_dir, sizeof(pfs_cvmfs_locks_dir), "%s/cvmfs_locks_XXXXXX", pfs_temp_per_instance_dir);
+	if(mkdtemp(pfs_cvmfs_locks_dir) == NULL)
+		fatal("could not create a cvmfs locks temporary directory: %s", strerror(errno));
 
 	if(!chose_auth) auth_register_all();
 
@@ -938,7 +946,7 @@ int main( int argc, char *argv[] )
 
 	{
 		char buf[PATH_MAX];
-		snprintf(buf, sizeof(buf), "%s/parrot-fd.XXXXXX", pfs_temp_dir);
+		snprintf(buf, sizeof(buf), "%s/parrot-fd.XXXXXX", pfs_temp_per_instance_dir);
 		if (mkdtemp(buf) == NULL)
 			fatal("could not create parrot-fd temporary directory: %s", strerror(errno));
 		parrot_dir_fd = open(buf, O_RDONLY|O_DIRECTORY);
@@ -1047,7 +1055,7 @@ int main( int argc, char *argv[] )
 	}
 
 	p->state = PFS_PROCESS_STATE_USER;
-	strcpy(p->name,argv[optind]);
+	snprintf(p->name,sizeof(p->name),"%s",argv[optind]);
 
 	while(pfs_process_count()>0) {
 		while(1) {
@@ -1105,7 +1113,7 @@ int main( int argc, char *argv[] )
 
 	if(pfs_paranoid_mode) pfs_paranoia_cleanup();
 
-	delete_dir(pfs_cvmfs_locks_dir);
+	delete_dir(pfs_temp_per_instance_dir);
 
 	if(namelist_table && namelist_file) {
 		char *key;

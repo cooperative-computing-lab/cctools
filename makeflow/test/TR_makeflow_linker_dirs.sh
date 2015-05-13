@@ -15,7 +15,7 @@ prepare() {
 run() {
     cd linker
     ../../src/makeflow_analyze -b "$out_dir" directories.mf &> tmp
-    `diff tmp expected/directories.mf`
+    diff tmp expected/directories.mf
     exit $?
 }
 
