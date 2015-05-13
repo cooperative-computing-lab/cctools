@@ -127,38 +127,7 @@ def putMetaData(ids, cmd_id=None):
 	prunedb.io_ins(op_id, 'I', None, None, ids['repo_id'], ids['filename'], 0)
 	prunedb.io_ins(op_id, 'O', guid, ids['pname'], ids['repo_id'], None, 0)
 	return op_id
-'''
-def putData(filename, pname=None, wait=True, cmd_id=None, file_guid=None, repo_id=None):
-	global transfers
-	chksum = hashfile(filename)
-	copies = prunedb.copies_get_by_chksum(chksum)
-	if len(copies)>0 and not file_guid: #Use the new file_guid even if there are already copies
-		file_guid = copies[0]['guid']
-	else:
-		if not file_guid:
-			file_guid = uuid.uuid4()
-		cache_filename = storage_pathname(file_guid)
-		if cache_filename!=filename:
-			p = transfer_file(filename, cache_filename, wait)
-			if p:
-				transfers += [p, file_guid, filename, cache_filename]
-			else:
-				file_meta_put(filename, file_guid)
-	if pname:
-		prunedb.var_set(pname, file_guid, repo_id)
 
-	op_id = prunedb.op_ins(ENVIRONMENT, cmd_id)
-	#prunedb.io_ins(op_id, 'F', function_guid, function_name)
-	prunedb.io_ins(op_id, 'I', None, None, None, filename, 0)
-	prunedb.io_ins(op_id, 'O', file_guid, pname, repo_id, None, 0)
-	#prunedb.run_ins(op_id)
-
-	return True
-
-def file_meta_put(pathname, file_guid):
-	global STORAGE_MODULE
-	prunedb.copy_ins(file_guid, pathname, STORAGE_MODULE)
-'''
 
 def getFile(name, filename, wait=True, repo_id=None):
 	global transfers
@@ -582,102 +551,6 @@ def hashstring(str):
 
 
 
-
-
-wq = None
-wq_task_cnt = 0
-def useWQ(name):
-	global wq, wq_task_cnt
-	try:
-		wq = WorkQueue(0)
-	except Exception as e:
-		raise Exception("Instantiation of Work Queue failed!")
-
-	wq.specify_name(name)
-	print "Work Queue master started on port %d with name '%s'..." % (wq.port,name)
-	wq.specify_log("wq.log")
-	#wq.set_bandwidth_limit('1250000000')
-	cctools_debug_flags_set("all")
-	cctools_debug_config_file("wq.debug")
-
-	return True
-	
-
-def wq_check():
-	global wq, wq_task_cnt, data_folder
-	if wq:
-		# Add new tasks first so that they are scheduled while waiting
-		left = wq.hungry()
-		#print 'left',left
-		if left>0:
-			runs = getRuns(10000)
-			#print 'returned runs:',len(runs)
-			for run in runs:
-				#print 'run:',run
-				if left <= 0:
-					break
-				operation = create_operation(run['op_id'],'wq')
-				if operation['cmd']:
-					t = operation['wq_task']
-					task_id = wq.submit(t)
-					prunedb.run_upd(run['id'],'Running',task_id,'','wq')
-					wq_task_cnt += 1
-					left -= 1
-					print 'started: #%i, run:%i, op_id:%i   cmd:"%s"'%(wq_task_cnt, run['id'], run['op_id'], operation['cmd'])
-				else:
-					'No task'
-
-		if wq_task_cnt==0:
-			return False
-		else:
-			# Wait for finished tasks (which also schedules new ones)
-			t = wq.wait(5)
-			while t: #Once there are no more tasks currently finished, return
-				try:
-					run = prunedb.run_get_by_task_id(t.id)
-					op_id = run['op_id']
-					ios = prunedb.ios_get(op_id)
-					if t.return_status==0:
-						for io in ios:
-							if io['io_type']=='O':
-								#print 'io:',io
-								pathname = storage_pathname(io['file_guid'])
-								store_file(pathname, io['file_guid'], True, storage_module='wq')
-
-						print 'complete: run:%i, op_id:%i'%(run['id'],run['op_id'])
-						prunedb.run_end(run['id'],t.return_status)
-					else:
-						for io in ios:
-							if io['io_type']=='O':
-								try:
-									print 'io:',io
-									pathname = storage_pathname(io['file_guid'])
-									store_file(pathname, io['file_guid'], True, storage_module='wq')
-								except:
-									pass
-						print 'Failed with exit code:',t.return_status
-						print 'Resubmit to try again.'
-						#print run
-						#print ios
-						print t.command
-						prunedb.run_upd(run['id'],'Failed',0,'','Exit code: %i'%t.return_status)
-
-				except:
-					print 'Return status:',t.return_status
-					print run
-					print ios
-					print traceback.format_exc()
-					prunedb.run_upd(run['id'],'Failed',0,'',traceback.format_exc())
-
-
-				wq_task_cnt -= 1
-				t = wq.wait(1)
-		return True
-	#print 'No WQ'
-	return False
-
-
-
 def create_operation(op_id,framework='local',local_fs=False):
 	global sandbox_prefix
 
@@ -702,7 +575,6 @@ def create_operation(op_id,framework='local',local_fs=False):
 				arg_str += '%s '%(arg)
 			else:
 				arg = io['name']
-				#arg_str += '%s '%(storage_pathname(io['file_guid']))
 				arg_str += '%s '%(arg)
 				res = prunedb.copies_get(io['file_guid'])
 				if len(res)==0:
@@ -722,9 +594,9 @@ def create_operation(op_id,framework='local',local_fs=False):
 		copy = copies[0]
 		if copy['dtype']=='umbrella':
 			env_type = copy['dtype']
-			options += ' --umbrella'
+			options += ' -umbrella'
 		elif copy['dtype']=='targz':
-			options += ' --targz ENVIRONMENT'
+			options += ' -targz ENVIRONMENT'
 			env_type = copy['dtype']
 			
 		
@@ -735,7 +607,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 
 	if local_fs:
 		for obj in place_files:
-			options += ' --ln %s=%s'%(obj['dst'],obj['src'])
+			options += ' -ln %s=%s'%(obj['dst'],obj['src'])
 
 	
 	final_cmd = 'chmod 755 PRUNE_RUN; ./PRUNE_RUN'
@@ -789,6 +661,93 @@ def create_operation(op_id,framework='local',local_fs=False):
 
 
 
+wq = None
+wq_task_cnt = 0
+def useWQ(name):
+	global wq, wq_task_cnt
+	try:
+		wq = WorkQueue(0)
+	except Exception as e:
+		raise Exception("Instantiation of Work Queue failed!")
+
+	wq.specify_name(name)
+	print "Work Queue master started on port %d with name '%s'..." % (wq.port,name)
+	wq.specify_log("wq.log")
+	#wq.set_bandwidth_limit('1250000000')
+	cctools_debug_flags_set("all")
+	cctools_debug_config_file("wq.debug")
+
+	return True
+	
+
+def wq_check():
+	global wq, wq_task_cnt, data_folder
+	if wq:
+		# Add new tasks first so that they are scheduled while waiting
+		left = wq.hungry()
+		if left>0:
+			runs = getRuns(10000)
+			for run in runs:
+				if left <= 0:
+					break
+				operation = create_operation(run['op_id'],'wq')
+				if operation['cmd']:
+					t = operation['wq_task']
+					task_id = wq.submit(t)
+					prunedb.run_upd(run['id'],'Running',task_id,'','wq')
+					wq_task_cnt += 1
+					left -= 1
+					print 'started: #%i, run:%i, op_id:%i   cmd:"%s"'%(wq_task_cnt, run['id'], run['op_id'], operation['cmd'])
+				else:
+					'No task'
+
+		if wq_task_cnt==0:
+			return False
+		else:
+			# Wait for finished tasks (which also schedules new ones)
+			t = wq.wait(5)
+			while t: #Once there are no more tasks currently finished, return
+				try:
+					run = prunedb.run_get_by_task_id(t.id)
+					op_id = run['op_id']
+					ios = prunedb.ios_get(op_id)
+					if t.return_status==0:
+						for io in ios:
+							if io['io_type']=='O':
+								#print 'io:',io
+								pathname = storage_pathname(io['file_guid'])
+								store_file(pathname, io['file_guid'], True, storage_module='wq')
+
+						print 'complete: run:%i, op_id:%i'%(run['id'],run['op_id'])
+						prunedb.run_end(run['id'],t.return_status)
+					else:
+						for io in ios:
+							if io['io_type']=='O':
+								try:
+									print 'io:',io
+									pathname = storage_pathname(io['file_guid'])
+									store_file(pathname, io['file_guid'], True, storage_module='wq')
+								except:
+									pass
+						print 'Failed with exit code:',t.return_status
+						print 'Resubmit to try again.'
+						print t.command
+						prunedb.run_upd(run['id'],'Failed',0,'','Exit code: %i'%t.return_status)
+
+				except:
+					print 'Return status:',t.return_status
+					print run
+					print ios
+					print traceback.format_exc()
+					prunedb.run_upd(run['id'],'Failed',0,'',traceback.format_exc())
+
+				wq_task_cnt -= 1
+				t = wq.wait(1)
+		return True
+	return False
+
+
+
 max_concurrency = 0
 local_workers = []
 def useLocal(concurrency):
@@ -796,122 +755,6 @@ def useLocal(concurrency):
 	print 'Allocating %i local workers. Don\'t forget to enter the WORK command to start execution.'%concurrency
 	max_concurrency = concurrency
 	return True
-
-
-def local_task(op_id):
-	global sandbox_prefix
-
-	in_args = []
-	out_ids = []
-	for io in ios:
-		if io['pos']<0:
-			out_ids += [io['file_id']]
-		elif io['pos']==0:
-			function_id = io['file_id']
-		else:
-			in_args += [io['file_id']]
-	
-
-	func = prunedb.function_get(function_id)
-	out_files = func['out_names'].split(' ')
-	
-	needed_files = []
-	input_files = []
-	for i,ftype in enumerate(func['in_types'].split(' ')):
-		if ftype.lower()=='file':
-			input_files += [in_args[i]]
-	for i, arg in enumerate(input_files):
-		res = prunedb.copy_get(arg)
-		if len(res)==0:
-			return None
-		else:
-			needed_files.append(arg)
-
-	#command = ['./prune_cmd'] + in_args # Use this to debug: + ['>', 'stdout.txt', '2>', 'stderr.txt']
-	command = ['./prune_cmd'] + in_args + ['>', 'stdout.txt', '2>', 'stderr.txt']
-	
-	sandbox_folder = sandbox_prefix+uuid.uuid4().hex+'/'
-	if not os.path.isdir(sandbox_folder):
-		try:
-			os.mkdir(sandbox_folder)
-		except OSError:
-			if not os.path.isdir(sandbox_folder):
-				raise
-	
-	file_data_get(function_id,sandbox_folder+'prune_cmd')
-
-	copy_out = []
-	# Use this to debug:
-	copy_out.append( [sandbox_folder+'stdout.txt', function_id+'.stdout'] )
-	# Use this to debug:
-	copy_out.append( [sandbox_folder+'stderr.txt', function_id+'.stderr'] )
-
-	for i, filename in enumerate(out_files):
-		copy_out.append( [sandbox_folder+filename,out_ids[i]] )
-	for i, arg in enumerate(needed_files):
-		file_data_get(arg,sandbox_folder+arg)
-	
-	return {'sandbox':sandbox_folder, 'cmd':command, 'out':copy_out}
-
-
-
-def umbrella_task(op_id):
-	global data_folder, sandbox_prefix, ENVIRONMENT
-	
-	sandbox_folder = sandbox_prefix+uuid.uuid4().hex+'/'
-	if not os.path.isdir(sandbox_folder):
-		try:
-			os.mkdir(sandbox_folder)
-		except OSError:
-			if not os.path.isdir(sandbox_folder):
-				raise
-	t = {'sandbox':sandbox_folder}
-
-	shutil.copy(storage_pathname(ENVIRONMENT), sandbox_folder+'package.json')
-
-	ios = prunedb.ios_get(op_id)
-	arg_str = ''
-	in_str = ''
-	t['out'] = []
-	for io in ios:
-		if io['io_type']=='F':
-			function_name = io['name']
-			function_guid = io['file_guid']
-			t['func'] = func = prunedb.function_get(function_guid)
-			out_names = func['out_names'].split()
-			shutil.copy(storage_pathname(function_guid), sandbox_folder+'prune_cmd')
-			os.chmod(sandbox_folder+'prune_cmd', 0755)
-
-	
-		elif io['io_type']=='I':
-			if io['literal']:
-				arg_str += '%s '%(io['literal'])
-			else:
-				arg = io['name']
-				arg_str += '%s '%(io['file_guid'])
-				res = prunedb.copies_get(io['file_guid'])
-				if len(res)==0:
-					shutil.rmtree(sandbox_folder)
-					#print 'No file yet:',io
-					return None
-				shutil.copy(storage_pathname(io['file_guid']), sandbox_folder+str(io['file_guid']) )
-				in_str += ','+str(io['file_guid'])+'='+str(io['file_guid'])
-		elif io['io_type']=='O':
-			t['out'] += [io]
-			#print storage_pathname(io['file_guid']), out_names[io['pos']]
-	arg_str = arg_str[0:-1]
-	command = './prune_cmd',arg_str
-
-	shutil.copy('../../../cctools.src/umbrella/src/umbrella', sandbox_folder+'umbrella')
-
-	t['cmd'] = ['./umbrella','-T','local','-i','prune_cmd=prune_cmd'+in_str, '-c','package.json', '-l','./tmp/', '-o','./final_output', 'run', '%s'%' '.join(command) ]
-	
-	f = open(sandbox_folder+'cmd.sh','w')
-	f.write( ' '.join(t['cmd']) )
-	f.close()
-	os.chmod(sandbox_folder+'cmd.sh', 0755)
-	return t
-	
 
 
 def local_check():
@@ -926,13 +769,10 @@ def local_check():
 		if p.poll() is not None:
 			print 'Returned: %i (%s) '%(p.returncode,operation['cmd'])
 			(stdout, stderr) = p.communicate()
-			#print stdout
-			#print stderr
 
 			fails = 0
 			for obj in operation['fetch_files']:
 				try:
-					#shutil.copy2(operation['sandbox']+obj['src'],obj['dst'])
 					store_file(operation['sandbox']+obj['src'], obj['guid'])
 				except:
 					fails += 1
@@ -959,7 +799,6 @@ def local_check():
 			w += 1
 			p = subprocess.Popen(operation['final_cmd'], stdout = subprocess.PIPE, stderr = subprocess.PIPE, cwd = operation['sandbox'], shell=True)
 			local_workers.append( [run['op_id'],operation,p] )
-			#prunedb.run_upd(run['id'],'Running',task_id,'','wq')
 			prunedb.run_upd(run['id'],'Running',0,'','local')
 	time.sleep(1)
 
@@ -967,221 +806,6 @@ def local_check():
 		return True
 	else:
 		return False
-
-
-
-
-# Use the following code as a reference for getting umbrella to work
-'''
-
-def isFile(arg):
-	file_objects = prunedb.files_get_by_id(arg)
-	if file_objects and file_objects.__len__()>0:
-		return True
-	return False
-
-def isFileChksum(chksum):
-	file_objects = prunedb.files_get_by_chksum(chksum)
-	if file_objects and file_objects.__len__()>0:
-		return True
-	return False
-
-
-
-
-	
-def runOps():
-	umbrella = False
-	global sandbox_prefix, concurrency, max_concurrency
-	
-	ops = prunedb.queue_get_by_status('Run',max_concurrency-concurrency)
-	for op in ops:
-		print op
-
-
-		sandbox_folder = None
-		while not sandbox_folder:
-			sandbox_folder = sandbox_prefix+uuid.uuid4().hex
-			#print 'Creating sandbox in '+sandbox_folder
-			if os.path.isdir(sandbox_folder):
-				sandbox_folder = None
-			else:	
-				try:
-					os.mkdir(sandbox_folder)
-				except OSError:
-					if not os.path.isdir(sandbox_folder):
-						raise
-
-
-		
-	
-		newpid = os.fork()
-		if newpid == 0:
-			# Forked process executes the function
-			run(op['op_id'],sandbox_folder)
-		else:
-			# Parent process has the pid of the forked process
-			prunedb.queue_upd(op['id'],'RunningLocally',sandbox_folder,newpid)
-			concurrency += 1
-
-	try:
-		(pid,exit_status,res) = os.wait3(os.WNOHANG)
-		if pid:
-			res2 = prunedb.queue_get_by_pid(pid)
-			if res2 and len(res2)>0:
-				op = res2[0]
-				sandbox_folder = op['sandbox']
-				
-				ios = prunedb.ios_get(op['id'])
-				in_args = []
-				out_ids = []
-				for io in ios:
-					if io['pos']<0:
-						out_ids += [io['file_id']]
-					elif io['pos']==0:
-						function_id = io['file_id']
-					else:
-						in_args += [io['file_id']]
-
-
-
-				if umbrella:
-					output_folder = '/final_output'
-				else:
-					output_folder = ''
-
-				with open(sandbox_folder+'/prune_cmd') as f:
-					i = 0
-					for line in f.read().splitlines():
-						if line.startswith('#PRUNE_'):
-							parts = line.split(' ')
-							if parts[0] == '#PRUNE_OUTPUT':
-								filename = parts[1]
-
-								if not os.path.isfile(sandbox_folder+filename):
-									print "Operation #%i completed, but the output file %s does not exist. The sandbox is at: %s! Press any key when the file exists."%(op['id'],filename, sandbox_folder)
-									sys.stdin.readline()
-									if not os.path.isfile(sandbox_folder+filename):
-										raise Exception('No File:',filename)
-								if not os.stat(sandbox_folder+filename).st_size:
-									print "Operation #%i completed, but the output file %s is empty. The sandbox is at: %s! Press any key when the file is not empty."%(op['id'],filename, sandbox_folder)
-									sys.stdin.readline()
-									if not os.stat(sandbox_folder+filename).st_size:
-										raise Exception('Empty File:',filename)
-
-								id = None
-								if len(out_ids)>i:
-									id = out_ids[i]
-								newFile(sandbox_folder+output_folder+filename,'DATA',0,0,id)
-
-								i += 1
-							elif parts[0] == '#PRUNE_OUT_CNT':
-								if parts[1][0] == '$':
-									out_cnt = in_args[int(parts[1][1:])]
-								else:
-									out_cnt = int(parts[1])
-								for i in range(0,out_cnt):
-									id = None
-									if len(out_ids)>i:
-										id = out_ids[i]
-									newFile(sandbox_folder+output_folder+'/prune.output.%i'%(i),'DATA',0,0,id)
-
-						
-
-				#print "Operation #%i completed. Press any key to clean up sandbox at %s!"%(op['id'],sandbox_folder)
-				#sys.stdin.readline()
-				shutil.rmtree(sandbox_folder)
-
-				prunedb.queue_upd_status(op['id'],'Complete')
-				prunedb.run_ins(op['id'],op['last_update'],res.ru_stime,res.ru_utime,exit_status)
-				concurrency -= 1
-
-
-		else:
-			# No processes finished at this time
-			#print '---', pid,status
-			pass
-		
-	except Exception, e:
-		if hasattr(e, 'errno') and e.errno==10:
-			# No child processes (this is normal when when all tasks are finished)
-			pass
-		else:
-			print e.message
-			print e.__class__.__name__
-			traceback.print_exc(e)
-
-
-
-def run(op_id, sandbox_folder, use_umbrella=True):
-	global ENVIRONMENT
-	ios = prunedb.ios_get(op_id)
-	in_args = []
-	out_ids = []
-	for io in ios:
-		if io['pos']<0:
-			out_ids += [io['file_id']]
-		elif io['pos']==0:
-			function_id = io['file_id']
-		else:
-			in_args += [io['file_id']]
-	#print out_ids, function_id, in_args
-	if use_umbrella:
-		shutil.copy(cache_folder+ENVIRONMENT, sandbox_folder+'/package.json')
-		shutil.copy('./umbrella', sandbox_folder+'/umbrella')
-
-	file_data_get(function_id,sandbox_folder+'/prune_cmd')
-	os.chmod(sandbox_folder+'/prune_cmd', 0755)
-
-	in_str = ''
-	for arg in in_args:
-		if isFile(arg):
-			#This filename could conflict with an existing file
-			#Need to make sure the file is there too
-			#shutil.copy(cache_folder+str(arg), sandbox_folder+arg)
-			file_data_get(arg,sandbox_folder+arg)
-			in_str += ','+arg+'='+arg
-
-
-	arg_str = ''
-	for in_arg in in_args:
-		arg_str += ' '+in_arg
-	##cmd = './umbrella -T local -i "prune_function=%s%s" -c package.json -l ./tmp/ -o ./final_output run "/bin/bash prune_function %s"' \
-	##% (function_id, in_str, arg_str)
-	if use_umbrella:
-		args = ['./umbrella','-T','local','-i','prune_function='+function_id+in_str, '-c','package.json', '-l','./tmp/', '-o','./final_output', 'run','/bin/bash prune_cmd'+arg_str]
-	else:
-		args = ['./prune_cmd'] + in_args
-	print 'Running: '+' '.join(args)
-	print '...'
-	start_time = time.time()
-	env = {}
-	for key in os.environ:
-		env[key] = os.environ[key]
-
-	#p = subprocess.Popen(['chmod','755','prune_cmd'], stdout = subprocess.PIPE, stderr = subprocess.PIPE, cwd=sandbox_folder, shell=False)
-	#(stdout, stderr) = p.communicate()
-	#sys.exit(p.wait())
-	p = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE, cwd=sandbox_folder, shell=False)
-	(stdout, stderr) = p.communicate()
-	sys.exit(p.wait())
-
-
-
-
-def cmdFiles(cmd_id):
-	print prunedb.ios_get_by_cmd_id(cmd_id)
-	return
-
-	cmd_object = prunedb.cmd_get_by_id(chksum)
-	if not cmd_object:
-		prunedb.cmd_ins(chksum)
-
-
-'''
-
-
-
 
 
 

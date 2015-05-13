@@ -9,8 +9,6 @@ import string, random, hashlib
 import subprocess
 import sqlite3, uuid
 
-#sqlite3.register_converter('GUID', lambda b: uuid.UUID(bytes_le=b))
-#sqlite3.register_adapter(uuid.UUID, lambda u: buffer(u.bytes_le))
 sqlite3.register_converter('GUID', lambda b: uuid.UUID(b))
 sqlite3.register_adapter(uuid.UUID, lambda u: str(u))
 
@@ -263,34 +261,6 @@ def ios_get(op_id):
 	return meta_db.fetchall()
 
 
-'''
-def op_ins(out_cnt, func_guid, input_args, input_type_str):
-	output_ids = []
-	for i in range(0,out_cnt):
-		output_ids += [uuid.uuid4()]
-	out_str = ', '.join(str(x) for x in output_ids)
-	in_str = ', '.join(str(x) for x in input_args)
-	input_types = input_type_str.split(' ')
-	env_guid = var_get('_ENV')
-
-	now = time.time()
-	ins = 'INSERT INTO ops (env_guid, func_guid, in_str, out_str, submitted_at) VALUES (?,?,?,?,?);'
-	meta_db.execute(ins,[env_guid, func_guid, in_str, out_str, now])
-	meta_data.commit()
-	op_id = meta_db.lastrowid
-	
-	ins = "INSERT INTO ios (op_id, file_guid, output, pos) VALUES (?,?,?,?);"
-	for i in range(0,out_cnt):
-		meta_db.execute(ins,[op_id,output_ids[i],'Y',(-out_cnt+i)])
-		meta_data.commit()
-	if func_guid:
-		meta_db.execute(ins,[op_id,func_guid,'N',0])
-	for i, arg in enumerate(input_args):
-		if input_types[i].lower()=='file':
-			meta_db.execute(ins,[op_id,arg,'N',i+1])
-	meta_data.commit()
-	return op_id,output_ids
-'''
 
 
 
@@ -446,7 +416,6 @@ def var_set(name, guid, repo_id=None):
 	upd = 'REPLACE INTO vars (name,repo_id,guid,set_at,gone_at) VALUES (?,?,?,?,?);'
 	meta_db.execute(upd,[name,repo_id,guid,now,2147389261])
 	return meta_data.commit()
-	#return meta_db.lastrowid
 
 def var_getAll():
 	global read_cnt

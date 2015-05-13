@@ -37,6 +37,7 @@ while argi<len(sys.argv):
 	argi += 1
 
 '''
+#Add these comments back into the help message
 parser = argparse.ArgumentParser(prog='PRUNE_EXEC', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--ln', help='local filename for remote file (local=remote)', action='append')
 parser.add_argument('--targz', help='name of file to extract in working directory', action='append')

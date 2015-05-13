@@ -9,7 +9,6 @@ import time, threading
 
 import readline, re
 
-#from zipfile_infolist import print_info
 import zipfile
 import operator
 
@@ -185,7 +184,6 @@ def process_line(line):
 				else:
 					prunelib.store_file(filename,ids['guid'],wait)
 			return True
-			#return prunelib.putFile(line,filename,pname,wait,cmd_id,guid)
 
 		elif line.startswith('USE'):
 			ar = line.split(' ')
@@ -234,16 +232,15 @@ def process_line(line):
 			if not work_start:
 				work_start = time.time()
 				last_report = work_start - 5
-				#print time.strftime("%H:%M:%S"), work_start
 
 
 			res = prunelib.getQueueCounts()
 			output = ''
-			some_complete = False
+			some_in_progress = False
 			for r in res:
 				output += '%s queue size: %i   '%( r['queue'], r['cnt'] )
-				if r['queue']=='Complete':
-					some_complete = True
+				if r['queue']=='Running' or r['queue']=='Run':
+					some_in_progress = True
 			if ((time.time()-last_report)>15):
 				now = time.time()
 				minutes = (time.time()-work_start)/60
@@ -268,11 +265,8 @@ def process_line(line):
 				if ar[-1]=='TERMINATE':
 					terminate = True
 				return True
-			elif some_complete and len(res)==1:
+			elif not some_in_progress:
 				print 'Work complete, or no execution resources available.'
-				#print time.strftime("%H:%M:%S"), time.time()
-				#print work_start
-				#print time.time()-work_start
 				minutes = (time.time()-work_start)/60
 				seconds = (time.time()-work_start)%60
 				print 'PRUNE finished executing after: %02dm%02ds'%( minutes, seconds )
@@ -324,8 +318,6 @@ def process_line(line):
 				print 'Total run (with preservation): %02dm%02ds'%( minutes, seconds )
 			except Exception as e:
 				print e
-				# Not sure if this is needed: if block == 0:
-				# Not sure if this is needed: 	special_print( prompt() )
 			return True
 
 		elif line.startswith('STATUS'):
@@ -386,7 +378,6 @@ def process_line(line):
 					destination = ar[i+1]
 					i += 1
 				i += 1
-			#zf = zipfile.ZipFile(destination, mode='w', compression=zipfile.ZIP_DEFLATED)
 			zf = zipfile.ZipFile(destination, mode='w')
 			try:
 				plan = 'REPO %s\n'%(repo_guid)
@@ -396,7 +387,6 @@ def process_line(line):
 					zf.write(pathname,pathname.split('/')[-1])
 			finally:
 				zf.close()
-			#print lines,files
 			
 			return True
 
@@ -421,7 +411,6 @@ def process_line(line):
 						(out_str,in_str) = ar
 						outs = out_str.split()
 						ins = in_str.split()
-						#print outs, '_:_', ins
 					else:
 						line = line.strip()
 						if line.startswith('LOCAL'):
@@ -457,7 +446,6 @@ def process_line(line):
 				done = process_line(line)
 				while not done:
 					done = process_line(line)
-			#print "\n"
 
 			sorted_functions = sorted(functions.items(), key=operator.itemgetter(0))
 			for func_id,data in sorted_functions:
@@ -489,8 +477,6 @@ def process_line(line):
 				done = process_line(line)
 				while not done:
 					done = process_line(line)
-			#for ifile in intermediate_files:
-			#	print "(GET %s AS %s)"%(ifile, ifile)
 
 			return True
 
@@ -613,27 +599,6 @@ def process_line(line):
 		print traceback.format_exc()
 		return True
 	sys.stdout.flush()
-
-
-class WaitSpinner(threading.Thread):   
-	def run(self):
-		global terminate, block
-		spin_i = 0
-		spin_array = ['\\','|','/','-']
-		try:
-			while not terminate:
-				if block > 0:
-					sys.stdout.write( '\b\b'+spin_array[spin_i] )
-					sys.stdout.flush()
-					spin_i += 1
-					if spin_i==len(spin_array):
-						spin_i = 0
-				time.sleep(0.05)
-
-		except Exception,e:
-			print traceback.format_exc()
-#spinner = WaitSpinner()
-#spinner.start()
 
 
 
