@@ -16,7 +16,7 @@
 	},
 	"software": {
 		"cmssw-5.2.5-slc5_amd64": {
-			"mountpoint": "/cvmfs/cms.cern.ch",
+			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
 	},
 	"data": {

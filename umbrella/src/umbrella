@@ -281,7 +281,7 @@ def cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_d
 	dependency_download(item['source'][0], item["checksum"], "md5sum", dest, item["format"], action)
 	return dest
 
-def set_cvmfs_siteinfo(name, action, packages_json, sandbox_dir):
+def set_cvmfs_siteconf(name, action, packages_json, sandbox_dir):
 	"""Download cvmfs SITEINFO and set its mountpoint.
 
 	Args:
@@ -296,7 +296,7 @@ def set_cvmfs_siteinfo(name, action, packages_json, sandbox_dir):
 	cvmfs_siteconf_mountpoint = ''
 	site_item = package_search(packages_json, "cms_siteconf_local_cvmfs")
 	dest = os.path.dirname(sandbox_dir) + "/cache/" + site_item['checksum'] + "/SITECONF"
-	dependency_download(site_item["source"][0], site_item["checksum"], "md5sum", dest, site_item["format"], action)
+	dependency_download(site_item["source"][0], site_item["checksum"], "md5sum", dest, site_item["format"], "unpack")
 	cvmfs_siteconf_mountpoint = '/cvmfs/cms.cern.ch/SITECONF/local %s/local' % dest
 	return cvmfs_siteconf_mountpoint
 
@@ -382,7 +382,7 @@ def dependency_process(env_para_dict, name, id, mountpoint, action, packages_jso
 			logging.debug("To access cvmfs, cctools binary is needed")
 			cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action)
 
-			cvmfs_siteconf_mountpoint = set_cvmfs_siteinfo(name, action, packages_json, sandbox_dir)
+			cvmfs_siteconf_mountpoint = set_cvmfs_siteconf(name, action, packages_json, sandbox_dir)
 
 			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
 
@@ -1682,6 +1682,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'wget %s\'' % (ssh_key, user_name, public_dns, python_url)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
+		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	scheme, netloc, path, query, fragment = urlparse.urlsplit(python_url)
@@ -1689,6 +1690,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'tar zxvf %s\'' % (ssh_key, user_name, public_dns, python_url_filename)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
+		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	#scp umbrella, packages.json and input files to the instance 
@@ -1701,6 +1703,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 	cmd = 'scp -i %s %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, packages_path, input_file_string, user_name, public_dns)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
+		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	#change the --inputs option to put all the inputs directory in the home dir of the instance
@@ -1724,6 +1727,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -T local -c %s --packages %s -l ec2_umbrella -o output -i \'%s\' -e %s run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, env_options, user_cmd[0])
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
+		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	#postprocessing
@@ -1731,29 +1735,35 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'tar cvzf output.tar.gz output\'' % (ssh_key, user_name, public_dns)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
+		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("The instance returns the output.tar.gz to the local machine.")
 	cmd = 'scp -i %s %s@%s:output.tar.gz %s/' % (ssh_key, user_name, public_dns, sandbox_dir)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
+		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("The instance returns the remote umbrella log file to the local machine.")
 	cmd = 'scp -i %s %s@%s:ec2_umbrella.log %s' % (ssh_key, user_name, public_dns, remotelog_path)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
+		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("Uncompress output.tar.gz to the output_dir (%s).", output_dir)
 	cmd = 'tar zxvf %s/output.tar.gz -C %s' % (sandbox_dir, sandbox_dir)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
+		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("Rename %s/output to the output_dir (%s).", sandbox_dir, output_dir)
 	os.rename('%s/output' % sandbox_dir, output_dir)
 	shutil.rmtree(sandbox_dir)
+
+	terminate_instance(instance_id)
 
 def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch_type, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting):
 	""" Create the execution environment specified in the specification file and run the task on it.
@@ -1870,7 +1880,20 @@ def get_instance_id(image_id, instance_type, key_pair, security_group):
 	else:
 		instance_id = stdout[(index+9):(index+20)]
 		return instance_id
-			
+	
+def terminate_instance(instance_id):
+	"""Terminate an instance.
+
+	Args:
+		instance_id: the id of the VM instance.
+
+	Returns:
+		None.
+	"""
+	logging.debug("Terminate the ec2 instance: %s", instance_id)
+	cmd = 'ec2-terminate-instances %s' % instance_id
+	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
+	
 def get_public_dns(instance_id):
 	"""Get the public dns of one VM instance from Amazon EC2. 
 	`ec2-run-instances` can not directly return the public dns of the instance, so this function is needed to check the result of `ec2-describe-instances` to obtain the public dns of the instance.

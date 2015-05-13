@@ -3,7 +3,7 @@
 		"arch": "x86_64",
 		"cores": "2",
 		"memory": "2GB",
-		"disk": "10GB"
+		"disk": "3GB"
 	},
 	"kernel" : {
 		"name": "linux",
@@ -15,8 +15,7 @@
 	},
 	"software": {
 		"cmssw-5.3.11-slc5_amd64": {
-			"mountpoint": "/cvmfs/cms.cern.ch",
-			"action": "unpack"
+			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
 	},
 	"data": {

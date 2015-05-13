@@ -11,15 +11,18 @@
 	},
 	"os": {
 		"name": "Redhat",
-		"version": "6.5",
-		"id": "669ab5ef94af84d273f8f92a86b7907a"
+		"version": "6.5"
 	},
 	"software": {
-		"cmssw-5.3.11-slc5_amd64": {
+		"cmssw-5.2.5-slc5_amd64": {
 			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
 	},
 	"data": {
+		"final_events_2381.lhe": {
+			"mountpoint": "/tmp/final_events_2381.lhe",
+			"action": "none"
+		}
 	},
 	"environ": {
 		"FAKEPWD": "/tmp/test"
