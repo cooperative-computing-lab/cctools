@@ -275,14 +275,16 @@ static void send_resource_update( struct link *master, int force_update )
 		if( (time(0)-last_send_time) < send_resources_interval ) return;
 	}
 
-        if(worker_mode == WORKER_MODE_FOREMAN) {
-                aggregate_workers_resources(foreman_q, total_resources);
-                total_resources->disk.total = local_resources->disk.total;
-                total_resources->disk.inuse = local_resources->disk.inuse;
-	} else {
-                memcpy(total_resources, local_resources, sizeof(struct work_queue_resources));
-        }
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		aggregate_workers_resources(foreman_q, total_resources);
+		total_resources->disk.total = local_resources->disk.total;
+		total_resources->disk.inuse = local_resources->disk.inuse;
+		// do not send resource update until we get at least one capable worker.
+		if(total_resources->cores.total < 1) return;
 
+	} else {
+		memcpy(total_resources, local_resources, sizeof(struct work_queue_resources));
+	}
 
 	if(!force_update) {
 		if( !memcmp(total_resources_last,total_resources,sizeof(struct work_queue_resources))) return;
