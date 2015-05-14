@@ -86,16 +86,9 @@ fi
 
 #import environment varibales
 export_env() {
-	while read line
+	while read -r -d '' line
 	do
-		IFS="="     # Set the field separator
-		set $line      # Breaks the string into $1, $2, ...
-		variable_name="$1"
-		name_len="${#variable_name}"
-		name_len=$(expr "${name_len}" + 1)
-		variable_value="${line:name_len}"
-		export "${variable_name}"="${variable_value}"
-		IFS=" "
+		export "${line}"
 	done < "${env_path}"
 }
 export_env
