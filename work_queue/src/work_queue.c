@@ -832,7 +832,7 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	// Check if there is space for incoming file at master
 	if(!check_disk_space_for_filesize(length)) {
 		debug(D_WQ, "Could not recieve file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
-		return WORKER_FAILURE;
+		return APP_FAILURE;
 	}
 
 	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0700);
