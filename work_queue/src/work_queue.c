@@ -2749,6 +2749,14 @@ static int receive_one_task( struct work_queue *q )
 		itable_nextkey(q->tasks_waiting_retrieval, &taskid, (void **)&t);
 		w = itable_lookup(q->worker_task_map, taskid);
 
+		if(!w) {
+			// band-aid for scale-run!
+			itable_remove(q->tasks_waiting_retrieval, taskid);
+			itable_firstkey(q->tasks_waiting_retrieval);
+			change_task_state(q, t, WORK_QUEUE_TASK_READY);
+			return 1;
+		}
+
 		fetch_output_from_worker(q, w, taskid);
 
 		// fetch_output removes the resolved task from the itable, thus
@@ -3943,14 +3951,24 @@ static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
 
 	// remove from current tables:
-	if( old_state == WORK_QUEUE_TASK_RUNNING )
-		itable_remove(q->running_tasks, t->taskid);
-	else if( old_state == WORK_QUEUE_TASK_READY )
-		list_remove(q->ready_list, t);
-	else if( old_state == WORK_QUEUE_TASK_WAITING_RETRIEVAL )
-		itable_remove(q->tasks_waiting_retrieval, t->taskid);
-	else if( old_state == WORK_QUEUE_TASK_RETRIEVED )
-		list_remove(q->retrieved_list, t);
+	switch(old_state) {
+		case WORK_QUEUE_TASK_READY:
+			list_remove(q->ready_list, t);
+			break;
+		case WORK_QUEUE_TASK_RUNNING:
+			itable_remove(q->running_tasks, t->taskid);
+			break;
+		case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
+			itable_remove(q->tasks_waiting_retrieval, t->taskid);
+			break;
+		case WORK_QUEUE_TASK_RETRIEVED:
+			list_remove(q->retrieved_list, t);
+			break;
+		case WORK_QUEUE_TASK_DONE:
+			break;
+		case WORK_QUEUE_TASK_CANCELED:
+			break;
+	}
 
 	// insert to corresponding table
 	switch(new_state) {
