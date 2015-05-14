@@ -73,7 +73,6 @@ an example.
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 
 #define CONTAINER_SH "docker.wrapper.sh"
-#define CONTAINER_TMP_SH_PREFIX "docker.tmp"
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
@@ -144,11 +143,6 @@ static void makeflow_wrapper_add_command( const char *cmd )
 	}
 }
 
-/* XXX 
- * makeflow_wrapper_add_input_file() and
- * makeflow_wrapper_add_output_file() do not work.
- * replace "optarg" by "file" ?
- */
 static void makeflow_wrapper_add_input_file( const char *file )
 {
  	if(!wrapper_input_files) wrapper_input_files = list_create();
@@ -620,30 +614,6 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 }
 
 /*
- * write task command into a shell script 
- */
-
-static char *makeflow_create_task_sh(const char *task_cmd, int nodeid) 
-{
-
-    char task_sh[4096];
-    sprintf(task_sh, "%s.%d", CONTAINER_TMP_SH_PREFIX, nodeid);
-
-    FILE *fn = fopen(task_sh, "w");
-    if(fn == NULL) {
-	   fprintf(stderr, "makeflow_container: cannot create sh for node: %d\n", nodeid);
-       exit(1);
-    }
-
-    fprintf(fn, "#!/bin/sh\n%s\n", task_cmd);
-    fclose(fn);
-   
-    chmod(task_sh, 0755);
- 
-    return task_sh;
-}
-
-/*
  * creates a general shell script for running each task with a 
  * docker container 
  */ 
@@ -658,15 +628,13 @@ static void makeflow_create_docker_sh()
 curr_dir=`pwd`\n\
 default_dir=/root/worker\n\
 flock /tmp/lockfile /usr/bin/docker pull %s\n\
-docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s $default_dir/$@\n", container_image, container_image);
+docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s \"$@\"\n", container_image, container_image);
 
   	fclose(wrapper_fn);
 
 	chmod(CONTAINER_SH, 0755);   
 
-    if(!wrapper_input_files) wrapper_input_files = list_create();
-	list_push_tail(wrapper_input_files,dag_file_create(CONTAINER_SH));
-
+    makeflow_wrapper_add_input_file(CONTAINER_SH);
 }
 
 /*
@@ -685,13 +653,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
-	/*
-	XXX this code has several problems:
-	1 - It should be abstracted away in a function.
-	2 - It should use string_format() to generate strings of appropriate size.
-	3 - It should not modify the global list wrapper_input_files.
-	*/
-
 	/* Create strings for all the files mentioned by this node. */
 	char *input_files = makeflow_file_list_format(n,0,n->source_files,queue);
 	char *output_files = makeflow_file_list_format(n,0,n->target_files,queue);
@@ -703,17 +664,11 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
     char *command;
     if (container_mode == CONTAINER_MODE_DOCKER) {
         /* XXX 2. for each task if docker mode is on
-         * 1) create a unique unique shell script for each task 
-         * 2) write task command into the shell script 
-         * 3) generate a general shell command by combining the
-         *    global shell script and the local script
+         * wrap task command in global wrapper_command (docker.wrapper.sh) 
          */
-        char *task_sh;      
-        task_sh = makeflow_create_task_sh(n->command, n->nodeid);
 
-		input_files = string_combine(input_files, task_sh);
-
-	    command = string_wrap_command(task_sh, wrapper_command);
+        char *local_cmd = string_format("sh -c \"%s\"", n->command);
+	    command = string_wrap_command(local_cmd, wrapper_command);
 	} else 
 	    /* Apply the wrapper(s) to the command, if it is (they are) enabled. */
 	    command = string_wrap_command(n->command, wrapper_command);
@@ -1013,11 +968,9 @@ static void makeflow_run( struct dag *d )
      * 1) create a global script for running docker container
      * 2) add this script to the global wrapper list
      */
-        makeflow_create_docker_sh();
         
-        //makeflow_wrapper_add_input_file(CONTAINER_SH);
-        char global_cmd[64];         
-        sprintf(global_cmd, "./%s", CONTAINER_SH);
+        makeflow_create_docker_sh();
+        char *global_cmd = string_format("sh %s", CONTAINER_SH);        
         makeflow_wrapper_add_command(global_cmd);
     }
 
@@ -1749,11 +1702,11 @@ int main(int argc, char *argv[])
 
 	/* XXX better to write created files to log, then delete those listed in log. */
 
-	/*if (container_mode == CONTAINER_MODE_DOCKER) {
-		char *cmd = string_format("rm %s.* %s.*",CONTAINER_SH_PREFIX,CONTAINER_TMP_SH_PREFIX);
+	if (container_mode == CONTAINER_MODE_DOCKER) {
+		char *cmd = string_format("rm %s", CONTAINER_SH);
 		system(cmd);
 		free(cmd);
-	}*/
+	}
 
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
