@@ -22,6 +22,8 @@ run()
 {
 	hostport=$(cat "$c")
 
+	set +e
+
 	N=10
 	parrot /bin/sh <<EOF1
 cat > a.py <<EOF2
@@ -57,6 +59,7 @@ clean()
 	rm -f "$c" "$parrot_debug"
 }
 
+set -e
 dispatch "$@"
 
 # vim: set noexpandtab tabstop=4:
