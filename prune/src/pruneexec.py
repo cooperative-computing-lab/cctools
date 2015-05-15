@@ -15,18 +15,22 @@ def script_str():
 import os, sys, traceback, os.path
 import time, threading
 import subprocess
+import os.path
 
 
-args = {'ln':[], 'targz':[], 'umbrella':False, 'function_name':None, 'function_inputs':[]}
+args = {'ln':[], 'gunzip':[], 'tar':[], 'umbrella':False, 'function_name':None, 'function_inputs':[]}
 argi = 1
 while argi<len(sys.argv):
 	arg = sys.argv[argi]
 	if arg=='-ln':
 		argi += 1
 		args['ln'].append( sys.argv[argi].split('=') )
-	elif arg=='-targz':
+	if arg=='-gunzip':
 		argi += 1
-		args['targz'].append( sys.argv[argi] )
+		args['gunzip'].append( sys.argv[argi].split('=') )
+	elif arg=='-tar':
+		argi += 1
+		args['tar'].append( sys.argv[argi] )
 	elif arg=='-umbrella':
 		args['umbrella'] = True
 	elif args['function_name'] is None:
@@ -40,7 +44,7 @@ while argi<len(sys.argv):
 #Add these comments back into the help message
 parser = argparse.ArgumentParser(prog='PRUNE_EXEC', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--ln', help='local filename for remote file (local=remote)', action='append')
-parser.add_argument('--targz', help='name of file to extract in working directory', action='append')
+parser.add_argument('--tar', help='name of file to extract in working directory', action='append')
 parser.add_argument('--umbrella', help='name of umbrella specification file')
 parser.add_argument('function_name', default='echo', help='command to execute function')
 parser.add_argument('function_inputs', nargs='*', default=['test'], help='function arg1 arg2...')
@@ -76,16 +80,20 @@ myexec('find ./')
 
 if args['ln']:
 	debug.write('Linking...'+newline)
-	for link in args['ln']:
-		(local,remote) = link.split('=')
+	for (local,remote) in args['ln']:
 		myexec('ln -s %s ./%s'%(remote, local))
 
-if args['targz']:
+if args['tar']:
 	debug.write('Unzipping...'+newline)
-	for fname in args['targz']:
-		myexec('tar -zxvf %s'%(fname))
+	for fname in args['tar']:
+		myexec('tar -xvf %s'%(fname))
 
-if args['targz'] or args['ln']:
+if args['gunzip']:
+	debug.write('gunzipping...'+newline)
+	for (unzip,zip) in args['ln']:
+		myexec('gunzip < %s > ./%s'%(zip, unzip))
+		
+if args['tar'] or args['gunzip'] or args['ln']:
 	debug.write('Local files after unzipping, linking:'+newline)
 	myexec('find ./')
 
@@ -119,6 +127,13 @@ else:
 	debug.write('Starting operation at %s:%s'%(str(time.time()) ,newline))
 	myexec(cmd)
 	debug.write('Finished operation at %s.%s'%(str(time.time()) ,newline))
+
+
+if args['gzip']:
+	debug.write('gzipping...'+newline)
+	for filename in args['ln']:
+		myexec('mv gzip -c %s > ./%s'%(unzip, zip))
+		
 
 debug.write('Environment variables after execution:'+newline)
 myexec('env')

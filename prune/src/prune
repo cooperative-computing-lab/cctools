@@ -56,7 +56,7 @@ terminate = False
 block = False
 hadoop_data = False
 
-repo_guid = prunelib.new_guid()
+repo_puid = prunelib.new_puid()
 if os.path.isfile(config_file):
 	with open(config_file) as f:
 		for line in f.readlines():
@@ -67,8 +67,8 @@ if os.path.isfile(config_file):
 				db_pathname = value
 			elif meta_type=='data_folder':
 				data_folder = value
-			elif meta_type=='repo_guid':
-				repo_guid = value
+			elif meta_type=='repo_puid':
+				repo_puid = value
 else:
 	data_folder = '/tmp/prune/data/'
 	db_pathname = '/tmp/prune/___prune.db'
@@ -132,7 +132,7 @@ def process_line(line):
 			return True
 		elif line.startswith('PUT'):
 			wait = True
-			filename = pname = guid = data = etype = None
+			filename = pname = puid = data = form = None
 			if line.find('"')>=0:
 				data = line[line.find('"')+1:line.rfind('"')]
 			line = line[:line.find('"')-1]+line[line.rfind('"')+1:]
@@ -145,10 +145,10 @@ def process_line(line):
 					pname = ar[i]
 				elif item == 'UUID' or item == 'GUID':
 					i += 1
-					guid = ar[i]
+					puid = ar[i]
 				elif item == 'ENV':
 					i += 1
-					etype = ar[i]
+					form = ar[i]
 				elif not filename:
 					filename = item
 				#elif item == 'LAZY':
@@ -168,35 +168,36 @@ def process_line(line):
 					return True
 			ids['pname'] = pname
 			if ids['exists']:
-				print 'That file already exists with that name: %s=%s'%(pname,ids['guid'])
+				print 'That file already exists with that name: %s=%s'%(pname,ids['puid'])
 				if ids['pname']:
-					prunedb.var_set(ids['pname'], ids['guid'], ids['repo_id'])
-				if etype:
+					prunedb.var_set(ids['pname'], ids['puid'])
+				if form:
 					prunelib.env_name(pname)
 			elif data:
-				prunelib.store_data(data,ids['guid'],wait)
+				prunelib.store_data(data,ids['puid'],wait)
 				op_id = prunelib.putMetaData(ids, cmd_id)
 			elif filename:
 				op_id = prunelib.putMetaData(ids, cmd_id)
-				if etype:
-					prunelib.store_file(filename,ids['guid'],wait,etype)
+				if form:
+					prunelib.store_file(filename,ids['puid'],wait,form,ids['pack'])
 					prunelib.env_name(pname)
 				else:
-					prunelib.store_file(filename,ids['guid'],wait)
+					prunelib.store_file(filename,ids['puid'],wait,pack=ids['pack'])
 			return True
 
 		elif line.startswith('USE'):
 			ar = line.split(' ')
 			resource_type = ar[1]
+			if 'TRY_LOCAL' in line:
+				local_fs = True
+			else:
+				local_fs = False
 			if resource_type=='local':
 				concurrency = int(ar[2])
-				prunelib.useLocal(concurrency)
+				prunelib.useLocal(concurrency,local_fs)
 			elif resource_type=='wq':
-				if len(ar)<=2:
-					prunelib.wq_check()
-				else:
-					master_name = ar[2]
-					prunelib.useWQ(master_name)
+				master_name = ar[2]
+				prunelib.useWQ(master_name,local_fs)
 			return True
 
 		elif line.startswith('ENV'):
@@ -305,7 +306,7 @@ def process_line(line):
 			name = ar[1]
 			try:
 				res = prunelib.locate_copies(name)
-				cache_filename = prunelib.storage_pathname(res[0]['guid'])
+				cache_filename = prunelib.storage_pathname(res[0]['puid'])
 				with open(cache_filename) as f:
 					for line in f.read().splitlines():
 						if len(line)>1 and line[0]!='#':
@@ -362,9 +363,9 @@ def process_line(line):
 			for r in res:
 				if keyword:
 					if keyword in r['name']:
-						print r['name'],' -> ',r['guid'], '  @', r['set_at']
+						print r['name'],' -> ',r['puid'], '  @', r['set_at']
 				else:
-					print r['name'],' -> ',r['guid'], '  @', r['set_at']
+					print r['name'],' -> ',r['puid'], '  @', r['set_at']
 			return True
 				
 
@@ -380,7 +381,7 @@ def process_line(line):
 				i += 1
 			zf = zipfile.ZipFile(destination, mode='w')
 			try:
-				plan = 'REPO %s\n'%(repo_guid)
+				plan = 'REPO %s\n'%(repo_puid)
 				plan += '\n'.join(lines)
 				zf.writestr('prune_cmds.plan', plan)
 				for pathname in files:
@@ -503,44 +504,30 @@ def process_line(line):
 				plan = zf.read('prune_cmds.plan')
 				for line in plan.splitlines(True):
 					print line
-					if line.startswith('REPO'):
+					if line.startswith('PUT'):
 						ar = line.split()
-						guid = ar[1]
-						repo = prunedb.repo_get_by_guid(repo_guid)
-						if not repo:
-							if 'repo_name' not in locals():
-								repo_name = guid
-							repo_id = prunedb.repo_ins(guid,repo_name)
-						else:
-							repo_id = repo['id']
-							if repo['name']!=repo_name:
-								prunedb.repo_upd(guid,repo_name)
-
-					elif line.startswith('PUT'):
-						ar = line.split()
-						guid = ar[1]
+						puid = ar[1]
 						pname = ar[3]
-						pathname = prunelib.storage_pathname(guid)
+						pathname = prunelib.storage_pathname(puid)
 						f = open(pathname,'w')
-						f.write(zf.read(guid))
+						f.write(zf.read(puid))
 						f.close()
 						
-						ids = prunelib.getDataIDs(filename,guid)
-						ids['repo_id'] = repo_id
+						ids = prunelib.getDataIDs(filename,puid)
 						ids['pname'] = pname
+						print ids
 
-						if prunelib.store_file(None, guid):
+						if prunelib.store_file(None, puid, pack=ids['pack']):
 							op_id = prunelib.putMetaData(ids, cmd_id)
 						else:
 							print 'There was a problem with the command'
-						#prunedb.io_ins(op_id, 'O', guid, pname, repo_id, None, 0)
+						#prunedb.io_ins(op_id, 'O', puid, pname, repo_id, None, 0)
 					elif line.startswith('#'):
 						extra = {}
 						matchObj = re.match( r'#([^=]+)=([^\(]*)\(([^/)]*)', line, re.M|re.I)
 						extra['vars'] = matchObj.group(1).split(',')
 						extra['funcname'] = matchObj.group(2).strip()
 						extra['args'] = matchObj.group(3).split(',')
-						extra['repo_id'] = repo_id
 						for i, assign in enumerate(extra['vars']):
 							extra['vars'][i] = assign.strip()
 						for i, arg in enumerate(extra['args']):
@@ -563,7 +550,6 @@ def process_line(line):
 				#	zf.write(pathname,pathname.split('/')[-1])
 			finally:
 				zf.close()
-				repo_id = None
 			#print lines,files
 			
 			return True
@@ -611,7 +597,7 @@ try:
 		f.write('data_folder\t%s\n'%data_folder)
 		f.write('database\t%s\n'%db_pathname)
 		f.write('sandbox\t%s\n'%sandbox_prefix)
-		f.write('repo_guid\t%s\n'%repo_guid)
+		f.write('repo_puid\t%s\n'%repo_puid)
 
 
 

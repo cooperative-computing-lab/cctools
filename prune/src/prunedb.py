@@ -9,7 +9,7 @@ import string, random, hashlib
 import subprocess
 import sqlite3, uuid
 
-sqlite3.register_converter('GUID', lambda b: uuid.UUID(b))
+sqlite3.register_converter('PUID', lambda b: uuid.UUID(b))
 sqlite3.register_adapter(uuid.UUID, lambda u: str(u))
 
 creates = []
@@ -73,24 +73,25 @@ def get_query_cnts():
 #dtype is data type (text, list of uids, etc)
 #stype is storage type (targz, gz, tar, p7zip)
 creates.append('''CREATE TABLE IF NOT EXISTS copies (
-												guid GUID,
-												dtype TEXT,
-												stype TEXT,
+												puid PUID,
+												form TEXT,
+												pack TEXT,
 												chksum TEXT,
 												length INT,
-												storage_module TEXT,
+												store TEXT,
 												created_at REAL
 											);''')
-creates.append('CREATE INDEX IF NOT EXISTS copy_guid ON copies(guid);')
+creates.append('CREATE INDEX IF NOT EXISTS copy_store ON copies(store);')
+creates.append('CREATE INDEX IF NOT EXISTS copy_puid ON copies(puid);')
 creates.append('CREATE INDEX IF NOT EXISTS copy_chksum ON copies(chksum);')
 
-def copy_ins(guid, chksum, length, dtype='text', stype=None, storage_module=None):
+def copy_ins(puid, chksum, length, form='ascii', pack=None, store=None):
 	global write_cnt
 	write_cnt += 1
 	#Always transfer the file before making an entry in the database (no partial files)
 	now = time.time()
-	ins = 'INSERT INTO copies (guid, chksum, length, dtype, stype, storage_module, created_at) VALUES (?,?,?,?,?,?,?);'
-	vals = (guid, chksum, length, dtype, stype, storage_module, now)
+	ins = 'INSERT INTO copies (puid, chksum, length, form, pack, store, created_at) VALUES (?,?,?,?,?,?,?);'
+	vals = (puid, chksum, length, form, pack, store, now)
 	meta_db.execute(ins,vals)
 	meta_data.commit()
 
@@ -101,11 +102,11 @@ def copies_get_by_chksum(chksum):
 	meta_db.execute(sel,[chksum])
 	return meta_db.fetchall()
 
-def copies_get(guid):
+def copies_get(puid):
 	global read_cnt
 	read_cnt += 1
-	sel = 'SELECT * FROM copies WHERE guid=? ORDER BY created_at;'
-	meta_db.execute(sel,[guid])
+	sel = 'SELECT * FROM copies WHERE puid=? ORDER BY created_at;'
+	meta_db.execute(sel,[puid])
 	return meta_db.fetchall()
 
 
@@ -113,29 +114,29 @@ def copies_get(guid):
 
 
 creates.append('''CREATE TABLE IF NOT EXISTS functions (
-												file_guid GUID,
+												file_puid PUID,
 												in_types TEXT,
 												out_names TEXT,
 												defined_at REAL
 											);''')
-creates.append('CREATE INDEX IF NOT EXISTS function_guid ON functions(file_guid);')
+creates.append('CREATE INDEX IF NOT EXISTS function_puid ON functions(file_puid);')
 
-def function_ins(out_names, file_guid, in_types):
+def function_ins(out_names, file_puid, in_types):
 	global write_cnt
 	write_cnt += 1
 	now = time.time()
-	ins = 'INSERT INTO functions (file_guid, in_types, out_names, defined_at) VALUES (?,?,?,?);'
-	vals = (file_guid, in_types, out_names, now)
+	ins = 'INSERT INTO functions (file_puid, in_types, out_names, defined_at) VALUES (?,?,?,?);'
+	vals = (file_puid, in_types, out_names, now)
 	meta_db.execute(ins,vals)
 	meta_data.commit()
-	return file_guid
+	return file_puid
 	#return meta_db.lastrowid
 
-def function_get(file_guid):
+def function_get(file_puid):
 	global read_cnt
 	read_cnt += 1
-	sel = 'SELECT * FROM functions WHERE file_guid=? ORDER BY defined_at DESC LIMIT 1;'
-	meta_db.execute(sel,[file_guid])
+	sel = 'SELECT * FROM functions WHERE file_puid=? ORDER BY defined_at DESC LIMIT 1;'
+	meta_db.execute(sel,[file_puid])
 	return meta_db.fetchone()
 
 
@@ -144,17 +145,17 @@ def function_get(file_guid):
 
 creates.append('''CREATE TABLE IF NOT EXISTS repos (
 												id INTEGER PRIMARY KEY,
-												guid GUID,
+												puid PUID,
 												name TEXT
 											);''')
-creates.append('CREATE UNIQUE INDEX IF NOT EXISTS repo_guid ON repos(guid);')
+creates.append('CREATE UNIQUE INDEX IF NOT EXISTS repo_puid ON repos(puid);')
 creates.append('CREATE UNIQUE INDEX IF NOT EXISTS repo_name ON repos(name);')
 
-def repo_ins(guid, name):
+def repo_ins(puid, name):
 	global write_cnt
 	write_cnt += 1
-	ins = 'INSERT INTO repos (guid, name) VALUES (?,?);'
-	vals = (guid, name)
+	ins = 'INSERT INTO repos (puid, name) VALUES (?,?);'
+	vals = (puid, name)
 	meta_db.execute(ins,vals)
 	meta_data.commit()
 	return meta_db.lastrowid
@@ -166,11 +167,11 @@ def repo_get(id):
 	meta_db.execute(sel,[id])
 	return meta_db.fetchone()
 
-def repo_get_by_guid(guid):
+def repo_get_by_puid(puid):
 	global read_cnt
 	read_cnt += 1
-	sel = 'SELECT * FROM repos WHERE guid=?;'
-	meta_db.execute(sel,[guid])
+	sel = 'SELECT * FROM repos WHERE puid=?;'
+	meta_db.execute(sel,[puid])
 	return meta_db.fetchone()
 
 def repo_get_by_name(name):
@@ -186,19 +187,19 @@ def repo_get_by_name(name):
 
 creates.append('''CREATE TABLE IF NOT EXISTS ops (
 												id INTEGER PRIMARY KEY,
-												env_guid GUID,
+												env_puid PUID,
 												cmd_id INT,
 												chksum TEXT,
 												submitted_at REAL
 											);''')
-creates.append('CREATE INDEX IF NOT EXISTS op_env_guid ON ops(env_guid);')
+creates.append('CREATE INDEX IF NOT EXISTS op_env_puid ON ops(env_puid);')
 creates.append('CREATE INDEX IF NOT EXISTS op_chksum ON ops(chksum);')
 
-def op_ins(env_guid, env_type, cmd_id=None, chksum=''):
+def op_ins(env_puid, env_type, cmd_id=None, chksum=''):
 	global write_cnt
 	write_cnt += 1
-	ins = 'INSERT INTO ops (env_guid, cmd_id, chksum) VALUES (?,?,?);'
-	vals = (env_guid, cmd_id, chksum)
+	ins = 'INSERT INTO ops (env_puid, cmd_id, chksum) VALUES (?,?,?);'
+	vals = (env_puid, cmd_id, chksum)
 	meta_db.execute(ins,vals)
 	meta_data.commit()
 	return meta_db.lastrowid
@@ -223,34 +224,33 @@ def op_get_by_chksum(chksum):
 
 creates.append('''CREATE TABLE IF NOT EXISTS ios (
 												op_id TEXT,
-												file_guid GUID,
+												file_puid PUID,
 												name TEXT,
-												repo_id INT,
 												literal TEXT,
 												io_type TEXT,
 												pos INT
 											);''')
 #io_types   #I=input, O=output, F=function
 creates.append('CREATE INDEX IF NOT EXISTS io_op ON ios(op_id);')
-creates.append('CREATE INDEX IF NOT EXISTS io_file_guid ON ios(file_guid);')
+creates.append('CREATE INDEX IF NOT EXISTS io_file_puid ON ios(file_puid);')
 
-def io_ins(op_id, io_type, file_guid, name=None, repo_id=None, literal=None, pos=0):
+def io_ins(op_id, io_type, file_puid, name=None, literal=None, pos=0):
 	global write_cnt
 	write_cnt += 1
-	ins = "INSERT INTO ios (op_id, file_guid, name, repo_id, literal, io_type, pos) VALUES (?,?,?,?,?,?,?);"
-	meta_db.execute(ins,[op_id, file_guid, name, repo_id, literal, io_type, pos])
+	ins = "INSERT INTO ios (op_id, file_puid, name, literal, io_type, pos) VALUES (?,?,?,?,?,?);"
+	meta_db.execute(ins,[op_id, file_puid, name, literal, io_type, pos])
 	meta_data.commit()
 
-def ios_get_by_file_guid(guid, io_type=None):
+def ios_get_by_file_puid(puid, io_type=None):
 	global read_cnt
 	read_cnt += 1
 	if io_type:
-		sel = 'SELECT * FROM ios WHERE file_guid=? AND io_type=? ORDER BY op_id;'
-		meta_db.execute(sel,[guid,io_type])
+		sel = 'SELECT * FROM ios WHERE file_puid=? AND io_type=? ORDER BY op_id;'
+		meta_db.execute(sel,[puid,io_type])
 		return meta_db.fetchall()
 	else:
-		sel = 'SELECT * FROM ios WHERE file_guid=? ORDER BY op_id;'
-		meta_db.execute(sel,[guid])
+		sel = 'SELECT * FROM ios WHERE file_puid=? ORDER BY op_id;'
+		meta_db.execute(sel,[puid])
 		return meta_db.fetchall()
 
 def ios_get(op_id):
@@ -287,9 +287,8 @@ creates.append('CREATE INDEX IF NOT EXISTS run_status ON runs(status);')
 def run_get_by_queue(queue, limit=50):
 	global read_cnt
 	read_cnt += 1
-	# Removed the limit because it wasn't working for some reason
-	sel = 'SELECT * FROM runs WHERE queue=? ORDER BY updated_at;'
-	meta_db.execute(sel,[queue])
+	sel = 'SELECT * FROM runs WHERE queue=? ORDER BY updated_at LIMIT ?;'
+	meta_db.execute(sel,[queue,limit])
 	meta_data.commit()
 	return meta_db.fetchall()
 
@@ -382,39 +381,30 @@ def run_ins(op_id):
 
 creates.append('''CREATE TABLE IF NOT EXISTS vars (
 												name TEXT,
-												repo_id INT,
-												guid GUID,
+												puid PUID,
 												set_at REAL,
 												gone_at REAL
 											);''')
 creates.append('CREATE INDEX IF NOT EXISTS var_name ON vars(name);')
-creates.append('CREATE INDEX IF NOT EXISTS var_guid ON vars(guid);')
+creates.append('CREATE INDEX IF NOT EXISTS var_puid ON vars(puid);')
 creates.append('CREATE INDEX IF NOT EXISTS var_gone ON vars(gone_at);')
 
-def var_get(name, repo_id=None):
+def var_get(name):
 	global read_cnt
 	read_cnt += 1
 	sel = 'SELECT * FROM vars WHERE name=? AND gone_at=2147389261 ORDER BY set_at DESC;'
 	meta_db.execute(sel,[name])
 	res = meta_db.fetchall()
-	if repo_id:
-		for r in res:
-			if r['repo_id']==repo_id:
-				#print name, repo_id, '->', r['guid']
-				return r['guid']
-		return None
-	else:
-		if res and res.__len__()>0 and not res[0]['repo_id']:
-			#print name, repo_id, '->', res[0]['guid']
-			return res[0]['guid']
-		return None
+	if res and res.__len__()>0:
+		return res[0]['puid']
+	return None
 
-def var_set(name, guid, repo_id=None):
+def var_set(name, puid):
 	global write_cnt
 	write_cnt += 1
 	now = time.time()
-	upd = 'REPLACE INTO vars (name,repo_id,guid,set_at,gone_at) VALUES (?,?,?,?,?);'
-	meta_db.execute(upd,[name,repo_id,guid,now,2147389261])
+	upd = 'REPLACE INTO vars (name,puid,set_at,gone_at) VALUES (?,?,?,?);'
+	meta_db.execute(upd,[name,puid,now,2147389261])
 	return meta_data.commit()
 
 def var_getAll():
