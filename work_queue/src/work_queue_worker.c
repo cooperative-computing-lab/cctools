@@ -635,29 +635,6 @@ static int check_disk_workspace(int64_t *workspace_usage, int force) {
 	}
 }
 
-
-/* faster disk check, overall with statfs */
-static int check_disk_space_for_filesize(int64_t file_size) {
-	uint64_t disk_avail, disk_total;
-
-	if(disk_avail_threshold > 0) {
-		disk_info_get(".", &disk_avail, &disk_total);
-		if(file_size > 0) {
-			if((uint64_t)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
-				debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
-				return 0;
-			}
-		} else {
-			if(disk_avail < disk_avail_threshold) {
-				debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
-				return 0;
-			}
-		}
-	}
-
-	return 1;
-}
-
 /**
  * Stream file/directory contents for the rget protocol.
  * Format:
@@ -915,7 +892,7 @@ static int do_put( struct link *master, char *filename, int64_t length, int mode
 	char *cur_pos;
 
 	debug(D_WQ, "Putting file %s into workspace\n", filename);
-	if(!check_disk_space_for_filesize(length)) {
+	if(!check_disk_space_for_filesize(".", length, disk_avail_threshold)) {
 		debug(D_WQ, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
 		return 0;
 	}
@@ -1385,7 +1362,7 @@ static void work_for_master(struct link *master) {
 			}
 		}
 
-		ok &= check_disk_space_for_filesize(0);
+		ok &= check_disk_space_for_filesize(".", 0, disk_avail_threshold);
 
 		int64_t disk_usage;
 		if(!check_disk_workspace(&disk_usage, 0)) {
@@ -2151,7 +2128,7 @@ int main(int argc, char *argv[])
 
 	watcher = work_queue_watcher_create();
 
-	if(!check_disk_space_for_filesize(0)) {
+	if(!check_disk_space_for_filesize(".", 0, disk_avail_threshold)) {
 		fprintf(stderr,"work_queue_worker: %s has less than minimum disk space %"PRIu64" MB\n",workspace,disk_avail_threshold);
 		return 1;
 	}
