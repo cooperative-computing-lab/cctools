@@ -4115,7 +4115,7 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 void work_queue_blacklist_add(struct work_queue *q, const char *hostname)
 {
 	if (!hash_table_lookup(q->worker_blacklist, hostname)) {
-		hash_table_insert(q->worker_blacklist, hostname, 0);
+		hash_table_insert(q->worker_blacklist, hostname, 1);
 	}
 }
 

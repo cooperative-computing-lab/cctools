@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include "work_queue.h"
 #include "work_queue_catalog.h"
 #include "xxmalloc.h"
+#include "unlink_recursive.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -42,6 +43,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 
 /*
 Code organization notes:
@@ -76,6 +78,11 @@ an example.
 #define CONTAINER_TMP_SH_PREFIX "docker.tmp"
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
+
+#define WITHOUT_CONTAINER 0
+#define WITH_DOCKER 1
+#define WRAPPER_SH_PREFIX "tmp_wrapper"
+#define TMP_SH_PREFIX "tmp"
 
 typedef enum {
 	CONTAINER_MODE_NONE,
@@ -113,6 +120,7 @@ static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
 static int monitor_enable_list_files  = 0;
 
+
 static char *monitor_limits_name = NULL;
 static int   monitor_interval = 1;	// in seconds
 static char *monitor_log_format = NULL;
@@ -120,6 +128,7 @@ static char *monitor_log_dir = NULL;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
+static char *local_task_dir = "makeflow.sandbox";
 
 /* wait upto this many seconds for an output file of a succesfull task
  * to appear on the local filesystem (e.g, to deal with NFS
@@ -590,6 +599,13 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	/* Display the fully elaborated command, just like Make does. */
 	printf("submitting job: %s\n", command);
 
+    // put the local_task_dir into the envlist, which can be passed to batch_job_submit
+    if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
+        envlist = nvpair_create();
+    	nvpair_insert_string(envlist, "local_task_dir", local_task_dir);
+        mkdir(local_task_dir, 0777);
+    }
+
 	while(1) {
 		jobid = batch_job_submit(queue, command, input_files, output_files, envlist );
 		if(jobid >= 0) {
@@ -629,6 +645,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	} else {
 		queue = remote_queue;
 	}
+
 
 	/*
 	XXX this code has several problems:
@@ -715,7 +732,7 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 
 	/* Generate the environment vars specific to this node. */
 	struct nvpair *envlist = dag_node_env_create(d,n);
-
+   
 	/*
 	Just before execution, replace double-percents with the nodeid.
 	This is used for substituting in the nodeid into a wrapper command or file.
@@ -1109,6 +1126,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Enable monitor time series.                 (default is disabled)\n", "--monitor-with-time-series");
 	printf(" %-30s Enable monitoring of openened files.        (default is disabled)\n", "--monitor-with-opened-files");
 	printf(" %-30s Format for monitor logs.                    (default %s)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
+    printf(stdout, " %-30s Specify the name of sandbox for sandbox batch system.\n", "--local-task-dir");
 }
 
 int main(int argc, char *argv[])
@@ -1189,7 +1207,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WRAPPER_OUTPUT,
-        LONG_OPT_DOCKER
+        LONG_OPT_DOCKER,
+        LONG_OPT_LOCAL_TASK_DIR
+
 	};
 
 	static struct option long_options_run[] = {
@@ -1243,6 +1263,7 @@ int main(int argc, char *argv[])
 		{"zero-length-error", no_argument, 0, 'z'},
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
+		{"local-task-dir", required_argument, 0, LONG_OPT_LOCAL_TASK_DIR},
 		{0, 0, 0, 0}
 	};
 
@@ -1459,6 +1480,9 @@ int main(int argc, char *argv[])
 				container_mode = CONTAINER_MODE_DOCKER; 
 				container_image = xxstrdup(optarg);
 				break;
+            case LONG_OPT_LOCAL_TASK_DIR:
+                local_task_dir = xxstrdup(optarg);
+                break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -1656,8 +1680,34 @@ int main(int argc, char *argv[])
 
 	if(clean_mode) {
 		printf("cleaning filesystem...\n");
-		makeflow_clean(d);
-		unlink(logfilename);
+		makeflow_clean(d); 
+
+        // check the batch_queue_mode, if it is sandbox mode, remove sandbox
+        char line[1024]; 
+        char comment_symbol[512], str_2[512], str_3[512];
+        FILE *tmp_log_fn;
+
+        tmp_log_fn = fopen(logfilename, "r+");
+
+        if(tmp_log_fn != NULL) {
+            if(fgets(line, sizeof line, tmp_log_fn) != NULL) {
+                sscanf(line, "%s %s\t%s", comment_symbol, str_2, str_3);
+                 
+                if (!strcmp(str_2, "SANDBOX")) {
+                     
+                    DIR* dir = opendir(str_3);
+                    if (dir) {
+                        closedir(dir);
+                        unlink_recursive(str_3);
+                    }
+   		        }
+            }
+            fclose(tmp_log_fn);
+
+		    unlink(logfilename);
+        }
+
+
 		unlink(batchlogfilename);
 		exit(0);
 	}
@@ -1686,6 +1736,10 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, handle_abort);
 	signal(SIGTERM, handle_abort);
 
+    // put the sandbox name into the log file
+    if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX)
+        fprintf(d->logfile, "# SANDBOX\t%s\n", local_task_dir);
+
 	makeflow_log_started_event(d);
 
 	runtime = timestamp_get();
@@ -1709,7 +1763,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(makeflow_abort_flag) {
-		makeflow_log_aborted_event(d);
+		fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
 		fprintf(stderr, "workflow was aborted.\n");
 		exit(EXIT_FAILURE);
 	} else if(makeflow_failed_flag) {
@@ -1722,6 +1776,7 @@ int main(int argc, char *argv[])
 		exit(EXIT_SUCCESS);
 	}
 
+    
 	return 0;
 }
 

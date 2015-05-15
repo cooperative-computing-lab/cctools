@@ -11,6 +11,7 @@ SOURCES_LIBRARY = \
 	batch_job_cluster.c \
 	batch_job_condor.c \
 	batch_job_local.c \
+        batch_job_sandbox.c \
 	batch_job_work_queue.c \
 	work_queue.c \
 	work_queue_catalog.c \
