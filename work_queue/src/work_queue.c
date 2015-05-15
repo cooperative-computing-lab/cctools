@@ -758,28 +758,6 @@ static void add_worker(struct work_queue *q)
 	return;
 }
 
-/* faster disk check, overall with statfs */
-static int check_disk_space_for_filesize(int64_t file_size) {
-    uint64_t disk_avail, disk_total;
-
-    if(disk_avail_threshold > 0) {
-        disk_info_get(".", &disk_avail, &disk_total);
-        if(file_size > 0) {
-            if((uint64_t)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
-                debug(D_WQ, "Incoming file of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);
-                return 0;
-            }
-        } else {
-            if(disk_avail < disk_avail_threshold) {
-                debug(D_WQ, "Available disk space (%"PRIu64" MB) lower than threshold (%"PRIu64" MB).\n", disk_avail/MEGA, disk_avail_threshold/MEGA);
-                return 0;
-            }
-        }
-    }
-
-    return 1;
-}
-
 /*
 Get a single file from a remote worker.
 Returns 1 on success, 0 on failure to receive, -1 on failure to access.
@@ -796,9 +774,9 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
 
 	// If necessary, create parent directories of the file.
+	char dirname[WORK_QUEUE_LINE_MAX];
+	path_dirname(local_name,dirname);
 	if(strchr(local_name,'/')) {
-		char dirname[WORK_QUEUE_LINE_MAX];
-		path_dirname(local_name,dirname);
 		if(!create_dir(dirname, 0700)) {
 			debug(D_WQ, "Could not create directory - %s (%s)", dirname, strerror(errno));
 			link_soak(w->link, length, stoptime);
@@ -809,7 +787,7 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	// Create the local file.
 	debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
 	// Check if there is space for incoming file at master
-	if(!check_disk_space_for_filesize(length)) {
+	if(!check_disk_space_for_filesize(dirname, length, disk_avail_threshold)) {
         debug(D_WQ, "Could not recieve file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
         return APP_FAILURE;
     }

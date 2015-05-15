@@ -22,4 +22,12 @@ Query disk space properties.
 */
 int disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total);
 
+/** Return whether a file will fit in the given directory.
+@param path A filename of the disk to be measured.
+@param file_size An integer that describes how large the incoming file is.
+@param disk_avail_threshold An unsigned integer that describes the minimum available space to leave.
+@return Zero if the file will not fit, one if the file fits.
+*/
+int check_disk_space_for_filesize(char *path, INT64_T file_size, UINT64_T disk_avail_threshold);
+
 #endif
