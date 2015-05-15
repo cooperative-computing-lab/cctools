@@ -154,6 +154,9 @@ static int64_t manual_disk_option = 0;
 static int64_t manual_memory_option = 0;
 static int64_t manual_gpus_option = 0;
 
+static time_t  last_cwd_measure_time = 0;
+static int64_t last_workspace_usage  = 0;
+
 static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
@@ -601,37 +604,6 @@ static int handle_tasks(struct link *master)
 
 	}
 	return 1;
-}
-
-/* slower disk check, poor man's du on workspace */
-static int check_disk_workspace(int64_t *workspace_usage, int force) {
-	static time_t  last_cwd_measure_time = 0;
-	static int64_t last_workspace_usage  = 0;
-
-	if(manual_disk_option < 1)
-		return 1;
-
-	if( force || (time(0) - last_cwd_measure_time) >= measure_wd_interval ) {
-		cwd_disk_info_get(workspace, &last_workspace_usage);
-		debug(D_WQ, "worker disk usage: %" PRId64 "\n", last_workspace_usage);
-		last_cwd_measure_time = time(0);
-	}
-
-	if(workspace_usage) {
-		*workspace_usage = last_workspace_usage;
-	}
-
-	// Use thershold only if smaller than specified disk size.
-	int64_t disk_limit = manual_disk_option - disk_avail_threshold; 
-	if(disk_limit < 0)
-		disk_limit = manual_disk_option;
-
-	if(last_workspace_usage > disk_limit) {
-		debug(D_WQ, "worker disk usage %"PRId64 " larger than: %" PRId64 "!\n", last_workspace_usage + disk_avail_threshold, manual_disk_option);
-		return 0;
-	} else {
-		return 1;
-	}
 }
 
 /**
@@ -1364,7 +1336,7 @@ static void work_for_master(struct link *master) {
 		ok &= check_disk_space_for_filesize(".", 0, disk_avail_threshold);
 
 		int64_t disk_usage;
-		if(!check_disk_workspace(&disk_usage, 0)) {
+		if(!check_disk_workspace(workspace, &disk_usage, 0, manual_disk_option, measure_wd_interval, last_cwd_measure_time, last_workspace_usage, disk_avail_threshold)) {
 			fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n",workspace, manual_cores_option, disk_usage);
 			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_usage);
 			ok = 0;
@@ -1601,7 +1573,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 	workspace_prepare();
 
-	check_disk_workspace(NULL, 1);
+	check_disk_workspace(workspace, NULL, 1, manual_disk_option, measure_wd_interval, last_cwd_measure_time, last_workspace_usage, disk_avail_threshold);
 	report_worker_ready(master);
 
 	send_master_message(master, "info worker-id %s\n", worker_id);
