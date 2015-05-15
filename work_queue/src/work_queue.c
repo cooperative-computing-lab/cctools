@@ -4007,13 +4007,13 @@ static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task
 		case WORK_QUEUE_TASK_RUNNING: 
 			itable_insert(q->running_tasks, t->taskid, t);
 			break;
-		case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
-			break;
-		case WORK_QUEUE_TASK_RETRIEVED:
-			break;
 		case WORK_QUEUE_TASK_DONE:
-			break;
 		case WORK_QUEUE_TASK_CANCELED:
+			/* tasks are freed when returned to user, thus we remove them from our local record */
+			itable_remove(q->tasks, taskid);
+			break;
+		default:
+			/* do nothing */
 			break;
 	}
 
