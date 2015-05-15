@@ -1,0 +1,42 @@
+# -*- coding: utf-8; mode: tcl; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- vim:fenc=utf-8:ft=tcl:et:sw=4:ts=4:sts=4
+# $Id$
+
+PortSystem              1.0
+PortGroup               github 1.0
+
+set description_common  {Notre Dame Cooperative Computing Software}
+
+name                    ndcctools
+version                 release-4.3.4
+categories              sysutils
+platforms               darwin
+license                 MIT
+ 
+maintainers             nd.edu:pivie \
+                        openmaintainer
+                        
+description             ${description_common} (cooperative-computing-lab)
+long_description        ${description_common} \
+                        Enables collaborators to easily harness large scale \
+                        distributed systems such as clusters, clouds, and grids.
+ 
+homepage                http://ccl.cse.nd.edu/
+master_sites            https://github.com/cooperative-computing-lab/cctools/archive/
+distfiles               ${version}.zip
+worksrcdir              cctools-${version}
+
+configure.pre_args      --prefix ${destroot}${prefix}
+
+post-destroot           {
+                            xinstall -d -m 755 ${destroot}${prefix}/share/doc
+                            file rename -force ${destroot}${prefix}/doc ${destroot}${prefix}/share/doc/${name}
+
+                            xinstall -d -m 755 ${destroot}${prefix}/etc/${name}
+                            file rename -force ${destroot}${prefix}/etc/config.mk ${destroot}${prefix}/etc/${name}/config.mk
+
+                        }
+
+checksums               rmd160 7b2b1919f11f205f6452cd26aee3a6f70ff24118 \
+                        sha256 17b48aa7b47ca27e6feef680ec51c9fa7a47e012a08947715f876276273a2db8
+use_zip                 yes
+
