@@ -36,10 +36,11 @@ EOF2
 cp "$(which python)" "$(which sh)" .
 chmod 700 a.py python sh
 EOF1
-	for ((i = 0; i < $N; i++)); do
+	while [ "$N" -gt 0 ]; do
 		parrot -- /bin/sh <<EOF1 &
 ./a.py
 EOF1
+		N=$(expr $N - 1)
 	done
 	rc=0
 	for pid in $(jobs -p); do
