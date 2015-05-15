@@ -1,5 +1,20 @@
 #!/bin/sh
 
+###########################
+# *** Set for releases. ***
+
+MAJOR=4
+MINOR=6
+MICRO=0
+
+# Optionally set this to some name (e.g. RC1 or FINAL)
+RELEASE=
+
+# *** You should not need to change anything below this line. ***
+###########################
+
+. ./configure.tools.sh
+
 uname -a
 
 if [ -z "$USER" ]; then
@@ -7,23 +22,77 @@ if [ -z "$USER" ]; then
   export USER
 fi
 
-. ./configure.tools
+save_arguments "$0" "$@"
 
-save_arguments $0 $@
+GIT_DIR="$(dirname "$0")/.git"
+export GIT_DIR
+if [ -d "$GIT_DIR" ] && which git > /dev/null 2> /dev/null; then
+	GIT=y
+fi
 
-major=4
-minor=6
-micro=0
+# `git archive` (man gitattributes(5)) fills this in, otherwise we do it manually...
+COMMIT='$Format:%H$'
+if [ "${COMMIT:0:1}" = '$' ]; then
+	if [ "$GIT" = y ]; then
+		COMMIT="$(git rev-parse HEAD)"
+	else
+		COMMIT="UNKNOWN"
+	fi
+fi
 
-# On a release, type would be changed from TRUNK to RELEASE.  TRUNK is a useful
-# signal that the user is not using a blessed (tagged) release.
-type="TRUNK"
+DIRTY=
+if [ "$GIT" = y ]; then
+	if [ -n "$(git status --porcelain)" ]; then
+		echo "Working copy dirty..." >&2
+		DIRTY='-DIRTY'
+	fi
+fi
 
-version="$major.$minor.$micro-$type"
+# The date is the commit date of the commit, or now if the working tree is dirty.
+DATE='$Format:%ci$'
+if [ "${DATE:0:1}" = '$' ]; then
+	if [ "$GIT" = y ]; then
+		DATE="$(git log -1 --pretty=format:%ci HEAD)"
+	else
+		echo "Source commit date unavailable, using current time." >&2
+		DATE="$NOW"
+	fi
+fi
+if [ -n "$DIRTY" ]; then
+	DATE="$NOW"
+fi
 
-# The release date is set automatically at configure time (the default).
-# For a tagged release, this should be the hard-coded date of the release.
-release_date=`date +%m/%d/%Y`
+if [ -n "$RELEASE" ]; then
+	BRANCH="$RELEASE"
+elif [ -n "$CCTOOLS_BRANCH" ]; then
+	BRANCH="$CCTOOLS_BRANCH"
+else
+	BRANCH='$Format:%d$'
+	if [ "${BRANCH:0:1}" = '$' ]; then
+		if [ "$GIT" = y ]; then
+			BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+		else
+			echo "Building from unknown branch!" >&2
+			BRANCH=UNKNOWN
+		fi
+	else
+		# example BRANCH:
+		#     "(HEAD, origin/heads/master, ccl/heads/master, master, refs/backup/master)"
+		# or on newer Git:
+		#     "(HEAD -> version-commit, tag: history/version-commit-006, afs/tags/history/version-commit-006, afs/backup/version-commit)"
+
+		# find the first instance of a (lowercase) branch name
+		echo "This commit is referenced by: $BRANCH" >&2
+		BRANCH="$(echo " ${BRANCH}," | tr -d '\n()' | perl -pe 's|.*? ([^ A-Z/]+),.*|\1|')"
+		if [ -z "$BRANCH" ]; then
+			echo "Could not interpret branch name." >&2
+			BRANCH=HEAD
+		fi
+	fi
+fi
+
+SOURCE="${BRANCH}:${COMMIT:0:8}${DIRTY}"
+VERSION="$MAJOR.$MINOR.$MICRO [${SOURCE}]"
 
 # Bourne shell is tricky when you use backtick command substitution backslash
 # has special meaning even when surrounded by single-quotes. It is necessary to
@@ -42,25 +111,26 @@ configure_arguments=`echo "$*" | sed 's/#/\\\\#/' | sed 's/\\$/$$/'`
 # The above sed commands are to escape the output for the Makefile.
 system_information=`uname -a | sed 's/#/\\\\#/' | sed 's/\\$/$$/'`
 
-build_user="$USER"
-build_host=`uname -n`
-build_sys=`uname -s | tr \[a-z\] \[A-Z\] | awk -F_ '{print $1}'`
-build_cpu=`uname -m | tr \[a-z\] \[A-Z\]`
+BUILD_CPU="$(uname -m | tr \[a-z\] \[A-Z\])"
+BUILD_DATE="$NOW"
+BUILD_HOST="$(uname -n)"
+BUILD_SYS="$(uname -s | tr \[a-z\] \[A-Z\] | awk -F_ '{print $1}')"
+BUILD_USER="$USER"
 
-if [ "${build_cpu}" = UNKNOWN ]
+if [ "$BUILD_CPU" = UNKNOWN ]
 then
-	build_cpu=`uname -p | tr \[a-z\] \[A-Z\]`
+	BUILD_CPU=`uname -p | tr \[a-z\] \[A-Z\]`
 fi
 
-case "$build_cpu" in
+case "$BUILD_CPU" in
 	I[0-9]86)
-	build_cpu=I386
+	BUILD_CPU=I386
 	;;
 	POWER\ MACINTOSH)
-	build_cpu=POWERPC
+	BUILD_CPU=POWERPC
 	;;
 	SUN4V)
-	build_cpu=SPARC
+	BUILD_CPU=SPARC
 	;;
 esac
 
@@ -79,29 +149,29 @@ swig_bindings=""
 
 echo "checking for package compatibility..."
 
-if [ -d parrot -a $build_sys = LINUX ]
+if [ -d parrot -a $BUILD_SYS = LINUX ]
 then
-	if [ $build_cpu = I386 -o $build_cpu = X86_64 ]
+	if [ $BUILD_CPU = I386 -o $BUILD_CPU = X86_64 ]
 	then
-		echo "parrot IS supported on ${build_sys} ${build_cpu}"
+		echo "parrot IS supported on ${BUILD_SYS} ${BUILD_CPU}"
 		include_package_parrot="parrot"
 	else
-		echo "parrot is NOT supported on ${build_sys} ${build_cpu}"
+		echo "parrot is NOT supported on ${BUILD_SYS} ${BUILD_CPU}"
 		include_package_parrot=""
 	fi
 else
-	echo "parrot is NOT supported on ${build_sys} for any cpu type"
+	echo "parrot is NOT supported on ${BUILD_SYS} for any cpu type"
 	include_package_parrot=""
 fi
 
 if [ -d resource_monitor ]
 then
-	if [ $build_sys = LINUX -o $build_sys = DARWIN ]
+	if [ $BUILD_SYS = LINUX -o $BUILD_SYS = DARWIN ]
 	then
-		echo "resource_monitor IS supported on ${build_sys}"
+		echo "resource_monitor IS supported on ${BUILD_SYS}"
 		include_package_resource_monitor="resource_monitor"
 	else
-		echo "resource_monitor is NOT (yet) supported on ${build_sys}"
+		echo "resource_monitor is NOT (yet) supported on ${BUILD_SYS}"
 		include_package_resource_monitor=""
 	fi
 fi
@@ -397,7 +467,7 @@ done
 # about char -> int conversions.
 # 2 - All code is PIC by default, and adding the flag causes more warnings.
 
-if [ ${build_sys} = CYGWIN ]
+if [ ${BUILD_SYS} = CYGWIN ]
 then
 	ccflags="${ccflags} -Wno-char-subscripts"
 else
@@ -422,10 +492,10 @@ else
         echo "no"
 fi
 
-if [ $build_sys = LINUX ]
+if [ $BUILD_SYS = LINUX ]
 then
         ldflags="-Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic ${link_as_needed}"
-elif [ $build_sys = DARWIN ]
+elif [ $BUILD_SYS = DARWIN ]
 then
         ldflags=""
 else
@@ -438,9 +508,9 @@ fi
 library_search_mode=prefer_static
 ##########################################################################
 
-if [ x$globus_flavor = xauto ]
+if [ "$globus_flavor" = auto ]
 then
-	if [ $build_cpu = X86_64 ] 
+	if [ $BUILD_CPU = X86_64 ]
 	then
 		globus_flavor=gcc64
 	else
@@ -610,9 +680,9 @@ fi
 
 if [ $config_xrootd_path != no ] && check_file ${xrootd_path}/include/xrootd/XrdVersion.hh
 then
-	if [ x$xrootd_arch = xauto ]
+	if [ "$xrootd_arch" = auto ]
 	then
-		if [ $build_cpu = X86_64 ] 
+		if [ "$BUILD_CPU" = X86_64 ]
 		then
 			xrootd_arch=x86_64_linux_26
 		else
@@ -687,7 +757,7 @@ if [ $config_fuse_path != no ]
 then
         if library_search fuse ${fuse_path} || library_search fuse /
         then
-                if [ x${fuse_path} != x/ -a x${fuse_path} != x/usr ]
+                if [ "${fuse_path}" != / -a "${fuse_path}" != /usr ]
                 then
                         fuse_ccflags="-I${fuse_path}/include"
                 fi
@@ -730,7 +800,7 @@ then
 	# However, libreadline doesn't properly specify a dependency
 	# on ncurses, termcap, and history, so we must force them to link.
 
-	if [ $build_sys = LINUX ]
+	if [ $BUILD_SYS = LINUX ]
 	then
 		# Remove the -lreadline that was added by "library_search readline" above
 		external_libraries=`echo $external_libraries | sed "s/-lreadline//"`
@@ -757,7 +827,7 @@ else
 	echo "*** skipping readline..."
 fi
 
-if [ $build_sys = DARWIN ]
+if [ $BUILD_SYS = DARWIN ]
 then
 	if [ ! -d "/usr/include" ]
 	then
@@ -804,7 +874,7 @@ then
 			# arguments, so that the compiler produces the default,
 			# which will be compatible with the other objects we compile.
 
-			if [ ${build_sys} = DARWIN ]
+			if [ ${BUILD_SYS} = DARWIN ]
 			then
 				perl_ccflags=`echo ${perl_ccflags} | sed 's/-arch [^ ]* *//g'`
 				perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
@@ -887,13 +957,13 @@ EOF
 				# arguments, so that the compiler produces the default,
 				# which will be compatible with the other objects we compile.
 
-	                        if [ ${build_sys} = DARWIN ]
+	                        if [ ${BUILD_SYS} = DARWIN ]
 				then
 					python_ccflags=`echo ${python_ccflags} | sed 's/-arch [^ ]* *//g'`
 					python_ldflags=`echo ${python_ldflags} | sed 's/-arch [^ ]* *//g'`
 				fi
 
-				if [ $build_sys = DARWIN ]
+				if [ $BUILD_SYS = DARWIN ]
 				then
 				    python_ldflags="$python_ldflags -undefined dynamic_lookup"
 				fi
@@ -976,13 +1046,13 @@ then
 				# arguments, so that the compiler produces the default,
 				# which will be compatible with the other objects we compile.
 
-				if [ ${build_sys} = DARWIN ]
+				if [ ${BUILD_SYS} = DARWIN ]
 				then
 					python3_ccflags=`echo ${python3_ccflags} | sed 's/-arch [^ ]* *//g'`
 					python3_ldflags=`echo ${python3_ldflags} | sed 's/-arch [^ ]* *//g'`
 				fi
 
-				if [ $build_sys = DARWIN ]
+				if [ $BUILD_SYS = DARWIN ]
 				then
 				    python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
 				fi
@@ -1083,12 +1153,12 @@ library_search_standard nsl /usr
 
 # Finally, add in standard system libraries found everywhere
 
-if [ $build_sys != DARWIN ]
+if [ $BUILD_SYS != DARWIN ]
 then
 	external_libraries="${external_libraries} -lrt"
 fi
 
-if [ $build_sys != FREEBSD ] || [ $build_sys != DRAGONFLY ]
+if [ $BUILD_SYS != FREEBSD ] || [ $BUILD_SYS != DRAGONFLY ]
 then
 	external_libraries="${external_libraries} -ldl"
 fi
@@ -1107,14 +1177,14 @@ else
 	exit 1
 fi
 
-if [ ${build_sys} != CYGWIN ]
+if [ ${BUILD_SYS} != CYGWIN ]
 then
 	external_libraries="${external_libraries} -lstdc++ -lpthread -lz -lc -lm"
 else
 	external_libraries="${external_libraries} -lstdc++ -lpthread -lz -lm"
 fi
 
-if [ $build_sys = DARWIN ]
+if [ $BUILD_SYS = DARWIN ]
 then
 	cctools_dynamic_suffix=dylib
 	cctools_dynamic_flag=-dynamiclib
@@ -1171,14 +1241,33 @@ fi
 # however on Solaris, the -g option results in a different
 # debugging format that causes linking errors in getopt code.
 
-if [ $build_sys = SUNOS ]
+if [ $BUILD_SYS = SUNOS ]
 then
 	debug_flag="-gstabs+"
 else
 	debug_flag="-g"
 fi
 
-ccflags="${ccflags} -DINSTALL_PATH='\"${install_path}\"' $debug_flag -D_REENTRANT -D_GNU_SOURCE -DBUILD_USER='\"$build_user\"' -DBUILD_HOST='\"$build_host\"' -DCCTOOLS_VERSION_MAJOR=$major -DCCTOOLS_VERSION_MINOR=$minor -DCCTOOLS_VERSION_MICRO='\"$micro\"' -DCCTOOLS_VERSION='\"$version\"' -DCCTOOLS_RELEASE_DATE='\"$release_date\"' -DCCTOOLS_CONFIGURE_ARGUMENTS='\"$configure_arguments\"' -DCCTOOLS_SYSTEM_INFORMATION='\"$system_information\"' -DCCTOOLS_OPSYS_${build_sys} -DCCTOOLS_CPU_${build_cpu} -DCCTOOLS_CVMFS_BUILD_FLAGS='\"${cvmfs_ldflags} ${cvmfs_ccflags}\"'"
+ccflags_append_define \
+	"BUILD_DATE='\"$BUILD_DATE\"'" \
+	"BUILD_HOST='\"$BUILD_HOST\"'" \
+	"BUILD_USER='\"$BUILD_USER\"'" \
+	"CCTOOLS_COMMIT='\"$COMMIT\"'" \
+	"CCTOOLS_CONFIGURE_ARGUMENTS='\"$configure_arguments\"'" \
+	"CCTOOLS_CPU_${BUILD_CPU}" \
+	"CCTOOLS_CVMFS_BUILD_FLAGS='\"${cvmfs_ldflags} ${cvmfs_ccflags}\"'" \
+	"CCTOOLS_OPSYS_${BUILD_SYS}" \
+	"CCTOOLS_RELEASE_DATE='\"$DATE\"'" \
+	"CCTOOLS_SOURCE='\"$SOURCE\"'" \
+	"CCTOOLS_SYSTEM_INFORMATION='\"$system_information\"'" \
+	"CCTOOLS_VERSION='\"$VERSION\"'" \
+	"CCTOOLS_VERSION_MAJOR=$MAJOR" \
+	"CCTOOLS_VERSION_MICRO=$MICRO" \
+	"CCTOOLS_VERSION_MINOR=$MINOR" \
+	"INSTALL_PATH='\"${install_path}\"'" \
+	"_GNU_SOURCE" \
+	"_REENTRANT"
+ccflags_append "$debug_flag"
 ldflags="${ldflags} ${debug_flag}"
 
 if [ X$include_package_parrot = "Xparrot" ]
@@ -1291,13 +1380,13 @@ CCTOOLS_SWIG_BINDINGS=${swig_bindings}
 
 CCTOOLS_DOCTARGETS=${cctools_doctargets}
 
-CCTOOLS_M4_ARGS=-DCCTOOLS_VERSION=${major}.${minor}.${micro} -DCCTOOLS_RELEASE_DATE=${release_date}
+CCTOOLS_M4_ARGS=-DCCTOOLS_VERSION="${VERSION}" -DCCTOOLS_RELEASE_DATE="${RELEASE_DATE}"
 
 CCTOOLS_BUILD_LIB64PARROT_HELPER=${build_lib64parrot_helper}
 CCTOOLS_BUILD_LIB32PARROT_HELPER=${build_lib32parrot_helper}
 
-CCTOOLS_VERSION=${version}
-CCTOOLS_RELEASEDATE=${release_date}
+CCTOOLS_VERSION=${VERSION}
+CCTOOLS_RELEASEDATE=${RELEASE_DATE}
 
 CCTOOLS_IRODS_LDFLAGS=${irods_ldflags}
 CCTOOLS_IRODS_CCFLAGS=${irods_ccflags}

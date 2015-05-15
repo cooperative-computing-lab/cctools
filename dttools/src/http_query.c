@@ -148,9 +148,9 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 		buffer_putliteral(&B, "Connection: close\r\n");
 		buffer_printf(&B, "Host: %s\r\n", actual_host);
 		if(getenv("HTTP_USER_AGENT"))
-			buffer_printf(&B, "User-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://ccl.cse.nd.edu/ %s)\r\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, getenv("HTTP_USER_AGENT"));
+			buffer_printf(&B, "User-Agent: Mozilla/5.0 (compatible; CCTools %s Parrot; http://ccl.cse.nd.edu/ %s)\r\n", CCTOOLS_VERSION, getenv("HTTP_USER_AGENT"));
 		else
-			buffer_printf(&B, "User-Agent: Mozilla/5.0 (compatible; CCTools %d.%d.%s Parrot; http://ccl.cse.nd.edu/)\r\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
+			buffer_printf(&B, "User-Agent: Mozilla/5.0 (compatible; CCTools %s Parrot; http://ccl.cse.nd.edu/)\r\n", CCTOOLS_VERSION);
 		buffer_putliteral(&B, "\r\n"); /* header terminator */
 
 		debug(D_HTTP, "%s", buffer_tostring(&B));

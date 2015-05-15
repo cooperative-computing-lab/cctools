@@ -1,4 +1,3 @@
-
 save_arguments()
 {
 cat >configure.rerun <<EOF
@@ -10,6 +9,11 @@ chmod 755 configure.rerun
 
 # Some shells (like /bin/sh on osx) do not support echo -n,
 # so we use this function as an alias instead.
+
+isodate() {
+	date +'%Y-%m-%d %H:%M:%S %z'
+}
+NOW=$(isodate)
 
 echon()
 {
@@ -176,7 +180,7 @@ library_search_normal()
 	# for compiling will be found in /lib64, if it exists.  The files in
 	# /lib are compatibilities libraries for 32-bit.
 	
-	if [ $build_cpu = X86_64 -a -d $2/lib64 ]
+	if [ $BUILD_CPU = X86_64 -a -d $2/lib64 ]
 	then
 		libdir=$basedir/lib64
 	elif [ -d $basedir/lib ]
@@ -188,7 +192,7 @@ library_search_normal()
 
 	# Darwin uses dylib for dynamic libraries, other platforms use .so
 
-	if [ $build_sys = DARWIN ]
+	if [ $BUILD_SYS = DARWIN ]
 	then
 		dynamic_suffix=dylib
 	else
@@ -250,7 +254,14 @@ library_search_normal()
 	return 1
 }
 
-append()
+ccflags_append()
+{
+	for arg; do
+		ccflags="${ccflags} ${arg}"
+	done
+}
+
+ccflags_append_define()
 {
 	for arg; do
 		ccflags="${ccflags} -D${arg}"
@@ -267,10 +278,10 @@ optional_function()
 	multiarch_include=$(echo "${header}" | sed "s|include/|include/$HOST_MULTIARCH/|")
 
 	if check_function "$name" "$header"; then
-		append "$@"
+		ccflags_append_define "$@"
 		return 0
 	elif [ -n "$HOST_MULTIARCH" ] && check_function "$name" "$multiarch_include"; then
-		append "$@"
+		ccflags_append_define "$@"
 		return 0
 	fi
 		
@@ -282,7 +293,7 @@ optional_file()
 	file="$1"
 	shift
 	if check_file "$file"; then
-		append "$@"
+		ccflags_append_define "$@"
 		return 0
 	else
 		return 1
@@ -303,7 +314,7 @@ EOF
 	if gcc .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1; then
 		echo yes
 		rm -f .configure.tmp.c .configure.tmp.out
-		append "$@"
+		ccflags_append_define "$@"
 		return 0
 	else
 		echo no
@@ -321,7 +332,7 @@ optional_library()
 
 	if echo 'int main;' | gcc -o /dev/null -x c - "-l${library}" >/dev/null 2>/dev/null; then
 		echo yes
-		append "$@"
+		ccflags_append_define "$@"
 		return 0
 	else
 		echo no
@@ -352,7 +363,7 @@ int main (int argc, char *argv[])
 EOF
 	if [ $? -eq 0 ]; then
 		echo yes
-		append "$@"
+		ccflags_append_define "$@"
 		return 0
 	else
 		echo no

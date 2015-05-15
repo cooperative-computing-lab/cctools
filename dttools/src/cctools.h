@@ -27,5 +27,6 @@ void cctools_version_print (FILE *stream, const char *cmd);
   */
 void cctools_version_debug (uint64_t type, const char *cmd);
 
+int cctools_version_cmp (const char *v1, const char *v2);
 
 #endif /* CCTOOLS_H */

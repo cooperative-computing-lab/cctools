@@ -176,7 +176,7 @@ static int ftsh_main( int argc, char *argv[] )
 
 	/* Reset the environment for my children */
 
-	sprintf(env,"FTSH_VERSION=%d.%d.%s",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
+	sprintf(env,"FTSH_VERSION=%d.%d.%d",CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	putenv(xxstrdup(env));
 
 	if(log_file) {

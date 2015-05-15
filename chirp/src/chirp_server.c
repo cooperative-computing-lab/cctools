@@ -195,7 +195,7 @@ static int update_all_catalogs(const char *url)
 	buffer_max(&B, DATAGRAM_PAYLOAD_MAX);
 	buffer_abortonfailure(&B, 1);
 	buffer_putliteral(&B, "type chirp\n");
-	buffer_printf(&B, "version %d.%d.%s\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
+	buffer_printf(&B, "version %d.%d.%d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
 	buffer_printf(&B, "url chirp://%s:%d\n", hostname, chirp_port);
 	buffer_printf(&B, "name %s\n", hostname);
 	buffer_printf(&B, "owner %s\n", chirp_owner);
