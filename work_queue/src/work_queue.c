@@ -108,7 +108,6 @@ struct work_queue {
 
 	struct list    *ready_list;      // ready to be sent to a worker
 	struct itable  *running_tasks;   // running on a worker
-	struct list    *retrieved_list;   // completed and awaiting return to the master process
 
 	struct hash_table *worker_table;
 	struct hash_table *worker_blacklist;
@@ -1746,14 +1745,16 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 			}
 		}
 
-		list_first_item(q->retrieved_list);
-		while((t = list_next_item(q->retrieved_list))) {
+		uint64_t taskid;
+		itable_firstkey(q->tasks);
+		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
 			nv = task_to_nvpair(t,"complete",0);
 			if(nv) {
 				link_nvpair_write(l,nv,stoptime);
 				nvpair_delete(nv);
 			}
 		}
+
 	} else if(!strcmp(request, "worker")) {
 		struct work_queue_worker *w;
 		struct nvpair *nv;
@@ -2915,18 +2916,6 @@ static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
 	return 1;
 }
 
-//comparator function for checking if a task matches given taskid.
-static int taskid_comparator(void *t, const void *r) {
-
-	struct work_queue_task *task_in_queue = t;
-	const int *taskid = r;
-
-	if (task_in_queue->taskid == *taskid) {
-		return 1;
-	}
-	return 0;
-}
-
 //comparator function for checking if a task matches given tag.
 static int tasktag_comparator(void *t, const void *r) {
 
@@ -2964,22 +2953,13 @@ static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) 
 	return 0;
 }
 
-static struct work_queue_task *find_running_task_by_id(struct work_queue *q, int taskid) {
-
-	if( task_state_is(q, taskid, WORK_QUEUE_TASK_RUNNING) || task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
-		return itable_lookup(q->tasks, taskid);
-	}
-
-	return NULL;
-}
-
-static struct work_queue_task *find_running_task_by_tag(struct work_queue *q, const char *tasktag) {
+static struct work_queue_task *find_task_by_tag(struct work_queue *q, const char *tasktag) {
 	struct work_queue_task *t;
 	uint64_t taskid;
 
 	itable_firstkey(q->tasks);
 	while(itable_nextkey(q->tasks, &taskid, (void**)&t)) {
-		if( (task_state_is(q, taskid, WORK_QUEUE_TASK_RUNNING) || task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL)) && tasktag_comparator(t, tasktag) ) {
+		if( tasktag_comparator(t, tasktag) ) {
 			return t;
 		}
 	}
@@ -3709,7 +3689,6 @@ struct work_queue *work_queue_create(int port)
 
 	q->ready_list = list_create();
 	q->running_tasks = itable_create(0);
-	q->retrieved_list = list_create();
 
 	q->tasks          = itable_create(0);
 
@@ -3945,7 +3924,6 @@ void work_queue_delete(struct work_queue *q)
 
 		list_delete(q->ready_list);
 		itable_delete(q->running_tasks);
-		list_delete(q->retrieved_list);
 
 		itable_delete(q->tasks);
 
@@ -4017,7 +3995,6 @@ static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task
 		list_remove(q->ready_list, t);
 	}
 
-	list_remove(q->retrieved_list, t);
 	itable_remove(q->running_tasks, t->taskid);
 
 	// insert to corresponding table
@@ -4033,7 +4010,6 @@ static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task
 		case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
 			break;
 		case WORK_QUEUE_TASK_RETRIEVED:
-			list_push_head(q->retrieved_list, t);
 			break;
 		case WORK_QUEUE_TASK_DONE:
 			break;
@@ -4326,7 +4302,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		remove_unresponsive_workers(q);
 
-		t = list_pop_head(q->retrieved_list);
+		t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
 		if(t) {
 			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
@@ -4421,8 +4397,6 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 
 /**
  * Cancel submitted task as long as it has not been retrieved through wait().
- * This is non-blocking and has a worst-case running time of O(n) where n is
- * number of submitted tasks.
  * This returns the work_queue_task struct corresponding to specified task and
  * null if the task is not found.
  */
@@ -4430,26 +4404,19 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int ta
 
 	struct work_queue_task *matched_task = NULL;
 
-	if (taskid > 0){
-		//see if task is executing at a worker (in running_tasks or tasks_waiting_retrieval).
-		if ((matched_task = find_running_task_by_id(q, taskid))) {
-			cancel_running_task(q, matched_task);
-		} //if not, see if task is in ready list.
-		else if ((matched_task = list_find(q->ready_list, taskid_comparator, &taskid))) {
-			debug(D_WQ, "Task with id %d is removed from ready list.", matched_task->taskid);
-		} //if not, see if task is in complete list.
-		else if ((matched_task = list_find(q->retrieved_list, taskid_comparator, &taskid))) {
-			debug(D_WQ, "Task with id %d is removed from complete list.", matched_task->taskid);
-		}
+	matched_task = itable_lookup(q->tasks, taskid);
 
-		if(matched_task) {
-			q->stats->total_tasks_cancelled++;
-			change_task_state(q, matched_task, WORK_QUEUE_TASK_CANCELED);
-		}
-		else {
-			debug(D_WQ, "Task with id %d is not found in queue.", taskid);
-		}
+	if(!matched_task) {
+		debug(D_WQ, "Task with id %d is not found in queue.", taskid);
+		return NULL;
 	}
+
+	if( task_state_is(q, taskid, WORK_QUEUE_TASK_RUNNING) ) {
+		cancel_running_task(q, matched_task);
+	}
+
+	q->stats->total_tasks_cancelled++;
+	change_task_state(q, matched_task, WORK_QUEUE_TASK_CANCELED);
 
 	return matched_task;
 }
@@ -4459,27 +4426,16 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 	struct work_queue_task *matched_task = NULL;
 
 	if (tasktag){
-		//see if task is executing at a worker (in running_tasks or tasks_waiting_retrieval).
-		if ((matched_task = find_running_task_by_tag(q, tasktag))) {
-			cancel_running_task(q, matched_task);
-		} //if not, see if task is in ready list.
-		else if ((matched_task = list_find(q->ready_list, tasktag_comparator, tasktag))) {
-			debug(D_WQ, "Task with tag %s and id %d is removed from ready list.", matched_task->tag, matched_task->taskid);
-		} //if not, see if task is in complete list.
-		else if ((matched_task = list_find(q->retrieved_list, tasktag_comparator, tasktag))) {
-			debug(D_WQ, "Task with tag %s and id %d is removed from complete list.", matched_task->tag, matched_task->taskid);
-		}
+		matched_task = find_task_by_tag(q, tasktag);
 
 		if(matched_task) {
-			q->stats->total_tasks_cancelled++;
-			change_task_state(q, matched_task, WORK_QUEUE_TASK_CANCELED);
+			return work_queue_cancel_by_taskid(q, matched_task->taskid);
 		}
-		else {
-			debug(D_WQ, "Task with tag %s is not found in queue.", tasktag);
-		}
+
 	}
 
-	return matched_task;
+	debug(D_WQ, "Task with tag %s is not found in queue.", tasktag);
+	return NULL;
 }
 
 struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
@@ -4489,15 +4445,11 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 	uint64_t taskid;
 	char *key;
 
-	while( (t = list_pop_head(q->ready_list)) ) {
+	itable_firstkey(q->tasks);
+	while(itable_nextkey(q->tasks, &taskid, (void**)&t)) {
 		list_push_tail(l, t);
-		q->stats->total_tasks_cancelled++;
+		work_queue_cancel_by_taskid(q, taskid);
 	}
-	while( (t = list_pop_head(q->retrieved_list)) ) {
-		list_push_tail(l, t);
-		q->stats->total_tasks_cancelled++;
-	}
-
 
 	hash_table_firstkey(q->workers_with_available_results);
 	while(hash_table_nextkey(q->workers_with_available_results, &key, (void **) &w)) {
@@ -4647,7 +4599,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	//info about tasks
 	s->tasks_waiting = list_size(q->ready_list);
 	s->tasks_running = task_state_count(q, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	s->tasks_complete = list_size(q->retrieved_list);
+	s->tasks_complete = task_state_count(q, WORK_QUEUE_TASK_RETRIEVED);
 	s->total_tasks_dispatched = qs->total_tasks_dispatched;
 	s->total_tasks_complete = qs->total_tasks_complete;
 	s->total_tasks_cancelled = qs->total_tasks_cancelled;
