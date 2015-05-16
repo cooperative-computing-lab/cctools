@@ -119,6 +119,7 @@ static char *monitor_log_dir = NULL;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
+static char *image_tar = NULL;
 
 /* wait upto this many seconds for an output file of a succesfull task
  * to appear on the local filesystem (e.g, to deal with NFS
@@ -619,11 +620,24 @@ static void makeflow_create_docker_sh()
 	
   	wrapper_fn = fopen(CONTAINER_SH, "w"); 
 
-    fprintf(wrapper_fn, "#!/bin/sh\n\
+    if (image_tar == NULL) {
+
+        fprintf(wrapper_fn, "#!/bin/sh\n\
 curr_dir=`pwd`\n\
 default_dir=/root/worker\n\
 flock /tmp/lockfile /usr/bin/docker pull %s\n\
 docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s \"$@\"\n", container_image, container_image);
+
+    } else {
+
+        fprintf(wrapper_fn, "#!/bin/sh\n\
+curr_dir=`pwd`\n\
+default_dir=/root/worker\n\
+flock /tmp/lockfile /usr/bin/docker load < %s\n\
+docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s \"$@\"\n", image_tar, container_image);
+
+        makeflow_wrapper_add_input_file(image_tar);
+    }
 
   	fclose(wrapper_fn);
 
@@ -1096,6 +1110,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
 	printf(" %-30s Add node id symbol tags in the makeflow log.        (default is false)\n", "   --log-verbose");
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
+	printf(" %-30s Load docker image from the tar file.\n", "--load-from-tar=<tar file>");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
@@ -1184,7 +1199,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WRAPPER_OUTPUT,
-        LONG_OPT_DOCKER
+        LONG_OPT_DOCKER,
+        LONG_OPT_LOAD_FROM_TAR
 	};
 
 	static struct option long_options_run[] = {
@@ -1238,6 +1254,7 @@ int main(int argc, char *argv[])
 		{"zero-length-error", no_argument, 0, 'z'},
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
+		{"load-from-tar", required_argument, 0, LONG_OPT_LOAD_FROM_TAR},
 		{0, 0, 0, 0}
 	};
 
@@ -1454,6 +1471,9 @@ int main(int argc, char *argv[])
 				container_mode = CONTAINER_MODE_DOCKER; 
 				container_image = xxstrdup(optarg);
 				break;
+            case LONG_OPT_LOAD_FROM_TAR:
+                image_tar = xxstrdup(optarg);
+                break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
