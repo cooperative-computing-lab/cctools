@@ -25,13 +25,16 @@ chirp_start() {
 	fi
 	shift
 	if chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"; then
-		for ((i = 0; i < 10; i++)); do
+		i=0
+		while [ $i -lt 10 ]
+		do
 			if [ -s "$pid" -a -s "$port" ]; then
 				hostport="127.0.0.1:$(cat "$port")"
 				unset debug pid port transient
 				return 0
 			fi
 			sleep 1
+			i=$((i+1))
 		done
 		echo "chirp_server did not start:"
 	else

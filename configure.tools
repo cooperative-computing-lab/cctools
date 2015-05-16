@@ -156,6 +156,7 @@ library_search_normal()
 	local basedir
 	local libdir
 	local dynamic_suffix
+	local arch
 
 	# Must clear out any previous values from the global
 	library_search_result=""
@@ -200,6 +201,13 @@ library_search_normal()
 	if [ X$3 != X -a -d "$libdir/$3" ]
 	then
 		libdir="$libdir/$3"
+	fi
+
+	# If no third argument, and debian based, libraries are in ARCH-linux-gnu.
+	arch=`uname -m`
+	if [ X$3 = X -a -d "$libdir/$arch-linux-gnu" ]
+	then
+		libdir="$libdir/$arch-linux-gnu"
 	fi
 
 	# Now check for the library file in all of the known places,

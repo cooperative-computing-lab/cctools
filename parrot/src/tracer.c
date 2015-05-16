@@ -477,6 +477,7 @@ more:
 #else
 	ssize_t n = syscall(SYSCALL64_process_vm_writev, t->pid, &local, (int64_t)1, remote, rn, (int64_t)0);
 #endif
+	assert(n >= 0 || n == -1);
 
 	/* There is a bug in the implementation, allowing a split remote iovec. The
 	 * manual says this should not be possible:
@@ -558,6 +559,7 @@ static ssize_t tracer_copy_in_slow( struct tracer *t, void *data, const void *ua
 				ERROR;
 		}
 		memcpy(bdata,&word,(length-total));
+		total = length;
 	}
 
 	return total;
@@ -607,6 +609,7 @@ more:
 #else
 	ssize_t n = syscall(SYSCALL64_process_vm_readv, (int64_t)t->pid, &local, (int64_t)1, remote, rn, (int64_t)0);
 #endif
+	assert(n >= 0 || n == -1);
 
 	/* There is a bug in the implementation, allowing a split remote iovec. The
 	 * manual says this should not be possible:
