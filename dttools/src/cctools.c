@@ -14,7 +14,7 @@ See the file COPYING for details.
 void cctools_version_print (FILE *stream, const char *cmd)
 {
 	fprintf(stream, "%s version %s (released %s)\n", cmd, CCTOOLS_VERSION, CCTOOLS_RELEASE_DATE);
-	fprintf(stream, "\tBuilt by %s@%s on %s at %s\n", BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
+	fprintf(stream, "\tBuilt by %s@%s on %s\n", BUILD_USER, BUILD_HOST, BUILD_DATE);
 	fprintf(stream, "\tSystem: %s\n", CCTOOLS_SYSTEM_INFORMATION);
 	fprintf(stream, "\tConfiguration: %s\n", CCTOOLS_CONFIGURE_ARGUMENTS);
 }
@@ -22,7 +22,7 @@ void cctools_version_print (FILE *stream, const char *cmd)
 void cctools_version_debug (uint64_t type, const char *cmd)
 {
 	debug(type, "%s version %s (released %s)", cmd, CCTOOLS_VERSION, CCTOOLS_RELEASE_DATE);
-	debug(type, "Built by %s@%s on %s at %s", BUILD_USER, BUILD_HOST, __DATE__, __TIME__);
+	debug(type, "Built by %s@%s on %s", BUILD_USER, BUILD_HOST, BUILD_DATE);
 	debug(type, "System: %s", CCTOOLS_SYSTEM_INFORMATION);
 	debug(type, "Configuration: %s", CCTOOLS_CONFIGURE_ARGUMENTS);
 }
