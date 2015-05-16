@@ -613,11 +613,6 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	return 0;
 }
 
-/*
- * creates a general shell script for running each task with a 
- * docker container 
- */ 
-
 static void makeflow_create_docker_sh() 
 {       
     FILE *wrapper_fn;
