@@ -1092,6 +1092,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Work Queue keepalive interval.              (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
 	printf(" %-30s Show version string\n", "-v,--version");
 	printf(" %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
+	printf(" %-30s Working directory for the batch system.\n", "   --working-dir=<dir|url>");
 	printf(" %-30s Wrap all commands with this prefix.\n", "   --wrapper=<cmd>");
 	printf(" %-30s Wrapper command requires this input file.\n", "   --wrapper-input=<cmd>");
 	printf(" %-30s Wrapper command produces this output file.\n", "   --wrapper-output=<cmd>");
