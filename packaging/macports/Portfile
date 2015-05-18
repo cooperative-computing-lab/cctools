@@ -2,12 +2,11 @@
 # $Id$
 
 PortSystem              1.0
-PortGroup               github 1.0
 
 set description_common  {Notre Dame Cooperative Computing Software}
 
 name                    ndcctools
-version                 release-4.3.4
+version                 4.4.2
 categories              sysutils
 platforms               darwin
 license                 MIT
@@ -21,9 +20,9 @@ long_description        ${description_common} \
                         distributed systems such as clusters, clouds, and grids.
  
 homepage                http://ccl.cse.nd.edu/
-master_sites            https://github.com/cooperative-computing-lab/cctools/archive/
-distfiles               ${version}.zip
-worksrcdir              cctools-${version}
+master_sites            http://ccl.cse.nd.edu/software/files/
+distfiles               cctools-${version}-source.tar.gz
+worksrcdir              cctools-${version}-source
 
 configure.pre_args      --prefix ${destroot}${prefix}
 
@@ -36,7 +35,7 @@ post-destroot           {
 
                         }
 
-checksums               rmd160 7b2b1919f11f205f6452cd26aee3a6f70ff24118 \
-                        sha256 17b48aa7b47ca27e6feef680ec51c9fa7a47e012a08947715f876276273a2db8
-use_zip                 yes
+checksums               rmd160 73c6b429c11235d42fe6a870420df496ed510fbd \
+                        sha256 64239e98c13536ab14ff70e625cd7f50a4cba714ee719a47b8286c2d6d38b597
+
 
