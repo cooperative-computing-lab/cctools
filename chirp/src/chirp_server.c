@@ -1718,8 +1718,6 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 		debug(D_LOGIN, "%s from %s:%d", typesubject, addr, port);
 
 		if(safe_username) {
-			cfs->chown("/", safe_uid, safe_gid);
-			cfs->chmod("/", S_IRWXU);
 			debug(D_AUTH, "changing to uid %d gid %d", safe_uid, safe_gid);
 			setgid(safe_gid);
 			setuid(safe_uid);
