@@ -1061,7 +1061,6 @@ static void show_help_run(const char *cmd)
 	printf("Use: %s [options] <dagfile>\n", cmd);
 	printf("Frequently used options:\n\n");
 	printf(" %-30s Clean up: remove logfile and all targets.\n", "-c,--clean");
-	printf(" %-30s Change directory: chdir to enable executing the Makefile in other directory.\n", "-X,--change-directory");
 	printf(" %-30s Batch system type: (default is local)\n", "-T,--batch-type=<type>");
 	printf(" %-30s %s\n\n", "", batch_queue_type_string());
 	printf("Other options are:\n");
@@ -1087,15 +1086,16 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	printf(" %-30s Automatically retry failed batch jobs up to %d times.\n", "-R,--retry", makeflow_retry_max);
 	printf(" %-30s Automatically retry failed batch jobs up to n times.\n", "-r,--retry-count=<n>");
-	printf(" %-30s Wait for output files to be created upto n seconds (e.g., to deal with NFS semantics).", "--wait-for-files-upto=<n>");
+	printf(" %-30s Wait for output files to be created upto n seconds (e.g., to deal with NFS semantics).\n", "   --wait-for-files-upto=<n>");
 	printf(" %-30s Time to retry failed batch job submission.  (default is %ds)\n", "-S,--submission-timeout=<#>", makeflow_submit_timeout);
 	printf(" %-30s Work Queue keepalive timeout.               (default is %ds)\n", "-t,--wq-keepalive-timeout=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
 	printf(" %-30s Work Queue keepalive interval.              (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
 	printf(" %-30s Show version string\n", "-v,--version");
 	printf(" %-30s Work Queue scheduling algorithm.            (time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
-	printf(" %-30s Wrap all commands with this prefix.\n", "--wrapper=<cmd>");
-	printf(" %-30s Wrapper command requires this input file.\n", "--wrapper-input=<cmd>");
-	printf(" %-30s Wrapper command produces this output file.\n", "--wrapper-output=<cmd>");
+	printf(" %-30s Wrap all commands with this prefix.\n", "   --wrapper=<cmd>");
+	printf(" %-30s Wrapper command requires this input file.\n", "   --wrapper-input=<cmd>");
+	printf(" %-30s Wrapper command produces this output file.\n", "   --wrapper-output=<cmd>");
+	printf(" %-30s Change directory: chdir to enable executing the Makefile in other directory.\n", "-X,--change-directory");
 	printf(" %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	printf(" %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
 	printf(" %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
@@ -1104,11 +1104,11 @@ static void show_help_run(const char *cmd)
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
-	printf(" %-30s Use <file> as value-pairs for resource limits.\n", "--monitor-limits=<file>");
-	printf(" %-30s Set monitor interval to <#> seconds.        (default is 1 second)\n", "--monitor-interval=<#>");
-	printf(" %-30s Enable monitor time series.                 (default is disabled)\n", "--monitor-with-time-series");
-	printf(" %-30s Enable monitoring of openened files.        (default is disabled)\n", "--monitor-with-opened-files");
-	printf(" %-30s Format for monitor logs.                    (default %s)\n", "--monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
+	printf(" %-30s Use <file> as value-pairs for resource limits.\n", "   --monitor-limits=<file>");
+	printf(" %-30s Set monitor interval to <#> seconds.        (default is 1 second)\n", "   --monitor-interval=<#>");
+	printf(" %-30s Enable monitor time series.                 (default is disabled)\n", "   --monitor-with-time-series");
+	printf(" %-30s Enable monitoring of openened files.        (default is disabled)\n", "   --monitor-with-opened-files");
+	printf(" %-30s Format for monitor logs.                    (default %s)\n", "   --monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
 }
 
 int main(int argc, char *argv[])
