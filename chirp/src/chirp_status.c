@@ -46,6 +46,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Rotate file once it reaches this size. (default 10M, 0 disables)\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Only show servers with this space available. (example: -A 100MB)\n", "-A,--server-space=<size>");
+	fprintf(stdout, " %-30s Only show servers with this project.\n", "   --server-project=<name>");
 	fprintf(stdout, " %-30s Show all records, not just chirps and catalogs.\n", "-a,--all");
 	fprintf(stdout, " %-30s Timeout.\n", "-t,--timeout=<time>");
 	fprintf(stdout, " %-30s Short output.\n", "-s,--brief");
