@@ -11,18 +11,16 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 
 #include <assert.h>
-#include <errno.h>
-#include <stdio.h>
-#include <string.h>
-#include <math.h>
-#include <stdlib.h>
 #include <ctype.h>
-#include <stdarg.h>
-#include <signal.h>
+#include <errno.h>
+#include <math.h>
 #include <regex.h>
-
-#define STRINGTOOLS_BUFFER_SIZE 256
-#define METRIC_POWER_COUNT 6
+#include <signal.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 char *escape_shell_string(const char *str)
 {
@@ -174,7 +172,7 @@ int string_match(const char *pattern, const char *text)
 
 char *string_front(const char *str, int max)
 {
-	static char buffer[STRINGTOOLS_BUFFER_SIZE];
+	static char buffer[256];
 	int length;
 
 	length = strlen(str);
@@ -199,87 +197,79 @@ const char *string_back(const char *str, int max)
 	}
 }
 
-char *string_metric(double invalue, int power_needed, char *buffer)
+char *string_metric(double value, int power_needed, char *buffer)
 {
+	static const char suffix[][3] = { "", " K", " M", " G", " T", " P" };
 	static char localbuffer[100];
-	static char *suffix[METRIC_POWER_COUNT] = { " ", "K", "M", "G", "T", "P" };
 
-	double value = invalue;
-	int power = 0;
+	double magnitude;
 
 	if(power_needed == -1) {
-		while((value >= 1000.0) && (power < (METRIC_POWER_COUNT - 1))) {
-			value = value / 1024.0;
-			power++;
-		}
+		magnitude = floor(log(value)/log(1024.0));
 	} else {
-		power = power_needed;
-		value = value / (pow(2, 10 * power));
+		magnitude = power_needed;
 	}
+	magnitude = fmin(fmax(magnitude, 0.0), (double)(sizeof(suffix)/sizeof(suffix[0])-1));
 
 	if(!buffer)
 		buffer = localbuffer;
 
-	sprintf(buffer, "%.1f %s", value, suffix[power]);
+	snprintf(buffer, sizeof(localbuffer), "%.1f%s", value / pow(1024.0, magnitude), suffix[(int)magnitude]);
 
 	return buffer;
 }
 
-INT64_T string_metric_parse(const char *str)
+int64_t string_metric_parse(const char *str)
 {
-	INT64_T result, factor;
+	int64_t result;
 	char prefix;
-	int fields;
 
-	fields = sscanf(str, INT64_FORMAT "%c", &result, &prefix);
-	if(fields == 1)
-		return result;
-
-	switch (toupper((int) prefix)) {
-	case 'K':
-		factor = 1024LL;
-		break;
-	case 'M':
-		factor = 1024LL * 1024;
-		break;
-	case 'G':
-		factor = 1024LL * 1024 * 1024;
-		break;
-	case 'T':
-		factor = 1024LL * 1024 * 1024 * 1024;
-		break;
-	case 'P':
-		factor = 1024LL * 1024 * 1024 * 1024 * 1024;
-		break;
-	default:
-		factor = 0;
-		break;
+	switch (sscanf(str, "%" SCNd64 " %c", &result, &prefix)) {
+		case 2:
+			switch (toupper((int) prefix)) {
+				case 'P':
+					return result << 50;
+				case 'T':
+					return result << 40;
+				case 'G':
+					return result << 30;
+				case 'M':
+					return result << 20;
+				case 'K':
+					return result << 10;
+				default:
+					return result;
+			}
+		case 1:
+			return result;
+		default:
+			return errno = EINVAL, -1;
 	}
-
-	return result * factor;
 }
 
-int string_time_parse(const char *str)
+time_t string_time_parse(const char *str)
 {
-	int value;
+	int64_t t;
 	char mod;
 
-	if(sscanf(str, "%d%c", &value, &mod) == 2) {
-		switch (mod) {
-		case 's':
-			return value;
-		case 'm':
-			return value * 60;
-		case 'h':
-			return value * 60 * 60;
-		case 'd':
-			return value * 60 * 60 * 24;
-		}
-	} else if(sscanf(str, "%d", &value) == 1) {
-		return value;
+	switch (sscanf(str, "%" SCNd64 " %c", &t, &mod)) {
+		case 2:
+			switch (tolower((int)mod)) {
+				case 'd':
+					return t * 60 * 60 * 24;
+				case 'h':
+					return t * 60 * 60;
+				case 'm':
+					return t * 60;
+				case 's':
+				default:
+					return t;
+			}
+		case 1:
+			return t;
+		default:
+			return errno = EINVAL, -1;
 	}
-
-	return 0;
 }
 
 /*

@@ -125,7 +125,7 @@ CODE(`workdir_number_files_dirs, workdir_footprint')
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM()CODE(BOLD(CCTOOLS_RESOURCE_MONITOR_HELPER)) Location of the desired helper library to wrap libc calls. If not provided, a version of the helper library is packed with the resource_monitor executable.
+LIST_ITEM(CODE(BOLD(CCTOOLS_RESOURCE_MONITOR_HELPER)) Location of the desired helper library to wrap libc calls. If not provided, a version of the helper library is packed with the resource_monitor executable.)
 LIST_END
 
 SECTION(EXIT STATUS)
@@ -162,9 +162,9 @@ summary files into the file CODE(some-log-file).
 SECTION(BUGS)
 
 LIST_BEGIN
-LIST_ITEM The monitor cannot track the children of statically linked executables.
-LIST_ITEM Not all systems report major memory faults, which means IO from memory maps is computed by changes in the resident set, and therefore not very exact.
-LIST_ITEM One would expect to be able to generate the information of the summary from the time-series, however they use different mechanisms, and the summary tends to be more accurate.
+LIST_ITEM(The monitor cannot track the children of statically linked executables.)
+LIST_ITEM(Not all systems report major memory faults, which means IO from memory maps is computed by changes in the resident set, and therefore not very exact.)
+LIST_ITEM(One would expect to be able to generate the information of the summary from the time-series, however they use different mechanisms, and the summary tends to be more accurate.)
 LIST_END
 
 SECTION(COPYRIGHT)

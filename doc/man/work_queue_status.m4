@@ -15,12 +15,12 @@ Work Queue masters.  When given an address and a port, it queries a master direc
 more detailed information about tasks and workers.
 
 LIST_BEGIN
-LIST_ITEM()Hostname and port number of the application.
-LIST_ITEM()Number of waiting tasks.
-LIST_ITEM()Number of completed tasks.
-LIST_ITEM()Number of connected workers.
-LIST_ITEM()Number of tasks currently being executed.
-LIST_ITEM()Timestamp of when there was last communication with the application.
+LIST_ITEM(Hostname and port number of the application.)
+LIST_ITEM(Number of waiting tasks.)
+LIST_ITEM(Number of completed tasks.)
+LIST_ITEM(Number of connected workers.)
+LIST_ITEM(Number of tasks currently being executed.)
+LIST_ITEM(Timestamp of when there was last communication with the application.)
 LIST_END
 
 SECTION(OPTIONS)

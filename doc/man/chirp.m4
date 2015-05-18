@@ -14,29 +14,29 @@ PARA
 Here are some important  BOLD(chirp) commands:
 
 LIST_BEGIN
-LIST_ITEM()BOLD(open) PARAM(host) Connect to a Chirp server.
-LIST_ITEM()BOLD(close) Close connection to current Chirp server.  
-LIST_ITEM()BOLD(get) PARAM(remotefile) [localfile] Copy a remote file to local storage.
-LIST_ITEM()BOLD(put) PARAM(localfile) [remotefile] Copy a local file to Chirp server.
-LIST_ITEM()BOLD(thirdput) PARAM(file) PARAM(3rdhost) PARAM(3rdfile) Copy a remote file to another Chirp server.
-LIST_ITEM()BOLD(getacl) PARAM(remotepath) Get acl of a remote file/directory.
-LIST_ITEM()BOLD(setacl) PARAM(remotepath) PARAM(user) PARAM(rwldax) Set acl for a remote file/directory.
-LIST_ITEM()BOLD(ls) [-la] [remotepath] List contents of a remote directory.
-LIST_ITEM()BOLD(mv) PARAM(oldname) PARAM(newname) Change name of a remote file.
-LIST_ITEM()BOLD(rm) PARAM(file) Delete a remote file.
-LIST_ITEM()BOLD(audit)	[-r] Audit current Chirp server.
-LIST_ITEM()BOLD(exit) Close connection and exit BOLD(Chirp).
+LIST_ITEM(BOLD(open) PARAM(host) Connect to a Chirp server.)
+LIST_ITEM(BOLD(close) Close connection to current Chirp server.  )
+LIST_ITEM(BOLD(get) PARAM(remotefile) [localfile] Copy a remote file to local storage.)
+LIST_ITEM(BOLD(put) PARAM(localfile) [remotefile] Copy a local file to Chirp server.)
+LIST_ITEM(BOLD(thirdput) PARAM(file) PARAM(3rdhost) PARAM(3rdfile) Copy a remote file to another Chirp server.)
+LIST_ITEM(BOLD(getacl) PARAM(remotepath) Get acl of a remote file/directory.)
+LIST_ITEM(BOLD(setacl) PARAM(remotepath) PARAM(user) PARAM(rwldax) Set acl for a remote file/directory.)
+LIST_ITEM(BOLD(ls) [-la] [remotepath] List contents of a remote directory.)
+LIST_ITEM(BOLD(mv) PARAM(oldname) PARAM(newname) Change name of a remote file.)
+LIST_ITEM(BOLD(rm) PARAM(file) Delete a remote file.)
+LIST_ITEM(BOLD(audit)	[-r] Audit current Chirp server.)
+LIST_ITEM(BOLD(exit) Close connection and exit BOLD(Chirp).)
 LIST_END
 
 BOLD(chirp) also manages Chirp tickets for authentication purpose.
 
 LIST_BEGIN
-LIST_ITEM()BOLD(ticket_create) [-o[utput] PARAM(ticket filename)] [-s[ubject] PARAM(subject/user)] [-d[uration] PARAM(duration)] [-b[its] <bits>] [[PARAM(directory) PARAM(acl)] ...] Creat a ticket
-LIST_ITEM()BOLD(ticket_register) PARAM(name) [PARAM(subject)] PARAM(duration) Manually register a ticket with multiple Chirp severs.
-LIST_ITEM()BOLD(ticket_delete) PARAM(name) Remove a ticket.
-LIST_ITEM()BOLD(ticket_list) PARAM(name) List registered tickets on a Chirp server.
-LIST_ITEM()BOLD(ticket_get) PARAM(name) Check status of a ticket.
-LIST_ITEM()BOLD(ticket_modify) PARAM(name) PARAM(directory) PARAM(aclmask) Modify a ticket.
+LIST_ITEM(BOLD(ticket_create) [-o[utput] PARAM(ticket filename)] [-s[ubject] PARAM(subject/user)] [-d[uration] PARAM(duration)] [-b[its] <bits>] [[PARAM(directory) PARAM(acl)] ...] Creat a ticket)
+LIST_ITEM(BOLD(ticket_register) PARAM(name) [PARAM(subject)] PARAM(duration) Manually register a ticket with multiple Chirp severs.)
+LIST_ITEM(BOLD(ticket_delete) PARAM(name) Remove a ticket.)
+LIST_ITEM(BOLD(ticket_list) PARAM(name) List registered tickets on a Chirp server.)
+LIST_ITEM(BOLD(ticket_get) PARAM(name) Check status of a ticket.)
+LIST_ITEM(BOLD(ticket_modify) PARAM(name) PARAM(directory) PARAM(aclmask) Modify a ticket.)
 LIST_END
 
 SECTION(OPTIONS)
@@ -53,7 +53,7 @@ OPTIONS_END
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM()CODE(BOLD(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).
+LIST_ITEM(CODE(BOLD(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).)
 LIST_END
 
 SECTION(EXIT STATUS)

@@ -736,6 +736,7 @@ static int chirp_fs_do_acl_check()
 
 struct chirp_filesystem chirp_fs_local = {
 	chirp_fs_local_init,
+	cfs_stub_destroy,
 
 	chirp_fs_local_fname,
 
@@ -776,7 +777,7 @@ struct chirp_filesystem chirp_fs_local = {
 	cfs_basic_lchown,
 	chirp_fs_local_truncate,
 	chirp_fs_local_utime,
-	cfs_basic_md5,
+	cfs_basic_hash,
 	chirp_fs_local_setrep,
 
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)

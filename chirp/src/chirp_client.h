@@ -9,6 +9,7 @@ See the file COPYING for details.
 #define CHIRP_CLIENT_H
 
 #include "int_sizes.h"
+
 #include "chirp_protocol.h"
 #include "chirp_types.h"
 
@@ -92,6 +93,7 @@ INT64_T chirp_client_chown(struct chirp_client *c, const char *path, INT64_T uid
 INT64_T chirp_client_lchown(struct chirp_client *c, const char *path, INT64_T uid, INT64_T gid, time_t stoptime);
 INT64_T chirp_client_truncate(struct chirp_client *c, const char *path, INT64_T length, time_t stoptime);
 INT64_T chirp_client_utime(struct chirp_client *c, const char *path, time_t actime, time_t modtime, time_t stoptime);
+INT64_T chirp_client_hash(struct chirp_client *c, const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime);
 INT64_T chirp_client_md5(struct chirp_client *c, const char *path, unsigned char digest[16], time_t stoptime);
 INT64_T chirp_client_setrep(struct chirp_client *c, const char *path, int nreps, time_t stoptime);
 

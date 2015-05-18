@@ -27,8 +27,8 @@ See MANPAGE(chirp_server,1) for option listing.
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM()CODE(BOLD(JAVA_HOME)) Location of your Java installation.
-LIST_ITEM()CODE(BOLD(HADOOP_HOME)) Location of your Hadoop installation.
+LIST_ITEM(CODE(BOLD(JAVA_HOME)) Location of your Java installation.)
+LIST_ITEM(CODE(BOLD(HADOOP_HOME)) Location of your Hadoop installation.)
 LIST_END
 
 

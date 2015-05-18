@@ -29,8 +29,8 @@ On success, returns zero. On failure (typically permission errors), returns non-
 
 SECTION(BUGS)
 LIST_BEGIN
-LIST_ITEM The makeflow_linker does not check for naming collisions beyond the initial workflow inputs.
-LIST_ITEM The makeflow_linker relies on regex parsing of files, so some forms of import statements may be missing.
+LIST_ITEM(The makeflow_linker does not check for naming collisions beyond the initial workflow inputs.)
+LIST_ITEM(The makeflow_linker relies on regex parsing of files, so some forms of import statements may be missing.)
 LIST_END
 
 SECTION(EXAMPLES)

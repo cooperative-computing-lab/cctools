@@ -1,0 +1,72 @@
+#!/bin/bash
+
+CCTOOLS_INSTALL=/afs/nd.edu/user31/pdonnel3/cctools-install/bin/
+WEAVER=/afs/nd.edu/user31/pdonnel3/weaver/usr/bin/weaver
+
+if [ "$(whoami)" = pdonnel3 ]; then
+	PORT=9123
+elif [ "$(whoami)" = nhazekam ]; then
+	PORT=9223
+else
+	PORT=9523
+fi
+
+CHIRP="${CCTOOLS_INSTALL}/chirp"
+CHIRP_SERVER="${CCTOOLS_INSTALL}/chirp_server"
+MAKEFLOW="${CCTOOLS_INSTALL}/makeflow"
+
+ARCHIVE=/afs/crc.nd.edu/group/ccl/data/workflows/archives/blast.tar.gz
+DIR="$(pwd)/blast"
+MAKEFLOW_FILE="$DIR"/Makeflow
+
+run () {
+	echo "$@"
+	time "$@"
+}
+
+runbg () {
+	echo "$@" '&'
+	"$@" &
+}
+
+if ! [ -d "$DIR/" ]; then
+	run tar xzf "$ARCHIVE"
+fi
+
+. "$(dirname "$0")/chirps-ssh.sh"
+sleep 5
+
+concurrency=0
+for pull in $(for g in $((1+32*2**10)) $((1+1*2**20)) $((1+1*2**30)) 0; do printf '%012d\t' "$g"; done); do
+	for scheduler in fifo-0 fifo-1; do
+		for replication in push-async-1 push-async-0; do
+			base="$(pwd)/test.pull-${pull}.${scheduler}.${replication}"
+			if [ -d "$base" ]; then
+				echo "$base already exists; continuing"
+				continue;
+			fi
+			run mkdir "$base" || exit 1
+			echo "$CONFUGA_NODE_LIST" > "${base}/nodes.lst"
+
+			eval "$CONFUGA_NODE_NUKE"
+			runbg "$CHIRP_SERVER" --auth=unix --catalog-update=30s --challenge-dir="${base}/" --debug=all --debug-file="${base}/confuga.debug" --debug-rotate-max=0 --interface=127.0.0.1 --jobs --job-concurrency=0 --pid-file="${base}/confuga.pid" --port="$PORT" --root="confuga://${base}/confuga.root?scheduler=${scheduler}&replication=${replication}&pull-threshold=${pull}&nodes=file:${base}/nodes.lst" --superuser="unix:$(whoami)" --transient="${base}/confuga.transient"
+
+			run "$CHIRP" --auth=unix --debug=chirp --debug-file="${base}/chirp.debug" --timeout=60m localhost:"$PORT" put "$DIR/"
+
+			run cp "$MAKEFLOW_FILE" "${base}/Makeflow"
+			run "$MAKEFLOW" --batch-type=chirp --debug=all --debug-file="${base}/makeflow.debug" --debug-rotate-max=0 --working-dir="chirp://localhost:${PORT}/$(basename "$DIR")" --wrapper=$'{\n {}\n} > stdout.%% 2> stderr.%%' --wrapper-output='stdout.%%' --wrapper-output='stderr.%%' "${base}/Makeflow"
+			result=$?
+			if [ $result -ne 0 ]; then
+				echo "makeflow failed with exit code $result"
+				echo "waiting for debugging"
+				sleep 7d
+			fi
+
+			kill %1
+			wait
+			sleep 10
+		done
+	done
+done
+
+# vim: set noexpandtab tabstop=4:

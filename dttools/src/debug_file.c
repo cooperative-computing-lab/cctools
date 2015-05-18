@@ -27,7 +27,8 @@ static off_t file_size_max = 1<<20;
 void debug_file_reopen (void)
 {
 	if (strlen(file_path)) {
-		file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY|O_NOCTTY, 0660);
+		close(file_fd);
+		file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY|O_NOCTTY, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
 		if (file_fd == -1){
 			fprintf(stderr, "could not access log file `%s' for writing: %s\n", file_path, strerror(errno));
 			exit(EXIT_FAILURE);
@@ -42,6 +43,15 @@ void debug_file_reopen (void)
 			fprintf(stderr, "could not set file flags: %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
+		/* canonicalize the debug_file path for future operations */
+		{
+			char tmp[PATH_MAX] = "";
+			if (realpath(file_path, tmp) == NULL) {
+				fprintf(stderr, "could not resolve '%s'\n", file_path);
+				exit(EXIT_FAILURE);
+			}
+			memcpy(file_path, tmp, sizeof(file_path));
+		}
 	}
 }
 
@@ -53,12 +63,9 @@ void debug_file_write (INT64_T flags, const char *str)
 		rc = fstat(file_fd, &info);
 		if (rc == 0) {
 			if (info.st_size >= file_size_max) {
-				close(file_fd);
-				if(stat(file_path, &info) == 0 && info.st_size >= file_size_max) {
-					char old[PATH_MAX] = "";
-					snprintf(old, sizeof(old)-1, "%s.old", file_path);
-					rename(file_path, old);
-				}
+				char old[PATH_MAX];
+				snprintf(old, sizeof(old), "%s.old", file_path);
+				rename(file_path, old);
 				debug_file_reopen();
 			}
 		} else {
@@ -76,8 +83,7 @@ void debug_file_write (INT64_T flags, const char *str)
 
 void debug_file_path (const char *path)
 {
-	path_absolute(path, file_path, 0);
-	close(file_fd);
+	strncpy(file_path, path, sizeof(file_path)-1);
 	debug_file_reopen();
 }
 
@@ -91,7 +97,6 @@ void debug_file_rename (const char *suffix)
 	if (strlen(file_path)) {
 		char old[PATH_MAX] = "";
 
-		close(file_fd);
 		snprintf(old, sizeof(old)-1, "%s.%s", file_path, suffix);
 		rename(file_path, old);
 		debug_file_reopen();

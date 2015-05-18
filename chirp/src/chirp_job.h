@@ -11,10 +11,10 @@
 
 #include "chirp_types.h"
 
-extern int   chirp_job_concurrency;
-extern int   chirp_job_enabled;
-extern pid_t chirp_job_schedd;
-extern int   chirp_job_time_limit;
+extern unsigned chirp_job_concurrency;
+extern int      chirp_job_enabled;
+extern pid_t    chirp_job_schedd;
+extern int      chirp_job_time_limit;
 
 enum {
 	CHIRP_JOB_WAIT_MAX_TIMEOUT = 30

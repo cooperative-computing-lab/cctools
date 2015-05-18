@@ -23,6 +23,7 @@ OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_TRIPLET(-O,debug-rotate-max,bytes)Rotate file once it reaches this size.
 OPTION_TRIPLET(-A,server-space,size)Only show servers with this space available. (example: -A 100MB).
+OPTION_PAIR(--server-project,name)Only servers with this project name.
 OPTION_TRIPLET(-t,timeout,time)Timeout.
 OPTION_ITEM(`-s, --brief')Short output.
 OPTION_ITEM(`-l, --verbose')Long output.
@@ -34,7 +35,7 @@ OPTIONS_END
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM()CODE(BOLD(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).
+LIST_ITEM(CODE(BOLD(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).)
 LIST_END
 
 SECTION(EXIT STATUS)

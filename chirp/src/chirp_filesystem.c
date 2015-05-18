@@ -11,13 +11,16 @@ See the file COPYING for details.
 #include "chirp_fs_chirp.h"
 #include "chirp_fs_hdfs.h"
 #include "chirp_fs_local.h"
+#include "chirp_fs_confuga.h"
 
 #include "debug.h"
 #include "macros.h"
 #include "buffer.h"
 #include "path.h"
+#include "pattern.h"
 #include "xxmalloc.h"
 #include "md5.h"
+#include "sha1.h"
 
 #include <fnmatch.h>
 
@@ -33,12 +36,12 @@ See the file COPYING for details.
 #define CHIRP_FILESYSTEM_BUFFER  65536
 
 struct chirp_filesystem *cfs = NULL;
-char   chirp_url[CHIRP_PATH_MAX] = "local://./";
+char chirp_url[CHIRP_PATH_MAX] = "local://./";
 
 struct CHIRP_FILE {
 	enum {
-	  LOCAL,
-	  CFS,
+		LOCAL,
+		CFS,
 	} type;
 	union {
 		struct {
@@ -60,6 +63,8 @@ struct chirp_filesystem *cfs_lookup(const char *url)
 		return &chirp_fs_chirp;
 	} else if(strprfx(url, "hdfs://")) {
 		return &chirp_fs_hdfs;
+	} else if(strprfx(url, "confuga://")) {
+		return &chirp_fs_confuga;
 	} else {
 		/* always interpret as a local url */
 		return &chirp_fs_local;
@@ -68,20 +73,30 @@ struct chirp_filesystem *cfs_lookup(const char *url)
 
 void cfs_normalize(char url[CHIRP_PATH_MAX])
 {
+	char *root = NULL;
+	char *rest = NULL;
+
 	if(strprfx(url, "chirp:")) {
 		return;
 	} else if(strprfx(url, "hdfs:")) {
 		return;
+	} else if(pattern_match(url, "^confuga://([^?]*)(.*)", &root, &rest) >= 0) {
+		char absolute[PATH_MAX];
+		path_absolute(root, absolute, 0);
+		debug(D_CHIRP, "normalizing url `%s' as `confuga://%s%s'", url, absolute, rest);
+		snprintf(url, CHIRP_PATH_MAX, "confuga://%s%s", absolute, rest);
 	} else {
 		char absolute[PATH_MAX];
 		if(strprfx(url, "file:") || strprfx(url, "local:"))
-			path_absolute(strstr(url, ":")+1, absolute, 0);
+			path_absolute(strstr(url, ":") + 1, absolute, 0);
 		else
 			path_absolute(url, absolute, 0);
 		debug(D_CHIRP, "normalizing url `%s' as `local://%s'", url, absolute);
 		strcpy(url, "local://");
 		strcat(url, absolute);
 	}
+	free(root);
+	free(rest);
 }
 
 CHIRP_FILE *cfs_fopen(const char *path, const char *mode)
@@ -191,30 +206,38 @@ size_t cfs_fwrite(const void *ptr, size_t size, size_t nitems, CHIRP_FILE * file
 	if(file->type == LOCAL)
 		return fwrite(ptr, size, nitems, file->f.lfile);
 	for(; bytes < nbytes; bytes++)
-		buffer_printf(&file->f.cfile.B, "%c", (int) (((const char *) ptr)[bytes]));
+		buffer_putfstring(&file->f.cfile.B, "%c", (int) (((const char *) ptr)[bytes]));
 	return nbytes;
 }
 
 /* WARNING: fread does not use the fgets buffer!! */
 size_t cfs_fread(void *ptr, size_t size, size_t nitems, CHIRP_FILE * file)
 {
-	size_t nitems_read = 0;
-
-	if(file->type == LOCAL)
+	if(file->type == LOCAL) {
 		return fread(ptr, size, nitems, file->f.lfile);
+	} else {
+		size_t btotal = size * nitems;
+		size_t bavail = btotal;
 
-	if(size == 0 || nitems == 0)
-		return 0;
-
-	while(nitems_read < nitems) {
-		INT64_T t = cfs->pread(file->f.cfile.fd, ptr, size, file->f.cfile.offset);
-		if(t == -1 || t == 0)
-			return nitems_read;
-		file->f.cfile.offset += t;
-		ptr = (char *) ptr + size;	//Previously void arithmetic!
-		nitems_read++;
+		while(bavail > size) {
+			INT64_T t = cfs->pread(file->f.cfile.fd, ptr, bavail, file->f.cfile.offset);
+			if(t == -1) {
+				if(errno == EINTR) {
+					continue;
+				} else {
+					file->f.cfile.error = errno;
+					break;
+				}
+			} else if(t == 0) {
+				break;
+			}
+			assert(0 < t && t < (INT64_T) bavail);
+			file->f.cfile.offset += t;
+			bavail -= t;
+			ptr = (char *) ptr + size;
+		}
+		return (btotal - bavail) / size;
 	}
-	return nitems_read;
 }
 
 char *cfs_fgets(char *s, int n, CHIRP_FILE * file)
@@ -318,41 +341,14 @@ int cfs_create_dir(const char *path, int mode)
 	}
 }
 
-int cfs_delete_dir(const char *path)
-{
-	int result = 1;
-	struct chirp_dir *dir;
-	struct chirp_dirent *d;
-
-	if(cfs->unlink(path) == 0)	/* Handle files and symlinks here */
-		return 0;
-
-	dir = cfs->opendir(path);
-	if(!dir) {
-		return errno == ENOENT;
-	}
-	while((d = cfs->readdir(dir))) {
-		char subdir[PATH_MAX];
-		if(!strcmp(d->name, "."))
-			continue;
-		if(!strcmp(d->name, ".."))
-			continue;
-		sprintf(subdir, "%s/%s", path, d->name);
-		if(!cfs_delete_dir(subdir)) {
-			result = 0;
-		}
-	}
-	cfs->closedir(dir);
-	return cfs->rmdir(path) == 0 ? result : 0;
-}
-
-int cfs_freadall(CHIRP_FILE * f, buffer_t *B)
+int cfs_freadall(CHIRP_FILE * f, buffer_t * B)
 {
 	size_t n;
 	char buf[BUFSIZ];
 
-	while ((n = cfs_fread(buf, sizeof(char), sizeof(buf), f)) > 0) {
-		buffer_putlstring(B, buf, n);
+	while((n = cfs_fread(buf, sizeof(char), sizeof(buf), f)) > 0) {
+		if(buffer_putlstring(B, buf, n) == -1)
+			return 0;
 	}
 
 	return cfs_ferror(f) ? 0 : 1;
@@ -457,11 +453,27 @@ INT64_T cfs_basic_fchown(int fd, INT64_T uid, INT64_T gid)
 	return 0;
 }
 
-INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
+INT64_T cfs_basic_hash(const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX])
 {
 	int fd;
 	INT64_T result;
 	struct chirp_stat info;
+
+	union {
+		md5_context_t md5;
+		sha1_context_t sha1;
+	} context;
+	enum { MD5, SHA1 } type;
+
+	if(strcmp(algorithm, "md5") == 0) {
+		type = MD5;
+		md5_init(&context.md5);
+	} else if(strcmp(algorithm, "sha1") == 0) {
+		type = SHA1;
+		sha1_init(&context.sha1);
+	} else {
+		return (errno = EINVAL, -1);
+	}
 
 	result = cfs->stat(path, &info);
 	if(result < 0)
@@ -476,9 +488,6 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 	if(fd >= 0) {
 		INT64_T total = 0;
 		INT64_T length = info.cst_size;
-		md5_context_t ctx;
-
-		md5_init(&ctx);
 
 		while(length > 0) {
 			char buffer[65536];
@@ -488,20 +497,52 @@ INT64_T cfs_basic_md5(const char *path, unsigned char digest[16])
 			if(ractual <= 0)
 				break;
 
-			md5_update(&ctx, (unsigned char *) buffer, ractual);
+			if(type == MD5)
+				md5_update(&context.md5, buffer, ractual);
+			else if(type == SHA1)
+				sha1_update(&context.sha1, buffer, ractual);
 
 			length -= ractual;
 			total += ractual;
 		}
 		cfs->close(fd);
 
-		result = MD5_DIGEST_LENGTH;
-		md5_final(digest, &ctx);
-	} else {
-		result = -1;
+		if(type == MD5) {
+			md5_final(digest, &context.md5);
+			return MD5_DIGEST_LENGTH;
+		} else if(type == SHA1) {
+			sha1_final(digest, &context.sha1);
+			return SHA1_DIGEST_LENGTH;
+		} else
+			assert(0);
 	}
+	return -1;
+}
 
-	return result;
+INT64_T cfs_basic_rmall(const char *path)
+{
+	INT64_T rc = cfs->unlink(path);
+	if(rc == -1 && (errno == EISDIR || errno == EPERM)) {
+		struct chirp_dir *dir = cfs->opendir(path);
+		if(dir) {
+			struct chirp_dirent *d;
+			rc = 0;
+			while(rc == 0 && (d = cfs->readdir(dir))) {
+				if(strcmp(d->name, ".") != 0 && strcmp(d->name, "..") != 0) {
+					char subpath[PATH_MAX];
+					snprintf(subpath, sizeof(subpath), "%s/%s", path, d->name);
+					rc = cfs_basic_rmall(subpath);
+					if(rc == -1) {
+						cfs->closedir(dir);
+						return -1;
+					}
+				}
+			}
+			cfs->closedir(dir);
+			rc = cfs->rmdir(path);
+		}
+	}
+	return rc;
 }
 
 INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
@@ -597,13 +638,13 @@ static int search_match_file(const char *pattern, const char *name)
 {
 	debug(D_DEBUG, "search_match_file(`%s', `%s')", pattern, name);
 	/* Decompose the pattern in atoms which are each matched against. */
-	while (1) {
+	while(1) {
 		char atom[CHIRP_PATH_MAX];
-		const char *end = strchr(pattern, '|'); /* disjunction operator */
+		const char *end = strchr(pattern, '|');	/* disjunction operator */
 
 		memset(atom, 0, sizeof(atom));
-		if (end)
-			strncpy(atom, pattern, (size_t)(end-pattern));
+		if(end)
+			strncpy(atom, pattern, (size_t) (end - pattern));
 		else
 			strcpy(atom, pattern);
 
@@ -620,11 +661,12 @@ static int search_match_file(const char *pattern, const char *name)
 				return 1;
 			}
 			test = strchr(test, '/');
-			if (test) test += 1;
-		} while (test);
+			if(test)
+				test += 1;
+		} while(test);
 
-		if (end)
-			pattern = end+1;
+		if(end)
+			pattern = end + 1;
 		else
 			break;
 	}
@@ -636,15 +678,16 @@ static int search_should_recurse(const char *base, const char *pattern)
 {
 	debug(D_DEBUG, "search_should_recurse(base = `%s', pattern = `%s')", base, pattern);
 	/* Decompose the pattern in atoms which are each matched against. */
-	while (1) {
+	while(1) {
 		char atom[CHIRP_PATH_MAX];
 
-		if (*pattern != '/') return 1; /* unanchored pattern is always recursive */
+		if(*pattern != '/')
+			return 1;	/* unanchored pattern is always recursive */
 
-		const char *end = strchr(pattern, '|'); /* disjunction operator */
+		const char *end = strchr(pattern, '|');	/* disjunction operator */
 		memset(atom, 0, sizeof(atom));
-		if (end)
-			strncpy(atom, pattern, (size_t)(end-pattern));
+		if(end)
+			strncpy(atom, pattern, (size_t) (end - pattern));
 		else
 			strcpy(atom, pattern);
 
@@ -652,29 +695,29 @@ static int search_should_recurse(const char *base, const char *pattern)
 		 * `pattern' to see if we should recurse in the directory `base'. To do
 		 * this, we strip off final parts of `pattern' until we get a match.
 		 */
-		while (*atom) {
+		while(*atom) {
 			int result = fnmatch(atom, base, FNM_PATHNAME);
 			debug(D_DEBUG, "fnmatch(`%s', `%s', FNM_PATHNAME) = %d", atom, base, result);
 			if(result == 0) {
 				return 1;
 			}
 			char *last = strrchr(atom, '/');
-			if (last) {
+			if(last) {
 				*last = '\0';
 			} else {
 				break;
 			}
 		}
 
-		if (end)
-			pattern = end+1;
+		if(end)
+			pattern = end + 1;
 		else
 			break;
 	}
 	return 0;
 }
 
-static int search_directory(const char *subject, const char * const base, char fullpath[CHIRP_PATH_MAX], const char *pattern, int flags, struct link *l, time_t stoptime)
+static int search_directory(const char *subject, const char *const base, char fullpath[CHIRP_PATH_MAX], const char *pattern, int flags, struct link *l, time_t stoptime)
 {
 	if(strlen(pattern) == 0)
 		return 0;
@@ -702,8 +745,8 @@ static int search_directory(const char *subject, const char * const base, char f
 
 			if(search_match_file(pattern, base)) {
 				const char *matched;
-				if (includeroot) {
-					if (base-fullpath == 1 && fullpath[0] == '/') {
+				if(includeroot) {
+					if(base - fullpath == 1 && fullpath[0] == '/') {
 						matched = base;
 					} else {
 						matched = fullpath;
@@ -713,23 +756,25 @@ static int search_directory(const char *subject, const char * const base, char f
 				}
 
 				result += 1;
-				if (access_flags == F_OK || cfs->access(fullpath, access_flags) == 0) {
+				if(access_flags == F_OK || cfs->access(fullpath, access_flags) == 0) {
 					if(metadata) {
 						/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
 						if(entry->lstatus == -1) {
-							link_putfstring(l, "0:%s::\n", stoptime, matched); // FIXME is this a bug?
+							link_putfstring(l, "0:%s::\n", stoptime, matched);	// FIXME is this a bug?
 							link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, matched);
 						} else {
 							BUFFER_STACK_ABORT(B, 4096)
-							chirp_stat_encode(&B, &entry->info);
+								chirp_stat_encode(&B, &entry->info);
 							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, buffer_tostring(&B));
-							if(stopatfirst) return 1;
+							if(stopatfirst)
+								return 1;
 						}
 					} else {
 						link_putfstring(l, "0:%s::\n", stoptime, matched);
-						if(stopatfirst) return 1;
+						if(stopatfirst)
+							return 1;
 					}
-				} /* FIXME access failure */
+				}	/* FIXME access failure */
 			}
 
 			if(cfs_isdir(fullpath) && search_should_recurse(base, pattern)) {
@@ -763,16 +808,21 @@ static int search_directory(const char *subject, const char * const base, char f
 }
 
 /* Note we need the subject because we must check the ACL for any nested directories. */
-INT64_T cfs_basic_search(const char *subject, const char *dir, const char *pattern, int flags, struct link *l, time_t stoptime)
+INT64_T cfs_basic_search(const char *subject, const char *dir, const char *pattern, int flags, struct link * l, time_t stoptime)
 {
 	char fullpath[CHIRP_PATH_MAX];
 	strcpy(fullpath, dir);
-	path_remove_trailing_slashes(fullpath); /* this prevents double slashes from appearing in paths we examine. */
+	path_remove_trailing_slashes(fullpath);	/* this prevents double slashes from appearing in paths we examine. */
 
 	debug(D_DEBUG, "cfs_basic_search(subject = `%s', dir = `%s', pattern = `%s', flags = %d, ...)", subject, dir, pattern, flags);
 
 	/* FIXME we should still check for literal paths to search since we can optimize that */
 	return search_directory(subject, fullpath + strlen(fullpath), fullpath, pattern, flags, l, stoptime);
+}
+
+void cfs_stub_destroy(void)
+{
+	return;
 }
 
 INT64_T cfs_stub_lockf(int fd, int cmd, INT64_T len)
@@ -853,12 +903,12 @@ INT64_T cfs_stub_lremovexattr(const char *path, const char *name)
 	return -1;
 }
 
-int cfs_stub_job_dbinit (sqlite3 *db)
+int cfs_stub_job_dbinit(sqlite3 * db)
 {
 	return ENOSYS;
 }
 
-int cfs_stub_job_schedule (sqlite3 *db)
+int cfs_stub_job_schedule(sqlite3 * db)
 {
 	return ENOSYS;
 }

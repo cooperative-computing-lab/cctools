@@ -10,6 +10,10 @@ set -e
 c="./hostport.$PPID"
 cr="./root.$PPID"
 
+chirp() {
+	../src/chirp -a unix "$@"
+}
+
 prepare()
 {
 	chirp_start local --auth=hostname --jobs --job-concurrency=2
@@ -25,6 +29,7 @@ run()
 	local json
 
 	chirp -a unix "$hostport" mkdir -p "/users/$(whoami)/data"
+	chirp -a unix "$hostport" setacl "/users/$(whoami)/data" 'hostname:*' 'lr'
 	chirp -a unix "$hostport" mkdir -p "/users/$(whoami)/bin"
 	chirp -a unix "$hostport" put /dev/stdin "/users/$(whoami)/data/db.txt" <<EOF
 a,b,c
@@ -84,6 +89,17 @@ EOF
 			"task_path": "bar",
 			"type": "OUTPUT"
 		},
+		{
+			"serv_path": "/users/$(whoami)/data/chirp.debug",
+			"task_path": ".chirp.debug",
+			"type": "OUTPUT"
+		}
+		,{
+			"serv_path": "chirp:\\/\\/${hostport}\\/users\\/$(whoami)\\/data\\/db.txt",
+			"task_path": "foo_url",
+			"type": "INPUT",
+			"binding": "URL"
+		}
 	],
 }
 EOF
@@ -91,7 +107,7 @@ EOF
 	J1=$(chirp -a unix -d all "$hostport" job_create "$json")
 	echo Job $J1 created.
 	chirp -a unix -d all "$hostport" job_commit "[$J1]"
-	chirp -a unix -d all "$hostport" job_commit "[$J1]" && return 1 # EPERM
+	chirp -a unix -d all "$hostport" job_commit "[$J1]" || return 1 # harmless NOP
 	J1b=$(chirp -a unix -d all "$hostport" job_create "$json")
 	echo Job $J1b created.
 	chirp -a unix -d all "$hostport" job_kill "[$J1b]"

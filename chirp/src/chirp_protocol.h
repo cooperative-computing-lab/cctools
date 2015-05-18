@@ -94,6 +94,9 @@ used by both the client and server implementations of the protocol.
 /** Error: This operation is not supported by this server. */
 #define CHIRP_ERROR_NOT_SUPPORTED -23
 
+/** Error: File name too long. */
+#define CHIRP_ERROR_NAME_TOO_LONG -24
+
 /** Error: An unknown error occurred. */
 #define CHIRP_ERROR_UNKNOWN -127
 

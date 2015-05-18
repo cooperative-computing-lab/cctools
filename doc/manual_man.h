@@ -11,18 +11,17 @@ define(LINK,$1 (BOLD($2)))dnl
 define(MANUAL,BOLD($1))dnl
 define(MANPAGE,BOLD($1($2)))dnl
 define(LIST_BEGIN)dnl
-define(LIST_ITEM,`.IP \(bu 4'
-.
-)dnl
+define(LIST_ITEM,`.IP \(bu 4
+$1')dnl
 define(LIST_END)dnl
 define(PARAM,<$1>)dnl
 define(OPTIONS_BEGIN,.LP)dnl
 define(OPTION_ITEM,.TP
-.B \$1
+.B \ $1
 .
 )dnl
 define(OPTION_PAIR,.TP
-.BI \$1 \ PARAM($2)
+.BI \ $1 \ PARAM($2)
 .
 )dnl
 define(OPTION_TRIPLET,.TP
