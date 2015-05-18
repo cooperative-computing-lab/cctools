@@ -25,6 +25,7 @@
 		}
 	},
 	"environ": {
-		"FAKEPWD": "/tmp/test"
+		"CMS_VERSION": "CMSSW_5_2_5",
+		"SCRAM_ARCH": "slc5_amd64_gcc462"
 	}
 }

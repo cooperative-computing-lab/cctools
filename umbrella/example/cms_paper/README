@@ -1,0 +1,17 @@
+#parrot execution engine test command.
+umbrella -T parrot -c cms_paper.umbrella -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/parrot_cms_paper_output run '/bin/sh cms_analysis_short.sh'
+
+#Docker execution engine test command. Don't do the docker test under your afs, it will fail due to the ACL of your afs.
+umbrella -T docker -c cms_paper.umbrella -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/docker_cms_paper_output run '/bin/sh cms_analysis_short.sh'
+
+#Local execution engine test command. Don't test local execution engine under your afs, because the ACL of your afs does not support importing an OS tarball into a docker image.
+umbrella -T local -c cms_paper.umbrella -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/local_cms_paper_output run '/bin/sh cms_analysis_short.sh'
+
+#EC2 execution engine test command. To test this, you must set up the Amazon EC2 command line interface tools on Linux (http://docs.aws.amazon.com/AWSEC2/latest/CommandLineReference/set-up-ec2-cli-linux.html#setting_up_ec2_command_linux).
+#there is only one difference between the specification for ec2 execution engine and the specification for the local execution engine (parrot/docker/chroot): the `id` attribute of the os section is an AMI in the ec2 specification; the `id` attribute of the os section is the checksum of the os image.
+umbrella -T ec2 --remotelog umbrella.log.ec2 --sshkey ~/bin/feb272015.pem -k feb272015 -g 'sg-24f96141' -c cms_paper.umbrella -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/ec2_cms_paper_output run '/bin/sh cms_analysis_short.sh'
+
+#Condor execution engine test command. To test this, the machine you are using should have condor installed.
+#Condor can not work together with afs. So don't do your test on your afs.
+umbrella -T condor --remotelog umbrella.log.condor -c cms_paper.umbrella -i 'cms_analysis_short.sh=cms_analysis_short.sh' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/condor_cms_paper_output run '/bin/sh cms_analysis_short.sh'
+

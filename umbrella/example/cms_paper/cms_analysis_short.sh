@@ -1,8 +1,5 @@
 #!/bin/sh
 
-export CMS_VERSION=CMSSW_5_2_5
-export SCRAM_ARCH=slc5_amd64_gcc462
-
 rm -rf sim_job
 mkdir sim_job
 cd sim_job
