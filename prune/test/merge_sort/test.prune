@@ -1,3 +1,5 @@
+#!/usr/bin/env prune
+
 PUT sort.sh AS sort
 PUT merge.sh AS merge
 PUT nouns.txt AS nouns

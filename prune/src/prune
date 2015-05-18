@@ -127,8 +127,13 @@ def process_line(line):
 	global block, work_start, last_report, hadoop_data, terminate
 	cmd_id = prunedb.cmd_ins(line)
 	try:
-		
+		print line, ord(line[0])
 		if len(line)==0 or line[0]=='#':
+			return True
+		elif line.startswith('HELP'):
+			message = '''Hello
+			'''
+			print message
 			return True
 		elif line.startswith('PUT'):
 			wait = True
