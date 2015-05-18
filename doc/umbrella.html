@@ -8,7 +8,7 @@
 <td valign=bottom>&nbsp;<br>
 <font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>umbrella</strong></big></big></font></td
 ><td align=right valign=bottom
-><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:/afs/nd.edu/user20/hmeng/git-development/cctools/umbrella/src/umbrella.py">/afs/nd.edu/user20/hmeng/git-development/cctools/umbrella/src/umbrella.py</a></font></td></tr></table>
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:/afs/crc.nd.edu/user/h/hmeng/git-development/cctools/umbrella/src/umbrella.py">/afs/crc.nd.edu/user/h/hmeng/git-development/cctools/umbrella/src/umbrella.py</a></font></td></tr></table>
     <p><tt>Umbrella&nbsp;is&nbsp;a&nbsp;tool&nbsp;for&nbsp;specifying&nbsp;and&nbsp;materializing&nbsp;comprehensive&nbsp;execution&nbsp;environments,&nbsp;from&nbsp;the&nbsp;hardware&nbsp;all&nbsp;the&nbsp;way&nbsp;up&nbsp;to&nbsp;software&nbsp;and&nbsp;data.&nbsp;&nbsp;A&nbsp;user&nbsp;simply&nbsp;invokes&nbsp;Umbrella&nbsp;with&nbsp;the&nbsp;desired&nbsp;task,&nbsp;and&nbsp;Umbrella&nbsp;determines&nbsp;the&nbsp;minimum&nbsp;mechanism&nbsp;necessary&nbsp;to&nbsp;run&nbsp;the&nbsp;task,&nbsp;whether&nbsp;it&nbsp;be&nbsp;direct&nbsp;execution,&nbsp;a&nbsp;system&nbsp;container,&nbsp;a&nbsp;local&nbsp;virtual&nbsp;machine,&nbsp;or&nbsp;submission&nbsp;to&nbsp;a&nbsp;cloud&nbsp;or&nbsp;grid&nbsp;environment.&nbsp;&nbsp;We&nbsp;present&nbsp;the&nbsp;overall&nbsp;design&nbsp;of&nbsp;Umbrella&nbsp;and&nbsp;demonstrate&nbsp;its&nbsp;use&nbsp;to&nbsp;precisely&nbsp;execute&nbsp;a&nbsp;high&nbsp;energy&nbsp;physics&nbsp;application&nbsp;and&nbsp;a&nbsp;ray-tracing&nbsp;application&nbsp;across&nbsp;many&nbsp;platforms&nbsp;using&nbsp;a&nbsp;combination&nbsp;of&nbsp;Parrot,&nbsp;Chroot,&nbsp;Docker,&nbsp;VMware,&nbsp;Condor,&nbsp;and&nbsp;Amazon&nbsp;EC2.<br>
 &nbsp;<br>
 Copyright&nbsp;(C)&nbsp;2003-2004&nbsp;Douglas&nbsp;Thain&nbsp;and&nbsp;the&nbsp;University&nbsp;of&nbsp;Wisconsin<br>
@@ -77,7 +77,7 @@ Args:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;action:&nbsp;the&nbsp;action&nbsp;on&nbsp;the&nbsp;downloaded&nbsp;dependency.&nbsp;Options:&nbsp;none,&nbsp;unpack.&nbsp;"none"&nbsp;leaves&nbsp;the&nbsp;downloaded&nbsp;dependency&nbsp;at&nbsp;it&nbsp;is.&nbsp;"unpack"&nbsp;uncompresses&nbsp;the&nbsp;dependency.<br>
 &nbsp;<br>
 Returns:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;downloaded&nbsp;cctools&nbsp;in&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.&nbsp;For&nbsp;example:&nbsp;/tmp/umbrella_test/cache/d19376d92daa129ff736f75247b79ec8/cctools-4.4.0-redhat6-x86_64</tt></dd></dl>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;downloaded&nbsp;cctools&nbsp;in&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.&nbsp;For&nbsp;example:&nbsp;/tmp/umbrella_test/cache/d19376d92daa129ff736f75247b79ec8/cctools-4.9.0-redhat6-x86_64</tt></dd></dl>
  <dl><dt><a name="-check_cvmfs_cms"><strong>check_cvmfs_cms</strong></a>()</dt><dd><tt>Check&nbsp;whether&nbsp;cvmfs&nbsp;is&nbsp;installed&nbsp;on&nbsp;the&nbsp;host&nbsp;or&nbsp;not<br>
 &nbsp;<br>
 Returns:<br>
@@ -456,7 +456,7 @@ Args:<br>
 &nbsp;<br>
 Returns:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;modified&nbsp;version&nbsp;of&nbsp;the&nbsp;user's&nbsp;cmd.</tt></dd></dl>
- <dl><dt><a name="-set_cvmfs_siteinfo"><strong>set_cvmfs_siteinfo</strong></a>(name, action, packages_json, sandbox_dir)</dt><dd><tt>Download&nbsp;cvmfs&nbsp;SITEINFO&nbsp;and&nbsp;set&nbsp;its&nbsp;mountpoint.<br>
+ <dl><dt><a name="-set_cvmfs_siteconf"><strong>set_cvmfs_siteconf</strong></a>(name, action, packages_json, sandbox_dir)</dt><dd><tt>Download&nbsp;cvmfs&nbsp;SITEINFO&nbsp;and&nbsp;set&nbsp;its&nbsp;mountpoint.<br>
 &nbsp;<br>
 Args:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;cmvfs&nbsp;SITEINFO&nbsp;package&nbsp;in&nbsp;packages_json.<br>
@@ -515,6 +515,13 @@ Args:<br>
 &nbsp;<br>
 Returns:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;directly&nbsp;exit&nbsp;the&nbsp;program.</tt></dd></dl>
+ <dl><dt><a name="-terminate_instance"><strong>terminate_instance</strong></a>(instance_id)</dt><dd><tt>Terminate&nbsp;an&nbsp;instance.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;instance_id:&nbsp;the&nbsp;id&nbsp;of&nbsp;the&nbsp;VM&nbsp;instance.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None.</tt></dd></dl>
  <dl><dt><a name="-transfer_env_para_docker"><strong>transfer_env_para_docker</strong></a>(env_para_dict)</dt><dd><tt>Transfer&nbsp;the&nbsp;env_para_dict&nbsp;into&nbsp;the&nbsp;docker&nbsp;`-e`&nbsp;options.<br>
 &nbsp;<br>
 Args:<br>

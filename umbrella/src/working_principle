@@ -69,6 +69,7 @@ Parrot and chroot and Docker: rename sandbox_dir to output_dir
 outputs of cloud execution engine:
 the output_dir on the remote execution node is transferred back to the local machine and put into the output_dir set by the user.
 the sandbox on the local machine will be deleted.
+Finally, the instance will be terminated.
 
 outputs of grid execution engine:
 the output_dir on the remote execution node is transferred back to the dir1 the local machine and then dir1 is rename into the output_dir set by the user.
@@ -76,6 +77,15 @@ The semantics of condor_output_files only supports transferring a dir from the e
 the sandbox on the local machine will be deleted.
 
 the execution result (return code, stdout data, stderr data) of all the subprocesses called by Umbrella are written into the umbrella log file.
+
+Phylosophy of Parrot options:
+The usage of Parrot inside Umbrella involves four options: 
+ -l,--ld-path=<path>            Path to ld.so to use.                      (PARROT_LDSO_PATH)
+ -m,--ftab-file=<file>          Use this file as a mountlist.             (PARROT_MOUNT_FILE)
+ -M,--mount=/foo=/bar           Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)
+ -p,--proxy=<hst:p>             Use this proxy server for HTTP requests.         (HTTP_PROXY)
+-M option can be merged into -m option.
+For each option, a corresponding environment variable is created to keep the parrot_run command clean.
 
 Phylosophy of global variables in Umbrella:
 Umbrella tries to avoid the usage of any global variable. However, some functions inside Umbrella indeed have very long argument lists. The long argument lists can be shrinked by merging single variable arguments into a single dictionary.

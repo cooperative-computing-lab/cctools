@@ -61,7 +61,7 @@ Note: 1). Condor is not compatible with AFS, so ensure your test is not running 
 2). --localdir option is still needed here for the potential usage to hold the packages.json. 
 
 Cloud execution engine:
-umbrella -T ec2 --sshkey ~/bin/feb272015.pem -k feb272015 -g 'sg-24f96141' -c povray_redhat5_ec2.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/ec2_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+umbrella -T ec2 --remotelog umbrella.log.ec2 --sshkey ~/bin/feb272015.pem -k feb272015 -g 'sg-24f96141' -c povray_redhat5_ec2.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/ec2_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 Note: --sshkey, --key and --group are only meaningful for cloud execution engine. According to the given specification file, the AMI and the instance type can be identified. The user of Umbrella needs to specify the security group within which an instance should be run and the name of the key pair to use when launching an instance.
 
 Here is the specification JSON file for a Ray-Tracing application:
@@ -118,7 +118,7 @@ A specification includes 6 parts: hardware, kernel, os, software, data, and envi
 
 `name` (Required): the OS name. Options: redhat, centos, arch, .... Not case sensitive.
 
-`version` (Required): the OS version in the format of 'A. B': A is the main version number and B is the minor version number. Exmaples: 5.10, 6.5. 
+`version` (Required): the OS version in the format of 'A.B': A is the main version number and B is the minor version number. Exmaples: 5.10, 6.5. 
 
 `id` (Optional): the id of the OS image. There may exist multiple OS images for redhat 5.10, the id attribute uniquely identifies a OS image. If this attribute is not provided in the specification and the OS version is redhat 5.10, the first OS image whose version is redhat 5.10 found in the packages.json will be used.
 
@@ -130,7 +130,7 @@ Each software dependency has a name, which corresponds to the name included in p
 
 `mountpoint` (Required): the mountpoint of the software. Case sensitive.
 
-`action` (Required): the action on the downloaded software dependencies. Options: none, unpack. `none` leaves the downloaded dedendency as it is. `unpack` uncompresses the depedency. Case sensitive.
+`action` (Required): the action on the downloaded software dependencies. Options: none, unpack. `none` leaves the downloaded dedendency as it is. `unpack` uncompresses the depedency. Not case sensitive.
 
 `data` Section (Optional):
 
@@ -140,7 +140,7 @@ Each data dependency has a name, which corresponds to the name included in packa
 
 `mountpoint` (Required): the mountpoint of the data dependency. Case sensitive.
 
-`action` (Required): the action on the downloaded data dependencies. Options: none, unpack. `none` leaves the downloaded dedendency as it is. `unpack` uncompresses the dependency. Case sensitive.
+`action` (Required): the action on the downloaded data dependencies. Options: none, unpack. `none` leaves the downloaded dedendency as it is. `unpack` uncompresses the dependency. Not case sensitive.
 
 `environ` Section (Optional):
 
@@ -234,4 +234,3 @@ The name of each instance type is the same provided by Amazon EC2 (e.g., m1.larg
 
 Tips of using Umbrella:
 The first step of using Umbrella is to compose an specification for your application. Double check the packages.json you are using to guarantee each dependency of your package is specified correctly.
-

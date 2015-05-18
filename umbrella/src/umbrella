@@ -59,7 +59,22 @@ if sys.version_info > (2,6,):
 else:
 	import simplejson as json #json module is introduce in python 2.4.3
 
-#cctools-version: based on http://www3.nd.edu/~ccl/software/files/cctools-4.4.0-x86_64-redhat6.tar.gz
+"""
+Replace the version of cctools inside umbrella is easy, just replace all the current version to the new version. 
+For example, for now, 4.9.0 is the version umbrella is using, if we want to let umbrella use 5.0.1 next month, just replace all the "4.9.0" with "5.0.1". 
+To allow this, do remember to add the 5.0.1 cctools packages into the remote archive and the metadata of the cctools 5.0.1 packages into packges.json.
+cctools-version: based on http://www3.nd.edu/~ccl/software/files/cctools-4.9.0-x86_64-redhat6.tar.gz
+Here, 4.9.0 is the version number I picked up to denote the latest master branch, the infomation of the HEAD is:
+	Author: Patrick Donnelly
+	Date:   2015-05-13 18:32:38 -0400
+	Commit: e25ce3debcbeae30dd0c2b82922aa441fa1f78db (master)
+	* Fix missing update to bytes written.
+	
+	This caused an assertion failure when an *atomic* write completed
+	successfully but the return value did not indicate this.
+	
+	Bug found by Haiyan, @hmeng-19.
+"""
 
 def subprocess_error(cmd, rc, stdout, stderr):
 	"""Print the command, return code, stdout, and stderr; and then directly exit.
@@ -273,9 +288,9 @@ def cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_d
 		action: the action on the downloaded dependency. Options: none, unpack. "none" leaves the downloaded dependency at it is. "unpack" uncompresses the dependency.
 
 	Returns:
-		the path of the downloaded cctools in the umbrella local cache. For example: /tmp/umbrella_test/cache/d19376d92daa129ff736f75247b79ec8/cctools-4.4.0-redhat6-x86_64
+		the path of the downloaded cctools in the umbrella local cache. For example: /tmp/umbrella_test/cache/d19376d92daa129ff736f75247b79ec8/cctools-4.9.0-redhat6-x86_64
 	"""
-	name = "cctools-4.4.0-%s-%s" % (host_linux_distro, hardware_platform)
+	name = "cctools-4.9.0-%s-%s" % (host_linux_distro, hardware_platform)
 	item = package_search(packages_json, name)
 	dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
 	dependency_download(item['source'][0], item["checksum"], "md5sum", dest, item["format"], action)
@@ -615,7 +630,7 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, ha
 		the modified version of the user's cmd.
 	"""
 	#Here we use the cctools package from the local cache (which includes all the packages including cvmfs, globus, fuse and so on). Even if the user may install cctools by himself on the machine, the configuration of the local installation may be not what we want. For example, the user may just configure like this `./configure --prefix ~/cctools`.
-	name = 'cctools-4.4.0-%s-%s' % (host_linux_distro, hardware_platform)
+	name = 'cctools-4.9.0-%s-%s' % (host_linux_distro, hardware_platform)
 	id = package_search(packages_json, name)["checksum"]
 	dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
 	#4.4 and 4.4 does not support --no-set-foreground feature.
