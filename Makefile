@@ -3,6 +3,10 @@ include rules.mk
 
 CYGWINLIB = cygwin1.dll cyggcc_s-1.dll cygintl-8.dll cygreadline7.dll cygncursesw-10.dll cygiconv-2.dll cygattr-1.dll sh.exe
 
+#set the default values for RPM_VERSION and RPM_RELEASE
+RPM_VERSION=4.4.1
+RPM_RELEASE=1
+
 all: $(CCTOOLS_PACKAGES)
 
 config.mk:
@@ -41,4 +45,8 @@ install: $(INSTALL_PACKAGES)
 test: $(CCTOOLS_PACKAGES)
 	./run_all_tests.sh
 
-.PHONY: $(CCTOOLS_PACKAGES) $(INSTALL_PACKAGES) $(CLEAN_PACKAGES) all clean install test
+rpm:
+	./packaging/rpm/rpm_creator.sh $(RPM_VERSION) $(RPM_RELEASE)
+
+.PHONY: $(CCTOOLS_PACKAGES) $(INSTALL_PACKAGES) $(CLEAN_PACKAGES) all clean install test rpm
+	

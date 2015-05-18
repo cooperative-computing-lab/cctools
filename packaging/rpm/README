@@ -1,0 +1,66 @@
+To create RPMs for cctools, go to the source code directory of cctools, and run:
+make rpm RPM_VERSION=<rpm_version> RPM_RELEASE=<rpm_release>
+
+The full feature of ndcctools depends on 9 packages: fuse, python, globus, swig, libuuid, readline, zlib, perl, and cvmfs.
+To create RPMs for ndcctools with all package support mentioned above, there are two options.
+Option 1: Use `./configure.afs` inside the `%build` section and create RPMs on a machine which supports the access of /afs/crc.nd.edu/group/ccl/software/cctools-dependencies.
+This option is currently supported by the `make rpm` rule of cctools.
+
+Option 2: Specify each package dependency as a `BuildRequires` attribute, and create RPMs on a machine with all these dependencies installed or you have root access to install these dependencies.
+This option is currently not supported by the `make rpm` rule of cctools.
+`BuildRequires` attributes are needed to specify the relative package dependencies, and more options (like --with-python-path, --with-cvmfs-path) should be added into the `./configure` command inside the `%build` section. (Note: here we use `./configure` instead of `./configure.afs`)
+#BuildRequires:  fuse-devel
+#BuildRequires:  python-devel
+#BuildRequires:  globus-connect-server
+#BuildRequires:  swig
+#BuildRequires:  libuuid-devel
+#BuildRequires:  readline-devel
+#BuildRequires:  zlib-devel
+#BuildRequires:  perl
+#BuildRequires:  cvmfs-devel
+
+#BuildRequires:  openssl-devel
+
+#%build
+#./configure --prefix /usr \
+#    --with-python-path /usr \
+#    --with-swig-path /usr \
+#    --with-readline-path /usr \
+#    --with-zlib-path /usr \
+#    --with-perl-path /usr \
+#    --with-cvmfs-path /usr \
+#    --with-fuse-path / \
+#    --with-uuid-path / 
+#make %{?_smp_mflags}
+
+#the globus dependency is too complex and ignored for now. When the globus dependency is ready, just add `--with-globus-path / \` into the `./configure` command.
+
+Here is the instructions how to create ndcctools RPMs separately from the `make rpm` rule of cctools:
+#install RPM development tools. This is the only operation which needs the root access.
+yum install rpmdevtools
+
+#set up an RPM build directory in your ~/rpmbuild directory. This command can be executed multiple times without scratching your current ~/rpmbuild directory.
+rpmdev-setuptree
+
+#put the source code compressed tarball of cctools into the ~/rpmbuild/SOURCES dirctory:
+
+#create a template .spec file for ndcctools under ~/rpmbuild/SPECS:
+cd ~/rpmbuild/SPECS
+rpmdev-newspec ndcctools #alternatively, you can also directly create and edit the .spec file.
+
+#edit ~/rpmbuild/SPECS/ndcctools.spec
+
+#build source and binary RPMs from ndcctools.spec:
+rpmbuild -ba ndcctools.spec
+
+#You can also just build source RPMs from ndcctools.spec:
+rpmbuild -bs ndcctools.spec
+
+#You can also just build binary RPMs from ndcctools.spec:
+rpmbuild -bb ndcctools.spec
+
+#check for errors of the SPEC files, RPMs and SRPMs using rpmlint:
+rpmlint -i ndcctools.spec ../SRPMS/ndcctools* ../RPMS/*/ndcctools*
+
+To change the name of RPMs for cctools, rename ndcctools.spec to <new_name>.spec, and change the `Name` attribute in the .spec file into <new_name>. In fact, you can just change the `Name` attribute in the .spec file into <new_name>, and leave the name of .spec file unchanged. However, it would look inconsistent.
+
