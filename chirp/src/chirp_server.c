@@ -2144,11 +2144,12 @@ int main(int argc, char *argv[])
 
 	if(getuid() == 0) {
 		if(!safe_username) {
-			fprintf(stdout, "Sorry, I refuse to run as root without certain safeguards.\n");
-			fprintf(stdout, "Please give me a safe username with the -i <user> option.\n");
-			fprintf(stdout, "After using root access to authenticate users,\n");
-			fprintf(stdout, "I will use the safe username to access data on disk.\n");
-			exit(1);
+			fatal(
+				"Sorry, I refuse to run as root without certain safeguards.\n"
+				"Please give me a safe username with the -i <user> option.\n"
+				"After using root access to authenticate users,\n"
+				"I will use the safe username to access data on disk."
+			);
 		} else {
 			struct passwd *p = getpwnam(safe_username);
 			if(!p)
@@ -2157,9 +2158,7 @@ int main(int argc, char *argv[])
 			safe_gid = p->pw_gid;
 		}
 	} else if(safe_username) {
-		fprintf(stdout, "Sorry, the -i option doesn't make sense\n");
-		fprintf(stdout, "unless I am already running as root.\n");
-		exit(1);
+		fatal("Sorry, the -i option doesn't make sense unless I am already running as root.");
 	}
 
 	link = link_serve_address(listen_on_interface, chirp_port);
