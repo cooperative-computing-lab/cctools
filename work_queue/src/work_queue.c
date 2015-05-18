@@ -200,9 +200,12 @@ static void push_task_to_ready_list( struct work_queue *q, struct work_queue_tas
 
 /* returns old state */
 static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task *t, uintptr_t new_state );
+
 /* 1, 0 whether t is in state */
 static int task_state_is( struct work_queue *q, uint64_t taskid, uint64_t state);
+/* pointer to first task found with state. NULL if no such task */
 static struct work_queue_task *task_state_any(struct work_queue *q, uint64_t state);
+/* number of tasks with state */
 static int task_state_count( struct work_queue *q, uint64_t state);
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
@@ -1175,7 +1178,6 @@ static void expire_waiting_task(struct work_queue *q, struct work_queue_task *t)
 {
 	t->result |= WORK_QUEUE_RESULT_TASK_TIMEOUT;
 
-
 	//add the task to complete list so it is given back to the application.
 	change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
 
@@ -1189,7 +1191,7 @@ static void expire_waiting_tasks(struct work_queue *q)
 	int count;
 
 	current_time = time(0);
-	count = list_size(q->ready_list);
+	count = task_state_count(q, WORK_QUEUE_TASK_READY);
 
 	while(count > 0)
 	{
@@ -1467,10 +1469,9 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
 	q->stats->total_execute_time += t->cmd_execution_time;
 
-	change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-
 	w->finished_tasks++;
 
+	change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 	return SUCCESS;
 }
 
@@ -2893,7 +2894,7 @@ static void abort_slow_workers(struct work_queue *q)
 	itable_firstkey(q->tasks);
 	while(itable_nextkey(q->tasks, &taskid, (void **) &t)) {
 		timestamp_t runtime = current - t->time_send_input_start;
-		if(runtime > (average_task_time * multiplier)) {
+		if(runtime >= (average_task_time * multiplier)) {
 			w = itable_lookup(q->worker_task_map, t->taskid);
 			if(w && !w->foreman)
 			{
@@ -4142,7 +4143,7 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 	// on a message. However, take care of not busy waiting, if no available
 	// worker can execute a task in the ready list.
 
-	if( (last_tasks_transfered || !busy_waiting) && available_workers(q) > 0 && (list_size(q->ready_list)>0 || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL)) ) {
+	if( (last_tasks_transfered || !busy_waiting) && available_workers(q) > 0 && (task_state_any(q, WORK_QUEUE_TASK_READY) || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL)) ) {
 		msec = 0;
 		busy_waiting = 1;        //Mark that we may be busy waiting, so that if no task are transfered, we force a wait next cycle.
 	}
@@ -4212,7 +4213,7 @@ static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 
 		struct work_queue_task *t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 
-		if((list_size(q->ready_list) > 0) && (!t || send_decision))
+		if(task_state_any(q, WORK_QUEUE_TASK_READY) && (!t || send_decision))
 		{
 			task_sent         = send_one_task(q);
 			total_tasks_sent += task_sent;
@@ -4309,7 +4310,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if( q->process_pending_check && process_pending() )
 			break;
 
-		if(!task_state_any(q, WORK_QUEUE_TASK_RUNNING) && list_size(q->ready_list) == 0 && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink))
+		if(!task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink))
 			break;
 
 		wait_loop_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active, tasks_transfered);
@@ -4359,7 +4360,7 @@ int work_queue_hungry(struct work_queue *q)
 	//j = # of queued tasks.
 	//i-j = # of tasks to queue to re-reach the status quo.
 	i = (1.1 * hash_table_size(q->worker_table));
-	j = list_size(q->ready_list);
+	j = task_state_count(q, WORK_QUEUE_TASK_READY);
 	return MAX(i - j, 0);
 }
 
@@ -4586,9 +4587,10 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_workers_removed = qs->total_workers_removed;
 
 	//info about tasks
-	s->tasks_waiting = list_size(q->ready_list);
+	s->tasks_waiting = task_state_count(q, WORK_QUEUE_TASK_READY);
 	s->tasks_running = task_state_count(q, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 	s->tasks_complete = task_state_count(q, WORK_QUEUE_TASK_RETRIEVED);
+
 	s->total_tasks_dispatched = qs->total_tasks_dispatched;
 	s->total_tasks_complete = qs->total_tasks_complete;
 	s->total_tasks_cancelled = qs->total_tasks_cancelled;
