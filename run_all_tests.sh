@@ -35,6 +35,10 @@ for package in ${CCTOOLS_PACKAGES_TEST}; do
 				(
 					echo "======== ${script} PREPARE ========"	
 					"./${script}" prepare
+					result=$?
+					if [ $result -ne 0 ]; then
+						exit $result
+					fi
 					echo "======== ${script} RUN ========"	
 					"./${script}" run
 					result=$?
