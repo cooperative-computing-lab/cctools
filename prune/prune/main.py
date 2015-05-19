@@ -20,6 +20,7 @@ database = lib.getdb()
 HOME = os.path.expanduser("~")
 CWD = os.getcwd()
 config_file = CWD+'/.prune.conf'
+config_file2 = None
 run_filename = run_lines = None
 reset_all = False
 
@@ -44,12 +45,17 @@ while argi<len(sys.argv):
 			os.chdir(os.getcwd()+'/'+nwd)
 		CWD = os.getcwd()
 		config_file = CWD+'/.prune.conf'
+	elif arg=='--conf':
+		argi += 1
+		config_file2 = sys.argv[argi]
 	elif arg=='-reset' or arg=='--reset':
 		reset_all = True
 
 	else:
 		run_filename = arg
 	argi += 1
+if config_file2:
+	config_file = config_file2
 
 
 terminate = False
@@ -58,6 +64,8 @@ hadoop_data = False
 
 repo_puid = lib.new_puid()
 if os.path.isfile(config_file):
+	print 'Using default configuration file:',config_file
+	print 'Use the command line argument "--conf <pathname>" to specify a different one.'
 	with open(config_file) as f:
 		for line in f.readlines():
 			(meta_type,value) = line[:-1].split('\t')
@@ -70,11 +78,15 @@ if os.path.isfile(config_file):
 			elif meta_type=='repo_puid':
 				repo_puid = value
 else:
+	print 'No default or specified configuration file found.'
+	print 'When you answer the following questions, a default configuration file will be created at:\n',config_file
+	sys.stdout.flush()
+
 	data_folder = '/tmp/prune/data/'
 	db_pathname = '/tmp/prune/___prune.db'
 	sandbox_prefix = '/tmp/prune/sandbox/'
 
-	line = raw_input('Enter location for data files [%s]: '%data_folder)
+	line = raw_input('\nEnter location for data files [%s]: '%data_folder)
 	if len(line)>0:
 		if line[-1] != '/':
 			line = line + '/'
