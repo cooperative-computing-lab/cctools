@@ -3,8 +3,8 @@
 ###########################
 # *** Set for releases. ***
 
-MAJOR=4
-MINOR=6
+MAJOR=5
+MINOR=0
 MICRO=0
 
 # Optionally set this to some name (e.g. RC1 or FINAL)
