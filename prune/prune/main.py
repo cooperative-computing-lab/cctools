@@ -114,8 +114,11 @@ def user_interface():
 			block = False
 			sys.stdout.write(forever_back+spaces+forever_back)
 			sys.stdout.flush()
+		except EOFError:
+			print '\nPrune exiting for Ctl-d...'
+			sys.exit(0)
 		except KeyboardInterrupt:
-			print 'PRUNE exiting.'
+			print '\nPrune exiting for Ctl-c...'
 			return
 		except Exception:
 			print traceback.format_exc()
@@ -127,8 +130,10 @@ def process_line(line):
 	global block, work_start, last_report, hadoop_data, terminate
 	cmd_id = database.cmd_ins(line)
 	try:
-		print line, ord(line[0])
 		if len(line)==0 or line[0]=='#':
+			return True
+		elif line.startswith('EXIT') or line.startswith('QUIT'):
+			terminate = True
 			return True
 		elif line.startswith('HELP'):
 			message = '''Hello
