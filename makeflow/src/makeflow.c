@@ -670,17 +670,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	/* This function may realloc input_files and output_files. */
 	input_files = makeflow_file_list_format(n,input_files,wrapper_input_files,queue);
 	output_files = makeflow_file_list_format(n,output_files,wrapper_output_files,queue);
-    char *command;
-    if (container_mode == CONTAINER_MODE_DOCKER) {
-        /* XXX 2. for each task if docker mode is on
-         * wrap task command in global wrapper_command (docker.wrapper.sh) 
-         */
-
-        char *local_cmd = string_format("sh -c \"%s\"", n->command);
-	    command = string_wrap_command(local_cmd, wrapper_command);
-	} else 
-	    /* Apply the wrapper(s) to the command, if it is (they are) enabled. */
-	    command = string_wrap_command(n->command, wrapper_command);
+	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
+	char *command = string_wrap_command(n->command, wrapper_command);
 
 	/* Wrap the command with the resource monitor, if it is enabled. */
 	if(monitor_mode) {
@@ -971,17 +962,6 @@ static void makeflow_run( struct dag *d )
 	struct dag_node *n;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
-   
-    if (container_mode == CONTAINER_MODE_DOCKER) {
-    /* XXX 1. for the workflow if docker mode is on 
-     * 1) create a global script for running docker container
-     * 2) add this script to the global wrapper list
-     */
-        
-        makeflow_create_docker_sh();
-        char *global_cmd = string_format("sh %s", CONTAINER_SH);        
-        makeflow_wrapper_add_command(global_cmd);
-    }
 
 	while(!makeflow_abort_flag) {
 		makeflow_dispatch_ready_jobs(d);
@@ -1110,7 +1090,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
 	printf(" %-30s Add node id symbol tags in the makeflow log.        (default is false)\n", "   --log-verbose");
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
-	printf(" %-30s Load docker image from the tar file.\n", "--load-from-tar=<tar file>");
+	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
@@ -1200,7 +1180,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WRAPPER_OUTPUT,
         LONG_OPT_DOCKER,
-        LONG_OPT_LOAD_FROM_TAR
+        LONG_OPT_DOCKER_TAR
 	};
 
 	static struct option long_options_run[] = {
@@ -1254,7 +1234,7 @@ int main(int argc, char *argv[])
 		{"zero-length-error", no_argument, 0, 'z'},
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
-		{"load-from-tar", required_argument, 0, LONG_OPT_LOAD_FROM_TAR},
+		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{0, 0, 0, 0}
 	};
 
@@ -1471,7 +1451,7 @@ int main(int argc, char *argv[])
 				container_mode = CONTAINER_MODE_DOCKER; 
 				container_image = xxstrdup(optarg);
 				break;
-            case LONG_OPT_LOAD_FROM_TAR:
+            case LONG_OPT_DOCKER_TAR:
                 image_tar = xxstrdup(optarg);
                 break;
 			default:
@@ -1704,6 +1684,23 @@ int main(int argc, char *argv[])
 	makeflow_log_started_event(d);
 
 	runtime = timestamp_get();
+
+    if (container_mode == CONTAINER_MODE_DOCKER) {
+    /* XXX if docker mode is on 
+     * 1) create a global script for running docker container
+     * 2) add this script to the global wrapper list
+     * 3) reformat each task command
+     */
+        
+        makeflow_create_docker_sh();
+        char *global_cmd = string_format("sh %s", CONTAINER_SH);        
+        makeflow_wrapper_add_command(global_cmd);
+
+	    struct dag_node *n;
+       	for(n = d->nodes; n; n = n->next) 
+            n->command = string_format("sh -c \"%s\"", n->command);
+    }
+
 	makeflow_run(d);
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
