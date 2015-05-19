@@ -11,8 +11,10 @@ import zipfile
 import operator
 
 from work_queue import *
-import prunelib
-prunedb = prunelib.getdb()
+
+from . import lib
+
+database = lib.getdb()
 
 
 HOME = os.path.expanduser("~")
@@ -54,7 +56,7 @@ terminate = False
 block = False
 hadoop_data = False
 
-repo_puid = prunelib.new_puid()
+repo_puid = lib.new_puid()
 if os.path.isfile(config_file):
 	with open(config_file) as f:
 		for line in f.readlines():
@@ -95,7 +97,7 @@ forever_back = '\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b
 def user_interface():
 	global block, terminate, forever_back, wait_start
 	spaces = '                                        '
-	cmds = prunedb.cmds_get()
+	cmds = database.cmds_get()
 	for cmd in cmds:
 		readline.add_history(cmd['command'])
 	while not terminate:
@@ -123,7 +125,7 @@ work_start = None
 last_report = None
 def process_line(line):
 	global block, work_start, last_report, hadoop_data, terminate
-	cmd_id = prunedb.cmd_ins(line)
+	cmd_id = database.cmd_ins(line)
 	try:
 		print line, ord(line[0])
 		if len(line)==0 or line[0]=='#':
@@ -160,12 +162,12 @@ def process_line(line):
 			if not pname and filename:
 				pname = filename
 			if filename:
-				ids = prunelib.getDataIDs(filename)
+				ids = lib.getDataIDs(filename)
 				if not ids:
 					print 'File does not exist: %s'%(filename)
 					return True
 			elif data:
-				ids = prunelib.getDataIDs2(data)
+				ids = lib.getDataIDs2(data)
 				if not ids:
 					print 'File does not exist: %s'%(data)
 					return True
@@ -173,19 +175,19 @@ def process_line(line):
 			if ids['exists']:
 				print 'That file already exists with that name: %s=%s'%(pname,ids['puid'])
 				if ids['pname']:
-					prunedb.var_set(ids['pname'], ids['puid'])
+					database.var_set(ids['pname'], ids['puid'])
 				if form:
-					prunelib.env_name(pname)
+					lib.env_name(pname)
 			elif data:
-				prunelib.store_data(data,ids['puid'],wait)
-				op_id = prunelib.putMetaData(ids, cmd_id)
+				lib.store_data(data,ids['puid'],wait)
+				op_id = lib.putMetaData(ids, cmd_id)
 			elif filename:
-				op_id = prunelib.putMetaData(ids, cmd_id)
+				op_id = lib.putMetaData(ids, cmd_id)
 				if form:
-					prunelib.store_file(filename,ids['puid'],wait,form,ids['pack'])
-					prunelib.env_name(pname)
+					lib.store_file(filename,ids['puid'],wait,form,ids['pack'])
+					lib.env_name(pname)
 				else:
-					prunelib.store_file(filename,ids['puid'],wait,pack=ids['pack'])
+					lib.store_file(filename,ids['puid'],wait,pack=ids['pack'])
 			return True
 
 		elif line.startswith('USE'):
@@ -197,17 +199,17 @@ def process_line(line):
 				local_fs = False
 			if resource_type=='local':
 				concurrency = int(ar[2])
-				prunelib.useLocal(concurrency,local_fs)
+				lib.useLocal(concurrency,local_fs)
 			elif resource_type=='wq':
 				master_name = ar[2]
-				prunelib.useWQ(master_name,local_fs)
+				lib.useWQ(master_name,local_fs)
 			return True
 
 		elif line.startswith('ENV'):
 			ar = line.split()
 
 			pname = ar[1]
-			prunelib.env_name(pname)
+			lib.env_name(pname)
 
 			return True
 
@@ -229,7 +231,7 @@ def process_line(line):
 				if not filename:
 					filename = expr
 				i += 1
-			return prunelib.getFile(expr,filename,wait)
+			return lib.getFile(expr,filename,wait)
 			
 
 		elif line.startswith('WORK'):
@@ -238,7 +240,7 @@ def process_line(line):
 				last_report = work_start - 5
 
 
-			res = prunelib.getQueueCounts()
+			res = lib.getQueueCounts()
 			output = ''
 			some_in_progress = False
 			for r in res:
@@ -254,8 +256,8 @@ def process_line(line):
 				last_report = now
 
 
-			prunelib.wq_check()
-			prunelib.local_check()
+			lib.wq_check()
+			lib.local_check()
 			
 			ar = line.split(' ')
 			if len(ar)>1 and ar[1]=='FOR':
@@ -274,7 +276,7 @@ def process_line(line):
 				minutes = (time.time()-work_start)/60
 				seconds = (time.time()-work_start)%60
 				print 'PRUNE finished executing after: %02dm%02ds'%( minutes, seconds )
-				#print 'DB read, write count:', prunedb.get_query_cnts()
+				#print 'DB read, write count:', database.get_query_cnts()
 
 				work_start = None
 				if ar[-1]=='TERMINATE':
@@ -291,7 +293,7 @@ def process_line(line):
 			ar = line.split(' ')
 			name = ar[1]
 			now = True if len(ar)>2 and ar[2]=='NOW' else False
-			res = prunelib.locate_pathname(name)
+			res = lib.locate_pathname(name)
 			if res:
 				if now:
 					peek(forever_back)
@@ -308,8 +310,8 @@ def process_line(line):
 			ar = line.split(' ')
 			name = ar[1]
 			try:
-				res = prunelib.locate_copies(name)
-				cache_filename = prunelib.storage_pathname(res[0]['puid'])
+				res = lib.locate_copies(name)
+				cache_filename = lib.storage_pathname(res[0]['puid'])
 				with open(cache_filename) as f:
 					for line in f.read().splitlines():
 						if len(line)>1 and line[0]!='#':
@@ -334,7 +336,7 @@ def process_line(line):
 			else:
 				timeout = 0.0
 
-			res = prunelib.getQueueCounts()
+			res = lib.getQueueCounts()
 			output = ''
 			for r in res:
 				output += '%s queue size: %i   '%( r['queue'], r['cnt'] )
@@ -351,9 +353,9 @@ def process_line(line):
 				return False
 
 		elif line.startswith('CUT'):
-			res = prunedb.var_getAll()
+			res = database.var_getAll()
 			for r in res:
-				prunedb.var_unset(r['name'])
+				database.var_unset(r['name'])
 			return True
 				
 		elif line.startswith('LS'):
@@ -362,7 +364,7 @@ def process_line(line):
 				keyword = ar[1]
 			else:
 				keyword = None
-			res = prunedb.var_getAll()
+			res = database.var_getAll()
 			for r in res:
 				if keyword:
 					if keyword in r['name']:
@@ -374,7 +376,7 @@ def process_line(line):
 
 		elif line.startswith('EXPORT'):
 			ar = line.split(' ')
-			lines,files = prunelib.origin(ar[1])
+			lines,files = lib.origin(ar[1])
 			i = 2
 			while i < len(ar):
 				item = ar[i]
@@ -511,20 +513,20 @@ def process_line(line):
 						ar = line.split()
 						puid = ar[1]
 						pname = ar[3]
-						pathname = prunelib.storage_pathname(puid)
+						pathname = lib.storage_pathname(puid)
 						f = open(pathname,'w')
 						f.write(zf.read(puid))
 						f.close()
 						
-						ids = prunelib.getDataIDs(filename,puid)
+						ids = lib.getDataIDs(filename,puid)
 						ids['pname'] = pname
 						print ids
 
-						if prunelib.store_file(None, puid, pack=ids['pack']):
-							op_id = prunelib.putMetaData(ids, cmd_id)
+						if lib.store_file(None, puid, pack=ids['pack']):
+							op_id = lib.putMetaData(ids, cmd_id)
 						else:
 							print 'There was a problem with the command'
-						#prunedb.io_ins(op_id, 'O', puid, pname, repo_id, None, 0)
+						#database.io_ins(op_id, 'O', puid, pname, repo_id, None, 0)
 					elif line.startswith('#'):
 						extra = {}
 						matchObj = re.match( r'#([^=]+)=([^\(]*)\(([^/)]*)', line, re.M|re.I)
@@ -538,7 +540,7 @@ def process_line(line):
 						print 'Skipping names for now:',line
 						pass
 					else:
-						res = prunelib.eval(line, 0, cmd_id, extra)
+						res = lib.eval(line, 0, cmd_id, extra)
 						extra = None
 						#print res
 				#print plan
@@ -560,7 +562,7 @@ def process_line(line):
 
 		elif line.startswith('ORIGIN'):
 			ar = line.split(' ')
-			lines,files = prunelib.origin(ar[1])
+			lines,files = lib.origin(ar[1])
 			for line in lines:
 				print line
 			return True
@@ -572,16 +574,16 @@ def process_line(line):
 			ar = line.split(' ')
 			fold_filename = ar[1]
 			unfold_filename = ar[2]
-			prunelib.add_store(fold_filename,unfold_filename)			
+			lib.add_store(fold_filename,unfold_filename)			
 			return True
 
 		elif line.startswith('RESET'):
 			print data_folder
-			prunelib.truncate()
-			prunedb.truncate()
+			lib.truncate()
+			database.truncate()
 			return True
 		else:
-			res = prunelib.eval(line, 0, cmd_id)
+			res = lib.eval(line, 0, cmd_id)
 			return True
 
 	except Exception, e:
@@ -593,9 +595,9 @@ def process_line(line):
 
 try:
 
-	prunedb.initialize(db_pathname)
+	database.initialize(db_pathname)
 	#Be sure to initialize the database first!
-	prunelib.initialize(data_folder, sandbox_prefix, hadoop_data)
+	lib.initialize(data_folder, sandbox_prefix, hadoop_data)
 	with open(config_file,'w') as f:
 		f.write('data_folder\t%s\n'%data_folder)
 		f.write('database\t%s\n'%db_pathname)
@@ -608,8 +610,8 @@ except Exception as e:
 	print traceback.format_exc()
 
 if reset_all:
-	prunelib.truncate()
-	prunedb.truncate()
+	lib.truncate()
+	database.truncate()
 	print 'PRUNE RESET'
 
 elif run_lines:
@@ -630,7 +632,7 @@ elif run_filename:
 else:
 	user_interface()
 	terminate = True
-	prunelib.terminate_now()
+	lib.terminate_now()
 	print 'PRUNE terminated'
 
 

@@ -11,8 +11,9 @@ from work_queue import *
 import subprocess
 from subprocess import Popen, PIPE, call
 
-import prunedb
-import pruneexec
+from . import database
+from . import wrapper
+
 
 
 HOME = os.path.expanduser("~")
@@ -71,10 +72,10 @@ def initialize(new_data_folder, new_sandbox_prefix, hadoop=False):
 			raise
 
 	exec_script = open(data_folder+'PRUNE_EXECUTOR','w')
-	exec_script.write( pruneexec.script_str() )
+	exec_script.write( wrapper.script_str() )
 	exec_script.close()
 
-	ENVIRONMENT = prunedb.var_get('_ENV')
+	ENVIRONMENT = database.var_get('_ENV')
 	if not ENVIRONMENT:
 		print 'Warning: No Environments defined!'
 
@@ -106,7 +107,7 @@ def getPackType(filename):
 def getDataIDs(filename, puid=None):
 	try:
 		chksum = hashfile(filename)
-		copies = prunedb.copies_get_by_chksum(chksum)
+		copies = database.copies_get_by_chksum(chksum)
 		pack = getPackType(filename)
 		if len(copies)>0:
 			puid = copies[0]['puid']
@@ -118,7 +119,7 @@ def getDataIDs(filename, puid=None):
 		return None
 def getDataIDs2(data, puid=None):
 	chksum = hashstring(data)
-	copies = prunedb.copies_get_by_chksum(chksum)
+	copies = database.copies_get_by_chksum(chksum)
 	if len(copies)>0:
 		puid = copies[0]['puid']
 		return {'puid':puid, 'chksum':chksum, 'filename':None, 'exists':True, 'pack':''}
@@ -130,11 +131,11 @@ def putMetaData(ids, cmd_id=None):
 	global ENVIRONMENT
 	puid = ids['puid']
 	if ids['pname']:
-		prunedb.var_set(ids['pname'], puid)
-	op_id = prunedb.op_ins(ENVIRONMENT, cmd_id)
-	#prunedb.io_ins(op_id, 'F', function_puid, function_name)
-	prunedb.io_ins(op_id, 'I', None, None, ids['filename'], 0)
-	prunedb.io_ins(op_id, 'O', puid, ids['pname'], None, 0)
+		database.var_set(ids['pname'], puid)
+	op_id = database.op_ins(ENVIRONMENT, cmd_id)
+	#database.io_ins(op_id, 'F', function_puid, function_name)
+	database.io_ins(op_id, 'I', None, None, ids['filename'], 0)
+	database.io_ins(op_id, 'O', puid, ids['pname'], None, 0)
 	return op_id
 
 
@@ -162,7 +163,7 @@ def store_file(filename, puid, wait=True, form='ascii', pack=None, storage_modul
 				shutil.copy2( filename, cache_filename )
 			length = os.stat(cache_filename).st_size
 			chksum = hashfile(cache_filename)
-			prunedb.copy_ins(puid, chksum, length, form, pack, storage_module)
+			database.copy_ins(puid, chksum, length, form, pack, storage_module)
 			return True
 		else:
 			print 'LAZY PUT not yet implemented.'
@@ -171,7 +172,7 @@ def store_file(filename, puid, wait=True, form='ascii', pack=None, storage_modul
 		cache_filename = storage_pathname(puid)
 		length = os.stat(cache_filename).st_size
 		chksum = hashfile(cache_filename)
-		prunedb.copy_ins(puid, chksum, length, form, pack, storage_module)
+		database.copy_ins(puid, chksum, length, form, pack, storage_module)
 		return True
 
 	else:
@@ -187,7 +188,7 @@ def store_data(data, puid, wait=True, form='ascii', pack=None, storage_module=No
 				f.write(data.replace('\\n',"\n"))
 			length = os.stat(cache_filename).st_size
 			chksum = hashfile(cache_filename)
-			prunedb.copy_ins(puid, chksum, length, form, pack, storage_module)
+			database.copy_ins(puid, chksum, length, form, pack, storage_module)
 			return True
 		else:
 			print 'LAZY PUT not yet implemented.'
@@ -196,7 +197,7 @@ def store_data(data, puid, wait=True, form='ascii', pack=None, storage_module=No
 		cache_filename = storage_pathname(puid)
 		length = os.stat(cache_filename).st_size
 		chksum = hashfile(cache_filename)
-		prunedb.copy_ins(puid, chksum, length, form, None, storage_module)
+		database.copy_ins(puid, chksum, length, form, None, storage_module)
 		return True
 
 	else:
@@ -246,7 +247,7 @@ def transfers_check():
 			puid = transfers[i+1]
 			source = transfers[i+2]
 			destination = transfers[i+3]
-			prunedb.copy_ins(id, location, cache_filename)
+			database.copy_ins(id, location, cache_filename)
 			nextt = transfers[i+4:] if len(transfers)>(i+4) else []
 			transfers = transfers[0:i] + nextt
 		else:	
@@ -262,16 +263,16 @@ def locate_pathname(name):
 	return None
 
 def locate_copies(name):
-	puid = prunedb.var_get(name)
+	puid = database.var_get(name)
 	if not puid:
 		raise Exception('That name is not found in the database: '+name)
-	return prunedb.copies_get(puid)
+	return database.copies_get(puid)
 
 
 def isNameDone(name):
 	start = time.time()
-	puid = prunedb.var_get(name)
-	copies = prunedb.copy_get(puid)
+	puid = database.var_get(name)
+	copies = database.copy_get(puid)
 	if len(copies)==0:
 		return False
 	return True
@@ -301,7 +302,7 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 			name = ar[0]
 			if len(ar)>2:
 				time = ar[2]
-			puid = prunedb.var_get(name)
+			puid = database.var_get(name)
 			if not puid and in_types and len(in_types)>a and in_types[a].lower()=='file':
 				puid = name
 				if 'args' in extra:
@@ -325,10 +326,10 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 			function_name = extra['funcname']
 		else:
 			function_name = expr[0:lparen].strip()
-			function_puid = prunedb.var_get(function_name)
+			function_puid = database.var_get(function_name)
 			if not function_puid:
 				raise Exception('A function by the name "%s" could not be found.'%function_name)
-		func = prunedb.function_get(function_puid)
+		func = database.function_get(function_puid)
 		if not func:
 			in_types = []
 			fout_names = []
@@ -342,8 +343,8 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 								in_types += ['File']
 					elif line.startswith('#PRUNE_OUTPUT'):
 						fout_names.append(line[14:-1])
-			prunedb.function_ins(' '.join(fout_names), function_puid, ' '.join(in_types))
-			func = prunedb.function_get(function_puid)
+			database.function_ins(' '.join(fout_names), function_puid, ' '.join(in_types))
+			func = database.function_get(function_puid)
 		else:
 			in_types = func['in_types'].split()
 			fout_names = func['out_names'].split()
@@ -360,19 +361,19 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 		op_string = op_string[0:-1] + ')' + str(ENVIRONMENT)
 		#op_chksum = hashstring(op_string)
 		op_chksum = op_string
-		op = prunedb.op_get_by_chksum(op_chksum)
+		op = database.op_get_by_chksum(op_chksum)
 		old_op_id = None
 		if op:
 			old_op_id = op['id']
-			old_ios = prunedb.ios_get(old_op_id)
+			old_ios = database.ios_get(old_op_id)
 			print 'A matching operation has already been invoked: '+op_string
-			prunedb.run_upd_by_op_id(op['id'], 'Run', -1, '', 'local')
+			database.run_upd_by_op_id(op['id'], 'Run', -1, '', 'local')
 
-		op_id = prunedb.op_ins(ENVIRONMENT, cmd_id, op_chksum)
+		op_id = database.op_ins(ENVIRONMENT, cmd_id, op_chksum)
 
-		prunedb.io_ins(op_id, 'F', function_puid, function_name)
+		database.io_ins(op_id, 'F', function_puid, function_name)
 		for i,arg in enumerate(res['arg_list']):
-			prunedb.io_ins(op_id, 'I', arg[0], arg[1], arg[2], i)
+			database.io_ins(op_id, 'I', arg[0], arg[1], arg[2], i)
 		
 		results = []
 		for i in range(0,len(fout_names)):
@@ -386,15 +387,15 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 				puid = extra['assigns'][i] if len(extra['assigns'])>i else uuid.uuid4() 
 			else:
 				name = extra['assigns'][i] if len(extra['assigns'])>i else None
-				prunedb.var_get
+				database.var_get
 				puid = uuid.uuid4()
 			results += [[puid,name,None]]
-			prunedb.io_ins(op_id, 'O', puid, name, None, i)
+			database.io_ins(op_id, 'O', puid, name, None, i)
 			if name:
-				prunedb.var_set(name,puid)
+				database.var_set(name,puid)
 		
 		if not old_op_id:
-			prunedb.run_ins(op_id)
+			database.run_ins(op_id)
 		return results
 
 	elif assign>0: # Simple assignment
@@ -410,7 +411,7 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 		else:
 			res = eval(remain, depth+1, cmd_id, extra)
 			for a, arg in enumerate(args):
-				prunedb.var_set(args[a], res['puids'][a])
+				database.var_set(args[a], res['puids'][a])
 			return res
 
 def make_command(ios):
@@ -456,7 +457,7 @@ def make_command(ios):
 
 def origin(name):
 	lines = []
-	puid = prunedb.var_get(name)
+	puid = database.var_get(name)
 	if not puid:
 		raise Exception('An object by the name "%s" could not be found.'%(name) )
 	file_puids = [puid]
@@ -465,9 +466,9 @@ def origin(name):
 	next_file = 0
 	while next_file < len(file_puids):
 		puid = file_puids[next_file]
-		outs = prunedb.ios_get_by_file_puid(puid,'O')
+		outs = database.ios_get_by_file_puid(puid,'O')
 		for out in outs:
-			ios = prunedb.ios_get(out['op_id'])
+			ios = database.ios_get(out['op_id'])
 			function_used = False
 			for io in ios:
 				if io['io_type']=='F':
@@ -504,28 +505,28 @@ def new_puid():
 
 def env_name(name):
 	global ENVIRONMENT
-	id_str = prunedb.var_get(name)
-	prunedb.var_set('_ENV',id_str)
+	id_str = database.var_get(name)
+	database.var_set('_ENV',id_str)
 	ENVIRONMENT = id_str
 
 def add_store(fold_filename, unfold_filename):
 	global STOREID
 	fold_file_id = file_put(fold_filename)
 	unfold_file_id = file_put(unfold_filename)
-	STOREID = prunedb.store_ins(fold_file_id, unfold_file_id)
+	STOREID = database.store_ins(fold_file_id, unfold_file_id)
 	
 
 def getRuns(cnt):
-	return prunedb.run_get_by_queue('Run',cnt)
+	return database.run_get_by_queue('Run',cnt)
 
 def getQueueCounts():
-	return prunedb.run_queue_cnts()
+	return database.run_queue_cnts()
 
 def getdb():
-	return prunedb
+	return database
 
 def cmd_log(original,final,op_id=None):
-	prunedb.cmd_ins(original,final,op_id)
+	database.cmd_ins(original,final,op_id)
 
 
 
@@ -550,8 +551,8 @@ def hashstring(str):
 def create_operation(op_id,framework='local',local_fs=False):
 	global sandbox_prefix
 
-	ios = prunedb.ios_get(op_id)
-	op = prunedb.op_get(op_id)
+	ios = database.ios_get(op_id)
+	op = database.op_get(op_id)
 
 	options = ''
 	arg_str = ''
@@ -562,7 +563,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 		if io['io_type']=='F':
 			function_name = io['name']
 			function_puid = io['file_puid']
-			func = prunedb.function_get(function_puid)
+			func = database.function_get(function_puid)
 			out_names = func['out_names'].split()
 			if io['pack']=='gzip':
 				place_files.append({'src':storage_pathname(function_puid),'dst':function_name+'.gz'})
@@ -577,7 +578,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 			else:
 				arg = io['name']
 				arg_str += '%s '%(arg)
-				res = prunedb.copies_get(io['file_puid'])
+				res = database.copies_get(io['file_puid'])
 				if len(res)==0:
 					#print 'No file', io
 					return {'cmd':None}
@@ -593,7 +594,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 
 	arg_str = arg_str[0:-1]
 
-	copies = prunedb.copies_get(op['env_puid'])
+	copies = database.copies_get(op['env_puid'])
 	env_type = ''
 	if len(copies)>0:
 		copy = copies[0]
@@ -700,7 +701,7 @@ def wq_check():
 				if operation['cmd']:
 					t = operation['wq_task']
 					task_id = wq.submit(t)
-					prunedb.run_upd(run['id'],'Running',task_id,'','wq')
+					database.run_upd(run['id'],'Running',task_id,'','wq')
 					wq_task_cnt += 1
 					left -= 1
 					print 'started: #%i, run:%i, op_id:%i   cmd:"%s"'%(wq_task_cnt, run['id'], run['op_id'], operation['cmd'])
@@ -714,9 +715,9 @@ def wq_check():
 			t = wq.wait(5)
 			while t: #Once there are no more tasks currently finished, return
 				try:
-					run = prunedb.run_get_by_task_id(t.id)
+					run = database.run_get_by_task_id(t.id)
 					op_id = run['op_id']
-					ios = prunedb.ios_get(op_id)
+					ios = database.ios_get(op_id)
 					if t.return_status==0:
 						for io in ios:
 							if io['io_type']=='O':
@@ -725,7 +726,7 @@ def wq_check():
 								store_file(pathname, io['file_puid'], True, storage_module='wq')
 
 						print 'complete: run:%i, op_id:%i'%(run['id'],run['op_id'])
-						prunedb.run_end(run['id'],t.return_status)
+						database.run_end(run['id'],t.return_status)
 					else:
 						for io in ios:
 							if io['io_type']=='O':
@@ -738,14 +739,14 @@ def wq_check():
 						print 'Failed with exit code:',t.return_status
 						print 'Resubmit to try again.'
 						print t.command
-						prunedb.run_upd(run['id'],'Failed',0,'','Exit code: %i'%t.return_status)
+						database.run_upd(run['id'],'Failed',0,'','Exit code: %i'%t.return_status)
 
 				except:
 					print 'Return status:',t.return_status
 					print run
 					print ios
 					print traceback.format_exc()
-					prunedb.run_upd(run['id'],'Failed',0,'',traceback.format_exc())
+					database.run_upd(run['id'],'Failed',0,'',traceback.format_exc())
 
 				wq_task_cnt -= 1
 				t = wq.wait(1)
@@ -785,12 +786,12 @@ def local_check():
 					fails += 1
 
 			if p.returncode==0 and fails==0:
-				prunedb.run_end(operation['run']['id'],p.returncode)
+				database.run_end(operation['run']['id'],p.returncode)
 				shutil.rmtree(operation['sandbox'])
 			else:
 				print 'returncode =', p.returncode, ', fails =',fails
 				print traceback.format_exc()
-				prunedb.run_upd(operation['run']['id'], 'Failed', p.returncode, '', 'local')
+				database.run_upd(operation['run']['id'], 'Failed', p.returncode, '', 'local')
 			del local_workers[w]
 			w -= 1
 		w += 1
@@ -805,7 +806,7 @@ def local_check():
 			w += 1
 			p = subprocess.Popen(operation['final_cmd'], stdout = subprocess.PIPE, stderr = subprocess.PIPE, cwd = operation['sandbox'], shell=True)
 			local_workers.append( [run['op_id'],operation,p] )
-			prunedb.run_upd(run['id'],'Running',0,'','local')
+			database.run_upd(run['id'],'Running',0,'','local')
 	time.sleep(1)
 
 	if w > 0:
