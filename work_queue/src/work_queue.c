@@ -15,6 +15,7 @@ The following major problems must be fixed:
 #include "work_queue_internal.h"
 #include "work_queue_resources.h"
 
+#include "cctools.h"
 #include "int_sizes.h"
 #include "link.h"
 #include "link_auth.h"
@@ -1283,7 +1284,7 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 	log_worker_stats(q);
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
 
-	if(strcmp(CCTOOLS_VERSION, w->version)) {
+	if(cctools_version_cmp(CCTOOLS_VERSION, w->version) != 0) {
 		debug(D_DEBUG, "Warning: potential worker version mismatch: worker %s (%s) is version %s, and master is version %s", w->hostname, w->addrport, w->version, CCTOOLS_VERSION);
 	}
 

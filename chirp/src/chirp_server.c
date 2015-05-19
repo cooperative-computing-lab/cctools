@@ -217,7 +217,7 @@ static int update_all_catalogs(const char *url)
 	buffer_putfstring(&B, "starttime %lu\n", (unsigned long) starttime);
 	buffer_putfstring(&B, "total %" PRIu64 "\n", info.f_blocks * info.f_bsize);
 	buffer_putfstring(&B, "url chirp://%s:%d\n", hostname, chirp_port);
-	buffer_putfstring(&B, "version %d.%d.%s\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
+	buffer_putfstring(&B, "version %d.%d.%d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
 	chirp_stats_summary(&B);
 
 	list_iterate(catalog_host_list, update_one_catalog, buffer_tostring(&B));
