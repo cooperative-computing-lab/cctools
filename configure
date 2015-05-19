@@ -32,7 +32,7 @@ fi
 
 # `git archive` (man gitattributes(5)) fills this in, otherwise we do it manually...
 COMMIT='$Format:%H$'
-if [ "${COMMIT:0:1}" = '$' ]; then
+if [ "$(substr "$COMMIT" 1 1)" = '$' ]; then
 	if [ "$GIT" = y ]; then
 		COMMIT="$(git rev-parse HEAD)"
 	else
@@ -50,7 +50,7 @@ fi
 
 # The date is the commit date of the commit, or now if the working tree is dirty.
 DATE='$Format:%ci$'
-if [ "${DATE:0:1}" = '$' ]; then
+if [ "$(substr "$DATE" 1 1)" = '$' ]; then
 	if [ "$GIT" = y ]; then
 		DATE="$(git log -1 --pretty=format:%ci HEAD)"
 	else
@@ -68,7 +68,7 @@ elif [ -n "$CCTOOLS_BRANCH" ]; then
 	BRANCH="$CCTOOLS_BRANCH"
 else
 	BRANCH='$Format:%d$'
-	if [ "${BRANCH:0:1}" = '$' ]; then
+	if [ "$(substr "$BRANCH" 1 1)" = '$' ]; then
 		if [ "$GIT" = y ]; then
 			BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 		else
@@ -91,7 +91,7 @@ else
 	fi
 fi
 
-SOURCE="${BRANCH}:${COMMIT:0:8}${DIRTY}"
+SOURCE="${BRANCH}:$(substr "$COMMIT" 1 8)${DIRTY}"
 VERSION="$MAJOR.$MINOR.$MICRO [${SOURCE}]"
 
 # Bourne shell is tricky when you use backtick command substitution backslash

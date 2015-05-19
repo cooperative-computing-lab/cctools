@@ -20,6 +20,21 @@ echon()
 	printf "%s" "$@"
 }
 
+# substr <s> <pos> <len>
+substr() {
+	local str="$1"
+	local i="$2"
+	local j="$3"
+
+	if [ -z "$i" ]; then
+		i=0
+	fi
+	if [ -z "$j" ]; then
+		j=-0
+	fi
+	printf "%s" "$str" | tail -c "+$i" | head -c "$j"
+}
+
 abspath() {
 	case "$1" in
 		/*)
