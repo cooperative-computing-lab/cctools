@@ -45,6 +45,8 @@
 		}\
 	} while (0)
 
+#define RCUNIX(rc) (rc == 0 ? 0 : (errno = rc, -1))
+
 #endif
 
 /* vim: set noexpandtab tabstop=4: */
