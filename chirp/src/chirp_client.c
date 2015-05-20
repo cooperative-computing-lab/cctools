@@ -5,57 +5,56 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "chirp_protocol.h"
 #include "chirp_client.h"
 #include "chirp_group.h"
+#include "chirp_protocol.h"
 #include "chirp_ticket.h"
 
-#include "sleeptools.h"
-
-#include "link.h"
 #include "auth.h"
 #include "auth_hostname.h"
+#include "catch.h"
+#include "copy_stream.h"
+#include "debug.h"
 #include "domain_name_cache.h"
 #include "full_io.h"
-#include "macros.h"
-#include "debug.h"
-#include "copy_stream.h"
+#include "link.h"
 #include "list.h"
+#include "macros.h"
+#include "shell.h"
+#include "sleeptools.h"
 #include "string_array.h"
 #include "url_encode.h"
 #include "xxmalloc.h"
 
-#include <assert.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#include <stdarg.h>
-#include <ctype.h>
-#include <sys/stat.h>
-#ifdef HAS_SYS_STATFS_H
-#include <sys/statfs.h>
+#if defined(HAS_ATTR_XATTR_H)
+#	include <attr/xattr.h>
+#elif defined(HAS_SYS_XATTR_H)
+#	include <sys/xattr.h>
 #endif
-#include <sys/param.h>
-#include <sys/mount.h>
-#include <signal.h>
-
-#include <unistd.h>
-#include <sys/errno.h>
-#include <sys/socket.h>
+#ifndef ENOATTR
+#	define ENOATTR  EINVAL
+#endif
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <sys/errno.h>
+#include <sys/mount.h>
+#include <sys/param.h>
+#include <sys/socket.h>
+#ifdef HAS_SYS_STATFS_H
+#	include <sys/statfs.h>
+#endif
+#include <unistd.h>
 
-#if defined(HAS_ATTR_XATTR_H)
-#include <attr/xattr.h>
-#elif defined(HAS_SYS_XATTR_H)
-#include <sys/xattr.h>
-#endif
-#ifndef ENOATTR
-#define ENOATTR  EINVAL
-#endif
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
