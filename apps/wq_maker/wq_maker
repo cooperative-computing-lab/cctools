@@ -928,6 +928,11 @@ sub submit_task {
 		configure_remote_tier_annotation($tier_num);	
 		specify_output_tier_files($task, $tier_num);
 	}	
+
+	my $tierFile = $start_tier."_todo.tier";
+	my $tier_ds = ${retrieve($tierFile)}; #$tier_ds holds all the information for task 
+
+	work_queue::work_queue_task_specify_cores($task, $tier_ds->CTL_OPT->{cpus});
 	
 	my $taskid = work_queue::work_queue_submit($wq, $task);
 	print localtime()." :: Submitted task $taskid for annotating $tiers_in_task tiers with command: $task_command $query_seqs\n";
