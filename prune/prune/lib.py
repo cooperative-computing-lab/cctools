@@ -75,7 +75,7 @@ def initialize(new_data_folder, new_sandbox_prefix, hadoop=False):
 	exec_script.write( wrapper.script_str() )
 	exec_script.close()
 
-	ENVIRONMENT = database.var_get('_ENV')
+	ENVIRONMENT = database.tag_get('_ENV')
 	if not ENVIRONMENT:
 		print 'Warning: No Environments defined!'
 
@@ -117,6 +117,7 @@ def getDataIDs(filename, puid=None):
 		return {'puid':puid, 'chksum':chksum, 'filename':filename, 'exists':False, 'pack':pack}
 	except IOError:
 		return None
+		
 def getDataIDs2(data, puid=None):
 	chksum = hashstring(data)
 	copies = database.copies_get_by_chksum(chksum)
@@ -131,11 +132,11 @@ def putMetaData(ids, cmd_id=None):
 	global ENVIRONMENT
 	puid = ids['puid']
 	if ids['pname']:
-		database.var_set(ids['pname'], puid)
-	op_id = database.op_ins(ENVIRONMENT, cmd_id)
+		database.tag_set(ids['pname'], puid)
+	op_id = database.op_ins(None, '', '')
 	#database.io_ins(op_id, 'F', function_puid, function_name)
-	database.io_ins(op_id, 'I', None, None, ids['filename'], 0)
-	database.io_ins(op_id, 'O', puid, ids['pname'], None, 0)
+	database.io_ins(op_id, 'I', None, ids['filename'], 0)
+	database.io_ins(op_id, 'O', puid, ids['pname'], 0)
 	return op_id
 
 
@@ -153,8 +154,7 @@ def getFile(name, filename, wait=True):
 	return False
 
 
-def store_file(filename, puid, wait=True, form='ascii', pack=None, storage_module=None):
-	print filename, puid, wait, form, pack, storage_module
+def store_file(filename, puid, wait=True, pack=None, storage_module=None):
 	if not storage_module:
 		if wait:
 			cache_filename = storage_pathname(puid)
@@ -163,7 +163,7 @@ def store_file(filename, puid, wait=True, form='ascii', pack=None, storage_modul
 				shutil.copy2( filename, cache_filename )
 			length = os.stat(cache_filename).st_size
 			chksum = hashfile(cache_filename)
-			database.copy_ins(puid, chksum, length, form, pack, storage_module)
+			database.copy_ins(puid, chksum, length, pack, storage_module)
 			return True
 		else:
 			print 'LAZY PUT not yet implemented.'
@@ -172,7 +172,7 @@ def store_file(filename, puid, wait=True, form='ascii', pack=None, storage_modul
 		cache_filename = storage_pathname(puid)
 		length = os.stat(cache_filename).st_size
 		chksum = hashfile(cache_filename)
-		database.copy_ins(puid, chksum, length, form, pack, storage_module)
+		database.copy_ins(puid, chksum, length, pack, storage_module)
 		return True
 
 	else:
@@ -263,7 +263,8 @@ def locate_pathname(name):
 	return None
 
 def locate_copies(name):
-	puid = database.var_get(name)
+	tag = database.tag_get(name)
+	puid = tag['puid']
 	if not puid:
 		raise Exception('That name is not found in the database: '+name)
 	return database.copies_get(puid)
@@ -271,7 +272,7 @@ def locate_copies(name):
 
 def isNameDone(name):
 	start = time.time()
-	puid = database.var_get(name)
+	puid = database.tag_get(name)
 	copies = database.copy_get(puid)
 	if len(copies)==0:
 		return False
@@ -302,7 +303,9 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 			name = ar[0]
 			if len(ar)>2:
 				time = ar[2]
-			puid = database.var_get(name)
+			tag = database.tag_get(name)
+			if tag:
+				puid = tag['puid']
 			if not puid and in_types and len(in_types)>a and in_types[a].lower()=='file':
 				puid = name
 				if 'args' in extra:
@@ -322,18 +325,20 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 		if (depth==0):
 			raise Exception('You must assign a name to the function result(s).')
 		if 'funcname' in extra:
-			function_puid = expr[0:lparen].strip()
+			function_file_puid = expr[0:lparen].strip()
 			function_name = extra['funcname']
 		else:
 			function_name = expr[0:lparen].strip()
-			function_puid = database.var_get(function_name)
-			if not function_puid:
+			tag = database.tag_get(function_name)
+			if not tag:
 				raise Exception('A function by the name "%s" could not be found.'%function_name)
-		func = database.function_get(function_puid)
+			else:
+				function_file_puid = tag['puid']
+		func = database.function_get_by_file(function_file_puid)
 		if not func:
 			in_types = []
 			fout_names = []
-			with open( storage_pathname(function_puid) ) as f:
+			with open( storage_pathname(function_file_puid) ) as f:
 				for line in f:
 					if line.startswith('#PRUNE_INPUTS'):
 						in_types = line[14:-1].split()
@@ -343,8 +348,8 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 								in_types += ['File']
 					elif line.startswith('#PRUNE_OUTPUT'):
 						fout_names.append(line[14:-1])
-			database.function_ins(' '.join(fout_names), function_puid, ' '.join(in_types))
-			func = database.function_get(function_puid)
+			database.function_ins(function_file_puid, ' '.join(in_types), ' '.join(fout_names))
+			func = database.function_get_by_file(function_file_puid)
 		else:
 			in_types = func['in_types'].split()
 			fout_names = func['out_names'].split()
@@ -352,28 +357,33 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 		remain = expr[lparen+1:expr.rfind(')')]
 		res = eval(remain, depth+1, cmd_id, dict({'in_types':in_types}.items()+extra.items()) )
 		
+		function_puid = func['puid']
 		op_string = '%s('%function_puid
 		for r in res['arg_list']:
 			if r[0]:
 				op_string += str(r[0])+','
 			else:
 				op_string += r[3]+','
-		op_string = op_string[0:-1] + ')' + str(ENVIRONMENT)
+		op_string = op_string[0:-1] + ')'
 		#op_chksum = hashstring(op_string)
 		op_chksum = op_string
-		op = database.op_get_by_chksum(op_chksum)
+		op_env_chksum = op_string + str(ENVIRONMENT)
+
+		op = database.op_get_by_env_chksum(op_env_chksum)
 		old_op_id = None
 		if op:
-			old_op_id = op['id']
+			old_op_id = op['puid']
 			old_ios = database.ios_get(old_op_id)
 			print 'A matching operation has already been invoked: '+op_string
-			database.run_upd_by_op_id(op['id'], 'Run', -1, '', 'local')
+			#database.run_upd_by_op_puid(op['puid'], 'Run', -1, '', 'local')
 
-		op_id = database.op_ins(ENVIRONMENT, cmd_id, op_chksum)
-
+		op_id = database.op_ins(function_puid,op_chksum, op_env_chksum)
+		if ENVIRONMENT:
+			database.io_ins(op_id, 'E', ENVIRONMENT, '')
+		
 		database.io_ins(op_id, 'F', function_puid, function_name)
 		for i,arg in enumerate(res['arg_list']):
-			database.io_ins(op_id, 'I', arg[0], arg[1], arg[2], i)
+			database.io_ins(op_id, 'I', arg[0], arg[1], i)
 		
 		results = []
 		for i in range(0,len(fout_names)):
@@ -387,12 +397,12 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 				puid = extra['assigns'][i] if len(extra['assigns'])>i else uuid.uuid4() 
 			else:
 				name = extra['assigns'][i] if len(extra['assigns'])>i else None
-				database.var_get
+				database.tag_get
 				puid = uuid.uuid4()
 			results += [[puid,name,None]]
-			database.io_ins(op_id, 'O', puid, name, None, i)
+			database.io_ins(op_id, 'O', puid, name, i)
 			if name:
-				database.var_set(name,puid)
+				database.tag_set(name,puid)
 		
 		if not old_op_id:
 			database.run_ins(op_id)
@@ -411,7 +421,7 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 		else:
 			res = eval(remain, depth+1, cmd_id, extra)
 			for a, arg in enumerate(args):
-				database.var_set(args[a], res['puids'][a])
+				database.tag_set(args[a], res['puids'][a])
 			return res
 
 def make_command(ios):
@@ -457,7 +467,7 @@ def make_command(ios):
 
 def origin(name):
 	lines = []
-	puid = database.var_get(name)
+	puid = database.tag_get(name)
 	if not puid:
 		raise Exception('An object by the name "%s" could not be found.'%(name) )
 	file_puids = [puid]
@@ -505,7 +515,7 @@ def new_puid():
 
 def env_name(name):
 	global ENVIRONMENT
-	id_str = database.var_get(name)
+	id_str = database.tag_get(name)
 	database.var_set('_ENV',id_str)
 	ENVIRONMENT = id_str
 
@@ -556,57 +566,57 @@ def create_operation(op_id,framework='local',local_fs=False):
 
 	options = ''
 	arg_str = ''
+	env_type = ''
 	place_files = []
 	fetch_files = []
 	for io in ios:
-		print io
 		if io['io_type']=='F':
-			function_name = io['name']
-			function_puid = io['file_puid']
+			function_name = io['display']
+			function_puid = op['function_puid']
 			func = database.function_get(function_puid)
 			out_names = func['out_names'].split()
-			if io['pack']=='gzip':
-				place_files.append({'src':storage_pathname(function_puid),'dst':function_name+'.gz'})
-				options += ' -gz %s=%s.gz'%(function_name,function_name)
-			else:
-				place_files.append({'src':storage_pathname(function_puid),'dst':function_name})
-	
+			res = database.copies_get(func['file_puid'])
+			for copy in res:
+				if copy['pack']=='gzip':
+					place_files.append({'src':storage_pathname(func['file_puid']),'dst':function_name+'.gz'})
+					options += ' -gz %s=%s.gz'%(function_name,function_name)
+				else:
+					place_files.append({'src':storage_pathname(func['file_puid']),'dst':function_name})
+		
 		elif io['io_type']=='I':
-			if io['literal']:
-				arg = io['literal']
-				arg_str += '%s '%(arg)
-			else:
-				arg = io['name']
-				arg_str += '%s '%(arg)
-				res = database.copies_get(io['file_puid'])
-				if len(res)==0:
-					#print 'No file', io
-					return {'cmd':None}
-				if io['pack']=='gzip':
-					place_files.append({'src':storage_pathname(io['file_puid']),'dst':str(arg)+'.gz'})
+			arg_str += '%s '%(io['display'])
+			res = database.copies_get(io['file_puid'])
+			if len(res)==0:
+				#print 'No file', io
+				return {'cmd':None}
+			for copy in res:
+				if copy['pack']=='gzip':
+					place_files.append({'src':storage_pathname(io['file_puid']),'dst':io['display']+'.gz'})
 					options += ' -gunzip %s=%s.gz'%(arg,arg)
 				else:
-					place_files.append({'src':storage_pathname(io['file_puid']),'dst':str(arg)})
+					place_files.append({'src':storage_pathname(io['file_puid']),'dst':io['display']})
 			
 
 		elif io['io_type']=='O':
 			fetch_files.append({'src':out_names[io['pos']],'dst':storage_pathname(io['file_puid']),'puid':io['file_puid']})
 
+
+		elif io['io_type']=='E':
+			env = database.environment_get(io['file_puid'])
+			env_type = env['env_type']
+			copies = database.copies_get(env['file_puid'])
+			if len(copies)>0:
+				copy = copies[0]
+				if env_type=='umbrella':
+					options += ' -umbrella'
+				elif env_type=='targz':
+					options += ' -targz ENVIRONMENT'
+					
+				
+				place_files.append({'src':storage_pathname(io['file_puid']),'dst':'ENVIRONMENT'})
+
 	arg_str = arg_str[0:-1]
 
-	copies = database.copies_get(op['env_puid'])
-	env_type = ''
-	if len(copies)>0:
-		copy = copies[0]
-		if copy['form']=='umbrella':
-			env_type = copy['form']
-			options += ' -umbrella'
-		elif copy['form']=='targz':
-			options += ' -targz ENVIRONMENT'
-			env_type = copy['form']
-			
-		
-		place_files.append({'src':storage_pathname(op['env_puid']),'dst':'ENVIRONMENT'})
 
 	place_files.append({'src':storage_pathname('PRUNE_EXECUTOR'),'dst':'PRUNE_EXECUTOR'})
 	fetch_files.append({'src':'prune_debug.log','dst':storage_pathname(op_id)+'.debug','puid':str(op_id)+'.debug'})
@@ -786,12 +796,12 @@ def local_check():
 					fails += 1
 
 			if p.returncode==0 and fails==0:
-				database.run_end(operation['run']['id'],p.returncode)
+				database.run_upd(operation['run']['puid'],'Complete',p.returncode)
 				shutil.rmtree(operation['sandbox'])
 			else:
 				print 'returncode =', p.returncode, ', fails =',fails
 				print traceback.format_exc()
-				database.run_upd(operation['run']['id'], 'Failed', p.returncode, '', 'local')
+				database.run_upd(operation['run']['puid'], 'Failed', p.returncode, '', 'local')
 			del local_workers[w]
 			w -= 1
 		w += 1
@@ -799,14 +809,14 @@ def local_check():
 	left = max_concurrency - len(local_workers)
 	runs = getRuns(left)
 	for run in runs:
-		operation = create_operation(run['op_id'],'local',local_local_fs)
+		operation = create_operation(run['op_puid'],'local',local_local_fs)
 		if operation['cmd']:
 			operation['run'] = run
 			print 'Start:',operation['cmd']
 			w += 1
 			p = subprocess.Popen(operation['final_cmd'], stdout = subprocess.PIPE, stderr = subprocess.PIPE, cwd = operation['sandbox'], shell=True)
-			local_workers.append( [run['op_id'],operation,p] )
-			database.run_upd(run['id'],'Running',0,'','local')
+			local_workers.append( [run['op_puid'],operation,p] )
+			database.run_upd(run['puid'],'Running',0,'','local')
 	time.sleep(1)
 
 	if w > 0:

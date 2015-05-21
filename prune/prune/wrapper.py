@@ -16,7 +16,7 @@ import subprocess
 import os.path
 
 
-args = {'ln':[], 'gunzip':[], 'tar':[], 'umbrella':False, 'function_name':None, 'function_inputs':[]}
+args = {'ln':[], 'gzip':[], 'gunzip':[], 'tar':[], 'umbrella':False, 'function_name':None, 'function_inputs':[]}
 argi = 1
 while argi<len(sys.argv):
 	arg = sys.argv[argi]

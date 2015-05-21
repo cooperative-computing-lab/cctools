@@ -2,7 +2,7 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-import os, sys, traceback, os.path
+import os, sys, traceback, os.path, select
 import time, threading
 
 import readline, re
@@ -14,12 +14,12 @@ from work_queue import *
 
 from . import lib
 
-database = lib.getdb()
 
+database = lib.getdb()
 
 HOME = os.path.expanduser("~")
 CWD = os.getcwd()
-config_file = CWD+'/.prune.conf'
+config_file = HOME+'/.pruneconf'
 config_file2 = None
 run_filename = run_lines = None
 reset_all = False
@@ -44,7 +44,7 @@ while argi<len(sys.argv):
 		else:
 			os.chdir(os.getcwd()+'/'+nwd)
 		CWD = os.getcwd()
-		config_file = CWD+'/.prune.conf'
+		config_file = HOME+'/.prune.conf'
 	elif arg=='--conf':
 		argi += 1
 		config_file2 = sys.argv[argi]
@@ -62,10 +62,8 @@ terminate = False
 block = False
 hadoop_data = False
 
-repo_puid = lib.new_puid()
+data_folder = db_pathname = sandbox_prefix = None
 if os.path.isfile(config_file):
-	print 'Using default configuration file:',config_file
-	print 'Use the command line argument "--conf <pathname>" to specify a different one.'
 	with open(config_file) as f:
 		for line in f.readlines():
 			(meta_type,value) = line[:-1].split('\t')
@@ -75,30 +73,22 @@ if os.path.isfile(config_file):
 				db_pathname = value
 			elif meta_type=='data_folder':
 				data_folder = value
-			elif meta_type=='repo_puid':
-				repo_puid = value
 else:
-	print 'No default or specified configuration file found.'
-	print 'When you answer the following questions, a default configuration file will be created at:\n',config_file
-	sys.stdout.flush()
-
-	data_folder = '/tmp/prune/data/'
-	db_pathname = '/tmp/prune/___prune.db'
-	sandbox_prefix = '/tmp/prune/sandbox/'
-
-	line = raw_input('\nEnter location for data files [%s]: '%data_folder)
+	base_dir = HOME+'/.prunespace/'
+	
+	print '\nWelcome to Prune!'
+	print 'The default config file will be stored at:',config_file
+	line = raw_input('Enter a location for data files, database, and sandboxes [%s]: '%(base_dir))
+	
 	if len(line)>0:
 		if line[-1] != '/':
 			line = line + '/'
-		data_folder = line
-	line = raw_input('Enter filepath for the database [%s]: '%db_pathname)
-	if len(line)>0:
-		db_pathname = line
-	line = raw_input('Enter location for execution sandboxes [%s]: '%sandbox_prefix)
-	if len(line)>0:
-		if line[-1] != '/':
-			line = line + '/'
-		sandbox_prefix = line
+		base_dir = line
+	
+	data_folder = base_dir+'data/'
+	db_pathname = base_dir+'_prune.db'
+	sandbox_prefix = base_dir+'sandbox/'
+
 
 
 def prompt():
@@ -144,10 +134,10 @@ def process_line(line):
 	try:
 		if len(line)==0 or line[0]=='#':
 			return True
-		elif line.startswith('EXIT') or line.startswith('QUIT'):
+		elif line.upper().startswith('EXIT') or line.upper().startswith('QUIT'):
 			terminate = True
 			return True
-		elif line.startswith('HELP'):
+		elif line.upper().startswith('HELP'):
 			message = '''
 **PUT [local.txt] AS [prune_name]: Files to be used in the workflow can be added to the preserved namespace. 
 Ex. PUT mylocalfilename.txt AS data_name_in_prune
@@ -167,7 +157,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			'''
 			print message
 			return True
-		elif line.startswith('PUT'):
+		elif line.upper().startswith('PUT'):
 			wait = True
 			filename = pname = puid = data = form = None
 			if line.find('"')>=0:
@@ -207,7 +197,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			if ids['exists']:
 				print 'That file already exists with that name: %s=%s'%(pname,ids['puid'])
 				if ids['pname']:
-					database.var_set(ids['pname'], ids['puid'])
+					database.tag_set(ids['pname'], ids['puid'])
 				if form:
 					lib.env_name(pname)
 			elif data:
@@ -222,7 +212,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 					lib.store_file(filename,ids['puid'],wait,pack=ids['pack'])
 			return True
 
-		elif line.startswith('USE'):
+		elif line.upper().startswith('USE'):
 			ar = line.split(' ')
 			resource_type = ar[1]
 			if 'TRY_LOCAL' in line:
@@ -237,7 +227,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				lib.useWQ(master_name,local_fs)
 			return True
 
-		elif line.startswith('ENV'):
+		elif line.upper().startswith('ENV'):
 			ar = line.split()
 
 			pname = ar[1]
@@ -246,7 +236,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			return True
 
 
-		elif line.startswith('GET'):
+		elif line.upper().startswith('GET'):
 			wait = True
 			filename = expr = None
 			ar = line.split(' ')
@@ -266,7 +256,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			return lib.getFile(expr,filename,wait)
 			
 
-		elif line.startswith('WORK'):
+		elif line.upper().startswith('WORK'):
 			if not work_start:
 				work_start = time.time()
 				last_report = work_start - 5
@@ -321,7 +311,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 
 
 
-		elif line.startswith('LOCATE'):
+		elif line.upper().startswith('LOCATE'):
 			ar = line.split(' ')
 			name = ar[1]
 			now = True if len(ar)>2 and ar[2]=='NOW' else False
@@ -337,7 +327,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				print 'That data does not exist yet. You could try WAITing for it, or try again later.'
 				return True
 
-		elif line.startswith('RUN'):
+		elif line.upper().startswith('RUN'):
 			start_time = time.time()
 			ar = line.split(' ')
 			name = ar[1]
@@ -355,10 +345,10 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				seconds = (time.time()-start_time)%60
 				print 'Total run (with preservation): %02dm%02ds'%( minutes, seconds )
 			except Exception as e:
-				print e
+				print traceback.format_exc()
 			return True
 
-		elif line.startswith('STATUS'):
+		elif line.upper().startswith('STATUS'):
 			if not wait_start:
 				wait_start = time.time()
 
@@ -384,13 +374,13 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				#time.sleep(10)
 				return False
 
-		elif line.startswith('CUT'):
+		elif line.upper().startswith('CUT'):
 			res = database.var_getAll()
 			for r in res:
 				database.var_unset(r['name'])
 			return True
 				
-		elif line.startswith('LS'):
+		elif line.upper().startswith('LS'):
 			ar = line.split()
 			if len(ar)>1 and ar[1]!='*':
 				keyword = ar[1]
@@ -406,7 +396,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			return True
 				
 
-		elif line.startswith('EXPORT'):
+		elif line.upper().startswith('EXPORT'):
 			ar = line.split(' ')
 			lines,files = lib.origin(ar[1])
 			i = 2
@@ -431,7 +421,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 
 
 
-		elif line.startswith('MF'):
+		elif line.upper().startswith('MF'):
 			ar = line.split(' ')
 			filename = ar[1]
 			
@@ -451,7 +441,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 						ins = in_str.split()
 					else:
 						line = line.strip()
-						if line.startswith('LOCAL'):
+						if line.upper().startswith('LOCAL'):
 							line = line[6:]
 						function_string = "#!/bin/bash\n\n#PRUNE_INPUT"
 						for in_file in ins:
@@ -521,7 +511,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 
 
 
-		elif line.startswith('IMPORT'):
+		elif line.upper().startswith('IMPORT'):
 			ar = line.split(' ')
 			filename = ar[1]
 			i = 2
@@ -541,7 +531,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				plan = zf.read('prune_cmds.plan')
 				for line in plan.splitlines(True):
 					print line
-					if line.startswith('PUT'):
+					if line.upper().startswith('PUT'):
 						ar = line.split()
 						puid = ar[1]
 						pname = ar[3]
@@ -558,8 +548,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 							op_id = lib.putMetaData(ids, cmd_id)
 						else:
 							print 'There was a problem with the command'
-						#database.io_ins(op_id, 'O', puid, pname, repo_id, None, 0)
-					elif line.startswith('#'):
+					elif line.upper().startswith('#'):
 						extra = {}
 						matchObj = re.match( r'#([^=]+)=([^\(]*)\(([^/)]*)', line, re.M|re.I)
 						extra['vars'] = matchObj.group(1).split(',')
@@ -592,24 +581,24 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			return True
 
 
-		elif line.startswith('ORIGIN'):
+		elif line.upper().startswith('ORIGIN'):
 			ar = line.split(' ')
 			lines,files = lib.origin(ar[1])
 			for line in lines:
 				print line
 			return True
 
-		elif line.startswith('FLOW'):
+		elif line.upper().startswith('FLOW'):
 			return True
 
-		elif line.startswith('STORE'):
+		elif line.upper().startswith('STORE'):
 			ar = line.split(' ')
 			fold_filename = ar[1]
 			unfold_filename = ar[2]
 			lib.add_store(fold_filename,unfold_filename)			
 			return True
 
-		elif line.startswith('RESET'):
+		elif line.upper().startswith('RESET'):
 			print data_folder
 			lib.truncate()
 			database.truncate()
@@ -626,16 +615,14 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 
 
 try:
-
 	database.initialize(db_pathname)
-	#Be sure to initialize the database first!
 	lib.initialize(data_folder, sandbox_prefix, hadoop_data)
 	with open(config_file,'w') as f:
 		f.write('data_folder\t%s\n'%data_folder)
 		f.write('database\t%s\n'%db_pathname)
 		f.write('sandbox\t%s\n'%sandbox_prefix)
-		f.write('repo_puid\t%s\n'%repo_puid)
-
+		#f.write('repo_puid\t%s\n'%repo_puid)
+	
 
 
 except Exception as e:
@@ -655,7 +642,10 @@ elif run_lines:
 			done = process_line(line)
 
 elif run_filename:
-	lines = [line.strip() for line in open(run_filename)]
+	if run_filename=='stdin':
+		lines = sys.stdin
+	else:
+		lines = [line.strip() for line in open(run_filename)]
 	for line in lines:
 		print line
 		done = False
