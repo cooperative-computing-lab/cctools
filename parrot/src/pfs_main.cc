@@ -536,6 +536,12 @@ int main( int argc, char *argv[] )
 	install_handler(SIGTTIN,SIG_IGN);
 	install_handler(SIGTTOU,SIG_IGN);
 
+	if(isatty(0)) {
+		pfs_master_timeout = 300;
+	} else {
+		pfs_master_timeout = 3600;
+	}
+
 	static const struct option long_options[] = {
 		{"auto-decompress", no_argument, 0, 'Z'},
 		{"block-size", required_argument, 0, 'b'},
@@ -805,12 +811,6 @@ int main( int argc, char *argv[] )
 			fatal("Can not obtain the current working directory!");
 		fprintf(fp, "PWD=%s\n", working_dir);
 		fclose(fp);
-	}
-
-	if(isatty(0)) {
-		pfs_master_timeout = 300;
-	} else {
-		pfs_master_timeout = 3600;
 	}
 
 	pfs_uid = getuid();

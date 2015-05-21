@@ -7,7 +7,7 @@ c="./hostport.$PPID"
 parrot_debug=parrot.debug
 
 parrot() {
-	../src/parrot_run --no-chirp-catalog --debug=all --debug-file="$parrot_debug" --work-dir="/chirp/$hostport/" "$@"
+	../src/parrot_run --no-chirp-catalog --debug=all --debug-file="$parrot_debug" --timeout=5 --work-dir="/chirp/$hostport/" "$@"
 }
 
 prepare()
