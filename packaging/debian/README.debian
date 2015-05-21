@@ -1,3 +1,9 @@
+For future reference, cctools was proposed for integration into debian at some point, but the maintainer lost interest:
+
+https://tracker.debian.org/pkg/cctools
+
+Some notes about the integration:
+
 Required packages:
 
     * build-essential
@@ -19,4 +25,4 @@ Optional packages:
 
 Debian Package page:
 
-    * http://packages/debian.org/source/sid/cctools
+    * http://packages.debian.org/source/sid/cctools
