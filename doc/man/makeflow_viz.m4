@@ -14,11 +14,11 @@ BOLD(makeflow_viz) is a collection of tools to graphically display workflows. Th
 SECTION(OPTIONS)
 SUBSECTION(Commands)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-D, display, opt)Display the Makefile as a Dot graph or a PPM completion graph. <opt> is one of:
-   dot      	Standard Dot graph
-   file     	Display the file as interpreted by Makeflow
-   ppm      	Display a completion graph in PPM format
-   cytoscape	Display the file as a graph in Cytoscape
+OPTION_TRIPLET(-D, display, opt) Translate the makeflow to the desired visualization format:
+    dot      DOT file format for precise graph drawing.
+    ppm      PPM file format for rapid iconic display
+    cyto     Cytoscape format for browsing and customization.
+    dax      DAX format for use by the Pegasus workflow manager.
 OPTION_ITEM(`--dot-merge-similar')Condense similar boxes
 OPTION_ITEM(`--dot-proportional')Change the size of the boxes proportional to file size
 OPTION_ITEM(` ')The following options for ppm generation are mutually exclusive:
@@ -26,7 +26,6 @@ OPTION_PAIR(--ppm-highlight-row, row)Highlight row <row> in completion grap
 OPTION_PAIR(--ppm-highlight-file,file)Highlight node that creates file <file> in completion graph
 OPTION_PAIR(--ppm-highlight-executable,exe)Highlight executable <exe> in completion grap
 OPTION_ITEM(`--ppm-show-levels')Display different levels of depth in completion graph
-OPTION_ITEM(`-e, --export-as-dax')Export the DAG in DAX format. (Pegasus)
 OPTION_ITEM(`-v, --version')Show version string.
 OPTIONS_END
 
@@ -39,7 +38,7 @@ LONGCODE_END
 
 To produce a cytoscape representation of the workflow
 LONGCODE_BEGIN
-makeflow_viz -D cytoscape Makeflow
+makeflow_viz -D cyto Makeflow
 LONGCODE_END
 
 SECTION(COPYRIGHT)
