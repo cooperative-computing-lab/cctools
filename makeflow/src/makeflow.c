@@ -72,8 +72,7 @@ an example.
 
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
 
-#define CONTAINER_SH_PREFIX "docker.wrapper"
-#define CONTAINER_TMP_SH_PREFIX "docker.tmp"
+#define CONTAINER_SH "docker.wrapper.sh"
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
@@ -120,6 +119,7 @@ static char *monitor_log_dir = NULL;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
+static char *image_tar = NULL;
 
 /* wait upto this many seconds for an output file of a succesfull task
  * to appear on the local filesystem (e.g, to deal with NFS
@@ -614,6 +614,38 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	return 0;
 }
 
+static void makeflow_create_docker_sh() 
+{       
+    FILE *wrapper_fn;
+	
+  	wrapper_fn = fopen(CONTAINER_SH, "w"); 
+
+    if (image_tar == NULL) {
+
+        fprintf(wrapper_fn, "#!/bin/sh\n\
+curr_dir=`pwd`\n\
+default_dir=/root/worker\n\
+flock /tmp/lockfile /usr/bin/docker pull %s\n\
+docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s \"$@\"\n", container_image, container_image);
+
+    } else {
+
+        fprintf(wrapper_fn, "#!/bin/sh\n\
+curr_dir=`pwd`\n\
+default_dir=/root/worker\n\
+flock /tmp/lockfile /usr/bin/docker load < %s\n\
+docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s \"$@\"\n", image_tar, container_image);
+
+        makeflow_wrapper_add_input_file(image_tar);
+    }
+
+  	fclose(wrapper_fn);
+
+	chmod(CONTAINER_SH, 0755);   
+
+    makeflow_wrapper_add_input_file(CONTAINER_SH);
+}
+
 /*
 Submit a node to the appropriate batch system, after materializing
 the necessary list of input and output files, and applying all
@@ -630,53 +662,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
-	/*
-	XXX this code has several problems:
-	1 - It should be abstracted away in a function.
-	2 - It should use string_format() to generate strings of appropriate size.
-	3 - It should not modify the global list wrapper_input_files.
-	*/
-
-	if (container_mode == CONTAINER_MODE_DOCKER) {
-
-	  	FILE *wrapper_fn;
-		
-		char wrapper_fn_name[4096];
-		sprintf(wrapper_fn_name, "%s.%d", CONTAINER_SH_PREFIX, n->nodeid);
-	
-	  	wrapper_fn = fopen(wrapper_fn_name, "w"); 
-
-		char tmp_sh_name[4096];
-		sprintf(tmp_sh_name, "%s.%d", CONTAINER_TMP_SH_PREFIX, n->nodeid); 
- 
-	  	fprintf(wrapper_fn, "#!/bin/sh\n\
-curr_dir=`pwd`\n\
-default_dir=/root/worker\n\
-echo \"#!/bin/sh\" > %s\n\
-echo \"$@\" >> %s\n\
-chmod 755 %s\n\
-flock /tmp/lockfile /usr/bin/docker pull %s\n\
-docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
-%s $default_dir/%s", tmp_sh_name, tmp_sh_name, tmp_sh_name, container_image, container_image, tmp_sh_name);
- 
-	  	fclose(wrapper_fn);
-
-		chmod(wrapper_fn_name, 0755);
-
-		/* XXX this is badly incorrect: it is adding files to the global wrapper list on each job submission. */
-		/* We must either do that once at startup, or do it every time to the local variable input_files. */
-
-		if(!wrapper_input_files) wrapper_input_files = list_create();
-		list_push_tail(wrapper_input_files,dag_file_create(wrapper_fn_name)); 
-
-		char wrap_cmd[4096]; 
-		sprintf(wrap_cmd, "./%s.%%%%", CONTAINER_SH_PREFIX);
-		
-		if(!wrapper_command) wrapper_command = strdup(wrap_cmd);
-		else wrapper_command = string_wrap_command(wrapper_command,optarg);
-
-	}
-
 	/* Create strings for all the files mentioned by this node. */
 	char *input_files = makeflow_file_list_format(n,0,n->source_files,queue);
 	char *output_files = makeflow_file_list_format(n,0,n->target_files,queue);
@@ -685,9 +670,8 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir \
 	/* This function may realloc input_files and output_files. */
 	input_files = makeflow_file_list_format(n,input_files,wrapper_input_files,queue);
 	output_files = makeflow_file_list_format(n,output_files,wrapper_output_files,queue);
-
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
-	char * command = string_wrap_command(n->command,wrapper_command);
+	char *command = string_wrap_command(n->command, wrapper_command);
 
 	/* Wrap the command with the resource monitor, if it is enabled. */
 	if(monitor_mode) {
@@ -788,7 +772,7 @@ Find all jobs ready to be run, then submit them.
 static void makeflow_dispatch_ready_jobs(struct dag *d)
 {
 	struct dag_node *n;
-
+  
 	for(n = d->nodes; n; n = n->next) {
 
 		if(dag_remote_jobs_running(d) >= remote_jobs_max && dag_local_jobs_running(d) >= local_jobs_max)
@@ -1056,6 +1040,11 @@ static void handle_abort(int sig)
 	makeflow_abort_flag = 1;
 }
 
+
+
+
+
+
 static void show_help_run(const char *cmd)
 {
 	printf("Use: %s [options] <dagfile>\n", cmd);
@@ -1102,6 +1091,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Disable Work Queue caching.                 (default is false)\n", "   --disable-wq-cache");
 	printf(" %-30s Add node id symbol tags in the makeflow log.        (default is false)\n", "   --log-verbose");
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
+	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
@@ -1190,7 +1180,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WRAPPER_OUTPUT,
-        LONG_OPT_DOCKER
+        LONG_OPT_DOCKER,
+        LONG_OPT_DOCKER_TAR
 	};
 
 	static struct option long_options_run[] = {
@@ -1244,6 +1235,7 @@ int main(int argc, char *argv[])
 		{"zero-length-error", no_argument, 0, 'z'},
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
+		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{0, 0, 0, 0}
 	};
 
@@ -1460,6 +1452,9 @@ int main(int argc, char *argv[])
 				container_mode = CONTAINER_MODE_DOCKER; 
 				container_image = xxstrdup(optarg);
 				break;
+            case LONG_OPT_DOCKER_TAR:
+                image_tar = xxstrdup(optarg);
+                break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -1690,6 +1685,19 @@ int main(int argc, char *argv[])
 	makeflow_log_started_event(d);
 
 	runtime = timestamp_get();
+
+    if (container_mode == CONTAINER_MODE_DOCKER) {
+    
+    /* 1) create a global script for running docker container
+     * 2) add this script to the global wrapper list
+     * 3) reformat each task command
+     */
+       
+        makeflow_create_docker_sh();
+        char *global_cmd = string_format("sh %s", CONTAINER_SH);        
+        makeflow_wrapper_add_command(global_cmd);
+    }
+
 	makeflow_run(d);
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
@@ -1704,7 +1712,7 @@ int main(int argc, char *argv[])
 	/* XXX better to write created files to log, then delete those listed in log. */
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
-		char *cmd = string_format("rm %s.* %s.*",CONTAINER_SH_PREFIX,CONTAINER_TMP_SH_PREFIX);
+		char *cmd = string_format("rm %s", CONTAINER_SH);
 		system(cmd);
 		free(cmd);
 	}
