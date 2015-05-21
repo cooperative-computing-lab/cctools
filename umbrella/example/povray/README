@@ -7,7 +7,8 @@ umbrella \
 --log umbrella.log \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
---localdir /tmp/umbrella_test/ -o /tmp/umbrella_test/parrot_povray \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/parrot_povray \
 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 #Docker execution engine test command. Don't do the docker test under your afs,
@@ -16,7 +17,8 @@ umbrella -T docker \
 --log umbrella.log \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
---localdir /tmp/umbrella_test/ -o /tmp/umbrella_test/docker_povray \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/docker_povray \
 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 #chroot execution engine test command. You must be root to run this command.
@@ -37,7 +39,8 @@ umbrella \
 --log umbrella.log \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
---localdir /tmp/umbrella_test/ -o /tmp/umbrella_test/local_povray  \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/local_povray  \
 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 #EC2 execution engine test command. To test this, you must set up the Amazon
@@ -56,7 +59,8 @@ umbrella \
 --group 'sg-24f96141' \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
---localdir /tmp/umbrella_test/ -o /tmp/umbrella_test/ec2_povray --remotelog umbrella.log.ec2 \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/ec2_povray --remotelog umbrella.log.ec2 \
 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 #Condor execution engine test command. To test this, the machine you are using should have condor installed.
@@ -67,6 +71,7 @@ umbrella \
 --remotelog umbrella.log.condor \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
---localdir /tmp/umbrella_test/ -o /tmp/umbrella_test/condor_povray \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/condor_povray \
 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
