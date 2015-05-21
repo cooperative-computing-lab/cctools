@@ -34,10 +34,14 @@
 			<p>Umbrella is a tool for specifying and materializing
 			comprehensive execution environments, from the hardware all the way up to
 			software and data.  A user simply invokes Umbrella with the desired task, and
-			Umbrella determines the minimum mechanism necessary to run the task, whether it
-			be direct execution, a system container (Docker, chroot, Parrot), a local
+			Umbrella parses the specification, 
+			determines the minimum mechanism necessary to run the task, 
+			downloads missing dependencies, and executes the application through the available minimal
+			mechanism, which may be direct execution, a system container (Docker, chroot, Parrot), a local
 			virtual machine (i.e., VMware), or submission to a cloud environment (i.e.,
-			Amazon EC2) or grid environment (i.e., Condor).</p>
+			Amazon EC2) or grid environment (i.e., Condor). The following figure shows
+			the overview of Umbrella.</p>
+            <img class="center" src="images/Umbrella.png" HEIGHT="500" WIDTH="800" align="center"/>
 
             <p>The architecture of Umbrella is shown in the figure below.</p>
 
@@ -68,7 +72,7 @@
 			through Umbrella, proceed with the <a href="#try_cms">Try CMS Applications with Umbrella</a>.</p>
 			
 			<p>If you want to construct umbrella specification for your own application,
-			proceed with the <a href="#starting">Getting Started with Umbrella</a> section
+			proceed with the <a href="#create_spec">Create Your Specification</a> section
 			below. </p>
 
 			<p>Note: Both Condor and Docker can not work together with AFS.
@@ -88,7 +92,36 @@
 			during runtime.  </p>
 
 			<p>The specification for the application is <a
-			href="http://ccl.cse.nd.edu/software/umbrella/database/povray/povray.umbrella">povray.umbrella</a>.
+			href="http://ccl.cse.nd.edu/software/umbrella/database/povray/povray.umbrella">povray.umbrella</a>:
+			<code>{
+	"comment": "A ray-tracing application which creates video frames.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.18"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "5.10"
+	},
+	"software": {
+		"povray-3.6.1-redhat5-x86_64": {
+			"id": "9b7f2362e6b927c8ef08c3f92599e47c",
+			"mountpoint": "/software/povray-3.6.1-redhat5-x86_64",
+			"action": "unpack"
+		}
+	},
+	"data": {
+	},
+	"environ": {
+	}
+}</code>
+
 			There are two input files <a
 			href="http://ccl.cse.nd.edu/software/umbrella/database/povray/4_cubes.pov">4_cubes.pov</a>
 			and <a
@@ -119,10 +152,10 @@
 			<p>You can check the help document of umbrella for the option settings by running the command: <code>umbrella -h</code></p> 
 
 			<p>You can try other execution engines following the instructions 
-			in the <a href="#running">Execute your Application through Umbrella</a> section.</p>
+			in the <a href="#running">Different Execution Engines of Umbrella</a> section.</p>
 	
 			<p>To construct umbrella specification for your own application,
-			proceed with the <a href="#starting">Getting Started with Umbrella</a> section
+			proceed with the <a href="#create_spec">Create Your Specification</a> section
 			below. </p>
 
         <h2 id="try_cms">Try CMS Applications with Umbrella<a class="sectionlink" href="#try_cms" title="Link to this section.">&#x21d7;</a></h2>
@@ -138,9 +171,58 @@
 			during runtime.  </p>
 
 			<p>The specification for the application is <a
-			href="http://ccl.cse.nd.edu/software/umbrella/database/cms_complex/cms_complex.umbrella">cms_complex.umbrella</a>.
+			href="http://ccl.cse.nd.edu/software/umbrella/database/cms_complex/cms_complex.umbrella">cms_complex.umbrella</a>:
+			<code>{
+	"comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.32"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "6.5"
+	},
+	"software": {
+		"cmssw-5.2.5-slc5_amd64": {
+			"mountpoint": "/cvmfs/cms.cern.ch"
+		}
+	},
+	"data": {
+		"final_events_2381.lhe": {
+			"mountpoint": "/tmp/final_events_2381.lhe",
+			"action": "none"
+		}
+	},
+	"environ": {
+		"CMS_VERSION": "CMSSW_5_2_5",
+		"SCRAM_ARCH": "slc5_amd64_gcc462"
+	}
+}</code>
+
 			The CMS analysis code is <a
-			href="http://ccl.cse.nd.edu/software/umbrella/database/cms_complex/cms_complex.sh">cms_complex.sh</a>
+			href="http://ccl.cse.nd.edu/software/umbrella/database/cms_complex/cms_complex.sh">cms_complex.sh</a>:
+			<code>#!/bin/sh
+
+rm -rf sim_job
+mkdir sim_job
+cd sim_job
+
+. /cvmfs/cms.cern.ch/cmsset_default.sh
+scramv1 project -f CMSSW ${CMS_VERSION}
+cd ${CMS_VERSION}
+eval `scram runtime -sh`
+cd ..
+cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
+--eventcontent=RAWSIM --datatier GEN -n 10 \
+--filein=file:/tmp/final_events_2381.lhe \
+--filetype=LHE --conditions=START52_V9::All</code>
+
 			The analysis code will create a directory called <tt>sim_job</tt> and put the CMSSW software dependencies under it.
 			The expected output of the CMS application is a png file named <tt>frame000.png</tt>.
 			The command for this application is:<code>/bin/sh cms_complex.sh</code> 
@@ -197,148 +279,21 @@ System                  2                   2
 <p>For more information about the Umbrella support for CMS applications, please check the <a href="#cms_app">Umbrella Support for CMS Application</a> section. </p>
 
 			<p>You can try other execution engines following the instructions in the 
-			<a href="#running">Execute your Application through Umbrella</a> section.</p>
+			<a href="#running">Different Execution Engines of Umbrella</a> section.</p>
 	
 			<p>To construct umbrella specification for your own application,
-			proceed with the <a href="#starting">Getting Started with Umbrella</a> section
+			proceed with the <a href="#create_spec">Create Your Specification</a> section
 			below. </p>
 
-	<h2 id="starting">Getting Started with Umbrella<a class="sectionlink" href="#starting" title="Link to this section.">&#x21d7;</a></h2>
-		<p>To run your application through Umbrella, there are two steps you need to prepare:</p>
-		<ul>
-			<li><b>Prepare the Remote Archive and the Metadata Database.</b> </li>
-			<li><b>Create the Specification.</b> </li>
-		</ul>
-
-		<h3 id="prepare.archive">Prepare the Remote Archive and the Metadata Database<a class="sectionlink" href="#prepare.archive" title="Link to this section.">&#x21d7;</a></h3>
+		<h2 id="create_spec">Create Your Specification<a class="sectionlink" href="#create_spec" title="Link to this section.">&#x21d7;</a></h2>
 
 			<p>By default, metadata of all the software, data and OS
 			dependencies is stored in <a
 			href="http://ccl.cse.nd.edu/software/umbrella/database/packages.json">the
 			metadata database</a>, which is a <b>JSON</b> file. To use Umbrella, you should
 			first check this metadata database to see whether it covers all the
-			dependencies of your application. If all the dependencies of your application
-			is included in it, then you can proceed with the <a href="#create_spec">Create
-			the Specification</a> section below. If the metadata database does not include
-			all the dependencies of your application, you can download  <a
-			href="http://ccl.cse.nd.edu/software/umbrella/database/packages.json">the
-			metadata database</a> and add the metadata information of the missing
-			dependencies into the specification. You can also recreate your own metadata
-			database from scratch. </p>
-
-			<b>Here is an example of metadata database:</b>
-			<code>"povray-3.6.1-redhat5-x86_64": {
-"9b7f2362e6b927c8ef08c3f92599e47c": {
-	"source":[
-		"http://ccl.cse.nd.edu/research/data/hep-case-study/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64.tar.gz"
-	],
-	"format": "tgz",
-	"checksum": "9b7f2362e6b927c8ef08c3f92599e47c",
-	"size": "1.5MB"
-},
-"c9da9e46b3ce0f7f9885ce60077c45c5": {
-	"source":[
-		"http://ccl.cse.nd.edu/research/data/hep-case-study/c9da9e46b3ce0f7f9885ce60077c45c5/povray-3.6.1-redhat5-x86_64.tar.gz"
-	],
-	"format": "tgz",
-	"checksum": "c9da9e46b3ce0f7f9885ce60077c45c5",
-	"size": "1.5MB"
-}
-},
-"redhat-5.10-x86_64": {
-"62aa9bc37afe3f738052da5545832c80": {
-	"source": [
-		"http://ccl.cse.nd.edu/research/data/hep-case-study/62aa9bc37afe3f738052da5545832c80/redhat-5.10-x86_64.tar.gz"
-	],
-	"format": "tgz",
-	"checksum": "62aa9bc37afe3f738052da5545832c80",
-	"size": "480MB"
-}
-},
-"final_events_2381.lhe": {
-"cb9878132aad42e7db30eabd214be8e2": {
-	"source": [
-		"http://ccl.cse.nd.edu/research/data/hep-case-study/cb9878132aad42e7db30eabd214be8e2/final_events_2381.lhe"
-	],
-	"format": "plain",
-	"checksum": "cb9878132aad42e7db30eabd214be8e2",
-	"size": "18MB"
-}
-}
-</code>
-
-			<p>The name of a software dependency is in the format of 'A-B-C-D', where A is
-			the software name, B is the software version, C is OS distro name, D is
-			hardware architecture. <tt>povray-3.6.1-redhat5-x86_64</tt> is an example of
-			this category.</p>
-			
-			<p>The name of an OS image dependency is in the format of 'A-B-C', where A is
-			the OS name, B is the OS version, C is hardware architecture.
-			<tt>redhat-5.10-x86_64</tt> is an example of this category.</p>
-			
-			<p>There is no special limitation on the name of a data dependency.
-			<tt>final_events_2381.lhe</tt> is an example of this category.</p>
-			
-			<p><b>Multiple Packages for One Dependency.</b> According to the building and
-			compilation settings, there may be multiple packages for one dependency. In
-			this case, all the packages for one dependency will be organized together and
-			the `id` attribute of each package will be used as item key to differentiate
-			different packages. For example, for the software dependency
-			<tt>povray-3.6.1-redhat5-x86_64</tt>, there are two different packages: one
-			with the id of <tt>9b7f2362e6b927c8ef08c3f92599e47c</tt> and one with the id of
-			<tt>c9da9e46b3ce0f7f9885ce60077c45c5</tt>.</p>
-
-			<p>Each OS, software and data package includes four attributes: source, checksum, size and format.</p>
-
-			<ul>
-
-				<li><b>source</b>: a list of storage location of the dependency, which includes
-				one or more resource URL. Each URL can be a local file path like
-				<tt>file:///etc/hosts</tt>, or a https/http URL as shown in the example. Case
-				sensitive. The first source will be first tried, if fails, then the second
-				source will be tried, and so on.</li>
-				
-				<li><b>checksum</b>: the checksum of the dependencies. Currently Umbrella only
-				supports md5 checksum. </li>
-				
-				<li><b>size</b>: the size of the dependency. Not case sensitive.</li>
-				
-				<li><b>format</b>: the perservation format of the dependency. Currently
-				Umbrella supports two formats: <tt>tgz</tt> (gzip compressed tarball) and
-				<tt>plain</tt> (plain text).</li>
-
-			</ul>
-
-			<p><b>Relationship of id and checksum.</b> The id and checksum of each package
-			in the archive are identical in our implementation of metadata database.
-			However, it is not necessary for them to be identical to each other. You can
-			implement your metadata database in a different semantics once the id of each
-			package is unique for one dependency.</p>
-			
-			<p><b>Organization of the Local Cache.</b> Within the local cache, the id of
-			each package dependency will be used to create a directory under the
-			<tt>&lt;localdir&gt;/cache</tt>, then the package will be put into
-			<tt>&lt;localdir&gt;/cache/&lt;id<id>gt;/&lt;name&gt;</tt>. Therefore,
-			<tt>&lt;localdir&gt;/cache/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64.tar.gz</tt>
-			will be the local location of the first povray package shown in the above
-			example. The uncompressed directory of the tarball will be
-			<tt>&lt;localdir&gt;/cache/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64</tt>.</p>
-			
-			<p><b>Organization of the Remote Archive.</b> Within the remote archive, to
-			differentiate multiple packages for the same dependency and the different
-			dependencies, a directory with the name of the checksum of each package will be
-			created and functions as the direct parent directory of the package. Therefore,
-			in the remote archive, there is a directory named
-			<tt>9b7f2362e6b927c8ef08c3f92599e47c</tt>, under which exists
-			<tt>povray-3.6.1-redhat5-x86_64.tar.gz</tt> However, the organization of the
-			remote archive can be in other format, once you have a way to differentiate the
-			packages.</p>
-			
-			<p>If you want to customize your own metadata database, please follow the
-			requirements above and then tell umbrella through <tt>--packages</tt> option to
-			use your own metadata database.</p>
-
-		<h3 id="create_spec">Create the Specification<a class="sectionlink" href="#create_spec" title="Link to this section.">&#x21d7;</a></h3>
+			dependencies of your application. If the metadata database does not include
+			all the dependencies of your application, please check the <a href="#prepare.archive">Prepare the Remote Archive and the Metadata Database</a> section.
 
 			<p>Like the metadata database file, the Umbrella specification
 			for an application is also a JSON file. Here is the specification file for a
@@ -477,8 +432,7 @@ System                  2                   2
 			which sets the HOME environment variable used by the sandbox to execute the
 			applicition. Case sensitive.</p>
 
-
-	<h2 id="running">Execute your Application through Umbrella<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
+	<h2 id="running">Different Execution Engines of Umbrella<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
 
 		<p>At runtime, Umbrella evaluates the local execution environment to see if it
 		is compatible with the specification.  Umbrella evaluates the hardware
@@ -621,9 +575,138 @@ System                  2                   2
 				EC2 command line interface tools on Linux</a>.
 				
 				<p>If you try to use the <tt>id</tt> attribute in the <tt>os</tt> section of the specification to
-				specify a unique OS image from the Amazon EC2, you need to check the <a href="#ec2_db">ec2 metadata
+				specify a unique OS image from the Amazon EC2, you need to check the <a href="#ec2_db">EC2 metadata
 				database</a> section below, which uses an AMI as the
 				<tt>id</tt> attribute. </p>
+
+		<h2 id="prepare.archive">Prepare the Remote Archive and the Metadata Database<a class="sectionlink" href="#prepare.archive" title="Link to this section.">&#x21d7;</a></h2>
+
+			<p>By default, metadata of all the software, data and OS
+			dependencies is stored in <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/packages.json">the
+			metadata database</a>, which is a <b>JSON</b> file. To use Umbrella, you should
+			first check this metadata database to see whether it covers all the
+			dependencies of your application. If all the dependencies of your application
+			is included in it, then you can proceed with the <a href="#create_spec">Create
+			Your Specification</a> section. If the metadata database does not include
+			all the dependencies of your application, you can download  <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/packages.json">the
+			metadata database</a> and add the metadata information of the missing
+			dependencies into the specification. You can also recreate your own metadata
+			database from scratch. </p>
+
+			<b>Here is an example of metadata database:</b>
+			<code>"povray-3.6.1-redhat5-x86_64": {
+"9b7f2362e6b927c8ef08c3f92599e47c": {
+	"source":[
+		"http://ccl.cse.nd.edu/research/data/hep-case-study/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64.tar.gz"
+	],
+	"format": "tgz",
+	"checksum": "9b7f2362e6b927c8ef08c3f92599e47c",
+	"size": "1.5MB"
+},
+"c9da9e46b3ce0f7f9885ce60077c45c5": {
+	"source":[
+		"http://ccl.cse.nd.edu/research/data/hep-case-study/c9da9e46b3ce0f7f9885ce60077c45c5/povray-3.6.1-redhat5-x86_64.tar.gz"
+	],
+	"format": "tgz",
+	"checksum": "c9da9e46b3ce0f7f9885ce60077c45c5",
+	"size": "1.5MB"
+}
+},
+"redhat-5.10-x86_64": {
+"62aa9bc37afe3f738052da5545832c80": {
+	"source": [
+		"http://ccl.cse.nd.edu/research/data/hep-case-study/62aa9bc37afe3f738052da5545832c80/redhat-5.10-x86_64.tar.gz"
+	],
+	"format": "tgz",
+	"checksum": "62aa9bc37afe3f738052da5545832c80",
+	"size": "480MB"
+}
+},
+"final_events_2381.lhe": {
+"cb9878132aad42e7db30eabd214be8e2": {
+	"source": [
+		"http://ccl.cse.nd.edu/research/data/hep-case-study/cb9878132aad42e7db30eabd214be8e2/final_events_2381.lhe"
+	],
+	"format": "plain",
+	"checksum": "cb9878132aad42e7db30eabd214be8e2",
+	"size": "18MB"
+}
+}
+</code>
+
+			<p>The name of a software dependency is in the format of 'A-B-C-D', where A is
+			the software name, B is the software version, C is OS distro name, D is
+			hardware architecture. <tt>povray-3.6.1-redhat5-x86_64</tt> is an example of
+			this category.</p>
+			
+			<p>The name of an OS image dependency is in the format of 'A-B-C', where A is
+			the OS name, B is the OS version, C is hardware architecture.
+			<tt>redhat-5.10-x86_64</tt> is an example of this category.</p>
+			
+			<p>There is no special limitation on the name of a data dependency.
+			<tt>final_events_2381.lhe</tt> is an example of this category.</p>
+			
+			<p><b>Multiple Packages for One Dependency.</b> According to the building and
+			compilation settings, there may be multiple packages for one dependency. In
+			this case, all the packages for one dependency will be organized together and
+			the `id` attribute of each package will be used as item key to differentiate
+			different packages. For example, for the software dependency
+			<tt>povray-3.6.1-redhat5-x86_64</tt>, there are two different packages: one
+			with the id of <tt>9b7f2362e6b927c8ef08c3f92599e47c</tt> and one with the id of
+			<tt>c9da9e46b3ce0f7f9885ce60077c45c5</tt>.</p>
+
+			<p>Each OS, software and data package includes four attributes: source, checksum, size and format.</p>
+
+			<ul>
+
+				<li><b>source</b>: a list of storage location of the dependency, which includes
+				one or more resource URL. Each URL can be a local file path like
+				<tt>file:///etc/hosts</tt>, or a https/http URL as shown in the example. Case
+				sensitive. The first source will be first tried, if fails, then the second
+				source will be tried, and so on.</li>
+				
+				<li><b>checksum</b>: the checksum of the dependencies. Currently Umbrella only
+				supports md5 checksum. </li>
+				
+				<li><b>size</b>: the size of the dependency. Not case sensitive.</li>
+				
+				<li><b>format</b>: the perservation format of the dependency. Currently
+				Umbrella supports two formats: <tt>tgz</tt> (gzip compressed tarball) and
+				<tt>plain</tt> (plain text).</li>
+
+			</ul>
+
+			<p><b>Relationship of id and checksum.</b> The id and checksum of each package
+			in the archive are identical in our implementation of metadata database.
+			However, it is not necessary for them to be identical to each other. You can
+			implement your metadata database in a different semantics once the id of each
+			package is unique for one dependency.</p>
+			
+			<p><b>Organization of the Local Cache.</b> Within the local cache, the id of
+			each package dependency will be used to create a directory under the
+			<tt>&lt;localdir&gt;/cache</tt>, then the package will be put into
+			<tt>&lt;localdir&gt;/cache/&lt;id<id>gt;/&lt;name&gt;</tt>. Therefore,
+			<tt>&lt;localdir&gt;/cache/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64.tar.gz</tt>
+			will be the local location of the first povray package shown in the above
+			example. The uncompressed directory of the tarball will be
+			<tt>&lt;localdir&gt;/cache/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64</tt>.</p>
+			
+			<p><b>Organization of the Remote Archive.</b> Within the remote archive, to
+			differentiate multiple packages for the same dependency and the different
+			dependencies, a directory with the name of the checksum of each package will be
+			created and functions as the direct parent directory of the package. Therefore,
+			in the remote archive, there is a directory named
+			<tt>9b7f2362e6b927c8ef08c3f92599e47c</tt>, under which exists
+			<tt>povray-3.6.1-redhat5-x86_64.tar.gz</tt> However, the organization of the
+			remote archive can be in other format, once you have a way to differentiate the
+			packages.</p>
+			
+			<p>If you want to customize your own metadata database, please follow the
+			requirements above and then tell umbrella through <tt>--packages</tt> option to
+			use your own metadata database.</p>
+
 
 		<h2 id="ec2_db">EC2 Metadata Database<a class="sectionlink" href="#ec2_db" title="Link to this section.">&#x21d7;</a></h2>
 
@@ -776,6 +859,7 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 --output /tmp/umbrella_test/parrot_cms_complex_output \
 run '/bin/sh cms_complex.sh'</code>
 
+			<p>If you want to run this CMS application through Umbrella, please check the <a href="#try_cms">Try CMS Applications with Umbrella</a>.</p>
     </div>
 </body>
 

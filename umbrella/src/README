@@ -1,77 +1,20 @@
 Umbrella is a tool for specifying and materializing comprehensive execution environments, from the hardware all the way up to software and data.  A user simply invokes Umbrella with the desired task, and Umbrella determines the minimum mechanism necessary to run the task, whether it be direct execution, a system container, a local virtual machine, or submission to a cloud or grid environment.  We present the overall design of Umbrella and demonstrate its use to precisely execute a high energy physics application and a ray-tracing application across many platforms using a combination of Parrot, Chroot, Docker, VMware, Condor, and Amazon EC2.
 
-Usage: umbrella [options] run "command"
-
-Options:
-  --version             show program's version number and exit
-  -h, --help            show this help message and exit
-  -c CONFIG, --config=CONFIG
-                        The specification json file. (By default: ./spec.json)
-  -l LOCALDIR, --localdir=LOCALDIR
-                        The path of directory used for all the cached data and all the sandboxes. (By default: ./umbrella_test)
-						this directory can be an existing dir.
-  -i INPUTS, --inputs=INPUTS
-                        The path of input files in the format of access_path=actual_path. i.e, -i '/home/hmeng/file1=/tmp/file2'. access_path must be consistent with the semantics of the provided command, actual_path can be relative or absolute. (By default: '')
-  -e ENV, --env=ENV     The environment variable. I.e., -e 'PWD=/tmp'. (By default: '')
-  -o OUTPUT, --output=OUTPUT
-                        The path of output. (By default: ./umbrella_output)
-						this directory must be non-existing or empty.
-  -T BATCH_TYPE, --batch_type=BATCH_TYPE
-                        Batch system type, which can be local, parrot, chroot, docker, condor, ec2. (By default: local)
-  --packages=PACKAGES   The source of packages information. (By default: ./packages.json)
-						If the value of this option does not exist, one copy of packages.json will be downloaded into the sandbox from the ccl website.
-  --ec2=EC2             The source of ec2 information. (By default: ./ec2.json)
-						If the value of this option does not exist, one copy of ec2.json will be downloaded into the sandbox from the ccl website.
-  --log=LOG             The path of umbrella log file. (By default: ./umbrella.log)
-  --remotelog=REMOTELOG The path of the remote umbrella log file. Required for ec2 and condor execution engines.
-  -g GROUP, --group=GROUP
-                        the security group within which an instance should be run. (only for ec2)
-  -k KEY, --key=KEY     the name of the key pair to use when launching an instance. (only for ec2)
-  --sshkey=SSHKEY       the name of the private key file to use when connecting to an instance. (only for ec2)
-
-Example:
-umbrella -T local -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l ~/umbrella_test/ -o ~/umbrella_test/local_povray_redhat5  run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
-
-In this example, the batch type is local; the application specification json file is povray_redhat5.json; there are two input files: 4_cubes.pov and WRC_RubiksCube.inc. Both of these two files are located in the current directory currently and will be put directory under the CWD directory within the constructed sandbox; the localdir is set to ~/umbrella_test/; the output directory is ~/umbrella_test/local_povray_redhat5; the command which will be executed within the constructed sandbox is povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50. The logging information of Umbrella will be put into ./umbrella.log.
-
-Execution Engine
 Currently, Umbrella supports three execution engines: local, condor, ec2. 
 Local execution engine can be further devided into three categories: parrot, docker, chroot.
 Parrot execution engine can be used without any special authority on the host machine; Docker execution engine requires Docker is installed on the host machine and the user is given the right authority to use Docker; Chroot execution engine requires the user to be the root user.
 
-Take an ray-tracing application as an example, the usage of different execution engines is shown as follows:
-Local execution engine:
-umbrella -T local -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/local_povray_redhat5  run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
-Note: In this case, Umbrella first check whether Docker exists on the host machine, if yes, use docker execution engine; if not, use parrot execution engine.
-Here setting the -T option to be local just focuses on docker and parrot, ignoring chroot, because to render a task includes lots of mount and umount oprations, which are dangerous. If you really want to use chroot to finish your task, please set the -T option to be chroot. 
-
-Parrot execution engine:
-umbrella -T parrot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/parrot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
-
-Docker execution engine:
-umbrella -T docker -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/docker_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
-Note: Do not try the docker test under your afs, it will fail due to the ACL of your afs.
-
-Chroot execution engine:
-sudo /tmphmeng/cctools/bin/umbrella -T chroot -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/chroot_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
-
-Condor execution engine:
-umbrella -T condor --remotelog umbrella.log.condor  -c povray_redhat5.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/condor_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
-Note: 1). Condor is not compatible with AFS, so ensure your test is not running on AFS. 
-2). --localdir option is still needed here for the potential usage to hold the packages.json. 
-
-Cloud execution engine:
-umbrella -T ec2 --remotelog umbrella.log.ec2 --sshkey ~/bin/feb272015.pem -k feb272015 -g 'sg-24f96141' -c povray_redhat5_ec2.json -i '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' -l /tmp/umbrella_test/ -o /tmp/umbrella_test/ec2_povray_redhat5 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
-Note: --sshkey, --key and --group are only meaningful for cloud execution engine. According to the given specification file, the AMI and the instance type can be identified. The user of Umbrella needs to specify the security group within which an instance should be run and the name of the key pair to use when launching an instance.
+Requirements:
+Umbrella is implemented in Python 2 (>= 2.6).
 
 Here is the specification JSON file for a Ray-Tracing application:
-
 {
+	"comment": "A ray-tracing application which creates video frames.",
 	"hardware": {
 		"arch": "x86_64",
 		"cores": "2",
 		"memory": "2GB",
-		"disk": "10GB"
+		"disk": "3GB"
 	},
 	"kernel" : {
 		"name": "linux",
@@ -79,8 +22,7 @@ Here is the specification JSON file for a Ray-Tracing application:
 	},
 	"os": {
 		"name": "Redhat",
-		"version": "5.10",
-		"id": "62aa9bc37afe3f738052da5545832c80"
+		"version": "5.10"
 	},
 	"software": {
 		"povray-3.6.1-redhat5-x86_64": {
@@ -92,156 +34,20 @@ Here is the specification JSON file for a Ray-Tracing application:
 	"data": {
 	},
 	"environ": {
-		"FAKEPWD": "/tmp/test"
 	}
 }
 
-A specification includes 6 parts: hardware, kernel, os, software, data, and environ.
+Once the specification is ready, you can run the application through umbrella:
 
-`hardware` Section (Required):
+umbrella \
+	--batch_type parrot \
+	--log umbrella.log \
+	--config povray.umbrella \
+	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/parrot_povray \
+	run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50" 
 
-`arch` (Required): the hardware architecture the application needs to run on. Options: x86_64, i386, i686. Current support options: x86_64. Not case sensitive.
-
-`cores` (Optional): the number of cores the applications needs. Options: 1, 2, 3, 4, ...
-
-`memory` (Optional): the memory space the application needs in the unit of GB. Options: 1GB, 2GB, .... Not case sensitive.
-
-`disk` (Optional): the disk space the application needs in the unit of GB. Options: 1GB, 2GB, .... Not case sensitive.
-
-`kernel` Section (Required):
-
-`name` (Required): the kernel type the application requires. Options: linux, windows. Current support options: linux. Not case sensitive.
-
-`version` (Required): the kernel version in the format of 'A.B.C' (A: kernel version; B: major revision of the kernel; C: the minor revision of the kernel). You can specify this attribute to a single value like `2.6.18` or a range like >=2.6.18 or a range like [2.6.18, 2.6.32].
-
-`os` Section (Required):
-
-`name` (Required): the OS name. Options: redhat, centos, arch, .... Not case sensitive.
-
-`version` (Required): the OS version in the format of 'A.B': A is the main version number and B is the minor version number. Exmaples: 5.10, 6.5. 
-
-`id` (Optional): the id of the OS image. There may exist multiple OS images for redhat 5.10, the id attribute uniquely identifies a OS image. If this attribute is not provided in the specification and the OS version is redhat 5.10, the first OS image whose version is redhat 5.10 found in the packages.json will be used.
-
-`software` Section (Optional):
-
-Each software dependency has a name, which corresponds to the name included in packages.json (which will be explained in the following part).
-
-`id` (Optional): the id of the software. There may exist multiple versions of a software like `povray-3.6.1-redhat5-x86_64` due to the difference of complication settings. the id attribute uniquely identifies a software. If this attribute is not provided in the specification, the first version found in the packages.json will be used. 
-
-`mountpoint` (Required): the mountpoint of the software. Case sensitive.
-
-`action` (Required): the action on the downloaded software dependencies. Options: none, unpack. `none` leaves the downloaded dedendency as it is. `unpack` uncompresses the depedency. Not case sensitive.
-
-`data` Section (Optional):
-
-Each data dependency has a name, which corresponds to the name included in packages.json (which will be explained in the following part).
-
-`id` (Optional): the id of the data. There may exist multiple versions of a data. the id attribute uniquely identifies a data. If this attribute is not provided in the specification, the first version found in the packages.json will be used. 
-
-`mountpoint` (Required): the mountpoint of the data dependency. Case sensitive.
-
-`action` (Required): the action on the downloaded data dependencies. Options: none, unpack. `none` leaves the downloaded dedendency as it is. `unpack` uncompresses the dependency. Not case sensitive.
-
-`environ` Section (Optional):
-
-Each item is a key-value pair. For example, "HOME": "/home/hmeng", which sets the HOME environment variable used by the sandbox to execute the applicition. Case sensitive.
-
-By default, metadata of all the software, data and OS dependencies is stored in http://ccl.cse.nd.edu/software/umbrella/database/packages.json. You can download this file using `wget` utility to check the currently supported dependencies.
-
-Here is an example of packages.json, which contains two dependencies. 
-
-{
-	"cctools-4.4.0-centos6-x86_64": {
-		"7b32c36052c75b01182bbdb1656199c2": {
-			"source": [
-				"https://www3.nd.edu/~ccl/research/data/hep-case-study/7b32c36052c75b01182bbdb1656199c2/cctools-4.4.0-centos6-x86_64.tar.gz"
-				"https://...cctools-4.4.0-centos6-x86_64.tar.gz"
-			],
-			"format": "tgz",
-			"checksum": "7b32c36052c75b01182bbdb1656199c2",
-			"size": "8.4MB"
-		}
-	},
-	"redhat-5.10-x86_64": {
-		"62aa9bc37afe3f738052da5545832c80": {
-			"source": [
-				"https://www3.nd.edu/~ccl/research/data/hep-case-study/62aa9bc37afe3f738052da5545832c80/redhat-5.10-x86_64.tar.gz"
-			],
-			"format": "tgz",
-			"checksum": "62aa9bc37afe3f738052da5545832c80",
-			"size": "480MB"
-		}
-	},
-	...
-}
-	
-The name of a software dependency is in the format of 'A-B-C-D', where A is the software name, B is the software version, C is OS distro name, D is hardware architecture. 
-
-The name of an OS image dependency is in the format of 'A-B-C', where A is the OS name, B is the OS version, C is hardware architecture.
-
-There is no special limitation on the name of a data dependency.
-
-Each dependency (OS, software and data) includes four attributes: source, checksum, size and format.
-
-`source`: a list of storage location of the dependency, which includes one or more resource URL. Each URL can be a local file path like "file:///etc/hosts", or a https/http URL as shown in the example. Case sensitive. The first source will be first tried, if fails, then the second source will be tried, and so on.
-
-`checksum`: the checksum of the dependencies. Currently Umbrella only supports md5 checksum. 
-
-`size`: the size of the dependency. Not case sensitive.
-
-`format`: the perservation format of the dependency. Currently Umbrella supports two formats: tgz (gzip compressed tarball) and plain (plain text).
-
-Relationship of id and checksum: 
-The id and checksum of each package in the archive are identical. Take cctools-4.4.0-centos6-x86_64 shown in the above packages.json as an example, the checksum of cctools-4.4.0-centos6-x86_64.tar.gz is 7b32c36052c75b01182bbdb1656199c2. 
-Within the local cache, the id of each package dependency will be used to create a directory under the <localdir>/cache, then the package will be put into <localdir>/cache/<id>/<name>. Therefore, <localdir>/cache/7b32c36052c75b01182bbdb1656199c2/cctools-4.4.0-centos6-x86_64.tar.gz will be the local location of the above package.
-Within the remote archive, to differentiate multiple packages on one software, a directory with the name of the checksum of each package will be created and functions as the direct parent directory of the package. Therefore, in the romote archive, there is a directory named 7b32c36052c75b01182bbdb1656199c2, under which exists cctools-4.4.0-centos6-x86_64.tar.gz. However, the organization of the remote archive can be in other format. 
-
-If you want to customize your own packages.json, follow the requirement and then tell umbrella through `--packages` option to use your own pacakges information.
-
-When the ec2 execution engine is used, Umbrella tries to map the specification into an AMI and an EC2 instance type with the help of the JSON file specified by the --ec2 option.
-Note: The `id` attribute of the `os` section should be an AMI.
-Here is an example of an ec2.json file:
-{
-	"redhat-5.10-x86_64": {
-		"ami-d76a29e7": {
-			"ami": "ami-d76a29e7",
-			"root_device_type": "ebs",
-			"virtualization_type": "hvm",
-			"user": "root"
-		}
-	},
-	"instances": {
-		"m1.large": {
-			"cores": "4",
-			"memory": "2GB",
-			"disk": "20GB"
-		}
-	}
-	...
-}
-There are two types of items in ec2.json: OS image and instance types.
-The name of an OS image shares the same specification with the name used in packages.json. There may exist multiple versions of images for an OS like redhat-5.10-x86_64. An identifier of each version is needed to differentiate these versions. Currently, the AMI is used as the identifier. So the `id` attribute of the `os` section of an specification should also be an AMI.
-An OS image includes four attributes:
-`AMI` (Required): the Amazon Machine Image.
-`root_device_type` (Optional): the type of the root device of the AMI.
-`virtualization_type` (Optional): the type of virtualization technique used for the AMI. Currently Amazon supports two types of virtualization: paravirtual (PV) or hardware virtual machine (HVM).
-`user` (Required): the user name used to connect to an instance.
-
-The name of each instance type is the same provided by Amazon EC2 (e.g., m1.large). Each instance type has three attributes:
-`cores` (Required): the number of cores.
-`memory` (Required): the memory space.
-`Disk` (Required): the disk space.
-
-Tips of using Umbrella:
-The first step of using Umbrella is to compose an specification for your application. Double check the packages.json you are using to guarantee each dependency of your package is specified correctly.
-
-func_notes.html: a html file including the help documents about all the modules and functions. The file is created by `pydoc` in the following way:
-1) copy umbrella into a new file whose name ends with .py. The reason why a file ending with .py is needed is pydoc only recognizes such files.
-$ cp umbrella umbrella.py
-2) create html document using pydoc, which will create a html file named umbrella.html including the help documents about all the modules and functions.
-$ pydoc -w umbrella
-3) rename umbrella.html to func_notes.html. This renaming is to avoid confusion between this html and the umbrella html document under cctools/doc.
-$ mv umbrella.html func_notes.html
-
-
+For more information of the usage of Umbrella, please check:
+   http://ccl.cse.nd.edu/software/umbrella/database/doc/umbrella.html
 
