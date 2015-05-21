@@ -15,8 +15,13 @@ prepare()
 
 run()
 {
-	../src/parrot_run -t${tmp_dir} -dcvmfs stat /cvmfs/atlas.cern.ch/repo
-	return $?
+	if ../src/parrot_run --check-driver cvmfs
+	then
+		../src/parrot_run -t${tmp_dir} -dcvmfs stat /cvmfs/atlas.cern.ch/repo
+		return $?
+	else
+		return 0
+	fi
 }
 
 clean()
