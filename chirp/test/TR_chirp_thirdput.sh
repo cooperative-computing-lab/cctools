@@ -18,11 +18,10 @@ prepare()
 }
 
 ITERATE=""
-for ((i = 1; i < 1024; i*=2)); do
-	ITERATE="$ITERATE $i"
-done
-for ((i = 2048; i < 1024*1024; i*=2)); do
-	ITERATE="$ITERATE $i"
+i=1
+while [ $i -lt 1048576 ]; do
+	ITERATE="${ITERATE} $i"
+	i=$(expr $i '*' 2)
 done
 
 run()
