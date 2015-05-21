@@ -128,6 +128,7 @@ static int root_exitstatus = 0;
 static int channel_size = 10;
 
 enum {
+	LONG_OPT_CHECK_DRIVER,
 	LONG_OPT_CVMFS_REPO_SWITCHING=UCHAR_MAX+1,
 	LONG_OPT_CVMFS_CONFIG,
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
@@ -196,6 +197,7 @@ static void show_help( const char *cmd )
                 /******************************************************************************/
 	fprintf(stdout, "Use: %s [options] <command> ...\n",cmd);
 	fprintf(stdout, "Where options and environment variables are:\n");
+	fprintf(stdout, " %-30s Check if the given driver is enabled and exit.\n","   --check-driver"); 
 	fprintf(stdout, " %-30s Use these Chirp authentication methods.   (PARROT_CHIRP_AUTH)\n", "-a,--chirp-auth=<list>");
 	fprintf(stdout, " %-30s Set the I/O block size hint.              (PARROT_BLOCK_SIZE)\n", "-b,--block-size=<bytes>");
 	fprintf(stdout, " %-30s Print exit status information to <file>.\n", "-c,--status-file=<file>");
@@ -547,6 +549,7 @@ int main( int argc, char *argv[] )
 		{"auto-decompress", no_argument, 0, 'Z'},
 		{"block-size", required_argument, 0, 'b'},
 		{"channel-auth", no_argument, 0, 'C'},
+		{"check-driver", required_argument, 0, LONG_OPT_CHECK_DRIVER },
 		{"chirp-auth",  required_argument, 0, 'a'},
 		{"cvmfs-repos", required_argument, 0, 'r'},
 		{"cvmfs-alien-cache", required_argument, 0, LONG_OPT_CVMFS_ALIEN_CACHE},
@@ -760,6 +763,14 @@ int main( int argc, char *argv[] )
 		case LONG_OPT_VALGRIND:
 			valgrind = 1;
 			break;
+		case LONG_OPT_CHECK_DRIVER:
+			if(pfs_service_lookup(optarg)) {
+				printf("%s is enabled\n",optarg);
+				return 0;
+			} else {
+				printf("%s is not enabled\n",optarg);
+				return 1;
+			}
 		default:
 			show_help(argv[0]);
 			break;

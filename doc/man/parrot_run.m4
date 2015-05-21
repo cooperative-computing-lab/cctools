@@ -16,6 +16,7 @@ For complete details with examples, see the LINK(Parrot User's Manual,http://ccl
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
+OPTION_ITEM('--check-driver <driver>') Check for the presence of a given driver (e.g. http, ftp, etc) and return success if it is currently enabled.
 OPTION_TRIPLET(-a,chirp-auth,unix|hostname|ticket|globus|kerberos)Use this Chirp authentication method.  May be invoked multiple times to indicate a preferred list, in order.
 OPTION_TRIPLET(-b, block-size, bytes)Set the I/O block size hint.
 OPTION_TRIPLET(-c, status-file, file)Print exit status information to file.
