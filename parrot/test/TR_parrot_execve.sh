@@ -25,19 +25,20 @@ run()
 	hostport=$(cat "$c")
 
 	parrot /bin/sh <<EOF1
-cat > a.py <<EOF2
-#!/chirp/$hostport/python
+mkdir bin
+cat > bin/a.py <<EOF2
+#!/chirp/$hostport/bin/python
 
 import sys
 
 print(' '.join(sys.argv))
 EOF2
-cp "$(which python)" "$(which sh)" .
-chmod 700 a.py python sh
+cp "$(which python)" "$(which sh)" bin/
+chmod 700 bin/a.py bin/python bin/sh
 EOF1
 	for loader in `find -L /lib /lib64 -name 'ld-linux*.so*' 2>/dev/null`; do
-		[ "$(parrot --ld-path="$loader" -- ./a.py 1 2 | tee /dev/tty)" = './a.py 1 2' ]
-		[ "$(parrot --ld-path="$loader" -- ./sh -c 'echo "$0"' | tee /dev/tty)" = './sh' ]
+		[ "$(parrot --ld-path="$loader" -- ./bin/a.py 1 2 | tee -a /dev/stderr)" = './bin/a.py 1 2' ]
+		[ "$(parrot --ld-path="$loader" -- ./bin/sh -c 'echo "$0"' | tee -a /dev/stderr)" = './bin/sh' ]
 		return 0
 	done
 	echo No loader found!
