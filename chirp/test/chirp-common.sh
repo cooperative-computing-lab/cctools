@@ -43,10 +43,14 @@ EOF
 	if [ "$result" -eq 0 ]; then
 		i=0
 		while [ $i -lt 10 ]; do
-			if [ -s "$pid" -a -s "$port" ]; then
-				hostport="127.0.0.1:$(cat "$port")"
-				unset acl debug pid port result transient
-				return 0
+			if [ -s "$pid" ]; then
+				if [ -s "$port" ]; then
+					hostport="127.0.0.1:$(cat "$port")"
+					unset acl debug pid port result transient
+					return 0
+				elif ! kill -s 0 "$(cat "$pid")"; then
+					break;
+				fi
 			fi
 			echo $i sleeping waiting for server to start
 			sleep 1
