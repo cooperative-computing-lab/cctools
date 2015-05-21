@@ -47,11 +47,11 @@ install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/man
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc/images
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/man/man1
-	cp *.html *.png manual.css $(CCTOOLS_INSTALL_DIR)/doc
+	cp *.html manual.css $(CCTOOLS_INSTALL_DIR)/doc
 	if [ -f man/chirp.html ]; then cp man/*.html $(CCTOOLS_INSTALL_DIR)/doc/man; fi
 	if [ -f man/chirp.1.gz ]; then cp man/*.1.gz $(CCTOOLS_INSTALL_DIR)/share/man/man1; fi
 	if [ -d api ]; then cp -rp api $(CCTOOLS_INSTALL_DIR)/doc; fi
-	if [ -d images ]; then cp images/*.gif $(CCTOOLS_INSTALL_DIR)/doc/images; fi
+	if [ -d images ]; then cp images/* $(CCTOOLS_INSTALL_DIR)/doc/images; fi
 
 test:
 
