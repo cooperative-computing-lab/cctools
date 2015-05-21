@@ -3,7 +3,7 @@
 . ../../dttools/test/test_runner_common.sh
 
 export PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES="yes"
-export HTTP_PROXY=http://cache01.hep.wisc.edu:3128
+export HTTP_PROXY=http://eddie.crc.nd.edu:3128
 export PARROT_CVMFS_REPO='*.cern.ch:pubkey=<BUILTIN-cern.ch.pub>,url=http://cvmfs-stratum-one.cern.ch/opt/*'
 
 tmp_dir_master=${PWD}/parrot_temp_dir
@@ -18,15 +18,20 @@ prepare()
 
 run()
 {
-	../src/parrot_run -t${tmp_dir_master} -dcvmfs sh -c "head $test_file > /dev/null; sleep 10" &
-	pid_master=$!
+	if ../src/parrot_run --check-driver cvmfs
+	then
+		../src/parrot_run -t${tmp_dir_master} -dcvmfs sh -c "head $test_file > /dev/null; sleep 10" &
+		pid_master=$!
 
-	../src/parrot_run -t${tmp_dir_hitcher} -dcvmfs --cvmfs-alien-cache=${tmp_dir_master}/cvmfs sh -c "stat $test_file"
-	status=$?
+		../src/parrot_run -t${tmp_dir_hitcher} -dcvmfs --cvmfs-alien-cache=${tmp_dir_master}/cvmfs sh -c "stat $test_file"
+		status=$?
 
-	kill $pid_master
+		kill $pid_master
 
-	return $status
+		return $status
+	else
+		return 0
+	fi
 }
 
 clean()

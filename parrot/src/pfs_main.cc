@@ -128,6 +128,7 @@ static int root_exitstatus = 0;
 static int channel_size = 10;
 
 enum {
+	LONG_OPT_CHECK_DRIVER,
 	LONG_OPT_CVMFS_REPO_SWITCHING=UCHAR_MAX+1,
 	LONG_OPT_CVMFS_CONFIG,
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
@@ -194,83 +195,75 @@ static void show_help( const char *cmd )
 {
 		/* 80-column text marker */
                 /******************************************************************************/
-	fprintf(stdout, "Use: %s [options] <command> ...\n",cmd);
-	fprintf(stdout, "Where options and environment variables are:\n");
-	fprintf(stdout, " %-30s Use these Chirp authentication methods.   (PARROT_CHIRP_AUTH)\n", "-a,--chirp-auth=<list>");
-	fprintf(stdout, " %-30s Set the I/O block size hint.              (PARROT_BLOCK_SIZE)\n", "-b,--block-size=<bytes>");
-	fprintf(stdout, " %-30s Print exit status information to <file>.\n", "-c,--status-file=<file>");
-	fprintf(stdout, " %-30s Enable data channel authentication in GridFTP.\n", "-C,--channel-auth");
-	fprintf(stdout, " %-30s Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n", "-d,--debug=<name>");
-	fprintf(stdout, " %-30s Disable small file optimizations.\n", "-D,--no-optimize");
-	fprintf(stdout, " %-30s Record the environment variables at the starting point.\n", "-e,--env-list=<path>");
-	fprintf(stdout, " %-30s Enable file snapshot caching for all protocols.\n", "-F,--with-snapshots");
-	fprintf(stdout, " %-30s Disable following symlinks.\n", "-f,--no-follow-symlinks");
-	fprintf(stdout, " %-30s Fake this gid; Real gid stays the same.          (PARROT_GID)\n", "-G,--gid=<num>");
-	fprintf(stdout, " %-30s Show this screen.\n", "-h,--help");
-	fprintf(stdout, " %-30s Enable use of helper library.\n", "--helper");
-	fprintf(stdout, " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
-	fprintf(stdout, " %-30s Set the debug level output for the iRODS driver.\n", "-I,--debug-level-irods=<num>");
-	fprintf(stdout, " %-30s Checksum files where available.\n", "-K,--with-checksums");
-	fprintf(stdout, " %-30s Do not checksum files.\n", "-k,--no-checksums");
-	fprintf(stdout, " %-30s Path to ld.so to use.                      (PARROT_LDSO_PATH)\n", "-l,--ld-path=<path>");
-	fprintf(stdout, " %-30s Record all the file names.\n", "-n,--name-list=<path>");
-	fprintf(stdout, " %-30s Disable changing the foreground process group of the session.\n","   --no-set-foreground");
-	fprintf(stdout, " %-30s Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n", "-m,--ftab-file=<file>");
-	fprintf(stdout, " %-30s Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
-	fprintf(stdout, " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
-	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal) (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
-	fprintf(stdout, " %-30s Rotate debug files of this size. (default 10M, 0 disables) (PARROT_DEBUG_FILE_SIZE)\n", "-O,--debug-rotate-max=<bytes>");
-	fprintf(stdout, " %-30s Use this proxy server for HTTP requests.         (HTTP_PROXY)\n", "-p,--proxy=<hst:p>");
-	fprintf(stdout, " %-30s Enable paranoid mode for identity boxing mode.\n", "-P,--paranoid");
-	fprintf(stdout, " %-30s Inhibit catalog queries to list /chirp.\n", "-Q,--no-chirp-catalog");
-	fprintf(stdout, " %-30s CVMFS common configuration.               (PARROT_CVMFS_CONFIG)\n", "   --cvmfs-config=<config>");
-	fprintf(stdout, " %-30s CVMFS repositories to enable.             (PARROT_CVMFS_REPO)\n", "-r,--cvmfs-repos=<repos>");
-	fprintf(stdout, " %-30s Allow repository switching when using CVMFS.\n","   --cvmfs-repo-switching");
-	fprintf(stdout, " %-30s Set CVMFS common cache directory.         (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache=<dir>");
-	fprintf(stdout, " %-30s Disable CVMFS common cache directory.\n","   --cvmfs-disable-alien-cache");
-	fprintf(stdout, " %-30s Enforce this root filesystem checksum, where available.\n", "-R,--root-checksum=<cksum>");
-	fprintf(stdout, " %-30s Use streaming protocols without caching.(PARROT_FORCE_STREAM)\n", "-s,--stream-no-cache");
-	fprintf(stdout, " %-30s Enable whole session caching for all protocols.\n", "-S,--session-caching");
-	fprintf(stdout, " %-30s Where to store temporary files.             (PARROT_TEMP_DIR)\n", "-t,--tempdir=<dir>");
-	fprintf(stdout, " %-30s Maximum amount of time to retry failures.    (PARROT_TIMEOUT)\n", "-T,--timeout=<time>");
-	fprintf(stdout, " %-30s Fake this unix uid; Real uid stays the same.     (PARROT_UID)\n", "-U,--uid=<num>");
-	fprintf(stdout, " %-30s Use this extended username.                 (PARROT_USERNAME)\n", "-u,--username=<name>");
-	fprintf(stdout, " %-30s Display version number.\n", "-v,--version");
-	fprintf(stdout, " %-30s Enable valgrind support for Parrot.\n", "   --valgrind");
-	fprintf(stdout, " %-30s Initial working directory.\n", "-w,--work-dir=<dir>");
-	fprintf(stdout, " %-30s Display table of system calls trapped.\n", "-W,--syscall-table");
-	fprintf(stdout, " %-30s Force synchronous disk writes.            (PARROT_FORCE_SYNC)\n", "-Y,--sync-write");
-	fprintf(stdout, " %-30s Enable automatic decompression on .gz files.\n", "-Z,--auto-decompress");
-	fprintf(stdout, "\n");
-	fprintf(stdout, "Known debugging sub-systems are: ");
+	printf( "Use: %s [options] <command> ...\n",cmd);
+	printf( "Where options and environment variables are:\n");
+	printf( " %-30s Check if the given driver is enabled and exit.\n","   --check-driver"); 
+	printf( " %-30s Use these Chirp authentication methods.   (PARROT_CHIRP_AUTH)\n", "-a,--chirp-auth=<list>");
+	printf( " %-30s Set the I/O block size hint.              (PARROT_BLOCK_SIZE)\n", "-b,--block-size=<bytes>");
+	printf( " %-30s Print exit status information to <file>.\n", "-c,--status-file=<file>");
+	printf( " %-30s Enable data channel authentication in GridFTP.\n", "-C,--channel-auth");
+	printf( " %-30s Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n", "-d,--debug=<name>");
+	printf( " %-30s Disable small file optimizations.\n", "-D,--no-optimize");
+	printf( " %-30s Record the environment variables at the starting point.\n", "-e,--env-list=<path>");
+	printf( " %-30s Enable file snapshot caching for all protocols.\n", "-F,--with-snapshots");
+	printf( " %-30s Disable following symlinks.\n", "-f,--no-follow-symlinks");
+	printf( " %-30s Fake this gid; Real gid stays the same.          (PARROT_GID)\n", "-G,--gid=<num>");
+	printf( " %-30s Show this screen.\n", "-h,--help");
+	printf( " %-30s Enable use of helper library.\n", "--helper");
+	printf( " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
+	printf( " %-30s Set the debug level output for the iRODS driver.\n", "-I,--debug-level-irods=<num>");
+	printf( " %-30s Checksum files where available.\n", "-K,--with-checksums");
+	printf( " %-30s Do not checksum files.\n", "-k,--no-checksums");
+	printf( " %-30s Path to ld.so to use.                      (PARROT_LDSO_PATH)\n", "-l,--ld-path=<path>");
+	printf( " %-30s Record all the file names.\n", "-n,--name-list=<path>");
+	printf( " %-30s Disable changing the foreground process group of the session.\n","   --no-set-foreground");
+	printf( " %-30s Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n", "-m,--ftab-file=<file>");
+	printf( " %-30s Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
+	printf( " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
+	printf( " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal) (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
+	printf( " %-30s Rotate debug files of this size. (default 10M, 0 disables) (PARROT_DEBUG_FILE_SIZE)\n", "-O,--debug-rotate-max=<bytes>");
+	printf( " %-30s Use this proxy server for HTTP requests.         (HTTP_PROXY)\n", "-p,--proxy=<hst:p>");
+	printf( " %-30s Enable paranoid mode for identity boxing mode.\n", "-P,--paranoid");
+	printf( " %-30s Inhibit catalog queries to list /chirp.\n", "-Q,--no-chirp-catalog");
+	printf( " %-30s CVMFS common configuration.               (PARROT_CVMFS_CONFIG)\n", "   --cvmfs-config=<config>");
+	printf( " %-30s CVMFS repositories to enable.             (PARROT_CVMFS_REPO)\n", "-r,--cvmfs-repos=<repos>");
+	printf( " %-30s Allow repository switching when using CVMFS.\n","   --cvmfs-repo-switching");
+	printf( " %-30s Set CVMFS common cache directory.         (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache=<dir>");
+	printf( " %-30s Disable CVMFS common cache directory.\n","   --cvmfs-disable-alien-cache");
+	printf( " %-30s Enforce this root filesystem checksum, where available.\n", "-R,--root-checksum=<cksum>");
+	printf( " %-30s Use streaming protocols without caching.(PARROT_FORCE_STREAM)\n", "-s,--stream-no-cache");
+	printf( " %-30s Enable whole session caching for all protocols.\n", "-S,--session-caching");
+	printf( " %-30s Where to store temporary files.             (PARROT_TEMP_DIR)\n", "-t,--tempdir=<dir>");
+	printf( " %-30s Maximum amount of time to retry failures.    (PARROT_TIMEOUT)\n", "-T,--timeout=<time>");
+	printf( " %-30s Fake this unix uid; Real uid stays the same.     (PARROT_UID)\n", "-U,--uid=<num>");
+	printf( " %-30s Use this extended username.                 (PARROT_USERNAME)\n", "-u,--username=<name>");
+	printf( " %-30s Display version number.\n", "-v,--version");
+	printf( " %-30s Enable valgrind support for Parrot.\n", "   --valgrind");
+	printf( " %-30s Initial working directory.\n", "-w,--work-dir=<dir>");
+	printf( " %-30s Display table of system calls trapped.\n", "-W,--syscall-table");
+	printf( " %-30s Force synchronous disk writes.            (PARROT_FORCE_SYNC)\n", "-Y,--sync-write");
+	printf( " %-30s Enable automatic decompression on .gz files.\n", "-Z,--auto-decompress");
+	printf( "\n");
+	printf( "Debug flags are: ");
 	debug_flags_print(stdout);
-	fprintf(stdout, "\n");
-	fprintf(stdout, "Enabled filesystems are:");
-	if(pfs_service_lookup("http"))		fprintf(stdout, " http");
-	if(pfs_service_lookup("grow"))		fprintf(stdout, " grow");
-	if(pfs_service_lookup("ftp"))		fprintf(stdout, " ftp");
-	if(pfs_service_lookup("anonftp"))	fprintf(stdout, " anonftp");
-	if(pfs_service_lookup("gsiftp"))	fprintf(stdout, " gsiftp");
-	if(pfs_service_lookup("nest"))		fprintf(stdout, " nest");
-	if(pfs_service_lookup("chirp"))		fprintf(stdout, " chirp");
-	if(pfs_service_lookup("gfal"))		fprintf(stdout, " gfal lfn guid srm");
-	if(pfs_service_lookup("rfio"))		fprintf(stdout, " rfio");
-	if(pfs_service_lookup("dcap"))		fprintf(stdout, " dcap");
-	if(pfs_service_lookup("glite"))		fprintf(stdout, " glite");
-	if(pfs_service_lookup("lfc"))		fprintf(stdout, " lfc");
-	if(pfs_service_lookup("irods"))		fprintf(stdout, " irods");
-	if(pfs_service_lookup("hdfs"))		fprintf(stdout, " hdfs");
-	if(pfs_service_lookup("bxgrid"))	fprintf(stdout, " bxgrid");
-	if(pfs_service_lookup("s3"))		fprintf(stdout, " s3");
-	if(pfs_service_lookup("root"))      fprintf(stdout, " root");
-	if(pfs_service_lookup("xrootd"))    fprintf(stdout, " xrootd");
-	if(pfs_service_lookup("cvmfs"))     fprintf(stdout, " cvmfs");
+	printf( "\n");
+	printf( "Enabled filesystems are:");
 
-	if(pfs_service_lookup("cvmfs")) {
-		fprintf(stdout, "\ncvmfs compilation flags: " CCTOOLS_CVMFS_BUILD_FLAGS);
+	const char *driver_list[] = {"http","grow","ftp","anonftp","gsiftp","nest","chirp","gfal","rfio","dcap","glite","lfc","irods","hdfs","bxgrid","s3","rootd","xrootd","cvmfs",0};
+
+	int i;
+
+	for(i=0;driver_list[i];i++) {
+		if(pfs_service_lookup(driver_list[i])) {
+			printf(" %s",driver_list[i]);
+		}
 	}
 
-	fprintf(stdout, "\n");
+	if(pfs_service_lookup("cvmfs")) {
+		printf( "\ncvmfs compilation flags: " CCTOOLS_CVMFS_BUILD_FLAGS);
+	}
+
+	printf("\n");
 	exit(1);
 }
 
@@ -547,6 +540,7 @@ int main( int argc, char *argv[] )
 		{"auto-decompress", no_argument, 0, 'Z'},
 		{"block-size", required_argument, 0, 'b'},
 		{"channel-auth", no_argument, 0, 'C'},
+		{"check-driver", required_argument, 0, LONG_OPT_CHECK_DRIVER },
 		{"chirp-auth",  required_argument, 0, 'a'},
 		{"cvmfs-repos", required_argument, 0, 'r'},
 		{"cvmfs-alien-cache", required_argument, 0, LONG_OPT_CVMFS_ALIEN_CACHE},
@@ -760,6 +754,14 @@ int main( int argc, char *argv[] )
 		case LONG_OPT_VALGRIND:
 			valgrind = 1;
 			break;
+		case LONG_OPT_CHECK_DRIVER:
+			if(pfs_service_lookup(optarg)) {
+				printf("%s is enabled\n",optarg);
+				return 0;
+			} else {
+				printf("%s is not enabled\n",optarg);
+				return 1;
+			}
 		default:
 			show_help(argv[0]);
 			break;
