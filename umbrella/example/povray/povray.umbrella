@@ -1,4 +1,5 @@
 {
+	"comment": "A ray-tracing application which creates video frames.",
 	"hardware": {
 		"arch": "x86_64",
 		"cores": "2",
@@ -11,7 +12,7 @@
 	},
 	"os": {
 		"name": "Redhat",
-		"version": "5.10",
+		"version": "5.10"
 	},
 	"software": {
 		"povray-3.6.1-redhat5-x86_64": {

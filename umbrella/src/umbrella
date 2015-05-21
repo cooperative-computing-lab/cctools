@@ -1822,7 +1822,7 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, batch
 		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform) #example of item here: redhat-6.5-x86_64
 		if os_id == '':
 			packages_item = package_search(packages_json, item)["checksum"]
-			os_id = packages_item["checksum"]
+			os_id = packages_item
 
 		os_image_dir = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), os_id, item)
 		logging.debug("A separate OS (%s) is needed!", os_image_dir)

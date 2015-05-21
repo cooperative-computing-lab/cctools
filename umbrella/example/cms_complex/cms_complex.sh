@@ -10,8 +10,8 @@ cd ${CMS_VERSION}
 eval `scram runtime -sh`
 cd ..
 cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
---eventcontent=RAWSIM --datatier GEN -n -1 \
+--eventcontent=RAWSIM --datatier GEN -n 10 \
 --filein=file:/tmp/final_events_2381.lhe \
 --filetype=LHE --conditions=START52_V9::All
 
-#--filein=file:/afs/crc.nd.edu/user/a/awoodard/Public/for_haiyan/many_events.lhe \
+# vim: set noexpandtab tabstop=4:
