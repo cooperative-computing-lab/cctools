@@ -24,7 +24,7 @@ chirp_start() {
 	if [ "$1" = local ]; then
 		root=`mktemp -d ./chirp.root.XXXXXX`
 		if [ "$(id -u)" -eq 0 ]; then
-			verbose chown nobody "$root"
+			verbose chown 9999 "$root"
 		fi
 	else
 		root="$1"
@@ -34,8 +34,8 @@ chirp_start() {
 		cat >> "$acl" <<EOF
 unix:root rwlda
 EOF
-		verbose chown nobody "$acl" "$debug" "$pid" "$transient"
-		chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --default-acl="$acl" --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" --user=nobody "$@"
+		verbose chown 9999 "$acl" "$debug" "$pid" "$transient"
+		chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --default-acl="$acl" --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" --user=9999 "$@"
 	else
 		chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"
 	fi

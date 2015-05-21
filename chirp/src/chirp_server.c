@@ -36,6 +36,7 @@
 #include "macros.h"
 #include "memory_info.h"
 #include "path.h"
+#include "pattern.h"
 #include "random.h"
 #include "stringtools.h"
 #include "url_encode.h"
@@ -2166,11 +2167,16 @@ int main(int argc, char *argv[])
 				"I will use the safe username to access data on disk."
 			);
 		} else {
-			struct passwd *p = getpwnam(safe_username);
-			if(!p)
-				fatal("unknown user: %s", safe_username);
-			safe_uid = p->pw_uid;
-			safe_gid = p->pw_gid;
+			if (pattern_match(safe_username, "^%d+$") >= 0) {
+				safe_uid = safe_gid = atoi(safe_username);
+			} else {
+				struct passwd *p = getpwnam(safe_username);
+				if(!p) {
+					fatal("unknown user: %s", safe_username);
+				}
+				safe_uid = p->pw_uid;
+				safe_gid = p->pw_gid;
+			}
 		}
 	} else if(safe_username) {
 		fatal("Sorry, the -i option doesn't make sense unless I am already running as root.");
