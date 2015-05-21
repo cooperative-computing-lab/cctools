@@ -58,11 +58,11 @@ char *perl_extensions[2]     = { "pl", "pm" };
 char *makeflow_extensions[2] = { "mf", "makeflow" };
 
 void create_workspace(){
-	workspace = (char *) malloc(PATH_MAX * sizeof(char));
 	if(dry_run){
 		workspace = xxstrdup("*");
 	} else {
-		snprintf(workspace, PATH_MAX, "/tmp/makeflow_linker_workspace_%d", rand()%2718 + 1);
+		char *template = xxstrdup("makeflow_linker_workspace_XXXXXX");
+		workspace = mktemp(template);
 		if(!create_dir(workspace, 0777)) fatal("Could not create directory.\n");
 	}
 
