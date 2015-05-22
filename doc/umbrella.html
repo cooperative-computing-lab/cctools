@@ -140,7 +140,7 @@
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/parrot_povray \
-	run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50" </code>
+	run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"</code>
 
 			<p>After this umbrella command is finished, you can find the output file,
 			<tt>frame000.png</tt>, in the output directory,
@@ -232,13 +232,13 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 
 			<p><b>The umbrella command for Parrot execution engine:</b></p>			
 			<code>umbrella \
---batch_type parrot \
---log umbrella.log \
---config cms_complex.umbrella \
---inputs 'cms_complex.sh=cms_complex.sh' \
---localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/parrot_cms_complex_output \
-run '/bin/sh cms_complex.sh'</code>
+	--batch_type parrot \
+	--log umbrella.log \
+	--config cms_complex.umbrella \
+	--inputs 'cms_complex.sh=cms_complex.sh' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/parrot_cms_complex_output \
+	run '/bin/sh cms_complex.sh'</code>
 
 			<p>After umbrella finishes executing the CMS application, you can see the analysis result:
 			<code>21-May-2015 11:05:45 EDT  Initiating request to open LHE file file:/tmp/final_events_2381.lhe
@@ -300,32 +300,32 @@ System                  2                   2
 			Ray-Tracing application:</p>
 
 			<code> {
-"hardware": {
-	"arch": "x86_64",
-	"cores": "2",
-	"memory": "2GB",
-	"disk": "10GB"
-},
-"kernel" : {
-	"name": "linux",
-	"version": ">=2.6.18"
-},
-"os": {
-	"name": "Redhat",
-	"version": "5.10"
-},
-"software": {
-	"povray-3.6.1-redhat5-x86_64": {
-		"id": "9b7f2362e6b927c8ef08c3f92599e47c",
-		"mountpoint": "/software/povray-3.6.1-redhat5-x86_64",
-		"action": "unpack"
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "10GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.18"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "5.10"
+	},
+	"software": {
+		"povray-3.6.1-redhat5-x86_64": {
+			"id": "9b7f2362e6b927c8ef08c3f92599e47c",
+			"mountpoint": "/software/povray-3.6.1-redhat5-x86_64",
+			"action": "unpack"
+		}
+	},
+	"data": {
+	},
+	"environ": {
+		"PATH": "/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin"
 	}
-},
-"data": {
-},
-"environ": {
-	"PATH": "/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin"
-}
 }
 </code>
 			<p>An Umbrella specification includes 6 parts: hardware, kernel, os, software, data, and environ.</p>
@@ -597,44 +597,43 @@ System                  2                   2
 
 			<b>Here is an example of metadata database:</b>
 			<code>"povray-3.6.1-redhat5-x86_64": {
-"9b7f2362e6b927c8ef08c3f92599e47c": {
-	"source":[
-		"http://ccl.cse.nd.edu/research/data/hep-case-study/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64.tar.gz"
-	],
-	"format": "tgz",
-	"checksum": "9b7f2362e6b927c8ef08c3f92599e47c",
-	"size": "1.5MB"
-},
-"c9da9e46b3ce0f7f9885ce60077c45c5": {
-	"source":[
-		"http://ccl.cse.nd.edu/research/data/hep-case-study/c9da9e46b3ce0f7f9885ce60077c45c5/povray-3.6.1-redhat5-x86_64.tar.gz"
-	],
-	"format": "tgz",
-	"checksum": "c9da9e46b3ce0f7f9885ce60077c45c5",
-	"size": "1.5MB"
-}
+	"9b7f2362e6b927c8ef08c3f92599e47c": {
+		"source":[
+			"http://ccl.cse.nd.edu/research/data/hep-case-study/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64.tar.gz"
+		],
+		"format": "tgz",
+		"checksum": "9b7f2362e6b927c8ef08c3f92599e47c",
+		"size": "1.5MB"
+	},
+	"c9da9e46b3ce0f7f9885ce60077c45c5": {
+		"source":[
+			"http://ccl.cse.nd.edu/research/data/hep-case-study/c9da9e46b3ce0f7f9885ce60077c45c5/povray-3.6.1-redhat5-x86_64.tar.gz"
+		],
+		"format": "tgz",
+		"checksum": "c9da9e46b3ce0f7f9885ce60077c45c5",
+		"size": "1.5MB"
+	}
 },
 "redhat-5.10-x86_64": {
-"62aa9bc37afe3f738052da5545832c80": {
-	"source": [
-		"http://ccl.cse.nd.edu/research/data/hep-case-study/62aa9bc37afe3f738052da5545832c80/redhat-5.10-x86_64.tar.gz"
-	],
-	"format": "tgz",
-	"checksum": "62aa9bc37afe3f738052da5545832c80",
-	"size": "480MB"
-}
+	"62aa9bc37afe3f738052da5545832c80": {
+		"source": [
+			"http://ccl.cse.nd.edu/research/data/hep-case-study/62aa9bc37afe3f738052da5545832c80/redhat-5.10-x86_64.tar.gz"
+		],
+		"format": "tgz",
+		"checksum": "62aa9bc37afe3f738052da5545832c80",
+		"size": "480MB"
+	}
 },
 "final_events_2381.lhe": {
-"cb9878132aad42e7db30eabd214be8e2": {
-	"source": [
-		"http://ccl.cse.nd.edu/research/data/hep-case-study/cb9878132aad42e7db30eabd214be8e2/final_events_2381.lhe"
-	],
-	"format": "plain",
-	"checksum": "cb9878132aad42e7db30eabd214be8e2",
-	"size": "18MB"
-}
-}
-</code>
+	"cb9878132aad42e7db30eabd214be8e2": {
+		"source": [
+			"http://ccl.cse.nd.edu/research/data/hep-case-study/cb9878132aad42e7db30eabd214be8e2/final_events_2381.lhe"
+		],
+		"format": "plain",
+		"checksum": "cb9878132aad42e7db30eabd214be8e2",
+		"size": "18MB"
+	}
+}</code>
 
 			<p>The name of a software dependency is in the format of 'A-B-C-D', where A is
 			the software name, B is the software version, C is OS distro name, D is
@@ -851,13 +850,13 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 			umbrella can be called to execute the application:</p>
 
 			<code>umbrella \
---batch_type parrot \
---log umbrella.log \
---config cms_complex.umbrella \
---inputs 'cms_complex.sh=cms_complex.sh' \
---localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/parrot_cms_complex_output \
-run '/bin/sh cms_complex.sh'</code>
+	--batch_type parrot \
+	--log umbrella.log \
+	--config cms_complex.umbrella \
+	--inputs 'cms_complex.sh=cms_complex.sh' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/parrot_cms_complex_output \
+	run '/bin/sh cms_complex.sh'</code>
 
 			<p>If you want to run this CMS application through Umbrella, please check the <a href="#try_cms">Try CMS Applications with Umbrella</a>.</p>
     </div>
