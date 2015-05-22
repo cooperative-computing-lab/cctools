@@ -23,6 +23,7 @@ config_file = HOME+'/.pruneconf'
 config_file2 = None
 run_filename = run_lines = None
 reset_all = False
+debug_level = None
 
 argi = 1
 while argi<len(sys.argv):
@@ -260,7 +261,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				lib.useLocal(concurrency,local_fs)
 			elif resource_type=='wq':
 				master_name = ar[2]
-				lib.useWQ(master_name,local_fs)
+				lib.useWQ(master_name,local_fs,debug_level=debug_level)
 			return True
 
 		elif line.upper().startswith('ENV'):

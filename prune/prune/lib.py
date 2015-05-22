@@ -679,7 +679,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 
 wq = None
 wq_task_cnt = 0
-def useWQ(name, local_fs=False):
+def useWQ(name, local_fs=False, debug_level=None):
 	global wq, wq_task_cnt, wq_local_fs
 	wq_local_fs = local_fs
 	try:
@@ -691,8 +691,9 @@ def useWQ(name, local_fs=False):
 	print "Work Queue master started on port %d with name '%s'..." % (wq.port,name)
 	wq.specify_log("wq.log")
 	#wq.set_bandwidth_limit('1250000000')
-	cctools_debug_flags_set("all")
-	cctools_debug_config_file("wq.debug")
+	if debug_level:
+		cctools_debug_flags_set(debug_level)
+		cctools_debug_config_file("wq.debug")
 
 	return True
 	
