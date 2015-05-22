@@ -8,7 +8,7 @@ expected=expected.txt
 output=output.txt
 
 search() {
-  ../src/parrot_run --debug=all --debug-file="$parrot_debug" --debug-rotate-max=0 ../src/parrot_search "$@"
+  ../src/parrot_run --debug=all --debug-file="$parrot_debug" --debug-rotate-max=0 --timeout=5 ../src/parrot_search "$@"
 }
 
 prepare()

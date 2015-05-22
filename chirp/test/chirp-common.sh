@@ -1,40 +1,60 @@
+verbose() {
+	printf '%s\n' "$*" >&2
+	"$@"
+}
+
 chirp() {
-	echo ../../chirp/src/chirp -d chirp "$@" >&2
-	../../chirp/src/chirp -d chirp "$@"
+	verbose ../../chirp/src/chirp -d chirp "$@"
 }
 
 chirp_benchmark() {
-	echo ../../chirp/src/chirp_benchmark "$@" >&2
-	../../chirp/src/chirp_benchmark "$@"
+	verbose ../../chirp/src/chirp_benchmark "$@"
 }
 
 chirp_server() {
-	echo ../../chirp/src/chirp "$@" >&2
-	../../chirp/src/chirp_server "$@"
+	verbose ../../chirp/src/chirp_server "$@"
 }
 
 chirp_start() {
+	acl=`mktemp ./chirp.acl.XXXXXX`
 	debug=`mktemp ./chirp.debug.XXXXXX`
 	pid=`mktemp ./chirp.pid.XXXXXX`
 	port=`mktemp ./chirp.port.XXXXXX`
 	transient=`mktemp -d ./chirp.transient.XXXXXX`
 	if [ "$1" = local ]; then
 		root=`mktemp -d ./chirp.root.XXXXXX`
+		if [ "$(id -u)" -eq 0 ]; then
+			verbose chown 9999 "$root"
+		fi
 	else
 		root="$1"
 	fi
 	shift
-	if chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"; then
+	if [ "$(id -u)" -eq 0 ]; then
+		cat >> "$acl" <<EOF
+unix:root rwlda
+EOF
+		verbose chown 9999 "$acl" "$debug" "$pid" "$transient"
+		chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --default-acl="$acl" --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" --user=9999 "$@"
+	else
+		chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"
+	fi
+	result=$?
+	if [ "$result" -eq 0 ]; then
 		i=0
-		while [ $i -lt 10 ]
-		do
-			if [ -s "$pid" -a -s "$port" ]; then
-				hostport="127.0.0.1:$(cat "$port")"
-				unset debug pid port transient
-				return 0
+		while [ $i -lt 10 ]; do
+			if [ -s "$pid" ]; then
+				if [ -s "$port" ]; then
+					hostport="127.0.0.1:$(cat "$port")"
+					unset acl debug pid port result transient
+					return 0
+				elif ! kill -s 0 "$(cat "$pid")"; then
+					break;
+				fi
 			fi
+			echo $i sleeping waiting for server to start
 			sleep 1
-			i=$((i+1))
+			i=$(expr $i + 1)
 		done
 		echo "chirp_server did not start:"
 	else
@@ -42,7 +62,7 @@ chirp_start() {
 	fi
 	touch "$debug"
 	cat "$debug"
-	unset debug pid port transient
+	unset acl debug pid port result transient
 	return 1
 }
 
@@ -54,8 +74,7 @@ chirp_clean() {
 			echo could not kill $pid
 		fi
 	done
-	echo rm -rf ./chirp.debug.* ./chirp.pid.* ./chirp.port.* ./chirp.transient.* ./chirp.root.*
-	rm -rf ./chirp.debug.* ./chirp.pid.* ./chirp.port.* ./chirp.transient.* ./chirp.root.*
+	verbose rm -rf ./chirp.acl.* ./chirp.debug.* ./chirp.pid.* ./chirp.port.* ./chirp.transient.* ./chirp.root.*
 	return 0
 }
 

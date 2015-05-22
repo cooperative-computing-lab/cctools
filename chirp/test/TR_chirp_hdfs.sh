@@ -13,11 +13,13 @@ if [ -z "$me" ]; then
 fi
 
 c="./hostport.$PPID"
-chirp_hdfs_root="hdfs:///users/${me}/.chirp.test/$0.$(hostname).$PPID"
 
 prepare()
 {
-	if chirp_start "$chirp_hdfs_root"; then
+	# Darwin's tr is criminally stupid. It apparently ignores SIGPIPE for the
+	# output of this pipeline. So we limit its input using dd:
+	local guid="$(dd if=/dev/urandom bs=1024 count=1 | tr -d -c 'a-zA-Z0-9' | head -c 20)"
+	if chirp_start "hdfs:///users/${me}/.chirp.test/${0}.${guid}"; then
 		echo "$hostport" > "$c"
 	fi
 	return 0

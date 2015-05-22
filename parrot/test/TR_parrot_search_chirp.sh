@@ -12,7 +12,7 @@ expected=expected.txt
 output=output.txt
 
 psearch() {
-	../src/parrot_run --no-chirp-catalog --debug=all --debug-file="$parrot_debug" ../src/parrot_search "$@"
+	../src/parrot_run --no-chirp-catalog --debug=all --debug-file="$parrot_debug" --timeout=5 ../src/parrot_search "$@"
 }
 
 prepare()

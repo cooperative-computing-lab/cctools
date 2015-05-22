@@ -36,6 +36,7 @@
 #include "macros.h"
 #include "memory_info.h"
 #include "path.h"
+#include "pattern.h"
 #include "random.h"
 #include "stringtools.h"
 #include "url_encode.h"
@@ -144,6 +145,19 @@ int update_one_catalog(void *catalog_host, const void *text)
 	return 1;
 }
 
+static void downgrade (void)
+{
+	/* downgrade privileges (necessary so files are created with correct uid) */
+	if(safe_username) {
+		debug(D_AUTH, "changing to uid %d gid %d", safe_uid, safe_gid);
+		if (setgid(safe_gid) == -1)
+			fatal("could not setgid: %s", strerror(errno));
+		if (setuid(safe_uid) == -1)
+			fatal("could not setuid: %s", strerror(errno));
+	}
+
+}
+
 static int backend_setup(const char *url)
 {
 	if(cfs->init(url) == -1)
@@ -158,8 +172,15 @@ static int backend_setup(const char *url)
 	return 0;
 }
 
+static int backend_bootstrap(const char *url)
+{
+	downgrade();
+	return backend_setup(url);
+}
+
 static int gc_tickets(const char *url)
 {
+	downgrade();
 	backend_setup(url);
 
 	chirp_acl_gctickets();
@@ -185,6 +206,7 @@ static int update_all_catalogs(const char *url)
 	load_average_get(avg);
 	cpus = load_average_get_cpus();
 
+	downgrade();
 	backend_setup(url);
 
 	if(chirp_alloc_statfs("/", &info) < 0) {
@@ -1698,7 +1720,13 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 	/* Chirp's backend file system must be loaded here. HDFS loads in the JVM
 	 * which does not play nicely with fork. So, we only manipulate the backend
 	 * file system in a child process which actually handles client requests.
-	 * */
+	 *
+	 * XXX Downgrade permissions *after auth*. [This is actually a nasty hack
+	 * as we should not make files as root in the backend. Fortunately, for
+	 * now, the initial bootstrap backend_setup does necessary ACL/etc.
+	 * creation so we should only ever read files between now and downgrade
+	 * (below).
+	 */
 	backend_setup(url);
 
 	struct auth_state *backend_state = auth_clone();
@@ -1717,13 +1745,7 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 
 		debug(D_LOGIN, "%s from %s:%d", typesubject, addr, port);
 
-		if(safe_username) {
-			cfs->chown("/", safe_uid, safe_gid);
-			cfs->chmod("/", S_IRWXU);
-			debug(D_AUTH, "changing to uid %d gid %d", safe_uid, safe_gid);
-			setgid(safe_gid);
-			setuid(safe_uid);
-		}
+		downgrade(); /* downgrade privileges after authentication */
 
 		/* See above comment concerning authentication. */
 		if (cfs != &chirp_fs_confuga) {
@@ -2132,34 +2154,38 @@ int main(int argc, char *argv[])
 		auth_register_all();
 	}
 
-	cfs = cfs_lookup(chirp_url);
-
-	if(run_in_child_process(backend_setup, chirp_url, "backend setup") != 0) {
-		fatal("couldn't setup %s", chirp_url);
-	}
-
 	if(!list_size(catalog_host_list)) {
 		list_push_head(catalog_host_list, CATALOG_HOST);
 	}
 
 	if(getuid() == 0) {
 		if(!safe_username) {
-			fprintf(stdout, "Sorry, I refuse to run as root without certain safeguards.\n");
-			fprintf(stdout, "Please give me a safe username with the -i <user> option.\n");
-			fprintf(stdout, "After using root access to authenticate users,\n");
-			fprintf(stdout, "I will use the safe username to access data on disk.\n");
-			exit(1);
+			fatal(
+				"Sorry, I refuse to run as root without certain safeguards.\n"
+				"Please give me a safe username with the -i <user> option.\n"
+				"After using root access to authenticate users,\n"
+				"I will use the safe username to access data on disk."
+			);
 		} else {
-			struct passwd *p = getpwnam(safe_username);
-			if(!p)
-				fatal("unknown user: %s", safe_username);
-			safe_uid = p->pw_uid;
-			safe_gid = p->pw_gid;
+			if (pattern_match(safe_username, "^%d+$") >= 0) {
+				safe_uid = safe_gid = atoi(safe_username);
+			} else {
+				struct passwd *p = getpwnam(safe_username);
+				if(!p) {
+					fatal("unknown user: %s", safe_username);
+				}
+				safe_uid = p->pw_uid;
+				safe_gid = p->pw_gid;
+			}
 		}
 	} else if(safe_username) {
-		fprintf(stdout, "Sorry, the -i option doesn't make sense\n");
-		fprintf(stdout, "unless I am already running as root.\n");
-		exit(1);
+		fatal("Sorry, the -i option doesn't make sense unless I am already running as root.");
+	}
+
+	cfs = cfs_lookup(chirp_url);
+
+	if(run_in_child_process(backend_bootstrap, chirp_url, "backend bootstrap") != 0) {
+		fatal("couldn't setup %s", chirp_url);
 	}
 
 	link = link_serve_address(listen_on_interface, chirp_port);
@@ -2203,6 +2229,7 @@ int main(int argc, char *argv[])
 
 		change_process_title("chirp_server [scheduler]");
 
+		downgrade();
 		backend_setup(chirp_url);
 		rc = chirp_job_schedule();
 		cfs->destroy();

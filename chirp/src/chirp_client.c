@@ -5,57 +5,56 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "chirp_protocol.h"
 #include "chirp_client.h"
 #include "chirp_group.h"
+#include "chirp_protocol.h"
 #include "chirp_ticket.h"
 
-#include "sleeptools.h"
-
-#include "link.h"
 #include "auth.h"
 #include "auth_hostname.h"
+#include "catch.h"
+#include "copy_stream.h"
+#include "debug.h"
 #include "domain_name_cache.h"
 #include "full_io.h"
-#include "macros.h"
-#include "debug.h"
-#include "copy_stream.h"
+#include "link.h"
 #include "list.h"
+#include "macros.h"
+#include "shell.h"
+#include "sleeptools.h"
 #include "string_array.h"
 #include "url_encode.h"
 #include "xxmalloc.h"
 
-#include <assert.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#include <stdarg.h>
-#include <ctype.h>
-#include <sys/stat.h>
-#ifdef HAS_SYS_STATFS_H
-#include <sys/statfs.h>
+#if defined(HAS_ATTR_XATTR_H)
+#	include <attr/xattr.h>
+#elif defined(HAS_SYS_XATTR_H)
+#	include <sys/xattr.h>
 #endif
-#include <sys/param.h>
-#include <sys/mount.h>
-#include <signal.h>
-
-#include <unistd.h>
-#include <sys/errno.h>
-#include <sys/socket.h>
+#ifndef ENOATTR
+#	define ENOATTR  EINVAL
+#endif
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <sys/errno.h>
+#include <sys/mount.h>
+#include <sys/param.h>
+#include <sys/socket.h>
+#ifdef HAS_SYS_STATFS_H
+#	include <sys/statfs.h>
+#endif
+#include <unistd.h>
 
-#if defined(HAS_ATTR_XATTR_H)
-#include <attr/xattr.h>
-#elif defined(HAS_SYS_XATTR_H)
-#include <sys/xattr.h>
-#endif
-#ifndef ENOATTR
-#define ENOATTR  EINVAL
-#endif
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
@@ -231,19 +230,18 @@ static INT64_T get_result(struct chirp_client *c, time_t stoptime)
 
 static INT64_T send_command_varargs(struct chirp_client *c, time_t stoptime, char const *fmt, va_list args)
 {
-	INT64_T result;
-	char command[CHIRP_LINE_MAX];
-
-	vsprintf(command, fmt, args);
+	BUFFER_STACK_ABORT(B, CHIRP_LINE_MAX);
 
 	if(c->broken) {
 		errno = ECONNRESET;
 		return -1;
 	}
 
-	debug(D_CHIRP, "%s: %s", c->hostport, command);
+	buffer_putvfstring(&B, fmt, args);
 
-	result = link_putstring(c->link, command, stoptime);
+	debug(D_CHIRP, "%s: %s", c->hostport, buffer_tostring(&B));
+
+	INT64_T result = link_putstring(c->link, buffer_tostring(&B), stoptime);
 	if(result < 0) {
 		c->broken = 1;
 		errno = ECONNRESET;
@@ -528,35 +526,57 @@ const char *chirp_client_readacl(struct chirp_client *c, time_t stoptime)
 
 static int ticket_translate(const char *name, char *ticket_subject)
 {
-	char command[PATH_MAX * 2 + 4096];
-	char pk[4096] = ""; /* max size of public key */
-	const char *dummy;
+	static const char command[] =
+		"set -e\n"
+		"sed '/^\\s*#/d' < \"$CHIRP_TICKET_NAME\" | openssl rsa -pubout\n"
+		;
 
+	INT64_T result = 0;
+	int status;
+	buffer_t Bout[1];
+	buffer_t Berr[1];
+	buffer_t Benv[1];
+	const char *env[] = {NULL, NULL, NULL};
+
+	const char *dummy;
 	if(chirp_ticket_isticketsubject(name, &dummy)) {
 		strcpy(ticket_subject, name);
 		return 0;
 	}
-
 	if (access(name, R_OK) == -1)
 		return -1;
 
-	sprintf(command, "sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null", name);
-	FILE *pkf = popen(command, "r");
-	size_t length = fread(pk, sizeof(char), sizeof(pk)/sizeof(char), pkf);
-	if(length == 0) {
-		errno = ferror(pkf);
-		if (errno == 0) /* empty file? */
-			errno = EINVAL;
-		pclose(pkf);
-		return -1;
+	buffer_init(Bout);
+	buffer_abortonfailure(Bout, 1);
+	buffer_init(Berr);
+	buffer_abortonfailure(Berr, 1);
+	buffer_init(Benv);
+	buffer_abortonfailure(Benv, 1);
+
+	buffer_putfstring(Benv, "CHIRP_TICKET_NAME=%s", name);
+	env[0] = buffer_tostring(Benv);
+
+	result = shellcode(command, env, Bout, Berr, &status);
+
+	if (result == 0) {
+		debug(D_DEBUG, "shellcode exit status %d; stderr:\n%s", status, buffer_tostring(Berr));
+
+		if (status == 0) {
+			/* load the digest */
+			const char *digest = chirp_ticket_digest(buffer_tostring(Bout));
+			sprintf(ticket_subject, "ticket:%s", digest);
+		} else {
+			debug(D_CHIRP, "could not create ticket, do you have openssl installed?");
+			errno = ENOSYS;
+			result = -1;
+		}
 	}
-	pclose(pkf);
 
-	/* load the digest */
-	const char *digest = chirp_ticket_digest(pk);
+	buffer_free(Bout);
+	buffer_free(Berr);
+	buffer_free(Benv);
 
-	sprintf(ticket_subject, "ticket:%s", digest);
-	return 0;
+	return result;
 }
 
 /* Some versions of gcc emit a silly error about the use of %c.  This suppresses that error. */
@@ -569,136 +589,163 @@ static size_t my_strftime(char *str, int len, const char *fmt, struct tm *t)
 
 INT64_T chirp_client_ticket_register(struct chirp_client * c, const char *name, const char *subject, time_t duration, time_t stoptime)
 {
-	char command[PATH_MAX * 2 + 4096];
-	char ticket_subject[CHIRP_LINE_MAX];
-	FILE *shell;
+	static const char command[] =
+		"set -e\n"
+		"if [ -r \"$CHIRP_TICKET_NAME\" ]; then\n"
+		"	sed '/^\\s*#/d' < \"$CHIRP_TICKET_NAME\" | openssl rsa -pubout\n"
+		"	exit 0\n"
+		"else\n"
+		"	exit 1\n"
+		"fi\n"
+		;
+
+	INT64_T result = 0;
 	int status;
-
-	if(access(name, R_OK) == -1)
-		return -1;	/* the 'name' argument must be a client ticket filename */
-
-	if (ticket_translate(name, ticket_subject) == -1)
-		return -1;
-
-	/* BEWARE: we don't bother to escape the filename, a user could
-	 * provide a malicious filename that makes us execute code we don't want to.
-	 */
-	sprintf(command, "if [ -r '%s' ]; then sed '/^\\s*#/d' < '%s' | openssl rsa -pubout 2> /dev/null; exit 0; else exit 1; fi", name, name);
-	shell = popen(command, "r");
-	if(!shell)
-		return -1;
-
-	/* read the ticket file (public key) */
-	char *ticket = xxrealloc(NULL, 4096);
-	size_t read, length = 0;
-	while((read = fread(ticket + length, 1, 4096, shell)) > 0) {
-		length += read;
-		ticket = xxrealloc(ticket, length + 4096);
-	}
-	if(ferror(shell)) {
-		status = pclose(shell);
-		errno = ferror(shell);
-		return -1;
-	}
-	assert(feof(shell));
-	status = pclose(shell);
-	if(status) {
-		errno = EINVAL;
-		return -1;
-	}
+	buffer_t Bout[1];
+	buffer_t Berr[1];
+	buffer_t Benv[1];
+	const char *env[] = {NULL, NULL};
 
 	if(subject == NULL)
 		subject = "self";
-	INT64_T result = send_command(c, stoptime, "ticket_register %s %llu %zu\n", subject, (unsigned long long) duration, length);
-	if(result < 0) {
-		free(ticket);
-		return result;
-	}
-	result = link_write(c->link, ticket, length, stoptime);
-	free(ticket);
-	if(result != (int) length) {
-		c->broken = 1;
-		errno = ECONNRESET;
+
+	char ticket_subject[CHIRP_LINE_MAX];
+	if(access(name, R_OK) == -1)
+		return -1;	/* the 'name' argument must be a client ticket filename */
+	if (ticket_translate(name, ticket_subject) == -1)
 		return -1;
+
+	buffer_init(Bout);
+	buffer_abortonfailure(Bout, 1);
+	buffer_init(Berr);
+	buffer_abortonfailure(Berr, 1);
+	buffer_init(Benv);
+	buffer_abortonfailure(Benv, 1);
+
+	buffer_putfstring(Benv, "CHIRP_TICKET_NAME=%s", name);
+	env[0] = buffer_tostring(Benv);
+
+	result = shellcode(command, env, Bout, Berr, &status);
+
+	if (result == 0) {
+		debug(D_DEBUG, "shellcode exit status %d; stderr:\n%s", status, buffer_tostring(Berr));
+
+		if (status != 0) {
+			debug(D_CHIRP, "could not create ticket, do you have openssl installed?");
+			errno = ENOSYS;
+			result = -1;
+			goto out;
+		}
+
+		result = send_command(c, stoptime, "ticket_register %s %llu %zu\n", subject, (unsigned long long) duration, buffer_pos(Bout));
+		if (result < 0)
+			goto out;
+
+		result = link_write(c->link, buffer_tostring(Bout), buffer_pos(Bout), stoptime);
+		if ((size_t)result != buffer_pos(Bout)) {
+			c->broken = 1;
+			errno = ECONNRESET;
+			result = -1;
+			goto out;
+		}
+
+		result = get_result(c, stoptime);
+
+		if(result == 0) {
+			time_t t;
+			struct tm tm;
+			char now[1024];
+			char expiration[1024];
+
+			time(&t);
+			localtime_r(&t, &tm);
+			my_strftime(now, sizeof(now) / sizeof(char), "%c", &tm);
+			t += duration;
+			localtime_r(&t, &tm);
+			my_strftime(expiration, sizeof(expiration) / sizeof(char), "%c", &tm);
+
+			FILE *file = fopen(name, "a");
+			if(file == NULL) {
+				result = -1;
+				goto out;
+			}
+			fprintf(file, "# %s: Registered with %s as \"%s\". Expires on %s\n", now, c->hostport, subject, expiration);
+			fclose(file);
+		}
 	}
 
-	result = get_result(c, stoptime);
+out:
+	buffer_free(Bout);
+	buffer_free(Berr);
+	buffer_free(Benv);
 
-	if(result == 0) {
-		time_t t;
-		struct tm tm;
-		char now[1024];
-		char expiration[1024];
-
-		time(&t);
-		localtime_r(&t, &tm);
-		my_strftime(now, sizeof(now) / sizeof(char), "%c", &tm);
-		t += duration;
-		localtime_r(&t, &tm);
-		my_strftime(expiration, sizeof(expiration) / sizeof(char), "%c", &tm);
-
-		FILE *file = fopen(name, "a");
-		if(file == NULL)
-			return -1;
-		fprintf(file, "# %s: Registered with %s as \"%s\". Expires on %s\n", now, c->hostport, subject, expiration);
-		fclose(file);
-	}
 	return result;
 }
 
 INT64_T chirp_client_ticket_create(struct chirp_client * c, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime)
 {
 	static const char command[] =
+		"set -e\n"
 		"umask 0177\n" /* files only readable/writable by owner */
 		"T=`mktemp /tmp/ticket.XXXXXX`\n"
 		"P=`mktemp /tmp/ticket.pub.XXXXXX`\n"
 		"MD5=`mktemp /tmp/ticket.md5.XXXXXX`\n"
 		"echo \"# Chirp Ticket\" > \"$T\"\n"
 		"echo \"# `date`: Ticket Created.\" >> \"$T\"\n"
-		"openssl genrsa \"$CHIRP_BITS\" >> \"$T\" 2> /dev/null\n"
-		"sed '/^\\s*#/d' < \"$T\" | openssl rsa -pubout > \"$P\" 2> /dev/null\n"
+		"openssl genrsa \"$CHIRP_TICKET_BITS\" >> \"$T\"\n"
+		"sed '/^\\s*#/d' < \"$T\" | openssl rsa -pubout > \"$P\"\n"
 		/* WARNING: openssl is *very* bad at giving sensible output. Use the last
 		 * 32 non-space characters as the MD5 sum.
 		 */
-		"openssl md5 < \"$P\" 2> /dev/null | tr -d '[:space:]' | tail -c 32 > \"$MD5\"\n"
-		"if [ -z \"$CHIRP_TICKET\" ]; then\n"
-		"  CHIRP_TICKET=\"ticket.`cat $MD5`\"\n"
+		"openssl md5 < \"$P\" | tr -d '[:space:]' | tail -c 32 > \"$MD5\"\n"
+		"if [ -z \"$CHIRP_TICKET_NAME\" ]; then\n"
+		"  CHIRP_TICKET_NAME=\"ticket.`cat $MD5`\"\n"
 		"fi\n"
-		"cat > \"$CHIRP_TICKET\" < \"$T\"\n"
+		"cat > \"$CHIRP_TICKET_NAME\" < \"$T\"\n"
 		"rm -f \"$T\" \"$P\" \"$MD5\"\n"
-		"echo \"Generated ticket $CHIRP_TICKET.\" 1>&2\n"
-		"printf '%s' \"$CHIRP_TICKET\"\n";
+		"echo \"Generated ticket $CHIRP_TICKET_NAME.\" 1>&2\n"
+		"printf '%s' \"$CHIRP_TICKET_NAME\"\n"
+		;
 
-	int result = 0;
+	INT64_T result = 0;
+	int status;
+	buffer_t Bout[1];
+	buffer_t Berr[1];
+	buffer_t Benv[1];
+	const char *env[] = {NULL, NULL, NULL};
 
-	if(strlen(name) == 0)
-		unsetenv("CHIRP_TICKET");
-	else
-		result = setenv("CHIRP_TICKET", name, 1);
-	if(result == -1)
-		return -1;
+	buffer_init(Bout);
+	buffer_abortonfailure(Bout, 1);
+	buffer_init(Berr);
+	buffer_abortonfailure(Berr, 1);
+	buffer_init(Benv);
+	buffer_abortonfailure(Benv, 1);
 
-	char bits_s[32];
-	sprintf(bits_s, "%u", bits);
-	result = setenv("CHIRP_BITS", bits_s, 1);
-	if(result == -1)
-		return -1;
+	buffer_putfstring(Benv, "CHIRP_TICKET_BITS=%u", bits);
+	buffer_putliteral(Benv, "\0");
+	buffer_putfstring(Benv, "CHIRP_TICKET_NAME=%s", name);
+	env[0] = buffer_tostring(Benv);
+	env[1] = strchr(env[0], '\0')+1;
 
-	memset(name, 0, CHIRP_PATH_MAX);
-	FILE *shell = popen(command, "r");
-	if(shell == NULL)
-		return -1;
-	ssize_t read;
-	char *buffer = name;
-	while((read = full_fread(shell, buffer, CHIRP_PATH_MAX - 1 - (name - buffer))) > 0)
-		buffer += read;
-	pclose(shell);
-	if((buffer - name) <= 0) {
-		errno = EINVAL;
-		return -1;
+	result = shellcode(command, env, Bout, Berr, &status);
+
+	if (result == 0) {
+		debug(D_DEBUG, "shellcode exit status %d; stderr:\n%s", status, buffer_tostring(Berr));
+
+		if (status == 0) {
+			snprintf(name, CHIRP_PATH_MAX, "%s", buffer_tostring(Bout));
+		} else {
+			debug(D_CHIRP, "could not create ticket, do you have openssl installed?");
+			errno = ENOSYS;
+			result = -1;
+		}
 	}
 
-	return 0;
+	buffer_free(Bout);
+	buffer_free(Berr);
+	buffer_free(Benv);
+
+	return result;
 }
 
 INT64_T chirp_client_ticket_delete(struct chirp_client * c, const char *name, time_t stoptime)
