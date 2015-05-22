@@ -27,16 +27,16 @@ reset_all = False
 argi = 1
 while argi<len(sys.argv):
 	arg = sys.argv[argi]
-	if arg=='--mf':
+	if arg in ['-m','--mf']:
 		argi += 1
 		mf_filename = sys.argv[argi]
-	elif arg=='--plan':
+	elif arg in ['-p','--plan']:
 		argi += 1
 		run_filename = sys.argv[argi]
-	elif arg=='--run':
+	elif arg in ['-r','--run']:
 		argi += 1
 		run_lines = sys.argv[argi].split(';')
-	elif arg=='--cwd':
+	elif arg in ['-w','--cwd']:
 		argi += 1
 		nwd = sys.argv[argi]
 		if nwd[0]=='/':
@@ -45,12 +45,32 @@ while argi<len(sys.argv):
 			os.chdir(os.getcwd()+'/'+nwd)
 		CWD = os.getcwd()
 		config_file = HOME+'/.prune.conf'
-	elif arg=='--conf':
+	elif arg in ['-c','--conf']:
 		argi += 1
 		config_file2 = sys.argv[argi]
-	elif arg=='-reset' or arg=='--reset':
+	elif arg in ['-v','--version']:
+		print "prune version CCTOOLS_VERSION (released CCTOOLS_RELEASEDATE)"
+		sys.exit(0)
+	elif arg in ['-d','--debug']:
+		argi += 1
+		debug_level = sys.argv[argi]
+	elif arg=='--reset':
 		reset_all = True
-
+	elif arg in ['-h','--help']:
+		message = '''Use: prune [options]
+prune options:
+	-p.--plan <pathname>	PUT the file in Prune and RUN it.
+	-r,--run '<commands>'	RUN the provided string as Prune commands separated by semi-colons.
+	-w,--cwd <path>		Directory to use when GETing and PUTing files
+	-m,--mf <pathname>	Convert the given Makeflow file into Prune commands and RUN them.
+	-c,--conf <pathname>	Specify a configuration file. (default=~/.pruneconf)
+	-d,--debug <subsystem>   Enable debugging on worker for this subsystem (try -d all to start).
+	-v,--version	Display the version of cctools that is installed.
+	-h,--help		Show command line options
+	--reset			Truncate the database and delete the data and sandboxes directories.
+		'''
+		print message
+		sys.exit(0)
 	else:
 		run_filename = arg
 	argi += 1
@@ -136,6 +156,22 @@ def process_line(line):
 			return True
 		elif line.upper().startswith('EXIT') or line.upper().startswith('QUIT'):
 			terminate = True
+			return True
+		elif line.upper().startswith('CAT'):
+			ar = line.split()
+			tag = database.tag_get(ar[1])
+			if tag:
+				puid = tag['puid']
+				pathname = lib.storage_pathname(puid)
+				if os.path.isfile(pathname):
+					with open(pathname) as f:
+						for line in f:
+							print line
+					return True
+				else:
+					print 'That is not a file that can be printed to screen.'
+			else:
+				print 'Cannot find the file.'
 			return True
 		elif line.upper().startswith('HELP'):
 			message = '''

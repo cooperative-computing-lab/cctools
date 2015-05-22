@@ -21,6 +21,8 @@ clean: $(CLEAN_TARGETS)
 
 INSTALL_TARGETS = $(TARGETS:%=install-%)
 $(INSTALL_TARGETS):
+	cat build/lib/prune/main.py | sed "s:CCTOOLS_VERSION:$(CCTOOLS_VERSION):g" | sed "s:CCTOOLS_RELEASEDATE:$(CCTOOLS_RELEASEDATE):g" > build/lib/prune/main2.py
+	mv -f build/lib/prune/main2.py build/lib/prune/main.py
 	$(CCTOOLS_PYTHON) setup.py install_scripts -d $(CCTOOLS_INSTALL_DIR)/bin
 	$(CCTOOLS_PYTHON) setup.py install_lib     -d $(PYTHON_INSTALL_DIR)
 

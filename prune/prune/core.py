@@ -2,7 +2,7 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-import os, sys, time
-import string, random, hashlib
-import subprocess
-import sqlite3, uuid
+import os, sys
+import string, hashlib
+import uuid
+
