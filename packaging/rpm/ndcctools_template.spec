@@ -11,18 +11,24 @@ BuildRequires:  make
 BuildRequires:  m4
 
 #cctools package dependencies
-#BuildRequires:  fuse-devel
-#BuildRequires:  python-devel
+BuildRequires:  fuse-devel
+BuildRequires:  python-devel
+BuildRequires:  swig
+BuildRequires:  libuuid-devel
+BuildRequires:  readline-devel
+BuildRequires:  zlib-devel
+BuildRequires:  perl
+BuildRequires:  perl-ExtUtils-Embed
+BuildRequires:  cvmfs-devel
+
+#the dependencies of globus-connect-server are complex, and ignored for now.
 #BuildRequires:  globus-connect-server
-#BuildRequires:  swig
-#BuildRequires:  libuuid-devel
-#BuildRequires:  readline-devel
-#BuildRequires:  zlib-devel
-#BuildRequires:  perl
-#BuildRequires:  cvmfs-devel
 
 #required by cvmfs-devel
-#BuildRequires:  openssl-devel
+BuildRequires:  openssl-devel
+
+#required by cvmfs applications
+BuildRequires:  freetype
 
 Requires(post): info
 Requires(preun): info
@@ -42,20 +48,16 @@ The CCTools package static libraries and header files
 %setup -n cctools-%{version}-source -q
 
 %build
-./configure.afs --prefix /usr 
+./configure --prefix /usr \
+    --with-python-path /usr \
+    --with-swig-path /usr \
+    --with-readline-path /usr \
+    --with-zlib-path /usr \
+    --with-perl-path /usr \
+    --with-cvmfs-path /usr \
+    --with-fuse-path /usr \
+    --with-uuid-path /usr
 make %{?_smp_mflags}
-
-#%build
-#./configure --prefix /usr \
-#    --with-python-path /usr \
-#    --with-swig-path /usr \
-#    --with-readline-path /usr \
-#    --with-zlib-path /usr \
-#    --with-perl-path /usr \
-#    --with-cvmfs-path /usr \
-#    --with-fuse-path / \
-#    --with-uuid-path / 
-#make %{?_smp_mflags}
 
 #the globus dependency is too complex and ignored for now. When the globus dependency is ready, just add `--with-globus-path / \` into the `./configure` command.
 
@@ -77,7 +79,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root,-)
 %doc %{_defaultdocdir}/cctools/*
 #%{_bindir}/*
-%{_mandir}/man1/*
+%{_datadir}/*
 %attr(0755,root,root) %{_bindir}/*
 
 %files devel
