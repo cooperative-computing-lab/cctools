@@ -34,6 +34,8 @@ while argi<len(sys.argv):
 	elif arg in ['-p','--plan']:
 		argi += 1
 		run_filename = sys.argv[argi]
+	elif arg in ['-s','--stdin']:
+		run_filename = 'stdin'
 	elif arg in ['-r','--run']:
 		argi += 1
 		run_lines = sys.argv[argi].split(';')
@@ -60,13 +62,14 @@ while argi<len(sys.argv):
 	elif arg in ['-h','--help']:
 		message = '''Use: prune [options]
 prune options:
-	-p.--plan <pathname>	PUT the file in Prune and RUN it.
+	-f.--file <pathname>	PUT the file in Prune and RUN it.
 	-r,--run '<commands>'	RUN the provided string as Prune commands separated by semi-colons.
 	-w,--cwd <path>		Directory to use when GETing and PUTing files
 	-m,--mf <pathname>	Convert the given Makeflow file into Prune commands and RUN them.
 	-c,--conf <pathname>	Specify a configuration file. (default=~/.pruneconf)
-	-d,--debug <subsystem>   Enable debugging on worker for this subsystem (try -d all to start).
-	-v,--version	Display the version of cctools that is installed.
+	-d,--debug <subsystem>	Enable debugging on worker for this subsystem (try -d all to start).
+	-s,--stdin		Read commands from standard input
+	-v,--version		Display the version of cctools that is installed.
 	-h,--help		Show command line options
 	--reset			Truncate the database and delete the data and sandboxes directories.
 		'''
@@ -199,14 +202,17 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			filename = pname = puid = data = form = None
 			if line.find('"')>=0:
 				data = line[line.find('"')+1:line.rfind('"')]
-			line = line[:line.find('"')-1]+line[line.rfind('"')+1:]
+				line = line[:line.find('"')-1]+line[line.rfind('"')+1:]
 			ar = line.split()
 			i = 1
+			pack = None
 			while i < len(ar):
 				item = ar[i]
 				if item == 'AS':
 					i += 1
 					pname = ar[i]
+				elif item == 'GZ':
+					pack = 'GZ'
 				elif item == 'UUID' or item == 'GUID':
 					i += 1
 					puid = ar[i]
@@ -231,6 +237,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 					print 'File does not exist: %s'%(data)
 					return True
 			ids['pname'] = pname
+			ids['pack'] = pack
 			if ids['exists']:
 				print 'That file already exists with that name: %s=%s'%(pname,ids['puid'])
 				if ids['pname']:
