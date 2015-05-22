@@ -632,6 +632,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 	run_buffer = '#!/bin/bash\npython PRUNE_EXECUTOR%s %s'%(options,run_cmd)
 	
 
+
 	if framework=='wq':
 		t = Task('')
 		for obj in place_files:
