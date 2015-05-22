@@ -18,12 +18,12 @@ int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename)(struc
 /* The dag_to_dax function writes a struct dag in memory to file
  * using the DAX format
  */
-int dag_to_dax(const struct dag *d, const char *name);
+int dag_to_dax(const struct dag *d, const char *name );
 
 /* The dag_to_dot function writes a struct dag in memory to a dot
  * file (graphviz), giving the graphical presentation of the makeflow.
  */
-void dag_to_dot(struct dag *d, int condense_display, int change_size);
+void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_labels );
 
 /* The dag_to_ppm function writes a struct dag in memory to a ppm
  * file, giving a graphical presentation of the makeflow

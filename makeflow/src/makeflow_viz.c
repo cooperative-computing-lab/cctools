@@ -48,13 +48,11 @@ See the file COPYING for details.
 #include "parser.h"
 
 /* Display options */
-enum { SHOW_INPUT_FILES = 2,
-       SHOW_OUTPUT_FILES,
-       SHOW_MAKEFLOW_ANALYSIS,
+enum {
        SHOW_DAG_DOT,
        SHOW_DAG_PPM,
-       SHOW_DAG_FILE,
-	   SHOW_DAG_CYTO
+       SHOW_DAG_CYTO,
+       SHOW_DAG_DAX
 };
 
 /* Unique integers for long options. */
@@ -64,20 +62,25 @@ enum { LONG_OPT_PPM_ROW,
        LONG_OPT_PPM_EXE,
        LONG_OPT_PPM_LEVELS,
        LONG_OPT_DOT_PROPORTIONAL,
-       LONG_OPT_DOT_CONDENSE };
+       LONG_OPT_DOT_CONDENSE,
+       LONG_OPT_DOT_LABELS,
+       LONG_OPT_DOT_NO_LABELS
+};
 
 static void show_help_viz(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
 	fprintf(stdout, " %-30s Show this help screen.\n", "-h,--help");
-	fprintf(stdout, " %-30s Display the Makefile as a Dot graph, a PPM completion graph, or print the Workflow to stdout.\n", "-D,--display=<opt>");
-	fprintf(stdout, " %-30s Where <opt> is:\n", "");
-	fprintf(stdout, " %-35s dot      Standard Dot graph\n", "");
-	fprintf(stdout, " %-35s ppm      Display a completion graph in PPM format\n", "");
-	fprintf(stdout, " %-35s file     Display the file as interpreted by makeflow\n", "");
-
+	fprintf(stdout, " %-30s Translate the makeflow to the desired visualization format:\n", "-D,--display=<format>");
+	fprintf(stdout, " %-30s Where <format> is:\n", "");
+	fprintf(stdout, " %-35s dot      DOT file format for precise graph drawing.\n", "");
+	fprintf(stdout, " %-35s ppm      PPM file format for rapid iconic display\n","");
+	fprintf(stdout, " %-35s cyto     Cytoscape format for browsing and customization.\n","");
+	fprintf(stdout, " %-35s dax      DAX format for use by the Pegasus workflow manager.\n","");
+	fprintf(stdout, "\n");
 	fprintf(stdout, " %-30s Condense similar boxes.\n", "--dot-merge-similar");
 	fprintf(stdout, " %-30s Change the size of the boxes proportional to file size.\n", "--dot-proportional");
+	fprintf(stdout, " %-30s Show only shapes with no text labels.\n","--dot-no-labels");
 	fprintf(stdout, "\nThe following options for ppm generation are mutually exclusive:\n\n");
 	fprintf(stdout, " %-30s Highlight row <row> in completion grap\n", "--ppm-highlight-row=<row>");
 	fprintf(stdout, " %-30s Highlight node that creates file <file> in completion graph\n", "--ppm-highlight-file=<file>");
@@ -97,8 +100,8 @@ int main(int argc, char *argv[])
 
 	int condense_display = 0;
 	int change_size = 0;
-	int export_as_dax = 0;
 	int ppm_mode = 0;
+	int dot_labels = 1;
 	char *ppm_option = NULL;
 
 	struct option long_options_viz[] = {
@@ -106,6 +109,8 @@ int main(int argc, char *argv[])
 		{"help", no_argument, 0, 'h'},
 		{"dot-merge-similar", no_argument, 0,  LONG_OPT_DOT_CONDENSE},
 		{"dot-proportional",  no_argument, 0,  LONG_OPT_DOT_PROPORTIONAL},
+		{"dot-no-labels", no_argument, 0, LONG_OPT_DOT_NO_LABELS},
+		{"dot-labels", no_argument, 0, LONG_OPT_DOT_LABELS},
 		{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
 		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
 		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
@@ -114,19 +119,22 @@ int main(int argc, char *argv[])
 		{"version", no_argument, 0, 'v'},
 		{0, 0, 0, 0}
 	};
-	const char *option_string_viz = "b:D:ehv";
+	const char *option_string_viz = "b:D:hv";
 
 	while((c = getopt_long(argc, argv, option_string_viz, long_options_viz, NULL)) >= 0) {
 		switch (c) {
 			case 'D':
-				if(strcasecmp(optarg, "dot") == 0)
+				if(strcasecmp(optarg, "dot") == 0) {
 					display_mode = SHOW_DAG_DOT;
-				else if (strcasecmp(optarg, "ppm") == 0)
+				} else if (strcasecmp(optarg, "ppm") == 0) {
 					display_mode = SHOW_DAG_PPM;
-				else if (strcasecmp(optarg, "cytoscape") == 0)
+				} else if (strcasecmp(optarg, "cyto") == 0) {
 					display_mode = SHOW_DAG_CYTO;
-				else
+				} else if (strcasecmp(optarg, "dax") ==0 ) {
+					display_mode = SHOW_DAG_DAX;
+				} else {
 					fatal("Unknown display option: %s\n", optarg);
+				}
 				break;
 			case LONG_OPT_DOT_CONDENSE:
 				display_mode = SHOW_DAG_DOT;
@@ -135,6 +143,12 @@ int main(int argc, char *argv[])
 			case LONG_OPT_DOT_PROPORTIONAL:
 				display_mode = SHOW_DAG_DOT;
 				change_size = 1;
+				break;
+			case LONG_OPT_DOT_LABELS:
+				dot_labels = 1;
+				break;
+			case LONG_OPT_DOT_NO_LABELS:
+				dot_labels = 0;
 				break;
 			case LONG_OPT_PPM_EXE:
 				display_mode = SHOW_DAG_PPM;
@@ -154,9 +168,6 @@ int main(int argc, char *argv[])
 			case LONG_OPT_PPM_LEVELS:
 				display_mode = SHOW_DAG_PPM;
 				ppm_mode = 5;
-				break;
-			case 'e':
-				export_as_dax = 1;
 				break;
 			case 'h':
 				show_help_viz(argv[0]);
@@ -188,17 +199,10 @@ int main(int argc, char *argv[])
 		fatal("makeflow_viz: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
 
-	if(export_as_dax) {
-		dag_to_dax(d, path_basename(dagfile));
-		return 0;
-	}
-
-	if(display_mode)
-	{
 		switch(display_mode)
 		{
 			case SHOW_DAG_DOT:
-				dag_to_dot(d, condense_display, change_size);
+				dag_to_dot(d, condense_display, change_size, dot_labels );
 				break;
 			case SHOW_DAG_PPM:
 				dag_to_ppm(d, ppm_mode, ppm_option);
@@ -206,12 +210,13 @@ int main(int argc, char *argv[])
 			case SHOW_DAG_CYTO:
 				dag_to_cyto(d, condense_display, change_size);
 				break;
+			case SHOW_DAG_DAX:
+				dag_to_dax(d, path_basename(dagfile) );
+				break;
 			default:
 				fatal("Unknown display option.");
 				break;
 		}
-		exit(0);
-	}
 
 	return 0;
 }
