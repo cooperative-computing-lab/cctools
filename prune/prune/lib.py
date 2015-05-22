@@ -635,10 +635,13 @@ def create_operation(op_id,framework='local',local_fs=False):
 	if framework=='wq':
 		t = Task('')
 		for obj in place_files:
+			print obj
 			if not local_fs or obj['dst']=='PRUNE_EXECUTOR':
 				t.specify_file(obj['src'], obj['dst'], WORK_QUEUE_INPUT, cache=True)
+		print run_buffer
 		t.specify_buffer(run_buffer, 'PRUNE_RUN', WORK_QUEUE_INPUT, cache=True)
 	
+		print final_cmd
 		t.specify_command(final_cmd)
 		t.specify_cores(1)
 
@@ -708,14 +711,17 @@ def wq_check():
 			for run in runs:
 				if left <= 0:
 					break
-				operation = create_operation(run['op_id'],'wq',wq_local_fs)
+				operation = create_operation(run['op_puid'],'wq',wq_local_fs)
+				for key in operation:
+					print '------%s'%key
+					print operation[key]
 				if operation['cmd']:
 					t = operation['wq_task']
 					task_id = wq.submit(t)
-					database.run_upd(run['id'],'Running',task_id,'','wq')
+					database.run_upd(run['puid'],'Running',task_id,'','wq')
 					wq_task_cnt += 1
 					left -= 1
-					print 'started: #%i, run:%i, op_id:%i   cmd:"%s"'%(wq_task_cnt, run['id'], run['op_id'], operation['cmd'])
+					print 'started: #%i, run:%i, op_id:%i   cmd:"%s"'%(wq_task_cnt, run['puid'], run['op_puid'], operation['cmd'])
 				else:
 					'No task'
 
@@ -723,11 +729,12 @@ def wq_check():
 			return False
 		else:
 			# Wait for finished tasks (which also schedules new ones)
+			print '.'
 			t = wq.wait(5)
 			while t: #Once there are no more tasks currently finished, return
 				try:
 					run = database.run_get_by_task_id(t.id)
-					op_id = run['op_id']
+					op_id = run['op_puid']
 					ios = database.ios_get(op_id)
 					if t.return_status==0:
 						for io in ios:
@@ -736,7 +743,7 @@ def wq_check():
 								pathname = storage_pathname(io['file_puid'])
 								store_file(pathname, io['file_puid'], True, storage_module='wq')
 
-						print 'complete: run:%i, op_id:%i'%(run['id'],run['op_id'])
+						print 'complete: run:%i, op_id:%i'%(run['puid'],run['op_puid'])
 						database.run_end(run['id'],t.return_status)
 					else:
 						for io in ios:
@@ -750,14 +757,14 @@ def wq_check():
 						print 'Failed with exit code:',t.return_status
 						print 'Resubmit to try again.'
 						print t.command
-						database.run_upd(run['id'],'Failed',0,'','Exit code: %i'%t.return_status)
+						database.run_upd(run['puid'],'Failed',0,'','Exit code: %i'%t.return_status)
 
 				except:
 					print 'Return status:',t.return_status
 					print run
 					print ios
 					print traceback.format_exc()
-					database.run_upd(run['id'],'Failed',0,'',traceback.format_exc())
+					database.run_upd(run['puid'],'Failed',0,'',traceback.format_exc())
 
 				wq_task_cnt -= 1
 				t = wq.wait(1)
