@@ -1353,7 +1353,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			path_fix(path);
 			if(chirp_acl_check_link(path, subject, CHIRP_ACL_DELETE) || chirp_acl_check_dir(path, subject, CHIRP_ACL_DELETE)) {
 				/* rmdir only works if the directory is user-visibly empty, and we don't track allocations for empty directories */
-				cfs->rmdir(path);
+				result = cfs->rmdir(path);
 			} else {
 				goto failure;
 			}
