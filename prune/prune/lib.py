@@ -718,7 +718,7 @@ def wq_check():
 					database.run_upd(run['puid'],'Running',task_id,'','wq')
 					wq_task_cnt += 1
 					left -= 1
-					print 'started: #%i, cmd:"%s", op_id:%i'%(wq_task_cnt, run['puid'], operation['cmd'], run['op_puid'])
+					print 'started: #%i, cmd:"%s", op_id:%s'%(wq_task_cnt, operation['cmd'], run['op_puid'])
 				else:
 					'No task'
 
