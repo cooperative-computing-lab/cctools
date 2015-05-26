@@ -52,7 +52,9 @@ while argi<len(sys.argv):
 		argi += 1
 		config_file2 = sys.argv[argi]
 	elif arg in ['-v','--version']:
-		print "prune version CCTOOLS_VERSION (released CCTOOLS_RELEASEDATE)"
+		cctools_version = '5.0.0 [prune:887c027d-DIRTY]'
+		cctools_releasedate = '2015-05-26 11:56:15 -0400'
+		print "prune version %s (released %s)"%(cctools_version,cctools_releasedate)
 		sys.exit(0)
 	elif arg in ['-d','--debug']:
 		argi += 1

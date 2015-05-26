@@ -1251,6 +1251,12 @@ else
 	echo "*** not building html or man pages"
 fi
 
+# Inject version into prune python code
+PRUNE_MAIN=prune/prune/main.py
+`sed "s/cctools_version = ['\"].*['\"]/cctools_version = '${VERSION}'/g" ${PRUNE_MAIN} > ${PRUNE_MAIN}2`
+`sed "s/cctools_releasedate = ['\"].*['\"]/cctools_releasedate = '${DATE}'/g" ${PRUNE_MAIN}2 > ${PRUNE_MAIN}`
+`rm -f ${PRUNE_MAIN}2`
+
 # We always compile with debugging enabled,
 # however on Solaris, the -g option results in a different
 # debugging format that causes linking errors in getopt code.
