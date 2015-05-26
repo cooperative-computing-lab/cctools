@@ -1698,7 +1698,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	free(target->hostname);
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
-	if(!sscanf(line, "%[^_]_status", request) == 1) {
+	if(sscanf(line, "%[^_]_status", request) != 1) {
 		return -1;
 	}
 
