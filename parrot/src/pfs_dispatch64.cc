@@ -731,7 +731,7 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 	if (redirect_ldso(physical_exe, ldso) == -1)
 		return -1;
 
-	/* "exe" + '\0' + [new "arg0" + '\0' + ... ] + padding + new argv array */
+	/* "exe" + '\0' + [new "arg0" + '\0' + ... ] + padding + [new argv array] */
 	buffer_t B;
 	buffer_init(&B);
 	buffer_abortonfailure(&B, 1);
@@ -769,44 +769,51 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 		buffer_putlstring(&B, (char *)&dummy, padding);
 	}
 
-	uintptr_t user_argv = buffer_pos(&B)+scratch;
-	if (replace_arg0) {
-		debug(D_DEBUG, "replacing argv0: `%s'", replace_arg0);
-		buffer_putlstring(&B, (char *)&user_arg0, sizeof(user_arg0));
-	} else {
-		uintptr_t old_user_argv0;
-		if (tracer_copy_in(p->tracer, &old_user_argv0, POINTER(old_user_argv), sizeof(old_user_argv0), 0) == -1) {
-			buffer_free(&B);
-			return errno = EFAULT, -1;
+	uintptr_t user_argv;
+	if (ldso[0] || replace_arg0 || arg1 || arg2) {
+		debug(D_DEBUG, "rewriting argv array...");
+		user_argv = buffer_pos(&B)+scratch;
+		if (replace_arg0) {
+			debug(D_DEBUG, "replacing argv0: `%s'", replace_arg0);
+			buffer_putlstring(&B, (char *)&user_arg0, sizeof(user_arg0));
+		} else {
+			uintptr_t old_user_argv0;
+			if (tracer_copy_in(p->tracer, &old_user_argv0, POINTER(old_user_argv), sizeof(old_user_argv0), 0) == -1) {
+				buffer_free(&B);
+				return errno = EFAULT, -1;
+			}
+			buffer_putlstring(&B, (char *)&old_user_argv0, sizeof(old_user_argv0));
 		}
-		buffer_putlstring(&B, (char *)&old_user_argv0, sizeof(old_user_argv0));
-	}
-	if (ldso[0]) {
-		debug(D_DEBUG, "wrapping execution with ldso, argv[1]: `%s'", logical_exe);
-		buffer_putlstring(&B, (char *)&user_exe, sizeof(user_exe)); /* exe is arg1 when wrapped by ldso */
-	}
-	if (arg1) {
-		debug(D_DEBUG, "argv[next]: `%s'", arg1);
-		buffer_putlstring(&B, (char *)&user_arg1, sizeof(user_arg1));
-	}
-	if (arg2) {
-		debug(D_DEBUG, "argv[next]: `%s'", arg2);
-		buffer_putlstring(&B, (char *)&user_arg2, sizeof(user_arg2));
-	}
-	/* copy in the rest of the user argv array... */
-	old_user_argv += sizeof(uintptr_t); /* skip user argv[0] */
-	while (1) {
-		size_t i;
-		uintptr_t user_argva[1024];
-		tracer_copy_in(p->tracer, user_argva, POINTER(old_user_argv), sizeof(user_argva),0);
-		for (i = 0; i < sizeof(user_argva)/sizeof(uintptr_t) && user_argva[i]; i++, old_user_argv += sizeof(uintptr_t))
-			buffer_putlstring(&B, (char *)&user_argva[i], sizeof(user_argva[i]));
-		if (i < sizeof(user_argva)/sizeof(uintptr_t))
-			break;
-	}
-	{
-		uintptr_t sentinel = 0;
-		buffer_putlstring(&B, (char *)&sentinel, sizeof(sentinel));
+		if (ldso[0]) {
+			debug(D_DEBUG, "wrapping execution with ldso, argv[1]: `%s'", logical_exe);
+			buffer_putlstring(&B, (char *)&user_exe, sizeof(user_exe)); /* exe is arg1 when wrapped by ldso */
+		}
+		if (arg1) {
+			debug(D_DEBUG, "argv[next]: `%s'", arg1);
+			buffer_putlstring(&B, (char *)&user_arg1, sizeof(user_arg1));
+		}
+		if (arg2) {
+			debug(D_DEBUG, "argv[next]: `%s'", arg2);
+			buffer_putlstring(&B, (char *)&user_arg2, sizeof(user_arg2));
+		}
+		/* copy in the rest of the user argv array... */
+		old_user_argv += sizeof(uintptr_t); /* skip user argv[0] */
+		while (1) {
+			size_t i;
+			uintptr_t user_argva[1024];
+			tracer_copy_in(p->tracer, user_argva, POINTER(old_user_argv), sizeof(user_argva),0);
+			for (i = 0; i < sizeof(user_argva)/sizeof(uintptr_t) && user_argva[i]; i++, old_user_argv += sizeof(uintptr_t))
+				buffer_putlstring(&B, (char *)&user_argva[i], sizeof(user_argva[i]));
+			if (i < sizeof(user_argva)/sizeof(uintptr_t))
+				break;
+		}
+		{
+			uintptr_t sentinel = 0;
+			buffer_putlstring(&B, (char *)&sentinel, sizeof(sentinel));
+		}
+	} else {
+		debug(D_DEBUG, "skipping unnecessary rewrite of argv");
+		user_argv = old_user_argv;
 	}
 
 #if 0
