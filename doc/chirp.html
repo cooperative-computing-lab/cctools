@@ -671,7 +671,7 @@ effect.</p>
 <p>
   Once the ticket is created, it is registered with the Chirp server with a
   validity period in seconds defined by the duration option (86400, or a day).
-  The <code>-subject unix:user</code> switch allows the user to set the ticket
+  The <tt>-subject unix:user</tt> switch allows the user to set the ticket
   for another user; however, only the <strong>chirp_server</strong> superuser
   (-P) may set tickets for any subject. For regular users, the -subject option
   is unnecessary as it is by default the subject you possess when registering
@@ -684,9 +684,9 @@ effect.</p>
   <em>ACL masks</em>. The ACL mask will mask the rights of the
   ticket-authenticated user with the rights of the subject that registered the
   ticket. For example, if a user named <em>foo</em> (subject is
-  <code>unix:foo</code>) has rights <strong>rwl</strong> in the root
+  <tt>unix:foo</tt>) has rights <strong>rwl</strong> in the root
   directory of the Chirp server and if a ticket is registered for <em>foo</em>
-  with the ACL mask <code>/ rlx</code>, the effective rights of the
+  with the ACL mask <tt>/ rlx</tt>, the effective rights of the
   ticket-authenticated user is <strong>rl</strong> in the root directory.
 </p>
 
@@ -751,13 +751,13 @@ effect.</p>
   A ticket is only useful when registered with a server. The ticket_create
   command does this for you automatically but you may also wish to register the
   ticket with multiple servers. To do this, you can manually register a ticket
-  that is already created by using the <code>ticket_register</code> command:
+  that is already created by using the <tt>ticket_register</tt> command:
 </p>
 
 <code><span class="prompt">$ </span>chirp &lt;host:port&gt; ticket_register myticket.ticket unix:user 86400</code>
 
 <p>
-  The first argument to <code>ticket_register</code> is the name of the ticket,
+  The first argument to <tt>ticket_register</tt> is the name of the ticket,
   followed by the subject, and finally the ticket duration.  The second option
   (the subject) is optional. As described earlier, specifying the subject
   allows you to register a ticket with a user other than yourself. This is only
@@ -767,7 +767,7 @@ effect.</p>
 <h3 id="tickets.rights">Modifying the Rights of a Ticket<a class="sectionlink" href="#tickets.rights" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>
-  You may use the <code>ticket_modify</code> command to change the rights
+  You may use the <tt>ticket_modify</tt> command to change the rights
   a ticket has in a directory. You are restricted to giving rights to a 
   ticket you already possess. Recall, however, that the rights are actually
   a mask that are logically ANDed with the rights the user has at the time.
@@ -776,12 +776,12 @@ effect.</p>
 <code><span class="prompt">$ </span>chirp &lt;host:port&gt; ticket_modify myticket.ticket / rl</code>
 
 <p>
-  The above command changes the ACL mask of <code>myticket.ticket</code>
-  to <code>rl</code> in the root directory.
+  The above command changes the ACL mask of <tt>myticket.ticket</tt>
+  to <tt>rl</tt> in the root directory.
 </p>
 
 <p>
-  A ticket identifier as returned by <code>ticket_list</code> may also
+  A ticket identifier as returned by <tt>ticket_list</tt> may also
   be used instead of a ticket filename.
 </p>
 
@@ -795,14 +795,14 @@ effect.</p>
 <code><span class="prompt">$ </span>chirp &lt;host:port&gt; ticket_delete myticket.ticket</code>
 
 <p>
-  A ticket identifier as returned by <code>ticket_list</code> may also
+  A ticket identifier as returned by <tt>ticket_list</tt> may also
   be used instead of a ticket filename.
 </p>
 
 <h3 id="tickets.list">Listing the Registered Tickets on the Server<a class="sectionlink" href="#tickets.list" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>
-  To list the tickets registered on a server, use the <code>ticket_list</code>
+  To list the tickets registered on a server, use the <tt>ticket_list</tt>
   command:
 </p>
 
@@ -810,18 +810,18 @@ effect.</p>
 
 <p>
   The subject argument instructs the command to fetch all the tickets belonging
-  to the user. You may also use <code>ticket_list all</code> to list all the
+  to the user. You may also use <tt>ticket_list all</tt> to list all the
   tickets of all users on the server. The latter command is only executable by
   the Chirp super user. The output is a list of tickets identifiers. You can
   query information about a ticket using these identifiers with the
-  <code>ticket_get</code> command.
+  <tt>ticket_get</tt> command.
 </p>
 
 <h3 id="tickets.get">Getting a Registered Ticket's Information from the Server<a class="sectionlink" href="#tickets.get" title="Link to this section.">&#x21d7;</a></h3>
 
 <p>
   To check the status of a ticket on a server, you may use the
-  <code>ticket_get</code> command:
+  <tt>ticket_get</tt> command:
 </p>
 
 <code><span class="prompt">$ </span>chirp &lt;host:port&gt; ticket_get myticket.ticket</code>
@@ -829,13 +829,13 @@ effect.</p>
 <p>
   So long as you own the ticket or are authenticated as the super user, the
   server will return to you information associated with the ticket.  The ticket
-  must also exist and must also not have expired.  <code>ticket_get</code>
+  must also exist and must also not have expired.  <tt>ticket_get</tt>
   takes a client side ticket filename as an argument or a ticket identifier as
-  returned by the <code>ticket_list</code> command.
+  returned by the <tt>ticket_list</tt> command.
 </p>
 
 <p>
-  <code>ticket_get</code> prints the subject that owns the ticket,
+  <tt>ticket_get</tt> prints the subject that owns the ticket,
   the base64 encoded public key of the ticket, the time left
   until the ticket expires in seconds, and a variable number of
   directory and ACL masks. For example, we might have the following
