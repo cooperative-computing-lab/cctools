@@ -75,7 +75,6 @@ code {
   border: 1px dashed #000000;
   color: #000000;
   display: block;
-  /*font: normal normal normal .75em/100% "Courier New", Courier, monospace;*/
   font: normal normal normal 18px "Courier New", Courier, monospace;
   margin: 10px 0 10px 20px;
   max-width: 65em; /* a little more than .75*80 */
