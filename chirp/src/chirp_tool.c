@@ -10,7 +10,6 @@ See the file COPYING for details.
 #include "chirp_recursive.h"
 #include "chirp_protocol.h"
 #include "chirp_acl.h"
-#include "chirp_group.h"
 #include "chirp_matrix.h"
 
 #include "b64_encode.h"
