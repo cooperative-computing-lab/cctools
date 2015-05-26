@@ -1,71 +1,53 @@
 #!/bin/sh
 
+# This test exercises the remote naming feature, in which a file
+# can have a different name in the execution sandbox than it does
+# in the makeflow working directory.
+
 . ../../dttools/test/test_runner_common.sh
 
-MAKE_FILE="syntax/remote_name.makeflow"
+MAKE_FILE="remote_name.makeflow"
 PORT_FILE="makeflow.port"
 WORKER_LOG="worker.log"
 STATUS_FILE="makeflow.status"
 
-
 prepare()
 {
-	rm -f $STATUS_FILE
-	rm -f $PORT_FILE
+	clean
 
-	CONVERT=`which convert`
+cat > input.txt <<EOF
+hello
+EOF
 
-	if [ -z "$CONVERT" ]; then
-		if   [ -f /usr/bin/convert ]; then
-			CONVERT=/usr/bin/convert
-		elif [ -f /usr/local/bin/convert ]; then
-			CONVERT=/usr/local/bin/convert
-		elif [ -f /opt/local/bin/convert ]; then
-			CONVERT=/opt/local/bin/convert
-		fi
-	fi
-	cp $CONVERT ./convert
+cat > $MAKE_FILE <<EOF
+out.1 -> out.txt: input.txt -> input.1
+	cat input.1 > out.txt
 
-	CURL=`which curl`
+out.2 -> out.txt:
+	echo world > out.txt
 
-	if [ -z "$CONVERT" ]; then
-		if   [ -f /usr/bin/curl ]; then
-			CURL=/usr/bin/curl
-		elif [ -f /usr/local/bin/curl ]; then
-			CURL=/usr/local/bin/curl
-		elif [ -f /opt/local/bin/curl ]; then
-			CURL=/opt/local/bin/curl
-		fi
-	fi
-	cp $CURL ./curl
+out.actual: out.1 out.2
+	cat out.1 out.2 > out.actual
+EOF
 
-	exit 0
+cat > out.expected <<EOF
+hello
+world
+EOF
 }
 
 run()
 {
-	# send makeflow to the background, saving its exit status.
-	(../src/makeflow -d all -T wq -Z $PORT_FILE $MAKE_FILE; echo $? > $STATUS_FILE) &
+	../src/makeflow -d all -T wq -Z "$PORT_FILE" "$MAKE_FILE" &
 
 	run_local_worker "$PORT_FILE" "$WORKER_LOG"
 
-	# retrieve makeflow exit status
-	status=`cat $STATUS_FILE`
-
-	[ $status != 0 ] && exit 1
-
-	exit 0
+	require_identical_files out.actual out.expected
 }
 
 clean()
 {
-	../src/makeflow -T wq -c $MAKE_FILE
-	rm -f $STATUS_FILE
-	rm -f $PORT_FILE
-	rm -f $WORKER_LOG
-	rm -f ./convert ./curl
-
-	exit 0
+	rm -f $MAKE_FILE $STATUS_FILE $PORT_FILE $WORKER_LOG out.1 out.2 out.actual out.expected
 }
 
 dispatch $@

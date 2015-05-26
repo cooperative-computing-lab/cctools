@@ -1,53 +1,57 @@
 #!/bin/sh
 
+# Test recursive invocation of a makeflow.
+# The top level makeflow creates a simple workflow, and then
+# sends it to be executed completely at the worker side.
+
 # Recursive makeflow requires that you have makeflow in your path.
 export PATH=`pwd`/../../makeflow/src:$PATH
 
 . ../../dttools/test/test_runner_common.sh
 
-test_dir=`basename $0 .sh`.dir
+PORT_FILE="makeflow.port"
+WORKER_LOG="worker.log"
+STATUS_FILE="makeflow.status"
 
 prepare()
 {
-	mkdir $test_dir
-	cd $test_dir
-	CONVERT=`which convert`
+clean
 
-	if [ -z "$CONVERT" ]; then
-		if [ -f /usr/bin/convert ]; then
-			CONVERT=/usr/bin/convert
-		elif [ -f /usr/local/bin/convert ]; then
-			CONVERT=/usr/local/bin/convert
-		elif [ -f /opt/local/bin/convert ]; then
-			CONVERT=/opt/local/bin/convert
-		else
-			echo "No convert program available, quitting!"
-			return 1
-		fi
-	fi
+cat > input.txt <<EOF
+hello
+EOF
 
-# example of makeflow provided with the source
-	MAKE_FILE_ORG=../../example/example.makeflow
-	MAKE_FILE=test.makeflow
+cat > toplevel.makeflow <<EOF
+out.actual: input.txt
+	MAKEFLOW sublevel.makeflow
+EOF
 
-	sed -e "s:^CONVERT.*:CONVERT=$CONVERT:" > $MAKE_FILE < $MAKE_FILE_ORG
+cat > sublevel.makeflow <<EOF
+out.1: input.txt
+	cat input.txt > out.1
 
-	ln -sf ../syntax/recursive.makeflow Makeflow
-	ln -sf ../syntax/options.makeflow .
-	return 0
+out.2:
+	echo world > out.2
+
+out.actual: out.1 out.2
+	cat out.1 out.2 > out.actual
+EOF
+
+cat > out.expected <<EOF
+hello
+world
+EOF
 }
 
 run()
 {
-	cd $test_dir
-	../../src/makeflow -dall
-	return $?
+	../src/makeflow -d all -Z "$PORT_FILE" toplevel.makeflow
+	require_identical_files out.actual out.expected
 }
 
 clean()
 {
-	rm -fr $test_dir
-	return 0
+	rm -f $MAKE_FILE $PORT_FILE $WORKER_LOG input.txt out.1 out.2 out.actual out.expected
 }
 
 dispatch "$@"
