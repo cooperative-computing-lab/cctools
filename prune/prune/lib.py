@@ -577,7 +577,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 			out_names = func['out_names'].split()
 			res = database.copies_get(func['file_puid'])
 			for copy in res:
-				if copy['pack']=='gzip':
+				if copy['pack']=='GZ':
 					place_files.append({'src':storage_pathname(func['file_puid']),'dst':function_name+'.gz'})
 					options += ' -gz %s=%s.gz'%(function_name,function_name)
 				else:
@@ -590,9 +590,9 @@ def create_operation(op_id,framework='local',local_fs=False):
 				#print 'No file', io
 				return {'cmd':None}
 			for copy in res:
-				if copy['pack']=='gzip':
+				if copy['pack']=='GZ':
 					place_files.append({'src':storage_pathname(io['file_puid']),'dst':io['display']+'.gz'})
-					options += ' -gunzip %s=%s.gz'%(arg,arg)
+					options += ' -gunzip %s=%s.gz'%(io['display'],io['display'])
 				else:
 					place_files.append({'src':storage_pathname(io['file_puid']),'dst':io['display']})
 			
@@ -636,13 +636,10 @@ def create_operation(op_id,framework='local',local_fs=False):
 	if framework=='wq':
 		t = Task('')
 		for obj in place_files:
-			print obj
 			if not local_fs or obj['dst']=='PRUNE_EXECUTOR':
 				t.specify_file(obj['src'], obj['dst'], WORK_QUEUE_INPUT, cache=True)
-		print run_buffer
 		t.specify_buffer(run_buffer, 'PRUNE_RUN', WORK_QUEUE_INPUT, cache=True)
 	
-		print final_cmd
 		t.specify_command(final_cmd)
 		t.specify_cores(1)
 
@@ -672,7 +669,6 @@ def create_operation(op_id,framework='local',local_fs=False):
 			for obj in place_files:
 				in_str += ',%s=%s'%(obj['dst'],obj['dst'])
 			final_cmd = './umbrella -T local -i PRUNE_RUN=PRUNE_RUN%s -c ENVIRONMENT -l ./tmp/ -o ./final_output run ./PRUNE_RUN'%(in_str)
-			print final_cmd
 			shutil.copy2('../../../cctools.src/umbrella/src/umbrella', sandbox_folder+'umbrella')
 
 		return {'cmd':run_cmd,'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files}
@@ -686,24 +682,26 @@ wq_task_cnt = 0
 def useWQ(name, local_fs=False, debug_level=None):
 	global wq, wq_task_cnt, wq_local_fs
 	wq_local_fs = local_fs
-	try:
-		wq = WorkQueue(0)
-	except Exception as e:
-		raise Exception("Instantiation of Work Queue failed!")
+	if not wq:
+		try:
+			wq = WorkQueue(0)
+		except Exception as e:
+			raise Exception("Instantiation of Work Queue failed!")
 
-	wq.specify_name(name)
-	print "Work Queue master started on port %d with name '%s'..." % (wq.port,name)
-	wq.specify_log("wq.log")
-	#wq.set_bandwidth_limit('1250000000')
-	if debug_level:
-		cctools_debug_flags_set(debug_level)
-		cctools_debug_config_file("wq.debug")
+		wq.specify_name(name)
+		print "Work Queue master started on port %d with name '%s'..." % (wq.port,name)
+		wq.specify_log("wq.log")
+		#wq.set_bandwidth_limit('1250000000')
+		if debug_level:
+			cctools_debug_flags_set(debug_level)
+			cctools_debug_config_file("wq.debug")
 
 	return True
 	
 
+wq_ops = {}
 def wq_check():
-	global wq, wq_task_cnt, data_folder, wq_local_fs
+	global wq, wq_task_cnt, data_folder, wq_local_fs, wq_ops
 	if wq:
 		# Add new tasks first so that they are scheduled while waiting
 		left = wq.hungry()
@@ -713,16 +711,14 @@ def wq_check():
 				if left <= 0:
 					break
 				operation = create_operation(run['op_puid'],'wq',wq_local_fs)
-				for key in operation:
-					print '------%s'%key
-					print operation[key]
 				if operation['cmd']:
 					t = operation['wq_task']
 					task_id = wq.submit(t)
+					wq_ops[task_id] = operation
 					database.run_upd(run['puid'],'Running',task_id,'','wq')
 					wq_task_cnt += 1
 					left -= 1
-					print 'started: #%i, run:%i, op_id:%i   cmd:"%s"'%(wq_task_cnt, run['puid'], run['op_puid'], operation['cmd'])
+					print 'started: #%i, cmd:"%s", op_id:%i'%(wq_task_cnt, run['puid'], operation['cmd'], run['op_puid'])
 				else:
 					'No task'
 
@@ -730,7 +726,6 @@ def wq_check():
 			return False
 		else:
 			# Wait for finished tasks (which also schedules new ones)
-			print '.'
 			t = wq.wait(5)
 			while t: #Once there are no more tasks currently finished, return
 				try:
@@ -738,19 +733,30 @@ def wq_check():
 					op_id = run['op_puid']
 					ios = database.ios_get(op_id)
 					if t.return_status==0:
+						all_files = True
 						for io in ios:
 							if io['io_type']=='O':
 								#print 'io:',io
 								pathname = storage_pathname(io['file_puid'])
-								store_file(pathname, io['file_puid'], True, storage_module='wq')
+								if os.path.isfile(pathname):
+									store_file(pathname, io['file_puid'], True, storage_module='wq')
+								else:
+									print 'Output file did not exist: %s'%(io['display'])
+									all_files = False
 
-						print 'complete: run:%i, op_id:%i'%(run['puid'],run['op_puid'])
-						database.run_end(run['id'],t.return_status)
+						if not all_files:
+							operation = create_operation(op_id,'local')
+							database.run_upd(run['puid'],'Failed',t.return_status)
+							print 'failed: run:%i, op_id:%i'%(run['puid'],run['op_puid'])
+							print 'Try to execute the operation manually in the sandbox at %s by running chmod 755 PRUNE_RUN; ./PRUNE_RUN'%(operation['sandbox'])
+						else:
+							print 'complete: run:%i, op_id:%i'%(run['puid'],run['op_puid'])
+							database.run_upd(run['puid'],'Complete',t.return_status)
 					else:
 						for io in ios:
 							if io['io_type']=='O':
 								try:
-									print 'io:',io
+									#print 'io:',io
 									pathname = storage_pathname(io['file_puid'])
 									store_file(pathname, io['file_puid'], True, storage_module='wq')
 								except:
@@ -762,9 +768,10 @@ def wq_check():
 
 				except:
 					print 'Return status:',t.return_status
-					print run
-					print ios
 					print traceback.format_exc()
+					print run
+					if 'ios' in locals():
+						print ios
 					database.run_upd(run['puid'],'Failed',0,'',traceback.format_exc())
 
 				wq_task_cnt -= 1
@@ -806,7 +813,7 @@ def local_check():
 
 			if p.returncode==0 and fails==0:
 				database.run_upd(operation['run']['puid'],'Complete',p.returncode)
-				shutil.rmtree(operation['sandbox'])
+				#shutil.rmtree(operation['sandbox'])
 			else:
 				print 'returncode =', p.returncode, ', fails =',fails
 				print traceback.format_exc()

@@ -23,7 +23,7 @@ while argi<len(sys.argv):
 	if arg=='-ln':
 		argi += 1
 		args['ln'].append( sys.argv[argi].split('=') )
-	if arg=='-gunzip':
+	elif arg=='-gunzip':
 		argi += 1
 		args['gunzip'].append( sys.argv[argi].split('=') )
 	elif arg=='-tar':
@@ -74,7 +74,8 @@ myexec('cat PRUNE_RUN')
 debug.write('Environment variables:'+newline)
 myexec('env')
 debug.write('Local files initially:'+newline)
-myexec('find ./')
+myexec('ls -la')
+debug.write('args:'+str(args)+newline)
 
 if args['ln']:
 	debug.write('Linking...'+newline)
@@ -88,12 +89,17 @@ if args['tar']:
 
 if args['gunzip']:
 	debug.write('gunzipping...'+newline)
-	for (unzip,zip) in args['ln']:
-		myexec('gunzip < %s > ./%s'%(zip, unzip))
+	for (unzip,zip) in args['gunzip']:
+		gunz_cmd = 'gunzip -c %s > ./%s'%(zip, unzip)
+		debug.write('gunz_cmd'+newline)
+		myexec(gunz_cmd)
+		myexec('head ./%s'%(unzip))
+		debug.write('...'+newline)
+		myexec('tail ./%s'%(unzip))
 		
 if args['tar'] or args['gunzip'] or args['ln']:
 	debug.write('Local files after unzipping, linking:'+newline)
-	myexec('find ./')
+	myexec('ls -la')
 
 
 debug.write('Function file:'+newline)
@@ -137,7 +143,7 @@ debug.write('Environment variables after execution:'+newline)
 myexec('env')
 
 debug.write('Local files after execution:'+newline)
-myexec('find ./')
+myexec('ls -la')
 
 
 

@@ -383,13 +383,14 @@ def run_upd_by_op_puid(op_puid, queue, status=None, notes='', resource=''):
 	meta_data.commit()
 	return meta_db.fetchall()
 
-'''
 def run_get_by_task_id(task_id):
 	global read_cnt
 	read_cnt += 1
-	sel = 'SELECT * FROM runs WHERE status=? AND queue=? ORDER BY id DESC;'
+	sel = 'SELECT * FROM runs WHERE status=? AND queue=? ORDER BY puid DESC;'
 	meta_db.execute(sel,[task_id,'Running'])
 	return meta_db.fetchone()
+
+'''
 
 
 def run_end(id, status=None, notes=''):

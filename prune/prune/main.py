@@ -170,7 +170,7 @@ def process_line(line):
 				if os.path.isfile(pathname):
 					with open(pathname) as f:
 						for line in f:
-							print line
+							sys.stdout.write( line )
 					return True
 				else:
 					print 'That is not a file that can be printed to screen.'
