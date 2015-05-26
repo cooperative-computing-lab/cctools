@@ -139,23 +139,23 @@ int list_push_priority(struct list *l, void *item, double priority)
 	struct list_node *node;
 	int result;
 
-	if(!l->head) {
-		result = list_push_head(l, item);
+	if(!l->tail) {
+		result = list_push_tail(l, item);
 		if(result)
-			l->head->priority = priority;
+			l->tail->priority = priority;
 		return result;
 	}
 
-	if(l->head->priority < priority) {
-		result = list_push_head(l, item);
+	if(l->tail->priority >= priority) {
+		result = list_push_tail(l, item);
 		if(result)
-			l->head->priority = priority;
+			l->tail->priority = priority;
 		return result;
 	}
 
-	for(n = l->head; n; n = n->next) {
-		if(n->priority < priority) {
-			node = new_node(item, n->prev, n);
+	for(n = l->tail; n; n = n->prev) {
+		if(n->priority >= priority) {
+			node = new_node(item, n, n->next);
 			l->size++;
 			node->priority = priority;
 			return 1;
