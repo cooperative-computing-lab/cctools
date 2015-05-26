@@ -304,7 +304,7 @@ control lists</b> or <b>ACLs</b>.</p>
 as AFS or NTFS.  To see the ACL for a directory, use the Chirp tool and the
 <tt>getacl</tt> command:</p>
 
-<code> chirp:host.mydomain.edu:/&gt; getacl
+<code><span class="prompt">chirp:host.mydomain.edu:/&gt;</span> getacl
 unix:dthain rwlda
 hostname:*.mydomain.edu rwl
 </code>
@@ -347,8 +347,8 @@ your convenience:</p>
 <p>To change an access control list on a directory, use the <tt>setacl</tt>
 command in the Chirp command line tool:</p>
 
-<code> chirp:host.mydomain.edu:/&gt; setacl / kerberos:dthain@nd.edu write
- chirp:host.mydomain.edu:/&gt; getacl 
+<code><span class="prompt">chirp:host.mydomain.edu:/&gt;</span> setacl / kerberos:dthain@nd.edu write
+<span class="prompt">chirp:host.mydomain.edu:/&gt;</span> getacl
 unix:dthain rwlda
 hostname:*.mydomain.edu rwl
 kerberos:dthain@nd.edu rwld
@@ -359,7 +359,7 @@ substitute underscores.  For example, if your subject name is <tt>/O=Univ of
 Somewhere/CN=Fred Flint</tt>, then you might issue a <tt>setacl</tt> command
 like this:</p>
 
-<code> chirp:host.mydomain.edu:/&gt; setacl / /O=Univ_of_Somewhere/CN=Fred_Flint rwlda</code>
+<code><span class="prompt">chirp:host.mydomain.edu:/&gt;</span> setacl / /O=Univ_of_Somewhere/CN=Fred_Flint rwlda</code>
 
 <p>Or, you can accomplish the same thing using <tt>parrot_setacl</tt> inside of
 Parrot:</p>
@@ -419,8 +419,8 @@ storage, but doesn't want them messing up his existing data.  So, Fred uses the
 Chirp tool to give the list (<b>l</b>) and reserve (<b>v</b>) rights to anyone
 calling from any machine in his organization:</p>
 
-<code> chirp:bigwig:&gt; setacl / hostname:*.somewhere.edu lv(rwlda)
- chirp:bigwig:&gt; getacl /
+<code><span class="prompt">chirp:bigwig:/&gt;</span> setacl / hostname:*.somewhere.edu lv(rwlda)
+<span class="prompt">chirp:bigwig:/&gt;</span> getacl /
 unix:fred rwlda
 hostname:*.somewhere.edu lv(rwlda)
 </code>
@@ -431,24 +431,24 @@ this server.  But, all that any user can do is issue <tt>ls</tt> or
 into this server from <tt>ws1.somewhere.edu</tt>.  She can not modify the root
 directory, but she can create her own directory:</p>
 
-<code> chirp:bigwig:&gt; mkdir /mydata</code>
+<code><span class="prompt">chirp:bigwig:/&gt;</span> mkdir /mydata</code>
 
 <p>And, in the new directory, <tt>ws1.somewhere.edu</tt> can do anything,
 including edit the access control.  Here is the new ACL for
 <tt>/mydata</tt>:</p>
 
-<code> chirp:bigwig:&gt; getacl /mydata
+<code><span class="prompt">chirp:bigwig:/&gt;</span> getacl /mydata
 hostname:ws1.somewhere.edu rwlda
 </code>
 
 <p>If Betty wants to authenticate with Globus credentials from
 here on, she can change the access control as follows:</p>
 
-<code> chirp:bigwig:&gt; setacl /mydata globus:/O=Univ_of_Somewhere/CN=Betty rwla</code>
+<code><span class="prompt">chirp:bigwig:/&gt;</span> setacl /mydata globus:/O=Univ_of_Somewhere/CN=Betty rwla</code>
 
 <p>And, the new acl will look as follows:</p>
 
-<code> chirp:bigwig:&gt; getacl /mydata
+<code><span class="prompt">chirp:bigwig:/&gt;</span> getacl /mydata
 hostname:ws1.somewhere.edu rwlda
 globus:/O=Univ_of_Somewhere/CN=Betty rwla
 </code>
@@ -480,9 +480,9 @@ unix:bprof
 (Notice the URL syntax.)  Then, to make a directory <tt>/homework</tt> that is
 readable by students and writable by faculty, do this:</p>
 
-<code> chirp:bigwig&gt; mkdir /homework
- chirp:bigwig&gt; setacl /homework group:students rl
- chirp:bigwig&gt; setacl /homework group:faculty  rwld
+<code><span class="prompt">chirp:bigwig:/&gt;</span> mkdir /homework
+<span class="prompt">chirp:bigwig:/&gt;</span> setacl /homework group:students rl
+<span class="prompt">chirp:bigwig:/&gt;</span> setacl /homework group:faculty  rwld
 </code>
 
 <p>If the groups are to be shared among many Chirp servers, place the group
