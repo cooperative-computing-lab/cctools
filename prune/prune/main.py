@@ -214,7 +214,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 					i += 1
 					pname = ar[i]
 				elif item == 'GZ':
-					pack = 'GZ'
+					pack = 'gz'
 				elif item == 'UUID' or item == 'GUID':
 					i += 1
 					puid = ar[i]
@@ -373,6 +373,15 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				print 'That data does not exist yet. You could try WAITing for it, or try again later.'
 				return True
 
+		elif line.upper().startswith('PRUN'):
+			ar = line.split(' ')
+			for line in ['PUT %s'%(ar[1]),'RUN %s'%(ar[1])]:
+				print line
+				done = process_line(line)
+				while not done:
+					done = process_line(line)
+			return True
+
 		elif line.upper().startswith('RUN'):
 			start_time = time.time()
 			ar = line.split(' ')
@@ -392,6 +401,12 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				print 'Total run (with preservation): %02dm%02ds'%( minutes, seconds )
 			except Exception as e:
 				print traceback.format_exc()
+			return True
+
+		elif line.upper().startswith('RETRY'):
+			runs = database.run_get_by_queue('Failed')
+			for run in runs:
+				database.run_upd(run['puid'], 'Run')
 			return True
 
 		elif line.upper().startswith('STATUS'):
@@ -421,7 +436,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				return False
 
 		elif line.upper().startswith('CUT'):
-			res = database.var_getAll()
+			res = database.tags_getAll()
 			for r in res:
 				database.var_unset(r['name'])
 			return True
@@ -432,7 +447,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				keyword = ar[1]
 			else:
 				keyword = None
-			res = database.var_getAll()
+			res = database.tags_getAll()
 			for r in res:
 				if keyword:
 					if keyword in r['name']:

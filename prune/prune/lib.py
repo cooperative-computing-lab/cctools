@@ -338,6 +338,7 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 		if not func:
 			in_types = []
 			fout_names = []
+			fout_types = []
 			with open( storage_pathname(function_file_puid) ) as f:
 				for line in f:
 					if line.startswith('#PRUNE_INPUTS'):
@@ -347,12 +348,18 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 							for i in range(0,40):
 								in_types += ['File']
 					elif line.startswith('#PRUNE_OUTPUT'):
-						fout_names.append(line[14:-1])
-			database.function_ins(function_file_puid, ' '.join(in_types), ' '.join(fout_names))
+						ar = line.split()
+						fout_names.append(ar[1])
+						if len(ar)>2:
+							fout_types.append(' '.join(ar[2:]))
+						else:
+							fout_types.append('')
+			database.function_ins(function_file_puid, ' '.join(in_types), ' '.join(fout_names), ','.join(fout_types) )
 			func = database.function_get_by_file(function_file_puid)
 		else:
 			in_types = func['in_types'].split()
 			fout_names = func['out_names'].split()
+			fout_types = func['out_types'].split()
 
 		remain = expr[lparen+1:expr.rfind(')')]
 		res = eval(remain, depth+1, cmd_id, dict({'in_types':in_types}.items()+extra.items()) )
@@ -575,9 +582,10 @@ def create_operation(op_id,framework='local',local_fs=False):
 			function_puid = op['function_puid']
 			func = database.function_get(function_puid)
 			out_names = func['out_names'].split()
+			out_types = func['out_types'].split()
 			res = database.copies_get(func['file_puid'])
 			for copy in res:
-				if copy['pack']=='GZ':
+				if copy['pack']=='gz':
 					place_files.append({'src':storage_pathname(func['file_puid']),'dst':function_name+'.gz'})
 					options += ' -gz %s=%s.gz'%(function_name,function_name)
 				else:
@@ -590,7 +598,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 				#print 'No file', io
 				return {'cmd':None}
 			for copy in res:
-				if copy['pack']=='GZ':
+				if copy['pack']=='gz':
 					place_files.append({'src':storage_pathname(io['file_puid']),'dst':io['display']+'.gz'})
 					options += ' -gunzip %s=%s.gz'%(io['display'],io['display'])
 				else:
@@ -598,7 +606,13 @@ def create_operation(op_id,framework='local',local_fs=False):
 			
 
 		elif io['io_type']=='O':
-			fetch_files.append({'src':out_names[io['pos']],'dst':storage_pathname(io['file_puid']),'puid':io['file_puid']})
+
+			if 'gz' in out_types:
+				options += ' -gzip %s'%(out_names[io['pos']])
+				fetch_files.append({'src':out_names[io['pos']]+'.gz','dst':storage_pathname(io['file_puid']),'puid':io['file_puid'],'pack':'gz','display':io['display']})
+			else:
+				fetch_files.append({'src':out_names[io['pos']],'dst':storage_pathname(io['file_puid']),'puid':io['file_puid'],'pack':'','display':io['display']})
+
 
 
 		elif io['io_type']=='E':
@@ -613,13 +627,13 @@ def create_operation(op_id,framework='local',local_fs=False):
 					options += ' -targz ENVIRONMENT'
 					
 				
-				place_files.append({'src':storage_pathname(io['file_puid']),'dst':'ENVIRONMENT'})
+				place_files.append({'src':storage_pathname(io['file_puid']),'dst':'ENVIRONMENT','puid':io['file_puid'],'pack':'','display':io['display']})
 
 	arg_str = arg_str[0:-1]
 
 
 	place_files.append({'src':storage_pathname('PRUNE_EXECUTOR'),'dst':'PRUNE_EXECUTOR'})
-	fetch_files.append({'src':'prune_debug.log','dst':storage_pathname(op_id)+'.debug','puid':str(op_id)+'.debug'})
+	fetch_files.append({'src':'prune_debug.log','dst':storage_pathname(op_id)+'.debug','puid':str(op_id)+'.debug','pack':'','puid':str(op_id)+'.debug','display':str(op_id)+'.debug'})
 
 	if local_fs:
 		for obj in place_files:
@@ -630,6 +644,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 	final_cmd = 'chmod 755 PRUNE_RUN; ./PRUNE_RUN'
 	run_cmd = "./%s %s"%(function_name, arg_str)
 	run_buffer = '#!/bin/bash\npython PRUNE_EXECUTOR%s %s'%(options,run_cmd)
+	print run_buffer
 	
 
 
@@ -648,7 +663,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 				t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=False)
 			else:
 				t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=True)
-		return {'cmd':run_cmd,'framework':framework,'wq_task':t}
+		return {'cmd':run_cmd,'framework':framework,'wq_task':t,'fetch_files':fetch_files}
 	
 	else:
 		sandbox_folder = sandbox_prefix+uuid.uuid4().hex+'/'
@@ -733,7 +748,16 @@ def wq_check():
 					op_id = run['op_puid']
 					ios = database.ios_get(op_id)
 					if t.return_status==0:
+						operation = wq_ops[t.id]
 						all_files = True
+						for obj in operation['fetch_files']:
+							if os.path.isfile(obj['dst']):
+								store_file(obj['dst'],obj['puid'],True,obj['pack'],storage_module='wq')
+							else:
+								print 'Output file not found: %s'%(obj['display'])
+								all_files = False
+						'''
+						print ios
 						for io in ios:
 							if io['io_type']=='O':
 								#print 'io:',io
@@ -743,7 +767,7 @@ def wq_check():
 								else:
 									print 'Output file did not exist: %s'%(io['display'])
 									all_files = False
-
+						'''
 						if not all_files:
 							operation = create_operation(op_id,'local')
 							database.run_upd(run['puid'],'Failed',t.return_status)
@@ -753,15 +777,13 @@ def wq_check():
 							print 'complete: run:%i, op_id:%i'%(run['puid'],run['op_puid'])
 							database.run_upd(run['puid'],'Complete',t.return_status)
 					else:
-						for io in ios:
-							if io['io_type']=='O':
-								try:
-									#print 'io:',io
-									pathname = storage_pathname(io['file_puid'])
-									store_file(pathname, io['file_puid'], True, storage_module='wq')
-								except:
-									pass
 						print 'Failed with exit code:',t.return_status
+						operation = wq_ops[t.id]
+						print operation
+						for obj in operation['fetch_files']:
+							if os.path.isfile(obj['dst']):
+								print 'File saved:',obj
+								store_file(obj['dst'],obj['puid'],True,obj['pack'],storage_module='wq')
 						print 'Resubmit to try again.'
 						print t.command
 						database.run_upd(run['puid'],'Failed',0,'','Exit code: %i'%t.return_status)

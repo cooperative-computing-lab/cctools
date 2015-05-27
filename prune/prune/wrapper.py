@@ -26,6 +26,9 @@ while argi<len(sys.argv):
 	elif arg=='-gunzip':
 		argi += 1
 		args['gunzip'].append( sys.argv[argi].split('=') )
+	elif arg=='-gzip':
+		argi += 1
+		args['gzip'].append( sys.argv[argi] )
 	elif arg=='-tar':
 		argi += 1
 		args['tar'].append( sys.argv[argi] )
@@ -135,8 +138,8 @@ else:
 
 if args['gzip']:
 	debug.write('gzipping...'+newline)
-	for filename in args['ln']:
-		myexec('mv gzip -c %s > ./%s'%(unzip, zip))
+	for filename in args['gzip']:
+		myexec('gzip -c %s > ./%s.gz'%(filename, filename))
 		
 
 debug.write('Environment variables after execution:'+newline)
