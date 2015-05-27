@@ -219,89 +219,93 @@ then
 	globus_path=${GLOBUS_LOCATION}
 fi
 
-IFS=' ='
-set -- $*
 
 while [ $# -gt 0 ]
 do
-	case $1 in
+	opt=$1
+	arg=''
+	shift
+
+	case $opt in
+			# handle options of the form --opt=arg
+		--*=*)
+			arg=$(eval echo ${opt#*=})
+			opt=${opt%%=*}
+			;;
+			# empty arg only for these options
+		--debug|--strict|--without-*|--help)
+			arg=''
+			;;
+		--*)
+			# handle options of the form --opt arg
+			arg=$1
+			shift
+		;;
+	esac
+
+	case $opt in
 		--debug)
 			optdebug=1
 			optstrict=1
 			;;
 		--prefix)
-			shift
-			install_path=$(abspath "$1")
+			install_path=$(abspath "${arg}")
 			;;
 		--strict)
 			optstrict=1
 			;;
 		--with-globus-path)
-			shift
-			globus_path=$1
+			globus_path=${arg}
 			config_globus_path=yes
 			;;
 		--globus-flavor)
-			shift
-			globus_flavor=$1
+			globus_flavor=${arg}
 			;;
 		--with-readline-path)
-			shift
-			readline_path=$1
+			readline_path=${arg}
 			config_readline_path=yes
 			;;
 		--with-fuse-path)
-			shift
-			fuse_path=$1
+			fuse_path=${arg}
 			config_fuse_path=yes
 			;;
 		--with-irods-path)
-			shift
-			irods_path=$1
+			irods_path=${arg}
 			config_irods_path=yes
 			;;
 		--with-mysql-path)
-			shift
-			mysql_path=$1
+			mysql_path=${arg}
 			config_mysql_path=yes
 			;;
 		--with-perl-path)
-			shift
-			perl_path=$1
+			perl_path=${arg}
 			config_perl_path=yes
 			;;
 		--with-python-path)
-			shift
-			python_path=$1
+			python_path=${arg}
 			config_python_path=yes
 			;;
 		--with-python3-path)
-			shift
-			python3_path=$1
+			python3_path=${arg}
 			config_python3_path=yes
 			;;
 		--with-xrootd-path)
-			shift
-			xrootd_path=$1
+			xrootd_path=${arg}
 			config_xrootd_path=yes
 			;;
 		--with-cvmfs-path)
-			shift
-			cvmfs_path=$1
+			cvmfs_path=${arg}
 			config_cvmfs_path=yes
 			;;
 		--with-uuid-path)
-			shift
-			uuid_path=$1
+			uuid_path=${arg}
 			;;
 		--with-zlib-path)
-			shift
-			zlib_path=$1
+			zlib_path=${arg}
 			config_zlib_path=yes
 			;;
 		--with-swig-path)
-			shift
-			swig_path=$1
+			swig_path=${arg}
 			config_swig_path=yes
 			;;
 		--without-system-sand)
@@ -337,26 +341,22 @@ do
 			include_package_resource_monitor=""
 			;;
 		--without-system-weaver)
-		        include_package_weaver=""
-		        ;;
+			include_package_weaver=""
+			;;
 		--without-system-doc)
 			include_package_doc=""
 			;;
 		--xrootd-arch)
-			shift
-			xrootd_arch=$1
+			xrootd_arch=${arg}
 			;;
 		--with-*-path)
-			echo "ignoring unknown package $1"
-			shift
+			echo "ignoring unknown package ${arg}"
 			;;
 		--tcp-low-port)
-			shift
-			ccflags="${ccflags} -DTCP_LOW_PORT_DEFAULT=$1"
+			ccflags="${ccflags} -DTCP_LOW_PORT_DEFAULT=${arg}"
 			;;
 		--tcp-high-port)
-			shift
-			ccflags="${ccflags} -DTCP_HIGH_PORT_DEFAULT=$1"
+			ccflags="${ccflags} -DTCP_HIGH_PORT_DEFAULT=${arg}"
 			;;
 		-h | -help | --h | --help)
 			cat <<EOF
@@ -402,11 +402,10 @@ EOF
 			exit 0
 			;;
 		*)
-			echo "Unknown argument $1"
+			echo "Unknown option ${opt}"
 			exit 1
 			;;
 	esac
-	shift
 done
 
 if [ "$optstrict" = 1 ]; then
