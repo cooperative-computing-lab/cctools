@@ -542,7 +542,7 @@ def tag_unsetOne(name,puid):
 	meta_db.execute(upd,[now,name,puid])
 	return meta_data.commit()
 
-def tag_getAll():
+def tags_getAll():
 	global read_cnt
 	read_cnt += 1
 	now = time.time()
