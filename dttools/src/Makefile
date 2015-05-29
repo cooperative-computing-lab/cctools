@@ -57,6 +57,7 @@ SOURCES = \
 	list.c \
 	load_average.c \
 	md5.c \
+	memfdexe.c \
 	memory_info.c \
 	mergesort.c \
 	mt19937-64.c \
