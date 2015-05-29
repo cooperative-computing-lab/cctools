@@ -1112,7 +1112,7 @@ int wait_for_messages(int interval)
 
     //If grandchildren processes cannot talk to us, simply wait.
     //Else, wait, and check socket for messages.
-    if ((monitor_queue_fd < 0) && (monitor_inotify_fd < 0))
+    if (monitor_queue_fd < 0)
     {
 		/* wait for interval. */
 		timeout.tv_sec  = 0;
@@ -1124,7 +1124,7 @@ int wait_for_messages(int interval)
     {
 
 	/* Figure out the number of file descriptors to pass to select */
-        int nfds = (monitor_queue_fd > monitor_inotify_fd ? monitor_queue_fd + 1 : monitor_inotify_fd + 1);
+        int nfds = monitor_queue_fd + 1;
 		fd_set rset;
 
         int count = 0;
@@ -1136,14 +1136,10 @@ int wait_for_messages(int interval)
 
 			FD_ZERO(&rset);
 			if (monitor_queue_fd > 0)   FD_SET(monitor_queue_fd,   &rset);
-			if (monitor_inotify_fd > 0) FD_SET(monitor_inotify_fd, &rset);
 
 			count = select(nfds, &rset, NULL, NULL, &timeout);
 
-			fprintf(stderr, "%d %d %d\n", interval, count, nfds);
-
 			if (FD_ISSET(monitor_queue_fd, &rset)) monitor_dispatch_msg();
-			if (FD_ISSET(monitor_inotify_fd, &rset)) monitor_handle_inotify();
 		} while(count > 0);
 	}
 
