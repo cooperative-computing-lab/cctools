@@ -33,6 +33,7 @@ SOURCES = \
 	domain_name.c \
 	domain_name_cache.c \
 	dpopen.c \
+	elfheader.c \
 	envtools.c \
 	fast_popen.c \
 	fd.c \
@@ -139,3 +140,5 @@ install: all
 test: all
 
 .PHONY: all clean install test
+
+# vim: set noexpandtab tabstop=4:
