@@ -107,7 +107,6 @@ extern "C" {
 #endif
 
 extern struct pfs_process *pfs_current;
-extern char *pfs_temp_dir;
 extern char *pfs_false_uname;
 extern uid_t pfs_uid;
 extern gid_t pfs_gid;
@@ -121,7 +120,8 @@ extern INT64_T pfs_write_count;
 extern int parrot_dir_fd;
 extern int *pfs_syscall_totals64;
 
-extern void handle_specific_process( pid_t pid );
+int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char *physical_name);
+int pfs_dispatch_isexe( const char *path );
 
 #define POINTER( i ) ((void *)(uintptr_t)(i))
 
@@ -616,119 +616,12 @@ static void decode_statfs( struct pfs_process *p, int entering, INT64_T syscall,
 	}
 }
 
-/*
-This function is an inexpensive test to see if a given
-filename is executable.  It is not all-inclusive, nor should
-it be considered a reliable security device.  This function is
-over-optimistic in some cases, but if it falsely reports
-true, the later real execve() may still fail.
-*/
-
-static int is_executable( const char *path )
-{
-	struct pfs_stat buf;
-
-	if(pfs_stat(path,&buf)!=0) return 0;
-
-	if(buf.st_mode&S_ISUID || buf.st_mode&S_ISGID) {
-		debug(D_NOTICE,"cannot execute the program %s because it is setuid.",path);
-		errno = EACCES;
-		return 0;
-	}
-
-	if(buf.st_mode&S_IXUSR || buf.st_mode&S_IXGRP || buf.st_mode&S_IXOTH) {
-		return 1;
-	} else {
-		errno = EACCES;
-		return 0;
-	}
-}
-
-static int redirect_ldso( const char *exe, char *ldso_physical_name )
-{
-	extern char pfs_ldso_path[PFS_PATH_MAX];
-
-	if (pfs_ldso_path[0] == '\0') {
-		ldso_physical_name[0] = '\0';
-		return 0;
-	}
-
-	debug(D_PROCESS, "redirect_ldso: called on %s", exe);
-
-	if(pfs_get_local_name(pfs_ldso_path, ldso_physical_name, 0, 0) < 0) {
-		debug(D_PROCESS, "redirect_ldso: cannot get physical name of %s", pfs_ldso_path);
-		return errno = ENOENT, -1;
-	}
-
-	/* Unwise to check ldso recursively */
-	if (strcmp(exe, ldso_physical_name) == 0) {
-		ldso_physical_name[0] = '\0';
-		return 0;
-	}
-
-	/* Test whether loading with ldso would work by running ldso --verify on
-	 * the executable (may be static).
-	 */
-
-	pid_t child = fork();
-	if (child == -1) {
-		debug(D_PROCESS,"redirect_ldso: cannot fork: %s", strerror(errno));
-		return errno = EIO, -1;
-	} else if (child == 0) {
-		int fd = open("/dev/null", O_RDWR);
-		if (fd == -1)
-			_exit(EXIT_FAILURE);
-		dup2(fd, STDIN_FILENO);
-		dup2(fd, STDOUT_FILENO);
-		dup2(fd, STDERR_FILENO);
-		execlp(ldso_physical_name, ldso_physical_name, "--verify", exe, NULL);
-		_exit(EXIT_FAILURE);
-	}
-
-	int status;
-	if (waitpid(child, &status, 0) == -1) {
-		debug(D_PROCESS, "redirect_ldso: couldn't wait: %s", strerror(errno));
-		kill(child, SIGKILL);
-		return errno = EIO, -1;
-	}
-	if (!WIFEXITED(status)) {
-		debug(D_PROCESS,"redirect_ldso: %s --verify %s didn't exit normally. status == %d", ldso_physical_name, exe, status);
-		return errno = EIO, -1;
-	}
-	switch (WEXITSTATUS(status)) {
-		case 0:
-			debug(D_PROCESS, "redirect_ldso: will execute %s %s", ldso_physical_name, exe);
-			return 0;
-		case 1:
-			debug(D_DEBUG, "redirect_ldso: %s is probably a static binary and will be executed directly", exe);
-			ldso_physical_name[0] = '\0';
-			return 0;
-		default:
-			debug(D_PROCESS,"redirect_ldso: %s --verify %s exited with status %d", ldso_physical_name, exe, WEXITSTATUS(status));
-			return errno = EIO, -1;
-	}
-}
-
-static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const char *physical_exe, const char *logical_exe, const char *replace_arg0, const char *arg1, const char *arg2 )
+static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const char *exe, const char *replace_arg0, const char *arg1, const char *arg2 )
 {
 	uintptr_t scratch = pfs_process_scratch_address(p);
+	char path[PATH_MAX];
 
-	/* XXX
-	 *
-	 * physical_exe is only used if we are doing execve directly without
-	 * wrapping with ldso, it becomes the exe argument for:
-	 *
-	 * execve(exe, argv, envp)
-	 *
-	 * The reason for that is the *kernel* needs to know the physical name. On
-	 * the other hand, ld-linux is a regular executable that will allow us to
-	 * do another translation of logical_exe -> physical_exe. XXX This is
-	 * important to get argv[0] right!!! XXX ld-linux replaces argv[0] with
-	 * its first argument!
-	 */
-
-	char ldso[PFS_PATH_MAX] = "";
-	if (redirect_ldso(physical_exe, ldso) == -1)
+	if (pfs_dispatch_prepexe(p, path, exe) == -1)
 		return -1;
 
 	/* "exe" + '\0' + [new "arg0" + '\0' + ... ] + padding + [new argv array] */
@@ -736,17 +629,8 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 	buffer_init(&B);
 	buffer_abortonfailure(&B, 1);
 
-	/* if we redirect ldso, then logical_exe becomes arg1 and ldso becomes exe */
-	uintptr_t user_ldso = buffer_pos(&B)+scratch;
-	if (ldso[0])
-		buffer_putlstring(&B, ldso, strlen(ldso)+1);
-
 	uintptr_t user_exe = buffer_pos(&B)+scratch;
-	if (ldso[0]) {
-		buffer_putlstring(&B, logical_exe, strlen(logical_exe)+1);
-	} else {
-		buffer_putlstring(&B, physical_exe, strlen(physical_exe)+1);
-	}
+	buffer_putlstring(&B, path, strlen(path)+1);
 
 	/* if we are changing arg0, then the user provided arg0 is replaced */
 	uintptr_t user_arg0 = buffer_pos(&B)+scratch;
@@ -770,7 +654,7 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 	}
 
 	uintptr_t user_argv;
-	if (ldso[0] || replace_arg0 || arg1 || arg2) {
+	if (replace_arg0 || arg1 || arg2) {
 		debug(D_DEBUG, "rewriting argv array...");
 		user_argv = buffer_pos(&B)+scratch;
 		if (replace_arg0) {
@@ -783,10 +667,6 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 				return errno = EFAULT, -1;
 			}
 			buffer_putlstring(&B, (char *)&old_user_argv0, sizeof(old_user_argv0));
-		}
-		if (ldso[0]) {
-			debug(D_DEBUG, "wrapping execution with ldso, argv[1]: `%s'", logical_exe);
-			buffer_putlstring(&B, (char *)&user_exe, sizeof(user_exe)); /* exe is arg1 when wrapped by ldso */
 		}
 		if (arg1) {
 			debug(D_DEBUG, "argv[next]: `%s'", arg1);
@@ -822,7 +702,7 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 #endif
 
 	if (buffer_pos(&B) > PFS_SCRATCH_SPACE) {
-		debug(D_NOTICE, "cannot handle too many arguments for `%s'", logical_exe);
+		debug(D_NOTICE, "cannot handle too many arguments for `%s'", exe);
 		buffer_free(&B);
 		return errno = E2BIG, -1;
 	}
@@ -831,7 +711,7 @@ static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const ch
 	buffer_free(&B);
 
 	/* change the registers to reflect argv */
-	INT64_T nargs[] = {(INT64_T) (ldso[0] ? user_ldso : user_exe), (INT64_T)user_argv};
+	INT64_T nargs[] = {(INT64_T)user_exe, (INT64_T)user_argv};
 	tracer_args_set(p->tracer,p->syscall,nargs,sizeof(nargs)/sizeof(nargs[0]));
 	p->syscall_args_changed = 1;
 	return 0;
@@ -869,8 +749,9 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 
 		tracer_copy_in_string(p->tracer,logical_name,POINTER(args[0]),sizeof(logical_name),0);
 		strncpy(p->new_logical_name, logical_name, sizeof(p->new_logical_name)-1);
+		p->exefd = -1;
 
-		if(!is_executable(logical_name))
+		if(!pfs_dispatch_isexe(logical_name))
 			goto failure;
 
 		if (pfs_get_local_name(logical_name,physical_name,firstline,sizeof(firstline))<0)
@@ -896,15 +777,15 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 				goto failure;
 
 			if (strlen(interp_arg)) {
-				if (fix_execve(p, old_user_argv, physical_name, interp_exe, interp_exe, interp_arg, logical_name) == -1)
+				if (fix_execve(p, old_user_argv, physical_name, interp_exe, interp_arg, logical_name) == -1)
 					goto failure;
 			} else {
-				if (fix_execve(p, old_user_argv, physical_name, interp_exe, interp_exe, logical_name, NULL) == -1)
+				if (fix_execve(p, old_user_argv, physical_name, interp_exe, logical_name, NULL) == -1)
 					goto failure;
 			}
 		} else {
 			debug(D_PROCESS, "execve: %s (%s) is an ordinary executable", p->new_logical_name, physical_name);
-			if (fix_execve(p, old_user_argv, physical_name, logical_name, NULL, NULL, NULL) == -1)
+			if (fix_execve(p, old_user_argv, physical_name, NULL, NULL, NULL) == -1)
 				goto failure;
 		}
 
@@ -920,6 +801,8 @@ done:
 		free(interp_arg);
 	} else if (p->syscall_dummy) {
 		debug(D_PROCESS, "execve: failed: %s", strerror(-p->syscall_result));
+		if (p->exefd >= 0)
+			p->exefd = (close(p->exefd), -1);
 	} else /* That is, we are not entering */ {
 		INT64_T actual;
 		tracer_result_get(p->tracer,&actual);
@@ -935,6 +818,8 @@ done:
 			debug(D_PROCESS, "execve: failed: %s", strerror(-actual));
 			pfs_process_scratch_restore(p);
 		}
+		if (p->exefd >= 0)
+			p->exefd = (close(p->exefd), -1);
 	}
 }
 

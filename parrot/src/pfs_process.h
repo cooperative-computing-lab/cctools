@@ -50,6 +50,7 @@ struct pfs_process {
 	int completing_execve;
 	int did_stream_warning;
 	char new_logical_name[PFS_PATH_MAX]; /* saved during execve */
+	int exefd; /* during execve */
 
 	INT64_T syscall;
 	INT64_T syscall_original;
