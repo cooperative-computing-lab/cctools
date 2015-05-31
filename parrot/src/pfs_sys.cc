@@ -501,7 +501,7 @@ int	pfs_mmap_delete( pfs_size_t logical_address, pfs_size_t length )
 	END
 }
 
-int pfs_get_local_name( const char *rpath, char *lpath, char *firstline, int length )
+int pfs_get_local_name( const char *rpath, char *lpath, char *firstline, size_t length )
 {
 	int fd;
 	int result;

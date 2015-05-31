@@ -230,6 +230,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	child->did_stream_warning = 0;
 	child->nsyscalls = 0;
 	child->completing_execve = 0;
+	child->exefd = -1;
 
 	actual_parent = pfs_process_lookup(ppid);
 
@@ -279,6 +280,8 @@ static void pfs_process_delete( struct pfs_process *p )
 		if(!p->table->refs()) delete p->table;
 		p->table = 0;
 	}
+	if(p->exefd >= 0)
+		close(p->exefd);
 	pfs_paranoia_delete_pid(p->pid);
 	tracer_detach(p->tracer);
 	itable_remove(pfs_process_table,p->pid);

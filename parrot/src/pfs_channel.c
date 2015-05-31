@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "pfs_channel.h"
 
 #include "debug.h"
+#include "memfdexe.h"
 #include "tracer.h"
 #include "xxmalloc.h"
 
@@ -20,8 +21,6 @@ See the file COPYING for details.
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-
-extern char pfs_temp_dir[];
 
 struct entry {
 	char *name;
@@ -79,9 +78,11 @@ static void entry_delete( struct entry *e )
 	free(e);
 }
 
-static int channel_create (void)
+int pfs_channel_init( pfs_size_t size )
 {
-	int fd;
+	extern char pfs_temp_per_instance_dir[PATH_MAX];
+
+	close(channel_fd);
 
 	/* We try to use memory file for the channel because we rely on POSIX
 	 * semantics for mmap. Some distributed file systems like GPFS do not
@@ -89,64 +90,7 @@ static int channel_create (void)
 	 *
 	 * See: https://github.com/cooperative-computing-lab/cctools/issues/305
 	 */
-
-	if (linux_available(3,17,0)) {
-#ifdef CCTOOLS_CPU_I386
-		fd = syscall(SYSCALL32_memfd_create, "parrot-channel", 0);
-#else
-		fd = syscall(SYSCALL64_memfd_create, "parrot-channel", 0);
-#endif
-	} else {
-		errno = ENOSYS;
-		fd = -1;
-	}
-
-	if (fd == -1 && errno == ENOSYS) {
-		const char *channel_dirs[] = {
-			"/dev/shm",
-			"/tmp",
-			"/var/tmp",
-			pfs_temp_dir,
-		};
-		int i;
-		for (i = 0; i < (int)(sizeof(channel_dirs)/sizeof(channel_dirs[0])); i++) {
-			char path[PATH_MAX];
-			snprintf(path, sizeof(path), "%s/parrot-channel.XXXXXX", channel_dirs[i]);
-
-			debug(D_DEBUG, "trying to create channel '%s'", path);
-			fd = mkstemp(path);
-			if (fd >= 0) {
-				unlink(path);
-
-				/* test if we can use it for executable data (i.e. is dir on a file system mounted with the 'noexec' option) */
-				size_t l = getpagesize();
-				if (ftruncate(fd, l) == -1) {
-					debug(D_DEBUG, "could not grow channel: %s", strerror(errno));
-					close(fd);
-					continue;
-				}
-				void *addr = mmap(NULL, l, PROT_READ|PROT_EXEC, MAP_SHARED, fd, 0);
-				if (addr == MAP_FAILED) {
-					debug(D_DEBUG, "failed executable mapping: %s", strerror(errno));
-					close(fd);
-					continue;
-				}
-				munmap(addr, l);
-				ftruncate(fd, 0);
-				break;
-			} else {
-				debug(D_DEBUG, "could not create channel: %s", strerror(errno));
-			}
-		}
-	}
-	return fd;
-}
-
-int pfs_channel_init( pfs_size_t size )
-{
-	close(channel_fd);
-
-	channel_fd = channel_create();
+	channel_fd = memfdexe("parrot-channel", pfs_temp_per_instance_dir);
 	if (channel_fd < 0) {
 		fatal("could not create a channel!");
 	}

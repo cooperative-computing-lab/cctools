@@ -33,6 +33,7 @@ SOURCES = \
 	domain_name.c \
 	domain_name_cache.c \
 	dpopen.c \
+	elfheader.c \
 	envtools.c \
 	fast_popen.c \
 	fd.c \
@@ -57,6 +58,7 @@ SOURCES = \
 	list.c \
 	load_average.c \
 	md5.c \
+	memfdexe.c \
 	memory_info.c \
 	mergesort.c \
 	mt19937-64.c \
@@ -138,3 +140,5 @@ install: all
 test: all
 
 .PHONY: all clean install test
+
+# vim: set noexpandtab tabstop=4:
