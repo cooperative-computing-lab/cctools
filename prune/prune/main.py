@@ -344,6 +344,10 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				elif item == 'AS':
 					filename = ar[i+1]
 					i += 1
+				elif not filename:
+					print 'Please specify the destination filename.'
+					print 'Ex. "GET <prune_name> AS <local_filename>".'
+
 				#elif item == 'LAZY':
 				#	wait = False
 				if not filename:
@@ -373,7 +377,6 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				print 'Queue sizes...', output, time.strftime("%H:%M:%S"), now, '(%02dm%02ds)'%( minutes, seconds )
 				last_report = now
 
-
 			lib.wq_check()
 			lib.local_check()
 			
@@ -389,8 +392,12 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				if ar[-1]=='TERMINATE':
 					terminate = True
 				return True
+			elif not (lib.usingWQ() or lib.usingLocal()):
+				print 'No resources are being used, so work can\'t be done.'
+				print 'Please try "USE local <#>" to use the specified number of processes.'
+				print '      -or- "USE wq <master_name>" to start a Work Queue master.'
+				return True
 			elif not some_in_progress:
-				print 'Work complete, or no execution resources available.'
 				minutes = (time.time()-work_start)/60
 				seconds = (time.time()-work_start)%60
 				print 'PRUNE finished executing after: %02dm%02ds'%( minutes, seconds )
@@ -406,8 +413,8 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			
 
 
-
-		elif line.upper().startswith('LOCATE'):
+		
+		elif line.upper().startswith('LOCATE____'):
 			ar = line.split(' ')
 			name = ar[1]
 			now = True if len(ar)>2 and ar[2]=='NOW' else False

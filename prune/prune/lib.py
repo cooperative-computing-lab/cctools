@@ -730,7 +730,12 @@ def useWQ(name, local_fs=False, debug_level=None):
 		cctools_debug_config_file("wq.debug")
 
 	return True
-	
+def usingWQ():
+	global wq
+	if wq:
+		return True
+	else:
+		return False
 def stopWQ():
 	if wq:
 		wq.shutdown_workers(0)	
@@ -846,6 +851,12 @@ def useLocal(concurrency,local_fs=False):
 	local_local_fs = local_fs
 	return True
 
+def usingLocal():
+	global wq
+	if max_concurrency<=0:
+		return False
+	else:
+		return True
 
 def local_check():
 	global local_workers, data_folder, local_local_fs
