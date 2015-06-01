@@ -384,7 +384,10 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 		op_string = op_string[0:-1] + ')'
 		#op_chksum = hashstring(op_string)
 		op_chksum = op_string
-		op_env_chksum = op_string + str(ENVIRONMENT['puid'])
+		if ENVIRONMENT and ENVIRONMENT['puid']:
+			op_env_chksum = op_string + str(ENVIRONMENT['puid'])
+		else:
+			op_env_chksum = op_string + 'None'
 
 		op = database.op_get_by_env_chksum(op_env_chksum)
 		old_op_id = None
@@ -629,7 +632,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 
 
 
-		elif io['io_type']=='E':
+		elif io['io_type']=='E' and io['file_puid']:
 			env = database.environment_get(io['file_puid'])
 			env_type = env['env_type']
 			copies = database.copies_get(env['file_puid'])
