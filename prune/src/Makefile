@@ -10,7 +10,7 @@ prune.py: prune.in
 	chmod 755 prune.py
 
 clean:
-	rm prune.py
+	rm -f prune.py
 
 install: prune.py
 	cp prune.py ${CCTOOLS_INSTALL_DIR}/bin/prune
