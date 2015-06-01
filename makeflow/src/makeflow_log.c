@@ -68,6 +68,12 @@ Line format: # ABORTED timestamp
 Line format: # FAILED timestamp
 Line format: # COMPLETED timestamp
 
+Line format: # EXPECT filename timestamp
+Line format: # RECIEVE filename timestamp
+Line format: # COMPLETE filename timestamp
+Line format: # DELETE filename timestamp
+
+
 These event types indicate that the workflow as a whole has started or completed in the indicated manner.
 */
 
@@ -127,6 +133,16 @@ void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate 
 	makeflow_log_sync(d,0);
 }
 
+void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int newstate )
+{
+	debug(D_MAKEFLOW_RUN, "file %s %s -> %s\n", f->filename, dag_file_state_name(f->state), dag_file_state_name(newstate));
+
+	f->state = newstate;
+
+	fprintf(d->logfile, "# %d %s %" PRIu64 "\n", f->state, f->filename, timestamp_get());
+	makeflow_log_sync(d,0);
+}
+
 void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected )
 {
 	fprintf(d->logfile, "# GC\t%" PRIu64 "\t%d\t%" PRIu64 "\t%d\n", timestamp_get(), collected, elapsed, total_collected);
@@ -135,10 +151,11 @@ void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, i
 
 void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode )
 {
-	char *line;
-	int nodeid, state, jobid;
+	char *line, file[30];
+	int nodeid, state, jobid, file_state;
 	int first_run = 1;
 	struct dag_node *n;
+	struct dag_file *f;
 	timestamp_t previous_completion_time;
 
 	d->logfile = fopen(filename, "r");
@@ -151,6 +168,12 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode 
 		while((line = get_line(d->logfile))) {
 			linenum++;
 
+			if(sscanf(line, "# %d %s %" SCNu64 "", &file_state, file, &previous_completion_time) == 3) {
+
+				f = dag_file_lookup_or_create(d, file);
+				f->state = file_state;
+				continue;
+			}
 			if(line[0] == '#')
 				continue;
 			if(sscanf(line, "%" SCNu64 " %d %d %d", &previous_completion_time, &nodeid, &state, &jobid) == 4) {

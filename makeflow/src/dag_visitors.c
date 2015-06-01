@@ -521,10 +521,10 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 	fprintf(cytograph, "\t<att name = \"layoutAlgorithm\" value = \"Grid Layout\" type = \"string\" cy:hidden = \"1\"/>\n");
 
 	if(change_size) {
-		hash_table_firstkey(d->completed_files);
-		while(hash_table_nextkey(d->completed_files, &label, (void **) &name)) {
-			stat(label, &st);
-			average += ((double) st.st_size) / ((double) hash_table_size(d->completed_files));
+		hash_table_firstkey(d->files);
+		while(hash_table_nextkey(d->files, &name, (void **) &f)) {
+			stat(name, &st);
+			average += ((double) st.st_size) / ((double) d->completed_files);
 		}
 	}
 
@@ -687,7 +687,7 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 		hash_table_firstkey(d->files);
 		while(hash_table_nextkey(d->files, &name, (void**)&f )) {
 			if(stat(name,&st)==0) {
-				average += ((double) st.st_size) / ((double) hash_table_size(d->completed_files));
+				average += ((double) st.st_size) / ((double) d->completed_files);
 			}
 		}
 	}
