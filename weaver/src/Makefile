@@ -6,7 +6,7 @@ CCTOOLS_PYTHON_PATH=${CCTOOLS_INSTALL_DIR}/lib/python${PYTHON_VERSION}/site-pack
 all: weaver.py
 
 weaver.py: weaver.in
-	sed 's/CCTOOLS_VERSION/${CCTOOLS_VERSION}/' < weaver.in > weaver.py
+	m4 '-DCCTOOLS_VERSION=${CCTOOLS_VERSION}' < weaver.in > weaver.py
 	chmod 755 weaver.py
 
 install: weaver.py
