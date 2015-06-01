@@ -259,6 +259,16 @@ See the manual for more details.
 					database.run_upd(run['puid'], 'Cancelled')
 			return True
 
+		elif line.upper().startswith('WAITING'):
+			#global failures
+			ar = line.split()
+			if len(ar)==1:
+				runs = database.run_get_by_queue('Waiting')
+				for run in runs:
+					operation = lib.create_operation(run['op_puid'],dry_run=True)
+					print '%s'%(operation['cmd'])
+			return True
+
 		elif line.upper().startswith('RUNNING'):
 			#global failures
 			ar = line.split()
@@ -329,7 +339,7 @@ See the manual for more details.
 				item = ar[i]
 				if not expr:
 					expr = item
-				elif item == 'AS':
+				elif item.upper() == 'AS':
 					filename = ar[i+1]
 					i += 1
 				elif not filename:
@@ -341,7 +351,12 @@ See the manual for more details.
 				if not filename:
 					filename = expr
 				i += 1
-			return lib.getFile(expr,filename,wait)
+			res = database.tag_get(expr)
+			try:
+				lib.restore_file(res['puid'], filename)
+			except IOError:
+				print 'That data does not yet exist. You may need to wait for it to be generated.'
+			return True
 			
 
 		elif line.upper().startswith('WORK'):

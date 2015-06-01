@@ -140,19 +140,6 @@ def putMetaData(ids, cmd_id=None):
 	return op_id
 
 
-def getFile(name, filename, wait=True):
-	global transfers
-	while True:
-		try:
-			copies = locate_copies(name)
-			for copy in copies:
-				restore_file(copy['puid'], filename, wait)
-				return True
-		except Exception as e:
-			print e
-		#time.sleep(1)
-	return False
-
 
 def store_file(filename, puid, wait=True, pack=None, storage_module=None):
 	if not storage_module:
@@ -394,6 +381,8 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 		if op:
 			old_op_id = op['puid']
 			old_ios = database.ios_get(old_op_id)
+			for old_io in old_ios:
+				print old_io
 			#database.run_upd_by_op_puid(op['puid'], 'Run', -1, '', 'local')
 
 		op_id = database.op_ins(function_puid,op_chksum, op_env_chksum)
