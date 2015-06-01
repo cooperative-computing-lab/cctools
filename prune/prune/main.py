@@ -445,6 +445,8 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				minutes = (time.time()-start_time)/60
 				seconds = (time.time()-start_time)%60
 				print 'Total run (with preservation): %02dm%02ds'%( minutes, seconds )
+			except TypeError as e:
+				print 'File not found:',name
 			except Exception as e:
 				print traceback.format_exc()
 			return True
