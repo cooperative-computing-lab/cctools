@@ -9,7 +9,7 @@ from prune.script import Script
 
 import sys
 
-cctools_version = 'CCTOOLS_VERSION'
+cctools_version = '5.0.0 [HEAD:b83b09ac-DIRTY]'
 cctools_releasedate = ''
 
 if __name__ == '__main__':
