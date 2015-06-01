@@ -1,5 +1,5 @@
-include ../config.mk
-include ../rules.mk
+include ../../config.mk
+include ../../rules.mk
 
 PYTHON_INSTALL_DIR=$(CCTOOLS_INSTALL_DIR)/lib/python$(CCTOOLS_PYTHON_VERSION)/site-packages
 
