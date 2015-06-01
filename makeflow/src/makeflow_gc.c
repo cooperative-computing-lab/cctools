@@ -169,7 +169,7 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue)
     while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 		if((f->state == DAG_FILE_STATE_COMPLETE) || (f->state == DAG_FILE_STATE_COMPLETE))
 			makeflow_file_clean(d, queue, f, 0);
-		if((f->state == DAG_FILE_STATE_INITIAL) || (f->state == DAG_FILE_STATE_EXPECT))
+		if(f->state == DAG_FILE_STATE_EXPECT)
 			makeflow_file_clean(d, queue, f, 1);
 	}
 
@@ -204,8 +204,12 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 	start_time = timestamp_get();
 	hash_table_firstkey(d->files);
 	while(hash_table_nextkey(d->files, &name, (void **) &f) && collected < maxfiles) {
-		if(f->state == DAG_FILE_STATE_COMPLETE && makeflow_file_clean(d, queue, f, 0))
+		if(f->state == DAG_FILE_STATE_COMPLETE 
+			&& !set_lookup(d->outputs, f) 
+			&& !set_lookup(d->inputs, f) 
+			&& makeflow_file_clean(d, queue, f, 0)){
 			collected++;
+		}
 	}
 
 	stop_time = timestamp_get();

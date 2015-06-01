@@ -852,7 +852,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))){
 			f->ref_count+= -1;
-			if(f->ref_count == 0)
+			if(f->ref_count == 0 && f->state)
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 		}
 
