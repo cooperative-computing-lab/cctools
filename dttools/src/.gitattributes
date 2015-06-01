@@ -1,0 +1,7 @@
+getopt.c -whitespace
+getopt.h -whitespace
+getopt_int.h -whitespace
+json.c -whitespace
+json.h -whitespace
+luapatt.c -whitespace
+mt19937-64.c -whitespace
