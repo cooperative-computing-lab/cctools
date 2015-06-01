@@ -486,15 +486,17 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			#res = database.tags_getAll()
 			res = database.ls()
 			for r in res:
+				if r['name'][0]=='_':
+					continue
 				if keyword:
 					if keyword in r['name']:
 						if r['length']:
-							print r['name'],'\t-> saved @', pretty_date(r['at'])
+							print '%s\t-> %i bytes @ %s'%(r['name'],r['length'], pretty_date(r['at']) )
 						else:
 							print r['name'],'\t(pending)'
 				else:
 					if r['length']:
-						print r['name'],'\t-> saved @', pretty_date(r['at'])
+						print '%s\t-> %i bytes @ %s'%(r['name'],r['length'], pretty_date(r['at']) )
 					else:
 						print r['name'],'\t(pending)'
 			return True

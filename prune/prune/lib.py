@@ -77,8 +77,8 @@ def initialize(new_data_folder, new_sandbox_prefix, hadoop=False):
 
 	ENVIRONMENT = database.tag_get('_ENV')
 	if not ENVIRONMENT:
-		print 'Warning: No Environments defined!'
-
+		print 'Warning: No Environments defined! A default environment will be created which assumes any resource (local or work queue) will have the appropriate libraries, software, etc.'
+		database.tag_set('_ENV',None)
 
 
 
@@ -307,6 +307,7 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 			ar = arg.split('@')
 			name = None
 			name = ar[0]
+			puid = None
 			if len(ar)>2:
 				time = ar[2]
 			tag = database.tag_get(name)
@@ -375,24 +376,26 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 		for r in res['arg_list']:
 			if r[0]:
 				op_string += str(r[0])+','
+			elif len(r)<=3:
+				print 'Too many arguments passed to the function.'
+				return None
 			else:
 				op_string += r[3]+','
 		op_string = op_string[0:-1] + ')'
 		#op_chksum = hashstring(op_string)
 		op_chksum = op_string
-		op_env_chksum = op_string + str(ENVIRONMENT)
+		op_env_chksum = op_string + str(ENVIRONMENT['puid'])
 
 		op = database.op_get_by_env_chksum(op_env_chksum)
 		old_op_id = None
 		if op:
 			old_op_id = op['puid']
 			old_ios = database.ios_get(old_op_id)
-			print 'A matching operation has already been invoked: '+op_string
 			#database.run_upd_by_op_puid(op['puid'], 'Run', -1, '', 'local')
 
 		op_id = database.op_ins(function_puid,op_chksum, op_env_chksum)
-		if ENVIRONMENT:
-			database.io_ins(op_id, 'E', ENVIRONMENT, '')
+		if ENVIRONMENT and 'puid' in ENVIRONMENT:
+			database.io_ins(op_id, 'E', ENVIRONMENT['puid'], '')
 		
 		database.io_ins(op_id, 'F', function_puid, function_name)
 		for i,arg in enumerate(res['arg_list']):
