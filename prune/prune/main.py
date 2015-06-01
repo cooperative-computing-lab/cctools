@@ -476,13 +476,20 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				keyword = ar[1]
 			else:
 				keyword = None
-			res = database.tags_getAll()
+			#res = database.tags_getAll()
+			res = database.ls()
 			for r in res:
 				if keyword:
 					if keyword in r['name']:
-						print r['name'],' -> ',r['puid'], '  @', pretty_date(r['set_at'])
+						if r['length']:
+							print r['name'],'\t-> saved @', pretty_date(r['at'])
+						else:
+							print r['name'],'\t(pending)'
 				else:
-					print r['name'],' -> ',r['puid'], '  @', pretty_date(r['set_at'])
+					if r['length']:
+						print r['name'],'\t-> saved @', pretty_date(r['at'])
+					else:
+						print r['name'],'\t(pending)'
 			return True
 				
 

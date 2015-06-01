@@ -557,6 +557,17 @@ def tags_getAll():
 
 
 
+def ls():
+	global read_cnt
+	read_cnt += 1
+	now = time.time()
+	sel = 'SELECT * FROM tags LEFT JOIN copies ON tags.puid=copies.puid WHERE ?<gone_at ORDER BY set_at DESC;'
+	meta_db.execute(sel,[now])
+	res = meta_db.fetchall()
+	return res
+
+
+
 
 
 
