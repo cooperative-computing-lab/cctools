@@ -18,6 +18,9 @@ import os
 import sys
 import time
 
+# ugly technique to obtain version number for -v optoin
+import __main__
+cctools_version = __main__.cctools_version
 
 # Built-ins
 
@@ -69,6 +72,8 @@ class Script(object):
                 setattr(self, 'engine_wrapper', args.popleft()),
         '-e': lambda self, args:
                 setattr(self, 'engine_arguments', args.popleft()),
+        '-v': lambda self, args:
+                self.show_version(),
         '-h': lambda self, args:
                 self.show_usage()
     }
@@ -145,6 +150,12 @@ class Script(object):
                 fatal(D_SCRIPT, 'Invalid option: {0}={1}'.format(key, value))
 
     @staticmethod
+    def show_version():
+        global cctools_version
+        sys.stderr.write('weaver '+cctools_version+"\n")
+        sys.exit(1)
+
+    @staticmethod
     def show_usage():
         """ Print usage description and abort. """
         subsystems = [eval('weaver.logger.{0}'.format(f))
@@ -154,6 +165,7 @@ class Script(object):
 
 General Options:
   -h              Show this help message.
+  -v              Show version string.
   -W              Stop on warnings.
   -g              Include debugging symbols in DAG.
   -I              Do not automatically import built-ins.
