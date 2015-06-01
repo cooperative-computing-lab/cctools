@@ -7,5 +7,4 @@
 cctools.test.log
 configure.rerun
 config.mk
-.prune.conf
 *.pyc
