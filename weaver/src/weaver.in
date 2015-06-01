@@ -6,9 +6,12 @@
 
 """ Weaver script compiler """
 
+cctools_version = 'CCTOOLS_VERSION'
+
 from weaver.script import Script
 
 import sys
+
 
 if __name__ == '__main__':
     s = Script(sys.argv[1:])
