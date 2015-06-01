@@ -164,6 +164,9 @@ def store_file(filename, puid, wait=True, pack=None, storage_module=None):
 			length = os.stat(cache_filename).st_size
 			chksum = hashfile(cache_filename)
 			database.copy_ins(puid, chksum, length, pack, storage_module)
+			runs = database.run_get_by_wait(puid)
+			for run in runs:
+				database.run_upd(run['puid'],'Run',wait=None)
 			return True
 		else:
 			print 'LAZY PUT not yet implemented.'
@@ -173,6 +176,9 @@ def store_file(filename, puid, wait=True, pack=None, storage_module=None):
 		length = os.stat(cache_filename).st_size
 		chksum = hashfile(cache_filename)
 		database.copy_ins(puid, chksum, length, pack, storage_module)
+		runs = database.run_get_by_wait(puid)
+		for run in runs:
+			database.run_upd(run['puid'],'Run',wait=None)
 		return True
 
 	else:
@@ -534,7 +540,11 @@ def add_store(fold_filename, unfold_filename):
 	
 
 def getRuns(cnt):
-	return database.run_get_by_queue('Run',cnt)
+	runs = database.run_get_by_queue('Run')
+	if len(runs)>cnt:
+		runs = runs[:cnt]
+	return runs
+	#return database.run_get_by_queue('Run',cnt)
 
 def getQueueCounts():
 	return database.run_queue_cnts()
@@ -565,7 +575,7 @@ def hashstring(str):
 
 
 
-def create_operation(op_id,framework='local',local_fs=False):
+def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 	global sandbox_prefix
 
 	ios = database.ios_get(op_id)
@@ -596,6 +606,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 			res = database.copies_get(io['file_puid'])
 			if len(res)==0:
 				#print 'No file', io
+				database.run_upd_by_op_puid(op_id,'Waiting',wait=io['file_puid'])
 				return {'cmd':None}
 			for copy in res:
 				if copy['pack']=='gz':
@@ -644,11 +655,13 @@ def create_operation(op_id,framework='local',local_fs=False):
 	final_cmd = 'chmod 755 PRUNE_RUN; ./PRUNE_RUN'
 	run_cmd = "./%s %s"%(function_name, arg_str)
 	run_buffer = '#!/bin/bash\npython PRUNE_EXECUTOR%s %s'%(options,run_cmd)
-	print run_buffer
+	#print run_buffer
 	
 
+	if dry_run:
+		return {'cmd':run_cmd,'fetch_files':fetch_files}
 
-	if framework=='wq':
+	elif framework=='wq':
 		t = Task('')
 		for obj in place_files:
 			if not local_fs or obj['dst']=='PRUNE_EXECUTOR':
@@ -673,7 +686,7 @@ def create_operation(op_id,framework='local',local_fs=False):
 			if not os.path.isdir(sandbox_folder):
 				raise
 		for obj in place_files:
-			if not local_fs or obj['dst']=='PRUNE_EXECUTOR':
+			if not local_fs or obj['dst']=='PRUNE_EXECUTOR' or not dry_run:
 				shutil.copy2(obj['src'], sandbox_folder+obj['dst'])
 		f = open(sandbox_folder+'PRUNE_RUN','w')
 		f.write(run_buffer)
@@ -697,22 +710,30 @@ wq_task_cnt = 0
 def useWQ(name, local_fs=False, debug_level=None):
 	global wq, wq_task_cnt, wq_local_fs
 	wq_local_fs = local_fs
-	if not wq:
-		try:
-			wq = WorkQueue(0)
-		except Exception as e:
-			raise Exception("Instantiation of Work Queue failed!")
+	if wq:
+		wq.shutdown_workers(0)
+		qs = database.run_get_by_queue('Running')
+		for q in qs:
+			run_upd(q['puid'],'Run',None,'')
 
-		wq.specify_name(name)
-		print "Work Queue master started on port %d with name '%s'..." % (wq.port,name)
-		wq.specify_log("wq.log")
-		#wq.set_bandwidth_limit('1250000000')
-		if debug_level:
-			cctools_debug_flags_set(debug_level)
-			cctools_debug_config_file("wq.debug")
+	try:
+		wq = WorkQueue(0)
+	except Exception as e:
+		raise Exception("Instantiation of Work Queue failed!")
+
+	wq.specify_name(name)
+	print "Work Queue master started on port %d with name '%s'..." % (wq.port,name)
+	wq.specify_log("wq.log")
+	#wq.set_bandwidth_limit('1250000000')
+	if debug_level:
+		cctools_debug_flags_set(debug_level)
+		cctools_debug_config_file("wq.debug")
 
 	return True
 	
+def stopWQ():
+	if wq:
+		wq.shutdown_workers(0)	
 
 wq_ops = {}
 def wq_check():
@@ -750,9 +771,18 @@ def wq_check():
 					if t.return_status==0:
 						operation = wq_ops[t.id]
 						all_files = True
+						exec_time = exec_space = 0
 						for obj in operation['fetch_files']:
 							if os.path.isfile(obj['dst']):
 								store_file(obj['dst'],obj['puid'],True,obj['pack'],storage_module='wq')
+								if obj['display'].endswith('.debug'):
+									f = open(obj['dst'])
+									for line in f:
+										if line.startswith('Execution time: '):
+											exec_time = line.split(": ")[1]
+										elif line.startswith('Execution space: '):
+											exec_space = line.split(": ")[1]
+									f.close()
 							else:
 								print 'Output file not found: %s'%(obj['display'])
 								all_files = False
@@ -775,7 +805,11 @@ def wq_check():
 							print 'Try to execute the operation manually in the sandbox at %s by running chmod 755 PRUNE_RUN; ./PRUNE_RUN'%(operation['sandbox'])
 						else:
 							print 'complete: run:%i, op_id:%i'%(run['puid'],run['op_puid'])
-							database.run_upd(run['puid'],'Complete',t.return_status)
+
+							database.run_end(run['puid'], cpu_time=exec_time, disk_space=exec_space)
+
+
+							
 					else:
 						print 'Failed with exit code:',t.return_status
 						operation = wq_ops[t.id]
@@ -827,15 +861,25 @@ def local_check():
 			(stdout, stderr) = p.communicate()
 
 			fails = 0
+			exec_time = exec_space = 0
 			for obj in operation['fetch_files']:
 				try:
 					store_file(operation['sandbox']+obj['src'], obj['puid'])
+					if obj['display'].endswith('.debug'):
+						f = open(operation['sandbox']+obj['src'])
+						for line in f:
+							if line.startswith('Execution time: '):
+								exec_time = line.split(": ")[1]
+							elif line.startswith('Execution space: '):
+								exec_space = line.split(": ")[1]
+						f.close()
+
 				except:
 					fails += 1
 
 			if p.returncode==0 and fails==0:
-				database.run_upd(operation['run']['puid'],'Complete',p.returncode)
-				#shutil.rmtree(operation['sandbox'])
+				database.run_end(operation['run']['puid'], cpu_time=exec_time, disk_space=exec_space)
+				shutil.rmtree(operation['sandbox'])
 			else:
 				print 'returncode =', p.returncode, ', fails =',fails
 				print traceback.format_exc()

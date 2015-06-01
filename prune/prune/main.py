@@ -87,6 +87,7 @@ if config_file2:
 terminate = False
 block = False
 hadoop_data = False
+failures = []
 
 data_folder = db_pathname = sandbox_prefix = None
 if os.path.isfile(config_file):
@@ -258,6 +259,51 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 					lib.store_file(filename,ids['puid'],wait,pack=ids['pack'])
 			return True
 
+		elif line.upper().startswith('CANCEL'):
+			lib.stopWQ()
+			for queue in ['Run','Running','Waiting','Failed','Wait']:
+				runs = database.run_get_by_queue(queue)
+				for run in runs:
+					database.run_upd(run['puid'], 'Cancelled')
+			return True
+
+		elif line.upper().startswith('RUNNING'):
+			#global failures
+			ar = line.split()
+			if len(ar)==1:
+				runs = database.run_get_by_queue('Running')
+				for run in runs:
+					operation = lib.create_operation(run['op_puid'],dry_run=True)
+					print '%s'%(operation['cmd'])
+			return True
+
+		elif line.upper().startswith('FAILURES'):
+			global failures
+			ar = line.split()
+			if len(ar)==1:
+				runs = database.run_get_by_queue('Failed')
+				for run in runs:
+					operation = lib.create_operation(run['op_puid'],dry_run=True)
+					if run['op_puid'] not in failures:
+						print '%i: %s'%(len(failures)+1,operation['cmd'])
+						failures.append(run['op_puid'])
+					else:
+						print '%i: %s'%(failures.index(run['op_puid'])+1,operation['cmd'])
+			return True
+
+		elif line.upper().startswith('RETRY'):
+			global failures
+			ar = line.split()
+			if len(ar)==1:
+				runs = database.run_get_by_queue('Failed')
+				for run in runs:
+					database.run_upd(run['puid'], 'Run')
+			else:
+				puid = failures[int(ar[1])-1]
+				database.run_upd_by_op_puid(puid, 'Run')
+			return True
+
+
 		elif line.upper().startswith('USE'):
 			ar = line.split(' ')
 			resource_type = ar[1]
@@ -312,7 +358,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			output = ''
 			some_in_progress = False
 			for r in res:
-				output += '%s queue size: %i   '%( r['queue'], r['cnt'] )
+				output += '%s: %i   '%( r['queue'], r['cnt'] )
 				if r['queue']=='Running' or r['queue']=='Run':
 					some_in_progress = True
 			if ((time.time()-last_report)>15):
@@ -320,7 +366,7 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				minutes = (time.time()-work_start)/60
 				seconds = (time.time()-work_start)%60
 
-				print output, time.strftime("%H:%M:%S"), now, '(%02dm%02ds)'%( minutes, seconds )
+				print 'Queue sizes...', output, time.strftime("%H:%M:%S"), now, '(%02dm%02ds)'%( minutes, seconds )
 				last_report = now
 
 
@@ -403,37 +449,14 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 				print traceback.format_exc()
 			return True
 
-		elif line.upper().startswith('RETRY'):
-			runs = database.run_get_by_queue('Failed')
-			for run in runs:
-				database.run_upd(run['puid'], 'Run')
-			return True
-
 		elif line.upper().startswith('STATUS'):
-			if not wait_start:
-				wait_start = time.time()
-
-			ar = line.split(' ')
-			if len(ar)>1:
-				timeout = float(ar[2])
-			else:
-				timeout = 0.0
-
 			res = lib.getQueueCounts()
 			output = ''
 			for r in res:
 				output += '%s queue size: %i   '%( r['queue'], r['cnt'] )
-			print forever_back+output
 
-			if len(res)==1 and res[0]['queue']=='Complete':
-				wait_start = None
-				return True
-			elif ( (time.time()-wait_start) > timeout ):
-				wait_start = None
-				return True
-			else:
-				#time.sleep(10)
-				return False
+			print output
+			return True
 
 		elif line.upper().startswith('CUT'):
 			res = database.tags_getAll()

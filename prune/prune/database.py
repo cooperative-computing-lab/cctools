@@ -312,6 +312,7 @@ creates.append('''CREATE TABLE IF NOT EXISTS runs (
 
 												status INT,
 												notes TEXT,
+												wait PUID,
 												
 												cpu_time REAL,
 												disk_space INT,
@@ -321,6 +322,7 @@ creates.append('''CREATE TABLE IF NOT EXISTS runs (
 											);''')
 creates.append('CREATE INDEX IF NOT EXISTS run_op_puid ON runs(op_puid);')
 creates.append('CREATE INDEX IF NOT EXISTS run_status ON runs(status);')
+creates.append('CREATE INDEX IF NOT EXISTS run_wait ON runs(wait);')
 
 def run_ins(op_puid):
 	global write_cnt
@@ -332,11 +334,19 @@ def run_ins(op_puid):
 	meta_data.commit()
 	return puid
 
-def run_get_by_queue(queue, limit=50):
+def run_get_by_queue(queue):
 	global read_cnt
 	read_cnt += 1
-	sel = 'SELECT * FROM runs WHERE queue=? ORDER BY updated_at LIMIT ?;'
-	meta_db.execute(sel,[queue,limit])
+	sel = 'SELECT * FROM runs WHERE queue=? ORDER BY updated_at;'
+	meta_db.execute(sel,[queue])
+	meta_data.commit()
+	return meta_db.fetchall()
+
+def run_get_by_wait(wait):
+	global read_cnt
+	read_cnt += 1
+	sel = 'SELECT * FROM runs WHERE wait=? ORDER BY updated_at;'
+	meta_db.execute(sel,[wait])
 	meta_data.commit()
 	return meta_db.fetchall()
 
@@ -359,27 +369,27 @@ def run_get_puid_by_op_puid(op_puid):
 	else:
 		return None
 
-def run_upd(puid, queue, status=None, notes='', resource=''):
+def run_upd(puid, queue, status=None, notes='', resource='', wait=None):
 	global write_cnt
 	write_cnt += 1
 	now = time.time()
 	start_time = None
 	if queue.find('ing')>0:
 		start_time = now
-	upd = "UPDATE runs SET queue=?,updated_at=?,resource=?,status=?,notes=?,start_time=? WHERE puid=?;"
-	meta_db.execute(upd,[queue, now, resource, status, notes, start_time, puid])
+	upd = "UPDATE runs SET queue=?,updated_at=?,resource=?,status=?,wait=?,notes=?,start_time=? WHERE puid=?;"
+	meta_db.execute(upd,[queue, now, resource, status, wait, notes, start_time, puid])
 	meta_data.commit()
 	return meta_db.fetchall()
 
-def run_upd_by_op_puid(op_puid, queue, status=None, notes='', resource=''):
+def run_upd_by_op_puid(op_puid, queue, status=None, notes='', resource='', wait=None):
 	global write_cnt
 	write_cnt += 1
 	now = time.time()
 	start_time = None
 	if queue.find('ing')>0:
 		start_time = now
-	upd = "UPDATE runs SET queue=?,updated_at=?,resource=?,status=?,notes=?,start_time=? WHERE op_puid=?;"
-	meta_db.execute(upd,[queue, now, resource, status, notes, start_time, op_puid])
+	upd = "UPDATE runs SET queue=?,updated_at=?,resource=?,status=?,wait=?,notes=?,start_time=? WHERE op_puid=?;"
+	meta_db.execute(upd,[queue, now, resource, status, wait, notes, start_time, op_puid])
 	meta_data.commit()
 	return meta_db.fetchall()
 
@@ -390,20 +400,14 @@ def run_get_by_task_id(task_id):
 	meta_db.execute(sel,[task_id,'Running'])
 	return meta_db.fetchone()
 
-'''
-
-
-def run_end(id, status=None, notes=''):
+def run_end(puid, cpu_time=0, disk_space=0, notes=''):
 	global write_cnt
 	write_cnt += 1
-	now = time.time()
-	upd = "UPDATE runs SET queue=?,updated_at=?,status=?,notes=?,total_time=?-start_time,sys_time=?,user_time=?,completed_at=? WHERE id=?;"
-	vals = ('Complete', now, status, notes, now, 0, 0, now, id)
-	meta_db.execute(upd,vals)
+	completed_at = time.time()
+	upd = "UPDATE runs SET queue=?,cpu_time=?,disk_space=?,notes=?,completed_at=? WHERE puid=?;"
+	meta_db.execute(upd,['Complete', cpu_time, disk_space, notes, completed_at, puid])
 	meta_data.commit()
 	return meta_db.fetchall()
-
-'''
 
 
 

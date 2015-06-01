@@ -62,12 +62,18 @@ def myexec(cmd):
 	global debug
 	pipes = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 	std_out, std_err = pipes.communicate()
-	debug.write('Running command:%s%s'%(cmd,newline))
+	debug.write('%s===================%sRunning command:%s%s'%(newline,newline,cmd,newline))
 	if len(std_out)>0:
 		debug.write('--stdout='+std_out+newline)
 	if len(std_err)>0:
 		debug.write('--stderr='+std_err+newline)
-	debug.write('Command returned:%i-----------------------------%s'%(pipes.returncode,newline))
+	debug.write('Command returned:%i-----------------------------%s%s'%(pipes.returncode,newline,newline))
+
+def myexec_output(cmd):
+	global debug
+	pipes = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+	std_out, std_err = pipes.communicate()
+	return std_out
 
 
 
@@ -111,6 +117,11 @@ if os.path.isfile(args['function_name']):
 	myexec('chmod 755 %s'%(args['function_name']))
 
 
+
+
+
+
+
 if args['umbrella']:
 	arg_str = ''
 	for arg in args['function_inputs']:
@@ -120,8 +131,14 @@ if args['umbrella']:
 
 	print cmd
 	debug.write('Starting operation at %s:%s'%(str(time.time()) ,newline))
+	
+	exec_start = time.time()
 	myexec(cmd)
+	execution_time = time.time()-exec_start
+
 	debug.write('Finished operation at %s.%s'%(str(time.time()) ,newline))
+	debug.write('Execution time: %s'%(execution_time))
+
 
 else:
 	arg_str = ''
@@ -132,8 +149,15 @@ else:
 
 	print cmd
 	debug.write('Starting operation at %s:%s'%(str(time.time()) ,newline))
+
+	exec_start = time.time()
 	myexec(cmd)
+	execution_time = time.time()-exec_start
+
 	debug.write('Finished operation at %s.%s'%(str(time.time()) ,newline))
+	debug.write('Execution time: %s%s'%(execution_time,newline))
+  
+
 
 
 if args['gzip']:
@@ -142,11 +166,11 @@ if args['gzip']:
 		myexec('gzip -c %s > ./%s.gz'%(filename, filename))
 		
 
-debug.write('Environment variables after execution:'+newline)
-myexec('env')
+debug.write('Final files:'+newline)
+myexec("du")
 
-debug.write('Local files after execution:'+newline)
-myexec('ls -la')
+execution_space = myexec_output("du | tail -n 1 | awk '{print $1}'")
+debug.write('Execution space: %s%s'%(execution_space,newline))
 
 
 
