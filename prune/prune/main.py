@@ -211,19 +211,23 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			pack = None
 			while i < len(ar):
 				item = ar[i]
-				if item == 'AS':
+				if item.upper() == 'AS':
 					i += 1
 					pname = ar[i]
-				elif item == 'GZ':
+				elif item.upper() == 'GZ':
 					pack = 'gz'
-				elif item == 'UUID' or item == 'GUID':
+				elif item.upper() == 'UUID' or item.upper() == 'GUID':
 					i += 1
 					puid = ar[i]
-				elif item == 'ENV':
+				elif item.upper() == 'ENV':
 					i += 1
 					form = ar[i]
 				elif not filename:
 					filename = item
+				elif not pname:
+					print 'Bad command: use "PUT <local_namespace_filename> AS <prune_namespace_filename>" '
+					return True
+
 				#elif item == 'LAZY':
 				#	wait = False
 				i += 1
@@ -232,17 +236,17 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			if filename:
 				ids = lib.getDataIDs(filename)
 				if not ids:
-					print 'File does not exist: %s'%(filename)
+					print 'Source file does not exist: %s'%(filename)
 					return True
 			elif data:
 				ids = lib.getDataIDs2(data)
 				if not ids:
-					print 'File does not exist: %s'%(data)
+					print 'Source file does not exist: %s'%(data)
 					return True
 			ids['pname'] = pname
 			ids['pack'] = pack
 			if ids['exists']:
-				print 'That file already exists with that name: %s=%s'%(pname,ids['puid'])
+				#print 'That file already exists with that name: %s=%s'%(pname,ids['puid'])
 				if ids['pname']:
 					database.tag_set(ids['pname'], ids['puid'])
 				if form:
@@ -476,9 +480,9 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 			for r in res:
 				if keyword:
 					if keyword in r['name']:
-						print r['name'],' -> ',r['puid'], '  @', r['set_at']
+						print r['name'],' -> ',r['puid'], '  @', pretty_date(r['set_at'])
 				else:
-					print r['name'],' -> ',r['puid'], '  @', r['set_at']
+					print r['name'],' -> ',r['puid'], '  @', pretty_date(r['set_at'])
 			return True
 				
 
@@ -700,6 +704,12 @@ Ex. GET data_name_in_prune AS mylocalfilename.txt
 
 
 
+def pretty_date(ts=False):
+    from datetime import datetime
+    return datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+
+
+
 try:
 	database.initialize(db_pathname)
 	lib.initialize(data_folder, sandbox_prefix, hadoop_data)
@@ -742,6 +752,7 @@ else:
 	terminate = True
 	lib.terminate_now()
 	print 'PRUNE terminated'
+
 
 
 
