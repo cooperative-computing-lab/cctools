@@ -6,8 +6,7 @@ PYTHON_INSTALL_DIR=$(CCTOOLS_INSTALL_DIR)/lib/python$(CCTOOLS_PYTHON_VERSION)/si
 all: prune.py
 
 prune.py: prune.in
-	sed 's/CCTOOLS_VERSION/${CCTOOLS_VERSION}/' < prune.in > prune.py
-	sed 's/CCTOOLS_RELEASE_DATE/${CCTOOLS_RELEASE_DATE}/' < prune.in > prune.py
+	sed 's/CCTOOLS_VERSION/${CCTOOLS_VERSION}/' < prune.in | sed 's/CCTOOLS_RELEASE_DATE/${CCTOOLS_RELEASE_DATE}/' > prune.py
 	chmod 755 prune.py
 
 clean:
