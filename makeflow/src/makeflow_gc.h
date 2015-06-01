@@ -20,7 +20,9 @@ typedef enum {
 	MAKEFLOW_GC_FORCE		/* Remove all collectable files right now. */
 } makeflow_gc_method_t;
 
-void makeflow_gc_prepare( struct dag *d );
-void makeflow_gc( struct dag *d, makeflow_gc_method_t method, int count );
+void makeflow_parse_input_outputs( struct dag *d );
+void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, int count );
+void makeflow_clean_node( struct dag *d, struct batch_queue *queue, struct dag_node *n);
+void makeflow_clean( struct dag *d, struct batch_queue *queue);
 
 #endif

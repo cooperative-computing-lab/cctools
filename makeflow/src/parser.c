@@ -244,7 +244,7 @@ static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node 
 	}
 	/* else if some other special variable .... */
 	/* ... */
-
+	
 	return special;
 }
 
@@ -364,6 +364,7 @@ static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 
 	return result;
 }
+
 
 static int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
 {

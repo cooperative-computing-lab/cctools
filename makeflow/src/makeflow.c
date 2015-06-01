@@ -181,79 +181,6 @@ static void makeflow_abort_all(struct dag *d)
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
 	}
 }
-
-/*
-Clean a specific file, while emitting an appropriate message.
-*/
-
-static void makeflow_file_clean(const char *filename, int silent)
-{
-	if(!filename)
-		return;
-
-	if(batch_fs_unlink(remote_queue, filename) == 0) {
-		if(!silent)
-			printf("deleted path %s\n", filename);
-	} else if(errno == ENOENT) {
-		// say nothing
-	} else if(!silent) {
-		fprintf(stderr, "couldn't delete %s: %s\n", filename, strerror(errno));
-	}
-}
-
-/*
-For a given dag node, export all variables into the environment.
-This is currently only used when cleaning a makeflow recurisvely,
-and would be better handled by invoking batch_job_local.
-*/
-
-static void makeflow_node_export_variables( struct dag *d, struct dag_node *n )
-{
-	struct nvpair *nv = dag_node_env_create(d,n);
-	if(nv) {
-		nvpair_export(nv);
-		nvpair_delete(nv);
-	}
-}
-
-/*
-Clean a node of a dag by cleaning all of its output dependencies,
-or by cleaning it recursively if it is a Makeflow itself.
-*/
-
-static void makeflow_node_clean(struct dag *d, struct dag_node *n)
-{
-	struct dag_file *f;
-	list_first_item(n->target_files);
-	while((f = list_next_item(n->target_files))) {
-		makeflow_file_clean(f->filename, 0);
-		hash_table_remove(d->completed_files, f->filename);
-	}
-
-	/* If the node is a Makeflow job, then we should recursively call the
-	 * clean operation on it. */
-	if(n->nested_job) {
-		char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
-		sprintf(command, "%s -c", n->command);
-
-		/* XXX this should use the batch job interface for consistency */
-		makeflow_node_export_variables(d, n);
-		system(command);
-		free(command);
-	}
-}
-
-/*
-Clean the entire dag by cleaning all nodes.
-*/
-
-static void makeflow_clean(struct dag *d)
-{
-	struct dag_node *n;
-	for(n = d->nodes; n; n = n->next)
-		makeflow_node_clean(d, n);
-}
-
 static void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
 
 /*
@@ -296,7 +223,7 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 				exit(1);
 			} else {
 				/* If input file is missing, but node completed and file was garbage, then avoid rerunning. */
-				if(n->state == DAG_NODE_STATE_COMPLETE && set_lookup(d->collect_table, f)) {
+				if(n->state == DAG_NODE_STATE_COMPLETE && f->state >= DAG_FILE_STATE_RECEIVE) {
 					continue;
 				}
 				goto rerun;
@@ -309,7 +236,7 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 	while((f = list_next_item(n->target_files))) {
 		if(batch_fs_stat(remote_queue, f->filename, &filestat) < 0) {
 			/* If output file is missing, but node completed and file was garbage, then avoid rerunning. */
-			if(n->state == DAG_NODE_STATE_COMPLETE && set_lookup(d->collect_table, f)) {
+			if(n->state == DAG_NODE_STATE_COMPLETE && f->state >= DAG_FILE_STATE_RECEIVE) {
 				continue;
 			}
 			goto rerun;
@@ -351,13 +278,13 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 		}
 	}
 	// Clean up things associated with this node
-	makeflow_node_clean(d, n);
+	makeflow_clean_node(d, remote_queue, n);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 
 	// For each parent node, rerun it if input file was garbage collected
 	list_first_item(n->source_files);
 	while((f1 = list_next_item(n->source_files))) {
-		if(!set_lookup(d->collect_table, f1))
+		if(f1->state != DAG_FILE_STATE_DELETE)
 			continue;
 
 		p = f1->created_by;
@@ -560,6 +487,24 @@ Given a list of files, add the files to the given string.
 Returns the original string, realloced if necessary
 */
 
+void log_file_create( struct dag *d, struct list *file_list )
+{
+    struct dag_file *f;
+
+	if(!file_list) return ;
+
+	list_first_item(file_list);
+	while((f=list_next_item(file_list))) {
+		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
+    }
+}
+
+
+/*
+Given a list of files, add the files to the given string.
+Returns the original string, realloced if necessary
+*/
+
 static char * makeflow_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue )
 {
 	struct dag_file *file;
@@ -672,6 +617,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	/* This function may realloc input_files and output_files. */
 	input_files = makeflow_file_list_format(n,input_files,wrapper_input_files,queue);
 	output_files = makeflow_file_list_format(n,output_files,wrapper_output_files,queue);
+
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
 	char *command = string_wrap_command(n->command, wrapper_command);
 
@@ -711,6 +657,10 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	input_files = replace_percents(input_files,nodeid);
 	output_files = replace_percents(output_files,nodeid);
 	free(nodeid);
+
+	/* Logs the creation of output files. */
+	log_file_create(d, n->target_files);	
+	log_file_create(d, wrapper_output_files);	
 
 	/* Now submit the actual job, retrying failures as needed. */
 	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist);
@@ -757,7 +707,7 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 
 	list_first_item(n->source_files);
 	while((f = list_next_item(n->source_files))) {
-		if(hash_table_lookup(d->completed_files, f->filename)) {
+		if(f->state >= DAG_FILE_STATE_RECEIVE) {
 			continue;
 		} else {
 			return 0;
@@ -894,17 +844,16 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		/* Record which target files have been generated by this node. */
 		list_first_item(n->target_files);
 		while((f = list_next_item(n->target_files))) {
-			hash_table_insert(d->completed_files, f->filename, f->filename);
+			d->completed_files += 1;
+			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_RECEIVE);
 		}
 
 		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
-		while((f = list_next_item(n->source_files)))
+		while((f = list_next_item(n->source_files))){
 			f->ref_count+= -1;
-
-		set_first_element(d->collect_table);
-		while((f = set_next_element(d->collect_table))) {
-			debug(D_MAKEFLOW_RUN, "%s: %d\n", f->filename, f->ref_count);
+			if(f->ref_count == 0)
+				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
@@ -928,12 +877,12 @@ static int makeflow_check(struct dag *d)
 		while((f = list_next_item(n->source_files))) {
 			struct stat buf;
 
-			if(hash_table_lookup(d->completed_files, f->filename)) {
+			if(f->state == DAG_FILE_STATE_DELETE) {
 				continue;
 			}
 
 			if(batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
-				hash_table_insert(d->completed_files, f->filename, f->filename);
+				d->completed_files += 1;
 				continue;
 			}
 
@@ -1007,7 +956,7 @@ static void makeflow_run( struct dag *d )
 		 * amount of tasks have passed. */
 		makeflow_gc_barrier--;
 		if(makeflow_gc_method != MAKEFLOW_GC_NONE && makeflow_gc_barrier == 0) {
-			makeflow_gc(d,makeflow_gc_method,makeflow_gc_param);
+			makeflow_gc(d, remote_queue, makeflow_gc_method,makeflow_gc_param);
 			makeflow_gc_barrier = MAX(d->nodeid_counter * makeflow_gc_task_ratio, 1);
 		}
 	}
@@ -1016,7 +965,7 @@ static void makeflow_run( struct dag *d )
 		makeflow_abort_all(d);
 	} else {
 		if(!makeflow_failed_flag && makeflow_gc_method != MAKEFLOW_GC_NONE) {
-			makeflow_gc(d,MAKEFLOW_GC_FORCE,0);
+			makeflow_gc(d,remote_queue,MAKEFLOW_GC_FORCE,0);
 		}
 	}
 }
@@ -1646,21 +1595,12 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(makeflow_gc_method != MAKEFLOW_GC_NONE)
-		makeflow_gc_prepare(d);
+    makeflow_parse_input_outputs(d);
 
 	makeflow_prepare_nested_jobs(d);
 
 	if (change_dir)
 		chdir(change_dir);
-
-	if(clean_mode) {
-		printf("cleaning filesystem...\n");
-		makeflow_clean(d);
-		unlink(logfilename);
-		unlink(batchlogfilename);
-		exit(0);
-	}
 
 	printf("checking %s for consistency...\n",dagfile);
 	if(!makeflow_check(d)) {
@@ -1673,6 +1613,15 @@ int main(int argc, char *argv[])
 	setlinebuf(stderr);
 
 	makeflow_log_recover(d, logfilename, log_verbose_mode );
+
+	if(clean_mode) {
+		printf("cleaning filesystem...\n");
+		makeflow_clean(d, remote_queue);
+		unlink(logfilename);
+		unlink(batchlogfilename);
+		exit(0);
+	}
+
 
 	printf("starting workflow....\n");
 
