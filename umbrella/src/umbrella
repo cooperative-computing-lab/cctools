@@ -202,7 +202,8 @@ def dependency_download(url, checksum, checksum_tool, dest, format_remote_storag
 		If the url is a broken link or the integrity of the downloaded data is bad, directly exit.
 		Otherwise, return None.
 	"""
-	logging.debug("Download software from %s into the dir (%s)", url, dest)
+	print "Download software from %s into the umbrella local cache (%s)" % (url, dest)
+	logging.debug("Download software from %s into the umbrella local cache (%s)", url, dest)
 	dest_dir = os.path.dirname(dest)
 	dest_uncompress = dest #dest_uncompress is the path of the uncompressed-version dependency
 
@@ -724,6 +725,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 
 	#if the sandbox_mode is parrot, add cctools into the dependency list to guarantee parrot can be used to create sandbox for the worst case (No root access authority and no docker).
 	if sandbox_mode == "parrot":
+		print "To support Parrot execution engine, cctools binary is needed."
 		host_cctools_path = cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, 'unpack')
 		logging.debug("To support Parrot execution engine, cctools binary (%s) is needed.", host_cctools_path)
 		logging.debug("Add mountpoint (%s:%s) into mount_dict", host_cctools_path, host_cctools_path)
@@ -1309,10 +1311,10 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 	logging.debug("chdir(%s)", sandbox_dir)
 	os.chdir(sandbox_dir) #here, we indeed want to chdir to sandbox_dir, not cwd_setting, to do preparation work like create mountlist file for Parrot.
 	#at this point, all the software should be under the cache dir, all the mountpoint of the software should be in mount_dict 
+	print "Execution engine: %s" % sandbox_mode
+	logging.debug("execution engine: %s", sandbox_mode)
+	logging.debug("need_separate_rootfs: %d", need_separate_rootfs)
 	if sandbox_mode == "chroot":
-		logging.debug("chroot execution engine")
-		logging.debug("need_separate_rootfs: %d", need_separate_rootfs)
-
 		if need_separate_rootfs == 1:
 			env_dict = construct_env(sandbox_dir, os_image_dir)
 		else:
@@ -1337,15 +1339,14 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 		logging.debug("Add env_para_dict into environment variables")
 		for key in env_para_dict:
 			env_dict[key] = env_para_dict[key]
+		print "Start executing the user's task: %s" % user_cmd[0]
 		rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
 		chroot_post_process(dir_dict, file_dict, sandbox_dir, 0, hardware_platform, distro_name, distro_version)
 		#rename the sandbox_dir to output_dir
 		logging.debug("Rename sandbox_dir (%s) to output_dir (%s)", sandbox_dir, output_dir)
 		os.rename(sandbox_dir, output_dir)
+		print "The output has been put into the output dir: %s" % output_dir
 	elif sandbox_mode == "docker":
-		logging.debug("docker execution engine")
-
-		logging.debug("need_separate_rootfs: %d", need_separate_rootfs)
 		if need_separate_rootfs == 1:
 			if has_docker_image(hardware_platform, distro_name, distro_version) == 'no':
 				logging.debug("Start to construct a docker image from the os image")
@@ -1378,6 +1379,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			container_name = "container_%s" % docker_image_name
 			#do not enable `-i` and `-t` option of Docker, it will fail when condor execution engine is chosen.
 			#to allow the exit code of user_cmd to be transferred back, seperate the user_cmd and the chown command.
+			print "Start executing the user's task: %s" % cmd
 			cmd = 'docker run --rm %s %s -e "PATH=%s" %s %s /bin/sh -c "cd %s; %s"' % (volume_output, volume_parameters, path_env, other_envs, docker_image_name, sandbox_dir, user_cmd[0])
 			rc, stdout, stderr = func_call(cmd)
 
@@ -1389,13 +1391,13 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 
 			if rc != 0:
 				subprocess_error(cmd, rc, stdout, stderr)
+
+			print "The output has been put into the output dir: %s" % output_dir
 		else:
 			#if a separate rootfs is not needed to execute the user's cmd, should forcely use other execution engine to run the user cmd.
 			logging.debug("Docker execution engine can only be used when a separate rootfs is needed.")
 			sys.exit("Docker execution engine can only be used when a separate rootfs is needed.\n")
 	elif sandbox_mode == "parrot":
-		logging.debug("Parrot execution engine")
-		logging.debug("need_separate_rootfs: %d", need_separate_rootfs)
 		if need_separate_rootfs == 1:
 			logging.debug("Construct environment variables ....")
 			env_dict = construct_env(sandbox_dir, os_image_dir)
@@ -1420,6 +1422,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			extra_path = collect_software_bin(host_cctools_path, sw_mount_dict)
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
+			print "Start executing the user's task: %s" % user_cmd[0]
 			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
 		else:
 			env_dict = os.environ
@@ -1435,6 +1438,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			extra_path = collect_software_bin(host_cctools_path, sw_mount_dict)
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
+			print "Start executing the user's task: %s" % user_cmd[0]
 			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
 
 		logging.debug("Removing the parrot mountlist file and the parrot submit file from the sandbox")
@@ -1443,6 +1447,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 
 		logging.debug("Rename sandbox_dir (%s) to output_dir (%s)", sandbox_dir, output_dir)
 		os.rename(sandbox_dir, output_dir)
+		print "The output has been put into the output dir: %s" % output_dir
 	else:
 		pass
 
@@ -1468,6 +1473,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 	if not os.path.exists(sandbox_dir):
 		os.makedirs(sandbox_dir)
 
+	print "Checking the validity of the umbrella specification ..."
 	if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
 		logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
 		(hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
@@ -1477,6 +1483,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 
 	condor_submit_path = sandbox_dir + "/condor_task.submit"
 
+	print "Constructing Condor submission file according to the umbrella specification ..."
 	transfer_inputs = ''
 	new_input_options = ''
 	logging.debug("Transform input_list_origin into condor attributes ....")
@@ -1530,6 +1537,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 	condor_submit_file.close()
 
 	#submit condor job
+	print "Submitting the Condor job ..."
 	cmd = 'condor_submit ' + condor_submit_path
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
@@ -1551,6 +1559,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 		index2 = content.find(')', index1)
 		remote_rc = int(content[(index1 + len(str)):index2])
 
+	print "The exit code of the remote executed umbrella found in the condor log file (%s) is %d!" % (condor_log_path, remote_rc)
 	logging.debug("The exit code of the remote executed umbrella found in the condor log file (%s) is %d!", condor_log_path, remote_rc)
 
 	if remote_rc == 500:
@@ -1566,13 +1575,17 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 	#the semantics of condor_output_files only supports transferring a dir from the execution node back to the current working dir (here it is condor_output_dir). 
 	os.rename(condor_output_dir, output_dir)
 
+	print "move condor_stdout, condor_stderr and condor_task.log from sandbox_dir to output_dir."
 	logging.debug("move condor_stdout, condor_stderr and condor_task.log from sandbox_dir to output_dir.")
 	os.rename(sandbox_dir + '/condor_stdout', output_dir + '/condor_stdout')
 	os.rename(sandbox_dir + '/condor_stderr', output_dir + '/condor_stderr')
 	os.rename(sandbox_dir + '/condor_task.log', output_dir + '/condor_task.log')
 
+	print "Remove the sandbox dir"
 	logging.debug("Remove the sandbox_dir.")
 	shutil.rmtree(sandbox_dir)
+
+	print "The output has been put into the output dir: %s" % output_dir
 
 def decide_instance_type(cpu_cores, memory_size, disk_size, instances):
 	""" Compare the required hardware configurations with each instance type, and return the first matched instance type, return 'no' if no matched instance type exist.
@@ -1625,6 +1638,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 		If no errors happen, return None;
 		Otherwise, directly exit.
 	"""
+	print "Checking the validity of the umbrella specification ..."
 	if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
 		(hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
 	else:
@@ -1632,6 +1646,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 
 	#According to the given specification file, the AMI and the instance type can be identified. os and arch can be used to decide the AMI; cores, memory and disk can be used to decide the instance type.
 	#decide the AMI according to (distro_name, distro_version, hardware_platform)
+	print "Deciding the AMI according to the umbrella specification ..."
 	name = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
 	if ec2_json.has_key(name):
 		if os_id == '':
@@ -1655,6 +1670,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 		sys.exit("%s is not in the ec2 json file (%s).\n" % (name, ec2_path))
 
 	#decide the instance type according to (cores, memory, disk)
+	print "Deciding the instance type according to the umbrella specification ..."
 	instances = ec2_json["instances"]
 	r = decide_instance_type(cpu_cores, memory_size, disk_size, instances)
 	if r == 'no':
@@ -1664,15 +1680,18 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 		logging.debug("the matched instance type exists: %s", r)
 
 	#start the instance and obtain the instance id
+	print "Starting an Amazon EC2 instance ..."
 	instance_id = get_instance_id(ami, r, ec2_key_pair, ec2_security_group)
 	logging.debug("Start the instance and obtain the instance id: %s", instance_id)
 
 	#get the public DNS of the instance_id
+	print "Obtaining the public DNS of the Amazon EC2 instance ..."
 	public_dns = get_public_dns(instance_id)
 	logging.debug("Get the public DNS of the instance_id: %s", public_dns)
 
 	#public_dns = "ec2-52-11-98-91.us-west-2.compute.amazonaws.com"
 	#install wget on the instance	
+	print "Installing wget on the EC2 instance ..."
 	logging.debug("Install wget on the instance")
 	#here we should judge the os type, yum is used by Fedora, CentOS, and REHL.
 	#without `-t` option of ssh, if the username is not root, `ssh + sudo` will get the following error: sudo: sorry, you must have a tty to run sudo.
@@ -1690,6 +1709,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 			time.sleep(5)
 
 	#python, the python is needed to execute umbrella itself
+	print "Installing python 2.6.9 on the instance ..."
 	logging.debug("Install python 2.6.9 on the instance.")
 	python_name = 'python-2.6.9-%s-%s' % (linux_distro, hardware_platform)
 	python_item = package_search(packages_json, python_name)
@@ -1709,6 +1729,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	#scp umbrella, packages.json and input files to the instance 
+	print "Sending the umbrella task to the EC2 instance ..."
 	logging.debug("scp relevant files into the HOME dir of the instance.")
 	input_file_string = ''
 	for input_file in input_list:
@@ -1735,6 +1756,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 	logging.debug("The new_input_options of Umbrella: %s", new_input_options) #--inputs option
 	
 	#execute the command on the instance 
+	print "Executing the user's task on the EC2 instance ..."
 	logging.debug("Execute the command on the instance ...")
 	if env_options == '':
 		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -s local -c %s --log ec2_umbrella.log --packages %s -l ec2_umbrella -o output -i \'%s\' run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, user_cmd[0])
@@ -1746,6 +1768,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	#postprocessing
+	print "Transferring the output of the user's task from the EC2 instance back to the local machine ..."
 	logging.debug("Create a tarball for the output dir on the instance.")
 	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'tar cvzf output.tar.gz output\'' % (ssh_key, user_name, public_dns)
 	rc, stdout, stderr = func_call(cmd)
@@ -1778,7 +1801,10 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 	os.rename('%s/output' % sandbox_dir, output_dir)
 	shutil.rmtree(sandbox_dir)
 
+	print "Terminating the EC2 instance ..."
 	terminate_instance(instance_id)
+
+	print "The output has been put into the output dir: %s" % output_dir
 
 def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting):
 	""" Create the execution environment specified in the specification file and run the task on it.
@@ -1798,6 +1824,7 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandb
 	Returns:
 		None.
 	"""
+	print "Checking the validity of the umbrella specification ..."
 	if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
 		logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
 		(hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
