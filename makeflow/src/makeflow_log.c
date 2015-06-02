@@ -68,11 +68,17 @@ Line format: # ABORTED timestamp
 Line format: # FAILED timestamp
 Line format: # COMPLETED timestamp
 
-Line format: # EXPECT filename timestamp
-Line format: # RECIEVE filename timestamp
-Line format: # COMPLETE filename timestamp
-Line format: # DELETE filename timestamp
-
+Line format: # dag_file_state filename timestamp
+dag_file_state - the new DAG_FILE_STATE_* of the file mentioned:
+	0. UNKNOWN  - The file is in an unknown state, where it may exists(input) but we have not checked yet.
+	1. EXPECT   - The file is the expected output of a task. Transition meant to more explicitly describe GC.
+	2. EXISTS   - The file exists on disk accessible to the workflow. Can result from checking an unknown file with stat, receiving a task's result files (EXPECT->EXISTS), or a file is retrieved from another source (DOWN->EXISTS).
+	3. COMPLETE - An existing file is no longer used as a source for remaining tasks.
+	4. DELETE   - The file was complete, then removed with either GC or clean.
+	5. DOWN     - Intermediate state when retrieving from different location. For acknowledging it may be partially existent in the file system.
+	6. UP       - Intermediate state for putting file to different lcoation. For acknowledging partial upload.
+filename - the filename specified within the dag_file whose state has changed.
+timestamp - the unix time (in microseconds) when this line is written to the log file.
 
 These event types indicate that the workflow as a whole has started or completed in the indicated manner.
 */

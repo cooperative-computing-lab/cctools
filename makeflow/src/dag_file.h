@@ -17,12 +17,13 @@ See the file COPYING for details.
  */
 
 typedef enum {
-	DAG_FILE_STATE_INITIAL = 0,
+	DAG_FILE_STATE_UNKNOWN = 0,
 	DAG_FILE_STATE_EXPECT = 1,
-	DAG_FILE_STATE_RECEIVE = 2,
+	DAG_FILE_STATE_EXISTS = 2,
 	DAG_FILE_STATE_COMPLETE = 3,
 	DAG_FILE_STATE_DELETE = 4,
-	DAG_FILE_STATE_INPUT = 5
+	DAG_FILE_STATE_DOWN = 5,
+	DAG_FILE_STATE_UP = 6
 } dag_file_state_t;
 
 
@@ -39,5 +40,7 @@ struct dag_file *dag_file_create( const char *filename );
 const char *dag_file_state_name(dag_file_state_t state);
 int dag_file_is_source( const struct dag_file *f );
 int dag_file_is_sink( const struct dag_file *f );
+int dag_file_exists( const struct dag_file *f );
+int dag_file_in_trans( const struct dag_file *f );
 
 #endif
