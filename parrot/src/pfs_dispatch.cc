@@ -3142,32 +3142,32 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 	CATCHUNIX(phyfd = open(physical_name, O_RDONLY));
 
 	if (pfs_ldso_path[0]) {
-		debug(D_PROCESS, "prepare_exe: forcing use of loader %s", pfs_ldso_path);
+		debug(D_PROCESS, "%s: forcing use of loader %s", __func__, pfs_ldso_path);
 		CATCHUNIX(pfs_get_local_name(pfs_ldso_path, ldso_physical_name, 0, 0));
 	} else {
 		char path[PATH_MAX] = "";
 		CATCHUNIX(elf_get_interp(phyfd, path));
 		if (path[0]) {
-			debug(D_DEBUG, "prepare_exe: %s PT_INTERP is %s", physical_name, path);
+			debug(D_DEBUG, "%s: %s PT_INTERP is %s", __func__, physical_name, path);
 			/* XXX This access skips mounts and other PFS redirections. */
 			if (access(path, R_OK|X_OK) == 0) {
 				/* The kernel can find it, we're done. */
-				debug(D_DEBUG, "prepare_exe: interpreter is local, no redirection required");
+				debug(D_DEBUG, "%s: interpreter is local, no redirection required", __func__);
 				exefd = phyfd;
 				phyfd = -1;
 				goto success;
 			}
-			debug(D_PROCESS, "prepare_exe: getting physical name of loader %s", path);
+			debug(D_PROCESS, "%s: getting physical name of loader %s", __func__, path);
 			CATCHUNIX(pfs_get_local_name(path, ldso_physical_name, 0, 0));
 		} else {
-			debug(D_DEBUG, "prepare_exe: %s is a static binary and will be executed directly", physical_name);
+			debug(D_DEBUG, "%s: %s is a static binary and will be executed directly", __func__, physical_name);
 			exefd = phyfd;
 			phyfd = -1;
 			goto success;
 		}
 	}
 
-	debug(D_PROCESS, "prepare_exe: rewriting executable to use interpreter %s", ldso_physical_name);
+	debug(D_PROCESS, "%s: rewriting executable to use interpreter %s", __func__, ldso_physical_name);
 	{
 		/* Use a useful name for the temporary file, for easier debugging. */
 		extern char pfs_temp_per_instance_dir[PATH_MAX];
