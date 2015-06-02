@@ -3146,25 +3146,22 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 		CATCHUNIX(pfs_get_local_name(pfs_ldso_path, ldso_physical_name, 0, 0));
 	} else {
 		char path[PATH_MAX] = "";
-		CATCHUNIX(elf_get_interp(phyfd, path));
-		if (path[0]) {
-			debug(D_DEBUG, "%s: %s PT_INTERP is %s", __func__, physical_name, path);
-			/* XXX This access skips mounts and other PFS redirections. */
-			if (access(path, R_OK|X_OK) == 0) {
-				/* The kernel can find it, we're done. */
-				debug(D_DEBUG, "%s: interpreter is local, no redirection required", __func__);
-				exefd = phyfd;
-				phyfd = -1;
-				goto success;
-			}
-			debug(D_PROCESS, "%s: getting physical name of loader %s", __func__, path);
-			CATCHUNIX(pfs_get_local_name(path, ldso_physical_name, 0, 0));
-		} else {
-			debug(D_DEBUG, "%s: %s is a static binary and will be executed directly", __func__, physical_name);
+		rc = elf_get_interp(phyfd, path);
+		if (rc == -1 && errno == EINVAL)
+			goto st;
+		CATCHUNIX(rc);
+		assert(path[0]);
+		debug(D_DEBUG, "%s: %s PT_INTERP is %s", __func__, physical_name, path);
+		/* XXX This access skips mounts and other PFS redirections. */
+		if (access(path, R_OK|X_OK) == 0) {
+			/* The kernel can find it, we're done. */
+			debug(D_DEBUG, "%s: interpreter is local, no redirection required", __func__);
 			exefd = phyfd;
 			phyfd = -1;
 			goto success;
 		}
+		debug(D_PROCESS, "%s: getting physical name of loader %s", __func__, path);
+		CATCHUNIX(pfs_get_local_name(path, ldso_physical_name, 0, 0));
 	}
 
 	debug(D_PROCESS, "%s: rewriting executable to use interpreter %s", __func__, ldso_physical_name);
@@ -3178,7 +3175,10 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 	}
 	CATCHUNIX(fchmod(exefd, S_IRWXU));
 	CATCHUNIX(copy_fd_to_fd(phyfd, exefd));
-	CATCHUNIX(elf_set_interp(exefd, ldso_physical_name));
+	rc = elf_set_interp(exefd, ldso_physical_name);
+	if (rc == -1 && errno == EINVAL)
+		goto st;
+	CATCHUNIX(rc);
 	{
 		char procfd[PATH_MAX];
 		CATCHUNIX(snprintf(procfd, PATH_MAX, "/proc/self/fd/%d", exefd));
@@ -3189,12 +3189,19 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 	}
 	goto success;
 
+st:
+	debug(D_DEBUG, "%s: %s is a static binary and will be executed directly", __func__, physical_name);
+	exefd = phyfd;
+	phyfd = -1;
+	goto success;
+
 success:
 	CATCHUNIX(snprintf(exe, PATH_MAX, "/proc/%d/fd/%d", getpid(), exefd));
 	p->exefd = exefd;
 
 	rc = 0;
 	goto out;
+
 out:
 	if (phyfd >= 0)
 		close(phyfd);
