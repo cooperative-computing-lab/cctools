@@ -78,10 +78,10 @@ and would be better handled by invoking batch_job_local.
 static void makeflow_node_export_variables( struct dag *d, struct dag_node *n )
 {
 	struct nvpair *nv = dag_node_env_create(d,n);
-	if(nv == NULL)
-		return ;
-	nvpair_export(nv);
-	nvpair_delete(nv);
+	if(nv){
+		nvpair_export(nv);
+		nvpair_delete(nv);
+	}
 }
 
 
