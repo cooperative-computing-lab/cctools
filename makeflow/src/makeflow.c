@@ -223,7 +223,7 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 				exit(1);
 			} else {
 				/* If input file is missing, but node completed and file was garbage, then avoid rerunning. */
-				if(n->state == DAG_NODE_STATE_COMPLETE && f->state >= DAG_FILE_STATE_RECEIVE) {
+				if(n->state == DAG_NODE_STATE_COMPLETE && dag_file_exists(f)) {
 					continue;
 				}
 				goto rerun;
@@ -236,7 +236,7 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 	while((f = list_next_item(n->target_files))) {
 		if(batch_fs_stat(remote_queue, f->filename, &filestat) < 0) {
 			/* If output file is missing, but node completed and file was garbage, then avoid rerunning. */
-			if(n->state == DAG_NODE_STATE_COMPLETE && f->state >= DAG_FILE_STATE_RECEIVE) {
+			if(n->state == DAG_NODE_STATE_COMPLETE && dag_file_exists(f)) {
 				continue;
 			}
 			goto rerun;
@@ -284,7 +284,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	// For each parent node, rerun it if input file was garbage collected
 	list_first_item(n->source_files);
 	while((f1 = list_next_item(n->source_files))) {
-		if(f1->state != DAG_FILE_STATE_DELETE)
+		if(dag_file_exists(f1))
 			continue;
 
 		p = f1->created_by;
@@ -483,11 +483,10 @@ static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, stru
 }
 
 /*
-Given a list of files, add the files to the given string.
-Returns the original string, realloced if necessary
+Given a list of files, set theses files' states to EXPECT.
 */
 
-void log_file_create( struct dag *d, struct list *file_list )
+void makeflow_log_file_expectation( struct dag *d, struct list *file_list )
 {
     struct dag_file *f;
 
@@ -659,8 +658,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	free(nodeid);
 
 	/* Logs the creation of output files. */
-	log_file_create(d, n->target_files);	
-	log_file_create(d, wrapper_output_files);	
+	makeflow_log_file_expectation(d, n->target_files);	
+	makeflow_log_file_expectation(d, wrapper_output_files);	
 
 	/* Now submit the actual job, retrying failures as needed. */
 	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist);
@@ -707,7 +706,7 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 
 	list_first_item(n->source_files);
 	while((f = list_next_item(n->source_files))) {
-		if(f->state >= DAG_FILE_STATE_RECEIVE) {
+		if(dag_file_exists(f)) {
 			continue;
 		} else {
 			return 0;
@@ -845,14 +844,14 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		list_first_item(n->target_files);
 		while((f = list_next_item(n->target_files))) {
 			d->completed_files += 1;
-			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_RECEIVE);
+			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
 		}
 
 		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))){
 			f->ref_count+= -1;
-			if(f->ref_count == 0 && f->state)
+			if(f->ref_count == 0 && f->state == DAG_FILE_STATE_EXISTS)
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 		}
 
@@ -882,6 +881,8 @@ static int makeflow_check(struct dag *d)
 			}
 
 			if(batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
+				if(!dag_file_exists(f))
+					f->state = DAG_FILE_STATE_EXISTS;
 				d->completed_files += 1;
 				continue;
 			}

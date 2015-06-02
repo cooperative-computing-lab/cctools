@@ -78,6 +78,8 @@ and would be better handled by invoking batch_job_local.
 static void makeflow_node_export_variables( struct dag *d, struct dag_node *n )
 {
 	struct nvpair *nv = dag_node_env_create(d,n);
+	if(nv == NULL)
+		return ;
 	nvpair_export(nv);
 	nvpair_delete(nv);
 }
@@ -87,8 +89,8 @@ static void makeflow_node_export_variables( struct dag *d, struct dag_node *n )
 
 void makeflow_parse_input_outputs( struct dag *d )
 {
-    char *input_list  = dag_variable_lookup_global_string("INPUTS" , d);
-    char *output_list = dag_variable_lookup_global_string("OUTPUTS", d);
+    char *input_list  = dag_variable_lookup_global_string("MAKEFLOW_INPUTS" , d);
+    char *output_list = dag_variable_lookup_global_string("MAKEFLOW_OUTPUTS", d);
 
     struct dag_file *f;
 
@@ -100,7 +102,6 @@ void makeflow_parse_input_outputs( struct dag *d )
     for(i = 0; i < argc; i++) {
 		d->completed_files += 1;
         f = dag_file_lookup_or_create(d, argv[i]);
-		f->state = DAG_FILE_STATE_INPUT;
         set_insert(d->inputs, f);
         debug(D_MAKEFLOW_RUN, "Added %s to input list", f->filename);
     }
@@ -167,7 +168,7 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue)
 
     hash_table_firstkey(d->files);
     while(hash_table_nextkey(d->files, &name, (void **) &f)) {
-		if((f->state == DAG_FILE_STATE_COMPLETE) || (f->state == DAG_FILE_STATE_COMPLETE))
+		if(dag_file_exists(f))
 			makeflow_file_clean(d, queue, f, 0);
 		if(f->state == DAG_FILE_STATE_EXPECT)
 			makeflow_file_clean(d, queue, f, 1);
