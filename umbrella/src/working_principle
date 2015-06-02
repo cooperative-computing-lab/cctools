@@ -1,32 +1,48 @@
 Options:
+  -h, --help            show this help message and exit
   -c CONFIG, --config=CONFIG
                         The specification json file. (By default: spec.json)
   -l LOCALDIR, --localdir=LOCALDIR
-                        The path of directory used for all the cached data and all the sandboxes. (By default: ./umbrella_test)
-						this directory can be an existing dir.
+                        The path of directory used for all the cached data and
+                        all the sandboxes, the directory can be an existing
+                        dir. (By default: ./umbrella_test)
   -i INPUTS, --inputs=INPUTS
-                        The path of input files in the format of access_path=actual_path. i.e, -i '/home/hmeng/file1=/tmp/file2'. access_path must be consistent with the semantics of the provided command, actual_path can be relative or absolute. (By default:
+                        The path of input files in the format of
+                        access_path=actual_path. i.e, -i
+                        '/home/hmeng/file1=/tmp/file2'. access_path must be
+                        consistent with the semantics of the provided command,
+                        actual_path can be relative or absolute. (By default:
                         '')
-  -e ENV, --env=ENV     The environment variable. I.e., -e 'PWD=/tmp'. (By default: '')
+  -e ENV, --env=ENV     The environment variable. I.e., -e 'PWD=/tmp'. (By
+                        default: '')
   -o OUTPUT, --output=OUTPUT
-                        The path of output. (By default: ./umbrella_output)
-						this directory must be non-existing or empty.
-
-  -T BATCH_TYPE, --batch_type=BATCH_TYPE
-                        Batch system type, which can be local, parrot, chroot, docker, condor, ec2. (By default: local)
-
-  --packages=PACKAGES   The source of packages information. (By default: ./packages.json)
+                        The path of output directory, which must be non-
+                        existing or empty. (By default: ./umbrella_output)
+  -s SANDBOX_MODE, --sandbox_mode=SANDBOX_MODE
+                        sandbox mode, which can be local, parrot, chroot,
+                        docker, condor, ec2. (By default: local)
+  --packages=PACKAGES   The source of packages information. (By default:
+                        ./packages.json)
 						If the value of this option does not exist, one copy of packages.json will be downloaded into the sandbox from the ccl website.
-
-  --ec2=EC2             The source of ec2 information. (By default: ./ec2.json)
+  --ec2=EC2             The source of ec2 information. (By default:
+                        ./ec2.json)
 						If the value of this option does not exist, one copy of ec2.json will be downloaded into the sandbox from the ccl website.
-
-  --log=LOG             The path of umbrella log file. (By default: ./umbrella.log)
-  --remotelog=REMOTELOG The path of the remote umbrella log file. Required for ec2 and condor execution engines.
-  -g GROUP, --group=GROUP
-                        the security group within which an instance should be run. (only for ec2)
-  -k KEY, --key=KEY     the name of the key pair to use when launching an instance. (only for ec2)
-  --sshkey=SSHKEY       the name of the private key file to use when connecting to an instance. (only for ec2)
+  --log=LOG             The path of umbrella log file. (By default:
+                        ./umbrella.log)
+  --condor_log=CONDOR_LOG
+                        The path of the condor umbrella log file. Required for
+                        condor execution engines.
+  --ec2_log=EC2_LOG     The path of the ec2 umbrella log file. Required for
+                        ec2 execution engines.
+  -g EC2_GROUP, --ec2_group=EC2_GROUP
+                        the security group within which an Amazon EC2 instance
+                        should be run. (only for ec2)
+  -k EC2_KEY, --ec2_key=EC2_KEY
+                        the name of the key pair to use when launching an
+                        Amazon EC2 instance. (only for ec2)
+  --ec2_sshkey=EC2_SSHKEY
+                        the name of the private key file to use when
+                        connecting to an Amazon EC2 instance. (only for ec2)
 
 inputs of local execution engine: 
 all the inputs are mounted into the sandbox without being copied into the sandbox in all these three container techniques (chroot, parrot and docker).
@@ -39,7 +55,7 @@ Required changes:
 	use a python from the archive if the remote execution node does not have the correct python to execute umbrella (not finished)
 	force the usage of the packages.json transferred to the execution node
 	change -c to use the specification under the home directory
-	change -T to be local
+	change -s to be local
 	change -i to set all the actual paths to be the home directory
 Optional changes:
 	change -l to ~/ec2_umbrella
@@ -54,7 +70,7 @@ Required changes:
 	use a python from the archive if the remote execution node does not have the correct python to execute umbrella (not finished)
 	force the usage of the packages.json transferred to the execution node
 	change -c to use the specification under the scratch directory of the condor job
-	change -T to be local
+	change -s to be local
 	change -i to set all the actual paths to be the scratch directory of the condor job
 Optional changes:
 	change -l to condor_umbrella

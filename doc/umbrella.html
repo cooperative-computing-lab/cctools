@@ -134,7 +134,7 @@
 
 			<p><b>The umbrella command for Parrot execution engine:</b></p>			
 			<code>umbrella \
-	--batch_type parrot \
+	--sandbox_mode parrot \
 	--log umbrella.log \
 	--config povray.umbrella \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
@@ -232,7 +232,7 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 
 			<p><b>The umbrella command for Parrot execution engine:</b></p>			
 			<code>umbrella \
-	--batch_type parrot \
+	--sandbox_mode parrot \
 	--log umbrella.log \
 	--config cms_complex.umbrella \
 	--inputs 'cms_complex.sh=cms_complex.sh' \
@@ -484,7 +484,7 @@ System                  2                   2
 
 				<p><b>The umbrella command for Parrot execution engine:</b></p>			
 				<code>umbrella \
-	--batch_type parrot \
+	--sandbox_mode parrot \
 	--log umbrella.log \
 	--config povray.umbrella \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
@@ -496,7 +496,7 @@ System                  2                   2
 
 				<p><b>The umbrella command for Docker execution engine:</b></p>			
 				<code>umbrella \
-	--batch_type docker \
+	--sandbox_mode docker \
 	--log umbrella.log \
 	--config povray.umbrella \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
@@ -510,7 +510,7 @@ System                  2                   2
 
 				<p><b>The umbrella command for chroot execution engine:</b></p>			
 				<code>umbrella \
-	--batch_type chroot \
+	--sandbox_mode chroot \
 	--log umbrella.log \
 	--config povray.umbrella \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
@@ -524,7 +524,7 @@ System                  2                   2
 
 				<p><b>The umbrella command for local execution engine:</b></p>			
 				<code>umbrella \
-	--batch_type local \
+	--sandbox_mode local \
 	--log umbrella.log \
 	--config povray.umbrella \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
@@ -539,15 +539,15 @@ System                  2                   2
 				engine just focuses on docker and parrot, ignoring chroot, because to render a
 				task includes lots of mount and umount oprations, which are dangerous.  If you
 				really want to use chroot to finish your task, please set the
-				<tt>--batch_type</tt> option to be chroot.</p> 
+				<tt>--sandbox_mode</tt> option to be chroot.</p> 
 			
 			<h3 id="run.condor">Execute your Application through Umbrella - Condor<a class="sectionlink" href="#run.condor" title="Link to this section.">&#x21d7;</a></h3>
 
 				<p><b>The umbrella command for condor execution engine:</b></p>			
 				<code>umbrella \
-	--batch_type condor \
+	--sandbox_mode condor \
 	--log umbrella.log \
-	--remotelog umbrella.log.condor \
+	--condor_log umbrella.log.condor \
 	--config povray.umbrella \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 	--localdir /tmp/umbrella_test/ \
@@ -561,9 +561,12 @@ System                  2                   2
 
 				<p><b>The umbrella command for ec2 execution engine:</b></p>			
 				<code>umbrella \
-	--batch_type ec2 \
+	--sandbox_mode ec2 \
 	--log umbrella.log \
-	--remotelog umbrella.log.ec2 \
+	--ec2_log umbrella.log.ec2 \
+	--ec2_sshkey ~/bin/feb272015.pem \
+	--ec2_key feb272015 \
+	--ec2_group 'sg-24f96141' \
 	--config povray.umbrella \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 	--localdir /tmp/umbrella_test/ \
@@ -850,7 +853,7 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 			umbrella can be called to execute the application:</p>
 
 			<code>umbrella \
-	--batch_type parrot \
+	--sandbox_mode parrot \
 	--log umbrella.log \
 	--config cms_complex.umbrella \
 	--inputs 'cms_complex.sh=cms_complex.sh' \

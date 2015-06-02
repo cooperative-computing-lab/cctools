@@ -3,7 +3,7 @@ a ray-tracing application.
 
 #parrot execution engine test command.
 umbrella \
---batch_type parrot \
+--sandbox_mode parrot \
 --log umbrella.log \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
@@ -23,7 +23,7 @@ run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 #chroot execution engine test command. You must be root to run this command.
 umbrella \
---batch_type chroot \
+--sandbox_mode chroot \
 --log umbrella.log \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
@@ -35,7 +35,7 @@ run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 #your afs, because the ACL of your afs does not support importing an OS tarball
 #into a docker image.
 umbrella \
---batch_type local \
+--sandbox_mode local \
 --log umbrella.log \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
@@ -51,12 +51,12 @@ run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 #the `id` attribute of the os section is an AMI in the ec2 specification; the
 #`id` attribute of the os section is the checksum of the os image.
 umbrella \
---batch_type ec2 \
+--sandbox_mode ec2 \
 --log umbrella.log \
---remotelog umbrella.log.ec2 \
---sshkey ~/bin/feb272015.pem \
---key feb272015 \
---group 'sg-24f96141' \
+--ec2_log umbrella.log.ec2 \
+--ec2_sshkey ~/bin/feb272015.pem \
+--ec2_key feb272015 \
+--ec2_group 'sg-24f96141' \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 --localdir /tmp/umbrella_test/ \
@@ -66,9 +66,9 @@ run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 #Condor execution engine test command. To test this, the machine you are using should have condor installed.
 #Condor can not work together with afs. So don't do your test on your afs.
 umbrella \
---batch_type condor \
+--sandbox_mode condor \
 --log umbrella.log \
---remotelog umbrella.log.condor \
+--condor_log umbrella.log.condor \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 --localdir /tmp/umbrella_test/ \
