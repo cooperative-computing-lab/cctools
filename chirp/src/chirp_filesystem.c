@@ -175,6 +175,9 @@ int cfs_fflush(CHIRP_FILE * file)
 
 int cfs_fclose(CHIRP_FILE * file)
 {
+	if(file == NULL)
+		return 0;
+
 	if(file->type == LOCAL)
 		return fclose(file->f.lfile);
 

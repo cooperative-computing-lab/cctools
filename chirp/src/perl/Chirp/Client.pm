@@ -152,6 +152,9 @@ sub resetacl {
 
 sub ls {
 	my ($self, $path, %args) = @_;
+
+	croak('A path should be given.')             unless $path;
+
 	my $dr = chirp_reli_opendir($self->hostport, $path, $self->__stoptime(%args));
 
 	croak_errno($!, "Could not list path '$path'.") unless $dr;
@@ -227,11 +230,9 @@ sub hash {
 
 	$args{algorithm} ||= 'sha1';
 
-	my $hash = chirp_wrap_hash($self->hostport, $path, $args{algorithm}, $self->__stoptime(%args));
+	my $hash_hex = chirp_wrap_hash($self->hostport, $path, $args{algorithm}, $self->__stoptime(%args));
 
-	croak_errno($!, "Could not hash path '$path'.\n") unless $hash;
-
-	my $hash_hex = unpack('H*', $hash);
+	croak_errno($!, "Could not hash path '$path'.\n") unless $hash_hex;
 
 	return $hash_hex;
 }
