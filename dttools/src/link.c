@@ -45,6 +45,8 @@ See the file COPYING for details.
 #define TCP_HIGH_PORT_DEFAULT 32767
 #endif
 
+static FILE *stats;
+
 enum link_type {
 	LINK_TYPE_STANDARD,
 	LINK_TYPE_FILE,
@@ -64,6 +66,12 @@ struct link {
 static int link_send_window = 65536;
 static int link_recv_window = 65536;
 static int link_override_window = 0;
+
+static void stats_update (int fd, const char type, size_t count)
+{
+	if (stats)
+		fprintf(stats, "%" PRIu64 " %d %c %zu\n", (uint64_t)time(NULL), fd, (int)type, count);
+}
 
 void link_window_set(int send_buffer, int recv_buffer)
 {
@@ -296,6 +304,7 @@ struct link *link_attach(int fd)
 
 	if(link_address_remote(l, l->raddr, &l->rport)) {
 		debug(D_TCP, "attached to %s:%d", l->raddr, l->rport);
+		stats_update(l->fd, 'o', 0);
 		return l;
 	} else {
 		l->fd = -1;
@@ -316,6 +325,7 @@ struct link *link_attach_to_file(FILE *f)
 
 	l->fd = fd;
 	l->type = LINK_TYPE_FILE;
+	stats_update(l->fd, 'o', 0);
 	return l;
 }
 
@@ -419,9 +429,12 @@ struct link *link_serve_address(const char *addr, int port)
 		goto failure;
 
 	debug(D_TCP, "listening on port %d", port);
+
+	stats_update(link->fd, 'o', 0);
+
 	return link;
 
-	  failure:
+failure:
 	if(link)
 		link_close(link);
 	return 0;
@@ -454,9 +467,11 @@ struct link *link_accept(struct link *master, time_t stoptime)
 
 	debug(D_TCP, "got connection from %s:%d", link->raddr, link->rport);
 
+	stats_update(link->fd, 'o', 0);
+
 	return link;
 
-	  failure:
+failure:
 	if(link)
 		link_close(link);
 	return 0;
@@ -524,6 +539,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 #ifdef CCTOOLS_OPSYS_CYGWIN
 			link_nonblocking(link, 1);
 #endif
+			stats_update(link->fd, 'o', 0);
 			return link;
 		}
 
@@ -559,6 +575,7 @@ static ssize_t fill_buffer(struct link *link, time_t stoptime)
 	while(1) {
 		ssize_t chunk = read(link->fd, link->buffer, sizeof(link->buffer));
 		if(chunk > 0) {
+			stats_update(link->fd, 'r', chunk);
 			link->read += chunk;
 			link->buffer_start = link->buffer;
 			link->buffer_length = chunk;
@@ -627,6 +644,7 @@ ssize_t link_read(struct link *link, char *data, size_t count, time_t stoptime)
 		} else if(chunk == 0) {
 			break;
 		} else {
+			stats_update(link->fd, 'r', chunk);
 			link->read += chunk;
 			total += chunk;
 			count -= chunk;
@@ -682,6 +700,7 @@ ssize_t link_read_avail(struct link *link, char *data, size_t count, time_t stop
 		} else if(chunk == 0) {
 			break;
 		} else {
+			stats_update(link->fd, 'r', chunk);
 			link->read += chunk;
 			total += chunk;
 			count -= chunk;
@@ -749,6 +768,7 @@ ssize_t link_write(struct link *link, const char *data, size_t count, time_t sto
 		} else if(chunk == 0) {
 			break;
 		} else {
+			stats_update(link->fd, 'w', chunk);
 			link->written += chunk;
 			total += chunk;
 			count -= chunk;
@@ -819,6 +839,7 @@ ssize_t link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...
 void link_close(struct link *link)
 {
 	if(link) {
+		stats_update(link->fd, 'c', 0);
 		if(link->fd >= 0)
 			close(link->fd);
 		if(link->rport)
@@ -1113,6 +1134,12 @@ int link_poll(struct link_info *links, int nlinks, int msec)
 	free(fds);
 
 	return result;
+}
+
+void link_stats (FILE *log)
+{
+	stats = log;
+	setvbuf(stats, NULL, _IOLBF, 4096);
 }
 
 /* vim: set noexpandtab tabstop=4: */

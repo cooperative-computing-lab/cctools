@@ -346,4 +346,9 @@ Wait for a activity on a an array of links.
 
 int link_poll(struct link_info *array, int nlinks, int msec);
 
+/** Set log file for global link stats.
+@param stats Log file.
+*/
+void link_stats(FILE *log);
+
 #endif
