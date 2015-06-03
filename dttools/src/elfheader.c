@@ -121,16 +121,14 @@ static int elf_interp(int fd, int set, char *interp)
 	CATCHUNIX(fstat(fd, &info));
 
 	if (info.st_size < (off_t)sizeof(Elf32_Ehdr))
-		CATCH(EINVAL);
+		CATCH(ENOEXEC);
 
 	addr_len = info.st_size;
 	addr = mmap(NULL, addr_len, PROT_READ|(set ? PROT_WRITE : 0), MAP_SHARED, fd, 0);
 	CATCHUNIX(addr == NULL ? -1 : 0);
 
-	if (strncmp((const char *)addr, ELFMAG, sizeof(ELFMAG)-1) != 0) {
-		debug(D_DEBUG, "not an ELF file");
-		CATCH(EINVAL);
-	}
+	if (strncmp((const char *)addr, ELFMAG, sizeof(ELFMAG)-1) != 0)
+		CATCH(ENOEXEC);
 
 	ident = (unsigned char *)addr;
 	switch (ident[EI_CLASS]) {
@@ -146,25 +144,30 @@ static int elf_interp(int fd, int set, char *interp)
 			phdr = addr+sizeof(*hdr);
 			for (i = 0; i < hdr->e_phnum; i++) {
 				if ((uintptr_t)&phdr[i+1] >= ((uintptr_t)addr+addr_len))
-					CATCH(EINVAL);
+					CATCH(ENOEXEC);
 				p32(phdr[i].p_type);
 				p32(phdr[i].p_offset);
 				p32(phdr[i].p_filesz);
 				if (phdr[i].p_type == PT_INTERP) {
 					const char *old = (const char *)addr+phdr[i].p_offset;
 					if (set) {
+						/* So the basic idea here is that we just add 4096
+						 * bytes (PATH_MAX) to the end of the file and point to
+						 * that. It's not that inefficient and we can skip
+						 * fixing file offsets in all the ELF headers.
+						 */
 						debug(D_DEBUG, "old interp: '%s'", old);
 						phdr[i].p_offset = addr_len;
 						phdr[i].p_filesz = PATH_MAX;
 						CATCHUNIX(pwrite(fd, interp, PATH_MAX, phdr[i].p_offset));
 					} else {
 						strcpy(interp, old);
-						rc = 0;
-						goto out;
 					}
+					rc = 0;
+					goto out;
 				}
 			}
-			break;
+			CATCH(EINVAL);
 		}
 		case ELFCLASS64: {
 			int i;
@@ -178,7 +181,7 @@ static int elf_interp(int fd, int set, char *interp)
 			phdr = addr+sizeof(*hdr);
 			for (i = 0; i < hdr->e_phnum; i++) {
 				if ((uintptr_t)&phdr[i+1] >= ((uintptr_t)addr+addr_len))
-					CATCH(EINVAL);
+					CATCH(ENOEXEC);
 				p32(phdr[i].p_type);
 				p64(phdr[i].p_offset);
 				p64(phdr[i].p_filesz);
@@ -196,15 +199,15 @@ static int elf_interp(int fd, int set, char *interp)
 						CATCHUNIX(pwrite(fd, interp, PATH_MAX, phdr[i].p_offset));
 					} else {
 						strcpy(interp, old);
-						rc = 0;
-						goto out;
 					}
+					rc = 0;
+					goto out;
 				}
 			}
-			break;
+			CATCH(EINVAL);
 		}
 		default:
-			CATCH(EINVAL);
+			CATCH(ENOEXEC);
 	}
 
 	rc = 0;

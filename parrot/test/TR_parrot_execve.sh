@@ -33,10 +33,10 @@ import sys
 
 print(' '.join(sys.argv))
 EOF2
-cp "$(which python)" "$(which sh)" bin/
+cp /usr/bin/python /bin/sh bin/
 chmod 700 bin/a.py bin/python bin/sh
 EOF1
-	for loader in `find -L /lib /lib64 -name 'ld-linux*.so*' 2>/dev/null`; do
+	for loader in `find -L /lib64 /lib -name 'ld-linux*.so*' 2>/dev/null`; do
 		[ "$(parrot --ld-path="$loader" -- ./bin/a.py 1 2 | tee -a /dev/stderr)" = './bin/a.py 1 2' ]
 		[ "$(parrot --ld-path="$loader" -- ./bin/sh -c 'echo "$0"' | tee -a /dev/stderr)" = './bin/sh' ]
 		return 0

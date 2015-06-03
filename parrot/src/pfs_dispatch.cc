@@ -3130,7 +3130,6 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 	extern char pfs_ldso_path[PFS_PATH_MAX];
 
 	int rc;
-	pid_t child = 0;
 	int phyfd = -1;
 	int exefd = -1;
 	int tmpfd = -1;
@@ -3143,93 +3142,58 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 	CATCHUNIX(phyfd = open(physical_name, O_RDONLY));
 
 	if (pfs_ldso_path[0]) {
-		debug(D_PROCESS, "prepare_exe: forcing use of loader %s", pfs_ldso_path);
+		debug(D_PROCESS, "%s: forcing use of loader %s", __func__, pfs_ldso_path);
 		CATCHUNIX(pfs_get_local_name(pfs_ldso_path, ldso_physical_name, 0, 0));
 	} else {
-		char path[PATH_MAX];
-		CATCHUNIX(elf_get_interp(phyfd, path));
-		debug(D_DEBUG, "prepare_exe: %s PT_INTERP is %s", physical_name, path);
+		char path[PATH_MAX] = "";
+		rc = elf_get_interp(phyfd, path);
+		if (rc == -1 && errno == EINVAL)
+			goto st;
+		CATCHUNIX(rc);
+		assert(path[0]);
+		debug(D_DEBUG, "%s: %s PT_INTERP is %s", __func__, physical_name, path);
 		/* XXX This access skips mounts and other PFS redirections. */
 		if (access(path, R_OK|X_OK) == 0) {
 			/* The kernel can find it, we're done. */
-			debug(D_DEBUG, "prepare_exe: interpreter is local, no redirection required");
+			debug(D_DEBUG, "%s: interpreter is local, no redirection required", __func__);
 			exefd = phyfd;
 			phyfd = -1;
 			goto success;
 		}
-		debug(D_PROCESS, "prepare_exe: getting physical name of loader %s", path);
+		debug(D_PROCESS, "%s: getting physical name of loader %s", __func__, path);
 		CATCHUNIX(pfs_get_local_name(path, ldso_physical_name, 0, 0));
 	}
 
-	/* Unwise to check ldso recursively */
-	if (strcmp(physical_name, ldso_physical_name) == 0) {
-		debug(D_DEBUG, "prepare_exe: recursive invocation of loader? skipping redirection");
-		exefd = phyfd;
-		phyfd = -1;
-		goto success;
+	debug(D_PROCESS, "%s: rewriting executable to use interpreter %s", __func__, ldso_physical_name);
+	{
+		/* Use a useful name for the temporary file, for easier debugging. */
+		extern char pfs_temp_per_instance_dir[PATH_MAX];
+		char filename[PATH_MAX];
+		strcpy(filename, physical_name);
+		pfs_process_pathtofilename(filename);
+		CATCHUNIX(exefd = memfdexe(filename, pfs_temp_per_instance_dir));
 	}
+	CATCHUNIX(fchmod(exefd, S_IRWXU));
+	CATCHUNIX(copy_fd_to_fd(phyfd, exefd));
+	rc = elf_set_interp(exefd, ldso_physical_name);
+	if (rc == -1 && errno == EINVAL)
+		goto st;
+	CATCHUNIX(rc);
+	{
+		char procfd[PATH_MAX];
+		CATCHUNIX(snprintf(procfd, PATH_MAX, "/proc/self/fd/%d", exefd));
+		CATCHUNIX(tmpfd = open(procfd, O_RDONLY)); /* reopen as O_RDONLY to avoid ETXTBSY */
+		CATCHUNIX(close(exefd));
+		exefd = tmpfd;
+		tmpfd = -1;
+	}
+	goto success;
 
-	/* Test whether loading with ldso would work by running ldso --verify on
-	 * the executable (may be static).
-	 */
-
-	child = fork();
-	CATCHUNIX(child);
-	if (child == 0) {
-		fd_null(STDIN_FILENO, O_RDONLY);
-		fd_null(STDOUT_FILENO, O_WRONLY);
-		fd_null(STDERR_FILENO, O_WRONLY);
-		execlp(ldso_physical_name, ldso_physical_name, "--verify", physical_name, NULL);
-		_exit(EXIT_FAILURE);
-	}
-
-	int status;
-	do {
-		rc = waitpid(child, &status, 0);
-	} while (rc == -1 && errno == EINTR);
-	if (rc == -1) {
-		debug(D_PROCESS, "prepare_exe: couldn't wait: %s", strerror(errno));
-		CATCH(EIO);
-	}
-	child = 0;
-	if (!WIFEXITED(status)) {
-		debug(D_PROCESS,"prepare_exe: %s --verify %s didn't exit normally. status == %d", ldso_physical_name, physical_name, status);
-		CATCH(EIO);
-	}
-	switch (WEXITSTATUS(status)) {
-		case 0: {
-			debug(D_PROCESS, "prepare_exe: rewriting executable to use interpreter %s", ldso_physical_name);
-			{
-				/* Use a useful name for the temporary file, for easier debugging. */
-				extern char pfs_temp_per_instance_dir[PATH_MAX];
-				char filename[PATH_MAX];
-				strcpy(filename, physical_name);
-				pfs_process_pathtofilename(filename);
-				CATCHUNIX(exefd = memfdexe(filename, pfs_temp_per_instance_dir));
-			}
-			CATCHUNIX(fchmod(exefd, S_IRWXU));
-			CATCHUNIX(copy_fd_to_fd(phyfd, exefd));
-			CATCHUNIX(elf_set_interp(exefd, ldso_physical_name));
-			{
-				char procfd[PATH_MAX];
-				CATCHUNIX(snprintf(procfd, PATH_MAX, "/proc/self/fd/%d", exefd));
-				CATCHUNIX(tmpfd = open(procfd, O_RDONLY));
-				CATCHUNIX(close(exefd));
-				exefd = tmpfd;
-				tmpfd = -1;
-			}
-			goto success;
-		}
-		case 1:
-			debug(D_DEBUG, "prepare_exe: %s is probably a static binary and will be executed directly", physical_name);
-			exefd = phyfd;
-			phyfd = -1;
-			goto success;
-		default:
-			debug(D_PROCESS,"prepare_exe: %s --verify %s exited with status %d", ldso_physical_name, physical_name, WEXITSTATUS(status));
-			CATCH(EIO);
-	}
-	assert(0);
+st:
+	debug(D_DEBUG, "%s: %s is a static binary and will be executed directly", __func__, physical_name);
+	exefd = phyfd;
+	phyfd = -1;
+	goto success;
 
 success:
 	CATCHUNIX(snprintf(exe, PATH_MAX, "/proc/%d/fd/%d", getpid(), exefd));
@@ -3237,13 +3201,8 @@ success:
 
 	rc = 0;
 	goto out;
+
 out:
-	if (child) {
-		int status;
-		kill(child, SIGKILL);
-		while (waitpid(child, &status, 0) == -1 && errno == EINTR)
-			;
-	}
 	if (phyfd >= 0)
 		close(phyfd);
 	if (tmpfd >= 0)
