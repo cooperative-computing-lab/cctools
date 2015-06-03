@@ -684,7 +684,7 @@ static void run (const char *sandbox, const char *path, char *const argv[], char
 	goto out;
 out:
 	debug(D_FATAL, "execution failed: %s", strerror(rc));
-	raise(SIGUSR1);
+	raise(SIGUSR1); /* signal abnormal termination before program starts */
 	abort();
 }
 
