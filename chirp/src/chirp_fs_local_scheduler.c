@@ -29,6 +29,7 @@
 #include "debug.h"
 #include "domain_name.h"
 #include "fd.h"
+#include "link.h"
 #include "md5.h"
 #include "path.h"
 #include "pattern.h"
@@ -37,6 +38,7 @@
 #include "sigdef.h"
 #include "unlink_recursive.h"
 
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -615,6 +617,7 @@ out:
 static void run (const char *sandbox, const char *path, char *const argv[], char *const envp[], const struct url_binding *urls)
 {
 	int rc;
+	int fd;
 	/* TODO don't propagate CHIRP_CLIENT_TICKETS across execve. */
 
 	signal(SIGUSR1, SIG_DFL);
@@ -633,6 +636,14 @@ static void run (const char *sandbox, const char *path, char *const argv[], char
 	debug_flags_set("all");
 	debug_config_file(".chirp.debug");
 	cctools_version_debug(D_DEBUG, "chirp@job");
+
+	/* This is closed by exit(3) or via execve. */
+	CATCHUNIX(fd = open(".chirp.stats", O_CREAT|O_TRUNC|O_WRONLY, S_IRUSR|S_IWUSR));
+	CATCHUNIX(fcntl(fd, F_GETFD));
+	CATCHUNIX(fcntl(fd, F_SETFD, rc|FD_CLOEXEC));
+	FILE *log = fdopen(fd, "w");
+	CATCHUNIX(log == NULL ? -1 : 0);
+	link_stats(log);
 
 #if defined(__linux__) && defined(SYS_ioprio_get)
 	/* Reduce the iopriority of jobs below the scheduler. */
