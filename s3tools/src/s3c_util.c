@@ -3,20 +3,22 @@ Copyright (C) 2010- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <math.h>
-#include <time.h>
-
-#include <debug.h>
-#include <link.h>
-#include <list.h>
-#include <hmac.h>
-#include <b64_encode.h>
-#include <domain_name_cache.h>
 
 #include "s3c_util.h"
+
+#include "b64_encode.h"
+#include "debug.h"
+#include "domain_name_cache.h"
+#include "hmac.h"
+#include "link.h"
+#include "list.h"
+
+#include <assert.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 char s3_default_endpoint[] = "s3.amazonaws.com";
 char *s3_endpoint = s3_default_endpoint;
