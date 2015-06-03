@@ -80,21 +80,21 @@ static int db_init (sqlite3 *db)
 		"CREATE TABLE Job("
 		"	id INTEGER PRIMARY KEY,"
 		"	error TEXT,"
-		"	executable TEXT NOT NULL," /* no UTF encoding? */
+		"	executable TEXT NOT NULL,"
 		"	exit_code INTEGER,"
 		"	exit_signal TEXT,"
 		"	exit_status TEXT REFERENCES ExitStatus (status),"
 		"	priority INTEGER NOT NULL DEFAULT 1,"
 		"	status TEXT NOT NULL DEFAULT 'CREATED' REFERENCES JobStatus (status),"
-		"	subject TEXT NOT NULL," /* no UTF encoding? */
-		"	tag TEXT NOT NULL," /* no UTF encoding? */
+		"	subject TEXT NOT NULL,"
+		"	tag TEXT NOT NULL,"
 		"	time_commit DATETIME,"
 		"	time_create DATETIME NOT NULL DEFAULT (strftime('%s', 'now')),"
 		"	time_error DATETIME,"
 		"	time_finish DATETIME,"
 		"	time_kill DATETIME,"
 		"	time_start DATETIME,"
-		"	url TEXT NOT NULL);" /* no UTF encoding? */
+		"	url TEXT NOT NULL);"
 		IMMUTABLE_JOB_UPDATE("Job")
 		/* We pull this out to allow INSERT of time_reap on a terminal job. */
 		"CREATE TABLE JobReaped("
@@ -140,20 +140,20 @@ static int db_init (sqlite3 *db)
 		"CREATE TABLE JobArgument("
 		"	id INTEGER REFERENCES Job (id),"
 		"	n INTEGER NOT NULL,"
-		"	arg TEXT NOT NULL," /* no UTF encoding? */
+		"	arg TEXT NOT NULL,"
 		"	PRIMARY KEY (id, n));"
 		IMMUTABLE_JOB_INSUPD("JobArgument")
 		"CREATE TABLE JobEnvironment("
 		"	id INTEGER REFERENCES Job (id),"
-		"	name TEXT NOT NULL," /* no UTF encoding? */
-		"	value TEXT NOT NULL," /* no UTF encoding? */
+		"	name TEXT NOT NULL,"
+		"	value TEXT NOT NULL,"
 		"	PRIMARY KEY (id, name));"
 		IMMUTABLE_JOB_INSUPD("JobEnvironment")
 		"CREATE TABLE JobFile("
 		"	id INTEGER REFERENCES Job (id),"
 		"	binding TEXT NOT NULL DEFAULT 'LINK' REFERENCES FileBinding (binding),"
-		"	serv_path TEXT NOT NULL," /* no UTF encoding? */
-		"	task_path TEXT NOT NULL," /* no UTF encoding? */
+		"	serv_path TEXT NOT NULL,"
+		"	task_path TEXT NOT NULL,"
 		"	tag TEXT," /* user value */
 		"	size INTEGER,"
 		"	type TEXT NOT NULL REFERENCES FileType (type),"
