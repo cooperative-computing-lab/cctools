@@ -898,27 +898,28 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 			/* SourceReplicaRandom gives a list replica sources (for pull transfers)... */
 		"	SourceReplicaRandom AS ("
 			/* URL_TRUNCATE is defined in confuga.c. */
-		"		SELECT RandomReplica.fid, URL_TRUNCATE(GROUP_CONCAT('chirp://' || StorageNodeActive.hostport || '/' || StorageNodeActive.root || '/file/' || HEX(RandomReplica.fid), '\t')) AS urls, RandomReplica.size AS size"
+		"		SELECT RandomReplica.fid, URL_TRUNCATE(GROUP_CONCAT(PRINTF('chirp://%s/%s/file/%s', StorageNodeActive.hostport, StorageNodeActive.root, HEX(RandomReplica.fid)), '\t')) AS urls, RandomReplica.size AS size"
 		"			FROM"
 						/* XXX Note that this ORDER BY clause only works with SQLite! */
 		"				(SELECT FileReplicas.*, RANDOM() AS _r FROM Confuga.FileReplicas ORDER BY _r) AS RandomReplica"
 		"				INNER JOIN Confuga.StorageNodeActive ON RandomReplica.sid = StorageNodeActive.id"
 		"			GROUP BY RandomReplica.fid"
 		"	)"
-		"	SELECT 'LINK' AS binding, StorageNode.root || '/ticket' AS serv_path, './.confuga.ticket' AS task_path, NULL AS tag, 'INPUT' AS type, NULL AS size"
+			/* Job ticket */
+		"	SELECT 'LINK' AS binding, PRINTF('%s/ticket', StorageNode.root) AS serv_path, './.confuga.ticket' AS task_path, NULL AS tag, 'INPUT' AS type, NULL AS size"
 		"		FROM ConfugaJob INNER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
 		"		WHERE ConfugaJob.id = ?1"
 		" UNION ALL"
 			/* Replicated files, pull is done later... */
-		"	SELECT 'LINK' AS binding, StorageNode.root || '/file/' || HEX(ConfugaInputFile.fid) AS serv_path, task_path, NULL AS tag, 'INPUT' AS type, FileReplicas.size AS size"
+		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%s', StorageNode.root, HEX(ConfugaInputFile.fid)) AS serv_path, task_path, NULL AS tag, 'INPUT' AS type, FileReplicas.size AS size"
 		"		FROM"
 		"			ConfugaInputFile"
 		"			INNER JOIN ConfugaJob ON ConfugaInputFile.jid = ConfugaJob.id"
 		"			INNER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
 		"			INNER JOIN Confuga.FileReplicas ON ConfugaInputFile.fid = FileReplicas.fid AND StorageNode.id = FileReplicas.sid"
 		"		WHERE ConfugaInputFile.jid = ?1"
-			/* Now include pull transfers... */
 		" UNION ALL"
+			/* Now include pull transfers... */
 		"	SELECT 'URL' AS binding, SourceReplicaRandom.urls AS serv_path, ConfugaInputFile.task_path AS task_path, NULL AS tag, 'INPUT' AS type, SourceReplicaRandom.size"
 		"		FROM"
 		"			ConfugaInputFile"
@@ -928,17 +929,17 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 					/* Exclude ConfugaInputFile that are replicated... */
 		"			LEFT OUTER JOIN Confuga.Replica AS NoReplica ON ConfugaInputFile.fid = NoReplica.fid AND ConfugaJob.sid = NoReplica.sid"
 		"		WHERE ConfugaInputFile.jid = ?1 AND NoReplica.fid IS NULL AND NoReplica.sid IS NULL"
-			/* Now outputs... */
 		" UNION ALL"
-		"	SELECT 'LINK' AS binding, StorageNode.root || '/file/%s' AS serv_path, JobFile.task_path AS task_path, '" CONFUGA_OUTPUT_TAG "' AS tag, 'OUTPUT' AS type, NULL AS size"
+			/* Now outputs... */
+		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%%s', StorageNode.root) AS serv_path, JobFile.task_path AS task_path, '" CONFUGA_OUTPUT_TAG "' AS tag, 'OUTPUT' AS type, NULL AS size"
 		"		FROM"
 		"			JobFile"
 		"			INNER JOIN ConfugaJob ON JobFile.id = ConfugaJob.id"
 		"			INNER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
 		"		WHERE JobFile.id = ?1 AND JobFile.type = 'OUTPUT'"
-			/* Now cache the pull transfer as an output replica. */
 		" UNION ALL"
-		"	SELECT 'LINK' AS binding, StorageNode.root || '/file/%s' AS serv_path, ConfugaInputFile.task_path AS task_path, '" CONFUGA_PULL_TAG "' AS tag, 'OUTPUT' AS type, NULL AS size"
+			/* Now cache the pull transfer as an output replica. */
+		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%%s', StorageNode.root) AS serv_path, ConfugaInputFile.task_path AS task_path, '" CONFUGA_PULL_TAG "' AS tag, 'OUTPUT' AS type, NULL AS size"
 		"		FROM"
 		"			ConfugaInputFile"
 		"			INNER JOIN ConfugaJob ON ConfugaInputFile.jid = ConfugaJob.id"

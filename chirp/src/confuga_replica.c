@@ -881,7 +881,7 @@ out:
 static int transfer_commit (confuga *C)
 {
 	static const char SQL[] =
-		"SELECT StorageNode.id, StorageNode.hostport, '[' || GROUP_CONCAT(TransferJob.id, ', ') || ']', '[' || GROUP_CONCAT(TransferJob.cid, ',') || ']'"
+		"SELECT StorageNode.id, StorageNode.hostport, PRINTF('[%s]', GROUP_CONCAT(TransferJob.id, ', ')), PRINTF('[%s]', GROUP_CONCAT(TransferJob.cid, ','))"
 		"	FROM Confuga.TransferJob JOIN Confuga.StorageNode ON TransferJob.fsid = StorageNode.id"
 		"	WHERE state = 'CREATED'"
 		"	GROUP BY StorageNode.id"
@@ -1122,7 +1122,7 @@ out:
 static int transfer_reap (confuga *C)
 {
 	static const char SQL[] =
-		"SELECT StorageNode.id, StorageNode.hostport, '[' || GROUP_CONCAT(TransferJob.id, ', ') || ']', '[' || GROUP_CONCAT(TransferJob.cid, ',') || ']'"
+		"SELECT StorageNode.id, StorageNode.hostport, PRINTF('[%s]', GROUP_CONCAT(TransferJob.id, ', ')), PRINTF('[%s]', GROUP_CONCAT(TransferJob.cid, ','))"
 		"	FROM Confuga.TransferJob JOIN Confuga.StorageNode ON TransferJob.fsid = StorageNode.id"
 		"	WHERE state = 'WAITED'"
 		"	GROUP BY StorageNode.id"
