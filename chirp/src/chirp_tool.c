@@ -12,7 +12,7 @@ See the file COPYING for details.
 #include "chirp_acl.h"
 #include "chirp_matrix.h"
 
-#include "b64_encode.h"
+#include "b64.h"
 #include "cctools.h"
 #include "timestamp.h"
 #include "debug.h"
@@ -381,10 +381,12 @@ static INT64_T do_ticket_get(int argc, char **argv)
 		printf("%s\n", subject);
 		free(subject);
 		/* base64 encode the ticket so it fits on one line */
-		char *bticket = xxmalloc(sizeof(char) * strlen(ticket) * 2 + 10);	/* double is more than 4/3 needed */
-		b64_encode(ticket, strlen(ticket), bticket, strlen(ticket) * 2 + 10);
-		printf("%s\n", bticket);
-		free(bticket);
+		buffer_t B[1];
+		buffer_init(B);
+		buffer_abortonfailure(B, 1);
+		b64_encode(ticket, strlen(ticket), B);
+		printf("%s\n", buffer_tostring(B));
+		buffer_free(B);
 		free(ticket);
 		printf("%llu\n", (unsigned long long) duration);
 		char **tmp = rights;

@@ -10,7 +10,7 @@ SOURCES = \
 	auth_kerberos.c \
 	auth_ticket.c \
 	auth_unix.c \
-	b64_encode.c \
+	b64.c \
 	bitmap.c \
 	buffer.c \
 	catalog_query.c \

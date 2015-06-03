@@ -6,7 +6,8 @@ See the file COPYING for details.
 
 #include "s3c_util.h"
 
-#include "b64_encode.h"
+#include "b64.h"
+#include "buffer.h"
 #include "debug.h"
 #include "domain_name_cache.h"
 #include "hmac.h"
@@ -85,10 +86,8 @@ int sign_message(struct s3_message* mesg, const char* user, const char * key) {
 	struct s3_header_object *amz;
 	struct list *amz_headers;
 	char digest[SHA1_DIGEST_LENGTH];
-	char string[SHA1_DIGEST_LENGTH*2];
 	int result;
 	memset(digest, 0, SHA1_DIGEST_LENGTH);
-	memset(string, 0, SHA1_DIGEST_LENGTH*2);
 
 	switch(mesg->type) {
 		case S3_MESG_GET:
@@ -201,10 +200,12 @@ int sign_message(struct s3_message* mesg, const char* user, const char * key) {
 	if((result = hmac_sha1(sign_str, strlen(sign_str), key, strlen(key), (unsigned char*)digest))) return result;
 
 	hmac_sha1(sign_str, strlen(sign_str), key, strlen(key), (unsigned char*)digest);
-	b64_encode(digest, SHA1_DIGEST_LENGTH, string, SHA1_DIGEST_LENGTH*2);
-
-	sprintf(mesg->authorization, "AWS %s:%s", user, string);
 	free(sign_str);
+	{
+		BUFFER_STACK_ABORT(B, 4096);
+		b64_encode(digest, SHA1_DIGEST_LENGTH, B);
+		sprintf(mesg->authorization, "AWS %s:%s", user, buffer_tostring(B));
+	}
 	return 0;
 }
 
