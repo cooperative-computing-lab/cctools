@@ -20,7 +20,7 @@
 	do {\
 		rc = (expr);\
 		if (rc) {\
-			debug(D_DEBUG, "[%s:%d] error: %d `%s'", __FILE__, __LINE__, rc, strerror(rc));\
+			debug(D_DEBUG, "%s: %s:%d[%s] error: %d `%s'", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, rc, strerror(rc));\
 			goto out;\
 		}\
 	} while (0)
@@ -29,8 +29,8 @@
 	do {\
 		rc = (expr);\
 		if (rc == -1) {\
-			debug(D_DEBUG, "[%s:%d] unix error: -1 (errno = %d) `%s'", __FILE__, __LINE__, errno, strerror(errno));\
 			rc = errno;\
+			debug(D_DEBUG, "%s: %s:%d[%s] unix error: -1 (errno = %d) `%s'", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, rc, strerror(rc));\
 			goto out;\
 		}\
 	} while (0)
@@ -39,8 +39,8 @@
 	do {\
 		rc = (expr);\
 		if (rc == -1 && errno != err) {\
-			debug(D_DEBUG, "[%s:%d] unix error: -1 (errno = %d) `%s'", __FILE__, __LINE__, errno, strerror(errno));\
 			rc = errno;\
+			debug(D_DEBUG, "%s: %s:%d[%s] unix error: -1 (errno = %d) `%s'", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, rc, strerror(rc));\
 			goto out;\
 		}\
 	} while (0)
