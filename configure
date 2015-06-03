@@ -1166,7 +1166,7 @@ fi
 if library_search z ${zlib_path}
 then
 	external_libraries="${external_libraries} ${library_search_result}"
-	if [ X${zlib_path} != X/usr ]
+	if [ "$zlib_path" != /usr ]
 	then   
 		ccflags="${ccflags} -I${zlib_path}/include"
 		ldflags="${ldflags} -L${zlib_path}/lib"
