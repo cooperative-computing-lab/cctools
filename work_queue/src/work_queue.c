@@ -42,6 +42,8 @@ The following major problems must be fixed:
 #include "md5.h"
 #include "url_encode.h"
 
+#include "disk_info.h"
+
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -82,6 +84,11 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define RESOURCE_MONITOR_TASK_SUMMARY_NAME "cctools-work-queue-%d-resource-monitor-task-%d"
 
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
+
+
+// Threshold for available disk space (MB) beyond which files are not received from worker.
+static uint64_t disk_avail_threshold = 100;
+ 
 
 /* Default: When there is a choice, send a task rather than receive 1 out of 2 times.
  * Classical WQ:   1.0 (always prefer to send)
@@ -772,9 +779,9 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
 
 	// If necessary, create parent directories of the file.
+	char dirname[WORK_QUEUE_LINE_MAX];
+	path_dirname(local_name,dirname);
 	if(strchr(local_name,'/')) {
-		char dirname[WORK_QUEUE_LINE_MAX];
-		path_dirname(local_name,dirname);
 		if(!create_dir(dirname, 0700)) {
 			debug(D_WQ, "Could not create directory - %s (%s)", dirname, strerror(errno));
 			link_soak(w->link, length, stoptime);
@@ -784,6 +791,12 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 
 	// Create the local file.
 	debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
+	// Check if there is space for incoming file at master
+	if(!check_disk_space_for_filesize(dirname, length, disk_avail_threshold)) {
+        debug(D_WQ, "Could not recieve file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
+        return APP_FAILURE;
+    }
+
 	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0700);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s for writing: %s", local_name, strerror(errno));
