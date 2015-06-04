@@ -50,11 +50,15 @@ def truncate():
 		print stdout,stderr
 	print 'Sandboxes erased at:%s'%sandbox_prefix
 	initialize(data_folder,sandbox_prefix)
+	
+	print 'A default environment has been created which assumes any resource (local or work queue) will have the appropriate libraries, software, etc.'
+	database.tag_set('DefaultEnvironment','E',None)
+	get_default_environment()
 
 
 
 def initialize(new_data_folder, new_sandbox_prefix, hadoop=False):
-	global ENVIRONMENT, data_folder, sandbox_prefix
+	global data_folder, sandbox_prefix
 	data_folder = new_data_folder
 	sandbox_prefix = new_sandbox_prefix
 	hadoop_data = hadoop
@@ -75,11 +79,7 @@ def initialize(new_data_folder, new_sandbox_prefix, hadoop=False):
 	exec_script.write( wrapper.script_str() )
 	exec_script.close()
 
-	ENVIRONMENT = database.tag_get('_ENV')
-	if not ENVIRONMENT:
-		print 'Warning: No Environments defined! A default environment will be created which assumes any resource (local or work queue) will have the appropriate libraries, software, etc.'
-		database.tag_set('_ENV',None)
-
+	get_default_environment()
 
 
 
@@ -132,7 +132,7 @@ def putMetaData(ids, cmd_id=None):
 	global ENVIRONMENT
 	puid = ids['puid']
 	if ids['pname']:
-		database.tag_set(ids['pname'], puid)
+		database.tag_set(ids['pname'], 'B', puid)
 	op_id = database.op_ins(None, '', '')
 	#database.io_ins(op_id, 'F', function_puid, function_name)
 	database.io_ins(op_id, 'I', None, ids['filename'], 0)
@@ -381,9 +381,22 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 		if op:
 			old_op_id = op['puid']
 			old_ios = database.ios_get(old_op_id)
+			op_display = displayOperation(old_ios)
+			all_files_exist = True
 			for old_io in old_ios:
-				print old_io
-			#database.run_upd_by_op_puid(op['puid'], 'Run', -1, '', 'local')
+				if old_io['io_type']=='O' and not os.path.isfile( storage_pathname(old_io['file_puid']) ):
+					all_files_exist = False
+					debug('Output file not memoized:'+old_io['display']+' '+old_io['puid'])
+			if not all_files_exist:
+				runs = database.runs_get_by_op_puid(old_op_id)
+				in_progress = False
+				for run in runs:
+					if run['queue'] in ['Run','Running','Waiting']:
+						in_progress = True
+						break
+				if not in_progress:
+					debug('Operation not running so queuing:'+op_display)
+					database.run_upd_by_op_puid(op['puid'], 'Run', -1, '', 'local')
 
 		op_id = database.op_ins(function_puid,op_chksum, op_env_chksum)
 		if ENVIRONMENT and 'puid' in ENVIRONMENT:
@@ -410,7 +423,7 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 			results += [[puid,name,None]]
 			database.io_ins(op_id, 'O', puid, name, i)
 			if name:
-				database.tag_set(name,puid)
+				database.tag_set(name,'B',puid)
 		
 		if not old_op_id:
 			database.run_ins(op_id)
@@ -429,8 +442,20 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 		else:
 			res = eval(remain, depth+1, cmd_id, extra)
 			for a, arg in enumerate(args):
-				database.tag_set(args[a], res['puids'][a])
+				database.tag_set(args[a], 'B', res['puids'][a])
 			return res
+
+def displayOperation(ios):
+	inputs = outputs = ''
+	for io in ios:
+		if io['io_type']=='F':
+			function_name = io['display']
+		elif io['io_type']=='I':
+			inputs = io['display']+', '
+		elif io['io_type']=='O':
+			outputs = io['display']+', '
+	return '%s = %s( %s ) '%(outputs[:-2], function_name, inputs[:-2])
+
 
 def make_command(ios):
 	out_str = ''
@@ -521,11 +546,12 @@ def origin(name):
 def new_puid():
 	return uuid.uuid4()
 
-def env_name(name):
+def get_default_environment():
 	global ENVIRONMENT
-	id_str = database.tag_get(name)
-	database.var_set('_ENV',id_str)
-	ENVIRONMENT = id_str
+	ENVIRONMENT = database.tag_get('DefaultEnvironment')
+	if not ENVIRONMENT:
+		print 'Warning: No Environments defined! A default environment has been created which assumes any resource (local or work queue) will have the appropriate libraries, software, etc.'
+		database.tag_set('DefaultEnvironment','E',None)
 
 def add_store(fold_filename, unfold_filename):
 	global STOREID
@@ -622,7 +648,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 
 
 		elif io['io_type']=='E' and io['file_puid']:
-			env = database.environment_get(io['file_puid'])
+			env = database.environment_get_by_file_puid(io['file_puid'])
 			env_type = env['env_type']
 			copies = database.copies_get(env['file_puid'])
 			if len(copies)>0:

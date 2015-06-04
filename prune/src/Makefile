@@ -6,7 +6,7 @@ PYTHON_INSTALL_DIR=$(CCTOOLS_INSTALL_DIR)/lib/python$(CCTOOLS_PYTHON_VERSION)/si
 all: prune.py
 
 prune.py: prune.in
-	m4 '-DCCTOOLS_VERSION=${CCTOOLS_VERSION}' < prune.in | m4 '-DCCTOOLS_VERSION=${CCTOOLS_VERSION}' > prune.py
+	m4 '-DCCTOOLS_VERSION=${CCTOOLS_VERSION}' < prune.in | m4 '-DCCTOOLS_RELEASE_DATE=${CCTOOLS_RELEASE_DATE}' > prune.py
 	chmod 755 prune.py
 
 clean:
