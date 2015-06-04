@@ -6,6 +6,7 @@ import os, sys, time
 import string, random, hashlib
 import subprocess
 import sqlite3, uuid
+import traceback
 
 sqlite3.register_converter('PUID', lambda b: uuid.UUID(b))
 sqlite3.register_adapter(uuid.UUID, lambda u: str(u))
@@ -14,57 +15,81 @@ creates = []
 meta_db = None
 meta_data = None
 db_pathname = None
+debug_level = None
 
 read_cnt = write_cnt = 0
 
-version = 0.1
+db_version = 0.1
+
+def debug(*options):
+	global debug_level
+	
+	if debug_level=='all':
+		for opt in options:
+			print opt
+
 
 def truncate():
 	global db_pathname
 	subprocess.call('rm -rf '+db_pathname,shell=True)
 	print 'Database truncated at:%s'%db_pathname
-	initialize(db_pathname)
 
 
-def initialize(new_db_pathname):
-	global creates, meta_db, meta_data, db_pathname
+def initialize(new_db_pathname,new_debug_level=None):
+	global creates, meta_db, meta_data, db_pathname, debug_level
+	
+	debug_level = new_debug_level
 
 	db_pathname = new_db_pathname
 
-	db_folder = '/'.join(db_pathname.split('/')[0:-1])
-	try: 
-		os.makedirs(db_folder)
-	except OSError:
-		if not os.path.isdir(db_folder):
-			raise
+	try:
+		db_folder = '/'.join(db_pathname.split('/')[0:-1])
+		try: 
+			os.makedirs(db_folder)
+		except OSError:
+			if not os.path.isdir(db_folder):
+				raise
 
-	meta_data = sqlite3.connect(db_pathname, detect_types=sqlite3.PARSE_DECLTYPES)
-	def dict_factory(cursor, row):
-	    d = {}
-	    for idx, col in enumerate(cursor.description):
-	        d[col[0]] = row[idx]
-	    return d
-	meta_data.row_factory = dict_factory
-	meta_db = meta_data.cursor()
-	meta_data.text_factory = str
+		meta_data = sqlite3.connect(db_pathname, detect_types=sqlite3.PARSE_DECLTYPES)
+		def dict_factory(cursor, row):
+		    d = {}
+		    for idx, col in enumerate(cursor.description):
+		        d[col[0]] = row[idx]
+		    return d
+		meta_data.row_factory = dict_factory
+		meta_db = meta_data.cursor()
+		meta_data.text_factory = str
 
-	
-	for create in creates:
-		meta_db.execute(create)
-	meta_data.commit()
-	
-	qs = run_get_by_queue('RunningLocally')
-	for q in qs:
-		run_upd(q['puid'],'Run',None,'')
+		for create in creates:
+			meta_db.execute(create)
+		meta_data.commit()
 
-	qs = run_get_by_queue('Running')
-	for q in qs:
-		run_upd(q['puid'],'Run',None,'')
+		qs = run_get_by_queue('RunningLocally')
+		for q in qs:
+			run_upd(q['puid'],'Run',None,'')
 
-	res = settings_get('version')
-	#if float(res['value'])<0.1:
-	#	migrate()
-	settings_set('version','0.1')
+		qs = run_get_by_queue('Running')
+		for q in qs:
+			run_upd(q['puid'],'Run',None,'')
+
+		res = settings_get('version')
+		if not res:
+			settings_set('version',str(db_version))
+			print 'It appears that the database format might have changed. Unless you just RESET the database, you might need to RESET the data in Prune to proceed.'
+		#elif float(res['value'])<db_version:
+		#	migrate()
+		elif float(res['value'])!=db_version:
+			print 'It appears that the database format might have changed. You might need to RESET the data in Prune to proceed.'
+
+		res = tag_get('DefaultEnvironment')
+		if not res:
+			print 'A default environment has been created which assumes any resource (local or work queue) will have the appropriate libraries, software, etc.'
+			tag_set('DefaultEnvironment','E',None)
+		
+	except Exception, e:
+		debug('Exception on:', creates, traceback.format_exc())
+		print 'There was an error initializing the database.'
+
 
 
 def start_query_cnts():

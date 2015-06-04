@@ -23,7 +23,8 @@ config_file = HOME+'/.pruneconf'
 config_file2 = None
 run_filename = run_lines = None
 reset_all = False
-debug_level = 'all'
+#debug_level = 'all'
+debug_level = None
 
 argi = 1
 while argi<len(sys.argv):
@@ -175,8 +176,15 @@ def process_line(line):
 			terminate = True
 			return True
 		elif line.upper().startswith('RESET'):
-			lib.truncate()
-			database.truncate()
+			if line=='RESET ALL':
+				lib.truncate()
+				database.truncate()
+				database.initialize(db_pathname, debug_level)
+				lib.initialize(data_folder, sandbox_prefix)
+			else:
+				print 'This command is designed to delete all data and meta-data in Prune. If you are sure this is what you want to do, use "PRUNE ALL" (no lower case letters). '
+
+
 			return True
 
 
@@ -418,7 +426,7 @@ See the manual for more details.
 				print '%s not found:'%(name)
 			except Exception as e:
 				print 'Something unexpected occurred.'
-				debug('Exception on:'+line, traceback.format_exc())
+				debug('Exception on: '+line, traceback.format_exc())
 			return True
 
 

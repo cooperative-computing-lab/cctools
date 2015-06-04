@@ -49,11 +49,7 @@ def truncate():
 	if (len(stdout)+len(stderr))>0:
 		print stdout,stderr
 	print 'Sandboxes erased at:%s'%sandbox_prefix
-	initialize(data_folder,sandbox_prefix)
 	
-	print 'A default environment has been created which assumes any resource (local or work queue) will have the appropriate libraries, software, etc.'
-	database.tag_set('DefaultEnvironment','E',None)
-	get_default_environment()
 
 
 
@@ -80,7 +76,6 @@ def initialize(new_data_folder, new_sandbox_prefix, hadoop=False):
 	exec_script.close()
 
 	get_default_environment()
-
 
 
 def terminate_now():
@@ -285,7 +280,12 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 	if nextpos<=0: # No lparens or assignments
 		if (depth==0):
 			print 'Unrecognized expression: '+expr
-			print 'Try using caps for PRUNE keywords or provide a name for results with an equal sign.'
+			message = '''
+List of available commands:
+EVAL (default,optional),  PUT, GET,  USE, WORK,  STATUS,  EXIT, QUIT,  CAT, LS, CUT,  RUN,  RESET
+See the manual for more details.
+			'''
+			print message
 			return True
 		args = expr.split(',')
 		results = []
