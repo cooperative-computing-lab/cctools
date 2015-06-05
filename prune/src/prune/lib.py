@@ -582,8 +582,8 @@ def get_default_environment():
 			#env_type = raw_input('What type of environment file is it [targz]: ')
 			env_type = 'targz'
 			ids = getDataIDs(env_file)
-			store_file(env_file, ids['puid'])
 			if ids:
+				store_file(env_file, ids['puid'])
 				database.environment_ins(ids['puid'],env_type)
 				env = database.environment_get_last()
 				ENVIRONMENT = env['puid']

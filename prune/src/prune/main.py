@@ -802,7 +802,6 @@ See the manual for more details.
 	except KeyboardInterrupt:
 		print ''
 	except Exception, e:
-		
 		print 'Prune couldn\'t understand that command. Please refer to the manual for help.'
 		debug('Exception on:'+line, traceback.format_exc())
 		return True
