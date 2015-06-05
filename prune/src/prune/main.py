@@ -182,8 +182,7 @@ def process_line(line):
 				database.initialize(db_pathname, debug_level)
 				lib.initialize(data_folder, sandbox_prefix)
 			else:
-				print 'This command is designed to delete all data and meta-data in Prune. If you are sure this is what you want to do, use "PRUNE ALL" (no lower case letters). '
-
+				print 'This command is designed to delete all data and meta-data in Prune. If you are sure this is what you want to do, use "RESET ALL" (no lower case letters). '
 
 			return True
 
@@ -557,6 +556,21 @@ See the manual for more details.
 
 
 
+		elif line.upper().startswith('_EDIT'):
+			ar = line.split()
+			print ar,temp_ids
+			if len(ar)==2:
+				i = int(ar[1])-1
+				print i
+				if i>=0 and i<len(temp_ids):
+					op_puid = temp_ids[i]
+					print op_puid
+					print lib.create_operation(op_puid,framework='local')
+			else:
+				print 'Command rejected'
+			return True
+
+
 
 
 		elif line.upper().startswith('LOCATE____'):
@@ -803,12 +817,14 @@ def pretty_date(ts=False):
 
 
 try:
-	db_version = database.initialize(db_pathname)
+	db_version = database.initialize(db_pathname,debug_level)
 	lib.initialize(data_folder, sandbox_prefix, hadoop_data)
 	with open(config_file,'w') as f:
 		f.write('data_folder\t%s\n'%data_folder)
 		f.write('database\t%s\n'%db_pathname)
 		f.write('sandbox\t%s\n'%sandbox_prefix)
+
+	
 	
 
 

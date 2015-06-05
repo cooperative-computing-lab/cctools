@@ -26,6 +26,15 @@ terminate = False
 data_folder = None
 sandbox_prefix = None
 hadoop_data = None
+debug_level = None
+
+def debug(*options):
+	global debug_level
+	
+	if debug_level=='all':
+		for opt in options:
+			print opt
+
 
 
 def truncate():
@@ -53,8 +62,9 @@ def truncate():
 
 
 
-def initialize(new_data_folder, new_sandbox_prefix, hadoop=False):
-	global data_folder, sandbox_prefix
+def initialize(new_data_folder, new_sandbox_prefix, debug=None, hadoop=False):
+	global data_folder, sandbox_prefix, debug_level
+	debug_level = debug
 	data_folder = new_data_folder
 	sandbox_prefix = new_sandbox_prefix
 	hadoop_data = hadoop
@@ -75,7 +85,7 @@ def initialize(new_data_folder, new_sandbox_prefix, hadoop=False):
 	exec_script.write( wrapper.script_str() )
 	exec_script.close()
 
-	get_default_environment()
+	return get_default_environment()
 
 
 def terminate_now():
@@ -124,11 +134,10 @@ def getDataIDs2(data, puid=None):
 	return {'puid':puid, 'chksum':chksum, 'filename':None, 'exists':False, 'pack':''}
 
 def putMetaData(ids, cmd_id=None):
-	global ENVIRONMENT
 	puid = ids['puid']
 	if ids['pname']:
 		database.tag_set(ids['pname'], 'B', puid)
-	op_id = database.op_ins(None, '', '')
+	op_id = database.op_ins(None, '', '',display='PUT %s AS %s'%(ids['filename'],ids['pname']))
 	#database.io_ins(op_id, 'F', function_puid, function_name)
 	database.io_ins(op_id, 'I', None, ids['filename'], 0)
 	database.io_ins(op_id, 'O', puid, ids['pname'], 0)
@@ -371,11 +380,8 @@ See the manual for more details.
 		op_string = op_string[0:-1] + ')'
 		#op_chksum = hashstring(op_string)
 		op_chksum = op_string
-		if ENVIRONMENT and ENVIRONMENT['puid']:
-			op_env_chksum = op_string + str(ENVIRONMENT['puid'])
-		else:
-			op_env_chksum = op_string + 'None'
-
+		op_env_chksum = op_string + str(ENVIRONMENT)
+		
 		op = database.op_get_by_env_chksum(op_env_chksum)
 		old_op_id = None
 		if op:
@@ -395,12 +401,12 @@ See the manual for more details.
 						in_progress = True
 						break
 				if not in_progress:
-					debug('Operation not running so queuing:'+op_display)
+					debug('Operation not already running so queuing for execution:'+op_display)
 					database.run_upd_by_op_puid(op['puid'], 'Run', -1, '', 'local')
 
-		op_id = database.op_ins(function_puid,op_chksum, op_env_chksum)
-		if ENVIRONMENT and 'puid' in ENVIRONMENT:
-			database.io_ins(op_id, 'E', ENVIRONMENT['puid'], '')
+
+		op_id = database.op_ins(function_puid,op_chksum, op_env_chksum, env_puid=ENVIRONMENT)
+		database.io_ins(op_id, 'E', ENVIRONMENT, '')
 		
 		database.io_ins(op_id, 'F', function_puid, function_name)
 		for i,arg in enumerate(res['arg_list']):
@@ -425,6 +431,10 @@ See the manual for more details.
 			if name:
 				database.tag_set(name,'B',puid)
 		
+		new_ios = database.ios_get(op_id)
+		op_display = displayOperation(new_ios)
+		database.op_upd_display(op_id,op_display)
+
 		if not old_op_id:
 			database.run_ins(op_id)
 		return results
@@ -451,9 +461,9 @@ def displayOperation(ios):
 		if io['io_type']=='F':
 			function_name = io['display']
 		elif io['io_type']=='I':
-			inputs = io['display']+', '
+			inputs += io['display']+', '
 		elif io['io_type']=='O':
-			outputs = io['display']+', '
+			outputs += io['display']+', '
 	return '%s = %s( %s ) '%(outputs[:-2], function_name, inputs[:-2])
 
 
@@ -548,10 +558,43 @@ def new_puid():
 
 def get_default_environment():
 	global ENVIRONMENT
-	ENVIRONMENT = database.tag_get('DefaultEnvironment')
-	if not ENVIRONMENT:
-		print 'Warning: No Environments defined! A default environment has been created which assumes any resource (local or work queue) will have the appropriate libraries, software, etc.'
-		database.tag_set('DefaultEnvironment','E',None)
+	env = None
+	try:
+		env = database.environment_get_last()
+		if env:
+			answer = raw_input('Would you like to execute operations in the environment used in the last session? [y] ')
+			if answer in ['','y','yes','Y','YES']:
+				ENVIRONMENT = env['puid']
+				return True
+			else:
+				env = None
+		else:
+			print 'Prune needs a file that describes the environment that operations should be executed in.'
+			print 'Currently the only option is a .tar.gz file that, when unzipped in a sandbox, contains all the libraries and dependencies needed to run the operations in a Linux environment.'
+
+
+		while not env:
+			line = raw_input('What local file should be used as execution environment? [empty.tar.gz] ')
+			if len(line)<=0:
+				env_file = 'empty.tar.gz'
+			else:
+				env_file = line
+			#env_type = raw_input('What type of environment file is it [targz]: ')
+			env_type = 'targz'
+			ids = getDataIDs(env_file)
+			store_file(env_file, ids['puid'])
+			if ids:
+				database.environment_ins(ids['puid'],env_type)
+				env = database.environment_get_last()
+				ENVIRONMENT = env['puid']
+				return True
+			else:
+				print 'Source file does not exist: %s'%(env_file)
+	except KeyboardInterrupt:
+		print ''
+		sys.exit(0)
+	
+
 
 def add_store(fold_filename, unfold_filename):
 	global STOREID
@@ -648,7 +691,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 
 
 		elif io['io_type']=='E' and io['file_puid']:
-			env = database.environment_get_by_file_puid(io['file_puid'])
+			env = database.environment_get(io['file_puid'])
 			env_type = env['env_type']
 			copies = database.copies_get(env['file_puid'])
 			if len(copies)>0:
@@ -659,7 +702,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 					options += ' -targz ENVIRONMENT'
 					
 				
-				place_files.append({'src':storage_pathname(io['file_puid']),'dst':'ENVIRONMENT','puid':io['file_puid'],'pack':'','display':io['display']})
+				place_files.append({'src':storage_pathname(copy['puid']),'dst':'ENVIRONMENT','puid':copy['puid'],'pack':copy['pack'],'display':io['display']})
 
 	arg_str = arg_str[0:-1]
 
@@ -680,7 +723,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 	
 
 	if dry_run:
-		return {'cmd':run_cmd,'fetch_files':fetch_files}
+		return {'cmd':op['display'],'fetch_files':fetch_files}
 
 	elif framework=='wq':
 		t = Task('')
@@ -697,7 +740,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 				t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=False)
 			else:
 				t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=True)
-		return {'cmd':run_cmd,'framework':framework,'wq_task':t,'fetch_files':fetch_files}
+		return {'cmd':op['display'],'framework':framework,'wq_task':t,'fetch_files':fetch_files}
 	
 	else:
 		sandbox_folder = sandbox_prefix+uuid.uuid4().hex+'/'
@@ -720,7 +763,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 			final_cmd = './umbrella -T local -i PRUNE_RUN=PRUNE_RUN%s -c ENVIRONMENT -l ./tmp/ -o ./final_output run ./PRUNE_RUN'%(in_str)
 			shutil.copy2('../../../cctools.src/umbrella/src/umbrella', sandbox_folder+'umbrella')
 
-		return {'cmd':run_cmd,'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files}
+		return {'cmd':op['display'],'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files}
 
 
 
@@ -780,7 +823,7 @@ def wq_check():
 					database.run_upd(run['puid'],'Running',task_id,'','wq')
 					wq_task_cnt += 1
 					left -= 1
-					print 'started: #%i, cmd:"%s", op_id:%s'%(wq_task_cnt, operation['cmd'], run['op_puid'])
+					print 'Started: %s  (%s) #%i'%(operation['cmd'], run['puid'], wq_task_cnt)
 				else:
 					'No task'
 
@@ -827,10 +870,10 @@ def wq_check():
 						if not all_files:
 							operation = create_operation(op_id,'local')
 							database.run_upd(run['puid'],'Failed',t.return_status)
-							print 'failed: run:%i, op_id:%i'%(run['puid'],run['op_puid'])
+							print 'Failed: %s  (%s)'%(operation['cmd'], run['puid'])
 							print 'Try to execute the operation manually in the sandbox at %s by running chmod 755 PRUNE_RUN; ./PRUNE_RUN'%(operation['sandbox'])
 						else:
-							print 'complete: run:%i, op_id:%i'%(run['puid'],run['op_puid'])
+							print 'Completed: %s  (%s)'%(operation['cmd'], run['puid'])
 
 							database.run_end(run['puid'], cpu_time=exec_time, disk_space=exec_space)
 
@@ -844,7 +887,7 @@ def wq_check():
 							if os.path.isfile(obj['dst']):
 								print 'File saved:',obj
 								store_file(obj['dst'],obj['puid'],True,obj['pack'],storage_module='wq')
-						print 'Resubmit to try again.'
+						print 'Resubmit to try again: '+operation['cmd']
 						print t.command
 						database.run_upd(run['puid'],'Failed',0,'','Exit code: %i'%t.return_status)
 
@@ -889,7 +932,7 @@ def local_check():
 	while w<len(local_workers):
 		(op_id,operation,p) = local_workers[w]
 		if p.poll() is not None:
-			print 'Returned: %i (%s) '%(p.returncode,operation['cmd'])
+			#print 'Returned: %i (%s) '%(p.returncode,operation['cmd'])
 			(stdout, stderr) = p.communicate()
 
 			fails = 0
@@ -910,11 +953,12 @@ def local_check():
 					fails += 1
 
 			if p.returncode==0 and fails==0:
+				print 'Completed: %s  (%s)'%(operation['cmd'], operation['run']['puid'])
 				database.run_end(operation['run']['puid'], cpu_time=exec_time, disk_space=exec_space)
 				shutil.rmtree(operation['sandbox'])
 			else:
-				print 'returncode =', p.returncode, ', fails =',fails
-				print traceback.format_exc()
+				debug( 'returncode =', p.returncode, ', fails =',fails, traceback.format_exc())
+				print 'Failed: %s  (%s)'%(operation['cmd'], operation['run']['puid'])
 				database.run_upd(operation['run']['puid'], 'Failed', p.returncode, '', 'local')
 			del local_workers[w]
 			w -= 1
@@ -926,7 +970,7 @@ def local_check():
 		operation = create_operation(run['op_puid'],'local',local_local_fs)
 		if operation['cmd']:
 			operation['run'] = run
-			print 'Start:',operation['cmd']
+			print 'Started: %s  (%s)'%(operation['cmd'], run['puid'])
 			w += 1
 			p = subprocess.Popen(operation['final_cmd'], stdout = subprocess.PIPE, stderr = subprocess.PIPE, cwd = operation['sandbox'], shell=True)
 			local_workers.append( [run['op_puid'],operation,p] )

@@ -81,10 +81,6 @@ def initialize(new_db_pathname,new_debug_level=None):
 		elif float(res['value'])!=db_version:
 			print 'It appears that the database format might have changed. You might need to RESET the data in Prune to proceed.'
 
-		res = tag_get('DefaultEnvironment')
-		if not res:
-			print 'A default environment has been created which assumes any resource (local or work queue) will have the appropriate libraries, software, etc.'
-			tag_set('DefaultEnvironment','E',None)
 		
 	except Exception, e:
 		debug('Exception on:', creates, traceback.format_exc())
@@ -251,6 +247,13 @@ def environment_get(puid):
 	meta_db.execute(sel,[puid])
 	return meta_db.fetchone()
 
+def environment_get_last():
+	global read_cnt
+	read_cnt += 1
+	sel = 'SELECT * FROM environments WHERE 1 ORDER BY at DESC;'
+	meta_db.execute(sel)
+	return meta_db.fetchone()
+
 
 
 
@@ -258,6 +261,7 @@ def environment_get(puid):
 
 creates.append('''CREATE TABLE IF NOT EXISTS ops (
 												puid PUID PRIMARY KEY,
+												display TEXT,
 												function_puid PUID,
 												env_puid PUID,
 												chksum TEXT,
@@ -267,13 +271,13 @@ creates.append('''CREATE TABLE IF NOT EXISTS ops (
 creates.append('CREATE INDEX IF NOT EXISTS op_chksum ON ops(chksum);')
 creates.append('CREATE INDEX IF NOT EXISTS op_env_chksum ON ops(env_chksum);')
 
-def op_ins(function_puid, chksum='', env_chksum='', env_puid=None):
+def op_ins(function_puid, chksum='', env_chksum='', env_puid=None, display=''):
 	global write_cnt
 	write_cnt += 1
 	now = time.time()
 	puid = uuid.uuid4()
-	ins = 'INSERT INTO ops (puid, function_puid, env_puid, chksum, env_chksum, at) VALUES (?,?,?,?,?,?);'
-	meta_db.execute(ins,[puid,function_puid,env_puid,chksum,env_chksum,now])
+	ins = 'INSERT INTO ops (puid, display, function_puid, env_puid, chksum, env_chksum, at) VALUES (?,?,?,?,?,?,?);'
+	meta_db.execute(ins,[puid,display,function_puid,env_puid,chksum,env_chksum,now])
 	meta_data.commit()
 	return puid
 
@@ -298,6 +302,12 @@ def op_get_by_env_chksum(env_chksum):
 	meta_db.execute(sel,[env_chksum])
 	return meta_db.fetchone()
 
+def op_upd_display(puid, display):
+	global write_cnt
+	write_cnt += 1
+	upd = "UPDATE ops SET display=? WHERE puid=?;"
+	meta_db.execute(upd,[display,puid])
+	meta_data.commit()
 
 
 

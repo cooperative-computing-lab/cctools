@@ -16,7 +16,7 @@ import subprocess
 import os.path
 
 
-args = {'ln':[], 'gzip':[], 'gunzip':[], 'tar':[], 'umbrella':False, 'function_name':None, 'function_inputs':[]}
+args = {'ln':[], 'gzip':[], 'gunzip':[], 'targz':[], 'umbrella':False, 'function_name':None, 'function_inputs':[]}
 argi = 1
 while argi<len(sys.argv):
 	arg = sys.argv[argi]
@@ -29,9 +29,9 @@ while argi<len(sys.argv):
 	elif arg=='-gzip':
 		argi += 1
 		args['gzip'].append( sys.argv[argi] )
-	elif arg=='-tar':
+	elif arg=='-targz':
 		argi += 1
-		args['tar'].append( sys.argv[argi] )
+		args['targz'].append( sys.argv[argi] )
 	elif arg=='-umbrella':
 		args['umbrella'] = True
 	elif args['function_name'] is None:
@@ -91,9 +91,9 @@ if args['ln']:
 	for (local,remote) in args['ln']:
 		myexec('ln -s %s ./%s'%(remote, local))
 
-if args['tar']:
+if args['targz']:
 	debug.write('Unzipping...'+newline)
-	for fname in args['tar']:
+	for fname in args['targz']:
 		myexec('tar -xvf %s'%(fname))
 
 if args['gunzip']:
@@ -106,7 +106,7 @@ if args['gunzip']:
 		debug.write('...'+newline)
 		myexec('tail ./%s'%(unzip))
 		
-if args['tar'] or args['gunzip'] or args['ln']:
+if args['targz'] or args['gunzip'] or args['ln']:
 	debug.write('Local files after unzipping, linking:'+newline)
 	myexec('ls -la')
 
