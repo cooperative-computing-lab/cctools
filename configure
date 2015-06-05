@@ -144,6 +144,7 @@ include_package_chirp="chirp"
 include_package_resource_monitor="resource_monitor"
 include_package_weaver="weaver"
 include_package_doc="doc"
+include_package_prune="prune"
 
 swig_bindings=""
 
@@ -342,6 +343,9 @@ do
 		--without-system-doc)
 			include_package_doc=""
 			;;
+		--without-system-prune)
+		        include_package_prune=""
+		        ;;
 		--xrootd-arch)
 			shift
 			xrootd_arch=$1
@@ -416,7 +420,7 @@ fi
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_doc}"
+potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_doc} ${include_package_prune}"
 
 check_multiarch
 
@@ -995,8 +999,11 @@ fi
 
 if [ $python != 0 -a $python_major_version = 2 -a $python_minor_version -ge 6 ]
 then
+	echo "python version is suitable for prune"
 	echo "python version is suitable for weaver"
 else
+	echo "prune requires python >= 2.6"
+	packages=`echo ${packages} | sed 's/prune//g'`
 	echo "weaver requires python >= 2.6"
 	packages=`echo ${packages} | sed 's/weaver//g'`
 fi

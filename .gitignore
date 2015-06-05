@@ -7,3 +7,4 @@
 cctools.test.log
 configure.rerun
 config.mk
+*.pyc

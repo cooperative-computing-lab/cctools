@@ -1,0 +1,13 @@
+#!/usr/bin/env prune
+
+PUT sort.sh AS sort
+PUT merge.sh AS merge
+PUT nouns.txt AS nouns
+PUT verbs.txt AS verbs
+
+n = sort(nouns)
+v = sort(verbs)
+merged_result = merge(n,v)
+
+USE local 1
+WORK
