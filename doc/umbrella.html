@@ -1,0 +1,868 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link rel="stylesheet" type="text/css" href="manual.css">
+    <title>Umbrella User's Manual</title>
+</head>
+
+<body>
+    <div id="manual">
+        <h1>Umbrella User's Manual</h1>
+        <p style="text-align: right;"><b>Last edited: May 2015</b></p>
+
+        <p id="copyright">Umbrella is Copyright (C) 2015 The University of Notre Dame.<br/>
+        All rights reserved.<br/>
+        This software is distributed under the GNU General Public License.<br/>
+        See the file COPYING for details.</p>
+
+        <p><b>Please use the following citation for Umbrella in a scientific publication:</b></p>
+
+        <ul>
+
+			<li>Haiyan Meng and Douglas Thain, <a
+			href="http://ccl.cse.nd.edu/research/papers/umbrella-vtdc15.pdf">Umbrella: A
+			Portable Environment Creator for Reproducible Computing on Clusters, Clouds,
+			and Grids</a>, Workshop on Virtualization Technologies in Distributed Computing
+			(VTDC) at HPDC, June, 2015. DOI: 10.1145/2755979.2755982</li>
+
+        </ul>
+
+        <h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
+
+			<p>Umbrella is a tool for specifying and materializing
+			comprehensive execution environments, from the hardware all the way up to
+			software and data.  A user simply invokes Umbrella with the desired task, and
+			Umbrella parses the specification, 
+			determines the minimum mechanism necessary to run the task, 
+			downloads missing dependencies, and executes the application through the available minimal
+			mechanism, which may be direct execution, a system container (Docker, chroot, Parrot), a local
+			virtual machine (i.e., VMware), or submission to a cloud environment (i.e.,
+			Amazon EC2) or grid environment (i.e., Condor). The following figure shows
+			the overview of Umbrella.</p>
+            <img class="center" src="images/Umbrella.png" HEIGHT="500" WIDTH="800" align="center"/>
+
+            <p>The architecture of Umbrella is shown in the figure below.</p>
+
+            <img class="center" src="images/umbrella-specification-big-picture.png" HEIGHT="450" WIDTH="600" align="center"/>
+
+			<p>Umbrella contains five parts: user inputs, Umbrella, underlying
+			execution engines, remote archive and metadata database. User inputs include
+			the specification, the task command, the input files, and the output directory.
+			Umbrella connects the user's execution environment specification with the
+			underlying execution engines, which includes local resources, clusters, cloud
+			resources, and grid resources. The remote archive stores the OS images,
+			software dependencies and data dependencies. The metadata database maintains
+			the mapping relationship between the dependency name referred in the
+			specification and the actual storage location within the remote archive.</p>
+
+			<p>Currently, Umbrella supports three execution engines: local,
+			condor, ec2.  Local execution engine can be further devided into three
+			categories: parrot, docker, chroot.  Parrot execution engine can be used
+			without any special authority on the host machine; Docker execution engine
+			requires Docker is installed on the host machine and the user is given the
+			right authority to use Docker; chroot execution engine requires the user to be
+			the root user.</p>  
+
+            <p>To get started using Umbrella, please begin by <a
+            href="install.html">installing CCTools</a> on your system. When you
+            are ready, proceed with the <a href="#have_a_try">Have a Try</a>
+            section below. If you are interested in running your CMS applications
+			through Umbrella, proceed with the <a href="#try_cms">Try CMS Applications with Umbrella</a>.</p>
+			
+			<p>If you want to construct umbrella specification for your own application,
+			proceed with the <a href="#create_spec">Create Your Specification</a> section
+			below. </p>
+
+			<p>Note: Both Condor and Docker can not work together with AFS.
+			If you try to use the condor and Docker execution engine of Umbrella,
+			please do not install CCTools on your AFS directory. </p>
+
+        <h2 id="have_a_try">Have a Try<a class="sectionlink" href="#have_a_try" title="Link to this section.">&#x21d7;</a></h2>
+
+			<p>The part uses a Ray-Tracing application as an example to illustrate 
+			how to execute an application with Umbrella.
+			The <tt>--packages</tt> option and the <tt>--ec2</tt> option are both not set
+			in the following command, so <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/packages.json">the
+			default metadata database</a> and <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/ec2.json">the default
+			ec2 metadata database</a> will be downloaded and used on the execution node
+			during runtime.  </p>
+
+			<p>The specification for the application is <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/povray/povray.umbrella">povray.umbrella</a>:
+			<code>{
+	"comment": "A ray-tracing application which creates video frames.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.18"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "5.10"
+	},
+	"software": {
+		"povray-3.6.1-redhat5-x86_64": {
+			"id": "9b7f2362e6b927c8ef08c3f92599e47c",
+			"mountpoint": "/software/povray-3.6.1-redhat5-x86_64",
+			"action": "unpack"
+		}
+	},
+	"data": {
+	},
+	"environ": {
+	}
+}</code>
+
+			There are two input files <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/povray/4_cubes.pov">4_cubes.pov</a>
+			and <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/povray/WRC_RubiksCube.inc">WRC_RubiksCube.inc</a>.
+			The expected output of the ray-tracing command is a png file named <tt>frame000.png</tt>.
+			The command for this application is:<code>povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50</code> 
+			Suppose you do your umbrella test under
+			<tt>/tmp/umbrella</tt>. First download the specification and the two input
+			files into <tt>/tmp/umbrella</tt>.  </p>
+
+			<p><b>The umbrella command for Parrot execution engine:</b></p>			
+			<code>umbrella \
+	--sandbox_mode parrot \
+	--log umbrella.log \
+	--config povray.umbrella \
+	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/parrot_povray \
+	run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"</code>
+
+			<p>After this umbrella command is finished, you can find the output file,
+			<tt>frame000.png</tt>, in the output directory,
+			<tt>/tmp/umbrella_test/parrot_povray</tt>. The output png file should
+			look like: </p>
+
+			<img class="center" src="images/umbrella-povray.png" HEIGHT="200" WIDTH="200" align="center"/>
+
+			<p>You can check the help document of umbrella for the option settings by running the command: <code>umbrella -h</code></p> 
+
+			<p>You can try other execution engines following the instructions 
+			in the <a href="#running">Different Execution Engines of Umbrella</a> section.</p>
+	
+			<p>To construct umbrella specification for your own application,
+			proceed with the <a href="#create_spec">Create Your Specification</a> section
+			below. </p>
+
+        <h2 id="try_cms">Try CMS Applications with Umbrella<a class="sectionlink" href="#try_cms" title="Link to this section.">&#x21d7;</a></h2>
+
+			<p>The part uses a CMS application as an example to illustrate 
+			how to execute a CMS application with Umbrella.
+			The <tt>--packages</tt> option and the <tt>--ec2</tt> option are both not set
+			in the following command, so <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/packages.json">the
+			default metadata database</a> and <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/ec2.json">the default
+			ec2 metadata database</a> will be downloaded and used on the execution node
+			during runtime.  </p>
+
+			<p>The specification for the application is <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/cms_complex/cms_complex.umbrella">cms_complex.umbrella</a>:
+			<code>{
+	"comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.32"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "6.5"
+	},
+	"software": {
+		"cmssw-5.2.5-slc5_amd64": {
+			"mountpoint": "/cvmfs/cms.cern.ch"
+		}
+	},
+	"data": {
+		"final_events_2381.lhe": {
+			"mountpoint": "/tmp/final_events_2381.lhe",
+			"action": "none"
+		}
+	},
+	"environ": {
+		"CMS_VERSION": "CMSSW_5_2_5",
+		"SCRAM_ARCH": "slc5_amd64_gcc462"
+	}
+}</code>
+
+			The CMS analysis code is <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/cms_complex/cms_complex.sh">cms_complex.sh</a>:
+			<code>#!/bin/sh
+
+rm -rf sim_job
+mkdir sim_job
+cd sim_job
+
+. /cvmfs/cms.cern.ch/cmsset_default.sh
+scramv1 project -f CMSSW ${CMS_VERSION}
+cd ${CMS_VERSION}
+eval `scram runtime -sh`
+cd ..
+cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
+--eventcontent=RAWSIM --datatier GEN -n 10 \
+--filein=file:/tmp/final_events_2381.lhe \
+--filetype=LHE --conditions=START52_V9::All</code>
+
+			The analysis code will create a directory called <tt>sim_job</tt> and put the CMSSW software dependencies under it.
+			The expected output of the CMS application is a png file named <tt>frame000.png</tt>.
+			The command for this application is:<code>/bin/sh cms_complex.sh</code> 
+			Suppose you do your umbrella test under
+			<tt>/tmp/umbrella</tt>. First download the specification and the CMS analysis code
+			file into <tt>/tmp/umbrella</tt>.  </p>
+
+			<p><b>The umbrella command for Parrot execution engine:</b></p>			
+			<code>umbrella \
+	--sandbox_mode parrot \
+	--log umbrella.log \
+	--config cms_complex.umbrella \
+	--inputs 'cms_complex.sh=cms_complex.sh' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/parrot_cms_complex_output \
+	run '/bin/sh cms_complex.sh'</code>
+
+			<p>After umbrella finishes executing the CMS application, you can see the analysis result:
+			<code>21-May-2015 11:05:45 EDT  Initiating request to open LHE file file:/tmp/final_events_2381.lhe
+21-May-2015 11:05:45 EDT  Successfully opened LHE file file:/tmp/final_events_2381.lhe
+Begin processing the 1st record. Run 1, Event 1, LumiSection 1 at 21-May-2015 11:05:45.202 EDT
+Begin processing the 2nd record. Run 1, Event 2, LumiSection 1 at 21-May-2015 11:05:45.204 EDT
+Begin processing the 3rd record. Run 1, Event 3, LumiSection 1 at 21-May-2015 11:05:45.210 EDT
+Begin processing the 4th record. Run 1, Event 4, LumiSection 1 at 21-May-2015 11:05:45.214 EDT
+Begin processing the 5th record. Run 1, Event 5, LumiSection 1 at 21-May-2015 11:05:45.216 EDT
+Begin processing the 6th record. Run 1, Event 6, LumiSection 1 at 21-May-2015 11:05:45.235 EDT
+Begin processing the 7th record. Run 1, Event 7, LumiSection 1 at 21-May-2015 11:05:45.244 EDT
+Begin processing the 8th record. Run 1, Event 8, LumiSection 1 at 21-May-2015 11:05:45.248 EDT
+Begin processing the 9th record. Run 1, Event 9, LumiSection 1 at 21-May-2015 11:05:45.249 EDT
+Begin processing the 10th record. Run 1, Event 10, LumiSection 1 at 21-May-2015 11:05:45.264 EDT
+
+=============================================
+
+MessageLogger Summary
+
+ type     category        sev    module        subroutine        count    total
+ ---- -------------------- -- ---------------- ----------------  -----    -----
+    1 fileAction           -s AfterSource                            2        2
+
+ type    category    Examples: run/evt        run/evt          run/evt
+ ---- -------------------- ---------------- ---------------- ----------------
+    1 fileAction           BeforeEvents     BeforeEvents     
+
+Severity    # Occurrences   Total Occurrences
+--------    -------------   -----------------
+System                  2                   2
+</code>
+
+			The analysis directory <tt>sim_job</tt> will be put in the output directory,
+			<tt>/tmp/umbrella_test/parrot_cms_complex_output</tt>. 
+
+			<p>You can check the help document of umbrella for the option settings by running the command: <code>umbrella -h</code></p> 
+
+<p>For more information about the Umbrella support for CMS applications, please check the <a href="#cms_app">Umbrella Support for CMS Application</a> section. </p>
+
+			<p>You can try other execution engines following the instructions in the 
+			<a href="#running">Different Execution Engines of Umbrella</a> section.</p>
+	
+			<p>To construct umbrella specification for your own application,
+			proceed with the <a href="#create_spec">Create Your Specification</a> section
+			below. </p>
+
+		<h2 id="create_spec">Create Your Specification<a class="sectionlink" href="#create_spec" title="Link to this section.">&#x21d7;</a></h2>
+
+			<p>By default, metadata of all the software, data and OS
+			dependencies is stored in <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/packages.json">the
+			metadata database</a>, which is a <b>JSON</b> file. To use Umbrella, you should
+			first check this metadata database to see whether it covers all the
+			dependencies of your application. If the metadata database does not include
+			all the dependencies of your application, please check the <a href="#prepare.archive">Prepare the Remote Archive and the Metadata Database</a> section.
+
+			<p>Like the metadata database file, the Umbrella specification
+			for an application is also a JSON file. Here is the specification file for a
+			Ray-Tracing application:</p>
+
+			<code> {
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "10GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.18"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "5.10"
+	},
+	"software": {
+		"povray-3.6.1-redhat5-x86_64": {
+			"id": "9b7f2362e6b927c8ef08c3f92599e47c",
+			"mountpoint": "/software/povray-3.6.1-redhat5-x86_64",
+			"action": "unpack"
+		}
+	},
+	"data": {
+	},
+	"environ": {
+		"PATH": "/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin"
+	}
+}
+</code>
+			<p>An Umbrella specification includes 6 parts: hardware, kernel, os, software, data, and environ.</p>
+
+			<p><b>hardware</b> Section (required):</p>
+
+			<ul>
+
+				<li><b>arch</b> (required): the hardware architecture the application needs to
+				run on. Options: x86_64, i386, i686. Current support options: x86_64. Not case
+				sensitive.</li>
+				
+				<li><b>cores</b> (optional): the number of cores the applications needs.
+				Options: 1, 2, 3, 4, ...</li>
+				
+				<li><b>memory</b> (optional): the memory space the application needs in the
+				unit of GB. Options: 1GB, 2GB, .... Not case sensitive.</li>
+				
+				<li><b>disk</b> (optional): the disk space the application needs in the unit of
+				GB. Options: 1GB, 2GB, .... Not case sensitive.</li>
+
+			</ul>
+			
+			<p><b>kernel</b> Section (required):</p>
+
+			<ul>
+
+				<li><b>name</b> (required): the kernel type the application requires. Options:
+				linux, windows. Current support options: linux. Not case sensitive.</li>
+				
+				<li><b>version</b> (required): the kernel version in the format of
+				<tt>A.B.C</tt> (A: kernel version; B: major revision of the kernel; C: the
+				minor revision of the kernel). You can specify this attribute to a single value
+				like <tt>2.6.18</tt> or a range like <tt>&gt;=2.6.18</tt> or a range like
+				<tt>[2.6.18, 2.6.32]</tt>.</li>
+
+			</ul>
+			
+			<p><b>os</b> Section (required):</p>
+
+			<ul>
+
+				<li><b>name</b> (required): the OS name. Options: redhat, centos, arch, ....
+				Not case sensitive.</li>
+				
+				<li><b>version</b> (required): the OS version in the format of <tt>A.B</tt>: A
+				is the main version number and B is the minor version number. Exmaples: 5.10,
+				6.5. </li>
+				
+				<li><b>id</b> (optional): the id of the OS image. There may exist multiple OS
+				images for redhat 5.10, the id attribute uniquely identifies a OS image. If
+				this attribute is not provided in the specification and the OS version is
+				redhat 5.10, the first OS image whose version is redhat 5.10 found in the
+				packages.json will be used.</li>
+
+			</ul>
+			
+			<p><b>software</b> Section (optional):</p>
+
+			<p>Each software dependency has a name, which corresponds to the name included in the metadata database.</p>
+
+			<ul>
+
+				<li><b>id</b> (optional): the id of the software. There may exist multiple
+				versions of a software like <tt>povray-3.6.1-redhat5-x86_64</tt> due to the
+				difference of complication settings. the id attribute uniquely identifies a
+				software. If this attribute is not provided in the specification, the first
+				version found in the packages.json will be used. </li>
+				
+				<li><b>mountpoint</b> (required): the mountpoint of the software. Case
+				sensitive.</li>
+				
+				<li><b>action</b> (required): the action on the downloaded software
+				dependencies. Options: <tt>none</tt>, <tt>unpack</tt>. <tt>none</tt> leaves the
+				downloaded dedendency as it is. <tt>unpack</tt> uncompresses the depedency. Not
+				case sensitive.</li>
+
+			</ul>
+			
+			<p><b>data</b> Section (optional):</p>
+
+			<p>Each data dependency has a name, which corresponds to the name included in the metadata database. </p>
+
+			<ul>
+
+				<li><b>id</b> (optional): the id of the data. There may exist multiple versions
+				of a data. the id attribute uniquely identifies a data. If this attribute is
+				not provided in the specification, the first version found in the packages.json
+				will be used. </li>
+				
+				<li><b>mountpoint</b> (required): the mountpoint of the data dependency. Case
+				sensitive.</li>
+				
+				<li><b>action</b> (required): the action on the downloaded data dependencies.
+				Options: <tt>none</tt>, <tt>unpack</tt>. <tt>none</tt> leaves the downloaded
+				dedendency as it is. <tt>unpack</tt> uncompresses the dependency. Not case
+				sensitive.</li>
+
+			</ul>
+			
+			<p><b>environ</b> Section (optional):</p>
+
+			<p>Each item is a key-value pair. For example, <tt>"HOME": "/home/hmeng"</tt>,
+			which sets the HOME environment variable used by the sandbox to execute the
+			applicition. Case sensitive.</p>
+
+	<h2 id="running">Different Execution Engines of Umbrella<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
+
+		<p>At runtime, Umbrella evaluates the local execution environment to see if it
+		is compatible with the specification.  Umbrella evaluates the hardware
+		resources available, the kernel and OS distribution, and the software and data
+		dependencies.  It then selects the mechanism necessary to deliver the desired
+		environment.  In the case where Umbrella can not construct the desired
+		environment on the local machine, the user will be notified.</p>
+		
+		<p><b>Local Cache and Mounting Mechanism.</b> One cache directory will be set
+		on each execution node involved in the execution engine to avoid download the
+		same data from the remote archive repeatedly.  Umbrella downloads and caches OS
+		images, software dependencies, and data dependencies in the host machine, and
+		then creates a sandbox to execute the application.  To enable software
+		reusability by multiple users, Umbrella constructs the sandbox for each
+		application through mounting-based sandbox techniques.</p>
+		
+		<p>The following figure shows the relationship between the remote archive, the
+		local cache and the sandbox for each application.  <tt>Sandbox 1</tt> uses the
+		root filesystem of the host machine as the root filesystem and mounts the
+		needed software and data dependencies (<tt>A</tt> and <tt>G</tt>) into it.
+		<tt>Sandbox 2</tt> needs to construct a separate root filesystem which groups
+		together the needed OS image (<tt>C</tt>), software dependency
+		(<tt>A</tt>).</p>
+
+		<img class="center" src="images/umbrella-archive-sandbox-cache.png" HEIGHT="340" WIDTH="510" align="center"/>
+
+			<p>The following parts uses a Ray-Tracing application as an example to illustrate 
+			how to use different execution engines of Umbrella to execute the application.
+			The <tt>--packages</tt> option and the <tt>--ec2</tt> option are both not set
+			in the following command, so <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/packages.json">the
+			default metadata database</a> and <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/ec2.json">the default
+			ec2 metadata database</a> will be downloaded and used on the execution node
+			during runtime.  </p>
+
+			<p>The specification for the application is <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/povray/povray.umbrella">povray.umbrella</a>.
+			There are two input files <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/povray/4_cubes.pov">4_cubes.pov</a>
+			and <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/povray/WRC_RubiksCube.inc">WRC_RubiksCube.inc</a>.
+			The command for this application is:<code>povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50</code> Suppose you do your umbrella test under
+			<tt>/tmp/umbrella</tt>. First download the specification and the two input
+			files into <tt>/tmp/umbrella</tt>.  </p>
+
+
+			<h3 id="run.parrot">Execute your Application through Umbrella - Parrot<a class="sectionlink" href="#run.parrot" title="Link to this section.">&#x21d7;</a></h3>
+
+				<p><b>The umbrella command for Parrot execution engine:</b></p>			
+				<code>umbrella \
+	--sandbox_mode parrot \
+	--log umbrella.log \
+	--config povray.umbrella \
+	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/parrot_povray \
+	run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50" </code>
+
+			<h3 id="run.docker">Execute your Application through Umbrella - Docker<a class="sectionlink" href="#run.docker" title="Link to this section.">&#x21d7;</a></h3>
+
+				<p><b>The umbrella command for Docker execution engine:</b></p>			
+				<code>umbrella \
+	--sandbox_mode docker \
+	--log umbrella.log \
+	--config povray.umbrella \
+	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/docker_povray \
+	run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50" </code>
+
+				<p>Don't do the Docker execution engine test under your AFS, it will fail due to the AFS ACL.</p>
+
+			<h3 id="run.chroot">Execute your Application through Umbrella - chroot<a class="sectionlink" href="#run.chroot" title="Link to this section.">&#x21d7;</a></h3>
+
+				<p><b>The umbrella command for chroot execution engine:</b></p>			
+				<code>umbrella \
+	--sandbox_mode chroot \
+	--log umbrella.log \
+	--config povray.umbrella \
+	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/chroot_povray \
+	run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50" </code>
+
+				<p>To test the root execution engine, you must have the root access authority.</p>
+
+			<h3 id="run.local">Execute your Application through Umbrella - local<a class="sectionlink" href="#run.local" title="Link to this section.">&#x21d7;</a></h3>
+
+				<p><b>The umbrella command for local execution engine:</b></p>			
+				<code>umbrella \
+	--sandbox_mode local \
+	--log umbrella.log \
+	--config povray.umbrella \
+	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/local_povray \
+	run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50" </code>
+
+				<p>The local execution engine of Umbrella first check whether
+				Docker exists on the host machine, if yes, use docker execution engine; if not,
+				use parrot execution engine.  If your workstation has both AFS and Docker
+				installed, you should avoid do the test under your AFS.  The local execution
+				engine just focuses on docker and parrot, ignoring chroot, because to render a
+				task includes lots of mount and umount oprations, which are dangerous.  If you
+				really want to use chroot to finish your task, please set the
+				<tt>--sandbox_mode</tt> option to be chroot.</p> 
+			
+			<h3 id="run.condor">Execute your Application through Umbrella - Condor<a class="sectionlink" href="#run.condor" title="Link to this section.">&#x21d7;</a></h3>
+
+				<p><b>The umbrella command for condor execution engine:</b></p>			
+				<code>umbrella \
+	--sandbox_mode condor \
+	--log umbrella.log \
+	--condor_log umbrella.log.condor \
+	--config povray.umbrella \
+	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/condor_povray \
+	run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50" </code>
+
+				<p>To test this, the machine you are using should have condor installed.
+				Condor can not work together with AFS. So do NOT do your test on your AFS.</p>
+
+			<h3 id="run.ec2">Execute your Application through Umbrella - EC2<a class="sectionlink" href="#run.ec2" title="Link to this section.">&#x21d7;</a></h3>
+
+				<p><b>The umbrella command for ec2 execution engine:</b></p>			
+				<code>umbrella \
+	--sandbox_mode ec2 \
+	--log umbrella.log \
+	--ec2_log umbrella.log.ec2 \
+	--ec2_sshkey ~/bin/feb272015.pem \
+	--ec2_key feb272015 \
+	--ec2_group 'sg-24f96141' \
+	--config povray.umbrella \
+	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/ec2_povray \
+	run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50" </code>
+
+				<p>To test this, you must set up the <a
+				href="http://docs.aws.amazon.com/AWSEC2/latest/CommandLineReference/set-up-ec2-cli-linux.html#setting_up_ec2_command_linux">Amazon
+				EC2 command line interface tools on Linux</a>.
+				
+				<p>If you try to use the <tt>id</tt> attribute in the <tt>os</tt> section of the specification to
+				specify a unique OS image from the Amazon EC2, you need to check the <a href="#ec2_db">EC2 metadata
+				database</a> section below, which uses an AMI as the
+				<tt>id</tt> attribute. </p>
+
+		<h2 id="prepare.archive">Prepare the Remote Archive and the Metadata Database<a class="sectionlink" href="#prepare.archive" title="Link to this section.">&#x21d7;</a></h2>
+
+			<p>By default, metadata of all the software, data and OS
+			dependencies is stored in <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/packages.json">the
+			metadata database</a>, which is a <b>JSON</b> file. To use Umbrella, you should
+			first check this metadata database to see whether it covers all the
+			dependencies of your application. If all the dependencies of your application
+			is included in it, then you can proceed with the <a href="#create_spec">Create
+			Your Specification</a> section. If the metadata database does not include
+			all the dependencies of your application, you can download  <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/packages.json">the
+			metadata database</a> and add the metadata information of the missing
+			dependencies into the specification. You can also recreate your own metadata
+			database from scratch. </p>
+
+			<b>Here is an example of metadata database:</b>
+			<code>"povray-3.6.1-redhat5-x86_64": {
+	"9b7f2362e6b927c8ef08c3f92599e47c": {
+		"source":[
+			"http://ccl.cse.nd.edu/research/data/hep-case-study/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64.tar.gz"
+		],
+		"format": "tgz",
+		"checksum": "9b7f2362e6b927c8ef08c3f92599e47c",
+		"size": "1.5MB"
+	},
+	"c9da9e46b3ce0f7f9885ce60077c45c5": {
+		"source":[
+			"http://ccl.cse.nd.edu/research/data/hep-case-study/c9da9e46b3ce0f7f9885ce60077c45c5/povray-3.6.1-redhat5-x86_64.tar.gz"
+		],
+		"format": "tgz",
+		"checksum": "c9da9e46b3ce0f7f9885ce60077c45c5",
+		"size": "1.5MB"
+	}
+},
+"redhat-5.10-x86_64": {
+	"62aa9bc37afe3f738052da5545832c80": {
+		"source": [
+			"http://ccl.cse.nd.edu/research/data/hep-case-study/62aa9bc37afe3f738052da5545832c80/redhat-5.10-x86_64.tar.gz"
+		],
+		"format": "tgz",
+		"checksum": "62aa9bc37afe3f738052da5545832c80",
+		"size": "480MB"
+	}
+},
+"final_events_2381.lhe": {
+	"cb9878132aad42e7db30eabd214be8e2": {
+		"source": [
+			"http://ccl.cse.nd.edu/research/data/hep-case-study/cb9878132aad42e7db30eabd214be8e2/final_events_2381.lhe"
+		],
+		"format": "plain",
+		"checksum": "cb9878132aad42e7db30eabd214be8e2",
+		"size": "18MB"
+	}
+}</code>
+
+			<p>The name of a software dependency is in the format of 'A-B-C-D', where A is
+			the software name, B is the software version, C is OS distro name, D is
+			hardware architecture. <tt>povray-3.6.1-redhat5-x86_64</tt> is an example of
+			this category.</p>
+			
+			<p>The name of an OS image dependency is in the format of 'A-B-C', where A is
+			the OS name, B is the OS version, C is hardware architecture.
+			<tt>redhat-5.10-x86_64</tt> is an example of this category.</p>
+			
+			<p>There is no special limitation on the name of a data dependency.
+			<tt>final_events_2381.lhe</tt> is an example of this category.</p>
+			
+			<p><b>Multiple Packages for One Dependency.</b> According to the building and
+			compilation settings, there may be multiple packages for one dependency. In
+			this case, all the packages for one dependency will be organized together and
+			the `id` attribute of each package will be used as item key to differentiate
+			different packages. For example, for the software dependency
+			<tt>povray-3.6.1-redhat5-x86_64</tt>, there are two different packages: one
+			with the id of <tt>9b7f2362e6b927c8ef08c3f92599e47c</tt> and one with the id of
+			<tt>c9da9e46b3ce0f7f9885ce60077c45c5</tt>.</p>
+
+			<p>Each OS, software and data package includes four attributes: source, checksum, size and format.</p>
+
+			<ul>
+
+				<li><b>source</b>: a list of storage location of the dependency, which includes
+				one or more resource URL. Each URL can be a local file path like
+				<tt>file:///etc/hosts</tt>, or a https/http URL as shown in the example. Case
+				sensitive. The first source will be first tried, if fails, then the second
+				source will be tried, and so on.</li>
+				
+				<li><b>checksum</b>: the checksum of the dependencies. Currently Umbrella only
+				supports md5 checksum. </li>
+				
+				<li><b>size</b>: the size of the dependency. Not case sensitive.</li>
+				
+				<li><b>format</b>: the perservation format of the dependency. Currently
+				Umbrella supports two formats: <tt>tgz</tt> (gzip compressed tarball) and
+				<tt>plain</tt> (plain text).</li>
+
+			</ul>
+
+			<p><b>Relationship of id and checksum.</b> The id and checksum of each package
+			in the archive are identical in our implementation of metadata database.
+			However, it is not necessary for them to be identical to each other. You can
+			implement your metadata database in a different semantics once the id of each
+			package is unique for one dependency.</p>
+			
+			<p><b>Organization of the Local Cache.</b> Within the local cache, the id of
+			each package dependency will be used to create a directory under the
+			<tt>&lt;localdir&gt;/cache</tt>, then the package will be put into
+			<tt>&lt;localdir&gt;/cache/&lt;id<id>gt;/&lt;name&gt;</tt>. Therefore,
+			<tt>&lt;localdir&gt;/cache/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64.tar.gz</tt>
+			will be the local location of the first povray package shown in the above
+			example. The uncompressed directory of the tarball will be
+			<tt>&lt;localdir&gt;/cache/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64</tt>.</p>
+			
+			<p><b>Organization of the Remote Archive.</b> Within the remote archive, to
+			differentiate multiple packages for the same dependency and the different
+			dependencies, a directory with the name of the checksum of each package will be
+			created and functions as the direct parent directory of the package. Therefore,
+			in the remote archive, there is a directory named
+			<tt>9b7f2362e6b927c8ef08c3f92599e47c</tt>, under which exists
+			<tt>povray-3.6.1-redhat5-x86_64.tar.gz</tt> However, the organization of the
+			remote archive can be in other format, once you have a way to differentiate the
+			packages.</p>
+			
+			<p>If you want to customize your own metadata database, please follow the
+			requirements above and then tell umbrella through <tt>--packages</tt> option to
+			use your own metadata database.</p>
+
+
+		<h2 id="ec2_db">EC2 Metadata Database<a class="sectionlink" href="#ec2_db" title="Link to this section.">&#x21d7;</a></h2>
+
+			<p>When the ec2 execution engine is used, Umbrella tries to map the
+			specification into an AMI and an EC2 instance type with the help of the EC2
+			metadata database, which is a JSON file and can be specified by the
+			<tt>--ec2</tt> option of Umbrella.  If the <tt>--ec2</tt> is not set, <a
+			href="http://ccl.cse.nd.edu/software/umbrella/database/ec2.json">the default
+			EC2 metadata database</a> will be downloaded and used on the execution node
+			during runtime.  </p>
+
+			<p><b>Here is an example of an EC2 metadata database:</b><p>
+
+			<code>{
+	"redhat-6.5-x86_64": {
+		"ami-2cf8901c": {
+			"ami": "ami-2cf8901c",
+			"root_device_type": "ebs",
+			"virtualization_type": "papavirtual",
+			"user": "ec2-user"
+		}
+	},
+	"redhat-5.10-x86_64": {
+		"ami-d76a29e7": {
+			"ami": "ami-d76a29e7",
+			"root_device_type": "ebs",
+			"virtualization_type": "hvm",
+			"user": "root"
+		}
+	},
+	"instances": {
+		"m1.large": {
+			"cores": "4",
+			"memory": "2GB",
+			"disk": "20GB"
+		}
+	}
+	...
+}</code>
+
+			<p>There are two types of items in an EC2 metadata: OS images and instance types.</p>
+			
+			<p>The name of an OS image shares the same specification with the name used in <a
+			href="#prepare.archive">the general metadata database</a>. There may exist
+			multiple versions of images for an OS like <tt>redhat-5.10-x86_64</tt>. An
+			identifier of each version is needed to differentiate these versions and
+			function as the name of each OS image version. Currently, the AMI is used as
+			the identifier. Correspondingly, the <tt>id</tt> attribute of the <tt>os</tt>
+			section of an specification should also be an AMI.</p>
+
+			<p>An OS image includes four attributes:</p>
+			<ul>
+				<li><b>AMI</b> (required): the Amazon Machine Image.</li>
+				<li><b>root_device_type</b> (optional): the type of the root device of the AMI.</li>
+				<li><b>virtualization_type</b> (optional): the type of virtualization technique used for
+				the AMI. Currently Amazon supports two types of virtualization: paravirtual
+				(PV) or hardware virtual machine (HVM).</li>
+				<li><b>user</b> (required): the user name used to connect to an instance.</li>
+			</ul>
+
+			<p>The name of each instance type is the same as the one provided by <a
+			href="http://aws.amazon.com/ec2/instance-types/">the Amazon EC2</a>(e.g.,
+			m1.large). Each instance type has three attributes:</p>
+			<ul>
+				<li><b>cores</b> (required): the number of cores.</li>
+				<li><b>memory</b> (required): the memory space.</li>
+				<li><b>disk</b> (required): the disk space.</li>
+			</ul>
+
+		<h2 id="cms_app">Umbrella Support for CMS Application<a class="sectionlink" href="#cms_app" title="Link to this section.">&#x21d7;</a></h2>
+
+			<p> As for CMS applications which need software from CVMFS, Umbrella first
+			checks whether the execution node has CVMFS installed or not.  If CVMFS is
+			installed and its CMS repository is mounted as <tt>/cvmfs/cms.cern.ch</tt>, the
+			application can run directly without the help from sandboxing techniques.  If
+			CVMFS is not installed or the mountpoint <tt>/cvmfs/cms.cern.ch</tt> is not
+			found, <a href="http://ccl.cse.nd.edu/software/parrot/">Parrot</a> will be used
+			to help access software from CVMFS.  </p>
+
+			<p>Here is an example of the umbrella specification for an CMS application, named
+			<tt>cms_complex.umbrella</tt>:</p>
+
+			<code>{
+	"comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.32"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "6.5"
+	},
+	"software": {
+		"cmssw-5.2.5-slc5_amd64": {
+			"mountpoint": "/cvmfs/cms.cern.ch"
+		}
+	},
+	"data": {
+		"final_events_2381.lhe": {
+			"mountpoint": "/tmp/final_events_2381.lhe",
+			"action": "none"
+		}
+	},
+	"environ": {
+		"CMS_VERSION": "CMSSW_5_2_5",
+		"SCRAM_ARCH": "slc5_amd64_gcc462"
+	}
+}</code>
+
+			<p>Like other software dependencies, the dependency of CMSSW will be specified
+			inside the <tt>software</tt> section of the specification, however, you only
+			need to specify the <tt>mountpoint</tt> attribute. The <tt>id</tt> and
+			<tt>action</tt> attributes for the CMSSW dependency will be ignored even if
+			they are specified. In fact, the support for CMS applications are hardcoded
+			inside the source code of Umbrella, not inside the metadata database.  </p>
+
+			<p>Here is the CMS analysis code, named <tt>cms_complex.sh</tt>:</p>
+
+			<code>#!/bin/sh
+
+rm -rf sim_job
+mkdir sim_job
+cd sim_job
+
+. /cvmfs/cms.cern.ch/cmsset_default.sh
+scramv1 project -f CMSSW ${CMS_VERSION}
+cd ${CMS_VERSION}
+eval `scram runtime -sh`
+cd ..
+cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
+--eventcontent=RAWSIM --datatier GEN -n 10 \
+--filein=file:/tmp/final_events_2381.lhe \
+--filetype=LHE --conditions=START52_V9::All</code>
+
+			<p>Once the application and its corresponding umbrella speficiation is ready,
+			umbrella can be called to execute the application:</p>
+
+			<code>umbrella \
+	--sandbox_mode parrot \
+	--log umbrella.log \
+	--config cms_complex.umbrella \
+	--inputs 'cms_complex.sh=cms_complex.sh' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/parrot_cms_complex_output \
+	run '/bin/sh cms_complex.sh'</code>
+
+			<p>If you want to run this CMS application through Umbrella, please check the <a href="#try_cms">Try CMS Applications with Umbrella</a>.</p>
+    </div>
+</body>
+
+</html>

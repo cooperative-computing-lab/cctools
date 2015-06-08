@@ -143,6 +143,7 @@ include_package_ftplite="ftp_lite"
 include_package_chirp="chirp"
 include_package_resource_monitor="resource_monitor"
 include_package_weaver="weaver"
+include_package_umbrella="umbrella"
 include_package_doc="doc"
 include_package_prune="prune"
 
@@ -331,6 +332,9 @@ do
 		--without-system-chirp)
 			include_package_chirp=""
 			;;
+		--without-system-umbrella)
+			include_package_umbrella=""
+			;;
 		--without-system-parrot)
 			include_package_parrot=""
 			;;
@@ -400,6 +404,7 @@ And SYSTEM may be:
     ftp-lite
     chirp
     parrot
+    umbrella
     resource_monitor
     doc
 EOF
@@ -420,7 +425,7 @@ fi
 IFS=" "
 export IFS
 
-potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_doc} ${include_package_prune}"
+potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_doc} ${include_package_prune}"
 
 check_multiarch
 
@@ -999,9 +1004,12 @@ fi
 
 if [ $python != 0 -a $python_major_version = 2 -a $python_minor_version -ge 6 ]
 then
+	echo "python version is suitable for umbrella"
 	echo "python version is suitable for prune"
 	echo "python version is suitable for weaver"
 else
+	echo "umbrella requires python >= 2.6"
+	packages=`echo ${packages} | sed 's/umbrella//g'`
 	echo "prune requires python >= 2.6"
 	packages=`echo ${packages} | sed 's/prune//g'`
 	echo "weaver requires python >= 2.6"
