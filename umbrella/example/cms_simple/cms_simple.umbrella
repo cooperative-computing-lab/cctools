@@ -1,0 +1,28 @@
+{
+	"comment": "a simple CMS application whose software and data dependencies are all from CVMFS.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.32"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "6.5"
+	},
+	"software": {
+		"cmssw-5.3.11-slc5_amd64": {
+			"mountpoint": "/cvmfs/cms.cern.ch"
+		}
+	},
+	"data": {
+	},
+	"environ": {
+		"CMS_VERSION": "CMSSW_5_3_11",
+		"SCRAM_ARCH": "slc5_amd64_gcc462"
+	}
+}

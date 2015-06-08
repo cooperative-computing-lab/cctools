@@ -1,0 +1,639 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module umbrella</title>
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>umbrella</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:/afs/crc.nd.edu/user/h/hmeng/git-development/cctools/umbrella/src/umbrella.py">/afs/crc.nd.edu/user/h/hmeng/git-development/cctools/umbrella/src/umbrella.py</a></font></td></tr></table>
+    <p><tt>Umbrella&nbsp;is&nbsp;a&nbsp;tool&nbsp;for&nbsp;specifying&nbsp;and&nbsp;materializing&nbsp;comprehensive&nbsp;execution&nbsp;environments,&nbsp;from&nbsp;the&nbsp;hardware&nbsp;all&nbsp;the&nbsp;way&nbsp;up&nbsp;to&nbsp;software&nbsp;and&nbsp;data.&nbsp;&nbsp;A&nbsp;user&nbsp;simply&nbsp;invokes&nbsp;Umbrella&nbsp;with&nbsp;the&nbsp;desired&nbsp;task,&nbsp;and&nbsp;Umbrella&nbsp;determines&nbsp;the&nbsp;minimum&nbsp;mechanism&nbsp;necessary&nbsp;to&nbsp;run&nbsp;the&nbsp;task,&nbsp;whether&nbsp;it&nbsp;be&nbsp;direct&nbsp;execution,&nbsp;a&nbsp;system&nbsp;container,&nbsp;a&nbsp;local&nbsp;virtual&nbsp;machine,&nbsp;or&nbsp;submission&nbsp;to&nbsp;a&nbsp;cloud&nbsp;or&nbsp;grid&nbsp;environment.&nbsp;&nbsp;We&nbsp;present&nbsp;the&nbsp;overall&nbsp;design&nbsp;of&nbsp;Umbrella&nbsp;and&nbsp;demonstrate&nbsp;its&nbsp;use&nbsp;to&nbsp;precisely&nbsp;execute&nbsp;a&nbsp;high&nbsp;energy&nbsp;physics&nbsp;application&nbsp;and&nbsp;a&nbsp;ray-tracing&nbsp;application&nbsp;across&nbsp;many&nbsp;platforms&nbsp;using&nbsp;a&nbsp;combination&nbsp;of&nbsp;Parrot,&nbsp;Chroot,&nbsp;Docker,&nbsp;VMware,&nbsp;Condor,&nbsp;and&nbsp;Amazon&nbsp;EC2.<br>
+&nbsp;<br>
+Copyright&nbsp;(C)&nbsp;2003-2004&nbsp;Douglas&nbsp;Thain&nbsp;and&nbsp;the&nbsp;University&nbsp;of&nbsp;Wisconsin<br>
+Copyright&nbsp;(C)&nbsp;2005-&nbsp;The&nbsp;University&nbsp;of&nbsp;Notre&nbsp;Dame<br>
+This&nbsp;software&nbsp;is&nbsp;distributed&nbsp;under&nbsp;the&nbsp;GNU&nbsp;General&nbsp;Public&nbsp;License.<br>
+See&nbsp;the&nbsp;file&nbsp;COPYING&nbsp;for&nbsp;details.<br>
+&nbsp;<br>
+Implementation&nbsp;Logics&nbsp;of&nbsp;Non-CMS&nbsp;and&nbsp;CMS&nbsp;Application&nbsp;Support:<br>
+For&nbsp;non-cms&nbsp;application:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;batch&nbsp;type&nbsp;is&nbsp;Parrot,&nbsp;create&nbsp;the&nbsp;mountlist&nbsp;file&nbsp;and&nbsp;set&nbsp;PARROT_MOUNT_FILE;&nbsp;set&nbsp;PATH;&nbsp;set&nbsp;PARROT_LDSO_PATH&nbsp;if&nbsp;a&nbsp;separate&nbsp;OS&nbsp;image&nbsp;is&nbsp;needed;&nbsp;parrotize&nbsp;the&nbsp;user's&nbsp;command&nbsp;into&nbsp;`parrot_run&nbsp;user_cmd`.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;batch&nbsp;type&nbsp;is&nbsp;Docker,&nbsp;transfer&nbsp;the&nbsp;OS&nbsp;image&nbsp;into&nbsp;a&nbsp;Docker&nbsp;image;&nbsp;use&nbsp;volume&nbsp;to&nbsp;mount&nbsp;all&nbsp;the&nbsp;software&nbsp;and&nbsp;data&nbsp;dependencies&nbsp;into&nbsp;a&nbsp;container;&nbsp;set&nbsp;PATH;&nbsp;dockerize&nbsp;the&nbsp;user's&nbsp;command&nbsp;into&nbsp;`docker&nbsp;run&nbsp;user_cmd`.&nbsp;To&nbsp;use&nbsp;Docker,&nbsp;a&nbsp;separate&nbsp;OS&nbsp;image&nbsp;is&nbsp;needed.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;batch&nbsp;type&nbsp;is&nbsp;chroot,&nbsp;create&nbsp;mountpoints&nbsp;for&nbsp;software&nbsp;and&nbsp;data&nbsp;dependencies&nbsp;inside&nbsp;the&nbsp;OS&nbsp;image&nbsp;directory&nbsp;and&nbsp;mount&nbsp;software&nbsp;and&nbsp;data&nbsp;into&nbsp;the&nbsp;OS&nbsp;image,&nbsp;set&nbsp;PATH,&nbsp;chrootize&nbsp;the&nbsp;user's&nbsp;command&nbsp;into&nbsp;`chroot&nbsp;user_cmd`.<br>
+For&nbsp;cms&nbsp;application:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;batch&nbsp;type&nbsp;is&nbsp;Parrot,&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;local&nbsp;machine&nbsp;has&nbsp;cvmfs&nbsp;installed,&nbsp;treat&nbsp;it&nbsp;as&nbsp;non-cms&nbsp;application;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;local&nbsp;machine&nbsp;does&nbsp;not&nbsp;have&nbsp;cvmfs&nbsp;installed,&nbsp;do&nbsp;all&nbsp;the&nbsp;work&nbsp;for&nbsp;non-cms&nbsp;application&nbsp;+&nbsp;set&nbsp;HTTP_PROXY&nbsp;+&nbsp;add&nbsp;SITEINFO&nbsp;into&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;batch&nbsp;type&nbsp;is&nbsp;Docker,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;local&nbsp;machine&nbsp;has&nbsp;cvmfs&nbsp;installed,&nbsp;treat&nbsp;it&nbsp;as&nbsp;non-cms&nbsp;application;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;local&nbsp;machine&nbsp;does&nbsp;not&nbsp;have&nbsp;cvmfs&nbsp;installed,&nbsp;do&nbsp;all&nbsp;the&nbsp;work&nbsp;for&nbsp;non-cms&nbsp;application&nbsp;+&nbsp;set&nbsp;HTTP_PROXY&nbsp;+&nbsp;add&nbsp;SITEINFO&nbsp;into&nbsp;mountlist&nbsp;file&nbsp;+&nbsp;parrotize&nbsp;the&nbsp;user's&nbsp;command.&nbsp;First&nbsp;parrotize&nbsp;the&nbsp;user's&nbsp;command,&nbsp;then&nbsp;dockerize&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;batch&nbsp;type&nbsp;is&nbsp;chroot,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;local&nbsp;machine&nbsp;has&nbsp;cvmfs&nbsp;installed,&nbsp;treat&nbsp;it&nbsp;as&nbsp;non-cms&nbsp;application;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;local&nbsp;machine&nbsp;does&nbsp;not&nbsp;have&nbsp;cvmfs&nbsp;installed,&nbsp;do&nbsp;all&nbsp;the&nbsp;work&nbsp;for&nbsp;non-cms&nbsp;application&nbsp;+&nbsp;set&nbsp;HTTP_PROXY&nbsp;+&nbsp;add&nbsp;SITEINFO&nbsp;into&nbsp;mountlist&nbsp;file&nbsp;+&nbsp;parrotize&nbsp;the&nbsp;user's&nbsp;command.&nbsp;First&nbsp;parrotize&nbsp;the&nbsp;user's&nbsp;command,&nbsp;then&nbsp;chrootize&nbsp;the&nbsp;user's&nbsp;command.</tt></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Modules</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="StringIO.html">StringIO</a><br>
+<a href="datetime.html">datetime</a><br>
+<a href="difflib.html">difflib</a><br>
+<a href="getpass.html">getpass</a><br>
+<a href="grp.html">grp</a><br>
+<a href="hashlib.html">hashlib</a><br>
+</td><td width="25%" valign=top><a href="json.html">json</a><br>
+<a href="logging.html">logging</a><br>
+<a href="multiprocessing.html">multiprocessing</a><br>
+<a href="os.html">os</a><br>
+<a href="platform.html">platform</a><br>
+<a href="re.html">re</a><br>
+</td><td width="25%" valign=top><a href="resource.html">resource</a><br>
+<a href="shutil.html">shutil</a><br>
+<a href="sqlite3.html">sqlite3</a><br>
+<a href="subprocess.html">subprocess</a><br>
+<a href="sys.html">sys</a><br>
+<a href="tarfile.html">tarfile</a><br>
+</td><td width="25%" valign=top><a href="tempfile.html">tempfile</a><br>
+<a href="time.html">time</a><br>
+<a href="urllib2.html">urllib2</a><br>
+<a href="urlparse.html">urlparse</a><br>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#eeaa77">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt><a name="-cctools_download"><strong>cctools_download</strong></a>(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action)</dt><dd><tt>Download&nbsp;cctools<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;of&nbsp;dependencies.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hardware_platform:&nbsp;the&nbsp;architecture&nbsp;of&nbsp;the&nbsp;required&nbsp;hardware&nbsp;platform&nbsp;(e.g.,&nbsp;x86_64).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;host_linux_distro:&nbsp;the&nbsp;linux&nbsp;distro&nbsp;of&nbsp;the&nbsp;host&nbsp;machine.&nbsp;For&nbsp;Example:&nbsp;redhat6,&nbsp;centos6.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;action:&nbsp;the&nbsp;action&nbsp;on&nbsp;the&nbsp;downloaded&nbsp;dependency.&nbsp;Options:&nbsp;none,&nbsp;unpack.&nbsp;"none"&nbsp;leaves&nbsp;the&nbsp;downloaded&nbsp;dependency&nbsp;at&nbsp;it&nbsp;is.&nbsp;"unpack"&nbsp;uncompresses&nbsp;the&nbsp;dependency.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;downloaded&nbsp;cctools&nbsp;in&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.&nbsp;For&nbsp;example:&nbsp;/tmp/umbrella_test/cache/d19376d92daa129ff736f75247b79ec8/cctools-4.9.0-redhat6-x86_64</tt></dd></dl>
+ <dl><dt><a name="-check_cvmfs_cms"><strong>check_cvmfs_cms</strong></a>()</dt><dd><tt>Check&nbsp;whether&nbsp;cvmfs&nbsp;is&nbsp;installed&nbsp;on&nbsp;the&nbsp;host&nbsp;or&nbsp;not<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;cvmfs&nbsp;is&nbsp;installed&nbsp;and&nbsp;cms&nbsp;repo&nbsp;is&nbsp;configured,&nbsp;returns&nbsp;the&nbsp;string&nbsp;including&nbsp;the&nbsp;mountpoint&nbsp;of&nbsp;cvmfs&nbsp;cms&nbsp;repo.&nbsp;For&nbsp;example:&nbsp;"/cvmfs/cms.cern.ch".<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;return&nbsp;an&nbsp;empty&nbsp;string.</tt></dd></dl>
+ <dl><dt><a name="-chroot_mount_bind"><strong>chroot_mount_bind</strong></a>(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, hardware_platform, distro_name, distro_version)</dt><dd><tt>Create&nbsp;each&nbsp;target&nbsp;mountpoint&nbsp;under&nbsp;the&nbsp;cached&nbsp;os&nbsp;image&nbsp;directory&nbsp;through&nbsp;`mount&nbsp;--bind`.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dir_dict:&nbsp;a&nbsp;dict&nbsp;including&nbsp;all&nbsp;the&nbsp;directory&nbsp;mountpoints&nbsp;needed&nbsp;to&nbsp;be&nbsp;created&nbsp;inside&nbsp;the&nbsp;OS&nbsp;image.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;file_dict:&nbsp;a&nbsp;dict&nbsp;including&nbsp;all&nbsp;the&nbsp;file&nbsp;mountpoints&nbsp;needed&nbsp;to&nbsp;be&nbsp;created&nbsp;inside&nbsp;the&nbsp;OS&nbsp;image.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;need_separate_rootfs:&nbsp;whether&nbsp;a&nbsp;separate&nbsp;rootfs&nbsp;is&nbsp;needed&nbsp;to&nbsp;execute&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hardware_platform:&nbsp;the&nbsp;architecture&nbsp;of&nbsp;the&nbsp;required&nbsp;hardware&nbsp;platform&nbsp;(e.g.,&nbsp;x86_64).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;distro_name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;(e.g.,&nbsp;redhat).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;distro_version:&nbsp;the&nbsp;version&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;(e.g.,&nbsp;6.5).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;no&nbsp;error&nbsp;happens,&nbsp;returns&nbsp;None.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;directly&nbsp;exit.</tt></dd></dl>
+ <dl><dt><a name="-chroot_post_process"><strong>chroot_post_process</strong></a>(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, hardware_platform, distro_name, distro_version)</dt><dd><tt>Remove&nbsp;all&nbsp;the&nbsp;created&nbsp;target&nbsp;mountpoints&nbsp;within&nbsp;the&nbsp;cached&nbsp;os&nbsp;image&nbsp;directory.<br>
+It&nbsp;is&nbsp;not&nbsp;necessary&nbsp;to&nbsp;change&nbsp;the&nbsp;mode&nbsp;of&nbsp;the&nbsp;output&nbsp;dir,&nbsp;because&nbsp;only&nbsp;the&nbsp;root&nbsp;user&nbsp;can&nbsp;use&nbsp;the&nbsp;chroot&nbsp;method.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dir_dict:&nbsp;a&nbsp;dict&nbsp;including&nbsp;all&nbsp;the&nbsp;directory&nbsp;mountpoints&nbsp;needed&nbsp;to&nbsp;be&nbsp;created&nbsp;inside&nbsp;the&nbsp;OS&nbsp;image.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;file_dict:&nbsp;a&nbsp;dict&nbsp;including&nbsp;all&nbsp;the&nbsp;file&nbsp;mountpoints&nbsp;needed&nbsp;to&nbsp;be&nbsp;created&nbsp;inside&nbsp;the&nbsp;OS&nbsp;image.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;need_separate_rootfs:&nbsp;whether&nbsp;a&nbsp;separate&nbsp;rootfs&nbsp;is&nbsp;needed&nbsp;to&nbsp;execute&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hardware_platform:&nbsp;the&nbsp;architecture&nbsp;of&nbsp;the&nbsp;required&nbsp;hardware&nbsp;platform&nbsp;(e.g.,&nbsp;x86_64).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;distro_name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;(e.g.,&nbsp;redhat).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;distro_version:&nbsp;the&nbsp;version&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;(e.g.,&nbsp;6.5).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;no&nbsp;error&nbsp;happens,&nbsp;returns&nbsp;None.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;directly&nbsp;exit.</tt></dd></dl>
+ <dl><dt><a name="-chrootize_user_cmd"><strong>chrootize_user_cmd</strong></a>(user_cmd, cwd_setting)</dt><dd><tt>Modify&nbsp;the&nbsp;user's&nbsp;command&nbsp;when&nbsp;the&nbsp;batch_type&nbsp;is&nbsp;chroot.&nbsp;This&nbsp;check&nbsp;should&nbsp;be&nbsp;done&nbsp;after&nbsp;`parrotize_user_cmd`.<br>
+The&nbsp;cases&nbsp;when&nbsp;this&nbsp;function&nbsp;should&nbsp;be&nbsp;called:&nbsp;batch_type&nbsp;==&nbsp;chroot<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user_cmd:&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cwd_setting:&nbsp;the&nbsp;current&nbsp;working&nbsp;directory&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;modified&nbsp;version&nbsp;of&nbsp;the&nbsp;user's&nbsp;cmd.</tt></dd></dl>
+ <dl><dt><a name="-collect_software_bin"><strong>collect_software_bin</strong></a>(host_cctools_path, sw_mount_dict)</dt><dd><tt>Construct&nbsp;the&nbsp;path&nbsp;environment&nbsp;from&nbsp;the&nbsp;mountpoints&nbsp;of&nbsp;software&nbsp;dependencies.<br>
+Each&nbsp;softare&nbsp;package&nbsp;has&nbsp;a&nbsp;bin&nbsp;subdir&nbsp;containing&nbsp;all&nbsp;its&nbsp;executables.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;host_cctools_path:&nbsp;the&nbsp;path&nbsp;of&nbsp;cctools&nbsp;under&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sw_mount_dict:&nbsp;a&nbsp;dict&nbsp;only&nbsp;including&nbsp;all&nbsp;the&nbsp;software&nbsp;mounting&nbsp;items.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extra_path:&nbsp;the&nbsp;paths&nbsp;which&nbsp;are&nbsp;extracted&nbsp;from&nbsp;sw_mount_dict&nbsp;and&nbsp;host_cctools_path,&nbsp;and&nbsp;needed&nbsp;to&nbsp;be&nbsp;added&nbsp;into&nbsp;PATH.</tt></dd></dl>
+ <dl><dt><a name="-compare_versions"><strong>compare_versions</strong></a>(v1, v2)</dt><dd><tt>Compare&nbsp;two&nbsp;versions,&nbsp;the&nbsp;format&nbsp;of&nbsp;version&nbsp;is:&nbsp;X.X.X<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v1:&nbsp;a&nbsp;version.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v2:&nbsp;a&nbsp;version.<br>
+&nbsp;<br>
+Returns:&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;if&nbsp;v1&nbsp;==&nbsp;v2;&nbsp;1&nbsp;if&nbsp;v1&nbsp;is&nbsp;newer&nbsp;than&nbsp;v2;&nbsp;-1&nbsp;if&nbsp;v1&nbsp;is&nbsp;older&nbsp;than&nbsp;v2.</tt></dd></dl>
+ <dl><dt><a name="-condor_process"><strong>condor_process</strong></a>(spec_path, spec_json, spec_path_basename, packages_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, remotelog_path)</dt><dd><tt>Process&nbsp;the&nbsp;specification&nbsp;when&nbsp;condor&nbsp;execution&nbsp;engine&nbsp;is&nbsp;chosen<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;spec_path:&nbsp;the&nbsp;absolute&nbsp;path&nbsp;of&nbsp;the&nbsp;specification.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;spec_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;the&nbsp;specification.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;spec_path_basename:&nbsp;the&nbsp;file&nbsp;name&nbsp;of&nbsp;the&nbsp;specification.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_path:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;json&nbsp;file&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;information.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;output_dir:&nbsp;the&nbsp;output&nbsp;directory.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input_list_origin:&nbsp;the&nbsp;list&nbsp;of&nbsp;input&nbsp;file&nbsp;paths.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user_cmd:&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cwd_setting:&nbsp;the&nbsp;current&nbsp;working&nbsp;directory&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;remotelog_path:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;umbrella&nbsp;log&nbsp;executed&nbsp;on&nbsp;the&nbsp;remote&nbsp;condor&nbsp;execution&nbsp;node.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;no&nbsp;errors&nbsp;happen,&nbsp;return&nbsp;None;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;directly&nbsp;exit.</tt></dd></dl>
+ <dl><dt><a name="-construct_chroot_mount_dict"><strong>construct_chroot_mount_dict</strong></a>(sandbox_dir, output_dir, input_dict, need_separate_rootfs, os_image_dir, is_cms_app, mount_dict, host_cctools_path)</dt><dd><tt>Construct&nbsp;directory&nbsp;mount&nbsp;list&nbsp;and&nbsp;file&nbsp;mount&nbsp;list&nbsp;for&nbsp;chroot.&nbsp;chroot&nbsp;requires&nbsp;the&nbsp;target&nbsp;mountpoint&nbsp;must&nbsp;be&nbsp;created&nbsp;within&nbsp;the&nbsp;chroot&nbsp;jail.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;output_dir:&nbsp;the&nbsp;output&nbsp;directory.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input_dict:&nbsp;the&nbsp;setting&nbsp;of&nbsp;input&nbsp;files&nbsp;specified&nbsp;by&nbsp;the&nbsp;--inputs&nbsp;option.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;need_separate_rootfs:&nbsp;whether&nbsp;a&nbsp;separate&nbsp;rootfs&nbsp;is&nbsp;needed&nbsp;to&nbsp;execute&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;os_image_dir:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;OS&nbsp;image&nbsp;inside&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;is_cms_app:&nbsp;whether&nbsp;this&nbsp;is&nbsp;a&nbsp;cms&nbsp;app.&nbsp;1&nbsp;means&nbsp;this&nbsp;is&nbsp;a&nbsp;cms&nbsp;app.&nbsp;0&nbsp;means&nbsp;this&nbsp;is&nbsp;not.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mount_dict:&nbsp;a&nbsp;dict&nbsp;including&nbsp;each&nbsp;mounting&nbsp;item&nbsp;in&nbsp;the&nbsp;specification,&nbsp;whose&nbsp;key&nbsp;is&nbsp;the&nbsp;access&nbsp;path&nbsp;used&nbsp;by&nbsp;the&nbsp;user's&nbsp;task;&nbsp;whose&nbsp;value&nbsp;is&nbsp;the&nbsp;actual&nbsp;storage&nbsp;path.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;host_cctools_path:&nbsp;the&nbsp;path&nbsp;of&nbsp;cctools&nbsp;under&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;tuple&nbsp;includes&nbsp;the&nbsp;directory&nbsp;mount&nbsp;list&nbsp;and&nbsp;the&nbsp;file&nbsp;mount&nbsp;list</tt></dd></dl>
+ <dl><dt><a name="-construct_docker_volume"><strong>construct_docker_volume</strong></a>(input_dict, mount_dict)</dt><dd><tt>Construct&nbsp;the&nbsp;docker&nbsp;volume&nbsp;parameters&nbsp;based&nbsp;on&nbsp;mount_dict.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input_dict:&nbsp;the&nbsp;setting&nbsp;of&nbsp;input&nbsp;files&nbsp;specified&nbsp;by&nbsp;the&nbsp;--inputs&nbsp;option.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mount_dict:&nbsp;a&nbsp;dict&nbsp;including&nbsp;each&nbsp;mounting&nbsp;item&nbsp;in&nbsp;the&nbsp;specification,&nbsp;whose&nbsp;key&nbsp;is&nbsp;the&nbsp;access&nbsp;path&nbsp;used&nbsp;by&nbsp;the&nbsp;user's&nbsp;task;&nbsp;whose&nbsp;value&nbsp;is&nbsp;the&nbsp;actual&nbsp;storage&nbsp;path.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;volume_paras:&nbsp;all&nbsp;the&nbsp;`-v`&nbsp;options&nbsp;for&nbsp;the&nbsp;docker&nbsp;command.</tt></dd></dl>
+ <dl><dt><a name="-construct_env"><strong>construct_env</strong></a>(sandbox_dir, os_image_dir)</dt><dd><tt>Read&nbsp;env_list&nbsp;inside&nbsp;an&nbsp;OS&nbsp;image&nbsp;and&nbsp;save&nbsp;all&nbsp;the&nbsp;environment&nbsp;variables&nbsp;into&nbsp;a&nbsp;dictionary.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;os_image_dir:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;OS&nbsp;image&nbsp;inside&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;env_dict:&nbsp;a&nbsp;dictionary&nbsp;which&nbsp;includes&nbsp;all&nbsp;the&nbsp;environment&nbsp;variables&nbsp;from&nbsp;env_list</tt></dd></dl>
+ <dl><dt><a name="-construct_mountfile_cvmfs_siteconf"><strong>construct_mountfile_cvmfs_siteconf</strong></a>(sandbox_dir, cvmfs_siteconf_mountpoint)</dt><dd><tt>Create&nbsp;the&nbsp;mountfile&nbsp;if&nbsp;chroot&nbsp;and&nbsp;docker&nbsp;is&nbsp;used&nbsp;to&nbsp;execute&nbsp;a&nbsp;CMS&nbsp;application&nbsp;and&nbsp;the&nbsp;host&nbsp;machine&nbsp;does&nbsp;not&nbsp;have&nbsp;cvmfs&nbsp;installed.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cvmfs_siteconf_mountpoint:&nbsp;a&nbsp;string&nbsp;in&nbsp;the&nbsp;format&nbsp;of&nbsp;'/cvmfs/cms.cern.ch/SITECONF/local&nbsp;&lt;SITEINFO&nbsp;dir&nbsp;in&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache&gt;/local'<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;mountfile.</tt></dd></dl>
+ <dl><dt><a name="-construct_mountfile_easy"><strong>construct_mountfile_easy</strong></a>(sandbox_dir, input_dict, mount_dict, cvmfs_siteconf_mountpoint)</dt><dd><tt>Create&nbsp;the&nbsp;mountfile&nbsp;if&nbsp;parrot&nbsp;is&nbsp;used&nbsp;to&nbsp;create&nbsp;a&nbsp;sandbox&nbsp;for&nbsp;the&nbsp;application&nbsp;and&nbsp;a&nbsp;separate&nbsp;rootfs&nbsp;is&nbsp;not&nbsp;needed.<br>
+The&nbsp;trick&nbsp;here&nbsp;is&nbsp;the&nbsp;adding&nbsp;sequence&nbsp;does&nbsp;matter.&nbsp;The&nbsp;latter-added&nbsp;items&nbsp;will&nbsp;be&nbsp;checked&nbsp;first&nbsp;during&nbsp;the&nbsp;execution.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mount_dict:&nbsp;all&nbsp;the&nbsp;mount&nbsp;items&nbsp;extracted&nbsp;from&nbsp;the&nbsp;specification&nbsp;file&nbsp;and&nbsp;possible&nbsp;implicit&nbsp;dependencies&nbsp;like&nbsp;cctools.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input_dict:&nbsp;the&nbsp;setting&nbsp;of&nbsp;input&nbsp;files&nbsp;specified&nbsp;by&nbsp;the&nbsp;--inputs&nbsp;option<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cvmfs_siteconf_mountpoint:&nbsp;a&nbsp;string&nbsp;in&nbsp;the&nbsp;format&nbsp;of&nbsp;'/cvmfs/cms.cern.ch/SITECONF/local&nbsp;&lt;SITEINFO&nbsp;dir&nbsp;in&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache&gt;/local'<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;mountfile.</tt></dd></dl>
+ <dl><dt><a name="-construct_mountfile_full"><strong>construct_mountfile_full</strong></a>(sandbox_dir, os_image_dir, mount_dict, input_dict, cvmfs_siteconf_mountpoint)</dt><dd><tt>Create&nbsp;the&nbsp;mountfile&nbsp;if&nbsp;parrot&nbsp;is&nbsp;used&nbsp;to&nbsp;create&nbsp;a&nbsp;sandbox&nbsp;for&nbsp;the&nbsp;application&nbsp;and&nbsp;a&nbsp;separate&nbsp;rootfs&nbsp;is&nbsp;needed.<br>
+The&nbsp;trick&nbsp;here&nbsp;is&nbsp;the&nbsp;adding&nbsp;sequence&nbsp;does&nbsp;matter.&nbsp;The&nbsp;latter-added&nbsp;items&nbsp;will&nbsp;be&nbsp;checked&nbsp;first&nbsp;during&nbsp;the&nbsp;execution.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;os_image_dir:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;OS&nbsp;image&nbsp;inside&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mount_dict:&nbsp;all&nbsp;the&nbsp;mount&nbsp;items&nbsp;extracted&nbsp;from&nbsp;the&nbsp;specification&nbsp;file&nbsp;and&nbsp;possible&nbsp;implicit&nbsp;dependencies&nbsp;like&nbsp;cctools.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input_dict:&nbsp;the&nbsp;setting&nbsp;of&nbsp;input&nbsp;files&nbsp;specified&nbsp;by&nbsp;the&nbsp;--inputs&nbsp;option<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cvmfs_siteconf_mountpoint:&nbsp;a&nbsp;string&nbsp;in&nbsp;the&nbsp;format&nbsp;of&nbsp;'/cvmfs/cms.cern.ch/SITECONF/local&nbsp;&lt;SITEINFO&nbsp;dir&nbsp;in&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache&gt;/local'<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;mountfile.</tt></dd></dl>
+ <dl><dt><a name="-create_docker_image"><strong>create_docker_image</strong></a>(sandbox_dir, hardware_platform, distro_name, distro_version, packages)</dt><dd><tt>Create&nbsp;a&nbsp;docker&nbsp;image&nbsp;based&nbsp;on&nbsp;the&nbsp;cached&nbsp;os&nbsp;image&nbsp;directory.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;docker&nbsp;image&nbsp;is&nbsp;imported&nbsp;from&nbsp;the&nbsp;tarball&nbsp;successfully,&nbsp;returns&nbsp;None.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;directly&nbsp;exit.</tt></dd></dl>
+ <dl><dt><a name="-data_dependency_process"><strong>data_dependency_process</strong></a>(name, id, packages_json, sandbox_dir, action)</dt><dd><tt>Download&nbsp;a&nbsp;data&nbsp;dependency<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name:&nbsp;the&nbsp;item&nbsp;name&nbsp;in&nbsp;the&nbsp;data&nbsp;section<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;id:&nbsp;the&nbsp;id&nbsp;attribute&nbsp;of&nbsp;the&nbsp;processed&nbsp;dependency<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;of&nbsp;dependencies.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;action:&nbsp;the&nbsp;action&nbsp;on&nbsp;the&nbsp;downloaded&nbsp;dependency.&nbsp;Options:&nbsp;none,&nbsp;unpack.&nbsp;"none"&nbsp;leaves&nbsp;the&nbsp;downloaded&nbsp;dependency&nbsp;at&nbsp;it&nbsp;is.&nbsp;"unpack"&nbsp;uncompresses&nbsp;the&nbsp;dependency.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;downloaded&nbsp;data&nbsp;dependency&nbsp;in&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.</tt></dd></dl>
+ <dl><dt><a name="-data_install"><strong>data_install</strong></a>(data_spec, packages_json, sandbox_dir, mount_dict)</dt><dd><tt>Process&nbsp;data&nbsp;section&nbsp;of&nbsp;the&nbsp;specification.<br>
+At&nbsp;the&nbsp;beginning&nbsp;of&nbsp;the&nbsp;function,&nbsp;mount_dict&nbsp;only&nbsp;includes&nbsp;items&nbsp;for&nbsp;software&nbsp;and&nbsp;os&nbsp;dependencies.&nbsp;After&nbsp;this&nbsp;function&nbsp;is&nbsp;done,&nbsp;all&nbsp;the&nbsp;items&nbsp;for&nbsp;data&nbsp;dependencies&nbsp;will&nbsp;be&nbsp;added&nbsp;into&nbsp;mount_dict.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data_spec:&nbsp;the&nbsp;data&nbsp;section&nbsp;of&nbsp;the&nbsp;specification.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;of&nbsp;dependencies.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mount_dict:&nbsp;a&nbsp;dict&nbsp;including&nbsp;each&nbsp;mounting&nbsp;item&nbsp;in&nbsp;the&nbsp;specification,&nbsp;whose&nbsp;key&nbsp;is&nbsp;the&nbsp;access&nbsp;path&nbsp;used&nbsp;by&nbsp;the&nbsp;user's&nbsp;task;&nbsp;whose&nbsp;value&nbsp;is&nbsp;the&nbsp;actual&nbsp;storage&nbsp;path.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;modified&nbsp;mount_dict&nbsp;with&nbsp;all&nbsp;the&nbsp;new&nbsp;mountpoints&nbsp;for&nbsp;data&nbsp;dependencies.</tt></dd></dl>
+ <dl><dt><a name="-decide_instance_type"><strong>decide_instance_type</strong></a>(cpu_cores, memory_size, disk_size, instances)</dt><dd><tt>Compare&nbsp;the&nbsp;required&nbsp;hardware&nbsp;configurations&nbsp;with&nbsp;each&nbsp;instance&nbsp;type,&nbsp;and&nbsp;return&nbsp;the&nbsp;first&nbsp;matched&nbsp;instance&nbsp;type,&nbsp;return&nbsp;'no'&nbsp;if&nbsp;no&nbsp;matched&nbsp;instance&nbsp;type&nbsp;exist.<br>
+We&nbsp;can&nbsp;rank&nbsp;each&nbsp;instance&nbsp;type&nbsp;in&nbsp;the&nbsp;future,&nbsp;so&nbsp;that&nbsp;in&nbsp;the&nbsp;case&nbsp;of&nbsp;multiple&nbsp;matches&nbsp;exit,&nbsp;the&nbsp;closest&nbsp;matched&nbsp;instance&nbsp;type&nbsp;is&nbsp;returned.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cpu_cores:&nbsp;the&nbsp;number&nbsp;of&nbsp;required&nbsp;&nbsp;cpus&nbsp;(e.g.,&nbsp;1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;memory_size:&nbsp;the&nbsp;memory&nbsp;size&nbsp;requirement&nbsp;(e.g.,&nbsp;2GB).&nbsp;Not&nbsp;case&nbsp;sensitive.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;disk_size:&nbsp;the&nbsp;disk&nbsp;size&nbsp;requirement&nbsp;(e.g.,&nbsp;2GB).&nbsp;Not&nbsp;case&nbsp;sensitive.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;instances:&nbsp;the&nbsp;instances&nbsp;section&nbsp;of&nbsp;the&nbsp;ec2&nbsp;json&nbsp;file.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;there&nbsp;is&nbsp;no&nbsp;matched&nbsp;instance&nbsp;type,&nbsp;return&nbsp;'no'.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;returns&nbsp;the&nbsp;first&nbsp;matched&nbsp;instance&nbsp;type.</tt></dd></dl>
+ <dl><dt><a name="-dependency_check"><strong>dependency_check</strong></a>(item)</dt><dd><tt>Check&nbsp;whether&nbsp;an&nbsp;executable&nbsp;exists&nbsp;or&nbsp;not.&nbsp;<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;item:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;executable&nbsp;to&nbsp;be&nbsp;found.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;executable&nbsp;can&nbsp;be&nbsp;found&nbsp;through&nbsp;$PATH,&nbsp;return&nbsp;0;&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;return&nbsp;-1.</tt></dd></dl>
+ <dl><dt><a name="-dependency_download"><strong>dependency_download</strong></a>(url, checksum, checksum_tool, dest, format_remote_storage, action)</dt><dd><tt>Download&nbsp;a&nbsp;dependency&nbsp;from&nbsp;the&nbsp;url&nbsp;and&nbsp;verify&nbsp;its&nbsp;integrity.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;url:&nbsp;the&nbsp;storage&nbsp;location&nbsp;of&nbsp;the&nbsp;dependency.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;checksum:&nbsp;the&nbsp;checksum&nbsp;of&nbsp;the&nbsp;dependency.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;checksum_tool:&nbsp;the&nbsp;tool&nbsp;used&nbsp;to&nbsp;calculate&nbsp;the&nbsp;checksum,&nbsp;such&nbsp;as&nbsp;md5sum.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dest:&nbsp;the&nbsp;destination&nbsp;of&nbsp;the&nbsp;dependency&nbsp;where&nbsp;the&nbsp;downloaded&nbsp;dependency&nbsp;will&nbsp;be&nbsp;put.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;format_remote_storage:&nbsp;the&nbsp;file&nbsp;format&nbsp;of&nbsp;the&nbsp;dependency,&nbsp;such&nbsp;as&nbsp;.tgz.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;action:&nbsp;the&nbsp;action&nbsp;on&nbsp;the&nbsp;downloaded&nbsp;dependency.&nbsp;Options:&nbsp;none,&nbsp;unpack.&nbsp;"none"&nbsp;leaves&nbsp;the&nbsp;downloaded&nbsp;dependency&nbsp;at&nbsp;it&nbsp;is.&nbsp;"unpack"&nbsp;uncompresses&nbsp;the&nbsp;dependency.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;url&nbsp;is&nbsp;a&nbsp;broken&nbsp;link&nbsp;or&nbsp;the&nbsp;integrity&nbsp;of&nbsp;the&nbsp;downloaded&nbsp;data&nbsp;is&nbsp;bad,&nbsp;directly&nbsp;exit.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;return&nbsp;None.</tt></dd></dl>
+ <dl><dt><a name="-dependency_process"><strong>dependency_process</strong></a>(env_para_dict, name, id, mountpoint, action, packages_json, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro)</dt><dd><tt>Process&nbsp;each&nbsp;explicit&nbsp;and&nbsp;implicit&nbsp;dependency.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;env_para_dict:&nbsp;the&nbsp;environment&nbsp;variables&nbsp;which&nbsp;need&nbsp;to&nbsp;be&nbsp;set&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name:&nbsp;the&nbsp;item&nbsp;name&nbsp;in&nbsp;the&nbsp;software&nbsp;section<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;id:&nbsp;the&nbsp;id&nbsp;attribute&nbsp;of&nbsp;the&nbsp;processed&nbsp;dependency<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mountpoint:&nbsp;the&nbsp;mountpoint&nbsp;of&nbsp;the&nbsp;dependency&nbsp;referred&nbsp;by&nbsp;the&nbsp;user's&nbsp;task.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;action:&nbsp;the&nbsp;action&nbsp;on&nbsp;the&nbsp;downloaded&nbsp;dependency.&nbsp;Options:&nbsp;none,&nbsp;unpack.&nbsp;"none"&nbsp;leaves&nbsp;the&nbsp;downloaded&nbsp;dependency&nbsp;at&nbsp;it&nbsp;is.&nbsp;"unpack"&nbsp;uncompresses&nbsp;the&nbsp;dependency.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;os_id:&nbsp;the&nbsp;id&nbsp;attribute&nbsp;of&nbsp;the&nbsp;required&nbsp;OS.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;of&nbsp;dependencies.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;batch_type:&nbsp;the&nbsp;execution&nbsp;engine.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user_cmd:&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cwd_setting:&nbsp;the&nbsp;current&nbsp;working&nbsp;directory&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hardware_platform:&nbsp;the&nbsp;architecture&nbsp;of&nbsp;the&nbsp;required&nbsp;hardware&nbsp;platform&nbsp;(e.g.,&nbsp;x86_64).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;host_linux_distro:&nbsp;the&nbsp;linux&nbsp;distro&nbsp;of&nbsp;the&nbsp;host&nbsp;machine.&nbsp;For&nbsp;Example:&nbsp;redhat6,&nbsp;centos6.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;is_cms_app:&nbsp;whether&nbsp;this&nbsp;is&nbsp;a&nbsp;cms&nbsp;app.&nbsp;1&nbsp;means&nbsp;this&nbsp;is&nbsp;a&nbsp;cms&nbsp;app.&nbsp;0&nbsp;means&nbsp;this&nbsp;is&nbsp;not.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cvmfs_siteconf_mountpoint:&nbsp;a&nbsp;string&nbsp;in&nbsp;the&nbsp;format&nbsp;of&nbsp;'/cvmfs/cms.cern.ch/SITECONF/local&nbsp;&lt;SITEINFO&nbsp;dir&nbsp;in&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache&gt;/local'<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mount_value:&nbsp;the&nbsp;actual&nbsp;storage&nbsp;path&nbsp;of&nbsp;one&nbsp;dependency.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;local_cvmfs:&nbsp;the&nbsp;mountpoint&nbsp;of&nbsp;the&nbsp;local-installed&nbsp;cvmfs&nbsp;(e.g.,&nbsp;/cvmfs).</tt></dd></dl>
+ <dl><dt><a name="-ec2_process"><strong>ec2_process</strong></a>(spec_path, spec_json, packages_path, packages_json, ec2_path, ec2_json, ssh_key, key_pair, security_group, sandbox_dir, output_dir, batch_type, input_list, input_list_origin, env_options, user_cmd, cwd_setting, remotelog_path)</dt><dd><tt>Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;spec_path:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;specification.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;spec_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;the&nbsp;specification.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_path:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;json&nbsp;file&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;information.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;of&nbsp;dependencies.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ec2_path:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;json&nbsp;file&nbsp;including&nbsp;all&nbsp;infomration&nbsp;about&nbsp;the&nbsp;ec2&nbsp;AMIs&nbsp;and&nbsp;instance&nbsp;types.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ec2_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;corresponding&nbsp;to&nbsp;ec2_path.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ssh_key:&nbsp;the&nbsp;name&nbsp;the&nbsp;private&nbsp;key&nbsp;file&nbsp;to&nbsp;use&nbsp;when&nbsp;connecting&nbsp;to&nbsp;an&nbsp;instance.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;key_pair:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;key-pair&nbsp;to&nbsp;use&nbsp;when&nbsp;launching&nbsp;an&nbsp;instance.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;security_group:&nbsp;the&nbsp;security&nbsp;group&nbsp;within&nbsp;which&nbsp;the&nbsp;EC2&nbsp;instance&nbsp;should&nbsp;be&nbsp;run.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;output_dir:&nbsp;the&nbsp;output&nbsp;directory.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;batch_type:&nbsp;the&nbsp;execution&nbsp;engine.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input_list:&nbsp;a&nbsp;list&nbsp;including&nbsp;all&nbsp;the&nbsp;absolute&nbsp;path&nbsp;of&nbsp;the&nbsp;input&nbsp;files&nbsp;on&nbsp;the&nbsp;local&nbsp;machine.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input_list_origin:&nbsp;the&nbsp;list&nbsp;of&nbsp;input&nbsp;file&nbsp;paths.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;env_options:&nbsp;the&nbsp;original&nbsp;`--env`&nbsp;option.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user_cmd:&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cwd_setting:&nbsp;the&nbsp;current&nbsp;working&nbsp;directory&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;remotelog_path:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;umbrella&nbsp;log&nbsp;executed&nbsp;on&nbsp;the&nbsp;remote&nbsp;EC2&nbsp;execution&nbsp;node.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;no&nbsp;errors&nbsp;happen,&nbsp;return&nbsp;None;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;directly&nbsp;exit.</tt></dd></dl>
+ <dl><dt><a name="-env_check"><strong>env_check</strong></a>(sandbox_dir, batch_type, hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version)</dt><dd><tt>Check&nbsp;the&nbsp;matching&nbsp;degree&nbsp;between&nbsp;the&nbsp;specification&nbsp;requirement&nbsp;and&nbsp;the&nbsp;host&nbsp;machine.<br>
+Currently&nbsp;check&nbsp;the&nbsp;following&nbsp;item:&nbsp;batch_type,&nbsp;hardware&nbsp;platform,&nbsp;kernel,&nbsp;OS,&nbsp;disk,&nbsp;memory,&nbsp;cpu&nbsp;cores.<br>
+Other&nbsp;things&nbsp;needed&nbsp;to&nbsp;check:&nbsp;software,&nbsp;and&nbsp;data??<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;batch_type:&nbsp;the&nbsp;execution&nbsp;engine.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hardware_platform:&nbsp;the&nbsp;architecture&nbsp;of&nbsp;the&nbsp;required&nbsp;hardware&nbsp;platform&nbsp;(e.g.,&nbsp;x86_64).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cpu_cores:&nbsp;the&nbsp;number&nbsp;of&nbsp;required&nbsp;&nbsp;cpus&nbsp;(e.g.,&nbsp;1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;memory_size:&nbsp;the&nbsp;memory&nbsp;size&nbsp;requirement&nbsp;(e.g.,&nbsp;2GB).&nbsp;Not&nbsp;case&nbsp;sensitive.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;disk_size:&nbsp;the&nbsp;disk&nbsp;size&nbsp;requirement&nbsp;(e.g.,&nbsp;2GB).&nbsp;Not&nbsp;case&nbsp;sensitive.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;kernel_name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;kernel&nbsp;(e.g.,&nbsp;linux).&nbsp;Not&nbsp;case&nbsp;sensitive.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;kernel_version:&nbsp;the&nbsp;version&nbsp;of&nbsp;the&nbsp;required&nbsp;kernel&nbsp;(e.g.,&nbsp;2.6.18).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;host_linux_distro:&nbsp;the&nbsp;linux&nbsp;distro&nbsp;of&nbsp;the&nbsp;host&nbsp;machine.&nbsp;For&nbsp;Example:&nbsp;redhat6,&nbsp;centos6.</tt></dd></dl>
+ <dl><dt><a name="-env_parameter_init"><strong>env_parameter_init</strong></a>(hardware_spec, kernel_spec, os_spec)</dt><dd><tt>Set&nbsp;the&nbsp;environment&nbsp;parameters&nbsp;according&nbsp;to&nbsp;the&nbsp;specification&nbsp;file.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hardware_spec:&nbsp;the&nbsp;hardware&nbsp;section&nbsp;in&nbsp;the&nbsp;specification&nbsp;for&nbsp;the&nbsp;user's&nbsp;task.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;kernel_spec:&nbsp;the&nbsp;kernel&nbsp;section&nbsp;in&nbsp;the&nbsp;specification&nbsp;for&nbsp;the&nbsp;user's&nbsp;task.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;os_spec:&nbsp;the&nbsp;os&nbsp;section&nbsp;in&nbsp;the&nbsp;specification&nbsp;for&nbsp;the&nbsp;user's&nbsp;task.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;tuple&nbsp;including&nbsp;the&nbsp;requirements&nbsp;for&nbsp;hardware,&nbsp;kernel&nbsp;and&nbsp;os.</tt></dd></dl>
+ <dl><dt><a name="-func_call"><strong>func_call</strong></a>(cmd)</dt><dd><tt>Execute&nbsp;a&nbsp;command&nbsp;and&nbsp;return&nbsp;the&nbsp;return&nbsp;code,&nbsp;stdout,&nbsp;stderr.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cmd:&nbsp;the&nbsp;command&nbsp;needs&nbsp;to&nbsp;execute&nbsp;using&nbsp;the&nbsp;subprocess&nbsp;module.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;tuple&nbsp;including&nbsp;the&nbsp;return&nbsp;code,&nbsp;stdout,&nbsp;stderr.</tt></dd></dl>
+ <dl><dt><a name="-func_call_withenv"><strong>func_call_withenv</strong></a>(cmd, env_dict)</dt><dd><tt>Execute&nbsp;a&nbsp;command&nbsp;with&nbsp;a&nbsp;special&nbsp;setting&nbsp;of&nbsp;the&nbsp;environment&nbsp;variables&nbsp;and&nbsp;return&nbsp;the&nbsp;return&nbsp;code,&nbsp;stdout,&nbsp;stderr.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cmd:&nbsp;the&nbsp;command&nbsp;needs&nbsp;to&nbsp;execute&nbsp;using&nbsp;the&nbsp;subprocess&nbsp;module.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;env_dict:&nbsp;the&nbsp;environment&nbsp;setting.<br>
+&nbsp;<br>
+Returns:&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;tuple&nbsp;including&nbsp;the&nbsp;return&nbsp;code,&nbsp;stdout,&nbsp;stderr.</tt></dd></dl>
+ <dl><dt><a name="-get_instance_id"><strong>get_instance_id</strong></a>(image_id, instance_type, key_pair, security_group)</dt><dd><tt>Start&nbsp;one&nbsp;VM&nbsp;instance&nbsp;through&nbsp;Amazon&nbsp;EC2&nbsp;command&nbsp;line&nbsp;interface&nbsp;and&nbsp;return&nbsp;the&nbsp;instance&nbsp;id.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;image_id:&nbsp;the&nbsp;Amazon&nbsp;Image&nbsp;Identifier.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;instance_type:&nbsp;the&nbsp;Amazon&nbsp;EC2&nbsp;instance&nbsp;type&nbsp;used&nbsp;for&nbsp;the&nbsp;task.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;key_pair:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;key-pair&nbsp;to&nbsp;use&nbsp;when&nbsp;launching&nbsp;an&nbsp;instance.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;security_group:&nbsp;the&nbsp;security&nbsp;group&nbsp;within&nbsp;which&nbsp;the&nbsp;EC2&nbsp;instance&nbsp;should&nbsp;be&nbsp;run.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;no&nbsp;error&nbsp;happens,&nbsp;returns&nbsp;the&nbsp;id&nbsp;of&nbsp;the&nbsp;started&nbsp;instance.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;directly&nbsp;exit.</tt></dd></dl>
+ <dl><dt><a name="-get_linker_path"><strong>get_linker_path</strong></a>(hardware_platform, os_image_dir)</dt><dd><tt>Return&nbsp;the&nbsp;path&nbsp;of&nbsp;ld-linux.so&nbsp;within&nbsp;the&nbsp;downloaded&nbsp;os&nbsp;image&nbsp;dependency<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hardware_platform:&nbsp;the&nbsp;architecture&nbsp;of&nbsp;the&nbsp;required&nbsp;hardware&nbsp;platform&nbsp;(e.g.,&nbsp;x86_64).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;os_image_dir:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;OS&nbsp;image&nbsp;inside&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;dynamic&nbsp;linker&nbsp;is&nbsp;found&nbsp;within&nbsp;the&nbsp;OS&nbsp;image,&nbsp;return&nbsp;its&nbsp;fullpath.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;returns&nbsp;None.</tt></dd></dl>
+ <dl><dt><a name="-get_public_dns"><strong>get_public_dns</strong></a>(instance_id)</dt><dd><tt>Get&nbsp;the&nbsp;public&nbsp;dns&nbsp;of&nbsp;one&nbsp;VM&nbsp;instance&nbsp;from&nbsp;Amazon&nbsp;EC2.&nbsp;<br>
+`ec2-run-instances`&nbsp;can&nbsp;not&nbsp;directly&nbsp;return&nbsp;the&nbsp;public&nbsp;dns&nbsp;of&nbsp;the&nbsp;instance,&nbsp;so&nbsp;this&nbsp;function&nbsp;is&nbsp;needed&nbsp;to&nbsp;check&nbsp;the&nbsp;result&nbsp;of&nbsp;`ec2-describe-instances`&nbsp;to&nbsp;obtain&nbsp;the&nbsp;public&nbsp;dns&nbsp;of&nbsp;the&nbsp;instance.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;instance_id:&nbsp;the&nbsp;id&nbsp;of&nbsp;the&nbsp;VM&nbsp;instance.<br>
+&nbsp;<br>
+Returns:&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;no&nbsp;error&nbsp;happens,&nbsp;returns&nbsp;the&nbsp;public&nbsp;dns&nbsp;of&nbsp;the&nbsp;instance.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;directly&nbsp;exit.</tt></dd></dl>
+ <dl><dt><a name="-has_docker_image"><strong>has_docker_image</strong></a>(hardware_platform, distro_name, distro_version)</dt><dd><tt>Check&nbsp;whether&nbsp;the&nbsp;required&nbsp;docker&nbsp;image&nbsp;exists&nbsp;on&nbsp;the&nbsp;local&nbsp;machine&nbsp;or&nbsp;not.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hardware_platform:&nbsp;the&nbsp;architecture&nbsp;of&nbsp;the&nbsp;required&nbsp;hardware&nbsp;platform&nbsp;(e.g.,&nbsp;x86_64).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;distro_name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;(e.g.,&nbsp;redhat).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;distro_version:&nbsp;the&nbsp;version&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;(e.g.,&nbsp;6.5).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;required&nbsp;docker&nbsp;image&nbsp;exists&nbsp;on&nbsp;the&nbsp;local&nbsp;machine,&nbsp;returns&nbsp;'yes'.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;returns&nbsp;'no'.</tt></dd></dl>
+ <dl><dt><a name="-in_local_group"><strong>in_local_group</strong></a>()</dt><dd><tt>Judge&nbsp;whether&nbsp;the&nbsp;current&nbsp;user's&nbsp;group&nbsp;exists&nbsp;in&nbsp;/etc/group.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;current&nbsp;user's&nbsp;group&nbsp;exists&nbsp;in&nbsp;/etc/group,&nbsp;returns&nbsp;'yes'.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;returns&nbsp;'no'.</tt></dd></dl>
+ <dl><dt><a name="-in_local_passwd"><strong>in_local_passwd</strong></a>()</dt><dd><tt>Judge&nbsp;whether&nbsp;the&nbsp;current&nbsp;user&nbsp;exists&nbsp;in&nbsp;/etc/passwd.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;current&nbsp;user&nbsp;is&nbsp;inside&nbsp;/etc/passwd,&nbsp;returns&nbsp;'yes'.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;returns&nbsp;'no'.</tt></dd></dl>
+ <dl><dt><a name="-main"><strong>main</strong></a>()</dt></dl>
+ <dl><dt><a name="-md5_cal"><strong>md5_cal</strong></a>(filename, block_size<font color="#909090">=1048576</font>)</dt><dd><tt>Calculate&nbsp;the&nbsp;md5sum&nbsp;of&nbsp;a&nbsp;file<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filename:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;file&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;block_size:&nbsp;the&nbsp;size&nbsp;of&nbsp;each&nbsp;block<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;calculation&nbsp;fails&nbsp;for&nbsp;any&nbsp;reason,&nbsp;directly&nbsp;exit.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;return&nbsp;the&nbsp;md5&nbsp;value&nbsp;of&nbsp;the&nbsp;content&nbsp;of&nbsp;the&nbsp;file</tt></dd></dl>
+ <dl><dt><a name="-obtain_path"><strong>obtain_path</strong></a>(os_image_dir, sw_mount_dict)</dt><dd><tt>Get&nbsp;the&nbsp;path&nbsp;environment&nbsp;variable&nbsp;from&nbsp;envfile&nbsp;and&nbsp;add&nbsp;the&nbsp;mountpoints&nbsp;of&nbsp;software&nbsp;dependencies&nbsp;into&nbsp;it<br>
+the&nbsp;envfile&nbsp;here&nbsp;is&nbsp;named&nbsp;env_list&nbsp;under&nbsp;the&nbsp;OS&nbsp;image.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;os_image_dir:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;OS&nbsp;image&nbsp;inside&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sw_mount_dict:&nbsp;a&nbsp;dict&nbsp;only&nbsp;including&nbsp;all&nbsp;the&nbsp;software&nbsp;mounting&nbsp;items.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;path_env:&nbsp;the&nbsp;new&nbsp;value&nbsp;for&nbsp;PATH.</tt></dd></dl>
+ <dl><dt><a name="-package_search"><strong>package_search</strong></a>(packages_json, name, id<font color="#909090">=None</font>)</dt><dd><tt>Search&nbsp;the&nbsp;metadata&nbsp;information&nbsp;of&nbsp;an&nbsp;dependency&nbsp;in&nbsp;the&nbsp;packages_json<br>
+First&nbsp;find&nbsp;all&nbsp;the&nbsp;items&nbsp;with&nbsp;the&nbsp;required&nbsp;name&nbsp;in&nbsp;packages_json.&nbsp;<br>
+Then&nbsp;find&nbsp;the&nbsp;right&nbsp;one&nbsp;whose&nbsp;id&nbsp;satisfied&nbsp;the&nbsp;requirement.<br>
+If&nbsp;no&nbsp;id&nbsp;parameter&nbsp;is&nbsp;problem,&nbsp;then&nbsp;the&nbsp;first&nbsp;matched&nbsp;one&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;of&nbsp;dependencies.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;dependency.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;id:&nbsp;the&nbsp;id&nbsp;attribute&nbsp;of&nbsp;the&nbsp;dependency.&nbsp;Defaults&nbsp;to&nbsp;None.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;one&nbsp;item&nbsp;is&nbsp;found&nbsp;in&nbsp;packages_json,&nbsp;return&nbsp;the&nbsp;item,&nbsp;which&nbsp;is&nbsp;a&nbsp;dictionary.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;no&nbsp;item&nbsp;satisfied&nbsp;the&nbsp;requirement&nbsp;on&nbsp;packages_json,&nbsp;directly&nbsp;exit.</tt></dd></dl>
+ <dl><dt><a name="-parrotize_user_cmd"><strong>parrotize_user_cmd</strong></a>(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)</dt><dd><tt>Modify&nbsp;the&nbsp;user's&nbsp;command&nbsp;into&nbsp;`parrot_run&nbsp;+&nbsp;the&nbsp;user's&nbsp;command`.&nbsp;<br>
+The&nbsp;cases&nbsp;when&nbsp;this&nbsp;function&nbsp;should&nbsp;be&nbsp;called:&nbsp;(1)&nbsp;non-cms&nbsp;app&nbsp;&amp;&nbsp;batch_type&nbsp;==&nbsp;parrot;&nbsp;(2)&nbsp;cms&nbsp;app&nbsp;&amp;&nbsp;cvmfs&nbsp;is&nbsp;not&nbsp;installed&nbsp;on&nbsp;the&nbsp;execution&nbsp;node.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user_cmd:&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cwd_setting:&nbsp;the&nbsp;current&nbsp;working&nbsp;directory&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hardware_platform:&nbsp;the&nbsp;architecture&nbsp;of&nbsp;the&nbsp;required&nbsp;hardware&nbsp;platform&nbsp;(e.g.,&nbsp;x86_64).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;host_linux_distro:&nbsp;the&nbsp;linux&nbsp;distro&nbsp;of&nbsp;the&nbsp;host&nbsp;machine.&nbsp;For&nbsp;Example:&nbsp;redhat6,&nbsp;centos6.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;of&nbsp;dependencies.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;modified&nbsp;version&nbsp;of&nbsp;the&nbsp;user's&nbsp;cmd.</tt></dd></dl>
+ <dl><dt><a name="-set_cvmfs_siteconf"><strong>set_cvmfs_siteconf</strong></a>(name, action, packages_json, sandbox_dir)</dt><dd><tt>Download&nbsp;cvmfs&nbsp;SITEINFO&nbsp;and&nbsp;set&nbsp;its&nbsp;mountpoint.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;cmvfs&nbsp;SITEINFO&nbsp;package&nbsp;in&nbsp;packages_json.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;action:&nbsp;the&nbsp;action&nbsp;on&nbsp;the&nbsp;downloaded&nbsp;dependency.&nbsp;Options:&nbsp;none,&nbsp;unpack.&nbsp;"none"&nbsp;leaves&nbsp;the&nbsp;downloaded&nbsp;dependency&nbsp;at&nbsp;it&nbsp;is.&nbsp;"unpack"&nbsp;uncompresses&nbsp;the&nbsp;dependency.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;of&nbsp;dependencies.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cvmfs_siteconf_mountpoint:&nbsp;a&nbsp;string&nbsp;in&nbsp;the&nbsp;format&nbsp;of&nbsp;'/cvmfs/cms.cern.ch/SITECONF/local&nbsp;&lt;SITEINFO&nbsp;dir&nbsp;in&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache&gt;/local'</tt></dd></dl>
+ <dl><dt><a name="-software_install"><strong>software_install</strong></a>(env_para_dict, os_id, software_spec, packages_json, sandbox_dir, batch_type, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs)</dt><dd><tt>Installation&nbsp;each&nbsp;software&nbsp;dependency&nbsp;specified&nbsp;in&nbsp;the&nbsp;software&nbsp;section&nbsp;of&nbsp;the&nbsp;specification.&nbsp;<br>
+If&nbsp;the&nbsp;application&nbsp;is&nbsp;a&nbsp;CMS&nbsp;app&nbsp;and&nbsp;the&nbsp;execution&nbsp;node&nbsp;does&nbsp;not&nbsp;have&nbsp;cvmfs&nbsp;installed,&nbsp;change&nbsp;`user_cmd`&nbsp;to&nbsp;`parrot_run&nbsp;...&nbsp;user_cmd`&nbsp;and&nbsp;set&nbsp;HTTP_PROXY&nbsp;and&nbsp;cvmfs_siteconf_mountpoint.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;env_para_dict:&nbsp;the&nbsp;environment&nbsp;variables&nbsp;which&nbsp;need&nbsp;to&nbsp;be&nbsp;set&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;os_id:&nbsp;the&nbsp;id&nbsp;attribute&nbsp;of&nbsp;the&nbsp;required&nbsp;OS.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;software_spec:&nbsp;the&nbsp;software&nbsp;section&nbsp;of&nbsp;the&nbsp;specification<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;of&nbsp;dependencies.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;batch_type:&nbsp;the&nbsp;execution&nbsp;engine.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user_cmd:&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cwd_setting:&nbsp;the&nbsp;current&nbsp;working&nbsp;directory&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hardware_platform:&nbsp;the&nbsp;architecture&nbsp;of&nbsp;the&nbsp;required&nbsp;hardware&nbsp;platform&nbsp;(e.g.,&nbsp;x86_64).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;host_linux_distro:&nbsp;the&nbsp;linux&nbsp;distro&nbsp;of&nbsp;the&nbsp;host&nbsp;machine.&nbsp;For&nbsp;Example:&nbsp;redhat6,&nbsp;centos6.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;distro_name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;(e.g.,&nbsp;redhat).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;distro_version:&nbsp;the&nbsp;version&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;(e.g.,&nbsp;6.5).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;need_separate_rootfs:&nbsp;whether&nbsp;a&nbsp;separate&nbsp;rootfs&nbsp;is&nbsp;needed&nbsp;to&nbsp;execute&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;host_cctools_path:&nbsp;the&nbsp;path&nbsp;of&nbsp;cctools&nbsp;under&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;is_cms_app:&nbsp;whether&nbsp;this&nbsp;is&nbsp;a&nbsp;cms&nbsp;app.&nbsp;1&nbsp;means&nbsp;this&nbsp;is&nbsp;a&nbsp;cms&nbsp;app.&nbsp;0&nbsp;means&nbsp;this&nbsp;is&nbsp;not.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cvmfs_siteconf_mountpoint:&nbsp;a&nbsp;string&nbsp;in&nbsp;the&nbsp;format&nbsp;of&nbsp;'/cvmfs/cms.cern.ch/SITECONF/local&nbsp;&lt;SITEINFO&nbsp;dir&nbsp;in&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache&gt;/local'<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mount_dict:&nbsp;a&nbsp;dict&nbsp;including&nbsp;each&nbsp;mounting&nbsp;item&nbsp;in&nbsp;the&nbsp;specification,&nbsp;whose&nbsp;key&nbsp;is&nbsp;the&nbsp;access&nbsp;path&nbsp;used&nbsp;by&nbsp;the&nbsp;user's&nbsp;task;&nbsp;whose&nbsp;value&nbsp;is&nbsp;the&nbsp;actual&nbsp;storage&nbsp;path.</tt></dd></dl>
+ <dl><dt><a name="-specification_process"><strong>specification_process</strong></a>(spec_json, sandbox_dir, behavior, packages_json, batch_type, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting)</dt><dd><tt>Create&nbsp;the&nbsp;execution&nbsp;environment&nbsp;specified&nbsp;in&nbsp;the&nbsp;specification&nbsp;file&nbsp;and&nbsp;run&nbsp;the&nbsp;task&nbsp;on&nbsp;it.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;spec_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;the&nbsp;specification.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;behavior:&nbsp;the&nbsp;umbrella&nbsp;behavior,&nbsp;such&nbsp;as&nbsp;`run`.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;of&nbsp;dependencies.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;batch_type:&nbsp;the&nbsp;execution&nbsp;engine.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;output_dir:&nbsp;the&nbsp;output&nbsp;directory.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input_dict:&nbsp;the&nbsp;setting&nbsp;of&nbsp;input&nbsp;files&nbsp;specified&nbsp;by&nbsp;the&nbsp;--inputs&nbsp;option.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;env_para_dict:&nbsp;the&nbsp;environment&nbsp;variables&nbsp;which&nbsp;need&nbsp;to&nbsp;be&nbsp;set&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user_cmd:&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cwd_setting:&nbsp;the&nbsp;current&nbsp;working&nbsp;directory&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None.</tt></dd></dl>
+ <dl><dt><a name="-subprocess_error"><strong>subprocess_error</strong></a>(cmd, rc, stdout, stderr)</dt><dd><tt>Print&nbsp;the&nbsp;command,&nbsp;return&nbsp;code,&nbsp;stdout,&nbsp;and&nbsp;stderr;&nbsp;and&nbsp;then&nbsp;directly&nbsp;exit.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cmd:&nbsp;the&nbsp;executed&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rc:&nbsp;the&nbsp;return&nbsp;code.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stdout:&nbsp;the&nbsp;standard&nbsp;output&nbsp;of&nbsp;the&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stderr:&nbsp;standard&nbsp;error&nbsp;of&nbsp;the&nbsp;command.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;directly&nbsp;exit&nbsp;the&nbsp;program.</tt></dd></dl>
+ <dl><dt><a name="-terminate_instance"><strong>terminate_instance</strong></a>(instance_id)</dt><dd><tt>Terminate&nbsp;an&nbsp;instance.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;instance_id:&nbsp;the&nbsp;id&nbsp;of&nbsp;the&nbsp;VM&nbsp;instance.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None.</tt></dd></dl>
+ <dl><dt><a name="-transfer_env_para_docker"><strong>transfer_env_para_docker</strong></a>(env_para_dict)</dt><dd><tt>Transfer&nbsp;the&nbsp;env_para_dict&nbsp;into&nbsp;the&nbsp;docker&nbsp;`-e`&nbsp;options.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;env_para_dict:&nbsp;the&nbsp;environment&nbsp;variables&nbsp;which&nbsp;need&nbsp;to&nbsp;be&nbsp;set&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;env_options:&nbsp;the&nbsp;docker&nbsp;`-e`&nbsp;options&nbsp;constructed&nbsp;from&nbsp;env_para_dict.</tt></dd></dl>
+ <dl><dt><a name="-url_download"><strong>url_download</strong></a>(url, dest)</dt><dd><tt>Download&nbsp;url&nbsp;into&nbsp;dest<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;url:&nbsp;the&nbsp;url&nbsp;needed&nbsp;to&nbsp;be&nbsp;downloaded.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dest:&nbsp;the&nbsp;path&nbsp;where&nbsp;the&nbsp;content&nbsp;from&nbsp;the&nbsp;url&nbsp;should&nbsp;be&nbsp;put.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;url&nbsp;is&nbsp;downloaded&nbsp;successfully,&nbsp;return&nbsp;None;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;directly&nbsp;exit.</tt></dd></dl>
+ <dl><dt><a name="-verify_kernel"><strong>verify_kernel</strong></a>(host_kernel_name, host_kernel_version, kernel_name, kernel_version)</dt><dd><tt>Check&nbsp;whether&nbsp;the&nbsp;kernel&nbsp;version&nbsp;of&nbsp;the&nbsp;host&nbsp;machine&nbsp;matches&nbsp;the&nbsp;requirement.<br>
+The&nbsp;kernel_version&nbsp;format&nbsp;supported&nbsp;for&nbsp;now&nbsp;includes:&nbsp;&gt;=2.6.18;&nbsp;[2.6.18,&nbsp;2.6.32].<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;host_kernel_name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;OS&nbsp;kernel&nbsp;of&nbsp;the&nbsp;host&nbsp;machine.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;host_kernel_version:&nbsp;the&nbsp;version&nbsp;of&nbsp;the&nbsp;kernel&nbsp;of&nbsp;the&nbsp;host&nbsp;machine.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;kernel_name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;kernel&nbsp;(e.g.,&nbsp;linux).&nbsp;Not&nbsp;case&nbsp;sensitive.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;kernel_version:&nbsp;the&nbsp;version&nbsp;of&nbsp;the&nbsp;required&nbsp;kernel&nbsp;(e.g.,&nbsp;2.6.18).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;kernel&nbsp;version&nbsp;of&nbsp;the&nbsp;host&nbsp;machine&nbsp;matches&nbsp;the&nbsp;requirement,&nbsp;return&nbsp;None.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;kernel&nbsp;version&nbsp;of&nbsp;the&nbsp;host&nbsp;machine&nbsp;does&nbsp;not&nbsp;match&nbsp;the&nbsp;requirement,&nbsp;directly&nbsp;exit.</tt></dd></dl>
+ <dl><dt><a name="-which_exec"><strong>which_exec</strong></a>(name)</dt><dd><tt>The&nbsp;implementation&nbsp;of&nbsp;shell&nbsp;which&nbsp;command<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;executable&nbsp;to&nbsp;be&nbsp;found.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;executable&nbsp;is&nbsp;found,&nbsp;returns&nbsp;its&nbsp;fullpath.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;returns&nbsp;None.</tt></dd></dl>
+ <dl><dt><a name="-workflow_repeat"><strong>workflow_repeat</strong></a>(cwd_setting, sandbox_dir, batch_type, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, is_cms_app, cvmfs_siteconf_mountpoint, mount_dict, sw_mount_dict, packages_json)</dt><dd><tt>Run&nbsp;user's&nbsp;task&nbsp;with&nbsp;the&nbsp;help&nbsp;of&nbsp;the&nbsp;sandbox&nbsp;techniques,&nbsp;which&nbsp;currently&nbsp;inculde&nbsp;chroot,&nbsp;parrot,&nbsp;docker.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cwd_setting:&nbsp;the&nbsp;current&nbsp;working&nbsp;directory&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sandbox_dir:&nbsp;the&nbsp;sandbox&nbsp;dir&nbsp;for&nbsp;temporary&nbsp;files&nbsp;like&nbsp;Parrot&nbsp;mountlist&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;batch_type:&nbsp;the&nbsp;execution&nbsp;engine.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;output_dir:&nbsp;the&nbsp;output&nbsp;directory.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input_dict:&nbsp;the&nbsp;setting&nbsp;of&nbsp;input&nbsp;files&nbsp;specified&nbsp;by&nbsp;the&nbsp;--inputs&nbsp;option.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;env_para_dict:&nbsp;the&nbsp;environment&nbsp;variables&nbsp;which&nbsp;need&nbsp;to&nbsp;be&nbsp;set&nbsp;for&nbsp;the&nbsp;execution&nbsp;of&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user_cmd:&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hardware_platform:&nbsp;the&nbsp;architecture&nbsp;of&nbsp;the&nbsp;required&nbsp;hardware&nbsp;platform&nbsp;(e.g.,&nbsp;x86_64).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;distro_name:&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;(e.g.,&nbsp;redhat).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;distro_version:&nbsp;the&nbsp;version&nbsp;of&nbsp;the&nbsp;required&nbsp;OS&nbsp;(e.g.,&nbsp;6.5).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;need_separate_rootfs:&nbsp;whether&nbsp;a&nbsp;separate&nbsp;rootfs&nbsp;is&nbsp;needed&nbsp;to&nbsp;execute&nbsp;the&nbsp;user's&nbsp;command.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;os_image_dir:&nbsp;the&nbsp;path&nbsp;of&nbsp;the&nbsp;OS&nbsp;image&nbsp;inside&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;host_cctools_path:&nbsp;the&nbsp;path&nbsp;of&nbsp;cctools&nbsp;under&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;is_cms_app:&nbsp;whether&nbsp;this&nbsp;is&nbsp;a&nbsp;cms&nbsp;app.&nbsp;1&nbsp;means&nbsp;this&nbsp;is&nbsp;a&nbsp;cms&nbsp;app.&nbsp;0&nbsp;means&nbsp;this&nbsp;is&nbsp;not.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cvmfs_siteconf_mountpoint:&nbsp;a&nbsp;string&nbsp;in&nbsp;the&nbsp;format&nbsp;of&nbsp;'/cvmfs/cms.cern.ch/SITECONF/local&nbsp;&lt;SITEINFO&nbsp;dir&nbsp;in&nbsp;the&nbsp;umbrella&nbsp;local&nbsp;cache&gt;/local'<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mount_dict:&nbsp;a&nbsp;dict&nbsp;including&nbsp;each&nbsp;mounting&nbsp;item&nbsp;in&nbsp;the&nbsp;specification,&nbsp;whose&nbsp;key&nbsp;is&nbsp;the&nbsp;access&nbsp;path&nbsp;used&nbsp;by&nbsp;the&nbsp;user's&nbsp;task;&nbsp;whose&nbsp;value&nbsp;is&nbsp;the&nbsp;actual&nbsp;storage&nbsp;path.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sw_mount_dict:&nbsp;a&nbsp;dict&nbsp;only&nbsp;including&nbsp;all&nbsp;the&nbsp;software&nbsp;mounting&nbsp;items.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;packages_json:&nbsp;the&nbsp;json&nbsp;object&nbsp;including&nbsp;all&nbsp;the&nbsp;metadata&nbsp;of&nbsp;dependencies.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;no&nbsp;error&nbsp;happens,&nbsp;returns&nbsp;None.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;directly&nbsp;exit.</tt></dd></dl>
+</td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#55aa55">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Data</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#55aa55"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><strong>SF_APPEND</strong> = 262144<br>
+<strong>SF_ARCHIVED</strong> = 65536<br>
+<strong>SF_IMMUTABLE</strong> = 131072<br>
+<strong>SF_NOUNLINK</strong> = 1048576<br>
+<strong>SF_SNAPSHOT</strong> = 2097152<br>
+<strong>ST_ATIME</strong> = 7<br>
+<strong>ST_CTIME</strong> = 9<br>
+<strong>ST_DEV</strong> = 2<br>
+<strong>ST_GID</strong> = 5<br>
+<strong>ST_INO</strong> = 1<br>
+<strong>ST_MODE</strong> = 0<br>
+<strong>ST_MTIME</strong> = 8<br>
+<strong>ST_NLINK</strong> = 3<br>
+<strong>ST_SIZE</strong> = 6<br>
+<strong>ST_UID</strong> = 4<br>
+<strong>S_ENFMT</strong> = 1024<br>
+<strong>S_IEXEC</strong> = 64<br>
+<strong>S_IFBLK</strong> = 24576<br>
+<strong>S_IFCHR</strong> = 8192<br>
+<strong>S_IFDIR</strong> = 16384<br>
+<strong>S_IFIFO</strong> = 4096<br>
+<strong>S_IFLNK</strong> = 40960<br>
+<strong>S_IFREG</strong> = 32768<br>
+<strong>S_IFSOCK</strong> = 49152<br>
+<strong>S_IREAD</strong> = 256<br>
+<strong>S_IRGRP</strong> = 32<br>
+<strong>S_IROTH</strong> = 4<br>
+<strong>S_IRUSR</strong> = 256<br>
+<strong>S_IRWXG</strong> = 56<br>
+<strong>S_IRWXO</strong> = 7<br>
+<strong>S_IRWXU</strong> = 448<br>
+<strong>S_ISGID</strong> = 1024<br>
+<strong>S_ISUID</strong> = 2048<br>
+<strong>S_ISVTX</strong> = 512<br>
+<strong>S_IWGRP</strong> = 16<br>
+<strong>S_IWOTH</strong> = 2<br>
+<strong>S_IWRITE</strong> = 128<br>
+<strong>S_IWUSR</strong> = 128<br>
+<strong>S_IXGRP</strong> = 8<br>
+<strong>S_IXOTH</strong> = 1<br>
+<strong>S_IXUSR</strong> = 64<br>
+<strong>UF_APPEND</strong> = 4<br>
+<strong>UF_IMMUTABLE</strong> = 2<br>
+<strong>UF_NODUMP</strong> = 1<br>
+<strong>UF_NOUNLINK</strong> = 16<br>
+<strong>UF_OPAQUE</strong> = 8</td></tr></table>
+</body></html>
