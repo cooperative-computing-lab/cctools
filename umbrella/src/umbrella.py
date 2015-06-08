@@ -1970,7 +1970,7 @@ def get_public_dns(instance_id):
 
 def main():
 	parser = OptionParser(usage="usage: %prog [options] run \"command\"",
-						version="%prog 1.0")
+						version="%prog CCTOOLS_VERSION")
 	parser.add_option("-c", "--config",
 					action="store",
 					default="./spec.json",
