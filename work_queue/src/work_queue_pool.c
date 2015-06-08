@@ -388,7 +388,7 @@ static void show_help(const char *cmd)
 }
 
 enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER };
-static struct option long_options[] = {
+static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
 	{"batch-type", required_argument, 0, 'T'},

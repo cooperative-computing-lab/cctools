@@ -173,7 +173,7 @@ int main( int argc, char *argv[] )
 
 	debug_config(progname);
 
-	struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"help",  no_argument, 0, 'h'},
 		{"version", no_argument, 0, 'v'},
 		{"debug", required_argument, 0, 'd'},

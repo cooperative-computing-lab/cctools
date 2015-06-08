@@ -579,7 +579,7 @@ int main(int argc, char *argv[])
 
 	signal(SIGCHLD, wait_for_children);
 
-	struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"help", no_argument, 0, 'h'},
 		{"name-list", required_argument, 0, 'n'},
 		{"env-list", required_argument, 0, 'e'},

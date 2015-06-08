@@ -1186,7 +1186,7 @@ int main(int argc, char *argv[])
         LONG_OPT_DOCKER_TAR
 	};
 
-	static struct option long_options_run[] = {
+	static const struct option long_options_run[] = {
 		{"advertise", no_argument, 0, 'a'},
 		{"auth", required_argument, 0, LONG_OPT_AUTH},
 		{"batch-log", required_argument, 0, 'L'},

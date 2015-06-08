@@ -310,7 +310,7 @@ int main(int argc, char **argv)
 
 	extra_files_list = list_create();
 
-	struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"debug", required_argument, 0, 'd'},
 		{"help",  no_argument, 0, 'h'},
 		{"version", no_argument, 0, 'v'},

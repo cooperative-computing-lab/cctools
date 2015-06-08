@@ -1774,7 +1774,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
       LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE, 
       LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT};
 
-struct option long_options[] = {
+static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
 	{"catalog",             required_argument,  0,  'C'},
 	{"debug",               required_argument,  0,  'd'},

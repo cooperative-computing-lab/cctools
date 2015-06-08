@@ -425,7 +425,7 @@ int main(int argc, char *argv[]){
 
 	int c;
 
-	struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"use-named", no_argument, 0, 'n'},
 		{"dry-run", no_argument, 0, LONG_OPT_DRY_RUN},
 		{"help", no_argument, 0, 'h'},

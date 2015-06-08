@@ -1363,7 +1363,7 @@ int main(int argc, char **argv) {
 
     rmsummary_read_env_vars(resources_limits);
 
-    struct option long_options[] =
+    static const struct option long_options[] =
 	    {
 		    /* Regular Options */
 		    {"debug",      required_argument, 0, 'd'},

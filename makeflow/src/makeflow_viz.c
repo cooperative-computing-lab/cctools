@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
 	int dot_labels = 1;
 	char *ppm_option = NULL;
 
-	struct option long_options_viz[] = {
+	static const struct option long_options_viz[] = {
 		{"display-mode", required_argument, 0, 'D'},
 		{"help", no_argument, 0, 'h'},
 		{"dot-merge-similar", no_argument, 0,  LONG_OPT_DOT_CONDENSE},

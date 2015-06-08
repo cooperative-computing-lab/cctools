@@ -100,7 +100,7 @@ static void show_help(const char *progname)
 
 static void work_queue_status_parse_command_line_arguments(int argc, char *argv[], const char **master_host, int *master_port)
 {
-	static struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"statistics", no_argument, 0, 'Q'},
 		{"workers", no_argument, 0, 'W'},
 		{"tasks", no_argument, 0, 'T'},

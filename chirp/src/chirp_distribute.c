@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	static struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"auth", required_argument, 0, 'a'},
 		{"debug", required_argument, 0, 'd'},
 		{"info-transfer", no_argument, 0, 'D'},

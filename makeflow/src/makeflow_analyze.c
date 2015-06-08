@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
 	char *bundle_directory = NULL;
 	int syntax_check = 0;
 
-	struct option long_options_analyze[] = {
+	static const struct option long_options_analyze[] = {
 		{"bundle-dir", required_argument, 0, 'b'},
 		{"help", no_argument, 0, 'h'},
 		{"analyze-exec", no_argument, 0, 'i'},

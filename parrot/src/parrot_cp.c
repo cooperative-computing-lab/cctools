@@ -219,7 +219,7 @@ int main( int argc, char *argv[] )
 	struct stat statbuf;
 	char newtarget[PFS_PATH_MAX];
 
-	struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"help",  no_argument, 0, 'h'},
 		{"verbose", no_argument, 0, 'v'},
 		{"force", no_argument, 0, 'f'},

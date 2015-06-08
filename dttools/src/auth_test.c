@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
-	static struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"auth", required_argument, 0, 'a'},
 		{"port", required_argument, 0, 'p'},
 		{"host", required_argument, 0, 'r'},
