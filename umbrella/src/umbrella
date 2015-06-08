@@ -47,6 +47,8 @@ import multiprocessing
 import resource
 import tempfile
 
+import cctools_version
+
 if sys.version_info >= (3,):
 	import urllib.request as urllib2
 	import urllib.parse as urlparse
@@ -1970,7 +1972,7 @@ def get_public_dns(instance_id):
 
 def main():
 	parser = OptionParser(usage="usage: %prog [options] run \"command\"",
-						version="%prog 1.0")
+						version="%prog " + cctools_version.cctools_version)
 	parser.add_option("-c", "--config",
 					action="store",
 					default="./spec.json",
