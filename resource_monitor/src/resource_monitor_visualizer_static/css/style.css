@@ -130,7 +130,7 @@ td {
 
 @media (min-width: 1280px) {
   .content {
-    max-width: 2350px;
+	max-width: 2350px;
   }
 }
 

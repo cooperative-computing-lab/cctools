@@ -41,20 +41,20 @@ if __name__ == '__main__':
   try:
       q = WorkQueue(port)
   except:
-      print "Instantiation of Work Queue failed!" 
+      print "Instantiation of Work Queue failed!"
       sys.exit(1)
 
   print "listening on port %d..." % q.port
 
-  # We create and dispatch a task for each filename given in the argument list 
+  # We create and dispatch a task for each filename given in the argument list
   for i in range(1, len(sys.argv)):
-      infile = "%s" % sys.argv[i] 
+      infile = "%s" % sys.argv[i]
       outfile = "%s.gz" % sys.argv[i]
 
       # Note that we write ./gzip here, to guarantee that the gzip version we
       # are using is the one being sent to the workers.
       command = "./gzip < %s > %s" % (infile, outfile)
-      
+
       t = Task(command)
 
       # gzip is the same across all tasks, so we can cache it in the * workers.
@@ -68,7 +68,7 @@ if __name__ == '__main__':
       # want to cache an output file if is the input of a later task.
       t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=False)
       t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=False)
-      
+
       # Once all files has been specified, we are ready to submit the task to the queue.
       taskid = q.submit(t)
       print "submitted task (id# %d): %s" % (taskid, t.command)

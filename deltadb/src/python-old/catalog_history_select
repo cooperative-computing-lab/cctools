@@ -28,7 +28,7 @@ def badSyntax(str):
   sys.stderr.write("catalog_history_select [source_directory] [starting_point] [ending_point]\n\n")
   sys.stderr.write("See man page for more details and examples.\n\n")
   sys.exit(0)
-  
+
 def timeToFileName(ts, days_offset=0):
   ts += (3600*24)*days_offset
   tt = datetime.datetime.fromtimestamp(ts).timetuple()
@@ -108,10 +108,10 @@ logDebug('Start:'+str(begin)+' End:'+str(end))
 
 seriesNow = {}
 seriesLog = []
-  
+
 # Read the initial checkpoint file and group data by the value of the "key" field
 # Go a day earlier (day_offset=-1) to handle for auto-deleted series' which start reporting again after not appearing in the checkpoint
-day_offset = 0 
+day_offset = 0
 filename = timeToFileName(begin,day_offset)
 filesFound = 0
 try:
@@ -142,13 +142,13 @@ while True:
 
   lastHost = None
   line_num = 0
-  
+
   try:
     logDebug(filename+'.log')
     f = open(filename+'.log', 'r')
     filesFound += 1
     for line in f:
-      
+
       line_num += 1
       line = line.strip()
       if debug:
@@ -156,7 +156,7 @@ while True:
       if 1:
         res = line.split(' ')
         format = res.pop(0)
-        
+
         if pastStartTime==0:
 
           # Timestamp for any proceeding events
@@ -188,7 +188,7 @@ while True:
               logError("v-------------Ignoring update for non-existant host series------------")
               logError(line)
               logError("^----------Perhaps the host was deleted and is still reporting--------")
-               
+
           # Record removal of a single field
           elif format == 'R' and res.__len__()>=2:
             host = res.pop(0)
@@ -209,10 +209,10 @@ while True:
             logError("v-----------------Error on last line below ("+filename+':'+str(line_num)+")----------------")
             logError('\n'.join(prevLines))
             logError("^------------------------------End of error------------------------------")
-            
+
           if prevLines.__len__()>20:
             prevLines.pop(0)
-            
+
           if pastStartTime==0 and logTime>=begin:
             pastStartTime = 1
             for host in seriesNow:
@@ -222,7 +222,7 @@ while True:
             print ""
             print line
             #del seriesNow
-          
+
         else: #pastStartTime==1
           if format == 'T' and res.__len__()>=1:
             time = res.pop(0)
@@ -240,16 +240,14 @@ while True:
     if 'logTime' not in locals():
       logTime = begin
     logTime += 3600*24
-    
+
   if 'f' in locals():
     f.close()
 
   if logTime>end or pastEndTime:
     break
-  day_offset += 1 
+  day_offset += 1
   filename = timeToFileName(begin,day_offset)
 
 if filesFound==0:
   logError("No files found in that source directory for the specified time frame.")
-
-

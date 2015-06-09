@@ -202,10 +202,10 @@ struct alignment * align_banded( struct matrix *m, const char *a, const char *b,
 
 	// Choose the best value on the valid ranges of the alignment.
 	choose_best(m, &best_i, &best_j,
-		       BRACKET(0,height+offset-k,width),
-		       BRACKET(0,height+offset+k,width),
-		       BRACKET(0,width-offset-k,height),
-		       BRACKET(0,width-offset+k,height) );
+			   BRACKET(0,height+offset-k,width),
+			   BRACKET(0,height+offset+k,width),
+			   BRACKET(0,width-offset-k,height),
+			   BRACKET(0,width-offset+k,height) );
 
 	// Run the traceback back to the edges of the matrix.
 	return alignment_traceback(m, best_i, best_j, a, b );
@@ -229,9 +229,9 @@ static void choose_best(struct matrix *m, int * best_i, int * best_j, int istart
 	if(jstart!=jend) {
 		for (i=m->width, j=jstart; j <= jend; j++) {
 			if ( matrix(m,i,j).score > best_score) {
-	      			best_score =  matrix(m,i,j).score;
-	      			*best_i = i;
-	      			*best_j = j;
+					best_score =  matrix(m,i,j).score;
+					*best_i = i;
+					*best_j = j;
 			}
 		}
 	}
@@ -301,7 +301,7 @@ static struct alignment * alignment_traceback(struct matrix *m, int istart, int 
 	aln->traceback = n;
 
 	// NOTE: These parameters are what are needed for OVL records.  Other values are
-        // calculated on runtime in the overlap output code
+		// calculated on runtime in the overlap output code
 
 	aln->start1 = i;
 	aln->start2 = j;

@@ -35,7 +35,7 @@ int find_executable(const char *exe_name, const char *env_path_var, char *exe_pa
 			goto fe_cleanup;
 	}
 
-      fe_cleanup:
+	  fe_cleanup:
 	free(env_paths);
 
 	return cur_path != NULL;

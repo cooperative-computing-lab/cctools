@@ -53,7 +53,7 @@ struct dag_node {
 	struct list   *target_files;        /* list of dag_files of the node's productions */
 
 	struct dag_task_category *category; /* The set of task this node belongs too. Ideally, the makeflow
-                                           file labeled which tasks have comparable resource usage. */
+										   file labeled which tasks have comparable resource usage. */
 	struct hash_table *variables;       /* This node settings for variables with @ syntax */
 	struct rmsummary *resources;        /* resources required by this rule */
 

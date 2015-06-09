@@ -4,12 +4,12 @@ SUBMIT_COMMON=$(which work_queue_submit_common)
 if [ -z "$SUBMIT_COMMON" ];
 then
 	echo "Please add 'work_queue_submit_common' to your PATH." 1>&2
-    exit 1
+	exit 1
 else
 	. $SUBMIT_COMMON
 fi
 
-show_help() 
+show_help()
 {
 	echo "  -j               Use job array to submit workers."
 	echo "  -p <parameters>  Torque qsub parameters."
@@ -68,8 +68,8 @@ EOF
 
 	if [ $use_jobarray = 1 ]
 	then
-		qsub -t 1-$count:1 -d `pwd` $torque_parameters worker.sh	
-	else 
+		qsub -t 1-$count:1 -d `pwd` $torque_parameters worker.sh
+	else
 		for n in `seq 1 $count`
 		do
 			qsub -d `pwd` $torque_parameters worker.sh
@@ -78,4 +78,3 @@ EOF
 }
 
 submit_workers "$@"
-

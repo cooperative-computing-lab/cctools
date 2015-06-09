@@ -195,7 +195,7 @@ int copypath( const char *source, const char *target )
 
 void show_help()
 {
-    	fprintf(stdout, "Use: parrot_cp [OPTIONS]... SOURCES ... DEST\n");
+		fprintf(stdout, "Use: parrot_cp [OPTIONS]... SOURCES ... DEST\n");
 	fprintf(stdout, "Where options are:\n");
 	fprintf(stdout, " %-30s Forcibly remove target before copying.\n", "-f,--force");
 	fprintf(stdout, " %-30s Interactive mode: ask before overwriting.\n", "-i,--interactive");
@@ -228,7 +228,7 @@ int main( int argc, char *argv[] )
 		{"symlinks", no_argument, 0, 's'},
 		{"hardlinks", no_argument, 0, 'l'},
 		{"update-only", no_argument, 0, 'u'},
-        {0,0,0,0}
+		{0,0,0,0}
 	};
 
 	while((c=getopt_long(argc,argv,"firRsluvh", long_options, NULL)) > -1) {

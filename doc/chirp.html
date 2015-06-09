@@ -328,7 +328,7 @@ three access rights. The access rights are as follows:</p>
 <tr><td><b>w</b> <td> - The subject may write items in the directory.
 <tr><td><b>l</b> <td> - The subject may list the directory contents.
 <tr><td><b>d</b> <td> - The subject may delete items in the directory.
-<tr><td><b>p</b> <td> - The subject may put new files into the directory. 
+<tr><td><b>p</b> <td> - The subject may put new files into the directory.
 <tr><td><b>a</b> <td> - The subject may administer the directory, including changing the ACL.
 <tr><td><b>x</b> <td> - The subject may execute programs in the directory.
 <tr><td><b>v</b> <td> - The subject may reserve a directory.
@@ -667,7 +667,7 @@ effect.</p>
   <strong>ticket.MD5SUM</strong> where <strong>MD5SUM</strong> is the MD5
   digest of the Public Key of the ticket.
 </p>
-  
+
 <p>
   Once the ticket is created, it is registered with the Chirp server with a
   validity period in seconds defined by the duration option (86400, or a day).
@@ -678,7 +678,7 @@ effect.</p>
   the ticket. Users who authenticate using this ticket in the future will
   become this subject with certain masked rights.
 </p>
-  
+
 <p>
   Once the ticket is created and registered, we give the ticket a set of
   <em>ACL masks</em>. The ACL mask will mask the rights of the
@@ -768,7 +768,7 @@ effect.</p>
 
 <p>
   You may use the <tt>ticket_modify</tt> command to change the rights
-  a ticket has in a directory. You are restricted to giving rights to a 
+  a ticket has in a directory. You are restricted to giving rights to a
   ticket you already possess. Recall, however, that the rights are actually
   a mask that are logically ANDed with the rights the user has at the time.
 <p>

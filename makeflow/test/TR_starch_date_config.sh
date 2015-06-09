@@ -7,7 +7,7 @@ cfgfile=date.cfg
 
 prepare()
 {
-    exec cat > $cfgfile << EOF
+	exec cat > $cfgfile << EOF
 [starch]
 executables = date
 EOF
@@ -15,14 +15,14 @@ EOF
 
 run()
 {
-    ../src/starch -C $cfgfile $sfxfile
-    exec ./$sfxfile
+	../src/starch -C $cfgfile $sfxfile
+	exec ./$sfxfile
 }
 
 clean()
 {
-    rm -f $sfxfile $cfgfile
-    exit 0
+	rm -f $sfxfile $cfgfile
+	exit 0
 }
 
 dispatch $@

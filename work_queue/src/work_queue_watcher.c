@@ -202,4 +202,3 @@ int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *
 
 	return 1;
 }
-

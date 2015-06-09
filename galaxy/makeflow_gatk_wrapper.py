@@ -9,7 +9,7 @@
 # Author: Nick Hazekamp
 # Date: 09/03/2013
 
-import optparse, os, sys, tempfile, shutil, stat 
+import optparse, os, sys, tempfile, shutil, stat
 
 class PassThroughParser(optparse.OptionParser):
     def _process_args(self, largs, rargs, values):
@@ -99,7 +99,7 @@ os.chmod(cur_dir+"/vcf-concat", os.stat(cur_dir+"/vcf-concat").st_mode | stat.S_
 os.chdir(cur_dir)
 
 os.system('python makeflow_gatk --verbose -T ' +options.type+ ' ' + inputs + '--progeny_list progeny_file --makeflow ' +  makeflow + ' --out ' + output_vcf +' ' +' '.join(args)+" &> " + debug_log)
-	
+
 os.system(cctools_dir+'/bin/makeflow -T wq -N ' + wq_project_name + ' -p 0 -l ' + makeflow_log + ' -L ' + wq_log + ' -d all -o ' + debug_log+" --password mypwfile &> "+debug_log)
 
 if options.dblog:

@@ -166,7 +166,7 @@ static void log_updates( struct nvpair_database *db, const char *key, struct nvp
 				fprintf(db->logfile,"U %s %s %s\n",key,name,bvalue);
 			}
 		} else {
-       			log_time(db);
+				log_time(db);
 			fprintf(db->logfile,"R %s %s\n",key,name);
 		}
 	}
@@ -178,7 +178,7 @@ static void log_updates( struct nvpair_database *db, const char *key, struct nvp
 	while(hash_table_nextkey(b->table,&name,(void**)&bvalue)) {
 		avalue = hash_table_lookup(a->table,name);
 		if(!avalue) {
-       			log_time(db);
+				log_time(db);
 			fprintf(db->logfile,"U %s %s %s\n",key,name,bvalue);
 		}
 	}

@@ -129,7 +129,7 @@ If `fixed_mode` is 1, use the mode parameter; otherwise use the mode of the orig
 Currently, each directory is created using fixed mode (i.e., fixed_mode = 1).
 */
 int mkpath(const char *path, mode_t mode, int fixed_mode, FILE *special_file) {
-    (void)mode; /* silence warnings */
+	(void)mode; /* silence warnings */
 	debug(D_DEBUG, "mkpath(`%s`) func\n", path);
 	if(access(path, F_OK) == 0) {
 		debug(D_DEBUG, "%s already exists, mkpath exist!\n", path);
@@ -675,7 +675,7 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-    if(rename(special_filename_tmp, special_filename) == -1)
+	if(rename(special_filename_tmp, special_filename) == -1)
 		fatal("mv: %s", strerror(errno));
 
 	if(post_process() == -1) {

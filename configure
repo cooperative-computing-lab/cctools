@@ -342,14 +342,14 @@ do
 			include_package_resource_monitor=""
 			;;
 		--without-system-weaver)
-		        include_package_weaver=""
-		        ;;
+				include_package_weaver=""
+				;;
 		--without-system-doc)
 			include_package_doc=""
 			;;
 		--without-system-prune)
-		        include_package_prune=""
-		        ;;
+				include_package_prune=""
+				;;
 		--xrootd-arch)
 			shift
 			xrootd_arch=$1
@@ -382,31 +382,31 @@ Where options are:
   --without-system-SYSTEM
 
 Where PACKAGE may be:
-    readline
-    fuse
-    globus
-    irods
-    mysql
-    perl
-    python
-    python3
-    xrootd
-    zlib
-    cvmfs
-    uuid
-    swig
+	readline
+	fuse
+	globus
+	irods
+	mysql
+	perl
+	python
+	python3
+	xrootd
+	zlib
+	cvmfs
+	uuid
+	swig
 
 And SYSTEM may be:
-    sand
-    allpairs
-    wavefront
-    makeflow
-    ftp-lite
-    chirp
-    parrot
-    umbrella
-    resource_monitor
-    doc
+	sand
+	allpairs
+	wavefront
+	makeflow
+	ftp-lite
+	chirp
+	parrot
+	umbrella
+	resource_monitor
+	doc
 EOF
 			exit 0
 			;;
@@ -492,23 +492,23 @@ fi
 #
 
 echon "checking if ld supports the --as-needed flag..."
-if ld --help 2>&1 | grep -- --as-needed 2>&1 >/dev/null 
+if ld --help 2>&1 | grep -- --as-needed 2>&1 >/dev/null
 then
-        echo "yes"
-        link_as_needed="-Xlinker --as-needed"
-        link_no_as_needed="-Xlinker --no-as-needed"
+		echo "yes"
+		link_as_needed="-Xlinker --as-needed"
+		link_no_as_needed="-Xlinker --no-as-needed"
 else
-        echo "no"
+		echo "no"
 fi
 
 if [ $BUILD_SYS = LINUX ]
 then
-        ldflags="-Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic ${link_as_needed}"
+		ldflags="-Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic ${link_as_needed}"
 elif [ $BUILD_SYS = DARWIN ]
 then
-        ldflags=""
+		ldflags=""
 else
-        ldflags="-static-libgcc"
+		ldflags="-static-libgcc"
 fi
 
 ##########################################################################
@@ -713,7 +713,7 @@ then
 			echo "*** Couldn't find $library in ${xrootd_path}"
 			exit 1
 		fi
-			
+
 	done
 else
 	if [ $config_xrootd_path = yes ]
@@ -738,7 +738,7 @@ then
 		echo "*** Couldn't find $library in ${cvmfs_path}"
 		exit 1
 	fi
-  
+
 	cvmfs_version=$(sed -n 's/^#define LIBCVMFS_VERSION \+\([0-9]\+\)/\1/p' ${cvmfs_path}/include/libcvmfs.h)
 	if [ $cvmfs_version -gt 1 ]
 	then
@@ -764,25 +764,25 @@ fi
 
 if [ $config_fuse_path != no ]
 then
-        if library_search fuse ${fuse_path} || library_search fuse /
-        then
-                if [ "${fuse_path}" != / -a "${fuse_path}" != /usr ]
-                then
-                        fuse_ccflags="-I${fuse_path}/include"
-                fi
-                ccflags="${ccflags} -DHAS_FUSE"
+		if library_search fuse ${fuse_path} || library_search fuse /
+		then
+				if [ "${fuse_path}" != / -a "${fuse_path}" != /usr ]
+				then
+						fuse_ccflags="-I${fuse_path}/include"
+				fi
+				ccflags="${ccflags} -DHAS_FUSE"
 				fuse_ldflags="${library_search_result}"
-        else
-                if [ $config_fuse_path = yes ]
-                then
+		else
+				if [ $config_fuse_path = yes ]
+				then
 
-        		echo "*** Sorry, I couldn't find Fuse in $fuse_path"
-        		echo "*** Check --with-fuse-path and try again."
-        		exit 1
-                else
-                        echo "*** skipping fuse support"
-                fi
-        fi
+				echo "*** Sorry, I couldn't find Fuse in $fuse_path"
+				echo "*** Check --with-fuse-path and try again."
+				exit 1
+				else
+						echo "*** skipping fuse support"
+				fi
+		fi
 else
 	echo "*** skipping fuse support"
 fi
@@ -801,7 +801,7 @@ then
 	then
 		ccflags="${ccflags} -I${readline_path}/include"
 	fi
-	
+
 	ccflags="${ccflags} -DHAS_LIBREADLINE"
 
 	# We rely on the --as-needed flag to figure out what dynamic
@@ -816,7 +816,7 @@ then
 
 		# Put the readline flags in a separate variable to be used only where needed.
 		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
-	else 
+	else
 		if library_search ncurses ${readline_path}
 		then
 			external_libraries="${external_libraries} ${library_search_result}"
@@ -832,7 +832,7 @@ then
 			external_libraries="${external_libraries} ${library_search_result}"
 		fi
 	fi
-else	
+else
 	echo "*** skipping readline..."
 fi
 
@@ -897,27 +897,27 @@ then
 
 	if [ $perl = 0 ]
 	then
-                if [ $config_perl_path = yes ]
-                then
-                        echo "*** Sorry, I couldn't find the perl libraries in $perl_path"
-                        echo "*** Check --with-perl-path and try again."
-                        exit 1
-                else
-                        echo "*** skipping perl support"
-                fi
+				if [ $config_perl_path = yes ]
+				then
+						echo "*** Sorry, I couldn't find the perl libraries in $perl_path"
+						echo "*** Check --with-perl-path and try again."
+						exit 1
+				else
+						echo "*** skipping perl support"
+				fi
 	fi
 fi
 
 if [ $config_python_path != no ]
 then
 	if [ -n "$PYTHON" ] && check_file ${PYTHON}
-	then	
+	then
 		python=${PYTHON}
 	elif check_file ${python_path}/bin/python2
-	then	
+	then
 		python=${python_path}/bin/python2
 	elif check_file ${python_path}/bin/python
- 	then
+	then
 		python=${python_path}/bin/python
 	else
 		python=0
@@ -943,14 +943,14 @@ flags = ['-I' + sysconfig.get_python_inc(),
 	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
 syscfgflags = sysconfig.get_config_var('CFLAGS')
 if not syscfgflags is None:
-    flags.extend(syscfgflags.split())
+	flags.extend(syscfgflags.split())
 print ' '.join(flags)
 EOF
 				env HOME=/var/empty ${python} > $python_ldflags_file <<EOF
 from distutils import sysconfig
 libs = sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
 if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
-    libs.insert(0, '-L' + sysconfig.get_config_var('LIBPL'))
+	libs.insert(0, '-L' + sysconfig.get_config_var('LIBPL'))
 print ' '.join(libs)
 EOF
 				python_ccflags=`cat $python_ccflags_file`
@@ -966,7 +966,7 @@ EOF
 				# arguments, so that the compiler produces the default,
 				# which will be compatible with the other objects we compile.
 
-	                        if [ ${BUILD_SYS} = DARWIN ]
+							if [ ${BUILD_SYS} = DARWIN ]
 				then
 					python_ccflags=`echo ${python_ccflags} | sed 's/-arch [^ ]* *//g'`
 					python_ldflags=`echo ${python_ldflags} | sed 's/-arch [^ ]* *//g'`
@@ -974,7 +974,7 @@ EOF
 
 				if [ $BUILD_SYS = DARWIN ]
 				then
-				    python_ldflags="$python_ldflags -undefined dynamic_lookup"
+					python_ldflags="$python_ldflags -undefined dynamic_lookup"
 				fi
 
 				swig_bindings="$swig_bindings python"
@@ -989,14 +989,14 @@ EOF
 
 	if [ $python = 0 ]
 	then
-                if [ $config_python_path = yes ]
-                then
-                        echo "*** Sorry, I couldn't find the Python >= 2.4 libraries in $python_path"
-                        echo "*** Check --with-python-path and try again."
-                        exit 1
-                else
-                        echo "*** skipping python support"
-                fi
+				if [ $config_python_path = yes ]
+				then
+						echo "*** Sorry, I couldn't find the Python >= 2.4 libraries in $python_path"
+						echo "*** Check --with-python-path and try again."
+						exit 1
+				else
+						echo "*** skipping python support"
+				fi
 	fi
 fi
 
@@ -1069,7 +1069,7 @@ then
 
 				if [ $BUILD_SYS = DARWIN ]
 				then
-				    python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
+					python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
 				fi
 
 				swig_bindings="$swig_bindings python3"
@@ -1182,7 +1182,7 @@ if library_search z ${zlib_path}
 then
 	external_libraries="${external_libraries} ${library_search_result}"
 	if [ "$zlib_path" != /usr ]
-	then   
+	then
 		ccflags="${ccflags} -I${zlib_path}/include"
 		ldflags="${ldflags} -L${zlib_path}/lib"
 	fi
@@ -1299,7 +1299,7 @@ then
 int main() { return 0; }
 EOF
 	echon "testing creation of 64-bit libparrot_helper.so..."
-	$ccompiler $internal_ccflags -m64 libparrot.test.c -o libparrot.test > /dev/null 2>&1 
+	$ccompiler $internal_ccflags -m64 libparrot.test.c -o libparrot.test > /dev/null 2>&1
 	if [ $? = 0 ]
 	then
 		build_lib64parrot_helper="yes"
@@ -1309,7 +1309,7 @@ EOF
 	echo $build_lib64parrot_helper
 
 	echon "testing creation of 32-bit libparrot_helper.so..."
-	$ccompiler $internal_ccflags -m32 libparrot.test.c -o libparrot.test > /dev/null 2>&1 
+	$ccompiler $internal_ccflags -m32 libparrot.test.c -o libparrot.test > /dev/null 2>&1
 	if [ $? = 0 ]
 	then
 		build_lib32parrot_helper="yes"

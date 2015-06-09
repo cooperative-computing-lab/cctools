@@ -15,8 +15,8 @@ prepare()
 void test (const char *in, const char *expected)
 {
 	char out[PATH_MAX];
-    strcpy(out, in);
-    path_remove_trailing_slashes(out);
+	strcpy(out, in);
+	path_remove_trailing_slashes(out);
 	if (strcmp(out, expected) != 0) {
 		fprintf(stderr, "for %s, got %s expected %s\n", in, out, expected);
 		exit(EXIT_FAILURE);

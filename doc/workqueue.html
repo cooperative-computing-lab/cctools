@@ -58,11 +58,11 @@ for the <a href="http://ccl.cse.nd.edu/software/makeflow">Makeflow</a> workflow 
 
 <h2 id="install">Installing Work Queue<a class="sectionlink" href="#install" title="Link to this section.">&#x21d7;</a></h2>
 <p>
-Work Queue is part of the <a href="http://ccl.cse.nd.edu/software">Cooperating Computing Tools</a>.  
+Work Queue is part of the <a href="http://ccl.cse.nd.edu/software">Cooperating Computing Tools</a>.
 The CCTools package can be downloaded from <a href="http://ccl.cse.nd.edu/software/download">this web page</a>.
 Follow the <a href=install.html>installation instructions</a> to setup CCTools
 required for running Work Queue.  The documentation for the full set of features
-of the Work Queue API can be viewed from either within the CCTools package or 
+of the Work Queue API can be viewed from either within the CCTools package or
 <a href="http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html">here</a>
 and <a href="http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePython.html">here</a>.
 
@@ -75,7 +75,7 @@ application from scratch.
 <p>
 We assume that you have downloaded and installed the cctools package in the
 directory CCTOOLS. Next, download the example file for the language of your
-choice: 
+choice:
 <ul>
 <li>C: <a href=work_queue_example.c>work_queue_example.c</a></li>
 <li>Python: <a href=work_queue_example.py>work_queue_example.py</a></li>
@@ -136,18 +136,18 @@ system.
 If you have access to a Condor pool, you can use this shortcut to submit
 ten workers at once via Condor:
 <div class ="code_area"><pre class="code_snip">
-% condor_submit_workers MACHINENAME 9123 10 
-Submitting job(s).......... 
-Logging submit event(s).......... 
+% condor_submit_workers MACHINENAME 9123 10
+Submitting job(s)..........
+Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 </pre></div>
 
 Or, if you have access to an SGE cluster, do this:
 <div class ="code_area"><pre class="code_snip">
-% sge_submit_workers MACHINENAME 9123 10 
-Your job 153083 ("worker.sh") has been submitted 
-Your job 153084 ("worker.sh") has been submitted 
-Your job 153085 ("worker.sh") has been submitted 
+% sge_submit_workers MACHINENAME 9123 10
+Your job 153083 ("worker.sh") has been submitted
+Your job 153084 ("worker.sh") has been submitted
+Your job 153085 ("worker.sh") has been submitted
 ...
 </pre></div>
 
@@ -164,7 +164,7 @@ If you forget to remove them, they will exit automatically after fifteen minutes
 To write your own program using Work Queue, begin with <a
 href=work_queue_example.c>C example</a> or <a
 href=work_queue_example.py>Python example</a> or <a
-href=work_queue_example.pl>Perl example</a> 
+href=work_queue_example.pl>Perl example</a>
 as a starting point.  Here is a basic outline for a Work Queue master:
 
 <div class ="code_area"><pre class="code_snip">
@@ -201,7 +201,7 @@ command line to run and a statement of what data is needed, and what data will
 be produced by the command. Input data can be provided in the form of a file or
 a local memory buffer. Output data can be provided in the form of a file or the
 standard output of the program. It is also required to specify whether the
-data, input or output, need to be cached at the worker site for later use. 
+data, input or output, need to be cached at the worker site for later use.
 <p>
 In the example, we specify a command that takes a single input file and produces
 a single output file. We then create a task by providing the specified command
@@ -209,11 +209,11 @@ as an argument:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
- t = work_queue_task_create(command);  
+ t = work_queue_task_create(command);
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- t = Task(command) 
+ t = Task(command)
 </pre>
 </div>
 
@@ -227,15 +227,15 @@ since they are not used by subsequent tasks in this example.
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
- work_queue_task_specify_file(t,"/usr/bin/gzip","gzip",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE); 
- work_queue_task_specify_file(t,infile,infile,WORK_QUEUE_INPUT,WORK_QUEUE_NOCACHE); 
+ work_queue_task_specify_file(t,"/usr/bin/gzip","gzip",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+ work_queue_task_specify_file(t,infile,infile,WORK_QUEUE_INPUT,WORK_QUEUE_NOCACHE);
  work_queue_task_specify_file(t,outfile,outfile,WORK_QUEUE_OUTPUT,WORK_QUEUE_NOCACHE);
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- t.specify_file("/usr/bin/gzip","gzip",WORK_QUEUE_INPUT,cache=True); 
- t.specify_file(infile,infile,WORK_QUEUE_INPUT,cache=False)  
- t.specify_file(outfile,outfile,WORK_QUEUE_OUTPUT,cache=False) 
+ t.specify_file("/usr/bin/gzip","gzip",WORK_QUEUE_INPUT,cache=True);
+ t.specify_file(infile,infile,WORK_QUEUE_INPUT,cache=False)
+ t.specify_file(outfile,outfile,WORK_QUEUE_OUTPUT,cache=False)
 </pre>
 </div>
 
@@ -252,11 +252,11 @@ directory. An example of its usage is given below:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
- t = work_queue_task_create("$WORK_QUEUE_SANDBOX/gzip < a > a.gz");  
+ t = work_queue_task_create("$WORK_QUEUE_SANDBOX/gzip < a > a.gz");
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- t = Task("$WORK_QUEUE_SANDBOX/gzip < a > a.gz")  
+ t = Task("$WORK_QUEUE_SANDBOX/gzip < a > a.gz")
 </pre>
 </div>
 
@@ -268,11 +268,11 @@ example:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
- t = work_queue_task_create("/usr/bin/gzip < a > a.gz");  
+ t = work_queue_task_create("/usr/bin/gzip < a > a.gz");
 </pre>
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- t = Task("/usr/bin/gzip < a > a.gz")  
+ t = Task("/usr/bin/gzip < a > a.gz")
 </pre>
 </div>
 
@@ -340,7 +340,7 @@ Keeping track of the master's hostname and port can get cumbersome, especially
 if there are multiple masters. To help with difficulty, we provide the project
 name feature to identify a Work Queue master with a more recognizable project
 name. Work Queue workers can then be started for their masters by providing the
-project names. 
+project names.
 
 <p> The project name feature uses the <b>catalog server</b> to maintain and
 track the project names of masters and their respective locations. It works as
@@ -348,7 +348,7 @@ follows: the master advertises its project name along with its hostname and port
 to the catalog server. Work Queue workers that are provided with the master's
 project name query the catalog server to find the hostname and port of the
 master with the given project name. So, to utilize this feature, the master
-must be specified to run in the <tt>WORK_QUEUE_MASTER_MODE_CATALOG</tt>. 
+must be specified to run in the <tt>WORK_QUEUE_MASTER_MODE_CATALOG</tt>.
 
 <p>For example, to have a Work Queue master advertise its project name as
 <tt>myproject</tt>, add the following code snippet after creating the queue:
@@ -369,24 +369,24 @@ To start a worker for this master, specify the project name (<tt>myproject</tt>)
 to connect in the <tt>-N</tt> option:
 
 <div class ="code_area"><pre class="code_snip">
-work_queue_worker -N myproject 
+work_queue_worker -N myproject
 </pre></div>
 
 You can start ten workers for this master on Condor using
 <tt>condor_submit_workers</tt> by providing the same option arguments.:
 <div class ="code_area"><pre class="code_snip">
-% condor_submit_workers -N myproject 10 
-Submitting job(s).......... 
-Logging submit event(s).......... 
+% condor_submit_workers -N myproject 10
+Submitting job(s)..........
+Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 </pre></div>
 
 Or similarly on SGE using <tt>sge_submit_workers</tt> as:
 <div class ="code_area"><pre class="code_snip">
 % sge_submit_workers -N myproject 10
-Your job 153097 ("worker.sh") has been submitted 
-Your job 153098 ("worker.sh") has been submitted 
-Your job 153099 ("worker.sh") has been submitted 
+Your job 153097 ("worker.sh") has been submitted
+Your job 153098 ("worker.sh") has been submitted
+Your job 153099 ("worker.sh") has been submitted
 ...
 </pre></div>
 
@@ -425,7 +425,7 @@ And give the <tt>--password</tt> option to give the same password file to your
 workers:
 </p>
 <div class ="code_area"><pre class="code_snip">
-work_queue_worker --password mypwfile  MACHINENAME 9123 
+work_queue_worker --password mypwfile  MACHINENAME 9123
 </pre></div>
 <p>
 With this option enabled, both the master and the workers will
@@ -438,7 +438,7 @@ through a SHA1-based challenge-response protocol.
 <p>A Work Queue foreman allows Work Queue workers to be managed in an
 hierarchical manner. Each foreman connects to the Work Queue master and accepts
 tasks as though it were a worker. It then accepts connections from Work Queue
-workers and dispatches tasks to them as if it were the master.</p> 
+workers and dispatches tasks to them as if it were the master.</p>
 
 <p>A setup using foremen is beneficial when there are common files that need to
 be transmitted to workers and cached for subsequent executions.  In this case,
@@ -467,9 +467,9 @@ instead of its project name).
 </pre></div>
 
 <p>To run a worker that connects to a foreman, specify the foreman's project name
-in the <tt>-N</tt> option. For example: 
+in the <tt>-N</tt> option. For example:
 <div class ="code_area"><pre class="code_snip">
-% work_queue_worker -N foreman_myproject 
+% work_queue_worker -N foreman_myproject
 </pre></div>
 
 <h2 id="multislot">Multi-slot workers<a class="sectionlink" href="#multislot" title="Link to this section.">&#x21d7;</a></h2>
@@ -482,7 +482,7 @@ core. As a result, the workers only execute a single core task by default.
 accomodated within the available resource sizes.
 
 <p>To start a multi-slot worker, you can specify the worker to automatically
-report the number of cores present at its execution site as: 
+report the number of cores present at its execution site as:
 <div class ="code_area"><pre class="code_snip">
 % work_queue_worker --cores 0  MACHINENAME 9123
 </pre></div>
@@ -506,7 +506,7 @@ memory, and disk.
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
- work_queue_task_specify_cores(t, 2); //needs 2 cores 
+ work_queue_task_specify_cores(t, 2); //needs 2 cores
  work_queue_task_specify_memory(t, 100); //needs 100 MB memory
  work_queue_task_specify_disk(t, 1000); //needs 1 GB disk
 
@@ -540,7 +540,7 @@ header to enable the debug messages at the master:
 <h4 class="code_header">C</h4>
 <pre class="code_snip">
  #include &#60;debug.h&#62;
- cctools_debug_flags_set("all"); 
+ cctools_debug_flags_set("all");
 </pre>
 </div>
 
@@ -566,24 +566,24 @@ href="http://ccl.cse.nd.edu/software/manuals/api/html/debug_8h.html">here</a>.
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
 <pre class="code_snip">
- cctools_debug_config_file("wq.debug"); 
+ cctools_debug_config_file("wq.debug");
 </pre>
 </div>
 <div class="code_area">
 <h4 class="code_header">Python</h4>
 <pre class="code_snip">
- cctools_debug_config_file("wq.debug") 
+ cctools_debug_config_file("wq.debug")
 </pre>
 </div>
 
 <p>To enable debugging at the worker, set the <tt>-d</tt> option:
 <div class ="code_area"><pre class="code_snip">
-work_queue_worker -d all MACHINENAME 9123 
+work_queue_worker -d all MACHINENAME 9123
 </pre></div>
 
 <p>To redirect the debug messages, specify the <tt>-o</tt> option:
 <div class ="code_area"><pre class="code_snip">
-work_queue_worker -d all -o worker.debug MACHINENAME 9123 
+work_queue_worker -d all -o worker.debug MACHINENAME 9123
 </pre></div>
 
 
@@ -609,7 +609,7 @@ You can specify a log file to obtain a time series of work queue statistics. Usu
 
 The script <tt>work_queue_graph_log</tt> is a wrapper for <tt>gnuplot</tt>, and
 with it you can plot some of the statistics, such as total time spent
-transfering tasks, number of tasks running, and workers connected: 
+transfering tasks, number of tasks running, and workers connected:
 
 <div class="code_area">
 <pre class="code_snip">
@@ -630,7 +630,7 @@ href="api/html/structwork__queue__task.html">work_queue_task struct</a>. The
 size of <tt>output</tt> is limited to 1 GB. Any output beyond 1 GB will be
 truncated. So, please redirect the stdout of the task to a file and specify the
 file as an output file of the task using <tt>work_queue_task_specify_file</tt>
-(<tt>specify_file</tt> in Python) as described above. 
+(<tt>specify_file</tt> in Python) as described above.
 
 <h2 id="advanced">Advanced Usage<a class="sectionlink" href="#advanced" title="Link to this section.">&#x21d7;</a></h2>
 
@@ -668,7 +668,7 @@ data in memory, it can pass the data directly to the remote task with
 <p>
 <li><b>String Interpolation.</b>  If you have workers distributed across
 multiple operating systems (such as Linux, Cygwin, Solaris) and/or architectures (such
-as i686, x86_64) and have files specific to each of these systems, this feature 
+as i686, x86_64) and have files specific to each of these systems, this feature
 will help. The strings $OS and $ARCH are available for use in the specification of input
 file names. Work Queue will automatically resolve these strings to the operating system
 and architecture of each connected worker and transfer the input file corresponding
@@ -685,7 +685,7 @@ to the resolved file name. For example:
 </div>
 This will transfer <tt>a.Linux.x86_64</tt> to workers running on a Linux system
 with an x86_64 architecture and <tt>a.Cygwin.i686</tt> to workers on Cygwin with
-an i686 architecture. 
+an i686 architecture.
 <p>
 Note this feature is specifically designed for specifying and distingushing
 input file names for different platforms and architectures. Also, this is
@@ -693,10 +693,10 @@ different from the $WORK_QUEUE_SANDBOX shell environment variable that exports
 the location of the working directory of the worker to its execution
 environment.
 <p>
-<li><b>Cancel Task.</b> This feature is useful in workflows where there are redundant tasks 
-or tasks that become obsolete as other tasks finish. Tasks that have been submitted can be 
-cancelled and immediately retrieved without waiting for Work Queue to return them in 
-<tt>work_queue_wait</tt>. The tasks to cancel can be identified by either their 
+<li><b>Cancel Task.</b> This feature is useful in workflows where there are redundant tasks
+or tasks that become obsolete as other tasks finish. Tasks that have been submitted can be
+cancelled and immediately retrieved without waiting for Work Queue to return them in
+<tt>work_queue_wait</tt>. The tasks to cancel can be identified by either their
 <tt>taskid</tt> or <tt>tag</tt>. For example:
 <div class="code_area">
 <h4 class="code_header">C/Perl</h4>
@@ -708,8 +708,8 @@ cancelled and immediately retrieved without waiting for Work Queue to return the
  t = q.cancel_by_tasktag("task3")
 </pre>
 </div>
-This cancels a task with <tt>tag</tt> named 'task3'. Note that in the presence of tasks with 
-the same tag, <tt>work_queue_cancel_by_tasktag</tt> will cancel and retrieve only one of the 
+This cancels a task with <tt>tag</tt> named 'task3'. Note that in the presence of tasks with
+the same tag, <tt>work_queue_cancel_by_tasktag</tt> will cancel and retrieve only one of the
 matching tasks.
 
 <p>

@@ -164,14 +164,14 @@ const char *buffer_tolstring(buffer_t * b, size_t * size)
 
 size_t buffer_pos(buffer_t * b)
 {
-    return inuse(b);
+	return inuse(b);
 }
 
 void buffer_rewind(buffer_t * b, size_t n)
 {
-    assert(inuse(b) >= n);
-    b->end = b->buf+n;
-    b->end[0] = '\0';
+	assert(inuse(b) >= n);
+	b->end = b->buf+n;
+	b->end[0] = '\0';
 }
 
 int buffer_dupl(buffer_t *b, char **buf, size_t *l)

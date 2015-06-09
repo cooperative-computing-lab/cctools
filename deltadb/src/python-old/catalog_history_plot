@@ -148,7 +148,7 @@ def handleReport():
   print '\t'.join(output)
 
 
-is_array = lambda var: isinstance(var, (list, tuple))  
+is_array = lambda var: isinstance(var, (list, tuple))
 
 
 prevLines = [] #used for debugging bad lines
@@ -180,7 +180,7 @@ for line in sys.stdin:
         lastHost = None
         ignore = 0
       blankLine = 1
-      
+
     else:
       blankLine = 0
       key, value = line.split(' ',1)
@@ -190,7 +190,7 @@ for line in sys.stdin:
         pass
       if key in varList:
         seriesTmp[key] = value
-    
+
   else:
     #print '=================='+line+'====================='
     # Read in log data
@@ -198,7 +198,7 @@ for line in sys.stdin:
     #print line
     res = line.split(' ')
     format = res.pop(0)
-    
+
     # Timestamp for any proceeding events
     if format == 'T' and res.__len__()>=1:
       time = res.pop(0)
@@ -213,7 +213,7 @@ for line in sys.stdin:
         handleReport()
         beginReport = endReport + 1
         endReport += report_frequency
-        
+
     # Create a new host series
     elif format == 'C' and res.__len__()>=1:
       lastHost = res.pop(0)
@@ -253,7 +253,7 @@ for line in sys.stdin:
           logError(line)
           logError("^----------Perhaps the host was deleted and is still reporting--------")
         #print seriess[host][field]
-         
+
     # Record removal of a single field
     elif format == 'R' and res.__len__()>=2:
       host = res.pop(0)
@@ -263,7 +263,7 @@ for line in sys.stdin:
       #    if field in seriess[host]:
       #      del seriess[host][field]
     elif lastHost is not None:
-      
+
       if res.__len__() > 0 or format.__len__()>0:
         field = format
         if field in staticFields:
@@ -277,7 +277,7 @@ for line in sys.stdin:
           except ValueError:
             pass
           seriesTmp[field] = value
-          
+
       else:
         seriess[lastHost] = seriesTmp
         lastHost = None
@@ -286,10 +286,10 @@ for line in sys.stdin:
       logError("v-----------------Error on last line below ("+str(logTime)+")----------------")
       logError('\n'.join(prevLines))
       logError("^------------------------------End of error------------------------------")
-      
+
     if prevLines.__len__()>20:
       prevLines.pop(0)
-    
+
 
 reportNumber += 1
 handleReport()
@@ -315,7 +315,3 @@ for line in eventLog:
       timeLine = None
     print line
 """
-
-
-
-

@@ -5,7 +5,7 @@
 #See the file COPYING for details.
 #
 
-use strict; 
+use strict;
 
 if ($#ARGV != 0) {
 	print "Usage: perl modify_registry.pl <registry>\n";
@@ -34,7 +34,7 @@ while (my $line = <INPUT>) {
 		$import = 0;
 		print OUTPUT "import cctools\n";
 	}
-		
+
 	if ($line =~ /self.datatypes_by_extension = {$/)
 	{
 		$datatypes = 1
@@ -78,5 +78,3 @@ while (my $line = <INPUT>) {
 }
 close(OUTPUT);
 close(INPUT);
-	
-

@@ -4,20 +4,20 @@
 
 prepare()
 {
-    syntax/long_line_test.pl > syntax/long_line_test.makeflow
-    exit 0
+	syntax/long_line_test.pl > syntax/long_line_test.makeflow
+	exit 0
 }
 
 run()
 {
-    cd syntax; ../../src/makeflow_analyze -k long_line_test.makeflow && exit 0
-    exit 1
+	cd syntax; ../../src/makeflow_analyze -k long_line_test.makeflow && exit 0
+	exit 1
 }
 
 clean()
 {
-    rm -f syntax/long_line_test.makeflow
-    exit 0
+	rm -f syntax/long_line_test.makeflow
+	exit 0
 }
 
 dispatch $@

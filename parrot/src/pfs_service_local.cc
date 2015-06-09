@@ -680,16 +680,16 @@ public:
 	}
 
 	virtual int whoami( pfs_name *name, char *buf, int size ) {
-	    int result;
-	    debug(D_LOCAL,"whoami %s",name->rest);
-	    if (pfs_username) {
+		int result;
+		debug(D_LOCAL,"whoami %s",name->rest);
+		if (pfs_username) {
 		strncpy(buf, pfs_username, size);
 		result = strlen(buf);
-	    } else {
+		} else {
 		result = username_get(buf);
 		result = strlen(buf);
-	    }
-	    END
+		}
+		END
 	}
 
 	virtual pfs_location* locate( pfs_name *name ) {

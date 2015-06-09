@@ -110,7 +110,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		{"debug", required_argument, 0, 'd'},
 		{"timeout", required_argument, 0, 't'},
 		{"help", no_argument, 0, 'h'},
-        {0,0,0,0}};
+		{0,0,0,0}};
 
 	signed int c;
 	int needs_explicit_master = 0;
@@ -143,7 +143,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 				fatal("Options -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
 			needs_explicit_master = 1;
 			query_mode = QUERY_WORKERS;
-		  	break;
+			break;
 		case 'l':
 			format_mode = FORMAT_LONG;
 			break;

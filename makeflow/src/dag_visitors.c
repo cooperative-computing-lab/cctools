@@ -442,22 +442,22 @@ void write_node_to_xgmml(FILE *f, char idheader, int id, char* nodename, int pro
 	//file *f must already be open!
 
 	fprintf(f,"\t<node id=\"%c%d\" label=\"%s\">\n", idheader, id, nodename);
-    fprintf(f,"\t\t<att name=\"shared name\" value=\"%s\" type=\"string\"/>\n", nodename);
-    fprintf(f,"\t\t<att name=\"name\" value=\"%s\" type=\"string\"/>\n", nodename);
-    fprintf(f,"\t\t<att name=\"process\" value=\"%d\" type=\"boolean\"/>\n", process);
-    fprintf(f,"\t</node>\n");
+	fprintf(f,"\t\t<att name=\"shared name\" value=\"%s\" type=\"string\"/>\n", nodename);
+	fprintf(f,"\t\t<att name=\"name\" value=\"%s\" type=\"string\"/>\n", nodename);
+	fprintf(f,"\t\t<att name=\"process\" value=\"%d\" type=\"boolean\"/>\n", process);
+	fprintf(f,"\t</node>\n");
 }
 
 void write_edge_to_xgmml(FILE *f, char sourceheader, int sourceid, char targetheader, int targetid, int directed)
 {
 	//file *f must already be open!
 	fprintf(f, "\t<edge id=\"%c%d-%c%d\" label=\"%c%d-%c%d\" source=\"%c%d\" target=\"%c%d\" cy:directed=\"%d\">\n", sourceheader, sourceid, targetheader, targetid, sourceheader, sourceid, targetheader, targetid, sourceheader, sourceid, targetheader, targetid, directed);
-    fprintf(f,"\t\t<att name=\"shared name\" value=\"%c%d-%c%d\" type=\"string\"/>\n", sourceheader, sourceid, targetheader, targetid);
-    fprintf(f,"\t\t<att name=\"shared interaction\" value=\"\" type=\"string\"/>\n");
-    fprintf(f,"\t\t<att name=\"name\" value=\"%c%d-%c%d\" type=\"string\"/>\n", sourceheader, sourceid, targetheader, targetid);
-    fprintf(f,"\t\t<att name=\"selected\" value=\"0\" type=\"boolean\"/>\n");
+	fprintf(f,"\t\t<att name=\"shared name\" value=\"%c%d-%c%d\" type=\"string\"/>\n", sourceheader, sourceid, targetheader, targetid);
+	fprintf(f,"\t\t<att name=\"shared interaction\" value=\"\" type=\"string\"/>\n");
+	fprintf(f,"\t\t<att name=\"name\" value=\"%c%d-%c%d\" type=\"string\"/>\n", sourceheader, sourceid, targetheader, targetid);
+	fprintf(f,"\t\t<att name=\"selected\" value=\"0\" type=\"boolean\"/>\n");
 	fprintf(f,"\t\t<att name=\"interaction\" value=\"\" type=\"string\"/>\n");
-    fprintf(f,"\t\t<att name=\"weight\" value=\"8\" type=\"integer\"/>\n");
+	fprintf(f,"\t\t<att name=\"weight\" value=\"8\" type=\"integer\"/>\n");
 	fprintf(f,"\t</edge>\n");
 }
 
@@ -488,8 +488,8 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 
 	FILE *cytograph = stdout;
 	//FILE *cytograph = fopen("cytoscape.xgmml", "w");
-	
-	
+
+
 	fprintf(cytograph, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n");
 	fprintf(cytograph, "<graph id=\"1\" label=\"small example\" directed=\"1\" cy:documentVersion=\"3.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\" xmlns:cy=\"http://www.cytoscape.org/\" xmlns=\"http://www.cs.rpi.edu/XGMML\">\n");
 	fprintf(cytograph, "\t<att name=\"networkMetadata\">\n");
@@ -529,8 +529,8 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 	}
 
 
-	h = hash_table_create(0, 0); 
-	
+	h = hash_table_create(0, 0);
+
 	for(n = d->nodes; n; n = n->next) {
 		name = xxstrdup(n->command);
 		label = strtok(name, " \t\n");
@@ -559,7 +559,7 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 		write_node_to_xgmml(cytograph, 'N', n->nodeid, label,1);
 		free(name);
 	}
-	
+
 	g = hash_table_create(0, 0);
 
 	for(n = d->nodes; n; n = n->next) {
@@ -608,7 +608,7 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 				if(width > 25)
 					width = 25;
 			}
-		} 
+		}
 	}
 
 	for(n = d->nodes; n; n = n->next) {
@@ -635,7 +635,7 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 
 	fprintf(cytograph, "</graph>\n");
 	fclose(cytograph);
-	
+
 	write_styles_file();
 
 	hash_table_firstkey(h);
@@ -652,8 +652,8 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 
 	hash_table_delete(g);
 	hash_table_delete(h);
-	
-	
+
+
 }
 
 
@@ -719,7 +719,7 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 				printf( "N%d [label=\"%s\"];\n", condense_display ? t->id : n->nodeid, with_labels ? label : "");
 			} else {
 				printf( "N%d [label=\"%s x%d\"];\n", t->id, with_labels ? label : "", t->count);
-			}	
+			}
 			t->print = 0;
 		}
 		free(name);

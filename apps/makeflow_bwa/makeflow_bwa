@@ -164,7 +164,7 @@ def parse_main_options(parser):
 	group.add_option('--output_err', dest='output_err', help='The file to save the output (SAM format) [bwa_results.sam]')
 	group.add_option('--algoalign', dest='algoalign', help='The type of Alignment Algorithm (backtrack, bwasw, mem) [mem]')
 	group.add_option('--num_seq', dest='num_seq', help='Number of Sequences per partition [50000]')
-	parser.add_option_group(group)	
+	parser.add_option_group(group)
 
 def parse_makeflow_options(parser):
 	group = optparse.OptionGroup(parser, "Makeflow Preparation Options")
@@ -196,7 +196,7 @@ def count_splits( fastq ):
 		if (re.search('^[@]', line) and line_count % 4 ==0):
 			if (read_count == num_reads):
 				num_outputs += 1
-				read_count = 0	
+				read_count = 0
 			else:
 				read_count += 1
 		#place all other lines in FASTQ file under same sequence
@@ -331,7 +331,7 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 		if options.config:
 			config = open(configuration, 'r')
 			makeflow.write(config.read())
-	
+
 		makeflow.write("CATEGORY=\"analysis\"\n")
 		makeflow.write("CORES=1")
 
@@ -340,17 +340,17 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 		inputlist = ""
 		for i in range(splits):
 			inputlist = inputlist + options.fastq + "." + str(i) + " "
-	
+
 		makeflow.write("\n\n"+inputlist + ": " + fastq_name + " " + options.fastq);
 		makeflow.write("\n\tLOCAL ./" + fastq_name + " "+options.fastq)
-	
+
 		if options.rfastq:
 
 			rsplits = count_splits(options.rfastq)
 			rinputlist = ""
 			for i in range(rsplits):
 				rinputlist = rinputlist + options.rfastq + "." + str(i) + " "
-	
+
 			makeflow.write("\n\n"+rinputlist+": " + fastq_name + " "+options.rfastq);
 			makeflow.write("\n\tLOCAL ./" + fastq_name + " "+options.rfastq)
 
@@ -369,17 +369,17 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 		index = options.ref + " " + index
 		results_to_cat = ""
 		errors_to_cat = ""
-    
+
 		for c in range(splits):
 			sc=str(c)
 			query1=query2=sai1=sai2=output=""
-		
-			query1 = options.fastq + "." + sc + " " 
+
+			query1 = options.fastq + "." + sc + " "
 			sai1 = query1[:-1] + ".sai "
 			if options.rfastq:
-				query2 = options.rfastq + "." + sc + " " 
+				query2 = options.rfastq + "." + sc + " "
 				sai2 = query2[:-1] + ".sai "
-		
+
 			output = "BWAMF.output." + sc + " "
 			results_to_cat += output
 
@@ -387,7 +387,7 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 			errors_to_cat += error
 
 			if options.algoalign=="bwa_backtrack":
-			
+
 				makeflow.write("\n\n"+sai1+" : bwa "+index+query1)
 				makeflow.write("\n\t./bwa aln "+aln_a+ref+" "+query1+"> "+sai1)
 
@@ -400,14 +400,14 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 				else:
 					makeflow.write("\n\n"+output+" "+error+": bwa "+index+query1+sai1)
 					makeflow.write("\n\t./bwa samse "+se_a+ ref+" "+sai1+query1+" > "+output+" 2>"+error)
-	
+
 			else:
 				algo = "mem "
-        	                args = mem_a + "-v 0 "
+		                args = mem_a + "-v 0 "
 				if(options.algoalign=="bwa_sw"):
 					algo = "bwasw "
 					args = sw_a
-      	
+
 				makeflow.write("\n\n"+output+" "+error+": bwa "+ index + query1 + query2)
 				makeflow.write("\n\t./bwa "+algo+args+ref+" "+query1+query2+" > "+output+" 2>"+error)
 
@@ -418,13 +418,13 @@ def write_makeflow(destination, configuration, index_a, mem_a, aln_a, se_a, pe_a
 		error = "bwa_errors.txt "
 		if options.output_err:
 			error = options.output_err + " "
-		
+
 		makeflow.write("\n\n"+output+": " + cat_name +" "+results_to_cat)
-		makeflow.write("\n\tLOCAL ./" + cat_name +" "+output+results_to_cat)	
+		makeflow.write("\n\tLOCAL ./" + cat_name +" "+output+results_to_cat)
 
 		makeflow.write("\n\n"+error+": "+errors_to_cat)
-		makeflow.write("\n\tLOCAL cat "+errors_to_cat+" > "+error)	
-		makeflow.write("\n")	
+		makeflow.write("\n\tLOCAL cat "+errors_to_cat+" > "+error)
+		makeflow.write("\n")
 
 	finally:
 		if options.makeflow is not None:

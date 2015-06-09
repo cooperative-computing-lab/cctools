@@ -11,7 +11,7 @@ if [ -z "$CONVERT" ]; then
 		CONVERT=/usr/local/bin/convert
 	elif [ -f /opt/local/bin/convert ]; then
 		CONVERT=/opt/local/bin/convert
-	else 
+	else
 		echo "Could not find convert!"
 		exit 1
 	fi

@@ -5,7 +5,7 @@
 #See the file COPYING for details.
 #
 
-use strict; 
+use strict;
 
 if ($#ARGV != 0) {
 	print "Usage: perl modify_registry.pl <tool_conf>\n";
@@ -31,5 +31,3 @@ while (my $line = <INPUT>) {
 }
 close(OUTPUT);
 close(INPUT);
-	
-

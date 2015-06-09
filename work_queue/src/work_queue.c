@@ -1034,12 +1034,12 @@ static int get_output_files( struct work_queue *q, struct work_queue_worker *w, 
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((f = list_next_item(t->output_files))) {
-			result = get_output_file(q,w,t,f); 
+			result = get_output_file(q,w,t,f);
 			//if success or app-level failure, continue to get other files.
 			//if worker failure, return.
 			if(result == 0) {
 				break;
-			} 
+			}
 		}
 	}
 
@@ -2265,7 +2265,7 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 	t->time_send_input_start = timestamp_get();
 	int result = send_input_files(q, w, t);
 	t->time_send_input_finish = timestamp_get(); //record end time in case we return prematurely below.
-	
+
 	if (result != SUCCESS) {
 		return result;
 	}
@@ -2770,7 +2770,7 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	itable_remove(w->current_tasks, t->taskid);
 	itable_remove(q->worker_task_map, t->taskid);
 	change_task_state(q, t, new_state);
-	
+
 	if(t->unlabeled)
 	{
 		w->unlabeled_allocated--;
@@ -2986,8 +2986,8 @@ static struct list *work_queue_task_file_list_clone(struct list *list) {
 
   list_first_item(list);
   while ((old_file = list_next_item(list))) {
-    new_file = work_queue_file_clone(old_file);
-    list_push_tail(new, new_file);
+	new_file = work_queue_file_clone(old_file);
+	list_push_tail(new, new_file);
   }
   return new;
 }
@@ -3429,7 +3429,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 			}
 		}
 	}
-	
+
 	tf = work_queue_file_create(t, local_name, remote_name, WORK_QUEUE_FILE_PIECE, flags);
 	if(!tf) return 0;
 
@@ -3469,8 +3469,8 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 			fprintf(stderr, "Error: buffer conflicts with an output pointing to same remote name (%s).\n", remote_name);
 			return 0;
 		}
-	}	
-	
+	}
+
 	tf = work_queue_file_create(t, NULL, remote_name, WORK_QUEUE_BUFFER, flags);
 	if(!tf) return 0;
 
@@ -3479,7 +3479,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 		fprintf(stderr, "Error: failed to allocate memory for buffer with remote name %s and length %d bytes.\n", remote_name, length);
 		return 0;
 	}
-	
+
 	tf->length  = length;
 
 	memcpy(tf->payload, data, length);
@@ -3518,7 +3518,7 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 
 		//check if there is an output file with the same remote name.
 		list_first_item(t->output_files);
-	    while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: input file command %s conflicts with an output pointing to same remote name (%s).\n", cmd, remote_name);
 				return 0;
@@ -3538,14 +3538,14 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 
 		//check if there is an input file with the same remote name.
 		list_first_item(t->input_files);
-	    while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
 			if(!strcmp(remote_name, tf->remote_name)){
 				fprintf(stderr, "Error: output file command %s conflicts with an input pointing to same remote name (%s).\n", cmd, remote_name);
 				return 0;
 			}
 		}
 	}
-	
+
 	tf = work_queue_file_create(t, cmd, remote_name, WORK_QUEUE_REMOTECMD, flags);
 	if(!tf) return 0;
 
@@ -3752,13 +3752,13 @@ struct work_queue *work_queue_create(int port)
 int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_file)
 {
   if(!q)
-    return 0;
+	return 0;
 
   if(q->monitor_mode)
   {
-    debug(D_NOTICE, "Monitoring already enabled. Closing old logfile and opening (perhaps) new one.\n");
-    if(fclose(q->monitor_file))
-      debug(D_NOTICE, "Error closing logfile: %s\n", strerror(errno));
+	debug(D_NOTICE, "Monitoring already enabled. Closing old logfile and opening (perhaps) new one.\n");
+	if(fclose(q->monitor_file))
+	  debug(D_NOTICE, "Error closing logfile: %s\n", strerror(errno));
   }
 
   q->monitor_mode = 0;
@@ -3766,22 +3766,22 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_fil
   q->monitor_exe = resource_monitor_copy_to_wd(NULL);
   if(!q->monitor_exe)
   {
-    debug(D_NOTICE, "Could not find the resource monitor executable. Disabling monitor mode.\n");
-    return 0;
+	debug(D_NOTICE, "Could not find the resource monitor executable. Disabling monitor mode.\n");
+	return 0;
   }
 
   if(monitor_summary_file)
-    monitor_summary_file = xxstrdup(monitor_summary_file);
+	monitor_summary_file = xxstrdup(monitor_summary_file);
   else
-    monitor_summary_file = string_format("wq-%d-resource-usage", getpid());
+	monitor_summary_file = string_format("wq-%d-resource-usage", getpid());
 
   q->monitor_file = fopen(monitor_summary_file, "w+");
   free(monitor_summary_file);
 
   if(!q->monitor_file)
   {
-    debug(D_NOTICE, "Could not open monitor log file. Disabling monitor mode.\n");
-    return 0;
+	debug(D_NOTICE, "Could not open monitor log file. Disabling monitor mode.\n");
+	return 0;
   }
 
 	q->monitor_mode = 1;
@@ -3932,7 +3932,7 @@ void work_queue_delete(struct work_queue *q)
 
 		free(q->stats);
 		free(q->stats_disconnected_workers);
-		
+
 		if(q->monitor_mode)
 			fclose(q->monitor_file);
 
@@ -3985,7 +3985,7 @@ static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
 
 	// remove from current tables:
-	
+
 	if( old_state == WORK_QUEUE_TASK_READY ) {
 		// Treat WORK_QUEUE_TASK_READY specially, as it has the order of the tasks
 		list_remove(q->ready_list, t);
@@ -4115,9 +4115,9 @@ static void print_password_warning( struct work_queue *q )
 
 	if(did_password_warning) return;
 
-       	if(!q->password && q->name) {
-       		fprintf(stderr,"warning: this work queue master is visible to the public.\n");
-	       	fprintf(stderr,"warning: you should set a password with the --password option.\n");
+		if(!q->password && q->name) {
+			fprintf(stderr,"warning: this work queue master is visible to the public.\n");
+			fprintf(stderr,"warning: you should set a password with the --password option.\n");
 		did_password_warning = 1;
 	}
 }
@@ -4234,12 +4234,12 @@ static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
 
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
 /*
-      --------------------
-     |  compute stoptime  |
-      --------------------
-               |
-               v
-         --------------
+	  --------------------
+	 |  compute stoptime  |
+	  --------------------
+			   |
+			   v
+		 --------------
 +------>|  poll links  |
 |        --------------
 |              |
@@ -4261,13 +4261,13 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 |              v                       |
 | yes  -----------------               |
 +-----| time remaining? |              |
-       -----------------               |
-            no |                       |
-               |-----------------------+
-               v
-           ----------
-          |  return  |
-           ----------
+	   -----------------               |
+			no |                       |
+			   |-----------------------+
+			   v
+		   ----------
+		  |  return  |
+		   ----------
 */
 {
 	struct work_queue_task *t;

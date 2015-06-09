@@ -49,4 +49,3 @@ rpm:
 	./packaging/rpm/rpm_creator.sh $(RPM_VERSION) $(RPM_RELEASE)
 
 .PHONY: $(CCTOOLS_PACKAGES) $(INSTALL_PACKAGES) $(CLEAN_PACKAGES) all clean install test rpm
-	

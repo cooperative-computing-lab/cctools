@@ -26,7 +26,7 @@ def make_inputs(option, opt_str, value, parser):
 def make_args(option, opt_str, value, parser):
         global arguments
         arguments += opt_str + " " + value + " "
-		
+
 def make_flag(option, opt_str, value, parser):
         global arguments
         arguments += opt_str + " "
@@ -35,7 +35,7 @@ def parse_req(parser):
         group = optparse.OptionGroup(parser, "Required Parameters")
         group.add_option('-T','--analysis_type',dest='type',type="string",help="Type of analysis to run")
         parser.add_option_group(group)
-		
+
 def parse_in(parser):
         group = optparse.OptionGroup(parser, "Optional Inputs")
         group.add_option('--BQSR',type="string",help="The input covariates table file which enables on-the-fly base quality score recalibration (intended for use with BaseRecalibrator and PrintReads)",action="callback",callback=make_inputs)
@@ -47,13 +47,13 @@ def parse_in(parser):
         group.add_option('--reference_index',dest='ref_index',type="string",help="Reference sequence file")
         group.add_option('--reference_dict',dest='ref_dict',type="string",help="Reference sequence file")
         parser.add_option_group(group)
-		
+
 def parse_out(parser):
         group = optparse.OptionGroup(parser, "Optional Outputs")
         group.add_option('--log_to_file',dest='log',type="string",help="Set the logging location")
         group.add_option('--out',dest='output',type="string",help="Output name")
         parser.add_option_group(group)
-		
+
 def parse_optp(parser):
         group = optparse.OptionGroup(parser, "Optional Parameters")
         group.add_option('--baq',type="string",help="Type of BAQ calculation to apply in the engine",action="callback",callback=make_args)
@@ -87,7 +87,7 @@ def parse_optp(parser):
         group.add_option('--heterozygosity',type="string",help="Heterozygosity value used to compute prior likelihoods for any locus. See the GATKDocs for full details on the meaning of this population genetics concept",action="callback",callback=make_args)
         group.add_option('--indel_heterozygosity',type="string",help="Heterozygosity for indel calling. See the GATKDocs for heterozygosity for full details on the meaning of this population genetics concept",action="callback",callback=make_args)
         parser.add_option_group(group)
-		
+
 def parse_optf(parser):
         group = optparse.OptionGroup(parser, "Optional Flags")
         group.add_option('--allow_potentially_misencoded_quality_scores',help="Do not fail when encountering base qualities that are too high and that seemingly indicate a problem with the base quality encoding of the BAM file",action="callback",callback=make_flag)
@@ -101,12 +101,12 @@ def parse_optf(parser):
         group.add_option('--useOriginalQualities',help="If set, use the original base quality scores from the OQ tag when present instead of the standard scores",action="callback",callback=make_flag)
         group.add_option('--version',help="Output version information",action="callback",callback=make_flag)
         parser.add_option_group(group)
-	
+
 def parse_advp(parser):
         group = optparse.OptionGroup(parser, "Advanced Parameters")
         group.add_option('--sample_rename_mapping_file',type="string",help="Rename sample IDs on-the-fly at runtime using the provided mapping file. This option requires that each BAM file listed in the mapping file have only a single sample specified in its header (though there may be multiple read groups for that sample). Each line of the mapping file must contain the absolute path to a BAM file, followed by whitespace, followed by the new sample name for that BAM file.",action="callback",callback=make_args)
         parser.add_option_group(group)
-		
+
 def parse_advf(parser):
         group = optparse.OptionGroup(parser, "Advanced Flags")
         group.add_option('--allow_bqsr_on_reduced_bams_despite_repeated_warnings',help="Do not fail when running base quality score recalibration on a reduced BAM file even though we highly recommend against it",action="callback",callback=make_flag)
@@ -173,7 +173,7 @@ my $num_outputs = 0;
 open(INPUT, $ref_file);
 my $loc_def = "";
 my $last_loc = "";
- 
+
 my $file = gensym;
 open(OUTPUT,">$ref.$num_outputs.fa");
 open($file, ">$sam.$num_outputs.sam");
@@ -186,7 +186,7 @@ while (my $line = <INPUT>) {
 	if ($line =~ /^>/){
 		($loc_def, my $loc) = $line =~ m/>(\D+)(\d+)/;
 		if($loc_def ne $last_loc){
-			push (@loc_defs, $loc_def); 
+			push (@loc_defs, $loc_def);
 			$last_loc = $loc_def;
 		}
 #Check if the new sequence should be placed in a new file, otherwise place it in same file
@@ -194,7 +194,7 @@ while (my $line = <INPUT>) {
 			close(OUTPUT);
 			$num_outputs++;
 			$read_count = 1;
-			
+
 			$file = gensym;
 			open(OUTPUT,">$ref.$num_outputs.fa");
 			open($file, ">$sam.$num_outputs.sam");
@@ -261,7 +261,7 @@ foreach $output (@outputs) {
 	finally:
 		if destination:
 			prog_split.close()
-	
+
 def write_java(destination):
 	if destination:
 		ref_split = open(destination, 'w')
@@ -274,7 +274,7 @@ def write_java(destination):
 # Date: 04/28/2014
 
 
-import optparse, os, sys, tempfile, shutil, stat 
+import optparse, os, sys, tempfile, shutil, stat
 
 #Parse Command Line
 parser = optparse.OptionParser()
@@ -317,7 +317,7 @@ if java_opt == \"\":
 	finally:
 		if destination:
 			ref_split.close()
-	
+
 
 def count_splits( fastq , num_reads):
 	num_outputs = 1
@@ -329,7 +329,7 @@ def count_splits( fastq , num_reads):
 		if re.match("^>", line) is not None:
 			if (read_count == num_reads):
 				num_outputs += 1
-				read_count = 0	
+				read_count = 0
 			else:
 				read_count += 1
 		#place all other lines in FASTQ file under same sequence
@@ -347,7 +347,7 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 		if options.config:
 			config = open(configuration, 'r')
 			makeflow.write(config.read())
-			
+
 		xmx = ""
 		if options.xmx:
 			xmx = " -Xmx" + options.xmx + " "
@@ -363,7 +363,7 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 		merge_files = ""
 		merge_inputs = ""
 		count = count_splits(ref, num_reads);
-			
+
 		inputs = []
 		refs = []
 		for i in range(0, count):
@@ -374,7 +374,7 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 		makeflow.write("\n\tLOCAL perl gatk_split_align "+str(num_reads)+" "+ref+" "+input_full_sam)
 
 		for i in range(0, count):
-			
+
 			ref_sp = ref[:-3]+"."+str(i)+".fa"
 			index = ref_sp+".fai "
 			dict  = ref[:-3]+"."+str(i)+".dict "
@@ -385,7 +385,7 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 			makeflow.write("\n\n"+dict+" : java_run jre.zip picard.jar "+ref_sp)
 			makeflow.write("\n\tpython java_run --java jre.zip --inputs \"-jar picard.jar CreateSequenceDictionary R="+ref_sp+" O="+dict+"\"")
 
-			ref_index = ref_sp+" "+index+" "+dict+" "			
+			ref_index = ref_sp+" "+index+" "+dict+" "
 			input_sam = input+str(i)+".sam"
 			input_bam = input+str(i)+".bam"
 			input_bai = input_bam+".bai"
@@ -399,7 +399,7 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 			query = input_bai+" "+input_bam+" "
 
 			log=""
-			if options.log:			
+			if options.log:
 				log = options.log
 				arguments += "-PF " + log + "."+ input + " "
 
@@ -407,22 +407,22 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 			if options.plog:
 				plog = options.plog
 				arguments += "-log " + plog + "."+ input + " "
-			
+
 			#added = "--heterozygosity 0.1 --indel_heterozygosity 0.05 --unsafe -fixMisencodedQuals "
 			added = ""
-	
+
 			merge_files += input_vcf+" "+input_idx+" "
-			merge_inputs += input_vcf+" " 
-				
+			merge_inputs += input_vcf+" "
+
 			makeflow.write("\n\n"+ log + plog +input_vcf+" "+input_idx+ " : java_run jre.zip "+ref_index+query+" GenomeAnalysisTK.jar ")
 			makeflow.write("\n\tpython java_run --java jre.zip --inputs \""+xmx+"-jar GenomeAnalysisTK.jar -T " + options.type +" -R "+ref_sp+" -I "+input_bam+" -o "+input_vcf+" "+arguments+added+"\"")
 
 
 		makeflow.write("\n\n"+options.output+" :  "+merge_files)
-		makeflow.write("\n\tLOCAL vcf-concat "+merge_inputs+" > "+options.output) 
-		makeflow.write("\n") 
+		makeflow.write("\n\tLOCAL vcf-concat "+merge_inputs+" > "+options.output)
+		makeflow.write("\n")
 
-			
+
 	finally:
 		if options.makeflow is not None:
 			makeflow.close()
@@ -459,7 +459,7 @@ if not options.ref:
 	sys.exit(4);
 
 input = 0
-if options.input: 
+if options.input:
 	input = input + 1;
 if options.numreads:
 	num_reads = options.numreads

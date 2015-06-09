@@ -71,5 +71,3 @@ for m in modules:
 	m_path = imp.find_module(m_split[0])[1]
 	if m_path != file_to_link:
 		print m_path, m
-
-

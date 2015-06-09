@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-rotate-max", required_argument, 0, 'O'},
 		{"debug", required_argument, 0, 'd'},
-        {0,0,0,0}
+		{0,0,0,0}
 	};
 
 	while((c = getopt_long(argc, argv, "a:p:r:d:o:O:", long_options, NULL)) > -1) {

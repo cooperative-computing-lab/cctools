@@ -58,7 +58,7 @@ OPTION_TRIPLET(-U, update-interval, time)Send status updates at this interval. (
 OPTION_ITEM(`-v, --version')Show version string
 OPTION_TRIPLET(-Z,port-file,file)Select port at random and write it to this file.  (default is disabled)
 OPTIONS_END
- 
+
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
@@ -78,4 +78,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_CHIRP
 
 FOOTER
-

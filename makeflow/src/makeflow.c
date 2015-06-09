@@ -61,8 +61,8 @@ because some of the execution state (note states, node counts, etc)
 is stored in struct dag and struct dag_node.  Perhaps this can be improved.
 
 - All operations on files should use the batch_fs_*() functions, rather
-than invoking Unix I/O directly.  This is because some batch systems 
-(Hadoop, Confuga, etc) also include the storage where the files to be 
+than invoking Unix I/O directly.  This is because some batch systems
+(Hadoop, Confuga, etc) also include the storage where the files to be
 accessed are located.
 
 - APIs like work_queue_* should be indirectly accessed by setting options
@@ -146,7 +146,7 @@ static void makeflow_wrapper_add_command( const char *cmd )
 
 static void makeflow_wrapper_add_input_file( const char *file )
 {
- 	if(!wrapper_input_files) wrapper_input_files = list_create();
+	if(!wrapper_input_files) wrapper_input_files = list_create();
 	list_push_tail(wrapper_input_files,dag_file_create(file));
 }
 
@@ -319,7 +319,7 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 	// Do not rerun this node
 	return;
 
-      rerun:
+	  rerun:
 	makeflow_node_force_rerun(rerun_table, d, n);
 }
 
@@ -421,7 +421,7 @@ static char *monitor_log_name(char *dirname, int nodeid)
 }
 
 /*
-Prepare a node for monitoring by wrapping the command and attaching the 
+Prepare a node for monitoring by wrapping the command and attaching the
 appropriate input and output dependencies.
 */
 
@@ -616,36 +616,36 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	return 0;
 }
 
-static void makeflow_create_docker_sh() 
-{       
-    FILE *wrapper_fn;
-	
-  	wrapper_fn = fopen(CONTAINER_SH, "w"); 
+static void makeflow_create_docker_sh()
+{
+	FILE *wrapper_fn;
 
-    if (image_tar == NULL) {
+	wrapper_fn = fopen(CONTAINER_SH, "w");
 
-        fprintf(wrapper_fn, "#!/bin/sh\n\
+	if (image_tar == NULL) {
+
+		fprintf(wrapper_fn, "#!/bin/sh\n\
 curr_dir=`pwd`\n\
 default_dir=/root/worker\n\
 flock /tmp/lockfile /usr/bin/docker pull %s\n\
 docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s \"$@\"\n", container_image, container_image);
 
-    } else {
+	} else {
 
-        fprintf(wrapper_fn, "#!/bin/sh\n\
+		fprintf(wrapper_fn, "#!/bin/sh\n\
 curr_dir=`pwd`\n\
 default_dir=/root/worker\n\
 flock /tmp/lockfile /usr/bin/docker load < %s\n\
 docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s \"$@\"\n", image_tar, container_image);
 
-        makeflow_wrapper_add_input_file(image_tar);
-    }
+		makeflow_wrapper_add_input_file(image_tar);
+	}
 
-  	fclose(wrapper_fn);
+	fclose(wrapper_fn);
 
-	chmod(CONTAINER_SH, 0755);   
+	chmod(CONTAINER_SH, 0755);
 
-    makeflow_wrapper_add_input_file(CONTAINER_SH);
+	makeflow_wrapper_add_input_file(CONTAINER_SH);
 }
 
 /*
@@ -774,7 +774,7 @@ Find all jobs ready to be run, then submit them.
 static void makeflow_dispatch_ready_jobs(struct dag *d)
 {
 	struct dag_node *n;
-  
+
 	for(n = d->nodes; n; n = n->next) {
 
 		if(dag_remote_jobs_running(d) >= remote_jobs_max && dag_local_jobs_running(d) >= local_jobs_max)
@@ -810,7 +810,7 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 			file_created = 1;
 			break;
 		}
-		
+
 		if(file_creation_patience_wait_time > 0 && time(0) - start_check < file_creation_patience_wait_time) {
 			/* Failed to see the file. Sleep and try again. */
 			debug(D_MAKEFLOW_RUN, "Checking again for file %s.\n", f->filename);
@@ -1182,8 +1182,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WRAPPER_OUTPUT,
-        LONG_OPT_DOCKER,
-        LONG_OPT_DOCKER_TAR
+		LONG_OPT_DOCKER,
+		LONG_OPT_DOCKER_TAR
 	};
 
 	static struct option long_options_run[] = {
@@ -1451,12 +1451,12 @@ int main(int argc, char *argv[])
 				makeflow_wrapper_add_output_file(optarg);
 				break;
 			case LONG_OPT_DOCKER:
-				container_mode = CONTAINER_MODE_DOCKER; 
+				container_mode = CONTAINER_MODE_DOCKER;
 				container_image = xxstrdup(optarg);
 				break;
-            case LONG_OPT_DOCKER_TAR:
-                image_tar = xxstrdup(optarg);
-                break;
+			case LONG_OPT_DOCKER_TAR:
+				image_tar = xxstrdup(optarg);
+				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -1637,7 +1637,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Remote storage modes do not (yet) support measuring storage for garbage collection. */
-	
+
 	if(batch_queue_type==BATCH_QUEUE_TYPE_CHIRP || batch_queue_type==BATCH_QUEUE_TYPE_HADOOP) {
 		if(makeflow_gc_method == MAKEFLOW_GC_ON_DEMAND) {
 			makeflow_gc_method = MAKEFLOW_GC_REF_COUNT;
@@ -1688,17 +1688,17 @@ int main(int argc, char *argv[])
 
 	runtime = timestamp_get();
 
-    if (container_mode == CONTAINER_MODE_DOCKER) {
-    
-    /* 1) create a global script for running docker container
-     * 2) add this script to the global wrapper list
-     * 3) reformat each task command
-     */
-       
-        makeflow_create_docker_sh();
-        char *global_cmd = string_format("sh %s", CONTAINER_SH);        
-        makeflow_wrapper_add_command(global_cmd);
-    }
+	if (container_mode == CONTAINER_MODE_DOCKER) {
+
+	/* 1) create a global script for running docker container
+	 * 2) add this script to the global wrapper list
+	 * 3) reformat each task command
+	 */
+
+		makeflow_create_docker_sh();
+		char *global_cmd = string_format("sh %s", CONTAINER_SH);
+		makeflow_wrapper_add_command(global_cmd);
+	}
 
 	makeflow_run(d);
 	time_completed = timestamp_get();

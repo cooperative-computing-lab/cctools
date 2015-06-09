@@ -64,7 +64,7 @@ resident_memory:           [maximum resident size across all processes, in MB,  
 swap_memory:               [maximum swap usage across all processes, in MB,       int]
 bytes_read:                [number of bytes read from disk,                       int]
 bytes_written:             [number of bytes written to disk,                      int]
-workdir_num_files:         [total maximum number of files and directories of 
+workdir_num_files:         [total maximum number of files and directories of
                             all the working directories in the tree,              int]
 workdir_footprint:         [size in MB of all working directories in the tree,    int]
 LONGCODE_END
@@ -74,10 +74,10 @@ The time-series log has a row per time sample. For each row, the columns have th
 LONGCODE_BEGIN
 wall_clock                [the sample time, since the epoch, in microseconds,      int]
 cpu_time                  [accumulated user + kernel time, in microseconds,        int]
-concurrent                [concurrent processes at the time of the sample,         int] 
+concurrent                [concurrent processes at the time of the sample,         int]
 virtual                   [current virtual memory size, in MB,                     int]
-resident                  [current resident memory size, in MB,                    int]   
-swap                      [current swap usage, in MB,                              int]   
+resident                  [current resident memory size, in MB,                    int]
+swap                      [current swap usage, in MB,                              int]
 bytes_read                [accumulated number of bytes read,                       int]
 bytes_written             [accumulated number of bytes written,                    int]
 files                     [current number of files and directories, across all
@@ -116,10 +116,10 @@ LONGCODE_END
 It may contain any of the following fields, in the same units as
 defined for the summary file:
 
-CODE(max_concurrent_processes), 
+CODE(max_concurrent_processes),
 CODE(`wall_time, cpu_time'),
-CODE(`virtual_memory, resident_memory, swap_memory'), 
-CODE(`bytes_read, bytes_written'), 
+CODE(`virtual_memory, resident_memory, swap_memory'),
+CODE(`bytes_read, bytes_written'),
 CODE(`workdir_number_files_dirs, workdir_footprint')
 
 SECTION(ENVIRONMENT VARIABLES)
@@ -172,4 +172,3 @@ SECTION(COPYRIGHT)
 COPYRIGHT_BOILERPLATE
 
 FOOTER
-

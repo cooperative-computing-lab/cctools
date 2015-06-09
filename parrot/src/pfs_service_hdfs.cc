@@ -125,7 +125,7 @@ public:
 				is_initialized = true;
 				result = 0;
 			}
-                }
+				}
 
 		HDFS_END
 	}

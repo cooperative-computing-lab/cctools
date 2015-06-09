@@ -244,4 +244,3 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode 
 		}
 	}
 }
-

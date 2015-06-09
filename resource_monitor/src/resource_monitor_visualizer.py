@@ -158,9 +158,9 @@ def fill_histogram_template(max_sorted, width, height, image_path, binwidth, res
 
   result += "set xtics out nomirror scale 1\n"
   result += "set xtics (floor(min_x), ceil(max_x))\n"
-  #result += "set xtics (" 
+  #result += "set xtics ("
   #result += ', '.join(['"" %.1f' % x for x in max_sorted])
-  #result += ")\n" 
+  #result += ")\n"
 
   result += "set xlabel \"" + resource_name.replace('_', ' ')
   if unit != " ":
@@ -246,7 +246,7 @@ def compute_binwidth(maximum_value):
 
 def compute_binwidth_iqr(maximums):
   n  = len(maximums) - 1
-  q1 = maximums[int(math.ceil(n / 4.0))] 
+  q1 = maximums[int(math.ceil(n / 4.0))]
   q3 = maximums[int(math.floor(3*n / 4.0))]
 
   if(q1 >= q3):
@@ -577,7 +577,7 @@ def main():
       create_aggregate_plots(resources, resource_units, workspace, destination_directory)
 
     create_main_page(groups.keys(), name, resources, resource_units, destination_directory, hist_small_width, hist_small_height, aggregate_height, aggregate_width, time_series_exist)
-    
+
     lib_static_home = os.path.normpath(os.path.join(visualizer_home, 'lib/resource_monitor_visualizer_static'))
     os.system("cp -r " + lib_static_home + "/* " + destination_directory)
 
@@ -588,4 +588,3 @@ def main():
 
 if __name__ == "__main__":
   main()
-

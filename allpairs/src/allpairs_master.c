@@ -328,13 +328,13 @@ int main(int argc, char **argv)
 		{"estimated-time", required_argument, 0, 't'},
 		{"priority", required_argument, 0, 'P'},
 		{"symmetric", no_argument, 0, LONG_OPT_SYMMETRIC},
-        {0,0,0,0}
+		{0,0,0,0}
 	};
 
 
 	while((c = getopt_long(argc, argv, "ad:e:f:hN:p:P:t:vx:y:Z:O:o:s:", long_options, NULL)) >= 0) {
 		switch (c) {
-	    case 'a':
+		case 'a':
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'd':

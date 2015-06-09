@@ -14,4 +14,3 @@ sudo port install ndcctools
 
 Updates to the Portfile should be submitted as a port enhancement using the rules from the following website:
 https://guide.macports.org/chunked/project.contributing.html
-

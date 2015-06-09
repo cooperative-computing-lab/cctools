@@ -2,7 +2,7 @@ include(manual.h)dnl
 HEADER(allpairs_multicore)
 
 SECTION(NAME)
-BOLD(allpairs_multicore) - executes All-Pairs workflow in parallel on a multicore machine 
+BOLD(allpairs_multicore) - executes All-Pairs workflow in parallel on a multicore machine
 
 SECTION(SYNOPSIS)
 CODE(BOLD(allparis_multicore [options] PARAM(set A) PARAM(set B) PARAM(compare function)))
@@ -14,7 +14,7 @@ BOLD(allpairs_multicore) computes the Cartesian product of two sets
 M[i,j] contains the output of the function F (BOLD(PARAM(compare function))) on
 objects A[i] (an item in BOLD(PARAM(set A))) and B[j] (an item in
 BOLD(PARAM(set B))). The resulting matrix is displayed on the standard output,
-one comparison result per line along with the associated X and Y indices. 
+one comparison result per line along with the associated X and Y indices.
 PARA
 For large sets of objects, BOLD(allpairs_multicore) will use as many cores as
 you have available, and will carefully manage virtual memory to exploit
@@ -43,14 +43,14 @@ Let's suppose you have a whole lot of files that you want to compare all to
 each other, named CODE(a), CODE(b), CODE(c), and so on. Suppose that you also
 have a program named BOLD(CODE(compareit)) that when invoked as CODE(compareit a b)
 will compare files CODE(a) and CODE(b) and produce some output summarizing the
-difference between the two, like this: 
+difference between the two, like this:
 
 LONGCODE_BEGIN
  a b are 45 percent similar
 LONGCODE_END
 
 To use the allpairs framework, create a file called CODE(set.list) that lists each of
-your files, one per line: 
+your files, one per line:
 
 LONGCODE_BEGIN
  a
@@ -67,7 +67,7 @@ LONGCODE_END
 
 The framework will carry out all possible comparisons of the objects, and print
 the results one by one (note that the first two columns are X and Y indices in
-the resulting matrix): 
+the resulting matrix):
 
 LONGCODE_BEGIN
  1	1	a a are 100 percent similar

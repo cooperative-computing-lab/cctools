@@ -15,7 +15,7 @@ void show_help( const char *cmd )
 {
 	printf("Usage: %s [options]\n",cmd);
 	printf("Where options are:\n");
-     	printf("-Z <file>  Write listening port to this file.\n");
+		printf("-Z <file>  Write listening port to this file.\n");
 	printf("-p <port>  Listen on this port.\n");
 	printf("-N <name>  Advertise this project name.\n");
 	printf("-d <flag>  Enable debugging for this subsystem.\n");
@@ -85,4 +85,3 @@ int main(int argc, char *argv[])
 
 	return result;
 }
-

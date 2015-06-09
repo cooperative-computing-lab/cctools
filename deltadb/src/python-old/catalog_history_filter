@@ -145,14 +145,14 @@ if dynamic==0:
   for line in sys.stdin:
     line = line.strip()
     prevLines.append(line) #used for debugging bad lines
-      
+
     if checkpoint_done==0:
       # Read in checkpoint data
       line = line.strip()
       if line.__len__() <= 0:
         if blankLine:
           checkpoint_done = 1
-          
+
           for host in checkPoint:
             for key in checkPoint[host]:
               print key+' '+checkPoint[host][key]
@@ -178,7 +178,7 @@ if dynamic==0:
           lastHost = None
           include = 0
         blankLine = 1
-        
+
       else:
         blankLine = 0
         try:
@@ -188,22 +188,22 @@ if dynamic==0:
         except ValueError:
           sys.stderr.write("Error on line containing: "+line+"\n")
           sys.stderr.write(str(prevLines)+"\n")
-      
-    
+
+
     else:
       # Read in log data
       #print "================================="+line+"==============================="
       res = line.split(' ')
       format = res.pop(0)
       ignoreS = 1
-      
+
       # Timestamp for any proceeding events
       if format == 'T' and res.__len__()>=1:
         flushEventLog()
         time = res.pop(0)
         logTime = int(time)
         eventLog.append(line)
-        
+
       # Create a new host series
       elif format == 'C' and res.__len__()>=1:
         key = res.pop(0)
@@ -212,13 +212,13 @@ if dynamic==0:
           checkPoint[lastHost] = {'key':lastHost}
           ignoreS = 0
         createTmp = [line]
-        
+
       # Delete entire host series
       elif format == 'D' and res.__len__()>=1:
         host = res.pop(0)
         if host in checkPoint:
           eventLog.append(line)
-          
+
       # Update a single field
       elif format == 'U' and res.__len__()>=3:
         host = res.pop(0)
@@ -227,16 +227,16 @@ if dynamic==0:
 
         if host in checkPoint:
           eventLog.append(line)
-          
-           
+
+
       # Record removal of a single field
       elif format == 'R' and res.__len__()>=2:
         host = res.pop(0)
         if host in checkPoint:
           eventLog.append(line)
-          
+
       elif lastHost is not None:
-        
+
         if res.__len__() > 0 or format.__len__()>0:
           createTmp.append(line)
           field = format
@@ -250,15 +250,15 @@ if dynamic==0:
               eventLog.append(line)
             eventLog.append("")
             createTmp = None
-        
+
       else:
         logError("v-----------------Error on last line below ("+str(logTime)+")----------------")
         logError('\n'.join(prevLines))
         logError("^------------------------------End of error------------------------------")
-        
+
       if prevLines.__len__()>20:
         prevLines.pop(0)
-      
+
 
 
 
@@ -284,7 +284,7 @@ else: #Dynamic==1
       if line.__len__() <= 0:
         if blankLine:
           checkpoint_done = 1
-        else: 
+        else:
           lastHost = seriesTmp["key"]
           if ignore==0:
             checkPoint[lastHost] = seriesTmp
@@ -296,14 +296,14 @@ else: #Dynamic==1
           lastHost = None
           ignore = 0
         blankLine = 1
-        
+
       else:
         blankLine = 0
         key, value = line.split(' ',1)
         ignore += shouldBeIgnored(key,value)
         seriesTmp[key] = value
-      
-    
+
+
     else:
       # Read in log data
       prevLines.append(line) #used for debugging bad lines
@@ -311,7 +311,7 @@ else: #Dynamic==1
       res = line.split(' ')
       format = res.pop(0)
       ignore = 0
-      
+
       # Timestamp for any proceeding events
       if format == 'T' and res.__len__()>=1:
         time = res.pop(0)
@@ -364,14 +364,14 @@ else: #Dynamic==1
               #eventLog.append(line)
           else:
             ignore = 1
-            
-          
-          
+
+
+
         else:
           logError("v-------------Ignoring update for non-existant host series------------")
           logError(line)
           logError("^----------Perhaps the host was deleted and is still reporting--------")
-           
+
       # Record removal of a single field
       elif format == 'R' and res.__len__()>=2:
         host = res.pop(0)
@@ -383,11 +383,11 @@ else: #Dynamic==1
         else:
           ignore = 1
       elif lastHost is not None:
-        
+
         if res.__len__() > 0 or format.__len__()>0:
           if lastHost in status:
             if 'creation' in status[lastHost]:
-              createTmp.append(line) 
+              createTmp.append(line)
               field = format
               value = " ".join(res)
               if shouldBeIgnored(field,value):
@@ -396,7 +396,7 @@ else: #Dynamic==1
                 if lastHost in checkPoint:
                   del checkPoint[lastHost]
                 createTmp.append(line)
-              
+
             else:
               ignore = 1
           else:
@@ -411,15 +411,15 @@ else: #Dynamic==1
               eventLog.append("")
               createTmp = []
         ignore = 1
-        
+
       else:
         logError("v-----------------Error on last line below ("+str(logTime)+")----------------")
         logError('\n'.join(prevLines))
         logError("^------------------------------End of error------------------------------")
-        
+
       if prevLines.__len__()>20:
         prevLines.pop(0)
-      
+
       if ignore==0:
         eventLog.append(line)
 
@@ -441,7 +441,3 @@ else: #Dynamic==1
         print timeLine
         timeLine = None
       print line
-
-
-
-

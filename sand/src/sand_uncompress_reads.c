@@ -16,8 +16,8 @@ See the file COPYING for details.
 
 static void show_help(const char *cmd)
 {
-        printf("Use: %s [options]  compressed_reads > fasta_reads\n", cmd);
-        printf("where options are:\n");
+		printf("Use: %s [options]  compressed_reads > fasta_reads\n", cmd);
+		printf("where options are:\n");
 	printf(" -q  Quiet mode: suppress summary line.\n");
 	printf(" -v  Show version string.\n");
 	printf(" -h  Show this help screen\n");
@@ -33,8 +33,8 @@ int main(int argc, char ** argv)
 	int quiet_mode = 0;
 	int count = 0;
 
-        while((d=getopt(argc,argv,"qhi")) > -1) {
-                switch(d) {
+		while((d=getopt(argc,argv,"qhi")) > -1) {
+				switch(d) {
 		case 'q':
 			quiet_mode = 1;
 			break;
@@ -42,13 +42,13 @@ int main(int argc, char ** argv)
 			cctools_version_print(stdout, progname);
 			exit(0);
 			break;
-                case 'h':
+				case 'h':
 		default:
-                        show_help(progname);
-                        exit(0);
-                        break;
-                }
-        }
+						show_help(progname);
+						exit(0);
+						break;
+				}
+		}
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 

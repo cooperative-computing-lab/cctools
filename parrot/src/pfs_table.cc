@@ -99,7 +99,7 @@ pfs_table::pfs_table()
 	for( i=0; i<pointer_count; i++ ) {
 		pointers[i] = 0;
 		fd_flags[i] = 0;
-  	}
+	}
 }
 
 pfs_table::~pfs_table()
@@ -434,7 +434,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 	size_t n;
 
 	if (depth > PFS_MAX_RESOLVE_DEPTH)
-	    return errno = ELOOP, 0;
+		return errno = ELOOP, 0;
 
 	if(strlen(cname) == 0)
 		return errno = ENOENT, 0;
@@ -521,7 +521,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 
 		/* Enable cross service symlink resolution */
 		if (do_follow_symlink && pfs_follow_symlinks) {
-		    follow_symlink(pname, depth + 1);
+			follow_symlink(pname, depth + 1);
 		}
 		return 1;
 	}
@@ -535,12 +535,12 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 
 	// Hack: Disable caching when doing plain old file copies.
 
-        if(
-                !strcmp(pfs_current->name,"cp") ||
-                !strcmp(string_back(pfs_current->name,3),"/cp")
-        ) {
-                force_stream = 1;
-        }
+		if(
+				!strcmp(pfs_current->name,"cp") ||
+				!strcmp(string_back(pfs_current->name,3),"/cp")
+		) {
+				force_stream = 1;
+		}
 
 	// Hack: Almost all calls to open a directory are routed
 	// through opendir(), which sets O_DIRECTORY.  In a few
@@ -1635,7 +1635,7 @@ static int search_to_access (int flags)
 		access_flags |= W_OK;
 	if (flags & PFS_SEARCH_X_OK)
 		access_flags |= X_OK;
-    return access_flags;
+	return access_flags;
 }
 
 static int search_error (int err, int errsource, char *path, char *buffer, size_t *i, size_t len) {

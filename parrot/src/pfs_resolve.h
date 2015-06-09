@@ -24,4 +24,3 @@ void pfs_resolve_manual_config( const char *string );
 pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, time_t stoptime );
 
 #endif
-

@@ -12,9 +12,9 @@ See the file COPYING for details.
 #include <string.h>
 
 /** @file buffer.h String Buffer Operations.
-    You can use the buffer in the same way you would print to a file. Use the
-    buffer to do formatted printing. When you are done retrieve the final
-    string using buffer_tostring.
+	You can use the buffer in the same way you would print to a file. Use the
+	buffer to do formatted printing. When you are done retrieve the final
+	string using buffer_tostring.
 */
 
 #if !(defined(__GNUC__) || defined(__clang__)) && !defined(__attribute__)
@@ -45,7 +45,7 @@ typedef struct buffer {
 	ever allocated on the heap. You can specify a larger starting buffer if
 	this is inadequate.
 
-    @param b The buffer to initialize.
+	@param b The buffer to initialize.
   */
 void buffer_init(buffer_t * b);
 
@@ -55,119 +55,119 @@ void buffer_init(buffer_t * b);
 	The user buffer is only used if it is larger than the internal starting
 	buffer.
 
-    @param b   The buffer.
-    @param buf A starting buffer to initially use to avoid allocating memory on the heap. (can be NULL)
-    @param len The length of the buffer. (ignored if buf == NULL)
+	@param b   The buffer.
+	@param buf A starting buffer to initially use to avoid allocating memory on the heap. (can be NULL)
+	@param len The length of the buffer. (ignored if buf == NULL)
   */
 void buffer_ubuf(buffer_t * b, char *buf, size_t len);
 
 /** Set the maximum size of the buffer.
 
-    @param b   The buffer.
-    @param max The maximum amount of memory to allocate. (0 is unlimited)
+	@param b   The buffer.
+	@param max The maximum amount of memory to allocate. (0 is unlimited)
   */
 void buffer_max(buffer_t * b, size_t max);
 
 /** Set the buffer to call fatal(...) on error instead of returning an error code.
 
-    @param b                The buffer.
-    @param abortonfailure   Kill the process on errors. (you no longer have to check returns)
+	@param b                The buffer.
+	@param abortonfailure   Kill the process on errors. (you no longer have to check returns)
   */
 void buffer_abortonfailure(buffer_t * b, int abortonfailure);
 
 /** Free any resources and memory in use by a buffer.
-    @param b The buffer to free.
+	@param b The buffer to free.
   */
 void buffer_free(buffer_t * b);
 
 /** Make a heap allocated copy of the buffer.
-    @param b The buffer to copy.
-    @param buf A place to store the copy pointer.
-    @param l The length of the string.
-    @return -1 on error.
+	@param b The buffer to copy.
+	@param buf A place to store the copy pointer.
+	@param l The length of the string.
+	@return -1 on error.
   */
 int buffer_dupl(buffer_t *b, char **buf, size_t *l);
 
 /** Make a heap allocated copy of the buffer.
-    @param b The buffer to copy.
-    @param buf A place to store the copy pointer.
-    @return -1 on error.
+	@param b The buffer to copy.
+	@param buf A place to store the copy pointer.
+	@return -1 on error.
   */
 #define buffer_dup(b,buf) (buffer_dupl(b,buf,NULL))
 
 /** Print the formatted output to the buffer. The format string follows the
-    same semantics as the UNIX vprintf function. buffer_putvfstring does not call
-    the variable argument macros va_(start|end) on ap.
-    @param b The buffer to fill.
-    @param format The format string.
-    @param ap The variable argument list for the format string.
-    @return bytes added (excluding NUL) or -1 on error.
+	same semantics as the UNIX vprintf function. buffer_putvfstring does not call
+	the variable argument macros va_(start|end) on ap.
+	@param b The buffer to fill.
+	@param format The format string.
+	@param ap The variable argument list for the format string.
+	@return bytes added (excluding NUL) or -1 on error.
   */
 
 int buffer_putvfstring(buffer_t * b, const char *format, va_list ap);
 #define buffer_vprintf buffer_putvfstring
 
 /** Appends the formatted output to the buffer. The format string follows the
-    same semantics as the UNIX vprintf function.
-    @param b The buffer to fill.
-    @param format The format string.
-    @param ... The variable arguments for the format string.
-    @return bytes added (excluding NUL) or -1 on error.
+	same semantics as the UNIX vprintf function.
+	@param b The buffer to fill.
+	@param format The format string.
+	@param ... The variable arguments for the format string.
+	@return bytes added (excluding NUL) or -1 on error.
   */
 int buffer_putfstring(buffer_t * b, const char *format, ...)
 __attribute__ (( format(printf,2,3) )) ;
 #define buffer_printf buffer_putfstring
 
 /** Appends the string to the end of the buffer.
-    @param b The buffer to fill.
-    @param str The string to append.
-    @param len The length of the string.
-    @return bytes added (excluding NUL) or -1 on error.
+	@param b The buffer to fill.
+	@param str The string to append.
+	@param len The length of the string.
+	@return bytes added (excluding NUL) or -1 on error.
   */
 int buffer_putlstring(buffer_t * b, const char *str, size_t len);
 
 /** Appends the string to the end of the buffer. Length derived via strlen.
-    @param b The buffer to fill.
-    @param s The string to append.
-    @return bytes added (excluding NUL) or -1 on error.
+	@param b The buffer to fill.
+	@param s The string to append.
+	@return bytes added (excluding NUL) or -1 on error.
   */
 #define buffer_putstring(b,s)  (buffer_putlstring(b,s,strlen(s)))
 
 /** Appends the string literal to the end of the buffer. Length derived via sizeof.
-    @param b The buffer to fill.
-    @param l The literal string to append.
-    @return bytes added (excluding NUL) or -1 on error.
+	@param b The buffer to fill.
+	@param l The literal string to append.
+	@return bytes added (excluding NUL) or -1 on error.
   */
 #define buffer_putliteral(b,l)  (buffer_putlstring(b,l "",sizeof(l)-1))
 
 /** Returns the buffer as a string. The string is no longer valid after
-    deleting the buffer. A final ASCII NUL character is guaranteed to terminate
-    the string.
-    @param b The buffer.
-    @param size The size of the string is placed in this variable. Can be NULL.
-    @return The buffer as a string with a NUL terminator.
+	deleting the buffer. A final ASCII NUL character is guaranteed to terminate
+	the string.
+	@param b The buffer.
+	@param size The size of the string is placed in this variable. Can be NULL.
+	@return The buffer as a string with a NUL terminator.
   */
 const char *buffer_tolstring(buffer_t * b, size_t * size);
 
 /** Returns the buffer as a string. The string is no longer valid after
-    deleting the buffer. A final ASCII NUL character is guaranteed to terminate
-    the string.
-    @param b The buffer.
-    @return The buffer as a string with a NUL terminator.
+	deleting the buffer. A final ASCII NUL character is guaranteed to terminate
+	the string.
+	@param b The buffer.
+	@return The buffer as a string with a NUL terminator.
   */
 #define buffer_tostring(b) buffer_tolstring(b, NULL)
 
 /** Rewinds the buffer to position n.
 
-    @param b The buffer.
-    @param n The position to rewind to.
+	@param b The buffer.
+	@param n The position to rewind to.
   */
 void buffer_rewind(buffer_t * b, size_t n);
 
 /** Get the current position in the buffer.
 
-    @param b The buffer.
-    @return The current position.
+	@param b The buffer.
+	@return The current position.
   */
 size_t buffer_pos(buffer_t * b);
 
@@ -178,8 +178,8 @@ size_t buffer_pos(buffer_t * b);
 	buffer_free(name) because nothing is ever allocated on the heap. This is
 	defined as a macro.
 
-    @param name The name of the buffer.
-    @param size The maximum size of the buffer.
+	@param name The name of the buffer.
+	@param size The maximum size of the buffer.
   */
 #define BUFFER_STACK(name,size) \
 	buffer_t name;\
@@ -192,8 +192,8 @@ size_t buffer_pos(buffer_t * b);
 	This works the same as BUFFER_STACK but also sets the abort flag on the
 	buffer. This is defined as a macro.
 
-    @param name The name of the buffer.
-    @param size The maximum size of the buffer.
+	@param name The name of the buffer.
+	@param size The maximum size of the buffer.
   */
 #define BUFFER_STACK_ABORT(name,size) \
 	BUFFER_STACK(name,size);\
@@ -203,8 +203,8 @@ size_t buffer_pos(buffer_t * b);
 	This macro uses BUFFER_STACK to allocate the buffer. Variable arguments
 	are passed to buffer_putfstring, starting with the format string.
 
-    @param name The name of the buffer.
-    @param size The maximum size of the buffer.
+	@param name The name of the buffer.
+	@param size The maximum size of the buffer.
   */
 #define BUFFER_STACK_PRINT(name,size,...) \
 	BUFFER_STACK(name,size);\

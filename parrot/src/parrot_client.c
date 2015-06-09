@@ -123,7 +123,7 @@ SEARCH *parrot_opensearch( const char *path, const char *pattern, int flags)
 	} while (err==-1 && errno==ERANGE);
 
 	if (err==-1) return NULL;
-        if (err==0) *buffer = '\0';
+		if (err==0) *buffer = '\0';
 
 	SEARCH *result = malloc(sizeof(SEARCH));
 	result->entry = (struct searchent*) malloc(sizeof(struct searchent));
@@ -218,9 +218,9 @@ struct searchent *parrot_readsearch(SEARCH *search) {
 }
 
 int parrot_closesearch(SEARCH *search) {
-        free(search->entry);
-        free(search->data);
-        free(search);
+		free(search->entry);
+		free(search->data);
+		free(search);
 	return 0;
 }
 

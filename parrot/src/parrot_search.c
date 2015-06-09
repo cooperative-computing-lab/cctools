@@ -30,15 +30,15 @@ int main( int argc, char *argv[] )
 	int flags = 0;
 	signed char c;
 
-        while((c = getopt(argc, argv, "+smi")) > -1) {
-                switch (c) {
-                	case 's':
+		while((c = getopt(argc, argv, "+smi")) > -1) {
+				switch (c) {
+					case 's':
 				flags |= PFS_SEARCH_STOPATFIRST;
 				break;
-                	case 'i':
+					case 'i':
 				flags |= PFS_SEARCH_INCLUDEROOT;
 				break;
-                	case 'm':
+					case 'm':
 				flags |= PFS_SEARCH_METADATA;
 				break;
 		}

@@ -22,4 +22,3 @@ int s3_rm_file(char* filename, char* bucketname, const char* access_key_id, cons
 int s3_stat_file(char* filename, char* bucketname, struct s3_dirent_object *dirent, const char* access_key_id, const char* access_key);
 
 #endif
-

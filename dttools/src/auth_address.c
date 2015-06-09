@@ -57,7 +57,7 @@ static int auth_address_accept(struct link *link, char **subject, time_t stoptim
 	link_putliteral(link, "yes\n", stoptime);
 	return 1;
 
-      reject:
+	  reject:
 	link_putliteral(link, "no\n", stoptime);
 	return 0;
 }

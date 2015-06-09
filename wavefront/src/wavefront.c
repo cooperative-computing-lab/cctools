@@ -65,10 +65,10 @@ static double average_dispatch_time = 30.0;
 static double average_task_time = 1.0;
 
 struct wavefront_task {
-       int x;
-       int y;
-       int width;
-       int height;
+	   int x;
+	   int y;
+	   int width;
+	   int height;
 };
 
 struct wavefront_task * wavefront_task_create( int x, int y, int w, int h )
@@ -405,7 +405,7 @@ int main( int argc, char *argv[] )
 		{"local", no_argument, 0, 'L'},
 		{"batch-type", required_argument, 0, 'T'},
 		{"verify", no_argument, 0, 'V'},
-        {0,0,0,0}
+		{0,0,0,0}
 	};
 
 	while((c=getopt_long(argc,argv,"n:b:d:o:l:B:i:qALDT:VX:Y:vh", long_options, NULL)) > -1) {

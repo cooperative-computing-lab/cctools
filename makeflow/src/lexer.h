@@ -78,12 +78,12 @@ struct lexer
 	struct dag *d;                      /* The dag being built. */
 
 	struct dag_task_category *category; /* Indicates the category to which the rules belong. The
-					       idea is to have rules that perform similar tasks, or
-					       use about the same resources, to belong to the
-					       same category. task_category is updated every time the
-					       value of the variable described in the macro
-					       MAKEFLOW_TASK_CATEGORY is changed in the makeflow file.
-					    */
+						   idea is to have rules that perform similar tasks, or
+						   use about the same resources, to belong to the
+						   same category. task_category is updated every time the
+						   value of the variable described in the macro
+						   MAKEFLOW_TASK_CATEGORY is changed in the makeflow file.
+						*/
 
 	FILE  *stream;                  /* The file pointer the rules are been read. */
 	char *lexeme_end;
@@ -164,5 +164,3 @@ int lexer_preppend_token(struct lexer *lx, struct token *t);
 
 void lexer_delete(struct lexer *lx);
 void lexer_free_token(struct token *t);
-
-

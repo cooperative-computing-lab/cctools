@@ -40,7 +40,7 @@ run()
 
 clean()
 {
-	rm -f test.mf test.dot test.dot.expected 
+	rm -f test.mf test.dot test.dot.expected
 }
 
 dispatch $@

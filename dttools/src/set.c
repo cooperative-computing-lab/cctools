@@ -86,7 +86,7 @@ int set_lookup(struct set *s, void *element)
 	struct entry *e;
 	uint64_t index;
 
-    uintptr_t key = (uintptr_t) element;
+	uintptr_t key = (uintptr_t) element;
 
 	index = key % s->bucket_count;
 	e = s->buckets[index];
@@ -184,7 +184,7 @@ int set_remove(struct set *s, const void *element)
 	struct entry *e, *f;
 	uint64_t index;
 
-    uintptr_t key = (uintptr_t) element;
+	uintptr_t key = (uintptr_t) element;
 
 	index = key % s->bucket_count;
 	e = s->buckets[index];
@@ -211,16 +211,16 @@ int set_remove(struct set *s, const void *element)
 void *set_pop(struct set *s)
 {
   if( set_size(s) < 1 )
-    return 0;
+	return 0;
 
   void *element;
   set_first_element(s);
   element = set_next_element(s);
 
   if(!set_remove(s, element))
-    return 0;
+	return 0;
   else
-    return element;
+	return element;
 }
 
 void set_first_element(struct set *s)
@@ -235,7 +235,7 @@ void set_first_element(struct set *s)
 
 void *set_next_element(struct set *s)
 {
-    void *element;
+	void *element;
 
 	if(s->ientry) {
 		element = (void *) s->ientry->element;

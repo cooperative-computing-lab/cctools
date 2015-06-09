@@ -675,5 +675,3 @@ static int dag_parse_export(struct lexer *bk)
 }
 
 /* vim: set noexpandtab tabstop=4: */
-
-

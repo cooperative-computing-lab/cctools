@@ -10,35 +10,35 @@ SYS=`uname -m`
 
 detect_packages()
 {
-    unset GLOBUS_LOCATION
-    export GLOBUS_LOCATION
-    
-    echo "platform is ${SYS}"
+	unset GLOBUS_LOCATION
+	export GLOBUS_LOCATION
 
-    if [ -f /etc/redhat-release ]
-    then
-        major=`cat /etc/redhat-release | awk '{print $7'} | awk -F. '{print $1}'`
+	echo "platform is ${SYS}"
+
+	if [ -f /etc/redhat-release ]
+	then
+		major=`cat /etc/redhat-release | awk '{print $7'} | awk -F. '{print $1}'`
 	subtype=redhat$major
 	echo "subtype is $subtype"
-    fi
+	fi
 
-    echo "$0: Detecting packages ..."
+	echo "$0: Detecting packages ..."
 
-    PACKAGES_CONFIG=""
-    for package in fuse irods mysql python perl globus swig xrootd cvmfs uuid
-    do
+	PACKAGES_CONFIG=""
+	for package in fuse irods mysql python perl globus swig xrootd cvmfs uuid
+	do
 	packagepath=$EXTERNAL/${SYS}/$subtype/$package
 
 	if [ -d $packagepath ]
-        then
-            echo "$package -> $packagepath"
-            PACKAGES_CONFIG="$PACKAGES_CONFIG --with-$package-path $packagepath"
+		then
+			echo "$package -> $packagepath"
+			PACKAGES_CONFIG="$PACKAGES_CONFIG --with-$package-path $packagepath"
 	else
-            echo "$package -> NOTFOUND"
-        fi
-    done
+			echo "$package -> NOTFOUND"
+		fi
+	done
 
-    echo ""
+	echo ""
 }
 
 detect_packages

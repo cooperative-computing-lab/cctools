@@ -194,10 +194,10 @@ static void pfs_helper_init( void )
 static void show_help( const char *cmd )
 {
 		/* 80-column text marker */
-                /******************************************************************************/
+				/******************************************************************************/
 	printf( "Use: %s [options] <command> ...\n",cmd);
 	printf( "Where options and environment variables are:\n");
-	printf( " %-30s Check if the given driver is enabled and exit.\n","   --check-driver"); 
+	printf( " %-30s Check if the given driver is enabled and exit.\n","   --check-driver");
 	printf( " %-30s Use these Chirp authentication methods.   (PARROT_CHIRP_AUTH)\n", "-a,--chirp-auth=<list>");
 	printf( " %-30s Set the I/O block size hint.              (PARROT_BLOCK_SIZE)\n", "-b,--block-size=<bytes>");
 	printf( " %-30s Print exit status information to <file>.\n", "-c,--status-file=<file>");

@@ -27,4 +27,3 @@ void ast_redirect_print( FILE *file, struct ast_redirect *r  );
 void ast_word_print( FILE *file, struct ast_word *w );
 
 #endif
-

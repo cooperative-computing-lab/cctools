@@ -8,7 +8,7 @@ SECTION(SYNOPSIS)
 CODE(BOLD(work_queue_pool -M PARAM(project-name) -T PARAM(batch-type) [options]))
 
 SECTION(DESCRIPTION)
-BOLD(work_queue_pool) submits and maintains a number 
+BOLD(work_queue_pool) submits and maintains a number
 of MANPAGE(work_queue_worker,1) processes on various batch systems, such as
 Condor and SGE.  All the workers managed by a BOLD(work_queue_pool) process
 will be directed to work for a specific master, or any set of masters matching
@@ -109,4 +109,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_WORK_QUEUE
 
 FOOTER
-

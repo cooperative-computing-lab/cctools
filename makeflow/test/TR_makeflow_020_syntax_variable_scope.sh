@@ -7,9 +7,9 @@ test_output=`basename $0 .sh`.output
 
 prepare()
 {
-    mkdir $test_dir
-    cd $test_dir
-    ln -sf ../syntax/variable_scope.makeflow Makeflow
+	mkdir $test_dir
+	cd $test_dir
+	ln -sf ../syntax/variable_scope.makeflow Makeflow
 cat > ../$test_output <<EOF
 0
 1
@@ -17,7 +17,7 @@ cat > ../$test_output <<EOF
 0
 1
 EOF
-    exit 0
+	exit 0
 }
 
 run()
@@ -33,8 +33,8 @@ run()
 
 clean()
 {
-    rm -fr $test_dir $test_output
-    exit 0
+	rm -fr $test_dir $test_output
+	exit 0
 }
 
 dispatch $@

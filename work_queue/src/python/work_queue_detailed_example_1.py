@@ -44,7 +44,7 @@ for i in range(5):
 
     task.specify_tag(str(time.time()))
     print task.command, task.tag
-    
+
     task.specify_algorithm(WORK_QUEUE_SCHEDULE_FILES)
     print task.command, task.algorithm
 
@@ -91,7 +91,7 @@ while not wq.empty():
 	print t.total_bytes_transferred, t.total_transfer_time
 	print t.cmd_execution_time
 	print t.output
-    
+
     print wq.stats.workers_init, wq.stats.workers_ready, wq.stats.workers_busy, \
 	  wq.stats.tasks_running, wq.stats.tasks_waiting, wq.stats.tasks_complete
 

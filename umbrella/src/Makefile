@@ -1,8 +1,8 @@
 include ../../config.mk
 include ../../rules.mk
 
-EXTERNAL_DEPENDENCIES = 
-LIBRARIES = 
+EXTERNAL_DEPENDENCIES =
+LIBRARIES =
 OBJECTS =
 PROGRAMS = umbrella
 SCRIPTS =

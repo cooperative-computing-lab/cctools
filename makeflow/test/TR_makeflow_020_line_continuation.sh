@@ -4,19 +4,19 @@
 
 prepare()
 {
-    clean $@
+	clean $@
 }
 
 run()
 {
-    cd syntax && ../../src/makeflow line_continuation.makeflow && exit 0
-    exit 1
+	cd syntax && ../../src/makeflow line_continuation.makeflow && exit 0
+	exit 1
 }
 
 clean()
 {
-    cd syntax; ../../src/makeflow -c line_continuation.makeflow && exit 0
-    exit 1
+	cd syntax; ../../src/makeflow -c line_continuation.makeflow && exit 0
+	exit 1
 }
 
 dispatch $@

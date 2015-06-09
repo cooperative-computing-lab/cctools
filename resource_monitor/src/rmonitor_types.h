@@ -94,8 +94,8 @@ struct filesys_info
 	struct statfs   disk_initial;    // Result of the first time we call statfs.
 
 	int initial_loaded_flag;         // Flag to indicate whether statfs has been called
-	                                 // already on this fs (that is, whether disk_initial
-	                                 // has a valid value).
+									 // already on this fs (that is, whether disk_initial
+									 // has a valid value).
 };
 
 struct process_info

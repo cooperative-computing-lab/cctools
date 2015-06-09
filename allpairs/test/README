@@ -9,4 +9,3 @@ TR_allpairs_bitwise.sh
 Compare the source of allpairs with the hard coded BITWISE function.
 This test could be better, since we only count the number of lines
 generated.
-

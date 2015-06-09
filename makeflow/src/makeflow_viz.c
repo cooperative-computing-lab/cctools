@@ -49,22 +49,22 @@ See the file COPYING for details.
 
 /* Display options */
 enum {
-       SHOW_DAG_DOT,
-       SHOW_DAG_PPM,
-       SHOW_DAG_CYTO,
-       SHOW_DAG_DAX
+	   SHOW_DAG_DOT,
+	   SHOW_DAG_PPM,
+	   SHOW_DAG_CYTO,
+	   SHOW_DAG_DAX
 };
 
 /* Unique integers for long options. */
 
 enum { LONG_OPT_PPM_ROW,
-       LONG_OPT_PPM_FILE,
-       LONG_OPT_PPM_EXE,
-       LONG_OPT_PPM_LEVELS,
-       LONG_OPT_DOT_PROPORTIONAL,
-       LONG_OPT_DOT_CONDENSE,
-       LONG_OPT_DOT_LABELS,
-       LONG_OPT_DOT_NO_LABELS
+	   LONG_OPT_PPM_FILE,
+	   LONG_OPT_PPM_EXE,
+	   LONG_OPT_PPM_LEVELS,
+	   LONG_OPT_DOT_PROPORTIONAL,
+	   LONG_OPT_DOT_CONDENSE,
+	   LONG_OPT_DOT_LABELS,
+	   LONG_OPT_DOT_NO_LABELS
 };
 
 static void show_help_viz(const char *cmd)

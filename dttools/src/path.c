@@ -33,7 +33,7 @@ void path_absolute (const char *src, char *dest, int exist)
 			if (mkdir(src, S_IRUSR|S_IWUSR) == -1) {
 				fatal("generating absolute path to `%s': %s", src, strerror(errno));
 			}
-            created = 1;
+			created = 1;
 		} else {
 			fatal("could not resolve path `%s': %s", src, strerror(errno));
 		}
@@ -41,10 +41,10 @@ void path_absolute (const char *src, char *dest, int exist)
 	if (realpath(src, dest) == NULL) {
 		fatal("could not resolve path `%s': %s", src, strerror(errno));
 	}
-    if (created) {
+	if (created) {
 		if (rmdir(src) == -1)
 			fatal("could not delete temporary dir `%s': %s", src, strerror(errno));
-    }
+	}
 }
 
 /* The interface here is actually bad. A typical basename implementation should

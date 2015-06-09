@@ -108,11 +108,11 @@ h1:hover .sectionlink, h2:hover .sectionlink, h3:hover .sectionlink, h4:hover .s
   padding: 10px;
 }
 .man {
-    font-weight: bold;
-    font-family: monospace;
+	font-weight: bold;
+	font-family: monospace;
 }
 img.center {
-    display: block;
-    margin-left: auto;
-    margin-right: auto
+	display: block;
+	margin-left: auto;
+	margin-right: auto
 }

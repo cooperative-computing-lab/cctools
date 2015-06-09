@@ -65,7 +65,7 @@ output_err = "output_err"
 
 # CREATE TMP AND MOVE FILES IN
 
-	
+
 shutil.copyfile(options.pwfile, "./mypwfile")
 
 os.symlink(cctools_dir+"/apps/makeflow_bwa/makeflow_bwa", "./makeflow_bwa")
@@ -84,11 +84,11 @@ if options.rfastq:
 	os.symlink(options.rfastq, "./rfastq.fq")
 	inputs += "--rfastq rfastq.fq "
 
-os.system('python ./makeflow_bwa --algoalign bwa_backtrack ' + inputs + 
+os.system('python ./makeflow_bwa --algoalign bwa_backtrack ' + inputs +
 	  '--makeflow ' +  makeflow + ' --output_SAM ' + output_sam +' '+ ' '.join(args))
 
-os.system(cctools_dir+'/bin/makeflow ' 
-	  ' -T wq -N ' + wq_project_name + ' -J 50 -p 0 -l ' + makeflow_log + 
+os.system(cctools_dir+'/bin/makeflow '
+	  ' -T wq -N ' + wq_project_name + ' -J 50 -p 0 -l ' + makeflow_log +
 	  ' -L '+wq_log+' -d all -o ' + debug_log+" --password mypwfile >&1 2>&1 ")
 
 if options.dblog:
@@ -102,7 +102,7 @@ if options.wqlog:
 
 shutil.copyfile(output_sam, options.outsam)
 
-os.system(cctools_dir+'/bin/makeflow -c') 
+os.system(cctools_dir+'/bin/makeflow -c')
 os.remove("./reference.fa")
 os.remove("./fastq.fq")
 os.remove("./makeflow_bwa")

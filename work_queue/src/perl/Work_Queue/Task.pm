@@ -18,335 +18,335 @@ use Carp qw(croak);
 our $VERSION = 4.3.0;
 
 sub Work_Queue::Task::new {
-    my ($class, $command) = @_;
-    my $_task = work_queue_task_create($command);
-    
-    croak "Could not create task." unless $_task;
-    
-    return bless {_task => $_task}, $class;
+	my ($class, $command) = @_;
+	my $_task = work_queue_task_create($command);
+
+	croak "Could not create task." unless $_task;
+
+	return bless {_task => $_task}, $class;
 }
 
 sub DESTROY {
-    my $self = shift;
+	my $self = shift;
 
-    my $id = eval { $self->id };
-    if(!$@) {
+	my $id = eval { $self->id };
+	if(!$@) {
 	# Ignore possible message in global cleanup.
 	eval { work_queue_task_delete($self->{_task}) };
-    }
+	}
 }
 
 sub _determine_file_flags {
-    my ($flags, $cache) = @_;
+	my ($flags, $cache) = @_;
 
-    $flags //= $WORK_QUEUE_CACHE;
-    if($cache) {
+	$flags //= $WORK_QUEUE_CACHE;
+	if($cache) {
 	$flags |= $WORK_QUEUE_CACHE;
-    } else {
+	} else {
 	$flags &= ~$WORK_QUEUE_CACHE;
-    }
-    
-    return $flags;
+	}
+
+	return $flags;
 }
 
 sub specify_tag {
-    my ($self, $tag) = @_;
-    return work_queue_task_specify_tag($self->{_task}, $tag);;
+	my ($self, $tag) = @_;
+	return work_queue_task_specify_tag($self->{_task}, $tag);;
 }
 
 sub clone {
-    my ($self) = @_;
-    my $copy = $self;
-    
-    $copy->{_task} = work_queue_task_clone($self->{_task});
+	my ($self) = @_;
+	my $copy = $self;
 
-    return $copy;
+	$copy->{_task} = work_queue_task_clone($self->{_task});
+
+	return $copy;
 }
 
 sub specify_command {
-    my ($self) = @_;
-    return work_queue_task_specify_command($self->{_task});;
+	my ($self) = @_;
+	return work_queue_task_specify_command($self->{_task});;
 }
 
 sub specify_algorithm {
-    my ($self, $algorithm) = @_;
-    return work_queue_task_specify_algorithm($self->{_task}, $algorithm);
+	my ($self, $algorithm) = @_;
+	return work_queue_task_specify_algorithm($self->{_task}, $algorithm);
 }
 
 sub specify_preferred_host {
-    my ($self, $host) = @_;
-    return work_queue_task_specify_preferred_host($self->{_task}, $host);
+	my ($self, $host) = @_;
+	return work_queue_task_specify_preferred_host($self->{_task}, $host);
 }
 
 sub specify_file {
-    my $self = shift;
-    my %args = @_;
-    
-    croak "At least local_name should be specified." unless $args{local_name};
-    
-    $args{remote_name} //= $args{local_name};
-    $args{type}        //= $WORK_QUEUE_INPUT;
-    $args{cache}       //= 1;
-    $args{flags}         = _determine_file_flags($args{flags}, $args{cache});
+	my $self = shift;
+	my %args = @_;
 
-    return work_queue_task_specify_file($self->{_task}, 
-					$args{local_name}, 
-					$args{remote_name}, 
-					$args{type}, 
+	croak "At least local_name should be specified." unless $args{local_name};
+
+	$args{remote_name} //= $args{local_name};
+	$args{type}        //= $WORK_QUEUE_INPUT;
+	$args{cache}       //= 1;
+	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
+
+	return work_queue_task_specify_file($self->{_task},
+					$args{local_name},
+					$args{remote_name},
+					$args{type},
 					$args{flags});
 }
 
 sub specify_file_piece {
-    my $self = shift;
-    my %args = @_;
-    
-    croak "At least local_name should be specified." unless $args{local_name};
-    
-    $args{remote_name} //= $args{local_name};
-    $args{start_byte}  //= 0;
-    $args{end_byte}    //= 0;
-    $args{type}        //= $WORK_QUEUE_INPUT;
-    $args{cache}       //= 1;
-    $args{flags}         = _determine_file_flags($args{flags});
+	my $self = shift;
+	my %args = @_;
 
-    return work_queue_task_specify_file_piece($self->{_task},
-					      $args{local_name},
-					      $args{remote_name},
-					      $args{start_byte},
-					      $args{end_byte},
-					      $args{type},
-					      $args{flags});
+	croak "At least local_name should be specified." unless $args{local_name};
+
+	$args{remote_name} //= $args{local_name};
+	$args{start_byte}  //= 0;
+	$args{end_byte}    //= 0;
+	$args{type}        //= $WORK_QUEUE_INPUT;
+	$args{cache}       //= 1;
+	$args{flags}         = _determine_file_flags($args{flags});
+
+	return work_queue_task_specify_file_piece($self->{_task},
+						  $args{local_name},
+						  $args{remote_name},
+						  $args{start_byte},
+						  $args{end_byte},
+						  $args{type},
+						  $args{flags});
 }
 
 sub specify_input_file {
-    my $self = shift;
-    unshift @_, 'local_name', if @_ == 1;
-    my %args = @_;
-    
-    return $self->specify_file(local_name  => $args{local_name},
-			       remote_name => $args{remote_name},
-			       type        => $WORK_QUEUE_INPUT,
-			       flags       => $args{flags},
-			       cache       => $args{cache});
+	my $self = shift;
+	unshift @_, 'local_name', if @_ == 1;
+	my %args = @_;
+
+	return $self->specify_file(local_name  => $args{local_name},
+				   remote_name => $args{remote_name},
+				   type        => $WORK_QUEUE_INPUT,
+				   flags       => $args{flags},
+				   cache       => $args{cache});
 }
 
 sub specify_output_file {
-    my $self = shift;
+	my $self = shift;
 
-    unshift @_, 'local_name', if @_ == 1;
-    my %args = @_;
+	unshift @_, 'local_name', if @_ == 1;
+	my %args = @_;
 
-    return $self->specify_file(local_name  => $args{local_name},
-			       remote_name => $args{remote_name},
-			       type        => $WORK_QUEUE_OUTPUT,
-			       flags       => $args{flags},
-			       cache       => $args{cache});
+	return $self->specify_file(local_name  => $args{local_name},
+				   remote_name => $args{remote_name},
+				   type        => $WORK_QUEUE_OUTPUT,
+				   flags       => $args{flags},
+				   cache       => $args{cache});
 }
 
 sub specify_directory {
-    my $self = shift;
-    my %args = @_;
-    croak "At least local_name should be specified." unless $args{local_name};
+	my $self = shift;
+	my %args = @_;
+	croak "At least local_name should be specified." unless $args{local_name};
 
-    $args{remote_name} //= $args{local_name};
-    $args{type}        //= $WORK_QUEUE_INPUT;
-    $args{recursive}   //= 0;
+	$args{remote_name} //= $args{local_name};
+	$args{type}        //= $WORK_QUEUE_INPUT;
+	$args{recursive}   //= 0;
 
-    $args{cache}       //= 1;
-    $args{flags}         = _determine_file_flags($args{flags}, $args{cache});
-    
-    return work_queue_task_specify_directory($self->{_task}, 
-					     $args{local_name}, 
-					     $args{type}, 
-					     $args{flags}, 
-					     $args{recursive});
+	$args{cache}       //= 1;
+	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
+
+	return work_queue_task_specify_directory($self->{_task},
+						 $args{local_name},
+						 $args{type},
+						 $args{flags},
+						 $args{recursive});
 }
 
 sub specify_buffer {
-    my $self = shift;
-    my %args = @_;
-    
-    croak "The buffer and remote_name should be specified." 
-	unless ($args{remote_name} and $args{buffer});
-    
-    $args{cache}       //= 1;
-    $args{flags}         = _determine_file_flags($args{flags}, $args{cache});
+	my $self = shift;
+	my %args = @_;
 
-    return work_queue_task_specify_buffer($self->{_task}, 
-					  $args{buffer}, 
-					  $args{remote_name}, 
-					  $args{flags}, 
+	croak "The buffer and remote_name should be specified."
+	unless ($args{remote_name} and $args{buffer});
+
+	$args{cache}       //= 1;
+	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
+
+	return work_queue_task_specify_buffer($self->{_task},
+					  $args{buffer},
+					  $args{remote_name},
+					  $args{flags},
 					  $args{cache});
 }
 
 sub specify_cores {
-    my ($self, $cores) = @_;
-    return work_queue_task_specify_cores($self->{_task}, $cores);
+	my ($self, $cores) = @_;
+	return work_queue_task_specify_cores($self->{_task}, $cores);
 }
 
 sub specify_memory {
-    my ($self, $memory) = @_;
-    return work_queue_task_specify_memory($self->{_task}, $memory);
+	my ($self, $memory) = @_;
+	return work_queue_task_specify_memory($self->{_task}, $memory);
 }
 
 sub specify_disk {
-    my ($self, $disk) = @_;
-    return work_queue_task_specify_disk($self->{_task}, $disk);
+	my ($self, $disk) = @_;
+	return work_queue_task_specify_disk($self->{_task}, $disk);
 }
 
 sub specify_gpus {
-    my ($self, $gpus) = @_;
-    return work_queue_task_specify_gpus($self->{_task}, $gpus);
+	my ($self, $gpus) = @_;
+	return work_queue_task_specify_gpus($self->{_task}, $gpus);
 }
 
 sub specify_end_time {
-    my ($self, $seconds) = @_;
-    return work_queue_task_specify_end_time($self->{_task}, $seconds);
+	my ($self, $seconds) = @_;
+	return work_queue_task_specify_end_time($self->{_task}, $seconds);
 }
 
 sub specify_priority {
-    my ($self, $priority) = @_;
-    return work_queue_task_specify_priority($self->{_task}, $priority);
+	my ($self, $priority) = @_;
+	return work_queue_task_specify_priority($self->{_task}, $priority);
 }
 
 sub tag {
-    my ($self) = @_;
-    return $self->{_task}->{tag};
+	my ($self) = @_;
+	return $self->{_task}->{tag};
 }
 
 sub priority {
-    my ($self) = @_;
-    return $self->{_task}->{priority};
+	my ($self) = @_;
+	return $self->{_task}->{priority};
 }
 
 sub command {
-    my ($self) = @_;
-    return $self->{_task}->{command_line};
+	my ($self) = @_;
+	return $self->{_task}->{command_line};
 }
 
 sub algorithm {
-    my ($self) = @_;
-    return $self->{_task}->{algorithm};
+	my ($self) = @_;
+	return $self->{_task}->{algorithm};
 }
 
 sub output {
-    my ($self) = @_;
-    return $self->{_task}->{output};
+	my ($self) = @_;
+	return $self->{_task}->{output};
 }
 
 sub id {
-    my ($self) = @_;
-    return $self->{_task}->{taskid};
+	my ($self) = @_;
+	return $self->{_task}->{taskid};
 }
 
 sub return_status {
-    my ($self) = @_;
-    return $self->{_task}->{return_status};
+	my ($self) = @_;
+	return $self->{_task}->{return_status};
 }
 
 sub result {
-    my ($self) = @_;
-    return $self->{_task}->{result};
+	my ($self) = @_;
+	return $self->{_task}->{result};
 }
 
 sub total_submissions {
-    my ($self) = @_;
-    return $self->{_task}->{total_submissions};
+	my ($self) = @_;
+	return $self->{_task}->{total_submissions};
 }
 
 sub host {
-    my ($self) = @_;
-    return $self->{_task}->{host};
+	my ($self) = @_;
+	return $self->{_task}->{host};
 }
 
 sub hostname {
-    my ($self) = @_;
-    return $self->{_task}->{hostname};
+	my ($self) = @_;
+	return $self->{_task}->{hostname};
 }
 
 sub commit_time {
-    my ($self) = @_;
-    return $self->{_task}->{time_committed};
+	my ($self) = @_;
+	return $self->{_task}->{time_committed};
 }
 
 sub submit_time {
-    my ($self) = @_;
-    return $self->{_task}->{time_task_submit};
+	my ($self) = @_;
+	return $self->{_task}->{time_task_submit};
 }
 
 sub finish_time {
-    my ($self) = @_;
-    return $self->{_task}->{time_task_finish};
+	my ($self) = @_;
+	return $self->{_task}->{time_task_finish};
 }
 
 sub time_app_delay {
-    my ($self) = @_;
-    return $self->{_task}->{time_app_delay};
+	my ($self) = @_;
+	return $self->{_task}->{time_app_delay};
 }
 
 sub send_input_start {
-    my ($self) = @_;
-    return $self->{_task}->{time_send_input_start};
+	my ($self) = @_;
+	return $self->{_task}->{time_send_input_start};
 }
 
 sub send_input_finish {
-    my ($self) = @_;
-    return $self->{_task}->{time_send_input_finish};
+	my ($self) = @_;
+	return $self->{_task}->{time_send_input_finish};
 }
 
 sub execute_cmd_start {
-    my ($self) = @_;
-    return $self->{_task}->{time_execute_cmd_start};
+	my ($self) = @_;
+	return $self->{_task}->{time_execute_cmd_start};
 }
 
 sub execute_cmd_finish {
-    my ($self) = @_;
-    return $self->{_task}->{time_execute_cmd_finish};
+	my ($self) = @_;
+	return $self->{_task}->{time_execute_cmd_finish};
 }
 
 sub receive_output_start {
-    my ($self) = @_;
-    return $self->{_task}->{time_receive_output_start};
+	my ($self) = @_;
+	return $self->{_task}->{time_receive_output_start};
 }
 
 sub receive_output_finish {
-    my ($self) = @_;
-    return $self->{_task}->{time_receive_output_finish};
+	my ($self) = @_;
+	return $self->{_task}->{time_receive_output_finish};
 }
 
 sub total_bytes_received {
-    my ($self) = @_;
-    return $self->{_task}->{total_bytes_received};
+	my ($self) = @_;
+	return $self->{_task}->{total_bytes_received};
 }
 
 sub total_bytes_sent {
-    my ($self) = @_;
-    return $self->{_task}->{total_bytes_sent};
+	my ($self) = @_;
+	return $self->{_task}->{total_bytes_sent};
 }
 
 sub total_bytes_transferred {
-    my ($self) = @_;
-    return $self->{_task}->{total_bytes_transferred};
+	my ($self) = @_;
+	return $self->{_task}->{total_bytes_transferred};
 }
 
 sub total_transfer_time {
-    my ($self) = @_;
-    return $self->{_task}->{total_transfer_time};
+	my ($self) = @_;
+	return $self->{_task}->{total_transfer_time};
 }
 
 sub cmd_execution_time {
-    my ($self) = @_;
-    return $self->{_task}->{cmd_execution_time};
+	my ($self) = @_;
+	return $self->{_task}->{cmd_execution_time};
 }
 
 sub total_cmd_execution_time {
-    my ($self) = @_;
-    return $self->{_task}->{total_cmd_execution_time};
+	my ($self) = @_;
+	return $self->{_task}->{total_cmd_execution_time};
 }
 
 sub resources_measured {
-    my ($self) = @_;
-    return $self->{_task}->{resources_measured};
+	my ($self) = @_;
+	return $self->{_task}->{resources_measured};
 }
 1;
 
@@ -362,20 +362,20 @@ The objects and methods provided by this package correspond to the
 native C API in work_queue.h for task creation and manipulation. This
 module is automatically loaded with C<< Work_Queue >>.
 
-        use Work_Queue;
+		use Work_Queue;
 
-        my $t = Work_Queue::Task->new($command);
-        $t->specify_input_file(local_name => 'some_name', remote_name => 'some_other_name');
-        $t->specify_output_file('some_name');
+		my $t = Work_Queue::Task->new($command);
+		$t->specify_input_file(local_name => 'some_name', remote_name => 'some_other_name');
+		$t->specify_output_file('some_name');
 
-        $q->submit($t);
+		$q->submit($t);
 
-        $t = $q->wait(5);
+		$t = $q->wait(5);
 
-        if($t) {
-                my $resources = $t->resources_measured;
-                print $resources->{resident_memory}, '\n';
-        }
+		if($t) {
+				my $resources = $t->resources_measured;
+				print $resources->{resident_memory}, '\n';
+		}
 
 =head1 METHODS
 
@@ -495,9 +495,9 @@ Legacy parameter for setting file caching attribute.  By default this is enabled
 
 =back
 
-        $t->specify_file(local_name => ...);
+		$t->specify_file(local_name => ...);
 
-        $t->specify_file(local_name => ..., remote_name => ..., );
+		$t->specify_file(local_name => ..., remote_name => ..., );
 
 =head3 C<specify_file_piece>
 
@@ -538,9 +538,9 @@ Legacy parameter for setting file caching attribute.  By default this is enabled
 =back
 
 
-        $t->specify_file_piece(local_name => ..., start_byte => ..., ...);
+		$t->specify_file_piece(local_name => ..., start_byte => ..., ...);
 
-        $t->specify_file_piece(local_name => ..., remote_name => ..., ...);
+		$t->specify_file_piece(local_name => ..., remote_name => ..., ...);
 
 =head3 C<specify_input_file>
 
@@ -836,33 +836,31 @@ Must be called only after the task completes execution.
 
 =head3 C<total_cmd_execution_time>
 
-    Get the time spent in microseconds for executing the command on any worker.
+	Get the time spent in microseconds for executing the command on any worker.
 
-    Must be called only after the task completes execution.
+	Must be called only after the task completes execution.
 
 =head3 C<resources_measured>
 
-    Get the resources measured when monitoring is enabled.
+	Get the resources measured when monitoring is enabled.
 
-    Must be called only after the task completes execution.
+	Must be called only after the task completes execution.
 
-        $t->resources_measured{bytes_read};
-        $t->resources_measured{bytes_written};
-        $t->resources_measured{cores};
-        $t->resources_measured{cpu_time};
-        $t->resources_measured{gpus};
-        $t->resources_measured{max_concurrent_processes};
-        $t->resources_measured{resident_memory};
-        $t->resources_measured{resident_memory};
-        $t->resources_measured{resident_memory};
-        $t->resources_measured{swap_memory};
-        $t->resources_measured{task_id};
-        $t->resources_measured{total_processes};
-        $t->resources_measured{virtual_memory};
-        $t->resources_measured{wall_time};
-        $t->resources_measured{workdir_footprint};
-        $t->resources_measured{workdir_num_files};
+		$t->resources_measured{bytes_read};
+		$t->resources_measured{bytes_written};
+		$t->resources_measured{cores};
+		$t->resources_measured{cpu_time};
+		$t->resources_measured{gpus};
+		$t->resources_measured{max_concurrent_processes};
+		$t->resources_measured{resident_memory};
+		$t->resources_measured{resident_memory};
+		$t->resources_measured{resident_memory};
+		$t->resources_measured{swap_memory};
+		$t->resources_measured{task_id};
+		$t->resources_measured{total_processes};
+		$t->resources_measured{virtual_memory};
+		$t->resources_measured{wall_time};
+		$t->resources_measured{workdir_footprint};
+		$t->resources_measured{workdir_num_files};
 
 =cut
-
-

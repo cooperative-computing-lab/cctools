@@ -47,7 +47,7 @@ int main(int argc, char **argv)
 
   uintptr_t i;
   for(i = 1; i < N; i++)
-    SET_INS(s, set_membership, i);
+	SET_INS(s, set_membership, i);
 
   uintptr_t sum   = 0;
   uintptr_t sum_z = set_size(s);
@@ -55,8 +55,8 @@ int main(int argc, char **argv)
   set_first_element(s);
   while( (i = (uintptr_t) set_pop(s)) )
   {
-    sum   += i;
-    sum_z += set_size(s);
+	sum   += i;
+	sum_z += set_size(s);
   }
 
   assert( sum   == ((N * (N - 1)) / 2) );

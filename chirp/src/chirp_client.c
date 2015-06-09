@@ -1683,7 +1683,7 @@ static const char *search_readnext(const char *current, char **result)
 static void search_unpackstat(const char *str, struct chirp_stat *info)
 {
 	sscanf(str, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " " "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " " "%" PRId64 " %" PRId64 " %" PRId64, &info->cst_dev, &info->cst_ino, &info->cst_mode, &info->cst_nlink,
-	       &info->cst_uid, &info->cst_gid, &info->cst_rdev, &info->cst_size, &info->cst_atime, &info->cst_mtime, &info->cst_ctime, &info->cst_blksize, &info->cst_blocks);
+		   &info->cst_uid, &info->cst_gid, &info->cst_rdev, &info->cst_size, &info->cst_atime, &info->cst_mtime, &info->cst_ctime, &info->cst_blksize, &info->cst_blocks);
 }
 
 struct chirp_searchent *chirp_client_readsearch(CHIRP_SEARCH * search)

@@ -33,11 +33,11 @@ close(SEQFILE);
 open CANDFILE, "$cand_file" or die $!;
 while($line = <CANDFILE>) {
 	chomp($line);
-	# The format of each line in the .cand file is: 
+	# The format of each line in the .cand file is:
 	# read1_name   read2_name   direction   start_position_in_read1   start_position_in_read2
 	if($line =~ /(\S+)\s+(\S+)\s+(1|-1)\s+(\d+)\s+(\d+)/) {
 		$count++;
-	
+
 		# "read_name" denotes the position of this read in its original
 		# sequence. Since we have two original sequence here, in order to
 		# locate the reads from the correct original sequence, we added the
@@ -87,7 +87,7 @@ while($line = <CANDFILE>) {
 		print "Invalid candidate format at line $count\n";
 		goto failure;
 	}
-}	
+}
 
 success:
 	close(CANDFILE);
@@ -97,4 +97,3 @@ success:
 failure:
 	close(CANDFILE);
 	exit(1);
-

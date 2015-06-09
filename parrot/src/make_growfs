@@ -4,10 +4,10 @@
 #
 # This script simply traverses a directory structure and
 # creates a file named .growfsdir that lists all the files
-# in the directory structure recursively.  
-# The Parrot growfs module uses this information in order to 
+# in the directory structure recursively.
+# The Parrot growfs module uses this information in order to
 # make a web server look like a filesystem.
-# 
+#
 # Example use:
 #    make_growfs /home/fred/www
 #    parrot_run tcsh

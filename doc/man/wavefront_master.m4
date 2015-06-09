@@ -19,7 +19,7 @@ PARA
 BOLD(wavefront_master) uses the Work Queue system to distribute tasks among
 processors. After starting BOLD(wavefront_master), you must start a number of
 MANPAGE(work_queue_worker,1) processes on remote machines.  The workers will
-then connect back to the master process and begin executing tasks.  
+then connect back to the master process and begin executing tasks.
 
 SECTION(OPTIONS)
 
@@ -42,11 +42,11 @@ SECTION(EXAMPLES)
 Suppose you have a program named CODE(function) that you want to use in the
 Wavefont workflow computation. The program CODE(function), when invoked as
 CODE(function a b c), should do some computations on files CODE(a), CODE(b) and
-CODE(c) and produce some output on the standard output. 
+CODE(c) and produce some output on the standard output.
 PARA
 Before running BOLD(wavefront_master), you need to create a file, say
 CODE(input.data), that lists initial values of the matrix (values on the left
-and bottom edges), one per line: 
+and bottom edges), one per line:
 
 LONGCODE_BEGIN
  0	0	value.0.0
@@ -72,21 +72,21 @@ LONGCODE_END
 The framework will carry out the computations in the order of dependencies, and
 print the results one by one (note that the first two columns are X and Y
 indices in the resulting matrix) in the specified output file. Below is an
-example of what the output file - CODE(output.data) would look like: 
+example of what the output file - CODE(output.data) would look like:
 
 LONGCODE_BEGIN
- 1	1	value.1.1	
- 1	2	value.1.2	
- 1	3	value.1.3	
+ 1	1	value.1.1
+ 1	2	value.1.2
+ 1	3	value.1.3
  ...
 LONGCODE_END
 
 To speed up the process, run more MANPAGE(work_queue_worker,1) processes on
 other machines, or use MANPAGE(condor_submit_workers,1) or
 MANPAGE(sge_submit_workers,1) to start hundreds of workers in your local batch
-system. 
+system.
 PARA
-The following is an example of adding more workers to execute a Wavefront 
+The following is an example of adding more workers to execute a Wavefront
 workflow. Suppose your BOLD(wavefront_master) is running on a machine named
 barney.nd.edu. If you have access to login to other machines, you could simply
 start worker processes on each one, like this:
@@ -121,4 +121,3 @@ LIST_ITEM(MANPAGE(sge_submit_workers,1))
 LIST_END
 
 FOOTER
-

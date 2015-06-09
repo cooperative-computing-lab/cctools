@@ -28,7 +28,7 @@ dir_output="output"
 dir_makeflows="makeflows"
 
 # If yes, all the tasks would share the same input, otherwise every task has
-# its independing input. 
+# its independing input.
 shared_input="yes"
 
 # Number of workers for each workload
@@ -73,7 +73,7 @@ validate_input () {
 			else
 				dd if=/dev/zero of=0.in bs=1$unit count=$in
 			fi
-		else 
+		else
 			for ((i=1;i<=$num;i++));do
 				if [ -e $i.in ]; then
 					size=`stat -c%s $i.in`
@@ -103,7 +103,7 @@ gen_sub_makeflows () {
 			#echo -e "$outputdir/$i.out:$outputdir/$i.tmp\n\t mkdir -p $outputdir; dd if=/dev/zero of=$outputdir/$i.out bs=1$unit count=$out; sleep $exe \n" >> $submakeflow
 			if [ "$shared_input" = "yes" ]; then
 				echo -e "$outputdir/$i.out:$inputdir/0.in\n\t mkdir -p $outputdir; dd if=/dev/zero of=$outputdir/$i.out bs=1$unit count=$out; sleep $exe \n" >> $submakeflow
-			else 
+			else
 				echo -e "$outputdir/$i.out:$inputdir/$i.in\n\t mkdir -p $outputdir; dd if=/dev/zero of=$outputdir/$i.out bs=1$unit count=$out; sleep $exe \n" >> $submakeflow
 			fi
 		done
@@ -114,10 +114,10 @@ gen_grand_makeflows () {
 	if [ "$1" = "local" ]; then
 		expr="local"
 		location="LOCAL"
-	elif [ "$1" = "remote" ]; then 
+	elif [ "$1" = "remote" ]; then
 		expr="remote"
 		location=""
-	else 
+	else
 		echo "Failed to generate makeflow scripts: argument to gen_grand_makeflows() should be either \"local\" or \"remote\"!"
 		exit 1
 	fi
@@ -171,13 +171,13 @@ start_workers () {
 	echo Starting $workloads_max \* $num_of_workers workers for executing the workloads ...
 	for ((j=1;j<=$workloads_max;j++)); do
 		projname=lyu2.$j
-		./work_queue_pool -T condor -f -a -N $projname -t 86400 $num_of_workers 
+		./work_queue_pool -T condor -f -a -N $projname -t 86400 $num_of_workers
 		sleep 5
 	done
 	echo $((workloads_max * num_of_workers)) are started successfully.
 
 	echo Starting workers for hosting multiple masters ...
-	./work_queue_pool -T condor -f -a -N lyu2.0 -t 86400 $((workloads_max)) 
+	./work_queue_pool -T condor -f -a -N lyu2.0 -t 86400 $((workloads_max))
 	echo $((workloads_max + 10)) are started successfully.
 }
 
@@ -208,11 +208,11 @@ run_experiment () {
 
 		echo Start running $expr masters experiment \($i workloads\) ...
 		if [ "$expr" = "local" ] ; then
-			./makeflow -d all -j $i -r $retry_max $makeflowargs $makeflowscript &> $makeflowoutput 
+			./makeflow -d all -j $i -r $retry_max $makeflowargs $makeflowscript &> $makeflowoutput
 		fi
 
 		if [ "$expr" = "remote" ] ; then
-			./makeflow -T wq -d all -a -e -N lyu2.0 -r $retry_max $makeflowargs $makeflowscript &> $makeflowoutput 
+			./makeflow -T wq -d all -a -e -N lyu2.0 -r $retry_max $makeflowargs $makeflowscript &> $makeflowoutput
 		fi
 
 		# Get turnaround time
@@ -226,7 +226,7 @@ run_experiment () {
 		dir=$expr.$i
 		rm -rf $dir
 		mkdir -p $dir
-		
+
 		if [ "$expr" = "remote" ] ; then
 			mv $wqlog $dir/
 		fi
@@ -301,7 +301,7 @@ plot \"1.queue\" using (\$2 / 1000000):$column title \"workload 1\" with lines l
 
 
 
-# Main Program	
+# Main Program
 
 in=`getfield $workload 1`
 exe=`getfield $workload 2`
@@ -312,7 +312,7 @@ if [ $unit == "M" ]; then
 	unit_size=$((1024*1024))
 elif [ $unit == "K" ]; then
 	unit_size=$((1024))
-else 
+else
 	unit_size=1
 fi
 

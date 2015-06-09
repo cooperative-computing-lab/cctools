@@ -67,10 +67,10 @@ void seq_reverse_complement( struct seq *s )
 void seq_free( struct seq *s )
 {
 	if(s) {
-	      free(s->name);
-	      free(s->data);
-	      free(s->metadata);
-	      free(s);
+		  free(s->name);
+		  free(s->data);
+		  free(s->metadata);
+		  free(s);
 	}
 }
 

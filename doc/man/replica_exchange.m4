@@ -1,22 +1,22 @@
 include(manual.h)dnl
 HEADER(replica_exchange)
 
-SECTION(NAME) 
+SECTION(NAME)
 BOLD(replica_exchange) -  Work Queue application for running replica exchange simulations using ProtoMol
 
 SECTION(SYNOPSIS)
 CODE(BOLD(replica_exchange [options] PARAM(pdb_file) PARAM(psf_file) PARAM(par_file) PARAM(min_temp) PARAM(max_temp) PARAM(num_replicas)))
 
 SECTION(DESCRIPTION)
-BOLD(replica_exchange) is a Work Queue application for running replica exchange simulations using the ProtoMol simulation package. The application supports both barrier and non-barrier based runs. 
+BOLD(replica_exchange) is a Work Queue application for running replica exchange simulations using the ProtoMol simulation package. The application supports both barrier and non-barrier based runs.
 PARA
 The barrier based run transfers the configuration files and input data for each replica to the connected MANPAGE(work_queue_worker) instances, runs the ProtoMol simulation package, and gathers the output, at each Monte Carlo step. It waits for the completion of simulation of all replicas at each step before proceeding to the next step and, therefore, incorporates a barrier at each step. At the end of every step, it randomly picks two neigboring replicas, applies the metropolis criterion, and if it is satisfied, swaps the parameters of the two replicas and continues simulations.
 PARA
-The non-barrier based run is equivalent to the barrier run in the output and results produced. However, it avoids the use of a barrier by running multiple monte carlo steps for each replica until that replica is picked to attempt an exchange. By default, the application will run using this non-barrier implementation. 
+The non-barrier based run is equivalent to the barrier run in the output and results produced. However, it avoids the use of a barrier by running multiple monte carlo steps for each replica until that replica is picked to attempt an exchange. By default, the application will run using this non-barrier implementation.
 PARA
-The BOLD(pdb_file), BOLD(psf_file), and BOLD(par_file) arguments specify the input files required for the simulation run. The BOLD(min_temp) and BOLD(max_temp) specify the temperature range in which the replicas are simulated. The number of replicas simulated is given by BOLD(num_replicas). 
+The BOLD(pdb_file), BOLD(psf_file), and BOLD(par_file) arguments specify the input files required for the simulation run. The BOLD(min_temp) and BOLD(max_temp) specify the temperature range in which the replicas are simulated. The number of replicas simulated is given by BOLD(num_replicas).
 PARA
-BOLD(replica_exchange) can be run on any machine accesible to work_queue_worker instances. 
+BOLD(replica_exchange) can be run on any machine accesible to work_queue_worker instances.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
@@ -68,4 +68,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_WORK_QUEUE
 
 FOOTER
-

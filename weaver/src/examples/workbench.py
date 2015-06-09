@@ -4,13 +4,13 @@ Examples:
 
     # Generate Chained workflow with 128 tasks
     $ ./weaver.py -o workbench examples/workbench.py chained noop 128
-    
+
     # Generate Concurrent workflow with 128 tasks
     $ ./weaver.py -o workbench examples/workbench.py concurrent noop 128
-    
+
     # Generate FanOut workflow with 128 tasks and 1K input file
     $ ./weaver.py -o workbench examples/workbench.py fanout cat 128 1024
-    
+
     # Generate FanIn workflow with 128 tasks and 1K input file
     $ ./weaver.py -o workbench examples/workbench.py fanin cat 128 1024
 

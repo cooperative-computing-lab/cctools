@@ -27,4 +27,3 @@ struct searchent *parrot_readsearch(SEARCH *search);
 int parrot_closesearch(SEARCH *search);
 
 #endif
-

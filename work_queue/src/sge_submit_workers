@@ -4,23 +4,23 @@ SUBMIT_COMMON=$(which work_queue_submit_common)
 if [ -z "$SUBMIT_COMMON" ];
 then
 	echo "Please add 'work_queue_submit_common' to your PATH." 1>&2
-    exit 1
+	exit 1
 else
 	. $SUBMIT_COMMON
 fi
 
 
-show_help() 
+show_help()
 {
 
-	echo "  -j                       Use job array to submit workers."	
+	echo "  -j                       Use job array to submit workers."
 	echo "  -p <parameters>          SGE qsub parameters."
 }
 
 use_jobarray=0
 sge_parameters=""
 
-# Used options (as in the getopts format):  aM:N:C:t:d:w:i:b:z:A:O:s:P:jp:h  
+# Used options (as in the getopts format):  aM:N:C:t:d:w:i:b:z:A:O:s:P:jp:h
 parse_arguments()
 {
 	if [ -z "$cores" -o $cores=0 ]
@@ -31,10 +31,10 @@ parse_arguments()
 	while [ $# -gt 0 ]
 	do
 		case $1 in
-			-j)  
+			-j)
 			use_jobarray=1
 			;;
-			-p)  
+			-p)
 			shift
 			sge_parameters="$sge_parameters $1"
 			;;
@@ -65,8 +65,8 @@ EOF
 
 	if [ $use_jobarray = 1 ]
 	then
-		qsub -t 1-$count:1 -cwd $sge_parameters worker.sh	
-	else 
+		qsub -t 1-$count:1 -cwd $sge_parameters worker.sh
+	else
 		for n in `seq 1 $count`
 		do
 			qsub -cwd $sge_parameters worker.sh
@@ -75,4 +75,3 @@ EOF
 }
 
 submit_workers "$@"
-

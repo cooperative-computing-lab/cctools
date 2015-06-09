@@ -9,4 +9,3 @@ condor_submit_makeflow: $BASEDIR/makeflow
 
 total_line_count.txt: makeflow.c condor_submit_makeflow
 	LOCAL cat makeflow.c condor_submit_makeflow | wc -l > total_line_count.txt
-

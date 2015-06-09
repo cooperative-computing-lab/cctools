@@ -1,56 +1,56 @@
 Options:
   -h, --help            show this help message and exit
   -c CONFIG, --config=CONFIG
-                        The specification json file. (By default: spec.json)
+						The specification json file. (By default: spec.json)
   -l LOCALDIR, --localdir=LOCALDIR
-                        The path of directory used for all the cached data and
-                        all the sandboxes, the directory can be an existing
-                        dir. (By default: ./umbrella_test)
+						The path of directory used for all the cached data and
+						all the sandboxes, the directory can be an existing
+						dir. (By default: ./umbrella_test)
   -i INPUTS, --inputs=INPUTS
-                        The path of input files in the format of
-                        access_path=actual_path. i.e, -i
-                        '/home/hmeng/file1=/tmp/file2'. access_path must be
-                        consistent with the semantics of the provided command,
-                        actual_path can be relative or absolute. (By default:
-                        '')
+						The path of input files in the format of
+						access_path=actual_path. i.e, -i
+						'/home/hmeng/file1=/tmp/file2'. access_path must be
+						consistent with the semantics of the provided command,
+						actual_path can be relative or absolute. (By default:
+						'')
   -e ENV, --env=ENV     The environment variable. I.e., -e 'PWD=/tmp'. (By
-                        default: '')
+						default: '')
   -o OUTPUT, --output=OUTPUT
-                        The path of output directory, which must be non-
-                        existing or empty. (By default: ./umbrella_output)
+						The path of output directory, which must be non-
+						existing or empty. (By default: ./umbrella_output)
   -s SANDBOX_MODE, --sandbox_mode=SANDBOX_MODE
-                        sandbox mode, which can be local, parrot, chroot,
-                        docker, condor, ec2. (By default: local)
+						sandbox mode, which can be local, parrot, chroot,
+						docker, condor, ec2. (By default: local)
   --packages=PACKAGES   The source of packages information. (By default:
-                        ./packages.json)
+						./packages.json)
 						If the value of this option does not exist, one copy of packages.json will be downloaded into the sandbox from the ccl website.
   --ec2=EC2             The source of ec2 information. (By default:
-                        ./ec2.json)
+						./ec2.json)
 						If the value of this option does not exist, one copy of ec2.json will be downloaded into the sandbox from the ccl website.
   --log=LOG             The path of umbrella log file. (By default:
-                        ./umbrella.log)
+						./umbrella.log)
   --condor_log=CONDOR_LOG
-                        The path of the condor umbrella log file. Required for
-                        condor execution engines.
+						The path of the condor umbrella log file. Required for
+						condor execution engines.
   --ec2_log=EC2_LOG     The path of the ec2 umbrella log file. Required for
-                        ec2 execution engines.
+						ec2 execution engines.
   -g EC2_GROUP, --ec2_group=EC2_GROUP
-                        the security group within which an Amazon EC2 instance
-                        should be run. (only for ec2)
+						the security group within which an Amazon EC2 instance
+						should be run. (only for ec2)
   -k EC2_KEY, --ec2_key=EC2_KEY
-                        the name of the key pair to use when launching an
-                        Amazon EC2 instance. (only for ec2)
+						the name of the key pair to use when launching an
+						Amazon EC2 instance. (only for ec2)
   --ec2_sshkey=EC2_SSHKEY
-                        the name of the private key file to use when
-                        connecting to an Amazon EC2 instance. (only for ec2)
+						the name of the private key file to use when
+						connecting to an Amazon EC2 instance. (only for ec2)
 
-inputs of local execution engine: 
+inputs of local execution engine:
 all the inputs are mounted into the sandbox without being copied into the sandbox in all these three container techniques (chroot, parrot and docker).
 The usage of the mounting mechanism on the execution node allows Umbrella to treat all the stuff created in the sandbox during the execution of the application as the output.
 
 inputs of cloud execution engine:
 Umbrella transfers the packages.json, the specification file, the input files to the home directory of the execution node through `scp`;
-Umbrella changes the Umbrella command to be executed on the remote execution node: 
+Umbrella changes the Umbrella command to be executed on the remote execution node:
 Required changes:
 	use a python from the archive if the remote execution node does not have the correct python to execute umbrella (not finished)
 	force the usage of the packages.json transferred to the execution node
@@ -59,13 +59,13 @@ Required changes:
 	change -i to set all the actual paths to be the home directory
 Optional changes:
 	change -l to ~/ec2_umbrella
-	change -o to ~/output 
-	change --log to ec2_umbrella.log 
+	change -o to ~/output
+	change --log to ec2_umbrella.log
 Then the local umbrella calls the remote umbrella command through `ssh`.
 
 inputs of grid execution engine:
 Umbrella transfer the packages.json, the specification file, the input files to the scratch directory of the execution node through the `transfer_input_files` attribute of Condor;
-Umbrella changes the Umbrella command to be executed on the remote execution node: 
+Umbrella changes the Umbrella command to be executed on the remote execution node:
 Required changes:
 	use a python from the archive if the remote execution node does not have the correct python to execute umbrella (not finished)
 	force the usage of the packages.json transferred to the execution node
@@ -78,7 +78,7 @@ Optional changes:
 	change --log to condor_umbrella.log
 Then the local umbrella calls`condor_submit`.
 
-outputs of local execution engine: 
+outputs of local execution engine:
 all the stuff created in the sandbox during the execution of the application will be finally put into the output_dir.
 Parrot and chroot and Docker: rename sandbox_dir to output_dir
 
@@ -95,7 +95,7 @@ the sandbox on the local machine will be deleted.
 the execution result (return code, stdout data, stderr data) of all the subprocesses called by Umbrella are written into the umbrella log file.
 
 Phylosophy of Parrot options:
-The usage of Parrot inside Umbrella involves four options: 
+The usage of Parrot inside Umbrella involves four options:
  -l,--ld-path=<path>            Path to ld.so to use.                      (PARROT_LDSO_PATH)
  -m,--ftab-file=<file>          Use this file as a mountlist.             (PARROT_MOUNT_FILE)
  -M,--mount=/foo=/bar           Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)
@@ -109,7 +109,7 @@ Umbrella tries to avoid the usage of any global variable. However, some function
 Phylosophy of error handling in Umbrella:
 In Umbrella, the return code, stdout and stderr information of the sub-processes created by subprocess.Popen are checked by the caller.
 all the other critical errors are directly thrown out by the function using sys.exit("error msg"); so the caller does not check the exit code of the called function.
-However, the callee returns the necessary variables to the caller.  
+However, the callee returns the necessary variables to the caller.
 all the execution logic information is recorded into the Umbrella log file.
 
 Exit code from sys.exit([arg]):
@@ -144,4 +144,3 @@ $ cp umbrella umbrella.py
 $ pydoc -w umbrella
 3) rename umbrella.html to func_notes.html. This renaming is to avoid confusion between this html and the umbrella html document under cctools/doc.
 $ mv umbrella.html func_notes.html
-

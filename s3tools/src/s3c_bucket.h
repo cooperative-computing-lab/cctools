@@ -16,4 +16,3 @@ int s3_rm_bucket(char* bucketname, const char* access_key_id, const char* access
 int s3_ls_bucket(char* bucketname, struct list* dirent, const char* access_key_id, const char* access_key);
 
 #endif
-

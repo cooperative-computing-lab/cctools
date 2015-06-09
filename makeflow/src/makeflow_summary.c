@@ -137,4 +137,3 @@ void makeflow_summary_create(struct dag *d, const char *filename, const char *em
 		fclose(summary_email);
 	}
 }
-

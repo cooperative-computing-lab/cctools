@@ -10,15 +10,15 @@ version                 4.4.2
 categories              sysutils
 platforms               darwin
 license                 MIT
- 
+
 maintainers             nd.edu:pivie \
-                        openmaintainer
-                        
+						openmaintainer
+
 description             ${description_common} (cooperative-computing-lab)
 long_description        ${description_common} \
-                        Enables collaborators to easily harness large scale \
-                        distributed systems such as clusters, clouds, and grids.
- 
+						Enables collaborators to easily harness large scale \
+						distributed systems such as clusters, clouds, and grids.
+
 homepage                http://ccl.cse.nd.edu/
 master_sites            http://ccl.cse.nd.edu/software/files/
 distfiles               cctools-${version}-source.tar.gz
@@ -27,15 +27,13 @@ worksrcdir              cctools-${version}-source
 configure.pre_args      --prefix ${destroot}${prefix}
 
 post-destroot           {
-                            xinstall -d -m 755 ${destroot}${prefix}/share/doc
-                            file rename -force ${destroot}${prefix}/doc ${destroot}${prefix}/share/doc/${name}
+							xinstall -d -m 755 ${destroot}${prefix}/share/doc
+							file rename -force ${destroot}${prefix}/doc ${destroot}${prefix}/share/doc/${name}
 
-                            xinstall -d -m 755 ${destroot}${prefix}/etc/${name}
-                            file rename -force ${destroot}${prefix}/etc/config.mk ${destroot}${prefix}/etc/${name}/config.mk
+							xinstall -d -m 755 ${destroot}${prefix}/etc/${name}
+							file rename -force ${destroot}${prefix}/etc/config.mk ${destroot}${prefix}/etc/${name}/config.mk
 
-                        }
+						}
 
 checksums               rmd160 73c6b429c11235d42fe6a870420df496ed510fbd \
-                        sha256 64239e98c13536ab14ff70e625cd7f50a4cba714ee719a47b8286c2d6d38b597
-
-
+						sha256 64239e98c13536ab14ff70e625cd7f50a4cba714ee719a47b8286c2d6d38b597

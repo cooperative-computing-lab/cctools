@@ -84,4 +84,3 @@ struct link * s3_send_message(struct s3_message *mesg, struct link *server, time
 int s3_message_to_string(struct s3_message *mesg, char** text);
 
 #endif
-

@@ -4,7 +4,7 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 #
-# This program generates makeflows to parallelize the 
+# This program generates makeflows to parallelize the
 # popular blastall program.
 #
 
@@ -140,7 +140,7 @@ def write_split_fasta(destination):
 		split_fasta.write("#\n\n")
 
 		split_fasta.write("import sys, re\n\n")
-		
+
 		split_fasta.write("if(len(sys.argv) < 3) :\n")
 		split_fasta.write("	sys.stderr.write(\"Usage: split_fasta.py query_granularity fasta_file\")\n")
 		split_fasta.write("	sys.exit(1)\n")
@@ -170,7 +170,7 @@ def write_split_fasta(destination):
 		split_fasta.write("sys.exit(0)\n")
 	finally:
 		split_fasta.close()
-		
+
 def write_cat_blast(destination):
 	cat_blast = open(destination, "w")
 	try:
@@ -217,17 +217,17 @@ def write_makeflow(destination):
 		makeflow = sys.stdout
 	else:
 		makeflow = open(destination, 'w')
-	
+
 	try:
 		inputlist = ""
 		outputlist = ""
 		errorlist = ""
 		num_splits = count_splits(options.query_gran, options.query)
 		for i in range(num_splits):
-	        	inputlist = inputlist + "input." + str(i) + " "
-	        	outputlist = outputlist + "output." + str(i) + " "
-	        	errorlist = errorlist + "error." + str(i) + " "
-	
+			inputlist = inputlist + "input." + str(i) + " "
+			outputlist = outputlist + "output." + str(i) + " "
+			errorlist = errorlist + "error." + str(i) + " "
+
 
 		if options.config:
 			config = open(options.config, 'r')
@@ -242,19 +242,19 @@ def write_makeflow(destination):
 		db_split = re.split("/",options.database)
 		database = db_split[0]
 		for i in range(num_splits):
-	        	temp_cmd = blast_args
-	        	makeflow.write("output." + str(i) + " error." + str(i) + ": legacy_blast.pl " + options.process + "  input." + str(i) + " " + options.database + "\n")
-	        	makeflow.write("\tperl legacy_blast.pl blastall"
+			temp_cmd = blast_args
+			makeflow.write("output." + str(i) + " error." + str(i) + ": legacy_blast.pl " + options.process + "  input." + str(i) + " " + options.database + "\n")
+			makeflow.write("\tperl legacy_blast.pl blastall"
 					+ " -p " + options.process
-                       	        	+ " -d " + options.database
+					+ " -d " + options.database
 					+ " -i input." + str(i)
 					+ " -o output." + str(i)
-                  	                + " " + temp_cmd + " 2> error." + str(i) + "\n")
+			                + " " + temp_cmd + " 2> error." + str(i) + "\n")
 
 		#How to concatenate and cleanup outputs (very naive)
 		makeflow.write(options.output + ": " + cat_name + " " + outputlist + "\n")
 		makeflow.write("\tLOCAL ./" + cat_name + " " + options.output+" "+outputlist+" ;find . -maxdepth 1 -name 'output.*' -exec rm {} \\\\;\n")
-		
+
 		#How to concatenate and cleanup errors (very naive)
 		makeflow.write("error: " + errorlist + "\n")
 		makeflow.write("\tLOCAL find . -maxdepth 1 -name 'error.*' -exec cat {} \\\\;> error;find . -maxdepth 1 -name 'error.*' -exec rm {} \\\\;\n")
@@ -262,7 +262,7 @@ def write_makeflow(destination):
 		#How to cleanup inputs (very naive)
 		makeflow.write("clean: error " + options.output + " " + inputlist + "\n")
 		makeflow.write("\tLOCAL find . -maxdepth 1 -name 'input.*' -exec rm {} \\\\; > clean\n")
-	
+
 	finally:
 		if options.makeflow is not None:
 			makeflow.close()
@@ -300,15 +300,15 @@ path += os.pathsep + options.path
 
 process = search_file(options.process, path)
 if process and not os.path.exists("./" + options.process):
-	log.info("Process located: " + process) 
-	os.symlink(process, options.process)	
+	log.info("Process located: " + process)
+	os.symlink(process, options.process)
 elif not os.path.exists("./"+options.process):
 	log.error("Unable to find process: " + options.process)
 	sys.exit(5)
 
 legacy = search_file("legacy_blast.pl", path)
 if legacy and not os.path.exists("./legacy_blast.pl"):
-	log.info("Legacy_BLAST located: " + legacy) 
+	log.info("Legacy_BLAST located: " + legacy)
 	os.symlink(legacy, "legacy_blast.pl")
 elif not os.path.exists("./legacy_blast.pl"):
 	log.error("Unable to find legacy_blast.pl script")
@@ -348,5 +348,3 @@ if (options.check == True and check_blast(blast_args, options.process, options.d
         sys.exit(3)
 
 write_makeflow(options.makeflow)
-
-

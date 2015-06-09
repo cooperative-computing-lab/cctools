@@ -129,22 +129,22 @@ static void show_help(const char *cmd)
 
 static void display_progress( struct work_queue *q )
 {
-        struct work_queue_stats info;
-        time_t current = time(0);
+		struct work_queue_stats info;
+		time_t current = time(0);
 
-        work_queue_get_stats(queue,&info);
+		work_queue_get_stats(queue,&info);
 
-        if(current == start_time)
+		if(current == start_time)
 		current++;
 
-        double speedup = (sequential_run_time*tasks_done)/(current-start_time);
+		double speedup = (sequential_run_time*tasks_done)/(current-start_time);
 
-        printf("%2.02lf%% %6d %6ds %4d %4d %4d %4d %4d %4d %.02lf\n",100.0*cells_complete/cells_total,cells_complete,(int)(time(0)-start_time),info.workers_init,info.workers_ready,info.workers_busy,info.tasks_waiting,info.tasks_running,info.tasks_complete,speedup);
+		printf("%2.02lf%% %6d %6ds %4d %4d %4d %4d %4d %4d %.02lf\n",100.0*cells_complete/cells_total,cells_complete,(int)(time(0)-start_time),info.workers_init,info.workers_ready,info.workers_busy,info.tasks_waiting,info.tasks_running,info.tasks_complete,speedup);
 
 	if(bmap)
 		bitmap_save_bmp(bmap,progress_bitmap_file);
 
-        last_display_time = current;
+		last_display_time = current;
 }
 
 void wavefront_bitmap_initialize( struct bitmap *b )
@@ -190,7 +190,7 @@ int main( int argc, char *argv[] )
 
 	while((c=getopt_long(argc,argv,"aB:d:hN:p:P:o:v:Z:", long_options, NULL)) >= 0) {
 		switch(c) {
-	    	case 'a':
+			case 'a':
 			break;
 		case 'd':
 			debug_flags_set(optarg);
@@ -322,11 +322,11 @@ int main( int argc, char *argv[] )
 				fprintf(stderr,"unexpected output: %s\nfrom command: %s\non host: %s",t->output,t->command_line,t->host);
 			}
 		} else {
-		    fprintf(stderr,"function failed return value (%i) result (%i) on host %s. output:\n%s\n",t->return_status,t->result,t->host,t->output);
+			fprintf(stderr,"function failed return value (%i) result (%i) on host %s. output:\n%s\n",t->return_status,t->result,t->host,t->output);
 		}
 		work_queue_task_delete(t);
 		if(work_queue_empty(queue))
-		    break;
+			break;
 	}
 
 	display_progress(queue);

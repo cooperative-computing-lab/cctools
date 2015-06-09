@@ -14,14 +14,14 @@ BOLD(allpairs_master) computes the Cartesian product of two sets
 M[i,j] contains the output of the function F (BOLD(PARAM(compare function))) on
 objects A[i] (an item in BOLD(PARAM(set A))) and B[j] (an item in
 BOLD(PARAM(set B))). The resulting matrix is displayed on the standard output,
-one comparison result per line along with the associated X and Y indices. 
+one comparison result per line along with the associated X and Y indices.
 PARA
 BOLD(allpairs_master) uses the Work Queue system to distribute tasks among
 processors.  Each processor utilizes the MANPAGE(allpairs_multicore,1) program
 to execute the tasks in parallel if multiple cores are present. After starting
 BOLD(allpairs_master), you must start a number of MANPAGE(work_queue_worker,1)
 processes on remote machines.  The workers will then connect back to the master
-process and begin executing tasks.  
+process and begin executing tasks.
 
 SECTION(OPTIONS)
 
@@ -51,14 +51,14 @@ Let's suppose you have a whole lot of files that you want to compare all to
 each other, named CODE(a), CODE(b), CODE(c), and so on. Suppose that you also
 have a program named BOLD(compareit) that when invoked as CODE(compareit a b)
 will compare files CODE(a) and CODE(b) and produce some output summarizing the
-difference between the two, like this: 
+difference between the two, like this:
 
 LONGCODE_BEGIN
  a b are 45 percent similar
 LONGCODE_END
 
 To use the allpairs framework, create a file called CODE(set.list) that lists each of
-your files, one per line: 
+your files, one per line:
 
 LONGCODE_BEGIN
  a
@@ -70,7 +70,7 @@ LONGCODE_END
 Because BOLD(allpairs_master) utilizes MANPAGE(allpairs_multicore,1), so please
 make sure MANPAGE(allpairs_multicore,1) is in your PATH before you proceed.To run
 a All-Pairs workflow sequentially, start a single MANPAGE(work_queue_worker,1)
-process in the background. Then, invoke BOLD(allpairs_master). 
+process in the background. Then, invoke BOLD(allpairs_master).
 
 LONGCODE_BEGIN
  % work_queue_worker localhost 9123 &
@@ -79,7 +79,7 @@ LONGCODE_END
 
 The framework will carry out all possible comparisons of the objects, and print
 the results one by one (note that the first two columns are X and Y indices in
-the resulting matrix): 
+the resulting matrix):
 
 LONGCODE_BEGIN
  1	1	a a are 100 percent similar
@@ -91,7 +91,7 @@ LONGCODE_END
 To speed up the process, run more MANPAGE(work_queue_worker,1) processes on
 other machines, or use MANPAGE(condor_submit_workers,1) or
 MANPAGE(sge_submit_workers,1) to start hundreds of workers in your local batch
-system. 
+system.
 PARA
 The following is an example of adding more workers to execute a All-Pairs
 workflow. Suppose your BOLD(allpairs_master) is running on a machine named
@@ -129,4 +129,3 @@ LIST_ITEM(MANPAGE(allpairs_multicore,1))
 LIST_END
 
 FOOTER
-

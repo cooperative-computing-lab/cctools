@@ -2,7 +2,7 @@
 <description> A Distributed version of BWA using Makeflow</description>
 <command interpreter="python">
     makeflow_bwa_wrapper.py
-    
+
     --user_id=$__user_id__
     --pwfile=${GALAXY_DATA_INDEX_DIR}/mypwfile
     --cctools_install=${GALAXY_DATA_INDEX_DIR}/shared/cctools
@@ -16,7 +16,7 @@
 
     --output_SAM=$SAM_File
     #if $Makeflow_Log:
-    	--output_log=$Makeflow_Log
+	--output_log=$Makeflow_Log
     #end if
     #if $Work_Queue_Log:
 	--wq_log=$Work_Queue_Log
@@ -41,47 +41,47 @@
 			--aln-M=$check_alignalgo.params.mismatchPenalty
 			--aln-O=$check_alignalgo.params.gapOpenPenalty
 			--aln-E=$check_alignalgo.params.gapExtensPenalty
-    		--aln-R=$check_alignalgo.params.suboptAlign
-    		--aln-N=$check_alignalgo.params.noIterSearch
-    		--samse-n=$check_alignalgo.params.outputTopN
-    		--sampe-n=$check_alignalgo.params.outputTopN
-    		--sampe-a=$check_alignalgo.params.maxInsertSize
-    		--sampe-o=$check_alignalgo.params.maxOccurPairing
-    	#end if
+		--aln-R=$check_alignalgo.params.suboptAlign
+		--aln-N=$check_alignalgo.params.noIterSearch
+		--samse-n=$check_alignalgo.params.outputTopN
+		--sampe-n=$check_alignalgo.params.outputTopN
+		--sampe-a=$check_alignalgo.params.maxInsertSize
+		--sampe-o=$check_alignalgo.params.maxOccurPairing
+	#end if
     #end if
 
     #if $check_alignalgo.alignalgo=="bwa_sw":
-    	#if $check_alignalgo.checkparams_bwasw.useparam=="full":
+	#if $check_alignalgo.checkparams_bwasw.useparam=="full":
 			--bwasw-t=$check_alignalgo.checkparams_bwasw.threads
-    		--bwasw-a=$check_alignalgo.checkparams_bwasw.matchscore
-    		--bwasw-b=$check_alignalgo.checkparams_bwasw.mismatchpenalty
-    		--bwasw-q=$check_alignalgo.checkparams_bwasw.gapopen
-    		--bwasw-r=$check_alignalgo.checkparams_bwasw.gapextension
-    		--bwasw-w=$check_alignalgo.checkparams_bwasw.bandwidth
-    		--bwasw-m=$check_alignalgo.checkparams_bwasw.minthreshold
-    		--bwasw-c=$check_alignalgo.checkparams_bwasw.coeff
-    		--bwasw-z=$check_alignalgo.checkparams_bwasw.heuristics
-    		--bwasw-s=$check_alignalgo.checkparams_bwasw.interval
-    		--bwasw-N=$check_alignalgo.checkparams_bwasw.minseed
-    	#end if
+		--bwasw-a=$check_alignalgo.checkparams_bwasw.matchscore
+		--bwasw-b=$check_alignalgo.checkparams_bwasw.mismatchpenalty
+		--bwasw-q=$check_alignalgo.checkparams_bwasw.gapopen
+		--bwasw-r=$check_alignalgo.checkparams_bwasw.gapextension
+		--bwasw-w=$check_alignalgo.checkparams_bwasw.bandwidth
+		--bwasw-m=$check_alignalgo.checkparams_bwasw.minthreshold
+		--bwasw-c=$check_alignalgo.checkparams_bwasw.coeff
+		--bwasw-z=$check_alignalgo.checkparams_bwasw.heuristics
+		--bwasw-s=$check_alignalgo.checkparams_bwasw.interval
+		--bwasw-N=$check_alignalgo.checkparams_bwasw.minseed
+	#end if
     #end if
 
     #if $check_alignalgo.alignalgo=="bwa_mem":
-    	#if $check_alignalgo.checkparams_bwamem.param_bwamem=="full":
+	#if $check_alignalgo.checkparams_bwamem.param_bwamem=="full":
 			--mem-t=$check_alignalgo.checkparams_bwamem.numthread
 			--mem-k=$check_alignalgo.checkparams_bwamem.minseedlen
-    		--mem-w=$check_alignalgo.checkparams_bwamem.bwidth
-    		--mem-d=$check_alignalgo.checkparams_bwamem.offdiagonal
-    		--mem-r=$check_alignalgo.checkparams_bwamem.reseed
-    		--mem-c=$check_alignalgo.checkparams_bwamem.discardmem
-    		--mem-A=$check_alignalgo.checkparams_bwamem.matchingscore
-    		--mem-B=$check_alignalgo.checkparams_bwamem.mismatch_penalty
-    		--mem-O=$check_alignalgo.checkparams_bwamem.gopenalty
-    		--mem-E=$check_alignalgo.checkparams_bwamem.gepenalty
-    		--mem-L=$check_alignalgo.checkparams_bwamem.cpenalty
-    		--mem-U=$check_alignalgo.checkparams_bwamem.upreadpenalty
-    		--mem-T=$check_alignalgo.checkparams_bwamem.dontop
-    	#end if
+		--mem-w=$check_alignalgo.checkparams_bwamem.bwidth
+		--mem-d=$check_alignalgo.checkparams_bwamem.offdiagonal
+		--mem-r=$check_alignalgo.checkparams_bwamem.reseed
+		--mem-c=$check_alignalgo.checkparams_bwamem.discardmem
+		--mem-A=$check_alignalgo.checkparams_bwamem.matchingscore
+		--mem-B=$check_alignalgo.checkparams_bwamem.mismatch_penalty
+		--mem-O=$check_alignalgo.checkparams_bwamem.gopenalty
+		--mem-E=$check_alignalgo.checkparams_bwamem.gepenalty
+		--mem-L=$check_alignalgo.checkparams_bwamem.cpenalty
+		--mem-U=$check_alignalgo.checkparams_bwamem.upreadpenalty
+		--mem-T=$check_alignalgo.checkparams_bwamem.dontop
+	#end if
     #end if
 
 
@@ -94,7 +94,7 @@
 		<option value="is">IS</option>
 		<option value="bwtsw">BWT-SW</option>
 	</param>
-  
+
 	<conditional name="paired">
 		<param name="sPaired" type="select" label="Single-End or Paired-End Reads">
 			<option value="single">Single-end</option>
@@ -226,9 +226,9 @@
     </data>
 </outputs>
 <help>
-    
-**What it does**  
-    
+
+**What it does**
+
 **BWA** is a high performance sequence aligner that succeeds MAQ. It is based on BWT-SW but uses a completely different algorithm, and it is aimed toward short read alignments. It is fast--it can map the human genome in only 15-25 minutes. Heng Li of the Sanger Institute wrote the majority of the code, with contributions by Chi-Kwong Wong at the University of Hong Kong, Nong Ge at Sun Yat-Sen University, and Yuta Mori.
 
 ------
@@ -255,7 +255,7 @@ The output is in SAM format, and has the following columns::
   10 SEQ    -  query SEQuence on the same strand as the reference
   11 QUAL   -  query QUALity (ASCII-33 gives the Phred base quality)
   12 OPT    -  variable OPTional fields in the format TAG:VTYPE:VALU
-  
+
 The flags are as follows::
 
   Flag    -  Description
@@ -334,4 +334,4 @@ For **sampe**::
 
 
 </help>
-</tool> 
+</tool>

@@ -29,7 +29,7 @@ def read_fields(file, lines_patience = 10):
       lines_patience = lines_patience - 1
     else:
       return line.strip('#\n\r\t ').split()
-    if lines_patience < 1: 
+    if lines_patience < 1:
       break
   sys.stderr.write("Could not find fields descriptions (a line such as # timestamp total_....)\n")
   sys.exit(1)
@@ -129,7 +129,7 @@ set key right top;
 
   def write_plot(self, file):
     self.preamble(file)
-    
+
     plots = [ self.plot_line(label) for label in self.labels ]
     pout(file, 'plot %s;' % (',\\\n'.join(plots),))
 
@@ -192,9 +192,9 @@ if __name__ == '__main__':
   prefix  = logname
 
   for opt, arg in optlist:
-    if   opt == '-c': 
+    if   opt == '-c':
       gnuplot_cmd = arg
-    elif opt == '-o': 
+    elif opt == '-o':
       prefix = arg
     elif opt == '-h':
       show_usage()
@@ -222,12 +222,12 @@ if __name__ == '__main__':
     file.close()
 
     plot_of_times = WQPlot(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
-        fields = ['timestamp', 'total_transfer_time', 'total_master_time', 
+        fields = ['timestamp', 'total_transfer_time', 'total_master_time',
                   'total_send_time', 'total_receive_time'],
         labels = ['wall time', 'sent+recv', 'master', 'sent', 'rec'])
 
     plot_of_times_log = WQPlotLog(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
-        fields = ['timestamp', 'total_transfer_time', 'total_master_time', 
+        fields = ['timestamp', 'total_transfer_time', 'total_master_time',
                   'total_send_time', 'total_receive_time', 'total_execute_time'],
         labels = ['wall time', 'sent+recv', 'master', 'sent', 'rec', 'exec'])
 
@@ -247,6 +247,3 @@ if __name__ == '__main__':
   except IOError:
     sys.stderr.write("Could not open file %s\n" % (logname,))
     sys.exit(1)
-
-
-

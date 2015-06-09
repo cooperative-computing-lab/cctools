@@ -45,5 +45,3 @@ try
 catch
 	echo "Endless recursion was stopped correctly."
 end
-
-

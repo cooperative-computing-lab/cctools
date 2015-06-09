@@ -4,13 +4,13 @@ SUBMIT_COMMON=$(which work_queue_submit_common)
 if [ -z "$SUBMIT_COMMON" ];
 then
 	echo "Please add 'work_queue_submit_common' to your PATH." 1>&2
-    exit 1
+	exit 1
 else
 	. $SUBMIT_COMMON
 fi
 
 
-show_help() 
+show_help()
 {
 	echo "  -r <requirements>        Condor requirements ClassAd."
 	echo "  --autosize               Condor will automatically size the worker to the slot."
@@ -28,7 +28,7 @@ parse_arguments()
 	while [ $# -gt 0 ]
 	do
 		case $1 in
-			-r)  
+			-r)
 			shift
 			requirements="$requirements $1"
 			;;
@@ -43,7 +43,7 @@ parse_arguments()
 			*)
 			break
 			;;
-			
+
 		esac
 		shift
 	done
@@ -78,17 +78,17 @@ getenv = true
 EOF
 
 	if [ ! -z "$cores" ]; then
-	    echo "request_cpus = ${cores}" >> condor_submit_file.$$
+		echo "request_cpus = ${cores}" >> condor_submit_file.$$
 	fi
 
 	if [ ! -z "$memory" ]; then
-	    #Memory in megabytes
-	    echo "request_memory = ${memory}" >> condor_submit_file.$$
+		#Memory in megabytes
+		echo "request_memory = ${memory}" >> condor_submit_file.$$
 	fi
 
 	if [ ! -z "$disk" ]; then
-	    #Disk in kilobytes
-	    echo "$disk" | awk '{ printf "request_disk =  %d\n", $1 * 1024 }' >> condor_submit_file.$$
+		#Disk in kilobytes
+		echo "$disk" | awk '{ printf "request_disk =  %d\n", $1 * 1024 }' >> condor_submit_file.$$
 	fi
 
 	echo "queue $count" >> condor_submit_file.$$
@@ -98,4 +98,3 @@ EOF
 }
 
 submit_workers "$@"
-

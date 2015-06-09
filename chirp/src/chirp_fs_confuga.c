@@ -307,7 +307,7 @@ struct chirp_dir *chirp_fs_confuga_opendir(const char *path)
 {
 	int rc;
 	struct chirp_dir *dir = NULL;
-	
+
 	dir = malloc(sizeof(struct chirp_dir));
 	if (dir == NULL) CATCH(ENOMEM);
 

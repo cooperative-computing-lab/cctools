@@ -183,7 +183,7 @@ workdir_number_files_dirs [current number of files and directories, across all
                            working directories in the tree,                        int]
 workdir_footprint         [current size of working directories in the tree, in MB  int]
 </code>
-     
+
 <h2 id="specifyinglimits">Specifying Resource Limits<a class="sectionlink" href="#specifyinglimits" title="Link to this section.">&#x21d7;</a></h2>
 
       The limits file should contain lines of the form:
@@ -210,7 +210,7 @@ swap_memory: 5242880
       <code>makeflow -Mmonitor_logs --monitor-limits=limits.txt</code>
 
       Or with <tt>condor:</tt>
-	
+
 <code>universe = vanilla
 executable = matlab
 arguments = -O matlab-script-log --limits-file=limits.txt -- matlab &lt; script.m
@@ -221,7 +221,7 @@ when_to_transfer_output = on_exit
 log = condor.matlab.logfile
 queue
 </code>
-      
+
 <h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
   For the latest information about <b>resource_monitor</b> please subscribe to our <a href="http://ccl.cse.nd.edu/software">mailing list</a>.

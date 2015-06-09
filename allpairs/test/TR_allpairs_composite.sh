@@ -12,10 +12,10 @@ export PATH=.:../src:../../work_queue/src:$PATH
 
 cleanfiles()
 {
-        if [ -f $TEST_INPUT ]
-        then
-                xargs rm < $TEST_INPUT
-        fi
+		if [ -f $TEST_INPUT ]
+		then
+				xargs rm < $TEST_INPUT
+		fi
 
 	rm -f $TEST_INPUT
 	rm -f $TEST_OUTPUT_STEP
@@ -40,7 +40,7 @@ run()
 	wait_for_file_creation $PORT_FILE 5
 
 	echo "starting worker"
- 	work_queue_worker localhost `cat $PORT_FILE` --timeout 10 --single-shot
+	work_queue_worker localhost `cat $PORT_FILE` --timeout 10 --single-shot
 
 	echo "checking output"
 	awk '$3 ~ /^0$/{print $1}' $TEST_OUTPUT_STEP | sort -n | uniq > $TEST_OUTPUT
@@ -51,7 +51,7 @@ run()
 
 clean()
 {
-    	cleanfiles
+		cleanfiles
 	exit 0
 }
 

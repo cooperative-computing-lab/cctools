@@ -4,24 +4,24 @@
 
 prepare()
 {
-    exit 0
+	exit 0
 }
 
 run()
 {
-    cd syntax
+	cd syntax
 
-    if ../../src/makeflow_analyze -k variable_issues.makeflow
-    then
-      exit 1
-    else
-      exit 0
-    fi
+	if ../../src/makeflow_analyze -k variable_issues.makeflow
+	then
+	  exit 1
+	else
+	  exit 0
+	fi
 }
 
 clean()
 {
-    exit 0
+	exit 0
 }
 
 dispatch $@

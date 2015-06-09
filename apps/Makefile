@@ -6,7 +6,7 @@ SCRIPTS = makeflow_blast/makeflow_blast makeflow_bwa/makeflow_bwa makeflow_gatk/
 
 all:
 
-install: 
+install:
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	chmod 755 $(SCRIPTS)
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/

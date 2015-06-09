@@ -162,7 +162,7 @@ struct ast_assign * ast_assign_create( int line, struct ast_word *name, struct e
 	ALLOC(r);
 
 	r->line = line;
-       	r->name = name;
+		r->name = name;
 	r->expr = expr;
 
 	return r;

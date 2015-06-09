@@ -383,7 +383,7 @@ static unsigned char pcx_rle_value = 0;
 static unsigned char pcx_rle_read(FILE * file)
 {
 	unsigned char c;
-      retry:if(pcx_rle_repeat > 0) {
+	  retry:if(pcx_rle_repeat > 0) {
 		pcx_rle_repeat--;
 		return pcx_rle_value;
 	}

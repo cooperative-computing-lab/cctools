@@ -34,8 +34,8 @@ static const char *file_type_to_string(file_type type){
 }
 
 enum { LONG_OPT_DRY_RUN = 1,
-       LONG_OPT_VERBOSE,
-     };
+	   LONG_OPT_VERBOSE,
+	 };
 
 struct dependency{
 	char *original_name;

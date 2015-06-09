@@ -1,28 +1,28 @@
-#!/bin/sh 
+#!/bin/sh
 
 SUBMIT_COMMON=$(which work_queue_submit_common)
 if [ -z "$SUBMIT_COMMON" ];
 then
 	echo "Please add 'work_queue_submit_common' to your PATH." 1>&2
-    exit 1
+	exit 1
 else
 	. $SUBMIT_COMMON
 fi
 
 
-show_help() 
+show_help()
 {
-        echo "Use: ec2_submit_workers [options] <servername> <port> <ec2-key-name> <ec2-key-file> <num-ec2-instances>"
-        echo "where options are:"
+		echo "Use: ec2_submit_workers [options] <servername> <port> <ec2-key-name> <ec2-key-file> <num-ec2-instances>"
+		echo "where options are:"
 		echo "  -k,--key-name <string>  Name of the EC2 key name. (required)"
 		echo "  -K,--key-file <path>    Path to the EC2 key file. (required)"
-        echo "  -n,--instances <number> Set the number of EC2 instances to launch. Each instance will"
+		echo "  -n,--instances <number> Set the number of EC2 instances to launch. Each instance will"
 		echo "                          launch <num-workers> workers. (required)"
-        echo "  -I <image_id>           EC2 OS image ID. Default = ami-fa01f193 (Ubuntu 10.04 x86_64)."
-        echo "  -Z <instance_size>      EC2 instance size. Default = m1.large."
-        echo "  -p <parameters>         Set parameters for ec2-run-instances."
-        echo "  -h                      Show this help message."
-        exit 1
+		echo "  -I <image_id>           EC2 OS image ID. Default = ami-fa01f193 (Ubuntu 10.04 x86_64)."
+		echo "  -Z <instance_size>      EC2 instance size. Default = m1.large."
+		echo "  -p <parameters>         Set parameters for ec2-run-instances."
+		echo "  -h                      Show this help message."
+		exit 1
 }
 
 image=ami-fa01f193
@@ -128,4 +128,3 @@ EOF
 }
 
 submit_workers "$@"
-

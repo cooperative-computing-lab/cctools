@@ -13,4 +13,3 @@ chooses an arbitrary port to run.
 */
 
 void opts_write_port_file(const char *port_file, const int port);
-

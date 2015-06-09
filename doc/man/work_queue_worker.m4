@@ -1,7 +1,7 @@
 include(manual.h)dnl
 HEADER(work_queue_worker)
 
-SECTION(NAME) 
+SECTION(NAME)
 BOLD(work_queue_worker) - worker process for executing tasks
 dispatched through Work Queue
 
@@ -11,20 +11,20 @@ CODE(BOLD(work_queue_worker [options] PARAM(masterhost) PARAM(port)))
 SECTION(DESCRIPTION)
 
 BOLD(work_queue_worker) is the worker process for executing tasks dispatched
-from a master application built using the BOLD(Work Queue) API. BOLD(work_queue_worker) 
-connects to the master application, accepts, runs, and returns tasks dispatched to it. 
+from a master application built using the BOLD(Work Queue) API. BOLD(work_queue_worker)
+connects to the master application, accepts, runs, and returns tasks dispatched to it.
 
 PARA
 
-The BOLD(masterhost) and BOLD(port) arguments specify the hostname and port number 
-of the master application for work_queue_worker to connect. These two arguments 
+The BOLD(masterhost) and BOLD(port) arguments specify the hostname and port number
+of the master application for work_queue_worker to connect. These two arguments
 become optional when the auto mode option is specified.
 
 PARA
 
 BOLD(work_queue_worker) can be run locally or deployed remotely on any of the
 grid or cloud computing environments such as SGE, Amazon EC2, Condor using
-MANPAGE(sge_submit_workers,1), MANPAGE(ec2_submit_workers,1), 
+MANPAGE(sge_submit_workers,1), MANPAGE(ec2_submit_workers,1),
 MANPAGE(condor_submit_workers,1) respectively.
 
 SECTION(OPTIONS)
@@ -58,9 +58,9 @@ OPTION_PAIR(--memory, mb)Manually set the amount of memory (in MB) reported by t
 OPTION_PAIR(--disk, mb)Manually set the amount of disk space (in MB) reported by this worker.
 OPTION_ITEM(-v, --version')Show version string.
 OPTION_ITEM(-h, --help')Show this help message.
-OPTION_PAIR(--docker, image) Enable the worker to run each task with a container based on this image. 
-OPTION_PAIR(--docker-preserve, image) Enable the worker to run all tasks with a shared container based on this image. 
-OPTION_PAIR(--docker-tar, tarball) Load docker image from this tarball.  
+OPTION_PAIR(--docker, image) Enable the worker to run each task with a container based on this image.
+OPTION_PAIR(--docker-preserve, image) Enable the worker to run all tasks with a shared container based on this image.
+OPTION_PAIR(--docker-tar, tarball) Load docker image from this tarball.
 OPTIONS_END
 
 SECTION(FOREMAN MODE)
@@ -77,16 +77,16 @@ presence on the MANPAGE(catalog_server) with the BOLD(-N PARAM(project name)) fl
 contact the foreman.
 
 SECTION(CONTAINER MODE)
-BOLD(work_queue_worker) can be run with container. Docker is the default management tool and docker deamon should be enabled 
-in computing nodes. Tasks received from master can be run with container based on user specified docker image. 
+BOLD(work_queue_worker) can be run with container. Docker is the default management tool and docker deamon should be enabled
+in computing nodes. Tasks received from master can be run with container based on user specified docker image.
 
 PARA
 
-BOLD(Container) mode is enable by either specifying a image name using the BOLD(--docker PARAM(image)) option, which enable workers 
-running each tasks with an independent container or by using the BOLD(--docker-preserve PARAM(image)) option, which enable workers 
-running all tasks with a shared container. The default way to manage the image is using docker hub, which means user 
+BOLD(Container) mode is enable by either specifying a image name using the BOLD(--docker PARAM(image)) option, which enable workers
+running each tasks with an independent container or by using the BOLD(--docker-preserve PARAM(image)) option, which enable workers
+running all tasks with a shared container. The default way to manage the image is using docker hub, which means user
 has to push the container image into the docker hub in advance. If the image is saved in a tarball and cached in the
-computing node, BOLD(--docker-tar PARAM(tarball)) option can be adopted to load the image from the tarball. 
+computing node, BOLD(--docker-tar PARAM(tarball)) option can be adopted to load the image from the tarball.
 
 SECTION(EXIT STATUS)
 On success, returns zero.  On failure, returns non-zero.
@@ -101,7 +101,7 @@ LONGCODE_END
 To run BOLD(work_queue_worker) in auto mode with debugging turned on for all subsystems and
 to accept tasks only from a master application with project name set to project_A:
 LONGCODE_BEGIN
-% work_queue_worker -a -d all -M project_A 
+% work_queue_worker -a -d all -M project_A
 LONGCODE_END
 
 To run BOLD(work_queue_worker) as a foreman working for project_A and advertising itself as foreman_A1 while listening on port 9123:
@@ -118,4 +118,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_WORK_QUEUE
 
 FOOTER
-

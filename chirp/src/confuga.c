@@ -78,25 +78,25 @@ static void profile (void *ud, const char *stmt, sqlite3_uint64 nano)
 
 static void s_log (sqlite3_context *context, int argc, sqlite3_value **argv)
 {
-    if (argc == 1) {
+	if (argc == 1) {
 		sqlite3_result_double(context, log(sqlite3_value_double(argv[0])));
-    } else {
+	} else {
 		sqlite3_result_null(context);
 	}
 }
 
 static void s_floor (sqlite3_context *context, int argc, sqlite3_value **argv)
 {
-    if (argc == 1) {
+	if (argc == 1) {
 		sqlite3_result_double(context, floor(sqlite3_value_double(argv[0])));
-    } else {
+	} else {
 		sqlite3_result_null(context);
 	}
 }
 
 static void s_url_truncate (sqlite3_context *context, int argc, sqlite3_value **argv)
 {
-    if (argc == 1) {
+	if (argc == 1) {
 		size_t n;
 		BUFFER_STACK(B, CHIRP_PATH_MAX); /* limit url list size */
 		const char *urls = (const char *)sqlite3_value_text(argv[0]);
@@ -115,7 +115,7 @@ static void s_url_truncate (sqlite3_context *context, int argc, sqlite3_value **
 		assert(buffer_pos(&B));
 		sqlite3_result_text(context, buffer_tostring(&B), -1, SQLITE_TRANSIENT);
 		url = realloc(url, 0);
-    } else {
+	} else {
 		sqlite3_result_null(context);
 	}
 }

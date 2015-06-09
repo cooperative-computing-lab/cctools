@@ -48,7 +48,7 @@ CREATE TEMPORARY TABLE IDS AS
 
 SELECT TransferJob.tsid, TransferJob.time_new-min, TransferJob.time_complete-min, Confuga.TransferJob.tag, IDS.rowid
 	FROM
-		Confuga.TransferJob 
+		Confuga.TransferJob
 		JOIN IDS ON Confuga.TransferJob.tag = IDS.tag,
 		(SELECT MIN(TransferJob.time_new) AS min FROM TransferJob);
 EOF
@@ -63,7 +63,7 @@ CREATE TEMPORARY TABLE IDS AS
 
 SELECT TransferJob.fsid, TransferJob.time_new-min, TransferJob.time_complete-min, Confuga.TransferJob.tag, IDS.rowid
 	FROM
-		Confuga.TransferJob 
+		Confuga.TransferJob
 		JOIN IDS ON Confuga.TransferJob.tag = IDS.tag,
 		(SELECT MIN(TransferJob.time_new) AS min FROM TransferJob);
 EOF
@@ -98,11 +98,11 @@ set ytics 1,1 offset 0,0.5 rangelimited
 unset colorbox
 
 plot "$data_run" u 2:(\$1+.2):(\$3-\$2):(0):5 with vectors arrowstyle 2 notitle, \\
-     "$data_sen" u 2:(\$1+.5):(\$3-\$2):(0):5 with vectors arrowstyle 2 notitle, \\
-     "$data_rec" u 2:(\$1+.825):(\$3-\$2):(0):5 with vectors arrowstyle 2 notitle, \\
-     "$data_run" u 3:(\$1+.2):(3):(0):(4) with vectors arrowstyle 6 notitle, \\
-     "$data_run" u 2:(\$1+.2):(3):(0):(4) with vectors arrowstyle 6 notitle, \\
-     for [i=1:${N}] i notitle ls 3
+	 "$data_sen" u 2:(\$1+.5):(\$3-\$2):(0):5 with vectors arrowstyle 2 notitle, \\
+	 "$data_rec" u 2:(\$1+.825):(\$3-\$2):(0):5 with vectors arrowstyle 2 notitle, \\
+	 "$data_run" u 3:(\$1+.2):(3):(0):(4) with vectors arrowstyle 6 notitle, \\
+	 "$data_run" u 2:(\$1+.2):(3):(0):(4) with vectors arrowstyle 6 notitle, \\
+	 for [i=1:${N}] i notitle ls 3
 EOF
 
 # vim: set noexpandtab tabstop=4:

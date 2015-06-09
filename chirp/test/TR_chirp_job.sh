@@ -171,21 +171,21 @@ EOF
 	chirp -a unix -d all "$hostport" job_commit "[$J2]"
 
 	echo Job status for $J1.
-    chirp -a unix -d all "$hostport" job_status "[$J1]"
+	chirp -a unix -d all "$hostport" job_status "[$J1]"
 	echo Job status for $J1b.
-    chirp -a unix -d all "$hostport" job_status "[$J1b]"
+	chirp -a unix -d all "$hostport" job_status "[$J1b]"
 	echo Job status for $J1c.
-    chirp -a unix -d all "$hostport" job_status "[$J1c]"
+	chirp -a unix -d all "$hostport" job_status "[$J1c]"
 	echo Job status for $J2.
-    chirp -a unix -d all "$hostport" job_status "[$J2]"
+	chirp -a unix -d all "$hostport" job_status "[$J2]"
 
 	echo Waiting for jobs.
-    chirp -a unix -d all "$hostport" job_wait $J1 2
-    chirp -a unix -d all "$hostport" job_reap "[$J1]"
-    chirp -a unix -d all "$hostport" job_wait 0 1
-    chirp -a unix -d all "$hostport" job_reap "[$J1b,$J1c]"
-    chirp -a unix -d all "$hostport" job_status "[$J1b]"
-    chirp -a unix -d all "$hostport" job_status "[$J1c]"
+	chirp -a unix -d all "$hostport" job_wait $J1 2
+	chirp -a unix -d all "$hostport" job_reap "[$J1]"
+	chirp -a unix -d all "$hostport" job_wait 0 1
+	chirp -a unix -d all "$hostport" job_reap "[$J1b,$J1c]"
+	chirp -a unix -d all "$hostport" job_status "[$J1b]"
+	chirp -a unix -d all "$hostport" job_status "[$J1c]"
 
 	# An error due to ACL
 	json=$(cat <<EOF

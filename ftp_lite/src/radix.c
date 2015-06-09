@@ -22,7 +22,7 @@ were adapted from similarly-named functions in globus_ftp_control_client.c
 #include <string.h>
 
 static char *radixN =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 static char pad = '=';
 

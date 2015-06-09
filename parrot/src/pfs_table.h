@@ -96,7 +96,7 @@ public:
 	int	rmdir( const char *path );
 	struct dirent * fdreaddir( int fd );
 
-    /* extended attributes */
+	/* extended attributes */
 	ssize_t getxattr (const char *path, const char *name, void *value, size_t size);
 	ssize_t lgetxattr (const char *path, const char *name, void *value, size_t size);
 	ssize_t fgetxattr (int fd, const char *name, void *value, size_t size);

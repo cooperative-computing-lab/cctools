@@ -379,8 +379,8 @@ class MakeflowLog( cctools ):
 	def __init__(self, **kwd):
 		"""Initialize taxonomy datatype"""
 		cctools.__init__( self, **kwd )
-		self.column_names = ['Timestamp', 'NodeId', 'NewState', 'JobId', 
-				'NodesWaiting', 'NodesRunning', 'NodesComplete', 
+		self.column_names = ['Timestamp', 'NodeId', 'NewState', 'JobId',
+				'NodesWaiting', 'NodesRunning', 'NodesComplete',
 				'NodesFailed', 'NodesAborted', 'NodeIdCounter'
 							 ]
 	def display_peek( self, dataset ):
@@ -473,11 +473,11 @@ class WorkQueueLog( cctools ):
 	def __init__(self, **kwd):
 		"""Initialize taxonomy datatype"""
 		cctools.__init__( self, **kwd )
-		self.column_names = ['Timestamp', 'TotalWorkersConnected', 'WorkersInit', 
+		self.column_names = ['Timestamp', 'TotalWorkersConnected', 'WorkersInit',
 							 'WorkersIdle', 'WorkersBusy', 'TotalWorkersJoined',
-							 'TotalWorkersRemoved', 'TasksWaiting', 'TasksRunning', 
+							 'TotalWorkersRemoved', 'TasksWaiting', 'TasksRunning',
 							 'TasksComplete', 'TotalTasksDispatched', 'TotalTasksComplete',
-							 'TotalTasksCancelled', 'StartTime', 'TotalSendTime', 
+							 'TotalTasksCancelled', 'StartTime', 'TotalSendTime',
 							 'TotalReceiveTime', 'TotalBytesSent', 'TotalBytesReceived',
 							 'Efficiency', 'IdlePercentage', 'Capacity', 'Bandwidth',
 							 'TotalCores', 'TotalMemory', 'TotalDisk', 'TotalGPUs',
@@ -552,10 +552,10 @@ class WorkQueueLog( cctools ):
 			dataset_fh.close()
 			dataset.metadata.comment_lines = comment_lines
 			dataset.metadata.columns = 34
-			dataset.metadata.column_types = ['str', 'int', 'int', 'int', 'int', 
-											 'int', 'int', 'int', 'int', 'int', 
-											 'int', 'int', 'int', 'int', 'int', 
-											 'int', 'int', 'int', 'int', 'int', 
-											 'int', 'int', 'int', 'int', 'int', 
-											 'int', 'int', 'int', 'int', 'int', 
+			dataset.metadata.column_types = ['str', 'int', 'int', 'int', 'int',
+											 'int', 'int', 'int', 'int', 'int',
+											 'int', 'int', 'int', 'int', 'int',
+											 'int', 'int', 'int', 'int', 'int',
+											 'int', 'int', 'int', 'int', 'int',
+											 'int', 'int', 'int', 'int', 'int',
 											 'int', 'int', 'int', 'int', 'int', 'int']

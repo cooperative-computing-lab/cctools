@@ -46,10 +46,10 @@ int fd_nonstd_close (void)
 	for (fd = STDERR_FILENO+1; fd < max; fd++) {
 		if (close(fd) == -1 && errno != EBADF) {
 			debug(D_DEBUG, "could not close open file descriptor: %s", strerror(errno));
-            return errno;
+			return errno;
 		}
 	}
-    return 0;
+	return 0;
 }
 
 int fd_null (int fd, int oflag)

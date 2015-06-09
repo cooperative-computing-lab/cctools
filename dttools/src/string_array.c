@@ -41,7 +41,7 @@ char **string_array_append (char **oarray, const char *str)
 	*tmp = (char *) (((char *)narray)+olength+sizeof(char *)); /* set to new string location */
 	strcpy(*tmp, str);
 	tmp++; /* now points to the old data length */
-    memmove(((char *)tmp)+sizeof(char *), tmp, olength-(((char *)tmp)-((char *)narray))); /* careful with pointer arithmetic */
+	memmove(((char *)tmp)+sizeof(char *), tmp, olength-(((char *)tmp)-((char *)narray))); /* careful with pointer arithmetic */
 	*tmp = NULL; /* set NULL terminated final entry */
 	tmp++;
 	*((size_t *) tmp) = nlength; /* set the new length */

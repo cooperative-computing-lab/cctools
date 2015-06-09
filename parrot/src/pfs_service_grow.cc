@@ -201,13 +201,13 @@ struct grow_dirent * grow_dirent_create_from_file( FILE *file, struct grow_diren
 
 		/* old large file format */
 		int fields = sscanf(line,"%c %[^\t]\t%o %*d %" PRIu64 " %*d %*d %ld %*d %s %[^\n]",
-                        &type,
-                        name,
-                        &d->mode,
-                        &d->size,
-                        &d->mtime,
-                        d->checksum,
-                        linkname);
+						&type,
+						name,
+						&d->mode,
+						&d->size,
+						&d->mtime,
+						d->checksum,
+						linkname);
 
 		if(fields<6) {
 		  /* new more compact file format */
@@ -712,8 +712,8 @@ public:
 		/* If we get stat("/grow") then construct a dummy entry. */
 
 		if(!name->host[0]) {
-                        pfs_service_emulate_stat(name,info);
-                        info->st_mode = S_IFDIR | 0555;
+						pfs_service_emulate_stat(name,info);
+						info->st_mode = S_IFDIR | 0555;
 			return 0;
 		}
 
@@ -731,8 +731,8 @@ public:
 		/* If we get stat("/grow") then construct a dummy entry. */
 
 		if(!name->host[0]) {
-                        pfs_service_emulate_stat(name,info);
-                        info->st_mode = S_IFDIR | 0555;
+						pfs_service_emulate_stat(name,info);
+						info->st_mode = S_IFDIR | 0555;
 			return 0;
 		}
 

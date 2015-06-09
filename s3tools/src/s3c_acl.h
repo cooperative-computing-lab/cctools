@@ -30,4 +30,3 @@ int s3_getacl(char* bucketname, char* filename, char *owner, struct hash_table* 
 int s3_setacl(char* bucketname, char* filename, const char* owner, struct hash_table* acls, const char* access_key_id, const char* access_key);
 
 #endif
-

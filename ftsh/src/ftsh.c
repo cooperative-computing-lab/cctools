@@ -42,23 +42,23 @@ static void show_help( char *cmd )
 Use: ftsh [options] <program> [arg1] [arg2]\n\
 Where options are:\n\
   -f <file>  Log file.\n\
-             Default is the standard error.\n\
-             Overrides environment variable FTSH_LOG_FILE.\n\
+			 Default is the standard error.\n\
+			 Overrides environment variable FTSH_LOG_FILE.\n\
   -l <level> Log level. Default is '10'.\n\
-             0  = log nothing\n\
-             10 = log failed commands\n\
-             20 = log all commands\n\
-             30 = log program structures\n\
-             40 = log process and signal activity\n\
-             Overrides environment variable FTSH_LOG_LEVEL.\n\
+			 0  = log nothing\n\
+			 10 = log failed commands\n\
+			 20 = log all commands\n\
+			 30 = log program structures\n\
+			 40 = log process and signal activity\n\
+			 Overrides environment variable FTSH_LOG_LEVEL.\n\
   -D         Log time values in decimal format.\n\
-             Overrides environment variable FTSH_LOG_DECIMAL.\n\
+			 Overrides environment variable FTSH_LOG_DECIMAL.\n\
   -t <secs>  Kill timeout.  Default is '30'.\n\
-             Number of seconds between soft kill and hard kill.\n\
-             Overrides environment variable FTSH_KILL_TIMEOUT.\n\
+			 Number of seconds between soft kill and hard kill.\n\
+			 Overrides environment variable FTSH_KILL_TIMEOUT.\n\
   -k <mode>  Kill mode.  Default is 'strong'.\n\
-             May be 'weak' or 'strong'.\n\
-             Overrides environment variable FTSH_KILL_MODE.\n\
+			 May be 'weak' or 'strong'.\n\
+			 Overrides environment variable FTSH_KILL_MODE.\n\
   -p or -n   Parse and print program, but do not execute.\n\
   -P         Parse and print program, including parser debug log.\n\
   -v         Show version string.\n\
@@ -79,7 +79,7 @@ static int ftsh_main( int argc, char *argv[] )
 	char *kill_mode = "strong";
 	FILE *stream;
 	char *s;
-    signed char c;
+	signed char c;
 	char env[1024];
 	int result;
 	struct sigaction sa;
@@ -210,7 +210,7 @@ static int ftsh_main( int argc, char *argv[] )
 	/* Now, initialize my systems */
 
 	if(log_file) {
-       		stream = fopen(log_file,"a");
+			stream = fopen(log_file,"a");
 		if(!stream) ftsh_fatal(0,"couldn't open log file %s: %s",log_file,strerror(errno));
 		ftsh_error_stream(stream);
 	}

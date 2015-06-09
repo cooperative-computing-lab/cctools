@@ -10,7 +10,7 @@ list.  The resulting OVL records are compared against a correct key as
 verification.
 
 The following will explain how to run the example, and describe the
-common execution steps included in the example script. 
+common execution steps included in the example script.
 
 Setup and Execution
 -------------------

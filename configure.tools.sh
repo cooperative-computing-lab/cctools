@@ -194,12 +194,12 @@ library_search_normal()
 	# If we are running on a 64-bit platform, then the native libraries
 	# for compiling will be found in /lib64, if it exists.  The files in
 	# /lib are compatibilities libraries for 32-bit.
-	
+
 	if [ $BUILD_CPU = X86_64 -a -d $2/lib64 ]
 	then
 		libdir=$basedir/lib64
 	elif [ -d $basedir/lib ]
-        then
+		then
 		libdir=$basedir/lib
 	else
 		libdir=$basedir
@@ -265,7 +265,7 @@ library_search_normal()
 			return 0
 		fi
 	fi
-	
+
 	return 1
 }
 
@@ -299,7 +299,7 @@ optional_function()
 		ccflags_append_define "$@"
 		return 0
 	fi
-		
+
 	return 1
 }
 
@@ -435,14 +435,14 @@ check_perl_version()
 		echon "checking perl version..."
 		cat >configure.perl-test <<EOF
 print "\$]\n";
- 
+
 \$v = \$ARGV[0]+\$ARGV[1]/1000+\$ARGV[2]/1000000;
- 
+
 if(\$v>=\$]) {
-        exit 1;
+		exit 1;
 } else  {
-        exit 0;
-} 
+		exit 0;
+}
 EOF
 		if perl configure.perl-test $1 $2 $3
 		then
@@ -484,7 +484,7 @@ check_for_globus_flavors()
 	# globus-makefile-header seems to move around.
 	# Use -f rather than -x, because the AFS acl may
 	# not match the UNIX perms.
-	#	
+	#
 
 	GMH=$1/sbin/globus-makefile-header
 	echo "checking for $GMH..."
@@ -505,7 +505,7 @@ check_for_globus_flavors()
 	# a perl script.  However, we don't want to universally assume
 	# that it is perl without some evidence.
 	#
-	 
+
 	if head -1 $GMH | grep perl > /dev/null 2>&1
 	then
 		GMH="perl ${GMH}"
@@ -589,7 +589,7 @@ check_for_globus()
 
 check_multiarch()
 {
-	echon "checking for multiarch environment..." 
+	echon "checking for multiarch environment..."
 	if [ -r /etc/debian_version ]; then
 		HOST_MULTIARCH=`dpkg-architecture -qDEB_HOST_MULTIARCH 2> /dev/null`
 		echo "$HOST_MULTIARCH"
@@ -601,7 +601,7 @@ check_multiarch()
 
 format_version()
 {
-	echo "$@" | awk -F. '{printf("%d%03d%03d%03d", $1, $2, $3, $4); }'	
+	echo "$@" | awk -F. '{printf("%d%03d%03d%03d", $1, $2, $3, $4); }'
 }
 
 # vim: set noexpandtab tabstop=4:

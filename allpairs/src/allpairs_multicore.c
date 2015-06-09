@@ -329,7 +329,7 @@ int main(int argc, char *argv[])
 		{"extra-args", required_argument, 0, 'e'},
 		{"symmetric", no_argument, 0, LONG_OPT_SYMMETRIC},
 		{"index", required_argument, 0, LONG_OPT_INDEX},
-        {0,0,0,0}
+		{0,0,0,0}
 	};
 
 	while((c = getopt_long(argc, argv, "b:c:e:d:vh", long_options, NULL)) > -1) {

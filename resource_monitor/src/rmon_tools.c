@@ -395,4 +395,3 @@ struct rmDsummary_set *make_new_set(char *category)
 
 	return ss;
 }
-

@@ -75,20 +75,20 @@ struct pfs_kernel_utimbuf {
 struct pfs_kernel_rusage {
 	struct pfs_kernel_timeval ru_utime;
 	struct pfs_kernel_timeval ru_stime;
- 	INT32_T ru_maxrss;
- 	INT32_T ru_ixrss;
- 	INT32_T ru_idrss;
- 	INT32_T ru_isrss;
- 	INT32_T ru_minflt;
- 	INT32_T ru_majflt;
- 	INT32_T ru_nswap;
- 	INT32_T ru_inblock;
- 	INT32_T ru_oublock;
- 	INT32_T ru_msgsnd;
- 	INT32_T ru_msgrcv;
- 	INT32_T ru_nsignals;
- 	INT32_T ru_nvcsw;
- 	INT32_T ru_nivcsw;
+	INT32_T ru_maxrss;
+	INT32_T ru_ixrss;
+	INT32_T ru_idrss;
+	INT32_T ru_isrss;
+	INT32_T ru_minflt;
+	INT32_T ru_majflt;
+	INT32_T ru_nswap;
+	INT32_T ru_inblock;
+	INT32_T ru_oublock;
+	INT32_T ru_msgsnd;
+	INT32_T ru_msgrcv;
+	INT32_T ru_nsignals;
+	INT32_T ru_nvcsw;
+	INT32_T ru_nivcsw;
 } __attribute__((packed));
 
 struct pfs_kernel_stat {
@@ -103,12 +103,12 @@ struct pfs_kernel_stat {
 	UINT32_T st_blksize;
 	UINT32_T st_blocks;
 #if !defined(st_atime)
-        INT32_T st_atime;
-        INT32_T st_atime_nsec;
-        INT32_T st_mtime;
-        INT32_T st_mtime_nsec;
-        INT32_T st_ctime;
-        INT32_T st_ctime_nsec;
+		INT32_T st_atime;
+		INT32_T st_atime_nsec;
+		INT32_T st_mtime;
+		INT32_T st_mtime_nsec;
+		INT32_T st_ctime;
+		INT32_T st_ctime_nsec;
 #else
 	struct pfs_kernel_timespec st_atim;
 	struct pfs_kernel_timespec st_mtim;
@@ -132,45 +132,45 @@ struct pfs_kernel_stat64 {
 	UINT32_T st_blksize;
 	UINT64_T st_blocks;
 #if !defined(st_atime)
-        UINT32_T st_atime;
-        UINT32_T st_atime_nsec;
-        UINT32_T st_mtime;
-        UINT32_T st_mtime_nsec;
-        UINT32_T st_ctime;
-        UINT32_T st_ctime_nsec;
+		UINT32_T st_atime;
+		UINT32_T st_atime_nsec;
+		UINT32_T st_mtime;
+		UINT32_T st_mtime_nsec;
+		UINT32_T st_ctime;
+		UINT32_T st_ctime_nsec;
 #else
-        struct pfs_kernel_timespec st_atim;
-        struct pfs_kernel_timespec st_mtim;
-        struct pfs_kernel_timespec st_ctim;
+		struct pfs_kernel_timespec st_atim;
+		struct pfs_kernel_timespec st_mtim;
+		struct pfs_kernel_timespec st_ctim;
 #endif
 	UINT64_T st_ino_extra;
 } __attribute__((packed));
 
 struct pfs_kernel_statfs {
-        UINT32_T f_type;
-        UINT32_T f_bsize;
-        UINT32_T f_blocks;
-        UINT32_T f_bfree;
-        UINT32_T f_bavail;
-        UINT32_T f_files;
-        UINT32_T f_ffree;
+		UINT32_T f_type;
+		UINT32_T f_bsize;
+		UINT32_T f_blocks;
+		UINT32_T f_bfree;
+		UINT32_T f_bavail;
+		UINT32_T f_files;
+		UINT32_T f_ffree;
 	UINT64_T f_fsid;
-        UINT32_T f_namelen;
-        UINT32_T f_spare[6];
+		UINT32_T f_namelen;
+		UINT32_T f_spare[6];
 } __attribute__((packed));
 
 struct pfs_kernel_statfs64 {
-        UINT32_T f_type;
-        UINT32_T f_bsize;
-        UINT64_T f_blocks;
-        UINT64_T f_bfree;
-        UINT64_T f_bavail;
-        UINT64_T f_files;
-        UINT64_T f_ffree;
-        UINT64_T f_fsid;
-        UINT32_T f_namelen;
-        UINT32_T f_frsize;
-        UINT32_T f_spare[5];
+		UINT32_T f_type;
+		UINT32_T f_bsize;
+		UINT64_T f_blocks;
+		UINT64_T f_bfree;
+		UINT64_T f_bavail;
+		UINT64_T f_files;
+		UINT64_T f_ffree;
+		UINT64_T f_fsid;
+		UINT32_T f_namelen;
+		UINT32_T f_frsize;
+		UINT32_T f_spare[5];
 } __attribute__((packed));
 
 struct pfs_kernel_iovec {
@@ -189,14 +189,14 @@ struct pfs_kernel_msghdr {
 } __attribute__((packed));
 
 struct pfs_kernel_cmsghdr {
-    UINT32_T cmsg_len;
-    INT32_T cmsg_level;
-    INT32_T cmsg_type;
+	UINT32_T cmsg_len;
+	INT32_T cmsg_level;
+	INT32_T cmsg_type;
 } __attribute__((packed));
 
 struct pfs_kernel_sockaddr_un {
-    UINT16_T sun_family;
-    char sun_path[108];
+	UINT16_T sun_family;
+	char sun_path[108];
 } __attribute__((packed));
 
 struct pfs_kernel_sigaction {
@@ -249,19 +249,19 @@ struct pfs_kernel_flock64 {
 	t.ru_utime = s.ru_utime;\
 	t.ru_utime = s.ru_stime;\
 	t.ru_maxrss = s.ru_maxrss;\
-        t.ru_ixrss = s.ru_ixrss;\
-        t.ru_idrss = s.ru_idrss;\
-        t.ru_isrss = s.ru_isrss;\
-        t.ru_minflt = s.ru_minflt;\
-        t.ru_majflt = s.ru_majflt;\
-        t.ru_nswap = s.ru_nswap;\
-        t.ru_inblock = s.ru_inblock;\
-        t.ru_oublock = s.ru_oublock;\
-        t.ru_msgsnd = s.ru_msgsnd;\
-        t.ru_msgrcv = s.ru_msgrcv;\
-        t.ru_nsignals = s.ru_nsignals;\
-        t.ru_nvcsw = s.ru_nvcsw;\
-        t.ru_nivcsw = s.ru_nivcsw;
+		t.ru_ixrss = s.ru_ixrss;\
+		t.ru_idrss = s.ru_idrss;\
+		t.ru_isrss = s.ru_isrss;\
+		t.ru_minflt = s.ru_minflt;\
+		t.ru_majflt = s.ru_majflt;\
+		t.ru_nswap = s.ru_nswap;\
+		t.ru_inblock = s.ru_inblock;\
+		t.ru_oublock = s.ru_oublock;\
+		t.ru_msgsnd = s.ru_msgsnd;\
+		t.ru_msgrcv = s.ru_msgrcv;\
+		t.ru_nsignals = s.ru_nsignals;\
+		t.ru_nvcsw = s.ru_nvcsw;\
+		t.ru_nivcsw = s.ru_nivcsw;
 
 #define COPY_FLOCK( s, t ) \
 	t.l_type = s.l_type;\

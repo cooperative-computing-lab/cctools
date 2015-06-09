@@ -84,10 +84,10 @@ static int pfs_paranoia_watchdog()
 { \
   flags = fcntl(fd, F_GETFL); \
   if (flags == -1) { \
-    goto fail_target; \
+	goto fail_target; \
   } \
   if (fcntl(fd, F_SETFL, flags | new_flag)) { \
-    goto fail_target; \
+	goto fail_target; \
   } \
 }
 
@@ -165,21 +165,21 @@ int pfs_paranoia_setup(void)
 
 	// Resource cleanup.
 	// Sigh - don't you wish you could toss a C++ exception here?
-      fail_fork:
+	  fail_fork:
 	if(to_watchdog_fd != -1)
 		close(to_watchdog_fd);
 	if(from_watchdog_fd != -1)
 		close(from_watchdog_fd);
-      fail_pipe2:
+	  fail_pipe2:
 	if(to_parent_fd != -1)
 		close(to_parent_fd);
 	if(from_parent_fd != -1)
 		close(from_parent_fd);
-      fail_pipe1:
+	  fail_pipe1:
 	munmap(shared_table, (max_pids + 1) / sizeof(pid_t));
-      fail_unmap:
+	  fail_unmap:
 	close(shared_mmap_fd);
-      fail_mkstemp:
+	  fail_mkstemp:
 	return -1;
 }
 

@@ -11,13 +11,13 @@
 
 #ifndef NDEBUG
 #   define cctools_assert(exp) \
-    do {\
-        if (!(exp)) {\
-            fprintf(stderr, "%s: %s:%d[%s]: Assertion '%s' failed.\n", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, #exp);\
-            fflush(stderr);\
-            abort();\
-        }\
-    } while (0)
+	do {\
+		if (!(exp)) {\
+			fprintf(stderr, "%s: %s:%d[%s]: Assertion '%s' failed.\n", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, #exp);\
+			fflush(stderr);\
+			abort();\
+		}\
+	} while (0)
 #else
 #   define cctools_assert(exp) ((void)0)
 #endif

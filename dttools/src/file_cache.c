@@ -144,7 +144,7 @@ struct file_cache *file_cache_init(const char *root)
 
 	return f;
 
-      failure:
+	  failure:
 	file_cache_fini(f);
 	return 0;
 }

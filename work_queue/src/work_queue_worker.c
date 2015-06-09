@@ -68,10 +68,10 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_MODE_WORKER  1
 #define WORKER_MODE_FOREMAN 2
 
-#define NONE 0 
+#define NONE 0
 #define DOCKER 1
 #define DOCKER_PRESERVE 2
-#define UMBRELLA 3 
+#define UMBRELLA 3
 
 #define DEFAULT_WORK_DIR "/home/worker"
 
@@ -166,7 +166,7 @@ static int measure_wd_interval     = 180;
 static struct work_queue *foreman_q = NULL;
 // docker image name
 static char *img_name = NULL;
-static char container_name[1024]; 
+static char container_name[1024];
 static char *tar_fn = NULL;
 // Table of all processes in any state, indexed by taskid.
 // Processes should be created/deleted when added/removed from this table.
@@ -421,15 +421,15 @@ accounting for the resources as necessary.
 static int start_process( struct work_queue_process *p )
 {
 
-    pid_t pid;
+	pid_t pid;
 
-    if (container_mode == DOCKER) 
-	    pid = work_queue_process_execute(p, container_mode, img_name);
-    else if (container_mode == DOCKER_PRESERVE)
-	    pid = work_queue_process_execute(p, container_mode, container_name);
-    else
-	    pid = work_queue_process_execute(p, container_mode);
-    
+	if (container_mode == DOCKER)
+		pid = work_queue_process_execute(p, container_mode, img_name);
+	else if (container_mode == DOCKER_PRESERVE)
+		pid = work_queue_process_execute(p, container_mode, container_name);
+	else
+		pid = work_queue_process_execute(p, container_mode);
+
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
 	itable_insert(procs_running,pid,p);
@@ -622,7 +622,7 @@ static int check_disk_workspace(int64_t *workspace_usage, int force) {
 	}
 
 	// Use thershold only if smaller than specified disk size.
-	int64_t disk_limit = manual_disk_option - disk_avail_threshold; 
+	int64_t disk_limit = manual_disk_option - disk_avail_threshold;
 	if(disk_limit < 0)
 		disk_limit = manual_disk_option;
 
@@ -652,7 +652,7 @@ static int check_disk_space_for_filesize(int64_t file_size) {
 				return 0;
 			}
 		}
-    }
+	}
 
 	return 1;
 }
@@ -834,7 +834,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	struct work_queue_task *task = p->task;
 
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
-	  	if(sscanf(line,"cmd %d",&length)==1) {
+		if(sscanf(line,"cmd %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(master,cmd,length,stoptime);
 			cmd[length] = 0;
@@ -852,14 +852,14 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		} else if(sscanf(line, "dir %s", filename)) {
 			work_queue_task_specify_directory(task, filename, filename, WORK_QUEUE_INPUT, 0700, 0);
 		} else if(sscanf(line,"cores %d",&n)) {
-		       	work_queue_task_specify_cores(task, n);
+				work_queue_task_specify_cores(task, n);
 		} else if(sscanf(line,"memory %d",&n)) {
-		       	work_queue_task_specify_memory(task, n);
+				work_queue_task_specify_memory(task, n);
 		} else if(sscanf(line,"disk %d",&n)) {
-		       	work_queue_task_specify_disk(task, n);
+				work_queue_task_specify_disk(task, n);
 		} else if(sscanf(line,"gpus %d",&n)) {
 			work_queue_task_specify_gpus(task, n);
-	  	} else if(sscanf(line,"env %d",&length)==1) {
+		} else if(sscanf(line,"env %d",&length)==1) {
 			char *env = malloc(length+1);
 			link_read(master,env,length,stoptime);
 			env[length] = 0;
@@ -871,7 +871,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			}
 			free(env);
 		} else if(!strcmp(line,"end")) {
-		       	break;
+				break;
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
 			work_queue_process_delete(p);
@@ -958,29 +958,29 @@ static int do_put( struct link *master, char *filename, int64_t length, int mode
 
 static int file_from_url(const char *url, const char *filename) {
 
-        debug(D_WQ, "Retrieving %s from (%s)\n", filename, url);
-        char command[WORK_QUEUE_LINE_MAX];
-        snprintf(command, WORK_QUEUE_LINE_MAX, "curl -f -o \"%s\" \"%s\"", filename, url);
+		debug(D_WQ, "Retrieving %s from (%s)\n", filename, url);
+		char command[WORK_QUEUE_LINE_MAX];
+		snprintf(command, WORK_QUEUE_LINE_MAX, "curl -f -o \"%s\" \"%s\"", filename, url);
 
 	if (system(command) == 0) {
-                debug(D_WQ, "Success, file retrieved from %s\n", url);
-        } else {
-                debug(D_WQ, "Failed to retrieve file from %s\n", url);
-                return 0;
-        }
+				debug(D_WQ, "Success, file retrieved from %s\n", url);
+		} else {
+				debug(D_WQ, "Failed to retrieve file from %s\n", url);
+				return 0;
+		}
 
-        return 1;
+		return 1;
 }
 
 static int do_url(struct link* master, const char *filename, int length, int mode) {
 
-        char url[WORK_QUEUE_LINE_MAX];
-        link_read(master, url, length, time(0) + active_timeout);
+		char url[WORK_QUEUE_LINE_MAX];
+		link_read(master, url, length, time(0) + active_timeout);
 
-        char cache_name[WORK_QUEUE_LINE_MAX];
-        snprintf(cache_name,WORK_QUEUE_LINE_MAX, "cache/%s", filename);
+		char cache_name[WORK_QUEUE_LINE_MAX];
+		snprintf(cache_name,WORK_QUEUE_LINE_MAX, "cache/%s", filename);
 
-        return file_from_url(url, cache_name);
+		return file_from_url(url, cache_name);
 }
 
 static int do_unlink(const char *path) {
@@ -1256,8 +1256,8 @@ static int handle_master(struct link *master) {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
 			}
-                } else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
-                        r = do_url(master, filename, length, mode);
+				} else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
+						r = do_url(master, filename, length, mode);
 		} else if(sscanf(line, "unlink %s", filename) == 1) {
 			if(path_within_dir(filename, workspace)) {
 				r = do_unlink(filename);
@@ -1351,20 +1351,20 @@ static void work_for_master(struct link *master) {
 		interrupted by a SIGCHILD signal.  However, the signal could
 		have been delivered while we were outside of the wait function,
 		setting sigchld_received_flag.  In that case, do not block
-		but proceed with the 
+		but proceed with the
 
 		There is a still a (very small) race condition in that the
 		signal could be received between the check and link_usleep,
 		hence a maximum wait time of five seconds is enforced.
 		*/
- 
+
 		int wait_msec = 5000;
 
 		if(sigchld_received_flag) {
 			wait_msec = 0;
 			sigchld_received_flag = 0;
 		}
- 
+
 		int master_activity = link_usleep_mask(master, wait_msec*1000, &mask, 1, 0);
 		if(master_activity < 0) break;
 
@@ -1395,9 +1395,9 @@ static void work_for_master(struct link *master) {
 
 
 		if(ok) {
-            
-            
-             
+
+
+
 			int visited = 0;
 			while(list_size(procs_waiting) > visited && cores_allocated < local_resources->cores.total) {
 				struct work_queue_process *p;
@@ -1427,8 +1427,8 @@ static void work_for_master(struct link *master) {
 				ok = 0;
 			}
 
-            
-             
+
+
 		}
 
 		if(!ok) break;
@@ -1504,7 +1504,7 @@ static int workspace_create() {
 		workdir = "/tmp";
 	}
 	//}
-	
+
 	if(!workspace) {
 		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 	}
@@ -1647,8 +1647,8 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 static int serve_master_by_name( const char *catalog_host, int catalog_port, const char *project_regex )
 {
-	static char *last_addr = NULL; 
-	static int   last_port = -1; 
+	static char *last_addr = NULL;
+	static int   last_port = -1;
 
 	struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
 
@@ -1769,10 +1769,10 @@ static void show_help(const char *cmd)
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
-      LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
-      LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
-      LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE, 
-      LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT};
+	  LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
+	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
+	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE,
+	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT};
 
 struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1828,7 +1828,7 @@ int main(int argc, char *argv[])
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
 	char * catalog_host = CATALOG_HOST;
-    int catalog_port = CATALOG_PORT;
+	int catalog_port = CATALOG_PORT;
 
 	worker_start_time = time(0);
 
@@ -2010,16 +2010,16 @@ int main(int argc, char *argv[])
 			return 0;
 		case LONG_OPT_RUN_DOCKER:
 			container_mode = DOCKER;
-            img_name = xxstrdup(optarg); 
+			img_name = xxstrdup(optarg);
 			break;
-        case LONG_OPT_RUN_DOCKER_PRESERVE:
-            container_mode = DOCKER_PRESERVE;
-            img_name = xxstrdup(optarg);
-            break;
-        case LONG_OPT_BUILD_FROM_TAR:
-            load_from_tar = 1;
-            tar_fn = xxstrdup(optarg);
-            break;
+		case LONG_OPT_RUN_DOCKER_PRESERVE:
+			container_mode = DOCKER_PRESERVE;
+			img_name = xxstrdup(optarg);
+			break;
+		case LONG_OPT_BUILD_FROM_TAR:
+			load_from_tar = 1;
+			tar_fn = xxstrdup(optarg);
+			break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -2122,26 +2122,26 @@ int main(int argc, char *argv[])
 
 	}
 
-    if(container_mode == DOCKER && load_from_tar == 1) {
- 		char load_cmd[1024];
-        sprintf(load_cmd, "docker load < %s", tar_fn);
-        system(load_cmd);
-    }
+	if(container_mode == DOCKER && load_from_tar == 1) {
+		char load_cmd[1024];
+		sprintf(load_cmd, "docker load < %s", tar_fn);
+		system(load_cmd);
+	}
 
-    if(container_mode == DOCKER_PRESERVE) {
-        if (load_from_tar == 1) {
-            char load_cmd[1024];
-            sprintf(load_cmd, "docker load < %s", tar_fn);
-            system(load_cmd);
-        }
+	if(container_mode == DOCKER_PRESERVE) {
+		if (load_from_tar == 1) {
+			char load_cmd[1024];
+			sprintf(load_cmd, "docker load < %s", tar_fn);
+			system(load_cmd);
+		}
 
-        sprintf(container_name, "worker-%d-%d", (int) getuid(), (int) getpid());
-        char container_mnt_point[1024];
-        char start_container_cmd[1024];
-        sprintf(container_mnt_point, "%s:%s", workspace, DEFAULT_WORK_DIR);
-        sprintf(start_container_cmd, "docker run -i -d --name=\"%s\" -v %s -w %s %s", container_name, container_mnt_point, DEFAULT_WORK_DIR, img_name);
-        system(start_container_cmd);
-    } 
+		sprintf(container_name, "worker-%d-%d", (int) getuid(), (int) getpid());
+		char container_mnt_point[1024];
+		char start_container_cmd[1024];
+		sprintf(container_mnt_point, "%s:%s", workspace, DEFAULT_WORK_DIR);
+		sprintf(start_container_cmd, "docker run -i -d --name=\"%s\" -v %s -w %s %s", container_name, container_mnt_point, DEFAULT_WORK_DIR, img_name);
+		system(start_container_cmd);
+	}
 
 	procs_running  = itable_create(0);
 	procs_table    = itable_create(0);
@@ -2208,21 +2208,21 @@ int main(int argc, char *argv[])
 		sleep(backoff_interval);
 	}
 
-    if(container_mode == DOCKER_PRESERVE || container_mode == DOCKER) {
-        char stop_container_cmd[1024];
-        char rm_container_cmd[1024];
-        
-        sprintf(stop_container_cmd, "docker stop %s", container_name);
-        sprintf(rm_container_cmd, "docker rm %s", container_name);
+	if(container_mode == DOCKER_PRESERVE || container_mode == DOCKER) {
+		char stop_container_cmd[1024];
+		char rm_container_cmd[1024];
 
-        if(container_mode == DOCKER_PRESERVE) {
-            //1. stop the container
-            system(stop_container_cmd); 
-            //2. remove the container
-            system(rm_container_cmd);
-        }
+		sprintf(stop_container_cmd, "docker stop %s", container_name);
+		sprintf(rm_container_cmd, "docker rm %s", container_name);
 
-    } 
+		if(container_mode == DOCKER_PRESERVE) {
+			//1. stop the container
+			system(stop_container_cmd);
+			//2. remove the container
+			system(rm_container_cmd);
+		}
+
+	}
 
 	workspace_delete();
 
