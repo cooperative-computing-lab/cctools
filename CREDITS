@@ -44,7 +44,7 @@ and other items.  In alphabetical order:
 	Patrick Donnelly
 	University of Notre Dame
 	Contributed to Chirp, Parrot, HDFS Support, and ticket authentication.
-	
+
 	Iheanyi Ekechukwu
 	University of Notre Dame
 	Contributed to Work Queue and the Sweeper abstraction.
@@ -53,7 +53,7 @@ and other items.  In alphabetical order:
 	Fermi National Labs and DESY
 	Provided invaluable help installing, configuring, and using dcache
 	for use with Parrot.
-	
+
 	Jamie Frey
 	University of Wisconsin
 	Debugged and deployed ftp_lite.
@@ -63,7 +63,7 @@ and other items.  In alphabetical order:
 	Developed support for distributed access control lists.
 
 	Miron Livny
-	University of Wisconsin	
+	University of Wisconsin
 	Provided excellent strategic and technical advice as my Ph.D. advisor.
 
 	Zach Miller
@@ -123,7 +123,7 @@ and other items.  In alphabetical order:
 	De Montfort University, U.K.
 	Contributed to the Fault Tolerant Shell
 
-	Ulrich Schwickerath	
+	Ulrich Schwickerath
 	FZH Hamburg
 	Contributed RFIO driver and Infiniband support for Parrot.
 

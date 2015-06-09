@@ -9,7 +9,7 @@ touch $filename
 
 I=2
 while [ $I -lt $N ]; do
-	echo $I > $I 
+	echo $I > $I
 	echo $I >> $filename
 	I=$((I+1))
 done

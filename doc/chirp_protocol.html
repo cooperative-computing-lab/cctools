@@ -40,7 +40,7 @@ Chirp is carried over a stream protocol such as TCP or Unix domain sockets.  A s
 
 In certain situations, the client may be provided in advance with a "cookie" that provides expedited access to a server with a fixed identity.  This method is typically used within Condor when communicating with the embedded Chirp proxy.
 <p>
-In this situation, the client is provided with a file named <tt>chirp.config</tt> which contains the host and port of the server, and a cookie string.  The client must connect to the server and immediately send <tt>cookie</tt>, a space, the cookie string, and a newline.  If the response from the server is <tt>0\n</tt> then the cookie is accepted, and the client may proceed to the main Chirp protocol described below.  Any other response indicates the cookie was rejected, and the client must abort. 
+In this situation, the client is provided with a file named <tt>chirp.config</tt> which contains the host and port of the server, and a cookie string.  The client must connect to the server and immediately send <tt>cookie</tt>, a space, the cookie string, and a newline.  If the response from the server is <tt>0\n</tt> then the cookie is accepted, and the client may proceed to the main Chirp protocol described below.  Any other response indicates the cookie was rejected, and the client must abort.
 
 <h3 id="authentication.negotiated">Negotiated Authentication<a class="sectionlink" href="#authentication.negotiated" title="Link to this section.">&#x21d7;</a></h3>
 
@@ -113,7 +113,7 @@ receipt of such a values should be interpreted in the same way as UNKNOWN.
 
 <h2 id="commands">Chirp Commands<a class="sectionlink" href="#commands" title="Link to this section.">&#x21d7;</a></h2>
 
-Following are the available commands.  Each argument to a command is specific 
+Following are the available commands.  Each argument to a command is specific
 Here are the available commands that are standardized.  Note that each implementation may support some additional commands which are not (yet) documented because they are still experimental.  Each argument to a command is specified with a type and a name.
 
 <code class="command">open  (string:name) (string:flags) (decimal:mode)</code>
@@ -163,7 +163,7 @@ Write up to "length" bytes to the file descriptor "fd", starting at “offset”, wr
 
 <code class="command">fstat (decimal:fd)</code>
 
-Get metadata 
+Get metadata
 
 <code class="command">fsync (decimal:fd)</code>
 
@@ -227,12 +227,12 @@ Note that not all fields may have meaning to all implementations.  For example, 
 Get filesystem metadata for an open file.  If the response line indicates success, it is followed by a second line of seven decimals with the following interpretation:
 
 <dir>
-<li>f_type  - The integer type of the filesystem. 
-<li>f_blocks  - The total number of blocks in the filesystem. 
-<li>f_bavail  - The number of blocks available to an ordinary user. 
-<li>f_bsize  - The size in bytes of a block. 
-<li>f_bfree  - The number of blocks free. 
-<li>f_files  - The maximum number of files (inodes) on the filesystem. 
+<li>f_type  - The integer type of the filesystem.
+<li>f_blocks  - The total number of blocks in the filesystem.
+<li>f_bavail  - The number of blocks available to an ordinary user.
+<li>f_bsize  - The size in bytes of a block.
+<li>f_bfree  - The number of blocks free.
+<li>f_files  - The maximum number of files (inodes) on the filesystem.
 <li>f_ffree  - The number of files (inodes) currently in use
 </dir>
 
@@ -352,9 +352,9 @@ Create a new space allocation at the given path that can contain “size” bytes of
 
 <code class="command">lsalloc (string:path)</code>
 
-List the space allocation state on a directory.  If the response indicates success, it is followed by a second line which gives the path of the containing allocation, the total size of the allocation, and the 
+List the space allocation state on a directory.  If the response indicates success, it is followed by a second line which gives the path of the containing allocation, the total size of the allocation, and the
 <p>
-<b>(NOTE 1)</b> The standalone Chirp server ignores the traditional Unix mode bits when performing access control.  Calls such as fchmod, chmod, chown, and fchown are essentially ignored, and the caller should employ setacl and getacl instead. 
+<b>(NOTE 1)</b> The standalone Chirp server ignores the traditional Unix mode bits when performing access control.  Calls such as fchmod, chmod, chown, and fchown are essentially ignored, and the caller should employ setacl and getacl instead.
 
 </div>
 </body>

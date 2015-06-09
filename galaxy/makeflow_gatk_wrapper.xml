@@ -9,21 +9,21 @@
     makeflow_gatk_wrapper.py
 
     -T $algo
-	
+
     --input_file=$INPUT
-		
+
     --reference_sequence=$REFERENCE
-	
+
     --cctools_install=${GALAXY_DATA_INDEX_DIR}/shared/cctools
     --samtools=${GALAXY_DATA_INDEX_DIR}/shared/samtools
     --gatk=${GALAXY_DATA_INDEX_DIR}/shared/jars/gatk
     --picard=${GALAXY_DATA_INDEX_DIR}/shared/picard/dist
     --java=${GALAXY_DATA_INDEX_DIR}/shared/java
     --vcftools=${GALAXY_DATA_INDEX_DIR}/shared/vcftools/bin
-	
+
     --user_id=$__user_id__
     --pwfile=${GALAXY_DATA_INDEX_DIR}/mypwfile
-		
+
 	--num-seq-part=$numreads
 
     --out=$VCF_File
@@ -37,26 +37,26 @@
         --output_dblog=$Debug_Log
     #end if
 
-    #if $checkparams.useparam=="full":	
+    #if $checkparams.useparam=="full":
 		#if $BQSR:
 			--BQSR=$BQSR
-		#end if	
+		#end if
 		#if $EXCLUDE_INTERVALS:
 			--excludeIntervals=$EXCLUDE_INTERVALS
-		#end if	
+		#end if
 		#if $INTERVALS:
 			--intervals=$$INTERVALS
-		#end if	
+		#end if
 		#if $RG_BLACK_LIST:
 			--read_group_black_list=$RG_BLACK_LIST
 		#end if
 
-		
+
 		#if $BAQ:
 			--baq=$BAQ
 		#end if
 		#if $BAQ_GOP:
-			--baqGapOpenPenalty=$BAQ_GOP	
+			--baqGapOpenPenalty=$BAQ_GOP
 		#end if
 		#if $DEF_BASE_QUALITY:
 			--defaultBaseQualities=$DEF_BASE_QUALITY
@@ -136,8 +136,8 @@
 		#if $INDEL_HETER
 			--indel_heterozygosity=$INDEL_HETER
 		#end if
-		
-		
+
+
 		#if $ALLOW_MISENCOD:
 			--allow_potentially_misencoded_quality_scores
 		#end if
@@ -168,12 +168,12 @@
 		#if	$VERSION:
 			--version
 		#end if
-		
-		
+
+
 		#if	$MAPPING:
 			--sample_rename_mapping_file=$MAPPING
 		#end if
-		
+
 		#if	$ALLOW_BQSR:
 			--allow_bqsr_on_reduced_bams_despite_repeated_warnings
 		#end if
@@ -233,9 +233,9 @@
 			<param name="VALID_STRICT" type="text" label="validation_strictness" help="How strict should we be with validation" />
 			<param name="HETER" type="text" label="heterozygosity" help="Heterozygosity value used to compute prior likelihoods for any locus. See the GATKDocs for full details on the meaning of this population genetics concept" />
 			<param name="INDEL_HETER" type="text" label="indel_heterozygosity" help="Heterozygosity for indel calling. See the GATKDocs for heterozygosity for full details on the meaning of this population genetics concept" />
-	
-			<param name="UNSAFE" type="boolean" checked="true" label="unsafe" help="If set, enables unsafe operations: nothing will be checked at runtime. For expert users only who know what they are doing. We do not support usage of this argument." />	
-	  
+
+			<param name="UNSAFE" type="boolean" checked="true" label="unsafe" help="If set, enables unsafe operations: nothing will be checked at runtime. For expert users only who know what they are doing. We do not support usage of this argument." />
+
 			<param name="ALLOW_MISENCOD" type="boolean" checked="true" label="allow_potentially_misencoded_quality_scores" help="Do not fail when encountering base qualities that are too high and that seemingly indicate a problem with the base quality encoding of the BAM file" />
 			<param name="DISABLE_INDEL_Q" type="boolean" checked="true" label="disable_indel_quals" help="If true, disables printing of base insertion and base deletion tags (with -BQSR)" />
 			<param name="EMIT_ORIG" type="boolean" checked="true" label="emit_original_quals" help="If true, enables printing of the OQ tag with the original base qualities (with -BQSR)" />
@@ -246,13 +246,13 @@
 			<param name="REMOVE_RECORDS" type="boolean" checked="true" label="remove_program_records" help="Should we override the Walker's default and remove program records from the SAM header" />
 			<param name="ORIG_QUALS" type="boolean" checked="true" label="useOriginalQualities" help="If set, use the original base quality scores from the OQ tag when present instead of the standard scores" />
 			<param name="VERSION" type="boolean" checked="true" label="version" help="Version Information" />
-	  
+
 			<param name="MAPPING" type="data" label="sample_rename_mapping_file" help="Rename sample IDs on-the-fly at runtime using the provided mapping file. This option requires that each BAM file listed in the mapping file have only a single sample specified in its header (though there may be multiple read groups for that sample). Each line of the mapping file must contain the absolute path to a BAM file, followed by whitespace, followed by the new sample name for that BAM file." />
-	  
+
 			<param name="ALLOW_BQSR" type="boolean" checked="true" label="allow_bqsr_on_reduced_bams_despite_repeated_warnings" help="Do not fail when running base quality score recalibration on a reduced BAM file even though we highly recommend against it" />
 		</when>
 	</conditional>
-   
+
     <param name="log_outputs" type="select" label="Select Optional Outputs" display="checkboxes" multiple="true">
 		<option value="OUTPUT_MFLOG">Makeflow Log</option>
 		<option value="OUTPUT_WQLOG">Work Queue Log</option>

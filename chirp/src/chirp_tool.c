@@ -463,8 +463,8 @@ static void long_ls_callback(const char *name, struct chirp_stat *info, void *ar
 	}
 
 	printf("%c%c%c%c%c%c%c%c%c%c %4" PRId64 " %8" PRId64 " %8" PRId64 " %8" PRId64 " %s %s\n", S_ISDIR(info->cst_mode) ? 'd' : '-', info->cst_mode & 0400 ? 'r' : '-', info->cst_mode & 0200 ? 'w' : '-', info->cst_mode & 0100 ? 'x' : '-',
-	       info->cst_mode & 0040 ? 'r' : '-', info->cst_mode & 0020 ? 'w' : '-', info->cst_mode & 0010 ? 'x' : '-', info->cst_mode & 0004 ? 'r' : '-', info->cst_mode & 0002 ? 'w' : '-', info->cst_mode & 0001 ? 'x' : '-', info->cst_nlink, info->cst_uid,
-	       info->cst_gid, info->cst_size, timestr, name);
+		   info->cst_mode & 0040 ? 'r' : '-', info->cst_mode & 0020 ? 'w' : '-', info->cst_mode & 0010 ? 'x' : '-', info->cst_mode & 0004 ? 'r' : '-', info->cst_mode & 0002 ? 'w' : '-', info->cst_mode & 0001 ? 'x' : '-', info->cst_nlink, info->cst_uid,
+		   info->cst_gid, info->cst_size, timestr, name);
 }
 
 static void ls_callback(const char *name, void *arg)

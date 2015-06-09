@@ -26,4 +26,3 @@ void            matrix_print( struct matrix *m, const char *a, const char *b );
 #define matrix(m,i,j) ( (m)->data[(m->width*(j) + i)] )
 
 #endif
-

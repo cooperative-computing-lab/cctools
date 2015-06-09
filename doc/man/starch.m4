@@ -28,7 +28,7 @@ If a PARAM(command) is specified, but no PARAM(executable) is passed, then the
 first token in the PARAM(command) will be used as the executable.
 PARA
 By default, CODE(starch) will use CODE(ldd) to detect any necessary libraries
-from the specified set of PARAM(executables) and include them in the CODE(SFX). 
+from the specified set of PARAM(executables) and include them in the CODE(SFX).
 OPTIONS_BEGIN
 OPTION_ITEM(-A)Do not automatically detect library dependencies.
 OPTION_PAIR(-C, cfg)Use configuration file.
@@ -88,7 +88,7 @@ Package the data program:
 LONGCODE_BEGIN
     $ starch -x date date.sfx
 LONGCODE_END
-   
+
 Package the date program using a configuration file:
 LONGCODE_BEGIN
     $ cat data.cfg
@@ -132,5 +132,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_MAKEFLOW
 
 FOOTER
-
-

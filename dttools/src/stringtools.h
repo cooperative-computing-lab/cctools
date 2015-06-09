@@ -57,7 +57,7 @@ int getDateString(char *str);
 int string_null_or_empty(const char *str);
 
 /** Returns a heap allocated freeable string formatted using sprintf.
-    @param fmt Format string passed to sprintf.
+	@param fmt Format string passed to sprintf.
 	@param ... Variable arguments passed to sprintf.
 	@return The formatted string.
 */

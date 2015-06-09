@@ -62,7 +62,7 @@ validate_input () {
 		else
 			dd if=/dev/zero of=0.in bs=1$unit count=$in
 		fi
-	else 
+	else
 		for ((i=1;i<=$num;i++));do
 			if [ -e $i.in ]; then
 				size=`stat -c%s $i.in`
@@ -143,7 +143,7 @@ gen_runtime_gnuplot () {
 
 		if [ "$i" -ne "${#makeflow_args[@]}" ]; then
 			echo -e "\t\"$resultdir/$statistics\" using 5: (\$6 / 1000000) title \"$arg_name\" with lines lt $i lw 3, \\" >> $runtimegnuplot
-		else 
+		else
 			echo -e "\t\"$resultdir/$statistics\" using 5: (\$6 / 1000000) title \"$arg_name\" with lines lt $i lw 3 " >> $runtimegnuplot
 		fi
 		i=$((i+1))
@@ -190,7 +190,7 @@ run_experiments () {
 			dir=$in.$exe.$out.$num.$arg_name.w$i
 			rm -rf $dir
 			mkdir -p ${dir}
-			
+
 			mv $makeflow.stdout.stderr $makeflowlog $wqlog $dir/
 			cp $makeflow $dir/
 
@@ -237,7 +237,7 @@ gen_plots () {
 	cd ..
 }
 
-# Main Program	
+# Main Program
 
 in=`getfield $workload 1`
 exe=`getfield $workload 2`
@@ -260,7 +260,7 @@ if [ $unit == "M" ]; then
 	unit_size=$((1024*1024))
 elif [ $unit == "K" ]; then
 	unit_size=$((1024))
-else 
+else
 	unit_size=1
 fi
 

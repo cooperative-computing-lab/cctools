@@ -27,7 +27,7 @@ class LoggerTestCase(TestCase):
     def test_00_enable(self):
         self.logger.enable('logger')
         self.logger.enable(['a', 'b', 'c'])
-    
+
     def test_01_disable(self):
         self.logger.disable('a')
         self.logger.disable(['a', 'b', 'c'])
@@ -37,11 +37,11 @@ class LoggerTestCase(TestCase):
         self.logger.stream = StringIO()
         self.logger.debug('asdf', 'hello, world')
         self.assertEqual(self.logger.stream.getvalue(), '')
-    
+
     def test_03_debug(self):
         self.logger.debug('logger', 'debug')
         self.assertEqual(self.logger.stream.getvalue(), '[D] LOGGER     debug\n')
-    
+
     def test_04_fatal(self):
         self.logger.stream.close()
         self.logger.stream = StringIO()
@@ -49,7 +49,7 @@ class LoggerTestCase(TestCase):
 
         self.assertRaises(Exception, self.logger.fatal, 'logger', 'fatal')
         self.assertEqual(self.logger.stream.getvalue(), '[F] LOGGER     fatal\n')
-    
+
     def test_05_warn(self):
         self.logger.stream.close()
         self.logger.stream = StringIO()

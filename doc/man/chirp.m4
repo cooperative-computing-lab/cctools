@@ -83,13 +83,13 @@ LONGCODE_END
 To create a ticket using:
 
 LONGCODE_BEGIN
-% chirp server1.somewhere.edu get ticket_create -output myticket.ticket -subject unix:user -bits 1024 -duration 86400 / rl /foo rwl 
+% chirp server1.somewhere.edu get ticket_create -output myticket.ticket -subject unix:user -bits 1024 -duration 86400 / rl /foo rwl
 LONGCODE_END
 
 To register a ticket with other Chirp servers:
 
 LONGCODE_BEGIN
-% chirp server2.somewhere.edu ticket_register myticket.ticket unix:user 86400 
+% chirp server2.somewhere.edu ticket_register myticket.ticket unix:user 86400
 LONGCODE_END
 
 To delete a ticket:
@@ -108,4 +108,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_CHIRP
 
 FOOTER
-

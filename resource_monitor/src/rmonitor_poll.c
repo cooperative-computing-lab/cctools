@@ -121,61 +121,61 @@ int monitor_poll_fs_once(struct filesys_info *f)
 
 FILE *open_proc_file(pid_t pid, char *filename)
 {
-        FILE *fproc;
-        char fproc_path[PATH_MAX];
+		FILE *fproc;
+		char fproc_path[PATH_MAX];
 
 #if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
-        return NULL;
+		return NULL;
 #endif
 
-        sprintf(fproc_path, "/proc/%d/%s", pid, filename);
+		sprintf(fproc_path, "/proc/%d/%s", pid, filename);
 
-        if((fproc = fopen(fproc_path, "r")) == NULL)
-        {
-                debug(D_DEBUG, "could not process file %s : %s\n", fproc_path, strerror(errno));
-                return NULL;
-        }
+		if((fproc = fopen(fproc_path, "r")) == NULL)
+		{
+				debug(D_DEBUG, "could not process file %s : %s\n", fproc_path, strerror(errno));
+				return NULL;
+		}
 
-        return fproc;
+		return fproc;
 }
 
 /* Parse a /proc file looking for line attribute: value */
 int get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value, int rewind_flag)
 {
-    char proc_attr_line[PATH_MAX];
-    int not_found = 1;
-    int n = strlen(attribute);
+	char proc_attr_line[PATH_MAX];
+	int not_found = 1;
+	int n = strlen(attribute);
 
-    if(!fstatus)
-        return not_found;
+	if(!fstatus)
+		return not_found;
 
-    proc_attr_line[PATH_MAX - 1] = '\0';
+	proc_attr_line[PATH_MAX - 1] = '\0';
 
-    if(rewind_flag)
-        rewind(fstatus);
+	if(rewind_flag)
+		rewind(fstatus);
 
-    while( fgets(proc_attr_line, PATH_MAX - 2, fstatus) )
-    {
-        if(strncmp(attribute, proc_attr_line, n) == 0)
-        {
-            //We make sure that fgets got a whole line
-            if(proc_attr_line[PATH_MAX - 2] == '\n')
-                proc_attr_line[PATH_MAX - 2] = '\0';
-            if(strlen(proc_attr_line) == PATH_MAX - 2)
-                return -1;
+	while( fgets(proc_attr_line, PATH_MAX - 2, fstatus) )
+	{
+		if(strncmp(attribute, proc_attr_line, n) == 0)
+		{
+			//We make sure that fgets got a whole line
+			if(proc_attr_line[PATH_MAX - 2] == '\n')
+				proc_attr_line[PATH_MAX - 2] = '\0';
+			if(strlen(proc_attr_line) == PATH_MAX - 2)
+				return -1;
 
-            sscanf(proc_attr_line, "%*s %" SCNu64, value);
-            not_found = 0;
-            break;
-        }
-    }
+			sscanf(proc_attr_line, "%*s %" SCNu64, value);
+			not_found = 0;
+			break;
+		}
+	}
 
-    return not_found;
+	return not_found;
 }
 
 uint64_t clicks_to_usecs(uint64_t clicks)
 {
-    return ((clicks * ONE_SECOND) / sysconf(_SC_CLK_TCK));
+	return ((clicks * ONE_SECOND) / sysconf(_SC_CLK_TCK));
 }
 
 /***
@@ -193,13 +193,13 @@ int get_cpu_time_linux(pid_t pid, uint64_t *accum)
 		return 1;
 
 	fscanf(fstat,
-	       "%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
-	       "%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
-	       "%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
-	       "%" SCNu64 /* user mode time (in clock ticks) */
-	       "%" SCNu64 /* kernel mode time (in clock ticks) */
-	       /* .... */,
-	       &kernel, &user);
+		   "%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
+		   "%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
+		   "%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
+		   "%" SCNu64 /* user mode time (in clock ticks) */
+		   "%" SCNu64 /* kernel mode time (in clock ticks) */
+		   /* .... */,
+		   &kernel, &user);
 
 	*accum = clicks_to_usecs(kernel) + clicks_to_usecs(user);
 
@@ -339,11 +339,11 @@ int get_mem_usage(pid_t pid, struct mem_info *mem)
 
 void acc_mem_usage(struct mem_info *acc, struct mem_info *other)
 {
-        acc->virtual  += other->virtual;
-        acc->resident += other->resident;
-        acc->shared   += other->shared;
-        acc->data     += other->data;
-        acc->swap     += other->swap;
+		acc->virtual  += other->virtual;
+		acc->resident += other->resident;
+		acc->shared   += other->shared;
+		acc->data     += other->data;
+		acc->swap     += other->swap;
 }
 
 int get_sys_io_usage(pid_t pid, struct io_info *io)

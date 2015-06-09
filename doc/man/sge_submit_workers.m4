@@ -18,14 +18,14 @@ LONGCODE_END
 when auto mode is enabled for the worker.
 
 SECTION(DESCRIPTION)
-CODE(sge_submit_workers) schedules the execution of MANPAGE(work_queue_worker,1) 
+CODE(sge_submit_workers) schedules the execution of MANPAGE(work_queue_worker,1)
 on the SUN Grid Engine (SGE) through its job submission interface, qsub.
 The number of BOLD(work_queue_worker) scheduled and run is given by the BOLD(num-workers)
 argument.
 
-The BOLD(servername) and BOLD(port) arguments specify the hostname and port number of the 
-master for the work_queue_worker to connect. These two arguments become optional when the 
-auto mode option is specified for work_queue_worker. 
+The BOLD(servername) and BOLD(port) arguments specify the hostname and port number of the
+master for the work_queue_worker to connect. These two arguments become optional when the
+auto mode option is specified for work_queue_worker.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
@@ -39,10 +39,10 @@ OPTION_TRIPLET(-i, min-backoff, time)Set initial value for backoff interval when
 OPTION_TRIPLET(-b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)
 OPTION_TRIPLET(-z, disk-threshold, size)Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
 OPTION_TRIPLET(-A, arch, arch)Set architecture string for the worker to report to master instead of the value in uname.
-OPTION_TRIPLET(-O, os, os)Set operating system string for the worker to report to master instead of the value in uname. 
+OPTION_TRIPLET(-O, os, os)Set operating system string for the worker to report to master instead of the value in uname.
 OPTION_TRIPLET(-s, workdir, path)Set the location for creating the working directory of the worker.
 OPTION_TRIPLET(-P,--password, file)Password file to authenticate workers to master.
-OPTION_PAIR(--cores, cores)Set the number of cores each worker should use (0=auto). (default=1) 
+OPTION_PAIR(--cores, cores)Set the number of cores each worker should use (0=auto). (default=1)
 OPTION_PAIR(--memory, size)Manually set the amonut of memory (in MB) reported by this worker.
 OPTION_PAIR(--disk, size)Manually set the amount of disk (in MB) reported by this worker.
 OPTION_ITEM(`-j')Use job array to submit workers.
@@ -75,4 +75,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_WORK_QUEUE
 
 FOOTER
-

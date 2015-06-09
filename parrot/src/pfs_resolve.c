@@ -166,7 +166,7 @@ static pfs_resolve_t mount_entry_check( const char *logical_name, const char *pr
 			local_prefix_len = (int)(prefix_sep-local_prefix);
 			/* anything in the local_prefix tree and the PFS cache is local */
 			if ((!strncmp(logical_name, local_prefix, local_prefix_len)) ||
-                            (!strncmp(logical_name, pfs_temp_dir, strlen(pfs_temp_dir))) )
+							(!strncmp(logical_name, pfs_temp_dir, strlen(pfs_temp_dir))) )
 			{
 				strcpy(physical_name,logical_name);
 				result = PFS_RESOLVE_CHANGED;

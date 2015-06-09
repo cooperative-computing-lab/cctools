@@ -65,16 +65,16 @@ struct pfs_kernel_stat {
 	INT64_T  st_blksize;
 	INT64_T  st_blocks;
 #if !defined(st_atime)
-        INT32_T st_atime;
-        INT32_T st_atime_nsec;
-        INT32_T st_mtime;
-        INT32_T st_mtime_nsec;
-        INT32_T st_ctime;
-        INT32_T st_ctime_nsec;
+		INT32_T st_atime;
+		INT32_T st_atime_nsec;
+		INT32_T st_mtime;
+		INT32_T st_mtime_nsec;
+		INT32_T st_ctime;
+		INT32_T st_ctime_nsec;
 #else
-        struct pfs_kernel_timespec st_atim;
-        struct pfs_kernel_timespec st_mtim;
-        struct pfs_kernel_timespec st_ctim;
+		struct pfs_kernel_timespec st_atim;
+		struct pfs_kernel_timespec st_mtim;
+		struct pfs_kernel_timespec st_ctim;
 #endif
 	INT64_T unused1;
 	INT64_T unused2;
@@ -82,16 +82,16 @@ struct pfs_kernel_stat {
 };
 
 struct pfs_kernel_statfs {
-        INT64_T f_type;
-        INT64_T f_bsize;
-        INT64_T f_blocks;
-        INT64_T f_bfree;
-        INT64_T f_bavail;
-        INT64_T f_files;
-        INT64_T f_ffree;
+		INT64_T f_type;
+		INT64_T f_bsize;
+		INT64_T f_blocks;
+		INT64_T f_bfree;
+		INT64_T f_bavail;
+		INT64_T f_files;
+		INT64_T f_ffree;
 	INT64_T f_fsid;
-        INT64_T f_namelen;
-        INT64_T f_spare[6];
+		INT64_T f_namelen;
+		INT64_T f_spare[6];
 };
 
 struct pfs_kernel_iovec {

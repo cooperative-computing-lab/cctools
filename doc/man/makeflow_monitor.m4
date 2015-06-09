@@ -26,7 +26,7 @@ OPTIONS_END
 PARA
 Currently, the only supported PARAM(format) is "text", which means
 CODE(makeflow_monitor) will display the progress of the workflows directly to
-the console.  
+the console.
 PARA
 Additionally, the CODE(-P) parameter current does not do anything.
 
@@ -45,7 +45,7 @@ LONGCODE_END
 Monitor multiple BOLD(Makeflow) logs under current directory and only display
 currently running workflows with a minimum of 4 tasks:
 LONGCODE_BEGIN
-find . -name '*.makeflowlog' | xargs makeflow_monitor -m 4 -H 
+find . -name '*.makeflowlog' | xargs makeflow_monitor -m 4 -H
 LONGCODE_END
 The example above is useful for hierarchical workflows.
 
@@ -56,4 +56,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_MAKEFLOW
 
 FOOTER
-

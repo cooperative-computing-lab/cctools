@@ -1,8 +1,8 @@
 include(manual.h)dnl
 HEADER(makeflow_blast)
 
-SECTION(NAME) 
-BOLD(makeflow_blast) - Generate a Makeflow to parallelize and distribute blastall jobs 
+SECTION(NAME)
+BOLD(makeflow_blast) - Generate a Makeflow to parallelize and distribute blastall jobs
 
 SECTION(SYNOPSIS)
 CODE(BOLD(makeflow_blast query_granularity character_granularity [blast_options]))
@@ -43,4 +43,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_MAKEFLOW
 
 FOOTER
-

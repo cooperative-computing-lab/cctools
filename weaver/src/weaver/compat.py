@@ -61,9 +61,9 @@ except ImportError:
 # Python3 uses __next__, while Python2 uses next.
 
 def compat_next(original_class):
-    """ 
+    """
     Alias next class method to __next__ to make Python3 style iterators
-    compatible with Python2. 
+    compatible with Python2.
     """
     original_class.next = original_class.__next__
     return original_class

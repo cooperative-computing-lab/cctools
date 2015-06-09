@@ -9,7 +9,7 @@ prepare()
 	rm -f $TEST_INPUT
 	rm -f R.*.*
 	./gen_ints_wf.sh $TEST_INPUT 10
-    exit 0
+	exit 0
 }
 
 run()
@@ -32,7 +32,7 @@ clean()
 {
 	rm -f $TEST_INPUT
 	rm -f R.*.*
-    exit 0
+	exit 0
 }
 
 dispatch $@

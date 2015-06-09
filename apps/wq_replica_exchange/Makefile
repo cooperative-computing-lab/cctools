@@ -11,4 +11,3 @@ install:
 	cp replica_exchange.py ${CCTOOLS_INSTALL_DIR}/bin
 
 clean:
-

@@ -65,7 +65,7 @@ char *get_line(FILE * fp)
 		return other;
 
 	} else {
-	    return xxstrdup(buffer);
+		return xxstrdup(buffer);
 	}
 }
 

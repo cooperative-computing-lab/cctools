@@ -36,4 +36,3 @@ try
 catch
 	echo "correct failure"
 end
-

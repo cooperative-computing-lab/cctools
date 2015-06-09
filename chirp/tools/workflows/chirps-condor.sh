@@ -33,9 +33,9 @@ EOF
 
 CONFUGA_NODE_LIST=""
 while sleep 1; do
-    CONFUGA_NODE_LIST=$("${CCTOOLS_INSTALL}/chirp_status" --server-lastheardfrom=60s --server-project="$PROJECT" --server-space=1G --verbose | tr $'\n' ' ' | sed 's/  /\n/g' | grep -E --only-matching 'url [^[:space:]]+' | sed 's/^url /,/g')
-    if [ "$(echo "$CONFUGA_NODE_LIST" | wc -l)" -ge "$N" ]; then
-        break;
-    fi
+	CONFUGA_NODE_LIST=$("${CCTOOLS_INSTALL}/chirp_status" --server-lastheardfrom=60s --server-project="$PROJECT" --server-space=1G --verbose | tr $'\n' ' ' | sed 's/  /\n/g' | grep -E --only-matching 'url [^[:space:]]+' | sed 's/^url /,/g')
+	if [ "$(echo "$CONFUGA_NODE_LIST" | wc -l)" -ge "$N" ]; then
+		break;
+	fi
 done
 export CONFUGA_NODE_LIST

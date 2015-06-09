@@ -185,7 +185,7 @@ static int auth_unix_accept(struct link *link, char **subject, time_t stoptime)
 
 				DIR *d = opendir(challenge_dir);
 				if(d) {
-				    closedir(d);
+					closedir(d);
 				}
 
 				if(stat(path,&buf)==0) {

@@ -103,7 +103,7 @@ static void display_progress(struct work_queue *q)
 	}
 
 	printf("%6d | %4d %4d | %6d %4d %4d %6d %6.2lf | %6d %6d | %5.2lf\n", (int) (time(0) - start_time), info.workers_init + info.workers_ready, info.workers_busy, tasks_submitted, info.tasks_waiting, info.tasks_running, tasks_done,
-	       tasks_done ? tasks_runtime / (double) tasks_done / 1000000.0 : 0, candidates_loaded / 1000, sequences_loaded / 1000, (time(0) > start_time) ? (tasks_runtime / 1000000.0) / (time(0) - start_time) : 0);
+		   tasks_done ? tasks_runtime / (double) tasks_done / 1000000.0 : 0, candidates_loaded / 1000, sequences_loaded / 1000, (time(0) > start_time) ? (tasks_runtime / 1000000.0) / (time(0) - start_time) : 0);
 
 	row_count--;
 

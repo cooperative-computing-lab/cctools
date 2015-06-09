@@ -59,7 +59,7 @@ unsigned long long get_total_lines(char *infile) {
 
 	while ((ch=fgetc(input_file)) != EOF) {
 		if (ch=='\n')
-	        ++line_count;
+			++line_count;
 	}
 	fclose(input_file);
 
@@ -79,7 +79,7 @@ off_t get_file_line_end_offset(FILE *fp, off_t start_offset, unsigned long long 
 
 	while ((ch=fgetc(fp)) != EOF && line_count < line_number) {
 		if (ch == '\n')
-	        ++line_count;
+			++line_count;
 	}
 
 	if(line_count == line_number) {
@@ -333,8 +333,8 @@ double wait_partition_tasks(struct work_queue *q, int timeout, char *task_times_
 	if(task_times_file) {
 		task_times_fp = fopen("wq_sort.tasktimes", "w");
 		if (!task_times_fp) {
-        	fprintf(stderr, "Opening of wq_sort.tasktimes file failed!\n");
-    	}
+			fprintf(stderr, "Opening of wq_sort.tasktimes file failed!\n");
+		}
 	}
 
 	while(!work_queue_empty(q)) {
@@ -480,7 +480,7 @@ int get_optimal_runtimes(char *input_file, char *executable, int resources, unsi
 }
 
 static void show_help(const char *cmd) {
-    fprintf(stdout, "Use: %s [options] <sort program> <infile>\n", cmd);
+	fprintf(stdout, "Use: %s [options] <sort program> <infile>\n", cmd);
 	fprintf(stdout, "where options are:\n");
 	fprintf(stdout, " %-30s Specify a project name for the Work Queue master. (default = none)\n", "-N <string>");
 	fprintf(stdout, " %-30s Specify the number of partitions to create of the input data. (default = 20)\n", "-k <int>");

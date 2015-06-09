@@ -1,0 +1,4 @@
+*.inp -whitespace
+*.pdb -whitespace
+*.psf -whitespace
+wq_replica_exchange whitespace=-indent-with-non-tab

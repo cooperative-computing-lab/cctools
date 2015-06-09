@@ -6,19 +6,19 @@ sfxfile=date.sfx
 
 prepare()
 {
-    exit 0
+	exit 0
 }
 
 run()
 {
-    ../src/starch -x date $sfxfile
-    exec ./$sfxfile
+	../src/starch -x date $sfxfile
+	exec ./$sfxfile
 }
 
 clean()
 {
-    rm -f $sfxfile
-    exit 0
+	rm -f $sfxfile
+	exit 0
 }
 
 dispatch $@

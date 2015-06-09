@@ -42,7 +42,7 @@ Loading generator fragment from Configuration.Generator.TTbar_Tauola_7TeV_cfi
 Step: SIM Spec:
 Step: ENDJOB Spec:
 Starting  cmsRun  TTbar_Tauola_7TeV_cfi_GEN_SIM.py
-     MSTU(12)       changed from              0 to          12345
+	 MSTU(12)       changed from              0 to          12345
 
 =============================================
 

@@ -80,7 +80,7 @@ run()
 
 clean()
 {
-    rm -f "$parrot_debug" "$expected" "$output"
+	rm -f "$parrot_debug" "$expected" "$output"
 }
 
 dispatch $@

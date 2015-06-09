@@ -20,10 +20,10 @@ show_help()
 	echo "" > /dev/null
 }
 
-show_help_common() 
+show_help_common()
 {
 	echo "Use: $script_name [worker options] [batch specific options] <servername> <port> <num-workers>"
-	echo "         or"  
+	echo "         or"
 	echo "     $script_name [worker options] [batch specific options] --master-name <name> <num-workers>"
 
 	echo "worker options:"
@@ -59,7 +59,7 @@ parse_arguments()
 
 parse_arguments_common()
 {
-	# Used options (as in the getopts format):  M:N:C:t:d:w:i:b:z:A:O:s:r:P:h  
+	# Used options (as in the getopts format):  M:N:C:t:d:w:i:b:z:A:O:s:r:P:h
 	while [ $# -gt 0 ]
 	do
 		case $1 in
@@ -78,15 +78,15 @@ parse_arguments_common()
 			arguments="$arguments -M $1"
 			use_master_name=1
 			;;
-			-C | --catalog)  
+			-C | --catalog)
 			shift
 			arguments="$arguments -C $1"
 			;;
-			-t | --timeout)  
+			-t | --timeout)
 			shift
 			arguments="$arguments -t $1"
 			;;
-			-d | --debug)  
+			-d | --debug)
 			shift
 			arguments="$arguments -d $1"
 			;;
@@ -110,39 +110,39 @@ parse_arguments_common()
 			shift
 			arguments="$arguments -A $1"
 			;;
-			-O | --os)  
+			-O | --os)
 			shift
 			arguments="$arguments -O $1"
 			;;
-			-s | --workdir)  
+			-s | --workdir)
 			shift
 			arguments="$arguments -s $1"
 			;;
-			-P | --password)  
+			-P | --password)
 			shift
-			pwfile=$1 
+			pwfile=$1
 			arguments="$arguments -P $pwfile"
 			;;
-			--cores)  
+			--cores)
 			shift
 			arguments="$arguments --cores $1"
 			cores="$1"
-			;; 
-			--memory)  
+			;;
+			--memory)
 			shift
 			arguments="$arguments --memory $1"
 			memory="$1"
 			;;
-			--disk)  
+			--disk)
 			shift
 			arguments="$arguments --disk $1"
 			disk="$1"
 			;;
-			-r)  
+			-r)
 			shift
 			requirements="$requirements $1"
 			;;
-			-E | --worker-options)  
+			-E | --worker-options)
 			shift
 			arguments="$arguments $1"
 			;;
@@ -272,7 +272,6 @@ submit_workers()
 
 if [ "${script_name##*/}" = work_queue_submit_common ]
 then
-    echo "This script provides support functions for the work queue"
-    echo "workers submission scripts, and cannot be executed by itself."
+	echo "This script provides support functions for the work queue"
+	echo "workers submission scripts, and cannot be executed by itself."
 fi
-

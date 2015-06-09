@@ -42,10 +42,10 @@ struct dag_variable_value *dag_variable_get_value(const char *name, struct hash_
  */
 
 struct dag_variable_lookup_set {
-    struct dag *dag;
-    struct dag_task_category *category;
-    struct dag_node *node;
-    struct hash_table *table;
+	struct dag *dag;
+	struct dag_task_category *category;
+	struct dag_node *node;
+	struct hash_table *table;
 };
 
 /* Look up a variable in multiple scopes and return the (constant) structure. */

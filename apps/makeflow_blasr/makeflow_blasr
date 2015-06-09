@@ -4,7 +4,7 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 #
-# This program generates makeflows to parallelize the 
+# This program generates makeflows to parallelize the
 # popular blasr program.
 
 
@@ -33,7 +33,7 @@ def parse_blasr_options(parser):
 def parse_makeflow_options(parser):
 	group = optparse.OptionGroup(parser, "Makeflow Preparation Options")
 	group.add_option('--makeflow', dest='makeflow', type='string', help='Makeflow destination file [stdout]')
-	group.add_option('--num_seq', help='determine the number of sequences per split', default=50000, type = int )	
+	group.add_option('--num_seq', help='determine the number of sequences per split', default=50000, type = int )
 	group.add_option('--makeflow-config', dest='config', help='Makeflow configurations')
 	group.add_option('--verbose', dest='verbose', help='Show verbose level output', action='store_true',default="False")
 	parser.add_option_group(group)
@@ -63,7 +63,7 @@ def count_splits(num_seq, query):
 				num_splits += 1
 				read_count = 0
 				if (num_splits % 10 == 0):
-					log.info("Current Number of Partitions : {0}".format(num_splits))	
+					log.info("Current Number of Partitions : {0}".format(num_splits))
 			else:
 				read_count += 1
 		#place all other lines in FASTQ file under same sequence
@@ -71,8 +71,8 @@ def count_splits(num_seq, query):
 	FILE.close()
 	log.info("Total Number of Partitions : {0}".format(num_splits))
 	return num_splits
-	
-	
+
+
 def write_split_reduce(destination):
 	global options
 	split_name = open(destination, 'w')
@@ -92,7 +92,7 @@ def write_split_reduce(destination):
 #
 #Purpose: Split a FASTQ file into smaller files determined by the number of sequences input
 
-use strict; 
+use strict;
 
 my $numargs = $#ARGV + 1;
 my $file =$ARGV[0];
@@ -120,7 +120,7 @@ while (my $line = <INPUT>) {
 			print OUTPUT \"\\n\";
 			$num_splits++;
 			$read_count = 0;
-		}	
+		}
 		else{
 			print OUTPUT $line;
 			print OUTPUT \"\\n\";
@@ -142,7 +142,7 @@ close(INPUT);
 		split_name.close()
 
 
-		
+
 def write_makeflow(destination, configuration, num_reads_per_split, split_name):
 
 	if destination:
@@ -164,20 +164,20 @@ def write_makeflow(destination, configuration, num_reads_per_split, split_name):
 		for i in range(num_splits):
 			inputlist = inputlist + str(i) + "."+ options.query + " "
 			outputlist = outputlist + "output." + str(i)+ "."+ options.query + " "
-			
 
-		#Here we actually start generating the Makeflow		
+
+		#Here we actually start generating the Makeflow
 		makeflow.write("export LD_LIBRARY_PATH=hdf5")
 		log.info("Writing Partitioning Rules")
 		#How to get inputs
 		makeflow.write("\n{0} : {1} {2}".format(inputlist, options.query, split_name))
 		makeflow.write("\n\tLOCAL perl {0} {1} {2}".format(split_name, options.query, num_reads_per_split))
-		
+
 		#How to get outputs
 		for i in range(num_splits):
 
-	        	makeflow.write("\noutput." + str(i) + "." + options.query + ": "+ str(i) + "." + options.query + " "+  options.ref+ " blasr ./hdf5/ \n")
-	        	makeflow.write("\t LD_LIBRARY_PATH=\"./hdf5/\" ./blasr "
+			makeflow.write("\noutput." + str(i) + "." + options.query + ": "+ str(i) + "." + options.query + " "+  options.ref+ " blasr ./hdf5/ \n")
+			makeflow.write("\t LD_LIBRARY_PATH=\"./hdf5/\" ./blasr "
 					+ str(i)+ "."+ options.query
 					+ " " + options.ref
 					+" "+ ' '.join(args)
@@ -198,9 +198,9 @@ parser = PassThroughParser()
 parse_makeflow_options(parser)
 parse_blasr_options(parser)
 (options, args) = parser.parse_args()
-	
+
 if options.verbose == True:
-       	log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
+	log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
         log.info("Verbose output.")
 else:
         log.basicConfig(format="%(levelname)s: %(message)s")
@@ -216,17 +216,17 @@ if not options.query:
 	sys.exit(4)
 else:
 	log.info("Query Fastq : {0}".format(options.query))
-	
+
 num_reads_per_split=50000
-	
+
 if options.num_seq:
 	num_reads_per_split = int(options.num_seq)
 log.info("Partition Size : {0}".format(num_reads_per_split))
-	
+
 split_name = "query_reduce"
 if os.path.exists(split_name):
-    	os.remove(split_name)
-    	
+	os.remove(split_name)
+
 write_split_reduce(split_name)
 st = os.stat(split_name)
 
@@ -241,10 +241,10 @@ log.info("Searching PATH for Blasr")
 blasr = search_file("blasr", path)
 if os.path.exists("./blasr"):
 		log.info("Blasr found locally")
-		
+
 elif blasr and not os.path.exists("./blasr"):
         log.info("Blasr linked from : " + blasr)
-       	os.symlink(blasr, "blasr")
+	os.symlink(blasr, "blasr")
 elif not os.path.exists("./blasr"):
         log.error("Unable to find blasr")
         sys.exit(3)
@@ -254,15 +254,14 @@ log.info("Searching PATH for HDF5 library")
 hdf5 = search_file("hdf5", path)
 if os.path.exists("./hdf5"):
 	log.info("HDF5 library found locally")
-		
+
 elif hdf5 and not os.path.exists("./hdf5"):
         log.info("HDF5 library linked from : "+ hdf5)
-       	os.symlink(hdf5_lib, "hdf5")
-       	
+	os.symlink(hdf5_lib, "hdf5")
+
 elif not os.path.exists("./hdf5"):
         log.error("Unable to find HDF5 library")
         sys.exit(3)
 
 
 write_makeflow(options.makeflow, options.config, num_reads_per_split, split_name)
-	

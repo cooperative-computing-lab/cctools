@@ -5,23 +5,23 @@
 out_dir="linker_abs_out"
 
 prepare() {
-    if [ -d "$out_dir" ]; then
-        exit 1
-    fi
-    exit 0
+	if [ -d "$out_dir" ]; then
+		exit 1
+	fi
+	exit 0
 }
 
 run() {
-    cd linker
-    ../../src/makeflow_analyze -b "$out_dir" absolute.mf &> tmp
-    diff tmp expected/absolute.mf
-    exit $?
+	cd linker
+	../../src/makeflow_analyze -b "$out_dir" absolute.mf &> tmp
+	diff tmp expected/absolute.mf
+	exit $?
 }
 
 clean() {
-    cd linker
-    rm -rf "$out_dir" tmp
-    exit 0
+	cd linker
+	rm -rf "$out_dir" tmp
+	exit 0
 }
 
 dispatch $@

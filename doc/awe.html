@@ -27,13 +27,13 @@ any idle machines.
 
 <p>AWE uses Work Queue, which is part of the Cooperating Computing Tools (CCTools)
 package, for dispatching jobs for execution on allocated resources.
-Documentation on downloading, installing, and using Work Queue can be found 
-<a href="workqueue.html">here</a>. 
+Documentation on downloading, installing, and using Work Queue can be found
+<a href="workqueue.html">here</a>.
 
 <h2 id="requirement">Software Requirements<a class="sectionlink" href="#requirement">&#x21d7;</a></h2>
 AWE currently uses the GROMACS molecular dynamics simulation package. So it
 requires an installation of GROMACS 4.5 or above and its installed location
-added to PATH. It also requires the GROMACS XTC library for operation. 
+added to PATH. It also requires the GROMACS XTC library for operation.
 
 <p>
 The software requirements of AWE are summarized below along with how AWE finds
@@ -65,14 +65,14 @@ href="http://www.gromacs.org/Developer_Zone/Programming_Guide/XTC_Library">GROMA
 <tr>
 <td><a href="http://matplotlib.org">Matplotlib</a></td><td>1.1.0 or higher</td><td>PYTHONPATH</td>
 </tr>
-</table> 
+</table>
 
 <h2 id="building">Building and Installing AWE<a class="sectionlink" href="#building" title="Link to this section.">&#x21d7;</a></h2>
 Download the CCTools source package from this <a
 href="http://ccl.cse.nd.edu/software/download">web page</a> and install
-using the steps <a href="http://ccl.cse.nd.edu/software/manuals/install.html">here</a>. 
+using the steps <a href="http://ccl.cse.nd.edu/software/manuals/install.html">here</a>.
 
-<p> 
+<p>
 First, determine the location where AWE is to be installed. For example:
 <code>% export AWE_INSTALL_PATH=$HOME/awe</code>
 
@@ -304,7 +304,7 @@ and list them in <tt>StructureIndices.dat</tt></li>
 <li> Define the initial coordinates for the walkers in <tt>State$i-$j.pdb</tt>
 where <tt>i</tt> is the index of the cell and <tt>j</tt> is the index of the walker.</li>
 <li> Specify the parameters for the walker simulation by GROMACS in
-<tt>sim.mdp</tt>. 
+<tt>sim.mdp</tt>.
 </ol>
 
 <h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>

@@ -1,8 +1,8 @@
 #!/bin/sh
 
 if [ ! -r config.mk ]; then
-    echo "Please run ./configure && make before executing the test script" 
-    exit 1
+	echo "Please run ./configure && make before executing the test script"
+	exit 1
 fi
 
 if [ -z "$CCTOOLS_PACKAGES_TEST" ]
@@ -33,16 +33,16 @@ for package in ${CCTOOLS_PACKAGES_TEST}; do
 				printf "%-66s" "--- Testing ${package}/test/${script} ... "
 				TEST_START_TIME=$(date +%s)
 				(
-					echo "======== ${script} PREPARE ========"	
+					echo "======== ${script} PREPARE ========"
 					"./${script}" prepare
 					result=$?
 					if [ $result -ne 0 ]; then
 						exit $result
 					fi
-					echo "======== ${script} RUN ========"	
+					echo "======== ${script} RUN ========"
 					"./${script}" run
 					result=$?
-					echo "======== ${script} CLEAN ========"	
+					echo "======== ${script} CLEAN ========"
 					"./${script}" clean
 					exit $result
 				) >> "$CCTOOLS_TEST_LOG" 2>&1

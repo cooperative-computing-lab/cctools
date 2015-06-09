@@ -63,4 +63,3 @@ extern int rectangle_size;
 extern int curr_rect_x;
 extern int curr_rect_y;
 extern unsigned long total_cand;
-

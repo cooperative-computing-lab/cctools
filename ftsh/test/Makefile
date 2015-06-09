@@ -23,4 +23,3 @@ install:
 
 clean:
 	rm -rf *.out *.err *.log *.parsed *.reparsed a g h i $(TESTS)
-

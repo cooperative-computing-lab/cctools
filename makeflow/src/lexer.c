@@ -1188,7 +1188,7 @@ int lexer_read_line(struct lexer * lx)
 		else {
 			lexer_read_syntax_or_variable(lx);
 		}
-			
+
 		return 1;
 		break;
 	}
@@ -1304,7 +1304,7 @@ struct token *lexer_next_token(struct lexer *lx)
 		if(lx->depth == 0)
 			debug(D_MAKEFLOW_LEXER, "%s", lexer_print_token(head));
 
-	    list_pop_head(lx->token_queue);
+		list_pop_head(lx->token_queue);
 	}
 
 	return head;

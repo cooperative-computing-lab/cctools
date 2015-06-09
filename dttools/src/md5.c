@@ -102,7 +102,7 @@ Rotation is separate from addition to prevent recomputation.
 /* MD5 initialization. Begins an MD5 operation, writing a new context.
  */
 void md5_init(context)
-     md5_context_t *context;	/* context */
+	 md5_context_t *context;	/* context */
 {
 	context->count[0] = context->count[1] = 0;
 	/* Load magic initialization constants.
@@ -117,9 +117,9 @@ void md5_init(context)
   a multiple of 4.
  */
 static void Encode(output, input, len)
-     uint8_t *output;
-     uint32_t *input;
-     size_t len;
+	 uint8_t *output;
+	 uint32_t *input;
+	 size_t len;
 {
 	size_t i, j;
 
@@ -135,9 +135,9 @@ static void Encode(output, input, len)
   a multiple of 4.
  */
 static void Decode(output, input, len)
-     uint32_t *output;
-     uint8_t *input;
-     size_t len;
+	 uint32_t *output;
+	 uint8_t *input;
+	 size_t len;
 {
 	size_t i, j;
 
@@ -148,8 +148,8 @@ static void Decode(output, input, len)
 /* MD5 basic transformation. Transforms state based on block.
  */
 static void MD5Transform(state, block)
-     uint32_t state[4];
-     uint8_t block[64];
+	 uint32_t state[4];
+	 uint8_t block[64];
 {
 	uint32_t a = state[0], b = state[1], c = state[2], d = state[3], x[16];
 
@@ -242,9 +242,9 @@ static void MD5Transform(state, block)
   context.
  */
 void md5_update(context, input, inputLen)
-     md5_context_t *context;	/* context */
-     const void *input;	/* input block */
-     size_t inputLen;	/* length of input block */
+	 md5_context_t *context;	/* context */
+	 const void *input;	/* input block */
+	 size_t inputLen;	/* length of input block */
 {
 	size_t i, index, partLen;
 
@@ -280,8 +280,8 @@ void md5_update(context, input, inputLen)
   the message digest and zeroizing the context.
  */
 void md5_final(digest, context)
-     unsigned char digest[16];	/* message digest */
-     md5_context_t *context;	/* context */
+	 unsigned char digest[16];	/* message digest */
+	 md5_context_t *context;	/* context */
 {
 	uint8_t bits[8];
 	size_t index, padLen;

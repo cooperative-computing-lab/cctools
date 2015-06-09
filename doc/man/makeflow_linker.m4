@@ -8,7 +8,7 @@ SECTION(SYNOPSIS)
 CODE(BOLD(makeflow_linker [options] PARAM(workflow_description)))
 
 SECTION(DESCRIPTION)
-BOLD(makeflow_linker) is a tool for automatically determining dependencies of workflows. It accepts a workflow description, currently Makeflow syntax is required, and recursively determines the dependencies and produces a self-contained package. BOLD(makeflow_linker) supports Python, Perl, and shared libraries. 
+BOLD(makeflow_linker) is a tool for automatically determining dependencies of workflows. It accepts a workflow description, currently Makeflow syntax is required, and recursively determines the dependencies and produces a self-contained package. BOLD(makeflow_linker) supports Python, Perl, and shared libraries.
 
 PARA
 

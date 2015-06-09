@@ -490,7 +490,7 @@ int main(int argc, char *argv[])
 			exit(EXIT_SUCCESS);
 		case 'h':
 			show_help(argv[0]);
- 			exit(EXIT_SUCCESS);
+			exit(EXIT_SUCCESS);
 		default:
 			show_help(argv[0]);
 			return EXIT_FAILURE;
@@ -541,9 +541,9 @@ int main(int argc, char *argv[])
 	}
 
 	signal(SIGINT, handle_abort);
-        signal(SIGQUIT, handle_abort);
-        signal(SIGTERM, handle_abort);
-        signal(SIGHUP, ignore_signal);
+		signal(SIGQUIT, handle_abort);
+		signal(SIGTERM, handle_abort);
+		signal(SIGHUP, ignore_signal);
 
 	struct batch_queue * queue = batch_queue_create(batch_queue_type);
 	if(!queue) {

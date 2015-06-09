@@ -4,8 +4,8 @@
 
 PATH=../src:../../work_queue/src:$PATH
 
-TEST_INPUT=test.wmaster.input	
-TEST_OUTPUT=test.wmaster.output	
+TEST_INPUT=test.wmaster.input
+TEST_OUTPUT=test.wmaster.output
 PORT_FILE=master.port
 MASTER_PID=master.pid
 MASTER_LOG=master.log
@@ -34,7 +34,7 @@ run()
 	echo "starting wavefront master"
 	wavefront_master -d all -o $MASTER_LOG -Z $PORT_FILE ./sum_wfm.sh 10 10 $TEST_INPUT $TEST_OUTPUT > $MASTER_OUTPUT &
 	pid=$!
-    echo $pid > $MASTER_PID
+	echo $pid > $MASTER_PID
 
 	echo "waiting for port file to be created"
 	wait_for_file_creation $PORT_FILE 5

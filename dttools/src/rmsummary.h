@@ -89,4 +89,3 @@ void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src);
 void rmsummary_debug_report(struct rmsummary *s);
 
 #endif
-

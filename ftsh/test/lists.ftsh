@@ -29,4 +29,3 @@ end
 for n in 10 .to. 1
 	echo $n
 end
-

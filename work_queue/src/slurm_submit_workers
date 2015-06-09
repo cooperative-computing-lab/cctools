@@ -4,15 +4,15 @@ SUBMIT_COMMON=$(which work_queue_submit_common)
 if [ -z "$SUBMIT_COMMON" ];
 then
 	echo "Please add 'work_queue_submit_common' to your PATH." 1>&2
-    exit 1
+	exit 1
 else
 	. $SUBMIT_COMMON
 fi
 
-show_help() 
+show_help()
 {
 
-	echo "  -j                       Use job array to submit workers."	
+	echo "  -j                       Use job array to submit workers."
 	echo "  -p <parameters>          SLURM sbatch parameters."
 }
 
@@ -55,7 +55,7 @@ submit_workers_command()
 		exit 1
 	fi
 
-	sbatch --job-name wqWorker --ntasks $count --nodes $count $slurm_parameters <<EOF 
+	sbatch --job-name wqWorker --ntasks $count --nodes $count $slurm_parameters <<EOF
 #!/bin/sh
 srun work_queue_worker $arguments $host $port
 EOF
@@ -63,4 +63,3 @@ EOF
 }
 
 submit_workers "$@"
-

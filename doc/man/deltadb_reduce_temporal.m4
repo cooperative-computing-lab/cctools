@@ -58,4 +58,3 @@ LIST_ITEM(MANPAGE(deltadb_pivot,1))
 LIST_END
 
 FOOTER
-

@@ -23,7 +23,7 @@ and install the software in your home directory:
    make install
    export PATH=$HOME/cctools/bin
    chirp_status
-   
+
 ------------------------------------------------------------
 This software package is
 Copyright (c) 2003-2004 Douglas Thain
@@ -46,4 +46,3 @@ The Glite module of Parrot is Copyright (c) Members of the EGEE Collaboration. 2
 See http://eu-egee.org/partners/ for details on the copyright holders.
 For license conditions see the license file or http://eu-egee.org/license.html
 ------------------------------------------------------------
-

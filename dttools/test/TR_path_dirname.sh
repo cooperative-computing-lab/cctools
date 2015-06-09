@@ -15,7 +15,7 @@ prepare()
 void test (const char *in, const char *expected)
 {
 	char out[PATH_MAX];
-    path_dirname(in, out);
+	path_dirname(in, out);
 	if (strcmp(out, expected) != 0) {
 		fprintf(stderr, "for %s, got %s expected %s\n", in, out, expected);
 		exit(EXIT_FAILURE);

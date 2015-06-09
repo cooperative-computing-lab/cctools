@@ -11,10 +11,10 @@ See the file COPYING for details.
 #include <errno.h>
 
 struct params {
-       double v1;
-       double v2;
-       double q1;
-       double q2;
+	   double v1;
+	   double v2;
+	   double q1;
+	   double q2;
 };
 
 struct params * params_load( const char *path )

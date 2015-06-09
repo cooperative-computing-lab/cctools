@@ -26,7 +26,7 @@ output_path = DEFAULT_OUTPUT_PATH
 
 replica_list = []
 
-#------------------------Initialize random generator---------------------------- 
+#------------------------Initialize random generator----------------------------
 random.seed()
 
 
@@ -63,7 +63,7 @@ class Replica(object):
 def generate_config(output_path, pdb_file, psf_file, par_file, monte_carlo_step, md_steps, output_freq, replica_obj, generate_xyz = False, generate_dcd = False):
 
 	#initialize the config file name based on the replica id.
-	cfg_file_name = "%s/%s/%s/%d/%d-%d.cfg" % ( output_path, "simfiles", "config", replica_obj.id, replica_obj.id, monte_carlo_step)	
+	cfg_file_name = "%s/%s/%s/%d/%d-%d.cfg" % ( output_path, "simfiles", "config", replica_obj.id, replica_obj.id, monte_carlo_step)
 	cfg_file_stream = open(cfg_file_name, "w")
 
 	#initialize string that will hold the config file values
@@ -75,18 +75,18 @@ def generate_config(output_path, pdb_file, psf_file, par_file, monte_carlo_step,
 	parsed_par_file = parse_file_name(par_file)
 
 	#Start writing the config file parameters and values
-	write_str += "randomtype 1\n" 
+	write_str += "randomtype 1\n"
 	write_str += "numsteps %d\n" % md_steps
 	write_str += "outputfreq %d\n" % output_freq
 
 	write_str += "posfile %s\n" % input_pdb
 	write_str += "psffile %s\n" % parsed_psf_file
 	write_str += "parfile %s\n" % parsed_par_file
-	
+
 	if monte_carlo_step > 0:
 		write_str += "velfile %s.%d-%d.vel\n" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step)
 
-	write_str += "dofinPDBPosFile true\n" 
+	write_str += "dofinPDBPosFile true\n"
 	write_str += "finPDBPosFile %s.%d-%d.pdb\n" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step+1)
 	write_str += "finXYZVelFile %s.%d-%d.vel\n" % (remove_trailing_dots(parse_file_name(pdb_file)), replica_obj.id, monte_carlo_step+1)
 
@@ -97,14 +97,14 @@ def generate_config(output_path, pdb_file, psf_file, par_file, monte_carlo_step,
 
 	if generate_xyz:
 		write_str += "XYZPosFile %d.xyz\n" % replica_obj.id
-		write_str += "XYZPosFileOutputFreq %d\n" % md_steps 
+		write_str += "XYZPosFileOutputFreq %d\n" % md_steps
 	if generate_dcd:
 		write_str += "DCDFile %d.dcd\n" % replica_obj.id
 		write_str += "DCDFileOutputFreq %d\n" % output_freq
 
 	write_str += "allEnergiesFile %d.eng\n" % replica_obj.id
 	write_str += "allEnergiesFileOutputFreq %d\n" % output_freq
-	
+
 	write_str += "seed %d\n" % random.randint(1, 1000000)
 	write_str += "shake on\n"
 
@@ -127,7 +127,7 @@ def generate_config(output_path, pdb_file, psf_file, par_file, monte_carlo_step,
 
 	#Write to the config file
 	cfg_file_stream.write(write_str)
-	
+
 	return cfg_file_name
 
 
@@ -140,7 +140,7 @@ def metropolis( u_i, u_j, t_i, t_j ):
 
 	if( deltaE < 0 ):
 		return True
-		
+
 	acceptProb = math.exp(-deltaE)
 	randNum = random.random()
 

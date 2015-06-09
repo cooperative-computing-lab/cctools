@@ -734,7 +734,7 @@ int main(int argc, char *argv[])
 					//targets[target].state = TARGET_STATE_IDLE;
 					if(detail_mode) {
 						printf("%u   %s (%d) -> %s (%d)   %.2lf secs, %.1lf MB/sec\n", (unsigned) time(0), targets[source].name, targets[source].cid, targets[target].name, targets[target].cid, (stop - start) / 1000000.0,
-						       result / (double) (stop - start));
+							   result / (double) (stop - start));
 						fprintf(out, "%s %s %.1lf\n", targets[source].name, targets[target].name, result / (double) (stop - start));
 						//end_time = time(0);
 						//fprintf(outResult,"%d\n",end_time-start_time);

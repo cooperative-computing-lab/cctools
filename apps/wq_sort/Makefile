@@ -3,13 +3,13 @@ CCTOOLS_HOME = ../../
 include ${CCTOOLS_HOME}/config.mk
 include ${CCTOOLS_HOME}/rules.mk
 
-PROGRAMS = wq_sort 
+PROGRAMS = wq_sort
 
 LOCAL_LDFLAGS= -lwork_queue -ldttools ${CCTOOLS_INTERNAL_LDFLAGS}
 
-all: ${PROGRAMS} 
+all: ${PROGRAMS}
 
-wq_sort: wq_sort.o 
+wq_sort: wq_sort.o
 	${CCTOOLS_LD} wq_sort.o ${LOCAL_LDFLAGS} -o $@
 
 clean:

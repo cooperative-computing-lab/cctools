@@ -26,4 +26,3 @@ void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, i
 void makeflow_log_recover( struct dag *d, const char *filename, int verbose_mode );
 
 #endif
-

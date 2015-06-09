@@ -34,8 +34,8 @@
 			<p>Umbrella is a tool for specifying and materializing
 			comprehensive execution environments, from the hardware all the way up to
 			software and data.  A user simply invokes Umbrella with the desired task, and
-			Umbrella parses the specification, 
-			determines the minimum mechanism necessary to run the task, 
+			Umbrella parses the specification,
+			determines the minimum mechanism necessary to run the task,
 			downloads missing dependencies, and executes the application through the available minimal
 			mechanism, which may be direct execution, a system container (Docker, chroot, Parrot), a local
 			virtual machine (i.e., VMware), or submission to a cloud environment (i.e.,
@@ -63,14 +63,14 @@
 			without any special authority on the host machine; Docker execution engine
 			requires Docker is installed on the host machine and the user is given the
 			right authority to use Docker; chroot execution engine requires the user to be
-			the root user.</p>  
+			the root user.</p>
 
             <p>To get started using Umbrella, please begin by <a
             href="install.html">installing CCTools</a> on your system. When you
             are ready, proceed with the <a href="#have_a_try">Have a Try</a>
             section below. If you are interested in running your CMS applications
 			through Umbrella, proceed with the <a href="#try_cms">Try CMS Applications with Umbrella</a>.</p>
-			
+
 			<p>If you want to construct umbrella specification for your own application,
 			proceed with the <a href="#create_spec">Create Your Specification</a> section
 			below. </p>
@@ -81,7 +81,7 @@
 
         <h2 id="have_a_try">Have a Try<a class="sectionlink" href="#have_a_try" title="Link to this section.">&#x21d7;</a></h2>
 
-			<p>The part uses a Ray-Tracing application as an example to illustrate 
+			<p>The part uses a Ray-Tracing application as an example to illustrate
 			how to execute an application with Umbrella.
 			The <tt>--packages</tt> option and the <tt>--ec2</tt> option are both not set
 			in the following command, so <a
@@ -127,12 +127,12 @@
 			and <a
 			href="http://ccl.cse.nd.edu/software/umbrella/database/povray/WRC_RubiksCube.inc">WRC_RubiksCube.inc</a>.
 			The expected output of the ray-tracing command is a png file named <tt>frame000.png</tt>.
-			The command for this application is:<code>povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50</code> 
+			The command for this application is:<code>povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50</code>
 			Suppose you do your umbrella test under
 			<tt>/tmp/umbrella</tt>. First download the specification and the two input
 			files into <tt>/tmp/umbrella</tt>.  </p>
 
-			<p><b>The umbrella command for Parrot execution engine:</b></p>			
+			<p><b>The umbrella command for Parrot execution engine:</b></p>
 			<code>umbrella \
 	--sandbox_mode parrot \
 	--log umbrella.log \
@@ -149,18 +149,18 @@
 
 			<img class="center" src="images/umbrella-povray.png" HEIGHT="200" WIDTH="200" align="center"/>
 
-			<p>You can check the help document of umbrella for the option settings by running the command: <code>umbrella -h</code></p> 
+			<p>You can check the help document of umbrella for the option settings by running the command: <code>umbrella -h</code></p>
 
-			<p>You can try other execution engines following the instructions 
+			<p>You can try other execution engines following the instructions
 			in the <a href="#running">Different Execution Engines of Umbrella</a> section.</p>
-	
+
 			<p>To construct umbrella specification for your own application,
 			proceed with the <a href="#create_spec">Create Your Specification</a> section
 			below. </p>
 
         <h2 id="try_cms">Try CMS Applications with Umbrella<a class="sectionlink" href="#try_cms" title="Link to this section.">&#x21d7;</a></h2>
 
-			<p>The part uses a CMS application as an example to illustrate 
+			<p>The part uses a CMS application as an example to illustrate
 			how to execute a CMS application with Umbrella.
 			The <tt>--packages</tt> option and the <tt>--ec2</tt> option are both not set
 			in the following command, so <a
@@ -225,12 +225,12 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 
 			The analysis code will create a directory called <tt>sim_job</tt> and put the CMSSW software dependencies under it.
 			The expected output of the CMS application is a png file named <tt>frame000.png</tt>.
-			The command for this application is:<code>/bin/sh cms_complex.sh</code> 
+			The command for this application is:<code>/bin/sh cms_complex.sh</code>
 			Suppose you do your umbrella test under
 			<tt>/tmp/umbrella</tt>. First download the specification and the CMS analysis code
 			file into <tt>/tmp/umbrella</tt>.  </p>
 
-			<p><b>The umbrella command for Parrot execution engine:</b></p>			
+			<p><b>The umbrella command for Parrot execution engine:</b></p>
 			<code>umbrella \
 	--sandbox_mode parrot \
 	--log umbrella.log \
@@ -264,7 +264,7 @@ MessageLogger Summary
 
  type    category    Examples: run/evt        run/evt          run/evt
  ---- -------------------- ---------------- ---------------- ----------------
-    1 fileAction           BeforeEvents     BeforeEvents     
+    1 fileAction           BeforeEvents     BeforeEvents
 
 Severity    # Occurrences   Total Occurrences
 --------    -------------   -----------------
@@ -272,15 +272,15 @@ System                  2                   2
 </code>
 
 			The analysis directory <tt>sim_job</tt> will be put in the output directory,
-			<tt>/tmp/umbrella_test/parrot_cms_complex_output</tt>. 
+			<tt>/tmp/umbrella_test/parrot_cms_complex_output</tt>.
 
-			<p>You can check the help document of umbrella for the option settings by running the command: <code>umbrella -h</code></p> 
+			<p>You can check the help document of umbrella for the option settings by running the command: <code>umbrella -h</code></p>
 
 <p>For more information about the Umbrella support for CMS applications, please check the <a href="#cms_app">Umbrella Support for CMS Application</a> section. </p>
 
-			<p>You can try other execution engines following the instructions in the 
+			<p>You can try other execution engines following the instructions in the
 			<a href="#running">Different Execution Engines of Umbrella</a> section.</p>
-	
+
 			<p>To construct umbrella specification for your own application,
 			proceed with the <a href="#create_spec">Create Your Specification</a> section
 			below. </p>
@@ -337,25 +337,25 @@ System                  2                   2
 				<li><b>arch</b> (required): the hardware architecture the application needs to
 				run on. Options: x86_64, i386, i686. Current support options: x86_64. Not case
 				sensitive.</li>
-				
+
 				<li><b>cores</b> (optional): the number of cores the applications needs.
 				Options: 1, 2, 3, 4, ...</li>
-				
+
 				<li><b>memory</b> (optional): the memory space the application needs in the
 				unit of GB. Options: 1GB, 2GB, .... Not case sensitive.</li>
-				
+
 				<li><b>disk</b> (optional): the disk space the application needs in the unit of
 				GB. Options: 1GB, 2GB, .... Not case sensitive.</li>
 
 			</ul>
-			
+
 			<p><b>kernel</b> Section (required):</p>
 
 			<ul>
 
 				<li><b>name</b> (required): the kernel type the application requires. Options:
 				linux, windows. Current support options: linux. Not case sensitive.</li>
-				
+
 				<li><b>version</b> (required): the kernel version in the format of
 				<tt>A.B.C</tt> (A: kernel version; B: major revision of the kernel; C: the
 				minor revision of the kernel). You can specify this attribute to a single value
@@ -363,18 +363,18 @@ System                  2                   2
 				<tt>[2.6.18, 2.6.32]</tt>.</li>
 
 			</ul>
-			
+
 			<p><b>os</b> Section (required):</p>
 
 			<ul>
 
 				<li><b>name</b> (required): the OS name. Options: redhat, centos, arch, ....
 				Not case sensitive.</li>
-				
+
 				<li><b>version</b> (required): the OS version in the format of <tt>A.B</tt>: A
 				is the main version number and B is the minor version number. Exmaples: 5.10,
 				6.5. </li>
-				
+
 				<li><b>id</b> (optional): the id of the OS image. There may exist multiple OS
 				images for redhat 5.10, the id attribute uniquely identifies a OS image. If
 				this attribute is not provided in the specification and the OS version is
@@ -382,7 +382,7 @@ System                  2                   2
 				packages.json will be used.</li>
 
 			</ul>
-			
+
 			<p><b>software</b> Section (optional):</p>
 
 			<p>Each software dependency has a name, which corresponds to the name included in the metadata database.</p>
@@ -394,17 +394,17 @@ System                  2                   2
 				difference of complication settings. the id attribute uniquely identifies a
 				software. If this attribute is not provided in the specification, the first
 				version found in the packages.json will be used. </li>
-				
+
 				<li><b>mountpoint</b> (required): the mountpoint of the software. Case
 				sensitive.</li>
-				
+
 				<li><b>action</b> (required): the action on the downloaded software
 				dependencies. Options: <tt>none</tt>, <tt>unpack</tt>. <tt>none</tt> leaves the
 				downloaded dedendency as it is. <tt>unpack</tt> uncompresses the depedency. Not
 				case sensitive.</li>
 
 			</ul>
-			
+
 			<p><b>data</b> Section (optional):</p>
 
 			<p>Each data dependency has a name, which corresponds to the name included in the metadata database. </p>
@@ -415,17 +415,17 @@ System                  2                   2
 				of a data. the id attribute uniquely identifies a data. If this attribute is
 				not provided in the specification, the first version found in the packages.json
 				will be used. </li>
-				
+
 				<li><b>mountpoint</b> (required): the mountpoint of the data dependency. Case
 				sensitive.</li>
-				
+
 				<li><b>action</b> (required): the action on the downloaded data dependencies.
 				Options: <tt>none</tt>, <tt>unpack</tt>. <tt>none</tt> leaves the downloaded
 				dedendency as it is. <tt>unpack</tt> uncompresses the dependency. Not case
 				sensitive.</li>
 
 			</ul>
-			
+
 			<p><b>environ</b> Section (optional):</p>
 
 			<p>Each item is a key-value pair. For example, <tt>"HOME": "/home/hmeng"</tt>,
@@ -440,7 +440,7 @@ System                  2                   2
 		dependencies.  It then selects the mechanism necessary to deliver the desired
 		environment.  In the case where Umbrella can not construct the desired
 		environment on the local machine, the user will be notified.</p>
-		
+
 		<p><b>Local Cache and Mounting Mechanism.</b> One cache directory will be set
 		on each execution node involved in the execution engine to avoid download the
 		same data from the remote archive repeatedly.  Umbrella downloads and caches OS
@@ -448,7 +448,7 @@ System                  2                   2
 		then creates a sandbox to execute the application.  To enable software
 		reusability by multiple users, Umbrella constructs the sandbox for each
 		application through mounting-based sandbox techniques.</p>
-		
+
 		<p>The following figure shows the relationship between the remote archive, the
 		local cache and the sandbox for each application.  <tt>Sandbox 1</tt> uses the
 		root filesystem of the host machine as the root filesystem and mounts the
@@ -459,7 +459,7 @@ System                  2                   2
 
 		<img class="center" src="images/umbrella-archive-sandbox-cache.png" HEIGHT="340" WIDTH="510" align="center"/>
 
-			<p>The following parts uses a Ray-Tracing application as an example to illustrate 
+			<p>The following parts uses a Ray-Tracing application as an example to illustrate
 			how to use different execution engines of Umbrella to execute the application.
 			The <tt>--packages</tt> option and the <tt>--ec2</tt> option are both not set
 			in the following command, so <a
@@ -482,7 +482,7 @@ System                  2                   2
 
 			<h3 id="run.parrot">Execute your Application through Umbrella - Parrot<a class="sectionlink" href="#run.parrot" title="Link to this section.">&#x21d7;</a></h3>
 
-				<p><b>The umbrella command for Parrot execution engine:</b></p>			
+				<p><b>The umbrella command for Parrot execution engine:</b></p>
 				<code>umbrella \
 	--sandbox_mode parrot \
 	--log umbrella.log \
@@ -494,7 +494,7 @@ System                  2                   2
 
 			<h3 id="run.docker">Execute your Application through Umbrella - Docker<a class="sectionlink" href="#run.docker" title="Link to this section.">&#x21d7;</a></h3>
 
-				<p><b>The umbrella command for Docker execution engine:</b></p>			
+				<p><b>The umbrella command for Docker execution engine:</b></p>
 				<code>umbrella \
 	--sandbox_mode docker \
 	--log umbrella.log \
@@ -508,7 +508,7 @@ System                  2                   2
 
 			<h3 id="run.chroot">Execute your Application through Umbrella - chroot<a class="sectionlink" href="#run.chroot" title="Link to this section.">&#x21d7;</a></h3>
 
-				<p><b>The umbrella command for chroot execution engine:</b></p>			
+				<p><b>The umbrella command for chroot execution engine:</b></p>
 				<code>umbrella \
 	--sandbox_mode chroot \
 	--log umbrella.log \
@@ -522,7 +522,7 @@ System                  2                   2
 
 			<h3 id="run.local">Execute your Application through Umbrella - local<a class="sectionlink" href="#run.local" title="Link to this section.">&#x21d7;</a></h3>
 
-				<p><b>The umbrella command for local execution engine:</b></p>			
+				<p><b>The umbrella command for local execution engine:</b></p>
 				<code>umbrella \
 	--sandbox_mode local \
 	--log umbrella.log \
@@ -539,11 +539,11 @@ System                  2                   2
 				engine just focuses on docker and parrot, ignoring chroot, because to render a
 				task includes lots of mount and umount oprations, which are dangerous.  If you
 				really want to use chroot to finish your task, please set the
-				<tt>--sandbox_mode</tt> option to be chroot.</p> 
-			
+				<tt>--sandbox_mode</tt> option to be chroot.</p>
+
 			<h3 id="run.condor">Execute your Application through Umbrella - Condor<a class="sectionlink" href="#run.condor" title="Link to this section.">&#x21d7;</a></h3>
 
-				<p><b>The umbrella command for condor execution engine:</b></p>			
+				<p><b>The umbrella command for condor execution engine:</b></p>
 				<code>umbrella \
 	--sandbox_mode condor \
 	--log umbrella.log \
@@ -559,7 +559,7 @@ System                  2                   2
 
 			<h3 id="run.ec2">Execute your Application through Umbrella - EC2<a class="sectionlink" href="#run.ec2" title="Link to this section.">&#x21d7;</a></h3>
 
-				<p><b>The umbrella command for ec2 execution engine:</b></p>			
+				<p><b>The umbrella command for ec2 execution engine:</b></p>
 				<code>umbrella \
 	--sandbox_mode ec2 \
 	--log umbrella.log \
@@ -576,7 +576,7 @@ System                  2                   2
 				<p>To test this, you must set up the <a
 				href="http://docs.aws.amazon.com/AWSEC2/latest/CommandLineReference/set-up-ec2-cli-linux.html#setting_up_ec2_command_linux">Amazon
 				EC2 command line interface tools on Linux</a>.
-				
+
 				<p>If you try to use the <tt>id</tt> attribute in the <tt>os</tt> section of the specification to
 				specify a unique OS image from the Amazon EC2, you need to check the <a href="#ec2_db">EC2 metadata
 				database</a> section below, which uses an AMI as the
@@ -642,14 +642,14 @@ System                  2                   2
 			the software name, B is the software version, C is OS distro name, D is
 			hardware architecture. <tt>povray-3.6.1-redhat5-x86_64</tt> is an example of
 			this category.</p>
-			
+
 			<p>The name of an OS image dependency is in the format of 'A-B-C', where A is
 			the OS name, B is the OS version, C is hardware architecture.
 			<tt>redhat-5.10-x86_64</tt> is an example of this category.</p>
-			
+
 			<p>There is no special limitation on the name of a data dependency.
 			<tt>final_events_2381.lhe</tt> is an example of this category.</p>
-			
+
 			<p><b>Multiple Packages for One Dependency.</b> According to the building and
 			compilation settings, there may be multiple packages for one dependency. In
 			this case, all the packages for one dependency will be organized together and
@@ -668,12 +668,12 @@ System                  2                   2
 				<tt>file:///etc/hosts</tt>, or a https/http URL as shown in the example. Case
 				sensitive. The first source will be first tried, if fails, then the second
 				source will be tried, and so on.</li>
-				
+
 				<li><b>checksum</b>: the checksum of the dependencies. Currently Umbrella only
 				supports md5 checksum. </li>
-				
+
 				<li><b>size</b>: the size of the dependency. Not case sensitive.</li>
-				
+
 				<li><b>format</b>: the perservation format of the dependency. Currently
 				Umbrella supports two formats: <tt>tgz</tt> (gzip compressed tarball) and
 				<tt>plain</tt> (plain text).</li>
@@ -685,7 +685,7 @@ System                  2                   2
 			However, it is not necessary for them to be identical to each other. You can
 			implement your metadata database in a different semantics once the id of each
 			package is unique for one dependency.</p>
-			
+
 			<p><b>Organization of the Local Cache.</b> Within the local cache, the id of
 			each package dependency will be used to create a directory under the
 			<tt>&lt;localdir&gt;/cache</tt>, then the package will be put into
@@ -694,7 +694,7 @@ System                  2                   2
 			will be the local location of the first povray package shown in the above
 			example. The uncompressed directory of the tarball will be
 			<tt>&lt;localdir&gt;/cache/9b7f2362e6b927c8ef08c3f92599e47c/povray-3.6.1-redhat5-x86_64</tt>.</p>
-			
+
 			<p><b>Organization of the Remote Archive.</b> Within the remote archive, to
 			differentiate multiple packages for the same dependency and the different
 			dependencies, a directory with the name of the checksum of each package will be
@@ -704,7 +704,7 @@ System                  2                   2
 			<tt>povray-3.6.1-redhat5-x86_64.tar.gz</tt> However, the organization of the
 			remote archive can be in other format, once you have a way to differentiate the
 			packages.</p>
-			
+
 			<p>If you want to customize your own metadata database, please follow the
 			requirements above and then tell umbrella through <tt>--packages</tt> option to
 			use your own metadata database.</p>
@@ -750,7 +750,7 @@ System                  2                   2
 }</code>
 
 			<p>There are two types of items in an EC2 metadata: OS images and instance types.</p>
-			
+
 			<p>The name of an OS image shares the same specification with the name used in <a
 			href="#prepare.archive">the general metadata database</a>. There may exist
 			multiple versions of images for an OS like <tt>redhat-5.10-x86_64</tt>. An

@@ -86,7 +86,7 @@ static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
 pid_t work_queue_process_execute(struct work_queue_process *p, int container_mode, ...)
 {
-	// make warning 
+	// make warning
 
 	fflush(NULL);		/* why is this necessary? */
 
@@ -221,8 +221,8 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 
 void work_queue_process_kill(struct work_queue_process *p)
 {
-	//make sure a few seconds have passed since child process was created to avoid sending a signal 
-	//before it has been fully initialized. Else, the signal sent to that process gets lost.        
+	//make sure a few seconds have passed since child process was created to avoid sending a signal
+	//before it has been fully initialized. Else, the signal sent to that process gets lost.
 	timestamp_t elapsed_time_execution_start = timestamp_get() - p->execution_start;
 
 	if(elapsed_time_execution_start / 1000000 < 3)
@@ -231,7 +231,7 @@ void work_queue_process_kill(struct work_queue_process *p)
 	debug(D_WQ, "terminating task %d pid %d", p->task->taskid, p->pid);
 
 	// Send signal to process group of child which is denoted by -ve value of child pid.
-	// This is done to ensure delivery of signal to processes forked by the child. 
+	// This is done to ensure delivery of signal to processes forked by the child.
 	kill((-1 * p->pid), SIGKILL);
 
 	// Reap the child process to avoid zombies.

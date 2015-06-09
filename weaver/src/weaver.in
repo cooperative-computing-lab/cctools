@@ -14,7 +14,7 @@ import sys
 
 
 if __name__ == '__main__':
-    s = Script(sys.argv[1:])
-    s.compile()
+	s = Script(sys.argv[1:])
+	s.compile()
 
 # vim: set sts=4 sw=4 ts=8 expandtab ft=python:

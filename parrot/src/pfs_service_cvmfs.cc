@@ -197,7 +197,7 @@ in the file tree.
 */
 
 class cvmfs_dirent {
-      public:
+	  public:
 	cvmfs_dirent();
 	~cvmfs_dirent();
 
@@ -869,25 +869,25 @@ Remove trailing slashes from a path
 
 static void chomp_slashes( char *s )
 {
-        char *t = s;
+		char *t = s;
 
-        if(!s) return;
+		if(!s) return;
 
-        while(*t) {
-                t++;
-        }
+		while(*t) {
+				t++;
+		}
 
-        t--;
+		t--;
 
-        while(*t=='/' && t!=s ) {
-                *t=0;
-                t--;
-        }
+		while(*t=='/' && t!=s ) {
+				*t=0;
+				t--;
+		}
 }
 static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 {
 
-        /* During each iteration path->rest is decomposed into
+		/* During each iteration path->rest is decomposed into
 	xpath->rest/path_head/path_tail. path_head is tried for
 	symlink expansion, and on failing, added to xpath->rest. */
 
@@ -1061,12 +1061,12 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_leaf_symlinks, bool expan
 
 
 class pfs_file_cvmfs:public pfs_file {
-      private:
+	  private:
 	int fd;
 	pfs_stat info;
 	pfs_off_t last_offset;
 
-      public:
+	  public:
 	pfs_file_cvmfs(pfs_name * n, int fd_arg, cvmfs_dirent & d):pfs_file(n) {
 		fd = fd_arg;
 		last_offset = 0;
@@ -1112,7 +1112,7 @@ class pfs_file_cvmfs:public pfs_file {
 };
 
 class pfs_service_cvmfs:public pfs_service {
-      public:
+	  public:
 	virtual int get_default_port() {
 		return 0;
 	}
@@ -1226,8 +1226,8 @@ class pfs_service_cvmfs:public pfs_service {
 		*/
 
 		if(!name->host[0]) {
-                        pfs_service_emulate_stat(name,info);
-                        info->st_mode = S_IFDIR | 0555;
+						pfs_service_emulate_stat(name,info);
+						info->st_mode = S_IFDIR | 0555;
 			return 0;
 		}
 
@@ -1337,18 +1337,18 @@ class pfs_service_cvmfs:public pfs_service {
 
 	virtual int readlink(pfs_name * name, char *buf, pfs_size_t bufsiz) {
 
-                /*
-                If we get readlink("/cvmfs"), return not-a-link.
-                */
+				/*
+				If we get readlink("/cvmfs"), return not-a-link.
+				*/
 
-                if(!name->host[0]) {
+				if(!name->host[0]) {
 			errno = EINVAL;
 			return -1;
-                }
+				}
 
-                /*
-                Otherwise, do the lookup in CVMFS itself.
-                */
+				/*
+				Otherwise, do the lookup in CVMFS itself.
+				*/
 
 		struct cvmfs_dirent d;
 

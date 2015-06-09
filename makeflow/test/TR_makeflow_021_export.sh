@@ -7,9 +7,9 @@ test_output=export.output
 
 prepare()
 {
-    mkdir $test_dir
-    cd $test_dir
-    ln -sf ../syntax/export.makeflow Makeflow
+	mkdir $test_dir
+	cd $test_dir
+	ln -sf ../syntax/export.makeflow Makeflow
 cat > ../$test_output <<EOF
 
 1
@@ -17,24 +17,24 @@ cat > ../$test_output <<EOF
 $
 $
 EOF
-    exit 0
+	exit 0
 }
 
 run()
 {
-    cd $test_dir
-    ../../src/makeflow -dall
-    if [ $? -eq 0 ]; then
-    	exec diff ../$test_output out.all
-    else
-    	exit 1
-    fi
+	cd $test_dir
+	../../src/makeflow -dall
+	if [ $? -eq 0 ]; then
+		exec diff ../$test_output out.all
+	else
+		exit 1
+	fi
 }
 
 clean()
 {
-    rm -fr $test_dir $test_output
-    exit 0
+	rm -fr $test_dir $test_output
+	exit 0
 }
 
 dispatch $@

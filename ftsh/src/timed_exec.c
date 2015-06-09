@@ -78,9 +78,9 @@ timed_exec_t timed_exec( int line, const char *path, char **argv, int fds[3], pi
 	} else {
 
 		/*
-	        Now clear the pipe.  If it contains an int, then the process
-	        forked, but was unable to exec.  Set the reason appropriately.
-	        Otherwise, live with what we have.
+			Now clear the pipe.  If it contains an int, then the process
+			forked, but was unable to exec.  Set the reason appropriately.
+			Otherwise, live with what we have.
 		*/
 
 		close(pfds[1]);

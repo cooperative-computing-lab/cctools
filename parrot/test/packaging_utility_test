@@ -9,9 +9,9 @@ print "Hello, World!"
 6. javac helloworld.java
 The content of helloworld.java:
 class helloworld {
-    public static void main(String[] args) {
-        System.out.println("Hello World!"); // Display the string.
-    }
+	public static void main(String[] args) {
+		System.out.println("Hello World!"); // Display the string.
+	}
 }
 7. java helloworld (helloworld is the result of test 6 - javac helloworld.java)
 

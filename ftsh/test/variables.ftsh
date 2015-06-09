@@ -8,9 +8,9 @@ function printit
 	echo "name is ${1}"
 	echo name is ${1}
 	echo "name" "is" "$1"
-        echo "name is $1"
-        echo name is $1
-        echo "name" "is" "$1"
+		echo "name is $1"
+		echo name is $1
+		echo "name" "is" "$1"
 end
 
 name=value

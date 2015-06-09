@@ -21,7 +21,7 @@ fi
 if [ -z "$(which rpmbuild)" -o -z "$(which rpmdev-setuptree)" ]; then
 	echo "Please guarantee rpmdevtools is installed on your system, rpmbuild and rpmdev-setuptree are needed to create RPMs!"
 	echo "To install rpmdevtools, please run: yum install rpmdevtools"
-	exit 1	
+	exit 1
 fi
 
 #preserve the path of the current working directory
@@ -54,7 +54,7 @@ fi
 
 cd -
 
-#create a template .spec file for ndcctools. 
+#create a template .spec file for ndcctools.
 #Even if the .spec files are recommended to be put under ~/rpmbuild/SPECS, in fact you can put it in other places, just be consistent the location of the .spec file with the rpmbuild command.
 cd "${make_dir}"/packaging/rpm
 temp_file="$(mktemp -p .)"
@@ -129,7 +129,7 @@ if [ -z "$(which grep)" ]; then
 	exit 1
 fi
 
-libfuse_path="$(rpm -ql fuse-devel | grep libfuse.so)" 
+libfuse_path="$(rpm -ql fuse-devel | grep libfuse.so)"
 libfuse_dir="$(printf "%s" "$libfuse_path" | tail -c +0 | head -c 4)"
 echo ${libfuse_dir}
 if [ "${libfuse_dir}" != "/usr" -a ! -e "/usr${libfuse_path}" ]; then
@@ -201,7 +201,7 @@ if [ -z "$(rpm -qa cvmfs-devel)" ]; then
 	echo "Then you can install cvmfs-devel by running: yum install cvmfs-devel"
 	exit 1
 fi
-	
+
 #check whether freetype is available
 if [ -z "$(rpm -qa freetype)" ]; then
 	echo "Please guarantee freetype is installed on your system!"

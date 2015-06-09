@@ -154,4 +154,3 @@ struct ast_redirect    * ast_redirect_create( int kind, int source, struct ast_w
 struct ast_word        * ast_word_create( int line, const char *text );
 
 #endif
-

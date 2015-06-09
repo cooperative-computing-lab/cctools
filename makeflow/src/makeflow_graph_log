@@ -10,28 +10,28 @@
 
 show_help()
 {
-    echo "use: makeflow_graph_log <makeflowlog> <imagefile>"
-    exit 1
+	echo "use: makeflow_graph_log <makeflowlog> <imagefile>"
+	exit 1
 }
 
 while [ $# -gt 0 ]
 do
-    case $1 in
+	case $1 in
 	-h |--help )
-	    show_help
-	    exit 1
-	    ;;
+		show_help
+		exit 1
+		;;
 	*)
-	    break
-	    ;;
+		break
+		;;
 	esac
-    shift
+	shift
 done
 
 if [ $# -ne 2 ]
 then
-    show_help
-    exit 1
+	show_help
+	exit 1
 fi
 
 infile=$1
@@ -45,17 +45,17 @@ for prog in gnuplot convert
 do
    if which $prog >& /dev/null
    then
-      true
+	  true
    else
-      echo "$0: could not find $prog in your PATH"
-      exit 1
+	  echo "$0: could not find $prog in your PATH"
+	  exit 1
    fi
 done
 
 if [ ! -f $infile ]
 then
-    echo "$0: $infile does not exist"
-    exit 1
+	echo "$0: $infile does not exist"
+	exit 1
 fi
 
 # Note that gnuplot generates very different fonts and output
@@ -71,17 +71,16 @@ set timefmt "%s"
 set xdata time
 set ylabel "Jobs Submitted / Complete"
 set y2label "Jobs Running"
-set y2tics 
-set style line 1 
+set y2tics
+set style line 1
 set key top left
 plot "$infile" using (\$1/1000000):(\$6+\$7+\$8+\$9) title "Submitted" with lines lw 5, "" using (\$1/1000000):6 title "Running" with lines lw 5, "" using (\$1/1000000):7 title "Complete" with lines lw 5
 EOF
 
 if [ $output_format = "eps" ]
 then
-    mv $tempfile $outfile
+	mv $tempfile $outfile
 else
-    convert eps:$tempfile -background white -flatten -antialias $outfile
-    rm $tempfile
+	convert eps:$tempfile -background white -flatten -antialias $outfile
+	rm $tempfile
 fi
-

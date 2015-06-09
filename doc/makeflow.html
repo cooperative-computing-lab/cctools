@@ -185,7 +185,7 @@ on port 9567 by default, you can run the following command:</p>
 <p>A simpler way to match workers to masters is to use the project name
 matching. You can give the master a project name with the -N option.</p>
 
-<code>makeflow -T wq -N MyProj example.makeflow </code> 
+<code>makeflow -T wq -N MyProj example.makeflow </code>
 
 <p>The -N option gives the master a project name called 'MyProj',
 and will cause it to advertise its information
@@ -234,7 +234,7 @@ make your masters and workers contact this catalog server, simply add the
 <tt>-C hostname:port</tt> option to both of your master and worker:</p>
 
 <code>makeflow -T wq -C catalog.somewhere.edu:9097 -N MyProj example.makeflow
-work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj 
+work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj
 </code>
 
 <h2 id="details">More Language Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
@@ -364,7 +364,7 @@ remote file renaming. For example:</p>
 in the remote system. Consider the following example:</p>
 
 <code>b.out: a.in myprog
-LOCAL myprog a.in &gt; b.out 
+LOCAL myprog a.in &gt; b.out
 
 c.out-&gt;out: a.in-&gt;in1 b.out myprog-&gt;prog
         prog in1 b.out &gt; out
@@ -450,7 +450,7 @@ environment variables CORES, MEMORY, and DISK.
 Consider the following example:
 
 <code> # These tasks are assigned to the category preprocessing.
-# MEMORY and CORES are read from the environment, if defined.  
+# MEMORY and CORES are read from the environment, if defined.
 
 CATEGORY="preprocessing"
 DISK=500
@@ -616,7 +616,7 @@ Each line contains the following items:
 	<li><b>task_id_counter</b> - total number of tasks in this Makeflow</li>
 </ul>
 
-<p> In addition, lines starting with a pound sign are comments and 
+<p> In addition, lines starting with a pound sign are comments and
 contain additional high-level information that can be safely ignored.
 The logfile begins with a comment to indicate the starting time, and ends with
 a comment indicating whether the entire workflow completed, failed, or was aborted.
@@ -647,7 +647,7 @@ and submitting workers via the cluster's normal submission mechanism.</p>
 <p>For clusters using managers similar to Torque, SGE, and PBS that submit
 jobs with commands like "qsub", you can inform makeflow of those commands
 and use the <tt>cluster</tt> driver.  For this to work, it is assumed
-there is a distributed filesystem shared (like NFS) shared across all 
+there is a distributed filesystem shared (like NFS) shared across all
 nodes of the cluster.</p>
 
 <p>To configure a custom driver, set the following environment variables:

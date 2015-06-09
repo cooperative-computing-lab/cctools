@@ -50,9 +50,9 @@ See the file COPYING for details.
 
 /* Display options */
 enum { SHOW_INPUT_FILES = 2,
-       SHOW_OUTPUT_FILES,
-       SHOW_MAKEFLOW_ANALYSIS,
-       SHOW_DAG_FILE
+	   SHOW_OUTPUT_FILES,
+	   SHOW_MAKEFLOW_ANALYSIS,
+	   SHOW_DAG_FILE
 };
 
 #define MAKEFLOW_AUTO_WIDTH 1

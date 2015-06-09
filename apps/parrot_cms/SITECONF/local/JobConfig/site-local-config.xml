@@ -4,9 +4,9 @@
       <catalog url="trivialcatalog_file:/afs/hep.wisc.edu/home/dan/parrot_glidein_wrapper/test/var/cms_siteconf/SITECONF/local/PhEDEx/storage.xml?protocol=xrootd"/>
     </event-data>
     <source-config>
-        <cache-hint value="storage-only"/> 
-        <read-hint value="read-ahead-buffered"/> 
-        <ttree-cache-size value="33554432"/> 
+        <cache-hint value="storage-only"/>
+        <read-hint value="read-ahead-buffered"/>
+        <ttree-cache-size value="33554432"/>
     </source-config>
     <local-stage-out>
       <command value="srmv2-lcg"/>
@@ -20,7 +20,7 @@
     </fallback-stage-out>
     <calib-data>
       <frontier-connect>
-        <proxy url="http://cache01.hep.wisc.edu:3128"/>      
+        <proxy url="http://cache01.hep.wisc.edu:3128"/>
         <failover toserver="no"/>
         <proxy url="http://cache01.hep.wisc.edu:8000"/>
         <proxy url="http://cache02.hep.wisc.edu:8000"/>
@@ -32,4 +32,3 @@
     </calib-data>
  </site>
  </site-local-config>
-

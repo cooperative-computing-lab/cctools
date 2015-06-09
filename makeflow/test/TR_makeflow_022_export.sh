@@ -14,7 +14,7 @@ cat > $TEST_INPUT <<EOF
 $ECHOA echob
 $ECHOA echob
 EOF
-    exit 0
+	exit 0
 }
 
 run()

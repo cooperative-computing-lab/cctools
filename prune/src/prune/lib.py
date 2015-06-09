@@ -30,7 +30,7 @@ debug_level = None
 
 def debug(*options):
 	global debug_level
-	
+
 	if debug_level=='all':
 		for opt in options:
 			print opt
@@ -58,7 +58,7 @@ def truncate():
 	if (len(stdout)+len(stderr))>0:
 		print stdout,stderr
 	print 'Sandboxes erased at:%s'%sandbox_prefix
-	
+
 
 
 
@@ -70,12 +70,12 @@ def initialize(new_data_folder, new_sandbox_prefix, debug=None, hadoop=False):
 	hadoop_data = hadoop
 
 	if not hadoop:
-		try: 
+		try:
 			os.makedirs(data_folder)
 		except OSError:
 			if not os.path.isdir(data_folder):
 				raise
-	try: 
+	try:
 		os.makedirs(sandbox_prefix)
 	except OSError:
 		if not os.path.isdir(sandbox_prefix):
@@ -122,7 +122,7 @@ def getDataIDs(filename, puid=None):
 		return {'puid':puid, 'chksum':chksum, 'filename':filename, 'exists':False, 'pack':pack}
 	except IOError:
 		return None
-		
+
 def getDataIDs2(data, puid=None):
 	chksum = hashstring(data)
 	copies = database.copies_get_by_chksum(chksum)
@@ -247,7 +247,7 @@ def transfers_check():
 			database.copy_ins(id, location, cache_filename)
 			nextt = transfers[i+4:] if len(transfers)>(i+4) else []
 			transfers = transfers[0:i] + nextt
-		else:	
+		else:
 			i += 4
 
 
@@ -285,7 +285,7 @@ def eval(expr, depth=0, cmd_id=None, extra={}):
 	in_types = extra['in_types'] if 'in_types' in extra else None
 	if nextpos<0:
 		nextpos = max(lparen,assign)
-	
+
 	if nextpos<=0: # No lparens or assignments
 		if (depth==0):
 			print 'Unrecognized expression: '+expr
@@ -323,7 +323,7 @@ See the manual for more details.
 			else:
 				results += [[None, None, arg]]
 		return {'arg_list':results}
-			
+
 	elif nextpos==lparen: # Function invokation
 		if (depth==0):
 			raise Exception('You must assign a name to the function result(s).')
@@ -366,7 +366,7 @@ See the manual for more details.
 
 		remain = expr[lparen+1:expr.rfind(')')]
 		res = eval(remain, depth+1, cmd_id, dict({'in_types':in_types}.items()+extra.items()) )
-		
+
 		function_puid = func['puid']
 		op_string = '%s('%function_puid
 		for r in res['arg_list']:
@@ -381,7 +381,7 @@ See the manual for more details.
 		#op_chksum = hashstring(op_string)
 		op_chksum = op_string
 		op_env_chksum = op_string + str(ENVIRONMENT)
-		
+
 		op = database.op_get_by_env_chksum(op_env_chksum)
 		old_op_id = None
 		if op:
@@ -407,11 +407,11 @@ See the manual for more details.
 
 		op_id = database.op_ins(function_puid,op_chksum, op_env_chksum, env_puid=ENVIRONMENT)
 		database.io_ins(op_id, 'E', ENVIRONMENT, '')
-		
+
 		database.io_ins(op_id, 'F', function_puid, function_name)
 		for i,arg in enumerate(res['arg_list']):
 			database.io_ins(op_id, 'I', arg[0], arg[1], i)
-		
+
 		results = []
 		for i in range(0,len(fout_names)):
 			if old_op_id:
@@ -421,7 +421,7 @@ See the manual for more details.
 						puid = old_io['file_puid']
 			elif 'vars' in extra:
 				name = extra['vars'][i] if len(extra['vars'])>i else None
-				puid = extra['assigns'][i] if len(extra['assigns'])>i else uuid.uuid4() 
+				puid = extra['assigns'][i] if len(extra['assigns'])>i else uuid.uuid4()
 			else:
 				name = extra['assigns'][i] if len(extra['assigns'])>i else None
 				database.tag_get
@@ -430,7 +430,7 @@ See the manual for more details.
 			database.io_ins(op_id, 'O', puid, name, i)
 			if name:
 				database.tag_set(name,'B',puid)
-		
+
 		new_ios = database.ios_get(op_id)
 		op_display = displayOperation(new_ios)
 		database.op_upd_display(op_id,op_display)
@@ -442,7 +442,7 @@ See the manual for more details.
 	elif assign>0: # Simple assignment
 		names = expr[0:assign].strip()
 		remain = expr[assign+1:]
-		
+
 		args = names.split(',')
 		for a,arg in enumerate(args):
 			args[a] = arg.strip()
@@ -542,7 +542,7 @@ def origin(name):
 
 
 				#new_name += '@'+str(io['repo_id']) if io['repo_id'] else ''
-				
+
 
 
 				lines += ['PUT %s AS %s'%(puid, new_name)]
@@ -550,7 +550,7 @@ def origin(name):
 
 		next_file += 1
 	return lines[::-1], necessary_files
-					
+
 
 
 def new_puid():
@@ -593,7 +593,7 @@ def get_default_environment():
 	except KeyboardInterrupt:
 		print ''
 		sys.exit(0)
-	
+
 
 
 def add_store(fold_filename, unfold_filename):
@@ -601,7 +601,7 @@ def add_store(fold_filename, unfold_filename):
 	fold_file_id = file_put(fold_filename)
 	unfold_file_id = file_put(unfold_filename)
 	STOREID = database.store_ins(fold_file_id, unfold_file_id)
-	
+
 
 def getRuns(cnt):
 	runs = database.run_get_by_queue('Run')
@@ -664,7 +664,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 					options += ' -gz %s=%s.gz'%(function_name,function_name)
 				else:
 					place_files.append({'src':storage_pathname(func['file_puid']),'dst':function_name})
-		
+
 		elif io['io_type']=='I':
 			arg_str += '%s '%(io['display'])
 			res = database.copies_get(io['file_puid'])
@@ -678,7 +678,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 					options += ' -gunzip %s=%s.gz'%(io['display'],io['display'])
 				else:
 					place_files.append({'src':storage_pathname(io['file_puid']),'dst':io['display']})
-			
+
 
 		elif io['io_type']=='O':
 
@@ -700,8 +700,8 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 					options += ' -umbrella'
 				elif env_type=='targz':
 					options += ' -targz ENVIRONMENT'
-					
-				
+
+
 				place_files.append({'src':storage_pathname(copy['puid']),'dst':'ENVIRONMENT','puid':copy['puid'],'pack':copy['pack'],'display':io['display']})
 
 	arg_str = arg_str[0:-1]
@@ -715,12 +715,12 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 			if obj['dst']!='PRUNE_EXECUTOR':
 				options += ' -ln %s=%s'%(obj['dst'],obj['src'])
 
-	
+
 	final_cmd = 'chmod 755 PRUNE_RUN; ./PRUNE_RUN'
 	run_cmd = "./%s %s"%(function_name, arg_str)
 	run_buffer = '#!/bin/bash\npython PRUNE_EXECUTOR%s %s'%(options,run_cmd)
 	#print run_buffer
-	
+
 
 	if dry_run:
 		return {'cmd':op['display'],'fetch_files':fetch_files}
@@ -731,7 +731,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 			if not local_fs or obj['dst']=='PRUNE_EXECUTOR':
 				t.specify_file(obj['src'], obj['dst'], WORK_QUEUE_INPUT, cache=True)
 		t.specify_buffer(run_buffer, 'PRUNE_RUN', WORK_QUEUE_INPUT, cache=True)
-	
+
 		t.specify_command(final_cmd)
 		t.specify_cores(1)
 
@@ -741,7 +741,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 			else:
 				t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=True)
 		return {'cmd':op['display'],'framework':framework,'wq_task':t,'fetch_files':fetch_files}
-	
+
 	else:
 		sandbox_folder = sandbox_prefix+uuid.uuid4().hex+'/'
 		try:
@@ -802,7 +802,7 @@ def usingWQ():
 		return False
 def stopWQ():
 	if wq:
-		wq.shutdown_workers(0)	
+		wq.shutdown_workers(0)
 
 wq_ops = {}
 def wq_check():
@@ -878,7 +878,7 @@ def wq_check():
 							database.run_end(run['puid'], cpu_time=exec_time, disk_space=exec_space)
 
 
-							
+
 					else:
 						print 'Failed with exit code:',t.return_status
 						operation = wq_ops[t.id]
@@ -981,9 +981,3 @@ def local_check():
 		return True
 	else:
 		return False
-
-
-
-
-
-

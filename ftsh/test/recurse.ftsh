@@ -19,5 +19,3 @@ try
 catch
 	echo "Script terminated, success!"
 end
-
-

@@ -105,7 +105,7 @@ if args['gunzip']:
 		myexec('head ./%s'%(unzip))
 		debug.write('...'+newline)
 		myexec('tail ./%s'%(unzip))
-		
+
 if args['targz'] or args['gunzip'] or args['ln']:
 	debug.write('Local files after unzipping, linking:'+newline)
 	myexec('ls -la')
@@ -131,7 +131,7 @@ if args['umbrella']:
 
 	print cmd
 	debug.write('Starting operation at %s:%s'%(str(time.time()) ,newline))
-	
+
 	exec_start = time.time()
 	myexec(cmd)
 	execution_time = time.time()-exec_start
@@ -156,7 +156,7 @@ else:
 
 	debug.write('Finished operation at %s.%s'%(str(time.time()) ,newline))
 	debug.write('Execution time: %s%s'%(execution_time,newline))
-  
+
 
 
 
@@ -164,7 +164,7 @@ if args['gzip']:
 	debug.write('gzipping...'+newline)
 	for filename in args['gzip']:
 		myexec('gzip -c %s > ./%s.gz'%(filename, filename))
-		
+
 
 debug.write('Final files:'+newline)
 myexec("du")
@@ -175,11 +175,3 @@ debug.write('Execution space: %s%s'%(execution_space,newline))
 
 
 """
-
-
-
-
-
-
-
-

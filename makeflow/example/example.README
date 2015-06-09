@@ -20,16 +20,16 @@ like "clean:" because such a rule does not actually create a
 file named "clean".
 
 To run it on your local machine as if it were a Makefile:
-    makeflow example.makeflow
+	makeflow example.makeflow
 
 To clean up the results of the run:
-    makeflow -c example.makeflow
+	makeflow -c example.makeflow
 
 To cause Makeflow to submit jobs to Condor:
-    makeflow -T condor example.makeflow
+	makeflow -T condor example.makeflow
 
 To submit Makeflow as a Condor job that submits more Condor jobs:
-    condor_submit_makeflow example.makeflow
+	condor_submit_makeflow example.makeflow
 
 (In this configuration, makeflow behaves like dagman: it can
 recover from a failure of the submissino machine.  We haven't
@@ -42,14 +42,14 @@ around this limitation, we provide the Work Queue system, which
 works as follows:
 
 To start your Makeflow with Work Queue on port 9123:
-    makeflow -T wq -p 9123 example.makeflow
+	makeflow -T wq -p 9123 example.makeflow
 
 Then, start as many workers as you like on whatever machines you
 have available.  You can ssh to another machine and run:
-    work_queue_worker servername 9123
+	work_queue_worker servername 9123
 
 Or, you can submit 100 workers to Condor like this:
-    condor_submit_workers servername 9123 100
+	condor_submit_workers servername 9123 100
 
 For more information, please check out our manuals and mailing list here:
 http://ccl.cse.nd.edu/software/help.shtml

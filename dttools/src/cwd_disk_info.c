@@ -47,4 +47,3 @@ int cwd_disk_info_get(const char *path, int64_t *total)
 
 	return result;
 }
-

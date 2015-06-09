@@ -7,7 +7,7 @@
 
 
 class Script(object):
-    
+
 
     def __init__(self, args):
         pass
@@ -15,6 +15,6 @@ class Script(object):
 
     def compile(self):
         pass
-        
+
 
 # vim: set sts=4 sw=4 ts=8 expandtab ft=python:

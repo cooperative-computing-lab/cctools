@@ -28,28 +28,28 @@ while not wq.empty():
     print '** wait for task'
     task = wq.wait(1)
     if task:
-    	print 'task'
-    	print 'algorithm', task.algorithm
-    	print 'command', task.command
-    	print 'tag', task.tag
-    	print 'output', task.output
-    	print 'id', task.id
-    	print task.return_status
-    	print task.result
-    	print task.host
-    	print task.submit_time
-    	print task.finish_time
-    	print task.app_delay
-    	print task.send_input_start
-    	print task.send_input_finish
-    	print task.execute_cmd_start
-    	print task.execute_cmd_finish
-    	print task.receive_output_start
-    	print task.receive_output_finish
-    	print task.total_bytes_transferred
-    	print task.total_transfer_time
-    	print task.cmd_execution_time
-    	del task
+	print 'task'
+	print 'algorithm', task.algorithm
+	print 'command', task.command
+	print 'tag', task.tag
+	print 'output', task.output
+	print 'id', task.id
+	print task.return_status
+	print task.result
+	print task.host
+	print task.submit_time
+	print task.finish_time
+	print task.app_delay
+	print task.send_input_start
+	print task.send_input_finish
+	print task.execute_cmd_start
+	print task.execute_cmd_finish
+	print task.receive_output_start
+	print task.receive_output_finish
+	print task.total_bytes_transferred
+	print task.total_transfer_time
+	print task.cmd_execution_time
+	del task
     print '** work queue'
     print wq.stats.workers_init
     print wq.stats.workers_ready
@@ -70,4 +70,3 @@ while not wq.empty():
     print wq.stats.capacity
     print wq.stats.avg_capacity
     print wq.stats.total_workers_connected
-

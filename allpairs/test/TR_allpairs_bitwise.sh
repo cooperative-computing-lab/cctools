@@ -25,7 +25,7 @@ run()
 {
 	ln -s ../src/allpairs_multicore .
 
-	echo "starting master"	
+	echo "starting master"
 	allpairs_master -x 1 -y 1 --output-file $TEST_OUTPUT -Z $PORT_FILE $TEST_INPUT $TEST_INPUT BITWISE &
 
 	echo "waiting for $PORT_FILE to be created"
@@ -42,12 +42,12 @@ run()
 	  count=`awk '{print $1}' $TEST_OUTPUT | grep -c $i`
 	  if [ $num_files != $count ]
 	  then
-	    exit 1
+		exit 1
 	  fi
 	  count=`awk '{print $2}' $TEST_OUTPUT | grep -c $i`
 	  if [ $num_files != $count ]
 	  then
-	    exit 1
+		exit 1
 	  fi
 	done
 

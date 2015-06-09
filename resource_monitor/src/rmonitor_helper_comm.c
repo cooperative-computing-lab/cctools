@@ -161,7 +161,7 @@ int monitor_open_socket(int *fd, int *port)
 {
 	struct addrinfo *addr;
 
-    int low = 1024;
+	int low = 1024;
 	int high = 32767;
 
 	const char *lowstr = getenv("TCP_LOW_PORT");
@@ -171,7 +171,7 @@ int monitor_open_socket(int *fd, int *port)
 	if (highstr)
 		high = atoi(highstr);
 
-    if(high < low)
+	if(high < low)
 	{
 		debug(D_RMON, "high port %d is less than low port %d in range", high, low);
 		return 0;

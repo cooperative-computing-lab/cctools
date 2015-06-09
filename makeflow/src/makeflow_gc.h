@@ -24,4 +24,3 @@ void makeflow_gc_prepare( struct dag *d );
 void makeflow_gc( struct dag *d, makeflow_gc_method_t method, int count );
 
 #endif
-

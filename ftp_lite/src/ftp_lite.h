@@ -51,4 +51,3 @@ int ftp_lite_third_party_transfer( struct ftp_lite_server *source, const char *s
 int ftp_lite_login( const char *prompt, char *name, int namelen, char *pass, int passlen );
 
 #endif
-

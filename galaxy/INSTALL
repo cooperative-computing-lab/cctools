@@ -1,17 +1,17 @@
 This install file goes through the steps needed to include makeflow_bwa and makeflow_gatk as
 tools in a Galaxy instance. The tools currently rely on dependencies in specific locations,
 which is described in the file below. Following the INSTALL instruction from the top provides
-the correct install, and lines can be copied and pasted onto the commandline for easier 
+the correct install, and lines can be copied and pasted onto the commandline for easier
 install. Once the installation is successful and the Galaxy instance is restarted the tools are ready.
 
-When running a tool, workers are required in order for the jobs to be completed. The last 
-section of this INSTALL show two different methods of creating workers, though the pool is 
-recommended to have/create workers for users that are not familiar with Work Queue. To 
+When running a tool, workers are required in order for the jobs to be completed. The last
+section of this INSTALL show two different methods of creating workers, though the pool is
+recommended to have/create workers for users that are not familiar with Work Queue. To
 understand this better, view Work Queue at http://ccl.cse.nd.edu/software/workqueue/.
 
 # Within galaxy-dist
 cd tool-data/shared/
-# Get recent cctools distribution:  
+# Get recent cctools distribution:
 wget https://github.com/cooperative-computing-lab/cctools/archive/master.zip
 unzip master.zip
 mkdir cctools
@@ -60,7 +60,7 @@ cd ../..
 
 #INSTALL samtools
 cd tool-data/shared
-wget http://sourceforge.net/projects/samtools/files/latest/download 
+wget http://sourceforge.net/projects/samtools/files/latest/download
 tar jxf download
 mkdir samtools
 mv samtools-*/* samtools
@@ -92,7 +92,7 @@ mkdir java
 cd java
 wget http://javadl.sun.com/webapps/download/AutoDL?BundleId=97800
 tar zxf AutoDL*
-mkdir jre 
+mkdir jre
 mv jre1*/* jre
 rmdir jre1*
 zip -r jre.zip jre/*
@@ -105,4 +105,3 @@ Submit workers for a particular job:
 
 Create worker pool
 work_queue_pool -T batch_system -N galaxy_\.\*  --password path/to/mypwfile –w <minimum workers> -W <maximum workers>
-

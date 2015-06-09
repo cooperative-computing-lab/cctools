@@ -60,20 +60,20 @@ void daemonize (int cdroot, const char *pidfile)
 
 	umask(0);
 
-    fd_nonstd_close();
+	fd_nonstd_close();
 
-    FILE *file0 = freopen("/dev/null", "r", stdin);
-    if (file0 == NULL) {
-        fatal("could not reopen stdin: %s", strerror(errno));
-    }
-    FILE *file1 = freopen("/dev/null", "w", stdout);
-    if (file1 == NULL) {
-        fatal("could not reopen stdout: %s", strerror(errno));
-    }
-    FILE *file2 = freopen("/dev/null", "w", stderr);
-    if (file2 == NULL) {
-        fatal("could not reopen stderr: %s", strerror(errno));
-    }
+	FILE *file0 = freopen("/dev/null", "r", stdin);
+	if (file0 == NULL) {
+		fatal("could not reopen stdin: %s", strerror(errno));
+	}
+	FILE *file1 = freopen("/dev/null", "w", stdout);
+	if (file1 == NULL) {
+		fatal("could not reopen stdout: %s", strerror(errno));
+	}
+	FILE *file2 = freopen("/dev/null", "w", stderr);
+	if (file2 == NULL) {
+		fatal("could not reopen stderr: %s", strerror(errno));
+	}
 
 	debug_reopen();
 }

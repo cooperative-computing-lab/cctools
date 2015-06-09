@@ -481,13 +481,13 @@ int main(int argc, char *argv[])
 	}
 
 	/** test
-    for(i=x1; i<=x2; i++) {
+	for(i=x1; i<=x2; i++) {
 		for(j=y1; j<=y2; j++) {
-	    	cntr=((i-x1)*(x2-x1+1))+(j-y1);
-	    	printf("%lf\t", resbuff[cntr]);
+			cntr=((i-x1)*(x2-x1+1))+(j-y1);
+			printf("%lf\t", resbuff[cntr]);
 		}
 		printf("\n");
-    }*/
+	}*/
 
 	// Set compare function
 	if(set_compare_function(argv[funcindex]) == 0) {

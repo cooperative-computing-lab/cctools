@@ -44,7 +44,7 @@
 
 #define rmsummary_assign_as_string_field(s, key, value, field)	\
 	if(!strcmp(#field, key)){				\
-     	if(s->field) free(s->field);        \
+		if(s->field) free(s->field);        \
 		s->field = xxstrdup(value);			\
 		return 1;}
 
@@ -77,7 +77,7 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 }
 
 /** Reads a single summary from stream. Summaries are not parsed, here
-    we simply read between markers (--) **/
+	we simply read between markers (--) **/
 char *rmsummary_read_single_chunk(FILE *stream)
 {
 	struct buffer b;
@@ -88,7 +88,7 @@ char *rmsummary_read_single_chunk(FILE *stream)
 	while( (c = getc(stream)) == '#' || isblank(c) || c == '-' )
 	{
 		ungetc(c, stream);
-		
+
 		/* Make sure we read complete comment lines */
 		do {
 			line[MAX_LINE - 1] = '\0';

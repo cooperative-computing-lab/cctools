@@ -1,0 +1,2 @@
+sqlite3.c -whitespace
+sqlite3.h -whitespace

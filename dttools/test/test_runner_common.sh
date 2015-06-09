@@ -3,7 +3,7 @@
 # Tests sometimes chdir, so we get the full path now. `pwd` is annoying to portable.
 WORK_QUEUE_WORKER=$(cd "$(dirname "$0")/../../work_queue/src/"; pwd)/work_queue_worker
 
-dispatch() 
+dispatch()
 {
 	case "$1" in
 		prepare)
@@ -45,20 +45,20 @@ wait_for_file_creation()
 	exit 1
 }
 
-# wait_for_file_modification(filename, timeout) 
+# wait_for_file_modification(filename, timeout)
 # returns until the last modification to filename is timeout seconds (default 5) in the past.
 wait_for_file_modification()
 {
 	filename=$1
 	timeout=${2:-5}
 
-    case `uname -s` in
-    	Darwin)
+	case `uname -s` in
+		Darwin)
 			args="-f %m $filename"
 		;;
 		*)
 			args="-c %Y $filename"
-    	;;
+		;;
 	esac
 
 	while true; do
@@ -113,7 +113,7 @@ require_identical_files()
 
 # For OS X
 if ! echo $PATH | grep /sbin > /dev/null 2>&1; then
-    export PATH=$PATH:/usr/sbin:/sbin
+	export PATH=$PATH:/usr/sbin:/sbin
 fi
 
 # vim: set noexpandtab tabstop=4:

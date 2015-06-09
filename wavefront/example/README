@@ -12,7 +12,7 @@ an output file with all of the values of the matrix.
 This directory contains a toy problem provided by Dr. Kenneth Judd
 at Stanford University.  It represents a common category of problems
 found in economics.  The function computes the Nash equilibrium between
-two players in a game.  
+two players in a game.
 
 Compile the example function like this:
 
@@ -46,4 +46,3 @@ size            time      time
 10x10           500s       50s
 100x100       50000s      500s
 500x500     1250000s     2500s
-

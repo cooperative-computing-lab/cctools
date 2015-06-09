@@ -8,7 +8,7 @@ The full feature of ndcctools depends on the following packages: fuse-devel, pyt
 To install cvmfs-devel, first add cernvm.repo into /etc/yum.repo.d by running the following command:
 	rpm -Uvh http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs/EL/6/`uname -i`/cvmfs-release-2-4.el6.noarch.rpm
 
-`make rpm RPM_VERSION=<rpm_version> RPM_RELEASE=<rpm_release>` tries to check every dependency and warn you if any of them is missing. 
+`make rpm RPM_VERSION=<rpm_version> RPM_RELEASE=<rpm_release>` tries to check every dependency and warn you if any of them is missing.
 
 To make a rpm for ndccools, the machine you are working should satisfy one of the following requirements:
 1) With all the dependencies mentioned above installed.
@@ -45,4 +45,3 @@ rpmbuild -bb ndcctools.spec
 rpmlint -i ndcctools.spec ../SRPMS/ndcctools* ../RPMS/*/ndcctools*
 
 To change the name of RPMs for cctools, rename ndcctools.spec to <new_name>.spec, and change the `Name` attribute in the .spec file into <new_name>. In fact, you can just change the `Name` attribute in the .spec file into <new_name>, and leave the name of .spec file unchanged. However, it would look inconsistent.
-

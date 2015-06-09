@@ -424,7 +424,7 @@ static char my_addr_string[NETWORK_ADDR_MAX];
 
 static int network_nameaddr_init()
 {
-       	struct utsname name;
+		struct utsname name;
 	int result;
 	static int init_done=0;
 

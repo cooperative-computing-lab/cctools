@@ -6,7 +6,7 @@ out_dir="linker_collision_out"
 
 prepare() {
   if [ -d "$out_dir" ]; then
-    exit 1
+	exit 1
   fi
 
   touch linker/ls

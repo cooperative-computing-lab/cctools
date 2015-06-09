@@ -6,23 +6,23 @@ Some notes about the integration:
 
 Required packages:
 
-    * build-essential
-    * zlib1g-dev
+	* build-essential
+	* zlib1g-dev
 
 Optional packages:
 
-    * doxygen (documentation)
-    * libfuse-dev (fuse chirp module)
-    * libglobus-common-dev (globus support)
-    * libglobus-gss-assist-dev (gssapi support)
-    * libkrb5-dev (kerberos support)
-    * libmysqlclient-dev (mysql support)
-    * libreadline-dev (readline support)
-    * swig (work queue bindings)
-    * python-dev (work queue bindings)
-    * libperl5-dev (work queue bindings)
-    * m4 (manpages)
+	* doxygen (documentation)
+	* libfuse-dev (fuse chirp module)
+	* libglobus-common-dev (globus support)
+	* libglobus-gss-assist-dev (gssapi support)
+	* libkrb5-dev (kerberos support)
+	* libmysqlclient-dev (mysql support)
+	* libreadline-dev (readline support)
+	* swig (work queue bindings)
+	* python-dev (work queue bindings)
+	* libperl5-dev (work queue bindings)
+	* m4 (manpages)
 
 Debian Package page:
 
-    * http://packages.debian.org/source/sid/cctools
+	* http://packages.debian.org/source/sid/cctools

@@ -163,7 +163,7 @@ static void remove_expired_records()
 		}
 
 		if( (current-lastheardfrom) > this_lifetime ) {
-		    	nv = nvpair_database_remove(table,key);
+				nv = nvpair_database_remove(table,key);
 			if(nv) nvpair_delete(nv);
 		}
 	}
@@ -477,7 +477,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Send status updates to this host. (default is %s)\n", "-u,--update-host=<host>", CATALOG_HOST_DEFAULT);
 	fprintf(stdout, " %-30s Send status updates at this interval. (default is 5m)\n", "-U,--update-interval=<time>");
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
-        fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
+		fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
 }
 
 int main(int argc, char *argv[])
@@ -514,7 +514,7 @@ int main(int argc, char *argv[])
 		{"update-interval", required_argument, 0, 'U'},
 		{"version", no_argument, 0, 'v'},
 		{"port-file", required_argument, 0, 'Z'},
-        {0,0,0,0}};
+		{0,0,0,0}};
 
 
 	while((ch = getopt_long(argc, argv, "bB:d:hH:I:l:L:m:M:n:o:O:p:ST:u:U:vZ:", long_options, NULL)) > -1) {

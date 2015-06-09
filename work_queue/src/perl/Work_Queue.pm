@@ -18,171 +18,171 @@ use Work_Queue::Task;
 our $VERSION = 4.3.0;
 
 local $SIG{INT} = sub {
-    croak "Got terminate signal!\n";
+	croak "Got terminate signal!\n";
 };
 
 sub Work_Queue::new {
-    my $class = shift;
+	my $class = shift;
 
-    unshift @_, 'port' if @_ == 1;
-    my %args = @_;
+	unshift @_, 'port' if @_ == 1;
+	my %args = @_;
 
-    $args{port} //= $Work_Queue::WORK_QUEUE_DEFAULT_PORT;
+	$args{port} //= $Work_Queue::WORK_QUEUE_DEFAULT_PORT;
 
-    my $_work_queue = work_queue::work_queue_create($args{port});
-    croak "Could not create a work queue on port $args{port}" unless $_work_queue;
+	my $_work_queue = work_queue::work_queue_create($args{port});
+	croak "Could not create a work queue on port $args{port}" unless $_work_queue;
 
-    my $_stats           = work_queue::work_queue_stats->new();
-    my $_stats_hierarchy = work_queue::work_queue_stats->new();
+	my $_stats           = work_queue::work_queue_stats->new();
+	my $_stats_hierarchy = work_queue::work_queue_stats->new();
 
-    my $q = bless {
+	my $q = bless {
 	_work_queue      => $_work_queue,
 	_task_table      => {},
 	_stats           => $_stats,
 	_stats_hierarchy => $_stats_hierarchy,
 	_shutdown        => $args{shutdown} // 0
-    }, $class;
+	}, $class;
 
-    $q->specify_name($args{name})           if $args{name};
-    $q->specify_master_mode($args{catalog}) if $args{catalog};
+	$q->specify_name($args{name})           if $args{name};
+	$q->specify_master_mode($args{catalog}) if $args{catalog};
 
-    return $q;
+	return $q;
 }
 
 sub DESTROY {
-    my ($self) = @_;
-    $self->shutdown_workers(0) if $self->{_shutdown};
+	my ($self) = @_;
+	$self->shutdown_workers(0) if $self->{_shutdown};
 
-    return work_queue_delete($self->{_work_queue});
+	return work_queue_delete($self->{_work_queue});
 }
 
 sub set_debug_flag {
-    my $self = shift;
+	my $self = shift;
 
-    foreach my $flag (@_) {
+	foreach my $flag (@_) {
 	cctools_debug_flags_set($flag);
-    }
+	}
 }
 
 sub set_debug_config_file {
-    my ($self, $filename) = @_;
-    return cctools_debug_config_file($filename);
+	my ($self, $filename) = @_;
+	return cctools_debug_config_file($filename);
 }
 
 sub name {
-    my $self = shift;
-    return work_queue_name($self->{_work_queue});
+	my $self = shift;
+	return work_queue_name($self->{_work_queue});
 }
 
 sub port {
-    my ($self) = @_;
-    return work_queue_port($self->{_work_queue})
+	my ($self) = @_;
+	return work_queue_port($self->{_work_queue})
 }
 
 sub stats {
-    my ($self) = @_;
-    work_queue_get_stats($self->{_work_queue}, $self->{_stats});
-    return $self->{_stats};
+	my ($self) = @_;
+	work_queue_get_stats($self->{_work_queue}, $self->{_stats});
+	return $self->{_stats};
 }
 
 sub stats_hierarchy {
-    my ($self) = @_;
-    work_queue_get_stats_hierarchy($self->{_work_queue}, $self->{_stats_hierarchy});
-    return $self->{_stats_hierarchy};
+	my ($self) = @_;
+	work_queue_get_stats_hierarchy($self->{_work_queue}, $self->{_stats_hierarchy});
+	return $self->{_stats_hierarchy};
 }
 
 sub task_state {
-    my ($self, $taskid) = @_;
-    return work_queue_task_state($self->{_work_queue}, $taskid);
+	my ($self, $taskid) = @_;
+	return work_queue_task_state($self->{_work_queue}, $taskid);
 }
 
 sub enable_monitoring {
-    my ($self, $summary_file) = @_;
-    return work_queue_enable_monitoring($self->{_work_queue}, $summary_file);
+	my ($self, $summary_file) = @_;
+	return work_queue_enable_monitoring($self->{_work_queue}, $summary_file);
 }
 
 sub activate_fast_abort {
-    my ($self, $multiplier) = @_;
-    return work_queue_activate_fast_abort($self->{_work_queue}, $multiplier);
+	my ($self, $multiplier) = @_;
+	return work_queue_activate_fast_abort($self->{_work_queue}, $multiplier);
 }
 
 sub empty {
-    my ($self) = @_;
-    return work_queue_empty($self->{_work_queue});
+	my ($self) = @_;
+	return work_queue_empty($self->{_work_queue});
 }
 
 sub hungry {
-    my ($self) = @_;
-    return work_queue_hungry($self->{_work_queue});
+	my ($self) = @_;
+	return work_queue_hungry($self->{_work_queue});
 }
 
 sub specify_algorithm {
-    my ($self, $algorithm) = @_;
-    return work_queue_specify_algorithm($self->{_work_queue}, $algorithm);
+	my ($self, $algorithm) = @_;
+	return work_queue_specify_algorithm($self->{_work_queue}, $algorithm);
 }
 
 sub specify_task_order {
-    my ($self, $order) = @_;
-    return work_queue_specify_task_order($self->{_work_queue}, $order);
+	my ($self, $order) = @_;
+	return work_queue_specify_task_order($self->{_work_queue}, $order);
 }
 
 sub specify_name {
-    my ($self, $name) = @_;
-    return work_queue_specify_name($self->{_work_queue}, $name);
+	my ($self, $name) = @_;
+	return work_queue_specify_name($self->{_work_queue}, $name);
 }
 
 sub specify_priority {
-    my ($self, $priority) = @_;
-    return work_queue_specify_priority($self->{_work_queue}, $priority);
+	my ($self, $priority) = @_;
+	return work_queue_specify_priority($self->{_work_queue}, $priority);
 }
 
 sub specify_master_mode {
-    my ($self, $mode) = @_;
-    return work_queue_specify_master_mode($self->{_work_queue}, $mode);
+	my ($self, $mode) = @_;
+	return work_queue_specify_master_mode($self->{_work_queue}, $mode);
 }
 
 sub specify_catalog_server {
-    my ($self, $hostname, $port) = @_;
-    return work_queue_specify_catalog_server($self->{_work_queue}, $hostname, $port);
+	my ($self, $hostname, $port) = @_;
+	return work_queue_specify_catalog_server($self->{_work_queue}, $hostname, $port);
 }
 
 sub specify_log {
-    my ($self, $logfile) = @_;
-    return work_queue_specify_log($self->{_work_queue}, $logfile);
+	my ($self, $logfile) = @_;
+	return work_queue_specify_log($self->{_work_queue}, $logfile);
 }
 
 sub specify_password {
-    my ($self, $password) = @_;
-    return work_queue_specify_password($self->{_work_queue}, $password);
+	my ($self, $password) = @_;
+	return work_queue_specify_password($self->{_work_queue}, $password);
 }
 
 sub specify_password_file {
-    my ($self, $file) = @_;
-    return work_queue_specify_password_file($self->{_work_queue}, $file);
+	my ($self, $file) = @_;
+	return work_queue_specify_password_file($self->{_work_queue}, $file);
 }
 
 sub cancel_by_taskid {
-    my ($self, $id) = @_;
-    return work_queue_cancel_by_taskid($self->{_work_queue}, $id);
+	my ($self, $id) = @_;
+	return work_queue_cancel_by_taskid($self->{_work_queue}, $id);
 }
 
 sub cancel_by_tasktag {
-    my ($self, $tag) = @_;
-    return work_queue_cancel_by_tasktag($self->{_work_queue}, $tag);
+	my ($self, $tag) = @_;
+	return work_queue_cancel_by_tasktag($self->{_work_queue}, $tag);
 }
 
 sub shutdown_workers {
-    my ($self, $n) = @_;
-    return work_queue_shut_down_workers($self->{_work_queue}, $n);
+	my ($self, $n) = @_;
+	return work_queue_shut_down_workers($self->{_work_queue}, $n);
 }
 
 sub blacklist {
-    my ($self, $host) = @_;
-    return work_queue_blacklist_add($self->{_work_queue}, $host);
+	my ($self, $host) = @_;
+	return work_queue_blacklist_add($self->{_work_queue}, $host);
 }
 
 sub blacklist_clear {
-    my ($self, $host) = @_;
+	my ($self, $host) = @_;
 
 	if($host) {
 		return work_queue_blacklist_remove($self->{_work_queue}, $host);
@@ -193,48 +193,48 @@ sub blacklist_clear {
 }
 
 sub specify_keepalive_interval {
-    my ($self, $interval) = @_;
-    return work_queue_specify_keepalive_interval($self->{_work_queue}, $interval);
+	my ($self, $interval) = @_;
+	return work_queue_specify_keepalive_interval($self->{_work_queue}, $interval);
 }
 
 sub specify_keepalive_timeout {
-    my ($self, $timeout) = @_;
-    return work_queue_specify_keepalive_timeout($self->{_work_queue}, $timeout);
+	my ($self, $timeout) = @_;
+	return work_queue_specify_keepalive_timeout($self->{_work_queue}, $timeout);
 }
 
 sub estimate_capacity {
-    my ($self) = @_;
-    return work_queue_specify_estimate_capacity_on($self->{_work_queue}, 1);
+	my ($self) = @_;
+	return work_queue_specify_estimate_capacity_on($self->{_work_queue}, 1);
 }
 
 sub activate_worker_waiting {
-    my ($self, $workers) = @_;
-    return work_queue_activate_worker_waiting($self->{_work_queue}, $workers);
+	my ($self, $workers) = @_;
+	return work_queue_activate_worker_waiting($self->{_work_queue}, $workers);
 }
 
 sub tune {
-    my ($self, $name, $value) = @_;
-    return work_queue_tune($self->{_work_queue}, $name, $value);
+	my ($self, $name, $value) = @_;
+	return work_queue_tune($self->{_work_queue}, $name, $value);
 }
-           	
+
 sub submit {
-    my ($self, $task) = @_;
-    my $taskid = work_queue_submit($self->{_work_queue}, $task->{_task});
-    $self->{_task_table}{$taskid} = $task;
-    
-    return $taskid;
+	my ($self, $task) = @_;
+	my $taskid = work_queue_submit($self->{_work_queue}, $task->{_task});
+	$self->{_task_table}{$taskid} = $task;
+
+	return $taskid;
 }
 
 sub wait {
-    my ($self, $timeout) = @_;
-    $timeout //= $WORK_QUEUE_WAITFORTASK;
-    my $_task = work_queue_wait($self->{_work_queue}, $timeout);
-    if($_task) {
+	my ($self, $timeout) = @_;
+	$timeout //= $WORK_QUEUE_WAITFORTASK;
+	my $_task = work_queue_wait($self->{_work_queue}, $timeout);
+	if($_task) {
 	my $task = delete $self->{_task_table}{$_task->{taskid}};
 	return $task;
-    } else {
+	} else {
 	return 0;
-    }
+	}
 }
 1;
 
@@ -252,25 +252,25 @@ automatically loaded with this module.
 
 The SWIG-based Perl bindings provide a higher-level interface, such as:
 
-        use Work_Queue;
+		use Work_Queue;
 
-        my $q = Work_Queue->new( port => $port, name => 'my_queue_name');
+		my $q = Work_Queue->new( port => $port, name => 'my_queue_name');
 
-        my $t = Work_Queue::Task->new($command);
-        $t->specify_input_file(local_name => 'some_name', remote_name => 'some_other_name');
-        $t->specify_output_file('some_name');
+		my $t = Work_Queue::Task->new($command);
+		$t->specify_input_file(local_name => 'some_name', remote_name => 'some_other_name');
+		$t->specify_output_file('some_name');
 
-        $q->submit($t);
+		$q->submit($t);
 
-        my $stats = $q->stats;
-        print $stats->{tasks_running}, '\n';
+		my $stats = $q->stats;
+		print $stats->{tasks_running}, '\n';
 
-        $t = $q->wait(5);
+		$t = $q->wait(5);
 
-        if($t) {
-                my $resources = $t->resources_measured;
-                print $resources->{resident_memory}, '\n';
-        }
+		if($t) {
+				my $resources = $t->resources_measured;
+				print $resources->{resident_memory}, '\n';
+		}
 
 =head1 METHODS
 
@@ -304,7 +304,7 @@ Automatically shutdown workers when queue is finished. Disabled by default.
 
 =back
 
-        my $q = Work_Queue->new( port => 0, name => 'my_queue' );
+		my $q = Work_Queue->new( port => 0, name => 'my_queue' );
 
 See work_queue_create in the C API for more information about environmental variables that affect the behavior this method.
 
@@ -312,25 +312,25 @@ See work_queue_create in the C API for more information about environmental vari
 
 Get the project name of the queue.
 
-         print $q->name;
+		 print $q->name;
 
 =head3 C<port>
 
 Get the listening port of the queue.
 
-         print $q->port
+		 print $q->port
 
 =head3 C<stats>
 
 Get the master's queue statistics.
 
-         print $q->stats->{workers_busy};
+		 print $q->stats->{workers_busy};
 
 =head3 C<stats_hierarchy>
 
 Get the queue statistics, including master and foremen.
 
-         print $q->stats_hierarchy->{workers_busy};
+		 print $q->stats_hierarchy->{workers_busy};
 
 =head3 C<enable_monitoring($summary_file)>
 
@@ -670,7 +670,7 @@ A task description created from Work_Queue::Task.
 
 =back
 
-        $q->submit($task);
+		$q->submit($task);
 
 =head3 C<wait>
 
@@ -689,14 +689,13 @@ completed.
 
 =back
 
-        while( !$q->empty ) {
-                ...
-                $task = $q->wait($seconds);
+		while( !$q->empty ) {
+				...
+				$task = $q->wait($seconds);
 
-                if($task) {
-                    ...
-                }
-                ...
-        }
+				if($task) {
+					...
+				}
+				...
+		}
 =cut
-

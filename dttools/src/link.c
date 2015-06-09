@@ -421,7 +421,7 @@ struct link *link_serve_address(const char *addr, int port)
 	debug(D_TCP, "listening on port %d", port);
 	return link;
 
-      failure:
+	  failure:
 	if(link)
 		link_close(link);
 	return 0;
@@ -456,7 +456,7 @@ struct link *link_accept(struct link *master, time_t stoptime)
 
 	return link;
 
-      failure:
+	  failure:
 	if(link)
 		link_close(link);
 	return 0;

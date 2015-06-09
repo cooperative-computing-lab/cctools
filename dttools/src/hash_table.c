@@ -267,13 +267,13 @@ For every delta with one or two bits set, and the deltas of all three
   2/3 of the time.  (Well, 22/100 and 78/100 for some 2-bit deltas.)
 mix() was built out of 36 single-cycle latency instructions in a
   structure that could supported 2x parallelism, like so:
-      a -= b;
-      a -= c; x = (c>>13);
-      b -= c; a ^= x;
-      b -= a; x = (a<<8);
-      c -= a; b ^= x;
-      c -= b; x = (b>>13);
-      ...
+	  a -= b;
+	  a -= c; x = (c>>13);
+	  b -= c; a ^= x;
+	  b -= a; x = (a<<8);
+	  c -= a; b ^= x;
+	  c -= b; x = (b>>13);
+	  ...
   Unfortunately, superscalar Pentiums and Sparcs can't take advantage
   of that parallelism.  They've also turned some of those single-cycle
   latency instructions into multi-cycle latency instructions.  Still,
@@ -316,9 +316,9 @@ acceptable.  Do NOT use for cryptographic purposes.
 */
 
 static ub4 jenkins_hash(k, length, initval)
-     register const ub1 *k;	/* the key */
-     register ub4 length;	/* the length of the key */
-     register ub4 initval;	/* the previous hash, or an arbitrary value */
+	 register const ub1 *k;	/* the key */
+	 register ub4 length;	/* the length of the key */
+	 register ub4 initval;	/* the previous hash, or an arbitrary value */
 {
 	register ub4 a, b, c, len;	/* Set up the internal state */
 	len = length;

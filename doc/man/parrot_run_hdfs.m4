@@ -9,7 +9,7 @@ CODE(BOLD(parrot_run_hdfs [parrot_options] program [program_options]))
 
 SECTION(DESCRIPTION)
 PARA
-CODE(parrot_run_hdfs) runs an application or a shell inside the Parrot virtual filesystem. 
+CODE(parrot_run_hdfs) runs an application or a shell inside the Parrot virtual filesystem.
 
 PARA
 HDFS is the primary distributed filesystem used in the Hadoop project. Parrot
@@ -82,4 +82,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_PARROT
 
 FOOTER
-

@@ -34,7 +34,7 @@ Requires(post): info
 Requires(preun): info
 
 %description
-The Cooperative Computing Tools (%{name}) contains Parrot, 
+The Cooperative Computing Tools (%{name}) contains Parrot,
 Chirp, Makeflow, Work Queue, SAND, and other software.
 
 %package devel
@@ -49,14 +49,14 @@ The CCTools package static libraries and header files
 
 %build
 ./configure --prefix /usr \
-    --with-python-path /usr \
-    --with-swig-path /usr \
-    --with-readline-path /usr \
-    --with-zlib-path /usr \
-    --with-perl-path /usr \
-    --with-cvmfs-path /usr \
-    --with-fuse-path /usr \
-    --with-uuid-path /usr
+	--with-python-path /usr \
+	--with-swig-path /usr \
+	--with-readline-path /usr \
+	--with-zlib-path /usr \
+	--with-perl-path /usr \
+	--with-cvmfs-path /usr \
+	--with-fuse-path /usr \
+	--with-uuid-path /usr
 make %{?_smp_mflags}
 
 #the globus dependency is too complex and ignored for now. When the globus dependency is ready, just add `--with-globus-path / \` into the `./configure` command.
@@ -75,7 +75,7 @@ mv %{buildroot}/usr/lib %{buildroot}%{_libdir}
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%files 
+%files
 %defattr(-,root,root,-)
 %doc %{_defaultdocdir}/cctools/*
 #%{_bindir}/*

@@ -14,4 +14,3 @@ See the file COPYING for details.
 #define CRITICAL_END sigsetmask(sigmask(SIGPIPE));
 
 #endif
-

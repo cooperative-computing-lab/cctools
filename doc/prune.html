@@ -139,16 +139,16 @@ since the granularity was determined by a user.</p>
   </code>
 
 
-<p>Contents of the file "sort.sh":</p>  
+<p>Contents of the file "sort.sh":</p>
 <code style="margin-right: auto;">#!/bin/bash
   #PRUNE_INPUTS File
   #PRUNE_OUTPUT sorted_data.txt
   sort $1 > sorted_data.txt
 </code>
 
-<p>Contents of the file "merge.sh":</p>  
+<p>Contents of the file "merge.sh":</p>
 <code style="margin-right: auto;">#!/bin/bash
   #PRUNE_INPUTS File*
   #PRUNE_OUTPUT merged_output.txt
-  sort -m $@ > merged_output.txt 
+  sort -m $@ > merged_output.txt
 </code>

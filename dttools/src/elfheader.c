@@ -64,7 +64,7 @@ typedef struct {
 	Elf32_Half e_shstrndx;
 } Elf32_Ehdr;
 
-typedef struct { 
+typedef struct {
 	unsigned char e_ident[EI_NIDENT];
 	Elf64_Half e_type;
 	Elf64_Half e_machine;

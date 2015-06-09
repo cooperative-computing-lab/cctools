@@ -87,7 +87,7 @@ if config_file2:
 
 def debug(*options):
 	global debug_level
-	
+
 	if debug_level=='all':
 		for opt in options:
 			print opt
@@ -112,16 +112,16 @@ if os.path.isfile(config_file):
 				data_folder = value
 else:
 	base_dir = HOME+'/.prunespace/'
-	
+
 	print '\nWelcome to Prune!'
 	print 'The default config file will be stored at:',config_file
 	line = raw_input('Enter a location for data files, database, and sandboxes [%s]: '%(base_dir))
-	
+
 	if len(line)>0:
 		if line[-1] != '/':
 			line = line + '/'
 		base_dir = line
-	
+
 	data_folder = base_dir+'data/'
 	db_pathname = base_dir+'_prune.db'
 	sandbox_prefix = base_dir+'sandbox/'
@@ -132,7 +132,7 @@ def prompt():
 	return 'PRUNE$ '
 
 forever_back = '\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b'
-	
+
 def user_interface():
 	global block, terminate, forever_back, wait_start
 	spaces = '                                        '
@@ -289,7 +289,7 @@ See the manual for more details.
 			except IOError:
 				print 'That data does not yet exist. You may need to wait for it to be generated.'
 			return True
-			
+
 
 
 
@@ -367,7 +367,7 @@ See the manual for more details.
 
 			lib.wq_check()
 			lib.local_check()
-			
+
 			ar = line.split(' ')
 			if len(ar)>1 and ar[1]=='FOR':
 				timeout = float(ar[2])
@@ -398,10 +398,10 @@ See the manual for more details.
 			else:
 				#time.sleep(1)
 				return False
-			
 
 
-		
+
+
 
 
 		elif line.upper().startswith('RUN'):
@@ -497,7 +497,7 @@ See the manual for more details.
 			return True
 
 
-				
+
 		elif line.upper().startswith('LS'):
 			ar = line.split()
 			keyword = None
@@ -521,7 +521,7 @@ See the manual for more details.
 					else:
 						print r['name'],'\t(pending)'
 			return True
-				
+
 
 
 		elif line.upper().startswith('CAT'):
@@ -611,7 +611,7 @@ See the manual for more details.
 					zf.write(pathname,pathname.split('/')[-1])
 			finally:
 				zf.close()
-			
+
 			return True
 
 
@@ -620,7 +620,7 @@ See the manual for more details.
 		elif line.upper().startswith('MF'):
 			ar = line.split(' ')
 			filename = ar[1]
-			
+
 			original_files = []
 			intermediate_files = []
 			final_files = []
@@ -655,7 +655,7 @@ See the manual for more details.
 						function_string += "\n\n"
 						for arg_i,in_file in enumerate(ins):
 							function_string += "mv ${%i} %s\n"%(arg_i+1,in_file)
-							
+
 						function_string += "\n\n"+line+"\n"
 						func_id = 'Function%03d'%next_func_id
 						next_func_id += 1
@@ -735,7 +735,7 @@ See the manual for more details.
 						f = open(pathname,'w')
 						f.write(zf.read(puid))
 						f.close()
-						
+
 						ids = lib.getDataIDs(filename,puid)
 						ids['pname'] = pname
 						print ids
@@ -773,7 +773,7 @@ See the manual for more details.
 			finally:
 				zf.close()
 			#print lines,files
-			
+
 			return True
 
 
@@ -791,7 +791,7 @@ See the manual for more details.
 			ar = line.split(' ')
 			fold_filename = ar[1]
 			unfold_filename = ar[2]
-			lib.add_store(fold_filename,unfold_filename)			
+			lib.add_store(fold_filename,unfold_filename)
 			return True
 
 		else:
@@ -823,8 +823,8 @@ try:
 		f.write('database\t%s\n'%db_pathname)
 		f.write('sandbox\t%s\n'%sandbox_prefix)
 
-	
-	
+
+
 
 
 except Exception as e:
@@ -858,8 +858,3 @@ else:
 	terminate = True
 	lib.terminate_now()
 	print 'PRUNE terminated'
-
-
-
-
-

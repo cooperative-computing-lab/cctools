@@ -28,7 +28,7 @@ def badSyntax(str):
   sys.stderr.write("catalog_history_select [source_directory] [starting_point] [ending_point]\n\n")
   sys.stderr.write("See man page for more details and examples.\n\n")
   sys.exit(0)
-  
+
 def timeToFileName(ts, days_offset=0):
   ts += (3600*24)*days_offset
   tt = datetime.datetime.fromtimestamp(ts).timetuple()
@@ -121,10 +121,10 @@ def read_in_chunks(file_object, chunk_size=1024):
 
 seriesNow = {}
 seriesLog = []
-  
+
 # Read the initial checkpoint file and group data by the value of the "key" field
 # Go a day earlier (day_offset=-1) to handle for auto-deleted series' which start reporting again after not appearing in the checkpoint
-day_offset = 0 
+day_offset = 0
 filename = timeToFileName(begin,day_offset)
 filesFound = 0
 try:
@@ -137,9 +137,9 @@ try:
   for line in  open(filename+'.ckpt', 'r'):
     line = line.strip()
     print line
-  
-  
-  
+
+
+
 except IOError:
   logDebug('File does not exist? '+filename)
 if 'checkpoint_file' in locals():
@@ -152,7 +152,7 @@ logTime = begin
 while True:
 
   lastHost = None
-  
+
   try:
     filesFound += 1
     logDebug(filename+'.log')
@@ -170,10 +170,10 @@ while True:
 
 
 
-      
+
   except IOError:
     logDebug('File does not exist? '+filename+'.log')
-    
+
   if 'f' in locals():
     f.close()
 
@@ -185,5 +185,3 @@ while True:
 
 if filesFound==0:
   logError("No files found in that source directory for the specified time frame.")
-
-

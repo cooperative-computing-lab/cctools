@@ -23,7 +23,7 @@ db_version = 0.1
 
 def debug(*options):
 	global debug_level
-	
+
 	if debug_level=='all':
 		for opt in options:
 			print opt
@@ -37,14 +37,14 @@ def truncate():
 
 def initialize(new_db_pathname,new_debug_level=None):
 	global creates, meta_db, meta_data, db_pathname, debug_level
-	
+
 	debug_level = new_debug_level
 
 	db_pathname = new_db_pathname
 
 	try:
 		db_folder = '/'.join(db_pathname.split('/')[0:-1])
-		try: 
+		try:
 			os.makedirs(db_folder)
 		except OSError:
 			if not os.path.isdir(db_folder):
@@ -81,7 +81,7 @@ def initialize(new_db_pathname,new_debug_level=None):
 		elif float(res['value'])!=db_version:
 			print 'It appears that the database format might have changed. You might need to RESET the data in Prune to proceed.'
 
-		
+
 	except Exception, e:
 		debug('Exception on:', creates, traceback.format_exc())
 		print 'There was an error initializing the database.'
@@ -356,17 +356,17 @@ creates.append('''CREATE TABLE IF NOT EXISTS runs (
 												puid PUID PRIMARY KEY,
 												op_puid PUID,
 												resource TEXT,
-												
+
 												queue TEXT,
 												updated_at REAL,
 
 												status INT,
 												notes TEXT,
 												wait PUID,
-												
+
 												cpu_time REAL,
 												disk_space INT,
-												
+
 												start_time REAL,
 												completed_at REAL
 											);''')
@@ -667,10 +667,3 @@ def hashfile(fname, hasher=hashlib.sha1(), blocksize=65536):
         hasher.update(buf)
         buf = afile.read(blocksize)
     return hasher.hexdigest()
-
-
-
-
-
-
-

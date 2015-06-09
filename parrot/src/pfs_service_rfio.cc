@@ -115,7 +115,7 @@ public:
 		int result;
 		debug(D_RFIO,"fchown %d %d %d",fd,uid,gid);
 		result =::rfio_fchown(fd,uid,gid);
- 		debug(D_RFIO,"= %d %s",result,result>=0?"":strerror(errno));
+		debug(D_RFIO,"= %d %s",result,result>=0?"":strerror(errno));
 		return result;
 	}
 

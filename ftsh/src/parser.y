@@ -265,7 +265,7 @@ opt_every_limit
 	| TOKEN_EVERY expr time_units
 		{ $$ = ast_try_limit_create( $2, $3 ); }
 	;
-	
+
 time_units
 	: TOKEN_SECONDS
 		{ $$ = 1; }

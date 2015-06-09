@@ -42,7 +42,7 @@ Ftsh is a balance between the flexibility and power of script languages
 and the precision of most compiled languages.  Ftsh parses complete
 programs in order to eliminate run-time errors.
 An exception-like structure allows scripts to be both succinct and safe.
-A focus on timed repetition simplifies the most common form of 
+A focus on timed repetition simplifies the most common form of
 recovery in a distributed system.  A carefully-vetted set of language
 features limits the "surprises" that haunt system programmers.
 <p>
@@ -378,7 +378,7 @@ succeeds in made available through the control variable:
 <code>hosts="mirror1.wisc.edu mirror2.wisc.edu mirror3.wisc.edu"
 forany h in ${hosts}
     echo "Attempting host ${host}"
-    wget http://${h}/some-file       
+    wget http://${h}/some-file
 end
 echo "Got file from ${h}"
 </code>
@@ -593,7 +593,7 @@ levels are currently defined:
 <li><b>10</b> - Display failed commands and structures.
 <li><b>20</b> - Display executed commands and their exit codes.
 <li><b>30</b> - Display structural elements such as TRY and IF-THEN.
-<li><b>40</b> - Display process activities such as signals and completions. 
+<li><b>40</b> - Display process activities such as signals and completions.
 </ul>
 
 <h3 id="misc.arguments">Command-Line Arguments<a class="sectionlink" href="#misc.arguments" title="Link to this section.">&#x21d7;</a></h3>
@@ -636,7 +636,7 @@ this is, then don't worry about it.
 ftsh asks it to.  Some variants of Linux won't kill processes
 using distributed file systems.  Consider using the "weak" mode
 of ftsh.
-<li> Rogue system administrators must not forcibly kill 
+<li> Rogue system administrators must not forcibly kill
 an ftsh with a SIGKILL.  However, you may safely send a SIGTERM, SIGHUP,
 SIGINT, or SIGQUIT to an ftsh, and it will clean up its children and exit.
 </dir>
@@ -646,7 +646,7 @@ own process session (i.e. <tt>setsid</tt>).
 This simplifies the administration of
 large process tress.  To cancel a command, ftsh sends a SIGTERM
 to every process in the group.  Ftsh then waits up to
-thirty seconds for the child to exit willingly.  At the end of 
+thirty seconds for the child to exit willingly.  At the end of
 that time, it forcibly terminates the entire process group
 with a SIGKILL.
 <p>

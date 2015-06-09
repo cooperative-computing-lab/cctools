@@ -173,7 +173,7 @@ struct chirp_file * chirp_reli_open( const char *host, const char *path, INT64_T
 			} else {
 				if(errno!=ECONNRESET) return 0;
 			}
-	 		invalidate_host(host);
+			invalidate_host(host);
 		} else {
 			if(errno==ENOENT) return 0;
 		}
@@ -224,7 +224,7 @@ INT64_T chirp_reli_close( struct chirp_file *file, time_t stoptime )
 				if(result>=0 || errno!=ECONNRESET) return result; \
 			} \
 			if(errno==ESTALE) return -1; \
-	 		invalidate_host(file->host); \
+			invalidate_host(file->host); \
 		} else { \
 			if(errno==ENOENT) return -1; \
 			if(errno==EPERM) return -1; \
@@ -846,8 +846,8 @@ CHIRP_SEARCH *chirp_reli_opensearch( const char *host, const char *paths, const 
 }
 
 struct chirp_dir {
-       struct chirp_dirent *head;
-       struct chirp_dirent *current;
+	   struct chirp_dirent *head;
+	   struct chirp_dirent *current;
 };
 
 static void opendir_callback( const char *path, struct chirp_stat *info, void *vdir )

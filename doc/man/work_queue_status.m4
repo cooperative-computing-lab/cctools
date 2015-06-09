@@ -1,7 +1,7 @@
 include(manual.h)dnl
 HEADER(work_queue_status)
 
-SECTION(NAME) 
+SECTION(NAME)
 BOLD(work_queue_status) - display status of currently running Work Queue applications.
 
 SECTION(SYNOPSIS)
@@ -48,4 +48,3 @@ SECTION(SEE ALSO)
 SEE_ALSO_WORK_QUEUE
 
 FOOTER
-

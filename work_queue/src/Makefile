@@ -17,8 +17,8 @@ SOURCES_LIBRARY = \
 	work_queue_resources.c
 
 SOURCES_WORKER = \
-    work_queue_process.o \
-    work_queue_watcher.o
+	work_queue_process.o \
+	work_queue_watcher.o
 
 PUBLIC_HEADERS = batch_job.h work_queue.h
 

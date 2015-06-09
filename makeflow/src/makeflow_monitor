@@ -52,7 +52,7 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
                 makeflow['start_time'] = int(slist[2])/1000000.0
             elif slist[1] in ['FAILED', 'ABORTED', 'COMPLETED']:
                 makeflow['finished'] = slist[1]
-                makeflow['elapsed_time'] = int(slist[2])/1000000.0 - makeflow['start_time'] 
+                makeflow['elapsed_time'] = int(slist[2])/1000000.0 - makeflow['start_time']
                 makeflow['average_task_rate'] = makeflow['total'] / makeflow['elapsed_time']
             continue
         else:
@@ -117,7 +117,7 @@ def emit_text(makeflow, field_width=13, progress_width=55):
         tlist.append(('time',
                       ', '.join(['start: '   + time_ctime(makeflow['start_time']),
                                  'elapsed: ' + time_format(makeflow['elapsed_time'])])))
-        tlist.append(('tasks/minute', 
+        tlist.append(('tasks/minute',
                       'average: %0.2f' % (makeflow['average_task_rate'] * 60.0)))
     else:
         progress_bars = int(progress_width * makeflow['percent_complete']) - 1
@@ -151,7 +151,7 @@ EMITTER_TABLE = {
 
 # Monitor makeflows
 
-def monitor_makeflows(log_paths, options): 
+def monitor_makeflows(log_paths, options):
     makeflows = []
     for lp in log_paths:
         makeflows.append({'log_path': lp, 'finished': False, 'percent_complete': 0.0, 'total': float('+infinity')})
@@ -174,16 +174,16 @@ def monitor_makeflows(log_paths, options):
             if (options.hide_finished and makeflow['finished']) or \
                 float(makeflow['total']) < options.min_tasks:
                 continue
-            
+
             try:
                 options.emitter(makeflow)
             except KeyError as e:
                 print >>sys.stderr, 'unable to emit %s: missing %s' % (makeflow['log_path'], str(e))
             finally:
                 next_makeflows.append(makeflow)
-        
+
         makeflows = next_makeflows
-        
+
         if options.sort:
             makeflows = sorted(makeflows, key = lambda mf: mf['percent_complete'])
 
@@ -222,7 +222,7 @@ def parse_command_line_options():
 
     options.emitter = EMITTER_TABLE[options.format]
 
-    return args, options 
+    return args, options
 
 # Formatting Functions
 
@@ -237,7 +237,7 @@ def time_format(seconds):
     for d in TDELTAS:
         if ctime >= d:
             tlist.append(ctime % d)
-            ctime = ctime / d 
+            ctime = ctime / d
         else:
             tlist.append(ctime)
             break

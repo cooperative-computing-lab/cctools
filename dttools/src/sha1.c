@@ -93,7 +93,7 @@ typedef unsigned char *POINTER;
    80-UINT2 expanded input array W, where the first 16 are copies of the input
    data, and the remaining 64 are defined by
 
-        W[ i ] = W[ i - 16 ] ^ W[ i - 14 ] ^ W[ i - 8 ] ^ W[ i - 3 ]
+		W[ i ] = W[ i - 16 ] ^ W[ i - 14 ] ^ W[ i - 8 ] ^ W[ i - 3 ]
 
    This implementation generates these values on the fly in a circular
    buffer - thanks to Colin Plumb, colin@nyx10.cs.du.edu for this
@@ -104,16 +104,16 @@ typedef unsigned char *POINTER;
    for this information */
 
 #define expand(W,i) ( W[ i & 15 ] = ROTL( 1, ( W[ i & 15 ] ^ W[ (i - 14) & 15 ] ^ \
-                                                 W[ (i - 8) & 15 ] ^ W[ (i - 3) & 15 ] ) ) )
+												 W[ (i - 8) & 15 ] ^ W[ (i - 3) & 15 ] ) ) )
 
 
 /* The prototype SHS sub-round.  The fundamental sub-round is:
 
-        a' = e + ROTL( 5, a ) + f( b, c, d ) + k + data;
-        b' = a;
-        c' = ROTL( 30, b );
-        d' = c;
-        e' = d;
+		a' = e + ROTL( 5, a ) + f( b, c, d ) + k + data;
+		b' = a;
+		c' = ROTL( 30, b );
+		d' = c;
+		e' = d;
 
    but this is implemented by unrolling the loop 5 times and renaming the
    variables ( e, a, b, c, d ) = ( a', b', c', d', e' ) each iteration.
@@ -121,7 +121,7 @@ typedef unsigned char *POINTER;
    the next 20 values from the W[] array each time */
 
 #define subRound(a, b, c, d, e, f, k, data) \
-    ( e += ROTL( 5, a ) + f( b, c, d ) + k + data, b = ROTL( 30, b ) )
+	( e += ROTL( 5, a ) + f( b, c, d ) + k + data, b = ROTL( 30, b ) )
 
 static void endianTest(int *endian_ness)
 {

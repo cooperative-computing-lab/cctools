@@ -9,7 +9,7 @@ See the file COPYING for details.
 #define SORT_DIR_H
 
 /** @file sort_dir.h Obtain a sorted directory listing.
-    The prototype of @ref sort_dir is a little scary, but it is easy to use.
+	The prototype of @ref sort_dir is a little scary, but it is easy to use.
 For example, to sort a given directory alphabetically:
 
 <pre>

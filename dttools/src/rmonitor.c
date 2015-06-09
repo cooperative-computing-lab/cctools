@@ -114,8 +114,8 @@ char *resource_monitor_copy_to_wd(const char *path_from_cmdline)
 //Using default sampling interval. We may want to add an option
 //to change it.
 char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_path, const char *template_filename, const char *limits_filename,
-				       const char *extra_monitor_options,
-				       int summary, int time_series, int opened_files)
+					   const char *extra_monitor_options,
+					   int summary, int time_series, int opened_files)
 {
 	char cmd_builder[PATH_MAX];
 	int  index;

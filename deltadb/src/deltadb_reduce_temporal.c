@@ -53,14 +53,14 @@ struct reduction {
 
 	//Keep track of changes?
 	//int CNT:1;
-    //int SUM:1;
-    //int FIRST:1;
-    //int LAST:1;
-    //int MIN:1;
-    //int AVG:1;
-    //int MAX:1;
-    //int PAVG:1;
-    //int INC:1;
+	//int SUM:1;
+	//int FIRST:1;
+	//int LAST:1;
+	//int MIN:1;
+	//int AVG:1;
+	//int MAX:1;
+	//int PAVG:1;
+	//int INC:1;
 	int dead;
 	int gone;
 	int is_number;

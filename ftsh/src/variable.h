@@ -18,5 +18,3 @@ int  variable_shift( int n, int line );
 char * variable_subst( char *value, int line );
 
 #endif
-
-
