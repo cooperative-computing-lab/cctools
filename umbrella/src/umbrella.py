@@ -651,7 +651,7 @@ def chrootize_user_cmd(user_cmd, cwd_setting):
 	Returns:
 		the modified version of the user's cmd.
 	"""
-	#By default, the directory of entering chroot is /. So before executing the user's command, first change the directory to the $CWD environment variable.
+	#By default, the directory of entering chroot is /. So before executing the user's command, first change the directory to the $PWD environment variable.
 	user_cmd[0] = 'chroot / /bin/sh -c "cd %s; %s"' %(cwd_setting, user_cmd[0])
 	return user_cmd
 
@@ -1379,8 +1379,8 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			container_name = "container_%s" % docker_image_name
 			#do not enable `-i` and `-t` option of Docker, it will fail when condor execution engine is chosen.
 			#to allow the exit code of user_cmd to be transferred back, seperate the user_cmd and the chown command.
-			print "Start executing the user's task: %s" % cmd
 			cmd = 'docker run --rm %s %s -e "PATH=%s" %s %s /bin/sh -c "cd %s; %s"' % (volume_output, volume_parameters, path_env, other_envs, docker_image_name, sandbox_dir, user_cmd[0])
+			print "Start executing the user's task: %s" % cmd
 			rc, stdout, stderr = func_call(cmd)
 
 			cmd1 = 'docker run --rm %s %s -e "PATH=%s" %s %s %s' % (volume_output, volume_parameters, path_env, other_envs, docker_image_name, chown_cmd)
@@ -2119,11 +2119,11 @@ def main():
 
 	if 'PWD' in env_para_dict:
 		cwd_setting = env_para_dict['PWD']
-		logging.debug("CWD environment variable is set explicitly: %s", cwd_setting)
+		logging.debug("PWD environment variable is set explicitly: %s", cwd_setting)
 	else:
 		cwd_setting = sandbox_dir
 		env_para_dict['PWD'] = cwd_setting
-		logging.debug("CWD is not set explicitly, use sandbox_dir (%s) as CWD", cwd_setting)
+		logging.debug("PWD is not set explicitly, use sandbox_dir (%s) as PWD", cwd_setting)
 
 	#get the absolute path of each input file
 	input_files = options.inputs
