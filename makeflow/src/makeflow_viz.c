@@ -64,7 +64,9 @@ enum { LONG_OPT_PPM_ROW,
        LONG_OPT_DOT_PROPORTIONAL,
        LONG_OPT_DOT_CONDENSE,
        LONG_OPT_DOT_LABELS,
-       LONG_OPT_DOT_NO_LABELS
+       LONG_OPT_DOT_NO_LABELS, 
+	   LONG_OPT_DOT_DETAILS, 
+	   LONG_OPT_DOT_NO_DETAILS
 };
 
 static void show_help_viz(const char *cmd)
@@ -102,6 +104,7 @@ int main(int argc, char *argv[])
 	int change_size = 0;
 	int ppm_mode = 0;
 	int dot_labels = 1;
+	int dot_details = 1;
 	char *ppm_option = NULL;
 
 	struct option long_options_viz[] = {
@@ -111,6 +114,8 @@ int main(int argc, char *argv[])
 		{"dot-proportional",  no_argument, 0,  LONG_OPT_DOT_PROPORTIONAL},
 		{"dot-no-labels", no_argument, 0, LONG_OPT_DOT_NO_LABELS},
 		{"dot-labels", no_argument, 0, LONG_OPT_DOT_LABELS},
+		{"dot-details", no_argument, 0, LONG_OPT_DOT_DETAILS}, 
+		{"dot-no-details", no_argument, 0, LONG_OPT_DOT_NO_DETAILS}, 
 		{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
 		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
 		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
@@ -149,6 +154,12 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_DOT_NO_LABELS:
 				dot_labels = 0;
+				break;
+			case LONG_OPT_DOT_DETAILS:
+				dot_details = 1;
+				break;
+			case LONG_OPT_DOT_NO_DETAILS:
+				dot_details = 0;
 				break;
 			case LONG_OPT_PPM_EXE:
 				display_mode = SHOW_DAG_PPM;
@@ -202,7 +213,7 @@ int main(int argc, char *argv[])
 		switch(display_mode)
 		{
 			case SHOW_DAG_DOT:
-				dag_to_dot(d, condense_display, change_size, dot_labels );
+				dag_to_dot(d, condense_display, change_size, dot_labels, dot_details );
 				break;
 			case SHOW_DAG_PPM:
 				dag_to_ppm(d, ppm_mode, ppm_option);

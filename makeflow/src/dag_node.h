@@ -37,10 +37,10 @@ struct dag_node {
 
 	int nodeid;              /* The ordinal number as the rule appears in the makeflow file */
 	int linenum;             /* Line number of the node's rule definition */
-	int local_job;           /* Flag: does this node runs locally? */
+	int local_job;           /* Flag: does this node run locally? */
 
-	struct set *descendants; /* The nodes this node is an immediate ancestor */
-	struct set *ancestors;   /* The nodes this node is an immediate descendant */
+	struct set *descendants; /* The nodes of which this node is an immediate ancestor */
+	struct set *ancestors;   /* The nodes of which this node is an immediate descendant */
 	int ancestor_depth;      /* The depth of the ancestor tree for this node */
 
 	int nested_job;            /* Flag: Is this a recursive call to makeflow? */
