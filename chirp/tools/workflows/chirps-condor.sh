@@ -39,3 +39,5 @@ while sleep 1; do
 	fi
 done
 export CONFUGA_NODE_LIST
+
+# vim: set noexpandtab tabstop=4:

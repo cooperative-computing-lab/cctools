@@ -237,3 +237,5 @@ void work_queue_process_kill(struct work_queue_process *p)
 	// Reap the child process to avoid zombies.
 	waitpid(p->pid, NULL, 0);
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -11,3 +11,5 @@ See the file COPYING for details.
 */
 
 #
+
+/* vim: set noexpandtab tabstop=4: */

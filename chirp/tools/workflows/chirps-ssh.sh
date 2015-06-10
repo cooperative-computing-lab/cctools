@@ -29,3 +29,5 @@ for ((i = 2; i <= 26; i++)); do
 	ssh -o PreferredAuthentications=publickey "${USERNAME}@${host}" "killall -u ${USERNAME} chirp_server"
 	screen -t "${host}" ssh -o PreferredAuthentications=publickey "${USERNAME}@${host}" "/bin/sh -c '"'CHIRP_ROOT='"$CHIRP_ROOT"'; rm -rf "$CHIRP_ROOT"; mkdir -p "$CHIRP_ROOT"; '"$CHIRP_SERVER"' --parent-death --auth=hostname --auth=unix --auth=ticket --challenge-dir='"$RENDEZVOUS"' --transient="$CHIRP_ROOT"/chirp.transient --root="$CHIRP_ROOT"/chirp.root --port='"$PORT"' --catalog-update=10s --debug=all --debug-file=:stdout --debug-rotate-max=0 --jobs --job-concurrency=100 --project-name='"$PROJECT"' --idle-clients=30m'"'"
 done
+
+# vim: set noexpandtab tabstop=4:

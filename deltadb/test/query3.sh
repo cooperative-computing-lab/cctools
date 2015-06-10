@@ -14,3 +14,5 @@ ${DIR}/deltadb_select_static  type=chirp | \
 ${DIR}/deltadb_project name | \
 ${DIR}/deltadb_reduce_temporal d1 name,LAST | \
 ${DIR}/deltadb_pivot name.LAST
+
+# vim: set noexpandtab tabstop=4:

@@ -452,3 +452,5 @@ struct nvpair * dag_node_env_create( struct dag *d, struct dag_node *n )
 
 	return nv;
 }
+
+/* vim: set noexpandtab tabstop=4: */

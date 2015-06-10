@@ -395,3 +395,5 @@ struct rmDsummary_set *make_new_set(char *category)
 
 	return ss;
 }
+
+/* vim: set noexpandtab tabstop=4: */

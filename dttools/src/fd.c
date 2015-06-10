@@ -73,3 +73,5 @@ out:
 	while (close(fdn) == -1 && errno == EINTR) ; /* nothing we can do if this fails any other way */
 	return rc;
 }
+
+/* vim: set noexpandtab tabstop=4: */

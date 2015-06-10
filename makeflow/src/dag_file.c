@@ -36,3 +36,5 @@ int dag_file_is_sink( const struct dag_file *f )
 	else
 		return 1;
 }
+
+/* vim: set noexpandtab tabstop=4: */

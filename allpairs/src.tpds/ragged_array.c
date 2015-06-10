@@ -154,3 +154,5 @@ void ragged_array_print( struct ragged_array *t )
 	}
 	printf("\n");
 }
+
+/* vim: set noexpandtab tabstop=4: */

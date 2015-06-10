@@ -222,3 +222,5 @@ char *dag_variable_lookup_global_string(const char *name, struct dag *d )
 	struct dag_variable_lookup_set s = { d, NULL, NULL, NULL };
 	return dag_variable_lookup_string(name, &s);
 }
+
+/* vim: set noexpandtab tabstop=4: */

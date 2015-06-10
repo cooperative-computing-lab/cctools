@@ -759,3 +759,5 @@ int main(int argc, char *argv[])
 	free(outfile);
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

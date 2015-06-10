@@ -94,3 +94,5 @@ void deltadb_reduction_print( struct deltadb_reduction *r )
 			break;
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */

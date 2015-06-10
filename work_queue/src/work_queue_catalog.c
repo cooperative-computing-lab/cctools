@@ -124,3 +124,5 @@ struct list *work_queue_catalog_query_cached( const char *catalog_host, int cata
 
 	return masters_list;
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -687,3 +687,5 @@ int main(int argc, char *argv[])
 	print_time();
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

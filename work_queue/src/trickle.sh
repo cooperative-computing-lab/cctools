@@ -9,3 +9,5 @@ do
 done
 
 echo "done!" >> output
+
+# vim: set noexpandtab tabstop=4:

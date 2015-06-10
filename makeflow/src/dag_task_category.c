@@ -16,3 +16,5 @@ struct dag_task_category * dag_task_category_create(  const char *label )
 	c->nodes = list_create();
 	return c;
 }
+
+/* vim: set noexpandtab tabstop=4: */
