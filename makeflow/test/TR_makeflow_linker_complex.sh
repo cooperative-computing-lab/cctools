@@ -3,41 +3,35 @@
 . ../../dttools/test/test_runner_common.sh
 
 out_dir="linker_complex_out"
+COMPLEX="/tmp/makeflow_test_complex"
 
 prepare() {
-  if [ -d "$out_dir" ]; then
-	exit 1
-  fi
-
-
-  touch /tmp/makeflow_test_complex_path
-  mkdir -p /tmp/makeflow_test_complex/a/b/x
-  touch /tmp/makeflow_test_complex/a/b/x/y
-  chmod 777 /tmp/makeflow_test_complex/a/b/x/y
-
-  exit 0
+	(
+		set -e
+		touch "$COMPLEX"path
+		mkdir -p "$COMPLEX"/a/b/x
+		printf '' > "$COMPLEX"/a/b/x/y
+		chmod 777 "$COMPLEX"/a/b/x/y || true
+	)
+	return $?
 }
 
 run() {
-  cd linker
-  ../../src/makeflow_analyze -b "$out_dir" complex.mf &> tmp
-  cat tmp | awk '{print $2}' | sort > tmp2
-
-  diff tmp2 expected/complex.mf
-  exit $?
+	(
+		set -e
+		cd linker
+		../../src/makeflow_analyze -b "$out_dir" complex.mf > tmp 2>&1
+		< tmp awk '{print $2}' | sort > tmp2
+		diff tmp2 expected/complex.mf
+	)
+	return $?
 }
 
 clean() {
-  cd linker
-  rm -r "$out_dir"
-  rm -r /tmp/a
-  rm -r /tmp/makeflow_test_complex_path
-  rm tmp
-  rm tmp2
-  exit 0
+	rm -rf linker/"$out_dir" linker/tmp linker/tmp2 "$COMPLEX" "$COMPLEX"path
+	return 0
 }
 
 dispatch "$@"
-
 
 # vim: set noexpandtab tabstop=4:

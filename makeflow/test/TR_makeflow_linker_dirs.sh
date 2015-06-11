@@ -5,25 +5,22 @@
 out_dir="linker_dirs_out"
 
 prepare() {
-	if [ -d "$out_dir" ]; then
-		exit 1
-	fi
-
-	exit 0
+	return 0
 }
 
 run() {
-	cd linker
-	../../src/makeflow_analyze -b "$out_dir" directories.mf &> tmp
-	diff tmp expected/directories.mf
-	exit $?
+	(
+		set -e
+		cd linker
+		../../src/makeflow_analyze -b "$out_dir" directories.mf > tmp 2>&1
+		diff tmp expected/directories.mf
+	)
+	return $?
 }
 
 clean() {
-	cd linker
-	rm -r "$out_dir"
-	rm tmp
-	exit 0
+	rm -rf linker/"$out_dir" linker/tmp
+	return 0
 }
 
 dispatch "$@"
