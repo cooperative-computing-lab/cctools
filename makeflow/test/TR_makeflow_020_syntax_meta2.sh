@@ -19,6 +19,6 @@ clean()
 	exit 1
 }
 
-dispatch $@
+dispatch "$@"
 
 # vim: set noexpandtab tabstop=4:

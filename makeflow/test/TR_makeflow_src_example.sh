@@ -28,7 +28,7 @@ PRODUCTS="capitol.montage.gif"
 
 . ./makeflow_dirs_test_common.sh
 
-dispatch $@
+dispatch "$@"
 
 
 # vim: set noexpandtab tabstop=4:
