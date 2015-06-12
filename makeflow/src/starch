@@ -8,6 +8,13 @@
 
 from __future__ import print_function
 
+import os
+import sys
+
+if sys.version_info[0:2] < (2, 6):
+    print('Sorry, you need at least Python 2.6 to use this program')
+    sys.exit(1)
+
 from io         import BytesIO
 from optparse   import OptionParser
 from subprocess import Popen, PIPE
@@ -16,13 +23,10 @@ from time       import time
 from tempfile   import NamedTemporaryFile
 from shutil     import copyfile, copyfileobj
 
-try:
+if sys.version_info[0:2] < (3, 0):
     from ConfigParser import ConfigParser, NoSectionError, NoOptionError
-except ImportError:
+else:
     from configparser import ConfigParser, NoSectionError, NoOptionError
-
-import os
-import sys
 
 # Todo
 
