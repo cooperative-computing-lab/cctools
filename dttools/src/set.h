@@ -93,7 +93,7 @@ int set_push(struct set *h, const void *element);
 
 int set_lookup(struct set *s, void *element);
 
-/** Remove a element.
+/** Remove an element.
 @param s A pointer to a set.
 @param element A pointer to remove.
 @return If found 1, otherwise 0.

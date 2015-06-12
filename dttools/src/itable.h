@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include "int_sizes.h"
 
 /** @file itable.h An integer-indexed hash table.
-This hash table module map integers to arbitrary objects (void pointers).
+This hash table module maps integers to arbitrary objects (void pointers).
 For example, to store a filename using the file descriptor as a key:
 <pre>
 struct itable *t;
@@ -24,7 +24,7 @@ pathname = itable_remove(h,id);
 
 </pre>
 
-To list all of the items in a itable, use @ref itable_firstkey and @ref itable_nextkey like this:
+To list all of the items in an itable, use @ref itable_firstkey and @ref itable_nextkey like this:
 
 <pre>
 UINT64_T  key;
