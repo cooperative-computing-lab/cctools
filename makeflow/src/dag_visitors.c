@@ -754,18 +754,14 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 		label = strtok(name, " \t\n");
 		t = hash_table_lookup(h, label);
 		if(!condense_display || t->print) {
-
-
-
 			//Dot Details
 			if(with_details) {
-
-				printf( "subgraph cluster_S%d { \n", condense_display ? t->id : n->nodeid);
-				printf( "\tstyle=unfilled;\n\tcolor=red\n" );
-				printf( "\tcores%d [style=filled, color=white, label=\"Cores: %"PRId64"\"]\n", condense_display ? t->id : n->nodeid, n->resources->cores );
-				printf( "\tresMem%d [style=filled, color=white, label=\"Memory: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources->resident_memory );
-				printf( "\tworkDirFtprnt%d [style=filled, color=white, label=\"Footprint: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources->workdir_footprint );
-				printf( "\tcores%d -> resMem%d -> workDirFtprnt%d [color=white]", condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid);
+				printf("subgraph cluster_S%d { \n", condense_display ? t->id : n->nodeid);
+				printf("\tstyle=unfilled;\n\tcolor=red\n");
+				printf("\tcores%d [style=filled, color=white, label=\"Cores: %"PRId64"\"]\n", condense_display ? t->id : n->nodeid, n->resources->cores);
+				printf("\tresMem%d [style=filled, color=white, label=\"Memory: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources->resident_memory);
+				printf("\tworkDirFtprnt%d [style=filled, color=white, label=\"Footprint: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources->workdir_footprint);
+				printf("\tcores%d -> resMem%d -> workDirFtprnt%d [color=white]", condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid);
 
 				//Source Files
 				list_first_item(n->source_files);
@@ -794,8 +790,6 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 					}
 				}
 			}
-
-
 
 			if((t->count == 1) || !condense_display) {
 				printf( "N%d [label=\"%s\"];\n", condense_display ? t->id : n->nodeid, with_labels ? label : "");
