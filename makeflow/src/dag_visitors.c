@@ -657,7 +657,7 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 }
 
 
-void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_labels )
+void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_labels, int with_details )
 {
 	struct dag_node *n;
 	struct dag_file *f;
@@ -671,6 +671,12 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 
 	char *name;
 	char *label;
+
+	//Dot Details Variables
+	int i;
+	int j;
+	struct file_node *src;
+	struct file_node *tar;
 
 	double average = 0;
 	double width = 0;
@@ -708,25 +714,6 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 		free(name);
 	}
 
-
-	for(n = d->nodes; n; n = n->next) {
-		name = xxstrdup(n->command);
-		label = strtok(name, " \t\n");
-		t = hash_table_lookup(h, label);
-		if(!condense_display || t->print) {
-
-			if((t->count == 1) || !condense_display) {
-				printf( "N%d [label=\"%s\"];\n", condense_display ? t->id : n->nodeid, with_labels ? label : "");
-			} else {
-				printf( "N%d [label=\"%s x%d\"];\n", t->id, with_labels ? label : "", t->count);
-			}
-			t->print = 0;
-		}
-		free(name);
-	}
-
-	printf( "node [shape=box,color=blue,style=%s,fixedsize=false];\n",with_labels ? "unfilled" : "filled" );
-
 	g = hash_table_create(0, 0);
 
 	for(n = d->nodes; n; n = n->next) {
@@ -761,6 +748,66 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 			}
 		}
 	}
+
+	for(n = d->nodes; n; n = n->next) {
+		name = xxstrdup(n->command);
+		label = strtok(name, " \t\n");
+		t = hash_table_lookup(h, label);
+		if(!condense_display || t->print) {
+			//Dot Details
+			if(with_details) {
+				printf("subgraph cluster_S%d { \n", condense_display ? t->id : n->nodeid);
+				printf("\tstyle=unfilled;\n\tcolor=red\n");
+				printf("\tcores%d [style=filled, color=white, label=\"Cores: %"PRId64"\"]\n", condense_display ? t->id : n->nodeid, n->resources->cores);
+				printf("\tresMem%d [style=filled, color=white, label=\"Memory: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources->resident_memory);
+				printf("\tworkDirFtprnt%d [style=filled, color=white, label=\"Footprint: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources->workdir_footprint);
+				printf("\tcores%d -> resMem%d -> workDirFtprnt%d [color=white]", condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid);
+
+				//Source Files
+				list_first_item(n->source_files);
+				i = 0;
+				while((f = list_next_item(n->source_files))) {
+					fn = f->filename;
+					e = hash_table_lookup(g, fn);
+					if(e) {
+						i++;
+						printf("\tsrc_%d_%d [label=\"%s\", style=unfilled, color=purple, shape=box];\n", condense_display ? t->id : n->nodeid, e->id, e->name);
+						printf("\tsrc_%d_%d -> N%d;\n", condense_display ? t->id : n->nodeid, e->id, condense_display ? t->id : n->nodeid);
+					}
+				}
+
+				//Target Files
+				list_first_item(n->target_files);
+				j = 0;
+				while((f = list_next_item(n->target_files))) {
+					fn = f->filename;
+					e = hash_table_lookup(g, fn);
+					if(e) {
+						j++;
+						printf("\ttar_%d_%d [label=\"%s\", style=dotted, color=purple, shape=box];\n", condense_display ? t->id : n->nodeid, e->id, e->name);
+						printf("\tN%d -> tar_%d_%d;\n", condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid, e->id);
+
+					}
+				}
+			}
+
+			if((t->count == 1) || !condense_display) {
+				printf( "N%d [label=\"%s\"];\n", condense_display ? t->id : n->nodeid, with_labels ? label : "");
+			} else {
+				printf( "N%d [label=\"%s x%d\"];\n", t->id, with_labels ? label : "", t->count);
+			}
+
+			if(with_details) {
+				printf( "}\n" );
+			}
+
+			t->print = 0;
+
+		}
+		free(name);
+	}
+
+	printf( "node [shape=box,color=blue,style=%s,fixedsize=false];\n",with_labels ? "unfilled" : "filled" );
 
 	hash_table_firstkey(g);
 	while(hash_table_nextkey(g, &label, (void **) &e)) {
@@ -798,13 +845,31 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
 			e = hash_table_lookup(g, f->filename);
+
+			if(with_details) {
+				src = hash_table_lookup(g, f->filename);
+				if(src) {
+					printf( "F%d -> src_%d_%d;\n", e->id, condense_display ? t->id : n->nodeid, e->id );
+				}
+			}
+			else {
 			printf( "F%d -> N%d;\n", e->id, condense_display ? t->id : n->nodeid);
+			}
 		}
 
 		list_first_item(n->target_files);
 		while((f = list_next_item(n->target_files))) {
 			e = hash_table_lookup(g, f->filename);
-			printf( "N%d -> F%d;\n", condense_display ? t->id : n->nodeid, e->id);
+
+			if(with_details) {
+				tar = hash_table_lookup(g, f->filename);
+				if(tar) {
+					printf( "tar_%d_%d -> F%d;\n", condense_display ? t->id : n->nodeid, e->id, e->id );
+				}
+			}
+			else {
+				printf( "N%d -> F%d;\n", condense_display ? t->id : n->nodeid, e->id);
+			}
 		}
 
 		free(name);

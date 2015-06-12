@@ -21,6 +21,7 @@ OPTION_TRIPLET(-D, display, opt) Translate the makeflow to the desired visualiza
     dax      DAX format for use by the Pegasus workflow manager.
 OPTION_ITEM(`--dot-merge-similar')Condense similar boxes
 OPTION_ITEM(`--dot-proportional')Change the size of the boxes proportional to file size
+OPTION_ITEM(`--dot-details')Display a more detailed graph including an operating sandbox for each task
 OPTION_ITEM(` ')The following options for ppm generation are mutually exclusive:
 OPTION_PAIR(--ppm-highlight-row, row)Highlight row <row> in completion grap
 OPTION_PAIR(--ppm-highlight-file,file)Highlight node that creates file <file> in completion graph
