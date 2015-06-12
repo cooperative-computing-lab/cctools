@@ -6,7 +6,9 @@
 
 """ Starch """
 
-from cStringIO  import StringIO
+from __future__ import print_function
+
+from io         import BytesIO
 from optparse   import OptionParser
 from subprocess import Popen, PIPE
 from tarfile    import REGTYPE, TarInfo, open as Tar
@@ -14,7 +16,10 @@ from time       import time
 from tempfile   import NamedTemporaryFile
 from shutil     import copyfile, copyfileobj
 
-from ConfigParser import ConfigParser, NoSectionError, NoOptionError
+try:
+    from ConfigParser import ConfigParser, NoSectionError, NoOptionError
+except ImportError:
+    from configparser import ConfigParser, NoSectionError, NoOptionError
 
 import os
 import sys
@@ -154,10 +159,10 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
     for exe_path, real_path in executables:
         exe_name = os.path.basename(exe_path)
         exe_info = archive.gettarinfo(real_path, os.path.join('bin', exe_name))
-        exe_info.mode = 0755
+        exe_info.mode = 0o755
 
         debug('    adding executable: %s (%s)' % (exe_name, real_path))
-        archive.addfile(exe_info, open(real_path))
+        archive.addfile(exe_info, open(real_path, 'rb'))
 
     debug('adding libraries...')
     libraries = find_libraries(libraries, executables)
@@ -166,7 +171,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         lib_info = archive.gettarinfo(real_path, os.path.join('lib', lib_name))
 
         debug('    adding library: %s (%s)' % (lib_name, real_path))
-        archive.addfile(lib_info, open(real_path))
+        archive.addfile(lib_info, open(real_path, 'rb'))
 
     debug('adding data...')
     for data_path, real_path in map(lambda s: s.split(':'), data):
@@ -178,29 +183,26 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         env_info = archive.gettarinfo(real_path, os.path.join('env', env_name))
 
         debug('    adding environment script: %s (%s)' % (env_name, real_path))
-        archive.addfile(env_info, open(real_path))
+        archive.addfile(env_info, open(real_path, 'rb'))
 
     run_info = TarInfo('run.sh')
     run_info_data  = RUN_SH % command
-    run_info.mode  = 0755
+    run_info.mode  = 0o755
     run_info.mtime = time()
     run_info.size  = len(run_info_data)
 
     debug('adding run.sh...')
-    archive.addfile(run_info, StringIO(run_info_data))
+    archive.addfile(run_info, BytesIO(run_info_data.encode('utf-8')))
     archive.close()
 
-    if os.path.exists(sfx_path):
-        os.unlink(sfx_path)
-
     debug('creating sfx...')
-    sfx_file = open(sfx_path, 'a+')
-    copyfileobj(StringIO(SFX_SH), sfx_file)
-    copyfileobj(open(arc_path, 'r'), sfx_file)
+    sfx_file = open(sfx_path, 'wb')
+    copyfileobj(BytesIO(SFX_SH.encode('utf-8')), sfx_file)
+    copyfileobj(open(arc_path, 'rb'), sfx_file)
     sfx_file.close()
 
     debug('cleaning up...')
-    os.chmod(sfx_path, 0755)
+    os.chmod(sfx_path, 0o755)
     os.unlink(arc_path)
 
 def add_data_to_archive(archive, data_path, real_path):
@@ -213,19 +215,19 @@ def add_data_to_archive(archive, data_path, real_path):
     else:
         data_info = archive.gettarinfo(os.path.realpath(real_path), data_path)
         debug('    adding data: %s (%s)' % (data_path, real_path))
-        archive.addfile(data_info, open(real_path))
+        archive.addfile(data_info, open(real_path, 'rb'))
 
 # Print utilities
 
 def debug(s):
     if STARCH_VERBOSE:
-        print '[D]', s
+        print('[D]', s)
 
 def warn(s):
-    print >>sys.stderr, '[W]', s
+    print('[W]', s, file=sys.stderr)
 
 def error(s):
-    print >>sys.stderr, '[E]', s
+    print('[E]', s, file=sys.stderr)
     sys.exit(1)
 
 # Find file utilities
@@ -279,15 +281,15 @@ def autodetect_libraries_linux(executable):
     libs = []
 
     try:
-        p = Popen(['ldd', executable], stdout = PIPE)
-        for line in p.communicate()[0].split('\n'):
+        p = Popen(['ldd', executable], stdout=PIPE)
+        for line in p.communicate()[0].decode().split('\n'):
             try:
                 lib_path = line.split('=>')[-1].strip().split()[0]
                 if os.path.exists(lib_path):
                     libs.append((lib_path, os.path.realpath(lib_path)))
-            except Exception, e:
+            except Exception:
                 pass
-    except Exception, e:
+    except Exception as e:
         error('could not execute ldd on %s: %s' % (executable, str(e)))
 
     return libs
@@ -297,15 +299,15 @@ def autodetect_libraries_darwin(executable):
     libs = []
 
     try:
-        p = Popen(['otool', '-L', executable], stdout = PIPE)
-        for line in p.communicate()[0].split('\n'):
+        p = Popen(['otool', '-L', executable], stdout=PIPE)
+        for line in p.communicate()[0].decode().split('\n'):
             try:
                 lib_path = line.split('(')[0].strip()
                 if os.path.exists(lib_path):
                     libs.append((lib_path, os.path.realpath(lib_path)))
-            except Exception, e:
+            except Exception:
                 pass
-    except Exception, e:
+    except Exception as e:
         error('could not execute otool on %s: %s' % (executable, str(e)))
 
     return libs
@@ -317,7 +319,7 @@ class StarchConfigParser(ConfigParser):
     def get(self, section, name, default = None):
         try:
             return ConfigParser.get(self, section, name)
-        except (NoSectionError, NoOptionError), e:
+        except (NoSectionError, NoOptionError):
             return default
 
 # Parse commandline options
