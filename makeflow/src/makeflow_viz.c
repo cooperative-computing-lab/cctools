@@ -83,6 +83,7 @@ static void show_help_viz(const char *cmd)
 	fprintf(stdout, " %-30s Condense similar boxes.\n", "--dot-merge-similar");
 	fprintf(stdout, " %-30s Change the size of the boxes proportional to file size.\n", "--dot-proportional");
 	fprintf(stdout, " %-30s Show only shapes with no text labels.\n","--dot-no-labels");
+	fprintf(stdout, " %-30s Include extra details in graph.\n","--dot-details");
 	fprintf(stdout, "\nThe following options for ppm generation are mutually exclusive:\n\n");
 	fprintf(stdout, " %-30s Highlight row <row> in completion grap\n", "--ppm-highlight-row=<row>");
 	fprintf(stdout, " %-30s Highlight node that creates file <file> in completion graph\n", "--ppm-highlight-file=<file>");
