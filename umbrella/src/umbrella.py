@@ -380,41 +380,47 @@ def dependency_process(env_para_dict, name, id, mountpoint, action, packages_jso
 	mount_value = ''
 	local_cvmfs = ''
 
-	if name[:5] == 'cmssw':
+	item = package_search(packages_json, name, id)
+	#table schema: (name text, version text, platform text, store text, store_type text, type text)
+	store = item["source"][0]
+	logging.debug("%s is chosen to deliver %s", store, name)
+
+	if name[:5] == 'cmssw': # another solution: split name based on '-' and check whether the first item is 'cmssw'.
 		is_cms_app = 1
 
-		local_cms = check_cvmfs_cms()
-		if local_cms:
-			local_cvmfs = os.path.dirname(local_cms)
-			logging.debug("The cvmfs is installed on the local host, and its mountpoint is: %s", local_cvmfs)
-		else:
-			logging.debug("The cvmfs is not installed on the local host.")
+		if store[:5] == 'cvmfs':
+			print "%s is chosen to deliver %s" % (store, name)
+			local_cms = check_cvmfs_cms()
+			if local_cms:
+				local_cvmfs = os.path.dirname(local_cms)
+				logging.debug("The cvmfs is installed on the local host, and its mountpoint is: %s", local_cvmfs)
+			else:
+				logging.debug("The cvmfs is not installed on the local host.")
 
-		#if local_cvmfs is empty, set $HTTP_PROXY, download cctools package, set cvmfs_siteconf_mountpoint, and call parrotize_user_cmd.
-		if not local_cvmfs:
-			logging.debug("Add env variable HTTP_PROXY = http://cache01.hep.wisc.edu:3128 into env_para_dict")
-			env_para_dict["HTTP_PROXY"] = "http://cache01.hep.wisc.edu:3128"
+			#if local_cvmfs is empty, set $HTTP_PROXY, download cctools package, set cvmfs_siteconf_mountpoint, and call parrotize_user_cmd.
+			if not local_cvmfs:
+				logging.debug("Add env variable HTTP_PROXY = http://cache01.hep.wisc.edu:3128 into env_para_dict")
+				env_para_dict["HTTP_PROXY"] = "http://cache01.hep.wisc.edu:3128"
 
-			logging.debug("To access cvmfs, cctools binary is needed")
-			cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action)
+				logging.debug("To access cvmfs, cctools binary is needed")
+				cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action)
 
-			cvmfs_siteconf_mountpoint = set_cvmfs_siteconf(name, action, packages_json, sandbox_dir)
+				cvmfs_siteconf_mountpoint = set_cvmfs_siteconf(name, action, packages_json, sandbox_dir)
 
-			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
-
-			mount_value = "PARROT_CVMFS"
-		else:
-			mount_value = local_cvmfs
-			logging.debug('cvmfs is already installed on the machine, and its mountpoint on the machine: %s', mount_value)
-
-			if sandbox_mode == 'parrot':
 				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
 
-	else:
-		item = package_search(packages_json, name, id)
-		#table schema: (name text, version text, platform text, store text, store_type text, type text)
-		store = item["source"][0]
+				mount_value = "PARROT_CVMFS"
+			else:
+				mount_value = local_cvmfs
+				logging.debug('cvmfs is already installed on the machine, and its mountpoint on the machine: %s', mount_value)
 
+				if sandbox_mode == 'parrot':
+					parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
+		else:
+			dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
+			dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
+			mount_value = dest
+	else:
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
 		dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
 		mount_value = dest

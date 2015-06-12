@@ -15,7 +15,7 @@
 		"version": "6.5"
 	},
 	"software": {
-		"cmssw-5.3.11-slc5_amd64": {
+		"cmssw-5.3.11-slc5-amd64": {
 			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
 	},
