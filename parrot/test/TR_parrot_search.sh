@@ -83,6 +83,6 @@ clean()
 	rm -f "$parrot_debug" "$expected" "$output"
 }
 
-dispatch $@
+dispatch "$@"
 
 # vim: set noexpandtab tabstop=4:

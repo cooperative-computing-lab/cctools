@@ -43,6 +43,6 @@ clean()
 	rm -f test.mf test.dot test.dot.expected
 }
 
-dispatch $@
+dispatch "$@"
 
 # vim: set noexpandtab tabstop=4:

@@ -217,14 +217,14 @@ library_search_normal()
 	# If a third argument is given, it means libraries are found in
 	# a subdirectory of lib, such as "mysql".
 
-	if [ X$3 != X -a -d "$libdir/$3" ]
+	if [ -n "$3" -a -d "$libdir/$3" ]
 	then
 		libdir="$libdir/$3"
 	fi
 
 	# If no third argument, and debian based, libraries are in ARCH-linux-gnu.
 	arch=`uname -m`
-	if [ X$3 = X -a -d "$libdir/$arch-linux-gnu" ]
+	if [ -z "$3" -a -d "$libdir/$arch-linux-gnu" ]
 	then
 		libdir="$libdir/$arch-linux-gnu"
 	fi

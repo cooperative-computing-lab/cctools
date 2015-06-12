@@ -2,63 +2,38 @@
 
 . ../../dttools/test/test_runner_common.sh
 
-function find_absolute_path() {
-	TARGET_FILE=$1
-
-	cd `dirname $TARGET_FILE`
-	TARGET_FILE=`basename $TARGET_FILE`
-
-	while [ -L "$TARGET_FILE" ]
-	do
-		TARGET_FILE=`readlink $TARGET_FILE`
-		cd `dirname $TARGET_FILE`
-		TARGET_FILE=`basename $TARGET_FILE`
-	done
-
-	PHYS_DIR=`pwd -P`
-	RESULT=$PHYS_DIR/$TARGET_FILE
-	echo "$RESULT"
-}
-
-PATH=$(find_absolute_path ../src/):$(find_absolute_path ../../makeflow/src/):$PATH
-
 out_dir=makeflow_linker.001.out
 expected=001
 workflow_description=001.mf
 
 prepare() {
-	cd ../src; make
-	exit $?
+	return 0
 }
 
 run() {
-	../src/makeflow_linker --use-named -o $out_dir linker/001/$workflow_description
-	named_dependency=$(cat $out_dir/named | awk '{print $1}')
-	if [ "$named_dependency" != "Python" ]; then
-		exit 1
-	fi
-	cp expected/$expected/named $out_dir/named
+	(
+		set -e
+		cd linker
+		env PATH="$PATH:$(pwd)/../../src/" ../../src/makeflow_linker --use-named -o "$out_dir" "001/$workflow_description"
 
-	if [ ! -f "$out_dir"/c.sh ]; then
-		exit 1
-	fi
-	rm -f "$out_dir"/c.sh
+		[ "$(< "$out_dir/named" awk '{print $1}')" = "Python" ] || return 1
+		cp "../expected/$expected/named" "$out_dir/named"
 
-	if [ ! -d "$out_dir"/a.py/b/gzip ]; then
-		exit 1
-	fi
+		[ -f "$out_dir/c.sh" ] || return 1
+		rm -f "$out_dir"/c.sh
 
-	rm -rf $out_dir/a.py/b/gzip
+		[ -d "$out_dir"/a.py/b/gzip ] || return 1
+		rm -rf "$out_dir/a.py/b/gzip"
 
-	diff -bur expected/$expected $out_dir
-	exit $?
+		diff -bur "../expected/$expected" "$out_dir"
+	)
+	return $?
 }
 
 clean() {
-	rm -rf $out_dir
+	rm -rf "linker/$out_dir"
 }
 
 dispatch "$@"
-
 
 # vim: set noexpandtab tabstop=4:

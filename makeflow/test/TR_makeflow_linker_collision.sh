@@ -5,31 +5,26 @@
 out_dir="linker_collision_out"
 
 prepare() {
-  if [ -d "$out_dir" ]; then
-	exit 1
-  fi
-
-  touch linker/ls
-
-  exit $?
+	return 0
 }
 
 run() {
-  cd linker
-  ../../src/makeflow_analyze -b "$out_dir" collision.mf &> tmp
-  cat tmp | awk '{print $2}' | sort > tmp2
-
-  diff tmp2 expected/collision.mf
-  exit $?
+	(
+		set -e
+		cd linker
+		printf '' > ls
+		../../src/makeflow_analyze -b "$out_dir" collision.mf > tmp 2>&1
+		< tmp awk '{print $2}' | sort > tmp2
+		diff tmp2 expected/collision.mf
+	)
+	return $?
 }
 
 clean() {
-  cd linker
-  rm -r "$out_dir"
-  rm -f /tmp/asdf asdf tmp tmp2 ls
+  rm -rf linker/"$out_dir" linker/tmp linker/tmp2 linker/ls
   exit 0
 }
 
-dispatch $@
+dispatch "$@"
 
 # vim: set noexpandtab tabstop=4:

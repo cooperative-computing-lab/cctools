@@ -6,12 +6,12 @@ sfxfile=example.sfx
 
 prepare()
 {
-	exit 0
+	return 0
 }
 
 run()
 {
-	case `uname -s` in
+	case "$(uname -s)" in
 		Darwin)
 			cfgfile=example.osx.cfg
 			;;
@@ -20,16 +20,17 @@ run()
 			;;
 	esac
 
-	../src/starch -C $cfgfile $sfxfile
-	exec ./$sfxfile
+	../src/starch -C "$cfgfile" "$sfxfile"
+	"./$sfxfile"
+	return $?
 }
 
 clean()
 {
-	rm -f $sfxfile
-	exit 0
+	rm -f -- "$sfxfile"
+	return 0
 }
 
-dispatch $@
+dispatch "$@"
 
 # vim: set noexpandtab tabstop=4:

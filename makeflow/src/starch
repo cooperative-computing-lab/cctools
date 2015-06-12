@@ -18,6 +18,7 @@ from ConfigParser import ConfigParser, NoSectionError, NoOptionError
 
 import os
 import sys
+import platform
 
 # Todo
 
@@ -261,8 +262,16 @@ def find_executables(executables):
 
 def find_libraries(libraries, executables):
     libs = []
+    search = ['/lib', '/lib64', '/usr/lib', '/usr/lib64']
 
-    for lp, rp in find_files(libraries, 'LD_LIBRARY_PATH', ['/lib', '/lib64', '/usr/lib', '/usr/lib64']):
+    if platform.system() == 'Linux':
+        platlib = '%s-linux-gnu' % platform.machine()
+        platsearch = []
+        for s in search:
+            platsearch.append(os.path.join(s, platlib))
+        search.extend(platsearch)
+
+    for lp, rp in find_files(libraries, 'LD_LIBRARY_PATH', search):
         libs.append((lp, rp))
 
     if STARCH_AUTODETECT:

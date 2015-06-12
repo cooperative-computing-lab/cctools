@@ -50,6 +50,6 @@ clean()
 	rm -f $MAKE_FILE $STATUS_FILE $PORT_FILE $WORKER_LOG out.1 out.2 out.actual out.expected
 }
 
-dispatch $@
+dispatch "$@"
 
 # vim: set noexpandtab tabstop=4:

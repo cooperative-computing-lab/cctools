@@ -9,7 +9,7 @@ PRODUCTS="mydir/1.txt mydir/2.txt mydir/3.txt"
 
 . ./makeflow_dirs_test_common.sh
 
-dispatch $@
+dispatch "$@"
 
 
 
