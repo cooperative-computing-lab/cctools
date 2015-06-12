@@ -6,23 +6,22 @@
 
 """ Starch """
 
-from __future__ import print_function
-
+import logging
 import os
-import sys
 import platform
+import sys
 
-if sys.version_info[0:2] < (2, 6):
-    print('Sorry, you need at least Python 2.6 to use this program')
-    sys.exit(1)
-
-from io         import BytesIO
 from optparse   import OptionParser
 from subprocess import Popen, PIPE
 from tarfile    import REGTYPE, TarInfo, open as Tar
 from time       import time
 from tempfile   import NamedTemporaryFile
 from shutil     import copyfile, copyfileobj
+
+if sys.version_info[0:2] < (2, 6):
+    from cStringIO    import StringIO as BytesIO
+else:
+    from io           import BytesIO
 
 if sys.version_info[0:2] < (3, 0):
     from ConfigParser import ConfigParser, NoSectionError, NoOptionError
@@ -37,9 +36,9 @@ else:
 
 # Global variables
 
-STARCH_AUTODETECT = True
-STARCH_VERBOSE    = False
-STARCH_PLATFORM   = 'Linux'
+STARCH_LOGGING_FORMAT = '[%(levelname)s] %(filename)s[%(process)d] %(message)s'
+STARCH_AUTODETECT     = True
+STARCH_PLATFORM       = 'Linux'
 
 # Shell scripts
 
@@ -159,55 +158,55 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
     arc_path = tmp_file.name
     archive  = Tar(arc_path, 'w:bz2')
 
-    debug('adding executables...')
+    logging.debug('adding executables...')
     executables = find_executables(executables)
     for exe_path, real_path in executables:
         exe_name = os.path.basename(exe_path)
         exe_info = archive.gettarinfo(real_path, os.path.join('bin', exe_name))
-        exe_info.mode = 0o755
+        exe_info.mode = int('755', 8)
 
-        debug('    adding executable: %s (%s)' % (exe_name, real_path))
+        logging.debug('    adding executable: %s (%s)' % (exe_name, real_path))
         archive.addfile(exe_info, open(real_path, 'rb'))
 
-    debug('adding libraries...')
+    logging.debug('adding libraries...')
     libraries = find_libraries(libraries, executables)
     for lib_path, real_path in libraries:
         lib_name = os.path.basename(lib_path)
         lib_info = archive.gettarinfo(real_path, os.path.join('lib', lib_name))
 
-        debug('    adding library: %s (%s)' % (lib_name, real_path))
+        logging.debug('    adding library: %s (%s)' % (lib_name, real_path))
         archive.addfile(lib_info, open(real_path, 'rb'))
 
-    debug('adding data...')
+    logging.debug('adding data...')
     for data_path, real_path in map(lambda s: s.split(':'), data):
         add_data_to_archive(archive, os.path.normpath(data_path), os.path.normpath(real_path))
 
-    debug('adding environment scripts...')
+    logging.debug('adding environment scripts...')
     for env_path, real_path in find_files(environments, 'PWD'):
         env_name = os.path.basename(env_path)
         env_info = archive.gettarinfo(real_path, os.path.join('env', env_name))
 
-        debug('    adding environment script: %s (%s)' % (env_name, real_path))
+        logging.debug('    adding environment script: %s (%s)' % (env_name, real_path))
         archive.addfile(env_info, open(real_path, 'rb'))
 
     run_info = TarInfo('run.sh')
     run_info_data  = RUN_SH % command
-    run_info.mode  = 0o755
+    run_info.mode  = int('755', 8)
     run_info.mtime = time()
     run_info.size  = len(run_info_data)
 
-    debug('adding run.sh...')
+    logging.debug('adding run.sh...')
     archive.addfile(run_info, BytesIO(run_info_data.encode('utf-8')))
     archive.close()
 
-    debug('creating sfx...')
+    logging.debug('creating sfx...')
     sfx_file = open(sfx_path, 'wb')
     copyfileobj(BytesIO(SFX_SH.encode('utf-8')), sfx_file)
     copyfileobj(open(arc_path, 'rb'), sfx_file)
     sfx_file.close()
 
-    debug('cleaning up...')
-    os.chmod(sfx_path, 0o755)
+    logging.debug('cleaning up...')
+    os.chmod(sfx_path, int('755', 8))
     os.unlink(arc_path)
 
 def add_data_to_archive(archive, data_path, real_path):
@@ -219,21 +218,9 @@ def add_data_to_archive(archive, data_path, real_path):
                 add_data_to_archive(archive, dp, rp)
     else:
         data_info = archive.gettarinfo(os.path.realpath(real_path), data_path)
-        debug('    adding data: %s (%s)' % (data_path, real_path))
+        logging.debug('    adding data: %s (%s)' % (data_path, real_path))
         archive.addfile(data_info, open(real_path, 'rb'))
 
-# Print utilities
-
-def debug(s):
-    if STARCH_VERBOSE:
-        print('[D]', s)
-
-def warn(s):
-    print('[W]', s, file=sys.stderr)
-
-def error(s):
-    print('[E]', s, file=sys.stderr)
-    sys.exit(1)
 
 # Find file utilities
 
@@ -255,7 +242,7 @@ def find_files(files, env_var, default_paths = None):
                 yield file_path, os.path.realpath(file_path)
                 break
         if not is_found:
-            error('could not find file: %s' % file)
+            logging.error('could not find file: %s' % file)
     raise StopIteration
 
 
@@ -302,8 +289,9 @@ def autodetect_libraries_linux(executable):
                     libs.append((lib_path, os.path.realpath(lib_path)))
             except Exception:
                 pass
-    except Exception as e:
-        error('could not execute ldd on %s: %s' % (executable, str(e)))
+    except Exception:
+        _, e = sys.exc_info()[:2]
+        logging.error('could not execute ldd on %s: %s' % (executable, str(e)))
 
     return libs
 
@@ -320,11 +308,11 @@ def autodetect_libraries_darwin(executable):
                     libs.append((lib_path, os.path.realpath(lib_path)))
             except Exception:
                 pass
-    except Exception as e:
-        error('could not execute otool on %s: %s' % (executable, str(e)))
+    except Exception:
+        _, e = sys.exc_info()[:2]
+        logging.error('could not execute otool on %s: %s' % (executable, str(e)))
 
     return libs
-
 
 # Configuration Parser
 
@@ -338,7 +326,6 @@ class StarchConfigParser(ConfigParser):
 # Parse commandline options
 
 def parse_command_line_options():
-    global STARCH_VERBOSE
     global STARCH_AUTODETECT
     global STARCH_PLATFORM
 
@@ -367,13 +354,17 @@ def parse_command_line_options():
         parser.print_help()
         sys.exit(1)
 
-    STARCH_VERBOSE    = options.verbose
+    if options.verbose:
+        logging.basicConfig(format=STARCH_LOGGING_FORMAT, level=logging.DEBUG)
+    else:
+        logging.basicConfig(format=STARCH_LOGGING_FORMAT)
+
     STARCH_AUTODETECT = not(options.autodetect_disable)
     STARCH_PLATFORM   = os.uname()[0]
 
     if options.config:
         if not os.path.exists(options.config):
-            error('config file \'%s\' does not exist' % options.config)
+            logging.error('config file \'%s\' does not exist' % options.config)
 
         config = StarchConfigParser()
         config.read(options.config)
@@ -386,13 +377,13 @@ def parse_command_line_options():
             options.command = config.get('starch', 'command', '')
 
     if not options.executables:
-        error('no executables specified')
+        logging.error('no executables specified')
 
     if not options.command:
         options.command = os.path.basename(options.executables[0]) + ' $@'
-        warn('no command specified, so using: %s' % options.command)
+        logging.warn('no command specified, so using: %s' % options.command)
 
-    debug('command ... ' + options.command)
+    logging.debug('command ... ' + options.command)
 
     return args[0], options.executables, options.libraries, \
                     options.data, options.environments, options.command
