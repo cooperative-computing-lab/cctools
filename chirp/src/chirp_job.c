@@ -151,7 +151,7 @@ static int db_init (sqlite3 *db)
 		IMMUTABLE_JOB_INSUPD("JobEnvironment")
 		"CREATE TABLE JobFile("
 		"	id INTEGER REFERENCES Job (id),"
-		"	binding TEXT NOT NULL DEFAULT 'SYMLINK' REFERENCES FileBinding (binding),"
+		"	binding TEXT NOT NULL DEFAULT 'LINK' REFERENCES FileBinding (binding),"
 		"	serv_path TEXT NOT NULL," /* no UTF encoding? */
 		"	task_path TEXT NOT NULL," /* no UTF encoding? */
 		"	tag TEXT," /* user value */
@@ -161,7 +161,7 @@ static int db_init (sqlite3 *db)
 		IMMUTABLE_JOB_INSUPD("JobFile")
 		/* We use FileType as an SQLite enum */
 		"CREATE TABLE FileBinding (binding TEXT PRIMARY KEY);"
-		"INSERT INTO FileBinding VALUES ('LINK'), ('SYMLINK'), ('COPY'), ('URL');"
+		"INSERT INTO FileBinding VALUES ('LINK'), ('COPY'), ('URL');"
 		IMMUTABLE("FileBinding")
 		"CREATE TABLE FileType (type TEXT PRIMARY KEY);"
 		"INSERT INTO FileType VALUES ('INPUT'), ('OUTPUT');"
@@ -427,7 +427,7 @@ restart:
 				CATCH(ENAMETOOLONG);
 			sqlcatch(sqlite3_bind_text(stmt, 5, task_path->u.string.ptr, -1, SQLITE_STATIC));
 
-			sqlcatch(sqlite3_bind_text(stmt, 6, binding ? binding->u.string.ptr : "SYMLINK", -1, SQLITE_STATIC));
+			sqlcatch(sqlite3_bind_text(stmt, 6, binding ? binding->u.string.ptr : NULL, -1, SQLITE_STATIC));
 
 			sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 			debug(D_DEBUG, "job %" PRICHIRP_JOBID_T " new file `%s' bound as `%s' type `%s'", *id, serv_path->u.string.ptr, task_path->u.string.ptr, type->u.string.ptr);

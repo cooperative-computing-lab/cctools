@@ -302,19 +302,13 @@ static int bindfile (sqlite3 *db, chirp_jobid_t id, const char *subject, const c
 		CATCHUNIX(create_dir(task_path_dir, S_IRWXU) ? 0 : -1);
 
 		if (strcmp(type, "INPUT") == 0) {
-			if (strcmp(binding, "SYMLINK") == 0) {
-				CATCHUNIX(symlink(serv_path_resolved, task_path_resolved));
-			} else if (strcmp(binding, "LINK") == 0) {
+			if (strcmp(binding, "LINK") == 0) {
 				CATCHUNIX(link(serv_path_resolved, task_path_resolved));
 			} else if (strcmp(binding, "COPY") == 0) {
 				CATCHUNIX(copy_file_to_file(serv_path_resolved, task_path_resolved));
 			} else assert(0);
 			CATCHUNIX(chmod(serv_path_resolved, S_IRWXU));
-		} else if (strcmp(type, "OUTPUT") == 0) {
-			if (strcmp(binding, "SYMLINK") == 0) {
-				CATCHUNIX(symlink(serv_path_resolved, task_path_resolved));
-			}
-		} else assert(0);
+		}
 	} else if (mode == STRAPBOOT) {
 		if (strcmp(type, "OUTPUT") == 0) {
 			struct stat info;
