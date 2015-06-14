@@ -55,7 +55,6 @@
 
 extern char chirp_hostname[DOMAIN_NAME_MAX];
 extern int chirp_port;
-extern char chirp_transient_path[PATH_MAX];
 
 struct url_binding {
 	char path[PATH_MAX]; /* task_path */
@@ -152,10 +151,12 @@ out:
 static int sandbox_create (char sandbox[PATH_MAX], chirp_jobid_t id)
 {
 	int rc;
+	char path[PATH_MAX] = "";
 
-	CATCHUNIX(snprintf(sandbox, PATH_MAX, "%s/job.%" PRICHIRP_JOBID_T ".XXXXXX", chirp_transient_path, id));
+	CATCHUNIX(snprintf(path, PATH_MAX, "/.__job.%" PRICHIRP_JOBID_T ".XXXXXX", id));
 	if (rc >= PATH_MAX)
 		CATCH(ENAMETOOLONG);
+	CATCHUNIX(chirp_fs_local_resolve(path, sandbox));
 	CATCHUNIX(mkdtemp(sandbox) ? 0 : -1);
 	debug(D_DEBUG, "created new sandbox `%s'", sandbox);
 
