@@ -1692,7 +1692,9 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 
-	change_process_title("chirp_server [authenticating]");
+	link_address_remote(link, addr, &port);
+
+	change_process_title("chirp_server [%s:%d] [backend starting]", addr, port, typesubject);
 
 	/* Authentication problems:
 	 *
@@ -1729,10 +1731,10 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 	 */
 	backend_setup(url);
 
+	change_process_title("chirp_server [%s:%d] [authenticating]", addr, port, typesubject);
+
 	struct auth_state *backend_state = auth_clone();
 	auth_replace(server_state);
-
-	link_address_remote(link, addr, &port);
 
 	auth_ticket_server_callback(chirp_acl_ticket_callback);
 
