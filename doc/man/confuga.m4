@@ -39,6 +39,7 @@ OPTION_PAIR(nodes,node-list)Sets the whitespace or comma delimited list of stora
 OPTION_PAIR(pull-threshold,bytes)Sets the threshold for pull transfers. The default is 128MB.
 OPTION_PAIR(replication,type)Sets the replication mode for satisfying job dependencies. BOLD(type) may be BOLD(push-sync) or BOLD(push-async-N). The default is BOLD(push-async-1).
 OPTION_PAIR(scheduler,type)Sets the scheduler used to assign jobs to storage nodes. The default is BOLD(fifo-0).
+OPTION_PAIR(tickets,tickets)Sets tickets to use for authenticating with storage nodes. Paths must be absolute.
 OPTIONS_END
 
 SECTION(STORAGE NODES)
