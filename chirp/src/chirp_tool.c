@@ -1235,6 +1235,8 @@ int main(int argc, char *argv[])
 			break;
 		case 't':
 			timeout = string_time_parse(optarg);
+			if (timeout == -1)
+				fatal("invalid timeout: %s", strerror(errno));
 			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
