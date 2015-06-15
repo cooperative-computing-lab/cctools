@@ -796,7 +796,7 @@ int chirp_acl_text_to_flags(const char *t)
 		if(*t == 'r')
 			flags |= CHIRP_ACL_READ;
 		if(*t == 'w')
-			flags |= CHIRP_ACL_WRITE;
+			flags |= CHIRP_ACL_WRITE|CHIRP_ACL_PUT;
 		if(*t == 'l')
 			flags |= CHIRP_ACL_LIST;
 		if(*t == 'd')
