@@ -184,7 +184,10 @@ static char *alloc_state_root(const char *path)
 		char statename[CHIRP_PATH_MAX];
 		snprintf(statename, sizeof(statename), "%s/.__alloc", dirname);
 		if(cfs_file_size(statename) >= 0) {
-			return xxstrdup(dirname);
+			if (dirname[0])
+				return xxstrdup(dirname);
+			else
+				return xxstrdup("/");
 		}
 		char *s = strrchr(dirname, '/');
 		if(!s)
