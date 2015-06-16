@@ -1414,13 +1414,15 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				buffer_putliteral(&B, "\n");
 			}
 		} else if(sscanf(line, "lsalloc %s", path) == 1) {
-			INT64_T inuse;
+			INT64_T size, inuse;
 			path_fix(path);
 			if(!chirp_acl_check_link(path, subject, CHIRP_ACL_LIST))
 				goto failure;
-			result = chirp_alloc_lsalloc(path, newpath, &length, &inuse);
-			if(result >= 0)
-				buffer_putfstring(&B, "%s %" PRId64 " %" PRId64 "\n", newpath, length, inuse);
+			result = chirp_alloc_lsalloc(path, newpath, &size, &inuse);
+			if(result >= 0) {
+				assert(newpath[0]);
+				buffer_putfstring(&B, "%s %" PRId64 " %" PRId64 "\n", newpath, size, inuse);
+			}
 		} else if(sscanf(line, "mkalloc %s %" SCNd64 " %" SCNd64, path, &length, &mode) == 3) {
 			if (length < 0) {
 				errno = EINVAL;
