@@ -97,7 +97,7 @@ static struct alloc_state *alloc_state_load(const char *path)
 
 	sprintf(statename, "%s/.__alloc", path);
 
-	s->fd = cfs->open(statename, O_RDWR, 0600);
+	s->fd = cfs->open(statename, O_RDWR, S_IRUSR|S_IWUSR);
 	if(s->fd == -1) {
 		free(s);
 		return 0;
@@ -160,7 +160,7 @@ static int alloc_state_create(const char *path, INT64_T size)
 	int fd;
 
 	sprintf(statepath, "%s/.__alloc", path);
-	fd = cfs->open(statepath, O_WRONLY|O_CREAT|O_TRUNC, 0600);
+	fd = cfs->open(statepath, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
 	if(fd >= 0) {
 		char buffer[4096];
 		INT64_T result = sprintf(buffer, "%" PRId64 " 0\n", size);
