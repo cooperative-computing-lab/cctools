@@ -483,6 +483,8 @@ static int parse_uri (confuga *C, const char *uri, int *explicit_auth)
 				} else CATCH(EINVAL);
 			} else if (strcmp(option, "nodes") == 0) {
 				CATCH(confuga_nodes(C, value));
+			} else if (strcmp(option, "tickets") == 0) {
+				auth_ticket_load(value);
 			} else {
 				debug(D_NOTICE|D_CONFUGA, "unknown URI option `%s'", option);
 				CATCH(EINVAL);
