@@ -983,19 +983,19 @@ This file is bound into the server namespace at task completion.</p>
             "task_path": "a",
             "serv_path": "/users/pdonnel3/a.txt",
             "type": "INPUT",
-            "binding": "SYMLINK"
+            "binding": "LINK"
         },
         {
             "task_path": "b",
             "serv_path": "/users/pdonnel3/b.txt",
             "type": "INPUT",
-            "binding": "SYMLINK"
+            "binding": "LINK"
         },
         {
             "task_path": "archive.tar",
             "serv_path": "/users/pdonnel3/archive.tar",
             "type": "OUTPUT",
-            "binding": "SYMLINK"
+            "binding": "LINK"
         }
     ]
 }
@@ -1003,7 +1003,7 @@ This file is bound into the server namespace at task completion.</p>
 
 <p>Here, each file is bound as a symbolic link the location on the server. This
 type of access is usually fast as the server does not need make a copy. You may
-also bind files as <tt>COPY</tt> if necessary. <tt>SYMLINK</tt> is the
+also bind files as <tt>COPY</tt> if necessary. <tt>LINK</tt> is the
 default.</p>
 
 <h4 id="jobs.create.e3">Example 3 -- Using custom executable.<a class="sectionlink" href="#jobs.create.e3" title="Link to this section.">&#x21d7;</a></h4>
@@ -1024,13 +1024,13 @@ you would any other file and give a relative (task) path for the
             "task_path": "myscript.sh",
             "serv_path": "/users/pdonnel3/myscript.sh",
             "type": "INPUT",
-            "binding": "SYMLINK"
+            "binding": "LINK"
         },
         {
             "task_path": "output.txt",
             "serv_path": "/users/pdonnel3/output.txt",
             "type": "OUTPUT",
-            "binding": "SYMLINK"
+            "binding": "LINK"
         }
     ]
 }
@@ -1098,7 +1098,7 @@ information is JSON-encoded and holds all job metadata.</p>
         "serv_path":"\/users\/pdonnel3\/my.0.output",
         "task_path":"my.output",
         "type":"OUTPUT",
-        "binding":"SYMLINK"
+        "binding":"LINK"
       }
     ]
   }
@@ -1140,7 +1140,7 @@ information is JSON-encoded and holds all job metadata.</p>
         "serv_path":"\/users\/pdonnel3\/my.0.output",
         "task_path":"my.output",
         "type":"OUTPUT",
-        "binding":"SYMLINK"
+        "binding":"LINK"
       }
     ]
   }
@@ -1181,7 +1181,7 @@ information is JSON-encoded and holds all job metadata.</p>
         "serv_path":"\/users\/pdonnel3\/my.0.output",
         "task_path":"my.output",
         "type":"OUTPUT",
-        "binding":"SYMLINK"
+        "binding":"LINK"
       }
     ]
   }
@@ -1246,7 +1246,7 @@ information is JSON-encoded and holds all job metadata.</p>
           "serv_path":"\/users\/pdonnel3\/my.0.output",
           "task_path":"my.output",
           "type":"OUTPUT",
-          "binding":"SYMLINK"
+          "binding":"LINK"
         }
       ]
     }

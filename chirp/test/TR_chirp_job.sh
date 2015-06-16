@@ -82,7 +82,7 @@ EOF
 			"serv_path": "/users/$(whoami)/data/db.txt",
 			"task_path": "foo_sym",
 			"type": "INPUT",
-			"binding": "SYMLINK"
+			"binding": "LINK"
 		},
 		{
 			"serv_path": "/users/$(whoami)/data/output.txt",
@@ -155,7 +155,7 @@ EOF
 			"serv_path": "/users/$(whoami)/data/db.txt",
 			"task_path": "foo_sym",
 			"type": "INPUT",
-			"binding": "SYMLINK"
+			"binding": "LINK"
 		},
 		{
 			"serv_path": "/users/$(whoami)/data/output.txt",
@@ -226,7 +226,7 @@ EOF
 			"serv_path": "/users/$(whoami)/data/db.txt",
 			"task_path": "foo_sym",
 			"type": "INPUT",
-			"binding": "SYMLINK"
+			"binding": "LINK"
 		},
 		{
 			"serv_path": "/users/$(whoami)/data/output.txt",
