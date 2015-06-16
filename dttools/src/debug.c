@@ -26,9 +26,9 @@ extern void debug_stdout_write (INT64_T flags, const char *str);
 
 extern void debug_file_write (INT64_T flags, const char *str);
 extern void debug_file_size (off_t size);
-extern void debug_file_path (const char *path);
+extern int debug_file_path (const char *path);
 extern void debug_file_rename (const char *suffix);
-extern void debug_file_reopen (void);
+extern int debug_file_reopen (void);
 
 #ifdef HAS_SYSLOG_H
 extern void debug_syslog_write (INT64_T flags, const char *str);
@@ -259,30 +259,40 @@ void debug_config_fatal(void (*callback) ())
 	fatal_callback_list = f;
 }
 
-void debug_config_file (const char *path)
+int debug_config_file_e (const char *path)
 {
 	if(path == NULL || strcmp(path, ":stderr") == 0) {
 		debug_write = debug_stderr_write;
+		return 0;
 	} else if(strcmp(path, ":stdout") == 0) {
 		debug_write = debug_stdout_write;
+		return 0;
 	} else if (strcmp(path, ":syslog") == 0) {
 #ifdef HAS_SYSLOG_H
 		debug_write = debug_syslog_write;
 		debug_syslog_config(debug_program_name);
+		return 0;
 #else
-		fprintf(stderr, "syslog is not available");
-		exit(EXIT_FAILURE);
+		return errno = EINVAL, -1;
 #endif
 	} else if (strcmp(path, ":journal") == 0) {
 #ifdef HAS_SYSTEMD_JOURNAL_H
 		debug_write = debug_journal_write;
+		return 0;
 #else
-		fprintf(stderr, "systemd journal is not available");
-		exit(EXIT_FAILURE);
+		return errno = EINVAL, -1;
 #endif
 	} else {
 		debug_write = debug_file_write;
-		debug_file_path(path);
+		return debug_file_path(path);
+	}
+}
+
+void debug_config_file (const char *path)
+{
+	if (debug_config_file_e(path) == -1) {
+		fprintf(stderr, "could not set debug file '%s': %s", path, strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -320,7 +330,8 @@ void debug_rename(const char *suffix)
 
 void debug_reopen(void)
 {
-	debug_file_reopen();
+	if (debug_file_reopen() == -1)
+		fatal("could not reopen debug log: %s", strerror(errno));
 }
 
 /* vim: set noexpandtab tabstop=4: */

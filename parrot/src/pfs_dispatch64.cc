@@ -29,6 +29,7 @@ int pfs_dispatch64( struct pfs_process *p )
 
 extern "C" {
 #include "buffer.h"
+#include "cctools.h"
 #include "debug.h"
 #include "int_sizes.h"
 #include "macros.h"
@@ -2786,6 +2787,65 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					TRACER_MEM_OP(tracer_copy_out(p->tracer,digest,POINTER(args[1]),sizeof(digest),TRACER_O_ATOMIC));
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL64_parrot_debug:
+			if(entering) {
+				if(args[0]) {
+					char *flag;
+					char flags[4096] = "";
+					TRACER_MEM_OP(tracer_copy_in_string(p->tracer,flags,POINTER(args[0]),sizeof(flags),0));
+					for (flag = flags; flag && flag[0]; flag = strnchr(flag, ',')) {
+						char *comma = strchr(flag, ',');
+						if (comma) *comma = '\0';
+						if(!debug_flags_set(flag)) {
+							divert_to_dummy(p,-EINVAL);
+							goto done;
+						}
+						if (comma) *comma = ',';
+					}
+				}
+
+				if(args[1]) {
+					int fd;
+					char native[PATH_MAX];
+
+					path[0] = 0;
+					TRACER_MEM_OP(tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0));
+
+					/* check the file can be written to and is a local path */
+					fd = pfs_open(path,O_WRONLY|O_CREAT,S_IRUSR|S_IWUSR,native,sizeof(native));
+					if (fd == -1) {
+						divert_to_dummy(p, -errno);
+						goto done;
+					} else if (fd == -2 /* canbenative */) {
+						/* done */
+					} else {
+						if (p->table->get_local_name(fd, native) == -1) {
+							pfs_close(fd);
+							divert_to_dummy(p, -EXDEV);
+							goto done;
+						} else {
+							/* done */
+							pfs_close(fd);
+						}
+					}
+
+					if(native[0] && debug_config_file_e(native) == -1) {
+						divert_to_dummy(p,-errno);
+						goto done;
+					}
+				}
+
+				if(args[2] >= 0) {
+					debug_config_file_size(args[2]);
+				}
+
+				/* Immediately print the version for debugging. */
+				cctools_version_debug(D_DEBUG, "parrot_debug");
+
+				divert_to_dummy(p,0);
 			}
 			break;
 

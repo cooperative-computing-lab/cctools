@@ -218,10 +218,19 @@ struct searchent *parrot_readsearch(SEARCH *search) {
 }
 
 int parrot_closesearch(SEARCH *search) {
-		free(search->entry);
-		free(search->data);
-		free(search);
+	free(search->entry);
+	free(search->data);
+	free(search);
 	return 0;
+}
+
+int parrot_debug ( const char *flags, const char *path, off_t size )
+{
+#ifdef CCTOOLS_CPU_I386
+	return syscall(SYSCALL32_parrot_debug,flags,path,size);
+#else
+	return syscall(SYSCALL64_parrot_debug,flags,path,size);
+#endif
 }
 
 /* vim: set noexpandtab tabstop=4: */

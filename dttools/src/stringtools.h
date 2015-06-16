@@ -106,4 +106,6 @@ char * string_wrap_command( const char *command, const char *wrapper_command );
 char *strsep(char **stringp, const char *delim);
 #endif
 
+char *strnchr (const char *s, int c);
+
 #endif
