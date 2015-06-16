@@ -13,7 +13,8 @@ run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 #Docker execution engine test command. Don't do the docker test under your afs,
 #it will fail due to the ACL of your afs.
-umbrella -T docker \
+umbrella \
+--sandbox_mode docker \
 --log umbrella.log \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
