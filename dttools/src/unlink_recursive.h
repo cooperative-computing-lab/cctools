@@ -10,15 +10,22 @@ See the file COPYING for details.
 /** @file unlink_recursive.h Unlink recursively. */
 
 /** Delete a path recursively.
+@param fd Open directory.
+@param path The path relative to the open directory fd to unlink recursively.
+@return 0 on success, -1 on failure.
+*/
+int unlinkat_recursive (int fd, const char *path);
+
+/** Delete a path recursively.
 @param path The path to unlink recursively.
 @return 0 on success, -1 on failure.
 */
 int unlink_recursive (const char *path);
 
 /** Unlink only the contents of the directory recursively.
-@param dirname The path of the directory.
+@param path The path of the directory.
 @return 0 on success, -1 on failure.
 */
-int unlink_dir_contents (const char *dirname);
+int unlink_dir_contents (const char *path);
 
 #endif
