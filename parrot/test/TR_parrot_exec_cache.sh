@@ -26,6 +26,7 @@ run()
 
 	N=10
 	parrot /bin/sh <<EOF1
+set -ex
 cat > a.py <<EOF2
 #!/chirp/$hostport/python
 
