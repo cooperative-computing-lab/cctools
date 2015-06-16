@@ -7,21 +7,22 @@ Copyright (C) 2005- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 
-Implementation Logics of Non-CMS and CMS Application Support:
-For non-cms application:
-	If the batch type is Parrot, create the mountlist file and set PARROT_MOUNT_FILE; set PATH; set PARROT_LDSO_PATH if a separate OS image is needed; parrotize the user's command into `parrot_run user_cmd`.
-	If the batch type is Docker, transfer the OS image into a Docker image; use volume to mount all the software and data dependencies into a container; set PATH; dockerize the user's command into `docker run user_cmd`. To use Docker, a separate OS image is needed.
-	If the batch type is chroot, create mountpoints for software and data dependencies inside the OS image directory and mount software and data into the OS image, set PATH, chrootize the user's command into `chroot user_cmd`.
-For cms application:
-	If the batch type is Parrot,
-		If the local machine has cvmfs installed, treat it as non-cms application;
-		If the local machine does not have cvmfs installed, do all the work for non-cms application + set HTTP_PROXY + add SITEINFO into mountlist file.
-	If the batch type is Docker,
-		If the local machine has cvmfs installed, treat it as non-cms application;
-		If the local machine does not have cvmfs installed, do all the work for non-cms application + set HTTP_PROXY + add SITEINFO into mountlist file + parrotize the user's command. First parrotize the user's command, then dockerize the user's command.
-	If the batch type is chroot,
-		If the local machine has cvmfs installed, treat it as non-cms application;
-		If the local machine does not have cvmfs installed, do all the work for non-cms application + set HTTP_PROXY + add SITEINFO into mountlist file + parrotize the user's command. First parrotize the user's command, then chrootize the user's command.
+Implementation Logics of Different Execution Engines:
+	If the sandbox type is Parrot, create the mountlist file and set PARROT_MOUNT_FILE; set PATH; set PARROT_LDSO_PATH if a separate OS image is needed; parrotize the user's command into `parrot_run user_cmd`.
+	If the sandbox type is Docker, transfer the OS image into a Docker image; use volume to mount all the software and data dependencies into a container; set PATH; dockerize the user's command into `docker run user_cmd`. To use Docker, a separate OS image is needed.
+	If the sandbox type is chroot, create mountpoints for software and data dependencies inside the OS image directory and mount software and data into the OS image, set PATH, chrootize the user's command into `chroot user_cmd`.
+
+Implementation Logic of Dependency Sources:
+	HTTP/HTTPS: Download the dependency into Umbrella local cache.
+	CVMFS: check whether the mountpoint already exists on the execution node, if yes, do not need to set mountpoint for this dependency and directly process the next dependency; if no, parrot will be used to deliver cvmfs for the application.
+		If Parrot is needed to access cvmfs, and the sandbox type is Parrot,
+			Do all the work mentioned above for Parrot execution engine + set HTTP_PROXY + add SITEINFO into mountlist file.
+		If Parrot is needed to access cvmfs, and the sandbox type is Docker,
+			Do all the work mentioned above for Docker execution engine + set HTTP_PROXY + add SITEINFO into mountlist file + parrotize the user's command. First parrotize the user's command, then dockerize the user's command.
+		If Parrot is needed to access cvmfs, and the sandbox type is chroot,
+			Do all the work mentioned above for chroot execution engine + set HTTP_PROXY + add SITEINFO into mountlist file + parrotize the user's command. First parrotize the user's command, then chrootize the user's command.
+	ROOT: do nothing if a ROOT file through ROOT protocol is needed, because ROOT supports data access during runtime without downloading first.
+
 """
 
 import sys
@@ -297,7 +298,7 @@ def cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_d
 	dependency_download(item['source'][0], item["checksum"], "md5sum", dest, item["format"], action)
 	return dest
 
-def set_cvmfs_siteconf(name, action, packages_json, sandbox_dir):
+def set_cvmfs_cms_siteconf(name, action, packages_json, sandbox_dir):
 	"""Download cvmfs SITEINFO and set its mountpoint.
 
 	Args:
@@ -307,14 +308,14 @@ def set_cvmfs_siteconf(name, action, packages_json, sandbox_dir):
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 
 	Returns:
-		cvmfs_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
+		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 	"""
-	cvmfs_siteconf_mountpoint = ''
+	cvmfs_cms_siteconf_mountpoint = ''
 	site_item = package_search(packages_json, "cms_siteconf_local_cvmfs")
 	dest = os.path.dirname(sandbox_dir) + "/cache/" + site_item['checksum'] + "/SITECONF"
 	dependency_download(site_item["source"][0], site_item["checksum"], "md5sum", dest, site_item["format"], "unpack")
-	cvmfs_siteconf_mountpoint = '/cvmfs/cms.cern.ch/SITECONF/local %s/local' % dest
-	return cvmfs_siteconf_mountpoint
+	cvmfs_cms_siteconf_mountpoint = '/cvmfs/cms.cern.ch/SITECONF/local %s/local' % dest
+	return cvmfs_cms_siteconf_mountpoint
 
 def data_dependency_process(name, id, packages_json, sandbox_dir, action):
 	"""Download a data dependency
@@ -336,15 +337,18 @@ def data_dependency_process(name, id, packages_json, sandbox_dir, action):
 	dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
 	return dest
 
-def check_cvmfs_cms():
-	""" Check whether cvmfs is installed on the host or not
+def check_cvmfs_repo(repo_name):
+	""" Check whether a cvmfs repo is installed on the host or not
+
+	Args:
+		repo_name: a cvmfs repo name. For example: "/cvmfs/cms.cern.ch".
 
 	Returns:
-		If cvmfs is installed and cms repo is configured, returns the string including the mountpoint of cvmfs cms repo. For example: "/cvmfs/cms.cern.ch".
+		If the cvmfs repo is installed,  returns the string including the mountpoint of cvmfs cms repo. For example: "/cvmfs/cms.cern.ch".
 		Otherwise, return an empty string.
 	"""
-	logging.debug("Check whether cvmfs is installed on the host or not")
-	cmd = "df -h|grep '^cvmfs'|grep cms.cern.ch|rev| cut -d' '  -f1|rev"
+	logging.debug("Check whether a cvmfs repo is installed on the host or not")
+	cmd = "df -h|grep '^cvmfs'|grep "+ "'" + repo_name + "'" + "|rev| cut -d' '  -f1|rev"
 	rc, stdout, stderr = func_call(cmd)
 	if rc == 0:
 		return stdout
@@ -370,13 +374,13 @@ def dependency_process(env_para_dict, name, id, mountpoint, action, packages_jso
 		host_linux_distro: the linux distro of the host machine. For Example: redhat6, centos6.
 
 	Returns:
-		is_cms_app: whether this is a cms app. 1 means this is a cms app. 0 means this is not.
-		cvmfs_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
+		is_cms_cvmfs_app: whether this is a cms app which will be delivered by cmvfs and the local machine has no cvmfs installed. 1 means this is a cms app. 0 means this is not.
+		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 		mount_value: the actual storage path of one dependency.
 		local_cvmfs: the mountpoint of the local-installed cvmfs (e.g., /cvmfs).
 	"""
-	is_cms_app = 0
-	cvmfs_siteconf_mountpoint = ''
+	is_cms_cvmfs_app = 0
+	cvmfs_cms_siteconf_mountpoint = ''
 	mount_value = ''
 	local_cvmfs = ''
 
@@ -385,46 +389,42 @@ def dependency_process(env_para_dict, name, id, mountpoint, action, packages_jso
 	store = item["source"][0]
 	logging.debug("%s is chosen to deliver %s", store, name)
 
-	if name[:5] == 'cmssw': # another solution: split name based on '-' and check whether the first item is 'cmssw'.
-		is_cms_app = 1
-
-		if store[:5] == 'cvmfs':
-			print "%s is chosen to deliver %s" % (store, name)
-			local_cms = check_cvmfs_cms()
-			if local_cms:
-				local_cvmfs = os.path.dirname(local_cms)
-				logging.debug("The cvmfs is installed on the local host, and its mountpoint is: %s", local_cvmfs)
-			else:
-				logging.debug("The cvmfs is not installed on the local host.")
-
-			#if local_cvmfs is empty, set $HTTP_PROXY, download cctools package, set cvmfs_siteconf_mountpoint, and call parrotize_user_cmd.
-			if not local_cvmfs:
-				logging.debug("Add env variable HTTP_PROXY = http://cache01.hep.wisc.edu:3128 into env_para_dict")
-				env_para_dict["HTTP_PROXY"] = "http://cache01.hep.wisc.edu:3128"
-
-				logging.debug("To access cvmfs, cctools binary is needed")
-				cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action)
-
-				cvmfs_siteconf_mountpoint = set_cvmfs_siteconf(name, action, packages_json, sandbox_dir)
-
-				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
-
-				mount_value = "PARROT_CVMFS"
-			else:
-				mount_value = local_cvmfs
-				logging.debug('cvmfs is already installed on the machine, and its mountpoint on the machine: %s', mount_value)
-
-				if sandbox_mode == 'parrot':
-					parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
+	if store[:5] == 'cvmfs':
+		print "%s is chosen to deliver %s" % (store, name)
+		local_cvmfs = ''
+		local_cvmfs = check_cvmfs_repo(store)
+		if local_cvmfs:
+			logging.debug("The cvmfs is installed on the local host, and its mountpoint is: %s", local_cvmfs)
 		else:
-			dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
-			dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
-			mount_value = dest
+			logging.debug("The cvmfs is not installed on the local host.")
+
+		#if local_cvmfs is empty, set $HTTP_PROXY, download cctools package, set cvmfs_cms_siteconf_mountpoint, and call parrotize_user_cmd.
+		if not local_cvmfs:
+			if store.find("cms.cern.ch") != -1:
+				is_cms_cvmfs_app = 1
+
+			logging.debug("Add env variable HTTP_PROXY = http://cache01.hep.wisc.edu:3128 into env_para_dict")
+			env_para_dict["HTTP_PROXY"] = "http://cache01.hep.wisc.edu:3128"
+
+			logging.debug("To access cvmfs, cctools binary is needed")
+			cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action)
+
+			cvmfs_cms_siteconf_mountpoint = set_cvmfs_cms_siteconf(name, action, packages_json, sandbox_dir)
+
+			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
+
+			mount_value = "PARROT_CVMFS"
+		else:
+			mount_value = local_cvmfs
+			logging.debug('cvmfs is already installed on the machine, and its mountpoint on the machine: %s', mount_value)
+
+			if sandbox_mode == 'parrot':
+				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
 	else:
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
 		dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
 		mount_value = dest
-	return (is_cms_app, cvmfs_siteconf_mountpoint, mount_value, local_cvmfs)
+	return (is_cms_cvmfs_app, cvmfs_cms_siteconf_mountpoint, mount_value, local_cvmfs)
 
 def env_parameter_init(hardware_spec, kernel_spec, os_spec):
 	""" Set the environment parameters according to the specification file.
@@ -623,7 +623,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 
 def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json):
 	"""Modify the user's command into `parrot_run + the user's command`.
-	The cases when this function should be called: (1) non-cms app & sandbox_mode == parrot; (2) cms app & cvmfs is not installed on the execution node.
+	The cases when this function should be called: (1) sandbox_mode == parrot; (2) sandbox_mode != parrot and cvmfs is needed to deliver some dependencies not installed on the execution node.
 
 	Args:
 		user_cmd: the user's command.
@@ -642,7 +642,7 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, ha
 	dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
 	#4.4 and 4.4 does not support --no-set-foreground feature.
 	#user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
-	user_cmd[0] = dest + "/bin/parrot_run /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
+	user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
 	logging.debug("The parrotized user_cmd: %s" % user_cmd[0])
 	return user_cmd
 
@@ -663,7 +663,7 @@ def chrootize_user_cmd(user_cmd, cwd_setting):
 
 def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs):
 	""" Installation each software dependency specified in the software section of the specification.
-	If the application is a CMS app and the execution node does not have cvmfs installed, change `user_cmd` to `parrot_run ... user_cmd` and set HTTP_PROXY and cvmfs_siteconf_mountpoint.
+	If the application is a CMS app and the execution node does not have cvmfs installed, change `user_cmd` to `parrot_run ... user_cmd` and set HTTP_PROXY and cvmfs_cms_siteconf_mountpoint.
 
 	Args:
 		env_para_dict: the environment variables which need to be set for the execution of the user's command.
@@ -682,15 +682,14 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 
 	Returns:
 		host_cctools_path: the path of cctools under the umbrella local cache.
-		is_cms_app: whether this is a cms app. 1 means this is a cms app. 0 means this is not.
-		cvmfs_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
+		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 		mount_dict: a dict including each mounting item in the specification, whose key is the access path used by the user's task; whose value is the actual storage path.
 	"""
 
 	print "Installing software dependencies ..."
 
-	is_cms_app = 0
-	cvmfs_siteconf_mountpoint = ''
+	is_cms_cvmfs_app = 0
+	cvmfs_cms_siteconf_mountpoint = ''
 	mount_dict = {}
 	host_cctools_path = '' #the path of the cctools binary which is compatible with the host machine under the umbrella cache
 	local_cvmfs = ''
@@ -706,10 +705,10 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 			action = 'none'
 
 		r1, r2, r3, r4 = dependency_process(env_para_dict, item, id, mountpoint, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro)
-		if r1 == 1 and is_cms_app == 0:
-			is_cms_app = 1
-		if not cvmfs_siteconf_mountpoint:
-			cvmfs_siteconf_mountpoint = r2
+		if r1 == 1 and is_cms_cvmfs_app == 0:
+			is_cms_cvmfs_app = 1
+		if not cvmfs_cms_siteconf_mountpoint:
+			cvmfs_cms_siteconf_mountpoint = r2
 		if r3 != 'PARROT_CVMFS':
 			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, r3)
 			mount_dict[mountpoint] = r3
@@ -724,7 +723,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
 		mountpoint = '/'
 		action = 'unpack'
-		#tuple returned by dependency_process: (is_cms_app, cvmfs_siteconf_mountpoint, mount_value, local_cvmfs)
+		#tuple returned by dependency_process: (is_cms_cvmfs_app, cvmfs_cms_siteconf_mountpoint, mount_value, local_cvmfs)
 		r1, r2, r3, r4 = dependency_process(env_para_dict, item, os_id, mountpoint, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro)
 		logging.debug("Add mountpoint (%s:%s) into mount_dict for /.", mountpoint, r3)
 		mount_dict[mountpoint] = r3
@@ -737,24 +736,24 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		logging.debug("Add mountpoint (%s:%s) into mount_dict", host_cctools_path, host_cctools_path)
 		mount_dict[host_cctools_path] = host_cctools_path
 
-		if is_cms_app == 0:
+		if is_cms_cvmfs_app == 0:
 			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
 
-	if sandbox_mode in ["docker", "chroot"] and is_cms_app == 1 and not local_cvmfs:
+	if sandbox_mode in ["docker", "chroot"] and is_cms_cvmfs_app == 1 and not local_cvmfs:
 		host_cctools_path = cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, 'unpack')
 		logging.debug("To support Parrot execution engine, cctools binary (%s) is needed.", host_cctools_path)
 		logging.debug("Add mountpoint (%s:%s) into mount_dict", host_cctools_path, host_cctools_path)
 		mount_dict[host_cctools_path] = host_cctools_path
 
 		#add cvmfs SITEINFO into mount_dict
-		list1 = cvmfs_siteconf_mountpoint.split(' ')
+		list1 = cvmfs_cms_siteconf_mountpoint.split(' ')
 		logging.debug("Add mountpoint (%s:%s) into mount_dict for cvmfs SITEINFO", list1[0], list1[1])
 		mount_dict[list1[0]] = list1[1]
 
 	if sandbox_mode == "chroot":
 		chrootize_user_cmd(user_cmd, cwd_setting)
 
-	return (host_cctools_path, is_cms_app, cvmfs_siteconf_mountpoint, mount_dict)
+	return (host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict)
 
 def data_install(data_spec, packages_json, sandbox_dir, mount_dict):
 	"""Process data section of the specification.
@@ -911,7 +910,7 @@ def in_local_group():
 	logging.debug("%s is not included in /etc/group!", group_name)
 	return 'no'
 
-def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, cvmfs_siteconf_mountpoint):
+def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, cvmfs_cms_siteconf_mountpoint):
 	"""Create the mountfile if parrot is used to create a sandbox for the application and a separate rootfs is needed.
 	The trick here is the adding sequence does matter. The latter-added items will be checked first during the execution.
 
@@ -920,7 +919,7 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 		os_image_dir: the path of the OS image inside the umbrella local cache.
 		mount_dict: all the mount items extracted from the specification file and possible implicit dependencies like cctools.
 		input_dict: the setting of input files specified by the --inputs option
-		cvmfs_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
+		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 
 	Returns:
 		the path of the mountfile.
@@ -991,31 +990,31 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 		for key in input_dict:
 			mountfile.write(key + " " + input_dict[key] + "\n")
 
-		if cvmfs_siteconf_mountpoint == '':
-			logging.debug('cvmfs_siteconf_mountpoint is null')
+		if cvmfs_cms_siteconf_mountpoint == '':
+			logging.debug('cvmfs_cms_siteconf_mountpoint is null')
 		else:
-			mountfile.write(cvmfs_siteconf_mountpoint + '\n')
-			logging.debug('cvmfs_siteconf_mountpoint is not null: %s', cvmfs_siteconf_mountpoint)
+			mountfile.write(cvmfs_cms_siteconf_mountpoint + '\n')
+			logging.debug('cvmfs_cms_siteconf_mountpoint is not null: %s', cvmfs_cms_siteconf_mountpoint)
 	return mountfile_path
 
-def construct_mountfile_cvmfs_siteconf(sandbox_dir, cvmfs_siteconf_mountpoint):
+def construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mountpoint):
 	""" Create the mountfile if chroot and docker is used to execute a CMS application and the host machine does not have cvmfs installed.
 
 	Args:
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
-		cvmfs_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
+		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 
 	Returns:
 		the path of the mountfile.
 	"""
 	mountfile_path = sandbox_dir + "/.__mountlist"
 	with open(mountfile_path, "wb") as f:
-		f.write(cvmfs_siteconf_mountpoint + '\n')
-		logging.debug('cvmfs_siteconf_mountpoint is not null: %s', cvmfs_siteconf_mountpoint)
+		f.write(cvmfs_cms_siteconf_mountpoint + '\n')
+		logging.debug('cvmfs_cms_siteconf_mountpoint is not null: %s', cvmfs_cms_siteconf_mountpoint)
 
 	return mountfile_path
 
-def construct_mountfile_easy(sandbox_dir, input_dict, mount_dict, cvmfs_siteconf_mountpoint):
+def construct_mountfile_easy(sandbox_dir, input_dict, mount_dict, cvmfs_cms_siteconf_mountpoint):
 	""" Create the mountfile if parrot is used to create a sandbox for the application and a separate rootfs is not needed.
 	The trick here is the adding sequence does matter. The latter-added items will be checked first during the execution.
 
@@ -1023,7 +1022,7 @@ def construct_mountfile_easy(sandbox_dir, input_dict, mount_dict, cvmfs_siteconf
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		mount_dict: all the mount items extracted from the specification file and possible implicit dependencies like cctools.
 		input_dict: the setting of input files specified by the --inputs option
-		cvmfs_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
+		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 
 	Returns:
 		the path of the mountfile.
@@ -1037,11 +1036,11 @@ def construct_mountfile_easy(sandbox_dir, input_dict, mount_dict, cvmfs_siteconf
 			f.write(key + " " + mount_dict[key] + "\n")
 			f.write(mount_dict[key] + " " + mount_dict[key] + "\n")
 
-		if cvmfs_siteconf_mountpoint == '':
-			logging.debug('cvmfs_siteconf_mountpoint is null')
+		if cvmfs_cms_siteconf_mountpoint == '':
+			logging.debug('cvmfs_cms_siteconf_mountpoint is null')
 		else:
-			f.write(cvmfs_siteconf_mountpoint + '\n')
-			logging.debug('cvmfs_siteconf_mountpoint is not null: %s', cvmfs_siteconf_mountpoint)
+			f.write(cvmfs_cms_siteconf_mountpoint + '\n')
+			logging.debug('cvmfs_cms_siteconf_mountpoint is not null: %s', cvmfs_cms_siteconf_mountpoint)
 
 	return mountfile_path
 
@@ -1107,7 +1106,7 @@ def create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_vers
 	if rc != 0:
 		subprocess_error(cmd, rc, stdout, stderr)
 
-def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separate_rootfs, os_image_dir, is_cms_app, mount_dict, host_cctools_path):
+def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separate_rootfs, os_image_dir, mount_dict, host_cctools_path):
 	"""Construct directory mount list and file mount list for chroot. chroot requires the target mountpoint must be created within the chroot jail.
 
 	Args:
@@ -1116,7 +1115,6 @@ def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separa
 		input_dict: the setting of input files specified by the --inputs option.
 		need_separate_rootfs: whether a separate rootfs is needed to execute the user's command.
 		os_image_dir: the path of the OS image inside the umbrella local cache.
-		is_cms_app: whether this is a cms app. 1 means this is a cms app. 0 means this is not.
 		mount_dict: a dict including each mounting item in the specification, whose key is the access path used by the user's task; whose value is the actual storage path.
 		host_cctools_path: the path of cctools under the umbrella local cache.
 
@@ -1143,7 +1141,7 @@ def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separa
 				if os.path.exists(item):
 					file_dict[item] = item
 
-	if is_cms_app == 1:
+	if host_cctools_path:
 		logging.debug("Add cctools binary (%s) into dir_dict of chroot", host_cctools_path)
 		dir_dict[host_cctools_path] = host_cctools_path
 
@@ -1285,7 +1283,7 @@ def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, 
 						os.rmdir(parent_dir)
 						parent_dir = os.path.dirname(parent_dir)
 
-def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, is_cms_app, cvmfs_siteconf_mountpoint, mount_dict, sw_mount_dict, packages_json):
+def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, packages_json):
 	"""Run user's task with the help of the sandbox techniques, which currently inculde chroot, parrot, docker.
 
 	Args:
@@ -1302,8 +1300,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 		need_separate_rootfs: whether a separate rootfs is needed to execute the user's command.
 		os_image_dir: the path of the OS image inside the umbrella local cache.
 		host_cctools_path: the path of cctools under the umbrella local cache.
-		is_cms_app: whether this is a cms app. 1 means this is a cms app. 0 means this is not.
-		cvmfs_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
+		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 		mount_dict: a dict including each mounting item in the specification, whose key is the access path used by the user's task; whose value is the actual storage path.
 		sw_mount_dict: a dict only including all the software mounting items.
 		packages_json: the json object including all the metadata of dependencies.
@@ -1326,17 +1323,17 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 		else:
 			env_dict = os.environ
 
-		if cvmfs_siteconf_mountpoint:
-			item = cvmfs_siteconf_mountpoint.split(' ')[1]
+		if cvmfs_cms_siteconf_mountpoint:
+			item = cvmfs_cms_siteconf_mountpoint.split(' ')[1]
 			logging.debug("Adding the siteconf package (%s) into mount_dict", item)
 			mount_dict[item] = item
 			logging.debug("Create a parrot mountfile for the siteconf package (%s)", item)
-			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_siteconf(sandbox_dir, cvmfs_siteconf_mountpoint)
+			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mountpoint)
 
 		#traverse the common-mountlist file to create the mountpoint and mount --bind -o ro
 		#traverse the special file to create the mountpoint and mount --bind
 		#remount /etc/passwd /etc/group /etc/hosts /etc/resolv.conf
-		(dir_dict, file_dict) = construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separate_rootfs, os_image_dir, is_cms_app, mount_dict, host_cctools_path)
+		(dir_dict, file_dict) = construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separate_rootfs, os_image_dir, mount_dict, host_cctools_path)
 		chroot_mount_bind(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, hardware_platform, distro_name, distro_version)
 		logging.debug("Construct environment variables ....")
 		logging.debug("Add software binary into PATH")
@@ -1359,12 +1356,12 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 				create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_version, packages_json)
 				logging.debug("Finish constructing a docker image from the os image")
 
-			if cvmfs_siteconf_mountpoint:
-				item = cvmfs_siteconf_mountpoint.split(' ')[1]
+			if cvmfs_cms_siteconf_mountpoint:
+				item = cvmfs_cms_siteconf_mountpoint.split(' ')[1]
 				logging.debug("Adding the siteconf package (%s) into mount_dict", item)
 				mount_dict[item] = item
 				logging.debug("Create a parrot mountfile for the siteconf package (%s)", item)
-				env_para_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_siteconf(sandbox_dir, cvmfs_siteconf_mountpoint)
+				env_para_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mountpoint)
 
 			logging.debug("Add a volume item (%s:%s) for the sandbox_dir", sandbox_dir, sandbox_dir)
 			#-v /home/hmeng/umbrella_test/output:/home/hmeng/umbrella_test/output
@@ -1409,7 +1406,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			env_dict = construct_env(sandbox_dir, os_image_dir)
 			env_dict['PWD'] = cwd_setting
 			logging.debug("Construct mounfile ....")
-			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, cvmfs_siteconf_mountpoint)
+			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, cvmfs_cms_siteconf_mountpoint)
 			for key in env_para_dict:
 				env_dict[key] = env_para_dict[key]
 
@@ -1432,7 +1429,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
 		else:
 			env_dict = os.environ
-			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_easy(sandbox_dir, input_dict, mount_dict, cvmfs_siteconf_mountpoint)
+			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_easy(sandbox_dir, input_dict, mount_dict, cvmfs_cms_siteconf_mountpoint)
 			for key in env_para_dict:
 				env_dict[key] = env_para_dict[key]
 
@@ -1860,16 +1857,16 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandb
 		os_image_dir = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), os_id, item)
 		logging.debug("A separate OS (%s) is needed!", os_image_dir)
 
-	is_cms_app = 0
-	cvmfs_siteconf_mountpoint = ''
+	is_cms_cvmfs_app = 0
+	cvmfs_cms_siteconf_mountpoint = ''
 	mount_dict = {}
 	host_cctools_path = '' #the path of the cctools binary which is compatible with the host machine under the umbrella cache
 
 	if spec_json.has_key("software") and spec_json["software"]:
-		host_cctools_path, is_cms_app, cvmfs_siteconf_mountpoint, mount_dict = software_install(env_para_dict, os_id, spec_json["software"], packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs)
+		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict = software_install(env_para_dict, os_id, spec_json["software"], packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs)
 	else:
 		logging.debug("this spec does not have software section!")
-		host_cctools_path, is_cms_app, cvmfs_siteconf_mountpoint, mount_dict = software_install(env_para_dict, os_id, "", packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs)
+		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict = software_install(env_para_dict, os_id, "", packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs)
 
 	sw_mount_dict = mount_dict #sw_mount_dict will be used later to config the $PATH
 	if spec_json.has_key("data") and spec_json["data"]:
@@ -1877,7 +1874,7 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandb
 	else:
 		logging.debug("this spec does not have data section!")
 
-	workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, is_cms_app, cvmfs_siteconf_mountpoint, mount_dict, sw_mount_dict, packages_json)
+	workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, packages_json)
 
 def dependency_check(item):
 	"""Check whether an executable exists or not.
