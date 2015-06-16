@@ -95,9 +95,9 @@ static struct alloc_state *alloc_state_load(const char *path)
 
 	debug(D_ALLOC, "locking %s", path);
 
-	sprintf(statename, "%s/.__alloc", path);
+	snprintf(statename, sizeof(statename), "%s/.__alloc", path);
 
-	s->fd = cfs->open(statename, O_RDWR, 0600);
+	s->fd = cfs->open(statename, O_RDWR, S_IRUSR|S_IWUSR);
 	if(s->fd == -1) {
 		free(s);
 		return 0;
@@ -145,7 +145,7 @@ static void alloc_state_save(const char *path, struct alloc_state *s)
 	if(s->dirty) {
 		char buffer[4096];
 		cfs->ftruncate(s->fd, 0);
-		INT64_T result = sprintf(buffer, "%" PRId64 "\n%" PRId64 "\n", s->size, s->inuse);
+		INT64_T result = snprintf(buffer, sizeof(buffer), "%" PRId64 "\n%" PRId64 "\n", s->size, s->inuse);
 		assert(0 < result && result < 4096);
 		result = cfs->pwrite(s->fd, buffer, strlen(buffer), 0);
 		assert(result == (INT64_T)strlen(buffer));
@@ -159,11 +159,11 @@ static int alloc_state_create(const char *path, INT64_T size)
 	char statepath[CHIRP_PATH_MAX];
 	int fd;
 
-	sprintf(statepath, "%s/.__alloc", path);
-	fd = cfs->open(statepath, O_WRONLY|O_CREAT|O_TRUNC, 0600);
+	snprintf(statepath, sizeof(statepath), "%s/.__alloc", path);
+	fd = cfs->open(statepath, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
 	if(fd >= 0) {
 		char buffer[4096];
-		INT64_T result = sprintf(buffer, "%" PRId64 " 0\n", size);
+		INT64_T result = snprintf(buffer, sizeof(buffer), "%" PRId64 " 0\n", size);
 		assert(0 < result && result < 4096);
 		result = cfs->pwrite(fd, buffer, strlen(buffer), 0);
 		assert(result == (INT64_T)strlen(buffer));
@@ -177,17 +177,19 @@ static int alloc_state_create(const char *path, INT64_T size)
 static char *alloc_state_root(const char *path)
 {
 	char dirname[CHIRP_PATH_MAX];
-	char statename[CHIRP_PATH_MAX];
-	char *s;
 
-	strcpy(dirname, path);
+	snprintf(dirname, sizeof(dirname), "%s", path);
 
 	while(1) {
-		sprintf(statename, "%s/.__alloc", dirname);
+		char statename[CHIRP_PATH_MAX];
+		snprintf(statename, sizeof(statename), "%s/.__alloc", dirname);
 		if(cfs_file_size(statename) >= 0) {
-			return xxstrdup(dirname);
+			if (dirname[0])
+				return xxstrdup(dirname);
+			else
+				return xxstrdup("/");
 		}
-		s = strrchr(dirname, '/');
+		char *s = strrchr(dirname, '/');
 		if(!s)
 			return 0;
 		*s = 0;
@@ -231,7 +233,7 @@ static struct alloc_state *alloc_state_cache_exact(const char *path)
 
 	strcpy(dirname, d);
 
-	sprintf(statename, "%s/.__alloc", dirname);
+	snprintf(statename, sizeof(statename), "%s/.__alloc", dirname);
 
 	a = hash_table_lookup(alloc_table, dirname);
 	if(a)
@@ -276,7 +278,7 @@ static void recover(const char *path)
 		if(!strncmp(d->name, ".__", 3))
 			continue;
 
-		sprintf(newpath, "%s/%s", path, d->name);
+		snprintf(newpath, sizeof(newpath), "%s/%s", path, d->name);
 
 		if(S_ISDIR(d->info.cst_mode)) {
 			recover(newpath);
@@ -477,8 +479,6 @@ INT64_T chirp_alloc_fstatfs(int fd, struct chirp_statfs *buf)
 
 INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total, INT64_T * inuse)
 {
-	char *name;
-	struct alloc_state *a;
 	int result = -1;
 
 	if(!alloc_enabled) {
@@ -486,9 +486,9 @@ INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total,
 		return -1;
 	}
 
-	name = alloc_state_root_cached(path);
+	char *name = alloc_state_root_cached(path);
 	if(name) {
-		a = alloc_state_cache_exact(name);
+		struct alloc_state *a = alloc_state_cache_exact(name);
 		if(a) {
 			strcpy(alloc_path, name);
 			*total = a->size;
