@@ -21,7 +21,9 @@ run()
 	fi
 	hostport1=$(cat "$c1")
 
+	chirp "$hostport1" lsalloc /
 	chirp "$hostport1" mkdir data
+	chirp "$hostport1" lsalloc /data
 	dd if=/dev/zero bs=64k count=1 | chirp "$hostport1" put /dev/stdin /data/foo || return 1
 	dd if=/dev/zero bs=64k count=1 | chirp "$hostport1" put /dev/stdin /data/foo || return 1
 	dd if=/dev/zero bs=65k count=1 | chirp "$hostport1" put /dev/stdin /data/foo && return 1
@@ -32,6 +34,7 @@ run()
 
 	chirp "$hostport1" mkalloc /data/mydata 4096
 	chirp "$hostport1" lsalloc /data/mydata
+	chirp "$hostport1" lsalloc /data/
 	dd if=/dev/zero bs=64k count=1 | chirp "$hostport1" put /dev/stdin /data/foo && return 1
 	dd if=/dev/zero bs=61440 count=1 | chirp "$hostport1" put /dev/stdin /data/foo || return 1
 	dd if=/dev/zero bs=61441 count=1 | chirp "$hostport1" put /dev/stdin /data/foo && return 1
