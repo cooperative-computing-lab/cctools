@@ -177,17 +177,16 @@ static int alloc_state_create(const char *path, INT64_T size)
 static char *alloc_state_root(const char *path)
 {
 	char dirname[CHIRP_PATH_MAX];
-	char statename[CHIRP_PATH_MAX];
-	char *s;
 
 	strcpy(dirname, path);
 
 	while(1) {
+		char statename[CHIRP_PATH_MAX];
 		sprintf(statename, "%s/.__alloc", dirname);
 		if(cfs_file_size(statename) >= 0) {
 			return xxstrdup(dirname);
 		}
-		s = strrchr(dirname, '/');
+		char *s = strrchr(dirname, '/');
 		if(!s)
 			return 0;
 		*s = 0;
@@ -477,8 +476,6 @@ INT64_T chirp_alloc_fstatfs(int fd, struct chirp_statfs *buf)
 
 INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total, INT64_T * inuse)
 {
-	char *name;
-	struct alloc_state *a;
 	int result = -1;
 
 	if(!alloc_enabled) {
@@ -486,9 +483,9 @@ INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total,
 		return -1;
 	}
 
-	name = alloc_state_root_cached(path);
+	char *name = alloc_state_root_cached(path);
 	if(name) {
-		a = alloc_state_cache_exact(name);
+		struct alloc_state *a = alloc_state_cache_exact(name);
 		if(a) {
 			strcpy(alloc_path, name);
 			*total = a->size;
