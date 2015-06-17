@@ -394,7 +394,7 @@ static const struct option long_options[] = {
 	{"batch-type", required_argument, 0, 'T'},
 	{"password", required_argument, 0, 'P'},
 	{"min-workers", required_argument, 0, 'w'},
-	{"max-workers", required_argument, 0, 'w'},
+	{"max-workers", required_argument, 0, 'W'},
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
 	{"timeout", required_argument, 0, 't'},
 	{"extra-options", required_argument, 0, 'E'},
