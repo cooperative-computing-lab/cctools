@@ -66,7 +66,8 @@ static void ignore_signal( int sig )
 }
 
 /*
-Count up the workers needed in a given list of masters, IGNORING how many workers are actually connected.
+Count up the workers needed in a given list of masters, IGNORING how many
+workers are actually connected.
 */
 
 static int count_workers_needed( struct list *masters_list, int only_waiting )
@@ -207,57 +208,57 @@ static struct nvpair_header queue_headers[] = {
 
 void print_stats(struct list *masters, struct list *foremen, int submitted, int needed, int requested)
 {
-		struct timeval tv;
-		struct tm *tm;
-		gettimeofday(&tv, 0);
-		tm = localtime(&tv.tv_sec);
+	struct timeval tv;
+	struct tm *tm;
+	gettimeofday(&tv, 0);
+	tm = localtime(&tv.tv_sec);
 
-		needed    = needed    > 0 ? needed    : 0;
-		requested = requested > 0 ? requested : 0;
+	needed    = needed    > 0 ? needed    : 0;
+	requested = requested > 0 ? requested : 0;
 
-		fprintf(stdout, "%04d/%02d/%02d %02d:%02d:%02d: "
-				"|submitted: %d |needed: %d |requested: %d \n",
-				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
-				submitted, needed, requested);
+	fprintf(stdout, "%04d/%02d/%02d %02d:%02d:%02d: "
+			"|submitted: %d |needed: %d |requested: %d \n",
+			tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
+			submitted, needed, requested);
 
-		int master_count = 0;
-		master_count += masters ? list_size(masters) : 0;
-		master_count += foremen ? list_size(foremen) : 0;
+	int master_count = 0;
+	master_count += masters ? list_size(masters) : 0;
+	master_count += foremen ? list_size(foremen) : 0;
 
-		if(master_count < 1)
+	if(master_count < 1)
+	{
+		fprintf(stdout, "No change this cycle.\n\n");
+		return;
+	}
+
+	nvpair_print_table_header(stdout, queue_headers);
+
+	struct nvpair *nv;
+	if(masters && list_size(masters) > 0)
+	{
+		fprintf(stdout, "masters:\n");
+
+		list_first_item(masters);
+		while((nv = list_next_item(masters)))
 		{
-			fprintf(stdout, "No change this cycle.\n\n");
-			return;
+			nvpair_print_table(nv, stdout, queue_headers);
+
 		}
+	}
 
-		nvpair_print_table_header(stdout, queue_headers);
+	if(foremen && list_size(foremen) > 0)
+	{
+		fprintf(stdout, "foremen:\n");
 
-		struct nvpair *nv;
-		if(masters && list_size(masters) > 0)
+		list_first_item(foremen);
+		while((nv = list_next_item(foremen)))
 		{
-			fprintf(stdout, "masters:\n");
+			nvpair_print_table(nv, stdout, queue_headers);
 
-			list_first_item(masters);
-			while((nv = list_next_item(masters)))
-			{
-				nvpair_print_table(nv, stdout, queue_headers);
-
-			}
 		}
+	}
 
-		if(foremen && list_size(foremen) > 0)
-		{
-			fprintf(stdout, "foremen:\n");
-
-			list_first_item(foremen);
-			while((nv = list_next_item(foremen)))
-			{
-				nvpair_print_table(nv, stdout, queue_headers);
-
-			}
-		}
-
-		fprintf(stdout, "\n");
+	fprintf(stdout, "\n");
 }
 
 void delete_projects_list(struct list *l)
@@ -369,7 +370,7 @@ static void show_help(const char *cmd)
 	printf("where options are:\n");
 	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,--master-name=<project>");
 	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
-	printf(" %-30s Batch system type. One of: %s (default is local)\n", "-T,--batch-type=<type>",batch_queue_type_string());
+	printf(" %-30s Batch system type (required). One of: %s\n", "-T,--batch-type=<type>",batch_queue_type_string());
 	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
 	printf(" %-30s Maximum workers running.  (default=%d)\n", "-W,--max-workers", workers_max);
@@ -394,7 +395,7 @@ static const struct option long_options[] = {
 	{"batch-type", required_argument, 0, 'T'},
 	{"password", required_argument, 0, 'P'},
 	{"min-workers", required_argument, 0, 'w'},
-	{"max-workers", required_argument, 0, 'w'},
+	{"max-workers", required_argument, 0, 'W'},
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
 	{"timeout", required_argument, 0, 't'},
 	{"extra-options", required_argument, 0, 'E'},
@@ -415,7 +416,7 @@ static const struct option long_options[] = {
 
 int main(int argc, char *argv[])
 {
-	batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
+	batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNKNOWN;
 
 	catalog_host = CATALOG_HOST;
 	catalog_port = CATALOG_PORT;
@@ -426,78 +427,85 @@ int main(int argc, char *argv[])
 
 	while((c = getopt_long(argc, argv, "F:N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
 		switch (c) {
-		case 'F':
-			foremen_regex = optarg;
-			break;
-		case 'N':
-		case 'M':
-			project_regex = optarg;
-			break;
-		case 'T':
-			batch_queue_type = batch_queue_type_from_string(optarg);
-			if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
-				fprintf(stderr, "unknown batch queue type: %s\n", optarg);
+			case 'F':
+				foremen_regex = optarg;
+				break;
+			case 'N':
+			case 'M':
+				project_regex = optarg;
+				break;
+			case 'T':
+				batch_queue_type = batch_queue_type_from_string(optarg);
+				if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
+					fprintf(stderr, "unknown batch queue type: %s\n", optarg);
+					return EXIT_FAILURE;
+				}
+				break;
+			case 't':
+				worker_timeout = atoi(optarg);
+				break;
+			case 'w':
+				workers_min = atoi(optarg);
+				break;
+			case 'W':
+				workers_max = atoi(optarg);
+				break;
+			case LONG_OPT_TASKS_PER_WORKER:
+				tasks_per_worker = atof(optarg);
+				break;
+			case 'E':
+				extra_worker_args = optarg;
+				break;
+			case LONG_OPT_CORES:
+				num_cores_option = xxstrdup(optarg);
+				break;
+			case LONG_OPT_MEMORY:
+				num_memory_option = xxstrdup(optarg);
+				break;
+			case LONG_OPT_DISK:
+				num_disk_option = xxstrdup(optarg);
+				break;
+			case LONG_OPT_GPUS:
+				num_gpus_option = xxstrdup(optarg);
+				break;
+			case 'P':
+				password_file = optarg;
+				break;
+			case 'S':
+				scratch_dir = optarg;
+				break;
+			case 'c':
+				consider_capacity = 1;
+				break;
+			case 'd':
+				debug_flags_set(optarg);
+				break;
+			case 'o':
+				debug_config_file(optarg);
+				break;
+			case 'O':
+				debug_config_file_size(string_metric_parse(optarg));
+				break;
+			case 'v':
+				cctools_version_print(stdout, argv[0]);
+				exit(EXIT_SUCCESS);
+			case 'h':
+				show_help(argv[0]);
+				exit(EXIT_SUCCESS);
+			default:
+				show_help(argv[0]);
 				return EXIT_FAILURE;
-			}
-			break;
-		case 't':
-			worker_timeout = atoi(optarg);
-			break;
-		case 'w':
-			workers_min = atoi(optarg);
-			break;
-		case 'W':
-			workers_max = atoi(optarg);
-			break;
-		case LONG_OPT_TASKS_PER_WORKER:
-			tasks_per_worker = atof(optarg);
-			break;
-		case 'E':
-			extra_worker_args = optarg;
-			break;
-		case LONG_OPT_CORES:
-			num_cores_option = xxstrdup(optarg);
-			break;
-		case LONG_OPT_MEMORY:
-			num_memory_option = xxstrdup(optarg);
-			break;
-		case LONG_OPT_DISK:
-			num_disk_option = xxstrdup(optarg);
-			break;
-		case LONG_OPT_GPUS:
-			num_gpus_option = xxstrdup(optarg);
-			break;
-		case 'P':
-			password_file = optarg;
-			break;
-		case 'S':
-			scratch_dir = optarg;
-			break;
-		case 'c':
-			consider_capacity = 1;
-			break;
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'o':
-			debug_config_file(optarg);
-			break;
-		case 'O':
-			debug_config_file_size(string_metric_parse(optarg));
-			break;
-		case 'v':
-			cctools_version_print(stdout, argv[0]);
-			exit(EXIT_SUCCESS);
-		case 'h':
-			show_help(argv[0]);
-			exit(EXIT_SUCCESS);
-		default:
-			show_help(argv[0]);
-			return EXIT_FAILURE;
 		}
 	}
 
 	cctools_version_debug(D_DEBUG, argv[0]);
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
+		fprintf(stderr,"work_queue_pool: You must specify a batch type with the -T option.\n");
+		fprintf(stderr, "valid options:\n");
+		fprintf(stderr, "%s\n", batch_queue_type_string());
+		return 1;
+	}
 
 	if(!project_regex) {
 		fprintf(stderr,"work_queue_pool: You must give a project name with the -M option.\n");
@@ -541,9 +549,9 @@ int main(int argc, char *argv[])
 	}
 
 	signal(SIGINT, handle_abort);
-		signal(SIGQUIT, handle_abort);
-		signal(SIGTERM, handle_abort);
-		signal(SIGHUP, ignore_signal);
+	signal(SIGQUIT, handle_abort);
+	signal(SIGTERM, handle_abort);
+	signal(SIGHUP, ignore_signal);
 
 	struct batch_queue * queue = batch_queue_create(batch_queue_type);
 	if(!queue) {
