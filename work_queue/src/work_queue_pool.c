@@ -369,7 +369,7 @@ static void show_help(const char *cmd)
 	printf("where options are:\n");
 	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,--master-name=<project>");
 	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
-	printf(" %-30s Batch system type. One of: %s (default is local)\n", "-T,--batch-type=<type>",batch_queue_type_string());
+	printf(" %-30s Batch system type (required). One of: %s\n", "-T,--batch-type=<type>",batch_queue_type_string());
 	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
 	printf(" %-30s Maximum workers running.  (default=%d)\n", "-W,--max-workers", workers_max);
@@ -415,7 +415,7 @@ static const struct option long_options[] = {
 
 int main(int argc, char *argv[])
 {
-	batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
+	batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNKNOWN;
 
 	catalog_host = CATALOG_HOST;
 	catalog_port = CATALOG_PORT;
@@ -498,6 +498,13 @@ int main(int argc, char *argv[])
 	}
 
 	cctools_version_debug(D_DEBUG, argv[0]);
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
+		fprintf(stderr,"work_queue_pool: You must specify a batch type with the -T option.\n");
+		fprintf(stderr, "valid options:\n");
+		fprintf(stderr, "%s\n", batch_queue_type_string());
+		return 1;
+	}
 
 	if(!project_regex) {
 		fprintf(stderr,"work_queue_pool: You must give a project name with the -M option.\n");
