@@ -10,7 +10,7 @@ endif
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) librmonitor_poll.a
 OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o rmon_tools.o rmonitor_poll.o rmonitor_helper.o
-PROGRAMS = resource_monitorv resource_monitor resource_monitor_cluster resource_monitor_histograms piggybacker
+PROGRAMS = resource_monitorv resource_monitor resource_monitor_cluster resource_monitor_histograms piggybacker rmonitor_poll_example
 SCRIPTS = resource_monitor_visualizer.py
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
@@ -42,6 +42,10 @@ endif
 resource_monitor.o resource_monitor_pb.o: rmonitor_piggyback.h
 resource_monitor resource_monitorv: rmonitor_helper_comm.o librmonitor_poll.a
 resource_monitor_cluster resource_monitor_histograms: rmon_tools.o
+
+rmonitor_poll_example: rmonitor_poll_example.o librmonitor_poll.a
+	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
+
 $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 
 resource_monitor_pb.o: resource_monitor.c
