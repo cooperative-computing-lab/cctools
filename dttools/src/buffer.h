@@ -182,11 +182,11 @@ size_t buffer_pos(buffer_t * b);
 	@param size The maximum size of the buffer.
   */
 #define BUFFER_STACK(name,size) \
-	buffer_t name;\
+	buffer_t name[1];\
 	char name##_ubuf[size > BUFFER_INISIZ ? size : 1]; /* Unfortunately, we can't conditionally allocate this ubuf array. Use char[1] if less than BUFFER_INISIZ */\
-	buffer_init(&name);\
-	buffer_max(&name, size);\
-	buffer_ubuf(&name, name##_ubuf, size); /* if this is less than BUFFER_INISIZ, then B->initial is still used. */
+	buffer_init(name);\
+	buffer_max(name, size);\
+	buffer_ubuf(name, name##_ubuf, size); /* if this is less than BUFFER_INISIZ, then B->initial is still used. */
 
 /** Allocate a buffer named `name' on the stack of at most `size' bytes.
 	This works the same as BUFFER_STACK but also sets the abort flag on the
@@ -197,7 +197,7 @@ size_t buffer_pos(buffer_t * b);
   */
 #define BUFFER_STACK_ABORT(name,size) \
 	BUFFER_STACK(name,size);\
-	buffer_abortonfailure(&name, 1);
+	buffer_abortonfailure(name, 1);
 
 /** Allocate and print to a buffer named `name' on the stack of at most `size' bytes.
 	This macro uses BUFFER_STACK to allocate the buffer. Variable arguments
@@ -208,6 +208,6 @@ size_t buffer_pos(buffer_t * b);
   */
 #define BUFFER_STACK_PRINT(name,size,...) \
 	BUFFER_STACK(name,size);\
-	buffer_putfstring(&name, __VA_ARGS__);
+	buffer_putfstring(name, __VA_ARGS__);
 
 #endif /* BUFFER_H */

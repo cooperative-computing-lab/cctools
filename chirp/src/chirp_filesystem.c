@@ -764,8 +764,8 @@ static int search_directory(const char *subject, const char *const base, char fu
 							link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, matched);
 						} else {
 							BUFFER_STACK_ABORT(B, 4096)
-								chirp_stat_encode(&B, &entry->info);
-							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, buffer_tostring(&B));
+							chirp_stat_encode(B, &entry->info);
+							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, buffer_tostring(B));
 							if(stopatfirst)
 								return 1;
 						}

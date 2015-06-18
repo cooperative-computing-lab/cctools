@@ -403,14 +403,14 @@ static int jgetargs (sqlite3 *db, chirp_jobid_t id, char ***args)
 		const char *arg = (const char *) sqlite3_column_text(stmt, 1);
 		*args = string_array_append(*args, arg);
 		if (n == 1)
-			buffer_putfstring(&B, "`%s'", arg);
+			buffer_putfstring(B, "`%s'", arg);
 		else
-			buffer_putfstring(&B, ", `%s'", arg);
+			buffer_putfstring(B, ", `%s'", arg);
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
-	debug(D_DEBUG, "jobs[%" PRICHIRP_JOBID_T "].args = {%s}", id, buffer_tostring(&B));
+	debug(D_DEBUG, "jobs[%" PRICHIRP_JOBID_T "].args = {%s}", id, buffer_tostring(B));
 
 	rc = 0;
 	goto out;

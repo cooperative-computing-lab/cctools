@@ -237,11 +237,11 @@ static INT64_T send_command_varargs(struct chirp_client *c, time_t stoptime, cha
 		return -1;
 	}
 
-	buffer_putvfstring(&B, fmt, args);
+	buffer_putvfstring(B, fmt, args);
 
-	debug(D_CHIRP, "%s: %s", c->hostport, buffer_tostring(&B));
+	debug(D_CHIRP, "%s: %s", c->hostport, buffer_tostring(B));
 
-	INT64_T result = link_putstring(c->link, buffer_tostring(&B), stoptime);
+	INT64_T result = link_putstring(c->link, buffer_tostring(B), stoptime);
 	if(result < 0) {
 		c->broken = 1;
 		errno = ECONNRESET;

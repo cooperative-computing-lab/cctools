@@ -267,8 +267,8 @@ static int batch_queue_chirp_create (struct batch_queue *q)
 	char tag[21];
 
 	random_hex(tag, sizeof(tag));
-	buffer_putfstring(&B, "unknown-project:%s", tag);
-	batch_queue_set_option(q, "tag", buffer_tostring(&B));
+	buffer_putfstring(B, "unknown-project:%s", tag);
+	batch_queue_set_option(q, "tag", buffer_tostring(B));
 	return 0;
 }
 
@@ -299,8 +299,8 @@ static void batch_queue_chirp_option_update (struct batch_queue *q, const char *
 		BUFFER_STACK(B, 128)
 
 		random_hex(tag, sizeof(tag));
-		buffer_putfstring(&B, "%.32s:%s", value == NULL ? "unknown-project" : value, tag);
-		batch_queue_set_option(q, "tag", buffer_tostring(&B));
+		buffer_putfstring(B, "%.32s:%s", value == NULL ? "unknown-project" : value, tag);
+		batch_queue_set_option(q, "tag", buffer_tostring(B));
 	} else if (strcmp(what, "tag") == 0) {
 		if (value == NULL)
 			fatal("tag value must be set!");
