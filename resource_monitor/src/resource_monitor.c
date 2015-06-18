@@ -13,7 +13,7 @@ See the file COPYING for details.
  *
  * Use as:
  *
- * resource_monitor -i 120 -- some-command-line-and-options
+ * resource_monitor -i 120000000 -- some-command-line-and-options
  *
  * to monitor some-command-line at two minutes intervals (120
  * seconds).
@@ -428,6 +428,130 @@ struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
     return inventory;
 }
 
+void monitor_inotify_add_watch(char *filename)
+{
+	/* Perhaps here we can do something more to the files, like a
+	 * final stat */
+
+#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+	struct file_info *finfo;
+	char **new_inotify_watches;
+	struct stat fst;
+	int iwd;
+
+	finfo = hash_table_lookup(files, filename);
+	if (finfo)
+	{
+		(finfo->n_references)++;
+		(finfo->n_opens)++;
+		return;
+	}
+
+	finfo = calloc(1, sizeof(struct file_info));
+	if (finfo != NULL)
+	{
+		finfo->n_opens = 1;
+		finfo->size_on_open= -1;
+		finfo->size_on_close = -1;
+		if (stat(filename, &fst) >= 0)
+		{
+			finfo->size_on_open  = fst.st_size;
+			finfo->device        = fst.st_dev;
+		}
+	}
+
+	hash_table_insert(files, filename, finfo);
+	if (monitor_inotify_fd >= 0)
+	{
+		if ((iwd = inotify_add_watch(monitor_inotify_fd,
+					     filename,
+					     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|
+					     IN_ACCESS|IN_MODIFY)) < 0)
+		{
+			debug(D_DEBUG, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
+		} else {
+			debug(D_DEBUG, "added watch (id: %d) for file %s", iwd, filename);
+			if (iwd >= alloced_inotify_watches)
+			{
+				new_inotify_watches = (char **)realloc(inotify_watches, (iwd+50) * (sizeof(char *)));
+				if (new_inotify_watches != NULL)
+				{
+					alloced_inotify_watches = iwd+50;
+					inotify_watches = new_inotify_watches;
+				} else {
+					debug(D_DEBUG, "Out of memory trying to expand inotify_watches");
+				}
+			}
+			if (iwd < alloced_inotify_watches)
+			{
+				inotify_watches[iwd] = strdup(filename);
+				if (finfo != NULL) finfo->n_references = 1;
+			} else {
+				debug(D_DEBUG, "Out of memory: Removing inotify watch for %s", filename);
+				inotify_rm_watch(monitor_inotify_fd, iwd);
+			}
+		}
+	}
+#endif
+}
+
+void monitor_handle_inotify(void)
+{
+#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+	struct inotify_event *evdata;
+	struct file_info *finfo;
+	struct stat fst;
+	char *fname;
+	int nbytes, evc, i;
+
+	if (monitor_inotify_fd >= 0)
+	{
+		if (ioctl(monitor_inotify_fd, FIONREAD, &nbytes) >= 0)
+		{
+
+			evdata = (struct inotify_event *) malloc(nbytes);
+			if (evdata == NULL) return;
+			if (read(monitor_inotify_fd, evdata, nbytes) != nbytes)
+			{
+				free(evdata);
+				return;
+			}
+
+			evc = nbytes/sizeof(*evdata);
+			for(i = 0; i < evc; i++)
+			{
+				if (evdata[i].wd >= alloced_inotify_watches) continue;
+				if ((fname = inotify_watches[evdata[i].wd]) == NULL) continue;
+				finfo = hash_table_lookup(files, fname);
+				if (finfo == NULL) continue;
+				if (evdata[i].mask & IN_ACCESS) (finfo->n_reads)++;
+				if (evdata[i].mask & IN_MODIFY) (finfo->n_writes)++;
+				if ((evdata[i].mask & IN_CLOSE_WRITE) ||
+				    (evdata[i].mask & IN_CLOSE_NOWRITE))
+				{
+					(finfo->n_closes)++;
+					if (stat(fname, &fst) >= 0)
+					{
+						finfo->size_on_close = fst.st_size;
+					}
+					/* Decrease reference count and remove watch of zero */
+					(finfo->n_references)--;
+					if (finfo->n_references == 0)
+					{
+						inotify_rm_watch(monitor_inotify_fd, evdata[i].wd);
+						debug(D_DEBUG, "removed watch (id: %d) for file %s", evdata[i].wd, fname);
+						free(fname);
+						inotify_watches[evdata[i].wd] = NULL;
+					}
+				}
+			}
+		}
+		free(evdata);
+	}
+#endif
+}
+
+
 /***
  * Logging functions. The process tree is summarized in struct
  * rmsummary's, computing current value, maximum, and minimums.
@@ -605,76 +729,30 @@ int monitor_final_summary()
 	}
 
 	if(log_opened)
+	{
+        int nfds = monitor_inotify_fd + 1;
+        int count = 0;
+
+		struct timeval timeout;
+		fd_set rset;
+		do
+		{
+			timeout.tv_sec   = 0;
+			timeout.tv_usec  = 0;
+
+			FD_ZERO(&rset);
+			if (monitor_inotify_fd > 0)   FD_SET(monitor_inotify_fd, &rset);
+
+			count = select(nfds, &rset, NULL, NULL, &timeout);
+
+			if(count > 0)
+				if (FD_ISSET(monitor_inotify_fd, &rset)) monitor_handle_inotify();
+		} while(count > 0);
+
 		monitor_file_io_summaries();
+	}
 
 	return summary->exit_status;
-}
-
-void monitor_inotify_add_watch(char *filename)
-{
-	/* Perhaps here we can do something more to the files, like a
-	 * final stat */
-
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
-	struct file_info *finfo;
-	char **new_inotify_watches;
-	struct stat fst;
-	int iwd;
-
-	finfo = hash_table_lookup(files, filename);
-	if (finfo)
-	{
-		(finfo->n_references)++;
-		(finfo->n_opens)++;
-		return;
-	}
-
-	finfo = calloc(1, sizeof(struct file_info));
-	if (finfo != NULL)
-	{
-		finfo->n_opens = 1;
-		finfo->size_on_open= -1;
-		finfo->size_on_close = -1;
-		if (stat(filename, &fst) >= 0)
-		{
-			finfo->size_on_open  = fst.st_size;
-			finfo->device        = fst.st_dev;
-		}
-	}
-
-	hash_table_insert(files, filename, finfo);
-	if (monitor_inotify_fd >= 0)
-	{
-		if ((iwd = inotify_add_watch(monitor_inotify_fd,
-					     filename,
-					     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|
-					     IN_ACCESS|IN_MODIFY)) < 0)
-		{
-			debug(D_DEBUG, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
-		} else {
-			debug(D_DEBUG, "added watch (id: %d) for file %s", iwd, filename);
-			if (iwd >= alloced_inotify_watches)
-			{
-				new_inotify_watches = (char **)realloc(inotify_watches, (iwd+50) * (sizeof(char *)));
-				if (new_inotify_watches != NULL)
-				{
-					alloced_inotify_watches = iwd+50;
-					inotify_watches = new_inotify_watches;
-				} else {
-					debug(D_DEBUG, "Out of memory trying to expand inotify_watches");
-				}
-			}
-			if (iwd < alloced_inotify_watches)
-			{
-				inotify_watches[iwd] = strdup(filename);
-				if (finfo != NULL) finfo->n_references = 1;
-			} else {
-				debug(D_DEBUG, "Out of memory: Removing inotify watch for %s", filename);
-				inotify_rm_watch(monitor_inotify_fd, iwd);
-			}
-		}
-	}
-#endif
 }
 
 /***
@@ -732,8 +810,6 @@ void cleanup_zombie(struct process_info *p)
 
   if(p->wd)
     dec_wd_count(p->wd);
-
-  //kill(p->pid, SIGTERM);
 
   itable_remove(processes, p->pid);
   free(p);
@@ -990,60 +1066,6 @@ void write_helper_lib(void)
     lib_helper_extracted = 1;
 }
 
-void monitor_handle_inotify(void)
-{
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
-	struct inotify_event *evdata;
-	struct file_info *finfo;
-	struct stat fst;
-	char *fname;
-	int nbytes, evc, i;
-	if (monitor_inotify_fd >= 0)
-	{
-		if (ioctl(monitor_inotify_fd, FIONREAD, &nbytes) >= 0)
-		{
-
-			evdata = (struct inotify_event *) malloc(nbytes);
-			if (evdata == NULL) return;
-			if (read(monitor_inotify_fd, evdata, nbytes) != nbytes)
-			{
-				free(evdata);
-				return;
-			}
-			evc = nbytes/sizeof(*evdata);
-			for(i = 0; i < evc; i++)
-			{
-				if (evdata[i].wd >= alloced_inotify_watches) continue;
-				if ((fname = inotify_watches[evdata[i].wd]) == NULL) continue;
-				finfo = hash_table_lookup(files, fname);
-				if (finfo == NULL) continue;
-				if (evdata[i].mask & IN_ACCESS) (finfo->n_reads)++;
-				if (evdata[i].mask & IN_MODIFY) (finfo->n_writes)++;
-				if ((evdata[i].mask & IN_CLOSE_WRITE) ||
-				    (evdata[i].mask & IN_CLOSE_NOWRITE))
-				{
-					(finfo->n_closes)++;
-					if (stat(fname, &fst) >= 0)
-					{
-						finfo->size_on_close = fst.st_size;
-					}
-					/* Decrease reference count and remove watch of zero */
-					(finfo->n_references)--;
-					if (finfo->n_references == 0)
-					{
-						inotify_rm_watch(monitor_inotify_fd, evdata[i].wd);
-						debug(D_DEBUG, "removed watch (id: %d) for file %s", evdata[i].wd, fname);
-						free(fname);
-						inotify_watches[evdata[i].wd] = NULL;
-					}
-				}
-			}
-		}
-		free(evdata);
-	}
-#endif
-}
-
 void monitor_dispatch_msg(void)
 {
 	struct monitor_msg msg;
@@ -1106,46 +1128,44 @@ int wait_for_messages(int interval)
 {
     struct timeval timeout;
 
-    /* wait for interval. */
-    timeout.tv_sec  = 0;
-    timeout.tv_usec = interval;
-
     debug(D_DEBUG, "sleeping for: %lf seconds\n", ((double) interval / ONE_SECOND));
 
     //If grandchildren processes cannot talk to us, simply wait.
     //Else, wait, and check socket for messages.
-    if ((monitor_queue_fd < 0) && (monitor_inotify_fd < 0))
+    if (monitor_queue_fd < 0)
     {
-        select(1, NULL, NULL, NULL, &timeout);
+		/* wait for interval. */
+		timeout.tv_sec  = 0;
+		timeout.tv_usec = interval;
+
+		select(1, NULL, NULL, NULL, &timeout);
     }
     else
     {
-        int count = 1;
 
 	/* Figure out the number of file descriptors to pass to select */
-        int nfds = (monitor_queue_fd > monitor_inotify_fd ? monitor_queue_fd + 1 : monitor_inotify_fd + 1);
+        int nfds = monitor_queue_fd + 1;
+		fd_set rset;
 
-        while(count > 0)
-        {
-            fd_set rset;
-            FD_ZERO(&rset);
-            if (monitor_queue_fd > 0)   FD_SET(monitor_queue_fd, &rset);
-            if (monitor_inotify_fd > 0) FD_SET(monitor_inotify_fd, &rset);
+        int count = 0;
+		do
+		{
+			timeout.tv_sec   = 0;
+			timeout.tv_usec  = interval;
+			interval = 0;                     //Next loop we do not wait at all
 
-            timeout.tv_sec   = 0;
-            timeout.tv_usec  = interval;
-            interval = 0;                     //Next loop we do not wait at all
-            count = select(nfds, &rset, NULL, NULL, &timeout);
+			FD_ZERO(&rset);
+			if (monitor_queue_fd > 0)   FD_SET(monitor_queue_fd,   &rset);
 
-            if(count > 0)
-	    {
-                if (FD_ISSET(monitor_queue_fd, &rset)) monitor_dispatch_msg();
-                if (FD_ISSET(monitor_inotify_fd, &rset)) monitor_handle_inotify();
-            }
-        }
-    }
+			count = select(nfds, &rset, NULL, NULL, &timeout);
 
-    return 0;
+			if(count > 0)
+				if (FD_ISSET(monitor_queue_fd, &rset)) monitor_dispatch_msg();
+
+		} while(count > 0);
+	}
+
+	return 0;
 }
 
 /***
@@ -1284,44 +1304,44 @@ int monitor_resources(long int interval /*in microseconds */)
     // Loop while there are processes to monitor, that is
     // itable_size(processes) > 0). The check is done again in a
     // if/break pair below to mitigate a race condition in which
-    // the last process exits after the while(...) is tested, but
-    // before we reach select.
-    round = 1;
-    while(itable_size(processes) > 0)
-    {
-        ping_processes();
+	// the last process exits after the while(...) is tested, but
+	// before we reach select.
+	round = 1;
+	while(itable_size(processes) > 0)
+	{
+		ping_processes();
 
-        monitor_poll_all_processes_once(processes, p_acc);
+		monitor_poll_all_processes_once(processes, p_acc);
 
-	if(resources_flags->workdir_footprint)
-		monitor_poll_all_wds_once(wdirs, d_acc);
+		if(resources_flags->workdir_footprint)
+			monitor_poll_all_wds_once(wdirs, d_acc);
 
-	// monitor_fss_once(f); disabled until statfs fs id makes sense.
+		// monitor_fss_once(f); disabled until statfs fs id makes sense.
 
-        monitor_collate_tree(resources_now, p_acc, d_acc, f_acc);
+		monitor_collate_tree(resources_now, p_acc, d_acc, f_acc);
 
-	monitor_find_max_tree(summary, resources_now);
+		monitor_find_max_tree(summary, resources_now);
 
-        monitor_log_row(resources_now);
+		monitor_log_row(resources_now);
 
-        if(!monitor_check_limits(summary))
-            monitor_final_cleanup(SIGTERM);
+		if(!monitor_check_limits(summary))
+			monitor_final_cleanup(SIGTERM);
 
-	release_waiting_processes();
+		release_waiting_processes();
 
-        cleanup_zombies();
-        //If no more process are alive, break out of loop.
-        if(itable_size(processes) < 1)
-            break;
+		cleanup_zombies();
+		//If no more process are alive, break out of loop.
+		if(itable_size(processes) < 1)
+			break;
 
-        wait_for_messages(interval);
+		wait_for_messages(interval);
 
-        //cleanup processes which by terminating may have awaken
-        //select.
-        cleanup_zombies();
+		//cleanup processes which by terminating may have awaken
+		//select.
+		cleanup_zombies();
 
-        round++;
-    }
+		round++;
+	}
 
     free(resources_now);
     free(p_acc);
