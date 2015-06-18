@@ -1529,14 +1529,14 @@ int main(int argc, char *argv[])
 		// In clean mode, delete all existing log files
 		if(clean_mode) {
 			BUFFER_STACK_ABORT(B, PATH_MAX);
-			buffer_putfstring(&B, "%s.condorlog", dagfile);
-			unlink(buffer_tostring(&B));
-			buffer_rewind(&B, 0);
-			buffer_putfstring(&B, "%s.wqlog", dagfile);
-			unlink(buffer_tostring(&B));
-			buffer_rewind(&B, 0);
-			buffer_putfstring(&B, "%s.batchlog", dagfile);
-			unlink(buffer_tostring(&B));
+			buffer_putfstring(B, "%s.condorlog", dagfile);
+			unlink(buffer_tostring(B));
+			buffer_rewind(B, 0);
+			buffer_putfstring(B, "%s.wqlog", dagfile);
+			unlink(buffer_tostring(B));
+			buffer_rewind(B, 0);
+			buffer_putfstring(B, "%s.batchlog", dagfile);
+			unlink(buffer_tostring(B));
 		}
 	}
 

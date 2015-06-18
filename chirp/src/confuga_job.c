@@ -58,7 +58,7 @@ static void jdebug (uint64_t level, chirp_jobid_t id, const char *tag, const cha
 	va_list va;
 	BUFFER_STACK_PRINT(B, 4096, "job %" PRICHIRP_JOBID_T " (`%s'): %s", id, tag, fmt)
 	va_start(va, fmt);
-	vdebug(level, buffer_tostring(&B), va);
+	vdebug(level, buffer_tostring(B), va);
 	va_end(va);
 }
 
@@ -1144,7 +1144,7 @@ static int jcommit (confuga *C, chirp_jobid_t id, const char *tag, const char *h
 
 	jdebug(D_DEBUG, id, tag, "committing job on storage node");
 
-	CATCHUNIX(chirp_reli_job_commit(hostport, buffer_tostring(&B), STOPTIME));
+	CATCHUNIX(chirp_reli_job_commit(hostport, buffer_tostring(B), STOPTIME));
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, id));
@@ -1421,7 +1421,7 @@ static int jreap (confuga *C, chirp_jobid_t id, const char *tag, const char *hos
 
 	jdebug(D_DEBUG, id, tag, "reaping job on storage node");
 
-	CATCHUNIX(chirp_reli_job_reap(hostport, buffer_tostring(&B), STOPTIME));
+	CATCHUNIX(chirp_reli_job_reap(hostport, buffer_tostring(B), STOPTIME));
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, id));
@@ -1610,11 +1610,11 @@ static int jkill (confuga *C, chirp_jobid_t id, const char *tag, const char *hos
 
 	if (hostport) {
 		jdebug(D_DEBUG, id, tag, "killing job");
-		rc = chirp_reli_job_kill(hostport, buffer_tostring(&B), STOPTIME);
+		rc = chirp_reli_job_kill(hostport, buffer_tostring(B), STOPTIME);
 		if (rc == -1 && !(errno == EACCES /* already in a terminal state */ || errno == ESRCH /* apparently remote Chirp server database was reset */))
 			CATCH(errno);
 		jdebug(D_DEBUG, id, tag, "reaping job");
-		rc = chirp_reli_job_reap(hostport, buffer_tostring(&B), STOPTIME);
+		rc = chirp_reli_job_reap(hostport, buffer_tostring(B), STOPTIME);
 		if (rc == -1 && !(errno == EACCES /* already in a terminal state */ || errno == ESRCH /* apparently remote Chirp server database was reset */))
 			CATCH(errno);
 	}

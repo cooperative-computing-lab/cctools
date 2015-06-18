@@ -103,17 +103,17 @@ static void s_url_truncate (sqlite3_context *context, int argc, sqlite3_value **
 		char *url = NULL;
 
 		while (pattern_match(urls, "%s*(%S+)()", &url, &n) >= 0) {
-			if ((buffer_pos(&B)+strlen(url)) >= CHIRP_PATH_MAX)
+			if ((buffer_pos(B)+strlen(url)) >= CHIRP_PATH_MAX)
 				break;
-			if (buffer_pos(&B))
-				buffer_putliteral(&B, "\t");
-			buffer_putstring(&B, url);
+			if (buffer_pos(B))
+				buffer_putliteral(B, "\t");
+			buffer_putstring(B, url);
 			urls += n;
 			url = realloc(url, 0);
 		}
 
-		assert(buffer_pos(&B));
-		sqlite3_result_text(context, buffer_tostring(&B), -1, SQLITE_TRANSIENT);
+		assert(buffer_pos(B));
+		sqlite3_result_text(context, buffer_tostring(B), -1, SQLITE_TRANSIENT);
 		url = realloc(url, 0);
 	} else {
 		sqlite3_result_null(context);
