@@ -230,7 +230,7 @@ int rmonitor_get_cpu_time_linux(pid_t pid, uint64_t *accum)
 	return 0;
 }
 
-int rmonitor_get_start_time_linux(pid_t pid, uint64_t *start_time)
+int rmonitor_get_start_time(pid_t pid, uint64_t *start_time)
 {
 	/* /dev/proc/[pid]/stat */
 
@@ -287,10 +287,6 @@ int rmonitor_get_cpu_time_freebsd(pid_t pid, uint64_t *accum)
 
 	return 0;
 }
-
-int rmonitor_get_start_time_freebsd(pid_t pid, uint64_t *start_time) {
-	return -1;
-}
 #endif
 
 
@@ -315,23 +311,6 @@ int rmonitor_get_cpu_time_usage(pid_t pid, struct rmonitor_cpu_time_info *cpu)
 
 	return 0;
 }
-
-int rmonitor_get_start_time(pid_t pid, uint64_t start_time)
-{
-
-#if   defined(CCTOOLS_OPSYS_LINUX)
-	if(rmonitor_get_start_time_linux(pid, &start_time) != 0)
-		return 1;
-#elif defined(CCTOOLS_OPSYS_FREEBSD)
-	if(rmonitor_get_start_time_freebsd(pid, &start_time) != 0)
-		return 1;
-#else
-	return 0;
-#endif
-
-	return 0;
-}
-
 
 void acc_cpu_time_usage(struct rmonitor_cpu_time_info *acc, struct rmonitor_cpu_time_info *other)
 {
@@ -664,7 +643,7 @@ int rmonitor_measure_process(struct rmsummary *tr, pid_t pid) {
 		return err;
 
 	uint64_t start;
-	err = rmonitor_get_start_time_linux(pid, &start);
+	err = rmonitor_get_start_time(pid, &start);
 	if(err != 0)
 		return err;
 
