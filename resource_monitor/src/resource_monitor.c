@@ -199,19 +199,6 @@ struct rmsummary *resources_flags;
  * Utility functions (open log files, proc files, measure time)
  ***/
 
-uint64_t usecs_since_epoch()
-{
-    uint64_t usecs;
-    struct timeval time;
-
-    gettimeofday(&time, NULL);
-
-    usecs  = time.tv_sec * ONE_SECOND;
-    usecs += time.tv_usec;
-
-    return usecs;
-}
-
 uint64_t usecs_since_launched()
 {
 	return (usecs_since_epoch() - summary->start);

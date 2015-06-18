@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#include <sys/time.h>
 
 #include "debug.h"
 
@@ -20,6 +21,19 @@ See the file COPYING for details.
 ***/
 
 #define div_round_up(a, b) (((a) + (b) - 1) / (b))
+
+uint64_t usecs_since_epoch()
+{
+	uint64_t usecs;
+	struct timeval time;
+
+	gettimeofday(&time, NULL);
+
+	usecs  = time.tv_sec * ONE_SECOND;
+	usecs += time.tv_usec;
+
+	return usecs;
+}
 
 /***
  * Functions to track the whole process tree.  They call the
@@ -591,5 +605,85 @@ void acc_wd_usage(struct rmonitor_wdir_info *acc, struct rmonitor_wdir_info *oth
 }
 
 
+void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f, uint64_t start_time)
+{
+	tr->start        = start_time;
+	tr->end          = usecs_since_epoch();
+	tr->wall_time    = tr->end - tr->start;
+	tr->cpu_time     = p->cpu.accumulated;
+	tr->cores        = -1;
+
+	if(tr->wall_time > 0)
+		tr->cores = (int64_t) ceil(tr->cpu_time/tr->wall_time);
+
+	tr->max_concurrent_processes = -1;
+	tr->total_processes          = -1;
+
+	tr->virtual_memory    = (int64_t) p->mem.virtual;
+	tr->resident_memory   = (int64_t) p->mem.resident;
+	tr->swap_memory       = (int64_t) p->mem.swap;
+
+	tr->bytes_read        = (int64_t)  p->io.chars_read;
+	tr->bytes_written     = (int64_t)  p->io.chars_written;
+
+	tr->workdir_num_files = -1;
+	tr->workdir_footprint = -1;
+
+	if(d) {
+		tr->workdir_num_files = (int64_t) (d->files + d->directories);
+		tr->workdir_footprint = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
+	}
+
+	tr->fs_nodes = -1;
+	if(f) {
+		tr->fs_nodes          = (int64_t) f->disk.f_ffree;
+	}
+}
+
+int rmonitor_measure_process(struct rmsummary *tr, pid_t pid) {
+	int err;
+
+	memset(tr, 0, sizeof(struct rmsummary));
+
+	struct rmonitor_process_info p;
+	p.pid = pid;
+
+	err = rmonitor_poll_process_once(&p);
+	if(err != 0)
+		return err;
+
+	struct rmonitor_wdir_info d;
+	char cwd_link[PATH_MAX];
+	char cwd_org[PATH_MAX];
+	snprintf(cwd_link, PATH_MAX, "/proc/%d/cwd", pid);
+	readlink(cwd_link, cwd_org, PATH_MAX);
+	d.path = cwd_org;
+
+	err = rmonitor_poll_wd_once(&d);
+	if(err != 0)
+		return err;
+
+	uint64_t start;
+	err = rmonitor_get_start_time_linux(pid, &start);
+	if(err != 0)
+		return err;
+
+	rmonitor_info_to_rmsummary(tr, &p, &d, NULL, start);
+
+	return 0;
+}
+
+int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid) {
+
+	struct rmsummary now;
+	int err = rmonitor_measure_process(&now, pid);
+
+	if(err != 0)
+		return err;
+
+	rmsummary_merge_max(tr, &now);
+
+	return 0;
+}
 
 /* vim: set noexpandtab tabstop=4: */

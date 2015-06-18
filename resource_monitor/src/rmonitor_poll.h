@@ -12,4 +12,7 @@ See the file COPYING for details.
 
 #include "rmsummary.h"
 
+int rmonitor_measure_process(struct rmsummary *tr, pid_t pid);
+int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid);
+
 #endif
