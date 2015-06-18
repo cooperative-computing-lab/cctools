@@ -12,7 +12,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 
-#include "rmonitor_poll.h"
+#include "rmonitor_poll_internal.h"
 
 /***
  * Helper functions
@@ -26,17 +26,17 @@ See the file COPYING for details.
  * all the processes.
 ***/
 
-void monitor_poll_all_processes_once(struct itable *processes, struct process_info *acc)
+void rmonitor_poll_all_processes_once(struct itable *processes, struct rmonitor_process_info *acc)
 {
 	uint64_t pid;
-	struct process_info *p;
+	struct rmonitor_process_info *p;
 
-	bzero(acc, sizeof( struct process_info ));
+	bzero(acc, sizeof( struct rmonitor_process_info ));
 
 	itable_firstkey(processes);
 	while(itable_nextkey(processes, &pid, (void **) &p))
 	{
-		monitor_poll_process_once(p);
+		rmonitor_poll_process_once(p);
 
 		acc_mem_usage(&acc->mem, &p->mem);
 
@@ -47,32 +47,32 @@ void monitor_poll_all_processes_once(struct itable *processes, struct process_in
 	}
 }
 
-void monitor_poll_all_wds_once(struct hash_table *wdirs, struct wdir_info *acc)
+void rmonitor_poll_all_wds_once(struct hash_table *wdirs, struct rmonitor_wdir_info *acc)
 {
-	struct wdir_info *d;
+	struct rmonitor_wdir_info *d;
 	char *path;
 
-	bzero(acc, sizeof( struct wdir_info ));
+	bzero(acc, sizeof( struct rmonitor_wdir_info ));
 
 	hash_table_firstkey(wdirs);
 	while(hash_table_nextkey(wdirs, &path, (void **) &d))
 	{
-		monitor_poll_wd_once(d);
+		rmonitor_poll_wd_once(d);
 		acc_wd_usage(acc, d);
 	}
 }
 
-void monitor_poll_all_fss_once(struct itable *filesysms, struct filesys_info *acc)
+void rmonitor_poll_all_fss_once(struct itable *filesysms, struct rmonitor_filesys_info *acc)
 {
-	struct   filesys_info *f;
+	struct rmonitor_filesys_info *f;
 	uint64_t dev_id;
 
-	bzero(acc, sizeof( struct filesys_info ));
+	bzero(acc, sizeof( struct rmonitor_filesys_info ));
 
 	itable_firstkey(filesysms);
 	while(itable_nextkey(filesysms, &dev_id, (void **) &f))
 	{
-		monitor_poll_fs_once(f);
+		rmonitor_poll_fs_once(f);
 		acc_dsk_usage(&acc->disk, &f->disk);
 	}
 }
@@ -81,32 +81,32 @@ void monitor_poll_all_fss_once(struct itable *filesysms, struct filesys_info *ac
 /***
  * Functions to monitor a single process, workind directory, or
  * filesystem.
- ***/
+***/
 
-int monitor_poll_process_once(struct process_info *p)
+int rmonitor_poll_process_once(struct rmonitor_process_info *p)
 {
 	debug(D_DEBUG, "monitoring process: %d\n", p->pid);
 
-	get_cpu_time_usage(p->pid, &p->cpu);
-	get_mem_usage(p->pid, &p->mem);
-	get_sys_io_usage(p->pid, &p->io);
-	//get_map_io_usage(p->pid, &p->io);
+	rmonitor_get_cpu_time_usage(p->pid, &p->cpu);
+	rmonitor_get_mem_usage(p->pid, &p->mem);
+	rmonitor_get_sys_io_usage(p->pid, &p->io);
+	//rmonitor_get_map_io_usage(p->pid, &p->io);
 
 	return 0;
 }
 
-int monitor_poll_wd_once(struct wdir_info *d)
+int rmonitor_poll_wd_once(struct rmonitor_wdir_info *d)
 {
 	debug(D_DEBUG, "monitoring dir %s\n", d->path);
 
-	get_wd_usage(d);
+	rmonitor_get_wd_usage(d);
 
 	return 0;
 }
 
-int monitor_poll_fs_once(struct filesys_info *f)
+int rmonitor_poll_fs_once(struct rmonitor_filesys_info *f)
 {
-	get_dsk_usage(f->path, &f->disk);
+	rmonitor_get_dsk_usage(f->path, &f->disk);
 
 	f->disk.f_bfree  = f->disk_initial.f_bfree  - f->disk.f_bfree;
 	f->disk.f_bavail = f->disk_initial.f_bavail - f->disk.f_bavail;
@@ -140,7 +140,7 @@ FILE *open_proc_file(pid_t pid, char *filename)
 }
 
 /* Parse a /proc file looking for line attribute: value */
-int get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value, int rewind_flag)
+int rmonitor_get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value, int rewind_flag)
 {
 	char proc_attr_line[PATH_MAX];
 	int not_found = 1;
@@ -182,7 +182,7 @@ uint64_t clicks_to_usecs(uint64_t clicks)
  * Low level resource monitor functions.
  ***/
 
-int get_cpu_time_linux(pid_t pid, uint64_t *accum)
+int rmonitor_get_cpu_time_linux(pid_t pid, uint64_t *accum)
 {
 	/* /dev/proc/[pid]/stat */
 
@@ -209,10 +209,10 @@ int get_cpu_time_linux(pid_t pid, uint64_t *accum)
 }
 
 #if defined(CCTOOLS_OPSYS_FREEBSD)
-int get_cpu_time_freebsd(pid_t pid, uint64_t *accum)
+int rmonitor_get_cpu_time_freebsd(pid_t pid, uint64_t *accum)
 {
 	int count;
-	struct kinfo_proc *kp = kvm_getprocs(kd_fbsd, KERN_PROC_PID, pid, &count);
+	struct rmonitor_kinfo_proc *kp = kvm_getprocs(kd_fbsd, KERN_PROC_PID, pid, &count);
 
 	if((kp == NULL) || (count < 1))
 		return 1;
@@ -227,17 +227,17 @@ int get_cpu_time_freebsd(pid_t pid, uint64_t *accum)
 }
 #endif
 
-int get_cpu_time_usage(pid_t pid, struct cpu_time_info *cpu)
+int rmonitor_get_cpu_time_usage(pid_t pid, struct rmonitor_cpu_time_info *cpu)
 {
 	uint64_t accum;
 
 	cpu->delta = 0;
 
 #if   defined(CCTOOLS_OPSYS_LINUX)
-	if(get_cpu_time_linux(pid, &accum) != 0)
+	if(rmonitor_get_cpu_time_linux(pid, &accum) != 0)
 		return 1;
 #elif defined(CCTOOLS_OPSYS_FREEBSD)
-	if(get_cpu_time_freebsd(pid, &accum) != 0)
+	if(rmonitor_get_cpu_time_freebsd(pid, &accum) != 0)
 		return 1;
 #else
 	return 0;
@@ -249,13 +249,13 @@ int get_cpu_time_usage(pid_t pid, struct cpu_time_info *cpu)
 	return 0;
 }
 
-void acc_cpu_time_usage(struct cpu_time_info *acc, struct cpu_time_info *other)
+void acc_cpu_time_usage(struct rmonitor_cpu_time_info *acc, struct rmonitor_cpu_time_info *other)
 {
 	acc->delta += other->delta;
 }
 
 
-int get_swap_linux(pid_t pid, struct mem_info *mem)
+int rmonitor_get_swap_linux(pid_t pid, struct rmonitor_mem_info *mem)
 {
 	FILE *fsmaps = open_proc_file(pid, "smaps");
 	if(!fsmaps)
@@ -265,7 +265,7 @@ int get_swap_linux(pid_t pid, struct mem_info *mem)
 	uint64_t accum = 0;
 	uint64_t value = 0;
 
-	while(get_int_attribute(fsmaps, "Swap:", &value, 0) == 0)
+	while(rmonitor_get_int_attribute(fsmaps, "Swap:", &value, 0) == 0)
 		accum += value;
 
 	mem->swap = accum;
@@ -275,7 +275,7 @@ int get_swap_linux(pid_t pid, struct mem_info *mem)
 	return 0;
 }
 
-int get_mem_linux(pid_t pid, struct mem_info *mem)
+int rmonitor_get_mem_linux(pid_t pid, struct rmonitor_mem_info *mem)
 {
 	// /dev/proc/[pid]/status:
 
@@ -284,12 +284,12 @@ int get_mem_linux(pid_t pid, struct mem_info *mem)
 		return 1;
 
 	/* in kB */
-	get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
-	get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
-	get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
-	get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
-	get_int_attribute(fmem, "VmData:", &mem->data,     1);
-	get_swap_linux(pid, mem);
+	rmonitor_get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
+	rmonitor_get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
+	rmonitor_get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
+	rmonitor_get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
+	rmonitor_get_int_attribute(fmem, "VmData:", &mem->data,     1);
+	rmonitor_get_swap_linux(pid, mem);
 
 	/* in MB */
 	mem->virtual  = div_round_up(mem->virtual,  1024);
@@ -305,10 +305,10 @@ int get_mem_linux(pid_t pid, struct mem_info *mem)
 }
 
 #if defined(CCTOOLS_OPSYS_FREEBSD)
-int get_mem_freebsd(pid_t pid, struct mem_info *mem)
+int rmonitor_get_mem_freebsd(pid_t pid, struct rmonitor_mem_info *mem)
 {
 	int count;
-	struct kinfo_proc *kp = kvm_getprocs(kd_fbsd, KERN_PROC_PID, pid, &count);
+	struct rmonitor_kinfo_proc *kp = kvm_getprocs(kd_fbsd, KERN_PROC_PID, pid, &count);
 
 	if((kp == NULL) || (count < 1))
 		return 1;
@@ -321,13 +321,13 @@ int get_mem_freebsd(pid_t pid, struct mem_info *mem)
 }
 #endif
 
-int get_mem_usage(pid_t pid, struct mem_info *mem)
+int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
 {
 #if   defined(CCTOOLS_OPSYS_LINUX)
-	if(get_mem_linux(pid, mem) != 0)
+	if(rmonitor_get_mem_linux(pid, mem) != 0)
 		return 1;
 #elif defined(CCTOOLS_OPSYS_FREEBSD)
-	if(get_mem_freebsd(pid, mem) != 0)
+	if(rmonitor_get_mem_freebsd(pid, mem) != 0)
 		return 1;
 #else
 	return 0;
@@ -337,7 +337,7 @@ int get_mem_usage(pid_t pid, struct mem_info *mem)
 	return 0;
 }
 
-void acc_mem_usage(struct mem_info *acc, struct mem_info *other)
+void acc_mem_usage(struct rmonitor_mem_info *acc, struct rmonitor_mem_info *other)
 {
 		acc->virtual  += other->virtual;
 		acc->resident += other->resident;
@@ -346,7 +346,7 @@ void acc_mem_usage(struct mem_info *acc, struct mem_info *other)
 		acc->swap     += other->swap;
 }
 
-int get_sys_io_usage(pid_t pid, struct io_info *io)
+int rmonitor_get_sys_io_usage(pid_t pid, struct rmonitor_io_info *io)
 {
 	/* /proc/[pid]/io: if process dies before we read the file,
 	   then info is lost, as if the process did not read or write
@@ -366,8 +366,8 @@ int get_sys_io_usage(pid_t pid, struct io_info *io)
 	/* We really want "bytes_read", but there are issues with
 	 * distributed filesystems. Instead, we also count page
 	 * faulting in another function below. */
-	rstatus  = get_int_attribute(fio, "rchar", &cread, 1);
-	wstatus  = get_int_attribute(fio, "write_bytes", &cwritten, 1);
+	rstatus  = rmonitor_get_int_attribute(fio, "rchar", &cread, 1);
+	wstatus  = rmonitor_get_int_attribute(fio, "write_bytes", &cwritten, 1);
 
 	fclose(fio);
 
@@ -383,14 +383,14 @@ int get_sys_io_usage(pid_t pid, struct io_info *io)
 	return 0;
 }
 
-void acc_sys_io_usage(struct io_info *acc, struct io_info *other)
+void acc_sys_io_usage(struct rmonitor_io_info *acc, struct rmonitor_io_info *other)
 {
 	acc->delta_chars_read    += other->delta_chars_read;
 	acc->delta_chars_written += other->delta_chars_written;
 }
 
 /* We compute the resident memory changes from mmap files. */
-int get_map_io_usage(pid_t pid, struct io_info *io)
+int rmonitor_get_map_io_usage(pid_t pid, struct rmonitor_io_info *io)
 {
 	/* /dev/proc/[pid]/smaps */
 
@@ -411,7 +411,7 @@ int get_map_io_usage(pid_t pid, struct io_info *io)
 	/* Look for next mmap file */
 	while(fgets(dummy_line, 1024, fsmaps))
 		if(strchr(dummy_line, '/'))
-			if(get_int_attribute(fsmaps, "Rss:", &kbytes_resident, 0) == 0)
+			if(rmonitor_get_int_attribute(fsmaps, "Rss:", &kbytes_resident, 0) == 0)
 				kbytes_resident_accum += kbytes_resident;
 
 	if((kbytes_resident_accum * 1024) > io->bytes_faulted)
@@ -425,7 +425,7 @@ int get_map_io_usage(pid_t pid, struct io_info *io)
 	return 0;
 }
 
-void acc_map_io_usage(struct io_info *acc, struct io_info *other)
+void acc_map_io_usage(struct rmonitor_io_info *acc, struct rmonitor_io_info *other)
 {
 	acc->delta_bytes_faulted += other->delta_bytes_faulted;
 }
@@ -435,7 +435,122 @@ void acc_map_io_usage(struct io_info *acc, struct io_info *other)
  * Low level resource monitor functions.
  ***/
 
-int get_dsk_usage(const char *path, struct statfs *disk)
+int rmonitor_get_dsk_usage(const char *path, struct statfs *disk)
+#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
+  #include <sys/param.h>
+  #include <sys/mount.h>
+  #include <sys/resource.h>
+#else
+  #include  <sys/vfs.h>
+#endif
+
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#ifdef HAS_SYS_STATFS_H
+#include <sys/statfs.h>
+#endif
+
+#ifdef HAS_SYS_STATVFS_H
+#include <sys/statvfs.h>
+#endif
+
+#ifdef HAS_FTS_H
+#include <fts.h>
+#endif
+#include <ftw.h>
+
+#include "int_sizes.h"
+
+#ifndef RMONITOR_TYPES_H
+#define RMONITOR_TYPES_H
+
+#define ONE_MEGABYTE 1048576  /* this many bytes */
+#define ONE_SECOND   1000000  /* this many usecs */
+
+#define MAX_FILE_DESCRIPTOR_COUNT 500 /* maximum depth of file tree walking */
+
+//time in usecs, no seconds:
+struct rmonitor_cpu_time_info
+{
+	uint64_t accumulated;
+	uint64_t delta;
+};
+
+struct rmonitor_mem_info
+{
+	uint64_t virtual;
+	uint64_t resident;
+	uint64_t swap;
+	uint64_t shared;
+	uint64_t text;
+	uint64_t data;
+};
+
+struct rmonitor_io_info
+{
+	uint64_t chars_read;
+	uint64_t chars_written;
+
+	uint64_t bytes_faulted;
+
+	uint64_t delta_chars_read;
+	uint64_t delta_chars_written;
+
+	uint64_t delta_bytes_faulted;
+};
+
+struct rmonitor_file_info
+{
+	uint64_t n_references;
+	uint64_t n_opens;
+	uint64_t n_closes;
+	uint64_t n_reads;
+	uint64_t n_writes;
+	off_t size_on_open;            /* in bytes */
+	off_t size_on_close;           /* in bytes */
+	dev_t device;
+};
+
+
+struct rmonitor_wdir_info
+{
+	char     *path;
+	int      files;
+	int      directories;
+	off_t    byte_count;
+	blkcnt_t block_count;
+
+	struct rmonitor_filesys_info *fs;
+};
+
+struct rmonitor_filesys_info
+{
+	int             id;
+	char           *path;            // Sample path on the filesystem.
+	struct rmonitor_statfs   disk;            // Current result of statfs call minus disk_initial.
+	struct rmonitor_statfs   disk_initial;    // Result of the first time we call statfs.
+
+	int initial_loaded_flag;         // Flag to indicate whether statfs has been called
+									 // already on this fs (that is, whether disk_initial
+									 // has a valid value).
+};
+
+struct rmonitor_process_info
+{
+	pid_t       pid;
+	const char *cmd;
+	int         running;
+	int         waiting;
+
+	struct rmonitor_mem_info      mem;
+	struct rmonitor_cpu_time_info cpu;
+	struct rmonitor_io_info       io;
+
+	struct rmonitor_wdir_info *wd;
+};
+
+#endif
 {
 	char cwd[PATH_MAX];
 
@@ -457,7 +572,7 @@ void acc_dsk_usage(struct statfs *acc, struct statfs *other)
 	acc->f_ffree  += other->f_ffree;
 }
 
-static struct wdir_info *temporary_dir_info;
+static struct rmonitor_wdir_info *temporary_dir_info;
 
 static int update_wd_usage(const char *path, const struct stat *s, int typeflag, struct FTW *f)
 {
@@ -491,7 +606,7 @@ static int update_wd_usage(const char *path, const struct stat *s, int typeflag,
 	return 0;
 }
 
-int get_wd_usage(struct wdir_info *d)
+int rmonitor_get_wd_usage(struct rmonitor_wdir_info *d)
 {
 	int result;
 
@@ -512,7 +627,7 @@ int get_wd_usage(struct wdir_info *d)
 	return result;
 }
 
-void acc_wd_usage(struct wdir_info *acc, struct wdir_info *other)
+void acc_wd_usage(struct rmonitor_wdir_info *acc, struct rmonitor_wdir_info *other)
 {
 	acc->files       += other->files;
 	acc->directories += other->directories;

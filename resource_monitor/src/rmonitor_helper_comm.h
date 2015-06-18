@@ -12,7 +12,7 @@ See the file COPYING for details.
 #define RESOURCE_MONITOR_HELPER_ENV_VAR "CCTOOLS_RESOURCE_MONITOR_HELPER"
 #define RESOURCE_MONITOR_INFO_ENV_VAR   "CCTOOLS_RESOURCE_MONITOR_INFO"
 
-enum monitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN, READ, WRITE };
+enum rmonitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN, READ, WRITE };
 
 /* BRANCH: pid of parent
  * END:    pid of child that ended
@@ -22,9 +22,9 @@ enum monitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN, READ, WRITE };
  * WRITE:  Number of bytes written.
  */
 
-struct monitor_msg
+struct rmonitor_msg
 {
-	enum monitor_msg_type type;
+	enum rmonitor_msg_type type;
 	pid_t                 origin;
 	union {
 		pid_t    p;
@@ -33,11 +33,11 @@ struct monitor_msg
 	}                     data;
 };
 
-int monitor_helper_init(char *path_from_cmdline, int *fd);
+int rmonitor_helper_init(char *path_from_cmdline, int *fd);
 
-const char *str_msgtype(enum monitor_msg_type n);
+const char *str_msgtype(enum rmonitor_msg_type n);
 
-int send_monitor_msg(struct monitor_msg *msg);
-int recv_monitor_msg(int fd, struct monitor_msg *msg);
+int send_monitor_msg(struct rmonitor_msg *msg);
+int recv_monitor_msg(int fd, struct rmonitor_msg *msg);
 
 #endif
