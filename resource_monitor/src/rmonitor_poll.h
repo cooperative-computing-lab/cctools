@@ -10,6 +10,6 @@ See the file COPYING for details.
 #include "itable.h"
 #include "hash_table.h"
 
-#include "rmonitor_types.h"
+#include "rmsummary.h"
 
 #endif

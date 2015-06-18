@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include <strings.h>
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 
 #include "debug.h"
 
@@ -128,7 +129,14 @@ FILE *open_proc_file(pid_t pid, char *filename)
 		return NULL;
 #endif
 
-		sprintf(fproc_path, "/proc/%d/%s", pid, filename);
+		if(pid > 0)
+		{
+			sprintf(fproc_path, "/proc/%d/%s", pid, filename);
+		}
+		else
+		{
+			sprintf(fproc_path, "/proc/%s", filename);
+		}
 
 		if((fproc = fopen(fproc_path, "r")) == NULL)
 		{
@@ -208,6 +216,46 @@ int rmonitor_get_cpu_time_linux(pid_t pid, uint64_t *accum)
 	return 0;
 }
 
+int rmonitor_get_start_time_linux(pid_t pid, uint64_t *start_time)
+{
+	/* /dev/proc/[pid]/stat */
+
+	uint64_t start_clicks;
+	double uptime;
+
+	FILE *fstat = open_proc_file(pid, "stat");
+	if(!fstat)
+		return 1;
+
+	FILE *fuptime = open_proc_file(0, "uptime");
+	if(!fuptime)
+		return 1;
+
+	fscanf(fstat,
+		   "%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
+		   "%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
+		   "%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
+		   "%*s" /* user mode time (in clock ticks)   (field 14)  */
+		   "%*s" /* kernel mode time (in clock ticks) (field 15) */
+		   "%*s" /* time (clock ticks) waiting for children in user mode */
+		   "%*s" /* time (clock ticks) waiting for children in kernel mode */
+		   "%*s" /* priority */ "%*s" /* nice */
+		   "%*s" /* num threads */ "%*s" /* always 0 */
+		   "%" SCNu64 /* clock ticks since start     (field 22) */
+		   /* .... */,
+		   &start_clicks);
+
+	fscanf(fuptime, "%lf %*s", &uptime);
+
+	uint64_t origin = usecs_since_epoch() - (uptime * ONE_SECOND);
+	*start_time     = origin + clicks_to_usecs(start_clicks);
+
+	fclose(fstat);
+	fclose(fuptime);
+
+	return 0;
+}
+
 #if defined(CCTOOLS_OPSYS_FREEBSD)
 int rmonitor_get_cpu_time_freebsd(pid_t pid, uint64_t *accum)
 {
@@ -225,7 +273,12 @@ int rmonitor_get_cpu_time_freebsd(pid_t pid, uint64_t *accum)
 
 	return 0;
 }
+
+int rmonitor_get_start_time_freebsd(pid_t pid, uint64_t *start_time) {
+	return -1;
+}
 #endif
+
 
 int rmonitor_get_cpu_time_usage(pid_t pid, struct rmonitor_cpu_time_info *cpu)
 {
@@ -248,6 +301,23 @@ int rmonitor_get_cpu_time_usage(pid_t pid, struct rmonitor_cpu_time_info *cpu)
 
 	return 0;
 }
+
+int rmonitor_get_start_time(pid_t pid, uint64_t start_time)
+{
+
+#if   defined(CCTOOLS_OPSYS_LINUX)
+	if(rmonitor_get_start_time_linux(pid, &start_time) != 0)
+		return 1;
+#elif defined(CCTOOLS_OPSYS_FREEBSD)
+	if(rmonitor_get_start_time_freebsd(pid, &start_time) != 0)
+		return 1;
+#else
+	return 0;
+#endif
+
+	return 0;
+}
+
 
 void acc_cpu_time_usage(struct rmonitor_cpu_time_info *acc, struct rmonitor_cpu_time_info *other)
 {
@@ -436,121 +506,6 @@ void acc_map_io_usage(struct rmonitor_io_info *acc, struct rmonitor_io_info *oth
  ***/
 
 int rmonitor_get_dsk_usage(const char *path, struct statfs *disk)
-#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
-  #include <sys/param.h>
-  #include <sys/mount.h>
-  #include <sys/resource.h>
-#else
-  #include  <sys/vfs.h>
-#endif
-
-#include <sys/types.h>
-#include <sys/stat.h>
-
-#ifdef HAS_SYS_STATFS_H
-#include <sys/statfs.h>
-#endif
-
-#ifdef HAS_SYS_STATVFS_H
-#include <sys/statvfs.h>
-#endif
-
-#ifdef HAS_FTS_H
-#include <fts.h>
-#endif
-#include <ftw.h>
-
-#include "int_sizes.h"
-
-#ifndef RMONITOR_TYPES_H
-#define RMONITOR_TYPES_H
-
-#define ONE_MEGABYTE 1048576  /* this many bytes */
-#define ONE_SECOND   1000000  /* this many usecs */
-
-#define MAX_FILE_DESCRIPTOR_COUNT 500 /* maximum depth of file tree walking */
-
-//time in usecs, no seconds:
-struct rmonitor_cpu_time_info
-{
-	uint64_t accumulated;
-	uint64_t delta;
-};
-
-struct rmonitor_mem_info
-{
-	uint64_t virtual;
-	uint64_t resident;
-	uint64_t swap;
-	uint64_t shared;
-	uint64_t text;
-	uint64_t data;
-};
-
-struct rmonitor_io_info
-{
-	uint64_t chars_read;
-	uint64_t chars_written;
-
-	uint64_t bytes_faulted;
-
-	uint64_t delta_chars_read;
-	uint64_t delta_chars_written;
-
-	uint64_t delta_bytes_faulted;
-};
-
-struct rmonitor_file_info
-{
-	uint64_t n_references;
-	uint64_t n_opens;
-	uint64_t n_closes;
-	uint64_t n_reads;
-	uint64_t n_writes;
-	off_t size_on_open;            /* in bytes */
-	off_t size_on_close;           /* in bytes */
-	dev_t device;
-};
-
-
-struct rmonitor_wdir_info
-{
-	char     *path;
-	int      files;
-	int      directories;
-	off_t    byte_count;
-	blkcnt_t block_count;
-
-	struct rmonitor_filesys_info *fs;
-};
-
-struct rmonitor_filesys_info
-{
-	int             id;
-	char           *path;            // Sample path on the filesystem.
-	struct rmonitor_statfs   disk;            // Current result of statfs call minus disk_initial.
-	struct rmonitor_statfs   disk_initial;    // Result of the first time we call statfs.
-
-	int initial_loaded_flag;         // Flag to indicate whether statfs has been called
-									 // already on this fs (that is, whether disk_initial
-									 // has a valid value).
-};
-
-struct rmonitor_process_info
-{
-	pid_t       pid;
-	const char *cmd;
-	int         running;
-	int         waiting;
-
-	struct rmonitor_mem_info      mem;
-	struct rmonitor_cpu_time_info cpu;
-	struct rmonitor_io_info       io;
-
-	struct rmonitor_wdir_info *wd;
-};
-
-#endif
 {
 	char cwd[PATH_MAX];
 

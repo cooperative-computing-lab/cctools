@@ -150,9 +150,6 @@ See the file COPYING for details.
 
 #define RESOURCES_EXCEEDED_EXIT_CODE 147
 
-#define ONE_MEGABYTE 1048576  /* this many bytes */
-#define ONE_SECOND   1000000  /* this many usecs */
-
 #define DEFAULT_INTERVAL       ONE_SECOND        /* in useconds */
 
 #define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
