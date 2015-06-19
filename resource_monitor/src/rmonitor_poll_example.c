@@ -11,6 +11,9 @@ int main(int argc, char **argv) {
 	struct rmsummary resources;
 	rmonitor_measure_process(&resources, getpid());
 
+	fprintf(stdout, "command: %s, ",
+			resources.command);
+
 	fprintf(stdout, "wall time used (s): %3.0lf, ",
 			resources.wall_time/1000000.0);
 

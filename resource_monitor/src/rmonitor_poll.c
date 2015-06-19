@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include <sys/time.h>
 
 #include "debug.h"
+#include "xxmalloc.h"
 
 #include "rmonitor_poll_internal.h"
 
@@ -583,6 +584,28 @@ void acc_wd_usage(struct rmonitor_wdir_info *acc, struct rmonitor_wdir_info *oth
 	acc->block_count += other->block_count;
 }
 
+char *rmonitor_get_command_line(pid_t pid)
+{
+	/* /dev/proc/[pid]/cmdline */
+
+	FILE *fline = open_proc_file(pid, "cmdline");
+	if(!fline)
+		return NULL;
+
+	char cmdline[PATH_MAX];
+	ssize_t cmdline_len = read(fileno(fline), cmdline, PATH_MAX);
+
+	if(cmdline_len < 1)
+		return NULL;
+
+	int i;
+	for(i=0; i < cmdline_len - 1; i++) { /* -1 because cmdline ends with two \0. */
+		if(cmdline[i] == '\0')
+			cmdline[i] = ' ';
+	}
+
+	return xxstrdup(cmdline);
+}
 
 void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f, uint64_t start_time)
 {
@@ -648,6 +671,7 @@ int rmonitor_measure_process(struct rmsummary *tr, pid_t pid) {
 		return err;
 
 	rmonitor_info_to_rmsummary(tr, &p, &d, NULL, start);
+	tr->command = rmonitor_get_command_line(pid);
 
 	return 0;
 }
