@@ -593,7 +593,7 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 	tr->cores        = -1;
 
 	if(tr->wall_time > 0)
-		tr->cores = (int64_t) ceil(tr->cpu_time/tr->wall_time);
+		tr->cores = (int64_t) ceil( ((double) tr->cpu_time)/tr->wall_time);
 
 	tr->max_concurrent_processes = -1;
 	tr->total_processes          = -1;

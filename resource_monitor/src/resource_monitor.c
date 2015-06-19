@@ -575,11 +575,14 @@ void rmonitor_summary_header()
 void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
 {
 	tr->wall_time         = usecs_since_epoch() - summary->start;
+	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
+
+	if(tr->wall_time > 0)
+		tr->cores = (int64_t) ceil( ((double) tr->cpu_time)/tr->wall_time);
 
 	tr->max_concurrent_processes     = (int64_t) itable_size(processes);
 	tr->total_processes     = summary->total_processes;
 
-	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
 	tr->virtual_memory    = (int64_t) p->mem.virtual;
 	tr->resident_memory   = (int64_t) p->mem.resident;
 	tr->swap_memory       = (int64_t) p->mem.swap;
