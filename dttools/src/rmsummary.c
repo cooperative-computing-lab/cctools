@@ -228,8 +228,9 @@ void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const cha
 	if(s->cores > -1)
 		fprintf(stream, "%s%-20s%20" PRId64 "\n", prefix,  "cores:", s->cores);
 
-	if(s->gpus > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 "\n",  prefix, "gpus:", s->gpus);
+	//Disable printing gpus for now, as we cannot measure them.
+	//if(s->gpus > -1)
+	//	fprintf(stream, "%s%-20s%20" PRId64 "\n",  prefix, "gpus:", s->gpus);
 
 	if(s->wall_time > -1)
 		fprintf(stream, "%s%-20s%20lf s\n", prefix, "wall_time:", s->wall_time >= 0 ? s->wall_time / 1000000e0 : -1);
