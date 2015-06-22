@@ -87,6 +87,7 @@ int pfs_paranoid_mode = 0;
 const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
 int set_foreground = 1;
+int pfs_syscall_disable_debug = 0;
 
 char sys_temp_dir[PATH_MAX] = "/tmp";
 char pfs_temp_dir[PATH_MAX];
@@ -128,13 +129,14 @@ static int root_exitstatus = 0;
 static int channel_size = 10;
 
 enum {
-	LONG_OPT_CHECK_DRIVER,
-	LONG_OPT_CVMFS_REPO_SWITCHING=UCHAR_MAX+1,
+	LONG_OPT_CHECK_DRIVER = UCHAR_MAX+1,
+	LONG_OPT_CVMFS_ALIEN_CACHE,
 	LONG_OPT_CVMFS_CONFIG,
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
-	LONG_OPT_CVMFS_ALIEN_CACHE,
+	LONG_OPT_CVMFS_REPO_SWITCHING,
 	LONG_OPT_HELPER,
 	LONG_OPT_NO_SET_FOREGROUND,
+	LONG_OPT_SYSCALL_DISABLE_DEBUG,
 	LONG_OPT_VALGRIND,
 };
 
@@ -578,6 +580,7 @@ int main( int argc, char *argv[] )
 		{"status-file", required_argument, 0, 'c'},
 		{"stream-no-cache", no_argument, 0, 's'},
 		{"sync-write", no_argument, 0, 'Y'},
+		{"syscall-disable-debug", no_argument, 0, LONG_OPT_SYSCALL_DISABLE_DEBUG},
 		{"syscall-table", no_argument, 0, 'W'},
 		{"tab-file", required_argument, 0, 'm'},
 		{"tempdir", required_argument, 0, 't'},
@@ -768,6 +771,9 @@ int main( int argc, char *argv[] )
 				printf("%s is not enabled\n",optarg);
 				return 1;
 			}
+		case LONG_OPT_SYSCALL_DISABLE_DEBUG:
+			pfs_syscall_disable_debug = 1;
+			break;
 		default:
 			show_help(argv[0]);
 			break;

@@ -48,6 +48,7 @@ OPTION_ITEM(--cvmfs-repo-switching) Allow repository switching with CVMFS.
 OPTION_TRIPLET(-R, root-checksum, cksum)Enforce this root filesystem checksum, where available.
 OPTION_ITEM(`-s, --stream-no-cache')Use streaming protocols without caching.
 OPTION_ITEM(`-S, --session-caching')Enable whole session caching for all protocols.
+OPTION_ITEM(`    --syscall-disable-debug')Disable tracee access to the Parrot debug syscall.
 OPTION_TRIPLET(-t, tempdir, dir)Where to store temporary files.
 OPTION_TRIPLET(-T, timeout, time)Maximum amount of time to retry failures.
 OPTION_TRIPLET(-U, uid, num)Fake this unix uid; Real uid stays the same.

@@ -856,4 +856,11 @@ char * string_wrap_command( const char *command, const char *wrapper_command )
 	return result;
 }
 
+char *strnchr (const char *s, int c)
+{
+	char *next = strchr(s, c);
+	if (next) next += 1;
+	return next;
+}
+
 /* vim: set noexpandtab tabstop=4: */

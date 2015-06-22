@@ -172,6 +172,8 @@ All enabled debugging statements will be sent to this file.
 
 void debug_config_file(const char *file);
 
+int debug_config_file_e(const char *file);
+
 /** Set the maximum debug file size.
 Debugging files can very quickly become large and fill up your available disk space.
 This functions sets the maximum size of a debug file.

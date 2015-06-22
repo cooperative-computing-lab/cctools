@@ -12,3 +12,4 @@
 1007 parrot parrot_locate sys_parrot_locate
 1008 parrot parrot_timeout sys_parrot_timeout
 1009 parrot parrot_search sys_parrot_search
+1010 parrot parrot_debug sys_parrot_debug

@@ -1,5 +1,6 @@
 libparrot_helper.so
 parrot_cp
+parrot_debug
 parrot_getacl
 parrot_locate
 parrot_lsalloc

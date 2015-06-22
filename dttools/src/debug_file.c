@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "catch.h"
 #include "debug.h"
-
 #include "full_io.h"
 #include "path.h"
 
@@ -24,35 +24,31 @@ static int file_fd = -1;
 static char file_path[PATH_MAX];
 static off_t file_size_max = 1<<20;
 
-void debug_file_reopen (void)
+/* define custom debug for catch */
+#undef debug
+#define debug(l,fmt,...) fprintf(stderr, "%s: " fmt "\n", #l, __VA_ARGS__);
+
+int debug_file_reopen (void)
 {
+	int rc;
 	if (strlen(file_path)) {
+		int flags;
 		close(file_fd);
-		file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY|O_NOCTTY, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
-		if (file_fd == -1){
-			fprintf(stderr, "could not access log file `%s' for writing: %s\n", file_path, strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-		int flags = fcntl(file_fd, F_GETFD);
-		if (flags == -1) {
-			fprintf(stderr, "could not get file flags: %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
+		CATCHUNIX(file_fd = open(file_path, O_CREAT|O_APPEND|O_WRONLY|O_NOCTTY, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP));
+		CATCHUNIX(flags = fcntl(file_fd, F_GETFD));
 		flags |= FD_CLOEXEC;
-		if (fcntl(file_fd, F_SETFD, flags) == -1) {
-			fprintf(stderr, "could not set file flags: %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
+		CATCHUNIX(fcntl(file_fd, F_SETFD, flags));
 		/* canonicalize the debug_file path for future operations */
 		{
 			char tmp[PATH_MAX] = "";
-			if (realpath(file_path, tmp) == NULL) {
-				fprintf(stderr, "could not resolve '%s'\n", file_path);
-				exit(EXIT_FAILURE);
-			}
+			CATCHUNIX(realpath(file_path, tmp) == NULL ? -1 : 0);
 			memcpy(file_path, tmp, sizeof(file_path));
 		}
 	}
+	rc = 0;
+	goto out;
+out:
+	return RCUNIX(rc);
 }
 
 void debug_file_write (INT64_T flags, const char *str)
@@ -81,10 +77,10 @@ void debug_file_write (INT64_T flags, const char *str)
 	}
 }
 
-void debug_file_path (const char *path)
+int debug_file_path (const char *path)
 {
 	strncpy(file_path, path, sizeof(file_path)-1);
-	debug_file_reopen();
+	return debug_file_reopen();
 }
 
 void debug_file_size (off_t size)
