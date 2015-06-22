@@ -6,6 +6,8 @@ See the file COPYING for details.
 
 #include "parrot_client.h"
 
+#include "debug.h"
+
 #include <unistd.h>
 
 #include <errno.h>
@@ -21,6 +23,9 @@ int main( int argc, char *argv[] )
 
 	if (!(2 <= argc && argc <= 4)) {
 		fprintf(stderr, "Use: %s <flags> [file [size]]\n", argv[0]);
+		fprintf(stderr, "Debug flags are: ");
+		debug_flags_print(stderr);
+		fprintf(stderr, "\n");
 		exit(EXIT_FAILURE);
 	}
 

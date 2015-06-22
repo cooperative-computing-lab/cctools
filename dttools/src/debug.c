@@ -136,8 +136,10 @@ void debug_flags_print(FILE * stream)
 {
 	int i;
 
+	fprintf(stream, "clear (unsets all flags)");
+
 	for(i = 0; table[i].name; i++) {
-		fprintf(stream, "%s ", table[i].name);
+		fprintf(stream, ", %s", table[i].name);
 	}
 }
 
