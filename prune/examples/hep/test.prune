@@ -1,0 +1,14 @@
+PUT cmssw_redhat6.json AS cms_env
+ENV umbrella cms_env
+
+PUT simulate.sh AS simulate
+simulated = simulate(10)
+
+PUT digitize.sh AS digitize
+digitized = digitize(10,simulated)
+
+PUT reconstruct.sh AS reconstruct
+reconstructed_py, reconstructed_root, reconstructed_root2 = reconstruct(10,digitized)
+
+USE local 1
+WORK

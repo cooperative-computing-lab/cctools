@@ -579,9 +579,9 @@ def get_default_environment():
 
 
 		while not env:
-			line = raw_input('What local file should be used as execution environment? [empty.tar.gz] ')
+			line = raw_input('What local file should be used as execution environment? [default.env] ')
 			if len(line)<=0:
-				env_file = 'empty.tar.gz'
+				env_file = 'default.env'
 			else:
 				env_file = line
 			line = raw_input('What type of environment file is it [targz]: ')
@@ -762,18 +762,21 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 		for obj in place_files:
 			if not local_fs or obj['dst']=='PRUNE_EXECUTOR' or not dry_run:
 				shutil.copy2(obj['src'], sandbox_folder+obj['dst'])
-		f = open(sandbox_folder+'PRUNE_RUN','w')
-		f.write(run_buffer)
-		f.close()
 
 		if env_type=='umbrella':
 			in_str = ''
 			for obj in place_files:
 				in_str += ',%s=%s'%(obj['dst'],obj['dst'])
-			final_cmd = './UMBRELLA_EXECUTABLE -T local -i PRUNE_RUN=PRUNE_RUN%s -c ENVIRONMENT -l ./tmp/ -o ./final_output run ./PRUNE_RUN'%(in_str)
+			run_buffer = final_cmd = './UMBRELLA_EXECUTABLE -s local -i PRUNE_RUN=PRUNE_RUN%s -c ENVIRONMENT -l ./tmp/ -o ./final_output run "%s"'%(in_str,run_cmd)
 			umbrella_file = which('umbrella')
 			shutil.copy2(umbrella_file[0], sandbox_folder+'UMBRELLA_EXECUTABLE')
 			#place_files.append({'src':umbrella_file,'dst':'umbrella','display':'umbrella'})
+
+		f = open(sandbox_folder+'PRUNE_RUN','w')
+		f.write(run_buffer)
+		f.close()
+		os.chmod(sandbox_folder+'PRUNE_RUN', 0555)
+
 
 		return {'cmd':op['display'],'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files}
 
