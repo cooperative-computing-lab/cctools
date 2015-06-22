@@ -46,7 +46,7 @@ then
   exit 1
 fi
 
-required_alternatives=$(sed -n '2{s/^#[\t ]*CCTOOLS_PYTHON_VERSION//p;q}' < $script)
+required_alternatives=$(sed -n '2{s/^#[\t ]*CCTOOLS_PYTHON_VERSION//p;q;}' < $script)
 
 if [ -z "$required_alternatives" ]
 then
