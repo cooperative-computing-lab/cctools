@@ -22,6 +22,9 @@ export CCTOOLS_TEST_LOG
 
 echo "[$(date)] Testing on $(uname -a)." > "$CCTOOLS_TEST_LOG"
 
+# we need cctools_python in the path.
+export PATH="$(pwd)/dttools/src:$PATH"
+
 SUCCESS=0
 FAILURE=0
 START_TIME=$(date +%s)
