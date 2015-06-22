@@ -2942,6 +2942,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_parrot_debug:
 			if(entering) {
+				extern int pfs_syscall_disable_debug;
+				if (pfs_syscall_disable_debug) {
+					divert_to_dummy(p, -ENOSYS);
+					goto done;
+				}
+
 				if(args[0]) {
 					char *flag;
 					char flags[4096] = "";
