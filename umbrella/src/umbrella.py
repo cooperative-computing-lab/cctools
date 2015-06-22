@@ -16,11 +16,11 @@ Implementation Logic of Dependency Sources:
 	HTTP/HTTPS: Download the dependency into Umbrella local cache.
 	CVMFS: check whether the mountpoint already exists on the execution node, if yes, do not need to set mountpoint for this dependency and directly process the next dependency; if no, parrot will be used to deliver cvmfs for the application.
 		If Parrot is needed to access cvmfs, and the sandbox type is Parrot,
-			Do all the work mentioned above for Parrot execution engine + set HTTP_PROXY + add SITEINFO into mountlist file.
+			Do all the work mentioned above for Parrot execution engine + add SITEINFO into mountlist file.
 		If Parrot is needed to access cvmfs, and the sandbox type is Docker,
-			Do all the work mentioned above for Docker execution engine + set HTTP_PROXY + add SITEINFO into mountlist file + parrotize the user's command. First parrotize the user's command, then dockerize the user's command.
+			Do all the work mentioned above for Docker execution engine + add SITEINFO into mountlist file + parrotize the user's command. First parrotize the user's command, then dockerize the user's command.
 		If Parrot is needed to access cvmfs, and the sandbox type is chroot,
-			Do all the work mentioned above for chroot execution engine + set HTTP_PROXY + add SITEINFO into mountlist file + parrotize the user's command. First parrotize the user's command, then chrootize the user's command.
+			Do all the work mentioned above for chroot execution engine + add SITEINFO into mountlist file + parrotize the user's command. First parrotize the user's command, then chrootize the user's command.
 	ROOT: do nothing if a ROOT file through ROOT protocol is needed, because ROOT supports data access during runtime without downloading first.
 
 """
@@ -178,15 +178,11 @@ def url_download(url, dest):
 		If the url is downloaded successfully, return None;
 		Otherwise, directly exit.
 	"""
-	try:
-		logging.debug("Start to download %s ....", url)
-		response = urllib2.urlopen(url)
-		data = response.read()
-	except urllib2.URLerror as e:
-		logging.critical("URLerror (%d): %s", e.errno, e.strerror)
-		sys.exit("URLerror({0}): {1}".format(e.errno, e.strerror))
-	with open(dest, "wb") as code:
-		code.write(data)
+	logging.debug("Start to download %s ....", url)
+	cmd = "wget -O %s %s>/dev/null 2>&1" % (dest, url)
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
 
 def dependency_download(url, checksum, checksum_tool, dest, format_remote_storage, action):
 	"""Download a dependency from the url and verify its integrity.
@@ -218,15 +214,7 @@ def dependency_download(url, checksum, checksum_tool, dest, format_remote_storag
 	if not os.path.exists(dest):
 		#download the dependency from the url
 		#this method currently will fail when the data size is larger than the memory size, use subprocess + wget can solve it
-		try:
-			logging.debug("Start to download ....")
-			response = urllib2.urlopen(url)
-			data = response.read()
-		except urllib2.URLerror as e:
-			logging.critical("URLerror (%d): %s", e.errno, e.strerror)
-			sys.exit("URLerror({0}): {1}".format(e.errno, e.strerror))
-		with open(dest, "wb") as code:
-			code.write(data)
+		url_download(url, dest)
 		#if it exists, the uncompressed-version directory will be deleted first
 		if action == "unpack" and format_remote_storage != 'plain' and os.path.exists(dest_uncompress):
 			shutil.rmtree(dest_uncompress)
@@ -398,13 +386,10 @@ def dependency_process(env_para_dict, name, id, mountpoint, action, packages_jso
 		else:
 			logging.debug("The cvmfs is not installed on the local host.")
 
-		#if local_cvmfs is empty, set $HTTP_PROXY, download cctools package, set cvmfs_cms_siteconf_mountpoint, and call parrotize_user_cmd.
+		#if local_cvmfs is empty, download cctools package, set cvmfs_cms_siteconf_mountpoint, and call parrotize_user_cmd.
 		if not local_cvmfs:
 			if store.find("cms.cern.ch") != -1:
 				is_cms_cvmfs_app = 1
-
-			logging.debug("Add env variable HTTP_PROXY = http://cache01.hep.wisc.edu:3128 into env_para_dict")
-			env_para_dict["HTTP_PROXY"] = "http://cache01.hep.wisc.edu:3128"
 
 			logging.debug("To access cvmfs, cctools binary is needed")
 			cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action)
@@ -663,7 +648,7 @@ def chrootize_user_cmd(user_cmd, cwd_setting):
 
 def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs):
 	""" Installation each software dependency specified in the software section of the specification.
-	If the application is a CMS app and the execution node does not have cvmfs installed, change `user_cmd` to `parrot_run ... user_cmd` and set HTTP_PROXY and cvmfs_cms_siteconf_mountpoint.
+	If the application is a CMS app and the execution node does not have cvmfs installed, change `user_cmd` to `parrot_run ... user_cmd` and cvmfs_cms_siteconf_mountpoint.
 
 	Args:
 		env_para_dict: the environment variables which need to be set for the execution of the user's command.
@@ -2180,6 +2165,7 @@ def main():
 		url = 'http://ccl.cse.nd.edu/software/umbrella/database/packages.json'
 		packages_path = '%s/packages.json' % (sandbox_dir)
 		logging.debug("The provided packages info (%s) does not exist, download from %s into %s", path1, url, packages_path)
+		print "The provided packages info (%s) does not exist, download from %s into %s" % (path1, url, packages_path)
 		url_download(url, packages_path)
 
 	with open(packages_path) as f: #python 2.4 does not support this syntax: with open () as
