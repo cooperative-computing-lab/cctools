@@ -1,0 +1,81 @@
+#! /bin/sh
+
+pythons="$PYTHON2 $PYTHON python2.7 python2.6 python2 python3 python"
+
+major_version () {
+	local version=$1
+	echo ${version%%.*}
+}
+
+minor_version () {
+	local version=$1
+	local major=$(major_version $version)
+	echo ${version#${major}} | cut -d . -f 2
+}
+
+match_versions () {
+	local required=$1
+	local available=$2
+	local major_r=$(major_version $required)
+	local minor_r=$(minor_version $required)
+	local major_a=$(major_version $available)
+	local minor_a=$(minor_version $available)
+
+	# majors do not match
+	if [ "$major_r" != "$major_a" ]
+	then
+	  echo 0
+	  return
+	fi
+
+	# minors do not match
+	if [ -n "$minor_r" -a "$minor_r" != "$minor_a" ]
+	then
+	  echo 0
+	  return
+	fi
+
+	# versions did match
+	echo 1
+}
+
+script=$1
+if [ -z "$script" ]
+then
+  echo 'Missing script name.' 1>&2
+  exit 1
+fi
+
+required_alternatives=$(sed -n '2{s/^#[\t ]*CCTOOLS_PYTHON_VERSION//p;q}' < $script)
+
+if [ -z "$required_alternatives" ]
+then
+	echo "No version of python was specified for $script." 1>&2
+	exit 1
+fi
+
+python=0
+for alt in $required_alternatives
+do
+	for candidate in $pythons
+	do
+		candidate_full=$(which $candidate 2> /dev/null)
+		[ -x $candidate_full ] || continue
+		candidate_version=$(${candidate_full} -V 2>&1 | cut -d " " -f 2)
+
+		match=$(match_versions $alt $candidate_version)
+		if [ "$match" = 1 ]
+		then
+			python=$candidate_full
+			break 2
+		fi
+	done
+done
+
+if [ $python = 0 ]
+then
+	echo "Could not find a valid python version ($required_alternatives )." 1>&2
+	echo 'Please set the environment variables PYTHON or PYTHON2 appropriately.' 1>&2
+else
+	exec $python "$@"
+fi
