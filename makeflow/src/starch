@@ -1,5 +1,5 @@
 #! /usr/bin/env cctools_python
-# CCTOOLS_PYTHON_VERSION 2.7 2.6 3
+# CCTOOLS_PYTHON_VERSION 2.7 2.6 2.5 2.4 3
 
 # Copyright (c) 2010- The University of Notre Dame.
 # This software is distributed under the GNU General Public License.

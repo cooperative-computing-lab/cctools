@@ -1,6 +1,6 @@
 #! /bin/sh
 
-pythons="$PYTHON2 $PYTHON python2.7 python2.6 python2 python3 python"
+pythons="$PYTHON2 $PYTHON python2.7 python2.6 python2.4 python2 python3 python"
 
 major_version () {
 	local version=$1
