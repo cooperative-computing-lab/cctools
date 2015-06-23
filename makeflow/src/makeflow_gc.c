@@ -89,33 +89,66 @@ static void makeflow_node_export_variables( struct dag *d, struct dag_node *n )
 
 void makeflow_parse_input_outputs( struct dag *d )
 {
-    char *input_list  = dag_variable_lookup_global_string("MAKEFLOW_INPUTS" , d);
-    char *output_list = dag_variable_lookup_global_string("MAKEFLOW_OUTPUTS", d);
+	/* Check if GC_*_LIST is specified and warn user about deprecated usage */
+    char *collect_list   = dag_variable_lookup_global_string("GC_COLLECT_LIST" , d);
+	if(collect_list)
+        debug(D_NOTICE, "GC_COLLECT_LIST is specified: Please refer to manual about MAKEFLOW_INPUTS/OUTPUTS");
 
+    char *preserve_list  = dag_variable_lookup_global_string("GC_PRESERVE_LIST", d);
+	if(preserve_list)
+        debug(D_NOTICE, "GC_PRESERVE_LIST is specified: Please refer to manual about MAKEFLOW_INPUTS/OUTPUTS");
+
+	/* Parse INPUT and OUTPUT lists */
     struct dag_file *f;
+    char *filename;
 
     int i, argc;
     char **argv;
 
-    /* add collect_list, for sink_files that should be removed */
-    string_split_quotes(input_list, &argc, &argv);
-    for(i = 0; i < argc; i++) {
-		d->completed_files += 1;
-        f = dag_file_lookup_or_create(d, argv[i]);
-        set_insert(d->inputs, f);
-        debug(D_MAKEFLOW_RUN, "Added %s to input list", f->filename);
-    }
-    free(argv);
+    char *input_list  = dag_variable_lookup_global_string("MAKEFLOW_INPUTS" , d);
+    char *output_list = dag_variable_lookup_global_string("MAKEFLOW_OUTPUTS", d);
 
-    /* remove files from preserve_list */
-    string_split_quotes(output_list, &argc, &argv);
-    for(i = 0; i < argc; i++) {
-        /* Must initialize to non-zero for hash_table functions to work properly. */
-        f = dag_file_lookup_or_create(d, argv[i]);
-        set_remove(d->outputs, f);
-        debug(D_MAKEFLOW_RUN, "Added %s to output list", f->filename);
-    }
-    free(argv);
+	if(input_list) {
+		/* add collect_list, for sink_files that should be removed */
+		string_split_quotes(input_list, &argc, &argv);
+		for(i = 0; i < argc; i++) {
+			d->completed_files += 1;
+		    f = dag_file_lookup_or_create(d, argv[i]);
+		    set_insert(d->inputs, f);
+		    debug(D_MAKEFLOW_RUN, "Added %s to input list", f->filename);
+		}
+		free(argv);
+	} else {
+        debug(D_NOTICE, "MAKEFLOW_INPUTS is not specified");
+		/* add all source files */
+		hash_table_firstkey(d->files);
+		while((hash_table_nextkey(d->files, &filename, (void **) &f)))
+			if(dag_file_is_source(f)) {
+				set_insert(d->inputs, f);
+				debug(D_MAKEFLOW_RUN, "Added %s to input list", f->filename);
+			}
+	}
+
+	if(output_list) {
+		/* remove files from preserve_list */
+	    string_split_quotes(output_list, &argc, &argv);
+	    for(i = 0; i < argc; i++) {
+	        /* Must initialize to non-zero for hash_table functions to work properly. */
+			f = dag_file_lookup_or_create(d, argv[i]);
+	        set_remove(d->outputs, f);
+	        debug(D_MAKEFLOW_RUN, "Added %s to output list", f->filename);
+	    }
+	    free(argv);
+	} else {
+        debug(D_NOTICE, "MAKEFLOW_OUTPUTS is not specified");
+		/* add all source files */
+		hash_table_firstkey(d->files);
+		while((hash_table_nextkey(d->files, &filename, (void **) &f)))
+			if(dag_file_is_sink(f)) {
+				set_insert(d->outputs, f);
+				debug(D_MAKEFLOW_RUN, "Added %s to output list", f->filename);
+			}
+	}
 }
 
 /* Clean a specific file, while emitting an appropriate message. */
