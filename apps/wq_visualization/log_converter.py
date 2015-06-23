@@ -36,7 +36,7 @@ for line in f:
 				resources_lines_dict[matched.group(1)].append(line)
 				non_worker_resource_lines.add(line_no)
 			except:
-				print "This is peculiar, keyerror would have occurred. A resource that is not workers came in first"	
+				print "This is peculiar, keyerror would have occurred. A resource that is not workers came in first"
 	else:
 		matched = tag_regex.search(line)
 		if matched:
@@ -44,8 +44,8 @@ for line in f:
 				resources_lines_dict[matched.group(1)].append(line)
 				non_worker_resource_lines.add(line_no)
 			except:
-				print "This is peculiar, keyerror would have occurred. A resource that is not workers came in first"	
-				
+				print "This is peculiar, keyerror would have occurred. A resource that is not workers came in first"
+
 	line_no += 1
 
 f.seek(0)

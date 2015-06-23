@@ -16,7 +16,7 @@ To make a gif visualization of a work_queue process given just cctools and the r
 	cd ..
 
 	to get out of the example directory and back to the
-    cctools/apps/work_queue_visualization directory.
+	cctools/apps/work_queue_visualization directory.
 
 2.) Convert the log to a viable form.
 	If you just ran work_queue to obtain a log and have cctools version 4.4+, the log will be new enough to use. If you skipped step 1 and
@@ -30,7 +30,7 @@ To make a gif visualization of a work_queue process given just cctools and the r
 
 	where output_gif_name does not need a ".gif" extension. This process may take awhile.
 	In this example, the exact line would be:
-	
+
 	python visualize.py example/wq.log trial
 
 	and the gif would be found at trial.gif

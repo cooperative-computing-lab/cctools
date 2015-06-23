@@ -3529,5 +3529,3 @@ wc good.gif > out99.txt
 2015/04/13 01:04:31.93 work_queue_python[27108] wq: workers status -- total: 0, active: 0, available: 0.
 2015/04/13 01:04:31.93 work_queue_python[27108] tcp: disconnected from 127.0.0.1:44167
 2015/04/13 01:04:31.93 work_queue_python[27108] wq: 0 workers are connected in total now
-
-

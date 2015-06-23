@@ -1,6 +1,5 @@
 Author: Ryan Boccabella
-(C) Copyright 2015-  University of Notre Dame
-(C) Copyright 2015-  Cooperative Computing Lab
+(C) Copyright 2015-  University of Notre Dame (see COPYING)
 
 Built using pythonv2.7
 
@@ -10,23 +9,23 @@ process or of a process makes use of work_queue by reading through a FULL log
 file* from the master machine, and stripping out lines from that file that are
 useful to the state of the process. Looking at these changes in state, changes
 to a PIL image are made and added to the gif animation. Using ffplay or a
-web browser will allow you to view the created gif. 
+web browser will allow you to view the created gif.
 
 Usage: python visualize.py log_file_name output_gif_name
 
-where the ouput_gif_name should not have the .gif extension 
+where the ouput_gif_name should not have the .gif extension
 
 *see the VIABLE LOGS section
 
 ----- PURPOSE -----------------------------------------------------------------
 The reason this tool was built is two-fold:
 1.) So that users of work_queue and what is built on work_queue can have a
-     visual representation of the machines at work when trying to find the
-     reason for slow or failed executions
+	 visual representation of the machines at work when trying to find the
+	 reason for slow or failed executions
 
 2.) So that the developers of work_queue and what is built on work_queue can
-     look for patterns in the execution of a work_queue process and find bugs
-     or inefficiencies in work_queue.
+	 look for patterns in the execution of a work_queue process and find bugs
+	 or inefficiencies in work_queue.
 
 ----- GIF STRUCTURE -----------------------------------------------------------
 Each frame of the GIF created has the line from the debug log on the bottom,
@@ -59,7 +58,7 @@ that the number of cores is represented in the frames. This is the most urgent
 future improvement if the tool is going to fulfill its PURPOSE.
 
 An outside package, 'gifsicle', was used to create the gif and must be
-installed on any machine wishing to run visualize.py. 
+installed on any machine wishing to run visualize.py.
 
 The Python Imaging Library (PIL) is also imported by visualizer.py, and thus
 needs to be present on your machine to run the visualization tool.
@@ -101,7 +100,7 @@ to the final, growing gif that is the end result of the visualize.py process.
 ----- FUTURE IMPROVEMENTS -----------------------------------------------------
 For a list of things that can be improved about this code, see TODO.txt and
 the TODO statements within the code for visualizer.py. Also look at the
-LIMITATIONS section. The general goal is to most accurately reflect the 
+LIMITATIONS section. The general goal is to most accurately reflect the
 resources being consumed - time, disk, cores, etc. - in the animation itself.
 
 The most pressing improvements are likely the scalability of the gif, as only

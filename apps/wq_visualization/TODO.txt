@@ -17,7 +17,7 @@ Viz Scaling Things
 		- keep the timestamp from each line, and when the timestamp changes, then save the frame
 		- while timestamp has not changed, keep a list of connections and machines to highlight
 		- be careful to do this after the read file loop also, in case the last line is not a useful line
-	
+
 	- Make workers' size correlate to the resources
 		- Number of file rows correlates to total disk on machine
 

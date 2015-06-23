@@ -3,7 +3,7 @@ To make a gif visualization of a work_queue process given just cctools and the r
 1.) Run a work_queue process and keep the whole log
 	You can either run a process with a short log, as this example will explain, or run your own process and keep the full log as described at http://ccl.cse.nd.edu/software/manuals/workqueue.html
 
-	For our purposes	
+	For our purposes
 
 2.) Convert the log to a viable form.
 	If you just ran work_queue to obtain a log, the log will be new enough to use. If you skipped step 1 and
