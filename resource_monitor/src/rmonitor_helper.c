@@ -58,7 +58,7 @@ pid_t fork()
 
 	if(!pid)
 	{
-		struct monitor_msg msg;
+		struct rmonitor_msg msg;
 
 		msg.type   = BRANCH;
 		msg.origin = getpid();
@@ -96,7 +96,7 @@ int chdir(const char *path)
 
 	if(status == 0)
 	{
-		struct monitor_msg msg;
+		struct rmonitor_msg msg;
 		char  *newpath = getcwd(NULL, 0);
 
 		msg.type   = CHDIR;
@@ -120,7 +120,7 @@ int fchdir(int fd)
 
 	if(status == 0)
 	{
-		struct monitor_msg msg;
+		struct rmonitor_msg msg;
 		char  *newpath = getcwd(NULL, 0);
 
 		msg.type   = CHDIR;
@@ -144,7 +144,7 @@ FILE *fopen(const char *path, const char *mode)
 
 	if(file)
 	{
-		struct monitor_msg msg;
+		struct rmonitor_msg msg;
 
 		msg.type   = OPEN;
 		msg.origin = getpid();
@@ -173,7 +173,7 @@ int open(const char *path, int flags, ...)
 
 	if(fd > -1)
 	{
-		struct monitor_msg msg;
+		struct rmonitor_msg msg;
 
 		msg.type   = OPEN;
 		msg.origin = getpid();
@@ -196,7 +196,7 @@ FILE *fopen64(const char *path, const char *mode)
 
 	if(file)
 	{
-		struct monitor_msg msg;
+		struct rmonitor_msg msg;
 
 		msg.type   = OPEN;
 		msg.origin = getpid();
@@ -225,7 +225,7 @@ int open64(const char *path, int flags, ...)
 
 	if(fd > -1)
 	{
-		struct monitor_msg msg;
+		struct rmonitor_msg msg;
 
 		msg.type   = OPEN;
 		msg.origin = getpid();
@@ -257,7 +257,7 @@ void exit_wrapper_preamble(void)
 	sigaddset(&set_cont, SIGCONT);
 	sigprocmask(SIG_BLOCK, &set_cont, &set_prev); //Adds SIGCONT to blocked signals.
 
-	struct monitor_msg msg;
+	struct rmonitor_msg msg;
 	msg.type   = END_WAIT;
 	msg.origin = getpid();
 	msg.data.p = getpid();
@@ -277,7 +277,7 @@ void end_wrapper_epilogue(void)
 {
 	debug(D_DEBUG, "%s from %d.\n", str_msgtype(END), getpid());
 
-	struct monitor_msg msg;
+	struct rmonitor_msg msg;
 	msg.type   = END;
 	msg.origin = getpid();
 	msg.data.p = getpid();
@@ -334,7 +334,7 @@ pid_t waitpid(pid_t pid, int *status, int options)
 
 	if(WIFEXITED(status_) || WIFSIGNALED(status_))
 	{
-		struct monitor_msg msg;
+		struct rmonitor_msg msg;
 		msg.type   = WAIT;
 		msg.origin = getpid();
 		msg.data.p = pidb;

@@ -33,13 +33,13 @@
 #define MAX_FILE_DESCRIPTOR_COUNT 500 /* maximum depth of file tree walking */
 
 //time in usecs, no seconds:
-struct cpu_time_info
+struct rmonitor_cpu_time_info
 {
 	uint64_t accumulated;
 	uint64_t delta;
 };
 
-struct mem_info
+struct rmonitor_mem_info
 {
 	uint64_t virtual;
 	uint64_t resident;
@@ -49,7 +49,7 @@ struct mem_info
 	uint64_t data;
 };
 
-struct io_info
+struct rmonitor_io_info
 {
 	uint64_t chars_read;
 	uint64_t chars_written;
@@ -62,7 +62,7 @@ struct io_info
 	uint64_t delta_bytes_faulted;
 };
 
-struct file_info
+struct rmonitor_file_info
 {
 	uint64_t n_references;
 	uint64_t n_opens;
@@ -75,7 +75,7 @@ struct file_info
 };
 
 
-struct wdir_info
+struct rmonitor_wdir_info
 {
 	char     *path;
 	int      files;
@@ -83,10 +83,10 @@ struct wdir_info
 	off_t    byte_count;
 	blkcnt_t block_count;
 
-	struct filesys_info *fs;
+	struct rmonitor_filesys_info *fs;
 };
 
-struct filesys_info
+struct rmonitor_filesys_info
 {
 	int             id;
 	char           *path;            // Sample path on the filesystem.
@@ -98,18 +98,17 @@ struct filesys_info
 									 // has a valid value).
 };
 
-struct process_info
+struct rmonitor_process_info
 {
 	pid_t       pid;
 	const char *cmd;
 	int         running;
 	int         waiting;
 
-	struct mem_info      mem;
-	struct cpu_time_info cpu;
-	struct io_info       io;
-
-	struct wdir_info *wd;
+	struct rmonitor_mem_info      mem;
+	struct rmonitor_cpu_time_info cpu;
+	struct rmonitor_io_info       io;
+	struct rmonitor_wdir_info    *wd;
 };
 
 #endif

@@ -195,12 +195,6 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits
 	if(s->category)
 		fprintf(stream, "%-15s%s\n",  "category:", s->category);
 
-	if(s->start > -1)
-		fprintf(stream, "%-20s%20lf s\n", "start:", s->start / 1000000e0);
-
-	if(s->end > -1)
-		fprintf(stream, "%-20s%20lf s\n", "end:",  s->end / 1000000e0);
-
 	if(s->exit_type)
 		fprintf(stream, "%-20s%20s\n",  "exit_type:", s->exit_type);
 
@@ -225,23 +219,34 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits
 
 void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix)
 {
-	if(s->cores > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 "\n", prefix,  "cores:", s->cores);
+	if(!prefix){
+		prefix = "";
+	}
 
-	if(s->gpus > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 "\n",  prefix, "gpus:", s->gpus);
+	if(s->start > -1)
+		fprintf(stream, "%-20s%20lf s\n", "start:", s->start / 1000000e0);
+
+	if(s->end > -1)
+		fprintf(stream, "%-20s%20lf s\n", "end:",  s->end / 1000000e0);
 
 	if(s->wall_time > -1)
 		fprintf(stream, "%s%-20s%20lf s\n", prefix, "wall_time:", s->wall_time >= 0 ? s->wall_time / 1000000e0 : -1);
+
+	if(s->cpu_time > -1)
+		fprintf(stream, "%s%-20s%20lf s\n", prefix, "cpu_time:", s->cpu_time   >= 0 ? s->cpu_time  / 1000000e0 : -1);
+
+	if(s->cores > -1)
+		fprintf(stream, "%s%-20s%20" PRId64 "\n", prefix,  "cores:", s->cores);
+
+	//Disable printing gpus for now, as we cannot measure them.
+	//if(s->gpus > -1)
+	//	fprintf(stream, "%s%-20s%20" PRId64 "\n",  prefix, "gpus:", s->gpus);
 
 	if(s->max_concurrent_processes > -1)
 		fprintf(stream, "%s%-20s%15" PRId64 " procs\n",  prefix, "max_concurrent_processes:", s->max_concurrent_processes);
 
 	if(s->total_processes > -1)
 		fprintf(stream, "%s%-20s%20" PRId64 " procs\n",  prefix, "total_processes:", s->total_processes);
-
-	if(s->cpu_time > -1)
-		fprintf(stream, "%s%-20s%20lf s\n", prefix, "cpu_time:", s->cpu_time   >= 0 ? s->cpu_time  / 1000000e0 : -1);
 
 	if(s->virtual_memory > -1)
 		fprintf(stream, "%s%-20s%20" PRId64 " MB\n",  prefix, "virtual_memory:", s->virtual_memory);

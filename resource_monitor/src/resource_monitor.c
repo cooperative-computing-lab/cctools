@@ -28,7 +28,7 @@ See the file COPYING for details.
  * The acc_RESOURCE_usage(accum, other) adds the contents of
  * other, field by field, to accum.
  *
- * monitor_CATEGORY_summary writes the corresponding information
+ * rmonitor_CATEGORY_summary writes the corresponding information
  * to the log. CATEGORY is one of process, working directory of
  * filesystem. Each field is separated by \t.
  *
@@ -51,14 +51,14 @@ See the file COPYING for details.
  * the end, reporting the command run, starting and ending times,
  * and maximum, of the resources monitored.
  *
- * Each monitored process gets a 'struct process_info', itself
+ * Each monitored process gets a 'struct rmonitor_process_info', itself
  * composed of 'struct mem_info', 'struct cpu_time_info', etc. There
  * is a global variable, 'processes', that keeps a table relating pids to
- * the corresponding struct process_info.
+ * the corresponding struct rmonitor_process_info.
  *
  * Likewise, there are tables that relate paths to 'struct
- * wdir_info' ('wdirs'), and device ids to 'struct
- * filesys_info' ('filesysms').
+ * rmonitor_wdir_info' ('wdirs'), and device ids to 'struct
+ * rmonitor_filesys_info' ('filesysms').
  *
  * The process tree is summarized from the struct *_info into
  * struct rmsummary. For each time interval there are three
@@ -137,7 +137,7 @@ See the file COPYING for details.
 #include "create_dir.h"
 
 #include "rmonitor.h"
-#include "rmonitor_poll.h"
+#include "rmonitor_poll_internal.h"
 
 #define RESOURCE_MONITOR_USE_INOTIFY 1
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
@@ -150,9 +150,6 @@ See the file COPYING for details.
 
 #define RESOURCES_EXCEEDED_EXIT_CODE 147
 
-#define ONE_MEGABYTE 1048576  /* this many bytes */
-#define ONE_SECOND   1000000  /* this many usecs */
-
 #define DEFAULT_INTERVAL       ONE_SECOND        /* in useconds */
 
 #define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
@@ -161,15 +158,15 @@ FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
 FILE  *log_opened  = NULL;      /* List of opened files is written to this file. */
 
-int    monitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
+int    rmonitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
                                   grandchildren processes report to the monitor. */
-static int monitor_inotify_fd = -1;
+static int rmonitor_inotify_fd = -1;
 
 pid_t  first_process_pid;              /* pid of the process given at the command line */
 pid_t  first_process_sigchild_status;  /* exit status flags of the process given at the command line */
 pid_t  first_process_already_waited = 0;  /* exit status flags of the process given at the command line */
 
-struct itable *processes;       /* Maps the pid of a process to a unique struct process_info. */
+struct itable *processes;       /* Maps the pid of a process to a unique struct rmonitor_process_info. */
 struct hash_table *wdirs;       /* Maps paths to working directory structures. */
 struct itable *filesysms;       /* Maps st_dev ids (from stat syscall) to filesystem structures. */
 struct hash_table *files;       /* Keeps track of which files have been opened. */
@@ -179,8 +176,8 @@ static char **inotify_watches;  /* Keeps track of created inotify watches. */
 static int alloced_inotify_watches = 0;
 #endif
 
-struct itable *wdirs_rc;        /* Counts how many process_info use a wdir_info. */
-struct itable *filesys_rc;      /* Counts how many wdir_info use a filesys_info. */
+struct itable *wdirs_rc;        /* Counts how many rmonitor_process_info use a rmonitor_wdir_info. */
+struct itable *filesys_rc;      /* Counts how many rmonitor_wdir_info use a rmonitor_filesys_info. */
 
 
 char *lib_helper_name = NULL;  /* Name of the helper library that is
@@ -201,19 +198,6 @@ struct rmsummary *resources_flags;
 /***
  * Utility functions (open log files, proc files, measure time)
  ***/
-
-uint64_t usecs_since_epoch()
-{
-    uint64_t usecs;
-    struct timeval time;
-
-    gettimeofday(&time, NULL);
-
-    usecs  = time.tv_sec * ONE_SECOND;
-    usecs += time.tv_usec;
-
-    return usecs;
-}
 
 uint64_t usecs_since_launched()
 {
@@ -304,7 +288,7 @@ int itable_addto_count(struct itable *table, void *key, int value)
     return count;
 }
 
-int inc_fs_count(struct filesys_info *f)
+int inc_fs_count(struct rmonitor_filesys_info *f)
 {
     int count = itable_addto_count(filesys_rc, f, 1);
 
@@ -313,7 +297,7 @@ int inc_fs_count(struct filesys_info *f)
     return count;
 }
 
-int dec_fs_count(struct filesys_info *f)
+int dec_fs_count(struct rmonitor_filesys_info *f)
 {
     int count = itable_addto_count(filesys_rc, f, -1);
 
@@ -329,7 +313,7 @@ int dec_fs_count(struct filesys_info *f)
     return count;
 }
 
-int inc_wd_count(struct wdir_info *d)
+int inc_wd_count(struct rmonitor_wdir_info *d)
 {
     int count = itable_addto_count(wdirs_rc, d, 1);
 
@@ -338,7 +322,7 @@ int inc_wd_count(struct wdir_info *d)
     return count;
 }
 
-int dec_wd_count(struct wdir_info *d)
+int dec_wd_count(struct rmonitor_wdir_info *d)
 {
     int count = itable_addto_count(wdirs_rc, d, -1);
 
@@ -375,20 +359,20 @@ int get_device_id(char *path)
     return dinfo.st_dev;
 }
 
-struct filesys_info *lookup_or_create_fs(char *path)
+struct rmonitor_filesys_info *lookup_or_create_fs(char *path)
 {
     uint64_t dev_id = get_device_id(path);
-    struct filesys_info *inventory = itable_lookup(filesysms, dev_id);
+    struct rmonitor_filesys_info *inventory = itable_lookup(filesysms, dev_id);
 
     if(!inventory)
     {
         debug(D_DEBUG, "filesystem %"PRId64" added to monitor.\n", dev_id);
 
-        inventory = (struct filesys_info *) malloc(sizeof(struct filesys_info));
+        inventory = (struct rmonitor_filesys_info *) malloc(sizeof(struct rmonitor_filesys_info));
         inventory->path = xxstrdup(path);
         inventory->id   = dev_id;
         itable_insert(filesysms, dev_id, (void *) inventory);
-        get_dsk_usage(inventory->path, &inventory->disk_initial);
+        rmonitor_get_dsk_usage(inventory->path, &inventory->disk_initial);
     }
 
     inc_fs_count(inventory);
@@ -396,9 +380,9 @@ struct filesys_info *lookup_or_create_fs(char *path)
     return inventory;
 }
 
-struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
+struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previous, char *path)
 {
-    struct wdir_info *inventory;
+    struct rmonitor_wdir_info *inventory;
 
     if(strlen(path) < 1 || access(path, F_OK) != 0)
         return previous;
@@ -409,7 +393,7 @@ struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
     {
         debug(D_DEBUG, "working directory '%s' added to monitor.\n", path);
 
-        inventory = (struct wdir_info *) malloc(sizeof(struct wdir_info));
+        inventory = (struct rmonitor_wdir_info *) malloc(sizeof(struct rmonitor_wdir_info));
         inventory->path = xxstrdup(path);
         hash_table_insert(wdirs, inventory->path, (void *) inventory);
 
@@ -428,13 +412,13 @@ struct wdir_info *lookup_or_create_wd(struct wdir_info *previous, char *path)
     return inventory;
 }
 
-void monitor_inotify_add_watch(char *filename)
+void rmonitor_inotify_add_watch(char *filename)
 {
 	/* Perhaps here we can do something more to the files, like a
 	 * final stat */
 
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
-	struct file_info *finfo;
+	struct rmonitor_file_info *finfo;
 	char **new_inotify_watches;
 	struct stat fst;
 	int iwd;
@@ -447,7 +431,7 @@ void monitor_inotify_add_watch(char *filename)
 		return;
 	}
 
-	finfo = calloc(1, sizeof(struct file_info));
+	finfo = calloc(1, sizeof(struct rmonitor_file_info));
 	if (finfo != NULL)
 	{
 		finfo->n_opens = 1;
@@ -461,9 +445,9 @@ void monitor_inotify_add_watch(char *filename)
 	}
 
 	hash_table_insert(files, filename, finfo);
-	if (monitor_inotify_fd >= 0)
+	if (rmonitor_inotify_fd >= 0)
 	{
-		if ((iwd = inotify_add_watch(monitor_inotify_fd,
+		if ((iwd = inotify_add_watch(rmonitor_inotify_fd,
 					     filename,
 					     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|
 					     IN_ACCESS|IN_MODIFY)) < 0)
@@ -488,30 +472,30 @@ void monitor_inotify_add_watch(char *filename)
 				if (finfo != NULL) finfo->n_references = 1;
 			} else {
 				debug(D_DEBUG, "Out of memory: Removing inotify watch for %s", filename);
-				inotify_rm_watch(monitor_inotify_fd, iwd);
+				inotify_rm_watch(rmonitor_inotify_fd, iwd);
 			}
 		}
 	}
 #endif
 }
 
-void monitor_handle_inotify(void)
+void rmonitor_handle_inotify(void)
 {
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct inotify_event *evdata;
-	struct file_info *finfo;
+	struct rmonitor_file_info *finfo;
 	struct stat fst;
 	char *fname;
 	int nbytes, evc, i;
 
-	if (monitor_inotify_fd >= 0)
+	if (rmonitor_inotify_fd >= 0)
 	{
-		if (ioctl(monitor_inotify_fd, FIONREAD, &nbytes) >= 0)
+		if (ioctl(rmonitor_inotify_fd, FIONREAD, &nbytes) >= 0)
 		{
 
 			evdata = (struct inotify_event *) malloc(nbytes);
 			if (evdata == NULL) return;
-			if (read(monitor_inotify_fd, evdata, nbytes) != nbytes)
+			if (read(rmonitor_inotify_fd, evdata, nbytes) != nbytes)
 			{
 				free(evdata);
 				return;
@@ -538,7 +522,7 @@ void monitor_handle_inotify(void)
 					(finfo->n_references)--;
 					if (finfo->n_references == 0)
 					{
-						inotify_rm_watch(monitor_inotify_fd, evdata[i].wd);
+						inotify_rm_watch(rmonitor_inotify_fd, evdata[i].wd);
 						debug(D_DEBUG, "removed watch (id: %d) for file %s", evdata[i].wd, fname);
 						free(fname);
 						inotify_watches[evdata[i].wd] = NULL;
@@ -557,7 +541,7 @@ void monitor_handle_inotify(void)
  * rmsummary's, computing current value, maximum, and minimums.
 ***/
 
-void monitor_summary_header()
+void rmonitor_summary_header()
 {
     if(log_series)
     {
@@ -588,14 +572,17 @@ void monitor_summary_header()
     }
 }
 
-void monitor_collate_tree(struct rmsummary *tr, struct process_info *p, struct wdir_info *d, struct filesys_info *f)
+void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
 {
 	tr->wall_time         = usecs_since_epoch() - summary->start;
+	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
+
+	if(tr->wall_time > 0)
+		tr->cores = (int64_t) ceil( ((double) tr->cpu_time)/tr->wall_time);
 
 	tr->max_concurrent_processes     = (int64_t) itable_size(processes);
 	tr->total_processes     = summary->total_processes;
 
-	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
 	tr->virtual_memory    = (int64_t) p->mem.virtual;
 	tr->resident_memory   = (int64_t) p->mem.resident;
 	tr->swap_memory       = (int64_t) p->mem.swap;
@@ -610,7 +597,7 @@ void monitor_collate_tree(struct rmsummary *tr, struct process_info *p, struct w
 	tr->fs_nodes          = (int64_t) f->disk.f_ffree;
 }
 
-void monitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
+void rmonitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
 {
     if(!tr)
         return;
@@ -618,7 +605,7 @@ void monitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
     rmsummary_merge_max(result, tr);
 }
 
-void monitor_log_row(struct rmsummary *tr)
+void rmonitor_log_row(struct rmsummary *tr)
 {
 	if(log_series)
 	{
@@ -676,14 +663,14 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 
 }
 
-int monitor_file_io_summaries()
+int rmonitor_file_io_summaries()
 {
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
-	if (monitor_inotify_fd >= 0)
+	if (rmonitor_inotify_fd >= 0)
 	{
 		char *fname;
 		struct stat buf;
-		struct file_info *finfo;
+		struct rmonitor_file_info *finfo;
 
 		fprintf(log_opened, "%-15s\n%-15s %6s %20s %20s %6s %6s %6s %6s\n",
 			"#path", "#", "device", "size_initial(B)", "size_final(B)", "opens", "closes", "reads", "writes");
@@ -713,7 +700,7 @@ int monitor_file_io_summaries()
 	return 0;
 }
 
-int monitor_final_summary()
+int rmonitor_final_summary()
 {
 	decode_zombie_status(summary, first_process_sigchild_status);
 
@@ -730,7 +717,7 @@ int monitor_final_summary()
 
 	if(log_opened)
 	{
-        int nfds = monitor_inotify_fd + 1;
+        int nfds = rmonitor_inotify_fd + 1;
         int count = 0;
 
 		struct timeval timeout;
@@ -741,15 +728,15 @@ int monitor_final_summary()
 			timeout.tv_usec  = 0;
 
 			FD_ZERO(&rset);
-			if (monitor_inotify_fd > 0)   FD_SET(monitor_inotify_fd, &rset);
+			if (rmonitor_inotify_fd > 0)   FD_SET(rmonitor_inotify_fd, &rset);
 
 			count = select(nfds, &rset, NULL, NULL, &timeout);
 
 			if(count > 0)
-				if (FD_ISSET(monitor_inotify_fd, &rset)) monitor_handle_inotify();
+				if (FD_ISSET(rmonitor_inotify_fd, &rset)) rmonitor_handle_inotify();
 		} while(count > 0);
 
-		monitor_file_io_summaries();
+		rmonitor_file_io_summaries();
 	}
 
 	return summary->exit_status;
@@ -765,10 +752,10 @@ int ping_process(pid_t pid)
     return (kill(pid, 0) == 0);
 }
 
-void monitor_track_process(pid_t pid)
+void rmonitor_track_process(pid_t pid)
 {
 	char *newpath;
-	struct process_info *p;
+	struct rmonitor_process_info *p;
 
 	if(!ping_process(pid))
 		return;
@@ -778,8 +765,8 @@ void monitor_track_process(pid_t pid)
 	if(p)
 		return;
 
-	p = malloc(sizeof(struct process_info));
-	bzero(p, sizeof(struct process_info));
+	p = malloc(sizeof(struct rmonitor_process_info));
+	bzero(p, sizeof(struct rmonitor_process_info));
 
 	p->pid = pid;
 	p->running = 0;
@@ -796,15 +783,15 @@ void monitor_track_process(pid_t pid)
 	summary->total_processes++;
 }
 
-void monitor_untrack_process(uint64_t pid)
+void rmonitor_untrack_process(uint64_t pid)
 {
-	struct process_info *p = itable_lookup(processes, pid);
+	struct rmonitor_process_info *p = itable_lookup(processes, pid);
 
 	if(p)
 		p->running = 0;
 }
 
-void cleanup_zombie(struct process_info *p)
+void cleanup_zombie(struct rmonitor_process_info *p)
 {
   debug(D_DEBUG, "cleaning process: %d\n", p->pid);
 
@@ -818,7 +805,7 @@ void cleanup_zombie(struct process_info *p)
 void cleanup_zombies(void)
 {
   uint64_t pid;
-  struct process_info *p;
+  struct rmonitor_process_info *p;
 
   itable_firstkey(processes);
   while(itable_nextkey(processes, &pid, (void **) &p))
@@ -834,7 +821,7 @@ void release_waiting_process(pid_t pid)
 void release_waiting_processes(void)
 {
 	uint64_t pid;
-	struct process_info *p;
+	struct rmonitor_process_info *p;
 
 	itable_firstkey(processes);
 	while(itable_nextkey(processes, &pid, (void **) &p))
@@ -845,18 +832,18 @@ void release_waiting_processes(void)
 void ping_processes(void)
 {
     uint64_t pid;
-    struct process_info *p;
+    struct rmonitor_process_info *p;
 
     itable_firstkey(processes);
     while(itable_nextkey(processes, &pid, (void **) &p))
         if(!ping_process(pid))
         {
             debug(D_DEBUG, "cannot find %"PRId64" process.\n", pid);
-            monitor_untrack_process(pid);
+            rmonitor_untrack_process(pid);
         }
 }
 
-struct rmsummary *monitor_rusage_tree(void)
+struct rmsummary *rmonitor_rusage_tree(void)
 {
     struct rusage usg;
     struct rmsummary *tr_usg = calloc(1, sizeof(struct rmsummary));
@@ -880,7 +867,7 @@ struct rmsummary *monitor_rusage_tree(void)
 }
 
 /* sigchild signal handler */
-void monitor_check_child(const int signal)
+void rmonitor_check_child(const int signal)
 {
     uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status,
                            WNOHANG | WCONTINUED | WUNTRACED);
@@ -923,23 +910,23 @@ void monitor_check_child(const int signal)
 
     first_process_already_waited = 1;
 
-    struct process_info *p;
+    struct rmonitor_process_info *p;
     debug(D_DEBUG, "adding all processes to cleanup list.\n");
     itable_firstkey(processes);
     while(itable_nextkey(processes, &pid, (void **) &p))
-      monitor_untrack_process(pid);
+      rmonitor_untrack_process(pid);
 
     /* get the peak values from getrusage */
-    struct rmsummary *tr_usg = monitor_rusage_tree();
-    monitor_find_max_tree(summary, tr_usg);
+    struct rmsummary *tr_usg = rmonitor_rusage_tree();
+    rmonitor_find_max_tree(summary, tr_usg);
     free(tr_usg);
 }
 
 //SIGINT, SIGQUIT, SIGTERM signal handler.
-void monitor_final_cleanup(int signum)
+void rmonitor_final_cleanup(int signum)
 {
     uint64_t pid;
-    struct   process_info *p;
+    struct   rmonitor_process_info *p;
     int      status;
 
 
@@ -959,7 +946,7 @@ void monitor_final_cleanup(int signum)
         sleep(5);
 
     if(!first_process_already_waited)
-	    monitor_check_child(signum);
+	    rmonitor_check_child(signum);
 
     signal(SIGCHLD, SIG_DFL);
 
@@ -971,7 +958,7 @@ void monitor_final_cleanup(int signum)
 
         kill(pid, SIGKILL);
 
-        monitor_untrack_process(pid);
+        rmonitor_untrack_process(pid);
     }
 
     cleanup_zombies();
@@ -979,7 +966,7 @@ void monitor_final_cleanup(int signum)
     if(lib_helper_extracted)
         unlink(lib_helper_name);
 
-    status = monitor_final_summary();
+    status = rmonitor_final_summary();
 
     if(log_summary)
 	    fclose(log_summary);
@@ -1009,7 +996,7 @@ void monitor_final_cleanup(int signum)
 	}
 
 /* return 0 means above limit, 1 means limist ok */
-int monitor_check_limits(struct rmsummary *tr)
+int rmonitor_check_limits(struct rmsummary *tr)
 {
 	tr->limits_exceeded = NULL;
 
@@ -1066,12 +1053,12 @@ void write_helper_lib(void)
     lib_helper_extracted = 1;
 }
 
-void monitor_dispatch_msg(void)
+void rmonitor_dispatch_msg(void)
 {
-	struct monitor_msg msg;
-	struct process_info *p;
+	struct rmonitor_msg msg;
+	struct rmonitor_process_info *p;
 
-	recv_monitor_msg(monitor_queue_fd, &msg);
+	recv_monitor_msg(rmonitor_queue_fd, &msg);
 
 	debug(D_DEBUG,"message \"%s\" from %d\n", str_msgtype(msg.type), msg.origin);
 
@@ -1094,7 +1081,7 @@ void monitor_dispatch_msg(void)
     switch(msg.type)
     {
         case BRANCH:
-            monitor_track_process(msg.origin);
+            rmonitor_track_process(msg.origin);
             if(summary->max_concurrent_processes < itable_size(processes))
                 summary->max_concurrent_processes = itable_size(processes);
             break;
@@ -1102,14 +1089,14 @@ void monitor_dispatch_msg(void)
             p->waiting = 1;
             break;
         case END:
-            monitor_untrack_process(msg.data.p);
+            rmonitor_untrack_process(msg.data.p);
             break;
         case CHDIR:
             p->wd = lookup_or_create_wd(p->wd, msg.data.s);
             break;
         case OPEN:
             debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
-            monitor_inotify_add_watch(msg.data.s);
+            rmonitor_inotify_add_watch(msg.data.s);
             break;
         case READ:
             break;
@@ -1119,8 +1106,8 @@ void monitor_dispatch_msg(void)
             break;
     };
 
-	if(!monitor_check_limits(summary))
-		monitor_final_cleanup(SIGTERM);
+	if(!rmonitor_check_limits(summary))
+		rmonitor_final_cleanup(SIGTERM);
 
 }
 
@@ -1132,7 +1119,7 @@ int wait_for_messages(int interval)
 
     //If grandchildren processes cannot talk to us, simply wait.
     //Else, wait, and check socket for messages.
-    if (monitor_queue_fd < 0)
+    if (rmonitor_queue_fd < 0)
     {
 		/* wait for interval. */
 		timeout.tv_sec  = 0;
@@ -1144,7 +1131,7 @@ int wait_for_messages(int interval)
     {
 
 	/* Figure out the number of file descriptors to pass to select */
-        int nfds = monitor_queue_fd + 1;
+        int nfds = rmonitor_queue_fd + 1;
 		fd_set rset;
 
         int count = 0;
@@ -1155,12 +1142,12 @@ int wait_for_messages(int interval)
 			interval = 0;                     //Next loop we do not wait at all
 
 			FD_ZERO(&rset);
-			if (monitor_queue_fd > 0)   FD_SET(monitor_queue_fd,   &rset);
+			if (rmonitor_queue_fd > 0)   FD_SET(rmonitor_queue_fd,   &rset);
 
 			count = select(nfds, &rset, NULL, NULL, &timeout);
 
 			if(count > 0)
-				if (FD_ISSET(monitor_queue_fd, &rset)) monitor_dispatch_msg();
+				if (FD_ISSET(rmonitor_queue_fd, &rset)) rmonitor_dispatch_msg();
 
 		} while(count > 0);
 	}
@@ -1181,7 +1168,7 @@ void wakeup_after_fork(int signum)
         signal(SIGCONT, SIG_DFL);
 }
 
-pid_t monitor_fork(void)
+pid_t rmonitor_fork(void)
 {
     pid_t pid;
     sigset_t set;
@@ -1197,7 +1184,7 @@ pid_t monitor_fork(void)
     {
         debug(D_DEBUG, "fork %d -> %d\n", getpid(), pid);
 
-        monitor_track_process(pid);
+        rmonitor_track_process(pid);
 
         signal(SIGCONT, prev_handler);
         kill(pid, SIGCONT);
@@ -1211,13 +1198,13 @@ pid_t monitor_fork(void)
     return pid;
 }
 
-struct process_info *spawn_first_process(const char *executable, char *argv[], int child_in_foreground)
+struct rmonitor_process_info *spawn_first_process(const char *executable, char *argv[], int child_in_foreground)
 {
     pid_t pid;
 
-    pid = monitor_fork();
+    pid = rmonitor_fork();
 
-    monitor_summary_header();
+    rmonitor_summary_header();
 
     if(pid > 0)
     {
@@ -1291,13 +1278,13 @@ static void show_help(const char *cmd)
 }
 
 
-int monitor_resources(long int interval /*in microseconds */)
+int rmonitor_resources(long int interval /*in microseconds */)
 {
     uint64_t round;
 
-    struct process_info  *p_acc = calloc(1, sizeof(struct process_info)); //Automatic zeroed.
-    struct wdir_info     *d_acc = calloc(1, sizeof(struct wdir_info));
-    struct filesys_info  *f_acc = calloc(1, sizeof(struct filesys_info));
+    struct rmonitor_process_info *p_acc = calloc(1, sizeof(struct rmonitor_process_info)); //Automatic zeroed.
+    struct rmonitor_wdir_info    *d_acc = calloc(1, sizeof(struct rmonitor_wdir_info));
+    struct rmonitor_filesys_info *f_acc = calloc(1, sizeof(struct rmonitor_filesys_info));
 
     struct rmsummary    *resources_now = calloc(1, sizeof(struct rmsummary));
 
@@ -1311,21 +1298,19 @@ int monitor_resources(long int interval /*in microseconds */)
 	{
 		ping_processes();
 
-		monitor_poll_all_processes_once(processes, p_acc);
+		rmonitor_poll_all_processes_once(processes, p_acc);
 
 		if(resources_flags->workdir_footprint)
-			monitor_poll_all_wds_once(wdirs, d_acc);
+			rmonitor_poll_all_wds_once(wdirs, d_acc);
 
-		// monitor_fss_once(f); disabled until statfs fs id makes sense.
+		// rmonitor_fss_once(f); disabled until statfs fs id makes sense.
 
-		monitor_collate_tree(resources_now, p_acc, d_acc, f_acc);
+		rmonitor_collate_tree(resources_now, p_acc, d_acc, f_acc);
+		rmonitor_find_max_tree(summary, resources_now);
+		rmonitor_log_row(resources_now);
 
-		monitor_find_max_tree(summary, resources_now);
-
-		monitor_log_row(resources_now);
-
-		if(!monitor_check_limits(summary))
-			monitor_final_cleanup(SIGTERM);
+		if(!rmonitor_check_limits(summary))
+			rmonitor_final_cleanup(SIGTERM);
 
 		release_waiting_processes();
 
@@ -1372,10 +1357,10 @@ int main(int argc, char **argv) {
 
     debug_config(argv[0]);
 
-    signal(SIGCHLD, monitor_check_child);
-    signal(SIGINT,  monitor_final_cleanup);
-    signal(SIGQUIT, monitor_final_cleanup);
-    signal(SIGTERM, monitor_final_cleanup);
+    signal(SIGCHLD, rmonitor_check_child);
+    signal(SIGINT,  rmonitor_final_cleanup);
+    signal(SIGQUIT, rmonitor_final_cleanup);
+    signal(SIGTERM, rmonitor_final_cleanup);
 
     summary          = calloc(1, sizeof(struct rmsummary));
     resources_limits = make_rmsummary(-1);
@@ -1543,11 +1528,11 @@ int main(int argc, char **argv) {
 
 #ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
     write_helper_lib();
-    monitor_helper_init(lib_helper_name, &monitor_queue_fd);
+    rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd);
 #endif
 
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
-    monitor_inotify_fd = inotify_init();
+    rmonitor_inotify_fd = inotify_init();
     alloced_inotify_watches = 100;
     inotify_watches = (char **)(calloc(alloced_inotify_watches, sizeof(char *)));
     if (inotify_watches == NULL) alloced_inotify_watches = 0;
@@ -1583,7 +1568,7 @@ int main(int argc, char **argv) {
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
     if(log_opened)
     {
-	    monitor_inotify_fd = inotify_init();
+	    rmonitor_inotify_fd = inotify_init();
 	    alloced_inotify_watches = 100;
 	    inotify_watches = (char **)(calloc(alloced_inotify_watches, sizeof(char *)));
 	    if (inotify_watches == NULL) alloced_inotify_watches = 0;
@@ -1601,9 +1586,9 @@ int main(int argc, char **argv) {
 
     spawn_first_process(executable, argv + optind, child_in_foreground);
 
-    monitor_resources(interval);
+    rmonitor_resources(interval);
 
-    monitor_final_cleanup(SIGTERM);
+    rmonitor_final_cleanup(SIGTERM);
 
     return 0;
 }

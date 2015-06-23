@@ -28,7 +28,7 @@ See the file COPYING for details.
 //#define D_RMON stderr
 
 
-const char *str_msgtype(enum monitor_msg_type n)
+const char *str_msgtype(enum rmonitor_msg_type n)
 {
 	switch(n)
 	{
@@ -62,7 +62,7 @@ const char *str_msgtype(enum monitor_msg_type n)
 	};
 }
 
-char *monitor_helper_locate(char *default_path)
+char *rmonitor_helper_locate(char *default_path)
 {
 	char *helper_path;
 
@@ -92,9 +92,9 @@ char *monitor_helper_locate(char *default_path)
 	return NULL;
 }
 
-int recv_monitor_msg(int fd, struct monitor_msg *msg)
+int recv_monitor_msg(int fd, struct rmonitor_msg *msg)
 {
-	return recv(fd, msg, sizeof(struct monitor_msg), 0);
+	return recv(fd, msg, sizeof(struct rmonitor_msg), 0);
 }
 
 int find_localhost_addr(int port, struct addrinfo **addr)
@@ -120,7 +120,7 @@ int find_localhost_addr(int port, struct addrinfo **addr)
 }
 
 
-int send_monitor_msg(struct monitor_msg *msg)
+int send_monitor_msg(struct rmonitor_msg *msg)
 {
 	int port;
 	int fd;
@@ -148,7 +148,7 @@ int send_monitor_msg(struct monitor_msg *msg)
 
 	int count;
 	debug(D_RMON, "sending message from %d to port %d\n", getpid(), port);
-	count = sendto(fd, msg, sizeof(struct monitor_msg), 0, addr->ai_addr, addr->ai_addrlen);
+	count = sendto(fd, msg, sizeof(struct rmonitor_msg), 0, addr->ai_addr, addr->ai_addrlen);
 	debug(D_RMON, "message sent from %d to port %d. %d bytes.\n", getpid(), port, count);
 
 	freeaddrinfo(addr);
@@ -157,7 +157,7 @@ int send_monitor_msg(struct monitor_msg *msg)
 	return count;
 }
 
-int monitor_open_socket(int *fd, int *port)
+int rmonitor_open_socket(int *fd, int *port)
 {
 	struct addrinfo *addr;
 
@@ -201,18 +201,18 @@ int monitor_open_socket(int *fd, int *port)
 
  /* We use datagrams to send information to the monitor from the
   * great grandchildren processes */
-int monitor_helper_init(char *lib_default_path, int *fd)
+int rmonitor_helper_init(char *lib_default_path, int *fd)
 {
 	int  port;
-	char *helper_path = monitor_helper_locate(lib_default_path);
+	char *helper_path = rmonitor_helper_locate(lib_default_path);
 	char helper_absolute[PATH_MAX + 1];
-	char *monitor_port;
+	char *rmonitor_port;
 
 	realpath(helper_path, helper_absolute);
 
 	if(access(helper_absolute,R_OK|X_OK)==0) {
 		debug(D_RMON, "found helper in %s\n", helper_absolute);
-		monitor_open_socket(fd, &port);
+		rmonitor_open_socket(fd, &port);
 	}
 	else {
 		debug(D_RMON,"couldn't find helper library %s but continuing anyway.", helper_path);
@@ -221,15 +221,15 @@ int monitor_helper_init(char *lib_default_path, int *fd)
 
 	if(port > 0)
 	{
-		monitor_port = string_format("%d", port);
+		rmonitor_port = string_format("%d", port);
 
 		debug(D_RMON,"setting LD_PRELOAD to %s\n", helper_absolute);
 		setenv("LD_PRELOAD", helper_absolute, 1);
 
-		debug(D_RMON,"setting %s to %s\n", RESOURCE_MONITOR_INFO_ENV_VAR, monitor_port);
-		setenv(RESOURCE_MONITOR_INFO_ENV_VAR, monitor_port, 1);
+		debug(D_RMON,"setting %s to %s\n", RESOURCE_MONITOR_INFO_ENV_VAR, rmonitor_port);
+		setenv(RESOURCE_MONITOR_INFO_ENV_VAR, rmonitor_port, 1);
 
-		free(monitor_port);
+		free(rmonitor_port);
 	}
 	else
 	{
