@@ -30,7 +30,8 @@ uint64_t usecs_since_epoch()
 
 	gettimeofday(&time, NULL);
 
-	usecs  = time.tv_sec * ONE_SECOND;
+	usecs  = time.tv_sec;
+	usecs *= ONE_SECOND;
 	usecs += time.tv_usec;
 
 	return usecs;
