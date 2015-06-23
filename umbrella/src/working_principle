@@ -137,10 +137,3 @@ umbrella: error: no such option: -r
 hmeng@ccl12 ~/git-development/cctools/umbrella/example/povray$ echo $?
 2
 
-func_notes.html: a html file including the help documents about all the modules and functions. The file is created by `pydoc` in the following way:
-1) copy umbrella into a new file whose name ends with .py. The reason why a file ending with .py is needed is pydoc only recognizes such files.
-$ cp umbrella umbrella.py
-2) create html document using pydoc, which will create a html file named umbrella.html including the help documents about all the modules and functions.
-$ pydoc -w umbrella
-3) rename umbrella.html to func_notes.html. This renaming is to avoid confusion between this html and the umbrella html document under cctools/doc.
-$ mv umbrella.html func_notes.html
