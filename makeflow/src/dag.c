@@ -44,9 +44,12 @@ struct dag *dag_create()
 	d->task_categories = hash_table_create(0, 0);
 
 	/* Add GC_*_LIST to variables table to ensure it is in
-	 * global DAG scope. */
+	 * global DAG scope. /
+	hash_table_insert(d->variables,"GC_PRESERVE_LIST"   , dag_variable_create(NULL, ""));
+	hash_table_insert(d->variables,"GC_COLLECT_LIST"  , dag_variable_create(NULL, ""));
 	hash_table_insert(d->variables,"MAKEFLOW_INPUTS"   , dag_variable_create(NULL, ""));
 	hash_table_insert(d->variables,"MAKEFLOW_OUTPUTS"  , dag_variable_create(NULL, ""));
+	*/
 
 	/* Declare special variables */
 	set_insert(d->special_vars, "CATEGORY");
