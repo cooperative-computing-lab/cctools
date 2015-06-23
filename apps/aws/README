@@ -1,0 +1,47 @@
+cctools-AMI.py is meant to take either a tarball or a version of cctools,
+install that into the user's home directory of an EC2 instance, take a machine
+image (AMI) of the instance, distribute that image to all regions AWS supports,
+and make the image in each region publicly accessible.
+
+Instructions regarding the use of cctools-AMI.py.
+
+cctools-AMI.py takes 3 arguments in the following usage:
+
+python cctools-AMI.py <version number | tarball> <AWSKeyFile> <userdata script>
+
+The first argument can be a valid version of cctools that exists at
+ccl.nd.edu/software/files. This will make the EC2 instance used to create the
+AMI wget the file from that website. It can also be a (path to) a tar.bz2 which
+will be scp'd to the EC2 instance for installation.
+
+The AWSKeyFile should have 400 permissions (read only owner) and be in the
+following format (everything between the newlines, with no newline at the end
+of the file):
+
+AWSAccessKeyId=AKIAEXAMPLEEXAMPLEEX
+AWSSecretKey=EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEXAMPL
+
+This is required for making a connection to AWS, but the key should be kept in
+a private place as anyone with it could create an API call to AWS with it under
+your account.
+
+The userdata script is tied closely (unfortunately) to the structure of the
+cctools-AMI.py script. The userdata is a script that can be passed to the EC2
+instance on creation, and the EC2 instance will run that script during its
+first boot only. This is how the instructions to obtain, unpack, and install
+cctools are run on the EC2 instance without logging into it. There is no
+support (currently) for determining whether or not the userdata script has
+finished on the instance, so setting flags by touching and deleting files with
+certain sleep times was the solution implemented. cctools-AMI.py will replace
+the following "keywords" in the userdata script to ensure appropriate timing
+and naming for taking the AMI:
+
+WAIT_ONCE
+WAIT_THRICE
+VERSION_NUMBER
+SRC_STRING
+
+make pull request on github for the code we've written mimic submit_to_condor
+and wait in an attmept to get AWS to create the AMI for us.
+
+
