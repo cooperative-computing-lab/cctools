@@ -35,6 +35,7 @@ The following major problems must be fixed:
 #include "buffer.h"
 #include "link_nvpair.h"
 #include "rmonitor.h"
+#include "rmonitor_poll.h"
 #include "copy_stream.h"
 #include "random.h"
 #include "process.h"
@@ -70,6 +71,9 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 // Seconds between updates to the catalog
 #define WORK_QUEUE_UPDATE_INTERVAL 60
+
+// Seconds between measurement of master local resources
+#define WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL 300
 
 #define WORKER_ADDRPORT_MAX 32
 #define WORKER_HASHKEY_MAX 32
@@ -149,7 +153,9 @@ struct work_queue {
 
 	int monitor_mode;
 	FILE *monitor_file;
+	char *monitor_summary_filename;
 	char *monitor_exe;
+	struct rmsummary *measured_local_resources;
 
 	char *password;
 	double bandwidth;
@@ -231,6 +237,8 @@ Thie performs a deep copy of the file list.
 */
 static struct list *work_queue_task_file_list_clone(struct list *list);
 
+/** Write master's resources to resource summary file and close the file **/
+void work_queue_disable_monitoring(struct work_queue *q);
 
 /******************************************************/
 /********** work_queue internal functions *************/
@@ -1075,7 +1083,7 @@ static void delete_uncacheable_files( struct work_queue *q, struct work_queue_wo
 	delete_worker_files(q, w, t, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 }
 
-void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
+void resource_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
 {
 	struct flock lock;
 	char        *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME ".summary", getpid(), t->taskid);
@@ -1088,9 +1096,7 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 	lock.l_whence = SEEK_SET;
 	lock.l_len    = 0;
 
-
 	fcntl(monitor_fd, F_SETLKW, &lock);
-	fprintf(q->monitor_file, "# Work Queue pid: %d Task: %d summary:\n", getpid(), t->taskid);
 
 	if(t->resources_measured)
 	{
@@ -1098,10 +1104,10 @@ void work_queue_monitor_append_report(struct work_queue *q, struct work_queue_ta
 	}
 	else
 	{
-		fprintf(q->monitor_file, "# Summary for task %d:%d was not available.\n", getpid(), t->taskid);
+		fprintf(q->monitor_file, "# Summary for task %d was not available.\n", t->taskid);
 	}
 
-	fprintf(q->monitor_file, "\n\n");
+	fprintf(q->monitor_file, "\n");
 
 	lock.l_type   = F_ULOCK;
 	fcntl(monitor_fd, F_SETLK, &lock);
@@ -1145,7 +1151,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	/* if q is monitoring, append the task summary to the single
 	 * queue summary, update t->resources_used, and delete the task summary. */
 	if(q->monitor_mode)
-		work_queue_monitor_append_report(q, t);
+		resource_monitor_append_report(q, t);
 
 	// Record statistics information for capacity estimation
 	add_task_report(q,t);
@@ -3771,12 +3777,11 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_fil
   }
 
   if(monitor_summary_file)
-	monitor_summary_file = xxstrdup(monitor_summary_file);
+	q->monitor_summary_filename = xxstrdup(monitor_summary_file);
   else
-	monitor_summary_file = string_format("wq-%d-resource-usage", getpid());
+	q->monitor_summary_filename = string_format("wq-%d-resource-usage", getpid());
 
-  q->monitor_file = fopen(monitor_summary_file, "w+");
-  free(monitor_summary_file);
+  q->monitor_file = fopen(q->monitor_summary_filename, "w");
 
   if(!q->monitor_file)
   {
@@ -3784,9 +3789,12 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_fil
 	return 0;
   }
 
-	q->monitor_mode = 1;
+  q->measured_local_resources = malloc(sizeof(struct rmsummary));
+  rmonitor_measure_process(q->measured_local_resources, getpid());
 
-	return 1;
+  q->monitor_mode = 1;
+
+  return 1;
 }
 
 int work_queue_send_receive_ratio(struct work_queue *q, double ratio)
@@ -3933,8 +3941,7 @@ void work_queue_delete(struct work_queue *q)
 		free(q->stats);
 		free(q->stats_disconnected_workers);
 
-		if(q->monitor_mode)
-			fclose(q->monitor_file);
+		work_queue_disable_monitoring(q);
 
 		free(q->poll_table);
 		link_close(q->master_link);
@@ -3943,6 +3950,52 @@ void work_queue_delete(struct work_queue *q)
 		}
 		free(q);
 	}
+}
+
+void update_resource_report(struct work_queue *q, int force_update){
+	static time_t last_update_time = 0;
+
+	// Only measure every few seconds.
+	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL)
+		return;
+
+	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
+}
+
+void work_queue_disable_monitoring(struct work_queue *q) {
+	if(!q->monitor_mode)
+		return;
+
+	fclose(q->monitor_file);
+	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
+
+	char template[] = "rmonitor-summaries-XXXXXX";
+	int final_fd = mkstemp(template);
+	int summs_fd = open(q->monitor_summary_filename, O_RDONLY);
+
+	if( final_fd < 0 || summs_fd < 0 ) {
+		warn(D_DEBUG, "Could not consolidate resource summaries.");
+		return;
+	}
+
+	FILE *final = fdopen(final_fd, "w");
+
+	fprintf(final, "user:        %s\n", getlogin());
+	fprintf(final, "type:        work_queue\n");
+
+	if(q->name)
+		fprintf(final, "master_name: %s\n", q->name);
+
+	fprintf(final, "exit_type:   normal\n");
+	rmsummary_print(final, q->measured_local_resources, NULL);
+
+	copy_fd_to_stream(summs_fd, final);
+
+	fclose(final);
+	close(summs_fd);
+
+	if(rename(template, q->monitor_summary_filename) < 0)
+		warn(D_DEBUG, "Could not move monitor report to final destination file.");
 }
 
 int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
@@ -4291,6 +4344,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(q->name) {
 			update_catalog(q, foreman_uplink, 0);
 		}
+
+		if(q->monitor_mode)
+			update_resource_report(q, 0);
 
 		remove_unresponsive_workers(q);
 

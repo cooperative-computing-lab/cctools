@@ -39,6 +39,8 @@ See the file COPYING for details.
 #include "rmonitor_types.h"
 #include "rmsummary.h"
 
+#include "rmonitor_poll.h"
+
 void rmonitor_poll_all_processes_once(struct itable *processes, struct rmonitor_process_info *acc);
 void rmonitor_poll_all_wds_once(      struct hash_table *wdirs, struct rmonitor_wdir_info *acc);
 void rmonitor_poll_all_fss_once(      struct itable *filesysms, struct rmonitor_filesys_info *acc);
