@@ -71,6 +71,7 @@ SOURCES = \
 	process.c \
 	random.c \
 	rmonitor.c \
+	rmonitor_poll.c \
 	rmsummary.c \
 	set.c \
 	sha1.c \
@@ -104,6 +105,7 @@ HEADERS_PUBLIC = \
 	int_sizes.h \
 	link.h \
 	md5.h \
+	rmonitor_poll.h \
 	rmsummary.h \
 	timestamp.h
 

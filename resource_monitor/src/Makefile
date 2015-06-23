@@ -8,20 +8,17 @@ LOCAL_LINKAGE = -lkvm
 endif
 
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
-LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) librmonitor_poll.a
-OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o rmon_tools.o rmonitor_poll.o rmonitor_helper.o
+LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
+OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o rmon_tools.o rmonitor_helper.o
 PROGRAMS = resource_monitorv resource_monitor resource_monitor_cluster resource_monitor_histograms piggybacker rmonitor_poll_example
 SCRIPTS = resource_monitor_visualizer.py
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
 ifeq ($(UNAME), Darwin)
-LIBRARIES = librmonitor_poll.a
 PROGRAMS = resource_monitorv piggybacker
 endif
 
 all: $(TARGETS)
-
-librmonitor_poll.a: rmonitor_poll.o
 
 ifeq ($(UNAME), FreeBSD)
 librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX): rmonitor_helper.o rmonitor_helper_comm.o $(EXTERNAL_DEPENDENCIES)
@@ -40,10 +37,10 @@ rmonitor_piggyback.h: librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) piggybacker
 endif
 
 resource_monitor.o resource_monitor_pb.o: rmonitor_piggyback.h
-resource_monitor resource_monitorv: rmonitor_helper_comm.o librmonitor_poll.a
+resource_monitor resource_monitorv: rmonitor_helper_comm.o
 resource_monitor_cluster resource_monitor_histograms: rmon_tools.o
 
-rmonitor_poll_example: rmonitor_poll_example.o librmonitor_poll.a
+rmonitor_poll_example: rmonitor_poll_example.o
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
