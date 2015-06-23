@@ -24,6 +24,10 @@ Implementation Logic of Dependency Sources:
 			Do all the work mentioned above for chroot execution engine + add SITEINFO into mountlist file + parrotize the user's command. First parrotize the user's command, then chrootize the user's command.
 	ROOT: do nothing if a ROOT file through ROOT protocol is needed, because ROOT supports data access during runtime without downloading first.
 
+mount_env and mountpoint:
+If only mountpoint is set to A in a specification, the dependency will be downloaded into the umbrella local cache with the file path of D, and a new mountpoint will be added into mount_dict (mount_dict[A] = D).
+If only mount_env is set to B in a specification, the dependency will not be downloaded, package_search will be executed to get one remote storage location, C, of the dependency, a new environment variable will be set (env_para_dict[B] = C).
+If mountpoint is set to A and mount_env is set to B in a specification, the dependency will be downloaded into the umbrella local cache with the file path of D, and a new mountpoint will be added into mount_dict (mount_dict[A] = D) and a new environment variable will also be set (env_para_dict[B] = A).
 """
 
 import sys
@@ -344,14 +348,12 @@ def check_cvmfs_repo(repo_name):
 	else:
 		return ''
 
-def dependency_process(env_para_dict, name, id, mountpoint, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro):
+def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro):
 	""" Process each explicit and implicit dependency.
 
 	Args:
-		env_para_dict: the environment variables which need to be set for the execution of the user's command.
 		name: the item name in the software section
 		id: the id attribute of the processed dependency
-		mountpoint: the mountpoint of the dependency referred by the user's task.
 		action: the action on the downloaded dependency. Options: none, unpack. "none" leaves the downloaded dependency at it is. "unpack" uncompresses the dependency.
 		os_id: the id attribute of the required OS.
 		packages_json: the json object including all the metadata of dependencies.
@@ -670,6 +672,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		host_cctools_path: the path of cctools under the umbrella local cache.
 		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 		mount_dict: a dict including each mounting item in the specification, whose key is the access path used by the user's task; whose value is the actual storage path.
+		env_para_dict: the environment variables which need to be set for the execution of the user's command.
 	"""
 
 	print "Installing software dependencies ..."
@@ -681,28 +684,41 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 	local_cvmfs = ''
 
 	for item in software_spec:
+		# always first check whether the attribute is set or not inside the umbrella specificiation file.
 		id = ''
 		if software_spec[item].has_key('id'):
 			id = software_spec[item]['id']
-		mountpoint = software_spec[item]['mountpoint']
+		mountpoint = ''
+		if software_spec[item].has_key('mountpoint'):
+			mountpoint = software_spec[item]['mountpoint']
+		mount_env = ''
+		if software_spec[item].has_key('mount_env'):
+			mount_env = software_spec[item]['mount_env']
+		action = 'none'
 		if software_spec[item].has_key('action'):
 			action = software_spec[item]['action'].lower()
-		else:
-			action = 'none'
 
-		r1, r2, r3, r4 = dependency_process(env_para_dict, item, id, mountpoint, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro)
-		if r1 == 1 and is_cms_cvmfs_app == 0:
-			is_cms_cvmfs_app = 1
-		if not cvmfs_cms_siteconf_mountpoint:
-			cvmfs_cms_siteconf_mountpoint = r2
-		if r3 != 'PARROT_CVMFS':
-			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, r3)
-			mount_dict[mountpoint] = r3
-		if r4:
-			mountpoint =  os.path.dirname(mountpoint)
-			logging.debug("Add mountpoint (%s:%s) into mount_dict for accessing local cvmfs", mountpoint, r4)
-			mount_dict[mountpoint] = r4
-			local_cvmfs = r4
+		if mount_env and not mountpoint:
+			result = package_search(packages_json, item, id)
+			#table schema: (name text, version text, platform text, store text, store_type text, type text)
+			env_para_dict[mount_env] =result["source"][0]
+		else:
+			r1, r2, r3, r4 = dependency_process(item, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro)
+			if r1 == 1 and is_cms_cvmfs_app == 0:
+				is_cms_cvmfs_app = 1
+			if not cvmfs_cms_siteconf_mountpoint:
+				cvmfs_cms_siteconf_mountpoint = r2
+			if r3 != 'PARROT_CVMFS' and mountpoint:
+				logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, r3)
+				mount_dict[mountpoint] = r3
+			if r4 and mountpoint:
+				mountpoint =  os.path.dirname(mountpoint)
+				logging.debug("Add mountpoint (%s:%s) into mount_dict for accessing local cvmfs", mountpoint, r4)
+				mount_dict[mountpoint] = r4
+				local_cvmfs = r4
+
+			if mount_env and mountpoint:
+				env_para_dict[mount_env] = mountpoint
 
 	#if the OS distribution does not match, add the OS image into the dependency list of the application and download it into the local machine
 	if need_separate_rootfs == 1:
@@ -710,7 +726,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		mountpoint = '/'
 		action = 'unpack'
 		#tuple returned by dependency_process: (is_cms_cvmfs_app, cvmfs_cms_siteconf_mountpoint, mount_value, local_cvmfs)
-		r1, r2, r3, r4 = dependency_process(env_para_dict, item, os_id, mountpoint, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro)
+		r1, r2, r3, r4 = dependency_process(item, os_id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro)
 		logging.debug("Add mountpoint (%s:%s) into mount_dict for /.", mountpoint, r3)
 		mount_dict[mountpoint] = r3
 
@@ -739,9 +755,9 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 	if sandbox_mode == "chroot":
 		chrootize_user_cmd(user_cmd, cwd_setting)
 
-	return (host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict)
+	return (host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict)
 
-def data_install(data_spec, packages_json, sandbox_dir, mount_dict):
+def data_install(data_spec, packages_json, sandbox_dir, mount_dict, env_para_dict):
 	"""Process data section of the specification.
 	At the beginning of the function, mount_dict only includes items for software and os dependencies. After this function is done, all the items for data dependencies will be added into mount_dict.
 
@@ -750,22 +766,38 @@ def data_install(data_spec, packages_json, sandbox_dir, mount_dict):
 		packages_json: the json object including all the metadata of dependencies.
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		mount_dict: a dict including each mounting item in the specification, whose key is the access path used by the user's task; whose value is the actual storage path.
+		env_para_dict: the environment variables which need to be set for the execution of the user's command.
 
 	Returns:
-		the modified mount_dict with all the new mountpoints for data dependencies.
+		mount_dict: the modified mount_dict with all the new mountpoints for data dependencies.
+		env_para_dict: the environment variables which need to be set for the execution of the user's command.
 	"""
 	print "Installing data dependencies ..."
 	for item in data_spec:
+		id = ''
 		if data_spec[item].has_key('id'):
 			id = data_spec[item]['id']
+		mountpoint = ''
+		if data_spec[item].has_key('mountpoint'):
+			mountpoint = data_spec[item]['mountpoint']
+		mount_env = ''
+		if data_spec[item].has_key('mount_env'):
+			mount_env = data_spec[item]['mount_env']
+		action = 'none'
+		if data_spec[item].has_key('action'):
+			action = data_spec[item]['action']
+
+		if mount_env and not mountpoint:
+			result = package_search(packages_json, item, id)
+			#table schema: (name text, version text, platform text, store text, store_type text, type text)
+			env_para_dict[mount_env] =result["source"][0]
 		else:
-			id = ''
-		mountpoint = data_spec[item]['mountpoint']
-		action = data_spec[item]['action']
-		mount_value = data_dependency_process(item, id, packages_json, sandbox_dir, action)
-		logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, mount_value)
-		mount_dict[mountpoint] = mount_value
-	return mount_dict
+			mount_value = data_dependency_process(item, id, packages_json, sandbox_dir, action)
+			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, mount_value)
+			mount_dict[mountpoint] = mount_value
+			if mount_env and mountpoint:
+				env_para_dict[mount_env] = mountpoint
+	return (mount_dict, env_para_dict)
 
 def get_linker_path(hardware_platform, os_image_dir):
 	"""Return the path of ld-linux.so within the downloaded os image dependency
@@ -1849,14 +1881,14 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandb
 	host_cctools_path = '' #the path of the cctools binary which is compatible with the host machine under the umbrella cache
 
 	if spec_json.has_key("software") and spec_json["software"]:
-		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict = software_install(env_para_dict, os_id, spec_json["software"], packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs)
+		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, spec_json["software"], packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs)
 	else:
 		logging.debug("this spec does not have software section!")
-		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict = software_install(env_para_dict, os_id, "", packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs)
+		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, "", packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs)
 
 	sw_mount_dict = mount_dict #sw_mount_dict will be used later to config the $PATH
 	if spec_json.has_key("data") and spec_json["data"]:
-		data_install(spec_json["data"], packages_json, sandbox_dir, mount_dict)
+		mount_dict, env_para_dict = data_install(spec_json["data"], packages_json, sandbox_dir, mount_dict, env_para_dict)
 	else:
 		logging.debug("this spec does not have data section!")
 

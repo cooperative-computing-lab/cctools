@@ -16,11 +16,13 @@
 	},
 	"software": {
 		"cmssw-5.2.5-slc5-amd64": {
+			"mount_env": "CMS_DIR",
 			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
 	},
 	"data": {
 		"final_events_2381.lhe": {
+			"mount_env": "INPUT_FILE",
 			"mountpoint": "/tmp/final_events_2381.lhe",
 			"action": "none"
 		}
