@@ -8,7 +8,7 @@ EXTERNAL="/afs/crc.nd.edu/group/ccl/software/cctools-dependencies"
 
 SYS=`uname -m`
 
-function detect_packages()
+detect_packages()
 {
     unset GLOBUS_LOCATION
     export GLOBUS_LOCATION
