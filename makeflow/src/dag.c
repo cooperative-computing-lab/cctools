@@ -50,6 +50,7 @@ struct dag *dag_create()
 
 	/* Declare special variables */
 	set_insert(d->special_vars, "CATEGORY");
+	set_insert(d->special_vars, "SYMBOL");          /* Deprecated alias for CATEGORY */
 	set_insert(d->special_vars, RESOURCES_CORES);
 	set_insert(d->special_vars, RESOURCES_MEMORY);
 	set_insert(d->special_vars, RESOURCES_DISK);

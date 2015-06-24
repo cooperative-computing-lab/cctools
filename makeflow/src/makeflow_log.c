@@ -188,7 +188,8 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode 
 			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->command);
 
 			/* Record the node category to the log */
-			fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->category->label);
+			fprintf(d->logfile, "# CATEGORY\t%d\t%s\n", n->nodeid, n->category->label);
+			fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->category->label);   /* also write the SYMBOL as alias of CATEGORY, deprecated. */
 
 			/* Record node parents to log */
 			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);

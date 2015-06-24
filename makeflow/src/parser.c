@@ -221,7 +221,7 @@ static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node 
 	struct dag *d = bk->d;
 	int   special = 0;
 
-	if(strcmp("CATEGORY", name) == 0) {
+	if(strcmp("CATEGORY", name) == 0 || strcmp("SYMBOL", name) == 0) {
 		special = 1;
 		/* If we have never seen this label, then create
 		 * a new category, otherwise retrieve the category. */
