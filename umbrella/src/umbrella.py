@@ -720,6 +720,13 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 			if mount_env and mountpoint:
 				env_para_dict[mount_env] = mountpoint
 
+			if not r4 and not env_para_dict.has_key('HTTP_PROXY'):
+				if os.environ.has_key('HTTP_PROXY'):
+					env_para_dict['HTTP_PROXY'] = os.environ['HTTP_PROXY']
+				else:
+					logging.debug("Access CVMFS through Parrot requires the HTTP_PROXY environment variable to be set first.")
+					sys.exit("Access CVMFS through Parrot requires the HTTP_PROXY environment variable to be set first.")
+
 	#if the OS distribution does not match, add the OS image into the dependency list of the application and download it into the local machine
 	if need_separate_rootfs == 1:
 		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
