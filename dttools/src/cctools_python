@@ -1,25 +1,25 @@
-#! /bin/sh
+#!/bin/sh
 
 pythons="$PYTHON2 $PYTHON python2.7 python2.6 python2.4 python2 python3 python"
 
 major_version () {
-	local version=$1
+	version=$1
 	echo ${version%%.*}
 }
 
 minor_version () {
-	local version=$1
-	local major=$(major_version $version)
+	version=$1
+	major=$(major_version $version)
 	echo ${version#${major}} | cut -d . -f 2
 }
 
 match_versions () {
-	local required=$1
-	local available=$2
-	local major_r=$(major_version $required)
-	local minor_r=$(minor_version $required)
-	local major_a=$(major_version $available)
-	local minor_a=$(minor_version $available)
+	required=$1
+	available=$2
+	major_r=$(major_version $required)
+	minor_r=$(minor_version $required)
+	major_a=$(major_version $available)
+	minor_a=$(minor_version $available)
 
 	# majors do not match
 	if [ "$major_r" != "$major_a" ]
@@ -76,6 +76,7 @@ if [ $python = 0 ]
 then
 	echo "Could not find a valid python version ($required_alternatives )." 1>&2
 	echo 'Please set the environment variables PYTHON or PYTHON2 appropriately.' 1>&2
+	exit 1
 else
-	exec $python "$@"
+	exec "$python" "$@"
 fi
