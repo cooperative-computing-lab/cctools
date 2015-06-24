@@ -18,6 +18,8 @@ See the file COPYING for details.
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
 #define RESOURCES_CATEGORY "CATEGORY"
+#define SYMBOL             "SYMBOL"    /* Deprecated alias for RESOURCES_CATEGORY */
+
 #define GC_COLLECT_LIST  "GC_COLLECT_LIST"
 #define GC_PRESERVE_LIST "GC_PRESERVE_LIST"
 

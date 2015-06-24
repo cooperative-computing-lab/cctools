@@ -107,9 +107,7 @@ static int monitor_enable_time_series = 0;
 static int monitor_enable_list_files  = 0;
 
 
-/* Write a verbose transaction log with SYMBOL tags.
- * SYMBOLs are category labels (SYMBOLs should be deprecated
- * once weaver/pbui tools are updated.) */
+/* Write a verbose transaction log with CATEGORY tags. */
 static int log_verbose_mode = 0; 
 
 static char *monitor_limits_name = NULL;
@@ -396,10 +394,11 @@ void dag_log_recover(struct dag *d, const char *filename)
 		struct dag_node *p;
 		for(n = d->nodes; n; n = n->next) {
 			/* Record node information to log */
-			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->original_command);
+			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->command);
 
 			/* Record the node category to the log */
-			fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->category->label);
+			fprintf(d->logfile, "# CATEGORY\t%d\t%s\n", n->nodeid, n->category->label);
+			fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->category->label);  /* also write the SYMBOL as alias of CATEGORY, deprecated. */
 
 			/* Record node parents to log */
 			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
