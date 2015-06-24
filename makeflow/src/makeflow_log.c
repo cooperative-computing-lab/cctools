@@ -11,6 +11,8 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "list.h"
 #include "debug.h"
+#include "stringtools.h"
+#include "unlink_recursive.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -70,6 +72,8 @@ Line format: # COMPLETED timestamp
 
 These event types indicate that the workflow as a whole has started or completed in the indicated manner.
 */
+
+#define CHAR_BUF_LEN 4096
 
 void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n );
 
@@ -245,5 +249,32 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode 
 		}
 	}
 }
+
+void makeflow_log_clean(const char *makeflow_log_file){
+        char fst_line[CHAR_BUF_LEN];
+     	FILE *mf_log = fopen(makeflow_log_file, "r");
+     	if( !mf_log ) {
+       		  fatal("Could not open makeflow log file.");
+     	} else {
+       		  if(fgets(fst_line, sizeof(fst_line), mf_log) != NULL) {
+             		char *token;
+             		char *sandbox_mode;
+             		token = strtok(fst_line, " \t");
+             		sandbox_mode = strtok(NULL, "\t");
+             		if (string_equal(sandbox_mode, "SANDBOX")) {
+                 		token = strtok(NULL, " \t");
+                 		unlink_recursive(token);
+             		} else
+                 		return;
+         	  } else
+             		fatal("Could not read line from makeflow log file.");
+     	}
+}
+
+void makeflow_log_sandbox_mode( struct dag*d, const char *local_task_dir ) {
+     	fprintf(d->logfile, "# SANDBOX\t%s\n", local_task_dir);
+	makeflow_log_sync(d,1);
+}
+
 
 /* vim: set noexpandtab tabstop=4: */
