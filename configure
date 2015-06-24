@@ -4,11 +4,11 @@
 # *** Set for releases. ***
 
 MAJOR=5
-MINOR=0
+MINOR=1
 MICRO=0
 
 # Optionally set this to some name (e.g. RC1 or FINAL)
-RELEASE=
+RELEASE=TRUNK
 
 # *** You should not need to change anything below this line. ***
 ###########################
