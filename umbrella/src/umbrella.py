@@ -272,20 +272,20 @@ def package_search(packages_json, name, id=None):
 		logging.debug("packages_json does not include %s", name)
 		sys.exit("packages_json does not include %s\n" % name)
 
-def cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action):
+def cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro, action):
 	"""Download cctools
 
 	Args:
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		packages_json: the json object including all the metadata of dependencies.
 		hardware_platform: the architecture of the required hardware platform (e.g., x86_64).
-		host_linux_distro: the linux distro of the host machine. For Example: redhat6, centos6.
+		linux_distro: the linux distro.  For Example: redhat6, centos6.
 		action: the action on the downloaded dependency. Options: none, unpack. "none" leaves the downloaded dependency at it is. "unpack" uncompresses the dependency.
 
 	Returns:
 		the path of the downloaded cctools in the umbrella local cache. For example: /tmp/umbrella_test/cache/d19376d92daa129ff736f75247b79ec8/cctools-4.9.0-redhat6-x86_64
 	"""
-	name = "cctools-4.9.0-%s-%s" % (host_linux_distro, hardware_platform)
+	name = "cctools-4.9.0-%s-%s" % (linux_distro, hardware_platform)
 	item = package_search(packages_json, name)
 	dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
 	dependency_download(item['source'][0], item["checksum"], "md5sum", dest, item["format"], action)
@@ -348,7 +348,7 @@ def check_cvmfs_repo(repo_name):
 	else:
 		return ''
 
-def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro):
+def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro):
 	""" Process each explicit and implicit dependency.
 
 	Args:
@@ -363,6 +363,7 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 		cwd_setting: the current working directory for the execution of the user's command.
 		hardware_platform: the architecture of the required hardware platform (e.g., x86_64).
 		host_linux_distro: the linux distro of the host machine. For Example: redhat6, centos6.
+		linux_distro: the linux distro of the required OS. For Example: redhat6, centos6.
 
 	Returns:
 		is_cms_cvmfs_app: whether this is a cms app which will be delivered by cmvfs and the local machine has no cvmfs installed. 1 means this is a cms app. 0 means this is not.
@@ -395,11 +396,16 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 				is_cms_cvmfs_app = 1
 
 			logging.debug("To access cvmfs, cctools binary is needed")
-			cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action)
+			if sandbox_mode in ['parrot']:
+				cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action)
+				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
+
+			if sandbox_mode in ['chroot', 'docker']:
+				cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro, action)
+				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardware_platform, packages_json)
 
 			cvmfs_cms_siteconf_mountpoint = set_cvmfs_cms_siteconf(name, action, packages_json, sandbox_dir)
 
-			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
 
 			mount_value = "PARROT_CVMFS"
 		else:
@@ -609,7 +615,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 
 	return host_linux_distro
 
-def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json):
+def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardware_platform, packages_json):
 	"""Modify the user's command into `parrot_run + the user's command`.
 	The cases when this function should be called: (1) sandbox_mode == parrot; (2) sandbox_mode != parrot and cvmfs is needed to deliver some dependencies not installed on the execution node.
 
@@ -618,14 +624,14 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, ha
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		cwd_setting: the current working directory for the execution of the user's command.
 		hardware_platform: the architecture of the required hardware platform (e.g., x86_64).
-		host_linux_distro: the linux distro of the host machine. For Example: redhat6, centos6.
+		linux_distro: the linux distro. For Example: redhat6, centos6.
 		packages_json: the json object including all the metadata of dependencies.
 
 	Returns:
 		the modified version of the user's cmd.
 	"""
 	#Here we use the cctools package from the local cache (which includes all the packages including cvmfs, globus, fuse and so on). Even if the user may install cctools by himself on the machine, the configuration of the local installation may be not what we want. For example, the user may just configure like this `./configure --prefix ~/cctools`.
-	name = 'cctools-4.9.0-%s-%s' % (host_linux_distro, hardware_platform)
+	name = 'cctools-4.9.0-%s-%s' % (linux_distro, hardware_platform)
 	id = package_search(packages_json, name)["checksum"]
 	dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
 	#4.4 and 4.4 does not support --no-set-foreground feature.
@@ -649,7 +655,7 @@ def chrootize_user_cmd(user_cmd, cwd_setting):
 	user_cmd[0] = 'chroot / /bin/sh -c "cd %s; %s"' %(cwd_setting, user_cmd[0])
 	return user_cmd
 
-def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs):
+def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs):
 	""" Installation each software dependency specified in the software section of the specification.
 	If the application is a CMS app and the execution node does not have cvmfs installed, change `user_cmd` to `parrot_run ... user_cmd` and cvmfs_cms_siteconf_mountpoint.
 
@@ -664,6 +670,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		cwd_setting: the current working directory for the execution of the user's command.
 		hardware_platform: the architecture of the required hardware platform (e.g., x86_64).
 		host_linux_distro: the linux distro of the host machine. For Example: redhat6, centos6.
+		linux_distro: the linux distro of the required OS. For Example: redhat6, centos6.
 		distro_name: the name of the required OS (e.g., redhat).
 		distro_version: the version of the required OS (e.g., 6.5).
 		need_separate_rootfs: whether a separate rootfs is needed to execute the user's command.
@@ -703,7 +710,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 			#table schema: (name text, version text, platform text, store text, store_type text, type text)
 			env_para_dict[mount_env] =result["source"][0]
 		else:
-			r1, r2, r3, r4 = dependency_process(item, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro)
+			r1, r2, r3, r4 = dependency_process(item, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro)
 			if r1 == 1 and is_cms_cvmfs_app == 0:
 				is_cms_cvmfs_app = 1
 			if not cvmfs_cms_siteconf_mountpoint:
@@ -733,7 +740,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		mountpoint = '/'
 		action = 'unpack'
 		#tuple returned by dependency_process: (is_cms_cvmfs_app, cvmfs_cms_siteconf_mountpoint, mount_value, local_cvmfs)
-		r1, r2, r3, r4 = dependency_process(item, os_id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro)
+		r1, r2, r3, r4 = dependency_process(item, os_id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro)
 		logging.debug("Add mountpoint (%s:%s) into mount_dict for /.", mountpoint, r3)
 		mount_dict[mountpoint] = r3
 
@@ -748,8 +755,10 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		if is_cms_cvmfs_app == 0:
 			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
 
+	#if the sandbox_mode is parrot, then the parrot version should match the local machine;
+	#if the sandbox_mode is docker or chroot, then the parrot version should match the specification.
 	if sandbox_mode in ["docker", "chroot"] and is_cms_cvmfs_app == 1 and not local_cvmfs:
-		host_cctools_path = cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, 'unpack')
+		host_cctools_path = cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro, 'unpack')
 		logging.debug("To support Parrot execution engine, cctools binary (%s) is needed.", host_cctools_path)
 		logging.debug("Add mountpoint (%s:%s) into mount_dict", host_cctools_path, host_cctools_path)
 		mount_dict[host_cctools_path] = host_cctools_path
@@ -1888,10 +1897,10 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandb
 	host_cctools_path = '' #the path of the cctools binary which is compatible with the host machine under the umbrella cache
 
 	if spec_json.has_key("software") and spec_json["software"]:
-		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, spec_json["software"], packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs)
+		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, spec_json["software"], packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs)
 	else:
 		logging.debug("this spec does not have software section!")
-		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, "", packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs)
+		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, "", packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs)
 
 	sw_mount_dict = mount_dict #sw_mount_dict will be used later to config the $PATH
 	if spec_json.has_key("data") and spec_json["data"]:
