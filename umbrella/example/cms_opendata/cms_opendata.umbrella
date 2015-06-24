@@ -21,11 +21,11 @@
 		}
 	},
 	"data": {
-		"cms_opendata_cfg": {
+		"demoanalyzer_cfg.py": {
 			"mountpoint": "/tmp/demoanalyzer_cfg.py",
 			"mount_env": "CONFIG_FILE"
 		},
-		"cms_opendata_rootfile": {
+		"00459D48-EB70-E011-AF09-90E6BA19A252.root": {
 			"mount_env": "ROOT_FILE"
 		}
 	},
