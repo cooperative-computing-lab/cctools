@@ -8,7 +8,7 @@ MINOR=0
 MICRO=0
 
 # Optionally set this to some name (e.g. RC1 or FINAL)
-RELEASE=RC1
+RELEASE=RC2
 
 # *** You should not need to change anything below this line. ***
 ###########################
