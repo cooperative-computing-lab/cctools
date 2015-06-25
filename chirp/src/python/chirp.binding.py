@@ -1,16 +1,18 @@
 import os
 import time
 
-cctools_debug_config('chirp')
-cctools_debug_flags_set('chirp')
-
 class Client:
-    def __init__(self, host, timeout=60, authentication=None, tickets=None):
+    def __init__(self, host, timeout=60, authentication=None, tickets=None, debug=False):
         self.host    = host
         self.timeout = timeout
 
+        if debug:
+            cctools_debug_config('chirp_python_client')
+            cctools_debug_flags_set('chirp')
+
+
         if tickets and (authentication is None):
-            authentication = ['tickets']
+            authentication = ['ticket']
 
         self.set_tickets(tickets)
 
@@ -77,16 +79,26 @@ class Client:
     def put(self, source, destination=None, absolute_stop_time=None, timeout=None):
         if destination is None:
             destination = source
-        chirp_recursive_put(self.host,
-                            source, destination,
-                            self.__stoptime(absolute_stop_time, timeout))
+        result = chirp_recursive_put(self.host,
+                                     source, destination,
+                                     self.__stoptime(absolute_stop_time, timeout))
+        if(result > -1):
+            return result
+
+        raise TransferFailure('put', result, source, destination)
+
 
     def get(self, source, destination=None, absolute_stop_time=None, timeout=None):
         if destination is None:
             destination = source
-        chirp_recursive_get(self.host,
-                            source, destination,
-                            self.__stoptime(absolute_stop_time, timeout))
+        result = chirp_recursive_get(self.host,
+                                     source, destination,
+                                     self.__stoptime(absolute_stop_time, timeout))
+
+        if(result > -1):
+            return result
+
+        raise TransferFailure('get', result, source, destination)
 
     def rm(self, path, absolute_stop_time=None, timeout=None):
         status = chirp_reli_rmall(self.host, path, self.__stoptime(absolute_stop_time, timeout))
@@ -164,3 +176,12 @@ class AuthenticationFailure(Exception):
         self.value = value
     def __str__(self):
         return repr(self.value)
+
+class TransferFailure(Exception):
+    def __init__(self, action, status, source, dest):
+        self.action = action
+        self.status = status
+        self.source = source
+        self.dest   = dest
+    def __str__(self):
+        return "Error with %s(%s) %s %s" % (self.action, self.status, self.source, self.dest)
