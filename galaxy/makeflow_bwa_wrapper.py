@@ -27,13 +27,9 @@ parser.add_option('', '--output_SAM', dest="outsam", type="string")
 
 parser.add_option('', '--output_log', dest="outlog", type="string")
 parser.add_option('', '--wq_log', dest="wqlog", type="string")
-
-parser.add_option('', '--cctools_install', dest="cctools", type="string")
-
 parser.add_option('', '--output_dblog', dest="dblog", type="string")
 parser.add_option('', '--output_err', dest="outerr", type="string")
 
-parser.add_option('', '--tmp_dir', dest="tmp_dir", type="string")
 parser.add_option('', '--pwfile', dest="pwfile", type="string")
 
 parser.add_option('', '--user_id', dest="uid", type="string")
@@ -55,41 +51,32 @@ wq_password=options.pwfile
 output_sam = "output_SAM"
 
 makeflow_log = "makeflow_log"
-makeflow_graph = "makeflow_graph.eps"
-
 wq_log = "wq_log"
-wq_graph = "wq_graph.eps"
-
 debug_log = "debug_log"
 output_err = "output_err"
 
 # CREATE TMP AND MOVE FILES IN
 
-
-shutil.copyfile(options.pwfile, "./mypwfile")
-
-os.symlink(cctools_dir+"/apps/makeflow_bwa/makeflow_bwa", "./makeflow_bwa")
-
 if options.ref:
-	shutil.copyfile(options.ref, "./reference.fa")
+	os.symlink(options.ref, "./reference.fa")
 else:
+	print "No reference provided"
 	sys.exit(1)
 
 inputs = "--ref reference.fa "
 
-shutil.copyfile(options.fastq, "./fastq.fq")
+os.symlink(options.fastq, "./fastq.fq")
 inputs += "--fastq fastq.fq "
 
 if options.rfastq:
 	os.symlink(options.rfastq, "./rfastq.fq")
 	inputs += "--rfastq rfastq.fq "
 
-os.system('python ./makeflow_bwa --algoalign bwa_backtrack ' + inputs +
-	  '--makeflow ' +  makeflow + ' --output_SAM ' + output_sam +' '+ ' '.join(args))
+os.system("makeflow_bwa --algoalign {0} {1} --makeflow {2} --output_SAM {3} {4}".format(
+			"bwa_backtrack", inputs, makeflow, output_sam, ' '.join(args)))
 
-os.system(cctools_dir+'/bin/makeflow '
-	  ' -T wq -N ' + wq_project_name + ' -J 50 -p 0 -l ' + makeflow_log +
-	  ' -L '+wq_log+' -d all -o ' + debug_log+" --password mypwfile >&1 2>&1 ")
+os.system("makeflow {0} -T wq -N {1} -J 50 -p 0 -l {2} -L {3} -dall -o {4} --password {5} >&1 2>&1".format(
+			makeflow, wq_project_name, makeflow_log, wq_log, debug_log, options.pwfile))
 
 if options.dblog:
 	shutil.copyfile(debug_log, options.dblog)
@@ -107,6 +94,5 @@ os.remove("./reference.fa")
 os.remove("./fastq.fq")
 os.remove("./makeflow_bwa")
 os.remove("./bwa")
-os.remove("./mypwfile")
 if options.rfastq:
 	os.remove("./rfastq.fq")

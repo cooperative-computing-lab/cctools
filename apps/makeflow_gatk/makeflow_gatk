@@ -14,112 +14,29 @@
 
 import optparse, os, sys, re, string, logging as log, stat
 
-#Initialize Global variables
-arguments = ""
-inputs = ""
-
-def make_inputs(option, opt_str, value, parser):
-        global arguments
-        global inputs
-        arguments += opt_str + " " + value + " "
-        inputs += value + " "
-
-def make_args(option, opt_str, value, parser):
-        global arguments
-        arguments += opt_str + " " + value + " "
-
-def make_flag(option, opt_str, value, parser):
-        global arguments
-        arguments += opt_str + " "
+class PassThroughParser(optparse.OptionParser):
+    def _process_args(self, largs, rargs, values):
+        while rargs:
+            try:
+                optparse.OptionParser._process_args(self,largs,rargs,values)
+            except (optparse.BadOptionError,optparse.AmbiguousOptionError), e:
+                largs.append(e.opt_str)
 
 def parse_req(parser):
         group = optparse.OptionGroup(parser, "Required Parameters")
         group.add_option('-T','--analysis_type',dest='type',type="string",help="Type of analysis to run")
-        parser.add_option_group(group)
-
-def parse_in(parser):
-        group = optparse.OptionGroup(parser, "Optional Inputs")
-        group.add_option('--BQSR',type="string",help="The input covariates table file which enables on-the-fly base quality score recalibration (intended for use with BaseRecalibrator and PrintReads)",action="callback",callback=make_inputs)
-        group.add_option('--excludeIntervals',type="string",help="One or more genomic intervals to exclude from processing. Can be explicitly specified on the command line or in a file (including a rod file)",action="callback",callback=make_inputs)
-        group.add_option('--input_file',dest='input',type="string",help="SAM or BAM file(s)")
-        group.add_option('--intervals',type="string",help="One or more genomic intervals over which to operate. Can be explicitly specified on the command line or in a file (including a rod file)",action="callback",callback=make_inputs)
-        group.add_option('--read_group_black_list',type="string",help="Filters out read groups matching : or a .txt file containing the filter strings one per line.",action="callback",callback=make_inputs)
-        group.add_option('--reference_sequence',dest='ref',type="string",help="Reference sequence file")
-        group.add_option('--reference_index',dest='ref_index',type="string",help="Reference sequence file")
-        group.add_option('--reference_dict',dest='ref_dict',type="string",help="Reference sequence file")
-        parser.add_option_group(group)
-
-def parse_out(parser):
-        group = optparse.OptionGroup(parser, "Optional Outputs")
-        group.add_option('--log_to_file',dest='log',type="string",help="Set the logging location")
+        group.add_option('--query',dest='input',type="string",help="SAM or BAM file(s)")
+        group.add_option('--ref',dest='ref',type="string",help="Reference sequence file")
         group.add_option('--out',dest='output',type="string",help="Output name")
+        group.add_option('--Xmx', dest='xmx', help='Specify Java Heap size', default="4G")
         parser.add_option_group(group)
-
-def parse_optp(parser):
-        group = optparse.OptionGroup(parser, "Optional Parameters")
-        group.add_option('--baq',type="string",help="Type of BAQ calculation to apply in the engine",action="callback",callback=make_args)
-        group.add_option('--baqGapOpenPenalty',type="string",help="BAQ gap open penalty (Phred Scaled). Default value is 40. 30 is perhaps better for whole genome call sets",action="callback",callback=make_args)
-        group.add_option('--defaultBaseQualities',type="string",help="If reads are missing some or all base quality scores, this value will be used for all base quality scores",action="callback",callback=make_args)
-        group.add_option('--downsample_to_coverage',type="string",help="Coverage [integer] to downsample to. For locus-based traversals (eg., LocusWalkers and ActiveRegionWalkers),this controls the maximum depth of coverage at each locus. For non-locus-based traversals (eg., ReadWalkers), this controls the maximum number of reads sharing the same alignment start position. Note that this downsampling option does NOT produce an unbiased random sampling from all available reads at each locus: instead, the primary goal of the to-coverage downsampler is to maintain an even representation of reads from all alignment start positions when removing excess coverage. For a true across-the-board unbiased random sampling of reads, use -dfrac instead. Also note that the coverage target is an approximate goal that is not guaranteed to be met exactly: the downsampling algorithm will under some circumstances retain slightly more coverage than requested.",action="callback",callback=make_args)
-        group.add_option('--downsample_to_fraction',type="string",help="Fraction [0.0-1.0] of reads to downsample to",action="callback",callback=make_args)
-        group.add_option('--downsampling_type',type="string",help="Type of reads downsampling to employ at a given locus. Reads will be selected randomly to be removed from the pile based on the method described here",action="callback",callback=make_args)
-        group.add_option('--gatk_key',type="string",help="GATK Key file. Required if running with -et NO_ET. Please see http://gatkforums.broadinstitute.org/discussion/1250/what-is-phone-home-and-how-does-it-affect-me#latest for details.",action="callback",callback=make_inputs)
-        group.add_option('--globalQScorePrior',type="string",help="The global Qscore Bayesian prior to use in the BQSR. If specified, this value will be used as the prior for all mismatch quality scores instead of the actual reported quality score",action="callback",callback=make_args)
-        group.add_option('--interval_merging',type="string",help="Indicates the interval merging rule we should use for abutting intervals",action="callback",callback=make_args)
-        group.add_option('--interval_padding',type="string",help="Indicates how many basepairs of padding to include around each of the intervals specified with the -L/--intervals argument",action="callback",callback=make_args)
-        group.add_option('--interval_set_rule',type="string",help="Indicates the set merging approach the interval parser should use to combine the various -L or -XL inputs",action="callback",callback=make_args)
-        group.add_option('--logging_level',type="string",help="Set the minimum level of logging, i.e. setting INFO get's you INFO up to FATAL, setting ERROR gets you ERROR and FATAL level logging.",action="callback",callback=make_args)
-        group.add_option('--maxRuntime',type="string",help="If provided, that GATK will stop execution cleanly as soon after maxRuntime has been exceeded, truncating the run but not exiting with a failure. By default the value is interpreted in minutes, but this can be changed by maxRuntimeUnits",action="callback",callback=make_args)
-        group.add_option('--maxRuntimeUnits',type="string",help="The TimeUnit for maxRuntime [MINUTES]",action="callback",callback=make_args)
-        group.add_option('--num_cpu_threads_per_data_thread',type="string",help="How many CPU threads should be allocated per data thread to running this analysis?",action="callback",callback=make_args)
-        group.add_option('--num_bam_file_handles',type="string",help="The total number of BAM file handles to keep open simultaneously",action="callback",callback=make_args)
-        group.add_option('--num_threads',type="string",help="How many data threads should be allocated to running this analysis.",action="callback",callback=make_args)
-        group.add_option('--pedigree',type="string",help="Pedigree files for samples",action="callback",callback=make_inputs)
-        group.add_option('--pedigreeString',type="string",help="Pedigree string for samples",action="callback",callback=make_args)
-        group.add_option('--pedigreeValidationType',type="string",help="How strict should we be in validating the pedigree information?",action="callback",callback=make_args)
-        group.add_option('--performanceLog',dest='plog',type="string",help="If provided, a GATK runtime performance log will be written to this file")
-        group.add_option('--phone_home',type="string",help="What kind of GATK run report should we generate? AWS is the default, can be NO_ET so nothing is posted to the run repository. Please see http://gatkforums.broadinstitute.org/discussion/1250/what-is-phone-home-and-how-does-it-affect-me#latest for details.",action="callback",callback=make_args)
-        group.add_option('--preserve_qscores_less_than',type="string",help="Bases with quality scores less than this threshold won't be recalibrated (with -BQSR)",action="callback",callback=make_args)
-        group.add_option('--read_buffer_size',type="string",help="Number of reads per SAM file to buffer in memory",action="callback",callback=make_args)
-        group.add_option('--read_filter',type="string",help="Specify filtration criteria to apply to each read individually",action="callback",callback=make_args)
-        group.add_option('--tag',type="string",help="Arbitrary tag string to identify this GATK run as part of a group of runs, for later analysis",action="callback",callback=make_args)
-        group.add_option('--unsafe',type="string",help="If set, enables unsafe operations: nothing will be checked at runtime. For expert users only who know what they are doing. We do not support usage of this argument.",action="callback",callback=make_args)
-        group.add_option('--validation_strictness',type="string",help="How strict should we be with validation",action="callback",callback=make_args)
-        group.add_option('--heterozygosity',type="string",help="Heterozygosity value used to compute prior likelihoods for any locus. See the GATKDocs for full details on the meaning of this population genetics concept",action="callback",callback=make_args)
-        group.add_option('--indel_heterozygosity',type="string",help="Heterozygosity for indel calling. See the GATKDocs for heterozygosity for full details on the meaning of this population genetics concept",action="callback",callback=make_args)
-        parser.add_option_group(group)
-
-def parse_optf(parser):
-        group = optparse.OptionGroup(parser, "Optional Flags")
-        group.add_option('--allow_potentially_misencoded_quality_scores',help="Do not fail when encountering base qualities that are too high and that seemingly indicate a problem with the base quality encoding of the BAM file",action="callback",callback=make_flag)
-        group.add_option('--disable_indel_quals',help="If true, disables printing of base insertion and base deletion tags (with -BQSR)",action="callback",callback=make_flag)
-        group.add_option('--emit_original_quals',help="If true, enables printing of the OQ tag with the original base qualities (with -BQSR)",action="callback",callback=make_flag)
-        group.add_option('--fix_misencoded_quality_scores',help="Fix mis-encoded base quality scores",action="callback",callback=make_flag)
-        group.add_option('--keep_program_records',help="Should we override the Walker's default and keep program records from the SAM header",action="callback",callback=make_flag)
-        group.add_option('--monitorThreadEfficiency',help="Enable GATK threading efficiency monitoring",action="callback",callback=make_flag)
-        group.add_option('--nonDeterministicRandomSeed',help="Makes the GATK behave non deterministically, that is, the random numbers generated will be different in every run",action="callback",callback=make_flag)
-        group.add_option('--remove_program_records',help="Should we override the Walker's default and remove program records from the SAM header",action="callback",callback=make_flag)
-        group.add_option('--useOriginalQualities',help="If set, use the original base quality scores from the OQ tag when present instead of the standard scores",action="callback",callback=make_flag)
-        group.add_option('--version',help="Output version information",action="callback",callback=make_flag)
-        parser.add_option_group(group)
-
-def parse_advp(parser):
-        group = optparse.OptionGroup(parser, "Advanced Parameters")
-        group.add_option('--sample_rename_mapping_file',type="string",help="Rename sample IDs on-the-fly at runtime using the provided mapping file. This option requires that each BAM file listed in the mapping file have only a single sample specified in its header (though there may be multiple read groups for that sample). Each line of the mapping file must contain the absolute path to a BAM file, followed by whitespace, followed by the new sample name for that BAM file.",action="callback",callback=make_args)
-        parser.add_option_group(group)
-
-def parse_advf(parser):
-        group = optparse.OptionGroup(parser, "Advanced Flags")
-        group.add_option('--allow_bqsr_on_reduced_bams_despite_repeated_warnings',help="Do not fail when running base quality score recalibration on a reduced BAM file even though we highly recommend against it",action="callback",callback=make_flag)
-        parser.add_option_group(group)
-
+		
 def parse_makeflow(parser):
         group = optparse.OptionGroup(parser, "Makeflow Preparation Options")
         group.add_option('--makeflow', dest='makeflow', help='Makeflow destination file [stdout]')
-        group.add_option('--makeflow-config', dest='config', help='Makeflow configurations')
-        group.add_option('--num-seq-part', dest='numreads', help='Makeflow configurations')
+        group.add_option('--makeflow-config', dest='config', help='Makeflow configurations File')
+        group.add_option('--num-seq', dest='num_seq', help='Determines number of sequences per partition [10000]', default=10000,type=int)
         group.add_option('--verbose', dest='verbose', help='Show verbose level output', action='store_true',default="False")
-        group.add_option('--Xmx', dest='xmx', help='Specify Java Heap size', action='store_true',default="4G")
         parser.add_option_group(group)
 
 
@@ -131,12 +48,21 @@ def search_file(filename, search_path, pathsep=os.pathsep):
             if os.path.exists(candidate): return os.path.abspath(candidate)
         return None
 
-def write_progeny_split(destination):
-	if destination:
-		prog_split = open(destination, 'w')
+def find_file(filename, path):
+	log.info("Searching PATH for : {0}".format(filename))
+	loc = search_file(filename, path)
+	if os.path.exists("./{0}".format(filename)):
+		log.info("{0} found locally".format(filename))
+	elif loc and not os.path.exists("./{0}".format(filename)):
+		os.symlink(loc, filename)
+		log.info("{0} linked from : {1}".format(filename, loc))
 	else:
-		prog_split = sys.stdout
+	    log.error("Unable to find {0}".format(filename))
+	    sys.exit(3)
 
+def write_progeny_split(destination):
+	prog_split = open(destination, 'w')
+	log.info("Writing Partitioning Script to : {0}".format(destination))
 	try:
 		prog_split.write('''#!/usr/bin/perl
 #Programmer: Nicholas Hazekamp
@@ -264,11 +190,8 @@ foreach $output (@outputs) {
 			prog_split.close()
 
 def write_java(destination):
-	if destination:
-		ref_split = open(destination, 'w')
-	else:
-		ref_split = sys.stdout
-
+	ref_split = open(destination, 'w')
+	log.info("Writing Java Environment Script to : {0}".format(destination))
 	try:
 		ref_split.write('''
 # Author: Nicholas Hazekamp
@@ -279,12 +202,9 @@ import optparse, os, sys, tempfile, shutil, stat
 
 #Parse Command Line
 parser = optparse.OptionParser()
-parser.add_option('', '--java', dest=\"java\", type=\"string\")
 parser.add_option('', '--inputs', dest=\"inputs\", type=\"string\")
 parser.add_option('', '--output', dest=\"output\", type=\"string\")
 (options, args) = parser.parse_args()
-
-os.system('unzip ' + options.java + "> /dev/null 2>&1")
 
 output = \"\"
 if options.output:
@@ -314,13 +234,15 @@ if java_home == \"NULL\":
 if ld_lib == \"NULL\":
 	os.environ['LD_LIBRARY_PATH'] = ld_lib
 if java_opt == \"\":
-	os.environ['_JAVA_OPTIONS'] = \"NULL\"''')
+	os.environ['_JAVA_OPTIONS'] = \"NULL\"
+''')
 	finally:
 		if destination:
 			ref_split.close()
 
 
-def count_splits( fastq , num_reads):
+def count_splits( fastq , num_reads, log):
+	log.info("Counting Number of Partitions")
 	num_outputs = 1
 	num_reads = int(num_reads)
 	FILE = open(fastq, "r")
@@ -330,22 +252,28 @@ def count_splits( fastq , num_reads):
 		if re.match("^>", line) is not None:
 			if (read_count == num_reads):
 				num_outputs += 1
-				read_count = 0
+				read_count = 0	
+				if ( num_outputs % 10 == 0):
+					log.info("Current Number of Partitions : {0}".format(num_outputs))
 			else:
 				read_count += 1
 		#place all other lines in FASTQ file under same sequence
 	FILE.close()
+	log.info("Total Number of Partitions : {0}".format(num_outputs))
 	return num_outputs
 
 
-def write_makeflow(destination, configuration, arguments, inputs, num_reads):
+def write_makeflow(destination, configuration, arguments, ref, input, num_reads, log):
 	if destination:
 		makeflow = open(destination,'w')
+		log.info("Writing Makeflow to : {0}".format(destination))
 	else:
 		makeflow = sys.stdout
+		log.info("Writing Makeflow to : STDOUT")
 
 	try:
 		if options.config:
+			log.info("Reading Configuration from : {0}".format(configuration))
 			config = open(configuration, 'r')
 			makeflow.write(config.read())
 
@@ -353,76 +281,73 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 		if options.xmx:
 			xmx = " -Xmx" + options.xmx + " "
 
-		ref = options.ref
-		input = options.input[:-3]
-		input_full_bam = input+"bam"
-		input_full_sam = input+"sam"
+		(ref_base, sep, file_ext) = ref.rpartition(".")
+		if not re.search("f[ast]?a", file_ext, re.IGNORECASE):
+			ref_base = "{0}.{1}".format(ref_base, file_ext)
 
-		makeflow.write("\n\n "+input_full_sam+" : samtools "+input_full_bam)
-		makeflow.write("\n\tLOCAL ./samtools view -h "+input_full_bam+" > "+input_full_sam)
 
-		merge_files = ""
-		merge_inputs = ""
-		count = count_splits(ref, num_reads);
+		(input, sep, file_ext) = input.rpartition(".")
+		if not re.search("[bs]am", file_ext, re.IGNORECASE):
+			input = "{0}.{1}".format(input,file_ext)
 
+		input_full_bam = "{0}.bam".format(input)
+		input_full_sam = "{0}.sam".format(input)
+
+		log.info("Writing Partitioning Rules")
+	
+		makeflow.write("\n\n {0} : samtools {1}".format(input_full_sam, input_full_bam))
+		makeflow.write("\n\tLOCAL ./samtools view -h {0} > {1}".format(input_full_bam, input_full_sam))
+
+		merge_files = []
+		merge_inputs = []
+		count = count_splits(ref, num_reads, log);
+			
 		inputs = []
 		refs = []
 		for i in range(0, count):
-			refs.append(ref[:-3]+"."+str(i)+".fa")
-			inputs.append(input+str(i)+".sam")
+			refs.append("{0}.{1}.fa".format(ref_base, i))
+			inputs.append("{0}.{1}.sam".format(input,i))
 
-		makeflow.write("\n\n"+" ".join(refs)+" "+" ".join(inputs)+" : gatk_split_align "+ref+" "+input_full_sam)
-		makeflow.write("\n\tLOCAL perl gatk_split_align "+str(num_reads)+" "+ref+" "+input_full_sam)
+		makeflow.write("\n\n{0} {1} : gatk_split_align {2} {3}".format(' '.join(refs), ' '.join(inputs), ref, input_full_sam))
+		makeflow.write("\n\tLOCAL perl gatk_split_align {0} {1} {2}".format(num_reads, ref, input_full_sam))
+
+		log.info("Writing Prep and GATK Rules")
 
 		for i in range(0, count):
+			ref_sp = "{0}.{1}.fa".format(ref_base, i)
+			index = "{0}.fai".format(ref_sp)
+			dict  = "{0}.{1}.dict".format(ref_base,i)
 
-			ref_sp = ref[:-3]+"."+str(i)+".fa"
-			index = ref_sp+".fai "
-			dict  = ref[:-3]+"."+str(i)+".dict "
+			makeflow.write("\n\n{0} : samtools {1}".format(index, ref_sp))
+			makeflow.write("\n\t./samtools faidx {0}".format(ref_sp))
 
-			makeflow.write("\n\n"+index+" : samtools "+ref_sp)
-			makeflow.write("\n\t./samtools faidx "+ref_sp)
+			makeflow.write("\n\n{0} : java_run jre/ picard.jar {1}".format(dict,ref_sp))
+			makeflow.write("\n\tpython java_run --inputs \"-jar picard.jar CreateSequenceDictionary R={0} O={1}\"".format(ref_sp, dict))
 
-			makeflow.write("\n\n"+dict+" : java_run jre.zip picard.jar "+ref_sp)
-			makeflow.write("\n\tpython java_run --java jre.zip --inputs \"-jar picard.jar CreateSequenceDictionary R="+ref_sp+" O="+dict+"\"")
+			ref_index = "{0} {1} {2}".format(ref_sp, index, dict)			
+			input_sam = "{0}.{1}.sam".format(input, i)
+			input_bam = "{0}.{1}.bam".format(input, i)
+			input_bai = "{0}.bai".format(input_bam)
+			input_vcf = "{0}.{1}.vcf".format(input, i)
+			input_idx = "{0}.idx".format(input_vcf)
 
-			ref_index = ref_sp+" "+index+" "+dict+" "
-			input_sam = input+str(i)+".sam"
-			input_bam = input+str(i)+".bam"
-			input_bai = input_bam+".bai"
-			input_vcf = input+str(i)+".vcf"
-			input_idx = input_vcf+".idx"
+			makeflow.write("\n\n{0} {1} : {2} samtools".format(input_bam, input_bai, input_sam))
+			makeflow.write("\n\t./samtools view -bS {0} > {1}".format(input_sam, input_bam))
+			makeflow.write(";\t./samtools index {0}".format(input_bam))
 
-			makeflow.write("\n\n"+input_bam+" "+input_bai+" : "+input_sam+" samtools")
-			makeflow.write("\n\t./samtools view -bS "+input_sam+" > "+input_bam)
-			makeflow.write(";\t./samtools index "+input_bam)
+			query = "{0} {1}".format(input_bai, input_bam)
 
-			query = input_bai+" "+input_bam+" "
+			merge_files.append("{0} {1}".format(input_vcf, input_idx))
+			merge_inputs.append("--variant {0}".format(input_vcf)) 
+				
+			makeflow.write("\n\n{0} {1} : java_run jre {2} {3} GenomeAnalysisTK.jar".format(input_vcf, input_idx, ref_index, query))
+			makeflow.write("\n\tpython java_run --inputs \"{0} -jar GenomeAnalysisTK.jar -T {1} -R {2} -I {3} -o {4} {5}\"".format(xmx, options.type, ref_sp, input_bam, input_vcf, ' '.join(arguments)))
 
-			log=""
-			if options.log:
-				log = options.log
-				arguments += "-PF " + log + "."+ input + " "
+		log.info("Writing Joining Rules")
 
-			plog=""
-			if options.plog:
-				plog = options.plog
-				arguments += "-log " + plog + "."+ input + " "
-
-			#added = "--heterozygosity 0.1 --indel_heterozygosity 0.05 --unsafe -fixMisencodedQuals "
-			added = ""
-
-			merge_files += input_vcf+" "+input_idx+" "
-			merge_inputs += input_vcf+" "
-
-			makeflow.write("\n\n"+ log + plog +input_vcf+" "+input_idx+ " : java_run jre.zip "+ref_index+query+" GenomeAnalysisTK.jar ")
-			makeflow.write("\n\tpython java_run --java jre.zip --inputs \""+xmx+"-jar GenomeAnalysisTK.jar -T " + options.type +" -R "+ref_sp+" -I "+input_bam+" -o "+input_vcf+" "+arguments+added+"\"")
-
-
-		makeflow.write("\n\n"+options.output+" :  "+merge_files)
-		makeflow.write("\n\tLOCAL vcf-concat "+merge_inputs+" > "+options.output)
-		makeflow.write("\n")
-
+		makeflow.write("\n\n{0} : GenomeAnalysisTK.jar {1} {2}".format(options.output, ref, ' '.join(merge_files)))
+		makeflow.write("\n\tLOCAL java -jar GenomeAnalysisTK.jar -T CombineVariants -R {0} {1} -o {2}".format(ref, ' '.join(merge_inputs), options.output)) 
+		makeflow.write("\n") 
 
 	finally:
 		if options.makeflow is not None:
@@ -432,16 +357,11 @@ def write_makeflow(destination, configuration, arguments, inputs, num_reads):
 #MAIN
 
     #Parse Command Line
-parser = optparse.OptionParser(usage="usage: %prog  [options]")
+parser = PassThroughParser()
+parser.usage="usage: %prog  [options]"
 
-parse_makeflow(parser)
 parse_req(parser)
-parse_in(parser)
-parse_out(parser)
-parse_optp(parser)
-parse_optf(parser)
-parse_advp(parser)
-parse_advf(parser)
+parse_makeflow(parser)
 
 (options, args) = parser.parse_args()
 
@@ -451,43 +371,54 @@ if options.verbose == True:
 else:
         log.basicConfig(format="%(levelname)s: %(message)s")
 
-if not options.type:
-        log.error("No analysis type selected: --analysis_type required")
-	sys.exit(4);
-
 if not options.ref:
-        log.error("No reference file: --reference_sequence required")
-	sys.exit(4);
+	log.error("Reference File required : --reference_sequence")
+	sys.exit(4)
+else:
+	log.info("Reference File : {0}".format(options.ref))
 
-input = 0
-if options.input:
-	input = input + 1;
-if options.numreads:
-	num_reads = options.numreads
+if not options.input:
+	log.error("Input SAM required : --input")
+	sys.exit(4)
+else:
+	log.info("Input SAM : {0}".format(options.input))
+
+if not options.type:
+	log.error("Analysis Type required : --analysis_type")
+	sys.exit(4)
+else:
+	log.info("Analysis Type : {0}".format(options.type))
+
+if options.num_seq:
+	num_reads = options.num_seq
 else:
 	num_reads = "10000"
 
-if input < 1:
-	log.error("No input or input_list: --input or --input_list required")
-	sys.exit(4);
-
-if input > 1:
-	log.error("Only one of input or input_list may be used: --input or --input_list required")
-	sys.exit(4);
+log.info("Partition Size : {0}".format(num_reads))
 
 path = os.getenv("PATH")
-path += os.pathsep + os.pathsep + "."
+path = "{0}{1}{1}.".format(path, os.pathsep)
 
-GATK = search_file("GenomeAnalysisTK.jar", path)
-if GATK and not os.path.exists("./GenomeAnalysisTK.jar"):
-        log.info("GenomeAnalysisTK.jar located: " + GATK)
-        os.symlink(GATK, "GenomeAnalysisTK.jar")
-elif not os.path.exists("./GenomeAnalysisTK.jar"):
-        log.error("Unable to find GenomeAnalysisTK.jar")
-        sys.exit(3)
+find_file("GenomeAnalysisTK.jar", path)
+
+find_file("samtools", path)
+
+find_file("picard.jar", path)
+
+java_home = os.environ.get('JAVA_HOME', 'NULL')
+if not java_home:
+	log.error("JAVA_HOME not initialized")
+	sys.exit(6)
+
+if os.path.exists("./jre"):
+	log.info("Using local jre directory")
+else:
+	os.symlink(java_home, "jre")
+	log.info("JAVA_HOME linked to : jre")
 
 write_progeny_split("gatk_split_align")
 write_java("java_run")
 
 
-write_makeflow(options.makeflow, options.config, arguments, inputs, num_reads)
+write_makeflow(options.makeflow, options.config, args, options.ref, options.input, num_reads, log)
+

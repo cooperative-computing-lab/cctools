@@ -5,7 +5,6 @@
 
     --user_id=$__user_id__
     --pwfile=${GALAXY_DATA_INDEX_DIR}/mypwfile
-    --cctools_install=${GALAXY_DATA_INDEX_DIR}/shared/cctools
 	--ref=$reference
 	--num_seq=$num_seq
 
