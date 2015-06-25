@@ -112,7 +112,7 @@ HEADERS_PUBLIC = \
 LIBRARIES = libdttools.a
 OBJECTS = $(SOURCES:%.c=%.o)
 PROGRAMS = catalog_update catalog_server watchdog
-SCRIPTS = cctools_gpu_autodetect
+SCRIPTS = cctools_gpu_autodetect cctools_python
 TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
 TEST_PROGRAMS = auth_test microbench multirun
 
