@@ -285,38 +285,82 @@ def write_makeflow(destination, configuration, arguments, ref, input, num_reads,
 		if not re.search("f[ast]?a", file_ext, re.IGNORECASE):
 			ref_base = "{0}.{1}".format(ref_base, file_ext)
 
-
+		comp = ""
 		(input, sep, file_ext) = input.rpartition(".")
 		if not re.search("[bs]am", file_ext, re.IGNORECASE):
 			input = "{0}.{1}".format(input,file_ext)
+		elif re.search("bam", file_ext, re.IGNORECASE):
+			comp = "bam"
+		else:
+			comp = "sam"
 
+		input_original = "{0}.{1}".format(input,file_ext)
+		
 		input_full_bam = "{0}.bam".format(input)
 		input_full_sam = "{0}.sam".format(input)
 
 		log.info("Writing Partitioning Rules")
 	
-		makeflow.write("\n\n {0} : samtools {1}".format(input_full_sam, input_full_bam))
-		makeflow.write("\n\tLOCAL ./samtools view -h {0} > {1}".format(input_full_bam, input_full_sam))
+		if num_reads > 0:
+			makeflow.write("\n\n {0} : samtools {1}".format(input_full_sam, input_full_bam))
+			makeflow.write("\n\tLOCAL ./samtools view -h {0} > {1}".format(input_full_bam, input_full_sam))
 
-		merge_files = []
-		merge_inputs = []
-		count = count_splits(ref, num_reads, log);
+			merge_files = []
+			merge_inputs = []
+
+			count = count_splits(ref, num_reads, log);
 			
-		inputs = []
-		refs = []
-		for i in range(0, count):
-			refs.append("{0}.{1}.fa".format(ref_base, i))
-			inputs.append("{0}.{1}.sam".format(input,i))
+			inputs = []
+			refs = []
+			for i in range(0, count):
+				refs.append("{0}.{1}.fa".format(ref_base, i))
+				inputs.append("{0}.{1}.sam".format(input,i))
+	
+			makeflow.write("\n\n{0} {1} : gatk_split_align {2} {3}".format(' '.join(refs), ' '.join(inputs), ref, input_full_sam))
+			makeflow.write("\n\tLOCAL perl gatk_split_align {0} {1} {2}".format(num_reads, ref, input_full_sam))
 
-		makeflow.write("\n\n{0} {1} : gatk_split_align {2} {3}".format(' '.join(refs), ' '.join(inputs), ref, input_full_sam))
-		makeflow.write("\n\tLOCAL perl gatk_split_align {0} {1} {2}".format(num_reads, ref, input_full_sam))
+			log.info("Writing Prep and GATK Rules")
 
-		log.info("Writing Prep and GATK Rules")
+			for i in range(0, count):
+			
+				ref_sp = "{0}.{1}.fa".format(ref_base, i)
+				index = "{0}.fai".format(ref_sp)
+				dict  = "{0}.{1}.dict".format(ref_base,i)
 
-		for i in range(0, count):
-			ref_sp = "{0}.{1}.fa".format(ref_base, i)
+				makeflow.write("\n\n{0} : samtools {1}".format(index, ref_sp))
+				makeflow.write("\n\t./samtools faidx {0}".format(ref_sp))
+
+				makeflow.write("\n\n{0} : java_run jre/ picard.jar {1}".format(dict,ref_sp))
+				makeflow.write("\n\tpython java_run --inputs \"-jar picard.jar CreateSequenceDictionary R={0} O={1}\"".format(ref_sp, dict))
+
+				ref_index = "{0} {1} {2}".format(ref_sp, index, dict)			
+				input_sam = "{0}.{1}.sam".format(input, i)
+				input_bam = "{0}.{1}.bam".format(input, i)
+				input_bai = "{0}.bai".format(input_bam)
+				input_vcf = "{0}.{1}.vcf".format(input, i)
+				input_idx = "{0}.idx".format(input_vcf)
+
+				makeflow.write("\n\n{0} {1} : {2} samtools".format(input_bam, input_bai, input_sam))
+				makeflow.write("\n\t./samtools view -bS {0} > {1}".format(input_sam, input_bam))
+				makeflow.write(";\t./samtools index {0}".format(input_bam))
+
+				query = "{0} {1}".format(input_bai, input_bam)
+
+				merge_files.append("{0} {1}".format(input_vcf, input_idx))
+				merge_inputs.append("--variant {0}".format(input_vcf)) 
+				
+				makeflow.write("\n\n{0} {1} : java_run jre {2} {3} GenomeAnalysisTK.jar".format(input_vcf, input_idx, ref_index, query))
+				makeflow.write("\n\tpython java_run --inputs \"{0} -jar GenomeAnalysisTK.jar -T {1} -R {2} -I {3} -o {4} {5}\"".format(xmx, options.type, ref_sp, input_bam, input_vcf, ' '.join(arguments)))
+
+			log.info("Writing Joining Rules")
+
+			makeflow.write("\n\n{0} : GenomeAnalysisTK.jar {1} {2}".format(options.output, ref, ' '.join(merge_files)))
+			makeflow.write("\n\tLOCAL java -jar GenomeAnalysisTK.jar -T CombineVariants -R {0} {1} -o {2}".format(ref, ' '.join(merge_inputs), options.output)) 
+
+		else:
+			ref_sp = "{0}.fa".format(ref_base)
 			index = "{0}.fai".format(ref_sp)
-			dict  = "{0}.{1}.dict".format(ref_base,i)
+			dict  = "{0}.dict".format(ref_base)
 
 			makeflow.write("\n\n{0} : samtools {1}".format(index, ref_sp))
 			makeflow.write("\n\t./samtools faidx {0}".format(ref_sp))
@@ -325,28 +369,22 @@ def write_makeflow(destination, configuration, arguments, ref, input, num_reads,
 			makeflow.write("\n\tpython java_run --inputs \"-jar picard.jar CreateSequenceDictionary R={0} O={1}\"".format(ref_sp, dict))
 
 			ref_index = "{0} {1} {2}".format(ref_sp, index, dict)			
-			input_sam = "{0}.{1}.sam".format(input, i)
-			input_bam = "{0}.{1}.bam".format(input, i)
-			input_bai = "{0}.bai".format(input_bam)
-			input_vcf = "{0}.{1}.vcf".format(input, i)
+			input_bai = "{0}.bai".format(input_original)
+
+			if not comp == "bam":
+				makeflow.write("\n\n{0} {1} : {2} samtools".format(input_bai, input_full_bam, input_original))
+				makeflow.write("\n\t./samtools view -bS {0} > {1};".format(input_original, input_full_bam))
+			else:
+				makeflow.write("\n\n{0} : {1} samtools\n".format(input_bai, input_full_bam))
+			makeflow.write("\t./samtools index {0}".format(input_full_bam))
+
+			query = "{0} {1}".format(input_bai, input_full_bam)
+			input_vcf = options.output
 			input_idx = "{0}.idx".format(input_vcf)
 
-			makeflow.write("\n\n{0} {1} : {2} samtools".format(input_bam, input_bai, input_sam))
-			makeflow.write("\n\t./samtools view -bS {0} > {1}".format(input_sam, input_bam))
-			makeflow.write(";\t./samtools index {0}".format(input_bam))
-
-			query = "{0} {1}".format(input_bai, input_bam)
-
-			merge_files.append("{0} {1}".format(input_vcf, input_idx))
-			merge_inputs.append("--variant {0}".format(input_vcf)) 
-				
 			makeflow.write("\n\n{0} {1} : java_run jre {2} {3} GenomeAnalysisTK.jar".format(input_vcf, input_idx, ref_index, query))
-			makeflow.write("\n\tpython java_run --inputs \"{0} -jar GenomeAnalysisTK.jar -T {1} -R {2} -I {3} -o {4} {5}\"".format(xmx, options.type, ref_sp, input_bam, input_vcf, ' '.join(arguments)))
+			makeflow.write("\n\tpython java_run --inputs \"{0} -jar GenomeAnalysisTK.jar -T {1} -R {2} -I {3} -o {4} {5}\"".format(xmx, options.type, ref_sp, input_full_bam, input_vcf, ' '.join(arguments)))
 
-		log.info("Writing Joining Rules")
-
-		makeflow.write("\n\n{0} : GenomeAnalysisTK.jar {1} {2}".format(options.output, ref, ' '.join(merge_files)))
-		makeflow.write("\n\tLOCAL java -jar GenomeAnalysisTK.jar -T CombineVariants -R {0} {1} -o {2}".format(ref, ' '.join(merge_inputs), options.output)) 
 		makeflow.write("\n") 
 
 	finally:

@@ -228,26 +228,35 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 			config = open(configuration, 'r')
 			makeflow.write(config.read())
 	
-		splits = count_splits(options.fastq, num_reads_per_split)
-		rsplits = 0
-		inputlist = []
-		for i in range(splits):
-			inputlist.append(options.fastq + "." + str(i))
+		if num_reads_per_split > 0:
+			splits = count_splits(options.fastq, num_reads_per_split)
+			rsplits = 0
+			inputlist = []
+			for i in range(splits):
+				inputlist.append(options.fastq + "." + str(i))
 		
-		log.info("Writing Partitioning Rules")
+			log.info("Writing Partitioning Rules")
 	
-		makeflow.write("\n\n{0} : {1} {2}".format(' '.join(inputlist), fastq_name, options.fastq))
-		makeflow.write("\n\tLOCAL perl {0} {1} {2}".format(fastq_name, options.fastq, num_reads_per_split))
+			makeflow.write("\n\n{0} : {1} {2}".format(' '.join(inputlist), fastq_name, options.fastq))
+			makeflow.write("\n\tLOCAL perl {0} {1} {2}".format(fastq_name, options.fastq, num_reads_per_split))
 	
-		if options.rfastq:
 
-			rsplits = count_splits(options.rfastq, num_reads_per_split)
-			rinputlist = []
-			for i in range(rsplits):
-				rinputlist.append(options.rfastq + "." + str(i))
-	
-			makeflow.write("\n\n{0} : {1} {2}".format(' '.join(rinputlist), fastq_name, options.rfastq));
-			makeflow.write("\n\tLOCAL perl {0} {1} {2}".format(fastq_name, options.rfastq, num_reads_per_split))
+			if options.rfastq:
+
+				rsplits = count_splits(options.rfastq, num_reads_per_split)
+				rinputlist = []
+				for i in range(rsplits):
+					rinputlist.append(options.rfastq + "." + str(i))
+		
+				makeflow.write("\n\n{0} : {1} {2}".format(' '.join(rinputlist), fastq_name, options.rfastq));
+				makeflow.write("\n\tLOCAL perl {0} {1} {2}".format(fastq_name, options.rfastq, num_reads_per_split))
+		else:
+			splits = 1
+			inputlist = [options.fastq]
+			if options.rfastq:
+				rsplits = 2
+				rinputlist = [options.rfastq]
+
 
 	 # Rule and Command for Indexing FASTA File
 		ref = options.ref
@@ -323,7 +332,7 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 				makeflow.write("\n\t./bwa {0} {1} {2} {3} {4} > {5} 2> {6}".format(algo, args, ref, query1, query2, output, error))
 
 		log.info("Writing Joining Rules")
-
+	
 		(base, sep, file_ext) = options.fastq.rpartition(".")
 		if not re.search("f(ast)?q", file_ext, re.IGNORECASE):
 			base = "{0}.{1}".format(base,file_ext)
@@ -336,11 +345,21 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 		if options.output_err:
 			error = options.output_err
 		
-		makeflow.write("\n\n{0} : {1} {2}".format(output, cat_name, ' '.join(results_to_cat)))
-		makeflow.write("\n\tLOCAL perl {0} {1} {2}".format(cat_name, output, ' '.join(results_to_cat)))	
+		if num_reads_per_split > 0:
+			makeflow.write("\n\n{0} : {1} {2}".format(output, cat_name, ' '.join(results_to_cat)))
+			makeflow.write("\n\tLOCAL perl {0} {1} {2}".format(cat_name, output, ' '.join(results_to_cat)))	
 
-		makeflow.write("\n\n{0} : {1}".format(error, ' '.join(errors_to_cat)))
-		makeflow.write("\n\tLOCAL cat {0} > {1}".format(' '.join(errors_to_cat), error))	
+			makeflow.write("\n\n{0} : {1}".format(error, ' '.join(errors_to_cat)))
+			makeflow.write("\n\tLOCAL cat {0} > {1}".format(' '.join(errors_to_cat), error))	
+		else:
+			if output != results_to_cat[0]:
+				makeflow.write("\n\n{0} : {1}".format(output, results_to_cat[0]))
+				makeflow.write("\n\tLOCAL mv {1} {0}".format(output, results_to_cat[0]))	
+
+			if error != errors_to_cat[0]:
+				makeflow.write("\n\n{0} : {1}".format(error, errors_to_cat[0]))
+				makeflow.write("\n\tLOCAL mv {0} {1}".format(errors_to_cat[0], error))	
+
 		makeflow.write("\n")	
 
 	finally:
