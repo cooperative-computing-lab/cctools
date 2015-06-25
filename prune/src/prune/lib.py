@@ -654,6 +654,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 	ios = database.ios_get(op_id)
 	op = database.op_get(op_id)
 
+	final_output = ''
 	options = ''
 	arg_str = ''
 	env_type = ''
@@ -733,6 +734,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 			in_str += ',%s=%s'%(obj['dst'],obj['dst'])
 		options += ' -umbrellai '+in_str[1:]
 		fetch_env_files.append({'src':'umbrella.log','dst':storage_pathname(op_id)+'.udebug','puid':str(op_id)+'.udebug','pack':'','puid':str(op_id)+'.udebug','display':str(op_id)+'.udebug'})
+		final_output += 'final_output/'
 
 
 
@@ -758,7 +760,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 		t.specify_cores(1)
 
 		for obj in fetch_files:
-			t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=True)
+			t.specify_file(obj['dst'], final_output+obj['src'], WORK_QUEUE_OUTPUT, cache=True)
 		for obj in fetch_env_files:
 			t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=False)
 		return {'cmd':op['display'],'framework':framework,'wq_task':t,'fetch_files':fetch_files}
@@ -788,7 +790,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 		os.chmod(sandbox_folder+'PRUNE_RUN', 0555)
 
 
-		return {'cmd':op['display'],'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files,'fetch_env_files':fetch_env_files}
+		return {'cmd':op['display'],'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files,'fetch_env_files':fetch_env_files,'final_output':final_output}
 
 
 
@@ -880,10 +882,10 @@ def wq_check():
 						operation = wq_ops[t.id]
 						all_files = True
 						exec_time = exec_space = 0
-						for obj in operation['fetch_files']:
+						for obj in operation['fetch_files']+operation['fetch_env_files']:
 							if os.path.isfile(obj['dst']):
 								store_file(obj['dst'],obj['puid'],True,obj['pack'],storage_module='wq')
-								if obj['display'].endswith('.debug'):
+								if obj['display'].endswith('.pdebug'):
 									f = open(obj['dst'])
 									for line in f:
 										if line.startswith('Execution time: '):
@@ -976,12 +978,7 @@ def local_check():
 
 			fails = 0
 			exec_time = exec_space = 0
-			for obj in operation['fetch_files']:
-				try:
-					store_file(operation['sandbox']+'final_output/'+obj['src'], obj['puid'])
-				except:
-					fails += 1
-			for obj in operation['fetch_env_files']:
+			for obj in operation['fetch_env_files']+operation['fetch_files']:
 				try:
 					store_file(operation['sandbox']+obj['src'], obj['puid'])
 					if obj['display'].endswith('.pdebug'):
@@ -1002,8 +999,6 @@ def local_check():
 				shutil.rmtree(operation['sandbox'])
 			else:
 				debug( 'returncode =', p.returncode, ', fails =',fails, traceback.format_exc())
-
-				print 'returncode =', p.returncode, ', fails =',fails, traceback.format_exc()
 				print 'Failed: %s  (%s)'%(operation['cmd'], operation['run']['puid'])
 				database.run_upd(operation['run']['puid'], 'Failed', p.returncode, '', 'local')
 			del local_workers[w]
