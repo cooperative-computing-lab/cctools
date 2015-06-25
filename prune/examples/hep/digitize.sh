@@ -3,6 +3,7 @@
 #PRUNE_INPUTS Text File
 #PRUNE_OUTPUT SinglePi0E10_cfi_GEN_DIGI_L1_DIGI2RAW_HLT_RAW2DIGI_L1Reco.root
 
+#ulimit -n 4096
 export CMS_VERSION=CMSSW_5_3_11
 export SCRAM_ARCH=slc5_amd64_gcc462
 

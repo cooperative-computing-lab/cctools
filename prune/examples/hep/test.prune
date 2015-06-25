@@ -1,3 +1,6 @@
+#The HTTP_PROXY environment variable must be set before prune is started. For example:
+#export HTTP_PROXY=http://cache01.hep.wisc.edu:3128
+
 PUT cmssw_redhat6.json AS cms_env
 ENV umbrella cms_env
 

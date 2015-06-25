@@ -170,6 +170,7 @@ def process_line(line):
 	cmd_id = database.cmd_ins(line)
 	try:
 		if len(line)==0 or line[0]=='#':
+			print line
 			return True
 
 		elif line.upper().startswith('EXIT') or line.upper().startswith('QUIT'):

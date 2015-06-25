@@ -1,9 +1,10 @@
 {
+	"comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.",
 	"hardware": {
 		"arch": "x86_64",
 		"cores": "2",
 		"memory": "2GB",
-		"disk": "10GB"
+		"disk": "3GB"
 	},
 	"kernel" : {
 		"name": "linux",
@@ -11,18 +12,21 @@
 	},
 	"os": {
 		"name": "Redhat",
-		"version": "6.5",
-		"id": "669ab5ef94af84d273f8f92a86b7907a"
+		"version": "6.5"
 	},
 	"software": {
-		"cmssw-5.3.11-slc5-amd64": {
-			"mountpoint": "/cvmfs/cms.cern.ch",
-			"action": "unpack"
+		"cmssw-5.2.5-slc5-amd64": {
+			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
 	},
 	"data": {
+		"final_events_2381.lhe": {
+			"mountpoint": "/tmp/final_events_2381.lhe",
+			"action": "none"
+		}
 	},
 	"environ": {
-		"FAKEPWD": "/tmp/test"
+		"CMS_VERSION": "CMSSW_5_2_5",
+		"SCRAM_ARCH": "slc5_amd64_gcc462"
 	}
 }

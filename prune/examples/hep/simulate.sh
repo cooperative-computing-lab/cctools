@@ -3,6 +3,7 @@
 #PRUNE_INPUTS TEXT
 #PRUNE_OUTPUT SinglePi0E10_cfi_GEN_SIM.root
 
+#ulimit -n 4096
 export CMS_VERSION=CMSSW_5_3_11
 export SCRAM_ARCH=slc5_amd64_gcc462
 

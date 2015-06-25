@@ -374,7 +374,7 @@ See the manual for more details.
 		if len(res['arg_list']) < len(in_types):
 			print 'Too few arguments passed to the function.'
 			return None
-		elif len(res['arg_list']) > len(in_types):
+		elif len(res['arg_list']) > len(in_types) and in_types[-1][-1]!='*':
 			print 'Too many arguments passed to the function.'
 			return None
 		else:
@@ -657,8 +657,10 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 	options = ''
 	arg_str = ''
 	env_type = ''
+	env_files = []
 	place_files = []
 	fetch_files = []
+	fetch_env_files = []
 	for io in ios:
 		if io['io_type']=='F':
 			function_name = io['display']
@@ -712,23 +714,31 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 					options += ' -targz ENVIRONMENT'
 
 
-				place_files.append({'src':storage_pathname(copy['puid']),'dst':'ENVIRONMENT','puid':copy['puid'],'pack':copy['pack'],'display':io['display']})
+				env_files.append({'src':storage_pathname(copy['puid']),'dst':'ENVIRONMENT','puid':copy['puid'],'pack':copy['pack'],'display':io['display']})
 
 	arg_str = arg_str[0:-1]
 
 
-	place_files.append({'src':storage_pathname('PRUNE_EXECUTOR'),'dst':'PRUNE_EXECUTOR'})
-	fetch_files.append({'src':'prune_debug.log','dst':storage_pathname(op_id)+'.debug','puid':str(op_id)+'.debug','pack':'','puid':str(op_id)+'.debug','display':str(op_id)+'.debug'})
+	env_files.append({'src':storage_pathname('PRUNE_EXECUTOR'),'dst':'PRUNE_EXECUTOR'})
+	fetch_env_files.append({'src':'prune_debug.log','dst':storage_pathname(op_id)+'.pdebug','puid':str(op_id)+'.pdebug','pack':'','puid':str(op_id)+'.pdebug','display':str(op_id)+'.pdebug'})
 
 	if local_fs:
 		for obj in place_files:
 			if obj['dst']!='PRUNE_EXECUTOR':
 				options += ' -ln %s=%s'%(obj['dst'],obj['src'])
 
+	if env_type=='umbrella':
+		in_str = ''
+		for obj in place_files:
+			in_str += ',%s=%s'%(obj['dst'],obj['dst'])
+		options += ' -umbrellai '+in_str[1:]
+		fetch_env_files.append({'src':'umbrella.log','dst':storage_pathname(op_id)+'.udebug','puid':str(op_id)+'.udebug','pack':'','puid':str(op_id)+'.udebug','display':str(op_id)+'.udebug'})
 
-	final_cmd = 'chmod 755 PRUNE_RUN; ./PRUNE_RUN'
+
+
+	final_cmd = 'chmod 755 PRUNE_RUN PRUNE_EXECUTOR; ./PRUNE_RUN'
 	run_cmd = "./%s %s"%(function_name, arg_str)
-	run_buffer = '#!/bin/bash\npython PRUNE_EXECUTOR%s %s'%(options,run_cmd)
+	run_buffer = './PRUNE_EXECUTOR%s %s'%(options,run_cmd)
 	#print run_buffer
 
 
@@ -737,8 +747,10 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 
 	elif framework=='wq':
 		t = Task('')
+		for obj in env_files:
+			t.specify_file(obj['src'], obj['dst'], WORK_QUEUE_INPUT, cache=True)
 		for obj in place_files:
-			if not local_fs or obj['dst']=='PRUNE_EXECUTOR':
+			if not local_fs:
 				t.specify_file(obj['src'], obj['dst'], WORK_QUEUE_INPUT, cache=True)
 		t.specify_buffer(run_buffer, 'PRUNE_RUN', WORK_QUEUE_INPUT, cache=True)
 
@@ -746,10 +758,9 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 		t.specify_cores(1)
 
 		for obj in fetch_files:
-			if obj['src']=='prune_debug.log':
-				t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=False)
-			else:
-				t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=True)
+			t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=True)
+		for obj in fetch_env_files:
+			t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=False)
 		return {'cmd':op['display'],'framework':framework,'wq_task':t,'fetch_files':fetch_files}
 
 	else:
@@ -759,18 +770,17 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 		except OSError:
 			if not os.path.isdir(sandbox_folder):
 				raise
-		for obj in place_files:
-			if not local_fs or obj['dst']=='PRUNE_EXECUTOR' or not dry_run:
-				shutil.copy2(obj['src'], sandbox_folder+obj['dst'])
 
 		if env_type=='umbrella':
-			in_str = ''
-			for obj in place_files:
-				in_str += ',%s=%s'%(obj['dst'],obj['dst'])
-			run_buffer = final_cmd = './UMBRELLA_EXECUTABLE -s local -i PRUNE_RUN=PRUNE_RUN%s -c ENVIRONMENT -l ./tmp/ -o ./final_output run "%s"'%(in_str,run_cmd)
 			umbrella_file = which('umbrella')
-			shutil.copy2(umbrella_file[0], sandbox_folder+'UMBRELLA_EXECUTABLE')
-			#place_files.append({'src':umbrella_file,'dst':'umbrella','display':'umbrella'})
+			env_files.append({'src':umbrella_file[0],'dst':'UMBRELLA_EXECUTABLE'})
+
+		for obj in env_files:
+			shutil.copy2(obj['src'], sandbox_folder+obj['dst'])
+		for obj in place_files:
+			if not local_fs or not dry_run:
+				shutil.copy2(obj['src'], sandbox_folder+obj['dst'])
+
 
 		f = open(sandbox_folder+'PRUNE_RUN','w')
 		f.write(run_buffer)
@@ -778,7 +788,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 		os.chmod(sandbox_folder+'PRUNE_RUN', 0555)
 
 
-		return {'cmd':op['display'],'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files}
+		return {'cmd':op['display'],'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files,'fetch_env_files':fetch_env_files}
 
 
 
@@ -968,8 +978,13 @@ def local_check():
 			exec_time = exec_space = 0
 			for obj in operation['fetch_files']:
 				try:
+					store_file(operation['sandbox']+'final_output/'+obj['src'], obj['puid'])
+				except:
+					fails += 1
+			for obj in operation['fetch_env_files']:
+				try:
 					store_file(operation['sandbox']+obj['src'], obj['puid'])
-					if obj['display'].endswith('.debug'):
+					if obj['display'].endswith('.pdebug'):
 						f = open(operation['sandbox']+obj['src'])
 						for line in f:
 							if line.startswith('Execution time: '):
@@ -987,6 +1002,8 @@ def local_check():
 				shutil.rmtree(operation['sandbox'])
 			else:
 				debug( 'returncode =', p.returncode, ', fails =',fails, traceback.format_exc())
+
+				print 'returncode =', p.returncode, ', fails =',fails, traceback.format_exc()
 				print 'Failed: %s  (%s)'%(operation['cmd'], operation['run']['puid'])
 				database.run_upd(operation['run']['puid'], 'Failed', p.returncode, '', 'local')
 			del local_workers[w]
