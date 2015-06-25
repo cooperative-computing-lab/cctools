@@ -37,9 +37,9 @@ const char *dag_file_state_name(dag_file_state_t state)
 	case DAG_FILE_STATE_DELETE:
 		return "delete";
 	case DAG_FILE_STATE_DOWN:
-		return "delete";
+		return "download";
 	case DAG_FILE_STATE_UP:
-		return "delete";
+		return "upload";
 	default:
 		return "unknown";
 	}
