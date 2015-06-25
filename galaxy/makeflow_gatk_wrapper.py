@@ -29,24 +29,14 @@ parser.add_option('--reference_sequence',dest='ref',type="string")
 parser.add_option('--log_to_file',dest='log',type="string")
 parser.add_option('--out',dest='output',type="string")
 
-parser.add_option('--cctools_install',dest='cctools',type="string")
 parser.add_option('--mf_log',dest='mflog',type="string",help="Makeflow Log Location")
 parser.add_option('--output_dblog',dest='dblog',type="string",help="Makeflow Debug Log Location")
-
 parser.add_option('--wq_log',dest='wqlog',type="string",help="Work Queue Log Location")
 
-parser.add_option('--tmp_dir',dest='tmp_dir',type='string')
 parser.add_option('--pwfile',dest='pwfile',type='string')
 
 parser.add_option('--user_id',dest='uid',type='string')
 parser.add_option('--user_job',dest='ujob',type='string')
-
-parser.add_option('--samtools',dest='samtools',type='string')
-parser.add_option('--gatk',dest='gatk',type='string')
-parser.add_option('--picard',dest='picard',type='string')
-parser.add_option('--java',dest='java',type='string')
-parser.add_option('--vcf-tools',dest='vcftools',type='string')
-
 
 (options, args) = parser.parse_args()
 
@@ -75,33 +65,18 @@ output_err = "output_err"
 
 # MOVE FILES TO ENV
 
-os.symlink(cctools_dir+'/apps/makeflow_gatk/makeflow_gatk', cur_dir+"/makeflow_gatk")
-
-shutil.copyfile(options.pwfile, cur_dir+"/mypwfile")
-
-shutil.copyfile(options.ref, cur_dir+"/reference.fa")
-#	os.symlink(options.ref, cur_dir+"/reference.fa")
+os.symlink(options.ref, cur_dir+"/reference.fa")
 
 inputs = "--reference_sequence reference.fa --reference_index reference.fa.fai --reference_dict reference.dict "
 
-shutil.copyfile(options.input, cur_dir+"/cur_bam.bam")
-#	os.symlink(options.input, cur_dir+"/cur_bam.bam")
+os.symlink(options.input, cur_dir+"/cur_bam.bam")
 inputs += "--input_file cur_bam.bam "
 
-shutil.copyfile(options.samtools+"/samtools", cur_dir+"/samtools")
-os.chmod(cur_dir+"/samtools", os.stat(cur_dir+"/samtools").st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+os.system("makeflow_gatk -T {0} {1} --makeflow {2} --out {3} {4} {5}".format(
+			options.type, inputs, makeflow, output_vcf, ' '.join(args), debug_log))
 
-shutil.copyfile(options.gatk+"/GenomeAnalysisTK.jar", cur_dir+"/GenomeAnalysisTK.jar")
-shutil.copyfile(options.picard+"/picard.jar", cur_dir+"/picard.jar")
-shutil.copyfile(options.java+"/jre.zip", cur_dir+"/jre.zip")
-shutil.copyfile(options.vcftools+"/vcf-concat", cur_dir+"/vcf-concat")
-os.chmod(cur_dir+"/vcf-concat", os.stat(cur_dir+"/vcf-concat").st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-os.chdir(cur_dir)
-
-os.system('python makeflow_gatk --verbose -T ' +options.type+ ' ' + inputs + '--progeny_list progeny_file --makeflow ' +  makeflow + ' --out ' + output_vcf +' ' +' '.join(args)+" &> " + debug_log)
-
-os.system(cctools_dir+'/bin/makeflow -T wq -N ' + wq_project_name + ' -p 0 -l ' + makeflow_log + ' -L ' + wq_log + ' -d all -o ' + debug_log+" --password mypwfile &> "+debug_log)
+os.system("makeflow -T wq -N {0} -p 0 -l {1} -L {2} -d all -o {3} --password {4} &> {5}".format(
+			wq_project_name, makeflow_log, wq_log, debug_log, options.pwfile, debug_log)
 
 if options.dblog:
 	shutil.copyfile(debug_log, options.dblog)
@@ -112,10 +87,9 @@ if options.wqlog:
 shutil.copyfile(output_vcf, options.output)
 
 os.system(cctools_dir+'/bin/makeflow -c')
-#os.remove("./reference.*")
-#os.remove("./cur_bam.bam")
-#os.remove("./samtools")
-#os.remove("./GenomeAnalysisTK.jar")
-#os.remove("./CreateSequenceDictionary.jar")
-#os.remove("./jre.zip")
-#os.remove("./mypwfile")
+os.remove("./reference.*")
+os.remove("./cur_bam.bam")
+os.remove("./samtools")
+os.remove("./GenomeAnalysisTK.jar")
+os.remove("./picard.jar")
+os.remove("./jre")
