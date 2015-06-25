@@ -15,6 +15,7 @@ import time, threading
 import subprocess
 import os.path
 
+os.environ["HTTP_PROXY"] = "http://cache01.hep.wisc.edu:3128"
 
 args = {'ln':[], 'gzip':[], 'gunzip':[], 'targz':[], 'umbrella':False, 'function_name':None, 'function_inputs':[]}
 argi = 1

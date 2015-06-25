@@ -661,7 +661,6 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 	env_files = []
 	place_files = []
 	fetch_files = []
-	fetch_env_files = []
 	for io in ios:
 		if io['io_type']=='F':
 			function_name = io['display']
@@ -721,7 +720,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 
 
 	env_files.append({'src':storage_pathname('PRUNE_EXECUTOR'),'dst':'PRUNE_EXECUTOR'})
-	fetch_env_files.append({'src':'prune_debug.log','dst':storage_pathname(op_id)+'.pdebug','puid':str(op_id)+'.pdebug','pack':'','puid':str(op_id)+'.pdebug','display':str(op_id)+'.pdebug'})
+	fetch_files.append({'src':'prune_debug.log','dst':storage_pathname(op_id)+'.pdebug','puid':str(op_id)+'.pdebug','pack':'','puid':str(op_id)+'.pdebug','display':str(op_id)+'.pdebug','env':True})
 
 	if local_fs:
 		for obj in place_files:
@@ -733,8 +732,8 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 		for obj in place_files:
 			in_str += ',%s=%s'%(obj['dst'],obj['dst'])
 		options += ' -umbrellai '+in_str[1:]
-		fetch_env_files.append({'src':'umbrella.log','dst':storage_pathname(op_id)+'.udebug','puid':str(op_id)+'.udebug','pack':'','puid':str(op_id)+'.udebug','display':str(op_id)+'.udebug'})
-		final_output += 'final_output/'
+		fetch_files.append({'src':'umbrella.log','dst':storage_pathname(op_id)+'.udebug','puid':str(op_id)+'.udebug','pack':'','puid':str(op_id)+'.udebug','display':str(op_id)+'.udebug','env':True})
+		final_output = 'final_output/'
 
 
 
@@ -742,6 +741,10 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 	run_cmd = "./%s %s"%(function_name, arg_str)
 	run_buffer = './PRUNE_EXECUTOR%s %s'%(options,run_cmd)
 	#print run_buffer
+
+	if env_type=='umbrella':
+		umbrella_file = which('umbrella')
+		env_files.append({'src':umbrella_file[0],'dst':'UMBRELLA_EXECUTABLE'})
 
 
 	if dry_run:
@@ -760,9 +763,10 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 		t.specify_cores(1)
 
 		for obj in fetch_files:
-			t.specify_file(obj['dst'], final_output+obj['src'], WORK_QUEUE_OUTPUT, cache=True)
-		for obj in fetch_env_files:
-			t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=False)
+			if 'env' in obj and obj['env']:
+				t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=False)
+			else:
+				t.specify_file(obj['dst'], final_output+obj['src'], WORK_QUEUE_OUTPUT, cache=True)
 		return {'cmd':op['display'],'framework':framework,'wq_task':t,'fetch_files':fetch_files}
 
 	else:
@@ -773,9 +777,6 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 			if not os.path.isdir(sandbox_folder):
 				raise
 
-		if env_type=='umbrella':
-			umbrella_file = which('umbrella')
-			env_files.append({'src':umbrella_file[0],'dst':'UMBRELLA_EXECUTABLE'})
 
 		for obj in env_files:
 			shutil.copy2(obj['src'], sandbox_folder+obj['dst'])
@@ -790,7 +791,7 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 		os.chmod(sandbox_folder+'PRUNE_RUN', 0555)
 
 
-		return {'cmd':op['display'],'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files,'fetch_env_files':fetch_env_files,'final_output':final_output}
+		return {'cmd':op['display'],'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files,'final_output':final_output}
 
 
 
@@ -882,7 +883,7 @@ def wq_check():
 						operation = wq_ops[t.id]
 						all_files = True
 						exec_time = exec_space = 0
-						for obj in operation['fetch_files']+operation['fetch_env_files']:
+						for obj in operation['fetch_files']:
 							if os.path.isfile(obj['dst']):
 								store_file(obj['dst'],obj['puid'],True,obj['pack'],storage_module='wq')
 								if obj['display'].endswith('.pdebug'):
@@ -978,9 +979,12 @@ def local_check():
 
 			fails = 0
 			exec_time = exec_space = 0
-			for obj in operation['fetch_env_files']+operation['fetch_files']:
+			for obj in operation['fetch_files']:
 				try:
-					store_file(operation['sandbox']+obj['src'], obj['puid'])
+					if 'env' in obj and obj['env']:
+						store_file(operation['sandbox']+obj['src'], obj['puid'])
+					else:
+						store_file(operation['sandbox']+operation['final_output']+obj['src'], obj['puid'])
 					if obj['display'].endswith('.pdebug'):
 						f = open(operation['sandbox']+obj['src'])
 						for line in f:
