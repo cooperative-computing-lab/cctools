@@ -82,7 +82,7 @@ def count_splits( fastq , num_reads ):
 		if (re.search('^[@]', line) and line_count % 4 ==0):
 			if (read_count == num_reads):
 				num_outputs += 1
-				read_count = 0	
+				read_count = 0
 				if ( num_outputs % 10 == 0):
 					log.info("Current Number of Partitions : {0}".format(num_outputs))
 			else:
@@ -112,7 +112,7 @@ def write_fastq_reduce(destination):
 #
 #Purpose: Split a FASTQ file into smaller files determined by the number of sequences input
 
-use strict; 
+use strict;
 
 
 my $numargs = $#ARGV + 1;
@@ -143,7 +143,7 @@ while (my $line = <INPUT>) {
 			print OUTPUT \"\\n\";
 			$num_outputs++;
 			$read_count = 0;
-		}	
+		}
 		else{
 			print OUTPUT $line;
 			print OUTPUT \"\\n\";
@@ -187,7 +187,7 @@ def write_cat_bwa(destination):
 my $output = shift;
 if (-e $output) {
 	unlink($output) || die \"Could not delete $output\";
-} 
+}
 
 open $OUT,'>>',$output or die(\"Could not open \" + $output + \" file.\");
 
@@ -205,7 +205,7 @@ while ($in = shift) {
 		else { $print = 1; }
 		if ($print gt 0){
 			print { $OUT } $line;
-		} 
+		}
 	}
 	close (IN);
 }
@@ -227,19 +227,19 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 			log.info("Reading Configuration from : {0}".format(configuration))
 			config = open(configuration, 'r')
 			makeflow.write(config.read())
-	
+
 		if num_reads_per_split > 0:
 			splits = count_splits(options.fastq, num_reads_per_split)
 			rsplits = 0
 			inputlist = []
 			for i in range(splits):
 				inputlist.append(options.fastq + "." + str(i))
-		
+
 			log.info("Writing Partitioning Rules")
-	
+
 			makeflow.write("\n\n{0} : {1} {2}".format(' '.join(inputlist), fastq_name, options.fastq))
 			makeflow.write("\n\tLOCAL perl {0} {1} {2}".format(fastq_name, options.fastq, num_reads_per_split))
-	
+
 
 			if options.rfastq:
 
@@ -247,7 +247,7 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 				rinputlist = []
 				for i in range(rsplits):
 					rinputlist.append(options.rfastq + "." + str(i))
-		
+
 				makeflow.write("\n\n{0} : {1} {2}".format(' '.join(rinputlist), fastq_name, options.rfastq));
 				makeflow.write("\n\tLOCAL perl {0} {1} {2}".format(fastq_name, options.rfastq, num_reads_per_split))
 		else:
@@ -263,7 +263,7 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 		index = "{0}.bwt {0}.pac {0}.amb {0}.ann {0}.sa".format(ref)
 
 		log.info("Writing Indexing Rules")
-	
+
 		index_a = ""
 		if bwa_args["index"]:
 			index_a = ' '.join(bwa_args["index"])
@@ -274,18 +274,18 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 		index = options.ref + " " + index
 		results_to_cat = []
 		errors_to_cat = []
-    
+
 		log.info("Writing BWA {0} Rules".format(algo))
-			
+
 		for i in range(splits):
 			query1=query2=sai1=sai2=output=""
-		
-			query1 = inputlist[i] 
+
+			query1 = inputlist[i]
 			sai1 = query1+".sai"
 			if options.rfastq:
-				query2 = rinputlist[i] 
+				query2 = rinputlist[i]
 				sai2 = query2+".sai"
-		
+
 			output = query1+".sam"
 			results_to_cat.append(output)
 
@@ -293,7 +293,7 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 			errors_to_cat.append(error)
 
 			if algo=="backtrack":
-	
+
 				aln_a = ""
 				if bwa_args["aln"]:
 					aln_a = ' '.join(bwa_args["aln"])
@@ -304,7 +304,7 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 				if options.rfastq:
 					makeflow.write("\n\n{0} : bwa {1} {2}".format(sai2, index, query2))
 					makeflow.write("\n\t./bwa aln {0} {1} {2} > {3}".format(aln_a,ref,query2,sai2))
-			
+
 					pe_a = ""
 					if bwa_args["sampe"]:
 						pe_a = ' '.join(bwa_args["sampe"])
@@ -315,10 +315,10 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 					se_a = ""
 					if bwa_args["samse"]:
 						se_a = ' '.join(bwa_args["samse"])
-					
+
 					makeflow.write("\n\n {0} {1} : bwa {2} {3} {4}".format(output, error, index, query1, sai1))
 					makeflow.write("\n\t./bwa samse {0} {1} {2} {3} > {4} 2> {5}".format(se_a, ref, sai1, query1, output, error))
-	
+
 			else:
 				args = " -v 0 "
 				if(algo=="bwasw"):
@@ -327,12 +327,12 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 
 				if bwa_args[algo]:
 					args = args + ' '.join(bwa_args[algo])
-      	
+
 				makeflow.write("\n\n{0} {1} : bwa {2} {3} {4}".format(output, error, index, query1, query2))
 				makeflow.write("\n\t./bwa {0} {1} {2} {3} {4} > {5} 2> {6}".format(algo, args, ref, query1, query2, output, error))
 
 		log.info("Writing Joining Rules")
-	
+
 		(base, sep, file_ext) = options.fastq.rpartition(".")
 		if not re.search("f(ast)?q", file_ext, re.IGNORECASE):
 			base = "{0}.{1}".format(base,file_ext)
@@ -344,23 +344,23 @@ def write_makeflow(destination, configuration, num_reads_per_split, fastq_name, 
 		error = "{0}.err".format(base)
 		if options.output_err:
 			error = options.output_err
-		
+
 		if num_reads_per_split > 0:
 			makeflow.write("\n\n{0} : {1} {2}".format(output, cat_name, ' '.join(results_to_cat)))
-			makeflow.write("\n\tLOCAL perl {0} {1} {2}".format(cat_name, output, ' '.join(results_to_cat)))	
+			makeflow.write("\n\tLOCAL perl {0} {1} {2}".format(cat_name, output, ' '.join(results_to_cat)))
 
 			makeflow.write("\n\n{0} : {1}".format(error, ' '.join(errors_to_cat)))
-			makeflow.write("\n\tLOCAL cat {0} > {1}".format(' '.join(errors_to_cat), error))	
+			makeflow.write("\n\tLOCAL cat {0} > {1}".format(' '.join(errors_to_cat), error))
 		else:
 			if output != results_to_cat[0]:
 				makeflow.write("\n\n{0} : {1}".format(output, results_to_cat[0]))
-				makeflow.write("\n\tLOCAL mv {1} {0}".format(output, results_to_cat[0]))	
+				makeflow.write("\n\tLOCAL mv {1} {0}".format(output, results_to_cat[0]))
 
 			if error != errors_to_cat[0]:
 				makeflow.write("\n\n{0} : {1}".format(error, errors_to_cat[0]))
-				makeflow.write("\n\tLOCAL mv {0} {1}".format(errors_to_cat[0], error))	
+				makeflow.write("\n\tLOCAL mv {0} {1}".format(errors_to_cat[0], error))
 
-		makeflow.write("\n")	
+		makeflow.write("\n")
 
 	finally:
 		if options.makeflow is not None:

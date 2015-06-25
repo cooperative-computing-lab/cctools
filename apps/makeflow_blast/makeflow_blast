@@ -78,18 +78,18 @@ def write_split_fasta(destination):
 #
 
 import sys, re
-		
+
 if(len(sys.argv) < 3) :
 	sys.stderr.write("Usage: split_fasta.py query_granularity fasta_file")
 	sys.exit(1)
 num_seq = sys.argv[1]
-query = sys.argv[2] 
+query = sys.argv[2]
 num_chars = 0
 num_queries = 0
 num_jobs = 0
 
 FILE  = open(query, "r")
-OF = open(query + "." + str(num_jobs), "w") 
+OF = open(query + "." + str(num_jobs), "w")
 for line in FILE:
 	if(re.search('^>', line)):
 		if( num_queries > (int(num_seq) - 1) ):
@@ -123,7 +123,7 @@ def write_cat_blast(destination):
 my $output = shift;
 if (-e $output) {
 	unlink($output) || die \"could not delete $output\";
-} 
+}
 open $OUT,'>>',$output or die(\"Could not open \" + $output + \" file.\");;
 
 $file = 0;
@@ -161,7 +161,7 @@ def write_makeflow(destination):
 	else:
 		makeflow = sys.stdout
 		log.info("Writing Makeflow to : STDOUT")
-	
+
 	try:
 		if options.config:
 			log.info("Reading Configuration from : {0}".format(configuration))
@@ -191,11 +191,11 @@ def write_makeflow(destination):
 		database = db_split[0]
 		for i in range(num_splits):
 				makeflow.write("\n\n{0} {1} : legacy_blast.pl {2} {3} {4}/".format(
-								outputs[i], errors[i], options.process, inputs[i], 
+								outputs[i], errors[i], options.process, inputs[i],
 								options.database))
-				makeflow.write("\n\tperl legacy_blast.pl blastall --path . " + 
+				makeflow.write("\n\tperl legacy_blast.pl blastall --path . " +
 								"-p {0} -d {1}/{1} -i {2} -o {3} 2> {4}".format(
-								options.process, options.database, inputs[i], 
+								options.process, options.database, inputs[i],
 								outputs[i], errors[i]))
 
 		log.info("Writing Joining Rules")
@@ -203,7 +203,7 @@ def write_makeflow(destination):
 		#How to concatenate and cleanup outputs (very naive)
 		makeflow.write("\n\n{0} : {1} {2}".format(options.output, cat_name, ' '.join(outputs)))
 		makeflow.write("\n\tLOCAL ./{0} {1} {2}".format(cat_name, options.output, ' '.join(outputs)))
-		
+
 		#How to concatenate and cleanup errors (very naive)
 		makeflow.write("\n\n{0}.err : {1}".format(options.output, ' '.join(errors)))
 		makeflow.write("\n\tLOCAL cat {0} > {1}.err\n".format(' '.join(errors), options.output))
@@ -229,19 +229,19 @@ else:
 if not options.query:
 	log.error("Query Fasta required : -i")
 	sys.exit(4)
-else: 
+else:
 	log.info("Query Fasta : {0}".format(options.query))
 
 if not options.database:
 	log.error("Reference Database required : -d")
 	sys.exit(4)
-else: 
+else:
 	log.info("Reference Database : {0}".format(options.database))
 
 if not options.process:
 	log.error("Process required : -p")
 	sys.exit(4)
-else: 
+else:
 	log.info("Selected Process : {0}".format(options.process))
 
 log.info("Partition Size : {0}".format(options.num_seq))
@@ -254,8 +254,8 @@ process = search_file(options.process, path)
 if os.path.exists("./{0}".format(options.process)):
 	log.info("{0} found locally")
 elif process and not os.path.exists("./{0}".format(options.process)):
-	os.symlink(process, options.process)	
-	log.info("Process linked from : {0}".format(process)) 
+	os.symlink(process, options.process)
+	log.info("Process linked from : {0}".format(process))
 elif not os.path.exists("./{0}".format(options.process)):
 	log.error("Unable to find process : {0}".format(options.process))
 	sys.exit(5)
@@ -266,7 +266,7 @@ if os.path.exists("./legacy_blast.pl"):
 	log.info("legacy_blast.pl found locally")
 if legacy and not os.path.exists("./legacy_blast.pl"):
 	os.symlink(legacy, "legacy_blast.pl")
-	log.info("legacy_blast.pl linked from : " + legacy) 
+	log.info("legacy_blast.pl linked from : " + legacy)
 elif not os.path.exists("./legacy_blast.pl"):
 	log.error("Unable to find legacy_blast.pl")
 	sys.exit(5)
@@ -285,7 +285,7 @@ else:
 	if db and not os.path.exists("./{0}.nal".format(options.database)):
 		dbpath = os.path.dirname(db)
 		for fn in os.listdir(dbpath):
-			oloc = "{0}/{1}\n".format(dbpath, fn) 
+			oloc = "{0}/{1}\n".format(dbpath, fn)
 			print "{0}\n".format(oloc)
 			if options.database in fn:
 				os.symlink(oloc, "{0}/{1}".format(options.database, fn))

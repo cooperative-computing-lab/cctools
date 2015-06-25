@@ -74,7 +74,7 @@ inputs += "--input_file cur_bam.bam "
 
 os.system("makeflow_gatk -T {0} {1} --makeflow {2} --out {3} {4} {5}".format(
 			options.type, inputs, makeflow, output_vcf, ' '.join(args), debug_log))
-	
+
 os.system("makeflow -T wq -N {0} -p 0 -l {1} -L {2} -d all -o {3} --password {4} &> {5}".format(
 			wq_project_name, makeflow_log, wq_log, debug_log, options.pwfile, debug_log)
 

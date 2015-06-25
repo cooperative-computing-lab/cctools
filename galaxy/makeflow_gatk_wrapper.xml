@@ -13,7 +13,7 @@
     --input_file=$INPUT
 
     --reference_sequence=$REFERENCE
-	
+
     --user_id=$__user_id__
     --pwfile=${GALAXY_DATA_INDEX_DIR}/mypwfile
 
