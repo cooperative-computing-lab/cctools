@@ -24,6 +24,7 @@ echo "[$(date)] Testing on $(uname -a)." > "$CCTOOLS_TEST_LOG"
 
 # we need cctools_python in the path.
 export PATH="$(pwd)/dttools/src:$PATH"
+export PYTHONPATH="$(pwd)/chirp/src/python:$(pwd)/work_queue/src/python:$PATH"
 
 SUCCESS=0
 FAILURE=0
