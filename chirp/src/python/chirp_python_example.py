@@ -1,5 +1,5 @@
 #!/usr/bin/env cctools_python
-# CCTOOLS_PYTHON_VERSION 2.7 2.6
+# CCTOOLS_PYTHON_VERSION 2.7 2.6 2.5 2.4
 
 import sys
 import os
@@ -23,7 +23,7 @@ def write_some_file(filename='bar.txt'):
         file = open(filename, 'w')
         file.write(message)
         file.close()
-    except IOError as e:
+    except IOError, e:
         print "Could not open for writing: %s" % ', '.join(e.value)
         sys.exit(1)
 
@@ -37,34 +37,48 @@ if __name__ == '__main__':
     hostport = sys.argv[1]
     ticket   = sys.argv[2]
 
-    try:
-        write_some_file()
+    write_some_file()
 
+    try:
         client = Chirp.Client(hostport,
                               authentication = ['ticket'],
                               tickets = [ticket],
                               timeout = 15,
                               debug = True)
+    except Chirp.AuthenticationFailure, e:
+        print "Could not authenticate using: %s" % ', '.join(e.value)
+        sys.exit(1)
 
-        print 'Chirp server sees me as ' + client.identity
+
+    try:
+        print 'Chirp server sees me, ' + client.identity
         print client.listacl('/')
         print client.ls('/')
+    except IOError, e:
+        print "Could access path: %s" % e
+        sys.exit(1)
 
+    try:
         client.put('bar.txt', '/bar.txt')
-        print client.stat('/bar.txt')
-
         client.get('/bar.txt', 'foo.txt')
+    except Chirp.TransferFailure, e:
+        print "Could not transfer file: %s" % e
+        sys.exit(1)
 
+    try:
+        print client.stat('/bar.txt')
+    except IOError, e:
+        print "Could access path at chirp server: %s" % e
+        sys.exit(1)
+
+
+    try:
         client.rm('/bar.txt')
         os.remove('bar.txt')
         os.remove('foo.txt')
-
-        sys.exit(0)
-
-
-    except Chirp.AuthenticationFailure as e:
-        print "Could not authenticate using: %s" % ', '.join(e.value)
+    except IOError, e:
+        print "Could not remove path: %s" % e
         sys.exit(1)
-    except Chirp.TransferFailure as e:
-        print "Could not transfer file: %s" % e
-        sys.exit(1)
+
+    sys.exit(0)
+
