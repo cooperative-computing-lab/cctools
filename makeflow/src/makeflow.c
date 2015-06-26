@@ -880,10 +880,7 @@ static int makeflow_check(struct dag *d)
 				continue;
 			}
 
-			if(batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
-				if(!dag_file_exists(f))
-					f->state = DAG_FILE_STATE_EXISTS;
-				d->completed_files += 1;
+			if(dag_file_exists(f)) {
 				continue;
 			}
 
@@ -1603,17 +1600,18 @@ int main(int argc, char *argv[])
 	if (change_dir)
 		chdir(change_dir);
 
-	printf("checking %s for consistency...\n",dagfile);
-	if(!makeflow_check(d)) {
-		exit(EXIT_FAILURE);
-	}
-
 	printf("%s has %d rules.\n",dagfile,d->nodeid_counter);
 
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	makeflow_log_recover(d, logfilename, log_verbose_mode );
+	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue );
+
+	printf("checking %s for consistency...\n",dagfile);
+	if(!makeflow_check(d)) {
+		exit(EXIT_FAILURE);
+	}
+
 
 	if(clean_mode) {
 		printf("cleaning filesystem...\n");
