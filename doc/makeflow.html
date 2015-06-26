@@ -532,14 +532,14 @@ default, garbage collection does not delete the original input files, nor <b>
 final</b> target files.</p>
 
 <p>Which files are deleted can be tailored from the default by appending files
-to the Makeflow variables <tt>MAKEFLOW_INPUTS</tt> and <tt>MAKEFLOW_OUTPUTS</tt>. 
-Files added to <tt>MAKEFLOW_INPUTS</tt> augment the original inputs files that 
-should not be deleted. <tt>MAKEFLOW_OUTPUTS</tt> marks final target files that 
-should not be deleted.  However, different from <tt>MAKEFLOW_INPUTS</tt>, files 
+to the Makeflow variables <tt>MAKEFLOW_INPUTS</tt> and <tt>MAKEFLOW_OUTPUTS</tt>.
+Files added to <tt>MAKEFLOW_INPUTS</tt> augment the original inputs files that
+should not be deleted. <tt>MAKEFLOW_OUTPUTS</tt> marks final target files that
+should not be deleted.  However, different from <tt>MAKEFLOW_INPUTS</tt>, files
 specified in <tt>MAKEFLOW_OUTPUTS</tt> does not include all output files. If
 <tt>MAKEFLOW_OUTPUTS</tt> is not specified, then all files not used in subsequent
-rules are considered outputs. It is considered best practice to always specify 
-<tt>MAKEFLOW_INPUTS/OUTPUTS</tt> to clearly specify which files are considered 
+rules are considered outputs. It is considered best practice to always specify
+<tt>MAKEFLOW_INPUTS/OUTPUTS</tt> to clearly specify which files are considered
 inputs and outputs and allow for better space management if garbage collection
 is used.</p>
 

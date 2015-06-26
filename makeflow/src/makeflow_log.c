@@ -18,6 +18,8 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
+#define MAX_BUFFER_SIZE 4096
+
 /*
 The makeflow log file records every essential event in the execution of a workflow,
 so that after a failure, the workflow can either be continued or aborted cleanly,
@@ -155,13 +157,14 @@ void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, i
 	makeflow_log_sync(d,0);
 }
 
-void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode )
+void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue)
 {
-	char *line, file[30];
+	char *line, *name, file[MAX_BUFFER_SIZE];
 	int nodeid, state, jobid, file_state;
 	int first_run = 1;
 	struct dag_node *n;
 	struct dag_file *f;
+	struct stat buf;
 	timestamp_t previous_completion_time;
 
 	d->logfile = fopen(filename, "r");
@@ -253,6 +256,18 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode 
 
 
 	dag_count_states(d);
+
+	// Check for log consistency
+    hash_table_firstkey(d->files);
+    while(hash_table_nextkey(d->files, &name, (void **) &f)) {
+		if(first_run && dag_file_is_source(f)) {
+			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
+		}
+        if(dag_file_exists(f) && !(batch_fs_stat(queue, f->filename, &buf) >= 0)){
+			fprintf(stderr, "makeflow: %s is reported as existing, but does not\n", f->filename);
+			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+        }
+    }
 
 	// Decide rerun tasks
 	if(!first_run) {

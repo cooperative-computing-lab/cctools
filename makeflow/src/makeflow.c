@@ -658,8 +658,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	free(nodeid);
 
 	/* Logs the creation of output files. */
-	makeflow_log_file_expectation(d, n->target_files);	
-	makeflow_log_file_expectation(d, wrapper_output_files);	
+	makeflow_log_file_expectation(d, n->target_files);
+	makeflow_log_file_expectation(d, wrapper_output_files);
 
 	/* Now submit the actual job, retrying failures as needed. */
 	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist);
@@ -880,10 +880,7 @@ static int makeflow_check(struct dag *d)
 				continue;
 			}
 
-			if(batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
-				if(!dag_file_exists(f))
-					f->state = DAG_FILE_STATE_EXISTS;
-				d->completed_files += 1;
+			if(dag_file_exists(f)) {
 				continue;
 			}
 
@@ -1603,17 +1600,18 @@ int main(int argc, char *argv[])
 	if (change_dir)
 		chdir(change_dir);
 
-	printf("checking %s for consistency...\n",dagfile);
-	if(!makeflow_check(d)) {
-		exit(EXIT_FAILURE);
-	}
-
 	printf("%s has %d rules.\n",dagfile,d->nodeid_counter);
 
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	makeflow_log_recover(d, logfilename, log_verbose_mode );
+	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue );
+
+	printf("checking %s for consistency...\n",dagfile);
+	if(!makeflow_check(d)) {
+		exit(EXIT_FAILURE);
+	}
+
 
 	if(clean_mode) {
 		printf("cleaning filesystem...\n");
