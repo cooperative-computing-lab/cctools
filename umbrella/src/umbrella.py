@@ -944,6 +944,52 @@ def in_local_group():
 	logging.debug("%s is not included in /etc/group!", group_name)
 	return 'no'
 
+def create_fake_mount(os_image_dir, sandbox_dir, mount_list, path):
+	"""For each ancestor dir B of path (including path iteself), check whether it exists in the rootfs and whether it exists in the mount_list and
+	whether it exists in the fake_mount directory inside the sandbox.
+	If B is inside the rootfs or the fake_mount dir, do nothing. Otherwise, create a fake directory inside the fake_mount.
+	Reason: the reason why we need to guarantee any ancestor dir of a path exists somehow is that `cd` shell builtin does a syscall stat on each level of
+	the ancestor dir of a path. Without creating the mountpoint for any ancestor dir, `cd` would fail.
+
+	Args:
+		os_image_dir: the path of the OS image inside the umbrella local cache.
+		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
+		mount_list: a list of mountpoints which already been inside the parrot mountlist file.
+		path: a dir path.
+
+	Returns:
+		If no error happens, returns None.
+		Otherwise, directly exit.
+	"""
+	if not path: #if the path is NULL, directly return.
+		return
+	path_list = []
+	tmp_path = path
+	while tmp_path != '/':
+		path_list.insert(0, tmp_path)
+		tmp_path = os.path.dirname(tmp_path)
+	for item in path_list:
+		logging.debug("Judge whether the following mountpoint exists: %s", item)
+		fake_mount_path = '%s/fake_mount%s' % (sandbox_dir, item)
+		if not os.path.exists(os_image_dir + item) and item not in mount_list and not os.path.exists(fake_mount_path):
+			logging.debug("The mountpoint (%s) does not exist, create a fake mountpoint (%s) for it!", item, fake_mount_path)
+			os.makedirs(fake_mount_path)
+		else:
+			logging.debug("The mountpoint (%s) already exists, do nothing!", item)
+
+def remove_trailing_slashes(path):
+	"""Remove the trailing slashes of a string
+
+	Args:
+		path: a path, which can be any string.
+
+	Returns:
+		path: the new path without any trailing slashes.
+	"""
+	while path.endswith('/'):
+		path = path[:-1]
+	return path
+
 def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, cvmfs_cms_siteconf_mountpoint):
 	"""Create the mountfile if parrot is used to create a sandbox for the application and a separate rootfs is needed.
 	The trick here is the adding sequence does matter. The latter-added items will be checked first during the execution.
@@ -958,29 +1004,45 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 	Returns:
 		the path of the mountfile.
 	"""
+	mount_list = []
 	mountfile_path = sandbox_dir + "/.__mountlist"
 	with open(mountfile_path, "wb") as mountfile:
 		new_root = mount_dict["/"]
 		mountfile.write("/ " + new_root + "\n")
+		mount_list.append('/')
 		del mount_dict["/"]
 		mountfile.write(new_root + " " + new_root + "\n")	#this one is needed to avoid recuisive path resolution.
+		mount_list.append(new_root)
 		logging.debug("Adding items from mount_dict into %s", mountfile_path)
 		for key in mount_dict:
 			mountfile.write(key + " " + mount_dict[key] + "\n")
 			mountfile.write(mount_dict[key] + " " + mount_dict[key] + "\n")
+			#os.path.dirname('/a/b/') is '/a/b'. Therefore, before and after calling dirname, use remove_trailing_slashes to remove the trailing slashes.
+			key = remove_trailing_slashes(key)
+			create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(key)))
+			mount_list.append(key)
+			mount_list.append(mount_dict[key])
 
 		#common-mountlist includes all the common mountpoint (/proc, /dev, /sys, /mnt, /disc, /selinux)
 		logging.debug("Adding items from %s/common-mountlist into %s", os_image_dir, mountfile_path)
 		with open(os_image_dir + "/common-mountlist", "rb") as f:
 			for line in f:
 				mountfile.write(line)
+				tmplist = line.split(' ')
+				item = remove_trailing_slashes(tmplist[0])
+				create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(item)))
+				mount_list.append(tmplist[0])
 
 		logging.debug("Add sandbox_dir(%s) into %s", sandbox_dir, mountfile_path)
 		mountfile.write(sandbox_dir + ' ' + sandbox_dir + '\n')
+		mount_list.append(sandbox_dir)
 
 		logging.debug("Add /etc/hosts and /etc/resolv.conf into %s", mountfile_path)
+		create_fake_mount(os_image_dir, sandbox_dir, mount_list, '/etc')
 		mountfile.write('/etc/hosts /etc/hosts\n')
+		mount_list.append('/etc/hosts')
 		mountfile.write('/etc/resolv.conf /etc/resolv.conf\n')
+		mount_list.append('/etc/resolv.conf')
 
 		#nd workstation uses NSCD (Name Service Cache Daemon) to deal with passwd, group, hosts services. Here first check whether the current uid and gid is in the /etc/passwd and /etc/group, if yes, use them. Otherwise, construct separate passwd and group files.
 		#If the current user name and group can not be found in /etc/passwd and /etc/group, a fake passwd and group file will be constructed under sandbox_dir.
@@ -998,8 +1060,9 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 			with open('.__acl', 'w+') as acl_file:
 				acl_file.write('%s rwlax\n' % getpass.getuser())
 
-			#getpass.getuser() returns the login name of the user
-			#os.makedirs(getpass.getuser()) #it is not really necessary to create this dir.
+		mount_list.append('/etc/passwd')
+		#getpass.getuser() returns the login name of the user
+		#os.makedirs(getpass.getuser()) #it is not really necessary to create this dir.
 
 		existed_group = in_local_group()
 		if existed_group == 'yes':
@@ -1010,23 +1073,34 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 			with open('.group', 'w+') as f:
 				f.write('%s:x:%d:%d\n' % (grp.getgrgid(os.getgid())[0], os.getgid(), os.getuid()))
 			mountfile.write('/etc/group %s/.group\n' % (sandbox_dir))
+		mount_list.append('/etc/group')
 
 		#add /var/run/nscd/socket into mountlist
+		create_fake_mount(os_image_dir, sandbox_dir, mount_list, '/var/run/nscd')
 		mountfile.write('/var/run/nscd/socket ENOENT\n')
+		mount_list.append('/var/run/nscd/socket')
 
 		logging.debug("Add %s/special_files into %s", os_image_dir, mountfile_path)
 		with open(os_image_dir + "/special_files", "rb") as f:
 			for line in f:
 				mountfile.write(line)
+				tmplist = line.split(' ')
+				item = remove_trailing_slashes(tmplist[0])
+				create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(item)))
+				mount_list.append(tmplist[0])
 
 		#add the input_dict into mountflie
 		logging.debug("Add items from input_dict into %s", mountfile_path)
 		for key in input_dict:
+			key = remove_trailing_slashes(key)
+			create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(key)))
 			mountfile.write(key + " " + input_dict[key] + "\n")
+			mount_list.append(key)
 
 		if cvmfs_cms_siteconf_mountpoint == '':
 			logging.debug('cvmfs_cms_siteconf_mountpoint is null')
 		else:
+			mountfile.write('/cvmfs /cvmfs\n')
 			mountfile.write(cvmfs_cms_siteconf_mountpoint + '\n')
 			logging.debug('cvmfs_cms_siteconf_mountpoint is not null: %s', cvmfs_cms_siteconf_mountpoint)
 	return mountfile_path
@@ -1479,8 +1553,8 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
 
 		logging.debug("Removing the parrot mountlist file and the parrot submit file from the sandbox")
-		if os.path.exists(env_dict['PARROT_MOUNT_FILE']):
-			os.remove(env_dict['PARROT_MOUNT_FILE'])
+#		if os.path.exists(env_dict['PARROT_MOUNT_FILE']):
+#			os.remove(env_dict['PARROT_MOUNT_FILE'])
 
 		logging.debug("Rename sandbox_dir (%s) to output_dir (%s)", sandbox_dir, output_dir)
 		os.rename(sandbox_dir, output_dir)
