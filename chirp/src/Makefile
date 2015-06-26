@@ -76,6 +76,8 @@ install: all install-bindings
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/cctools/chirp/
 	cp -r ../tools/workflows/ $(CCTOOLS_INSTALL_DIR)/share/cctools/chirp/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
+	cp python/chirp_python_example.py $(CCTOOLS_INSTALL_DIR)/doc/
 
 test: all
 
