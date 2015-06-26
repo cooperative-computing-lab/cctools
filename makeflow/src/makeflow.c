@@ -874,8 +874,6 @@ static int makeflow_check(struct dag *d)
 	for(n = d->nodes; n; n = n->next) {
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
-			struct stat buf;
-
 			if(f->state == DAG_FILE_STATE_DELETE) {
 				continue;
 			}
