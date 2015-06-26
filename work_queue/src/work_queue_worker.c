@@ -1273,6 +1273,11 @@ static void work_for_master(struct link *master) {
 
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
+	sigaddset(&mask, SIGTERM);
+	sigaddset(&mask, SIGQUIT);
+	sigaddset(&mask, SIGINT);
+	sigaddset(&mask, SIGUSR1);
+	sigaddset(&mask, SIGUSR2);
 
 	reset_idle_timer();
 
