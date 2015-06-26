@@ -1121,7 +1121,14 @@ int pfs_table::chdir( const char *path )
 
 char *pfs_table::getcwd( char *path, pfs_size_t size )
 {
-	strncpy(path,working_dir,size);
+	char cwd[PFS_PATH_MAX];
+	strcpy(cwd, working_dir);
+	path_remove_trailing_slashes(cwd);
+	if (strlen(cwd)+1 > (size_t)size) {
+		errno = ERANGE;
+		return NULL;
+	}
+	strcpy(path, cwd);
 	return path;
 }
 
