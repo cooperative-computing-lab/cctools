@@ -157,6 +157,8 @@ static int64_t manual_gpus_option = 0;
 static time_t  last_cwd_measure_time = 0;
 static int64_t last_workspace_usage  = 0;
 
+static time_t  last_ds_measure_time = 0;
+
 static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
@@ -165,6 +167,7 @@ static int64_t gpus_allocated = 0;
 static int send_resources_interval = 30;
 static int send_stats_interval     = 60;
 static int measure_wd_interval     = 180;
+static int measure_ds_interval     = 30;
 
 static struct work_queue *foreman_q = NULL;
 // docker image name
@@ -1368,11 +1371,19 @@ static void work_for_master(struct link *master) {
 				results_to_be_sent_msg = 1;
 			}
 		}
-
-		ok &= check_disk_space_for_filesize(".", 0, disk_avail_threshold);
-
+		
+		//We need to protect FS from too frequent statvfs calls from this loop -
+		//it has been known to overload the FS when 100 workers were running on a
+		//shared FS. Each worker was issuing ststvfs from check_disk_space_for_filesize every 10ms.
+		//Sleep in link_usleep above somehow was not happening.
+		//Because fixed zero file size parameter is used here anyway, it should
+		//be OK to cache the results.
+		if((time(0) - last_ds_measure_time) >= measure_ds_interval) {
+			ok &= check_disk_space_for_filesize(".", 0, disk_avail_threshold);
+			last_ds_measure_time = time(0);
+		}
 		int64_t disk_usage;
-		if(!check_disk_workspace(workspace, &disk_usage, 0, manual_disk_option, measure_wd_interval, last_cwd_measure_time, last_workspace_usage, disk_avail_threshold)) {
+		if(!check_disk_workspace(workspace, &disk_usage, 0, manual_disk_option, measure_wd_interval, &last_cwd_measure_time, &last_workspace_usage, disk_avail_threshold)) {
 			fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n",workspace, manual_cores_option, disk_usage);
 			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_usage);
 			ok = 0;
@@ -1611,7 +1622,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 	workspace_prepare();
 
-	check_disk_workspace(workspace, NULL, 1, manual_disk_option, measure_wd_interval, last_cwd_measure_time, last_workspace_usage, disk_avail_threshold);
+	check_disk_workspace(workspace, NULL, 1, manual_disk_option, measure_wd_interval, &last_cwd_measure_time, &last_workspace_usage, disk_avail_threshold);
 	report_worker_ready(master);
 
 	send_master_message(master, "info worker-id %s\n", worker_id);
