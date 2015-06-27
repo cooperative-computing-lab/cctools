@@ -540,6 +540,34 @@ static void expire_procs_running() {
 
 }
 
+// Just terminate the running task processes without doing any
+// other cleanups or communication. To be called when abort is 
+// requested to make sure that no child process is left running
+// if this worker process is then quickly terminated with KILL.
+static void abort_procs_running() {
+	struct work_queue_process *p;
+	uint64_t pid;
+
+	itable_firstkey(procs_running);
+	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
+		kill(-1 * pid, SIGKILL);
+	}
+
+}
+
+// We cannot call abort_procs_running() from a signal handler because
+// itable iterators change itable's internal state and therefore not
+// reentrant. We call this function wherever we need to check for
+// abort_flag status to make sure that at least child processes are
+// quickly killed before anything else is done
+static int check_abort_flag() {
+	int ret = abort_flag;
+	if(ret) {
+		abort_procs_running();
+	}
+	return ret;
+}
+
 /*
 Scan over all of the processes known by the worker,
 and if they have exited, move them into the procs_complete table
@@ -1278,12 +1306,13 @@ static void work_for_master(struct link *master) {
 	sigaddset(&mask, SIGINT);
 	sigaddset(&mask, SIGUSR1);
 	sigaddset(&mask, SIGUSR2);
+	sigaddset(&mask, SIGALRM);
 
 	reset_idle_timer();
 
 	time_t volatile_stoptime = time(0) + 60;
 	// Start serving masters
-	while(!abort_flag) {
+	while(!check_abort_flag()) {
 
 		if(time(0) > idle_stoptime) {
 			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", master_addr,master_port,idle_timeout);
@@ -1322,6 +1351,7 @@ static void work_for_master(struct link *master) {
 
 		int master_activity = link_usleep_mask(master, wait_msec*1000, &mask, 1, 0);
 		if(master_activity < 0) break;
+		if(check_abort_flag()) break;
 
 		int ok = 1;
 		if(master_activity) {
@@ -1355,6 +1385,8 @@ static void work_for_master(struct link *master) {
 
 			int visited = 0;
 			while(list_size(procs_waiting) > visited && cores_allocated < local_resources->cores.total) {
+				
+				if(check_abort_flag()) break;
 				struct work_queue_process *p;
 
 				p = list_pop_head(procs_waiting);
@@ -1667,6 +1699,14 @@ static void handle_abort(int sig)
 	abort_flag = 1;
 }
 
+// Per GNU docs (https://www.gnu.org/software/libc/manual/html_node/Handler-Returns.html#Handler-Returns)
+// Signal handler for alarm timer should re-enable itself after setting the flag
+static void handle_abort_alarm(int sig)
+{
+	abort_flag = 1;
+	signal(sig, handle_abort_alarm);
+}
+
 static void handle_sigchld(int sig)
 {
 	sigchld_received_flag = 1;
@@ -1695,6 +1735,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set both --idle-timeout and --connect-timeout.\n", "-t,--timeout=<time>");
 	printf( " %-30s Disconnect after this time if master sends no work. (default=%ds)\n", "   --idle-timeout=<time>", idle_timeout);
 	printf( " %-30s Abort after this time if no masters are available. (default=%ds)\n", "   --connect-timeout=<time>", idle_timeout);
+	printf( " %-30s Work only for this time then exit. (default=0 meaning no limit)\n", "   --worker-max-wallclock=<time>");
 	printf( " %-30s Set TCP window size.\n", "-w,--tcp-window-size=<size>");
 	printf( " %-30s Set initial value for backoff interval when worker fails to connect\n", "-i,--min-backoff=<time>");
 	printf( " %-30s to a master. (default=%ds)\n", "", init_backoff_interval);
@@ -1727,7 +1768,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE,
-	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT};
+	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT, LONG_OPT_WORKER_MAX_WALLCLOCK};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1747,6 +1788,7 @@ static const struct option long_options[] = {
 	{"timeout",             required_argument,  0,  't'},
 	{"idle-timeout",        required_argument,  0,  LONG_OPT_IDLE_TIMEOUT},
 	{"connect-timeout",     required_argument,  0,  LONG_OPT_CONNECT_TIMEOUT},
+	{"worker-max-wallclock",required_argument,  0,  LONG_OPT_WORKER_MAX_WALLCLOCK},
 	{"tcp-window-size",     required_argument,  0,  'w'},
 	{"min-backoff",         required_argument,  0,  'i'},
 	{"max-backoff",         required_argument,  0,  'b'},
@@ -1784,6 +1826,7 @@ int main(int argc, char *argv[])
 	char *foreman_stats_filename = NULL;
 	char * catalog_host = CATALOG_HOST;
 	int catalog_port = CATALOG_PORT;
+	int worker_max_wallclock = 0;
 
 	worker_start_time = time(0);
 
@@ -1854,6 +1897,9 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_CONNECT_TIMEOUT:
 			connect_timeout = string_time_parse(optarg);
+			break;
+		case LONG_OPT_WORKER_MAX_WALLCLOCK:
+			worker_max_wallclock = string_time_parse(optarg);
 			break;
 		case 'j':
 			manual_cores_option = atoi(optarg);
@@ -2017,6 +2063,11 @@ int main(int argc, char *argv[])
 	signal(SIGUSR1, handle_abort);
 	signal(SIGUSR2, handle_abort);
 	signal(SIGCHLD, handle_sigchld);
+
+	if(worker_max_wallclock>0) {
+		signal (SIGALRM, handle_abort_alarm);
+		alarm(worker_max_wallclock);
+	}
 
 	random_init();
 
