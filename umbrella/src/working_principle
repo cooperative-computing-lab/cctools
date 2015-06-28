@@ -136,4 +136,3 @@ Usage: umbrella [options] run "command"
 umbrella: error: no such option: -r
 hmeng@ccl12 ~/git-development/cctools/umbrella/example/povray$ echo $?
 2
-
