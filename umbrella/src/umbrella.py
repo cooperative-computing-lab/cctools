@@ -72,14 +72,8 @@ To allow this, do remember to add the 5.0.1 cctools packages into the remote arc
 cctools-version: based on http://www3.nd.edu/~ccl/software/files/cctools-4.9.0-x86_64-redhat6.tar.gz
 Here, 4.9.0 is the version number I picked up to denote the latest master branch, the infomation of the HEAD is:
 	Author: Patrick Donnelly
-	Date:   2015-05-13 18:32:38 -0400
-	Commit: e25ce3debcbeae30dd0c2b82922aa441fa1f78db (master)
-	* Fix missing update to bytes written.
-
-	This caused an assertion failure when an *atomic* write completed
-	successfully but the return value did not indicate this.
-
-	Bug found by Haiyan, @hmeng-19.
+	Date:   2015-06-26 17:08:45 -0400
+	Commit: f2bb681fdf8403632aa3da767983bf566e40007d (master)
 """
 
 def subprocess_error(cmd, rc, stdout, stderr):
