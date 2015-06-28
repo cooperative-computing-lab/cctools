@@ -721,7 +721,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 			if mount_env and mountpoint:
 				env_para_dict[mount_env] = mountpoint
 
-			if not r4 and not env_para_dict.has_key('HTTP_PROXY'):
+			if not r4 and not env_para_dict.has_key('HTTP_PROXY') and is_cms_cvmfs_app:
 				if os.environ.has_key('HTTP_PROXY'):
 					env_para_dict['HTTP_PROXY'] = os.environ['HTTP_PROXY']
 				else:
@@ -952,9 +952,9 @@ def create_fake_mount(os_image_dir, sandbox_dir, mount_list, path):
 		path: a dir path.
 
 	Returns:
-		If no error happens, returns None.
-		Otherwise, directly exit.
+		mount_str: a string including the mount items which are needed to added into the parrot mount file.
 	"""
+	mount_str = ''
 	if not path: #if the path is NULL, directly return.
 		return
 	path_list = []
@@ -965,11 +965,16 @@ def create_fake_mount(os_image_dir, sandbox_dir, mount_list, path):
 	for item in path_list:
 		logging.debug("Judge whether the following mountpoint exists: %s", item)
 		fake_mount_path = '%s/fake_mount%s' % (sandbox_dir, item)
+		#if item is under localdir, do nothing.
+		if item in remove_trailing_slashes(os.path.dirname(sandbox_dir)):
+			break
 		if not os.path.exists(os_image_dir + item) and item not in mount_list and not os.path.exists(fake_mount_path):
 			logging.debug("The mountpoint (%s) does not exist, create a fake mountpoint (%s) for it!", item, fake_mount_path)
 			os.makedirs(fake_mount_path)
+			mount_str += '%s %s\n' % (item, fake_mount_path)
 		else:
 			logging.debug("The mountpoint (%s) already exists, do nothing!", item)
+	return mount_str
 
 def remove_trailing_slashes(path):
 	"""Remove the trailing slashes of a string
@@ -1007,32 +1012,45 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 		del mount_dict["/"]
 		mountfile.write(new_root + " " + new_root + "\n")	#this one is needed to avoid recuisive path resolution.
 		mount_list.append(new_root)
+
+		mountfile.write("%s %s\n" % (os.path.dirname(sandbox_dir), os.path.dirname(sandbox_dir)))
+		mount_list.append(os.path.dirname(sandbox_dir))
+
 		logging.debug("Adding items from mount_dict into %s", mountfile_path)
 		for key in mount_dict:
-			mountfile.write(key + " " + mount_dict[key] + "\n")
-			mountfile.write(mount_dict[key] + " " + mount_dict[key] + "\n")
 			#os.path.dirname('/a/b/') is '/a/b'. Therefore, before and after calling dirname, use remove_trailing_slashes to remove the trailing slashes.
 			key = remove_trailing_slashes(key)
-			create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(key)))
+			mount_str = create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(key)))
+			if mount_str:
+				logging.debug("Adding fake mount items (%s) into %s", mount_str, mountfile_path)
+				mountfile.write(mount_str)
 			mount_list.append(key)
 			mount_list.append(mount_dict[key])
+			mountfile.write(key + " " + mount_dict[key] + "\n")
+			mountfile.write(mount_dict[key] + " " + mount_dict[key] + "\n")
 
 		#common-mountlist includes all the common mountpoint (/proc, /dev, /sys, /mnt, /disc, /selinux)
 		logging.debug("Adding items from %s/common-mountlist into %s", os_image_dir, mountfile_path)
 		with open(os_image_dir + "/common-mountlist", "rb") as f:
 			for line in f:
-				mountfile.write(line)
 				tmplist = line.split(' ')
 				item = remove_trailing_slashes(tmplist[0])
-				create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(item)))
+				mount_str = create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(item)))
+				if mount_str:
+					logging.debug("Adding fake mount items (%s) into %s", mount_str, mountfile_path)
+					mountfile.write(mount_str)
 				mount_list.append(tmplist[0])
+				mountfile.write(line)
 
 		logging.debug("Add sandbox_dir(%s) into %s", sandbox_dir, mountfile_path)
 		mountfile.write(sandbox_dir + ' ' + sandbox_dir + '\n')
 		mount_list.append(sandbox_dir)
 
 		logging.debug("Add /etc/hosts and /etc/resolv.conf into %s", mountfile_path)
-		create_fake_mount(os_image_dir, sandbox_dir, mount_list, '/etc')
+		mount_str = create_fake_mount(os_image_dir, sandbox_dir, mount_list, '/etc')
+		if mount_str:
+			logging.debug("Adding fake mount items (%s) into %s", mount_str, mountfile_path)
+			mountfile.write(mount_str)
 		mountfile.write('/etc/hosts /etc/hosts\n')
 		mount_list.append('/etc/hosts')
 		mountfile.write('/etc/resolv.conf /etc/resolv.conf\n')
@@ -1070,24 +1088,33 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 		mount_list.append('/etc/group')
 
 		#add /var/run/nscd/socket into mountlist
-		create_fake_mount(os_image_dir, sandbox_dir, mount_list, '/var/run/nscd')
+		mount_str = create_fake_mount(os_image_dir, sandbox_dir, mount_list, '/var/run/nscd')
+		if mount_str:
+			logging.debug("Adding fake mount items (%s) into %s", mount_str, mountfile_path)
+			mountfile.write(mount_str)
 		mountfile.write('/var/run/nscd/socket ENOENT\n')
 		mount_list.append('/var/run/nscd/socket')
 
 		logging.debug("Add %s/special_files into %s", os_image_dir, mountfile_path)
 		with open(os_image_dir + "/special_files", "rb") as f:
 			for line in f:
-				mountfile.write(line)
 				tmplist = line.split(' ')
 				item = remove_trailing_slashes(tmplist[0])
-				create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(item)))
+				mount_str = create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(item)))
+				if mount_str:
+					logging.debug("Adding fake mount items (%s) into %s", mount_str, mountfile_path)
+					mountfile.write(mount_str)
 				mount_list.append(tmplist[0])
+				mountfile.write(line)
 
 		#add the input_dict into mountflie
 		logging.debug("Add items from input_dict into %s", mountfile_path)
 		for key in input_dict:
 			key = remove_trailing_slashes(key)
-			create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(key)))
+			mount_str = create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(key)))
+			if mount_str:
+				logging.debug("Adding fake mount items (%s) into %s", mount_str, mountfile_path)
+				mountfile.write(mount_str)
 			mountfile.write(key + " " + input_dict[key] + "\n")
 			mount_list.append(key)
 
@@ -1546,7 +1573,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			print "Start executing the user's task: %s" % user_cmd[0]
 			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
 
-		logging.debug("Removing the parrot mountlist file and the parrot submit file from the sandbox")
+#		logging.debug("Removing the parrot mountlist file and the parrot submit file from the sandbox")
 #		if os.path.exists(env_dict['PARROT_MOUNT_FILE']):
 #			os.remove(env_dict['PARROT_MOUNT_FILE'])
 
