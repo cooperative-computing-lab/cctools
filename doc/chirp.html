@@ -1001,8 +1001,8 @@ This file is bound into the server namespace at task completion.</p>
 }
 </code>
 
-<p>Here, each file is bound as a symbolic link the location on the server. This
-type of access is usually fast as the server does not need make a copy. You may
+<p>Here, each file is bound using hard links to the file located on the server.
+This type of access is fast as the server does not need make a copy. You may
 also bind files as <tt>COPY</tt> if necessary. <tt>LINK</tt> is the
 default.</p>
 
@@ -1315,6 +1315,14 @@ not reached a terminal state (<tt>FINISHED</tt>, <tt>KILLED</tt>, or
 <tt>ERRORED</tt>) will immediately be moved to the <tt>KILLED</tt> state. If
 the job is running, the internal Chirp scheduler will also terminate the job at
 its convenience.</p>
+
+<h3 id="jobs.afs">Chirp Jobs on AFS<a class="sectionlink" href="#jobs.afs" title="Link to this section.">&#x21d7;</a></h3>
+
+<p>On the AFS file system, Chirp job execution will not work with <tt>LINK</tt>
+file bindings. This is due to limitations in AFS preventing hard links across
+directories. For this reason we recommend against using AFS as the backing
+storage for Chirp (<tt>--root</tt>). If you must use AFS, the <tt>COPY</tt>
+binding should work.</p>
 
 
 <h2 id="debugging">Debugging Advice<a class="sectionlink" href="#debugging" title="Link to this section.">&#x21d7;</a></h2>

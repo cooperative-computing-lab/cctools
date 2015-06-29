@@ -352,6 +352,16 @@ nothing left to do.</code>
     --wrapper-output='stdout.%%' \\
     --wrapper-output='stderr.%%'</code>
 
+        <h2 id="notes">Notes<a class="sectionlink" href="#notes" title="Link to this section.">&#x21d7;</a></h2>
+
+            <h3 id="notes.afs">AFS<a class="sectionlink" href="#notes.afs" title="Link to this section.">&#x21d7;</a></h3>
+
+                <p>Storage nodes used by Confuga must <a
+                href="chirp.html#jobs.afs">not use AFS as their backing
+                storage</a>. Confuga requires use of the Chirp job
+                <tt>LINK</tt> file binding. For this reason, it cannot use
+                Chirp servers running with <tt>--root</tt> on AFS.</p>
+
         <h2 id="missing">Missing Features<a class="sectionlink" href="#missing" title="Link to this section.">&#x21d7;</a></h2>
 
             <p>Confuga is a beta quality software and is presently missing a few features that will be addressed in future releases:</p>
