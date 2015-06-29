@@ -1563,8 +1563,11 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 				env_dict[key] = env_para_dict[key]
 
 			if 'PATH' not in env_dict: #if we run umbrella on Condor, Condor will not set PATH by default.
-				env_dict['PATH'] = '/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin'
+				env_dict['PATH'] = '.:/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin'
 				logging.debug("PATH is empty, forcely set it to be %s", env_dict['PATH'])
+			else:
+				env_dict['PATH'] = '.' + env_dict['PATH']
+				logging.debug("Forcely add '.' into PATH")
 
 			logging.debug("Add software binary into PATH")
 			extra_path = collect_software_bin(host_cctools_path, sw_mount_dict)
@@ -1641,13 +1644,20 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 
 	logging.debug("The full path of umbrella is: %s" % umbrella_fullpath)
 
+	#find cctools_python
+	cmd = 'which cctools_python'
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
+	cctools_python_path = stdout[:-1]
+
 	condor_submit_file = open(condor_submit_path, "w+")
 	condor_submit_file.write('universe = vanilla\n')
-	condor_submit_file.write('executable = %s\n' % umbrella_fullpath)
-	condor_submit_file.write('arguments = "-s local -c %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(packages_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
+	condor_submit_file.write('executable = %s\n' % cctools_python_path)
+	condor_submit_file.write('arguments = "./umbrella -s local -c %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(packages_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
 #	condor_submit_file.write('PostCmd = "echo"\n')
 #	condor_submit_file.write('PostArguments = "$?>%s/condor_rc"\n' % os.path.basename(condor_output_dir))
-	condor_submit_file.write('transfer_input_files = %s, %s, %s%s\n' % (umbrella_fullpath, packages_path, spec_path, transfer_inputs))
+	condor_submit_file.write('transfer_input_files = %s, %s, %s, %s%s\n' % (cctools_python_path, umbrella_fullpath, packages_path, spec_path, transfer_inputs))
 	condor_submit_file.write('transfer_output_files = %s, condor_umbrella.log\n' % os.path.basename(condor_output_dir))
 	condor_submit_file.write('transfer_output_remaps = "condor_umbrella.log=%s"\n' % condorlog_path)
 
@@ -1657,7 +1667,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 	else:
 		#condor_submit_file.write('requirements = TARGET.Arch == "%s" && TARGET.OpSys == "%s" && TARGET.OpSysAndVer == "%s" && TARGET.has_docker == true\n' % (hardware_platform, kernel_name, linux_distro))
 		condor_submit_file.write('requirements = TARGET.Arch == "%s" && TARGET.OpSys == "%s" && TARGET.OpSysAndVer == "%s"\n' % (hardware_platform, kernel_name, linux_distro))
-	condor_submit_file.write('environment = PATH=/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin\n')
+	condor_submit_file.write('environment = PATH=.:/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin\n')
 
 	condor_submit_file.write('output = %s/condor_stdout\n' % sandbox_dir)
 	condor_submit_file.write('error = %s/condor_stderr\n' % sandbox_dir)
