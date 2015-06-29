@@ -1,7 +1,7 @@
 #!/bin/bash
 apt-get update
 apt-get install build-essential automake autoconf zlibc zlib1g-dev -y
-cd /home/ubuntu 
+cd /home/ubuntu
 fileTransferred=0
 while [ $fileTransferred -ne 1 ]; do
 	homeListing=`ls`
@@ -10,7 +10,7 @@ while [ $fileTransferred -ne 1 ]; do
 	else
 		fileTransferred=1
 		touch /home/ubuntu/GOT_IT
-	fi	
+	fi
 done
 
 chmod 755 $homeListing
@@ -24,7 +24,7 @@ done
 
 ./configure
 make
-make install 
+make install
 cp -r /cctools /home/ubuntu/cctools
 rm -r /cctools
 export PATH=/home/ubuntu/cctools/bin:$PATH

@@ -43,5 +43,3 @@ SRC_STRING
 
 make pull request on github for the code we've written mimic submit_to_condor
 and wait in an attmept to get AWS to create the AMI for us.
-
-

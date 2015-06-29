@@ -51,7 +51,7 @@ except:
 if not version_is_good:
 	if (os.path.isfile(sys.argv[1])):
 		is_tarball = True
-	
+
 	if not is_tarball:
 		print sys.argv[1] + " is not a valid version of cctools and is not an accessible file that can contain cctools"
 		sys.exit()
@@ -69,7 +69,7 @@ else:
 #### DEFINE VARIABLES ############################################
 instance_type = "t2.micro"
 
-#these two are coupled, 
+#these two are coupled,
 instance_ami = "ami-9eaa1cf6" #Ubuntu 14.04. Coupled with the default region being "us-east-1"
 default_region_name = "us-east-1" #If AWS changes their regions, this is the source of your error.
 
@@ -202,7 +202,7 @@ while waiting_on_ec2instance:
 
 #wait for IM_DONE to be removed from ~ on machine
 #cannot use "while try sleep" pattern here, as
-#the image could be taken when the script is running 
+#the image could be taken when the script is running
 for i in range(3):
 	time.sleep(WAIT_LENGTH)
 	print "Still waiting..."
@@ -240,7 +240,7 @@ print "Instance terminated."
 ###Instance terminated ###########################################
 
 ###we need to copy this public ami to all other regions except the one we created it in#############
-regions_to_distribute_to = all_regions  
+regions_to_distribute_to = all_regions
 regions_to_distribute_to.pop(0)
 num_to_copy = len(regions_to_distribute_to)
 #connect to each region to copy to
@@ -278,5 +278,3 @@ if publicize:
 	publicize_amis(to_make_public)
 else:
 	print "not publicizing"
-
-
