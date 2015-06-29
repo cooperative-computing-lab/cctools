@@ -2,33 +2,35 @@
 	"comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.",
 	"hardware": {
 		"arch": "x86_64",
-		"cores": "2",
+		"cores": "1",
 		"memory": "2GB",
 		"disk": "3GB"
 	},
 	"kernel" : {
 		"name": "linux",
-		"version": ">=2.6.32"
+		"version": ">=2.6.18"
 	},
 	"os": {
 		"name": "Redhat",
-		"version": "6.5"
+		"version": "5.10"
 	},
 	"software": {
-		"cmssw-5.2.5-slc5-amd64": {
+		"cmssw-4.2.8-slc5-amd64": {
 			"mount_env": "CMS_DIR",
 			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
 	},
 	"data": {
-		"final_events_2381.lhe": {
-			"mount_env": "INPUT_FILE",
-			"mountpoint": "/tmp/final_events_2381.lhe",
-			"action": "none"
+		"demoanalyzer_cfg.py": {
+			"mountpoint": "/tmp/demoanalyzer_cfg.py",
+			"mount_env": "CONFIG_FILE"
+		},
+		"00459D48-EB70-E011-AF09-90E6BA19A252.root": {
+			"mount_env": "ROOT_FILE"
 		}
 	},
 	"environ": {
-		"CMS_VERSION": "CMSSW_5_2_5",
-		"SCRAM_ARCH": "slc5_amd64_gcc462"
+		"CMS_VERSION": "CMSSW_4_2_8",
+		"SCRAM_ARCH": "slc5_amd64_gcc434"
 	}
 }

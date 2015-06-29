@@ -16,6 +16,7 @@
 	},
 	"software": {
 		"cmssw-5.3.11-slc5-amd64": {
+			"mount_env": "CMS_DIR",
 			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
 	},
