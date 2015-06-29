@@ -142,6 +142,7 @@
     --catalog-update=30s \
     --debug=confuga \
     --jobs \
+    --port=9000 \
     --project-name=`whoami`-test \
     --root='confuga://./confuga.root/?auth=unix&amp;nodes=node:chirp://localhost:9001/,chirp://localhost:9002/'</code>
                 </p>
@@ -163,7 +164,7 @@ chirp    localhost.localdomain     9094  batrick    4.4.0    163.1 GB  34.0 GB</
 
                 <p>In another terminal, we can run the <a href="makeflow.html#language">standard Makeflow example</a> against the cluster to confirm everything works. This example Makeflow is distributed with CCTools in <tt>makeflow/example/example.makeflow</tt>.</p>
 
-                <code><span class="prompt">$ </span>makeflow --batch-type=chirp --working-dir=chirp://localhost/ makeflow/example/example.makeflow
+                <code><span class="prompt">$ </span>makeflow --batch-type=chirp --working-dir=chirp://localhost:9000/ makeflow/example/example.makeflow
 parsing makeflow/example/example.makeflow...
 checking makeflow/example/example.makeflow for consistency...
 makeflow/example/example.makeflow has 6 rules.
