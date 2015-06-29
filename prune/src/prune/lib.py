@@ -8,6 +8,8 @@ import string, random, time, shutil, uuid, hashlib, re, threading
 
 from work_queue import *
 
+from distutils.spawn import find_executable
+
 import subprocess
 from subprocess import Popen, PIPE, call
 
@@ -320,8 +322,8 @@ See the manual for more details.
 				results += [[puid,name,None]]
 			elif len(in_types)>a and in_types[a].lower()=='file':
 				raise Exception('Input file not found: %s'%(arg))
-			else:
-				results += [[None, None, arg]]
+			elif len(arg)>0:
+				results += [[None, arg, None]]
 		return {'arg_list':results}
 
 	elif nextpos==lparen: # Function invokation
@@ -369,14 +371,18 @@ See the manual for more details.
 
 		function_puid = func['puid']
 		op_string = '%s('%function_puid
-		for r in res['arg_list']:
-			if r[0]:
-				op_string += str(r[0])+','
-			elif len(r)<=3:
-				print 'Too many arguments passed to the function.'
-				return None
-			else:
-				op_string += r[3]+','
+		if len(res['arg_list']) < len(in_types):
+			print 'Too few arguments passed to the function.'
+			return None
+		elif len(res['arg_list']) > len(in_types) and in_types[-1][-1]!='*':
+			print 'Too many arguments passed to the function.'
+			return None
+		else:
+			for r in res['arg_list']:
+				if r[0]:
+					op_string += str(r[0])+','
+				else:
+					op_string += r[1]+','
 		op_string = op_string[0:-1] + ')'
 		#op_chksum = hashstring(op_string)
 		op_chksum = op_string
@@ -390,9 +396,9 @@ See the manual for more details.
 			op_display = displayOperation(old_ios)
 			all_files_exist = True
 			for old_io in old_ios:
-				if old_io['io_type']=='O' and not os.path.isfile( storage_pathname(old_io['file_puid']) ):
+				if old_io['io_type']=='O' and old_io['file_puid'] and not os.path.isfile( storage_pathname(old_io['file_puid']) ):
 					all_files_exist = False
-					debug('Output file not memoized:'+old_io['display']+' '+old_io['puid'])
+					debug('Output file not memoized:',old_io)
 			if not all_files_exist:
 				runs = database.runs_get_by_op_puid(old_op_id)
 				in_progress = False
@@ -430,7 +436,6 @@ See the manual for more details.
 			database.io_ins(op_id, 'O', puid, name, i)
 			if name:
 				database.tag_set(name,'B',puid)
-
 		new_ios = database.ios_get(op_id)
 		op_display = displayOperation(new_ios)
 		database.op_upd_display(op_id,op_display)
@@ -574,13 +579,17 @@ def get_default_environment():
 
 
 		while not env:
-			line = raw_input('What local file should be used as execution environment? [empty.tar.gz] ')
+			line = raw_input('What local file should be used as execution environment? [default.env] ')
 			if len(line)<=0:
-				env_file = 'empty.tar.gz'
+				env_file = 'default.env'
 			else:
 				env_file = line
-			#env_type = raw_input('What type of environment file is it [targz]: ')
-			env_type = 'targz'
+			line = raw_input('What type of environment file is it [targz]: ')
+			if len(line)<=0:
+				env_type = 'targz'
+			else:
+				env_type = line
+
 			ids = getDataIDs(env_file)
 			if ids:
 				store_file(env_file, ids['puid'])
@@ -645,9 +654,11 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 	ios = database.ios_get(op_id)
 	op = database.op_get(op_id)
 
+	final_output = ''
 	options = ''
 	arg_str = ''
 	env_type = ''
+	env_files = []
 	place_files = []
 	fetch_files = []
 	for io in ios:
@@ -667,17 +678,18 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 
 		elif io['io_type']=='I':
 			arg_str += '%s '%(io['display'])
-			res = database.copies_get(io['file_puid'])
-			if len(res)==0:
-				#print 'No file', io
-				database.run_upd_by_op_puid(op_id,'Waiting',wait=io['file_puid'])
-				return {'cmd':None}
-			for copy in res:
-				if copy['pack']=='gz':
-					place_files.append({'src':storage_pathname(io['file_puid']),'dst':io['display']+'.gz'})
-					options += ' -gunzip %s=%s.gz'%(io['display'],io['display'])
-				else:
-					place_files.append({'src':storage_pathname(io['file_puid']),'dst':io['display']})
+			if io['file_puid']:
+				res = database.copies_get(io['file_puid'])
+				if len(res)==0:
+					#print 'No file', io
+					database.run_upd_by_op_puid(op_id,'Waiting',wait=io['file_puid'])
+					return {'cmd':None}
+				for copy in res:
+					if copy['pack']=='gz':
+						place_files.append({'src':storage_pathname(io['file_puid']),'dst':io['display']+'.gz'})
+						options += ' -gunzip %s=%s.gz'%(io['display'],io['display'])
+					else:
+						place_files.append({'src':storage_pathname(io['file_puid']),'dst':io['display']})
 
 
 		elif io['io_type']=='O':
@@ -702,24 +714,37 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 					options += ' -targz ENVIRONMENT'
 
 
-				place_files.append({'src':storage_pathname(copy['puid']),'dst':'ENVIRONMENT','puid':copy['puid'],'pack':copy['pack'],'display':io['display']})
+				env_files.append({'src':storage_pathname(copy['puid']),'dst':'ENVIRONMENT','puid':copy['puid'],'pack':copy['pack'],'display':io['display']})
 
 	arg_str = arg_str[0:-1]
 
 
-	place_files.append({'src':storage_pathname('PRUNE_EXECUTOR'),'dst':'PRUNE_EXECUTOR'})
-	fetch_files.append({'src':'prune_debug.log','dst':storage_pathname(op_id)+'.debug','puid':str(op_id)+'.debug','pack':'','puid':str(op_id)+'.debug','display':str(op_id)+'.debug'})
+	env_files.append({'src':storage_pathname('PRUNE_EXECUTOR'),'dst':'PRUNE_EXECUTOR'})
+	fetch_files.append({'src':'prune_debug.log','dst':storage_pathname(op_id)+'.pdebug','puid':str(op_id)+'.pdebug','pack':'','puid':str(op_id)+'.pdebug','display':str(op_id)+'.pdebug','env':True})
 
 	if local_fs:
 		for obj in place_files:
 			if obj['dst']!='PRUNE_EXECUTOR':
 				options += ' -ln %s=%s'%(obj['dst'],obj['src'])
 
+	if env_type=='umbrella':
+		in_str = ''
+		for obj in place_files:
+			in_str += ',%s=%s'%(obj['dst'],obj['dst'])
+		options += ' -umbrellai '+in_str[1:]
+		fetch_files.append({'src':'umbrella.log','dst':storage_pathname(op_id)+'.udebug','puid':str(op_id)+'.udebug','pack':'','puid':str(op_id)+'.udebug','display':str(op_id)+'.udebug','env':True})
+		final_output = 'final_output/'
 
-	final_cmd = 'chmod 755 PRUNE_RUN; ./PRUNE_RUN'
+
+
+	final_cmd = 'chmod 755 PRUNE_RUN PRUNE_EXECUTOR; ./PRUNE_RUN'
 	run_cmd = "./%s %s"%(function_name, arg_str)
-	run_buffer = '#!/bin/bash\npython PRUNE_EXECUTOR%s %s'%(options,run_cmd)
+	run_buffer = './PRUNE_EXECUTOR%s %s'%(options,run_cmd)
 	#print run_buffer
+
+	if env_type=='umbrella':
+		umbrella_file = which('umbrella')
+		env_files.append({'src':umbrella_file[0],'dst':'UMBRELLA_EXECUTABLE'})
 
 
 	if dry_run:
@@ -727,8 +752,10 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 
 	elif framework=='wq':
 		t = Task('')
+		for obj in env_files:
+			t.specify_file(obj['src'], obj['dst'], WORK_QUEUE_INPUT, cache=True)
 		for obj in place_files:
-			if not local_fs or obj['dst']=='PRUNE_EXECUTOR':
+			if not local_fs:
 				t.specify_file(obj['src'], obj['dst'], WORK_QUEUE_INPUT, cache=True)
 		t.specify_buffer(run_buffer, 'PRUNE_RUN', WORK_QUEUE_INPUT, cache=True)
 
@@ -736,10 +763,10 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 		t.specify_cores(1)
 
 		for obj in fetch_files:
-			if obj['src']=='prune_debug.log':
+			if 'env' in obj and obj['env']:
 				t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=False)
 			else:
-				t.specify_file(obj['dst'], obj['src'], WORK_QUEUE_OUTPUT, cache=True)
+				t.specify_file(obj['dst'], final_output+obj['src'], WORK_QUEUE_OUTPUT, cache=True)
 		return {'cmd':op['display'],'framework':framework,'wq_task':t,'fetch_files':fetch_files}
 
 	else:
@@ -749,25 +776,40 @@ def create_operation(op_id,framework='local',local_fs=False, dry_run=False):
 		except OSError:
 			if not os.path.isdir(sandbox_folder):
 				raise
+
+
+		for obj in env_files:
+			shutil.copy2(obj['src'], sandbox_folder+obj['dst'])
 		for obj in place_files:
-			if not local_fs or obj['dst']=='PRUNE_EXECUTOR' or not dry_run:
+			if not local_fs or not dry_run:
 				shutil.copy2(obj['src'], sandbox_folder+obj['dst'])
+
+
 		f = open(sandbox_folder+'PRUNE_RUN','w')
 		f.write(run_buffer)
 		f.close()
+		os.chmod(sandbox_folder+'PRUNE_RUN', 0555)
 
-		if env_type=='umbrella':
-			in_str = ''
-			for obj in place_files:
-				in_str += ',%s=%s'%(obj['dst'],obj['dst'])
-			final_cmd = './umbrella -T local -i PRUNE_RUN=PRUNE_RUN%s -c ENVIRONMENT -l ./tmp/ -o ./final_output run ./PRUNE_RUN'%(in_str)
-			shutil.copy2('../../../cctools.src/umbrella/src/umbrella', sandbox_folder+'umbrella')
 
-		return {'cmd':op['display'],'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files}
+		return {'cmd':op['display'],'final_cmd':final_cmd,'framework':framework,'sandbox':sandbox_folder,'fetch_files':fetch_files,'final_output':final_output}
 
 
 
-
+def which(name, flags=os.X_OK):
+	result = []
+	exts = filter(None, os.environ.get('PATHEXT', '').split(os.pathsep))
+	path = os.environ.get('PATH', None)
+	if path is None:
+		return []
+	for p in os.environ.get('PATH', '').split(os.pathsep):
+		p = os.path.join(p, name)
+		if os.access(p, flags):
+			result.append(p)
+		for e in exts:
+			pext = p + e
+			if os.access(pext, flags):
+				result.append(pext)
+	return result
 
 wq = None
 wq_task_cnt = 0
@@ -844,7 +886,7 @@ def wq_check():
 						for obj in operation['fetch_files']:
 							if os.path.isfile(obj['dst']):
 								store_file(obj['dst'],obj['puid'],True,obj['pack'],storage_module='wq')
-								if obj['display'].endswith('.debug'):
+								if obj['display'].endswith('.pdebug'):
 									f = open(obj['dst'])
 									for line in f:
 										if line.startswith('Execution time: '):
@@ -939,8 +981,11 @@ def local_check():
 			exec_time = exec_space = 0
 			for obj in operation['fetch_files']:
 				try:
-					store_file(operation['sandbox']+obj['src'], obj['puid'])
-					if obj['display'].endswith('.debug'):
+					if 'env' in obj and obj['env']:
+						store_file(operation['sandbox']+obj['src'], obj['puid'])
+					else:
+						store_file(operation['sandbox']+operation['final_output']+obj['src'], obj['puid'])
+					if obj['display'].endswith('.pdebug'):
 						f = open(operation['sandbox']+obj['src'])
 						for line in f:
 							if line.startswith('Execution time: '):
