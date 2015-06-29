@@ -1316,6 +1316,14 @@ not reached a terminal state (<tt>FINISHED</tt>, <tt>KILLED</tt>, or
 the job is running, the internal Chirp scheduler will also terminate the job at
 its convenience.</p>
 
+<h3 id="jobs.afs">Chirp Jobs on AFS<a class="sectionlink" href="#jobs.afs" title="Link to this section.">&#x21d7;</a></h3>
+
+<p>On the AFS file system, Chirp job execution will not work with <tt>LINK</tt>
+file bindings. This is due to limitations in AFS preventing hard links across
+directories. For this reason we recommend against using AFS as the backing
+storage for Chirp (<tt>--root</tt>). If you must use AFS, the <tt>COPY</tt>
+binding should work.</p>
+
 
 <h2 id="debugging">Debugging Advice<a class="sectionlink" href="#debugging" title="Link to this section.">&#x21d7;</a></h2>
 
