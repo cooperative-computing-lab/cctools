@@ -1001,8 +1001,8 @@ This file is bound into the server namespace at task completion.</p>
 }
 </code>
 
-<p>Here, each file is bound as a symbolic link the location on the server. This
-type of access is usually fast as the server does not need make a copy. You may
+<p>Here, each file is bound using hard links to the file located on the server.
+This type of access is fast as the server does not need make a copy. You may
 also bind files as <tt>COPY</tt> if necessary. <tt>LINK</tt> is the
 default.</p>
 
