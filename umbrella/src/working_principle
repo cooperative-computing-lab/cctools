@@ -21,6 +21,8 @@ Options:
   -s SANDBOX_MODE, --sandbox_mode=SANDBOX_MODE
 						sandbox mode, which can be local, parrot, chroot,
 						docker, condor, ec2. (By default: local)
+  --cvmfs_http_proxy=CVMFS_HTTP_PROXY
+						HTTP_PROXY to access cvmfs (Used by Parrot)
   --packages=PACKAGES   The source of packages information. (By default:
 						./packages.json)
 						If the value of this option does not exist, one copy of packages.json will be downloaded into the sandbox from the ccl website.

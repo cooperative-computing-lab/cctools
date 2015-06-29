@@ -1660,7 +1660,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 	condor_submit_file.write('universe = vanilla\n')
 	condor_submit_file.write('executable = %s\n' % cctools_python_path)
 	if cvmfs_http_proxy:
-		condor_submit_file.write('arguments = "./umbrella -s local -c %s --cvmfs_http_proxy %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(packages_path), cvmfs_http_proxy, new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
+		condor_submit_file.write('arguments = "./umbrella -s local -c %s --cvmfs_http_proxy %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, cvmfs_http_proxy, os.path.basename(packages_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
 	else:
 		condor_submit_file.write('arguments = "./umbrella -s local -c %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(packages_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
 #	condor_submit_file.write('PostCmd = "echo"\n')
