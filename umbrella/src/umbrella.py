@@ -342,7 +342,7 @@ def check_cvmfs_repo(repo_name):
 	else:
 		return ''
 
-def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro):
+def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, cvmfs_http_proxy):
 	""" Process each explicit and implicit dependency.
 
 	Args:
@@ -358,6 +358,7 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 		hardware_platform: the architecture of the required hardware platform (e.g., x86_64).
 		host_linux_distro: the linux distro of the host machine. For Example: redhat6, centos6.
 		linux_distro: the linux distro of the required OS. For Example: redhat6, centos6.
+		cvmfs_http_proxy: HTTP_PROXY environmetn variable used to access CVMFS by Parrot
 
 	Returns:
 		is_cms_cvmfs_app: whether this is a cms app which will be delivered by cmvfs and the local machine has no cvmfs installed. 1 means this is a cms app. 0 means this is not.
@@ -392,11 +393,11 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 			logging.debug("To access cvmfs, cctools binary is needed")
 			if sandbox_mode in ['parrot']:
 				cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action)
-				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
+				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json, cvmfs_http_proxy)
 
 			if sandbox_mode in ['chroot', 'docker']:
 				cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro, action)
-				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardware_platform, packages_json)
+				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardware_platform, packages_json, cvmfs_http_proxy)
 
 			cvmfs_cms_siteconf_mountpoint = set_cvmfs_cms_siteconf(name, action, packages_json, sandbox_dir)
 
@@ -407,7 +408,7 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 			logging.debug('cvmfs is already installed on the machine, and its mountpoint on the machine: %s', mount_value)
 
 			if sandbox_mode == 'parrot':
-				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
+				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json, cvmfs_http_proxy)
 	else:
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
 		dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
@@ -609,7 +610,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 
 	return host_linux_distro
 
-def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardware_platform, packages_json):
+def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardware_platform, packages_json, cvmfs_http_proxy):
 	"""Modify the user's command into `parrot_run + the user's command`.
 	The cases when this function should be called: (1) sandbox_mode == parrot; (2) sandbox_mode != parrot and cvmfs is needed to deliver some dependencies not installed on the execution node.
 
@@ -620,6 +621,7 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardwar
 		hardware_platform: the architecture of the required hardware platform (e.g., x86_64).
 		linux_distro: the linux distro. For Example: redhat6, centos6.
 		packages_json: the json object including all the metadata of dependencies.
+		cvmfs_http_proxy: HTTP_PROXY environmetn variable used to access CVMFS by Parrot
 
 	Returns:
 		the modified version of the user's cmd.
@@ -630,7 +632,10 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardwar
 	dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
 	#4.4 and 4.4 does not support --no-set-foreground feature.
 	#user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
-	user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
+	if cvmfs_http_proxy:
+		user_cmd[0] = "export HTTP_PROXY=" + cvmfs_http_proxy + "; " + dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
+	else:
+		user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
 	logging.debug("The parrotized user_cmd: %s" % user_cmd[0])
 	return user_cmd
 
@@ -649,7 +654,7 @@ def chrootize_user_cmd(user_cmd, cwd_setting):
 	user_cmd[0] = 'chroot / /bin/sh -c "cd %s; %s"' %(cwd_setting, user_cmd[0])
 	return user_cmd
 
-def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs):
+def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs, cvmfs_http_proxy):
 	""" Installation each software dependency specified in the software section of the specification.
 	If the application is a CMS app and the execution node does not have cvmfs installed, change `user_cmd` to `parrot_run ... user_cmd` and cvmfs_cms_siteconf_mountpoint.
 
@@ -668,6 +673,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		distro_name: the name of the required OS (e.g., redhat).
 		distro_version: the version of the required OS (e.g., 6.5).
 		need_separate_rootfs: whether a separate rootfs is needed to execute the user's command.
+		cvmfs_http_proxy: HTTP_PROXY environmetn variable used to access CVMFS by Parrot
 
 	Returns:
 		host_cctools_path: the path of cctools under the umbrella local cache.
@@ -704,7 +710,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 			#table schema: (name text, version text, platform text, store text, store_type text, type text)
 			env_para_dict[mount_env] =result["source"][0]
 		else:
-			r1, r2, r3, r4 = dependency_process(item, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro)
+			r1, r2, r3, r4 = dependency_process(item, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, cvmfs_http_proxy)
 			if r1 == 1 and is_cms_cvmfs_app == 0:
 				is_cms_cvmfs_app = 1
 			if not cvmfs_cms_siteconf_mountpoint:
@@ -721,12 +727,10 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 			if mount_env and mountpoint:
 				env_para_dict[mount_env] = mountpoint
 
-			if not r4 and not env_para_dict.has_key('HTTP_PROXY') and is_cms_cvmfs_app:
-				if os.environ.has_key('HTTP_PROXY'):
-					env_para_dict['HTTP_PROXY'] = os.environ['HTTP_PROXY']
-				else:
-					logging.debug("Access CVMFS through Parrot requires the HTTP_PROXY environment variable to be set first.")
-					sys.exit("Access CVMFS through Parrot requires the HTTP_PROXY environment variable to be set first.")
+			if not r4 and is_cms_cvmfs_app:
+				if not cvmfs_http_proxy:
+					logging.debug("Access CVMFS through Parrot requires the --cvmfs_http_proxy of umbrella to be set.")
+					sys.exit("Access CVMFS through Parrot requires the --cvmfs_http_proxy of umbrella to be set.")
 
 	#if the OS distribution does not match, add the OS image into the dependency list of the application and download it into the local machine
 	if need_separate_rootfs == 1:
@@ -734,7 +738,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		mountpoint = '/'
 		action = 'unpack'
 		#tuple returned by dependency_process: (is_cms_cvmfs_app, cvmfs_cms_siteconf_mountpoint, mount_value, local_cvmfs)
-		r1, r2, r3, r4 = dependency_process(item, os_id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro)
+		r1, r2, r3, r4 = dependency_process(item, os_id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, cvmfs_http_proxy)
 		logging.debug("Add mountpoint (%s:%s) into mount_dict for /.", mountpoint, r3)
 		mount_dict[mountpoint] = r3
 
@@ -747,7 +751,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		mount_dict[host_cctools_path] = host_cctools_path
 
 		if is_cms_cvmfs_app == 0:
-			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json)
+			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json, cvmfs_http_proxy)
 
 	#if the sandbox_mode is parrot, then the parrot version should match the local machine;
 	#if the sandbox_mode is docker or chroot, then the parrot version should match the specification.
@@ -1586,7 +1590,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 	else:
 		pass
 
-def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, condorlog_path):
+def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, condorlog_path, cvmfs_http_proxy):
 	"""Process the specification when condor execution engine is chosen
 
 	Args:
@@ -1600,6 +1604,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 		user_cmd: the user's command.
 		cwd_setting: the current working directory for the execution of the user's command.
 		condorlog_path: the path of the umbrella log executed on the remote condor execution node.
+		cvmfs_http_proxy: HTTP_PROXY environmetn variable used to access CVMFS by Parrot
 
 	Returns:
 		If no errors happen, return None;
@@ -1654,7 +1659,10 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 	condor_submit_file = open(condor_submit_path, "w+")
 	condor_submit_file.write('universe = vanilla\n')
 	condor_submit_file.write('executable = %s\n' % cctools_python_path)
-	condor_submit_file.write('arguments = "./umbrella -s local -c %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(packages_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
+	if cvmfs_http_proxy:
+		condor_submit_file.write('arguments = "./umbrella -s local -c %s --cvmfs_http_proxy %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(packages_path), cvmfs_http_proxy, new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
+	else:
+		condor_submit_file.write('arguments = "./umbrella -s local -c %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(packages_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
 #	condor_submit_file.write('PostCmd = "echo"\n')
 #	condor_submit_file.write('PostArguments = "$?>%s/condor_rc"\n' % os.path.basename(condor_output_dir))
 	condor_submit_file.write('transfer_input_files = %s, %s, %s, %s%s\n' % (cctools_python_path, umbrella_fullpath, packages_path, spec_path, transfer_inputs))
@@ -1754,7 +1762,7 @@ def decide_instance_type(cpu_cores, memory_size, disk_size, instances):
 			return item
 	return 'no'
 
-def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec2_json, ssh_key, ec2_key_pair, ec2_security_group, sandbox_dir, output_dir, sandbox_mode, input_list, input_list_origin, env_options, user_cmd, cwd_setting, ec2log_path):
+def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec2_json, ssh_key, ec2_key_pair, ec2_security_group, sandbox_dir, output_dir, sandbox_mode, input_list, input_list_origin, env_options, user_cmd, cwd_setting, ec2log_path, cvmfs_http_proxy):
 	"""
 	Args:
 		spec_path: the path of the specification.
@@ -1775,6 +1783,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 		user_cmd: the user's command.
 		cwd_setting: the current working directory for the execution of the user's command.
 		ec2log_path: the path of the umbrella log executed on the remote EC2 execution node.
+		cvmfs_http_proxy: HTTP_PROXY environmetn variable used to access CVMFS by Parrot
 
 	Returns:
 		If no errors happen, return None;
@@ -1897,13 +1906,25 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 		new_input_options = new_input_options[:-1]
 	logging.debug("The new_input_options of Umbrella: %s", new_input_options) #--inputs option
 
+	#find cctools_python
+	cmd = 'which cctools_python'
+	rc, stdout, stderr = func_call(cmd)
+	if rc != 0:
+		subprocess_error(cmd, rc, stdout, stderr)
+	cctools_python_path = stdout[:-1]
+
+	#cvmfs_http_proxy
+	cvmfs_http_proxy_option = ''
+	if cvmfs_http_proxy:
+		cvmfs_http_proxy_option = '--cvmfs_http_proxy %s' % cvmfs_http_proxy
+
 	#execute the command on the instance
 	print "Executing the user's task on the EC2 instance ..."
 	logging.debug("Execute the command on the instance ...")
 	if env_options == '':
-		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -s local -c %s --log ec2_umbrella.log --packages %s -l ec2_umbrella -o output -i \'%s\' run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, user_cmd[0])
+		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella %s -s local -c %s --log ec2_umbrella.log --packages %s -l ec2_umbrella -o output -i \'%s\' run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, cvmfs_http_proxy_option, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, user_cmd[0])
 	else:
-		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -s local -c %s --packages %s -l ec2_umbrella -o output -i \'%s\' -e %s run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, env_options, user_cmd[0])
+		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -s local -c %s --packages %s -l ec2_umbrella -o output -i \'%s\' -e %s run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, cvmfs_http_proxy_option, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, env_options, user_cmd[0])
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
 		terminate_instance(instance_id)
@@ -1948,7 +1969,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 
 	print "The output has been put into the output dir: %s" % output_dir
 
-def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting):
+def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy):
 	""" Create the execution environment specified in the specification file and run the task on it.
 
 	Args:
@@ -1962,6 +1983,7 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandb
 		env_para_dict: the environment variables which need to be set for the execution of the user's command.
 		user_cmd: the user's command.
 		cwd_setting: the current working directory for the execution of the user's command.
+		cvmfs_http_proxy: HTTP_PROXY environmetn variable used to access CVMFS by Parrot
 
 	Returns:
 		None.
@@ -2002,10 +2024,10 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandb
 	host_cctools_path = '' #the path of the cctools binary which is compatible with the host machine under the umbrella cache
 
 	if spec_json.has_key("software") and spec_json["software"]:
-		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, spec_json["software"], packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs)
+		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, spec_json["software"], packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs, cvmfs_http_proxy)
 	else:
 		logging.debug("this spec does not have software section!")
-		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, "", packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs)
+		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, "", packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs, cvmfs_http_proxy)
 
 	sw_mount_dict = mount_dict #sw_mount_dict will be used later to config the $PATH
 	if spec_json.has_key("data") and spec_json["data"]:
@@ -2138,6 +2160,9 @@ def main():
 					default="parrot",
 					choices=['local', 'parrot', 'chroot', 'docker', 'condor', 'ec2',],
 					help="sandbox mode, which can be local, parrot, chroot, docker, condor, ec2. (By default: local)",)
+	parser.add_option("--cvmfs_http_proxy",
+					action="store",
+					help="HTTP_PROXY to access cvmfs (Used by Parrot)",)
 	parser.add_option("--packages",
 					action="store",
 					default='./packages.json',
@@ -2237,6 +2262,9 @@ def main():
 			env_para_dict[name] = value
 		logging.debug("the dictionary format of the env options (env_para_dict):")
 		logging.debug(env_para_dict)
+
+	#get the cvmfs HTTP_PROXY
+	cvmfs_http_proxy = options.cvmfs_http_proxy
 
 	spec_path = options.config
 	spec_path_basename = os.path.basename(spec_path)
@@ -2367,22 +2395,22 @@ def main():
 			ec2_security_group = options.ec2_group
 			ec2_key_pair = options.ec2_key
 
-			ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec2_json, ssh_key, ec2_key_pair, ec2_security_group, sandbox_dir, output_dir, sandbox_mode, input_list, input_list_origin, env_para, user_cmd, cwd_setting, ec2log_path)
+			ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec2_json, ssh_key, ec2_key_pair, ec2_security_group, sandbox_dir, output_dir, sandbox_mode, input_list, input_list_origin, env_para, user_cmd, cwd_setting, ec2log_path, cvmfs_http_proxy)
 		elif sandbox_mode == "condor":
-			condor_process(spec_path, spec_json, spec_path_basename, packages_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, condorlog_path)
+			condor_process(spec_path, spec_json, spec_path_basename, packages_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, condorlog_path, cvmfs_http_proxy)
 		elif sandbox_mode == "local":
 			#first check whether Docker exists, if yes, use docker execution engine; if not, use parrot execution engine.
 			if dependency_check('docker') == 0:
 				logging.debug('docker exists, use docker execution engine')
-				specification_process(spec_json, sandbox_dir, behavior, packages_json, 'docker', output_dir, input_dict, env_para_dict, user_cmd, cwd_setting)
+				specification_process(spec_json, sandbox_dir, behavior, packages_json, 'docker', output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
 			else:
 				logging.debug('docker does not exist, use parrot execution engine')
-				specification_process(spec_json, sandbox_dir, behavior, packages_json, 'parrot', output_dir, input_dict, env_para_dict, user_cmd, cwd_setting)
+				specification_process(spec_json, sandbox_dir, behavior, packages_json, 'parrot', output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
 		else:
 			if sandbox_mode == 'docker' and dependency_check('docker') != 0:
 				logging.critical('Docker is not installed on the host machine, please try other execution engines!')
 				sys.exit('Docker is not installed on the host machine, please try other execution engines!')
-			specification_process(spec_json, sandbox_dir, behavior, packages_json, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting)
+			specification_process(spec_json, sandbox_dir, behavior, packages_json, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
 
 	end = datetime.datetime.now()
 	diff = end - start
