@@ -3,45 +3,64 @@ make rpm RPM_VERSION=<rpm_version> RPM_RELEASE=<rpm_release>
 
 `rpmbuild` requires the following package: rpmdevtools.
 
-The full feature of ndcctools depends on the following packages: fuse-devel, python-devel, swig, libuuid-devel, readline-devel, zlib-devel, perl, perl-ExtUtils-Embed, cvmfs-devel, openssl-devel, gcc, gcc-c++, make, m4, tar, wget, which, grep, freetype.
+The full feature of ndcctools depends on the following packages: fuse-devel,
+python-devel, swig, libuuid-devel, readline-devel, zlib-devel, perl,
+perl-ExtUtils-Embed, cvmfs-devel, openssl-devel, gcc, gcc-c++, make, m4, tar,
+wget, which, grep, freetype.
 
-To install cvmfs-devel, first add cernvm.repo into /etc/yum.repo.d by running the following command:
+To install cvmfs-devel, first add cernvm.repo into /etc/yum.repo.d by running
+the following command:
+
 	rpm -Uvh http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs/EL/6/`uname -i`/cvmfs-release-2-4.el6.noarch.rpm
 
-`make rpm RPM_VERSION=<rpm_version> RPM_RELEASE=<rpm_release>` tries to check every dependency and warn you if any of them is missing.
+The following command tries to check every dependency and warn you if any of them is missing.
+
+    make rpm RPM_VERSION=<rpm_version> RPM_RELEASE=<rpm_release>
 
 To make a rpm for ndccools, the machine you are working should satisfy one of the following requirements:
+
 1) With all the dependencies mentioned above installed.
 2) You have root access, which can be a virtual machine or a Docker image.
-The virtual machine used for our test is from the Amazon EC2: AMI ID: RHEL-6.6_HVM_GA-20150128-x86_64-1-Hourly2-GP2 (ami-0b5f073b)
-The Docker image used for our test can be obtained by the following command: docker pull centos:6
+
+The virtual machine used for our test is from the Amazon EC2: AMI ID:
+RHEL-6.6_HVM_GA-20150128-x86_64-1-Hourly2-GP2 (ami-0b5f073b) The Docker image
+used for our test can be obtained by the following command: docker pull
+centos:6
 
 
 Here is the instructions how to create ndcctools RPMs separately from the `make rpm` rule of cctools:
-#install RPM development tools. This is the only operation which needs the root access.
+
+# install RPM development tools. This is the only operation which needs the root access.
 yum install rpmdevtools
 
-#set up an RPM build directory in your ~/rpmbuild directory. This command can be executed multiple times without scratching your current ~/rpmbuild directory.
+# set up an RPM build directory in your ~/rpmbuild directory. This command can
+# be executed multiple times without scratching your current ~/rpmbuild
+# directory.
 rpmdev-setuptree
 
-#put the source code compressed tarball of cctools into the ~/rpmbuild/SOURCES dirctory:
+# put the source code compressed tarball of cctools into the ~/rpmbuild/SOURCES dirctory:
 
-#create a template .spec file for ndcctools under ~/rpmbuild/SPECS:
+# create a template .spec file for ndcctools under ~/rpmbuild/SPECS:
 cd ~/rpmbuild/SPECS
 rpmdev-newspec ndcctools #alternatively, you can also directly create and edit the .spec file.
 
-#edit ~/rpmbuild/SPECS/ndcctools.spec
+# edit ~/rpmbuild/SPECS/ndcctools.spec
 
-#build source and binary RPMs from ndcctools.spec:
+# build source and binary RPMs from ndcctools.spec:
 rpmbuild -ba ndcctools.spec
 
-#You can also just build source RPMs from ndcctools.spec:
+# You can also just build source RPMs from ndcctools.spec:
 rpmbuild -bs ndcctools.spec
 
-#You can also just build binary RPMs from ndcctools.spec:
+# You can also just build binary RPMs from ndcctools.spec:
 rpmbuild -bb ndcctools.spec
 
-#check for errors of the SPEC files, RPMs and SRPMs using rpmlint:
+# check for errors of the SPEC files, RPMs and SRPMs using rpmlint:
 rpmlint -i ndcctools.spec ../SRPMS/ndcctools* ../RPMS/*/ndcctools*
 
-To change the name of RPMs for cctools, rename ndcctools.spec to <new_name>.spec, and change the `Name` attribute in the .spec file into <new_name>. In fact, you can just change the `Name` attribute in the .spec file into <new_name>, and leave the name of .spec file unchanged. However, it would look inconsistent.
+To change the name of RPMs for cctools, rename ndcctools.spec to
+<new_name>.spec, and change the `Name` attribute in the .spec file into
+<new_name>. In fact, you can just change the `Name` attribute in the .spec file
+into <new_name>, and leave the name of .spec file unchanged. However, it would
+look inconsistent.
+

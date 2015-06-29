@@ -6,7 +6,7 @@ PortSystem              1.0
 set description_common  {Notre Dame Cooperative Computing Software}
 
 name                    ndcctools
-version                 4.4.2
+version                 5.0
 categories              sysutils
 platforms               darwin
 license                 MIT
@@ -37,3 +37,4 @@ post-destroot           {
 
 checksums               rmd160 73c6b429c11235d42fe6a870420df496ed510fbd \
 						sha256 64239e98c13536ab14ff70e625cd7f50a4cba714ee719a47b8286c2d6d38b597
+
