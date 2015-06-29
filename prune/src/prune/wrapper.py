@@ -15,6 +15,7 @@ import time, threading
 import subprocess
 import os.path
 
+os.environ["HTTP_PROXY"] = "http://cache01.hep.wisc.edu:3128"
 
 args = {'ln':[], 'gzip':[], 'gunzip':[], 'targz':[], 'umbrella':False, 'function_name':None, 'function_inputs':[]}
 argi = 1
@@ -34,24 +35,15 @@ while argi<len(sys.argv):
 		args['targz'].append( sys.argv[argi] )
 	elif arg=='-umbrella':
 		args['umbrella'] = True
+	elif arg=='-umbrellai':
+		argi += 1
+		args['umbrellai'] = sys.argv[argi]
 	elif args['function_name'] is None:
 		args['function_name'] = sys.argv[argi]
 	else:
 		args['function_inputs'].append( sys.argv[argi] )
 
 	argi += 1
-
-'''
-#Add these comments back into the help message
-parser = argparse.ArgumentParser(prog='PRUNE_EXEC', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--ln', help='local filename for remote file (local=remote)', action='append')
-parser.add_argument('--tar', help='name of file to extract in working directory', action='append')
-parser.add_argument('--umbrella', help='name of umbrella specification file')
-parser.add_argument('function_name', default='echo', help='command to execute function')
-parser.add_argument('function_inputs', nargs='*', default=['test'], help='function arg1 arg2...')
-args = parser.parse_args()
-#parser.print_help()
-'''
 
 #print args
 
@@ -122,40 +114,28 @@ if os.path.isfile(args['function_name']):
 
 
 
+arg_str = ''
+for arg in args['function_inputs']:
+	arg_str += ' '+arg
+arg_str = arg_str[1:]
+
+
 if args['umbrella']:
-	arg_str = ''
-	for arg in args['function_inputs']:
-		arg_str += ' '+arg
-	arg_str = arg_str[1:]
-	cmd = "%s %s"%( args['function_name'], arg_str)
-
-	print cmd
-	debug.write('Starting operation at %s:%s'%(str(time.time()) ,newline))
-
-	exec_start = time.time()
-	myexec(cmd)
-	execution_time = time.time()-exec_start
-
-	debug.write('Finished operation at %s.%s'%(str(time.time()) ,newline))
-	debug.write('Execution time: %s'%(execution_time))
-
+	sub_cmd = "%s %s"%( args['function_name'], arg_str)
+	cmd = './UMBRELLA_EXECUTABLE -s local -i %s -c ENVIRONMENT -l ./tmp/ -o ./final_output run "%s"'%(args['umbrellai'],sub_cmd)
 
 else:
-	arg_str = ''
-	for arg in args['function_inputs']:
-		arg_str += ' '+arg
-	arg_str = arg_str[1:]
 	cmd = "%s %s"%( args['function_name'], arg_str)
 
-	print cmd
-	debug.write('Starting operation at %s:%s'%(str(time.time()) ,newline))
+print cmd
+debug.write('Starting operation at %s:%s'%(str(time.time()) ,newline))
 
-	exec_start = time.time()
-	myexec(cmd)
-	execution_time = time.time()-exec_start
+exec_start = time.time()
+myexec(cmd)
+execution_time = time.time()-exec_start
 
-	debug.write('Finished operation at %s.%s'%(str(time.time()) ,newline))
-	debug.write('Execution time: %s%s'%(execution_time,newline))
+debug.write('Finished operation at %s.%s'%(str(time.time()) ,newline))
+debug.write('Execution time: %s%s'%(execution_time,newline))
 
 
 

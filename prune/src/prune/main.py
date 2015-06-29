@@ -170,6 +170,7 @@ def process_line(line):
 	cmd_id = database.cmd_ins(line)
 	try:
 		if len(line)==0 or line[0]=='#':
+			print line
 			return True
 
 		elif line.upper().startswith('EXIT') or line.upper().startswith('QUIT'):
@@ -299,10 +300,10 @@ See the manual for more details.
 			if len(ar)<=2 or len(ar)>3:
 				print 'You need to specify the type of environment you want to use. Any file needed for the environment should be first PUT into Prune.'
 				print 'Please try "ENV targz <prune_filename>" for a file that simply needs to be untarred and ungzipped in the sandbox to create the environment.'
-				#print '      -or- "ENV umbrella <prune_filename>" to use an Umbrella specification for the environment.'
+				print '      -or- "ENV umbrella <prune_filename>" to use an Umbrella specification for the environment.'
 			else:
 				(env_type,env_filename) = ar[1:3]
-				if env_type not in ['targz']:
+				if env_type not in ['targz','umbrella']:
 					print 'Invalid environment type:',env_type
 					return True
 				tag = database.tag_get(env_filename)

@@ -1,5 +1,9 @@
 #!/usr/bin/env prune
 
+PUT empty.tar.gz AS empty_env
+ENV targz empty_env
+
+
 PUT sort.sh AS sort
 PUT merge.sh AS merge
 PUT nouns.txt AS nouns
