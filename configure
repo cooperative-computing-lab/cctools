@@ -12,7 +12,7 @@ MICRO=0
 # so you do not need to set this. Setting this variable is instead useful for
 # statically naming the source when it will not match the branch name (like RC1
 # or FINAL).
-RELEASE=RC2
+RELEASE=RC3
 
 # *** You should not need to change anything below this line. ***
 ###########################
