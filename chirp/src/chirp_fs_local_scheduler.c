@@ -1009,8 +1009,16 @@ out:
 
 int chirp_fs_local_job_schedule (sqlite3 *db)
 {
+	int rc;
 	unsigned count = 0; /* FIXME get rid of this, do a query to see what's running? */
 	time_t update = 0;
+	struct chirp_statfs buf;
+
+	CATCHUNIX(chirp_fs_local.statfs("/", &buf));
+	/* check if root is on AFS */
+	if (buf.f_type == 0x5346414F /* AFS_SUPER_MAGIC */) {
+		debug(D_ERROR|D_CHIRP, "Chirp jobs with LINK file bindings will not work with --root on AFS.");
+	}
 
 	/* continue until parent dies */
 	while (getppid() != 1) {
@@ -1032,7 +1040,10 @@ int chirp_fs_local_job_schedule (sqlite3 *db)
 		usleep(50000);
 	}
 
-	return 0;
+	rc = 0;
+	goto out;
+out:
+	return rc;
 }
 
 /* vim: set noexpandtab tabstop=4: */
