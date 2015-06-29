@@ -15,7 +15,7 @@ the following command:
 
 The following command tries to check every dependency and warn you if any of them is missing.
 
-    make rpm RPM_VERSION=<rpm_version> RPM_RELEASE=<rpm_release>
+	make rpm RPM_VERSION=<rpm_version> RPM_RELEASE=<rpm_release>
 
 To make a rpm for ndccools, the machine you are working should satisfy one of the following requirements:
 
@@ -63,4 +63,3 @@ To change the name of RPMs for cctools, rename ndcctools.spec to
 <new_name>. In fact, you can just change the `Name` attribute in the .spec file
 into <new_name>, and leave the name of .spec file unchanged. However, it would
 look inconsistent.
-
