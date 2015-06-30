@@ -38,3 +38,5 @@ test:
 install: all
 	mkdir -p $(PYTHON_INSTALL_DIR)
 	cp Chirp.py $(CHIRPPYTHONSO) $(PYTHON_INSTALL_DIR)/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
+	cp chirp_python_example.py $(CCTOOLS_INSTALL_DIR)/doc/
