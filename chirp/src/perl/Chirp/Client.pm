@@ -53,13 +53,13 @@ sub Chirp::Client::new {
 	}
 
 	my $c = bless {
-		hostport => $args{hostport},
-		timeout  => $args{timeout} },
+		__hostport => $args{hostport},
+		__timeout  => $args{timeout} },
 	$class;
 
-	$c->{identity} = $c->whoami();
+	$c->{__identity} = $c->whoami();
 
-	croak("Could not authenticate with $args{hostport}.") unless $c->{identity};
+	croak("Could not authenticate with $args{hostport}.") unless $c->identity;
 
 	return $c;
 }
@@ -82,20 +82,38 @@ sub __set_tickets {
 sub __stoptime {
 	my ($self, %args) = @_;
 
-	$args{timeout}            ||= $self->{timeout};
+	$args{timeout}            ||= $self->timeout;
 	$args{absolute_stop_time} ||= time() + $args{timeout};
 
 	return $args{absolute_stop_time}+0;
 }
 
+sub hostport {
+	my ($self) = @_;
+	return $self->{__hostport};
+}
+
+
+sub timeout {
+	my ($self, $value) = @_;
+	$self->{__timeout} = $value if $value;
+	return $self->{__timeout};
+}
+
+
+sub identity {
+	my ($self) = @_;
+	return $self->{__identity};
+}
+
 sub whoami {
 	my ($self, %args) = @_;
-	return chirp_wrap_whoami($self->{hostport}, $self->__stoptime(%args));
+	return chirp_wrap_whoami($self->hostport, $self->__stoptime(%args));
 }
 
 sub listacl {
 	my ($self, $path, %args) = @_;
-	my $acls = chirp_wrap_listacl($self->{hostport}, $path, $self->__stoptime(%args));
+	my $acls = chirp_wrap_listacl($self->hostport, $path, $self->__stoptime(%args));
 
 	croak("Could not get ACL from path '$path'.\n") unless $acls;
 
@@ -104,7 +122,7 @@ sub listacl {
 
 sub ls {
 	my ($self, $path, %args) = @_;
-	my $dr = chirp_reli_opendir($self->{hostport}, $path, $self->__stoptime(%args));
+	my $dr = chirp_reli_opendir($self->hostport, $path, $self->__stoptime(%args));
 
 	croak("Could not list path '$path'.\n") unless $dr;
 
@@ -119,7 +137,7 @@ sub ls {
 
 sub stat {
 	my ($self, $path, %args) = @_;
-	my $info = chirp_wrap_stat($self->{hostport}, $path, $self->__stoptime(%args));
+	my $info = chirp_wrap_stat($self->hostport, $path, $self->__stoptime(%args));
 
 	croak("Could not stat path '$path'.\n") unless $info;
 
@@ -132,7 +150,7 @@ sub put {
 
 	$args{destination} ||= $source;
 
-	my $status = chirp_recursive_put($self->{hostport}, $source, $args{destination}, $self->__stoptime(%args));
+	my $status = chirp_recursive_put($self->hostport, $source, $args{destination}, $self->__stoptime(%args));
 
 	croak("Could not put path '$source' into '$args{destination}' (status $status).\n") if $status < 0;
 	return $status;
@@ -144,7 +162,7 @@ sub get {
 
 	$args{destination} ||= $source;
 
-	my $status = chirp_recursive_get($self->{hostport}, $source, $args{destination}, $self->__stoptime(%args));
+	my $status = chirp_recursive_get($self->hostport, $source, $args{destination}, $self->__stoptime(%args));
 
 	croak("Could not get path '$source' to '$args{destination}' (status $status).\n") if $status < 0;
 	return $status;
@@ -153,16 +171,15 @@ sub get {
 sub rm {
 	my ($self, $path, %args) = @_;
 
-	my $status = chirp_reli_rmall($self->{hostport}, $path, $self->__stoptime(%args));
+	my $result = chirp_reli_rmall($self->hostport, $path, $self->__stoptime(%args));
 
-	croak("Could not recursevely remove path '$path' (status $status).\n") if $status < 0;
-	return $status;
+	croak("Could not recursevely remove path '$path' (status $result).\n") if $result < 0;
+	return $result;
 }
 
 1;
 
 __END__
-
 
 =head1 NAME
 
@@ -196,6 +213,23 @@ Creates a new chirp client connected to the server at addr:port.
 =item debug             Generate client debug output.
 
 =back
+
+
+=head3 C<< hostport >>
+
+Returns the hostport of the chirp server the client is connected.
+
+
+=head3 C<< timeout >>
+
+Returns the default timeout of the client when waiting for to the server.
+
+
+=head3 C<< identity >>
+
+Returns a string with identity of the client according to the server. It is the value of a call to C<< whoami >> just after the client connects to the server.
+
+
 
 All the following methods receive the following optional keys:
 
