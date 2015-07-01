@@ -1567,7 +1567,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			debug(D_CHIRP, "--> job_create `%.*s'", (int)length, (char *)buffer);
 			json_value *J = json_parse(buffer, length);
 			if (J) {
-				result = chirp_job_create(&id, J, subject);
+				result = chirp_job_create(&id, J, esubject);
 				json_value_free(J);
 				if (result) {
 					errno = result;
@@ -1585,7 +1585,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			debug(D_CHIRP, "--> job_commit `%.*s'", (int)length, (char *)buffer);
 			json_value *J = json_parse(buffer, length);
 			if (J) {
-				result = chirp_job_commit(J, subject);
+				result = chirp_job_commit(J, esubject);
 				json_value_free(J);
 				if (result) {
 					errno = result;
@@ -1602,7 +1602,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			debug(D_DEBUG, "--> job_kill `%.*s'", (int)length, (char *)buffer);
 			json_value *J = json_parse(buffer, length);
 			if (J) {
-				result = chirp_job_kill(J, subject);
+				result = chirp_job_kill(J, esubject);
 				json_value_free(J);
 				if (result) {
 					errno = result;
@@ -1619,7 +1619,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			debug(D_CHIRP, "--> job_status `%.*s'", (int)length, (char *)buffer);
 			json_value *J = json_parse(buffer, length);
 			if (J) {
-				result = chirp_job_status(J, subject, &B);
+				result = chirp_job_status(J, esubject, &B);
 				if (result) {
 					errno = result;
 					goto failure;
@@ -1633,7 +1633,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			}
 		} else if(sscanf(line, "job_wait %" SCNCHIRP_JOBID_T " %" SCNd64, &id, &length) == 2) {
-			result = chirp_job_wait(id, subject, length, &B);
+			result = chirp_job_wait(id, esubject, length, &B);
 			if (result) {
 				errno = result;
 				goto failure;
@@ -1646,7 +1646,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			debug(D_DEBUG, "--> job_reap `%.*s'", (int)length, (char *)buffer);
 			json_value *J = json_parse(buffer, length);
 			if (J) {
-				result = chirp_job_reap(J, subject);
+				result = chirp_job_reap(J, esubject);
 				json_value_free(J);
 				if (result) {
 					errno = result;
