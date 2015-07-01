@@ -33,7 +33,6 @@
 #ifdef SWIGPERL
 	$1 = (uint64_t) SvIV($input);
 #endif
-
 }
 
 /* vdebug() takes va_list as arg but SWIG can't wrap such functions. */

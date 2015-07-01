@@ -67,4 +67,3 @@ unlink 'bar.txt', 'foo.txt';
 exit 0;
 
 __END__
-
