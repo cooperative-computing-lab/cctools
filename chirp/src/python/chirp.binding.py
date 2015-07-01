@@ -8,8 +8,8 @@
 # The SWIG-based Python bindings provide a higher-level interface that
 # revolves around:
 #
-# - @ref Chirp::Client
-# - @ref Chirp::Stat
+# - @ref Chirp.Client
+# - @ref Chirp.Stat
 
 import os
 import time
