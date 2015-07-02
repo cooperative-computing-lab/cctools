@@ -32,6 +32,7 @@ struct dag_file {
 	struct list     *needed_by;              /* List of nodes that have this file as a source */
 	struct dag_node *created_by;             /* The node (if any) that created the file */
 	int    ref_count;                        /* How many nodes still to run need this file */
+	time_t creation_logged;                  /* Time that file creation is logged */
 	dag_file_state_t state;                  /* Enum: DAG_FILE_STATE_{INTIAL,EXPECT,...} */
 };
 

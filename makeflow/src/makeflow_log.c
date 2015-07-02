@@ -147,7 +147,10 @@ void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int news
 
 	f->state = newstate;
 
-	fprintf(d->logfile, "# %d %s %" PRIu64 "\n", f->state, f->filename, timestamp_get());
+	timestamp_t time = timestamp_get();
+	fprintf(d->logfile, "# %d %s %" PRIu64 "\n", f->state, f->filename, time);
+	if(f->state == DAG_FILE_STATE_EXISTS)
+		f->creation_logged = (time_t) (time / 1000000);
 	makeflow_log_sync(d,0);
 }
 
@@ -181,6 +184,9 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 
 				f = dag_file_lookup_or_create(d, file);
 				f->state = file_state;
+				if(file_state == DAG_FILE_STATE_EXISTS){
+					f->creation_logged = (time_t) (previous_completion_time / 1000000);
+				}
 				continue;
 			}
 			if(line[0] == '#')
@@ -264,7 +270,14 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
 		}
         if(dag_file_exists(f) && !(batch_fs_stat(queue, f->filename, &buf) >= 0)){
-			fprintf(stderr, "makeflow: %s is reported as existing, but does not\n", f->filename);
+			fprintf(stderr, "makeflow: %s is reported as existing, but does not.\n", f->filename);
+			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+			continue;
+        }
+		if(!first_run && S_ISDIR(buf.st_mode))
+            continue;
+        if(!first_run && dag_file_exists(f) && difftime(buf.st_mtime, f->creation_logged) > 0) {
+			fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, buf.st_mtime, f->creation_logged);
 			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
         }
     }
