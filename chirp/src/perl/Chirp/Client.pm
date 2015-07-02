@@ -120,6 +120,24 @@ sub listacl {
 	return split(/\n/, $acls);
 }
 
+sub setacl {
+	my ($self, $path, $subject, $rights, %args) = @_;
+
+	my $result = chirp_reli_setacl($self->hostport, $path, $subject, $rights, $self->__stoptime(%args));
+
+	croak("Could not modify acl on '$path' for '$subject' to '$rights'.") if $result < 0;
+	return $result;
+}
+
+sub resetacl {
+	my ($self, $path, $rights, %args) = @_;
+
+	my $result  = chirp_reli_resetacl($self->hostport, $path, $rights, $self->__stoptime(%args));
+
+	croak("Could not set acl on '$path' for '@{[$self->identity]}' to '$rights'.\n") if $result < 0;
+	return $result;
+}
+
 sub ls {
 	my ($self, $path, %args) = @_;
 	my $dr = chirp_reli_opendir($self->hostport, $path, $self->__stoptime(%args));
@@ -150,10 +168,10 @@ sub put {
 
 	$args{destination} ||= $source;
 
-	my $status = chirp_recursive_put($self->hostport, $source, $args{destination}, $self->__stoptime(%args));
+	my $result = chirp_recursive_put($self->hostport, $source, $args{destination}, $self->__stoptime(%args));
 
-	croak("Could not put path '$source' into '$args{destination}' (status $status).\n") if $status < 0;
-	return $status;
+	croak("Could not put path '$source' into '$args{destination}'.") if $result < 0;
+	return $result;
 }
 
 sub get {
@@ -162,10 +180,10 @@ sub get {
 
 	$args{destination} ||= $source;
 
-	my $status = chirp_recursive_get($self->hostport, $source, $args{destination}, $self->__stoptime(%args));
+	my $result = chirp_recursive_get($self->hostport, $source, $args{destination}, $self->__stoptime(%args));
 
-	croak("Could not get path '$source' to '$args{destination}' (status $status).\n") if $status < 0;
-	return $status;
+	croak("Could not get path '$source' to '$args{destination}'.") if $result < 0;
+	return $result;
 }
 
 sub rm {
@@ -173,9 +191,36 @@ sub rm {
 
 	my $result = chirp_reli_rmall($self->hostport, $path, $self->__stoptime(%args));
 
-	croak("Could not recursively remove path '$path' (status $result).\n") if $result < 0;
+	croak("Could not recursively remove path '$path'.") if $result < 0;
 	return $result;
 }
+
+sub mkdir {
+	my ($self, $path, %args) = @_;
+
+	$args{mode} ||= 0755;
+
+	my $result = chirp_reli_mkdir_recursive($self->hostport, $path, $args{mode}, $self->__stoptime(%args));
+
+	croak("Could not recursively create directory '$path'.") if $result < 0;
+
+	return $result;
+}
+
+sub hash {
+	my ($self, $path, %args) = @_;
+
+	$args{algorithm} ||= 'sha1';
+
+	my $hash = chirp_wrap_hash($self->hostport, $path, $args{algorithm}, $self->__stoptime(%args));
+
+	croak("Could not hash path '$path'.\n") unless $hash;
+
+	my $hash_hex = unpack('H*', $hash);
+
+	return $hash_hex;
+}
+
 
 eval "use JSON qw(to_json from_json);";
 if ($@) {
@@ -200,7 +245,7 @@ sub job_create {
 	my $job_json = to_json($job_description);
 
 	my $job_id   = chirp_wrap_job_create($self->hostport, $job_json, $self->__stoptime);
-	croak("Could not create job.\n") if $job_id < 0;
+	croak("Could not create job.") if $job_id < 0;
 
 	return $job_id;
 }
@@ -211,7 +256,7 @@ sub job_commit {
 	my $job_ids_str = $self->__json_of_ids(@job_ids);
 	my $result      = chirp_wrap_job_commit($self->hostport, $job_ids_str, $self->__stoptime);
 
-	croak("Could not commit jobs: $job_ids_str") if $result < 0;
+	croak("Could not commit jobs: $job_ids_str.") if $result < 0;
 	return $result;
 }
 
@@ -221,7 +266,7 @@ sub job_kill {
 	my $job_ids_str = $self->__json_of_ids(@job_ids);
 	my $result      = chirp_wrap_job_kill($self->hostport, $job_ids_str, $self->__stoptime);
 
-	croak("Could not kill jobs: $job_ids_str\n") if $result < 0;
+	croak("Could not kill jobs: $job_ids_str.") if $result < 0;
 	return $result;
 }
 
@@ -231,7 +276,7 @@ sub job_reap {
 	my $job_ids_str = $self->__json_of_ids(@job_ids);
 	my $result      = chirp_wrap_job_reap($self->hostport, $job_ids_str, $self->__stoptime);
 
-	croak("Could not reap jobs: $job_ids_str\n") if $result < 0;
+	croak("Could not reap jobs: $job_ids_str.") if $result < 0;
 	return $result;
 }
 
@@ -241,7 +286,7 @@ sub job_status {
 	my $job_ids_str = $self->__json_of_ids(@job_ids);
 	my $status      = chirp_wrap_job_status($self->hostport, $job_ids_str, $self->__stoptime);
 
-	croak("Could not get status of jobs: $job_ids_str\n") unless $status;
+	croak("Could not get status of jobs: $job_ids_str.\n") unless $status;
 	return from_json($status);
 }
 
@@ -336,6 +381,34 @@ Returns a string with the ACL of the given directory. Dies if path cannot be acc
 =back
 
 
+=head3 C<< setacl(path) >>
+
+Modifies the ACL for the given directory.
+
+=over 12
+
+=item path                Target directory.
+
+=item subject             Target subject.
+
+=item rights              Permissions to be granted.
+
+=back
+
+
+=head3 C<< resetacl(path) >>
+
+Set the ACL for the given directory to be only for the rights to the calling user.
+
+=over 12
+
+=item path                Target directory.
+
+=item rights              Permissions to be granted.
+
+=back
+
+
 =head3 C<< ls(path) >>
 
 Returns a list with stat objects of the files in the path.  Dies if path cannot be accessed.
@@ -397,7 +470,34 @@ Removes the given file or directory from the server. Dies on error.
 
 =back
 
-=head2 C<< rm(path) >>
+
+=head3 C<< mkdir(path) >>
+
+Recursively create the directories in path. Dies on error.
+
+=over 12
+
+=item path                Target directory.
+
+=item mode                Unix permissions for the created directory.
+
+=back
+
+
+=head3 C<< hash(path, algorithm => ...) >>
+
+Computes the checksum of path.
+
+=over 12
+
+=item path                Target file.
+
+=item algorithm           One of 'md5' or 'sha1' (default if not given).
+
+=back
+
+
+=head2 Job interface
 
 Chirp job interface. (Needs the JSON module from CPAN).
 

@@ -54,6 +54,18 @@ char *chirp_wrap_whoami(const char *hostname, time_t stoptime)
 	return xxstrdup(id);
 }
 
+char *chirp_wrap_hash(const char *hostname, const char *path, const char *algorithm, time_t stoptime) {
+	int result;
+	unsigned char digest[CHIRP_DIGEST_MAX];
+
+	result = chirp_reli_hash(hostname, path, algorithm, digest, stoptime);
+
+	if(result < 0)
+		return NULL;
+
+	return xxstrdup( (char *) digest);
+}
+
 int64_t chirp_wrap_job_create (const char *host, const char *json, time_t stoptime)
 {
 	chirp_jobid_t id;
