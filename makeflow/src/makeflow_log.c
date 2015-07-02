@@ -267,19 +267,26 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
     hash_table_firstkey(d->files);
     while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 		if(first_run && dag_file_is_source(f)) {
-			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
+			if(batch_fs_stat(queue, f->filename, &buf) >= 0){
+				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
+			} else {
+				fprintf(stderr, "makeflow: %s is reported as source file, but does not.\n", f->filename);
+				exit(1);
+			}
 		}
-        if(dag_file_exists(f) && !(batch_fs_stat(queue, f->filename, &buf) >= 0)){
-			fprintf(stderr, "makeflow: %s is reported as existing, but does not.\n", f->filename);
-			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
-			continue;
-        }
-		if(!first_run && S_ISDIR(buf.st_mode))
-            continue;
-        if(!first_run && dag_file_exists(f) && difftime(buf.st_mtime, f->creation_logged) > 0) {
-			fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, buf.st_mtime, f->creation_logged);
-			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
-        }
+		if(!first_run){
+			if(dag_file_exists(f) && !(batch_fs_stat(queue, f->filename, &buf) >= 0)){
+				fprintf(stderr, "makeflow: %s is reported as existing, but does not.\n", f->filename);
+				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+				continue;
+			}
+			if(S_ISDIR(buf.st_mode))
+			    continue;
+			if(dag_file_exists(f) && difftime(buf.st_mtime, f->creation_logged) > 0) {
+				fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, buf.st_mtime, f->creation_logged);
+				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+			}
+		}
     }
 
 	// Decide rerun tasks
