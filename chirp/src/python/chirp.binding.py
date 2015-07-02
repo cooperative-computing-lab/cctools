@@ -13,6 +13,7 @@
 
 import os
 import time
+import json
 
 ##
 # Python Client object
@@ -223,6 +224,111 @@ class Client:
         if status < 0:
             raise OSError(path)
 
+    ##
+    # Creates a chirp job. See http://ccl.cse.nd.edu/software/manuals/chirp.html for details.
+    #
+    # @param job_description A dictionary with a job chirp description.
+    #
+    # @code
+    #    job_description = {
+    #        'executable': "/bin/tar",
+    #        'arguments':  [ 'tar', '-cf', 'archive.tar', 'a', 'b' ],
+    #        'files':      { 'task_path': 'a',
+    #                        'serv_path': '/users/magrat/a.txt'
+    #                        'type':      'INPUT' },
+    #                      { 'task_path': 'b',
+    #                        'serv_path': '/users/magrat/b.txt'
+    #                        'type':      'INPUT' },
+    #                      { 'task_path': 'archive.tar',
+    #                        'serv_path': '/users/magrat/archive.tar'
+    #                        'type':      'OUTPUT' }
+    #    }
+    #    job_id = client.job_create(job_description);
+    # @encode
+    def job_create(self, job_description):
+        job_json = json.dumps(job_description)
+        job_id   = chirp_wrap_job_create(self.hostport, job_json, self.__stoptime())
+
+        if job_id < 0:
+            raise ChirpJobError('create', job_id, job_json)
+
+        return job_id;
+
+
+    ##
+    # Kills the jobs identified with the different job ids.
+    #
+    # @param job_ids Job ids of the chirp jobs to be killed.
+    #
+    def job_kill(self, *job_ids):
+        ids_str = json.dumps(job_ids)
+        result  = chirp_wrap_job_kill(self.hostport, ids_str, self.__stoptime())
+
+        if result < 0:
+            raise ChirpJobError('kill', result, ids_str)
+
+        return result;
+
+
+
+    ##
+    # Commits (starts running) the jobs identified with the different job ids.
+    #
+    # @param job_ids Job ids of the chirp jobs to be committed.
+    #
+    def job_commit(self, *job_ids):
+        ids_str = json.dumps(job_ids)
+        result  = chirp_wrap_job_commit(self.hostport, ids_str, self.__stoptime())
+
+        if result < 0:
+            raise ChirpJobError('commit', result, ids_str)
+
+        return result;
+
+    ##
+    # Reaps the jobs identified with the different job ids.
+    #
+    # @param job_ids Job ids of the chirp jobs to be reaped.
+    #
+    def job_reap(self, *job_ids):
+        ids_str = json.dumps(job_ids)
+        result  = chirp_wrap_job_reap(self.hostport, ids_str, self.__stoptime())
+
+        if result < 0:
+            raise ChirpJobError('reap', result, ids_str)
+
+        return result;
+
+    ##
+    # Obtains the current status for each job id. The value returned is a
+    # list which contains a dictionary reference per job id.
+    #
+    # @param job_ids Job ids of the chirp jobs to be reaped.
+    #
+    def job_status(self, *job_ids):
+        ids_str = json.dumps(job_ids)
+        status  = chirp_wrap_job_status(self.hostport, ids_str, self.__stoptime())
+
+        if status is None:
+            raise ChirpJobError('status', None, ids_str)
+
+        return json.loads(status);
+
+    ##
+    # Waits waiting_time seconds for the job_id to terminate. Return value is
+    # the same as job_status. If the call timesout, an empty string is
+    # returned. If job_id is missing, C<<job_wait>> waits for any of the user's job.
+    #
+    # @param waiting_time maximum number of seconds to wait for a job to finish.
+    # @param job_id id of the job to wait.
+    def job_wait(self, waiting_time, job_id = 0):
+        status  = chirp_wrap_job_wait(self.hostport, job_id, waiting_time, self.__stoptime())
+
+        if status is None:
+            raise ChirpJobError('status', None, job_id)
+
+        return json.loads(status);
+
 
 ##
 # Python Stat object
@@ -404,7 +510,6 @@ class Stat:
     def __repr__(self):
         return "%s uid:%d gid:%d size:%d" % (self.path, self.uid, self.gid, self.size)
 
-
 class AuthenticationFailure(Exception):
     def __init__(self, value):
         self.value = value
@@ -419,3 +524,11 @@ class TransferFailure(Exception):
         self.dest   = dest
     def __str__(self):
         return "Error with %s(%s) %s %s" % (self.action, self.status, self.source, self.dest)
+
+class ChirpJobError(Exception):
+    def __init__(self, action, status, value):
+        self.action = action
+        self.status = status
+        self.value  = value
+    def __str__(self):
+        return "%s(%s) %s" % (self.action, self.status, self.value)

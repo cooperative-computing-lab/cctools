@@ -53,13 +53,13 @@ sub Chirp::Client::new {
 	}
 
 	my $c = bless {
-		hostport => $args{hostport},
-		timeout  => $args{timeout} },
+		__hostport => $args{hostport},
+		__timeout  => $args{timeout} },
 	$class;
 
-	$c->{identity} = $c->whoami();
+	$c->{__identity} = $c->whoami();
 
-	croak("Could not authenticate with $args{hostport}.") unless $c->{identity};
+	croak("Could not authenticate with $args{hostport}.") unless $c->identity;
 
 	return $c;
 }
@@ -82,20 +82,38 @@ sub __set_tickets {
 sub __stoptime {
 	my ($self, %args) = @_;
 
-	$args{timeout}            ||= $self->{timeout};
+	$args{timeout}            ||= $self->timeout;
 	$args{absolute_stop_time} ||= time() + $args{timeout};
 
 	return $args{absolute_stop_time}+0;
 }
 
+sub hostport {
+	my ($self) = @_;
+	return $self->{__hostport};
+}
+
+
+sub timeout {
+	my ($self, $value) = @_;
+	$self->{__timeout} = $value if $value;
+	return $self->{__timeout};
+}
+
+
+sub identity {
+	my ($self) = @_;
+	return $self->{__identity};
+}
+
 sub whoami {
 	my ($self, %args) = @_;
-	return chirp_wrap_whoami($self->{hostport}, $self->__stoptime(%args));
+	return chirp_wrap_whoami($self->hostport, $self->__stoptime(%args));
 }
 
 sub listacl {
 	my ($self, $path, %args) = @_;
-	my $acls = chirp_wrap_listacl($self->{hostport}, $path, $self->__stoptime(%args));
+	my $acls = chirp_wrap_listacl($self->hostport, $path, $self->__stoptime(%args));
 
 	croak("Could not get ACL from path '$path'.\n") unless $acls;
 
@@ -104,7 +122,7 @@ sub listacl {
 
 sub ls {
 	my ($self, $path, %args) = @_;
-	my $dr = chirp_reli_opendir($self->{hostport}, $path, $self->__stoptime(%args));
+	my $dr = chirp_reli_opendir($self->hostport, $path, $self->__stoptime(%args));
 
 	croak("Could not list path '$path'.\n") unless $dr;
 
@@ -119,7 +137,7 @@ sub ls {
 
 sub stat {
 	my ($self, $path, %args) = @_;
-	my $info = chirp_wrap_stat($self->{hostport}, $path, $self->__stoptime(%args));
+	my $info = chirp_wrap_stat($self->hostport, $path, $self->__stoptime(%args));
 
 	croak("Could not stat path '$path'.\n") unless $info;
 
@@ -132,7 +150,7 @@ sub put {
 
 	$args{destination} ||= $source;
 
-	my $status = chirp_recursive_put($self->{hostport}, $source, $args{destination}, $self->__stoptime(%args));
+	my $status = chirp_recursive_put($self->hostport, $source, $args{destination}, $self->__stoptime(%args));
 
 	croak("Could not put path '$source' into '$args{destination}' (status $status).\n") if $status < 0;
 	return $status;
@@ -144,7 +162,7 @@ sub get {
 
 	$args{destination} ||= $source;
 
-	my $status = chirp_recursive_get($self->{hostport}, $source, $args{destination}, $self->__stoptime(%args));
+	my $status = chirp_recursive_get($self->hostport, $source, $args{destination}, $self->__stoptime(%args));
 
 	croak("Could not get path '$source' to '$args{destination}' (status $status).\n") if $status < 0;
 	return $status;
@@ -153,16 +171,93 @@ sub get {
 sub rm {
 	my ($self, $path, %args) = @_;
 
-	my $status = chirp_reli_rmall($self->{hostport}, $path, $self->__stoptime(%args));
+	my $result = chirp_reli_rmall($self->hostport, $path, $self->__stoptime(%args));
 
-	croak("Could not recursevely remove path '$path' (status $status).\n") if $status < 0;
-	return $status;
+	croak("Could not recursively remove path '$path' (status $result).\n") if $result < 0;
+	return $result;
+}
+
+eval "use JSON qw(to_json from_json);";
+if ($@) {
+	# JSON module is not installed.
+	sub to_json {
+		croak("The chirp job interface needs the JSON module from CPAN.\n");
+	}
+
+	sub from_json {
+		croak("The chirp job interface needs the JSON module from CPAN.\n");
+	}
+}
+
+sub __json_of_ids {
+	my ($self, @numbers) = @_;
+	return to_json([ map { $_ + 0 } @numbers ]);
+}
+
+sub job_create {
+	my ($self, $job_description) = @_;
+
+	my $job_json = to_json($job_description);
+
+	my $job_id   = chirp_wrap_job_create($self->hostport, $job_json, $self->__stoptime);
+	croak("Could not create job.\n") if $job_id < 0;
+
+	return $job_id;
+}
+
+sub job_commit {
+	my ($self, @job_ids) = @_;
+
+	my $job_ids_str = $self->__json_of_ids(@job_ids);
+	my $result      = chirp_wrap_job_commit($self->hostport, $job_ids_str, $self->__stoptime);
+
+	croak("Could not commit jobs: $job_ids_str") if $result < 0;
+	return $result;
+}
+
+sub job_kill {
+	my ($self, @job_ids) = @_;
+
+	my $job_ids_str = $self->__json_of_ids(@job_ids);
+	my $result      = chirp_wrap_job_kill($self->hostport, $job_ids_str, $self->__stoptime);
+
+	croak("Could not kill jobs: $job_ids_str\n") if $result < 0;
+	return $result;
+}
+
+sub job_reap {
+	my ($self, @job_ids) = @_;
+
+	my $job_ids_str = $self->__json_of_ids(@job_ids);
+	my $result      = chirp_wrap_job_reap($self->hostport, $job_ids_str, $self->__stoptime);
+
+	croak("Could not reap jobs: $job_ids_str\n") if $result < 0;
+	return $result;
+}
+
+sub job_status {
+	my ($self, @job_ids) = @_;
+
+	my $job_ids_str = $self->__json_of_ids(@job_ids);
+	my $status      = chirp_wrap_job_status($self->hostport, $job_ids_str, $self->__stoptime);
+
+	croak("Could not get status of jobs: $job_ids_str\n") unless $status;
+	return from_json($status);
+}
+
+sub job_wait {
+	my ($self, $waiting_time, %args) = @_;
+	$args{job_id} ||= 0;
+
+	my $state = chirp_wrap_job_wait($self->hostport, $args{job_id}, $waiting_time, $self->__stoptime);
+
+	croak("Error when waiting for job: $args{job_id}.\n") unless $state;
+	return from_json($state);
 }
 
 1;
 
 __END__
-
 
 =head1 NAME
 
@@ -196,6 +291,23 @@ Creates a new chirp client connected to the server at addr:port.
 =item debug             Generate client debug output.
 
 =back
+
+
+=head3 C<< hostport >>
+
+Returns the hostport of the chirp server the client is connected.
+
+
+=head3 C<< timeout >>
+
+Returns the default timeout of the client when waiting for to the server.
+
+
+=head3 C<< identity >>
+
+Returns a string with identity of the client according to the server. It is the value of a call to C<< whoami >> just after the client connects to the server.
+
+
 
 All the following methods receive the following optional keys:
 
@@ -284,5 +396,97 @@ Removes the given file or directory from the server. Dies on error.
 =item path                Target file/directory.
 
 =back
+
+=head2 C<< rm(path) >>
+
+Chirp job interface. (Needs the JSON module from CPAN).
+
+=head3 C<< job_create(job_description) >>
+
+Creates a chirp job. See http://ccl.cse.nd.edu/software/manuals/chirp.html for details.
+
+		my $job_description = {
+			executable => "/bin/tar",
+			arguments  =>  qw(tar -cf archive.tar a b),
+			files      => { task_path => 'a',
+							serv_path => '/users/magrat/a.txt'
+							type      => 'INPUT' },
+						  { task_path => 'b',
+							serv_path => '/users/magrat/b.txt'
+							type      => 'INPUT' },
+						  { task_path => 'archive.tar',
+							serv_path => '/users/magrat/archive.tar'
+							type      => 'OUTPUT' }
+		};
+
+		my $job_id = $client->job_create($job_description);
+
+=over 12
+
+=item job_description A hash reference with a job chirp description.
+
+=back
+
+
+=head3 C<< job_commit(job_id, job_id, ...) >>
+
+Commits (starts running) the jobs identified with the different job ids.
+
+		$client->commit($job_id);
+
+=item job_id,... Job ids of the chirp jobs to be committed.
+
+=back
+
+
+=head3 C<< job_kill(job_id, job_id, ...) >>
+
+		$client->commit($job_id);
+
+Kills the jobs identified with the different job ids.
+
+=item job_id,... Job ids of the chirp jobs to be killed.
+
+=back
+
+
+=head3 C<< job_reap(job_id, job_id, ...) >>
+
+Reaps the jobs identified with the different job ids.
+
+=item job_id,... Job ids of the chirp jobs to be reaped.
+
+=back
+
+
+=head3 C<< job_status(job_id, job_id, ...) >>
+
+Obtains the current status for each job id. The value returned is an array
+reference, which contains a hash reference per job_id.
+
+		my $jobs_states = $client->job_status($job_a, $job_b);
+
+		for my $state ($jobs_states) {
+			print 'Job ' . $state->{id} . ' is ' . $state->{status} . "\n";
+		}
+
+=item job_id,... Job ids of the chirp jobs to request an status update.
+
+=back
+
+
+=head3 C<< job_wait(waiting_time, job_id=>id) >>
+
+Waits waiting_time seconds for the job_id to terminate. Return value is the
+same as job_status. If the call timesout, an empty string is returned. If
+job_id is missing, C<<job_wait>> waits for any of the user's job.
+
+=item waiting_time maximum number of seconds to wait for a job to finish.
+=item job_id id of the job to wait.
+
+=back
+
+1;
+
 
 =cut

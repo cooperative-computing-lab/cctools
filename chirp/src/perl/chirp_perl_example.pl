@@ -36,7 +36,7 @@ eval { $client = Chirp::Client->new(hostport       => $hostport,
 									debug          => 1) };
 die "Could not connect to server: $@" if $@;
 
-print 'Chirp server sees me as ' . $client->{identity} . "\n";
+print 'Chirp server sees me as ' . $client->identity . "\n";
 
 eval {
 		print "ACL on / is @{[$client->listacl('/')]}" . "\n";
@@ -67,4 +67,3 @@ unlink 'bar.txt', 'foo.txt';
 exit 0;
 
 __END__
-
