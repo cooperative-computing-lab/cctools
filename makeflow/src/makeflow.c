@@ -189,7 +189,6 @@ Decide whether to rerun a node based on batch and file system status.
 
 void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n)
 {
-	struct stat filestat;
 	struct dag_file *f;
 
 	if(itable_lookup(rerun_table, n->nodeid))
@@ -211,19 +210,15 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 	// Rerun if an input file has been updated since the last execution.
 	list_first_item(n->source_files);
 	while((f = list_next_item(n->source_files))) {
-		if(batch_fs_stat(remote_queue, f->filename, &filestat) >= 0) {
-			if(S_ISDIR(filestat.st_mode))
-				continue;
-			if(difftime(filestat.st_mtime, n->previous_completion) > 0) {
-				goto rerun;	// rerun this node
-			}
+		if(dag_file_exists(f)) {
+			continue;
 		} else {
 			if(!f->created_by) {
 				fprintf(stderr, "makeflow: input file %s does not exist and is not created by any rule.\n", f->filename);
 				exit(1);
 			} else {
 				/* If input file is missing, but node completed and file was garbage, then avoid rerunning. */
-				if(n->state == DAG_NODE_STATE_COMPLETE && dag_file_exists(f)) {
+				if(n->state == DAG_NODE_STATE_COMPLETE && f->state == DAG_FILE_STATE_DELETE) {
 					continue;
 				}
 				goto rerun;
@@ -234,13 +229,12 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 	// Rerun if an output file is missing.
 	list_first_item(n->target_files);
 	while((f = list_next_item(n->target_files))) {
-		if(batch_fs_stat(remote_queue, f->filename, &filestat) < 0) {
-			/* If output file is missing, but node completed and file was garbage, then avoid rerunning. */
-			if(n->state == DAG_NODE_STATE_COMPLETE && dag_file_exists(f)) {
-				continue;
-			}
-			goto rerun;
-		}
+		if(dag_file_exists(f))
+			continue;
+		/* If output file is missing, but node completed and file was garbage, then avoid rerunning. */
+		if(n->state == DAG_NODE_STATE_COMPLETE && f->state == DAG_FILE_STATE_DELETE)
+			continue;
+		goto rerun;
 	}
 
 	// Do not rerun this node
@@ -1636,6 +1630,7 @@ int main(int argc, char *argv[])
 
 	runtime = timestamp_get();
 
+<<<<<<< HEAD
 	if (container_mode == CONTAINER_MODE_DOCKER) {
 
 	/* 1) create a global script for running docker container
@@ -1647,6 +1642,19 @@ int main(int argc, char *argv[])
 		char *global_cmd = string_format("sh %s", CONTAINER_SH);
 		makeflow_wrapper_add_command(global_cmd);
 	}
+=======
+	if (container_mode == CONTAINER_MODE_DOCKER) {
+
+	/* 1) create a global script for running docker container
+	 * 2) add this script to the global wrapper list
+	 * 3) reformat each task command
+	 */
+
+		makeflow_create_docker_sh();
+		char *global_cmd = string_format("sh %s", CONTAINER_SH);
+		makeflow_wrapper_add_command(global_cmd);
+	}
+>>>>>>> Small logging changes
 
 	makeflow_run(d);
 	time_completed = timestamp_get();
