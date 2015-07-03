@@ -13,11 +13,21 @@ use v5.8.8;
 use strict;
 use warnings;
 
-use CChirp;
+use POSIX qw(strerror);
+use Errno qw(:POSIX);
+use Carp  qw(croak);
 
+use CChirp;
 use Chirp::Stat;
 
-use Carp qw(croak);
+
+sub croak_errno {
+	my ($errno, $msg) = @_;
+	my $errno_msg     = strerror($errno);
+
+	croak("$msg ($errno_msg)");
+}
+
 
 sub Chirp::Client::new {
 	# hostport, timeout=>, authentication=>, debug=>
@@ -108,14 +118,16 @@ sub identity {
 
 sub whoami {
 	my ($self, %args) = @_;
-	return chirp_wrap_whoami($self->hostport, $self->__stoptime(%args));
+	my $identity = chirp_wrap_whoami($self->hostport, $self->__stoptime(%args));
+
+	croak_errno($!, "Could not get my identity from server.") unless $identity;
 }
 
 sub listacl {
 	my ($self, $path, %args) = @_;
 	my $acls = chirp_wrap_listacl($self->hostport, $path, $self->__stoptime(%args));
 
-	croak("Could not get ACL from path '$path'.\n") unless $acls;
+	croak_errno($!, "Could not get ACL from path '$path'.") unless $acls;
 
 	return split(/\n/, $acls);
 }
@@ -125,7 +137,7 @@ sub setacl {
 
 	my $result = chirp_reli_setacl($self->hostport, $path, $subject, $rights, $self->__stoptime(%args));
 
-	croak("Could not modify acl on '$path' for '$subject' to '$rights'.") if $result < 0;
+	croak_errno($!, "Could not modify acl on '$path' for '$subject' to '$rights'.") if $result < 0;
 	return $result;
 }
 
@@ -134,7 +146,7 @@ sub resetacl {
 
 	my $result  = chirp_reli_resetacl($self->hostport, $path, $rights, $self->__stoptime(%args));
 
-	croak("Could not set acl on '$path' for '@{[$self->identity]}' to '$rights'.\n") if $result < 0;
+	croak_errno($!, "Could not set acl on '$path' for '@{[$self->identity]}' to '$rights'.") if $result < 0;
 	return $result;
 }
 
@@ -142,7 +154,7 @@ sub ls {
 	my ($self, $path, %args) = @_;
 	my $dr = chirp_reli_opendir($self->hostport, $path, $self->__stoptime(%args));
 
-	croak("Could not list path '$path'.\n") unless $dr;
+	croak_errno($!, "Could not list path '$path'.") unless $dr;
 
 	my @files;
 	while (my $f = chirp_reli_readdir($dr)) {
@@ -157,7 +169,7 @@ sub stat {
 	my ($self, $path, %args) = @_;
 	my $info = chirp_wrap_stat($self->hostport, $path, $self->__stoptime(%args));
 
-	croak("Could not stat path '$path'.\n") unless $info;
+	croak_errno($!, "Could not stat path '$path'.") unless $info;
 
 	return Chirp::Stat->__new($path, $info);
 }
@@ -170,7 +182,7 @@ sub put {
 
 	my $result = chirp_recursive_put($self->hostport, $source, $args{destination}, $self->__stoptime(%args));
 
-	croak("Could not put path '$source' into '$args{destination}'.") if $result < 0;
+	croak_errno($!, "Could not put path '$source' into '$args{destination}'.") if $result < 0;
 	return $result;
 }
 
@@ -182,7 +194,7 @@ sub get {
 
 	my $result = chirp_recursive_get($self->hostport, $source, $args{destination}, $self->__stoptime(%args));
 
-	croak("Could not get path '$source' to '$args{destination}'.") if $result < 0;
+	croak_errno($!, "Could not get path '$source' to '$args{destination}'.") if $result < 0;
 	return $result;
 }
 
@@ -191,18 +203,21 @@ sub rm {
 
 	my $result = chirp_reli_rmall($self->hostport, $path, $self->__stoptime(%args));
 
-	croak("Could not recursively remove path '$path'.") if $result < 0;
+	croak_errno($!, "Could not recursively remove path '$path'.") if $result < 0;
 	return $result;
 }
 
 sub mkdir {
 	my ($self, $path, %args) = @_;
 
-	$args{mode} ||= 0755;
+	$args{mode}         ||= 0755;
+	$args{ignore_exist} ||= 0;
 
 	my $result = chirp_reli_mkdir_recursive($self->hostport, $path, $args{mode}, $self->__stoptime(%args));
 
-	croak("Could not recursively create directory '$path'.") if $result < 0;
+	if( $result < 0 && ! ($args{ignore_exist} && $!{EEXIST}) ) {
+		croak_errno($!, "Could not recursively create directory '$path'.") if $result < 0;
+	}
 
 	return $result;
 }
@@ -214,7 +229,7 @@ sub hash {
 
 	my $hash = chirp_wrap_hash($self->hostport, $path, $args{algorithm}, $self->__stoptime(%args));
 
-	croak("Could not hash path '$path'.\n") unless $hash;
+	croak_errno($!, "Could not hash path '$path'.\n") unless $hash;
 
 	my $hash_hex = unpack('H*', $hash);
 
@@ -225,11 +240,11 @@ sub hash {
 eval "use JSON qw(to_json from_json);";
 if ($@) {
 	# JSON module is not installed.
-	sub to_json {
+	sub to_json ($@) {
 		croak("The chirp job interface needs the JSON module from CPAN.\n");
 	}
 
-	sub from_json {
+	sub from_json ($@) {
 		croak("The chirp job interface needs the JSON module from CPAN.\n");
 	}
 }
@@ -245,8 +260,8 @@ sub job_create {
 	my $job_json = to_json($job_description);
 
 	my $job_id   = chirp_wrap_job_create($self->hostport, $job_json, $self->__stoptime);
-	croak("Could not create job.") if $job_id < 0;
 
+	croak_errno($!, "Could not create job.") if $job_id < 0;
 	return $job_id;
 }
 
@@ -256,7 +271,7 @@ sub job_commit {
 	my $job_ids_str = $self->__json_of_ids(@job_ids);
 	my $result      = chirp_wrap_job_commit($self->hostport, $job_ids_str, $self->__stoptime);
 
-	croak("Could not commit jobs: $job_ids_str.") if $result < 0;
+	croak_errno($!, "Could not commit jobs: $job_ids_str.") if $result < 0;
 	return $result;
 }
 
@@ -266,7 +281,7 @@ sub job_kill {
 	my $job_ids_str = $self->__json_of_ids(@job_ids);
 	my $result      = chirp_wrap_job_kill($self->hostport, $job_ids_str, $self->__stoptime);
 
-	croak("Could not kill jobs: $job_ids_str.") if $result < 0;
+	croak_errno($!, "Could not kill jobs: $job_ids_str.") if $result < 0;
 	return $result;
 }
 
@@ -276,7 +291,7 @@ sub job_reap {
 	my $job_ids_str = $self->__json_of_ids(@job_ids);
 	my $result      = chirp_wrap_job_reap($self->hostport, $job_ids_str, $self->__stoptime);
 
-	croak("Could not reap jobs: $job_ids_str.") if $result < 0;
+	croak_errno($!, "Could not reap jobs: $job_ids_str.") if $result < 0;
 	return $result;
 }
 
@@ -286,7 +301,7 @@ sub job_status {
 	my $job_ids_str = $self->__json_of_ids(@job_ids);
 	my $status      = chirp_wrap_job_status($self->hostport, $job_ids_str, $self->__stoptime);
 
-	croak("Could not get status of jobs: $job_ids_str.\n") unless $status;
+	croak_errno($!, "Could not get status of jobs: $job_ids_str.\n") unless $status;
 	return from_json($status);
 }
 
@@ -296,8 +311,13 @@ sub job_wait {
 
 	my $state = chirp_wrap_job_wait($self->hostport, $args{job_id}, $waiting_time, $self->__stoptime);
 
-	croak("Error when waiting for job: $args{job_id}.\n") unless $state;
-	return from_json($state);
+	croak_errno($!, "Error when waiting for job: $args{job_id}.\n") unless $state;
+
+	my $jsons = from_json($state);
+
+	# if only one status was requested, return first element of the list.
+	return $jsons->[0] if ($args{job_id} > 0);
+	return $jsons;
 }
 
 1;
@@ -330,10 +350,10 @@ Creates a new chirp client connected to the server at addr:port.
 
 =over 12
 
-=item hostport          The host:port of the server (default is localhost:9094).
-=item timeout           The time to wait for a server response on every request (default is 60).
-=item authentication    A list of prefered authentications. E.g., ['tickets', 'unix']
-=item debug             Generate client debug output.
+=item hostport=>          The host:port of the server (default is localhost:9094).
+=item timeout=>           The time to wait for a server response on every request (default is 60).
+=item authentication=>    A list of prefered authentications. E.g., ['tickets', 'unix']
+=item debug=>             Generate client debug output (default 0).
 
 =back
 
@@ -441,7 +461,7 @@ destination.  If destination is not given, source name is used. Dies on error.
 
 =item source              A local file or directory.
 
-=item destination         File or directory name to use in the server (defaults to source).
+=item destination=>       File or directory name to use in the server (defaults to source).
 
 =back
 
@@ -455,7 +475,7 @@ If destination is not given, source name is used. Dies on error.
 
 =item source              A server file or directory.
 
-=item destination         File or directory name to be used locally (defaults to source).
+=item destination=>       File or directory name to be used locally (defaults to source).
 
 =back
 
@@ -479,7 +499,9 @@ Recursively create the directories in path. Dies on error.
 
 =item path                Target directory.
 
-=item mode                Unix permissions for the created directory.
+=item mode=>              Unix permissions for the created directory (default 0755).
+
+=item ignore_exist=>      Ignore error if directory exists (default 0)
 
 =back
 
@@ -492,7 +514,7 @@ Computes the checksum of path.
 
 =item path                Target file.
 
-=item algorithm           One of 'md5' or 'sha1' (default if not given).
+=item algorithm=>         One of 'md5' or 'sha1' (default if not given).
 
 =back
 

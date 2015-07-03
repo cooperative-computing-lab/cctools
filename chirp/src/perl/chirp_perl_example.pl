@@ -58,7 +58,7 @@ die "Could not stat file: $@" if $@;
 
 
 eval {
-	$client->rm('/bar.txt')
+	$client->rm('/bar.txt');
 };
 die "Could not remove file: $@" if $@;
 
