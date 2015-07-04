@@ -1,9 +1,9 @@
 #include "buffer.h"
 #include "chirp_reli.h"
 #include "chirp_types.h"
-#include "md5.h"
-#include "sha1.h"
 #include "xxmalloc.h"
+
+#include <assert.h>
 
 static void accumulate_one_acl(const char *line, void *args)
 {
@@ -57,27 +57,20 @@ char *chirp_wrap_whoami(const char *hostname, time_t stoptime)
 }
 
 char *chirp_wrap_hash(const char *hostname, const char *path, const char *algorithm, time_t stoptime) {
-	int result;
+	int i, result;
 	unsigned char digest[CHIRP_DIGEST_MAX];
+	char hexdigest[CHIRP_DIGEST_MAX*2+1] = "";
 
 	result = chirp_reli_hash(hostname, path, algorithm, digest, stoptime);
 
 	if(result < 0)
 		return NULL;
 
-	const char *hex_str;
-	if( strcmp(algorithm, "sha1") == 0 ) {
-		hex_str = sha1_string(digest);
-	}
-	else if( strcmp(algorithm, "md5") == 0 ) {
-		hex_str = md5_string(digest);
-	}
-	else {
-		/* for completeness, but we should have returned NULL already */
-		return NULL;
-	}
+	assert(result <= CHIRP_DIGEST_MAX);
+	for (i = 0; i < result; i++)
+		sprintf(&hexdigest[i*2], "%02X", (unsigned int)digest[i]);
 
-	return xxstrdup(hex_str);
+	return xxstrdup(hexdigest);
 }
 
 int64_t chirp_wrap_job_create (const char *host, const char *json, time_t stoptime)
