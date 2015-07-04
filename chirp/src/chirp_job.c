@@ -80,21 +80,21 @@ static int db_init (sqlite3 *db)
 		"CREATE TABLE Job("
 		"	id INTEGER PRIMARY KEY,"
 		"	error TEXT,"
-		"	executable TEXT NOT NULL," /* no UTF encoding? */
+		"	executable TEXT NOT NULL,"
 		"	exit_code INTEGER,"
 		"	exit_signal TEXT,"
 		"	exit_status TEXT REFERENCES ExitStatus (status),"
 		"	priority INTEGER NOT NULL DEFAULT 1,"
 		"	status TEXT NOT NULL DEFAULT 'CREATED' REFERENCES JobStatus (status),"
-		"	subject TEXT NOT NULL," /* no UTF encoding? */
-		"	tag TEXT NOT NULL," /* no UTF encoding? */
+		"	subject TEXT NOT NULL,"
+		"	tag TEXT NOT NULL,"
 		"	time_commit DATETIME,"
 		"	time_create DATETIME NOT NULL DEFAULT (strftime('%s', 'now')),"
 		"	time_error DATETIME,"
 		"	time_finish DATETIME,"
 		"	time_kill DATETIME,"
 		"	time_start DATETIME,"
-		"	url TEXT NOT NULL);" /* no UTF encoding? */
+		"	url TEXT NOT NULL);"
 		IMMUTABLE_JOB_UPDATE("Job")
 		/* We pull this out to allow INSERT of time_reap on a terminal job. */
 		"CREATE TABLE JobReaped("
@@ -140,20 +140,20 @@ static int db_init (sqlite3 *db)
 		"CREATE TABLE JobArgument("
 		"	id INTEGER REFERENCES Job (id),"
 		"	n INTEGER NOT NULL,"
-		"	arg TEXT NOT NULL," /* no UTF encoding? */
+		"	arg TEXT NOT NULL,"
 		"	PRIMARY KEY (id, n));"
 		IMMUTABLE_JOB_INSUPD("JobArgument")
 		"CREATE TABLE JobEnvironment("
 		"	id INTEGER REFERENCES Job (id),"
-		"	name TEXT NOT NULL," /* no UTF encoding? */
-		"	value TEXT NOT NULL," /* no UTF encoding? */
+		"	name TEXT NOT NULL,"
+		"	value TEXT NOT NULL,"
 		"	PRIMARY KEY (id, name));"
 		IMMUTABLE_JOB_INSUPD("JobEnvironment")
 		"CREATE TABLE JobFile("
 		"	id INTEGER REFERENCES Job (id),"
 		"	binding TEXT NOT NULL DEFAULT 'LINK' REFERENCES FileBinding (binding),"
-		"	serv_path TEXT NOT NULL," /* no UTF encoding? */
-		"	task_path TEXT NOT NULL," /* no UTF encoding? */
+		"	serv_path TEXT NOT NULL,"
+		"	task_path TEXT NOT NULL,"
 		"	tag TEXT," /* user value */
 		"	size INTEGER,"
 		"	type TEXT NOT NULL REFERENCES FileType (type),"
@@ -665,7 +665,7 @@ restart:
 		sqlcatch(sqlite3_bind_int(stmt, 2, strcmp(subject, chirp_super_user) == 0));
 		sqlcatch(sqlite3_bind_text(stmt, 3, subject, -1, SQLITE_STATIC));
 		if ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-			chirp_sqlite3_row_jsonify(stmt, B);
+			CATCH(chirp_sqlite3_row_jsonify(stmt, B));
 			buffer_rewind(B, buffer_pos(B)-1); /* remove trailing '}' */
 		} else if (rc == SQLITE_DONE) {
 			CATCH(EACCES);
@@ -684,7 +684,7 @@ restart:
 				CATCHUNIX(buffer_putliteral(B, ","));
 			first0 = 0;
 			assert(sqlite3_column_count(stmt) == 1);
-			chirp_sqlite3_column_jsonify(stmt, 0, B);
+			CATCH(chirp_sqlite3_column_jsonify(stmt, 0, B));
 		}
 		sqlcatchcode(rc, SQLITE_DONE);
 		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -699,9 +699,9 @@ restart:
 				CATCHUNIX(buffer_putliteral(B, ","));
 			first0 = 0;
 			assert(sqlite3_column_count(stmt) == 2);
-			chirp_sqlite3_column_jsonify(stmt, 0, B);
+			CATCH(chirp_sqlite3_column_jsonify(stmt, 0, B));
 			CATCHUNIX(buffer_putliteral(B, ":"));
-			chirp_sqlite3_column_jsonify(stmt, 1, B);
+			CATCH(chirp_sqlite3_column_jsonify(stmt, 1, B));
 		}
 		sqlcatchcode(rc, SQLITE_DONE);
 		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -715,7 +715,7 @@ restart:
 			if (!first0)
 				CATCHUNIX(buffer_putliteral(B, ","));
 			first0 = 0;
-			chirp_sqlite3_row_jsonify(stmt, B);
+			CATCH(chirp_sqlite3_row_jsonify(stmt, B));
 		}
 		sqlcatchcode(rc, SQLITE_DONE);
 		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -835,23 +835,23 @@ restart:
 
 	{
 		int first = 1;
-		buffer_t Bstatus;
-		buffer_init(&Bstatus);
-		buffer_abortonfailure(&Bstatus, 1);
+		buffer_t Bstatus[1];
+		buffer_init(Bstatus);
+		buffer_abortonfailure(Bstatus, 1);
 
-		CATCHUNIX(buffer_putliteral(&Bstatus, "["));
+		buffer_putliteral(Bstatus, "[");
 		for (i = 0; i < n; i++) {
 			if (first)
-				CATCHUNIX(buffer_putfstring(&Bstatus, "%" PRICHIRP_JOBID_T, jobs[i]));
+				buffer_putfstring(Bstatus, "%" PRICHIRP_JOBID_T, jobs[i]);
 			else
-				CATCHUNIX(buffer_putfstring(&Bstatus, ",%" PRICHIRP_JOBID_T, jobs[i]));
+				buffer_putfstring(Bstatus, ",%" PRICHIRP_JOBID_T, jobs[i]);
 			first = 0;
 		}
-		CATCHUNIX(buffer_putliteral(&Bstatus, "]"));
+		buffer_putliteral(Bstatus, "]");
 
-		J = json_parse(buffer_tostring(&Bstatus), buffer_pos(&Bstatus));
+		J = json_parse(buffer_tostring(Bstatus), buffer_pos(Bstatus));
 		assert(J);
-		buffer_free(&Bstatus);
+		buffer_free(Bstatus);
 		CATCH(chirp_job_status(J, subject, B));
 	}
 

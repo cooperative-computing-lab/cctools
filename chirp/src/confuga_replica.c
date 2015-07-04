@@ -735,41 +735,41 @@ static int create (confuga *C, chirp_jobid_t id, const char *fhostport, const ch
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
 	chirp_jobid_t cid;
-	buffer_t B;
-	buffer_init(&B);
+	buffer_t B[1];
+	buffer_init(B);
 
 	debug(D_DEBUG, "transfer job %" PRICHIRP_JOBID_T ": creating job", id);
 
-	CATCHUNIX(buffer_putliteral(&B, "{"));
+	CATCHUNIX(buffer_putliteral(B, "{"));
 
-	CATCHUNIX(buffer_putliteral(&B, "\"executable\":\"@put\""));
-	CATCHUNIX(buffer_putfstring(&B, ",\"tag\":\"%s\"", tag));
+	CATCHUNIX(buffer_putliteral(B, "\"executable\":\"@put\""));
+	CATCHUNIX(buffer_putfstring(B, ",\"tag\":\"%s\"", tag));
 
-	CATCHUNIX(buffer_putliteral(&B, ",\"arguments\":["));
-	CATCHUNIX(buffer_putliteral(&B, "\"@put\""));
-	CATCHUNIX(buffer_putliteral(&B, ",\"")); jsonA_escapestring(&B, thostport); CATCHUNIX(buffer_putliteral(&B, "\""));
-	CATCHUNIX(buffer_putliteral(&B, ",\"file\""));
-	CATCHUNIX(buffer_putliteral(&B, ",\"")); jsonA_escapestring(&B, topen); CATCHUNIX(buffer_putliteral(&B, "\""));
-	CATCHUNIX(buffer_putliteral(&B, "]"));
+	CATCHUNIX(buffer_putliteral(B, ",\"arguments\":["));
+	CATCHUNIX(buffer_putliteral(B, "\"@put\""));
+	CATCHUNIX(buffer_putliteral(B, ",\"")); jsonA_escapestring(B, thostport); CATCHUNIX(buffer_putliteral(B, "\""));
+	CATCHUNIX(buffer_putliteral(B, ",\"file\""));
+	CATCHUNIX(buffer_putliteral(B, ",\"")); jsonA_escapestring(B, topen); CATCHUNIX(buffer_putliteral(B, "\""));
+	CATCHUNIX(buffer_putliteral(B, "]"));
 
-	CATCHUNIX(buffer_putliteral(&B, ",\"environment\":{\"CHIRP_CLIENT_TICKETS\":\"./confuga.ticket\"}"));
+	CATCHUNIX(buffer_putliteral(B, ",\"environment\":{\"CHIRP_CLIENT_TICKETS\":\"./confuga.ticket\"}"));
 
-	CATCHUNIX(buffer_putliteral(&B, ",\"files\":["));
-	CATCHUNIX(buffer_putliteral(&B, "{\"task_path\":\"file\",\"serv_path\":\""));
-		jsonA_escapestring(&B, ffile);
-		CATCHUNIX(buffer_putliteral(&B, "\",\"type\":\"INPUT\",\"binding\":\"LINK\"}"));
-	CATCHUNIX(buffer_putliteral(&B, ",{\"task_path\":\"./confuga.ticket\",\"serv_path\":\""));
-		jsonA_escapestring(&B, fticket);
-		CATCHUNIX(buffer_putliteral(&B, "\",\"type\":\"INPUT\",\"binding\":\"LINK\"}"));
-	CATCHUNIX(buffer_putliteral(&B, ",{\"task_path\":\".chirp.debug\",\"serv_path\":\""));
-		jsonA_escapestring(&B, fdebug);
-		CATCHUNIX(buffer_putliteral(&B, "\",\"type\":\"OUTPUT\",\"binding\":\"LINK\"}"));
-	CATCHUNIX(buffer_putliteral(&B, "]"));
+	CATCHUNIX(buffer_putliteral(B, ",\"files\":["));
+	CATCHUNIX(buffer_putliteral(B, "{\"task_path\":\"file\",\"serv_path\":\""));
+		jsonA_escapestring(B, ffile);
+		CATCHUNIX(buffer_putliteral(B, "\",\"type\":\"INPUT\",\"binding\":\"LINK\"}"));
+	CATCHUNIX(buffer_putliteral(B, ",{\"task_path\":\"./confuga.ticket\",\"serv_path\":\""));
+		jsonA_escapestring(B, fticket);
+		CATCHUNIX(buffer_putliteral(B, "\",\"type\":\"INPUT\",\"binding\":\"LINK\"}"));
+	CATCHUNIX(buffer_putliteral(B, ",{\"task_path\":\".chirp.debug\",\"serv_path\":\""));
+		jsonA_escapestring(B, fdebug);
+		CATCHUNIX(buffer_putliteral(B, "\",\"type\":\"OUTPUT\",\"binding\":\"LINK\"}"));
+	CATCHUNIX(buffer_putliteral(B, "]"));
 
-	CATCHUNIX(buffer_putliteral(&B, "}"));
+	CATCHUNIX(buffer_putliteral(B, "}"));
 
-	debug(D_DEBUG, "json = `%s'", buffer_tostring(&B));
-	CATCHUNIX(chirp_reli_job_create(fhostport, buffer_tostring(&B), &cid, STOPTIME));
+	debug(D_DEBUG, "json = `%s'", buffer_tostring(B));
+	CATCHUNIX(chirp_reli_job_create(fhostport, buffer_tostring(B), &cid, STOPTIME));
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, cid));
@@ -781,8 +781,8 @@ static int create (confuga *C, chirp_jobid_t id, const char *fhostport, const ch
 	rc = 0;
 	goto out;
 out:
-	buffer_free(&B);
 	sqlite3_finalize(stmt);
+	buffer_free(B);
 	return rc;
 }
 
@@ -881,7 +881,7 @@ out:
 static int transfer_commit (confuga *C)
 {
 	static const char SQL[] =
-		"SELECT StorageNode.id, StorageNode.hostport, '[' || GROUP_CONCAT(TransferJob.id, ', ') || ']', '[' || GROUP_CONCAT(TransferJob.cid, ',') || ']'"
+		"SELECT StorageNode.id, StorageNode.hostport, PRINTF('[%s]', GROUP_CONCAT(TransferJob.id, ', ')), PRINTF('[%s]', GROUP_CONCAT(TransferJob.cid, ','))"
 		"	FROM Confuga.TransferJob JOIN Confuga.StorageNode ON TransferJob.fsid = StorageNode.id"
 		"	WHERE state = 'CREATED'"
 		"	GROUP BY StorageNode.id"
@@ -1122,7 +1122,7 @@ out:
 static int transfer_reap (confuga *C)
 {
 	static const char SQL[] =
-		"SELECT StorageNode.id, StorageNode.hostport, '[' || GROUP_CONCAT(TransferJob.id, ', ') || ']', '[' || GROUP_CONCAT(TransferJob.cid, ',') || ']'"
+		"SELECT StorageNode.id, StorageNode.hostport, PRINTF('[%s]', GROUP_CONCAT(TransferJob.id, ', ')), PRINTF('[%s]', GROUP_CONCAT(TransferJob.cid, ','))"
 		"	FROM Confuga.TransferJob JOIN Confuga.StorageNode ON TransferJob.fsid = StorageNode.id"
 		"	WHERE state = 'WAITED'"
 		"	GROUP BY StorageNode.id"
@@ -1262,8 +1262,10 @@ static int transfer_stats (confuga *C)
 	sqlite3 *db = C->db;
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
-	buffer_t B;
+	buffer_t B[1];
 	time_t now = time(NULL);
+
+	buffer_init(B);
 
 	if (now < C->transfer_stats+30) {
 		rc = 0;
@@ -1271,23 +1273,23 @@ static int transfer_stats (confuga *C)
 	}
 	C->transfer_stats = now;
 
-	buffer_init(&B);
-	buffer_putliteral(&B, "TJ: ");
+	buffer_putliteral(B, "TJ: ");
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
 		const char *state = (const char *)sqlite3_column_text(stmt, 0);
-		buffer_putfstring(&B, "%s; ", state);
+		buffer_putfstring(B, "%s; ", state);
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
-	debug(D_DEBUG, "%s", buffer_tostring(&B));
+	debug(D_DEBUG, "%s", buffer_tostring(B));
 
 	rc = 0;
 	goto out;
 out:
 	sqlite3_finalize(stmt);
+	buffer_free(B);
 	return rc;
 }
 

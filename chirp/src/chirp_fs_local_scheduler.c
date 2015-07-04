@@ -430,25 +430,25 @@ static const char *readenv (char *const *env, const char *name)
 static int envinsert (char ***env, const char *name, const char *fmt, ...)
 {
 	int rc;
-	buffer_t B;
-	buffer_init(&B);
+	buffer_t B[1];
+	buffer_init(B);
 
 	if (!readenv(*env, name)) {
 		va_list ap;
 
-		CATCHUNIX(buffer_putfstring(&B, "%s=", name));
+		CATCHUNIX(buffer_putfstring(B, "%s=", name));
 
 		va_start(ap, fmt);
-		rc = buffer_putvfstring(&B, fmt, ap);
+		rc = buffer_putvfstring(B, fmt, ap);
 		va_end(ap);
 		CATCHUNIX(rc);
-		*env = string_array_append(*env, buffer_tostring(&B));
+		*env = string_array_append(*env, buffer_tostring(B));
 	}
 
 	rc = 0;
 	goto out;
 out:
-	buffer_free(&B);
+	buffer_free(B);
 	return rc;
 }
 
@@ -484,8 +484,8 @@ static int jgetenv (sqlite3 *db, chirp_jobid_t id, const char *subject, const ch
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
 	*env = string_array_new();
-	buffer_t B;
-	buffer_init(&B);
+	buffer_t B[1];
+	buffer_init(B);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));
@@ -497,9 +497,9 @@ static int jgetenv (sqlite3 *db, chirp_jobid_t id, const char *subject, const ch
 		const char *name = (const char *) sqlite3_column_text(stmt, 0);
 		const char *value = (const char *) sqlite3_column_text(stmt, 1);
 		debug(D_DEBUG, "jobs[%" PRICHIRP_JOBID_T "].environment[`%s'] = `%s'", id, name, value);
-		buffer_rewind(&B, 0);
-		CATCHUNIX(buffer_putfstring(&B, "%s=%s", name, value));
-		*env = string_array_append(*env, buffer_tostring(&B));
+		buffer_rewind(B, 0);
+		CATCHUNIX(buffer_putfstring(B, "%s=%s", name, value));
+		*env = string_array_append(*env, buffer_tostring(B));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -509,7 +509,7 @@ static int jgetenv (sqlite3 *db, chirp_jobid_t id, const char *subject, const ch
 	goto out;
 out:
 	sqlite3_finalize(stmt);
-	buffer_free(&B);
+	buffer_free(B);
 	return rc;
 }
 
@@ -666,17 +666,17 @@ static void run (const char *sandbox, const char *path, char *const argv[], char
 	} else if (strcmp(path, "@hash") == 0) {
 		do_hash(argv, envp);
 	} else {
-		buffer_t B;
-		buffer_init(&B);
+		buffer_t B[1];
+		buffer_init(B);
 		int i;
 		for (i = 0; argv[i]; i++) {
 			if (i)
-				buffer_putfstring(&B, ", '%s'", argv[i]);
+				buffer_putfstring(B, ", '%s'", argv[i]);
 			else
-				buffer_putfstring(&B, "'%s'", argv[i]);
+				buffer_putfstring(B, "'%s'", argv[i]);
 		}
-		debug(D_CHIRP, "execve('%s', [%s], [...])", path, buffer_tostring(&B));
-		buffer_free(&B);
+		debug(D_CHIRP, "execve('%s', [%s], [...])", path, buffer_tostring(B));
+		buffer_free(B);
 		CATCHUNIX(execve(path, argv, envp));
 	}
 
@@ -684,7 +684,7 @@ static void run (const char *sandbox, const char *path, char *const argv[], char
 	goto out;
 out:
 	debug(D_FATAL, "execution failed: %s", strerror(rc));
-	raise(SIGUSR1);
+	raise(SIGUSR1); /* signal abnormal termination before program starts */
 	abort();
 }
 
