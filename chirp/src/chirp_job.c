@@ -835,23 +835,23 @@ restart:
 
 	{
 		int first = 1;
-		buffer_t Bstatus;
-		buffer_init(&Bstatus);
-		buffer_abortonfailure(&Bstatus, 1);
+		buffer_t Bstatus[1];
+		buffer_init(Bstatus);
+		buffer_abortonfailure(Bstatus, 1);
 
-		CATCHUNIX(buffer_putliteral(&Bstatus, "["));
+		buffer_putliteral(Bstatus, "[");
 		for (i = 0; i < n; i++) {
 			if (first)
-				CATCHUNIX(buffer_putfstring(&Bstatus, "%" PRICHIRP_JOBID_T, jobs[i]));
+				buffer_putfstring(Bstatus, "%" PRICHIRP_JOBID_T, jobs[i]);
 			else
-				CATCHUNIX(buffer_putfstring(&Bstatus, ",%" PRICHIRP_JOBID_T, jobs[i]));
+				buffer_putfstring(Bstatus, ",%" PRICHIRP_JOBID_T, jobs[i]);
 			first = 0;
 		}
-		CATCHUNIX(buffer_putliteral(&Bstatus, "]"));
+		buffer_putliteral(Bstatus, "]");
 
-		J = json_parse(buffer_tostring(&Bstatus), buffer_pos(&Bstatus));
+		J = json_parse(buffer_tostring(Bstatus), buffer_pos(Bstatus));
 		assert(J);
-		buffer_free(&Bstatus);
+		buffer_free(Bstatus);
 		CATCH(chirp_job_status(J, subject, B));
 	}
 

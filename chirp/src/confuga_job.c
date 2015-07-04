@@ -1058,22 +1058,23 @@ static int jcreate (confuga *C, chirp_jobid_t id, const char *tag, const char *h
 	sqlite3 *db = C->db;
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
-	buffer_t B;
+	buffer_t B[1];
 	chirp_jobid_t cid;
 	struct job_stats stats;
 	memset(&stats, 0, sizeof(stats));
 
-	buffer_init(&B);
+	buffer_init(B);
+
 	jdebug(D_DEBUG, id, tag, "creating job on storage node");
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
-	CATCH(encode(C, id, tag, &B, &stats));
-	debug(D_DEBUG, "json = `%s'", buffer_tostring(&B));
+	CATCH(encode(C, id, tag, B, &stats));
+	debug(D_DEBUG, "json = `%s'", buffer_tostring(B));
 
-	CATCHUNIX(chirp_reli_job_create(hostport, buffer_tostring(&B), &cid, STOPTIME));
+	CATCHUNIX(chirp_reli_job_create(hostport, buffer_tostring(B), &cid, STOPTIME));
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, id));
@@ -1090,7 +1091,7 @@ static int jcreate (confuga *C, chirp_jobid_t id, const char *tag, const char *h
 	rc = 0;
 	goto out;
 out:
-	buffer_free(&B);
+	buffer_free(B);
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	return rc;
@@ -1698,10 +1699,10 @@ static int job_stats (confuga *C)
 	sqlite3 *db = C->db;
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
-	buffer_t B;
+	buffer_t B[1];
 	time_t now = time(NULL);
 
-	buffer_init(&B);
+	buffer_init(B);
 
 	if (now < C->job_stats+30) {
 		rc = 0;
@@ -1712,39 +1713,39 @@ static int job_stats (confuga *C)
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
 		const char *state = (const char *)sqlite3_column_text(stmt, 0);
-		buffer_putfstring(&B, "%s; ", state);
+		buffer_putfstring(B, "%s; ", state);
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-		buffer_putfstring(&B, "Active SN (%d); ", sqlite3_column_int(stmt, 0));
+		buffer_putfstring(B, "Active SN (%d); ", sqlite3_column_int(stmt, 0));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-		buffer_putfstring(&B, "Allocated SN (%d); ", sqlite3_column_int(stmt, 0));
+		buffer_putfstring(B, "Allocated SN (%d); ", sqlite3_column_int(stmt, 0));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-		buffer_putfstring(&B, "Executing SN (%d); ", sqlite3_column_int(stmt, 0));
+		buffer_putfstring(B, "Executing SN (%d); ", sqlite3_column_int(stmt, 0));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
-	if (buffer_pos(&B))
-		debug(D_DEBUG, "%s", buffer_tostring(&B));
+	if (buffer_pos(B))
+		debug(D_DEBUG, "%s", buffer_tostring(B));
 
 	rc = 0;
 	goto out;
 out:
-	buffer_free(&B);
+	buffer_free(B);
 	sqlite3_finalize(stmt);
 	return rc;
 }
