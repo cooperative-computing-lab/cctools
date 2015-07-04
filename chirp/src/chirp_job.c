@@ -665,7 +665,7 @@ restart:
 		sqlcatch(sqlite3_bind_int(stmt, 2, strcmp(subject, chirp_super_user) == 0));
 		sqlcatch(sqlite3_bind_text(stmt, 3, subject, -1, SQLITE_STATIC));
 		if ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-			chirp_sqlite3_row_jsonify(stmt, B);
+			CATCH(chirp_sqlite3_row_jsonify(stmt, B));
 			buffer_rewind(B, buffer_pos(B)-1); /* remove trailing '}' */
 		} else if (rc == SQLITE_DONE) {
 			CATCH(EACCES);
@@ -684,7 +684,7 @@ restart:
 				CATCHUNIX(buffer_putliteral(B, ","));
 			first0 = 0;
 			assert(sqlite3_column_count(stmt) == 1);
-			chirp_sqlite3_column_jsonify(stmt, 0, B);
+			CATCH(chirp_sqlite3_column_jsonify(stmt, 0, B));
 		}
 		sqlcatchcode(rc, SQLITE_DONE);
 		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -699,9 +699,9 @@ restart:
 				CATCHUNIX(buffer_putliteral(B, ","));
 			first0 = 0;
 			assert(sqlite3_column_count(stmt) == 2);
-			chirp_sqlite3_column_jsonify(stmt, 0, B);
+			CATCH(chirp_sqlite3_column_jsonify(stmt, 0, B));
 			CATCHUNIX(buffer_putliteral(B, ":"));
-			chirp_sqlite3_column_jsonify(stmt, 1, B);
+			CATCH(chirp_sqlite3_column_jsonify(stmt, 1, B));
 		}
 		sqlcatchcode(rc, SQLITE_DONE);
 		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -715,7 +715,7 @@ restart:
 			if (!first0)
 				CATCHUNIX(buffer_putliteral(B, ","));
 			first0 = 0;
-			chirp_sqlite3_row_jsonify(stmt, B);
+			CATCH(chirp_sqlite3_row_jsonify(stmt, B));
 		}
 		sqlcatchcode(rc, SQLITE_DONE);
 		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);

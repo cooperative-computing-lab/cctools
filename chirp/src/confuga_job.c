@@ -968,9 +968,9 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 	sqlcatch(sqlite3_bind_int64(stmt, 1, id));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_ROW);
 	CATCHUNIX(buffer_putliteral(B, "\"executable\":"));
-	chirp_sqlite3_column_jsonify(stmt, 0, B);
+	CATCH(chirp_sqlite3_column_jsonify(stmt, 0, B));
 	CATCHUNIX(buffer_putliteral(B, ",\"tag\":"));
-	chirp_sqlite3_column_jsonify(stmt, 1, B);
+	CATCH(chirp_sqlite3_column_jsonify(stmt, 1, B));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
@@ -982,7 +982,7 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 		if (!first0)
 			CATCHUNIX(buffer_putliteral(B, ","));
 		first0 = 0;
-		chirp_sqlite3_column_jsonify(stmt, 0, B);
+		CATCH(chirp_sqlite3_column_jsonify(stmt, 0, B));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -996,9 +996,9 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 		if (!first0)
 			CATCHUNIX(buffer_putliteral(B, ","));
 		first0 = 0;
-		chirp_sqlite3_column_jsonify(stmt, 0, B);
+		CATCH(chirp_sqlite3_column_jsonify(stmt, 0, B));
 		CATCHUNIX(buffer_putliteral(B, ":"));
-		chirp_sqlite3_column_jsonify(stmt, 1, B);
+		CATCH(chirp_sqlite3_column_jsonify(stmt, 1, B));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -1024,7 +1024,7 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 			/* XXX If this is a pull, then there is no available storage node. Reschedule... */
 			CATCH(EIO);
 		}
-		chirp_sqlite3_row_jsonify(stmt, B);
+		CATCH(chirp_sqlite3_row_jsonify(stmt, B));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
