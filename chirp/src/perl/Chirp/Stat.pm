@@ -26,8 +26,8 @@ sub Chirp::Stat::__new {
 	# path=>, cstat=>
 	my ($class, $path, $cinfo) = @_;
 
-	$path  || croak('A path should be given.\n');
-	$cinfo || croak('struct stat from C should be given.\n');
+	croak('A path should be given.')             unless $path;
+	croak('struct stat from C should be given.') unless $cinfo;
 
 	return bless {
 		__path  => $path,

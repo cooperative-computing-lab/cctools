@@ -56,9 +56,15 @@ eval {
 };
 die "Could not stat file: $@" if $@;
 
+eval {
+	print 'checksum of bar.txt is: ';
+	print $client->hash('/bar.txt', algorithm => 'sha1') . "\n";
+};
+die "Could not compute hash of file: $@" if $@;
+
 
 eval {
-	$client->rm('/bar.txt')
+	$client->rm('/bar.txt');
 };
 die "Could not remove file: $@" if $@;
 

@@ -14,6 +14,8 @@
 import os
 import time
 import json
+import binascii
+
 
 ##
 # Python Client object
@@ -109,6 +111,46 @@ class Client:
 
         return acls.split('\n')
 
+    ##
+    # Returns a string with the ACL of the given directory.
+    # Throws a GeneralError on error.
+    #
+    # @param self                Reference to the current task object.
+    # @param path                Target directory.
+    # @param subject             Target subject.
+    # @param rights              Permissions to be granted.
+    # @param absolute_stop_time  If given, maximum number of seconds since
+    #                            epoch to wait for a server response.
+    #                            (Overrides any timeout.)
+    # @param timeout             If given, maximum number of seconds to
+    #                            wait for a server response.
+    def setacl(self, path, subject, rights, absolute_stop_time=None, timeout=None):
+        result = chirp_reli_setacl(self.hostport, path, subject, rights, self.__stoptime(absolute_stop_time, timeout))
+
+        if result < 0:
+            raise GeneralFailure('setacl', result, [path, subject, rights])
+
+        return result
+
+    ##
+    # Set the ACL for the given directory to be only for the rights to the calling user.
+    # Throws a GeneralError on error.
+    #
+    # @param self                Reference to the current task object.
+    # @param path                Target directory.
+    # @param rights              Permissions to be granted.
+    # @param absolute_stop_time  If given, maximum number of seconds since
+    #                            epoch to wait for a server response.
+    #                            (Overrides any timeout.)
+    # @param timeout             If given, maximum number of seconds to
+    #                            wait for a server response.
+    def resetacl(self, path, rights, absolute_stop_time=None, timeout=None):
+        result = chirp_wrap_resetacl(self.hostport, path, rights, self.__stoptime(absolute_stop_time, timeout))
+
+        if result < 0:
+            raise GeneralFailure('resetacl', result, [path, subject, rights])
+
+        return result
 
     ##
     # Returns a list with the names of the files in the path.
@@ -206,7 +248,6 @@ class Client:
 
         raise TransferFailure('get', result, source, destination)
 
-
     ##
     # Removes the given file or directory from the server.
     # Raises OSError on error.
@@ -222,7 +263,48 @@ class Client:
         status = chirp_reli_rmall(self.hostport, path, self.__stoptime(absolute_stop_time, timeout))
 
         if status < 0:
-            raise OSError(path)
+            raise OSError
+
+    ##
+    # Recursively create the directories in path.
+    # Raises OSError on error.
+    #
+    # @param self                Reference to the current task object.
+    # @param path                Target file/directory.
+    # @param mode                Unix permissions for the created directory.
+    # @param absolute_stop_time  If given, maximum number of seconds since
+    #                            epoch to wait for a server response.
+    #                            (Overrides any timeout.)
+    # @param timeout             If given, maximum number of seconds to
+    #                            wait for a server response.
+    def mkdir(self, path, mode=493, absolute_stop_time=None, timeout=None):
+        result = chirp_reli_mkdir_recursive(self.hostport, path, self.__stoptime(absolute_stop_time, timeout))
+
+        if result < 0:
+            raise OSError
+
+        return result
+
+
+    ##
+    # Computes the checksum of path.
+    # Raises IOError on error.
+    #
+    # @param self                Reference to the current task object.
+    # @param path                Target file.
+    # @param algorithm           One of 'md5' or 'sha1' (default).
+    # @param absolute_stop_time  If given, maximum number of seconds since
+    #                            epoch to wait for a server response.
+    #                            (Overrides any timeout.)
+    # @param timeout             If given, maximum number of seconds to
+    #                            wait for a server response.
+    def hash(self, path, algorithm='sha1', absolute_stop_time=None, timeout=None):
+        hash_hex = chirp_wrap_hash(self.hostport, path, algorithm, self.__stoptime(absolute_stop_time, timeout))
+
+        if hash_hex is None:
+            raise IOError
+
+        return hash_hex
 
     ##
     # Creates a chirp job. See http://ccl.cse.nd.edu/software/manuals/chirp.html for details.
@@ -515,6 +597,14 @@ class AuthenticationFailure(Exception):
         self.value = value
     def __str__(self):
         return repr(self.value)
+
+class GeneralFailure(Exception):
+    def __init__(self, action, status, value):
+        self.action = action
+        self.status = status
+        self.value  = value
+    def __str__(self):
+        return "%s(%s) %s" % (self.action, self.status, self.value)
 
 class TransferFailure(Exception):
     def __init__(self, action, status, source, dest):
