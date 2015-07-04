@@ -299,12 +299,12 @@ class Client:
     # @param timeout             If given, maximum number of seconds to
     #                            wait for a server response.
     def hash(self, path, algorithm='sha1', absolute_stop_time=None, timeout=None):
-        hash = chirp_wrap_hash(self.hostport, path, algorithm, self.__stoptime(absolute_stop_time, timeout))
+        hash_hex = chirp_wrap_hash(self.hostport, path, algorithm, self.__stoptime(absolute_stop_time, timeout))
 
-        if hash is None:
+        if hash_hex is None:
             raise IOError
 
-        return binascii.hexlify(hash)
+        return hash_hex
 
     ##
     # Creates a chirp job. See http://ccl.cse.nd.edu/software/manuals/chirp.html for details.

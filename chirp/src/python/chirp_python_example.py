@@ -73,6 +73,12 @@ if __name__ == '__main__':
 
 
     try:
+        print 'checksum of bar.txt is ' + client.hash('/bar.txt')
+    except IOError, e:
+        print "Could not compute hash of file: %s" % e
+        sys.exit(1)
+
+    try:
         client.rm('/bar.txt')
         os.remove('bar.txt')
         os.remove('foo.txt')

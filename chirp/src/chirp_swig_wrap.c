@@ -1,6 +1,8 @@
 #include "buffer.h"
 #include "chirp_reli.h"
 #include "chirp_types.h"
+#include "md5.h"
+#include "sha1.h"
 #include "xxmalloc.h"
 
 static void accumulate_one_acl(const char *line, void *args)
@@ -63,7 +65,19 @@ char *chirp_wrap_hash(const char *hostname, const char *path, const char *algori
 	if(result < 0)
 		return NULL;
 
-	return xxstrdup( (char *) digest);
+	const char *hex_str;
+	if( strcmp(algorithm, "sha1") == 0 ) {
+		hex_str = sha1_string(digest);
+	}
+	else if( strcmp(algorithm, "md5") == 0 ) {
+		hex_str = md5_string(digest);
+	}
+	else {
+		/* for completeness, but we should have returned NULL already */
+		return NULL;
+	}
+
+	return xxstrdup(hex_str);
 }
 
 int64_t chirp_wrap_job_create (const char *host, const char *json, time_t stoptime)
