@@ -3,19 +3,21 @@ Copyright (C) 2010- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
-#include <list.h>
-#include <hash_table.h>
-#include <link.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <hmac.h>
-#include <math.h>
-#include <b64_encode.h>
+
+#include "s3c_acl.h"
+#include "s3c_util.h"
+
 #include <sys/stat.h>
 
-#include "s3c_util.h"
-#include "s3c_acl.h"
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "hash_table.h"
+#include "hmac.h"
+#include "link.h"
+#include "list.h"
 
 extern char *s3_endpoint;
 extern char *s3_address;
