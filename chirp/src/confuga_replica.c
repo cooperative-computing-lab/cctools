@@ -1265,13 +1265,14 @@ static int transfer_stats (confuga *C)
 	buffer_t B;
 	time_t now = time(NULL);
 
+	buffer_init(&B);
+
 	if (now < C->transfer_stats+30) {
 		rc = 0;
 		goto out;
 	}
 	C->transfer_stats = now;
 
-	buffer_init(&B);
 	buffer_putliteral(&B, "TJ: ");
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
@@ -1288,6 +1289,7 @@ static int transfer_stats (confuga *C)
 	goto out;
 out:
 	sqlite3_finalize(stmt);
+	buffer_free(&B);
 	return rc;
 }
 

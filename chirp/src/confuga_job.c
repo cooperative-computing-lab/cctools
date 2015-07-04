@@ -1701,13 +1701,13 @@ static int job_stats (confuga *C)
 	buffer_t B;
 	time_t now = time(NULL);
 
+	buffer_init(&B);
+
 	if (now < C->job_stats+30) {
 		rc = 0;
 		goto out;
 	}
 	C->job_stats = now;
-
-	buffer_init(&B);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
@@ -1744,6 +1744,7 @@ static int job_stats (confuga *C)
 	rc = 0;
 	goto out;
 out:
+	buffer_free(&B);
 	sqlite3_finalize(stmt);
 	return rc;
 }
