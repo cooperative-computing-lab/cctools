@@ -11,6 +11,10 @@ See the file COPYING for details.
 #ifndef LIBCVMFS_VERSION
 	#define LIBCVMFS_VERSION 1
 #endif
+#ifndef LIBCVMFS_REVISION
+	#define LIBCVMFS_REVISION 0
+#endif
+
 
 extern "C" {
 #include "buffer.h"
@@ -143,6 +147,26 @@ int compat_cvmfs_open(const char *path) {
 #else
 	return cvmfs_open(cvmfs_active_filesystem->cvmfs_ctx, path);
 #endif
+}
+
+pfs_ssize_t compat_cvmfs_read(int fd, void *d, pfs_size_t length, pfs_off_t offset, pfs_off_t last_offset) {
+	pfs_ssize_t result;
+
+	debug(D_LOCAL, "read %d 0x%p %lld %lld", fd, d,(long long)length,(long long)offset);
+
+#if LIBCVMFS_REVISION < 18
+	if(offset != last_offset)
+		::lseek64(fd, offset, SEEK_SET);
+	result =::read(fd, d, length);
+#else
+	result = cvmfs_pread(cvmfs_active_filesystem->cvmfs_ctx, fd, d, length, offset);
+	if (result < 0) {
+		errno = -result;
+		result = -1;
+	}
+#endif
+
+	return result;
 }
 
 int compat_cvmfs_close(int fd) {
@@ -1078,16 +1102,9 @@ class pfs_file_cvmfs:public pfs_file {
 	}
 
 	virtual pfs_ssize_t read(void *d, pfs_size_t length, pfs_off_t offset) {
-		pfs_ssize_t result;
-
-		debug(D_LOCAL, "read %d 0x%p %lld %lld", fd, d,(long long)length,(long long)offset);
-
-		if(offset != last_offset)
-			::lseek64(fd, offset, SEEK_SET);
-		result =::read(fd, d, length);
+		pfs_ssize_t result = compat_cvmfs_read(fd, d, length, offset, last_offset);
 		if(result > 0)
 			last_offset = offset + result;
-
 		return result;
 	}
 
