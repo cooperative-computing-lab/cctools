@@ -157,6 +157,8 @@ static int64_t manual_gpus_option = 0;
 static time_t  last_cwd_measure_time = 0;
 static int64_t last_workspace_usage  = 0;
 
+static time_t  last_ds_measure_time = 0;
+
 static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
@@ -165,6 +167,7 @@ static int64_t gpus_allocated = 0;
 static int send_resources_interval = 30;
 static int send_stats_interval     = 60;
 static int measure_wd_interval     = 180;
+static int measure_ds_interval     = 30;
 
 static struct work_queue *foreman_q = NULL;
 // docker image name
@@ -538,6 +541,34 @@ static void expire_procs_running() {
 		}
 	}
 
+}
+
+// Just terminate the running task processes without doing any
+// other cleanups or communication. To be called when abort is 
+// requested to make sure that no child process is left running
+// if this worker process is then quickly terminated with KILL.
+static void abort_procs_running() {
+	struct work_queue_process *p;
+	uint64_t pid;
+
+	itable_firstkey(procs_running);
+	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
+		kill(-1 * pid, SIGKILL);
+	}
+
+}
+
+// We cannot call abort_procs_running() from a signal handler because
+// itable iterators change itable's internal state and therefore not
+// reentrant. We call this function wherever we need to check for
+// abort_flag status to make sure that at least child processes are
+// quickly killed before anything else is done
+static int check_abort_flag() {
+	int ret = abort_flag;
+	if(ret) {
+		abort_procs_running();
+	}
+	return ret;
 }
 
 /*
@@ -1278,12 +1309,13 @@ static void work_for_master(struct link *master) {
 	sigaddset(&mask, SIGINT);
 	sigaddset(&mask, SIGUSR1);
 	sigaddset(&mask, SIGUSR2);
+	sigaddset(&mask, SIGALRM);
 
 	reset_idle_timer();
 
 	time_t volatile_stoptime = time(0) + 60;
 	// Start serving masters
-	while(!abort_flag) {
+	while(!check_abort_flag()) {
 
 		if(time(0) > idle_stoptime) {
 			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", master_addr,master_port,idle_timeout);
@@ -1322,6 +1354,7 @@ static void work_for_master(struct link *master) {
 
 		int master_activity = link_usleep_mask(master, wait_msec*1000, &mask, 1, 0);
 		if(master_activity < 0) break;
+		if(check_abort_flag()) break;
 
 		int ok = 1;
 		if(master_activity) {
@@ -1338,11 +1371,19 @@ static void work_for_master(struct link *master) {
 				results_to_be_sent_msg = 1;
 			}
 		}
-
-		ok &= check_disk_space_for_filesize(".", 0, disk_avail_threshold);
-
+		
+		//We need to protect FS from too frequent statvfs calls from this loop -
+		//it has been known to overload the FS when 100 workers were running on a
+		//shared FS. Each worker was issuing ststvfs from check_disk_space_for_filesize every 10ms.
+		//Sleep in link_usleep above somehow was not happening.
+		//Because fixed zero file size parameter is used here anyway, it should
+		//be OK to cache the results.
+		if((time(0) - last_ds_measure_time) >= measure_ds_interval) {
+			ok &= check_disk_space_for_filesize(".", 0, disk_avail_threshold);
+			last_ds_measure_time = time(0);
+		}
 		int64_t disk_usage;
-		if(!check_disk_workspace(workspace, &disk_usage, 0, manual_disk_option, measure_wd_interval, last_cwd_measure_time, last_workspace_usage, disk_avail_threshold)) {
+		if(!check_disk_workspace(workspace, &disk_usage, 0, manual_disk_option, measure_wd_interval, &last_cwd_measure_time, &last_workspace_usage, disk_avail_threshold)) {
 			fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n",workspace, manual_cores_option, disk_usage);
 			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_usage);
 			ok = 0;
@@ -1355,6 +1396,8 @@ static void work_for_master(struct link *master) {
 
 			int visited = 0;
 			while(list_size(procs_waiting) > visited && cores_allocated < local_resources->cores.total) {
+				
+				if(check_abort_flag()) break;
 				struct work_queue_process *p;
 
 				p = list_pop_head(procs_waiting);
@@ -1579,7 +1622,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 	workspace_prepare();
 
-	check_disk_workspace(workspace, NULL, 1, manual_disk_option, measure_wd_interval, last_cwd_measure_time, last_workspace_usage, disk_avail_threshold);
+	check_disk_workspace(workspace, NULL, 1, manual_disk_option, measure_wd_interval, &last_cwd_measure_time, &last_workspace_usage, disk_avail_threshold);
 	report_worker_ready(master);
 
 	send_master_message(master, "info worker-id %s\n", worker_id);
@@ -1667,6 +1710,14 @@ static void handle_abort(int sig)
 	abort_flag = 1;
 }
 
+// Per GNU docs (https://www.gnu.org/software/libc/manual/html_node/Handler-Returns.html#Handler-Returns)
+// Signal handler for alarm timer should re-enable itself after setting the flag
+static void handle_abort_alarm(int sig)
+{
+	abort_flag = 1;
+	signal(sig, handle_abort_alarm);
+}
+
 static void handle_sigchld(int sig)
 {
 	sigchld_received_flag = 1;
@@ -1693,6 +1744,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set both --idle-timeout and --connect-timeout.\n", "-t,--timeout=<time>");
 	printf( " %-30s Disconnect after this time if master sends no work. (default=%ds)\n", "   --idle-timeout=<time>", idle_timeout);
 	printf( " %-30s Abort after this time if no masters are available. (default=%ds)\n", "   --connect-timeout=<time>", idle_timeout);
+	printf( " %-30s Work only for this time then exit. (default=0 meaning no limit)\n", "   --worker-max-wallclock=<time>");
 	printf( " %-30s Set TCP window size.\n", "-w,--tcp-window-size=<size>");
 	printf( " %-30s Set initial value for backoff interval when worker fails to connect\n", "-i,--min-backoff=<time>");
 	printf( " %-30s to a master. (default=%ds)\n", "", init_backoff_interval);
@@ -1725,7 +1777,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE,
-	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT};
+	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT, LONG_OPT_WORKER_MAX_WALLCLOCK};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1745,6 +1797,7 @@ static const struct option long_options[] = {
 	{"timeout",             required_argument,  0,  't'},
 	{"idle-timeout",        required_argument,  0,  LONG_OPT_IDLE_TIMEOUT},
 	{"connect-timeout",     required_argument,  0,  LONG_OPT_CONNECT_TIMEOUT},
+	{"worker-max-wallclock",required_argument,  0,  LONG_OPT_WORKER_MAX_WALLCLOCK},
 	{"tcp-window-size",     required_argument,  0,  'w'},
 	{"min-backoff",         required_argument,  0,  'i'},
 	{"max-backoff",         required_argument,  0,  'b'},
@@ -1782,6 +1835,7 @@ int main(int argc, char *argv[])
 	char *foreman_stats_filename = NULL;
 	char * catalog_host = CATALOG_HOST;
 	int catalog_port = CATALOG_PORT;
+	int worker_max_wallclock = 0;
 
 	worker_start_time = time(0);
 
@@ -1852,6 +1906,9 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_CONNECT_TIMEOUT:
 			connect_timeout = string_time_parse(optarg);
+			break;
+		case LONG_OPT_WORKER_MAX_WALLCLOCK:
+			worker_max_wallclock = string_time_parse(optarg);
 			break;
 		case 'j':
 			manual_cores_option = atoi(optarg);
@@ -2015,6 +2072,11 @@ int main(int argc, char *argv[])
 	signal(SIGUSR1, handle_abort);
 	signal(SIGUSR2, handle_abort);
 	signal(SIGCHLD, handle_sigchld);
+
+	if(worker_max_wallclock>0) {
+		signal (SIGALRM, handle_abort_alarm);
+		alarm(worker_max_wallclock);
+	}
 
 	random_init();
 
