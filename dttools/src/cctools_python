@@ -3,33 +3,33 @@
 pythons="$PYTHON2 $PYTHON python2.7 python2.6 python2.4 python2 python3 python"
 
 major_version () {
-	version=$1
-	echo ${version%%.*}
+	_version=$1
+	echo ${_version%%.*}
 }
 
 minor_version () {
-	version=$1
-	major=$(major_version $version)
-	echo ${version#${major}} | cut -d . -f 2
+	_version=$1
+	_major=$(major_version $_version)
+	echo ${_version#${_major}} | cut -d . -f 2
 }
 
 match_versions () {
-	required=$1
-	available=$2
-	major_r=$(major_version $required)
-	minor_r=$(minor_version $required)
-	major_a=$(major_version $available)
-	minor_a=$(minor_version $available)
+	_required=$1
+	_available=$2
+	_major_r=$(major_version $_required)
+	_minor_r=$(minor_version $_required)
+	_major_a=$(major_version $_available)
+	_minor_a=$(minor_version $_available)
 
 	# majors do not match
-	if [ "$major_r" != "$major_a" ]
+	if [ "$_major_r" != "$_major_a" ]
 	then
 	  echo 0
 	  return
 	fi
 
 	# minors do not match
-	if [ -n "$minor_r" -a "$minor_r" != "$minor_a" ]
+	if [ -n "$_minor_r" -a "$_minor_r" != "$_minor_a" ]
 	then
 	  echo 0
 	  return
@@ -39,13 +39,31 @@ match_versions () {
 	echo 1
 }
 
-script=$1
-if [ -z "$script" ]
+find_python_path () {
+	_script=$1
+	_version=$2
+	_dirname="$(dirname $_script)/../lib"
+
+	for dir in $_dirname/python{$_version,}; do
+		echo $dir
+		if [ -d "$dir" ]; then
+			echo "$dir"
+			return
+		fi
+	done
+
+	echo "Could not find the python libraries at the expected location. Execution" 1>&2
+	echo "will continue, but if errors are found please set PYTHONPATH to include" 1>&2
+	echo "the CCTOOLs modules for the python interpreter version $_version." 1>&2
+}
+
+if [ -z "$1" ]
 then
   echo 'Missing script name.' 1>&2
   exit 1
 fi
 
+script=$(which "$1")
 required_alternatives=$(sed -n '2{s/^#[\t ]*CCTOOLS_PYTHON_VERSION//p;q;}' < $script)
 
 if [ -z "$required_alternatives" ]
@@ -55,6 +73,7 @@ then
 fi
 
 python=0
+version=
 for alt in $required_alternatives
 do
 	for candidate in $pythons
@@ -67,6 +86,7 @@ do
 		if [ "$match" = 1 ]
 		then
 			python=$candidate_full
+			version=$(major_version $candidate_version).$(minor_version $candidate_version)
 			break 2
 		fi
 	done
@@ -78,5 +98,7 @@ then
 	echo 'Please set the environment variables PYTHON or PYTHON2 appropriately.' 1>&2
 	exit 1
 else
-	exec "$python" "$@"
+	export PYTHONPATH=$(find_python_path $script $version):$PYTHONPATH
+	shift
+	exec "$python" "$script" "$@"
 fi
