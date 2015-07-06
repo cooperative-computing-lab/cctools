@@ -1,8 +1,6 @@
 include ../../config.mk
 include ../../rules.mk
 
-CCTOOLS_PYTHON_PATH=${CCTOOLS_INSTALL_DIR}/lib/python${PYTHON_VERSION}/site-packages
-
 all: weaver.py
 
 weaver.py: weaver.in

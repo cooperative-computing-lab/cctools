@@ -1,8 +1,6 @@
 include ../../../config.mk
 include ../../../rules.mk
 
-PYTHON_INSTALL_DIR = $(CCTOOLS_INSTALL_DIR)/lib/python$(CCTOOLS_PYTHON_VERSION)/site-packages
-
 # Python always uses 'so' for its modules (even on Darwin)
 CCTOOLS_DYNAMIC_SUFFIX = so
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
@@ -33,8 +31,8 @@ clean:
 test:
 
 install: all
-	mkdir -p $(PYTHON_INSTALL_DIR)
+	mkdir -p $(CCTOOLS_PYTHON_PATH)
 	chmod 755 work_queue_example.py
-	cp work_queue.py $(WQPYTHONSO) $(PYTHON_INSTALL_DIR)/
+	cp work_queue.py $(WQPYTHONSO) $(CCTOOLS_PYTHON_PATH)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 	cp work_queue_example.py $(CCTOOLS_INSTALL_DIR)/doc/
