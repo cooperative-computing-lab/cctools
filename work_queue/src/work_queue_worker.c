@@ -1684,8 +1684,6 @@ static void show_help(const char *cmd)
 	printf( " %-30s Select port to listen to at random and write to this file.  Implies --foreman.\n", "-Z,--foreman-port-file=<file>");
 	printf( " %-30s Set the fast abort multiplier for foreman (default=disabled).\n", "-F,--fast-abort=<mult>");
 	printf( " %-30s Send statistics about foreman to this file.\n", "--specify-log=<logfile>");
-	printf( " %-30s When in Foreman mode, this foreman will advertise to the catalog server\n", "-N,--foreman-name=<name>");
-	printf( " %-30s as <name>.\n", "");
 	printf( " %-30s Password file for authenticating to the master.\n", "-P,--password=<pwfile>");
 	printf( " %-30s Set both --idle-timeout and --connect-timeout.\n", "-t,--timeout=<time>");
 	printf( " %-30s Disconnect after this time if master sends no work. (default=%ds)\n", "   --idle-timeout=<time>", idle_timeout);
