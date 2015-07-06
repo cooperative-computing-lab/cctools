@@ -58,7 +58,7 @@ class Script(object):
                 setattr(self, 'force', False),
         '-g': lambda self, args:
                 setattr(self, 'include_symbols', True),
-        '-l': lambda self, args:
+        '-o': lambda self, args:
                 weaver.logger.set_log_path(args.popleft()),
         '-x': lambda self, args:
                 setattr(self, 'execute_dag', True),
