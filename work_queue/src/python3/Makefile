@@ -1,8 +1,6 @@
 include ../../../config.mk
 include ../../../rules.mk
 
-PYTHON_INSTALL_DIR = $(CCTOOLS_INSTALL_DIR)/lib/python$(CCTOOLS_PYTHON3_VERSION)/site-packages
-
 # Python always uses 'so' for its modules (even on Darwin)
 CCTOOLS_DYNAMIC_SUFFIX = so
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
@@ -41,7 +39,7 @@ clean:
 	rm -f $(OBJECTS) $(TARGETS) Python.framework work_queue.binding.py3* work_queue.py work_queue_wrap.c *.pyc work_queue_example.py3*
 
 install: all
-	mkdir -p $(PYTHON_INSTALL_DIR)
-	cp work_queue.py _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(PYTHON_INSTALL_DIR)/
+	mkdir -p $(CCTOOLS_PYTHON3_PATH)
+	cp work_queue.py _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(CCTOOLS_PYTHON3_PATH)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 	cp work_queue_example.py3 $(CCTOOLS_INSTALL_DIR)/doc/
