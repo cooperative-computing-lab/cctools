@@ -62,7 +62,7 @@ class Script(object):
                 weaver.logger.set_log_path(args.popleft()),
         '-x': lambda self, args:
                 setattr(self, 'execute_dag', True),
-        '-o': lambda self, args:
+        '-O': lambda self, args:
                 setattr(self, 'output_directory', str(args.popleft())),
         '-a': lambda self, args:
                 setattr(self, 'nested_abstractions', True),
