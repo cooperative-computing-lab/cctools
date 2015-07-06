@@ -1,8 +1,6 @@
 include ../../config.mk
 include ../../rules.mk
 
-PYTHON_INSTALL_DIR=$(CCTOOLS_INSTALL_DIR)/lib/python$(CCTOOLS_PYTHON_VERSION)/site-packages
-
 all: prune.py
 
 prune.py: prune.in
@@ -14,5 +12,5 @@ clean:
 
 install: prune.py
 	cp prune.py ${CCTOOLS_INSTALL_DIR}/bin/prune
-	mkdir -p ${PYTHON_INSTALL_DIR}/prune
-	cp -r prune/* ${PYTHON_INSTALL_DIR}/prune
+	mkdir -p $(CCTOOLS_PYTHON_PATH)/prune
+	cp -r prune/* $(CCTOOLS_PYTHON_PATH)/prune
