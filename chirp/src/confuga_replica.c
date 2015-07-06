@@ -48,14 +48,15 @@ struct confuga_file {
 CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t size, const struct confuga_host *host)
 {
 	static const char SQL[] =
-		"BEGIN TRANSACTION;"
+		"SAVEPOINT confugaR_register;"
 		"INSERT OR IGNORE INTO Confuga.File (id, size)"
 		"   VALUES (?, ?);"
 		"INSERT OR IGNORE INTO Confuga.Replica (fid, sid)"
 		"   SELECT ?, Confuga.StorageNode.id"
 		"   FROM Confuga.StorageNode"
 		"   WHERE hostport = ?;"
-		"END TRANSACTION;";
+		"RELEASE SAVEPOINT confugaR_register;"
+		;
 
 	int rc;
 	sqlite3 *db = C->db;
@@ -86,14 +87,14 @@ CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t
 	goto out;
 out:
 	sqlite3_finalize(stmt);
-	sqlend(db);
+	sqlendsavepoint(confugaR_register);
 	return rc;
 }
 
-/* N.B. must have open transaction. */
 CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_t sid, const char *tag, time_t stoptime)
 {
 	static const char SQL[] =
+		"SAVEPOINT confugaR_replicate;"
 		/* Check for Replica. */
 		"SELECT 1"
 		"	FROM Confuga.Replica"
@@ -112,7 +113,9 @@ CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_
 		"INSERT INTO Confuga.Replica (fid, sid) VALUES (?, ?);"
 		/* Insert a fake TransferJob for records... */
 		"INSERT INTO Confuga.TransferJob (state, fid, fsid, tsid, progress, time_new, time_commit, time_complete, tag)"
-		"	VALUES ('COMPLETED', ?1, ?2, ?3, ?4, ?5, ?5, strftime('%s', 'now'), ?6);";
+		"	VALUES ('COMPLETED', ?1, ?2, ?3, ?4, ?5, ?5, strftime('%s', 'now'), ?6);"
+		"RELEASE SAVEPOINT confugaR_replicate;"
+		;
 
 	int rc;
 	sqlite3 *db = C->db;
@@ -126,6 +129,10 @@ CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_
 	confuga_off_t size;
 
 	debug(D_DEBUG, "synchronously replicating " CONFUGA_FID_DEBFMT " to " CONFUGA_SID_DEBFMT, CONFUGA_FID_PRIARGS(fid), sid);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
@@ -195,9 +202,9 @@ replicated:
 	assert(sqlite3_changes(db));
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	if (fsid) {
 		/* fsid is 0 if it was already there... (access) */
-		sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 		debug(D_DEBUG, CONFUGA_FID_DEBFMT " from " CONFUGA_SID_DEBFMT " to " CONFUGA_SID_DEBFMT " size=%" PRICONFUGA_OFF_T, CONFUGA_FID_PRIARGS(fid), fsid, sid, size);
 		sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
 		sqlcatch(sqlite3_bind_int64(stmt, 2, fsid));
@@ -207,14 +214,18 @@ replicated:
 		sqlcatch(sqlite3_bind_text(stmt, 6, tag, -1, SQLITE_STATIC));
 		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 		assert(sqlite3_changes(db));
-		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 	}
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	rc = 0;
 	goto out;
 out:
 	sqlite3_finalize(stmt);
-	/* the caller is responsible for ROLLBACK */
+	sqlendsavepoint(confugaR_replicate);
 	return rc;
 }
 
