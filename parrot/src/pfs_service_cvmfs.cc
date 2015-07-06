@@ -60,7 +60,7 @@ static const char *default_cvmfs_repo =
  *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/*";
 
 #if LIBCVMFS_VERSION > 1
-static const char *default_cvmfs_global_config = "max_open_files=500,change_to_cache_directory,log_prefix=libcvmfs";
+static const char *default_cvmfs_global_config = "change_to_cache_directory,log_prefix=libcvmfs";
 #endif
 
 static bool wrote_cern_key;
