@@ -56,6 +56,11 @@ CONFUGA_IAPI int confugaS_node_insert (confuga *C, const char *hostport, const c
 
 CONFUGA_IAPI int confugaJ_schedule (confuga *C);
 
+CONFUGA_IAPI int confugaN_init (confuga *C);
+CONFUGA_IAPI int confugaN_special_update (confuga *C, const char *path, confuga_fid_t fid, confuga_off_t size);
+
+#define streql(s1,s2) (strcmp(s1,s2) == 0)
+
 #endif
 
 /* vim: set noexpandtab tabstop=4: */

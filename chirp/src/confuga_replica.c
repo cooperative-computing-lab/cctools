@@ -28,6 +28,10 @@ See the file COPYING for details.
 
 #define STOPTIME (time(NULL)+30)
 
+#define CONFUGA_TRANSFER_FILE_TAG   "confuga-transfer-fid-"
+#define CONFUGA_TRANSFER_FILE_TAG_DEBUG CONFUGA_TRANSFER_FILE_TAG "debug"
+#define CONFUGA_TRANSFER_FILE_TAG_STATS CONFUGA_TRANSFER_FILE_TAG "stats"
+
 struct confuga_replica {
 	confuga *C;
 	confuga_fid_t fid;
@@ -741,7 +745,7 @@ static void handle_error (confuga *C, chirp_jobid_t id, int error)
 		}\
 	} while (0)
 
-static int create (confuga *C, chirp_jobid_t id, const char *fhostport, const char *ffile, const char *fticket, const char *fdebug, const char *thostport, const char *topen, const char *tag)
+static int create (confuga *C, chirp_jobid_t id, const char *fhostport, const char *ffile, const char *fticket, const char *fdebug, const char *fstats, const char *thostport, const char *topen, const char *tag)
 {
 	static const char SQL[] =
 		"UPDATE Confuga.TransferJob"
@@ -785,7 +789,10 @@ static int create (confuga *C, chirp_jobid_t id, const char *fhostport, const ch
 		CATCHUNIX(buffer_putliteral(B, "\",\"type\":\"INPUT\",\"binding\":\"LINK\"}"));
 	CATCHUNIX(buffer_putliteral(B, ",{\"task_path\":\".chirp.debug\",\"serv_path\":\""));
 		jsonA_escapestring(B, fdebug);
-		CATCHUNIX(buffer_putliteral(B, "\",\"type\":\"OUTPUT\",\"binding\":\"LINK\"}"));
+		CATCHUNIX(buffer_putfstring(B, "\",\"type\":\"OUTPUT\",\"binding\":\"LINK\",\"tag\":\"%s\"}", CONFUGA_TRANSFER_FILE_TAG_DEBUG));
+	CATCHUNIX(buffer_putliteral(B, ",{\"task_path\":\".chirp.stats\",\"serv_path\":\""));
+		jsonA_escapestring(B, fstats);
+		CATCHUNIX(buffer_putfstring(B, "\",\"type\":\"OUTPUT\",\"binding\":\"LINK\",\"tag\":\"%s\"}", CONFUGA_TRANSFER_FILE_TAG_STATS));
 	CATCHUNIX(buffer_putliteral(B, "]"));
 
 	CATCHUNIX(buffer_putliteral(B, "}"));
@@ -816,7 +823,8 @@ static int transfer_create (confuga *C)
 		"		fsn.hostport,"
 		"		PRINTF('%s/file/%s', fsn.root, UPPER(HEX(TransferJob.fid))),"
 		"		PRINTF('%s/ticket', fsn.root),"
-		"		PRINTF('%s/debug.%%j', tsn.root),"
+		"		PRINTF('%s/file/%%s', tsn.root),"
+		"		PRINTF('%s/file/%%s', tsn.root),"
 		"		tsn.hostport,"
 		"		PRINTF('%s/open/%s', tsn.root, UPPER(HEX(RANDOMBLOB(16)))),"
 		"		Option.value"
@@ -841,11 +849,12 @@ static int transfer_create (confuga *C)
 		const char *ffile = (const char *)sqlite3_column_text(stmt, 2);
 		const char *fticket = (const char *)sqlite3_column_text(stmt, 3);
 		const char *fdebug = (const char *)sqlite3_column_text(stmt, 4);
-		const char *thostport = (const char *)sqlite3_column_text(stmt, 5);
-		const char *topen = (const char *)sqlite3_column_text(stmt, 6);
-		const char *tag = (const char *)sqlite3_column_text(stmt, 7);
+		const char *fstats = (const char *)sqlite3_column_text(stmt, 5);
+		const char *thostport = (const char *)sqlite3_column_text(stmt, 6);
+		const char *topen = (const char *)sqlite3_column_text(stmt, 7);
+		const char *tag = (const char *)sqlite3_column_text(stmt, 8);
 
-		CATCHJOB(create(C, id, fhostport, ffile, fticket, fdebug, thostport, topen, tag));
+		CATCHJOB(create(C, id, fhostport, ffile, fticket, fdebug, fstats, thostport, topen, tag));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -1049,6 +1058,59 @@ static int waitall (confuga *C, confuga_sid_t fsid, const char *fhostport)
 		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 		if (!sqlite3_changes(db)) {
 			debug(D_DEBUG, "transfer job %" PRICHIRP_JOBID_T " job not set to WAITED!", id);
+		}
+
+		if (status && strcmp(status->u.string.ptr, "FINISHED") == 0 && exit_status && strcmp(exit_status->u.string.ptr, "EXITED") == 0) {
+			json_value *files = jsonA_getname(job, "files", json_array);
+			if (files) {
+				unsigned j;
+
+				for (j = 0; j < files->u.array.length; j++) {
+					json_value *file = files->u.array.values[j];
+					if (jistype(file, json_object)) {
+						json_value *task_path = jsonA_getname(file, "task_path", json_string);
+						json_value *serv_path = jsonA_getname(file, "serv_path", json_string);
+						json_value *type = jsonA_getname(file, "type", json_string);
+						if (task_path && serv_path && type && strcmp(type->u.string.ptr, "OUTPUT") == 0) {
+							json_value *size = jsonA_getname(file, "size", json_integer);
+							json_value *file_tag = jsonA_getname(file, "tag", json_string);
+							if (size && file_tag && strncmp(file_tag->u.string.ptr, CONFUGA_TRANSFER_FILE_TAG, strlen(CONFUGA_TRANSFER_FILE_TAG)) == 0) {
+								confuga_fid_t fid;
+								const char *sp = serv_path->u.string.ptr;
+
+								/* extract the File ID from interpolated serv_path */
+								if (strlen(sp) > sizeof(fid.id)*2) {
+									size_t k;
+									const char *idx = strchr(sp, '\0')-sizeof(fid.id)*2;
+									for (k = 0; k < sizeof(fid.id); k += 1, idx += 2) {
+										char byte[3] = {idx[0], idx[1], '\0'};
+										char *endptr;
+										unsigned long value = strtoul(byte, &endptr, 16);
+										if (endptr == &byte[2]) {
+											fid.id[k] = value;
+										} else {
+											CATCH(EINVAL);
+										}
+									}
+								}
+
+								CATCH(confugaR_register(C, fid, size->u.integer, fsid));
+								if (streql(file_tag->u.string.ptr, CONFUGA_TRANSFER_FILE_TAG_DEBUG)) {
+									char path[PATH_MAX];
+									CATCHUNIX(snprintf(path, PATH_MAX, "push/%" PRICHIRP_JOBID_T "/debug", id));
+									CATCH(confugaN_special_update(C, path, fid, size->u.integer));
+								} else if (streql(file_tag->u.string.ptr, CONFUGA_TRANSFER_FILE_TAG_STATS)) {
+									char path[PATH_MAX];
+									CATCHUNIX(snprintf(path, PATH_MAX, "push/%" PRICHIRP_JOBID_T "/stats", id));
+									CATCH(confugaN_special_update(C, path, fid, size->u.integer));
+								} else assert(0);
+							}
+						}
+					} else {
+						CATCH(EINVAL);
+					}
+				}
+			}
 		}
 	}
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);

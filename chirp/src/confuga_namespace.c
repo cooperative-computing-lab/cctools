@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "confuga_fs.h"
 
 #include "catch.h"
+#include "create_dir.h"
 #include "debug.h"
 #include "full_io.h"
 #include "path.h"
@@ -582,6 +583,45 @@ CONFUGA_API int confuga_update (confuga *C, const char *path, confuga_fid_t fid,
 	debug(D_CONFUGA, "update(`%s', fid = " CONFUGA_FID_PRIFMT ", size = %" PRIuCONFUGA_OFF_T ", flags = %d)", unresolved_path, CONFUGA_FID_PRIARGS(fid), size, flags);
 	CATCH(update(C, path, fid, size, flags));
 	PROLOGUE
+}
+
+CONFUGA_IAPI int confugaN_init (confuga *C)
+{
+	int rc;
+	char path[CONFUGA_PATH_MAX];
+
+	CATCHUNIX(snprintf(path, sizeof(path), "%s/root", C->root));
+	CATCHUNIXIGNORE(mkdir(path, S_IRWXU), EEXIST);
+	CATCHUNIX(snprintf(path, sizeof(path), "%s/root/.confuga", C->root));
+	CATCHUNIXIGNORE(mkdir(path, S_IRWXU), EEXIST);
+	CATCHUNIX(snprintf(path, sizeof(path), "%s/root/.confuga/jobs", C->root));
+	CATCHUNIXIGNORE(mkdir(path, S_IRWXU), EEXIST);
+	CATCHUNIX(snprintf(path, sizeof(path), "%s/root/.confuga/push", C->root));
+	CATCHUNIXIGNORE(mkdir(path, S_IRWXU), EEXIST);
+
+	rc = 0;
+	goto out;
+out:
+	return rc;
+}
+
+CONFUGA_IAPI int confugaN_special_update (confuga *C, const char *path, confuga_fid_t fid, confuga_off_t size)
+{
+	int rc;
+	char special[CONFUGA_PATH_MAX];
+	char resolved[CONFUGA_PATH_MAX];
+	char dirname[CONFUGA_PATH_MAX];
+
+	CATCHUNIX(snprintf(special, sizeof(special), "/.confuga/%s", path));
+	CATCH(resolve(C, special, resolved));
+	path_dirname(resolved, dirname);
+	CATCHUNIX(create_dir(dirname, S_IRWXU) ? 0 : -1);
+	CATCH(update(C, resolved, fid, size, 0));
+
+	rc = 0;
+	goto out;
+out:
+	return rc;
 }
 
 /* vim: set noexpandtab tabstop=4: */

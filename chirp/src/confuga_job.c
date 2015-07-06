@@ -23,12 +23,13 @@ See the file COPYING for details.
 #include <signal.h>
 #include <stdarg.h>
 
-#define streql(s1,s2) (strcmp(s1,s2) == 0)
-
 #define STOPTIME (time(NULL)+5)
 
-#define CONFUGA_OUTPUT_TAG "confuga-output-fid"
-#define CONFUGA_PULL_TAG "confuga-pull-fid"
+#define CONFUGA_FILE_TAG        "confuga-file-"
+#define CONFUGA_FILE_TAG_OUTPUT CONFUGA_FILE_TAG "output"
+#define CONFUGA_FILE_TAG_PULL   CONFUGA_FILE_TAG "pull"
+#define CONFUGA_FILE_TAG_STATS  CONFUGA_FILE_TAG "stats"
+#define CONFUGA_FILE_TAG_DEBUG  CONFUGA_FILE_TAG "debug"
 
 struct job_stats {
 	confuga_off_t pull_bytes;
@@ -931,7 +932,7 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 		"		WHERE ConfugaInputFile.jid = ?1 AND NoReplica.fid IS NULL AND NoReplica.sid IS NULL"
 		" UNION ALL"
 			/* Now outputs... */
-		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%%s', StorageNode.root) AS serv_path, JobFile.task_path AS task_path, '" CONFUGA_OUTPUT_TAG "' AS tag, 'OUTPUT' AS type, NULL AS size"
+		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%%s', StorageNode.root) AS serv_path, JobFile.task_path AS task_path, '" CONFUGA_FILE_TAG_OUTPUT "' AS tag, 'OUTPUT' AS type, NULL AS size"
 		"		FROM"
 		"			JobFile"
 		"			INNER JOIN ConfugaJob ON JobFile.id = ConfugaJob.id"
@@ -939,7 +940,7 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 		"		WHERE JobFile.id = ?1 AND JobFile.type = 'OUTPUT'"
 		" UNION ALL"
 			/* Now cache the pull transfer as an output replica. */
-		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%%s', StorageNode.root) AS serv_path, ConfugaInputFile.task_path AS task_path, '" CONFUGA_PULL_TAG "' AS tag, 'OUTPUT' AS type, NULL AS size"
+		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%%s', StorageNode.root) AS serv_path, ConfugaInputFile.task_path AS task_path, '" CONFUGA_FILE_TAG_PULL "' AS tag, 'OUTPUT' AS type, NULL AS size"
 		"		FROM"
 		"			ConfugaInputFile"
 		"			INNER JOIN ConfugaJob ON ConfugaInputFile.jid = ConfugaJob.id"
@@ -947,13 +948,14 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 					/* Exclude ConfugaInputFile that are replicated... */
 		"			LEFT OUTER JOIN Confuga.Replica AS NoReplica ON ConfugaInputFile.fid = NoReplica.fid AND ConfugaJob.sid = NoReplica.sid"
 		"		WHERE ConfugaInputFile.jid = ?1 AND NoReplica.fid IS NULL AND NoReplica.sid IS NULL"
-/* debugging for pull transfers */
-#if 1
 		" UNION ALL"
-		"	SELECT 'LINK' AS binding, StorageNode.root || '/debug.%j' AS serv_path, '.chirp.debug' AS task_path, NULL AS tag, 'OUTPUT' AS type, NULL AS size"
+		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%%s', StorageNode.root) AS serv_path, '.chirp.debug' AS task_path, '" CONFUGA_FILE_TAG_DEBUG "' AS tag, 'OUTPUT' AS type, NULL AS size"
 		"		FROM ConfugaJob INNER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
-		"		WHERE ConfugaJob.id = ?1;"
-#endif
+		"		WHERE ConfugaJob.id = ?1"
+		" UNION ALL"
+		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%%s', StorageNode.root) AS serv_path, '.chirp.stats' AS task_path, '" CONFUGA_FILE_TAG_STATS "' AS tag, 'OUTPUT' AS type, NULL AS size"
+		"		FROM ConfugaJob INNER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
+		"		WHERE ConfugaJob.id = ?1"
 		";";
 
 	int rc;
@@ -1256,7 +1258,7 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 							if (task_path && serv_path && type) {
 								json_value *size = jsonA_getname(file, "size", json_integer);
 								json_value *file_tag = jsonA_getname(file, "tag", json_string);
-								if (strcmp(type->u.string.ptr, "OUTPUT") == 0 && size && file_tag && (streql(file_tag->u.string.ptr, CONFUGA_OUTPUT_TAG) || streql(file_tag->u.string.ptr, CONFUGA_PULL_TAG))) {
+								if (strcmp(type->u.string.ptr, "OUTPUT") == 0 && size && file_tag && strncmp(file_tag->u.string.ptr, CONFUGA_FILE_TAG, strlen(CONFUGA_FILE_TAG)) == 0) {
 									confuga_fid_t fid;
 									const char *sp = serv_path->u.string.ptr;
 
@@ -1277,7 +1279,7 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 									}
 
 									CATCH(confugaR_register(C, fid, size->u.integer, sid));
-									if (streql(file_tag->u.string.ptr, CONFUGA_OUTPUT_TAG)) {
+									if (streql(file_tag->u.string.ptr, CONFUGA_FILE_TAG_OUTPUT)) {
 										jdebug(D_DEBUG, id, tag, "setting output fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T " task_path = `%s'", CONFUGA_FID_PRIARGS(fid), size, task_path);
 										sqlcatch(sqlite3_reset(stmt));
 										sqlcatch(sqlite3_bind_int64(stmt, 1, id));
@@ -1285,6 +1287,14 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 										sqlcatch(sqlite3_bind_blob(stmt, 3, fid.id, sizeof(fid.id), SQLITE_STATIC));
 										sqlcatch(sqlite3_bind_int64(stmt, 4, size->u.integer));
 										sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+									} else if (streql(file_tag->u.string.ptr, CONFUGA_FILE_TAG_DEBUG)) {
+										char path[PATH_MAX];
+										CATCHUNIX(snprintf(path, PATH_MAX, "jobs/%" PRICHIRP_JOBID_T "/debug", id));
+										CATCH(confugaN_special_update(C, path, fid, size->u.integer));
+									} else if (streql(file_tag->u.string.ptr, CONFUGA_FILE_TAG_STATS)) {
+										char path[PATH_MAX];
+										CATCHUNIX(snprintf(path, PATH_MAX, "jobs/%" PRICHIRP_JOBID_T "/stats", id));
+										CATCH(confugaN_special_update(C, path, fid, size->u.integer));
 									}
 								}
 							} else {

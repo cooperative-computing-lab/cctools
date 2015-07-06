@@ -422,12 +422,10 @@ out:
 static int setroot (confuga *C, const char *root)
 {
 	int rc;
-	char namespace[CONFUGA_PATH_MAX] = "";
 
 	strncpy(C->root, root, sizeof(C->root)-1);
 	CATCHUNIX(create_dir(C->root, S_IRWXU) ? 0 : -1);
-	CATCHUNIX(snprintf(namespace, sizeof(namespace)-1, "%s/root", C->root));
-	CATCHUNIX(create_dir(namespace, S_IRWXU) ? 0 : -1);
+	CATCH(confugaN_init(C));
 	CATCH(confugaI_dbload(C, NULL));
 
 	rc = 0;
