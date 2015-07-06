@@ -38,6 +38,7 @@ struct confuga_replica {
 
 struct confuga_file {
 	confuga *C;
+	confuga_sid_t sid;
 	struct confuga_host host;
 	char path[CONFUGA_PATH_MAX]; /* path to open file */
 	struct chirp_file *stream; /* open chirp stream */
@@ -45,7 +46,7 @@ struct confuga_file {
 	confuga_off_t size; /* running size */
 };
 
-CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t size, const struct confuga_host *host)
+CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t size, confuga_sid_t sid)
 {
 	static const char SQL[] =
 		"SAVEPOINT confugaR_register;"
@@ -54,7 +55,7 @@ CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t
 		"INSERT OR IGNORE INTO Confuga.Replica (fid, sid)"
 		"   SELECT ?, Confuga.StorageNode.id"
 		"   FROM Confuga.StorageNode"
-		"   WHERE hostport = ?;"
+		"   WHERE id = ?;"
 		"RELEASE SAVEPOINT confugaR_register;"
 		;
 
@@ -75,7 +76,7 @@ CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
-	sqlcatch(sqlite3_bind_text(stmt, 2, host->hostport, -1, SQLITE_STATIC));
+	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
@@ -332,7 +333,7 @@ CONFUGA_API int confuga_file_create (confuga *C, confuga_file **filep, time_t st
 		"			Confuga.StorageNodeActive"
 		"			LEFT OUTER JOIN Confuga.FileReplicas ON StorageNodeActive.id = FileReplicas.sid"
 		"		GROUP BY StorageNodeActive.id;"
-		"SELECT hostport, root, _open"
+		"SELECT id, hostport, root, _open"
 		"	FROM ConfugaFileTargets"
 		/* 1. Prefer nodes with lower than normal replica count (group exponentially). */
 		/* 2. Prefer nodes with more space available (group exponentially). */
@@ -369,9 +370,10 @@ CONFUGA_API int confuga_file_create (confuga *C, confuga_file **filep, time_t st
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-		snprintf(file->host.hostport, sizeof(file->host.hostport), "%s", (const char *) sqlite3_column_text(stmt, 0));
-		snprintf(file->host.root, sizeof(file->host.root), "%s", (const char *) sqlite3_column_text(stmt, 1));
-		strcpy(file->path, (const char *) sqlite3_column_text(stmt, 2));
+		file->sid = sqlite3_column_int64(stmt, 0);
+		snprintf(file->host.hostport, sizeof(file->host.hostport), "%s", (const char *) sqlite3_column_text(stmt, 1));
+		snprintf(file->host.root, sizeof(file->host.root), "%s", (const char *) sqlite3_column_text(stmt, 2));
+		strcpy(file->path, (const char *) sqlite3_column_text(stmt, 3));
 		debug(D_DEBUG, "creating file on free SN chirp://%s%s", file->host.hostport, file->host.root);
 		file->stream = chirp_reli_open(file->host.hostport, file->path, O_CREAT|O_EXCL|O_WRONLY, S_IRUSR, STOPTIME);
 		if (file->stream) {
@@ -466,7 +468,7 @@ CONFUGA_API int confuga_file_close (confuga_file *file, confuga_fid_t *fid, conf
 	char replica[CONFUGA_PATH_MAX];
 	snprintf(replica, sizeof(replica), "%s/file/" CONFUGA_FID_PRIFMT, file->host.root, CONFUGA_FID_PRIARGS(*fid));
 	CATCHUNIX(chirp_reli_rename(file->host.hostport, file->path, replica, stoptime));
-	CATCH(confugaR_register(C, *fid, file->size, &file->host));
+	CATCH(confugaR_register(C, *fid, file->size, file->sid));
 	rc = 0;
 	goto out;
 out:

@@ -1193,8 +1193,6 @@ out:
 static int addoutput (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t sid, const char *task_path, confuga_fid_t fid, confuga_off_t size)
 {
 	static const char SQL[] =
-		"INSERT OR IGNORE INTO Confuga.File (id, size) VALUES (?, ?);"
-		"INSERT OR IGNORE INTO Confuga.Replica (fid, sid) VALUES (?, ?);"
 		"INSERT INTO ConfugaOutputFile (jid, task_path, fid, size) VALUES (?, ?, ?, ?);"
 		;
 
@@ -1204,18 +1202,6 @@ static int addoutput (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid
 	const char *current = SQL;
 
 	debug(D_DEBUG, "creating replica fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T " sid = " CONFUGA_SID_PRIFMT, CONFUGA_FID_PRIARGS(fid), size, sid);
-
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
-	sqlcatch(sqlite3_bind_int64(stmt, 2, size));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
-	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	if (task_path) {
@@ -1319,6 +1305,7 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 										}
 									}
 
+									CATCH(confugaR_register(C, fid, size->u.integer, sid));
 									if (streql(file_tag->u.string.ptr, CONFUGA_OUTPUT_TAG)) {
 										addoutput(C, id, tag, sid, task_path->u.string.ptr, fid, size->u.integer);
 									} else if (streql(file_tag->u.string.ptr, CONFUGA_PULL_TAG)) {
