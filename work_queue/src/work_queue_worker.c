@@ -117,7 +117,7 @@ static int abort_flag = 0;
 static int sigchld_received_flag = 0;
 
 // Threshold for available disk space (MB) beyond which clean up and restart.
-static uint64_t disk_avail_threshold = 100;
+static int64_t disk_avail_threshold = 100;
 
 // Password shared between master and worker.
 char *password = 0;
@@ -154,20 +154,15 @@ static int64_t manual_disk_option = 0;
 static int64_t manual_memory_option = 0;
 static int64_t manual_gpus_option = 0;
 
-static time_t  last_cwd_measure_time = 0;
-static int64_t last_workspace_usage  = 0;
-
-static time_t  last_ds_measure_time = 0;
-
 static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
 
+static int64_t disk_measured = 0;
+
 static int send_resources_interval = 30;
 static int send_stats_interval     = 60;
-static int measure_wd_interval     = 180;
-static int measure_ds_interval     = 30;
 
 static struct work_queue *foreman_q = NULL;
 // docker image name
@@ -241,6 +236,7 @@ and apply any operations that override.
 void resources_measure_locally(struct work_queue_resources *r)
 {
 	work_queue_resources_measure_locally(r,workspace);
+	cwd_disk_info_get(".", &disk_measured);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		r->cores.total = 0;
@@ -274,13 +270,14 @@ Only a foreman needs to send regular updates after the initial ready message.
 static void send_resource_update( struct link *master, int force_update )
 {
 	static time_t last_send_time = 0;
-
 	time_t stoptime = time(0) + active_timeout;
 
 	if(!force_update) {
 		if( results_to_be_sent_msg ) return;
 		if( (time(0)-last_send_time) < send_resources_interval ) return;
 	}
+
+	resources_measure_locally(local_resources);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		aggregate_workers_resources(foreman_q, total_resources);
@@ -1342,28 +1339,13 @@ static void work_for_master(struct link *master) {
 			}
 		}
 
-		//We need to protect FS from too frequent statvfs calls from this loop -
-		//it has been known to overload the FS when 100 workers were running on a
-		//shared FS. Each worker was issuing ststvfs from check_disk_space_for_filesize every 10ms.
-		//Sleep in link_usleep above somehow was not happening.
-		//Because fixed zero file size parameter is used here anyway, it should
-		//be OK to cache the results.
-		if((time(0) - last_ds_measure_time) >= measure_ds_interval) {
-			ok &= check_disk_space_for_filesize(".", 0, disk_avail_threshold);
-			last_ds_measure_time = time(0);
-		}
-		int64_t disk_usage;
-		if(!check_disk_workspace(workspace, &disk_usage, 0, manual_disk_option, measure_wd_interval, &last_cwd_measure_time, &last_workspace_usage, disk_avail_threshold)) {
-			fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n",workspace, manual_cores_option, disk_usage);
-			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_usage);
+		if( manual_disk_option > 0 && disk_measured > (manual_disk_option - disk_avail_threshold) ) {
+			fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, disk_measured);
+			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_measured);
 			ok = 0;
 		}
 
-
 		if(ok) {
-
-
-
 			int visited = 0;
 			while(list_size(procs_waiting) > visited && cores_allocated < local_resources->cores.total) {
 				struct work_queue_process *p;
@@ -1392,12 +1374,11 @@ static void work_for_master(struct link *master) {
 				debug(D_WQ, "No task can be executed with the available resources.\n");
 				ok = 0;
 			}
-
-
-
 		}
 
 		if(!ok) break;
+
+		send_resource_update(master,0);
 
 		//Reset idle_stoptime if something interesting is happening at this worker.
 		if(list_size(procs_waiting) > 0 || itable_size(procs_table) > 0 || itable_size(procs_complete) > 0) {
@@ -1589,8 +1570,6 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	}
 
 	workspace_prepare();
-
-	check_disk_workspace(workspace, NULL, 1, manual_disk_option, measure_wd_interval, &last_cwd_measure_time, &last_workspace_usage, disk_avail_threshold);
 	report_worker_ready(master);
 
 	send_master_message(master, "info worker-id %s\n", worker_id);
