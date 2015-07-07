@@ -45,7 +45,6 @@ find_python_path () {
 	_dirname="$(dirname $_script)/../lib"
 
 	for dir in $_dirname/python{$_version,}/site-packages; do
-		echo $dir
 		if [ -d "$dir" ]; then
 			echo "$dir"
 			return
