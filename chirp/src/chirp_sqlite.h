@@ -100,6 +100,22 @@ do {\
 	}\
 } while (0)
 
+#define sqlendsavepoint(savepoint) \
+do {\
+	if (rc) {\
+		char *errmsg;\
+		int erc = sqlite3_exec(db, "ROLLBACK TRANSACTION TO SAVEPOINT " #savepoint "; RELEASE SAVEPOINT " #savepoint ";", NULL, NULL, &errmsg);\
+		if (erc) {\
+			if (erc == SQLITE_ERROR /* cannot rollback because no transaction is active */) {\
+				; /* do nothing */\
+			} else {\
+				debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s': %s", __FILE__, __LINE__, erc, sqlite3_errstr(erc), errmsg);\
+			}\
+			sqlite3_free(errmsg);\
+		}\
+	}\
+} while (0)
+
 #define IMMUTABLE(T) \
 		"CREATE TRIGGER " T "ImmutableI BEFORE INSERT ON " T " FOR EACH ROW" \
 		"    BEGIN" \

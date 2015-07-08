@@ -1190,55 +1190,11 @@ out:
 	return rc;
 }
 
-static int addoutput (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t sid, const char *task_path, confuga_fid_t fid, confuga_off_t size)
-{
-	static const char SQL[] =
-		"INSERT OR IGNORE INTO Confuga.File (id, size) VALUES (?, ?);"
-		"INSERT OR IGNORE INTO Confuga.Replica (fid, sid) VALUES (?, ?);"
-		"INSERT INTO ConfugaOutputFile (jid, task_path, fid, size) VALUES (?, ?, ?, ?);"
-		;
-
-	int rc;
-	sqlite3 *db = C->db;
-	sqlite3_stmt *stmt = NULL;
-	const char *current = SQL;
-
-	debug(D_DEBUG, "creating replica fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T " sid = " CONFUGA_SID_PRIFMT, CONFUGA_FID_PRIARGS(fid), size, sid);
-
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
-	sqlcatch(sqlite3_bind_int64(stmt, 2, size));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
-	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	if (task_path) {
-		jdebug(D_DEBUG, id, tag, "setting output fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T " task_path = `%s'", CONFUGA_FID_PRIARGS(fid), size, task_path);
-		sqlcatch(sqlite3_bind_int64(stmt, 1, id));
-		sqlcatch(sqlite3_bind_text(stmt, 2, task_path, -1, SQLITE_STATIC));
-		sqlcatch(sqlite3_bind_blob(stmt, 3, fid.id, sizeof(fid.id), SQLITE_STATIC));
-		sqlcatch(sqlite3_bind_int64(stmt, 4, size));
-		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	}
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-
-	rc = 0;
-	goto out;
-out:
-	sqlite3_finalize(stmt);
-	return rc;
-}
-
 static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t sid, const char *hostport, chirp_jobid_t cid)
 {
 	static const char SQL[] =
 		"BEGIN TRANSACTION;"
+		"INSERT INTO ConfugaOutputFile (jid, task_path, fid, size) VALUES (?, ?, ?, ?);"
 		"INSERT OR REPLACE INTO ConfugaJobWaitResult (id, error, exit_code, exit_signal, exit_status, status)"
 		"	VALUES (?, ?, ?, ?, ?, ?);"
 		"UPDATE ConfugaJob"
@@ -1285,6 +1241,7 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 			json_value *exit_status = jsonA_getname(job, "exit_status", json_string);
 			json_value *status = jsonA_getname(job, "status", json_string);
 
+			sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 			if (status && strcmp(status->u.string.ptr, "FINISHED") == 0 && exit_status && strcmp(exit_status->u.string.ptr, "EXITED") == 0) {
 				json_value *files = jsonA_getname(job, "files", json_array);
 				if (files) {
@@ -1319,11 +1276,16 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 										}
 									}
 
+									CATCH(confugaR_register(C, fid, size->u.integer, sid));
 									if (streql(file_tag->u.string.ptr, CONFUGA_OUTPUT_TAG)) {
-										addoutput(C, id, tag, sid, task_path->u.string.ptr, fid, size->u.integer);
-									} else if (streql(file_tag->u.string.ptr, CONFUGA_PULL_TAG)) {
-										addoutput(C, id, tag, sid, NULL, fid, size->u.integer);
-									} else assert(0);
+										jdebug(D_DEBUG, id, tag, "setting output fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T " task_path = `%s'", CONFUGA_FID_PRIARGS(fid), size, task_path);
+										sqlcatch(sqlite3_reset(stmt));
+										sqlcatch(sqlite3_bind_int64(stmt, 1, id));
+										sqlcatch(sqlite3_bind_text(stmt, 2, task_path->u.string.ptr, -1, SQLITE_STATIC));
+										sqlcatch(sqlite3_bind_blob(stmt, 3, fid.id, sizeof(fid.id), SQLITE_STATIC));
+										sqlcatch(sqlite3_bind_int64(stmt, 4, size->u.integer));
+										sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+									}
 								}
 							} else {
 								CATCH(EINVAL);
@@ -1337,6 +1299,7 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 				/* This indicates the job failed startup, probably could not source a URL. We should retry the job! */
 				CATCH(EIO);
 			}
+			sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 			sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 			sqlcatch(sqlite3_bind_int64(stmt, 1, id));
