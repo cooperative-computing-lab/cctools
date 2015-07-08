@@ -90,36 +90,36 @@ static void makeflow_node_export_variables( struct dag *d, struct dag_node *n )
 void makeflow_parse_input_outputs( struct dag *d )
 {
 	/* Check if GC_*_LIST is specified and warn user about deprecated usage */
-    char *collect_list   = dag_variable_lookup_global_string("GC_COLLECT_LIST" , d);
+	char *collect_list   = dag_variable_lookup_global_string("GC_COLLECT_LIST" , d);
 	if(collect_list)
-        debug(D_NOTICE, "GC_COLLECT_LIST is specified: Please refer to manual about MAKEFLOW_INPUTS/OUTPUTS");
+		debug(D_NOTICE, "GC_COLLECT_LIST is specified: Please refer to manual about MAKEFLOW_INPUTS/OUTPUTS");
 
-    char *preserve_list  = dag_variable_lookup_global_string("GC_PRESERVE_LIST", d);
+	char *preserve_list  = dag_variable_lookup_global_string("GC_PRESERVE_LIST", d);
 	if(preserve_list)
-        debug(D_NOTICE, "GC_PRESERVE_LIST is specified: Please refer to manual about MAKEFLOW_INPUTS/OUTPUTS");
+		debug(D_NOTICE, "GC_PRESERVE_LIST is specified: Please refer to manual about MAKEFLOW_INPUTS/OUTPUTS");
 
 	/* Parse INPUT and OUTPUT lists */
-    struct dag_file *f;
-    char *filename;
+	struct dag_file *f;
+	char *filename;
 
-    int i, argc;
-    char **argv;
+	int i, argc;
+	char **argv;
 
-    char *input_list  = dag_variable_lookup_global_string("MAKEFLOW_INPUTS" , d);
-    char *output_list = dag_variable_lookup_global_string("MAKEFLOW_OUTPUTS", d);
+	char *input_list  = dag_variable_lookup_global_string("MAKEFLOW_INPUTS" , d);
+	char *output_list = dag_variable_lookup_global_string("MAKEFLOW_OUTPUTS", d);
 
 	if(input_list) {
 		/* add collect_list, for sink_files that should be removed */
 		string_split_quotes(input_list, &argc, &argv);
 		for(i = 0; i < argc; i++) {
 			d->completed_files += 1;
-		    f = dag_file_lookup_or_create(d, argv[i]);
-		    set_insert(d->inputs, f);
-		    debug(D_MAKEFLOW_RUN, "Added %s to input list", f->filename);
+			f = dag_file_lookup_or_create(d, argv[i]);
+			set_insert(d->inputs, f);
+			debug(D_MAKEFLOW_RUN, "Added %s to input list", f->filename);
 		}
 		free(argv);
 	} else {
-        debug(D_NOTICE, "MAKEFLOW_INPUTS is not specified");
+		debug(D_NOTICE, "MAKEFLOW_INPUTS is not specified");
 	}
 	/* add all source files */
 	hash_table_firstkey(d->files);
@@ -131,16 +131,16 @@ void makeflow_parse_input_outputs( struct dag *d )
 
 	if(output_list) {
 		/* remove files from preserve_list */
-	    string_split_quotes(output_list, &argc, &argv);
-	    for(i = 0; i < argc; i++) {
-	        /* Must initialize to non-zero for hash_table functions to work properly. */
+		string_split_quotes(output_list, &argc, &argv);
+		for(i = 0; i < argc; i++) {
+			/* Must initialize to non-zero for hash_table functions to work properly. */
 			f = dag_file_lookup_or_create(d, argv[i]);
-	        set_remove(d->outputs, f);
-	        debug(D_MAKEFLOW_RUN, "Added %s to output list", f->filename);
-	    }
-	    free(argv);
+			set_remove(d->outputs, f);
+			debug(D_MAKEFLOW_RUN, "Added %s to output list", f->filename);
+		}
+		free(argv);
 	} else {
-        debug(D_NOTICE, "MAKEFLOW_OUTPUTS is not specified");
+		debug(D_NOTICE, "MAKEFLOW_OUTPUTS is not specified");
 		/* add all sink if OUTPUTS not specified */
 		hash_table_firstkey(d->files);
 		while((hash_table_nextkey(d->files, &filename, (void **) &f)))
@@ -155,21 +155,26 @@ void makeflow_parse_input_outputs( struct dag *d )
 
 int makeflow_file_clean( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent)
 {
-    if(!f)
-        return 1;
+	if(!f)
+		return 1;
 
-    if(batch_fs_unlink(queue, f->filename) == 0) {
+	if(batch_fs_unlink(queue, f->filename) == 0) {
 		debug(D_MAKEFLOW_RUN, "File deleted %s\n", f->filename);
 		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 
-        if(!silent)
+		if(!silent)
 			debug(D_NOTICE, "Makeflow: Deleted path %s\n", f->filename);
 	} else if(errno != ENOENT) {
+		if(f->state == DAG_FILE_STATE_EXPECT || dag_file_exists(f))
+			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+		
 		if(!silent) {
 			debug(D_NOTICE, "Makeflow: Couldn't delete %s: %s\n", f->filename, strerror(errno));
 			return 1;
+		} else {
+			debug(D_MAKEFLOW_RUN, "Makeflow: Couldn't delete %s: %s\n", f->filename, strerror(errno));
 		}
-    }
+	}
 	return 0;
 }
 
@@ -183,12 +188,12 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 
 	if(n->nested_job){
 		char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
-        sprintf(command, "%s -c", n->command);
+		sprintf(command, "%s -c", n->command);
 
-        /* XXX this should use the batch job interface for consistency */
-        makeflow_node_export_variables(d, n);
-        system(command);
-        free(command);
+		/* XXX this should use the batch job interface for consistency */
+		makeflow_node_export_variables(d, n);
+		system(command);
+		free(command);
 	}
 }
 
@@ -196,11 +201,11 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 
 void makeflow_clean(struct dag *d, struct batch_queue *queue)
 {
-    struct dag_file *f;
-    char *name;
+	struct dag_file *f;
+	char *name;
 
-    hash_table_firstkey(d->files);
-    while(hash_table_nextkey(d->files, &name, (void **) &f)) {
+	hash_table_firstkey(d->files);
+	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 		if(dag_file_is_source(f))
 			continue;
 		if(dag_file_exists(f))
@@ -209,10 +214,10 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue)
 			makeflow_file_clean(d, queue, f, 1);
 	}
 
-    struct dag_node *n;
-    for(n = d->nodes; n; n = n->next) {
-	     /* If the node is a Makeflow job, then we should recursively call the *
-          * clean operation on it. */
+	struct dag_node *n;
+	for(n = d->nodes; n; n = n->next) {
+		 /* If the node is a Makeflow job, then we should recursively call the *
+		  * clean operation on it. */
 		 if(n->nested_job) {
 			char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
 			sprintf(command, "%s -c", n->command);
