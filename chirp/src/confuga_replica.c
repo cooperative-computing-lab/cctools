@@ -72,12 +72,16 @@ CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t
 	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
 	sqlcatch(sqlite3_bind_int64(stmt, 2, size));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	if (sqlite3_changes(db))
+		debug(D_DEBUG, "created new file fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T, CONFUGA_FID_PRIARGS(fid), size);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
 	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	if (sqlite3_changes(db))
+		debug(D_DEBUG, "created new replica fid = " CONFUGA_FID_PRIFMT " sid = " CONFUGA_SID_PRIFMT, CONFUGA_FID_PRIARGS(fid), sid);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
