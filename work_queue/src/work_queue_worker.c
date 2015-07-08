@@ -148,11 +148,13 @@ static struct work_queue_watcher * watcher = 0;
 static struct work_queue_resources * local_resources = 0;
 static struct work_queue_resources * total_resources = 0;
 static struct work_queue_resources * total_resources_last = 0;
+
 static int64_t last_task_received  = 0;
 static int64_t manual_cores_option = 1;
 static int64_t manual_disk_option = 0;
 static int64_t manual_memory_option = 0;
 static int64_t manual_gpus_option = 0;
+static time_t  manual_wall_time_option = 0;
 
 static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
@@ -165,10 +167,12 @@ static int send_resources_interval = 30;
 static int send_stats_interval     = 60;
 
 static struct work_queue *foreman_q = NULL;
+
 // docker image name
 static char *img_name = NULL;
 static char container_name[1024];
 static char *tar_fn = NULL;
+
 // Table of all processes in any state, indexed by taskid.
 // Processes should be created/deleted when added/removed from this table.
 static struct itable *procs_table = NULL;
@@ -1266,6 +1270,29 @@ static int check_for_resources(struct work_queue_task *t)
 		(gpus_allocated   + t->gpus   <= local_resources->gpus.total);
 }
 
+static int check_worker_limits(struct link *master) {
+	if( manual_wall_time_option > 0 && (time(0) - worker_start_time) > manual_wall_time_option) {
+		fprintf(stderr,"work_queue_worker: reached the wall time limit %"PRIu64" s\n", manual_wall_time_option);
+		if(master) {
+			send_master_message(master, "info wall_time_exhausted %lld\n", (long long) manual_wall_time_option);
+		}
+		return 0;
+	}
+
+	if( manual_disk_option > 0 && disk_measured > (manual_disk_option - disk_avail_threshold) ) {
+		fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, disk_measured);
+
+		if(master) {
+			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_measured);
+		}
+
+		return 0;
+	}
+
+
+	return 1;
+}
+
 static void work_for_master(struct link *master) {
 	sigset_t mask;
 
@@ -1300,7 +1327,6 @@ static void work_for_master(struct link *master) {
 			}
 		}
 
-
 		/*
 		link_usleep will cause the worker to sleep for a time until
 		interrupted by a SIGCHILD signal.  However, the signal could
@@ -1332,17 +1358,16 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
-		if(!results_to_be_sent_msg) {
+		if( !check_worker_limits(master) ) {
+			ok = 0;
+			abort_flag = 1;
+		}
+
+		if(ok && !results_to_be_sent_msg) {
 			if(work_queue_watcher_check(watcher) || itable_size(procs_complete) > 0) {
 				send_master_message(master, "available_results\n");
 				results_to_be_sent_msg = 1;
 			}
-		}
-
-		if( manual_disk_option > 0 && disk_measured > (manual_disk_option - disk_avail_threshold) ) {
-			fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, disk_measured);
-			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_measured);
-			ok = 0;
 		}
 
 		if(ok) {
@@ -1703,6 +1728,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set the number of GPUs reported by this worker. (default=0)\n", "--gpus=<n>");
 	printf( " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
 	printf( " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
+	printf( " %-30s Set the maximum number of seconds the worker may be active. (in s).\n", "--wall-time=<s>");
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf(" %-30s docker mode -- run each task with a container based on this docker image.\n", "--docker=<image>");
@@ -1715,7 +1741,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE,
-	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT};
+	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1750,6 +1776,7 @@ static const struct option long_options[] = {
 	{"memory",              required_argument,  0,  LONG_OPT_MEMORY},
 	{"disk",                required_argument,  0,  LONG_OPT_DISK},
 	{"gpus",                required_argument,  0,  LONG_OPT_GPUS},
+	{"wall-time",           required_argument,  0,  LONG_OPT_WALL_TIME},
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
 	{"disable-symlinks",    no_argument,        0,  LONG_OPT_DISABLE_SYMLINKS},
@@ -1941,6 +1968,9 @@ int main(int argc, char *argv[])
 			} else {
 				manual_gpus_option = atoi(optarg);
 			}
+			break;
+		case LONG_OPT_WALL_TIME:
+			manual_wall_time_option = atoi(optarg);
 			break;
 		case LONG_OPT_DISABLE_SYMLINKS:
 			symlinks_enabled = 0;
@@ -2141,6 +2171,10 @@ int main(int argc, char *argv[])
 			}
 		} else {
 			backoff_interval = MIN(backoff_interval*2,max_backoff_interval);
+		}
+
+		if(!check_worker_limits(NULL)) {
+			abort_flag = 1;
 		}
 
 		if(abort_flag) {
