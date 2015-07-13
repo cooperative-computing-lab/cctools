@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include "link.h"
 #include "getopt.h"
 #include "stringtools.h"
+#include "xxmalloc.h"
 
 #include <errno.h>
 #include <string.h>
@@ -88,6 +89,7 @@ static void show_help(const char *progname)
 	fprintf(stdout, "Otherwise, contact the catalog server for summary data.\n");
 	fprintf(stdout, "Options:\n");
 	fprintf(stdout, " %-30s Show queue summary statistics. (default)\n", "-Q,--statistics");
+	fprintf(stdout, " %-30s Filter results of -Q for masters matching <name>\n", "-M,--project-name<name>");
 	fprintf(stdout, " %-30s List workers connected to the given master.\n", "-W,--workers");
 	fprintf(stdout, " %-30s List tasks of the given master.\n", "-T,--tasks");
 	fprintf(stdout, " %-30s Long text output.\n", "-l,--verbose");
@@ -98,9 +100,10 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
-static void work_queue_status_parse_command_line_arguments(int argc, char *argv[], const char **master_host, int *master_port)
+static void work_queue_status_parse_command_line_arguments(int argc, char *argv[], const char **master_host, int *master_port, const char **project_name)
 {
 	static const struct option long_options[] = {
+		{"project-name", required_argument, 0, 'M'},
 		{"statistics", no_argument, 0, 'Q'},
 		{"workers", no_argument, 0, 'W'},
 		{"tasks", no_argument, 0, 'T'},
@@ -115,7 +118,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 	signed int c;
 	int needs_explicit_master = 0;
 
-	while((c = getopt_long(argc, argv, "QTWC:d:lo:O:Rt:vh", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "M:QTWC:d:lo:O:Rt:vh", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'C':
 			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
@@ -125,6 +128,9 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			break;
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case 'M':
+			*project_name = xxstrdup(optarg);
 			break;
 		case 'Q':
 			if(query_mode != NO_QUERY)
@@ -180,6 +186,9 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 	if(needs_explicit_master && optind >= argc)
 		fatal("Options -T and -W need an explicit master to query.");
 
+	if(project_name && query_mode != QUERY_QUEUE)
+		fatal("Option -M,--project-name can only be used together with -Q,--statistics");
+
 	if( optind < argc ) {
 		*master_host = argv[optind];
 		optind++;
@@ -228,10 +237,10 @@ int get_masters(time_t stoptime)
 			resize_catalog( catalog_size * 2 );
 
 		if(strcmp(nvpair_lookup_string(nv, "type"), "wq_master") == 0) {
-			global_catalog[i] = nv; //make the global catalog point to this memory that nv references
-			i++; //only increment i when a master nvpair is found
-		}else{
-			nvpair_delete(nv); //free the memory so something valid can take its place
+			global_catalog[i] = nv; // make the global catalog point to this memory that nv references
+			i++;                    // only increment i when a master nvpair is found
+		} else{
+			nvpair_delete(nv);
 		}
 	}
 
@@ -312,12 +321,13 @@ int find_child_relations(int spaces, const char *host, int port, time_t stoptime
 	return 1;
 }
 
-int do_catalog_query( time_t stoptime )
+int do_catalog_query(const char *project_name, time_t stoptime )
 {
 	int i = 0; //global_catalog iterator
 
 	if(resource_mode == 0 && format_mode == FORMAT_TABLE) nvpair_print_table_header(stdout, queue_headers);
 	else if(resource_mode) nvpair_print_table_header(stdout, master_resource_headers);
+
 
 	while(global_catalog[i] != NULL){
 		if(!(resource_mode || format_mode == FORMAT_TABLE)){ //long options
@@ -325,16 +335,19 @@ int do_catalog_query( time_t stoptime )
 		}else{
 			const char *temp_my_master = nvpair_lookup_string(global_catalog[i], "my_master");
 			if( !temp_my_master || !strcmp(temp_my_master, "127.0.0.1:-1") ) { //this master has no master
-				if(resource_mode) {
-					debug(D_WQ,"%s resources -- cores:%s memory:%s disk:%s\n",nvpair_lookup_string(global_catalog[i],"project"),nvpair_lookup_string(global_catalog[i],"cores_total"),nvpair_lookup_string(global_catalog[i],"memory_total"),nvpair_lookup_string(global_catalog[i],"disk_total"));
-					nvpair_print_table(global_catalog[i], stdout, master_resource_headers);
-				}else if(format_mode == FORMAT_TABLE){
-					nvpair_print_table(global_catalog[i], stdout, queue_headers);
+
+				if(!project_name || whole_string_match_regex(nvpair_lookup_string(global_catalog[i], "project"), project_name)) {
+					if(resource_mode) {
+						debug(D_WQ,"%s resources -- cores:%s memory:%s disk:%s\n",nvpair_lookup_string(global_catalog[i],"project"),nvpair_lookup_string(global_catalog[i],"cores_total"),nvpair_lookup_string(global_catalog[i],"memory_total"),nvpair_lookup_string(global_catalog[i],"disk_total"));
+						nvpair_print_table(global_catalog[i], stdout, master_resource_headers);
+					}else if(format_mode == FORMAT_TABLE){
+						nvpair_print_table(global_catalog[i], stdout, queue_headers);
+					}
+					find_child_relations(1,
+							nvpair_lookup_string(global_catalog[i], "name"),
+							atoi(nvpair_lookup_string(global_catalog[i], "port")),
+							stoptime);
 				}
-				find_child_relations(1,
-						nvpair_lookup_string(global_catalog[i], "name"),
-						atoi(nvpair_lookup_string(global_catalog[i], "port")),
-						stoptime);
 			}
 		}
 		i++;
@@ -397,12 +410,13 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 
 int main(int argc, char *argv[])
 {
-	const char *master_host = 0;
+	const char *master_host  = 0;
+	const char *project_name = 0;
 	int master_port = WORK_QUEUE_DEFAULT_PORT;
 
 	debug_config(argv[0]);
 
-	work_queue_status_parse_command_line_arguments(argc, argv, &master_host, &master_port);
+	work_queue_status_parse_command_line_arguments(argc, argv, &master_host, &master_port, &project_name);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
@@ -413,7 +427,7 @@ int main(int argc, char *argv[])
 	} else {
 		global_catalog = malloc(sizeof(*global_catalog)*CATALOG_SIZE); //only malloc if catalog queries are being done
 		get_masters(stoptime);
-		return do_catalog_query(stoptime);
+		return do_catalog_query(project_name, stoptime);
 	}
 }
 

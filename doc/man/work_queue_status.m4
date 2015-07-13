@@ -26,6 +26,7 @@ LIST_END
 SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_ITEM(`-Q, --statistics')Show summary information about queues. (default)
+OPTION_ITEM(`-M, --project-name=<name>')Filter results of -Q for masters matching <name>.
 OPTION_ITEM(`-W, --workers')Show details of all workers connected to the master.
 OPTION_ITEM(`-T, --tasks')Show details of all tasks in the queue.
 OPTION_ITEM(`-l, --verbose')Long output.
