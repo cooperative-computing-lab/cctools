@@ -43,7 +43,17 @@ find_python_path () {
 	_script=$1
 	_version=$2
 	_dirname="$(dirname $_script)/../lib"
-	echo $_dirname/python$_version/site-packages:$_dirname/python/site-packages
+
+	for dir in $_dirname/python{$_version,}/site-packages; do
+		if [ -d "$dir" ]; then
+			echo "$dir"
+			return
+		fi
+	done
+
+	echo "Could not find the python libraries at the expected location. Execution" 1>&2
+	echo "will continue, but if errors are found please set PYTHONPATH to include" 1>&2
+	echo "the CCTOOLs modules for the python interpreter version $_version." 1>&2
 }
 
 if [ -z "$1" ]
