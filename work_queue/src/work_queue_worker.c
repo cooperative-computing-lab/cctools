@@ -1272,7 +1272,7 @@ static int check_for_resources(struct work_queue_task *t)
 
 static int check_worker_limits(struct link *master) {
 	if( manual_wall_time_option > 0 && (time(0) - worker_start_time) > manual_wall_time_option) {
-		fprintf(stderr,"work_queue_worker: reached the wall time limit %"PRIu64" s\n", manual_wall_time_option);
+		fprintf(stderr,"work_queue_worker: reached the wall time limit %lld s\n", (long long) manual_wall_time_option);
 		if(master) {
 			send_master_message(master, "info wall_time_exhausted %lld\n", (long long) manual_wall_time_option);
 		}
