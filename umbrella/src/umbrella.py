@@ -701,7 +701,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		mount_env = ''
 		if software_spec[item].has_key('mount_env'):
 			mount_env = software_spec[item]['mount_env']
-		action = 'none'
+		action = 'unpack'
 		if software_spec[item].has_key('action'):
 			action = software_spec[item]['action'].lower()
 
