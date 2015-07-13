@@ -41,7 +41,9 @@ any collection of machines, large or small.</p>
 <tr><td>wq       <td> <a href=http://ccl.cse.nd.edu/software/workqueue>Work Queue</a> distributed application system, included with Makeflow.
 <tr><td>condor   <td> <a href=http://www.cs.wisc.edu/htcondor>HTCondor</a> distributed computing system.
 <tr><td>sge      <td> <a href=http://gridscheduler.sourceforge.net>Open Grid Scheduler</a>, Univa Grid Engine, Oracle Grid Engine, all derived from Sun Grid Engine (SGE).
+<tr><td>pbs      <td> <a href=http://www.arc.ox.ac.uk/content/pbs>Portable Batch Scheduler</a>
 <tr><td>torque   <td> <a href=http://www.adaptivecomputing.com/products/open-source/torque>Torque Resource Manager</a>
+<tr><td>slurm    <td> <a href=http://slurm.schedmd.com>Slurm Workload Manager</a>
 <tr><td>moab     <td> <a href="http://www.adaptivecomputing.com/resources/docs/mwm/6-0/index.php">Moab Workload Manager</a></li>
 <tr><td>cluster  <td> Custom-defined batch submission commands, see <a href=#custom.drivers>custom drivers</a> below for details.
 <tr><td>chirp    <td> Active storage jobs on the <a href=http://ccl.cse.nd.edu/software/chirp>Chirp filesystem</a>.
@@ -116,7 +118,7 @@ again:</p>
 
 <code>makeflow -c example.makeflow</code>
 
-<p>If you have access to a batch system like Condor, SGE, Torque, or Moab,
+<p>If you have access to a batch system like Condor, SGE, Torque, SLURM, or Moab,
 you can direct Makeflow to run your jobs there:</p>
 
 <code>
