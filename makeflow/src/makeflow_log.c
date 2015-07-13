@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "makeflow_log.h"
+#include "makeflow_gc.h"
 #include "dag.h"
 #include "get_line.h"
 
@@ -270,21 +271,21 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 			if(batch_fs_stat(queue, f->filename, &buf) >= 0){
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
 			} else {
-				fprintf(stderr, "makeflow: %s is reported as source file, but does not.\n", f->filename);
+				fprintf(stderr, "makeflow: %s is reported as source file, but does not exist.\n", f->filename);
 				exit(1);
 			}
 		}
 		if(!first_run){
 			if(dag_file_exists(f) && !(batch_fs_stat(queue, f->filename, &buf) >= 0)){
-				fprintf(stderr, "makeflow: %s is reported as existing, but does not.\n", f->filename);
-				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+				fprintf(stderr, "makeflow: %s is reported as existing, but does not exist.\n", f->filename);
+				makeflow_file_clean(d, queue, f, 1);
 				continue;
 			}
 			if(S_ISDIR(buf.st_mode))
 				continue;
 			if(dag_file_exists(f) && difftime(buf.st_mtime, f->creation_logged) > 0) {
 				fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, buf.st_mtime, f->creation_logged);
-				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+				makeflow_file_clean(d, queue, f, 0);
 			}
 		}
 	}
