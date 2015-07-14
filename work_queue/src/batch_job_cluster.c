@@ -55,6 +55,8 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 		return 0;
 	}
 
+	char *path = getenv("PWD");
+
 	fprintf(file, "#!/bin/sh\n");
 
 	if(q->type == BATCH_QUEUE_TYPE_SLURM){
@@ -62,6 +64,10 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	} else {
 		// Some systems set PBS_JOBID, some set JOBID.
 		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
+	}
+	
+	if(q->type == BATCH_QUEUE_TYPE_TORQUE){
+		fprintf(file, "cd %s\n", path);
 	}
 
 	// Each job writes out to its own log file.
@@ -283,7 +289,7 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 			cluster_name = strdup("torque");
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
-			cluster_options = strdup("-d . -o /dev/null -j oe -V");
+			cluster_options = strdup("-o /dev/null -j oe -V");
 			cluster_jobname_var = strdup("-N");
 			break;
         case BATCH_QUEUE_TYPE_SLURM:
