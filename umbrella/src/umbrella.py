@@ -282,7 +282,7 @@ def cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro
 	name = "cctools-4.9.0-%s-%s" % (linux_distro, hardware_platform)
 	item = package_search(packages_json, name)
 	dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
-	dependency_download(item['source'][0], item["checksum"], "md5sum", dest, item["format"], action)
+	dependency_download(item["source"][0], item["checksum"], "md5sum", dest, item["format"], action)
 	return dest
 
 def set_cvmfs_cms_siteconf(name, action, packages_json, sandbox_dir):
