@@ -40,7 +40,7 @@ Here is the specification JSON file for a Ray-Tracing application:
 Once the specification is ready, you can run the application through umbrella:
 
 umbrella \
-	--batch_type parrot \
+	--sandbox_mode parrot \
 	--log umbrella.log \
 	--config povray.umbrella \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \

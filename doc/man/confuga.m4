@@ -131,10 +131,10 @@ chirp_server --jobs --root='confuga://./confuga.root/?replication=push-async-1&n
 LONGCODE_END
 
 PARA
-Launch a head node with workspace BOLD(/tmp/confuga.root) using storage nodes BOLD(chirp://localhost:10000/) and BOLD(chirp://localhost:10001/):
+Launch a head node with workspace BOLD(/tmp/confuga.root) using storage nodes BOLD(chirp://localhost:10001/) and BOLD(chirp://localhost:10002/):
 
 LONGCODE_BEGIN
-chirp_server --jobs --root='confuga:///tmp/confuga.root/?nodes=node:chirp://localhost:10000/,chirp://localhost:10001/'
+chirp_server --jobs --root='confuga:///tmp/confuga.root/?nodes=node:chirp://localhost:10001/,chirp://localhost:10002/'
 LONGCODE_END
 
 PARA
@@ -180,7 +180,8 @@ chirp_server --advertise=localhost \\
              --catalog-update=30s \\
              --debug=confuga \\
              --jobs \\
-             --root='confuga://./confuga.root/?auth=unix&nodes=node:chirp://localhost:9001/,chirp://localhost:9002/'
+             --root='confuga://./confuga.root/?auth=unix&nodes=node:chirp://localhost:9001/,chirp://localhost:9002/' \\
+             --port=9000
 LONGCODE_END
 
 SECTION(COPYRIGHT)

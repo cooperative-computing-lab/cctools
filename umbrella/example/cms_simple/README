@@ -9,6 +9,7 @@ umbrella \
 --inputs 'cms_simple1.sh=cms_simple.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/parrot_cms_simple_output \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 run '/bin/bash cms_simple1.sh'
 
 #Docker execution engine test command. Don't do the docker test under your afs,
@@ -20,6 +21,7 @@ umbrella \
 --inputs 'cms_simple1.sh=cms_simple.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/docker_cms_simple_output \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 run '/bin/bash cms_simple1.sh'
 
 #Local execution engine test command. Don't test local execution engine under
@@ -32,6 +34,7 @@ umbrella \
 --inputs 'cms_simple1.sh=cms_simple.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/local_cms_simple_output \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 run '/bin/bash cms_simple1.sh'
 
 #EC2 execution engine test command. To test this, you must set up the Amazon
@@ -52,6 +55,7 @@ umbrella \
 --inputs 'cms_simple1.sh=cms_simple.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/ec2_cms_simple_output \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 run '/bin/bash cms_simple1.sh'
 
 #Condor execution engine test command. To test this, the machine you are using should have condor installed.
@@ -64,5 +68,6 @@ umbrella \
 --inputs 'cms_simple1.sh=cms_simple.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/condor_cms_simple_output \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 run '/bin/bash cms_simple1.sh'
 

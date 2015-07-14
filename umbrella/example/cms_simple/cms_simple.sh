@@ -4,7 +4,7 @@ rm -rf cmsjob
 mkdir cmsjob
 cd cmsjob
 
-. /cvmfs/cms.cern.ch/cmsset_default.sh
+. ${CMS_DIR}/cmsset_default.sh
 scramv1 project CMSSW ${CMS_VERSION}
 cd ${CMS_VERSION}
 eval `scram runtime -sh`

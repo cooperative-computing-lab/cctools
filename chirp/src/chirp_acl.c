@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "chirp_protocol.h"
 #include "chirp_ticket.h"
 
+#include "catch.h"
 #include "debug.h"
 #include "hash_table.h"
 #include "path.h"
@@ -53,25 +54,26 @@ void chirp_acl_inherit_default( int onoff )
 
 static int ticket_read(char *ticket_filename, struct chirp_ticket *ct)
 {
-	buffer_t B;
-	CHIRP_FILE *tf = cfs_fopen(ticket_filename, "r");
-	if(!tf)
-		return 0;
+	int rc;
+	buffer_t B[1];
+	CHIRP_FILE *tf = NULL;
 
-	buffer_init(&B);
-	buffer_abortonfailure(&B, 1);
+	buffer_init(B);
+	buffer_abortonfailure(B, 1);
 
-	if(!cfs_freadall(tf, &B)) {
-		cfs_fclose(tf);
-		return 0;
-	}
+	tf = cfs_fopen(ticket_filename, "r");
+	CATCHUNIX(tf == NULL ? -1 : 0);
+
+	CATCH(cfs_freadall(tf, B) ? 0 : cfs_ferror(tf));
+
+	CATCHUNIX(chirp_ticket_read(buffer_tostring(B), ct) == 0 ? -1 : 0);
+
+	rc = 0;
+	goto out;
+out:
 	cfs_fclose(tf);
-
-	int result = chirp_ticket_read(buffer_tostring(&B), ct);
-
-	buffer_free(&B);
-
-	return result;
+	buffer_free(B);
+	return rc == 0 ? 1 : 0;
 }
 
 static int ticket_write(const char *ticket_filename, struct chirp_ticket *ct)

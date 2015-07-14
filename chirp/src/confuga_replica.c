@@ -38,6 +38,7 @@ struct confuga_replica {
 
 struct confuga_file {
 	confuga *C;
+	confuga_sid_t sid;
 	struct confuga_host host;
 	char path[CONFUGA_PATH_MAX]; /* path to open file */
 	struct chirp_file *stream; /* open chirp stream */
@@ -45,17 +46,18 @@ struct confuga_file {
 	confuga_off_t size; /* running size */
 };
 
-CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t size, const struct confuga_host *host)
+CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t size, confuga_sid_t sid)
 {
 	static const char SQL[] =
-		"BEGIN TRANSACTION;"
+		"SAVEPOINT confugaR_register;"
 		"INSERT OR IGNORE INTO Confuga.File (id, size)"
 		"   VALUES (?, ?);"
 		"INSERT OR IGNORE INTO Confuga.Replica (fid, sid)"
 		"   SELECT ?, Confuga.StorageNode.id"
 		"   FROM Confuga.StorageNode"
-		"   WHERE hostport = ?;"
-		"END TRANSACTION;";
+		"   WHERE id = ?;"
+		"RELEASE SAVEPOINT confugaR_register;"
+		;
 
 	int rc;
 	sqlite3 *db = C->db;
@@ -70,12 +72,16 @@ CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t
 	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
 	sqlcatch(sqlite3_bind_int64(stmt, 2, size));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	if (sqlite3_changes(db))
+		debug(D_DEBUG, "created new file fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T, CONFUGA_FID_PRIARGS(fid), size);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
-	sqlcatch(sqlite3_bind_text(stmt, 2, host->hostport, -1, SQLITE_STATIC));
+	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	if (sqlite3_changes(db))
+		debug(D_DEBUG, "created new replica fid = " CONFUGA_FID_PRIFMT " sid = " CONFUGA_SID_PRIFMT, CONFUGA_FID_PRIARGS(fid), sid);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
@@ -86,14 +92,14 @@ CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t
 	goto out;
 out:
 	sqlite3_finalize(stmt);
-	sqlend(db);
+	sqlendsavepoint(confugaR_register);
 	return rc;
 }
 
-/* N.B. must have open transaction. */
 CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_t sid, const char *tag, time_t stoptime)
 {
 	static const char SQL[] =
+		"SAVEPOINT confugaR_replicate;"
 		/* Check for Replica. */
 		"SELECT 1"
 		"	FROM Confuga.Replica"
@@ -112,7 +118,9 @@ CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_
 		"INSERT INTO Confuga.Replica (fid, sid) VALUES (?, ?);"
 		/* Insert a fake TransferJob for records... */
 		"INSERT INTO Confuga.TransferJob (state, fid, fsid, tsid, progress, time_new, time_commit, time_complete, tag)"
-		"	VALUES ('COMPLETED', ?1, ?2, ?3, ?4, ?5, ?5, strftime('%s', 'now'), ?6);";
+		"	VALUES ('COMPLETED', ?1, ?2, ?3, ?4, ?5, ?5, strftime('%s', 'now'), ?6);"
+		"RELEASE SAVEPOINT confugaR_replicate;"
+		;
 
 	int rc;
 	sqlite3 *db = C->db;
@@ -126,6 +134,10 @@ CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_
 	confuga_off_t size;
 
 	debug(D_DEBUG, "synchronously replicating " CONFUGA_FID_DEBFMT " to " CONFUGA_SID_DEBFMT, CONFUGA_FID_PRIARGS(fid), sid);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
@@ -195,9 +207,9 @@ replicated:
 	assert(sqlite3_changes(db));
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	if (fsid) {
 		/* fsid is 0 if it was already there... (access) */
-		sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 		debug(D_DEBUG, CONFUGA_FID_DEBFMT " from " CONFUGA_SID_DEBFMT " to " CONFUGA_SID_DEBFMT " size=%" PRICONFUGA_OFF_T, CONFUGA_FID_PRIARGS(fid), fsid, sid, size);
 		sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
 		sqlcatch(sqlite3_bind_int64(stmt, 2, fsid));
@@ -207,14 +219,18 @@ replicated:
 		sqlcatch(sqlite3_bind_text(stmt, 6, tag, -1, SQLITE_STATIC));
 		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 		assert(sqlite3_changes(db));
-		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 	}
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	rc = 0;
 	goto out;
 out:
 	sqlite3_finalize(stmt);
-	/* the caller is responsible for ROLLBACK */
+	sqlendsavepoint(confugaR_replicate);
 	return rc;
 }
 
@@ -321,7 +337,7 @@ CONFUGA_API int confuga_file_create (confuga *C, confuga_file **filep, time_t st
 		"			Confuga.StorageNodeActive"
 		"			LEFT OUTER JOIN Confuga.FileReplicas ON StorageNodeActive.id = FileReplicas.sid"
 		"		GROUP BY StorageNodeActive.id;"
-		"SELECT hostport, root, _open"
+		"SELECT id, hostport, root, _open"
 		"	FROM ConfugaFileTargets"
 		/* 1. Prefer nodes with lower than normal replica count (group exponentially). */
 		/* 2. Prefer nodes with more space available (group exponentially). */
@@ -358,9 +374,10 @@ CONFUGA_API int confuga_file_create (confuga *C, confuga_file **filep, time_t st
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-		snprintf(file->host.hostport, sizeof(file->host.hostport), "%s", (const char *) sqlite3_column_text(stmt, 0));
-		snprintf(file->host.root, sizeof(file->host.root), "%s", (const char *) sqlite3_column_text(stmt, 1));
-		strcpy(file->path, (const char *) sqlite3_column_text(stmt, 2));
+		file->sid = sqlite3_column_int64(stmt, 0);
+		snprintf(file->host.hostport, sizeof(file->host.hostport), "%s", (const char *) sqlite3_column_text(stmt, 1));
+		snprintf(file->host.root, sizeof(file->host.root), "%s", (const char *) sqlite3_column_text(stmt, 2));
+		strcpy(file->path, (const char *) sqlite3_column_text(stmt, 3));
 		debug(D_DEBUG, "creating file on free SN chirp://%s%s", file->host.hostport, file->host.root);
 		file->stream = chirp_reli_open(file->host.hostport, file->path, O_CREAT|O_EXCL|O_WRONLY, S_IRUSR, STOPTIME);
 		if (file->stream) {
@@ -455,7 +472,7 @@ CONFUGA_API int confuga_file_close (confuga_file *file, confuga_fid_t *fid, conf
 	char replica[CONFUGA_PATH_MAX];
 	snprintf(replica, sizeof(replica), "%s/file/" CONFUGA_FID_PRIFMT, file->host.root, CONFUGA_FID_PRIARGS(*fid));
 	CATCHUNIX(chirp_reli_rename(file->host.hostport, file->path, replica, stoptime));
-	CATCH(confugaR_register(C, *fid, file->size, &file->host));
+	CATCH(confugaR_register(C, *fid, file->size, file->sid));
 	rc = 0;
 	goto out;
 out:
@@ -735,41 +752,41 @@ static int create (confuga *C, chirp_jobid_t id, const char *fhostport, const ch
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
 	chirp_jobid_t cid;
-	buffer_t B;
-	buffer_init(&B);
+	buffer_t B[1];
+	buffer_init(B);
 
 	debug(D_DEBUG, "transfer job %" PRICHIRP_JOBID_T ": creating job", id);
 
-	CATCHUNIX(buffer_putliteral(&B, "{"));
+	CATCHUNIX(buffer_putliteral(B, "{"));
 
-	CATCHUNIX(buffer_putliteral(&B, "\"executable\":\"@put\""));
-	CATCHUNIX(buffer_putfstring(&B, ",\"tag\":\"%s\"", tag));
+	CATCHUNIX(buffer_putliteral(B, "\"executable\":\"@put\""));
+	CATCHUNIX(buffer_putfstring(B, ",\"tag\":\"%s\"", tag));
 
-	CATCHUNIX(buffer_putliteral(&B, ",\"arguments\":["));
-	CATCHUNIX(buffer_putliteral(&B, "\"@put\""));
-	CATCHUNIX(buffer_putliteral(&B, ",\"")); jsonA_escapestring(&B, thostport); CATCHUNIX(buffer_putliteral(&B, "\""));
-	CATCHUNIX(buffer_putliteral(&B, ",\"file\""));
-	CATCHUNIX(buffer_putliteral(&B, ",\"")); jsonA_escapestring(&B, topen); CATCHUNIX(buffer_putliteral(&B, "\""));
-	CATCHUNIX(buffer_putliteral(&B, "]"));
+	CATCHUNIX(buffer_putliteral(B, ",\"arguments\":["));
+	CATCHUNIX(buffer_putliteral(B, "\"@put\""));
+	CATCHUNIX(buffer_putliteral(B, ",\"")); jsonA_escapestring(B, thostport); CATCHUNIX(buffer_putliteral(B, "\""));
+	CATCHUNIX(buffer_putliteral(B, ",\"file\""));
+	CATCHUNIX(buffer_putliteral(B, ",\"")); jsonA_escapestring(B, topen); CATCHUNIX(buffer_putliteral(B, "\""));
+	CATCHUNIX(buffer_putliteral(B, "]"));
 
-	CATCHUNIX(buffer_putliteral(&B, ",\"environment\":{\"CHIRP_CLIENT_TICKETS\":\"./confuga.ticket\"}"));
+	CATCHUNIX(buffer_putliteral(B, ",\"environment\":{\"CHIRP_CLIENT_TICKETS\":\"./confuga.ticket\"}"));
 
-	CATCHUNIX(buffer_putliteral(&B, ",\"files\":["));
-	CATCHUNIX(buffer_putliteral(&B, "{\"task_path\":\"file\",\"serv_path\":\""));
-		jsonA_escapestring(&B, ffile);
-		CATCHUNIX(buffer_putliteral(&B, "\",\"type\":\"INPUT\",\"binding\":\"LINK\"}"));
-	CATCHUNIX(buffer_putliteral(&B, ",{\"task_path\":\"./confuga.ticket\",\"serv_path\":\""));
-		jsonA_escapestring(&B, fticket);
-		CATCHUNIX(buffer_putliteral(&B, "\",\"type\":\"INPUT\",\"binding\":\"LINK\"}"));
-	CATCHUNIX(buffer_putliteral(&B, ",{\"task_path\":\".chirp.debug\",\"serv_path\":\""));
-		jsonA_escapestring(&B, fdebug);
-		CATCHUNIX(buffer_putliteral(&B, "\",\"type\":\"OUTPUT\",\"binding\":\"LINK\"}"));
-	CATCHUNIX(buffer_putliteral(&B, "]"));
+	CATCHUNIX(buffer_putliteral(B, ",\"files\":["));
+	CATCHUNIX(buffer_putliteral(B, "{\"task_path\":\"file\",\"serv_path\":\""));
+		jsonA_escapestring(B, ffile);
+		CATCHUNIX(buffer_putliteral(B, "\",\"type\":\"INPUT\",\"binding\":\"LINK\"}"));
+	CATCHUNIX(buffer_putliteral(B, ",{\"task_path\":\"./confuga.ticket\",\"serv_path\":\""));
+		jsonA_escapestring(B, fticket);
+		CATCHUNIX(buffer_putliteral(B, "\",\"type\":\"INPUT\",\"binding\":\"LINK\"}"));
+	CATCHUNIX(buffer_putliteral(B, ",{\"task_path\":\".chirp.debug\",\"serv_path\":\""));
+		jsonA_escapestring(B, fdebug);
+		CATCHUNIX(buffer_putliteral(B, "\",\"type\":\"OUTPUT\",\"binding\":\"LINK\"}"));
+	CATCHUNIX(buffer_putliteral(B, "]"));
 
-	CATCHUNIX(buffer_putliteral(&B, "}"));
+	CATCHUNIX(buffer_putliteral(B, "}"));
 
-	debug(D_DEBUG, "json = `%s'", buffer_tostring(&B));
-	CATCHUNIX(chirp_reli_job_create(fhostport, buffer_tostring(&B), &cid, STOPTIME));
+	debug(D_DEBUG, "json = `%s'", buffer_tostring(B));
+	CATCHUNIX(chirp_reli_job_create(fhostport, buffer_tostring(B), &cid, STOPTIME));
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, cid));
@@ -781,8 +798,8 @@ static int create (confuga *C, chirp_jobid_t id, const char *fhostport, const ch
 	rc = 0;
 	goto out;
 out:
-	buffer_free(&B);
 	sqlite3_finalize(stmt);
+	buffer_free(B);
 	return rc;
 }
 
@@ -881,7 +898,7 @@ out:
 static int transfer_commit (confuga *C)
 {
 	static const char SQL[] =
-		"SELECT StorageNode.id, StorageNode.hostport, '[' || GROUP_CONCAT(TransferJob.id, ', ') || ']', '[' || GROUP_CONCAT(TransferJob.cid, ',') || ']'"
+		"SELECT StorageNode.id, StorageNode.hostport, PRINTF('[%s]', GROUP_CONCAT(TransferJob.id, ', ')), PRINTF('[%s]', GROUP_CONCAT(TransferJob.cid, ','))"
 		"	FROM Confuga.TransferJob JOIN Confuga.StorageNode ON TransferJob.fsid = StorageNode.id"
 		"	WHERE state = 'CREATED'"
 		"	GROUP BY StorageNode.id"
@@ -1122,7 +1139,7 @@ out:
 static int transfer_reap (confuga *C)
 {
 	static const char SQL[] =
-		"SELECT StorageNode.id, StorageNode.hostport, '[' || GROUP_CONCAT(TransferJob.id, ', ') || ']', '[' || GROUP_CONCAT(TransferJob.cid, ',') || ']'"
+		"SELECT StorageNode.id, StorageNode.hostport, PRINTF('[%s]', GROUP_CONCAT(TransferJob.id, ', ')), PRINTF('[%s]', GROUP_CONCAT(TransferJob.cid, ','))"
 		"	FROM Confuga.TransferJob JOIN Confuga.StorageNode ON TransferJob.fsid = StorageNode.id"
 		"	WHERE state = 'WAITED'"
 		"	GROUP BY StorageNode.id"
@@ -1262,8 +1279,10 @@ static int transfer_stats (confuga *C)
 	sqlite3 *db = C->db;
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
-	buffer_t B;
+	buffer_t B[1];
 	time_t now = time(NULL);
+
+	buffer_init(B);
 
 	if (now < C->transfer_stats+30) {
 		rc = 0;
@@ -1271,23 +1290,23 @@ static int transfer_stats (confuga *C)
 	}
 	C->transfer_stats = now;
 
-	buffer_init(&B);
-	buffer_putliteral(&B, "TJ: ");
+	buffer_putliteral(B, "TJ: ");
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
 		const char *state = (const char *)sqlite3_column_text(stmt, 0);
-		buffer_putfstring(&B, "%s; ", state);
+		buffer_putfstring(B, "%s; ", state);
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
-	debug(D_DEBUG, "%s", buffer_tostring(&B));
+	debug(D_DEBUG, "%s", buffer_tostring(B));
 
 	rc = 0;
 	goto out;
 out:
 	sqlite3_finalize(stmt);
+	buffer_free(B);
 	return rc;
 }
 

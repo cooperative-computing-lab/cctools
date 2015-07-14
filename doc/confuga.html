@@ -142,6 +142,7 @@
     --catalog-update=30s \
     --debug=confuga \
     --jobs \
+    --port=9000 \
     --project-name=`whoami`-test \
     --root='confuga://./confuga.root/?auth=unix&amp;nodes=node:chirp://localhost:9001/,chirp://localhost:9002/'</code>
                 </p>
@@ -163,7 +164,7 @@ chirp    localhost.localdomain     9094  batrick    4.4.0    163.1 GB  34.0 GB</
 
                 <p>In another terminal, we can run the <a href="makeflow.html#language">standard Makeflow example</a> against the cluster to confirm everything works. This example Makeflow is distributed with CCTools in <tt>makeflow/example/example.makeflow</tt>.</p>
 
-                <code><span class="prompt">$ </span>makeflow --batch-type=chirp --working-dir=chirp://localhost/ makeflow/example/example.makeflow
+                <code><span class="prompt">$ </span>makeflow --batch-type=chirp --working-dir=chirp://localhost:9000/ makeflow/example/example.makeflow
 parsing makeflow/example/example.makeflow...
 checking makeflow/example/example.makeflow for consistency...
 makeflow/example/example.makeflow has 6 rules.
@@ -351,13 +352,23 @@ nothing left to do.</code>
     --wrapper-output='stdout.%%' \\
     --wrapper-output='stderr.%%'</code>
 
+        <h2 id="notes">Notes<a class="sectionlink" href="#notes" title="Link to this section.">&#x21d7;</a></h2>
+
+            <h3 id="notes.afs">AFS<a class="sectionlink" href="#notes.afs" title="Link to this section.">&#x21d7;</a></h3>
+
+                <p>Storage nodes used by Confuga must <a
+                href="chirp.html#jobs.afs">not use AFS as their backing
+                storage</a>. Confuga requires use of the Chirp job
+                <tt>LINK</tt> file binding. For this reason, it cannot use
+                Chirp servers running with <tt>--root</tt> on AFS.</p>
+
         <h2 id="missing">Missing Features<a class="sectionlink" href="#missing" title="Link to this section.">&#x21d7;</a></h2>
 
             <p>Confuga is a beta quality software and is presently missing a few features that will be addressed in future releases:</p>
 
             <ul>
-                <li><b>Space consumed by deleted data is not reclaimed.</b> A garbage collector for old files needs to be written to cleanup stale replicas on storage nodes.</li>
-                <li><b>Organize storage nodes by project name.</b> Attaching a project name to storage nodes would allow Confuga to dynamically pick up new storage nodes. It also greatly simplifies specifying storage nodes.</li>
+                <li><b>Space consumed by deleted data is not reclaimed.</b> A garbage collector for old files needs to be written to cleanup stale replicas on storage nodes. Please see issue <a href="https://github.com/cooperative-computing-lab/cctools/issues/827">#827</a> for updates.</li>
+                <li><b>Organize storage nodes by project name.</b> Attaching a project name to storage nodes would allow Confuga to dynamically pick up new storage nodes. It also greatly simplifies specifying storage nodes. Please see issue <a href="https://github.com/cooperative-computing-lab/cctools/issues/828">#828</a> for updates.</li>
             </ul>
     </div>
 </body>

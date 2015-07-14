@@ -18,6 +18,7 @@
 
 %typemap(in) time_t
 {
+#ifdef SWIGPYTHON
 	if (PyLong_Check($input))
 		$1 = (time_t) PyLong_AsLong($input);
 	else if (PyInt_Check($input))
@@ -28,6 +29,10 @@
 		PyErr_SetString(PyExc_TypeError,"Expected a number");
 		return NULL;
 	}
+#endif
+#ifdef SWIGPERL
+	$1 = (uint64_t) SvIV($input);
+#endif
 }
 
 /* vdebug() takes va_list as arg but SWIG can't wrap such functions. */

@@ -238,6 +238,7 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 	--inputs 'cms_complex.sh=cms_complex.sh' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/parrot_cms_complex_output \
+	--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 	run '/bin/sh cms_complex.sh'</code>
 
 			<p>After umbrella finishes executing the CMS application, you can see the analysis result:
@@ -859,6 +860,7 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 	--inputs 'cms_complex.sh=cms_complex.sh' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/parrot_cms_complex_output \
+	--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 	run '/bin/sh cms_complex.sh'</code>
 
 			<p>If you want to run this CMS application through Umbrella, please check the <a href="#try_cms">Try CMS Applications with Umbrella</a>.</p>

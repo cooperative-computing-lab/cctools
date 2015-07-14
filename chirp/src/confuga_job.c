@@ -898,27 +898,28 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 			/* SourceReplicaRandom gives a list replica sources (for pull transfers)... */
 		"	SourceReplicaRandom AS ("
 			/* URL_TRUNCATE is defined in confuga.c. */
-		"		SELECT RandomReplica.fid, URL_TRUNCATE(GROUP_CONCAT('chirp://' || StorageNodeActive.hostport || '/' || StorageNodeActive.root || '/file/' || HEX(RandomReplica.fid), '\t')) AS urls, RandomReplica.size AS size"
+		"		SELECT RandomReplica.fid, URL_TRUNCATE(GROUP_CONCAT(PRINTF('chirp://%s/%s/file/%s', StorageNodeActive.hostport, StorageNodeActive.root, HEX(RandomReplica.fid)), '\t')) AS urls, RandomReplica.size AS size"
 		"			FROM"
 						/* XXX Note that this ORDER BY clause only works with SQLite! */
 		"				(SELECT FileReplicas.*, RANDOM() AS _r FROM Confuga.FileReplicas ORDER BY _r) AS RandomReplica"
 		"				INNER JOIN Confuga.StorageNodeActive ON RandomReplica.sid = StorageNodeActive.id"
 		"			GROUP BY RandomReplica.fid"
 		"	)"
-		"	SELECT 'LINK' AS binding, StorageNode.root || '/ticket' AS serv_path, './.confuga.ticket' AS task_path, NULL AS tag, 'INPUT' AS type, NULL AS size"
+			/* Job ticket */
+		"	SELECT 'LINK' AS binding, PRINTF('%s/ticket', StorageNode.root) AS serv_path, './.confuga.ticket' AS task_path, NULL AS tag, 'INPUT' AS type, NULL AS size"
 		"		FROM ConfugaJob INNER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
 		"		WHERE ConfugaJob.id = ?1"
 		" UNION ALL"
 			/* Replicated files, pull is done later... */
-		"	SELECT 'LINK' AS binding, StorageNode.root || '/file/' || HEX(ConfugaInputFile.fid) AS serv_path, task_path, NULL AS tag, 'INPUT' AS type, FileReplicas.size AS size"
+		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%s', StorageNode.root, HEX(ConfugaInputFile.fid)) AS serv_path, task_path, NULL AS tag, 'INPUT' AS type, FileReplicas.size AS size"
 		"		FROM"
 		"			ConfugaInputFile"
 		"			INNER JOIN ConfugaJob ON ConfugaInputFile.jid = ConfugaJob.id"
 		"			INNER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
 		"			INNER JOIN Confuga.FileReplicas ON ConfugaInputFile.fid = FileReplicas.fid AND StorageNode.id = FileReplicas.sid"
 		"		WHERE ConfugaInputFile.jid = ?1"
-			/* Now include pull transfers... */
 		" UNION ALL"
+			/* Now include pull transfers... */
 		"	SELECT 'URL' AS binding, SourceReplicaRandom.urls AS serv_path, ConfugaInputFile.task_path AS task_path, NULL AS tag, 'INPUT' AS type, SourceReplicaRandom.size"
 		"		FROM"
 		"			ConfugaInputFile"
@@ -928,17 +929,17 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 					/* Exclude ConfugaInputFile that are replicated... */
 		"			LEFT OUTER JOIN Confuga.Replica AS NoReplica ON ConfugaInputFile.fid = NoReplica.fid AND ConfugaJob.sid = NoReplica.sid"
 		"		WHERE ConfugaInputFile.jid = ?1 AND NoReplica.fid IS NULL AND NoReplica.sid IS NULL"
-			/* Now outputs... */
 		" UNION ALL"
-		"	SELECT 'LINK' AS binding, StorageNode.root || '/file/%s' AS serv_path, JobFile.task_path AS task_path, '" CONFUGA_OUTPUT_TAG "' AS tag, 'OUTPUT' AS type, NULL AS size"
+			/* Now outputs... */
+		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%%s', StorageNode.root) AS serv_path, JobFile.task_path AS task_path, '" CONFUGA_OUTPUT_TAG "' AS tag, 'OUTPUT' AS type, NULL AS size"
 		"		FROM"
 		"			JobFile"
 		"			INNER JOIN ConfugaJob ON JobFile.id = ConfugaJob.id"
 		"			INNER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
 		"		WHERE JobFile.id = ?1 AND JobFile.type = 'OUTPUT'"
-			/* Now cache the pull transfer as an output replica. */
 		" UNION ALL"
-		"	SELECT 'LINK' AS binding, StorageNode.root || '/file/%s' AS serv_path, ConfugaInputFile.task_path AS task_path, '" CONFUGA_PULL_TAG "' AS tag, 'OUTPUT' AS type, NULL AS size"
+			/* Now cache the pull transfer as an output replica. */
+		"	SELECT 'LINK' AS binding, PRINTF('%s/file/%%s', StorageNode.root) AS serv_path, ConfugaInputFile.task_path AS task_path, '" CONFUGA_PULL_TAG "' AS tag, 'OUTPUT' AS type, NULL AS size"
 		"		FROM"
 		"			ConfugaInputFile"
 		"			INNER JOIN ConfugaJob ON ConfugaInputFile.jid = ConfugaJob.id"
@@ -967,9 +968,9 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 	sqlcatch(sqlite3_bind_int64(stmt, 1, id));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_ROW);
 	CATCHUNIX(buffer_putliteral(B, "\"executable\":"));
-	chirp_sqlite3_column_jsonify(stmt, 0, B);
+	CATCH(chirp_sqlite3_column_jsonify(stmt, 0, B));
 	CATCHUNIX(buffer_putliteral(B, ",\"tag\":"));
-	chirp_sqlite3_column_jsonify(stmt, 1, B);
+	CATCH(chirp_sqlite3_column_jsonify(stmt, 1, B));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
@@ -981,7 +982,7 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 		if (!first0)
 			CATCHUNIX(buffer_putliteral(B, ","));
 		first0 = 0;
-		chirp_sqlite3_column_jsonify(stmt, 0, B);
+		CATCH(chirp_sqlite3_column_jsonify(stmt, 0, B));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -995,9 +996,9 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 		if (!first0)
 			CATCHUNIX(buffer_putliteral(B, ","));
 		first0 = 0;
-		chirp_sqlite3_column_jsonify(stmt, 0, B);
+		CATCH(chirp_sqlite3_column_jsonify(stmt, 0, B));
 		CATCHUNIX(buffer_putliteral(B, ":"));
-		chirp_sqlite3_column_jsonify(stmt, 1, B);
+		CATCH(chirp_sqlite3_column_jsonify(stmt, 1, B));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -1023,7 +1024,7 @@ static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, s
 			/* XXX If this is a pull, then there is no available storage node. Reschedule... */
 			CATCH(EIO);
 		}
-		chirp_sqlite3_row_jsonify(stmt, B);
+		CATCH(chirp_sqlite3_row_jsonify(stmt, B));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -1057,22 +1058,23 @@ static int jcreate (confuga *C, chirp_jobid_t id, const char *tag, const char *h
 	sqlite3 *db = C->db;
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
-	buffer_t B;
+	buffer_t B[1];
 	chirp_jobid_t cid;
 	struct job_stats stats;
 	memset(&stats, 0, sizeof(stats));
 
-	buffer_init(&B);
+	buffer_init(B);
+
 	jdebug(D_DEBUG, id, tag, "creating job on storage node");
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
-	CATCH(encode(C, id, tag, &B, &stats));
-	debug(D_DEBUG, "json = `%s'", buffer_tostring(&B));
+	CATCH(encode(C, id, tag, B, &stats));
+	debug(D_DEBUG, "json = `%s'", buffer_tostring(B));
 
-	CATCHUNIX(chirp_reli_job_create(hostport, buffer_tostring(&B), &cid, STOPTIME));
+	CATCHUNIX(chirp_reli_job_create(hostport, buffer_tostring(B), &cid, STOPTIME));
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, id));
@@ -1089,7 +1091,7 @@ static int jcreate (confuga *C, chirp_jobid_t id, const char *tag, const char *h
 	rc = 0;
 	goto out;
 out:
-	buffer_free(&B);
+	buffer_free(B);
 	sqlite3_finalize(stmt);
 	sqlend(db);
 	return rc;
@@ -1188,55 +1190,11 @@ out:
 	return rc;
 }
 
-static int addoutput (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t sid, const char *task_path, confuga_fid_t fid, confuga_off_t size)
-{
-	static const char SQL[] =
-		"INSERT OR IGNORE INTO Confuga.File (id, size) VALUES (?, ?);"
-		"INSERT OR IGNORE INTO Confuga.Replica (fid, sid) VALUES (?, ?);"
-		"INSERT INTO ConfugaOutputFile (jid, task_path, fid, size) VALUES (?, ?, ?, ?);"
-		;
-
-	int rc;
-	sqlite3 *db = C->db;
-	sqlite3_stmt *stmt = NULL;
-	const char *current = SQL;
-
-	debug(D_DEBUG, "creating replica fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T " sid = " CONFUGA_SID_PRIFMT, CONFUGA_FID_PRIARGS(fid), size, sid);
-
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
-	sqlcatch(sqlite3_bind_int64(stmt, 2, size));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
-	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	if (task_path) {
-		jdebug(D_DEBUG, id, tag, "setting output fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T " task_path = `%s'", CONFUGA_FID_PRIARGS(fid), size, task_path);
-		sqlcatch(sqlite3_bind_int64(stmt, 1, id));
-		sqlcatch(sqlite3_bind_text(stmt, 2, task_path, -1, SQLITE_STATIC));
-		sqlcatch(sqlite3_bind_blob(stmt, 3, fid.id, sizeof(fid.id), SQLITE_STATIC));
-		sqlcatch(sqlite3_bind_int64(stmt, 4, size));
-		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	}
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-
-	rc = 0;
-	goto out;
-out:
-	sqlite3_finalize(stmt);
-	return rc;
-}
-
 static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t sid, const char *hostport, chirp_jobid_t cid)
 {
 	static const char SQL[] =
 		"BEGIN TRANSACTION;"
+		"INSERT INTO ConfugaOutputFile (jid, task_path, fid, size) VALUES (?, ?, ?, ?);"
 		"INSERT OR REPLACE INTO ConfugaJobWaitResult (id, error, exit_code, exit_signal, exit_status, status)"
 		"	VALUES (?, ?, ?, ?, ?, ?);"
 		"UPDATE ConfugaJob"
@@ -1283,6 +1241,7 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 			json_value *exit_status = jsonA_getname(job, "exit_status", json_string);
 			json_value *status = jsonA_getname(job, "status", json_string);
 
+			sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 			if (status && strcmp(status->u.string.ptr, "FINISHED") == 0 && exit_status && strcmp(exit_status->u.string.ptr, "EXITED") == 0) {
 				json_value *files = jsonA_getname(job, "files", json_array);
 				if (files) {
@@ -1317,11 +1276,16 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 										}
 									}
 
+									CATCH(confugaR_register(C, fid, size->u.integer, sid));
 									if (streql(file_tag->u.string.ptr, CONFUGA_OUTPUT_TAG)) {
-										addoutput(C, id, tag, sid, task_path->u.string.ptr, fid, size->u.integer);
-									} else if (streql(file_tag->u.string.ptr, CONFUGA_PULL_TAG)) {
-										addoutput(C, id, tag, sid, NULL, fid, size->u.integer);
-									} else assert(0);
+										jdebug(D_DEBUG, id, tag, "setting output fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T " task_path = `%s'", CONFUGA_FID_PRIARGS(fid), size, task_path);
+										sqlcatch(sqlite3_reset(stmt));
+										sqlcatch(sqlite3_bind_int64(stmt, 1, id));
+										sqlcatch(sqlite3_bind_text(stmt, 2, task_path->u.string.ptr, -1, SQLITE_STATIC));
+										sqlcatch(sqlite3_bind_blob(stmt, 3, fid.id, sizeof(fid.id), SQLITE_STATIC));
+										sqlcatch(sqlite3_bind_int64(stmt, 4, size->u.integer));
+										sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+									}
 								}
 							} else {
 								CATCH(EINVAL);
@@ -1335,6 +1299,7 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 				/* This indicates the job failed startup, probably could not source a URL. We should retry the job! */
 				CATCH(EIO);
 			}
+			sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 			sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 			sqlcatch(sqlite3_bind_int64(stmt, 1, id));
@@ -1697,8 +1662,10 @@ static int job_stats (confuga *C)
 	sqlite3 *db = C->db;
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
-	buffer_t B;
+	buffer_t B[1];
 	time_t now = time(NULL);
+
+	buffer_init(B);
 
 	if (now < C->job_stats+30) {
 		rc = 0;
@@ -1706,43 +1673,42 @@ static int job_stats (confuga *C)
 	}
 	C->job_stats = now;
 
-	buffer_init(&B);
-
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
 		const char *state = (const char *)sqlite3_column_text(stmt, 0);
-		buffer_putfstring(&B, "%s; ", state);
+		buffer_putfstring(B, "%s; ", state);
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-		buffer_putfstring(&B, "Active SN (%d); ", sqlite3_column_int(stmt, 0));
+		buffer_putfstring(B, "Active SN (%d); ", sqlite3_column_int(stmt, 0));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-		buffer_putfstring(&B, "Allocated SN (%d); ", sqlite3_column_int(stmt, 0));
+		buffer_putfstring(B, "Allocated SN (%d); ", sqlite3_column_int(stmt, 0));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-		buffer_putfstring(&B, "Executing SN (%d); ", sqlite3_column_int(stmt, 0));
+		buffer_putfstring(B, "Executing SN (%d); ", sqlite3_column_int(stmt, 0));
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
-	if (buffer_pos(&B))
-		debug(D_DEBUG, "%s", buffer_tostring(&B));
+	if (buffer_pos(B))
+		debug(D_DEBUG, "%s", buffer_tostring(B));
 
 	rc = 0;
 	goto out;
 out:
+	buffer_free(B);
 	sqlite3_finalize(stmt);
 	return rc;
 }

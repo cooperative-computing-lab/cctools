@@ -9,13 +9,9 @@
 
 #include "buffer.h"
 #include "catch.h"
-#include "json.h"
-#include "json_aux.h"
+#include "debug.h"
 
 #include <sqlite3.h>
-
-#include <errno.h>
-#include <string.h>
 
 #define CHIRP_SQLITE_TIMEOUT (5000)
 
@@ -104,6 +100,22 @@ do {\
 	}\
 } while (0)
 
+#define sqlendsavepoint(savepoint) \
+do {\
+	if (rc) {\
+		char *errmsg;\
+		int erc = sqlite3_exec(db, "ROLLBACK TRANSACTION TO SAVEPOINT " #savepoint "; RELEASE SAVEPOINT " #savepoint ";", NULL, NULL, &errmsg);\
+		if (erc) {\
+			if (erc == SQLITE_ERROR /* cannot rollback because no transaction is active */) {\
+				; /* do nothing */\
+			} else {\
+				debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s': %s", __FILE__, __LINE__, erc, sqlite3_errstr(erc), errmsg);\
+			}\
+			sqlite3_free(errmsg);\
+		}\
+	}\
+} while (0)
+
 #define IMMUTABLE(T) \
 		"CREATE TRIGGER " T "ImmutableI BEFORE INSERT ON " T " FOR EACH ROW" \
 		"    BEGIN" \
@@ -118,47 +130,9 @@ do {\
 		"        SELECT RAISE(ABORT, 'cannot delete rows of immutable table');" \
 		"    END;"
 
-#define chirp_sqlite3_column_jsonify(stmt, n, B) \
-do {\
-	switch (sqlite3_column_type(stmt, n)) {\
-		case SQLITE_NULL:\
-			CATCHUNIX(buffer_putliteral(B, "null"));\
-			break;\
-		case SQLITE_INTEGER:\
-			CATCHUNIX(buffer_putfstring(B, "%" PRId64, (int64_t) sqlite3_column_int64(stmt, n)));\
-			break;\
-		case SQLITE_FLOAT:\
-			CATCHUNIX(buffer_putfstring(B, "%.*e", DBL_DIG, sqlite3_column_double(stmt, n)));\
-			break;\
-		case SQLITE_TEXT: {\
-			CATCHUNIX(buffer_putliteral(B, "\""));\
-			CATCHUNIX(jsonA_escapestring(B, (const char *)sqlite3_column_text(stmt, n)));\
-			CATCHUNIX(buffer_putliteral(B, "\""));\
-			break;\
-		}\
-		case SQLITE_BLOB:\
-		default:\
-			assert(0); /* we don't handle this */\
-	}\
-} while (0)
-
-#define chirp_sqlite3_row_jsonify(stmt, B) \
-do {\
-	int _i;\
-	int _first = 1;\
-	sqlite3_stmt *_stmt = (stmt);\
-	buffer_t *_B = (B);\
-	CATCHUNIX(buffer_putliteral(_B, "{"));\
-	for (_i = 0; _i < sqlite3_column_count(_stmt); _i++) {\
-		if (!_first)\
-			CATCHUNIX(buffer_putliteral(_B, ","));\
-		_first = 0;\
-		CATCHUNIX(buffer_putfstring(_B, "\"%s\":", sqlite3_column_name(_stmt, _i)));\
-		chirp_sqlite3_column_jsonify(_stmt, _i, _B);\
-	}\
-	CATCHUNIX(buffer_putliteral(_B, "}"));\
-} while (0)
-
 #endif
+
+int chirp_sqlite3_column_jsonify(sqlite3_stmt *stmt, int n, buffer_t *B);
+int chirp_sqlite3_row_jsonify(sqlite3_stmt *stmt, buffer_t *B);
 
 /* vim: set noexpandtab tabstop=4: */

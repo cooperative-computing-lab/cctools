@@ -75,7 +75,7 @@ OPTIONS_BEGIN
 OPTION_ITEM(`-a, --advertise')Advertise the master information to a catalog server.
 OPTION_TRIPLET(-C, catalog-server, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
 OPTION_TRIPLET(-F, wq-fast-abort, #)WorkQueue fast abort multiplier. (default is deactivated)
-OPTION_TRIPLET(-N, project-name, project)Set the project name to PARAM(project).
+OPTION_TRIPLET(-M,-N, project-name, project)Set the project name to PARAM(project).
 OPTION_TRIPLET(-p, port, port)Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
 OPTION_TRIPLET(-Z, port-file, file)Select port at random and write it to this file.  (default is disabled)
 OPTION_TRIPLET(-P, priority, integer)Priority. Higher the value, higher the priority.
@@ -86,7 +86,7 @@ OPTIONS_END
 
 SUBSECTION(Monitor Options)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-M, monitor, dir)Enable the resource monitor, and write the monitor logs to <dir>
+OPTION_PAIR(--monitor, dir)Enable the resource monitor, and write the monitor logs to <dir>
 OPTION_PAIR(--monitor-limits, file)Use <file> as value-pairs for resource limits.
 OPTION_ITEM(`--monitor-with-time-series')Enable monitor time series.                 (default is disabled)
 OPTION_ITEM(`--monitor-with-opened-files')Enable monitoring of openened files.        (default is disabled)

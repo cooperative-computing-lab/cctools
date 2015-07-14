@@ -1168,6 +1168,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_DISABLE_BATCH_CACHE,
 		LONG_OPT_DOT_CONDENSE,
 		LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME,
+		LONG_OPT_MONITOR,
 		LONG_OPT_MONITOR_INTERVAL,
 		LONG_OPT_MONITOR_LIMITS,
 		LONG_OPT_MONITOR_LOG_NAME,
@@ -1205,7 +1206,7 @@ int main(int argc, char *argv[])
 		{"makeflow-log", required_argument, 0, 'l'},
 		{"max-local", required_argument, 0, 'j'},
 		{"max-remote", required_argument, 0, 'J'},
-		{"monitor", required_argument, 0, 'M'},
+		{"monitor", required_argument, 0, LONG_OPT_MONITOR},
 		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
 		{"monitor-limits", required_argument,   0, LONG_OPT_MONITOR_LIMITS},
 		{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
@@ -1328,7 +1329,7 @@ int main(int argc, char *argv[])
 			case 'm':
 				email_summary_to = xxstrdup(optarg);
 				break;
-			case 'M':
+			case LONG_OPT_MONITOR:
 				monitor_mode = 1;
 				if(monitor_log_dir)
 					free(monitor_log_dir);
@@ -1358,6 +1359,7 @@ int main(int argc, char *argv[])
 					free(monitor_log_format);
 				monitor_log_format = xxstrdup(optarg);
 				break;
+			case 'M':
 			case 'N':
 				free(project);
 				project = xxstrdup(optarg);

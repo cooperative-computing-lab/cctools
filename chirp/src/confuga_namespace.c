@@ -198,8 +198,6 @@ CONFUGA_API int confuga_metadata_lookup (confuga *C, const char *path, char **da
 	size_t _size;
 	char header[HEADER_LENGTH+1] = "";
 	confuga_fid_t fid;
-	buffer_t B;
-	buffer_init(&B);
 	RESOLVE(path);
 
 	if (size == NULL)
@@ -253,7 +251,6 @@ CONFUGA_API int confuga_metadata_lookup (confuga *C, const char *path, char **da
 	goto out;
 out:
 	debug(D_CONFUGA, "= %d (%s)", rc, strerror(rc));
-	buffer_free(&B);
 	close(fd); /* -1 is a NOP */
 	return rc;
 }

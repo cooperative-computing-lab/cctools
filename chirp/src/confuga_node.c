@@ -201,7 +201,7 @@ out:
 	return rc;
 }
 
-static int sn_init (confuga *C, const struct confuga_host *host)
+static int sn_init (confuga *C, confuga_sid_t sid, const struct confuga_host *host)
 {
 	static const confuga_fid_t empty = {CONFUGA_FID_EMPTY};
 	static const char SQL[] =
@@ -230,6 +230,7 @@ static int sn_init (confuga *C, const struct confuga_host *host)
 
 	CATCHUNIX(snprintf(template, sizeof(template), "%s/file/" CONFUGA_FID_PRIFMT, host->root, CONFUGA_FID_PRIARGS(empty)));
 	CATCHUNIXIGNORE(chirp_reli_putfile_buffer(host->hostport, template, "", S_IRUSR, 0, stoptime), EEXIST);
+	CATCH(confugaR_register(C, empty, 0, sid));
 
 	CATCHUNIX(snprintf(template, sizeof(template), "%s/open", host->root));
 	CATCHUNIXIGNORE(chirp_reli_mkdir(host->hostport, template, S_IRWXU, stoptime), EEXIST);
@@ -240,7 +241,6 @@ static int sn_init (confuga *C, const struct confuga_host *host)
 	CATCHUNIX(chirp_reli_setacl(host->hostport, template, whoami, "rwldpa", stoptime));
 
 	debug(D_DEBUG, "setting `%s' to initialized", host->hostport);
-	CATCH(confugaR_register(C, empty, 0, host));
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_text(stmt, 1, host->hostport, -1, SQLITE_STATIC));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
@@ -288,7 +288,7 @@ CONFUGA_IAPI int confugaS_setup (confuga *C)
 	static const char SQL[] =
 		"DROP TABLE IF EXISTS ConfugaResults;"
 		"CREATE TEMPORARY TABLE ConfugaResults AS" /* so we don't hold read locks */
-		"	SELECT hostport, root, initialized, ticket"
+		"	SELECT id, hostport, root, initialized, ticket"
 		"		FROM Confuga.StorageNodeAlive;"
 		"SELECT * FROM ConfugaResults;";
 
@@ -307,14 +307,16 @@ CONFUGA_IAPI int confugaS_setup (confuga *C)
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		confuga_sid_t sid;
 		struct confuga_host host;
-		CATCHUNIX(snprintf(host.hostport, sizeof(host.hostport), "%s", (const char *) sqlite3_column_text(stmt, 0)));
-		CATCHUNIX(snprintf(host.root, sizeof(host.root), "%s", (const char *) sqlite3_column_text(stmt, 1)));
-		if (!sqlite3_column_int(stmt, 2)) {
-			sn_init(C, &host);
+		sid = sqlite3_column_int64(stmt, 0);
+		CATCHUNIX(snprintf(host.hostport, sizeof(host.hostport), "%s", (const char *) sqlite3_column_text(stmt, 1)));
+		CATCHUNIX(snprintf(host.root, sizeof(host.root), "%s", (const char *) sqlite3_column_text(stmt, 2)));
+		if (!sqlite3_column_int(stmt, 3)) {
+			sn_init(C, sid, &host);
 		}
-		const unsigned char *ticket = sqlite3_column_blob(stmt, 3);
-		assert(sqlite3_column_bytes(stmt, 3) == 0 || sqlite3_column_bytes(stmt, 3) == sizeof(C->ticket));
+		const unsigned char *ticket = sqlite3_column_blob(stmt, 4);
+		assert(sqlite3_column_bytes(stmt, 4) == 0 || sqlite3_column_bytes(stmt, 4) == sizeof(C->ticket));
 		if (ticket == NULL || !(memcmp(ticket, C->ticket, sizeof(C->ticket)) == 0)) {
 			sn_ticket(C, &host);
 		}

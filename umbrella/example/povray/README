@@ -61,7 +61,7 @@ umbrella \
 --config povray.umbrella \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/ec2_povray --remotelog umbrella.log.ec2 \
+--output /tmp/umbrella_test/ec2_povray \
 run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
 
 #Condor execution engine test command. To test this, the machine you are using should have condor installed.
