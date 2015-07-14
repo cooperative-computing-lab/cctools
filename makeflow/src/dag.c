@@ -56,6 +56,13 @@ struct dag *dag_create()
 	set_insert(d->special_vars, RESOURCES_DISK);
 	set_insert(d->special_vars, RESOURCES_GPUS);
 
+	/* export all variables related to resources */
+	set_insert(d->export_vars, "CATEGORY");
+	set_insert(d->export_vars, RESOURCES_CORES);
+	set_insert(d->export_vars, RESOURCES_MEMORY);
+	set_insert(d->export_vars, RESOURCES_DISK);
+	set_insert(d->export_vars, RESOURCES_GPUS);
+
 	memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
 	return d;
 }
