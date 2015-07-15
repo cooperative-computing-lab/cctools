@@ -163,8 +163,8 @@ static int64_t gpus_allocated = 0;
 
 static int64_t disk_measured = 0;
 
-static int send_resources_interval = 30;
-static int send_stats_interval     = 60;
+static int send_resources_interval = 180;
+static int send_stats_interval     = 180;
 
 static struct work_queue *foreman_q = NULL;
 
