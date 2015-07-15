@@ -163,8 +163,8 @@ static int64_t gpus_allocated = 0;
 
 static int64_t disk_measured = 0;
 
-static int send_resources_interval = 30;
-static int send_stats_interval     = 60;
+static int send_resources_interval = 180;
+static int send_stats_interval     = 180;
 
 static struct work_queue *foreman_q = NULL;
 
@@ -1605,7 +1605,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		work_for_master(master);
 	}
 
-	last_task_received  = -1;
+	last_task_received     = 0;
 	results_to_be_sent_msg = 0;
 
 	workspace_cleanup();
