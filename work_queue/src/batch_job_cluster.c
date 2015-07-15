@@ -292,13 +292,13 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 			cluster_options = strdup("-o /dev/null -j oe -V");
 			cluster_jobname_var = strdup("-N");
 			break;
-        case BATCH_QUEUE_TYPE_SLURM:
-            cluster_name = strdup("slurm");
-            cluster_submit_cmd = strdup("sbatch");
-            cluster_remove_cmd = strdup("scancel");
-            cluster_options = strdup("-D . -o /dev/null -e /dev/null --export=ALL");
+		case BATCH_QUEUE_TYPE_SLURM:
+			cluster_name = strdup("slurm");
+			cluster_submit_cmd = strdup("sbatch");
+			cluster_remove_cmd = strdup("scancel");
+			cluster_options = strdup("-D . -o /dev/null -e /dev/null --export=ALL -n 1");
 			cluster_jobname_var = strdup("-J");
-            break;
+			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:
 			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
 			cluster_submit_cmd = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND");
@@ -440,28 +440,28 @@ const struct batch_queue_module batch_queue_torque = {
 };
 
 const struct batch_queue_module batch_queue_slurm = {
-    BATCH_QUEUE_TYPE_SLURM,
-    "slurm",
+	BATCH_QUEUE_TYPE_SLURM,
+	"slurm",
 
-    batch_queue_cluster_create,
-    batch_queue_cluster_free,
-    batch_queue_cluster_port,
-    batch_queue_cluster_option_update,
+	batch_queue_cluster_create,
+	batch_queue_cluster_free,
+	batch_queue_cluster_port,
+	batch_queue_cluster_option_update,
 
-    {
-        batch_job_cluster_submit,
-        batch_job_cluster_wait,
-        batch_job_cluster_remove,
-    },
+	{
+		batch_job_cluster_submit,
+		batch_job_cluster_wait,
+		batch_job_cluster_remove,
+	},
 
-    {
-        batch_fs_cluster_chdir,
-        batch_fs_cluster_getcwd,
-        batch_fs_cluster_mkdir,
-        batch_fs_cluster_putfile,
-        batch_fs_cluster_stat,
-        batch_fs_cluster_unlink,
-    },
+	{
+		batch_fs_cluster_chdir,
+		batch_fs_cluster_getcwd,
+		batch_fs_cluster_mkdir,
+		batch_fs_cluster_putfile,
+		batch_fs_cluster_stat,
+		batch_fs_cluster_unlink,
+	},
 };
 
 /* vim: set noexpandtab tabstop=4: */
