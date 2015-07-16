@@ -16,12 +16,14 @@
 	},
 	"software": {
 		"cmssw-4.2.8-slc5-amd64": {
+			"id": "cvmfs",
 			"mount_env": "CMS_DIR",
 			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
 	},
 	"data": {
 		"OutreachExercise2010.git": {
+			"id": "1",
 			"mount_env": "GIT_REPO_1",
 			"mountpoint": "/data/git_repo/OutreachExercise2010"
 		}

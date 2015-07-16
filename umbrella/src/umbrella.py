@@ -22,12 +22,27 @@ Implementation Logic of Dependency Sources:
 			Do all the work mentioned above for Docker execution engine + add SITEINFO into mountlist file + parrotize the user's command. First parrotize the user's command, then dockerize the user's command.
 		If Parrot is needed to access cvmfs, and the sandbox type is chroot,
 			Do all the work mentioned above for chroot execution engine + add SITEINFO into mountlist file + parrotize the user's command. First parrotize the user's command, then chrootize the user's command.
-	ROOT: do nothing if a ROOT file through ROOT protocol is needed, because ROOT supports data access during runtime without downloading first.
+	ROOT: If the user expects the root file to be access at runtime without downloading. Umbrella does nothing if a ROOT file through ROOT protocol is needed, because ROOT supports data access during runtime without downloading first. Inside the umbrella specification file, the user only needs to specify the mount_env attribute.
+		If the user expects the root file to be downloaded first, then the user needs to specify both the mount_env and mountpoint attributes inside the umbrella specification.
+
+	Git: If the user's application needs git to do `git clone <repo_url>; git checkout <branch_name/commit_id>`, then the user does not need to specify mountpoint attribute inside the umbrella specification.
+		If the user's application does not explicitly require git, but umbrella tries to pull some dependencies from a remote git repository, then the user needs to specify both the mount_env and mountpoint attributes inside the umbrella specification.
 
 mount_env and mountpoint:
 If only mountpoint is set to A in a specification, the dependency will be downloaded into the umbrella local cache with the file path of D, and a new mountpoint will be added into mount_dict (mount_dict[A] = D).
 If only mount_env is set to B in a specification, the dependency will not be downloaded, package_search will be executed to get one remote storage location, C, of the dependency, a new environment variable will be set (env_para_dict[B] = C).
 If mountpoint is set to A and mount_env is set to B in a specification, the dependency will be downloaded into the umbrella local cache with the file path of D, and a new mountpoint will be added into mount_dict (mount_dict[A] = D) and a new environment variable will also be set (env_para_dict[B] = A).
+
+Local path inside the umbrella local cache:
+Case 1: the dependency is delivered as a git repository through http/https/git protocol.
+        dest = os.path.dirname(sandbox_dir) + "/cache/" + git_commit + '/' + repo_name
+	Note: git_commit is optional in the metadata database. If git_commit is not specified in the metadata database, then:
+        dest = os.path.dirname(sandbox_dir) + "/cache/" + repo_name
+Case 2: the dependency is delivered not as a git repository through http/https protocol.
+        dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
+	Note: checksum is required to be specified in the metadata database. If it is not specified, umbrella will complain and exit.
+Case 3: SITECONF info necessary for CVMFS cms repository access through Parrot. For this case, we use a hard-coded path.
+        dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/SITECONF"
 """
 
 import sys
@@ -788,8 +803,8 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardwar
 	#Here we use the cctools package from the local cache (which includes all the packages including cvmfs, globus, fuse and so on). Even if the user may install cctools by himself on the machine, the configuration of the local installation may be not what we want. For example, the user may just configure like this `./configure --prefix ~/cctools`.
 	name = 'cctools-4.9.0-%s-%s' % (linux_distro, hardware_platform)
 	item = package_search(packages_json, name)
-	id = attr_check(item, "checksum")
-	dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
+	checksum = attr_check(item, "checksum")
+	dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), checksum, name)
 	#4.4 and 4.4 does not support --no-set-foreground feature.
 	#user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
 	if cvmfs_http_proxy:
