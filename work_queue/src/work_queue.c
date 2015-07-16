@@ -3001,8 +3001,11 @@ static struct work_queue_file *work_queue_file_clone(const struct work_queue_fil
   memcpy(new, file, file_t_size);
   //allocate new memory for strings so we don't segfault when the original
   //memory is freed.
-  new->payload = xxstrdup(file->payload);
+  new->payload     = xxstrdup(file->payload);
   new->remote_name = xxstrdup(file->remote_name);
+
+  if(file->cached_name)
+	  new->cached_name = xxstrdup(file->cached_name);
 
   return new;
 }
@@ -3018,6 +3021,17 @@ static struct list *work_queue_task_file_list_clone(struct list *list) {
 	list_push_tail(new, new_file);
   }
   return new;
+}
+
+static struct list *work_queue_task_env_list_clone(struct list *env_list) {
+	struct list *new = list_create();
+	char *var;
+	list_first_item(env_list);
+	while((var=list_next_item(env_list))) {
+		list_push_tail(new, xxstrdup(var));
+	}
+
+	return new;
 }
 
 
@@ -3061,7 +3075,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 
 struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task)
 {
-  struct work_queue_task *new = xxmalloc(sizeof(*new));
+  struct work_queue_task *new = xxmalloc(sizeof(struct work_queue_task));
   memcpy(new, task, sizeof(*new));
 
   //allocate new memory so we don't segfault when original memory is freed.
@@ -3073,8 +3087,14 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
 	new->command_line = xxstrdup(task->command_line);
   }
 
-  new->input_files = work_queue_task_file_list_clone(task->input_files);
+  new->input_files  = work_queue_task_file_list_clone(task->input_files);
   new->output_files = work_queue_task_file_list_clone(task->output_files);
+  new->env_list     = work_queue_task_env_list_clone(task->env_list);
+
+  if(task->resources_measured) {
+	  new->resources_measured = malloc(sizeof(struct rmsummary));
+	  memcpy(new->resources_measured, task->resources_measured, sizeof(sizeof(struct rmsummary)));
+  }
 
   if(task->output) {
 	new->output = xxstrdup(task->output);
