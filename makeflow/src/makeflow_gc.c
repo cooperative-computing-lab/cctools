@@ -178,13 +178,13 @@ int makeflow_file_clean( struct dag *d, struct batch_queue *queue, struct dag_fi
 	return 0;
 }
 
-void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_node *n)
+void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_node *n, int silent)
 {
 	struct dag_file *f;
 
 	list_first_item(n->target_files);
 	while((f = list_next_item(n->target_files)))
-		makeflow_file_clean(d, queue, f, 0);
+		makeflow_file_clean(d, queue, f, silent);
 
 	if(n->nested_job){
 		char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
