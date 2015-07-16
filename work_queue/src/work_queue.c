@@ -761,10 +761,10 @@ static void add_worker(struct work_queue *q)
 //	w->resources = work_queue_resources_create();
 
 	struct work_queue_resources *r = work_queue_resources_create();
-    r->cores.smallest = r->cores.largest = r->cores.total = -1;//default_resource_value;
-    r->memory.smallest = r->memory.largest = r->memory.total = -1;//default_resource_value;
-    r->disk.smallest = r->disk.largest = r->disk.total = -1;//default_resource_value;
-    r->gpus.smallest = r->gpus.largest = r->gpus.total = -1;//default_resource_value;
+	r->cores.smallest = r->cores.largest = r->cores.total = -1;//default_resource_value;
+	r->memory.smallest = r->memory.largest = r->memory.total = -1;//default_resource_value;
+	r->disk.smallest = r->disk.largest = r->disk.total = -1;//default_resource_value;
+	r->gpus.smallest = r->gpus.largest = r->gpus.total = -1;//default_resource_value;
 	w->resources = r;
 
 	w->stats     = calloc(1, sizeof(struct work_queue_stats));
@@ -2146,7 +2146,7 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 
 static int send_input_file(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f)
 {
-	
+
 	int64_t total_bytes = 0;
 	int64_t actual = 0;
 	int result = SUCCESS; //return success unless something fails below
@@ -3047,6 +3047,10 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 		return NULL;
 	}
 	memset(t, 0, sizeof(*t));
+
+	/* REMEMBER: Any memory allocation done in this function should have a
+	 * corresponding copy in work_queue_task_clone. Otherwise we get
+	 * double-free segfaults. */
 
 	if(command_line) t->command_line = xxstrdup(command_line);
 
