@@ -79,6 +79,34 @@ static void export_environment( struct list *env_list )
 			setenv(name,value+1,1);
 			*value='=';
 		}
+		else {
+			/* Without =, we remove the variable */
+			unsetenv(name);
+		}
+	}
+}
+
+static void specify_integer_env_var( struct work_queue_process *p, const char *name, int64_t value) {
+	char *value_str = string_format("%" PRId64, value);
+	work_queue_task_specify_enviroment_variable(p->task, name, value_str);
+	free(value_str);
+}
+
+static void specify_resources_vars(struct work_queue_process *p) {
+	if(p->task->cores > 0) {
+		specify_integer_env_var(p, "CORES", p->task->cores);
+	}
+
+	if(p->task->memory > 0) {
+		specify_integer_env_var(p, "MEMORY", p->task->memory);
+	}
+
+	if(p->task->disk > 0) {
+		specify_integer_env_var(p, "DISK", p->task->disk);
+	}
+
+	if(p->task->gpus > 0) {
+		specify_integer_env_var(p, "GPUS", p->task->gpus);
 	}
 }
 
@@ -118,7 +146,6 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 		return p->pid;
 
 	} else {
-
 		if(chdir(p->sandbox)) {
 			printf("The sandbox dir is %s", p->sandbox);
 			fatal("could not change directory into %s: %s", p->sandbox, strerror(errno));
@@ -141,6 +168,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 
 		close(p->output_fd);
 
+		specify_resources_vars(p);
 		export_environment(p->task->env_list);
 
 		va_list arg_lst;
