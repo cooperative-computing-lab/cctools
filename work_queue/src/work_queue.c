@@ -3122,7 +3122,7 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
-void work_queue_task_specify_env( struct work_queue_task *t, const char *name, const char *value )
+void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value )
 {
 	list_push_tail(t->env_list,string_format("%s=%s",name,value));
 }
