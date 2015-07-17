@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <dirent.h>
 
 #define MAX_BUFFER_SIZE 4096
 
@@ -308,28 +309,32 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 }
 
 void makeflow_log_clean(const char *makeflow_log_file){
-        char fst_line[CHAR_BUF_LEN];
-     	FILE *mf_log = fopen(makeflow_log_file, "r");
-     	if( !mf_log ) {
-       		  fatal("Could not open makeflow log file.");
-     	} else {
-       		  if(fgets(fst_line, sizeof(fst_line), mf_log) != NULL) {
-             		char *token;
-             		char *sandbox_mode;
-             		token = strtok(fst_line, " \t");
-             		sandbox_mode = strtok(NULL, "\t");
-             		if (string_equal(sandbox_mode, "SANDBOX")) {
-                 		token = strtok(NULL, " \t");
-                 		unlink_recursive(token);
-             		} else
-                 		return;
-         	  } else
-             		fatal("Could not read line from makeflow log file.");
-     	}
+    char fst_line[CHAR_BUF_LEN];
+    FILE *mf_log = fopen(makeflow_log_file, "r");
+    if( !mf_log ) {
+    	fatal("Could not open makeflow log file.");
+    } else {
+    	if(fgets(fst_line, sizeof(fst_line), mf_log) != NULL) {
+        	char *token;
+         	char *sandbox_mode;
+         	token = strtok(fst_line, " \t");
+         	sandbox_mode = strtok(NULL, "\t");
+         	if (string_equal(sandbox_mode, "SANDBOX")) {
+            	token = strtok(NULL, " \t");
+                char sandbox_name[CHAR_BUF_LEN];
+                strncpy(sandbox_name, token, strlen(token)-1);
+                DIR *dir = opendir(sandbox_name);
+                if(dir)
+             		unlink_recursive(sandbox_name);
+         	} else
+           		return;
+     	} else
+        	fatal("Could not read line from makeflow log file.");
+    }
 }
 
 void makeflow_log_sandbox_mode( struct dag*d, const char *local_task_dir ) {
-     	fprintf(d->logfile, "# SANDBOX\t%s\n", local_task_dir);
+    fprintf(d->logfile, "# SANDBOX\t%s\n", local_task_dir);
 	makeflow_log_sync(d,1);
 }
 

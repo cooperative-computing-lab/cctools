@@ -1055,6 +1055,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Add node id symbol tags in the makeflow log.		(default is false)\n", "   --log-verbose");
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
 	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
+	printf(" %-30s Put all tasks' sandbox inside this directory.\n", "--local-task-dir=<dir>");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
@@ -1144,8 +1145,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WRAPPER_OUTPUT,
-		LONG_OPT_DOCKER,
-		LONG_OPT_DOCKER_TAR
+        LONG_OPT_DOCKER,
+        LONG_OPT_DOCKER_TAR,
+        LONG_OPT_LOCAL_TASK_DIR
 	};
 
 	static const struct option long_options_run[] = {
@@ -1200,6 +1202,7 @@ int main(int argc, char *argv[])
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
+        {"local-task-dir", required_argument, 0, LONG_OPT_LOCAL_TASK_DIR},
 		{0, 0, 0, 0}
 	};
 
@@ -1427,9 +1430,12 @@ int main(int argc, char *argv[])
 				container_mode = CONTAINER_MODE_DOCKER;
 				container_image = xxstrdup(optarg);
 				break;
-			case LONG_OPT_DOCKER_TAR:
-				image_tar = xxstrdup(optarg);
-				break;
+            case LONG_OPT_DOCKER_TAR:
+                image_tar = xxstrdup(optarg);
+                break;
+            case LONG_OPT_LOCAL_TASK_DIR:
+                local_task_dir = xxstrdup(optarg);
+                break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -1709,7 +1715,7 @@ int main(int argc, char *argv[])
 	}
 
     if(batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX)
-        unlink_recursive(local_task_dir);
+       unlink_recursive(local_task_dir);
 
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
