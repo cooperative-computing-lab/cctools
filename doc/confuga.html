@@ -191,12 +191,12 @@ job 19 completed
 nothing left to do.</code>
 
                 <p>You can then view the result by fetching the output and using your favorite <tt>gif</tt> viewing program:</p>
-                <code><span class="prompt">$ </span>chirp localhost get /capitol.montage.gif
+                <code><span class="prompt">$ </span>chirp localhost:9000 get /capitol.montage.gif
 903.4 KB read in 0.05s (16.1 MB/s)</code>
                 <code><span class="prompt">$ </span>$ display ./capitol.montage.gif</code>
 
                 <p>You can also achieve the same thing using <a href="parrot.html">Parrot</a>:</p>
-                <code><span class="prompt">$ </span>parrot_run display /chirp/localhost/capitol.montage.gif</code>
+                <code><span class="prompt">$ </span>parrot_run display /chirp/localhost:9000/capitol.montage.gif</code>
 
         <h2 id="confuga">Setting up Confuga<a class="sectionlink" href="#confuga" title="Link to this section.">&#x21d7;</a></h2>
             <h3 id="confuga.nodes">Running Storage Nodes<a class="sectionlink" href="#starting.nodes" title="Link to this section.">&#x21d7;</a></h3>
