@@ -134,8 +134,12 @@ def which_exec(name):
 
 	Returns:
 		If the executable is found, returns its fullpath.
+		If PATH is not set, directly exit.
 		Otherwise, returns None.
 	"""
+	if not os.environ.has_key("PATH"):
+		logging.critical("The environment variable PATH is not set!")
+		sys.exit("The environment variable PATH is not set!")
 	for path in os.environ["PATH"].split(":"):
 		fullpath = path + '/' + name
 		if os.path.exists(fullpath) and os.path.isfile(fullpath):
@@ -266,6 +270,34 @@ def package_search(packages_json, name, id=None):
 		logging.debug("packages_json does not include %s", name)
 		sys.exit("packages_json does not include %s\n" % name)
 
+def attr_check(item, attr, check_len = 0):
+	"""Check and obtain the attr of an item.
+
+	Args:
+		item: an item from the metadata database
+		attr: an attribute
+		check_len: if set to 1, also check whether the length of the attr is > 0; if set to 0, ignore the length checking.
+
+	Returns:
+		If the attribute check is successful, directly return the attribute.
+		Otherwise, directly exit.
+	"""
+	logging.debug("check the %s attr of the following item:", attr)
+	logging.debug(item)
+	if item.has_key(attr):
+		if check_len == 1:
+			if len(item[attr]) <= 0:
+				logging.debug("The %s attr of the item is empty.", attr)
+				sys.exit("The %s attr of the item (%s) is empty." % (attr, item))
+			else:
+				return item[attr][0]
+		else:
+			return item[attr]
+	else:
+		logging.debug("This item doesn not have %s attr!", attr)
+		sys.exit("the item (%s) does not have %s attr:" % (attr, item))
+
+
 def cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro, action):
 	"""Download cctools
 
@@ -281,8 +313,16 @@ def cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro
 	"""
 	name = "cctools-4.9.0-%s-%s" % (linux_distro, hardware_platform)
 	item = package_search(packages_json, name)
-	dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
-	dependency_download(item['source'][0], item["checksum"], "md5sum", dest, item["format"], action)
+
+	source = attr_check(item, "source", 1)
+
+	if source[:4] == 'git+':
+		dest = git_dependency_parser(item, source[4:], sandbox_dir)
+	else:
+		checksum = attr_check(item, "checksum")
+		format = attr_check(item, "format")
+		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
+		dependency_download(source, checksum, "md5sum", dest, format, action)
 	return dest
 
 def set_cvmfs_cms_siteconf(name, action, packages_json, sandbox_dir):
@@ -298,11 +338,109 @@ def set_cvmfs_cms_siteconf(name, action, packages_json, sandbox_dir):
 		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 	"""
 	cvmfs_cms_siteconf_mountpoint = ''
-	site_item = package_search(packages_json, "cms_siteconf_local_cvmfs")
-	dest = os.path.dirname(sandbox_dir) + "/cache/" + site_item['checksum'] + "/SITECONF"
-	dependency_download(site_item["source"][0], site_item["checksum"], "md5sum", dest, site_item["format"], "unpack")
-	cvmfs_cms_siteconf_mountpoint = '/cvmfs/cms.cern.ch/SITECONF/local %s/local' % dest
+	item = package_search(packages_json, "cms_siteconf_local_cvmfs")
+	source = attr_check(item, "source", 1)
+	if source[:4] == 'git+':
+		dest = git_dependency_parser(item, source[4:], sandbox_dir)
+	else:
+		checksum = attr_check(item, "checksum")
+		format = attr_check(item, "format")
+		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/SITECONF"
+		dependency_download(source, checksum, "md5sum", dest, format, "unpack")
+		cvmfs_cms_siteconf_mountpoint = '/cvmfs/cms.cern.ch/SITECONF/local %s/local' % dest
 	return cvmfs_cms_siteconf_mountpoint
+
+def is_dir(path):
+	"""Judge whether a path is directory or not.
+	If the path is a dir, directly return. Otherwise, exit directly.
+
+	Args:
+		path: a path
+
+	Returns:
+		None
+	"""
+	if os.path.isdir(path):
+		pass
+	else:
+		logging.debug("%s is not a directory!", path)
+		sys.exit("%s is not a directory!" % path)
+
+def git_dependency_download(repo_url, dest, git_branch, git_commit):
+	"""Prepare a dependency from a git repository.
+	First check whether dest exist or not: if dest exists, then checkout to git_branch and git_commit;
+	otherwise, git clone url, and then checkout to git_branch and git_commit.
+
+	Args:
+		repo_url: the url of the remote git repository
+		dest: the local directory where the git repository will be cloned into
+		git_branch: the branch name of the git repository
+		git_commit: the commit id of the repository
+
+	Returns:
+		dest: the local directory where the git repository is
+	"""
+	dest = remove_trailing_slashes(dest)
+
+	scheme, netloc, path, query, fragment = urlparse.urlsplit(repo_url)
+	repo_name = os.path.basename(path)
+	if repo_name[-4:] == '.git':
+		repo_name = repo_name[:-4]
+
+	dest = dest + '/' + repo_name
+	if os.path.exists(dest):
+		is_dir(dest)
+	else:
+		dir = os.path.dirname(dest)
+		if os.path.exists(dir):
+			is_dir(dir)
+		else:
+			os.makedirs(dir)
+		os.chdir(dir)
+
+		if dependency_check('git') == -1:
+			sys.exit("Git is not found!")
+		cmd = "git clone %s" % repo_url
+		rc, stdout, stderr = func_call(cmd)
+		if rc != 0:
+			subprocess_error(cmd, rc, stdout, stderr)
+
+	os.chdir(dest)
+	if git_branch:
+		cmd = "git checkout %s" % git_branch
+		rc, stdout, stderr = func_call(cmd)
+		if rc != 0:
+			subprocess_error(cmd, rc, stdout, stderr)
+
+	if git_commit:
+		cmd = "git checkout %s" % git_commit
+		rc, stdout, stderr = func_call(cmd)
+		if rc != 0:
+			subprocess_error(cmd, rc, stdout, stderr)
+	return dest
+
+def git_dependency_parser(item, repo_url, sandbox_dir):
+	"""Parse a git dependency
+
+	Args:
+		item: an item from the metadata database
+		repo_url: the url of the remote git repository
+		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
+
+	Returns:
+		dest: the path of the downloaded data dependency in the umbrella local cache.
+	"""
+	logging.debug("This dependency is stored as a git repository: ")
+	logging.debug(item)
+	git_branch = ''
+	if item.has_key("branch"):
+		git_branch = item["branch"]
+	git_commit = ''
+	if item.has_key("commit"):
+		git_commit = item["commit"]
+	dest = os.path.dirname(sandbox_dir) + "/cache/" + git_commit
+	dest = git_dependency_download(repo_url, dest, git_branch, git_commit)
+	return dest
 
 def data_dependency_process(name, id, packages_json, sandbox_dir, action):
 	"""Download a data dependency
@@ -315,13 +453,17 @@ def data_dependency_process(name, id, packages_json, sandbox_dir, action):
 		action: the action on the downloaded dependency. Options: none, unpack. "none" leaves the downloaded dependency at it is. "unpack" uncompresses the dependency.
 
 	Returns:
-		the path of the downloaded data dependency in the umbrella local cache.
+		dest: the path of the downloaded data dependency in the umbrella local cache.
 	"""
 	item = package_search(packages_json, name, id)
-	#table schema: (name text, version text, platform text, store text, store_type text, type text)
-	store = item["source"][0]
-	dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
-	dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
+	source = attr_check(item, "source", 1)
+	if source[:4] == 'git+':
+		dest = git_dependency_parser(item, source[4:], sandbox_dir)
+	else:
+		checksum = attr_check(item, "checksum")
+		format = attr_check(item, "format")
+		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
+		dependency_download(source, checksum, "md5sum", dest, format, action)
 	return dest
 
 def check_cvmfs_repo(repo_name):
@@ -372,14 +514,17 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 	local_cvmfs = ''
 
 	item = package_search(packages_json, name, id)
-	#table schema: (name text, version text, platform text, store text, store_type text, type text)
-	store = item["source"][0]
-	logging.debug("%s is chosen to deliver %s", store, name)
+	source = attr_check(item, "source", 1)
+	logging.debug("%s is chosen to deliver %s", source, name)
 
-	if store[:5] == 'cvmfs':
-		print "%s is chosen to deliver %s" % (store, name)
+	if source[:4] == 'git+':
+		dest = git_dependency_parser(item, source[4:], sandbox_dir)
+		mount_value = dest
+		sys.exit("this is git source, can not support")
+	if source[:5] == 'cvmfs':
+		print "%s is chosen to deliver %s" % (source, name)
 		local_cvmfs = ''
-		local_cvmfs = check_cvmfs_repo(store)
+		local_cvmfs = check_cvmfs_repo(source)
 		if local_cvmfs:
 			logging.debug("The cvmfs is installed on the local host, and its mountpoint is: %s", local_cvmfs)
 		else:
@@ -387,7 +532,7 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 
 		#if local_cvmfs is empty, download cctools package, set cvmfs_cms_siteconf_mountpoint, and call parrotize_user_cmd.
 		if not local_cvmfs:
-			if store.find("cms.cern.ch") != -1:
+			if source.find("cms.cern.ch") != -1:
 				is_cms_cvmfs_app = 1
 
 			logging.debug("To access cvmfs, cctools binary is needed")
@@ -410,8 +555,10 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 			if sandbox_mode == 'parrot':
 				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json, cvmfs_http_proxy)
 	else:
-		dest = os.path.dirname(sandbox_dir) + "/cache/" + item["checksum"] + "/" + name
-		dependency_download(store, item['checksum'], "md5sum", dest, item["format"], action)
+		checksum = attr_check(item, "checksum")
+		format = attr_check(item, "format")
+		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
+		dependency_download(source, checksum, "md5sum", dest, format, action)
 		mount_value = dest
 	return (is_cms_cvmfs_app, cvmfs_cms_siteconf_mountpoint, mount_value, local_cvmfs)
 
@@ -426,19 +573,31 @@ def env_parameter_init(hardware_spec, kernel_spec, os_spec):
 	Returns:
 		a tuple including the requirements for hardware, kernel and os.
 	"""
-	hardware_platform = hardware_spec["arch"].lower()
-	cpu_cores = hardware_spec["cores"].lower()
-	memory_size = hardware_spec["memory"].lower()
-	disk_size = hardware_spec["disk"].lower()
-	kernel_name = kernel_spec["name"].lower()
-	kernel_version = kernel_spec["version"].lower()
+	hardware_platform = attr_check(hardware_spec, "arch").lower()
+
+	cpu_cores = 1
+	if hardware_spec.has_key("cores"):
+		cpu_cores = hardware_spec["cores"].lower()
+
+	memory_size = "1GB"
+	if hardware_spec.has_key("memory"):
+		memory_size = hardware_spec["memory"].lower()
+
+	disk_size = "1GB"
+	if hardware_spec.has_key("disk"):
+		disk_size = hardware_spec["disk"].lower()
+
+	kernel_name = attr_check(kernel_spec, "name").lower()
+	kernel_version = attr_check(kernel_spec, "version").lower()
 	kernel_version = re.sub('\s+', '', kernel_version).strip()
-	distro_name = os_spec["name"].lower()
-	distro_version = os_spec["version"].lower()
+
+	distro_name = attr_check(os_spec, "name").lower()
+	distro_version = attr_check(os_spec, "version").lower()
+
+	os_id = ''
 	if os_spec.has_key("id"):
 		os_id = os_spec["id"]
-	else:
-		os_id = ''
+
 	index = distro_version.find('.')
 	linux_distro = distro_name + distro_version[:index] #example of linux_distro: redhat6
 	return (hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id)
@@ -628,7 +787,8 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardwar
 	"""
 	#Here we use the cctools package from the local cache (which includes all the packages including cvmfs, globus, fuse and so on). Even if the user may install cctools by himself on the machine, the configuration of the local installation may be not what we want. For example, the user may just configure like this `./configure --prefix ~/cctools`.
 	name = 'cctools-4.9.0-%s-%s' % (linux_distro, hardware_platform)
-	id = package_search(packages_json, name)["checksum"]
+	item = package_search(packages_json, name)
+	id = attr_check(item, "checksum")
 	dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), id, name)
 	#4.4 and 4.4 does not support --no-set-foreground feature.
 	#user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
@@ -701,14 +861,13 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		mount_env = ''
 		if software_spec[item].has_key('mount_env'):
 			mount_env = software_spec[item]['mount_env']
-		action = 'none'
+		action = 'unpack'
 		if software_spec[item].has_key('action'):
 			action = software_spec[item]['action'].lower()
 
 		if mount_env and not mountpoint:
 			result = package_search(packages_json, item, id)
-			#table schema: (name text, version text, platform text, store text, store_type text, type text)
-			env_para_dict[mount_env] =result["source"][0]
+			env_para_dict[mount_env] =attr_check(result, "source", 1)
 		else:
 			r1, r2, r3, r4 = dependency_process(item, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, cvmfs_http_proxy)
 			if r1 == 1 and is_cms_cvmfs_app == 0:
@@ -803,8 +962,7 @@ def data_install(data_spec, packages_json, sandbox_dir, mount_dict, env_para_dic
 
 		if mount_env and not mountpoint:
 			result = package_search(packages_json, item, id)
-			#table schema: (name text, version text, platform text, store text, store_type text, type text)
-			env_para_dict[mount_env] =result["source"][0]
+			env_para_dict[mount_env] = attr_check(result, "source", 1)
 		else:
 			mount_value = data_dependency_process(item, id, packages_json, sandbox_dir, action)
 			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, mount_value)
@@ -1231,7 +1389,8 @@ def create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_vers
 		Otherwise, directly exit.
 	"""
 	name = "%s-%s-%s" %(distro_name, distro_version, hardware_platform)
-	id = package_search(packages, name)["checksum"]
+	item = package_search(packages, name)
+	id = attr_check(item, "checksum")
 	location = os.path.dirname(sandbox_dir) + '/cache/' + id + '/' + name
 	#docker container runs as root user, so use the owner option of tar command to set the owner of the docker image
 	cmd = 'cd ' + location + '; tar --owner=root -c .|docker import - ' + name + '; cd -'
@@ -2012,8 +2171,8 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandb
 
 		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform) #example of item here: redhat-6.5-x86_64
 		if os_id == '':
-			packages_item = package_search(packages_json, item)["checksum"]
-			os_id = packages_item
+			item1 = package_search(packages_json, item)
+			os_id = attr_check(item1, "checksum")
 
 		os_image_dir = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), os_id, item)
 		logging.debug("A separate OS (%s) is needed!", os_image_dir)

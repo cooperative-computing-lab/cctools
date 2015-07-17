@@ -252,6 +252,17 @@ class Task(_object):
         return self._task.command_line
 
     ##
+    # Get the priority of the task.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.priority
+    # @endcode
+    @property
+    def priority(self):
+        return self._task.priority
+
+    ##
     # Get the algorithm for choosing worker to run the task.
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
