@@ -23,6 +23,7 @@ extern const struct batch_queue_module batch_queue_condor;
 extern const struct batch_queue_module batch_queue_local;
 extern const struct batch_queue_module batch_queue_moab;
 extern const struct batch_queue_module batch_queue_sge;
+extern const struct batch_queue_module batch_queue_pbs;
 extern const struct batch_queue_module batch_queue_torque;
 extern const struct batch_queue_module batch_queue_slurm;
 extern const struct batch_queue_module batch_queue_wq;
@@ -46,6 +47,7 @@ const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_local,
 	&batch_queue_moab,
 	&batch_queue_sge,
+	&batch_queue_pbs,
 	&batch_queue_torque,
 	&batch_queue_slurm,
 	&batch_queue_wq,

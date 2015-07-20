@@ -66,7 +66,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
 	}
 	
-	if(q->type == BATCH_QUEUE_TYPE_TORQUE){
+	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS){
 		fprintf(file, "cd %s\n", path);
 	}
 
@@ -285,6 +285,13 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 			cluster_options = strdup("-d . -o /dev/null -j oe -V");
 			cluster_jobname_var = strdup("-N");
 			break;
+		case BATCH_QUEUE_TYPE_PBS:
+			cluster_name = strdup("pbs");
+			cluster_submit_cmd = strdup("qsub");
+			cluster_remove_cmd = strdup("qdel");
+			cluster_options = strdup("-o /dev/null -j oe -V");
+			cluster_jobname_var = strdup("-N");
+			break;
 		case BATCH_QUEUE_TYPE_TORQUE:
 			cluster_name = strdup("torque");
 			cluster_submit_cmd = strdup("qsub");
@@ -392,6 +399,31 @@ const struct batch_queue_module batch_queue_moab = {
 const struct batch_queue_module batch_queue_sge = {
 	BATCH_QUEUE_TYPE_SGE,
 	"sge",
+
+	batch_queue_cluster_create,
+	batch_queue_cluster_free,
+	batch_queue_cluster_port,
+	batch_queue_cluster_option_update,
+
+	{
+		batch_job_cluster_submit,
+		batch_job_cluster_wait,
+		batch_job_cluster_remove,
+	},
+
+	{
+		batch_fs_cluster_chdir,
+		batch_fs_cluster_getcwd,
+		batch_fs_cluster_mkdir,
+		batch_fs_cluster_putfile,
+		batch_fs_cluster_stat,
+		batch_fs_cluster_unlink,
+	},
+};
+
+const struct batch_queue_module batch_queue_pbs = {
+	BATCH_QUEUE_TYPE_PBS,
+	"pbs",
 
 	batch_queue_cluster_create,
 	batch_queue_cluster_free,
