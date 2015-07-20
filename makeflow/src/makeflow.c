@@ -43,6 +43,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 
 /*
 Code organization notes:
@@ -545,7 +546,11 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
     if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
         envlist = nvpair_create();
     	nvpair_insert_string(envlist, "local_task_dir", local_task_dir);
-        mkdir(local_task_dir, 0777);
+        DIR *dir = opendir(local_task_dir);
+        if (dir == NULL) 
+        	if (mkdir(local_task_dir, 0777) == -1) 
+  				fatal("Fail to create public sandbox with the error message %s", strerror(errno));
+
     }
 
 	while(1) {

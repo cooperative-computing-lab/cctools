@@ -315,14 +315,13 @@ void makeflow_log_clean(const char *makeflow_log_file){
     	fatal("Could not open makeflow log file.");
     } else {
     	if(fgets(fst_line, sizeof(fst_line), mf_log) != NULL) {
-        	char *token;
-         	char *sandbox_mode;
-         	token = strtok(fst_line, " \t");
-         	sandbox_mode = strtok(NULL, "\t");
+            char sandbox_mode[CHAR_BUF_LEN];
+            char sandbox_name[CHAR_BUF_LEN];
+
+            if(sscanf("# %s\t%s", sandbox_mode, sandbox_name) == -1) 
+ 				fatal("Fail to split the string with the error message %s\n", strerror(errno));
+             
          	if (string_equal(sandbox_mode, "SANDBOX")) {
-            	token = strtok(NULL, " \t");
-                char sandbox_name[CHAR_BUF_LEN];
-                strncpy(sandbox_name, token, strlen(token)-1);
                 DIR *dir = opendir(sandbox_name);
                 if(dir)
              		unlink_recursive(sandbox_name);
