@@ -621,6 +621,9 @@ Each line contains the following items:
 		<li> failed </li>
 		<li> aborted </li>
 	</ol>
+        <li><b>job_id</b> - the job id of this task in the underline execution
+	system (local or batch system). If the Makeflow is executed locally, the
+	job id would be the process id of the process that executes this task. If
 	the underline execution system is a batch system, such as Condor or SGE,
 	the job id would be the job id assigned by the batch system when the task
 	was sent to the batch system for execution.</li>
