@@ -228,6 +228,11 @@ class Task(_object):
     def specify_end_time( self, seconds ):
         return work_queue_task_specify_end_time(self._task,seconds)
 
+    # Set this environment variable before running the task.
+    # If value is None, then variable is unset.
+    def specify_environment_variable( self, name, value = None ):
+        return work_queue_task_specify_enviroment_variable(self._task,name,value)
+
     ##
     # Get the user-defined logical name for the task.
     #
