@@ -1687,6 +1687,23 @@ static void handle_sigchld(int sig)
 	sigchld_received_flag = 1;
 }
 
+static void read_resources_env_var(const char *name, int64_t *manual_option) {
+	char *value;
+	value = getenv(name);
+	if(value) {
+		*manual_option = atoi(value);
+		/* unset variable so that children task cannot read the global value */
+		unsetenv(name);
+	}
+}
+
+static void read_resources_env_vars() {
+	read_resources_env_var("CORES",  &manual_cores_option);
+	read_resources_env_var("MEMORY", &manual_memory_option);
+	read_resources_env_var("DISK",   &manual_disk_option);
+	read_resources_env_var("GPUS",   &manual_gpus_option);
+}
+
 static void show_help(const char *cmd)
 {
 	printf( "Use: %s [options] <masterhost> <port>\n", cmd);
@@ -1811,6 +1828,7 @@ int main(int argc, char *argv[])
 	worker_mode = WORKER_MODE_WORKER;
 
 	debug_config(argv[0]);
+	read_resources_env_vars();
 
 	while((c = getopt_long(argc, argv, "acC:d:f:F:t:o:p:M:N:P:w:i:b:z:A:O:s:vZ:h", long_options, 0)) != (char) -1) {
 		switch (c) {
