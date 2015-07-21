@@ -79,6 +79,10 @@ static void export_environment( struct list *env_list )
 			setenv(name,value+1,1);
 			*value='=';
 		}
+		else {
+			/* Without =, we remove the variable */
+			unsetenv(name);
+		}
 	}
 }
 

@@ -3124,7 +3124,12 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 
 void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value )
 {
-	list_push_tail(t->env_list,string_format("%s=%s",name,value));
+	if(value) {
+		list_push_tail(t->env_list,string_format("%s=%s",name,value));
+	} else {
+		/* Specifications without = indicate variables to me unset. */
+		list_push_tail(t->env_list,string_format("%s",name));
+	}
 }
 
 static void set_task_unlabel_flag( struct work_queue_task *t )
