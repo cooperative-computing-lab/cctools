@@ -18,6 +18,7 @@ static char * cluster_name = NULL;
 static char * cluster_submit_cmd = NULL;
 static char * cluster_remove_cmd = NULL;
 static char * cluster_options = NULL;
+static char * cluster_jobname_var = NULL;
 
 /*
 Principle of operation:
@@ -54,10 +55,20 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 		return 0;
 	}
 
+	char *path = getenv("PWD");
+
 	fprintf(file, "#!/bin/sh\n");
 
-	// Some systems set PBS_JOBID, some set JOBID.
-	fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
+	if(q->type == BATCH_QUEUE_TYPE_SLURM){
+		fprintf(file, "[ -n \"${SLURM_JOB_ID}\" ] && JOB_ID=`echo ${SLURM_JOB_ID} | cut -d . -f 1`\n");
+	} else {
+		// Some systems set PBS_JOBID, some set JOBID.
+		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
+	}
+	
+	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS){
+		fprintf(file, "cd %s\n", path);
+	}
 
 	// Each job writes out to its own log file.
 	fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
@@ -120,9 +131,10 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	*/
 	setenv("BATCH_JOB_COMMAND", cmd, 1);
 
-	char *command = string_format("%s %s -N '%s' %s %s.wrapper",
+	char *command = string_format("%s %s %s '%s' %s %s.wrapper",
 		cluster_submit_cmd,
 		cluster_options,
+		cluster_jobname_var,
 		path_basename(name),
 		options ? options : "",
 		cluster_name);
@@ -140,7 +152,9 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 
 	char line[BATCH_JOB_LINE_MAX] = "";
 	while(fgets(line, sizeof(line), file)) {
-		if(sscanf(line, "Your job %" SCNbjid, &jobid) == 1 || sscanf(line, "%" SCNbjid, &jobid) == 1) {
+		if(sscanf(line, "Your job %" SCNbjid, &jobid) == 1 
+		|| sscanf(line, "Submitted batch job %" SCNbjid, &jobid) == 1 
+		|| sscanf(line, "%" SCNbjid, &jobid) == 1 ) {
 			debug(D_BATCH, "job %" PRIbjid " submitted", jobid);
 			pclose(file);
 			info = malloc(sizeof(*info));
@@ -251,8 +265,10 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 		free(cluster_remove_cmd);
 	if(cluster_options)
 		free(cluster_options);
+	if(cluster_jobname_var)
+		free(cluster_jobname_var);
 
-	cluster_name = cluster_submit_cmd = cluster_remove_cmd = cluster_options = NULL;
+	cluster_name = cluster_submit_cmd = cluster_remove_cmd = cluster_options = cluster_jobname_var = NULL;
 
 	switch(q->type) {
 		case BATCH_QUEUE_TYPE_SGE:
@@ -260,31 +276,49 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
 			cluster_options = strdup("-cwd -o /dev/null -j y -V");
+			cluster_jobname_var = strdup("-N");
 			break;
 		case BATCH_QUEUE_TYPE_MOAB:
 			cluster_name = strdup("moab");
 			cluster_submit_cmd = strdup("msub");
 			cluster_remove_cmd = strdup("mdel");
 			cluster_options = strdup("-d . -o /dev/null -j oe -V");
+			cluster_jobname_var = strdup("-N");
+			break;
+		case BATCH_QUEUE_TYPE_PBS:
+			cluster_name = strdup("pbs");
+			cluster_submit_cmd = strdup("qsub");
+			cluster_remove_cmd = strdup("qdel");
+			cluster_options = strdup("-o /dev/null -j oe -V");
+			cluster_jobname_var = strdup("-N");
 			break;
 		case BATCH_QUEUE_TYPE_TORQUE:
 			cluster_name = strdup("torque");
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
-			cluster_options = strdup("-d . -o /dev/null -j oe -V");
+			cluster_options = strdup("-o /dev/null -j oe -V");
+			cluster_jobname_var = strdup("-N");
+			break;
+		case BATCH_QUEUE_TYPE_SLURM:
+			cluster_name = strdup("slurm");
+			cluster_submit_cmd = strdup("sbatch");
+			cluster_remove_cmd = strdup("scancel");
+			cluster_options = strdup("-D . -o /dev/null -e /dev/null --export=ALL -n 1");
+			cluster_jobname_var = strdup("-J");
 			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:
 			cluster_name = getenv("BATCH_QUEUE_CLUSTER_NAME");
 			cluster_submit_cmd = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND");
 			cluster_remove_cmd = getenv("BATCH_QUEUE_CLUSTER_REMOVE_COMMAND");
 			cluster_options = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS");
+			cluster_jobname_var = getenv("BATCH_QUEUE_CLUSTER_SUBMIT_JOBNAME_VAR");
 			break;
 		default:
 			debug(D_BATCH, "Invalid cluster type: %s\n", batch_queue_type_to_string(q->type));
 			return -1;
 	}
 
-	if(cluster_name && cluster_submit_cmd && cluster_remove_cmd && cluster_options)
+	if(cluster_name && cluster_submit_cmd && cluster_remove_cmd && cluster_options && cluster_jobname_var)
 		return 0;
 
 	if(!cluster_name)
@@ -295,6 +329,8 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_REMOVE_COMMAND unset\n");
 	if(!cluster_options)
 		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS unset\n");
+	if(!cluster_jobname_var)
+		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_SUBMIT_JOBNAME_VAR unset\n");
 
 	return -1;
 }
@@ -385,9 +421,59 @@ const struct batch_queue_module batch_queue_sge = {
 	},
 };
 
+const struct batch_queue_module batch_queue_pbs = {
+	BATCH_QUEUE_TYPE_PBS,
+	"pbs",
+
+	batch_queue_cluster_create,
+	batch_queue_cluster_free,
+	batch_queue_cluster_port,
+	batch_queue_cluster_option_update,
+
+	{
+		batch_job_cluster_submit,
+		batch_job_cluster_wait,
+		batch_job_cluster_remove,
+	},
+
+	{
+		batch_fs_cluster_chdir,
+		batch_fs_cluster_getcwd,
+		batch_fs_cluster_mkdir,
+		batch_fs_cluster_putfile,
+		batch_fs_cluster_stat,
+		batch_fs_cluster_unlink,
+	},
+};
+
 const struct batch_queue_module batch_queue_torque = {
 	BATCH_QUEUE_TYPE_TORQUE,
 	"torque",
+
+	batch_queue_cluster_create,
+	batch_queue_cluster_free,
+	batch_queue_cluster_port,
+	batch_queue_cluster_option_update,
+
+	{
+		batch_job_cluster_submit,
+		batch_job_cluster_wait,
+		batch_job_cluster_remove,
+	},
+
+	{
+		batch_fs_cluster_chdir,
+		batch_fs_cluster_getcwd,
+		batch_fs_cluster_mkdir,
+		batch_fs_cluster_putfile,
+		batch_fs_cluster_stat,
+		batch_fs_cluster_unlink,
+	},
+};
+
+const struct batch_queue_module batch_queue_slurm = {
+	BATCH_QUEUE_TYPE_SLURM,
+	"slurm",
 
 	batch_queue_cluster_create,
 	batch_queue_cluster_free,

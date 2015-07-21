@@ -220,12 +220,6 @@ config_xrootd_path=no
 config_cvmfs_path=no
 config_swig_path=auto
 
-if [ "X${GLOBUS_LOCATION}" != "X" ]
-then
-	globus_path=${GLOBUS_LOCATION}
-fi
-
-
 while [ $# -gt 0 ]
 do
 	opt=$1
