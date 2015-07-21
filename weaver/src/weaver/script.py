@@ -126,6 +126,8 @@ class Script(object):
         if self.path is None:
             self.show_usage()
 
+        self.globals['_path'] = self.path
+
     def __str__(self):
         return 'Script({0})'.format(self.path)
 
