@@ -25,9 +25,6 @@ See the file COPYING for details.
 #define WORK_QUEUE_RANDOM_PORT  0    /**< Indicates that any port number may be chosen. */
 #define WORK_QUEUE_WAITFORTASK  -1    /**< Wait for a task to complete before returning. */
 
-#define WORK_QUEUE_RESET_ALL        0  /**< When resetting, clear out all tasks and files */
-#define WORK_QUEUE_RESET_KEEP_TASKS 1  /**< When resetting, keep the current list of tasks */
-
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
 
