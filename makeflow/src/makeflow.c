@@ -876,15 +876,11 @@ static int makeflow_check(struct dag *d)
 	for(n = d->nodes; n; n = n->next) {
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
-			if(f->state == DAG_FILE_STATE_DELETE) {
-				continue;
-			}
-
-			if(dag_file_exists(f)) {
-				continue;
-			}
-
 			if(f->created_by) {
+				continue;
+			}
+
+			if(batch_fs_stat(queue, f->filename, &buf) >= 0) {
 				continue;
 			}
 
@@ -1600,18 +1596,17 @@ int main(int argc, char *argv[])
 	if (change_dir)
 		chdir(change_dir);
 
+	printf("checking %s for consistency...\n",dagfile);
+	if(!makeflow_check(d)) {
+		exit(EXIT_FAILURE);
+	}
+
 	printf("%s has %d rules.\n",dagfile,d->nodeid_counter);
 
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
 	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue );
-
-	printf("checking %s for consistency...\n",dagfile);
-	if(!makeflow_check(d)) {
-		exit(EXIT_FAILURE);
-	}
-
 
 	if(clean_mode) {
 		printf("cleaning filesystem...\n");
