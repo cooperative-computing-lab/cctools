@@ -420,6 +420,10 @@ int process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 		w->stats->total_bytes_sent = atoll(value);
 	} else if(string_prefix_is(field, "total_bytes_received")) {
 		w->stats->total_bytes_received = atoll(value);
+	} else if(string_prefix_is(field, "tasks_waiting")) {
+		w->stats->tasks_waiting = atoll(value);
+	} else if(string_prefix_is(field, "tasks_running")) {
+		w->stats->tasks_running = atoll(value);
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
@@ -4745,6 +4749,10 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 	char *key;
 	struct work_queue_worker *w;
 
+	s->tasks_waiting = 0;
+	s->tasks_running = 0;
+	s->total_workers_connected = 0;
+
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 		if(w->foreman)
@@ -4757,7 +4765,15 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 			accumulate_stat(s, w->stats, total_bytes_sent);
 			accumulate_stat(s, w->stats, total_bytes_received);
 		}
+		else {
+			s->total_workers_connected++;
+		}
+
+		accumulate_stat(s, w->stats, tasks_waiting);
+		accumulate_stat(s, w->stats, tasks_running);
 	}
+
+	s->total_workers_connected += s->total_workers_joined - s->total_workers_removed;
 
 	s->total_workers_joined  += q->stats_disconnected_workers->total_workers_joined;
 	s->total_workers_removed += q->stats_disconnected_workers->total_workers_removed;

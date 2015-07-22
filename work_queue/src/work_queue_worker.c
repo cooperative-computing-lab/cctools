@@ -332,6 +332,13 @@ static void send_stats_update( struct link *master, int force_update)
 		send_master_message(master, "info total_execute_time %lld\n", (long long) s.total_execute_time);
 		send_master_message(master, "info total_bytes_sent %lld\n", (long long) s.total_bytes_sent);
 		send_master_message(master, "info total_bytes_received %lld\n", (long long) s.total_bytes_received);
+
+		send_master_message(master, "info tasks_waiting %lld\n", (long long) s.tasks_waiting);
+		send_master_message(master, "info tasks_running %lld\n", (long long) s.tasks_running);
+	}
+	else {
+		send_master_message(master, "info tasks_waiting %lld\n", (long long) list_size(procs_waiting));
+		send_master_message(master, "info tasks_running %lld\n", (long long) itable_size(procs_running));
 	}
 
 	last_send_time = time(0);
@@ -1403,6 +1410,7 @@ static void work_for_master(struct link *master) {
 
 		if(!ok) break;
 
+		send_stats_update(master,0);
 		send_resource_update(master,0);
 
 		//Reset idle_stoptime if something interesting is happening at this worker.
