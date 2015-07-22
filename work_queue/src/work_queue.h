@@ -25,14 +25,16 @@ See the file COPYING for details.
 #define WORK_QUEUE_RANDOM_PORT  0    /**< Indicates that any port number may be chosen. */
 #define WORK_QUEUE_WAITFORTASK  -1    /**< Wait for a task to complete before returning. */
 
-#define WORK_QUEUE_INPUT  0	/**< Specify an input object. */
-#define WORK_QUEUE_OUTPUT 1	/**< Specify an output object. */
-
 #define WORK_QUEUE_RESET_ALL        0  /**< When resetting, clear out all tasks and files */
 #define WORK_QUEUE_RESET_KEEP_TASKS 1  /**< When resetting, keep the current list of tasks */
 
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
+
+enum work_queue_file_type_t {
+	WORK_QUEUE_INPUT  = 0,  /**< Specify an input object. */
+	WORK_QUEUE_OUTPUT = 1   /**< Specify an output object. */
+};
 
 enum work_queue_file_flags_t {
 	WORK_QUEUE_NOCACHE  = 0, /**< Do not cache file at execution site. */
@@ -231,7 +233,7 @@ is entirely dependent upon the system load.  If the master is busy interacting w
 output updates will be infrequent.)
 @return 1 if the task file is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, enum work_queue_file_flags_t flags);
+int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags);
 
 /** Add a file piece to a task.
 @param t A task object.
@@ -247,7 +249,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @return 1 if the task file piece is successfully specified, 0 if either of @a t, @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, enum work_queue_file_flags_t flags);
+int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags);
 
 /** Add an input buffer to a task.
 @param t A task object.
@@ -274,7 +276,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 @param recursive indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
 @return 1 if the task directory is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, enum work_queue_file_flags_t, int recursive);
+int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, enum work_queue_file_type_t type, enum work_queue_file_flags_t, int recursive);
 
 /** Specify the amount of memory required by a task.
 @param t A task object.
