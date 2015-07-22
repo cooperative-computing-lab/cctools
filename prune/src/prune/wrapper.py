@@ -122,7 +122,7 @@ arg_str = arg_str[1:]
 
 if args['umbrella']:
 	sub_cmd = "%s %s"%( args['function_name'], arg_str)
-	cmd = './UMBRELLA_EXECUTABLE -s local -i %s -c ENVIRONMENT -l ./tmp/ -o ./final_output run "%s"'%(args['umbrellai'],sub_cmd)
+	cmd = './UMBRELLA_EXECUTABLE -s local -i %s -c ENVIRONMENT --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 -l ./tmp/ -o ./final_output run "%s"'%(args['umbrellai'],sub_cmd)
 
 else:
 	cmd = "%s %s"%( args['function_name'], arg_str)
