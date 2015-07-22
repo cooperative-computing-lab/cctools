@@ -21,7 +21,7 @@ slurm_parameters=""
 
 parse_arguments()
 {
-	if [ -z "$cores" -o $cores=0 ]
+	if [ -z "$cores" -o $cores = 0 ]
 	then
 		slurm_parameters="$slurm_parameters --exclusive"
 	else
