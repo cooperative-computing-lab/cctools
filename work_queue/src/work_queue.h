@@ -49,22 +49,25 @@ See the file COPYING for details.
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
 
-#define WORK_QUEUE_RESULT_SUCCESS 0		   /**< The task ran successfully >**/
-#define WORK_QUEUE_RESULT_INPUT_MISSING 1  /**< The task cannot be run due to a missing input file >**/
-#define WORK_QUEUE_RESULT_OUTPUT_MISSING 2 /**< The task ran but failed to generate a specified output file >**/
-#define WORK_QUEUE_RESULT_STDOUT_MISSING 4 /**< The task ran but its stdout has been truncated >**/
-#define WORK_QUEUE_RESULT_SIGNAL         8 /**< The task was terminated with a signal >**/
-#define WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION 16 /**< The task used more resources than requested >**/
-#define WORK_QUEUE_RESULT_TASK_TIMEOUT 32 /**< The task ran after specified end time. >**/
+enum work_queue_result_t {
+	WORK_QUEUE_RESULT_SUCCESS        = 0, /**< The task ran successfully **/
+	WORK_QUEUE_RESULT_INPUT_MISSING  = 1, /**< The task cannot be run due to a missing input file **/
+	WORK_QUEUE_RESULT_OUTPUT_MISSING = 2, /**< The task ran but failed to generate a specified output file **/
+	WORK_QUEUE_RESULT_STDOUT_MISSING = 4, /**< The task ran but its stdout has been truncated **/
+	WORK_QUEUE_RESULT_SIGNAL         = 8, /**< The task was terminated with a signal **/
+	WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION = 16, /**< The task used more resources than requested **/
+	WORK_QUEUE_RESULT_TASK_TIMEOUT   = 32 /**< The task ran after specified end time. **/
+};
 
-/** Task states **/
-#define WORK_QUEUE_TASK_UNKNOWN           0  /**< There is no such task >**/
-#define WORK_QUEUE_TASK_READY             1  /**< Task is ready to be run, waiting in queue >**/
-#define WORK_QUEUE_TASK_RUNNING           2  /**< Task has been dispatched to some worker >**/
-#define WORK_QUEUE_TASK_WAITING_RETRIEVAL 3  /**< Task results are available at the worker >**/
-#define WORK_QUEUE_TASK_RETRIEVED         4  /**< Task results are available at the master >**/
-#define WORK_QUEUE_TASK_DONE              5  /**< Task is done, and has been returned through work_queue_wait >**/
-#define WORK_QUEUE_TASK_CANCELED          6  /**< Task was canceled before completion >**/
+enum work_queue_task_state_t {
+	WORK_QUEUE_TASK_UNKNOWN = 0,       /**< There is no such task **/
+	WORK_QUEUE_TASK_READY,             /**< Task is ready to be run, waiting in queue **/
+	WORK_QUEUE_TASK_RUNNING,           /**< Task has been dispatched to some worker **/
+	WORK_QUEUE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
+	WORK_QUEUE_TASK_RETRIEVED,         /**< Task results are available at the master **/
+	WORK_QUEUE_TASK_DONE,              /**< Task is done, and returned through work_queue_wait >**/
+	WORK_QUEUE_TASK_CANCELED           /**< Task was canceled before completion **/
+};
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
 
@@ -82,7 +85,7 @@ struct work_queue_task {
 	struct list *env_list;		/**< Environment variables applied to the task. */
 	int taskid;			/**< A unique task id number. */
 	int return_status;		/**< The exit code of the command line. */
-	int result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
+	enum work_queue_result_t result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
 	char *host;			/**< The address and port of the host on which it ran. */
 	char *hostname;			/**< The name of the host on which it ran. */
 
@@ -470,7 +473,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 @param taskid The taskid of the task.
 @return One of: WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE)
 */
-int work_queue_task_state(struct work_queue *q, int taskid);
+enum work_queue_task_state_t work_queue_task_state(struct work_queue *q, int taskid);
 
 /** Limit the queue bandwidth when transferring files to and from workers.
 @param q A work queue object.

@@ -4072,7 +4072,7 @@ void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 	change_task_state(q, t, WORK_QUEUE_TASK_READY);
 }
 
-int work_queue_task_state( struct work_queue *q, int taskid) {
+enum work_queue_task_state_t work_queue_task_state(struct work_queue *q, int taskid) {
 	return (int)(uintptr_t)itable_lookup(q->task_state_map, taskid);
 }
 

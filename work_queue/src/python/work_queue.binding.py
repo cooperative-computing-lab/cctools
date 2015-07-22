@@ -309,8 +309,9 @@ class Task(_object):
         return self._task.return_status
 
     ##
-    # Get the result of the task (successful, failed return_status, missing input file, missing output file).
-    # Must be called only after the task completes execution.
+    # Get the result of the task, such as successful, missing file, etc.
+    # See @ref work_queue_result_t for possible values.  Must be called only
+    # after the task completes execution.
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
@@ -654,7 +655,7 @@ class WorkQueue(_object):
         return self._stats_hierarchy
 
     ##
-    # Get current task state
+    # Get current task state. See @ref work_queue_task_state_t for possible values.
     # @code
     # >>> print q.task_state(taskid)
     # @endcode
