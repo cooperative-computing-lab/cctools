@@ -80,11 +80,8 @@ class Task(_object):
     #
     # @param self       Reference to the current task object.
     # @param algorithm  One of the following algorithms to use in assigning a
-    #                   task to a worker:
-    #                   - @ref WORK_QUEUE_SCHEDULE_FCFS
-    #                   - @ref WORK_QUEUE_SCHEDULE_FILES
-    #                   - @ref WORK_QUEUE_SCHEDULE_TIME
-    #                   - @ref WORK_QUEUE_SCHEDULE_RAND
+    #                   task to a worker. See @ref work_queue_schedule_t for
+    #                   possible values.
     def specify_algorithm(self, algorithm):
         return work_queue_task_specify_algorithm(self._task, algorithm)
 
@@ -702,11 +699,8 @@ class WorkQueue(_object):
     #
     # @param self       Reference to the current work queue object.
     # @param algorithm  One of the following algorithms to use in assigning a
-    #                   task to a worker:
-    #                   - @ref WORK_QUEUE_SCHEDULE_FCFS
-    #                   - @ref WORK_QUEUE_SCHEDULE_FILES
-    #                   - @ref WORK_QUEUE_SCHEDULE_TIME
-    #                   - @ref WORK_QUEUE_SCHEDULE_RAND
+    #                   task to a worker. See @ref work_queue_schedule_t for
+    #                   possible values.
     def specify_algorithm(self, algorithm):
         return work_queue_specify_algorithm(self._work_queue, algorithm)
 

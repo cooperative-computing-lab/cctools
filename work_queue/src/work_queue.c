@@ -3606,9 +3606,9 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 	return 1;
 }
 
-void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
+void work_queue_task_specify_algorithm(struct work_queue_task *t, enum work_queue_schedule_t algorithm)
 {
-	t->worker_selection_algorithm = alg;
+	t->worker_selection_algorithm = algorithm;
 }
 
 void work_queue_task_specify_priority( struct work_queue_task *t, double priority )
@@ -3894,9 +3894,9 @@ void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
 	// always on
 }
 
-void work_queue_specify_algorithm(struct work_queue *q, int alg)
+void work_queue_specify_algorithm(struct work_queue *q, enum work_queue_schedule_t algorithm)
 {
-	q->worker_selection_algorithm = alg;
+	q->worker_selection_algorithm = algorithm;
 }
 
 void work_queue_specify_task_order(struct work_queue *q, int order)

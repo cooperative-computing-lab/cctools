@@ -25,13 +25,6 @@ See the file COPYING for details.
 #define WORK_QUEUE_RANDOM_PORT  0    /**< Indicates that any port number may be chosen. */
 #define WORK_QUEUE_WAITFORTASK  -1    /**< Wait for a task to complete before returning. */
 
-#define WORK_QUEUE_SCHEDULE_UNSET 0
-#define WORK_QUEUE_SCHEDULE_FCFS	 1 /**< Select worker on a first-come-first-serve basis. */
-#define WORK_QUEUE_SCHEDULE_FILES	 2 /**< Select worker that has the most data required by the task. */
-#define WORK_QUEUE_SCHEDULE_TIME	 3 /**< Select worker that has the fastest execution time on previous tasks. */
-#define WORK_QUEUE_SCHEDULE_RAND	 4 /**< Select a random worker. (default) */
-#define WORK_QUEUE_SCHEDULE_WORST	 5 /**< Select the worst fit worker (the worker with more unused resources). */
-
 #define WORK_QUEUE_INPUT  0	/**< Specify an input object. */
 #define WORK_QUEUE_OUTPUT 1	/**< Specify an output object. */
 
@@ -48,6 +41,16 @@ See the file COPYING for details.
 
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
+
+enum work_queue_schedule_t {
+	WORK_QUEUE_SCHEDULE_UNSET = 0,
+	WORK_QUEUE_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. */
+	WORK_QUEUE_SCHEDULE_FILES,     /**< Select worker that has the most data required by the task. */
+	WORK_QUEUE_SCHEDULE_TIME,      /**< Select worker that has the fastest execution time on previous tasks. */
+	WORK_QUEUE_SCHEDULE_RAND,      /**< Select a random worker. (default) */
+	WORK_QUEUE_SCHEDULE_WORST      /**< Select the worst fit worker (the worker with more unused resources). */
+};
+
 
 enum work_queue_result_t {
 	WORK_QUEUE_RESULT_SUCCESS        = 0, /**< The task ran successfully **/
@@ -78,7 +81,7 @@ extern int wq_option_scheduler;	/**< Initial setting for algorithm to assign tas
 struct work_queue_task {
 	char *tag;			/**< An optional user-defined logical name for the task. */
 	char *command_line;		/**< The program(s) to execute, as a shell command line. */
-	int worker_selection_algorithm;		  /**< How to choose worker to run the task. */
+	enum work_queue_schedule_t worker_selection_algorithm;		  /**< How to choose worker to run the task. */
 	char *output;			/**< The standard output of the task. */
 	struct list *input_files;	/**< The files to transfer to the worker and place in the executing directory. */
 	struct list *output_files;	/**< The output files (other than the standard output stream) created by the program expected to be retrieved from the task. */
@@ -333,13 +336,9 @@ void work_queue_task_specify_env( struct work_queue_task *t, const char *name, c
 /** Select the scheduling algorithm for a single task.
 To change the scheduling algorithm for all tasks, use @ref work_queue_specify_algorithm instead.
 @param t A task object.
-@param algo The algorithm to use in assigning this task to a worker:
-- @ref WORK_QUEUE_SCHEDULE_FCFS	 - Select worker on a first-come-first-serve basis.
-- @ref WORK_QUEUE_SCHEDULE_FILES - Select worker that has the most data required by the task.
-- @ref WORK_QUEUE_SCHEDULE_TIME	 - Select worker that has the fastest execution time on previous tasks.
-- @ref WORK_QUEUE_SCHEDULE_RAND	 - Select a random worker.
+@param algorithm The algorithm to use in assigning this task to a worker. For possible values, see @ref work_queue_schedule_t.
 */
-void work_queue_task_specify_algorithm(struct work_queue_task *t, int algo );
+void work_queue_task_specify_algorithm(struct work_queue_task *t, enum work_queue_schedule_t algorithm);
 
 /** Delete a task.
 This may be called on tasks after they are returned from @ref work_queue_wait.
@@ -511,13 +510,9 @@ int work_queue_send_receive_ratio(struct work_queue *q, double ratio);
 /** Change the worker selection algorithm.
 This function controls which <b>worker</b> will be selected for a given task.
 @param q A work queue object.
-@param algo The algorithm to use in assigning a task to a worker:
-- @ref WORK_QUEUE_SCHEDULE_FCFS	 - Select worker on a first-come-first-serve basis.
-- @ref WORK_QUEUE_SCHEDULE_FILES - Select worker that has the most data required by the task.
-- @ref WORK_QUEUE_SCHEDULE_TIME	 - Select worker that has the fastest execution time on previous tasks.
-- @ref WORK_QUEUE_SCHEDULE_RAND	 - Select a random worker (default).
+@param algorithm The algorithm to use in assigning a task to a worker. See @ref work_queue_schedule_t for possible values.
 */
-void work_queue_specify_algorithm(struct work_queue *q, int algo);
+void work_queue_specify_algorithm(struct work_queue *q, enum work_queue_schedule_t algorithm);
 
 /** Get the project name of the queue.
 @param q A work queue object.
