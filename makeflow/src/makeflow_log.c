@@ -265,14 +265,14 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 	dag_count_states(d);
 
 	// Check for log consistency
+	int dne_counter = 0;
     hash_table_firstkey(d->files);
     while(hash_table_nextkey(d->files, &name, (void **) &f)) {
-		if(first_run && dag_file_is_source(f)) {
-			if(batch_fs_stat(queue, f->filename, &buf) >= 0){
-				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
-			} else {
-				fprintf(stderr, "makeflow: %s is reported as source file, but does not exist.\n", f->filename);
-				exit(1);
+		if(first_run) {
+			if(dag_file_is_source(f) && batch_fs_stat(queue, f->filename, &buf) < 0){
+				fprintf(stderr, "makeflow: %s is reported as input file, but does not exist.\n", f->filename);
+				if( dne_counter++ > 10)
+					exit(1);
 			}
 		}
 		if(!first_run){
