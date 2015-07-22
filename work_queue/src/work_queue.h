@@ -28,19 +28,21 @@ See the file COPYING for details.
 #define WORK_QUEUE_INPUT  0	/**< Specify an input object. */
 #define WORK_QUEUE_OUTPUT 1	/**< Specify an output object. */
 
-#define WORK_QUEUE_NOCACHE 0	/**< Do not cache file at execution site. */
-#define WORK_QUEUE_CACHE 1	/**< Cache file at execution site for later use. */
-#define WORK_QUEUE_SYMLINK 2	/* Create a symlink to the file rather than copying it, if possible. */
-#define WORK_QUEUE_PREEXIST 4   /* If the filename already exists on the host, use it in place. */
-#define WORK_QUEUE_THIRDGET 8	/* Access the file on the client from a shared filesystem */
-#define WORK_QUEUE_THIRDPUT 8	/* Access the file on the client from a shared filesystem (included for readability) */
-#define WORK_QUEUE_WATCH 16     /**< Watch the output file and send back changes as the task runs. */
-
 #define WORK_QUEUE_RESET_ALL        0  /**< When resetting, clear out all tasks and files */
 #define WORK_QUEUE_RESET_KEEP_TASKS 1  /**< When resetting, keep the current list of tasks */
 
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
+
+enum work_queue_file_flags_t {
+	WORK_QUEUE_NOCACHE  = 0, /**< Do not cache file at execution site. */
+	WORK_QUEUE_CACHE    = 1, /**< Cache file at execution site for later use. */
+	WORK_QUEUE_SYMLINK  = 2, /**< Create a symlink to the file rather than copying it, if possible. */
+	WORK_QUEUE_PREEXIST = 4, /**< If the filename already exists on the host, use it in place. */
+	WORK_QUEUE_THIRDGET = 8, /**< Access the file on the client from a shared filesystem */
+	WORK_QUEUE_THIRDPUT = 8, /**< Access the file on the client from a shared filesystem (same as WORK_QUEUE_THIRDGET, included for readability) */
+	WORK_QUEUE_WATCH    = 16 /**< Watch the output file and send back changes as the task runs. */
+};
 
 enum work_queue_schedule_t {
 	WORK_QUEUE_SCHEDULE_UNSET = 0,
@@ -220,7 +222,7 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 @param type Must be one of the following values:
 - @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of the following or'd together:
+@param flags	May be zero to indicate no special handling or any of @ref work_queue_file_flags_t or'd together. The most common are:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 - @ref WORK_QUEUE_WATCH indicates that the worker will watch the output file as it is created
@@ -229,7 +231,7 @@ is entirely dependent upon the system load.  If the master is busy interacting w
 output updates will be infrequent.)
 @return 1 if the task file is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags);
+int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, enum work_queue_file_flags_t flags);
 
 /** Add a file piece to a task.
 @param t A task object.
@@ -240,24 +242,24 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 @param type Must be one of the following values:
 - @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of the following or'd together:
+@param flags	May be zero to indicate no special handling or any of @ref work_queue_file_flags_t or'd together. The most common are:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @return 1 if the task file piece is successfully specified, 0 if either of @a t, @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags);
+int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, enum work_queue_file_flags_t flags);
 
 /** Add an input buffer to a task.
 @param t A task object.
 @param data The data to be passed as an input file.
 @param length The length of the buffer, in bytes
 @param remote_name The name of the remote file to create.
-@param flags	May be zero to indicate no special handling or any of the following or'd together:
+@param flags	May be zero to indicate no special handling or any of @ref work_queue_file_flags_t or'd together. The most common are:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags);
+int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, enum work_queue_file_flags_t);
 
 /** Add a directory to a task.
 @param t A task object.
@@ -266,13 +268,13 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 @param type Must be one of the following values:
 - @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of the following or'd together:
+@param flags	May be zero to indicate no special handling or any of @ref work_queue_file_flags_t or'd together. The most common are:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @param recursive indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
 @return 1 if the task directory is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags, int recursive);
+int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, enum work_queue_file_flags_t, int recursive);
 
 /** Specify the amount of memory required by a task.
 @param t A task object.

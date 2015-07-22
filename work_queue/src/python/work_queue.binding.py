@@ -108,7 +108,8 @@ class Task(_object):
     # @param local_name     The name of the file on local disk or shared filesystem.
     # @param remote_name    The name of the file at the execution site.
     # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
-    # @param flags          May be zero to indicate no special handling, or any of the following or'd together:
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
     #                       - @ref WORK_QUEUE_WATCH
@@ -139,7 +140,8 @@ class Task(_object):
     # @param start_byte     The starting byte offset of the file piece to be transferred.
     # @param end_byte       The ending byte offset of the file piece to be transferred.
     # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
-    # @param flags          May be zero to indicate no special handling, or any of the following or'd together:
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
     # @param cache          Legacy parameter for setting file caching attribute.  By default this is enabled.
@@ -173,7 +175,8 @@ class Task(_object):
     # @param local_name     The name of the directory on local disk or shared filesystem. Optional if the directory is empty.
     # @param remote_name    The name of the directory at the remote execution site.
     # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
-    # @param flags          May be zero to indicate no special handling, or any of the following or'd together:
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
     # @param recursive      Indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
