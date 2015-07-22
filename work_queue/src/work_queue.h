@@ -21,104 +21,122 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "rmsummary.h"
 
-#define WORK_QUEUE_DEFAULT_PORT 9123  /**< Default Work Queue port number. */
-#define WORK_QUEUE_RANDOM_PORT  0    /**< Indicates that any port number may be chosen. */
-#define WORK_QUEUE_WAITFORTASK  -1    /**< Wait for a task to complete before returning. */
+#define WORK_QUEUE_DEFAULT_PORT 9123               /**< Default Work Queue port number. */
+#define WORK_QUEUE_RANDOM_PORT  0                  /**< Indicates that any port may be chosen. */
 
-#define WORK_QUEUE_SCHEDULE_UNSET 0
-#define WORK_QUEUE_SCHEDULE_FCFS	 1 /**< Select worker on a first-come-first-serve basis. */
-#define WORK_QUEUE_SCHEDULE_FILES	 2 /**< Select worker that has the most data required by the task. */
-#define WORK_QUEUE_SCHEDULE_TIME	 3 /**< Select worker that has the fastest execution time on previous tasks. */
-#define WORK_QUEUE_SCHEDULE_RAND	 4 /**< Select a random worker. (default) */
-#define WORK_QUEUE_SCHEDULE_WORST	 5 /**< Select the worst fit worker (the worker with more unused resources). */
-
-#define WORK_QUEUE_INPUT  0	/**< Specify an input object. */
-#define WORK_QUEUE_OUTPUT 1	/**< Specify an output object. */
-
-#define WORK_QUEUE_NOCACHE 0	/**< Do not cache file at execution site. */
-#define WORK_QUEUE_CACHE 1	/**< Cache file at execution site for later use. */
-#define WORK_QUEUE_SYMLINK 2	/* Create a symlink to the file rather than copying it, if possible. */
-#define WORK_QUEUE_PREEXIST 4   /* If the filename already exists on the host, use it in place. */
-#define WORK_QUEUE_THIRDGET 8	/* Access the file on the client from a shared filesystem */
-#define WORK_QUEUE_THIRDPUT 8	/* Access the file on the client from a shared filesystem (included for readability) */
-#define WORK_QUEUE_WATCH 16     /**< Watch the output file and send back changes as the task runs. */
-
-#define WORK_QUEUE_RESET_ALL        0  /**< When resetting, clear out all tasks and files */
-#define WORK_QUEUE_RESET_KEEP_TASKS 1  /**< When resetting, keep the current list of tasks */
+#define WORK_QUEUE_WAITFORTASK  -1                 /**< Timeout value to wait for a task to complete before returning. */
 
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
-#define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT 30    /**< Default value for Work Queue keepalive timeout in seconds. */
+#define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT  30   /**< Default value for Work Queue keepalive timeout in seconds. */
 
-#define WORK_QUEUE_RESULT_SUCCESS 0		   /**< The task ran successfully >**/
-#define WORK_QUEUE_RESULT_INPUT_MISSING 1  /**< The task cannot be run due to a missing input file >**/
-#define WORK_QUEUE_RESULT_OUTPUT_MISSING 2 /**< The task ran but failed to generate a specified output file >**/
-#define WORK_QUEUE_RESULT_STDOUT_MISSING 4 /**< The task ran but its stdout has been truncated >**/
-#define WORK_QUEUE_RESULT_SIGNAL         8 /**< The task was terminated with a signal >**/
-#define WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION 16 /**< The task used more resources than requested >**/
-#define WORK_QUEUE_RESULT_TASK_TIMEOUT 32 /**< The task ran after specified end time. >**/
+enum work_queue_file_type_t {
+	WORK_QUEUE_INPUT  = 0,                         /**< Specify an input object. */
+	WORK_QUEUE_OUTPUT = 1                          /**< Specify an output object. */
+};
 
-/** Task states **/
-#define WORK_QUEUE_TASK_UNKNOWN           0  /**< There is no such task >**/
-#define WORK_QUEUE_TASK_READY             1  /**< Task is ready to be run, waiting in queue >**/
-#define WORK_QUEUE_TASK_RUNNING           2  /**< Task has been dispatched to some worker >**/
-#define WORK_QUEUE_TASK_WAITING_RETRIEVAL 3  /**< Task results are available at the worker >**/
-#define WORK_QUEUE_TASK_RETRIEVED         4  /**< Task results are available at the master >**/
-#define WORK_QUEUE_TASK_DONE              5  /**< Task is done, and has been returned through work_queue_wait >**/
-#define WORK_QUEUE_TASK_CANCELED          6  /**< Task was canceled before completion >**/
+enum work_queue_file_flags_t {
+	WORK_QUEUE_NOCACHE  = 0, /**< Do not cache file at execution site. */
+	WORK_QUEUE_CACHE    = 1, /**< Cache file at execution site for later use. */
+	WORK_QUEUE_SYMLINK  = 2, /**< Create a symlink to the file rather than copying it, if possible. */
+	WORK_QUEUE_PREEXIST = 4, /**< If the filename already exists on the host, use it in place. */
+	WORK_QUEUE_THIRDGET = 8, /**< Access the file on the client from a shared filesystem */
+	WORK_QUEUE_THIRDPUT = 8, /**< Access the file on the client from a shared filesystem (same as WORK_QUEUE_THIRDGET, included for readability) */
+	WORK_QUEUE_WATCH    = 16 /**< Watch the output file and send back changes as the task runs. */
+};
 
-extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon creating queue. Turned off if less than 0. Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls. */
+enum work_queue_schedule_t {
+	WORK_QUEUE_SCHEDULE_UNSET = 0,
+	WORK_QUEUE_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. */
+	WORK_QUEUE_SCHEDULE_FILES,     /**< Select worker that has the most data required by the task. */
+	WORK_QUEUE_SCHEDULE_TIME,      /**< Select worker that has the fastest execution time on previous tasks. */
+	WORK_QUEUE_SCHEDULE_RAND,      /**< Select a random worker. (default) */
+	WORK_QUEUE_SCHEDULE_WORST      /**< Select the worst fit worker (the worker with more unused resources). */
+};
 
-extern int wq_option_scheduler;	/**< Initial setting for algorithm to assign tasks to workers upon creating queue . Change prior to calling work_queue_create, after queue is created this variable is not considered and changes must be made through the API calls.   */
 
-/** A task description.  This structure should only be created with @ref work_queue_task_create and delete with @ref work_queue_task_delete.  You may examine (but not modify) this structure once a task has completed.
+enum work_queue_result_t {
+	WORK_QUEUE_RESULT_SUCCESS        = 0,       /**< The task ran successfully **/
+	WORK_QUEUE_RESULT_INPUT_MISSING  = 1,       /**< The task cannot be run due to a missing input file **/
+	WORK_QUEUE_RESULT_OUTPUT_MISSING = 2,       /**< The task ran but failed to generate a specified output file **/
+	WORK_QUEUE_RESULT_STDOUT_MISSING = 4,       /**< The task ran but its stdout has been truncated **/
+	WORK_QUEUE_RESULT_SIGNAL         = 8,       /**< The task was terminated with a signal **/
+	WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION = 16, /**< The task used more resources than requested **/
+	WORK_QUEUE_RESULT_TASK_TIMEOUT   = 32       /**< The task ran after specified end time. **/
+};
+
+enum work_queue_task_state_t {
+	WORK_QUEUE_TASK_UNKNOWN = 0,       /**< There is no such task **/
+	WORK_QUEUE_TASK_READY,             /**< Task is ready to be run, waiting in queue **/
+	WORK_QUEUE_TASK_RUNNING,           /**< Task has been dispatched to some worker **/
+	WORK_QUEUE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
+	WORK_QUEUE_TASK_RETRIEVED,         /**< Task results are available at the master **/
+	WORK_QUEUE_TASK_DONE,              /**< Task is done, and returned through work_queue_wait >**/
+	WORK_QUEUE_TASK_CANCELED           /**< Task was canceled before completion **/
+};
+
+extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon
+												 creating queue. Turned off if less than 0. Change
+												 prior to calling work_queue_create, after queue is
+												 created this variable is not considered and changes
+												 must be made through the API calls. */
+
+extern int wq_option_scheduler;	               /**< Initial setting for algorithm to assign tasks to
+												 workers upon creating queue . Change prior to
+												 calling work_queue_create, after queue is created
+												 this variable is not considered and changes must be
+												 made through the API calls.   */
+
+/** A task description.  This structure should only be created with @ref
+ * work_queue_task_create and delete with @ref work_queue_task_delete.  You may
+ * examine (but not modify) this structure once a task has completed.
 */
 struct work_queue_task {
-	char *tag;			/**< An optional user-defined logical name for the task. */
-	char *command_line;		/**< The program(s) to execute, as a shell command line. */
-	int worker_selection_algorithm;		  /**< How to choose worker to run the task. */
-	char *output;			/**< The standard output of the task. */
-	struct list *input_files;	/**< The files to transfer to the worker and place in the executing directory. */
-	struct list *output_files;	/**< The output files (other than the standard output stream) created by the program expected to be retrieved from the task. */
-	struct list *env_list;		/**< Environment variables applied to the task. */
-	int taskid;			/**< A unique task id number. */
-	int return_status;		/**< The exit code of the command line. */
-	int result;			/**< The result of the task (successful, failed return_status, missing input file, missing output file). */
-	char *host;			/**< The address and port of the host on which it ran. */
-	char *hostname;			/**< The name of the host on which it ran. */
+	char *tag;                                             /**< An optional user-defined logical name for the task. */
+	char *command_line;                                    /**< The program(s) to execute, as a shell command line. */
+	enum work_queue_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
+	char *output;                                          /**< The standard output of the task. */
+	struct list *input_files;                              /**< The files to transfer to the worker and place in the executing directory. */
+	struct list *output_files;                             /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
+	struct list *env_list;                                 /**< Environment variables applied to the task. */
+	int taskid;                                            /**< A unique task id number. */
+	int return_status;                                     /**< The exit code of the command line. */
+	enum work_queue_result_t result;                       /**< The result of the task (successful, failed return_status, missing input file, missing output file). */
+	char *host;                                            /**< The address and port of the host on which it ran. */
+	char *hostname;                                        /**< The name of the host on which it ran. */
 
-	timestamp_t time_committed;	/**< The time at which a task was committed to a worker. */
+	timestamp_t time_committed;                            /**< The time at which a task was committed to a worker. */
 
-	timestamp_t time_task_submit;	/**< The time at which this task was submitted. */
-	timestamp_t time_task_finish;	/**< The time at which this task was finished. */
-	timestamp_t time_send_input_start;	/**< The time at which it started to transfer input files. */
-	timestamp_t time_send_input_finish;	/**< The time at which it finished transferring input files. */
-	timestamp_t time_execute_cmd_start;		    /**< The time at which the task began. */
-	timestamp_t time_execute_cmd_finish;		/**< The time at which the task finished (discovered by the master). */
-	timestamp_t time_receive_result_start;	/**< The time at which it started to transfer the results. */
-	timestamp_t time_receive_result_finish;	/**< The time at which it finished transferring the results. */
-	timestamp_t time_receive_output_start;	/**< The time at which it started to transfer output files. */
-	timestamp_t time_receive_output_finish;	/**< The time at which it finished transferring output files. */
+	timestamp_t time_task_submit;                          /**< The time at which this task was submitted. */
+	timestamp_t time_task_finish;                          /**< The time at which this task was finished. */
+	timestamp_t time_send_input_start;                     /**< The time at which it started to transfer input files. */
+	timestamp_t time_send_input_finish;                    /**< The time at which it finished transferring input files. */
+	timestamp_t time_execute_cmd_start;                    /**< The time at which the task began. */
+	timestamp_t time_execute_cmd_finish;                   /**< The time at which the task finished (discovered by the master). */
+	timestamp_t time_receive_result_start;                 /**< The time at which it started to transfer the results. */
+	timestamp_t time_receive_result_finish;                /**< The time at which it finished transferring the results. */
+	timestamp_t time_receive_output_start;                 /**< The time at which it started to transfer output files. */
+	timestamp_t time_receive_output_finish;                /**< The time at which it finished transferring output files. */
 
-	int64_t total_bytes_received;/**< Number of bytes received since task has last started receiving input data. */
-	int64_t total_bytes_sent;/**< Number of bytes sent since task has last started sending input data. */
-	int64_t total_bytes_transferred;/**< Number of bytes transferred since task has last started transferring input data. */
-	timestamp_t total_transfer_time;    /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
-	timestamp_t cmd_execution_time;	   /**< Time spent in microseconds for executing the command on the worker. */
-	int total_submissions;			   /**< The number of times the task has been submitted. */
-	timestamp_t total_cmd_execution_time;	/**< Time spent in microseconds for executing the command on any worker, including resubmittions of the task. */
+	int64_t total_bytes_received;                          /**< Number of bytes received since task has last started receiving input data. */
+	int64_t total_bytes_sent;                              /**< Number of bytes sent since task has last started sending input data. */
+	int64_t total_bytes_transferred;                       /**< Number of bytes transferred since task has last started transferring input data. */
+	timestamp_t total_transfer_time;                       /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
+	timestamp_t cmd_execution_time;                        /**< Time spent in microseconds for executing the command on the worker. */
+	int total_submissions;                                 /**< The number of times the task has been submitted. */
+	timestamp_t total_cmd_execution_time;                  /**< Time spent in microseconds for executing the command on any worker, including resubmittions of the task. */
 
-	int64_t maximum_end_time;
-	int64_t memory;
-	int64_t disk;
-	int cores;
-	int gpus;
-	int unlabeled;
+	int64_t maximum_end_time;                              /**< Maximum time (from epoch) this task may run. */
+	int64_t memory;                                        /**< Memory required by the task. (MB) */
+	int64_t disk;                                          /**< Disk space required by the task. (MB) */
+	int cores;                                             /**< Number of cores required by the task. */
+	int gpus;                                              /**< Number of gpus required by the task. */
+	int unlabeled;                                         /**< 1 if the task did not specify any required resource. 0 otherwise. */
 
-	double priority;			/**< The priority of this task relative to others in the queue: higher number run earlier. */
+	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
 
-	struct rmsummary *resources_measured;   /**< When monitoring is enabled, it points to the measured resources used by the task. */
+	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
 
-	timestamp_t time_app_delay;	 /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
+	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 
 };
 
@@ -145,7 +163,7 @@ struct work_queue_stats {
 	timestamp_t total_receive_time; /**< Total time in microseconds spent in receiving data from workers. */
 	timestamp_t total_good_transfer_time;    /**< Total time in microseconds spent in sending and receiving data to workers for tasks with result WQ_RESULT_SUCCESS. */
 
-	timestamp_t total_execute_time; /**< Total time in microseconds workers spent executing completed tasks. */
+	timestamp_t total_execute_time;      /**< Total time in microseconds workers spent executing completed tasks. */
 	timestamp_t total_good_execute_time; /**< Total time in microseconds workers spent executing successful tasks. */
 
 
@@ -214,7 +232,7 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 @param type Must be one of the following values:
 - @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of the following or'd together:
+@param flags	May be zero to indicate no special handling or any of @ref work_queue_file_flags_t or'd together. The most common are:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 - @ref WORK_QUEUE_WATCH indicates that the worker will watch the output file as it is created
@@ -223,7 +241,7 @@ is entirely dependent upon the system load.  If the master is busy interacting w
 output updates will be infrequent.)
 @return 1 if the task file is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags);
+int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags);
 
 /** Add a file piece to a task.
 @param t A task object.
@@ -234,24 +252,24 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 @param type Must be one of the following values:
 - @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of the following or'd together:
+@param flags	May be zero to indicate no special handling or any of @ref work_queue_file_flags_t or'd together. The most common are:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @return 1 if the task file piece is successfully specified, 0 if either of @a t, @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags);
+int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags);
 
 /** Add an input buffer to a task.
 @param t A task object.
 @param data The data to be passed as an input file.
 @param length The length of the buffer, in bytes
 @param remote_name The name of the remote file to create.
-@param flags	May be zero to indicate no special handling or any of the following or'd together:
+@param flags	May be zero to indicate no special handling or any of @ref work_queue_file_flags_t or'd together. The most common are:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags);
+int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, enum work_queue_file_flags_t);
 
 /** Add a directory to a task.
 @param t A task object.
@@ -260,13 +278,13 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 @param type Must be one of the following values:
 - @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of the following or'd together:
+@param flags	May be zero to indicate no special handling or any of @ref work_queue_file_flags_t or'd together. The most common are:
 - @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @param recursive indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
 @return 1 if the task directory is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags, int recursive);
+int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, enum work_queue_file_type_t type, enum work_queue_file_flags_t, int recursive);
 
 /** Specify the amount of memory required by a task.
 @param t A task object.
@@ -330,13 +348,9 @@ void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, con
 /** Select the scheduling algorithm for a single task.
 To change the scheduling algorithm for all tasks, use @ref work_queue_specify_algorithm instead.
 @param t A task object.
-@param algo The algorithm to use in assigning this task to a worker:
-- @ref WORK_QUEUE_SCHEDULE_FCFS	 - Select worker on a first-come-first-serve basis.
-- @ref WORK_QUEUE_SCHEDULE_FILES - Select worker that has the most data required by the task.
-- @ref WORK_QUEUE_SCHEDULE_TIME	 - Select worker that has the fastest execution time on previous tasks.
-- @ref WORK_QUEUE_SCHEDULE_RAND	 - Select a random worker.
+@param algorithm The algorithm to use in assigning this task to a worker. For possible values, see @ref work_queue_schedule_t.
 */
-void work_queue_task_specify_algorithm(struct work_queue_task *t, int algo );
+void work_queue_task_specify_algorithm(struct work_queue_task *t, enum work_queue_schedule_t algorithm);
 
 /** Delete a task.
 This may be called on tasks after they are returned from @ref work_queue_wait.
@@ -470,7 +484,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 @param taskid The taskid of the task.
 @return One of: WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE)
 */
-int work_queue_task_state(struct work_queue *q, int taskid);
+enum work_queue_task_state_t work_queue_task_state(struct work_queue *q, int taskid);
 
 /** Limit the queue bandwidth when transferring files to and from workers.
 @param q A work queue object.
@@ -508,13 +522,9 @@ int work_queue_send_receive_ratio(struct work_queue *q, double ratio);
 /** Change the worker selection algorithm.
 This function controls which <b>worker</b> will be selected for a given task.
 @param q A work queue object.
-@param algo The algorithm to use in assigning a task to a worker:
-- @ref WORK_QUEUE_SCHEDULE_FCFS	 - Select worker on a first-come-first-serve basis.
-- @ref WORK_QUEUE_SCHEDULE_FILES - Select worker that has the most data required by the task.
-- @ref WORK_QUEUE_SCHEDULE_TIME	 - Select worker that has the fastest execution time on previous tasks.
-- @ref WORK_QUEUE_SCHEDULE_RAND	 - Select a random worker (default).
+@param algorithm The algorithm to use in assigning a task to a worker. See @ref work_queue_schedule_t for possible values.
 */
-void work_queue_specify_algorithm(struct work_queue *q, int algo);
+void work_queue_specify_algorithm(struct work_queue *q, enum work_queue_schedule_t algorithm);
 
 /** Get the project name of the queue.
 @param q A work queue object.

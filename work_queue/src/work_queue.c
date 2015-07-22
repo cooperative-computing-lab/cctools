@@ -3224,7 +3224,7 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 	t->tag = xxstrdup(tag);
 }
 
-struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, int type, int flags)
+struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags)
 {
 	struct work_queue_file *f;
 
@@ -3251,7 +3251,7 @@ struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, 
 	return f;
 }
 
-int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url, const char *remote_name, int type, int flags)
+int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url, const char *remote_name, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags)
 {
 	struct list *files;
 	struct work_queue_file *tf;
@@ -3314,7 +3314,7 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 	return 1;
 }
 
-int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)
+int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags)
 {
 	struct list *files;
 	struct work_queue_file *tf;
@@ -3384,7 +3384,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	return 1;
 }
 
-int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags, int recursive) {
+int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags, int recursive) {
 	struct list *files;
 	struct work_queue_file *tf;
 
@@ -3428,7 +3428,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 
 }
 
-int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags)
+int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags)
 {
 	struct list *files;
 	struct work_queue_file *tf;
@@ -3501,7 +3501,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 	return 1;
 }
 
-int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags)
+int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, enum work_queue_file_flags_t flags)
 {
 	struct work_queue_file *tf;
 	if(!t || !remote_name) {
@@ -3549,7 +3549,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 	return 1;
 }
 
-int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags)
+int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags)
 {
 	struct list *files;
 	struct work_queue_file *tf;
@@ -3615,9 +3615,9 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 	return 1;
 }
 
-void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
+void work_queue_task_specify_algorithm(struct work_queue_task *t, enum work_queue_schedule_t algorithm)
 {
-	t->worker_selection_algorithm = alg;
+	t->worker_selection_algorithm = algorithm;
 }
 
 void work_queue_task_specify_priority( struct work_queue_task *t, double priority )
@@ -3903,9 +3903,9 @@ void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
 	// always on
 }
 
-void work_queue_specify_algorithm(struct work_queue *q, int alg)
+void work_queue_specify_algorithm(struct work_queue *q, enum work_queue_schedule_t algorithm)
 {
-	q->worker_selection_algorithm = alg;
+	q->worker_selection_algorithm = algorithm;
 }
 
 void work_queue_specify_task_order(struct work_queue *q, int order)
@@ -4081,7 +4081,7 @@ void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 	change_task_state(q, t, WORK_QUEUE_TASK_READY);
 }
 
-int work_queue_task_state( struct work_queue *q, int taskid) {
+enum work_queue_task_state_t work_queue_task_state(struct work_queue *q, int taskid) {
 	return (int)(uintptr_t)itable_lookup(q->task_state_map, taskid);
 }
 
