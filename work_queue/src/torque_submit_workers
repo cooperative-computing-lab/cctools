@@ -20,8 +20,7 @@ torque_parameters=""
 
 parse_arguments()
 {
-
-	if [ -z "$cores" -o $cores=0 ]
+	if [ -z "$cores" -o "$cores" = 0 ]
 	then
 		cores=1
 	fi
