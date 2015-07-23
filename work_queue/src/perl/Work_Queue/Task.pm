@@ -209,6 +209,10 @@ sub specify_priority {
 	return work_queue_task_specify_priority($self->{_task}, $priority);
 }
 
+sub specify_environment_variable {
+	my ($self, $name, $value) = @_;
+	return work_queue_task_specify_enviroment_variable($self->{_task}, $name, $value);
+
 sub tag {
 	my ($self) = @_;
 	return $self->{_task}->{tag};
@@ -689,6 +693,22 @@ default is 0).
 =item n
 
 Integer priority.
+
+=back
+
+=head3 C<specify_environment_variable>
+
+Set the environment variable to value before the task is run.
+
+=over 12
+
+=item name
+
+Name of the environment variable.
+
+=item value
+
+Value of the environment variable. Variable is unset if value is not given.
 
 =back
 

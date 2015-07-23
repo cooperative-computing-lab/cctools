@@ -58,7 +58,7 @@ static void specify_envlist( struct work_queue_task *t, struct nvpair *envlist )
 		char *name, *value;
 		nvpair_first_item(envlist);
 		while(nvpair_next_item(envlist,&name,&value)) {
-			work_queue_task_specify_env(t,name,value);
+			work_queue_task_specify_enviroment_variable(t,name,value);
 		}
 	}
 }

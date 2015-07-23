@@ -2313,6 +2313,10 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 	send_worker_msg(q,w, "disk %"PRId64"\n",    t->disk );
 	send_worker_msg(q,w, "gpus %d\n",    t->gpus );
 
+	/* Note we send environment variables after resources. If the user, for
+	 * example, specifies manually CORES as a variable, the task will be
+	 * scheduled with the value of specify_cores, but the environment variable
+	 * will have the value given by the user. */
 	char *var;
 	list_first_item(t->env_list);
 	while((var=list_next_item(t->env_list))) {
@@ -3126,9 +3130,14 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
-void work_queue_task_specify_env( struct work_queue_task *t, const char *name, const char *value )
+void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value )
 {
-	list_push_tail(t->env_list,string_format("%s=%s",name,value));
+	if(value) {
+		list_push_tail(t->env_list,string_format("%s=%s",name,value));
+	} else {
+		/* Specifications without = indicate variables to me unset. */
+		list_push_tail(t->env_list,string_format("%s",name));
+	}
 }
 
 static void set_task_unlabel_flag( struct work_queue_task *t )

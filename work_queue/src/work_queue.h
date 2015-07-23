@@ -343,7 +343,7 @@ Specify an environment variable to be added to the task.
 @param name Name of the variable.
 @param value Value of the variable.
  */
-void work_queue_task_specify_env( struct work_queue_task *t, const char *name, const char *value );
+void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value );
 
 /** Select the scheduling algorithm for a single task.
 To change the scheduling algorithm for all tasks, use @ref work_queue_specify_algorithm instead.
