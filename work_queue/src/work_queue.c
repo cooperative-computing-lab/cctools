@@ -224,7 +224,7 @@ static int task_state_count( struct work_queue *q, uintptr_t state);
 
 static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static int process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
-static void process_available_results(struct work_queue *q, struct work_queue_worker *w);
+static int process_available_results(struct work_queue *q, struct work_queue_worker *w, int ask_for_results);
 static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
 
@@ -466,6 +466,9 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 		result = process_workqueue(q, w, line);
 	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status")) {
 		result = process_queue_status(q, w, line, stoptime);
+	} else if (string_prefix_is(line, "exhaustion_results")) {
+		process_available_results(q, w, 0);
+		result = 0;
 	} else if (string_prefix_is(line, "available_results")) {
 		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
 		result = 0;
@@ -1507,11 +1510,13 @@ static int process_result(struct work_queue *q, struct work_queue_worker *w, con
 	return SUCCESS;
 }
 
-static void process_available_results(struct work_queue *q, struct work_queue_worker *w)
+static int process_available_results(struct work_queue *q, struct work_queue_worker *w, int ask_for_results)
 {
+	if(ask_for_results) {
+		//max_count == -1, tells the worker to send all available results.
+		send_worker_msg(q, w, "send_results %d\n", -1);
+	}
 
-	//max_count == -1, tells the worker to send all available results.
-	send_worker_msg(q, w, "send_results %d\n", -1);
 	debug(D_WQ, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
 	char line[WORK_QUEUE_LINE_MAX];
@@ -1546,7 +1551,7 @@ static void process_available_results(struct work_queue *q, struct work_queue_wo
 		handle_worker_failure(q, w);
 	}
 
-	return;
+	return result;
 }
 
 /*
@@ -4299,7 +4304,7 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 		struct work_queue_worker *w;
 		hash_table_firstkey(q->workers_with_available_results);
 		while(hash_table_nextkey(q->workers_with_available_results,&key,(void**)&w)) {
-			process_available_results(q, w);
+			process_available_results(q, w, 1);
 			hash_table_remove(q->workers_with_available_results, key);
 			hash_table_firstkey(q->workers_with_available_results);
 		}

@@ -1136,14 +1136,22 @@ If this failed to bring the system back to a fresh state,
 then we need to abort to clean things up.
 */
 
-static void kill_all_tasks() {
+static void kill_all_tasks(struct link *master, int resources_exhausted) {
 	struct work_queue_process *p;
 	uint64_t taskid;
 
+	if(master && resources_exhausted)
+		send_master_message(master, "exhaustion_results\n");
+
 	itable_firstkey(procs_table);
 	while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
+		if(master && resources_exhausted)
+			send_master_message(master, "result %d 0 0 %llu %" PRId64 "\n", WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION, (unsigned long long) timestamp_get() - p->execution_start, taskid);
 		do_kill(taskid);
 	}
+
+	if(master && resources_exhausted)
+		send_master_message(master, "end\n");
 
 	assert(itable_size(procs_table)==0);
 	assert(itable_size(procs_running)==0);
@@ -1174,7 +1182,7 @@ static void disconnect_master(struct link *master) {
 	link_close(master);
 
 	debug(D_WQ, "killing all outstanding tasks");
-	kill_all_tasks();
+	kill_all_tasks(NULL, 0);
 
 	//KNOWN HACK: We remove all workers on a master disconnection to avoid
 	//returning old tasks to a new master.
@@ -1236,7 +1244,7 @@ static int handle_master(struct link *master) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);
 			} else {
-				kill_all_tasks();
+				kill_all_tasks(NULL, 0);
 				r = 1;
 			}
 		} else if(!strncmp(line, "release", 8)) {
@@ -1286,7 +1294,7 @@ static int check_worker_limits(struct link *master) {
 		return 0;
 	}
 
-	if( manual_disk_option > 0 && disk_measured > (manual_disk_option - disk_avail_threshold) ) {
+	if(manual_disk_option > 0 && disk_measured > MAX(0, manual_disk_option - disk_avail_threshold)) {
 		fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, disk_measured);
 
 		if(master) {
@@ -1368,6 +1376,7 @@ static void work_for_master(struct link *master) {
 		if( !check_worker_limits(master) ) {
 			ok = 0;
 			abort_flag = 1;
+			kill_all_tasks(master, 1);
 		}
 
 		if(ok && !results_to_be_sent_msg) {
