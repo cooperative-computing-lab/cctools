@@ -17,19 +17,47 @@
 static struct nvpair *output_files_list;
 static struct nvpair *task_sandbox_name_list;
 
-static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
+static batch_job_id_t batch_job_sandbox_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist)
 {
 	batch_job_id_t jobid;
 
-    // create task sandbox
+	// create task sandbox
 	const char *local_task_dir = nvpair_lookup_string(envlist, "local_task_dir");
 	char *template = string_format("%s/task.sandbox.XXXXXX", local_task_dir);
-    char *task_sandbox_name = mkdtemp(template);
+	char *task_sandbox_name = mkdtemp(template);
 
-    if (output_files_list == NULL)
-    	output_files_list = nvpair_create();
-    if (task_sandbox_name_list == NULL) 
-        task_sandbox_name_list = nvpair_create();
+	if(output_files_list == NULL)
+		output_files_list = nvpair_create();
+	if(task_sandbox_name_list == NULL)
+		task_sandbox_name_list = nvpair_create();
+
+	while(isspace(*extra_input_files))
+		extra_input_files++;
+	char *p;
+	char *input_files = strdup(extra_input_files);
+	p = strtok(input_files, ",");
+	char cwd[CHAR_BUFF_LEN];
+	getcwd(cwd, sizeof(cwd));
+
+	while(p != NULL) {
+
+		char *orig_file = NULL;
+		char *symlink_path = NULL;
+
+		// move input files into task sandbox
+		if(p[0] != '/') {
+			orig_file = string_format("%s/%s", cwd, p);
+			symlink_path = string_format("%s/%s", task_sandbox_name, p);
+			symlink(orig_file, symlink_path);
+			free(orig_file);
+			free(symlink_path);
+		}
+
+		p = strtok(NULL, ",");
+
+	}
+
+	free(input_files);
 
 	fflush(NULL);
 	jobid = fork();
@@ -43,32 +71,10 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 		info->started = time(0);
 		itable_insert(q->job_table, jobid, info);
 
-        // store the extra output files and task sandbox name
-        char *jobid_str = string_format("%d", (int)jobid);
-        nvpair_insert_string(output_files_list, jobid_str, extra_output_files);
-        nvpair_insert_string(task_sandbox_name_list, jobid_str, task_sandbox_name);
-
-        while(isspace(*extra_input_files)) extra_input_files++;
-        char *p;
-        char *input_files = strdup(extra_input_files); 
-        p = strtok(input_files, ","); 
-        while (p != NULL) {
-
-            char *orig_file; 
-            char *symlink_path;
-            
-            // move input files into task sandbox
-            if (p[0] != '/') {
-                char cwd[CHAR_BUFF_LEN];
-            	getcwd(cwd, sizeof(cwd));
-                orig_file = string_format("%s/%s", cwd, p);
-                symlink_path = string_format("%s/%s", task_sandbox_name, p);
-                symlink(orig_file, symlink_path);
-            }
-            
-            p = strtok(NULL, ",");
-
-        }
+		// store the extra output files and task sandbox name
+		char *jobid_str = string_format("%d", (int) jobid);
+		nvpair_insert_string(output_files_list, jobid_str, extra_output_files);
+		nvpair_insert_string(task_sandbox_name_list, jobid_str, task_sandbox_name);
 
 		return jobid;
 
@@ -80,16 +86,16 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 		if(envlist) {
 			nvpair_export(envlist);
 		}
-       
-        // change working directory to the task sandbox directory 
-        chdir(task_sandbox_name);
+		// change working directory to the task sandbox directory 
+		if(chdir(task_sandbox_name) == -1)
+			fatal("Faile to change working directory with error message %s\n.", strerror(errno));
 		execlp("sh", "sh", "-c", cmd, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return -1;
 }
 
-static batch_job_id_t batch_job_sandbox_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_job_id_t batch_job_sandbox_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
 {
 	while(1) {
 		int timeout;
@@ -120,23 +126,25 @@ static batch_job_id_t batch_job_sandbox_wait (struct batch_queue * q, struct bat
 			memcpy(info_out, info, sizeof(*info));
 
 			int jobid = p->pid;
-          
-            char *jobid_str = string_format("%d", jobid);
-            const char *extra_output_files = nvpair_lookup_string(output_files_list, jobid_str);
-            const char *task_sandbox_name = nvpair_lookup_string(task_sandbox_name_list, jobid_str);
-          
-            while(isspace(*extra_output_files)) extra_output_files++;
-            char *p;
-            char *output_files = strdup(extra_output_files);
-            p = strtok(output_files, ",");
-            while ( p != NULL ) {
-                // move the output file to makeflow working directory
-                char *output_file_path = string_format("%s/%s", task_sandbox_name, p);
-                if(rename(output_file_path, p) == -1)
+
+			char *jobid_str = string_format("%d", jobid);
+			const char *extra_output_files = nvpair_lookup_string(output_files_list, jobid_str);
+			const char *task_sandbox_name = nvpair_lookup_string(task_sandbox_name_list, jobid_str);
+
+			while(isspace(*extra_output_files))
+				extra_output_files++;
+			char *p;
+			char *output_files = strdup(extra_output_files);
+			p = strtok(output_files, ",");
+			while(p != NULL) {
+				// move the output file to makeflow working directory
+				char *output_file_path = string_format("%s/%s", task_sandbox_name, p);
+				if(rename(output_file_path, p) == -1)
 					fatal("Fail to move the output file with the error message %s.\n", strerror(errno));
-                p = strtok(NULL, ",");	
-            } 
-          
+				free(output_file_path);
+				p = strtok(NULL, ",");
+			}
+
 			free(p);
 			free(info);
 			return jobid;
@@ -150,7 +158,7 @@ static batch_job_id_t batch_job_sandbox_wait (struct batch_queue * q, struct bat
 	}
 }
 
-static int batch_job_sandbox_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_job_sandbox_remove(struct batch_queue *q, batch_job_id_t jobid)
 {
 	int status;
 
@@ -192,19 +200,19 @@ const struct batch_queue_module batch_queue_sandbox = {
 	batch_queue_sandbox_option_update,
 
 	{
-		batch_job_sandbox_submit,
-		batch_job_sandbox_wait,
-		batch_job_sandbox_remove,
-	},
+	 batch_job_sandbox_submit,
+	 batch_job_sandbox_wait,
+	 batch_job_sandbox_remove,
+	 },
 
 	{
-		batch_fs_sandbox_chdir,
-		batch_fs_sandbox_getcwd,
-		batch_fs_sandbox_mkdir,
-		batch_fs_sandbox_putfile,
-		batch_fs_sandbox_stat,
-		batch_fs_sandbox_unlink,
-	},
+	 batch_fs_sandbox_chdir,
+	 batch_fs_sandbox_getcwd,
+	 batch_fs_sandbox_mkdir,
+	 batch_fs_sandbox_putfile,
+	 batch_fs_sandbox_stat,
+	 batch_fs_sandbox_unlink,
+	 },
 };
 
 /* vim: set noexpandtab tabstop=4: */
