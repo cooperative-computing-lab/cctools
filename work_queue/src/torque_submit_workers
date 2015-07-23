@@ -60,6 +60,8 @@ submit_workers_command()
 #!/bin/sh
 #PBS -l nodes=1:ppn=$cores
 
+cd $PWD
+
 ./work_queue_worker $arguments $host $port
 EOF
 
@@ -67,11 +69,11 @@ EOF
 
 	if [ $use_jobarray = 1 ]
 	then
-		qsub -t 1-$count:1 -d `pwd` $torque_parameters worker.sh
+		qsub -t 1-$count:1 $torque_parameters worker.sh
 	else
 		for n in `seq 1 $count`
 		do
-			qsub -d `pwd` $torque_parameters worker.sh
+			qsub $torque_parameters worker.sh
 		done
 	fi
 }
