@@ -29,12 +29,12 @@ See the file COPYING for details.
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT  30   /**< Default value for Work Queue keepalive timeout in seconds. */
 
-enum work_queue_file_type_t {
+typedef enum {
 	WORK_QUEUE_INPUT  = 0,                         /**< Specify an input object. */
 	WORK_QUEUE_OUTPUT = 1                          /**< Specify an output object. */
-};
+} work_queue_file_type_t;
 
-enum work_queue_file_flags_t {
+typedef enum {
 	WORK_QUEUE_NOCACHE  = 0, /**< Do not cache file at execution site. */
 	WORK_QUEUE_CACHE    = 1, /**< Cache file at execution site for later use. */
 	WORK_QUEUE_SYMLINK  = 2, /**< Create a symlink to the file rather than copying it, if possible. */
@@ -42,19 +42,19 @@ enum work_queue_file_flags_t {
 	WORK_QUEUE_THIRDGET = 8, /**< Access the file on the client from a shared filesystem */
 	WORK_QUEUE_THIRDPUT = 8, /**< Access the file on the client from a shared filesystem (same as WORK_QUEUE_THIRDGET, included for readability) */
 	WORK_QUEUE_WATCH    = 16 /**< Watch the output file and send back changes as the task runs. */
-};
+} work_queue_file_flags_t;
 
-enum work_queue_schedule_t {
+typedef enum {
 	WORK_QUEUE_SCHEDULE_UNSET = 0,
 	WORK_QUEUE_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. */
 	WORK_QUEUE_SCHEDULE_FILES,     /**< Select worker that has the most data required by the task. */
 	WORK_QUEUE_SCHEDULE_TIME,      /**< Select worker that has the fastest execution time on previous tasks. */
 	WORK_QUEUE_SCHEDULE_RAND,      /**< Select a random worker. (default) */
 	WORK_QUEUE_SCHEDULE_WORST      /**< Select the worst fit worker (the worker with more unused resources). */
-};
+} work_queue_schedule_t;
 
 
-enum work_queue_result_t {
+typedef enum {
 	WORK_QUEUE_RESULT_SUCCESS        = 0,       /**< The task ran successfully **/
 	WORK_QUEUE_RESULT_INPUT_MISSING  = 1,       /**< The task cannot be run due to a missing input file **/
 	WORK_QUEUE_RESULT_OUTPUT_MISSING = 2,       /**< The task ran but failed to generate a specified output file **/
@@ -62,9 +62,9 @@ enum work_queue_result_t {
 	WORK_QUEUE_RESULT_SIGNAL         = 8,       /**< The task was terminated with a signal **/
 	WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION = 16, /**< The task used more resources than requested **/
 	WORK_QUEUE_RESULT_TASK_TIMEOUT   = 32       /**< The task ran after specified end time. **/
-};
+} work_queue_result_t;
 
-enum work_queue_task_state_t {
+typedef enum {
 	WORK_QUEUE_TASK_UNKNOWN = 0,       /**< There is no such task **/
 	WORK_QUEUE_TASK_READY,             /**< Task is ready to be run, waiting in queue **/
 	WORK_QUEUE_TASK_RUNNING,           /**< Task has been dispatched to some worker **/
@@ -72,7 +72,7 @@ enum work_queue_task_state_t {
 	WORK_QUEUE_TASK_RETRIEVED,         /**< Task results are available at the master **/
 	WORK_QUEUE_TASK_DONE,              /**< Task is done, and returned through work_queue_wait >**/
 	WORK_QUEUE_TASK_CANCELED           /**< Task was canceled before completion **/
-};
+} work_queue_task_state_t;
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon
 												 creating queue. Turned off if less than 0. Change
@@ -93,14 +93,14 @@ extern int wq_option_scheduler;	               /**< Initial setting for algorith
 struct work_queue_task {
 	char *tag;                                             /**< An optional user-defined logical name for the task. */
 	char *command_line;                                    /**< The program(s) to execute, as a shell command line. */
-	enum work_queue_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
+	work_queue_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
 	char *output;                                          /**< The standard output of the task. */
 	struct list *input_files;                              /**< The files to transfer to the worker and place in the executing directory. */
 	struct list *output_files;                             /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
 	struct list *env_list;                                 /**< Environment variables applied to the task. */
 	int taskid;                                            /**< A unique task id number. */
 	int return_status;                                     /**< The exit code of the command line. */
-	enum work_queue_result_t result;                       /**< The result of the task (successful, failed return_status, missing input file, missing output file). */
+	work_queue_result_t result;                       /**< The result of the task (successful, failed return_status, missing input file, missing output file). */
 	char *host;                                            /**< The address and port of the host on which it ran. */
 	char *hostname;                                        /**< The name of the host on which it ran. */
 
@@ -241,7 +241,7 @@ is entirely dependent upon the system load.  If the master is busy interacting w
 output updates will be infrequent.)
 @return 1 if the task file is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags);
+int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags);
 
 /** Add a file piece to a task.
 @param t A task object.
@@ -257,7 +257,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @return 1 if the task file piece is successfully specified, 0 if either of @a t, @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, enum work_queue_file_type_t type, enum work_queue_file_flags_t flags);
+int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, work_queue_file_type_t type, work_queue_file_flags_t flags);
 
 /** Add an input buffer to a task.
 @param t A task object.
@@ -269,7 +269,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, enum work_queue_file_flags_t);
+int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, work_queue_file_flags_t);
 
 /** Add a directory to a task.
 @param t A task object.
@@ -284,7 +284,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 @param recursive indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
 @return 1 if the task directory is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, enum work_queue_file_type_t type, enum work_queue_file_flags_t, int recursive);
+int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t, int recursive);
 
 /** Specify the amount of memory required by a task.
 @param t A task object.
@@ -350,7 +350,7 @@ To change the scheduling algorithm for all tasks, use @ref work_queue_specify_al
 @param t A task object.
 @param algorithm The algorithm to use in assigning this task to a worker. For possible values, see @ref work_queue_schedule_t.
 */
-void work_queue_task_specify_algorithm(struct work_queue_task *t, enum work_queue_schedule_t algorithm);
+void work_queue_task_specify_algorithm(struct work_queue_task *t, work_queue_schedule_t algorithm);
 
 /** Delete a task.
 This may be called on tasks after they are returned from @ref work_queue_wait.
@@ -484,7 +484,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 @param taskid The taskid of the task.
 @return One of: WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE)
 */
-enum work_queue_task_state_t work_queue_task_state(struct work_queue *q, int taskid);
+work_queue_task_state_t work_queue_task_state(struct work_queue *q, int taskid);
 
 /** Limit the queue bandwidth when transferring files to and from workers.
 @param q A work queue object.
@@ -524,7 +524,7 @@ This function controls which <b>worker</b> will be selected for a given task.
 @param q A work queue object.
 @param algorithm The algorithm to use in assigning a task to a worker. See @ref work_queue_schedule_t for possible values.
 */
-void work_queue_specify_algorithm(struct work_queue *q, enum work_queue_schedule_t algorithm);
+void work_queue_specify_algorithm(struct work_queue *q, work_queue_schedule_t algorithm);
 
 /** Get the project name of the queue.
 @param q A work queue object.
