@@ -113,6 +113,10 @@ static double worker_volatility = 0.0;
 // This can be set by Ctrl-C or by any condition that prevents further progress.
 static int abort_flag = 0;
 
+// If flag is set, no new tasks are accepted by the worker. Worker exits when
+// no tasks are waiting to sent results back.
+static int soft_abort_flag = 0;
+
 // Flag used to indicate a child must be waited for.
 static int sigchld_received_flag = 0;
 
@@ -611,7 +615,6 @@ static int handle_tasks(struct link *master)
 			}
 
 			itable_insert(procs_complete, p->task->taskid, p);
-
 		}
 
 	}
@@ -1157,6 +1160,21 @@ static void kill_all_tasks() {
 	debug(D_WQ,"all data structures are clean");
 }
 
+/*
+Kill all known running tasks, but do not remove their record.
+Also, assign result as a cause for the kill.
+*/
+static void finish_running_tasks(struct link *master, work_queue_result_t result) {
+	struct work_queue_process *p;
+	pid_t pid;
+
+	itable_firstkey(procs_running);
+	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
+		kill(-1 * pid, SIGKILL);
+		p->task->result |= result;
+	}
+}
+
 static int do_release() {
 	debug(D_WQ, "released by master %s:%d.\n", master_addr, master_port);
 	released_by_master = 1;
@@ -1277,7 +1295,8 @@ static int check_for_resources(struct work_queue_task *t)
 		(gpus_allocated   + t->gpus   <= local_resources->gpus.total);
 }
 
-static int check_worker_limits(struct link *master) {
+/* Limits that if exhausted, should abort the worker right away. */
+static int check_worker_hard_limits(struct link *master) {
 	if( manual_wall_time_option > 0 && (time(0) - worker_start_time) > manual_wall_time_option) {
 		fprintf(stderr,"work_queue_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t)manual_wall_time_option);
 		if(master) {
@@ -1286,8 +1305,13 @@ static int check_worker_limits(struct link *master) {
 		return 0;
 	}
 
-	if( manual_disk_option > 0 && disk_measured > (manual_disk_option - disk_avail_threshold) ) {
-		fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, disk_measured);
+	return 1;
+}
+
+/* Limits that if exhausted, allow information to be sent back to the master. */
+static int check_worker_soft_limits(struct link *master) {
+	if(manual_disk_option > 0 && disk_measured > MAX(0, manual_disk_option - disk_avail_threshold)) {
+		fprintf(stderr,"work_queue_worker: %s has less than the expected disk space %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, disk_measured);
 
 		if(master) {
 			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_measured);
@@ -1295,7 +1319,6 @@ static int check_worker_limits(struct link *master) {
 
 		return 0;
 	}
-
 
 	return 1;
 }
@@ -1361,14 +1384,20 @@ static void work_for_master(struct link *master) {
 			ok &= handle_master(master);
 		}
 
+		if( !check_worker_hard_limits(master) ) {
+			abort_flag = 1;
+			break;
+		}
+
+		if( !check_worker_soft_limits(master) ) {
+			finish_running_tasks(master, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
+			send_master_message(master, "info going_away\n");
+			soft_abort_flag = 1;
+		}
+
 		expire_procs_running();
 
 		ok &= handle_tasks(master);
-
-		if( !check_worker_limits(master) ) {
-			ok = 0;
-			abort_flag = 1;
-		}
 
 		if(ok && !results_to_be_sent_msg) {
 			if(work_queue_watcher_check(watcher) || itable_size(procs_complete) > 0) {
@@ -1416,6 +1445,11 @@ static void work_for_master(struct link *master) {
 		//Reset idle_stoptime if something interesting is happening at this worker.
 		if(list_size(procs_waiting) > 0 || itable_size(procs_table) > 0 || itable_size(procs_complete) > 0) {
 			reset_idle_timer();
+		}
+		else if(soft_abort_flag) {
+			// Else, if no task lives in the worker, and the worker is going away, then the worker is ready to abort.
+			abort_flag = 1;
+			break;
 		}
 	}
 }
@@ -2196,7 +2230,7 @@ int main(int argc, char *argv[])
 			backoff_interval = MIN(backoff_interval*2,max_backoff_interval);
 		}
 
-		if(!check_worker_limits(NULL)) {
+		if(!(check_worker_hard_limits(NULL) && check_worker_soft_limits(NULL))) {
 			abort_flag = 1;
 		}
 

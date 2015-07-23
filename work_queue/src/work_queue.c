@@ -187,6 +187,7 @@ struct work_queue_worker {
 	int  foreman;                             // 0 if regular worker, 1 if foreman
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
+	int     going_away;                       // if 1, then worker will exit as soon as it sends all its results.
 	int64_t unlabeled_allocated;
 	int64_t cores_allocated;
 	int64_t memory_allocated;
@@ -416,7 +417,9 @@ int process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 	if(n != 2)
 		return -1;
 
-	if(string_prefix_is(field, "total_workers_joined")) {
+	if(string_prefix_is(field, "going_away")) {
+		w->going_away = 1;
+	} else if(string_prefix_is(field, "total_workers_joined")) {
 		w->stats->total_workers_joined = atoll(value);
 	} else if(string_prefix_is(field, "total_workers_removed")) {
 		w->stats->total_workers_removed = atoll(value);
@@ -1518,9 +1521,9 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 static work_queue_result_code_t get_available_results(struct work_queue *q, struct work_queue_worker *w)
 {
-
 	//max_count == -1, tells the worker to send all available results.
 	send_worker_msg(q, w, "send_results %d\n", -1);
+
 	debug(D_WQ, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
 	char line[WORK_QUEUE_LINE_MAX];
@@ -2521,6 +2524,10 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 
 	/* worker has no reported any resources yet */
 	if(w->resources->tag < 0)
+		return 0;
+
+	/* worker reported it does not want any more tasks */
+	if(w->going_away)
 		return 0;
 
 	if(w->foreman)
