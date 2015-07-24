@@ -61,7 +61,8 @@ typedef enum {
 	WORK_QUEUE_RESULT_STDOUT_MISSING = 4,       /**< The task ran but its stdout has been truncated **/
 	WORK_QUEUE_RESULT_SIGNAL         = 8,       /**< The task was terminated with a signal **/
 	WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION = 16, /**< The task used more resources than requested **/
-	WORK_QUEUE_RESULT_TASK_TIMEOUT   = 32       /**< The task ran after specified end time. **/
+	WORK_QUEUE_RESULT_TASK_TIMEOUT   = 32,      /**< The task ran after specified end time. **/
+	WORK_QUEUE_RESULT_UNKNOWN        = 64       /**< The task ran successfully **/
 } work_queue_result_t;
 
 typedef enum {
