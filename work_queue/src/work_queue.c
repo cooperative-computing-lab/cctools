@@ -80,17 +80,23 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_ADDRPORT_MAX 32
 #define WORKER_HASHKEY_MAX 32
 
+#define RESOURCE_MONITOR_TASK_SUMMARY_NAME "cctools-work-queue-%d-resource-monitor-task-%d"
+
+#define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
+
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
-	SUCCESS =  0,
+	SUCCESS = 0,
 	WORKER_FAILURE, 
 	APP_FAILURE
 } work_queue_result_code_t;
 
 
-#define RESOURCE_MONITOR_TASK_SUMMARY_NAME "cctools-work-queue-%d-resource-monitor-task-%d"
-
-#define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
+typedef enum {
+	MSG_PROCESSED = 0,
+	MSG_NOT_PROCESSED,
+	MSG_FAILURE
+} work_queue_msg_code_t;
 
 
 // Threshold for available disk space (MB) beyond which files are not received from worker.
@@ -225,12 +231,12 @@ static struct work_queue_task *task_state_any(struct work_queue *q, uintptr_t st
 /* number of tasks with state */
 static int task_state_count( struct work_queue *q, uintptr_t state);
 
-static work_queue_result_code_t process_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
+static work_queue_result_code_t get_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
+static work_queue_result_code_t get_available_results(struct work_queue *q, struct work_queue_worker *w);
 
-static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
-static void process_available_results(struct work_queue *q, struct work_queue_worker *w);
-static int process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
-static int process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
+static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
+static work_queue_msg_code_t process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
+static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
 
 static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink );
 
@@ -438,12 +444,8 @@ int process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 /**
  * This function receives a message from worker and records the time a message is successfully
  * received. This timestamp is used in keepalive timeout computations.
- * Its return value is:
- *  0 : a message was received and processed
- *  1 : a message was received but NOT processed
- * -1 : failure to read from link or in processing received message
  */
-static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, char *line, size_t length )
+static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, char *line, size_t length )
 {
 	time_t stoptime;
 
@@ -456,7 +458,7 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 	int result = link_readline(w->link, line, length, stoptime);
 
 	if (result <= 0) {
-		return -1;
+		return MSG_FAILURE;
 	}
 
 	w->last_msg_recv_time = timestamp_get();
@@ -465,29 +467,29 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 
 	// Check for status updates that can be consumed here.
 	if(string_prefix_is(line, "alive")) {
-		result = 0;
+		result = MSG_PROCESSED;
 	} else if(string_prefix_is(line, "workqueue")) {
 		result = process_workqueue(q, w, line);
 	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status")) {
 		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
 		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
-		result = 0;
+		result = MSG_PROCESSED;
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
 		debug(D_WQ|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
-		result = -1;
+		result = MSG_FAILURE;
 	} else if (string_prefix_is(line,"ready")) {
 		debug(D_WQ|D_NOTICE,"worker (%s) is an older worker that is not compatible with this master.",w->addrport);
-		result = -1;
+		result = MSG_FAILURE;
 	} else if (string_prefix_is(line, "name")) {
 		result = process_name(q, w, line);
 	} else if (string_prefix_is(line, "info")) {
 		result = process_info(q, w, line);
 	} else {
 		// Message is not a status update: return it to the user.
-		return 1;
+		return MSG_NOT_PROCESSED;
 	}
 
 	return result;
@@ -497,16 +499,15 @@ static int recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, ch
 /*
 Call recv_worker_msg and silently retry if the result indicates
 an asynchronous update message like 'keepalive' or 'resource'.
-Returns 1 or -1 (as above) but does not return zero.
 */
 
-int recv_worker_msg_retry( struct work_queue *q, struct work_queue_worker *w, char *line, int length )
+work_queue_msg_code_t recv_worker_msg_retry( struct work_queue *q, struct work_queue_worker *w, char *line, int length )
 {
-	int result=0;
+	work_queue_msg_code_t result = MSG_PROCESSED;
 
 	do {
 		result = recv_worker_msg(q, w,line,length);
-	} while(result==0);
+	} while(result == MSG_PROCESSED);
 
 	return result;
 }
@@ -875,7 +876,7 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 		int64_t length;
 		int errnum;
 
-		if(recv_worker_msg_retry(q, w, line, sizeof(line)) < 0) {
+		if(recv_worker_msg_retry(q, w, line, sizeof(line)) == MSG_FAILURE) {
 			result = WORKER_FAILURE;
 			break;
 		}
@@ -994,7 +995,8 @@ static int do_thirdput( struct work_queue *q, struct work_queue_worker *w,  cons
 
 	send_worker_msg(q,w,"thirdput %d %s %s\n",command,cached_name,payload);
 
-	if(recv_worker_msg_retry(q, w, line, WORK_QUEUE_LINE_MAX) < 0) return WORKER_FAILURE;
+	if(recv_worker_msg_retry(q, w, line, WORK_QUEUE_LINE_MAX) == MSG_FAILURE)
+		return WORKER_FAILURE;
 
 	if(sscanf(line, "thirdput-complete %d", &result)) {
 		return result;
@@ -1193,8 +1195,8 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
-		q->stats->total_good_execute_time += t->cmd_execution_time;
-		q->stats->total_good_transfer_time     += t->total_transfer_time;
+		q->stats->total_good_execute_time  += t->cmd_execution_time;
+		q->stats->total_good_transfer_time += t->total_transfer_time;
 	}
 
 	debug(D_WQ, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
@@ -1288,17 +1290,18 @@ static void handle_failure(struct work_queue *q, struct work_queue_worker *w, st
 	return;
 }
 
-static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line)
+static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line)
 {
 	char items[4][WORK_QUEUE_LINE_MAX];
 	int worker_protocol;
 
 	int n = sscanf(line,"workqueue %d %s %s %s %s",&worker_protocol,items[0],items[1],items[2],items[3]);
-	if(n!=5) return -1;
+	if(n != 5)
+		return MSG_FAILURE;
 
 	if(worker_protocol!=WORK_QUEUE_PROTOCOL_VERSION) {
 		debug(D_WQ|D_NOTICE,"worker (%s) is using work queue protocol %d, but I am using protocol %d",w->addrport,worker_protocol,WORK_QUEUE_PROTOCOL_VERSION);
-		return -1;
+		return MSG_FAILURE;
 	}
 
 	if(w->hostname) free(w->hostname);
@@ -1323,7 +1326,7 @@ static int process_workqueue(struct work_queue *q, struct work_queue_worker *w, 
 		debug(D_DEBUG, "Warning: potential worker version mismatch: worker %s (%s) is version %s, and master is version %s", w->hostname, w->addrport, w->version, CCTOOLS_VERSION);
 	}
 
-	return 0;
+	return MSG_PROCESSED;
 }
 
 /*
@@ -1335,7 +1338,7 @@ not line up with an expected task and file, then we discard it and keep
 going.
 */
 
-static work_queue_result_code_t process_update( struct work_queue *q, struct work_queue_worker *w, const char *line )
+static work_queue_result_code_t get_update( struct work_queue *q, struct work_queue_worker *w, const char *line )
 {
 	int64_t taskid;
 	char path[WORK_QUEUE_LINE_MAX];
@@ -1347,7 +1350,6 @@ static work_queue_result_code_t process_update( struct work_queue *q, struct wor
 		debug(D_WQ,"Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line );
 		return WORKER_FAILURE;
 	}
-
 
 	struct work_queue_task *t = itable_lookup(w->current_tasks,taskid);
 	if(!t) {
@@ -1395,16 +1397,20 @@ static work_queue_result_code_t process_update( struct work_queue *q, struct wor
 Failure to store result is treated as success so we continue to retrieve the
 output files of the task.
 */
-static work_queue_result_code_t process_result(struct work_queue *q, struct work_queue_worker *w, const char *line) {
+static work_queue_result_code_t get_result(struct work_queue *q, struct work_queue_worker *w, const char *line) {
 
-	if(!q || !w || !line) return WORKER_FAILURE;
+	if(!q || !w || !line) 
+		return WORKER_FAILURE;
+
+	struct work_queue_task *t;
 
 	int task_status, exit_status;
 	uint64_t taskid;
 	int64_t output_length, retrieved_output_length;
 	timestamp_t execution_time;
-	struct work_queue_task *t;
+
 	int64_t actual;
+
 	timestamp_t observed_execution_time;
 	timestamp_t effective_stoptime = 0;
 	time_t stoptime;
@@ -1510,7 +1516,7 @@ static work_queue_result_code_t process_result(struct work_queue *q, struct work
 	return SUCCESS;
 }
 
-static void process_available_results(struct work_queue *q, struct work_queue_worker *w)
+static work_queue_result_code_t get_available_results(struct work_queue *q, struct work_queue_worker *w)
 {
 
 	//max_count == -1, tells the worker to send all available results.
@@ -1523,17 +1529,17 @@ static void process_available_results(struct work_queue *q, struct work_queue_wo
 	work_queue_result_code_t result = SUCCESS; //return success unless something fails below.
 
 	while(1) {
-		if(recv_worker_msg_retry(q, w, line, sizeof(line)) < 0) {
+		if(recv_worker_msg_retry(q, w, line, sizeof(line)) == MSG_FAILURE) {
 			result = WORKER_FAILURE;
 			break;
 		}
 
 		if(string_prefix_is(line,"result")) {
-			result = process_result(q, w, line);
+			result = get_result(q, w, line);
 			if(result != SUCCESS) break;
 			i++;
 		} else if(string_prefix_is(line,"update")) {
-			result = process_update(q,w,line);
+			result = get_update(q,w,line);
 			if(result != SUCCESS) break;
 		} else if(!strcmp(line,"end")) {
 			//Only return success if last message is end.
@@ -1549,7 +1555,7 @@ static void process_available_results(struct work_queue *q, struct work_queue_wo
 		handle_worker_failure(q, w);
 	}
 
-	return;
+	return result;
 }
 
 /*
@@ -1723,7 +1729,7 @@ struct nvpair * task_to_nvpair( struct work_queue_task *t, const char *state, co
 	return nv;
 }
 
-static int process_queue_status( struct work_queue *q, struct work_queue_worker *target, const char *line, time_t stoptime )
+static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct work_queue_worker *target, const char *line, time_t stoptime )
 {
 	char request[WORK_QUEUE_LINE_MAX];
 	struct link *l = target->link;
@@ -1732,7 +1738,7 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
 	if(sscanf(line, "%[^_]_status", request) != 1) {
-		return -1;
+		return MSG_FAILURE;
 	}
 
 	if(!strcmp(request, "queue")) {
@@ -1810,10 +1816,10 @@ static int process_queue_status( struct work_queue *q, struct work_queue_worker 
 	q->stats->total_workers_joined--;
 	q->stats->total_workers_removed--;
 
-	return 0;
+	return MSG_PROCESSED;
 }
 
-static int process_resource( struct work_queue *q, struct work_queue_worker *w, const char *line )
+static work_queue_msg_code_t process_resource( struct work_queue *q, struct work_queue_worker *w, const char *line )
 {
 	char category[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
@@ -1838,9 +1844,11 @@ static int process_resource( struct work_queue *q, struct work_queue_worker *w, 
 		} else if(!strcmp(category,"workers")) {
 			w->resources->workers = r;
 		}
+	} else {
+		return MSG_FAILURE;
 	}
 
-	return 0;
+	return MSG_PROCESSED;
 }
 
 static void handle_worker(struct work_queue *q, struct link *l)
@@ -4304,7 +4312,7 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 		struct work_queue_worker *w;
 		hash_table_firstkey(q->workers_with_available_results);
 		while(hash_table_nextkey(q->workers_with_available_results,&key,(void**)&w)) {
-			process_available_results(q, w);
+			get_available_results(q, w);
 			hash_table_remove(q->workers_with_available_results, key);
 			hash_table_firstkey(q->workers_with_available_results);
 		}
