@@ -2968,7 +2968,7 @@ static int tasktag_comparator(void *t, const void *r) {
 }
 
 
-static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
+static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t) {
 
 	struct work_queue_worker *w = itable_lookup(q->worker_task_map, t->taskid);
 
@@ -4519,9 +4519,7 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int ta
 		return NULL;
 	}
 
-	if( task_state_is(q, taskid, WORK_QUEUE_TASK_RUNNING) ) {
-		cancel_running_task(q, matched_task);
-	}
+	cancel_task_on_worker(q, matched_task);
 
 	q->stats->total_tasks_cancelled++;
 	change_task_state(q, matched_task, WORK_QUEUE_TASK_CANCELED);
