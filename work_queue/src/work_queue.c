@@ -4762,7 +4762,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 	char *key;
 	struct work_queue_worker *w;
 
-	s->tasks_waiting = 0;
+	/* Consider running only if reported by some hand. */
 	s->tasks_running = 0;
 	s->total_workers_connected = 0;
 
@@ -4778,15 +4778,13 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 			accumulate_stat(s, w->stats, total_bytes_sent);
 			accumulate_stat(s, w->stats, total_bytes_received);
 		}
-		else {
-			s->total_workers_connected++;
-		}
 
 		accumulate_stat(s, w->stats, tasks_waiting);
 		accumulate_stat(s, w->stats, tasks_running);
 	}
 
-	s->total_workers_connected += s->total_workers_joined - s->total_workers_removed;
+	/* Account also for workers connected directly to the master. */
+	s->total_workers_connected = s->total_workers_joined - s->total_workers_removed;
 
 	s->total_workers_joined  += q->stats_disconnected_workers->total_workers_joined;
 	s->total_workers_removed += q->stats_disconnected_workers->total_workers_removed;
