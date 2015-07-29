@@ -825,7 +825,6 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				if(chirp_acl_check(path, subject, CHIRP_ACL_PUT)) {
 					flags |= O_EXCL;
 				} else {
-					errno = EACCES;
 					goto failure;
 				}
 			}
@@ -939,7 +938,6 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					/* ok to proceed */
 				}
 			} else {
-				errno = EACCES;
 				goto failure;
 			}
 
