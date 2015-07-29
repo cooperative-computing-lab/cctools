@@ -1,34 +1,9 @@
 #!/bin/bash
 
-#CCTOOLS_INSTALL="${HOME}/cctools-install/bin"
-CCTOOLS_INSTALL=/afs/nd.edu/user31/pdonnel3/cctools-install/bin/
-
-if [ "$(whoami)" = pdonnel3 ]; then
-	PORT=9123
-elif [ "$(whoami)" = nhazekam ]; then
-	PORT=9223
-else
-	PORT=9523
-fi
-
-CHIRP="${CCTOOLS_INSTALL}/chirp"
-CHIRP_SERVER="${CCTOOLS_INSTALL}/chirp_server"
-MAKEFLOW="${CCTOOLS_INSTALL}/makeflow"
+source "$(dirname "$0")"/test-common.bash
 
 DIR="$(pwd)/scheduler-tests.workflow"
 MAKEFLOW_FILE="$DIR"/Makeflow
-
-run () {
-	echo "$@"
-	time "$@"
-}
-
-runbg () {
-	echo "$@" '&'
-	"$@" &
-}
-
-. "$(dirname "$0")/chirps-ssh.sh"
 
 for concurrency in 0; do
 #for scheduler in fifo-0 fifo-8 fifo-4 fifo-2 fifo-1; do

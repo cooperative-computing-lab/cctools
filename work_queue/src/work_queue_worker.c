@@ -332,6 +332,13 @@ static void send_stats_update( struct link *master, int force_update)
 		send_master_message(master, "info total_execute_time %lld\n", (long long) s.total_execute_time);
 		send_master_message(master, "info total_bytes_sent %lld\n", (long long) s.total_bytes_sent);
 		send_master_message(master, "info total_bytes_received %lld\n", (long long) s.total_bytes_received);
+
+		send_master_message(master, "info tasks_waiting %lld\n", (long long) s.tasks_waiting);
+		send_master_message(master, "info tasks_running %lld\n", (long long) s.tasks_running);
+	}
+	else {
+		send_master_message(master, "info tasks_waiting %lld\n", (long long) list_size(procs_waiting));
+		send_master_message(master, "info tasks_running %lld\n", (long long) itable_size(procs_running));
 	}
 
 	last_send_time = time(0);
@@ -821,7 +828,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			if(value) {
 				*value = 0;
 				value++;
-				work_queue_task_specify_env(task,env,value);
+				work_queue_task_specify_enviroment_variable(task,env,value);
 			}
 			free(env);
 		} else if(!strcmp(line,"end")) {
@@ -1403,6 +1410,7 @@ static void work_for_master(struct link *master) {
 
 		if(!ok) break;
 
+		send_stats_update(master,0);
 		send_resource_update(master,0);
 
 		//Reset idle_stoptime if something interesting is happening at this worker.
@@ -1687,6 +1695,23 @@ static void handle_sigchld(int sig)
 	sigchld_received_flag = 1;
 }
 
+static void read_resources_env_var(const char *name, int64_t *manual_option) {
+	char *value;
+	value = getenv(name);
+	if(value) {
+		*manual_option = atoi(value);
+		/* unset variable so that children task cannot read the global value */
+		unsetenv(name);
+	}
+}
+
+static void read_resources_env_vars() {
+	read_resources_env_var("CORES",  &manual_cores_option);
+	read_resources_env_var("MEMORY", &manual_memory_option);
+	read_resources_env_var("DISK",   &manual_disk_option);
+	read_resources_env_var("GPUS",   &manual_gpus_option);
+}
+
 static void show_help(const char *cmd)
 {
 	printf( "Use: %s [options] <masterhost> <port>\n", cmd);
@@ -1811,8 +1836,9 @@ int main(int argc, char *argv[])
 	worker_mode = WORKER_MODE_WORKER;
 
 	debug_config(argv[0]);
+	read_resources_env_vars();
 
-	while((c = getopt_long(argc, argv, "acC:d:f:F:t:j:o:p:M:N:P:w:i:b:z:A:O:s:vZ:h", long_options, 0)) != (char) -1) {
+	while((c = getopt_long(argc, argv, "acC:d:f:F:t:o:p:M:N:P:w:i:b:z:A:O:s:vZ:h", long_options, 0)) != (char) -1) {
 		switch (c) {
 		case 'a':
 			//Left here for backwards compatibility
@@ -1869,9 +1895,6 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_CONNECT_TIMEOUT:
 			connect_timeout = string_time_parse(optarg);
-			break;
-		case 'j':
-			manual_cores_option = atoi(optarg);
 			break;
 		case 'o':
 			debug_config_file(optarg);

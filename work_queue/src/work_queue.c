@@ -420,6 +420,10 @@ int process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 		w->stats->total_bytes_sent = atoll(value);
 	} else if(string_prefix_is(field, "total_bytes_received")) {
 		w->stats->total_bytes_received = atoll(value);
+	} else if(string_prefix_is(field, "tasks_waiting")) {
+		w->stats->tasks_waiting = atoll(value);
+	} else if(string_prefix_is(field, "tasks_running")) {
+		w->stats->tasks_running = atoll(value);
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
@@ -2309,6 +2313,10 @@ static int start_one_task(struct work_queue *q, struct work_queue_worker *w, str
 	send_worker_msg(q,w, "disk %"PRId64"\n",    t->disk );
 	send_worker_msg(q,w, "gpus %d\n",    t->gpus );
 
+	/* Note we send environment variables after resources. If the user, for
+	 * example, specifies manually CORES as a variable, the task will be
+	 * scheduled with the value of specify_cores, but the environment variable
+	 * will have the value given by the user. */
 	char *var;
 	list_first_item(t->env_list);
 	while((var=list_next_item(t->env_list))) {
@@ -2955,7 +2963,7 @@ static int tasktag_comparator(void *t, const void *r) {
 }
 
 
-static int cancel_running_task(struct work_queue *q, struct work_queue_task *t) {
+static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t) {
 
 	struct work_queue_worker *w = itable_lookup(q->worker_task_map, t->taskid);
 
@@ -3122,9 +3130,14 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
-void work_queue_task_specify_env( struct work_queue_task *t, const char *name, const char *value )
+void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value )
 {
-	list_push_tail(t->env_list,string_format("%s=%s",name,value));
+	if(value) {
+		list_push_tail(t->env_list,string_format("%s=%s",name,value));
+	} else {
+		/* Specifications without = indicate variables to me unset. */
+		list_push_tail(t->env_list,string_format("%s",name));
+	}
 }
 
 static void set_task_unlabel_flag( struct work_queue_task *t )
@@ -3215,7 +3228,7 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 	t->tag = xxstrdup(tag);
 }
 
-struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, int type, int flags)
+struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
 {
 	struct work_queue_file *f;
 
@@ -3242,7 +3255,7 @@ struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, 
 	return f;
 }
 
-int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url, const char *remote_name, int type, int flags)
+int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags)
 {
 	struct list *files;
 	struct work_queue_file *tf;
@@ -3305,7 +3318,7 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 	return 1;
 }
 
-int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags)
+int work_queue_task_specify_file(struct work_queue_task *t, const char *local_name, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags)
 {
 	struct list *files;
 	struct work_queue_file *tf;
@@ -3375,7 +3388,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	return 1;
 }
 
-int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, int type, int flags, int recursive) {
+int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags, int recursive) {
 	struct list *files;
 	struct work_queue_file *tf;
 
@@ -3419,7 +3432,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 
 }
 
-int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, int type, int flags)
+int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, work_queue_file_type_t type, work_queue_file_flags_t flags)
 {
 	struct list *files;
 	struct work_queue_file *tf;
@@ -3492,7 +3505,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 	return 1;
 }
 
-int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, int flags)
+int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, work_queue_file_flags_t flags)
 {
 	struct work_queue_file *tf;
 	if(!t || !remote_name) {
@@ -3540,7 +3553,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 	return 1;
 }
 
-int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, int type, int flags)
+int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, work_queue_file_type_t type, work_queue_file_flags_t flags)
 {
 	struct list *files;
 	struct work_queue_file *tf;
@@ -3606,9 +3619,9 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 	return 1;
 }
 
-void work_queue_task_specify_algorithm(struct work_queue_task *t, int alg)
+void work_queue_task_specify_algorithm(struct work_queue_task *t, work_queue_schedule_t algorithm)
 {
-	t->worker_selection_algorithm = alg;
+	t->worker_selection_algorithm = algorithm;
 }
 
 void work_queue_task_specify_priority( struct work_queue_task *t, double priority )
@@ -3894,9 +3907,9 @@ void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
 	// always on
 }
 
-void work_queue_specify_algorithm(struct work_queue *q, int alg)
+void work_queue_specify_algorithm(struct work_queue *q, work_queue_schedule_t algorithm)
 {
-	q->worker_selection_algorithm = alg;
+	q->worker_selection_algorithm = algorithm;
 }
 
 void work_queue_specify_task_order(struct work_queue *q, int order)
@@ -4072,7 +4085,7 @@ void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 	change_task_state(q, t, WORK_QUEUE_TASK_READY);
 }
 
-int work_queue_task_state( struct work_queue *q, int taskid) {
+work_queue_task_state_t work_queue_task_state(struct work_queue *q, int taskid) {
 	return (int)(uintptr_t)itable_lookup(q->task_state_map, taskid);
 }
 
@@ -4505,9 +4518,7 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int ta
 		return NULL;
 	}
 
-	if( task_state_is(q, taskid, WORK_QUEUE_TASK_RUNNING) ) {
-		cancel_running_task(q, matched_task);
-	}
+	cancel_task_on_worker(q, matched_task);
 
 	q->stats->total_tasks_cancelled++;
 	change_task_state(q, matched_task, WORK_QUEUE_TASK_CANCELED);
@@ -4749,6 +4760,10 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 	char *key;
 	struct work_queue_worker *w;
 
+	/* Consider running only if reported by some hand. */
+	s->tasks_running = 0;
+	s->total_workers_connected = 0;
+
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 		if(w->foreman)
@@ -4761,7 +4776,13 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 			accumulate_stat(s, w->stats, total_bytes_sent);
 			accumulate_stat(s, w->stats, total_bytes_received);
 		}
+
+		accumulate_stat(s, w->stats, tasks_waiting);
+		accumulate_stat(s, w->stats, tasks_running);
 	}
+
+	/* Account also for workers connected directly to the master. */
+	s->total_workers_connected = s->total_workers_joined - s->total_workers_removed;
 
 	s->total_workers_joined  += q->stats_disconnected_workers->total_workers_joined;
 	s->total_workers_removed += q->stats_disconnected_workers->total_workers_removed;

@@ -1,40 +1,14 @@
 #!/bin/bash
 
-CCTOOLS_INSTALL=/afs/nd.edu/user31/pdonnel3/cctools-install/bin/
-WEAVER=/afs/nd.edu/user31/pdonnel3/weaver/usr/bin/weaver
-
-if [ "$(whoami)" = pdonnel3 ]; then
-	PORT=9123
-elif [ "$(whoami)" = nhazekam ]; then
-	PORT=9223
-else
-	PORT=9523
-fi
-
-CHIRP="${CCTOOLS_INSTALL}/chirp"
-CHIRP_SERVER="${CCTOOLS_INSTALL}/chirp_server"
-MAKEFLOW="${CCTOOLS_INSTALL}/makeflow"
+source "$(dirname "$0")"/test-common.bash
 
 ARCHIVE=/afs/crc.nd.edu/group/ccl/data/workflows/archives/blast.tar.gz
 DIR="$(pwd)/blast"
 MAKEFLOW_FILE="$DIR"/Makeflow
 
-run () {
-	echo "$@"
-	time "$@"
-}
-
-runbg () {
-	echo "$@" '&'
-	"$@" &
-}
-
 if ! [ -d "$DIR/" ]; then
 	run tar xzf "$ARCHIVE"
 fi
-
-. "$(dirname "$0")/chirps-ssh.sh"
-sleep 5
 
 concurrency=0
 for pull in $(for g in $((1+32*2**10)) $((1+1*2**20)) $((1+1*2**30)) 0; do printf '%012d\t' "$g"; done); do
