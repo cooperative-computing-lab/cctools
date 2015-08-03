@@ -21,7 +21,7 @@ slurm_parameters=""
 
 parse_arguments()
 {
-	if [ -z "$cores" -o $cores=0 ]
+	if [ -z "$cores" -o "$cores" = 0 ]
 	then
 		slurm_parameters="$slurm_parameters --exclusive"
 	else
@@ -57,7 +57,7 @@ submit_workers_command()
 
 	sbatch --job-name wqWorker --ntasks $count --nodes $count $slurm_parameters <<EOF
 #!/bin/sh
-srun work_queue_worker $arguments $host $port
+work_queue_worker $arguments $host $port
 EOF
 
 }

@@ -80,11 +80,8 @@ class Task(_object):
     #
     # @param self       Reference to the current task object.
     # @param algorithm  One of the following algorithms to use in assigning a
-    #                   task to a worker:
-    #                   - @ref WORK_QUEUE_SCHEDULE_FCFS
-    #                   - @ref WORK_QUEUE_SCHEDULE_FILES
-    #                   - @ref WORK_QUEUE_SCHEDULE_TIME
-    #                   - @ref WORK_QUEUE_SCHEDULE_RAND
+    #                   task to a worker. See @ref work_queue_schedule_t for
+    #                   possible values.
     def specify_algorithm(self, algorithm):
         return work_queue_task_specify_algorithm(self._task, algorithm)
 
@@ -111,7 +108,8 @@ class Task(_object):
     # @param local_name     The name of the file on local disk or shared filesystem.
     # @param remote_name    The name of the file at the execution site.
     # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
-    # @param flags          May be zero to indicate no special handling, or any of the following or'd together:
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
     #                       - @ref WORK_QUEUE_WATCH
@@ -142,7 +140,8 @@ class Task(_object):
     # @param start_byte     The starting byte offset of the file piece to be transferred.
     # @param end_byte       The ending byte offset of the file piece to be transferred.
     # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
-    # @param flags          May be zero to indicate no special handling, or any of the following or'd together:
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
     # @param cache          Legacy parameter for setting file caching attribute.  By default this is enabled.
@@ -176,7 +175,8 @@ class Task(_object):
     # @param local_name     The name of the directory on local disk or shared filesystem. Optional if the directory is empty.
     # @param remote_name    The name of the directory at the remote execution site.
     # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
-    # @param flags          May be zero to indicate no special handling, or any of the following or'd together:
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
     # @param recursive      Indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
@@ -227,6 +227,11 @@ class Task(_object):
     # Indicate the maximum end time (in seconds from the Epoch) of this task.
     def specify_end_time( self, seconds ):
         return work_queue_task_specify_end_time(self._task,seconds)
+
+    # Set this environment variable before running the task.
+    # If value is None, then variable is unset.
+    def specify_environment_variable( self, name, value = None ):
+        return work_queue_task_specify_enviroment_variable(self._task,name,value)
 
     ##
     # Get the user-defined logical name for the task.
@@ -309,8 +314,9 @@ class Task(_object):
         return self._task.return_status
 
     ##
-    # Get the result of the task (successful, failed return_status, missing input file, missing output file).
-    # Must be called only after the task completes execution.
+    # Get the result of the task, such as successful, missing file, etc.
+    # See @ref work_queue_result_t for possible values.  Must be called only
+    # after the task completes execution.
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
@@ -654,7 +660,7 @@ class WorkQueue(_object):
         return self._stats_hierarchy
 
     ##
-    # Get current task state
+    # Get current task state. See @ref work_queue_task_state_t for possible values.
     # @code
     # >>> print q.task_state(taskid)
     # @endcode
@@ -701,11 +707,8 @@ class WorkQueue(_object):
     #
     # @param self       Reference to the current work queue object.
     # @param algorithm  One of the following algorithms to use in assigning a
-    #                   task to a worker:
-    #                   - @ref WORK_QUEUE_SCHEDULE_FCFS
-    #                   - @ref WORK_QUEUE_SCHEDULE_FILES
-    #                   - @ref WORK_QUEUE_SCHEDULE_TIME
-    #                   - @ref WORK_QUEUE_SCHEDULE_RAND
+    #                   task to a worker. See @ref work_queue_schedule_t for
+    #                   possible values.
     def specify_algorithm(self, algorithm):
         return work_queue_specify_algorithm(self._work_queue, algorithm)
 

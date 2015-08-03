@@ -23,10 +23,13 @@ sge_parameters=""
 # Used options (as in the getopts format):  aM:N:C:t:d:w:i:b:z:A:O:s:P:jp:h
 parse_arguments()
 {
-	if [ -z "$cores" -o $cores=0 ]
+	if [ -z "$cores" -o "$cores" = 0 ]
 	then
 		cores=1
 	fi
+
+	echo $cores
+	exit
 
 	while [ $# -gt 0 ]
 	do

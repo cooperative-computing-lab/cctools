@@ -13,7 +13,7 @@ def make_job(job_number):
     job = { 'executable' : './my_script',
             'arguments'  : ['my_script', str(job_number)],
             'files'      : [ { 'task_path':  'my_script',
-                               'serv_path':  '/my_script.sh',
+                               'serv_path':  '/my_script_org',
                                'type':  'INPUT',
                              },
                              { 'task_path':  'my.output',
@@ -24,11 +24,12 @@ def make_job(job_number):
 
 if __name__ == '__main__':
 
-    if(len(sys.argv) != 2):
-        print "Usage: %s HOST:PORT" % sys.argv[0]
+    if(len(sys.argv) != 3):
+        print "Usage: %s HOST:PORT executable" % sys.argv[0]
         sys.exit(1)
 
-    hostport = sys.argv[1]
+    hostport   = sys.argv[1]
+    executable = sys.argv[2]
 
     try:
         client = Chirp.Client(hostport,
@@ -43,7 +44,7 @@ if __name__ == '__main__':
 
     jobs = [ make_job(x) for x in range(1,10) ]
 
-    client.put('my_script.sh', '/my_script.sh')
+    client.put(executable, '/my_script_org')
 
     jobs_running = 0
     for job in jobs:
@@ -57,10 +58,13 @@ if __name__ == '__main__':
         for state in job_states:
             print 'job ' + str(state['id']) + ' is ' + state['status'] + "\n"
 
-            if   state['status'] == 'FINISHED':
-                client.job_reap( state['id'] )
-            elif state['status'] == 'ERRORED':
-                client.job_kill( state['id'] )
+            try:
+                if   state['status'] == 'FINISHED':
+                    client.job_reap( state['id'] )
+                elif state['status'] == 'ERRORED':
+                    client.job_kill( state['id'] )
+            except Chirp.ChirpJobError:
+                print 'error trying to clean job ' + str(state['id'])
 
             jobs_running -= 1
 
