@@ -276,7 +276,7 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 			if(S_ISDIR(buf.st_mode))
 			    continue;
 			if(dag_file_exists(f) && !dag_file_is_source(f) && difftime(buf.st_mtime, f->creation_logged) > 0) {
-				fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, buf.st_mtime, f->creation_logged);
+				fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, (uint64_t)buf.st_mtime, (uint64_t)f->creation_logged);
 				makeflow_file_clean(d, queue, f, 0);
 			}
 		}
