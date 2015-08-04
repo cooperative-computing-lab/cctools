@@ -64,7 +64,8 @@ int dag_file_is_sink( const struct dag_file *f )
 int dag_file_exists( const struct dag_file *f )
 {
 	if(f->state == DAG_FILE_STATE_EXISTS
-		|| f->state == DAG_FILE_STATE_COMPLETE)
+		|| f->state == DAG_FILE_STATE_COMPLETE
+		|| dag_file_is_source(f))
 		return 1;
 	else
 		return 0;
