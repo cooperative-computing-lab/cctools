@@ -867,6 +867,7 @@ Check the dag for consistency, and emit errors if input dependencies, etc are mi
 
 static int makeflow_check(struct dag *d)
 {
+	struct stat buf;
 	struct dag_node *n;
 	struct dag_file *f;
 	int error = 0;
@@ -880,7 +881,7 @@ static int makeflow_check(struct dag *d)
 				continue;
 			}
 
-			if(batch_fs_stat(queue, f->filename, &buf) >= 0) {
+			if(batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
 				continue;
 			}
 
