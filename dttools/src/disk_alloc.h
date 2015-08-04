@@ -3,6 +3,7 @@ Copyright (C) 2015- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
+
 #include <stdint.h>
 #ifndef DISK_ALLOC_H
 #define DISK_ALLOC_H
@@ -26,5 +27,4 @@ int disk_alloc_create(char *loc, int64_t size);
  * @return: Return 0 on success, else -1.
  */
 int disk_alloc_delete(char *loc);
-
 #endif
