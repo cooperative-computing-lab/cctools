@@ -35,11 +35,14 @@ extern "C" {
 #include "stringtools.h"
 }
 
+#include <string>
+
 extern int pfs_irods_debug_level;
 
 static struct hash_table *connect_cache = 0;
 static rodsEnv irods_env;
 static int got_irods_env = 0;
+static int got_irods_passwd_file = 0;
 static int irods_serial = 0;
 
 /* iRODS considers paths ending in a forward slash to be invalid and throws an error. */
@@ -115,6 +118,17 @@ static struct irods_server * connect_to_host( const char *hostport )
 	if(!hostport[0]) {
 		errno = EACCES;
 		return 0;
+	}
+
+	if(!got_irods_passwd_file) {
+		std::string passwd_file(getenv("HOME"));
+		passwd_file += "/.irods/.irodsA";
+		if(access(passwd_file.c_str(),R_OK)!=0) {
+			debug(D_NOTICE,"Could not find password file %s", passwd_file.c_str());
+			debug(D_NOTICE,"Did you run iinit to access your iRODS resources?");
+			return 0;
+		}
+		got_irods_passwd_file = 1;
 	}
 
 	if(!got_irods_env) {
