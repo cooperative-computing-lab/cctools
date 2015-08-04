@@ -580,7 +580,7 @@ then
 
 		irods_ldflags="${library_search_result}"
 
-	elif library_search RodsAPIs "${irods_path}/iRODS/lib/core/obj"
+	elif library_search RodsAPIs "${irods_path}/lib"
 	then
 		echo "detected irods 4.x installation"
 
@@ -594,9 +594,9 @@ then
 		ccflags="${ccflags} -DHAS_IRODS -DIRODS_USES_PLUGINS -DIRODS_USES_HPP"
 		ldflags="${ldflags} -rdynamic"
 
-		echo "*** warning: irods 4.0 requires plugins installed in /var/lib"
+		echo "*** warning: irods 4.x requires plugins installed in /var/lib, or for the irods_plugins_home variable to be set."
 
-		for d in ${irods_path}/iRODS/lib/*/include ${irods_path}/iRODS/server/*/include
+		for d in ${irods_path}/include/irods
 		do
 			irods_ccflags="${irods_ccflags} -I$d"
 		done
@@ -605,7 +605,7 @@ then
 
 		# irods 4.x depends on a specific version of boost:
 
-		boost_path=`ls -d ${irods_path}/external/boost_*`
+		boost_path=`ls -d ${irods_path}/lib/irods/externals`
 		if [ ! -d ${boost_path} ]
 		then
 			echo "*** Could not find irods boost in ${irods_path}/external !"
@@ -613,10 +613,9 @@ then
 		fi
 
 		echo "found irods boost in $boost_path"
-		boost_lib="${boost_path}/stage/lib"
 		for subtype in system thread chrono filesystem regex
 		do
-			lib=${boost_lib}/libboost_${subtype}.a
+			lib=${boost_path}/libboost_${subtype}.a
 			if [ -f $lib ]
 			then
 				echo "found $lib"
@@ -624,7 +623,7 @@ then
 			fi
 		done
 
-		jansson_path=`ls -d ${irods_path}/external/jansson-*`
+		jansson_path=`ls -d ${irods_path}/lib/irods/externals`
 		if [ ! -d ${jansson_path} ]
 		then
 			echo "*** Could not find irods jansson in ${irods_path}/external !"
@@ -632,8 +631,7 @@ then
 		fi
 
 		echo "found irods jansson in $jansson_path"
-		jansson_lib="${jansson_path}/src/.libs"
-		irods_ldflags="${irods_ldflags} ${jansson_lib}/libjansson.a"
+		irods_ldflags="${irods_ldflags} ${jansson_path}/libjansson.a"
 
 	elif [ $config_irods_path = yes ]
 	then

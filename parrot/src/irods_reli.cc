@@ -12,7 +12,7 @@ See the file COPYING for details.
 #include "rodsPath.hpp"
 #include "miscUtil.hpp"
 #ifdef IRODS_USES_PLUGINS
-#include "irods_network_home.hpp"
+#include "irods_plugin_home_directory.hpp"
 #endif
 #else
 #include "rodsClient.h"
@@ -116,14 +116,30 @@ static struct irods_server * connect_to_host( const char *hostport )
 		errno = EACCES;
 		return 0;
 	}
+
+	if(!got_irods_env) {
+		rodsLogLevel(pfs_irods_debug_level);
+		if(getRodsEnv(&irods_env)<0) {
+			debug(D_IRODS,"couldn't load irods environment!");
+			return 0;
+		}
+		got_irods_env = 1;
+	}
+
+
 #ifdef IRODS_USES_PLUGINS
 	static int did_plugin_warning = 0;
 
 	if(!did_plugin_warning) {
-		std::string plugin_path = irods::NETWORK_HOME+"libtcp.so";
+		std::string plugin_home(irods::PLUGIN_HOME);
+		if(strlen(irods_env.irodsPluginHome) > 0)
+			plugin_home = irods_env.irodsPluginHome;
+
+		std::string plugin_path = plugin_home + "network/libtcp.so";
 		if(access(plugin_path.c_str(),R_OK)!=0) {
-			debug(D_NOTICE,"warning: irods 4.x requires plugins installed in %s",irods::NETWORK_HOME.c_str());
+			debug(D_NOTICE,"warning: irods expects plugins installed in %s", plugin_home.c_str());
 			debug(D_NOTICE,"warning: could not find %s",plugin_path.c_str());
+			debug(D_NOTICE,"warning: please update irods_plugin_home in your ~/.irods/irods_environment.json configuration file");
 		}
 		did_plugin_warning = 1;
 	}
@@ -142,15 +158,6 @@ static struct irods_server * connect_to_host( const char *hostport )
 			server->lastused = current;
 			return server;
 		}
-	}
-
-	if(!got_irods_env) {
-		rodsLogLevel(pfs_irods_debug_level);
-		if(getRodsEnv(&irods_env)<0) {
-			debug(D_IRODS,"couldn't load irods environment!");
-			return 0;
-		}
-		got_irods_env = 1;
 	}
 
 	debug(D_IRODS,"connecting to %s",hostport);
