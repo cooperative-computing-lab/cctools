@@ -11,8 +11,9 @@ See the file COPYING for details.
 #include <string.h>
 
 #include "disk_alloc.h"
+#include "stringtools.h"
 
-int disk_del(int i, int k[10], char *arg_loc) {
+int disk_del(int i, char *arg_loc) {
 
 	char *test_loc = (char *) malloc(sizeof(char) * 20);
 
@@ -20,13 +21,14 @@ int disk_del(int i, int k[10], char *arg_loc) {
 
 		sprintf(test_loc, "%s%d/", arg_loc, i);
 
-		printf("\nAttempting delete of %s on device: %d.\n", test_loc, k[i]);
+		printf("\nAttempting delete of %s.\n", test_loc);
 
-		while(disk_alloc_delete(test_loc, k[i]) < 0) {
+		while(disk_alloc_delete(test_loc) < 0) {
 			printf("couldn't delete %s, still trying...\n",test_loc);
 			sleep(1);
 		}
 
+		printf("Disk allocation cleaned and removed.\n");
 		i--;
 	}
 
@@ -38,28 +40,31 @@ int disk_del(int i, int k[10], char *arg_loc) {
 int main(int argc, char **argv) {
 
 	int i, j, result, fail_flag = 0;
-	int k[10];
 	char *arg_loc = argv[1];
+	char *arg_size = argv[2];
+	int64_t size = string_metric_parse(arg_size) / 1024;
 	char *test_loc = (char *) malloc(sizeof(char) * 20);
 
-	for(j = 0; j < 100; j++) {
+	for(j = 0; j < 3; j++) {
 
 		i = 0;
 
+		printf("Beginning run #%d.\n", j + 1);
 		while(i < 10) {
 
 			sprintf(test_loc, "%s%d/", arg_loc, i);
 
-			result = disk_alloc_create(test_loc, "300m");
+			result = disk_alloc_create(test_loc, size);
 
 			if(result < 0) {
 
+				printf("Disk allocation failed.\n");
 				fail_flag = 1;
 				i--;
 				break;
 			}
 
-			k[i] = result;
+			printf("Disk allocation successful.\n");
 			i++;
 		}
 
@@ -67,10 +72,10 @@ int main(int argc, char **argv) {
 			i--;
 		}
 
-		disk_del(i, k, arg_loc);
+		//disk_del(i, arg_loc);
 
 		printf("\n\nRun #%d complete.\n\n", (j + 1));
-		sleep(2);
+		sleep(1);
 	}
 
 	free(test_loc);
