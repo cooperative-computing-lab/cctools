@@ -117,7 +117,7 @@ int main (int argc, char *argv[])
 		buffer_rewind(Bbase, 0);
 		for (i = 0; i <= UCHAR_MAX; i++) {
 			unsigned char c = i;
-			buffer_putlstring(Bblob, &c, sizeof(c));
+			buffer_putlstring(Bblob, (const char *)&c, sizeof(c));
 		}
 		l = b64_size(buffer_pos(Bblob));
 		check(sizeof(b64test) ==, l);
