@@ -6,6 +6,8 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <inttypes.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
@@ -14,78 +16,32 @@ See the file COPYING for details.
 #include <errno.h>
 
 #include "disk_alloc.h"
+#include "stringtools.h"
+#include "path.h"
 
-int disk_alloc_create(char *loc, char *space) {
-
-	long long size;
-	char metric;
-	int result;
+int disk_alloc_create(char *loc, int64_t size) {
 
 	//Check for trailing '/'
-	if(loc[strlen(loc) - 1] == 47) {
+	path_remove_trailing_slashes(loc);
 
-		loc[strlen(loc) - 1] = 0;
-	}
-
-	//Scale disk allocation to correct size
-	if(sscanf(space, "%lli%c", &size, &metric) == 2) {
-
-		switch (toupper((int) metric)) {
-
-			case 'P':
-				size = size << 10;
-			case 'T':
-				size = size << 10;
-			case 'G':
-				size = size << 10;
-			case 'M':
-				size = size << 10;
-			case 'K':
-				break;
-		}
-
-	}
-
-	else {
-
-		printf("\nInvalid device size parameters passed.\n");
-		return -1;
-	}
-
-	char *device_loc = (char *) malloc(sizeof(char) * 200);
-	char *dd_args = (char *) malloc(sizeof(char) * 200);
-	char *losetup_args = (char *) malloc(sizeof(char) * 200);
-	char *mk_args = (char *) malloc(sizeof(char) * 200);
-	char *mount_args = (char *) malloc(sizeof(char) * 200);
+	int result;
+	char *device_loc, *dd_args, *losetup_args, *mk_args, *mount_args;
 
 	//Set Loopback Device Location
-	sprintf(device_loc, "%s/cct_img.img", loc);
-
-	printf("\nInitializing disk allocation. This will take a moment.\n");
+	device_loc = string_format("%s/alloc.img", loc);
 
 	//Make Directory for Loop Device
 	if(mkdir(loc, 7777) != 0) {
-		printf("\nFailed to make directory: %s.\n", strerror(errno));
-		free(device_loc);
-		free(dd_args);
-		free(losetup_args);
-		free(mk_args);
-		free(mount_args);
-		return -1;
+		printf("%s.\n", strerror(errno));
+		goto error;
 	}
 
 	//Create Image
-	sprintf(dd_args, "dd if=/dev/zero of=%s bs=1024 count=%lli", device_loc, size);
+	dd_args = string_format("dd if=/dev/zero of=%s bs=1024 count=%"PRId64"", device_loc, size);
 	if(system(dd_args) != 0) {
-		printf("\nFailed to create image file: %s.\n", strerror(errno));
 		unlink(device_loc);
 		rmdir(loc);
-		free(device_loc);
-		free(dd_args);
-		free(losetup_args);
-		free(mk_args);
-		free(mount_args);
-		return -1;
+		goto error;
 	}
 
 	//Attach Image to Loop Device
@@ -97,9 +53,9 @@ int disk_alloc_create(char *loc, char *space) {
 			break;
 		}
 
-		sprintf(losetup_args, "losetup /dev/loop%d %s", j, device_loc);
-		sprintf(mk_args, "mkfs /dev/loop%d", j);
-		sprintf(mount_args, "/dev/loop%d", j);
+		losetup_args = string_format("losetup /dev/loop%d %s", j, device_loc);
+		mk_args = string_format("mkfs /dev/loop%d", j);
+		mount_args = string_format("/dev/loop%d", j);
 
 		if(system(losetup_args) == 0) {
 
@@ -108,46 +64,28 @@ int disk_alloc_create(char *loc, char *space) {
 	}
 
 	if(losetup_flag == 1) {
-		printf("\nFailed to bind image file to loop device: %s.\n", strerror(errno));
 		unlink(device_loc);
 		rmdir(loc);
-		free(device_loc);
-		free(dd_args);
-		free(losetup_args);
-		free(mk_args);
-		free(mount_args);
-		return -1;
+		goto error;
 	}
 
 	//Create Filesystem
 	if(system(mk_args) != 0) {
-		printf("\nFailed to make filesystem: %s.\n", strerror(errno));
-		char *rm_dir_args = (char *) malloc(sizeof(char) * 400);
-		sprintf(rm_dir_args, "losetup -d /dev/loop%d; rm -r %s", j, loc);
+		char *rm_dir_args;
+		rm_dir_args = string_format("losetup -d /dev/loop%d; rm -r %s", j, loc);
 		system(rm_dir_args);
 		free(rm_dir_args);
-		free(device_loc);
-		free(dd_args);
-		free(losetup_args);
-		free(mk_args);
-		free(mount_args);
-		return -1;
+		goto error;
 	}
 
 	//Mount Loop Device
 	result = mount(mount_args, loc, "ext2", 0, "");
 	if(result != 0) {
-		printf("\nFailed to mount/dev/loop%d: %s.\n", j, strerror(errno));
-		char *rm_dir_args = (char *) malloc(sizeof(char) * 400);
-		sprintf(rm_dir_args, "losetup -d /dev/loop%d; rm -r %s", j, loc);
+		char *rm_dir_args;
+		rm_dir_args = string_format("losetup -d /dev/loop%d' rm -r %s", j, loc);
 		system(rm_dir_args);
 		free(rm_dir_args);
-		free(device_loc);
-		free(dd_args);
-		free(losetup_args);
-		free(mk_args);
-		free(mount_args);
-		return -1;
+		goto error;
 	}
 
 	free(device_loc);
@@ -156,75 +94,98 @@ int disk_alloc_create(char *loc, char *space) {
 	free(mk_args);
 	free(mount_args);
 
-	printf("\nDisk space %s allocated on device: /dev/loop%d.\n", space, j);
+	return 0;
 
-	return j;
+	error:
+
+		free(device_loc);
+		free(dd_args);
+		free(losetup_args);
+		free(mk_args);
+		free(mount_args);
+		return -1;
 }
 
-int disk_alloc_delete(char *loc, int dev_num) {
+int disk_alloc_delete(char *loc) {
 
 	int result;
 
 	//Check for trailing '/'
-	if(loc[strlen(loc) - 1] == 47) {
+	path_remove_trailing_slashes(loc);
 
-		loc[strlen(loc) - 1] = 0;
+	char *losetup_args, *rm_args;
+
+	//Find Used Device
+	int i;
+	int dev_num = -1;
+	char *device_loc = (char *) malloc(sizeof(char) * 200);
+	device_loc = string_format("(%s/alloc.img)", loc);
+
+	for(i = 0; i < 256; i++) {
+
+		char loop_dev[128], loop_info[128], loop_mount[128];
+		FILE *loop_find;
+		losetup_args = string_format("losetup /dev/loop%d", i);
+		loop_find = popen(losetup_args, "r");
+		fscanf(loop_find, "%s %s %s", loop_dev, loop_info, loop_mount);
+		pclose(loop_find);
+
+		if(strstr(loop_mount, device_loc) != NULL) {
+
+			dev_num = i;
+			break;
+		}
 	}
 
-	char *losetup_args = (char *) malloc(sizeof(char) * 200);
-	char *rm_args = (char *) malloc(sizeof(char) * 200);
+	free(device_loc);
 
-	sprintf(rm_args, "%s/cct_img.img", loc);
-	sprintf(losetup_args, "losetup -d /dev/loop%d", dev_num);
+	//Device Not Found
+	if(dev_num == -1) {
+		goto error;
+	}
 
-	printf("\nPreparing to clean disk allocation.\n");
+	rm_args = string_format("%s/alloc.img", loc);
+	losetup_args = string_format("losetup -d /dev/loop%d", dev_num);
 
 	//Loop Device Unmounted
 	result = umount2(loc, MNT_FORCE);
 	if(result != 0) {
 
-		printf("\nFailed to unmount /dev/loop%d: %s.\nStopping disk deallocation.\n", dev_num, strerror(errno));
-		free(losetup_args);
-		free(rm_args);
-		return -1;
+		if(errno != ENOENT) {
+			goto error;
+		}
 	}
 
 	//Loop Device Deleted
 	result = system(losetup_args);
 	if(result != 0) {
 
-		printf("\nFailed to detach /dev/loop%d: %s. Stopping disk deallocation.\n", dev_num, strerror(errno));
-		free(losetup_args);
-		free(rm_args);
-		return -1;
+		if(errno != ENOENT) {
+			goto error;
+		}
 	}
 
 	//Image Deleted
 	result = unlink(rm_args);
-
 	if(result != 0) {
 
-		printf("\nFailed to remove directory: %s. Stopping disk deallocation.\n", strerror(errno));
-		free(losetup_args);
-		free(rm_args);
-		return -1;
+		goto error;
 	}
 
 	//Directory Deleted
 	result = rmdir(loc);
-
 	if(result != 0) {
 
-		printf("\nFailed to remove directory: %s. Stopping disk deallocation.\n", strerror(errno));
-		free(losetup_args);
-		free(rm_args);
-		return -1;
+		goto error;
 	}
 
 	free(losetup_args);
 	free(rm_args);
 
-	printf("Disk allocation cleaned and removed.\n");
-
 	return 0;
+
+	error:
+		free(losetup_args);
+		free(rm_args);
+		return -1;
 }
