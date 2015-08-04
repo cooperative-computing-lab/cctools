@@ -121,6 +121,13 @@ static struct irods_server * connect_to_host( const char *hostport )
 	}
 
 	if(!got_irods_passwd_file) {
+
+		if(!getenv("HOME")) {
+			debug(D_NOTICE, "Environment variable HOME is not set.");
+			debug(D_NOTICE, "Need $HOME/.irods/.irodsA to access iRODS resources.");
+			return 0;
+		}
+
 		std::string passwd_file(getenv("HOME"));
 		passwd_file += "/.irods/.irodsA";
 		if(access(passwd_file.c_str(),R_OK)!=0) {
@@ -128,6 +135,7 @@ static struct irods_server * connect_to_host( const char *hostport )
 			debug(D_NOTICE,"Did you run iinit to access your iRODS resources?");
 			return 0;
 		}
+
 		got_irods_passwd_file = 1;
 	}
 
