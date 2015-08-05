@@ -58,16 +58,26 @@ find_python_path () {
 
 if [ -z "$1" ]
 then
-  echo 'Missing script name.' 1>&2
+  echo 'Missing script name or option.' 1>&2
+  echo "          To execute a python script: $0 script-name [script options]." 1>&2
+  echo "To print the python interpreter path: $0 -n [python versions]." 1>&2
   exit 1
 fi
 
-script=$(which "$1")
-required_alternatives=$(sed -n '2{s/^#[\t ]*CCTOOLS_PYTHON_VERSION//p;q;}' < $script)
+if [ "$1" = "-n" ]
+then
+	shift
+	print_path=1
+	required_alternatives="$@"
+else
+	print_path=0
+	script=$(which "$1")
+	required_alternatives=$(sed -n '2{s/^#[\t ]*CCTOOLS_PYTHON_VERSION//p;q;}' < $script)
+fi
 
 if [ -z "$required_alternatives" ]
 then
-	echo "No version of python was specified for $script." 1>&2
+	echo "No version of python was specified." 1>&2
 	exit 1
 fi
 
@@ -96,6 +106,9 @@ then
 	echo "Could not find a valid python version ($required_alternatives )." 1>&2
 	echo 'Please set the environment variables PYTHON or PYTHON2 appropriately.' 1>&2
 	exit 1
+elif [ $print_path = 1 ]
+then
+	echo $python
 else
 	export PYTHONPATH=$(find_python_path $script $version):$PYTHONPATH
 	shift
