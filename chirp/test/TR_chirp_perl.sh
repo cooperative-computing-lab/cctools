@@ -9,6 +9,11 @@ c="./hostport.$PPID"
 
 ticket=my.ticket
 
+check_needed()
+{
+	test -f ../src/perl/CChirp.so
+}
+
 prepare()
 {
 	chirp_start local --auth=ticket
