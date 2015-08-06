@@ -64,7 +64,7 @@ int dag_file_is_sink( const struct dag_file *f )
 
 /* Reports is a file is expeced to exist, does not guarantee existence
  * if files are altered outside of Makeflow */
-int dag_file_exists( const struct dag_file *f )
+int dag_file_should_exist( const struct dag_file *f )
 {
 	if(f->state == DAG_FILE_STATE_EXISTS
 		|| f->state == DAG_FILE_STATE_COMPLETE

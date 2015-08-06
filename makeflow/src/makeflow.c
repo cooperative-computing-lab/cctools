@@ -212,7 +212,7 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 	// Rerun if an input file has been updated since the last execution.
 	list_first_item(n->source_files);
 	while((f = list_next_item(n->source_files))) {
-		if(dag_file_exists(f)) {
+		if(dag_file_should_exist(f)) {
 			continue;
 		} else {
 			if(!f->created_by) {
@@ -231,7 +231,7 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 	// Rerun if an output file is missing.
 	list_first_item(n->target_files);
 	while((f = list_next_item(n->target_files))) {
-		if(dag_file_exists(f))
+		if(dag_file_should_exist(f))
 			continue;
 		/* If output file is missing, but node completed and file was garbage, then avoid rerunning. */
 		if(n->state == DAG_NODE_STATE_COMPLETE && f->state == DAG_FILE_STATE_DELETE)
@@ -280,7 +280,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	// For each parent node, rerun it if input file was garbage collected
 	list_first_item(n->source_files);
 	while((f1 = list_next_item(n->source_files))) {
-		if(dag_file_exists(f1))
+		if(dag_file_should_exist(f1))
 			continue;
 
 		p = f1->created_by;
@@ -702,7 +702,7 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 
 	list_first_item(n->source_files);
 	while((f = list_next_item(n->source_files))) {
-		if(dag_file_exists(f)) {
+		if(dag_file_should_exist(f)) {
 			continue;
 		} else {
 			return 0;
