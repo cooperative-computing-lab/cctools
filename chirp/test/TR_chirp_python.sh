@@ -9,6 +9,14 @@ c="./hostport.$PPID"
 
 ticket=my.ticket
 
+check_needed()
+{
+	[ -f ../src/python/_CChirp.so ] || return 1
+	python=$(cctools_python -n 3 2.7 2.6)
+	[ -n "$python" ] || return 1
+	${python} -c "import json; import Chirp"
+}
+
 prepare()
 {
 	chirp_start local --auth=ticket

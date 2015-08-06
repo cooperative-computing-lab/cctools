@@ -6,6 +6,9 @@ WORK_QUEUE_WORKER=$(cd "$(dirname "$0")/../../work_queue/src/"; pwd)/work_queue_
 dispatch()
 {
 	case "$1" in
+		check_needed)
+			check_needed $@
+			;;
 		prepare)
 			prepare $@
 			;;
@@ -17,7 +20,7 @@ dispatch()
 			;;
 		*)
 			echo "unknown command: $1"
-			echo "use: $0 [prepare|run|clean]"
+			echo "use: $0 [check_needed|prepare|run|clean]"
 			exit 1
 			;;
 	esac
@@ -109,6 +112,13 @@ require_identical_files()
 		echo "ERROR: $1 and $2 differ!"
 		exit 1
 	fi
+}
+
+check_needed()
+{
+# to be implemented by individual tests that are optional.
+# For an example, see chirp/test/TR_chirp_python.sh
+	return 0
 }
 
 # For OS X
