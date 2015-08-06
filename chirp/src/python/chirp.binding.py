@@ -278,7 +278,7 @@ class Client:
     # @param timeout             If given, maximum number of seconds to
     #                            wait for a server response.
     def mkdir(self, path, mode=493, absolute_stop_time=None, timeout=None):
-        result = chirp_reli_mkdir_recursive(self.hostport, path, self.__stoptime(absolute_stop_time, timeout))
+        result = chirp_reli_mkdir_recursive(self.hostport, path, mode, self.__stoptime(absolute_stop_time, timeout))
 
         if result < 0:
             raise OSError
