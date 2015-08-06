@@ -1061,7 +1061,7 @@ int main(int argc, char *argv[])
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
 	char *catalog_host;
 	int catalog_port;
-	int clean_mode = 0;
+	makeflow_clean_depth clean_mode = MAKEFLOW_CLEAN_NONE;
 	char *email_summary_to = NULL;
 	int explicit_remote_jobs_max = 0;
 	int explicit_local_jobs_max = 0;
@@ -1200,12 +1200,15 @@ int main(int argc, char *argv[])
 				batch_submit_options = optarg;
 				break;
 			case 'c':
-				clean_mode = 3;
+				clean_mode = MAKEFLOW_CLEAN_ALL;
 				if(optarg){
 					if(strcasecmp(optarg, "intermediates") == 0){
-						clean_mode = 1;
+						clean_mode = MAKEFLOW_CLEAN_INTERMEDIATES;
 					} else if(strcasecmp(optarg, "outputs") == 0){
-						clean_mode = 2;
+						clean_mode = MAKEFLOW_CLEAN_OUTPUTS;
+					} else if(strcasecmp(optarg, "all") != 0){
+						fprintf(stderr, "makeflow: unknown clean option %s", optarg);
+						exit(1);
 					}
 				}
 				break;
@@ -1480,7 +1483,7 @@ int main(int argc, char *argv[])
 		}
 
 		// In clean mode, delete all existing log files
-		if(clean_mode == 3) {
+		if(clean_mode == MAKEFLOW_CLEAN_ALL) {
 			BUFFER_STACK_ABORT(B, PATH_MAX);
 			buffer_putfstring(B, "%s.condorlog", dagfile);
 			unlink(buffer_tostring(B));
@@ -1616,10 +1619,10 @@ int main(int argc, char *argv[])
 
 	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue );
 
-	if(clean_mode) {
+	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		printf("cleaning filesystem...\n");
 		makeflow_clean(d, remote_queue, clean_mode);
-		if(clean_mode == 3) {
+		if(clean_mode == MAKEFLOW_CLEAN_ALL) {
 			unlink(logfilename);
 			unlink(batchlogfilename);
 		}
