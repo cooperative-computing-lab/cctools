@@ -40,7 +40,7 @@ for package in ${CCTOOLS_PACKAGES_TEST}; do
 				TEST_START_TIME=$(date +%s)
 				(
 					"./${script}" check_needed
-				)
+				) >> "$CCTOOLS_TEST_LOG" 2>&1
 				result=$?
 				if [ "$result" -ne 0 ]; then
 					skip=1
