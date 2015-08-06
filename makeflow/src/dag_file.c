@@ -23,6 +23,7 @@ struct dag_file * dag_file_create( const char *filename )
 	return f;
 }
 
+/* Converts enum to string value for decoding file state */
 const char *dag_file_state_name(dag_file_state_t state)
 {
 	switch (state) {
@@ -61,6 +62,8 @@ int dag_file_is_sink( const struct dag_file *f )
 		return 1;
 }
 
+/* Reports is a file is expeced to exist, does not guarantee existence
+ * if files are altered outside of Makeflow */
 int dag_file_exists( const struct dag_file *f )
 {
 	if(f->state == DAG_FILE_STATE_EXISTS

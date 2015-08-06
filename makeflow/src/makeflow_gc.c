@@ -199,7 +199,7 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 
 /* Clean the entire dag by cleaning all nodes. */
 
-void makeflow_clean(struct dag *d, struct batch_queue *queue)
+void makeflow_clean(struct dag *d, struct batch_queue *queue, int clean_depth)
 {
 	struct dag_file *f;
 	char *name;
@@ -208,10 +208,18 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue)
 	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 		if(dag_file_is_source(f))
 			continue;
+
+		int silent = 1;
 		if(dag_file_exists(f))
-			makeflow_file_clean(d, queue, f, 0);
-		if(f->state == DAG_FILE_STATE_EXPECT)
-			makeflow_file_clean(d, queue, f, 1);
+			silent = 0;
+
+		if(clean_depth == 3){
+			makeflow_file_clean(d, queue, f, silent);
+		} else if(set_lookup(d->outputs, f) && (clean_depth == 2)) {
+			makeflow_file_clean(d, queue, f, silent);
+		} else if(!set_lookup(d->outputs, f) && (clean_depth == 1)){
+			makeflow_file_clean(d, queue, f, silent);
+		}
 	}
 
 	struct dag_node *n;
