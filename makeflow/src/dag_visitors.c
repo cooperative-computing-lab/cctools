@@ -522,9 +522,10 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 
 	if(change_size) {
 		hash_table_firstkey(d->files);
-		while(hash_table_nextkey(d->files, &name, (void **) &f) && dag_file_exists(f)) {
-			stat(name, &st);
-			average += ((double) st.st_size) / ((double) d->completed_files);
+		while(hash_table_nextkey(d->files, &name, (void **) &f) && dag_file_should_exist(f)) {
+			if(stat(name,&st)==0) {
+				average += ((double) st.st_size) / ((double) d->completed_files);
+			}
 		}
 	}
 

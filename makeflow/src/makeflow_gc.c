@@ -165,7 +165,7 @@ int makeflow_file_clean( struct dag *d, struct batch_queue *queue, struct dag_fi
 		if(!silent)
 			debug(D_NOTICE, "Makeflow: Deleted path %s\n", f->filename);
 	} else if(errno != ENOENT) {
-		if(f->state == DAG_FILE_STATE_EXPECT || dag_file_exists(f))
+		if(f->state == DAG_FILE_STATE_EXPECT || dag_file_should_exist(f))
 			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 
 		if(!silent) {
@@ -210,7 +210,7 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue, int clean_depth)
 			continue;
 
 		int silent = 1;
-		if(dag_file_exists(f))
+		if(dag_file_should_exist(f))
 			silent = 0;
 
 		if(clean_depth == 3){
