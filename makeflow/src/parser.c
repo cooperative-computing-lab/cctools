@@ -365,6 +365,7 @@ static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 	return result;
 }
 
+
 static int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
 {
 	int before_colon = 1;

@@ -534,13 +534,16 @@ default, garbage collection does not delete the original input files, nor <b>
 final</b> target files.</p>
 
 <p>Which files are deleted can be tailored from the default by appending files
-to the Makeflow variables <tt>GC_PRESERVE_LIST</tt> and
-<tt>GC_COLLECT_LIST</tt>.  Files added to <tt>GC_PRESERVE_LIST</tt> are never
-deleted, thus it is used to mark intermediate files that should not be deleted.
-Similarly, <tt>GC_COLLECT_LIST</tt> marks final target files that should be
-deleted.  Makeflow is conservative, in the sense that <tt>GC_PRESERVE_LIST</tt>
-takes precedence over <tt>GC_COLLECT_LIST</tt>, and original input files are
-never deleted, even if they are listed in <tt>GC_COLLECT_LIST</tt>.</p>
+to the Makeflow variables <tt>MAKEFLOW_INPUTS</tt> and <tt>MAKEFLOW_OUTPUTS</tt>.
+Files added to <tt>MAKEFLOW_INPUTS</tt> augment the original inputs files that
+should not be deleted. <tt>MAKEFLOW_OUTPUTS</tt> marks final target files that
+should not be deleted.  However, different from <tt>MAKEFLOW_INPUTS</tt>, files
+specified in <tt>MAKEFLOW_OUTPUTS</tt> does not include all output files. If
+<tt>MAKEFLOW_OUTPUTS</tt> is not specified, then all files not used in subsequent
+rules are considered outputs. It is considered best practice to always specify
+<tt>MAKEFLOW_INPUTS/OUTPUTS</tt> to clearly specify which files are considered
+inputs and outputs and allow for better space management if garbage collection
+is used.</p>
 
 <p>Makeflow offers two modes for garbage collection: reference count, and on
 demand. With the reference count mode, intermediate files are deleted as soon
@@ -567,20 +570,37 @@ and debugging.</p>
 
 <p>A sample logfile might look like this:</p>
 
-<code># STARTED timestamp
-1347281321284638 5 1 9206 5 1 0 0 0 6
-1347281321348488 5 2 9206 5 0 1 0 0 6
-1347281321348760 4 1 9207 4 1 1 0 0 6
-1347281321348958 3 1 9208 3 2 1 0 0 6
-1347281321629802 4 2 9207 3 1 2 0 0 6
-1347281321630005 2 1 9211 2 2 2 0 0 6
-1347281321635236 3 2 9208 2 1 3 0 0 6
-1347281321635463 1 1 9212 1 2 3 0 0 6
-1347281321742870 2 2 9211 1 1 4 0 0 6
-1347281321752857 1 2 9212 1 0 5 0 0 6
-1347281321753064 0 1 9215 0 1 5 0 0 6
-1347281325731146 0 2 9215 0 0 6 0 0 6
-# COMPLETED timestamp
+<code># STARTED	1435251570723463
+# 1 capitol.jpg 1435251570725086
+1435251570725528 5 1 17377 5 1 0 0 0 6
+# 2 capitol.jpg 1435251570876426
+1435251570876486 5 2 17377 5 0 1 0 0 6
+# 1 capitol.360.jpg 1435251570876521
+1435251570876866 4 1 17379 4 1 1 0 0 6
+# 1 capitol.270.jpg 1435251570876918
+1435251570877166 3 1 17380 3 2 1 0 0 6
+# 2 capitol.270.jpg 1435251570984114
+1435251570984161 3 2 17380 3 1 2 0 0 6
+# 1 capitol.180.jpg 1435251570984199
+1435251570984533 2 1 17383 2 2 2 0 0 6
+# 2 capitol.360.jpg 1435251571003847
+1435251571003923 4 2 17379 2 1 3 0 0 6
+# 1 capitol.90.jpg 1435251571003969
+1435251571004476 1 1 17384 1 2 3 0 0 6
+# 2 capitol.180.jpg 1435251571058319
+1435251571058369 2 2 17383 1 1 4 0 0 6
+# 2 capitol.90.jpg 1435251571094157
+1435251571094214 1 2 17384 1 0 5 0 0 6
+# 1 capitol.montage.gif 1435251571094257
+1435251571094590 0 1 17387 0 1 5 0 0 6
+# 2 capitol.montage.gif 1435251575980215
+# 3 capitol.360.jpg 1435251575980270
+# 3 capitol.270.jpg 1435251575980288
+# 3 capitol.180.jpg 1435251575980303
+# 3 capitol.90.jpg 1435251575980319
+# 3 capitol.jpg 1435251575980334
+1435251575980350 0 2 17387 0 0 6 0 0 6
+# COMPLETED	1435251575980391
 </code>
 
 <p>
@@ -624,20 +644,25 @@ The logfile begins with a comment to indicate the starting time, and ends with
 a comment indicating whether the entire workflow completed, failed, or was aborted.
 </p>
 
-<p>When file garbage collection is enabled, the log file also records information at
-each collection cycle. Collection information is included in lines starting
-with the <tt># GC</tt> prefix:</p>
+<p>Aside from the high-level information, file states are also recorded in the log.
+This allows for tracking files throughout the workflow execution. This information
+is shown starting with the <tt>#</tt>:</p>
 
-<code># GC timestamp collected time_spent dag_gc_collected</code>
+<code># new_state filename timestamp</code>
 
-<p>Each garbage collection line records the garbage collection statistics
-during a garbage collection cycle:</p>
+<p>Each file state line records the state change and time:</p>
 
 <ul>
+	<li><b>new_state</b> - the integer represents the new state this file has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:</li>
+	<ol start="0">
+		<li> unknown </li>
+		<li> expect </li>
+		<li> exists </li>
+		<li> complete </li>
+		<li> delete </li>
+	</ol>
+	<li><b>filename</b> - the file name given in the rule specification of Makeflow.</li>
 	<li><b>timestamp</b> - the unix time (in microseconds) when this line is written to the log file. </li>
-	<li><b>collected</b> - the number of files were collected in this garbage collection cycle.</li>
-	<li><b>time_spent</b> - the length of time this cycle took.</li>
-	<li><b>dag_gc_collected</b> - the total number of files has been collected so far since the start this Makeflow execution.</li>
 </ul>
 
 <h2 id="custom.drivers">Custom Drivers<a class="sectionlink" href="#custom.drivers" title="Link to this section.">&#x21d7;</a></h2>
