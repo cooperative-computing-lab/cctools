@@ -33,7 +33,7 @@ execution engine.
 
 SUBSECTION(Commands)
 OPTIONS_BEGIN
-OPTION_ITEM(`-c, --clean')Clean up: remove logfile and all targets.
+OPTION_TRIPLET(-c, --clean, option)Clean up: remove logfile and all targets. If option [intermediates, outputs] is specified, only indicated files are removed.
 OPTION_TRIPLET(-f, summary-log, file)Write summary of workflow to file.
 OPTION_ITEM(`-h, --help')Show this help screen.
 OPTION_TRIPLET(-m, email, email)Email summary of workflow to address.
