@@ -167,7 +167,7 @@ int makeflow_file_clean( struct dag *d, struct batch_queue *queue, struct dag_fi
 	} else if(errno != ENOENT) {
 		if(f->state == DAG_FILE_STATE_EXPECT || dag_file_should_exist(f))
 			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
-		
+
 		if(!silent) {
 			debug(D_NOTICE, "Makeflow: Couldn't delete %s: %s\n", f->filename, strerror(errno));
 			return 1;

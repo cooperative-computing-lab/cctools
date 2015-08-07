@@ -1646,17 +1646,17 @@ int main(int argc, char *argv[])
 
 	runtime = timestamp_get();
 
-    if (container_mode == CONTAINER_MODE_DOCKER) {
+	if (container_mode == CONTAINER_MODE_DOCKER) {
 
 	/* 1) create a global script for running docker container
 	 * 2) add this script to the global wrapper list
 	 * 3) reformat each task command
 	 */
 
-        makeflow_create_docker_sh();
-        char *global_cmd = string_format("sh %s", CONTAINER_SH);
-        makeflow_wrapper_add_command(global_cmd);
-    }
+		makeflow_create_docker_sh();
+		char *global_cmd = string_format("sh %s", CONTAINER_SH);
+		makeflow_wrapper_add_command(global_cmd);
+	}
 
 	makeflow_run(d);
 	time_completed = timestamp_get();
