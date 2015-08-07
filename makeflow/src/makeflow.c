@@ -995,7 +995,7 @@ static void show_help_run(const char *cmd)
 {
 	printf("Use: %s [options] <dagfile>\n", cmd);
 	printf("Frequently used options:\n\n");
-	printf(" %-30s Clean up: remove logfile and all targets.\n", "-c,--clean");
+	printf(" %-30s Clean up: remove logfile and all targets. Optional specification [intermediates, outputs] removes only the indicated files.\n", "-c,--clean=<type>");
 	printf(" %-30s Batch system type: (default is local)\n", "-T,--batch-type=<type>");
 	printf(" %-30s %s\n\n", "", batch_queue_type_string());
 	printf("Other options are:\n");
