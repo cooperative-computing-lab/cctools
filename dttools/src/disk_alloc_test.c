@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
 	char *arg_loc = argv[1];
 	char *arg_size = argv[2];
 	int64_t size = string_metric_parse(arg_size) / 1024;
-	char *test_loc = (char *) malloc(sizeof(char) * 20);
+	char *test_loc = (char *) malloc(sizeof(char) * 200);
 
 	for(j = 0; j < 3; j++) {
 
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
 			i--;
 		}
 
-		//disk_del(i, arg_loc);
+		disk_del(i, arg_loc);
 
 		printf("\n\nRun #%d complete.\n\n", (j + 1));
 		sleep(1);

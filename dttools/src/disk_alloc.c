@@ -31,8 +31,8 @@ int disk_alloc_create(char *loc, int64_t size) {
 	device_loc = string_format("%s/alloc.img", loc);
 
 	//Make Directory for Loop Device
-	if(mkdir(loc, 7777) != 0) {
-		printf("%s.\n", strerror(errno));
+	if(mkdir(loc, 0777) != 0) {
+
 		goto error;
 	}
 
@@ -113,12 +113,11 @@ int disk_alloc_delete(char *loc) {
 	//Check for trailing '/'
 	path_remove_trailing_slashes(loc);
 
-	char *losetup_args, *rm_args;
+	char *losetup_args, *rm_args, *device_loc;
 
 	//Find Used Device
 	int i;
 	int dev_num = -1;
-	char *device_loc = (char *) malloc(sizeof(char) * 200);
 	device_loc = string_format("(%s/alloc.img)", loc);
 
 	for(i = 0; i < 256; i++) {
@@ -130,17 +129,16 @@ int disk_alloc_delete(char *loc) {
 		fscanf(loop_find, "%s %s %s", loop_dev, loop_info, loop_mount);
 		pclose(loop_find);
 
-		if(strstr(loop_mount, device_loc) != NULL) {
+		if(strstr(loop_mount, loc) != NULL) {
 
 			dev_num = i;
 			break;
 		}
 	}
 
-	free(device_loc);
-
 	//Device Not Found
 	if(dev_num == -1) {
+
 		goto error;
 	}
 
@@ -181,11 +179,15 @@ int disk_alloc_delete(char *loc) {
 
 	free(losetup_args);
 	free(rm_args);
+	free(device_loc);
 
 	return 0;
 
 	error:
+
 		free(losetup_args);
 		free(rm_args);
+		free(device_loc);
+
 		return -1;
 }
