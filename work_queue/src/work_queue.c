@@ -1436,6 +1436,12 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 		return SUCCESS;
 	}
 
+	if(task_status == WORK_QUEUE_RESULT_FORSAKEN) {
+		/* task will be resubmitted, so we do not update any of the execution stats */
+		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
+		return SUCCESS;
+	}
+
 	t->time_receive_result_start = timestamp_get();
 	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
 
@@ -2969,7 +2975,7 @@ static int tasktag_comparator(void *t, const void *r) {
 }
 
 
-static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t) {
+static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state) {
 
 	struct work_queue_worker *w = itable_lookup(q->worker_task_map, t->taskid);
 
@@ -2985,7 +2991,7 @@ static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t
 		delete_worker_files(q, w, t, t->output_files, 0);
 
 		//update tables.
-		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_CANCELED);
+		reap_task_from_worker(q, w, t, new_state);
 
 		return 1;
 	}
@@ -4442,6 +4448,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		expire_waiting_tasks(q);
 
+		//Re-enqueue the tasks that workers labeled for resubmission.
+		while((t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RESUBMISSION))) {
+			cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
+		}
+
 		//We have the resources we have been waiting for; start task transfers
 		int known = known_workers(q);
 		if(known > 0 && known >= q->workers_to_wait) {
@@ -4526,10 +4537,12 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int ta
 		return NULL;
 	}
 
-	cancel_task_on_worker(q, matched_task);
+	cancel_task_on_worker(q, matched_task, WORK_QUEUE_TASK_CANCELED);
+
+	/* change state even if task is not running on a worker. */
+	change_task_state(q, matched_task, WORK_QUEUE_TASK_CANCELED);
 
 	q->stats->total_tasks_cancelled++;
-	change_task_state(q, matched_task, WORK_QUEUE_TASK_CANCELED);
 
 	return matched_task;
 }
