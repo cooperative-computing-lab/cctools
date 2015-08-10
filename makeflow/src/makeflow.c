@@ -544,12 +544,13 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 
     // put the local_task_dir into the envlist, which can be passed to batch_job_submit
     if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
-        envlist = nvpair_create();
+
+        if (mkdir(local_task_dir, 0777) == -1) 
+  			fatal("Fail to create public sandbox with the error message %s", strerror(errno));
+
+        if (envlist == NULL)
+            envlist = nvpair_create();
     	nvpair_insert_string(envlist, "local_task_dir", local_task_dir);
-        DIR *dir = opendir(local_task_dir);
-        if (dir == NULL) 
-        	if (mkdir(local_task_dir, 0777) == -1) 
-  				fatal("Fail to create public sandbox with the error message %s", strerror(errno));
 
     }
 
