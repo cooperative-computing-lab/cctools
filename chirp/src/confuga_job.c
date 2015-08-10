@@ -1717,19 +1717,19 @@ CONFUGA_IAPI int confugaJ_schedule (confuga *C)
 {
 	int rc;
 
-	CATCH(job_stats(C));
-	CATCH(job_new(C));
-	CATCH(job_bind_inputs(C));
+	job_stats(C);
+	job_new(C);
+	job_bind_inputs(C);
 	if (C->scheduler == CONFUGA_SCHEDULER_FIFO)
-		CATCH(job_schedule_fifo(C));
+		job_schedule_fifo(C);
 	else assert(0);
-	CATCH(job_replicate(C));
-	CATCH(job_create(C));
-	CATCH(job_commit(C));
-	CATCH(job_wait(C));
-	CATCH(job_reap(C));
-	CATCH(job_complete(C));
-	CATCH(job_kill(C));
+	job_replicate(C);
+	job_create(C);
+	job_commit(C);
+	job_wait(C);
+	job_reap(C);
+	job_complete(C);
+	job_kill(C);
 
 	rc = 0;
 	goto out;
