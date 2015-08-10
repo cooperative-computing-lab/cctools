@@ -62,7 +62,8 @@ typedef enum {
 	WORK_QUEUE_RESULT_SIGNAL         = 8,       /**< The task was terminated with a signal **/
 	WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION = 16, /**< The task used more resources than requested **/
 	WORK_QUEUE_RESULT_TASK_TIMEOUT   = 32,      /**< The task ran after specified end time. **/
-	WORK_QUEUE_RESULT_UNKNOWN        = 64       /**< The task ran successfully **/
+	WORK_QUEUE_RESULT_UNKNOWN        = 64,      /**< The result could not be classified. **/
+	WORK_QUEUE_RESULT_FORSAKEN       = 128      /**< The task failed, but it was neither a task or worker error **/
 } work_queue_result_t;
 
 typedef enum {
@@ -72,8 +73,10 @@ typedef enum {
 	WORK_QUEUE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
 	WORK_QUEUE_TASK_RETRIEVED,         /**< Task results are available at the master **/
 	WORK_QUEUE_TASK_DONE,              /**< Task is done, and returned through work_queue_wait >**/
-	WORK_QUEUE_TASK_CANCELED           /**< Task was canceled before completion **/
+	WORK_QUEUE_TASK_CANCELED,           /**< Task was canceled before completion **/
+	WORK_QUEUE_TASK_WAITING_RESUBMISSION /**< Worker gave up on the task, and task should be resubmitted >**/
 } work_queue_task_state_t;
+
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon
 												 creating queue. Turned off if less than 0. Change
