@@ -197,6 +197,25 @@ class Client:
 
         return Stat(path, info)
 
+    ##
+    # Changes permissions on path.
+    # Throws a GeneralFailure on error (e.g., no such path or insufficient permissions).
+    #
+    # @param self                Reference to the current task object.
+    # @param path                Target file/directory.
+    # @param mode                Desired permissions (e.g., 0755)
+    # @param absolute_stop_time  If given, maximum number of seconds since
+    #                            epoch to wait for a server response.
+    #                            (Overrides any timeout.)
+    # @param timeout             If given, maximum number of seconds to
+    #                            wait for a server response.
+    def chmod(self, path, mode, absolute_stop_time=None, timeout=None):
+        result = chirp_reli_chmod(self.hostport, path, mode, self.__stoptime(absolute_stop_time, timeout))
+
+        if result < 0:
+            raise GeneralFailure('chmod', result)
+
+        return result
 
     ##
     # Copies local file/directory source to the chirp server as file/directory destination.
