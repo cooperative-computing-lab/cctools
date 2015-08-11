@@ -237,7 +237,7 @@ Measure only the resources associated with this particular node
 and apply any operations that override.
 */
 
-void resources_measure_locally(struct work_queue_resources *r)
+void measure_worker_resources(struct work_queue_resources *r)
 {
 	work_queue_resources_measure_locally(r,workspace);
 	path_disk_size_info_get(".", &disk_measured);
@@ -281,7 +281,7 @@ static void send_resource_update( struct link *master, int force_update )
 		if( (time(0)-last_send_time) < send_resources_interval ) return;
 	}
 
-	resources_measure_locally(local_resources);
+	measure_worker_resources(local_resources);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		aggregate_workers_resources(foreman_q, total_resources);
@@ -1291,7 +1291,10 @@ static int check_for_resources(struct work_queue_task *t)
 		(gpus_allocated   + t->gpus   <= local_resources->gpus.total);
 }
 
-static int check_worker_limits(struct link *master) {
+/*
+If 0, the worker is using more resources than promised. 1 if resource usage holds that promise.
+*/
+static int enforce_worker_limits(struct link *master) {
 	if( manual_wall_time_option > 0 && (time(0) - worker_start_time) > manual_wall_time_option) {
 		fprintf(stderr,"work_queue_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t)manual_wall_time_option);
 		if(master) {
@@ -1379,9 +1382,10 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
-		if( !check_worker_limits(master) ) {
-			ok = 0;
+
+		if(!enforce_worker_limits(master)) {
 			abort_flag = 1;
+			break;
 		}
 
 		if(ok && !results_to_be_sent_msg) {
@@ -2174,7 +2178,7 @@ int main(int argc, char *argv[])
 	total_resources = work_queue_resources_create();
 	total_resources_last = work_queue_resources_create();
 
-	resources_measure_locally(local_resources);
+	measure_worker_resources(local_resources);
 
 	int backoff_interval = init_backoff_interval;
 	connect_stoptime = time(0) + connect_timeout;
@@ -2210,7 +2214,7 @@ int main(int argc, char *argv[])
 			backoff_interval = MIN(backoff_interval*2,max_backoff_interval);
 		}
 
-		if(!check_worker_limits(NULL)) {
+		if(!enforce_worker_limits(NULL)) {
 			abort_flag = 1;
 		}
 
