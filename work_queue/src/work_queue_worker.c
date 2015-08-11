@@ -163,8 +163,8 @@ static int64_t gpus_allocated = 0;
 
 static int64_t disk_measured = 0;
 
-static int send_resources_interval = 180;
-static int send_stats_interval     = 180;
+static int check_resources_interval = 180;
+static int send_stats_interval      = 180;
 
 static struct work_queue *foreman_q = NULL;
 
@@ -278,7 +278,7 @@ static void send_resource_update( struct link *master, int force_update )
 
 	if(!force_update) {
 		if( results_to_be_sent_msg ) return;
-		if( (time(0)-last_send_time) < send_resources_interval ) return;
+		if( (time(0)-last_send_time) < check_resources_interval ) return;
 	}
 
 	measure_worker_resources(local_resources);
@@ -1169,6 +1169,58 @@ static int do_invalidate_file(const char *filename) {
 	return -1;
 }
 
+static void finish_running_tasks(work_queue_result_t result) {
+	struct work_queue_process *p;
+	pid_t pid;
+
+	itable_firstkey(procs_running);
+	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
+		kill(-1 * pid, SIGKILL);
+		p->task->result |= result;
+	}
+}
+
+static int enforce_process_limits(struct work_queue_process *p) {
+	/* If the task did not specify disk usage, return right away. */
+	if(p->task->disk < 1)
+		return 1;
+
+	int64_t sandbox_size = 0;
+	path_disk_size_info_get(p->sandbox, &sandbox_size);
+
+	if(sandbox_size > p->task->disk)
+		return 0;
+
+	return 1;
+}
+
+static int enforce_processes_limits(struct link *master) {
+	static time_t last_check_time = 0;
+
+	struct work_queue_process *p;
+	uint64_t taskid;
+
+	/* Do not check too often, as it is expensive (particularly disk) */
+	if((time(0) - last_check_time) < check_resources_interval ) return 1;
+
+	last_check_time = time(0);
+
+	itable_firstkey(procs_table);
+	while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
+		if(!enforce_process_limits(NULL)) {
+			finish_running_tasks(WORK_QUEUE_RESULT_FORSAKEN);
+			p->task->result = WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION;
+
+			/* we delete the sandbox, to free the exhausted resource. */
+			delete_dir(p->sandbox);
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+
 static int do_release() {
 	debug(D_WQ, "released by master %s:%d.\n", master_addr, master_port);
 	released_by_master = 1;
@@ -1382,6 +1434,7 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
+		enforce_processes_limits(master);
 
 		if(!enforce_worker_limits(master)) {
 			abort_flag = 1;
