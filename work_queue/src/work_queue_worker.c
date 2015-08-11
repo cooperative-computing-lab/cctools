@@ -832,7 +832,8 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			}
 			free(env);
 		} else if(!strcmp(line,"end")) {
-				break;
+			work_queue_process_compute_disk_needed(p);
+			break;
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
 			work_queue_process_delete(p);
@@ -1182,7 +1183,7 @@ static void finish_running_tasks(work_queue_result_t result) {
 
 static int enforce_process_limits(struct work_queue_process *p) {
 	/* If the task did not specify disk usage, return right away. */
-	if(p->task->disk < 1)
+	if(p->disk < 1)
 		return 1;
 
 	int64_t sandbox_size = 0;

@@ -1,6 +1,7 @@
 
 #include "work_queue_process.h"
 #include "work_queue.h"
+#include "work_queue_internal.h"
 
 #include "debug.h"
 #include "errno.h"
@@ -266,6 +267,43 @@ void work_queue_process_kill(struct work_queue_process *p)
 
 	// Reap the child process to avoid zombies.
 	waitpid(p->pid, NULL, 0);
+}
+
+/* The disk needed by a task is shared between the cache and the process
+ * sandbox. To account for this overlap, the sandbox size is computed from the
+ * stated task size minus those files in the cache directory (i.e., input
+ * files). In this way, we can only measure the size of the sandbox when
+ * enforcing limits on the process, as a task should never write directly to
+ * the cache. */
+void  work_queue_process_compute_disk_needed( struct work_queue_process *p ) {
+	struct work_queue_task *t = p->task;
+	struct work_queue_file *f;
+	struct stat s;
+
+	p->disk = t->disk;
+
+	/* task did not specify its disk usage. */
+	if(p->disk < 0)
+		return;
+
+	if(t->input_files) {
+		list_first_item(t->input_files);
+		while((f = list_next_item(t->input_files))) {
+			if(f->type != WORK_QUEUE_FILE && f->type != WORK_QUEUE_FILE_PIECE)
+					continue;
+
+			if(stat(f->cached_name, &s) < 0)
+				continue;
+
+			/* p->disk is in MD, st_size in bytes. */
+			p->disk -= s.st_size/(1024*1024);
+		}
+	}
+
+	if(p->disk < 0) {
+		p->disk = -1;
+	}
+
 }
 
 /* vim: set noexpandtab tabstop=4: */
