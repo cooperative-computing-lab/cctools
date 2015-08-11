@@ -564,10 +564,15 @@ static int schedule_replication (confuga *C)
 		"CREATE TEMPORARY VIEW IF NOT EXISTS ConfugaTransferSchedule AS"
 		"	WITH"
 				/* This a StorageNode we are able to use to transfer a replica. If it is currently transferring a file, it is excluded. */
+		"		StorageNodeActiveRandom AS ("
+		"			SELECT StorageNodeActive.*, RANDOM() AS _r"
+		"				FROM StorageNodeActive"
+		"		),"
 		"		SourceStorageNode AS ("
-		"			SELECT Replica.fid, StorageNodeActive.id AS sid"
-		"				FROM Confuga.Replica JOIN Confuga.StorageNodeActive ON Replica.sid = StorageNodeActive.id"
-		"				WHERE NOT EXISTS (SELECT fsid FROM Confuga.ActiveTransfers WHERE fsid = StorageNodeActive.id)"
+		"			SELECT Replica.fid, StorageNodeActiveRandom.id AS sid, MIN(StorageNodeActiveRandom._r)"
+		"				FROM Confuga.Replica JOIN StorageNodeActiveRandom ON Replica.sid = StorageNodeActiveRandom.id"
+		"				WHERE NOT EXISTS (SELECT fsid FROM Confuga.ActiveTransfers WHERE fsid = StorageNodeActiveRandom.id)"
+		"				GROUP BY Replica.fid"
 		"		),"
 				/* This contains all the Replica of a File AND ongoing transfers of the File to some StorageNode */
 		"		Replicas AS ("
