@@ -450,17 +450,14 @@ static INT64_T do_link(int argc, char **argv)
 {
 	INT64_T result;
 	char old_full_path[CHIRP_PATH_MAX];
-	char new_full_path[CHIRP_PATH_MAX];
 	int sym = (argc == 4 && strcmp(argv[1], "-s") == 0);
 
 	if(sym) {
 		complete_remote_path(argv[2], old_full_path);
-		complete_remote_path(argv[3], new_full_path);
-		result = chirp_reli_symlink(current_host, old_full_path, new_full_path, stoptime);
+		result = chirp_reli_symlink(current_host, old_full_path, argv[3], stoptime);
 	} else {
 		complete_remote_path(argv[1], old_full_path);
-		complete_remote_path(argv[2], new_full_path);
-		result = chirp_reli_link(current_host, old_full_path, new_full_path, stoptime);
+		result = chirp_reli_link(current_host, old_full_path, argv[2], stoptime);
 	}
 
 	return result;
