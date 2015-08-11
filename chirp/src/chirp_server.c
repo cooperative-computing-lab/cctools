@@ -25,16 +25,16 @@
 #include "daemon.h"
 #include "datagram.h"
 #include "debug.h"
-#include "disk_info.h"
 #include "domain_name_cache.h"
 #include "get_canonical_path.h"
 #include "getopt_aux.h"
+#include "host_disk_info.h"
+#include "host_memory_info.h"
 #include "json.h"
 #include "link.h"
 #include "list.h"
 #include "load_average.h"
 #include "macros.h"
-#include "memory_info.h"
 #include "path.h"
 #include "pattern.h"
 #include "random.h"
@@ -213,7 +213,7 @@ static int update_all_catalogs(const char *url)
 		memset(&info, 0, sizeof(info));
 	}
 
-	memory_info_get(&memory_avail, &memory_total);
+	host_memory_info_get(&memory_avail, &memory_total);
 
 	buffer_init(B);
 	buffer_max(B, DATAGRAM_PAYLOAD_MAX);

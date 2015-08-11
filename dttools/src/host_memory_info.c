@@ -4,13 +4,13 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "memory_info.h"
+#include "host_memory_info.h"
 
 #if defined(CCTOOLS_OPSYS_LINUX) || defined(CCTOOLS_OPSYS_SUNOS)
 
 #include <unistd.h>
 
-int memory_info_get(UINT64_T * avail, UINT64_T * total)
+int host_memory_info_get(UINT64_T * avail, UINT64_T * total)
 {
 	*total = getpagesize() * (UINT64_T) sysconf(_SC_PHYS_PAGES);
 	*avail = getpagesize() * (UINT64_T) sysconf(_SC_AVPHYS_PAGES);
@@ -22,7 +22,7 @@ int memory_info_get(UINT64_T * avail, UINT64_T * total)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
-int memory_info_get(UINT64_T * avail, UINT64_T * total)
+int host_memory_info_get(UINT64_T * avail, UINT64_T * total)
 {
 	unsigned x = 0;
 	size_t s = sizeof(x);
@@ -33,7 +33,7 @@ int memory_info_get(UINT64_T * avail, UINT64_T * total)
 
 #else
 
-int memory_info_get(UINT64_T * avail, UINT64_T * total)
+int host_memory_info_get(UINT64_T * avail, UINT64_T * total)
 {
 	*total = 0;
 	*avail = 0;
@@ -46,7 +46,7 @@ int memory_info_get(UINT64_T * avail, UINT64_T * total)
 #include <stdio.h>
 #include <unistd.h>
 
-int memory_usage_get(UINT64_T * rssp, UINT64_T * totalp)
+int host_memory_usage_get(UINT64_T * rssp, UINT64_T * totalp)
 {
 #ifdef CCTOOLS_OPSYS_LINUX
 	/*

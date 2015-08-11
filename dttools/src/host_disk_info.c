@@ -5,8 +5,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "disk_info.h"
-#include "cwd_disk_info.h"
+#include "host_disk_info.h"
+#include "path_disk_size_info.h"
 #include "debug.h"
 #include "macros.h"
 
@@ -28,7 +28,7 @@ See the file COPYING for details.
 #include <sys/vfs.h>
 #endif
 
-int disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total)
+int host_disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total)
 {
 #ifdef CCTOOLS_OPSYS_SUNOS
 	int result;
@@ -61,7 +61,7 @@ int check_disk_space_for_filesize(char *path, int64_t file_size, uint64_t disk_a
 	uint64_t disk_avail, disk_total;
 
 	if(disk_avail_threshold > 0) {
-		disk_info_get(path, &disk_avail, &disk_total);
+		host_disk_info_get(path, &disk_avail, &disk_total);
 		if(file_size > 0) {
 			if((uint64_t)file_size > disk_avail || (disk_avail - file_size) < disk_avail_threshold) {
 				debug(D_DEBUG, "File of size %"PRId64" MB will lower available disk space (%"PRIu64" MB) below threshold (%"PRIu64" MB).\n", file_size/MEGA, disk_avail/MEGA, disk_avail_threshold/MEGA);

@@ -8,8 +8,8 @@ See the file COPYING for details.
 
 #include "link.h"
 #include "load_average.h"
-#include "memory_info.h"
-#include "disk_info.h"
+#include "host_disk_info.h"
+#include "host_memory_info.h"
 #include "gpu_info.h"
 #include "macros.h"
 #include "debug.h"
@@ -44,11 +44,11 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 	 * not executing by itself, but that it has to share its resources with
 	 * other processes/workers. */
 
-	disk_info_get(disk_path,&avail,&total);
+	host_disk_info_get(disk_path,&avail,&total);
 	r->disk.total = (avail / (UINT64_T) MEGA) + r->disk.inuse; // Free + whatever we are using.
 	r->disk.largest = r->disk.smallest = r->disk.total;
 
-	memory_info_get(&avail,&total);
+	host_memory_info_get(&avail,&total);
 	r->memory.total = (avail / (UINT64_T) MEGA) + r->memory.inuse; // Free + whatever we are using.
 	r->memory.largest = r->memory.smallest = r->memory.total;
 

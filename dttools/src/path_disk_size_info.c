@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "cwd_disk_info.h"
+#include "path_disk_size_info.h"
 
 #include <limits.h>
 #include <ftw.h>
@@ -31,7 +31,7 @@ static int update_cwd_usage(const char *path, const struct stat *s, int typeflag
 	return 0;
 }
 
-int cwd_disk_info_get(const char *path, int64_t *total)
+int path_disk_size_info_get(const char *path, int64_t *total)
 {
 	total_usage = 0;
 

@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "int_sizes.h"
 #include "load_average.h"
-#include "memory_info.h"
+#include "host_memory_info.h"
 #include "stringtools.h"
 #include "username.h"
 #include "uptime.h"
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
 	string_tolower(name.release);
 	load_average_get(load);
 	cpus = load_average_get_cpus();
-	memory_info_get(&memory_avail, &memory_total);
+	host_memory_info_get(&memory_avail, &memory_total);
 	uptime = uptime_get();
 	username_get(owner);
 

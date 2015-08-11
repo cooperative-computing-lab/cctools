@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include "int_sizes.h"
 #include <time.h>
 
-/** @file disk_info.h
+/** @file host_disk_info.h
 Query disk space properties.
 */
 
@@ -21,7 +21,7 @@ Query disk space properties.
 @param total A pointer to an integer that will be filled with the total space in bytes.
 @return Greater than or equal to zero on success, less than zero otherwise.
 */
-int disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total);
+int host_disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total);
 
 /** Return whether a file will fit in the given directory.
 @param path A filename of the disk to be measured.

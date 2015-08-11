@@ -18,9 +18,9 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "nvpair.h"
 #include "copy_stream.h"
-#include "memory_info.h"
-#include "disk_info.h"
-#include "cwd_disk_info.h"
+#include "host_memory_info.h"
+#include "host_disk_info.h"
+#include "path_disk_size_info.h"
 #include "hash_cache.h"
 #include "link.h"
 #include "link_auth.h"
@@ -240,7 +240,7 @@ and apply any operations that override.
 void resources_measure_locally(struct work_queue_resources *r)
 {
 	work_queue_resources_measure_locally(r,workspace);
-	cwd_disk_info_get(".", &disk_measured);
+	path_disk_size_info_get(".", &disk_measured);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		r->cores.total = 0;

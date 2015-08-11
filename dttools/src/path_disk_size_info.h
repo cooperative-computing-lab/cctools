@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include "int_sizes.h"
 
-/** @file cwd_info.h
+/** @file path_disk_size_info.h
 Query disk space on the given directory.
 */
 
@@ -18,6 +18,6 @@ Query disk space on the given directory.
 @param total A pointer to an integer that will be filled with the total space in bytes.
 @return Greater than or equal to zero on success, less than zero otherwise.
 */
-int cwd_disk_info_get(const char *path, int64_t * total);
+int path_disk_size_info_get(const char *path, int64_t * total);
 
 #endif
