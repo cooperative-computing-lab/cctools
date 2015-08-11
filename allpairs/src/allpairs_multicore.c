@@ -23,7 +23,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "fast_popen.h"
 #include "text_list.h"
-#include "memory_info.h"
+#include "host_memory_info.h"
 #include "load_average.h"
 #include "macros.h"
 #include "full_io.h"
@@ -80,7 +80,7 @@ int block_size_estimate( struct text_list *seta )
 	UINT64_T total_data = 0,free_mem,total_mem;
 	int block_size;
 
-	memory_info_get(&free_mem, &total_mem);
+	host_memory_info_get(&free_mem, &total_mem);
 
 	for(i=0;i<count;i++) {
 		total_data += get_file_size(text_list_get(seta,i));

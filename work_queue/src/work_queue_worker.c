@@ -18,9 +18,9 @@ See the file COPYING for details.
 #include "domain_name_cache.h"
 #include "nvpair.h"
 #include "copy_stream.h"
-#include "memory_info.h"
-#include "disk_info.h"
-#include "cwd_disk_info.h"
+#include "host_memory_info.h"
+#include "host_disk_info.h"
+#include "path_disk_size_info.h"
 #include "hash_cache.h"
 #include "link.h"
 #include "link_auth.h"
@@ -162,9 +162,12 @@ static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
 
 static int64_t disk_measured = 0;
+static int64_t files_counted = 0;
 
 static int send_resources_interval = 180;
-static int send_stats_interval     = 180;
+static int check_resources_interval = 15;
+static int max_time_on_measurement  = 3;
+static int send_stats_interval      = 180;
 
 static struct work_queue *foreman_q = NULL;
 
@@ -233,14 +236,49 @@ void reset_idle_timer()
 }
 
 /*
+   Measure the disk used by the worker. We only manually measure the cache directory, as processes measure themselves.
+   */
+
+void measure_worker_disk() {
+	static struct path_disk_size_info *state = NULL;
+
+	path_disk_size_info_get_r("./cache", max_time_on_measurement, &state);
+
+	if(state->last_byte_size_complete >= 0) {
+		disk_measured = (int64_t) ceil(state->last_byte_size_complete/(1.0*MEGA));
+	}
+	else {
+		disk_measured = -1;
+	}
+
+	files_counted = state->last_file_count_complete;
+
+	if(state->complete_measurement && disk_measured > -1) {
+		/* if a complete measurement has been done, then update
+		 * for the found value, and add the known values of the processes. */
+
+		struct work_queue_process *p;
+		uint64_t taskid;
+
+		itable_firstkey(procs_table);
+		while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
+			if(p->sandbox_size > 0) {
+				disk_measured += p->sandbox_size;
+				files_counted += p->sandbox_file_count;
+			}
+		}
+	}
+}
+
+/*
 Measure only the resources associated with this particular node
 and apply any operations that override.
 */
 
-void resources_measure_locally(struct work_queue_resources *r)
+void measure_worker_resources(struct work_queue_resources *r)
 {
 	work_queue_resources_measure_locally(r,workspace);
-	cwd_disk_info_get(".", &disk_measured);
+	measure_worker_disk();
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		r->cores.total = 0;
@@ -262,6 +300,8 @@ void resources_measure_locally(struct work_queue_resources *r)
 	r->memory.smallest = r->memory.largest = r->memory.total;
 	r->disk.smallest = r->disk.largest = r->disk.total;
 	r->gpus.smallest = r->gpus.largest = r->gpus.total;
+
+	r->disk.inuse = disk_measured;
 }
 
 
@@ -280,8 +320,6 @@ static void send_resource_update( struct link *master, int force_update )
 		if( results_to_be_sent_msg ) return;
 		if( (time(0)-last_send_time) < send_resources_interval ) return;
 	}
-
-	resources_measure_locally(local_resources);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		aggregate_workers_resources(foreman_q, total_resources);
@@ -1285,7 +1323,13 @@ static int check_for_resources(struct work_queue_task *t)
 		(gpus_allocated   + t->gpus   <= local_resources->gpus.total);
 }
 
-static int check_worker_limits(struct link *master) {
+/*
+If 0, the worker is using more resources than promised. 1 if resource usage holds that promise.
+*/
+static int enforce_worker_limits(struct link *master) {
+	static time_t last_check_time = 0;
+
+	/* check time everytime, as it is cheap to check */
 	if( manual_wall_time_option > 0 && (time(0) - worker_start_time) > manual_wall_time_option) {
 		fprintf(stderr,"work_queue_worker: reached the wall time limit %lld s\n", (long long) manual_wall_time_option);
 		if(master) {
@@ -1293,6 +1337,13 @@ static int check_worker_limits(struct link *master) {
 		}
 		return 0;
 	}
+
+	/* Do not check too often, as it is expensive (particularly disk) */
+	if((time(0) - last_check_time) < check_resources_interval ) return 1;
+
+	measure_worker_resources(local_resources);
+
+	last_check_time = time(0);
 
 	if(manual_disk_option > 0 && disk_measured > MAX(0, manual_disk_option - disk_avail_threshold)) {
 		fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, disk_measured);
@@ -1303,7 +1354,6 @@ static int check_worker_limits(struct link *master) {
 
 		return 0;
 	}
-
 
 	return 1;
 }
@@ -1373,10 +1423,10 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
-		if( !check_worker_limits(master) ) {
-			ok = 0;
+
+		if(!enforce_worker_limits(master)) {
 			abort_flag = 1;
-			kill_all_tasks(master, 1);
+			break;
 		}
 
 		if(ok && !results_to_be_sent_msg) {
@@ -2169,7 +2219,7 @@ int main(int argc, char *argv[])
 	total_resources = work_queue_resources_create();
 	total_resources_last = work_queue_resources_create();
 
-	resources_measure_locally(local_resources);
+	measure_worker_resources(local_resources);
 
 	int backoff_interval = init_backoff_interval;
 	connect_stoptime = time(0) + connect_timeout;
@@ -2205,7 +2255,7 @@ int main(int argc, char *argv[])
 			backoff_interval = MIN(backoff_interval*2,max_backoff_interval);
 		}
 
-		if(!check_worker_limits(NULL)) {
+		if(!enforce_worker_limits(NULL)) {
 			abort_flag = 1;
 		}
 

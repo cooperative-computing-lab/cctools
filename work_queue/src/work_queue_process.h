@@ -3,6 +3,7 @@
 
 #include "work_queue.h"
 #include "timestamp.h"
+#include "path_disk_size_info.h"
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -36,7 +37,14 @@ struct work_queue_process {
 
 	struct work_queue_task *task;
 
-		char container_id[MAX_BUFFER_SIZE];
+	/* disk size and number of files found in the process sandbox. */
+	int64_t sandbox_size;
+	int64_t sandbox_file_count;
+
+	/* state between complete disk measurements. */
+	struct path_disk_size_info *disk_measurement_state;
+
+	char container_id[MAX_BUFFER_SIZE];
 };
 
 struct work_queue_process * work_queue_process_create( int taskid );
@@ -44,5 +52,7 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int container_mo
 // lunching process with container, arg_3 can be either img_name or container_name, depending on container_mode
 void  work_queue_process_kill( struct work_queue_process *p );
 void  work_queue_process_delete( struct work_queue_process *p);
+
+int work_queue_process_measure_disk(struct work_queue_process *p, int max_time_on_measurement);
 
 #endif

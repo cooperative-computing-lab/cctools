@@ -21,7 +21,6 @@ SOURCES = \
 	console_login.c \
 	copy_stream.c \
 	create_dir.c \
-	cwd_disk_info.c \
 	daemon.c \
 	datagram.c \
 	debug.c \
@@ -29,7 +28,6 @@ SOURCES = \
 	debug_journal.c \
 	debug_stream.c \
 	debug_syslog.c \
-	disk_info.c \
 	domain_name.c \
 	domain_name_cache.c \
 	dpopen.c \
@@ -48,6 +46,8 @@ SOURCES = \
 	hash_table.c \
 	hdfs_library.c \
 	hmac.c \
+	host_disk_info.c \
+	host_memory_info.c \
 	http_query.c \
 	itable.c \
 	json.c \
@@ -59,13 +59,13 @@ SOURCES = \
 	load_average.c \
 	md5.c \
 	memfdexe.c \
-	memory_info.c \
 	mergesort.c \
 	mt19937-64.c \
 	nvpair.c \
 	nvpair_database.c \
 	password_cache.c \
 	path.c \
+	path_disk_size_info.c \
 	pattern.c \
 	preadwrite.c \
 	process.c \

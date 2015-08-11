@@ -23,7 +23,7 @@ See the file COPYING for details.
 #include "copy_stream.h"
 #include "work_queue_catalog.h"
 #include "datagram.h"
-#include "disk_info.h"
+#include "host_disk_info.h"
 #include "domain_name_cache.h"
 #include "link.h"
 #include "macros.h"

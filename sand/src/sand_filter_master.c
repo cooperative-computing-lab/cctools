@@ -19,7 +19,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "work_queue.h"
 #include "work_queue_catalog.h"
-#include "memory_info.h"
+#include "host_memory_info.h"
 #include "macros.h"
 #include "delete_dir.h"
 #include "envtools.h"

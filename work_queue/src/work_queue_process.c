@@ -4,11 +4,13 @@
 
 #include "debug.h"
 #include "errno.h"
+#include "macros.h"
 #include "stringtools.h"
 #include "create_dir.h"
 #include "delete_dir.h"
 #include "list.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +18,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <dirent.h>
 
 #include <sys/resource.h>
 #include <sys/wait.h>
@@ -63,6 +66,10 @@ void work_queue_process_delete(struct work_queue_process *p)
 	if(p->sandbox) {
 		delete_dir(p->sandbox);
 		free(p->sandbox);
+	}
+
+	if(p->disk_measurement_state) {
+		path_disk_size_info_delete_state(p->disk_measurement_state);
 	}
 
 	free(p);
@@ -266,6 +273,28 @@ void work_queue_process_kill(struct work_queue_process *p)
 
 	// Reap the child process to avoid zombies.
 	waitpid(p->pid, NULL, 0);
+}
+
+int work_queue_process_measure_disk(struct work_queue_process *p, int max_time_on_measurement) {
+	/* we can't have pointers to struct members, thus we create temp variables here */
+
+	struct path_disk_size_info *state = p->disk_measurement_state;
+
+	int result = path_disk_size_info_get_r(p->sandbox, max_time_on_measurement, &state);
+
+	/* not a memory leak... Either disk_measurement_state was NULL or the same as state. */
+	p->disk_measurement_state = state;
+
+	if(state->last_byte_size_complete >= 0) {
+		p->sandbox_size = (int64_t) ceil(state->last_byte_size_complete/(1.0*MEGA));
+	}
+	else {
+		p->sandbox_size = -1;
+	}
+
+	p->sandbox_file_count = state->last_file_count_complete;
+
+	return result;
 }
 
 /* vim: set noexpandtab tabstop=4: */

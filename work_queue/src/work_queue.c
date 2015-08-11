@@ -43,7 +43,7 @@ The following major problems must be fixed:
 #include "md5.h"
 #include "url_encode.h"
 
-#include "disk_info.h"
+#include "host_disk_info.h"
 
 #include <unistd.h>
 #include <dirent.h>

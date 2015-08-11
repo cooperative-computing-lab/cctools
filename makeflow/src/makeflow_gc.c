@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "set.h"
 #include "timestamp.h"
-#include "disk_info.h"
+#include "host_disk_info.h"
 #include "stringtools.h"
 
 #include <dirent.h>
@@ -62,7 +62,7 @@ static int directory_low_disk( const char *path )
 {
 	UINT64_T avail, total;
 
-	if(disk_info_get(path, &avail, &total) >= 0)
+	if(host_disk_info_get(path, &avail, &total) >= 0)
 		return avail <= MAKEFLOW_MIN_SPACE;
 
 	return 0;
