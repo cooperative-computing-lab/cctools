@@ -25,7 +25,6 @@ See the file COPYING for details.
 #include "work_queue.h"
 #include "work_queue_catalog.h"
 #include "xxmalloc.h"
-#include "unlink_recursive.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -602,12 +601,20 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	/* Display the fully elaborated command, just like Make does. */
 	printf("submitting job: %s\n", command);
 
-    // put the local_task_dir into the envlist, which can be passed to batch_job_submit
     if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
 
-        if (mkdir(local_task_dir, 0777) == -1) 
-  			fatal("Fail to create public sandbox with the error message %s", strerror(errno));
+		struct stat s;
+		int err = stat(local_task_dir, &s);
+		if(-1 == err) {
+		    if(ENOENT == errno) {
+		        /* sandbox dir does not exist, create one */
+                if (mkdir(local_task_dir, 0777) == -1) 
+  					fatal("Fail to create public sandbox with the error message %s", strerror(errno));
+		    } else 
+  				fatal("Fail to locate public sandbox with the error message %s", strerror(errno));
+		} 
 
+        // put the local_task_dir into the envlist, which can be passed to batch_job_submit
         if (envlist == NULL)
             envlist = nvpair_create();
     	nvpair_insert_string(envlist, "local_task_dir", local_task_dir);
@@ -1719,7 +1726,7 @@ int main(int argc, char *argv[])
 	signal(SIGTERM, handle_abort);
 
     if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX)
-    	makeflow_log_sandbox_mode(d, local_task_dir);
+    	makeflow_log_sandbox_mode_create(d, local_task_dir);
 
 	makeflow_log_started_event(d);
 
@@ -1757,7 +1764,7 @@ int main(int argc, char *argv[])
 	}
 
     if(batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX)
-       unlink_recursive(local_task_dir);
+       makeflow_log_clean(logfilename);
 
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
