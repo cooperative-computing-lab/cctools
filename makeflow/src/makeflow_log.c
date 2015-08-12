@@ -308,34 +308,55 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 	}
 }
 
-void makeflow_log_clean(const char *makeflow_log_file){
+void makeflow_log_clean( const char *makeflow_logfile_name){
+
     char fst_line[CHAR_BUF_LEN];
-    FILE *mf_log = fopen(makeflow_log_file, "r");
+    FILE *mf_log = fopen(makeflow_logfile_name, "r");
+
     if( !mf_log ) {
     	fatal("Could not open makeflow log file.");
     } else {
     	if(fgets(fst_line, sizeof(fst_line), mf_log) != NULL) {
             char sandbox_mode[CHAR_BUF_LEN];
+            char sandbox_state[CHAR_BUF_LEN];
             char sandbox_name[CHAR_BUF_LEN];
 
-            if(sscanf("# %s\t%s", sandbox_mode, sandbox_name) == -1) 
- 				fatal("Fail to split the string with the error message %s\n", strerror(errno));
+            if(sscanf(fst_line, "# %s\t%s\t%s\n", sandbox_mode, sandbox_state, sandbox_name) == -1) 
+ 				fatal("Fail to split the string with the error message %s.\n", strerror(errno));
              
          	if (string_equal(sandbox_mode, "SANDBOX")) {
-                DIR *dir = opendir(sandbox_name);
-                if(dir)
-             		unlink_recursive(sandbox_name);
-         	} else
-           		return;
-     	} else
-        	fatal("Could not read line from makeflow log file.");
+
+				struct stat s;
+        		int err = stat(sandbox_name, &s);
+                /*if the state of sandbox directory is CREATED*/
+                if (string_equal(sandbox_state, "CREATED")) {
+                    if(-1 == err) {
+                        if(ENOENT == errno) 
+                            fatal("sandbox directory does not exist.\n");
+                        else
+                            fatal("Fail to locate public sandbox with the error message %s.\n", strerror(errno));
+                    } else {
+    					if(S_ISDIR(s.st_mode)) { 
+                     		unlink_recursive(sandbox_name);
+							char *replace_cmd = string_format("sed -i \'1s/CREATED/DELETED/\' %s", makeflow_logfile_name);
+                            system(replace_cmd);
+                            free(replace_cmd);
+                        } else 
+                            fatal("Public sandbox directory does not exit %s.\n", strerror(errno));
+					}
+                }
+            } 
+
+        } else
+            fatal("Could not read line from makeflow log file.");
+
+        fclose(mf_log);
     }
 }
 
-void makeflow_log_sandbox_mode( struct dag*d, const char *local_task_dir ) {
-    fprintf(d->logfile, "# SANDBOX\t%s\n", local_task_dir);
+void makeflow_log_sandbox_mode_create( struct dag *d, const char *local_task_dir ) {
+    fprintf(d->logfile, "# SANDBOX\tCREATED\t%s\n", local_task_dir);
 	makeflow_log_sync(d,1);
 }
-
 
 /* vim: set noexpandtab tabstop=4: */
