@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include "work_queue.h"
 #include "work_queue_catalog.h"
 #include "xxmalloc.h"
+#include "unlink_recursive.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -76,6 +77,12 @@ an example.
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
+#define WITHOUT_CONTAINER 0
+#define WITH_DOCKER 1
+#define WRAPPER_SH "tmp_wrapper.sh"
+
+#define CHAR_BUF_LEN 4096
+
 typedef enum {
 	CONTAINER_MODE_NONE,
 	CONTAINER_MODE_DOCKER,
@@ -120,6 +127,8 @@ static char *monitor_log_dir = NULL;
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
 static char *image_tar = NULL;
+
+static char *local_task_dir = "makeflow.sandbox";
 
 /* wait upto this many seconds for an output file of a succesfull task
  * to appear on the local filesystem (e.g, to deal with NFS
@@ -532,6 +541,13 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	/* Display the fully elaborated command, just like Make does. */
 	printf("submitting job: %s\n", command);
 
+    // put the local_task_dir into the envlist, which can be passed to batch_job_submit
+    if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
+        envlist = nvpair_create();
+    	nvpair_insert_string(envlist, "local_task_dir", local_task_dir);
+        mkdir(local_task_dir, 0777);
+    }
+
 	while(1) {
 		jobid = batch_job_submit(queue, command, input_files, output_files, envlist );
 		if(jobid >= 0) {
@@ -642,7 +658,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 
 	/* Generate the environment vars specific to this node. */
 	struct nvpair *envlist = dag_node_env_create(d,n);
-
+   
 	/*
 	Just before execution, replace double-percents with the nodeid.
 	This is used for substituting in the nodeid into a wrapper command or file.
@@ -993,6 +1009,7 @@ static void handle_abort(int sig)
 
 static void show_help_run(const char *cmd)
 {
+
 	printf("Use: %s [options] <dagfile>\n", cmd);
 	printf("Frequently used options:\n\n");
 	printf(" %-30s Clean up: remove logfile and all targets. Optional specification [intermediates, outputs] removes only the indicated files.\n", "-c,--clean=<type>");
@@ -1607,6 +1624,17 @@ int main(int argc, char *argv[])
 	if (change_dir)
 		chdir(change_dir);
 
+	if(clean_mode) {
+		printf("cleaning filesystem...\n");
+
+		makeflow_clean(d);
+        makeflow_log_clean(logfilename);
+		unlink(logfilename);
+		unlink(batchlogfilename);
+               
+		exit(0);
+	}
+
 	printf("checking %s for consistency...\n",dagfile);
 	if(!makeflow_check(d)) {
 		exit(EXIT_FAILURE);
@@ -1642,6 +1670,9 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, handle_abort);
 	signal(SIGTERM, handle_abort);
 
+    if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX)
+    	makeflow_log_sandbox_mode(d, local_task_dir);
+
 	makeflow_log_started_event(d);
 
 	runtime = timestamp_get();
@@ -1676,6 +1707,9 @@ int main(int argc, char *argv[])
 		system(cmd);
 		free(cmd);
 	}
+
+    if(batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX)
+        unlink_recursive(local_task_dir);
 
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
