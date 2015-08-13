@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include <string.h>
 
 static int file_fd = -1;
+static struct stat file_stat;
 static char file_path[PATH_MAX];
 static off_t file_size_max = 1<<20;
 
@@ -38,6 +39,7 @@ int debug_file_reopen (void)
 		CATCHUNIX(flags = fcntl(file_fd, F_GETFD));
 		flags |= FD_CLOEXEC;
 		CATCHUNIX(fcntl(file_fd, F_SETFD, flags));
+		CATCHUNIX(fstat(file_fd, &file_stat)); /* save inode */
 		/* canonicalize the debug_file path for future operations */
 		{
 			char tmp[PATH_MAX] = "";
@@ -54,14 +56,24 @@ out:
 void debug_file_write (INT64_T flags, const char *str)
 {
 	int rc;
+
+	/* Beware this code is racey and debug messages may be lost during
+	 * rotations. Two processes rotating logs at the same time may create two
+	 * new logs. The stat on the filename and inode comparison catches this
+	 * after one lost debug message.
+	 */
+
 	if (file_size_max > 0) {
 		struct stat info;
-		rc = fstat(file_fd, &info);
+		rc = stat(file_path, &info);
 		if (rc == 0) {
 			if (info.st_size >= file_size_max) {
 				char old[PATH_MAX];
 				snprintf(old, sizeof(old), "%s.old", file_path);
 				rename(file_path, old);
+				debug_file_reopen();
+			} else if (info.st_ino != file_stat.st_ino) {
+				/* another process rotated the log */
 				debug_file_reopen();
 			}
 		} else {
