@@ -821,9 +821,9 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		} else if(sscanf(line,"gpus %d",&n)) {
 			work_queue_task_specify_gpus(task, n);
 		} else if(sscanf(line,"env %d",&length)==1) {
-			char *env = malloc(length+1);
-			link_read(master,env,length,stoptime);
-			env[length] = 0;
+			char *env = malloc(length+2); /* +2 for \n and \0 */
+			link_read(master, env, length+1, stoptime);
+			env[length] = 0;              /* replace \n with \0 */
 			char *value = strchr(env,'=');
 			if(value) {
 				*value = 0;
