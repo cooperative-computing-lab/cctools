@@ -2,6 +2,11 @@
 
 . ../../dttools/src/test_runner.common.sh
 
+check_needed()
+{
+	return 0
+}
+
 prepare()
 {
 	return 0

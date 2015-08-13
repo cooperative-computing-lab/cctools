@@ -825,7 +825,6 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				if(chirp_acl_check(path, subject, CHIRP_ACL_PUT)) {
 					flags |= O_EXCL;
 				} else {
-					errno = EACCES;
 					goto failure;
 				}
 			}
@@ -939,7 +938,6 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					/* ok to proceed */
 				}
 			} else {
-				errno = EACCES;
 				goto failure;
 			}
 
@@ -1234,7 +1232,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "link %s %s", path, newpath) == 2) {
 			/* Can only hard link to files on which you already have r/w perms */
 			path_fix(path);
-			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ | CHIRP_ACL_WRITE))
+			if(!chirp_acl_check_link(path, subject, CHIRP_ACL_READ | CHIRP_ACL_WRITE))
 				goto failure;
 			path_fix(newpath);
 			if(!chirp_acl_check(newpath, subject, CHIRP_ACL_WRITE))

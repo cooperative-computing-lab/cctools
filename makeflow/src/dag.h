@@ -25,6 +25,8 @@ struct dag {
 	struct dag_node *nodes;             /* Linked list of all production rules, without ordering. */
 	struct itable *node_table;          /* Mapping from unique integers dag_node->nodeid to nodes. */
 	struct hash_table *files;           /* Maps every filename to a struct dag_file. */
+	struct set *inputs;                 /* Set of every struct dag_file specified as input. */
+	struct set *outputs;                /* Set of every struct dag_file specified as output. */
 	struct hash_table *variables;       /* Mappings between variable names defined in the makeflow file and their values. */
 	struct hash_table *task_categories; /* Mapping from labels to category structures. */
 	struct set *export_vars;            /* List of variables with prefix export. (these are setenv'ed eventually). */
@@ -37,8 +39,7 @@ struct dag {
 
 	struct itable *local_job_table;     /* Mapping from unique integers dag_node->jobid to nodes, rules with prefix LOCAL. */
 	struct itable *remote_job_table;    /* Mapping from unique integers dag_node->jobid to nodes. */
-	struct hash_table *completed_files; /* Records which target files have been updated/generated. */
-	struct set *collect_table;          /* Keeps files that are garbage collectable. */
+	int completed_files;				/* Keeps a count of the rules in state recieved or beyond. */
 };
 
 struct dag *dag_create();
@@ -50,6 +51,8 @@ void dag_find_ancestor_depth(struct dag *d);
 void dag_count_states(struct dag *d);
 
 struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename);
+struct dag_file *dag_input_lookup_or_create(struct dag *d, const char *filename);
+struct dag_file *dag_output_lookup_or_create(struct dag *d, const char *filename);
 struct dag_file *dag_file_from_name(struct dag *d, const char *filename);
 struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label);
 

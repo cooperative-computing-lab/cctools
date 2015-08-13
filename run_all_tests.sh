@@ -29,6 +29,7 @@ export PERL5LIB="$(pwd)/chirp/src/perl:$(pwd)/work_queue/src/perl:$PERL5LIB"
 
 SUCCESS=0
 FAILURE=0
+SKIP=0
 START_TIME=$(date +%s)
 for package in ${CCTOOLS_PACKAGES_TEST}; do
 	if [ -d "${package}/test" ]; then
@@ -38,23 +39,36 @@ for package in ${CCTOOLS_PACKAGES_TEST}; do
 				printf "%-66s" "--- Testing ${package}/test/${script} ... "
 				TEST_START_TIME=$(date +%s)
 				(
-					echo "======== ${script} PREPARE ========"
-					"./${script}" prepare
-					result=$?
-					if [ $result -ne 0 ]; then
-						exit $result
-					fi
-					echo "======== ${script} RUN ========"
-					"./${script}" run
-					result=$?
-					echo "======== ${script} CLEAN ========"
-					"./${script}" clean
-					exit $result
+					"./${script}" check_needed
 				) >> "$CCTOOLS_TEST_LOG" 2>&1
 				result=$?
+				if [ "$result" -ne 0 ]; then
+					skip=1
+				else
+					skip=0
+					(
+						echo "======== ${script} PREPARE ========"
+						"./${script}" prepare
+						result=$?
+						if [ $result -ne 0 ]; then
+							exit $result
+						fi
+						echo "======== ${script} RUN ========"
+						"./${script}" run
+						result=$?
+						echo "======== ${script} CLEAN ========"
+						"./${script}" clean
+						exit $result
+					) >> "$CCTOOLS_TEST_LOG" 2>&1
+					result=$?
+				fi
 				TEST_STOP_TIME=$(date +%s)
 				TEST_ELAPSED=$(($TEST_STOP_TIME-$TEST_START_TIME))
-				if [ "$result" -eq 0 ]; then
+				if [ "$skip" -eq 1 ]; then
+					SKIP=$((SKIP+1))
+					echo "skipped ${TEST_ELAPSED}s"
+					echo "=== Test ${package}/test/${script}: skipped." >> $CCTOOLS_TEST_LOG
+				elif [ "$result" -eq 0 ]; then
 					SUCCESS=$((SUCCESS+1))
 					echo "success ${TEST_ELAPSED}s"
 					echo "=== Test ${package}/test/${script}: success." >> $CCTOOLS_TEST_LOG
@@ -70,11 +84,11 @@ for package in ${CCTOOLS_PACKAGES_TEST}; do
 done
 STOP_TIME=$(date +%s)
 
-TOTAL=$((SUCCESS+FAILURE))
+TOTAL=$((SUCCESS+FAILURE-SKIP))
 ELAPSED=$((STOP_TIME-START_TIME))
 
 echo ""
-echo "Test Results: ${FAILURE} of ${TOTAL} tests failed in ${ELAPSED} seconds."
+echo "Test Results: ${FAILURE} of ${TOTAL} tests failed (${SKIP} skipped) in ${ELAPSED} seconds."
 echo ""
 
 

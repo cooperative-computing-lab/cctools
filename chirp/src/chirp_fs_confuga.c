@@ -303,7 +303,7 @@ struct chirp_dir {
 	struct chirp_dirent dirent;
 };
 
-struct chirp_dir *chirp_fs_confuga_opendir(const char *path)
+static struct chirp_dir *chirp_fs_confuga_opendir(const char *path)
 {
 	int rc;
 	struct chirp_dir *dir = NULL;
@@ -322,7 +322,7 @@ out:
 	}
 }
 
-struct chirp_dirent *chirp_fs_confuga_readdir(struct chirp_dir *dir)
+static struct chirp_dirent *chirp_fs_confuga_readdir(struct chirp_dir *dir)
 {
 	int rc;
 	struct confuga_dirent *dirent;
@@ -344,7 +344,7 @@ out:
 	}
 }
 
-void chirp_fs_confuga_closedir(struct chirp_dir *dir)
+static void chirp_fs_confuga_closedir(struct chirp_dir *dir)
 {
 	confuga_closedir(dir->dir);
 	free(dir);
@@ -355,42 +355,42 @@ void chirp_fs_confuga_closedir(struct chirp_dir *dir)
 	CATCH_CONFUGA(call);\
 	PROLOGUE
 
-INT64_T chirp_fs_confuga_unlink(const char *path)
+static INT64_T chirp_fs_confuga_unlink(const char *path)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_unlink(C, path));
 }
 
-INT64_T chirp_fs_confuga_rename(const char *old, const char *new)
+static INT64_T chirp_fs_confuga_rename(const char *old, const char *new)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_rename(C, old, new));
 }
 
-INT64_T chirp_fs_confuga_link(const char *target, const char *path)
+static INT64_T chirp_fs_confuga_link(const char *target, const char *path)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_link(C, target, path));
 }
 
-INT64_T chirp_fs_confuga_symlink(const char *target, const char *path)
+static INT64_T chirp_fs_confuga_symlink(const char *target, const char *path)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_symlink(C, target, path));
 }
 
-INT64_T chirp_fs_confuga_readlink(const char *path, char *buf, INT64_T length)
+static INT64_T chirp_fs_confuga_readlink(const char *path, char *buf, INT64_T length)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_readlink(C, path, buf, length));
 }
 
-INT64_T chirp_fs_confuga_mkdir(const char *path, INT64_T mode)
+static INT64_T chirp_fs_confuga_mkdir(const char *path, INT64_T mode)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_mkdir(C, path, mode));
 }
 
-INT64_T chirp_fs_confuga_rmdir(const char *path)
+static INT64_T chirp_fs_confuga_rmdir(const char *path)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_rmdir(C, path));
 }
 
-INT64_T chirp_fs_confuga_stat(const char *path, struct chirp_stat *buf)
+static INT64_T chirp_fs_confuga_stat(const char *path, struct chirp_stat *buf)
 {
 	int rc;
 	struct confuga_stat info;
@@ -399,7 +399,7 @@ INT64_T chirp_fs_confuga_stat(const char *path, struct chirp_stat *buf)
 	PROLOGUE
 }
 
-INT64_T chirp_fs_confuga_lstat(const char *path, struct chirp_stat *buf)
+static INT64_T chirp_fs_confuga_lstat(const char *path, struct chirp_stat *buf)
 {
 	int rc;
 	struct confuga_stat info;
@@ -408,7 +408,7 @@ INT64_T chirp_fs_confuga_lstat(const char *path, struct chirp_stat *buf)
 	PROLOGUE
 }
 
-INT64_T chirp_fs_confuga_statfs(const char *path, struct chirp_statfs *buf)
+static INT64_T chirp_fs_confuga_statfs(const char *path, struct chirp_statfs *buf)
 {
 	int rc;
 	struct confuga_statfs info;
@@ -417,12 +417,12 @@ INT64_T chirp_fs_confuga_statfs(const char *path, struct chirp_statfs *buf)
 	PROLOGUE
 }
 
-INT64_T chirp_fs_confuga_access(const char *path, INT64_T mode)
+static INT64_T chirp_fs_confuga_access(const char *path, INT64_T mode)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_access(C, path, mode));
 }
 
-INT64_T chirp_fs_confuga_chmod(const char *path, INT64_T mode)
+static INT64_T chirp_fs_confuga_chmod(const char *path, INT64_T mode)
 {
 	// A remote user can change some of the permissions bits,
 	// which only affect local users, but we don't let them
@@ -432,66 +432,66 @@ INT64_T chirp_fs_confuga_chmod(const char *path, INT64_T mode)
 	WRAP_CONFUGA_SIMPLE(confuga_chmod(C, path, mode));
 }
 
-INT64_T chirp_fs_confuga_chown(const char *path, INT64_T uid, INT64_T gid)
+static INT64_T chirp_fs_confuga_chown(const char *path, INT64_T uid, INT64_T gid)
 {
 	// Changing file ownership is silently ignored,
 	// because permissions are handled through the ACL model.
 	return 0;
 }
 
-INT64_T chirp_fs_confuga_lchown(const char *path, INT64_T uid, INT64_T gid)
+static INT64_T chirp_fs_confuga_lchown(const char *path, INT64_T uid, INT64_T gid)
 {
 	// Changing file ownership is silently ignored,
 	// because permissions are handled through the ACL model.
 	return 0;
 }
 
-INT64_T chirp_fs_confuga_truncate(const char *path, INT64_T length)
+static INT64_T chirp_fs_confuga_truncate(const char *path, INT64_T length)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_truncate(C, path, length));
 }
 
-INT64_T chirp_fs_confuga_utime(const char *path, time_t actime, time_t modtime)
+static INT64_T chirp_fs_confuga_utime(const char *path, time_t actime, time_t modtime)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_utime(C, path, actime, modtime));
 }
 
-INT64_T chirp_fs_confuga_getxattr(const char *path, const char *name, void *data, size_t size)
+static INT64_T chirp_fs_confuga_getxattr(const char *path, const char *name, void *data, size_t size)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_getxattr(C, path, name, data, size));
 }
 
-INT64_T chirp_fs_confuga_lgetxattr(const char *path, const char *name, void *data, size_t size)
+static INT64_T chirp_fs_confuga_lgetxattr(const char *path, const char *name, void *data, size_t size)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_lgetxattr(C, path, name, data, size));
 }
 
-INT64_T chirp_fs_confuga_listxattr(const char *path, char *list, size_t size)
+static INT64_T chirp_fs_confuga_listxattr(const char *path, char *list, size_t size)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_listxattr(C, path, list, size));
 }
 
-INT64_T chirp_fs_confuga_llistxattr(const char *path, char *list, size_t size)
+static INT64_T chirp_fs_confuga_llistxattr(const char *path, char *list, size_t size)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_llistxattr(C, path, list, size));
 }
 
-INT64_T chirp_fs_confuga_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
+static INT64_T chirp_fs_confuga_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_setxattr(C, path, name, data, size, flags));
 }
 
-INT64_T chirp_fs_confuga_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
+static INT64_T chirp_fs_confuga_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_lsetxattr(C, path, name, data, size, flags));
 }
 
-INT64_T chirp_fs_confuga_removexattr(const char *path, const char *name)
+static INT64_T chirp_fs_confuga_removexattr(const char *path, const char *name)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_removexattr(C, path, name));
 }
 
-INT64_T chirp_fs_confuga_lremovexattr(const char *path, const char *name)
+static INT64_T chirp_fs_confuga_lremovexattr(const char *path, const char *name)
 {
 	WRAP_CONFUGA_SIMPLE(confuga_lremovexattr(C, path, name));
 }

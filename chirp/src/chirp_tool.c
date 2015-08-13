@@ -446,6 +446,25 @@ static INT64_T do_getacl(int argc, char **argv)
 	return chirp_reli_getacl(current_host, full_path, print_one_acl, stdout, stoptime);
 }
 
+static INT64_T do_link(int argc, char **argv)
+{
+	INT64_T result;
+	char old_full_path[CHIRP_PATH_MAX];
+	int sym = (argc == 4 && strcmp(argv[1], "-s") == 0);
+
+	if(sym) {
+		complete_remote_path(argv[2], old_full_path);
+		result = chirp_reli_symlink(current_host, old_full_path, argv[3], stoptime);
+	} else {
+		char new_full_path[CHIRP_PATH_MAX];
+		complete_remote_path(argv[1], old_full_path);
+		complete_remote_path(argv[2], new_full_path);
+		result = chirp_reli_link(current_host, old_full_path, new_full_path, stoptime);
+	}
+
+	return result;
+}
+
 static int ls_all_mode = 0;
 
 static void long_ls_callback(const char *name, struct chirp_stat *info, void *arg)
@@ -1100,6 +1119,7 @@ static struct command list[] = {
 	{"listacl", 1, 0, 1, "[remotepath]", do_getacl},
 	{"localpath", 1, 0, 1, "[remotepath]", do_localpath},
 	{"lpwd", 0, 0, 0, "", do_lpwd},
+	{"ln", 1, 2, 3, "[-s] <path> <new path>", do_link},
 	{"ls", 1, 0, 2, "[-la] [remotepath]", do_ls},
 	{"lsalloc", 1, 0, 1, "[path]", do_lsalloc},
 	{"matrix_create", 1, 4, 4, "<path> <width> <height> <nhosts>", do_matrix_create},

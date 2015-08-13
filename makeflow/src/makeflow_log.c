@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "makeflow_log.h"
+#include "makeflow_gc.h"
 #include "dag.h"
 #include "get_line.h"
 
@@ -17,6 +18,8 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+
+#define MAX_BUFFER_SIZE 4096
 
 /*
 The makeflow log file records every essential event in the execution of a workflow,
@@ -67,6 +70,18 @@ Line format: # STARTED timestamp
 Line format: # ABORTED timestamp
 Line format: # FAILED timestamp
 Line format: # COMPLETED timestamp
+
+Line format: # dag_file_state filename timestamp
+dag_file_state - the new DAG_FILE_STATE_* of the file mentioned:
+	0. UNKNOWN  - The file is in an unknown state, where it may exists(input) but we have not checked yet.
+	1. EXPECT   - The file is the expected output of a task. Transition meant to more explicitly describe GC.
+	2. EXISTS   - The file exists on disk accessible to the workflow. Can result from checking an unknown file with stat, receiving a task's result files (EXPECT->EXISTS), or a file is retrieved from another source (DOWN->EXISTS).
+	3. COMPLETE - An existing file is no longer used as a source for remaining tasks.
+	4. DELETE   - The file was complete, then removed with either GC or clean.
+	5. DOWN     - Intermediate state when retrieving from different location. For acknowledging it may be partially existent in the file system.
+	6. UP       - Intermediate state for putting file to different lcoation. For acknowledging partial upload.
+filename - the filename specified within the dag_file whose state has changed.
+timestamp - the unix time (in microseconds) when this line is written to the log file.
 
 These event types indicate that the workflow as a whole has started or completed in the indicated manner.
 */
@@ -127,18 +142,33 @@ void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate 
 	makeflow_log_sync(d,0);
 }
 
+void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int newstate )
+{
+	debug(D_MAKEFLOW_RUN, "file %s %s -> %s\n", f->filename, dag_file_state_name(f->state), dag_file_state_name(newstate));
+
+	f->state = newstate;
+
+	timestamp_t time = timestamp_get();
+	fprintf(d->logfile, "# %d %s %" PRIu64 "\n", f->state, f->filename, time);
+	if(f->state == DAG_FILE_STATE_EXISTS)
+		f->creation_logged = (time_t) (time / 1000000);
+	makeflow_log_sync(d,0);
+}
+
 void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected )
 {
 	fprintf(d->logfile, "# GC\t%" PRIu64 "\t%d\t%" PRIu64 "\t%d\n", timestamp_get(), collected, elapsed, total_collected);
 	makeflow_log_sync(d,0);
 }
 
-void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode )
+void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue)
 {
-	char *line;
-	int nodeid, state, jobid;
+	char *line, *name, file[MAX_BUFFER_SIZE];
+	int nodeid, state, jobid, file_state;
 	int first_run = 1;
 	struct dag_node *n;
+	struct dag_file *f;
+	struct stat buf;
 	timestamp_t previous_completion_time;
 
 	d->logfile = fopen(filename, "r");
@@ -151,6 +181,15 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode 
 		while((line = get_line(d->logfile))) {
 			linenum++;
 
+			if(sscanf(line, "# %d %s %" SCNu64 "", &file_state, file, &previous_completion_time) == 3) {
+
+				f = dag_file_lookup_or_create(d, file);
+				f->state = file_state;
+				if(file_state == DAG_FILE_STATE_EXISTS){
+					f->creation_logged = (time_t) (previous_completion_time / 1000000);
+				}
+				continue;
+			}
 			if(line[0] == '#')
 				continue;
 			if(sscanf(line, "%" SCNu64 " %d %d %d", &previous_completion_time, &nodeid, &state, &jobid) == 4) {
@@ -224,6 +263,24 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode 
 
 
 	dag_count_states(d);
+
+	// Check for log consistency
+	if(!first_run) {
+		hash_table_firstkey(d->files);
+		while(hash_table_nextkey(d->files, &name, (void **) &f)) {
+			if(dag_file_should_exist(f) && !dag_file_is_source(f) && !(batch_fs_stat(queue, f->filename, &buf) >= 0)){
+				fprintf(stderr, "makeflow: %s is reported as existing, but does not exist.\n", f->filename);
+				makeflow_file_clean(d, queue, f, 1);
+				continue;
+			}
+			if(S_ISDIR(buf.st_mode))
+				continue;
+			if(dag_file_should_exist(f) && !dag_file_is_source(f) && difftime(buf.st_mtime, f->creation_logged) > 0) {
+				fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, (uint64_t)buf.st_mtime, (uint64_t)f->creation_logged);
+				makeflow_file_clean(d, queue, f, 0);
+			}
+		}
+	}
 
 	// Decide rerun tasks
 	if(!first_run) {

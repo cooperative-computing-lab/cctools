@@ -682,9 +682,11 @@ static void cvmfs_read_config()
 		cvmfs_global_options = getenv("PARROT_CVMFS_CONFIG");
 	}
 	if ( !cvmfs_global_options ) {
-		cvmfs_global_options = string_format("cache_directory=%s,%s%s",
+		cvmfs_global_options = string_format("cache_directory=%s%s%s%s%s",
 				pfs_cvmfs_alien_cache_dir,
-				pfs_cvmfs_enable_alien  ?  "alien_cache," : "",
+				pfs_cvmfs_enable_alien  ?  ",lock_directory="  : "",
+				pfs_cvmfs_enable_alien  ?  pfs_cvmfs_locks_dir : "",
+				pfs_cvmfs_enable_alien  ?  ",alien_cache,"     : "",
 				default_cvmfs_global_config);
 	}
 	if ( !cvmfs_global_options || !cvmfs_global_options[0] ) {

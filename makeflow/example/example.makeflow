@@ -5,6 +5,9 @@
 # for more information.
 #
 
+MAKEFLOW_INPUTS=
+MAKEFLOW_OUTPUTS="capitol.montage.gif"
+
 CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
 URL=http://ccl.cse.nd.edu/images/capitol.jpg

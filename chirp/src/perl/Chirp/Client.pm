@@ -177,6 +177,15 @@ sub stat {
 	return Chirp::Stat->__new($path, $info);
 }
 
+sub chmod {
+	my ($self, $path, $mode, %args) = @_;
+	my $result = chirp_reli_chmod($self->hostport, $path, $mode, $self->__stoptime(%args));
+
+	croak_errno($!, "Could not change mode of path '$path' to '$mode'") unless $result >= 0;
+
+	return $result;
+}
+
 sub put {
 	# self, source, destination=>, absolute_stop_time=>, timeout=>
 	my ($self, $source, %args) = @_;
@@ -449,6 +458,17 @@ Returns a Chirp::Stat object with information on path. Dies if path cannot be ac
 =over 12
 
 =item path                Target file/directory.
+
+=back
+
+=head3 C<< chmod(path, mode) >>
+
+Changes permissions on path.
+
+=over 12
+
+=item path                Target file/directory.
+=item mode                Desired permissions (e.g., 0755)
 
 =back
 

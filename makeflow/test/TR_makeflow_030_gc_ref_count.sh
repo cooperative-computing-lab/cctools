@@ -13,9 +13,9 @@ prepare()
 	ln -sf ../syntax/collect.makeflow .
 cat > ../$test_output <<EOF
 7
-7
-7
-7
+5
+6
+5
 EOF
 	exit 0
 }
