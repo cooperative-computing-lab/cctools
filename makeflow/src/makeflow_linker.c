@@ -62,8 +62,10 @@ void create_workspace(){
 		workspace = xxstrdup("*");
 	} else {
 		char *template = xxstrdup("makeflow_linker_workspace_XXXXXX");
-		workspace = mktemp(template);
-		if(!create_dir(workspace, 0777)) fatal("Could not create directory.\n");
+		workspace = mkdtemp(template);
+		if(!workspace) {
+			fatal("Could not create directory.\n");
+		}
 	}
 
 	if(verbose) fprintf(stdout, "Created temporary workspace: %s\n", workspace);
