@@ -21,8 +21,11 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
+<<<<<<< HEAD
 
 #define MAX_BUFFER_SIZE 4096
+=======
+>>>>>>> 468a8135271686d8a60d5682e965b4ea555658ee
 
 /*
 The makeflow log file records every essential event in the execution of a workflow,

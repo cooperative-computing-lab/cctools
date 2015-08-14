@@ -39,7 +39,6 @@ static struct batch_queue_module batch_queue_unknown = {
 	{NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
-
 #define BATCH_JOB_SYSTEMS  "local, sandbox, wq, condor, sge, torque, moab, slurm, chirp"
 
 const struct batch_queue_module * const batch_queue_modules[] = {
