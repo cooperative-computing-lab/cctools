@@ -25,6 +25,6 @@ void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate 
 void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int newstate );
 void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected );
 void makeflow_log_recover( struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue );
-void makeflow_log_clean(const char *makeflow_log_file);
-void makeflow_log_sandbox_mode( struct dag*d, const char *local_task_dir );
+void makeflow_log_clean( const char *makeflow_log_file );
+void makeflow_log_sandbox_mode_create( struct dag*d, const char *local_task_dir );
 #endif

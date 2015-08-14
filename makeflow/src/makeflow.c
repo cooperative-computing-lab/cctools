@@ -1643,17 +1643,6 @@ int main(int argc, char *argv[])
 	if (change_dir)
 		chdir(change_dir);
 
-	if(clean_mode) {
-		printf("cleaning filesystem...\n");
-
-		makeflow_clean(d);
-        makeflow_log_clean(logfilename);
-		unlink(logfilename);
-		unlink(batchlogfilename);
-               
-		exit(0);
-	}
-
 	printf("checking %s for consistency...\n",dagfile);
 	if(!makeflow_check(d)) {
 		exit(EXIT_FAILURE);
@@ -1669,6 +1658,7 @@ int main(int argc, char *argv[])
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		printf("cleaning filesystem...\n");
 		makeflow_clean(d, remote_queue, clean_mode);
+        makeflow_log_clean(logfilename);
 		if(clean_mode == MAKEFLOW_CLEAN_ALL) {
 			unlink(logfilename);
 			unlink(batchlogfilename);

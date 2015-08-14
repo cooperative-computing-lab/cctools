@@ -308,50 +308,71 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 	}
 }
 
-void makeflow_log_clean( const char *makeflow_logfile_name){
+void makeflow_log_clean( const char *makeflow_logfile_name ){
 
-    char fst_line[CHAR_BUF_LEN];
-    FILE *mf_log = fopen(makeflow_logfile_name, "r");
+    FILE *mf_log = fopen(makeflow_logfile_name, "ar+");
 
-    if( !mf_log ) {
+    int is_sandbox_delete = 0;
+    char *curr_line = NULL;
+    size_t len = 0;
+    ssize_t read_len;
+    char sandbox_mode[CHAR_BUF_LEN];
+ 	char sandbox_state[CHAR_BUF_LEN];
+ 	char sandbox_name[CHAR_BUF_LEN];
+    
+    if( !mf_log ) 
     	fatal("Could not open makeflow log file.");
-    } else {
-    	if(fgets(fst_line, sizeof(fst_line), mf_log) != NULL) {
-            char sandbox_mode[CHAR_BUF_LEN];
-            char sandbox_state[CHAR_BUF_LEN];
-            char sandbox_name[CHAR_BUF_LEN];
+    else {
+    	/* scan the log file and get the name of the sandbox */
+        while((read_len = getline(&curr_line, &len, mf_log)) != -1) {
 
-            if(sscanf(fst_line, "# %s\t%s\t%s\n", sandbox_mode, sandbox_state, sandbox_name) == -1) 
- 				fatal("Fail to split the string with the error message %s.\n", strerror(errno));
-             
-         	if (string_equal(sandbox_mode, "SANDBOX")) {
+        	if ((sscanf(curr_line, "# %s\t%s\t%s\n", sandbox_mode, sandbox_state, sandbox_name)) == -1)			
+				fatal("Fail to read line with error message %s.\n", strerror(errno));
 
-				struct stat s;
-        		int err = stat(sandbox_name, &s);
-                /*if the state of sandbox directory is CREATED*/
-                if (string_equal(sandbox_state, "CREATED")) {
-                    if(-1 == err) {
-                        if(ENOENT == errno) 
-                            fatal("sandbox directory does not exist.\n");
-                        else
-                            fatal("Fail to locate public sandbox with the error message %s.\n", strerror(errno));
-                    } else {
-    					if(S_ISDIR(s.st_mode)) { 
-                     		unlink_recursive(sandbox_name);
-							char *replace_cmd = string_format("sed -i \'1s/CREATED/DELETED/\' %s", makeflow_logfile_name);
-                            system(replace_cmd);
-                            free(replace_cmd);
-                        } else 
-                            fatal("Public sandbox directory does not exit %s.\n", strerror(errno));
-					}
-                }
-            } 
+		    if (string_equal(sandbox_mode, "SANDBOX")) {	
+				if(string_equal(sandbox_state, "CREATED"))
+					is_sandbox_delete = 0;
+				else
+					is_sandbox_delete = 1;
+                break;
+			}
+        }
 
-        } else
-            fatal("Could not read line from makeflow log file.");
+    	/* scan the log file and get the state of the sandbox */
+        while((read_len = getline(&curr_line, &len, mf_log)) != -1) {
 
-        fclose(mf_log);
+        	if ((sscanf(curr_line, "# %s\t%s", sandbox_mode, sandbox_state)) == -1)			
+				fatal("Fail to read line with error message %s.\n", strerror(errno));
+
+		    if (string_equal(sandbox_mode, "SANDBOX")) {	
+				if(string_equal(sandbox_state, "CREATED"))
+					is_sandbox_delete = 0;
+				else
+					is_sandbox_delete = 1;
+                break;
+			}
+        }
     }
+
+    /* if the sandbox is not deleted, we delete it and update the state of the sandbox*/
+    if (!is_sandbox_delete) {
+        struct stat s;
+        int err = stat(sandbox_name, &s);
+        if(-1 == err) {
+            if(ENOENT == errno) 
+            	fatal("sandbox directory does not exist.\n");
+            else
+                fatal("Fail to locate public sandbox with the error message %s.\n", strerror(errno));
+        } else {
+    		if(S_ISDIR(s.st_mode)) { 
+            	unlink_recursive(sandbox_name);
+                fprintf(mf_log, "# SANDBOX\tDELETED\t%s\n", sandbox_name);
+            } else 
+                fatal("Public sandbox directory does not exit %s.\n", strerror(errno));
+		}		
+	}
+
+    fclose(mf_log);
 }
 
 void makeflow_log_sandbox_mode_create( struct dag *d, const char *local_task_dir ) {
