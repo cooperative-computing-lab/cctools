@@ -1,6 +1,12 @@
 /* chirp.i */
 %module CChirp
 
+/* next is a perl keyword. rename it to next_entry */
+%rename(next_entry) chirp_dirent::next;
+
+/* silent const char leaking memory, as we do not leak memory */
+%warnfilter(451) chirp_searchstream::current;
+
 %{
 	#include <time.h>
 	#include "debug.h"
