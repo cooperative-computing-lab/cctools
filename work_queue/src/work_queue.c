@@ -2320,14 +2320,13 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	send_worker_msg(q,w, "disk %"PRId64"\n",    t->disk );
 	send_worker_msg(q,w, "gpus %d\n",    t->gpus );
 
-	/* Note we send environment variables after resources. If the user, for
-	 * example, specifies manually CORES as a variable, the task will be
-	 * scheduled with the value of specify_cores, but the environment variable
-	 * will have the value given by the user. */
+	/* Note that even when environment variables after resources, values for
+	 * CORES, MEMORY, etc. will be set at the worker to the values of
+	 * specify_*, if used. */
 	char *var;
 	list_first_item(t->env_list);
 	while((var=list_next_item(t->env_list))) {
-		send_worker_msg(q,w,"env %d\n%s\n",(int)strlen(var),var);
+		send_worker_msg(q, w,"env %d\n%s\n", (int) strlen(var), var);
 	}
 
 	char remote_name_encoded[PATH_MAX];
