@@ -62,7 +62,15 @@ typedef enum {
 	WORK_QUEUE_RESULT_SIGNAL         = 8,       /**< The task was terminated with a signal **/
 	WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION = 16, /**< The task used more resources than requested **/
 	WORK_QUEUE_RESULT_TASK_TIMEOUT   = 32,      /**< The task ran after specified end time. **/
-	WORK_QUEUE_RESULT_UNKNOWN        = 64       /**< The task ran successfully **/
+	WORK_QUEUE_RESULT_UNKNOWN        = 64,      /**< The task encountered an unknown error. */
+
+	/* 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144 for future use */
+
+	WORK_QUEUE_RESULT_EXTERNAL_NO_RESOLVE    = 524288,    /**< External resource could not be resolved. */
+	WORK_QUEUE_RESULT_EXTERNAL_NO_CONNECT    = 1048576,   /**< Could not connect to external resource. */
+	WORK_QUEUE_RESULT_EXTERNAL_NO_AUTH       = 2097152,   /**< Could not authenticate to external resource. */
+	WORK_QUEUE_RESULT_EXTERNAL_WRITE_ERROR   = 4194304,   /**< Write error on external resource. */
+	WORK_QUEUE_RESULT_EXTERNAL_TIMEOUT       = 8388608    /**< Timeout when connecting to external resource. */
 } work_queue_result_t;
 
 typedef enum {
