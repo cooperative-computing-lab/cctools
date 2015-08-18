@@ -2060,17 +2060,17 @@ static work_queue_result_code_t send_file_or_directory( struct work_queue *q, st
 
 	work_queue_result_code_t result = SUCCESS;
 
-	// Look in the current files hash to see if the file is already cached.
+	// Look in the current files hash to see if the file is already on the worker.
 	remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
-	// If not cached, or the metadata has changed, then send the item.
-	if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size) {
-
-		if(remote_info) {
-			hash_table_remove(w->current_files, tf->cached_name);
-			free(remote_info);
-		}
-
+	/* If it is in the worker, but a new version is available, warn and return.
+	   We do not want to rewrite the file while some other task may be using
+	   it. */
+	if(remote_info && (remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size)) {
+		debug(D_NOTICE|D_WQ, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
+	}
+	else if(!remote_info) {
+		/* If not on the worker, send it. */
 		if(S_ISDIR(local_info.st_mode)) {
 			result = send_directory(q, w, t, expanded_local_name, tf->cached_name, total_bytes, tf->flags);
 		} else {
@@ -2086,6 +2086,9 @@ static work_queue_result_code_t send_file_or_directory( struct work_queue *q, st
 				debug(D_NOTICE, "Cannot allocate memory for cache entry for input file %s at %s (%s)", expanded_local_name, w->hostname, w->addrport);
 			}
 		}
+	}
+	else {
+		/* Up-to-date file on the worker, we do nothing. */
 	}
 
 	return result;
