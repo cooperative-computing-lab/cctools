@@ -960,24 +960,29 @@ char *make_cached_name( const struct work_queue_task *t, const struct work_queue
 		url_encode(path_basename(payload), payload_enc, PATH_MAX);
 	}
 
+	/* 0 for cache files, taskid for non-cache files. With this, non-cache
+	 * files cannot be shared among tasks, and can be safely deleted once a
+	 * task finishes. */
+	int cache_task_id = f->flags | WORK_QUEUE_CACHE ? 0 : t->taskid;;
+
 	switch(f->type) {
 		case WORK_QUEUE_FILE:
 		case WORK_QUEUE_DIRECTORY:
-			return string_format("file-%s-%s",md5_string(digest),payload_enc);
+			return string_format("file-%d-%s-%s", cache_task_id, md5_string(digest), payload_enc);
 			break;
 		case WORK_QUEUE_FILE_PIECE:
-			return string_format("piece-%s-%s-%lld-%lld",md5_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
+			return string_format("piece-%d-%s-%s-%lld-%lld",cache_task_id, md5_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
 			break;
 		case WORK_QUEUE_REMOTECMD:
-			return string_format("cmd-%s",md5_string(digest));
+			return string_format("cmd-%d-%s", cache_task_id, md5_string(digest));
 			break;
 		case WORK_QUEUE_URL:
-			return string_format("url-%s",md5_string(digest));
+			return string_format("url-%d-%s", cache_task_id, md5_string(digest));
 			break;
 		case WORK_QUEUE_BUFFER:
 		default:
 			buffer_count++;
-			return string_format("buffer-%d-%s", buffer_count, md5_string(digest));
+			return string_format("buffer-%d-%d-%s", cache_task_id, buffer_count, md5_string(digest));
 			break;
 	}
 }
