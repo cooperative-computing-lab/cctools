@@ -74,8 +74,17 @@ typedef enum {
 	WORK_QUEUE_TASK_RETRIEVED,         /**< Task results are available at the master **/
 	WORK_QUEUE_TASK_DONE,              /**< Task is done, and returned through work_queue_wait >**/
 	WORK_QUEUE_TASK_CANCELED,           /**< Task was canceled before completion **/
-	WORK_QUEUE_TASK_WAITING_RESUBMISSION /**< Worker gave up on the task, and task should be resubmitted >**/
+	WORK_QUEUE_TASK_WAITING_RESUBMISSION /**< Worker gave up on the task, and task will be resubmitted >**/
 } work_queue_task_state_t;
+
+typedef enum {
+	WORK_QUEUE_FILE = 1,              /**< File-spec is a regular file **/
+	WORK_QUEUE_BUFFER,                /**< Data comes from buffer memory **/
+	WORK_QUEUE_REMOTECMD,             /**< File-spec is a regular file **/
+	WORK_QUEUE_FILE_PIECE,            /**< File-spec refers to only a part of a file **/
+	WORK_QUEUE_DIRECTORY,             /**< File-spec is a directory **/
+	WORK_QUEUE_URL                    /**< File-spec refers to an URL **/
+} work_queue_file_t;
 
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon
@@ -424,6 +433,22 @@ void work_queue_blacklist_remove(struct work_queue *q, const char *hostname);
 @param q A work queue object.
 */
 void work_queue_blacklist_clear(struct work_queue *q);
+
+/** Invalidate cached file.
+The file or directory with the given local name specification is deleted from
+the workers' cache, so that a newer version may be used. Any running task using
+the file is canceled and resubmitted. Completed tasks waiting for retrieval are
+not affected.
+(Currently anonymous buffers and file pieces cannot be deleted once cached in a worker.)
+@param q A work queue object.
+@param local_name The name of the file on local disk or shared filesystem, or uri.
+@param type One of:
+- @ref WORK_QUEUE_FILE
+- @ref WORK_QUEUE_DIRECTORY
+- @ref WORK_QUEUE_URL
+*/
+void work_queue_invalidate_cached_file(struct work_queue *q, const char *local_name, work_queue_file_flags_t type);
+
 
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the queue is empty.
