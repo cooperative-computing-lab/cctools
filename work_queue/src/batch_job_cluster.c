@@ -58,6 +58,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	char *path = getenv("PWD");
 
 	fprintf(file, "#!/bin/sh\n");
+	fprintf(file, "#$ -S /bin/sh\n");
 
 	if(q->type == BATCH_QUEUE_TYPE_SLURM){
 		fprintf(file, "[ -n \"${SLURM_JOB_ID}\" ] && JOB_ID=`echo ${SLURM_JOB_ID} | cut -d . -f 1`\n");
