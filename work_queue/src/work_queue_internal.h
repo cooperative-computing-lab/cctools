@@ -9,15 +9,6 @@ See the file COPYING for details.
 
 #include "list.h"
 
-typedef enum {
-	WORK_QUEUE_FILE = 1,
-	WORK_QUEUE_BUFFER,
-	WORK_QUEUE_REMOTECMD,
-	WORK_QUEUE_FILE_PIECE,
-	WORK_QUEUE_DIRECTORY,
-	WORK_QUEUE_URL
-} work_queue_file_t;
-
 struct work_queue_file {
 	work_queue_file_t type;
 	int flags;		// WORK_QUEUE_CACHE or others in the future.
