@@ -1618,7 +1618,7 @@ static int job_kill (confuga *C)
 		"		Job"
 		"		INNER JOIN ConfugaJob ON Job.id = ConfugaJob.id"
 		"		LEFT OUTER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
-		"	WHERE (Job.status = 'KILLED' OR Job.status = 'ERRORED') AND ConfugaJob.state != 'KILLED' AND ConfugaJob.cid IS NOT NULL"
+		"	WHERE (Job.status = 'KILLED' OR Job.status = 'ERRORED') AND ConfugaJob.state != 'KILLED'"
 		"	ORDER BY RANDOM();"; /* to ensure no starvation, kill may result in a ROLLBACK that aborts this SELECT */
 
 	int rc;
