@@ -1161,6 +1161,18 @@ static void kill_all_tasks() {
 	debug(D_WQ,"all data structures are clean");
 }
 
+/* Remove a file, even when mark as cached. Foreman broadcast this message to
+ * foremen down its hierarchy. It is invalid for a worker to receice this message. */
+static int do_invalidate_file(const char *filename) {
+
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		work_queue_invalidate_cached_file_internal(foreman_q, filename);
+		return 1;
+	}
+
+	return -1;
+}
+
 static int do_release() {
 	debug(D_WQ, "released by master %s:%d.\n", master_addr, master_port);
 	released_by_master = 1;
@@ -1243,6 +1255,8 @@ static int handle_master(struct link *master) {
 				kill_all_tasks();
 				r = 1;
 			}
+		} else if(sscanf(line, "invalidate-file %s", filename) == 1) {
+			r = do_invalidate_file(filename);
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
