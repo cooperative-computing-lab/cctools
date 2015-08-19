@@ -1093,10 +1093,10 @@ static work_queue_result_code_t get_output_files( struct work_queue *q, struct w
 	return result;
 }
 
-static void delete_worker_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_file *tf, int except_flags ) {
-	if(!(tf->flags & except_flags)) {
-		send_worker_msg(q,w, "unlink %s\n", tf->cached_name);
-		hash_table_remove(w->current_files, tf->cached_name);
+static void delete_worker_file( struct work_queue *q, struct work_queue_worker *w, const char *filename, int flags, int except_flags ) {
+	if(!(flags & except_flags)) {
+		send_worker_msg(q,w, "unlink %s\n", filename);
+		hash_table_remove(w->current_files, filename);
 	}
 }
 
@@ -1108,7 +1108,7 @@ static void delete_worker_files( struct work_queue *q, struct work_queue_worker 
 
 	list_first_item(files);
 	while((tf = list_next_item(files))) {
-		delete_worker_file(q, w, tf, except_flags);
+		delete_worker_file(q, w, tf->cached_name, tf->flags, except_flags);
 	}
 }
 
@@ -3669,12 +3669,21 @@ void work_queue_file_delete(struct work_queue_file *tf) {
 void work_queue_invalidate_cached_file(struct work_queue *q, const char *local_name, work_queue_file_flags_t type) {
 	struct work_queue_file *f = work_queue_file_create(NULL, local_name, local_name, type, WORK_QUEUE_CACHE);
 
+	work_queue_invalidate_cached_file_internal(q, f->cached_name);
+	work_queue_file_delete(f);
+}
+
+void work_queue_invalidate_cached_file_internal(struct work_queue *q, const char *filename) {
 	char *key;
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		if(!hash_table_lookup(w->current_files, f->cached_name))
+		if(!hash_table_lookup(w->current_files, filename))
 			continue;
+
+		if(w->foreman) {
+			send_worker_msg(q, w, "invalidate-file %s\n", filename);
+		}
 
 		struct work_queue_task *t;
 		uint64_t taskid;
@@ -3685,24 +3694,22 @@ void work_queue_invalidate_cached_file(struct work_queue *q, const char *local_n
 			list_first_item(t->input_files);
 
 			while((tf = list_next_item(t->input_files))) {
-				if(strcmp(f->cached_name, tf->cached_name) == 0) {
+				if(strcmp(filename, tf->cached_name) == 0) {
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 					continue;
 				}
 			}
 
 			while((tf = list_next_item(t->output_files))) {
-				if(strcmp(f->cached_name, tf->cached_name) == 0) {
+				if(strcmp(filename, tf->cached_name) == 0) {
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 					continue;
 				}
 			}
 		}
 
-		delete_worker_file(q, w, f, WORK_QUEUE_PREEXIST);
+		delete_worker_file(q, w, filename, 0, 0);
 	}
-
-	work_queue_file_delete(f);
 }
 
 
