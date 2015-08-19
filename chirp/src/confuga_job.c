@@ -1573,7 +1573,8 @@ static int jkill (confuga *C, chirp_jobid_t id, const char *tag, const char *hos
 	const char *current = SQL;
 	BUFFER_STACK_PRINT(B, 64, "[%" PRICHIRP_JOBID_T "]", cid);
 
-	if (hostport) {
+	if (cid > 0) {
+		assert(hostport);
 		jdebug(D_DEBUG, id, tag, "killing job");
 		rc = chirp_reli_job_kill(hostport, buffer_tostring(B), STOPTIME);
 		if (rc == -1 && !(errno == EACCES /* already in a terminal state */ || errno == ESRCH /* apparently remote Chirp server database was reset */))
