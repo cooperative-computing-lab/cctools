@@ -54,6 +54,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	if(!file) {
 		return 0;
 	}
+	fchmod(fileno(file), 0755);
 
 	char *path = getenv("PWD");
 
@@ -86,8 +87,6 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	fprintf(file, "stop $status $stoptime\n");
 	fprintf(file, "EOF\n");
 	fclose(file);
-
-	chmod(wrapperfile, 0755);
 
 	return 1;
 }
