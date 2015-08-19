@@ -58,6 +58,18 @@ void string_toupper(char *str);
 int string_isspace(const char *str);
 int string_is_integer(const char *str);
 void string_replace_backslash_codes(const char *instr, char *outstr);
+
+/** Replace instances of %% in a string with the string 'replace'.
+  To escape this behavior, %%%% becomes %%.
+  (Backslash it not used as the escape, as it would interfere with shell escapes.)
+  This function works like realloc: the string str must be created by malloc
+  and may be freed and reallocated.  Therefore, always invoke it like this:
+  x = replace_percents(x,replace);
+  @param str Base string to have percents replaced within.
+  @param replace String used to replace %%.
+  @return The base string with replacements.
+  */
+char *string_replace_percents( char *str, const char *replace );
 int string_equal(const char *str1, const char *str2);
 
 int strpos(const char *str, char c);

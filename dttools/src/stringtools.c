@@ -722,6 +722,71 @@ void string_replace_backslash_codes(const char *a, char *b)
 	*b = 0;
 }
 
+char *string_replace_percents( char *str, const char *replace )
+{
+	/* Common case: do nothing if no percents. */
+	if(!strchr(str,'%')) return str;
+
+	buffer_t buffer;
+	buffer_init(&buffer);
+
+	char *s;
+	for(s=str;*s;s++) {
+		if(*s=='%' && *(s+1)=='%' ) {
+			if( *(s+2)=='%' && *(s+3)=='%') {
+				buffer_putlstring(&buffer,"%%",2);
+				s+=3;
+			} else {
+				buffer_putstring(&buffer,replace);
+				s++;
+			}
+		} else {
+			buffer_putlstring(&buffer,s,1);
+		}
+	}
+
+	char *result;
+	buffer_dup(&buffer,&result);
+	buffer_free(&buffer);
+
+	free(str);
+
+	return result;
+}
+
+
+/*
+char *string_replace_percents( char *str, const char *replace )
+{
+	/* Common case: do nothing if no percents. /
+	if(!strchr(str,'%')) return str;
+
+	char *r = replace;
+	char *s = str;
+	char *b;
+	while(*s) {
+		if(*s=='%' && *(s+1)=='%' ) {
+			if( *(s+2)=='%' && *(s+3)=='%') {
+				*b++ = '%';
+				*b++ = '%';
+				s+=4;
+			} else {
+				*r = replace;
+				while(*r){
+					*b++ = *r++;
+				}
+				s+=2;
+			}
+		} else {
+			*b++ = *s++;
+		}
+	}
+	free(str);
+	*b = 0;
+	return b;
+}
+*/
+
 int strpos(const char *str, char c)
 {
 

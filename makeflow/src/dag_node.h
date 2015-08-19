@@ -74,7 +74,16 @@ struct dag_node {
 	struct dag_node *next;              /* The next node in the list of nodes */
 };
 
+struct dag_node_running {
+	struct dag_node *n;
+
+	const char *command;
+	struct list	*input_files;
+	struct list	*output_files;
+};
+
 struct dag_node *dag_node_create(struct dag *d, int linenum);
+struct dag_node_running *dag_node_running_create(struct dag_node *n, const char *command, struct list *input_files, struct list *output_files);
 
 void dag_node_add_source_file(struct dag_node *n, const char *filename, char *remotename);
 void dag_node_add_target_file(struct dag_node *n, const char *filename, char *remotename);

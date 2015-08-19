@@ -34,6 +34,7 @@ struct dag *dag_create()
 	d->node_table = itable_create(0);
 	d->local_job_table = itable_create(0);
 	d->remote_job_table = itable_create(0);
+	d->running_job_table = itable_create(0);
 	d->files = hash_table_create(0, 0);
 	d->inputs = set_create(0);
 	d->outputs = set_create(0);

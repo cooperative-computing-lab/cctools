@@ -54,12 +54,33 @@ static int directory_inode_count(const char *dirname)
 	return inode_count;
 }
 
+static struct list *makeflow_wrapper_generate_files( struct list *input, struct dag_node *n )
+{
+	char *f;
+	char *nodeid = string_format("%d",n->nodeid);
+
+	struct list *files = list_create();
+
+	list_first_item(input);
+	while((f = list_next_item(input)))
+	{
+		char *filename = strdup(f);
+		filename = string_replace_percents(filename, nodeid);
+		struct dag_file *file = dag_file_lookup_or_create(n->d, filename);
+		list_push_tail(files, file);
+	}
+	free(nodeid);
+
+	return files;
+}
+
+
 /*
 Return true if disk space falls below the fixed minimum. (inexpensive!)
 XXX this value should be configurable.
 */
 
-static int directory_low_disk( const char *path )
+static int directory_low_disk( const char *path, uint64_t size )
 {
 	UINT64_T avail, total;
 
@@ -153,7 +174,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 
 /* Clean a specific file, while emitting an appropriate message. */
 
-int makeflow_file_clean( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent)
+int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent)
 {
 	if(!f)
 		return 1;
@@ -180,12 +201,6 @@ int makeflow_file_clean( struct dag *d, struct batch_queue *queue, struct dag_fi
 
 void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_node *n, int silent)
 {
-	struct dag_file *f;
-
-	list_first_item(n->target_files);
-	while((f = list_next_item(n->target_files)))
-		makeflow_file_clean(d, queue, f, silent);
-
 	if(n->nested_job){
 		char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
 		sprintf(command, "%s -c", n->command);
@@ -199,7 +214,7 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 
 /* Clean the entire dag by cleaning all nodes. */
 
-void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth)
+void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth, struct list *wrapper_output, struct list *monitor_output)
 {
 	struct dag_file *f;
 	char *name;
@@ -214,19 +229,41 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dep
 			silent = 0;
 
 		if(clean_depth == MAKEFLOW_CLEAN_ALL){
-			makeflow_file_clean(d, queue, f, silent);
+			makeflow_clean_file(d, queue, f, silent);
 		} else if(set_lookup(d->outputs, f) && (clean_depth == MAKEFLOW_CLEAN_OUTPUTS)) {
-			makeflow_file_clean(d, queue, f, silent);
+			makeflow_clean_file(d, queue, f, silent);
 		} else if(!set_lookup(d->outputs, f) && (clean_depth == MAKEFLOW_CLEAN_INTERMEDIATES)){
-			makeflow_file_clean(d, queue, f, silent);
+			makeflow_clean_file(d, queue, f, silent);
 		}
 	}
 
 	struct dag_node *n;
 	for(n = d->nodes; n; n = n->next) {
-		 /* If the node is a Makeflow job, then we should recursively call the *
-		  * clean operation on it. */
-		 if(n->nested_job) {
+		int silent = 1;
+		if(n->state == DAG_NODE_STATE_COMPLETE)
+			silent = 0;
+
+		if(wrapper_output){
+			struct list *wrapper = makeflow_wrapper_generate_files( wrapper_output, n);
+			list_first_item(wrapper);
+			while((f = list_next_item(wrapper))){
+				makeflow_clean_file(d, queue, f, silent);
+			}
+			free(wrapper);
+		}
+
+		if(monitor_output){
+			struct list *wrapper = makeflow_wrapper_generate_files( monitor_output, n);
+			list_first_item(wrapper);
+			while((f = list_next_item(wrapper))){
+				makeflow_clean_file(d, queue, f, silent);
+			}
+			free(wrapper);
+		}
+
+		/* If the node is a Makeflow job, then we should recursively call the *
+		 * clean operation on it. */
+		if(n->nested_job) {
 			char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
 			sprintf(command, "%s -c", n->command);
 
@@ -257,7 +294,7 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 			&& !dag_file_is_source(f)
 			&& !set_lookup(d->outputs, f)
 			&& !set_lookup(d->inputs, f)
-			&& makeflow_file_clean(d, queue, f, 0)){
+			&& makeflow_clean_file(d, queue, f, 0)){
 			collected++;
 		}
 	}
@@ -273,22 +310,22 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 
 /* Collect garbage only if conditions warrant. */
 
-void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, int count )
+void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, uint64_t size, int count )
 {
 	switch (method) {
 	case MAKEFLOW_GC_NONE:
 		break;
-	case MAKEFLOW_GC_REF_COUNT:
+	case MAKEFLOW_GC_COUNT:
 		debug(D_MAKEFLOW_RUN, "Performing incremental file (%d) garbage collection", count);
 		makeflow_gc_all(d, queue, count);
 		break;
-	case MAKEFLOW_GC_ON_DEMAND:
-		if(directory_inode_count(".") >= count || directory_low_disk(".")) {
+	case MAKEFLOW_GC_SIZE:
+		if(directory_low_disk(".", size)) {
 			debug(D_MAKEFLOW_RUN, "Performing on demand (%d) garbage collection", count);
-			makeflow_gc_all(d, queue, INT_MAX);
+			makeflow_gc_all(d, queue, count);
 		}
 		break;
-	case MAKEFLOW_GC_FORCE:
+	case MAKEFLOW_GC_ALL:
 		makeflow_gc_all(d, queue, INT_MAX);
 		break;
 	}

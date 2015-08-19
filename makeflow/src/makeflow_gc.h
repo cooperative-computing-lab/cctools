@@ -15,9 +15,9 @@ may be removed, according to a variety of criteria.
 
 typedef enum {
 	MAKEFLOW_GC_NONE,		/* Do no garbage collection. */
-	MAKEFLOW_GC_REF_COUNT,	/* Remove files as soon as the reference count falls to zero. */
-	MAKEFLOW_GC_ON_DEMAND,	/* Remove files when available storage is low. */
-	MAKEFLOW_GC_FORCE		/* Remove all collectable files right now. */
+	MAKEFLOW_GC_COUNT,		/* Remove COUNT files as soon as the reference count falls to zero. */
+	MAKEFLOW_GC_SIZE,		/* Remove COUNT files when available storage is below SIZE. */
+	MAKEFLOW_GC_ALL			/* Remove all collectable files right now. */
 } makeflow_gc_method_t;
 
 typedef enum {
@@ -28,9 +28,9 @@ typedef enum {
 } makeflow_clean_depth;
 
 void makeflow_parse_input_outputs( struct dag *d );
-void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, int count );
-int makeflow_file_clean( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent );
+void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, uint64_t size, int count );
+int  makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent );
 void makeflow_clean_node( struct dag *d, struct batch_queue *queue, struct dag_node *n, int silent );
-void makeflow_clean( struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth);
+void makeflow_clean( struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth, struct list *wrapper_output, struct list *monitor_output);
 
 #endif

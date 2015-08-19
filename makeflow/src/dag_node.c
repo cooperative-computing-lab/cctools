@@ -46,6 +46,20 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	return n;
 }
 
+struct dag_node_running *dag_node_running_create(struct dag_node *n, const char *command, struct list *input_files, struct list *output_files)
+{
+	struct dag_node_running *r;
+
+	r = malloc(sizeof(struct dag_node_running));
+	memset(r, 0, sizeof(struct dag_node_running));
+	r->n = n;
+	r->command = command;
+	r->input_files = input_files;
+	r->output_files = output_files;
+
+	return r;
+}
+
 const char *dag_node_state_name(dag_node_state_t state)
 {
 	switch (state) {
