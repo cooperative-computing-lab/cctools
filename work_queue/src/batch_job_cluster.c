@@ -45,13 +45,13 @@ returning true on success and false on failure.
 
 static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 {
-	char *wrapperfile = string_format("%s.wrapper", sysname);
+	char wrapperfile[PATH_MAX];
+	snprintf(wrapperfile, PATH_MAX, "%s.wrapper", sysname);
 
 	if(access(wrapperfile, R_OK | X_OK) == 0) return 1;
 
 	FILE *file = fopen(wrapperfile, "w");
 	if(!file) {
-		free(wrapperfile);
 		return 0;
 	}
 
@@ -88,8 +88,6 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	fclose(file);
 
 	chmod(wrapperfile, 0755);
-
-	free(wrapperfile);
 
 	return 1;
 }
