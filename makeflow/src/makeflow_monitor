@@ -75,7 +75,7 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
         if slist is None:
             current_time = time()
         else:
-            current_time = slist[MF_LOG_TIME]/1000000.0
+            current_time = float(slist[MF_LOG_TIME])/1000000.0
 
         makeflow['elapsed_time']     = current_time - start_time
         makeflow['percent_complete'] = float(makeflow['complete']) / float(makeflow['total'])
