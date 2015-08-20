@@ -312,6 +312,7 @@ void makeflow_log_clean( const char *makeflow_logfile_name ){
 
     FILE *mf_log = fopen(makeflow_logfile_name, "ar+");
 
+    int is_sandbox_mode = 0;
     int is_sandbox_delete = 0;
     char *curr_line = NULL;
     size_t len = 0;
@@ -329,7 +330,8 @@ void makeflow_log_clean( const char *makeflow_logfile_name ){
         	if ((sscanf(curr_line, "# %s\t%s\t%s\n", sandbox_mode, sandbox_state, sandbox_name)) == -1)			
 				fatal("Fail to read line with error message %s.\n", strerror(errno));
 
-		    if (string_equal(sandbox_mode, "SANDBOX")) {	
+		    if (string_equal(sandbox_mode, "SANDBOX")) {
+                is_sandbox_mode = 1;	
 				if(string_equal(sandbox_state, "CREATED"))
 					is_sandbox_delete = 0;
 				else
@@ -339,39 +341,43 @@ void makeflow_log_clean( const char *makeflow_logfile_name ){
         }
 
     	/* scan the log file and get the state of the sandbox */
-        while((read_len = getline(&curr_line, &len, mf_log)) != -1) {
+        if (is_sandbox_mode) {
+            while((read_len = getline(&curr_line, &len, mf_log)) != -1) {
 
-        	if ((sscanf(curr_line, "# %s\t%s", sandbox_mode, sandbox_state)) == -1)			
-				fatal("Fail to read line with error message %s.\n", strerror(errno));
+            	if ((sscanf(curr_line, "# %s\t%s", sandbox_mode, sandbox_state)) == -1)			
+		    		fatal("Fail to read line with error message %s.\n", strerror(errno));
 
-		    if (string_equal(sandbox_mode, "SANDBOX")) {	
-				if(string_equal(sandbox_state, "CREATED"))
-					is_sandbox_delete = 0;
-				else
-					is_sandbox_delete = 1;
-                break;
-			}
-        }
+		        if (string_equal(sandbox_mode, "SANDBOX")) {	
+		    		if(string_equal(sandbox_state, "CREATED"))
+		    			is_sandbox_delete = 0;
+		    		else
+		    			is_sandbox_delete = 1;
+                    break;
+		    	}
+            }
+
+            /* if the sandbox is not deleted, we delete it and update the state of the sandbox*/
+            if (!is_sandbox_delete) {
+                struct stat s;
+                int err = stat(sandbox_name, &s);
+                if(-1 == err) {
+                    if(ENOENT == errno) 
+                    	fatal("sandbox directory does not exist.\n");
+                    else
+                        fatal("Fail to locate public sandbox with the error message %s.\n", strerror(errno));
+                } else {
+            		if(S_ISDIR(s.st_mode)) { 
+                    	unlink_recursive(sandbox_name);
+                        fprintf(mf_log, "# SANDBOX\tDELETED\t%s\n", sandbox_name);
+                    } else 
+                        fatal("Public sandbox directory does not exit %s.\n", strerror(errno));
+	        	}		
+	        }
+
+		}
     }
 
-    /* if the sandbox is not deleted, we delete it and update the state of the sandbox*/
-    if (!is_sandbox_delete) {
-        struct stat s;
-        int err = stat(sandbox_name, &s);
-        if(-1 == err) {
-            if(ENOENT == errno) 
-            	fatal("sandbox directory does not exist.\n");
-            else
-                fatal("Fail to locate public sandbox with the error message %s.\n", strerror(errno));
-        } else {
-    		if(S_ISDIR(s.st_mode)) { 
-            	unlink_recursive(sandbox_name);
-                fprintf(mf_log, "# SANDBOX\tDELETED\t%s\n", sandbox_name);
-            } else 
-                fatal("Public sandbox directory does not exit %s.\n", strerror(errno));
-		}		
-	}
-
+    
     fclose(mf_log);
 }
 
