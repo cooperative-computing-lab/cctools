@@ -4,16 +4,18 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "dag.h"
-#include "makeflow_gc.h"
-#include "makeflow_log.h"
-
 #include "debug.h"
 #include "xxmalloc.h"
 #include "set.h"
 #include "timestamp.h"
 #include "host_disk_info.h"
 #include "stringtools.h"
+
+#include "dag.h"
+#include "makeflow_log.h"
+#include "makeflow_wrapper.h"
+#include "makeflow_gc.h"
+
 
 #include <dirent.h>
 #include <sys/types.h>
@@ -34,46 +36,6 @@ include measuring available space and inodes consumed.
 #define	MAKEFLOW_MIN_SPACE 10*1024*1024	/* 10 MB */
 
 static int makeflow_gc_collected = 0;
-
-/* Count the number of items in a directory.  (expensive!) */
-
-static int directory_inode_count(const char *dirname)
-{
-	DIR *dir;
-	struct dirent *d;
-	int inode_count = 0;
-
-	dir = opendir(dirname);
-	if(dir == NULL)
-		return INT_MAX;
-
-	while((d = readdir(dir)))
-		inode_count++;
-	closedir(dir);
-
-	return inode_count;
-}
-
-static struct list *makeflow_wrapper_generate_files( struct list *input, struct dag_node *n )
-{
-	char *f;
-	char *nodeid = string_format("%d",n->nodeid);
-
-	struct list *files = list_create();
-
-	list_first_item(input);
-	while((f = list_next_item(input)))
-	{
-		char *filename = strdup(f);
-		filename = string_replace_percents(filename, nodeid);
-		struct dag_file *file = dag_file_lookup_or_create(n->d, filename);
-		list_push_tail(files, file);
-	}
-	free(nodeid);
-
-	return files;
-}
-
 
 /*
 Return true if disk space falls below the fixed minimum. (inexpensive!)
@@ -214,7 +176,7 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 
 /* Clean the entire dag by cleaning all nodes. */
 
-void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth, struct list *wrapper_output, struct list *monitor_output)
+void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth, struct makeflow_wrapper *w, struct makeflow_monitor *m)
 {
 	struct dag_file *f;
 	char *name;
@@ -239,26 +201,23 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dep
 
 	struct dag_node *n;
 	for(n = d->nodes; n; n = n->next) {
-		int silent = 1;
-		if(n->state == DAG_NODE_STATE_COMPLETE)
-			silent = 0;
 
-		if(wrapper_output){
-			struct list *wrapper = makeflow_wrapper_generate_files( wrapper_output, n);
-			list_first_item(wrapper);
-			while((f = list_next_item(wrapper))){
-				makeflow_clean_file(d, queue, f, silent);
-			}
-			free(wrapper);
+		if(w){
+			struct list *files = list_create();
+			files = makeflow_wrapper_generate_files(files, w->output_files, n);
+			list_first_item(files);
+			while((f = list_next_item(files)))
+				makeflow_clean_file(d, queue, f, 0);
+			free(files);
 		}
 
-		if(monitor_output){
-			struct list *wrapper = makeflow_wrapper_generate_files( monitor_output, n);
-			list_first_item(wrapper);
-			while((f = list_next_item(wrapper))){
-				makeflow_clean_file(d, queue, f, silent);
-			}
-			free(wrapper);
+		if(m){
+			struct list *files = list_create();
+			files = makeflow_wrapper_generate_files(files, m->wrapper->output_files, n);
+			list_first_item(files);
+			while((f = list_next_item(files)))
+				makeflow_clean_file(d, queue, f, 0);
+			free(files);
 		}
 
 		/* If the node is a Makeflow job, then we should recursively call the *

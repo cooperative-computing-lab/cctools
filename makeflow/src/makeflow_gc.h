@@ -31,6 +31,6 @@ void makeflow_parse_input_outputs( struct dag *d );
 void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, uint64_t size, int count );
 int  makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent );
 void makeflow_clean_node( struct dag *d, struct batch_queue *queue, struct dag_node *n, int silent );
-void makeflow_clean( struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth, struct list *wrapper_output, struct list *monitor_output);
+void makeflow_clean( struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth, struct makeflow_wrapper *w, struct makeflow_monitor *m );
 
 #endif
