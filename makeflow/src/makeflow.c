@@ -1239,7 +1239,7 @@ int main(int argc, char *argv[])
 						clean_mode = MAKEFLOW_CLEAN_INTERMEDIATES;
 					} else if(strcasecmp(optarg, "outputs") == 0){
 						clean_mode = MAKEFLOW_CLEAN_OUTPUTS;
-					} else if(strcasecmp(optarg, "all") != 0){
+                    } else if(strcasecmp(optarg, "all") != 0){
 						fprintf(stderr, "makeflow: unknown clean option %s", optarg);
 						exit(1);
 					}
@@ -1658,7 +1658,6 @@ int main(int argc, char *argv[])
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		printf("cleaning filesystem...\n");
 		makeflow_clean(d, remote_queue, clean_mode);
-        makeflow_log_clean(logfilename);
 		if(clean_mode == MAKEFLOW_CLEAN_ALL) {
 			unlink(logfilename);
 			unlink(batchlogfilename);
@@ -1717,8 +1716,8 @@ int main(int argc, char *argv[])
 		free(cmd);
 	}
 
-    if(batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX)
-       makeflow_log_clean(logfilename);
+    if(batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) 
+		makeflow_sandbox_delete(d, local_task_dir);	
 
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);

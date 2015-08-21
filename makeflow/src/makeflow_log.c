@@ -20,7 +20,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <dirent.h>
 
 #define MAX_BUFFER_SIZE 4096
 
@@ -175,6 +174,12 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 	struct dag_file *f;
 	struct stat buf;
 	timestamp_t previous_completion_time;
+    int is_sandbox_mode = 0;
+    int is_sandbox_deleted = 0;
+    char sandbox_mode[CHAR_BUF_LEN];
+ 	char sandbox_state[CHAR_BUF_LEN];
+ 	char sandbox_name[CHAR_BUF_LEN];
+
 
 	d->logfile = fopen(filename, "r");
 	if(d->logfile) {
@@ -195,6 +200,20 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 				}
 				continue;
 			}
+
+            /* Check the sandbox state */
+            if ((sscanf(line, "# %s\t%s\t%s\n", sandbox_mode, sandbox_state, sandbox_name)) == -1) {			
+				fatal("Fail to read line with error message %s.\n", strerror(errno));
+
+		        if (string_equal(sandbox_mode, "SANDBOX")) {
+                    is_sandbox_mode = 1;	
+			    	if(string_equal(sandbox_state, "CREATED"))
+			    		is_sandbox_deleted = 0;
+			    	else
+			    		is_sandbox_deleted = 1;
+			    }
+			}
+
 			if(line[0] == '#')
 				continue;
 			if(sscanf(line, "%" SCNu64 " %d %d %d", &previous_completion_time, &nodeid, &state, &jobid) == 4) {
@@ -287,6 +306,12 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 		}
 	}
 
+    /* Check if the sandbox exists, if yes delete it */
+    if (is_sandbox_mode) 
+		/* if the sandbox is not deleted, we delete it and update the state of the sandbox*/
+        if (!is_sandbox_deleted) 
+            makeflow_sandbox_delete(d, sandbox_name);	
+
 	// Decide rerun tasks
 	if(!first_run) {
 		struct itable *rerun_table = itable_create(0);
@@ -308,82 +333,14 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 	}
 }
 
-void makeflow_log_clean( const char *makeflow_logfile_name ){
-
-    FILE *mf_log = fopen(makeflow_logfile_name, "ar+");
-
-    int is_sandbox_mode = 0;
-    int is_sandbox_delete = 0;
-    char *curr_line = NULL;
-    size_t len = 0;
-    ssize_t read_len;
-    char sandbox_mode[CHAR_BUF_LEN];
- 	char sandbox_state[CHAR_BUF_LEN];
- 	char sandbox_name[CHAR_BUF_LEN];
-    
-    if( !mf_log ) 
-    	fatal("Could not open makeflow log file.");
-    else {
-    	/* scan the log file and get the name of the sandbox */
-        while((read_len = getline(&curr_line, &len, mf_log)) != -1) {
-
-        	if ((sscanf(curr_line, "# %s\t%s\t%s\n", sandbox_mode, sandbox_state, sandbox_name)) == -1)			
-				fatal("Fail to read line with error message %s.\n", strerror(errno));
-
-		    if (string_equal(sandbox_mode, "SANDBOX")) {
-                is_sandbox_mode = 1;	
-				if(string_equal(sandbox_state, "CREATED"))
-					is_sandbox_delete = 0;
-				else
-					is_sandbox_delete = 1;
-                break;
-			}
-        }
-
-    	/* scan the log file and get the state of the sandbox */
-        if (is_sandbox_mode) {
-            while((read_len = getline(&curr_line, &len, mf_log)) != -1) {
-
-            	if ((sscanf(curr_line, "# %s\t%s", sandbox_mode, sandbox_state)) == -1)			
-		    		fatal("Fail to read line with error message %s.\n", strerror(errno));
-
-		        if (string_equal(sandbox_mode, "SANDBOX")) {	
-		    		if(string_equal(sandbox_state, "CREATED"))
-		    			is_sandbox_delete = 0;
-		    		else
-		    			is_sandbox_delete = 1;
-                    break;
-		    	}
-            }
-
-            /* if the sandbox is not deleted, we delete it and update the state of the sandbox*/
-            if (!is_sandbox_delete) {
-                struct stat s;
-                int err = stat(sandbox_name, &s);
-                if(-1 == err) {
-                    if(ENOENT == errno) 
-                    	fatal("sandbox directory does not exist.\n");
-                    else
-                        fatal("Fail to locate public sandbox with the error message %s.\n", strerror(errno));
-                } else {
-            		if(S_ISDIR(s.st_mode)) { 
-                    	unlink_recursive(sandbox_name);
-                        fprintf(mf_log, "# SANDBOX\tDELETED\t%s\n", sandbox_name);
-                    } else 
-                        fatal("Public sandbox directory does not exit %s.\n", strerror(errno));
-	        	}		
-	        }
-
-		}
-    }
-
-    
-    fclose(mf_log);
-}
 
 void makeflow_log_sandbox_mode_create( struct dag *d, const char *local_task_dir ) {
     fprintf(d->logfile, "# SANDBOX\tCREATED\t%s\n", local_task_dir);
 	makeflow_log_sync(d,1);
 }
 
+void makeflow_log_sandbox_mode_delete( struct dag *d, const char *local_task_dir ) {
+    fprintf(d->logfile, "# SANDBOX\tDELETED\t%s\n", local_task_dir);
+	makeflow_log_sync(d,1);
+}
 /* vim: set noexpandtab tabstop=4: */

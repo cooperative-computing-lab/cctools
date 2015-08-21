@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "disk_info.h"
 #include "stringtools.h"
+#include "unlink_recursive.h"
 
 #include <dirent.h>
 #include <sys/types.h>
@@ -176,6 +177,24 @@ int makeflow_file_clean( struct dag *d, struct batch_queue *queue, struct dag_fi
 		}
 	}
 	return 0;
+}
+
+/* Delete the sandbox */
+void makeflow_sandbox_delete(struct dag *d, const char *sandbox_name) {
+	struct stat s;
+    int err = stat(sandbox_name, &s);
+    if(-1 == err) {
+        if(ENOENT == errno)
+            fatal("sandbox directory does not exist.\n");
+        else
+            fatal("Fail to locate public sandbox with the error message %s.\n", strerror(errno));
+    } else {
+        if(S_ISDIR(s.st_mode)) {
+            unlink_recursive(sandbox_name);
+            makeflow_log_sandbox_mode_delete(d, sandbox_name);
+        } else
+            fatal("Public sandbox directory does not exit %s.\n", strerror(errno));
+    }
 }
 
 void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_node *n, int silent)
