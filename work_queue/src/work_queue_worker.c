@@ -603,7 +603,7 @@ static int handle_tasks(struct link *master)
 				char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
 
 				debug(D_WQ,"moving output file from %s to %s",sandbox_name,f->payload);
-				if(rename(sandbox_name,f->payload)!=0) {
+				if(copy_file_to_file(sandbox_name,f->payload)!=0) {
 					debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
 				}
 
@@ -791,8 +791,9 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char taskname_encoded[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
 
-	struct work_queue_process *p = work_queue_process_create(taskid);
-	struct work_queue_task *task = p->task;
+	//struct work_queue_task *task = p->task;
+	struct work_queue_task *task = work_queue_task_create(0);
+	task->taskid = taskid;
 
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
 		if(sscanf(line,"cmd %d",&length)==1) {
@@ -821,9 +822,9 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 		} else if(sscanf(line,"gpus %d",&n)) {
 			work_queue_task_specify_gpus(task, n);
 		} else if(sscanf(line,"env %d",&length)==1) {
-			char *env = malloc(length+1);
-			link_read(master,env,length,stoptime);
-			env[length] = 0;
+			char *env = malloc(length+2); /* +2 for \n and \0 */
+			link_read(master, env, length+1, stoptime);
+			env[length] = 0;              /* replace \n with \0 */
 			char *value = strchr(env,'=');
 			if(value) {
 				*value = 0;
@@ -835,10 +836,12 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 				break;
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
-			work_queue_process_delete(p);
+			//work_queue_process_delete(p);
 			return 0;
 		}
 	}
+
+	struct work_queue_process *p = work_queue_process_create(task);
 
 	last_task_received = task->taskid;
 

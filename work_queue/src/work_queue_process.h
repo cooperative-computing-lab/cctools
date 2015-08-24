@@ -39,7 +39,7 @@ struct work_queue_process {
 		char container_id[MAX_BUFFER_SIZE];
 };
 
-struct work_queue_process * work_queue_process_create( int taskid );
+struct work_queue_process * work_queue_process_create( struct work_queue_task *task );
 pid_t work_queue_process_execute( struct work_queue_process *p, int container_mode, ... );
 // lunching process with container, arg_3 can be either img_name or container_name, depending on container_mode
 void  work_queue_process_kill( struct work_queue_process *p );

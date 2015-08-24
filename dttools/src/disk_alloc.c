@@ -20,7 +20,7 @@ See the file COPYING for details.
 #include "path.h"
 #include "debug.h"
 
-#ifdef CCTOOLS_PLATFORM_LINUX
+//#ifdef CCTOOLS_PLATFORM_LINUX
 int disk_alloc_create(char *loc, int64_t size) {
 
 	//Check for trailing '/'
@@ -193,7 +193,7 @@ int disk_alloc_delete(char *loc) {
 
 		return -1;
 }
-
+/*
 #else
 int disk_alloc_create(char *loc, int64_t size) {
 
@@ -206,4 +206,4 @@ int disk_alloc_delete(char *loc) {
 	debug(0, "Platform not supported by this library.\n");
 	return -1;
 }
-#endif
+#endif*/
