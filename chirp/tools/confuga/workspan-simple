@@ -100,6 +100,10 @@ max(a,b) = a > b ? a : b
 
 tmin = min(run_min, min(sen_min, rec_min))
 
+# Use 2D vectors to indicate activity in time.
+# <tstart, sid, max((tfinish-tstart), 30), 0, workflow_tag>
+#  - The 3rd column is the duration, which is artifially set to at least 30 seconds in the graph for visibility.
+#  - The 5th column is used for styling the vector according to the workflow source of the activity.
 plot  "$data_run" u (\$2-tmin):(\$1+.30):(max(\$3-\$2, 30)):(0):5 with vectors arrowstyle 1 notitle \\
 	 ,"$data_sen" u (\$2-tmin):(\$1+.75):(max(\$3-\$2, 30)):(0):5 with vectors arrowstyle 1 notitle \\
 	 ,"$data_rec" u (\$2-tmin):(\$1+.75):(max(\$3-\$2, 30)):(0):5 with vectors arrowstyle 1 notitle \\
