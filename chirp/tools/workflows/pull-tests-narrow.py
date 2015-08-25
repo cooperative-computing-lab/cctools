@@ -67,8 +67,6 @@ def makerandoms(i, files):
     sync = nstdir('sync.%08d' % i)
     args = [sync]
     outputs = [sync]
-    # create a big file so these don't finish too quickly...
-    args.extend((binascii.hexlify(os.urandom(64)), 16*2**30, '__big.%08d' % i))
     for f in files:
         args.extend((binascii.hexlify(os.urandom(64)), f['size'](), f['path']))
         outputs.append(f['path'])
