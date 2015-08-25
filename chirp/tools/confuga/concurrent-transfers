@@ -9,8 +9,8 @@ data=$(mktemp)
 
 echo $0
 sqlite3 -separator $'\t' > "$data"  <<EOF
-ATTACH 'file://${job}?mode=ro' as Job;
-ATTACH 'file://${confuga}?mode=ro' as Confuga;
+ATTACH 'file://${job}?immutable=1' as Job;
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
 
 	SELECT id, time_commit AS t, 1
 		FROM Confuga.TransferJob
