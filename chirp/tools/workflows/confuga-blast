@@ -23,7 +23,7 @@ for pull in $(for g in $((1+32*2**10)) $((1+1*2**20)) $((1+1*2**30)) 0; do print
 			echo "$CONFUGA_NODE_LIST" > "${base}/nodes.lst"
 
 			eval "$CONFUGA_NODE_NUKE"
-			runbg "$CHIRP_SERVER" --auth=unix --catalog-update=30s --challenge-dir="${base}/" --debug=all --debug-file="${base}/confuga.debug" --debug-rotate-max=0 --interface=127.0.0.1 --jobs --job-concurrency=0 --pid-file="${base}/confuga.pid" --port="$PORT" --root="confuga://${base}/confuga.root?scheduler=${scheduler}&replication=${replication}&pull-threshold=${pull}&nodes=file:${base}/nodes.lst" --superuser="unix:$(whoami)" --transient="${base}/confuga.transient"
+			runbg "$CHIRP_SERVER" --auth=unix --catalog-update=30s --challenge-dir="${base}/" --debug=all --debug-file="${base}/confuga.debug" --debug-rotate-max=0 --interface=127.0.0.1 --jobs --job-concurrency=0 --pid-file="${base}/confuga.pid" --port="$PORT" --root="confuga://${base}/confuga.root?scheduler=${scheduler}&replication=${replication}&pull-threshold=${pull}&nodes=file:${base}/nodes.lst" --superuser="unix:$(whoami)" --transient="${base}/confuga.transient" --inherit-default-acl
 
 			run "$CHIRP" --auth=unix --debug=chirp --debug-file="${base}/chirp.debug" --timeout=60m localhost:"$PORT" put "$DIR/"
 
@@ -35,6 +35,8 @@ for pull in $(for g in $((1+32*2**10)) $((1+1*2**20)) $((1+1*2**30)) 0; do print
 				echo "waiting for debugging"
 				sleep 7d
 			fi
+
+			run "$PARROT" -- cp -r "/chirp/localhost:${PORT}/.confuga/" "${base}/confuga-proc/"
 
 			kill %1
 			wait
