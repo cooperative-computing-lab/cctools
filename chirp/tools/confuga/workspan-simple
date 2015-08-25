@@ -13,8 +13,8 @@ echo $0 "$data_run" "$data_rec" "$data_sen"
 
 T=$(mktemp)
 sqlite3 -separator $'\t' > "$T" <<EOF
-ATTACH 'file://${job}?mode=ro' as Job;
-ATTACH 'file://${confuga}?mode=ro' as Confuga;
+ATTACH 'file://${job}?immutable=1' as Job;
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
 
 SELECT COUNT(*) FROM Confuga.StorageNode;
 EOF
@@ -24,8 +24,8 @@ rm "$T"
 {
 	sqlite3 -separator $'\t' | awk '$1 != prev {printf "\n"; prev = $1}; {print}' > "$data_run"
 } <<EOF
-ATTACH 'file://${job}?mode=ro' as Job;
-ATTACH 'file://${confuga}?mode=ro' as Confuga;
+ATTACH 'file://${job}?immutable=1' as Job;
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
 
 CREATE TEMPORARY TABLE IDS AS
 	SELECT DISTINCT tag FROM Confuga.TransferJob;
@@ -40,7 +40,7 @@ EOF
 {
 	sqlite3 -separator $'\t' | awk '$1 != prev {printf "\n"; prev = $1}; {print}' > "$data_rec"
 } <<EOF
-ATTACH 'file://${confuga}?mode=ro' as Confuga;
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
 
 CREATE TEMPORARY TABLE IDS AS
 	SELECT DISTINCT tag FROM Confuga.TransferJob;
@@ -54,7 +54,7 @@ EOF
 {
 	sqlite3 -separator $'\t' | awk '$1 != prev {printf "\n"; prev = $1}; {print}' > "$data_sen"
 } <<EOF
-ATTACH 'file://${confuga}?mode=ro' as Confuga;
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
 
 CREATE TEMPORARY TABLE IDS AS
 	SELECT DISTINCT tag FROM Confuga.TransferJob;
