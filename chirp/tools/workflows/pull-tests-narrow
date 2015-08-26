@@ -3,7 +3,6 @@
 source "$(dirname "$0")"/test-common.bash
 
 DIR="pull-tests-narrow.workflow"
-MAKEFLOW_FILE="$DIR"/Makeflow
 
 if ! [ -d "$DIR" ]; then
 	weaver -N -O "$DIR" "$(dirname "$0")/pull-tests-narrow.py"
@@ -13,27 +12,7 @@ fi
 for pull in $(for exp in 20 32 31 30 22 24 26 28; do printf '%012d\t' $((1+1*2**exp)); done); do
 	for scheduler in fifo-0; do
 		for replication in push-async-1 push-async-0; do
-			base="$(pwd)/test.${pull}.${scheduler}.${replication}"
-			if [ -d "$base" ]; then
-				echo "$base already exists; continuing"
-				continue;
-			fi
-			run mkdir "$base" || exit 1
-			echo "$CONFUGA_NODE_LIST" > "${base}/nodes.lst"
-
-			eval "$CONFUGA_NODE_NUKE"
-			runbg "$CHIRP_SERVER" --auth=unix --catalog-update=30s --challenge-dir="${base}/" --debug=all --debug-file="${base}/confuga.debug" --debug-rotate-max=0 --interface=127.0.0.1 --jobs --job-concurrency=0 --pid-file="${base}/confuga.pid" --port="$PORT" --root="confuga://${base}/confuga.root?scheduler=${scheduler}&replication=${replication}&pull-threshold=${pull}&nodes=file:${base}/nodes.lst" --superuser="unix:$(whoami)" --transient="${base}/confuga.transient" --inherit-default-acl
-
-			run "$CHIRP" --auth=unix --debug=chirp --debug-file="${base}/chirp.debug" --timeout=60m localhost:"$PORT" put "$DIR/"
-
-			run cp "$MAKEFLOW_FILE" "${base}/Makeflow"
-			run "$MAKEFLOW" --batch-type=chirp --debug=all --debug-file="${base}/makeflow.debug" --debug-rotate-max=0 --working-dir="chirp://localhost:${PORT}/$(basename "$DIR")" --wrapper=$'{\n {}\n} > stdout.%% 2> stderr.%%' --wrapper-output='stdout.%%' --wrapper-output='stderr.%%' "${base}/Makeflow"
-
-			run "$PARROT" -- cp -r "/chirp/localhost:${PORT}/.confuga/" "${base}/confuga-proc/"
-
-			kill %1
-			wait
-			sleep 10
+			testrun "$DIR" "$(pwd)/test.${pull}.${scheduler}.${replication}" "scheduler=${scheduler}&replication=${replication}&pull-threshold=${pull}"
 		done
 	done
 done
