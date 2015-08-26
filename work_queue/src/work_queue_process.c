@@ -1,5 +1,6 @@
 
 #include "work_queue_process.h"
+#include "work_queue_internal.h"
 #include "work_queue.h"
 
 #include "debug.h"
@@ -34,31 +35,30 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 {
 	struct work_queue_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
-	//p->task = work_queue_task_create(0);
 	p->task = wq_task;
-	int taskid = (int) p->task->taskid;
-	//p->task->taskid = taskid;
+	int taskid = p->task->taskid;
 
 	p->sandbox = string_format("t.%d", taskid);
 
-/*	if(!create_dir(p->sandbox, 0777)) {
-		work_queue_process_delete(p);
-		return 0;
-	}
-*/
-
 	int64_t size;
-	int i;
-	struct stat buff;
-	struct list_node *curr = p->task->input_files->head;
-	for(i = 0; i < p->task->input_files->size; i++) {
-		stat(curr->data, &buff);
-		size += ((int64_t) buff.st_size / 1024);
-		curr = curr->next;
-		printf("Total Size: %" PRId64 "\n", size);
+	if(p->task->disk > 0) {
+		size = (p->task->disk) * 1024;
 	}
-
-	size = size / 1024;
+	else {
+		int i;
+		struct stat buff;
+		struct list *input_copy = list_duplicate(p->task->input_files);
+		//struct list_node *curr = p->task->input_copy->head;
+		for(i = 0; i < p->task->input_files->size; i++) {
+			struct work_queue_file *input = list_pop_head(input_copy);
+			stat(input->remote_name, &buff);
+			size += ((int64_t) buff.st_size / 1024);
+			//curr = curr->next;
+			printf("Total Size: %" PRId64 "\n", size);
+		}
+		list_free(input_copy);
+		size = size / 1024;
+	}
 
 	if(disk_alloc_create(p->sandbox, size) == 0) {
 		return p;
