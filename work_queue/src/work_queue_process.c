@@ -42,7 +42,6 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 
 	if(p->task->disk > 0) {
 		int64_t size = (p->task->disk) * 1024;
-
 		if(disk_alloc_create(p->sandbox, size) == 0) {
 			p->task->loop_mount = 1;
 			debug(D_WQ, "disk_alloc: %"PRId64"MB\n", size);
