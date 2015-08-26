@@ -4,9 +4,9 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include <stdint.h>
 #ifndef DISK_ALLOC_H
 #define DISK_ALLOC_H
+#include <stdint.h>
 
 /* The disk_alloc_create function instantiates
  * a virtual device and creates a file system
