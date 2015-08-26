@@ -7,6 +7,11 @@ MAKEFLOW="${CCTOOLS_INSTALL}/makeflow"
 PARROT="${CCTOOLS_INSTALL}/parrot_run"
 WEAVER="${CCTOOLS_INSTALL}/weaver"
 
+function fatal {
+	printf '%s\n' "$*"
+	exit 1
+}
+
 function run {
 	printf '%s\n' "$*"
 	time "$@"
