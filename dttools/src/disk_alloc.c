@@ -20,7 +20,7 @@ See the file COPYING for details.
 #include "path.h"
 #include "debug.h"
 
-#ifdef CCTOOLS_PLATFORM_LINUX
+#ifdef CCTOOLS_OPSYS_LINUX
 int disk_alloc_create(char *loc, int64_t size) {
 
 	//Check for trailing '/'
