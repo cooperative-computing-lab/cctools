@@ -22,7 +22,6 @@ See the file COPYING for details.
 #include "disk_alloc.h"
 #include "stringtools.h"
 #include "path.h"
-#include "debug.h"
 
 int disk_alloc_create(char *loc, int64_t size) {
 
