@@ -4,6 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#ifdef CCTOOLS_OPSYS_LINUX
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -20,8 +22,11 @@ See the file COPYING for details.
 #include "path.h"
 #include "debug.h"
 
-//#ifdef CCTOOLS_PLATFORM_LINUX
 int disk_alloc_create(char *loc, int64_t size) {
+
+	if(size <= 0) {
+		return -1;
+	}
 
 	//Check for trailing '/'
 	path_remove_trailing_slashes(loc);
@@ -193,7 +198,7 @@ int disk_alloc_delete(char *loc) {
 
 		return -1;
 }
-/*
+
 #else
 int disk_alloc_create(char *loc, int64_t size) {
 
@@ -206,4 +211,4 @@ int disk_alloc_delete(char *loc) {
 	debug(0, "Platform not supported by this library.\n");
 	return -1;
 }
-#endif*/
+#endif

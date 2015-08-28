@@ -40,38 +40,26 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 
 	p->sandbox = string_format("t.%d", taskid);
 
-	int64_t size;
 	if(p->task->disk > 0) {
-		size = (p->task->disk) * 1024;
-	}
-	else {
-		int i;
-		struct stat buff;
-		struct list *input_copy = list_duplicate(p->task->input_files);
-		//struct list_node *curr = p->task->input_copy->head;
-		for(i = 0; i < p->task->input_files->size; i++) {
-			struct work_queue_file *input = list_pop_head(input_copy);
-			stat(input->remote_name, &buff);
-			size += ((int64_t) buff.st_size / 1024);
-			//curr = curr->next;
-			printf("Total Size: %" PRId64 "\n", size);
+		int64_t size = (p->task->disk) * 1024;
+		printf("process_create disk: %" PRId64 "\n", size);
+
+		if(disk_alloc_create(p->sandbox, size) == 0) {
+			p->task->loop_mount = 1;
+			return p;
 		}
-		list_free(input_copy);
-		size = size / 1024;
+	}
+	if(!create_dir(p->sandbox, 0777)) {
+		work_queue_process_delete(p);
+		return 0;
 	}
 
-	if(disk_alloc_create(p->sandbox, size) == 0) {
-		return p;
-	}
-	else if(create_dir(p->sandbox, 0777) == 0) {
-		return p;
-	}
-
-	return 0;
+	return p;
 }
 
 void work_queue_process_delete(struct work_queue_process *p)
 {
+
 	if(p->task)
 		work_queue_task_delete(p->task);
 
@@ -85,8 +73,12 @@ void work_queue_process_delete(struct work_queue_process *p)
 	}
 
 	if(p->sandbox) {
-		//delete_dir(p->sandbox);
-		disk_alloc_delete(p->sandbox);
+		if(p->task->loop_mount == 1) {
+			disk_alloc_delete(p->sandbox);
+		}
+		else {
+			delete_dir(p->sandbox);
+		}
 		free(p->sandbox);
 	}
 
