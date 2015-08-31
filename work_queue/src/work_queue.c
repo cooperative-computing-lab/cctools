@@ -971,8 +971,9 @@ char *make_cached_name( const struct work_queue_task *t, const struct work_queue
 		case WORK_QUEUE_REMOTECMD:
 			return string_format("cmd-%s",md5_string(digest));
 			break;
-		case WORK_QUEUE_URL:
-			return string_format("url-%s",md5_string(digest));
+		case WORK_QUEUE_EXTERNAL_URL:
+		/* case WORK_QUEUE_EXTERNAL_CHIRP: */
+			return string_format("external-%s",md5_string(digest));
 			break;
 		case WORK_QUEUE_BUFFER:
 		default:
@@ -2182,13 +2183,9 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 		debug(D_WQ, "%s (%s) needs %s from remote filesystem using %s", w->hostname, w->addrport, f->remote_name, f->payload);
 		send_worker_msg(q,w, "thirdget %d %s %s\n",WORK_QUEUE_FS_CMD, f->cached_name, f->payload);
 		break;
-
-	case WORK_QUEUE_URL:
-		debug(D_WQ, "%s (%s) needs %s from the url, %s %d", w->hostname, w->addrport, f->cached_name, f->payload, f->length);
-		send_worker_msg(q,w, "url %s %d 0%o %d\n",f->cached_name, f->length, 0777, f->flags);
-		link_putlstring(w->link, f->payload, f->length, time(0) + q->short_timeout);
+	case WORK_QUEUE_EXTERNAL_URL:
+		// Do nothing. File is downloaded at the worker.
 		break;
-
 	case WORK_QUEUE_DIRECTORY:
 		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as WORK_QUEUE_FILEs
 		break;
@@ -3316,7 +3313,7 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 		}
 	}
 
-	tf = work_queue_file_create(t, file_url, remote_name, WORK_QUEUE_URL, flags);
+	tf = work_queue_file_create(t, file_url, remote_name, WORK_QUEUE_EXTERNAL_URL, flags);
 	if(!tf) return 0;
 
 	list_push_tail(files, tf);

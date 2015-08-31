@@ -1,6 +1,7 @@
 
 #include "work_queue_process.h"
-#include "work_queue.h"
+#include "work_queue_protocol.h"
+#include "work_queue_internal.h"
 
 #include "debug.h"
 #include "errno.h"
@@ -266,6 +267,75 @@ void work_queue_process_kill(struct work_queue_process *p)
 
 	// Reap the child process to avoid zombies.
 	waitpid(p->pid, NULL, 0);
+}
+
+
+static int download_url(const char *url, const char *cache_name) {
+	debug(D_WQ, "Retrieving %s from (%s)\n", cache_name, url);
+
+	char command[WORK_QUEUE_LINE_MAX];
+	snprintf(command, WORK_QUEUE_LINE_MAX, "curl -f -o \"cache/%s\" \"%s\"", cache_name, url);
+
+	int result = system(command);
+
+	/* numbers come from curl(1) */
+	/* bug, we probably want to link against curl */
+	switch(result) {
+		case 6:
+			result = WORK_QUEUE_RESULT_EXTERNAL_NO_RESOLVE;
+			break;
+		case 7:
+			result = WORK_QUEUE_RESULT_EXTERNAL_NO_CONNECT;
+			break;
+		case 23:
+			result = WORK_QUEUE_RESULT_EXTERNAL_WRITE_ERROR;
+			break;
+		case 28:
+			result = WORK_QUEUE_RESULT_EXTERNAL_TIMEOUT;
+			break;
+		default:
+			break;
+	}
+
+	if(result == 0) {
+		debug(D_WQ, "Success, file retrieved from %s\n", url);
+		return 0;
+	}
+
+	return (result | WORK_QUEUE_RESULT_INPUT_MISSING);
+}
+
+int work_queue_process_download_externals(struct work_queue_process *p)
+{
+	struct work_queue_file *f;
+	struct stat s;
+
+	if(p->task->input_files) {
+		list_first_item(p->task->input_files);
+		while((f = list_next_item(p->task->input_files))) {
+
+			char *expanded_name = string_format("cache/%s", f->cached_name);
+
+			if(stat(expanded_name, &s) == 0) {
+				/* do not redownload if already present */
+				continue;
+			}
+
+			int error;
+			switch(f->type) {
+				case WORK_QUEUE_EXTERNAL_URL:
+					error = download_url(f->payload, f->cached_name);
+					break;
+				default:
+					break;
+			}
+
+			if(error)
+				return error;
+		}
+	}
+
+	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */

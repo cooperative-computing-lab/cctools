@@ -45,4 +45,6 @@ pid_t work_queue_process_execute( struct work_queue_process *p, int container_mo
 void  work_queue_process_kill( struct work_queue_process *p );
 void  work_queue_process_delete( struct work_queue_process *p);
 
+int work_queue_process_download_externals(struct work_queue_process *p);
+
 #endif

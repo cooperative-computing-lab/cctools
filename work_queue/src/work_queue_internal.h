@@ -15,7 +15,10 @@ typedef enum {
 	WORK_QUEUE_REMOTECMD,
 	WORK_QUEUE_FILE_PIECE,
 	WORK_QUEUE_DIRECTORY,
-	WORK_QUEUE_URL
+
+	/* externals */
+	/* e.g.: WORK_QUEUE_EXTERNAL_CHIRP */
+	WORK_QUEUE_EXTERNAL_URL
 } work_queue_file_t;
 
 struct work_queue_file {
