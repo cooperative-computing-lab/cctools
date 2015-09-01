@@ -9,15 +9,6 @@ See the file COPYING for details.
 
 #include "list.h"
 
-typedef enum {
-	WORK_QUEUE_FILE = 1,
-	WORK_QUEUE_BUFFER,
-	WORK_QUEUE_REMOTECMD,
-	WORK_QUEUE_FILE_PIECE,
-	WORK_QUEUE_DIRECTORY,
-	WORK_QUEUE_URL
-} work_queue_file_t;
-
 struct work_queue_file {
 	work_queue_file_t type;
 	int flags;		// WORK_QUEUE_CACHE or others in the future.
@@ -46,6 +37,9 @@ simply a wrapper of this function that also generates a taskid.
 work_queue_submit_internal is the submit function used in foreman, where the
 taskid should not be modified.*/
 int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t);
+
+/** Same as @ref work_queue_invalidate_cached_file, but takes filename as face value, rather than computing cached_name. */
+void work_queue_invalidate_cached_file_internal(struct work_queue *q, const char *filename);
 
 void release_all_workers(struct work_queue *q);
 

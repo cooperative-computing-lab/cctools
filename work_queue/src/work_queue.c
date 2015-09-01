@@ -960,24 +960,32 @@ char *make_cached_name( const struct work_queue_task *t, const struct work_queue
 		url_encode(path_basename(payload), payload_enc, PATH_MAX);
 	}
 
+	/* 0 for cache files, taskid for non-cache files. With this, non-cache
+	 * files cannot be shared among tasks, and can be safely deleted once a
+	 * task finishes. */
+	int cache_task_id = 0;
+	if(t && !(f->flags | WORK_QUEUE_CACHE)) {
+		cache_task_id = t->taskid;
+	}
+
 	switch(f->type) {
 		case WORK_QUEUE_FILE:
 		case WORK_QUEUE_DIRECTORY:
-			return string_format("file-%s-%s",md5_string(digest),payload_enc);
+			return string_format("file-%d-%s-%s", cache_task_id, md5_string(digest), payload_enc);
 			break;
 		case WORK_QUEUE_FILE_PIECE:
-			return string_format("piece-%s-%s-%lld-%lld",md5_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
+			return string_format("piece-%d-%s-%s-%lld-%lld",cache_task_id, md5_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
 			break;
 		case WORK_QUEUE_REMOTECMD:
-			return string_format("cmd-%s",md5_string(digest));
+			return string_format("cmd-%d-%s", cache_task_id, md5_string(digest));
 			break;
 		case WORK_QUEUE_URL:
-			return string_format("url-%s",md5_string(digest));
+			return string_format("url-%d-%s", cache_task_id, md5_string(digest));
 			break;
 		case WORK_QUEUE_BUFFER:
 		default:
 			buffer_count++;
-			return string_format("buffer-%d-%s", buffer_count, md5_string(digest));
+			return string_format("buffer-%d-%d-%s", cache_task_id, buffer_count, md5_string(digest));
 			break;
 	}
 }
@@ -1085,30 +1093,34 @@ static work_queue_result_code_t get_output_files( struct work_queue *q, struct w
 	return result;
 }
 
+static void delete_worker_file( struct work_queue *q, struct work_queue_worker *w, const char *filename, int flags, int except_flags ) {
+	if(!(flags & except_flags)) {
+		send_worker_msg(q,w, "unlink %s\n", filename);
+		hash_table_remove(w->current_files, filename);
+	}
+}
+
 // Sends "unlink file" for every file in the list except those that match one or more of the "except_flags"
-static void delete_worker_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct list *files, int except_flags ) {
+static void delete_worker_files( struct work_queue *q, struct work_queue_worker *w, struct list *files, int except_flags ) {
 	struct work_queue_file *tf;
 
 	if(!files) return;
 
 	list_first_item(files);
 	while((tf = list_next_item(files))) {
-		if(!(tf->flags & except_flags)) {
-			send_worker_msg(q,w, "unlink %s\n", tf->cached_name);
-			hash_table_remove(w->current_files, tf->cached_name);
-		}
+		delete_worker_file(q, w, tf->cached_name, tf->flags, except_flags);
 	}
 }
 
 static void delete_task_output_files(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
-	delete_worker_files(q, w, t, t->output_files, 0);
+	delete_worker_files(q, w, t->output_files, 0);
 }
 
 static void delete_uncacheable_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
-	delete_worker_files(q, w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
-	delete_worker_files(q, w, t, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+	delete_worker_files(q, w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+	delete_worker_files(q, w, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 }
 
 void resource_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
@@ -1433,6 +1445,12 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 		debug(D_WQ, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
 		stoptime = time(0) + get_transfer_wait_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
+		return SUCCESS;
+	}
+
+	if(task_status == WORK_QUEUE_RESULT_FORSAKEN) {
+		/* task will be resubmitted, so we do not update any of the execution stats */
+		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
 		return SUCCESS;
 	}
 
@@ -2054,17 +2072,17 @@ static work_queue_result_code_t send_file_or_directory( struct work_queue *q, st
 
 	work_queue_result_code_t result = SUCCESS;
 
-	// Look in the current files hash to see if the file is already cached.
+	// Look in the current files hash to see if the file is already on the worker.
 	remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
-	// If not cached, or the metadata has changed, then send the item.
-	if(!remote_info || remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size) {
-
-		if(remote_info) {
-			hash_table_remove(w->current_files, tf->cached_name);
-			free(remote_info);
-		}
-
+	/* If it is in the worker, but a new version is available, warn and return.
+	   We do not want to rewrite the file while some other task may be using
+	   it. */
+	if(remote_info && (remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size)) {
+		debug(D_NOTICE|D_WQ, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
+	}
+	else if(!remote_info) {
+		/* If not on the worker, send it. */
 		if(S_ISDIR(local_info.st_mode)) {
 			result = send_directory(q, w, t, expanded_local_name, tf->cached_name, total_bytes, tf->flags);
 		} else {
@@ -2080,6 +2098,9 @@ static work_queue_result_code_t send_file_or_directory( struct work_queue *q, st
 				debug(D_NOTICE, "Cannot allocate memory for cache entry for input file %s at %s (%s)", expanded_local_name, w->hostname, w->addrport);
 			}
 		}
+	}
+	else {
+		/* Up-to-date file on the worker, we do nothing. */
 	}
 
 	return result;
@@ -2969,7 +2990,7 @@ static int tasktag_comparator(void *t, const void *r) {
 }
 
 
-static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t) {
+static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state) {
 
 	struct work_queue_worker *w = itable_lookup(q->worker_task_map, t->taskid);
 
@@ -2979,13 +3000,13 @@ static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t
 		debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 
 		//Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+		delete_worker_files(q, w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 
 		//Delete all output files since they are not needed as the task was aborted.
-		delete_worker_files(q, w, t, t->output_files, 0);
+		delete_worker_files(q, w, t->output_files, 0);
 
 		//update tables.
-		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_CANCELED);
+		reap_task_from_worker(q, w, t, new_state);
 
 		return 1;
 	}
@@ -3644,6 +3665,53 @@ void work_queue_file_delete(struct work_queue_file *tf) {
 		free(tf->cached_name);
 	free(tf);
 }
+
+void work_queue_invalidate_cached_file(struct work_queue *q, const char *local_name, work_queue_file_flags_t type) {
+	struct work_queue_file *f = work_queue_file_create(NULL, local_name, local_name, type, WORK_QUEUE_CACHE);
+
+	work_queue_invalidate_cached_file_internal(q, f->cached_name);
+	work_queue_file_delete(f);
+}
+
+void work_queue_invalidate_cached_file_internal(struct work_queue *q, const char *filename) {
+	char *key;
+	struct work_queue_worker *w;
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+		if(!hash_table_lookup(w->current_files, filename))
+			continue;
+
+		if(w->foreman) {
+			send_worker_msg(q, w, "invalidate-file %s\n", filename);
+		}
+
+		struct work_queue_task *t;
+		uint64_t taskid;
+
+		itable_firstkey(w->current_tasks);
+		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+			struct work_queue_file *tf;
+			list_first_item(t->input_files);
+
+			while((tf = list_next_item(t->input_files))) {
+				if(strcmp(filename, tf->cached_name) == 0) {
+					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
+					continue;
+				}
+			}
+
+			while((tf = list_next_item(t->output_files))) {
+				if(strcmp(filename, tf->cached_name) == 0) {
+					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
+					continue;
+				}
+			}
+		}
+
+		delete_worker_file(q, w, filename, 0, 0);
+	}
+}
+
 
 void work_queue_task_delete(struct work_queue_task *t)
 {
@@ -4442,6 +4510,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		expire_waiting_tasks(q);
 
+		//Re-enqueue the tasks that workers labeled for resubmission.
+		while((t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RESUBMISSION))) {
+			cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
+		}
+
 		//We have the resources we have been waiting for; start task transfers
 		int known = known_workers(q);
 		if(known > 0 && known >= q->workers_to_wait) {
@@ -4526,10 +4599,12 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int ta
 		return NULL;
 	}
 
-	cancel_task_on_worker(q, matched_task);
+	cancel_task_on_worker(q, matched_task, WORK_QUEUE_TASK_CANCELED);
+
+	/* change state even if task is not running on a worker. */
+	change_task_state(q, matched_task, WORK_QUEUE_TASK_CANCELED);
 
 	q->stats->total_tasks_cancelled++;
-	change_task_state(q, matched_task, WORK_QUEUE_TASK_CANCELED);
 
 	return matched_task;
 }
@@ -4578,10 +4653,10 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 		itable_firstkey(w->current_tasks);
 		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
 			//Delete any input files that are not to be cached.
-			delete_worker_files(q, w, t, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+			delete_worker_files(q, w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 
 			//Delete all output files since they are not needed as the task was aborted.
-			delete_worker_files(q, w, t, t->output_files, 0);
+			delete_worker_files(q, w, t->output_files, 0);
 			reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_CANCELED);
 
 			list_push_tail(l, t);
