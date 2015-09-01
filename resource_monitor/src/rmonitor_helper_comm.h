@@ -27,6 +27,7 @@ struct rmonitor_msg
 {
 	enum rmonitor_msg_type type;
 	pid_t                 origin;
+	int                   error;
 	union {
 		pid_t    p;
 		uint64_t n;
