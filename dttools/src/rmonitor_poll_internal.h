@@ -42,11 +42,11 @@ See the file COPYING for details.
 #include "rmonitor_poll.h"
 
 void rmonitor_poll_all_processes_once(struct itable *processes, struct rmonitor_process_info *acc);
-void rmonitor_poll_all_wds_once(      struct hash_table *wdirs, struct rmonitor_wdir_info *acc);
+void rmonitor_poll_all_wds_once(      struct hash_table *wdirs, struct rmonitor_wdir_info *acc, int max_time_for_measurement);
 void rmonitor_poll_all_fss_once(      struct itable *filesysms, struct rmonitor_filesys_info *acc);
 
 int rmonitor_poll_process_once(struct rmonitor_process_info *p);
-int rmonitor_poll_wd_once(     struct rmonitor_wdir_info    *d);
+int rmonitor_poll_wd_once(     struct rmonitor_wdir_info    *d, int max_time_for_measurement);
 int rmonitor_poll_fs_once(     struct rmonitor_filesys_info *f);
 
 void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f, uint64_t start_time);
@@ -57,7 +57,7 @@ int rmonitor_get_sys_io_usage(  pid_t pid,        struct rmonitor_io_info *io);
 int rmonitor_get_map_io_usage(  pid_t pid,        struct rmonitor_io_info *io);
 int rmonitor_get_dsk_usage(     const char *path, struct statfs *disk);
 
-int rmonitor_get_wd_usage(struct rmonitor_wdir_info *d);
+int rmonitor_get_wd_usage(struct rmonitor_wdir_info *d, int max_time_for_measurement);
 
 void acc_cpu_time_usage( struct rmonitor_cpu_time_info *acc, struct rmonitor_cpu_time_info *other);
 void acc_mem_usage(      struct rmonitor_mem_info *acc,      struct rmonitor_mem_info *other);
