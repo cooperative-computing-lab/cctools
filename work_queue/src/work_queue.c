@@ -3108,7 +3108,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->cores = -1;
 	t->gpus = -1;
 	t->unlabeled = 1;
-	t->loop_mount = 0;	
+	t->loop_mount = 0;
 
 	return t;
 }
