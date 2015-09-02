@@ -1074,6 +1074,10 @@ int rmonitor_check_limits(struct rmsummary *tr)
 {
 	tr->limits_exceeded = NULL;
 
+	/* Consider errors as resources exhausted. Used for ENOSPC, ENFILE, etc. */
+	if(tr->last_error)
+		return 0;
+
 	if(!resources_limits)
 		return 1;
 
@@ -1190,7 +1194,9 @@ void rmonitor_dispatch_msg(void)
             break;
     };
 
-	if(!rmonitor_check_limits(summary))
+	summary->last_error = msg.error;
+
+	if(rmonitor_check_limits(summary))
 		rmonitor_final_cleanup(SIGTERM);
 
 }
@@ -1379,6 +1385,8 @@ int rmonitor_resources(long int interval /*in microseconds */)
 	round = 1;
 	while(itable_size(processes) > 0)
 	{
+		resources_now->last_error = 0;
+
 		ping_processes();
 
 		rmonitor_poll_all_processes_once(processes, p_acc);

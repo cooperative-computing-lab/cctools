@@ -56,9 +56,11 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	rmsummary_assign_as_time_field  (s, key, value, start);
 	rmsummary_assign_as_time_field  (s, key, value, end);
 	rmsummary_assign_as_string_field(s, key, value, exit_type);
+	rmsummary_assign_as_int_field   (s, key, value, last_error);
 	rmsummary_assign_as_int_field   (s, key, value, signal);
 	rmsummary_assign_as_string_field(s, key, value, limits_exceeded);
 	rmsummary_assign_as_int_field   (s, key, value, exit_status);
+	rmsummary_assign_as_int_field   (s, key, value, last_error);
 	rmsummary_assign_as_time_field  (s, key, value, wall_time);
 	rmsummary_assign_as_int_field   (s, key, value, max_concurrent_processes);
 	rmsummary_assign_as_int_field   (s, key, value, total_processes);
@@ -202,6 +204,9 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits
 		fprintf(stream, "%-20s%20s\n",  "exit_type:", s->exit_type);
 
 	fprintf(stream, "%-20s%20" PRId64 "\n",  "exit_status:", s->exit_status);
+
+	if(s->last_error)
+		fprintf(stream, "%-20s%20" PRId64 " %s\n",  "last_error:", s->last_error, strerror(s->last_error));
 
 	if(s->exit_type)
 	{
@@ -360,6 +365,7 @@ void rmsummary_bin_op(struct rmsummary *dest, struct rmsummary *src, rm_bin_op f
 	rmsummary_apply_op(dest, src, fn, start);
 	rmsummary_apply_op(dest, src, fn, end);
 	rmsummary_apply_op(dest, src, fn, exit_status);
+	rmsummary_apply_op(dest, src, fn, last_error);
 	rmsummary_apply_op(dest, src, fn, wall_time);
 	rmsummary_apply_op(dest, src, fn, max_concurrent_processes);
 	rmsummary_apply_op(dest, src, fn, total_processes);
