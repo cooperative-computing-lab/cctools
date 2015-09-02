@@ -12,6 +12,8 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "list.h"
 #include "debug.h"
+#include "stringtools.h"
+#include "unlink_recursive.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -85,6 +87,8 @@ timestamp - the unix time (in microseconds) when this line is written to the log
 
 These event types indicate that the workflow as a whole has started or completed in the indicated manner.
 */
+
+#define CHAR_BUF_LEN 4096
 
 void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n );
 
@@ -170,6 +174,12 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 	struct dag_file *f;
 	struct stat buf;
 	timestamp_t previous_completion_time;
+    int is_sandbox_mode = 0;
+    int is_sandbox_deleted = 0;
+    char sandbox_mode[CHAR_BUF_LEN];
+ 	char sandbox_state[CHAR_BUF_LEN];
+ 	char sandbox_name[CHAR_BUF_LEN];
+
 
 	d->logfile = fopen(filename, "r");
 	if(d->logfile) {
@@ -190,6 +200,20 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 				}
 				continue;
 			}
+
+            /* Check the sandbox state */
+            if ((sscanf(line, "# %s\t%s\t%s\n", sandbox_mode, sandbox_state, sandbox_name)) == -1) {			
+				fatal("Fail to read line with error message %s.\n", strerror(errno));
+
+		        if (string_equal(sandbox_mode, "SANDBOX")) {
+                    is_sandbox_mode = 1;	
+			    	if(string_equal(sandbox_state, "CREATED"))
+			    		is_sandbox_deleted = 0;
+			    	else
+			    		is_sandbox_deleted = 1;
+			    }
+			}
+
 			if(line[0] == '#')
 				continue;
 			if(sscanf(line, "%" SCNu64 " %d %d %d", &previous_completion_time, &nodeid, &state, &jobid) == 4) {
@@ -282,6 +306,12 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 		}
 	}
 
+    /* Check if the sandbox exists, if yes delete it */
+    if (is_sandbox_mode) 
+		/* if the sandbox is not deleted, we delete it and update the state of the sandbox*/
+        if (!is_sandbox_deleted) 
+            makeflow_sandbox_delete(d, sandbox_name);	
+
 	// Decide rerun tasks
 	if(!first_run) {
 		struct itable *rerun_table = itable_create(0);
@@ -303,4 +333,14 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 	}
 }
 
+
+void makeflow_log_sandbox_mode_create( struct dag *d, const char *local_task_dir ) {
+    fprintf(d->logfile, "# SANDBOX\tCREATED\t%s\n", local_task_dir);
+	makeflow_log_sync(d,1);
+}
+
+void makeflow_log_sandbox_mode_delete( struct dag *d, const char *local_task_dir ) {
+    fprintf(d->logfile, "# SANDBOX\tDELETED\t%s\n", local_task_dir);
+	makeflow_log_sync(d,1);
+}
 /* vim: set noexpandtab tabstop=4: */

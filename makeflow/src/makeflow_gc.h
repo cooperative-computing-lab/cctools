@@ -30,6 +30,7 @@ typedef enum {
 void makeflow_parse_input_outputs( struct dag *d );
 void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, int count );
 int makeflow_file_clean( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent );
+void makeflow_sandbox_delete( struct dag *d, const char *sandbox_name );
 void makeflow_clean_node( struct dag *d, struct batch_queue *queue, struct dag_node *n, int silent );
 void makeflow_clean( struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth);
 

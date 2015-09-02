@@ -42,6 +42,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 
 /*
 Code organization notes:
@@ -75,6 +76,12 @@ an example.
 #define CONTAINER_SH "docker.wrapper.sh"
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
+
+#define WITHOUT_CONTAINER 0
+#define WITH_DOCKER 1
+#define WRAPPER_SH "tmp_wrapper.sh"
+
+#define CHAR_BUF_LEN 4096
 
 typedef enum {
 	CONTAINER_MODE_NONE,
@@ -120,6 +127,8 @@ static char *monitor_log_dir = NULL;
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
 static char *image_tar = NULL;
+
+static char *local_task_dir = "makeflow.sandbox";
 
 /* wait upto this many seconds for an output file of a succesfull task
  * to appear on the local filesystem (e.g, to deal with NFS
@@ -532,6 +541,26 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	/* Display the fully elaborated command, just like Make does. */
 	printf("submitting job: %s\n", command);
 
+    if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) {
+
+		struct stat s;
+		int err = stat(local_task_dir, &s);
+		if(-1 == err) {
+		    if(ENOENT == errno) {
+		        /* sandbox dir does not exist, create one */
+                if (mkdir(local_task_dir, 0777) == -1) 
+  					fatal("Fail to create public sandbox with the error message %s", strerror(errno));
+		    } else 
+  				fatal("Fail to locate public sandbox with the error message %s", strerror(errno));
+		} 
+
+        // put the local_task_dir into the envlist, which can be passed to batch_job_submit
+        if (envlist == NULL)
+            envlist = nvpair_create();
+    	nvpair_insert_string(envlist, "local_task_dir", local_task_dir);
+
+    }
+
 	while(1) {
 		jobid = batch_job_submit(queue, command, input_files, output_files, envlist );
 		if(jobid >= 0) {
@@ -642,7 +671,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 
 	/* Generate the environment vars specific to this node. */
 	struct nvpair *envlist = dag_node_env_create(d,n);
-
+   
 	/*
 	Just before execution, replace double-percents with the nodeid.
 	This is used for substituting in the nodeid into a wrapper command or file.
@@ -993,6 +1022,7 @@ static void handle_abort(int sig)
 
 static void show_help_run(const char *cmd)
 {
+
 	printf("Use: %s [options] <dagfile>\n", cmd);
 	printf("Frequently used options:\n\n");
 	printf(" %-30s Clean up: remove logfile and all targets. Optional specification [intermediates, outputs] removes only the indicated files.\n", "-c,--clean=<type>");
@@ -1038,6 +1068,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Add node id symbol tags in the makeflow log.		(default is false)\n", "   --log-verbose");
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
 	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
+	printf(" %-30s Put all tasks' sandbox inside this directory.\n", "--local-task-dir=<dir>");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
@@ -1127,8 +1158,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WRAPPER_OUTPUT,
-		LONG_OPT_DOCKER,
-		LONG_OPT_DOCKER_TAR
+        LONG_OPT_DOCKER,
+        LONG_OPT_DOCKER_TAR,
+        LONG_OPT_LOCAL_TASK_DIR
 	};
 
 	static const struct option long_options_run[] = {
@@ -1183,6 +1215,7 @@ int main(int argc, char *argv[])
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
+        {"local-task-dir", required_argument, 0, LONG_OPT_LOCAL_TASK_DIR},
 		{0, 0, 0, 0}
 	};
 
@@ -1206,7 +1239,7 @@ int main(int argc, char *argv[])
 						clean_mode = MAKEFLOW_CLEAN_INTERMEDIATES;
 					} else if(strcasecmp(optarg, "outputs") == 0){
 						clean_mode = MAKEFLOW_CLEAN_OUTPUTS;
-					} else if(strcasecmp(optarg, "all") != 0){
+                    } else if(strcasecmp(optarg, "all") != 0){
 						fprintf(stderr, "makeflow: unknown clean option %s", optarg);
 						exit(1);
 					}
@@ -1410,9 +1443,12 @@ int main(int argc, char *argv[])
 				container_mode = CONTAINER_MODE_DOCKER;
 				container_image = xxstrdup(optarg);
 				break;
-			case LONG_OPT_DOCKER_TAR:
-				image_tar = xxstrdup(optarg);
-				break;
+            case LONG_OPT_DOCKER_TAR:
+                image_tar = xxstrdup(optarg);
+                break;
+            case LONG_OPT_LOCAL_TASK_DIR:
+                local_task_dir = xxstrdup(optarg);
+                break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -1642,6 +1678,9 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, handle_abort);
 	signal(SIGTERM, handle_abort);
 
+    if (batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX)
+    	makeflow_log_sandbox_mode_create(d, local_task_dir);
+
 	makeflow_log_started_event(d);
 
 	runtime = timestamp_get();
@@ -1676,6 +1715,9 @@ int main(int argc, char *argv[])
 		system(cmd);
 		free(cmd);
 	}
+
+    if(batch_queue_type == BATCH_QUEUE_TYPE_SANDBOX) 
+		makeflow_sandbox_delete(d, local_task_dir);	
 
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);

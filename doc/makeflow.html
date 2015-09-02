@@ -35,9 +35,14 @@ jobs there to run.  If you don't already have a batch system, Makeflow comes
 with a system called Work Queue that will let you distribute the load across
 any collection of machines, large or small.</p>
 
+<p>Makeflow can be run with docker container You can define your own
+docker image and run each Makeflow task with a docker container
+based on the image.</p>
+
 <p>Makeflow currently supports the following batch systems:
 <table>
 <tr><td>local    <td> Local execution on the submitting machine, using multiple cores if available.
+<tr><td>sandbox  <td> Running each task with a sandbox. 
 <tr><td>wq       <td> <a href=http://ccl.cse.nd.edu/software/workqueue>Work Queue</a> distributed application system, included with Makeflow.
 <tr><td>condor   <td> <a href=http://www.cs.wisc.edu/htcondor>HTCondor</a> distributed computing system.
 <tr><td>sge      <td> <a href=http://gridscheduler.sourceforge.net>Open Grid Scheduler</a>, Univa Grid Engine, Oracle Grid Engine, all derived from Sun Grid Engine (SGE).
@@ -238,6 +243,22 @@ make your masters and workers contact this catalog server, simply add the
 <code>makeflow -T wq -C catalog.somewhere.edu:9097 -N MyProj example.makeflow
 work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj
 </code>
+
+<h2 id="docker">Running Makeflow with Docker container<a class="sectionlink" href="#docker" title="Link to this section.">&#x21d7;</a></h2>
+<p>Sometimes running Makeflow may required a customized execution environment. In order to start Makeflow with a customized environment, we 
+integrate Docker into Makeflow system, which enable users to define their own execution environment with Docker containers and running Makeflow with 
+specified containers.</p>
+
+<h3 id="docker.dockerhub">Using Docker Hub to manage container image<a class="sectionlink" href="#docker.dockerhub" title="Link to this section.">&#x21d7;</a></h3>
+<p>Global Docker Hub can be applied to transfer container images. Users need to first create their own container images and push them to the Docker Hub. Then 
+run Makeflow with option <tt>--docker imagename</tt>, the container image will be pulled from Docker Hub and each task would run with a container based on this image</p>
+<code>makeflow --docker ccl/debian_cctools </code>
+
+<h3 id="docker.tar">Using Tarball to manage container image<a class="sectionlink" href="#docker.tar" title="Link to this section.">&#x21d7;</a></h3>
+<p>Another way to transfer container images is by using tarball. Users are required to define their own container image and save this image to a tarball. The tarball need 
+to be placed in the Makeflow working directory. Later when users start running Makeflow, they use option <tt>--docker-tar tarballname</tt> to distribute this tarball to all
+computing nodes. In the following example, we assume that the container built from tarball ccl_debian_cctools.tar is named as ccl/debian_cctools</p>
+<code>makeflow --docker ccl/debian_cctools --docker-tar ccl_debian_cctools.tar</code>
 
 <h2 id="details">More Language Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
 
@@ -608,7 +629,6 @@ Each line in the log file represents a single action taken on a single rule in t
 For simplicity, rules are numbered from the beginning of the Makeflow, starting with zero.
 Each line contains the following items:
 </p>
-
 <code>timestamp task_id new_state job_id tasks_waiting tasks_running tasks_complete tasks_failed tasks_aborted task_id_counter</code>
 
 <p>Which are defined as follows:</p>
@@ -624,7 +644,7 @@ Each line contains the following items:
 		<li> failed </li>
 		<li> aborted </li>
 	</ol>
-	<li><b>job_id</b> - the job id of this task in the underline execution
+        <li><b>job_id</b> - the job id of this task in the underline execution
 	system (local or batch system). If the Makeflow is executed locally, the
 	job id would be the process id of the process that executes this task. If
 	the underline execution system is a batch system, such as Condor or SGE,
