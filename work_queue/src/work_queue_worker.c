@@ -641,6 +641,9 @@ static int handle_tasks(struct link *master)
 
 				debug(D_WQ,"moving output file from %s to %s",sandbox_name,f->payload);
 				if(rename(sandbox_name,f->payload)!=0) {
+					copy_file_to_file(sandbox_name, f->payload);
+				}
+				if(errno != 0) {
 					debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
 				}
 
@@ -828,8 +831,8 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char taskname_encoded[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
 
-	struct work_queue_process *p = work_queue_process_create(taskid);
-	struct work_queue_task *task = p->task;
+	struct work_queue_task *task = work_queue_task_create(0);
+	task->taskid = taskid;
 
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
 		if(sscanf(line,"cmd %d",&length)==1) {
@@ -869,16 +872,17 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			}
 			free(env);
 		} else if(!strcmp(line,"end")) {
-			work_queue_process_compute_disk_needed(p);
+			//work_queue_process_compute_disk_needed(p);
 			break;
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
-			work_queue_process_delete(p);
 			return 0;
 		}
 	}
 
 	last_task_received = task->taskid;
+
+	struct work_queue_process *p = work_queue_process_create(task);
 
 	// Every received task goes into procs_table.
 	itable_insert(procs_table,taskid,p);
