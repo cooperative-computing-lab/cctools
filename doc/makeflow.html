@@ -35,6 +35,10 @@ jobs there to run.  If you don't already have a batch system, Makeflow comes
 with a system called Work Queue that will let you distribute the load across
 any collection of machines, large or small.</p>
 
+<p>Makeflow also supports the use of Docker containers to set up the
+appropriate environment for each task.  This requires that Docker is
+already operational on the machine sthat you intend to use.</p>
+
 <p>Makeflow currently supports the following batch systems:
 <table>
 <tr><td>local    <td> Local execution on the submitting machine, using multiple cores if available.
@@ -238,6 +242,25 @@ make your masters and workers contact this catalog server, simply add the
 <code>makeflow -T wq -C catalog.somewhere.edu:9097 -N MyProj example.makeflow
 work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj
 </code>
+
+<h2 id="docker">Makeflow and Docker<a class="sectionlink" href="#docker" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>Makeflow can be used with Docker to create a precise execution environment for each task.  In this mode, Makeflow will
+invoke Docker to set up the environment, copy the input files into the container, run the command, and then save the
+output files created by the command.</p>
+
+<p>To do this, simply invoke Makeflow with the <tt>--docker</tt> argument, and name the container image
+that you wish all of the commands to use.  Makeflow will ensure that the named image is pulled into each
+Docker node, and then execute the task within that container.  For example, <tt>--docker debian</tt>
+will cause all tasks to be run in the container name <tt>debian</tt>.</p>
+
+<p>Alternatively, if you have an exported container image, you can use the exported image via the <tt>--docker-tar</tt> option.
+Makeflow will load the container into each execution node as needed.  This allows you to use a container without pushing it to a remote repository.
+</p>
+
+<p>This capability <i>in addition</i> to the selection of a batch system.  For example, if you invoke
+<tt>makeflow -T condor --docker debian</tt>, then Makeflow will distribute tasks via Condor, and
+then use Docker to invoke the task at each execution node.
 
 <h2 id="details">More Language Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
 
@@ -608,7 +631,6 @@ Each line in the log file represents a single action taken on a single rule in t
 For simplicity, rules are numbered from the beginning of the Makeflow, starting with zero.
 Each line contains the following items:
 </p>
-
 <code>timestamp task_id new_state job_id tasks_waiting tasks_running tasks_complete tasks_failed tasks_aborted task_id_counter</code>
 
 <p>Which are defined as follows:</p>
@@ -624,9 +646,6 @@ Each line contains the following items:
 		<li> failed </li>
 		<li> aborted </li>
 	</ol>
-	<li><b>job_id</b> - the job id of this task in the underline execution
-	system (local or batch system). If the Makeflow is executed locally, the
-	job id would be the process id of the process that executes this task. If
 	the underline execution system is a batch system, such as Condor or SGE,
 	the job id would be the job id assigned by the batch system when the task
 	was sent to the batch system for execution.</li>
