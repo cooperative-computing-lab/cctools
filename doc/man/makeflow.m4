@@ -26,6 +26,14 @@ jobs there to run. If you don't already have a batch system, BOLD(Makeflow)
 comes with a system called Work Queue that will let you distribute the load
 across any collection of machines, large or small.
 
+PARA
+
+BOLD(Makeflow) can be run with Docker container, you can define your own 
+docker image and run each BOLD(Makeflow) task with a docker container
+based on the image.
+
+PARA
+
 SECTION(OPTIONS)
 When CODE(makeflow) is ran without arguments, it will attempt to execute the
 workflow specified by the BOLD(Makeflow) dagfile using the CODE(local)
@@ -86,6 +94,12 @@ OPTION_PAIR(--monitor-interval, #)Set monitor interval to <#> seconds. (default 
 OPTION_PAIR(--monitor-log-fmt, fmt)Format for monitor logs. (default resource-rule-%06.6d, %d -> rule number)
 OPTIONS_END
 
+SUBSECTION(Docker Support)
+OPTIONS_BEGIN
+OPTION_PAIR(--docker,image) Run each task with a container based on this docker image.
+OPTION_PAIR(--docker-tar,tar) Load docker image from tar file
+OPTIONS_END
+
 SUBSECTION(Other Options)
 OPTIONS_BEGIN
 OPTION_ITEM(`-A, --disable-afs-check')Disable the check for AFS. (experts only)
@@ -93,8 +107,6 @@ OPTION_ITEM(`-z, --zero-length-error')Force failure on zero-length output files.
 OPTION_PAIR(--wrapper,script) Wrap all commands with this BOLD(script). Each rule's original recipe is appended to BOLD(script) or replaces the first occurrence of BOLD({}) in BOLD(script).
 OPTION_PAIR(--wrapper-input,file) Wrapper command requires this input file. This option may be specified more than once, defining an array of inputs. Additionally, each job executing a recipe has a unique integer identifier that replaces occurrences BOLD(%%) in BOLD(file).
 OPTION_PAIR(--wrapper-output,file) Wrapper command requires this output file. This option may be specified more than once, defining an array of outputs. Additionally, each job executing a recipe has a unique integer identifier that replaces occurrences BOLD(%%) in BOLD(file).
-OPTION_PAIR(--docker,image) Run each task with a container based on this docker image.
-OPTION_PAIR(--docker-tar,tar) Load docker image from tar file
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
