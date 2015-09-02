@@ -14,7 +14,7 @@ See the file COPYING for details.
 #include <limits.h>
 
 #include "cctools.h"
-#include "memory_info.h"
+#include "host_memory_info.h"
 #include "debug.h"
 #include "macros.h"
 
@@ -37,14 +37,14 @@ static char *output_filename = 0;
 static unsigned long get_mem_avail()
 {
 	UINT64_T total, avail;
-	memory_info_get(&total, &avail);
+	host_memory_info_get(&total, &avail);
 	return (unsigned long) avail / 1024;
 }
 
 static unsigned long get_mem_usage()
 {
 	UINT64_T rss, total;
-	memory_usage_get(&rss, &total);
+	host_memory_usage_get(&rss, &total);
 	return rss / 1024;
 }
 
