@@ -18,6 +18,12 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 
+struct DIR_with_name {
+	DIR *dir;
+	char *name;
+};
+
+
 int path_disk_size_info_get(const char *path, int64_t *measured_size, int64_t *number_of_files) {
 	struct path_disk_size_info *state = NULL;
 	int result = path_disk_size_info_get_r(path, -1, &state);
@@ -45,8 +51,10 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 	if(!s->current_dirs) {
 		s->complete_measurement = 0;
 
-		DIR *here;
-		if((here = opendir(path))) {
+		struct DIR_with_name *here = malloc(sizeof(struct DIR_with_name));
+
+		if((here->dir = opendir(path))) {
+			here->name = xxstrdup(path);
 			s->current_dirs = list_create(0);
 			s->size_so_far  = 0;
 			s->count_so_far = 1;                     /* count the root directory */
@@ -61,19 +69,19 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 		}
 	}
 
-	DIR *tail;
+	struct DIR_with_name *tail;
 	while((tail = list_peek_tail(s->current_dirs))) {
 		struct dirent *entry;
 		struct stat   file_info;
-		while((entry = readdir(tail))) {
+		while((entry = readdir(tail->dir))) {
 			if( strcmp(".", entry->d_name) == 0 || strcmp("..", entry->d_name) == 0)
 				continue;
 
-			char *composed_path;
+			char composed_path[PATH_MAX];
 			if(entry->d_name[0] == '/') {
-				composed_path = xxstrdup(entry->d_name);
+				strncpy(composed_path, entry->d_name, PATH_MAX);
 			} else {
-				composed_path = string_format("%s/%s", path, entry->d_name);
+				snprintf(composed_path, PATH_MAX, "%s/%s", tail->name, entry->d_name);
 			}
 
 			if(lstat(composed_path, &file_info) < 0) {
@@ -90,10 +98,11 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 			if(S_ISREG(file_info.st_mode)) {
 				s->size_so_far += file_info.st_size;
 			} else if(S_ISDIR(file_info.st_mode)) {
-				DIR *branch;
-				if((branch = opendir(composed_path))) {
-					/* next while we read from the branch */
-					list_push_tail(s->current_dirs, branch);
+				struct DIR_with_name *branch = malloc(sizeof(struct DIR_with_name));
+				if((branch->dir = opendir(composed_path))) {
+					/* future while we'll read from the branch */
+					branch->name = xxstrdup(composed_path);
+					list_push_head(s->current_dirs, branch);
 				} else {
 					result = -1;
 					continue;
@@ -111,7 +120,9 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 
 		/* we are done reading a complete directory, and we go to the next in the queue */
 		tail = list_pop_tail(s->current_dirs);
-		closedir(tail);
+		closedir(tail->dir);
+		free(tail->name);
+		free(tail);
 	}
 
 	list_delete(s->current_dirs);
@@ -147,9 +158,12 @@ void path_disk_size_info_delete_state(struct path_disk_size_info *state) {
 		return;
 
 	if(state->current_dirs) {
-		DIR *dir;
-		while((dir = list_pop_head(state->current_dirs))) {
-			closedir(dir);
+		struct DIR_with_name *tail;
+		while((tail = list_pop_tail(state->current_dirs))) {
+			tail = list_pop_tail(state->current_dirs);
+			closedir(tail->dir);
+			free(tail->name);
+			free(tail);
 		}
 		list_delete(state->current_dirs);
 	}

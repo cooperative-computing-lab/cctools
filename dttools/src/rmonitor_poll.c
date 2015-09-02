@@ -74,7 +74,6 @@ void rmonitor_poll_all_wds_once(struct hash_table *wdirs, struct rmonitor_wdir_i
 	bzero(acc, sizeof( struct rmonitor_wdir_info ));
 
 	if(hash_table_size(wdirs) > 0) {
-
 		if(max_time_for_measurement > 0) {
 			/* split time available across all directories to measure. */
 			max_time_for_measurement = MAX(1, max_time_for_measurement/hash_table_size(wdirs));
