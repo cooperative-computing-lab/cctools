@@ -24,13 +24,9 @@ a multi-core machine, then you can run multiple tasks simultaneously. If you
 have a Condor pool or a Sun Grid Engine batch system, then you can send your
 jobs there to run. If you don't already have a batch system, BOLD(Makeflow)
 comes with a system called Work Queue that will let you distribute the load
-across any collection of machines, large or small.
-
-PARA
-
-BOLD(Makeflow) can be run with Docker container, you can define your own 
-docker image and run each BOLD(Makeflow) task with a docker container
-based on the image.
+across any collection of machines, large or small.  BOLD(Makeflow) also
+supports execution in a Docker container, regardless of the batch system
+used.
 
 PARA
 
@@ -96,8 +92,8 @@ OPTIONS_END
 
 SUBSECTION(Docker Support)
 OPTIONS_BEGIN
-OPTION_PAIR(--docker,image) Run each task with a container based on this docker image.
-OPTION_PAIR(--docker-tar,tar) Load docker image from tar file
+OPTION_PAIR(--docker,image) Run each task in the Docker container with this name.  The image will be obtained via "docker pull" if it is not already available.
+OPTION_PAIR(--docker-tar,tar) Run each task in the Docker container given by this tar file.  The image will be uploaded via "docker load" on each execution site.
 OPTIONS_END
 
 SUBSECTION(Other Options)
