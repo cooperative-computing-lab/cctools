@@ -293,6 +293,22 @@ int open64(const char *path, int flags, ...)
 }
 #endif /* defined linux && __USE_LARGEFILE64 */
 
+ssize_t write(int fd, const void *buf, size_t count)
+{
+	struct rmonitor_msg msg;
+	msg.type   = WRITE;
+	msg.origin = getpid();
+
+	typeof(write) *original_write = dlsym(RTLD_NEXT, "write");
+
+	ssize_t real_count = original_write(fd, buf, count);
+
+	msg.error  = errno;
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
 
 void wakeup_pselect_from_exit(int signum)
 {
