@@ -1168,14 +1168,20 @@ void rmonitor_dispatch_msg(void)
         case CHDIR:
             p->wd = lookup_or_create_wd(p->wd, msg.data.s);
             break;
-        case OPEN_INPUT:
-            debug(D_DEBUG, "File %s has been opened as input.\n", msg.data.s);
-            rmonitor_add_file_watch(msg.data.s, 0);
-            break;
-        case OPEN_OUTPUT:
-            debug(D_DEBUG, "File %s has been opened as output.\n", msg.data.s);
-            rmonitor_add_file_watch(msg.data.s, 1);
-            break;
+		case OPEN_INPUT:
+		case OPEN_OUTPUT:
+			switch(msg.error) {
+				case 0:
+					debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
+					rmonitor_inotify_add_watch(msg.data.s, msg.type == OPEN_OUTPUT);
+					break;
+				case EMFILE:
+					/* Eventually report that we ran out of file descriptors. */
+					break;
+				default:
+					break;
+			}
+			break;
         case READ:
             break;
         case WRITE:
