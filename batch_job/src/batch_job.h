@@ -32,7 +32,8 @@ typedef int64_t batch_job_id_t;
 /** Indicates which type of batch submission to use. */
 /* Must be kept in sync with batch_job_subsystems. */
 typedef enum {
-	BATCH_QUEUE_TYPE_LOCAL,	              /**< Batch jobs will run as local processes. */
+	BATCH_QUEUE_TYPE_LOCAL,	              /**< Batch jobs will run as local processes in the current working directory.  */
+	BATCH_QUEUE_TYPE_SANDBOX,	      /**< Batch jobs will run as local processes in a sandbox directory. */
 	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
 	BATCH_QUEUE_TYPE_AMAZON,              /**< Batch jobs will be sent spun up Amazon ec2 instances */
 	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine. */
