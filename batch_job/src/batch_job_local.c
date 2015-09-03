@@ -21,28 +21,40 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 {
 	batch_job_id_t jobid;
 
+	/* Always flush buffers just before fork, to avoid double output. */
 	fflush(NULL);
+
 	jobid = fork();
 	if(jobid > 0) {
+		/* In parent process after child has started. */
 		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, cmd);
+
 		struct batch_job_info *info = malloc(sizeof(*info));
 		memset(info, 0, sizeof(*info));
 		info->submitted = time(0);
 		info->started = time(0);
 		itable_insert(q->job_table, jobid, info);
+
 		return jobid;
 	} else if(jobid < 0) {
+		/* Fork failed, child process does not exist. */
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
 		return -1;
 	} else {
-		/** The following code works but would duplicates the current process because of the system() function.
-		int result = system(cmd);
-		if(WIFEXITED(result)) {
-			_exit(WEXITSTATUS(result));
-		} else {
-			_exit(1);
-		}*/
+		/*
+		The child process following a fork before an exec
+		is a very limited execution environment.
+		Generally, we should not produce output, debug statements,
+		or do anything that could conflict with actions by the
+		parent process on the same file descriptors.
+		If an error occurs, we call _exit() so as to end the
+		process quickly without performing any cleanup or
+		buffer flushes.
+		*/
 
+		/* Move to the sandbox directory. */
+
+		/* Set up the environment specific to the child. */
 		if(envlist) {
 			jx_export(envlist);
 		}

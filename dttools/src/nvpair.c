@@ -197,6 +197,12 @@ double nvpair_lookup_float(struct nvpair * n, const char *name)
 	}
 }
 
+/*
+Careful not to emit any debug messages here, this function is typically
+used in a child process after fork but before exec, so we must not do
+anything more than the minimum necessary.
+*/
+
 void nvpair_export( struct nvpair *nv )
 {
 	char *name, *value;

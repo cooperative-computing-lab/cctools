@@ -4,6 +4,13 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+/*
+The batch_job_sandbox module is very similar to the batch_job_local
+module, except that it creates a subdirectory and links/renames files
+in and out of the directory, to ensure a clean namespace.
+Eventually, this module will supersede "local" as the default.
+*/
+
 #include "batch_job.h"
 #include "batch_job_internal.h"
 #include "debug.h"
@@ -25,16 +32,18 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 {
 	batch_job_id_t jobid;
 
-	fflush(NULL);
-
 	struct sandbox *s = sandbox_create(".",extra_input_files,extra_output_files);
 	if(!s) {
 		debug(D_BATCH,"couldn't create sandbox for %s\n",cmd);
 		return -1;
 	}
 
+	/* Always flush buffers just before fork, to avoid double output. */
+	fflush(NULL);
+
 	jobid = fork();
 	if(jobid > 0) {
+		/* In parent process after child has started. */
 		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, cmd);
 
 		struct batch_job_info *info = malloc(sizeof(*info));
@@ -48,23 +57,28 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 		
 		return jobid;
 	} else if(jobid < 0) {
+		/* Fork failed, child process does not exist. */
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
 		sandbox_delete(s);
 		return -1;
 	} else {
+		/*
+		The child process following a fork before an exec
+		is a very limited execution environment.
+		Generally, we should not produce output, debug statements,
+		or do anything that could conflict with actions by the
+		parent process on the same file descriptors.
+		If an error occurs, we call _exit() so as to end the
+		process quickly without performing any cleanup or
+		buffer flushes.
+		*/
 
+		/* Move to the sandbox directory. */
 		if(chdir(s->sandbox_path)<0) {
 			_exit(127);
 		}
 
-		/** The following code works but would duplicates the current process because of the system() function.
-		int result = system(cmd);
-		if(WIFEXITED(result)) {
-			_exit(WEXITSTATUS(result));
-		} else {
-			_exit(1);
-		}*/
-
+		/* Set up the environment specific to the child. */
 		if(envlist) {
 			nvpair_export(envlist);
 		}
