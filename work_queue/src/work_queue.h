@@ -446,7 +446,7 @@ not affected.
 - @ref WORK_QUEUE_DIRECTORY
 - @ref WORK_QUEUE_URL
 */
-void work_queue_invalidate_cached_file(struct work_queue *q, const char *local_name, work_queue_file_flags_t type);
+void work_queue_invalidate_cached_file(struct work_queue *q, const char *local_name, work_queue_file_t type);
 
 
 /** Wait for a task to complete.

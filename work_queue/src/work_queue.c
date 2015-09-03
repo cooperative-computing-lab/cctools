@@ -3666,7 +3666,7 @@ void work_queue_file_delete(struct work_queue_file *tf) {
 	free(tf);
 }
 
-void work_queue_invalidate_cached_file(struct work_queue *q, const char *local_name, work_queue_file_flags_t type) {
+void work_queue_invalidate_cached_file(struct work_queue *q, const char *local_name, work_queue_file_t type) {
 	struct work_queue_file *f = work_queue_file_create(NULL, local_name, local_name, type, WORK_QUEUE_CACHE);
 
 	work_queue_invalidate_cached_file_internal(q, f->cached_name);
