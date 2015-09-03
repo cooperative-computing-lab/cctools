@@ -1531,13 +1531,6 @@ int main(int argc, char **argv) {
     rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd);
 #endif
 
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
-    rmonitor_inotify_fd = inotify_init();
-    alloced_inotify_watches = 100;
-    inotify_watches = (char **)(calloc(alloced_inotify_watches, sizeof(char *)));
-    if (inotify_watches == NULL) alloced_inotify_watches = 0;
-#endif
-
 #if defined(CCTOOLS_OPSYS_FREEBSD)
     kd_fbsd = kvm_open(NULL, "/dev/null", NULL, O_RDONLY, "kvm_open");
 #endif
@@ -1574,7 +1567,6 @@ int main(int argc, char **argv) {
 	    if (inotify_watches == NULL) alloced_inotify_watches = 0;
     }
 #endif
-
 
 	char *verbatim_line;
 	if(log_summary)
