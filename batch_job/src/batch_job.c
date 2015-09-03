@@ -7,6 +7,7 @@ See the file COPYING for details.
 
 #include "batch_job.h"
 #include "batch_job_internal.h"
+#include "stringtools.h"
 
 #include "debug.h"
 #include "itable.h"
@@ -34,29 +35,29 @@ extern const struct batch_queue_module batch_queue_dryrun;
 
 static struct batch_queue_module batch_queue_unknown = {
 	BATCH_QUEUE_TYPE_UNKNOWN, "unknown",
-
 	NULL, NULL, NULL, NULL,
-
 	{NULL, NULL, NULL},
-
 	{NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
-#define BATCH_JOB_SYSTEMS  "local, sandbox, wq, condor, sge, torque, moab, slurm, chirp, amazon, dryrun"
-
+/*
+Note that modules here are given in the order that they
+will appear in the batch_job_string() output, so order
+them by typical use of our customers.
+*/
 const struct batch_queue_module * const batch_queue_modules[] = {
-	&batch_queue_amazon,
-	&batch_queue_chirp,
-	&batch_queue_cluster,
-	&batch_queue_condor,
-	&batch_queue_sandbox,
 	&batch_queue_local,
-	&batch_queue_moab,
+	&batch_queue_sandbox,
+	&batch_queue_wq,
+	&batch_queue_condor,
 	&batch_queue_sge,
 	&batch_queue_pbs,
 	&batch_queue_torque,
 	&batch_queue_slurm,
-	&batch_queue_wq,
+	&batch_queue_moab,
+	&batch_queue_cluster,
+	&batch_queue_chirp,
+	&batch_queue_amazon,
 	&batch_queue_dryrun,
 	&batch_queue_unknown
 };
@@ -197,9 +198,18 @@ const char *batch_queue_type_to_string(batch_queue_type_t t)
 	return "unknown";
 }
 
-const char *batch_queue_type_string()
+char *batch_queue_type_string()
 {
-	return BATCH_JOB_SYSTEMS;
+	char *result="";
+
+	const struct batch_queue_module *b;
+	for(b=batch_queue_modules[0];b->type!=BATCH_QUEUE_TYPE_UNKNOWN;b++) {
+		char *nresult = string_format("%s,%s",result,b->typestr);
+		free(result);
+		result = nresult;
+	}
+
+	return result;
 }
 
 

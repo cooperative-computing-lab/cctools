@@ -201,9 +201,10 @@ void batch_queue_delete(struct batch_queue *q);
 
 /** Returns the list of queue types supported by this module.
 Useful for including in help-option outputs.
-@return A static string listing the types of queues supported.
+@return A string listing the types of queues supported.
+Must be freed after use.
 */
-const char *batch_queue_type_string();
+char *batch_queue_type_string();
 
 /** Returns the port number of the batch queue.
 @param q The batch queue of interest.
