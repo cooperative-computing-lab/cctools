@@ -135,6 +135,7 @@ See the file COPYING for details.
 #include "copy_stream.h"
 #include "getopt.h"
 #include "create_dir.h"
+#include "macros.h"
 
 #include "rmonitor.h"
 #include "rmonitor_poll_internal.h"
@@ -332,6 +333,7 @@ int dec_wd_count(struct rmonitor_wdir_info *d)
     {
         debug(D_DEBUG, "working directory '%s' is not monitored anymore.\n", d->path);
 
+		path_disk_size_info_delete_state(d->state);
         hash_table_remove(wdirs, d->path);
 
         dec_fs_count((void *) d->fs);
@@ -394,7 +396,8 @@ struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previo
         debug(D_DEBUG, "working directory '%s' added to monitor.\n", path);
 
         inventory = (struct rmonitor_wdir_info *) malloc(sizeof(struct rmonitor_wdir_info));
-        inventory->path = xxstrdup(path);
+        inventory->path  = xxstrdup(path);
+		inventory->state = NULL;
         hash_table_insert(wdirs, inventory->path, (void *) inventory);
 
         inventory->fs = lookup_or_create_fs(inventory->path);
@@ -591,7 +594,7 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->bytes_read       += (int64_t)  p->io.delta_bytes_faulted;
 	tr->bytes_written     = (int64_t) (p->io.delta_chars_written + tr->bytes_written);
 
-	tr->workdir_num_files = (int64_t) (d->files + d->directories);
+	tr->workdir_num_files = (int64_t) d->files;
 	tr->workdir_footprint = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 
 	tr->fs_nodes          = (int64_t) f->disk.f_ffree;
@@ -1273,8 +1276,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Do not write the time series log file.\n", "--without-time-series");
     fprintf(stdout, "%-30s Do not write the list of opened files.\n", "--without-opened-files");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Measure working directory footprint (potentially slow).\n", "--with-disk-footprint");
-    fprintf(stdout, "%-30s Do not measure working directory footprint (default).\n", "--without-disk-footprint");
+    fprintf(stdout, "%-30s Do not measure working directory footprint.\n", "--without-disk-footprint");
 }
 
 
@@ -1301,7 +1303,7 @@ int rmonitor_resources(long int interval /*in microseconds */)
 		rmonitor_poll_all_processes_once(processes, p_acc);
 
 		if(resources_flags->workdir_footprint)
-			rmonitor_poll_all_wds_once(wdirs, d_acc);
+			rmonitor_poll_all_wds_once(wdirs, d_acc, MAX(1, interval/(ONE_SECOND*hash_table_size(wdirs))));
 
 		// rmonitor_fss_once(f); disabled until statfs fs id makes sense.
 
@@ -1390,12 +1392,14 @@ int main(int argc, char **argv) {
 		    {"without-summary",      no_argument, 0, 3},
 		    {"without-time-series",  no_argument, 0, 4},
 		    {"without-opened-files", no_argument, 0, 5},
-
-		    {"with-disk-footprint",    no_argument, 0, 6},
 		    {"without-disk-footprint", no_argument, 0, 7},
 
 		    {0, 0, 0, 0}
 	    };
+
+
+	/* By default, measure working directory. */
+	resources_flags->workdir_footprint = 1;
 
     while((c = getopt_long(argc, argv, "d:fhi:L:l:o:O:vV:", long_options, NULL)) >= 0)
     {
@@ -1486,9 +1490,6 @@ int main(int argc, char **argv) {
 				opened_path = NULL;
 				use_opened  = 0;
 				break;
-			case 6:
-				resources_flags->workdir_footprint = 1;
-				break;
 			case 7:
 				resources_flags->workdir_footprint = 0;
 				break;
@@ -1531,13 +1532,6 @@ int main(int argc, char **argv) {
     rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd);
 #endif
 
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
-    rmonitor_inotify_fd = inotify_init();
-    alloced_inotify_watches = 100;
-    inotify_watches = (char **)(calloc(alloced_inotify_watches, sizeof(char *)));
-    if (inotify_watches == NULL) alloced_inotify_watches = 0;
-#endif
-
 #if defined(CCTOOLS_OPSYS_FREEBSD)
     kd_fbsd = kvm_open(NULL, "/dev/null", NULL, O_RDONLY, "kvm_open");
 #endif
@@ -1574,7 +1568,6 @@ int main(int argc, char **argv) {
 	    if (inotify_watches == NULL) alloced_inotify_watches = 0;
     }
 #endif
-
 
 	char *verbatim_line;
 	if(log_summary)

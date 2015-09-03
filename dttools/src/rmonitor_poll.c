@@ -13,6 +13,8 @@ See the file COPYING for details.
 #include <sys/time.h>
 
 #include "debug.h"
+#include "path_disk_size_info.h"
+#include "macros.h"
 #include "xxmalloc.h"
 
 #include "rmonitor_poll_internal.h"
@@ -64,18 +66,25 @@ void rmonitor_poll_all_processes_once(struct itable *processes, struct rmonitor_
 	}
 }
 
-void rmonitor_poll_all_wds_once(struct hash_table *wdirs, struct rmonitor_wdir_info *acc)
+void rmonitor_poll_all_wds_once(struct hash_table *wdirs, struct rmonitor_wdir_info *acc, int max_time_for_measurement)
 {
 	struct rmonitor_wdir_info *d;
 	char *path;
 
 	bzero(acc, sizeof( struct rmonitor_wdir_info ));
 
-	hash_table_firstkey(wdirs);
-	while(hash_table_nextkey(wdirs, &path, (void **) &d))
-	{
-		rmonitor_poll_wd_once(d);
-		acc_wd_usage(acc, d);
+	if(hash_table_size(wdirs) > 0) {
+		if(max_time_for_measurement > 0) {
+			/* split time available across all directories to measure. */
+			max_time_for_measurement = MAX(1, max_time_for_measurement/hash_table_size(wdirs));
+		}
+
+		hash_table_firstkey(wdirs);
+		while(hash_table_nextkey(wdirs, &path, (void **) &d))
+		{
+			rmonitor_poll_wd_once(d, max_time_for_measurement);
+			acc_wd_usage(acc, d);
+		}
 	}
 }
 
@@ -112,11 +121,11 @@ int rmonitor_poll_process_once(struct rmonitor_process_info *p)
 	return 0;
 }
 
-int rmonitor_poll_wd_once(struct rmonitor_wdir_info *d)
+int rmonitor_poll_wd_once(struct rmonitor_wdir_info *d, int max_time_for_measurement)
 {
 	debug(D_DEBUG, "monitoring dir %s\n", d->path);
 
-	rmonitor_get_wd_usage(d);
+	rmonitor_get_wd_usage(d, max_time_for_measurement);
 
 	return 0;
 }
@@ -173,6 +182,7 @@ int rmonitor_get_int_attribute(FILE *fstatus, char *attribute, uint64_t *value, 
 	if(!fstatus)
 		return not_found;
 
+	proc_attr_line[PATH_MAX - 2] = '\0';
 	proc_attr_line[PATH_MAX - 1] = '\0';
 
 	if(rewind_flag)
@@ -508,7 +518,7 @@ int rmonitor_get_dsk_usage(const char *path, struct statfs *disk)
 
 	if(statfs(path, disk) > 0)
 	{
-		debug(D_DEBUG, "could statfs on %s : %s\n", cwd, strerror(errno));
+		debug(D_DEBUG, "could not statfs on %s : %s\n", cwd, strerror(errno));
 		return 1;
 	}
 
@@ -522,67 +532,23 @@ void acc_dsk_usage(struct statfs *acc, struct statfs *other)
 	acc->f_ffree  += other->f_ffree;
 }
 
-static struct rmonitor_wdir_info *temporary_dir_info;
-
-static int update_wd_usage(const char *path, const struct stat *s, int typeflag, struct FTW *f)
+int rmonitor_get_wd_usage(struct rmonitor_wdir_info *d, int max_time_for_measurement)
 {
-	switch(typeflag)
-	{
-		case FTW_D:
-			temporary_dir_info->directories++;
-			break;
-		case FTW_DNR:
-			debug(D_DEBUG, "ftw cannot read %s\n", path);
-			temporary_dir_info->directories++;
-			break;
-		case FTW_DP:
-			break;
-		case FTW_F:
-			temporary_dir_info->directories++;
-			temporary_dir_info->byte_count  += s->st_size;
-			temporary_dir_info->block_count += s->st_blocks;
-			break;
-		case FTW_NS:
-			break;
-		case FTW_SL:
-			temporary_dir_info->files++;
-			break;
-		case FTW_SLN:
-			break;
-		default:
-			break;
-	}
+	/* We need a pointer to a pointer, which it is not possible from a struct. Use a dummy variable. */
+	struct path_disk_size_info *state = d->state;
+	path_disk_size_info_get_r(d->path, max_time_for_measurement, &state);
+	d->state = state;
+
+	d->files = d->state->last_file_count_complete;
+	d->byte_count = d->state->last_byte_size_complete;
 
 	return 0;
-}
-
-int rmonitor_get_wd_usage(struct rmonitor_wdir_info *d)
-{
-	int result;
-
-	d->files = 0;
-	d->directories = 0;
-	d->byte_count = 0;
-	d->block_count = 0;
-
-	temporary_dir_info = d;
-	result = nftw(d->path, update_wd_usage, MAX_FILE_DESCRIPTOR_COUNT, FTW_PHYS);
-	temporary_dir_info = NULL;
-
-	if(result == -1) {
-		debug(D_DEBUG, "ftw error\n");
-		result = 1;
-	}
-
-	return result;
 }
 
 void acc_wd_usage(struct rmonitor_wdir_info *acc, struct rmonitor_wdir_info *other)
 {
 	acc->files       += other->files;
-	acc->directories += other->directories;
 	acc->byte_count  += other->byte_count;
-	acc->block_count += other->block_count;
 }
 
 char *rmonitor_get_command_line(pid_t pid)
@@ -633,7 +599,7 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 	tr->workdir_footprint = -1;
 
 	if(d) {
-		tr->workdir_num_files = (int64_t) (d->files + d->directories);
+		tr->workdir_num_files = (int64_t) (d->files);
 		tr->workdir_footprint = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 	}
 
@@ -660,9 +626,11 @@ int rmonitor_measure_process(struct rmsummary *tr, pid_t pid) {
 	char cwd_org[PATH_MAX];
 	snprintf(cwd_link, PATH_MAX, "/proc/%d/cwd", pid);
 	readlink(cwd_link, cwd_org, PATH_MAX);
-	d.path = cwd_org;
 
-	err = rmonitor_poll_wd_once(&d);
+	d.path = cwd_org;
+	d.state = NULL;
+
+	err = rmonitor_poll_wd_once(&d, -1);
 	if(err != 0)
 		return err;
 

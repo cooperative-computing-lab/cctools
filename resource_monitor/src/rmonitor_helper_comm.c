@@ -114,6 +114,8 @@ int find_localhost_addr(int port, struct addrinfo **addr)
 	if( status != 0)
 		debug(D_RMON, "couldn't resolve socket address: %s\n", strerror(errno));
 
+	free(portname);
+
 	*addr = res;
 
 	return status;
@@ -137,12 +139,18 @@ int send_monitor_msg(struct rmonitor_msg *msg)
 	sscanf(socket_info, "%d", &port);
 	debug(D_RMON, "found socket info at %d.\n", port);
 
-	find_localhost_addr(port, &addr);
+	int status = find_localhost_addr(port, &addr);
+
+	if(status != 0) {
+		debug(D_RMON,"couldn't read socket information.");
+		return -1;
+	}
 
 	fd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
 	if(fd < 0)
 	{
 		debug(D_RMON,"couldn't open socket for writing.");
+		freeaddrinfo(addr);
 		return -1;
 	}
 
@@ -185,18 +193,22 @@ int rmonitor_open_socket(int *fd, int *port)
 	}
 
 	for(*port = low; *port <= high; *port +=1) {
-		find_localhost_addr(*port, &addr);
+		int status = find_localhost_addr(*port, &addr);
 
 		if(!bind(*fd, addr->ai_addr, addr->ai_addrlen))
 		{
+			free(addr);
 			debug(D_RMON,"socket open at port %d\n", *port);
 			return *port;
 		}
+
+		if(status == 0)
+			free(addr);
 	}
 
-		debug(D_RMON,"couldn't find open port for socket.");
+	debug(D_RMON,"couldn't find open port for socket.");
 
-		return 0;
+	return 0;
 }
 
  /* We use datagrams to send information to the monitor from the

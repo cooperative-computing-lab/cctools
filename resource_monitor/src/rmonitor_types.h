@@ -17,10 +17,7 @@
 #include <sys/statvfs.h>
 #endif
 
-#ifdef HAS_FTS_H
-#include <fts.h>
-#endif
-#include <ftw.h>
+#include "path_disk_size_info.h"
 
 #include "int_sizes.h"
 
@@ -79,10 +76,9 @@ struct rmonitor_wdir_info
 {
 	char     *path;
 	int      files;
-	int      directories;
 	off_t    byte_count;
-	blkcnt_t block_count;
 
+	struct path_disk_size_info *state;
 	struct rmonitor_filesys_info *fs;
 };
 
