@@ -29,22 +29,34 @@ struct sandbox * sandbox_create( const char *parent_dir, const char *input_files
 	char *file = strtok(files,",");
 	while(file && !failed) {
 
-		// doesn't handle equals sign yet
+		/*
+		When remote renaming is used, the file may be of the
+		form x=y, where x is the name outside the sandbox, 
+		and y is the name inside the sandbox.
+		*/
 
-		char *link_location = string_format("%s/%s",sandbox_path,file);
-		char *link_target = string_format("../%s",file);
+		char *inside_file = strchr(file,'=');
+		if(inside_file) {
+			*inside_file = 0;
+			inside_file++;
+		} else {
+			inside_file = file;
+		}
 
-		debug(D_BATCH,"symlink %s -> %s",link_target,link_location);
+		char *inside_path = string_format("%s/%s",sandbox_path,inside_file);
+		char *outside_path = string_format("../%s",file);
 
-		int result = symlink(link_target,link_location);
+		debug(D_BATCH,"symlink %s -> %s",inside_path,outside_path);
+
+		int result = symlink(outside_path,inside_path);
 		if(result<0) {
-			debug(D_BATCH|D_NOTICE,"couldn't symlink %s to %s: %s",link_location,link_target,strerror(errno));
+			debug(D_BATCH|D_NOTICE,"couldn't symlink %s to %s: %s",inside_path,outside_path,strerror(errno));
 			failed = 1;
 			break;
 		}
 		
-		free(link_location);
-		free(link_target);
+		free(inside_path);
+		free(outside_path);
 
 		file = strtok(0,",");
 	}
@@ -83,21 +95,33 @@ void sandbox_cleanup( struct sandbox *s )
 	char *file = strtok(files,",");
 	while(file) {
 
-		// doesn't handle equals sign yet
+		/*
+		When remote renaming is used, the file may be of the
+		form x=y, where x is the name outside the sandbox, 
+		and y is the name inside the sandbox.
+		*/
 
-		char *source_file = string_format("%s/%s",s->sandbox_path,file);
-		char *target_file = string_format("%s",file);
+		char *inside_file = strchr(file,'=');
+		if(inside_file) {
+			*inside_file = 0;
+			inside_file++;
+		} else {
+			inside_file = file;
+		}
 
-		debug(D_BATCH,"rename %s -> %s",source_file,target_file);
+		char *inside_path = string_format("%s/%s",s->sandbox_path,inside_file);
+		char *outside_path = string_format("%s",file);
 
-		int result = rename(source_file,target_file);
+		debug(D_BATCH,"rename %s -> %s",inside_path,outside_path);
+
+		int result = rename(inside_path,outside_path);
 		if(result<0) {
-			debug(D_BATCH|D_NOTICE,"couldn't move %s to %s: %s",source_file,target_file,strerror(errno));
+			debug(D_BATCH|D_NOTICE,"couldn't move %s to %s: %s",inside_path,outside_path,strerror(errno));
 			// fall through on failure, let next layer detect it
 		}
 		
-		free(source_file);
-		free(target_file);
+		free(inside_path);
+		free(outside_path);
 
 		file = strtok(0,",");
 	}
