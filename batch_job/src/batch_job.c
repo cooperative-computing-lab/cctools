@@ -33,13 +33,6 @@ extern const struct batch_queue_module batch_queue_slurm;
 extern const struct batch_queue_module batch_queue_wq;
 extern const struct batch_queue_module batch_queue_dryrun;
 
-static struct batch_queue_module batch_queue_unknown = {
-	BATCH_QUEUE_TYPE_UNKNOWN, "unknown",
-	NULL, NULL, NULL, NULL,
-	{NULL, NULL, NULL},
-	{NULL, NULL, NULL, NULL, NULL, NULL},
-};
-
 /*
 Note that modules here are given in the order that they
 will appear in the batch_job_string() output, so order
@@ -59,7 +52,7 @@ const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_chirp,
 	&batch_queue_amazon,
 	&batch_queue_dryrun,
-	&batch_queue_unknown
+	0
 };
 
 struct batch_queue *batch_queue_create(batch_queue_type_t type)
@@ -81,9 +74,10 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	batch_queue_set_feature(q, "gc_size", "yes");
 
 	q->module = NULL;
-	for (i = 0; batch_queue_modules[i]->type != BATCH_QUEUE_TYPE_UNKNOWN; i++)
+	for (i = 0; batch_queue_modules[i]; i++)
 		if (batch_queue_modules[i]->type == type)
 			q->module = batch_queue_modules[i];
+
 	if (q->module == NULL) {
 		batch_queue_delete(q);
 		return NULL;
@@ -183,7 +177,7 @@ void batch_queue_set_int_option(struct batch_queue *q, const char *what, int val
 batch_queue_type_t batch_queue_type_from_string(const char *str)
 {
 	int i;
-	for (i = 0; batch_queue_modules[i]->type != BATCH_QUEUE_TYPE_UNKNOWN; i++)
+	for (i = 0; batch_queue_modules[i]; i++)
 		if (strcmp(batch_queue_modules[i]->typestr, str) == 0)
 			return batch_queue_modules[i]->type;
 	return BATCH_QUEUE_TYPE_UNKNOWN;
@@ -192,7 +186,7 @@ batch_queue_type_t batch_queue_type_from_string(const char *str)
 const char *batch_queue_type_to_string(batch_queue_type_t t)
 {
 	int i;
-	for (i = 0; batch_queue_modules[i]->type != BATCH_QUEUE_TYPE_UNKNOWN; i++)
+	for (i = 0; batch_queue_modules[i]; i++)
 		if (batch_queue_modules[i]->type == t)
 			return batch_queue_modules[i]->typestr;
 	return "unknown";
@@ -200,13 +194,18 @@ const char *batch_queue_type_to_string(batch_queue_type_t t)
 
 char *batch_queue_type_string()
 {
-	char *result="";
+	char *result=0;
 
-	const struct batch_queue_module *b;
-	for(b=batch_queue_modules[0];b->type!=BATCH_QUEUE_TYPE_UNKNOWN;b++) {
-		char *nresult = string_format("%s,%s",result,b->typestr);
-		free(result);
-		result = nresult;
+	int i;
+
+	for (i = 0; batch_queue_modules[i]; i++) {
+		if(result) {
+			char *nresult = string_format("%s, %s",result,batch_queue_modules[i]->typestr);
+			free(result);
+			result = nresult;
+		} else {
+			result = strdup(batch_queue_modules[i]->typestr);
+		}
 	}
 
 	return result;
