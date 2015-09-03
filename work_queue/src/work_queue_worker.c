@@ -872,7 +872,6 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			}
 			free(env);
 		} else if(!strcmp(line,"end")) {
-			//work_queue_process_compute_disk_needed(p);
 			break;
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
