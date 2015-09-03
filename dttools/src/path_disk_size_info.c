@@ -104,6 +104,7 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 					branch->name = xxstrdup(composed_path);
 					list_push_head(s->current_dirs, branch);
 				} else {
+					free(branch);
 					result = -1;
 					continue;
 				}
@@ -160,9 +161,12 @@ void path_disk_size_info_delete_state(struct path_disk_size_info *state) {
 	if(state->current_dirs) {
 		struct DIR_with_name *tail;
 		while((tail = list_pop_tail(state->current_dirs))) {
-			tail = list_pop_tail(state->current_dirs);
-			closedir(tail->dir);
-			free(tail->name);
+			if(tail->dir)
+				closedir(tail->dir);
+
+			if(tail->name)
+				free(tail->name);
+
 			free(tail);
 		}
 		list_delete(state->current_dirs);
