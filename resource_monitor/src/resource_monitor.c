@@ -1181,14 +1181,27 @@ void rmonitor_dispatch_msg(void)
 					break;
 				case EMFILE:
 					/* Eventually report that we ran out of file descriptors. */
+					debug(D_DEBUG, "Process %d ran out of file descriptors.\n", msg.origin);
 					break;
 				default:
+					/* Clear the error, as it is not related to resources. */
+					msg.error = 0;
 					break;
 			}
 			break;
         case READ:
             break;
         case WRITE:
+			switch(msg.error) {
+				case ENOSPC:
+					/* Eventually report that we ran out of space. */
+					debug(D_DEBUG, "Process %d ran out of disk space.\n", msg.origin);
+					break;
+				default:
+					/* Clear the error, as it is not related to resources. */
+					msg.error = 0;
+					break;
+			}
             break;
         default:
             break;
