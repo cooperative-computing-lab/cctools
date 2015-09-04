@@ -56,7 +56,6 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	rmsummary_assign_as_time_field  (s, key, value, start);
 	rmsummary_assign_as_time_field  (s, key, value, end);
 	rmsummary_assign_as_string_field(s, key, value, exit_type);
-	rmsummary_assign_as_int_field   (s, key, value, last_error);
 	rmsummary_assign_as_int_field   (s, key, value, signal);
 	rmsummary_assign_as_string_field(s, key, value, limits_exceeded);
 	rmsummary_assign_as_int_field   (s, key, value, exit_status);

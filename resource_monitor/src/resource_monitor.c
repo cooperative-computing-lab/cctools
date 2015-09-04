@@ -1209,7 +1209,7 @@ void rmonitor_dispatch_msg(void)
 
 	summary->last_error = msg.error;
 
-	if(rmonitor_check_limits(summary))
+	if(!rmonitor_check_limits(summary))
 		rmonitor_final_cleanup(SIGTERM);
 
 }
