@@ -6,6 +6,7 @@ umbrella \
 --sandbox_mode parrot \
 --log umbrella.log \
 --config povray.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/parrot_povray \
@@ -17,6 +18,7 @@ umbrella \
 --sandbox_mode docker \
 --log umbrella.log \
 --config povray.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/docker_povray \
@@ -27,6 +29,7 @@ umbrella \
 --sandbox_mode chroot \
 --log umbrella.log \
 --config povray.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/chroot_povray \
@@ -39,6 +42,7 @@ umbrella \
 --sandbox_mode local \
 --log umbrella.log \
 --config povray.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/local_povray  \
@@ -59,6 +63,7 @@ umbrella \
 --ec2_key feb272015 \
 --ec2_group 'sg-24f96141' \
 --config povray.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/ec2_povray \
@@ -71,6 +76,7 @@ umbrella \
 --log umbrella.log \
 --condor_log umbrella.log.condor \
 --config povray.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/condor_povray \

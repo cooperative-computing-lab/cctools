@@ -6,6 +6,7 @@ umbrella \
 --sandbox_mode parrot \
 --log umbrella.log \
 --config cms_simple.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs 'cms_simple1.sh=cms_simple.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/parrot_cms_simple_output \
@@ -18,6 +19,7 @@ umbrella \
 --sandbox_mode docker \
 --log umbrella.log \
 --config cms_simple.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs 'cms_simple1.sh=cms_simple.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/docker_cms_simple_output \
@@ -31,6 +33,7 @@ umbrella \
 --sandbox_mode local \
 --log umbrella.log \
 --config cms_simple.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs 'cms_simple1.sh=cms_simple.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/local_cms_simple_output \
@@ -52,6 +55,7 @@ umbrella \
 --ec2_key feb272015 \
 --ec2_group 'sg-24f96141' \
 --config cms_simple.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs 'cms_simple1.sh=cms_simple.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/ec2_cms_simple_output \
@@ -65,6 +69,7 @@ umbrella \
 --log umbrella.log \
 --condor_log umbrella.log.condor \
 --config cms_simple.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs 'cms_simple1.sh=cms_simple.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/condor_cms_simple_output \
