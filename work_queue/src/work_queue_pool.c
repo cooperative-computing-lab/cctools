@@ -526,7 +526,7 @@ int main(int argc, char *argv[])
 		scratch_dir = string_format("/tmp/wq-pool-%d",getuid());
 	}
 
-	if(!create_dir(scratch_dir,0700)) {
+	if(!create_dir(scratch_dir,0777)) {
 		fprintf(stderr,"work_queue_pool: couldn't create %s: %s",scratch_dir,strerror(errno));
 		return 1;
 	}
