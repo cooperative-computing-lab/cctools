@@ -34,7 +34,7 @@
 #define TMP_SCRIPT "tmp.sh"
 #define DEFAULT_EXE_APP "#!/bin/sh"
 
-struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_task)
+struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_task, int disk_allocation)
 {
 	struct work_queue_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
@@ -43,23 +43,34 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 
 	p->sandbox = string_format("t.%d", taskid);
 
+	if(disk_allocation == 1) {
 	work_queue_process_compute_disk_needed(p);
+		if(p->disk > 0) {
+			int64_t size = (p->disk) * 1024;
 
-	if(p->disk > 0) {
-		int64_t size = (p->disk) * 1024;
-
-		if(disk_alloc_create(p->sandbox, size) == 0) {
-			p->task->loop_mount = 1;
-			debug(D_WQ, "disk_alloc: %"PRId64"MB\n", size);
-			return p;
+			if(disk_alloc_create(p->sandbox, size) == 0) {
+				p->loop_mount = 1;
+				debug(D_WQ, "disk_alloc: %"PRId64"MB\n", size);
+				return p;
+			}
 		}
-	}
-	if(!create_dir(p->sandbox, 0777)) {
-		work_queue_process_delete(p);
-		return 0;
-	}
+		if(!create_dir(p->sandbox, 0777)) {
+			work_queue_process_delete(p);
+			return 0;
+		}
 
-	return p;
+		p->loop_mount = 0;
+		return p;
+	}
+	else {
+		if(!create_dir(p->sandbox, 0777)) {
+			work_queue_process_delete(p);
+			return 0;
+		}
+
+		p->loop_mount = 0;
+		return p;
+	}
 }
 
 void work_queue_process_delete(struct work_queue_process *p)
@@ -78,7 +89,7 @@ void work_queue_process_delete(struct work_queue_process *p)
 	}
 
 	if(p->sandbox) {
-		if(p->task->loop_mount == 1) {
+		if(p->loop_mount == 1) {
 			disk_alloc_delete(p->sandbox);
 		}
 		else {

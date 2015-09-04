@@ -144,8 +144,7 @@ struct work_queue_task {
 	int cores;                                             /**< Number of cores required by the task. */
 	int gpus;                                              /**< Number of gpus required by the task. */
 	int unlabeled;                                         /**< 1 if the task did not specify any required resource. 0 otherwise. */
-	int loop_mount;                                        /**< 1 if the task sandbox was mounted on a loop device. 0 otherwise. */
-
+	
 	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
 
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
