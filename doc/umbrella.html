@@ -137,6 +137,7 @@
 	--sandbox_mode parrot \
 	--log umbrella.log \
 	--config povray.umbrella \
+	--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/parrot_povray \
@@ -235,6 +236,7 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 	--sandbox_mode parrot \
 	--log umbrella.log \
 	--config cms_complex.umbrella \
+	--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 	--inputs 'cms_complex.sh=cms_complex.sh' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/parrot_cms_complex_output \
@@ -319,6 +321,7 @@ System                  2                   2
 		"povray-3.6.1-redhat5-x86_64": {
 			"id": "9b7f2362e6b927c8ef08c3f92599e47c",
 			"mountpoint": "/software/povray-3.6.1-redhat5-x86_64",
+			"mount_env": "POVRAY_PATH",
 			"action": "unpack"
 		}
 	},
@@ -399,11 +402,33 @@ System                  2                   2
 				<li><b>mountpoint</b> (required): the mountpoint of the software. Case
 				sensitive.</li>
 
+				<li><b>mount_env</b> (optional): Replace hard-coded paths in the shell script
+				with environment variables to make it easy to redirect dependencies in the
+				future. Case sensitive. In the above example, <tt>POVRAY_PATH</tt> is used inside
+				the user's source code instead of the path <tt>/software/povray-3.6.1-redhat5-x86_64</tt>.</li>
+
 				<li><b>action</b> (required): the action on the downloaded software
 				dependencies. Options: <tt>none</tt>, <tt>unpack</tt>. <tt>none</tt> leaves the
 				downloaded dedendency as it is. <tt>unpack</tt> uncompresses the depedency. Not
 				case sensitive.</li>
 
+				<p><b>Relationship between mountpoint and mount_env (3 Cases): </b></p>
+
+				<p> <b>Case 1:</b> If only mountpoint is set to A in a specification, the
+				dependency will be downloaded into the umbrella local cache with the file path
+				of D, and a new mountpoint will be added into mount_dict (mount_dict[A] = D).
+				</p>
+
+				<p> <b>Case 2:</b> If only mount_env is set to B in a specification, the
+				dependency will not be downloaded, package_search will be executed to get one
+				remote storage location, C, of the dependency, a new environment variable will
+				be set (env_para_dict[B] = C).  </p>
+
+				<p> <b>Case 3:</b> If mountpoint is set to A and mount_env is set to B in a
+				specification, the dependency will be downloaded into the umbrella local cache
+				with the file path of D, and a new mountpoint will be added into mount_dict
+				(mount_dict[A] = D) and a new environment variable will also be set
+				(env_para_dict[B] = A).  </p>
 			</ul>
 
 			<p><b>data</b> Section (optional):</p>
@@ -488,6 +513,7 @@ System                  2                   2
 	--sandbox_mode parrot \
 	--log umbrella.log \
 	--config povray.umbrella \
+	--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/parrot_povray \
@@ -500,6 +526,7 @@ System                  2                   2
 	--sandbox_mode docker \
 	--log umbrella.log \
 	--config povray.umbrella \
+	--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/docker_povray \
@@ -514,6 +541,7 @@ System                  2                   2
 	--sandbox_mode chroot \
 	--log umbrella.log \
 	--config povray.umbrella \
+	--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/chroot_povray \
@@ -528,6 +556,7 @@ System                  2                   2
 	--sandbox_mode local \
 	--log umbrella.log \
 	--config povray.umbrella \
+	--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/local_povray \
@@ -550,6 +579,7 @@ System                  2                   2
 	--log umbrella.log \
 	--condor_log umbrella.log.condor \
 	--config povray.umbrella \
+	--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/condor_povray \
@@ -569,6 +599,7 @@ System                  2                   2
 	--ec2_key feb272015 \
 	--ec2_group 'sg-24f96141' \
 	--config povray.umbrella \
+	--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/ec2_povray \
@@ -628,6 +659,13 @@ System                  2                   2
 		"size": "480MB"
 	}
 },
+"cmssw-4.2.8-slc5-amd64": {
+	"cvmfs://cvmfs/cms.cern.ch": {
+		"source": [
+			"cvmfs://cvmfs/cms.cern.ch"
+		]
+	}
+},
 "final_events_2381.lhe": {
 	"cb9878132aad42e7db30eabd214be8e2": {
 		"source": [
@@ -681,11 +719,17 @@ System                  2                   2
 
 			</ul>
 
-			<p><b>Relationship of id and checksum.</b> The id and checksum of each package
-			in the archive are identical in our implementation of metadata database.
+			<p><b>Relationship of id and checksum and source.</b> The checksum of each package
+			in the archive can be used as the id of the package in our implementation of metadata database.
 			However, it is not necessary for them to be identical to each other. You can
 			implement your metadata database in a different semantics once the id of each
-			package is unique for one dependency.</p>
+			package is unique for one dependency.
+			In case when the checksum of one dependency is not provided or
+			feasible, the first item of the source section will be used.  For example, in
+			the above example, <tt>cmssw-4.2.8-slc5-amd64</tt> is delivered through cvmfs
+			during runtime, and no checksum is provided, the url from the source section,
+			<tt>cvmfs://cvmfs/cms.cern.ch</tt> is used as the id of this package.
+			</p>
 
 			<p><b>Organization of the Local Cache.</b> Within the local cache, the id of
 			each package dependency will be used to create a directory under the
@@ -857,6 +901,7 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 	--sandbox_mode parrot \
 	--log umbrella.log \
 	--config cms_complex.umbrella \
+	--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 	--inputs 'cms_complex.sh=cms_complex.sh' \
 	--localdir /tmp/umbrella_test/ \
 	--output /tmp/umbrella_test/parrot_cms_complex_output \
