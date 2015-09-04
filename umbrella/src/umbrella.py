@@ -80,16 +80,14 @@ if sys.version_info > (2,6,):
 else:
 	import simplejson as json #json module is introduce in python 2.4.3
 
-"""
-Replace the version of cctools inside umbrella is easy, just replace all the current version to the new version.
-For example, for now, 4.9.0 is the version umbrella is using, if we want to let umbrella use 5.0.1 next month, just replace all the "4.9.0" with "5.0.1".
-To allow this, do remember to add the 5.0.1 cctools packages into the remote archive and the metadata of the cctools 5.0.1 packages into packges.json.
-cctools-version: based on http://www3.nd.edu/~ccl/software/files/cctools-4.9.0-x86_64-redhat6.tar.gz
-Here, 4.9.0 is the version number I picked up to denote the latest master branch, the infomation of the HEAD is:
-	Author: Patrick Donnelly
-	Date:   2015-06-26 17:08:45 -0400
-	Commit: f2bb681fdf8403632aa3da767983bf566e40007d (master)
-"""
+#Replace the version of cctools inside umbrella is easy: set cctools_binary_version.
+cctools_binary_version = "5.2.0"
+cctools_dest = ""
+
+#set cms_siteconf_url to be the url for the siteconf your application depends
+#the url and format settings here should be consistent with the function set_cvmfs_cms_siteconf
+cms_siteconf_url = "http://ccl.cse.nd.edu/research/data/hep-case-study/2efd5cbb3424fe6b4a74294c84d0fb43/SITECONF.tar.gz"
+cms_siteconf_format = "tgz"
 
 def subprocess_error(cmd, rc, stdout, stderr):
 	"""Print the command, return code, stdout, and stderr; and then directly exit.
@@ -242,13 +240,14 @@ def dependency_download(url, checksum, checksum_tool, dest, format_remote_storag
 	if checksum_tool == "md5sum":
 		local_checksum = md5_cal(dest)
 		logging.debug("The checksum of %s is: %s", dest, local_checksum)
+		if not local_checksum == checksum:
+			logging.critical("The version of %s is incorrect! Please first delete it and its unpacked directory!!", dest)
+			sys.exit("the version of " + dest + " is incorrect! Please first delete it and its unpacked directory!!\n")
+	elif not checksum_tool:
+		logging.debug("the checksum of %s is not provided!", url)
 	else:
 		logging.critical("%s is not supported currently!", checksum_tool)
 		sys.exit(checksum_tool + "is not supported currently!")
-
-	if not local_checksum == checksum:
-		logging.critical("The version of %s is incorrect! Please first delete it and its unpacked directory!!", dest)
-		sys.exit("the version of " + dest + " is incorrect! Please first delete it and its unpacked directory!!\n")
 
 	#if the uncompressed-version dependency does not exist, uncompress the dependency
 	if action == "unpack" and (not os.path.exists(dest_uncompress)) and format_remote_storage == "tgz":
@@ -326,19 +325,12 @@ def cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro
 	Returns:
 		the path of the downloaded cctools in the umbrella local cache. For example: /tmp/umbrella_test/cache/d19376d92daa129ff736f75247b79ec8/cctools-4.9.0-redhat6-x86_64
 	"""
-	name = "cctools-4.9.0-%s-%s" % (linux_distro, hardware_platform)
-	item = package_search(packages_json, name)
-
-	source = attr_check(item, "source", 1)
-
-	if source[:4] == 'git+':
-		dest = git_dependency_parser(item, source[4:], sandbox_dir)
-	else:
-		checksum = attr_check(item, "checksum")
-		format = attr_check(item, "format")
-		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
-		dependency_download(source, checksum, "md5sum", dest, format, action)
-	return dest
+	name = "cctools-%s-%s-%s" % (cctools_binary_version, hardware_platform, linux_distro)
+	source = "http://ccl.cse.nd.edu/software/files/%s.tar.gz" % name
+	global cctools_dest
+	cctools_dest = os.path.dirname(sandbox_dir) + "/cache/" + name
+	dependency_download(source, None, None, cctools_dest, "tgz", "unpack")
+	return cctools_dest
 
 def set_cvmfs_cms_siteconf(name, action, packages_json, sandbox_dir):
 	"""Download cvmfs SITEINFO and set its mountpoint.
@@ -352,17 +344,9 @@ def set_cvmfs_cms_siteconf(name, action, packages_json, sandbox_dir):
 	Returns:
 		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 	"""
-	cvmfs_cms_siteconf_mountpoint = ''
-	item = package_search(packages_json, "cms_siteconf_local_cvmfs")
-	source = attr_check(item, "source", 1)
-	if source[:4] == 'git+':
-		dest = git_dependency_parser(item, source[4:], sandbox_dir)
-	else:
-		checksum = attr_check(item, "checksum")
-		format = attr_check(item, "format")
-		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/SITECONF"
-		dependency_download(source, checksum, "md5sum", dest, format, "unpack")
-		cvmfs_cms_siteconf_mountpoint = '/cvmfs/cms.cern.ch/SITECONF/local %s/local' % dest
+	dest = os.path.dirname(sandbox_dir) + "/cache/cms_siteconf/SITECONF"
+	dependency_download(cms_siteconf_url, "", "", dest, cms_siteconf_format, "unpack")
+	cvmfs_cms_siteconf_mountpoint = '/cvmfs/cms.cern.ch/SITECONF/local %s/local' % dest
 	return cvmfs_cms_siteconf_mountpoint
 
 def is_dir(path):
@@ -801,16 +785,12 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardwar
 		the modified version of the user's cmd.
 	"""
 	#Here we use the cctools package from the local cache (which includes all the packages including cvmfs, globus, fuse and so on). Even if the user may install cctools by himself on the machine, the configuration of the local installation may be not what we want. For example, the user may just configure like this `./configure --prefix ~/cctools`.
-	name = 'cctools-4.9.0-%s-%s' % (linux_distro, hardware_platform)
-	item = package_search(packages_json, name)
-	checksum = attr_check(item, "checksum")
-	dest = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), checksum, name)
 	#4.4 and 4.4 does not support --no-set-foreground feature.
 	#user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
 	if cvmfs_http_proxy:
-		user_cmd[0] = "export HTTP_PROXY=" + cvmfs_http_proxy + "; " + dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
+		user_cmd[0] = "export HTTP_PROXY=" + cvmfs_http_proxy + "; " + cctools_dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
 	else:
-		user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
+		user_cmd[0] = cctools_dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
 	logging.debug("The parrotized user_cmd: %s" % user_cmd[0])
 	return user_cmd
 
@@ -2306,6 +2286,98 @@ def get_public_dns(instance_id):
 			break
 	return public_dns
 
+def add_item(item, source_dict, target_dict):
+	"""Add the metadata information (source format checksum size) about item from source_dict (umbrella specification) to target_dict (metadata database).
+	The item can be identified through two mechanisms: checksum attribute or one source location, which is used when checksum is not applicable for this item.
+	If the item has been in the metadata database, do nothing; otherwise, add it, together with its metadata, into the metadata database.
+
+	Args:
+		item: the name of a dependency
+		source_dict: fragment of an Umbrella specification
+		target_dict: fragement of an Umbrella metadata database
+
+	Returns:
+		None
+	"""
+	if not item in target_dict:
+		target_dict[item] = {}
+
+	ident = None
+	if source_dict.has_key("checksum"):
+		checksum = source_dict["checksum"]
+		if target_dict[item].has_key(checksum):
+			logging.debug("%s has been inside the metadata database!", item)
+			return
+		ident = checksum
+		target_dict[item][ident] = {}
+		target_dict[item][ident]["checksum"] = source_dict["checksum"]
+
+	if source_dict.has_key("source"):
+		if len(source_dict["source"]) == 0:
+			logging.critical("the source attribute of %s can not be empty!" % item)
+			sys.exit("the source attribute of %s can not be empty!" % item)
+		else:
+			source = source_dict["source"][0]
+
+		if target_dict[item].has_key(source):
+			logging.debug("%s has been inside the metadata database!", item)
+			return
+
+		#if checksum is not provided in source_dict, the first url in the source section will be set to the ident.
+		if not ident:
+			ident = source
+			target_dict[item][ident] = {}
+
+		target_dict[item][ident]["source"] = list(source_dict["source"])
+	else:
+		logging.critical("%s does not have source attribute in the umbrella specification!", item)
+		sys.exit("%s does not have source attribute in the umbrella specification!" % item)
+
+	if source_dict.has_key("format"):
+		target_dict[item][ident]["format"] = source_dict["format"]
+
+	if source_dict.has_key("size"):
+		target_dict[item][ident]["size"] = source_dict["size"]
+
+def abstract_metadata(spec_json, packages_path):
+	"""Abstract metadata information from a self-contained umbrella spec into a metadata database.
+
+	Args:
+		spec_json: a dict including the contents from a json file
+		packages_path: the path of the metadata database.
+
+	Returns:
+		If the umbrella spec is not complete, exit directly.
+		Otherwise, return None.
+	"""
+	hardware_sec = attr_check(spec_json, "hardware")
+	hardware_arch = attr_check(hardware_sec, "arch")
+
+	metadata = {}
+	os_sec = attr_check(spec_json, "os")
+	os_name = attr_check(os_sec, "name")
+	os_version = attr_check(os_sec, "version")
+	os_item = "%s-%s-%s" % (os_name, os_version, hardware_arch)
+	os_item = os_item.lower()
+	add_item(os_item, os_sec, metadata)
+
+	if spec_json.has_key("software"):
+		software_sec = spec_json["software"]
+		if software_sec:
+			for item in software_sec:
+				add_item(item, software_sec[item], metadata)
+
+	if spec_json.has_key("data"):
+		data_sec = spec_json["data"]
+		if data_sec:
+			for item in data_sec:
+				add_item(item, data_sec[item], metadata)
+
+	with open(packages_path, 'w') as f:
+		json.dump(metadata, f, indent=4)
+		logging.debug("dump the metadata information from the umbrella spec to %s" % packages_path)
+		print "dump the metadata information from the umbrella spec to %s" % packages_path
+
 def main():
 	parser = OptionParser(usage="usage: %prog [options] run \"command\"",
 						version="%prog CCTOOLS_VERSION")
@@ -2313,10 +2385,9 @@ def main():
 					action="store",
 					default="./spec.json",
 					help="The specification json file. (By default: spec.json)")
-	parser.add_option("-l", "--localdir",
+	parser.add_option("--packages",
 					action="store",
-					default="./umbrella_test",
-					help="The path of directory used for all the cached data and all the sandboxes, the directory can be an existing dir. (By default: ./umbrella_test)",)
+					help="The source of packages information, which can be a local file path (e.g., file:///tmp/packages.json) or url (e.g., http://...).\nIf this option is not provided, the specification will be treated a self-contained specification.",)
 	parser.add_option("-i", "--inputs",
 					action="store",
 					default='',
@@ -2325,22 +2396,22 @@ def main():
 					action="store",
 					default='',
 					help="The environment variable. I.e., -e 'PWD=/tmp'. (By default: '')")
-	parser.add_option("-o", "--output",
-					action="store",
-					default="./umbrella_output",
-					help="The path of output directory, which must be non-existing or empty. (By default: ./umbrella_output)",)
 	parser.add_option("-s", "--sandbox_mode",
 					action="store",
 					default="parrot",
 					choices=['local', 'parrot', 'chroot', 'docker', 'condor', 'ec2',],
 					help="sandbox mode, which can be local, parrot, chroot, docker, condor, ec2. (By default: local)",)
+	parser.add_option("-l", "--localdir",
+					action="store",
+					default="./umbrella_test",
+					help="The path of directory used for all the cached data and all the sandboxes, the directory can be an existing dir. (By default: ./umbrella_test)",)
+	parser.add_option("-o", "--output",
+					action="store",
+					default="./umbrella_output",
+					help="The path of output directory, which must be non-existing or empty. (By default: ./umbrella_output)",)
 	parser.add_option("--cvmfs_http_proxy",
 					action="store",
 					help="HTTP_PROXY to access cvmfs (Used by Parrot)",)
-	parser.add_option("--packages",
-					action="store",
-					default='./packages.json',
-					help="The source of packages information. (By default: ./packages.json)",)
 	parser.add_option("--ec2",
 					action="store",
 					default='./ec2.json',
@@ -2511,18 +2582,31 @@ def main():
 	else:
 		pass
 
-	#packages_path always refers to the local path of the packages json file.
+	"""
+	packages_path is optional. If set, it provides the metadata information for the dependencies.
+	If not set, the umbrella specification is treated as a self-contained specification.
+	packages_path can be in either file:///filepath format or a http/https url like http:/ccl.cse.nd.edu/...
+	"""
 	packages_path = options.packages
-	packages_path = os.path.abspath(packages_path)
-	logging.debug("Check the packages information file: %s", packages_path)
-
-	if not os.path.exists(packages_path):
-		path1 = packages_path
-		url = 'http://ccl.cse.nd.edu/software/umbrella/database/packages.json'
+	if packages_path:
+		if packages_path[:7] == "file://":
+			packages_path = packages_path[7:]
+			logging.debug("Check the metatdata database file: %s", packages_path)
+			if not os.path.exists(packages_path):
+				logging.critical("the metatdata database file (%s) does not exist!", packages_path)
+				sys.exit("the metatdata database file (%s) does not exist!" % packages_path)
+		else:
+			url = packages_path
+			packages_path = '%s/packages.json' % (sandbox_dir)
+			logging.debug("Download metadata database from %s into %s", url, packages_path)
+			print "Download metadata database from %s into %s" % (url, packages_path)
+			url_download(url, packages_path)
+	else:
+		#the provided specification should be self-contained.
+		# One solution is to change all the current implementation of Umbrella to check whether the metadata information is included in the specification.
+		# Another solution is to extract all the metadata information into a separate metadata database file. (This solution is currently used).
 		packages_path = '%s/packages.json' % (sandbox_dir)
-		logging.debug("The provided packages info (%s) does not exist, download from %s into %s", path1, url, packages_path)
-		print "The provided packages info (%s) does not exist, download from %s into %s" % (path1, url, packages_path)
-		url_download(url, packages_path)
+		abstract_metadata(spec_json, packages_path)
 
 	with open(packages_path) as f: #python 2.4 does not support this syntax: with open () as
 		packages_json = json.load(f)
