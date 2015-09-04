@@ -6,6 +6,7 @@ umbrella \
 --sandbox_mode parrot \
 --log umbrella.log \
 --config cms_opendata_git.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs 'cms_opendata_git.sh=cms_opendata_git.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/parrot_cms_opendata_git_output \
@@ -17,6 +18,7 @@ umbrella \
 --sandbox_mode docker \
 --log umbrella.log \
 --config cms_opendata_git.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs 'cms_opendata_git.sh=cms_opendata_git.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/docker_cms_opendata_git_output \
@@ -30,6 +32,7 @@ umbrella \
 --sandbox_mode local \
 --log umbrella.log \
 --config cms_opendata_git.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs 'cms_opendata_git.sh=cms_opendata_git.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/local_cms_opendata_git_output \
@@ -43,6 +46,7 @@ umbrella \
 --log umbrella.log \
 --condor_log umbrella.log.condor \
 --config cms_opendata_git.umbrella \
+--packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --inputs 'cms_opendata_git.sh=cms_opendata_git.sh' \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/condor_cms_opendata_git_output \
