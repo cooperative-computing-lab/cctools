@@ -805,7 +805,7 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 	char dirname[WORK_QUEUE_LINE_MAX];
 	path_dirname(local_name,dirname);
 	if(strchr(local_name,'/')) {
-		if(!create_dir(dirname, 0700)) {
+		if(!create_dir(dirname, 0777)) {
 			debug(D_WQ, "Could not create directory - %s (%s)", dirname, strerror(errno));
 			link_soak(w->link, length, stoptime);
 			return APP_FAILURE;
@@ -820,7 +820,7 @@ static int get_file( struct work_queue *q, struct work_queue_worker *w, struct w
 		return APP_FAILURE;
 	}
 
-	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0700);
+	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s for writing: %s", local_name, strerror(errno));
 		link_soak(w->link, length, stoptime);
@@ -883,8 +883,8 @@ static int get_file_or_directory( struct work_queue *q, struct work_queue_worker
 
 		if(sscanf(line,"dir %s", tmp_remote_path)==1) {
 			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
-			result = create_dir(tmp_local_name,0700);
-			if(!result) {
+			int result_dir = create_dir(tmp_local_name,0777);
+			if(!result_dir) {
 				debug(D_WQ, "Could not create directory - %s (%s)", tmp_local_name, strerror(errno));
 				result = APP_FAILURE;
 				free(tmp_local_name);
