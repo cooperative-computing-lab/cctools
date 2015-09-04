@@ -35,7 +35,7 @@ function testrun {
 	eval "$CONFUGA_NODE_NUKE"
 
 	echo "$CONFUGA_NODE_LIST" > "${base}/nodes.lst"
-	runbg "$CHIRP_SERVER" --auth=unix --catalog-update=30s --challenge-dir="${base}/" --debug=all --debug-file="${base}/confuga.debug" --debug-rotate-max=0 --inherit-default-acl --interface=127.0.0.1 --jobs --job-concurrency=0 --pid-file="${base}/confuga.pid" --port="$PORT" --root="confuga://${base}/confuga.root?nodes=file:${base}/nodes.lst&${opts}" --superuser="unix:$(whoami)" --transient="${base}/confuga.transient" "$@"
+	runbg "$CHIRP_SERVER" --auth=unix --catalog-update=30s --challenge-dir="${base}/" --debug=all --debug-file="${base}/confuga.debug" --debug-rotate-max=0 --inherit-default-acl --interface=127.0.0.1 --jobs --job-concurrency=0 --pid-file="${base}/confuga.pid" --port="$PORT" --root="confuga://${base}/confuga.root?nodes=file:${base}/nodes.lst&auth=unix&${opts}" --superuser="unix:$(whoami)" --transient="${base}/confuga.transient" "$@"
 
 	local namespace="$(basename "$workflow")"
 	run "$CHIRP" --auth=unix --debug=chirp --debug-file="${base}/chirp.debug" --timeout=60m localhost:"$PORT" put "${workflow}/" "${namespace}"
