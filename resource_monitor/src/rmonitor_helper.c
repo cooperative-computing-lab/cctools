@@ -49,6 +49,9 @@
 #define RTLD_NEXT 0
 #endif
 
+#define PUSH_ERRNO { int last_errno = errno; errno = 0;
+#define POP_ERRNO(msg) msg.error = errno; if(!errno){ errno = last_errno; } }
+
 pid_t fork()
 {
 	pid_t pid;
@@ -165,8 +168,10 @@ FILE *fopen(const char *path, const char *mode)
 	typeof(fopen) *original_fopen = dlsym(RTLD_NEXT, "fopen");
 
 	debug(D_DEBUG, "fopen %s mode %s from %d.\n", path, mode, getpid());
-	file = original_fopen(path, mode);
-	msg.error = errno;
+
+	PUSH_ERRNO
+		file = original_fopen(path, mode);
+	POP_ERRNO(msg)
 
 	if(file)
 	{
@@ -202,8 +207,10 @@ int open(const char *path, int flags, ...)
 	va_end(ap);
 
 	debug(D_DEBUG, "open %s from %d.\n", path, getpid());
-	fd = original_open(path, flags, mode);
-	msg.error  = errno;
+
+	PUSH_ERRNO
+		fd = original_open(path, flags, mode);
+	POP_ERRNO(msg)
 
 	struct rmonitor_msg msg;
 	if(fd > -1)
@@ -233,8 +240,10 @@ FILE *fopen64(const char *path, const char *mode)
 	typeof(fopen64) *original_fopen64 = dlsym(RTLD_NEXT, "fopen64");
 
 	debug(D_DEBUG, "fopen64 %s mode %s from %d.\n", path, mode, getpid());
-	file = original_fopen64(path, mode);
-	msg.error  = errno;
+
+	PUSH_ERRNO
+		file = original_fopen64(path, mode);
+	POP_ERRNO(msg)
 
 	if(file)
 	{
@@ -270,8 +279,10 @@ int open64(const char *path, int flags, ...)
 	va_end(ap);
 
 	debug(D_DEBUG, "open64 %s from %d.\n", path, getpid());
-	fd = original_open64(path, flags, mode);
-	msg.error  = errno;
+
+	PUSH_ERRNO
+		fd = original_open64(path, flags, mode);
+	POP_ERRNO(msg)
 
 	if(fd > -1)
 	{
@@ -301,9 +312,11 @@ ssize_t write(int fd, const void *buf, size_t count)
 
 	typeof(write) *original_write = dlsym(RTLD_NEXT, "write");
 
-	ssize_t real_count = original_write(fd, buf, count);
+	ssize_t real_count;
+	PUSH_ERRNO
+		real_count = original_write(fd, buf, count);
+	POP_ERRNO(msg)
 
-	msg.error  = errno;
 	msg.data.n = real_count;
 	send_monitor_msg(&msg);
 
