@@ -10,6 +10,7 @@
 #include "create_dir.h"
 #include "delete_dir.h"
 #include "list.h"
+#include "disk_alloc.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -33,25 +34,48 @@
 #define TMP_SCRIPT "tmp.sh"
 #define DEFAULT_EXE_APP "#!/bin/sh"
 
-struct work_queue_process *work_queue_process_create(int taskid)
+struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_task, int disk_allocation)
 {
 	struct work_queue_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
-	p->task = work_queue_task_create(0);
-	p->task->taskid = taskid;
+	p->task = wq_task;
+	int taskid = p->task->taskid;
 
 	p->sandbox = string_format("t.%d", taskid);
 
-	if(!create_dir(p->sandbox, 0777)) {
-		work_queue_process_delete(p);
-		return 0;
-	}
+	if(disk_allocation == 1) {
+	work_queue_process_compute_disk_needed(p);
+		if(p->disk > 0) {
+			int64_t size = (p->disk) * 1024;
 
-	return p;
+			if(disk_alloc_create(p->sandbox, size) == 0) {
+				p->loop_mount = 1;
+				debug(D_WQ, "disk_alloc: %"PRId64"MB\n", size);
+				return p;
+			}
+		}
+		if(!create_dir(p->sandbox, 0777)) {
+			work_queue_process_delete(p);
+			return 0;
+		}
+
+		p->loop_mount = 0;
+		return p;
+	}
+	else {
+		if(!create_dir(p->sandbox, 0777)) {
+			work_queue_process_delete(p);
+			return 0;
+		}
+
+		p->loop_mount = 0;
+		return p;
+	}
 }
 
 void work_queue_process_delete(struct work_queue_process *p)
 {
+
 	if(p->task)
 		work_queue_task_delete(p->task);
 
@@ -65,12 +89,13 @@ void work_queue_process_delete(struct work_queue_process *p)
 	}
 
 	if(p->sandbox) {
-		delete_dir(p->sandbox);
+		if(p->loop_mount == 1) {
+			disk_alloc_delete(p->sandbox);
+		}
+		else {
+			delete_dir(p->sandbox);
+		}
 		free(p->sandbox);
-	}
-
-	if(p->disk_measurement_state) {
-		path_disk_size_info_delete_state(p->disk_measurement_state);
 	}
 
 	free(p);

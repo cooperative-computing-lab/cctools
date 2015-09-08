@@ -161,6 +161,9 @@ static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
 
+// Allow worker to use disk_alloc loop devices for task sandbox. Disabled by default.
+static int disk_allocation = 0;
+
 static int64_t disk_measured = 0;
 static int64_t files_counted = 0;
 
@@ -641,6 +644,9 @@ static int handle_tasks(struct link *master)
 
 				debug(D_WQ,"moving output file from %s to %s",sandbox_name,f->payload);
 				if(rename(sandbox_name,f->payload)!=0) {
+					copy_file_to_file(sandbox_name, f->payload);
+				}
+				if(errno != 0) {
 					debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
 				}
 
@@ -827,9 +833,10 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char taskname[WORK_QUEUE_LINE_MAX];
 	char taskname_encoded[WORK_QUEUE_LINE_MAX];
 	int n, flags, length;
+	int disk_alloc = disk_allocation;
 
-	struct work_queue_process *p = work_queue_process_create(taskid);
-	struct work_queue_task *task = p->task;
+	struct work_queue_task *task = work_queue_task_create(0);
+	task->taskid = taskid;
 
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
 		if(sscanf(line,"cmd %d",&length)==1) {
@@ -869,16 +876,16 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			}
 			free(env);
 		} else if(!strcmp(line,"end")) {
-			work_queue_process_compute_disk_needed(p);
 			break;
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
-			work_queue_process_delete(p);
 			return 0;
 		}
 	}
 
 	last_task_received = task->taskid;
+
+	struct work_queue_process *p = work_queue_process_create(task, disk_alloc);
 
 	// Every received task goes into procs_table.
 	itable_insert(procs_table,taskid,p);
@@ -1872,6 +1879,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set the number of GPUs reported by this worker. (default=0)\n", "--gpus=<n>");
 	printf( " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
 	printf( " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
+	printf( " %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n", "--disk-allocation");
 	printf( " %-30s Set the maximum number of seconds the worker may be active. (in s).\n", "--wall-time=<s>");
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
@@ -1885,7 +1893,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE,
-	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME};
+	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1893,6 +1901,7 @@ static const struct option long_options[] = {
 	{"debug",               required_argument,  0,  'd'},
 	{"debug-file",          required_argument,  0,  'o'},
 	{"debug-rotate-max",    required_argument,  0,  LONG_OPT_DEBUG_FILESIZE},
+	{"disk-allocation",     no_argument,        0, LONG_OPT_DISK_ALLOCATION},
 	{"foreman",             no_argument,        0,  LONG_OPT_FOREMAN},
 	{"foreman-port",        required_argument,  0,  LONG_OPT_FOREMAN_PORT},
 	{"foreman-port-file",   required_argument,  0,  'Z'},
@@ -2134,6 +2143,9 @@ int main(int argc, char *argv[])
 		case LONG_OPT_BUILD_FROM_TAR:
 			load_from_tar = 1;
 			tar_fn = xxstrdup(optarg);
+			break;
+		case LONG_OPT_DISK_ALLOCATION:
+			disk_allocation = 1;
 			break;
 		default:
 			show_help(argv[0]);
