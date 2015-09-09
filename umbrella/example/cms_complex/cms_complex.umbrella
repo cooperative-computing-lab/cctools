@@ -25,10 +25,15 @@
 			"mount_env": "INPUT_FILE",
 			"mountpoint": "/tmp/final_events_2381.lhe",
 			"action": "none"
+		},
+		"cms_complex.sh": {
+			"id": "9f8587e9ef90ab4f5de8b3c9ab5cf0cb",
+			"mountpoint": "/tmp/cms_complex.sh"
 		}
 	},
 	"environ": {
 		"CMS_VERSION": "CMSSW_5_2_5",
 		"SCRAM_ARCH": "slc5_amd64_gcc462"
-	}
+	},
+	"cmd": "/bin/sh /tmp/cms_complex.sh"
 }

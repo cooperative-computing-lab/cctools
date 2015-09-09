@@ -15,7 +15,7 @@ umbrella: umbrella.py
 	chmod 755 umbrella
 
 umbrella_helper.html: umbrella.py
-	pydoc -w umbrella
+	if which pydoc2; then pydoc2 -w umbrella; else pydoc -w umbrella; fi
 	mv umbrella.html umbrella_helper.html
 
 clean:
