@@ -16,20 +16,25 @@
 	},
 	"software": {
 		"cmssw-4.2.8-slc5-amd64": {
-			"id": "cvmfs",
+			"id": "cvmfs://cvmfs/cms.cern.ch",
 			"mount_env": "CMS_DIR",
 			"mountpoint": "/cvmfs/cms.cern.ch"
 		}
 	},
 	"data": {
 		"OutreachExercise2010.git": {
-			"id": "1",
+			"id": "git+https://github.com/ayrodrig/OutreachExercise2010.git",
 			"mount_env": "GIT_REPO_1",
 			"mountpoint": "/data/git_repo/OutreachExercise2010"
+		},
+		"git_protocol.sh": {
+			"id": "518876dbe4dca81bd19e823b6ea1f866",
+			"mountpoint": "/tmp/git_protocol.sh"
 		}
 	},
 	"environ": {
 		"CMS_VERSION": "CMSSW_4_2_8",
 		"SCRAM_ARCH": "slc5_amd64_gcc434"
-	}
+	},
+	"cmd": "/bin/sh /tmp/git_protocol.sh"
 }

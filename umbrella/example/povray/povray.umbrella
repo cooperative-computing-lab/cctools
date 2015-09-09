@@ -22,7 +22,17 @@
 		}
 	},
 	"data": {
+		"4_cubes.pov": {
+			"id": "c65266cd2b672854b821ed93028a877a",
+			"mountpoint": "/tmp/4_cubes.pov"
+		},
+		"WRC_RubiksCube.inc": {
+			"id": "2f8afdd09fc3a6177c6f1977bb3bdae7",
+			"mountpoint": "/tmp/WRC_RubiksCube.inc"
+		}
 	},
 	"environ": {
-	}
+		"PWD": "/tmp"
+	},
+	"cmd": "povray +I/tmp/4_cubes.pov +O/tmp/frame000.png +K.0  -H50 -W50"
 }
