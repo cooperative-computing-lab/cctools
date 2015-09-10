@@ -238,6 +238,7 @@ int open64(const char *path, int flags, ...)
 }
 #endif /* defined linux && __USE_LARGEFILE64 */
 
+
 void wakeup_pselect_from_exit(int signum)
 {
 	if(signum == SIGCONT)
@@ -246,9 +247,16 @@ void wakeup_pselect_from_exit(int signum)
 
 void exit_wrapper_preamble(void)
 {
+	static int did_exit_wrapper = 0;
+
+	if(did_exit_wrapper)
+		return;
+
+	did_exit_wrapper = 1;
+	
 	sigset_t set_cont, set_prev;
 	void (*prev_handler)(int signum);
-	struct timespec timeout = {.tv_sec = 10, .tv_nsec = 0};
+	struct timespec timeout = {.tv_sec = 2, .tv_nsec = 0};
 
 	debug(D_DEBUG, "%s from %d.\n", str_msgtype(END_WAIT), getpid());
 
