@@ -253,12 +253,16 @@ void measure_worker_disk() {
 
 	files_counted = state->last_file_count_complete;
 
+	struct work_queue_process *p;
+	uint64_t taskid;
+	itable_firstkey(procs_table);
+	while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
+		work_queue_process_measure_disk(p, max_time_on_measurement);
+	}
+
 	if(state->complete_measurement && disk_measured > -1) {
 		/* if a complete measurement has been done, then update
 		 * for the found value, and add the known values of the processes. */
-
-		struct work_queue_process *p;
-		uint64_t taskid;
 
 		itable_firstkey(procs_table);
 		while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
