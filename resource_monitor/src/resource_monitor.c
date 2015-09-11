@@ -1253,7 +1253,7 @@ static void show_help(const char *cmd)
 {
     fprintf(stdout, "\nUse: %s [options] -- command-line-and-options\n\n", cmd);
     fprintf(stdout, "%-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
-	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, "%-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
     fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
     fprintf(stdout, "%-30s Show version string.\n", "-v,--version");
     fprintf(stdout, "\n");
@@ -1276,6 +1276,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Do not write the time series log file.\n", "--without-time-series");
     fprintf(stdout, "%-30s Do not write the list of opened files.\n", "--without-opened-files");
     fprintf(stdout, "\n");
+    fprintf(stdout, "%-30s Measure working directory footprint (default).\n", "--with-disk-footprint");
     fprintf(stdout, "%-30s Do not measure working directory footprint.\n", "--without-disk-footprint");
 }
 
@@ -1392,6 +1393,7 @@ int main(int argc, char **argv) {
 		    {"without-summary",      no_argument, 0, 3},
 		    {"without-time-series",  no_argument, 0, 4},
 		    {"without-opened-files", no_argument, 0, 5},
+		    {"with-disk-footprint",  no_argument, 0, 6},
 		    {"without-disk-footprint", no_argument, 0, 7},
 
 		    {0, 0, 0, 0}
@@ -1489,6 +1491,9 @@ int main(int argc, char **argv) {
 					free(opened_path);
 				opened_path = NULL;
 				use_opened  = 0;
+				break;
+			case 6:
+				resources_flags->workdir_footprint = 1;
 				break;
 			case 7:
 				resources_flags->workdir_footprint = 0;
