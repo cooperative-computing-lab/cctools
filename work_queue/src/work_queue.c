@@ -218,18 +218,19 @@ static void start_task_on_worker(struct work_queue *q, struct work_queue_worker 
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
 static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
-static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, uintptr_t new_state);
+static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_task_state_t new_state);
 static void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t );
 
 /* returns old state */
-static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task *t, uintptr_t new_state );
+static work_queue_task_state_t change_task_state( struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state);
+
 
 /* 1, 0 whether t is in state */
-static int task_state_is( struct work_queue *q, uint64_t taskid, uintptr_t state);
+static int task_state_is( struct work_queue *q, uint64_t taskid, work_queue_task_state_t state);
 /* pointer to first task found with state. NULL if no such task */
-static struct work_queue_task *task_state_any(struct work_queue *q, uintptr_t state);
+static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_task_state_t state);
 /* number of tasks with state */
-static int task_state_count( struct work_queue *q, uintptr_t state);
+static int task_state_count( struct work_queue *q, work_queue_task_state_t state);
 
 static work_queue_result_code_t get_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_result_code_t get_available_results(struct work_queue *q, struct work_queue_worker *w);
@@ -2820,7 +2821,7 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	log_worker_stats(q);
 }
 
-static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, uintptr_t new_state)
+static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_task_state_t new_state)
 {
 	struct work_queue_worker *wr = itable_lookup(q->worker_task_map, t->taskid);
 
@@ -4165,9 +4166,9 @@ work_queue_task_state_t work_queue_task_state(struct work_queue *q, int taskid) 
 
 /* Changes task state. Returns old state */
 /* State of the task. One of WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|WAITING_RETRIEVAL|RETRIEVED|DONE) */
-static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task *t, uintptr_t new_state ) {
+static work_queue_task_state_t change_task_state( struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state ) {
 
-	uintptr_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
+	work_queue_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
 
 	// remove from current tables:
@@ -4198,11 +4199,11 @@ static uintptr_t change_task_state( struct work_queue *q, struct work_queue_task
 }
 
 
-static int task_state_is( struct work_queue *q, uint64_t taskid, uintptr_t state) {
+static int task_state_is( struct work_queue *q, uint64_t taskid, work_queue_task_state_t state) {
 	return itable_lookup(q->task_state_map, taskid) == (void *) state;
 }
 
-static struct work_queue_task *task_state_any(struct work_queue *q, uintptr_t state) {
+static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_task_state_t state) {
 	struct work_queue_task *t;
 	uint64_t taskid;
 
@@ -4216,7 +4217,7 @@ static struct work_queue_task *task_state_any(struct work_queue *q, uintptr_t st
 	return NULL;
 }
 
-static int task_state_count(struct work_queue *q, uintptr_t state) {
+static int task_state_count(struct work_queue *q, work_queue_task_state_t state) {
 	struct work_queue_task *t;
 	uint64_t taskid;
 
