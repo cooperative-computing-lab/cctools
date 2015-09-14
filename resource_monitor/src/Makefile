@@ -3,10 +3,6 @@ UNAME := $(shell uname)
 include ../../config.mk
 include ../../rules.mk
 
-ifeq ($(UNAME), FreeBSD)
-LOCAL_LINKAGE = -lkvm
-endif
-
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
 OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o rmon_tools.o rmonitor_helper.o

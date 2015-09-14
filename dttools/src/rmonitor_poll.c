@@ -150,7 +150,7 @@ FILE *open_proc_file(pid_t pid, char *filename)
 		FILE *fproc;
 		char fproc_path[PATH_MAX];
 
-#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
+#if defined(CCTOOLS_OPSYS_DARWIN)
 		return NULL;
 #endif
 
@@ -216,32 +216,6 @@ uint64_t clicks_to_usecs(uint64_t clicks)
  * Low level resource monitor functions.
  ***/
 
-int rmonitor_get_cpu_time_linux(pid_t pid, uint64_t *accum)
-{
-	/* /dev/proc/[pid]/stat */
-
-	uint64_t kernel, user;
-
-	FILE *fstat = open_proc_file(pid, "stat");
-	if(!fstat)
-		return 1;
-
-	fscanf(fstat,
-		   "%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
-		   "%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
-		   "%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
-		   "%" SCNu64 /* user mode time (in clock ticks) */
-		   "%" SCNu64 /* kernel mode time (in clock ticks) */
-		   /* .... */,
-		   &kernel, &user);
-
-	*accum = clicks_to_usecs(kernel) + clicks_to_usecs(user);
-
-	fclose(fstat);
-
-	return 0;
-}
-
 int rmonitor_get_start_time(pid_t pid, uint64_t *start_time)
 {
 	/* /dev/proc/[pid]/stat */
@@ -282,41 +256,29 @@ int rmonitor_get_start_time(pid_t pid, uint64_t *start_time)
 	return 0;
 }
 
-#if defined(CCTOOLS_OPSYS_FREEBSD)
-int rmonitor_get_cpu_time_freebsd(pid_t pid, uint64_t *accum)
-{
-	int count;
-	struct rmonitor_kinfo_proc *kp = kvm_getprocs(kd_fbsd, KERN_PROC_PID, pid, &count);
-
-	if((kp == NULL) || (count < 1))
-		return 1;
-
-	/* According to ps(1): * This counts time spent handling interrupts.  We
-	 * could * fix this, but it is not 100% trivial (and interrupt * time
-	 * fractions only work on the sparc anyway).   XXX */
-
-	*accum  = kp->ki_runtime;
-
-	return 0;
-}
-#endif
-
-
 int rmonitor_get_cpu_time_usage(pid_t pid, struct rmonitor_cpu_time_info *cpu)
 {
-	uint64_t accum;
+	/* /dev/proc/[pid]/stat */
 
-	cpu->delta = 0;
+	uint64_t kernel, user;
 
-#if   defined(CCTOOLS_OPSYS_LINUX)
-	if(rmonitor_get_cpu_time_linux(pid, &accum) != 0)
+
+	FILE *fstat = open_proc_file(pid, "stat");
+	if(!fstat)
 		return 1;
-#elif defined(CCTOOLS_OPSYS_FREEBSD)
-	if(rmonitor_get_cpu_time_freebsd(pid, &accum) != 0)
-		return 1;
-#else
-	return 0;
-#endif
+
+	fscanf(fstat,
+		   "%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
+		   "%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
+		   "%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
+		   "%" SCNu64 /* user mode time (in clock ticks) */
+		   "%" SCNu64 /* kernel mode time (in clock ticks) */
+		   /* .... */,
+		   &kernel, &user);
+
+	fclose(fstat);
+
+	uint64_t accum = clicks_to_usecs(kernel) + clicks_to_usecs(user);
 
 	cpu->delta       = accum  - cpu->accumulated;
 	cpu->accumulated = accum;
@@ -330,7 +292,7 @@ void acc_cpu_time_usage(struct rmonitor_cpu_time_info *acc, struct rmonitor_cpu_
 }
 
 
-int rmonitor_get_swap_linux(pid_t pid, struct rmonitor_mem_info *mem)
+int rmonitor_get_swap_usage(pid_t pid, struct rmonitor_mem_info *mem)
 {
 	FILE *fsmaps = open_proc_file(pid, "smaps");
 	if(!fsmaps)
@@ -350,7 +312,7 @@ int rmonitor_get_swap_linux(pid_t pid, struct rmonitor_mem_info *mem)
 	return 0;
 }
 
-int rmonitor_get_mem_linux(pid_t pid, struct rmonitor_mem_info *mem)
+int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
 {
 	// /dev/proc/[pid]/status:
 
@@ -364,7 +326,7 @@ int rmonitor_get_mem_linux(pid_t pid, struct rmonitor_mem_info *mem)
 	rmonitor_get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
 	rmonitor_get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
 	rmonitor_get_int_attribute(fmem, "VmData:", &mem->data,     1);
-	rmonitor_get_swap_linux(pid, mem);
+	rmonitor_get_swap_usage(pid, mem);
 
 	/* in MB */
 	mem->virtual  = div_round_up(mem->virtual,  1024);
@@ -375,39 +337,6 @@ int rmonitor_get_mem_linux(pid_t pid, struct rmonitor_mem_info *mem)
 	mem->swap     = div_round_up(mem->swap,     1024);
 
 	fclose(fmem);
-
-	return 0;
-}
-
-#if defined(CCTOOLS_OPSYS_FREEBSD)
-int rmonitor_get_mem_freebsd(pid_t pid, struct rmonitor_mem_info *mem)
-{
-	int count;
-	struct rmonitor_kinfo_proc *kp = kvm_getprocs(kd_fbsd, KERN_PROC_PID, pid, &count);
-
-	if((kp == NULL) || (count < 1))
-		return 1;
-
-	/* in MB */
-	mem->resident = kp->ki_rssize * sysconf(_SC_PAGESIZE); //Multiply pages by pages size.
-	mem->virtual = kp->ki_size;
-
-	return 0;
-}
-#endif
-
-int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
-{
-#if   defined(CCTOOLS_OPSYS_LINUX)
-	if(rmonitor_get_mem_linux(pid, mem) != 0)
-		return 1;
-#elif defined(CCTOOLS_OPSYS_FREEBSD)
-	if(rmonitor_get_mem_freebsd(pid, mem) != 0)
-		return 1;
-#else
-	return 0;
-#endif
-
 
 	return 0;
 }

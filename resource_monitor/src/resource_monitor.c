@@ -188,10 +188,6 @@ int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
                                    helper library was automatically extracted
                                    */
 
-#if defined(CCTOOLS_OPSYS_FREEBSD)
-kvm_t *kd_fbsd;
-#endif
-
 struct rmsummary *summary;
 struct rmsummary *resources_limits;
 struct rmsummary *resources_flags;
@@ -1535,10 +1531,6 @@ int main(int argc, char **argv) {
 #ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
     write_helper_lib();
     rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd);
-#endif
-
-#if defined(CCTOOLS_OPSYS_FREEBSD)
-    kd_fbsd = kvm_open(NULL, "/dev/null", NULL, O_RDONLY, "kvm_open");
 #endif
 
     processes = itable_create(0);
