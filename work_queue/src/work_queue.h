@@ -71,7 +71,8 @@ typedef enum {
 	WORK_QUEUE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
 	WORK_QUEUE_TASK_RETRIEVED,         /**< Task results are available at the master **/
 	WORK_QUEUE_TASK_DONE,              /**< Task is done, and returned through work_queue_wait >**/
-	WORK_QUEUE_TASK_CANCELED           /**< Task was canceled before completion **/
+	WORK_QUEUE_TASK_CANCELED,          /**< Task was canceled before completion **/
+    WORK_QUEUE_TASK_WAITING_RESUBMISSION /**< Worker gave up on the task, and task will be resubmitted >**/
 } work_queue_task_state_t;
 
 extern double wq_option_fast_abort_multiplier; /**< Initial setting for fast abort multiplier upon
