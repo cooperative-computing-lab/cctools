@@ -227,31 +227,37 @@ int rmonitor_get_start_time(pid_t pid, uint64_t *start_time)
 	if(!fstat)
 		return 1;
 
+	int n;
+	n = fscanf(fstat,
+			"%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
+			"%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
+			"%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
+			"%*s" /* user mode time (in clock ticks)   (field 14)  */
+			"%*s" /* kernel mode time (in clock ticks) (field 15) */
+			"%*s" /* time (clock ticks) waiting for children in user mode */
+			"%*s" /* time (clock ticks) waiting for children in kernel mode */
+			"%*s" /* priority */ "%*s" /* nice */
+			"%*s" /* num threads */ "%*s" /* always 0 */
+			"%" SCNu64 /* clock ticks since start     (field 22) */
+			/* .... */,
+			&start_clicks);
+	fclose(fstat);
+
+	if(n != 1)
+		return 1;
+
 	FILE *fuptime = open_proc_file(0, "uptime");
 	if(!fuptime)
 		return 1;
 
-	fscanf(fstat,
-		   "%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
-		   "%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
-		   "%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
-		   "%*s" /* user mode time (in clock ticks)   (field 14)  */
-		   "%*s" /* kernel mode time (in clock ticks) (field 15) */
-		   "%*s" /* time (clock ticks) waiting for children in user mode */
-		   "%*s" /* time (clock ticks) waiting for children in kernel mode */
-		   "%*s" /* priority */ "%*s" /* nice */
-		   "%*s" /* num threads */ "%*s" /* always 0 */
-		   "%" SCNu64 /* clock ticks since start     (field 22) */
-		   /* .... */,
-		   &start_clicks);
+	n = fscanf(fuptime, "%lf %*s", &uptime);
+	fclose(fuptime);
 
-	fscanf(fuptime, "%lf %*s", &uptime);
+	if(n != 1)
+		return 1;
 
 	uint64_t origin = usecs_since_epoch() - (uptime * ONE_SECOND);
 	*start_time     = origin + clicks_to_usecs(start_clicks);
-
-	fclose(fstat);
-	fclose(fuptime);
 
 	return 0;
 }
@@ -267,16 +273,19 @@ int rmonitor_get_cpu_time_usage(pid_t pid, struct rmonitor_cpu_time_info *cpu)
 	if(!fstat)
 		return 1;
 
-	fscanf(fstat,
-		   "%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
-		   "%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
-		   "%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
-		   "%" SCNu64 /* user mode time (in clock ticks) */
-		   "%" SCNu64 /* kernel mode time (in clock ticks) */
-		   /* .... */,
-		   &kernel, &user);
-
+	int n;
+	n = fscanf(fstat,
+			"%*s" /* pid */ "%*s" /* cmd line */ "%*s" /* state */ "%*s" /* pid of parent */
+			"%*s" /* group ID */ "%*s" /* session id */ "%*s" /* tty pid */ "%*s" /* tty group ID */
+			"%*s" /* linux/sched.h flags */ "%*s %*s %*s %*s" /* faults */
+			"%" SCNu64 /* user mode time (in clock ticks) */
+			"%" SCNu64 /* kernel mode time (in clock ticks) */
+			/* .... */,
+			&kernel, &user);
 	fclose(fstat);
+
+	if(n != 2)
+		return 1;
 
 	uint64_t accum = clicks_to_usecs(kernel) + clicks_to_usecs(user);
 
@@ -320,13 +329,21 @@ int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
 	if(!fmem)
 		return 1;
 
+	int status = 0;
+
 	/* in kB */
-	rmonitor_get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
-	rmonitor_get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
-	rmonitor_get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
-	rmonitor_get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
-	rmonitor_get_int_attribute(fmem, "VmData:", &mem->data,     1);
-	rmonitor_get_swap_usage(pid, mem);
+	status |= rmonitor_get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
+	status |= rmonitor_get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
+	status |= rmonitor_get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
+	status |= rmonitor_get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
+	status |= rmonitor_get_int_attribute(fmem, "VmData:", &mem->data,     1);
+	status |= rmonitor_get_swap_usage(pid, mem);
+
+	fclose(fmem);
+
+	/* One of the fields was not found, so we return early. */
+	if(status)
+		return 1;
 
 	/* in MB */
 	mem->virtual  = div_round_up(mem->virtual,  1024);
@@ -335,8 +352,6 @@ int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
 	mem->text     = div_round_up(mem->text,     1024);
 	mem->data     = div_round_up(mem->data,     1024);
 	mem->swap     = div_round_up(mem->swap,     1024);
-
-	fclose(fmem);
 
 	return 0;
 }
