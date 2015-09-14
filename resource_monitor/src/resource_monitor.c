@@ -1339,7 +1339,7 @@ int main(int argc, char **argv) {
     int i;
     char command_line[1024] = {'\0'};
     char *executable;
-    char c;
+    int64_t c;
     uint64_t interval = DEFAULT_INTERVAL;
 
     char *template_path = NULL;
@@ -1367,6 +1367,17 @@ int main(int argc, char **argv) {
 
     rmsummary_read_env_vars(resources_limits);
 
+	enum {
+		LONG_OPT_SUMMARY_FILE = UCHAR_MAX+1,
+		LONG_OPT_TIME_SERIES,
+		LONG_OPT_OPENED_FILES,
+		LONG_OPT_DISK_FOOTPRINT,
+		LONG_OPT_NO_SUMMARY_FILE,
+		LONG_OPT_NO_TIME_SERIES,
+		LONG_OPT_NO_OPENED_FILES,
+		LONG_OPT_NO_DISK_FOOTPRINT
+	};
+
     static const struct option long_options[] =
 	    {
 		    /* Regular Options */
@@ -1380,17 +1391,17 @@ int main(int argc, char **argv) {
 
 		    {"verbatim-to-summary",required_argument, 0, 'V'},
 
-		    {"with-output-files", required_argument, 0,  'O'},
+		    {"with-output-files",   required_argument, 0,  'O'},
 
-		    {"with-summary-file", required_argument, 0,  0},
-		    {"with-time-series",  required_argument, 0,  1 },
-		    {"with-opened-files", required_argument, 0,  2 },
+		    {"with-summary-file",   required_argument, 0, LONG_OPT_SUMMARY_FILE},
+		    {"with-time-series",    required_argument, 0, LONG_OPT_TIME_SERIES},
+		    {"with-opened-files",   required_argument, 0, LONG_OPT_OPENED_FILES},
+		    {"with-disk-footprint", no_argument,       0, LONG_OPT_DISK_FOOTPRINT},
 
-		    {"without-summary",      no_argument, 0, 3},
-		    {"without-time-series",  no_argument, 0, 4},
-		    {"without-opened-files", no_argument, 0, 5},
-		    {"with-disk-footprint",  no_argument, 0, 6},
-		    {"without-disk-footprint", no_argument, 0, 7},
+		    {"without-summary",        no_argument, 0, LONG_OPT_NO_SUMMARY_FILE},
+		    {"without-time-series",    no_argument, 0, LONG_OPT_NO_TIME_SERIES},
+		    {"without-opened-files",   no_argument, 0, LONG_OPT_NO_OPENED_FILES},
+		    {"without-disk-footprint", no_argument, 0, LONG_OPT_NO_DISK_FOOTPRINT},
 
 		    {0, 0, 0, 0}
 	    };
@@ -1452,46 +1463,46 @@ int main(int argc, char **argv) {
 				}
 				template_path = xxstrdup(optarg);
 				break;
-			case 0:
+			case LONG_OPT_SUMMARY_FILE:
 				if(summary_path)
 					free(summary_path);
 				summary_path = xxstrdup(optarg);
 				use_summary = 1;
 				break;
-			case  1:
+			case  LONG_OPT_TIME_SERIES:
 				if(series_path)
 					free(series_path);
 				series_path = xxstrdup(optarg);
 				use_series  = 1;
 				break;
-			case  2:
+			case  LONG_OPT_OPENED_FILES:
 				if(opened_path)
 					free(opened_path);
 				opened_path = xxstrdup(optarg);
 				use_opened  = 1;
 				break;
-			case  3:
+			case  LONG_OPT_NO_SUMMARY_FILE:
 				if(summary_path)
 					free(summary_path);
 				summary_path = NULL;
 				use_summary = 0;
 				break;
-			case  4:
+			case  LONG_OPT_NO_TIME_SERIES:
 				if(series_path)
 					free(series_path);
 				series_path = NULL;
 				use_series  = 0;
 				break;
-			case  5:
+			case  LONG_OPT_NO_OPENED_FILES:
 				if(opened_path)
 					free(opened_path);
 				opened_path = NULL;
 				use_opened  = 0;
 				break;
-			case 6:
+			case LONG_OPT_DISK_FOOTPRINT:
 				resources_flags->workdir_footprint = 1;
 				break;
-			case 7:
+			case LONG_OPT_NO_DISK_FOOTPRINT:
 				resources_flags->workdir_footprint = 0;
 				break;
 			default:
