@@ -1628,6 +1628,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_integer(nv,"capacity",info.capacity);
 	nvpair_insert_integer(nv,"total_execute_time",info.total_execute_time);
 	nvpair_insert_integer(nv,"total_good_execute_time",info.total_good_execute_time);
+	nvpair_insert_integer(nv,"master_prefer_hostname",info.master_prefer_hostname);
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
@@ -4740,6 +4741,11 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 	q->keepalive_timeout = timeout;
 }
 
+void work_queue_master_prefer_hostname(struct work_queue *q, int prefer_hostname)
+{
+	q->stats->master_prefer_hostname = prefer_hostname;
+}
+
 int work_queue_tune(struct work_queue *q, const char *name, double value)
 {
 
@@ -4842,6 +4848,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 		s->idle_percentage = (double) q->total_idle_time / wall_clock_time;
 	}
 	s->capacity = compute_capacity(q);
+	s->master_prefer_hostname = qs->master_prefer_hostname;
 
 	//info about resources
 	s->bandwidth = work_queue_get_effective_bandwidth(q);

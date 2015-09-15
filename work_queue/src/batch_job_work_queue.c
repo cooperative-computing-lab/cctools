@@ -250,6 +250,11 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 			work_queue_activate_worker_waiting(q->data, atoi(value));
 		else
 			work_queue_activate_worker_waiting(q->data, 0);
+	} else if(strcmp(what, "master-prefer-hostname") == 0) {
+		if(value)
+			work_queue_master_prefer_hostname(q->data, atoi(value));
+		else
+			work_queue_master_prefer_hostname(q->data, 0);
 	}
 }
 

@@ -1072,6 +1072,7 @@ int main(int argc, char *argv[])
 	timestamp_t time_completed = 0;
 	const char *work_queue_keepalive_interval = NULL;
 	const char *work_queue_keepalive_timeout = NULL;
+	const char *master_prefer_hostname = NULL;
 	const char *work_queue_master_mode = "standalone";
 	const char *work_queue_port_file = NULL;
 	const char *priority = NULL;
@@ -1123,6 +1124,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_VERBOSE_PARSING,
 		LONG_OPT_LOG_VERBOSE_MODE,
 		LONG_OPT_WORKING_DIR,
+		LONG_OPT_MASTER_PREFER_HOSTNAME,
 		LONG_OPT_WQ_WAIT_FOR_WORKERS,
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
@@ -1170,6 +1172,7 @@ int main(int argc, char *argv[])
 		{"version", no_argument, 0, 'v'},
 		{"log-verbose", no_argument, 0, LONG_OPT_LOG_VERBOSE_MODE},
 		{"working-dir", required_argument, 0, LONG_OPT_WORKING_DIR},
+		{"master-prefer-hostname", no_argument, 0, LONG_OPT_MASTER_PREFER_HOSTNAME},
 		{"wq-estimate-capacity", no_argument, 0, 'E'},
 		{"wq-fast-abort", required_argument, 0, 'F'},
 		{"wq-keepalive-interval", required_argument, 0, 'u'},
@@ -1391,6 +1394,9 @@ int main(int argc, char *argv[])
 				free(working_dir);
 				working_dir = xxstrdup(optarg);
 				break;
+			case LONG_OPT_MASTER_PREFER_HOSTNAME:
+				master_prefer_hostname = xxstrdup("1");
+				break;
 			case LONG_OPT_DEBUG_ROTATE_MAX:
 				debug_config_file_size(string_metric_parse(optarg));
 				break;
@@ -1578,6 +1584,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
+	batch_queue_set_option(remote_queue, "master-prefer-hostname", master_prefer_hostname);
 
 	/* Do not create a local queue for systems where local and remote are the same. */
 

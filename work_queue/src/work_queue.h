@@ -205,6 +205,7 @@ struct work_queue_stats {
 	int64_t max_gpus;               /**< The highest number of GPUs observed among the connected workers. */
 	int port;
 	int priority;
+	int master_prefer_hostname;		/**< Boolean that expresses preference to useing hostname vs IP address for connection. */
 	int workers_ready;              /**< @deprecated Use @ref workers_idle instead. */
 	int workers_full;               /**< @deprecated Use @ref workers_busy insead. */
 	int total_worker_slots;         /**< @deprecated Use @ref tasks_running instead. */
@@ -646,6 +647,12 @@ void work_queue_specify_keepalive_interval(struct work_queue *q, int interval);
 */
 void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 
+/** Set the preference for using hostname over IP address to connect.
+0 uses IP address (standard behavior), 1 uses hostname provided by master
+@param q A work queue object.
+@param prefer_hostname An int to indicate using IP or hostname.
+*/
+void work_queue_master_prefer_hostname(struct work_queue *q, int prefer_hostname);
 
 /** Tune advanced parameters for work queue.
 @param q A work queue object.
