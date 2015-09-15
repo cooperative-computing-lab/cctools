@@ -1130,7 +1130,7 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 
 	if(t->resources_measured)
 	{
-		rmsummary_print(q->monitor_file, t->resources_measured, NULL);
+		rmsummary_print(q->monitor_file, t->resources_measured, NULL, NULL, NULL);
 	}
 	else
 	{
@@ -4048,7 +4048,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 		fprintf(final, "master_name: %s\n", q->name);
 
 	fprintf(final, "exit_type:   normal\n");
-	rmsummary_print(final, q->measured_local_resources, NULL);
+	rmsummary_print(final, q->measured_local_resources, NULL, NULL, NULL);
 
 	copy_fd_to_stream(summs_fd, final);
 
@@ -4065,7 +4065,7 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 	char *template = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
 	char *summary  = string_format("%s.summary", template);
 
-	wrap_cmd = resource_monitor_rewrite_command(t->command_line, NULL, template, NULL, NULL, 1, 0, 0);
+	wrap_cmd = resource_monitor_rewrite_command(t->command_line, NULL, template, NULL, NULL, 0, 0);
 
 	//BUG: what if user changes current working directory?
 	work_queue_task_specify_file(t, q->monitor_exe, q->monitor_exe, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
@@ -4131,6 +4131,9 @@ const char *task_state_str(work_queue_task_state_t task_state) {
 	switch(task_state) {
 		case WORK_QUEUE_TASK_READY:
 			str = "ready";
+			break;
+		case WORK_QUEUE_TASK_RUNNING:
+			str = "running";
 			break;
 		case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
 			str = "waiting_retrieval";

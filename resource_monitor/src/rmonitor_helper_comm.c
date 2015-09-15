@@ -47,8 +47,11 @@ const char *str_msgtype(enum rmonitor_msg_type n)
 		case CHDIR:
 			return "chdir";
 			break;
-		case OPEN:
-			return "open-file";
+		case OPEN_INPUT:
+			return "open-input-file";
+			break;
+		case OPEN_OUTPUT:
+			return "open-output-file";
 			break;
 		case READ:
 			return "read";

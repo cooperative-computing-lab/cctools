@@ -481,7 +481,6 @@ static char *makeflow_node_rmonitor_wrap_command( struct dag_node *n, const char
 			log_name_prefix,
 			monitor_limits_name,
 			extra_options,
-			1,                           /* summaries always enabled */
 			monitor_enable_time_series,
 			monitor_enable_list_files);
 
@@ -866,7 +865,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 			if(s)
 			{
-				rmsummary_print(stderr, s, NULL);
+				rmsummary_print(stderr, s, NULL, NULL, NULL);
 				free(s);
 				fprintf(stderr, "\n");
 			}
