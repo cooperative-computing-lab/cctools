@@ -124,18 +124,19 @@ See the file COPYING for details.
 #include <inttypes.h>
 #include <sys/types.h>
 
+#include "buffer.h"
 #include "cctools.h"
+#include "copy_stream.h"
+#include "create_dir.h"
+#include "debug.h"
+#include "getopt.h"
 #include "hash_table.h"
 #include "itable.h"
 #include "list.h"
+#include "macros.h"
 #include "path.h"
 #include "stringtools.h"
-#include "debug.h"
 #include "xxmalloc.h"
-#include "copy_stream.h"
-#include "getopt.h"
-#include "create_dir.h"
-#include "macros.h"
 
 #include "rmonitor.h"
 #include "rmonitor_poll_internal.h"
@@ -158,6 +159,9 @@ See the file COPYING for details.
 FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
 FILE  *log_opened  = NULL;      /* List of opened files is written to this file. */
+
+struct list *verbatim_summary_lines; /* lines added to the summary without change */
+
 
 int    rmonitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
                                   grandchildren processes report to the monitor. */
@@ -413,9 +417,6 @@ struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previo
 
 void rmonitor_inotify_add_watch(char *filename)
 {
-	/* Perhaps here we can do something more to the files, like a
-	 * final stat */
-
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct rmonitor_file_info *finfo;
 	char **new_inotify_watches;
@@ -509,9 +510,7 @@ void rmonitor_handle_inotify(void)
 				if (finfo == NULL) continue;
 				if (evdata[i].mask & IN_ACCESS) (finfo->n_reads)++;
 				if (evdata[i].mask & IN_MODIFY) (finfo->n_writes)++;
-				if ((evdata[i].mask & IN_CLOSE_WRITE) ||
-				    (evdata[i].mask & IN_CLOSE_NOWRITE))
-				{
+				if ((evdata[i].mask & IN_CLOSE_WRITE) || (evdata[i].mask & IN_CLOSE_NOWRITE)) {
 					(finfo->n_closes)++;
 					if (stat(fname, &fst) >= 0)
 					{
@@ -662,13 +661,66 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 
 }
 
+void rmonitor_find_files_final_sizes() {
+		char *fname;
+		struct stat buf;
+		struct rmonitor_file_info *finfo;
+
+		hash_table_firstkey(files);
+		while(hash_table_nextkey(files, &fname, (void **) &finfo))
+		{
+			/* If size_on_close is unknwon, perform a stat on the file. */
+
+			if(finfo->size_on_close < 0 && stat(fname, &buf) == 0) {
+				finfo->size_on_close = buf.st_size;
+			}
+		}
+}
+
+void rmonitor_add_files_to_summary(char *field, int inputp) {
+		char *fname;
+		struct rmonitor_file_info *finfo;
+
+		buffer_t b;
+
+		buffer_init(&b);
+		buffer_putfstring(&b,  "%-15s[\n", field);
+
+		char *delimeter = "";
+
+		hash_table_firstkey(files);
+		while(hash_table_nextkey(files, &fname, (void **) &finfo))
+		{
+			if(inputp && finfo->n_writes > 0)
+				continue;
+
+			if(!inputp && finfo->n_writes < 1)
+				continue;
+
+			int64_t file_size = MAX(finfo->size_on_open, finfo->size_on_close);
+
+			if(file_size < 0) {
+				debug(D_NOTICE, "Could not find size of file %s\n", fname);
+				continue;
+			}
+
+			buffer_putfstring(&b, "%s%20s%-50s, %20" PRId64 " ]", delimeter, "[ ", fname, (int64_t) ceil(1.0*file_size/ONE_MEGABYTE));
+			delimeter = ",\n";
+		}
+
+		buffer_putfstring(&b,  "\n%16s\n", "]");
+
+		list_push_tail(verbatim_summary_lines, xxstrdup(buffer_tostring(&b)));
+
+		buffer_free(&b);
+}
+
 int rmonitor_file_io_summaries()
 {
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0)
 	{
 		char *fname;
-		struct stat buf;
 		struct rmonitor_file_info *finfo;
 
 		fprintf(log_opened, "%-15s\n%-15s %6s %20s %20s %6s %6s %6s %6s\n",
@@ -677,11 +729,6 @@ int rmonitor_file_io_summaries()
 		hash_table_firstkey(files);
 		while(hash_table_nextkey(files, &fname, (void **) &finfo))
 		{
-			/* If size_on_close is unknwon, perform a stat on the file. */
-
-			if(finfo->size_on_close < 0 && stat(fname, &buf) == 0)
-				finfo->size_on_close = buf.st_size;
-
 			fprintf(log_opened, "%-15s\n%-15s ", fname, "");
 			fprintf(log_opened, "%6" PRId64 " %20lld %20lld",
 				finfo->device,
@@ -709,9 +756,18 @@ int rmonitor_final_summary()
 	if(summary->exit_status == 0 && summary->limits_exceeded)
 		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
 
+	rmonitor_find_files_final_sizes();
+	rmonitor_add_files_to_summary("input_files:", 1);
+	rmonitor_add_files_to_summary("output_files:", 0);
+
 	if(log_summary)
 	{
 		rmsummary_print(log_summary, summary, resources_limits);
+
+		char *verbatim_line;
+		list_first_item(verbatim_summary_lines);
+		while((verbatim_line = list_next_item(verbatim_summary_lines)))
+			fprintf(log_summary, "%s\n", verbatim_line);
 	}
 
 	if(log_opened)
@@ -1347,8 +1403,6 @@ int main(int argc, char **argv) {
     char *series_path  = NULL;
     char *opened_path  = NULL;
 
-	struct list *verbatim_summary_lines = list_create();
-
     int use_summary = 1;
     int use_series  = 1;
     int use_opened  = 1;
@@ -1366,6 +1420,8 @@ int main(int argc, char **argv) {
     resources_flags  = make_rmsummary(0);
 
     rmsummary_read_env_vars(resources_limits);
+
+	verbatim_summary_lines = list_create(0);
 
 	enum {
 		LONG_OPT_SUMMARY_FILE = UCHAR_MAX+1,
@@ -1576,14 +1632,6 @@ int main(int argc, char **argv) {
 	    if (inotify_watches == NULL) alloced_inotify_watches = 0;
     }
 #endif
-
-	char *verbatim_line;
-	if(log_summary)
-	{
-		list_first_item(verbatim_summary_lines);
-		while((verbatim_line = list_next_item(verbatim_summary_lines)))
-			fprintf(log_summary, "%s\n", verbatim_line);
-	}
 
     spawn_first_process(executable, argv + optind, child_in_foreground);
 
