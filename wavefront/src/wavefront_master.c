@@ -125,6 +125,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s The port that the master will be listening on. (default 9068)\n", "-p,--port=<port>");
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--random-port=<file>");
+	fprintf(stdout, " %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 }
 
 static void display_progress( struct work_queue *q )
@@ -166,12 +167,17 @@ int main( int argc, char *argv[] )
 {
 	signed char c;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
+	char *work_queue_preferred_connection = NULL;
 	char *project = NULL;
 	int priority = 0;
 
 	const char *progname = "wavefront";
 
 	debug_config(progname);
+
+	enum {
+		LONG_OPT_PREFERRED_CONNECTION
+	};
 
 	static const struct option long_options[] = {
 		{"help",  no_argument, 0, 'h'},
@@ -185,6 +191,7 @@ int main( int argc, char *argv[] )
 		{"estimated-time", required_argument, 0, 't'},
 		{"random-port", required_argument, 0, 'Z'},
 		{"bitmap", required_argument, 0, 'B'},
+		{"work-queue-preferred-connection", required_argument, 0, LONG_OPT_PREFERRED_CONNECTION},
 		{0,0,0,0}
 	};
 
@@ -223,6 +230,10 @@ int main( int argc, char *argv[] )
 			break;
 		case 'B':
 			progress_bitmap_file = optarg;
+			break;
+		case LONG_OPT_PREFERRED_CONNECTION:
+			free(work_queue_preferred_connection);
+			work_queue_preferred_connection = xxstrdup(optarg);
 			break;
 		default:
 			show_help(progname);
@@ -290,6 +301,9 @@ int main( int argc, char *argv[] )
 	work_queue_specify_master_mode(queue, work_queue_master_mode);
 	work_queue_specify_name(queue, project);
 	work_queue_specify_priority(queue, priority);
+
+	if(work_queue_preferred_connection)
+		work_queue_master_preferred_connection(queue, work_queue_preferred_connection);
 
 	fprintf(stdout, "%s: listening for workers on port %d...\n",progname,work_queue_port(queue));
 

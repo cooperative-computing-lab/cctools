@@ -1093,14 +1093,15 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Add node id symbol tags in the makeflow log.        (default is false)\n", "   --log-verbose");
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
 	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
+	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
 	printf(" %-30s Use <file> as value-pairs for resource limits.\n", "   --monitor-limits=<file>");
-	printf(" %-30s Set monitor interval to <#> seconds.        (default is 1 second)\n", "   --monitor-interval=<#>");
-	printf(" %-30s Enable monitor time series.                 (default is disabled)\n", "   --monitor-with-time-series");
-	printf(" %-30s Enable monitoring of openened files.        (default is disabled)\n", "   --monitor-with-opened-files");
-	printf(" %-30s Format for monitor logs.                    (default %s)\n", "   --monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
+	printf(" %-30s Set monitor interval to <#> seconds.		(default is 1 second)\n", "   --monitor-interval=<#>");
+	printf(" %-30s Enable monitor time series.				 (default is disabled)\n", "   --monitor-with-time-series");
+	printf(" %-30s Enable monitoring of openened files.		(default is disabled)\n", "   --monitor-with-opened-files");
+	printf(" %-30s Format for monitor logs.					(default %s)\n", "   --monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
 }
 
 int main(int argc, char *argv[])
@@ -1135,6 +1136,7 @@ int main(int argc, char *argv[])
 	int did_explicit_auth = 0;
 	char *chirp_tickets = NULL;
 	char *working_dir = NULL;
+	char *work_queue_preferred_connection = NULL;
 	char *write_summary_to = NULL;
 	char *s;
 
@@ -1178,6 +1180,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_VERBOSE_PARSING,
 		LONG_OPT_LOG_VERBOSE_MODE,
 		LONG_OPT_WORKING_DIR,
+		LONG_OPT_PREFERRED_CONNECTION,
 		LONG_OPT_WQ_WAIT_FOR_WORKERS,
 		LONG_OPT_WRAPPER,
 		LONG_OPT_WRAPPER_INPUT,
@@ -1225,6 +1228,7 @@ int main(int argc, char *argv[])
 		{"version", no_argument, 0, 'v'},
 		{"log-verbose", no_argument, 0, LONG_OPT_LOG_VERBOSE_MODE},
 		{"working-dir", required_argument, 0, LONG_OPT_WORKING_DIR},
+		{"work-queue-preferred-connection", required_argument, 0, LONG_OPT_PREFERRED_CONNECTION},
 		{"wq-estimate-capacity", no_argument, 0, 'E'},
 		{"wq-fast-abort", required_argument, 0, 'F'},
 		{"wq-keepalive-interval", required_argument, 0, 'u'},
@@ -1436,6 +1440,10 @@ int main(int argc, char *argv[])
 				free(working_dir);
 				working_dir = xxstrdup(optarg);
 				break;
+			case LONG_OPT_PREFERRED_CONNECTION:
+				free(work_queue_preferred_connection);
+				work_queue_preferred_connection = xxstrdup(optarg);
+				break;
 			case LONG_OPT_DEBUG_ROTATE_MAX:
 				debug_config_file_size(string_metric_parse(optarg));
 				break;
@@ -1623,6 +1631,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
+	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
 
 	/* Do not create a local queue for systems where local and remote are the same. */
 
