@@ -578,7 +578,7 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
 
 	if(tr->wall_time > 0)
-		tr->cores = (int64_t) ceil( ((double) tr->cpu_time)/tr->wall_time);
+		tr->cores = (int64_t) MAX(1, ceil( ((double) tr->cpu_time)/tr->wall_time));
 
 	tr->max_concurrent_processes     = (int64_t) itable_size(processes);
 	tr->total_processes     = summary->total_processes;
