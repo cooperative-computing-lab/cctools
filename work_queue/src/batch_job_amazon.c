@@ -1,16 +1,25 @@
 #include "batch_job_internal.h"
 #include "batch_job.h"
+#include "debug.h"
 
 #include <stdio.h>
 
 static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
-    printf("test submit\n");
+    int jobid = 3;
+    debug(D_BATCH, "test file");
+    struct batch_job_info *info = malloc(sizeof(*info));
+    memset(info, 0, sizeof(*info));
+    info->submitted = time(0);
+    info->started = time(0);
+    itable_insert(q->job_table, jobid, info);
+    return 0;
 }
 
 static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
-    printf("test submit\n");
+    debug(D_BATCH, "test wait\n");
+    return -1;
 }
 
 static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
