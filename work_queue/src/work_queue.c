@@ -4206,6 +4206,9 @@ const char *task_state_str(work_queue_task_state_t task_state) {
 		case WORK_QUEUE_TASK_READY:
 			str = "ready";
 			break;
+		case WORK_QUEUE_TASK_RUNNING:
+			str = "running";
+			break;
 		case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
 			str = "waiting_retrieval";
 			break;
