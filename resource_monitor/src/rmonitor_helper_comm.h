@@ -12,12 +12,13 @@ See the file COPYING for details.
 #define RESOURCE_MONITOR_HELPER_ENV_VAR "CCTOOLS_RESOURCE_MONITOR_HELPER"
 #define RESOURCE_MONITOR_INFO_ENV_VAR   "CCTOOLS_RESOURCE_MONITOR_INFO"
 
-enum rmonitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN, READ, WRITE };
+enum rmonitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN_INPUT, OPEN_OUTPUT, READ, WRITE };
 
 /* BRANCH: pid of parent
  * END:    pid of child that ended
  * CHDIR:  new working directory
- * OPEN:   path of the file opened, or "" if not a regular file.
+ * OPEN_INPUT:  path of the file opened, or "" if not a regular file.
+ * OPEN_OUTPUT: path of the file opened, or "" if not a regular file.
  * READ:   Number of bytes read.
  * WRITE:  Number of bytes written.
  */

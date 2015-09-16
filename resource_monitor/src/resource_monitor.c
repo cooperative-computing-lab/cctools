@@ -415,9 +415,8 @@ struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previo
     return inventory;
 }
 
-void rmonitor_inotify_add_watch(char *filename)
+void rmonitor_add_file_watch(char *filename, int is_output)
 {
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct rmonitor_file_info *finfo;
 	char **new_inotify_watches;
 	struct stat fst;
@@ -434,9 +433,11 @@ void rmonitor_inotify_add_watch(char *filename)
 	finfo = calloc(1, sizeof(struct rmonitor_file_info));
 	if (finfo != NULL)
 	{
-		finfo->n_opens = 1;
-		finfo->size_on_open= -1;
+		finfo->n_opens       = 1;
+		finfo->size_on_open  = -1;
 		finfo->size_on_close = -1;
+		finfo->is_output     = is_output;
+
 		if (stat(filename, &fst) >= 0)
 		{
 			finfo->size_on_open  = fst.st_size;
@@ -445,12 +446,13 @@ void rmonitor_inotify_add_watch(char *filename)
 	}
 
 	hash_table_insert(files, filename, finfo);
+
+#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0)
 	{
 		if ((iwd = inotify_add_watch(rmonitor_inotify_fd,
 					     filename,
-					     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|
-					     IN_ACCESS|IN_MODIFY)) < 0)
+					     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|IN_ACCESS|IN_MODIFY)) < 0)
 		{
 			debug(D_DEBUG, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
 		} else {
@@ -677,7 +679,7 @@ void rmonitor_find_files_final_sizes() {
 		}
 }
 
-void rmonitor_add_files_to_summary(char *field, int inputp) {
+void rmonitor_add_files_to_summary(char *field, int outputs) {
 		char *fname;
 		struct rmonitor_file_info *finfo;
 
@@ -691,10 +693,7 @@ void rmonitor_add_files_to_summary(char *field, int inputp) {
 		hash_table_firstkey(files);
 		while(hash_table_nextkey(files, &fname, (void **) &finfo))
 		{
-			if(inputp && finfo->n_writes > 0)
-				continue;
-
-			if(!inputp && finfo->n_writes < 1)
+			if(finfo->is_output != outputs)
 				continue;
 
 			int64_t file_size = MAX(finfo->size_on_open, finfo->size_on_close);
@@ -757,8 +756,8 @@ int rmonitor_final_summary()
 		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
 
 	rmonitor_find_files_final_sizes();
-	rmonitor_add_files_to_summary("input_files:", 1);
-	rmonitor_add_files_to_summary("output_files:", 0);
+	rmonitor_add_files_to_summary("input_files:",  0);
+	rmonitor_add_files_to_summary("output_files:", 1);
 
 	if(log_summary)
 	{
@@ -1149,9 +1148,13 @@ void rmonitor_dispatch_msg(void)
         case CHDIR:
             p->wd = lookup_or_create_wd(p->wd, msg.data.s);
             break;
-        case OPEN:
-            debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
-            rmonitor_inotify_add_watch(msg.data.s);
+        case OPEN_INPUT:
+            debug(D_DEBUG, "File %s has been opened as input.\n", msg.data.s);
+            rmonitor_add_file_watch(msg.data.s, 0);
+            break;
+        case OPEN_OUTPUT:
+            debug(D_DEBUG, "File %s has been opened as output.\n", msg.data.s);
+            rmonitor_add_file_watch(msg.data.s, 1);
             break;
         case READ:
             break;

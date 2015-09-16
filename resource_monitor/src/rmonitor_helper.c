@@ -134,6 +134,20 @@ int fchdir(int fd)
 	return status;
 }
 
+static int open_for_writing(int fd) {
+	int flags, access_mode;
+
+	flags       = fcntl(fd, F_GETFL);
+
+	if(flags == -1) {
+		/* if error, assume output. */
+		return 1;
+	}
+
+	access_mode = flags & O_ACCMODE;
+	return (access_mode != O_RDONLY);
+}
+
 FILE *fopen(const char *path, const char *mode)
 {
 	FILE *file;
@@ -146,7 +160,12 @@ FILE *fopen(const char *path, const char *mode)
 	{
 		struct rmonitor_msg msg;
 
-		msg.type   = OPEN;
+		if(open_for_writing(fileno(file))) {
+			msg.type   = OPEN_OUTPUT;
+		} else {
+			msg.type   = OPEN_INPUT;
+		}
+
 		msg.origin = getpid();
 		strcpy(msg.data.s, path);
 
@@ -175,7 +194,12 @@ int open(const char *path, int flags, ...)
 	{
 		struct rmonitor_msg msg;
 
-		msg.type   = OPEN;
+		if(open_for_writing(fd)) {
+			msg.type   = OPEN_OUTPUT;
+		} else {
+			msg.type   = OPEN_INPUT;
+		}
+
 		msg.origin = getpid();
 		strcpy(msg.data.s, path);
 
@@ -198,7 +222,12 @@ FILE *fopen64(const char *path, const char *mode)
 	{
 		struct rmonitor_msg msg;
 
-		msg.type   = OPEN;
+		if(open_for_writing(fileno(file))) {
+			msg.type   = OPEN_OUTPUT;
+		} else {
+			msg.type   = OPEN_INPUT;
+		}
+
 		msg.origin = getpid();
 		strcpy(msg.data.s, path);
 
@@ -227,7 +256,12 @@ int open64(const char *path, int flags, ...)
 	{
 		struct rmonitor_msg msg;
 
-		msg.type   = OPEN;
+		if(open_for_writing(fd)) {
+			msg.type   = OPEN_OUTPUT;
+		} else {
+			msg.type   = OPEN_INPUT;
+		}
+
 		msg.origin = getpid();
 		strcpy(msg.data.s, path);
 
