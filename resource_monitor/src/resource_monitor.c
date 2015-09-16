@@ -983,6 +983,13 @@ void rmonitor_final_cleanup(int signum)
     struct   rmonitor_process_info *p;
     int      status;
 
+	static int handler_already_running = 0;
+
+	if(handler_already_running)
+		return;
+	handler_already_running = 1;
+
+    signal(SIGCHLD, rmonitor_check_child);
 
     //ask politely to quit
     itable_firstkey(processes);
@@ -1294,9 +1301,14 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
     else //child
     {
         debug(D_DEBUG, "executing: %s\n", executable);
+
+		errno = 0;
         execvp(executable, argv);
         //We get here only if execlp fails.
-        fatal("error executing %s: %s\n", executable, strerror(errno));
+		int exec_errno = errno;
+        debug(D_DEBUG, "error executing %s: %s\n", executable, strerror(errno));
+
+		exit(exec_errno);
     }
 
     return itable_lookup(processes, pid);
@@ -1637,9 +1649,7 @@ int main(int argc, char **argv) {
 #endif
 
     spawn_first_process(executable, argv + optind, child_in_foreground);
-
     rmonitor_resources(interval);
-
     rmonitor_final_cleanup(SIGTERM);
 
     return 0;
