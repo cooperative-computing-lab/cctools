@@ -704,7 +704,7 @@ void rmonitor_add_files_to_summary(char *field, int outputs) {
 				continue;
 			}
 
-			buffer_putfstring(&b, "%s%20s%-50s, %20" PRId64 " ]", delimeter, "[ ", fname, (int64_t) ceil(1.0*file_size/ONE_MEGABYTE));
+			buffer_putfstring(&b, "%s%20s\"%s\", %" PRId64 " ]", delimeter, "[ ", fname, (int64_t) ceil(1.0*file_size/ONE_MEGABYTE));
 			delimeter = ",\n";
 		}
 
