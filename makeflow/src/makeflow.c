@@ -105,6 +105,7 @@ static int port = 0;
 static int output_len_check = 0;
 
 static int cache_mode = 1;
+static int master_prefer_hostname = 0;
 
 static char *monitor_exe  = "resource_monitor_cctools";
 
@@ -1072,7 +1073,6 @@ int main(int argc, char *argv[])
 	timestamp_t time_completed = 0;
 	const char *work_queue_keepalive_interval = NULL;
 	const char *work_queue_keepalive_timeout = NULL;
-	const char *master_prefer_hostname = NULL;
 	const char *work_queue_master_mode = "standalone";
 	const char *work_queue_port_file = NULL;
 	const char *priority = NULL;
@@ -1395,7 +1395,7 @@ int main(int argc, char *argv[])
 				working_dir = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MASTER_PREFER_HOSTNAME:
-				master_prefer_hostname = xxstrdup("1");
+				master_prefer_hostname = 1;
 				break;
 			case LONG_OPT_DEBUG_ROTATE_MAX:
 				debug_config_file_size(string_metric_parse(optarg));
@@ -1584,7 +1584,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
-	batch_queue_set_option(remote_queue, "master-prefer-hostname", master_prefer_hostname);
+	batch_queue_set_option(remote_queue, "master-prefer-hostname", master_prefer_hostname ? "yes" : "no");
 
 	/* Do not create a local queue for systems where local and remote are the same. */
 
