@@ -418,9 +418,7 @@ struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previo
 void rmonitor_add_file_watch(char *filename, int is_output)
 {
 	struct rmonitor_file_info *finfo;
-	char **new_inotify_watches;
 	struct stat fst;
-	int iwd;
 
 	finfo = hash_table_lookup(files, filename);
 	if (finfo)
@@ -450,6 +448,9 @@ void rmonitor_add_file_watch(char *filename, int is_output)
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0)
 	{
+		char **new_inotify_watches;
+		int iwd;
+
 		if ((iwd = inotify_add_watch(rmonitor_inotify_fd,
 					     filename,
 					     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|IN_ACCESS|IN_MODIFY)) < 0)
