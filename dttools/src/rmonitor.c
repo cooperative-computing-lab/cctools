@@ -115,7 +115,7 @@ char *resource_monitor_copy_to_wd(const char *path_from_cmdline)
 //to change it.
 char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_path, const char *template_filename, const char *limits_filename,
 					   const char *extra_monitor_options,
-					   int summary, int time_series, int opened_files)
+					   int time_series, int inotify_stats)
 {
 	char cmd_builder[PATH_MAX];
 	int  index;
@@ -127,18 +127,13 @@ char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_
 	if(!monitor_path)
 		monitor_path = monitor_exe;
 
-	index = sprintf(cmd_builder, "./%s --with-disk-footprint ", monitor_path);
+	index = sprintf(cmd_builder, "./%s --with-output-files=%s ", monitor_path, template_filename);
 
-	index += sprintf(cmd_builder + index, "--with-output-files=%s ", template_filename);
+	if(time_series)
+		index += sprintf(cmd_builder + index, "--with-time-series ");
 
-	if(!summary)
-		index += sprintf(cmd_builder + index, "--without-summary-file ");
-
-	if(!time_series)
-		index += sprintf(cmd_builder + index, "--without-time-series ");
-
-	if(!opened_files)
-		index += sprintf(cmd_builder + index, "--without-opened-files ");
+	if(inotify_stats)
+		index += sprintf(cmd_builder + index, "--with-inotify ");
 
 	if(limits_filename)
 		index += sprintf(cmd_builder + index, "--limits-file=%s ", limits_filename);
