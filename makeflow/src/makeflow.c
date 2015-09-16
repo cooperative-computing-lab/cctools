@@ -823,7 +823,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 			if(s)
 			{
-				rmsummary_print(stderr, s, NULL);
+				rmsummary_print(stderr, s, NULL, NULL, NULL);
 				free(s);
 				fprintf(stderr, "\n");
 			}

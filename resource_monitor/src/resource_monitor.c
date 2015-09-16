@@ -707,11 +707,27 @@ void rmonitor_add_files_to_summary(char *field, int outputs) {
 			delimeter = ",\n";
 		}
 
-		buffer_putfstring(&b,  "\n%16s\n", "]");
+		buffer_putfstring(&b,  "\n%16s", "]");
 
 		list_push_tail(verbatim_summary_lines, xxstrdup(buffer_tostring(&b)));
 
 		buffer_free(&b);
+}
+
+char *rmonitor_consolidate_verbatim_lines() {
+	char *verbatim_line;
+
+	buffer_t b;
+	buffer_init(&b);
+
+	list_first_item(verbatim_summary_lines);
+	while((verbatim_line = list_next_item(verbatim_summary_lines)))
+		buffer_putfstring(&b,  "%s\n", verbatim_line);
+
+	char *result = xxstrdup(buffer_tostring(&b));
+
+	buffer_free(&b);
+	return result;
 }
 
 int rmonitor_file_io_summaries()
@@ -759,14 +775,11 @@ int rmonitor_final_summary()
 	rmonitor_add_files_to_summary("input_files:",  0);
 	rmonitor_add_files_to_summary("output_files:", 1);
 
-	{
-		char *verbatim_line;
+	char *epilogue = rmonitor_consolidate_verbatim_lines();
+	rmsummary_print(log_summary, summary, resources_limits, NULL, epilogue);
 
-		rmsummary_print(log_summary, summary, resources_limits);
-		list_first_item(verbatim_summary_lines);
-		while((verbatim_line = list_next_item(verbatim_summary_lines)))
-			fprintf(log_summary, "%s\n", verbatim_line);
-	}
+	if(epilogue)
+		free(epilogue);
 
 	if(log_inotify)
 	{
