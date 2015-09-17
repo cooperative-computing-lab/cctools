@@ -397,17 +397,17 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 	return result;
 }
 
-int process_name(struct work_queue *q, struct work_queue_worker *w, char *line)
+work_queue_msg_code_t process_name(struct work_queue *q, struct work_queue_worker *w, char *line)
 {
 	debug(D_WQ, "Sending project name to worker (%s)", w->addrport);
 
 	//send project name (q->name) if there is one. otherwise send blank line
 	send_worker_msg(q, w, "%s\n", q->name ? q->name : "");
 
-	return 0;
+	return MSG_PROCESSED;
 }
 
-int process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
+work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 {
 	char field[WORK_QUEUE_LINE_MAX];
 	char value[WORK_QUEUE_LINE_MAX];
@@ -416,7 +416,7 @@ int process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 	debug(D_WQ, "Receiving %s info from worker (%s)", field, w->addrport);
 
 	if(n != 2)
-		return -1;
+		return MSG_FAILURE;
 
 	if(string_prefix_is(field, "total_workers_joined")) {
 		w->stats->total_workers_joined = atoll(value);
@@ -439,7 +439,7 @@ int process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
-	return 0;
+	return MSG_PROCESSED;
 }
 
 
@@ -491,7 +491,7 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = process_info(q, w, line);
 	} else {
 		// Message is not a status update: return it to the user.
-		return MSG_NOT_PROCESSED;
+		result = MSG_NOT_PROCESSED;
 	}
 
 	return result;
@@ -1881,13 +1881,13 @@ static void handle_worker(struct work_queue *q, struct link *l)
 	w = hash_table_lookup(q->worker_table, key);
 
 	int worker_failure = 0;
-	int result = recv_worker_msg(q, w, line, sizeof(line));
+	work_queue_msg_code_t result = recv_worker_msg(q, w, line, sizeof(line));
 
-	//if result > 0, it means a message is left to consume
-	if(result > 0) {
+	//we only expect status messages from above. If the last message is left to be processed, we fail.
+	if(result == MSG_NOT_PROCESSED) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		worker_failure = 1;
-	} else if(result < 0){
+	} else if(result == MSG_FAILURE){
 		if(!strcmp(w->hostname, "QUEUE_STATUS")) {
 			debug(D_WQ, "Work Queue Status worker disconnected (%s)", w->addrport);
 		} else {
