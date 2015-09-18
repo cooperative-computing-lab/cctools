@@ -250,11 +250,11 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 			work_queue_activate_worker_waiting(q->data, atoi(value));
 		else
 			work_queue_activate_worker_waiting(q->data, 0);
-	} else if(strcmp(what, "master-prefer-hostname") == 0) {
-		if(strcmp(value, "yes") == 0)
-			work_queue_master_prefer_hostname(q->data, 1);
+	} else if(strcmp(what, "master-preferred-connection") == 0) {
+		if(value)
+			work_queue_master_preferred_connection(q->data, value);
 		else
-			work_queue_master_prefer_hostname(q->data, 0);
+			work_queue_master_preferred_connection(q->data, "IP");
 	}
 }
 

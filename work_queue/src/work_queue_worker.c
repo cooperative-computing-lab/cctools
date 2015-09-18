@@ -1772,7 +1772,7 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 		const char *project = nvpair_lookup_string(nv,"project");
 		const char *name = nvpair_lookup_string(nv,"name");
 		const char *addr = nvpair_lookup_string(nv,"address");
-		int pref = nvpair_lookup_integer(nv,"master_prefer_hostname");
+		const char *pref = nvpair_lookup_string(nv,"master-preferred-connection");
 		int port = nvpair_lookup_integer(nv,"port");
 
 		/* Do not connect to the same master after idle disconnection. */
@@ -1797,7 +1797,7 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 		last_port = port;
 
 		debug(D_WQ,"selected master with project=%s name=%s addr=%s port=%d",project,name,addr,port);
-		if(pref)
+		if(pref && strcmp(pref, "HOSTNAME") == 0)
 			return serve_master_by_hostport(name,port,project);
 		return serve_master_by_hostport(addr,port,project);
 	}
