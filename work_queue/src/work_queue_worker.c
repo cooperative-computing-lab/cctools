@@ -1772,7 +1772,7 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 		const char *project = nvpair_lookup_string(nv,"project");
 		const char *name = nvpair_lookup_string(nv,"name");
 		const char *addr = nvpair_lookup_string(nv,"address");
-		const char *pref = nvpair_lookup_string(nv,"master-preferred-connection");
+		const char *pref = nvpair_lookup_string(nv,"master_preferred_connection");
 		int port = nvpair_lookup_integer(nv,"port");
 
 		/* Do not connect to the same master after idle disconnection. */
