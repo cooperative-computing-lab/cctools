@@ -449,17 +449,18 @@ static INT64_T do_getacl(int argc, char **argv)
 static INT64_T do_link(int argc, char **argv)
 {
 	INT64_T result;
-	char old_full_path[CHIRP_PATH_MAX];
+	char path[CHIRP_PATH_MAX]; /* the new link */
 	int sym = (argc == 4 && strcmp(argv[1], "-s") == 0);
 
 	if(sym) {
-		complete_remote_path(argv[2], old_full_path);
-		result = chirp_reli_symlink(current_host, old_full_path, argv[3], stoptime);
+		const char *target = argv[2]; /* uninterpreted */
+		complete_remote_path(argv[3], path);
+		result = chirp_reli_symlink(current_host, target, path, stoptime);
 	} else {
-		char new_full_path[CHIRP_PATH_MAX];
-		complete_remote_path(argv[1], old_full_path);
-		complete_remote_path(argv[2], new_full_path);
-		result = chirp_reli_link(current_host, old_full_path, new_full_path, stoptime);
+		char target[CHIRP_PATH_MAX];
+		complete_remote_path(argv[1], target);
+		complete_remote_path(argv[2], path);
+		result = chirp_reli_link(current_host, target, path, stoptime);
 	}
 
 	return result;
