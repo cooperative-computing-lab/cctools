@@ -985,8 +985,8 @@ done:
 
 		p->completing_execve = 0;
 		if (actual == 0) {
-			debug(D_PROCESS, "execve: %s succeeded in 32-bit mode", p->new_logical_name);
-			strcpy(p->name, p->new_logical_name);
+			p->table->complete_at_path(AT_FDCWD, p->new_logical_name, p->name);
+			debug(D_PROCESS, "execve: %s (%s) succeeded in 32-bit mode", p->new_logical_name, p->name);
 			/* Undo "syscall_args_changed = 1" because execve returns multiple results in syscall argument registers. */
 			p->syscall_args_changed = 0;
 			/* We do not need to restore the scratch space as the process image has been replaced. */
