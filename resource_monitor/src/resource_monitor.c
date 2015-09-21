@@ -451,9 +451,7 @@ void rmonitor_add_file_watch(char *filename, int is_output)
 		char **new_inotify_watches;
 		int iwd;
 
-		if ((iwd = inotify_add_watch(rmonitor_inotify_fd,
-					     filename,
-					     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|IN_ACCESS|IN_MODIFY)) < 0)
+		if ((iwd = inotify_add_watch(rmonitor_inotify_fd, filename, IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|IN_ACCESS|IN_MODIFY)) < 0)
 		{
 			debug(D_DEBUG, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
 		} else {
@@ -1177,7 +1175,7 @@ void rmonitor_dispatch_msg(void)
 			switch(msg.error) {
 				case 0:
 					debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
-					rmonitor_inotify_add_watch(msg.data.s, msg.type == OPEN_OUTPUT);
+					rmonitor_add_file_watch(msg.data.s, msg.type == OPEN_OUTPUT);
 					break;
 				case EMFILE:
 					/* Eventually report that we ran out of file descriptors. */

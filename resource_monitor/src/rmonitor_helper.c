@@ -212,7 +212,6 @@ int open(const char *path, int flags, ...)
 		fd = original_open(path, flags, mode);
 	POP_ERRNO(msg)
 
-	struct rmonitor_msg msg;
 	if(fd > -1)
 	{
 
@@ -247,8 +246,6 @@ FILE *fopen64(const char *path, const char *mode)
 
 	if(file)
 	{
-		struct rmonitor_msg msg;
-
 		if(open_for_writing(fileno(file))) {
 			msg.type   = OPEN_OUTPUT;
 		} else {
@@ -286,8 +283,6 @@ int open64(const char *path, int flags, ...)
 
 	if(fd > -1)
 	{
-		struct rmonitor_msg msg;
-
 		if(open_for_writing(fd)) {
 			msg.type   = OPEN_OUTPUT;
 		} else {
