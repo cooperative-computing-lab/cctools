@@ -66,7 +66,7 @@ struct rmsummary_field
 	}       value;
 };
 
-void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits);
+void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits, char *preamble, char *epilogue);
 void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix);
 
 

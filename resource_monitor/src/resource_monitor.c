@@ -124,18 +124,19 @@ See the file COPYING for details.
 #include <inttypes.h>
 #include <sys/types.h>
 
+#include "buffer.h"
 #include "cctools.h"
+#include "copy_stream.h"
+#include "create_dir.h"
+#include "debug.h"
+#include "getopt.h"
 #include "hash_table.h"
 #include "itable.h"
 #include "list.h"
+#include "macros.h"
 #include "path.h"
 #include "stringtools.h"
-#include "debug.h"
 #include "xxmalloc.h"
-#include "copy_stream.h"
-#include "getopt.h"
-#include "create_dir.h"
-#include "macros.h"
 
 #include "rmonitor.h"
 #include "rmonitor_poll_internal.h"
@@ -157,7 +158,10 @@ See the file COPYING for details.
 
 FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
-FILE  *log_opened  = NULL;      /* List of opened files is written to this file. */
+FILE  *log_inotify  = NULL;      /* List of opened files is written to this file. */
+
+struct list *verbatim_summary_lines; /* lines added to the summary without change */
+
 
 int    rmonitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
                                   grandchildren processes report to the monitor. */
@@ -411,16 +415,10 @@ struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previo
     return inventory;
 }
 
-void rmonitor_inotify_add_watch(char *filename)
+void rmonitor_add_file_watch(char *filename, int is_output)
 {
-	/* Perhaps here we can do something more to the files, like a
-	 * final stat */
-
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct rmonitor_file_info *finfo;
-	char **new_inotify_watches;
 	struct stat fst;
-	int iwd;
 
 	finfo = hash_table_lookup(files, filename);
 	if (finfo)
@@ -433,9 +431,11 @@ void rmonitor_inotify_add_watch(char *filename)
 	finfo = calloc(1, sizeof(struct rmonitor_file_info));
 	if (finfo != NULL)
 	{
-		finfo->n_opens = 1;
-		finfo->size_on_open= -1;
+		finfo->n_opens       = 1;
+		finfo->size_on_open  = -1;
 		finfo->size_on_close = -1;
+		finfo->is_output     = is_output;
+
 		if (stat(filename, &fst) >= 0)
 		{
 			finfo->size_on_open  = fst.st_size;
@@ -444,12 +444,16 @@ void rmonitor_inotify_add_watch(char *filename)
 	}
 
 	hash_table_insert(files, filename, finfo);
+
+#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0)
 	{
+		char **new_inotify_watches;
+		int iwd;
+
 		if ((iwd = inotify_add_watch(rmonitor_inotify_fd,
 					     filename,
-					     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|
-					     IN_ACCESS|IN_MODIFY)) < 0)
+					     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|IN_ACCESS|IN_MODIFY)) < 0)
 		{
 			debug(D_DEBUG, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
 		} else {
@@ -509,9 +513,7 @@ void rmonitor_handle_inotify(void)
 				if (finfo == NULL) continue;
 				if (evdata[i].mask & IN_ACCESS) (finfo->n_reads)++;
 				if (evdata[i].mask & IN_MODIFY) (finfo->n_writes)++;
-				if ((evdata[i].mask & IN_CLOSE_WRITE) ||
-				    (evdata[i].mask & IN_CLOSE_NOWRITE))
-				{
+				if ((evdata[i].mask & IN_CLOSE_WRITE) || (evdata[i].mask & IN_CLOSE_NOWRITE)) {
 					(finfo->n_closes)++;
 					if (stat(fname, &fst) >= 0)
 					{
@@ -577,7 +579,7 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
 
 	if(tr->wall_time > 0)
-		tr->cores = (int64_t) ceil( ((double) tr->cpu_time)/tr->wall_time);
+		tr->cores = (int64_t) MAX(1, ceil( ((double) tr->cpu_time)/tr->wall_time));
 
 	tr->max_concurrent_processes     = (int64_t) itable_size(processes);
 	tr->total_processes     = summary->total_processes;
@@ -662,35 +664,96 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 
 }
 
-int rmonitor_file_io_summaries()
-{
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
-	if (rmonitor_inotify_fd >= 0)
-	{
+void rmonitor_find_files_final_sizes() {
 		char *fname;
 		struct stat buf;
 		struct rmonitor_file_info *finfo;
-
-		fprintf(log_opened, "%-15s\n%-15s %6s %20s %20s %6s %6s %6s %6s\n",
-			"#path", "#", "device", "size_initial(B)", "size_final(B)", "opens", "closes", "reads", "writes");
 
 		hash_table_firstkey(files);
 		while(hash_table_nextkey(files, &fname, (void **) &finfo))
 		{
 			/* If size_on_close is unknwon, perform a stat on the file. */
 
-			if(finfo->size_on_close < 0 && stat(fname, &buf) == 0)
+			if(finfo->size_on_close < 0 && stat(fname, &buf) == 0) {
 				finfo->size_on_close = buf.st_size;
+			}
+		}
+}
 
-			fprintf(log_opened, "%-15s\n%-15s ", fname, "");
-			fprintf(log_opened, "%6" PRId64 " %20lld %20lld",
+void rmonitor_add_files_to_summary(char *field, int outputs) {
+		char *fname;
+		struct rmonitor_file_info *finfo;
+
+		buffer_t b;
+
+		buffer_init(&b);
+		buffer_putfstring(&b,  "%-15s[\n", field);
+
+		char *delimeter = "";
+
+		hash_table_firstkey(files);
+		while(hash_table_nextkey(files, &fname, (void **) &finfo))
+		{
+			if(finfo->is_output != outputs)
+				continue;
+
+			int64_t file_size = MAX(finfo->size_on_open, finfo->size_on_close);
+
+			if(file_size < 0) {
+				debug(D_NOTICE, "Could not find size of file %s\n", fname);
+				continue;
+			}
+
+			buffer_putfstring(&b, "%s%20s\"%s\", %" PRId64 " ]", delimeter, "[ ", fname, (int64_t) ceil(1.0*file_size/ONE_MEGABYTE));
+			delimeter = ",\n";
+		}
+
+		buffer_putfstring(&b,  "\n%16s", "]");
+
+		list_push_tail(verbatim_summary_lines, xxstrdup(buffer_tostring(&b)));
+
+		buffer_free(&b);
+}
+
+char *rmonitor_consolidate_verbatim_lines() {
+	char *verbatim_line;
+
+	buffer_t b;
+	buffer_init(&b);
+
+	list_first_item(verbatim_summary_lines);
+	while((verbatim_line = list_next_item(verbatim_summary_lines)))
+		buffer_putfstring(&b,  "%s\n", verbatim_line);
+
+	char *result = xxstrdup(buffer_tostring(&b));
+
+	buffer_free(&b);
+	return result;
+}
+
+int rmonitor_file_io_summaries()
+{
+#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+	if (rmonitor_inotify_fd >= 0)
+	{
+		char *fname;
+		struct rmonitor_file_info *finfo;
+
+		fprintf(log_inotify, "%-15s\n%-15s %6s %20s %20s %6s %6s %6s %6s\n",
+			"#path", "#", "device", "size_initial(B)", "size_final(B)", "opens", "closes", "reads", "writes");
+
+		hash_table_firstkey(files);
+		while(hash_table_nextkey(files, &fname, (void **) &finfo))
+		{
+			fprintf(log_inotify, "%-15s\n%-15s ", fname, "");
+			fprintf(log_inotify, "%6" PRId64 " %20lld %20lld",
 				finfo->device,
 				(long long int) finfo->size_on_open,
 				(long long int) finfo->size_on_close);
-			fprintf(log_opened, " %6" PRId64 " %6" PRId64,
+			fprintf(log_inotify, " %6" PRId64 " %6" PRId64,
 				finfo->n_opens,
 				finfo->n_closes);
-			fprintf(log_opened, " %6" PRId64 " %6" PRId64 "\n",
+			fprintf(log_inotify, " %6" PRId64 " %6" PRId64 "\n",
 				finfo->n_reads,
 				finfo->n_writes);
 		}
@@ -709,12 +772,17 @@ int rmonitor_final_summary()
 	if(summary->exit_status == 0 && summary->limits_exceeded)
 		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
 
-	if(log_summary)
-	{
-		rmsummary_print(log_summary, summary, resources_limits);
-	}
+	rmonitor_find_files_final_sizes();
+	rmonitor_add_files_to_summary("input_files:",  0);
+	rmonitor_add_files_to_summary("output_files:", 1);
 
-	if(log_opened)
+	char *epilogue = rmonitor_consolidate_verbatim_lines();
+	rmsummary_print(log_summary, summary, resources_limits, NULL, epilogue);
+
+	if(epilogue)
+		free(epilogue);
+
+	if(log_inotify)
 	{
         int nfds = rmonitor_inotify_fd + 1;
         int count = 0;
@@ -928,6 +996,13 @@ void rmonitor_final_cleanup(int signum)
     struct   rmonitor_process_info *p;
     int      status;
 
+	static int handler_already_running = 0;
+
+	if(handler_already_running)
+		return;
+	handler_already_running = 1;
+
+    signal(SIGCHLD, rmonitor_check_child);
 
     //ask politely to quit
     itable_firstkey(processes);
@@ -967,12 +1042,12 @@ void rmonitor_final_cleanup(int signum)
 
     status = rmonitor_final_summary();
 
-    if(log_summary)
-	    fclose(log_summary);
+	fclose(log_summary);
+
     if(log_series)
 	    fclose(log_series);
-    if(log_opened)
-	    fclose(log_opened);
+    if(log_inotify)
+	    fclose(log_inotify);
 
     exit(status);
 }
@@ -1093,9 +1168,13 @@ void rmonitor_dispatch_msg(void)
         case CHDIR:
             p->wd = lookup_or_create_wd(p->wd, msg.data.s);
             break;
-        case OPEN:
-            debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
-            rmonitor_inotify_add_watch(msg.data.s);
+        case OPEN_INPUT:
+            debug(D_DEBUG, "File %s has been opened as input.\n", msg.data.s);
+            rmonitor_add_file_watch(msg.data.s, 0);
+            break;
+        case OPEN_OUTPUT:
+            debug(D_DEBUG, "File %s has been opened as output.\n", msg.data.s);
+            rmonitor_add_file_watch(msg.data.s, 1);
             break;
         case READ:
             break;
@@ -1235,9 +1314,14 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
     else //child
     {
         debug(D_DEBUG, "executing: %s\n", executable);
+
+		errno = 0;
         execvp(executable, argv);
         //We get here only if execlp fails.
-        fatal("error executing %s: %s\n", executable, strerror(errno));
+		int exec_errno = errno;
+        debug(D_DEBUG, "error executing %s: %s\n", executable, strerror(errno));
+
+		exit(exec_errno);
     }
 
     return itable_lookup(processes, pid);
@@ -1262,17 +1346,11 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Keep the monitored process in foreground (for interactive use).\n", "-f,--child-in-foreground");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-O,--with-output-files=<file>");
-    fprintf(stdout, "%-30s Write resource summary to <file>.        (default=<template>.summary)\n", "--with-summary-file=<file>");
-    fprintf(stdout, "%-30s Write resource time series to <file>.    (default=<template>.series)\n", "--with-time-series=<file>");
-    fprintf(stdout, "%-30s Write list of opened files to <file>.    (default=<template>.files)\n", "--with-opened-files=<file>");
+    fprintf(stdout, "%-30s Write resource time series to <template>.series\n", "--with-time-series");
+    fprintf(stdout, "%-30s Write inotify statistics of opened files to default=<template>.files\n", "--with-inotify");
     fprintf(stdout, "%-30s Include this string verbatim in a line in the summary. \n", "-V,--verbatim-to-summary=<str>");
     fprintf(stdout, "%-30s (Could be specified multiple times.)\n", "");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Do not write the summary log file.\n", "--without-summary-file");
-    fprintf(stdout, "%-30s Do not write the time series log file.\n", "--without-time-series");
-    fprintf(stdout, "%-30s Do not write the list of opened files.\n", "--without-opened-files");
-    fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Measure working directory footprint (default).\n", "--with-disk-footprint");
     fprintf(stdout, "%-30s Do not measure working directory footprint.\n", "--without-disk-footprint");
 }
 
@@ -1347,11 +1425,8 @@ int main(int argc, char **argv) {
     char *series_path  = NULL;
     char *opened_path  = NULL;
 
-	struct list *verbatim_summary_lines = list_create();
-
-    int use_summary = 1;
-    int use_series  = 1;
-    int use_opened  = 1;
+    int use_series   = 0;
+    int use_inotify  = 0;
     int child_in_foreground = 0;
 
     debug_config(argv[0]);
@@ -1367,14 +1442,12 @@ int main(int argc, char **argv) {
 
     rmsummary_read_env_vars(resources_limits);
 
+	verbatim_summary_lines = list_create(0);
+
 	enum {
-		LONG_OPT_SUMMARY_FILE = UCHAR_MAX+1,
-		LONG_OPT_TIME_SERIES,
+		LONG_OPT_TIME_SERIES = UCHAR_MAX+1,
 		LONG_OPT_OPENED_FILES,
 		LONG_OPT_DISK_FOOTPRINT,
-		LONG_OPT_NO_SUMMARY_FILE,
-		LONG_OPT_NO_TIME_SERIES,
-		LONG_OPT_NO_OPENED_FILES,
 		LONG_OPT_NO_DISK_FOOTPRINT
 	};
 
@@ -1393,14 +1466,8 @@ int main(int argc, char **argv) {
 
 		    {"with-output-files",   required_argument, 0,  'O'},
 
-		    {"with-summary-file",   required_argument, 0, LONG_OPT_SUMMARY_FILE},
-		    {"with-time-series",    required_argument, 0, LONG_OPT_TIME_SERIES},
-		    {"with-opened-files",   required_argument, 0, LONG_OPT_OPENED_FILES},
-		    {"with-disk-footprint", no_argument,       0, LONG_OPT_DISK_FOOTPRINT},
-
-		    {"without-summary",        no_argument, 0, LONG_OPT_NO_SUMMARY_FILE},
-		    {"without-time-series",    no_argument, 0, LONG_OPT_NO_TIME_SERIES},
-		    {"without-opened-files",   no_argument, 0, LONG_OPT_NO_OPENED_FILES},
+		    {"with-time-series",    no_argument, 0, LONG_OPT_TIME_SERIES},
+		    {"with-opened-files",   no_argument, 0, LONG_OPT_OPENED_FILES},
 		    {"without-disk-footprint", no_argument, 0, LONG_OPT_NO_DISK_FOOTPRINT},
 
 		    {0, 0, 0, 0}
@@ -1463,12 +1530,6 @@ int main(int argc, char **argv) {
 				}
 				template_path = xxstrdup(optarg);
 				break;
-			case LONG_OPT_SUMMARY_FILE:
-				if(summary_path)
-					free(summary_path);
-				summary_path = xxstrdup(optarg);
-				use_summary = 1;
-				break;
 			case  LONG_OPT_TIME_SERIES:
 				if(series_path)
 					free(series_path);
@@ -1479,28 +1540,7 @@ int main(int argc, char **argv) {
 				if(opened_path)
 					free(opened_path);
 				opened_path = xxstrdup(optarg);
-				use_opened  = 1;
-				break;
-			case  LONG_OPT_NO_SUMMARY_FILE:
-				if(summary_path)
-					free(summary_path);
-				summary_path = NULL;
-				use_summary = 0;
-				break;
-			case  LONG_OPT_NO_TIME_SERIES:
-				if(series_path)
-					free(series_path);
-				series_path = NULL;
-				use_series  = 0;
-				break;
-			case  LONG_OPT_NO_OPENED_FILES:
-				if(opened_path)
-					free(opened_path);
-				opened_path = NULL;
-				use_opened  = 0;
-				break;
-			case LONG_OPT_DISK_FOOTPRINT:
-				resources_flags->workdir_footprint = 1;
+				use_inotify = 1;
 				break;
 			case LONG_OPT_NO_DISK_FOOTPRINT:
 				resources_flags->workdir_footprint = 0;
@@ -1552,23 +1592,24 @@ int main(int argc, char **argv) {
     wdirs_rc   = itable_create(0);
     filesys_rc = itable_create(0);
 
-    if(use_summary && !summary_path)
-        summary_path = default_summary_name(template_path);
-    if(use_series && !series_path)
+	summary_path = default_summary_name(template_path);
+
+    if(use_series)
         series_path = default_series_name(template_path);
-    if(use_opened && !opened_path)
+
+    if(use_inotify)
         opened_path = default_opened_name(template_path);
 
     log_summary = open_log_file(summary_path);
     log_series  = open_log_file(series_path);
-    log_opened  = open_log_file(opened_path);
+    log_inotify = open_log_file(opened_path);
 
     summary->command = xxstrdup(command_line);
     summary->start   = usecs_since_epoch();
 
 
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
-    if(log_opened)
+    if(log_inotify)
     {
 	    rmonitor_inotify_fd = inotify_init();
 	    alloced_inotify_watches = 100;
@@ -1577,18 +1618,8 @@ int main(int argc, char **argv) {
     }
 #endif
 
-	char *verbatim_line;
-	if(log_summary)
-	{
-		list_first_item(verbatim_summary_lines);
-		while((verbatim_line = list_next_item(verbatim_summary_lines)))
-			fprintf(log_summary, "%s\n", verbatim_line);
-	}
-
     spawn_first_process(executable, argv + optind, child_in_foreground);
-
     rmonitor_resources(interval);
-
     rmonitor_final_cleanup(SIGTERM);
 
     return 0;

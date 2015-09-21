@@ -187,8 +187,11 @@ struct rmsummary *rmsummary_parse_file_single(char *filename)
 	return s;
 }
 
-void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits)
+void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits, char *preamble, char *epilogue)
 {
+	if(preamble)
+		fprintf(stream, "%s", preamble);
+
 	if(s->command)
 		fprintf(stream, "%s %s\n",  "command:", s->command);
 
@@ -213,6 +216,9 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits
 	if(limits) {
 		rmsummary_print_only_resources(stream, limits, "limits_");
 	}
+
+	if(epilogue)
+		fprintf(stream, "%s", epilogue);
 
 	fprintf(stream, "--\n\n");
 }
