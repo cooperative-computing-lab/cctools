@@ -1525,12 +1525,13 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 		} else if(pattern_match(pname.path, "^/proc/(%d+)/exe", &pid) >= 0) {
 			struct pfs_process *target = pfs_process_lookup(atoi(pid));
 			if(target) {
-				/* Fill in the target->name for readlink. */
-				char complete_target_path[PFS_PATH_MAX];
-				complete_path(target->name,complete_target_path);
-				path_collapse(complete_target_path, pname.path, 1);
+				const char *path = target->name;
+				size_t count = MIN(strlen(path), (size_t)size);
+				memcpy(buf,path,count);
+				result = (int)count;
+			} else {
+				result = pname.service->readlink(&pname,buf,size);
 			}
-			result = pname.service->readlink(&pname,buf,size);
 		} else {
 			result = pname.service->readlink(&pname,buf,size);
 		}
