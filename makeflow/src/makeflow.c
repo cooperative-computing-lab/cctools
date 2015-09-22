@@ -1046,6 +1046,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Enable monitor time series.				 (default is disabled)\n", "   --monitor-with-time-series");
 	printf(" %-30s Enable monitoring of openened files.		(default is disabled)\n", "   --monitor-with-opened-files");
 	printf(" %-30s Format for monitor logs.					(default %s)\n", "   --monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
+	printf(" %-30s Indicate preferred master connection. (IP [default], HOSTNAME)", "--work-queue-preferred-connection");
 }
 
 int main(int argc, char *argv[])

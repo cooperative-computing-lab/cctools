@@ -4743,7 +4743,6 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 
 void work_queue_master_preferred_connection(struct work_queue *q, const char *preferred_connection)
 {
-
 	q->stats->master_preferred_connection = xxstrdup(preferred_connection);
 }
 

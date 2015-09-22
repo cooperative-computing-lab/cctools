@@ -53,6 +53,7 @@ static int empty_task = 0;
 
 enum {
 	LONG_OPT_SYMMETRIC=UCHAR_MAX+1,
+	LONG_OPT_PREFERRED_CONNECTION
 };
 
 static void show_help(const char *cmd)
@@ -75,6 +76,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
 	fprintf(stdout, " %-30s Display this message.\n", "-h,--help");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--random-port=<file>");
+	fprintf(stdout, " %-30s Indicate preferred master connection. (IP [default], HOSTNAME)", "--work-queue-preferred-connection");
 }
 
 /*
@@ -304,6 +306,7 @@ int main(int argc, char **argv)
 	static const char *port_file = NULL;
 	int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 	char *project = NULL;
+	char *work_queue_preferred_connection = NULL;
 	int priority = 0;
 
 	debug_config("allpairs_master");
@@ -328,6 +331,7 @@ int main(int argc, char **argv)
 		{"estimated-time", required_argument, 0, 't'},
 		{"priority", required_argument, 0, 'P'},
 		{"symmetric", no_argument, 0, LONG_OPT_SYMMETRIC},
+		{"work-queue-preferred-connection", required_argument, 0, LONG_OPT_PREFERRED_CONNECTION},
 		{0,0,0,0}
 	};
 
@@ -391,6 +395,10 @@ int main(int argc, char **argv)
 		case 'Z':
 			port_file = optarg;
 			port = 0;
+			break;
+		case LONG_OPT_PREFERRED_CONNECTION:
+			free(work_queue_preferred_connection);
+			work_queue_preferred_connection = xxstrdup(optarg);
 			break;
 		default:
 			show_help(progname);
@@ -477,6 +485,9 @@ int main(int argc, char **argv)
 	work_queue_specify_master_mode(q, work_queue_master_mode);
 	work_queue_specify_name(q, project);
 	work_queue_specify_priority(q, priority);
+
+	if(work_queue_preferred_connection)
+		work_queue_master_preferred_connection(q, work_queue_preferred_connection);
 
 	fprintf(stdout, "%s: listening for workers on port %d...\n",progname,work_queue_port(q));
 

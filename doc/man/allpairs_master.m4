@@ -40,6 +40,7 @@ OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem. (Try -d all to
 OPTION_ITEM(`-v, --version')Show program version.
 OPTION_PAIR(`-h, --help')Display this message.
 OPTION_TRIPLET(-Z,port-file,file)Select port at random and write it to this file.  (default is disabled)
+OPTION_PAIR(--work-queue-preferred-connection,connection)Indicate preferred connection. (IP [default], HOSTNAME)
 OPTIONS_END
 
 SECTION(EXIT STATUS)
