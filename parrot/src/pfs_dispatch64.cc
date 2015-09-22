@@ -551,7 +551,7 @@ static void decode_stat( struct pfs_process *p, int entering, INT64_T syscall, c
 			struct pfs_kernel_stat kbuf;
 			COPY_STAT(lbuf,kbuf);
 			ssize_t count = tracer_copy_out(p->tracer, &kbuf, POINTER(args[1]), sizeof(kbuf), TRACER_O_ATOMIC|TRACER_O_FAST);
-			if (count == p->syscall_result) {
+			if (count == (ssize_t)sizeof(kbuf)) {
 				divert_to_dummy(p, 0);
 			} else if (count == -1 && errno != ENOSYS) {
 				debug(D_DEBUG, "tracer memory write failed: %s", strerror(errno));\
@@ -593,7 +593,7 @@ static void decode_statfs( struct pfs_process *p, int entering, INT64_T syscall,
 			COPY_STATFS(lbuf,kbuf);
 
 			ssize_t count = tracer_copy_out(p->tracer, &kbuf, POINTER(args[1]), sizeof(kbuf), TRACER_O_ATOMIC|TRACER_O_FAST);
-			if (count == p->syscall_result) {
+			if (count == (ssize_t)sizeof(kbuf)) {
 				divert_to_dummy(p, 0);
 			} else if (count == -1 && errno != ENOSYS) {
 				debug(D_DEBUG, "tracer memory write failed: %s", strerror(errno));\
