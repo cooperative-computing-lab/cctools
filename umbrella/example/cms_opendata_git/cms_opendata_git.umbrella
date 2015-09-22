@@ -26,10 +26,15 @@
 	"data": {
 		"cms_opendata_git": {
 			"mount_env": "GIT_REPO_1"
+		},
+		"cms_opendata.sh": {
+			"id": "2f2051dff6ca75ff67e71f95e9271857",
+			"mountpoint": "/tmp/cms_opendata.sh"
 		}
 	},
 	"environ": {
 		"CMS_VERSION": "CMSSW_4_2_8",
 		"SCRAM_ARCH": "slc5_amd64_gcc434"
-	}
+	},
+	"cmd": "/bin/sh /tmp/cms_opendata.sh"
 }

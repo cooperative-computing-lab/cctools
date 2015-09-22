@@ -30,7 +30,7 @@ Implementation Logic of Dependency Sources:
 
 mount_env and mountpoint:
 If only mountpoint is set to A in a specification, the dependency will be downloaded into the umbrella local cache with the file path of D, and a new mountpoint will be added into mount_dict (mount_dict[A] = D).
-If only mount_env is set to B in a specification, the dependency will not be downloaded, package_search will be executed to get one remote storage location, C, of the dependency, a new environment variable will be set (env_para_dict[B] = C).
+If only mount_env is set to B in a specification, the dependency will not be downloaded, meta_search will be executed to get one remote storage location, C, of the dependency, a new environment variable will be set (env_para_dict[B] = C).
 If mountpoint is set to A and mount_env is set to B in a specification, the dependency will be downloaded into the umbrella local cache with the file path of D, and a new mountpoint will be added into mount_dict (mount_dict[A] = D) and a new environment variable will also be set (env_para_dict[B] = A).
 
 Local path inside the umbrella local cache:
@@ -89,6 +89,9 @@ cctools_dest = ""
 cms_siteconf_url = "http://ccl.cse.nd.edu/research/data/hep-case-study/2efd5cbb3424fe6b4a74294c84d0fb43/SITECONF.tar.gz"
 cms_siteconf_format = "tgz"
 
+tempfile_list = [] #a list of temporary file created by umbrella and need to be removed before umbrella ends.
+tempdir_list = [] #a list of temporary dir created by umbrella and need to be removed before umbrella ends.
+
 def subprocess_error(cmd, rc, stdout, stderr):
 	"""Print the command, return code, stdout, and stderr; and then directly exit.
 
@@ -101,6 +104,7 @@ def subprocess_error(cmd, rc, stdout, stderr):
 	Returns:
 		directly exit the program.
 	"""
+	cleanup(tempfile_list, tempdir_list)
 	sys.exit("`%s` fails with the return code of %d, \nstdout: %s, \nstderr: %s\n" % (cmd, rc, stdout, stderr))
 
 def func_call(cmd):
@@ -151,6 +155,7 @@ def which_exec(name):
 		Otherwise, returns None.
 	"""
 	if not os.environ.has_key("PATH"):
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("The environment variable PATH is not set!")
 		sys.exit("The environment variable PATH is not set!")
 	for path in os.environ["PATH"].split(":"):
@@ -180,6 +185,7 @@ def md5_cal(filename, block_size=2**20):
 				md5.update(data)
 			return md5.hexdigest()
 	except:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("Computing the checksum of %s fails.", filename)
 		sys.exit("md5_cal(" + filename + ") failed.\n")
 
@@ -241,11 +247,13 @@ def dependency_download(url, checksum, checksum_tool, dest, format_remote_storag
 		local_checksum = md5_cal(dest)
 		logging.debug("The checksum of %s is: %s", dest, local_checksum)
 		if not local_checksum == checksum:
+			cleanup(tempfile_list, tempdir_list)
 			logging.critical("The version of %s is incorrect! Please first delete it and its unpacked directory!!", dest)
 			sys.exit("the version of " + dest + " is incorrect! Please first delete it and its unpacked directory!!\n")
 	elif not checksum_tool:
 		logging.debug("the checksum of %s is not provided!", url)
 	else:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("%s is not supported currently!", checksum_tool)
 		sys.exit(checksum_tool + "is not supported currently!")
 
@@ -255,34 +263,36 @@ def dependency_download(url, checksum, checksum_tool, dest, format_remote_storag
 		tfile = tarfile.open(dest, "r:gz")
 		tfile.extractall(dest_dir)
 
-def package_search(packages_json, name, id=None):
-	"""Search the metadata information of an dependency in the packages_json
-	First find all the items with the required name in packages_json.
+def meta_search(meta_json, name, id=None):
+	"""Search the metadata information of an dependency in the meta_json
+	First find all the items with the required name in meta_json.
 	Then find the right one whose id satisfied the requirement.
 	If no id parameter is problem, then the first matched one will be returned.
 
 	Args:
-		packages_json: the json object including all the metadata of dependencies.
+		meta_json: the json object including all the metadata of dependencies.
 		name: the name of the dependency.
 		id: the id attribute of the dependency. Defaults to None.
 
 	Returns:
-		If one item is found in packages_json, return the item, which is a dictionary.
-		If no item satisfied the requirement on packages_json, directly exit.
+		If one item is found in meta_json, return the item, which is a dictionary.
+		If no item satisfied the requirement on meta_json, directly exit.
 	"""
-	if packages_json.has_key(name):
+	if meta_json.has_key(name):
 		if not id:
-			for item in packages_json[name]:
-				return packages_json[name][item]
+			for item in meta_json[name]:
+				return meta_json[name][item]
 		else:
-			if packages_json[name].has_key(id):
-				return packages_json[name][id]
+			if meta_json[name].has_key(id):
+				return meta_json[name][id]
 			else:
-				logging.debug("packages_json does not has <%s> with the id <%s>", name, id)
-				sys.exit("packages_json does not has <%s> with the id <%s>" % (name, id))
+				cleanup(tempfile_list, tempdir_list)
+				logging.debug("meta_json does not has <%s> with the id <%s>", name, id)
+				sys.exit("meta_json does not has <%s> with the id <%s>" % (name, id))
 	else:
-		logging.debug("packages_json does not include %s", name)
-		sys.exit("packages_json does not include %s\n" % name)
+		cleanup(tempfile_list, tempdir_list)
+		logging.debug("meta_json does not include %s", name)
+		sys.exit("meta_json does not include %s\n" % name)
 
 def attr_check(item, attr, check_len = 0):
 	"""Check and obtain the attr of an item.
@@ -301,23 +311,25 @@ def attr_check(item, attr, check_len = 0):
 	if item.has_key(attr):
 		if check_len == 1:
 			if len(item[attr]) <= 0:
+				cleanup(tempfile_list, tempdir_list)
 				logging.debug("The %s attr of the item is empty.", attr)
-				sys.exit("The %s attr of the item (%s) is empty." % (attr, item))
+				sys.exit("The %s attr of the item (%s) is empty." % (item, attr))
 			else:
 				return item[attr][0]
 		else:
 			return item[attr]
 	else:
+		cleanup(tempfile_list, tempdir_list)
 		logging.debug("This item doesn not have %s attr!", attr)
-		sys.exit("the item (%s) does not have %s attr:" % (attr, item))
+		sys.exit("the item (%s) does not have %s attr!" % (item, attr))
 
 
-def cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro, action):
+def cctools_download(sandbox_dir, meta_json, hardware_platform, linux_distro, action):
 	"""Download cctools
 
 	Args:
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
-		packages_json: the json object including all the metadata of dependencies.
+		meta_json: the json object including all the metadata of dependencies.
 		hardware_platform: the architecture of the required hardware platform (e.g., x86_64).
 		linux_distro: the linux distro.  For Example: redhat6, centos6.
 		action: the action on the downloaded dependency. Options: none, unpack. "none" leaves the downloaded dependency at it is. "unpack" uncompresses the dependency.
@@ -332,13 +344,13 @@ def cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro
 	dependency_download(source, None, None, cctools_dest, "tgz", "unpack")
 	return cctools_dest
 
-def set_cvmfs_cms_siteconf(name, action, packages_json, sandbox_dir):
+def set_cvmfs_cms_siteconf(name, action, meta_json, sandbox_dir):
 	"""Download cvmfs SITEINFO and set its mountpoint.
 
 	Args:
-		name: the name of the cmvfs SITEINFO package in packages_json.
+		name: the name of the cmvfs SITEINFO meta in meta_json.
 		action: the action on the downloaded dependency. Options: none, unpack. "none" leaves the downloaded dependency at it is. "unpack" uncompresses the dependency.
-		packages_json: the json object including all the metadata of dependencies.
+		meta_json: the json object including all the metadata of dependencies.
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 
 	Returns:
@@ -362,6 +374,7 @@ def is_dir(path):
 	if os.path.isdir(path):
 		pass
 	else:
+		cleanup(tempfile_list, tempdir_list)
 		logging.debug("%s is not a directory!", path)
 		sys.exit("%s is not a directory!" % path)
 
@@ -398,6 +411,7 @@ def git_dependency_download(repo_url, dest, git_branch, git_commit):
 		os.chdir(dir)
 
 		if dependency_check('git') == -1:
+			cleanup(tempfile_list, tempdir_list)
 			sys.exit("Git is not found!")
 		cmd = "git clone %s" % repo_url
 		rc, stdout, stderr = func_call(cmd)
@@ -441,20 +455,20 @@ def git_dependency_parser(item, repo_url, sandbox_dir):
 	dest = git_dependency_download(repo_url, dest, git_branch, git_commit)
 	return dest
 
-def data_dependency_process(name, id, packages_json, sandbox_dir, action):
+def data_dependency_process(name, id, meta_json, sandbox_dir, action):
 	"""Download a data dependency
 
 	Args:
 		name: the item name in the data section
 		id: the id attribute of the processed dependency
-		packages_json: the json object including all the metadata of dependencies.
+		meta_json: the json object including all the metadata of dependencies.
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		action: the action on the downloaded dependency. Options: none, unpack. "none" leaves the downloaded dependency at it is. "unpack" uncompresses the dependency.
 
 	Returns:
 		dest: the path of the downloaded data dependency in the umbrella local cache.
 	"""
-	item = package_search(packages_json, name, id)
+	item = meta_search(meta_json, name, id)
 	source = attr_check(item, "source", 1)
 	if source[:4] == 'git+':
 		dest = git_dependency_parser(item, source[4:], sandbox_dir)
@@ -483,7 +497,7 @@ def check_cvmfs_repo(repo_name):
 	else:
 		return ''
 
-def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, cvmfs_http_proxy):
+def dependency_process(name, id, action, meta_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, cvmfs_http_proxy):
 	""" Process each explicit and implicit dependency.
 
 	Args:
@@ -491,7 +505,7 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 		id: the id attribute of the processed dependency
 		action: the action on the downloaded dependency. Options: none, unpack. "none" leaves the downloaded dependency at it is. "unpack" uncompresses the dependency.
 		os_id: the id attribute of the required OS.
-		packages_json: the json object including all the metadata of dependencies.
+		meta_json: the json object including all the metadata of dependencies.
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		sandbox_mode: the execution engine.
 		user_cmd: the user's command.
@@ -512,13 +526,14 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 	mount_value = ''
 	local_cvmfs = ''
 
-	item = package_search(packages_json, name, id)
+	item = meta_search(meta_json, name, id)
 	source = attr_check(item, "source", 1)
 	logging.debug("%s is chosen to deliver %s", source, name)
 
 	if source[:4] == 'git+':
 		dest = git_dependency_parser(item, source[4:], sandbox_dir)
 		mount_value = dest
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("this is git source, can not support")
 	if source[:5] == 'cvmfs':
 		print "%s is chosen to deliver %s" % (source, name)
@@ -529,21 +544,21 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 		else:
 			logging.debug("The cvmfs is not installed on the local host.")
 
-		#if local_cvmfs is empty, download cctools package, set cvmfs_cms_siteconf_mountpoint, and call parrotize_user_cmd.
+		#if local_cvmfs is empty, download cctools meta, set cvmfs_cms_siteconf_mountpoint, and call parrotize_user_cmd.
 		if not local_cvmfs:
 			if source.find("cms.cern.ch") != -1:
 				is_cms_cvmfs_app = 1
 
 			logging.debug("To access cvmfs, cctools binary is needed")
 			if sandbox_mode in ['parrot']:
-				cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, action)
-				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json, cvmfs_http_proxy)
+				cctools_download(sandbox_dir, meta_json, hardware_platform, host_linux_distro, action)
+				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, meta_json, cvmfs_http_proxy)
 
 			if sandbox_mode in ['chroot', 'docker']:
-				cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro, action)
-				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardware_platform, packages_json, cvmfs_http_proxy)
+				cctools_download(sandbox_dir, meta_json, hardware_platform, linux_distro, action)
+				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardware_platform, meta_json, cvmfs_http_proxy)
 
-			cvmfs_cms_siteconf_mountpoint = set_cvmfs_cms_siteconf(name, action, packages_json, sandbox_dir)
+			cvmfs_cms_siteconf_mountpoint = set_cvmfs_cms_siteconf(name, action, meta_json, sandbox_dir)
 
 
 			mount_value = "PARROT_CVMFS"
@@ -552,7 +567,7 @@ def dependency_process(name, id, action, packages_json, sandbox_dir, sandbox_mod
 			logging.debug('cvmfs is already installed on the machine, and its mountpoint on the machine: %s', mount_value)
 
 			if sandbox_mode == 'parrot':
-				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json, cvmfs_http_proxy)
+				parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, meta_json, cvmfs_http_proxy)
 	else:
 		checksum = attr_check(item, "checksum")
 		format = attr_check(item, "format")
@@ -650,6 +665,7 @@ def	verify_kernel(host_kernel_name, host_kernel_version, kernel_name, kernel_ver
 		If the kernel version of the host machine does not match the requirement, directly exit.
 	"""
 	if host_kernel_name != kernel_name:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("The required kernel name is %s, the kernel name of the host machine is %s!", kernel_name, host_kernel_name)
 		sys.exit("The required kernel name is %s, the kernel name of the host machine is %s!\n" % (kernel_name, host_kernel_name))
 	if kernel_version[0] == '[':
@@ -657,24 +673,28 @@ def	verify_kernel(host_kernel_name, host_kernel_version, kernel_name, kernel_ver
 		if compare_versions(host_kernel_version, list1[0]) >= 0 and compare_versions(host_kernel_version, list1[1]) <= 0:
 			logging.debug("The kernel version matches!")
 		else:
+			cleanup(tempfile_list, tempdir_list)
 			logging.debug("The required kernel version is %s, the kernel version of the host machine is %s!", kernel_version, host_kernel_version)
 			sys.exit("The required kernel version is %s, the kernel version of the host machine is %s!\n" % (kernel_version, host_kernel_version))
 	elif kernel_version[0] == '>':
 		if compare_versions(host_kernel_version, kernel_version[2:]) >= 0:
 			logging.debug("The kernel version matches!")
 		else:
+			cleanup(tempfile_list, tempdir_list)
 			logging.debug("The required kernel version is %s, the kernel version of the host machine is %s!", kernel_version, host_kernel_version)
 			sys.exit("The required kernel version is %s, the kernel version of the host machine is %s!\n" % (kernel_version, host_kernel_version))
 	elif kernel_version[0] == '<':
 		if compare_versions(host_kernel_version, kernel_version[2:]) <= 0:
 			logging.debug("The kernel version matches!")
 		else:
+			cleanup(tempfile_list, tempdir_list)
 			logging.debug("The required kernel version is %s, the kernel version of the host machine is %s!", kernel_version, host_kernel_version)
 			sys.exit("The required kernel version is %s, the kernel version of the host machine is %s!\n" % (kernel_version, host_kernel_version))
 	else: #the kernel version is a single value
 		if compare_versions(host_kernel_version, kernel_version[2:]) == 0:
 			logging.debug("The kernel version matches!")
 		else:
+			cleanup(tempfile_list, tempdir_list)
 			logging.critical("The required kernel version is %s, the kernel version of the host machine is %s!", kernel_version, host_kernel_version)
 			sys.exit("The required kernel version is %s, the kernel version of the host machine is %s!\n" % (kernel_version, host_kernel_version))
 
@@ -699,6 +719,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 	print "Execution environment checking ..."
 
 	if sandbox_mode not in ["docker", "chroot", "parrot"]:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("Currently local execution engine only support three sandbox techniques: docker, chroot or parrot!")
 		sys.exit("Currently local execution engine only support three sandbox techniques: docker, chroot or parrot!\n")
 
@@ -706,6 +727,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 
 	logging.debug("Hardware platform checking ...")
 	if hardware_platform != uname_list[4].lower():
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("The specification requires %s, but the local machine is %s", hardware_platform, uname_list[4].lower())
 		sys.exit("The specification requires " + hardware_platform + ", but the local machine is " + uname_list[4].lower() + "!\n")
 
@@ -713,6 +735,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 	cpu_cores = int(cpu_cores)
 	host_cpu_cores = multiprocessing.cpu_count()
 	if cpu_cores > host_cpu_cores:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("The specification requires %d cpu cores, but the local machine only has %d cores!", cpu_cores, host_cpu_cores)
 		sys.exit("The specification requires %d cpu cores, but the local machine only has %d cores!\n" % (cpu_cores, host_cpu_cores))
 
@@ -727,6 +750,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 	else:
 		host_memory_size = float(stdout)
 		if memory_size > host_memory_size:
+			cleanup(tempfile_list, tempdir_list)
 			logging.critical("The specification requires %.2f GB memory space, but the local machine only has %.2f GB free memory space!", memory_size, host_memory_size)
 			sys.exit("The specification requires %.2f GB memory space, but the local machine only has %.2f GB free memory space!" % (memory_size, host_memory_size))
 
@@ -736,6 +760,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 	st = os.statvfs(sandbox_dir)
 	free_disk = float(st.f_bavail * st.f_frsize) / (1024*1024*1024)
 	if disk_size > free_disk:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("The specification requires %.2f GB disk space, but the local machine only has %.2f GB free disk space!", disk_size, free_disk)
 		sys.exit("The specification requires %.2f GB disk space, but the local machine only has %.2f GB free disk space!" % (disk_size, free_disk))
 
@@ -768,7 +793,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 
 	return host_linux_distro
 
-def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardware_platform, packages_json, cvmfs_http_proxy):
+def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardware_platform, meta_json, cvmfs_http_proxy):
 	"""Modify the user's command into `parrot_run + the user's command`.
 	The cases when this function should be called: (1) sandbox_mode == parrot; (2) sandbox_mode != parrot and cvmfs is needed to deliver some dependencies not installed on the execution node.
 
@@ -778,13 +803,13 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardwar
 		cwd_setting: the current working directory for the execution of the user's command.
 		hardware_platform: the architecture of the required hardware platform (e.g., x86_64).
 		linux_distro: the linux distro. For Example: redhat6, centos6.
-		packages_json: the json object including all the metadata of dependencies.
+		meta_json: the json object including all the metadata of dependencies.
 		cvmfs_http_proxy: HTTP_PROXY environmetn variable used to access CVMFS by Parrot
 
 	Returns:
 		the modified version of the user's cmd.
 	"""
-	#Here we use the cctools package from the local cache (which includes all the packages including cvmfs, globus, fuse and so on). Even if the user may install cctools by himself on the machine, the configuration of the local installation may be not what we want. For example, the user may just configure like this `./configure --prefix ~/cctools`.
+	#Here we use the cctools meta from the local cache (which includes all the meta including cvmfs, globus, fuse and so on). Even if the user may install cctools by himself on the machine, the configuration of the local installation may be not what we want. For example, the user may just configure like this `./configure --prefix ~/cctools`.
 	#4.4 and 4.4 does not support --no-set-foreground feature.
 	#user_cmd[0] = dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
 	if cvmfs_http_proxy:
@@ -809,7 +834,7 @@ def chrootize_user_cmd(user_cmd, cwd_setting):
 	user_cmd[0] = 'chroot / /bin/sh -c "cd %s; %s"' %(cwd_setting, user_cmd[0])
 	return user_cmd
 
-def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs, cvmfs_http_proxy):
+def software_install(env_para_dict, os_id, software_spec, meta_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs, cvmfs_http_proxy):
 	""" Installation each software dependency specified in the software section of the specification.
 	If the application is a CMS app and the execution node does not have cvmfs installed, change `user_cmd` to `parrot_run ... user_cmd` and cvmfs_cms_siteconf_mountpoint.
 
@@ -817,7 +842,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		env_para_dict: the environment variables which need to be set for the execution of the user's command.
 		os_id: the id attribute of the required OS.
 		software_spec: the software section of the specification
-		packages_json: the json object including all the metadata of dependencies.
+		meta_json: the json object including all the metadata of dependencies.
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		sandbox_mode: the execution engine.
 		user_cmd: the user's command.
@@ -861,10 +886,10 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 			action = software_spec[item]['action'].lower()
 
 		if mount_env and not mountpoint:
-			result = package_search(packages_json, item, id)
+			result = meta_search(meta_json, item, id)
 			env_para_dict[mount_env] =attr_check(result, "source", 1)
 		else:
-			r1, r2, r3, r4 = dependency_process(item, id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, cvmfs_http_proxy)
+			r1, r2, r3, r4 = dependency_process(item, id, action, meta_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, cvmfs_http_proxy)
 			if r1 == 1 and is_cms_cvmfs_app == 0:
 				is_cms_cvmfs_app = 1
 			if not cvmfs_cms_siteconf_mountpoint:
@@ -883,6 +908,7 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 
 			if not r4 and is_cms_cvmfs_app:
 				if not cvmfs_http_proxy:
+					cleanup(tempfile_list, tempdir_list)
 					logging.debug("Access CVMFS through Parrot requires the --cvmfs_http_proxy of umbrella to be set.")
 					sys.exit("Access CVMFS through Parrot requires the --cvmfs_http_proxy of umbrella to be set.")
 
@@ -892,25 +918,25 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 		mountpoint = '/'
 		action = 'unpack'
 		#tuple returned by dependency_process: (is_cms_cvmfs_app, cvmfs_cms_siteconf_mountpoint, mount_value, local_cvmfs)
-		r1, r2, r3, r4 = dependency_process(item, os_id, action, packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, cvmfs_http_proxy)
+		r1, r2, r3, r4 = dependency_process(item, os_id, action, meta_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, cvmfs_http_proxy)
 		logging.debug("Add mountpoint (%s:%s) into mount_dict for /.", mountpoint, r3)
 		mount_dict[mountpoint] = r3
 
 	#if the sandbox_mode is parrot, add cctools into the dependency list to guarantee parrot can be used to create sandbox for the worst case (No root access authority and no docker).
 	if sandbox_mode == "parrot":
 		print "To support Parrot execution engine, cctools binary is needed."
-		host_cctools_path = cctools_download(sandbox_dir, packages_json, hardware_platform, host_linux_distro, 'unpack')
+		host_cctools_path = cctools_download(sandbox_dir, meta_json, hardware_platform, host_linux_distro, 'unpack')
 		logging.debug("To support Parrot execution engine, cctools binary (%s) is needed.", host_cctools_path)
 		logging.debug("Add mountpoint (%s:%s) into mount_dict", host_cctools_path, host_cctools_path)
 		mount_dict[host_cctools_path] = host_cctools_path
 
 		if is_cms_cvmfs_app == 0:
-			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, packages_json, cvmfs_http_proxy)
+			parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, meta_json, cvmfs_http_proxy)
 
 	#if the sandbox_mode is parrot, then the parrot version should match the local machine;
 	#if the sandbox_mode is docker or chroot, then the parrot version should match the specification.
 	if sandbox_mode in ["docker", "chroot"] and is_cms_cvmfs_app == 1 and not local_cvmfs:
-		host_cctools_path = cctools_download(sandbox_dir, packages_json, hardware_platform, linux_distro, 'unpack')
+		host_cctools_path = cctools_download(sandbox_dir, meta_json, hardware_platform, linux_distro, 'unpack')
 		logging.debug("To support Parrot execution engine, cctools binary (%s) is needed.", host_cctools_path)
 		logging.debug("Add mountpoint (%s:%s) into mount_dict", host_cctools_path, host_cctools_path)
 		mount_dict[host_cctools_path] = host_cctools_path
@@ -925,13 +951,13 @@ def software_install(env_para_dict, os_id, software_spec, packages_json, sandbox
 
 	return (host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict)
 
-def data_install(data_spec, packages_json, sandbox_dir, mount_dict, env_para_dict):
+def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict):
 	"""Process data section of the specification.
 	At the beginning of the function, mount_dict only includes items for software and os dependencies. After this function is done, all the items for data dependencies will be added into mount_dict.
 
 	Args:
 		data_spec: the data section of the specification.
-		packages_json: the json object including all the metadata of dependencies.
+		meta_json: the json object including all the metadata of dependencies.
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		mount_dict: a dict including each mounting item in the specification, whose key is the access path used by the user's task; whose value is the actual storage path.
 		env_para_dict: the environment variables which need to be set for the execution of the user's command.
@@ -956,10 +982,10 @@ def data_install(data_spec, packages_json, sandbox_dir, mount_dict, env_para_dic
 			action = data_spec[item]['action']
 
 		if mount_env and not mountpoint:
-			result = package_search(packages_json, item, id)
+			result = meta_search(meta_json, item, id)
 			env_para_dict[mount_env] = attr_check(result, "source", 1)
 		else:
-			mount_value = data_dependency_process(item, id, packages_json, sandbox_dir, action)
+			mount_value = data_dependency_process(item, id, meta_json, sandbox_dir, action)
 			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, mount_value)
 			mount_dict[mountpoint] = mount_value
 			if mount_env and mountpoint:
@@ -1046,7 +1072,7 @@ def transfer_env_para_docker(env_para_dict):
 
 def collect_software_bin(host_cctools_path, sw_mount_dict):
 	"""Construct the path environment from the mountpoints of software dependencies.
-	Each softare package has a bin subdir containing all its executables.
+	Each softare meta has a bin subdir containing all its executables.
 
 	Args:
 		host_cctools_path: the path of cctools under the umbrella local cache.
@@ -1376,7 +1402,7 @@ def has_docker_image(hardware_platform, distro_name, distro_version):
 	else:
 		return 'yes'
 
-def create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_version, packages):
+def create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_version, meta):
 	"""Create a docker image based on the cached os image directory.
 
 	Returns:
@@ -1384,7 +1410,7 @@ def create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_vers
 		Otherwise, directly exit.
 	"""
 	name = "%s-%s-%s" %(distro_name, distro_version, hardware_platform)
-	item = package_search(packages, name)
+	item = meta_search(meta, name)
 	id = attr_check(item, "checksum")
 	location = os.path.dirname(sandbox_dir) + '/cache/' + id + '/' + name
 	#docker container runs as root user, so use the owner option of tar command to set the owner of the docker image
@@ -1570,7 +1596,7 @@ def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, 
 						os.rmdir(parent_dir)
 						parent_dir = os.path.dirname(parent_dir)
 
-def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, packages_json):
+def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json):
 	"""Run user's task with the help of the sandbox techniques, which currently inculde chroot, parrot, docker.
 
 	Args:
@@ -1590,7 +1616,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 		mount_dict: a dict including each mounting item in the specification, whose key is the access path used by the user's task; whose value is the actual storage path.
 		sw_mount_dict: a dict only including all the software mounting items.
-		packages_json: the json object including all the metadata of dependencies.
+		meta_json: the json object including all the metadata of dependencies.
 
 	Returns:
 		If no error happens, returns None.
@@ -1612,9 +1638,9 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 
 		if cvmfs_cms_siteconf_mountpoint:
 			item = cvmfs_cms_siteconf_mountpoint.split(' ')[1]
-			logging.debug("Adding the siteconf package (%s) into mount_dict", item)
+			logging.debug("Adding the siteconf meta (%s) into mount_dict", item)
 			mount_dict[item] = item
-			logging.debug("Create a parrot mountfile for the siteconf package (%s)", item)
+			logging.debug("Create a parrot mountfile for the siteconf meta (%s)", item)
 			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mountpoint)
 
 		#traverse the common-mountlist file to create the mountpoint and mount --bind -o ro
@@ -1640,14 +1666,14 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 		if need_separate_rootfs == 1:
 			if has_docker_image(hardware_platform, distro_name, distro_version) == 'no':
 				logging.debug("Start to construct a docker image from the os image")
-				create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_version, packages_json)
+				create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_version, meta_json)
 				logging.debug("Finish constructing a docker image from the os image")
 
 			if cvmfs_cms_siteconf_mountpoint:
 				item = cvmfs_cms_siteconf_mountpoint.split(' ')[1]
-				logging.debug("Adding the siteconf package (%s) into mount_dict", item)
+				logging.debug("Adding the siteconf meta (%s) into mount_dict", item)
 				mount_dict[item] = item
-				logging.debug("Create a parrot mountfile for the siteconf package (%s)", item)
+				logging.debug("Create a parrot mountfile for the siteconf meta (%s)", item)
 				env_para_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mountpoint)
 
 			logging.debug("Add a volume item (%s:%s) for the sandbox_dir", sandbox_dir, sandbox_dir)
@@ -1685,6 +1711,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			print "The output has been put into the output dir: %s" % output_dir
 		else:
 			#if a separate rootfs is not needed to execute the user's cmd, should forcely use other execution engine to run the user cmd.
+			cleanup(tempfile_list, tempdir_list)
 			logging.debug("Docker execution engine can only be used when a separate rootfs is needed.")
 			sys.exit("Docker execution engine can only be used when a separate rootfs is needed.\n")
 	elif sandbox_mode == "parrot":
@@ -1701,6 +1728,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			logging.debug("Construct dynamic linker path ....")
 			result = get_linker_path(hardware_platform, os_image_dir)
 			if not result:
+				cleanup(tempfile_list, tempdir_list)
 				logging.critical("Can not find the dynamic linker inside the os image (%s)!", os_image_dir)
 				sys.exit("Can not find the dynamic linker inside the os image (%s)!\n" % os_image_dir)
 
@@ -1744,14 +1772,14 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 	else:
 		pass
 
-def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, condorlog_path, cvmfs_http_proxy):
+def condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, condorlog_path, cvmfs_http_proxy):
 	"""Process the specification when condor execution engine is chosen
 
 	Args:
 		spec_path: the absolute path of the specification.
 		spec_json: the json object including the specification.
 		spec_path_basename: the file name of the specification.
-		packages_path: the path of the json file including all the metadata information.
+		meta_path: the path of the json file including all the metadata information.
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		output_dir: the output directory.
 		input_list_origin: the list of input file paths.
@@ -1772,6 +1800,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 		logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
 		(hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
 	else:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("this specification is not complete! You must have a hardware section, a kernel section and a os section!")
 		sys.exit("this spec has no hardware section\n")
 
@@ -1798,6 +1827,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 
 	umbrella_fullpath = which_exec("umbrella")
 	if umbrella_fullpath == None:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("Failed to find the executable umbrella. Please modify your $PATH.")
 		sys.exit("Failed to find the executable umbrella. Please modify your $PATH.\n")
 
@@ -1814,12 +1844,12 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 	condor_submit_file.write('universe = vanilla\n')
 	condor_submit_file.write('executable = %s\n' % cctools_python_path)
 	if cvmfs_http_proxy:
-		condor_submit_file.write('arguments = "./umbrella -s local -c %s --cvmfs_http_proxy %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, cvmfs_http_proxy, os.path.basename(packages_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
+		condor_submit_file.write('arguments = "./umbrella -s local --spec %s --cvmfs_http_proxy %s --meta %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, cvmfs_http_proxy, os.path.basename(meta_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
 	else:
-		condor_submit_file.write('arguments = "./umbrella -s local -c %s --packages %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(packages_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
+		condor_submit_file.write('arguments = "./umbrella -s local --spec %s --meta %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(meta_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
 #	condor_submit_file.write('PostCmd = "echo"\n')
 #	condor_submit_file.write('PostArguments = "$?>%s/condor_rc"\n' % os.path.basename(condor_output_dir))
-	condor_submit_file.write('transfer_input_files = %s, %s, %s, %s%s\n' % (cctools_python_path, umbrella_fullpath, packages_path, spec_path, transfer_inputs))
+	condor_submit_file.write('transfer_input_files = %s, %s, %s, %s%s\n' % (cctools_python_path, umbrella_fullpath, meta_path, spec_path, transfer_inputs))
 	condor_submit_file.write('transfer_output_files = %s, condor_umbrella.log\n' % os.path.basename(condor_output_dir))
 	condor_submit_file.write('transfer_output_remaps = "condor_umbrella.log=%s"\n' % condorlog_path)
 
@@ -1867,9 +1897,11 @@ def condor_process(spec_path, spec_json, spec_path_basename, packages_path, sand
 	logging.debug("The exit code of the remote executed umbrella found in the condor log file (%s) is %d!", condor_log_path, remote_rc)
 
 	if remote_rc == 500:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("Can not find the exit code of the remote executed umbrella inside the condor log file (%s)!", condor_log_path)
 		sys.exit("Can not find the exit code of the remote executed umbrella inside the condor log file (%s)!" % condor_log_path)
 	elif remote_rc != 0:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("The remote umbrella fails and the exit code is %d.", remote_rc)
 		sys.exit("The remote umbrella fails and the exit code is %d." % remote_rc)
 
@@ -1916,13 +1948,13 @@ def decide_instance_type(cpu_cores, memory_size, disk_size, instances):
 			return item
 	return 'no'
 
-def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec2_json, ssh_key, ec2_key_pair, ec2_security_group, sandbox_dir, output_dir, sandbox_mode, input_list, input_list_origin, env_options, user_cmd, cwd_setting, ec2log_path, cvmfs_http_proxy):
+def ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, ssh_key, ec2_key_pair, ec2_security_group, sandbox_dir, output_dir, sandbox_mode, input_list, input_list_origin, env_options, user_cmd, cwd_setting, ec2log_path, cvmfs_http_proxy):
 	"""
 	Args:
 		spec_path: the path of the specification.
 		spec_json: the json object including the specification.
-		packages_path: the path of the json file including all the metadata information.
-		packages_json: the json object including all the metadata of dependencies.
+		meta_path: the path of the json file including all the metadata information.
+		meta_json: the json object including all the metadata of dependencies.
 		ec2_path: the path of the json file including all infomration about the ec2 AMIs and instance types.
 		ec2_json: the json object corresponding to ec2_path.
 		ssh_key: the name the private key file to use when connecting to an instance.
@@ -1947,6 +1979,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 	if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
 		(hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
 	else:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("this spec has no hardware section!\n")
 
 	#According to the given specification file, the AMI and the instance type can be identified. os and arch can be used to decide the AMI; cores, memory and disk can be used to decide the instance type.
@@ -1968,9 +2001,11 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 				ami = ec2_json[name][os_id]['ami']
 				user_name = ec2_json[name][os_id]['user']
 			else:
+				cleanup(tempfile_list, tempdir_list)
 				logging.critical("%s with the id <%s> is not in the ec2 json file (%s).", name, os_id, ec2_path)
 				sys.exit("%s with the id <%s> is not in the ec2 json file (%s)." % (name, os_id, ec2_path))
 	else:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("%s is not in the ec2 json file (%s).", name, ec2_path)
 		sys.exit("%s is not in the ec2 json file (%s).\n" % (name, ec2_path))
 
@@ -1979,6 +2014,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 	instances = ec2_json["instances"]
 	r = decide_instance_type(cpu_cores, memory_size, disk_size, instances)
 	if r == 'no':
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("No matched instance type.")
 		sys.exit("No matched instance type.\n")
 	else:
@@ -2007,6 +2043,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 		if distro_name in ["fedora", "centos", "redhat"]:
 			cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo yum -y install wget\'' % (ssh_key, user_name, public_dns)
 		else:
+			cleanup(tempfile_list, tempdir_list)
 			sys.exit("Currently the supported Linux distributions are redhat, centos and fedora.\n")
 		rc, stdout, stderr = func_call(cmd)
 		if rc != 0:
@@ -2017,7 +2054,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 	print "Installing python 2.6.9 on the instance ..."
 	logging.debug("Install python 2.6.9 on the instance.")
 	python_name = 'python-2.6.9-%s-%s' % (linux_distro, hardware_platform)
-	python_item = package_search(packages_json, python_name)
+	python_item = meta_search(meta_json, python_name)
 	python_url = python_item["source"][0] #get the url of python
 	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'wget %s\'' % (ssh_key, user_name, public_dns, python_url)
 	rc, stdout, stderr = func_call(cmd)
@@ -2033,7 +2070,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
-	#scp umbrella, packages.json and input files to the instance
+	#scp umbrella, meta.json and input files to the instance
 	print "Sending the umbrella task to the EC2 instance ..."
 	logging.debug("scp relevant files into the HOME dir of the instance.")
 	input_file_string = ''
@@ -2041,7 +2078,7 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 		input_file_string += input_file + ' '
 
 	umbrella_fullpath = which_exec("umbrella")
-	cmd = 'scp -i %s %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, packages_path, input_file_string, user_name, public_dns)
+	cmd = 'scp -i %s %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, meta_path, input_file_string, user_name, public_dns)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
 		terminate_instance(instance_id)
@@ -2076,9 +2113,9 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 	print "Executing the user's task on the EC2 instance ..."
 	logging.debug("Execute the command on the instance ...")
 	if env_options == '':
-		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella %s -s local -c %s --log ec2_umbrella.log --packages %s -l ec2_umbrella -o output -i \'%s\' run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, cvmfs_http_proxy_option, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, user_cmd[0])
+		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella %s -s local --spec %s --log ec2_umbrella.log --meta %s -l ec2_umbrella -o output -i \'%s\' run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, cvmfs_http_proxy_option, os.path.basename(spec_path), os.path.basename(meta_path), new_input_options, user_cmd[0])
 	else:
-		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -s local -c %s --packages %s -l ec2_umbrella -o output -i \'%s\' -e %s run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, cvmfs_http_proxy_option, os.path.basename(spec_path), os.path.basename(packages_path), new_input_options, env_options, user_cmd[0])
+		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -s local --spec %s --meta %s -l ec2_umbrella -o output -i \'%s\' -e %s run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, cvmfs_http_proxy_option, os.path.basename(spec_path), os.path.basename(meta_path), new_input_options, env_options, user_cmd[0])
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
 		terminate_instance(instance_id)
@@ -2123,14 +2160,14 @@ def ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec
 
 	print "The output has been put into the output dir: %s" % output_dir
 
-def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy):
+def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy):
 	""" Create the execution environment specified in the specification file and run the task on it.
 
 	Args:
 		spec_json: the json object including the specification.
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		behavior: the umbrella behavior, such as `run`.
-		packages_json: the json object including all the metadata of dependencies.
+		meta_json: the json object including all the metadata of dependencies.
 		sandbox_mode: the execution engine.
 		output_dir: the output directory.
 		input_dict: the setting of input files specified by the --inputs option.
@@ -2147,6 +2184,7 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandb
 		logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
 		(hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
 	else:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("this specification is not complete! You must have a hardware section, a kernel section and a os section!")
 		sys.exit("this specification is not complete! You must have a hardware section, a kernel section and a os section!\n")
 
@@ -2166,7 +2204,7 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandb
 
 		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform) #example of item here: redhat-6.5-x86_64
 		if os_id == '':
-			item1 = package_search(packages_json, item)
+			item1 = meta_search(meta_json, item)
 			os_id = attr_check(item1, "checksum")
 
 		os_image_dir = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), os_id, item)
@@ -2178,18 +2216,18 @@ def specification_process(spec_json, sandbox_dir, behavior, packages_json, sandb
 	host_cctools_path = '' #the path of the cctools binary which is compatible with the host machine under the umbrella cache
 
 	if spec_json.has_key("software") and spec_json["software"]:
-		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, spec_json["software"], packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs, cvmfs_http_proxy)
+		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, spec_json["software"], meta_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs, cvmfs_http_proxy)
 	else:
 		logging.debug("this spec does not have software section!")
-		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, "", packages_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs, cvmfs_http_proxy)
+		host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, env_para_dict = software_install(env_para_dict, os_id, "", meta_json, sandbox_dir, sandbox_mode, user_cmd, cwd_setting, hardware_platform, host_linux_distro, linux_distro, distro_name, distro_version, need_separate_rootfs, cvmfs_http_proxy)
 
 	sw_mount_dict = mount_dict #sw_mount_dict will be used later to config the $PATH
 	if spec_json.has_key("data") and spec_json["data"]:
-		mount_dict, env_para_dict = data_install(spec_json["data"], packages_json, sandbox_dir, mount_dict, env_para_dict)
+		mount_dict, env_para_dict = data_install(spec_json["data"], meta_json, sandbox_dir, mount_dict, env_para_dict)
 	else:
 		logging.debug("this spec does not have data section!")
 
-	workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, packages_json)
+	workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json)
 
 def dependency_check(item):
 	"""Check whether an executable exists or not.
@@ -2236,6 +2274,7 @@ def get_instance_id(image_id, instance_type, ec2_key_pair, ec2_security_group):
 	str = "\nINSTANCE"
 	index = stdout.find(str)
 	if index == -1:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("Fail to get the instance id!")
 	else:
 		instance_id = stdout[(index+9):(index+20)]
@@ -2286,7 +2325,59 @@ def get_public_dns(instance_id):
 			break
 	return public_dns
 
-def add_item(item, source_dict, target_dict):
+def add2spec(item, source_dict, target_dict):
+	"""Abstract the metadata information (source format checksum size) from source_dict (metadata database) and add these information into target_dict (umbrella spec).
+	For any piece of metadata information, if it already exists in target_dict, do nothing; otherwise, add it into the umbrella spec.
+
+	Args:
+		item: the name of a dependency
+		source_dict: fragment of an Umbrella metadata database
+		target_dict: fragement of an Umbrella specficiation
+
+	Returns:
+		None
+	"""
+	#item must exist inside target_dict.
+
+	ident = None
+	if source_dict.has_key("checksum"):
+		checksum = source_dict["checksum"]
+		ident = checksum
+		if not target_dict.has_key("id"):
+			target_dict["id"] = ident
+		if not target_dict.has_key(checksum):
+			target_dict["checksum"] = source_dict["checksum"]
+
+	if source_dict.has_key("source"):
+		if len(source_dict["source"]) == 0:
+			cleanup(tempfile_list, tempdir_list)
+			logging.critical("the source attribute of %s can not be empty!" % item)
+			sys.exit("the source attribute of %s can not be empty!" % item)
+		else:
+			source = source_dict["source"][0]
+
+		#if checksum is not provided in source_dict, the first url in the source section will be set to the ident.
+		if not ident and not target_dict.has_key("id"):
+			target_dict["id"] = source
+
+		if not target_dict.has_key("source"):
+			target_dict["source"] = list(source_dict["source"])
+
+	else:
+		cleanup(tempfile_list, tempdir_list)
+		logging.critical("%s does not have source attribute in the umbrella metadata database!", item)
+		sys.exit("%s does not have source attribute in the umbrella metadata database!" % item)
+
+	if source_dict.has_key("format") and not target_dict.has_key("format"):
+		target_dict["format"] = source_dict["format"]
+
+	if source_dict.has_key("size") and not target_dict.has_key("size"):
+		target_dict["size"] = source_dict["size"]
+
+	if source_dict.has_key("uncompressed_size") and not target_dict.has_key("uncompressed_size"):
+		target_dict["uncompressed_size"] = source_dict["uncompressed_size"]
+
+def add2db(item, source_dict, target_dict):
 	"""Add the metadata information (source format checksum size) about item from source_dict (umbrella specification) to target_dict (metadata database).
 	The item can be identified through two mechanisms: checksum attribute or one source location, which is used when checksum is not applicable for this item.
 	If the item has been in the metadata database, do nothing; otherwise, add it, together with its metadata, into the metadata database.
@@ -2314,6 +2405,7 @@ def add_item(item, source_dict, target_dict):
 
 	if source_dict.has_key("source"):
 		if len(source_dict["source"]) == 0:
+			cleanup(tempfile_list, tempdir_list)
 			logging.critical("the source attribute of %s can not be empty!" % item)
 			sys.exit("the source attribute of %s can not be empty!" % item)
 		else:
@@ -2330,6 +2422,7 @@ def add_item(item, source_dict, target_dict):
 
 		target_dict[item][ident]["source"] = list(source_dict["source"])
 	else:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("%s does not have source attribute in the umbrella specification!", item)
 		sys.exit("%s does not have source attribute in the umbrella specification!" % item)
 
@@ -2339,12 +2432,62 @@ def add_item(item, source_dict, target_dict):
 	if source_dict.has_key("size"):
 		target_dict[item][ident]["size"] = source_dict["size"]
 
-def abstract_metadata(spec_json, packages_path):
+	if source_dict.has_key("uncompressed_size"):
+		target_dict[item][ident]["uncompressed_size"] = source_dict["uncompressed_size"]
+
+def prune_attr(dict_item, attr_list):
+	"""Remove certain attributes from a dict.
+	If a specific ttribute does not exist, pass.
+
+	Args:
+		dict_item: a dict
+		attr_list: a list of attributes which will be removed from the dict.
+
+	Returns:
+		None
+	"""
+	for item in attr_list:
+		if dict_item.has_key(item):
+			del dict_item[item]
+
+def prune_spec(json_object):
+	"""Remove the metadata information from a json file (which represents an umbrella specification).
+	Note: the original json file will not be changed by this function.
+
+	Args:
+		json_object: a json file representing an umbrella specification
+
+	Returns:
+		temp_json: a new json file without metadata information
+	"""
+	logging.debug("Remove the metadata information from %s.\n", json_object)
+	temp_json = dict(json_object)
+
+	attr_list = ["source", "checksum", "format", "size", "uncompressed_size"]
+	if temp_json.has_key("os"):
+		os_sec = temp_json["os"]
+		if os_sec:
+			prune_attr(os_sec, attr_list)
+
+	if temp_json.has_key("software"):
+		software_sec = temp_json["software"]
+		if software_sec:
+			for item in software_sec:
+				prune_attr(software_sec[item], attr_list)
+
+	if temp_json.has_key("data"):
+		data_sec = temp_json["data"]
+		if data_sec:
+			for item in data_sec:
+				prune_attr(data_sec[item], attr_list)
+	return temp_json
+
+def abstract_metadata(spec_json, meta_path):
 	"""Abstract metadata information from a self-contained umbrella spec into a metadata database.
 
 	Args:
 		spec_json: a dict including the contents from a json file
-		packages_path: the path of the metadata database.
+		meta_path: the path of the metadata database.
 
 	Returns:
 		If the umbrella spec is not complete, exit directly.
@@ -2359,48 +2502,239 @@ def abstract_metadata(spec_json, packages_path):
 	os_version = attr_check(os_sec, "version")
 	os_item = "%s-%s-%s" % (os_name, os_version, hardware_arch)
 	os_item = os_item.lower()
-	add_item(os_item, os_sec, metadata)
+	add2db(os_item, os_sec, metadata)
 
 	if spec_json.has_key("software"):
 		software_sec = spec_json["software"]
 		if software_sec:
 			for item in software_sec:
-				add_item(item, software_sec[item], metadata)
+				add2db(item, software_sec[item], metadata)
 
 	if spec_json.has_key("data"):
 		data_sec = spec_json["data"]
 		if data_sec:
 			for item in data_sec:
-				add_item(item, data_sec[item], metadata)
+				add2db(item, data_sec[item], metadata)
 
-	with open(packages_path, 'w') as f:
+	with open(meta_path, 'w') as f:
 		json.dump(metadata, f, indent=4)
-		logging.debug("dump the metadata information from the umbrella spec to %s" % packages_path)
-		print "dump the metadata information from the umbrella spec to %s" % packages_path
+		logging.debug("dump the metadata information from the umbrella spec to %s" % meta_path)
+		print "dump the metadata information from the umbrella spec to %s" % meta_path
+
+def cleanup(filelist, dirlist):
+	"""Cleanup the temporary files and dirs created by umbrella
+
+	Args:
+		filelist: a list including file paths
+		dirlist: a list including dir paths
+
+	Returns:
+		None
+	"""
+	#cleanup the temporary files
+	for item in filelist:
+		if os.path.exists(item):
+			logging.debug("cleanup temporary file: %s", item)
+			print "cleanup temporary file: ", item
+			os.remove(item)
+
+	#cleanup the temporary dirs
+	for item in dirlist:
+		if os.path.exists(item):
+			logging.debug("cleanup temporary dir: %s", item)
+			print "cleanup temporary dir: ", item
+			shutil.rmtree(item)
+
+def separatize_spec(spec_json, meta_json, target_type):
+	"""Given an umbrella specification and an umbrella metadata database, generate a self-contained umbrella specification or a metadata database only including the informationnecessary for the umbrella spec.
+	If the target_type is spec, then generate a self-contained umbrella specification.
+	If the target_type is db, then generate a metadata database only including the information necessary for the umbrella spec.
+
+	Args:
+		spec_json: the json object including the specification.
+		meta_json: the json object including all the metadata of dependencies.
+		target_type: the type of the target json file, which can be an umbrella spec or an umbrella metadata db.
+
+	Returns:
+		metadata: a json object
+	"""
+	#pull the metadata information of the spec from the meatadata db to the spec
+	if target_type == "spec":
+		metadata = dict(spec_json)
+
+	#pull the metadata information of the spec from the metadata db into a separate db
+	if target_type == "meta":
+		metadata = {}
+
+
+	hardware_sec = attr_check(spec_json, "hardware")
+	hardware_arch = attr_check(hardware_sec, "arch")
+
+	os_sec = attr_check(spec_json, "os")
+	os_name = attr_check(os_sec, "name")
+	os_version = attr_check(os_sec, "version")
+	os_item = "%s-%s-%s" % (os_name, os_version, hardware_arch)
+	os_item = os_item.lower()
+	id = None
+	if os_sec.has_key("id"):
+		id = os_sec["id"]
+	source = meta_search(meta_json, os_item, id)
+
+	if target_type == "spec":
+		add2spec(os_item, source, metadata["os"])
+	if target_type == "meta":
+		add2db(os_item, source, metadata)
+
+	if spec_json.has_key("software"):
+		software_sec = spec_json["software"]
+		if software_sec:
+			for item in software_sec:
+				id = None
+				if software_sec.has_key("id"):
+					id = software_sec["id"]
+				source = meta_search(meta_json, item, id)
+				if target_type == "spec":
+					add2spec(os_item, source, metadata["software"][item])
+				if target_type == "meta":
+					add2db(item, source, metadata)
+
+	if spec_json.has_key("data"):
+		data_sec = spec_json["data"]
+		if data_sec:
+			for item in data_sec:
+				id = None
+				if data_sec.has_key("id"):
+					id = data_sec["id"]
+				source = meta_search(meta_json, item, id)
+				if target_type == "spec":
+					add2spec(os_item, source, metadata["data"][item])
+				if target_type == "meta":
+					add2db(item, source, metadata)
+
+	return metadata
+
+def json2file(filepath, json_item):
+	"""Write a json object into a file
+
+	Args:
+		filepath: a file path
+		json_item: a dict representing a json object
+
+	Returns:
+		None
+	"""
+	with open(filepath, 'w') as f:
+		json.dump(json_item, f, indent=4)
+		logging.debug("dump a json object from the umbrella spec to %s" % filepath)
+		print "dump a json object from the umbrella spec to %s" % filepath
+
+def dir_create(filepath):
+	"""Check the validity and existence of a file path. Create the directory for it if necessary. If the file already exists, exit directly.
+
+	Args:
+		filepath: a file path
+
+	Returns:
+		Exit directly if any error happens.
+		Otherwise, returns None.
+	"""
+	logging.debug("Checking file path: %s", filepath)
+	if os.path.exists(filepath):
+		cleanup(tempfile_list, tempdir_list)
+		logging.debug("The file (%s) already exists, please specify a new path!", filepath)
+		sys.exit("The file (%s) already exists, please specify a new path!" % filepath)
+	dirpath = os.path.dirname(filepath)
+
+	if not os.path.exists(dirpath):
+		os.makedirs(dirpath)
+	else:
+		if not os.path.isdir(dirpath):
+			cleanup(tempfile_list, tempdir_list)
+			logging.debug("The basename of the file (%s) is not a directory!\n", dirpath)
+			sys.exit("The basename of the file (%s) is not a directory!\n" % dirpath)
+
+def validate_meta(meta_json):
+	"""Validate a metadata db.
+	The current standard for a valid metadata db is: for each item, the "source" attribute must exist and not be not empty.
+
+	Args:
+		meta_json: a dict object representing a metadata db.
+
+	Returns:
+		If error happens, return directly with the error info.
+		Otherwise, None.
+	"""
+	logging.debug("Starting validating the metadata db ....\n")
+	print "Starting validating the metadata db ...."
+
+	for name in meta_json:
+		for ident in meta_json[name]:
+			logging.debug("check for %s with the id of %s ...", name, ident)
+			print "check for %s with the id of %s ..." % (name, ident)
+			attr_check(meta_json[name][ident], "source", 1)
+
+	logging.debug("Finish validating the metadata db ....\n")
+	print "Finish validating the metadata db successfully!"
+
+def validate_spec(spec_json, meta_json = None):
+	"""Validate a spec_json.
+
+	Args:
+		spec_json: a dict object representing a specification.
+		meta_json: a dict object representing a metadata db.
+
+	Returns:
+		If error happens, return directly with the error info.
+		Otherwise, None.
+	"""
+	logging.debug("Starting validating the spec file ....\n")
+	print "Starting validating the spec file ...."
+
+	#validate the following three sections: hardware, kernel and os.
+	env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
+
+	for sec_name in ["software", "data"]:
+		if spec_json.has_key(sec_name) and spec_json[sec_name]:
+			for item in spec_json[sec_name]:
+				if (spec_json[sec_name][item].has_key("mountpoint") and spec_json[sec_name][item]["mountpoint"]) \
+						or (spec_json[sec_name][item].has_key("mount_env") and spec_json[sec_name][item]["mount_env"]):
+					pass
+				else:
+					cleanup(tempfile_list, tempdir_list)
+					logging.critical("%s in the %s section should have either <mountpoint> or <mount_env>!\n", item, sec_name)
+					sys.exit("%s in the %s section should have either <mountpoint> or <mount_env>!\n" % (item, sec_name))
+
+				if spec_json[sec_name][item].has_key("source") and len(spec_json[sec_name][item]["source"]) > 0:
+					pass
+				else:
+					if meta_json:
+						ident = None
+						if spec_json[sec_name][item].has_key("id"):
+							ident = spec_json[sec_name][item]["id"]
+						result = meta_search(meta_json, item, ident)
+						if result.has_key("source") and len(result["source"]) > 0:
+							pass
+						else:
+							cleanup(tempfile_list, tempdir_list)
+							logging.critical("%s in the metadata db should have <source> attr!\n", item)
+							sys.exit("%s in the metadata db should have <source> attr!\n", item)
+					else:
+						cleanup(tempfile_list, tempdir_list)
+						logging.critical("%s in the %s section should have <source> attr!\n", item, sec_name)
+						sys.exit("%s in the %s section should have <source> attr!\n" % (item, sec_name))
+	logging.debug("Finish validating the spec file ....\n")
+	print "Finish validating the spec file successfully!"
+
 
 def main():
 	parser = OptionParser(usage="usage: %prog [options] run \"command\"",
 						version="%prog CCTOOLS_VERSION")
-	parser.add_option("-c", "--config",
+	parser.add_option("--spec",
 					action="store",
-					default="./spec.json",
-					help="The specification json file. (By default: spec.json)")
-	parser.add_option("--packages",
+					help="The specification json file.",)
+	parser.add_option("--meta",
 					action="store",
-					help="The source of packages information, which can be a local file path (e.g., file:///tmp/packages.json) or url (e.g., http://...).\nIf this option is not provided, the specification will be treated a self-contained specification.",)
-	parser.add_option("-i", "--inputs",
-					action="store",
-					default='',
-					help="The path of input files in the format of access_path=actual_path. i.e, -i '/home/hmeng/file1=/tmp/file2'. access_path must be consistent with the semantics of the provided command, actual_path can be relative or absolute. (By default: '')",)
-	parser.add_option("-e", "--env",
-					action="store",
-					default='',
-					help="The environment variable. I.e., -e 'PWD=/tmp'. (By default: '')")
-	parser.add_option("-s", "--sandbox_mode",
-					action="store",
-					default="parrot",
-					choices=['local', 'parrot', 'chroot', 'docker', 'condor', 'ec2',],
-					help="sandbox mode, which can be local, parrot, chroot, docker, condor, ec2. (By default: local)",)
+					help="The source of meta information, which can be a local file path (e.g., file:///tmp/meta.json) or url (e.g., http://...).\nIf this option is not provided, the specification will be treated a self-contained specification.",)
 	parser.add_option("-l", "--localdir",
 					action="store",
 					default="./umbrella_test",
@@ -2409,6 +2743,23 @@ def main():
 					action="store",
 					default="./umbrella_output",
 					help="The path of output directory, which must be non-existing or empty. (By default: ./umbrella_output)",)
+	parser.add_option("-s", "--sandbox_mode",
+					action="store",
+					default="parrot",
+					choices=['local', 'parrot', 'chroot', 'docker', 'condor', 'ec2',],
+					help="sandbox mode, which can be local, parrot, chroot, docker, condor, ec2. (By default: local)",)
+	parser.add_option("-i", "--inputs",
+					action="store",
+					default='',
+					help="The path of input files in the format of access_path=actual_path. i.e, -i '/home/hmeng/file1=/tmp/file2'. access_path must be consistent with the semantics of the provided command, actual_path can be relative or absolute. (By default: '')",)
+	parser.add_option("-e", "--env",
+					action="store",
+					default='',
+					help="The environment variable. I.e., -e 'PWD=/tmp'. (By default: '')")
+	parser.add_option("--log",
+					action="store",
+					default="./umbrella.log",
+					help="The path of umbrella log file. (By default: ./umbrella.log)",)
 	parser.add_option("--cvmfs_http_proxy",
 					action="store",
 					help="HTTP_PROXY to access cvmfs (Used by Parrot)",)
@@ -2416,10 +2767,6 @@ def main():
 					action="store",
 					default='./ec2.json',
 					help="The source of ec2 information. (By default: ./ec2.json)",)
-	parser.add_option("--log",
-					action="store",
-					default="./umbrella.log",
-					help="The path of umbrella log file. (By default: ./umbrella.log)",)
 	parser.add_option("--condor_log",
 					action="store",
 					help="The path of the condor umbrella log file. Required for condor execution engines.",)
@@ -2441,6 +2788,9 @@ def main():
 	if os.path.exists(logfilename) and not os.path.isfile(logfilename):
 		sys.exit("The --log option <%s> is not a file!" % logfilename)
 
+	global tempfile_list
+	global tempdir_list
+
 	logging.basicConfig(filename=logfilename, level=logging.DEBUG,
         format='%(asctime)s.%(msecs)d %(levelname)s %(module)s - %(funcName)s: %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
@@ -2458,173 +2808,232 @@ def main():
 		parser.print_help()
 		sys.exit(1)
 
+	user_cmd = []
+
 	behavior = args[0]
 	logging.debug("Check the validity of the behavior: %s", behavior)
-	behavior_list = ["run"]
+	behavior_list = ["run", "expand", "filter", "split", "validate"]
 	if behavior not in behavior_list:
 		logging.critical("%s is not supported by umbrella!", behavior)
 		print behavior + " is not supported by umbrella!\n"
 		parser.print_help()
 		sys.exit(1)
 
-	sandbox_mode = options.sandbox_mode
-	logging.debug("Check the sandbox_mode option: %s", sandbox_mode)
-	if sandbox_mode == 'chroot':
-		if getpass.getuser() != 'root':
-			logging.critical("You must be root to use chroot method.")
-			print 'You must be root to use chroot method.\n'
-			parser.print_help()
-			sys.exit(1)
+	if behavior in ["run"]:
+		sandbox_mode = options.sandbox_mode
+		logging.debug("Check the sandbox_mode option: %s", sandbox_mode)
+		if sandbox_mode == 'chroot':
+			if getpass.getuser() != 'root':
+				logging.critical("You must be root to use chroot method.")
+				print 'You must be root to use chroot method.\n'
+				parser.print_help()
+				sys.exit(1)
 
-	#get the absolute path of the localdir directory, which will cache all the data, and store all the sandboxes.
-	#to allow the reuse the local cache, the localdir can be a dir which already exists.
-	localdir = options.localdir
-	localdir = os.path.abspath(localdir)
-	logging.debug("Check the localdir option: %s", localdir)
+		#get the absolute path of the localdir directory, which will cache all the data, and store all the sandboxes.
+		#to allow the reuse the local cache, the localdir can be a dir which already exists.
+		localdir = options.localdir
+		localdir = os.path.abspath(localdir)
+		logging.debug("Check the localdir option: %s", localdir)
 
-	if not os.path.exists(localdir):
-		logging.debug("create the localdir: %s", localdir)
-		os.makedirs(localdir)
+		if not os.path.exists(localdir):
+			logging.debug("create the localdir: %s", localdir)
+			os.makedirs(localdir)
 
-	sandbox_dir = tempfile.mkdtemp(dir=localdir)
-	logging.debug("Create the sandbox_dir: %s", sandbox_dir)
+		sandbox_dir = tempfile.mkdtemp(dir=localdir)
+		logging.debug("Create the sandbox_dir: %s", sandbox_dir)
 
-	#transfer options.env into a dictionary, env_para_dict
-	env_para = options.env
-	env_para_dict = {}
-	if env_para == '':
-		logging.debug("The env option is null")
-		env_para_list = ''
+		#add sandbox_dir into tempdir_list
+		tempdir_list.append(sandbox_dir)
+
+		#transfer options.env into a dictionary, env_para_dict
+		env_para = options.env
 		env_para_dict = {}
-	else:
-		logging.debug("Process the env option: %s", env_para)
-		env_para = re.sub('\s+', '', env_para).strip()
-		env_para_list = env_para.split(',')
-		for item in env_para_list:
-			index = item.find('=')
-			name = item[:index]
-			value = item[(index+1):]
-			env_para_dict[name] = value
-		logging.debug("the dictionary format of the env options (env_para_dict):")
-		logging.debug(env_para_dict)
-
-	#get the cvmfs HTTP_PROXY
-	cvmfs_http_proxy = options.cvmfs_http_proxy
-
-	spec_path = options.config
-	spec_path_basename = os.path.basename(spec_path)
-	logging.debug("Start to read the specification file: %s", spec_path)
-	if not os.path.isfile(spec_path):
-		logging.critical("The specification json file (%s) does not exist! Please refer the -c option.", spec_path)
-		print "The specification json file does not exist! Please refer the -c option.\n"
-		parser.print_help()
-		sys.exit(1)
-
-	with open(spec_path) as f: #python 2.4 does not support this syntax: with open () as
-		spec_json = json.load(f)
-
-		#if the spec file has environ seciton, merge the variables defined in it into env_para_dict
-		if spec_json.has_key("environ") and spec_json["environ"]:
-			logging.debug("The specification file has environ section, update env_para_dict ....")
-			spec_env = spec_json["environ"]
-			for key in spec_env:
-				env_para_dict[key] = spec_env[key]
-			logging.debug("env_para_dict:")
+		if env_para == '':
+			logging.debug("The env option is null")
+			env_para_list = ''
+			env_para_dict = {}
+		else:
+			logging.debug("Process the env option: %s", env_para)
+			env_para = re.sub('\s+', '', env_para).strip()
+			env_para_list = env_para.split(',')
+			for item in env_para_list:
+				index = item.find('=')
+				name = item[:index]
+				value = item[(index+1):]
+				env_para_dict[name] = value
+			logging.debug("the dictionary format of the env options (env_para_dict):")
 			logging.debug(env_para_dict)
 
-	if 'PWD' in env_para_dict:
-		cwd_setting = env_para_dict['PWD']
-		logging.debug("PWD environment variable is set explicitly: %s", cwd_setting)
-	else:
-		cwd_setting = sandbox_dir
-		env_para_dict['PWD'] = cwd_setting
-		logging.debug("PWD is not set explicitly, use sandbox_dir (%s) as PWD", cwd_setting)
+		#get the cvmfs HTTP_PROXY
+		cvmfs_http_proxy = options.cvmfs_http_proxy
 
-	#get the absolute path of each input file
-	input_files = options.inputs
-	input_files = re.sub( '\s+', '', input_files).strip() #remove all the whitespaces within the inputs option
+	if behavior in ["run", "expand", "filter", "split", "validate"]:
+		spec_path = options.spec
+		if behavior == "validate" and spec_path == None:
+			spec_json = None
+		else:
+			spec_path_basename = os.path.basename(spec_path)
+			logging.debug("Start to read the specification file: %s", spec_path)
+			if not os.path.isfile(spec_path):
+				logging.critical("The specification json file (%s) does not exist! Please refer the -c option.", spec_path)
+				print "The specification json file does not exist! Please refer the -c option.\n"
+				parser.print_help()
+				sys.exit(1)
 
-	input_list = []
-	input_dict = {}
+			with open(spec_path) as f: #python 2.4 does not support this syntax: with open () as
+				spec_json = json.load(f)
+				if behavior in ["run"]:
+					user_cmd = args[1:]
+					if len(user_cmd) == 0:
+						if spec_json.has_key("cmd") and len(spec_json["cmd"]) > 0:
+							user_cmd.append(spec_json["cmd"])
+						else:
+							user_cmd.append("/bin/sh") #set the user_cmd to be default: /bin/sh
 
-	if input_files == '':
-		input_list_origin = ''
+					logging.debug("The user's command is: %s", user_cmd)
+
+					#if the spec file has environ seciton, merge the variables defined in it into env_para_dict
+					if spec_json.has_key("environ") and spec_json["environ"]:
+						logging.debug("The specification file has environ section, update env_para_dict ....")
+						spec_env = spec_json["environ"]
+						for key in spec_env:
+							env_para_dict[key] = spec_env[key]
+						logging.debug("env_para_dict:")
+						logging.debug(env_para_dict)
+
+	if behavior in ["run"]:
+		if 'PWD' in env_para_dict:
+			cwd_setting = env_para_dict['PWD']
+			logging.debug("PWD environment variable is set explicitly: %s", cwd_setting)
+		else:
+			cwd_setting = sandbox_dir
+			env_para_dict['PWD'] = cwd_setting
+			logging.debug("PWD is not set explicitly, use sandbox_dir (%s) as PWD", cwd_setting)
+
+		#get the absolute path of each input file
+		input_files = options.inputs
+		input_files = re.sub( '\s+', '', input_files).strip() #remove all the whitespaces within the inputs option
+
 		input_list = []
 		input_dict = {}
-		logging.debug("the inputs options is null")
-	else:
-		logging.debug("The inputs option: %s", input_files)
-		input_list_origin = input_files.split(',')
-		for item in input_list_origin:
-			index = item.find('=')
-			access_path = item[:index]
-			actual_path = item[(index+1):]
-			if access_path[0] != '/':
-				access_path = os.path.join(cwd_setting, access_path)
-			actual_path = os.path.abspath(actual_path)
-			input_dict[access_path] = actual_path
-			input_list.append(actual_path) #get the absolute path of each input file and add it into input_list
-		logging.debug("The list version of the inputs option: ")
-		logging.debug(input_list)
-		logging.debug("The dict version of the inputs option: ")
-		logging.debug(input_dict)
 
-	#get the absolute path of each output file
-	output_dir = options.output
-	output_dir = os.path.abspath(output_dir)
-
-	if not os.path.exists(output_dir):
-		logging.debug("create the output_dir: %s", output_dir)
-		os.makedirs(output_dir)
-	elif len(os.listdir(output_dir)) != 0:
-		logging.critical("output_dir (%s) is not empty!", output_dir)
-		sys.exit("%s is not empty! Please clean the output directory first or specify another directory!\n" % output_dir)
-	else:
-		pass
-
-	"""
-	packages_path is optional. If set, it provides the metadata information for the dependencies.
-	If not set, the umbrella specification is treated as a self-contained specification.
-	packages_path can be in either file:///filepath format or a http/https url like http:/ccl.cse.nd.edu/...
-	"""
-	packages_path = options.packages
-	if packages_path:
-		if packages_path[:7] == "file://":
-			packages_path = packages_path[7:]
-			logging.debug("Check the metatdata database file: %s", packages_path)
-			if not os.path.exists(packages_path):
-				logging.critical("the metatdata database file (%s) does not exist!", packages_path)
-				sys.exit("the metatdata database file (%s) does not exist!" % packages_path)
+		if input_files == '':
+			input_list_origin = ''
+			input_list = []
+			input_dict = {}
+			logging.debug("the inputs options is null")
 		else:
-			url = packages_path
-			packages_path = '%s/packages.json' % (sandbox_dir)
-			logging.debug("Download metadata database from %s into %s", url, packages_path)
-			print "Download metadata database from %s into %s" % (url, packages_path)
-			url_download(url, packages_path)
-	else:
-		#the provided specification should be self-contained.
-		# One solution is to change all the current implementation of Umbrella to check whether the metadata information is included in the specification.
-		# Another solution is to extract all the metadata information into a separate metadata database file. (This solution is currently used).
-		packages_path = '%s/packages.json' % (sandbox_dir)
-		abstract_metadata(spec_json, packages_path)
+			logging.debug("The inputs option: %s", input_files)
+			input_list_origin = input_files.split(',')
+			for item in input_list_origin:
+				index = item.find('=')
+				access_path = item[:index]
+				actual_path = item[(index+1):]
+				if access_path[0] != '/':
+					access_path = os.path.join(cwd_setting, access_path)
+				actual_path = os.path.abspath(actual_path)
+				input_dict[access_path] = actual_path
+				input_list.append(actual_path) #get the absolute path of each input file and add it into input_list
+			logging.debug("The list version of the inputs option: ")
+			logging.debug(input_list)
+			logging.debug("The dict version of the inputs option: ")
+			logging.debug(input_dict)
 
-	with open(packages_path) as f: #python 2.4 does not support this syntax: with open () as
-		packages_json = json.load(f)
+		#get the absolute path of each output file
+		output_dir = options.output
+		output_dir = os.path.abspath(output_dir)
 
-	user_cmd = args[1:]
-	logging.debug("The user's command is: %s", user_cmd)
+		if not os.path.exists(output_dir):
+			logging.debug("create the output_dir: %s", output_dir)
+			os.makedirs(output_dir)
+		elif len(os.listdir(output_dir)) != 0:
+			cleanup(tempfile_list, tempdir_list)
+			logging.critical("output_dir (%s) is not empty!", output_dir)
+			sys.exit("%s is not empty! Please clean the output directory first or specify another directory!\n" % output_dir)
+		else:
+			pass
 
-	if sandbox_mode == "ec2":
-		ec2log_path = options.ec2_log
-		ec2log_path = os.path.abspath(ec2log_path)
-		if os.path.exists(ec2log_path):
-			sys.exit("The ec2_log option <%s> already exists!" % ec2log_path)
 
-	if sandbox_mode == "condor":
-		condorlog_path = options.condor_log
-		condorlog_path = os.path.abspath(condorlog_path)
-		if os.path.exists(condorlog_path):
-			sys.exit("The condor_log option <%s> already exists!" % condorlog_path)
+	if behavior in ["run", "expand", "filter", "validate"]:
+		"""
+		meta_path is optional. If set, it provides the metadata information for the dependencies.
+		If not set, the umbrella specification is treated as a self-contained specification.
+		meta_path can be in either file:///filepath format or a http/https url like http:/ccl.cse.nd.edu/...
+		"""
+		meta_path = options.meta
+		if meta_path:
+			if meta_path[:7] == "file://":
+				meta_path = meta_path[7:]
+				logging.debug("Check the metatdata database file: %s", meta_path)
+				if not os.path.exists(meta_path):
+					cleanup(tempfile_list, tempdir_list)
+					logging.critical("the metatdata database file (%s) does not exist!", meta_path)
+					sys.exit("the metatdata database file (%s) does not exist!" % meta_path)
+			elif meta_path[:7] == "http://" or meta_path[:8] == "https://":
+				url = meta_path
+				if behavior in ["run"]:
+					meta_path = '%s/meta.json' % (sandbox_dir)
+				if behavior in ["expand", "filter", "validate"]:
+					#create a tempfile under /tmp
+					(fd, meta_path) = tempfile.mkstemp()
+					tempfile_list.append(meta_path)
+					os.close(fd)
+					logging.debug("Creating a temporary file (%s) to hold the metadata file specified by the --meta options!", meta_path)
+				logging.debug("Download metadata database from %s into %s", url, meta_path)
+				print "Download metadata database from %s into %s" % (url, meta_path)
+				url_download(url, meta_path)
+			else:
+				cleanup(tempfile_list, tempdir_list)
+				logging.debug("The format of the --meta option should be file:///... or http://... or https://... \n")
+				sys.exit("The format of the --meta option should be file:///... or http://... or https://... \n")
+		else:
+			if behavior in ["run"]:
+				#the provided specification should be self-contained.
+				# One solution is to change all the current implementation of Umbrella to check whether the metadata information is included in the specification.
+				# Another solution is to extract all the metadata information into a separate metadata database file. (This solution is currently used).
+				meta_path = '%s/meta.json' % (sandbox_dir)
+				abstract_metadata(spec_json, meta_path)
+			elif behavior in ["expand", "filter"]:
+				cleanup(tempfile_list, tempdir_list)
+				logging.critical("The --meta option should be provided for the umbrella %s behavior!\n", behavior)
+				sys.exit("The --meta option should be provided for the umbrella %s behavior!\n" % behavior)
+
+		if meta_path:
+			with open(meta_path) as f: #python 2.4 does not support this syntax: with open () as
+				meta_json = json.load(f)
+		else:
+			meta_json = None
+
+
+	if behavior in ["run", "validate", "split", "filter", "expand"]:
+		#for validate, if only --spec is provided, then check whether this spec is self-contained.
+		#for validate, if only --meta is provided, then check whether each item in the metadata db is well archived (for now, well-archived means the source attr is not null).
+		#for validate, if both --spec and --meta are provided, then check whether the dependencies of the spec file is well archived.
+		if spec_json == None:
+			if meta_json == None:
+				pass
+			else:
+				validate_meta(meta_json)
+		else:
+			if meta_json == None:
+				validate_spec(spec_json)
+			else:
+				validate_spec(spec_json, meta_json)
+
+	if behavior in ["run"]:
+		if sandbox_mode == "ec2":
+			ec2log_path = options.ec2_log
+			ec2log_path = os.path.abspath(ec2log_path)
+			if os.path.exists(ec2log_path):
+				cleanup(tempfile_list, tempdir_list)
+				sys.exit("The ec2_log option <%s> already exists!" % ec2log_path)
+
+		if sandbox_mode == "condor":
+			condorlog_path = options.condor_log
+			condorlog_path = os.path.abspath(condorlog_path)
+			if os.path.exists(condorlog_path):
+				cleanup(tempfile_list, tempdir_list)
+				sys.exit("The condor_log option <%s> already exists!" % condorlog_path)
 
 	if behavior in ["run"]:
 #		user_name = 'root' #username who can access the VM instances from Amazon EC2
@@ -2647,29 +3056,60 @@ def main():
 
 			ssh_key = os.path.abspath(options.ec2_sshkey)
 			if not os.path.exists(ssh_key):
+				cleanup(tempfile_list, tempdir_list)
 				logging.critical("The ssh key file (%s) does not exists!", ssh_key)
 				sys.exit("The ssh key file (%s) does not exists!\n" % ssh_key)
 
 			ec2_security_group = options.ec2_group
 			ec2_key_pair = options.ec2_key
 
-			ec2_process(spec_path, spec_json, packages_path, packages_json, ec2_path, ec2_json, ssh_key, ec2_key_pair, ec2_security_group, sandbox_dir, output_dir, sandbox_mode, input_list, input_list_origin, env_para, user_cmd, cwd_setting, ec2log_path, cvmfs_http_proxy)
+			ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, ssh_key, ec2_key_pair, ec2_security_group, sandbox_dir, output_dir, sandbox_mode, input_list, input_list_origin, env_para, user_cmd, cwd_setting, ec2log_path, cvmfs_http_proxy)
 		elif sandbox_mode == "condor":
-			condor_process(spec_path, spec_json, spec_path_basename, packages_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, condorlog_path, cvmfs_http_proxy)
+			condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, condorlog_path, cvmfs_http_proxy)
 		elif sandbox_mode == "local":
 			#first check whether Docker exists, if yes, use docker execution engine; if not, use parrot execution engine.
 			if dependency_check('docker') == 0:
 				logging.debug('docker exists, use docker execution engine')
-				specification_process(spec_json, sandbox_dir, behavior, packages_json, 'docker', output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
+				specification_process(spec_json, sandbox_dir, behavior, meta_json, 'docker', output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
 			else:
 				logging.debug('docker does not exist, use parrot execution engine')
-				specification_process(spec_json, sandbox_dir, behavior, packages_json, 'parrot', output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
+				specification_process(spec_json, sandbox_dir, behavior, meta_json, 'parrot', output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
 		else:
 			if sandbox_mode == 'docker' and dependency_check('docker') != 0:
+				cleanup(tempfile_list, tempdir_list)
 				logging.critical('Docker is not installed on the host machine, please try other execution engines!')
 				sys.exit('Docker is not installed on the host machine, please try other execution engines!')
-			specification_process(spec_json, sandbox_dir, behavior, packages_json, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
+			specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
 
+	if behavior in ["expand", "filter"]:
+		if len(args) != 2:
+			cleanup(tempfile_list, tempdir_list)
+			logging.critical("The syntax for umbrella %s is: umbrella ... %s <filepath>.\n", behavior, behavior)
+			sys.exit("The syntax for umbrella %s is: umbrella ... %s <filepath>.\n" % (behavior, behavior))
+		target_specpath = os.path.abspath(args[1])
+		dir_create(target_specpath)
+		if behavior == "expand":
+			new_json = separatize_spec(spec_json, meta_json, "spec")
+		else:
+			new_json = separatize_spec(spec_json, meta_json, "meta")
+		#write new_json into the file specified by the user.
+		json2file(target_specpath, new_json)
+
+	if behavior in ["split"]:
+		if len(args) != 3:
+			cleanup(tempfile_list, tempdir_list)
+			logging.critical("The syntax for umbrella split is: umbrella ... split <spec_filepath> <meta_filepath>.\n")
+			sys.exit("The syntax for umbrella split is: umbrella ... split <spec_filepath> <meata_filepath>.\n")
+
+		new_spec_path = os.path.abspath(args[1])
+		db_path = os.path.abspath(args[2])
+		dir_create(new_spec_path)
+		dir_create(db_path)
+		abstract_metadata(spec_json, db_path)
+		new_json = prune_spec(spec_json)
+		json2file(new_spec_path, new_json)
+
+	cleanup(tempfile_list, tempdir_list)
 	end = datetime.datetime.now()
 	diff = end - start
 	logging.debug("End time: %s", end)

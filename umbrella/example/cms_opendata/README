@@ -1,83 +1,71 @@
 The documentation illustrates how to use different execution engines of Umbrella to execute
 a complex CMS application.
 
-#parrot execution engine test command - Metadata database is specified through --packages option.
+#parrot execution engine test command - Metadata database is specified through --meta option.
 umbrella \
---sandbox_mode parrot \
---log umbrella.log \
---config cms_opendata.umbrella \
---packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
---inputs 'cms_opendata.sh=cms_opendata.sh' \
+--spec cms_opendata.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/parrot_cms_opendata_output \
+--sandbox_mode parrot \
+--log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
-run '/bin/sh cms_opendata.sh'
-
+run
 
 #parrot execution engine test command - the umbrella specification is self-contained, so no metadata database is needed.
 umbrella \
---sandbox_mode parrot \
---log umbrella.log \
---config cms_opendata_S.umbrella \
---inputs 'cms_opendata.sh=cms_opendata.sh' \
+--spec cms_opendata_S.umbrella \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/parrot_cms_opendata_output \
+--sandbox_mode parrot \
+--log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
-run '/bin/sh cms_opendata.sh'
+run
 
 
 #Docker execution engine test command. Don't do the docker test under your afs, it will fail due to the ACL of your afs.
 umbrella \
---sandbox_mode docker \
---log umbrella.log \
---config cms_opendata.umbrella \
---packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
---inputs 'cms_opendata.sh=cms_opendata.sh' \
+--spec cms_opendata.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/docker_cms_opendata_output \
+--sandbox_mode docker \
+--log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
-run '/bin/sh cms_opendata.sh'
+run
 
 #Docker execution engine test command. Don't do the docker test under your afs, it will fail due to the ACL of your afs - the umbrella specification is self-contained, so no metadata database is needed.
 umbrella \
---sandbox_mode docker \
---log umbrella.log \
---config cms_opendata_S.umbrella \
---inputs 'cms_opendata.sh=cms_opendata.sh' \
+--spec cms_opendata_S.umbrella \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/docker_cms_opendata_output \
+--sandbox_mode docker \
+--log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
-run '/bin/sh cms_opendata.sh'
-
-
+run
 
 #Local execution engine test command. Don't test local execution engine under
 #your afs, because the ACL of your afs does not support importing an OS tarball
 #into a docker image.
 umbrella \
---sandbox_mode local \
---log umbrella.log \
---config cms_opendata.umbrella \
---packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
---inputs 'cms_opendata.sh=cms_opendata.sh' \
+--spec cms_opendata.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/local_cms_opendata_output \
+--sandbox_mode local \
+--log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
-run '/bin/sh cms_opendata.sh'
-
-
+run
 
 #Condor execution engine test command. To test this, the machine you are using should have condor installed.
 #Condor can not work together with afs. So don't do your test on your afs.
 umbrella \
---sandbox_mode condor \
---log umbrella.log \
---condor_log umbrella.log.condor \
---config cms_opendata.umbrella \
---packages http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
---inputs 'cms_opendata.sh=cms_opendata.sh' \
+--spec cms_opendata.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/condor_cms_opendata_output \
+--sandbox_mode condor \
+--log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
-run '/bin/sh cms_opendata.sh'
-
+--condor_log umbrella.log.condor \
+run

@@ -27,10 +27,15 @@
 		},
 		"00459D48-EB70-E011-AF09-90E6BA19A252.root": {
 			"mount_env": "ROOT_FILE"
+		},
+		"cms_opendata.sh": {
+			"id": "a6f9d99bcc08adb019ed6f3c31d9c090",
+			"mountpoint": "/tmp/cms_opendata.sh"
 		}
 	},
 	"environ": {
 		"CMS_VERSION": "CMSSW_4_2_8",
 		"SCRAM_ARCH": "slc5_amd64_gcc434"
-	}
+	},
+	"cmd": "/bin/sh /tmp/cms_opendata.sh"
 }

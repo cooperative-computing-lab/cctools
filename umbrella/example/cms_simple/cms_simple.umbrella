@@ -21,9 +21,14 @@
 		}
 	},
 	"data": {
+		"cms_simple.sh": {
+			"id": "9d4b969f93743ded4a4830376b2038b9",
+			"mountpoint": "/tmp/cms_simple.sh"
+		}
 	},
 	"environ": {
 		"CMS_VERSION": "CMSSW_5_3_11",
 		"SCRAM_ARCH": "slc5_amd64_gcc462"
-	}
+	},
+	"cmd": "/bin/sh /tmp/cms_simple.sh"
 }
