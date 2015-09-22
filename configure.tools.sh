@@ -152,7 +152,7 @@ library_search()
 	then
 		return 0
 	fi
-	if [ X$HOST_MULTIARCH != X ] && library_search_multiarch $@;
+	if [ "X${HOST_MULTIARCH}" != X ] && library_search_multiarch $@;
 	then
 		return 0
 	fi
@@ -220,13 +220,6 @@ library_search_normal()
 	if [ -n "$3" -a -d "$libdir/$3" ]
 	then
 		libdir="$libdir/$3"
-	fi
-
-	# If no third argument, and debian based, libraries are in ARCH-linux-gnu.
-	arch=`uname -m`
-	if [ -z "$3" -a -d "$libdir/$arch-linux-gnu" ]
-	then
-		libdir="$libdir/$arch-linux-gnu"
 	fi
 
 	# Now check for the library file in all of the known places,
@@ -589,14 +582,14 @@ check_for_globus()
 
 check_multiarch()
 {
-	echon "checking for multiarch environment..."
 	if [ -r /etc/debian_version ]; then
-		HOST_MULTIARCH=`dpkg-architecture -qDEB_HOST_MULTIARCH 2> /dev/null`
-		echo "$HOST_MULTIARCH"
+		HOST_MULTIARCH="$(uname -m)-linux-gnu"
 	else
 		HOST_MULTIARCH=
-		echo "no"
 	fi
+
+	# echo to capture result
+	echo "$HOST_MULTIARCH"
 }
 
 format_version()
