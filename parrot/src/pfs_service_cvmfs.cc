@@ -152,7 +152,7 @@ int compat_cvmfs_open(const char *path) {
 pfs_ssize_t compat_cvmfs_read(int fd, void *d, pfs_size_t length, pfs_off_t offset, pfs_off_t last_offset) {
 	pfs_ssize_t result;
 
-	debug(D_LOCAL, "read %d 0x%p %lld %lld", fd, d,(long long)length,(long long)offset);
+	debug(D_CVMFS, "read %d %p %lld %lld", fd, d, (long long)length, (long long)offset);
 
 #if LIBCVMFS_REVISION < 18
 	if(offset != last_offset)
