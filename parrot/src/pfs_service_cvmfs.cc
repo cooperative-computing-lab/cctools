@@ -160,10 +160,6 @@ pfs_ssize_t compat_cvmfs_read(int fd, void *d, pfs_size_t length, pfs_off_t offs
 	result =::read(fd, d, length);
 #else
 	result = cvmfs_pread(cvmfs_active_filesystem->cvmfs_ctx, fd, d, length, offset);
-	if (result < 0) {
-		errno = -result;
-		result = -1;
-	}
 #endif
 
 	return result;
