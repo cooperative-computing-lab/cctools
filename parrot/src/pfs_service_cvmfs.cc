@@ -1083,47 +1083,58 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_leaf_symlinks, bool expan
 
 
 class pfs_file_cvmfs:public pfs_file {
-	  private:
-	int fd;
-	pfs_stat info;
-	pfs_off_t last_offset;
+	private:
+		struct cvmfs_filesystem *filesystem;
+		int fd;
+		pfs_stat info;
+		pfs_off_t last_offset;
 
-	  public:
-	pfs_file_cvmfs(pfs_name * n, int fd_arg, cvmfs_dirent & d):pfs_file(n) {
-		fd = fd_arg;
-		last_offset = 0;
-		cvmfs_dirent_to_stat(&d, &info);
-	}
+	public:
+		pfs_file_cvmfs(pfs_name * n, struct cvmfs_filesystem *fsys_arg, int fd_arg, cvmfs_dirent & d):pfs_file(n) {
+			filesystem = fsys_arg;
+			fd = fd_arg;
+			last_offset = 0;
+			cvmfs_dirent_to_stat(&d, &info);
+		}
 
-	virtual int close() {
-		return compat_cvmfs_close(fd);
-	}
+		virtual int close() {
 
-	virtual pfs_ssize_t read(void *d, pfs_size_t length, pfs_off_t offset) {
-		pfs_ssize_t result = compat_cvmfs_read(fd, d, length, offset, last_offset);
-		if(result > 0)
-			last_offset = offset + result;
-		return result;
-	}
+			if(filesystem && filesystem != cvmfs_active_filesystem) {
+				cvmfs_activate_filesystem(filesystem);
+			}
 
-	virtual int fstat(struct pfs_stat *i) {
-		*i = info;
-		return 0;
-	}
+			return compat_cvmfs_close(fd);
+		}
 
-	/*
-	   This is a compatibility hack.
-	   This filesystem is read only, so locks make no sense.
-	   This simply satisfies some programs that insist upon it.
-	 */
-	virtual int flock(int op) {
-		return 0;
-	}
+		virtual pfs_ssize_t read(void *d, pfs_size_t length, pfs_off_t offset) {
 
-	virtual pfs_ssize_t get_size() {
-		return info.st_size;
-	}
+			if(filesystem && filesystem != cvmfs_active_filesystem) {
+				cvmfs_activate_filesystem(filesystem);
+			}
 
+			pfs_ssize_t result = compat_cvmfs_read(fd, d, length, offset, last_offset);
+			if(result > 0)
+				last_offset = offset + result;
+			return result;
+		}
+
+		virtual int fstat(struct pfs_stat *i) {
+			*i = info;
+			return 0;
+		}
+
+		/*
+		   This is a compatibility hack.
+		   This filesystem is read only, so locks make no sense.
+		   This simply satisfies some programs that insist upon it.
+		   */
+		virtual int flock(int op) {
+			return 0;
+		}
+
+		virtual pfs_ssize_t get_size() {
+			return info.st_size;
+		}
 };
 
 class pfs_service_cvmfs:public pfs_service {
@@ -1165,7 +1176,7 @@ class pfs_service_cvmfs:public pfs_service {
 
 		if(fd<0) return 0;
 
-		return new pfs_file_cvmfs(name, fd, d);
+		return new pfs_file_cvmfs(name, cvmfs_active_filesystem, fd, d);
 	}
 
 	pfs_dir *getdir(pfs_name * name) {
