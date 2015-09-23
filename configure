@@ -928,6 +928,7 @@ then
 				echo "found python development libraries"
 				python_ccflags_file=`mktemp tmp.XXXXXX`
 				python_ldflags_file=`mktemp tmp.XXXXXX`
+				python_dev=yes
 
 				env HOME=/var/empty ${python} > $python_ccflags_file <<EOF
 from distutils import sysconfig
@@ -971,7 +972,7 @@ EOF
 
 				swig_bindings="$swig_bindings python"
 			else
-				python=0
+				python_dev=no
 			fi
 		else
 			echo "*** Sorry, we require Python >= 2.4"
@@ -979,7 +980,7 @@ EOF
 		fi
 	fi
 
-	if [ $python = 0 ]
+	if [ $python_dev = no ]
 	then
 				if [ $config_python_path = yes ]
 				then
@@ -987,7 +988,7 @@ EOF
 						echo "*** Check --with-python-path and try again."
 						exit 1
 				else
-						echo "*** skipping python support"
+						echo "*** skipping python bindings support"
 				fi
 	fi
 fi
