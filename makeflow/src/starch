@@ -77,7 +77,7 @@ extract() {
 }
 
 run() {
-    $SFX_DIR/run.sh $@
+    $SFX_DIR/run.sh "$@"
     SFX_EXIT_STATUS=$?
 }
 
@@ -98,7 +98,7 @@ if [ "$SFX_EXTRACT_ONLY" -eq 1 ]; then
     echo $SFX_DIR
     SFX_KEEP=1
 else
-    extract && run $@
+    extract && run "$@"
 fi
 
 if [ "$SFX_KEEP" -ne 1 ]; then
@@ -381,7 +381,7 @@ def parse_command_line_options():
         logging.error('no executables specified')
 
     if not options.command:
-        options.command = os.path.basename(options.executables[0]) + ' $@'
+        options.command = os.path.basename(options.executables[0]) + ' "$@"'
         logging.warn('no command specified, so using: %s' % options.command)
 
     logging.debug('command ... ' + options.command)
