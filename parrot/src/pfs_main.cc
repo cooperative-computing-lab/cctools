@@ -316,8 +316,6 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 	struct pfs_process *p;
 	unsigned long message;
 
-	trace_this_pid = -1; /* now always trace any process at all */
-
 	p = pfs_process_lookup(pid);
 	if(!p) {
 		debug(D_PROCESS,"ignoring event %d for unknown pid %d",status,pid);
@@ -478,6 +476,12 @@ void write_rval(const char* message, int status) {
 	}
 
 }
+
+struct pfswait {
+	pid_t pid;
+	int status;
+	struct rusage usage;
+};
 
 int main( int argc, char *argv[] )
 {
@@ -1065,33 +1069,59 @@ int main( int argc, char *argv[] )
 	p->state = PFS_PROCESS_STATE_USER;
 	snprintf(p->name,sizeof(p->name),"%s",argv[optind]);
 
+	/* We perform wait4 until there are no tracees left to wait for.
+	 * Previously, we would wait for a process, handle the event, then repeat.
+	 * This caused problems with Java where threads would get stuck in a race
+	 * condition with sched_yield/futex.
+	 *
+	 * The reason I discovered this solution is due to strace(1). I've long
+	 * wondered why it chooses to wait for all tracees before processing events
+	 * (you can see this if you strace strace).  After again seeing the
+	 * sched_yield infinite loop again in #927, I recalled this peculiarity and
+	 * decided to give the strace approach a try.  It apparently fixes the
+	 * problem. I couldn't find any documentation on why strace does this.
+	 */
+
 	while(pfs_process_count()>0) {
-		while(1) {
+		std::vector<struct pfswait> pfswait;
+
+		if(trace_this_pid != -1)
+			debug(D_PROCESS, "Waiting for process %d\n", trace_this_pid);
+
+		while (1) {
+			struct pfswait p;
 			int flags = WUNTRACED|__WALL;
-			int status;
-			struct rusage usage;
-
-			if(trace_this_pid != -1)
-				debug(D_PROCESS, "Waiting for process %d\n", trace_this_pid);
-			pid = wait4(trace_this_pid,&status,flags,&usage);
+			if (pfswait.size() > 0)
+				flags |= WNOHANG;
+			p.pid = wait4(trace_this_pid, &p.status, flags, &p.usage);
 #if 0 /* Enable this for extreme debugging... */
-			debug(D_DEBUG, "%d = wait4(%d, %p, %d, %p)", (int)pid, (int)trace_this_pid, &status, flags, &usage);
+			debug(D_DEBUG, "%d = wait4(%d, %p, %d, %p)", (int)p.pid, (int)trace_this_pid, &p.status, flags, &p.usage);
 #endif
+			if (p.pid == -1 && errno == ECHILD) {
+				debug(D_FATAL, "No children to wait for? Cleaning up...");
+				pfs_process_kill_everyone(SIGKILL);
+				abort();
+			} else if (p.pid == 0 || p.pid == -1) {
+				break;
+			}
+			pfswait.push_back(p);
+		}
+		if (pfswait.size() == 0)
+			break;
 
-			if(pid == pfs_watchdog_pid) {
-				if (WIFEXITED(status) || WIFSIGNALED(status)) {
+		trace_this_pid = -1; /* reinitialize to wait for any process; handle_event may change this after clone is processed */
+
+		for (std::vector<struct pfswait>::iterator it = pfswait.begin(); it != pfswait.end(); ++it) {
+			if(it->pid == pfs_watchdog_pid) {
+				if (WIFEXITED(it->status) || WIFSIGNALED(it->status)) {
 					debug(D_NOTICE,"watchdog died unexpectedly; killing everyone");
 					pfs_process_kill_everyone(SIGKILL);
 					break;
 				}
-			} else if(pid>0) {
-				handle_event(pid,status,&usage);
 			} else {
-				break;
+				handle_event(it->pid,it->status,&it->usage);
 			}
 		}
-
-		if(pid==-1 && errno==ECHILD) break;
 	}
 
 	if(pfs_syscall_totals32) {
