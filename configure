@@ -421,7 +421,7 @@ fi
 
 potential_packages="dttools ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_prune} ${include_package_doc}"
 
-check_multiarch
+export HOST_MULTIARCH=$(check_multiarch)
 
 if [ -f config.mk ]; then
 	echo "we are reconfiguring - prepare with make clean..."
