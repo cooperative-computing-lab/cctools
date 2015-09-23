@@ -32,7 +32,7 @@ OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By defaul
 OPTION_TRIPLET(-p, port, port)Port number for queue master to listen on.
 OPTION_TRIPLET(-P, priority, num)Priority. Higher the value, higher the priority.
 OPTION_TRIPLET(-Z, port-file, file)Select port at random and write it to this file.  (default is disabled)
-OPTION_PAIR(--work-queue-preferred-connection,connection)Indicate preferred connection. (IP [default], HOSTNAME)
+OPTION_PAIR(--work-queue-preferred-connection,connection)Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
 OPTIONS_END
 
 SECTION(EXIT STATUS)

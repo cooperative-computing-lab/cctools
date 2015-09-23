@@ -254,7 +254,7 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 		if(value)
 			work_queue_master_preferred_connection(q->data, value);
 		else
-			work_queue_master_preferred_connection(q->data, "IP");
+			work_queue_master_preferred_connection(q->data, "by_ip");
 	}
 }
 

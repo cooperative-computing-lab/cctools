@@ -125,7 +125,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s The port that the master will be listening on. (default 9068)\n", "-p,--port=<port>");
 	fprintf(stdout, " %-30s Priority. Higher the value, higher the priority.\n", "-P,--priority=<integer>");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--random-port=<file>");
-	fprintf(stdout, " %-30s Indicate preferred master connection. (IP [default], HOSTNAME)", "--work-queue-preferred-connection");
+	fprintf(stdout, " %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 }
 
 static void display_progress( struct work_queue *q )

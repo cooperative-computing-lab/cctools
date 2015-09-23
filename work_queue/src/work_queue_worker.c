@@ -1797,7 +1797,7 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 		last_port = port;
 
 		debug(D_WQ,"selected master with project=%s name=%s addr=%s port=%d",project,name,addr,port);
-		if(pref && strcmp(pref, "HOSTNAME") == 0)
+		if(pref && strcmp(pref, "by_hostname") == 0)
 			return serve_master_by_hostport(name,port,project);
 		return serve_master_by_hostport(addr,port,project);
 	}

@@ -76,7 +76,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Show program version.\n", "-v,--version");
 	fprintf(stdout, " %-30s Display this message.\n", "-h,--help");
 	fprintf(stdout, " %-30s Select port at random and write it to this file.\n", "-Z,--random-port=<file>");
-	fprintf(stdout, " %-30s Indicate preferred master connection. (IP [default], HOSTNAME)", "--work-queue-preferred-connection");
+	fprintf(stdout, " %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 }
 
 /*
