@@ -84,7 +84,7 @@ On success, returns zero.  On failure, returns non-zero.
 
 SECTION(EXAMPLES)
 
-Package the data program:
+Package the date program:
 LONGCODE_BEGIN
     $ starch -x date date.sfx
 LONGCODE_END
