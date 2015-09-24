@@ -739,6 +739,16 @@ class WorkQueue(_object):
     def specify_priority(self, priority):
         return work_queue_specify_priority(self._work_queue, priority)
 
+    ## Specify the number of tasks not yet submitted to the queue.
+    # It is used by work_queue_pool to determine the number of workers to launch.
+    # If not specified, it defaults to 0.
+    # work_queue_pool considers the number of tasks as:
+    # num tasks left + num tasks running + num tasks read.
+    # @param q A work queue object.
+    # @param ntasks Number of tasks yet to be submitted.
+    def specify_num_tasks_left(self, ntasks):
+        return work_queue_specify_num_tasks_left(self._work_queue, ntasks)
+
     ##
     # Specify the master mode for the given queue.
     #

@@ -115,6 +115,7 @@ struct work_queue {
 	char *name;
 	int port;
 	int priority;
+	int num_tasks_left;
 
 	char workingdir[PATH_MAX];
 
@@ -1596,6 +1597,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 
 	nvpair_insert_integer(nv,"port",info.port);
 	nvpair_insert_integer(nv,"priority",info.priority);
+	nvpair_insert_integer(nv,"tasks_left",q->num_tasks_left);
 
 	//send info on workers
 	nvpair_insert_integer(nv,"workers",info.total_workers_connected);
@@ -4013,6 +4015,16 @@ const char *work_queue_name(struct work_queue *q)
 void work_queue_specify_priority(struct work_queue *q, int priority)
 {
 	q->priority = priority;
+}
+
+void work_queue_specify_num_tasks_left(struct work_queue *q, int ntasks)
+{
+	if(ntasks < 1) {
+		q->num_tasks_left = 0;
+	}
+	else {
+		q->num_tasks_left = ntasks;
+	}
 }
 
 void work_queue_specify_master_mode(struct work_queue *q, int mode)

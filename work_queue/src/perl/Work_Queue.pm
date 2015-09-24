@@ -136,6 +136,11 @@ sub specify_priority {
 	return work_queue_specify_priority($self->{_work_queue}, $priority);
 }
 
+sub specify_num_tasks_left {
+	my ($self, $ntasks) = @_;
+	return work_queue_specify_num_tasks_left($self->{_work_queue}, $ntasks);
+}
+
 sub specify_master_mode {
 	my ($self, $mode) = @_;
 	return work_queue_specify_master_mode($self->{_work_queue}, $mode);
@@ -439,6 +444,23 @@ Change the project priority for the given queue.
 An integer that presents the priorty of this work queue master. The higher the value, the higher the priority.
 
 =back
+
+=head3 C<specify_num_tasks_left>
+
+Specify the number of tasks not yet submitted to the queue.
+It is used by work_queue_pool to determine the number of workers to launch.
+If not specified, it defaults to 0.
+work_queue_pool considers the number of tasks as:
+num tasks left + num tasks running + num tasks read.
+
+=over 12
+
+=item ntasks
+
+ntasks Number of tasks yet to be submitted.
+
+=back
+
 
 =head3 C<specify_master_mode>
 
