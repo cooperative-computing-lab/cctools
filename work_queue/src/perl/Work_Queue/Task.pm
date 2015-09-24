@@ -212,6 +212,7 @@ sub specify_priority {
 sub specify_environment_variable {
 	my ($self, $name, $value) = @_;
 	return work_queue_task_specify_enviroment_variable($self->{_task}, $name, $value);
+}
 
 sub tag {
 	my ($self) = @_;
