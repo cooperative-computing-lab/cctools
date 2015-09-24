@@ -287,7 +287,7 @@ void exit_wrapper_preamble(void)
 		return;
 
 	did_exit_wrapper = 1;
-	
+
 	sigset_t set_cont, set_prev;
 	void (*prev_handler)(int signum);
 	struct timespec timeout = {.tv_sec = 2, .tv_nsec = 0};
