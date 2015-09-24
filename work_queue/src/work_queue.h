@@ -205,7 +205,6 @@ struct work_queue_stats {
 	int64_t max_gpus;               /**< The highest number of GPUs observed among the connected workers. */
 	int port;
 	int priority;
-	char *master_preferred_connection;	/**< Boolean that expresses preference to useing hostname vs IP address for connection. */
 	int workers_ready;              /**< @deprecated Use @ref workers_idle instead. */
 	int workers_full;               /**< @deprecated Use @ref workers_busy insead. */
 	int total_worker_slots;         /**< @deprecated Use @ref tasks_running instead. */

@@ -167,6 +167,8 @@ struct work_queue {
 	int keepalive_timeout;
 	timestamp_t link_poll_end;	//tracks when we poll link; used to timeout unacknowledged keepalive checks
 
+    char *master_preferred_connection; 
+
 	int monitor_mode;
 	FILE *monitor_file;
 	char *monitor_summary_filename;
@@ -1628,7 +1630,7 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_integer(nv,"capacity",info.capacity);
 	nvpair_insert_integer(nv,"total_execute_time",info.total_execute_time);
 	nvpair_insert_integer(nv,"total_good_execute_time",info.total_good_execute_time);
-	nvpair_insert_string(nv,"master_preferred_connection",info.master_preferred_connection);
+	nvpair_insert_string(nv,"master_preferred_connection",q->master_preferred_connection);
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
@@ -3876,6 +3878,8 @@ struct work_queue *work_queue_create(int port)
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1*MEGABYTE;
 
+	q->master_preferred_connection = xxstrdup("by_ip");
+
 	if( (envstring  = getenv("WORK_QUEUE_BANDWIDTH")) ) {
 		q->bandwidth = string_metric_parse(envstring);
 		if(q->bandwidth < 0) {
@@ -4746,7 +4750,8 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 
 void work_queue_master_preferred_connection(struct work_queue *q, const char *preferred_connection)
 {
-	q->stats->master_preferred_connection = xxstrdup(preferred_connection);
+	free(q->master_preferred_connection);
+	q->master_preferred_connection = xxstrdup(preferred_connection);
 }
 
 int work_queue_tune(struct work_queue *q, const char *name, double value)
@@ -4851,7 +4856,6 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 		s->idle_percentage = (double) q->total_idle_time / wall_clock_time;
 	}
 	s->capacity = compute_capacity(q);
-	s->master_preferred_connection = qs->master_preferred_connection;
 
 	//info about resources
 	s->bandwidth = work_queue_get_effective_bandwidth(q);
