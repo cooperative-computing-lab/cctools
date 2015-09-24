@@ -1,0 +1,57 @@
+#!/bin/sh
+# Runs makeflow directions on ec2 instance
+#
+# Invocation:
+# $ ./amazon_ec2.sh $AWS_ACCESS_KEY $AWS_SECRET_KEY
+set -e
+
+EC2_TOOLS_DIR="../ec2-api-tools-1.7.5.1/bin"
+AMI_IMAGE="ami-4b630d2e"
+INSTANCE_TYPE="t1.micro"
+AWS_ACCESS_KEY=$1
+AWS_SECRET_KEY=$2
+KEYPAIR_NAME="makeflow-keypair"
+SECURITY_GROUP_NAME="makeflow-security-group"
+
+cleanup () {
+    echo "Deleting temporary security group..."
+    $EC2_TOOLS_DIR/ec2-delete-group $SECURITY_GROUP_NAME > /dev/null
+    echo "Temporary security group deleted."
+
+    echo "Deleting temporary keypair..."
+    $EC2_TOOLS_DIR/ec2-delete-keypair $KEYPAIR_NAME > /dev/null
+    echo "Temporary keypair deleted."
+}
+
+trap cleanup EXIT
+
+if [ "$#" -ne 2 ]; then
+    echo "Incorrect arguments passed to program"
+    echo "Usage: $0 AWS_ACCESS_KEY AWS_SECRET_KEY" >&2
+    exit 1
+fi
+
+# Generate temp key pair and save
+echo "Generating temporary keypair..."
+$EC2_TOOLS_DIR/ec2-create-keypair $KEYPAIR_NAME | sed 's/.*KEYPAIR.*//' > $KEYPAIR_NAME.pem
+echo "Keypair generated."
+
+# Create temp security group
+echo "Generating temporary security group..."
+$EC2_TOOLS_DIR/ec2-create-group $SECURITY_GROUP_NAME -d "$SECURITY_GROUP_NAME"
+echo "Security group generated."
+
+echo "Authorizing port 22 on instance for SSH access..."
+$EC2_TOOLS_DIR/ec2-authorize $SECURITY_GROUP_NAME -p 22
+
+echo "Starting EC2 instance..."
+INSTANCE_ID=$($EC2_TOOLS_DIR/ec2-run-instances \
+    $AMI_IMAGE \
+    -t $INSTANCE_TYPE \
+    -k $KEYPAIR_NAME \
+    -g $SECURITY_GROUP_NAME \
+    | grep "INSTANCE" | awk '{print $2}')
+
+
+echo "Terminating EC2 instance..."
+$EC2_TOOLS_DIR/ec2-terminate-instances $INSTANCE_ID
