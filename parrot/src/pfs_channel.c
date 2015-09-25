@@ -34,6 +34,8 @@ struct entry {
 #define CHANNEL_FMT "`%s':%" PRIx64 ":%zu"
 #define CHANNEL_FMT_ARGS(e) e->name, (uint64_t)e->start, (size_t)e->length
 
+extern int parrot_fd_start;
+
 static struct entry *head=0;
 static int channel_fd=-1;
 static char *channel_base=0;
@@ -82,7 +84,9 @@ int pfs_channel_init( pfs_size_t size )
 {
 	extern char pfs_temp_per_instance_dir[PATH_MAX];
 
-	close(channel_fd);
+	if (channel_fd == -1) {
+		channel_fd = --parrot_fd_start;
+	}
 
 	/* We try to use memory file for the channel because we rely on POSIX
 	 * semantics for mmap. Some distributed file systems like GPFS do not
@@ -90,9 +94,17 @@ int pfs_channel_init( pfs_size_t size )
 	 *
 	 * See: https://github.com/cooperative-computing-lab/cctools/issues/305
 	 */
-	channel_fd = memfdexe("parrot-channel", pfs_temp_per_instance_dir);
-	if (channel_fd < 0) {
-		fatal("could not create a channel!");
+	{
+		int fd;
+		fd = memfdexe("parrot-channel", pfs_temp_per_instance_dir);
+		if (fd < 0) {
+			fatal("could not create a channel!");
+		}
+
+		if (dup2(fd, channel_fd) == -1) {
+			fatal("could not dup2(%d, channel_fd = %d): %s", fd, channel_fd, strerror(errno));
+		}
+		close(fd);
 	}
 
 	channel_size = size;
@@ -101,14 +113,12 @@ int pfs_channel_init( pfs_size_t size )
 	channel_base = (char*) mmap(0,channel_size,PROT_READ|PROT_WRITE,MAP_SHARED,channel_fd,0);
 	if(channel_base==MAP_FAILED) {
 		close(channel_fd);
-		channel_fd = -1;
 		return 0;
 	}
 
 	head = entry_create(0,0,channel_size,0,0);
 	if(!head) {
 		close(channel_fd);
-		channel_fd = -1;
 		munmap(channel_base,channel_size);
 		return 0;
 	}

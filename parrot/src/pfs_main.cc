@@ -49,6 +49,7 @@ extern "C" {
 #include <termios.h>
 #include <unistd.h>
 
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
@@ -117,6 +118,9 @@ char pfs_cvmfs_locks_dir[PATH_MAX];
 bool pfs_cvmfs_enable_alien  = true;
 
 int pfs_irods_debug_level = 0;
+
+int parrot_fd_max = -1;
+int parrot_fd_start = -1;
 
 /*
 This process at the very top of the traced tree
@@ -477,6 +481,20 @@ void write_rval(const char* message, int status) {
 
 }
 
+static int get_maxfd (void)
+{
+	struct rlimit rl;
+	if (getrlimit(RLIMIT_NOFILE, &rl) == -1)
+		fatal("getrlimit: %s", strerror(errno));
+	if (rl.rlim_max == RLIM_INFINITY)
+		rl.rlim_max = 1<<20; /* 2^20 fd should be enough for anyone! */
+	debug(D_DEBUG, "RLIMIT_NOFILE: %" PRId64, (int64_t)rl.rlim_max);
+	rl.rlim_cur = rl.rlim_max;
+	if (setrlimit(RLIMIT_NOFILE, &rl) == -1)
+		fatal("setrlimit: %s", strerror(errno));
+	return rl.rlim_max;
+}
+
 struct pfswait {
 	pid_t pid;
 	int status;
@@ -506,6 +524,14 @@ int main( int argc, char *argv[] )
 	debug_config_file_size(0); /* do not rotate debug file by default */
 	debug_config_fatal(pfs_process_killall);
 	debug_config_getpid(pfs_process_getpid);
+
+	/* Special file descriptors (currently the channel and the Parrot
+	 * directory) are allocated from the top of our file descriptor pool. After
+	 * setting up all special file descriptors, the root tracee will lower its
+	 * RLIMIT_NOFILE so that special file descriptors are outside of its
+	 * allocation/visibility. We're segmenting the file descriptor table.
+	*/
+	parrot_fd_start = parrot_fd_max = get_maxfd();
 
 	install_handler(SIGQUIT,pfs_process_kill_everyone);
 	install_handler(SIGILL,pfs_process_kill_everyone);
@@ -957,13 +983,19 @@ int main( int argc, char *argv[] )
 	if(!pfs_channel_init(channel_size*1024*1024)) fatal("couldn't establish I/O channel");
 
 	{
+		int fd;
 		char buf[PATH_MAX];
 		snprintf(buf, sizeof(buf), "%s/parrot-fd.XXXXXX", pfs_temp_per_instance_dir);
 		if (mkdtemp(buf) == NULL)
 			fatal("could not create parrot-fd temporary directory: %s", strerror(errno));
-		parrot_dir_fd = open(buf, O_RDONLY|O_DIRECTORY);
-		if (parrot_dir_fd == -1)
+		fd = open(buf, O_RDONLY|O_DIRECTORY);
+		if (fd == -1)
 			fatal("could not open tempdir: %s", strerror(errno));
+		parrot_dir_fd = --parrot_fd_start;
+		if (dup2(fd, parrot_dir_fd) == -1) {
+			fatal("could not dup2(%d, parrot_dir_fd = %d): %s", fd, parrot_dir_fd, strerror(errno));
+		}
+		close(fd);
 	}
 
 	pid_t pfs_watchdog_pid = -2;
