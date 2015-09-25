@@ -25,6 +25,9 @@ See the file COPYING for details.
 #include "path.h"
 #include "buffer.h"
 
+#include "json.h"
+#include "json_aux.h"
+
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -43,11 +46,11 @@ static int catalog_port = 0;
 static int workers_min = 5;
 static int workers_max = 100;
 static double tasks_per_worker = -1;
-static int consider_capacity = 0;
-static const char *project_regex = 0;
-static const char *foremen_regex = 0;
 static int worker_timeout = 300;
-static const char *extra_worker_args=0;
+static int consider_capacity = 0;
+static char *project_regex = 0;
+static char *foremen_regex = 0;
+static char *extra_worker_args=0;
 static const char *resource_args=0;
 static int abort_flag = 0;
 static const char *scratch_dir = 0;
@@ -59,6 +62,8 @@ static int num_cores_option  = -1;
 static int num_disk_option   = -1;
 static int num_memory_option = -1;
 static int num_gpus_option   = -1;
+
+struct batch_queue *queue = 0;
 
 static void handle_abort( int sig )
 {
@@ -289,6 +294,119 @@ void delete_projects_list(struct list *l)
 	}
 }
 
+#define assign_new_value(new_var, old_var, option, type_c, type_json, field) \
+	type_c new_var = old_var;\
+	{\
+		json_value *jv = jsonA_getname_raw(J, #option);\
+		if(jv) {\
+			if(jistype(jv, type_json)) {\
+				new_var = jv->u.field;\
+			} else {\
+				debug(D_NOTICE, #option " has not a valid value.");\
+				error_found = 1;\
+			}\
+		}\
+	}
+int read_config_file(const char *config_file) {
+	static time_t last_time_modified = 0;
+
+	struct stat s;
+	time_t new_time_modified;
+	if(stat(config_file, &s) < 0) {
+		debug(D_NOTICE, "Error reading file %s (%s)", config_file, strerror(errno));
+		return 0;
+	}
+
+	new_time_modified = s.st_mtime;
+	if(new_time_modified == last_time_modified) {
+		return 1;
+	}
+
+	json_value *J = NULL;
+	int error_found = 0;
+
+	J = jsonA_parse_file(config_file);
+
+	if(!J || !jistype(J, json_object)) {
+		debug(D_NOTICE, "Configuration file is not a valid json object: %s\n", config_file);
+		return 0;
+	}
+
+	assign_new_value(new_workers_max, workers_max, max-workers, int, json_integer, integer)
+	assign_new_value(new_workers_min, workers_min, min-workers, int, json_integer, integer)
+	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, json_integer, integer)
+
+	assign_new_value(new_num_cores_option, num_cores_option, cores,    int, json_integer, integer)
+	assign_new_value(new_num_disk_option, num_disk_option, disk,       int, json_integer, integer)
+	assign_new_value(new_num_memory_option, num_memory_option, memory, int, json_integer, integer)
+
+
+	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, json_double, dbl)
+
+	assign_new_value(new_project_regex, project_regex, master-name, const char *, json_string, string.ptr)
+	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, json_string, string.ptr)
+	assign_new_value(new_extra_worker_args, extra_worker_args, worker-extra-options, const char *, json_string, string.ptr)
+
+
+	if(!new_project_regex || strlen(new_project_regex) == 0) {
+		debug(D_NOTICE, "%s: master name is missing.\n", config_file);
+		error_found = 1;
+	}
+
+	if(new_workers_min > new_workers_max) {
+		debug(D_NOTICE, "%s: min workers (%d) is greater than max workers (%d)\n", config_file, new_workers_min, new_workers_max);
+		error_found = 1;
+	}
+
+	if(new_workers_min < 0) {
+		debug(D_NOTICE, "%s: min workers (%d) is less than zero.\n", config_file, new_workers_min);
+		error_found = 1;
+	}
+
+	if(new_workers_max < 0) {
+		debug(D_NOTICE, "%s: max workers (%d) is less than zero.\n", config_file, new_workers_max);
+		error_found = 1;
+	}
+
+	if(error_found) {
+		goto end;
+	}
+
+	workers_max    = new_workers_max;
+	workers_min    = new_workers_min;
+	worker_timeout = new_worker_timeout;
+	tasks_per_worker = new_tasks_per_worker;
+
+	num_cores_option = new_num_cores_option;
+	num_memory_option = new_num_memory_option;
+	num_disk_option = new_num_disk_option;
+
+	if(new_project_regex != project_regex) {
+		if(project_regex) free(project_regex); project_regex = xxstrdup(new_project_regex);
+	}
+
+	if(new_foremen_regex != foremen_regex) {
+		if(foremen_regex)
+			free(foremen_regex);
+		free(foremen_regex);
+		foremen_regex = xxstrdup(new_foremen_regex);
+	}
+
+	if(extra_worker_args != new_extra_worker_args) {
+		if(extra_worker_args)
+			free(extra_worker_args);
+		free(extra_worker_args);
+		extra_worker_args = xxstrdup(new_extra_worker_args);
+	}
+
+	last_time_modified = new_time_modified;
+	debug(D_NOTICE, "Configuration file '%s' has been loaded.", config_file);
+
+end:
+	json_value_free(J);
+	return !error_found;
+}
+
 /*
 Main loop of work queue pool.  Determine the number of workers needed by our
 current list of masters, compare it to the number actually submitted, then
@@ -303,9 +421,16 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 	struct list *masters_list = NULL;
 	struct list *foremen_list = NULL;
 
-	const char *submission_regex = foremen_regex ? foremen_regex : project_regex;
-
 	while(!abort_flag) {
+
+		if(config_file && !read_config_file(config_file)) {
+			debug(D_NOTICE, "Error re-reading '%s'. Using previous values.", config_file);
+		} else {
+			set_worker_resources( queue );
+		}
+
+		const char *submission_regex = foremen_regex ? foremen_regex : project_regex;
+
 		masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
 
 		debug(D_WQ,"evaluating master list...");
@@ -450,11 +575,11 @@ int main(int argc, char *argv[])
 				config_file = xxstrdup(optarg);
 				break;
 			case 'F':
-				foremen_regex = optarg;
+				foremen_regex = xxstrdup(optarg);
 				break;
 			case 'N':
 			case 'M':
-				project_regex = optarg;
+				project_regex = xxstrdup(optarg);
 				break;
 			case 'T':
 				batch_queue_type = batch_queue_type_from_string(optarg);
@@ -476,7 +601,7 @@ int main(int argc, char *argv[])
 				tasks_per_worker = atof(optarg);
 				break;
 			case 'E':
-				extra_worker_args = optarg;
+				extra_worker_args = xxstrdup(optarg);
 				break;
 			case LONG_OPT_CORES:
 				num_cores_option = atoi(optarg);
@@ -529,13 +654,20 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if(config_file) {
+		if(!read_config_file(config_file)) {
+			fprintf(stderr,"work_queue_pool: There were errors in the configuration file: %s\n", config_file);
+			return 1;
+		}
+	}
+
 	if(!project_regex) {
-		fprintf(stderr,"work_queue_pool: You must give a project name with the -M option.\n");
+		fprintf(stderr,"work_queue_pool: You must give a project name with the -M option, or the master-name option with a configuration file.\n");
 		return 1;
 	}
 
 	if(workers_min>workers_max) {
-		fprintf(stderr,"work_queue_pool: --min-workers (%d) is greater than --max-workers (%d)\n",workers_min,workers_max);
+		fprintf(stderr,"work_queue_pool: min workers (%d) is greater than max workers (%d)\n",workers_min, workers_max);
 		return 1;
 	}
 
@@ -565,6 +697,19 @@ int main(int argc, char *argv[])
 		system(cmd);
 	}
 
+	if(config_file) {
+		const char *base = path_basename(config_file);
+		char *cwd  = get_current_dir_name();
+		char *old_fullname = string_format("%s/%s", cwd, base);
+		char *new_fullname = string_format("%s/%s", scratch_dir, base);
+
+		symlink(old_fullname, new_fullname);
+
+		free(old_fullname);
+		free(new_fullname);
+		free(cwd);
+	}
+
 	if(chdir(scratch_dir)!=0) {
 		fprintf(stderr,"work_queue_pool: couldn't chdir to %s: %s",scratch_dir,strerror(errno));
 		return 1;
@@ -575,7 +720,7 @@ int main(int argc, char *argv[])
 	signal(SIGTERM, handle_abort);
 	signal(SIGHUP, ignore_signal);
 
-	struct batch_queue * queue = batch_queue_create(batch_queue_type);
+	queue = batch_queue_create(batch_queue_type);
 	if(!queue) {
 		fprintf(stderr,"work_queue_pool: couldn't establish queue type %s",batch_queue_type_to_string(batch_queue_type));
 		return 1;
