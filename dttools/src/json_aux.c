@@ -18,15 +18,22 @@ const char json_type_str[][10] = {
 
 json_value *jsonA_getname (json_value *object, const char *name, json_type t)
 {
+	json_value *val = jsonA_getname_raw(object, name);
+
+	if(!val || !jistype(val, t)) {
+		return NULL;
+	} else {
+		return val;
+	}
+}
+
+json_value *jsonA_getname_raw (json_value *object, const char *name)
+{
 	unsigned int i;
 	assert(object->type == json_object);
 	for (i = 0; i < object->u.object.length; i++) {
 		if (strcmp(name, object->u.object.values[i].name) == 0) {
-			if (jistype(object->u.object.values[i].value, t)) {
-				return object->u.object.values[i].value;
-			} else {
-				return NULL;
-			}
+			return object->u.object.values[i].value;
 		}
 	}
 	return NULL;
