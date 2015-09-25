@@ -53,6 +53,7 @@ OPTION_TRIPLET(-W,max-workers,workers) Maximum workers running.  (default=100)
 OPTION_ITEM(-c --capacity) Use worker capacity reported by masters.
 OPTION_TRIPLET(-P,password,file) Password file for workers to authenticate to master.
 OPTION_TRIPLET(-t,timeout,time)Abort after this amount of idle time.
+OPTION_TRIPLET(-C,config-file,file)Use the configuration file <file>.
 OPTION_TRIPLET(-E,extra-options,options)Extra options that should be added to the worker.
 OPTION_TRIPLET(-S,scratch,file)Scratch directory. (default is /tmp/${USER}-workers)
 OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
@@ -90,6 +91,36 @@ with barney, use a regular expression:
 
 LONGCODE_BEGIN
 work_queue_pool -T condor -M barney.\* -c -t 300
+LONGCODE_END
+
+Use the configuration file BOLD(my_conf):
+
+LONGCODE_BEGIN
+work_queue_pool -Cmy_conf
+LONGCODE_END
+
+BOLD(my_conf) should be a proper JSON document, as:
+LONGCODE_BEGIN
+{
+        "master-name": "my_master.*",
+        "max-workers": 100,
+        "min-workers": 0
+}
+LONGCODE_END
+
+Valid configuration fields are:
+
+LONGCODE_BEGIN
+master-name
+foremen-name
+min-workers
+max-workers
+task-per-worker
+timeout
+worker-extra-options
+cores
+memory
+disk
 LONGCODE_END
 
 SECTION(KNOWN BUGS)
