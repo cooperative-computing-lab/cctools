@@ -573,6 +573,16 @@ void work_queue_specify_name(struct work_queue *q, const char *name);
 */
 void work_queue_specify_priority(struct work_queue *q, int priority);
 
+/** Specify the number of tasks not yet submitted to the queue.
+	It is used by work_queue_pool to determine the number of workers to launch.
+	If not specified, it defaults to 0.
+	work_queue_pool considers the number of tasks as:
+	num tasks left + num tasks running + num tasks read.
+  @param q A work queue object.
+  @param ntasks Number of tasks yet to be submitted.
+  */
+void work_queue_specify_num_tasks_left(struct work_queue *q, int ntasks);
+
 /** Specify the catalog server the master should report to.
 @param q A work queue object.
 @param hostname The catalog server's hostname.
@@ -699,6 +709,7 @@ void work_queue_specify_task_order(struct work_queue *q, int order);
 @deprecated Enabled automatically when @ref work_queue_specify_name is used.
 */
 void work_queue_specify_master_mode(struct work_queue *q, int mode);
+
 
 /** Change whether to estimate master capacity for a given queue.
 @param q A work queue object.

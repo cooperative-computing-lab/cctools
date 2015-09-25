@@ -89,9 +89,10 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		const char *owner =  nvpair_lookup_string(nv,"owner");
 		const int tr =       nvpair_lookup_integer(nv,"tasks_running");
 		const int tw =       nvpair_lookup_integer(nv,"tasks_waiting");
+		const int tl =       nvpair_lookup_integer(nv,"tasks_left");
 		const int capacity = nvpair_lookup_integer(nv,"capacity");
 
-		int tasks = tr+tw;
+		int tasks = tr+tw+tl;
 
 		int need;
 
