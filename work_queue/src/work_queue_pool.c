@@ -22,6 +22,8 @@ See the file COPYING for details.
 #include "list.h"
 #include "get_line.h"
 #include "getopt.h"
+#include "path.h"
+#include "buffer.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -51,10 +53,11 @@ static int abort_flag = 0;
 static const char *scratch_dir = 0;
 static const char *password_file = 0;
 
-static char *num_cores_option  = NULL;
-static char *num_disk_option   = NULL;
-static char *num_memory_option = NULL;
-static char *num_gpus_option   = NULL;
+/* -1 means 'not specified' */
+static int num_cores_option  = -1;
+static int num_disk_option   = -1;
+static int num_memory_option = -1;
+static int num_gpus_option   = -1;
 
 static void handle_abort( int sig )
 {
@@ -119,20 +122,32 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 
 static void set_worker_resources( struct batch_queue *queue )
 {
-	batch_queue_set_option(queue, "cores", num_cores_option);
-	batch_queue_set_option(queue, "memory", num_memory_option);
-	batch_queue_set_option(queue, "disk", num_disk_option);
-	batch_queue_set_option(queue, "gpus", num_gpus_option);
 
-	resource_args = string_format("%s%s%s%s%s%s%s%s\n",
-			num_cores_option ? " --cores=" : "",
-			num_cores_option ? num_cores_option : "",
-			num_memory_option ? " --memory=" : "",
-			num_memory_option ? num_memory_option : "",
-			num_disk_option ? " --disk=" : "",
-			num_disk_option ? num_disk_option : "",
-			num_gpus_option ? " --gpus=" : "",
-			num_gpus_option ? num_gpus_option : "");
+	buffer_t b;
+	buffer_init(&b);
+
+	if(num_cores_option > -1) {
+		batch_queue_set_int_option(queue, "cores",  num_cores_option);
+		buffer_printf(&b, " --cores=%d", num_cores_option);
+	}
+
+	if(num_disk_option > -1) {
+		batch_queue_set_int_option(queue, "memory", num_memory_option);
+		buffer_printf(&b, " --disk=%d", num_disk_option);
+	}
+
+	if(num_memory_option > -1) {
+		batch_queue_set_int_option(queue, "disk",   num_disk_option);
+		buffer_printf(&b, " --memory=%d", num_memory_option);
+	}
+
+	if(num_gpus_option > -1) {
+		batch_queue_set_int_option(queue, "gpus",   num_gpus_option);
+		buffer_printf(&b, " --gpus=%d", num_gpus_option);
+	}
+
+	resource_args = xxstrdup(buffer_tostring(&b));
+	buffer_free(&b);
 }
 
 static int submit_worker( struct batch_queue *queue, const char *master_regex )
@@ -458,16 +473,16 @@ int main(int argc, char *argv[])
 				extra_worker_args = optarg;
 				break;
 			case LONG_OPT_CORES:
-				num_cores_option = xxstrdup(optarg);
+				num_cores_option = atoi(optarg);
 				break;
 			case LONG_OPT_MEMORY:
-				num_memory_option = xxstrdup(optarg);
+				num_memory_option = atoi(optarg);
 				break;
 			case LONG_OPT_DISK:
-				num_disk_option = xxstrdup(optarg);
+				num_disk_option = atoi(optarg);
 				break;
 			case LONG_OPT_GPUS:
-				num_gpus_option = xxstrdup(optarg);
+				num_gpus_option = atoi(optarg);
 				break;
 			case 'P':
 				password_file = optarg;
@@ -520,7 +535,7 @@ int main(int argc, char *argv[])
 
 	if(tasks_per_worker < 1)
 	{
-		tasks_per_worker = num_cores_option ? atof(num_cores_option) : 1;
+		tasks_per_worker = num_cores_option > 0 ? num_cores_option : 1;
 	}
 
 	if(!scratch_dir) {
