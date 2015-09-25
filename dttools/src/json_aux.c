@@ -1,9 +1,13 @@
 #include "buffer.h"
+#include "copy_stream.h"
 #include "json.h"
 #include "json_aux.h"
 
 #include <assert.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 const char json_type_str[][10] = {
 	"NONE",
@@ -73,6 +77,19 @@ int jsonA_escapestring(buffer_t *B, const char *str)
 		}
 	}
 	return 0;
+}
+
+json_value *jsonA_parse_file(const char *path) {
+	size_t size;
+	char *buffer;
+
+	if(copy_file_to_buffer(path, &buffer, &size) < 1)
+		return NULL;
+
+	json_value *J = json_parse(buffer, size);
+	free(buffer);
+
+	return J;
 }
 
 /* vim: set noexpandtab tabstop=4: */
