@@ -10,6 +10,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "itable.h"
+#include "stringtools.h"
 #include "xxmalloc.h"
 
 #include <sys/stat.h>
@@ -138,6 +139,13 @@ void batch_queue_set_option (struct batch_queue *q, const char *what, const char
 		debug(D_BATCH, "cleared option `%s'", what);
 	}
 	q->module->option_update(q, what, value);
+}
+
+void batch_queue_set_int_option(struct batch_queue *q, const char *what, int value) {
+	char *str_value = string_format("%d", value);
+	batch_queue_set_option(q, what, str_value);
+
+	free(str_value);
 }
 
 batch_queue_type_t batch_queue_type_from_string(const char *str)
