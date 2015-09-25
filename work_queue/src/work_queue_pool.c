@@ -52,6 +52,7 @@ static const char *resource_args=0;
 static int abort_flag = 0;
 static const char *scratch_dir = 0;
 static const char *password_file = 0;
+static const char *config_file = 0;
 
 /* -1 means 'not specified' */
 static int num_cores_option  = -1;
@@ -388,6 +389,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
 	printf(" %-30s Batch system type (required). One of: %s\n", "-T,--batch-type=<type>",batch_queue_type_string());
 	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
+	printf(" %-30s Use configuration file <file>.\n","-C,--config-file=<file>");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
 	printf(" %-30s Maximum workers running.  (default=%d)\n", "-W,--max-workers", workers_max);
 	printf(" %-30s Average tasks per worker. (default=one task per core)\n", "--tasks-per-worker");
@@ -404,12 +406,13 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE };
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
 	{"batch-type", required_argument, 0, 'T'},
 	{"password", required_argument, 0, 'P'},
+	{"config-file", required_argument, 0, 'C'},
 	{"min-workers", required_argument, 0, 'w'},
 	{"max-workers", required_argument, 0, 'W'},
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
@@ -441,8 +444,11 @@ int main(int argc, char *argv[])
 
 	int c;
 
-	while((c = getopt_long(argc, argv, "F:N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "C:F:N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
 		switch (c) {
+			case 'C':
+				config_file = xxstrdup(optarg);
+				break;
 			case 'F':
 				foremen_regex = optarg;
 				break;
