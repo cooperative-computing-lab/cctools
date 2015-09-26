@@ -5,9 +5,6 @@
 
 #include <assert.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 const char json_type_str[][10] = {
 	"NONE",
