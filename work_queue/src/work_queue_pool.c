@@ -699,7 +699,9 @@ int main(int argc, char *argv[])
 
 	if(config_file) {
 		const char *base = path_basename(config_file);
-		char *cwd  = get_current_dir_name();
+		char *cwd = malloc(PATH_MAX * sizeof(char));
+		getcwd(cwd, PATH_MAX);
+
 		char *old_fullname = string_format("%s/%s", cwd, base);
 		char *new_fullname = string_format("%s/%s", scratch_dir, base);
 
