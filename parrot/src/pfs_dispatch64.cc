@@ -1248,6 +1248,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_dup2:
 			if (entering) {
 				if (p->table->isspecial(args[1])) {
+					debug(D_NOTICE, "an attempt was made to claim a Parrot file descriptor: %d", (int)args[1]);
 					divert_to_dummy(p, -EIO); /* best errno we can give */
 				} else if (!p->table->isvalid(args[1])) {
 					divert_to_dummy(p, -EBADF);
@@ -1388,7 +1389,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL64_close:
-			if (p->table->isnative(args[0])) {
+			if (p->table->isspecial(args[1])) {
+				if (entering) {
+					debug(D_DEBUG, "ignoring attempt to close special fd %d", (int)args[1]);
+					divert_to_dummy(p, -EIO); /* best errno we can give */
+				}
+			} else if (p->table->isnative(args[0])) {
 				if (entering) {
 					debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 					pfs_close(args[0]);

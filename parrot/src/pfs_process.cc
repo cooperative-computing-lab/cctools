@@ -21,6 +21,7 @@ extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <sys/resource.h>
 #include <sys/wait.h>
 
 #include <assert.h>
@@ -160,8 +161,19 @@ void pfs_process_pathtofilename( char *path )
 
 void pfs_process_bootstrapfd( void )
 {
-	int count = sysconf(_SC_OPEN_MAX);
-	for (int i = 0; i < count; i++) {
+	extern int parrot_fd_max;
+	extern int parrot_fd_start;
+
+	struct rlimit rl;
+	rl.rlim_cur = rl.rlim_max = parrot_fd_start;
+	if (setrlimit(RLIMIT_NOFILE, &rl) == -1)
+		fatal("setrlimit: %s", strerror(errno));
+	if (getrlimit(RLIMIT_NOFILE, &rl) == -1)
+		fatal("setrlimit: %s", strerror(errno));
+	assert((int)rl.rlim_cur == parrot_fd_start && (int)rl.rlim_max == parrot_fd_start);
+	debug(D_DEBUG, "lowered RLIMIT_NOFILE to %d.", parrot_fd_start);
+
+	for (int i = 0; i < parrot_fd_max; i++) {
 		if (!(i == parrot_dir_fd || i == pfs_channel_fd())) {
 			struct stat buf;
 			if (fstat(i, &buf) == 0 && !(fcntl(i, F_GETFD)&FD_CLOEXEC) && !bootnative(buf.st_mode)) {
@@ -245,12 +257,13 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 		strcpy(child->name,actual_parent->name);
 		child->umask = actual_parent->umask;
 	} else {
+		extern int parrot_fd_max;
+
 		child->table = new pfs_table;
 
 		/* The first child process must inherit file descriptors */
 		/* If valid, duplicate and attach them to the child process. */
-		int count = sysconf(_SC_OPEN_MAX);
-		for(int i=0;i<count;i++) {
+		for(int i=0;i<parrot_fd_max;i++) {
 			initfd(child, i);
 		}
 
