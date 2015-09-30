@@ -11,6 +11,7 @@
 		"version": ">=2.6.18"
 	},
 	"os": {
+		"id": "62aa9bc37afe3f738052da5545832c80",
 		"name": "Redhat",
 		"version": "5.10"
 	},
@@ -22,6 +23,7 @@
 	},
 	"data": {
 		"demoanalyzer_cfg.py": {
+			"action": "none",
 			"mountpoint": "/tmp/demoanalyzer_cfg.py",
 			"mount_env": "CONFIG_FILE"
 		},
@@ -29,6 +31,7 @@
 			"mount_env": "ROOT_FILE"
 		},
 		"cms_opendata.sh": {
+			"action": "none",
 			"id": "a6f9d99bcc08adb019ed6f3c31d9c090",
 			"mountpoint": "/tmp/cms_opendata.sh"
 		}

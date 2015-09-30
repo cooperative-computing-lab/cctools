@@ -11,6 +11,7 @@
 		"version": ">=2.6.18"
 	},
 	"os": {
+		"id": "62aa9bc37afe3f738052da5545832c80",
 		"name": "Redhat",
 		"version": "5.10"
 	},
@@ -28,6 +29,7 @@
 			"mountpoint": "/data/git_repo/OutreachExercise2010"
 		},
 		"git_protocol.sh": {
+			"action": "none",
 			"id": "518876dbe4dca81bd19e823b6ea1f866",
 			"mountpoint": "/tmp/git_protocol.sh"
 		}

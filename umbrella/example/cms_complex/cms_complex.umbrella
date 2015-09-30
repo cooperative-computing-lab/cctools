@@ -28,7 +28,8 @@
 		},
 		"cms_complex.sh": {
 			"id": "9f8587e9ef90ab4f5de8b3c9ab5cf0cb",
-			"mountpoint": "/tmp/cms_complex.sh"
+			"mountpoint": "/tmp/cms_complex.sh",
+			"action": "none"
 		}
 	},
 	"environ": {

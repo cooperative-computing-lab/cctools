@@ -1,0 +1,16 @@
+sh-4.1# /software/openMalaria-32-centos6-x86_64/bin/openMalaria  -s /tmp/scenario.xml
+BoincWrapper: not using BOINC
+Warning: human life-span (1) shorter than length of warm-up requested by
+transmission model (55). Transmission may be unstable; perhaps use forced
+transmission (mode="forced") or a longer life-span.
+[100%]  sim end
+Total/allowed infections: 496885/496183 (0.14128% prevented)
+Human updates/total calls: 4528000/4528000      (0% skipped)
+
+sh-4.1# cat ctsout.txt 
+##      ##
+timestep
+0
+1
+
+sh-4.1# cat output.txt 

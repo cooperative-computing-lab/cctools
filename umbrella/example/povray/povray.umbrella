@@ -12,21 +12,22 @@
 	},
 	"os": {
 		"name": "Redhat",
-		"version": "5.10"
+		"version": "6.5"
 	},
 	"software": {
-		"povray-3.6.1-redhat5-x86_64": {
-			"id": "9b7f2362e6b927c8ef08c3f92599e47c",
-			"mountpoint": "/software/povray-3.6.1-redhat5-x86_64",
-			"action": "unpack"
+		"povray-3.6.1-redhat6-x86_64": {
+			"id": "b02ba86dd3081a703b4b01dc463e0499",
+			"mountpoint": "/software/povray-3.6.1-redhat6-x86_64"
 		}
 	},
 	"data": {
 		"4_cubes.pov": {
+			"action": "none",
 			"id": "c65266cd2b672854b821ed93028a877a",
 			"mountpoint": "/tmp/4_cubes.pov"
 		},
 		"WRC_RubiksCube.inc": {
+			"action": "none",
 			"id": "2f8afdd09fc3a6177c6f1977bb3bdae7",
 			"mountpoint": "/tmp/WRC_RubiksCube.inc"
 		}
