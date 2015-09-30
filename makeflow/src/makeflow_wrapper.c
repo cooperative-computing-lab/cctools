@@ -101,20 +101,20 @@ void makeflow_prepare_for_monitoring( struct makeflow_monitor *m)
 	makeflow_wrapper_add_input_file(m->wrapper, m->exe);
 
 	log_name = string_format("%s.summary", log_prefix);
-	makeflow_wrapper_add_input_file(m->wrapper, log_name);
+	makeflow_wrapper_add_output_file(m->wrapper, log_name);
 	free(log_name);
 
 	if(m->enable_time_series)
 	{
 		log_name = string_format("%s.series", log_prefix);
-		makeflow_wrapper_add_input_file(m->wrapper, log_name);
+		makeflow_wrapper_add_output_file(m->wrapper, log_name);
 		free(log_name);
 	}
 
 	if(m->enable_list_files)
 	{
 		log_name = string_format("%s.files", log_prefix);
-		makeflow_wrapper_add_input_file(m->wrapper, log_name);
+		makeflow_wrapper_add_output_file(m->wrapper, log_name);
 		free(log_name);
 	}
 
@@ -139,7 +139,6 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct dag_
 			log_prefix,
 			m->limits_name,
 			extra_options,
-			1,                         /* summaries always enabled */
 			m->enable_time_series,
 			m->enable_list_files);
 

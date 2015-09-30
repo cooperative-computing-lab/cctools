@@ -144,7 +144,10 @@ static struct list *makeflow_generate_output_files( struct dag_node *n, struct m
 	}
 
 	if(m){
+		printf("%d\t:\t", list_size(result));
+		printf("%d\t:\t", list_size(m->wrapper->output_files));
 		result = makeflow_wrapper_generate_files(result, m->wrapper->output_files, n);
+		printf("%d\n", list_size(result));
 	}
 
 	return result;
@@ -487,16 +490,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 
 	/* Generate the environment vars specific to this node. */
 	struct nvpair *envlist = dag_node_env_create(d,n);
-
-	/*
-	Just before execution, replace double-percents with the nodeid.
-	This is used for substituting in the nodeid into a wrapper command or file.
-	*/
-	char *nodeid = string_format("%d",n->nodeid);
-	command = string_replace_percents(command,nodeid);
-	input_files = string_replace_percents(input_files,nodeid);
-	output_files = string_replace_percents(output_files,nodeid);
-	free(nodeid);
 
 	/* Logs the creation of output files. */
 	makeflow_log_file_expectation(d, output_list);
@@ -1112,7 +1105,7 @@ int main(int argc, char *argv[])
 					if(makeflow_gc_count < 0)
 						makeflow_gc_count = 16;	/* Try to collect at most 16 files. */
 				} else if(strcasecmp(optarg, "on_demand") == 0) {
-					makeflow_gc_method = MAKEFLOW_GC_SIZE;
+					makeflow_gc_method = MAKEFLOW_GC_COUNT;
 					if(makeflow_gc_count < 0)
 						makeflow_gc_count = 16;	/* Try to collect at most 16 files. */
 				} else if(strcasecmp(optarg, "all") == 0) {
@@ -1509,7 +1502,7 @@ int main(int argc, char *argv[])
 
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		printf("cleaning filesystem...\n");
-		makeflow_clean(d, remote_queue, clean_mode, wrapper, monitor);
+		makeflow_clean(d, remote_queue, clean_mode);//, wrapper, monitor);
 		if(clean_mode == MAKEFLOW_CLEAN_ALL) {
 			unlink(logfilename);
 			unlink(batchlogfilename);

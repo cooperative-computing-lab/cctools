@@ -176,19 +176,22 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 
 /* Clean the entire dag by cleaning all nodes. */
 
-void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth, struct makeflow_wrapper *w, struct makeflow_monitor *m)
+void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth)//, struct makeflow_wrapper *w, struct makeflow_monitor *m)
 {
 	struct dag_file *f;
 	char *name;
 
 	hash_table_firstkey(d->files);
 	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
-		if(dag_file_is_source(f))
-			continue;
-
 		int silent = 1;
 		if(dag_file_should_exist(f))
 			silent = 0;
+
+		/* We have a record of the file, but it is no longer created or used so delete */
+		if(dag_file_is_source(f) && dag_file_is_sink(f))
+			makeflow_clean_file(d, queue, f, silent);
+		if(dag_file_is_source(f))
+			continue;
 
 		if(clean_depth == MAKEFLOW_CLEAN_ALL){
 			makeflow_clean_file(d, queue, f, silent);
@@ -202,6 +205,7 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dep
 	struct dag_node *n;
 	for(n = d->nodes; n; n = n->next) {
 
+/*
 		if(w){
 			struct list *files = list_create();
 			files = makeflow_wrapper_generate_files(files, w->output_files, n);
@@ -219,7 +223,7 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dep
 				makeflow_clean_file(d, queue, f, 0);
 			free(files);
 		}
-
+*/
 		/* If the node is a Makeflow job, then we should recursively call the *
 		 * clean operation on it. */
 		if(n->nested_job) {
