@@ -754,39 +754,6 @@ char *string_replace_percents( char *str, const char *replace )
 	return result;
 }
 
-
-/*
-char *string_replace_percents( char *str, const char *replace )
-{
-	/* Common case: do nothing if no percents. /
-	if(!strchr(str,'%')) return str;
-
-	char *r = replace;
-	char *s = str;
-	char *b;
-	while(*s) {
-		if(*s=='%' && *(s+1)=='%' ) {
-			if( *(s+2)=='%' && *(s+3)=='%') {
-				*b++ = '%';
-				*b++ = '%';
-				s+=4;
-			} else {
-				*r = replace;
-				while(*r){
-					*b++ = *r++;
-				}
-				s+=2;
-			}
-		} else {
-			*b++ = *s++;
-		}
-	}
-	free(str);
-	*b = 0;
-	return b;
-}
-*/
-
 int strpos(const char *str, char c)
 {
 

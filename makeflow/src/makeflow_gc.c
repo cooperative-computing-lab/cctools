@@ -204,26 +204,6 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dep
 
 	struct dag_node *n;
 	for(n = d->nodes; n; n = n->next) {
-
-/*
-		if(w){
-			struct list *files = list_create();
-			files = makeflow_wrapper_generate_files(files, w->output_files, n);
-			list_first_item(files);
-			while((f = list_next_item(files)))
-				makeflow_clean_file(d, queue, f, 0);
-			free(files);
-		}
-
-		if(m){
-			struct list *files = list_create();
-			files = makeflow_wrapper_generate_files(files, m->wrapper->output_files, n);
-			list_first_item(files);
-			while((f = list_next_item(files)))
-				makeflow_clean_file(d, queue, f, 0);
-			free(files);
-		}
-*/
 		/* If the node is a Makeflow job, then we should recursively call the *
 		 * clean operation on it. */
 		if(n->nested_job) {
