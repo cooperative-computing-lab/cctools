@@ -1,31 +1,74 @@
 #include "batch_job_internal.h"
+#include "process.h"
 #include "batch_job.h"
 #include "debug.h"
 
 #include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 
 static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
-    int jobid = 3;
-    debug(D_BATCH, "test file");
+    int jobid;
     struct batch_job_info *info = malloc(sizeof(*info));
     memset(info, 0, sizeof(*info));
-    info->submitted = time(0);
-    info->started = time(0);
-    itable_insert(q->job_table, jobid, info);
-    return 0;
+    debug(D_BATCH, "Forking EC2 script process...");
+    // Fork process and spin off shell script
+    jobid = fork();
+    if (jobid > 0) // parent
+    {
+        info->submitted = time(0);
+        info->started = time(0);
+        itable_insert(q->job_table, jobid, info);
+        return jobid;
+    }
+    else { // child
+	    execlp("sh", "sh", "-c", cmd, (char *) 0);
+    }
 }
 
 static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
-    debug(D_BATCH, "test wait\n");
-    return -1;
+    while (1) {
+        int timeout = 5;
+        struct process_info *p = process_wait(timeout);
+		if(p) {
+			struct batch_job_info *info = itable_remove(q->job_table, p->pid);
+			if(!info) {
+				process_putback(p);
+				return -1;
+			}
+
+			info->finished = time(0);
+			if(WIFEXITED(p->status)) {
+				info->exited_normally = 1;
+				info->exit_code = WEXITSTATUS(p->status);
+			} else {
+				info->exited_normally = 0;
+				info->exit_signal = WTERMSIG(p->status);
+			}
+
+			memcpy(info_out, info, sizeof(*info));
+
+			int jobid = p->pid;
+			free(p);
+			free(info);
+			return jobid;
+		}
+    }
 }
 
 static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
-    printf("test submit\n");
+    printf("test remove\n");
+    struct batch_job_info *info =  itable_lookup(q->job_table, jobid);
+    printf("Job started at: %d\n", (int)info->started);
+	info->finished = time(0);
+	info->exited_normally = 0;
+	info->exit_signal = 0;
+    return 0;
 }
+
 
 batch_queue_stub_create(amazon);
 batch_queue_stub_free(amazon);
