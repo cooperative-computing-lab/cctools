@@ -3,7 +3,7 @@ batch_submit_workers
 catalog_server
 catalog_update
 chunk_test
-disk_alloc
+disk_allocator
 disk_alloc_test
 hmac_test
 int_sizes.h
