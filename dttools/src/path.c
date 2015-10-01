@@ -8,6 +8,7 @@
 
 #include "buffer.h"
 #include "debug.h"
+#include "stringtools.h"
 #include "xxmalloc.h"
 
 #include <dirent.h>
@@ -379,5 +380,67 @@ int path_within_dir(const char *path, const char *dir)
 	free(tmp_path);
 	return rv;
 }
+
+/*
+Returns the first absolute path for executable exec as found in PATH.
+Returns NULL if none is found.
+Adapted from FreeBSD's /usr.bin/which/which.c, with the following license:
+
+* Copyright (c) 2000 Dan Papasian.  All rights reserved.
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions
+* are met:
+* 1. Redistributions of source code must retain the above copyright
+*    notice, this list of conditions and the following disclaimer.
+* 2. Redistributions in binary form must reproduce the above copyright
+*    notice, this list of conditions and the following disclaimer in the
+*    documentation and/or other materials provided with the distribution.
+* 3. The name of the author may not be used to endorse or promote products
+*    derived from this software without specific prior written permission.
+*/
+char *path_which(const char *exec) {
+	struct stat s;
+
+	const char *path_org = getenv("PATH");
+	if(!path_org)
+		return NULL;
+
+	/* strsep needs to work on a copy */
+	char *path = xxstrdup(path_org);
+
+	int found = 0;
+	char *candidate = NULL;
+	const char *d;
+
+	/* save first location, so we can free it later. */
+	char *path_init = path;
+	while(!found && (d = strsep(&path, ":")) != NULL) {
+		/* for PATH, :: means current directory */
+		if (*d == '\0')
+			d = ".";
+
+		candidate = string_format("%s/%s", d, exec);
+
+		if(access(candidate, X_OK) == 0 && stat(candidate, &s) == 0 && S_ISREG(s.st_mode) &&
+				(getuid() != 0 || (s.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0)) {
+			found = 1;
+		}
+		else {
+			free(candidate);
+		}
+	}
+
+	free(path_init);
+
+	if(found) {
+		return candidate;
+	}
+	else {
+		return NULL;
+	}
+}
+
+
 
 /* vim: set noexpandtab tabstop=4: */
