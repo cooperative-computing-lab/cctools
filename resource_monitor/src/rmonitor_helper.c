@@ -18,6 +18,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include <signal.h>
 #include <fcntl.h>
 #include <dlfcn.h>
@@ -48,6 +49,9 @@
 #define RTLD_NEXT 0
 #endif
 
+#define PUSH_ERRNO { int last_errno = errno; errno = 0;
+#define POP_ERRNO(msg) msg.error = errno; if(!errno){ errno = last_errno; } }
+
 pid_t fork()
 {
 	pid_t pid;
@@ -59,8 +63,10 @@ pid_t fork()
 	if(!pid)
 	{
 		struct rmonitor_msg msg;
-
 		msg.type   = BRANCH;
+
+		/* We only send a message from the child, thus error is always zero. */
+		msg.error  = 0;
 		msg.origin = getpid();
 		msg.data.p = getppid();
 
@@ -100,6 +106,9 @@ int chdir(const char *path)
 		char  *newpath = getcwd(NULL, 0);
 
 		msg.type   = CHDIR;
+
+		/* We only send a message when cwd actually changes, so errno is always 0. */
+		msg.error  = 0;
 		msg.origin = getpid();
 		strcpy(msg.data.s, newpath);
 		free(newpath);
@@ -124,6 +133,9 @@ int fchdir(int fd)
 		char  *newpath = getcwd(NULL, 0);
 
 		msg.type   = CHDIR;
+
+		/* We only send a message when cwd actually changes, so errno is always 0. */
+		msg.error  = 0;
 		msg.origin = getpid();
 		strcpy(msg.data.s, newpath);
 		free(newpath);
@@ -150,11 +162,16 @@ static int open_for_writing(int fd) {
 
 FILE *fopen(const char *path, const char *mode)
 {
+	struct rmonitor_msg msg;
+
 	FILE *file;
 	typeof(fopen) *original_fopen = dlsym(RTLD_NEXT, "fopen");
 
 	debug(D_DEBUG, "fopen %s mode %s from %d.\n", path, mode, getpid());
-	file = original_fopen(path, mode);
+
+	PUSH_ERRNO
+		file = original_fopen(path, mode);
+	POP_ERRNO(msg)
 
 	if(file)
 	{
@@ -165,18 +182,20 @@ FILE *fopen(const char *path, const char *mode)
 		} else {
 			msg.type   = OPEN_INPUT;
 		}
-
-		msg.origin = getpid();
-		strcpy(msg.data.s, path);
-
-		send_monitor_msg(&msg);
 	}
+
+	msg.origin = getpid();
+	strcpy(msg.data.s, path);
+
+	send_monitor_msg(&msg);
 
 	return file;
 }
 
 int open(const char *path, int flags, ...)
 {
+	struct rmonitor_msg msg;
+
 	va_list ap;
 	int     fd;
 	int     mode;
@@ -188,23 +207,25 @@ int open(const char *path, int flags, ...)
 	va_end(ap);
 
 	debug(D_DEBUG, "open %s from %d.\n", path, getpid());
-	fd = original_open(path, flags, mode);
+
+	PUSH_ERRNO
+		fd = original_open(path, flags, mode);
+	POP_ERRNO(msg)
 
 	if(fd > -1)
 	{
-		struct rmonitor_msg msg;
 
 		if(open_for_writing(fd)) {
 			msg.type   = OPEN_OUTPUT;
 		} else {
 			msg.type   = OPEN_INPUT;
 		}
-
-		msg.origin = getpid();
-		strcpy(msg.data.s, path);
-
-		send_monitor_msg(&msg);
 	}
+
+	msg.origin = getpid();
+	strcpy(msg.data.s, path);
+
+	send_monitor_msg(&msg);
 
 	return fd;
 }
@@ -212,33 +233,38 @@ int open(const char *path, int flags, ...)
 #if defined(__linux__) && defined(__USE_LARGEFILE64)
 FILE *fopen64(const char *path, const char *mode)
 {
+	struct rmonitor_msg msg;
+
 	FILE *file;
 	typeof(fopen64) *original_fopen64 = dlsym(RTLD_NEXT, "fopen64");
 
 	debug(D_DEBUG, "fopen64 %s mode %s from %d.\n", path, mode, getpid());
-	file = original_fopen64(path, mode);
+
+	PUSH_ERRNO
+		file = original_fopen64(path, mode);
+	POP_ERRNO(msg)
 
 	if(file)
 	{
-		struct rmonitor_msg msg;
-
 		if(open_for_writing(fileno(file))) {
 			msg.type   = OPEN_OUTPUT;
 		} else {
 			msg.type   = OPEN_INPUT;
 		}
-
-		msg.origin = getpid();
-		strcpy(msg.data.s, path);
-
-		send_monitor_msg(&msg);
 	}
+
+	msg.origin = getpid();
+	strcpy(msg.data.s, path);
+
+	send_monitor_msg(&msg);
 
 	return file;
 }
 
 int open64(const char *path, int flags, ...)
 {
+	struct rmonitor_msg msg;
+
 	va_list ap;
 	int     fd;
 	int     mode;
@@ -250,28 +276,47 @@ int open64(const char *path, int flags, ...)
 	va_end(ap);
 
 	debug(D_DEBUG, "open64 %s from %d.\n", path, getpid());
-	fd = original_open64(path, flags, mode);
+
+	PUSH_ERRNO
+		fd = original_open64(path, flags, mode);
+	POP_ERRNO(msg)
 
 	if(fd > -1)
 	{
-		struct rmonitor_msg msg;
-
 		if(open_for_writing(fd)) {
 			msg.type   = OPEN_OUTPUT;
 		} else {
 			msg.type   = OPEN_INPUT;
 		}
-
-		msg.origin = getpid();
-		strcpy(msg.data.s, path);
-
-		send_monitor_msg(&msg);
 	}
+
+	msg.origin = getpid();
+	strcpy(msg.data.s, path);
+
+	send_monitor_msg(&msg);
 
 	return fd;
 }
 #endif /* defined linux && __USE_LARGEFILE64 */
 
+ssize_t write(int fd, const void *buf, size_t count)
+{
+	struct rmonitor_msg msg;
+	msg.type   = WRITE;
+	msg.origin = getpid();
+
+	typeof(write) *original_write = dlsym(RTLD_NEXT, "write");
+
+	ssize_t real_count;
+	PUSH_ERRNO
+		real_count = original_write(fd, buf, count);
+	POP_ERRNO(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
 
 void wakeup_pselect_from_exit(int signum)
 {
@@ -301,6 +346,7 @@ void exit_wrapper_preamble(void)
 
 	struct rmonitor_msg msg;
 	msg.type   = END_WAIT;
+	msg.error  = 0;
 	msg.origin = getpid();
 	msg.data.p = getpid();
 
@@ -321,6 +367,7 @@ void end_wrapper_epilogue(void)
 
 	struct rmonitor_msg msg;
 	msg.type   = END;
+	msg.error  = 0;
 	msg.origin = getpid();
 	msg.data.p = getpid();
 
@@ -378,6 +425,7 @@ pid_t waitpid(pid_t pid, int *status, int options)
 	{
 		struct rmonitor_msg msg;
 		msg.type   = WAIT;
+		msg.error  = 0;          /* send message only on success, so error is 0. */
 		msg.origin = getpid();
 		msg.data.p = pidb;
 

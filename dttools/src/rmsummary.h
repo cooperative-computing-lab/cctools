@@ -33,6 +33,7 @@ struct rmsummary
 	int64_t  signal;
 	char    *limits_exceeded;
 	int64_t  exit_status;
+	int64_t  last_error;
 
 	int64_t  wall_time;
 	int64_t  total_processes;

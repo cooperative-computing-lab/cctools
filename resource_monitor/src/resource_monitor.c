@@ -451,9 +451,7 @@ void rmonitor_add_file_watch(char *filename, int is_output)
 		char **new_inotify_watches;
 		int iwd;
 
-		if ((iwd = inotify_add_watch(rmonitor_inotify_fd,
-					     filename,
-					     IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|IN_ACCESS|IN_MODIFY)) < 0)
+		if ((iwd = inotify_add_watch(rmonitor_inotify_fd, filename, IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|IN_ACCESS|IN_MODIFY)) < 0)
 		{
 			debug(D_DEBUG, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
 		} else {
@@ -1074,6 +1072,10 @@ int rmonitor_check_limits(struct rmsummary *tr)
 {
 	tr->limits_exceeded = NULL;
 
+	/* Consider errors as resources exhausted. Used for ENOSPC, ENFILE, etc. */
+	if(tr->last_error)
+		return 0;
+
 	if(!resources_limits)
 		return 1;
 
@@ -1168,21 +1170,42 @@ void rmonitor_dispatch_msg(void)
         case CHDIR:
             p->wd = lookup_or_create_wd(p->wd, msg.data.s);
             break;
-        case OPEN_INPUT:
-            debug(D_DEBUG, "File %s has been opened as input.\n", msg.data.s);
-            rmonitor_add_file_watch(msg.data.s, 0);
-            break;
-        case OPEN_OUTPUT:
-            debug(D_DEBUG, "File %s has been opened as output.\n", msg.data.s);
-            rmonitor_add_file_watch(msg.data.s, 1);
-            break;
+		case OPEN_INPUT:
+		case OPEN_OUTPUT:
+			switch(msg.error) {
+				case 0:
+					debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
+					rmonitor_add_file_watch(msg.data.s, msg.type == OPEN_OUTPUT);
+					break;
+				case EMFILE:
+					/* Eventually report that we ran out of file descriptors. */
+					debug(D_DEBUG, "Process %d ran out of file descriptors.\n", msg.origin);
+					break;
+				default:
+					/* Clear the error, as it is not related to resources. */
+					msg.error = 0;
+					break;
+			}
+			break;
         case READ:
             break;
         case WRITE:
+			switch(msg.error) {
+				case ENOSPC:
+					/* Eventually report that we ran out of space. */
+					debug(D_DEBUG, "Process %d ran out of disk space.\n", msg.origin);
+					break;
+				default:
+					/* Clear the error, as it is not related to resources. */
+					msg.error = 0;
+					break;
+			}
             break;
         default:
             break;
     };
+
+	summary->last_error = msg.error;
 
 	if(!rmonitor_check_limits(summary))
 		rmonitor_final_cleanup(SIGTERM);
@@ -1373,6 +1396,8 @@ int rmonitor_resources(long int interval /*in microseconds */)
 	round = 1;
 	while(itable_size(processes) > 0)
 	{
+		resources_now->last_error = 0;
+
 		ping_processes();
 
 		rmonitor_poll_all_processes_once(processes, p_acc);
