@@ -52,6 +52,14 @@ INSTANCE_ID=$($EC2_TOOLS_DIR/ec2-run-instances \
     -g $SECURITY_GROUP_NAME \
     | grep "INSTANCE" | awk '{print $2}')
 
+INSTANCE_STATUS="pending"
+while [ "$INSTANCE_STATUS" = "pending" ]; do
+    INSTANCE_STATUS=$($EC2_TOOLS_DIR/ec2-describe-instances $INSTANCE_ID \
+    | grep "INSTANCE" | awk '{print $5}')
+done
+
+PUBLIC_DNS=$($EC2_TOOLS_DIR/ec2-describe-instances $INSTANCE_ID \
+| grep "INSTANCE" | awk '{print $4'})
 
 echo "Terminating EC2 instance..."
 $EC2_TOOLS_DIR/ec2-terminate-instances $INSTANCE_ID
