@@ -15,6 +15,7 @@ COPYING for details.
 
 #include "debug.h"
 #include "copy_stream.h"
+#include "path.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
@@ -71,8 +72,14 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 	if(monitor_path)
 		return monitor_path;
 
+	debug(D_RMON,"trying executable at PATH.\n");
+	//LD_CONFIG version.
+	monitor_path = path_which("resource_monitor");
+	if(monitor_path)
+		return monitor_path;
+
 	//static "vanilla" version
-	monitor_path = resource_monitor_check_path("./", "resource_monitorv");
+	monitor_path = path_which("resource_monitorv");
 	if(monitor_path)
 		return monitor_path;
 
