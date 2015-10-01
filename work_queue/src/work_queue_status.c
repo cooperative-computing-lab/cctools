@@ -186,7 +186,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 	if(needs_explicit_master && optind >= argc)
 		fatal("Options -T and -W need an explicit master to query.");
 
-	if(project_name && query_mode != QUERY_QUEUE)
+	if(*project_name && query_mode != QUERY_QUEUE)
 		fatal("Option -M,--project-name can only be used together with -Q,--statistics");
 
 	if( optind < argc ) {
@@ -410,8 +410,8 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 
 int main(int argc, char *argv[])
 {
-	const char *master_host  = 0;
-	const char *project_name = 0;
+	const char *master_host  = NULL;
+	const char *project_name = NULL;
 	int master_port = WORK_QUEUE_DEFAULT_PORT;
 
 	debug_config(argv[0]);
