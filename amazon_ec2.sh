@@ -8,6 +8,7 @@ set -e
 EC2_TOOLS_DIR="../ec2-api-tools-1.7.5.1/bin"
 AMI_IMAGE="ami-4b630d2e"
 INSTANCE_TYPE="t1.micro"
+USERNAME="ubuntu"
 AWS_ACCESS_KEY=$1
 AWS_SECRET_KEY=$2
 KEYPAIR_NAME="makeflow-keypair"
@@ -20,6 +21,7 @@ cleanup () {
 
     echo "Deleting temporary keypair..."
     $EC2_TOOLS_DIR/ec2-delete-keypair $KEYPAIR_NAME > /dev/null
+    rm -f $KEYPAIR_NAME.pem
     echo "Temporary keypair deleted."
 }
 
@@ -60,6 +62,20 @@ done
 
 PUBLIC_DNS=$($EC2_TOOLS_DIR/ec2-describe-instances $INSTANCE_ID \
 | grep "INSTANCE" | awk '{print $4'})
+
+chmod 400 $KEYPAIR_NAME.pem
+set -x
+
+# Try sshing certain number of times
+tries="10"
+while [ $tries -ne 0 ]
+do
+    ssh -o StrictHostKeyChecking=no -i $KEYPAIR_NAME.pem $USERNAME@$PUBLIC_DNS \
+        "echo test > testfile" && break
+    tries=$[$tries-1]
+    sleep 1
+done
+set +x
 
 echo "Terminating EC2 instance..."
 $EC2_TOOLS_DIR/ec2-terminate-instances $INSTANCE_ID
