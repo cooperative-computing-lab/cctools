@@ -3,7 +3,7 @@
 TESTFILE="testfile"
 
 
-./makeflow/src/makeflow -T amazon -l /dev/null <(cat <<EOF
+./makeflow/src/makeflow -d batch -T amazon -l /dev/null <(cat <<EOF
 MAKEFLOW_INPUTS =
 MAKEFLOW_OUTPUTS =
 
