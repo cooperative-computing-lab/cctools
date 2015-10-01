@@ -29,7 +29,6 @@ SOURCES = \
 	debug_stream.c \
 	debug_syslog.c \
 	disk_alloc.c \
-	disk_alloc_main.c \
 	domain_name.c \
 	domain_name_cache.c \
 	dpopen.c \
@@ -113,7 +112,7 @@ HEADERS_PUBLIC = \
 
 LIBRARIES = libdttools.a
 OBJECTS = $(SOURCES:%.c=%.o)
-PROGRAMS = catalog_update catalog_server watchdog disk_alloc
+PROGRAMS = catalog_update catalog_server watchdog disk_allocator
 SCRIPTS = cctools_gpu_autodetect cctools_python
 TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
 TEST_PROGRAMS = auth_test disk_alloc_test microbench multirun
