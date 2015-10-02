@@ -185,6 +185,31 @@ static int submit_worker( struct batch_queue *queue, const char *master_regex )
 	return batch_job_submit(queue,cmd,extra_input_files,"output.log",0);
 }
 
+static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
+	buffer_t b;
+	struct nvpair *nv;
+
+	buffer_init(&b);
+
+	char *sep = "";
+	list_first_item(masters_list);
+	while((nv=list_next_item(masters_list))) {
+		const char *blacklisted = nvpair_lookup_string(nv,"workers-blacklisted");
+		if(blacklisted) {
+			buffer_printf(&b, "%s%s", sep, blacklisted);
+			sep = " ";
+		}
+	}
+
+	if(buffer_pos(&b) > 0) {
+		batch_queue_set_option(queue, "workers-blacklisted", buffer_tostring(&b));
+	} else {
+		batch_queue_set_option(queue, "workers-blacklisted", NULL);
+	}
+
+	buffer_free(&b);
+}
+
 static int submit_workers( struct batch_queue *queue, struct itable *job_table, int count, const char *master_regex )
 {
 	int i;
@@ -466,6 +491,8 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		debug(D_WQ,"workers in queue: %d",workers_submitted);
 
 		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed);
+
+		update_blacklisted_workers(queue, masters_list);
 
 		if(new_workers_needed>0) {
 			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
