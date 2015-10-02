@@ -80,7 +80,7 @@ static int makeflow_retry_flag = 0;
 static int makeflow_retry_max = MAX_REMOTE_JOBS_DEFAULT;
 
 static makeflow_gc_method_t makeflow_gc_method = MAKEFLOW_GC_NONE;
-static uint64_t makeflow_gc_size   = -1;
+static uint64_t makeflow_gc_size   = 0;
 static int makeflow_gc_count  = -1;
 static int makeflow_gc_barrier = 1;
 static double makeflow_gc_task_ratio = 0.05;
@@ -591,7 +591,6 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 		else {
 			/* File was created and has length larger than zero. */
 			debug(D_MAKEFLOW_RUN, "File %s created by rule %d.\n", f->filename, n->nodeid);
-			n->d->completed_files += 1;
 			makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_EXISTS);
 			file_created = 1;
 			break;
@@ -1105,7 +1104,7 @@ int main(int argc, char *argv[])
 					if(makeflow_gc_count < 0)
 						makeflow_gc_count = 16;	/* Try to collect at most 16 files. */
 				} else if(strcasecmp(optarg, "on_demand") == 0) {
-					makeflow_gc_method = MAKEFLOW_GC_COUNT;
+					makeflow_gc_method = MAKEFLOW_GC_ON_DEMAND;
 					if(makeflow_gc_count < 0)
 						makeflow_gc_count = 16;	/* Try to collect at most 16 files. */
 				} else if(strcasecmp(optarg, "all") == 0) {
@@ -1502,7 +1501,7 @@ int main(int argc, char *argv[])
 
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		printf("cleaning filesystem...\n");
-		makeflow_clean(d, remote_queue, clean_mode);//, wrapper, monitor);
+		makeflow_clean(d, remote_queue, clean_mode);
 		if(clean_mode == MAKEFLOW_CLEAN_ALL) {
 			unlink(logfilename);
 			unlink(batchlogfilename);

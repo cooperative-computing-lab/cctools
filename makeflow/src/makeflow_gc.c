@@ -47,7 +47,7 @@ static int directory_low_disk( const char *path, uint64_t size )
 	UINT64_T avail, total;
 
 	if(host_disk_info_get(path, &avail, &total) >= 0)
-		return avail <= MAKEFLOW_MIN_SPACE;
+		return avail <= size;
 
 	return 0;
 }
@@ -255,6 +255,8 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 
 void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, uint64_t size, int count )
 {
+	if(size == 0)
+		size = MAKEFLOW_MIN_SPACE;
 	switch (method) {
 	case MAKEFLOW_GC_NONE:
 		break;
@@ -262,10 +264,16 @@ void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t
 		debug(D_MAKEFLOW_RUN, "Performing incremental file (%d) garbage collection", count);
 		makeflow_gc_all(d, queue, count);
 		break;
+	case MAKEFLOW_GC_ON_DEMAND:
+		if(d->completed_files - d->deleted_files > count || directory_low_disk(".",size)){
+			debug(D_MAKEFLOW_RUN, "Performing on demand (%d) garbage collection", count);
+			makeflow_gc_all(d, queue, INT_MAX);
+		}
+		break;
 	case MAKEFLOW_GC_SIZE:
 		if(directory_low_disk(".", size)) {
-			debug(D_MAKEFLOW_RUN, "Performing on demand (%d) garbage collection", count);
-			makeflow_gc_all(d, queue, count);
+			debug(D_MAKEFLOW_RUN, "Performing size (%d) garbage collection", count);
+			makeflow_gc_all(d, queue, INT_MAX);
 		}
 		break;
 	case MAKEFLOW_GC_ALL:

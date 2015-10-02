@@ -14,10 +14,11 @@ may be removed, according to a variety of criteria.
 */
 
 typedef enum {
-	MAKEFLOW_GC_NONE,		/* Do no garbage collection. */
-	MAKEFLOW_GC_COUNT,		/* Remove COUNT files as soon as the reference count falls to zero. */
-	MAKEFLOW_GC_SIZE,		/* Remove COUNT files when available storage is below SIZE. */
-	MAKEFLOW_GC_ALL			/* Remove all collectable files right now. */
+	MAKEFLOW_GC_NONE,       /* Do no garbage collection. */
+	MAKEFLOW_GC_COUNT,      /* If existing files > count, remove all available files as soon as the reference count falls to zero. */
+	MAKEFLOW_GC_ON_DEMAND,  /* Remove COUNT files as soon as the reference count falls to zero. */
+	MAKEFLOW_GC_SIZE,       /* Remove COUNT files when available storage is below SIZE. */
+	MAKEFLOW_GC_ALL         /* Remove all collectable files right now. */
 } makeflow_gc_method_t;
 
 typedef enum {
