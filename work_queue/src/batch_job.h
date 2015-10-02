@@ -143,6 +143,13 @@ the <tt>qsub</tt> command.  This call has no effect on other queue types.
 */
 void batch_queue_set_option(struct batch_queue *q, const char *what, const char *value);
 
+/** As @batch_queue_set_option, but allowing an integer argument.
+@param q The batch queue to adjust.
+@param what The key for option.
+@param value The value of the option.
+*/
+void batch_queue_set_int_option(struct batch_queue *q, const char *what, int value);
+
 /** Get batch queue options.
 This call returns the additional options to be passed to the batch system each
 time a job is submitted.

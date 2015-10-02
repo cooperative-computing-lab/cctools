@@ -1,4 +1,5 @@
 #include "buffer.h"
+#include "copy_stream.h"
 #include "json.h"
 #include "json_aux.h"
 
@@ -18,15 +19,22 @@ const char json_type_str[][10] = {
 
 json_value *jsonA_getname (json_value *object, const char *name, json_type t)
 {
+	json_value *val = jsonA_getname_raw(object, name);
+
+	if(!val || !jistype(val, t)) {
+		return NULL;
+	} else {
+		return val;
+	}
+}
+
+json_value *jsonA_getname_raw (json_value *object, const char *name)
+{
 	unsigned int i;
 	assert(object->type == json_object);
 	for (i = 0; i < object->u.object.length; i++) {
 		if (strcmp(name, object->u.object.values[i].name) == 0) {
-			if (jistype(object->u.object.values[i].value, t)) {
-				return object->u.object.values[i].value;
-			} else {
-				return NULL;
-			}
+			return object->u.object.values[i].value;
 		}
 	}
 	return NULL;
@@ -66,6 +74,19 @@ int jsonA_escapestring(buffer_t *B, const char *str)
 		}
 	}
 	return 0;
+}
+
+json_value *jsonA_parse_file(const char *path) {
+	size_t size;
+	char *buffer;
+
+	if(copy_file_to_buffer(path, &buffer, &size) < 1)
+		return NULL;
+
+	json_value *J = json_parse(buffer, size);
+	free(buffer);
+
+	return J;
 }
 
 /* vim: set noexpandtab tabstop=4: */
