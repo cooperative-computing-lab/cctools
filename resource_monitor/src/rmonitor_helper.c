@@ -175,8 +175,6 @@ FILE *fopen(const char *path, const char *mode)
 
 	if(file)
 	{
-		struct rmonitor_msg msg;
-
 		if(open_for_writing(fileno(file))) {
 			msg.type   = OPEN_OUTPUT;
 		} else {
