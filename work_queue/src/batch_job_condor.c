@@ -5,6 +5,7 @@
 #include "path.h"
 #include "process.h"
 #include "stringtools.h"
+#include "xxmalloc.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -33,6 +34,33 @@ static int setup_condor_wrapper(const char *wrapperfile)
 
 	return 0;
 }
+
+static char *blacklisted_expression(struct batch_queue *q) {
+	const char *blacklisted = hash_table_lookup(q->options, "workers-blacklisted");
+	if(!blacklisted)
+		return NULL;
+
+	buffer_t b;
+	buffer_init(&b);
+
+	char *blist = xxstrdup(blacklisted);
+	char *sep = "";
+	char *hostname;
+
+	buffer_printf(&b, "(");
+	while((hostname = strsep(&blist, " "))) {
+		buffer_printf(&b, "%s(machine != \"%s\")", sep, hostname);
+
+		sep = " && ";
+	}
+	buffer_printf(&b, ")");
+
+	char *result = xxstrdup(buffer_tostring(&b));
+	buffer_free(&b);
+
+	return result;
+}
+
 
 static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
@@ -79,6 +107,12 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "transfer_executable = true\n");
 	fprintf(file, "keep_claim_idle = 30\n");
 	fprintf(file, "log = %s\n", q->logfile);
+
+	char *bexp = blacklisted_expression(q);
+	if(bexp) {
+		fprintf(file, "requirements = %s\n", bexp);
+		free(bexp);
+	}
 
 	/*
 	Getting environment variables formatted for a condor submit
