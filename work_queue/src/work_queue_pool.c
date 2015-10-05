@@ -121,7 +121,9 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		masters++;
 	}
 
-	needed_workers = (int) ceil(needed_workers / tasks_per_worker);
+	if(tasks_per_worker > 0) {
+		needed_workers = (int) ceil(needed_workers / tasks_per_worker);
+	}
 
 	return needed_workers;
 }
@@ -183,6 +185,31 @@ static int submit_worker( struct batch_queue *queue, const char *master_regex )
 	debug(D_WQ,"submitting worker: %s",cmd);
 
 	return batch_job_submit(queue,cmd,extra_input_files,"output.log",0);
+}
+
+static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
+	buffer_t b;
+	struct nvpair *nv;
+
+	buffer_init(&b);
+
+	char *sep = "";
+	list_first_item(masters_list);
+	while((nv=list_next_item(masters_list))) {
+		const char *blacklisted = nvpair_lookup_string(nv,"workers-blacklisted");
+		if(blacklisted) {
+			buffer_printf(&b, "%s%s", sep, blacklisted);
+			sep = " ";
+		}
+	}
+
+	if(buffer_pos(&b) > 0) {
+		batch_queue_set_option(queue, "workers-blacklisted", buffer_tostring(&b));
+	} else {
+		batch_queue_set_option(queue, "workers-blacklisted", NULL);
+	}
+
+	buffer_free(&b);
 }
 
 static int submit_workers( struct batch_queue *queue, struct itable *job_table, int count, const char *master_regex )
@@ -402,6 +429,29 @@ int read_config_file(const char *config_file) {
 	last_time_modified = new_time_modified;
 	debug(D_NOTICE, "Configuration file '%s' has been loaded.", config_file);
 
+	debug(D_NOTICE, "master-name: %s\n", project_regex);
+	if(foremen_regex) {
+		debug(D_NOTICE, "foremen-name: %s\n", foremen_regex);
+	}
+	debug(D_NOTICE, "max-workers: %d\n", workers_max);
+	debug(D_NOTICE, "min-workers: %d\n", workers_min);
+
+	debug(D_NOTICE, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (num_cores_option > 0 ? num_cores_option : 1));
+	debug(D_NOTICE, "timeout: %d s\n", worker_timeout);
+	debug(D_NOTICE, "cores: %d\n", num_cores_option > 0 ? num_cores_option : 1);
+
+	if(num_memory_option > -1) {
+		debug(D_NOTICE, "memory: %d MB\n", num_memory_option);
+	}
+
+	if(num_memory_option > -1) {
+		debug(D_NOTICE, "disk: %d MB\n", num_disk_option);
+	}
+
+	if(extra_worker_args) {
+		debug(D_NOTICE, "worker-extra-options: %s", extra_worker_args);
+	}
+
 end:
 	json_value_free(J);
 	return !error_found;
@@ -466,6 +516,8 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		debug(D_WQ,"workers in queue: %d",workers_submitted);
 
 		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed);
+
+		update_blacklisted_workers(queue, masters_list);
 
 		if(new_workers_needed>0) {
 			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
@@ -669,11 +721,6 @@ int main(int argc, char *argv[])
 	if(workers_min>workers_max) {
 		fprintf(stderr,"work_queue_pool: min workers (%d) is greater than max workers (%d)\n",workers_min, workers_max);
 		return 1;
-	}
-
-	if(tasks_per_worker < 1)
-	{
-		tasks_per_worker = num_cores_option > 0 ? num_cores_option : 1;
 	}
 
 	if(!scratch_dir) {

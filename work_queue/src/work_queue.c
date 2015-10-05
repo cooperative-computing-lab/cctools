@@ -1581,6 +1581,31 @@ static work_queue_result_code_t get_available_results(struct work_queue *q, stru
 	return result;
 }
 
+static char *blacklisted_to_string( struct work_queue  *q ) {
+	if(hash_table_size(q->worker_blacklist) < 1) {
+		return NULL;
+	}
+
+	buffer_t b;
+	buffer_init(&b);
+
+	char *hostname;
+	void *dummy_value;
+
+	char *sep = "";
+
+	hash_table_firstkey(q->worker_blacklist);
+	while(hash_table_nextkey(q->worker_blacklist, &hostname, &dummy_value)) {
+		buffer_printf(&b, "%s%s", sep, hostname);
+		sep = " ";
+	}
+
+	char *result = xxstrdup(buffer_tostring(&b));
+	buffer_free(&b);
+
+	return result;
+}
+
 /*
 queue_to_nvpair examines the overall queue status and creates
 an nvair which can be sent to the catalog or directly to the
@@ -1633,6 +1658,13 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_integer(nv,"total_execute_time",info.total_execute_time);
 	nvpair_insert_integer(nv,"total_good_execute_time",info.total_good_execute_time);
 	nvpair_insert_string(nv,"master_preferred_connection",q->master_preferred_connection);
+
+	// Add the blacklisted workers
+	char *blacklist = blacklisted_to_string(q);
+	if(blacklist) {
+		nvpair_insert_string(nv,"workers-blacklisted", blacklist);
+		free(blacklist);
+	}
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
