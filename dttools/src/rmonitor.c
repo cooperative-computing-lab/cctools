@@ -15,6 +15,7 @@ COPYING for details.
 
 #include "debug.h"
 #include "copy_stream.h"
+#include "path.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
@@ -22,59 +23,76 @@ COPYING for details.
 
 static char *monitor_exe  = NULL;
 
-//BUG: Too much code repetition!
+static char *resource_monitor_check_path(const char *path, const char *executable_opt) {
+	struct stat buf;
+
+	if(path)
+	{
+		char *monitor_path;
+		if(executable_opt) {
+			monitor_path = string_format("%s/%s", path, executable_opt);
+		}
+		else {
+			monitor_path = xxstrdup(path);
+		}
+
+		if(stat(monitor_path, &buf) == 0)
+			if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
+				return monitor_path;
+
+		/* If we get here, we did not find a valid monitor at path */
+		free(monitor_path);
+	}
+
+	return NULL;
+}
+
+
 char *resource_monitor_locate(const char *path_from_cmdline)
 {
+	char *test_path;
 	char *monitor_path;
-	struct stat buf;
 
 	debug(D_RMON,"locating resource monitor executable...\n");
 
-	monitor_path = (char*) path_from_cmdline;
+	debug(D_RMON,"trying executable from path provided at command line.\n");
+	monitor_path = resource_monitor_check_path(path_from_cmdline, NULL);
 	if(monitor_path)
-	{
-		debug(D_RMON,"trying executable from path provided at command line.\n");
-		if(stat(monitor_path, &buf) == 0)
-			if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-				return xxstrdup(monitor_path);
-	}
+		return monitor_path;
 
-	monitor_path = getenv(RESOURCE_MONITOR_ENV_VAR);
+	debug(D_RMON,"trying executable from $%s.\n", RESOURCE_MONITOR_ENV_VAR);
+	test_path = getenv(RESOURCE_MONITOR_ENV_VAR);
+	monitor_path = resource_monitor_check_path(test_path, NULL);
 	if(monitor_path)
-	{
-		debug(D_RMON,"trying executable from $%s.\n", RESOURCE_MONITOR_ENV_VAR);
-		if(stat(monitor_path, &buf) == 0)
-			if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-				return xxstrdup(monitor_path);
-	}
+		return monitor_path;
 
 	debug(D_RMON,"trying executable at local directory.\n");
 	//LD_CONFIG version.
-	monitor_path = string_format("./resource_monitor");
-	if(stat(monitor_path, &buf) == 0)
-		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return monitor_path;
+	monitor_path = resource_monitor_check_path("./", "resource_monitor");
+	if(monitor_path)
+		return monitor_path;
+
+	debug(D_RMON,"trying executable at PATH.\n");
+	//LD_CONFIG version.
+	monitor_path = path_which("resource_monitor");
+	if(monitor_path)
+		return monitor_path;
 
 	//static "vanilla" version
-	free(monitor_path);
-	monitor_path = string_format("./resource_monitorv");
-	if(stat(monitor_path, &buf) == 0)
-		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return monitor_path;
+	monitor_path = path_which("resource_monitorv");
+	if(monitor_path)
+		return monitor_path;
 
 	debug(D_RMON,"trying executable at installed path location.\n");
 	//LD_CONFIG version.
-	free(monitor_path);
-	monitor_path = string_format("%s/bin/resource_monitor", INSTALL_PATH);
-	if(stat(monitor_path, &buf) == 0)
-		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return monitor_path;
+	monitor_path = resource_monitor_check_path(INSTALL_PATH, "bin/resource_monitor");
+	if(monitor_path)
+		return monitor_path;
 
-	free(monitor_path);
-	monitor_path = string_format("%s/bin/resource_monitorv", INSTALL_PATH);
-	if(stat(monitor_path, &buf) == 0)
-		if(S_ISREG(buf.st_mode) && access(monitor_path, R_OK|X_OK) == 0)
-			return monitor_path;
+	//static "vanilla" version
+	monitor_path = resource_monitor_check_path(INSTALL_PATH, "bin/resource_monitorv");
+	if(monitor_path)
+		return monitor_path;
 
 	return NULL;
 }

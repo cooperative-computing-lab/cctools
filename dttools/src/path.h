@@ -37,4 +37,11 @@ int path_find (buffer_t *B, const char *dir, const char *pattern, int recursive)
 
 int path_within_dir( const char *path, const char *dir );
 
+
+/*
+Returns the first absolute path for executable exec as found in PATH.
+Returns NULL if none is found.
+*/
+char *path_which(const char *exec);
+
 #endif
