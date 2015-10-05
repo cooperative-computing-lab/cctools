@@ -44,6 +44,11 @@ static char *blacklisted_expression(struct batch_queue *q) {
 	buffer_init(&b);
 
 	char *blist = xxstrdup(blacklisted);
+
+
+	/* strsep updates blist, so we keep the original pointer in binit so we can free it later */
+	char *binit = blist;
+
 	char *sep = "";
 	char *hostname;
 
@@ -56,6 +61,8 @@ static char *blacklisted_expression(struct batch_queue *q) {
 	buffer_printf(&b, ")");
 
 	char *result = xxstrdup(buffer_tostring(&b));
+
+	free(binit);
 	buffer_free(&b);
 
 	return result;
