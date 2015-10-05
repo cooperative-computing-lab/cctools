@@ -535,7 +535,7 @@ struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previo
     return inventory;
 }
 
-void rmonitor_add_file_watch(char *filename, int is_output)
+void rmonitor_add_file_watch(const char *filename, int is_output)
 {
 	struct rmonitor_file_info *finfo;
 	struct stat fst;
@@ -1485,6 +1485,12 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
 				exit(RM_MONITOR_ERROR);
 			}
         }
+
+		char *executable_path = path_which(executable);
+		if(executable_path) {
+			rmonitor_add_file_watch(executable_path, /* is output? */ 0);
+			free(executable_path);
+		}
     }
     else if(pid < 0) {
 		debug(D_FATAL, "fork failed: %s\n", strerror(errno));
