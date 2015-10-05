@@ -121,7 +121,9 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		masters++;
 	}
 
-	needed_workers = (int) ceil(needed_workers / tasks_per_worker);
+	if(tasks_per_worker > 0) {
+		needed_workers = (int) ceil(needed_workers / tasks_per_worker);
+	}
 
 	return needed_workers;
 }
@@ -427,6 +429,29 @@ int read_config_file(const char *config_file) {
 	last_time_modified = new_time_modified;
 	debug(D_NOTICE, "Configuration file '%s' has been loaded.", config_file);
 
+	debug(D_NOTICE, "master-name: %s\n", project_regex);
+	if(foremen_regex) {
+		debug(D_NOTICE, "foremen-name: %s\n", foremen_regex);
+	}
+	debug(D_NOTICE, "max-workers: %d\n", workers_max);
+	debug(D_NOTICE, "min-workers: %d\n", workers_min);
+
+	debug(D_NOTICE, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (num_cores_option > 0 ? num_cores_option : 1));
+	debug(D_NOTICE, "timeout: %d s\n", worker_timeout);
+	debug(D_NOTICE, "cores: %d\n", num_cores_option > 0 ? num_cores_option : 1);
+
+	if(num_memory_option > -1) {
+		debug(D_NOTICE, "memory: %d MB\n", num_memory_option);
+	}
+
+	if(num_memory_option > -1) {
+		debug(D_NOTICE, "disk: %d MB\n", num_disk_option);
+	}
+
+	if(extra_worker_args) {
+		debug(D_NOTICE, "worker-extra-options: %s", extra_worker_args);
+	}
+
 end:
 	json_value_free(J);
 	return !error_found;
@@ -696,11 +721,6 @@ int main(int argc, char *argv[])
 	if(workers_min>workers_max) {
 		fprintf(stderr,"work_queue_pool: min workers (%d) is greater than max workers (%d)\n",workers_min, workers_max);
 		return 1;
-	}
-
-	if(tasks_per_worker < 1)
-	{
-		tasks_per_worker = num_cores_option > 0 ? num_cores_option : 1;
 	}
 
 	if(!scratch_dir) {
