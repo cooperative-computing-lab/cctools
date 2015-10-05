@@ -36,9 +36,16 @@ static int setup_condor_wrapper(const char *wrapperfile)
 }
 
 static char *blacklisted_expression(struct batch_queue *q) {
-	const char *blacklisted = hash_table_lookup(q->options, "workers-blacklisted");
+	const char *blacklisted     = hash_table_lookup(q->options, "workers-blacklisted");
+	static char *last_blacklist = NULL;
+
 	if(!blacklisted)
 		return NULL;
+
+	/* print blacklist only when it changes. */
+	if(!last_blacklist || strcmp(last_blacklist, blacklisted) != 0) {
+		debug(D_BATCH, "Blacklisted hostnames: %s\n", blacklisted);
+	}
 
 	buffer_t b;
 	buffer_init(&b);
@@ -64,6 +71,12 @@ static char *blacklisted_expression(struct batch_queue *q) {
 
 	free(binit);
 	buffer_free(&b);
+
+	if(last_blacklist) {
+		free(last_blacklist);
+	}
+
+	last_blacklist = xxstrdup(blacklisted);
 
 	return result;
 }
