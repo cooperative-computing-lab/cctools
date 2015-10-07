@@ -48,6 +48,12 @@ char *escape_shell_string(const char *str)
 }
 
 /*
+ * Based on opengroup.org's definition of the Shell Command Language (also gnu's)
+ * In section 2.2.3 on Double-Quoted Strings, it indicates you only need to
+ * escape dollar sign, backtick, and backslash. I also escape double quote as
+ * we are adding and exterior double quote around the string.
+ *
+ * [ $ \ ` " ] Are always escaped.
  * */
 char *string_escape_shell( const char *str )
 {
