@@ -987,6 +987,10 @@ void rmonitor_check_child(const int signal)
     free(tr_usg);
 }
 
+void cleanup_library() {
+	unlink(lib_helper_name);
+}
+
 //SIGINT, SIGQUIT, SIGTERM signal handler.
 void rmonitor_final_cleanup(int signum)
 {
@@ -1035,8 +1039,10 @@ void rmonitor_final_cleanup(int signum)
 
     cleanup_zombies();
 
-    if(lib_helper_extracted)
-        unlink(lib_helper_name);
+    if(lib_helper_extracted) {
+		cleanup_library();
+		lib_helper_extracted = 0;
+	}
 
     status = rmonitor_final_summary();
 
@@ -1127,6 +1133,8 @@ void write_helper_lib(void)
     chmod(lib_helper_name, 0777);
 
     lib_helper_extracted = 1;
+
+	atexit(cleanup_library);
 }
 
 void rmonitor_dispatch_msg(void)
