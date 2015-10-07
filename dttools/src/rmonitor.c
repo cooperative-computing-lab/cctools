@@ -21,8 +21,6 @@ COPYING for details.
 
 #include "rmonitor.h"
 
-static char *monitor_exe  = NULL;
-
 static char *resource_monitor_check_path(const char *path, const char *executable_opt) {
 	struct stat buf;
 
@@ -97,37 +95,6 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 	return NULL;
 }
 
-//atexit handler
-void resource_monitor_delete_exe(void)
-{
-	debug(D_RMON, "unlinking %s\n", monitor_exe);
-	unlink(monitor_exe);
-}
-
-char *resource_monitor_copy_to_wd(const char *path_from_cmdline)
-{
-	char *mon_unique;
-	char *monitor_org;
-	monitor_org = resource_monitor_locate(path_from_cmdline);
-
-	if(!monitor_org)
-		fatal("Monitor program could not be found.\n");
-
-	mon_unique = string_format("monitor-%d", getpid());
-
-	debug(D_RMON,"copying monitor %s to %s.\n", monitor_org, mon_unique);
-
-	if(copy_file_to_file(monitor_org, mon_unique) == 0)
-		fatal("Could not copy monitor %s to %s in local directory: %s\n",
-				monitor_org, mon_unique, strerror(errno));
-
-	atexit(resource_monitor_delete_exe);
-	chmod(mon_unique, 0777);
-
-	monitor_exe = mon_unique;
-
-	return mon_unique;
-}
 
 //Using default sampling interval. We may want to add an option
 //to change it.
@@ -138,12 +105,8 @@ char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_
 	char cmd_builder[PATH_MAX];
 	int  index;
 
-	if(!monitor_path && !monitor_exe)
-		monitor_exe = resource_monitor_copy_to_wd(NULL);
-
-
 	if(!monitor_path)
-		monitor_path = monitor_exe;
+		fatal("Monitor path should be specified.");
 
 	index = sprintf(cmd_builder, "./%s --with-output-files=%s ", monitor_path, template_filename);
 

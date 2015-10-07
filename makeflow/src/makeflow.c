@@ -106,7 +106,10 @@ static int output_len_check = 0;
 
 static int cache_mode = 1;
 
-static char *monitor_exe  = "resource_monitor_cctools";
+/* path is where to locally find the monitor. */
+/* exe is the name in the remote site. */
+static char *monitor_path = NULL;
+static const char *monitor_exe  = NULL;
 
 static int monitor_mode = 0;
 static int monitor_enable_time_series = 0;
@@ -356,8 +359,6 @@ static int makeflow_prepare_for_monitoring(struct dag *d)
 	{
 		char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
 		char *log_name;
-
-		dag_node_add_source_file(n, monitor_exe, NULL);
 
 		log_name = string_format("%s.summary", log_name_prefix);
 		dag_node_add_target_file(n, log_name, NULL);
@@ -1507,7 +1508,20 @@ int main(int argc, char *argv[])
 		if(!monitor_log_dir)
 			fatal("Monitor mode was enabled, but a log output directory was not specified (use -M<dir>)");
 
-		monitor_exe = resource_monitor_copy_to_wd(NULL);
+		monitor_path = resource_monitor_locate(NULL);
+		if(!monitor_path) {
+			fatal("Monitor mode was enabled, but could not find resource_monitor in PATH.");
+		}
+
+		switch (batch_queue_type) {
+			case BATCH_QUEUE_TYPE_WORK_QUEUE:
+			case BATCH_QUEUE_TYPE_CONDOR:
+				monitor_exe = path_basename(monitor_path);
+			default:
+				monitor_exe = monitor_path;
+		}
+
+		makeflow_wrapper_add_input_file(monitor_path);
 
 		if(monitor_interval < 1)
 			fatal("Monitoring interval should be non-negative.");
