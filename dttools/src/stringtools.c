@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "timestamp.h"
 #include "xxmalloc.h"
+#include "buffer.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -44,6 +45,27 @@ char *escape_shell_string(const char *str)
 	}
 	strcpy(current, "'");
 	return escaped_string;
+}
+
+char *string_escape_shell( const char *str )
+{
+	buffer_t buffer;
+	buffer_init(&buffer);
+
+	char *s;
+	buffer_putlstring(&buffer,"\"",1);
+	for(s=str;*s;s++) {
+		if(*s=='"' || *s=='\\' || *s=='$' || *s=='`')
+			buffer_putlstring(&buffer,"\\",1);
+		buffer_putlstring(&buffer,s,1);
+	}
+	buffer_putlstring(&buffer,"\"",1);
+
+	char *result;
+	buffer_dup(&buffer,&result);
+	buffer_free(&buffer);
+
+	return result;
 }
 
 void string_from_ip_address(const unsigned char *bytes, char *str)
@@ -839,14 +861,24 @@ char * string_wrap_command( const char *command, const char *wrapper_command )
 {
 	if(!wrapper_command) return strdup(command);
 
-	char * result = malloc(strlen(command)+strlen(wrapper_command)+2);
 	char * braces = strstr(wrapper_command,"{}");
+	char * square = strstr(wrapper_command,"[]");
+
+	if(square)
+		command = string_escape_shell(command);
+
+	char * result = malloc(strlen(command)+strlen(wrapper_command)+2);
 
 	if(braces) {
 		strcpy(result,wrapper_command);
 		result[braces-wrapper_command] = 0;
 		strcat(result,command);
 		strcat(result,braces+2);
+	} else if(square) {
+		strcpy(result,wrapper_command);
+		result[square-wrapper_command] = 0;
+		strcat(result,command);
+		strcat(result,square+2);
 	} else {
 		strcpy(result,wrapper_command);
 		strcat(result," ");
