@@ -47,23 +47,26 @@ char *escape_shell_string(const char *str)
 	return escaped_string;
 }
 
+/*
+ * */
 char *string_escape_shell( const char *str )
 {
-	buffer_t buffer;
-	buffer_init(&buffer);
+	buffer_t B[1];
+	buffer_init(B);
+	buffer_abortonfailure(B, 1);
 
 	char *s;
-	buffer_putlstring(&buffer,"\"",1);
+	buffer_putliteral(B,"\"");
 	for(s=str;*s;s++) {
 		if(*s=='"' || *s=='\\' || *s=='$' || *s=='`')
-			buffer_putlstring(&buffer,"\\",1);
-		buffer_putlstring(&buffer,s,1);
+			buffer_putliteral(B,"\\");
+		buffer_putlstring(B,s,1);
 	}
-	buffer_putlstring(&buffer,"\"",1);
+	buffer_putliteral(B,"\"");
 
 	char *result;
-	buffer_dup(&buffer,&result);
-	buffer_free(&buffer);
+	buffer_dup(B,&result);
+	buffer_free(B);
 
 	return result;
 }
@@ -863,27 +866,33 @@ char * string_wrap_command( const char *command, const char *wrapper_command )
 
 	char * braces = strstr(wrapper_command,"{}");
 	char * square = strstr(wrapper_command,"[]");
+	char * new_command;
 
-	if(square)
-		command = string_escape_shell(command);
+	if(square) {
+		new_command = string_escape_shell(command);
+	} else {
+		new_command = strdup(command);
+	}
 
 	char * result = malloc(strlen(command)+strlen(wrapper_command)+2);
 
 	if(braces) {
 		strcpy(result,wrapper_command);
 		result[braces-wrapper_command] = 0;
-		strcat(result,command);
+		strcat(result,new_command);
 		strcat(result,braces+2);
 	} else if(square) {
 		strcpy(result,wrapper_command);
 		result[square-wrapper_command] = 0;
-		strcat(result,command);
+		strcat(result,new_command);
 		strcat(result,square+2);
 	} else {
 		strcpy(result,wrapper_command);
 		strcat(result," ");
-		strcat(result,command);
+		strcat(result,new_command);
 	}
+
+	free(new_command);
 
 	return result;
 }
