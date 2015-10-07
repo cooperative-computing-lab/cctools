@@ -61,7 +61,7 @@ char *string_escape_shell( const char *str )
 	buffer_init(B);
 	buffer_abortonfailure(B, 1);
 
-	char *s;
+	const char *s;
 	buffer_putliteral(B,"\"");
 	for(s=str;*s;s++) {
 		if(*s=='"' || *s=='\\' || *s=='$' || *s=='`')
