@@ -55,7 +55,7 @@ static const char *resource_args=0;
 static int abort_flag = 0;
 static const char *scratch_dir = 0;
 static const char *password_file = 0;
-static const char *config_file = 0;
+static char *config_file = 0;
 
 /* -1 means 'not specified' */
 static int num_cores_option  = -1;
@@ -755,7 +755,11 @@ int main(int argc, char *argv[])
 		symlink(old_fullname, new_fullname);
 
 		free(old_fullname);
-		free(new_fullname);
+		free(config_file);
+
+		/* From now on, read config_file from the symlink */
+		config_file = new_fullname;
+
 		free(cwd);
 	}
 
