@@ -144,10 +144,7 @@ static struct list *makeflow_generate_output_files( struct dag_node *n, struct m
 	}
 
 	if(m){
-		printf("%d\t:\t", list_size(result));
-		printf("%d\t:\t", list_size(m->wrapper->output_files));
 		result = makeflow_wrapper_generate_files(result, m->wrapper->output_files, n);
-		printf("%d\n", list_size(result));
 	}
 
 	return result;
