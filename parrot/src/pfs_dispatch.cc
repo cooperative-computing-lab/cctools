@@ -1340,7 +1340,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				unsigned long persona = args[0] & 0xff;
 				switch (persona) {
 					case PER_LINUX:
-					case PER_LINUX32:
 					case 0xff: /* get personality */
 						/* allow the call to go through to the kernel */
 						break;
