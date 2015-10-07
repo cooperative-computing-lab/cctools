@@ -1336,11 +1336,11 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_personality:
 			if(entering) {
-				unsigned long persona = args[0];
+				/* Low byte encodes personality. High byte encodes options */
+				unsigned long persona = args[0] & 0xff;
 				switch (persona) {
 					case PER_LINUX:
-					case PER_LINUX_32BIT:
-					case 0xffffffff: /* get personality */
+					case 0xff: /* get personality */
 						/* allow the call to go through to the kernel */
 						break;
 					default:
