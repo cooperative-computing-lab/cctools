@@ -565,26 +565,32 @@ int rmonitor_measure_process(struct rmsummary *tr, pid_t pid) {
 	if(err != 0)
 		return err;
 
-	struct rmonitor_wdir_info d;
 	char cwd_link[PATH_MAX];
 	char cwd_org[PATH_MAX];
+
+	struct rmonitor_wdir_info *d = NULL;
 	snprintf(cwd_link, PATH_MAX, "/proc/%d/cwd", pid);
-	readlink(cwd_link, cwd_org, PATH_MAX);
+	err = readlink(cwd_link, cwd_org, PATH_MAX);
 
-	d.path = cwd_org;
-	d.state = NULL;
+	if(!err)  {
+		d = malloc(sizeof(struct rmonitor_wdir_info));
+		d->path  = cwd_org;
+		d->state = NULL;
 
-	err = rmonitor_poll_wd_once(&d, -1);
-	if(err != 0)
-		return err;
+		rmonitor_poll_wd_once(d, -1);
+	}
 
 	uint64_t start;
 	err = rmonitor_get_start_time(pid, &start);
 	if(err != 0)
 		return err;
 
-	rmonitor_info_to_rmsummary(tr, &p, &d, NULL, start);
+	rmonitor_info_to_rmsummary(tr, &p, d, NULL, start);
 	tr->command = rmonitor_get_command_line(pid);
+
+	if(d) {
+		free(d);
+	}
 
 	return 0;
 }

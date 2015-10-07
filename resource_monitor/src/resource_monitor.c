@@ -382,7 +382,7 @@ struct rmonitor_filesys_info *lookup_or_create_fs(char *path)
     return inventory;
 }
 
-struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previous, char *path)
+struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previous, char const *path)
 {
     struct rmonitor_wdir_info *inventory;
 
