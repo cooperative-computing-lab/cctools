@@ -136,6 +136,9 @@ struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separa
 
 	struct rmsummary *s = make_rmsummary(-1);
 
+	/* if source have no last_error, we do not want the -1 from above */
+	s->last_error = 0;
+
 	token = strtok_r(buffer_copy, delim, &saveptr);
 	while(token)
 	{
