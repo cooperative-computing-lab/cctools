@@ -17,6 +17,7 @@ extern "C" {
 #include "full_io.h"
 #include "file_cache.h"
 #include "stringtools.h"
+#include "pfs_resolve.h"
 }
 
 #include <errno.h>
@@ -29,6 +30,7 @@ extern "C" {
 
 extern struct file_cache *pfs_file_cache;
 extern int pfs_force_cache;
+extern int pfs_allow_dynamic_mounts;
 
 /*
 Notice that we make the check for EINTR in here,
@@ -230,6 +232,20 @@ char * pfs_getcwd( char *path, pfs_size_t size )
 	result = pfs_current->table->getcwd(path,size);
 	debug(D_LIBCALL,"= %s",result ? result : "(null)");
 	return result;
+}
+
+int pfs_mount( const char *path, const char *device )
+{
+	BEGIN
+	debug(D_LIBCALL,"mount %s %s",path,device);
+	if(pfs_allow_dynamic_mounts) {
+		pfs_resolve_add_entry(path,device);
+		result = 0;
+	} else {
+		result = -1;
+		errno = EPERM;
+	}
+	END
 }
 
 int pfs_stat( const char *path, struct pfs_stat *buf )

@@ -22,6 +22,8 @@ typedef enum {
 void pfs_resolve_file_config( const char *mountfile );
 void pfs_resolve_manual_config( const char *string );
 
+void pfs_resolve_add_entry( const char *path, const char *device, mode_t mode );
+
 pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t mode, time_t stoptime );
 
 #endif

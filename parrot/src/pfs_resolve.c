@@ -34,7 +34,7 @@ struct mount_entry {
 static struct mount_entry * mount_list = 0;
 static struct hash_table *resolve_cache = 0;
 
-static void add_mount_entry( const char *prefix, const char *redirect, mode_t mode )
+void pfs_resolve_add_entry( const char *prefix, const char *redirect, mode_t mode )
 {
 	struct mount_entry * m = xxmalloc(sizeof(*m));
 	strcpy(m->prefix,prefix);
@@ -69,7 +69,7 @@ void pfs_resolve_manual_config( const char *str )
 	if(!e) fatal("badly formed mount string: %s",str);
 	*e = 0;
 	e++;
-	add_mount_entry(str,e,R_OK|W_OK|X_OK);
+	pfs_resolve_add_entry(str,e,R_OK|W_OK|X_OK);
 }
 
 void pfs_resolve_file_config( const char *filename )
@@ -117,7 +117,7 @@ void pfs_resolve_file_config( const char *filename )
 			if(mode < 0) {
 				fatal("%s has invalid options on line %d\n",filename,linenum);
 			}
-			add_mount_entry(prefix,redirect,mode);
+			pfs_resolve_add_entry(prefix,redirect,mode);
 		}
 	}
 
