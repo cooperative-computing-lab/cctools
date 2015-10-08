@@ -238,14 +238,15 @@ a path in the host's filesystem. If two paths are given, then the third
 column can contain an optional access control specifier.
 
 <p>
-For example, if a database is stored at an FTP server under the
-path <tt>/anonftp/ftp.cs.wisc.edu/db</tt>, it may be spliced into the
-filesystem under <tt>/dbase</tt> with a mount list like this:
-<code>/dbase       /anonftp/ftp.cs.wisc.edu/db</code>
+For example, the GNU FTP server available at 
+<tt>/anonftp/ftp.cs.wisc.edu/db</tt> can be spliced into the
+filesystem under <tt>/gnu</tt> with a mount list like this:
+<code>/gnu      /anonftp/ftp.gnu.org</code>
 Instruct Parrot to use the mountlist as follows:
-<code>% parrot_run -m mountfile tcsh
-% cd /dbase
+<code>% parrot_run -m mountfile bash
+% cd /gnu
 % ls -la
+% exit
 </code>
 
 <p>An <b>access control specifier</b> restricts the operations allowed under
@@ -261,10 +262,18 @@ For example, a mountlist could contain the following entries
 /opt  /home/fred/project  RX
 </code></p>
 
-A single mount entry may be given on the command line
+Individual mount entries may be given on the command line
 with the <b>-M</b> option as follows:
-<code>% parrot_run -M /dbase=/anonftp/ftp.cs.wisc.edu/db tcsh</code>
+<code>% parrot_run -M /gnu=/anonftp/ftp.gnu.org bash</code>
 <p>
+The mount list may also be changed at runtime via <tt>parrot_mount</tt>
+which has the same effect as <tt>-M</tt>:
+<code>% parrot_run bash
+% parrot_mount /gnu /anonftp/ftp.gnu.org/gnu
+% ls /gnu
+% parrot_unmount /gnu
+% exit
+</code>
 A more sophisticated way to perform name binding is with
 an <i>external resolver</i>.  This is a program executed
 whenever Parrot needs to locate a file or directory.
@@ -283,13 +292,12 @@ copy of a file.  For example:
 To connect the program <tt>locate_file</tt> to Parrot,
 simply give a mount string that specifies the program
 as a resolver:
-<code>% parrot_run -M /dbase=resolver:/path/to/locate_file tcsh</code>
-
+<code>% parrot_run -M /gnu=resolver:/path/to/locate_file bash</code>
 <p>
-Now, if you attempt to access files under /dbase,
+Now, if you attempt to access files under /gnu,
 Parrot will execute <tt>locate_file</tt> and access
 the data stored there:
-<code>% cat /dbase/1523.data
+<code>% cat /gnu/1523.data
 (see contents of /chirp/server.nd.edu/mix/1523.data)
 </code>
 
@@ -671,6 +679,8 @@ An exhaustive list of all options and commands can be found in the manual pages:
 <li> <a href="man/parrot_locate.html">parrot_locate</a>
 <li> <a href="man/parrot_timeout.html">parrot_timeout</a>
 <li> <a href="man/parrot_whoami.html">parrot_whoami</a>
+<li> <a href="man/parrot_mount.html">parrot_mount</a>
+<li> <a href="man/parrot_unmount.html">parrot_unmount</a>
 </dir>
 
 </div>

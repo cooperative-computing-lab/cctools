@@ -20,7 +20,7 @@ define(SEE_ALSO_PARROT,
 `LIST_BEGIN
 LIST_ITEM MANUAL(Cooperative Computing Tools Documentation,"../index.html")
 LIST_ITEM MANUAL(Parrot User Manual,"../parrot.html")
-LIST_ITEM MANPAGE(parrot_run,1), MANPAGE(parrot_run_hdfs,1), MANPAGE(parrot_cp,1), MANPAGE(parrot_getacl,1), MANPAGE(parrot_setacl,1), MANPAGE(parrot_mkalloc,1), MANPAGE(parrot_lsalloc,1), MANPAGE(parrot_locate,1), MANPAGE(parrot_timeout,1), MANPAGE(parrot_whoami,1), MANPAGE(parrot_md5,1), MANPAGE(parrot_package_create,1), MANPAGE(parrot_package_run,1), MANPAGE(chroot_package_run,1)
+LIST_ITEM MANPAGE(parrot_run,1), MANPAGE(parrot_run_hdfs,1), MANPAGE(parrot_cp,1), MANPAGE(parrot_getacl,1), MANPAGE(parrot_setacl,1), MANPAGE(parrot_mkalloc,1), MANPAGE(parrot_lsalloc,1), MANPAGE(parrot_locate,1), MANPAGE(parrot_timeout,1), MANPAGE(parrot_whoami,1), MANPAGE(parrot_mount,1), MANPAGE(parrot_unmount,1) MANPAGE(parrot_md5,1), MANPAGE(parrot_package_create,1), MANPAGE(parrot_package_run,1), MANPAGE(chroot_package_run,1)
 LIST_END')dnl
 define(SEE_ALSO_CHIRP,
 `LIST_BEGIN
