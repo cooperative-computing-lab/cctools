@@ -102,29 +102,37 @@ char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_
 					   const char *extra_monitor_options,
 					   int time_series, int inotify_stats)
 {
-	char cmd_builder[PATH_MAX];
-	int  index;
+
+
+	buffer_t cmd_builder;
+	buffer_init(&cmd_builder);
 
 	if(!monitor_path)
 		fatal("Monitor path should be specified.");
 
-	index = sprintf(cmd_builder, "./%s --with-output-files=%s ", monitor_path, template_filename);
+	buffer_printf(&cmd_builder, "./%s", monitor_path);
+	buffer_printf(&cmd_builder, " --with-output-files=%s", template_filename);
 
 	if(time_series)
-		index += sprintf(cmd_builder + index, "--with-time-series ");
+		buffer_printf(&cmd_builder, " --with-time-series");
 
 	if(inotify_stats)
-		index += sprintf(cmd_builder + index, "--with-inotify ");
+		buffer_printf(&cmd_builder, " --with-inotify");
 
 	if(limits_filename)
-		index += sprintf(cmd_builder + index, "--limits-file=%s ", limits_filename);
+		buffer_printf(&cmd_builder, " --limits-file=%s", limits_filename);
 
 	if(extra_monitor_options)
-		index += sprintf(cmd_builder + index, "%s ", extra_monitor_options);
+		buffer_printf(&cmd_builder, " %s", extra_monitor_options);
 
-	sprintf(cmd_builder + index, "-- %s", cmdline);
+	char *cmdline_escaped = string_escape_shell(cmdline);
+	buffer_printf(&cmd_builder, " --sh %s", cmdline_escaped);
+	free(cmdline_escaped);
 
-	return xxstrdup(cmd_builder);
+	char *result = xxstrdup(buffer_tostring(&cmd_builder));
+	buffer_free(&cmd_builder);
+
+	return result;
 }
 
 /* vim: set noexpandtab tabstop=4: */

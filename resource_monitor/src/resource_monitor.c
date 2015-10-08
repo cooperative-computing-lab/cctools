@@ -1605,11 +1605,18 @@ int main(int argc, char **argv) {
 	if(sh_cmd_line) {
 		argc = 3;
 		optind = 0;
-		char *argv_sh[] = { "/bin/sh", "-c", sh_cmd_line, 0 };
+
+		/* we do an exec here so that we do not overcount processes created. */
+		char *sh_cmd_line_exec = string_format("exec %s", sh_cmd_line);
+		char *argv_sh[] = { "/bin/sh", "-c", sh_cmd_line_exec, 0 };
 		argv = argv_sh;
 
 		/* for pretty printing in the summary. */
 		command_line = sh_cmd_line;
+
+		char *sh_cmd_line_exec_escaped = string_escape_shell(sh_cmd_line_exec);
+		debug(D_RMON, "command line: /bin/sh -c %s\n", sh_cmd_line_exec_escaped);
+		free(sh_cmd_line_exec_escaped);
 	}
 	else {
 		buffer_t b;
@@ -1624,9 +1631,10 @@ int main(int argc, char **argv) {
 
 		command_line = xxstrdup(buffer_tostring(&b));
 		buffer_free(&b);
+
+		debug(D_RMON, "command line: %s\n", command_line);
 	}
 
-	debug(D_RMON, "executing: %s\n", command_line);
 
 
     if(getenv(RESOURCE_MONITOR_INFO_ENV_VAR))
