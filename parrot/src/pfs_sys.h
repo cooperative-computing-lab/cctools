@@ -59,6 +59,7 @@ int		pfs_utime( const char *path, struct utimbuf *buf );
 int		pfs_utimensat( int dirfd, const char *pathname, const struct timespec times[2], int flags );
 int		pfs_unlink( const char *name );
 int		pfs_rename( const char *old_name, const char *new_name );
+  int		pfs_mount( const char *path, const char *device );
 int		pfs_link( const char *oldpath, const char *newpath );
 int		pfs_symlink( const char *target, const char *path );
 int		pfs_readlink( const char *path, char *buf, pfs_size_t size );
