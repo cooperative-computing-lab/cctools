@@ -29,5 +29,6 @@ SEARCH *parrot_opensearch(const char *path, const char *pattern, int flags);
 struct searchent *parrot_readsearch(SEARCH *search);
 int parrot_closesearch(SEARCH *search);
 int parrot_debug( const char *flags, const char *path, off_t size );
+int parrot_mount( const char *path, const char *destination );
 
 #endif

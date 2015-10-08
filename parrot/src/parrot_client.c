@@ -233,4 +233,13 @@ int parrot_debug ( const char *flags, const char *path, off_t size )
 #endif
 }
 
+int parrot_mount ( const char *path, const char *destination )
+{
+#ifdef CCTOOLS_CPU_I386
+	return syscall(SYSCALL32_parrot_mount,path,destination);
+#else
+	return syscall(SYSCALL64_parrot_mount,path,destination);
+#endif
+}
+
 /* vim: set noexpandtab tabstop=4: */
