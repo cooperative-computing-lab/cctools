@@ -89,6 +89,7 @@ const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
 int set_foreground = 1;
 int pfs_syscall_disable_debug = 0;
+int pfs_allow_dynamic_mounts = 1;
 
 char sys_temp_dir[PATH_MAX] = "/tmp";
 char pfs_temp_dir[PATH_MAX];
@@ -142,6 +143,8 @@ enum {
 	LONG_OPT_NO_SET_FOREGROUND,
 	LONG_OPT_SYSCALL_DISABLE_DEBUG,
 	LONG_OPT_VALGRIND,
+	LONG_OPT_NO_DYNAMIC_MOUNTS,
+	LONG_OPT_DYNAMIC_MOUNTS
 };
 
 static void get_linux_version(const char *cmd)
@@ -210,6 +213,8 @@ static void show_help( const char *cmd )
 	printf( " %-30s Enable data channel authentication in GridFTP.\n", "-C,--channel-auth");
 	printf( " %-30s Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n", "-d,--debug=<name>");
 	printf( " %-30s Disable small file optimizations.\n", "-D,--no-optimize");
+	printf( " %-30s Enable dynamic mounting with parrot_mount.\n","--dynamic-mounts");
+	printf( " %-30s Disable dynamic mounting with parrot_mount.\n","--no-dynamic-mounts");
 	printf( " %-30s Record the environment variables at the starting point.\n", "-e,--env-list=<path>");
 	printf( " %-30s Enable file snapshot caching for all protocols.\n", "-F,--with-snapshots");
 	printf( " %-30s Disable following symlinks.\n", "-f,--no-follow-symlinks");
@@ -828,6 +833,12 @@ int main( int argc, char *argv[] )
 			}
 		case LONG_OPT_SYSCALL_DISABLE_DEBUG:
 			pfs_syscall_disable_debug = 1;
+			break;
+		case LONG_OPT_DYNAMIC_MOUNTS:
+			pfs_allow_dynamic_mounts = 1;
+			break;
+		case LONG_OPT_NO_DYNAMIC_MOUNTS:
+			pfs_allow_dynamic_mounts = 0;
 			break;
 		default:
 			show_help(argv[0]);
