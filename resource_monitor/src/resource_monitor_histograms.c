@@ -561,6 +561,7 @@ void write_images(struct histogram *h)
 		char *path = string_format("%s/%s", output_directory, sanitize_path_name(h->source->category));
 		chdir(path);
 		execlp(gnuplot_path, "gnuplot", path_of_thumbnail_script(h, 1), NULL);
+		fatal("Could not exec when creating thumbnail: %s\n", path_of_thumbnail_image(h, 0));
 	}
 
 	pid = fork();
@@ -573,6 +574,7 @@ void write_images(struct histogram *h)
 		char *path = string_format("%s/%s", output_directory, sanitize_path_name(h->source->category));
 		chdir(path);
 		execlp(gnuplot_path, "gnuplot", path_of_image_script(h, 1), NULL);
+		fatal("Could not exec when creating image: %s\n", path_of_image(h, 0));
 	}
 
 	gnuplots_running += 2;
@@ -784,6 +786,9 @@ void write_outlier(FILE *stream, struct rmDsummary *s, struct field *f, char *pr
 
 	outlier_name = copy_outlier(s);
 
+	if(!outlier_name)
+		return;
+
 	if(!prefix)
 	{
 		prefix = "";
@@ -831,34 +836,34 @@ void write_webpage_stats_header(FILE *stream, struct histogram *h)
 	fprintf(stream, "<td class=\"datahdr\" >z_95</td>");
 }
 
-void write_webpage_stats(FILE *stream, struct histogram *h, int include_thumbnail)
+void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int include_thumbnail)
 {
 	struct field *f = h->resource;
 
 	fprintf(stream, "<td>");
 	if(include_thumbnail)
 	{
-		fprintf(stream, "<a href=\"../../%s\">",  path_of_page(h, 0));
-		fprintf(stream, "<img src=\"../../%s\">", path_of_thumbnail_image(h, 0));
+		fprintf(stream, "<a href=\"../%s\">",  path_of_page(h, 0));
+		fprintf(stream, "<img src=\"../%s\">", path_of_thumbnail_image(h, 0));
 		fprintf(stream, "</a>");
 	}
 	fprintf(stream, "</td>");
 
 	struct rmDsummary *s;
 	s = h->summaries_sorted[h->total_count - 1];
-	write_outlier(stream, s, f, NULL);
+	write_outlier(stream, s, f, prefix);
 
 	s = h->summaries_sorted[index_of_p(h, 0.99)];
-	write_outlier(stream, s, f, NULL);
+	write_outlier(stream, s, f, prefix);
 
 	s = h->summaries_sorted[index_of_p(h, 0.95)];
-	write_outlier(stream, s, f, NULL);
+	write_outlier(stream, s, f, prefix);
 
 	s = h->summaries_sorted[index_of_p(h, 0.50)];
-	write_outlier(stream, s, f, NULL);
+	write_outlier(stream, s, f, prefix);
 
 	s = h->summaries_sorted[0];
-	write_outlier(stream, s, f, NULL);
+	write_outlier(stream, s, f, prefix);
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, "%6.0lf\n", h->value_at_max_count);
@@ -935,7 +940,7 @@ void write_individual_histogram_webpage(struct histogram *h)
 	fprintf(fo, "</tr>\n");
 
 	fprintf(fo, "<tr>\n");
-	write_webpage_stats(fo, h, 0);
+	write_webpage_stats(fo, h, "../", 0);
 	fprintf(fo, "</tr>\n");
 	fprintf(fo, "</table>\n");
 
@@ -995,7 +1000,7 @@ void write_front_page(char *workflow_name)
 		while((s = list_next_item(all_sets)))
 		{
 			h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-			write_webpage_stats(fo, h, 1);
+			write_webpage_stats(fo, h, NULL, 1);
 		}
 		fprintf(fo, "</tr>\n");
 
@@ -1101,6 +1106,11 @@ int main(int argc, char **argv)
 	}
 
 	output_directory = argv[optind];
+
+	char *outlier_dir = string_format("%s/%s", output_directory, OUTLIER_DIR);
+	if(create_dir(outlier_dir, 0755) < 0 && errno != EEXIST)
+		fatal("Could not create outliers directory.");
+	free(outlier_dir);
 
 	if(argc - optind > 1)
 	{
