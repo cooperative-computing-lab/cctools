@@ -22,6 +22,12 @@ See the file COPYING for details.
 #include <fnmatch.h>
 #include <fcntl.h>
 
+/*
+Some things that could be cleaned up in this code:
+- Use list.h instead of an embedded linked list.
+- The resolver cache was used to cache the (expensive) lookups of the external resolver, which is basically unused.  Not clear if the cache actually helps for internal lookups, which simply traverse a (usually short) linked list.  Try removing the resolver cache and see how that impacts real applications.
+*/
+
 extern char pfs_temp_dir[PFS_PATH_MAX];
 
 struct mount_entry {
@@ -34,6 +40,19 @@ struct mount_entry {
 static struct mount_entry * mount_list = 0;
 static struct hash_table *resolve_cache = 0;
 
+static void pfs_resolve_cache_flush()
+{
+	char *key, *value;
+
+	if(!resolve_cache) return;
+
+	hash_table_firstkey(resolve_cache);
+	while(hash_table_nextkey(resolve_cache,&key,(void**)&value)) {
+		hash_table_remove(resolve_cache,key);
+		free(value);
+	}
+}
+
 void pfs_resolve_add_entry( const char *prefix, const char *redirect, mode_t mode )
 {
 	struct mount_entry * m = xxmalloc(sizeof(*m));
@@ -42,6 +61,7 @@ void pfs_resolve_add_entry( const char *prefix, const char *redirect, mode_t mod
 	m->mode = mode;
 	m->next = mount_list;
 	mount_list = m;
+	pfs_resolve_cache_flush();
 }
 
 int pfs_resolve_remove_entry( const char *prefix )
@@ -56,6 +76,7 @@ int pfs_resolve_remove_entry( const char *prefix )
 				mount_list = m->next;
 			}
 			free(m);
+			pfs_resolve_cache_flush();
 			return 1;
 		}
 	}
