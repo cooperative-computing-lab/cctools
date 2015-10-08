@@ -53,7 +53,7 @@ int main( int argc, char *argv[] )
 		}
 	}
 
-	if( (argc-optind)<2 ) {
+	if( (argc-optind)!=2 ) {
 		show_help();
 		return 1;
 	}
