@@ -44,6 +44,25 @@ void pfs_resolve_add_entry( const char *prefix, const char *redirect, mode_t mod
 	mount_list = m;
 }
 
+int pfs_resolve_remove_entry( const char *prefix )
+{
+	struct mount_entry *m, *p=0;
+
+	for(m=mount_list;m;p=m,m=m->next) {
+		if(!strcmp(m->prefix,prefix)) {
+			if(p) {
+				p->next = m->next;			
+			} else {
+				mount_list = m->next;
+			}
+			free(m);
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 int parse_mode( const char * options ) {
 	unsigned int i;
 	int mode = 0;

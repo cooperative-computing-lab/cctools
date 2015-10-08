@@ -2841,13 +2841,23 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
-		case SYSCALL64_parrot_mount:
+		case SYSCALL32_parrot_mount:
 			if(entering) {
 				char path[PFS_PATH_MAX];
 				char device[PFS_PATH_MAX];
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0));
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,device,POINTER(args[1]),sizeof(device),0));
 				p->syscall_result = pfs_mount(path,device);
+				if(p->syscall_result<0) p->syscall_result = -errno;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_parrot_unmount:
+			if(entering) {
+				char path[PFS_PATH_MAX];
+				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0));
+				p->syscall_result = pfs_unmount(path);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
 			}

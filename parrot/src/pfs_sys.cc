@@ -248,6 +248,24 @@ int pfs_mount( const char *path, const char *device )
 	END
 }
 
+int pfs_unmount( const char *path )
+{
+	BEGIN
+	debug(D_LIBCALL,"unmount %s",path);
+	if(pfs_allow_dynamic_mounts) {
+		if(pfs_resolve_remove_entry(path)) {
+			result = 0;
+		} else {
+			result = -1;
+			errno = EINVAL;
+		}
+	} else {
+		result = -1;
+		errno = EPERM;
+	}
+	END
+}
+
 int pfs_stat( const char *path, struct pfs_stat *buf )
 {
 	BEGIN

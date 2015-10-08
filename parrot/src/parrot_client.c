@@ -242,4 +242,13 @@ int parrot_mount ( const char *path, const char *destination )
 #endif
 }
 
+int parrot_unmount ( const char *path )
+{
+#ifdef CCTOOLS_CPU_I386
+	return syscall(SYSCALL32_parrot_unmount,path);
+#else
+	return syscall(SYSCALL64_parrot_unmount,path);
+#endif
+}
+
 /* vim: set noexpandtab tabstop=4: */
