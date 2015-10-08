@@ -1361,6 +1361,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Show version string.\n", "-v,--version");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Interval between observations, in microseconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
+    fprintf(stdout, "%-30s Read command line from <str>, and execute as '/bin/sh -c <str>'\n", "-c,--sh=<str>");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
     fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify.\n", "-L,--limits=<string>");
@@ -1450,6 +1451,8 @@ int main(int argc, char **argv) {
     char *series_path  = NULL;
     char *opened_path  = NULL;
 
+	char *sh_cmd_line = NULL;
+
     int use_series   = 0;
     int use_inotify  = 0;
     int child_in_foreground = 0;
@@ -1473,7 +1476,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_TIME_SERIES = UCHAR_MAX+1,
 		LONG_OPT_OPENED_FILES,
 		LONG_OPT_DISK_FOOTPRINT,
-		LONG_OPT_NO_DISK_FOOTPRINT
+		LONG_OPT_NO_DISK_FOOTPRINT,
+		LONG_OPT_SH_CMDLINE
 	};
 
     static const struct option long_options[] =
@@ -1486,6 +1490,7 @@ int main(int argc, char **argv) {
 		    {"interval",   required_argument, 0, 'i'},
 		    {"limits",     required_argument, 0, 'L'},
 		    {"limits-file",required_argument, 0, 'l'},
+		    {"sh",         required_argument, 0, 'c'},
 
 		    {"verbatim-to-summary",required_argument, 0, 'V'},
 
@@ -1502,7 +1507,7 @@ int main(int argc, char **argv) {
 	/* By default, measure working directory. */
 	resources_flags->workdir_footprint = 1;
 
-    while((c = getopt_long(argc, argv, "d:fhi:L:l:o:O:vV:", long_options, NULL)) >= 0)
+    while((c = getopt_long(argc, argv, "c:d:fhi:L:l:o:O:vV:", long_options, NULL)) >= 0)
     {
 		switch (c) {
 			case 'd':
@@ -1518,6 +1523,9 @@ int main(int argc, char **argv) {
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
+			case 'c':
+				sh_cmd_line = xxstrdup(optarg);
+				break;
 			case 'i':
 				interval = strtoll(optarg, NULL, 10);
 				if(interval < 1)
@@ -1579,27 +1587,31 @@ int main(int argc, char **argv) {
 
     rmsummary_debug_report(resources_limits);
 
-    //this is ugly
-    if(optind < argc)
-    {
-        executable = xxstrdup(argv[optind]);
-        for(i = optind; i < argc; i++)
-        {
-            strcat(command_line, argv[i]);
-            strcat(command_line, " ");
-        }
-    }
-    else
-    {
-        show_help(argv[0]);
-        return 1;
-    }
+	//this is ugly. if -c given, we should not accept any more arguments.
+	// if not given, we should get the arguments that represent the command line.
+	if((optind < argc && sh_cmd_line) || (optind >= argc && !sh_cmd_line)) {
+		show_help(argv[0]);
+		return 1;
+	}
 
+	if(sh_cmd_line) {
+		argc = 3;
+		optind = 0;
+		char *argv_sh[] = { "/bin/sh", "-c", sh_cmd_line, 0 };
+		argv = argv_sh;
+	}
+
+	executable = xxstrdup(argv[optind]);
+	for(i = optind; i < argc; i++)
+	{
+		strcat(command_line, argv[i]);
+		strcat(command_line, " ");
+	}
 
     if(getenv(RESOURCE_MONITOR_INFO_ENV_VAR))
     {
         debug(D_DEBUG, "using upstream monitor. executing: %s\n", command_line);
-        execlp("sh", "sh", "-c", command_line, (char *) NULL);
+        execlp("/bin/sh", "sh", "-c", command_line, (char *) NULL);
         //We get here only if execlp fails.
         fatal("error executing %s: %s\n", command_line, strerror(errno));
     }

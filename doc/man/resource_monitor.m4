@@ -90,6 +90,7 @@ OPTIONS_BEGIN
 OPTION_TRIPLET(-d,debug,subsystem)Enable debugging for this subsystem.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_TRIPLET(-i,interval,n)Interval between observations, in seconds (default=1).
+OPTION_TRIPLET(-c,sh,str)Read command line from <str>, and execute as '/bin/sh -c <str>'.
 OPTION_TRIPLET(-l,limits-file,file)Use maxfile with list of var: value pairs for resource limits.
 OPTION_TRIPLET(-L,limits,string)String of the form `"var: value, var: value\' to specify resource limits. (Could be specified multiple times.)
 OPTION_ITEM(`-f, --child-in-foreground')Keep the monitored process in foreground (for interactive use).
@@ -134,6 +135,12 @@ To monitor 'sleep 10', at 2 second intervals, with output to sleep-log.summary, 
 
 LONGCODE_BEGIN
 % resource_monitor --interval=2 -L"wall_time: 5" -o sleep-log -- sleep 10
+LONGCODE_END
+
+Execute 'date' and redirect its output to a file:
+
+LONGCODE_BEGIN
+% resource_monitor --sh 'date > date.output'
 LONGCODE_END
 
 It can also be run automatically from makeflow, by specifying the '-M' flag:
