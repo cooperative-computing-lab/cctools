@@ -239,8 +239,13 @@ int pfs_mount( const char *path, const char *device )
 	BEGIN
 	debug(D_LIBCALL,"mount %s %s",path,device);
 	if(pfs_allow_dynamic_mounts) {
-		pfs_resolve_add_entry(path,device);
-		result = 0;
+		if(path[0]!='/') {
+			result = -1;
+			errno = EINVAL;
+		} else {
+			pfs_resolve_add_entry(path,device);
+			result = 0;
+		}
 	} else {
 		result = -1;
 		errno = EPERM;
@@ -253,7 +258,10 @@ int pfs_unmount( const char *path )
 	BEGIN
 	debug(D_LIBCALL,"unmount %s",path);
 	if(pfs_allow_dynamic_mounts) {
-		if(pfs_resolve_remove_entry(path)) {
+		if(path[0]!='/') {
+			result = -1;
+			errno = EINVAL;
+		} else if(pfs_resolve_remove_entry(path)) {
 			result = 0;
 		} else {
 			result = -1;
