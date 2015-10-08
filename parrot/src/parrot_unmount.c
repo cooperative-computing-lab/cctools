@@ -7,6 +7,8 @@ See the file COPYING for details.
 #include "parrot_client.h"
 #include "debug.h"
 #include "cctools.h"
+#include "path.h"
+#include "stringtools.h"
 
 #include <stdio.h>
 #include <errno.h>
@@ -58,7 +60,15 @@ int main( int argc, char *argv[] )
 		return 1;
 	}
 
-	const char *path = argv[optind];
+	const char *relpath = argv[optind];
+	const char *path;
+
+	if(relpath[0]!='/') {
+		const char * cwd = path_getcwd();
+		path = string_format("%s/%s",cwd,relpath);
+	} else {
+		path = relpath;
+	}
 
 	int result = parrot_unmount(path);
 
