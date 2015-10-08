@@ -111,7 +111,7 @@ void rmonitor_poll_all_fss_once(struct itable *filesysms, struct rmonitor_filesy
 
 int rmonitor_poll_process_once(struct rmonitor_process_info *p)
 {
-	debug(D_DEBUG, "monitoring process: %d\n", p->pid);
+	debug(D_RMON, "monitoring process: %d\n", p->pid);
 
 	rmonitor_get_cpu_time_usage(p->pid, &p->cpu);
 	rmonitor_get_mem_usage(p->pid, &p->mem);
@@ -123,7 +123,7 @@ int rmonitor_poll_process_once(struct rmonitor_process_info *p)
 
 int rmonitor_poll_wd_once(struct rmonitor_wdir_info *d, int max_time_for_measurement)
 {
-	debug(D_DEBUG, "monitoring dir %s\n", d->path);
+	debug(D_RMON, "monitoring dir %s\n", d->path);
 
 	rmonitor_get_wd_usage(d, max_time_for_measurement);
 
@@ -165,7 +165,7 @@ FILE *open_proc_file(pid_t pid, char *filename)
 
 		if((fproc = fopen(fproc_path, "r")) == NULL)
 		{
-				debug(D_DEBUG, "could not process file %s : %s\n", fproc_path, strerror(errno));
+				debug(D_RMON, "could not process file %s : %s\n", fproc_path, strerror(errno));
 				return NULL;
 		}
 
@@ -458,11 +458,11 @@ int rmonitor_get_dsk_usage(const char *path, struct statfs *disk)
 {
 	char cwd[PATH_MAX];
 
-	debug(D_DEBUG, "statfs on path: %s\n", path);
+	debug(D_RMON, "statfs on path: %s\n", path);
 
 	if(statfs(path, disk) > 0)
 	{
-		debug(D_DEBUG, "could not statfs on %s : %s\n", cwd, strerror(errno));
+		debug(D_RMON, "could not statfs on %s : %s\n", cwd, strerror(errno));
 		return 1;
 	}
 
