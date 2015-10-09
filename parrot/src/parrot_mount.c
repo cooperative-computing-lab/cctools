@@ -34,7 +34,7 @@ typedef enum {
 	MODE_MOUNT,
 	MODE_UNMOUNT,
 	MODE_DISABLE
-} mode_t;
+} mount_mode_t;
 
 typedef enum {
 	LONG_OPT_UNMOUNT=256,
@@ -44,7 +44,7 @@ typedef enum {
 int main( int argc, char *argv[] )
 {
 	int c;
-	mode_t mode = MODE_MOUNT;
+	mount_mode_t mode = MODE_MOUNT;
 	int expected_args = 2;
 
 	static const struct option long_options[] = {
