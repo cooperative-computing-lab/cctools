@@ -1010,7 +1010,7 @@ void rmonitor_final_cleanup(int signum)
     itable_firstkey(processes);
     while(itable_nextkey(processes, &pid, (void **) &p))
     {
-        debug(D_RMON, "sending %s to process %"PRId64".\n", strsignal(signum), pid);
+        debug(D_RMON, "sending %s(%d) to process %"PRId64".\n", strsignal(signum), signum, pid);
 
         kill(pid, signum);
     }
@@ -1030,7 +1030,7 @@ void rmonitor_final_cleanup(int signum)
     itable_firstkey(processes);
     while(itable_nextkey(processes, &pid, (void **) &p))
     {
-        debug(D_RMON, "sending %s to process %"PRId64".\n", strsignal(SIGKILL), pid);
+        debug(D_RMON, "sending %s(%d) to process %"PRId64".\n", strsignal(SIGKILL), SIGKILL, pid);
 
         kill(pid, SIGKILL);
 
@@ -1144,7 +1144,7 @@ void rmonitor_dispatch_msg(void)
 
 	recv_monitor_msg(rmonitor_queue_fd, &msg);
 
-	debug(D_RMON,"message \"%s\" from %d\n", str_msgtype(msg.type), msg.origin);
+	debug(D_RMON,"message \"%s\" from %d with error %d\n", str_msgtype(msg.type), msg.origin, msg.error);
 
 	p = itable_lookup(processes, (uint64_t) msg.origin);
 

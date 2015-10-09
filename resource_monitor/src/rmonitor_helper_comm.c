@@ -4,6 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -18,12 +20,12 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <limits.h>
 
-#include "debug.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
 #include "rmonitor_helper_comm.h"
 
+#include "debug.h"
 //#define debug fprintf
 //#define D_RMON stderr
 
@@ -158,7 +160,7 @@ int send_monitor_msg(struct rmonitor_msg *msg)
 	}
 
 	int count;
-	debug(D_RMON, "sending message from %d to port %d\n", getpid(), port);
+	debug(D_RMON, "sending message from %d to port %d: %s(%d)\n", getpid(), port, str_msgtype(msg->type), msg->error);
 	count = sendto(fd, msg, sizeof(struct rmonitor_msg), 0, addr->ai_addr, addr->ai_addrlen);
 	debug(D_RMON, "message sent from %d to port %d. %d bytes.\n", getpid(), port, count);
 
