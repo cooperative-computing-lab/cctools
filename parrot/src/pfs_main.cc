@@ -637,6 +637,8 @@ int main( int argc, char *argv[] )
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-level-irods", required_argument, 0, 'I'},
 		{"debug-rotate-max", required_argument, 0, 'O'},
+		{"dynamic-mounts", no_argument, 0, LONG_OPT_DYNAMIC_MOUNTS },
+		{"no-dynamic-mounts", no_argument, 0, LONG_OPT_NO_DYNAMIC_MOUNTS },
 		{"env-list", required_argument, 0, 'e'},
 		{"gid", required_argument, 0, 'G'},
 		{"help", no_argument, 0, 'h'},
