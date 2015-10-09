@@ -30,6 +30,7 @@ struct mount_entry {
 };
 
 static struct mount_entry * mount_list = 0;
+static struct mount_entry * whitelist = 0;
 static struct hash_table *resolve_cache = 0;
 
 static void add_mount_entry( const char *prefix, const char *redirect )
@@ -39,6 +40,15 @@ static void add_mount_entry( const char *prefix, const char *redirect )
 	strcpy(m->redirect,redirect);
 	m->next = mount_list;
 	mount_list = m;
+}
+
+static void add_whitelist_entry( const char *path )
+{
+	struct mount_entry * m = xxmalloc(sizeof(*m));
+	strcpy(m->prefix,path);
+	strcpy(m->redirect,path);
+	m->next = whitelist;
+	whitelist = m;
 }
 
 void pfs_resolve_manual_config( const char *str )
@@ -88,6 +98,63 @@ void pfs_resolve_file_config( const char *filename )
 	}
 
 	fclose(file);
+}
+
+void pfs_resolve_whitelist_file( const char *filename )
+{
+	FILE *file;
+	struct mount_entry * m;
+	char line[PFS_LINE_MAX];
+	char path[PFS_LINE_MAX];
+	char * fake_root;
+	int fields;
+	int linenum=0;
+
+	file = fopen(filename,"r");
+	if(!file) fatal("couldn't open whitelist %s: %s\n",filename,strerror(errno));
+
+	fake_root = mkdtemp(xxstrdup("/tmp/parrot_fakeroot-XXXXXX"));
+	if(fake_root == NULL) fatal("couldn't create fake root: %s\n",strerror(errno));
+
+	m = xxmalloc(sizeof(*m));
+	strcpy(m->prefix, "/");
+	strcpy(m->redirect, fake_root);
+	m->next = 0;
+	whitelist = m;
+	free(fake_root);
+
+	while(1) {
+		if(!fgets(line,sizeof(line),file)) {
+			if(errno==EINTR) {
+				continue;
+			} else {
+				break;
+			}
+		}
+		linenum++;
+		if(line[0]=='#') continue;
+		string_chomp(line);
+		if(!line[0]) continue;
+		fields = sscanf(line,"%s",path);
+
+		if(fields==0) {
+			continue;
+		} else {
+			add_whitelist_entry(path);
+		}
+	}
+
+	fclose(file);
+
+	m = mount_list;
+	while(m && m->next) {
+		m = m->next;
+	}
+	if(m) {
+		m->next = whitelist;
+	} else {
+		mount_list = whitelist;
+	}
 }
 
 int pfs_resolve_external( const char *logical_name, const char *prefix, const char *redirect, char *physical_name )
