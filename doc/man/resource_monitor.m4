@@ -96,7 +96,7 @@ OPTION_TRIPLET(-L,limits,string)String of the form `"var: value, var: value\' to
 OPTION_ITEM(`-f, --child-in-foreground')Keep the monitored process in foreground (for interactive use).
 OPTION_TRIPLET(-O,with-output-files,template)Specify template for log files (default=resource-pid-<pid>).
 OPTION_ITEM(--with-time-series)Write resource time series to <template>.series.
-OPTION_PAIR(--with-inotify)Write inotify statistics to <template>.files.
+OPTION_ITEM(--with-inotify)Write inotify statistics to <template>.files.
 OPTION_TRIPLET(-V,verbatim-to-summary,str)Include this string verbatim in a line in the summary. (Could be specified multiple times.)
 OPTION_ITEM(--without-time-series)Do not write the time-series log file.
 OPTION_ITEM(--without-opened-files)Do not write the list of opened files.

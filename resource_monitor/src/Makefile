@@ -7,7 +7,6 @@ EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
 OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o rmon_tools.o rmonitor_helper.o
 PROGRAMS = resource_monitorv resource_monitor resource_monitor_cluster resource_monitor_histograms piggybacker rmonitor_poll_example
-SCRIPTS = resource_monitor_visualizer.py
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
 ifeq ($(UNAME), Darwin)
@@ -54,10 +53,8 @@ clean:
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
-	cp $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
-	cp -r resource_monitor_visualizer_static $(CCTOOLS_INSTALL_DIR)/lib
 
 test: all
 

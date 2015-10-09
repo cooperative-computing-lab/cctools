@@ -91,6 +91,5 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/lib64/*.so
 %{_libdir}/python*
 %{_libdir}/perl*
-%{_libdir}/resource_monitor_visualizer_static*
 %attr(0755,root,root) %{_libdir}/*.so
 %attr(0755,root,root) %{_libdir}/lib64/*.so

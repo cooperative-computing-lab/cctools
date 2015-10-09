@@ -14,7 +14,7 @@ config.mk:
 	@exit 1
 
 makeflow parrot wavefront work_queue: chirp
-allpairs chirp ftp_lite makeflow makeflow_linker parrot resource_monitor resource_monitor_visualizer sand wavefront work_queue: dttools
+allpairs chirp ftp_lite makeflow makeflow_linker parrot resource_monitor sand wavefront work_queue: dttools
 parrot: ftp_lite
 allpairs: sand
 allpairs makeflow sand wavefront: work_queue
