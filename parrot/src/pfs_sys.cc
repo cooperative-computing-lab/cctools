@@ -238,7 +238,11 @@ int pfs_mount( const char *path, const char *device )
 {
 	BEGIN
 	debug(D_LIBCALL,"mount %s %s",path,device);
-	if(pfs_allow_dynamic_mounts) {
+
+	if(!path && !device) {
+		pfs_allow_dynamic_mounts = 0;
+		result = 0;
+	} else if(pfs_allow_dynamic_mounts) {
 		if(path[0]!='/') {
 			result = -1;
 			errno = EINVAL;
@@ -250,6 +254,7 @@ int pfs_mount( const char *path, const char *device )
 		result = -1;
 		errno = EPERM;
 	}
+
 	END
 }
 
