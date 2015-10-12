@@ -188,6 +188,10 @@ static int submit_worker( struct batch_queue *queue, const char *master_regex )
 }
 
 static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
+
+	if(!masters_list || list_size(masters_list) < 1)
+		return;
+
 	buffer_t b;
 	struct nvpair *nv;
 
