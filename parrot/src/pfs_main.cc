@@ -142,7 +142,6 @@ enum {
 	LONG_OPT_NO_SET_FOREGROUND,
 	LONG_OPT_SYSCALL_DISABLE_DEBUG,
 	LONG_OPT_VALGRIND,
-	LONG_OPT_WHITELIST,
 };
 
 static void get_linux_version(const char *cmd)
@@ -225,7 +224,6 @@ static void show_help( const char *cmd )
 	printf( " %-30s Record all the file names.\n", "-n,--name-list=<path>");
 	printf( " %-30s Disable changing the foreground process group of the session.\n","   --no-set-foreground");
 	printf( " %-30s Use this file as a mountlist.             (PARROT_MOUNT_FILE)\n", "-m,--ftab-file=<file>");
-	printf( " %-30s Only allow access to the paths in the given file.          (PARROT_WHITELIST)\n", "--whitelist=<file>");
 	printf( " %-30s Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)\n", "-M,--mount=/foo=/bar");
 	printf( " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
 	printf( " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal) (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
@@ -625,7 +623,6 @@ int main( int argc, char *argv[] )
 		{"with-checksums", no_argument, 0, 'K'},
 		{"with-snapshots", no_argument, 0, 'F'},
 		{"work-dir", required_argument, 0, 'w'},
-		{"whitelist", required_argument, 0, LONG_OPT_WHITELIST},
 		{0,0,0,0}
 	};
 
@@ -692,9 +689,6 @@ int main( int argc, char *argv[] )
 			break;
 		case 'M':
 			pfs_resolve_manual_config(optarg);
-			break;
-		case LONG_OPT_WHITELIST:
-			pfs_resolve_whitelist_file(optarg);
 			break;
 		case 'n':
 			if(access(optarg, F_OK) != -1) {
@@ -870,9 +864,6 @@ int main( int argc, char *argv[] )
 
 	s = getenv("PARROT_MOUNT_STRING");
 	if(s) pfs_resolve_manual_config(s);
-
-	s = getenv("PARROT_WHITELIST");
-	if(s) pfs_resolve_whitelist_file(s);
 
 	s = getenv("PARROT_FORCE_STREAM");
 	if(s) pfs_force_stream = 1;

@@ -20,7 +20,6 @@ typedef enum {
 
 void pfs_resolve_file_config( const char *mountfile );
 void pfs_resolve_manual_config( const char *string );
-void pfs_resolve_whitelist_file( const char *filename );
 
 pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, time_t stoptime );
 
