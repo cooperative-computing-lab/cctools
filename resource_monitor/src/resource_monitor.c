@@ -1144,7 +1144,7 @@ void rmonitor_dispatch_msg(void)
 
 	recv_monitor_msg(rmonitor_queue_fd, &msg);
 
-	debug(D_RMON,"message \"%s\" from %d with error %d\n", str_msgtype(msg.type), msg.origin, msg.error);
+	debug(D_RMON,"message '%s' (%d) from %d with status '%s' (%d)\n", str_msgtype(msg.type), msg.type, msg.origin, strerror(msg.error), msg.error);
 
 	p = itable_lookup(processes, (uint64_t) msg.origin);
 

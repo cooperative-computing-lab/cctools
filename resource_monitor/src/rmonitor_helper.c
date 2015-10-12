@@ -173,13 +173,11 @@ FILE *fopen(const char *path, const char *mode)
 		file = original_fopen(path, mode);
 	POP_ERRNO(msg)
 
-	if(file)
-	{
-		if(open_for_writing(fileno(file))) {
-			msg.type   = OPEN_OUTPUT;
-		} else {
-			msg.type   = OPEN_INPUT;
-		}
+	/* Consider file as input by default. */
+	msg.type   = OPEN_INPUT;
+
+	if(file && open_for_writing(fileno(file))) {
+		msg.type   = OPEN_OUTPUT;
 	}
 
 	msg.origin = getpid();
@@ -210,14 +208,11 @@ int open(const char *path, int flags, ...)
 		fd = original_open(path, flags, mode);
 	POP_ERRNO(msg)
 
-	if(fd > -1)
-	{
+	/* Consider file as input by default. */
+	msg.type   = OPEN_INPUT;
 
-		if(open_for_writing(fd)) {
-			msg.type   = OPEN_OUTPUT;
-		} else {
-			msg.type   = OPEN_INPUT;
-		}
+	if(fd > -1 && open_for_writing(fd)) {
+		msg.type   = OPEN_OUTPUT;
 	}
 
 	msg.origin = getpid();
@@ -242,13 +237,11 @@ FILE *fopen64(const char *path, const char *mode)
 		file = original_fopen64(path, mode);
 	POP_ERRNO(msg)
 
-	if(file)
-	{
-		if(open_for_writing(fileno(file))) {
-			msg.type   = OPEN_OUTPUT;
-		} else {
-			msg.type   = OPEN_INPUT;
-		}
+	/* Consider file as input by default. */
+	msg.type   = OPEN_INPUT;
+
+	if(file && open_for_writing(fileno(file))) {
+		msg.type   = OPEN_OUTPUT;
 	}
 
 	msg.origin = getpid();
@@ -279,13 +272,11 @@ int open64(const char *path, int flags, ...)
 		fd = original_open64(path, flags, mode);
 	POP_ERRNO(msg)
 
-	if(fd > -1)
-	{
-		if(open_for_writing(fd)) {
-			msg.type   = OPEN_OUTPUT;
-		} else {
-			msg.type   = OPEN_INPUT;
-		}
+	/* Consider file as input by default. */
+	msg.type   = OPEN_INPUT;
+
+	if(fd > -1 && open_for_writing(fd)) {
+		msg.type   = OPEN_OUTPUT;
 	}
 
 	msg.origin = getpid();
