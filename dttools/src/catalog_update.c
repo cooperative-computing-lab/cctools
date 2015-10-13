@@ -8,10 +8,10 @@ See the file COPYING for details.
 #include "catalog_query.h"
 #include "datagram.h"
 #include "debug.h"
-#include "domain_name_cache.h"
 #include "int_sizes.h"
 #include "load_average.h"
 #include "host_memory_info.h"
+#include "macros.h"
 #include "stringtools.h"
 #include "username.h"
 #include "uptime.h"
@@ -30,7 +30,7 @@ void show_help(const char *cmd) {
 
 int main(int argc, char *argv[]) {
 	char *host = CATALOG_HOST;
-	int   port = CATALOG_PORT;
+	char *port = CATALOG_PORT;
 
 	static const struct option long_options[] = {
 		{"catalog", required_argument, 0, 'c'},
@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	struct datagram *d;
-	d = datagram_create(DATAGRAM_PORT_ANY);
+	d = datagram_create_address(NULL, NULL);
 	if (!d) {
 		fatal("could not create datagram port!");
 	}
@@ -105,14 +105,10 @@ int main(int argc, char *argv[]) {
 
 	char *text = jx_print_string(j);
 
-	char address[DATAGRAM_ADDRESS_MAX];
-	if (domain_name_cache_lookup(host, address)) {
-		datagram_send(d, text, strlen(text), address, port);
-	} else {
-		fatal("unable to lookup address of host: %s", host);
-	}
+	datagram_send(d, text, strlen(text), host, port);
 
 	jx_delete(j);
+
 	datagram_delete(d);
 	return EXIT_SUCCESS;
 }

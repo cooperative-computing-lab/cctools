@@ -9,13 +9,13 @@ See the file COPYING for details.
 #include "pfs_service.h"
 
 extern "C" {
+#include "copy_stream.h"
 #include "debug.h"
 #include "ftp_lite.h"
+#include "full_io.h"
+#include "hostname.h"
 #include "stringtools.h"
 #include "username.h"
-#include "domain_name_cache.h"
-#include "copy_stream.h"
-#include "full_io.h"
 }
 
 #include <unistd.h>
@@ -81,11 +81,12 @@ public:
 			result = ftp_lite_auth_globus(server);
 		} else if(this->type==ANONYMOUS) {
 			char username[USERNAME_MAX];
-			char hostname[DOMAIN_NAME_MAX];
-			char email[USERNAME_MAX+DOMAIN_NAME_MAX+1];
+			char hostname[HOST_NAME_MAX];
+			char email[sizeof(username)+sizeof(hostname)+1];
 			if(!username_get(username)) strcpy(username,"anonymous");
-			if(!domain_name_cache_guess(hostname)) strcpy(hostname,"nowhere");
-			sprintf(email,"%s@%s",username,hostname);
+			if(getcanonicalhostname(hostname, sizeof(hostname)) == -1)
+				strcpy(hostname,"nowhere");
+			snprintf(email,sizeof(email),"%s@%s",username,hostname);
 			server = ftp_lite_open(name->host,name->port);
 			if(!server) return 0;
 			result = ftp_lite_auth_userpass(server,"anonymous",email);

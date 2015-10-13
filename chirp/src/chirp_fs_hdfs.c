@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "chirp_filesystem.h"
 #include "chirp_fs_hdfs.h"
 #include "chirp_protocol.h"
+#include "chirp_server.h"
 
 #include "debug.h"
 #include "hash_table.h"
@@ -32,8 +33,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-extern char chirp_owner[USERNAME_MAX];
 
 /*
 This file must take into account several oddities of HDFS:

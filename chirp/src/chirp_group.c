@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "chirp_group.h"
+#include "chirp_server.h"
 #include "chirp_types.h"
 
 #include "debug.h"
@@ -16,9 +17,6 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
-
-
-extern char chirp_transient_path[PATH_MAX];
 
 char chirp_group_base_url[PATH_MAX];
 int  chirp_group_cache_time = 900;

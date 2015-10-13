@@ -13,7 +13,7 @@ See the file COPYING for details.
 
 #include "auth.h"
 #include "debug.h"
-#include "domain_name_cache.h"
+#include "xxmalloc.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -40,24 +40,18 @@ static int auth_address_assert(struct link *link, time_t stoptime)
 
 static int auth_address_accept(struct link *link, char **subject, time_t stoptime)
 {
-	char addr[LINK_ADDRESS_MAX];
-	int port;
+	char node[HOST_NAME_MAX];
+	char serv[128];
 
-	if(!link_address_remote(link, addr, &port)) {
+	if(!link_getpeername(link, node, sizeof(node), serv, sizeof(serv), NI_NUMERICHOST|NI_NUMERICSERV)) {
 		debug(D_AUTH, "address: couldn't get address of link");
 		goto reject;
 	}
 
-	*subject = strdup(addr);
-	if(!*subject) {
-		debug(D_AUTH, "address: out of memory");
-		goto reject;
-	}
-
+	*subject = xxstrdup(node);
 	link_putliteral(link, "yes\n", stoptime);
 	return 1;
-
-	  reject:
+reject:
 	link_putliteral(link, "no\n", stoptime);
 	return 0;
 }

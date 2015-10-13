@@ -7,8 +7,10 @@ See the file COPYING for details.
 #ifndef CATALOG_QUERY_H
 #define CATALOG_QUERY_H
 
-#include <time.h>
 #include "jx.h"
+#include "macros.h"
+
+#include <time.h>
 
 /** @file catalog_query.h
 Query the global catalog server for server descriptions.
@@ -18,7 +20,7 @@ Query the global catalog server for server descriptions.
 #define CATALOG_PORT_DEFAULT 9097
 
 #define CATALOG_HOST (getenv("CATALOG_HOST") ? getenv("CATALOG_HOST") : CATALOG_HOST_DEFAULT )
-#define CATALOG_PORT (getenv("CATALOG_PORT") ? atoi(getenv("CATALOG_PORT")) : CATALOG_PORT_DEFAULT )
+#define CATALOG_PORT (getenv("CATALOG_PORT") ? getenv("CATALOG_PORT") : xstr(CATALOG_PORT_DEFAULT) )
 
 /** Create a catalog query.
 Connects to a catalog server, issues a query, and waits for the results.

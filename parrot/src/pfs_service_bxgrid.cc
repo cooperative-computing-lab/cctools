@@ -12,8 +12,8 @@ See the file COPYING for details.
 extern "C" {
 #include "chirp_global.h"
 #include "debug.h"
-#include "domain_name.h"
 #include "hash_table.h"
+#include "hostname.h"
 #include "path.h"
 #include "random.h"
 #include "stringtools.h"
@@ -518,11 +518,7 @@ public:
 		s = getenv("BXGRID_TIMEOUT");
 		if (s) bxgrid_timeout = atoi(s);
 
-		if (gethostname(bxgrid_hostname, PFS_LINE_MAX) >= 0) {
-			char ip_address[PFS_LINE_MAX];
-			if (domain_name_lookup(bxgrid_hostname, ip_address))
-				domain_name_lookup_reverse(ip_address, bxgrid_hostname);
-		} else {
+		if (getcanonicalhostname(bxgrid_hostname, PFS_LINE_MAX) == -1) {
 			strncpy(bxgrid_hostname, "localhost", PFS_LINE_MAX);
 		}
 	}

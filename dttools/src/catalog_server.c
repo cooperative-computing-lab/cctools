@@ -5,34 +5,37 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "cctools.h"
+#include "buffer.h"
 #include "catalog_query.h"
+#include "cctools.h"
+#include "daemon.h"
 #include "datagram.h"
-#include "link.h"
-#include "nvpair_database.h"
 #include "debug.h"
 #include "getopt.h"
+#include "getopt_aux.h"
+#include "hostname.h"
+#include "link.h"
+#include "list.h"
+#include "macros.h"
 #include "nvpair.h"
+#include "nvpair_database.h"
 #include "nvpair_jx.h"
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "stringtools.h"
-#include "domain_name_cache.h"
 #include "username.h"
-#include "list.h"
 #include "xxmalloc.h"
-#include "macros.h"
-#include "daemon.h"
-#include "getopt_aux.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include <sys/select.h>
+#include <sys/wait.h>
+
+#include <unistd.h>
+
 #include <errno.h>
 #include <signal.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <sys/select.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifndef LINE_MAX
 #define LINE_MAX 1024
@@ -59,7 +62,7 @@ static time_t last_clean_time = 0;
 static time_t clean_interval = 60;
 
 /* The port upon which to listen. */
-static int port = CATALOG_PORT_DEFAULT;
+static char port[128] = xstr(CATALOG_PORT_DEFAULT);
 
 /* The file for writing out the port number. */
 const char *port_file = 0;
@@ -68,7 +71,7 @@ const char *port_file = 0;
 static const char *preferred_hostname = 0;
 
 /* This machine's canonical hostname. */
-static char hostname[DOMAIN_NAME_MAX];
+static char hostname[HOST_NAME_MAX];
 
 /* This process's owner */
 static char owner[USERNAME_MAX];
@@ -177,11 +180,8 @@ static void remove_expired_records()
 
 static int update_one_catalog( void *outgoing_host, const void *text)
 {
-	char addr[DATAGRAM_ADDRESS_MAX];
-	if(domain_name_cache_lookup(outgoing_host, addr)) {
-		debug(D_DEBUG, "sending update to %s:%d", (char*) outgoing_host, CATALOG_PORT);
-		datagram_send(outgoing_dgram, text, strlen(text), addr, CATALOG_PORT);
-	}
+	debug(D_DEBUG, "sending update to %s:%s", (const char *)outgoing_host, port);
+	datagram_send(outgoing_dgram, text, strlen(text), outgoing_host, port);
 	return 1;
 }
 
@@ -192,7 +192,7 @@ static void update_all_catalogs(struct datagram *outgoing_dgram)
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
 	jx_insert_string(j,"owner",owner);
 	jx_insert_integer(j,"starttime",starttime);
-	jx_insert_integer(j,"port",port);
+	jx_insert_string(j,"port",port);
 	jx_insert(j,
 		jx_string("url"),
 		jx_format("http://%s:%d",preferred_hostname,port)
@@ -207,35 +207,53 @@ static void update_all_catalogs(struct datagram *outgoing_dgram)
 
 static void make_hash_key(struct nvpair *nv, char *key)
 {
-	const char *name, *addr;
-	int port;
+	const char *name, *addr, *port;
 
 	addr = nvpair_lookup_string(nv, "address");
 	if(!addr)
 		addr = "unknown";
 
-	port = nvpair_lookup_integer(nv, "port");
+	port = nvpair_lookup_string(nv, "port");
 
 	name = nvpair_lookup_string(nv, "name");
 	if(!name)
 		name = "unknown";
 
-	sprintf(key, "%s:%d:%s", addr, port, name);
+	sprintf(key, "%s:%s:%s", addr, port, name);
 }
 
 static void handle_updates(struct datagram *update_port)
 {
-	char data[DATAGRAM_PAYLOAD_MAX * 2];
-	char addr[DATAGRAM_ADDRESS_MAX];
-	char key[LINE_MAX];
-	int port;
-	int result;
-	struct nvpair *nv;
-
 	while(1) {
-		result = datagram_recv(update_port, data, DATAGRAM_PAYLOAD_MAX, addr, &port, 0);
+		int rc;
+		ssize_t result;
+		struct sockaddr_storage sa;
+		socklen_t socklen = sizeof(sa);
+		char nodeaddr[HOST_NAME_MAX];
+		char nodename[HOST_NAME_MAX];
+		char servname[128];
+		char data[DATAGRAM_PAYLOAD_MAX * 2];
+		char key[LINE_MAX];
+		struct nvpair *nv;
+
+		result = datagram_recv(update_port, data, DATAGRAM_PAYLOAD_MAX, (struct sockaddr *)&sa, &socklen, 0);
 		if(result <= 0)
 			return;
+
+		rc = getnameinfo((struct sockaddr *)&sa, socklen, nodename, sizeof(nodename), servname, sizeof(servname), NI_NAMEREQD|NI_NUMERICSERV);
+		if (rc != 0) {
+			if (rc == EAI_NONAME) {
+				nodename[0] = 0; /* no result */
+			} else {
+				debug(D_DEBUG, "getnameinfo: %s", gai_strerror(rc));
+				continue;
+			}
+		}
+		rc = getnameinfo((struct sockaddr *)&sa, socklen, nodeaddr, sizeof(nodeaddr), servname, sizeof(servname), NI_NUMERICHOST|NI_NUMERICSERV);
+		if (rc != 0) {
+			debug(D_DEBUG, "getnameinfo: %s", gai_strerror(rc));
+			continue;
+		}
 
 		data[result] = 0;
 
@@ -250,7 +268,7 @@ static void handle_updates(struct datagram *update_port)
 			nvpair_parse(nv, data);
 		}
 
-		nvpair_insert_string(nv, "address", addr);
+		nvpair_insert_string(nv, "address", nodeaddr);
 		nvpair_insert_integer(nv, "lastheardfrom", time(0));
 
 		/* If the server reports unbelievable numbers, simply reset them */
@@ -265,18 +283,16 @@ static void handle_updates(struct datagram *update_port)
 			}
 		}
 
-		/* Do not believe the server's reported name, just resolve it backwards. */
-
-		char name[DOMAIN_NAME_MAX];
-		if(domain_name_cache_lookup_reverse(addr, name)) {
-			nvpair_insert_string(nv, "name", name);
+		/* Do not believe the server's reported name, use rDNS name. */
+		if(nodename[0]) {
+			nvpair_insert_string(nv, "name", nodename);
 		} else if (nvpair_lookup_string(nv, "name") == NULL) {
 			/* If rDNS is unsuccessful, then we use the name reported if given.
 			 * This allows for hostnames that are only valid in the subnet of
 			 * the reporting server.  Here we set the "name" field to the IP
 			 * Address, addr, because it was not set by the reporting server.
 			 */
-			nvpair_insert_string(nv, "name", addr);
+			nvpair_insert_string(nv, "name", nodeaddr);
 		}
 
 		make_hash_key(nv, key);
@@ -315,17 +331,16 @@ static void handle_query(struct link *query_link)
 	char action[LINE_MAX];
 	char version[LINE_MAX];
 	char hostport[LINE_MAX];
-	char addr[LINK_ADDRESS_MAX];
+	char nodename[HOST_NAME_MAX];
 	char key[LINE_MAX];
-	int port;
 	time_t current;
 
 	char *hkey;
 	struct nvpair *nv;
 	int i, n;
 
-	link_address_remote(query_link, addr, &port);
-	debug(D_DEBUG, "www query from %s:%d", addr, port);
+	link_getpeername(query_link, nodename, sizeof(nodename), NULL, 0, NI_NUMERICHOST|NI_NUMERICSERV);
+	debug(D_DEBUG, "www query from %s", nodename);
 
 	if(link_readline(query_link, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
 		string_chomp(line);
@@ -491,13 +506,13 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Preferred host name of this server.\n", "-n,--name=<name>");
 	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size. (default 10M, 0 disables)\n", "-O,--debug-rotate-max=<bytes>");
-	fprintf(stdout, " %-30s Port number to listen on (default is %d)\n", "-p,--port=<port>", port);
+	fprintf(stdout, " %-30s Port number to listen on (default is %s)\n", "-p,--port=<port>", port);
 	fprintf(stdout, " %-30s Single process mode; do not work on queries.\n", "-S,--single");
 	fprintf(stdout, " %-30s Maximum time to allow a query process to run.  (default is %ds)\n", "-T,--timeout=<time>",child_procs_timeout);
 	fprintf(stdout, " %-30s Send status updates to this host. (default is %s)\n", "-u,--update-host=<host>", CATALOG_HOST_DEFAULT);
 	fprintf(stdout, " %-30s Send status updates at this interval. (default is 5m)\n", "-U,--update-interval=<time>");
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
-		fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
+	fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
 }
 
 int main(int argc, char *argv[])
@@ -582,7 +597,10 @@ int main(int argc, char *argv[])
 				debug_config_file_size(string_metric_parse(optarg));
 				break;
 			case 'p':
-				port = atoi(optarg);
+				if (strtoul(optarg, NULL, 10) == 0)
+					strcpy(port, "");
+				else
+					snprintf(port, sizeof(port), "%s", optarg);
 				break;
 			case 'S':
 				fork_mode = 0;
@@ -601,7 +619,7 @@ int main(int argc, char *argv[])
 				return 0;
 			case 'Z':
 				port_file = optarg;
-				port = 0;
+				strcpy(port, "");
 				break;
 			}
 	}
@@ -631,7 +649,7 @@ int main(int argc, char *argv[])
 	install_handler(SIGALRM, shutdown_clean);
 
 	if(!preferred_hostname) {
-		domain_name_cache_guess(hostname);
+		getcanonicalhostname(hostname, sizeof(hostname));
 		preferred_hostname = hostname;
 	}
 
@@ -642,7 +660,7 @@ int main(int argc, char *argv[])
 	if(!table)
 		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
-	list_port = link_serve_address(interface, port);
+	list_port = link_serve_address(interface, port[0] ? port : NULL);
 	if(list_port) {
 		/*
 		If a port was chosen automatically, read it back
@@ -651,15 +669,14 @@ int main(int argc, char *argv[])
 		fail because that port is in use.
 		*/
 
-		if(port==0) {
-			char addr[LINK_ADDRESS_MAX];
-			link_address_local(list_port,addr,&port);
+		if(port == NULL) {
+			link_getlocalname(link, NULL, 0, port, sizeof(port), NI_NUMERICSERV);
 		}
 	} else {
 		if(interface)
-			fatal("couldn't listen on TCP address %s port %d", interface, port);
+			fatal("couldn't listen on TCP address %s port %s", interface, port);
 		else
-			fatal("couldn't listen on TCP port %d", port);
+			fatal("couldn't listen on TCP port %s", port);
 	}
 
 	outgoing_dgram = datagram_create(0);
@@ -669,9 +686,9 @@ int main(int argc, char *argv[])
 	update_dgram = datagram_create_address(interface, port);
 	if(!update_dgram) {
 		if(interface)
-			fatal("couldn't listen on UDP address %s port %d", interface, port);
+			fatal("couldn't listen on UDP address %s port %s", interface, port);
 		else
-			fatal("couldn't listen on UDP port %d", port);
+			fatal("couldn't listen on UDP port %s", port);
 	}
 
 	opts_write_port_file(port_file,port);

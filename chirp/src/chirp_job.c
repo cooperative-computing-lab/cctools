@@ -17,6 +17,7 @@
 #include "chirp_acl.h"
 #include "chirp_filesystem.h"
 #include "chirp_job.h"
+#include "chirp_server.h"
 #include "chirp_sqlite.h"
 #include "chirp_types.h"
 
@@ -60,9 +61,6 @@
 		IMMUTABLE_JOB_INSERT(T) \
 		IMMUTABLE_JOB_UPDATE(T)
 
-
-extern const char *chirp_super_user;
-extern char        chirp_transient_path[PATH_MAX];
 
 unsigned chirp_job_concurrency = 1;
 int      chirp_job_enabled = 0;

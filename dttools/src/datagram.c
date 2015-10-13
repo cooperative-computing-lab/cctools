@@ -6,74 +6,107 @@ See the file COPYING for details.
 */
 
 #include "datagram.h"
-#include "stringtools.h"
+#include "debug.h"
+#include "getaddrinfo_cache.h"
 
-#include <sys/types.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/udp.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 #include <sys/file.h>
+#include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/utsname.h>
+#include <sys/types.h>
 #include <sys/un.h>
-
-#include <fcntl.h>
+#include <sys/utsname.h>
 #include <unistd.h>
-#include <signal.h>
-#include <netdb.h>
-#include <errno.h>
 
-#include <stdlib.h>
+#include <assert.h>
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#if ! (defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_AIX))
+	typedef int socklen_t;
+#endif
 
 struct datagram {
 	int fd;
 };
 
-struct datagram *datagram_create_address(const char *addr, int port)
+struct datagram *datagram_create_address (const char *nodename, const char *servname)
 {
+	int rc;
 	struct datagram *d = 0;
-	struct sockaddr_in address;
-	int success;
-	int on = 1;
+	struct addrinfo hints;
+	struct addrinfo *addr = NULL, *addri;
+
+	debug(D_DEBUG, "binding socket to %s:%s", nodename ? nodename : "*", servname ? servname : "*");
 
 	d = malloc(sizeof(*d));
 	if(!d)
 		goto failure;
 
-	d->fd = socket(PF_INET, SOCK_DGRAM, 0);
-	if(d->fd < 0)
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_family = AF_UNSPEC; /* IPv4 or IPv6 (RFC 3484 specifies IPv6 first) */
+	hints.ai_flags = AI_PASSIVE;
+	rc = getaddrinfo(nodename, servname ? servname : "0", &hints, &addr);
+	if (rc) {
+		debug(D_TCP, "getaddrinfo: %s", gai_strerror(rc));
+		errno = EINVAL;
 		goto failure;
-
-	setsockopt(d->fd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on));
-
-	memset(&address, 0, sizeof(address));
-	address.sin_family = AF_INET;
-#if defined(CCTOOLS_OPSYS_DARWIN)
-	address.sin_len = sizeof(address);
-#endif
-	if(addr) {
-		string_to_ip_address(addr, (unsigned char *) &address.sin_addr.s_addr);
-	} else {
-		address.sin_addr.s_addr = htonl(INADDR_ANY);
+	} else if (addr == NULL) {
+		debug(D_TCP, "getaddrinfo: no results");
+		errno = EINVAL;
+		goto failure;
 	}
-	address.sin_port =  DATAGRAM_PORT_ANY ? htons(0) : htons(port);
 
-	success = bind(d->fd, (struct sockaddr *) &address, sizeof(address));
-	if(success < 0)
-		goto failure;
+	for (addri = addr; addri; addri = addri->ai_next) {
+		d->fd = socket(addri->ai_family, addri->ai_socktype, addri->ai_protocol);
+		if(d->fd == -1) {
+			debug(D_DEBUG, "could not create socket for address family");
+			continue;
+		}
 
-	return d;
+		rc = fcntl(d->fd, F_GETFD);
+		if (rc == -1)
+			abort();
+		rc |= FD_CLOEXEC;
+		if (fcntl(d->fd, F_SETFD, rc) == -1)
+			abort();
+
+		rc = 1;
+		if (setsockopt(d->fd, SOL_SOCKET, SO_REUSEADDR, &rc, sizeof(rc)) == -1)
+			debug(D_DEBUG, "could not setsockopt SO_REUSEADDR: %s", strerror(errno));
+		rc = 1;
+		if (setsockopt(d->fd, SOL_SOCKET, SO_BROADCAST, &rc, sizeof(rc)) == -1)
+			debug(D_DEBUG, "could not setsockopt SO_BROADCAST: %s", strerror(errno));
+
+		if (servname) {
+			rc = bind(d->fd, addri->ai_addr, addri->ai_addrlen);
+			if (rc == -1) {
+				debug(D_DEBUG, "bind: %s", strerror(errno));
+				goto failure;
+			}
+		}
+
+		return d;
+	}
+
 failure:
-	datagram_delete(d);
+	free(d);
 	return 0;
 }
 
 struct datagram *datagram_create(int port)
 {
-	return datagram_create_address(NULL, port);
+	char servname[128];
+	snprintf(servname, sizeof(servname), "%d", port);
+	return datagram_create_address(NULL, servname);
 }
 
 void datagram_delete(struct datagram *d)
@@ -85,14 +118,6 @@ void datagram_delete(struct datagram *d)
 	}
 }
 
-static void addr_to_string(struct in_addr *addr, char *str)
-{
-	unsigned char *bytes;
-	bytes = (unsigned char *) addr;
-
-	sprintf(str, "%u.%u.%u.%u", (unsigned) bytes[0], (unsigned) bytes[1], (unsigned) bytes[2], (unsigned) bytes[3]);
-}
-
 static int errno_is_temporary(int e)
 {
 	if(e == EINTR || e == EWOULDBLOCK || e == EAGAIN || e == EINPROGRESS || e == EALREADY || e == EISCONN) {
@@ -102,23 +127,14 @@ static int errno_is_temporary(int e)
 	}
 }
 
-#ifndef SOCKLEN_T
-#if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_AIX)
-#define SOCKLEN_T socklen_t
-#else
-#define SOCKLEN_T int
-#endif
-#endif
-
-int datagram_recv(struct datagram *d, char *data, int length, char *addr, int *port, int timeout)
+ssize_t datagram_recv(struct datagram *d, void *data, size_t length, struct sockaddr *sa, socklen_t *socklen, time_t timeout)
 {
-	int result;
-	struct sockaddr_in iaddr;
-	SOCKLEN_T iaddr_length;
-	fd_set fds;
-	struct timeval tm;
+	int rc;
+	ssize_t result;
 
 	while(1) {
+		fd_set fds;
+		struct timeval tm;
 
 		tm.tv_sec = timeout / 1000000;
 		tm.tv_usec = timeout % 1000000;
@@ -126,45 +142,50 @@ int datagram_recv(struct datagram *d, char *data, int length, char *addr, int *p
 		FD_ZERO(&fds);
 		FD_SET(d->fd, &fds);
 
-		result = select(d->fd + 1, &fds, 0, 0, &tm);
-		if(result > 0) {
+		rc = select(d->fd + 1, &fds, 0, 0, &tm);
+		if(rc > 0) {
 			if(FD_ISSET(d->fd, &fds))
 				break;
-		} else if(result < 0 && errno_is_temporary(errno)) {
+		} else if(rc < 0 && errno_is_temporary(errno)) {
 			continue;
 		} else {
 			return -1;
 		}
 	}
 
-	iaddr_length = sizeof(iaddr);
-
-	result = recvfrom(d->fd, data, length, 0, (struct sockaddr *) &iaddr, &iaddr_length);
-	if(result < 0)
-		return result;
-
-	addr_to_string(&iaddr.sin_addr, addr);
-	*port = ntohs(iaddr.sin_port);
+	result = recvfrom(d->fd, data, length, 0, sa, socklen);
+	if (result == -1)
+		return -1;
 
 	return result;
 }
 
-int datagram_send(struct datagram *d, const char *data, int length, const char *addr, int port)
+ssize_t datagram_send (struct datagram *d, const void *data, size_t length, const char *nodename, const char *servname)
 {
-	int result;
-	struct sockaddr_in iaddr;
-	SOCKLEN_T iaddr_length;
+	int rc;
+	ssize_t result;
+	struct addrinfo hints;
+	struct addrinfo *addr = NULL, *addri;
 
-	iaddr_length = sizeof(iaddr);
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_family = AF_UNSPEC; /* IPv4 or IPv6 */
+	rc = getaddrinfo_cache(nodename, servname, &hints, &addr);
+	if (rc)
+		return errno = EINVAL, -1;
 
-	iaddr.sin_family = AF_INET;
-	iaddr.sin_port = htons(port);
-	if(!string_to_ip_address(addr, (unsigned char *) &iaddr.sin_addr))
-		return -1;
-
-	result = sendto(d->fd, data, length, 0, (const struct sockaddr *) &iaddr, iaddr_length);
-	if(result < 0)
-		return result;
+	for (addri = addr; addri; addri = addri->ai_next) {
+		result = sendto(d->fd, data, length, 0, addri->ai_addr, addri->ai_addrlen);
+		if (result == -1) {
+			debug(D_DEBUG, "sendto: %s", strerror(errno));
+			continue; /* try another address */
+		} else if ((size_t)result < length) {
+			debug(D_DEBUG, "sendto: sent partial datagram (%zd/%zu)", result, length);
+			break;
+		} else if ((size_t)result == length) {
+			break;
+		} else assert(0);
+	}
 
 	return result;
 }

@@ -25,25 +25,25 @@ static UINT64_T total_bytes_read = 0;
 static UINT64_T total_bytes_written = 0;
 
 struct chirp_stats {
-	char addr[LINK_ADDRESS_MAX];
+	char peer[HOST_NAME_MAX + 1 /* : */ + 128 /* servname */ + 1];
 	UINT64_T ops;
 	UINT64_T bytes_read;
 	UINT64_T bytes_written;
 };
 
-void chirp_stats_collect(const char *addr, const char *subject, UINT64_T ops, UINT64_T bytes_read, UINT64_T bytes_written)
+void chirp_stats_collect(const char *peer, const char *subject, UINT64_T ops, UINT64_T bytes_read, UINT64_T bytes_written)
 {
 	struct chirp_stats *s;
 
 	if(!stats_table)
 		stats_table = hash_table_create(0, 0);
 
-	s = hash_table_lookup(stats_table, addr);
+	s = hash_table_lookup(stats_table, peer);
 	if(!s) {
 		s = malloc(sizeof(*s));
 		memset(s, 0, sizeof(*s));
-		strcpy(s->addr, addr);
-		hash_table_insert(stats_table, addr, s);
+		strcpy(s->peer, peer);
+		hash_table_insert(stats_table, peer, s);
 	}
 
 	s->ops += ops;
@@ -57,7 +57,7 @@ void chirp_stats_collect(const char *addr, const char *subject, UINT64_T ops, UI
 
 void chirp_stats_summary( struct jx *j )
 {
-	char *addr;
+	char *peer;
 	struct chirp_stats *s;
 
 	if(!stats_table)
@@ -70,11 +70,11 @@ void chirp_stats_summary( struct jx *j )
 	struct jx *arr = jx_array(0);
 
 	hash_table_firstkey(stats_table);
-	while(hash_table_nextkey(stats_table, &addr, (void **) &s)) {
+	while(hash_table_nextkey(stats_table, &peer, (void **) &s)) {
 		// there may be a large number of clients,
 		// so we used a brief notation to keep the doc size down.
 		struct jx *c = jx_object(0);
-		jx_insert_string(c,"a",addr);
+		jx_insert_string(c,"a",peer);
 		jx_insert_integer(c,"o",s->ops);
 		jx_insert_integer(c,"r",s->bytes_read);
 		jx_insert_integer(c,"w",s->bytes_written);
@@ -85,15 +85,15 @@ void chirp_stats_summary( struct jx *j )
 
 void chirp_stats_cleanup()
 {
-	char *addr;
+	char *peer;
 	struct chirp_stats *s;
 
 	if(!stats_table)
 		stats_table = hash_table_create(0, 0);
 
 	hash_table_firstkey(stats_table);
-	while(hash_table_nextkey(stats_table, &addr, (void **) &s)) {
-		hash_table_remove(stats_table, addr);
+	while(hash_table_nextkey(stats_table, &peer, (void **) &s)) {
+		hash_table_remove(stats_table, peer);
 		free(s);
 	}
 }
@@ -110,12 +110,12 @@ void chirp_stats_update(UINT64_T ops, UINT64_T bytes_read, UINT64_T bytes_writte
 	child_bytes_written += bytes_written;
 }
 
-void chirp_stats_report(int pipefd, const char *addr, const char *subject, int interval)
+void chirp_stats_report(int pipefd, const char *peer, const char *subject, int interval)
 {
 	char line[PIPE_BUF];
 
 	if(time(0) - child_report_time > interval) {
-		snprintf(line, PIPE_BUF, "stats %s %s %" PRId64 " %" PRId64 " %" PRId64 "\n", addr, subject, child_ops, child_bytes_read, child_bytes_written);
+		snprintf(line, PIPE_BUF, "stats %s %s %" PRId64 " %" PRId64 " %" PRId64 "\n", peer, subject, child_ops, child_bytes_read, child_bytes_written);
 		write(pipefd, line, strlen(line));
 		debug(D_DEBUG, "sending stats: %s", line);
 		child_ops = child_bytes_read = child_bytes_written = 0;

@@ -7,10 +7,11 @@ See the file COPYING for details.
 
 #include "buffer.h"
 #include "debug.h"
-#include "domain_name.h"
 #include "full_io.h"
+#include "getaddrinfo_cache.h"
 #include "link.h"
 #include "macros.h"
+#include "pattern.h"
 #include "stringtools.h"
 
 #include <arpa/inet.h>
@@ -37,12 +38,18 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
+#define BACKLOG 128
+
+#if ! (defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_AIX))
+	typedef int socklen_t;
+#endif
+
 #ifndef TCP_LOW_PORT_DEFAULT
-#define TCP_LOW_PORT_DEFAULT 1024
+#	define TCP_LOW_PORT_DEFAULT 1024
 #endif
 
 #ifndef TCP_HIGH_PORT_DEFAULT
-#define TCP_HIGH_PORT_DEFAULT 32767
+#	define TCP_HIGH_PORT_DEFAULT 32767
 #endif
 
 enum link_type {
@@ -51,14 +58,14 @@ enum link_type {
 };
 
 struct link {
-	int fd;
 	enum link_type type;
+	int fd;
 	uint64_t read, written;
+	char peernodename[HOST_NAME_MAX];
+	char peerservname[128];
 	char *buffer_start;
 	size_t buffer_length;
 	char buffer[1<<16];
-	char raddr[LINK_ADDRESS_MAX];
-	int rport;
 };
 
 static int link_send_window = 65536;
@@ -164,11 +171,7 @@ int link_buffer_empty(struct link *link) {
 
 static int errno_is_temporary(int e)
 {
-	if(e == EINTR || e == EWOULDBLOCK || e == EAGAIN || e == EINPROGRESS || e == EALREADY || e == EISCONN) {
-		return 1;
-	} else {
-		return 0;
-	}
+	return e == EAGAIN || e == EALREADY || e == EINPROGRESS || e == EINTR || e == EISCONN || e == EWOULDBLOCK;
 }
 
 static int link_internal_sleep(struct link *link, struct timeval *timeout, sigset_t *mask, int reading, int writing)
@@ -279,161 +282,151 @@ static struct link *link_create()
 	link->fd = -1;
 	link->buffer_start = link->buffer;
 	link->buffer_length = 0;
-	link->raddr[0] = 0;
-	link->rport = 0;
 	link->type = LINK_TYPE_STANDARD;
+	strcpy(link->peernodename, "");
+	strcpy(link->peerservname, "");
 
 	return link;
 }
 
-struct link *link_attach(int fd)
+static struct link *link_bind (const char *nodename, const char *servname)
 {
-	struct link *l = link_create();
-	if(!l)
-		return 0;
-
-	l->fd = fd;
-
-	if(link_address_remote(l, l->raddr, &l->rport)) {
-		debug(D_TCP, "attached to %s:%d", l->raddr, l->rport);
-		return l;
-	} else {
-		l->fd = -1;
-		link_close(l);
-		return 0;
-	}
-}
-
-struct link *link_attach_to_file(FILE *f)
-{
-	struct link *l = link_create();
-	int fd = fileno(f);
-
-	if(fd < 0) {
-		link_close(l);
-		return NULL;
-	}
-
-	l->fd = fd;
-	l->type = LINK_TYPE_FILE;
-	return l;
-}
-
-struct link *link_attach_to_fd(int fd)
-{
-	struct link *l = link_create();
-
-	if(fd < 0) {
-		link_close(l);
-		return NULL;
-	}
-
-	l->fd = fd;
-	l->type = LINK_TYPE_FILE;
-	return l;
-}
-
-struct link *link_serve(int port)
-{
-	return link_serve_address(0, port);
-}
-
-struct link *link_serve_address(const char *addr, int port)
-{
+	int rc;
+	struct addrinfo hints;
+	struct addrinfo *addr = NULL, *addri;
 	struct link *link = 0;
-	struct sockaddr_in address;
-	int success;
-	int value;
+
+	debug(D_DEBUG, "binding socket to %s:%s", nodename ? nodename : "*", servname);
 
 	link = link_create();
 	if(!link)
 		goto failure;
 
-	link->fd = socket(AF_INET, SOCK_STREAM, 0);
-	if(link->fd < 0)
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC; /* IPv4 or IPv6 (RFC 3484 specifies IPv6 first) */
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_socktype = SOCK_STREAM;
+	rc = getaddrinfo(nodename, servname, &hints, &addr);
+	if (rc) {
+		debug(D_TCP, "getaddrinfo: %s", gai_strerror(rc));
+		errno = EINVAL;
 		goto failure;
-
-	value = fcntl(link->fd, F_GETFD);
-	if (value == -1)
+	} else if (addr == NULL) {
+		debug(D_TCP, "getaddrinfo: no results");
+		errno = EINVAL;
 		goto failure;
-	value |= FD_CLOEXEC;
-	if (fcntl(link->fd, F_SETFD, value) == -1)
-		goto failure;
-
-	value = 1;
-	setsockopt(link->fd, SOL_SOCKET, SO_REUSEADDR, (void *) &value, sizeof(value));
-
-	link_window_configure(link);
-
-	memset(&address, 0, sizeof(address));
-#if defined(CCTOOLS_OPSYS_DARWIN)
-	address.sin_len = sizeof(address);
-#endif
-	address.sin_family = AF_INET;
-
-	if(addr) {
-		string_to_ip_address(addr, (unsigned char *) &address.sin_addr.s_addr);
-	} else {
-		address.sin_addr.s_addr = htonl(INADDR_ANY);
 	}
 
-	int low = TCP_LOW_PORT_DEFAULT;
-	int high = TCP_HIGH_PORT_DEFAULT;
-	if(port < 1) {
+	for (addri = addr; addri; addri = addri->ai_next) {
+		char nodename[HOST_NAME_MAX];
+		char servname[128];
+
+		link->fd = socket(addri->ai_family, addri->ai_socktype, addri->ai_protocol);
+		if(link->fd == -1) {
+			debug(D_DEBUG, "could not create socket for address family");
+			continue;
+		}
+
+		rc = fcntl(link->fd, F_GETFD);
+		if (rc == -1)
+			abort();
+		rc |= FD_CLOEXEC;
+		if (fcntl(link->fd, F_SETFD, rc) == -1)
+			abort();
+
+		rc = 1;
+		if (setsockopt(link->fd, SOL_SOCKET, SO_REUSEADDR, &rc, sizeof(rc)) == -1)
+			debug(D_DEBUG, "could not setsockopt SO_REUSEADDR: %s", strerror(errno));
+
+		if(!link_nonblocking(link, 1)) {
+			debug(D_DEBUG, "could not set non-blocking flag on socket");
+			goto failure;
+		}
+
+		link_window_configure(link);
+
+		rc = bind(link->fd, addri->ai_addr, addri->ai_addrlen);
+		if (rc == -1) {
+			debug(D_DEBUG, "bind: %s", strerror(errno));
+			goto failure;
+		}
+
+		rc = listen(link->fd, BACKLOG);
+		if (rc == -1) {
+			debug(D_DEBUG, "listen: %s", strerror(errno));
+			goto failure;
+		}
+
+		if(!link_getlocalname(link, nodename, sizeof(nodename), servname, sizeof(servname), NI_NUMERICHOST|NI_NUMERICSERV)) {
+			debug(D_DEBUG, "getlocalname: %s", strerror(errno));
+			goto failure;
+		}
+
+		debug(D_TCP, "listening on %s:%s", nodename, servname);
+		goto out;
+	}
+
+	goto out;
+failure:
+	{
+		int save_errno = errno;
+		if(link)
+			link_close(link);
+		errno = save_errno;
+		link = NULL;
+	}
+out:
+	if (addr)
+		freeaddrinfo(addr);
+	return link;
+}
+
+struct link *link_serve(int port)
+{
+	char servname[128];
+	snprintf(servname, sizeof(servname), "%d", port);
+	return link_serve_address(0, servname);
+}
+
+struct link *link_serve_address(const char *nodename, const char *servname)
+{
+	/* We need to find an available port for *all* interfaces, so iterate here. */
+	if (servname == NULL) {
+		unsigned long low = TCP_LOW_PORT_DEFAULT;
+		unsigned long high = TCP_HIGH_PORT_DEFAULT;
+
 		const char *lowstr = getenv("TCP_LOW_PORT");
 		if (lowstr)
-			low = atoi(lowstr);
+			low = strtoul(lowstr, NULL, 10);
 		const char *highstr = getenv("TCP_HIGH_PORT");
 		if (highstr)
-			high = atoi(highstr);
-	} else {
-		low = high = port;
-	}
+			high = strtoul(highstr, NULL, 10);
 
-	if(high < low)
-		fatal("high port %d is less than low port %d in range", high, low);
+		if(high < low)
+			fatal("high port %d is less than low port %d in range", high, low);
 
-	for (port = low; port <= high; port++) {
-		address.sin_port = htons(port);
-		success = bind(link->fd, (struct sockaddr *) &address, sizeof(address));
-		if(success == -1) {
-			if(errno == EADDRINUSE) {
-				//If a port is specified, fail!
-				if (low == high) {
-					goto failure;
-				} else {
-					continue;
-				}
-			} else {
-				goto failure;
-			}
+		for (; low <= high; low++) {
+			char port[128];
+			struct link *link;
+			snprintf(port, sizeof(port), "%lu", low);
+			link = link_bind(nodename, port);
+			if (link)
+				return link;
+			else if (errno == EINVAL)
+				break;
 		}
-		break;
+		return NULL;
+	} else {
+		return link_bind(nodename, servname);
 	}
-
-	success = listen(link->fd, 5);
-	if(success < 0)
-		goto failure;
-
-	if(!link_nonblocking(link, 1))
-		goto failure;
-
-	debug(D_TCP, "listening on port %d", port);
-	return link;
-
-	  failure:
-	if(link)
-		link_close(link);
-	return 0;
 }
 
 struct link *link_accept(struct link *master, time_t stoptime)
 {
 	struct link *link = 0;
 
-	if(master->type == LINK_TYPE_FILE) {
-		return NULL;
-	}
+	if(master->type == LINK_TYPE_FILE)
+		return errno = EINVAL, NULL;
 
 	link = link_create();
 	if(!link)
@@ -448,26 +441,25 @@ struct link *link_accept(struct link *master, time_t stoptime)
 
 	if(!link_nonblocking(link, 1))
 		goto failure;
-	if(!link_address_remote(link, link->raddr, &link->rport))
+	if(!link_getpeername(link, link->peernodename, sizeof(link->peernodename), link->peerservname, sizeof(link->peerservname), NI_NUMERICHOST|NI_NUMERICSERV))
 		goto failure;
 	link_squelch();
 
-	debug(D_TCP, "got connection from %s:%d", link->raddr, link->rport);
+	debug(D_TCP, "got connection from %s:%s", link->peernodename, link->peerservname);
 
 	return link;
-
-	  failure:
+failure:
 	if(link)
 		link_close(link);
 	return 0;
 }
 
-struct link *link_connect(const char *addr, int port, time_t stoptime)
+struct link *link_connect(const char *nodename, const char *servname, time_t stoptime)
 {
-	struct sockaddr_in address;
+	int rc;
+	struct addrinfo hints;
+	struct addrinfo *addr = NULL, *addri;
 	struct link *link = 0;
-	int result;
-	int save_errno;
 
 	link = link_create();
 	if(!link)
@@ -475,81 +467,130 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 	link_squelch();
 
-	memset(&address, 0, sizeof(address));
-#if defined(CCTOOLS_OPSYS_DARWIN)
-	address.sin_len = sizeof(address);
-#endif
-	address.sin_family = AF_INET;
-	address.sin_port = htons(port);
-
-	if(!string_to_ip_address(addr, (unsigned char *) &address.sin_addr))
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = AF_UNSPEC; /* IPv4 or IPv6 */
+	rc = getaddrinfo_cache(nodename, servname, &hints, &addr);
+	if (rc) {
+		errno = EINVAL;
 		goto failure;
-
-	link->fd = socket(AF_INET, SOCK_STREAM, 0);
-	if(link->fd < 0)
-		goto failure;
-
-	link_window_configure(link);
-
-	/* sadly, cygwin does not do non-blocking connect correctly */
-#ifdef CCTOOLS_OPSYS_CYGWIN
-	if(!link_nonblocking(link, 0))
-		goto failure;
-#else
-	if(!link_nonblocking(link, 1))
-		goto failure;
-#endif
-
-	debug(D_TCP, "connecting to %s:%d", addr, port);
-
-	while(1) {
-		// First attempt a non-blocking connect
-		result = connect(link->fd, (struct sockaddr *) &address, sizeof(address));
-
-		// On many platforms, non-blocking connect sets errno in unexpected ways:
-
-		// On OSX, result=-1 and errno==EISCONN indicates a successful connection.
-		if(result<0 && errno==EISCONN) result=0;
-
-		// On BSD-derived systems, failure to connect is indicated by errno = EINVAL.
-		// Set it to something more explanatory.
-		if(result<0 && errno==EINVAL) errno=ECONNREFUSED;
-
-		// Otherwise, a non-temporary errno should cause us to bail out.
-		if(result<0 && !errno_is_temporary(errno)) break;
-
-		// If the remote address is valid, we are connected no matter what.
-		if(link_address_remote(link, link->raddr, &link->rport)) {
-			debug(D_TCP, "made connection to %s:%d", link->raddr, link->rport);
-#ifdef CCTOOLS_OPSYS_CYGWIN
-			link_nonblocking(link, 1);
-#endif
-			return link;
-		}
-
-		// if the time has expired, bail out
-		if( time(0) >= stoptime ) {
-			errno = ETIMEDOUT;
-			break;
-		}
-
-		// wait for some activity on the socket.
-		link_sleep(link, stoptime, 0, 1);
-
-		// No matter how the sleep ends, we want to go back to the top
-		// and call connect again to get a proper errno.
 	}
 
+	for (addri = addr; addri; addri = addri->ai_next) {
+		link->fd = socket(addri->ai_family, addri->ai_socktype, addri->ai_protocol);
+		if(link->fd == -1) {
+			debug(D_DEBUG, "could not create socket for address family");
+			continue;
+		}
 
-	debug(D_TCP, "connection to %s:%d failed (%s)", addr, port, strerror(errno));
+		if(!link_nonblocking(link, 1)) {
+			close(link->fd);
+			continue;
+		}
 
+		link_window_configure(link);
+
+		debug(D_TCP, "connecting to %s:%s", nodename, servname);
+
+		while(1) {
+			// First attempt a non-blocking connect
+			rc = connect(link->fd, addri->ai_addr, addri->ai_addrlen);
+
+			// On many platforms, non-blocking connect sets errno in unexpected ways:
+
+			// On OSX, rc=-1 and errno==EISCONN indicates a successful connection.
+			if(rc<0 && errno==EISCONN)
+				rc = 0;
+
+			// On BSD-derived systems, failure to connect is indicated by errno = EINVAL.
+			// Set it to something more explanatory.
+			if(rc<0 && errno==EINVAL)
+				errno = ECONNREFUSED;
+
+			// Otherwise, a non-temporary errno should cause us to bail out.
+			if(rc<0 && !errno_is_temporary(errno))
+				break;
+
+			// If the remote address is valid, we are connected no matter what.
+			if(link_getpeername(link, link->peernodename, sizeof(link->peernodename), link->peerservname, sizeof(link->peerservname), NI_NUMERICHOST|NI_NUMERICSERV))
+				goto out;
+
+			// if the time has expired, bail out
+			if(time(0) >= stoptime) {
+				errno = ETIMEDOUT;
+				break;
+			}
+
+			// wait for some activity on the socket.
+			link_sleep(link, stoptime, 0, 1);
+
+			// No matter how the sleep ends, we want to go back to the top
+			// and call connect again to get a proper errno.
+		}
+
+		debug(D_TCP, "connection to %s:%s failed (%s)", nodename, servname, strerror(errno));
+		close(link->fd);
+		link->fd = -1;
+	}
+
+	goto out;
 failure:
-	save_errno = errno;
-	if(link)
-		link_close(link);
-	errno = save_errno;
-	return 0;
+	{
+		int save_errno = errno;
+		if(link)
+			link_close(link);
+		errno = save_errno;
+		link = NULL;
+	}
+out:
+	if (link)
+		debug(D_TCP, "made connection to %s:%s", link->peernodename, link->peerservname);
+	return link;
 }
+
+struct link *link_connect_nodeserv(const char *nodeserv, const char *servname_default, time_t stoptime)
+{
+	char *nodename = NULL, *servname = NULL;
+	size_t n;
+	struct link *link;
+
+	/* Match (per RFC 2732 with extensions):
+	 *  - "[" IPv6address "]" [":" port]
+	 *  - IPv6address ":" port  // port is *required*
+	 *  - IPv4address [":" port]
+	 *  - hostname [":" port"]
+	 */
+
+	if (pattern_match(nodeserv, "^%s*%[([%x%d.:]+)%]%s*()", &nodename, &n) >= 0) {
+		;
+	} else if (pattern_match(nodeserv, "^%s*([%x%d.:]+)%s*:%s*(%d+)%s*$", &nodename, &servname) >= 0) {
+		goto connect;
+	} else if (pattern_match(nodeserv, "^%s*([%d.]+)%s*()", &nodename, &n) >= 0) {
+		;
+	} else if (pattern_match(nodeserv, "^%s*([%w-.]+)%s*()", &nodename, &n) >= 0) {
+		;
+	} else {
+		debug(D_DEBUG, "'%s' does not match as a host per RFC 2732", nodeserv+n);
+		return errno = EINVAL, NULL;
+	}
+
+	if (pattern_match(nodeserv+n, "^:%s*(%d+)%s*$", &servname) >= 0) {
+		;
+	} else if (n == strlen(nodeserv)) {
+		servname = strdup(servname_default);
+	} else {
+		debug(D_DEBUG, "'%s' does not match as a service", nodeserv+n);
+		free(nodename);
+		return errno = EINVAL, NULL;
+	}
+
+connect:
+	link = link_connect(nodename, servname, stoptime);
+	free(nodename);
+	free(servname);
+	return link;
+}
+
 
 static ssize_t fill_buffer(struct link *link, time_t stoptime)
 {
@@ -821,8 +862,8 @@ void link_close(struct link *link)
 	if(link) {
 		if(link->fd >= 0)
 			close(link->fd);
-		if(link->rport)
-			debug(D_TCP, "disconnected from %s:%d", link->raddr, link->rport);
+		if(link->peernodename[0])
+			debug(D_TCP, "disconnected from %s:%s", link->peernodename, link->peerservname);
 		free(link);
 	}
 }
@@ -839,52 +880,44 @@ int link_fd(struct link *link)
 	return link->fd;
 }
 
-#ifndef SOCKLEN_T
-#if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_AIX)
-#define SOCKLEN_T socklen_t
-#else
-#define SOCKLEN_T int
-#endif
-#endif
-
-int link_address_local(struct link *link, char *addr, int *port)
+int link_getlocalname(struct link *link, char *host, size_t hostlen, char *serv, size_t servlen, int flags)
 {
-	struct sockaddr_in iaddr;
-	SOCKLEN_T length;
-	int result;
+	int rc;
+	struct sockaddr_storage addr;
+	socklen_t len = sizeof(addr);
 
-	if(link->type == LINK_TYPE_FILE) {
+	if(link->type == LINK_TYPE_FILE)
+		return errno = EINVAL, 0;
+
+	if(getsockname(link->fd, (struct sockaddr *)&addr, &len) == -1)
 		return 0;
+
+	rc = getnameinfo((struct sockaddr *)&addr, len, host, hostlen, serv, servlen, flags);
+	if (rc != 0) {
+		debug(D_TCP, "getpeername failed: %s", gai_strerror(rc));
+		return errno = EIO, 0;
 	}
-
-	length = sizeof(iaddr);
-	result = getsockname(link->fd, (struct sockaddr *) &iaddr, &length);
-	if(result != 0)
-		return 0;
-
-	*port = ntohs(iaddr.sin_port);
-	string_from_ip_address((unsigned char *) &iaddr.sin_addr, addr);
 
 	return 1;
 }
 
-int link_address_remote(struct link *link, char *addr, int *port)
+int link_getpeername(struct link *link, char *host, size_t hostlen, char *serv, size_t servlen, int flags)
 {
-	struct sockaddr_in iaddr;
-	SOCKLEN_T length;
-	int result;
+	int rc;
+	struct sockaddr_storage addr;
+	socklen_t len = sizeof(addr);
 
-	if(link->type == LINK_TYPE_FILE) {
+	if(link->type == LINK_TYPE_FILE)
+		return errno = EINVAL, 0;
+
+	if(getpeername(link->fd, (struct sockaddr *)&addr, &len) == -1)
 		return 0;
+
+	rc = getnameinfo((struct sockaddr *)&addr, len, host, hostlen, serv, servlen, flags);
+	if (rc != 0) {
+		debug(D_TCP, "getpeername failed: %s", gai_strerror(rc));
+		return errno = EIO, 0;
 	}
-
-	length = sizeof(iaddr);
-	result = getpeername(link->fd, (struct sockaddr *) &iaddr, &length);
-	if(result != 0)
-		return 0;
-
-	*port = ntohs(iaddr.sin_port);
-	string_from_ip_address((unsigned char *) &iaddr.sin_addr, addr);
 
 	return 1;
 }

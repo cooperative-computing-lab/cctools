@@ -9,10 +9,10 @@ See the file COPYING for details.
 #include "link.h"
 #include "getopt.h"
 #include "debug.h"
-#include "domain_name_cache.h"
 #include "auth_all.h"
 #include "stringtools.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,11 +41,10 @@ int main(int argc, char *argv[])
 {
 	struct link *link, *master;
 	char *subject = 0, *type = 0;
-	time_t stoptime;
 	char line[1024];
 	signed char c;
-	int portnum = 30000;
-	char *hostname = 0;
+	char port[128] = "30000";
+	char hostname[HOST_NAME_MAX] = "";
 	int timeout = 30;
 
 	debug_config(argv[0]);
@@ -64,14 +63,14 @@ int main(int argc, char *argv[])
 	while((c = getopt_long(argc, argv, "a:p:r:d:o:O:", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'p':
-			portnum = atoi(optarg);
+			snprintf(port, sizeof(port), "%s", optarg);
 			break;
 		case 'h':
 			show_help(argv[0]);
 			exit(0);
 			break;
 		case 'r':
-			hostname = optarg;
+			snprintf(hostname, sizeof(hostname), "%s", optarg);
 			break;
 		case 'd':
 			debug_flags_set(optarg);
@@ -93,17 +92,12 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(hostname) {
-		char addr[LINK_ADDRESS_MAX];
+	if(hostname[0]) {
+		time_t stoptime = time(0) + timeout;
 
-		stoptime = time(0) + timeout;
-
-		if(!domain_name_cache_lookup(hostname, addr))
-			fatal("unknown host name: %s", hostname);
-
-		link = link_connect(addr, portnum, stoptime);
+		link = link_connect(hostname, port, stoptime);
 		if(!link)
-			fatal("couldn't connect to %s:%d: %s", hostname, portnum, strerror(errno));
+			fatal("couldn't connect to %s:%s: %s", hostname, port, strerror(errno));
 
 		if(auth_assert(link, &type, &subject, stoptime)) {
 			printf("server thinks I am %s %s\n", type, subject);
@@ -119,11 +113,11 @@ int main(int argc, char *argv[])
 		link_close(link);
 
 	} else {
-		stoptime = time(0) + timeout;
+		time_t stoptime = time(0) + timeout;
 
-		master = link_serve(portnum);
+		master = link_serve_address(NULL, port);
 		if(!master)
-			fatal("couldn't serve port %d: %s\n", portnum, strerror(errno));
+			fatal("couldn't serve port %d: %s\n", port, strerror(errno));
 
 		while(time(0) < stoptime) {
 			link = link_accept(master, stoptime);

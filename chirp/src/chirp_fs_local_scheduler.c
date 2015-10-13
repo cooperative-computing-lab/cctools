@@ -19,6 +19,7 @@
 #include "chirp_job.h"
 #include "chirp_fs_local.h"
 #include "chirp_reli.h"
+#include "chirp_server.h"
 #include "chirp_sqlite.h"
 
 #include "auth_all.h"
@@ -27,7 +28,6 @@
 #include "copy_stream.h"
 #include "create_dir.h"
 #include "debug.h"
-#include "domain_name.h"
 #include "fd.h"
 #include "md5.h"
 #include "path.h"
@@ -51,10 +51,6 @@
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
-
-
-extern char chirp_hostname[DOMAIN_NAME_MAX];
-extern int chirp_port;
 
 struct url_binding {
 	char path[PATH_MAX]; /* task_path */

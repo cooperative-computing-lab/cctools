@@ -8,6 +8,11 @@ See the file COPYING for details.
 #ifndef DATAGRAM_H
 #define DATAGRAM_H
 
+#include <sys/socket.h>
+#include <netdb.h>
+
+#include <stdlib.h>
+
 /** @file datagram.h UDP datagram communications.
 This module implements datagram communications using UDP.
 A datagram is a small, fixed size message send to a given
@@ -80,7 +85,7 @@ struct datagram *datagram_create(int port);
 @param port The UDP port number to bind to.  On most versions of Unix, an ordinary user can only bind to ports greater than 1024.
 @return A new object for sending or receiving datagrams.  On failure, returns null and sets errno appropriately.  A very common error is EADDRINUSE, which indicates another process is already bound to that port.
 */
-struct datagram *datagram_create_address(const char *address, int port);
+struct datagram *datagram_create_address (const char *nodename, const char *servname);
 
 /** Destroy a datagram port.
 @param d The datagram object to destroy.
@@ -96,17 +101,17 @@ void datagram_delete(struct datagram *d);
 @param timeout Maximum time to wait, in microseconds.
 @return On success, returns the number of bytes received.  On failure, returns less than zero and sets errno appropriately.
 */
-int datagram_recv(struct datagram *d, char *data, int length, char *addr, int *port, int timeout);
+ssize_t datagram_recv(struct datagram *d, void *data, size_t length, struct sockaddr *sa, socklen_t *socklen, time_t timeout);
 
 /** Send a datagram.
 @param d The datagram object.
 @param data The data to send.
 @param length The length of the datagram.
-@param addr The address of the recipient.
-@param port The port of the recipient.
+@param nodename The network hostname or IP address, in string form as understood by getaddrinfo(3).
+@param servname The service or port number, as a string.
 @return On success, returns the number of bytes sent.  On failure, returns less than zero and sets errno appropriately.
 */
-int datagram_send(struct datagram *d, const char *data, int length, const char *addr, int port);
+ssize_t datagram_send(struct datagram *d, const void *data, size_t length, const char *nodename, const char *servname);
 
 /** Obtain the file descriptor of a datagram object.
 @param d The datagram object.

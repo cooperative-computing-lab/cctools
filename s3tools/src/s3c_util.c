@@ -9,7 +9,6 @@ See the file COPYING for details.
 #include "b64.h"
 #include "buffer.h"
 #include "debug.h"
-#include "domain_name_cache.h"
 #include "hmac.h"
 #include "link.h"
 #include "list.h"
@@ -21,20 +20,16 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
-char s3_default_endpoint[] = "s3.amazonaws.com";
-char *s3_endpoint = s3_default_endpoint;
+char s3_endpoint[256] = "s3.amazonaws.com";
 int s3_timeout = 60;
 
-
 int s3_set_endpoint(const char *target) {
-	static char endpoint_address[DOMAIN_NAME_MAX];
-
-	if(!target) return 0;
-	if(!domain_name_cache_lookup(target, endpoint_address)) return 0;
-
-	if(s3_endpoint && s3_endpoint != s3_default_endpoint) free(s3_endpoint);
-	s3_endpoint = strdup(target);
-	return 1;
+	if (target) {
+		snprintf(s3_endpoint, sizeof(s3_endpoint), "%s", target);
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 struct s3_header_object* s3_new_header_object(enum s3_header_type type, const char* custom_type, const char* value) {
@@ -216,10 +211,7 @@ struct link * s3_send_message(struct s3_message *mesg, struct link *server, time
 	int message_length, data_sent;
 
 	if(!server) {
-		if(!domain_name_cache_lookup(s3_endpoint, address))
-			return NULL;
-
-		server = link_connect(address, 80, stoptime);
+		server = link_connect(s3_endpoint, "80", stoptime);
 	}
 
 	if(!server)

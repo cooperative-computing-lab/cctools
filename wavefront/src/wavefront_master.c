@@ -294,8 +294,11 @@ int main( int argc, char *argv[] )
 		return 1;
 	}
 
-	if(port_file)
-		opts_write_port_file(port_file, port);
+	if(port_file) {
+		char s[128];
+		snprintf(s, sizeof(s), "%d", port);
+		opts_write_port_file(port_file, s);
+	}
 
 	// advanced work queue options
 	work_queue_specify_master_mode(queue, work_queue_master_mode);

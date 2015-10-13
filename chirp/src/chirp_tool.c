@@ -21,7 +21,6 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "list.h"
-#include "domain_name_cache.h"
 #include "getopt_aux.h"
 #include "path.h"
 

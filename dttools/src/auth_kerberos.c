@@ -32,19 +32,12 @@ int auth_kerberos_assert(struct link *link, time_t stoptime)
 	krb5_ap_rep_enc_part *rep_ret;
 	krb5_error *err_ret;
 	int success = 0;
-	int port;
+	char node[HOST_NAME_MAX];
+	char serv[128];
 
-	char addr[LINK_ADDRESS_MAX];
-	char dname[DOMAIN_NAME_MAX];
-
-	debug(D_AUTH, "kerberos: determining service name");
-
-	link_address_remote(link, addr, &port);
-	if(domain_name_cache_lookup_reverse(addr, dname)) {
-
-		debug(D_AUTH, "kerberos: name of %s is %s", addr, dname);
-		cksum.data = dname;
-		cksum.length = strlen(dname);
+	if(link_getpeername(link, node, sizeof(node), serv, sizeof(serv), NI_NUMERICSERV)) {
+		cksum.data = node;
+		cksum.length = strlen(node);
 
 		debug(D_AUTH, "kerberos: creating context");
 		if(!krb5_init_context(&context)) {
@@ -61,7 +54,7 @@ int auth_kerberos_assert(struct link *link, time_t stoptime)
 					free(name);
 
 					debug(D_AUTH, "kerberos: building server principal");
-					if(!krb5_sname_to_principal(context, dname, SERVICE, KRB5_NT_SRV_HST, &server)) {
+					if(!krb5_sname_to_principal(context, node, SERVICE, KRB5_NT_SRV_HST, &server)) {
 
 						krb5_unparse_name(context, server, &name);
 						debug(D_AUTH, "kerberos: expecting server %s", name);
@@ -105,7 +98,7 @@ int auth_kerberos_assert(struct link *link, time_t stoptime)
 			auth_barrier(link, "no\n", stoptime);
 		}
 	} else {
-		debug(D_AUTH, "kerberos: couldn't determine name of %s", addr);
+		debug(D_AUTH, "kerberos: couldn't determine peer name");
 		auth_barrier(link, "no\n", stoptime);
 	}
 

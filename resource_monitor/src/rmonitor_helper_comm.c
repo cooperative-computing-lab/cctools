@@ -102,78 +102,54 @@ int recv_monitor_msg(int fd, struct rmonitor_msg *msg)
 	return recv(fd, msg, sizeof(struct rmonitor_msg), 0);
 }
 
-int find_localhost_addr(int port, struct addrinfo **addr)
-{
-	char *hostname = NULL; /* localhost */
-	char *portname = string_format("%d", port);
-	struct addrinfo info, *res;
-
-	memset(&info, 0, sizeof(info));
-
-	info.ai_family=AF_INET;
-	info.ai_socktype=SOCK_DGRAM;
-	info.ai_protocol=0;
-	info.ai_flags=AI_ADDRCONFIG;
-
-	int status = getaddrinfo(hostname, portname, &info, &res);
-	if( status != 0)
-		debug(D_RMON, "couldn't resolve socket address: %s\n", strerror(errno));
-
-	free(portname);
-
-	*addr = res;
-
-	return status;
-}
-
-
 int send_monitor_msg(struct rmonitor_msg *msg)
 {
-	int port;
-	int fd;
-	char *socket_info;
-	struct addrinfo *addr;
+	int rc;
+	char *servname;
+	struct addrinfo *addr, *addri, hints;
 
-	socket_info = getenv(RESOURCE_MONITOR_INFO_ENV_VAR);
-	if(!socket_info)
+	servname = getenv(RESOURCE_MONITOR_INFO_ENV_VAR);
+	if(!servname)
 	{
 		debug(D_RMON,"couldn't find socket info.\n");
 		return -1;
 	}
+	debug(D_RMON, "found socket info at %s.", servname);
 
-	sscanf(socket_info, "%d", &port);
-	debug(D_RMON, "found socket info at %d.\n", port);
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_NUMERICSERV;
+	rc = getaddrinfo(NULL, servname, &hints, &addr);
+	if (rc)
+		fatal("could not getaddrinfo: %s", gai_strerror(rc));
 
-	int status = find_localhost_addr(port, &addr);
+	for (addri = addr; addri; addri = addri->ai_next) {
+		int fd = socket(addri->ai_family, addri->ai_socktype, addri->ai_protocol);
+		if (fd == -1) {
+			debug(D_DEBUG, "skipping, could not create socket: %s", strerror(errno));
+			continue;
+		}
 
-	if(status != 0) {
-		debug(D_RMON,"couldn't read socket information.");
-		return -1;
+		debug(D_RMON, "sending message from %d to port %s: %s(%d)", getpid(), servname, str_msgtype(msg->type), msg->error);
+		ssize_t count = sendto(fd, msg, sizeof(struct rmonitor_msg), 0, addr->ai_addr, addr->ai_addrlen);
+		if (count == -1) {
+			debug(D_DEBUG, "sendto failed: %s", strerror(errno));
+			close(fd);
+			continue;
+		}
+		debug(D_RMON, "message sent from %d to port %s. %zd bytes.", getpid(), servname, count);
+		close(fd);
+		return count;
 	}
-
-	fd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-	if(fd < 0)
-	{
-		debug(D_RMON,"couldn't open socket for writing.");
-		freeaddrinfo(addr);
-		return -1;
-	}
-
-	int count;
-	debug(D_RMON, "sending message from %d to port %d: %s(%d)\n", getpid(), port, str_msgtype(msg->type), msg->error);
-	count = sendto(fd, msg, sizeof(struct rmonitor_msg), 0, addr->ai_addr, addr->ai_addrlen);
-	debug(D_RMON, "message sent from %d to port %d. %d bytes.\n", getpid(), port, count);
-
 	freeaddrinfo(addr);
-	close(fd);
 
-	return count;
+	return -1;
 }
 
 int rmonitor_open_socket(int *fd, int *port)
 {
-	struct addrinfo *addr;
-
+	int rc;
 	int low = 1024;
 	int high = 32767;
 
@@ -190,25 +166,39 @@ int rmonitor_open_socket(int *fd, int *port)
 		return 0;
 	}
 
-	*fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if(*fd < 0)
-	{
-		debug(D_RMON,"couldn't open socket for reading.");
-		return 0;
-	}
-
 	for(*port = low; *port <= high; *port +=1) {
-		int status = find_localhost_addr(*port, &addr);
+		struct addrinfo *addr, *addri, hints;
+		char servname[128];
 
-		if(!bind(*fd, addr->ai_addr, addr->ai_addrlen))
-		{
-			free(addr);
-			debug(D_RMON,"socket open at port %d\n", *port);
-			return *port;
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_DGRAM;
+		hints.ai_flags = AI_PASSIVE|AI_NUMERICSERV;
+		snprintf(servname, sizeof(servname), "%d", *port);
+		rc = getaddrinfo(NULL, servname, &hints, &addr);
+		if (rc)
+			fatal("could not getaddrinfo: %s", gai_strerror(rc));
+
+		for (addri = addr; addri; addri = addri->ai_next) {
+			*fd = socket(addri->ai_family, addri->ai_socktype, addri->ai_protocol);
+			if (*fd == -1) {
+				debug(D_DEBUG, "skipping, could not create socket: %s", strerror(errno));
+				continue;
+			}
+
+			if (bind(*fd, addr->ai_addr, addr->ai_addrlen) == -1) {
+				debug(D_DEBUG, "bind failed: %s", strerror(errno));
+				close(*fd);
+				*fd = -1;
+				break; /* try different port */
+			}
+
+			debug(D_RMON,"socket open at port %d", *port);
+
+			freeaddrinfo(addr);
+			return 0;
 		}
-
-		if(status == 0)
-			free(addr);
+		freeaddrinfo(addr);
 	}
 
 	debug(D_RMON,"couldn't find open port for socket.");
