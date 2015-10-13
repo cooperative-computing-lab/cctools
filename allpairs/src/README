@@ -1,0 +1,7 @@
+Source for the All-Pairs TPDS paper [1] can be found in commit
+82b7a15755068c0047a423ae2b6c2ee88480dd08, tagged as papers/allpairs-tpds.
+
+[1] Moretti, C.; Hoang Bui; Hollingsworth, K.; Rich, B.; Flynn, P.; Thain, D.,
+"All-Pairs: An Abstraction for Data-Intensive Computing on Campus Grids," in
+Parallel and Distributed Systems, IEEE Transactions on , vol.21, no.1,
+pp.33-46, Jan. 2010 doi: 10.1109/TPDS.2009.49
