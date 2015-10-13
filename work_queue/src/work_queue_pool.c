@@ -431,29 +431,29 @@ int read_config_file(const char *config_file) {
 	}
 
 	last_time_modified = new_time_modified;
-	debug(D_NOTICE, "Configuration file '%s' has been loaded.", config_file);
+	fprintf(stdout, "Configuration file '%s' has been loaded.", config_file);
 
-	debug(D_NOTICE, "master-name: %s\n", project_regex);
+	fprintf(stdout, "master-name: %s\n", project_regex);
 	if(foremen_regex) {
-		debug(D_NOTICE, "foremen-name: %s\n", foremen_regex);
+		fprintf(stdout, "foremen-name: %s\n", foremen_regex);
 	}
-	debug(D_NOTICE, "max-workers: %d\n", workers_max);
-	debug(D_NOTICE, "min-workers: %d\n", workers_min);
+	fprintf(stdout, "max-workers: %d\n", workers_max);
+	fprintf(stdout, "min-workers: %d\n", workers_min);
 
-	debug(D_NOTICE, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (num_cores_option > 0 ? num_cores_option : 1));
-	debug(D_NOTICE, "timeout: %d s\n", worker_timeout);
-	debug(D_NOTICE, "cores: %d\n", num_cores_option > 0 ? num_cores_option : 1);
+	fprintf(stdout, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (num_cores_option > 0 ? num_cores_option : 1));
+	fprintf(stdout, "timeout: %d s\n", worker_timeout);
+	fprintf(stdout, "cores: %d\n", num_cores_option > 0 ? num_cores_option : 1);
 
 	if(num_memory_option > -1) {
-		debug(D_NOTICE, "memory: %d MB\n", num_memory_option);
+		fprintf(stdout, "memory: %d MB\n", num_memory_option);
 	}
 
 	if(num_memory_option > -1) {
-		debug(D_NOTICE, "disk: %d MB\n", num_disk_option);
+		fprintf(stdout, "disk: %d MB\n", num_disk_option);
 	}
 
 	if(extra_worker_args) {
-		debug(D_NOTICE, "worker-extra-options: %s", extra_worker_args);
+		fprintf(stdout, "worker-extra-options: %s", extra_worker_args);
 	}
 
 end:
@@ -711,6 +711,18 @@ int main(int argc, char *argv[])
 	}
 
 	if(config_file) {
+		char abs_path_name[PATH_MAX];
+
+		if(!realpath(config_file, abs_path_name)) {
+			fprintf(stderr, "work_queue_pool: could not resolve configuration file path: '%s'.\n", config_file);
+			exit(EXIT_FAILURE);
+		}
+
+		free(config_file);
+
+		/* From now on, read config_file from absolute path */
+		config_file = xxstrdup(abs_path_name);
+
 		if(!read_config_file(config_file)) {
 			fprintf(stderr,"work_queue_pool: There were errors in the configuration file: %s\n", config_file);
 			return 1;
@@ -746,25 +758,6 @@ int main(int argc, char *argv[])
 	if(password_file) {
 		sprintf(cmd,"cp %s %s/pwfile",password_file,scratch_dir);
 		system(cmd);
-	}
-
-	if(config_file) {
-		const char *base = path_basename(config_file);
-		char *cwd = malloc(PATH_MAX * sizeof(char));
-		getcwd(cwd, PATH_MAX);
-
-		char *old_fullname = string_format("%s/%s", cwd, base);
-		char *new_fullname = string_format("%s/%s", scratch_dir, base);
-
-		symlink(old_fullname, new_fullname);
-
-		free(old_fullname);
-		free(config_file);
-
-		/* From now on, read config_file from the symlink */
-		config_file = new_fullname;
-
-		free(cwd);
 	}
 
 	if(chdir(scratch_dir)!=0) {
