@@ -4191,7 +4191,7 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 	static char *monitor_remote_name = NULL;
 
 	if(!monitor_remote_name) {
-		monitor_remote_name = string_format("cctools-resource-monitor-%d", getpid());
+		monitor_remote_name = string_format("./cctools-resource-monitor-%d", getpid());
 	}
 
 	wrap_cmd = resource_monitor_rewrite_command(t->command_line, monitor_remote_name, template, NULL, NULL, 0, 0);

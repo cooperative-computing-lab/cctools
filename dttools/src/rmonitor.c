@@ -110,7 +110,7 @@ char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_
 	if(!monitor_path)
 		fatal("Monitor path should be specified.");
 
-	buffer_printf(&cmd_builder, "./%s", monitor_path);
+	buffer_printf(&cmd_builder, "%s", monitor_path);
 	buffer_printf(&cmd_builder, " --with-output-files=%s", template_filename);
 
 	if(time_series)
