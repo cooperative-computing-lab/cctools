@@ -1041,7 +1041,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 
 	printf("\n*Monitor Options:\n\n");
-	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "-M,--monitor=<dir>");
+	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
 	printf(" %-30s Use <file> as value-pairs for resource limits.\n", "   --monitor-limits=<file>");
 	printf(" %-30s Set monitor interval to <#> seconds.		(default is 1 second)\n", "   --monitor-interval=<#>");
 	printf(" %-30s Enable monitor time series.				 (default is disabled)\n", "   --monitor-with-time-series");
