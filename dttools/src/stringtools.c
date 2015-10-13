@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "timestamp.h"
 #include "xxmalloc.h"
+#include "buffer.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -44,6 +45,36 @@ char *escape_shell_string(const char *str)
 	}
 	strcpy(current, "'");
 	return escaped_string;
+}
+
+/*
+ * Based on opengroup.org's definition of the Shell Command Language (also gnu's)
+ * In section 2.2.3 on Double-Quoted Strings, it indicates you only need to
+ * escape dollar sign, backtick, and backslash. I also escape double quote as
+ * we are adding and exterior double quote around the string.
+ *
+ * [ $ \ ` " ] Are always escaped.
+ * */
+char *string_escape_shell( const char *str )
+{
+	buffer_t B[1];
+	buffer_init(B);
+	buffer_abortonfailure(B, 1);
+
+	const char *s;
+	buffer_putliteral(B,"\"");
+	for(s=str;*s;s++) {
+		if(*s=='"' || *s=='\\' || *s=='$' || *s=='`')
+			buffer_putliteral(B,"\\");
+		buffer_putlstring(B,s,1);
+	}
+	buffer_putliteral(B,"\"");
+
+	char *result;
+	buffer_dup(B,&result);
+	buffer_free(B);
+
+	return result;
 }
 
 void string_from_ip_address(const unsigned char *bytes, char *str)
@@ -839,19 +870,35 @@ char * string_wrap_command( const char *command, const char *wrapper_command )
 {
 	if(!wrapper_command) return strdup(command);
 
-	char * result = malloc(strlen(command)+strlen(wrapper_command)+2);
 	char * braces = strstr(wrapper_command,"{}");
+	char * square = strstr(wrapper_command,"[]");
+	char * new_command;
+
+	if(square) {
+		new_command = string_escape_shell(command);
+	} else {
+		new_command = strdup(command);
+	}
+
+	char * result = malloc(strlen(command)+strlen(wrapper_command)+2);
 
 	if(braces) {
 		strcpy(result,wrapper_command);
 		result[braces-wrapper_command] = 0;
-		strcat(result,command);
+		strcat(result,new_command);
 		strcat(result,braces+2);
+	} else if(square) {
+		strcpy(result,wrapper_command);
+		result[square-wrapper_command] = 0;
+		strcat(result,new_command);
+		strcat(result,square+2);
 	} else {
 		strcpy(result,wrapper_command);
 		strcat(result," ");
-		strcat(result,command);
+		strcat(result,new_command);
 	}
+
+	free(new_command);
 
 	return result;
 }

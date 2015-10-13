@@ -357,7 +357,7 @@ void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname)
 			if(!stream)
 				fatal("Cannot open resources summary file: %s : %s\n", entry->fts_accpath, strerror(errno));
 
-			while((s = parse_summary(stream, entry->fts_accpath)))
+			while((s = parse_summary(stream, entry->fts_path)))
 				list_push_tail(dest->summaries, s);
 
 			fclose(stream);

@@ -35,7 +35,7 @@
 
 #include "debug.h"
 //#define debug fprintf
-//#define D_DEBUG stderr
+//#define D_RMON stderr
 
 #include "rmonitor_helper_comm.h"
 
@@ -57,7 +57,7 @@ pid_t fork()
 	pid_t pid;
 	typeof(fork) *original_fork = dlsym(RTLD_NEXT, "fork");
 
-	debug(D_DEBUG, "fork from %d.\n", getpid());
+	debug(D_RMON, "fork from %d.\n", getpid());
 	pid = original_fork();
 
 	if(!pid)
@@ -97,7 +97,7 @@ int chdir(const char *path)
 	int   status;
 	typeof(chdir) *original_chdir = dlsym(RTLD_NEXT, "chdir");
 
-	debug(D_DEBUG, "chdir from %d.\n", getpid());
+	debug(D_RMON, "chdir from %d.\n", getpid());
 	status = original_chdir(path);
 
 	if(status == 0)
@@ -124,7 +124,7 @@ int fchdir(int fd)
 	int   status;
 	typeof(fchdir) *original_fchdir = dlsym(RTLD_NEXT, "fchdir");
 
-	debug(D_DEBUG, "fchdir from %d.\n", getpid());
+	debug(D_RMON, "fchdir from %d.\n", getpid());
 	status = original_fchdir(fd);
 
 	if(status == 0)
@@ -167,19 +167,17 @@ FILE *fopen(const char *path, const char *mode)
 	FILE *file;
 	typeof(fopen) *original_fopen = dlsym(RTLD_NEXT, "fopen");
 
-	debug(D_DEBUG, "fopen %s mode %s from %d.\n", path, mode, getpid());
+	debug(D_RMON, "fopen %s mode %s from %d.\n", path, mode, getpid());
 
 	PUSH_ERRNO
 		file = original_fopen(path, mode);
 	POP_ERRNO(msg)
 
-	if(file)
-	{
-		if(open_for_writing(fileno(file))) {
-			msg.type   = OPEN_OUTPUT;
-		} else {
-			msg.type   = OPEN_INPUT;
-		}
+	/* Consider file as input by default. */
+	msg.type   = OPEN_INPUT;
+
+	if(file && open_for_writing(fileno(file))) {
+		msg.type   = OPEN_OUTPUT;
 	}
 
 	msg.origin = getpid();
@@ -204,20 +202,17 @@ int open(const char *path, int flags, ...)
 	mode = va_arg(ap, int);
 	va_end(ap);
 
-	debug(D_DEBUG, "open %s from %d.\n", path, getpid());
+	debug(D_RMON, "open %s from %d.\n", path, getpid());
 
 	PUSH_ERRNO
 		fd = original_open(path, flags, mode);
 	POP_ERRNO(msg)
 
-	if(fd > -1)
-	{
+	/* Consider file as input by default. */
+	msg.type   = OPEN_INPUT;
 
-		if(open_for_writing(fd)) {
-			msg.type   = OPEN_OUTPUT;
-		} else {
-			msg.type   = OPEN_INPUT;
-		}
+	if(fd > -1 && open_for_writing(fd)) {
+		msg.type   = OPEN_OUTPUT;
 	}
 
 	msg.origin = getpid();
@@ -236,19 +231,17 @@ FILE *fopen64(const char *path, const char *mode)
 	FILE *file;
 	typeof(fopen64) *original_fopen64 = dlsym(RTLD_NEXT, "fopen64");
 
-	debug(D_DEBUG, "fopen64 %s mode %s from %d.\n", path, mode, getpid());
+	debug(D_RMON, "fopen64 %s mode %s from %d.\n", path, mode, getpid());
 
 	PUSH_ERRNO
 		file = original_fopen64(path, mode);
 	POP_ERRNO(msg)
 
-	if(file)
-	{
-		if(open_for_writing(fileno(file))) {
-			msg.type   = OPEN_OUTPUT;
-		} else {
-			msg.type   = OPEN_INPUT;
-		}
+	/* Consider file as input by default. */
+	msg.type   = OPEN_INPUT;
+
+	if(file && open_for_writing(fileno(file))) {
+		msg.type   = OPEN_OUTPUT;
 	}
 
 	msg.origin = getpid();
@@ -273,19 +266,17 @@ int open64(const char *path, int flags, ...)
 	mode = va_arg(ap, int);
 	va_end(ap);
 
-	debug(D_DEBUG, "open64 %s from %d.\n", path, getpid());
+	debug(D_RMON, "open64 %s from %d.\n", path, getpid());
 
 	PUSH_ERRNO
 		fd = original_open64(path, flags, mode);
 	POP_ERRNO(msg)
 
-	if(fd > -1)
-	{
-		if(open_for_writing(fd)) {
-			msg.type   = OPEN_OUTPUT;
-		} else {
-			msg.type   = OPEN_INPUT;
-		}
+	/* Consider file as input by default. */
+	msg.type   = OPEN_INPUT;
+
+	if(fd > -1 && open_for_writing(fd)) {
+		msg.type   = OPEN_OUTPUT;
 	}
 
 	msg.origin = getpid();
@@ -335,7 +326,7 @@ void exit_wrapper_preamble(void)
 	void (*prev_handler)(int signum);
 	struct timespec timeout = {.tv_sec = 2, .tv_nsec = 0};
 
-	debug(D_DEBUG, "%s from %d.\n", str_msgtype(END_WAIT), getpid());
+	debug(D_RMON, "%s from %d.\n", str_msgtype(END_WAIT), getpid());
 
 	prev_handler = signal(SIGCONT, wakeup_pselect_from_exit);
 	sigemptyset(&set_cont);
@@ -351,17 +342,17 @@ void exit_wrapper_preamble(void)
 	send_monitor_msg(&msg);
 
 	/* Wait at most timeout for monitor to send SIGCONT */
-	debug(D_DEBUG, "Waiting for monitoring: %d.\n", getpid());
+	debug(D_RMON, "Waiting for monitoring: %d.\n", getpid());
 	pselect(0, NULL, NULL, NULL, &timeout, &set_prev);
 	signal(SIGCONT, prev_handler);
 	sigprocmask(SIG_SETMASK, &set_prev, NULL);
 
-	debug(D_DEBUG, "Continue with %s: %d.\n", str_msgtype(END_WAIT), getpid());
+	debug(D_RMON, "Continue with %s: %d.\n", str_msgtype(END_WAIT), getpid());
 }
 
 void end_wrapper_epilogue(void)
 {
-	debug(D_DEBUG, "%s from %d.\n", str_msgtype(END), getpid());
+	debug(D_RMON, "%s from %d.\n", str_msgtype(END), getpid());
 
 	struct rmonitor_msg msg;
 	msg.type   = END;
@@ -378,7 +369,7 @@ void exit(int status)
 	exit_wrapper_preamble();
 	end_wrapper_epilogue();
 
-	debug(D_DEBUG, "%d about to call exit()\n", getpid());
+	debug(D_RMON, "%d about to call exit()\n", getpid());
 
 	typeof(exit) *original_exit = dlsym(RTLD_NEXT, "exit");
 	original_exit(status);
@@ -399,7 +390,7 @@ void _exit(int status)
 	exit_wrapper_preamble();
 	end_wrapper_epilogue();
 
-	debug(D_DEBUG, "%d about to call _exit()\n", getpid());
+	debug(D_RMON, "%d about to call _exit()\n", getpid());
 
 	typeof(_exit) *original_exit = dlsym(RTLD_NEXT, "_exit");
 	original_exit(status);
@@ -416,7 +407,7 @@ pid_t waitpid(pid_t pid, int *status, int options)
 	pid_t pidb;
 	typeof(waitpid) *original_waitpid = dlsym(RTLD_NEXT, "waitpid");
 
-	debug(D_DEBUG, "waiting from %d for %d.\n", getpid(), pid);
+	debug(D_RMON, "waiting from %d for %d.\n", getpid(), pid);
 	pidb = original_waitpid(pid, &status_, options);
 
 	if(WIFEXITED(status_) || WIFSIGNALED(status_))

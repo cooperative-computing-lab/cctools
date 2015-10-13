@@ -293,7 +293,7 @@ int inc_fs_count(struct rmonitor_filesys_info *f)
 {
     int count = itable_addto_count(filesys_rc, f, 1);
 
-    debug(D_DEBUG, "filesystem %d reference count +1, now %d references.\n", f->id, count);
+    debug(D_RMON, "filesystem %d reference count +1, now %d references.\n", f->id, count);
 
     return count;
 }
@@ -302,11 +302,11 @@ int dec_fs_count(struct rmonitor_filesys_info *f)
 {
     int count = itable_addto_count(filesys_rc, f, -1);
 
-    debug(D_DEBUG, "filesystem %d reference count -1, now %d references.\n", f->id, count);
+    debug(D_RMON, "filesystem %d reference count -1, now %d references.\n", f->id, count);
 
     if(count < 1)
     {
-        debug(D_DEBUG, "filesystem %d is not monitored anymore.\n", f->id);
+        debug(D_RMON, "filesystem %d is not monitored anymore.\n", f->id);
         free(f->path);
         free(f);
     }
@@ -318,7 +318,7 @@ int inc_wd_count(struct rmonitor_wdir_info *d)
 {
     int count = itable_addto_count(wdirs_rc, d, 1);
 
-    debug(D_DEBUG, "working directory '%s' reference count +1, now %d references.\n", d->path, count);
+    debug(D_RMON, "working directory '%s' reference count +1, now %d references.\n", d->path, count);
 
     return count;
 }
@@ -327,11 +327,11 @@ int dec_wd_count(struct rmonitor_wdir_info *d)
 {
     int count = itable_addto_count(wdirs_rc, d, -1);
 
-    debug(D_DEBUG, "working directory '%s' reference count -1, now %d references.\n", d->path, count);
+    debug(D_RMON, "working directory '%s' reference count -1, now %d references.\n", d->path, count);
 
     if(count < 1)
     {
-        debug(D_DEBUG, "working directory '%s' is not monitored anymore.\n", d->path);
+        debug(D_RMON, "working directory '%s' is not monitored anymore.\n", d->path);
 
 		path_disk_size_info_delete_state(d->state);
         hash_table_remove(wdirs, d->path);
@@ -354,7 +354,7 @@ int get_device_id(char *path)
 
     if(stat(path, &dinfo) != 0)
     {
-        debug(D_DEBUG, "stat call on '%s' failed : %s\n", path, strerror(errno));
+        debug(D_RMON, "stat call on '%s' failed : %s\n", path, strerror(errno));
         return -1;
     }
 
@@ -368,7 +368,7 @@ struct rmonitor_filesys_info *lookup_or_create_fs(char *path)
 
     if(!inventory)
     {
-        debug(D_DEBUG, "filesystem %"PRId64" added to monitor.\n", dev_id);
+        debug(D_RMON, "filesystem %"PRId64" added to monitor.\n", dev_id);
 
         inventory = (struct rmonitor_filesys_info *) malloc(sizeof(struct rmonitor_filesys_info));
         inventory->path = xxstrdup(path);
@@ -382,7 +382,7 @@ struct rmonitor_filesys_info *lookup_or_create_fs(char *path)
     return inventory;
 }
 
-struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previous, char *path)
+struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previous, char const *path)
 {
     struct rmonitor_wdir_info *inventory;
 
@@ -393,7 +393,7 @@ struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previo
 
     if(!inventory)
     {
-        debug(D_DEBUG, "working directory '%s' added to monitor.\n", path);
+        debug(D_RMON, "working directory '%s' added to monitor.\n", path);
 
         inventory = (struct rmonitor_wdir_info *) malloc(sizeof(struct rmonitor_wdir_info));
         inventory->path  = xxstrdup(path);
@@ -410,7 +410,7 @@ struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previo
             dec_wd_count(previous);
     }
 
-    debug(D_DEBUG, "filesystem of %s is %d\n", inventory->path, inventory->fs->id);
+    debug(D_RMON, "filesystem of %s is %d\n", inventory->path, inventory->fs->id);
 
     return inventory;
 }
@@ -453,9 +453,9 @@ void rmonitor_add_file_watch(char *filename, int is_output)
 
 		if ((iwd = inotify_add_watch(rmonitor_inotify_fd, filename, IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|IN_ACCESS|IN_MODIFY)) < 0)
 		{
-			debug(D_DEBUG, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
+			debug(D_RMON, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
 		} else {
-			debug(D_DEBUG, "added watch (id: %d) for file %s", iwd, filename);
+			debug(D_RMON, "added watch (id: %d) for file %s", iwd, filename);
 			if (iwd >= alloced_inotify_watches)
 			{
 				new_inotify_watches = (char **)realloc(inotify_watches, (iwd+50) * (sizeof(char *)));
@@ -464,7 +464,7 @@ void rmonitor_add_file_watch(char *filename, int is_output)
 					alloced_inotify_watches = iwd+50;
 					inotify_watches = new_inotify_watches;
 				} else {
-					debug(D_DEBUG, "Out of memory trying to expand inotify_watches");
+					debug(D_RMON, "Out of memory trying to expand inotify_watches");
 				}
 			}
 			if (iwd < alloced_inotify_watches)
@@ -472,7 +472,7 @@ void rmonitor_add_file_watch(char *filename, int is_output)
 				inotify_watches[iwd] = strdup(filename);
 				if (finfo != NULL) finfo->n_references = 1;
 			} else {
-				debug(D_DEBUG, "Out of memory: Removing inotify watch for %s", filename);
+				debug(D_RMON, "Out of memory: Removing inotify watch for %s", filename);
 				inotify_rm_watch(rmonitor_inotify_fd, iwd);
 			}
 		}
@@ -522,7 +522,7 @@ void rmonitor_handle_inotify(void)
 					if (finfo->n_references == 0)
 					{
 						inotify_rm_watch(rmonitor_inotify_fd, evdata[i].wd);
-						debug(D_DEBUG, "removed watch (id: %d) for file %s", evdata[i].wd, fname);
+						debug(D_RMON, "removed watch (id: %d) for file %s", evdata[i].wd, fname);
 						free(fname);
 						inotify_watches[evdata[i].wd] = NULL;
 					}
@@ -634,13 +634,13 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 {
 	if( WIFEXITED(wait_status) )
 	{
-		debug(D_DEBUG, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(wait_status));
+		debug(D_RMON, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(wait_status));
 		summary->exit_type = xxstrdup("normal");
 		summary->exit_status = WEXITSTATUS(first_process_sigchild_status);
 	}
 	else if ( WIFSIGNALED(wait_status) || WIFSTOPPED(wait_status) )
 	{
-		debug(D_DEBUG, "process %d terminated: %s.\n",
+		debug(D_RMON, "process %d terminated: %s.\n",
 		      first_process_pid,
 		      strsignal(WIFSIGNALED(wait_status) ? WTERMSIG(wait_status) : WSTOPSIG(wait_status)));
 
@@ -858,7 +858,7 @@ void rmonitor_untrack_process(uint64_t pid)
 
 void cleanup_zombie(struct rmonitor_process_info *p)
 {
-  debug(D_DEBUG, "cleaning process: %d\n", p->pid);
+  debug(D_RMON, "cleaning process: %d\n", p->pid);
 
   if(p->wd)
     dec_wd_count(p->wd);
@@ -903,7 +903,7 @@ void ping_processes(void)
     while(itable_nextkey(processes, &pid, (void **) &p))
         if(!ping_process(pid))
         {
-            debug(D_DEBUG, "cannot find %"PRId64" process.\n", pid);
+            debug(D_RMON, "cannot find %"PRId64" process.\n", pid);
             rmonitor_untrack_process(pid);
         }
 }
@@ -913,11 +913,11 @@ struct rmsummary *rmonitor_rusage_tree(void)
     struct rusage usg;
     struct rmsummary *tr_usg = calloc(1, sizeof(struct rmsummary));
 
-    debug(D_DEBUG, "calling getrusage.\n");
+    debug(D_RMON, "calling getrusage.\n");
 
     if(getrusage(RUSAGE_CHILDREN, &usg) != 0)
     {
-        debug(D_DEBUG, "getrusage failed: %s\n", strerror(errno));
+        debug(D_RMON, "getrusage failed: %s\n", strerror(errno));
         return NULL;
     }
 
@@ -926,7 +926,7 @@ struct rmsummary *rmonitor_rusage_tree(void)
 
     tr_usg->resident_memory = (usg.ru_maxrss + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 
-    debug(D_DEBUG, "rusage faults: %ld resident memory: %ld.\n", usg.ru_majflt, usg.ru_maxrss);
+    debug(D_RMON, "rusage faults: %ld resident memory: %ld.\n", usg.ru_majflt, usg.ru_maxrss);
 
     return tr_usg;
 }
@@ -940,19 +940,19 @@ void rmonitor_check_child(const int signal)
     if(pid != (uint64_t) first_process_pid)
 	    return;
 
-    debug(D_DEBUG, "SIGCHLD from %d : ", first_process_pid);
+    debug(D_RMON, "SIGCHLD from %d : ", first_process_pid);
 
     if(WIFEXITED(first_process_sigchild_status))
     {
-        debug(D_DEBUG, "exit\n");
+        debug(D_RMON, "exit\n");
     }
     else if(WIFSIGNALED(first_process_sigchild_status))
     {
-      debug(D_DEBUG, "signal\n");
+      debug(D_RMON, "signal\n");
     }
     else if(WIFSTOPPED(first_process_sigchild_status))
     {
-      debug(D_DEBUG, "stop\n");
+      debug(D_RMON, "stop\n");
 
       switch(WSTOPSIG(first_process_sigchild_status))
       {
@@ -969,14 +969,14 @@ void rmonitor_check_child(const int signal)
     }
     else if(WIFCONTINUED(first_process_sigchild_status))
     {
-      debug(D_DEBUG, "continue\n");
+      debug(D_RMON, "continue\n");
       return;
     }
 
     first_process_already_waited = 1;
 
     struct rmonitor_process_info *p;
-    debug(D_DEBUG, "adding all processes to cleanup list.\n");
+    debug(D_RMON, "adding all processes to cleanup list.\n");
     itable_firstkey(processes);
     while(itable_nextkey(processes, &pid, (void **) &p))
       rmonitor_untrack_process(pid);
@@ -985,6 +985,10 @@ void rmonitor_check_child(const int signal)
     struct rmsummary *tr_usg = rmonitor_rusage_tree();
     rmonitor_find_max_tree(summary, tr_usg);
     free(tr_usg);
+}
+
+void cleanup_library() {
+	unlink(lib_helper_name);
 }
 
 //SIGINT, SIGQUIT, SIGTERM signal handler.
@@ -1006,7 +1010,7 @@ void rmonitor_final_cleanup(int signum)
     itable_firstkey(processes);
     while(itable_nextkey(processes, &pid, (void **) &p))
     {
-        debug(D_DEBUG, "sending %s to process %"PRId64".\n", strsignal(signum), pid);
+        debug(D_RMON, "sending %s(%d) to process %"PRId64".\n", strsignal(signum), signum, pid);
 
         kill(pid, signum);
     }
@@ -1026,7 +1030,7 @@ void rmonitor_final_cleanup(int signum)
     itable_firstkey(processes);
     while(itable_nextkey(processes, &pid, (void **) &p))
     {
-        debug(D_DEBUG, "sending %s to process %"PRId64".\n", strsignal(SIGKILL), pid);
+        debug(D_RMON, "sending %s(%d) to process %"PRId64".\n", strsignal(SIGKILL), SIGKILL, pid);
 
         kill(pid, SIGKILL);
 
@@ -1035,8 +1039,10 @@ void rmonitor_final_cleanup(int signum)
 
     cleanup_zombies();
 
-    if(lib_helper_extracted)
-        unlink(lib_helper_name);
+    if(lib_helper_extracted) {
+		cleanup_library();
+		lib_helper_extracted = 0;
+	}
 
     status = rmonitor_final_summary();
 
@@ -1055,7 +1061,7 @@ void rmonitor_final_cleanup(int signum)
 #define over_limit_check(tr, fld, mult, fmt)				\
 	if(resources_limits->fld > -1 && (tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)\
 	{								\
-		debug(D_DEBUG, "Limit " #fld " broken.\n");		\
+		debug(D_RMON, "Limit " #fld " broken.\n");		\
 		char *tmp;						\
 		if((tr)->limits_exceeded)                               \
 		{							\
@@ -1127,6 +1133,8 @@ void write_helper_lib(void)
     chmod(lib_helper_name, 0777);
 
     lib_helper_extracted = 1;
+
+	atexit(cleanup_library);
 }
 
 void rmonitor_dispatch_msg(void)
@@ -1136,7 +1144,7 @@ void rmonitor_dispatch_msg(void)
 
 	recv_monitor_msg(rmonitor_queue_fd, &msg);
 
-	debug(D_DEBUG,"message \"%s\" from %d\n", str_msgtype(msg.type), msg.origin);
+	debug(D_RMON,"message '%s' (%d) from %d with status '%s' (%d)\n", str_msgtype(msg.type), msg.type, msg.origin, strerror(msg.error), msg.error);
 
 	p = itable_lookup(processes, (uint64_t) msg.origin);
 
@@ -1174,12 +1182,12 @@ void rmonitor_dispatch_msg(void)
 		case OPEN_OUTPUT:
 			switch(msg.error) {
 				case 0:
-					debug(D_DEBUG, "File %s has been opened.\n", msg.data.s);
+					debug(D_RMON, "File %s has been opened.\n", msg.data.s);
 					rmonitor_add_file_watch(msg.data.s, msg.type == OPEN_OUTPUT);
 					break;
 				case EMFILE:
 					/* Eventually report that we ran out of file descriptors. */
-					debug(D_DEBUG, "Process %d ran out of file descriptors.\n", msg.origin);
+					debug(D_RMON, "Process %d ran out of file descriptors.\n", msg.origin);
 					break;
 				default:
 					/* Clear the error, as it is not related to resources. */
@@ -1193,7 +1201,7 @@ void rmonitor_dispatch_msg(void)
 			switch(msg.error) {
 				case ENOSPC:
 					/* Eventually report that we ran out of space. */
-					debug(D_DEBUG, "Process %d ran out of disk space.\n", msg.origin);
+					debug(D_RMON, "Process %d ran out of disk space.\n", msg.origin);
 					break;
 				default:
 					/* Clear the error, as it is not related to resources. */
@@ -1216,7 +1224,7 @@ int wait_for_messages(int interval)
 {
     struct timeval timeout;
 
-    debug(D_DEBUG, "sleeping for: %lf seconds\n", ((double) interval / ONE_SECOND));
+    debug(D_RMON, "sleeping for: %lf seconds\n", ((double) interval / ONE_SECOND));
 
     //If grandchildren processes cannot talk to us, simply wait.
     //Else, wait, and check socket for messages.
@@ -1283,7 +1291,7 @@ pid_t rmonitor_fork(void)
 
     if(pid > 0)
     {
-        debug(D_DEBUG, "fork %d -> %d\n", getpid(), pid);
+        debug(D_RMON, "fork %d -> %d\n", getpid(), pid);
 
         rmonitor_track_process(pid);
 
@@ -1336,13 +1344,13 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
         fatal("fork failed: %s\n", strerror(errno));
     else //child
     {
-        debug(D_DEBUG, "executing: %s\n", executable);
+        debug(D_RMON, "executing: %s\n", executable);
 
 		errno = 0;
         execvp(executable, argv);
         //We get here only if execlp fails.
 		int exec_errno = errno;
-        debug(D_DEBUG, "error executing %s: %s\n", executable, strerror(errno));
+        debug(D_RMON, "error executing %s: %s\n", executable, strerror(errno));
 
 		exit(exec_errno);
     }
@@ -1361,6 +1369,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Show version string.\n", "-v,--version");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Interval between observations, in microseconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
+    fprintf(stdout, "%-30s Read command line from <str>, and execute as '/bin/sh -c <str>'\n", "-c,--sh=<str>");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
     fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify.\n", "-L,--limits=<string>");
@@ -1440,7 +1449,7 @@ int rmonitor_resources(long int interval /*in microseconds */)
 
 int main(int argc, char **argv) {
     int i;
-    char command_line[1024] = {'\0'};
+    char *command_line;
     char *executable;
     int64_t c;
     uint64_t interval = DEFAULT_INTERVAL;
@@ -1449,6 +1458,8 @@ int main(int argc, char **argv) {
     char *summary_path = NULL;
     char *series_path  = NULL;
     char *opened_path  = NULL;
+
+	char *sh_cmd_line = NULL;
 
     int use_series   = 0;
     int use_inotify  = 0;
@@ -1473,7 +1484,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_TIME_SERIES = UCHAR_MAX+1,
 		LONG_OPT_OPENED_FILES,
 		LONG_OPT_DISK_FOOTPRINT,
-		LONG_OPT_NO_DISK_FOOTPRINT
+		LONG_OPT_NO_DISK_FOOTPRINT,
+		LONG_OPT_SH_CMDLINE
 	};
 
     static const struct option long_options[] =
@@ -1486,6 +1498,7 @@ int main(int argc, char **argv) {
 		    {"interval",   required_argument, 0, 'i'},
 		    {"limits",     required_argument, 0, 'L'},
 		    {"limits-file",required_argument, 0, 'l'},
+		    {"sh",         required_argument, 0, 'c'},
 
 		    {"verbatim-to-summary",required_argument, 0, 'V'},
 
@@ -1502,7 +1515,7 @@ int main(int argc, char **argv) {
 	/* By default, measure working directory. */
 	resources_flags->workdir_footprint = 1;
 
-    while((c = getopt_long(argc, argv, "d:fhi:L:l:o:O:vV:", long_options, NULL)) >= 0)
+    while((c = getopt_long(argc, argv, "c:d:fhi:L:l:o:O:vV:", long_options, NULL)) >= 0)
     {
 		switch (c) {
 			case 'd':
@@ -1518,6 +1531,9 @@ int main(int argc, char **argv) {
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
+			case 'c':
+				sh_cmd_line = xxstrdup(optarg);
+				break;
 			case 'i':
 				interval = strtoll(optarg, NULL, 10);
 				if(interval < 1)
@@ -1579,27 +1595,52 @@ int main(int argc, char **argv) {
 
     rmsummary_debug_report(resources_limits);
 
-    //this is ugly
-    if(optind < argc)
-    {
-        executable = xxstrdup(argv[optind]);
-        for(i = optind; i < argc; i++)
-        {
-            strcat(command_line, argv[i]);
-            strcat(command_line, " ");
-        }
-    }
-    else
-    {
-        show_help(argv[0]);
-        return 1;
-    }
+	//this is ugly. if -c given, we should not accept any more arguments.
+	// if not given, we should get the arguments that represent the command line.
+	if((optind < argc && sh_cmd_line) || (optind >= argc && !sh_cmd_line)) {
+		show_help(argv[0]);
+		return 1;
+	}
+
+	if(sh_cmd_line) {
+		argc = 3;
+		optind = 0;
+
+		/* we do an exec here so that we do not overcount processes created. */
+		char *sh_cmd_line_exec = string_format("exec %s", sh_cmd_line);
+		char *argv_sh[] = { "/bin/sh", "-c", sh_cmd_line_exec, 0 };
+		argv = argv_sh;
+
+		/* for pretty printing in the summary. */
+		command_line = sh_cmd_line;
+
+		char *sh_cmd_line_exec_escaped = string_escape_shell(sh_cmd_line_exec);
+		debug(D_RMON, "command line: /bin/sh -c %s\n", sh_cmd_line_exec_escaped);
+		free(sh_cmd_line_exec_escaped);
+	}
+	else {
+		buffer_t b;
+		buffer_init(&b);
+
+		char *sep = "";
+		for(i = optind; i < argc; i++)
+		{
+			buffer_printf(&b, "%s%s", sep, argv[i]);
+			sep = " ";
+		}
+
+		command_line = xxstrdup(buffer_tostring(&b));
+		buffer_free(&b);
+
+		debug(D_RMON, "command line: %s\n", command_line);
+	}
+
 
 
     if(getenv(RESOURCE_MONITOR_INFO_ENV_VAR))
     {
-        debug(D_DEBUG, "using upstream monitor. executing: %s\n", command_line);
-        execlp("sh", "sh", "-c", command_line, (char *) NULL);
+        debug(D_NOTICE, "using upstream monitor. executing: %s\n", command_line);
+        execlp("/bin/sh", "sh", "-c", command_line, (char *) NULL);
         //We get here only if execlp fails.
         fatal("error executing %s: %s\n", command_line, strerror(errno));
     }
@@ -1642,6 +1683,8 @@ int main(int argc, char **argv) {
 	    if (inotify_watches == NULL) alloced_inotify_watches = 0;
     }
 #endif
+
+	executable = xxstrdup(argv[optind]);
 
     spawn_first_process(executable, argv + optind, child_in_foreground);
     rmonitor_resources(interval);

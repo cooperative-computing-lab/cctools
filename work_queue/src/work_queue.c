@@ -3943,7 +3943,7 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_fil
 
   q->monitor_mode = 0;
 
-  q->monitor_exe = resource_monitor_copy_to_wd(NULL);
+  q->monitor_exe = resource_monitor_locate(NULL);
   if(!q->monitor_exe)
   {
 	debug(D_NOTICE, "Could not find the resource monitor executable. Disabling monitor mode.\n");
@@ -4188,10 +4188,16 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 	char *template = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
 	char *summary  = string_format("%s.summary", template);
 
-	wrap_cmd = resource_monitor_rewrite_command(t->command_line, NULL, template, NULL, NULL, 0, 0);
+	static char *monitor_remote_name = NULL;
+
+	if(!monitor_remote_name) {
+		monitor_remote_name = string_format("./cctools-resource-monitor-%d", getpid());
+	}
+
+	wrap_cmd = resource_monitor_rewrite_command(t->command_line, monitor_remote_name, template, NULL, NULL, 0, 0);
 
 	//BUG: what if user changes current working directory?
-	work_queue_task_specify_file(t, q->monitor_exe, q->monitor_exe, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+	work_queue_task_specify_file(t, q->monitor_exe, monitor_remote_name, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 	work_queue_task_specify_file(t, summary, summary, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 
 	free(summary);

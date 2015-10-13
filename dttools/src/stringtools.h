@@ -15,6 +15,15 @@ See the file COPYING for details.
 typedef char *(*string_subst_lookup_t) (const char *name, void *arg);
 
 char *escape_shell_string (const char *str);
+
+/** Takes a command string and escapes special characters in the Shell Command
+  language. Mallocs space for new string and does not modify original string.
+  Characters dollar-sign $, backtick `, backslash \, and double-quote " are
+  escaped.
+  @param str Command string presented to be escaped.
+  @return String with special characters escaped.
+  */
+char *string_escape_shell (const char *str);
 void string_from_ip_address(const unsigned char *ip_addr_bytes, char *str);
 int string_to_ip_address(const char *str, unsigned char *ip_addr_bytes);
 int string_ip_subnet(const char *addr, char *subnet);

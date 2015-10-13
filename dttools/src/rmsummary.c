@@ -88,8 +88,6 @@ char *rmsummary_read_single_chunk(FILE *stream)
 	char c;
 	while( (c = getc(stream)) == '#' || isblank(c) || c == '-' )
 	{
-		ungetc(c, stream);
-
 		/* Make sure we read complete comment lines */
 		do {
 			line[MAX_LINE - 1] = '\0';
@@ -105,16 +103,13 @@ char *rmsummary_read_single_chunk(FILE *stream)
 	buffer_init(&b);
 
 	ungetc(c, stream);
-	while( (c = getc(stream)) != EOF )
+	while(fgets(line, MAX_LINE, stream))
 	{
-		ungetc(c, stream);
-		if(c == '#' || c == '\n')
-			continue;
-
-		if(c == '-')
+		if(string_prefix_is(line, "--")) {
+			/* we got to the end of document */
 			break;
+		}
 
-		fgets(line, MAX_LINE, stream);
 		buffer_printf(&b, "%s", line);
 	}
 
@@ -140,6 +135,9 @@ struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separa
 	const char delim[] = { separator, '\n', '\0'};
 
 	struct rmsummary *s = make_rmsummary(-1);
+
+	/* if source have no last_error, we do not want the -1 from above */
+	s->last_error = 0;
 
 	token = strtok_r(buffer_copy, delim, &saveptr);
 	while(token)

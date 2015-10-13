@@ -21,8 +21,6 @@ COPYING for details.
 
 #include "rmonitor.h"
 
-static char *monitor_exe  = NULL;
-
 static char *resource_monitor_check_path(const char *path, const char *executable_opt) {
 	struct stat buf;
 
@@ -97,37 +95,6 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 	return NULL;
 }
 
-//atexit handler
-void resource_monitor_delete_exe(void)
-{
-	debug(D_RMON, "unlinking %s\n", monitor_exe);
-	unlink(monitor_exe);
-}
-
-char *resource_monitor_copy_to_wd(const char *path_from_cmdline)
-{
-	char *mon_unique;
-	char *monitor_org;
-	monitor_org = resource_monitor_locate(path_from_cmdline);
-
-	if(!monitor_org)
-		fatal("Monitor program could not be found.\n");
-
-	mon_unique = string_format("monitor-%d", getpid());
-
-	debug(D_RMON,"copying monitor %s to %s.\n", monitor_org, mon_unique);
-
-	if(copy_file_to_file(monitor_org, mon_unique) == 0)
-		fatal("Could not copy monitor %s to %s in local directory: %s\n",
-				monitor_org, mon_unique, strerror(errno));
-
-	atexit(resource_monitor_delete_exe);
-	chmod(mon_unique, 0777);
-
-	monitor_exe = mon_unique;
-
-	return mon_unique;
-}
 
 //Using default sampling interval. We may want to add an option
 //to change it.
@@ -135,33 +102,37 @@ char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_
 					   const char *extra_monitor_options,
 					   int time_series, int inotify_stats)
 {
-	char cmd_builder[PATH_MAX];
-	int  index;
 
-	if(!monitor_path && !monitor_exe)
-		monitor_exe = resource_monitor_copy_to_wd(NULL);
 
+	buffer_t cmd_builder;
+	buffer_init(&cmd_builder);
 
 	if(!monitor_path)
-		monitor_path = monitor_exe;
+		fatal("Monitor path should be specified.");
 
-	index = sprintf(cmd_builder, "./%s --with-output-files=%s ", monitor_path, template_filename);
+	buffer_printf(&cmd_builder, "%s", monitor_path);
+	buffer_printf(&cmd_builder, " --with-output-files=%s", template_filename);
 
 	if(time_series)
-		index += sprintf(cmd_builder + index, "--with-time-series ");
+		buffer_printf(&cmd_builder, " --with-time-series");
 
 	if(inotify_stats)
-		index += sprintf(cmd_builder + index, "--with-inotify ");
+		buffer_printf(&cmd_builder, " --with-inotify");
 
 	if(limits_filename)
-		index += sprintf(cmd_builder + index, "--limits-file=%s ", limits_filename);
+		buffer_printf(&cmd_builder, " --limits-file=%s", limits_filename);
 
 	if(extra_monitor_options)
-		index += sprintf(cmd_builder + index, "%s ", extra_monitor_options);
+		buffer_printf(&cmd_builder, " %s", extra_monitor_options);
 
-	sprintf(cmd_builder + index, "-- %s", cmdline);
+	char *cmdline_escaped = string_escape_shell(cmdline);
+	buffer_printf(&cmd_builder, " --sh %s", cmdline_escaped);
+	free(cmdline_escaped);
 
-	return xxstrdup(cmd_builder);
+	char *result = xxstrdup(buffer_tostring(&cmd_builder));
+	buffer_free(&cmd_builder);
+
+	return result;
 }
 
 /* vim: set noexpandtab tabstop=4: */
