@@ -1,0 +1,16 @@
+#openmalaria execution engine test command.
+umbrella \
+--spec openmalaria.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/parrot_openmalaria \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
+
+umbrella \
+--spec openmalaria.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/docker_openmalaria \
+--sandbox_mode docker \
+--log umbrella.log \
+run

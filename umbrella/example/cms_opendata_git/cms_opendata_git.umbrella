@@ -11,6 +11,7 @@
 		"version": ">=2.6.18"
 	},
 	"os": {
+		"id": "62aa9bc37afe3f738052da5545832c80",
 		"name": "Redhat",
 		"version": "5.10"
 	},
@@ -28,6 +29,7 @@
 			"mount_env": "GIT_REPO_1"
 		},
 		"cms_opendata.sh": {
+			"action": "none",
 			"id": "2f2051dff6ca75ff67e71f95e9271857",
 			"mountpoint": "/tmp/cms_opendata.sh"
 		}
