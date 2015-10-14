@@ -13,17 +13,18 @@
 #include "makeflow_wrapper.h"
 
 #include <string.h>
-
-/* Monitor control functions for wrapping command and adding input/output
- *  * files. */
-char *monitor_exe  = "resource_monitor_cctools";
+#include <stdlib.h>
 
 struct makeflow_wrapper * makeflow_wrapper_create()
 {
 	struct makeflow_wrapper *w = malloc(sizeof(*w));
 	w->command = NULL;
-	w->input_files = list_create();
-	w->output_files = list_create();
+
+	w->input_files = list_create(0);
+	w->output_files = list_create(0);
+
+	w->remote_names = itable_create(0);
+	w->remote_names_inv = hash_table_create(0, 0);
 
 	return w;
 }
@@ -37,9 +38,9 @@ struct makeflow_monitor * makeflow_monitor_create()
 
 	m->limits_name	= NULL;
 	m->interval		= 1;  // in seconds
-	m->log_format	= xxstrdup(DEFAULT_MONITOR_LOG_FORMAT);
-	m->log_dir		= NULL;
+	m->log_prefix	= NULL;
 	m->exe			= NULL;
+	m->exe_remote	= NULL;
 
 	return m;
 }
@@ -55,19 +56,17 @@ void makeflow_wrapper_add_command( struct makeflow_wrapper *w, const char *cmd )
 
 void makeflow_wrapper_add_input_file( struct makeflow_wrapper *w, const char *file )
 {
-	if(!w->input_files) w->input_files = list_create();
-	char *f      = string_format("%s",file);
+	char *f = strdup(file);
 	list_push_tail(w->input_files, f);
 }
 
 void makeflow_wrapper_add_output_file( struct makeflow_wrapper *w, const char *file )
 {
-	if(!w->output_files) w->output_files = list_create();
-	char *f      = string_format("%s",file);
+	char *f = strdup(file);
 	list_push_tail(w->output_files, f);
 }
 
-struct list *makeflow_wrapper_generate_files( struct list *result, struct list *input, struct dag_node *n )
+struct list *makeflow_wrapper_generate_files( struct list *result, struct list *input, struct dag_node *n, struct makeflow_wrapper *w)
 {
 	char *f;
 	char *nodeid = string_format("%d",n->nodeid);
@@ -79,7 +78,26 @@ struct list *makeflow_wrapper_generate_files( struct list *result, struct list *
 	{
 		char *filename = strdup(f);
 		filename = string_replace_percents(filename, nodeid);
-		struct dag_file *file = dag_file_lookup_or_create(n->d, filename);
+
+		char *remote, *p;
+		char *f = strdup(filename);
+		struct dag_file *file;
+		free(filename);
+		p = strchr(f, '=');
+		if(p) {
+			*p = 0;
+			filename = xxstrdup(f);
+			remote = xxstrdup(p+1);
+			*p = '=';
+			file = dag_file_lookup_or_create(n->d, filename);
+			itable_insert(w->remote_names, (uintptr_t) file, remote);
+			hash_table_insert(w->remote_names_inv, remote, (void *)file);
+		} else {
+			filename = xxstrdup(f);
+			remote = NULL;
+			file = dag_file_lookup_or_create(n->d, filename);
+		}
+		free(f);
 		list_push_tail(files, file);
 	}
 	free(nodeid);
@@ -89,36 +107,52 @@ struct list *makeflow_wrapper_generate_files( struct list *result, struct list *
 	return result;
 }
 
+/* Returns the remotename used in wrapper for local name filename */
+const char *makeflow_wrapper_get_remote_name(struct makeflow_wrapper *w, struct dag *d, const char *filename)
+{
+	struct dag_file *f;
+	char *name;
+
+	f = dag_file_from_name(d, filename);
+	name = (char *) itable_lookup(w->remote_names, (uintptr_t) f);
+
+	return name;
+}
+
 /*
  * Prepare for monitoring by creating wrapper command and attaching the
  * appropriate input and output dependencies.
  * */
-void makeflow_prepare_for_monitoring( struct makeflow_monitor *m)
+void makeflow_prepare_for_monitoring( struct makeflow_monitor *m, char *log_dir, char *log_format)
 {
-	char *log_prefix = string_format("%s/%s", m->log_dir, m->log_format);
+	m->log_prefix = string_format("%s/%s", log_dir, log_format);
 	char *log_name;
 
-	makeflow_wrapper_add_input_file(m->wrapper, m->exe);
+	if(m->exe_remote){
+		log_name = string_format("%s=%s", m->exe, m->exe_remote);
+		makeflow_wrapper_add_input_file(m->wrapper, log_name);
+		free(log_name);
+	} else {
+		makeflow_wrapper_add_input_file(m->wrapper, m->exe);
+	}
 
-	log_name = string_format("%s.summary", log_prefix);
+	log_name = string_format("%s.summary", m->log_prefix);
 	makeflow_wrapper_add_output_file(m->wrapper, log_name);
 	free(log_name);
 
 	if(m->enable_time_series)
 	{
-		log_name = string_format("%s.series", log_prefix);
+		log_name = string_format("%s.series", m->log_prefix);
 		makeflow_wrapper_add_output_file(m->wrapper, log_name);
 		free(log_name);
 	}
 
 	if(m->enable_list_files)
 	{
-		log_name = string_format("%s.files", log_prefix);
+		log_name = string_format("%s.files", m->log_prefix);
 		makeflow_wrapper_add_output_file(m->wrapper, log_name);
 		free(log_name);
 	}
-
-	free(log_prefix);
 }
 
 /*
@@ -128,15 +162,20 @@ void makeflow_prepare_for_monitoring( struct makeflow_monitor *m)
 
 char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct dag_node *n )
 {
-	char *log_prefix = string_format("%s/%s", m->log_dir, m->log_format);
+	char *executable;
+	if(m->exe_remote){
+		executable = string_format("./%s", m->exe_remote);
+	} else {
+		executable = string_format("%s", m->exe);
+	}
 	char *limits_str = dag_node_resources_wrap_as_rmonitor_options(n);
 	char *extra_options = string_format("%s -V '%-15s%s'",
 			limits_str ? limits_str : "",
 			"category:",
 			n->category->label);
 
-	char * result = resource_monitor_write_command(m->exe,
-			log_prefix,
+	char * result = resource_monitor_write_command(executable,
+			m->log_prefix,
 			m->limits_name,
 			extra_options,
 			m->enable_time_series,
@@ -145,7 +184,7 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct dag_
 	char *nodeid = string_format("%d",n->nodeid);
 	result = string_replace_percents(result, nodeid);
 
-	free(log_prefix);
+	free(executable);
 	free(limits_str);
 	free(extra_options);
 	free(nodeid);

@@ -4203,7 +4203,6 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 
 	free(summary);
 	free(template);
-	free(command);
 	free(t->command_line);
 
 	t->command_line = wrap_cmd;
