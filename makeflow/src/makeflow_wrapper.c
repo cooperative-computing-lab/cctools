@@ -90,8 +90,10 @@ struct list *makeflow_wrapper_generate_files( struct list *result, struct list *
 			remote = xxstrdup(p+1);
 			*p = '=';
 			file = dag_file_lookup_or_create(n->d, filename);
-			itable_insert(w->remote_names, (uintptr_t) file, remote);
-			hash_table_insert(w->remote_names_inv, remote, (void *)file);
+			if(!n->local_job){
+				itable_insert(w->remote_names, (uintptr_t) file, remote);
+				hash_table_insert(w->remote_names_inv, remote, (void *)file);
+			}
 		} else {
 			filename = xxstrdup(f);
 			remote = NULL;
@@ -163,7 +165,7 @@ void makeflow_prepare_for_monitoring( struct makeflow_monitor *m, char *log_dir,
 char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct dag_node *n )
 {
 	char *executable;
-	if(m->exe_remote){
+	if(m->exe_remote && !n->local_job){
 		executable = string_format("./%s", m->exe_remote);
 	} else {
 		executable = string_format("%s", m->exe);

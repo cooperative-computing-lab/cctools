@@ -1382,7 +1382,6 @@ int main(int argc, char *argv[])
 			default:
 				monitor->exe_remote = NULL;
 		}
-		fprintf(stderr, "%s\n", monitor->exe_remote);
 
 		if(monitor->interval < 1)
 			fatal("Monitoring interval should be positive.");
