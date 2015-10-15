@@ -32,6 +32,8 @@ See the file COPYING for details.
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
 #include "makeflow_wrapper.h"
+#include "makeflow_wrapper_docker.h"
+#include "makeflow_wrapper_monitor.h"
 #include "parser.h"
 
 #include <fcntl.h>
