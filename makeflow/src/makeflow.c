@@ -716,6 +716,23 @@ static int makeflow_check(struct dag *d)
 	debug(D_MAKEFLOW_RUN, "checking rules for consistency...\n");
 
 	for(n = d->nodes; n; n = n->next) {
+
+		if(itable_size(n->remote_names) > 0 || wrapper->uses_remote_rename){
+			switch (batch_queue_type) {
+				case BATCH_QUEUE_TYPE_WORK_QUEUE:
+				case BATCH_QUEUE_TYPE_CONDOR:
+					break;
+				default:
+					debug(D_ERROR, "remote renaming is not supported on selected batch system. Rule %d.\n", n->nodeid);
+					error = 1;
+			if(n->local_job) {
+				debug(D_ERROR, "remote renaming is not supported on locally. Rule %d.\n", n->nodeid);
+				error = 1;
+			}
+		}
+
+		}
+
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
 			if(f->created_by) {

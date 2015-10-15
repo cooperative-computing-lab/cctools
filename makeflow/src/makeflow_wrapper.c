@@ -26,6 +26,8 @@ struct makeflow_wrapper * makeflow_wrapper_create()
 	w->remote_names = itable_create(0);
 	w->remote_names_inv = hash_table_create(0, 0);
 
+	w->uses_remote_rename = 0;
+
 	return w;
 }
 
@@ -57,12 +59,16 @@ void makeflow_wrapper_add_command( struct makeflow_wrapper *w, const char *cmd )
 void makeflow_wrapper_add_input_file( struct makeflow_wrapper *w, const char *file )
 {
 	char *f = strdup(file);
+	char *p = strchr(f, '=');
+	if(p) w->uses_remote_rename = 1;
 	list_push_tail(w->input_files, f);
 }
 
 void makeflow_wrapper_add_output_file( struct makeflow_wrapper *w, const char *file )
 {
 	char *f = strdup(file);
+	char *p = strchr(f, '=');
+	if(p) w->uses_remote_rename = 1;
 	list_push_tail(w->output_files, f);
 }
 

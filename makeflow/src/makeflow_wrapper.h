@@ -32,6 +32,8 @@ struct makeflow_wrapper {
 
 	struct itable *remote_names;
 	struct hash_table *remote_names_inv;
+
+	int uses_remote_rename;
 };
 
 struct makeflow_monitor {
