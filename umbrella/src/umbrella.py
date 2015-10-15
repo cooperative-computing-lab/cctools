@@ -1646,7 +1646,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 				subprocess_error(cmd, rc, stdout, stderr)
 
 			logging.debug("Rename the sandbox dir(%s) to the output directory(%s)", sandbox_dir, output_dir)
-			os.rmdir(output_dir)
+			shutil.rmtree(output_dir)
 			os.renames(sandbox_dir, output_dir)
 			print "The output has been put into the output dir: %s" % output_dir
 		else:

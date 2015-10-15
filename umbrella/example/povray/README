@@ -21,3 +21,24 @@ umbrella \
 --sandbox_mode docker \
 --log umbrella.log \
 run
+
+umbrella \
+--spec povray.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+expand povray_S.umbrella
+
+umbrella \
+--spec povray_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/parrot_povray_S \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
+
+umbrella \
+--spec povray_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/docker_povray_S \
+--sandbox_mode docker \
+--log umbrella.log \
+run
