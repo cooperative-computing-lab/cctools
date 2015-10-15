@@ -302,7 +302,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 */
 int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t, int recursive);
 
-/** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default).
+/** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result WORK_QUEUE_RESULT_MAX_RETRIES.
 @param t A task object.
 @param max_retries The number of retries.
 */

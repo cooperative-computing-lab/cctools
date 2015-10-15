@@ -631,7 +631,8 @@ Legacy parameter for setting file caching attribute.  By default this is enabled
 =head3 C<specify_max_retries>
 
 Specify the number of times this task is retried on worker errors. If less than
-one, the task is retried indefinitely (this the default).
+one, the task is retried indefinitely (this the default).  A task that did not
+succeed after the given number of retries is returned with result $WORK_QUEUE_RESULT_MAX_RETRIES.
 
 =over 12
 
