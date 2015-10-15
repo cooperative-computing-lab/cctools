@@ -63,7 +63,8 @@ typedef enum {
 	WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION = 16, /**< The task used more resources than requested **/
 	WORK_QUEUE_RESULT_TASK_TIMEOUT   = 32,      /**< The task ran after specified end time. **/
 	WORK_QUEUE_RESULT_UNKNOWN        = 64,      /**< The result could not be classified. **/
-	WORK_QUEUE_RESULT_FORSAKEN       = 128      /**< The task failed, but it was neither a task or worker error **/
+	WORK_QUEUE_RESULT_FORSAKEN       = 128,     /**< The task failed, but it was neither a task or worker error **/
+	WORK_QUEUE_RESULT_MAX_RETRIES    = 256      /**< The task could not be completed succesfully in the given number of retries. **/
 } work_queue_result_t;
 
 typedef enum {
@@ -146,6 +147,8 @@ struct work_queue_task {
 	int unlabeled;                                         /**< 1 if the task did not specify any required resource. 0 otherwise. */
 
 	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
+
+	int max_retries;                                       /**< Number of times the task is retried on worker errors until success. If less than one, the task is retried indefinitely. */
 
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
 
@@ -299,9 +302,16 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 */
 int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t, int recursive);
 
-/** Specify the amount of memory required by a task.
+/** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default).
 @param t A task object.
-@param memory The amount of memory required by the task, in megabytes.
+@param max_retries The number of retries.
+*/
+
+void work_queue_task_specify_max_retries( struct work_queue_task *t, int64_t max_retries );
+
+/** Specify the amount of disk space required by a task.
+@param t A task object.
+@param disk The amount of disk space required by the task, in megabytes.
 */
 
 void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory );
