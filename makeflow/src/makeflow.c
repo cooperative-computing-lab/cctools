@@ -81,10 +81,17 @@ static int makeflow_submit_timeout = 3600;
 static int makeflow_retry_flag = 0;
 static int makeflow_retry_max = MAX_REMOTE_JOBS_DEFAULT;
 
+/* makeflow_gc_method indicates the type of garbage collection
+ * indicated by the user. Refer to makeflow_gc.h for specifics */
 static makeflow_gc_method_t makeflow_gc_method = MAKEFLOW_GC_NONE;
+/* Disk size at which point GC is run */
 static uint64_t makeflow_gc_size   = 0;
+/* # of files after which GC is run */
 static int makeflow_gc_count  = -1;
+/* Iterations of wait loop prior ot GC check */
 static int makeflow_gc_barrier = 1;
+/* Determines next gc_barrier to make checks less frequent with
+ * large number of tasks */
 static double makeflow_gc_task_ratio = 0.05;
 
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;

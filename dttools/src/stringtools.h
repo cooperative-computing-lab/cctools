@@ -69,7 +69,7 @@ void string_replace_backslash_codes(const char *instr, char *outstr);
   @param replace String used to replace %%.
   @return The base string with replacements.
   */
-char *string_replace_percents( char *str, const char *replace );
+char *string_replace_percents( const char *str, const char *replace );
 int string_equal(const char *str1, const char *str2);
 
 int strpos(const char *str, char c);

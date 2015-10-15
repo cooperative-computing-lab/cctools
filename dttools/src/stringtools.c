@@ -722,15 +722,15 @@ void string_replace_backslash_codes(const char *a, char *b)
 	*b = 0;
 }
 
-char *string_replace_percents( char *str, const char *replace )
+char *string_replace_percents( const char *str, const char *replace )
 {
 	/* Common case: do nothing if no percents. */
-	if(!strchr(str,'%')) return str;
+	if(!strchr(str,'%')) return xxstrdup(str);
 
 	buffer_t buffer;
 	buffer_init(&buffer);
 
-	char *s;
+	const char *s;
 	for(s=str;*s;s++) {
 		if(*s=='%' && *(s+1)=='%' ) {
 			if( *(s+2)=='%' && *(s+3)=='%') {
@@ -748,8 +748,6 @@ char *string_replace_percents( char *str, const char *replace )
 	char *result;
 	buffer_dup(&buffer,&result);
 	buffer_free(&buffer);
-
-	free(str);
 
 	return result;
 }
