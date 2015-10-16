@@ -147,7 +147,7 @@ struct work_queue_task {
 
 	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
 
-	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
+	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. See @ref rmsummary. */
 
 	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 

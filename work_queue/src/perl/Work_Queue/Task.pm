@@ -867,21 +867,60 @@ Must be called only after the task completes execution.
 
 	Must be called only after the task completes execution.
 
-		$t->resources_measured{bytes_read};
-		$t->resources_measured{bytes_written};
-		$t->resources_measured{cores};
-		$t->resources_measured{cpu_time};
-		$t->resources_measured{gpus};
-		$t->resources_measured{max_concurrent_processes};
-		$t->resources_measured{resident_memory};
-		$t->resources_measured{resident_memory};
-		$t->resources_measured{resident_memory};
-		$t->resources_measured{swap_memory};
-		$t->resources_measured{task_id};
-		$t->resources_measured{total_processes};
-		$t->resources_measured{virtual_memory};
+		start:                     microseconds at the start of execution, since epoch.
+
+		$t->resources_measured{start};
+
+		end:                       microseconds at the end of execution, since epoch.
+
+		$t->resources_measured{end};
+
+		wall_time:                 microseconds spent during execution
+
 		$t->resources_measured{wall_time};
+
+		cpu_time:                  user + system time of the execution
+
+		$t->resources_measured{cpu_time};
+
+		cores:                     number of cores. Computed as cpu_time/wall_time
+
+		$t->resources_measured{cores};
+
+		max_concurrent_processes:  the maximum number of processes running concurrently
+
+		$t->resources_measured{max_concurrent_processes};
+
+		total_processes:           count of all of the processes created
+
+		$t->resources_measured{total_processes};
+
+		virtual_memory:            maximum virtual memory across all processes
+
+		$t->resources_measured{virtual_memory};
+
+		resident_memory:           maximum resident size across all processes
+
+		$t->resources_measured{resident_memory};
+
+		swap_memory:               maximum swap usage across all processes
+
+		$t->resources_measured{swap_memory};
+
+		bytes_read:                number of bytes read from disk
+
+		$t->resources_measured{bytes_read};
+
+		bytes_written:             number of bytes written to disk
+
+		$t->resources_measured{bytes_written};
+
+		workdir_num_files:         total maximum number of files and directories of all the working directories in the tree
+
 		$t->resources_measured{workdir_footprint};
+
+		workdir_footprint:         size in MB of all working directories in the tree
+
 		$t->resources_measured{workdir_num_files};
 
 =cut
