@@ -832,8 +832,11 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char localname[WORK_QUEUE_LINE_MAX];
 	char taskname[WORK_QUEUE_LINE_MAX];
 	char taskname_encoded[WORK_QUEUE_LINE_MAX];
-	int n, flags, length;
+	int flags, length;
+	int64_t n;
 	int disk_alloc = disk_allocation;
+
+	timestamp_t nt;
 
 	struct work_queue_task *task = work_queue_task_create(0);
 	task->taskid = taskid;
@@ -856,13 +859,13 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags);
 		} else if(sscanf(line, "dir %s", filename)) {
 			work_queue_task_specify_directory(task, filename, filename, WORK_QUEUE_INPUT, 0700, 0);
-		} else if(sscanf(line,"cores %d",&n)) {
+		} else if(sscanf(line,"cores %" PRId64,&n)) {
 				work_queue_task_specify_cores(task, n);
-		} else if(sscanf(line,"memory %d",&n)) {
+		} else if(sscanf(line,"memory %" PRId64,&n)) {
 				work_queue_task_specify_memory(task, n);
-		} else if(sscanf(line,"disk %d",&n)) {
+		} else if(sscanf(line,"disk %" PRId64,&n)) {
 				work_queue_task_specify_disk(task, n);
-		} else if(sscanf(line,"gpus %d",&n)) {
+		} else if(sscanf(line,"gpus %" PRId64,&n)) {
 			work_queue_task_specify_gpus(task, n);
 		} else if(sscanf(line,"env %d",&length)==1) {
 			char *env = malloc(length+2); /* +2 for \n and \0 */

@@ -2379,12 +2379,12 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	t->hostname = xxstrdup(w->hostname);
 	t->host = xxstrdup(w->addrport);
 
-	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid);
-	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(t->command_line), t->command_line);
-	send_worker_msg(q,w, "cores %d\n",   t->cores );
-	send_worker_msg(q,w, "memory %"PRId64"\n",  t->memory );
-	send_worker_msg(q,w, "disk %"PRId64"\n",    t->disk );
-	send_worker_msg(q,w, "gpus %d\n",    t->gpus );
+	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid );
+	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(t->command_line), t->command_line );
+	send_worker_msg(q,w, "cores %d\n",         t->cores );
+	send_worker_msg(q,w, "memory %"PRId64"\n", t->memory );
+	send_worker_msg(q,w, "disk %"PRId64"\n",   t->disk );
+	send_worker_msg(q,w, "gpus %d\n",          t->gpus );
 
 	/* Note that even when environment variables after resources, values for
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
