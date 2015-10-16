@@ -3302,6 +3302,17 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, timestamp_t us
 	}
 }
 
+void work_queue_task_specify_running_time( struct work_queue_task *t, timestamp_t useconds )
+{
+	if(useconds < 1)
+	{
+		t->maximum_running_time = 0;
+	}
+	else
+	{
+		t->maximum_running_time = useconds;
+	}
+}
 
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 {
