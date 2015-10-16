@@ -205,6 +205,14 @@ class Task(_object):
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     ##
+    # Indicate the number of times the task should be retried. If 0 (the
+    # default), the task is tried indefinitely. A task that did not succeed
+    # after the given number of retries is returned with result
+    # WORK_QUEUE_RESULT_MAX_RETRIES.
+    def specify_max_retries( self, max_retries ):
+        return work_queue_task_specify_max_retries(self._task,max_retries)
+
+    ##
     # Indicate the number of cores required by this task.
     def specify_cores( self, cores ):
         return work_queue_task_specify_cores(self._task,cores)

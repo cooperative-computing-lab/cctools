@@ -643,7 +643,6 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	itable_firstkey(w->current_tasks);
 	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
-		t->result = WORK_QUEUE_RESULT_UNKNOWN;
 		t->total_bytes_transferred = 0;
 		t->total_transfer_time = 0;
 		t->cmd_execution_time = 0;
@@ -652,13 +651,20 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		}
 		if(t->output) {
 			free(t->output);
+			t->output = NULL;
 		}
 		t->output = 0;
 		if(t->unlabeled) {
 			t->cores = t->memory = t->disk = t->gpus = -1;
 		}
 
-		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
+		if(t->max_retries > 0 && (t->total_submissions >= t->max_retries)) {
+			t->result = WORK_QUEUE_RESULT_MAX_RETRIES;
+			reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
+		} else {
+			t->result = WORK_QUEUE_RESULT_UNKNOWN;
+			reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
+		}
 
 		itable_firstkey(w->current_tasks);
 	}
@@ -3203,6 +3209,15 @@ void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, con
 	} else {
 		/* Specifications without = indicate variables to me unset. */
 		list_push_tail(t->env_list,string_format("%s",name));
+	}
+}
+
+void work_queue_task_specify_max_retries( struct work_queue_task *t, int64_t max_retries ) {
+	if(max_retries < 1) {
+		t->max_retries = 0;
+	}
+	else {
+		t->max_retries = max_retries;
 	}
 }
 
