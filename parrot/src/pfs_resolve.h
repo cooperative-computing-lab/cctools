@@ -9,6 +9,7 @@ See the file COPYING for details.
 #define PFS_RESOLVE
 
 #include <time.h>
+#include "pfs_types.h"
 
 typedef enum {
 	PFS_RESOLVE_UNCHANGED,
@@ -21,6 +22,6 @@ typedef enum {
 void pfs_resolve_file_config( const char *mountfile );
 void pfs_resolve_manual_config( const char *string );
 
-pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, time_t stoptime );
+pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t mode, time_t stoptime );
 
 #endif

@@ -20,23 +20,26 @@ See the file COPYING for details.
 #include <signal.h>
 #include <sys/stat.h>
 #include <fnmatch.h>
+#include <fcntl.h>
 
 extern char pfs_temp_dir[PFS_PATH_MAX];
 
 struct mount_entry {
 	char prefix[PFS_PATH_MAX];
 	char redirect[PFS_PATH_MAX];
+	mode_t mode;
 	struct mount_entry *next;
 };
 
 static struct mount_entry * mount_list = 0;
 static struct hash_table *resolve_cache = 0;
 
-static void add_mount_entry( const char *prefix, const char *redirect )
+static void add_mount_entry( const char *prefix, const char *redirect, mode_t mode )
 {
 	struct mount_entry * m = xxmalloc(sizeof(*m));
 	strcpy(m->prefix,prefix);
 	strcpy(m->redirect,redirect);
+	m->mode = mode;
 	m->next = mount_list;
 	mount_list = m;
 }
@@ -49,7 +52,7 @@ void pfs_resolve_manual_config( const char *str )
 	if(!e) fatal("badly formed mount string: %s",str);
 	*e = 0;
 	e++;
-	add_mount_entry(str,e);
+	add_mount_entry(str,e,R_OK|W_OK|X_OK);
 }
 
 void pfs_resolve_file_config( const char *filename )
@@ -60,6 +63,7 @@ void pfs_resolve_file_config( const char *filename )
 	char redirect[PFS_LINE_MAX];
 	int fields;
 	int linenum=0;
+	mode_t mode;
 
 	file = fopen(filename,"r");
 	if(!file) fatal("couldn't open mountfile %s: %s\n",filename,strerror(errno));
@@ -76,15 +80,16 @@ void pfs_resolve_file_config( const char *filename )
 		if(line[0]=='#') continue;
 		string_chomp(line);
 		if(!line[0]) continue;
-		fields = sscanf(line,"%s %s",prefix,redirect);
+		fields = sscanf(line,"%s %s %o",prefix,redirect,&mode);
 
 		if(fields==0) {
 			continue;
 		} else if(fields<2) {
 			fatal("%s has an error on line %d\n",filename,linenum);
-		} else {
-			add_mount_entry(prefix,redirect);
+		} else if(fields==2) {
+			mode = R_OK|W_OK|X_OK; /* default mode */
 		}
+		add_mount_entry(prefix,redirect,mode);
 	}
 
 	fclose(file);
@@ -241,7 +246,7 @@ void clean_up_path( char *path )
 	}
 }
 
-pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, time_t stoptime )
+pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t mode, time_t stoptime )
 {
 	pfs_resolve_t result = PFS_RESOLVE_UNCHANGED;
 	struct mount_entry *e;
@@ -256,7 +261,13 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, time_t
 	} else {
 		for(e=mount_list;e;e=e->next) {
 			result = mount_entry_check(logical_name,e->prefix,e->redirect,physical_name);
-			if(result!=PFS_RESOLVE_UNCHANGED) break;
+			if(result!=PFS_RESOLVE_UNCHANGED) {
+				if ((mode & e->mode) != mode) {
+					result = PFS_RESOLVE_DENIED;
+					debug(D_RESOLVE,"%s denied, requesting mode %o on mount entry with %o",logical_name,mode,e->mode);
+				}
+				break;
+			}
 		}
 	}
 
@@ -279,7 +290,7 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, time_t
 	}
 
 	if(result==PFS_RESOLVE_UNCHANGED || result==PFS_RESOLVE_CHANGED) {
-		debug(D_RESOLVE,"%s = %s",logical_name,physical_name);
+		debug(D_RESOLVE,"%s = %s,%o",logical_name,physical_name,mode);
 		if(!hash_table_lookup(resolve_cache,logical_name)) {
 			hash_table_insert(resolve_cache,logical_name,xxstrdup(physical_name));
 		}
