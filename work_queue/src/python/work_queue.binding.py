@@ -232,9 +232,17 @@ class Task(_object):
     def specify_priority( self, priority ):
         return work_queue_task_specify_priority(self._task,priority)
 
-    # Indicate the maximum end time (in seconds from the Epoch) of this task.
-    def specify_end_time( self, seconds ):
-        return work_queue_task_specify_end_time(self._task,seconds)
+    # Indicate the maximum end time (absolute, in microseconds from the Epoch) of this task.
+    # This is useful, for example, when the task uses certificates that expire.
+    # If less than 1, or not specified, no limit is imposed.
+    def specify_end_time( self, useconds ):
+        return work_queue_task_specify_end_time(self._task,useconds)
+
+    # Indicate the maximum running time for a task in a worker (relative to
+    # when the task starts to run).  If less than 1, or not specified, no limit
+    # is imposed.
+    def specify_running_time( self, useconds ):
+        return work_queue_task_specify_running_time(self._task,useconds)
 
     # Set this environment variable before running the task.
     # If value is None, then variable is unset.
