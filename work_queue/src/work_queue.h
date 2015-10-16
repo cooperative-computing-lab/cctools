@@ -139,7 +139,7 @@ struct work_queue_task {
 	int total_submissions;                                 /**< The number of times the task has been submitted. */
 	timestamp_t total_cmd_execution_time;                  /**< Time spent in microseconds for executing the command on any worker, including resubmittions of the task. */
 
-	int64_t maximum_end_time;                              /**< Maximum time (from epoch) this task may run. */
+	timestamp_t maximum_end_time;                               /**< Maximum time (microseconds from epoch) this is valid. If less than 1, then task is always valid (default).*/
 	int64_t memory;                                        /**< Memory required by the task. (MB) */
 	int64_t disk;                                          /**< Disk space required by the task. (MB) */
 	int cores;                                             /**< Number of cores required by the task. */
@@ -337,7 +337,9 @@ void work_queue_task_specify_cores( struct work_queue_task *t, int cores );
 
 void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus );
 
-/** Specify the maximum end time allowed for the task (in seconds since the Epoch). If seconds less than 1, then no end time is specified.
+/** Specify the maximum end time allowed for the task (in microseconds since the
+ * Epoch). If less than 1, then no end time is specified (this is the default).
+This is useful, for example, when the task uses certificates that expire.
 @param t A task object.
 @param seconds Number of seconds since the Epoch.
 */

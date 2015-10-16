@@ -579,16 +579,16 @@ static void expire_procs_running() {
 	struct work_queue_process *p;
 	uint64_t pid;
 
-	int64_t current_time = time(0);
+	timestamp_t current_time = timestamp_get();
 
 	itable_firstkey(procs_running);
 	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
 		if(p->task->maximum_end_time > 0 && current_time - p->task->maximum_end_time > 0)
 		{
 			kill(-1 * pid, SIGKILL);
+			p->task->result = WORK_QUEUE_RESULT_TASK_TIMEOUT;
 		}
 	}
-
 }
 
 /*
@@ -867,6 +867,10 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 				work_queue_task_specify_disk(task, n);
 		} else if(sscanf(line,"gpus %" PRId64,&n)) {
 			work_queue_task_specify_gpus(task, n);
+		} else if(sscanf(line,"wall_time %" PRIu64,&nt)) {
+			work_queue_task_specify_running_time(task, nt);
+		} else if(sscanf(line,"end_time %" PRIu64,&nt)) {
+			work_queue_task_specify_end_time(task, nt);
 		} else if(sscanf(line,"env %d",&length)==1) {
 			char *env = malloc(length+2); /* +2 for \n and \0 */
 			link_read(master, env, length+1, stoptime);
@@ -1242,17 +1246,17 @@ static int enforce_process_limits(struct work_queue_process *p) {
 	return 1;
 }
 
-static int enforce_processes_limits(struct link *master) {
+static int enforce_processes_limits() {
 	static time_t last_check_time = 0;
 
 	struct work_queue_process *p;
-	uint64_t taskid;
+	pid_t pid;
 
 	/* Do not check too often, as it is expensive (particularly disk) */
 	if((time(0) - last_check_time) < check_resources_interval ) return 1;
 
 	itable_firstkey(procs_table);
-	while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
+	while(itable_nextkey(procs_table,(uint64_t*)&pid,(void**)&p)) {
 		if(!enforce_process_limits(p)) {
 			finish_running_tasks(WORK_QUEUE_RESULT_FORSAKEN);
 			p->task->result = WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION;
@@ -1492,7 +1496,7 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
-		enforce_processes_limits(master);
+		enforce_processes_limits();
 
 		if(!enforce_worker_limits(master)) {
 			abort_flag = 1;
