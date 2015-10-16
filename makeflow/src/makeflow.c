@@ -726,7 +726,7 @@ static int makeflow_check(struct dag *d)
 
 	for(n = d->nodes; n; n = n->next) {
 
-		if(itable_size(n->remote_names) > 0 || wrapper->uses_remote_rename){
+		if(itable_size(n->remote_names) > 0 || (wrapper && wrapper->uses_remote_rename)){
 			if(n->local_job) {
 				debug(D_ERROR, "remote renaming is not supported on locally. Rule %d.\n", n->nodeid);
 				error = 1;
