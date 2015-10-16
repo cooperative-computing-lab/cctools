@@ -52,6 +52,7 @@ end:                       [seconds at the end of execution, since the epoch,   
 exit_type:                 [one of normal, signal or limit,                    string]
 signal:                    [number of the signal that terminated the process.
                             Only present if exit_type is signal                   int]
+cores:                     [number of cores. Computed as cpu_time/wall_time     float]
 limits_exceeded:           [resources over the limit. Only present if
                             exit_type is limit,                                string]
 exit_status:               [final status of the parent process,                   int]

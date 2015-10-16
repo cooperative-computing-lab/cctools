@@ -544,9 +544,24 @@ class Task(_object):
 
     ##
     # Get the resources measured for the task execution if resource monitoring is enabled.
-    # Must be called only after the task completes execution.
+    # Must be called only after the task completes execution. Valid fields:
+    #
+    # start:                     microseconds at the start of execution
+    # end:                       microseconds at the end of execution
+    # wall_time:                 microseconds spent during execution
+    # cpu_time:                  user + system time of the execution
+    # cores:                     number of cores. Computed as cpu_time/wall_time
+    # max_concurrent_processes:  the maximum number of processes running concurrently
+    # total_processes:           count of all of the processes created
+    # virtual_memory:            maximum virtual memory across all processes
+    # resident_memory:           maximum resident size across all processes
+    # swap_memory:               maximum swap usage across all processes
+    # bytes_read:                number of bytes read from disk
+    # bytes_written:             number of bytes written to disk
+    # workdir_num_files:         total maximum number of files and directories of all the working directories in the tree
+    # workdir_footprint:         size in MB of all working directories in the tree
     # @code
-    # >>> print t.resources_measured('resident_memory')
+    # >>> print t.resources_measured.resident_memory
     # @endcode
     @property
     def resources_measured(self):
