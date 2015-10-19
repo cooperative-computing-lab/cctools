@@ -53,6 +53,7 @@ SOURCES = \
 	itable.c \
 	json.c \
 	json_aux.c \
+	jx.c \
 	link.c \
 	link_auth.c \
 	link_nvpair.c \
