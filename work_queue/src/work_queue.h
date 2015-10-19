@@ -114,7 +114,7 @@ struct work_queue_task {
 	struct list *env_list;                                 /**< Environment variables applied to the task. */
 	int taskid;                                            /**< A unique task id number. */
 	int return_status;                                     /**< The exit code of the command line. */
-	work_queue_result_t result;                       /**< The result of the task (successful, failed return_status, missing input file, missing output file). */
+	work_queue_result_t result;                       /**< The result of the task (see @ref work_queue_result_t */
 	char *host;                                            /**< The address and port of the host on which it ran. */
 	char *hostname;                                        /**< The name of the host on which it ran. */
 
@@ -424,11 +424,20 @@ Once returned, it is safe to re-submit the same take object via @ref work_queue_
 */
 int work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 
-/** Blacklist host from a queue.
+/** Blacklist hostname from a queue.
 @param q A work queue object.
 @param hostname A string for hostname.
 */
 void work_queue_blacklist_add(struct work_queue *q, const char *hostname);
+
+/** Blacklist hostname from a queue. Remove from blacklist in timeout seconds.
+  If timeout is less than 1, then the hostname is blacklisted indefinitely, as
+  if @ref work_queue_blacklist_add was called instead.
+  @param q A work queue object.
+  @param hostname A string for hostname.
+  @param seconds Number of seconds to the hostname will be in the blacklist.
+  */
+void work_queue_blacklist_add_with_timeout(struct work_queue *q, const char *hostname, time_t seconds);
 
 
 /** Unblacklist host from a queue.

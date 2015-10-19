@@ -111,6 +111,9 @@ double wq_option_send_receive_ratio    = 0.5;
 double wq_option_fast_abort_multiplier = -1.0;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
+/* default timeout for slow workers to come back to the pool */
+double wq_option_blacklist_slow_workers_timeout = 900;
+
 struct work_queue {
 	char *name;
 	int port;
@@ -214,6 +217,13 @@ struct work_queue_task_report {
 };
 
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
+
+struct blacklist_host_info {
+	int    blacklisted;
+	int    times_blacklisted;
+	time_t release_at;
+};
+
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 
@@ -1596,14 +1606,16 @@ static char *blacklisted_to_string( struct work_queue  *q ) {
 	buffer_init(&b);
 
 	char *hostname;
-	void *dummy_value;
+	struct blacklist_host_info *info;
 
 	char *sep = "";
 
 	hash_table_firstkey(q->worker_blacklist);
-	while(hash_table_nextkey(q->worker_blacklist, &hostname, &dummy_value)) {
-		buffer_printf(&b, "%s%s", sep, hostname);
-		sep = " ";
+	while(hash_table_nextkey(q->worker_blacklist, &hostname, (void *) &info)) {
+		if(info->blacklisted) {
+			buffer_printf(&b, "%s%s", sep, hostname);
+			sep = " ";
+		}
 	}
 
 	char *result = xxstrdup(buffer_tostring(&b));
@@ -2594,7 +2606,8 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	}
 	else
 	{
-		if (hash_table_lookup(q->worker_blacklist,w->hostname) && !w->foreman) {
+		struct blacklist_host_info *info = hash_table_lookup(q->worker_blacklist, w->hostname);
+		if (!w->foreman && info && info->blacklisted) {
 			return 0;
 		}
 		else
@@ -3008,6 +3021,7 @@ static void abort_slow_workers(struct work_queue *q)
 			if(w && !w->foreman)
 			{
 				debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
+				work_queue_blacklist_add_with_timeout(q, w->hostname, wq_option_blacklist_slow_workers_timeout);
 				remove_worker(q, w);
 			}
 		}
@@ -4005,9 +4019,11 @@ int work_queue_send_receive_ratio(struct work_queue *q, double ratio)
 int work_queue_activate_fast_abort(struct work_queue *q, double multiplier)
 {
 	if(multiplier >= 1) {
+		debug(D_WQ, "Enabling fast abort multiplier: %3.3lf\n", multiplier);
 		q->fast_abort_multiplier = multiplier;
 		return 0;
 	} else {
+		debug(D_WQ, "Disabling fast abort multiplier.\n");
 		q->fast_abort_multiplier = -1.0;
 		return 1;
 	}
@@ -4386,21 +4402,74 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	return work_queue_submit_internal(q, t);
 }
 
+void work_queue_blacklist_add_with_timeout(struct work_queue *q, const char *hostname, time_t timeout)
+{
+	struct blacklist_host_info *info = hash_table_lookup(q->worker_blacklist, hostname);
+
+	if(!info) {
+		info = malloc(sizeof(struct blacklist_host_info));
+		info->times_blacklisted = 0;
+		info->blacklisted       = 0;
+	}
+
+	/* count the times the worker goes from active to blacklisted. */
+	if(!info->blacklisted)
+		info->times_blacklisted++;
+
+	info->blacklisted = 1;
+
+	if(timeout > 0) {
+		debug(D_WQ, "Blacklisting host %s by %" PRIu64 " seconds (blacklisted %d times).\n", hostname, (uint64_t) timeout, info->times_blacklisted);
+		info->release_at = time(0) + timeout;
+	} else {
+		debug(D_WQ, "Blacklisting host %s indefinitely.\n", hostname);
+		info->release_at = -1;
+	}
+
+	hash_table_insert(q->worker_blacklist, hostname, (void *) info);
+}
+
 void work_queue_blacklist_add(struct work_queue *q, const char *hostname)
 {
-	if (!hash_table_lookup(q->worker_blacklist, hostname)) {
-		hash_table_insert(q->worker_blacklist, hostname, (void *) 1);
-	}
+	work_queue_blacklist_add_with_timeout(q, hostname, -1);
 }
 
 void work_queue_blacklist_remove(struct work_queue *q, const char *hostname)
 {
-	hash_table_remove(q->worker_blacklist, hostname);
+	struct blacklist_host_info *info = hash_table_remove(q->worker_blacklist, hostname);
+	if(info) {
+		info->blacklisted = 0;
+		info->release_at  = 0;
+	}
+}
+
+/* deadline < 1 means release all, regardless of release_at time. */
+static void work_queue_blacklist_clear_by_time(struct work_queue *q, time_t deadline)
+{
+	char *hostname;
+	struct blacklist_host_info *info;
+
+	hash_table_firstkey(q->worker_blacklist);
+	while(hash_table_nextkey(q->worker_blacklist, &hostname, (void *) &info)) {
+		if(!info->blacklisted)
+			continue;
+
+		/* do not clear if blacklisted indefinitely, and we are not clearing the whole list. */
+		if(info->release_at < 1 && deadline > 0)
+			continue;
+
+		/* do not clear if the time for this host has not meet the deadline. */
+		if(deadline > 0 && info->release_at > deadline)
+			continue;
+
+		debug(D_WQ, "Clearing hostname %s from blacklist.\n", hostname);
+		work_queue_blacklist_remove(q, hostname);
+	}
 }
 
 void work_queue_blacklist_clear(struct work_queue *q)
 {
-	hash_table_clear(q->worker_blacklist);
+	work_queue_blacklist_clear_by_time(q, -1);
 }
 
 static void print_password_warning( struct work_queue *q )
@@ -4490,6 +4559,8 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 			hash_table_firstkey(q->workers_with_available_results);
 		}
 	}
+
+	work_queue_blacklist_clear_by_time(q, time(0));
 
 	return result;
 }
