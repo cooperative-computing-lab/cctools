@@ -251,10 +251,13 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t
 	pfs_resolve_t result = PFS_RESOLVE_UNCHANGED;
 	struct mount_entry *e;
 	const char *t;
+	char lookup_key[PFS_PATH_MAX + sizeof(int)];
+
+	sprintf(lookup_key, "%o%s", mode, logical_name); // Hack: write string key
 
 	if(!resolve_cache) resolve_cache = hash_table_create(0,0);
 
-	t = hash_table_lookup(resolve_cache,logical_name);
+	t = hash_table_lookup(resolve_cache,lookup_key);
 	if(t) {
 		strcpy(physical_name,t);
 		result = PFS_RESOLVE_CHANGED;
@@ -291,8 +294,8 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t
 
 	if(result==PFS_RESOLVE_UNCHANGED || result==PFS_RESOLVE_CHANGED) {
 		debug(D_RESOLVE,"%s = %s,%o",logical_name,physical_name,mode);
-		if(!hash_table_lookup(resolve_cache,logical_name)) {
-			hash_table_insert(resolve_cache,logical_name,xxstrdup(physical_name));
+		if(!hash_table_lookup(resolve_cache,lookup_key)) {
+			hash_table_insert(resolve_cache,lookup_key,xxstrdup(physical_name));
 		}
 	}
 

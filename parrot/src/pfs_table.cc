@@ -387,7 +387,7 @@ void pfs_table::follow_symlink( struct pfs_name *pname, int depth )
 				name_to_resolve = absolute_link_target;
 			}
 		}
-		if (resolve_name(0, name_to_resolve, &new_pname, R_OK, true, depth + 1)) { //TODO check this
+		if (resolve_name(0, name_to_resolve, &new_pname, X_OK, true, depth + 1)) { //TODO check this
 			*pname = new_pname;
 		}
 	}
@@ -529,9 +529,18 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 
 pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, int force_cache )
 {
+	mode_t open_mode;
 	pfs_name pname;
 	pfs_file *file=0;
 	int force_stream = pfs_force_stream;
+
+	if(flags & O_RDWR) {
+		open_mode = R_OK|W_OK;
+	} else if (flags & O_WRONLY) {
+		open_mode = W_OK;
+	} else {
+		open_mode = R_OK;
+	}
 
 	// Hack: Disable caching when doing plain old file copies.
 
@@ -552,7 +561,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 		flags |= O_DIRECTORY;
 	}
 
-	if(resolve_name(1,lname,&pname,flags)) {
+	if(resolve_name(1,lname,&pname,open_mode)) {
 		char *pid = NULL;
 		if(flags&O_DIRECTORY) {
 			if (pattern_match(pname.rest, "^/proc/(%d+)/fd$", &pid) >= 0) {
@@ -609,7 +618,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 					strcpy(tmpfd, "/dev/null");
 				}
 
-				resolve_name(0, tmpfd, &pname, flags);
+				resolve_name(0, tmpfd, &pname, open_mode);
 				file = pname.service->open(&pname, O_RDONLY, 0);
 				assert(file);
 				close(fd);
@@ -1137,7 +1146,7 @@ int pfs_table::access( const char *n, mode_t mode )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(0,n,&pname,R_OK)) {
+	if(resolve_name(0,n,&pname,F_OK)) {
 		result = pname.service->access(&pname,mode);
 	}
 
@@ -1383,7 +1392,7 @@ int pfs_table::stat( const char *n, struct pfs_stat *b )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(0,n,&pname,X_OK)) {
+	if(resolve_name(0,n,&pname,F_OK)) {
 		result = pname.service->stat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pname.service->get_block_size();
@@ -1402,7 +1411,7 @@ int pfs_table::statfs( const char *n, struct pfs_statfs *b )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(0,n,&pname,X_OK)) {
+	if(resolve_name(0,n,&pname,F_OK)) {
 		result = pname.service->statfs(&pname,b);
 	}
 
@@ -1414,7 +1423,7 @@ int pfs_table::lstat( const char *n, struct pfs_stat *b )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,false,X_OK)) {
+	if(resolve_name(0,n,&pname,false,F_OK)) {
 		result = pname.service->lstat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pname.service->get_block_size();
@@ -1454,7 +1463,7 @@ int pfs_table::link( const char *n1, const char *n2 )
 	pfs_name p1, p2;
 	int result = -1;
 
-	if(resolve_name(1,n1,&p1,false,W_OK) && resolve_name(0,n2,&p2,false,W_OK)) {
+	if(resolve_name(1,n1,&p1,false,X_OK) && resolve_name(0,n2,&p2,false,W_OK)) {
 		if(p1.service==p2.service) {
 			result = p1.service->link(&p1,&p2);
 		} else {
@@ -1504,7 +1513,7 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,false,R_OK)) {
+	if(resolve_name(0,n,&pname,false,X_OK)) {
 		char *pid = NULL, *fd = NULL;
 		if(pattern_match(pname.path, "^/proc/(%d+)/fd/(%d+)$",&pid,&fd) >= 0) {
 			struct pfs_process *target = pfs_process_lookup(atoi(pid));
@@ -1600,7 +1609,7 @@ int pfs_table::mkalloc( const char *n, pfs_ssize_t size, mode_t mode )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(1,n,&pname,R_OK)) { //TODO check this
+	if(resolve_name(1,n,&pname,W_OK)) { //TODO check this
 		result = pname.service->mkalloc(&pname,size,mode);
 	}
 
