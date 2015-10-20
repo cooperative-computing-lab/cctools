@@ -61,10 +61,11 @@ typedef enum {
 	WORK_QUEUE_RESULT_STDOUT_MISSING = 4,       /**< The task ran but its stdout has been truncated **/
 	WORK_QUEUE_RESULT_SIGNAL         = 8,       /**< The task was terminated with a signal **/
 	WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION = 16, /**< The task used more resources than requested **/
-	WORK_QUEUE_RESULT_TASK_TIMEOUT   = 32,      /**< The task ran after specified end time. **/
+	WORK_QUEUE_RESULT_TASK_TIMEOUT   = 32,      /**< The task ran after the specified (absolute since epoch) end time. **/
 	WORK_QUEUE_RESULT_UNKNOWN        = 64,      /**< The result could not be classified. **/
 	WORK_QUEUE_RESULT_FORSAKEN       = 128,     /**< The task failed, but it was neither a task or worker error **/
-	WORK_QUEUE_RESULT_MAX_RETRIES    = 256      /**< The task could not be completed succesfully in the given number of retries. **/
+	WORK_QUEUE_RESULT_MAX_RETRIES    = 256,     /**< The task could not be completed successfully in the given number of retries. **/
+	WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME = 512   /**< The task ran for more than the specified time (relative since running in a worker). **/
 } work_queue_result_t;
 
 typedef enum {
@@ -139,7 +140,7 @@ struct work_queue_task {
 	int total_submissions;                                 /**< The number of times the task has been submitted. */
 	timestamp_t total_cmd_execution_time;                  /**< Time spent in microseconds for executing the command on any worker, including resubmittions of the task. */
 
-	int64_t maximum_end_time;                              /**< Maximum time (from epoch) this task may run. */
+	timestamp_t maximum_end_time;                               /**< Maximum time (microseconds from epoch) this is valid. If less than 1, then task is always valid (default).*/
 	int64_t memory;                                        /**< Memory required by the task. (MB) */
 	int64_t disk;                                          /**< Disk space required by the task. (MB) */
 	int cores;                                             /**< Number of cores required by the task. */
@@ -153,6 +154,8 @@ struct work_queue_task {
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
 
 	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
+
+	timestamp_t maximum_running_time;                      /**< Maximum time (microseconds) this task may run in a worker. If less than 1, no limit is enforced (default).*/
 
 };
 
@@ -337,12 +340,23 @@ void work_queue_task_specify_cores( struct work_queue_task *t, int cores );
 
 void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus );
 
-/** Specify the maximum end time allowed for the task (in seconds since the Epoch). If seconds less than 1, then no end time is specified.
+/** Specify the maximum end time allowed for the task (in microseconds since the
+ * Epoch). If less than 1, then no end time is specified (this is the default).
+This is useful, for example, when the task uses certificates that expire.
 @param t A task object.
 @param seconds Number of seconds since the Epoch.
 */
 
-void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t seconds );
+void work_queue_task_specify_end_time( struct work_queue_task *t, timestamp_t useconds );
+
+/** Specify the maximum time (in microseconds) the task is allowed to run in a
+ * worker. This time is accounted since the the moment the task starts to run
+ * in a worker.  If less than 1, then no maximum time is specified (this is the default).
+@param t A task object.
+@param seconds Maximum number of seconds the task may run in a worker.
+*/
+
+void work_queue_task_specify_running_time( struct work_queue_task *t, timestamp_t useconds );
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the work queue, but is provided for the user's convenience

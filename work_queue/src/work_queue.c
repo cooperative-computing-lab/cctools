@@ -1248,10 +1248,9 @@ static void expire_waiting_task(struct work_queue *q, struct work_queue_task *t)
 static void expire_waiting_tasks(struct work_queue *q)
 {
 	struct work_queue_task *t;
-	int64_t current_time;
 	int count;
 
-	current_time = time(0);
+	timestamp_t current_time = timestamp_get();
 	count = task_state_count(q, WORK_QUEUE_TASK_READY);
 
 	while(count > 0)
@@ -2379,12 +2378,14 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	t->hostname = xxstrdup(w->hostname);
 	t->host = xxstrdup(w->addrport);
 
-	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid);
-	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(t->command_line), t->command_line);
-	send_worker_msg(q,w, "cores %d\n",   t->cores );
-	send_worker_msg(q,w, "memory %"PRId64"\n",  t->memory );
-	send_worker_msg(q,w, "disk %"PRId64"\n",    t->disk );
-	send_worker_msg(q,w, "gpus %d\n",    t->gpus );
+	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid );
+	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(t->command_line), t->command_line );
+	send_worker_msg(q,w, "cores %d\n",         t->cores );
+	send_worker_msg(q,w, "memory %"PRId64"\n", t->memory );
+	send_worker_msg(q,w, "disk %"PRId64"\n",   t->disk );
+	send_worker_msg(q,w, "gpus %d\n",          t->gpus );
+	send_worker_msg(q,w, "end_time %"PRIu64"\n",  t->maximum_end_time );
+	send_worker_msg(q,w, "wall_time %"PRIu64"\n", t->maximum_running_time );
 
 	/* Note that even when environment variables after resources, values for
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
@@ -3289,18 +3290,29 @@ void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
 	set_task_unlabel_flag(t);
 }
 
-void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t seconds )
+void work_queue_task_specify_end_time( struct work_queue_task *t, timestamp_t useconds )
 {
-	if(seconds < 1)
+	if(useconds < 1)
 	{
 		t->maximum_end_time = 0;
 	}
 	else
 	{
-		t->maximum_end_time = seconds;
+		t->maximum_end_time = useconds;
 	}
 }
 
+void work_queue_task_specify_running_time( struct work_queue_task *t, timestamp_t useconds )
+{
+	if(useconds < 1)
+	{
+		t->maximum_running_time = 0;
+	}
+	else
+	{
+		t->maximum_running_time = useconds;
+	}
+}
 
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 {
