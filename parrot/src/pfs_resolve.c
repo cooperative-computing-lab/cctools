@@ -44,6 +44,23 @@ static void add_mount_entry( const char *prefix, const char *redirect, mode_t mo
 	mount_list = m;
 }
 
+int parse_mode( const char * options ) {
+	unsigned int i;
+	int mode = 0;
+	for(i = 0; i < strlen(options); i++) {
+		if(options[i] == 'r' || options[i] == 'R') {
+			mode |= R_OK;
+		} else if(options[i] == 'w' || options[i] == 'W') {
+			mode |= W_OK;
+		} else if (options[i] == 'x' || options[i] == 'X') {
+			mode |= X_OK;
+		} else {
+			return -1;
+		}
+	}
+	return mode;
+}
+
 void pfs_resolve_manual_config( const char *str )
 {
 	char *e;
@@ -61,9 +78,10 @@ void pfs_resolve_file_config( const char *filename )
 	char line[PFS_LINE_MAX];
 	char prefix[PFS_LINE_MAX];
 	char redirect[PFS_LINE_MAX];
+	char options[PFS_LINE_MAX];
 	int fields;
 	int linenum=0;
-	mode_t mode;
+	int mode;
 
 	file = fopen(filename,"r");
 	if(!file) fatal("couldn't open mountfile %s: %s\n",filename,strerror(errno));
@@ -80,16 +98,27 @@ void pfs_resolve_file_config( const char *filename )
 		if(line[0]=='#') continue;
 		string_chomp(line);
 		if(!line[0]) continue;
-		fields = sscanf(line,"%s %s %o",prefix,redirect,&mode);
+		fields = sscanf(line,"%s %s %s",prefix,redirect,options);
 
 		if(fields==0) {
 			continue;
 		} else if(fields<2) {
 			fatal("%s has an error on line %d\n",filename,linenum);
 		} else if(fields==2) {
-			mode = R_OK|W_OK|X_OK; /* default mode */
+			mode = parse_mode(redirect);
+			if(mode < 0) {
+				mode = R_OK|W_OK|X_OK; /* default mode */
+				add_mount_entry(prefix,redirect,mode);
+			} else {
+				add_mount_entry(prefix,prefix,mode);
+			}
+		} else {
+			mode = parse_mode(options);
+			if(mode < 0) {
+				fatal("%s has invalid options on line %d\n",filename,linenum);
+			}
+			add_mount_entry(prefix,redirect,mode);
 		}
-		add_mount_entry(prefix,redirect,mode);
 	}
 
 	fclose(file);
@@ -253,7 +282,7 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t
 	const char *t;
 	char lookup_key[PFS_PATH_MAX + sizeof(int)];
 
-	sprintf(lookup_key, "%o%s", mode, logical_name); // Hack: write string key
+	sprintf(lookup_key, "%o%s", mode, logical_name); /* Hack: write string key */
 
 	if(!resolve_cache) resolve_cache = hash_table_create(0,0);
 
