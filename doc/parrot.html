@@ -266,9 +266,9 @@ Individual mount entries may be given on the command line
 with the <b>-M</b> option as follows:
 <code>% parrot_run -M /gnu=/anonftp/ftp.gnu.org bash</code>
 <p>
-The mount list may also be changed at runtime via <tt>parrot_mount</tt>
-which has the same effect as <tt>-M</tt>:
-<code>% parrot_run bash
+The mount list may also be changed at runtime via <tt>parrot_mount</tt>,
+if parrot is run with the <tt>--dynamic-mounts</tt> option:
+<code>% parrot_run --dynamic-mounts bash
 % parrot_mount /gnu /anonftp/ftp.gnu.org/gnu
 % ls /gnu
 % parrot_mount --unmount /gnu
