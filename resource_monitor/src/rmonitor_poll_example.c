@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 			resources.resident_memory + resources.swap_memory);
 
 	fprintf(stdout, "total cores used: %" PRId64 "\n",
-			resources.resident_memory + resources.swap_memory);
+			resources.cores);
 
 	return 0;
 }
