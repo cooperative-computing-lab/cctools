@@ -280,9 +280,9 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t
 	pfs_resolve_t result = PFS_RESOLVE_UNCHANGED;
 	struct mount_entry *e;
 	const char *t;
-	char lookup_key[PFS_PATH_MAX + sizeof(int)];
+	char lookup_key[PFS_PATH_MAX + 3 * sizeof(int) + 1];
 
-	sprintf(lookup_key, "%o%s", mode, logical_name); /* Hack: write string key */
+	sprintf(lookup_key, "%o|%s", mode, logical_name);
 
 	if(!resolve_cache) resolve_cache = hash_table_create(0,0);
 
