@@ -1191,7 +1191,7 @@ int pfs_table::lchown( const char *n, uid_t uid, gid_t gid )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,false,W_OK)) {
+	if(resolve_name(0,n,&pname,W_OK,false)) {
 		result = pname.service->lchown(&pname,uid,gid);
 	}
 
@@ -1227,7 +1227,7 @@ ssize_t pfs_table::lgetxattr (const char *path, const char *name, void *value, s
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,path,&pname,false,R_OK)) {
+	if(resolve_name(0,path,&pname,R_OK,false)) {
 		result = pname.service->lgetxattr(&pname,name,value,size);
 	}
 
@@ -1258,7 +1258,7 @@ ssize_t pfs_table::llistxattr (const char *path, char *list, size_t size)
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,path,&pname,false,R_OK)) {
+	if(resolve_name(0,path,&pname,R_OK,false)) {
 		result = pname.service->llistxattr(&pname,list,size);
 	}
 
@@ -1289,7 +1289,7 @@ int pfs_table::lsetxattr (const char *path, const char *name, const void *value,
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,path,&pname,false,W_OK)) {
+	if(resolve_name(0,path,&pname,W_OK,false)) {
 		result = pname.service->lsetxattr(&pname,name,value,size,flags);
 	}
 
@@ -1320,7 +1320,7 @@ int pfs_table::lremovexattr (const char *path, const char *name)
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,path,&pname,false,W_OK)) {
+	if(resolve_name(0,path,&pname,W_OK,false)) {
 		result = pname.service->lremovexattr(&pname,name);
 	}
 
@@ -1363,7 +1363,7 @@ int pfs_table::lutimens( const char *n, const struct timespec times[2] )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,false,R_OK)) {
+	if(resolve_name(0,n,&pname,R_OK,false)) {
 		result = pname.service->lutimens(&pname,times);
 	}
 
@@ -1376,7 +1376,7 @@ int pfs_table::unlink( const char *n )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(0,n,&pname,false,W_OK)) {
+	if(resolve_name(0,n,&pname,W_OK,false)) {
 		result = pname.service->unlink(&pname);
 		if(result==0) {
 			pfs_cache_invalidate(&pname);
@@ -1423,7 +1423,7 @@ int pfs_table::lstat( const char *n, struct pfs_stat *b )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,false,F_OK)) {
+	if(resolve_name(0,n,&pname,F_OK,false)) {
 		result = pname.service->lstat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pname.service->get_block_size();
@@ -1442,7 +1442,7 @@ int pfs_table::rename( const char *n1, const char *n2 )
 	pfs_name p1, p2;
 	int result = -1;
 
-	if(resolve_name(0,n1,&p1,false,W_OK) && resolve_name(0,n2,&p2,false,W_OK)) {
+	if(resolve_name(0,n1,&p1,W_OK,false) && resolve_name(0,n2,&p2,W_OK,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->rename(&p1,&p2);
 			if(result==0) {
@@ -1463,7 +1463,7 @@ int pfs_table::link( const char *n1, const char *n2 )
 	pfs_name p1, p2;
 	int result = -1;
 
-	if(resolve_name(1,n1,&p1,false,X_OK) && resolve_name(0,n2,&p2,false,W_OK)) {
+	if(resolve_name(1,n1,&p1,X_OK,false) && resolve_name(0,n2,&p2,W_OK,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->link(&p1,&p2);
 		} else {
@@ -1488,7 +1488,7 @@ int pfs_table::symlink( const char *n1, const char *n2 )
 	verbatim down to the needed driver.
 	*/
 
-	if(resolve_name(0,n2,&pname,false,W_OK)) {
+	if(resolve_name(0,n2,&pname,W_OK,false)) {
 		result = pname.service->symlink(n1,&pname);
 	}
 
@@ -1513,7 +1513,7 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,false,X_OK)) {
+	if(resolve_name(0,n,&pname,X_OK,false)) {
 		char *pid = NULL, *fd = NULL;
 		if(pattern_match(pname.path, "^/proc/(%d+)/fd/(%d+)$",&pid,&fd) >= 0) {
 			struct pfs_process *target = pfs_process_lookup(atoi(pid));
@@ -1583,7 +1583,7 @@ int pfs_table::rmdir( const char *n )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,false,W_OK)) {
+	if(resolve_name(0,n,&pname,W_OK,false)) {
 		result = pname.service->rmdir(&pname);
 	}
 
