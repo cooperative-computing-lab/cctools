@@ -583,7 +583,7 @@ static void expire_procs_running() {
 
 	itable_firstkey(procs_running);
 	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
-		if(p->task->maximum_end_time > 0 && current_time - p->task->maximum_end_time > 0)
+		if(p->task->maximum_end_time > 0 && current_time > p->task->maximum_end_time)
 		{
 			p->task_status |= WORK_QUEUE_RESULT_TASK_TIMEOUT;
 			kill(pid, SIGKILL);
