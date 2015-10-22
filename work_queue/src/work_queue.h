@@ -166,8 +166,12 @@ struct work_queue_stats {
 	int workers_init;               /**< Number of workers initializing.*/
 	int workers_idle;               /**< Number of workers that are not running a task. */
 	int workers_busy;               /**< Number of workers that are running at least one task. */
+
 	int total_workers_joined;       /**< Total number of worker connections that were established to the master. */
-	int total_workers_removed;      /**< Total number of worker connections that were terminated by the master. */
+	int total_workers_removed;      /**< Total number of worker connections that were lost or terminated by the master. */
+	int total_workers_lost;         /**< Total number of worker connections that were unexpectedly lost. */
+	int total_workers_idled_out;    /**< Total number of worker that disconnected for being idle. */
+	int total_workers_fast_aborted; /**< Total number of worker connections terminated for being too slow. (see @ref work_queue_activate_fast_abort) */
 
 	int tasks_waiting;              /**< Number of tasks waiting to be run. */
 	int tasks_running;              /**< Number of tasks currently running. */
