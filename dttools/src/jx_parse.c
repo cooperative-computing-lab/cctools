@@ -138,7 +138,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	} else if(c=='[') {
 		return JX_TOKEN_LBRACKET;
 	} else if(c==']') {
-		return JX_TOKEN_LBRACKET;
+		return JX_TOKEN_RBRACKET;
 	} else if(c==',') {
 		return JX_TOKEN_COMMA;
 	} else if(c==':') {
