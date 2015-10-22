@@ -54,6 +54,7 @@ SOURCES = \
 	json.c \
 	json_aux.c \
 	jx.c \
+	jx_parse.c \
 	link.c \
 	link_auth.c \
 	link_nvpair.c \

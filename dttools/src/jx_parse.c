@@ -203,11 +203,11 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	}
 }
 
-static jx_t * jx_parse( struct jx_parser *s );
+static struct jx * jx_parse( struct jx_parser *s );
 
-static jx_item_t * jx_parse_item_list( struct jx_parser *s )
+static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 {
-	jx_item_t *i = jx_item(0,0);
+	struct jx_item *i = jx_item(0,0);
 
 	i->value = jx_parse(s);
 	if(!i->value) {
@@ -228,9 +228,9 @@ static jx_item_t * jx_parse_item_list( struct jx_parser *s )
 	return i;
 }
 		
-static jx_pair_t * jx_parse_pair_list( struct jx_parser *s )
+static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 {
-	jx_pair_t *p = jx_pair(0,0,0);
+	struct jx_pair *p = jx_pair(0,0,0);
 
 	p->key = jx_parse(s);
 	if(!p->key) {
@@ -265,7 +265,7 @@ static jx_pair_t * jx_parse_pair_list( struct jx_parser *s )
 	return p;
 }
 		
-static jx_t * jx_parse( struct jx_parser *s )
+static struct jx * jx_parse( struct jx_parser *s )
 {
 	jx_token_t t = jx_scan(s);
 
@@ -302,20 +302,20 @@ static jx_t * jx_parse( struct jx_parser *s )
 	return 0;
 }
 
-jx_t * jx_parse_string( const char *str )
+struct jx * jx_parse_string( const char *str )
 {
 	struct jx_parser *s = jx_parser_create();
        	s->source_string = str;
-	jx_t * result = jx_parse(s);
+	struct jx * result = jx_parse(s);
 	jx_parser_delete(s);
 	return result;
 }
 
-jx_t * jx_parse_file( FILE *file )
+struct jx * jx_parse_file( FILE *file )
 {
 	struct jx_parser *s = jx_parser_create();
 	s->source_file = file;
-	jx_t * result = jx_parse(s);
+	struct jx * result = jx_parse(s);
 	jx_parser_delete(s);
 	return result;
 }

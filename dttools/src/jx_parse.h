@@ -4,7 +4,7 @@
 #include "jx.h"
 #include <stdio.h>
 
-jx_t * jx_parse_string( const char *str );
-jx_t * jx_parse_file( FILE *file );
+struct jx * jx_parse_string( const char *str );
+struct jx * jx_parse_file( FILE *file );
 
 #endif
