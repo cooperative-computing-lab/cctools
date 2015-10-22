@@ -46,6 +46,11 @@ static void jx_parser_delete( struct jx_parser *p )
 	free(p);
 }
 
+static void jx_parse_error( struct jx_parser *p )
+{
+	p->errors++;
+}
+
 static int jx_getchar( struct jx_parser *p )
 {
 	int c;
@@ -60,6 +65,8 @@ static int jx_getchar( struct jx_parser *p )
 			c = EOF;
 		}
 	}
+
+	printf("%c",c);
 
 	return c;
 }
@@ -88,11 +95,11 @@ static int jx_scan_unicode( struct jx_parser *s )
 		if(uc<=0x7f) {
 			return uc;
 		} else {
-			s->errors++;
+			jx_parse_error(s);
 			return -1;
 		}
 	} else {
-		s->errors++;
+		jx_parse_error(s);
 		return -1;
 	}
 }
@@ -156,26 +163,26 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				s->token[i] = n;
 			}
 		}
-		s->errors++;
+		jx_parse_error(s);
 		return JX_TOKEN_ERROR;
 	} else if(strchr("+-0123456789.",c)) {
 		s->token[0] = c;
-		c = jx_getchar(s);
 		int i;
 		for(i=1;i<MAX_TOKEN_SIZE;i++) {
+			c = jx_getchar(s);
 			if(strchr("0123456789.",c)) {
 				s->token[i] = c;
 			} else {
 				s->token[i] = 0;
 				jx_ungetchar(s,c);
-					if(strchr(s->token,'.')) {
+				if(strchr(s->token,'.')) {
 					return JX_TOKEN_FLOAT;
 				} else {
 					return JX_TOKEN_INTEGER;
 				}
 			}
 		}
-		s->errors++;
+		jx_parse_error(s);
 		return JX_TOKEN_ERROR;
 	} else if(isalpha(c)) {
 		s->token[0] = c;
@@ -198,7 +205,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				}
 			}
 		}
-		s->errors++;
+		jx_parse_error(s);
 		return JX_TOKEN_ERROR;
 	} else {
 		s->token[0] = c;
@@ -226,7 +233,7 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 	} else if(t==JX_TOKEN_RBRACKET) {
 		i->next = 0;
 	} else {
-		s->errors++;
+		jx_parse_error(s);
 	}
 
 	return i;
@@ -245,7 +252,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 
 	jx_token_t t = jx_scan(s);
 	if(t!=JX_TOKEN_COLON) {
-		s->errors++;
+		jx_parse_error(s);
 		jx_pair_delete(p);
 		return 0;
 	}
@@ -263,7 +270,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	} else if(t==JX_TOKEN_RBRACE) {
 		p->next = 0;
 	} else {
-		s->errors++;
+		jx_parse_error(s);
 	}
 
 	return p;
@@ -299,7 +306,7 @@ static struct jx * jx_parse( struct jx_parser *s )
 	case JX_TOKEN_COMMA:
 	case JX_TOKEN_COLON:
 	case JX_TOKEN_ERROR:
-		s->errors++;
+		jx_parse_error(s);
 		return 0;
 	}
 
@@ -308,7 +315,7 @@ static struct jx * jx_parse( struct jx_parser *s )
 	should be handled above.  But just in case...
 	*/
 
-	s->errors++;
+	jx_parse_error(s);
 	return 0;
 }
 
