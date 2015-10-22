@@ -14,18 +14,18 @@ typedef enum {
 	JX_OBJECT
 } jx_type_t;
 
-typedef struct jx_pair {
+struct jx_pair {
 	struct jx      *key;
 	struct jx      *value;
 	struct jx_pair *next;
-} jx_pair_t;
+};
 
-typedef struct jx_item {
+struct jx_item {
 	struct jx      *value;
 	struct jx_item *next;
-} jx_item_t;
+};
 
-typedef struct jx {
+struct jx {
 	jx_type_t type;
 	union {
 		char *    symbol_name;
@@ -33,45 +33,45 @@ typedef struct jx {
 		double    float_value;
 		int       integer_value;
 		int       boolean_value;
-		jx_pair_t *pairs;
-		jx_item_t *items;
+		struct jx_pair *pairs;
+		struct jx_item *items;
 	};
-} jx_t;
+};
 
-jx_pair_t * jx_pair( jx_t *key, jx_t *value, jx_pair_t *next );
-jx_pair_t * jx_pair_copy( jx_pair_t *pair );
-void        jx_pair_print( jx_pair_t *pair, FILE *file );
-void        jx_pair_delete( jx_pair_t *pair );
+struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next );
+struct jx_pair * jx_pair_copy( struct jx_pair *pair );
+void             jx_pair_print( struct jx_pair *pair, FILE *file );
+void             jx_pair_delete( struct jx_pair *pair );
 
-jx_item_t * jx_item( jx_t *value, jx_item_t *next );
-jx_item_t * jx_item_copy( jx_item_t *item );
-void        jx_item_print( jx_item_t *item, FILE *file );
-void        jx_item_delete( jx_item_t *item );
+struct jx_item * jx_item( struct jx *value, struct jx_item *next );
+struct jx_item * jx_item_copy( struct jx_item *item );
+void             jx_item_print( struct jx_item *item, FILE *file );
+void             jx_item_delete( struct jx_item *item );
 
-jx_t * jx_null();
-jx_t * jx_symbol( const char *symbol_name );
-jx_t * jx_string( const char *string_value );
-jx_t * jx_integer( int integer_value );
-jx_t * jx_float( double float_value );
-jx_t * jx_boolean( int boolean_value );
-jx_t * jx_array( jx_item_t *items );
-jx_t * jx_object( jx_pair_t *pairs );
+struct jx * jx_null();
+struct jx * jx_symbol( const char *symbol_name );
+struct jx * jx_string( const char *string_value );
+struct jx * jx_integer( int integer_value );
+struct jx * jx_float( double float_value );
+struct jx * jx_boolean( int boolean_value );
+struct jx * jx_array( struct jx_item *items );
+struct jx * jx_object( struct jx_pair *pairs );
 
-void   jx_assert( jx_t *j, jx_type_t type );
-int    jx_equals( jx_t *j, jx_t *k );
-jx_t * jx_copy( jx_t *j );
-void   jx_delete( jx_t *j );
-void   jx_print( jx_t *j, FILE *file );
+void        jx_assert( struct jx *j, jx_type_t type );
+int         jx_equals( struct jx *j, struct jx *k );
+struct jx * jx_copy( struct jx *j );
+void        jx_delete( struct jx *j );
+void        jx_print( struct jx *j, FILE *file );
 
-int    jx_object_insert( jx_t *object, jx_t *key, jx_t *value );
-jx_t * jx_object_lookup( jx_t *object, const char *key );
+int         jx_object_insert( struct jx *object, struct jx *key, struct jx *value );
+struct jx * jx_object_lookup( struct jx *object, const char *key );
 
-void   jx_array_insert( jx_t *array, jx_t *value );
-void   jx_array_append( jx_t *array, jx_t *value );
+void        jx_array_insert( struct jx *array, struct jx *value );
+void        jx_array_append( struct jx *array, struct jx *value );
 
 int     jx_is_constant( struct jx *j );
 
-typedef jx_t * (*jx_eval_func_t) ( const char *ident );
-jx_t *  jx_evaluate( jx_t *j, jx_eval_func_t evaluator );
+typedef struct jx * (*jx_eval_func_t) ( const char *ident );
+struct jx *  jx_evaluate( struct jx *j, jx_eval_func_t evaluator );
 
 #endif

@@ -4,16 +4,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-jx_pair_t * jx_pair( jx_t *key, jx_t *value, jx_pair_t *next )
+struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next )
 {
-	jx_pair_t *pair = malloc(sizeof(*pair));
+	struct jx_pair *pair = malloc(sizeof(*pair));
 	pair->key = key;
 	pair->value = value;
 	pair->next = next;
 	return pair;
 }
 
-void jx_pair_print( jx_pair_t *pair, FILE *file )
+void jx_pair_print( struct jx_pair *pair, FILE *file )
 {
 	jx_print(pair->key,file);
 	fprintf(file," : ");
@@ -25,23 +25,23 @@ void jx_pair_print( jx_pair_t *pair, FILE *file )
 	}
 }
 
-jx_pair_t * jx_pair_copy( jx_pair_t *p )
+struct jx_pair * jx_pair_copy( struct jx_pair *p )
 {
-	jx_pair_t *pair = malloc(sizeof(*pair));
+	struct jx_pair *pair = malloc(sizeof(*pair));
 	pair->key = jx_copy(p->key);
 	pair->value = jx_copy(p->value);
 	pair->next = jx_pair_copy(p->next);
 	return pair;
 }
 
-int jx_pair_is_constant( jx_pair_t *p )
+int jx_pair_is_constant( struct jx_pair *p )
 {
 	return jx_is_constant(p->key)
 		&& jx_is_constant(p->value)
 		&& jx_pair_is_constant(p->next);
 }
 
-jx_pair_t * jx_pair_evaluate( jx_pair_t *pair, jx_eval_func_t func )
+struct jx_pair * jx_pair_evaluate( struct jx_pair *pair, jx_eval_func_t func )
 {
 	return jx_pair(
 		jx_evaluate(pair->key,func),
@@ -50,7 +50,7 @@ jx_pair_t * jx_pair_evaluate( jx_pair_t *pair, jx_eval_func_t func )
 	);
 }
 
-void jx_pair_delete( jx_pair_t *pair )
+void jx_pair_delete( struct jx_pair *pair )
 {
 	if(!pair) return;
 	jx_delete(pair->key);
@@ -59,15 +59,15 @@ void jx_pair_delete( jx_pair_t *pair )
 	free(pair);
 }
 
-jx_item_t * jx_item( jx_t *value, jx_item_t *next )
+struct jx_item * jx_item( struct jx *value, struct jx_item *next )
 {
-	jx_item_t *item = malloc(sizeof(*item));
+	struct jx_item *item = malloc(sizeof(*item));
 	item->value = value;
 	item->next = next;
 	return item;
 }
 
-void jx_item_print( jx_item_t *item, FILE *file )
+void jx_item_print( struct jx_item *item, FILE *file )
 {
 	if(!item) return;
 	jx_print(item->value,file);
@@ -77,7 +77,7 @@ void jx_item_print( jx_item_t *item, FILE *file )
 	}
 }
 
-jx_item_t * jx_item_evaluate( jx_item_t *item, jx_eval_func_t func )
+struct jx_item * jx_item_evaluate( struct jx_item *item, jx_eval_func_t func )
 {
 	return jx_item(
 		jx_evaluate(item->value,func),
@@ -85,20 +85,20 @@ jx_item_t * jx_item_evaluate( jx_item_t *item, jx_eval_func_t func )
 	);
 }
 
-int jx_item_is_constant( jx_item_t *i )
+int jx_item_is_constant( struct jx_item *i )
 {
 	return jx_is_constant(i->value) && jx_item_is_constant(i->next);
 }
 
-jx_item_t * jx_item_copy( jx_item_t *i )
+struct jx_item * jx_item_copy( struct jx_item *i )
 {
-	jx_item_t *item = malloc(sizeof(*item));
+	struct jx_item *item = malloc(sizeof(*item));
 	item->value = jx_copy(i->value);
 	item->next = jx_item_copy(i->next);
 	return item;
 }
 
-void jx_item_delete( jx_item_t *item )
+void jx_item_delete( struct jx_item *item )
 {
 	if(!item) return;
 	jx_delete(item->value);
@@ -106,70 +106,70 @@ void jx_item_delete( jx_item_t *item )
 	free(item);
 }
 
-static jx_t * jx_create( jx_type_t type )
+static struct jx * jx_create( jx_type_t type )
 {
-	jx_t *j = malloc(sizeof(*j));
+	struct jx *j = malloc(sizeof(*j));
 	j->type = type;
 	return j;
 }
 
-jx_t * jx_null()
+struct jx * jx_null()
 {
 	return jx_create(JX_NULL);
 }
 
-jx_t * jx_symbol( const char *symbol_name )
+struct jx * jx_symbol( const char *symbol_name )
 {
-	jx_t *j = jx_create(JX_SYMBOL);
+	struct jx *j = jx_create(JX_SYMBOL);
 	j->symbol_name = strdup(symbol_name);
 	return j;
 }
 
-jx_t * jx_string( const char *string_value )
+struct jx * jx_string( const char *string_value )
 {
-	jx_t *j = jx_create(JX_STRING);
+	struct jx *j = jx_create(JX_STRING);
 	j->string_value = strdup(string_value);
 	return j;
 }
 
-jx_t * jx_integer( int integer_value )
+struct jx * jx_integer( int integer_value )
 {
-	jx_t *j = jx_create(JX_INTEGER);
+	struct jx *j = jx_create(JX_INTEGER);
 	j->integer_value = integer_value;
 	return j;
 }
 
-jx_t * jx_float( double float_value )
+struct jx * jx_float( double float_value )
 {
-	jx_t *j = jx_create(JX_FLOAT);
+	struct jx *j = jx_create(JX_FLOAT);
 	j->float_value = float_value;
 	return j;
 }
 
-jx_t * jx_boolean( int boolean_value )
+struct jx * jx_boolean( int boolean_value )
 {
-	jx_t *j = jx_create(JX_BOOLEAN);
+	struct jx *j = jx_create(JX_BOOLEAN);
 	j->boolean_value = boolean_value;
 	return j;
 }
 
-jx_t * jx_object( jx_pair_t *pairs )
+struct jx * jx_object( struct jx_pair *pairs )
 {
-	jx_t *j = jx_create(JX_OBJECT);
+	struct jx *j = jx_create(JX_OBJECT);
 	j->pairs = pairs;
 	return j;
 }
 
-jx_t * jx_array( jx_item_t *items )
+struct jx * jx_array( struct jx_item *items )
 {
-	jx_t *j = jx_create(JX_ARRAY);
+	struct jx *j = jx_create(JX_ARRAY);
 	j->items = items;
 	return j;
 }
 
-jx_t * jx_object_lookup( jx_t *j, const char *key )
+struct jx * jx_object_lookup( struct jx *j, const char *key )
 {
-	jx_pair_t *p;
+	struct jx_pair *p;
 
 	if(!j || j->type!=JX_OBJECT) return 0;
 
@@ -184,14 +184,14 @@ jx_t * jx_object_lookup( jx_t *j, const char *key )
 	return 0;
 }
 
-int jx_object_insert( jx_t *j, jx_t *key, jx_t *value )
+int jx_object_insert( struct jx *j, struct jx *key, struct jx *value )
 {
 	if(!j || j->type!=JX_OBJECT) return 0;
 	j->pairs = jx_pair(key,value,j->pairs);
 	return 1;
 }
 
-void jx_delete( jx_t *j )
+void jx_delete( struct jx *j )
 {
 	if(!j) return;
 
@@ -226,7 +226,7 @@ int jx_item_equals( struct jx_item *j, struct jx_item *k )
 	return jx_equals(j->value,k->value) && jx_item_equals(j->next,k->next);
 }
 
-int jx_equals( jx_t *j, jx_t *k )
+int jx_equals( struct jx *j, struct jx *k )
 {
 	if(!j && !k) return 1;
 	if(!j || !k) return 0;
@@ -252,7 +252,7 @@ int jx_equals( jx_t *j, jx_t *k )
 	}
 }
 
-jx_t  *jx_copy( jx_t *j )
+struct jx  *jx_copy( struct jx *j )
 {
 	switch(j->type) {
 		case JX_NULL:
@@ -274,7 +274,7 @@ jx_t  *jx_copy( jx_t *j )
 	}
 }
 
-void jx_print( jx_t *j, FILE *file )
+void jx_print( struct jx *j, FILE *file )
 {
 	switch(j->type) {
 		case JX_NULL:
@@ -327,7 +327,7 @@ int jx_is_constant( struct jx *j )
 	}
 }
 
-jx_t * jx_evaluate( struct jx *j, jx_eval_func_t func )
+struct jx * jx_evaluate( struct jx *j, jx_eval_func_t func )
 {
 	switch(j->type) {
 		case JX_SYMBOL:
@@ -344,97 +344,3 @@ jx_t * jx_evaluate( struct jx *j, jx_eval_func_t func )
 			return jx_object(jx_pair_evaluate(j->pairs,func));
 	}
 }
-
-#if 0
-
-typedef enum {
-	TOKEN_SYMBOL,
-	TOKEN_INTEGER,
-	TOKEN_FLOAT,
-	TOKEN_STRING,
-	TOKEN_LPAREN,
-	TOKEN_RPAREN,
-	TOKEN_LBRACKET,
-	TOKEN_RBRACKET,
-	TOKEN_LBRACE,
-	TOKEN_RBRACE,
-	TOKEN_COMMA,
-	TOKEN_SEMI,
-	TOKEN_COLON,
-	TOKEN_LPAREN,
-	TOKEN_RPAREN
-} token_t;
-
-struct scanner {
-	char text[MAX_TOKEN_SIZE];
-	FILE *source;
-};
-
-token_t scanner_read( struct scanner *s )
-{
-		int c = fgetchar(file);
-
-		if(isspace(c)) {
-			continue;
-		} else if(c=='{') {
-			return TOKEN_LBRACE;
-		} else if(c=='}') {
-			return TOKEN_RBRACE;
-		} else if(c=='[') {
-			return TOKEN_LBRACKET;
-		} else if(c==']') {
-			return TOKEN_LBRACKET;
-		} else if(c==',') {
-			return TOKEN_COMMA;
-		} else if(c==':') {
-			return TOKEN_COLON;
-		} else if(isalpha(c)) {
-			s->text[0] = c;
-			for(i=1;i<MAX_TOKEN_SIZE;i++) {
-				c = fgetchar(file);
-				if(isalpha(c)) {	
-					s->text[i] = c;
-				} else {
-					ungetc(c,file);
-					s->text[i] = 0;
-					if(!strcmp(s->text,"true")) {
-						return TOKEN_TRUE;
-					} else if(!strcmp(s->text,"false")) {
-						return TOKEN_FALSE;
-					} else if(!strcmp(s->text,"null")) {
-						return TOKEN_NULL;
-					} else {
-						return TOKEN_ID;
-					}
-				}
-			}
-			abort();
-		} else if(isdigit(c)) {
-			s->text[0] = c;
-       			c = fgetchar(file);
-	       		while(isdigit(c)) {
-				s->text[i] = c;
-			}
-			s->text[i] = 0;
-			ungetchar(c,file);
-
-		} else if(c=='\"') {
-			for(i=0;i<MAX_TOKEN_SIZE;i++) {
-				c = fgetchar(file);
-				if(c=='\"') {
-					s->text[i] = 0;
-					return TOKEN_STRING;
-				} else if(c=='\\') {
-					// XXX substitute backwhacks
-					c = fgetchar(file);
-					s->text[i] = c;
-				} else {
-					s->text[i] = c;
-				}				
-			}
-			abort();
-		}
-	}
-}
-
-#endif
