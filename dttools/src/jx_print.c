@@ -4,6 +4,8 @@
 
 static void jx_pair_print( struct jx_pair *pair, buffer_t *b )
 {
+	if(!pair) return;
+
 	jx_print_buffer(pair->key,b);
 	buffer_putstring(b,":");
 	jx_print_buffer(pair->value,b);
@@ -16,6 +18,7 @@ static void jx_pair_print( struct jx_pair *pair, buffer_t *b )
 static void jx_item_print( struct jx_item *item, buffer_t *b )
 {
 	if(!item) return;
+
 	jx_print_buffer(item->value,b);
 	if(item->next) {
 		buffer_putstring(b,",");
@@ -25,6 +28,8 @@ static void jx_item_print( struct jx_item *item, buffer_t *b )
 
 static void jx_string_print( const char *s, buffer_t *b )
 {
+	if(!s) return;
+
 	buffer_putstring(b,"\"");
 	while(*s) {
 		switch(*s) {
@@ -67,6 +72,8 @@ static void jx_string_print( const char *s, buffer_t *b )
 
 void jx_print_buffer( struct jx *j, buffer_t *b )
 {
+	if(!j) return;
+
 	switch(j->type) {
 		case JX_NULL:
 			buffer_putstring(b,"null");

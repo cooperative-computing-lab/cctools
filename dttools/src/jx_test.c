@@ -10,9 +10,11 @@ int main( int argc, char *argv[] )
 
 	if(j) {
 		jx_print_file(j,stdout);
+		printf("\n");
 		jx_delete(j);
 		return 0;
 	} else {
+		printf("\"jx parse error\"\n");
 		return 1;
 	}
 }
