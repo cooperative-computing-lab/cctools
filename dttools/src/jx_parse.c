@@ -31,6 +31,7 @@ struct jx_parser {
 	char token[MAX_TOKEN_SIZE];
 	FILE *source_file;
 	const char *source_string;
+	int errors;
 };
 
 static struct jx_parser * jx_parser_create()
@@ -47,17 +48,20 @@ static void jx_parser_delete( struct jx_parser *p )
 
 static int jx_getchar( struct jx_parser *p )
 {
+	int c;
+
 	if(p->source_file) {
-		return fgetc(p->source_file);
+		c = fgetc(p->source_file);
 	} else {
-		char c = *p->source_string;
+		c = *p->source_string;
 		if(c) {
 			p->source_string++;
-			return (int)c;
 		} else {
-			return EOF;
+			c = EOF;
 		}
 	}
+
+	return c;
 }
 
 static void jx_ungetchar( struct jx_parser *p, int c )
@@ -84,11 +88,11 @@ static int jx_scan_unicode( struct jx_parser *s )
 		if(uc<=0x7f) {
 			return uc;
 		} else {
-			// ERROR
+			s->errors++;
 			return -1;
 		}
 	} else {
-		// ERROR
+		s->errors++;
 		return -1;
 	}
 }
@@ -152,11 +156,11 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				s->token[i] = n;
 			}
 		}
-		// ERROR string too long
+		s->errors++;
 		return JX_TOKEN_ERROR;
 	} else if(strchr("+-0123456789.",c)) {
 		s->token[0] = c;
-      			c = jx_getchar(s);
+		c = jx_getchar(s);
 		int i;
 		for(i=1;i<MAX_TOKEN_SIZE;i++) {
 			if(strchr("0123456789.",c)) {
@@ -171,7 +175,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				}
 			}
 		}
-		// ERROR number too long
+		s->errors++;
 		return JX_TOKEN_ERROR;
 	} else if(isalpha(c)) {
 		s->token[0] = c;
@@ -194,7 +198,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				}
 			}
 		}
-		// ERROR
+		s->errors++;
 		return JX_TOKEN_ERROR;
 	} else {
 		s->token[0] = c;
@@ -222,7 +226,7 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 	} else if(t==JX_TOKEN_RBRACKET) {
 		i->next = 0;
 	} else {
-		// PARSE ERROR
+		s->errors++;
 	}
 
 	return i;
@@ -241,7 +245,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 
 	jx_token_t t = jx_scan(s);
 	if(t!=JX_TOKEN_COLON) {
-		// ERROR
+		s->errors++;
 		jx_pair_delete(p);
 		return 0;
 	}
@@ -259,7 +263,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	} else if(t==JX_TOKEN_RBRACE) {
 		p->next = 0;
 	} else {
-		// PARSE ERROR
+		s->errors++;
 	}
 
 	return p;
@@ -283,7 +287,7 @@ static struct jx * jx_parse( struct jx_parser *s )
 	case JX_TOKEN_FLOAT:
 		return jx_float(atof(s->token));
 	case JX_TOKEN_TRUE:
-		return jx_boolean(1);;
+		return jx_boolean(1);
 	case JX_TOKEN_FALSE:
 		return jx_boolean(0);
 	case JX_TOKEN_NULL:
@@ -295,10 +299,16 @@ static struct jx * jx_parse( struct jx_parser *s )
 	case JX_TOKEN_COMMA:
 	case JX_TOKEN_COLON:
 	case JX_TOKEN_ERROR:
-		// ERROR
+		s->errors++;
 		return 0;
 	}
 
+	/*
+	We shouldn't get here, since all the token types
+	should be handled above.  But just in case...
+	*/
+
+	s->errors++;
 	return 0;
 }
 
@@ -308,7 +318,12 @@ struct jx * jx_parse_string( const char *str )
        	s->source_string = str;
 	struct jx * result = jx_parse(s);
 	jx_parser_delete(s);
-	return result;
+	if(s->errors) {
+		jx_delete(result);
+		return 0;
+	} else {
+		return result;
+	}
 }
 
 struct jx * jx_parse_file( FILE *file )
@@ -316,6 +331,12 @@ struct jx * jx_parse_file( FILE *file )
 	struct jx_parser *s = jx_parser_create();
 	s->source_file = file;
 	struct jx * result = jx_parse(s);
-	jx_parser_delete(s);
-	return result;
+	if(s->errors) {
+		jx_parser_delete(s);
+		jx_delete(result);
+		return 0;
+	} else {
+		jx_parser_delete(s);
+		return result;
+	}
 }
