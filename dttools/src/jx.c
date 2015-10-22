@@ -13,97 +13,12 @@ struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next
 	return pair;
 }
 
-void jx_pair_print( struct jx_pair *pair, FILE *file )
-{
-	jx_print(pair->key,file);
-	fprintf(file," : ");
-	jx_print(pair->value,file);
-	if(pair->next) {
-		fprintf(file,",");
-		fprintf(file,"\n");
-		jx_pair_print(pair->next,file);
-	}
-}
-
-struct jx_pair * jx_pair_copy( struct jx_pair *p )
-{
-	struct jx_pair *pair = malloc(sizeof(*pair));
-	pair->key = jx_copy(p->key);
-	pair->value = jx_copy(p->value);
-	pair->next = jx_pair_copy(p->next);
-	return pair;
-}
-
-int jx_pair_is_constant( struct jx_pair *p )
-{
-	return jx_is_constant(p->key)
-		&& jx_is_constant(p->value)
-		&& jx_pair_is_constant(p->next);
-}
-
-struct jx_pair * jx_pair_evaluate( struct jx_pair *pair, jx_eval_func_t func )
-{
-	return jx_pair(
-		jx_evaluate(pair->key,func),
-		jx_evaluate(pair->value,func),
-		jx_pair_evaluate(pair->next,func)
-	);
-}
-
-void jx_pair_delete( struct jx_pair *pair )
-{
-	if(!pair) return;
-	jx_delete(pair->key);
-	jx_delete(pair->value);
-       	jx_pair_delete(pair->next);
-	free(pair);
-}
-
 struct jx_item * jx_item( struct jx *value, struct jx_item *next )
 {
 	struct jx_item *item = malloc(sizeof(*item));
 	item->value = value;
 	item->next = next;
 	return item;
-}
-
-void jx_item_print( struct jx_item *item, FILE *file )
-{
-	if(!item) return;
-	jx_print(item->value,file);
-	if(item->next) {
-		fprintf(file,",");
-		jx_item_print(item->next,file);
-	}
-}
-
-struct jx_item * jx_item_evaluate( struct jx_item *item, jx_eval_func_t func )
-{
-	return jx_item(
-		jx_evaluate(item->value,func),
-		jx_item_evaluate(item->next,func)
-	);
-}
-
-int jx_item_is_constant( struct jx_item *i )
-{
-	return jx_is_constant(i->value) && jx_item_is_constant(i->next);
-}
-
-struct jx_item * jx_item_copy( struct jx_item *i )
-{
-	struct jx_item *item = malloc(sizeof(*item));
-	item->value = jx_copy(i->value);
-	item->next = jx_item_copy(i->next);
-	return item;
-}
-
-void jx_item_delete( struct jx_item *item )
-{
-	if(!item) return;
-	jx_delete(item->value);
-       	jx_item_delete(item->next);
-	free(item);
 }
 
 static struct jx * jx_create( jx_type_t type )
@@ -191,6 +106,23 @@ int jx_object_insert( struct jx *j, struct jx *key, struct jx *value )
 	return 1;
 }
 
+void jx_pair_delete( struct jx_pair *pair )
+{
+	if(!pair) return;
+	jx_delete(pair->key);
+	jx_delete(pair->value);
+       	jx_pair_delete(pair->next);
+	free(pair);
+}
+
+void jx_item_delete( struct jx_item *item )
+{
+	if(!item) return;
+	jx_delete(item->value);
+       	jx_item_delete(item->next);
+	free(item);
+}
+
 void jx_delete( struct jx *j )
 {
 	if(!j) return;
@@ -252,6 +184,23 @@ int jx_equals( struct jx *j, struct jx *k )
 	}
 }
 
+struct jx_pair * jx_pair_copy( struct jx_pair *p )
+{
+	struct jx_pair *pair = malloc(sizeof(*pair));
+	pair->key = jx_copy(p->key);
+	pair->value = jx_copy(p->value);
+	pair->next = jx_pair_copy(p->next);
+	return pair;
+}
+
+struct jx_item * jx_item_copy( struct jx_item *i )
+{
+	struct jx_item *item = malloc(sizeof(*item));
+	item->value = jx_copy(i->value);
+	item->next = jx_item_copy(i->next);
+	return item;
+}
+
 struct jx  *jx_copy( struct jx *j )
 {
 	switch(j->type) {
@@ -274,39 +223,16 @@ struct jx  *jx_copy( struct jx *j )
 	}
 }
 
-void jx_print( struct jx *j, FILE *file )
+int jx_pair_is_constant( struct jx_pair *p )
 {
-	switch(j->type) {
-		case JX_NULL:
-			fprintf(file,"null");
-			break;
-		case JX_FLOAT:
-			fprintf(file,"%lg",j->float_value);
-			break;
-		case JX_BOOLEAN:
-			fprintf(file,"%s",j->boolean_value ? "true" : "false");
-			break;
-		case JX_INTEGER:
-			fprintf(file,"%d",j->integer_value);
-			break;
-		case JX_SYMBOL:
-			fprintf(file,"%s",j->symbol_name);
-			break;
-		case JX_STRING:
-			// XXX escape quotes here
-			fprintf(file,"\"%s\"",j->string_value);
-			break;
-		case JX_ARRAY:
-			fprintf(file,"[");
-			jx_item_print(j->items,file);
-			fprintf(file,"]");
-			break;
-		case JX_OBJECT:
-			fprintf(file,"\n{\n");
-			jx_pair_print(j->pairs,file);
-			fprintf(file,"\n}\n");
-			break;
-	}
+	return jx_is_constant(p->key)
+		&& jx_is_constant(p->value)
+		&& jx_pair_is_constant(p->next);
+}
+
+int jx_item_is_constant( struct jx_item *i )
+{
+	return jx_is_constant(i->value) && jx_item_is_constant(i->next);
 }
 
 int jx_is_constant( struct jx *j )
@@ -325,6 +251,23 @@ int jx_is_constant( struct jx *j )
 		case JX_OBJECT:
 			return jx_pair_is_constant(j->pairs);
 	}
+}
+
+struct jx_pair * jx_pair_evaluate( struct jx_pair *pair, jx_eval_func_t func )
+{
+	return jx_pair(
+		jx_evaluate(pair->key,func),
+		jx_evaluate(pair->value,func),
+		jx_pair_evaluate(pair->next,func)
+	);
+}
+
+struct jx_item * jx_item_evaluate( struct jx_item *item, jx_eval_func_t func )
+{
+	return jx_item(
+		jx_evaluate(item->value,func),
+		jx_item_evaluate(item->next,func)
+	);
 }
 
 struct jx * jx_evaluate( struct jx *j, jx_eval_func_t func )

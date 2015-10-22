@@ -40,12 +40,10 @@ struct jx {
 
 struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next );
 struct jx_pair * jx_pair_copy( struct jx_pair *pair );
-void             jx_pair_print( struct jx_pair *pair, FILE *file );
 void             jx_pair_delete( struct jx_pair *pair );
 
 struct jx_item * jx_item( struct jx *value, struct jx_item *next );
 struct jx_item * jx_item_copy( struct jx_item *item );
-void             jx_item_print( struct jx_item *item, FILE *file );
 void             jx_item_delete( struct jx_item *item );
 
 struct jx * jx_null();
@@ -61,7 +59,6 @@ void        jx_assert( struct jx *j, jx_type_t type );
 int         jx_equals( struct jx *j, struct jx *k );
 struct jx * jx_copy( struct jx *j );
 void        jx_delete( struct jx *j );
-void        jx_print( struct jx *j, FILE *file );
 
 int         jx_object_insert( struct jx *object, struct jx *key, struct jx *value );
 struct jx * jx_object_lookup( struct jx *object, const char *key );
