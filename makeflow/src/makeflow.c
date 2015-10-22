@@ -113,10 +113,7 @@ static struct batch_queue *remote_queue = 0;
 static int local_jobs_max = 1;
 static int remote_jobs_max = 100;
 
-<<<<<<< HEAD
-=======
 static local_info loc_info;
->>>>>>> Added local machine params
 
 static char *project = NULL;
 static int port = 0;
@@ -542,11 +539,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
-<<<<<<< HEAD
 	if(makeflow_is_local_node(n))
-=======
-	if(makeflow_is_local_job(n))
->>>>>>> Added local machine params
 	{
 		makeflow_alloc_local(n);
 	}
@@ -610,8 +603,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	free(output_files);
 	jx_delete(envlist);
 }
-<<<<<<< HEAD
-=======
+
 static int makeflow_is_local_node(struct dag_node *n)
 {
 	return (batch_queue_type == BATCH_TYPE_LOCAL || (n->local_job && local_queue));
@@ -635,7 +627,7 @@ static int makeflow_can_alloc_local(struct dag_node *n)
 }
 static void makeflow_alloc_local(struct dag_node *n)
 {
-	if(!n->resources || (n->resources->local_mem == -1 && n->resources->local_disk == -1)
+	if(!n->resources || (n->resources->local_mem == -1 && n->resources->local_disk == -1))
 	{
 		loc_info.local_cores--;
 	}
@@ -648,7 +640,7 @@ static void makeflow_alloc_local(struct dag_node *n)
 }
 static void makeflow_dealloc_local(struct dag_node *n)
 {
-	if(!n->resources || (n->resources->local_mem == -1 && n->resources->local_disk == -1)
+	if(!n->resources || (n->resources->local_mem == -1 && n->resources->local_disk == -1))
 	{
 		loc_info.local_cores++;
 	}
@@ -659,7 +651,6 @@ static void makeflow_dealloc_local(struct dag_node *n)
 		loc_info.local_disk += n->resources->swap_memory;
 	}
 }
->>>>>>> Added local machine params
 static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 {
 	struct dag_file *f;
@@ -667,15 +658,12 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 	if(n->state != DAG_NODE_STATE_WAITING)
 		return 0;
 
-<<<<<<< HEAD
 	if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)){
 					return 0;
 	}
-=======
 		 if(makeflow_is_local_job(n) && !makeflow_can_alloc_local(n)){
 				return 0;
 			}
->>>>>>> Added local machine params
 	if(n->local_job && local_queue) {
 		if(dag_local_jobs_running(d) >= local_jobs_max)
 			return 0;
