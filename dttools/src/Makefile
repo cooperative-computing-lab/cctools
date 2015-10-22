@@ -55,6 +55,7 @@ SOURCES = \
 	json_aux.c \
 	jx.c \
 	jx_parse.c \
+	jx_print.c \
 	link.c \
 	link_auth.c \
 	link_nvpair.c \
@@ -117,7 +118,7 @@ OBJECTS = $(SOURCES:%.c=%.o)
 PROGRAMS = catalog_update catalog_server watchdog disk_allocator
 SCRIPTS = cctools_gpu_autodetect cctools_python
 TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
-TEST_PROGRAMS = auth_test disk_alloc_test microbench multirun
+TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun
 
 all: $(TARGETS)
 
