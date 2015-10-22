@@ -6,6 +6,7 @@ See the file COPYING for details.
 */
 
 #include "auth.h"
+#include "catch.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "domain_name_cache.h"
@@ -61,39 +62,41 @@ static void auth_sanitize(char *s)
 
 int auth_assert(struct link *link, char **type, char **subject, time_t stoptime)
 {
-	char line[AUTH_LINE_MAX];
+	int rc;
 	struct auth_ops *a;
 
 	for(a = state.ops; a; a = a->next) {
+		char line[AUTH_LINE_MAX];
+
 		debug(D_AUTH, "requesting '%s' authentication", a->type);
 
-		if (link_putfstring(link, "%s\n", stoptime, a->type) <= 0)
-			return 0;
+		CATCHUNIX(link_putfstring(link, "%s\n", stoptime, a->type));
 
-		if(!link_readline(link, line, AUTH_LINE_MAX, stoptime))
-			return 0;
-		if(!strcmp(line, "yes")) {
+		CATCHUNIX(link_readline(link, line, AUTH_LINE_MAX, stoptime) ? 0 : -1);
+
+		if(strcmp(line, "yes") == 0) {
 			debug(D_AUTH, "server agrees to try '%s'", a->type);
-			if(a->assert(link, stoptime)) {
+			if(a->assert(link, stoptime) == 0) {
 				debug(D_AUTH, "successfully authenticated");
-				if(!link_readline(link, line, AUTH_LINE_MAX, stoptime))
-					return 0;
+
+				CATCHUNIX(link_readline(link, line, AUTH_LINE_MAX, stoptime) ? 0 : -1);
 				if(!strcmp(line, "yes")) {
 					debug(D_AUTH, "reading back auth info from server");
-					if(!link_readline(link, line, sizeof(line), stoptime))
-						return 0;
+					CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
 					*type = xxstrdup(line);
-					if(!link_readline(link, line, sizeof(line), stoptime))
-						return 0;
+					CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
 					*subject = xxstrdup(line);
 					auth_sanitize(*subject);
 					debug(D_AUTH, "server thinks I am %s:%s", *type, *subject);
-					return 1;
+					rc = 0;
+					goto out;
 				} else {
 					debug(D_AUTH, "but not authorized to continue");
 				}
-			} else {
+			} else if (errno == EACCES) {
 				debug(D_AUTH, "failed to authenticate");
+			} else {
+				CATCHUNIX(-1);
 			}
 		} else {
 			debug(D_AUTH, "server refuses to try '%s'", a->type);
@@ -102,9 +105,10 @@ int auth_assert(struct link *link, char **type, char **subject, time_t stoptime)
 	}
 
 	debug(D_AUTH, "ran out of authenticators");
-	errno = EACCES;
-
-	return 0;
+	rc = EACCES;
+	goto out;
+out:
+	return rc == 0 ? 1 : 0;
 }
 
 int auth_accept(struct link *link, char **typeout, char **subject, time_t stoptime)
@@ -157,18 +161,20 @@ int auth_accept(struct link *link, char **typeout, char **subject, time_t stopti
 
 int auth_barrier(struct link *link, const char *response, time_t stoptime)
 {
+	int rc;
 	char line[AUTH_LINE_MAX];
 
-	if (link_putstring(link, response, stoptime) <= 0)
-		return 0;
+	CATCHUNIX(link_putstring(link, response, stoptime));
+	CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
 
-	if(link_readline(link, line, sizeof(line), stoptime)) {
-		if(!strcmp(line, "yes")) {
-			return 1;
-		}
+	if(strcmp(line, "yes") != 0) {
+		THROW_QUIET(EACCES);
 	}
 
-	return 0;
+	rc = 0;
+	goto out;
+out:
+	return rc;
 }
 
 int auth_register(char *type, auth_assert_t assert, auth_accept_t accept)

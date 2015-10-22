@@ -6,18 +6,21 @@ See the file COPYING for details.
 */
 
 #include "auth.h"
+#include "catch.h"
 #include "debug.h"
 #include "xxmalloc.h"
 #include "stringtools.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <errno.h>
-#include <pwd.h>
-#include <sys/stat.h>
 #include <dirent.h>
+#include <pwd.h>
+#include <sys/fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static char challenge_dir[AUTH_LINE_MAX] = "/tmp";
 static char alternate_passwd_file[AUTH_LINE_MAX] = "\0";
@@ -41,34 +44,34 @@ void auth_unix_timeout_set( int secs )
 
 static int auth_unix_assert(struct link *link, time_t stoptime)
 {
-	int success = 0;
-	FILE *file;
-	char line[AUTH_LINE_MAX];
+	int rc;
+	char challenge[AUTH_LINE_MAX];
 
 	debug(D_AUTH, "unix: waiting for challenge");
-	if(link_readline(link, line, sizeof(line), stoptime)) {
-		debug(D_AUTH, "unix: challenge is %s", line);
-		file = fopen(line, "w");
-		if(file) {
-			fsync(fileno(file));
-			fclose(file);
-			debug(D_AUTH, "unix: issued response");
-			if(auth_barrier(link, "yes\n", stoptime)) {
-				debug(D_AUTH, "unix: response accepted");
-				success = 1;
-			} else {
-				debug(D_AUTH, "unix: response rejected");
-			}
-		} else {
-			debug(D_AUTH, "unix: could not meet challenge: %s", strerror(errno));
-			link_putliteral(link, "no\n", stoptime);
-		}
-		unlink(line);
-	} else {
-		debug(D_AUTH, "unix: couldn't read challenge");
+	CATCHUNIX(link_readline(link, challenge, sizeof(challenge), stoptime) ? 0 : -1);
+	debug(D_AUTH, "unix: challenge is %s", challenge);
+
+	rc = open(challenge, O_CREAT|O_EXCL|O_WRONLY|O_SYNC, S_IRUSR|S_IWUSR);
+	if (rc == -1) {
+		debug(D_AUTH, "unix: could not meet challenge: %s", strerror(errno));
+		link_putliteral(link, "no\n", stoptime); /* don't catch failure */
+		CATCHUNIX(rc);
+	}
+	close(rc);
+	debug(D_AUTH, "unix: issued response");
+	rc = auth_barrier(link, "yes\n", stoptime);
+	unlink(challenge);
+	if (rc) {
+		debug(D_AUTH, "unix: response rejected");
+		CATCHUNIX(rc);
 	}
 
-	return success;
+	debug(D_AUTH, "unix: response accepted");
+
+	rc = 0;
+	goto out;
+out:
+	return RCUNIX(rc);
 }
 
 static void make_challenge_path(char *path)

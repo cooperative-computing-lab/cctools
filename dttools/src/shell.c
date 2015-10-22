@@ -18,17 +18,20 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-static int execute (const char *cmd, const char * const env[], int out[2], int err[2])
+static int execute (const char *cmd, const char * const env[], int in[2], int out[2], int err[2])
 {
 	int rc;
 	int i;
 
+	CATCHUNIX(close(in[1]));
 	CATCHUNIX(close(out[0]));
 	CATCHUNIX(close(err[0]));
 
+	CATCHUNIX(dup2(in[0], STDIN_FILENO));
 	CATCHUNIX(dup2(out[1], STDOUT_FILENO));
 	CATCHUNIX(dup2(err[1], STDERR_FILENO));
 
+	CATCHUNIX(close(in[0]));
 	CATCHUNIX(close(out[1]));
 	CATCHUNIX(close(err[1]));
 
@@ -45,9 +48,10 @@ out:
 	abort();
 }
 
-int shellcode(const char *cmd, const char * const env[], buffer_t * Bout, buffer_t * Berr, int *status)
+int shellcode(const char *cmd, const char * const env[], const char *input, size_t len, buffer_t *Bout, buffer_t *Berr, int *status)
 {
 	int rc;
+	int in[2] = {-1, -1};
 	int out[2] = {-1, -1};
 	int err[2] = {-1, -1};
 	pid_t child = 0;
@@ -56,22 +60,31 @@ int shellcode(const char *cmd, const char * const env[], buffer_t * Bout, buffer
 	if (env == NULL)
 		env = _env;
 
+	CATCHUNIX(pipe(in));
 	CATCHUNIX(pipe(out));
 	CATCHUNIX(pipe(err));
 
 	CATCHUNIX(child = fork());
 
 	if(child == 0) {
-		return execute(cmd, env, out, err);
+		return execute(cmd, env, in, out, err);
 	}
 
+	CATCHUNIX(close(in[0]));
+	in[0] = -1;
+	CATCHUNIX(close(out[1]));
+	out[1] = -1;
+	CATCHUNIX(close(err[1]));
+	err[1] = -1;
+
+	CATCHUNIX(fcntl(in[1], F_GETFL));
+	CATCHUNIX(fcntl(in[1], F_SETFL, rc|O_NONBLOCK));
+
 	CATCHUNIX(fcntl(out[0], F_GETFL));
-	rc |= O_NONBLOCK;
-	CATCHUNIX(fcntl(out[0], F_SETFL, rc));
+	CATCHUNIX(fcntl(out[0], F_SETFL, rc|O_NONBLOCK));
 
 	CATCHUNIX(fcntl(err[0], F_GETFL));
-	rc |= O_NONBLOCK;
-	CATCHUNIX(fcntl(err[0], F_SETFL, rc));
+	CATCHUNIX(fcntl(err[0], F_SETFL, rc|O_NONBLOCK));
 
 	while (1) {
 		char b[1<<16];
@@ -80,15 +93,28 @@ int shellcode(const char *cmd, const char * const env[], buffer_t * Bout, buffer
 
 		CATCHUNIX(w = waitpid(child, status, WNOHANG));
 
-		result = full_read(out[0], b, sizeof(b));
-		if (result == -1 && errno != EAGAIN) {
+		if (len) {
+			result = write(in[1], input, len);
+			if (result == -1 && errno != EAGAIN && errno != EINTR) {
+				CATCH(errno);
+			} else if (result > 0) {
+				input += result;
+				len -= (size_t)result;
+			}
+		} else if (in[1] >= 0) {
+			close(in[1]);
+			in[1] = -1;
+		}
+
+		result = read(out[0], b, sizeof(b));
+		if (result == -1 && errno != EAGAIN && errno != EINTR) {
 			CATCH(errno);
 		} else if (result > 0 && Bout) {
 			buffer_putlstring(Bout, b, (size_t)result);
 		}
 
-		result = full_read(err[0], b, sizeof(b));
-		if (result == -1 && errno != EAGAIN) {
+		result = read(err[0], b, sizeof(b));
+		if (result == -1 && errno != EAGAIN && errno != EINTR) {
 			CATCH(errno);
 		} else if (result > 0 && Berr) {
 			buffer_putlstring(Berr, b, (size_t)result);
@@ -105,10 +131,12 @@ out:
 		kill(child, SIGKILL);
 		waitpid(child, NULL, 0);
 	}
-	close(out[0]);
-	close(out[1]);
-	close(err[0]);
-	close(err[1]);
+	if (in[0] >= 0) close(in[0]);
+	if (in[1] >= 0) close(in[1]);
+	if (out[0] >= 0) close(out[0]);
+	if (out[1] >= 0) close(out[1]);
+	if (err[0] >= 0) close(err[0]);
+	if (err[1] >= 0) close(err[1]);
 	return RCUNIX(rc);
 }
 

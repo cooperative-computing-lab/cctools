@@ -556,7 +556,7 @@ static int ticket_translate(const char *name, char *ticket_subject)
 	buffer_putfstring(Benv, "CHIRP_TICKET_NAME=%s", name);
 	env[0] = buffer_tostring(Benv);
 
-	result = shellcode(command, env, Bout, Berr, &status);
+	result = shellcode(command, env, NULL, 0, Bout, Berr, &status);
 
 	if (result == 0) {
 		debug(D_DEBUG, "shellcode exit status %d; stderr:\n%s", status, buffer_tostring(Berr));
@@ -625,7 +625,7 @@ INT64_T chirp_client_ticket_register(struct chirp_client * c, const char *name, 
 	buffer_putfstring(Benv, "CHIRP_TICKET_NAME=%s", name);
 	env[0] = buffer_tostring(Benv);
 
-	result = shellcode(command, env, Bout, Berr, &status);
+	result = shellcode(command, env, NULL, 0, Bout, Berr, &status);
 
 	if (result == 0) {
 		debug(D_DEBUG, "shellcode exit status %d; stderr:\n%s", status, buffer_tostring(Berr));
@@ -727,7 +727,7 @@ INT64_T chirp_client_ticket_create(struct chirp_client * c, char name[CHIRP_PATH
 	env[0] = buffer_tostring(Benv);
 	env[1] = strchr(env[0], '\0')+1;
 
-	result = shellcode(command, env, Bout, Berr, &status);
+	result = shellcode(command, env, NULL, 0, Bout, Berr, &status);
 
 	if (result == 0) {
 		debug(D_DEBUG, "shellcode exit status %d; stderr:\n%s", status, buffer_tostring(Berr));
