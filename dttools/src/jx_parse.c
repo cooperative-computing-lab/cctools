@@ -66,8 +66,6 @@ static int jx_getchar( struct jx_parser *p )
 		}
 	}
 
-	printf("%c",c);
-
 	return c;
 }
 
