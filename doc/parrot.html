@@ -255,10 +255,10 @@ allows operation on the local filesystem. For more fine-grained control,
 an access specifier can also be a combination of the letters <tt>r</tt>, <tt>w</tt>,
 and <tt>x</tt> to allow read, write, and execute/search, respectively.
 For example, a mountlist could contain the following entries
-<code>/     rX
+<code>/     RX
 /home DENY
 /tmp  /tmp/sandbox
-/opt  /home/fred/project  xr
+/opt  /home/fred/project  RX
 </code></p>
 
 A single mount entry may be given on the command line
