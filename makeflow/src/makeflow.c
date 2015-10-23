@@ -1370,15 +1370,6 @@ exit(1);
 			case 'J':
 				explicit_remote_jobs_max = atoi(optarg);
 				break;
-			case '1':
-				loc_info.local_disk = atoi(optarg);
-				break;
-			case '2':
-				loc_info.local_mem = atoi(optarg);
-				break;
-			case '3':
-				loc_info.local_cores = atoi(optarg);
-				break;
 			case 'l':
 				logfilename = xxstrdup(optarg);
 				break;
@@ -1533,6 +1524,7 @@ exit(1);
 			case 'X':
 				change_dir = optarg;
 				break;
+<<<<<<< HEAD
 			case LONG_OPT_DISK:
 				loc_info.local_disk = string_metric_parse(optarg);
 				break;
@@ -1540,6 +1532,15 @@ exit(1);
 				loc_info.local_mem = string_metric_parse(optarg);
 				break;
 			case LONG_OPT_CORES:
+=======
+			case '1':
+				loc_info.local_disk = atoi(optarg);
+				break;
+			case '2':
+				loc_info.local_mem = atoi(optarg);
+				break;
+			case '3':
+>>>>>>> ;
 				loc_info.local_cores = atoi(optarg);
 				break;
 		}
