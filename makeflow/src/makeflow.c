@@ -1151,10 +1151,9 @@ int main(int argc, char *argv[])
 	char *log_format = NULL;
 
 	loc_info = malloc(sizeof(local_info));
-    loc_info.local_mem = 0;
-	loc_info.local_mem = 0;
-	loc_info.local_disk = 0;
-	loc_info.local_cores= load_average_get_cpus();
+	loc_info.local_mem = -1;
+	loc_info.local_disk = -1;
+	loc_info.local_cores = 1;
 
 	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
 	if(s) {
