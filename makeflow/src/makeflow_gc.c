@@ -4,16 +4,18 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "dag.h"
-#include "makeflow_gc.h"
-#include "makeflow_log.h"
-
 #include "debug.h"
 #include "xxmalloc.h"
 #include "set.h"
 #include "timestamp.h"
 #include "host_disk_info.h"
 #include "stringtools.h"
+
+#include "dag.h"
+#include "makeflow_log.h"
+#include "makeflow_wrapper.h"
+#include "makeflow_gc.h"
+
 
 #include <dirent.h>
 #include <sys/types.h>
@@ -35,36 +37,17 @@ include measuring available space and inodes consumed.
 
 static int makeflow_gc_collected = 0;
 
-/* Count the number of items in a directory.  (expensive!) */
-
-static int directory_inode_count(const char *dirname)
-{
-	DIR *dir;
-	struct dirent *d;
-	int inode_count = 0;
-
-	dir = opendir(dirname);
-	if(dir == NULL)
-		return INT_MAX;
-
-	while((d = readdir(dir)))
-		inode_count++;
-	closedir(dir);
-
-	return inode_count;
-}
-
 /*
 Return true if disk space falls below the fixed minimum. (inexpensive!)
 XXX this value should be configurable.
 */
 
-static int directory_low_disk( const char *path )
+static int directory_low_disk( const char *path, uint64_t size )
 {
 	UINT64_T avail, total;
 
 	if(host_disk_info_get(path, &avail, &total) >= 0)
-		return avail <= MAKEFLOW_MIN_SPACE;
+		return avail <= size;
 
 	return 0;
 }
@@ -153,7 +136,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 
 /* Clean a specific file, while emitting an appropriate message. */
 
-int makeflow_file_clean( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent)
+int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent)
 {
 	if(!f)
 		return 1;
@@ -180,12 +163,6 @@ int makeflow_file_clean( struct dag *d, struct batch_queue *queue, struct dag_fi
 
 void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_node *n, int silent)
 {
-	struct dag_file *f;
-
-	list_first_item(n->target_files);
-	while((f = list_next_item(n->target_files)))
-		makeflow_file_clean(d, queue, f, silent);
-
 	if(n->nested_job){
 		char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
 		sprintf(command, "%s -c", n->command);
@@ -199,34 +176,37 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 
 /* Clean the entire dag by cleaning all nodes. */
 
-void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth)
+void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth)//, struct makeflow_wrapper *w, struct makeflow_monitor *m)
 {
 	struct dag_file *f;
 	char *name;
 
 	hash_table_firstkey(d->files);
 	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
-		if(dag_file_is_source(f))
-			continue;
-
 		int silent = 1;
 		if(dag_file_should_exist(f))
 			silent = 0;
 
+		/* We have a record of the file, but it is no longer created or used so delete */
+		if(dag_file_is_source(f) && dag_file_is_sink(f))
+			makeflow_clean_file(d, queue, f, silent);
+		if(dag_file_is_source(f))
+			continue;
+
 		if(clean_depth == MAKEFLOW_CLEAN_ALL){
-			makeflow_file_clean(d, queue, f, silent);
+			makeflow_clean_file(d, queue, f, silent);
 		} else if(set_lookup(d->outputs, f) && (clean_depth == MAKEFLOW_CLEAN_OUTPUTS)) {
-			makeflow_file_clean(d, queue, f, silent);
+			makeflow_clean_file(d, queue, f, silent);
 		} else if(!set_lookup(d->outputs, f) && (clean_depth == MAKEFLOW_CLEAN_INTERMEDIATES)){
-			makeflow_file_clean(d, queue, f, silent);
+			makeflow_clean_file(d, queue, f, silent);
 		}
 	}
 
 	struct dag_node *n;
 	for(n = d->nodes; n; n = n->next) {
-		 /* If the node is a Makeflow job, then we should recursively call the *
-		  * clean operation on it. */
-		 if(n->nested_job) {
+		/* If the node is a Makeflow job, then we should recursively call the *
+		 * clean operation on it. */
+		if(n->nested_job) {
 			char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
 			sprintf(command, "%s -c", n->command);
 
@@ -257,7 +237,7 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 			&& !dag_file_is_source(f)
 			&& !set_lookup(d->outputs, f)
 			&& !set_lookup(d->inputs, f)
-			&& makeflow_file_clean(d, queue, f, 0)){
+			&& makeflow_clean_file(d, queue, f, 0)){
 			collected++;
 		}
 	}
@@ -273,22 +253,30 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 
 /* Collect garbage only if conditions warrant. */
 
-void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, int count )
+void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, uint64_t size, int count )
 {
+	if(size == 0)
+		size = MAKEFLOW_MIN_SPACE;
 	switch (method) {
 	case MAKEFLOW_GC_NONE:
 		break;
-	case MAKEFLOW_GC_REF_COUNT:
+	case MAKEFLOW_GC_COUNT:
 		debug(D_MAKEFLOW_RUN, "Performing incremental file (%d) garbage collection", count);
 		makeflow_gc_all(d, queue, count);
 		break;
 	case MAKEFLOW_GC_ON_DEMAND:
-		if(directory_inode_count(".") >= count || directory_low_disk(".")) {
+		if(d->completed_files - d->deleted_files > count || directory_low_disk(".",size)){
 			debug(D_MAKEFLOW_RUN, "Performing on demand (%d) garbage collection", count);
 			makeflow_gc_all(d, queue, INT_MAX);
 		}
 		break;
-	case MAKEFLOW_GC_FORCE:
+	case MAKEFLOW_GC_SIZE:
+		if(directory_low_disk(".", size)) {
+			debug(D_MAKEFLOW_RUN, "Performing size (%d) garbage collection", count);
+			makeflow_gc_all(d, queue, INT_MAX);
+		}
+		break;
+	case MAKEFLOW_GC_ALL:
 		makeflow_gc_all(d, queue, INT_MAX);
 		break;
 	}

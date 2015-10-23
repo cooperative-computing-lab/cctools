@@ -29,8 +29,11 @@ See the file COPYING for details.
 #include "dag.h"
 #include "dag_visitors.h"
 #include "makeflow_summary.h"
-#include "makeflow_log.h"
 #include "makeflow_gc.h"
+#include "makeflow_log.h"
+#include "makeflow_wrapper.h"
+#include "makeflow_wrapper_docker.h"
+#include "makeflow_wrapper_monitor.h"
 #include "parser.h"
 
 #include <fcntl.h>
@@ -70,17 +73,7 @@ in Batch Job using batch_queue_set_option. See batch_job_work_queue.c for
 an example.
 */
 
-#define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%06.6d"
-
-#define CONTAINER_SH "docker.wrapper.sh"
-
 #define MAX_REMOTE_JOBS_DEFAULT 100
-
-typedef enum {
-	CONTAINER_MODE_NONE,
-	CONTAINER_MODE_DOCKER,
-	// CONTAINER_MODE_ROCKET etc
-} container_mode_t;
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 0;
@@ -88,9 +81,17 @@ static int makeflow_submit_timeout = 3600;
 static int makeflow_retry_flag = 0;
 static int makeflow_retry_max = MAX_REMOTE_JOBS_DEFAULT;
 
+/* makeflow_gc_method indicates the type of garbage collection
+ * indicated by the user. Refer to makeflow_gc.h for specifics */
 static makeflow_gc_method_t makeflow_gc_method = MAKEFLOW_GC_NONE;
-static int makeflow_gc_param = -1;
+/* Disk size at which point GC is run */
+static uint64_t makeflow_gc_size   = 0;
+/* # of files after which GC is run */
+static int makeflow_gc_count  = -1;
+/* Iterations of wait loop prior ot GC check */
 static int makeflow_gc_barrier = 1;
+/* Determines next gc_barrier to make checks less frequent with
+ * large number of tasks */
 static double makeflow_gc_task_ratio = 0.05;
 
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
@@ -106,20 +107,6 @@ static int output_len_check = 0;
 
 static int cache_mode = 1;
 
-/* path is where to locally find the monitor. */
-/* exe is the name in the remote site. */
-static char *monitor_path = NULL;
-static const char *monitor_exe  = NULL;
-
-static int monitor_mode = 0;
-static int monitor_enable_time_series = 0;
-static int monitor_enable_list_files  = 0;
-
-static char *monitor_limits_name = NULL;
-static int   monitor_interval = 1;	// in seconds
-static char *monitor_log_format = NULL;
-static char *monitor_log_dir = NULL;
-
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
 static char *image_tar = NULL;
@@ -134,29 +121,42 @@ static int file_creation_patience_wait_time = 0;
  * once weaver/pbui tools are updated.) */
 static int log_verbose_mode = 0;
 
-static char *wrapper_command = 0;
-static struct list *wrapper_input_files = 0;
-static struct list *wrapper_output_files = 0;
+/* Wrapper control functions for wrapping command and adding input/output
+ *  * files. */
+static struct makeflow_wrapper *wrapper = 0;
+static struct makeflow_monitor *monitor = 0;
 
-static void makeflow_wrapper_add_command( const char *cmd )
+/* Generates file list for node based on node files, wrapper
+ *  * input files, and monitor input files. Relies on %% nodeid
+ *   * replacement for monitor file names. */
+static struct list *makeflow_generate_input_files( struct dag_node *n, struct makeflow_wrapper *w, struct makeflow_monitor *m )
 {
-	if(!wrapper_command) {
-		wrapper_command = strdup(cmd);
-	} else {
-		wrapper_command = string_wrap_command(wrapper_command,cmd);
+	struct list *result = list_duplicate(n->source_files);
+
+	if(w){
+		result = makeflow_wrapper_generate_files(result, w->input_files, n, w);
 	}
+
+	if(m){
+		result = makeflow_wrapper_generate_files(result, m->wrapper->input_files, n, m->wrapper);
+	}
+
+	return result;
 }
 
-static void makeflow_wrapper_add_input_file( const char *file )
+static struct list *makeflow_generate_output_files( struct dag_node *n, struct makeflow_wrapper *w, struct makeflow_monitor *m )
 {
-	if(!wrapper_input_files) wrapper_input_files = list_create();
-	list_push_tail(wrapper_input_files,dag_file_create(file));
-}
+	struct list *result = list_duplicate(n->target_files);
 
-static void makeflow_wrapper_add_output_file( const char *file )
-{
-	if(!wrapper_output_files) wrapper_output_files = list_create();
-	list_push_tail(wrapper_output_files,dag_file_create(file));
+	if(w){
+		result = makeflow_wrapper_generate_files(result, w->output_files, n, w);
+	}
+
+	if(m){
+		result = makeflow_wrapper_generate_files(result, m->wrapper->output_files, n, m->wrapper);
+	}
+
+	return result;
 }
 
 /*
@@ -167,6 +167,7 @@ static void makeflow_abort_all(struct dag *d)
 {
 	UINT64_T jobid;
 	struct dag_node *n;
+	struct dag_file *f;
 
 	printf("got abort signal...\n");
 
@@ -175,6 +176,10 @@ static void makeflow_abort_all(struct dag *d)
 		printf("aborting local job %" PRIu64 "\n", jobid);
 		batch_job_remove(local_queue, jobid);
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
+		struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
+		list_first_item(outputs);
+		while((f = list_next_item(outputs)))
+			makeflow_clean_file(d, local_queue, f, 0);
 		makeflow_clean_node(d, local_queue, n, 1);
 	}
 
@@ -183,6 +188,10 @@ static void makeflow_abort_all(struct dag *d)
 		printf("aborting remote job %" PRIu64 "\n", jobid);
 		batch_job_remove(remote_queue, jobid);
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
+		struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
+		list_first_item(outputs);
+		while((f = list_next_item(outputs)))
+			makeflow_clean_file(d, remote_queue, f, 0);
 		makeflow_clean_node(d, remote_queue, n, 1);
 	}
 }
@@ -236,7 +245,7 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 	while((f = list_next_item(n->target_files))) {
 		if(dag_file_should_exist(f))
 			continue;
-		/* If output file is missing, but node completed and file was garbage, then avoid rerunning. */
+		/* If output file is missing, but node completed and file was gc'ed, then avoid rerunning. */
 		if(n->state == DAG_NODE_STATE_COMPLETE && f->state == DAG_FILE_STATE_DELETE)
 			continue;
 		goto rerun;
@@ -277,6 +286,10 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 		}
 	}
 	// Clean up things associated with this node
+	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
+	list_first_item(outputs);
+	while((f1 = list_next_item(outputs)))
+		makeflow_clean_file(d, remote_queue, f1, 0);
 	makeflow_clean_node(d, remote_queue, n, 0);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 
@@ -337,135 +350,17 @@ static void makeflow_prepare_nested_jobs(struct dag *d)
 	}
 }
 
-static char *monitor_log_name(char *dirname, int nodeid)
-{
-	char *name = string_format(monitor_log_format, nodeid);
-	char *path = string_format("%s/%s", dirname, name);
-	free(name);
-
-	return path;
-}
-
-/*
-Prepare a node for monitoring by wrapping the command and attaching the
-appropriate input and output dependencies.
-*/
-
-static int makeflow_prepare_for_monitoring(struct dag *d)
-{
-	struct dag_node *n;
-
-	for(n = d->nodes; n; n = n->next)
-	{
-		char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
-		char *log_name;
-
-		log_name = string_format("%s.summary", log_name_prefix);
-		dag_node_add_target_file(n, log_name, NULL);
-		free(log_name);
-
-		if(monitor_enable_time_series)
-		{
-			log_name = string_format("%s.series", log_name_prefix);
-			dag_node_add_target_file(n, log_name, NULL);
-			free(log_name);
-		}
-
-		if(monitor_enable_list_files)
-		{
-			log_name = string_format("%s.files", log_name_prefix);
-			dag_node_add_target_file(n, log_name, NULL);
-			free(log_name);
-		}
-
-		free(log_name_prefix);
-	}
-
-	return 1;
-}
-
-/*
-Wraps a given command with the appropriate resource monitor string.
-Returns a newly allocated string that must be freed.
-*/
-
-static char *makeflow_node_rmonitor_wrap_command( struct dag_node *n, const char *command )
-{
-	char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
-	char *limits_str = dag_node_resources_wrap_as_rmonitor_options(n);
-	char *extra_options = string_format("%s -V '%-15s%s'",
-			limits_str ? limits_str : "",
-			"category:",
-			n->category->label);
-
-	log_name_prefix	 = monitor_log_name(monitor_log_dir, n->nodeid);
-
-	char * result = resource_monitor_rewrite_command(command,
-			monitor_exe,
-			log_name_prefix,
-			monitor_limits_name,
-			extra_options,
-			monitor_enable_time_series,
-			monitor_enable_list_files);
-
-	free(log_name_prefix);
-	free(extra_options);
-	free(limits_str);
-
-	return result;
-}
-
-
-/*
-Replace instances of %% in a string with the string 'replace'.
-To escape this behavior, %%%% becomes %%.
-(Backslash it not used as the escape, as it would interfere with shell escapes.)
-This function works like realloc: the string str must be created by malloc
-and may be freed and reallocated.  Therefore, always invoke it like this:
-x = replace_percents(x,replace);
-*/
-
-static char * replace_percents( char *str, const char *replace )
-{
-	/* Common case: do nothing if no percents. */
-	if(!strchr(str,'%')) return str;
-
-	buffer_t buffer;
-	buffer_init(&buffer);
-
-	char *s;
-	for(s=str;*s;s++) {
-		if(*s=='%' && *(s+1)=='%' ) {
-			if( *(s+2)=='%' && *(s+3)=='%') {
-				buffer_putlstring(&buffer,"%%",2);
-				s+=3;
-			} else {
-				buffer_putstring(&buffer,replace);
-				s++;
-			}
-		} else {
-			buffer_putlstring(&buffer,s,1);
-		}
-	}
-
-	char *result;
-	buffer_dup(&buffer,&result);
-	buffer_free(&buffer);
-
-	free(str);
-
-	return result;
-}
-
 /*
 Given a file, return the string that identifies it appropriately
 for the given batch system, combining the local and remote name
 and making substitutions according to the node.
 */
 
-static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue )
+static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue, struct makeflow_wrapper *w, struct makeflow_monitor *m)
 {
 	const char *remotename = dag_node_get_remote_name(n, f->filename);
+	if(!remotename && w) remotename = makeflow_wrapper_get_remote_name(w, n->d, f->filename);
+	if(!remotename && m) remotename = makeflow_wrapper_get_remote_name(m->wrapper, n->d, f->filename);
 	if(!remotename) remotename = f->filename;
 
 	switch (batch_queue_get_type(queue)) {
@@ -500,7 +395,7 @@ Given a list of files, add the files to the given string.
 Returns the original string, realloced if necessary
 */
 
-static char * makeflow_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue )
+static char * makeflow_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue, struct makeflow_wrapper *w, struct makeflow_monitor *m )
 {
 	struct dag_file *file;
 
@@ -510,7 +405,7 @@ static char * makeflow_file_list_format( struct dag_node *node, char *file_str, 
 
 	list_first_item(file_list);
 	while((file=list_next_item(file_list))) {
-		char *f = makeflow_file_format(node,file,queue);
+		char *f = makeflow_file_format(node,file,queue,w,m);
 		file_str = string_combine(file_str,f);
 		free(f);
 	}
@@ -556,38 +451,6 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	return 0;
 }
 
-static void makeflow_create_docker_sh()
-{
-	FILE *wrapper_fn;
-
-	wrapper_fn = fopen(CONTAINER_SH, "w");
-
-	if (image_tar == NULL) {
-
-		fprintf(wrapper_fn, "#!/bin/sh\n\
-curr_dir=`pwd`\n\
-default_dir=/root/worker\n\
-flock /tmp/lockfile /usr/bin/docker pull %s\n\
-docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s \"$@\"\n", container_image, container_image);
-
-	} else {
-
-		fprintf(wrapper_fn, "#!/bin/sh\n\
-curr_dir=`pwd`\n\
-default_dir=/root/worker\n\
-flock /tmp/lockfile /usr/bin/docker load < %s\n\
-docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s \"$@\"\n", image_tar, container_image);
-
-		makeflow_wrapper_add_input_file(image_tar);
-	}
-
-	fclose(wrapper_fn);
-
-	chmod(CONTAINER_SH, 0755);
-
-	makeflow_wrapper_add_input_file(CONTAINER_SH);
-}
-
 /*
 Submit a node to the appropriate batch system, after materializing
 the necessary list of input and output files, and applying all
@@ -604,24 +467,17 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
-	/* Create strings for all the files mentioned by this node. */
-	char *input_files = makeflow_file_list_format(n,0,n->source_files,queue);
-	char *output_files = makeflow_file_list_format(n,0,n->target_files,queue);
+	struct list *input_list  = makeflow_generate_input_files(n, wrapper, monitor);
+	struct list *output_list = makeflow_generate_output_files(n, wrapper, monitor);
 
-	/* Add the wrapper input and output files to the strings. */
-	/* This function may realloc input_files and output_files. */
-	input_files = makeflow_file_list_format(n,input_files,wrapper_input_files,queue);
-	output_files = makeflow_file_list_format(n,output_files,wrapper_output_files,queue);
+	/* Create strings for all the files mentioned by this node. */
+	char *input_files  = makeflow_file_list_format(n, 0, input_list,  queue, wrapper, monitor);
+	char *output_files = makeflow_file_list_format(n, 0, output_list, queue, wrapper, monitor);
 
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
-	char *command = string_wrap_command(n->command, wrapper_command);
-
-	/* Wrap the command with the resource monitor, if it is enabled. */
-	if(monitor_mode) {
-		char *newcommand = makeflow_node_rmonitor_wrap_command(n,command);
-		free(command);
-		command = newcommand;
-	}
+	char *command = strdup(n->command);
+	command = makeflow_wrap_wrapper(command, n, wrapper);
+	command = makeflow_wrap_monitor(command, n, monitor);
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
@@ -630,8 +486,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	char *batch_options_env	= dag_variable_lookup_string("BATCH_OPTIONS", &s);
 	char *batch_submit_options = dag_node_resources_wrap_options(n, batch_options_env, batch_queue_get_type(queue));
 	char *old_batch_submit_options = NULL;
-
 	free(batch_options_env);
+
 	if(batch_submit_options) {
 		debug(D_MAKEFLOW_RUN, "Batch options: %s\n", batch_submit_options);
 		if(batch_queue_get_option(queue, "batch-options"))
@@ -643,19 +499,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	/* Generate the environment vars specific to this node. */
 	struct nvpair *envlist = dag_node_env_create(d,n);
 
-	/*
-	Just before execution, replace double-percents with the nodeid.
-	This is used for substituting in the nodeid into a wrapper command or file.
-	*/
-	char *nodeid = string_format("%d",n->nodeid);
-	command = replace_percents(command,nodeid);
-	input_files = replace_percents(input_files,nodeid);
-	output_files = replace_percents(output_files,nodeid);
-	free(nodeid);
-
 	/* Logs the creation of output files. */
-	makeflow_log_file_expectation(d, n->target_files);
-	makeflow_log_file_expectation(d, wrapper_output_files);
+	makeflow_log_file_expectation(d, output_list);
 
 	/* Now submit the actual job, retrying failures as needed. */
 	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist);
@@ -680,6 +525,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	}
 
 	free(command);
+	free(input_list);
+	free(output_list);
 	free(input_files);
 	free(output_files);
 	nvpair_delete(envlist);
@@ -752,7 +599,6 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 		else {
 			/* File was created and has length larger than zero. */
 			debug(D_MAKEFLOW_RUN, "File %s created by rule %d.\n", f->filename, n->nodeid);
-			n->d->completed_files += 1;
 			makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_EXISTS);
 			file_created = 1;
 			break;
@@ -785,9 +631,11 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
 
+	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
+
 	if(info->exited_normally && info->exit_code == 0) {
-		list_first_item(n->target_files);
-		while((f = list_next_item(n->target_files))) {
+		list_first_item(outputs);
+		while((f = list_next_item(outputs))) {
 			if(!makeflow_node_check_file_was_created(n, f))
 			{
 				job_failed = 1;
@@ -806,19 +654,21 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
 
 		/* Clean files created in node. Clean existing and expected and record deletion. */
-		list_first_item(n->target_files);
-		while((f = list_next_item(n->target_files))) {
+		list_first_item(outputs);
+		while((f = list_next_item(outputs))) {
 			if(f->state == DAG_FILE_STATE_EXPECT) {
-				makeflow_file_clean(d, remote_queue, f, 1);
+				makeflow_clean_file(d, remote_queue, f, 1);
 			} else {
-				makeflow_file_clean(d, remote_queue, f, 0);
+				makeflow_clean_file(d, remote_queue, f, 0);
 			}
 		}
 
-		if(monitor_mode && info->exit_code == 147)
+		if(monitor && info->exit_code == 147)
 		{
 			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
-			char *log_name_prefix = monitor_log_name(monitor_log_dir, n->nodeid);
+			char *nodeid = string_format("%d",n->nodeid);
+			char *log_name_prefix = string_replace_percents(monitor->log_prefix, nodeid);
+			free(nodeid);
 			char *summary_name = string_format("%s.summary", log_name_prefix);
 			struct rmsummary *s = rmsummary_parse_limits_exceeded(summary_name);
 
@@ -875,6 +725,23 @@ static int makeflow_check(struct dag *d)
 	debug(D_MAKEFLOW_RUN, "checking rules for consistency...\n");
 
 	for(n = d->nodes; n; n = n->next) {
+
+		if(itable_size(n->remote_names) > 0 || (wrapper && wrapper->uses_remote_rename)){
+			if(n->local_job) {
+				debug(D_ERROR, "remote renaming is not supported on locally. Rule %d.\n", n->nodeid);
+				error = 1;
+			} else {
+				switch (batch_queue_type) {
+					case BATCH_QUEUE_TYPE_WORK_QUEUE:
+					case BATCH_QUEUE_TYPE_CONDOR:
+						break;
+					default:
+						debug(D_ERROR, "remote renaming is not supported on selected batch system. Rule %d.\n", n->nodeid);
+						error = 1;
+				}
+			}
+		}
+
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
 			if(f->created_by) {
@@ -908,6 +775,7 @@ static void makeflow_run( struct dag *d )
 	struct dag_node *n;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
+
 
 	while(!makeflow_abort_flag) {
 		makeflow_dispatch_ready_jobs(d);
@@ -951,7 +819,7 @@ static void makeflow_run( struct dag *d )
 		 * amount of tasks have passed. */
 		makeflow_gc_barrier--;
 		if(makeflow_gc_method != MAKEFLOW_GC_NONE && makeflow_gc_barrier == 0) {
-			makeflow_gc(d, remote_queue, makeflow_gc_method,makeflow_gc_param);
+			makeflow_gc(d, remote_queue, makeflow_gc_method, makeflow_gc_size, makeflow_gc_count);
 			makeflow_gc_barrier = MAX(d->nodeid_counter * makeflow_gc_task_ratio, 1);
 		}
 	}
@@ -960,7 +828,7 @@ static void makeflow_run( struct dag *d )
 		makeflow_abort_all(d);
 	} else {
 		if(!makeflow_failed_flag && makeflow_gc_method != MAKEFLOW_GC_NONE) {
-			makeflow_gc(d,remote_queue,MAKEFLOW_GC_FORCE,0);
+			makeflow_gc(d,remote_queue,MAKEFLOW_GC_ALL,0,0);
 		}
 	}
 }
@@ -1084,6 +952,8 @@ int main(int argc, char *argv[])
 	char *work_queue_preferred_connection = NULL;
 	char *write_summary_to = NULL;
 	char *s;
+	char *log_dir = NULL;
+	char *log_format = NULL;
 
 	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
 	if(s) {
@@ -1114,6 +984,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_DISABLE_BATCH_CACHE,
 		LONG_OPT_DOT_CONDENSE,
 		LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME,
+		LONG_OPT_GC_SIZE,
 		LONG_OPT_MONITOR,
 		LONG_OPT_MONITOR_INTERVAL,
 		LONG_OPT_MONITOR_LIMITS,
@@ -1148,6 +1019,10 @@ int main(int argc, char *argv[])
 		{"disable-afs-check", no_argument, 0, 'A'},
 		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
 		{"email", required_argument, 0, 'm'},
+		{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
+		{"gc", required_argument, 0, 'g'},
+		{"gc-size", required_argument, 0, LONG_OPT_GC_SIZE},
+		{"gc-count", required_argument, 0, 'G'},
 		{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
 		{"help", no_argument, 0, 'h'},
 		{"makeflow-log", required_argument, 0, 'l'},
@@ -1251,20 +1126,27 @@ int main(int argc, char *argv[])
 				if(strcasecmp(optarg, "none") == 0) {
 					makeflow_gc_method = MAKEFLOW_GC_NONE;
 				} else if(strcasecmp(optarg, "ref_count") == 0) {
-					makeflow_gc_method = MAKEFLOW_GC_REF_COUNT;
-					if(makeflow_gc_param < 0)
-						makeflow_gc_param = 16;	/* Try to collect at most 16 files. */
+					makeflow_gc_method = MAKEFLOW_GC_COUNT;
+					if(makeflow_gc_count < 0)
+						makeflow_gc_count = 16;	/* Try to collect at most 16 files. */
 				} else if(strcasecmp(optarg, "on_demand") == 0) {
 					makeflow_gc_method = MAKEFLOW_GC_ON_DEMAND;
-					if(makeflow_gc_param < 0)
-						makeflow_gc_param = 1 << 14;	/* Inode threshold of 2^14. */
+					if(makeflow_gc_count < 0)
+						makeflow_gc_count = 16;	/* Try to collect at most 16 files. */
+				} else if(strcasecmp(optarg, "all") == 0) {
+					makeflow_gc_method = MAKEFLOW_GC_ALL;
+					if(makeflow_gc_count < 0)
+						makeflow_gc_count = 1 << 14;	/* Inode threshold of 2^14. */
 				} else {
 					fprintf(stderr, "makeflow: invalid garbage collection method: %s\n", optarg);
 					exit(1);
 				}
 				break;
+			case LONG_OPT_GC_SIZE:
+				makeflow_gc_size = string_metric_parse(optarg);
+				break;
 			case 'G':
-				makeflow_gc_param = atoi(optarg);
+				makeflow_gc_count = atoi(optarg);
 				break;
 			case LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME:
 				file_creation_patience_wait_time = MAX(0,atoi(optarg));
@@ -1288,34 +1170,32 @@ int main(int argc, char *argv[])
 				email_summary_to = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MONITOR:
-				monitor_mode = 1;
-				if(monitor_log_dir)
-					free(monitor_log_dir);
-				monitor_log_dir = xxstrdup(optarg);
+				if (!monitor) monitor = makeflow_monitor_create();
+				if(log_dir) free(log_dir);
+				log_dir = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MONITOR_LIMITS:
-				monitor_mode = 1;
-				if(monitor_limits_name)
-					free(monitor_limits_name);
-				monitor_limits_name = xxstrdup(optarg);
+				if (!monitor) monitor = makeflow_monitor_create();
+				if(monitor->limits_name)
+					free(monitor->limits_name);
+				monitor->limits_name = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MONITOR_INTERVAL:
-				monitor_mode = 1;
-				monitor_interval = atoi(optarg);
+				if (!monitor) monitor = makeflow_monitor_create();
+				monitor->interval = atoi(optarg);
 				break;
 			case LONG_OPT_MONITOR_TIME_SERIES:
-				monitor_mode = 1;
-				monitor_enable_time_series = 1;
+				if (!monitor) monitor = makeflow_monitor_create();
+				monitor->enable_time_series = 1;
 				break;
 			case LONG_OPT_MONITOR_OPENED_FILES:
-				monitor_mode = 1;
-				monitor_enable_list_files = 1;
+				if (!monitor) monitor = makeflow_monitor_create();
+				monitor->enable_list_files = 1;
 				break;
 			case LONG_OPT_MONITOR_LOG_NAME:
-				monitor_mode = 1;
-				if(monitor_log_format)
-					free(monitor_log_format);
-				monitor_log_format = xxstrdup(optarg);
+				if (!monitor) monitor = makeflow_monitor_create();
+				if(log_format) free(log_format);
+				log_format = xxstrdup(optarg);
 				break;
 			case 'M':
 			case 'N':
@@ -1406,15 +1286,19 @@ int main(int argc, char *argv[])
 				log_verbose_mode = 1;
 				break;
 			case LONG_OPT_WRAPPER:
-				makeflow_wrapper_add_command(optarg);
+				if(!wrapper) wrapper = makeflow_wrapper_create();
+				makeflow_wrapper_add_command(wrapper, optarg);
 				break;
 			case LONG_OPT_WRAPPER_INPUT:
-				makeflow_wrapper_add_input_file(optarg);
+				if(!wrapper) wrapper = makeflow_wrapper_create();
+				makeflow_wrapper_add_input_file(wrapper, optarg);
 				break;
 			case LONG_OPT_WRAPPER_OUTPUT:
-				makeflow_wrapper_add_output_file(optarg);
+				if(!wrapper) wrapper = makeflow_wrapper_create();
+				makeflow_wrapper_add_output_file(wrapper, optarg);
 				break;
 			case LONG_OPT_DOCKER:
+				if(!wrapper) wrapper = makeflow_wrapper_create();
 				container_mode = CONTAINER_MODE_DOCKER;
 				container_image = xxstrdup(optarg);
 				break;
@@ -1504,30 +1388,33 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(monitor_mode) {
-		if(!monitor_log_dir)
-			fatal("Monitor mode was enabled, but a log output directory was not specified (use -M<dir>)");
+	if(monitor) {
+		if(!log_dir)
+			fatal("Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
 
-		monitor_path = resource_monitor_locate(NULL);
-		if(!monitor_path) {
+		if(!log_format)
+			log_format = xxstrdup(DEFAULT_MONITOR_LOG_FORMAT);
+
+		monitor->exe = resource_monitor_locate(NULL);
+		if(!monitor->exe) {
 			fatal("Monitor mode was enabled, but could not find resource_monitor in PATH.");
 		}
 
 		switch (batch_queue_type) {
 			case BATCH_QUEUE_TYPE_WORK_QUEUE:
 			case BATCH_QUEUE_TYPE_CONDOR:
-				monitor_exe = path_basename(monitor_path);
+				monitor->exe_remote = path_basename(monitor->exe);
+				break;
 			default:
-				monitor_exe = monitor_path;
+				monitor->exe_remote = NULL;
 		}
 
-		makeflow_wrapper_add_input_file(monitor_path);
+		if(monitor->interval < 1)
+			fatal("Monitoring interval should be positive.");
 
-		if(monitor_interval < 1)
-			fatal("Monitoring interval should be non-negative.");
-
-		if(!monitor_log_format)
-			monitor_log_format = DEFAULT_MONITOR_LOG_FORMAT;
+		makeflow_prepare_for_monitoring(monitor, log_dir, log_format);
+		free(log_dir);
+		free(log_format);
 	}
 
 	printf("parsing %s...\n",dagfile);
@@ -1574,9 +1461,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(monitor_mode && !makeflow_prepare_for_monitoring(d)) {
-		fatal("Could not prepare for monitoring.\n");
-	}
 
 	remote_queue = batch_queue_create(batch_queue_type);
 	if(!remote_queue) {
@@ -1617,8 +1501,8 @@ int main(int argc, char *argv[])
 	/* Remote storage modes do not (yet) support measuring storage for garbage collection. */
 
 	if(batch_queue_type==BATCH_QUEUE_TYPE_CHIRP || batch_queue_type==BATCH_QUEUE_TYPE_HADOOP) {
-		if(makeflow_gc_method == MAKEFLOW_GC_ON_DEMAND) {
-			makeflow_gc_method = MAKEFLOW_GC_REF_COUNT;
+		if(makeflow_gc_method == MAKEFLOW_GC_SIZE) {
+			makeflow_gc_method = MAKEFLOW_GC_ALL;
 		}
 	}
 
@@ -1666,18 +1550,11 @@ int main(int argc, char *argv[])
 
 	makeflow_log_started_event(d);
 
+
 	runtime = timestamp_get();
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
-
-	/* 1) create a global script for running docker container
-	 * 2) add this script to the global wrapper list
-	 * 3) reformat each task command
-	 */
-
-		makeflow_create_docker_sh();
-		char *global_cmd = string_format("sh %s", CONTAINER_SH);
-		makeflow_wrapper_add_command(global_cmd);
+		makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
 	}
 
 	makeflow_run(d);
@@ -1692,7 +1569,6 @@ int main(int argc, char *argv[])
 		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue, makeflow_abort_flag, makeflow_failed_flag );
 
 	/* XXX better to write created files to log, then delete those listed in log. */
-
 	if (container_mode == CONTAINER_MODE_DOCKER) {
 		char *cmd = string_format("rm %s", CONTAINER_SH);
 		system(cmd);

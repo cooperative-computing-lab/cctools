@@ -98,7 +98,7 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 
 //Using default sampling interval. We may want to add an option
 //to change it.
-char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_path, const char *template_filename, const char *limits_filename,
+char *resource_monitor_write_command(const char *monitor_path, const char *template_filename, const char *limits_filename,
 					   const char *extra_monitor_options,
 					   int time_series, int inotify_stats)
 {
@@ -125,9 +125,7 @@ char *resource_monitor_rewrite_command(const char *cmdline, const char *monitor_
 	if(extra_monitor_options)
 		buffer_printf(&cmd_builder, " %s", extra_monitor_options);
 
-	char *cmdline_escaped = string_escape_shell(cmdline);
-	buffer_printf(&cmd_builder, " --sh %s", cmdline_escaped);
-	free(cmdline_escaped);
+	buffer_printf(&cmd_builder, " --sh []");
 
 	char *result = xxstrdup(buffer_tostring(&cmd_builder));
 	buffer_free(&cmd_builder);

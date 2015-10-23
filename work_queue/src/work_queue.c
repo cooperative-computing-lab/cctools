@@ -4247,7 +4247,8 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 		monitor_remote_name = string_format("./cctools-resource-monitor-%d", getpid());
 	}
 
-	wrap_cmd = resource_monitor_rewrite_command(t->command_line, monitor_remote_name, template, NULL, NULL, 0, 0);
+	wrap_cmd = string_wrap_command(t->command_line,
+		resource_monitor_write_command(monitor_remote_name, template, NULL, NULL, 0, 0));
 
 	//BUG: what if user changes current working directory?
 	work_queue_task_specify_file(t, q->monitor_exe, monitor_remote_name, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);

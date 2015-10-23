@@ -42,6 +42,8 @@ struct dag *dag_create()
 	d->export_vars  = set_create(0);
 	d->special_vars = set_create(0);
 	d->task_categories = hash_table_create(0, 0);
+	d->completed_files = 0;
+	d->deleted_files = 0;
 
 	/* Add GC_*_LIST to variables table to ensure it is in
 	 * global DAG scope. /
