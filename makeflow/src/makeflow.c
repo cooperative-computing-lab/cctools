@@ -1037,9 +1037,9 @@ int main(int argc, char *argv[])
 	char *work_queue_preferred_connection = NULL;
 	char *write_summary_to = NULL;
 	char *s;
-	loc_info.local_mem = -1;
-	loc_info.local_disk =-1;
-	loc_info.local_cores=1;
+	loc_info.local_mem =  -1;
+	loc_info.local_disk = -1;
+	loc_info.local_cores= 1;
 
 	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
 	if(s) {
@@ -1253,15 +1253,6 @@ int main(int argc, char *argv[])
 			case 'J':
 				explicit_remote_jobs_max = atoi(optarg);
 				break;
-			case '1':
-				loc_info.local_disk = atoi(optarg);
-				break;
-			case '2':
-				loc_info.local_mem = atoi(optarg);
-				break;
-			case '3':
-				loc_info.local_cores = atoi(optarg);
-				break;
 			case 'l':
 				logfilename = xxstrdup(optarg);
 				break;
@@ -1415,6 +1406,15 @@ int main(int argc, char *argv[])
 				return 1;
 			case 'X':
 				change_dir = optarg;
+				break;
+			case '1':
+				loc_info.local_disk = atoi(optarg);
+				break;
+			case '2':
+				loc_info.local_mem = atoi(optarg);
+				break;
+			case '3':
+				loc_info.local_cores = atoi(optarg);
 				break;
 		}
 	}
