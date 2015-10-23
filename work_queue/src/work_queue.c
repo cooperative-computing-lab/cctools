@@ -449,6 +449,8 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 		w->stats->tasks_waiting = atoll(value);
 	} else if(string_prefix_is(field, "tasks_running")) {
 		w->stats->tasks_running = atoll(value);
+	} else if(string_prefix_is(field, "idle-disconnecting")) {
+		q->stats->total_workers_idled_out++;
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
@@ -691,6 +693,9 @@ static void record_removed_worker_stats(struct work_queue *q, struct work_queue_
 	struct work_queue_stats *ws = w->stats;
 
 	accumulate_stat(qs, ws, total_workers_joined);
+	accumulate_stat(qs, ws, total_workers_idled_out);
+	accumulate_stat(qs, ws, total_workers_lost);
+	accumulate_stat(qs, ws, total_workers_fast_aborted);
 	accumulate_stat(qs, ws, total_send_time);
 	accumulate_stat(qs, ws, total_receive_time);
 	accumulate_stat(qs, ws, total_execute_time);
@@ -1652,6 +1657,9 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 	nvpair_insert_integer(nv,"total_workers_connected",info.total_workers_connected);
 	nvpair_insert_integer(nv,"total_workers_joined",info.total_workers_joined);
 	nvpair_insert_integer(nv,"total_workers_removed",info.total_workers_removed);
+	nvpair_insert_integer(nv,"total_workers_idled_out",info.total_workers_idled_out);
+	nvpair_insert_integer(nv,"total_workers_lost",info.total_workers_lost);
+	nvpair_insert_integer(nv,"total_workers_fast_aborted",info.total_workers_fast_aborted);
 
 	//send info on tasks
 	nvpair_insert_integer(nv,"tasks_waiting",info.tasks_waiting);
@@ -1946,6 +1954,7 @@ static void handle_worker(struct work_queue *q, struct link *l)
 			debug(D_WQ, "Work Queue Status worker disconnected (%s)", w->addrport);
 		} else {
 			debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
+			q->stats->total_workers_lost++;
 		}
 		worker_failure = 1;
 	} // otherwise do nothing..message was consumed and processed in recv_worker_msg()
@@ -3024,6 +3033,7 @@ static void abort_slow_workers(struct work_queue *q)
 				debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
 				work_queue_blacklist_add_with_timeout(q, w->hostname, wq_option_blacklist_slow_workers_timeout);
 				remove_worker(q, w);
+				q->stats->total_workers_fast_aborted++;
 			}
 		}
 	}
@@ -4976,8 +4986,12 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->workers_init = hash_table_size(q->worker_table) - known_workers(q);
 	s->workers_idle = known_workers(q) - workers_with_tasks(q); //returns workers that are not running any tasks.
 	s->workers_busy = workers_with_tasks(q);
-	s->total_workers_joined = qs->total_workers_joined;
-	s->total_workers_removed = qs->total_workers_removed;
+
+	s->total_workers_joined       = qs->total_workers_joined;
+	s->total_workers_removed      = qs->total_workers_removed;
+	s->total_workers_idled_out    = qs->total_workers_idled_out;
+	s->total_workers_lost         = qs->total_workers_lost;
+	s->total_workers_fast_aborted = qs->total_workers_fast_aborted;
 
 	//info about tasks
 	s->tasks_waiting = task_state_count(q, WORK_QUEUE_TASK_READY);
@@ -5048,6 +5062,9 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 		{
 			accumulate_stat(s, w->stats, total_workers_joined);
 			accumulate_stat(s, w->stats, total_workers_removed);
+			accumulate_stat(s, w->stats, total_workers_idled_out);
+			accumulate_stat(s, w->stats, total_workers_lost);
+			accumulate_stat(s, w->stats, total_workers_fast_aborted);
 			accumulate_stat(s, w->stats, total_send_time);
 			accumulate_stat(s, w->stats, total_receive_time);
 			accumulate_stat(s, w->stats, total_execute_time);
@@ -5064,6 +5081,9 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 
 	s->total_workers_joined  += q->stats_disconnected_workers->total_workers_joined;
 	s->total_workers_removed += q->stats_disconnected_workers->total_workers_removed;
+	s->total_workers_idled_out    += q->stats_disconnected_workers->total_workers_idled_out;
+	s->total_workers_lost         += q->stats_disconnected_workers->total_workers_lost;
+	s->total_workers_fast_aborted += q->stats_disconnected_workers->total_workers_fast_aborted;
 	s->total_send_time       += q->stats_disconnected_workers->total_send_time;
 	s->total_receive_time    += q->stats_disconnected_workers->total_receive_time;
 	s->total_execute_time    += q->stats_disconnected_workers->total_execute_time;

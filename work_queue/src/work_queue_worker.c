@@ -367,6 +367,9 @@ static void send_stats_update( struct link *master, int force_update)
 
 		send_master_message(master, "info total_workers_joined %lld\n", (long long) s.total_workers_joined);
 		send_master_message(master, "info total_workers_removed %lld\n", (long long) s.total_workers_removed);
+		send_master_message(master, "info total_workers_lost %lld\n", (long long) s.total_workers_lost);
+		send_master_message(master, "info total_workers_idled_out %lld\n", (long long) s.total_workers_idled_out);
+		send_master_message(master, "info total_workers_fast_aborted %lld\n", (long long) s.total_workers_fast_aborted);
 		send_master_message(master, "info total_send_time %lld\n", (long long) s.total_send_time);
 		send_master_message(master, "info total_receive_time %lld\n", (long long) s.total_receive_time);
 		send_master_message(master, "info total_execute_time %lld\n", (long long) s.total_execute_time);
