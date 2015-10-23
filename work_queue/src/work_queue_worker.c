@@ -320,7 +320,7 @@ static void send_resource_update( struct link *master, int force_update )
 
 	if(!force_update) {
 		if( results_to_be_sent_msg ) return;
-		if( (time(0)-last_send_time) < check_resources_interval ) return;
+		if( (time(0)-last_send_time) < send_stats_interval ) return;
 	}
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
