@@ -73,7 +73,7 @@ static const int _SENTINEL2 = 0;
 
 #define PARROT_POINTER(pointer) (!(pointer == NATIVE || pointer == SPECIAL || pointer == NULL))
 
-#define VALID_FD(fd) (0 <= fd && fd <= pointer_count)
+#define VALID_FD(fd) (0 <= fd && fd < pointer_count)
 #define PARROT_FD(fd) (VALID_FD(fd) && PARROT_POINTER(pointers[fd]))
 
 #define CHECK_FD(fd) \
@@ -150,6 +150,7 @@ void pfs_table::setparrot(int fd, int rfd, struct stat *buf)
 {
 	if (!PARROT_FD(fd))
 		fatal("fd %d is not an open parrotfd", fd);
+	assert(fd == rfd || (VALID_FD(rfd) && pointers[rfd] == NULL));
 
 	/* It's possible for another thread to create a native fd which is equal to
 	 * the parrot fd. If that happens we change the parrot fd to what the
@@ -221,6 +222,7 @@ to this physical file descriptor in the tracing process.
 
 void pfs_table::attach( int logical, int physical, int flags, mode_t mode, const char *name, struct stat *buf )
 {
+	assert(VALID_FD(logical) && pointers[logical] == NULL);
 	pointers[logical] = new pfs_pointer(pfs_file_bootstrap(physical,name),flags,mode);
 	fd_flags[logical] = 0;
 	setparrot(logical, logical, buf);
@@ -229,6 +231,7 @@ void pfs_table::attach( int logical, int physical, int flags, mode_t mode, const
 void pfs_table::setnative( int fd, int fdflags )
 {
 	debug(D_DEBUG, "setting fd %d as native%s", fd, fdflags & FD_CLOEXEC ? " (FD_CLOEXEC)" : "");
+	assert(VALID_FD(fd) && (pointers[fd] == NULL || pointers[fd] == NATIVE));
 	pointers[fd] = NATIVE;
 	fd_flags[fd] = fdflags;
 }
@@ -236,6 +239,7 @@ void pfs_table::setnative( int fd, int fdflags )
 void pfs_table::setspecial( int fd )
 {
 	debug(D_DEBUG, "setting fd %d as special", fd);
+	assert(VALID_FD(fd) && pointers[fd] == NULL);
 	pointers[fd] = SPECIAL;
 	fd_flags[fd] = 0;
 }
@@ -665,7 +669,7 @@ int pfs_table::open( const char *lname, int flags, mode_t mode, int force_cache,
 		if(file) {
 			if(path && file->canbenative(path, len)) {
 				file->close();
-				return -2;
+				result = -2;
 			} else {
 				pointers[result] = new pfs_pointer(file,flags,mode);
 				fd_flags[result] = 0;
@@ -675,13 +679,13 @@ int pfs_table::open( const char *lname, int flags, mode_t mode, int force_cache,
 			}
 		} else if (errno == ECHILD /* hack: indicates to open natively */) {
 			snprintf(path, len, "%s", lname);
-			return -2;
+			result = -2;
 		} else {
 			result = -1;
 		}
 	} else {
-		result = -1;
 		errno = EMFILE;
+		result = -1;
 	}
 
 	return result;

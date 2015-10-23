@@ -103,7 +103,7 @@ extern char *pfs_false_uname;
 extern uid_t pfs_uid;
 extern gid_t pfs_gid;
 
-extern pid_t trace_this_pid;
+extern int wait_barrier;
 
 extern INT64_T pfs_syscall_count;
 extern INT64_T pfs_read_count;
@@ -182,7 +182,7 @@ static void divert_to_parrotfd( struct pfs_process *p, INT64_T fd, char *path, c
 
 	p->syscall_args_changed = 1;
 	p->syscall_parrotfd = fd;
-	trace_this_pid = p->pid; /* this handles two processes racing to create the same file, also see comment for pfs_table::setparrot. */
+	wait_barrier = 1; /* this handles two processes racing to create the same file, also see comment for pfs_table::setparrot. */
 }
 
 static void handle_parrotfd( struct pfs_process *p )
@@ -1331,7 +1331,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				 * we can determine the child pid before seeing any events from
 				 * the child.
 				 */
-				trace_this_pid = p->pid;
+				wait_barrier = 1;
 			}
 			break;
 
