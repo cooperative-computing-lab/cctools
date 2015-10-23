@@ -9,11 +9,12 @@ See the file COPYING for details.
 
 /** @file jx_parse.h Parse JSON strings and files into JX expressions.
 This module parses arbirary JSON expressions according to the
-definition at <a href=http://www.json.org>json.org</a> albeit
-with some limitations:
+definition at <a href=http://www.json.org>json.org</a>,
+with the following exceptions:
 <ol>
-<li>
-<li>
+<li> Atomic values are limited to 4KB in size.
+<li> Scientific notation of integers/floats is not yet supported.
+<li> Bare identifiers are permitted, to enable expression evaluation.
 </ol>
 */
 
