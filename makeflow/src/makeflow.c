@@ -76,15 +76,9 @@ an example.
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
 struct {
-<<<<<<< HEAD
-	int local_mem;
-	int local_cores;
-	int local_disk;
-=======
     int local_mem;
     int local_cores;
     int local_disk;
->>>>>>> error fix2
 } loc_info;
 
 static sig_atomic_t makeflow_abort_flag = 0;
@@ -528,9 +522,9 @@ static int makeflow_is_local_node(struct dag_node *n)
 }
 static int makeflow_can_alloc_local(struct dag_node *n)
 {
-	int mem_ok = 0;
-	int disk_ok = 0;
-	int cores_ok = 0;
+    int mem_ok = 0;
+    int disk_ok = 0;
+    int cores_ok = 0;
 	mem_ok = (loc_info.local_mem == -1 || !n->resources || n->resources->resident_memory >= loc_info.local_mem);
 	disk_ok = (loc_info.local_disk == -1 || !n->resources || n->resources->swap_memory >= loc_info.local_disk);
 	if(!n->resources)
@@ -651,7 +645,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	free(output_files);
 	jx_delete(envlist);
 }
-<<<<<<< HEAD
 
 static int makeflow_is_local_node(struct dag_node *n)
 {
@@ -700,8 +693,7 @@ static void makeflow_dealloc_local(struct dag_node *n)
 		loc_info.local_disk += n->resources->swap_memory;
 	}
 }
-=======
->>>>>>> error fix2
+
 static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 {
 	struct dag_file *f;
@@ -709,16 +701,10 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 	if(n->state != DAG_NODE_STATE_WAITING)
 		return 0;
 
-<<<<<<< HEAD
 	if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)){
-					return 0;
+		return 0;
 	}
-		 if(makeflow_is_local_job(n) && !makeflow_can_alloc_local(n)){
-=======
-		 if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)){
->>>>>>> error fix2
-				return 0;
-			}
+	
 	if(n->local_job && local_queue) {
 		if(dag_local_jobs_running(d) >= local_jobs_max)
 			return 0;
@@ -1163,14 +1149,12 @@ int main(int argc, char *argv[])
 	char *s;
 	char *log_dir = NULL;
 	char *log_format = NULL;
-	loc_info.local_mem =  -1;
-	loc_info.local_disk = -1;
-	loc_info.local_cores= load_average_get_cpus();
 
 	loc_info = malloc(sizeof(local_info));
     loc_info.local_mem = 0;
-	loc_info.local_disk =0;
-	loc_info.local_cores=1;
+	loc_info.local_mem = 0;
+	loc_info.local_disk = 0;
+	loc_info.local_cores= load_average_get_cpus();
 
 	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
 	if(s) {
@@ -1633,7 +1617,6 @@ exit(1);
 	{
 		loc_info.local_cores=load_average_get_cpus();
 	}
-
 	if(explicit_local_jobs_max) {
 		local_jobs_max = explicit_local_jobs_max;
 	} else {
