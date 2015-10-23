@@ -1037,8 +1037,8 @@ int main(int argc, char *argv[])
 	char *work_queue_preferred_connection = NULL;
 	char *write_summary_to = NULL;
 	char *s;
-	loc_info.local_mem = 0;
-	loc_info.local_disk =0;
+	loc_info.local_mem = -1;
+	loc_info.local_disk =-1;
 	loc_info.local_cores=1;
 
 	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
