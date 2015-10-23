@@ -71,7 +71,7 @@ int linux_major;
 int linux_minor;
 int linux_micro;
 
-pid_t trace_this_pid = -1;
+int wait_barrier = 0;
 
 int pfs_master_timeout = 300;
 struct file_cache *pfs_file_cache = 0;
@@ -500,6 +500,31 @@ struct pfswait {
 	int status;
 	struct rusage usage;
 };
+
+static int pfswait (struct pfswait *p, pid_t pid, int block)
+{
+	int flags = WUNTRACED|__WALL;
+	if (!block)
+		flags |= WNOHANG;
+	if (pid > 0)
+		debug(D_PROCESS, "waiting for blocking event from process %d\n", pid);
+	p->pid = wait4(pid, &p->status, flags, &p->usage);
+#if 0 /* Enable this for extreme debugging... */
+	debug(D_DEBUG, "%d = wait4(%d, %p, %d, %p)", (int)p->pid, pid, &p->status, flags, &p->usage);
+#endif
+	if (p->pid == -1) {
+		debug(D_DEBUG, "wait4: %s", strerror(errno));
+		if (errno == ECHILD) {
+			debug(D_FATAL, "No children to wait for? Cleaning up...");
+			pfs_process_kill_everyone(SIGKILL);
+			abort();
+		}
+		return 0;
+	} else if (p->pid == 0) {
+		return 0;
+	}
+	return 1;
+}
 
 int main( int argc, char *argv[] )
 {
@@ -1115,35 +1140,16 @@ int main( int argc, char *argv[] )
 	 */
 
 	while(pfs_process_count()>0) {
-		std::vector<struct pfswait> pfswait;
+		std::vector<struct pfswait> pevents;
+		struct pfswait p;
 
-		if(trace_this_pid != -1)
-			debug(D_PROCESS, "Waiting for process %d\n", trace_this_pid);
-
-		while (1) {
-			struct pfswait p;
-			int flags = WUNTRACED|__WALL;
-			if (pfswait.size() > 0)
-				flags |= WNOHANG;
-			p.pid = wait4(trace_this_pid, &p.status, flags, &p.usage);
-#if 0 /* Enable this for extreme debugging... */
-			debug(D_DEBUG, "%d = wait4(%d, %p, %d, %p)", (int)p.pid, (int)trace_this_pid, &p.status, flags, &p.usage);
-#endif
-			if (p.pid == -1 && errno == ECHILD) {
-				debug(D_FATAL, "No children to wait for? Cleaning up...");
-				pfs_process_kill_everyone(SIGKILL);
-				abort();
-			} else if (p.pid == 0 || p.pid == -1) {
-				break;
-			}
-			pfswait.push_back(p);
+		while (pfswait(&p, -1, !pevents.size())) {
+			pevents.push_back(p);
 		}
-		if (pfswait.size() == 0)
+		if (pevents.size() == 0)
 			break;
 
-		trace_this_pid = -1; /* reinitialize to wait for any process; handle_event may change this after clone is processed */
-
-		for (std::vector<struct pfswait>::iterator it = pfswait.begin(); it != pfswait.end(); ++it) {
+		for (std::vector<struct pfswait>::iterator it = pevents.begin(); it != pevents.end(); ++it) {
 			if(it->pid == pfs_watchdog_pid) {
 				if (WIFEXITED(it->status) || WIFSIGNALED(it->status)) {
 					debug(D_NOTICE,"watchdog died unexpectedly; killing everyone");
@@ -1151,7 +1157,11 @@ int main( int argc, char *argv[] )
 					break;
 				}
 			} else {
-				handle_event(it->pid,it->status,&it->usage);
+				p = *it;
+				do {
+					wait_barrier = 0; /* reinitialize */
+					handle_event(p.pid, p.status, &p.usage);
+				} while (wait_barrier && pfswait(&p, it->pid, 1));
 			}
 		}
 	}
