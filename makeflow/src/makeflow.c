@@ -522,9 +522,9 @@ static int makeflow_is_local_node(struct dag_node *n)
 }
 static int makeflow_can_alloc_local(struct dag_node *n)
 {
-    int mem_ok = 0;
-    int disk_ok = 0;
-    int cores_ok = 0;
+	int mem_ok = 0;
+	int disk_ok = 0;
+	int cores_ok = 0;
 	mem_ok = (loc_info.local_mem == -1 || !n->resources || n->resources->resident_memory >= loc_info.local_mem);
 	disk_ok = (loc_info.local_disk == -1 || !n->resources || n->resources->swap_memory >= loc_info.local_disk);
 	if(!n->resources)
