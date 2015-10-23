@@ -64,6 +64,7 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	q->type = type;
 	strncpy(q->logfile, "", sizeof(q->logfile));
 	q->options = hash_table_create(0, NULL);
+	q->features = hash_table_create(0, NULL);
 	q->job_table = itable_create(0);
 	q->output_table = itable_create(0);
 	q->data = NULL;
@@ -109,6 +110,11 @@ void batch_queue_delete(struct batch_queue *q)
 const char *batch_queue_get_option (struct batch_queue *q, const char *what)
 {
 	return hash_table_lookup(q->options, what);
+}
+
+const char *batch_queue_supports_feature (struct batch_queue *q, const char *what)
+{
+	return hash_table_lookup(q->features, what);
 }
 
 batch_queue_type_t batch_queue_get_type(struct batch_queue *q)

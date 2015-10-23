@@ -4,6 +4,8 @@
  * See the file COPYING for details.
  * */
 
+#include "debug.h"
+#include "path.h"
 #include "rmonitor.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -36,8 +38,21 @@ struct makeflow_monitor * makeflow_monitor_create()
  * Prepare for monitoring by creating wrapper command and attaching the
  * appropriate input and output dependencies.
  * */
-void makeflow_prepare_for_monitoring( struct makeflow_monitor *m, char *log_dir, char *log_format)
+void makeflow_prepare_for_monitoring( struct makeflow_monitor *m, struct batch_queue *queue, char *log_dir, char *log_format)
 {
+
+
+	m->exe = resource_monitor_locate(NULL);
+	if(!m->exe) {
+		fatal("Monitor mode was enabled, but could not find resource_monitor in PATH.");
+	}
+
+	if (batch_queue_supports_feature(queue, "remote_rename")) {
+		m->exe_remote = path_basename(m->exe);
+	} else {
+		m->exe_remote = NULL;
+	}
+
 	m->log_prefix = string_format("%s/%s", log_dir, log_format);
 	char *log_name;
 

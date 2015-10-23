@@ -45,6 +45,7 @@ struct batch_queue {
 
 	char logfile[PATH_MAX];
 	struct hash_table *options;
+	struct hash_table *features;
 	struct itable *job_table;
 	struct itable *output_table;
 	void *data; /* module user data */

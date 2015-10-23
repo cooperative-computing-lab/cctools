@@ -159,6 +159,9 @@ time a job is submitted.
 */
 const char *batch_queue_get_option(struct batch_queue *q, const char *what);
 
+const char *batch_queue_supports_feature (struct batch_queue *q, const char *what);
+
+
 /** Get batch queue type.
 This call returns the type of the batch queue.
 @param q The batch queue.
