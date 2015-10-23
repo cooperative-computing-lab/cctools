@@ -150,6 +150,7 @@ void pfs_table::setparrot(int fd, int rfd, struct stat *buf)
 {
 	if (!PARROT_FD(fd))
 		fatal("fd %d is not an open parrotfd", fd);
+	assert(fd == rfd || (VALID_FD(rfd) && pointers[rfd] == NULL));
 
 	/* It's possible for another thread to create a native fd which is equal to
 	 * the parrot fd. If that happens we change the parrot fd to what the
@@ -221,6 +222,7 @@ to this physical file descriptor in the tracing process.
 
 void pfs_table::attach( int logical, int physical, int flags, mode_t mode, const char *name, struct stat *buf )
 {
+	assert(VALID_FD(logical) && pointers[logical] == NULL);
 	pointers[logical] = new pfs_pointer(pfs_file_bootstrap(physical,name),flags,mode);
 	fd_flags[logical] = 0;
 	setparrot(logical, logical, buf);
@@ -229,6 +231,7 @@ void pfs_table::attach( int logical, int physical, int flags, mode_t mode, const
 void pfs_table::setnative( int fd, int fdflags )
 {
 	debug(D_DEBUG, "setting fd %d as native%s", fd, fdflags & FD_CLOEXEC ? " (FD_CLOEXEC)" : "");
+	assert(VALID_FD(fd) && (pointers[fd] == NULL || pointers[fd] == NATIVE));
 	pointers[fd] = NATIVE;
 	fd_flags[fd] = fdflags;
 }
@@ -236,6 +239,7 @@ void pfs_table::setnative( int fd, int fdflags )
 void pfs_table::setspecial( int fd )
 {
 	debug(D_DEBUG, "setting fd %d as special", fd);
+	assert(VALID_FD(fd) && pointers[fd] == NULL);
 	pointers[fd] = SPECIAL;
 	fd_flags[fd] = 0;
 }
