@@ -73,7 +73,7 @@ static const int _SENTINEL2 = 0;
 
 #define PARROT_POINTER(pointer) (!(pointer == NATIVE || pointer == SPECIAL || pointer == NULL))
 
-#define VALID_FD(fd) (0 <= fd && fd <= pointer_count)
+#define VALID_FD(fd) (0 <= fd && fd < pointer_count)
 #define PARROT_FD(fd) (VALID_FD(fd) && PARROT_POINTER(pointers[fd]))
 
 #define CHECK_FD(fd) \
