@@ -39,14 +39,29 @@ struct jx_parser {
 	int errors;
 };
 
-static struct jx_parser * jx_parser_create()
+struct jx_parser * jx_parser_create()
 {
 	struct jx_parser *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
 	return p;
 }
 
-static void jx_parser_delete( struct jx_parser *p )
+void jx_parser_read_file( struct jx_parser *p, FILE *file )
+{
+	p->source_file = file;
+}
+
+void jx_parser_read_string( struct jx_parser *p, const char *str )
+{
+	p->source_string = str;
+}
+
+int jx_parser_errors( struct jx_parser *p )
+{
+	return p->errors;
+}
+
+void jx_parser_delete( struct jx_parser *p )
 {
 	free(p);
 }
@@ -217,8 +232,6 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	}
 }
 
-static struct jx * jx_parse( struct jx_parser *s );
-
 static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 {
 	struct jx_item *i = jx_item(0,0);
@@ -279,7 +292,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	return p;
 }
 		
-static struct jx * jx_parse( struct jx_parser *s )
+struct jx * jx_parse( struct jx_parser *s )
 {
 	jx_token_t t = jx_scan(s);
 
@@ -324,29 +337,28 @@ static struct jx * jx_parse( struct jx_parser *s )
 
 struct jx * jx_parse_string( const char *str )
 {
-	struct jx_parser *s = jx_parser_create();
-       	s->source_string = str;
-	struct jx * result = jx_parse(s);
-	jx_parser_delete(s);
-	if(s->errors) {
-		jx_delete(result);
+	struct jx_parser *p = jx_parser_create();
+	jx_parser_read_string(p,str);
+	struct jx * j = jx_parse(p);
+	if(jx_parser_errors(p)) {
+		jx_parser_delete(p);
+		jx_delete(j);
 		return 0;
-	} else {
-		return result;
 	}
+	jx_parser_delete(p);
+	return j;
 }
 
 struct jx * jx_parse_file( FILE *file )
 {
-	struct jx_parser *s = jx_parser_create();
-	s->source_file = file;
-	struct jx * result = jx_parse(s);
-	if(s->errors) {
-		jx_parser_delete(s);
-		jx_delete(result);
+	struct jx_parser *p = jx_parser_create();
+	jx_parser_read_file(p,file);
+	struct jx * j = jx_parse(p);
+	if(jx_parser_errors(p)) {
+		jx_parser_delete(p);
+		jx_delete(j);
 		return 0;
-	} else {
-		jx_parser_delete(s);
-		return result;
 	}
+	jx_parser_delete(p);
+	return j;
 }
