@@ -150,6 +150,7 @@ static void divert_to_dummy( struct pfs_process *p, INT64_T result )
 
 static void divert_to_parrotfd( struct pfs_process *p, INT64_T fd, char *path, const void *uaddr, int flags )
 {
+	assert(fd >= 0);
 	pfs_process_pathtofilename(path);
 
 	/* If possible, use memfd_create for the new Parrot FD file. This has a few
