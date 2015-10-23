@@ -88,17 +88,15 @@ struct jx * jx_array( struct jx_item *items )
 	return j;
 }
 
-struct jx * jx_object_lookup( struct jx *j, const char *key )
+struct jx * jx_object_lookup( struct jx *j, struct jx *key )
 {
 	struct jx_pair *p;
 
 	if(!j || j->type!=JX_OBJECT) return 0;
 
 	for(p=j->pairs;p;p=p->next) {
-		if(p->key && p->key->type==JX_STRING) {
-			if(!strcmp(p->key->string_value,key)) {
-				return p->value;
-			}
+		if(p && jx_equals(p->key,key)) {
+			return p->value;
 		}
 	}
 
@@ -110,6 +108,22 @@ int jx_object_insert( struct jx *j, struct jx *key, struct jx *value )
 	if(!j || j->type!=JX_OBJECT) return 0;
 	j->pairs = jx_pair(key,value,j->pairs);
 	return 1;
+}
+
+void jx_array_insert( struct jx *array, struct jx *value )
+{
+	array->items = jx_item( value, array->items->next );
+}
+
+void jx_array_append( struct jx *array, struct jx *value )
+{
+	if(!array->items) {
+		array->items = jx_item( value, 0 );
+	} else {
+		struct jx_item *i;
+		for(i=array->items;i->next;i=i->next) { }
+		i->next = jx_item(value,0);
+	}
 }
 
 void jx_pair_delete( struct jx_pair *pair )
@@ -188,6 +202,9 @@ int jx_equals( struct jx *j, struct jx *k )
 		case JX_OBJECT:
 			return jx_pair_equals(j->pairs,k->pairs);
 	}
+
+	/* not reachable, but some compilers complain. */
+	return 0;
 }
 
 struct jx_pair * jx_pair_copy( struct jx_pair *p )
@@ -227,6 +244,9 @@ struct jx  *jx_copy( struct jx *j )
 		case JX_OBJECT:
 			return jx_object(jx_pair_copy(j->pairs));
 	}
+
+	/* not reachable, but some compilers complain. */
+	return 0;
 }
 
 int jx_pair_is_constant( struct jx_pair *p )
@@ -257,6 +277,9 @@ int jx_is_constant( struct jx *j )
 		case JX_OBJECT:
 			return jx_pair_is_constant(j->pairs);
 	}
+
+	/* not reachable, but some compilers complain. */
+	return 0;
 }
 
 struct jx_pair * jx_pair_evaluate( struct jx_pair *pair, jx_eval_func_t func )
@@ -292,4 +315,6 @@ struct jx * jx_evaluate( struct jx *j, jx_eval_func_t func )
 		case JX_OBJECT:
 			return jx_object(jx_pair_evaluate(j->pairs,func));
 	}
+	/* not reachable, but some compilers complain. */
+	return 0;
 }
