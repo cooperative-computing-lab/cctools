@@ -669,7 +669,7 @@ int pfs_table::open( const char *lname, int flags, mode_t mode, int force_cache,
 		if(file) {
 			if(path && file->canbenative(path, len)) {
 				file->close();
-				return -2;
+				result = -2;
 			} else {
 				pointers[result] = new pfs_pointer(file,flags,mode);
 				fd_flags[result] = 0;
@@ -679,13 +679,13 @@ int pfs_table::open( const char *lname, int flags, mode_t mode, int force_cache,
 			}
 		} else if (errno == ECHILD /* hack: indicates to open natively */) {
 			snprintf(path, len, "%s", lname);
-			return -2;
+			result = -2;
 		} else {
 			result = -1;
 		}
 	} else {
-		result = -1;
 		errno = EMFILE;
+		result = -1;
 	}
 
 	return result;
