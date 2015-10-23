@@ -469,7 +469,7 @@ static int makeflow_can_alloc_local(struct dag_node *n)
 	int disk_ok = 0;
 	int cores_ok = 0;
 	mem_ok = (loc_info.local_mem == -1 || !n->resources || n->resources->resident_memory >= loc_info.local_mem);
-	disk_ok = (loc_info.local_disk == -1 || !n->resources || n->resources->swap_memory >= loc_info.local_disk);
+	disk_ok = (loc_info.local_disk == -1 || !n->resources || n->resources->workdir_footprint >= loc_info.local_disk);
 	if(!n->resources)
 	{
 		cores_ok = (n->resources->cores >= loc_info.local_cores);
@@ -491,12 +491,12 @@ static void makeflow_alloc_local(struct dag_node *n)
 	{
 		loc_info.local_cores -= n->resources->cores;
 		loc_info.local_mem -= n->resources->resident_memory;
-		loc_info.local_disk -= n->resources->swap_memory;
+		loc_info.local_disk -= n->resources->workdir_footprint;
 	}
 }
 static void makeflow_dealloc_local(struct dag_node *n)
 {
-	if(!n->resources || (n->resources->resident_memory == -1 && n->resources->swap_memory == -1))
+	if(!n->resources || (n->resources->resident_memory == -1 && n->resources->workdir_footprint == -1))
 	{
 		loc_info.local_cores++;
 	}
@@ -504,7 +504,7 @@ static void makeflow_dealloc_local(struct dag_node *n)
 	{
 		loc_info.local_cores += n->resources->cores;
 		loc_info.local_mem += n->resources->resident_memory;
-		loc_info.local_disk += n->resources->swap_memory;
+		loc_info.local_disk += n->resources->workdir_footprint;
 	}
 }
 
@@ -595,8 +595,11 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 	if(n->state != DAG_NODE_STATE_WAITING)
 		return 0;
 
-		 if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)){
-				return 0;
+		 if(makeflow_is_local_node(n)){
+				if(!makeflow_can_alloc_local(n))
+				{
+					return 0;
+				}
 			}
 	if(n->local_job && local_queue) {
 		if(dag_local_jobs_running(d) >= local_jobs_max)
@@ -1039,7 +1042,7 @@ int main(int argc, char *argv[])
 	char *s;
 	loc_info.local_mem =  -1;
 	loc_info.local_disk = -1;
-	loc_info.local_cores= 1;
+	loc_info.local_cores= load_average_get_cpus();
 
 	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
 	if(s) {
@@ -1090,7 +1093,10 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
-		LONG_OPT_SKIP_FILE_CHECK
+		LONG_OPT_SKIP_FILE_CHECK,
+		LONG_OPT_MEM,
+		LONG_OPT_DISK,
+		LONG_OPT_CORES
 	};
 
 	static const struct option long_options_run[] = {
@@ -1115,9 +1121,9 @@ int main(int argc, char *argv[])
 		{"help", no_argument, 0, 'h'},
 		{"makeflow-log", required_argument, 0, 'l'},
 		{"max-local", required_argument, 0, 'j'},
-		{"-max_local_disk", required_argument, 0, '1'},
-		{"-max_local_ram", required_argument, 0, '2'},
-		{"-max_local_cores", required_argument, 0, '3'},
+		{"max_local_disk", required_argument, 0, LONG_OPT_DISK},
+		{"max_local_ram", required_argument, 0, LONG_OPT_MEM},
+		{"max_local_cores", required_argument, 0, LONG_OPT_CORES},
 		{"max-remote", required_argument, 0, 'J'},
 		{"monitor", required_argument, 0, LONG_OPT_MONITOR},
 		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
@@ -1407,13 +1413,13 @@ int main(int argc, char *argv[])
 			case 'X':
 				change_dir = optarg;
 				break;
-			case '1':
+			case LONG_OPT_DISK:
 				loc_info.local_disk = atoi(optarg);
 				break;
-			case '2':
+			case LONG_OPT_MEM:
 				loc_info.local_mem = atoi(optarg);
 				break;
-			case '3':
+			case LONG_OPT_CORES:
 				loc_info.local_cores = atoi(optarg);
 				break;
 		}
@@ -1476,18 +1482,6 @@ int main(int argc, char *argv[])
 	// This forces -J vs -j to behave correctly
 	if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
 		explicit_remote_jobs_max = explicit_local_jobs_max;
-	}
-	if(!loc_info.local_disk)
-	{
-		loc_info.local_disk = -1;
-	}
-	if(!loc_info.local_mem)
-	{
-		loc_info.local_mem = -1;
-	}
-	if(!loc_info.local_cores)
-	{
-		loc_info.local_cores=load_average_get_cpus();
 	}
 	if(explicit_local_jobs_max) {
 		local_jobs_max = explicit_local_jobs_max;
