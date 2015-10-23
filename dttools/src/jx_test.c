@@ -20,7 +20,7 @@ and failure is returned.
 
 int main( int argc, char *argv[] )
 {
-	struct jx *j = jx_parse_file(stdin);
+	struct jx *j = jx_parse_stream(stdin);
 
 	if(j) {
 		jx_print_file(j,stdout);

@@ -26,8 +26,11 @@ struct jx_parser;
 /** Parse a JSON string to a JX expression.  @param str A C string containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
 struct jx * jx_parse_string( const char *str );
 
-/** Parse a standard IO stream to a JX expression.  @param file A file containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
-struct jx * jx_parse_file( FILE *file );
+/** Parse a standard IO stream to a JX expression.  @param file A stream containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
+struct jx * jx_parse_stream( FILE *file );
+
+/** Parse a file to a JX expression.  @param name The name of a file containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
+struct jx * jx_parse_stream( const char *name );
 
 /** Create a JX parser object.  @return A parser object. */
 struct jx_parser * jx_parser_create();

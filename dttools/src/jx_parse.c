@@ -362,3 +362,12 @@ struct jx * jx_parse_file( FILE *file )
 	jx_parser_delete(p);
 	return j;
 }
+
+struct jx * jx_parse_stream( const char *name )
+{
+	FILE *file = fopen(name,"r");
+	if(!file) return 0;
+	struct jx *j = jx_parse_file(file);
+	fclose(file);
+	return j;
+}
