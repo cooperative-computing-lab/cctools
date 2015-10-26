@@ -169,7 +169,6 @@ static int64_t files_counted = 0;
 
 static int check_resources_interval = 15;
 static int max_time_on_measurement  = 3;
-static int send_stats_interval      = 180;
 
 static struct work_queue *foreman_q = NULL;
 
@@ -277,17 +276,22 @@ Measure only the resources associated with this particular node
 and apply any operations that override.
 */
 
-void measure_worker_resources(struct work_queue_resources *r)
+void measure_worker_resources()
 {
+	static time_t last_resources_measurement = 0;
+	if(time(0) < last_resources_measurement + check_resources_interval) {
+		return;
+	}
+
+	struct work_queue_resources *r = local_resources;
+
 	work_queue_resources_measure_locally(r,workspace);
 	measure_worker_disk();
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
-		r->cores.total = 0;
-		r->memory.total = 0;
-		r->gpus.total = 0;
+		aggregate_workers_resources(foreman_q, total_resources);
 	} else {
-		if(manual_cores_option)
+		if(manual_cores_option > 0)
 			r->cores.total = manual_cores_option;
 		if(manual_memory_option)
 			r->memory.total = MIN(r->memory.total, manual_memory_option);
@@ -304,63 +308,44 @@ void measure_worker_resources(struct work_queue_resources *r)
 	r->gpus.smallest = r->gpus.largest = r->gpus.total;
 
 	r->disk.inuse = disk_measured;
+	r->tag = last_task_received;
+
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		total_resources->disk.total = r->disk.total;
+		total_resources->disk.inuse = r->disk.inuse;
+		total_resources->tag        = last_task_received;
+	} else {
+		/* in a regular worker, total and local resources are the same. */
+		memcpy(total_resources, r, sizeof(struct work_queue_resources));
+	}
+
+	last_resources_measurement = time(0);
 }
 
 
 /*
-Send a message to the master with my current resources, if they have changed.
-Don't send a message more than every send_resources_interval seconds.
-Only a foreman needs to send regular updates after the initial ready message.
+Send a message to the master with my current resources.
 */
 
-static void send_resource_update( struct link *master, int force_update )
+static void send_resource_update(struct link *master)
 {
-	static time_t last_send_time = 0;
 	time_t stoptime = time(0) + active_timeout;
 
-	if(!force_update) {
-		if( results_to_be_sent_msg ) return;
-		if( (time(0)-last_send_time) < check_resources_interval ) return;
-	}
-
 	if(worker_mode == WORKER_MODE_FOREMAN) {
-		aggregate_workers_resources(foreman_q, total_resources);
 		total_resources->disk.total = local_resources->disk.total;
 		total_resources->disk.inuse = local_resources->disk.inuse;
-		// do not send resource update until we get at least one capable worker.
-		if(total_resources->cores.total < 1) return;
-
-	} else {
-		memcpy(total_resources, local_resources, sizeof(struct work_queue_resources));
 	}
-
-	if(!force_update) {
-		if( !memcmp(total_resources_last,total_resources,sizeof(struct work_queue_resources))) return;
-	}
-
-	total_resources->tag = last_task_received;
 
 	work_queue_resources_send(master,total_resources,stoptime);
 	send_master_message(master, "info end_of_resource_update %d\n", 0);
-
-	memcpy(total_resources_last,total_resources,sizeof(*total_resources));
-	last_send_time = time(0);
 }
 
 /*
 Send a message to the master with my current statistics information.
 */
 
-static void send_stats_update( struct link *master, int force_update)
+static void send_stats_update(struct link *master)
 {
-	static time_t last_send_time = 0;
-
-	if(!force_update) {
-		if( results_to_be_sent_msg ) return;
-		if((time(0) - last_send_time) < send_stats_interval ) return;
-	}
-
-
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		struct work_queue_stats s;
 		work_queue_get_stats_hierarchy(foreman_q, &s);
@@ -383,8 +368,6 @@ static void send_stats_update( struct link *master, int force_update)
 		send_master_message(master, "info tasks_waiting %lld\n", (long long) list_size(procs_waiting));
 		send_master_message(master, "info tasks_running %lld\n", (long long) itable_size(procs_running));
 	}
-
-	last_send_time = time(0);
 }
 
 
@@ -398,7 +381,7 @@ static void report_worker_ready( struct link *master )
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
 	send_master_message(master,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
-	send_resource_update(master,1);
+	send_resource_update(master);
 }
 
 
@@ -538,7 +521,7 @@ static void report_task_complete( struct link *master, struct work_queue_process
 		total_tasks_executed++;
 	}
 
-	send_stats_update(master, 1);
+	send_stats_update(master);
 }
 
 /*
@@ -1303,6 +1286,9 @@ static int do_release() {
 
 static int send_keepalive(struct link *master){
 	send_master_message(master, "alive\n");
+	send_resource_update(master);
+	send_stats_update(master);
+
 	return 1;
 }
 
@@ -1421,9 +1407,6 @@ static int check_for_resources(struct work_queue_task *t)
 If 0, the worker is using more resources than promised. 1 if resource usage holds that promise.
 */
 static int enforce_worker_limits(struct link *master) {
-	static time_t last_check_time = 0;
-
-	/* check time everytime, as it is cheap to check */
 	if( manual_wall_time_option > 0 && (time(0) - worker_start_time) > manual_wall_time_option) {
 		fprintf(stderr,"work_queue_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t)manual_wall_time_option);
 		if(master) {
@@ -1431,13 +1414,6 @@ static int enforce_worker_limits(struct link *master) {
 		}
 		return 0;
 	}
-
-	/* Do not check too often, as it is expensive (particularly disk) */
-	if((time(0) - last_check_time) < check_resources_interval ) return 1;
-
-	measure_worker_resources(local_resources);
-
-	last_check_time = time(0);
 
 	if( manual_disk_option > 0 && disk_measured > (manual_disk_option - disk_avail_threshold) ) {
 		fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, disk_measured);
@@ -1521,6 +1497,8 @@ static void work_for_master(struct link *master) {
 		enforce_processes_max_running_time();
 		enforce_processes_limits();
 
+		measure_worker_resources();
+
 		if(!enforce_worker_limits(master)) {
 			abort_flag = 1;
 			break;
@@ -1566,8 +1544,8 @@ static void work_for_master(struct link *master) {
 
 		if(!ok) break;
 
-		send_stats_update(master,0);
-		send_resource_update(master,0);
+		send_stats_update(master);
+		send_resource_update(master);
 
 		//Reset idle_stoptime if something interesting is happening at this worker.
 		if(list_size(procs_waiting) > 0 || itable_size(procs_table) > 0 || itable_size(procs_complete) > 0) {
@@ -1595,6 +1573,7 @@ static void foreman_for_master(struct link *master) {
 			break;
 		}
 
+		measure_worker_resources();
 		task = work_queue_wait_internal(foreman_q, foreman_internal_timeout, master, &master_active);
 
 		if(task) {
@@ -1611,8 +1590,8 @@ static void foreman_for_master(struct link *master) {
 			results_to_be_sent_msg = 1;
 		}
 
-		send_stats_update(master,0);
-		send_resource_update(master,0);
+		send_stats_update(master);
+		send_resource_update(master);
 
 		if(master_active) {
 			result &= handle_master(master);
@@ -1759,6 +1738,9 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	}
 
 	workspace_prepare();
+
+	measure_worker_resources();
+
 	report_worker_ready(master);
 
 	send_master_message(master, "info worker-id %s\n", worker_id);
@@ -2323,8 +2305,6 @@ int main(int argc, char *argv[])
 	total_resources = work_queue_resources_create();
 	total_resources_last = work_queue_resources_create();
 
-	measure_worker_resources(local_resources);
-
 	int backoff_interval = init_backoff_interval;
 	connect_stoptime = time(0) + connect_timeout;
 
@@ -2359,6 +2339,7 @@ int main(int argc, char *argv[])
 			backoff_interval = MIN(backoff_interval*2,max_backoff_interval);
 		}
 
+		measure_worker_resources();
 		if(!enforce_worker_limits(NULL)) {
 			abort_flag = 1;
 		}
