@@ -167,7 +167,7 @@ static int disk_allocation = 0;
 static int64_t disk_measured = 0;
 static int64_t files_counted = 0;
 
-static int check_resources_interval = 15;
+static int check_resources_interval = 5;
 static int max_time_on_measurement  = 3;
 
 static struct work_queue *foreman_q = NULL;
@@ -370,6 +370,13 @@ static void send_stats_update(struct link *master)
 	}
 }
 
+static int send_keepalive(struct link *master){
+	send_master_message(master, "alive\n");
+	send_resource_update(master);
+	send_stats_update(master);
+
+	return 1;
+}
 
 /*
 Send the initial "ready" message to the master with the version and so forth.
@@ -381,7 +388,7 @@ static void report_worker_ready( struct link *master )
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
 	send_master_message(master,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
-	send_resource_update(master);
+	send_keepalive(master);
 }
 
 
@@ -1284,14 +1291,6 @@ static int do_release() {
 	return 0;
 }
 
-static int send_keepalive(struct link *master){
-	send_master_message(master, "alive\n");
-	send_resource_update(master);
-	send_stats_update(master);
-
-	return 1;
-}
-
 static void disconnect_master(struct link *master) {
 
 	debug(D_WQ, "disconnecting from master %s:%d",master_addr,master_port);
@@ -1544,9 +1543,6 @@ static void work_for_master(struct link *master) {
 
 		if(!ok) break;
 
-		send_stats_update(master);
-		send_resource_update(master);
-
 		//Reset idle_stoptime if something interesting is happening at this worker.
 		if(list_size(procs_waiting) > 0 || itable_size(procs_table) > 0 || itable_size(procs_complete) > 0) {
 			reset_idle_timer();
@@ -1564,6 +1560,7 @@ static void foreman_for_master(struct link *master) {
 
 	reset_idle_timer();
 
+	int64_t prev_num_workers = 0;
 	while(!abort_flag) {
 		int result = 1;
 		struct work_queue_task *task = NULL;
@@ -1574,6 +1571,14 @@ static void foreman_for_master(struct link *master) {
 		}
 
 		measure_worker_resources();
+
+		/* if the number of workers changed by more than %10, send an status update */
+		int64_t curr_num_workers = total_resources->workers.total;
+		if(10*abs(curr_num_workers - prev_num_workers) > prev_num_workers) {
+			send_keepalive(master);
+		}
+		prev_num_workers = curr_num_workers;
+
 		task = work_queue_wait_internal(foreman_q, foreman_internal_timeout, master, &master_active);
 
 		if(task) {
@@ -1589,9 +1594,6 @@ static void foreman_for_master(struct link *master) {
 			send_master_message(master, "available_results\n");
 			results_to_be_sent_msg = 1;
 		}
-
-		send_stats_update(master);
-		send_resource_update(master);
 
 		if(master_active) {
 			result &= handle_master(master);

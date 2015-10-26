@@ -26,7 +26,7 @@ See the file COPYING for details.
 
 #define WORK_QUEUE_WAITFORTASK  -1                 /**< Timeout value to wait for a task to complete before returning. */
 
-#define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
+#define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 120  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT  30   /**< Default value for Work Queue keepalive timeout in seconds. */
 
 typedef enum {
