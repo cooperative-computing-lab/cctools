@@ -59,6 +59,8 @@ extern "C" {
 #	define O_CLOEXEC 02000000
 #endif
 
+#define E_OK 10000
+
 extern int pfs_force_stream;
 extern int pfs_force_sync;
 extern int pfs_follow_symlinks;
@@ -430,6 +432,7 @@ void namelist_table_insert(const char *content, int is_special_syscall) {
 
 int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pfs_name *pname, mode_t mode, bool do_follow_symlink, int depth ) {
 	char full_logical_name[PFS_PATH_MAX];
+	char parent_directory[PFS_PATH_MAX];
 	pfs_resolve_t result;
 	size_t n;
 
@@ -441,6 +444,25 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 
 	complete_path(cname,full_logical_name);
 	path_collapse(full_logical_name,pname->logical_name,1);
+
+	if(mode & E_OK) {
+		path_dirname(pname->logical_name, parent_directory);
+		result = pfs_resolve(parent_directory,pname->path,mode & ~E_OK,time(0)+pfs_master_timeout);
+		switch(result) {
+			case PFS_RESOLVE_DENIED:
+				return errno = EACCES, 0;
+			case PFS_RESOLVE_ENOENT:
+				return errno = ENOENT, 0;
+			case PFS_RESOLVE_FAILED:
+				fatal("unable to resolve parent directory %s",parent_directory);
+				return 0;
+			default:
+				mode = F_OK;
+				break;
+		}
+	}
+
+	mode = mode & ~E_OK;
 
 	if(pattern_match(full_logical_name, "^/proc/self/()", &n) >= 0) {
 		snprintf(pname->logical_name, sizeof(pname->logical_name), "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n]);
@@ -1378,11 +1400,8 @@ int pfs_table::unlink( const char *n )
 {
 	pfs_name pname;
 	int result = -1;
-	char dirname[PFS_PATH_MAX];
 
-	path_dirname(n,dirname);
-
-	if(resolve_name(0,dirname,&pname,X_OK|W_OK,false) && resolve_name(0,n,&pname,F_OK,false)) {
+	if(resolve_name(0,n,&pname,X_OK|W_OK|E_OK,false)) {
 		result = pname.service->unlink(&pname);
 		if(result==0) {
 			pfs_cache_invalidate(&pname);
@@ -1397,11 +1416,8 @@ int pfs_table::stat( const char *n, struct pfs_stat *b )
 {
 	pfs_name pname;
 	int result = -1;
-	char dirname[PFS_PATH_MAX];
 
-	path_dirname(n,dirname);
-
-	if(resolve_name(0,dirname,&pname,X_OK) && resolve_name(0,n,&pname,F_OK)) {
+	if(resolve_name(0,n,&pname,X_OK|E_OK)) {
 		result = pname.service->stat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pname.service->get_block_size();
@@ -1431,11 +1447,8 @@ int pfs_table::lstat( const char *n, struct pfs_stat *b )
 {
 	pfs_name pname;
 	int result=-1;
-	char dirname[PFS_PATH_MAX];
 
-	path_dirname(n,dirname);
-
-	if(resolve_name(0,dirname,&pname,X_OK,false) && resolve_name(0,n,&pname,F_OK,false)) {
+	if(resolve_name(0,n,&pname,X_OK|E_OK,false)) {
 		result = pname.service->lstat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pname.service->get_block_size();
@@ -1453,14 +1466,8 @@ int pfs_table::rename( const char *n1, const char *n2 )
 {
 	pfs_name p1, p2;
 	int result = -1;
-	char dirname1[PFS_PATH_MAX];
-	char dirname2[PFS_PATH_MAX];
 
-	path_dirname(n1,dirname1);
-	path_dirname(n2,dirname2);
-
-	if(resolve_name(0,dirname1,&p1,X_OK|W_OK,false) && resolve_name(0,n1,&p1,F_OK,false) &&
-			resolve_name(0,dirname2,&p2,X_OK|W_OK,false) && resolve_name(0,n2,&p2,F_OK,false)) {
+	if(resolve_name(0,n1,&p1,X_OK|W_OK|E_OK,false) && resolve_name(0,n2,&p2,X_OK|W_OK|E_OK,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->rename(&p1,&p2);
 			if(result==0) {
@@ -1480,14 +1487,10 @@ int pfs_table::link( const char *n1, const char *n2 )
 {
 	pfs_name p1, p2;
 	int result = -1;
-	char dirname2[PFS_PATH_MAX];
-
-	path_dirname(n2,dirname2);
 
 	// Require write on the target to prevent linking into a RW directory
 	// and bypassing restrictions
-	if(resolve_name(0,n1,&p1,X_OK|W_OK,false) &&
-			resolve_name(0,dirname2,&p2,X_OK|W_OK,false) && resolve_name(0,n2,&p2,F_OK,false)) {
+	if(resolve_name(0,n1,&p1,X_OK|W_OK,false) && resolve_name(0,n2,&p2,X_OK|W_OK|E_OK,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->link(&p1,&p2);
 		} else {
@@ -1502,7 +1505,6 @@ int pfs_table::symlink( const char *n1, const char *n2 )
 {
 	pfs_name pname;
 	int result = -1;
-	char dirname2[PFS_PATH_MAX];
 
 	/*
 	Note carefully: Symlinks are used to store all sorts
@@ -1513,12 +1515,7 @@ int pfs_table::symlink( const char *n1, const char *n2 )
 	verbatim down to the needed driver.
 	*/
 
-	path_dirname(n2,dirname2);
-
-	// Require write on the target to prevent linking into a RW directory
-	// and bypassing restrictions
-	if(resolve_name(0,n1,&pname,W_OK,false) &&
-			resolve_name(0,dirname2,&pname,X_OK|W_OK,false) && resolve_name(0,n2,&pname,F_OK,false)) {
+	if(resolve_name(0,n2,&pname,X_OK|W_OK|E_OK,false)) {
 		result = pname.service->symlink(n1,&pname);
 	}
 
@@ -1588,11 +1585,8 @@ int pfs_table::mknod( const char *n, mode_t mode, dev_t dev )
 {
 	pfs_name pname;
 	int result=-1;
-	char dirname[PFS_PATH_MAX];
 
-	path_dirname(n,dirname);
-
-	if(resolve_name(0,dirname,&pname,X_OK|W_OK) && resolve_name(0,n,&pname,F_OK)) {
+	if(resolve_name(0,n,&pname,X_OK|W_OK|E_OK)) {
 		result = pname.service->mknod(&pname,mode,dev);
 	}
 
@@ -1603,11 +1597,8 @@ int pfs_table::mkdir( const char *n, mode_t mode )
 {
 	pfs_name pname;
 	int result=-1;
-	char dirname[PFS_PATH_MAX];
 
-	path_dirname(n,dirname);
-
-	if(resolve_name(0,dirname,&pname,X_OK|W_OK) && resolve_name(0,n,&pname,F_OK)) {
+	if(resolve_name(0,n,&pname,X_OK|W_OK|E_OK)) {
 		result = pname.service->mkdir(&pname,mode);
 	}
 
@@ -1618,11 +1609,8 @@ int pfs_table::rmdir( const char *n )
 {
 	pfs_name pname;
 	int result=-1;
-	char dirname[PFS_PATH_MAX];
 
-	path_dirname(n,dirname);
-
-	if(resolve_name(0,dirname,&pname,X_OK|W_OK,false) && resolve_name(0,n,&pname,F_OK,false)) {
+	if(resolve_name(0,n,&pname,X_OK|W_OK|E_OK,false)) {
 		result = pname.service->rmdir(&pname);
 	}
 
@@ -1647,11 +1635,8 @@ int pfs_table::mkalloc( const char *n, pfs_ssize_t size, mode_t mode )
 {
 	pfs_name pname;
 	int result=-1;
-	char dirname[PFS_PATH_MAX];
 
-	path_dirname(n,dirname);
-
-	if(resolve_name(0,dirname,&pname,X_OK|W_OK) && resolve_name(0,n,&pname,F_OK)) { //TODO check this
+	if(resolve_name(0,n,&pname,X_OK|W_OK|E_OK)) { //TODO check this
 		result = pname.service->mkalloc(&pname,size,mode);
 	}
 
@@ -1663,7 +1648,7 @@ int pfs_table::lsalloc( const char *n, char *a, pfs_ssize_t *total, pfs_ssize_t 
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(1,n,&pname,R_OK)) { //TODO check this
+	if(resolve_name(1,n,&pname,X_OK)) { //TODO check this
 		result = pname.service->lsalloc(&pname,a,total,avail);
 		if(result==0) {
 			strcpy(a,pname.path);
@@ -2139,7 +2124,7 @@ pfs_ssize_t pfs_table::copyfile( const char *source, const char *target )
 	}
 
 	if(resolve_name(1,source,&psource,X_OK|R_OK)<0) return -1; //TODO check this
-	if(resolve_name(1,target,&ptarget,X_OK|W_OK)<0) return -1; //TODO check this
+	if(resolve_name(1,target,&ptarget,X_OK|W_OK|E_OK)<0) return -1; //TODO check this
 
 	if(psource.service == ptarget.service) {
 		result = ptarget.service->thirdput(&psource,&ptarget);
