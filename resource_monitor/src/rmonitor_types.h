@@ -41,7 +41,13 @@ struct rmonitor_mem_info
 	uint64_t virtual;
 	uint64_t resident;
 	uint64_t swap;
-	uint64_t shared;
+	uint64_t resident_shared;
+	uint64_t swap_shared;
+
+	char    *map_name;
+	uint64_t map_start;
+	uint64_t map_end;
+
 	uint64_t text;
 	uint64_t data;
 };
