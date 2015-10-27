@@ -2681,8 +2681,12 @@ def needCVMFS(spec_json, meta_json):
 	for sec_name in ["software", "data", "package_manager"]:
 		if spec_json.has_key(sec_name) and spec_json[sec_name]:
 			sec = spec_json[sec_name]
-			if sec_name == "package_manager" and sec.has_key("config") and sec["config"]:
-				sec = sec["config"]
+			if sec_name == "package_manager":
+				if sec.has_key("config") and sec["config"]:
+					sec = sec["config"]
+				else:
+					logging.debug("%s does not have config attribute!", sec_name)
+					break
 
 			for item in sec:
 				item_id = ""
@@ -2887,8 +2891,12 @@ def validate_spec(spec_json, meta_json = None):
 	for sec_name in ["software", "data", "package_manager"]:
 		if spec_json.has_key(sec_name) and spec_json[sec_name]:
 			sec = spec_json[sec_name]
-			if sec_name == "package_manager" and sec.has_key("config") and sec["config"]:
-				sec = sec["config"]
+			if sec_name == "package_manager":
+				if sec.has_key("config") and sec["config"]:
+					sec = sec["config"]
+				else:
+					logging.debug("%s does not have config attribute!", sec_name)
+					break
 			for item in sec:
 				if (sec[item].has_key("mountpoint") and sec[item]["mountpoint"]) \
 						or (sec[item].has_key("mount_env") and sec[item]["mount_env"]):
