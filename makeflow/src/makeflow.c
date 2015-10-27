@@ -525,11 +525,11 @@ static int makeflow_can_alloc_local(struct dag_node *n)
 	int mem_ok = 0;
 	int disk_ok = 0;
 	int cores_ok = 0;
-	mem_ok = (loc_info.local_mem == -1 || !n->resources || n->resources->resident_memory >= loc_info.local_mem);
-	disk_ok = (loc_info.local_disk == -1 || !n->resources || n->resources->workdir_footprint >= loc_info.local_disk);
+	mem_ok = (loc_info.local_mem == -1 || !n->resources || n->resources->resident_memory <= loc_info.local_mem);
+	disk_ok = (loc_info.local_disk == -1 || !n->resources || n->resources->workdir_footprint <= loc_info.local_disk);
 	if(!n->resources)
 	{
-		cores_ok = (n->resources->cores >= loc_info.local_cores);
+		cores_ok = (n->resources->cores <= loc_info.local_cores);
 	}
 	else
 	{
@@ -540,28 +540,49 @@ static int makeflow_can_alloc_local(struct dag_node *n)
 }
 static void makeflow_alloc_local(struct dag_node *n)
 {
-	if(!n->resources || (loc_info.local_disk == -1 && loc_info.local_mem == -1))
-	{
-		loc_info.local_cores--;
+
+	if( (loc_info.local_disk == -1 && loc_info.local_mem == -1)) {
+		if(n->resources && n->resources->cores > 0){
+			loc_info.local_cores -= n->resources->cores;
+		} else {
+			loc_info.local_cores--;
+		}
 	}
-	else
-	{
-		loc_info.local_cores -= n->resources->cores;
-		loc_info.local_mem -= n->resources->resident_memory;
-		loc_info.local_disk -= n->resources->workdir_footprint;
+	else {
+
+		if(n->resources->cores > 0){
+			loc_info.local_cores -= n->resources->cores;
+		} else {
+			loc_info.local_cores--;
+		}
+
+		if(loc_info.local_mem != -1)
+			loc_info.local_mem -= n->resources->resident_memory;
+
+		if(loc_info.local_disk != -1)
+			loc_info.local_disk -= n->resources->workdir_footprint;
 	}
 }
 static void makeflow_dealloc_local(struct dag_node *n)
 {
-	if(!n->resources || (n->resources->resident_memory == -1 && n->resources->workdir_footprint == -1))
-	{
-		loc_info.local_cores++;
+	if( (loc_info.local_disk == -1 && loc_info.local_mem == -1)) {
+		if(n->resources->cores > 0){
+			loc_info.local_cores += n->resources->cores;
+		} else {
+			loc_info.local_cores++;
+		}
 	}
-	else
-	{
-		loc_info.local_cores += n->resources->cores;
-		loc_info.local_mem += n->resources->resident_memory;
-		loc_info.local_disk += n->resources->workdir_footprint;
+	else if(n->resources) {
+		if(n->resources->cores < 1)	{
+			loc_info.local_cores += 1;
+		} else {
+			loc_info.local_cores += n->resources->cores;
+		}
+		if(loc_info.local_mem != -1)
+			loc_info.local_mem += n->resources->resident_memory;
+
+		if(loc_info.local_disk != -1)
+			loc_info.local_disk += n->resources->workdir_footprint;
 	}
 }
 
@@ -1532,7 +1553,7 @@ exit(1);
 				break;
 			case LONG_OPT_MEM:
 				loc_info.local_mem = string_metric_parse(optarg);
-				break;	
+				break;
 			case LONG_OPT_CORES:
 				loc_info.local_cores = atoi(optarg);
 				break;
