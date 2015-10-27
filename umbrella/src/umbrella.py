@@ -93,6 +93,10 @@ cms_siteconf_format = "tgz"
 tempfile_list = [] #a list of temporary file created by umbrella and need to be removed before umbrella ends.
 tempdir_list = [] #a list of temporary dir created by umbrella and need to be removed before umbrella ends.
 
+pac_manager = {
+"yum": ("-y install", "info")
+}
+
 def subprocess_error(cmd, rc, stdout, stderr):
 	"""Print the command, return code, stdout, and stderr; and then directly exit.
 
@@ -689,7 +693,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 	"""
 	print "Execution environment checking ..."
 
-	if sandbox_mode not in ["docker", "chroot", "parrot"]:
+	if sandbox_mode not in ["docker", "destructive", "parrot"]:
 		cleanup(tempfile_list, tempdir_list)
 		logging.critical("Currently local execution engine only support three sandbox techniques: docker, chroot or parrot!")
 		sys.exit("Currently local execution engine only support three sandbox techniques: docker, chroot or parrot!\n")
@@ -1566,7 +1570,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 	print "Execution engine: %s" % sandbox_mode
 	logging.debug("execution engine: %s", sandbox_mode)
 	logging.debug("need_separate_rootfs: %d", need_separate_rootfs)
-	if sandbox_mode == "chroot":
+	if sandbox_mode == "destructive":
 		if need_separate_rootfs == 1:
 			env_dict = construct_env(sandbox_dir, os_image_dir)
 		else:
@@ -2114,23 +2118,29 @@ def ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, 
 
 	print "The output has been put into the output dir: %s" % output_dir
 
-def obtain_yum_package(spec_json):
+def obtain_package(spec_json):
 	"""Check whether this spec includes a package_manager section, which in turn includes a list attr.
 
 	Args:
 		spec_json: the json object including the specification.
 
 	Returns:
-		if a package list is specified in the spec_json, return a list of the required package name.
+		if a package list is specified in the spec_json, return the package manager name and a list of the required package name.
 		Otherwise, return None
 	"""
-	if spec_json.has_key("package_manager") and spec_json["package_manager"] and spec_json["package_manager"].has_key("list"):
-		pac_str = spec_json["package_manager"]["list"]
-		pac_list = pac_str.split()
-		pac_list.sort()
-		if len(pac_list) > 0:
-			return pac_list
-	return None
+	if spec_json.has_key("package_manager") and spec_json["package_manager"]:
+		if spec_json["package_manager"].has_key("name") and spec_json["package_manager"].has_key("list"):
+			pac_name = spec_json["package_manager"]["name"]
+			pac_str = spec_json["package_manager"]["list"]
+			pac_list = pac_str.split()
+			pac_list.sort()
+			if len(pac_list) > 0:
+				if len(pac_name) == 0:
+					logging.critical("The spec does not specify which package manager to use\n")
+					sys.exit("The spec does not specify which package manager to use\n")
+				else:
+					return (pac_name, pac_list)
+	return (None, None)
 
 def cal_new_os_id(sec, old_os_id, pac_list):
 	"""Calculate the id of the new OS based on the old_os_id and the package_manager section
@@ -2145,7 +2155,7 @@ def cal_new_os_id(sec, old_os_id, pac_list):
 		install_cmd: the package install cmd, such as: yum -y install python
 	"""
 	pm_name = attr_check(sec, "name")
-	cmd = pm_name + " -y install " + ' '.join(pac_list)
+	cmd = pm_name + " " + pac_manager[pm_name][0] + " " + ' '.join(pac_list)
 	install_cmd = []
 	install_cmd.append(cmd)
 	pac_str = ''.join(pac_list)
@@ -2220,10 +2230,10 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 			sys.exit("A separate os image is specified, which does not support the %s sandbox mode!" % sandbox_mode)
 
 	#check for dependencies which need to be installed by package managers
-	pac_list = obtain_yum_package(spec_json)
+	(pac_name, pac_list) = obtain_package(spec_json)
 	if pac_list:
-		logging.debug("The spec needs to install yum packages, therefore a sperate root filesystem is needed.")
-		print "The spec needs to install yum packages, therefore a sperate root filesystem is needed."
+		logging.debug("The spec needs to use %s install packages, therefore a sperate root filesystem is needed.", pac_name)
+		print "The spec needs to use %s install packages, therefore a sperate root filesystem is needed." % pac_name
 		if sandbox_mode in ["parrot"]:
 			cleanup(tempfile_list, tempdir_list)
 			logging.critical("Installing packages through package managers requires the root authority! Please choose a different sandbox mode (docker or destructive)!")
