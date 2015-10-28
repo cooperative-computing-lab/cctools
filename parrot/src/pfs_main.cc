@@ -102,9 +102,15 @@ const char *pfs_initial_working_directory=0;
 
 char *pfs_false_uname = 0;
 char pfs_ldso_path[PATH_MAX];
-uid_t pfs_uid = 0;
-gid_t pfs_gid = 0;
+uid_t pfs_ruid = 0;
+uid_t pfs_euid = 0;
+uid_t pfs_suid = 0;
+gid_t pfs_rgid = 0;
+gid_t pfs_egid = 0;
+gid_t pfs_sgid = 0;
 const char * pfs_username = 0;
+int pfs_fake_setuid = 0;
+int pfs_fake_setgid = 0;
 
 INT64_T pfs_syscall_count = 0;
 INT64_T pfs_read_count = 0;
@@ -142,6 +148,7 @@ enum {
 	LONG_OPT_NO_SET_FOREGROUND,
 	LONG_OPT_SYSCALL_DISABLE_DEBUG,
 	LONG_OPT_VALGRIND,
+	LONG_OPT_FAKE_SETUID,
 };
 
 static void get_linux_version(const char *cmd)
@@ -243,6 +250,7 @@ static void show_help( const char *cmd )
 	printf( " %-30s Maximum amount of time to retry failures.    (PARROT_TIMEOUT)\n", "-T,--timeout=<time>");
 	printf( " %-30s Fake this unix uid; Real uid stays the same.     (PARROT_UID)\n", "-U,--uid=<num>");
 	printf( " %-30s Use this extended username.                 (PARROT_USERNAME)\n", "-u,--username=<name>");
+	printf( " %-30s Track changes from setuid and setgid.\n", "--fake-setuid");
 	printf( " %-30s Display version number.\n", "-v,--version");
 	printf( " %-30s Enable valgrind support for Parrot.\n", "   --valgrind");
 	printf( " %-30s Initial working directory.\n", "-w,--work-dir=<dir>");
@@ -590,6 +598,7 @@ int main( int argc, char *argv[] )
 		{"debug-level-irods", required_argument, 0, 'I'},
 		{"debug-rotate-max", required_argument, 0, 'O'},
 		{"env-list", required_argument, 0, 'e'},
+		{"fake-setuid", no_argument, 0, LONG_OPT_FAKE_SETUID},
 		{"gid", required_argument, 0, 'G'},
 		{"help", no_argument, 0, 'h'},
 		{"helper", no_argument, 0, LONG_OPT_HELPER},
@@ -664,7 +673,7 @@ int main( int argc, char *argv[] )
 			pfs_follow_symlinks = 0;
 			break;
 		case 'G':
-			pfs_gid = atoi(optarg);
+			pfs_rgid = pfs_egid = pfs_sgid = atoi(optarg);
 			break;
 		case 'H':
 			/* deprecated */
@@ -765,7 +774,7 @@ int main( int argc, char *argv[] )
 			pfs_master_timeout = string_time_parse(optarg);
 			break;
 		case 'U':
-			pfs_uid = atoi(optarg);
+			pfs_ruid = pfs_euid = pfs_suid = atoi(optarg);
 			break;
 		case 'u':
 			pfs_username = optarg;
@@ -803,6 +812,10 @@ int main( int argc, char *argv[] )
 			}
 		case LONG_OPT_SYSCALL_DISABLE_DEBUG:
 			pfs_syscall_disable_debug = 1;
+			break;
+		case LONG_OPT_FAKE_SETUID:
+			pfs_fake_setuid = 1;
+			pfs_fake_setgid = 1;
 			break;
 		default:
 			show_help(argv[0]);
@@ -849,8 +862,8 @@ int main( int argc, char *argv[] )
 		fclose(fp);
 	}
 
-	pfs_uid = getuid();
-	pfs_gid = getgid();
+	pfs_ruid = pfs_euid = pfs_suid = getuid();
+	pfs_rgid = pfs_egid = pfs_sgid = getgid();
 
 	if (http_proxy)
 		setenv("HTTP_PROXY", http_proxy, 1);
@@ -881,10 +894,10 @@ int main( int argc, char *argv[] )
 	if(s && !pfs_false_uname) pfs_false_uname = xxstrdup(pfs_false_uname);
 
 	s = getenv("PARROT_UID");
-	if(s) pfs_uid = atoi(s);
+	if(s) pfs_ruid = pfs_euid = pfs_suid = atoi(s);
 
 	s = getenv("PARROT_GID");
-	if(s) pfs_gid = atoi(s);
+	if(s) pfs_rgid = pfs_egid = pfs_sgid = atoi(s);
 
 	s = getenv("PARROT_TIMEOUT");
 	if(s) pfs_master_timeout = string_time_parse(s);

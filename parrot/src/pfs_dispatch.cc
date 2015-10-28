@@ -100,8 +100,10 @@ extern "C" {
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_false_uname;
-extern uid_t pfs_uid;
-extern gid_t pfs_gid;
+extern uid_t pfs_ruid, pfs_euid, pfs_suid;
+extern gid_t pfs_rgid, pfs_egid, pfs_sgid;
+extern int pfs_fake_setuid;
+extern int pfs_fake_setgid;
 
 extern pid_t trace_this_pid;
 
@@ -1373,28 +1375,37 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL32_getuid32:
+		case SYSCALL32_getuid:
+			if (entering)
+				divert_to_dummy(p,pfs_ruid);
+			break;
+
 		case SYSCALL32_geteuid32:
 		case SYSCALL32_geteuid:
-		case SYSCALL32_getuid:
-			/* Always return the dummy uids. */
+		case SYSCALL32_setfsuid32:
 			if (entering)
-				divert_to_dummy(p,pfs_uid);
+				divert_to_dummy(p,pfs_euid);
 			break;
 
 		case SYSCALL32_getgid32:
-		case SYSCALL32_getegid32:
-		case SYSCALL32_getegid:
 		case SYSCALL32_getgid:
 			if (entering)
-				divert_to_dummy(p,pfs_gid);
+				divert_to_dummy(p,pfs_rgid);
+			break;
+
+		case SYSCALL32_getegid32:
+		case SYSCALL32_getegid:
+		case SYSCALL32_setfsgid32:
+			if (entering)
+				divert_to_dummy(p,pfs_egid);
 			break;
 
 		case SYSCALL32_getresuid32:
 		case SYSCALL32_getresuid:
 			if (entering) {
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[0]),sizeof(pfs_uid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[1]),sizeof(pfs_uid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[2]),sizeof(pfs_uid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_ruid,POINTER(args[0]),sizeof(pfs_ruid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_euid,POINTER(args[1]),sizeof(pfs_euid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_suid,POINTER(args[2]),sizeof(pfs_suid),TRACER_O_ATOMIC));
 				divert_to_dummy(p,0);
 			}
 			break;
@@ -1402,33 +1413,100 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_getresgid32:
 		case SYSCALL32_getresgid:
 			if (entering) {
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[0]),sizeof(pfs_uid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[1]),sizeof(pfs_uid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[2]),sizeof(pfs_uid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_rgid,POINTER(args[0]),sizeof(pfs_rgid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_egid,POINTER(args[1]),sizeof(pfs_egid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_sgid,POINTER(args[2]),sizeof(pfs_sgid),TRACER_O_ATOMIC));
 				divert_to_dummy(p,0);
 			}
 			break;
 
-		/* Changing the userid is not allow, but for completeness, you can
-		 * always change to your own uid.
+		/* Actually changing the uid/gid is not allowed, but you can optionally
+		   track set uid/gid operations and tell the program you did
 		 */
-
-		case SYSCALL32_setgid:
-		case SYSCALL32_setregid:
-		case SYSCALL32_setuid:
-		case SYSCALL32_setresuid:
-		case SYSCALL32_setresgid:
-		case SYSCALL32_setreuid:
-		case SYSCALL32_setgid32:
-		case SYSCALL32_setregid32:
-		case SYSCALL32_setuid32:
 		case SYSCALL32_setresuid32:
-		case SYSCALL32_setresgid32:
-		case SYSCALL32_setreuid32:
-		case SYSCALL32_setfsuid32:
-		case SYSCALL32_setfsgid32:
-			if (entering)
+		case SYSCALL32_setresuid:
+			if (entering) {
+				if (pfs_fake_setuid) {
+					if ((uid_t) args[0] != (uid_t) -1) {
+						pfs_ruid = args[0];
+					}
+					if ((uid_t) args[1] != (uid_t) -1) {
+						pfs_euid = args[1];
+					}
+					if ((uid_t) args[2] != (uid_t) -1) {
+						pfs_suid = args[2];
+					}
+				}
 				divert_to_dummy(p,0);
+			}
+			break;
+
+		case SYSCALL32_setreuid32:
+		case SYSCALL32_setreuid:
+			if (entering) {
+				if (pfs_fake_setuid) {
+					if ((uid_t) args[0] != (uid_t) -1) {
+						pfs_ruid = args[0];
+					}
+					if ((uid_t) args[1] != (uid_t) -1) {
+						pfs_euid = args[1];
+					}
+				}
+				divert_to_dummy(p,0);
+			}
+			break;
+
+		case SYSCALL32_setuid32:
+		case SYSCALL32_setuid:
+			if (entering) {
+				if (pfs_fake_setuid) {
+					pfs_ruid = pfs_euid = pfs_suid = args[0];
+				}
+				divert_to_dummy(p,0);
+			}
+			break;
+
+		case SYSCALL32_setresgid32:
+		case SYSCALL32_setresgid:
+			if (entering) {
+				if (pfs_fake_setgid) {
+					if ((gid_t) args[0] != (gid_t) -1) {
+						pfs_rgid = args[0];
+					}
+					if ((gid_t) args[1] != (gid_t) -1) {
+						pfs_egid = args[1];
+					}
+					if ((gid_t) args[2] != (gid_t) -1) {
+						pfs_sgid = args[2];
+					}
+				}
+				divert_to_dummy(p,0);
+			}
+			break;
+
+		case SYSCALL32_setregid32:
+		case SYSCALL32_setregid:
+			if (entering) {
+				if (pfs_fake_setgid) {
+					if ((gid_t) args[0] != (gid_t) -1) {
+						pfs_rgid = args[0];
+					}
+					if ((gid_t) args[1] != (gid_t) -1) {
+						pfs_egid = args[1];
+					}
+				}
+				divert_to_dummy(p,0);
+			}
+			break;
+
+		case SYSCALL32_setgid32:
+		case SYSCALL32_setgid:
+			if (entering) {
+				if (pfs_fake_setgid) {
+					pfs_rgid = pfs_egid = pfs_sgid = args[0];
+				}
+				divert_to_dummy(p,0);
+			}
 			break;
 
 		/* Here begin all of the I/O operations, given in the same order as in

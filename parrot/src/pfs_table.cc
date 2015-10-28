@@ -1055,8 +1055,8 @@ int pfs_table::fchmod( int fd, mode_t mode )
 	return pointers[fd]->file->fchmod(mode);
 }
 
-extern uid_t pfs_uid;
-extern gid_t pfs_gid;
+extern uid_t pfs_euid;
+extern gid_t pfs_egid;
 
 int pfs_table::fchown( int fd, uid_t uid, gid_t gid )
 {
@@ -1069,7 +1069,7 @@ int pfs_table::fchown( int fd, uid_t uid, gid_t gid )
 	then fake success, as tools like cp do this very often.
 	*/
 
-	if(result<0 && errno==ENOSYS && uid==pfs_uid && gid==pfs_gid) {
+	if(result<0 && errno==ENOSYS && uid==pfs_euid && gid==pfs_egid) {
 		result = 0;
 	}
 
@@ -1170,7 +1170,7 @@ int pfs_table::chown( const char *n, uid_t uid, gid_t gid )
 	then fake success, as tools like cp do this very often.
 	*/
 
-	if(result<0 && errno==ENOSYS && uid==pfs_uid && gid==pfs_gid) {
+	if(result<0 && errno==ENOSYS && uid==pfs_euid && gid==pfs_egid) {
 		result = 0;
 	}
 

@@ -59,8 +59,8 @@ struct pfs_statfs {
 	INT64_T f_ffree;
 };
 
-extern uid_t pfs_uid;
-extern gid_t pfs_gid;
+extern uid_t pfs_euid;
+extern gid_t pfs_egid;
 
 #ifndef COPY_STAT
 #define COPY_STAT( a, b )\
@@ -87,8 +87,8 @@ extern gid_t pfs_gid;
 	(b).st_ino = (a).cst_ino;\
 	(b).st_mode = (a).cst_mode;\
 	(b).st_nlink = (a).cst_nlink;\
-	(b).st_uid = pfs_uid;\
-	(b).st_gid = pfs_gid;\
+	(b).st_uid = pfs_euid;\
+	(b).st_gid = pfs_egid;\
 	(b).st_rdev = (a).cst_rdev;\
 	(b).st_size = (a).cst_size;\
 	(b).st_blksize = (a).cst_blksize;\

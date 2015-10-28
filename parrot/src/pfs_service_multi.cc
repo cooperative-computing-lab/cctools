@@ -22,9 +22,6 @@ extern "C" {
 #include <utime.h>
 #include <sys/statfs.h>
 
-extern uid_t pfs_uid;
-extern gid_t pfs_gid;
-
 extern int pfs_master_timeout;
 
 class pfs_file_multi : public pfs_file
