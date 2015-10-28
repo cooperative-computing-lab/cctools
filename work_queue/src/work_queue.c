@@ -75,7 +75,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORK_QUEUE_UPDATE_INTERVAL 60
 
 // Seconds between measurement of master local resources
-#define WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL 300
+#define WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL 30
 
 #define WORKER_ADDRPORT_MAX 32
 #define WORKER_HASHKEY_MAX 32
@@ -4197,6 +4197,8 @@ void update_resource_report(struct work_queue *q, int force_update){
 		return;
 
 	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
+
+	last_update_time = time(0);
 }
 
 void work_queue_disable_monitoring(struct work_queue *q) {
