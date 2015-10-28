@@ -5,6 +5,8 @@
 PARROT_MOUNTFILE=$PWD/parrot_mount.$PPID
 PARROT_TMPDIR=$PWD/parrot_tmp.$PPID
 
+set -x
+
 prepare()
 {
   mkdir -p "$PARROT_TMPDIR/subdir"
