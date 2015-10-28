@@ -18,14 +18,14 @@ prepare()
   cat > "$PARROT_MOUNTFILE" <<EOF
 /                  rx
 /dev/null          rwx
-/var               DENY
+/proc/1            DENY
 $PARROT_TMPDIR/rw  rwx
 EOF
 }
 
 run()
 {
-  ../src/parrot_run -m "$PARROT_MOUNTFILE" -- sh -c "ls /var/log" >/dev/null 2>&1
+  ../src/parrot_run -m "$PARROT_MOUNTFILE" -- sh -c "ls /proc/1/fd" >/dev/null 2>&1
   if [ $? -eq 0 ]; then echo 'ignored DENY'; return 1; fi
 
   ../src/parrot_run -m "$PARROT_MOUNTFILE" -- sh -c "rm $PARROT_TMPDIR/file1" >/dev/null 2>&1
