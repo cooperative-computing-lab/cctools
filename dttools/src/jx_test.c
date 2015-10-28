@@ -20,15 +20,21 @@ and failure is returned.
 
 int main( int argc, char *argv[] )
 {
-	struct jx *j = jx_parse_stream(stdin);
+	struct jx_parser *p = jx_parser_create(0);
+
+	jx_parser_read_file(p,stdin);
+
+	struct jx *j = jx_parse(p);
 
 	if(j) {
 		jx_print_file(j,stdout);
 		printf("\n");
 		jx_delete(j);
+		jx_parser_delete(p);
 		return 0;
 	} else {
-		printf("\"jx parse error\"\n");
+		printf("\"jx parse error: %s\"\n",jx_parser_error_string(p));
+		jx_parser_delete(p);
 		return 1;
 	}
 }
