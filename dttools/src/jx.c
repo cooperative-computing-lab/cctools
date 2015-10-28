@@ -88,7 +88,24 @@ struct jx * jx_array( struct jx_item *items )
 	return j;
 }
 
-struct jx * jx_object_lookup( struct jx *j, struct jx *key )
+struct jx * jx_object_lookup( struct jx *j, const char *key )
+{
+	struct jx_pair *p;
+
+	if(!j || j->type!=JX_OBJECT) return 0;
+
+	for(p=j->pairs;p;p=p->next) {
+		if(p && p->key && p->key->type==JX_STRING) {
+			if(!strcmp(p->key->string_value,key)) {
+				return p->value;
+			}
+		}
+	}
+
+	return 0;
+}
+
+struct jx * jx_object_lookup_expr( struct jx *j, struct jx *key )
 {
 	struct jx_pair *p;
 
