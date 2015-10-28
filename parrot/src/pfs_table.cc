@@ -432,7 +432,6 @@ void namelist_table_insert(const char *content, int is_special_syscall) {
 
 int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pfs_name *pname, mode_t mode, bool do_follow_symlink, int depth ) {
 	char full_logical_name[PFS_PATH_MAX];
-	char parent_directory[PFS_PATH_MAX];
 	pfs_resolve_t result;
 	size_t n;
 
@@ -445,24 +444,25 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 	complete_path(cname,full_logical_name);
 	path_collapse(full_logical_name,pname->logical_name,1);
 
+	/* Check permissions to edit parent directory entry. */
 	if(mode & E_OK) {
-		path_dirname(pname->logical_name, parent_directory);
-		result = pfs_resolve(parent_directory,pname->path,mode & ~E_OK,time(0)+pfs_master_timeout);
+		char dirname[PFS_PATH_MAX];
+		char tmp[PFS_PATH_MAX];
+		mode &= ~E_OK;
+		path_dirname(pname->logical_name, dirname);
+		result = pfs_resolve(dirname,tmp,W_OK,time(0)+pfs_master_timeout);
 		switch(result) {
 			case PFS_RESOLVE_DENIED:
 				return errno = EACCES, 0;
 			case PFS_RESOLVE_ENOENT:
 				return errno = ENOENT, 0;
 			case PFS_RESOLVE_FAILED:
-				fatal("unable to resolve parent directory %s",parent_directory);
+				fatal("unable to resolve parent directory %s",dirname);
 				return 0;
 			default:
-				mode = F_OK;
 				break;
 		}
 	}
-
-	mode = mode & ~E_OK;
 
 	if(pattern_match(full_logical_name, "^/proc/self/()", &n) >= 0) {
 		snprintf(pname->logical_name, sizeof(pname->logical_name), "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n]);
