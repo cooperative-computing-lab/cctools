@@ -1417,7 +1417,8 @@ int pfs_table::stat( const char *n, struct pfs_stat *b )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(0,n,&pname,E_OK)) {
+	/* You don't need to have read permission on a file to stat it. */
+	if(resolve_name(0,n,&pname,F_OK)) {
 		result = pname.service->stat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pname.service->get_block_size();
@@ -1436,6 +1437,7 @@ int pfs_table::statfs( const char *n, struct pfs_statfs *b )
 	pfs_name pname;
 	int result = -1;
 
+	/* You don't need to have read permission on a file to stat it. */
 	if(resolve_name(0,n,&pname,F_OK)) {
 		result = pname.service->statfs(&pname,b);
 	}
@@ -1448,7 +1450,8 @@ int pfs_table::lstat( const char *n, struct pfs_stat *b )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,E_OK,false)) {
+	/* You don't need to have read permission on a file to stat it. */
+	if(resolve_name(0,n,&pname,F_OK,false)) {
 		result = pname.service->lstat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pname.service->get_block_size();
