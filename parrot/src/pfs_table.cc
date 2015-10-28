@@ -1401,7 +1401,7 @@ int pfs_table::unlink( const char *n )
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(0,n,&pname,W_OK|E_OK,false)) {
+	if(resolve_name(0,n,&pname,E_OK,false)) {
 		result = pname.service->unlink(&pname);
 		if(result==0) {
 			pfs_cache_invalidate(&pname);
@@ -1470,7 +1470,7 @@ int pfs_table::rename( const char *n1, const char *n2 )
 	pfs_name p1, p2;
 	int result = -1;
 
-	if(resolve_name(0,n1,&p1,W_OK|E_OK,false) && resolve_name(0,n2,&p2,W_OK|E_OK,false)) {
+	if(resolve_name(0,n1,&p1,E_OK,false) && resolve_name(0,n2,&p2,E_OK,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->rename(&p1,&p2);
 			if(result==0) {
@@ -1493,7 +1493,7 @@ int pfs_table::link( const char *n1, const char *n2 )
 
 	// Require write on the target to prevent linking into a RW directory
 	// and bypassing restrictions
-	if(resolve_name(0,n1,&p1,W_OK,false) && resolve_name(0,n2,&p2,W_OK|E_OK,false)) {
+	if(resolve_name(0,n1,&p1,W_OK,false) && resolve_name(0,n2,&p2,E_OK,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->link(&p1,&p2);
 		} else {
@@ -1518,7 +1518,7 @@ int pfs_table::symlink( const char *n1, const char *n2 )
 	verbatim down to the needed driver.
 	*/
 
-	if(resolve_name(0,n2,&pname,W_OK|E_OK,false)) {
+	if(resolve_name(0,n2,&pname,E_OK,false)) {
 		result = pname.service->symlink(n1,&pname);
 	}
 
@@ -1589,7 +1589,7 @@ int pfs_table::mknod( const char *n, mode_t mode, dev_t dev )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,W_OK|E_OK)) {
+	if(resolve_name(0,n,&pname,E_OK)) {
 		result = pname.service->mknod(&pname,mode,dev);
 	}
 
@@ -1601,7 +1601,7 @@ int pfs_table::mkdir( const char *n, mode_t mode )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,W_OK|E_OK)) {
+	if(resolve_name(0,n,&pname,E_OK)) {
 		result = pname.service->mkdir(&pname,mode);
 	}
 
@@ -1613,7 +1613,7 @@ int pfs_table::rmdir( const char *n )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,W_OK|E_OK,false)) {
+	if(resolve_name(0,n,&pname,E_OK,false)) {
 		result = pname.service->rmdir(&pname);
 	}
 
@@ -1639,7 +1639,7 @@ int pfs_table::mkalloc( const char *n, pfs_ssize_t size, mode_t mode )
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(0,n,&pname,W_OK|E_OK)) {
+	if(resolve_name(0,n,&pname,E_OK)) {
 		result = pname.service->mkalloc(&pname,size,mode);
 	}
 
