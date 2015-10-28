@@ -89,7 +89,7 @@ public:
 	int	unlink( const char *name );
 	int	rename( const char *old_name, const char *new_name );
 	int	link( const char *oldpath, const char *newpath );
-	int	symlink( const char *oldpath, const char *newpath );
+	int	symlink( const char *target, const char *path );
 	int	readlink( const char *path, char *buf, pfs_size_t size );
 	int	mknod( const char *path, mode_t mode, dev_t dev );
 	int	mkdir( const char *path, mode_t mode );

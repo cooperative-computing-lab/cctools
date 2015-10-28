@@ -328,11 +328,11 @@ int pfs_link( const char *oldpath, const char *newpath )
 	END
 }
 
-int pfs_symlink( const char *oldpath, const char *newpath )
+int pfs_symlink( const char *target, const char *path )
 {
 	BEGIN
-	debug(D_LIBCALL,"symlink %s %s",oldpath,newpath);
-	result = pfs_current->table->symlink(oldpath,newpath);
+	debug(D_LIBCALL,"symlink %s %s",target,path);
+	result = pfs_current->table->symlink(target,path);
 	END
 }
 

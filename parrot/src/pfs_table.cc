@@ -1508,7 +1508,7 @@ int pfs_table::link( const char *n1, const char *n2 )
 	return result;
 }
 
-int pfs_table::symlink( const char *n1, const char *n2 )
+int pfs_table::symlink( const char *target, const char *path )
 {
 	pfs_name pname;
 	int result = -1;
@@ -1522,8 +1522,8 @@ int pfs_table::symlink( const char *n1, const char *n2 )
 	verbatim down to the needed driver.
 	*/
 
-	if(resolve_name(0,n2,&pname,E_OK,false)) {
-		result = pname.service->symlink(n1,&pname);
+	if(resolve_name(0,path,&pname,E_OK,false)) {
+		result = pname.service->symlink(target,&pname);
 	}
 
 	return result;
