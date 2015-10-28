@@ -4189,11 +4189,11 @@ void work_queue_delete(struct work_queue *q)
 	}
 }
 
-void update_resource_report(struct work_queue *q, int force_update){
+void update_resource_report(struct work_queue *q) {
 	static time_t last_update_time = 0;
 
 	// Only measure every few seconds.
-	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL)
+	if((time(0) - last_update_time) < WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL)
 		return;
 
 	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
@@ -4216,6 +4216,13 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 		warn(D_DEBUG, "Could not consolidate resource summaries.");
 		return;
 	}
+
+	/* set permissions according to user's mask. getumask is not available yet,
+	   and the only way to get the value of the current mask is to change
+	   it... */
+	mode_t old_mask = umask(0);
+	umask(old_mask);
+	fchmod(final_fd, 0777 & ~old_mask  );
 
 	FILE *final = fdopen(final_fd, "w");
 
@@ -4683,7 +4690,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 
 		if(q->monitor_mode)
-			update_resource_report(q, 0);
+			update_resource_report(q);
 
 		remove_unresponsive_workers(q);
 
