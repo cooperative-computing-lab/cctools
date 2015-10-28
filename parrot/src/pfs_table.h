@@ -123,7 +123,7 @@ public:
 	int	md5_slow( const char *path, unsigned char *digest );
 	int 	search( const char *paths, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i);
 
-	void	follow_symlink( struct pfs_name *pname, int depth = 0 );
+	void	follow_symlink( struct pfs_name *pname, mode_t amode, int depth = 0 );
 	int	resolve_name( int is_special_syscall, const char *cname, pfs_name *pname, mode_t mode, bool do_follow_symlink = true, int depth = 0 );
 
 	/* mmap operations */

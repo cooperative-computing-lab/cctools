@@ -366,7 +366,7 @@ int pfs_table::complete_at_path( int dirfd, const char *path, char *full_path )
 	return 0;
 }
 
-void pfs_table::follow_symlink( struct pfs_name *pname, int depth )
+void pfs_table::follow_symlink( struct pfs_name *pname, mode_t mode, int depth )
 {
 	char link_target[PFS_PATH_MAX];
 	char absolute_link_target[PFS_PATH_MAX];
@@ -389,7 +389,7 @@ void pfs_table::follow_symlink( struct pfs_name *pname, int depth )
 				name_to_resolve = absolute_link_target;
 			}
 		}
-		if (resolve_name(0, name_to_resolve, &new_pname, X_OK, true, depth + 1)) {
+		if (resolve_name(0, name_to_resolve, &new_pname, mode, true, depth + 1)) {
 			*pname = new_pname;
 		}
 	}
@@ -543,7 +543,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 
 		/* Enable cross service symlink resolution */
 		if (do_follow_symlink && pfs_follow_symlinks) {
-			follow_symlink(pname, depth + 1);
+			follow_symlink(pname, mode, depth + 1);
 		}
 		return 1;
 	}
