@@ -25,8 +25,8 @@ See the file COPYING for details.
 #include "path.h"
 #include "buffer.h"
 
-#include "json.h"
-#include "json_aux.h"
+#include "jx.h"
+#include "jx_parse.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -328,10 +328,10 @@ void delete_projects_list(struct list *l)
 #define assign_new_value(new_var, old_var, option, type_c, type_json, field) \
 	type_c new_var = old_var;\
 	{\
-		json_value *jv = jsonA_getname_raw(J, #option);\
+		struct jx *jv = jx_object_lookup(J,#option); \
 		if(jv) {\
-			if(jistype(jv, type_json)) {\
-				new_var = jv->u.field;\
+			if(jv->type==type_json) {\
+				new_var = jv->field;\
 			} else {\
 				debug(D_NOTICE, #option " has not a valid value.");\
 				error_found = 1;\
@@ -353,31 +353,29 @@ int read_config_file(const char *config_file) {
 		return 1;
 	}
 
-	json_value *J = NULL;
 	int error_found = 0;
 
-	J = jsonA_parse_file(config_file);
+	struct jx *J = jx_parse_file(config_file);
 
-	if(!J || !jistype(J, json_object)) {
+	if(!J || J->type!=JX_OBJECT) {
 		debug(D_NOTICE, "Configuration file is not a valid json object: %s\n", config_file);
 		return 0;
 	}
 
-	assign_new_value(new_workers_max, workers_max, max-workers, int, json_integer, integer)
-	assign_new_value(new_workers_min, workers_min, min-workers, int, json_integer, integer)
-	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, json_integer, integer)
+	assign_new_value(new_workers_max, workers_max, max-workers, int, JX_INTEGER, integer_value)
+	assign_new_value(new_workers_min, workers_min, min-workers, int, JX_INTEGER, integer_value)
+	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, JX_INTEGER, integer_value)
 
-	assign_new_value(new_num_cores_option, num_cores_option, cores,    int, json_integer, integer)
-	assign_new_value(new_num_disk_option, num_disk_option, disk,       int, json_integer, integer)
-	assign_new_value(new_num_memory_option, num_memory_option, memory, int, json_integer, integer)
+	assign_new_value(new_num_cores_option, num_cores_option, cores,    int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_disk_option, num_disk_option, disk,       int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_memory_option, num_memory_option, memory, int, JX_INTEGER, integer_value)
 
 
-	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, json_double, dbl)
+	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_FLOAT, float_value)
 
-	assign_new_value(new_project_regex, project_regex, master-name, const char *, json_string, string.ptr)
-	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, json_string, string.ptr)
-	assign_new_value(new_extra_worker_args, extra_worker_args, worker-extra-options, const char *, json_string, string.ptr)
-
+	assign_new_value(new_project_regex, project_regex, master-name, const char *, JX_STRING, string_value)
+	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, JX_STRING, string_value)
+	assign_new_value(new_extra_worker_args, extra_worker_args, worker-extra-options, const char *, JX_STRING, string_value)
 
 	if(!new_project_regex || strlen(new_project_regex) == 0) {
 		debug(D_NOTICE, "%s: master name is missing.\n", config_file);
@@ -457,7 +455,7 @@ int read_config_file(const char *config_file) {
 	}
 
 end:
-	json_value_free(J);
+	jx_delete(J);
 	return !error_found;
 }
 
