@@ -41,7 +41,7 @@ void jx_parser_read_file( struct jx_parser *p, FILE *file );
 /** Attach parser to a string.  @param p A parser object.  @param str A JSON string to parse. */
 void jx_parser_read_string( struct jx_parser *p, const char *str );
 
-/** Parse a JX expression.  @param p A parser created by @ref jx_parser_create.  @return A JX expression, or null on parse failure. */
+/** Parse a JX expression. Note that in the event of a parse error, this function can return a partial result, reflecting the text that was parseable. You must call @ref jx_parser_errors to determine if the parse was successul.  @param p A parser created by @ref jx_parser_create.  @return A JX expression, or null if nothing was parsed. */
 struct jx * jx_parse( struct jx_parser *p );
 
 /** Return number of parse errors.  @param p A parser object.  @return Number of parse errors encountered. */

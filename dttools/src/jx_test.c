@@ -26,7 +26,7 @@ int main( int argc, char *argv[] )
 
 	struct jx *j = jx_parse(p);
 
-	if(j) {
+	if(!jx_parser_errors(p)) {
 		jx_print_file(j,stdout);
 		printf("\n");
 		jx_delete(j);
@@ -34,6 +34,7 @@ int main( int argc, char *argv[] )
 		return 0;
 	} else {
 		printf("\"jx parse error: %s\"\n",jx_parser_error_string(p));
+		jx_delete(j);
 		jx_parser_delete(p);
 		return 1;
 	}

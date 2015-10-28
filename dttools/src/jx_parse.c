@@ -219,7 +219,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		int i;
 		for(i=1;i<MAX_TOKEN_SIZE;i++) {
 			c = jx_getchar(s);
-			if(isalpha(c)) {	
+			if(isalpha(c)) {
 				s->token[i] = c;
 			} else {
 				jx_ungetchar(s,c);
@@ -262,6 +262,8 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 		i->next = 0;
 	} else {
 		jx_parse_error(s,"array items missing a comma or closing brace");
+		jx_item_delete(i);
+		return 0;
 	}
 
 	return i;
@@ -307,6 +309,8 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 		p->next = 0;
 	} else {
 		jx_parse_error(s,"key-value pairs missing a comma or closing brace");
+		jx_pair_delete(p);
+		return 0;
 	}
 
 	return p;
