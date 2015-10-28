@@ -214,12 +214,12 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		}
 		jx_parse_error(s,"integer constant too long");
 		return JX_TOKEN_ERROR;
-	} else if(isalpha(c)) {
+	} else if(isalpha(c) || c=='_') {
 		s->token[0] = c;
 		int i;
 		for(i=1;i<MAX_TOKEN_SIZE;i++) {
 			c = jx_getchar(s);
-			if(isalpha(c)) {
+			if(isalnum(c) || c=='_') {
 				s->token[i] = c;
 			} else {
 				jx_ungetchar(s,c);
