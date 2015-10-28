@@ -39,6 +39,8 @@ struct jx_parser {
 	char *error_string;
 	int errors;
 	int strict_mode;
+	int token_putback_valid;
+	jx_token_t token_putback;
 };
 
 struct jx_parser * jx_parser_create( int strict_mode )
@@ -157,9 +159,20 @@ static int jx_scan_string_char( struct jx_parser *s )
 	}
 }
 
+static void jx_scan_putback( struct jx_parser *s, jx_token_t t )
+{
+	s->token_putback = t;
+	s->token_putback_valid = 1;
+}
+
 static jx_token_t jx_scan( struct jx_parser *s )
 {
 	int c;
+
+	if(s->token_putback_valid) {
+		s->token_putback_valid = 0;
+		return s->token_putback;
+	}
 
 	retry:
 	c = jx_getchar(s);
@@ -246,6 +259,14 @@ static jx_token_t jx_scan( struct jx_parser *s )
 
 static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 {
+	jx_token_t t = jx_scan(s);
+	if(t==JX_TOKEN_RBRACKET) {
+		// empty list
+		return 0;
+	}
+
+	jx_scan_putback(s,t);
+
 	struct jx_item *i = jx_item(0,0);
 
 	i->value = jx_parse(s);
@@ -255,7 +276,7 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 		return 0;
 	}
 
-	jx_token_t t = jx_scan(s);
+	t = jx_scan(s);
 	if(t==JX_TOKEN_COMMA) {
 		i->next = jx_parse_item_list(s);
 	} else if(t==JX_TOKEN_RBRACKET) {
@@ -271,6 +292,14 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 		
 static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 {
+	jx_token_t t = jx_scan(s);
+	if(t==JX_TOKEN_RBRACE) {
+		// empty list
+		return 0;
+	}
+
+	jx_scan_putback(s,t);
+
 	struct jx_pair *p = jx_pair(0,0,0);
 
 	p->key = jx_parse(s);
@@ -288,7 +317,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 		}
 	}
 
-	jx_token_t t = jx_scan(s);
+	t = jx_scan(s);
 	if(t!=JX_TOKEN_COLON) {
 		jx_parse_error(s,"key-value pair must be separated by a colon");
 		jx_pair_delete(p);
