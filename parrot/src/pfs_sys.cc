@@ -531,11 +531,6 @@ int pfs_get_local_name( const char *rpath, char *lpath, char *firstline, size_t 
 	}
 }
 
-int pfs_resolve_name(int is_special_syscall, const char *path, struct pfs_name *pname )
-{
-	return pfs_current->table->resolve_name(is_special_syscall,path,pname);
-}
-
 /*
 A proposed POSIX standard includes a number of new system calls
 ending in -at, corresponding to traditional system calls.

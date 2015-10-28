@@ -231,10 +231,12 @@ that you specify.
 <p>
 The simplest name resolver is the <b>mountlist</b>, given
 by the <b>-m mountfile</b> option.  This file corresponds closely
-to <tt>/etc/ftsab</tt> in Unix.  A mountlist is simply a file with two
-columns.  The first column gives a logical directory or file name,
-while the second gives the physical path that it must be connected
-to.
+to <tt>/etc/fstab</tt> in Unix.  A mountlist is simply a file with one
+mount entry given per line. The first column is the path in Parrot's
+namespace. The next column can be either an access control specifier or
+a path in the host's filesystem. If two paths are given, then the third
+column can contain an optional access control specifier.
+
 <p>
 For example, if a database is stored at an FTP server under the
 path <tt>/anonftp/ftp.cs.wisc.edu/db</tt>, it may be spliced into the
@@ -245,6 +247,20 @@ Instruct Parrot to use the mountlist as follows:
 % cd /dbase
 % ls -la
 </code>
+
+<p>An <b>access control specifier</b> restricts the operations allowed under
+a given path. <tt>DENY</tt> blocks all operations, <tt>ENOENT</tt> makes
+operations fail as if nothing was present at the path, and <tt>LOCAL</tt> only
+allows operation on the local filesystem. For more fine-grained control,
+an access specifier can also be a combination of the letters <tt>r</tt>, <tt>w</tt>,
+and <tt>x</tt> to allow read, write, and execute/search, respectively.
+For example, a mountlist could contain the following entries
+<code>/     RX
+/home DENY
+/tmp  /tmp/sandbox
+/opt  /home/fred/project  RX
+</code></p>
+
 A single mount entry may be given on the command line
 with the <b>-M</b> option as follows:
 <code>% parrot_run -M /dbase=/anonftp/ftp.cs.wisc.edu/db tcsh</code>
