@@ -37,12 +37,14 @@ struct jx_parser {
 	FILE *source_file;
 	const char *source_string;
 	int errors;
+	int strict_mode;
 };
 
-struct jx_parser * jx_parser_create()
+struct jx_parser * jx_parser_create( int strict_mode )
 {
 	struct jx_parser *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
+	p->strict_mode = strict_mode;
 	return p;
 }
 
@@ -266,6 +268,14 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 		return 0;
 	}
 
+	if(s->strict_mode) {
+		if(p->key->type!=JX_STRING) {
+			jx_parse_error(s);
+			jx_pair_delete(p);
+			return 0;
+		}
+	}
+
 	jx_token_t t = jx_scan(s);
 	if(t!=JX_TOKEN_COLON) {
 		jx_parse_error(s);
@@ -316,7 +326,12 @@ struct jx * jx_parse( struct jx_parser *s )
 	case JX_TOKEN_NULL:
 		return jx_null();
 	case JX_TOKEN_SYMBOL:
-		return jx_symbol(s->token);
+		if(s->strict_mode) {
+			jx_parse_error(s);
+			return 0;
+		} else {
+			return jx_symbol(s->token);
+		}
 	case JX_TOKEN_RBRACE:
 	case JX_TOKEN_RBRACKET:
 	case JX_TOKEN_COMMA:
@@ -337,7 +352,7 @@ struct jx * jx_parse( struct jx_parser *s )
 
 struct jx * jx_parse_string( const char *str )
 {
-	struct jx_parser *p = jx_parser_create();
+	struct jx_parser *p = jx_parser_create(0);
 	jx_parser_read_string(p,str);
 	struct jx * j = jx_parse(p);
 	if(jx_parser_errors(p)) {
@@ -349,9 +364,9 @@ struct jx * jx_parse_string( const char *str )
 	return j;
 }
 
-struct jx * jx_parse_file( FILE *file )
+struct jx * jx_parse_stream( FILE *file )
 {
-	struct jx_parser *p = jx_parser_create();
+	struct jx_parser *p = jx_parser_create(0);
 	jx_parser_read_file(p,file);
 	struct jx * j = jx_parse(p);
 	if(jx_parser_errors(p)) {
@@ -363,11 +378,11 @@ struct jx * jx_parse_file( FILE *file )
 	return j;
 }
 
-struct jx * jx_parse_stream( const char *name )
+struct jx * jx_parse_file( const char *name )
 {
 	FILE *file = fopen(name,"r");
 	if(!file) return 0;
-	struct jx *j = jx_parse_file(file);
+	struct jx *j = jx_parse_stream(file);
 	fclose(file);
 	return j;
 }

@@ -30,7 +30,7 @@ struct jx * jx_parse_string( const char *str );
 struct jx * jx_parse_stream( FILE *file );
 
 /** Parse a file to a JX expression.  @param name The name of a file containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
-struct jx * jx_parse_stream( const char *name );
+struct jx * jx_parse_file( const char *name );
 
 /** Create a JX parser object.  @return A parser object. */
 struct jx_parser * jx_parser_create();
