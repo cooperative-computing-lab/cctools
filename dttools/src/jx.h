@@ -110,6 +110,9 @@ struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next
 /** Create a JX array item.  @param value The value of this item.  @param next The next item in the linked list.  @return An array item. */
 struct jx_item * jx_item( struct jx *value, struct jx_item *next );
 
+/** Test an expression's type.  @param j An expression. @param type The desired type. @return True if the expression type matches, false otherwise. */
+int jx_istype( struct jx *j, jx_type_t type );
+
 /** Test two expressions for equality. @param j A constant expression. @param k A constant expression. @return True if equal, false if not.
 */
 int jx_equals( struct jx *j, struct jx *k );

@@ -185,6 +185,11 @@ void jx_delete( struct jx *j )
 	}
 }
 
+int jx_istype( struct jx *j, jx_type_t type )
+{
+	return j && j->type==type;
+}
+
 int jx_pair_equals( struct jx_pair *j, struct jx_pair *k ) 
 {
 	return jx_equals(j->key,k->key) && jx_equals(j->value,k->value) && jx_pair_equals(j->next,k->next);
