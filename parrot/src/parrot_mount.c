@@ -18,7 +18,7 @@ See the file COPYING for details.
 
 static void show_help()
 {
-	printf("Use: parrot_mount [OPTIONS] PATH DEST\n");
+	printf("Use: parrot_mount [OPTIONS] PATH DEST RWX\n");
 	printf("     parrot_mount [OPTIONS] --unmount PATH\n");
 	printf("     parrot_mount [OPTIONS] --disable\n");
 	printf("\n");
@@ -45,7 +45,7 @@ int main( int argc, char *argv[] )
 {
 	int c;
 	mount_mode_t mode = MODE_MOUNT;
-	int expected_args = 2;
+	int expected_args = 3;
 
 	static const struct option long_options[] = {
 		{"help",  no_argument, 0, 'h'},
@@ -89,7 +89,7 @@ int main( int argc, char *argv[] )
 	}
 
 	if(mode==MODE_DISABLE) {
-		int result = parrot_mount(0,0);
+		int result = parrot_mount(0,0,0);
 		if(result==0) {
 			return 0;
 		} else {
@@ -110,7 +110,8 @@ int main( int argc, char *argv[] )
 
 	if(mode==MODE_MOUNT) {
 		const char *destination = argv[optind+1];
-		int result = parrot_mount(path,destination);
+		const char *perms = argv[optind+2];
+		int result = parrot_mount(path,destination,perms);
 		if(result<0) {
 			fprintf(stderr,"parrot_mount: couldn't mount %s as %s: %s\n",path,destination,strerror(errno));
 			return 1;

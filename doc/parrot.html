@@ -269,7 +269,7 @@ with the <b>-M</b> option as follows:
 The mount list may also be changed at runtime via <tt>parrot_mount</tt>,
 if parrot is run with the <tt>--dynamic-mounts</tt> option:
 <code>% parrot_run --dynamic-mounts bash
-% parrot_mount /gnu /anonftp/ftp.gnu.org/gnu
+% parrot_mount /gnu /anonftp/ftp.gnu.org/gnu RWX
 % ls /gnu
 % parrot_mount --unmount /gnu
 % exit

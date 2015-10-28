@@ -67,7 +67,7 @@ int		pfs_mkdir( const char *path, mode_t mode );
 int		pfs_rmdir( const char *path );
 struct dirent *	pfs_fdreaddir( int fd );
 
-int		pfs_mount( const char *path, const char *device );
+int		pfs_mount( const char *path, const char *device, const char *mode );
 int		pfs_unmount( const char *path );
 
 int		pfs_openat( int dirfd, const char *path, int flags, mode_t mode, char *native_path, size_t len );

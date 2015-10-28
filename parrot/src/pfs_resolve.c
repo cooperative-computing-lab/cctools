@@ -84,7 +84,7 @@ int pfs_resolve_remove_entry( const char *prefix )
 	return 0;
 }
 
-int parse_mode( const char * options ) {
+mode_t pfs_resolve_parse_mode( const char * options ) {
 	unsigned int i;
 	int mode = 0;
 	for(i = 0; i < strlen(options); i++) {
@@ -145,15 +145,15 @@ void pfs_resolve_file_config( const char *filename )
 		} else if(fields<2) {
 			fatal("%s has an error on line %d\n",filename,linenum);
 		} else if(fields==2) {
-			mode = parse_mode(redirect);
+			mode = pfs_resolve_parse_mode(redirect);
 			if(mode < 0) {
 				mode = R_OK|W_OK|X_OK; /* default mode */
-				add_mount_entry(prefix,redirect,mode);
+				pfs_resolve_add_entry(prefix,redirect,mode);
 			} else {
-				add_mount_entry(prefix,prefix,mode);
+				pfs_resolve_add_entry(prefix,prefix,mode);
 			}
 		} else {
-			mode = parse_mode(options);
+			mode = pfs_resolve_parse_mode(options);
 			if(mode < 0) {
 				fatal("%s has invalid options on line %d\n",filename,linenum);
 			}

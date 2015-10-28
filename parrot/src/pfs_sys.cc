@@ -234,10 +234,10 @@ char * pfs_getcwd( char *path, pfs_size_t size )
 	return result;
 }
 
-int pfs_mount( const char *path, const char *device )
+int pfs_mount( const char *path, const char *device, const char *mode )
 {
 	BEGIN
-	debug(D_LIBCALL,"mount %s %s",path,device);
+	debug(D_LIBCALL,"mount %s %s %s",path,device,mode);
 
 	if(!path && !device) {
 		pfs_allow_dynamic_mounts = 0;
@@ -247,7 +247,7 @@ int pfs_mount( const char *path, const char *device )
 			result = -1;
 			errno = EINVAL;
 		} else {
-			pfs_resolve_add_entry(path,device);
+			pfs_resolve_add_entry(path,device,pfs_resolve_parse_mode(mode));
 			result = 0;
 		}
 	} else {
