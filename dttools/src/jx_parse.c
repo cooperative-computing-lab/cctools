@@ -36,6 +36,7 @@ struct jx_parser {
 	char token[MAX_TOKEN_SIZE];
 	FILE *source_file;
 	const char *source_string;
+	char *error_string;
 	int errors;
 	int strict_mode;
 };
@@ -63,13 +64,21 @@ int jx_parser_errors( struct jx_parser *p )
 	return p->errors;
 }
 
+const char * jx_parser_error_string( struct jx_parser *p )
+{
+	return p->error_string;
+}
+
 void jx_parser_delete( struct jx_parser *p )
 {
+	if(p->error_string) free(p->error_string);
 	free(p);
 }
 
-static void jx_parse_error( struct jx_parser *p )
+static void jx_parse_error( struct jx_parser *p, const char *str )
 {
+	if(p->error_string) free(p->error_string);
+	p->error_string = strdup(str);
 	p->errors++;
 }
 
@@ -113,13 +122,14 @@ static int jx_scan_unicode( struct jx_parser *s )
 	int uc;
 	if(sscanf(str,"%x",&uc)) {
 		if(uc<=0x7f) {
+			// only accept basic ascii characters
 			return uc;
 		} else {
-			jx_parse_error(s);
+			jx_parse_error(s,"unsupported unicode escape string");
 			return -1;
 		}
 	} else {
-		jx_parse_error(s);
+		jx_parse_error(s,"invalid unicode escape string");
 		return -1;
 	}
 }
@@ -183,7 +193,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				s->token[i] = n;
 			}
 		}
-		jx_parse_error(s);
+		jx_parse_error(s,"string constant too long");
 		return JX_TOKEN_ERROR;
 	} else if(strchr("+-0123456789.",c)) {
 		s->token[0] = c;
@@ -202,7 +212,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				}
 			}
 		}
-		jx_parse_error(s);
+		jx_parse_error(s,"integer constant too long");
 		return JX_TOKEN_ERROR;
 	} else if(isalpha(c)) {
 		s->token[0] = c;
@@ -225,7 +235,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				}
 			}
 		}
-		jx_parse_error(s);
+		jx_parse_error(s,"symbol too long");
 		return JX_TOKEN_ERROR;
 	} else {
 		s->token[0] = c;
@@ -251,7 +261,7 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 	} else if(t==JX_TOKEN_RBRACKET) {
 		i->next = 0;
 	} else {
-		jx_parse_error(s);
+		jx_parse_error(s,"array items missing a comma or closing brace");
 	}
 
 	return i;
@@ -270,7 +280,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 
 	if(s->strict_mode) {
 		if(p->key->type!=JX_STRING) {
-			jx_parse_error(s);
+			jx_parse_error(s,"key-value pair must have a string as the key");
 			jx_pair_delete(p);
 			return 0;
 		}
@@ -278,7 +288,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 
 	jx_token_t t = jx_scan(s);
 	if(t!=JX_TOKEN_COLON) {
-		jx_parse_error(s);
+		jx_parse_error(s,"key-value pair must be separated by a colon");
 		jx_pair_delete(p);
 		return 0;
 	}
@@ -296,7 +306,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	} else if(t==JX_TOKEN_RBRACE) {
 		p->next = 0;
 	} else {
-		jx_parse_error(s);
+		jx_parse_error(s,"key-value pairs missing a comma or closing brace");
 	}
 
 	return p;
@@ -327,7 +337,7 @@ struct jx * jx_parse( struct jx_parser *s )
 		return jx_null();
 	case JX_TOKEN_SYMBOL:
 		if(s->strict_mode) {
-			jx_parse_error(s);
+			jx_parse_error(s,"symbols are not allowed in strict parsing mode");
 			return 0;
 		} else {
 			return jx_symbol(s->token);
@@ -337,7 +347,7 @@ struct jx * jx_parse( struct jx_parser *s )
 	case JX_TOKEN_COMMA:
 	case JX_TOKEN_COLON:
 	case JX_TOKEN_ERROR:
-		jx_parse_error(s);
+		jx_parse_error(s,"unexpected token");
 		return 0;
 	}
 
@@ -346,7 +356,7 @@ struct jx * jx_parse( struct jx_parser *s )
 	should be handled above.  But just in case...
 	*/
 
-	jx_parse_error(s);
+	jx_parse_error(s,"parse error");
 	return 0;
 }
 
