@@ -25,4 +25,7 @@ void jx_print_file( struct jx *j, FILE *file );
 
 void jx_print_buffer( struct jx *j, buffer_t *buffer);
 
+/** Print a C string in JSON format (with escape codes) into a buffer.  @param s A C string.  @param buffer The buffer for output.  @see buffer.h */
+void jx_escape_string( const char *s, buffer_t *b );
+
 #endif

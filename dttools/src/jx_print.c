@@ -32,7 +32,7 @@ static void jx_item_print( struct jx_item *item, buffer_t *b )
 	}
 }
 
-static void jx_string_print( const char *s, buffer_t *b )
+void jx_escape_string( const char *s, buffer_t *b )
 {
 	if(!s) return;
 
@@ -97,7 +97,7 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			buffer_printf(b,"%s",j->symbol_name);
 			break;
 		case JX_STRING:
-			jx_string_print(j->string_value,b);
+			jx_escape_string(j->string_value,b);
 			break;
 		case JX_ARRAY:
 			buffer_putstring(b,"[");
