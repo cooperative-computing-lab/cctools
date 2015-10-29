@@ -61,7 +61,7 @@ public:
 	int		fchdir( int fd );
 	int		fcntl( int fd, int cmd, void *arg );
 	int		fchmod( int fd, mode_t mode );
-	int		fchown( int fd, uid_t uid, gid_t gid );
+	int		fchown( int fd, struct pfs_process *p, uid_t uid, gid_t gid );
 	int		flock( int fd, int op );
 	int		bind( int fd, char *lpath, size_t len );
 
@@ -80,7 +80,7 @@ public:
 	int	lstat( const char *name, struct pfs_stat *buf );
 	int	access( const char *name, mode_t mode );
 	int	chmod( const char *name, mode_t mode );
-	int	chown( const char *name, uid_t uid, gid_t gid );
+	int	chown( const char *name, struct pfs_process *p, uid_t uid, gid_t gid );
 	int	lchown( const char *name, uid_t uid, gid_t gid );
 	int	truncate( const char *path, pfs_off_t length );
 	int	utime( const char *path, struct utimbuf *buf );

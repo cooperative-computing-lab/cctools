@@ -1055,10 +1055,7 @@ int pfs_table::fchmod( int fd, mode_t mode )
 	return pointers[fd]->file->fchmod(mode);
 }
 
-extern uid_t pfs_uid;
-extern gid_t pfs_gid;
-
-int pfs_table::fchown( int fd, uid_t uid, gid_t gid )
+int pfs_table::fchown( int fd, struct pfs_process *p, uid_t uid, gid_t gid )
 {
 	CHECK_FD(fd);
 
@@ -1069,7 +1066,7 @@ int pfs_table::fchown( int fd, uid_t uid, gid_t gid )
 	then fake success, as tools like cp do this very often.
 	*/
 
-	if(result<0 && errno==ENOSYS && uid==pfs_uid && gid==pfs_gid) {
+	if(result<0 && errno==ENOSYS && uid==p->euid && gid==p->egid) {
 		result = 0;
 	}
 
@@ -1156,7 +1153,7 @@ int pfs_table::chmod( const char *n, mode_t mode )
 	return result;
 }
 
-int pfs_table::chown( const char *n, uid_t uid, gid_t gid )
+int pfs_table::chown( const char *n, struct pfs_process *p, uid_t uid, gid_t gid )
 {
 	pfs_name pname;
 	int result=-1;
@@ -1170,7 +1167,7 @@ int pfs_table::chown( const char *n, uid_t uid, gid_t gid )
 	then fake success, as tools like cp do this very often.
 	*/
 
-	if(result<0 && errno==ENOSYS && uid==pfs_uid && gid==pfs_gid) {
+	if(result<0 && errno==ENOSYS && uid==p->euid && gid==p->egid) {
 		result = 0;
 	}
 

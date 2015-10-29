@@ -1793,7 +1793,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if (p->table->isnative(args[0])) {
 				if (entering) debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else if (entering) {
-				p->syscall_result = pfs_fchown(args[0],args[1],args[2]);
+				p->syscall_result = pfs_fchown(args[0],p,args[1],args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
 			}
@@ -2089,7 +2089,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_chown:
 			if(entering) {
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0));
-				p->syscall_result = pfs_chown(path,args[1],args[2]);
+				p->syscall_result = pfs_chown(path,p,args[1],args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
 			}
@@ -2495,7 +2495,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			if(entering) {
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0));
-				p->syscall_result = pfs_fchownat(args[0],path,args[2],args[3],args[4]);
+				p->syscall_result = pfs_fchownat(args[0],path,p,args[2],args[3],args[4]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
 			}
