@@ -36,6 +36,8 @@ Will create the following output:
 @see jx_print.h
 */
 
+#include <stdint.h>
+
 /** JX atomic type.  */
 
 typedef enum {
@@ -48,6 +50,8 @@ typedef enum {
 	JX_ARRAY,	/**< array containing values */
 	JX_OBJECT,	/**< object containing key-value pairs */
 } jx_type_t;
+
+typedef int64_t jx_int_t;
 
 /** JX item linked-list used by @ref JX_ARRAY and @ref jx.items */
  
@@ -69,8 +73,8 @@ struct jx_pair {
 struct jx {
 	jx_type_t type;               /**< type of this value */
 	union {
-		int boolean_value;    /**< value of @ref JX_BOOLEAN */
-		int integer_value;    /**< value of @ref JX_INTEGER */
+		int boolean_value;      /**< value of @ref JX_BOOLEAN */
+		jx_int_t integer_value; /**< value of @ref JX_INTEGER */
 		double float_value;   /**< value of @ref JX_FLOAT */
 		char * string_value;  /**< value of @ref JX_STRING */
 		char * symbol_name;   /**< value of @ref JX_SYMBOL */
@@ -86,7 +90,7 @@ struct jx * jx_null();
 struct jx * jx_boolean( int boolean_value );
 
 /** Create a JX integer value. @param integer_value A C integer. @return a JX integer value. */
-struct jx * jx_integer( int integer_value );
+struct jx * jx_integer( jx_int_t integer_value );
 
 /** Create a JX floating point value. @param float_value A C double precision floating point.  @return a JX float value. */
 struct jx * jx_float( double float_value );

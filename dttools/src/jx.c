@@ -53,7 +53,7 @@ struct jx * jx_string( const char *string_value )
 	return j;
 }
 
-struct jx * jx_integer( int integer_value )
+struct jx * jx_integer( jx_int_t integer_value )
 {
 	struct jx *j = jx_create(JX_INTEGER);
 	j->integer_value = integer_value;

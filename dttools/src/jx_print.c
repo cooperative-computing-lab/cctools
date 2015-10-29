@@ -91,7 +91,7 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			buffer_printf(b,"%s",j->boolean_value ? "true" : "false");
 			break;
 		case JX_INTEGER:
-			buffer_printf(b,"%d",j->integer_value);
+			buffer_printf(b,"%lld",(long long)j->integer_value);
 			break;
 		case JX_SYMBOL:
 			buffer_printf(b,"%s",j->symbol_name);

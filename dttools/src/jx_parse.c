@@ -359,7 +359,7 @@ struct jx * jx_parse( struct jx_parser *s )
 	case JX_TOKEN_STRING:
 		return jx_string(strdup(s->token));
 	case JX_TOKEN_INTEGER:
-		return jx_integer(atoi(s->token));
+		return jx_integer((jx_int_t)atoll(s->token));
 	case JX_TOKEN_FLOAT:
 		return jx_float(atof(s->token));
 	case JX_TOKEN_TRUE:
