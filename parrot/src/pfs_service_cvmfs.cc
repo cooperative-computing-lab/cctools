@@ -644,10 +644,10 @@ cvmfs_filesystem *cvmfs_filesystem::createMatch(char const *repo_name) const
  * escaped with a backslash.
  *
  * Example for /cvmfs/cms.cern.ch:
- * cms.cern.ch:pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/opt/cms
+ * cms.cern.ch:pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch
  *
  * Example with wildcard (using <*> to avoid compiler warning about nested comment):
- * *.cern.ch:pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/opt/<*>
+ * *.cern.ch:pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/cvmfs/<*>.cern.ch
  */
 static void cvmfs_read_config()
 {
