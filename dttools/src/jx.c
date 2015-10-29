@@ -148,7 +148,7 @@ void jx_pair_delete( struct jx_pair *pair )
 	if(!pair) return;
 	jx_delete(pair->key);
 	jx_delete(pair->value);
-       	jx_pair_delete(pair->next);
+	jx_pair_delete(pair->next);
 	free(pair);
 }
 
@@ -156,7 +156,7 @@ void jx_item_delete( struct jx_item *item )
 {
 	if(!item) return;
 	jx_delete(item->value);
-       	jx_item_delete(item->next);
+	jx_item_delete(item->next);
 	free(item);
 }
 
@@ -190,12 +190,12 @@ int jx_istype( struct jx *j, jx_type_t type )
 	return j && j->type==type;
 }
 
-int jx_pair_equals( struct jx_pair *j, struct jx_pair *k ) 
+int jx_pair_equals( struct jx_pair *j, struct jx_pair *k )
 {
 	return jx_equals(j->key,k->key) && jx_equals(j->value,k->value) && jx_pair_equals(j->next,k->next);
 }
 
-int jx_item_equals( struct jx_item *j, struct jx_item *k ) 
+int jx_item_equals( struct jx_item *j, struct jx_item *k )
 {
 	return jx_equals(j->value,k->value) && jx_item_equals(j->next,k->next);
 }

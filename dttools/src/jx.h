@@ -54,7 +54,7 @@ typedef enum {
 typedef int64_t jx_int_t;
 
 /** JX item linked-list used by @ref JX_ARRAY and @ref jx.items */
- 
+
 struct jx_item {
 	struct jx      *value;	/**< value of this item */
 	struct jx_item *next;	/**< pointer to next item */
