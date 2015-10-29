@@ -1436,8 +1436,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					if ((uid_t) args[2] != (uid_t) -1) {
 						pfs_suid = args[2];
 					}
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
 				}
-				divert_to_dummy(p,0);
 			}
 			break;
 
@@ -1451,8 +1453,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					if ((uid_t) args[1] != (uid_t) -1) {
 						pfs_euid = args[1];
 					}
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
 				}
-				divert_to_dummy(p,0);
 			}
 			break;
 
@@ -1461,8 +1465,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if (entering) {
 				if (pfs_fake_setuid) {
 					pfs_ruid = pfs_euid = pfs_suid = args[0];
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
 				}
-				divert_to_dummy(p,0);
 			}
 			break;
 
@@ -1479,8 +1485,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					if ((gid_t) args[2] != (gid_t) -1) {
 						pfs_sgid = args[2];
 					}
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
 				}
-				divert_to_dummy(p,0);
 			}
 			break;
 
@@ -1494,8 +1502,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					if ((gid_t) args[1] != (gid_t) -1) {
 						pfs_egid = args[1];
 					}
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
 				}
-				divert_to_dummy(p,0);
 			}
 			break;
 
@@ -1504,8 +1514,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if (entering) {
 				if (pfs_fake_setgid) {
 					pfs_rgid = pfs_egid = pfs_sgid = args[0];
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
 				}
-				divert_to_dummy(p,0);
 			}
 			break;
 
