@@ -3377,7 +3377,7 @@ int pfs_dispatch_isexe( const char *path )
 
 	if(pfs_stat(path,&buf)!=0) return 0;
 
-	if(buf.st_mode&S_ISUID || buf.st_mode&S_ISGID) {
+	if((!pfs_fake_setuid && buf.st_mode&S_ISUID) || (!pfs_fake_setgid && buf.st_mode&S_ISGID)) {
 		debug(D_NOTICE,"cannot execute the program %s because it is setuid.",path);
 		errno = EACCES;
 		return 0;
