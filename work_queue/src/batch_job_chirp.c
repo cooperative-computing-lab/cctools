@@ -76,9 +76,8 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 
 	buffer_putliteral(&B, "\"executable\":\"/bin/sh\"");
 
-	buffer_putfstring(&B, ",\"arguments\":[\"sh\",\"-c\",\"{\\n");
+	buffer_putfstring(&B, ",\"arguments\":[\"sh\",\"-c\",\"");
 	jsonA_escapestring(&B, cmd);
-	buffer_putliteral(&B, "\\n}");
 	buffer_putliteral(&B, "\"]");
 
 	if(envlist) {
