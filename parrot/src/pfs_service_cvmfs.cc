@@ -59,7 +59,7 @@ static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
 static const char *default_cvmfs_repo =
 "*:try_local_filesystem \
 \
- *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/* \
+ *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/cvmfs/*.cern.ch;http://cernvmfs.gridpp.rl.ac.uk/cvmfs/*.cern.ch;http://cvmfs.racf.bnl.gov/cvmfs/*.cern.ch \
 \
  *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/*";
 
