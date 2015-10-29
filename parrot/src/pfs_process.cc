@@ -36,6 +36,9 @@ int parrot_dir_fd = -1;
 static struct itable * pfs_process_table = 0;
 static int nprocs = 0;
 
+extern uid_t pfs_uid;
+extern gid_t pfs_gid;
+
 struct pfs_process * pfs_process_lookup( pid_t pid )
 {
 	return (struct pfs_process *) itable_lookup(pfs_process_table,pid);
@@ -213,9 +216,8 @@ void pfs_process_bootstrapfd( void )
 	}
 }
 
-struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table )
+struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, int share_table )
 {
-	struct pfs_process *actual_parent;
 	struct pfs_process *child;
 
 	if(!pfs_process_table) pfs_process_table = itable_create(0);
@@ -229,7 +231,6 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	memset(child->name, 0, sizeof(child->name));
 	memset(child->new_logical_name, 0, sizeof(child->new_logical_name));
 	child->pid = pid;
-	child->ppid = ppid;
 	child->tgid = pid;
 	child->state = PFS_PROCESS_STATE_KERNEL;
 	child->flags = PFS_PROCESS_FLAGS_STARTUP;
@@ -244,19 +245,29 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	child->completing_execve = 0;
 	child->exefd = -1;
 
-	actual_parent = pfs_process_lookup(ppid);
+	if(parent) {
+		child->ppid = parent->pid;
+		child->ruid = parent->ruid;
+		child->euid = parent->euid;
+		child->suid = parent->suid;
+		child->rgid = parent->rgid;
+		child->egid = parent->egid;
+		child->sgid = parent->sgid;
 
-	if(actual_parent) {
-		child->flags |= actual_parent->flags;
+		child->flags |= parent->flags;
 		if(share_table) {
-			child->table = actual_parent->table;
+			child->table = parent->table;
 			child->table->addref();
 		} else {
-			child->table = actual_parent->table->fork();
+			child->table = parent->table->fork();
 		}
-		strcpy(child->name,actual_parent->name);
-		child->umask = actual_parent->umask;
+		strcpy(child->name,parent->name);
+		child->umask = parent->umask;
 	} else {
+		child->ppid = getpid();
+		child->ruid = child->euid = child->suid = pfs_uid;
+		child->rgid = child->egid = child->sgid = pfs_gid;
+
 		extern int parrot_fd_max;
 
 		child->table = new pfs_table;
@@ -275,7 +286,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 
 	nprocs++;
 
-	debug(D_PSTREE,"%d %s %d", ppid, share_table ? "newthread" : "fork", pid);
+	debug(D_PSTREE,"%d %s %d", child->ppid, share_table ? "newthread" : "fork", pid);
 
 	return child;
 }

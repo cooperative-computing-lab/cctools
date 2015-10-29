@@ -102,12 +102,8 @@ const char *pfs_initial_working_directory=0;
 
 char *pfs_false_uname = 0;
 char pfs_ldso_path[PATH_MAX];
-uid_t pfs_ruid = 0;
-uid_t pfs_euid = 0;
-uid_t pfs_suid = 0;
-gid_t pfs_rgid = 0;
-gid_t pfs_egid = 0;
-gid_t pfs_sgid = 0;
+uid_t pfs_uid = 0;
+gid_t pfs_gid = 0;
 const char * pfs_username = 0;
 int pfs_fake_setuid = 0;
 int pfs_fake_setgid = 0;
@@ -352,7 +348,7 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 		} else {
 			clone_files = p->syscall_args[0]&CLONE_FILES;
 		}
-		child = pfs_process_create(cpid,pid,clone_files);
+		child = pfs_process_create(cpid,p,clone_files);
 		child->syscall_result = 0;
 		if(p->syscall_args[0]&CLONE_THREAD)
 			child->tgid = p->tgid;
@@ -673,7 +669,7 @@ int main( int argc, char *argv[] )
 			pfs_follow_symlinks = 0;
 			break;
 		case 'G':
-			pfs_rgid = pfs_egid = pfs_sgid = atoi(optarg);
+			pfs_gid = atoi(optarg);
 			break;
 		case 'H':
 			/* deprecated */
@@ -774,7 +770,7 @@ int main( int argc, char *argv[] )
 			pfs_master_timeout = string_time_parse(optarg);
 			break;
 		case 'U':
-			pfs_ruid = pfs_euid = pfs_suid = atoi(optarg);
+			pfs_uid = atoi(optarg);
 			break;
 		case 'u':
 			pfs_username = optarg;
@@ -862,8 +858,8 @@ int main( int argc, char *argv[] )
 		fclose(fp);
 	}
 
-	pfs_ruid = pfs_euid = pfs_suid = getuid();
-	pfs_rgid = pfs_egid = pfs_sgid = getgid();
+	pfs_uid = getuid();
+	pfs_gid = getgid();
 
 	if (http_proxy)
 		setenv("HTTP_PROXY", http_proxy, 1);
@@ -894,10 +890,10 @@ int main( int argc, char *argv[] )
 	if(s && !pfs_false_uname) pfs_false_uname = xxstrdup(pfs_false_uname);
 
 	s = getenv("PARROT_UID");
-	if(s) pfs_ruid = pfs_euid = pfs_suid = atoi(s);
+	if(s) pfs_uid = atoi(s);
 
 	s = getenv("PARROT_GID");
-	if(s) pfs_rgid = pfs_egid = pfs_sgid = atoi(s);
+	if(s) pfs_gid = atoi(s);
 
 	s = getenv("PARROT_TIMEOUT");
 	if(s) pfs_master_timeout = string_time_parse(s);
@@ -1102,7 +1098,7 @@ int main( int argc, char *argv[] )
 	if (tracer_attach(pid) == -1)
 		fatal("could not trace child");
 	kill(pid, SIGUSR1);
-	p = pfs_process_create(pid,getpid(),0);
+	p = pfs_process_create(pid,NULL,0);
 	if(!p) {
 		if(pfs_write_rval) {
 			write_rval("noattach", 0);

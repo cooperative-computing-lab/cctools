@@ -100,8 +100,6 @@ extern "C" {
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_false_uname;
-extern uid_t pfs_ruid, pfs_euid, pfs_suid;
-extern gid_t pfs_rgid, pfs_egid, pfs_sgid;
 extern int pfs_fake_setuid;
 extern int pfs_fake_setgid;
 
@@ -1377,35 +1375,35 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_getuid32:
 		case SYSCALL32_getuid:
 			if (entering)
-				divert_to_dummy(p,pfs_ruid);
+				divert_to_dummy(p,p->ruid);
 			break;
 
 		case SYSCALL32_geteuid32:
 		case SYSCALL32_geteuid:
 		case SYSCALL32_setfsuid32:
 			if (entering)
-				divert_to_dummy(p,pfs_euid);
+				divert_to_dummy(p,p->euid);
 			break;
 
 		case SYSCALL32_getgid32:
 		case SYSCALL32_getgid:
 			if (entering)
-				divert_to_dummy(p,pfs_rgid);
+				divert_to_dummy(p,p->rgid);
 			break;
 
 		case SYSCALL32_getegid32:
 		case SYSCALL32_getegid:
 		case SYSCALL32_setfsgid32:
 			if (entering)
-				divert_to_dummy(p,pfs_egid);
+				divert_to_dummy(p,p->egid);
 			break;
 
 		case SYSCALL32_getresuid32:
 		case SYSCALL32_getresuid:
 			if (entering) {
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_ruid,POINTER(args[0]),sizeof(pfs_ruid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_euid,POINTER(args[1]),sizeof(pfs_euid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_suid,POINTER(args[2]),sizeof(pfs_suid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->ruid,POINTER(args[0]),sizeof(p->ruid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->euid,POINTER(args[1]),sizeof(p->euid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->suid,POINTER(args[2]),sizeof(p->suid),TRACER_O_ATOMIC));
 				divert_to_dummy(p,0);
 			}
 			break;
@@ -1413,9 +1411,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_getresgid32:
 		case SYSCALL32_getresgid:
 			if (entering) {
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_rgid,POINTER(args[0]),sizeof(pfs_rgid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_egid,POINTER(args[1]),sizeof(pfs_egid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_sgid,POINTER(args[2]),sizeof(pfs_sgid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->rgid,POINTER(args[0]),sizeof(p->rgid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->egid,POINTER(args[1]),sizeof(p->egid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->sgid,POINTER(args[2]),sizeof(p->sgid),TRACER_O_ATOMIC));
 				divert_to_dummy(p,0);
 			}
 			break;
@@ -1428,13 +1426,13 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if (entering) {
 				if (pfs_fake_setuid) {
 					if ((uid_t) args[0] != (uid_t) -1) {
-						pfs_ruid = args[0];
+						p->ruid = args[0];
 					}
 					if ((uid_t) args[1] != (uid_t) -1) {
-						pfs_euid = args[1];
+						p->euid = args[1];
 					}
 					if ((uid_t) args[2] != (uid_t) -1) {
-						pfs_suid = args[2];
+						p->suid = args[2];
 					}
 					divert_to_dummy(p,0);
 				} else {
@@ -1448,10 +1446,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if (entering) {
 				if (pfs_fake_setuid) {
 					if ((uid_t) args[0] != (uid_t) -1) {
-						pfs_ruid = args[0];
+						p->ruid = args[0];
 					}
 					if ((uid_t) args[1] != (uid_t) -1) {
-						pfs_euid = args[1];
+						p->euid = args[1];
 					}
 					divert_to_dummy(p,0);
 				} else {
@@ -1464,7 +1462,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_setuid:
 			if (entering) {
 				if (pfs_fake_setuid) {
-					pfs_ruid = pfs_euid = pfs_suid = args[0];
+					p->ruid = p->euid = p->suid = args[0];
 					divert_to_dummy(p,0);
 				} else {
 					divert_to_dummy(p,-EPERM);
@@ -1477,13 +1475,13 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if (entering) {
 				if (pfs_fake_setgid) {
 					if ((gid_t) args[0] != (gid_t) -1) {
-						pfs_rgid = args[0];
+						p->rgid = args[0];
 					}
 					if ((gid_t) args[1] != (gid_t) -1) {
-						pfs_egid = args[1];
+						p->egid = args[1];
 					}
 					if ((gid_t) args[2] != (gid_t) -1) {
-						pfs_sgid = args[2];
+						p->sgid = args[2];
 					}
 					divert_to_dummy(p,0);
 				} else {
@@ -1497,10 +1495,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if (entering) {
 				if (pfs_fake_setgid) {
 					if ((gid_t) args[0] != (gid_t) -1) {
-						pfs_rgid = args[0];
+						p->rgid = args[0];
 					}
 					if ((gid_t) args[1] != (gid_t) -1) {
-						pfs_egid = args[1];
+						p->egid = args[1];
 					}
 					divert_to_dummy(p,0);
 				} else {
@@ -1513,7 +1511,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_setgid:
 			if (entering) {
 				if (pfs_fake_setgid) {
-					pfs_rgid = pfs_egid = pfs_sgid = args[0];
+					p->rgid = p->egid = p->sgid = args[0];
 					divert_to_dummy(p,0);
 				} else {
 					divert_to_dummy(p,-EPERM);

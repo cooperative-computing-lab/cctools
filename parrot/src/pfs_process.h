@@ -37,6 +37,8 @@ enum pfs_process_state {
 struct pfs_process {
 	char name[PFS_PATH_MAX];
 	pid_t pid, ppid, tgid;
+	uid_t ruid, euid, suid;
+	gid_t rgid, egid, sgid;
 	mode_t umask;
 	int flags;
 
@@ -63,7 +65,7 @@ struct pfs_process {
 	char tmp[4096];
 };
 
-struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table );
+struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, int share_table );
 void pfs_process_exec( struct pfs_process *p );
 void pfs_process_stop( struct pfs_process *p, int status, struct rusage *usage );
 
