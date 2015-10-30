@@ -18,7 +18,7 @@ OBJECTS_SERVER = $(SOURCES_SERVER:%.c=%.o)
 PROGRAMS = chirp chirp_get chirp_put chirp_server chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute
 PUBLIC_HEADERS = chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h confuga.h
 SCRIPTS = chirp_audit_cluster chirp_server_hdfs
-SOURCES_CONFUGA = confuga.c confuga_namespace.c confuga_replica.c confuga_node.c confuga_job.c
+SOURCES_CONFUGA = confuga.c confuga_namespace.c confuga_replica.c confuga_node.c confuga_job.c confuga_file.c
 SOURCES_LIBRARY = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_ticket.c
 SOURCES_SERVER = sqlite3.c chirp_stats.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chirp_acl.c chirp_group.c chirp_filesystem.c chirp_fs_hdfs.c chirp_fs_local.c chirp_fs_local_scheduler.c chirp_fs_chirp.c chirp_fs_confuga.c chirp_job.c chirp_sqlite.c
 TARGETS = $(PROGRAMS) $(LIBRARIES) bindings
@@ -39,7 +39,7 @@ chirp_job.o chirp_fs_local_scheduler.o: chirp_sqlite.h
 # This is the library intended to be used by clients of the system.
 libchirp.a: $(OBJECTS_LIBRARY)
 
-confuga.o confuga_job.o confuga_namespace.o confuga_node.o confuga_replica.o: confuga.h chirp_sqlite.h
+confuga.o confuga_job.o confuga_namespace.o confuga_node.o confuga_replica.o confuga_file.o: confuga.h confuga_fs.h chirp_sqlite.h
 libconfuga.a: $(OBJECTS_CONFUGA) $(OBJECTS_LIBRARY)
 libconfuga.$(CCTOOLS_DYNAMIC_SUFFIX): $(OBJECTS_CONFUGA) ../../dttools/src/auth_all.o $(EXTERNAL_DEPENDENCIES)
 
