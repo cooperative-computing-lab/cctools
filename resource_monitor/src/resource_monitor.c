@@ -587,8 +587,8 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	/* we use max here, as /proc/pid/smaps that fills *m is not always
 	 * available. This causes /proc/pid/status to become a conservative
 	 * fallback. */
-	if(m->resident + m->resident_shared > 0) {
-		tr->resident_memory   = (int64_t) (m->resident + m->resident_shared);
+	if(m->resident > 0) {
+		tr->resident_memory   = (int64_t) m->resident;
 		tr->swap_memory       = (int64_t) m->swap;
 	}
 	else {
@@ -931,12 +931,11 @@ struct rmsummary *rmonitor_rusage_tree(void)
         return NULL;
     }
 
-    /* Here we add the maximum recorded + the io from memory maps */
-    tr_usg->bytes_read     =  summary->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
-
-    tr_usg->resident_memory = (usg.ru_maxrss + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
-
-    debug(D_RMON, "rusage faults: %ld resident memory: %ld.\n", usg.ru_majflt, usg.ru_maxrss);
+	if(usg.ru_majflt > 0) {
+		/* Here we add the maximum recorded + the io from memory maps */
+		tr_usg->bytes_read     =  summary->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
+		debug(D_RMON, "page faults: %ld.\n", usg.ru_majflt);
+	}
 
     return tr_usg;
 }
