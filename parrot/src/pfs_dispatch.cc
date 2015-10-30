@@ -113,7 +113,7 @@ extern int parrot_dir_fd;
 extern int *pfs_syscall_totals32;
 
 int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char *physical_name);
-int pfs_dispatch_isexe( const char *path );
+int pfs_dispatch_isexe( const char *path, uid_t *uid, gid_t *gid );
 
 #define POINTER( i ) ((void *)(uintptr_t)(i))
 
@@ -922,12 +922,14 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 		char firstline[PFS_PATH_MAX] = "";
 		char *interp_exe = NULL, *interp_arg = NULL;
 		const uint32_t old_user_argv = args[1];
+		uid_t new_uid = p->euid;
+		gid_t new_gid = p->egid;
 
 		tracer_copy_in_string(p->tracer,logical_name,POINTER(args[0]),sizeof(logical_name),0);
 		strncpy(p->new_logical_name, logical_name, sizeof(p->new_logical_name)-1);
 		p->exefd = -1;
 
-		if(!pfs_dispatch_isexe(logical_name))
+		if(!pfs_dispatch_isexe(logical_name, &new_uid, &new_gid))
 			goto failure;
 
 		if (pfs_get_local_name(logical_name,physical_name,firstline,sizeof(firstline))<0)
@@ -973,6 +975,11 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 failure:
 		divert_to_dummy(p, -errno);
 done:
+		p->euid = new_uid;
+		p->suid = new_uid;
+		p->egid = new_gid;
+		p->sgid = new_gid;
+
 		free(interp_exe);
 		free(interp_arg);
 	} else if (p->syscall_dummy) {
@@ -3381,16 +3388,30 @@ over-optimistic in some cases, but if it falsely reports
 true, the later real execve() may still fail.
 */
 
-int pfs_dispatch_isexe( const char *path )
+int pfs_dispatch_isexe( const char *path, uid_t *uid, gid_t *gid )
 {
 	struct pfs_stat buf;
 
 	if(pfs_stat(path,&buf)!=0) return 0;
 
-	if((!pfs_fake_setuid && buf.st_mode&S_ISUID) || (!pfs_fake_setgid && buf.st_mode&S_ISGID)) {
-		debug(D_NOTICE,"cannot execute the program %s because it is setuid.",path);
-		errno = EACCES;
-		return 0;
+	if(buf.st_mode&S_ISUID) {
+		if(pfs_fake_setuid) {
+			*uid = buf.st_uid;
+		} else {
+			debug(D_NOTICE,"cannot execute the program %s because it is setuid.",path);
+			errno = EACCES;
+			return 0;
+		}
+	}
+
+	if(buf.st_mode&S_ISGID) {
+		if(pfs_fake_setgid) {
+			*gid = buf.st_gid;
+		} else {
+			debug(D_NOTICE,"cannot execute the program %s because it is setgid.",path);
+			errno = EACCES;
+			return 0;
+		}
 	}
 
 	if(buf.st_mode&S_IXUSR || buf.st_mode&S_IXGRP || buf.st_mode&S_IXOTH) {
