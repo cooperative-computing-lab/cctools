@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include <sys/time.h>
 #include <unistd.h>
 
+#include <assert.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -102,6 +103,7 @@ int shellcode(const char *cmd, const char * const env[], const char *input, size
 			if (result == -1 && errno != EAGAIN && errno != EINTR) {
 				CATCH(errno);
 			} else if (result > 0) {
+				assert((size_t)result <= len);
 				input += result;
 				len -= (size_t)result;
 			}
