@@ -11,6 +11,7 @@ See the file COPYING for details.
 
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include <errno.h>
@@ -56,6 +57,9 @@ int shellcode(const char *cmd, const char * const env[], const char *input, size
 	int err[2] = {-1, -1};
 	pid_t child = 0;
 	const char * const _env[] = {NULL};
+	struct timeval start, stop;
+
+	gettimeofday(&start, NULL);
 
 	if (env == NULL)
 		env = _env;
@@ -138,6 +142,8 @@ out:
 	if (out[1] >= 0) close(out[1]);
 	if (err[0] >= 0) close(err[0]);
 	if (err[1] >= 0) close(err[1]);
+	gettimeofday(&stop, NULL);
+	debug(D_DEBUG, "shellcode finished in %.2fs", (double)(stop.tv_sec-start.tv_sec) + (stop.tv_usec-start.tv_usec)*1e-6);
 	return RCUNIX(rc);
 }
 
