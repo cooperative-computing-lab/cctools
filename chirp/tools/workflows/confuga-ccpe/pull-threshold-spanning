@@ -9,7 +9,7 @@ if ! [ -d "$DIR" ]; then
 	weaver -N -O "$DIR" "$0.py"
 fi
 
-for pull in $(for exp in 35; do printf '%d\t' $((1+1*2**exp)); done) 0; do
+for pull in 0 $(for exp in 35; do printf '%d\t' $((1+1*2**exp)); done); do
 	for scheduler in fifo-0; do
 		for replication in push-async-1; do
 			testrun "$DIR" "$(pwd)/test.$(printf '%016x' "${pull}").${scheduler}.${replication}" "scheduler=${scheduler}&replication=${replication}&pull-threshold=${pull}"
