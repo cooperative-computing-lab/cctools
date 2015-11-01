@@ -54,6 +54,7 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 			/* load the digest */
 			{
 				static const char cmd[] =
+					"export HOME=/\n" /* prevent using $HOME/.rnd */
 					"openssl rsa -in \"$TICKET\" -pubout\n"
 					;
 
@@ -102,6 +103,7 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 
 			{
 				static const char cmd[] =
+					"export HOME=/\n" /* prevent using $HOME/.rnd */
 					"openssl rsautl -inkey \"$TICKET\" -sign\n" /* reads challenge from stdin */
 					;
 
@@ -206,6 +208,7 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 
 					{
 						static const char cmd[] =
+							"export HOME=/\n" /* prevent using $HOME/.rnd */
 							"openssl rsautl -inkey \"$TICKET\" -pubin -verify\n"
 							;
 
