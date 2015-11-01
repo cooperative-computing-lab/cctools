@@ -97,11 +97,12 @@ int shellcode(const char *cmd, const char * const env[], buffer_t * Bout, buffer
 		if (w == child)
 			break;
 	}
+	child = 0;
 
 	rc = 0;
 	goto out;
 out:
-	if (child) {
+	if (child > 0) {
 		kill(child, SIGKILL);
 		waitpid(child, NULL, 0);
 	}
