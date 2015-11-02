@@ -578,6 +578,9 @@ int main( int argc, char *argv[] )
 		pfs_master_timeout = 3600;
 	}
 
+	pfs_uid = getuid();
+	pfs_gid = getgid();
+
 	static const struct option long_options[] = {
 		{"auto-decompress", no_argument, 0, 'Z'},
 		{"block-size", required_argument, 0, 'b'},
@@ -857,9 +860,6 @@ int main( int argc, char *argv[] )
 		fprintf(fp, "PWD=%s\n", working_dir);
 		fclose(fp);
 	}
-
-	pfs_uid = getuid();
-	pfs_gid = getgid();
 
 	if (http_proxy)
 		setenv("HTTP_PROXY", http_proxy, 1);
