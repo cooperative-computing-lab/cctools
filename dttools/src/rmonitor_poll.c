@@ -389,7 +389,7 @@ struct rmonitor_mem_info *rmonitor_get_map_info(FILE *fmem, int rewind_flag) {
 		// 560019f25000-56001a127000 r-xp 00000000 08:01 266469                     /usr/bin/vim.basic
 
 		int n;
-		n = sscanf(map_info_line, "%lx-%lx %*s %lx %*s %*s %s", &(info->map_start), &(info->map_end), &offset, map_name_found);
+		n = sscanf(map_info_line, "%llx-%llx %*s %llx %*s %*s %s", (long long unsigned int *) &(info->map_start), (long long unsigned int *)  &(info->map_end), (long long unsigned int *) &offset, map_name_found);
 
 		/* continue if we do not get at least start, end, and offset */
 		if(n < 3)
