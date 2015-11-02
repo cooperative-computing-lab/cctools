@@ -924,14 +924,14 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 		char firstline[PFS_PATH_MAX] = "";
 		char *interp_exe = NULL, *interp_arg = NULL;
 		const uint32_t old_user_argv = args[1];
-		uid_t new_uid = p->euid;
-		gid_t new_gid = p->egid;
+		p->set_uid = p->euid;
+		p->set_gid = p->egid;
 
 		tracer_copy_in_string(p->tracer,logical_name,POINTER(args[0]),sizeof(logical_name),0);
 		strncpy(p->new_logical_name, logical_name, sizeof(p->new_logical_name)-1);
 		p->exefd = -1;
 
-		if(!pfs_dispatch_isexe(logical_name, &new_uid, &new_gid))
+		if(!pfs_dispatch_isexe(logical_name, &p->set_uid, &p->set_gid))
 			goto failure;
 
 		if (pfs_get_local_name(logical_name,physical_name,firstline,sizeof(firstline))<0)
@@ -977,11 +977,6 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 failure:
 		divert_to_dummy(p, -errno);
 done:
-		p->euid = new_uid;
-		p->suid = new_uid;
-		p->egid = new_gid;
-		p->sgid = new_gid;
-
 		free(interp_exe);
 		free(interp_arg);
 	} else if (p->syscall_dummy) {
@@ -999,6 +994,11 @@ done:
 			/* Undo "syscall_args_changed = 1" because execve returns multiple results in syscall argument registers. */
 			p->syscall_args_changed = 0;
 			/* We do not need to restore the scratch space as the process image has been replaced. */
+
+			p->euid = p->set_uid;
+			p->suid = p->set_uid;
+			p->egid = p->set_gid;
+			p->sgid = p->set_gid;
 		} else {
 			debug(D_PROCESS, "execve: failed: %s", strerror(-actual));
 			pfs_process_scratch_restore(p);

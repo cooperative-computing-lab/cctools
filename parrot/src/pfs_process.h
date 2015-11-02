@@ -37,8 +37,8 @@ enum pfs_process_state {
 struct pfs_process {
 	char name[PFS_PATH_MAX];
 	pid_t pid, ppid, tgid;
-	uid_t ruid, euid, suid;
-	gid_t rgid, egid, sgid;
+	uid_t ruid, euid, suid, set_uid;
+	gid_t rgid, egid, sgid, set_gid;
 	mode_t umask;
 	int flags;
 
