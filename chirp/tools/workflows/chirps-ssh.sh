@@ -5,7 +5,8 @@ RENDEZVOUS="${RENDEZVOUS:-${HOME}/rendezvous/}"
 USERNAME="${USERNAME:-$(whoami)}"
 PROJECT=-"${USERNAME}-confuga"
 
-CHIRP_ROOT="/disk/d10/${USERNAME}"
+CHIRP_ROOT="/disk/d10/${USERNAME}/confuga.node.root"
+CHIRP_TRAN="/disk/d11/${USERNAME}/confuga.node.tran"
 CONFUGA_ROOT="/users/${USERNAME}/.confuga/"
 
 if [ "$(whoami)" = pdonnel3 ]; then
@@ -27,7 +28,7 @@ for ((i = 2; i <= 26; i++)); do
 	CONFUGA_NODE_LIST="${CONFUGA_NODE_LIST},chirp://${hostport}/${CONFUGA_ROOT}"
 	CONFUGA_NODE_NUKE="${CONFUGA_NODE_NUKE} ${CHIRP} -d chirp ${hostport} rm /${CONFUGA_ROOT};"
 	ssh -o PreferredAuthentications=publickey "${USERNAME}@${host}" "killall -u ${USERNAME} chirp_server"
-	screen -t "${host}" ssh -o PreferredAuthentications=publickey "${USERNAME}@${host}" "/bin/sh -c '"'CHIRP_ROOT='"$CHIRP_ROOT"'; rm -rf "$CHIRP_ROOT"; mkdir -p "$CHIRP_ROOT"; '"$CHIRP_SERVER"' --parent-death --auth=hostname --auth=unix --auth=ticket --challenge-dir='"$RENDEZVOUS"' --transient="$CHIRP_ROOT"/chirp.transient --root="$CHIRP_ROOT"/chirp.root --port='"$PORT"' --catalog-update=10s --debug=notice --debug=fatal --debug-file=:stdout --debug-rotate-max=0 --jobs --job-concurrency=100 --project-name='"$PROJECT"' --idle-clients=30m'"'"
+	screen -t "${host}" ssh -o PreferredAuthentications=publickey "${USERNAME}@${host}" "/bin/sh -c 'rm -rf -- $CHIRP_ROOT $CHIRP_TRAN; mkdir -p -- $CHIRP_ROOT $CHIRP_TRAN; $CHIRP_SERVER --parent-death --auth=hostname --auth=unix --auth=ticket --challenge-dir=$RENDEZVOUS --transient=$CHIRP_TRAN --root=$CHIRP_ROOT --port=$PORT --catalog-update=10s --debug=notice --debug=fatal --debug-file=:stdout --debug-rotate-max=0 --jobs --job-concurrency=100 --project-name=$PROJECT --idle-clients=30m'"
 done
 
 # vim: set noexpandtab tabstop=4:
