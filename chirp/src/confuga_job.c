@@ -1650,7 +1650,8 @@ static int job_stats (confuga *C)
 	static const char SQL[] =
 		"SELECT PRINTF('%s (%d)', ConfugaJob.state, COUNT(ConfugaJob.id))"
 		"	FROM ConfugaJob"
-		"	GROUP BY ConfugaJob.state;"
+		"	GROUP BY ConfugaJob.state"
+		"	ORDER BY ConfugaJob.state;"
 		"SELECT COUNT(*)"
 		"	FROM Confuga.StorageNodeActive;"
 		"SELECT COUNT(*)"

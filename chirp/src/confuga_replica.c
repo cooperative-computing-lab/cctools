@@ -1277,7 +1277,7 @@ static int transfer_stats (confuga *C)
 		"SELECT PRINTF('%s (%d)', TransferJob.state, COUNT(TransferJob.id))"
 		"	FROM TransferJob"
 		"	GROUP BY TransferJob.state"
-		"	ORDER BY RANDOM()" /* to ensure no starvation, complete may result in a ROLLBACK that aborts this SELECT */
+		"	ORDER BY TransferJob.state"
 		";";
 
 	int rc;
