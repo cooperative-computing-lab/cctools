@@ -125,6 +125,8 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 int pfs_dispatch_isexe( const char *path, uid_t *uid, gid_t *gid );
 
 #define POINTER( i ) ((void *)(uintptr_t)(i))
+#define PRIVILEGED_ID(r,e,s) (((r) == 0) || ((e) == 0) || ((s) == 0))
+#define ALLOWED_ID(n,r,e,s) ((n) == (uid_t) -1 || ((n) == (r)) || ((n) == (e)) || ((n) == (s)))
 
 /*
 Divert this incoming system call to a read or write on the I/O channel
@@ -1193,7 +1195,11 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		 */
 		case SYSCALL64_setresuid:
 			if (entering) {
-				if (pfs_fake_setuid) {
+				if (pfs_fake_setuid &&
+						(PRIVILEGED_ID(p->ruid, p->euid, p->suid) || (
+						ALLOWED_ID((uid_t) args[0], p->ruid, p->euid, p->suid) &&
+						ALLOWED_ID((uid_t) args[1], p->ruid, p->euid, p->suid) &&
+						ALLOWED_ID((uid_t) args[2], p->ruid, p->euid, p->suid)))) {
 					if ((uid_t) args[0] != (uid_t) -1) {
 						p->ruid = args[0];
 					}
@@ -1212,12 +1218,19 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_setreuid:
 			if (entering) {
-				if (pfs_fake_setuid) {
-					if ((uid_t) args[0] != (uid_t) -1) {
-						p->ruid = args[0];
-					}
+				if (pfs_fake_setuid &&
+						(PRIVILEGED_ID(p->ruid, p->euid, p->suid) || (
+						ALLOWED_ID((uid_t) args[0], p->ruid, p->euid, p->suid) &&
+						ALLOWED_ID((uid_t) args[1], p->ruid, p->euid, p->suid)))) {
 					if ((uid_t) args[1] != (uid_t) -1) {
 						p->euid = args[1];
+						if (p->euid != p->ruid) {
+							p->suid = p->euid;
+						}
+					}
+					if ((uid_t) args[0] != (uid_t) -1) {
+						p->ruid = args[0];
+						p->suid = p->euid;
 					}
 					divert_to_dummy(p,0);
 				} else {
@@ -1228,8 +1241,14 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_setuid:
 			if (entering) {
-				if (pfs_fake_setuid) {
-					p->ruid = p->euid = p->suid = args[0];
+				if (pfs_fake_setuid &&
+						(PRIVILEGED_ID(p->ruid, p->euid, p->suid) ||
+						ALLOWED_ID((uid_t) args[0], p->ruid, p->euid, p->suid))) {
+					if (PRIVILEGED_ID(p->ruid, p->euid, p->suid)) {
+						p->ruid = p->euid = p->suid = args[0];
+					} else {
+						p->euid = args[0];
+					}
 					divert_to_dummy(p,0);
 				} else {
 					divert_to_dummy(p,-EPERM);
@@ -1239,7 +1258,11 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_setresgid:
 			if (entering) {
-				if (pfs_fake_setgid) {
+				if (pfs_fake_setgid &&
+						(PRIVILEGED_ID(p->rgid, p->egid, p->sgid) || (
+						ALLOWED_ID((gid_t) args[0], p->rgid, p->egid, p->sgid) &&
+						ALLOWED_ID((gid_t) args[1], p->rgid, p->egid, p->sgid) &&
+						ALLOWED_ID((gid_t) args[2], p->rgid, p->egid, p->sgid)))) {
 					if ((gid_t) args[0] != (gid_t) -1) {
 						p->rgid = args[0];
 					}
@@ -1258,12 +1281,19 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_setregid:
 			if (entering) {
-				if (pfs_fake_setgid) {
-					if ((gid_t) args[0] != (gid_t) -1) {
-						p->rgid = args[0];
-					}
+				if (pfs_fake_setgid &&
+						(PRIVILEGED_ID(p->rgid, p->egid, p->sgid) || (
+						ALLOWED_ID((gid_t) args[0], p->rgid, p->egid, p->sgid) &&
+						ALLOWED_ID((gid_t) args[1], p->rgid, p->egid, p->sgid)))) {
 					if ((gid_t) args[1] != (gid_t) -1) {
 						p->egid = args[1];
+						if (p->egid != p->rgid) {
+							p->sgid = p->egid;
+						}
+					}
+					if ((gid_t) args[0] != (gid_t) -1) {
+						p->rgid = args[0];
+						p->sgid = p->egid;
 					}
 					divert_to_dummy(p,0);
 				} else {
@@ -1274,8 +1304,14 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_setgid:
 			if (entering) {
-				if (pfs_fake_setgid) {
-					p->rgid = p->egid = p->sgid = args[0];
+				if (pfs_fake_setgid &&
+						(PRIVILEGED_ID(p->rgid, p->egid, p->sgid) ||
+						ALLOWED_ID((gid_t) args[0], p->rgid, p->egid, p->sgid))) {
+					if (PRIVILEGED_ID(p->rgid, p->egid, p->sgid)) {
+						p->rgid = p->egid = p->sgid = args[0];
+					} else {
+						p->egid = args[0];
+					}
 					divert_to_dummy(p,0);
 				} else {
 					divert_to_dummy(p,-EPERM);
