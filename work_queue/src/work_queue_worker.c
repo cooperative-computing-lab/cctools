@@ -1690,11 +1690,13 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	}
 
 	/*
-	For a single connection attempt, we use the short single_connect_timeout.
-	If this fails, the outer loop will try again up to connect_timeout.
+	For the preliminary steps of password and project verification, we use the idle timeout,
+	because we have not yet been assigned any work and should leave if the master is not responsive.
 	*/
 
-	struct link *master = link_connect(master_addr,port,time(0)+single_connect_timeout);
+	reset_idle_timer();
+
+	struct link *master = link_connect(master_addr,port,time(0)+idle_stoptime);
 	if(!master) {
 		fprintf(stderr,"couldn't connect to %s:%d: %s\n",master_addr,port,strerror(errno));
 		return 0;
@@ -1704,14 +1706,6 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	debug(D_WQ, "connected to master %s:%d", host, port );
 
 	link_tune(master,LINK_TUNE_INTERACTIVE);
-
-	/*
-	For the preliminary steps of password and project verification, we use the idle timeout,
-	because we have not yet been assigned any work and should leave if the master is not responsive.
-	*/
-
-
-	reset_idle_timer();
 
 	if(password) {
 		debug(D_WQ,"authenticating to master");
