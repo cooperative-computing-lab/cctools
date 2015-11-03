@@ -36,11 +36,15 @@ struct jx_parser {
 	char token[MAX_TOKEN_SIZE];
 	FILE *source_file;
 	const char *source_string;
+	struct link *source_link;
+	time_t stoptime;
 	char *error_string;
 	int errors;
 	int strict_mode;
-	int token_putback_valid;
-	jx_token_t token_putback;
+	int putback_char_valid;
+	int putback_char;
+	int putback_token_valid;
+	jx_token_t putback_token;
 };
 
 struct jx_parser * jx_parser_create( int strict_mode )
@@ -59,6 +63,12 @@ void jx_parser_read_file( struct jx_parser *p, FILE *file )
 void jx_parser_read_string( struct jx_parser *p, const char *str )
 {
 	p->source_string = str;
+}
+
+void jx_parser_read_link( struct jx_parser *p, struct link *l, time_t stoptime )
+{
+	p->source_link = l;
+	p->stoptime = stoptime;
 }
 
 int jx_parser_errors( struct jx_parser *p )
@@ -86,14 +96,27 @@ static void jx_parse_error( struct jx_parser *p, const char *str )
 
 static int jx_getchar( struct jx_parser *p )
 {
-	int c;
+	int c=0;
+
+	if(p->putback_char_valid) {
+		p->putback_char_valid = 0;
+		return p->putback_char;
+	}
 
 	if(p->source_file) {
 		c = fgetc(p->source_file);
-	} else {
+	} else if(p->source_string) {
 		c = *p->source_string;
 		if(c) {
 			p->source_string++;
+		} else {
+			c = EOF;
+		}
+	} else if(p->source_link) {
+		char ch;
+		int result = link_read(p->source_link,&ch,1,p->stoptime);
+		if(result==1) {
+			c = ch;
 		} else {
 			c = EOF;
 		}
@@ -104,11 +127,8 @@ static int jx_getchar( struct jx_parser *p )
 
 static void jx_ungetchar( struct jx_parser *p, int c )
 {
-	if(p->source_file) {
-		ungetc(c,p->source_file);
-	} else {
-		p->source_string--;
-	}
+	p->putback_char = c;
+	p->putback_char_valid = 1;
 }
 
 static int jx_scan_unicode( struct jx_parser *s )
@@ -159,19 +179,19 @@ static int jx_scan_string_char( struct jx_parser *s )
 	}
 }
 
-static void jx_scan_putback( struct jx_parser *s, jx_token_t t )
+static void jx_unscan( struct jx_parser *s, jx_token_t t )
 {
-	s->token_putback = t;
-	s->token_putback_valid = 1;
+	s->putback_token = t;
+	s->putback_token_valid = 1;
 }
 
 static jx_token_t jx_scan( struct jx_parser *s )
 {
 	int c;
 
-	if(s->token_putback_valid) {
-		s->token_putback_valid = 0;
-		return s->token_putback;
+	if(s->putback_token_valid) {
+		s->putback_token_valid = 0;
+		return s->putback_token;
 	}
 
 	retry:
@@ -265,7 +285,7 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 		return 0;
 	}
 
-	jx_scan_putback(s,t);
+	jx_unscan(s,t);
 
 	struct jx_item *i = jx_item(0,0);
 
@@ -298,7 +318,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 		return 0;
 	}
 
-	jx_scan_putback(s,t);
+	jx_unscan(s,t);
 
 	struct jx_pair *p = jx_pair(0,0,0);
 
@@ -397,6 +417,20 @@ struct jx * jx_parse_string( const char *str )
 {
 	struct jx_parser *p = jx_parser_create(0);
 	jx_parser_read_string(p,str);
+	struct jx * j = jx_parse(p);
+	if(jx_parser_errors(p)) {
+		jx_parser_delete(p);
+		jx_delete(j);
+		return 0;
+	}
+	jx_parser_delete(p);
+	return j;
+}
+
+struct jx * jx_parse_link( struct link *l, time_t stoptime )
+{
+	struct jx_parser *p = jx_parser_create(0);
+	jx_parser_read_link(p,l,stoptime);
 	struct jx * j = jx_parse(p);
 	if(jx_parser_errors(p)) {
 		jx_parser_delete(p);
