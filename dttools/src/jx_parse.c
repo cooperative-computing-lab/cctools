@@ -413,10 +413,8 @@ struct jx * jx_parse( struct jx_parser *s )
 	return 0;
 }
 
-struct jx * jx_parse_string( const char *str )
+static struct jx * jx_parse_finish( struct jx_parser *p )
 {
-	struct jx_parser *p = jx_parser_create(0);
-	jx_parser_read_string(p,str);
 	struct jx * j = jx_parse(p);
 	if(jx_parser_errors(p)) {
 		jx_parser_delete(p);
@@ -425,34 +423,27 @@ struct jx * jx_parse_string( const char *str )
 	}
 	jx_parser_delete(p);
 	return j;
+}
+
+struct jx * jx_parse_string( const char *str )
+{
+	struct jx_parser *p = jx_parser_create(0);
+	jx_parser_read_string(p,str);
+	return jx_parse_finish(p);
 }
 
 struct jx * jx_parse_link( struct link *l, time_t stoptime )
 {
 	struct jx_parser *p = jx_parser_create(0);
 	jx_parser_read_link(p,l,stoptime);
-	struct jx * j = jx_parse(p);
-	if(jx_parser_errors(p)) {
-		jx_parser_delete(p);
-		jx_delete(j);
-		return 0;
-	}
-	jx_parser_delete(p);
-	return j;
+	return jx_parse_finish(p);
 }
 
 struct jx * jx_parse_stream( FILE *file )
 {
 	struct jx_parser *p = jx_parser_create(0);
 	jx_parser_read_file(p,file);
-	struct jx * j = jx_parse(p);
-	if(jx_parser_errors(p)) {
-		jx_parser_delete(p);
-		jx_delete(j);
-		return 0;
-	}
-	jx_parser_delete(p);
-	return j;
+	return jx_parse_finish(p);
 }
 
 struct jx * jx_parse_file( const char *name )
