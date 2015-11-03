@@ -123,10 +123,12 @@ extern int *pfs_syscall_totals64;
 
 int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char *physical_name);
 int pfs_dispatch_isexe( const char *path, uid_t *uid, gid_t *gid );
+int allowed_uid(struct pfs_process *p, uid_t n);
+int privileged_uid(struct pfs_process *p);
+int allowed_gid(struct pfs_process *p, uid_t n);
+int privileged_gid(struct pfs_process *p);
 
 #define POINTER( i ) ((void *)(uintptr_t)(i))
-#define PRIVILEGED_ID(r,e,s) (((r) == 0) || ((e) == 0) || ((s) == 0))
-#define ALLOWED_ID(n,r,e,s) ((n) == (uid_t) -1 || ((n) == (r)) || ((n) == (e)) || ((n) == (s)))
 
 /*
 Divert this incoming system call to a read or write on the I/O channel
@@ -1196,10 +1198,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_setresuid:
 			if (entering) {
 				if (pfs_fake_setuid &&
-						(PRIVILEGED_ID(p->ruid, p->euid, p->suid) || (
-						ALLOWED_ID((uid_t) args[0], p->ruid, p->euid, p->suid) &&
-						ALLOWED_ID((uid_t) args[1], p->ruid, p->euid, p->suid) &&
-						ALLOWED_ID((uid_t) args[2], p->ruid, p->euid, p->suid)))) {
+						(privileged_uid(p) || (
+						allowed_uid(p, (uid_t) args[0]) &&
+						allowed_uid(p, (uid_t) args[1]) &&
+						allowed_uid(p, (uid_t) args[2])))) {
 					if ((uid_t) args[0] != (uid_t) -1) {
 						p->ruid = args[0];
 					}
@@ -1219,9 +1221,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_setreuid:
 			if (entering) {
 				if (pfs_fake_setuid &&
-						(PRIVILEGED_ID(p->ruid, p->euid, p->suid) || (
-						ALLOWED_ID((uid_t) args[0], p->ruid, p->euid, p->suid) &&
-						ALLOWED_ID((uid_t) args[1], p->ruid, p->euid, p->suid)))) {
+						(privileged_uid(p) || (
+						allowed_uid(p, (uid_t) args[0]) &&
+						allowed_uid(p, (uid_t) args[1])))) {
 					if ((uid_t) args[1] != (uid_t) -1) {
 						p->euid = args[1];
 						if (p->euid != p->ruid) {
@@ -1242,9 +1244,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_setuid:
 			if (entering) {
 				if (pfs_fake_setuid &&
-						(PRIVILEGED_ID(p->ruid, p->euid, p->suid) ||
-						ALLOWED_ID((uid_t) args[0], p->ruid, p->euid, p->suid))) {
-					if (PRIVILEGED_ID(p->ruid, p->euid, p->suid)) {
+						(privileged_uid(p) ||
+						allowed_uid(p, (uid_t) args[0]))) {
+					if (privileged_uid(p)) {
 						p->ruid = p->euid = p->suid = args[0];
 					} else {
 						p->euid = args[0];
@@ -1259,10 +1261,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_setresgid:
 			if (entering) {
 				if (pfs_fake_setgid &&
-						(PRIVILEGED_ID(p->rgid, p->egid, p->sgid) || (
-						ALLOWED_ID((gid_t) args[0], p->rgid, p->egid, p->sgid) &&
-						ALLOWED_ID((gid_t) args[1], p->rgid, p->egid, p->sgid) &&
-						ALLOWED_ID((gid_t) args[2], p->rgid, p->egid, p->sgid)))) {
+						(privileged_gid(p) || (
+						allowed_gid(p, (gid_t) args[0]) &&
+						allowed_gid(p, (gid_t) args[1]) &&
+						allowed_gid(p, (gid_t) args[2])))) {
 					if ((gid_t) args[0] != (gid_t) -1) {
 						p->rgid = args[0];
 					}
@@ -1282,9 +1284,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_setregid:
 			if (entering) {
 				if (pfs_fake_setgid &&
-						(PRIVILEGED_ID(p->rgid, p->egid, p->sgid) || (
-						ALLOWED_ID((gid_t) args[0], p->rgid, p->egid, p->sgid) &&
-						ALLOWED_ID((gid_t) args[1], p->rgid, p->egid, p->sgid)))) {
+						(privileged_gid(p) || (
+						allowed_gid(p, (gid_t) args[0]) &&
+						allowed_gid(p, (gid_t) args[1])))) {
 					if ((gid_t) args[1] != (gid_t) -1) {
 						p->egid = args[1];
 						if (p->egid != p->rgid) {
@@ -1305,9 +1307,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_setgid:
 			if (entering) {
 				if (pfs_fake_setgid &&
-						(PRIVILEGED_ID(p->rgid, p->egid, p->sgid) ||
-						ALLOWED_ID((gid_t) args[0], p->rgid, p->egid, p->sgid))) {
-					if (PRIVILEGED_ID(p->rgid, p->egid, p->sgid)) {
+						(privileged_gid(p) ||
+						allowed_gid(p, (gid_t) args[0]))) {
+					if (privileged_gid(p)) {
 						p->rgid = p->egid = p->sgid = args[0];
 					} else {
 						p->egid = args[0];
