@@ -571,8 +571,6 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 	mem->private      = div_round_up(mem->private, 1024);
 	mem->resident     = div_round_up(mem->resident, 1024);
 
-	debug(D_NOTICE, "Resident per maps: resident %"PRId64", used with others %"PRId64"\n", mem->resident, mem->shared);
-
 	return 0;
 }
 
