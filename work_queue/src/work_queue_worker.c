@@ -91,9 +91,6 @@ static time_t connect_stoptime = 0;
 // Maximum time to attempt connecting to all available masters before giving up.
 static int connect_timeout = 900;
 
-// Maximum time to attempt a single link_connect before trying other options.
-static int single_connect_timeout = 15;
-
 // Maximum time to attempt sending/receiving any given file or message.
 static const int active_timeout = 3600;
 
@@ -1720,7 +1717,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		char line[WORK_QUEUE_LINE_MAX];
 		debug(D_WQ, "verifying master's project name");
 		send_master_message(master, "name\n");
-		if(!recv_master_message(master, line, sizeof(line),time(0) + single_connect_timeout)) {
+		if(!recv_master_message(master, line, sizeof(line), time(0) + idle_stoptime)) {
 			debug(D_WQ,"no response from master while verifying name");
 			link_close(master);
 			return 0;
