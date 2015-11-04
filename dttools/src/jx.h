@@ -137,6 +137,15 @@ void jx_item_delete( struct jx_item *i );
 /** Insert a key-value pair into an object.  @param object The object.  @param key The key.  @param value The value. @return True on success, false on failure.  Failure can only occur if the object is not a @ref JX_OBJECT. */
 int jx_insert( struct jx *object, struct jx *key, struct jx *value );
 
+/** Insert an integer value into an object @param object The object @param key The key represented as a C string  @param value The integer value. */
+void jx_insert_integer( struct jx *object, const char *key, jx_int_t value );
+
+/** Insert a float value into an object @param object The object @param key The key represented as a C string  @param value The float value. */
+void jx_insert_float( struct jx *object, const char *key, double value );
+
+/** Insert a string value into an object @param object The object @param key The key represented as a C string  @param value The C string value. */
+void jx_insert_string( struct jx *object, const char *key, const char *value );
+
 /** Search for a arbitrary item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The value of the matching pair, or null if none is found. */
 struct jx * jx_lookup( struct jx *object, const char *key );
 

@@ -142,6 +142,21 @@ int jx_insert( struct jx *j, struct jx *key, struct jx *value )
 	return 1;
 }
 
+void jx_insert_integer( struct jx *j, const char *key, jx_int_t value )
+{
+	jx_insert(j,jx_string(key),jx_integer(value));
+}
+
+void jx_insert_float( struct jx *j, const char *key, double value )
+{
+	jx_insert(j,jx_string(key),jx_float(value));
+}
+
+void jx_insert_string( struct jx *j, const char *key, const char *value )
+{
+	jx_insert(j,jx_string(key),jx_string(value));
+}
+
 void jx_array_insert( struct jx *array, struct jx *value )
 {
 	array->items = jx_item( value, array->items->next );
