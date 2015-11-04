@@ -56,6 +56,7 @@ SOURCES = \
 	jx.c \
 	jx_parse.c \
 	jx_print.c \
+	jx_table.c \
 	link.c \
 	link_auth.c \
 	link_nvpair.c \
