@@ -328,9 +328,11 @@ int do_catalog_query(const char *project_name, time_t stoptime )
 {
 	int i = 0; //global_catalog iterator
 
-	if(resource_mode == 0 && format_mode == FORMAT_TABLE) jx_table_print_header(queue_headers,stdout);
-	else if(resource_mode) jx_table_print_header(master_resource_headers,stdout);
-
+	if(resource_mode == 0 && format_mode == FORMAT_TABLE) {
+		jx_table_print_header(queue_headers,stdout);
+	} else if(resource_mode) {
+		jx_table_print_header(master_resource_headers,stdout);
+	}
 
 	while(global_catalog[i] != NULL){
 		if(!(resource_mode || format_mode == FORMAT_TABLE)){ //long options
@@ -348,7 +350,7 @@ int do_catalog_query(const char *project_name, time_t stoptime )
 					}
 					find_child_relations(1,
 							jx_lookup_string(global_catalog[i], "name"),
-							atoi(jx_lookup_string(global_catalog[i], "port")),
+							jx_lookup_integer(global_catalog[i], "port"),
 							stoptime);
 				}
 			}
