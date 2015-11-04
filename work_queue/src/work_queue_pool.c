@@ -328,7 +328,7 @@ void delete_projects_list(struct list *l)
 #define assign_new_value(new_var, old_var, option, type_c, type_json, field) \
 	type_c new_var = old_var;\
 	{\
-		struct jx *jv = jx_object_lookup(J,#option); \
+		struct jx *jv = jx_lookup(J,#option); \
 		if(jv) {\
 			if(jv->type==type_json) {\
 				new_var = jv->field;\
