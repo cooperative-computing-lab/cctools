@@ -327,17 +327,27 @@ int find_child_relations(int spaces, const char *host, int port, time_t stoptime
 int do_catalog_query(const char *project_name, time_t stoptime )
 {
 	int i = 0; //global_catalog iterator
+	int first = 1;
 
-	if(resource_mode == 0 && format_mode == FORMAT_TABLE) {
-		jx_table_print_header(queue_headers,stdout);
-	} else if(resource_mode) {
-		jx_table_print_header(master_resource_headers,stdout);
+	if(format_mode==FORMAT_TABLE) {
+		if(resource_mode) {
+	       		jx_table_print_header(master_resource_headers,stdout);
+		} else {
+			jx_table_print_header(queue_headers,stdout);
+		}
+	} else {
+		printf("[\n");
 	}
 
 	while(global_catalog[i] != NULL){
 		if(!(resource_mode || format_mode == FORMAT_TABLE)){ //long options
+			if(first) {
+				first = 0;
+			} else {
+				printf(",\n");
+			}
 			jx_print_stream(global_catalog[i], stdout);
-		}else{
+		} else {
 			const char *temp_my_master = jx_lookup_string(global_catalog[i], "my_master");
 			if( !temp_my_master || !strcmp(temp_my_master, "127.0.0.1:-1") ) { //this master has no master
 
@@ -359,9 +369,13 @@ int do_catalog_query(const char *project_name, time_t stoptime )
 	}
 
 	if(format_mode == FORMAT_TABLE){
-		jx_table_print_footer(queue_headers,stdout);
-	}else if(resource_mode){
-		jx_table_print_footer(master_resource_headers,stdout);
+		if(resource_mode) {
+			jx_table_print_footer(master_resource_headers,stdout);
+		} else {
+			jx_table_print_footer(queue_headers,stdout);
+		}
+	} else {
+		printf("\n]\n");
 	}
 	global_catalog_cleanup();
 	return EXIT_SUCCESS;

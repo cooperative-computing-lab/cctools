@@ -204,6 +204,8 @@ int main(int argc, char *argv[])
 
 	if(mode == MODE_TABLE) {
 		jx_table_print_header(headers,stdout);
+	} else if(mode==MODE_LONG) {
+		printf("[\n");
 	}
 
 	while((j = catalog_query_read(q, stoptime))) {
@@ -250,8 +252,8 @@ int main(int argc, char *argv[])
 				printf("%s:%d\n", jx_lookup_string(table[i], "name"), (int) jx_lookup_integer(table[i], "port"));
 			}
 		} else if(mode == MODE_LONG) {
+			if(i!=0) printf(",\n");
 			jx_print_stream(table[i],stdout);
-			fprintf(stdout,"\n");
 		} else if(mode == MODE_TABLE) {
 			jx_table_print(headers, table[i], stdout);
 		} else if(mode == MODE_TOTAL) {
@@ -265,10 +267,10 @@ int main(int argc, char *argv[])
 		printf("TOTAL: %6sB\n", string_metric(sum_total, -1, 0));
 		printf("AVAIL: %6sB\n", string_metric(sum_avail, -1, 0));
 		printf("INUSE: %6sB\n", string_metric(sum_total - sum_avail, -1, 0));
-	}
-
-	if(mode == MODE_TABLE) {
+	} else if(mode == MODE_TABLE) {
 		jx_table_print_footer(headers,stdout);
+	} else if(mode==MODE_LONG) {
+		printf("\n]\n");
 	}
 
 	return 0;
