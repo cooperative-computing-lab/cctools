@@ -13,6 +13,9 @@ See the file COPYING for details.
 #include "debug.h"
 #include "getopt.h"
 #include "nvpair.h"
+#include "nvpair_jx.h"
+#include "jx_parse.h"
+#include "jx_print.h"
 #include "stringtools.h"
 #include "domain_name_cache.h"
 #include "username.h"
@@ -229,8 +232,16 @@ static void handle_updates(struct datagram *update_port)
 
 		data[result] = 0;
 
-		nv = nvpair_create();
-		nvpair_parse(nv, data);
+		if(data[0]=='{') {
+			struct jx *jobject = jx_parse_string(data);
+			if(!jobject) continue;
+			nv = jx_to_nvpair(jobject);
+			jx_delete(jobject);
+		} else {
+			nv = nvpair_create();
+			if(!nv) continue;
+			nvpair_parse(nv, data);
+		}
 
 		nvpair_insert_string(nv, "address", addr);
 		nvpair_insert_integer(nv, "lastheardfrom", time(0));
@@ -370,7 +381,9 @@ static void handle_query(struct link *query_link)
 		fprintf(stream, "Content-type: text/plain\n\n");
 		fprintf(stream,"[\n");
 		for(i = 0; i < n; i++) {
-			nvpair_print_json(array[i], stream);
+			struct jx *j = nvpair_to_jx(array[i]);
+			jx_print_stream(j,stream);
+			jx_delete(j);
 			if(i<(n-1)) fprintf(stream,",\n");
 		}
 		fprintf(stream,"]\n");
