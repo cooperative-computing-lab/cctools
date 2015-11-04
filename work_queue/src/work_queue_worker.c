@@ -16,7 +16,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "catalog_query.h"
 #include "domain_name_cache.h"
-#include "nvpair.h"
+#include "jx.h"
 #include "copy_stream.h"
 #include "host_memory_info.h"
 #include "host_disk_info.h"
@@ -1781,19 +1781,19 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 	}
 
 	while(1) {
-		struct nvpair *nv = list_peek_head(masters_list);
-		const char *project = nvpair_lookup_string(nv,"project");
-		const char *name = nvpair_lookup_string(nv,"name");
-		const char *addr = nvpair_lookup_string(nv,"address");
-		const char *pref = nvpair_lookup_string(nv,"master_preferred_connection");
-		int port = nvpair_lookup_integer(nv,"port");
+		struct jx *jx = list_peek_head(masters_list);
+		const char *project = jx_lookup_string(jx,"project");
+		const char *name = jx_lookup_string(jx,"name");
+		const char *addr = jx_lookup_string(jx,"address");
+		const char *pref = jx_lookup_string(jx,"master_preferred_connection");
+		int port = jx_lookup_integer(jx,"port");
 
 		/* Do not connect to the same master after idle disconnection. */
 		if(last_addr) {
 			if( time(0) > idle_stoptime && strcmp(addr, last_addr) == 0 && port == last_port) {
 				if(list_size(masters_list) < 2) {
 					free(last_addr);
-					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
+					/* cojxert idle_stoptime into connect_stoptime (e.g., time already served). */
 					connect_stoptime = idle_stoptime;
 					debug(D_WQ,"Previous idle disconnection from only master available project=%s name=%s addr=%s port=%d",project,name,addr,port);
 					return 0;
@@ -1988,7 +1988,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'C':
 			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr, "The provided catalog server is invalid. The format of the '-C' option is '-C HOSTNAME:PORT'.\n");
+				fprintf(stderr, "The provided catalog server is ijxalid. The format of the '-C' option is '-C HOSTNAME:PORT'.\n");
 				exit(1);
 			}
 			break;
