@@ -246,6 +246,7 @@ int jx_equals( struct jx *j, struct jx *k )
 
 struct jx_pair * jx_pair_copy( struct jx_pair *p )
 {
+	if(!p) return 0;
 	struct jx_pair *pair = malloc(sizeof(*pair));
 	pair->key = jx_copy(p->key);
 	pair->value = jx_copy(p->value);
@@ -255,6 +256,7 @@ struct jx_pair * jx_pair_copy( struct jx_pair *p )
 
 struct jx_item * jx_item_copy( struct jx_item *i )
 {
+	if(!i) return 0;
 	struct jx_item *item = malloc(sizeof(*item));
 	item->value = jx_copy(i->value);
 	item->next = jx_item_copy(i->next);
