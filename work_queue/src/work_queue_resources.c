@@ -122,31 +122,36 @@ void work_queue_resources_add( struct work_queue_resources *total, struct work_q
 	work_queue_resource_add(&total->cores,   &r->cores);
 }
 
-void work_queue_resources_add_to_nvpair( struct work_queue_resources *r, struct nvpair *nv )
+void work_queue_resources_add_to_jx( struct work_queue_resources *r, struct jx *nv )
 {
-	nvpair_insert_integer(nv, "workers_inuse",   r->workers.inuse);
-	nvpair_insert_integer(nv, "workers_total",   r->workers.total);
-	nvpair_insert_integer(nv, "workers_smallest",r->workers.smallest);
-	nvpair_insert_integer(nv, "workers_largest", r->workers.largest);
-	nvpair_insert_integer(nv, "cores_inuse",     r->cores.inuse);
-	nvpair_insert_integer(nv, "cores_total",     r->cores.total);
-	nvpair_insert_integer(nv, "cores_smallest",  r->cores.smallest);
-	nvpair_insert_integer(nv, "cores_largest",   r->cores.largest);
-	nvpair_insert_integer(nv, "memory_inuse",    r->memory.inuse);
-	nvpair_insert_integer(nv, "memory_total",    r->memory.total);
-	nvpair_insert_integer(nv, "memory_smallest", r->memory.smallest);
-	nvpair_insert_integer(nv, "memory_largest",  r->memory.largest);
-	nvpair_insert_integer(nv, "disk_inuse",      r->disk.inuse);
-	nvpair_insert_integer(nv, "disk_total",      r->disk.total);
-	nvpair_insert_integer(nv, "disk_smallest",   r->disk.smallest);
-	nvpair_insert_integer(nv, "disk_largest",    r->disk.largest);
-	nvpair_insert_integer(nv, "gpus_inuse",      r->gpus.inuse);
-	nvpair_insert_integer(nv, "gpus_total",      r->gpus.total);
-	nvpair_insert_integer(nv, "gpus_smallest",   r->gpus.smallest);
-	nvpair_insert_integer(nv, "gpus_largest",    r->gpus.largest);
+	jx_insert_integer(nv, "workers_inuse",   r->workers.inuse);
+	jx_insert_integer(nv, "workers_total",   r->workers.total);
+	jx_insert_integer(nv, "workers_smallest",r->workers.smallest);
+	jx_insert_integer(nv, "workers_largest", r->workers.largest);
+	jx_insert_integer(nv, "workers_committed", r->workers.committed);
+	jx_insert_integer(nv, "cores_inuse",     r->cores.inuse);
+	jx_insert_integer(nv, "cores_total",     r->cores.total);
+	jx_insert_integer(nv, "cores_smallest",  r->cores.smallest);
+	jx_insert_integer(nv, "cores_largest",   r->cores.largest);
+	jx_insert_integer(nv, "cores_committed", r->cores.committed);
+	jx_insert_integer(nv, "memory_inuse",    r->memory.inuse);
+	jx_insert_integer(nv, "memory_total",    r->memory.total);
+	jx_insert_integer(nv, "memory_smallest", r->memory.smallest);
+	jx_insert_integer(nv, "memory_largest",  r->memory.largest);
+	jx_insert_integer(nv, "memory_committed", r->memory.committed);
+	jx_insert_integer(nv, "disk_inuse",      r->disk.inuse);
+	jx_insert_integer(nv, "disk_total",      r->disk.total);
+	jx_insert_integer(nv, "disk_smallest",   r->disk.smallest);
+	jx_insert_integer(nv, "disk_largest",    r->disk.largest);
+	jx_insert_integer(nv, "disk_committed",  r->disk.committed);
+	jx_insert_integer(nv, "gpus_inuse",      r->gpus.inuse);
+	jx_insert_integer(nv, "gpus_total",      r->gpus.total);
+	jx_insert_integer(nv, "gpus_smallest",   r->gpus.smallest);
+	jx_insert_integer(nv, "gpus_largest",    r->gpus.largest);
+	jx_insert_integer(nv, "gpus_committed",  r->gpus.committed);
 
 	/* total, etc. are not meaningful for unlabeled */
-	nvpair_insert_integer(nv, "unlabeled_inuse",     r->unlabeled.inuse);
+	jx_insert_integer(nv, "unlabeled_inuse",     r->unlabeled.inuse);
 }
 
 

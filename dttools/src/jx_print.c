@@ -121,6 +121,15 @@ void jx_print_stream( struct jx *j, FILE *file )
 	buffer_free(&buffer);
 }
 
+void jx_print_link( struct jx *j, struct link *l, time_t stoptime )
+{
+	buffer_t buffer;
+	buffer_init(&buffer);
+	jx_print_buffer(j,&buffer);
+	link_write(l,buffer.buf,buffer.len,stoptime);
+	buffer_free(&buffer);
+}
+
 char * jx_print_string( struct jx *j )
 {
 	buffer_t buffer;
