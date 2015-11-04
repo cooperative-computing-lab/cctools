@@ -158,6 +158,9 @@ void jx_array_append( struct jx *array, struct jx *value );
 /** Determine if an expression is constant.  Traverses the expression recursively, and returns true if it consists only of constant values, arrays, and objects. @param j The expression to evaluate.  @return True if constant. */
 int jx_is_constant( struct jx *j );
 
+/** Export a jx object as a set of environment variables.  @param j A JX_OBJECT. */
+void jx_export( struct jx *j );
+
 /** Evaluation function.  To use @ref jx_evaluate, the caller must
 define a function of type @ref jx_eval_func_t which accepts a symbol
 name and returns a JX value.

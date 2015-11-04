@@ -321,6 +321,18 @@ int jx_is_constant( struct jx *j )
 	return 0;
 }
 
+void jx_export( struct jx *j )
+{
+	if(!j || !jx_istype(j,JX_OBJECT)) return;
+
+	struct jx_pair *p;
+	for(p=j->pairs;p;p=p->next) {
+		if(p->key->type==JX_STRING && p->value->type==JX_STRING) {
+			setenv(p->key->string_value,p->value->string_value,1);
+		}
+	}
+}
+
 struct jx_pair * jx_pair_evaluate( struct jx_pair *pair, jx_eval_func_t func )
 {
 	return jx_pair(

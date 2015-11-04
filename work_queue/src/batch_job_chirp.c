@@ -11,6 +11,8 @@
 #include "debug.h"
 #include "json.h"
 #include "json_aux.h"
+#include "jx.h"
+#include "jx_print.h"
 #include "random.h"
 #include "sigdef.h"
 #include "stringtools.h"
@@ -63,7 +65,7 @@ static void addfile (struct batch_queue *q, buffer_t *B, const char *file, const
 	}
 }
 
-static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
+static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
 {
 	buffer_t B;
 
@@ -81,24 +83,8 @@ static batch_job_id_t batch_job_chirp_submit (struct batch_queue *q, const char 
 	buffer_putliteral(&B, "\"]");
 
 	if(envlist) {
-		char *name, *value;
-		int first=1;
-		buffer_putliteral(&B,",\"environment\":{");
-		nvpair_first_item(envlist);
-		while(nvpair_next_item(envlist,&name,&value)) {
-			if(first) {
-				first=0;
-			} else {
-				buffer_putliteral(&B,",");
-			}
-
-			buffer_putliteral(&B,"\"");
-			jsonA_escapestring(&B,name);
-			buffer_putliteral(&B,"\":\"");
-			jsonA_escapestring(&B,value);
-			buffer_putliteral(&B,"\"");
-		}
-		buffer_putliteral(&B,"}");
+		buffer_putliteral(&B,",\"environment\":");
+		jx_print_buffer(envlist,&B);
 	}
 
 	buffer_putliteral(&B, ",\"files\":[");
