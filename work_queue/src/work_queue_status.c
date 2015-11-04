@@ -43,7 +43,6 @@ static query_t query_mode = NO_QUERY;
 static int work_queue_status_timeout = 300;
 static char *catalog_host = NULL;
 static int catalog_port = 0;
-static int resource_mode = 0;
 int catalog_size = CATALOG_SIZE;
 static struct jx **global_catalog = NULL; //pointer to an array of jx pointers
 
@@ -169,7 +168,6 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			break;
 		case 'R':
 			query_mode = QUERY_MASTER_RESOURCES;
-			resource_mode = 1;
 			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
@@ -277,7 +275,7 @@ void add_child_relation(const char *name, int spaces, char *buffer, size_t max_s
 	strncat(buffer + spaces, name, max_size - spaces);
 }
 
-int find_child_relations(int spaces, const char *host, int port, time_t stoptime)
+int find_child_relations(int spaces, const char *host, int port, struct jx_table *headers, time_t stoptime)
 {
 	int i = 0; //global_catalog iterator
 	char full_address[1024];
@@ -308,14 +306,14 @@ int find_child_relations(int spaces, const char *host, int port, time_t stoptime
 			free(jproject->string_value);
 			jproject->string_value = branch;
 
-			if(resource_mode)
-				jx_table_print(master_resource_headers,global_catalog[i], stdout);
-			else if(format_mode == FORMAT_TABLE)
-				jx_table_print(queue_headers,global_catalog[i], stdout);
+			if(format_mode==FORMAT_TABLE) {
+				jx_table_print(headers,global_catalog[i], stdout);
+			}
 
 			find_child_relations(spaces + 1,
 					jx_lookup_string(global_catalog[i], "name"),
 					atoi(jx_lookup_string(global_catalog[i], "port")),
+					headers,
 					stoptime);
 		}
 		i++;
@@ -324,43 +322,35 @@ int find_child_relations(int spaces, const char *host, int port, time_t stoptime
 	return 1;
 }
 
-int do_catalog_query(const char *project_name, time_t stoptime )
+int do_catalog_query(const char *project_name, struct jx_table *headers, time_t stoptime )
 {
 	int i = 0; //global_catalog iterator
 	int first = 1;
 
 	if(format_mode==FORMAT_TABLE) {
-		if(resource_mode) {
-	       		jx_table_print_header(master_resource_headers,stdout);
-		} else {
-			jx_table_print_header(queue_headers,stdout);
-		}
+		jx_table_print_header(headers,stdout);
 	} else {
 		printf("[\n");
 	}
 
 	while(global_catalog[i] != NULL){
-		if(!(resource_mode || format_mode == FORMAT_TABLE)){ //long options
+		if(format_mode==FORMAT_LONG) {
 			if(first) {
 				first = 0;
 			} else {
 				printf(",\n");
 			}
 			jx_print_stream(global_catalog[i], stdout);
-		} else {
+		} else if(format_mode==FORMAT_TABLE) {
 			const char *temp_my_master = jx_lookup_string(global_catalog[i], "my_master");
 			if( !temp_my_master || !strcmp(temp_my_master, "127.0.0.1:-1") ) { //this master has no master
 
 				if(!project_name || whole_string_match_regex(jx_lookup_string(global_catalog[i], "project"), project_name)) {
-					if(resource_mode) {
-						debug(D_WQ,"%s resources -- cores:%s memory:%s disk:%s\n",jx_lookup_string(global_catalog[i],"project"),jx_lookup_string(global_catalog[i],"cores_total"),jx_lookup_string(global_catalog[i],"memory_total"),jx_lookup_string(global_catalog[i],"disk_total"));
-						jx_table_print(master_resource_headers,global_catalog[i], stdout);
-					}else if(format_mode == FORMAT_TABLE){
-						jx_table_print(queue_headers,global_catalog[i], stdout);
-					}
+					jx_table_print(headers,global_catalog[i], stdout);
 					find_child_relations(1,
 							jx_lookup_string(global_catalog[i], "name"),
 							jx_lookup_integer(global_catalog[i], "port"),
+							headers,
 							stoptime);
 				}
 			}
@@ -369,11 +359,7 @@ int do_catalog_query(const char *project_name, time_t stoptime )
 	}
 
 	if(format_mode == FORMAT_TABLE){
-		if(resource_mode) {
-			jx_table_print_footer(master_resource_headers,stdout);
-		} else {
-			jx_table_print_footer(queue_headers,stdout);
-		}
+		jx_table_print_footer(headers,stdout);
 	} else {
 		printf("\n]\n");
 	}
@@ -450,7 +436,13 @@ int main(int argc, char *argv[])
 	} else {
 		global_catalog = malloc(sizeof(*global_catalog)*CATALOG_SIZE); //only malloc if catalog queries are being done
 		get_masters(stoptime);
-		return do_catalog_query(project_name, stoptime);
+		struct jx_table *h;
+		if(query_mode==QUERY_MASTER_RESOURCES) {
+			h = master_resource_headers;
+		} else {
+			h = queue_headers;
+		}
+		return do_catalog_query(project_name,h,stoptime);
 	}
 }
 
