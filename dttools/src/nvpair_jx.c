@@ -38,7 +38,9 @@ struct jx * nvpair_to_jx( struct nvpair *nv )
 	nvpair_first_item(nv);
 	while(nvpair_next_item(nv,&key,&value)) {
 		if(string_is_integer(value)) {
-			jvalue = jx_integer(atoi(value));
+			jvalue = jx_integer(atoll(value));
+		} else if(string_is_float(value)) {
+			jvalue = jx_float(atof(value));
 		} else {
 			jvalue = jx_string(value);
 		}

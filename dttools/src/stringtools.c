@@ -669,6 +669,28 @@ int string_is_integer(const char *s)
 	return 1;
 }
 
+int string_is_float(const char *s)
+{
+	int digits=0, periods=0, dashes=0;
+
+	while(*s) {
+		if(isdigit((*s))) {
+			digits++;
+		} else if(*s=='.') {
+			periods++;
+		} else if(*s=='-') {
+			dashes++;
+		}
+		s++;
+	}
+
+	if(digits>0 && periods<=1 && dashes<=1) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 int string_isspace(const char *s)
 {
 	while(*s) {

@@ -57,6 +57,7 @@ void string_tolower(char *str);
 void string_toupper(char *str);
 int string_isspace(const char *str);
 int string_is_integer(const char *str);
+int string_is_float(const char *str);
 void string_replace_backslash_codes(const char *instr, char *outstr);
 
 /** Replace instances of %% in a string with the string 'replace'.
