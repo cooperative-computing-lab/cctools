@@ -26,7 +26,7 @@ See the file COPYING for details.
 
 #define WORK_QUEUE_WAITFORTASK  -1                 /**< Timeout value to wait for a task to complete before returning. */
 
-#define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 300  /**< Default value for Work Queue keepalive interval in seconds. */
+#define WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL 120  /**< Default value for Work Queue keepalive interval in seconds. */
 #define WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT  30   /**< Default value for Work Queue keepalive timeout in seconds. */
 
 typedef enum {
@@ -201,10 +201,6 @@ struct work_queue_stats {
 	int64_t total_memory;           /**< Total memory in MB aggregated across the connected workers. */
 	int64_t total_disk;	            /**< Total disk space in MB aggregated across the connected workers. */
 	int64_t total_gpus;             /**< Total number of GPUs aggregated across the connected workers. */
-	int64_t committed_cores;        /**< Committed number of cores aggregated across the connected workers. */
-	int64_t committed_memory;       /**< Committed memory in MB aggregated across the connected workers. */
-	int64_t committed_disk;	        /**< Committed disk space in MB aggregated across the connected workers. */
-	int64_t committed_gpus;         /**< Committed number of GPUs aggregated across the connected workers. */
 	int64_t min_cores;              /**< The lowest number of cores observed among the connected workers. */
 	int64_t max_cores;              /**< The highest number of cores observed among the connected workers. */
 	int64_t min_memory;             /**< The smallest memory size in MB observed among the connected workers. */
