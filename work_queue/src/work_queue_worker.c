@@ -1687,8 +1687,13 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	}
 
 	/*
-	For the preliminary steps of password and project verification, we use the idle timeout,
-	because we have not yet been assigned any work and should leave if the master is not responsive.
+	For the preliminary steps of password and project verification, we use the
+	idle timeout, because we have not yet been assigned any work and should
+	leave if the master is not responsive.
+
+	It is tempting to use a short timeout here, but DON'T. The name and
+	password messages are ayncronous; if the master is busy handling other
+	workers, a short window is not enough for a response to come back.
 	*/
 
 	reset_idle_timer();
