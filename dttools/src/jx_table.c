@@ -51,13 +51,22 @@ void jx_table_print( struct jx_table *t, struct jx *j, FILE * f )
 {
 	while(t->name) {
 		char *line;
-		if(t->mode == JX_TABLE_MODE_METRIC && j->type==JX_INTEGER) {
+		if(t->mode == JX_TABLE_MODE_METRIC) {
 			line = malloc(10);
-			string_metric(j->integer_value, -1, line);
+			string_metric(jx_lookup_integer(j,t->name), -1, line);
 			strcat(line, "B");
 		} else {
-			line = jx_print_string(j);
-			if(!line) line = strdup("???");
+			struct jx *v = jx_lookup(j,t->name);
+			if(!v) {
+				line = strdup("???");
+			} else if(v->type==JX_STRING) {
+				// special case b/c we want to see
+				// a raw string without quotes or escapes.
+				line = string_format("%s",v->string_value);
+			} else {
+				// other types should be printed natively
+				line = jx_print_string(v);
+			}
 		}
 		char *aligned = malloc(t->width + 1);
 		fill_string(line, aligned, t->width, t->align);
