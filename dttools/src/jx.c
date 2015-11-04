@@ -88,7 +88,7 @@ struct jx * jx_array( struct jx_item *items )
 	return j;
 }
 
-struct jx * jx_object_lookup( struct jx *j, const char *key )
+struct jx * jx_lookup( struct jx *j, const char *key )
 {
 	struct jx_pair *p;
 
@@ -105,22 +105,37 @@ struct jx * jx_object_lookup( struct jx *j, const char *key )
 	return 0;
 }
 
-struct jx * jx_object_lookup_expr( struct jx *j, struct jx *key )
+const char * jx_lookup_string( struct jx *object, const char *key )
 {
-	struct jx_pair *p;
-
-	if(!j || j->type!=JX_OBJECT) return 0;
-
-	for(p=j->pairs;p;p=p->next) {
-		if(p && jx_equals(p->key,key)) {
-			return p->value;
-		}
+	struct jx *j = jx_lookup(object,key);
+	if(j && jx_istype(j,JX_STRING)) {
+		return j->string_value;
+	} else {
+		return 0;
 	}
-
-	return 0;
 }
 
-int jx_object_insert( struct jx *j, struct jx *key, struct jx *value )
+jx_int_t jx_lookup_integer( struct jx *object, const char *key )
+{
+	struct jx *j = jx_lookup(object,key);
+	if(j && jx_istype(j,JX_INTEGER)) {
+		return j->integer_value;
+	} else {
+		return 0;
+	}
+}
+
+double jx_lookup_float( struct jx *object, const char *key )
+{
+	struct jx *j = jx_lookup(object,key);
+	if(j && jx_istype(j,JX_FLOAT)) {
+		return j->float_value;
+	} else {
+		return 0;
+	}
+}
+
+int jx_insert( struct jx *j, struct jx *key, struct jx *value )
 {
 	if(!j || j->type!=JX_OBJECT) return 0;
 	j->pairs = jx_pair(key,value,j->pairs);

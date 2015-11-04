@@ -135,13 +135,19 @@ void jx_pair_delete( struct jx_pair *p );
 void jx_item_delete( struct jx_item *i );
 
 /** Insert a key-value pair into an object.  @param object The object.  @param key The key.  @param value The value. @return True on success, false on failure.  Failure can only occur if the object is not a @ref JX_OBJECT. */
-int jx_object_insert( struct jx *object, struct jx *key, struct jx *value );
+int jx_insert( struct jx *object, struct jx *key, struct jx *value );
 
-/** Search for a particular item in an object.  The key is an ordinary string value.  (To search by other expression values, see @ref jx_object_lookup_expr.  @param object The object in which to search.  @param key The string key to match.  @return The value of the matching pair, or null if none is found. */
-struct jx * jx_object_lookup( struct jx *object, const char *key );
+/** Search for a arbitrary item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The value of the matching pair, or null if none is found. */
+struct jx * jx_lookup( struct jx *object, const char *key );
 
-/** Search for a particular item in an object.  The key may be any JX compound expression.  @param object The object in which to search.  @param key The key to match.  @return The value of the matching pair, or null if none is found. */
-struct jx * jx_object_lookup_expr( struct jx *object, struct jx *key );
+/** Search for a string item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The C string value of the matching object, or null if it is not found, or is not a string. */
+const char * jx_lookup_string( struct jx *object, const char *key );
+
+/** Search for an integer item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The integer value of the matching object, or zero if it is not found, or is not an integer. */
+jx_int_t jx_lookup_integer( struct jx *object, const char *key );
+
+/** Search for a float item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The float value of the matching object, or null if it is not found, or is not a float. */
+double jx_lookup_float( struct jx *object, const char *key );
 
 /** Insert an item at the beginning of an array.  @param array The array to modify.  @param value The value to insert. */
 void jx_array_insert( struct jx *array, struct jx *value );
