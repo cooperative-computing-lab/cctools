@@ -17,9 +17,9 @@ See the file COPYING for details.
 
 char * jx_print_string( struct jx *j );
 
-/** Print a JX expression to a file.  @param j A JX expression.  @param file A standard IO stream. */
+/** Print a JX expression to a standard I/O stream.  @param j A JX expression.  @param file A standard IO stream. */
 
-void jx_print_file( struct jx *j, FILE *file );
+void jx_print_stream( struct jx *j, FILE *file );
 
 /** Print a JX expression to a buffer. @param j A JX expression. @param buffer The buffer for output. @see buffer.h */
 

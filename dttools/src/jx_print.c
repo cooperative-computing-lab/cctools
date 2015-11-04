@@ -112,7 +112,7 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 	}
 }
 
-void jx_print_file( struct jx *j, FILE *file )
+void jx_print_stream( struct jx *j, FILE *file )
 {
 	buffer_t buffer;
 	buffer_init(&buffer);
