@@ -59,7 +59,7 @@ static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
 static const char *default_cvmfs_repo =
 "*:try_local_filesystem \
 \
- *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/opt/*;http://cernvmfs.gridpp.rl.ac.uk/opt/*;http://cvmfs.racf.bnl.gov/opt/* \
+ *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/cvmfs/*.cern.ch;http://cernvmfs.gridpp.rl.ac.uk/cvmfs/*.cern.ch;http://cvmfs.racf.bnl.gov/cvmfs/*.cern.ch \
 \
  *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/*";
 
@@ -644,10 +644,10 @@ cvmfs_filesystem *cvmfs_filesystem::createMatch(char const *repo_name) const
  * escaped with a backslash.
  *
  * Example for /cvmfs/cms.cern.ch:
- * cms.cern.ch:pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/opt/cms
+ * cms.cern.ch:pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch
  *
  * Example with wildcard (using <*> to avoid compiler warning about nested comment):
- * *.cern.ch:pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/opt/<*>
+ * *.cern.ch:pubkey=/path/to/cern.ch.pub,url=http://cvmfs-stratum-one.cern.ch/cvmfs/<*>.cern.ch
  */
 static void cvmfs_read_config()
 {
