@@ -13,7 +13,7 @@ the underlying file servers.
 
 So as to avoid many slow queries to the catalog server, queries are cached and
 sonsulted repeatedly.  Each query pulls off the details of each server in the
-form of name-value pairs (nvpairs) that are placed into a hash table according
+form of jx json expressions that are placed into a hash table according
 to the server name and port.  The catalog is not queried above once per minute.
 Note that no matter how often the catalog is queried, the data will be stale
 due to the propagation delay from servers to the catalog.  If you are using a
@@ -67,11 +67,11 @@ static int is_multi_path(const char *host)
 	return !strcmp(host, "multi") || !strcmp(host, "multi:9094");
 }
 
-static void chirp_nvpair_to_stat(struct nvpair *nv, struct chirp_stat *info)
+static void chirp_jx_to_stat(struct jx *j, struct chirp_stat *info)
 {
 	memset(info, 0, sizeof(*info));
-	info->cst_atime = info->cst_mtime = info->cst_ctime = nvpair_lookup_integer(nv, "lastheardfrom");
-	info->cst_size = nvpair_lookup_integer(nv, "total") - nvpair_lookup_integer(nv, "avail");
+	info->cst_atime = info->cst_mtime = info->cst_ctime = jx_lookup_integer(j, "lastheardfrom");
+	info->cst_size = jx_lookup_integer(j, "total") - jx_lookup_integer(j, "avail");
 	info->cst_size /= 1024 * 1024;
 	info->cst_mode = S_IFDIR | 0555;
 }
@@ -97,7 +97,7 @@ static void parse_multi_path(const char *path, char *mhost, char *mpath)
 static int server_table_load(time_t stoptime)
 {
 	struct catalog_query *q;
-	struct nvpair *n;
+	struct jx *j;
 	char *key;
 	void *item;
 
@@ -119,7 +119,7 @@ static int server_table_load(time_t stoptime)
 	hash_table_firstkey(server_table);
 	while(hash_table_nextkey(server_table, &key, &item)) {
 		hash_table_remove(server_table, key);
-		nvpair_delete(item);
+		jx_delete(item);
 	}
 
 	debug(D_CHIRP, "querying catalog at %s:%d", CATALOG_HOST, CATALOG_PORT);
@@ -128,25 +128,25 @@ static int server_table_load(time_t stoptime)
 	if(!q)
 		return 0;
 
-	while((n = catalog_query_read(q, stoptime))) {
+	while((j = catalog_query_read(q, stoptime))) {
 		char name[CHIRP_PATH_MAX];
 		const char *type, *hname;
 		int port;
 
-		type = nvpair_lookup_string(n, "type");
+		type = jx_lookup_string(j, "type");
 		if(type && !strcmp(type, "chirp")) {
-			hname = nvpair_lookup_string(n, "name");
+			hname = jx_lookup_string(j, "name");
 			if(hname) {
-				port = nvpair_lookup_integer(n, "port");
+				port = jx_lookup_integer(j, "port");
 				if(!port)
 					port = CHIRP_PORT;
 				sprintf(name, "%s:%d", hname, port);
-				hash_table_insert(server_table, name, n);
+				hash_table_insert(server_table, name, j);
 			} else {
-				nvpair_delete(n);
+				jx_delete(j);
 			}
 		} else {
-			nvpair_delete(n);
+			jx_delete(j);
 		}
 	}
 	catalog_query_delete(q);
@@ -155,7 +155,7 @@ static int server_table_load(time_t stoptime)
 	return 1;
 }
 
-static struct nvpair *server_lookup(const char *host, time_t stoptime)
+static struct jx *server_lookup(const char *host, time_t stoptime)
 {
 	if(server_table_load(stoptime)) {
 		return hash_table_lookup(server_table, host);
@@ -362,7 +362,7 @@ INT64_T chirp_global_getlongdir(const char *host, const char *path, chirp_longdi
 
 			hash_table_firstkey(server_table);
 			while(hash_table_nextkey(server_table, &key, &item)) {
-				chirp_nvpair_to_stat(item, &info);
+				chirp_jx_to_stat(item, &info);
 				callback(key, &info, arg);
 			}
 			chirp_blank_stat(&info);
@@ -641,9 +641,9 @@ INT64_T chirp_global_stat(const char *host, const char *path, struct chirp_stat 
 	} else if(not_empty(path)) {
 		return chirp_reli_stat(host, path, buf, stoptime);
 	} else if(not_empty(host)) {
-		struct nvpair *nv = server_lookup(host, stoptime);
-		if(nv) {
-			chirp_nvpair_to_stat(nv, buf);
+		struct jx *j = server_lookup(host, stoptime);
+		if(j) {
+			chirp_jx_to_stat(j, buf);
 			return 0;
 		} else {
 			return chirp_reli_stat(host, "/", buf, stoptime);
@@ -664,9 +664,9 @@ INT64_T chirp_global_lstat(const char *host, const char *path, struct chirp_stat
 	} else if(not_empty(path)) {
 		return chirp_reli_lstat(host, path, buf, stoptime);
 	} else if(not_empty(host)) {
-		struct nvpair *nv = server_lookup(host, stoptime);
-		if(nv) {
-			chirp_nvpair_to_stat(nv, buf);
+		struct jx *j = server_lookup(host, stoptime);
+		if(j) {
+			chirp_jx_to_stat(j, buf);
 			return 0;
 		} else {
 			return chirp_reli_lstat(host, "/", buf, stoptime);
