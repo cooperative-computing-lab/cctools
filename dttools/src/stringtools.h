@@ -79,8 +79,6 @@ int strrpos(const char *str, char c);
 int getDateString(char *str);
 int string_null_or_empty(const char *str);
 
-char *string_vformat ( const char *fmt, va_list args );
-
 /** Returns a heap allocated freeable string formatted using sprintf.
 	@param fmt Format string passed to sprintf.
 	@param ... Variable arguments passed to sprintf.

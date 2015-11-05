@@ -55,12 +55,11 @@ struct jx * jx_string( const char *string_value )
 	return j;
 }
 
-struct jx * jx_format( const char *fmt, ... )
+struct jx * jx_string_nodup( char *string_value )
 {
-	va_list args;
-	va_start(args,fmt);
-	return jx_string(string_vformat(fmt,args));
-	va_end(args);
+	struct jx *j = jx_create(JX_STRING);
+	j->string_value = string_value;
+	return j;
 }
 
 struct jx * jx_integer( jx_int_t integer_value )
