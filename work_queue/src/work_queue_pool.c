@@ -370,7 +370,7 @@ int read_config_file(const char *config_file) {
 	assign_new_value(new_num_memory_option, num_memory_option, memory, int, JX_INTEGER, integer_value)
 
 
-	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_FLOAT, float_value)
+	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_DOUBLE, double_value)
 
 	assign_new_value(new_project_regex, project_regex, master-name, const char *, JX_STRING, string_value)
 	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, JX_STRING, string_value)

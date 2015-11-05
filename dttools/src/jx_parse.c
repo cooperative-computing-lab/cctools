@@ -15,7 +15,7 @@ See the file COPYING for details.
 typedef enum {
 	JX_TOKEN_SYMBOL,
 	JX_TOKEN_INTEGER,
-	JX_TOKEN_FLOAT,
+	JX_TOKEN_DOUBLE,
 	JX_TOKEN_STRING,
 	JX_TOKEN_LBRACKET,
 	JX_TOKEN_RBRACKET,
@@ -239,7 +239,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				s->token[i] = 0;
 				jx_ungetchar(s,c);
 				if(strchr(s->token,'.')) {
-					return JX_TOKEN_FLOAT;
+					return JX_TOKEN_DOUBLE;
 				} else {
 					return JX_TOKEN_INTEGER;
 				}
@@ -380,8 +380,8 @@ struct jx * jx_parse( struct jx_parser *s )
 		return jx_string(s->token);
 	case JX_TOKEN_INTEGER:
 		return jx_integer((jx_int_t)atoll(s->token));
-	case JX_TOKEN_FLOAT:
-		return jx_float(atof(s->token));
+	case JX_TOKEN_DOUBLE:
+		return jx_double(atof(s->token));
 	case JX_TOKEN_TRUE:
 		return jx_boolean(1);
 	case JX_TOKEN_FALSE:

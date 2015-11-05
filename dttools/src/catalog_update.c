@@ -79,9 +79,9 @@ int main(int argc, char *argv[]) {
 	jx_insert_string(j,"cpu",name.machine);
 	jx_insert_string(j,"opsys",name.sysname);
 	jx_insert_string(j,"opsysversion",name.release);
-	jx_insert_float(j,"load1",load[0]);
-	jx_insert_float(j,"load5",load[1]);
-	jx_insert_float(j,"load15",load[2]);
+	jx_insert_double(j,"load1",load[0]);
+	jx_insert_double(j,"load5",load[1]);
+	jx_insert_double(j,"load15",load[2]);
 	jx_insert_integer(j,"memory_total",memory_total);
 	jx_insert_integer(j,"memory_avail",memory_avail);
 	jx_insert_integer(j,"cpus",cpus);

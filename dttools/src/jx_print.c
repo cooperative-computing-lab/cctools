@@ -84,8 +84,8 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 		case JX_NULL:
 			buffer_putstring(b,"null");
 			break;
-		case JX_FLOAT:
-			buffer_printf(b,"%lg",j->float_value);
+		case JX_DOUBLE:
+			buffer_printf(b,"%lf",j->double_value);
 			break;
 		case JX_BOOLEAN:
 			buffer_printf(b,"%s",j->boolean_value ? "true" : "false");

@@ -44,7 +44,7 @@ typedef enum {
 	JX_NULL,	/**< null value */
 	JX_BOOLEAN,	/**< true or false */
 	JX_INTEGER,	/**< integer value */
-	JX_FLOAT,	/**< floating point value */
+	JX_DOUBLE,	/**< floating point value */
 	JX_STRING,	/**< string value */
 	JX_SYMBOL,	/**< variable identifier */
 	JX_ARRAY,	/**< array containing values */
@@ -75,7 +75,7 @@ struct jx {
 	union {
 		int boolean_value;      /**< value of @ref JX_BOOLEAN */
 		jx_int_t integer_value; /**< value of @ref JX_INTEGER */
-		double float_value;   /**< value of @ref JX_FLOAT */
+		double double_value;   /**< value of @ref JX_DOUBLE */
 		char * string_value;  /**< value of @ref JX_STRING */
 		char * symbol_name;   /**< value of @ref JX_SYMBOL */
 		struct jx_item *items;  /**< value of @ref JX_ARRAY */
@@ -92,8 +92,8 @@ struct jx * jx_boolean( int boolean_value );
 /** Create a JX integer value. @param integer_value A C integer. @return a JX integer value. */
 struct jx * jx_integer( jx_int_t integer_value );
 
-/** Create a JX floating point value. @param float_value A C double precision floating point.  @return a JX float value. */
-struct jx * jx_float( double float_value );
+/** Create a JX floating point value. @param double_value A C double precision floating point.  @return a JX double value. */
+struct jx * jx_double( double double_value );
 
 /** Create a JX string value. @param string_value A C string, which will be duplciated via strdup(). @return A JX string value. */
 struct jx * jx_string( const char *string_value );
@@ -146,8 +146,8 @@ int jx_insert( struct jx *object, struct jx *key, struct jx *value );
 /** Insert an integer value into an object @param object The object @param key The key represented as a C string  @param value The integer value. */
 void jx_insert_integer( struct jx *object, const char *key, jx_int_t value );
 
-/** Insert a float value into an object @param object The object @param key The key represented as a C string  @param value The float value. */
-void jx_insert_float( struct jx *object, const char *key, double value );
+/** Insert a double value into an object @param object The object @param key The key represented as a C string  @param value The double value. */
+void jx_insert_double( struct jx *object, const char *key, double value );
 
 /** Insert a string value into an object @param object The object @param key The key represented as a C string  @param value The C string value. */
 void jx_insert_string( struct jx *object, const char *key, const char *value );
@@ -161,8 +161,8 @@ const char * jx_lookup_string( struct jx *object, const char *key );
 /** Search for an integer item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The integer value of the matching object, or zero if it is not found, or is not an integer. */
 jx_int_t jx_lookup_integer( struct jx *object, const char *key );
 
-/** Search for a float item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The float value of the matching object, or null if it is not found, or is not a float. */
-double jx_lookup_float( struct jx *object, const char *key );
+/** Search for a double item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The double value of the matching object, or null if it is not found, or is not a double. */
+double jx_lookup_double( struct jx *object, const char *key );
 
 /** Insert an item at the beginning of an array.  @param array The array to modify.  @param value The value to insert. */
 void jx_array_insert( struct jx *array, struct jx *value );

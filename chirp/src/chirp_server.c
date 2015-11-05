@@ -223,9 +223,9 @@ static int update_all_catalogs(const char *url)
 	jx_insert_string (j,"backend",url);
 	jx_insert_string (j,"cpu",name.machine);
 	jx_insert_integer(j,"cpus", cpus);
-	jx_insert_float  (j,"load1",avg[0]);
-	jx_insert_float  (j,"load5",avg[1]);
-	jx_insert_float  (j,"load15",avg[2]);
+	jx_insert_double  (j,"load1",avg[0]);
+	jx_insert_double  (j,"load5",avg[1]);
+	jx_insert_double  (j,"load15",avg[2]);
 	jx_insert_integer(j,"memory_avail",memory_avail);
 	jx_insert_integer(j,"memory_total",memory_total);
 	jx_insert_integer(j,"minfree",minimum_space_free);

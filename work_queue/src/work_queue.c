@@ -1677,8 +1677,8 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"total_receive_time",info.total_receive_time);
 	jx_insert_integer(j,"total_bytes_sent",info.total_bytes_sent);
 	jx_insert_integer(j,"total_bytes_received",info.total_bytes_received);
-	jx_insert_float(j,"efficiency",info.efficiency);
-	jx_insert_float(j,"idle_percentage",info.idle_percentage);
+	jx_insert_double(j,"efficiency",info.efficiency);
+	jx_insert_double(j,"idle_percentage",info.idle_percentage);
 	jx_insert_integer(j,"capacity",info.capacity);
 	jx_insert_integer(j,"total_execute_time",info.total_execute_time);
 	jx_insert_integer(j,"total_good_execute_time",info.total_good_execute_time);

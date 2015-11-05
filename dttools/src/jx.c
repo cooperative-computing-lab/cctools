@@ -69,10 +69,10 @@ struct jx * jx_integer( jx_int_t integer_value )
 	return j;
 }
 
-struct jx * jx_float( double float_value )
+struct jx * jx_double( double double_value )
 {
-	struct jx *j = jx_create(JX_FLOAT);
-	j->float_value = float_value;
+	struct jx *j = jx_create(JX_DOUBLE);
+	j->double_value = double_value;
 	return j;
 }
 
@@ -134,11 +134,11 @@ jx_int_t jx_lookup_integer( struct jx *object, const char *key )
 	}
 }
 
-double jx_lookup_float( struct jx *object, const char *key )
+double jx_lookup_double( struct jx *object, const char *key )
 {
 	struct jx *j = jx_lookup(object,key);
-	if(j && jx_istype(j,JX_FLOAT)) {
-		return j->float_value;
+	if(j && jx_istype(j,JX_DOUBLE)) {
+		return j->double_value;
 	} else {
 		return 0;
 	}
@@ -156,9 +156,9 @@ void jx_insert_integer( struct jx *j, const char *key, jx_int_t value )
 	jx_insert(j,jx_string(key),jx_integer(value));
 }
 
-void jx_insert_float( struct jx *j, const char *key, double value )
+void jx_insert_double( struct jx *j, const char *key, double value )
 {
-	jx_insert(j,jx_string(key),jx_float(value));
+	jx_insert(j,jx_string(key),jx_double(value));
 }
 
 void jx_insert_string( struct jx *j, const char *key, const char *value )
@@ -204,7 +204,7 @@ void jx_delete( struct jx *j )
 	if(!j) return;
 
 	switch(j->type) {
-		case JX_FLOAT:
+		case JX_DOUBLE:
 		case JX_BOOLEAN:
 		case JX_INTEGER:
 		case JX_NULL:
@@ -249,8 +249,8 @@ int jx_equals( struct jx *j, struct jx *k )
 	switch(j->type) {
 		case JX_NULL:
 			return 1;
-		case JX_FLOAT:
-			return j->float_value==k->float_value;
+		case JX_DOUBLE:
+			return j->double_value==k->double_value;
 		case JX_BOOLEAN:
 			return j->boolean_value==k->boolean_value;
 		case JX_INTEGER:
@@ -293,8 +293,8 @@ struct jx  *jx_copy( struct jx *j )
 	switch(j->type) {
 		case JX_NULL:
 			return jx_null();
-		case JX_FLOAT:
-			return jx_float(j->float_value);
+		case JX_DOUBLE:
+			return jx_double(j->double_value);
 		case JX_BOOLEAN:
 			return jx_boolean(j->boolean_value);
 		case JX_INTEGER:
@@ -330,7 +330,7 @@ int jx_is_constant( struct jx *j )
 	switch(j->type) {
 		case JX_SYMBOL:
 			return 0;
-		case JX_FLOAT:
+		case JX_DOUBLE:
 		case JX_BOOLEAN:
 		case JX_INTEGER:
 		case JX_STRING:
@@ -380,7 +380,7 @@ struct jx * jx_evaluate( struct jx *j, jx_eval_func_t func )
 	switch(j->type) {
 		case JX_SYMBOL:
 			return func(j->symbol_name);
-		case JX_FLOAT:
+		case JX_DOUBLE:
 		case JX_BOOLEAN:
 		case JX_INTEGER:
 		case JX_STRING:
