@@ -770,6 +770,9 @@ int rmonitor_final_summary()
 	if(summary->exit_status == 0 && summary->limits_exceeded)
 		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
 
+	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s", "", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, CCTOOLS_COMMIT);
+	list_push_tail(verbatim_summary_lines, monitor_self_info);
+
 	rmonitor_find_files_final_sizes();
 	rmonitor_add_files_to_summary("input_files:",  0);
 	rmonitor_add_files_to_summary("output_files:", 1);
@@ -777,6 +780,8 @@ int rmonitor_final_summary()
 	char *epilogue = rmonitor_consolidate_verbatim_lines();
 	rmsummary_print(log_summary, summary, resources_limits, NULL, epilogue);
 
+	if(monitor_self_info)
+		free(monitor_self_info);
 	if(epilogue)
 		free(epilogue);
 
