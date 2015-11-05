@@ -5,7 +5,7 @@
 # $ ./amazon_ec2.sh $AWS_ACCESS_KEY $AWS_SECRET_KEY
 set -e
 #OUTPUT_FILES_DESTINATION="/tmp/test_amazon_makeflow"
-OUTPUT_FILES_DESTINATION="$(pwd)"
+OUTPUT_FILES_DESTINATION="."
 EC2_TOOLS_DIR="../ec2-api-tools-1.7.5.1/bin"
 AMI_IMAGE="ami-4b630d2e"
 INSTANCE_TYPE="t1.micro"
@@ -14,6 +14,7 @@ AWS_ACCESS_KEY=$1
 AWS_SECRET_KEY=$2
 CMD=$3
 INPUT_FILES=$4
+OUTPUT_FILES=$5
 KEYPAIR_NAME="makeflow-keypair"
 SECURITY_GROUP_NAME="makeflow-security-group"
 
@@ -61,7 +62,7 @@ get_file_from_server_to_destination () {
 
 copy_file_to_server () {
     scp -o StrictHostKeyChecking=no -i $KEYPAIR_NAME.pem \
-        $1 $USERNAME@$PUBLIC_DNS:~
+        $* $USERNAME@$PUBLIC_DNS:~
 }
 
 generate_temp_keypair () {
@@ -87,7 +88,7 @@ trap cleanup EXIT
 
 if [ "$#" -lt 3 ]; then
     echo "Incorrect arguments passed to program"
-    echo "Usage: $0 AWS_ACCESS_KEY AWS_SECRET_KEY INPUT_FILES" >&2
+    echo "Usage: $0 AWS_ACCESS_KEY AWS_SECRET_KEY INPUT_FILES OUTPUT_FILES" >&2
     exit 1
 fi
 
@@ -130,12 +131,13 @@ done
 if [ $SUCCESSFUL_SSH -eq 0 ]
 then
     # Pass input files
-    $INPUTS="$(echo $INPUT_FILES | sed 's/,/ /g')"
+    INPUTS="$(echo $INPUT_FILES | sed 's/,/ /g')"
     copy_file_to_server $INPUTS
 
     # Run command
     run_ssh_cmd "$CMD"
 
     # Get output files
-    get_file_from_server_to_destination "testfile" $OUTPUT_FILES_DESTINATION
+    OUTPUTS="$(echo $OUTPUT_FILES | sed 's/,/ /g')"
+    get_file_from_server_to_destination $OUTPUTS $OUTPUT_FILES_DESTINATION
 fi
