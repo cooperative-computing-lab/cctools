@@ -377,7 +377,7 @@ struct jx * jx_parse( struct jx_parser *s )
 	case JX_TOKEN_LBRACKET:
 		return jx_array(jx_parse_item_list(s));
 	case JX_TOKEN_STRING:
-		return jx_string(strdup(s->token));
+		return jx_string(s->token);
 	case JX_TOKEN_INTEGER:
 		return jx_integer((jx_int_t)atoll(s->token));
 	case JX_TOKEN_FLOAT:

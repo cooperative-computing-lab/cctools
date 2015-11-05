@@ -222,6 +222,7 @@ void jx_delete( struct jx *j )
 			jx_pair_delete(j->pairs);
 			break;
 	}
+	free(j);
 }
 
 int jx_istype( struct jx *j, jx_type_t type )
