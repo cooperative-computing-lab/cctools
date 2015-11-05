@@ -348,8 +348,7 @@ static int jbindfiles (sqlite3 *db, chirp_jobid_t id, const char *subject, const
 	static const char SQL[] =
 		"SELECT task_path, serv_path, binding, type"
 		"	FROM JobFile"
-		"	WHERE id = ?"
-		"	ORDER BY RANDOM();";
+		"	WHERE id = ?;";
 
 	int rc;
 	sqlite3_stmt *stmt = NULL;
