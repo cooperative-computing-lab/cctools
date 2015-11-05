@@ -7,7 +7,40 @@ See the file COPYING for details.
 #include "nvpair.h"
 #include "jx.h"
 #include "jx_print.h"
+#include "jx_parse.h"
 #include "stringtools.h"
+
+/*
+This is a compatibility layer between jx and nvpair,
+to allow for mixed code during the transition.
+An nvpair is internally just (unquoted) string values,
+so all JX values are just printed out, except for strings,
+which are quoted.  For more complex jx expressions within
+a value, they are printed out exactly.   For example,
+the following objects are equivalent.
+*/
+
+/*
+nvpair:
+
+port 1234
+load 1.25
+hostname ccl
+url  http://ccl.cse.nd.edu:1234
+working true
+alist ["one","two","three"]
+
+jx:
+
+{
+port: 1234,
+load: 1.25,
+hostname: "ccl"
+url: "http://ccl.cse.nd.edu:1234",
+working: true,
+alist: ["one","two","three"]
+}
+*/
 
 struct nvpair * jx_to_nvpair( struct jx *object )
 {
@@ -37,10 +70,19 @@ struct jx * nvpair_to_jx( struct nvpair *nv )
 
 	nvpair_first_item(nv);
 	while(nvpair_next_item(nv,&key,&value)) {
-		if(string_is_integer(value)) {
+		if(!strcmp(value,"true")) {
+			jvalue = jx_boolean(1);
+		} else if(!strcmp(value,"false")) {
+			jvalue = jx_boolean(0);
+		} else if(!strcmp(value,"null")) {
+			jvalue = jx_null();
+		} else if(string_is_integer(value)) {
 			jvalue = jx_integer(atoll(value));
 		} else if(string_is_float(value)) {
 			jvalue = jx_float(atof(value));
+		} else if(value[0]=='[' || value[0]=='{') {
+			jvalue = jx_parse_string(value);
+			if(!jvalue) jvalue = jx_string(value);
 		} else {
 			jvalue = jx_string(value);
 		}
