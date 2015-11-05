@@ -7,12 +7,186 @@
 #include <string.h>
 #include <unistd.h>
 
+static struct hash_table *hash;
+
+char *amazon_ec2_script ="\
+#!/bin/sh\n\
+# Runs makeflow directions on ec2 instance\n\
+#\n\
+# Invocation:\n\
+# $ ./amazon_ec2.sh $AWS_ACCESS_KEY $AWS_SECRET_KEY\n\
+set -e\n\
+#OUTPUT_FILES_DESTINATION=\"/tmp/test_amazon_makeflow\"\n\
+OUTPUT_FILES_DESTINATION=\".\"\n\
+EC2_TOOLS_DIR=\"../ec2-api-tools-1.7.5.1/bin\"\n\
+AMI_IMAGE=\"ami-4b630d2e\"\n\
+INSTANCE_TYPE=\"t1.micro\"\n\
+USERNAME=\"ubuntu\"\n\
+AWS_ACCESS_KEY=$1\n\
+AWS_SECRET_KEY=$2\n\
+CMD=$3\n\
+INPUT_FILES=$4\n\
+OUTPUT_FILES=$5\n\
+KEYPAIR_NAME=\"makeflow-keypair\"\n\
+SECURITY_GROUP_NAME=\"makeflow-security-group\"\n\
+\n\
+# Flags\n\
+INSTANCE_CREATED=0\n\
+\n\
+cleanup () {\n\
+    if [ $INSTANCE_CREATED -eq 1 ]\n\
+    then\n\
+        echo \"Terminating EC2 instance...\"\n\
+        $EC2_TOOLS_DIR/ec2-terminate-instances $INSTANCE_ID\n\
+\n\
+        # Instance must be shut down in order to delete keypair\n\
+        echo \"Waiting for EC2 instance to shutdown...\"\n\
+        INSTANCE_SHUTTING_DOWN=1\n\
+        while [ $INSTANCE_SHUTTING_DOWN -eq 1 ]\n\
+        do\n\
+            $EC2_TOOLS_DIR/ec2-describe-instances | \\\n\
+                grep \"shutting-down\" | grep -v \"RESERVATION\" \\\n\
+                >/dev/null || INSTANCE_SHUTTING_DOWN=0\n\
+        done\n\
+    fi\n\
+\n\
+\n\
+    echo \"Deleting temporary security group...\"\n\
+    $EC2_TOOLS_DIR/ec2-delete-group $SECURITY_GROUP_NAME > /dev/null\n\
+    echo \"Temporary security group deleted.\"\n\
+\n\
+    echo \"Deleting temporary keypair...\"\n\
+    $EC2_TOOLS_DIR/ec2-delete-keypair $KEYPAIR_NAME > /dev/null\n\
+    rm -f $KEYPAIR_NAME.pem\n\
+    echo \"Temporary keypair deleted.\"\n\
+}\n\
+\n\
+run_ssh_cmd () {\n\
+    ssh -o StrictHostKeyChecking=no -i $KEYPAIR_NAME.pem $USERNAME@$PUBLIC_DNS \\\n\
+            $1\n\
+}\n\
+\n\
+get_file_from_server_to_destination () {\n\
+    echo \"Copying file to $2\"\n\
+    scp -o StrictHostKeyChecking=no -i $KEYPAIR_NAME.pem \\\n\
+        $USERNAME@$PUBLIC_DNS:~/\"$1\" $2\n\
+}\n\
+\n\
+copy_file_to_server () {\n\
+    scp -o StrictHostKeyChecking=no -i $KEYPAIR_NAME.pem \\\n\
+        $* $USERNAME@$PUBLIC_DNS:~\n\
+}\n\
+\n\
+generate_temp_keypair () {\n\
+    # Generate temp key pair and save\n\
+    echo \"Generating temporary keypair...\"\n\
+    $EC2_TOOLS_DIR/ec2-create-keypair $KEYPAIR_NAME | sed \'s/.*KEYPAIR.*//\' > $KEYPAIR_NAME.pem\n\
+    echo \"Keypair generated.\"\n\
+}\n\
+\n\
+create_temp_security_group () {\n\
+    # Create temp security group\n\
+    echo \"Generating temporary security group...\"\n\
+    $EC2_TOOLS_DIR/ec2-create-group $SECURITY_GROUP_NAME -d \"$SECURITY_GROUP_NAME\"\n\
+    echo \"Security group generated.\"\n\
+}\n\
+\n\
+authorize_port_22_for_ssh_access () {\n\
+    echo \"Authorizing port 22 on instance for SSH access...\"\n\
+    $EC2_TOOLS_DIR/ec2-authorize $SECURITY_GROUP_NAME -p 22\n\
+}\n\
+\n\
+trap cleanup EXIT\n\
+\n\
+if [ \"$#\" -lt 3 ]; then\n\
+    echo \"Incorrect arguments passed to program\"\n\
+    echo \"Usage: $0 AWS_ACCESS_KEY AWS_SECRET_KEY INPUT_FILES OUTPUT_FILES\" >&2\n\
+    exit 1\n\
+fi\n\
+\n\
+generate_temp_keypair\n\
+create_temp_security_group\n\
+authorize_port_22_for_ssh_access\n\
+\n\
+echo \"Starting EC2 instance...\"\n\
+INSTANCE_ID=$($EC2_TOOLS_DIR/ec2-run-instances \\\n\
+    $AMI_IMAGE \\\n\
+    -t $INSTANCE_TYPE \\\n\
+    -k $KEYPAIR_NAME \\\n\
+    -g $SECURITY_GROUP_NAME \\\n\
+    | grep \"INSTANCE\" | awk \'{print $2}\')\n\
+INSTANCE_CREATED=1\n\
+\n\
+INSTANCE_STATUS=\"pending\"\n\
+while [ \"$INSTANCE_STATUS\" = \"pending\" ]; do\n\
+    INSTANCE_STATUS=$($EC2_TOOLS_DIR/ec2-describe-instances $INSTANCE_ID \\\n\
+    | grep \"INSTANCE\" | awk \'{print $5}\')\n\
+done\n\
+\n\
+PUBLIC_DNS=$($EC2_TOOLS_DIR/ec2-describe-instances $INSTANCE_ID \\\n\
+| grep \"INSTANCE\" | awk \'{print $4\'})\n\
+\n\
+chmod 400 $KEYPAIR_NAME.pem\n\
+\n\
+# Try for successful ssh connection\n\
+tries=\"10\"\n\
+SUCCESSFUL_SSH=-1\n\
+while [ $tries -ne 0 ]\n\
+do\n\
+    run_ssh_cmd \"echo \'Connection to remote server successful\'\" \\\n\
+        && SUCCESSFUL_SSH=0 && break\n\
+    tries=$[$tries-1]\n\
+    sleep 1\n\
+done\n\
+\n\
+# Run rest of ssh commands\n\
+if [ $SUCCESSFUL_SSH -eq 0 ]\n\
+then\n\
+    # Pass input files\n\
+    INPUTS=\"$(echo $INPUT_FILES | sed \'s/,/ /g\')\"\n\
+    copy_file_to_server $INPUTS\n\
+\n\
+    # Run command\n\
+    run_ssh_cmd \"$CMD\"\n\
+\n\
+    # Get output files\n\
+    OUTPUTS=\"$(echo $OUTPUT_FILES | sed \'s/,/ /g\')\"\n\
+    get_file_from_server_to_destination $OUTPUTS $OUTPUT_FILES_DESTINATION\n\
+fi\n\
+";
+
 static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
     int jobid;
     struct batch_job_info *info = malloc(sizeof(*info));
     memset(info, 0, sizeof(*info));
+
+    // Write amazon ec2 script to file
+    char *amazon_script_filename = "_temp_amazon_ec2_script.sh";
+    //char *amazon_script_filename = "amazon_ec2.sh";
+    FILE *f = fopen(amazon_script_filename, "w");
+    fprintf(f, amazon_ec2_script);
+    fclose(f);
+    // Execute permissions
+    char mode[] = "0755";
+    int i = strtol(mode, 0, 8);
+    chmod(amazon_ec2_script, i);
+
+
+    // Run ec2 script
+    char shell_cmd[200];
+    sprintf(
+        shell_cmd,
+        "%s %s %s '%s' %s %s",
+        amazon_script_filename,
+        "secret_key",
+        "password",
+        cmd,
+        extra_input_files,
+        extra_output_files
+    );
     debug(D_BATCH, "Forking EC2 script process...");
+    debug(D_BATCH, "options: %s", hash_table_lookup(q->options, "batch-options"));
     // Fork process and spin off shell script
     jobid = fork();
     if (jobid > 0) // parent
@@ -23,7 +197,14 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
         return jobid;
     }
     else { // child
-	    execlp("sh", "sh", "-c", cmd, (char *) 0);
+	    execlp(
+            "sh",
+            "sh",
+            "-c",
+            shell_cmd,
+            (char *) 0
+	    );
+	    execlp("rm", "rm", amazon_script_filename);
     }
 }
 
