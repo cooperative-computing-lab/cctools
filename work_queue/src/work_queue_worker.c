@@ -1698,7 +1698,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 	reset_idle_timer();
 
-	struct link *master = link_connect(master_addr,port,time(0)+idle_stoptime);
+	struct link *master = link_connect(master_addr,port,idle_stoptime);
 	if(!master) {
 		fprintf(stderr,"couldn't connect to %s:%d: %s\n",master_addr,port,strerror(errno));
 		return 0;
@@ -1722,7 +1722,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		char line[WORK_QUEUE_LINE_MAX];
 		debug(D_WQ, "verifying master's project name");
 		send_master_message(master, "name\n");
-		if(!recv_master_message(master, line, sizeof(line), time(0) + idle_stoptime)) {
+		if(!recv_master_message(master,line,sizeof(line),idle_stoptime)) {
 			debug(D_WQ,"no response from master while verifying name");
 			link_close(master);
 			return 0;
