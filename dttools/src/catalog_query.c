@@ -20,23 +20,23 @@ struct catalog_query {
 
 struct catalog_query *catalog_query_create(const char *host, int port, time_t stoptime)
 {
-	char url[1024];
-
 	if(!host)
 		host = CATALOG_HOST;
 	if(!port)
 		port = CATALOG_PORT;
 
-	sprintf(url, "http://%s:%d/query.json", host, port);
-
+	char *url = string_format("http://%s:%d/query.json", host, port);
        	struct link *link = http_query(url, "GET", stoptime);
+	free(url);
+
 	if(!link) return 0;
 
-
 	struct jx *j = jx_parse_link(link,stoptime);
+
+	link_close(link);
+
 	if(!j) {
 		debug(D_DEBUG,"query result failed to parse as JSON");
-		link_close(link);
 		return 0;
 	}
 
