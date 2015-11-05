@@ -212,6 +212,8 @@ int main(int argc, char *argv[])
 		table[count++] = j;
 	}
 
+	catalog_query_delete(q);
+
 	qsort(table, count, sizeof(*table), (int (*)(const void *, const void *)) compare_entries);
 
 	for(i = 0; i < count; i++) {
@@ -260,6 +262,8 @@ int main(int argc, char *argv[])
 			sum_avail += jx_lookup_integer(table[i], "avail");
 			sum_total += jx_lookup_integer(table[i], "total");
 		}
+
+		jx_delete(table[i]);
 	}
 
 	if(mode == MODE_TOTAL) {
