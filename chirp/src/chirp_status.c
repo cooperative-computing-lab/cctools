@@ -262,7 +262,9 @@ int main(int argc, char *argv[])
 			sum_avail += jx_lookup_integer(table[i], "avail");
 			sum_total += jx_lookup_integer(table[i], "total");
 		}
+	}
 
+	for(i=0;i<count;i++) {
 		jx_delete(table[i]);
 	}
 
