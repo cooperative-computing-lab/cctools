@@ -4,16 +4,40 @@
 # Invocation:
 # $ ./amazon_ec2.sh $AWS_ACCESS_KEY $AWS_SECRET_KEY
 set -e
+#OUTPUT_FILES_DESTINATION="/tmp/test_amazon_makeflow"
+OUTPUT_FILES_DESTINATION="$(pwd)"
 EC2_TOOLS_DIR="../ec2-api-tools-1.7.5.1/bin"
 AMI_IMAGE="ami-4b630d2e"
 INSTANCE_TYPE="t1.micro"
 USERNAME="ubuntu"
 AWS_ACCESS_KEY=$1
 AWS_SECRET_KEY=$2
+CMD=$3
+INPUT_FILES=$4
 KEYPAIR_NAME="makeflow-keypair"
 SECURITY_GROUP_NAME="makeflow-security-group"
 
+# Flags
+INSTANCE_CREATED=0
+
 cleanup () {
+    if [ $INSTANCE_CREATED -eq 1 ]
+    then
+        echo "Terminating EC2 instance..."
+        $EC2_TOOLS_DIR/ec2-terminate-instances $INSTANCE_ID
+
+        # Instance must be shut down in order to delete keypair
+        echo "Waiting for EC2 instance to shutdown..."
+        INSTANCE_SHUTTING_DOWN=1
+        while [ $INSTANCE_SHUTTING_DOWN -eq 1 ]
+        do
+            $EC2_TOOLS_DIR/ec2-describe-instances | \
+                grep "shutting-down" | grep -v "RESERVATION" \
+                >/dev/null || INSTANCE_SHUTTING_DOWN=0
+        done
+    fi
+
+
     echo "Deleting temporary security group..."
     $EC2_TOOLS_DIR/ec2-delete-group $SECURITY_GROUP_NAME > /dev/null
     echo "Temporary security group deleted."
@@ -26,13 +50,18 @@ cleanup () {
 
 run_ssh_cmd () {
     ssh -o StrictHostKeyChecking=no -i $KEYPAIR_NAME.pem $USERNAME@$PUBLIC_DNS \
-            "$1"
+            $1
 }
 
 get_file_from_server_to_destination () {
-    echo "Copying file to $(pwd)"
+    echo "Copying file to $2"
     scp -o StrictHostKeyChecking=no -i $KEYPAIR_NAME.pem \
         $USERNAME@$PUBLIC_DNS:~/"$1" $2
+}
+
+copy_file_to_server () {
+    scp -o StrictHostKeyChecking=no -i $KEYPAIR_NAME.pem \
+        $1 $USERNAME@$PUBLIC_DNS:~
 }
 
 generate_temp_keypair () {
@@ -56,9 +85,9 @@ authorize_port_22_for_ssh_access () {
 
 trap cleanup EXIT
 
-if [ "$#" -ne 2 ]; then
+if [ "$#" -lt 3 ]; then
     echo "Incorrect arguments passed to program"
-    echo "Usage: $0 AWS_ACCESS_KEY AWS_SECRET_KEY" >&2
+    echo "Usage: $0 AWS_ACCESS_KEY AWS_SECRET_KEY INPUT_FILES" >&2
     exit 1
 fi
 
@@ -73,6 +102,7 @@ INSTANCE_ID=$($EC2_TOOLS_DIR/ec2-run-instances \
     -k $KEYPAIR_NAME \
     -g $SECURITY_GROUP_NAME \
     | grep "INSTANCE" | awk '{print $2}')
+INSTANCE_CREATED=1
 
 INSTANCE_STATUS="pending"
 while [ "$INSTANCE_STATUS" = "pending" ]; do
@@ -99,11 +129,13 @@ done
 # Run rest of ssh commands
 if [ $SUCCESSFUL_SSH -eq 0 ]
 then
-    run_ssh_cmd "echo 'dat thang' > testfile"
+    # Pass input files
+    $INPUTS="$(echo $INPUT_FILES | sed 's/,/ /g')"
+    copy_file_to_server $INPUTS
+
+    # Run command
+    run_ssh_cmd "$CMD"
 
     # Get output files
-    get_file_from_server_to_destination "testfile" /tmp
+    get_file_from_server_to_destination "testfile" $OUTPUT_FILES_DESTINATION
 fi
-
-echo "Terminating EC2 instance..."
-$EC2_TOOLS_DIR/ec2-terminate-instances $INSTANCE_ID
