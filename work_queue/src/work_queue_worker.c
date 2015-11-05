@@ -91,9 +91,6 @@ static time_t connect_stoptime = 0;
 // Maximum time to attempt connecting to all available masters before giving up.
 static int connect_timeout = 900;
 
-// Maximum time to attempt a single link_connect before trying other options.
-static int single_connect_timeout = 15;
-
 // Maximum time to attempt sending/receiving any given file or message.
 static const int active_timeout = 3600;
 
@@ -1690,11 +1687,18 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	}
 
 	/*
-	For a single connection attempt, we use the short single_connect_timeout.
-	If this fails, the outer loop will try again up to connect_timeout.
+	For the preliminary steps of password and project verification, we use the
+	idle timeout, because we have not yet been assigned any work and should
+	leave if the master is not responsive.
+
+	It is tempting to use a short timeout here, but DON'T. The name and
+	password messages are ayncronous; if the master is busy handling other
+	workers, a short window is not enough for a response to come back.
 	*/
 
-	struct link *master = link_connect(master_addr,port,time(0)+single_connect_timeout);
+	reset_idle_timer();
+
+	struct link *master = link_connect(master_addr,port,idle_stoptime);
 	if(!master) {
 		fprintf(stderr,"couldn't connect to %s:%d: %s\n",master_addr,port,strerror(errno));
 		return 0;
@@ -1704,14 +1708,6 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	debug(D_WQ, "connected to master %s:%d", host, port );
 
 	link_tune(master,LINK_TUNE_INTERACTIVE);
-
-	/*
-	For the preliminary steps of password and project verification, we use the idle timeout,
-	because we have not yet been assigned any work and should leave if the master is not responsive.
-	*/
-
-
-	reset_idle_timer();
 
 	if(password) {
 		debug(D_WQ,"authenticating to master");
@@ -1726,7 +1722,7 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		char line[WORK_QUEUE_LINE_MAX];
 		debug(D_WQ, "verifying master's project name");
 		send_master_message(master, "name\n");
-		if(!recv_master_message(master, line, sizeof(line),time(0) + single_connect_timeout)) {
+		if(!recv_master_message(master,line,sizeof(line),idle_stoptime)) {
 			debug(D_WQ,"no response from master while verifying name");
 			link_close(master);
 			return 0;
