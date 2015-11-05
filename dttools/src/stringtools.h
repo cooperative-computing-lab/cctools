@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stdarg.h>
 
 typedef char *(*string_subst_lookup_t) (const char *name, void *arg);
 
@@ -77,6 +78,8 @@ int strpos(const char *str, char c);
 int strrpos(const char *str, char c);
 int getDateString(char *str);
 int string_null_or_empty(const char *str);
+
+char *string_vformat ( const char *fmt, va_list args );
 
 /** Returns a heap allocated freeable string formatted using sprintf.
 	@param fmt Format string passed to sprintf.

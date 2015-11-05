@@ -832,24 +832,26 @@ int getDateString(char *str)
 		return 1;
 }
 
-char *string_format(const char *fmt, ...)
+char *string_vformat(const char *fmt, va_list va )
 {
-	va_list va;
-
-	va_start(va, fmt);
 	int n = vsnprintf(NULL, 0, fmt, va);
-	va_end(va);
 
 	if(n < 0)
 		return NULL;
 
 	char *str = xxmalloc((n + 1) * sizeof(char));
-	va_start(va, fmt);
 	n = vsnprintf(str, n + 1, fmt, va);
 	assert(n >= 0);
-	va_end(va);
 
 	return str;
+}
+
+char *string_format( const char *fmt, ... )
+{
+	va_list args;
+	va_start(args,fmt);
+	return string_vformat(fmt,args);
+	va_end(args);
 }
 
 int string_nformat (char *str, const size_t max, const char *fmt, ...)

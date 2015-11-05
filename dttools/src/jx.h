@@ -98,6 +98,9 @@ struct jx * jx_float( double float_value );
 /** Create a JX string value. @param string_value A C string. @return A JX string value. */
 struct jx * jx_string( const char *string_value );
 
+/** Create a JX string value using prinf style formatting.  @param fmt A printf-style format string, followed by matching arguments.  @return A JX string value. */
+struct jx * jx_format( const char *fmt, ... );
+
 /** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_evaluate. @param symbol_name A C string. @return A JX expression.
 */
 struct jx * jx_symbol( const char *symbol_name );

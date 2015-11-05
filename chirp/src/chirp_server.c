@@ -31,6 +31,8 @@
 #include "host_disk_info.h"
 #include "host_memory_info.h"
 #include "json.h"
+#include "jx.h"
+#include "jx_print.h"
 #include "link.h"
 #include "list.h"
 #include "load_average.h"
@@ -192,7 +194,6 @@ static int gc_tickets(const char *url)
 
 static int update_all_catalogs(const char *url)
 {
-	buffer_t B[1];
 	struct chirp_statfs info;
 	struct utsname name;
 	int cpus;
@@ -215,37 +216,47 @@ static int update_all_catalogs(const char *url)
 
 	host_memory_info_get(&memory_avail, &memory_total);
 
-	buffer_init(B);
-	buffer_max(B, DATAGRAM_PAYLOAD_MAX);
-	buffer_abortonfailure(B, 1);
-	buffer_putliteral(B, "type chirp\n");
-	buffer_putfstring(B, "avail %" PRIu64 "\n", info.f_bavail * info.f_bsize);
-	buffer_putfstring(B, "backend %s\n", url);
-	buffer_putfstring(B, "cpu %s\n", name.machine);
-	buffer_putfstring(B, "cpus %d\n", cpus);
-	buffer_putfstring(B, "load1 %0.02lf\n", avg[0]);
-	buffer_putfstring(B, "load15 %0.02lf\n", avg[2]);
-	buffer_putfstring(B, "load5 %0.02lf\n", avg[1]);
-	buffer_putfstring(B, "memory_avail %" PRIu64 "\n", memory_avail);
-	buffer_putfstring(B, "memory_total %" PRIu64 "\n", memory_total);
-	buffer_putfstring(B, "minfree %" PRIu64 "\n", minimum_space_free);
-	buffer_putfstring(B, "name %s\n", hostname);
-	buffer_putfstring(B, "opsys %s\n", name.sysname);
-	buffer_putfstring(B, "opsysversion %s\n", name.release);
-	buffer_putfstring(B, "owner %s\n", chirp_owner);
-	buffer_putfstring(B, "port %d\n", chirp_port);
-	if (strlen(chirp_project_name))
-		buffer_putfstring(B, "project %s\n", chirp_project_name);
-	buffer_putfstring(B, "starttime %lu\n", (unsigned long) starttime);
-	buffer_putfstring(B, "total %" PRIu64 "\n", info.f_blocks * info.f_bsize);
-	buffer_putfstring(B, "url chirp://%s:%d\n", hostname, chirp_port);
-	buffer_putfstring(B, "version %d.%d.%d\n", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO);
-	chirp_stats_summary(B);
+	struct jx *j = jx_object(0);
 
-	list_iterate(catalog_host_list, update_one_catalog, buffer_tostring(B));
+	jx_insert_string (j,"type","chirp");
+	jx_insert_integer(j,"avail",info.f_bavail * info.f_bsize);
+	jx_insert_string (j,"backend",url);
+	jx_insert_string (j,"cpu",name.machine);
+	jx_insert_integer(j,"cpus", cpus);
+	jx_insert_float  (j,"load1",avg[0]);
+	jx_insert_float  (j,"load5",avg[1]);
+	jx_insert_float  (j,"load15",avg[2]);
+	jx_insert_integer(j,"memory_avail",memory_avail);
+	jx_insert_integer(j,"memory_total",memory_total);
+	jx_insert_integer(j,"minfree",minimum_space_free);
+	jx_insert_string (j,"name",hostname);
+	jx_insert_string (j,"opsys",name.sysname);
+	jx_insert_string (j,"opsysversion",name.release);
+	jx_insert_string (j,"owner",chirp_owner);
+	jx_insert_integer(j,"port",chirp_port);
+	jx_insert_integer(j,"starttime",starttime);
+	jx_insert_integer(j,"total",info.f_blocks * info.f_bsize);
 
-	buffer_free(B);
+	if (strlen(chirp_project_name)) {
+		jx_insert_string(j,"project",chirp_project_name);
+	}
 
+	jx_insert(j,
+		jx_string("url"),
+		jx_format("chirp://%s:%d\n", hostname, chirp_port));
+
+	jx_insert(j,
+		jx_string("version"),
+		jx_format("%d.%d.%d", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO));
+
+	chirp_stats_summary(j);
+
+	char *message = jx_print_string(j);
+
+	list_iterate(catalog_host_list, update_one_catalog, message);
+
+	free(message);
+	jx_delete(j);
 	cfs->destroy();
 
 	return 0;

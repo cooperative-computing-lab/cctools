@@ -5,10 +5,12 @@ See the file COPYING for details.
 */
 
 #include "jx.h"
+#include "stringtools.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next )
 {
@@ -51,6 +53,14 @@ struct jx * jx_string( const char *string_value )
 	struct jx *j = jx_create(JX_STRING);
 	j->string_value = strdup(string_value);
 	return j;
+}
+
+struct jx * jx_format( const char *fmt, ... )
+{
+	va_list args;
+	va_start(args,fmt);
+	return jx_string(string_vformat(fmt,args));
+	va_end(args);
 }
 
 struct jx * jx_integer( jx_int_t integer_value )
