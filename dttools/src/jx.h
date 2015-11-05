@@ -111,6 +111,9 @@ struct jx * jx_symbol( const char *symbol_name );
 /** Create a JX array.  @param items A linked list of @ref jx_item values.  @return A JX array. */
 struct jx * jx_array( struct jx_item *items );
 
+/** Create a JX array with inline items.  @param item One or more items of the array must be given, terminated with a null value.  @return A JX array. */
+struct jx * jx_arrayv( struct jx *value, ... );
+
 /** Create a JX object.  @param pairs A linked list of @ref jx_pair key-value pairs.  @return a JX object. */
 struct jx * jx_object( struct jx_pair *pairs );
 

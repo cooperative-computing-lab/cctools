@@ -97,6 +97,20 @@ struct jx * jx_array( struct jx_item *items )
 	return j;
 }
 
+struct jx * jx_arrayv( struct jx *value, ... )
+{
+	va_list args;
+	va_start(args,value);
+
+	struct jx *array = jx_array(0);
+	while(value) {
+		jx_array_append(array,value);
+		value = va_arg(args,struct jx *);
+	}
+
+	return array;
+}
+
 struct jx * jx_lookup( struct jx *j, const char *key )
 {
 	struct jx_pair *p;
