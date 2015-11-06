@@ -160,31 +160,42 @@ static void set_worker_resources( struct batch_queue *queue )
 
 static int submit_worker( struct batch_queue *queue, const char *master_regex )
 {
-	char cmd[1024];
-	char extra_input_files[1024];
+	buffer_t cmd;
+	buffer_t extra_input_files;
 
-	sprintf(cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o worker.log ",master_regex,worker_timeout,catalog_host,catalog_port);
-	strcpy(extra_input_files,"work_queue_worker");
+	buffer_init(&cmd);
+	buffer_init(&extra_input_files);
+
+	buffer_printf(&cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o worker.log ",master_regex,worker_timeout,catalog_host,catalog_port);
+	buffer_printf(&extra_input_files, "work_queue_worker");
 
 	if(password_file) {
-		strcat(cmd," -P pwfile");
-		strcat(extra_input_files,",pwfile");
+		buffer_printf(&cmd," -P pwfile");
+		buffer_printf(&extra_input_files,",pwfile");
 	}
 
 	if(resource_args) {
-		strcat(cmd," ");
-		strcat(cmd,resource_args);
+		buffer_printf(&cmd," ");
+		buffer_printf(&cmd,resource_args);
 	}
 
 	if(extra_worker_args) {
-		strcat(cmd," ");
-		strcat(cmd,extra_worker_args);
+		buffer_printf(&cmd," ");
+		buffer_printf(&cmd,extra_worker_args);
 	}
 
+	/* These strings are freed by buffer_free. */
+	const char *cmd_str               = buffer_tostring(&cmd);
+	const char *extra_input_files_str = buffer_tostring(&extra_input_files);
 
-	debug(D_WQ,"submitting worker: %s",cmd);
+	debug(D_WQ,"submitting worker: %s",cmd_str);
 
-	return batch_job_submit(queue,cmd,extra_input_files,"output.log",0);
+	int status = batch_job_submit(queue,cmd_str,extra_input_files_str,"output.log",0);
+
+	buffer_free(&cmd);
+	buffer_free(&extra_input_files);
+
+	return status;
 }
 
 static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
