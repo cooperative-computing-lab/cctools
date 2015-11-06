@@ -166,7 +166,7 @@ static int submit_worker( struct batch_queue *queue, const char *master_regex )
 	buffer_init(&cmd);
 	buffer_init(&extra_input_files);
 
-	buffer_printf(&cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o worker.log ",master_regex,worker_timeout,catalog_host,catalog_port);
+	buffer_printf(&cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all ",master_regex,worker_timeout,catalog_host,catalog_port);
 	buffer_printf(&extra_input_files, "work_queue_worker");
 
 	if(password_file) {
