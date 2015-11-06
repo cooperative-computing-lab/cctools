@@ -187,15 +187,22 @@ static int update_one_catalog( void *outgoing_host, const void *text)
 
 static void update_all_catalogs(struct datagram *outgoing_dgram)
 {
-	char text[DATAGRAM_PAYLOAD_MAX];
-	int length;
+	struct jx *j = jx_object(0);
+	jx_insert_string(j,"type","catalog");
+	jx_insert_string(j,"version",CCTOOLS_VERSION);
+	jx_insert_string(j,"owner",owner);
+	jx_insert_integer(j,"starttime",starttime);
+	jx_insert_integer(j,"port",port);
+	jx_insert(j,
+		jx_string("url"),
+		jx_format("http://%s:%d",preferred_hostname,port)
+		);
 
-	length = sprintf(text, "type catalog\nversion %s\nurl http://%s:%d\nname %s\nowner %s\nstarttime %lu\nport %d\n", CCTOOLS_VERSION, preferred_hostname, port, preferred_hostname, owner, (long)starttime, port);
-
-	if(!length)
-		return;
+	char *text = jx_print_string(j);
+	jx_delete(j);
 
 	list_iterate(outgoing_host_list, update_one_catalog, text);
+	free(text);
 }
 
 static void make_hash_key(struct nvpair *nv, char *key)
