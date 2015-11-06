@@ -671,7 +671,7 @@ int string_is_integer(const char *s)
 
 int string_is_float(const char *s)
 {
-	int digits=0, periods=0, dashes=0;
+	int digits=0, periods=0, dashes=0, other=0;
 
 	while(*s) {
 		if(isdigit((*s))) {
@@ -680,11 +680,14 @@ int string_is_float(const char *s)
 			periods++;
 		} else if(*s=='-') {
 			dashes++;
+		} else {
+			other++;
+			break;
 		}
 		s++;
 	}
 
-	if(digits>0 && periods<=1 && dashes<=1) {
+	if(other==0 && digits>0 && periods<=1 && dashes<=1) {
 		return 1;
 	} else {
 		return 0;
