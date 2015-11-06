@@ -243,7 +243,7 @@ static int update_all_catalogs(const char *url)
 
 	jx_insert(j,
 		jx_string("url"),
-		jx_format("chirp://%s:%d\n", hostname, chirp_port));
+		jx_format("chirp://%s:%d", hostname, chirp_port));
 
 	jx_insert(j,
 		jx_string("version"),
