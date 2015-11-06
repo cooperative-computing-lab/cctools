@@ -1793,7 +1793,7 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 			if( time(0) > idle_stoptime && strcmp(addr, last_addr) == 0 && port == last_port) {
 				if(list_size(masters_list) < 2) {
 					free(last_addr);
-					/* cojxert idle_stoptime into connect_stoptime (e.g., time already served). */
+					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
 					connect_stoptime = idle_stoptime;
 					debug(D_WQ,"Previous idle disconnection from only master available project=%s name=%s addr=%s port=%d",project,name,addr,port);
 					return 0;
@@ -1988,7 +1988,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'C':
 			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr, "The provided catalog server is ijxalid. The format of the '-C' option is '-C HOSTNAME:PORT'.\n");
+				fprintf(stderr, "The provided catalog server is invalid. The format of the '-C' option is '-C HOSTNAME:PORT'.\n");
 				exit(1);
 			}
 			break;
