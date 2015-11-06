@@ -595,10 +595,11 @@ static void show_help(const char *cmd)
 	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	printf(" %-30s Retrieve debug log file from workers. (currently only with -T condor.)\n", "--worker-debug-files");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_WORKER_DEBUG_FILES };
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
@@ -619,6 +620,7 @@ static const struct option long_options[] = {
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
 	{"debug-file-size", required_argument, 0, 'O'},
+	{"worker-debug-files", no_argument, 0, LONG_OPT_WORKER_DEBUG_FILES},
 	{"version", no_argument, 0, 'v'},
 	{"help", no_argument, 0, 'h'},
 	{0,0,0,0}
@@ -631,6 +633,8 @@ int main(int argc, char *argv[])
 
 	catalog_host = CATALOG_HOST;
 	catalog_port = CATALOG_PORT;
+
+	int worker_debug_files = 0;
 
 	debug_config(argv[0]);
 
@@ -681,6 +685,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_GPUS:
 				num_gpus_option = atoi(optarg);
+				break;
+			case LONG_OPT_WORKER_DEBUG_FILES:
+				worker_debug_files = 1;
 				break;
 			case 'P':
 				password_file = optarg;
@@ -789,7 +796,8 @@ int main(int argc, char *argv[])
 
 	set_worker_resources(queue);
 
-	batch_queue_set_errorfile(queue, "worker.error");
+	if(worker_debug_files)
+		batch_queue_set_errorfile(queue, "worker.error");
 
 	mainloop( queue, project_regex, foremen_regex );
 
