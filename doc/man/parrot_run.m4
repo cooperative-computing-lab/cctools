@@ -53,6 +53,7 @@ OPTION_TRIPLET(-t, tempdir, dir)Where to store temporary files.
 OPTION_TRIPLET(-T, timeout, time)Maximum amount of time to retry failures.
 OPTION_TRIPLET(-U, uid, num)Fake this unix uid; Real uid stays the same.
 OPTION_TRIPLET(-u, username, name)Use this extended username.
+OPTION_ITEM(`    --fake-setuid')Track changes from setuid and setgid.
 OPTION_ITEM(`    --valgrind')Enable valgrind support for Parrot.
 OPTION_ITEM(`-v, --version')Display version number.
 OPTION_TRIPLET(-w, work-dir, dir)Initial working directory.

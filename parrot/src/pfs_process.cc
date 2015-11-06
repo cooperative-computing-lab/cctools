@@ -36,6 +36,9 @@ int parrot_dir_fd = -1;
 static struct itable * pfs_process_table = 0;
 static int nprocs = 0;
 
+extern uid_t pfs_uid;
+extern gid_t pfs_gid;
+
 struct pfs_process * pfs_process_lookup( pid_t pid )
 {
 	return (struct pfs_process *) itable_lookup(pfs_process_table,pid);
@@ -213,9 +216,8 @@ void pfs_process_bootstrapfd( void )
 	}
 }
 
-struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table )
+struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, int share_table )
 {
-	struct pfs_process *actual_parent;
 	struct pfs_process *child;
 
 	if(!pfs_process_table) pfs_process_table = itable_create(0);
@@ -229,7 +231,6 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	memset(child->name, 0, sizeof(child->name));
 	memset(child->new_logical_name, 0, sizeof(child->new_logical_name));
 	child->pid = pid;
-	child->ppid = ppid;
 	child->tgid = pid;
 	child->state = PFS_PROCESS_STATE_KERNEL;
 	child->flags = PFS_PROCESS_FLAGS_STARTUP;
@@ -244,19 +245,29 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 	child->completing_execve = 0;
 	child->exefd = -1;
 
-	actual_parent = pfs_process_lookup(ppid);
+	if(parent) {
+		child->ppid = parent->pid;
+		child->ruid = parent->ruid;
+		child->euid = parent->euid;
+		child->suid = parent->suid;
+		child->rgid = parent->rgid;
+		child->egid = parent->egid;
+		child->sgid = parent->sgid;
 
-	if(actual_parent) {
-		child->flags |= actual_parent->flags;
+		child->flags |= parent->flags;
 		if(share_table) {
-			child->table = actual_parent->table;
+			child->table = parent->table;
 			child->table->addref();
 		} else {
-			child->table = actual_parent->table->fork();
+			child->table = parent->table->fork();
 		}
-		strcpy(child->name,actual_parent->name);
-		child->umask = actual_parent->umask;
+		strcpy(child->name,parent->name);
+		child->umask = parent->umask;
 	} else {
+		child->ppid = getpid();
+		child->ruid = child->euid = child->suid = pfs_uid;
+		child->rgid = child->egid = child->sgid = pfs_gid;
+
 		extern int parrot_fd_max;
 
 		child->table = new pfs_table;
@@ -275,7 +286,7 @@ struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table 
 
 	nprocs++;
 
-	debug(D_PSTREE,"%d %s %d", ppid, share_table ? "newthread" : "fork", pid);
+	debug(D_PSTREE,"%d %s %d", child->ppid, share_table ? "newthread" : "fork", pid);
 
 	return child;
 }
@@ -402,6 +413,118 @@ uintptr_t pfs_process_scratch_set( struct pfs_process *p, const void *data, size
 void pfs_process_scratch_restore( struct pfs_process *p )
 {
 	/* do nothing */
+}
+
+int allowed_uid(struct pfs_process *p, uid_t n) {
+	return (n == (uid_t) -1) || (n == p->ruid) || (n == p->euid) || (n == p->suid);
+}
+
+int privileged_uid(struct pfs_process *p) {
+	return (p->ruid == 0) || (p->euid == 0) || (p->suid == 0);
+}
+
+int allowed_gid(struct pfs_process *p, gid_t n) {
+	return (n == (gid_t) -1) || (n == p->rgid) || (n == p->egid) || (n == p->sgid);
+}
+
+int privileged_gid(struct pfs_process *p) {
+	return (p->rgid == 0) || (p->egid == 0) || (p->sgid == 0);
+}
+
+int pfs_process_setresuid( struct pfs_process *p, uid_t ruid, uid_t euid, uid_t suid ) {
+	if (privileged_uid(p) || (allowed_uid(p, ruid) && allowed_uid(p, euid) &&  allowed_uid(p, suid))) {
+		if (ruid != (uid_t) -1) {
+			p->ruid = ruid;
+		}
+		if (euid != (uid_t) -1) {
+			p->euid = euid;
+		}
+		if (suid != (uid_t) -1) {
+			p->suid = suid;
+		}
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+int pfs_process_setreuid( struct pfs_process *p, uid_t ruid, uid_t euid ) {
+	if (privileged_uid(p) || (allowed_uid(p, ruid) && allowed_uid(p, euid))) {
+		if (euid != (uid_t) -1) {
+			p->euid = euid;
+			if (p->euid != p->ruid) {
+				p->suid = p->euid;
+			}
+		}
+		if (ruid != (uid_t) -1) {
+			p->ruid = ruid;
+			p->suid = p->euid;
+		}
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+int pfs_process_setuid( struct pfs_process *p, uid_t uid ) {
+	if (privileged_uid(p) || allowed_uid(p, uid)) {
+		if (privileged_uid(p)) {
+			p->ruid = p->euid = p->suid = uid;
+		} else {
+			p->euid = uid;
+		}
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+int pfs_process_setresgid( struct pfs_process *p, gid_t rgid, gid_t egid, gid_t sgid ) {
+	if (privileged_gid(p) || (allowed_gid(p, rgid) && allowed_gid(p, egid) &&  allowed_gid(p, sgid))) {
+		if (rgid != (gid_t) -1) {
+			p->rgid = rgid;
+		}
+		if (egid != (gid_t) -1) {
+			p->egid = egid;
+		}
+		if (sgid != (gid_t) -1) {
+			p->sgid = sgid;
+		}
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+int pfs_process_setregid( struct pfs_process *p, gid_t rgid, gid_t egid ) {
+	if (privileged_gid(p) || (allowed_gid(p, rgid) && allowed_gid(p, egid))) {
+		if (egid != (gid_t) -1) {
+			p->egid = egid;
+			if (p->egid != p->rgid) {
+				p->sgid = p->egid;
+			}
+		}
+		if (rgid != (gid_t) -1) {
+			p->rgid = rgid;
+			p->sgid = p->egid;
+		}
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+int pfs_process_setgid( struct pfs_process *p, gid_t gid ) {
+	if (privileged_gid(p) || allowed_gid(p, gid)) {
+		if (privileged_gid(p)) {
+			p->rgid = p->egid = p->sgid = gid;
+		} else {
+			p->egid = gid;
+		}
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 /* vim: set noexpandtab tabstop=4: */

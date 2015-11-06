@@ -105,6 +105,8 @@ char pfs_ldso_path[PATH_MAX];
 uid_t pfs_uid = 0;
 gid_t pfs_gid = 0;
 const char * pfs_username = 0;
+int pfs_fake_setuid = 0;
+int pfs_fake_setgid = 0;
 
 INT64_T pfs_syscall_count = 0;
 INT64_T pfs_read_count = 0;
@@ -142,6 +144,7 @@ enum {
 	LONG_OPT_NO_SET_FOREGROUND,
 	LONG_OPT_SYSCALL_DISABLE_DEBUG,
 	LONG_OPT_VALGRIND,
+	LONG_OPT_FAKE_SETUID,
 };
 
 static void get_linux_version(const char *cmd)
@@ -243,6 +246,7 @@ static void show_help( const char *cmd )
 	printf( " %-30s Maximum amount of time to retry failures.    (PARROT_TIMEOUT)\n", "-T,--timeout=<time>");
 	printf( " %-30s Fake this unix uid; Real uid stays the same.     (PARROT_UID)\n", "-U,--uid=<num>");
 	printf( " %-30s Use this extended username.                 (PARROT_USERNAME)\n", "-u,--username=<name>");
+	printf( " %-30s Track changes from setuid and setgid.\n", "--fake-setuid");
 	printf( " %-30s Display version number.\n", "-v,--version");
 	printf( " %-30s Enable valgrind support for Parrot.\n", "   --valgrind");
 	printf( " %-30s Initial working directory.\n", "-w,--work-dir=<dir>");
@@ -344,7 +348,7 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 		} else {
 			clone_files = p->syscall_args[0]&CLONE_FILES;
 		}
-		child = pfs_process_create(cpid,pid,clone_files);
+		child = pfs_process_create(cpid,p,clone_files);
 		child->syscall_result = 0;
 		if(p->syscall_args[0]&CLONE_THREAD)
 			child->tgid = p->tgid;
@@ -599,6 +603,9 @@ int main( int argc, char *argv[] )
 		pfs_master_timeout = 3600;
 	}
 
+	pfs_uid = getuid();
+	pfs_gid = getgid();
+
 	static const struct option long_options[] = {
 		{"auto-decompress", no_argument, 0, 'Z'},
 		{"block-size", required_argument, 0, 'b'},
@@ -615,6 +622,7 @@ int main( int argc, char *argv[] )
 		{"debug-level-irods", required_argument, 0, 'I'},
 		{"debug-rotate-max", required_argument, 0, 'O'},
 		{"env-list", required_argument, 0, 'e'},
+		{"fake-setuid", no_argument, 0, LONG_OPT_FAKE_SETUID},
 		{"gid", required_argument, 0, 'G'},
 		{"help", no_argument, 0, 'h'},
 		{"helper", no_argument, 0, LONG_OPT_HELPER},
@@ -829,6 +837,10 @@ int main( int argc, char *argv[] )
 		case LONG_OPT_SYSCALL_DISABLE_DEBUG:
 			pfs_syscall_disable_debug = 1;
 			break;
+		case LONG_OPT_FAKE_SETUID:
+			pfs_fake_setuid = 1;
+			pfs_fake_setgid = 1;
+			break;
 		default:
 			show_help(argv[0]);
 			break;
@@ -873,9 +885,6 @@ int main( int argc, char *argv[] )
 		fprintf(fp, "PWD=%s\n", working_dir);
 		fclose(fp);
 	}
-
-	pfs_uid = getuid();
-	pfs_gid = getgid();
 
 	if (http_proxy)
 		setenv("HTTP_PROXY", http_proxy, 1);
@@ -1114,7 +1123,7 @@ int main( int argc, char *argv[] )
 	if (tracer_attach(pid) == -1)
 		fatal("could not trace child");
 	kill(pid, SIGUSR1);
-	p = pfs_process_create(pid,getpid(),0);
+	p = pfs_process_create(pid,NULL,0);
 	if(!p) {
 		if(pfs_write_rval) {
 			write_rval("noattach", 0);

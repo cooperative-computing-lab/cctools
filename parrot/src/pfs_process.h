@@ -37,6 +37,8 @@ enum pfs_process_state {
 struct pfs_process {
 	char name[PFS_PATH_MAX];
 	pid_t pid, ppid, tgid;
+	uid_t ruid, euid, suid, set_uid;
+	gid_t rgid, egid, sgid, set_gid;
 	mode_t umask;
 	int flags;
 
@@ -63,7 +65,7 @@ struct pfs_process {
 	char tmp[4096];
 };
 
-struct pfs_process * pfs_process_create( pid_t pid, pid_t ppid, int share_table );
+struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, int share_table );
 void pfs_process_exec( struct pfs_process *p );
 void pfs_process_stop( struct pfs_process *p, int status, struct rusage *usage );
 
@@ -85,6 +87,13 @@ void pfs_process_scratch_restore( struct pfs_process *p );
 void pfs_process_pathtofilename( char *path );
 int pfs_process_stat( pid_t pid, int fd, struct stat *buf );
 void pfs_process_bootstrapfd( void );
+
+int pfs_process_setresuid( struct pfs_process *p, uid_t ruid, uid_t euid, uid_t suid );
+int pfs_process_setreuid( struct pfs_process *p, uid_t ruid, uid_t euid );
+int pfs_process_setuid( struct pfs_process *p, uid_t uid );
+int pfs_process_setresgid( struct pfs_process *p, gid_t rgid, uid_t egid, uid_t sgid );
+int pfs_process_setregid( struct pfs_process *p, gid_t rgid, uid_t egid );
+int pfs_process_setgid( struct pfs_process *p, gid_t gid );
 
 extern struct pfs_process *pfs_current;
 extern int parrot_dir_fd;

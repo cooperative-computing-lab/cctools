@@ -30,8 +30,7 @@ extern "C" {
 #include <utime.h>
 #include <sys/statfs.h>
 
-extern uid_t pfs_uid;
-extern gid_t pfs_gid;
+
 extern int pfs_master_timeout;
 extern int pfs_enable_small_file_optimizations;
 

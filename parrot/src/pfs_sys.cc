@@ -199,11 +199,11 @@ int pfs_fchmod( int fd, mode_t mode )
 	END
 }
 
-int pfs_fchown( int fd, uid_t uid, gid_t gid )
+int pfs_fchown( int fd, struct pfs_process *p, uid_t uid, gid_t gid )
 {
 	BEGIN
 	debug(D_LIBCALL,"fchown %d %d %d",fd,uid,gid);
-	result = pfs_current->table->fchown(fd,uid,gid);
+	result = pfs_current->table->fchown(fd,p,uid,gid);
 	END
 }
 
@@ -272,11 +272,11 @@ int pfs_chmod( const char *path, mode_t mode )
 	END
 }
 
-int pfs_chown( const char *path, uid_t uid, gid_t gid )
+int pfs_chown( const char *path, struct pfs_process *p, uid_t uid, gid_t gid )
 {
 	BEGIN
 	debug(D_LIBCALL,"chown %s %d %d",path,uid,gid);
-	result = pfs_current->table->chown(path,uid,gid);
+	result = pfs_current->table->chown(path,p,uid,gid);
 	END
 }
 
@@ -562,7 +562,7 @@ int pfs_mknodat( int dirfd, const char *path, mode_t mode, dev_t dev )
 	return pfs_mknod(newpath,mode,dev);
 }
 
-int pfs_fchownat( int dirfd, const char *path, uid_t owner, gid_t group, int flags )
+int pfs_fchownat( int dirfd, const char *path, struct pfs_process *p, uid_t owner, gid_t group, int flags )
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
@@ -571,7 +571,7 @@ int pfs_fchownat( int dirfd, const char *path, uid_t owner, gid_t group, int fla
 		return pfs_lchown(newpath,owner,group);
 	}
 #endif
-	return pfs_chown(newpath,owner,group);
+	return pfs_chown(newpath,p,owner,group);
 }
 
 int pfs_futimesat( int dirfd, const char *path, const struct timeval times[2] )

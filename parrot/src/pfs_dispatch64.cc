@@ -109,8 +109,8 @@ extern "C" {
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_false_uname;
-extern uid_t pfs_uid;
-extern gid_t pfs_gid;
+extern int pfs_fake_setuid;
+extern int pfs_fake_setgid;
 
 extern int wait_barrier;
 
@@ -122,7 +122,7 @@ extern int parrot_dir_fd;
 extern int *pfs_syscall_totals64;
 
 int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char *physical_name);
-int pfs_dispatch_isexe( const char *path );
+int pfs_dispatch_isexe( const char *path, uid_t *uid, gid_t *gid );
 
 #define POINTER( i ) ((void *)(uintptr_t)(i))
 
@@ -748,12 +748,14 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 		char firstline[PFS_PATH_MAX] = "";
 		char *interp_exe = NULL, *interp_arg = NULL;
 		const uintptr_t old_user_argv = args[1];
+		p->set_uid = p->euid;
+		p->set_gid = p->egid;
 
 		tracer_copy_in_string(p->tracer,logical_name,POINTER(args[0]),sizeof(logical_name),0);
 		strncpy(p->new_logical_name, logical_name, sizeof(p->new_logical_name)-1);
 		p->exefd = -1;
 
-		if(!pfs_dispatch_isexe(logical_name))
+		if(!pfs_dispatch_isexe(logical_name, &p->set_uid, &p->set_gid))
 			goto failure;
 
 		if (pfs_get_local_name(logical_name,physical_name,firstline,sizeof(firstline))<0)
@@ -816,6 +818,11 @@ done:
 			/* Undo "syscall_args_changed = 1" because execve returns multiple results in syscall argument registers. */
 			p->syscall_args_changed = 0;
 			/* We do not need to restore the scratch space as the process image has been replaced. */
+
+			p->euid = p->set_uid;
+			p->suid = p->set_uid;
+			p->egid = p->set_gid;
+			p->sgid = p->set_gid;
 		} else {
 			debug(D_PROCESS, "execve: failed: %s", strerror(-actual));
 			pfs_process_scratch_restore(p);
@@ -1142,51 +1149,107 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				pfs_current->umask = args[0] & 0777;
 			break;
 
-		case SYSCALL64_geteuid:
 		case SYSCALL64_getuid:
-			/* Always return the dummy uids. */
 			if (entering)
-				divert_to_dummy(p,pfs_uid);
+				divert_to_dummy(p,p->ruid);
 			break;
 
-		case SYSCALL64_getegid:
+		case SYSCALL64_geteuid:
+		case SYSCALL64_setfsuid:
+			if (entering)
+				divert_to_dummy(p,p->euid);
+			break;
+
 		case SYSCALL64_getgid:
 			if (entering)
-				divert_to_dummy(p,pfs_gid);
+				divert_to_dummy(p,p->rgid);
+			break;
+
+		case SYSCALL64_setfsgid:
+		case SYSCALL64_getegid:
+			if (entering)
+				divert_to_dummy(p,p->egid);
 			break;
 
 		case SYSCALL64_getresuid:
 			if (entering) {
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[0]),sizeof(pfs_uid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[1]),sizeof(pfs_uid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_uid,POINTER(args[2]),sizeof(pfs_uid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->ruid,POINTER(args[0]),sizeof(p->ruid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->euid,POINTER(args[1]),sizeof(p->euid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->suid,POINTER(args[2]),sizeof(p->suid),TRACER_O_ATOMIC));
 				divert_to_dummy(p,0);
 			}
 			break;
 
 		case SYSCALL64_getresgid:
 			if (entering) {
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[0]),sizeof(pfs_uid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[1]),sizeof(pfs_uid),TRACER_O_ATOMIC));
-				TRACER_MEM_OP(tracer_copy_out(p->tracer,&pfs_gid,POINTER(args[2]),sizeof(pfs_uid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->rgid,POINTER(args[0]),sizeof(p->rgid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->egid,POINTER(args[1]),sizeof(p->egid),TRACER_O_ATOMIC));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer,&p->sgid,POINTER(args[2]),sizeof(p->sgid),TRACER_O_ATOMIC));
 				divert_to_dummy(p,0);
 			}
 			break;
 
-		/* Changing the userid is not allow, but for completeness, you can
-		 * always change to your own uid.
+		/* Actually changing the uid/gid is not allowed, but you can optionally
+		   track set uid/gid operations and tell the program you did
 		 */
-
-		case SYSCALL64_setfsgid:
-		case SYSCALL64_setfsuid:
-		case SYSCALL64_setgid:
-		case SYSCALL64_setregid:
-		case SYSCALL64_setresgid:
 		case SYSCALL64_setresuid:
+			if (entering) {
+				if (pfs_fake_setuid && pfs_process_setresuid(p, args[0], args[1], args[2])) {
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
+				}
+			}
+			break;
+
 		case SYSCALL64_setreuid:
+			if (entering) {
+				if (pfs_fake_setuid && pfs_process_setreuid(p, args[0], args[1])) {
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
+				}
+			}
+			break;
+
 		case SYSCALL64_setuid:
-			if (entering)
-				divert_to_dummy(p,0);
+			if (entering) {
+				if (pfs_fake_setuid && pfs_process_setuid(p, args[0])) {
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
+				}
+			}
+			break;
+
+		case SYSCALL64_setresgid:
+			if (entering) {
+				if (pfs_fake_setgid && pfs_process_setresgid(p, args[0], args[1], args[2])) {
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
+				}
+			}
+			break;
+
+		case SYSCALL64_setregid:
+			if (entering) {
+				if (pfs_fake_setgid && pfs_process_setregid(p, args[0], args[1])) {
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
+				}
+			}
+			break;
+
+		case SYSCALL64_setgid:
+			if (entering) {
+				if (pfs_fake_setgid && pfs_process_setgid(p, args[0])) {
+					divert_to_dummy(p,0);
+				} else {
+					divert_to_dummy(p,-EPERM);
+				}
+			}
 			break;
 
 		/* Here begin all of the I/O operations, given in the same order as in
@@ -1706,7 +1769,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			if (p->table->isnative(args[0])) {
 				if (entering) debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else if (entering) {
-				p->syscall_result = pfs_fchown(args[0],args[1],args[2]);
+				p->syscall_result = pfs_fchown(args[0],p,args[1],args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
 			}
@@ -2002,7 +2065,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_chown:
 			if(entering) {
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0));
-				p->syscall_result = pfs_chown(path,args[1],args[2]);
+				p->syscall_result = pfs_chown(path,p,args[1],args[2]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
 			}
@@ -2408,7 +2471,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			if(entering) {
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0));
-				p->syscall_result = pfs_fchownat(args[0],path,args[2],args[3],args[4]);
+				p->syscall_result = pfs_fchownat(args[0],path,p,args[2],args[3],args[4]);
 				if(p->syscall_result<0) p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
 			}
