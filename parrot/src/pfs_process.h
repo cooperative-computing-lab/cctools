@@ -88,6 +88,13 @@ void pfs_process_pathtofilename( char *path );
 int pfs_process_stat( pid_t pid, int fd, struct stat *buf );
 void pfs_process_bootstrapfd( void );
 
+int pfs_process_setresuid( struct pfs_process *p, uid_t ruid, uid_t euid, uid_t suid );
+int pfs_process_setreuid( struct pfs_process *p, uid_t ruid, uid_t euid );
+int pfs_process_setuid( struct pfs_process *p, uid_t uid );
+int pfs_process_setresgid( struct pfs_process *p, gid_t rgid, uid_t egid, uid_t sgid );
+int pfs_process_setregid( struct pfs_process *p, gid_t rgid, uid_t egid );
+int pfs_process_setgid( struct pfs_process *p, gid_t gid );
+
 extern struct pfs_process *pfs_current;
 extern int parrot_dir_fd;
 

@@ -123,10 +123,6 @@ extern int *pfs_syscall_totals64;
 
 int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char *physical_name);
 int pfs_dispatch_isexe( const char *path, uid_t *uid, gid_t *gid );
-int allowed_uid(struct pfs_process *p, uid_t n);
-int privileged_uid(struct pfs_process *p);
-int allowed_gid(struct pfs_process *p, uid_t n);
-int privileged_gid(struct pfs_process *p);
 
 #define POINTER( i ) ((void *)(uintptr_t)(i))
 
@@ -1197,20 +1193,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		 */
 		case SYSCALL64_setresuid:
 			if (entering) {
-				if (pfs_fake_setuid &&
-						(privileged_uid(p) || (
-						allowed_uid(p, (uid_t) args[0]) &&
-						allowed_uid(p, (uid_t) args[1]) &&
-						allowed_uid(p, (uid_t) args[2])))) {
-					if ((uid_t) args[0] != (uid_t) -1) {
-						p->ruid = args[0];
-					}
-					if ((uid_t) args[1] != (uid_t) -1) {
-						p->euid = args[1];
-					}
-					if ((uid_t) args[2] != (uid_t) -1) {
-						p->suid = args[2];
-					}
+				if (pfs_fake_setuid && pfs_process_setresuid(p, args[0], args[1], args[2])) {
 					divert_to_dummy(p,0);
 				} else {
 					divert_to_dummy(p,-EPERM);
@@ -1220,20 +1203,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_setreuid:
 			if (entering) {
-				if (pfs_fake_setuid &&
-						(privileged_uid(p) || (
-						allowed_uid(p, (uid_t) args[0]) &&
-						allowed_uid(p, (uid_t) args[1])))) {
-					if ((uid_t) args[1] != (uid_t) -1) {
-						p->euid = args[1];
-						if (p->euid != p->ruid) {
-							p->suid = p->euid;
-						}
-					}
-					if ((uid_t) args[0] != (uid_t) -1) {
-						p->ruid = args[0];
-						p->suid = p->euid;
-					}
+				if (pfs_fake_setuid && pfs_process_setreuid(p, args[0], args[1])) {
 					divert_to_dummy(p,0);
 				} else {
 					divert_to_dummy(p,-EPERM);
@@ -1243,14 +1213,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_setuid:
 			if (entering) {
-				if (pfs_fake_setuid &&
-						(privileged_uid(p) ||
-						allowed_uid(p, (uid_t) args[0]))) {
-					if (privileged_uid(p)) {
-						p->ruid = p->euid = p->suid = args[0];
-					} else {
-						p->euid = args[0];
-					}
+				if (pfs_fake_setuid && pfs_process_setuid(p, args[0])) {
 					divert_to_dummy(p,0);
 				} else {
 					divert_to_dummy(p,-EPERM);
@@ -1260,20 +1223,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_setresgid:
 			if (entering) {
-				if (pfs_fake_setgid &&
-						(privileged_gid(p) || (
-						allowed_gid(p, (gid_t) args[0]) &&
-						allowed_gid(p, (gid_t) args[1]) &&
-						allowed_gid(p, (gid_t) args[2])))) {
-					if ((gid_t) args[0] != (gid_t) -1) {
-						p->rgid = args[0];
-					}
-					if ((gid_t) args[1] != (gid_t) -1) {
-						p->egid = args[1];
-					}
-					if ((gid_t) args[2] != (gid_t) -1) {
-						p->sgid = args[2];
-					}
+				if (pfs_fake_setgid && pfs_process_setresgid(p, args[0], args[1], args[2])) {
 					divert_to_dummy(p,0);
 				} else {
 					divert_to_dummy(p,-EPERM);
@@ -1283,20 +1233,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_setregid:
 			if (entering) {
-				if (pfs_fake_setgid &&
-						(privileged_gid(p) || (
-						allowed_gid(p, (gid_t) args[0]) &&
-						allowed_gid(p, (gid_t) args[1])))) {
-					if ((gid_t) args[1] != (gid_t) -1) {
-						p->egid = args[1];
-						if (p->egid != p->rgid) {
-							p->sgid = p->egid;
-						}
-					}
-					if ((gid_t) args[0] != (gid_t) -1) {
-						p->rgid = args[0];
-						p->sgid = p->egid;
-					}
+				if (pfs_fake_setgid && pfs_process_setregid(p, args[0], args[1])) {
 					divert_to_dummy(p,0);
 				} else {
 					divert_to_dummy(p,-EPERM);
@@ -1306,14 +1243,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_setgid:
 			if (entering) {
-				if (pfs_fake_setgid &&
-						(privileged_gid(p) ||
-						allowed_gid(p, (gid_t) args[0]))) {
-					if (privileged_gid(p)) {
-						p->rgid = p->egid = p->sgid = args[0];
-					} else {
-						p->egid = args[0];
-					}
+				if (pfs_fake_setgid && pfs_process_setgid(p, args[0])) {
 					divert_to_dummy(p,0);
 				} else {
 					divert_to_dummy(p,-EPERM);
