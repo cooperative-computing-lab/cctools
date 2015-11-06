@@ -218,7 +218,7 @@ static void show_help( const char *cmd )
 	printf( " %-30s Disable following symlinks.\n", "-f,--no-follow-symlinks");
 	printf( " %-30s Fake this gid; Real gid stays the same.          (PARROT_GID)\n", "-G,--gid=<num>");
 	printf( " %-30s Show this screen.\n", "-h,--help");
-	printf( " %-30s Enable use of helper library.\n", "--helper");
+	printf( " %-30s Enable use of helper library.\n", "   --helper");
 	printf( " %-30s Comma-delimited list of tickets to use for authentication.\n", "-i,--tickets=<files>");
 	printf( " %-30s Set the debug level output for the iRODS driver.\n", "-I,--debug-level-irods=<num>");
 	printf( " %-30s Checksum files where available.\n", "-K,--with-checksums");
@@ -246,7 +246,7 @@ static void show_help( const char *cmd )
 	printf( " %-30s Maximum amount of time to retry failures.    (PARROT_TIMEOUT)\n", "-T,--timeout=<time>");
 	printf( " %-30s Fake this unix uid; Real uid stays the same.     (PARROT_UID)\n", "-U,--uid=<num>");
 	printf( " %-30s Use this extended username.                 (PARROT_USERNAME)\n", "-u,--username=<name>");
-	printf( " %-30s Track changes from setuid and setgid.\n", "--fake-setuid");
+	printf( " %-30s Track changes from setuid and setgid.\n", "   --fake-setuid");
 	printf( " %-30s Display version number.\n", "-v,--version");
 	printf( " %-30s Enable valgrind support for Parrot.\n", "   --valgrind");
 	printf( " %-30s Initial working directory.\n", "-w,--work-dir=<dir>");
