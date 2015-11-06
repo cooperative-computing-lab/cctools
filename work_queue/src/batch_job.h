@@ -123,11 +123,19 @@ const char *batch_queue_type_to_string(batch_queue_type_t t);
 
 /** Set the log file used by the batch queue.
 This is an optional call that will only affect batch queue types
-that use an internal logfile; currently only Condor.
+that use an internal logfile; currently only Condor and Work Queue.
 @param q The batch queue to adjust.
 @param logfile Name of the logfile to use.
 */
 void batch_queue_set_logfile(struct batch_queue *q, const char *logfile);
+
+/** Set the standard error file used by the batch queue.
+This is an optional call that will only affect batch queue types
+that use an internal errorfile; currently only Condor.
+@param q The batch queue to adjust.
+@param logfile Name of the errorfile to use.
+*/
+void batch_queue_set_errorfile(struct batch_queue *q, const char *errorfile);
 
 /** Add extra options to pass to the underlying batch system.
 This call specifies additional options to be passed to the batch system each

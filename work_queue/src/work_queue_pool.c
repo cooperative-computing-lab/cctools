@@ -787,7 +787,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	set_worker_resources( queue );
+	set_worker_resources(queue);
+
+	batch_queue_set_errorfile(queue, "worker.error");
 
 	mainloop( queue, project_regex, foremen_regex );
 
