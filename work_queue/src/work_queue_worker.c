@@ -1703,11 +1703,14 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		fprintf(stderr,"couldn't connect to %s:%d: %s\n",master_addr,port,strerror(errno));
 		return 0;
 	}
-
-	printf("connected to master %s:%d\n", host, port );
-	debug(D_WQ, "connected to master %s:%d", host, port );
-
 	link_tune(master,LINK_TUNE_INTERACTIVE);
+
+	char local_addr[LINK_ADDRESS_MAX];
+	int  local_port;
+	link_address_local(master, local_addr, &local_port);
+
+	printf("connected to master %s:%d via local address %s:%d\n", host, port, local_addr, local_port);
+	debug(D_WQ, "connected to master %s:%d via local address %s:%d", host, port, local_addr, local_port);
 
 	if(password) {
 		debug(D_WQ,"authenticating to master");
