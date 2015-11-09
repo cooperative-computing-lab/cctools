@@ -129,6 +129,8 @@ OPTION_ITEM(`-z, --zero-length-error')Force failure on zero-length output files.
 OPTION_PAIR(--wrapper,script) Wrap all commands with this BOLD(script). Each rule's original recipe is appended to BOLD(script) or replaces the first occurrence of BOLD({}) in BOLD(script).
 OPTION_PAIR(--wrapper-input,file) Wrapper command requires this input file. This option may be specified more than once, defining an array of inputs. Additionally, each job executing a recipe has a unique integer identifier that replaces occurrences BOLD(%%) in BOLD(file).
 OPTION_PAIR(--wrapper-output,file) Wrapper command requires this output file. This option may be specified more than once, defining an array of outputs. Additionally, each job executing a recipe has a unique integer identifier that replaces occurrences BOLD(%%) in BOLD(file).
+OPTION_ITEM(`--sandbox')Use Parrot to restrict access to the given inputs/outputs.
+OPTION_PAIR(--parrot,path)Path to parrot_run executable on the host system.
 OPTIONS_END
 
 SECTION(DRYRUN MODE)
