@@ -1221,8 +1221,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_get_robust_list:
 		case SYSCALL32_get_thread_area:
 		case SYSCALL32_getcpu:
-		case SYSCALL32_getgroups32:
-		case SYSCALL32_getgroups:
 		case SYSCALL32_getitimer:
 		case SYSCALL32_getpgid:
 		case SYSCALL32_getpgrp:
@@ -1493,6 +1491,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
+		case SYSCALL32_getgroups32:
+		case SYSCALL32_getgroups:
 		case SYSCALL32_setgroups32:
 		case SYSCALL32_setgroups:
 			if (entering && pfs_fake_setgid)
