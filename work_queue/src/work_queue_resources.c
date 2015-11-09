@@ -21,7 +21,8 @@ See the file COPYING for details.
 struct work_queue_resources * work_queue_resources_create()
 {
 	struct work_queue_resources *r = malloc(sizeof(*r));
-	memset(r,0,sizeof(*r));
+	memset(r, 0, sizeof(struct work_queue_resources));
+
 	r->tag = -1;
 	return r;
 }
@@ -72,7 +73,7 @@ static void work_queue_resource_debug( struct work_queue_resource *r, const char
 static void work_queue_resource_send( struct link *master, struct work_queue_resource *r, const char *name, time_t stoptime )
 {
 	work_queue_resource_debug(r, name);
-	link_putfstring(master, "resource %s %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", stoptime, name, r->inuse, r->total, r->smallest, r->largest );
+	link_putfstring(master, "resource %s %"PRId64" %"PRId64" %"PRId64"\n", stoptime, name, r->total, r->smallest, r->largest );
 }
 
 void work_queue_resources_send( struct link *master, struct work_queue_resources *r, time_t stoptime )
