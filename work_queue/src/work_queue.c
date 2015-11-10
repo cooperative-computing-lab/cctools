@@ -80,7 +80,8 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_ADDRPORT_MAX 32
 #define WORKER_HASHKEY_MAX 32
 
-#define RESOURCE_MONITOR_TASK_SUMMARY_NAME "cctools-work-queue-%d-resource-monitor-task-%d"
+#define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
+#define RESOURCE_MONITOR_TASK_REMOTE_NAME "wq-cctools-monitoring-task"
 
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
@@ -179,7 +180,10 @@ struct work_queue {
 
 	int monitor_mode;
 	FILE *monitor_file;
+
+	char *monitor_output_dirname;
 	char *monitor_summary_filename;
+
 	char *monitor_exe;
 	struct rmsummary *measured_local_resources;
 
@@ -1156,7 +1160,7 @@ static void delete_uncacheable_files( struct work_queue *q, struct work_queue_wo
 void resource_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
 {
 	struct flock lock;
-	char        *summary = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME ".summary", getpid(), t->taskid);
+	char        *summary = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".summary", q->monitor_output_dirname, getpid(), t->taskid);
 
 	t->resources_measured = rmsummary_parse_file_single(summary);
 	int monitor_fd = fileno(q->monitor_file);
@@ -1185,9 +1189,6 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 
 	lock.l_type   = F_ULOCK;
 	fcntl(monitor_fd, F_SETLK, &lock);
-
-	if(unlink(summary) != 0)
-		debug(D_NOTICE, "Summary %s could not be removed.\n", summary);
 
 	free(summary);
 }
@@ -3988,17 +3989,10 @@ struct work_queue *work_queue_create(int port)
 	return q;
 }
 
-int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_file)
+int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_directory)
 {
   if(!q)
 	return 0;
-
-  if(q->monitor_mode == MON_SINGLE_FILE)
-  {
-	debug(D_NOTICE, "Monitoring already enabled. Closing old logfile and opening (perhaps) new one.\n");
-	if(fclose(q->monitor_file))
-	  debug(D_NOTICE, "Error closing logfile: %s\n", strerror(errno));
-  }
 
   q->monitor_mode = MON_DISABLED;
 
@@ -4009,12 +4003,23 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_fil
 	return 0;
   }
 
-  if(monitor_summary_file)
-	q->monitor_summary_filename = xxstrdup(monitor_summary_file);
-  else
-	q->monitor_summary_filename = string_format("wq-%d-resource-usage", getpid());
+  if(!monitor_output_directory) {
+	  debug(D_NOTICE, "Missing monitor output directory. Disabling monitor mode.\n");
+	  return 0;
+  }
 
-  q->monitor_file = fopen(q->monitor_summary_filename, "w");
+  q->monitor_output_dirname = xxstrdup(monitor_output_directory);
+
+  if(!create_dir(q->monitor_output_dirname, 0777)) {
+	  debug(D_NOTICE, "Could not create monitor output directory - %s (%s)", q->monitor_output_dirname, strerror(errno));
+	  debug(D_NOTICE, "Disabling monitor mode.\n");
+
+	  return 0;
+  }
+
+  q->monitor_summary_filename = string_format("%s/all_summaries-%d.log", q->monitor_output_dirname, getpid());
+
+  q->monitor_file = fopen(q->monitor_summary_filename, "a");
 
   if(!q->monitor_file)
   {
@@ -4028,6 +4033,15 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_fil
   q->monitor_mode = MON_SINGLE_FILE;
 
   return 1;
+}
+
+int work_queue_enable_monitoring_full(struct work_queue *q, char *monitor_output_directory) {
+	int status = work_queue_enable_monitoring(q, monitor_output_directory);
+
+	if(status)
+		q->monitor_mode = MON_FULL;
+
+	return status;
 }
 
 int work_queue_send_receive_ratio(struct work_queue *q, double ratio)
@@ -4254,27 +4268,44 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 
 int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 {
-	char *wrap_cmd;
-	char *template = string_format(RESOURCE_MONITOR_TASK_SUMMARY_NAME, getpid(), t->taskid);
-	char *summary  = string_format("%s.summary", template);
-
 	static char *monitor_remote_name = NULL;
-
 	if(!monitor_remote_name) {
 		monitor_remote_name = string_format("./cctools-resource-monitor-%d", getpid());
 	}
 
-	wrap_cmd = string_wrap_command(t->command_line,
-		resource_monitor_write_command(monitor_remote_name, template, NULL, NULL, 0, 0));
+	char *template = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME, q->monitor_output_dirname, getpid(), t->taskid);
 
-	//BUG: what if user changes current working directory?
+	char *summary       = string_format("%s.summary", template);
+	char *extra_options = string_format("-V 'taskid: %d'", t->taskid);
+
+
 	work_queue_task_specify_file(t, q->monitor_exe, monitor_remote_name, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
-	work_queue_task_specify_file(t, summary, summary, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
-
+	work_queue_task_specify_file(t, summary, RESOURCE_MONITOR_TASK_REMOTE_NAME ".summary", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 	free(summary);
-	free(template);
-	free(t->command_line);
 
+	char *wrap_cmd;
+	if(q->monitor_mode == MON_FULL) {
+		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, NULL, extra_options, /* debug */ 1, /* series */ 1, 0));
+
+		char *debug    = NULL;
+		char *series   = NULL;
+
+		debug  = string_format("%s.debug",   template);
+		series = string_format("%s.series",  template);
+
+		work_queue_task_specify_file(t, debug, RESOURCE_MONITOR_TASK_REMOTE_NAME ".debug",   WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+		work_queue_task_specify_file(t, series, RESOURCE_MONITOR_TASK_REMOTE_NAME ".series", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+
+		free(debug);
+		free(series);
+	} else {
+		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, NULL, extra_options, 0, 0, 0));
+	}
+
+	free(extra_options);
+	free(template);
+
+	free(t->command_line);
 	t->command_line = wrap_cmd;
 
 	return 0;
