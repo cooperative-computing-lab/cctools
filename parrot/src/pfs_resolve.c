@@ -22,6 +22,12 @@ See the file COPYING for details.
 #include <fnmatch.h>
 #include <fcntl.h>
 
+/*
+Some things that could be cleaned up in this code:
+- Use list.h instead of an embedded linked list.
+- The resolver cache was used to cache the (expensive) lookups of the external resolver, which is basically unused.  Not clear if the cache actually helps for internal lookups, which simply traverse a (usually short) linked list.  Try removing the resolver cache and see how that impacts real applications.
+*/
+
 extern char pfs_temp_dir[PFS_PATH_MAX];
 
 struct mount_entry {
@@ -34,7 +40,20 @@ struct mount_entry {
 static struct mount_entry * mount_list = 0;
 static struct hash_table *resolve_cache = 0;
 
-static void add_mount_entry( const char *prefix, const char *redirect, mode_t mode )
+static void pfs_resolve_cache_flush()
+{
+	char *key, *value;
+
+	if(!resolve_cache) return;
+
+	hash_table_firstkey(resolve_cache);
+	while(hash_table_nextkey(resolve_cache,&key,(void**)&value)) {
+		hash_table_remove(resolve_cache,key);
+		free(value);
+	}
+}
+
+void pfs_resolve_add_entry( const char *prefix, const char *redirect, mode_t mode )
 {
 	struct mount_entry * m = xxmalloc(sizeof(*m));
 	strcpy(m->prefix,prefix);
@@ -42,9 +61,30 @@ static void add_mount_entry( const char *prefix, const char *redirect, mode_t mo
 	m->mode = mode;
 	m->next = mount_list;
 	mount_list = m;
+	pfs_resolve_cache_flush();
 }
 
-int parse_mode( const char * options ) {
+int pfs_resolve_remove_entry( const char *prefix )
+{
+	struct mount_entry *m, *p=0;
+
+	for(m=mount_list;m;p=m,m=m->next) {
+		if(!strcmp(m->prefix,prefix)) {
+			if(p) {
+				p->next = m->next;			
+			} else {
+				mount_list = m->next;
+			}
+			free(m);
+			pfs_resolve_cache_flush();
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+mode_t pfs_resolve_parse_mode( const char * options ) {
 	unsigned int i;
 	int mode = 0;
 	for(i = 0; i < strlen(options); i++) {
@@ -69,7 +109,7 @@ void pfs_resolve_manual_config( const char *str )
 	if(!e) fatal("badly formed mount string: %s",str);
 	*e = 0;
 	e++;
-	add_mount_entry(str,e,R_OK|W_OK|X_OK);
+	pfs_resolve_add_entry(str,e,R_OK|W_OK|X_OK);
 }
 
 void pfs_resolve_file_config( const char *filename )
@@ -105,19 +145,19 @@ void pfs_resolve_file_config( const char *filename )
 		} else if(fields<2) {
 			fatal("%s has an error on line %d\n",filename,linenum);
 		} else if(fields==2) {
-			mode = parse_mode(redirect);
+			mode = pfs_resolve_parse_mode(redirect);
 			if(mode < 0) {
 				mode = R_OK|W_OK|X_OK; /* default mode */
-				add_mount_entry(prefix,redirect,mode);
+				pfs_resolve_add_entry(prefix,redirect,mode);
 			} else {
-				add_mount_entry(prefix,prefix,mode);
+				pfs_resolve_add_entry(prefix,prefix,mode);
 			}
 		} else {
-			mode = parse_mode(options);
+			mode = pfs_resolve_parse_mode(options);
 			if(mode < 0) {
 				fatal("%s has invalid options on line %d\n",filename,linenum);
 			}
-			add_mount_entry(prefix,redirect,mode);
+			pfs_resolve_add_entry(prefix,redirect,mode);
 		}
 	}
 

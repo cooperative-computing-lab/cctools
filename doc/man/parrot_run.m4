@@ -23,6 +23,7 @@ OPTION_TRIPLET(-c, status-file, file)Print exit status information to file.
 OPTION_ITEM(`-C, channel-auth')Enable data channel authentication in GridFTP.
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for this sub-system.
 OPTION_ITEM(`-D, --no-optimize')Disable small file optimizations.
+OPTION_ITEM('    --dynamic-mounts') Enable the use of parot_mount in this session.
 OPTION_ITEM(`-F, --with-snapshots')Enable file snapshot caching for all protocols.
 OPTION_ITEM(`-f, --no-follow-symlinks')Disable following symlinks.
 OPTION_TRIPLET(-G,gid,num)Fake this gid; Real gid stays the same.

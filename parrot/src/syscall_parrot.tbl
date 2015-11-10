@@ -13,3 +13,5 @@
 1008 parrot parrot_timeout sys_parrot_timeout
 1009 parrot parrot_search sys_parrot_search
 1010 parrot parrot_debug sys_parrot_debug
+1011 parrot parrot_mount sys_parrot_mount
+1012 parrot parrot_unmount sys_parrot_unmount
