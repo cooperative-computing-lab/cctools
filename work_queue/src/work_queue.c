@@ -4802,6 +4802,9 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	while(i < n && hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 		if(itable_size(w->current_tasks) == 0) {
 			shut_down_worker(q, w);
+
+			/* shut_down_worker alters the table, so we reset it here. */
+			hash_table_firstkey(q->worker_table);
 			i++;
 		}
 	}
