@@ -1020,6 +1020,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_iopl:
 		case SYSCALL64_kcmp:
 		case SYSCALL64_madvise:
+		case SYSCALL64_membarrier:
 		case SYSCALL64_migrate_pages:
 		case SYSCALL64_mincore:
 		case SYSCALL64_mlock:
@@ -2994,7 +2995,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_kexec_load:
 		case SYSCALL64_keyctl:
 		case SYSCALL64_mbind:
-		case SYSCALL64_membarrier:
 		case SYSCALL64_mq_getsetattr:
 		case SYSCALL64_mq_notify:
 		case SYSCALL64_mq_open:
