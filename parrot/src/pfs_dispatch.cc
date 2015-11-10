@@ -97,6 +97,9 @@ extern "C" {
 #ifndef MFD_CLOEXEC
 #	define MFD_CLOEXEC 0x0001U
 #endif
+#ifndef UFFD_CLOEXEC
+#	define UFFD_CLOEXEC 02000000
+#endif
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_false_uname;
@@ -1587,6 +1590,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_signalfd4:
 		case SYSCALL32_signalfd:
 		case SYSCALL32_timerfd_create:
+		case SYSCALL32_userfaultfd:
 			if (entering) {
 				debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else {
@@ -1611,6 +1615,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					} else if (p->syscall == SYSCALL32_signalfd4 && (args[2]&SFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL32_timerfd_create && (args[1]&TFD_CLOEXEC)) {
+						p->table->setnative(actual, FD_CLOEXEC);
+					} else if (p->syscall == SYSCALL32_userfaultfd && (args[0]&UFFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
 					} else {
 						p->table->setnative(actual, 0);
@@ -3202,7 +3208,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_syncfs:
 		case SYSCALL32_tee:
 		case SYSCALL32_unshare:
-		case SYSCALL32_userfaultfd:
 		case SYSCALL32_vmsplice:
 		case SYSCALL32_vserver:
 			/* fallthrough */
