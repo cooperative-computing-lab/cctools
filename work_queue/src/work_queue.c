@@ -4777,6 +4777,10 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	char *key;
 	int i = 0;
 
+	/* by default, remove all workers. */
+	if(n < 1)
+		n = hash_table_size(q->worker_table);
+
 	if(!q)
 		return -1;
 
