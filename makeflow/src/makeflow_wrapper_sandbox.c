@@ -6,6 +6,7 @@
 
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "copy_stream.h"
 #include "debug.h"
 
 #include "list.h"
@@ -17,7 +18,6 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/sendfile.h>
 #include <fcntl.h>
 #include <errno.h>
 
@@ -38,8 +38,8 @@ void makeflow_wrapper_sandbox_init(struct makeflow_wrapper *sandbox, char *parro
 		/* parrot_run is already in the current directory, so we'll just use that */
 	} else {
 		fchmod(local_parrot, 0755);
-		if (sendfile(local_parrot, host_parrot, NULL, stat_buf.st_size) == -1) {
-			fatal("could not copy parrot: %s", strerror(errno));
+		if (copy_fd_to_fd(host_parrot, local_parrot) != stat_buf.st_size) {
+			fatal("could not copy parrot: %s");
 		}
 	}
 	close(local_parrot);
