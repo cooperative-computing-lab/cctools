@@ -1657,9 +1657,9 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"total_workers_connected",info.total_workers_connected);
 	jx_insert_integer(j,"total_workers_joined",info.total_workers_joined);
 	jx_insert_integer(j,"total_workers_removed",info.total_workers_removed);
-	jx_insert_integer(j,"total_workers_idled_out",info.idled_out);
-	jx_insert_integer(j,"total_workers_lost",info.lost);
-	jx_insert_integer(j,"total_workers_fast_aborted",info.fast_aborted);
+	jx_insert_integer(j,"total_workers_idled_out",info.total_workers_idled_out);
+	jx_insert_integer(j,"total_workers_lost",info.total_workers_lost);
+	jx_insert_integer(j,"total_workers_fast_aborted",info.total_workers_fast_aborted);
 
 	//send info on tasks
 	jx_insert_integer(j,"tasks_waiting",info.tasks_waiting);
