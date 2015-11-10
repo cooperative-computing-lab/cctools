@@ -1364,7 +1364,9 @@ static int handle_master(struct link *master) {
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
-			r = 0;
+			work_queue_broadcast_message(foreman_q, "exit\n");
+			abort_flag = 1;
+			r = 1;
 		} else if(!strncmp(line, "check", 6)) {
 			r = send_keepalive(master);
 		} else if(!strncmp(line, "auth", 4)) {

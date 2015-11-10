@@ -410,6 +410,19 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 	return result;
 }
 
+void work_queue_broadcast_message(struct work_queue *q, const char *msg) {
+	if(!q)
+		return;
+
+	struct work_queue_worker *w;
+	char* id;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+		send_worker_msg(q, w, "%s", msg);
+	}
+}
+
 work_queue_msg_code_t process_name(struct work_queue *q, struct work_queue_worker *w, char *line)
 {
 	debug(D_WQ, "Sending project name to worker (%s)", w->addrport);
@@ -4777,6 +4790,10 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	char *key;
 	int i = 0;
 
+	/* by default, remove all workers. */
+	if(n < 1)
+		n = hash_table_size(q->worker_table);
+
 	if(!q)
 		return -1;
 
@@ -4785,6 +4802,9 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	while(i < n && hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 		if(itable_size(w->current_tasks) == 0) {
 			shut_down_worker(q, w);
+
+			/* shut_down_worker alters the table, so we reset it here. */
+			hash_table_firstkey(q->worker_table);
 			i++;
 		}
 	}

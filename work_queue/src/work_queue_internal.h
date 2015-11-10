@@ -44,3 +44,6 @@ void work_queue_invalidate_cached_file_internal(struct work_queue *q, const char
 void release_all_workers(struct work_queue *q);
 
 void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update );
+
+/** Send msg to all the workers in the queue. **/
+void work_queue_broadcast_message(struct work_queue *q, const char *msg);
