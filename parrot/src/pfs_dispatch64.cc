@@ -1251,8 +1251,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL64_getgroups:
-		case SYSCALL64_setgroups:
 			if (entering && pfs_fake_setgid)
+				divert_to_dummy(p,-EPERM);
+			break;
+
+		case SYSCALL64_setgroups:
+			if (entering)
 				divert_to_dummy(p,-EPERM);
 			break;
 
