@@ -1632,6 +1632,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 						/* process id of sender */
 					}
 				}
+				free(msg.msg_control);
 			}
 			break;
 
