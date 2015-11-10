@@ -119,7 +119,7 @@
 110	i386	iopl			sys_iopl
 111	i386	vhangup			sys_vhangup
 112	i386	idle
-113	i386	vm86old			sys_vm86old			sys32_vm86_warning
+113	i386	vm86old			sys_vm86old			sys_ni_syscall
 114	i386	wait4			sys_wait4			compat_sys_wait4
 115	i386	swapoff			sys_swapoff
 116	i386	sysinfo			sys_sysinfo			compat_sys_sysinfo
@@ -172,7 +172,7 @@
 163	i386	mremap			sys_mremap
 164	i386	setresuid		sys_setresuid16
 165	i386	getresuid		sys_getresuid16
-166	i386	vm86			sys_vm86			sys32_vm86_warning
+166	i386	vm86			sys_vm86			sys_ni_syscall
 167	i386	query_module
 168	i386	poll			sys_poll
 169	i386	nfsservctl
@@ -363,3 +363,22 @@
 354	i386	seccomp			sys_seccomp
 355	i386	getrandom		sys_getrandom
 356	i386	memfd_create		sys_memfd_create
+357	i386	bpf			sys_bpf
+358	i386	execveat		sys_execveat			stub32_execveat
+359	i386	socket			sys_socket
+360	i386	socketpair		sys_socketpair
+361	i386	bind			sys_bind
+362	i386	connect			sys_connect
+363	i386	listen			sys_listen
+364	i386	accept4			sys_accept4
+365	i386	getsockopt		sys_getsockopt			compat_sys_getsockopt
+366	i386	setsockopt		sys_setsockopt			compat_sys_setsockopt
+367	i386	getsockname		sys_getsockname
+368	i386	getpeername		sys_getpeername
+369	i386	sendto			sys_sendto
+370	i386	sendmsg			sys_sendmsg			compat_sys_sendmsg
+371	i386	recvfrom		sys_recvfrom			compat_sys_recvfrom
+372	i386	recvmsg			sys_recvmsg			compat_sys_recvmsg
+373	i386	shutdown		sys_shutdown
+374	i386	userfaultfd		sys_userfaultfd
+375	i386	membarrier		sys_membarrier
