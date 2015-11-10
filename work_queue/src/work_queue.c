@@ -410,6 +410,19 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 	return result;
 }
 
+void work_queue_broadcast_message(struct work_queue *q, const char *msg) {
+	if(!q)
+		return;
+
+	struct work_queue_worker *w;
+	char* id;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+		send_worker_msg(q, w, "%s", msg);
+	}
+}
+
 work_queue_msg_code_t process_name(struct work_queue *q, struct work_queue_worker *w, char *line)
 {
 	debug(D_WQ, "Sending project name to worker (%s)", w->addrport);
