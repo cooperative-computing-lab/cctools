@@ -698,14 +698,26 @@ class WorkQueue(_object):
     def task_state(self, taskid):
         return work_queue_task_state(self._work_queue, taskid)
 
-    ## Enables resource monitoring of tasks in the queue. And writes a summary of the monitored information to a file.
+    ## Enables resource monitoring of tasks in the queue, and writes a summary
+    #  per task to the directory given. Additionally, all summaries are
+    #  consolidate into the file all_summaries-PID.log
     #
     #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
     # @param self 	Reference to the current work queue object.
-    # @param summaryfile Filename for the summary log (If NULL, writes to wq-\<pid\>-resource-usage).
-    def enable_monitoring(self, summaryfile):
-        return work_queue_enable_monitoring(self._work_queue, summaryfile)
+    # @param dirname    Directory name for the monitor output.
+    def enable_monitoring(self, dirname):
+        return work_queue_enable_monitoring(self._work_queue, dirname)
+
+    ## As @ref enable_monitoring, but it also generates a time series and a debug file.
+    #  WARNING: Such files may reach gigabyte sizes for long running tasks.
+    #
+    #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
+    #
+    # @param self 	Reference to the current work queue object.
+    # @param dirname    Directory name for the monitor output.
+    def enable_monitoring_full(self, dirname):
+        return work_queue_enable_monitoring_full(self._work_queue, dirname)
 
     ##
     # Turn on or off fast abort functionality for a given queue.
