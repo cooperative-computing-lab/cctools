@@ -1559,33 +1559,12 @@ int main(int argc, char **argv) {
 			case 'O':
 				if(template_path)
 					free(template_path);
-				if(summary_path)
-				{
-					free(summary_path);
-					summary_path = NULL;
-				}
-				if(series_path)
-				{
-					free(series_path);
-					series_path = NULL;
-				}
-				if(opened_path)
-				{
-					free(opened_path);
-					opened_path = NULL;
-				}
 				template_path = xxstrdup(optarg);
 				break;
 			case  LONG_OPT_TIME_SERIES:
-				if(series_path)
-					free(series_path);
-				series_path = xxstrdup(optarg);
 				use_series  = 1;
 				break;
 			case  LONG_OPT_OPENED_FILES:
-				if(opened_path)
-					free(opened_path);
-				opened_path = xxstrdup(optarg);
 				use_inotify = 1;
 				break;
 			case LONG_OPT_NO_DISK_FOOTPRINT:
