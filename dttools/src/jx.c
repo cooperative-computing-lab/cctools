@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "jx.h"
 #include "stringtools.h"
+#include "buffer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,10 +56,24 @@ struct jx * jx_string( const char *string_value )
 	return j;
 }
 
-struct jx * jx_string_nodup( char *string_value )
+struct jx * jx_format( const char *fmt, ... )
 {
-	struct jx *j = jx_create(JX_STRING);
-	j->string_value = string_value;
+	va_list va;
+	struct jx *j;
+	buffer_t B[1];
+	char *str;
+
+	buffer_init(B);
+	buffer_abortonfailure(B, 1);
+	va_start(va, fmt);
+	buffer_putvfstring(B, fmt, va);
+	va_end(va);
+	buffer_dup(B, &str);
+	buffer_free(B);
+
+	j = jx_create(JX_STRING);
+	j->string_value = str;
+
 	return j;
 }
 

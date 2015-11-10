@@ -98,11 +98,8 @@ struct jx * jx_double( double double_value );
 /** Create a JX string value. @param string_value A C string, which will be duplciated via strdup(). @return A JX string value. */
 struct jx * jx_string( const char *string_value );
 
-/** Create a JX string value without duplication.  @param string_value A C string, which will be used directly and freed with @ref jx_delete.  @return A JX string value. */
-struct jx * jx_string_nodup( char *string_value );
-
 /** Create a JX string value using prinf style formatting.  @param fmt A printf-style format string, followed by matching arguments.  @return A JX string value. */
-#define jx_format(fmt,...) jx_string_nodup(string_format(fmt,__VA_ARGS__))
+struct jx * jx_format( const char *fmt, ... );
 
 /** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_evaluate. @param symbol_name A C string. @return A JX expression.
 */
