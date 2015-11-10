@@ -1002,7 +1002,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_get_robust_list:
 		case SYSCALL64_get_thread_area:
 		case SYSCALL64_getcpu:
-		case SYSCALL64_getgroups:
 		case SYSCALL64_getitimer:
 		case SYSCALL64_getpgid:
 		case SYSCALL64_getpgrp:
@@ -1064,7 +1063,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_set_thread_area:
 		case SYSCALL64_set_tid_address:
 		case SYSCALL64_setdomainname:
-		case SYSCALL64_setgroups:
 		case SYSCALL64_sethostname:
 		case SYSCALL64_setitimer:
 		case SYSCALL64_setpgid:
@@ -1250,6 +1248,16 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					divert_to_dummy(p,-EPERM);
 				}
 			}
+			break;
+
+		case SYSCALL64_getgroups:
+			if (entering && pfs_fake_setgid)
+				divert_to_dummy(p,-EPERM);
+			break;
+
+		case SYSCALL64_setgroups:
+			if (entering)
+				divert_to_dummy(p,-EPERM);
 			break;
 
 		/* Here begin all of the I/O operations, given in the same order as in
