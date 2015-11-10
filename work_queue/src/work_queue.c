@@ -98,10 +98,14 @@ typedef enum {
 	MSG_FAILURE
 } work_queue_msg_code_t;
 
+typedef enum {
+	MON_DISABLED = 0,
+	MON_SINGLE_FILE,
+	MON_FULL
+} work_queue_monitoring_mode;
 
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
-
 
 /* Default: When there is a choice, send a task rather than receive 1 out of 2 times.
  * Classical WQ:   1.0 (always prefer to send)
@@ -1166,7 +1170,11 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 
 	if(t->resources_measured)
 	{
-		rmsummary_print(q->monitor_file, t->resources_measured, NULL, NULL, NULL);
+		FILE *fs = fopen(summary, "r");
+		if(fs) {
+			copy_stream_to_stream(fs, q->monitor_file);
+			fclose(fs);
+		}
 	}
 	else
 	{
@@ -3952,7 +3960,7 @@ struct work_queue *work_queue_create(int port)
 	q->keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
 	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
 
-	q->monitor_mode   =  0;
+	q->monitor_mode = MON_DISABLED;
 	q->password = 0;
 
 	q->asynchrony_multiplier = 1.0;
@@ -3985,14 +3993,14 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_fil
   if(!q)
 	return 0;
 
-  if(q->monitor_mode)
+  if(q->monitor_mode == MON_SINGLE_FILE)
   {
 	debug(D_NOTICE, "Monitoring already enabled. Closing old logfile and opening (perhaps) new one.\n");
 	if(fclose(q->monitor_file))
 	  debug(D_NOTICE, "Error closing logfile: %s\n", strerror(errno));
   }
 
-  q->monitor_mode = 0;
+  q->monitor_mode = MON_DISABLED;
 
   q->monitor_exe = resource_monitor_locate(NULL);
   if(!q->monitor_exe)
@@ -4017,7 +4025,7 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_fil
   q->measured_local_resources = malloc(sizeof(struct rmsummary));
   rmonitor_measure_process(q->measured_local_resources, getpid());
 
-  q->monitor_mode = 1;
+  q->monitor_mode = MON_SINGLE_FILE;
 
   return 1;
 }

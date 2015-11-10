@@ -98,9 +98,7 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 
 //Using default sampling interval. We may want to add an option
 //to change it.
-char *resource_monitor_write_command(const char *monitor_path, const char *template_filename, const char *limits_filename,
-					   const char *extra_monitor_options,
-					   int time_series, int inotify_stats)
+char *resource_monitor_write_command(const char *monitor_path, const char *template_filename, const char *limits_filename, const char *extra_monitor_options, int debug_output, int time_series, int inotify_stats)
 {
 
 
@@ -112,6 +110,9 @@ char *resource_monitor_write_command(const char *monitor_path, const char *templ
 
 	buffer_printf(&cmd_builder, "%s", monitor_path);
 	buffer_printf(&cmd_builder, " --with-output-files=%s", template_filename);
+
+	if(debug_output)
+		buffer_printf(&cmd_builder, " -dall -o %s.debug", template_filename);
 
 	if(time_series)
 		buffer_printf(&cmd_builder, " --with-time-series");
