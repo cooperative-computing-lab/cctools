@@ -1333,6 +1333,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL64_accept:
+		case SYSCALL64_accept4:
 		case SYSCALL64_epoll_create1:
 		case SYSCALL64_epoll_create:
 		case SYSCALL64_eventfd2:
@@ -1372,6 +1373,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 						p->table->setnative(fds[0], fdflags);
 						assert(fds[1] >= 0);
 						p->table->setnative(fds[1], fdflags);
+					} else if (p->syscall == SYSCALL64_accept4 && (args[3]&SOCK_CLOEXEC)) {
+						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL64_epoll_create1 && (args[1]&EPOLL_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL64_eventfd2 && (args[1]&EFD_CLOEXEC)) {
@@ -2967,7 +2970,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		 * we aren't handling them.
 		 */
 
-		case SYSCALL64_accept4:
 		case SYSCALL64_add_key:
 		case SYSCALL64_bpf:
 		case SYSCALL64_clock_adjtime:
