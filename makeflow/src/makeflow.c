@@ -201,7 +201,7 @@ static void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d,
 Decide whether to rerun a node based on batch and file system status.
 */
 
-void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n)
+void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n, int silent)
 {
 	struct dag_file *f;
 
@@ -213,12 +213,12 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 	// If a job was submitted to Condor, then just reconnect to it.
 	if(n->state == DAG_NODE_STATE_RUNNING && !(n->local_job && local_queue) && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
 		// Reconnect the Condor jobs
-		fprintf(stderr, "rule still running: %s\n", n->command);
+		if(!silent) fprintf(stderr, "rule still running: %s\n", n->command);
 		itable_insert(d->remote_job_table, n->jobid, n);
 
 		// Otherwise, we cannot reconnect to the job, so rerun it
 	} else if(n->state == DAG_NODE_STATE_RUNNING || n->state == DAG_NODE_STATE_FAILED || n->state == DAG_NODE_STATE_ABORTED) {
-		fprintf(stderr, "will retry failed rule: %s\n", n->command);
+		if(!silent) fprintf(stderr, "will retry failed rule: %s\n", n->command);
 		goto rerun;
 	}
 	// Rerun if an input file has been updated since the last execution.
@@ -228,7 +228,7 @@ void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struc
 			continue;
 		} else {
 			if(!f->created_by) {
-				fprintf(stderr, "makeflow: input file %s does not exist and is not created by any rule.\n", f->filename);
+				if(!silent) fprintf(stderr, "makeflow: input file %s does not exist and is not created by any rule.\n", f->filename);
 				exit(1);
 			} else {
 				/* If input file is missing, but node completed and file was garbage, then avoid rerunning. */
@@ -1523,7 +1523,7 @@ int main(int argc, char *argv[])
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue );
+	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode );
 
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		printf("cleaning filesystem...\n");
