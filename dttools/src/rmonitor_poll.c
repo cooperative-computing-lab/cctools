@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "path_disk_size_info.h"
 #include "macros.h"
+#include "stringtools.h"
 #include "xxmalloc.h"
 
 #include "rmonitor_poll_internal.h"
@@ -24,6 +25,8 @@ See the file COPYING for details.
 ***/
 
 #define div_round_up(a, b) (((a) + (b) - 1) / (b))
+
+#define ANON_MAPS_NAME "[anon]"
 
 uint64_t usecs_since_epoch()
 {
@@ -117,6 +120,7 @@ int rmonitor_poll_process_once(struct rmonitor_process_info *p)
 	rmonitor_get_mem_usage(p->pid, &p->mem);
 	rmonitor_get_sys_io_usage(p->pid, &p->io);
 	//rmonitor_get_map_io_usage(p->pid, &p->io);
+	//
 
 	return 0;
 }
@@ -315,6 +319,7 @@ int rmonitor_get_swap_usage(pid_t pid, struct rmonitor_mem_info *mem)
 		accum += value;
 
 	mem->swap = accum;
+	mem->swap = div_round_up(mem->swap, 1024);
 
 	fclose(fsmaps);
 
@@ -348,10 +353,9 @@ int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
 	/* in MB */
 	mem->virtual  = div_round_up(mem->virtual,  1024);
 	mem->resident = div_round_up(mem->resident, 1024);
-	mem->shared   = div_round_up(mem->shared,   1024);
 	mem->text     = div_round_up(mem->text,     1024);
 	mem->data     = div_round_up(mem->data,     1024);
-	mem->swap     = div_round_up(mem->swap,     1024);
+	mem->shared   = div_round_up(mem->shared,   1024);
 
 	return 0;
 }
@@ -360,10 +364,216 @@ void acc_mem_usage(struct rmonitor_mem_info *acc, struct rmonitor_mem_info *othe
 {
 		acc->virtual  += other->virtual;
 		acc->resident += other->resident;
-		acc->shared   += other->shared;
 		acc->data     += other->data;
 		acc->swap     += other->swap;
+		acc->shared   += other->shared;
 }
+
+struct rmonitor_mem_info *rmonitor_get_map_info(FILE *fmem, int rewind_flag) {
+	static int anon_map_count = 0;
+
+	if(!fmem)
+		return NULL;
+
+	if(rewind_flag)
+		rewind(fmem);
+
+	struct rmonitor_mem_info *info = malloc(sizeof(struct rmonitor_mem_info));
+
+	uint64_t offset;
+	char map_info_line[PATH_MAX];
+	char map_name_found[PATH_MAX];
+	while( fgets(map_info_line, PATH_MAX, fmem) )
+	{
+		// start-end                 perm   offset device inode                       path
+		// 560019f25000-56001a127000 r-xp 00000000 08:01 266469                     /usr/bin/vim.basic
+
+		int n;
+		n = sscanf(map_info_line, "%llx-%llx %*s %llx %*s %*s %s", (long long unsigned int *) &(info->map_start), (long long unsigned int *)  &(info->map_end), (long long unsigned int *) &offset, map_name_found);
+
+		/* continue if we do not get at least start, end, and offset */
+		if(n < 3)
+			continue;
+
+		/* file maps are always an absolute pathname. consider maps without a filename as different. */
+		if(n < 4 || map_name_found[0] != '/') {
+			info->map_name = string_format("ANON_MAPS_NAME.%d", anon_map_count);
+			anon_map_count++;
+		} else {
+			info->map_name = xxstrdup(map_name_found);
+		}
+
+		// move boundaries to origin
+		info->map_end   = info->map_end - info->map_start + offset;
+		info->map_start = offset;
+
+		return info;
+	}
+
+	free(info);
+
+	return NULL;
+}
+
+int rmonitor_get_mmaps_usage(pid_t pid, struct hash_table *maps)
+{
+	// /dev/proc/[pid]/smaps:
+
+	FILE *fmem = open_proc_file(pid, "smaps");
+	if(!fmem)
+		return 1;
+
+	struct rmonitor_mem_info *info;
+	while((info = rmonitor_get_map_info(fmem, 0))) {
+
+		uint64_t rss, pss, swap, ref;
+		uint64_t private_dirty, private_clean;
+
+		/* order is important, this is how the fields appear in smaps */
+		/* in kB! */
+		rmonitor_get_int_attribute(fmem, "Rss:",           &rss, 0);
+		rmonitor_get_int_attribute(fmem, "Pss:",           &pss, 0);
+		rmonitor_get_int_attribute(fmem, "Private_Clean:", &private_clean, 0);
+		rmonitor_get_int_attribute(fmem, "Private_Dirty:", &private_dirty, 0);
+		rmonitor_get_int_attribute(fmem, "Referenced:",    &ref, 0);
+		rmonitor_get_int_attribute(fmem, "Swap:",          &swap, 0);
+
+		info->resident   = rss;
+		info->referenced = ref;
+		info->swap       = swap;
+
+		/* private and shared may or may not be currently resident, (e.g.,
+		 swap). That is: rss = private + shared - swap = referenced - swap.  In
+		 the following, we try to compute private and shared that are actually
+		 resident. Since we do not have enough information, we assume the worst
+		 case that all private pages are resident. If swap is zero, then
+		 resident private and resident shared will have the correct values. */
+
+		info->private  = MIN(private_dirty + private_clean, rss);
+		info->shared   = MAX(rss - info->private, 0);
+
+		/* add the info to a sorted list per map, by start. Overlaping maps will be merged later. */
+		struct list *infos = hash_table_lookup(maps, info->map_name);
+		if(!infos) {
+			infos = list_create(0);
+			hash_table_insert(maps, info->map_name, infos);
+		}
+
+		list_push_priority(infos, info, -1*(info->map_start));
+	}
+
+	fclose(fmem);
+
+	return 0;
+}
+
+int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *mem) {
+	struct hash_table *maps_per_file = hash_table_create(0, 0);
+
+	uint64_t pid;
+	struct rmonitor_process_info *pinfo;
+	itable_firstkey(processes);
+	while(itable_nextkey(processes, &pid, (void *) &pinfo)) {
+		rmonitor_get_mmaps_usage(pid, maps_per_file);
+	}
+
+	/* Accumulate the maps we just found per file. First, we merge together all
+	 * the maps segment that overlap. With this, we do not overcount private
+	 * segments, but do consider that segments are shared as little as
+	 * possible.
+	 *
+	 * After this merging, we determine upper bounds, such as:
+	 *
+	 * virtual >= referenced >= private >= referenced - private >= shared.
+	 *
+	 * If swap size is zero, then virtual and private have the exact values,
+	 * and we have worst case counts for referenced and shared.
+	 *
+	 * When we accumulate resident for the result, we do it from private +
+	 * shared, rather than the resident reported originally as this would
+	 * overcount shared.
+	 *
+	 * There could be a way to use Pss (proportional resident) to improve these
+	 * bounds.
+	 */
+
+	if(mem->map_name)
+		free(mem->map_name);
+
+	/* set result to 0. */
+	memset(mem, 0, sizeof(struct rmonitor_mem_info));
+
+	struct list *infos;
+	char *map_name;
+
+	hash_table_firstkey(maps_per_file);
+	while(hash_table_nextkey(maps_per_file, &map_name, (void *) &infos )) {
+
+		struct rmonitor_mem_info *info, *next;
+		while((info = list_pop_head(infos))) {
+			while((next = list_peek_head(infos))) {
+				/* do we need to merge with the next segment? */
+				if(info->map_end > next->map_start) {
+					info->private  += next->private;
+					info->shared   += next->shared;
+					info->resident += next->resident;
+					info->referenced += next->referenced;
+					info->swap     += next->swap;
+
+					info->map_end = MAX(info->map_end, next->map_end);
+
+					list_pop_head(infos);
+					if(next->map_name)
+						free(next->map_name);
+				} else {
+					break;
+				}
+			}
+
+			/* a series of upper bounds: */
+			/* by adding referenced, we assumed a worst case of non-sharing
+			 * memory, but referenced cannot be larger than the virtual size: */
+			info->virtual  = div_round_up(info->map_end - info->map_start, 1024); /* bytes to kB. */
+			info->referenced = MIN(info->referenced, info->virtual);
+
+			/* similarly, resident cannot be larger than referenced. */
+			info->resident = MIN(info->resident, info->referenced);
+
+			/* and, resident private cannot be larger than resident. */
+			info->private  = MIN(info->private, info->resident);
+
+			/* lastly, resident shared memory cannot be larger than the whole
+			 * resident size minus the resident private memory. */
+			info->shared = MIN(info->shared, info->resident - info->private);
+
+			/* once the individual values have been found, we added together to the result. */
+			mem->virtual     += info->virtual;
+			mem->referenced  += info->referenced;
+			mem->shared      += info->shared;
+			mem->private     += info->private;
+
+			/* note that we add private + shared, rather than resident,
+			 * otherwise we will overcount shared. */
+			mem->resident += info->private + info->shared;
+
+			if(info->map_name)
+				free(info->map_name);
+			free(info);
+		}
+
+		list_delete(infos);
+	}
+
+	hash_table_delete(maps_per_file);
+
+	/* all the values computed are in kB, we convert to MB. */
+	mem->shared       = div_round_up(mem->shared, 1024);
+	mem->private      = div_round_up(mem->private, 1024);
+	mem->resident     = div_round_up(mem->resident, 1024);
+
+	return 0;
+}
+
 
 int rmonitor_get_sys_io_usage(pid_t pid, struct rmonitor_io_info *io)
 {

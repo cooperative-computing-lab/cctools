@@ -571,7 +571,7 @@ void rmonitor_summary_header()
     }
 }
 
-void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
+void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
 {
 	tr->wall_time         = usecs_since_epoch() - summary->start;
 	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
@@ -583,8 +583,18 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->total_processes     = summary->total_processes;
 
 	tr->virtual_memory    = (int64_t) p->mem.virtual;
-	tr->resident_memory   = (int64_t) p->mem.resident;
-	tr->swap_memory       = (int64_t) p->mem.swap;
+
+	/* we use max here, as /proc/pid/smaps that fills *m is not always
+	 * available. This causes /proc/pid/status to become a conservative
+	 * fallback. */
+	if(m->resident > 0) {
+		tr->resident_memory   = (int64_t) m->resident;
+		tr->swap_memory       = (int64_t) m->swap;
+	}
+	else {
+		tr->resident_memory   = (int64_t) p->mem.resident;
+		tr->swap_memory       = (int64_t) p->mem.swap;
+	}
 
 	tr->bytes_read        = (int64_t) (p->io.delta_chars_read + tr->bytes_read);
 	tr->bytes_read       += (int64_t)  p->io.delta_bytes_faulted;
@@ -926,12 +936,11 @@ struct rmsummary *rmonitor_rusage_tree(void)
         return NULL;
     }
 
-    /* Here we add the maximum recorded + the io from memory maps */
-    tr_usg->bytes_read     =  summary->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
-
-    tr_usg->resident_memory = (usg.ru_maxrss + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
-
-    debug(D_RMON, "rusage faults: %ld resident memory: %ld.\n", usg.ru_majflt, usg.ru_maxrss);
+	if(usg.ru_majflt > 0) {
+		/* Here we add the maximum recorded + the io from memory maps */
+		tr_usg->bytes_read     =  summary->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
+		debug(D_RMON, "page faults: %ld.\n", usg.ru_majflt);
+	}
 
     return tr_usg;
 }
@@ -1399,6 +1408,7 @@ int rmonitor_resources(long int interval /*in microseconds */)
     struct rmonitor_process_info *p_acc = calloc(1, sizeof(struct rmonitor_process_info)); //Automatic zeroed.
     struct rmonitor_wdir_info    *d_acc = calloc(1, sizeof(struct rmonitor_wdir_info));
     struct rmonitor_filesys_info *f_acc = calloc(1, sizeof(struct rmonitor_filesys_info));
+    struct rmonitor_mem_info     *m_acc = calloc(1, sizeof(struct rmonitor_mem_info));
 
     struct rmsummary    *resources_now = calloc(1, sizeof(struct rmsummary));
 
@@ -1415,13 +1425,14 @@ int rmonitor_resources(long int interval /*in microseconds */)
 		ping_processes();
 
 		rmonitor_poll_all_processes_once(processes, p_acc);
+		rmonitor_poll_maps_once(processes, m_acc);
 
 		if(resources_flags->workdir_footprint)
 			rmonitor_poll_all_wds_once(wdirs, d_acc, MAX(1, interval/(ONE_SECOND*hash_table_size(wdirs))));
 
 		// rmonitor_fss_once(f); disabled until statfs fs id makes sense.
 
-		rmonitor_collate_tree(resources_now, p_acc, d_acc, f_acc);
+		rmonitor_collate_tree(resources_now, p_acc, m_acc, d_acc, f_acc);
 		rmonitor_find_max_tree(summary, resources_now);
 		rmonitor_log_row(resources_now);
 

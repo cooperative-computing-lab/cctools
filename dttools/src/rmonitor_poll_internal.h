@@ -48,6 +48,7 @@ void rmonitor_poll_all_fss_once(      struct itable *filesysms, struct rmonitor_
 int rmonitor_poll_process_once(struct rmonitor_process_info *p);
 int rmonitor_poll_wd_once(     struct rmonitor_wdir_info    *d, int max_time_for_measurement);
 int rmonitor_poll_fs_once(     struct rmonitor_filesys_info *f);
+int rmonitor_poll_maps_once(   struct itable *processes, struct rmonitor_mem_info *mem);
 
 void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f, uint64_t start_time);
 

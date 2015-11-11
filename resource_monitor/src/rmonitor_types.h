@@ -39,9 +39,18 @@ struct rmonitor_cpu_time_info
 struct rmonitor_mem_info
 {
 	uint64_t virtual;
+	uint64_t referenced;
 	uint64_t resident;
 	uint64_t swap;
+
+	/* resident values, itemized. */
+	uint64_t private;
 	uint64_t shared;
+
+	char    *map_name;
+	uint64_t map_start;
+	uint64_t map_end;
+
 	uint64_t text;
 	uint64_t data;
 };
