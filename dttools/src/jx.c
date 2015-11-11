@@ -124,6 +124,8 @@ struct jx * jx_arrayv( struct jx *value, ... )
 	}
 
 	return array;
+
+	va_end(args);
 }
 
 struct jx * jx_lookup( struct jx *j, const char *key )
