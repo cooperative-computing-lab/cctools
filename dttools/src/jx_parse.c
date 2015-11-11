@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include <ctype.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 typedef enum {
 	JX_TOKEN_SYMBOL,
@@ -45,6 +46,8 @@ struct jx_parser {
 	int putback_char;
 	int putback_token_valid;
 	jx_token_t putback_token;
+	jx_int_t integer_value;
+	double double_value;
 };
 
 struct jx_parser * jx_parser_create( int strict_mode )
@@ -228,21 +231,28 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		}
 		jx_parse_error(s,"string constant too long");
 		return JX_TOKEN_ERROR;
+
 	} else if(strchr("+-0123456789.",c)) {
 		s->token[0] = c;
 		int i;
 		for(i=1;i<MAX_TOKEN_SIZE;i++) {
 			c = jx_getchar(s);
-			if(strchr("0123456789.",c)) {
+			if(strchr("0123456789.-+eE",c)) {
 				s->token[i] = c;
 			} else {
 				s->token[i] = 0;
 				jx_ungetchar(s,c);
-				if(strchr(s->token,'.')) {
-					return JX_TOKEN_DOUBLE;
-				} else {
-					return JX_TOKEN_INTEGER;
-				}
+
+				char *endptr;
+
+				s->integer_value = strtoll(s->token,&endptr,10);
+				if(!*endptr) return JX_TOKEN_INTEGER;
+ 
+				s->double_value = strtod(s->token,&endptr);
+				if(!*endptr) return JX_TOKEN_DOUBLE;
+
+				jx_parse_error(s,"invalid number format");
+				return JX_TOKEN_ERROR;
 			}
 		}
 		jx_parse_error(s,"integer constant too long");
@@ -379,9 +389,9 @@ struct jx * jx_parse( struct jx_parser *s )
 	case JX_TOKEN_STRING:
 		return jx_string(s->token);
 	case JX_TOKEN_INTEGER:
-		return jx_integer((jx_int_t)atoll(s->token));
+		return jx_integer(s->integer_value);
 	case JX_TOKEN_DOUBLE:
-		return jx_double(atof(s->token));
+		return jx_double(s->double_value);
 	case JX_TOKEN_TRUE:
 		return jx_boolean(1);
 	case JX_TOKEN_FALSE:

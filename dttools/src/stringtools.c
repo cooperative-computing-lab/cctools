@@ -659,39 +659,18 @@ void string_toupper(char *s)
 	}
 }
 
-int string_is_integer(const char *s)
+int string_is_integer( const char *s, long long *integer_value )
 {
-	while(*s) {
-		if(!isdigit((int) *s))
-			return 0;
-		s++;
-	}
-	return 1;
+	char *endptr;
+	*integer_value = strtoll(s,&endptr,10);
+	return !*endptr;
 }
 
-int string_is_float(const char *s)
+int string_is_float( const char *s, double *double_value )
 {
-	int digits=0, periods=0, dashes=0, other=0;
-
-	while(*s) {
-		if(isdigit((*s))) {
-			digits++;
-		} else if(*s=='.') {
-			periods++;
-		} else if(*s=='-') {
-			dashes++;
-		} else {
-			other++;
-			break;
-		}
-		s++;
-	}
-
-	if(other==0 && digits>0 && periods<=1 && dashes<=1) {
-		return 1;
-	} else {
-		return 0;
-	}
+	char *endptr;
+	*double_value = strtod(s,&endptr);
+	return !*endptr;
 }
 
 int string_isspace(const char *s)

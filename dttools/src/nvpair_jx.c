@@ -68,6 +68,9 @@ struct jx * nvpair_to_jx( struct nvpair *nv )
 	char *value;
 	struct jx *jvalue;
 
+	long long integer_value;
+	double  double_value;
+
 	nvpair_first_item(nv);
 	while(nvpair_next_item(nv,&key,&value)) {
 		if(!strcmp(value,"true")) {
@@ -76,10 +79,10 @@ struct jx * nvpair_to_jx( struct nvpair *nv )
 			jvalue = jx_boolean(0);
 		} else if(!strcmp(value,"null")) {
 			jvalue = jx_null();
-		} else if(string_is_integer(value)) {
-			jvalue = jx_integer(atoll(value));
-		} else if(string_is_float(value)) {
-			jvalue = jx_double(atof(value));
+		} else if(string_is_integer(value,&integer_value)) {
+			jvalue = jx_integer(integer_value);
+		} else if(string_is_float(value,&double_value)) {
+			jvalue = jx_double(double_value);
 		} else if(value[0]=='[' || value[0]=='{') {
 			jvalue = jx_parse_string(value);
 			if(!jvalue) jvalue = jx_string(value);
