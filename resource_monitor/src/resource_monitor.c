@@ -176,6 +176,8 @@ struct hash_table *wdirs;       /* Maps paths to working directory structures. *
 struct itable *filesysms;       /* Maps st_dev ids (from stat syscall) to filesystem structures. */
 struct hash_table *files;       /* Keeps track of which files have been opened. */
 
+static int   follow_chdir = 0; /* Keep track of all the working directories per process. */
+
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
 static char **inotify_watches;  /* Keeps track of created inotify watches. */
 static int alloced_inotify_watches = 0;
@@ -854,9 +856,11 @@ void rmonitor_track_process(pid_t pid)
 	p->pid = pid;
 	p->running = 0;
 
-	newpath = getcwd(NULL, 0);
-	p->wd   = lookup_or_create_wd(NULL, newpath);
-	free(newpath);
+	if(follow_chdir) {
+		newpath = getcwd(NULL, 0);
+		p->wd   = lookup_or_create_wd(NULL, newpath);
+		free(newpath);
+	}
 
 	itable_insert(processes, p->pid, (void *) p);
 
@@ -878,7 +882,7 @@ void cleanup_zombie(struct rmonitor_process_info *p)
 {
   debug(D_RMON, "cleaning process: %d\n", p->pid);
 
-  if(p->wd)
+  if(follow_chdir && p->wd)
     dec_wd_count(p->wd);
 
   itable_remove(processes, p->pid);
@@ -1193,7 +1197,8 @@ void rmonitor_dispatch_msg(void)
             rmonitor_untrack_process(msg.data.p);
             break;
         case CHDIR:
-            p->wd = lookup_or_create_wd(p->wd, msg.data.s);
+			if(follow_chdir)
+				p->wd = lookup_or_create_wd(p->wd, msg.data.s);
             break;
 		case OPEN_INPUT:
 		case OPEN_OUTPUT:
@@ -1393,6 +1398,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s resource limits. (Could be specified multiple times.)\n", "");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Keep the monitored process in foreground (for interactive use).\n", "-f,--child-in-foreground");
+    fprintf(stdout, "%-30s Follow processes' current working directories. \n", "--follow-chdir");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-O,--with-output-files=<file>");
     fprintf(stdout, "%-30s Write resource time series to <template>.series\n", "--with-time-series");
@@ -1504,7 +1510,9 @@ int main(int argc, char **argv) {
 		LONG_OPT_OPENED_FILES,
 		LONG_OPT_DISK_FOOTPRINT,
 		LONG_OPT_NO_DISK_FOOTPRINT,
-		LONG_OPT_SH_CMDLINE
+		LONG_OPT_SH_CMDLINE,
+		LONG_OPT_WORKING_DIRECTORY,
+		LONG_OPT_FOLLOW_CHDIR
 	};
 
     static const struct option long_options[] =
@@ -1521,8 +1529,9 @@ int main(int argc, char **argv) {
 
 		    {"verbatim-to-summary",required_argument, 0, 'V'},
 
-		    {"with-output-files",   required_argument, 0,  'O'},
+		    {"follow-chdir", no_argument, 0,  LONG_OPT_FOLLOW_CHDIR},
 
+		    {"with-output-files",   required_argument, 0,  'O'},
 		    {"with-time-series",    no_argument, 0, LONG_OPT_TIME_SERIES},
 		    {"with-opened-files",   no_argument, 0, LONG_OPT_OPENED_FILES},
 		    {"without-disk-footprint", no_argument, 0, LONG_OPT_NO_DISK_FOOTPRINT},
@@ -1584,6 +1593,9 @@ int main(int argc, char **argv) {
 				break;
 			case LONG_OPT_NO_DISK_FOOTPRINT:
 				resources_flags->workdir_footprint = 0;
+				break;
+			case LONG_OPT_FOLLOW_CHDIR:
+				follow_chdir = 1;
 				break;
 			default:
 				show_help(argv[0]);
@@ -1682,6 +1694,13 @@ int main(int argc, char **argv) {
 	    if (inotify_watches == NULL) alloced_inotify_watches = 0;
     }
 #endif
+
+	/* if we are not following changes in directory, and no directory was manually added, we follow the current working directory. */
+	if(!follow_chdir || hash_table_size(wdirs) == 0) {
+		char *newpath = getcwd(NULL, 0);
+		lookup_or_create_wd(NULL, newpath);
+		free(newpath);
+	}
 
 	executable = xxstrdup(argv[optind]);
 
