@@ -26,7 +26,7 @@ struct catalog_query *catalog_query_create(const char *host, int port, time_t st
 		port = CATALOG_PORT;
 
 	char *url = string_format("http://%s:%d/query.json", host, port);
-       	struct link *link = http_query(url, "GET", stoptime);
+	struct link *link = http_query(url, "GET", stoptime);
 	free(url);
 
 	if(!link) return 0;

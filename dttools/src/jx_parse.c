@@ -247,7 +247,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 
 				s->integer_value = strtoll(s->token,&endptr,10);
 				if(!*endptr) return JX_TOKEN_INTEGER;
- 
+
 				s->double_value = strtod(s->token,&endptr);
 				if(!*endptr) return JX_TOKEN_DOUBLE;
 
@@ -319,7 +319,7 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 
 	return i;
 }
-	
+
 static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 {
 	jx_token_t t = jx_scan(s);
@@ -374,7 +374,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 
 	return p;
 }
-	
+
 struct jx * jx_parse( struct jx_parser *s )
 {
 	jx_token_t t = jx_scan(s);
