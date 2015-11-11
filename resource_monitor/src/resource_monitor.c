@@ -841,20 +841,12 @@ int rmonitor_final_summary()
 	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s", "", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, CCTOOLS_COMMIT);
 	list_push_tail(verbatim_summary_lines, monitor_self_info);
 
-	rmonitor_find_files_final_sizes();
-	rmonitor_add_files_to_summary("input_files:",  0);
-	rmonitor_add_files_to_summary("output_files:", 1);
-
-	char *epilogue = rmonitor_consolidate_verbatim_lines();
-	rmsummary_print(log_summary, summary, resources_limits, NULL, epilogue);
-
-	if(monitor_self_info)
-		free(monitor_self_info);
-	if(epilogue)
-		free(epilogue);
-
 	if(log_inotify)
 	{
+		rmonitor_find_files_final_sizes();
+		rmonitor_add_files_to_summary("input_files:",  0);
+		rmonitor_add_files_to_summary("output_files:", 1);
+
         int nfds = rmonitor_inotify_fd + 1;
         int count = 0;
 
@@ -876,6 +868,14 @@ int rmonitor_final_summary()
 
 		rmonitor_file_io_summaries();
 	}
+
+	char *epilogue = rmonitor_consolidate_verbatim_lines();
+	rmsummary_print(log_summary, summary, resources_limits, NULL, epilogue);
+
+	if(monitor_self_info)
+		free(monitor_self_info);
+	if(epilogue)
+		free(epilogue);
 
 	return summary->exit_status;
 }
@@ -1601,7 +1601,7 @@ int main(int argc, char **argv) {
 
 		    {"with-output-files",   required_argument, 0,  'O'},
 		    {"with-time-series",    no_argument, 0, LONG_OPT_TIME_SERIES},
-		    {"with-opened-files",   no_argument, 0, LONG_OPT_OPENED_FILES},
+		    {"with-inotify",   no_argument, 0, LONG_OPT_OPENED_FILES},
 		    {"without-disk-footprint", no_argument, 0, LONG_OPT_NO_DISK_FOOTPRINT},
 
 		    {0, 0, 0, 0}
