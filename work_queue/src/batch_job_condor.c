@@ -318,8 +318,8 @@ static int batch_job_condor_remove (struct batch_queue *q, batch_job_id_t jobid)
 static int batch_queue_condor_create (struct batch_queue *q)
 {
 	strncpy(q->logfile, "condor.logfile", sizeof(q->logfile));
-	hash_table_insert(q->features, "remote_rename", "%s=%s");
-	hash_table_insert(q->features, "batch_log_name", "%s.condorlog");
+	batch_queue_set_feature(q, "remote_rename", "%s=%s");
+	batch_queue_set_feature(q, "batch_log_name", "%s.condorlog");
 
 	return 0;
 }

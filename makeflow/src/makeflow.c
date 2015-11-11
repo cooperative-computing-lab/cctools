@@ -940,6 +940,7 @@ int main(int argc, char *argv[])
 	const char *work_queue_keepalive_timeout = NULL;
 	const char *work_queue_master_mode = "standalone";
 	const char *work_queue_port_file = NULL;
+	const char *wq_option_fast_abort_multiplier = NULL;
 	const char *priority = NULL;
 	char *work_queue_password = NULL;
 	char *wq_wait_queue_size = 0;
@@ -972,7 +973,7 @@ int main(int argc, char *argv[])
 	}
 	s = getenv("WORK_QUEUE_FAST_ABORT_MULTIPLIER");
 	if(s) {
-		wq_option_fast_abort_multiplier = atof(s);
+		wq_option_fast_abort_multiplier = xxstrdup(s);
 	}
 
 	enum {
@@ -1117,7 +1118,7 @@ int main(int argc, char *argv[])
 				write_summary_to = xxstrdup(optarg);
 				break;
 			case 'F':
-				wq_option_fast_abort_multiplier = atof(optarg);
+				wq_option_fast_abort_multiplier = xxstrdup(optarg);
 				break;
 			case 'g':
 				if(strcasecmp(optarg, "none") == 0) {
@@ -1424,8 +1425,8 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "password", work_queue_password);
 	batch_queue_set_option(remote_queue, "master-mode", work_queue_master_mode);
 	batch_queue_set_option(remote_queue, "name", project);
+	batch_queue_set_option(remote_queue, "fast-abort-multiplier", wq_option_fast_abort_multiplier);
 	batch_queue_set_option(remote_queue, "priority", priority);
-	batch_queue_set_option(remote_queue, "estimate-capacity", "yes"); // capacity estimation is on by default
 	batch_queue_set_option(remote_queue, "keepalive-interval", work_queue_keepalive_interval);
 	batch_queue_set_option(remote_queue, "keepalive-timeout", work_queue_keepalive_timeout);
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
@@ -1435,9 +1436,7 @@ int main(int argc, char *argv[])
 
 	/* Do not create a local queue for systems where local and remote are the same. */
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP ||
-	   batch_queue_type == BATCH_QUEUE_TYPE_HADOOP ||
-	   batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
+	if(!batch_queue_supports_feature(remote_queue, "local_job_queue")) {
 		local_queue = 0;
 	} else {
 		local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
@@ -1448,7 +1447,7 @@ int main(int argc, char *argv[])
 
 	/* Remote storage modes do not (yet) support measuring storage for garbage collection. */
 
-	if(batch_queue_type==BATCH_QUEUE_TYPE_CHIRP || batch_queue_type==BATCH_QUEUE_TYPE_HADOOP) {
+	if(!batch_queue_supports_feature(remote_queue, "gc_size")) {
 		if(makeflow_gc_method == MAKEFLOW_GC_SIZE) {
 			makeflow_gc_method = MAKEFLOW_GC_ALL;
 		}

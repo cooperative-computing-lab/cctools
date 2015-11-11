@@ -122,7 +122,12 @@ static int batch_job_local_remove (struct batch_queue *q, batch_job_id_t jobid)
 
 }
 
-batch_queue_stub_create(local);
+static int batch_queue_local_create (struct batch_queue *q)
+{
+	batch_queue_set_feature(q, "local_job_queue", NULL);
+	return 0;
+}
+
 batch_queue_stub_free(local);
 batch_queue_stub_port(local);
 batch_queue_stub_option_update(local);

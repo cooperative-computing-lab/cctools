@@ -4261,6 +4261,11 @@ const char *work_queue_name(struct work_queue *q)
 	return q->name;
 }
 
+void work_queue_specify_fast_abort_multiplier(struct work_queue *q, double fast_abort_multiplier)
+{
+	q->fast_abort_multiplier = fast_abort_multiplier;
+}
+
 void work_queue_specify_priority(struct work_queue *q, int priority)
 {
 	q->priority = priority;

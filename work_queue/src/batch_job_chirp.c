@@ -254,6 +254,8 @@ static int batch_queue_chirp_create (struct batch_queue *q)
 	random_hex(tag, sizeof(tag));
 	buffer_putfstring(B, "unknown-project:%s", tag);
 	batch_queue_set_option(q, "tag", buffer_tostring(B));
+	batch_queue_set_feature(q, "local_job_queue", NULL);
+	batch_queue_set_feature(q, "gc_size", NULL);
 	return 0;
 }
 
