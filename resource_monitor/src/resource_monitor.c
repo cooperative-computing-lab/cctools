@@ -1448,10 +1448,13 @@ static void show_help(const char *cmd)
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
     fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify.\n", "-L,--limits=<string>");
-    fprintf(stdout, "%-30s resource limits. (Could be specified multiple times.)\n", "");
+    fprintf(stdout, "%-30s resource limits. Can be specified multiple times.\n", "");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Keep the monitored process in foreground (for interactive use).\n", "-f,--child-in-foreground");
-    fprintf(stdout, "%-30s Follow processes' current working directories. \n", "--follow-chdir");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "%-30s Follow the size of processes' current working directories. \n", "--follow-chdir");
+    fprintf(stdout, "%-30s Follow the size of <dir>. If not specified, follow the current directory.\n", "--measure-dir");
+    fprintf(stdout, "%-30s Can be specified multiple times.\n", "");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-O,--with-output-files=<file>");
     fprintf(stdout, "%-30s Write resource time series to <template>.series\n", "--with-time-series");
@@ -1556,7 +1559,17 @@ int main(int argc, char **argv) {
 
     rmsummary_read_env_vars(resources_limits);
 
+    processes = itable_create(0);
+    wdirs     = hash_table_create(0,0);
+    filesysms = itable_create(0);
+    files     = hash_table_create(0,0);
+
+    wdirs_rc   = itable_create(0);
+    filesys_rc = itable_create(0);
+
 	verbatim_summary_lines = list_create(0);
+
+	char *cwd = getcwd(NULL, 0);
 
 	enum {
 		LONG_OPT_TIME_SERIES = UCHAR_MAX+1,
@@ -1565,7 +1578,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_NO_DISK_FOOTPRINT,
 		LONG_OPT_SH_CMDLINE,
 		LONG_OPT_WORKING_DIRECTORY,
-		LONG_OPT_FOLLOW_CHDIR
+		LONG_OPT_FOLLOW_CHDIR,
+		LONG_OPT_MEASURE_DIR
 	};
 
     static const struct option long_options[] =
@@ -1583,6 +1597,7 @@ int main(int argc, char **argv) {
 		    {"verbatim-to-summary",required_argument, 0, 'V'},
 
 		    {"follow-chdir", no_argument, 0,  LONG_OPT_FOLLOW_CHDIR},
+		    {"measure-dir", required_argument, 0,  LONG_OPT_MEASURE_DIR},
 
 		    {"with-output-files",   required_argument, 0,  'O'},
 		    {"with-time-series",    no_argument, 0, LONG_OPT_TIME_SERIES},
@@ -1595,6 +1610,9 @@ int main(int argc, char **argv) {
 
 	/* By default, measure working directory. */
 	resources_flags->workdir_footprint = 1;
+
+	/* Used in LONG_OPT_MEASURE_DIR */
+	char measure_dir_name[PATH_MAX];
 
     while((c = getopt_long(argc, argv, "c:d:fhi:L:l:o:O:vV:", long_options, NULL)) >= 0)
     {
@@ -1650,12 +1668,22 @@ int main(int argc, char **argv) {
 			case LONG_OPT_FOLLOW_CHDIR:
 				follow_chdir = 1;
 				break;
+			case LONG_OPT_MEASURE_DIR:
+				path_absolute(optarg, measure_dir_name, 0);
+				if(!lookup_or_create_wd(NULL, measure_dir_name))
+					fatal("Directory '%s' does not exist.", optarg);
+				break;
 			default:
 				show_help(argv[0]);
 				return 1;
 				break;
 		}
 	}
+
+	if( follow_chdir && hash_table_size(wdirs) > 0) {
+		fatal("Options --follow-chdir and --measure-dir as mutually exclusive.");
+	}
+
 
     rmsummary_debug_report(resources_limits);
 
@@ -1714,14 +1742,6 @@ int main(int argc, char **argv) {
     rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd);
 #endif
 
-    processes = itable_create(0);
-    wdirs     = hash_table_create(0,0);
-    filesysms = itable_create(0);
-    files     = hash_table_create(0,0);
-
-    wdirs_rc   = itable_create(0);
-    filesys_rc = itable_create(0);
-
 	summary_path = default_summary_name(template_path);
 
     if(use_series)
@@ -1750,9 +1770,7 @@ int main(int argc, char **argv) {
 
 	/* if we are not following changes in directory, and no directory was manually added, we follow the current working directory. */
 	if(!follow_chdir || hash_table_size(wdirs) == 0) {
-		char *newpath = getcwd(NULL, 0);
-		lookup_or_create_wd(NULL, newpath);
-		free(newpath);
+		lookup_or_create_wd(NULL, cwd);
 	}
 
 	executable = xxstrdup(argv[optind]);
