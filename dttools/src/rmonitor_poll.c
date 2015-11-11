@@ -305,59 +305,41 @@ void acc_cpu_time_usage(struct rmonitor_cpu_time_info *acc, struct rmonitor_cpu_
 }
 
 
-int rmonitor_get_swap_usage(pid_t pid, struct rmonitor_mem_info *mem)
-{
-	FILE *fsmaps = open_proc_file(pid, "smaps");
-	if(!fsmaps)
-		return 1;
-
-	/* in kB */
-	uint64_t accum = 0;
-	uint64_t value = 0;
-
-	while(rmonitor_get_int_attribute(fsmaps, "Swap:", &value, 0) == 0)
-		accum += value;
-
-	mem->swap = accum;
-	mem->swap = div_round_up(mem->swap, 1024);
-
-	fclose(fsmaps);
-
-	return 0;
-}
-
 int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
 {
 	// /dev/proc/[pid]/status:
 
-	FILE *fmem = open_proc_file(pid, "status");
-	if(!fmem)
-		return 1;
-
 	int status = 0;
 
-	/* in kB */
-	status |= rmonitor_get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
-	status |= rmonitor_get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
-	status |= rmonitor_get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
-	status |= rmonitor_get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
-	status |= rmonitor_get_int_attribute(fmem, "VmData:", &mem->data,     1);
-	status |= rmonitor_get_swap_usage(pid, mem);
+	FILE *fmem = open_proc_file(pid, "status");
+	if(!fmem) {
+		status = 1;
+	} else {
+		/* in kB */
+		status |= rmonitor_get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
+		status |= rmonitor_get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
+		status |= rmonitor_get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
+		status |= rmonitor_get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
+		status |= rmonitor_get_int_attribute(fmem, "VmData:", &mem->data,     1);
 
-	fclose(fmem);
+		/* from smaps when reading maps. */
+		mem->swap = 0;
 
-	/* One of the fields was not found, so we return early. */
+		fclose(fmem);
+
+		/* in MB */
+		mem->virtual  = div_round_up(mem->virtual,  1024);
+		mem->resident = div_round_up(mem->resident, 1024);
+		mem->text     = div_round_up(mem->text,     1024);
+		mem->data     = div_round_up(mem->data,     1024);
+		mem->shared   = div_round_up(mem->shared,   1024);
+	}
+
+	/* Found some error, so reset values found. */
 	if(status)
-		return 1;
+		bzero(mem, sizeof(struct rmonitor_mem_info));
 
-	/* in MB */
-	mem->virtual  = div_round_up(mem->virtual,  1024);
-	mem->resident = div_round_up(mem->resident, 1024);
-	mem->text     = div_round_up(mem->text,     1024);
-	mem->data     = div_round_up(mem->data,     1024);
-	mem->shared   = div_round_up(mem->shared,   1024);
-
-	return 0;
+	return status;
 }
 
 void acc_mem_usage(struct rmonitor_mem_info *acc, struct rmonitor_mem_info *other)
@@ -429,14 +411,20 @@ int rmonitor_get_mmaps_usage(pid_t pid, struct hash_table *maps)
 		uint64_t rss, pss, swap, ref;
 		uint64_t private_dirty, private_clean;
 
+		int status = 0;
+
 		/* order is important, this is how the fields appear in smaps */
 		/* in kB! */
-		rmonitor_get_int_attribute(fmem, "Rss:",           &rss, 0);
-		rmonitor_get_int_attribute(fmem, "Pss:",           &pss, 0);
-		rmonitor_get_int_attribute(fmem, "Private_Clean:", &private_clean, 0);
-		rmonitor_get_int_attribute(fmem, "Private_Dirty:", &private_dirty, 0);
-		rmonitor_get_int_attribute(fmem, "Referenced:",    &ref, 0);
-		rmonitor_get_int_attribute(fmem, "Swap:",          &swap, 0);
+		status |= rmonitor_get_int_attribute(fmem, "Rss:",           &rss, 0);
+		status |= rmonitor_get_int_attribute(fmem, "Pss:",           &pss, 0);
+		status |= rmonitor_get_int_attribute(fmem, "Private_Clean:", &private_clean, 0);
+		status |= rmonitor_get_int_attribute(fmem, "Private_Dirty:", &private_dirty, 0);
+		status |= rmonitor_get_int_attribute(fmem, "Referenced:",    &ref, 0);
+		status |= rmonitor_get_int_attribute(fmem, "Swap:",          &swap, 0);
+
+		/* error reading a field, we simply skip the record. */
+		if(status)
+			continue;
 
 		info->resident   = rss;
 		info->referenced = ref;
@@ -501,7 +489,7 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 		free(mem->map_name);
 
 	/* set result to 0. */
-	memset(mem, 0, sizeof(struct rmonitor_mem_info));
+	bzero(mem, sizeof(struct rmonitor_mem_info));
 
 	struct list *infos;
 	char *map_name;
@@ -567,8 +555,9 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 	hash_table_delete(maps_per_file);
 
 	/* all the values computed are in kB, we convert to MB. */
-	mem->shared       = div_round_up(mem->shared, 1024);
-	mem->private      = div_round_up(mem->private, 1024);
+	mem->virtual      = div_round_up(mem->virtual,  1024);
+	mem->shared       = div_round_up(mem->shared,   1024);
+	mem->private      = div_round_up(mem->private,  1024);
 	mem->resident     = div_round_up(mem->resident, 1024);
 
 	return 0;
