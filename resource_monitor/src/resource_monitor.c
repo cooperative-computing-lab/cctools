@@ -671,19 +671,19 @@ void rmonitor_log_row(struct rmsummary *tr)
 {
 	if(log_series)
 	{
-		fprintf(log_series,  "%-20" PRId64, tr->wall_time + summary->start);
-		fprintf(log_series, " %20" PRId64, tr->cpu_time);
-		fprintf(log_series, " %25" PRId64, tr->max_concurrent_processes);
-		fprintf(log_series, " %25" PRId64, tr->virtual_memory);
-		fprintf(log_series, " %25" PRId64, tr->resident_memory);
-		fprintf(log_series, " %25" PRId64, tr->swap_memory);
-		fprintf(log_series, " %25" PRId64, tr->bytes_read);
-		fprintf(log_series, " %25" PRId64, tr->bytes_written);
+		fprintf(log_series,  "%-18" PRId64, tr->wall_time + summary->start);
+		fprintf(log_series, " %18" PRId64, tr->cpu_time);
+		fprintf(log_series, " %20" PRId64, tr->max_concurrent_processes);
+		fprintf(log_series, " %20" PRId64, tr->virtual_memory);
+		fprintf(log_series, " %20" PRId64, tr->resident_memory);
+		fprintf(log_series, " %20" PRId64, tr->swap_memory);
+		fprintf(log_series, " %20" PRId64, tr->bytes_read);
+		fprintf(log_series, " %20" PRId64, tr->bytes_written);
 
 		if(resources_flags->workdir_footprint)
 		{
-			fprintf(log_series, " %25" PRId64, tr->workdir_num_files);
-			fprintf(log_series, " %25" PRId64, tr->workdir_footprint);
+			fprintf(log_series, " %20" PRId64, tr->workdir_num_files);
+			fprintf(log_series, " %20" PRId64, tr->workdir_footprint);
 		}
 
 		fprintf(log_series, "\n");
@@ -691,6 +691,9 @@ void rmonitor_log_row(struct rmsummary *tr)
 		/* are we going to keep monitoring the whole filesystem? */
 		// fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
 	}
+
+	debug(D_RMON, "resources: %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 "% " PRId64 "\n", tr->wall_time + summary->start, tr->cpu_time, tr->max_concurrent_processes, tr->virtual_memory, tr->resident_memory, tr->swap_memory, tr->bytes_read, tr->bytes_written, tr->workdir_num_files, tr->workdir_footprint);
+
 }
 
 void decode_zombie_status(struct rmsummary *summary, int wait_status)
@@ -1592,6 +1595,7 @@ int main(int argc, char **argv) {
 				break;
 			case 'o':
 				debug_config_file(optarg);
+				debug_config_file_size(0);
 				break;
 			case 'h':
 				show_help(argv[0]);
