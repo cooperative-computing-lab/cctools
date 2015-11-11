@@ -1,6 +1,9 @@
 CP=/bin/cp
 BASEDIR=../../src/
 
+MAKEFLOW_INPUTS=$BASEDIR/makeflow.c
+MAKEFLOW_OUTPUTS=total_line_count.txt
+
 makeflow.c: $BASEDIR/makeflow.c
 	$CP $BASEDIR/makeflow.c makeflow.c
 

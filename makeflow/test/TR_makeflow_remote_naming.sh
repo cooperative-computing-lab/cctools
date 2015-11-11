@@ -20,6 +20,9 @@ hello
 EOF
 
 cat > $MAKE_FILE <<EOF
+MAKEFLOW_INPUTS=input.txt
+MAKEFLOW_OUTPUTS=out.actual
+
 out.1 -> out.txt: input.txt -> input.1
 	cat input.1 > out.txt
 
