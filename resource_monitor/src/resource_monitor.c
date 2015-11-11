@@ -142,7 +142,7 @@ See the file COPYING for details.
 #include "rmonitor_poll_internal.h"
 
 #define RESOURCE_MONITOR_USE_INOTIFY 1
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
 #include <sys/inotify.h>
 #include <sys/ioctl.h>
 #endif
@@ -176,7 +176,7 @@ struct hash_table *wdirs;       /* Maps paths to working directory structures. *
 struct itable *filesysms;       /* Maps st_dev ids (from stat syscall) to filesystem structures. */
 struct hash_table *files;       /* Keeps track of which files have been opened. */
 
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
 static char **inotify_watches;  /* Keeps track of created inotify watches. */
 static int alloced_inotify_watches = 0;
 #endif
@@ -445,7 +445,7 @@ void rmonitor_add_file_watch(char *filename, int is_output)
 
 	hash_table_insert(files, filename, finfo);
 
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0)
 	{
 		char **new_inotify_watches;
@@ -482,7 +482,7 @@ void rmonitor_add_file_watch(char *filename, int is_output)
 
 void rmonitor_handle_inotify(void)
 {
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct inotify_event *evdata;
 	struct rmonitor_file_info *finfo;
 	struct stat fst;
@@ -741,7 +741,7 @@ char *rmonitor_consolidate_verbatim_lines() {
 
 int rmonitor_file_io_summaries()
 {
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0)
 	{
 		char *fname;
@@ -1669,7 +1669,7 @@ int main(int argc, char **argv) {
     summary->start   = usecs_since_epoch();
 
 
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
     if(log_inotify)
     {
 	    rmonitor_inotify_fd = inotify_init();
