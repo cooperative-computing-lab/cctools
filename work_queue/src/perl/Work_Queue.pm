@@ -101,6 +101,11 @@ sub enable_monitoring {
 	return work_queue_enable_monitoring($self->{_work_queue}, $summary_file);
 }
 
+sub enable_monitoring_full {
+	my ($self, $dir_name) = @_;
+	return work_queue_enable_monitoring_full($self->{_work_queue}, $dir_name);
+}
+
 sub activate_fast_abort {
 	my ($self, $multiplier) = @_;
 	return work_queue_activate_fast_abort($self->{_work_queue}, $multiplier);
@@ -337,20 +342,33 @@ Get the queue statistics, including master and foremen.
 
 		 print $q->stats_hierarchy->{workers_busy};
 
-=head3 C<enable_monitoring($summary_file)>
+=head3 C<enable_monitoring($dir_name)>
 
-Enables resource monitoring of tasks in the queue. And writes a
-summary of the monitored information to a file.
+Enables resource monitoring of tasks in the queue, and writes a summary per
+task to the directory given. Additionally, all summaries are consolidate into
+the file all_summaries-PID.log
 
- Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
+Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
 
 =over 12
 
-=item summaryfile
-
-Filename for the summary log (If NULL, writes to wq-\<pid\>-resource-usage).
+=item dirname    Directory name for the monitor output.
 
 =back
+
+=head3 C<enable_monitoring_full($dir_name)>
+
+As @ref enable_monitoring, but it also generates a time series and a debug
+file.  WARNING: Such files may reach gigabyte sizes for long running tasks.
+
+Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
+
+=over 12
+
+=item dirname    Directory name for the monitor output.
+
+=back
+
 
 =head3 C<fast_abort>
 

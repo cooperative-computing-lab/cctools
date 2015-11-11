@@ -19,6 +19,7 @@ struct makeflow_monitor * makeflow_monitor_create()
 {
 	struct makeflow_monitor *m = malloc(sizeof(*m));
 	m->wrapper = makeflow_wrapper_create();
+	m->enable_debug       = 0;
 	m->enable_time_series = 0;
 	m->enable_list_files  = 0;
 
@@ -90,6 +91,7 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct dag_
 			m->log_prefix,
 			m->limits_name,
 			extra_options,
+			m->enable_debug,
 			m->enable_time_series,
 			m->enable_list_files);
 

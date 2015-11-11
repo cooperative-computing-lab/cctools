@@ -16,6 +16,7 @@ may be removed, according to a variety of criteria.
 
 struct makeflow_monitor {
 	struct makeflow_wrapper *wrapper;
+	int enable_debug;
 	int enable_time_series;
 	int enable_list_files;
 

@@ -24,9 +24,7 @@ the corresponding log file options.
 @return A wrapper command line for string_wrap_command to wrap original command line with the resource monitor.
 */
 
-char *resource_monitor_write_command(const char *monitor_path, const char *template_filename, const char *limits_filename,
-					   const char *extra_monitor_options,
-					   int time_series, int opened_files);
+char *resource_monitor_write_command(const char *monitor_path, const char *template_filename, const char *limits_filename, const char *extra_monitor_options, int debug_output, int time_series, int opened_files);
 
 /** Looks for a resource monitor executable, and makes a copy in
 current working directory.
