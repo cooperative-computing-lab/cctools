@@ -635,16 +635,16 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->max_concurrent_processes     = (int64_t) itable_size(processes);
 	tr->total_processes     = summary->total_processes;
 
-	tr->virtual_memory    = (int64_t) p->mem.virtual;
-
 	/* we use max here, as /proc/pid/smaps that fills *m is not always
 	 * available. This causes /proc/pid/status to become a conservative
 	 * fallback. */
 	if(m->resident > 0) {
+		tr->virtual_memory    = (int64_t) m->virtual;
 		tr->resident_memory   = (int64_t) m->resident;
 		tr->swap_memory       = (int64_t) m->swap;
 	}
 	else {
+		tr->virtual_memory    = (int64_t) p->mem.virtual;
 		tr->resident_memory   = (int64_t) p->mem.resident;
 		tr->swap_memory       = (int64_t) p->mem.swap;
 	}
