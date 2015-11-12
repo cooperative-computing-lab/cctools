@@ -40,7 +40,7 @@ See the file COPYING for details.
 #include "makeflow_wrapper_monitor.h"
 #include "makeflow_wrapper_umbrella.h"
 #include "makeflow_mounts.h"
-#include "makeflow_wrapper_sandbox.h"
+#include "makeflow_wrapper_enforcement.h"
 #include "parser.h"
 #include "parser_jx.h"
 
@@ -142,7 +142,7 @@ static int log_verbose_mode = 0;
  *  * files. */
 static struct makeflow_wrapper *wrapper = 0;
 static struct makeflow_monitor *monitor = 0;
-static struct makeflow_wrapper *sandbox = 0;
+static struct makeflow_wrapper *enforcer = 0;
 static struct makeflow_wrapper_umbrella *wrapper_umbrella = 0;
 
 /* is true only if the -N command is used. Useful for catalog reporting.
@@ -219,7 +219,7 @@ static void makeflow_abort_all(struct dag *d)
 		printf("aborting local job %" PRIu64 "\n", jobid);
 		batch_job_remove(local_queue, jobid);
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
-		struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, sandbox, wrapper_umbrella);
+		struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
 		list_first_item(outputs);
 		while((f = list_next_item(outputs)))
 			makeflow_clean_file(d, local_queue, f, 0);
@@ -231,7 +231,7 @@ static void makeflow_abort_all(struct dag *d)
 		printf("aborting remote job %" PRIu64 "\n", jobid);
 		batch_job_remove(remote_queue, jobid);
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
-		struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, sandbox, wrapper_umbrella);
+		struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
 		list_first_item(outputs);
 		while((f = list_next_item(outputs)))
 			makeflow_clean_file(d, remote_queue, f, 0);
@@ -331,7 +331,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 		}
 	}
 	// Clean up things associated with this node
-	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, sandbox, wrapper_umbrella);
+	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
 	list_first_item(outputs);
 	while((f1 = list_next_item(outputs)))
 		makeflow_clean_file(d, remote_queue, f1, 0);
@@ -512,17 +512,17 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
-	struct list *input_list  = makeflow_generate_input_files(n, wrapper, monitor, sandbox, wrapper_umbrella);
-	struct list *output_list = makeflow_generate_output_files(n, wrapper, monitor, sandbox, wrapper_umbrella);
+	struct list *input_list  = makeflow_generate_input_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+	struct list *output_list = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
 
 	/* Create strings for all the files mentioned by this node. */
-	char *input_files  = makeflow_file_list_format(n, 0, input_list,  queue, wrapper, monitor, sandbox, wrapper_umbrella);
-	char *output_files = makeflow_file_list_format(n, 0, output_list, queue, wrapper, monitor, sandbox, wrapper_umbrella);
+	char *input_files  = makeflow_file_list_format(n, 0, input_list,  queue, wrapper, monitor, enforcer, wrapper_umbrella);
+	char *output_files = makeflow_file_list_format(n, 0, output_list, queue, wrapper, monitor, enforcer, wrapper_umbrella);
 
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
 	char *command = strdup(n->command);
 	command = makeflow_wrap_wrapper(command, n, wrapper);
-	command = makeflow_wrap_sandbox(command, n, sandbox, input_list, output_list);
+	command = makeflow_wrap_enforcer(command, n, enforcer, input_list, output_list);
 	command = makeflow_wrap_umbrella(command, wrapper_umbrella, queue, input_files, output_files);
 	command = makeflow_wrap_monitor(command, n, queue, monitor);
 
@@ -703,7 +703,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		free(summary_name);
 	}
 
-	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, sandbox, wrapper_umbrella);
+	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
 
 	if(info->disk_allocation_exhausted) {
 		job_failed = 1;
@@ -1076,7 +1076,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
 	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
 	printf(" %-30s Indicate user trusts inputs exist.\n", "--skip-file-check");
-	printf(" %-30s Use Parrot to restrict access to the given inputs/outputs.\n", "--sandbox");
+	printf(" %-30s Use Parrot to restrict access to the given inputs/outputs.\n", "--enforcement");
 	printf(" %-30s Path to parrot_run (defaults to current directory).\n", "--parrot-path=<path>");
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 	printf(" %-30s Use JSON format rather than Make-style format for the input file.\n", "--json");
@@ -1185,7 +1185,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_UMBRELLA_BINARY,
 		LONG_OPT_UMBRELLA_SPEC,
 		LONG_OPT_ALLOCATION_MODE,
-		LONG_OPT_SANDBOX,
+		LONG_OPT_ENFORCEMENT,
 		LONG_OPT_PARROT_PATH,
 	};
 
@@ -1254,7 +1254,7 @@ int main(int argc, char *argv[])
 		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 		{"json", no_argument, 0, LONG_OPT_JSON},
-		{"sandbox", no_argument, 0, LONG_OPT_SANDBOX},
+		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
 		{0, 0, 0, 0}
 	};
@@ -1530,8 +1530,8 @@ int main(int argc, char *argv[])
 			case 'X':
 				change_dir = optarg;
 				break;
-			case LONG_OPT_SANDBOX:
-				if(!sandbox) sandbox = makeflow_wrapper_create();
+			case LONG_OPT_ENFORCEMENT:
+				if(!enforcer) enforcer = makeflow_wrapper_create();
 				break;
 			case LONG_OPT_PARROT_PATH:
 				parrot_path = xxstrdup(optarg);
@@ -1719,8 +1719,8 @@ int main(int argc, char *argv[])
 		makeflow_wrapper_umbrella_preparation(wrapper_umbrella, remote_queue);
 	}
 
-	if(sandbox) {
-		makeflow_wrapper_sandbox_init(sandbox, parrot_path);
+	if(enforcer) {
+		makeflow_wrapper_enforcer_init(enforcer, parrot_path);
 	}
 
 	makeflow_parse_input_outputs(d);
