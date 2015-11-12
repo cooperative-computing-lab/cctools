@@ -13,7 +13,7 @@ See the file COPYING for details.
 #include "catalog_query.h"
 #include "catch.h"
 #include "debug.h"
-#include "nvpair.h"
+#include "jx.h"
 #include "sha1.h"
 
 #include <sys/stat.h>
@@ -72,7 +72,7 @@ CONFUGA_IAPI int confugaS_catalog_sync (confuga *C)
 	const char *current = SQL;
 	time_t stoptime = time(NULL)+15;
 	struct catalog_query *Q = NULL;
-	struct nvpair *nv = NULL;
+	struct jx *j = NULL;
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_ROW);
@@ -94,41 +94,41 @@ CONFUGA_IAPI int confugaS_catalog_sync (confuga *C)
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	while ((nv = catalog_query_read(Q, stoptime))) {
-		const char *type = nvpair_lookup_string(nv, "type");
+	while ((j = catalog_query_read(Q, stoptime))) {
+		const char *type = jx_lookup_string(j, "type");
 		if (type && strcmp(type, "chirp") == 0) {
 			int n = 1;
 			/* UPDATE */
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "address"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "avail"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "backend"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "bytes_read"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "bytes_written"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "cpu"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "cpus"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "lastheardfrom"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "load1"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "load5"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "load15"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "memory_avail"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "memory_total"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "minfree"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "name"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "opsys"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "opsysversion"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "owner"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "port"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "starttime"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "total"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "total_ops"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "url"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "version"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "address"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "avail"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "backend"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "bytes_read"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "bytes_written"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "cpu"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "cpus"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "lastheardfrom"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "load1"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "load5"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "load15"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "memory_avail"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "memory_total"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "minfree"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "name"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "opsys"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "opsysversion"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "owner"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "port"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "starttime"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "total"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "total_ops"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "url"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "version"), -1, SQLITE_TRANSIENT));
 			/* WHERE hostport = ? */
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "name"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "port"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "address"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "port"), -1, SQLITE_TRANSIENT));
-			sqlcatch(sqlite3_bind_text(stmt, n++, nvpair_lookup_string(nv, "url"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "name"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "port"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "address"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "port"), -1, SQLITE_TRANSIENT));
+			sqlcatch(sqlite3_bind_text(stmt, n++, jx_lookup_string(j, "url"), -1, SQLITE_TRANSIENT));
 			sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 			sqlcatch(sqlite3_reset(stmt));
 			sqlcatch(sqlite3_clear_bindings(stmt));

@@ -82,7 +82,7 @@ static char *blacklisted_expression(struct batch_queue *q) {
 }
 
 
-static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
+static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
 {
 	FILE *file;
 	int njobs;
@@ -144,7 +144,7 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "getenv = true\n");
 
 	if(envlist) {
-		nvpair_export(envlist);
+		jx_export(envlist);
 	}
 
 	if(options)

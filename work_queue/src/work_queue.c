@@ -33,7 +33,6 @@ The following major problems must be fixed:
 #include "xxmalloc.h"
 #include "load_average.h"
 #include "buffer.h"
-#include "link_nvpair.h"
 #include "rmonitor.h"
 #include "rmonitor_poll.h"
 #include "copy_stream.h"
@@ -42,6 +41,7 @@ The following major problems must be fixed:
 #include "path.h"
 #include "md5.h"
 #include "url_encode.h"
+#include "jx_print.h"
 
 #include "host_disk_info.h"
 
@@ -261,7 +261,7 @@ static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work
 static work_queue_msg_code_t process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
 
-static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink );
+static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
 
 /** Clone a @ref work_queue_file
 This performs a deep copy of the file struct.
@@ -645,17 +645,17 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 		return;
 	}
 
-	// Generate the master status in an nvpair, and print it to a buffer.
-	char buffer[DATAGRAM_PAYLOAD_MAX];
-	struct nvpair *nv = queue_to_nvpair(q,foreman_uplink);
-	nvpair_print(nv,buffer,sizeof(buffer));
+	// Generate the master status in an jx, and print it to a buffer.
+	struct jx *j = queue_to_jx(q,foreman_uplink);
+	char *str = jx_print_string(j);
 
 	// Send the buffer.
 	debug(D_WQ, "Advertising master status to the catalog server at %s:%d ...", q->catalog_host, q->catalog_port);
-	datagram_send(q->update_port, buffer, strlen(buffer), address, q->catalog_port);
+	datagram_send(q->update_port, str, strlen(str), address, q->catalog_port);
 
 	// Clean up.
-	nvpair_delete(nv);
+	free(str);
+	jx_delete(j);
 	last_update_time = time(0);
 }
 
@@ -1651,83 +1651,83 @@ static char *blacklisted_to_string( struct work_queue  *q ) {
 }
 
 /*
-queue_to_nvpair examines the overall queue status and creates
-an nvair which can be sent to the catalog or directly to the
+queue_to_jx examines the overall queue status and creates
+an jx expression which can be sent to the catalog or directly to the
 user that connects via work_queue_status.
 */
 
-static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *foreman_uplink )
+static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink )
 {
-	struct nvpair *nv = nvpair_create();
-	if(!nv) return 0;
+	struct jx *j = jx_object(0);
+	if(!j) return 0;
 
 	// Insert all properties from work_queue_stats
 
 	struct work_queue_stats info;
 	work_queue_get_stats(q,&info);
 
-	nvpair_insert_integer(nv,"port",info.port);
-	nvpair_insert_integer(nv,"priority",info.priority);
-	nvpair_insert_integer(nv,"tasks_left",q->num_tasks_left);
+	jx_insert_integer(j,"port",info.port);
+	jx_insert_integer(j,"priority",info.priority);
+	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
 
 	//send info on workers
-	nvpair_insert_integer(nv,"workers",info.total_workers_connected);
-	nvpair_insert_integer(nv,"workers_init",info.workers_init);
-	nvpair_insert_integer(nv,"workers_idle",info.workers_idle);
-	nvpair_insert_integer(nv,"workers_busy",info.workers_busy);
-	nvpair_insert_integer(nv,"workers_ready",info.workers_ready); //workers_ready is deprecated
-	nvpair_insert_integer(nv,"total_workers_connected",info.total_workers_connected);
-	nvpair_insert_integer(nv,"total_workers_joined",info.total_workers_joined);
-	nvpair_insert_integer(nv,"total_workers_removed",info.total_workers_removed);
-	nvpair_insert_integer(nv,"total_workers_idled_out",info.total_workers_idled_out);
-	nvpair_insert_integer(nv,"total_workers_lost",info.total_workers_lost);
-	nvpair_insert_integer(nv,"total_workers_fast_aborted",info.total_workers_fast_aborted);
+	jx_insert_integer(j,"workers",info.total_workers_connected);
+	jx_insert_integer(j,"workers_init",info.workers_init);
+	jx_insert_integer(j,"workers_idle",info.workers_idle);
+	jx_insert_integer(j,"workers_busy",info.workers_busy);
+	jx_insert_integer(j,"workers_ready",info.workers_ready); //workers_ready is deprecated
+	jx_insert_integer(j,"total_workers_connected",info.total_workers_connected);
+	jx_insert_integer(j,"total_workers_joined",info.total_workers_joined);
+	jx_insert_integer(j,"total_workers_removed",info.total_workers_removed);
+	jx_insert_integer(j,"total_workers_idled_out",info.total_workers_idled_out);
+	jx_insert_integer(j,"total_workers_lost",info.total_workers_lost);
+	jx_insert_integer(j,"total_workers_fast_aborted",info.total_workers_fast_aborted);
 
 	//send info on tasks
-	nvpair_insert_integer(nv,"tasks_waiting",info.tasks_waiting);
-	nvpair_insert_integer(nv,"tasks_running",info.tasks_running);
+	jx_insert_integer(j,"tasks_waiting",info.tasks_waiting);
+	jx_insert_integer(j,"tasks_running",info.tasks_running);
 	// KNOWN HACK: The following line is inconsistent but kept for compatibility reasons.
 	// Everyone wants to know total_tasks_complete, but few are interested in tasks_complete.
-	nvpair_insert_integer(nv,"tasks_complete",info.total_tasks_complete);
-	nvpair_insert_integer(nv,"total_tasks_complete",info.total_tasks_complete);
-	nvpair_insert_integer(nv,"total_tasks_dispatched",info.total_tasks_dispatched);
-	nvpair_insert_integer(nv,"total_tasks_cancelled",info.total_tasks_cancelled);
+	jx_insert_integer(j,"tasks_complete",info.total_tasks_complete);
+	jx_insert_integer(j,"total_tasks_complete",info.total_tasks_complete);
+	jx_insert_integer(j,"total_tasks_dispatched",info.total_tasks_dispatched);
+	jx_insert_integer(j,"total_tasks_cancelled",info.total_tasks_cancelled);
 
 	//send info on queue
-	nvpair_insert_integer(nv,"start_time",info.start_time);
-	nvpair_insert_integer(nv,"total_send_time",info.total_send_time);
-	nvpair_insert_integer(nv,"total_receive_time",info.total_receive_time);
-	nvpair_insert_integer(nv,"total_bytes_sent",info.total_bytes_sent);
-	nvpair_insert_integer(nv,"total_bytes_received",info.total_bytes_received);
-	nvpair_insert_float(nv,"efficiency",info.efficiency);
-	nvpair_insert_float(nv,"idle_percentage",info.idle_percentage);
-	nvpair_insert_integer(nv,"capacity",info.capacity);
-	nvpair_insert_integer(nv,"total_execute_time",info.total_execute_time);
-	nvpair_insert_integer(nv,"total_good_execute_time",info.total_good_execute_time);
-	nvpair_insert_string(nv,"master_preferred_connection",q->master_preferred_connection);
+	jx_insert_integer(j,"start_time",info.start_time);
+	jx_insert_integer(j,"total_send_time",info.total_send_time);
+	jx_insert_integer(j,"total_receive_time",info.total_receive_time);
+	jx_insert_integer(j,"total_bytes_sent",info.total_bytes_sent);
+	jx_insert_integer(j,"total_bytes_received",info.total_bytes_received);
+	jx_insert_double(j,"efficiency",info.efficiency);
+	jx_insert_double(j,"idle_percentage",info.idle_percentage);
+	jx_insert_integer(j,"capacity",info.capacity);
+	jx_insert_integer(j,"total_execute_time",info.total_execute_time);
+	jx_insert_integer(j,"total_good_execute_time",info.total_good_execute_time);
+	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
 	// Add the blacklisted workers
 	char *blacklist = blacklisted_to_string(q);
 	if(blacklist) {
-		nvpair_insert_string(nv,"workers-blacklisted", blacklist);
+		jx_insert_string(j,"workers-blacklisted", blacklist);
 		free(blacklist);
 	}
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
 	aggregate_workers_resources(q,&r);
-	work_queue_resources_add_to_nvpair(&r,nv);
+	work_queue_resources_add_to_jx(&r,j);
 
 	char owner[USERNAME_MAX];
 	username_get(owner);
 
 	// Add special properties expected by the catalog server
-	nvpair_insert_string(nv,"type","wq_master");
-	if(q->name) nvpair_insert_string(nv,"project",q->name);
-	nvpair_insert_integer(nv,"starttime",(q->stats->start_time/1000000)); // catalog expects time_t not timestamp_t
-	nvpair_insert_string(nv,"working_dir",q->workingdir);
-	nvpair_insert_string(nv,"owner",owner);
-	nvpair_insert_string(nv,"version",CCTOOLS_VERSION);
+	jx_insert_string(j,"type","wq_master");
+	if(q->name) jx_insert_string(j,"project",q->name);
+	jx_insert_integer(j,"starttime",(q->stats->start_time/1000000)); // catalog expects time_t not timestamp_t
+	jx_insert_string(j,"working_dir",q->workingdir);
+	jx_insert_string(j,"owner",owner);
+	jx_insert_string(j,"version",CCTOOLS_VERSION);
 
 	// If this is a foreman, add the master address and the disk resources
 	if(foreman_uplink) {
@@ -1737,21 +1737,21 @@ static struct nvpair * queue_to_nvpair( struct work_queue *q, struct link *forem
 
 		link_address_remote(foreman_uplink,address,&port);
 		sprintf(addrport,"%s:%d",address,port);
-		nvpair_insert_string(nv,"my_master",addrport);
+		jx_insert_string(j,"my_master",addrport);
 
 		// get foreman local resources and overwrite disk usage
 		struct work_queue_resources local_resources;
 		work_queue_resources_measure_locally(&local_resources,q->workingdir);
 		r.disk.total = local_resources.disk.total;
 		r.disk.inuse = local_resources.disk.inuse;
-		work_queue_resources_add_to_nvpair(&r,nv);
+		work_queue_resources_add_to_jx(&r,j);
 	}
 
-	return nv;
+	return j;
 }
 
 
-void current_tasks_to_nvpair( struct nvpair *nv, struct work_queue_worker *w )
+void current_tasks_to_jx( struct jx *j, struct work_queue_worker *w )
 {
 	struct work_queue_task *t;
 	uint64_t taskid;
@@ -1762,40 +1762,40 @@ void current_tasks_to_nvpair( struct nvpair *nv, struct work_queue_worker *w )
 		char task_string[WORK_QUEUE_LINE_MAX];
 
 		sprintf(task_string, "current_task_%03d_id", n);
-		nvpair_insert_integer(nv,task_string,t->taskid);
+		jx_insert_integer(j,task_string,t->taskid);
 
 		sprintf(task_string, "current_task_%03d_command", n);
-		nvpair_insert_string(nv,task_string,t->command_line);
+		jx_insert_string(j,task_string,t->command_line);
 		n++;
 	}
 }
 
-struct nvpair * worker_to_nvpair( struct work_queue *q, struct work_queue_worker *w )
+struct jx * worker_to_jx( struct work_queue *q, struct work_queue_worker *w )
 {
-	struct nvpair *nv = nvpair_create();
-	if(!nv) return 0;
+	struct jx *j = jx_object(0);
+	if(!j) return 0;
 
-	nvpair_insert_string(nv,"hostname",w->hostname);
-	nvpair_insert_string(nv,"os",w->os);
-	nvpair_insert_string(nv,"arch",w->arch);
-	nvpair_insert_string(nv,"address_port",w->addrport);
-	nvpair_insert_integer(nv,"ncpus",w->resources->cores.total);
-	nvpair_insert_integer(nv,"total_tasks_complete",w->total_tasks_complete);
-	nvpair_insert_integer(nv,"total_tasks_running",itable_size(w->current_tasks));
-	nvpair_insert_integer(nv,"total_bytes_transferred",w->total_bytes_transferred);
-	nvpair_insert_integer(nv,"total_transfer_time",w->total_transfer_time);
-	nvpair_insert_integer(nv,"start_time",w->start_time);
-	nvpair_insert_integer(nv,"current_time",timestamp_get());
+	jx_insert_string(j,"hostname",w->hostname);
+	jx_insert_string(j,"os",w->os);
+	jx_insert_string(j,"arch",w->arch);
+	jx_insert_string(j,"address_port",w->addrport);
+	jx_insert_integer(j,"ncpus",w->resources->cores.total);
+	jx_insert_integer(j,"total_tasks_complete",w->total_tasks_complete);
+	jx_insert_integer(j,"total_tasks_running",itable_size(w->current_tasks));
+	jx_insert_integer(j,"total_bytes_transferred",w->total_bytes_transferred);
+	jx_insert_integer(j,"total_transfer_time",w->total_transfer_time);
+	jx_insert_integer(j,"start_time",w->start_time);
+	jx_insert_integer(j,"current_time",timestamp_get());
 
 
-	work_queue_resources_add_to_nvpair(w->resources,nv);
+	work_queue_resources_add_to_jx(w->resources,j);
 
-	current_tasks_to_nvpair(nv, w);
+	current_tasks_to_jx(j, w);
 
-	return nv;
+	return j;
 }
 
-static void priority_add_to_nvpair(struct nvpair *nv, double priority)
+static void priority_add_to_jx(struct jx *j, double priority)
 {
 	int decimals = 2;
 	int factor   = pow(10, decimals);
@@ -1809,28 +1809,27 @@ static void priority_add_to_nvpair(struct nvpair *nv, double priority)
 	else
 		str = string_format("%.2g", priority);
 
-	nvpair_insert_string(nv, "priority", str);
+	jx_insert_string(j, "priority", str);
 
 	free(str);
 }
 
 
 
-struct nvpair * task_to_nvpair( struct work_queue_task *t, const char *state, const char *host )
+struct jx * task_to_jx( struct work_queue_task *t, const char *state, const char *host )
 {
-	struct nvpair *nv = nvpair_create();
-	if(!nv) return 0;
+	struct jx *j = jx_object(0);
 
-	nvpair_insert_integer(nv,"taskid",t->taskid);
-	nvpair_insert_string(nv,"state",state);
-	if(t->tag) nvpair_insert_string(nv,"tag",t->tag);
-	nvpair_insert_string(nv,"command",t->command_line);
-	if(host) nvpair_insert_string(nv,"host",host);
+	jx_insert_integer(j,"taskid",t->taskid);
+	jx_insert_string(j,"state",state);
+	if(t->tag) jx_insert_string(j,"tag",t->tag);
+	jx_insert_string(j,"command",t->command_line);
+	if(host) jx_insert_string(j,"host",host);
 
-	priority_add_to_nvpair(nv, t->priority);
+	priority_add_to_jx(j, t->priority);
 
 
-	return nv;
+	return j;
 }
 
 static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct work_queue_worker *target, const char *line, time_t stoptime )
@@ -1846,70 +1845,72 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	}
 
 	if(!strcmp(request, "queue")) {
-		struct nvpair *nv = queue_to_nvpair( q, 0 );
-		if(nv) {
-			link_nvpair_write(l,nv,stoptime);
-			nvpair_delete(nv);
+		struct jx *j = queue_to_jx( q, 0 );
+		if(j) {
+			char *str = jx_print_string(j);
+			link_write(l,str,strlen(str),stoptime);
+			jx_delete(j);
+			free(j);
 		}
 	} else if(!strcmp(request, "task")) {
 		struct work_queue_task *t;
 		struct work_queue_worker *w;
-		struct nvpair *nv;
+		struct jx *j;
 		uint64_t taskid;
 
 		itable_firstkey(q->tasks);
 		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
 			w = itable_lookup(q->worker_task_map, taskid);
 			if(w) {
-				nv = task_to_nvpair(t,"running",w->hostname);
-				if(nv) {
+				j = task_to_jx(t,"running",w->hostname);
+				if(j) {
 					// Include detailed information on where the task is running:
 					// address and port, workspace
-					nvpair_insert_string(nv, "address_port", w->addrport);
+					jx_insert_string(j, "address_port", w->addrport);
 
 					// Timestamps on running task related events
-					nvpair_insert_integer(nv, "submit_to_queue_time", t->time_task_submit);
-					nvpair_insert_integer(nv, "send_input_start_time", t->time_send_input_start);
-					nvpair_insert_integer(nv, "execute_cmd_start_time", t->time_execute_cmd_start);
-					nvpair_insert_integer(nv, "current_time", timestamp_get());
+					jx_insert_integer(j, "submit_to_queue_time", t->time_task_submit);
+					jx_insert_integer(j, "send_input_start_time", t->time_send_input_start);
+					jx_insert_integer(j, "execute_cmd_start_time", t->time_execute_cmd_start);
+					jx_insert_integer(j, "current_time", timestamp_get());
 
-					link_nvpair_write(l,nv,stoptime);
-					nvpair_delete(nv);
+					jx_print_link(j,l,stoptime);
+					jx_delete(j);
 				}
 			}
 		}
 
 		list_first_item(q->ready_list);
 		while((t = list_next_item(q->ready_list))) {
-			nv = task_to_nvpair(t,"waiting",0);
-			if(nv) {
-				link_nvpair_write(l,nv,stoptime);
-				nvpair_delete(nv);
+			j = task_to_jx(t,"waiting",0);
+			if(j) {
+				jx_print_link(j,l,stoptime);
+				jx_delete(j);
 			}
 		}
 
 		itable_firstkey(q->tasks);
 		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
-			nv = task_to_nvpair(t,"complete",0);
-			if(nv) {
-				link_nvpair_write(l,nv,stoptime);
-				nvpair_delete(nv);
+			j = task_to_jx(t,"complete",0);
+			if(j) {
+				jx_print_link(j,l,stoptime);
+				jx_delete(j);
 			}
 		}
 
 	} else if(!strcmp(request, "worker")) {
 		struct work_queue_worker *w;
-		struct nvpair *nv;
+		struct jx *j;
 		char *key;
 
 		hash_table_firstkey(q->worker_table);
 		while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 			// If the worker has not been initializd, ignore it.
 			if(!strcmp(w->hostname, "unknown")) continue;
-			nv = worker_to_nvpair(q, w);
-			if(nv) {
-				link_nvpair_write(l,nv,stoptime);
-				nvpair_delete(nv);
+			j = worker_to_jx(q, w);
+			if(j) {
+				jx_print_link(j,l,stoptime);
+				jx_delete(j);
 			}
 		}
 	}

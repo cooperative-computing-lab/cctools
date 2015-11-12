@@ -16,7 +16,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "catalog_query.h"
 #include "domain_name_cache.h"
-#include "nvpair.h"
+#include "jx.h"
 #include "copy_stream.h"
 #include "host_memory_info.h"
 #include "host_disk_info.h"
@@ -1783,12 +1783,12 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 	}
 
 	while(1) {
-		struct nvpair *nv = list_peek_head(masters_list);
-		const char *project = nvpair_lookup_string(nv,"project");
-		const char *name = nvpair_lookup_string(nv,"name");
-		const char *addr = nvpair_lookup_string(nv,"address");
-		const char *pref = nvpair_lookup_string(nv,"master_preferred_connection");
-		int port = nvpair_lookup_integer(nv,"port");
+		struct jx *jx = list_peek_head(masters_list);
+		const char *project = jx_lookup_string(jx,"project");
+		const char *name = jx_lookup_string(jx,"name");
+		const char *addr = jx_lookup_string(jx,"address");
+		const char *pref = jx_lookup_string(jx,"master_preferred_connection");
+		int port = jx_lookup_integer(jx,"port");
 
 		/* Do not connect to the same master after idle disconnection. */
 		if(last_addr) {

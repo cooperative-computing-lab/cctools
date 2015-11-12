@@ -60,13 +60,12 @@ and would be better handled by invoking batch_job_local.
 
 static void makeflow_node_export_variables( struct dag *d, struct dag_node *n )
 {
-	struct nvpair *nv = dag_node_env_create(d,n);
-	if(nv){
-		nvpair_export(nv);
-		nvpair_delete(nv);
+	struct jx *j = dag_node_env_create(d,n);
+	if(j) {
+		jx_export(j);
+		jx_delete(j);
 	}
 }
-
 
 /* Prepare the dag for garbage collection by identifying which files may or may not be gcd. */
 

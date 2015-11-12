@@ -8,7 +8,7 @@ See the file COPYING for details.
 #define CATALOG_QUERY_H
 
 #include <time.h>
-#include "nvpair.h"
+#include "jx.h"
 
 /** @file catalog_query.h
 Query the global catalog server for server descriptions.
@@ -33,14 +33,15 @@ If neither is set, the system will contact chirp.cse.nd.edu on port 9097.
 struct catalog_query *catalog_query_create(const char *host, int port, time_t stoptime);
 
 /** Read the next object from a query.
-Returns the next @ref nvpair.h object from the issued query.
-The caller may @ref nvpair_lookup_string or @ref nvpair_lookup_integer to examine the object,
-and then must call @ref nvpair_delete when done.
+Returns the next @ref jx expressions from the issued query.
+The caller may use @ref jx_lookup_string, @ref jx_lookup_integer and related
+functions to manipulate the object, and then must call @ref jx_delete
+when done.
 @param q A query created by @ref catalog_query_create.
 @param stoptime The absolute time at which to abort.
-@return An @ref nvpair.h object representing the next result, or null if the end of stream has been reached.
+@return A @ref jx expression representing the next result, or null if the end of stream has been reached.
 */
-struct nvpair *catalog_query_read(struct catalog_query *q, time_t stoptime);
+struct jx *catalog_query_read(struct catalog_query *q, time_t stoptime);
 
 /** Delete a completed query object.
 @param q The query to delete.

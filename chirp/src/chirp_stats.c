@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "hash_table.h"
 #include "link.h"
+#include "jx.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -54,7 +55,7 @@ void chirp_stats_collect(const char *addr, const char *subject, UINT64_T ops, UI
 	total_bytes_written += bytes_written;
 }
 
-void chirp_stats_summary(buffer_t *B)
+void chirp_stats_summary( struct jx *j )
 {
 	char *addr;
 	struct chirp_stats *s;
@@ -62,16 +63,24 @@ void chirp_stats_summary(buffer_t *B)
 	if(!stats_table)
 		stats_table = hash_table_create(0, 0);
 
-	buffer_putfstring(B, "bytes_written %" PRIu64 "\n", total_bytes_written);
-	buffer_putfstring(B, "bytes_read %" PRIu64 "\n", total_bytes_read);
-	buffer_putfstring(B, "total_ops %" PRIu64 "\n", total_ops);
+	jx_insert_integer(j,"bytes_written",total_bytes_written);
+	jx_insert_integer(j,"bytes_read",total_bytes_read);
+	jx_insert_integer(j,"total_ops",total_ops);
 
-	buffer_putliteral(B, "clients ");
+	struct jx *arr = jx_array(0);
+
 	hash_table_firstkey(stats_table);
 	while(hash_table_nextkey(stats_table, &addr, (void **) &s)) {
-		buffer_putfstring(B, "%s,1,1,%" PRIu64 ",%" PRIu64 ",%" PRIu64 "; ", s->addr, s->ops, s->bytes_read, s->bytes_written);
+		// there may be a large number of clients,
+		// so we used a brief notation to keep the doc size down.
+		struct jx *c = jx_object(0);
+		jx_insert_string(c,"a",addr);
+		jx_insert_integer(c,"o",s->ops);
+		jx_insert_integer(c,"r",s->bytes_read);
+		jx_insert_integer(c,"w",s->bytes_written);
+		jx_array_insert(arr,c);
 	}
-	buffer_putliteral(B, "\n");
+	jx_insert(j,jx_string("clients"),arr);
 }
 
 void chirp_stats_cleanup()

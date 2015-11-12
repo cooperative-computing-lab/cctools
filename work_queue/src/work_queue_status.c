@@ -11,8 +11,9 @@ See the file COPYING for details.
 #include "debug.h"
 #include "catalog_query.h"
 #include "domain_name_cache.h"
-#include "nvpair.h"
-#include "link_nvpair.h"
+#include "jx_table.h"
+#include "jx_print.h"
+#include "jx_parse.h"
 #include "link.h"
 #include "getopt.h"
 #include "stringtools.h"
@@ -35,51 +36,50 @@ typedef enum {
 	QUERY_MASTER_RESOURCES
 } query_t;
 
-#define CATALOG_SIZE 50 //size of the array of nvpair pointers
+#define CATALOG_SIZE 50 //size of the array of jx pointers
 
 static format_t format_mode = FORMAT_TABLE;
 static query_t query_mode = NO_QUERY;
 static int work_queue_status_timeout = 300;
 static char *catalog_host = NULL;
 static int catalog_port = 0;
-static int resource_mode = 0;
 int catalog_size = CATALOG_SIZE;
-static struct nvpair **global_catalog = NULL; //pointer to an array of nvpair pointers
+static struct jx **global_catalog = NULL; //pointer to an array of jx pointers
 
-static struct nvpair_header queue_headers[] = {
-	{"project",       "PROJECT", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 18},
-	{"name",          "HOST",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 21},
-	{"port",          "PORT",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 5},
-	{"tasks_waiting", "WAITING",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
-	{"tasks_running",  "RUNNING",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
-	{"tasks_complete","COMPLETE",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8},
-	{"workers",       "WORKERS", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
-	{NULL,NULL,0,0,0}
+static struct jx_table queue_headers[] = {
+{"project",       "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 18},
+{"name",          "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 21},
+{"port",          "PORT",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 5},
+{"tasks_waiting", "WAITING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{"tasks_running", "RUNNING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{"tasks_complete","COMPLETE",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 8},
+{"workers",       "WORKERS", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{NULL,NULL,0,0,0}
 };
 
-static struct nvpair_header task_headers[] = {
-	{"taskid",       "ID",      NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 8},
-	{"state",        "STATE",   NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,  8},
-	{"priority",     "PRIORITY",NVPAIR_MODE_STRING, NVPAIR_ALIGN_RIGHT, 8},
-	{"host",         "HOST",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 24},
-	{"command",      "COMMAND", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 30},
-	{NULL,NULL,0,0,0}
+static struct jx_table task_headers[] = {
+{"taskid",       "ID",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
+{"state",        "STATE",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,  8},
+{"priority",     "PRIORITY",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 8},
+{"host",         "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 24},
+{"command",      "COMMAND", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 30},
+{NULL,NULL,0,0,0}
 };
 
-static struct nvpair_header worker_headers[] = {
-	{"hostname",             "HOST",    NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 24},
-	{"address_port",             "ADDRESS", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,16},
-	{"total_tasks_complete",       "COMPLETED",   NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 9},
-	{"total_tasks_running",        "RUNNING",   NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT,8},
-	{NULL,NULL,0,0,0}
+static struct jx_table worker_headers[] = {
+{"hostname",            "HOST",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 24},
+{"address_port",        "ADDRESS",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,16},
+{"total_tasks_complete","COMPLETED",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 9},
+{"total_tasks_running", "RUNNING",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,8},
+{NULL,NULL,0,0,0}
 };
 
-static struct nvpair_header master_resource_headers[] = {
-	{"project",	"MASTER",	NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 30},
-	{"cores_total",	"CORES",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 10},
-	{"memory_total",	"MEMORY",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 15},
-	{"disk_total",	"DISK",	NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 20},
-	{NULL,NULL,0,0,0}
+static struct jx_table master_resource_headers[] = {
+{"project",     "MASTER", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 30},
+{"cores_total", "CORES",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"memory_total","MEMORY", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 15},
+{"disk_total",  "DISK",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 20},
+{NULL,NULL,0,0,0}
 };
 
 static void show_help(const char *progname)
@@ -168,7 +168,6 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			break;
 		case 'R':
 			query_mode = QUERY_MASTER_RESOURCES;
-			resource_mode = 1;
 			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
@@ -208,7 +207,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 
 void resize_catalog(size_t new_size)
 {
-	struct nvpair **temp_ptr = NULL;
+	struct jx **temp_ptr = NULL;
 	temp_ptr = realloc(global_catalog,(sizeof(*global_catalog)*new_size + 1)); //add one for NULL stub at the end.
 
 	if(!temp_ptr)
@@ -221,8 +220,8 @@ void resize_catalog(size_t new_size)
 int get_masters(time_t stoptime)
 {
 	struct catalog_query *cq;
-	struct nvpair *nv;
-	int i = 0; //nvpair pointer array iterator
+	struct jx *j;
+	int i = 0; //jx pointer array iterator
 	if(!catalog_host) {
 		catalog_host = strdup(CATALOG_HOST);
 		catalog_port = CATALOG_PORT;
@@ -232,15 +231,15 @@ int get_masters(time_t stoptime)
 	if(!cq)
 		fatal("failed to query catalog server %s:%d: %s \n",catalog_host,catalog_port,strerror(errno));
 
-	while((nv = catalog_query_read(cq,stoptime))) {
+	while((j = catalog_query_read(cq,stoptime))) {
 		if(i == catalog_size)
 			resize_catalog( catalog_size * 2 );
 
-		if(strcmp(nvpair_lookup_string(nv, "type"), "wq_master") == 0) {
-			global_catalog[i] = nv; // make the global catalog point to this memory that nv references
-			i++;                    // only increment i when a master nvpair is found
+		if(strcmp(jx_lookup_string(j, "type"), "wq_master") == 0) {
+			global_catalog[i] = j; // make the global catalog point to this memory that j references
+			i++;                    // only increment i when a master jx is found
 		} else{
-			nvpair_delete(nv);
+			jx_delete(j);
 		}
 	}
 
@@ -257,7 +256,7 @@ void global_catalog_cleanup()
 	int i = 0;
 	while(global_catalog[i] != NULL)
 	{
-		nvpair_delete(global_catalog[i]);
+		jx_delete(global_catalog[i]);
 		i++;
 	}
 	free(global_catalog);
@@ -276,7 +275,7 @@ void add_child_relation(const char *name, int spaces, char *buffer, size_t max_s
 	strncat(buffer + spaces, name, max_size - spaces);
 }
 
-int find_child_relations(int spaces, const char *host, int port, time_t stoptime)
+int find_child_relations(int spaces, const char *host, int port, struct jx_table *headers, time_t stoptime)
 {
 	int i = 0; //global_catalog iterator
 	char full_address[1024];
@@ -291,28 +290,30 @@ int find_child_relations(int spaces, const char *host, int port, time_t stoptime
 
 	while(global_catalog[i] != NULL)
 	{
-		const char *temp_my_master = nvpair_lookup_string(global_catalog[i], "my_master");
+		const char *temp_my_master = jx_lookup_string(global_catalog[i], "my_master");
 
 		if(temp_my_master && !strcmp(temp_my_master, full_address))
 		{
-			const char *project_name = nvpair_lookup_string(global_catalog[i], "project");
+			struct jx *jproject = jx_lookup(global_catalog[i],"project");
+			const char *project_name = jproject->string_value;
+
 			int branch_len = strlen(project_name) + spaces + 2;
 
 			char *branch = malloc(branch_len);
 			add_child_relation(project_name, spaces, branch, branch_len);
 
 			// update project_name
-			nvpair_remove(global_catalog[i], project_name);
-			nvpair_insert_string(global_catalog[i], "project", branch);
+			free(jproject->string_value);
+			jproject->string_value = branch;
 
-			if(resource_mode)
-				nvpair_print_table(global_catalog[i], stdout, master_resource_headers);
-			else if(format_mode == FORMAT_TABLE)
-				nvpair_print_table(global_catalog[i], stdout, queue_headers);
+			if(format_mode==FORMAT_TABLE) {
+				jx_table_print(headers,global_catalog[i], stdout);
+			}
 
 			find_child_relations(spaces + 1,
-					nvpair_lookup_string(global_catalog[i], "name"),
-					atoi(nvpair_lookup_string(global_catalog[i], "port")),
+					jx_lookup_string(global_catalog[i], "name"),
+					atoi(jx_lookup_string(global_catalog[i], "port")),
+					headers,
 					stoptime);
 		}
 		i++;
@@ -321,31 +322,35 @@ int find_child_relations(int spaces, const char *host, int port, time_t stoptime
 	return 1;
 }
 
-int do_catalog_query(const char *project_name, time_t stoptime )
+int do_catalog_query(const char *project_name, struct jx_table *headers, time_t stoptime )
 {
 	int i = 0; //global_catalog iterator
+	int first = 1;
 
-	if(resource_mode == 0 && format_mode == FORMAT_TABLE) nvpair_print_table_header(stdout, queue_headers);
-	else if(resource_mode) nvpair_print_table_header(stdout, master_resource_headers);
-
+	if(format_mode==FORMAT_TABLE) {
+		jx_table_print_header(headers,stdout);
+	} else {
+		printf("[\n");
+	}
 
 	while(global_catalog[i] != NULL){
-		if(!(resource_mode || format_mode == FORMAT_TABLE)){ //long options
-			nvpair_print_text(global_catalog[i], stdout);
-		}else{
-			const char *temp_my_master = nvpair_lookup_string(global_catalog[i], "my_master");
+		if(format_mode==FORMAT_LONG) {
+			if(first) {
+				first = 0;
+			} else {
+				printf(",\n");
+			}
+			jx_print_stream(global_catalog[i], stdout);
+		} else if(format_mode==FORMAT_TABLE) {
+			const char *temp_my_master = jx_lookup_string(global_catalog[i], "my_master");
 			if( !temp_my_master || !strcmp(temp_my_master, "127.0.0.1:-1") ) { //this master has no master
 
-				if(!project_name || whole_string_match_regex(nvpair_lookup_string(global_catalog[i], "project"), project_name)) {
-					if(resource_mode) {
-						debug(D_WQ,"%s resources -- cores:%s memory:%s disk:%s\n",nvpair_lookup_string(global_catalog[i],"project"),nvpair_lookup_string(global_catalog[i],"cores_total"),nvpair_lookup_string(global_catalog[i],"memory_total"),nvpair_lookup_string(global_catalog[i],"disk_total"));
-						nvpair_print_table(global_catalog[i], stdout, master_resource_headers);
-					}else if(format_mode == FORMAT_TABLE){
-						nvpair_print_table(global_catalog[i], stdout, queue_headers);
-					}
+				if(!project_name || whole_string_match_regex(jx_lookup_string(global_catalog[i], "project"), project_name)) {
+					jx_table_print(headers,global_catalog[i], stdout);
 					find_child_relations(1,
-							nvpair_lookup_string(global_catalog[i], "name"),
-							atoi(nvpair_lookup_string(global_catalog[i], "port")),
+							jx_lookup_string(global_catalog[i], "name"),
+							jx_lookup_integer(global_catalog[i], "port"),
+							headers,
 							stoptime);
 				}
 			}
@@ -354,9 +359,9 @@ int do_catalog_query(const char *project_name, time_t stoptime )
 	}
 
 	if(format_mode == FORMAT_TABLE){
-		nvpair_print_table_footer(stdout, queue_headers);
-	}else if(resource_mode){
-		nvpair_print_table_footer(stdout, master_resource_headers);
+		jx_table_print_footer(headers,stdout);
+	} else {
+		printf("\n]\n");
 	}
 	global_catalog_cleanup();
 	return EXIT_SUCCESS;
@@ -364,14 +369,13 @@ int do_catalog_query(const char *project_name, time_t stoptime )
 
 int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 {
-	static struct nvpair_header *query_headers[] = { [QUERY_QUEUE] = queue_headers, task_headers, worker_headers, master_resource_headers };
+	static struct jx_table *query_headers[] = { [QUERY_QUEUE] = queue_headers, task_headers, worker_headers, master_resource_headers };
 	static const char * query_strings[] = { [QUERY_QUEUE] = "queue","task","worker", "master_resource"};
 
-	struct nvpair_header *query_header = query_headers[query_mode];
+	struct jx_table *query_header = query_headers[query_mode];
 	const char * query_string = query_strings[query_mode];
 
 	struct link *l;
-	struct nvpair *nv;
 
 	char master_addr[LINK_ADDRESS_MAX];
 
@@ -386,23 +390,28 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 		return 1;
 	}
 
+	struct jx * jarray = jx_parse_link(l,stoptime);
+
 	link_putfstring(l,"%s_status\n",stoptime,query_string);
 
 	if(format_mode==FORMAT_TABLE) {
-		nvpair_print_table_header(stdout, query_header);
+		jx_table_print_header(query_header,stdout);
 	}
 
-	while((nv = link_nvpair_read(l,stoptime))) {
+	struct jx_item *i;
+	for(i=jarray->items;i;i=i->next) {
 		if(format_mode == FORMAT_TABLE) {
-			nvpair_print_table(nv, stdout, query_header);
+			jx_table_print(query_header,i->value,stdout);
 		} else {
-			nvpair_print_text(nv, stdout);
+			// XXX need to print the whole array syntax
+			jx_print_stream(i->value,stdout);
 		}
-		nvpair_delete(nv);
 	}
+
+	jx_delete(jarray);
 
 	if(format_mode == FORMAT_TABLE) {
-		nvpair_print_table_footer(stdout, query_header);
+		jx_table_print_footer(query_header,stdout);
 	}
 
 	return EXIT_SUCCESS;
@@ -427,7 +436,13 @@ int main(int argc, char *argv[])
 	} else {
 		global_catalog = malloc(sizeof(*global_catalog)*CATALOG_SIZE); //only malloc if catalog queries are being done
 		get_masters(stoptime);
-		return do_catalog_query(project_name, stoptime);
+		struct jx_table *h;
+		if(query_mode==QUERY_MASTER_RESOURCES) {
+			h = master_resource_headers;
+		} else {
+			h = queue_headers;
+		}
+		return do_catalog_query(project_name,h,stoptime);
 	}
 }
 

@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <signal.h>
 
-static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
+static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
 {
 	batch_job_id_t jobid;
 
@@ -38,7 +38,7 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		}*/
 
 		if(envlist) {
-			nvpair_export(envlist);
+			jx_export(envlist);
 		}
 
 		/** A note from "man system 3" as of Jan 2012:

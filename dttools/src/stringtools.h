@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stdarg.h>
 
 typedef char *(*string_subst_lookup_t) (const char *name, void *arg);
 
@@ -56,7 +57,8 @@ char *string_signal(int sig);
 void string_tolower(char *str);
 void string_toupper(char *str);
 int string_isspace(const char *str);
-int string_is_integer(const char *str);
+int string_is_integer(const char *str, long long *integer_value );
+int string_is_float(const char *str, double *double_value );
 void string_replace_backslash_codes(const char *instr, char *outstr);
 
 /** Replace instances of %% in a string with the string 'replace'.

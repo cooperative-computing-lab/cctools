@@ -25,8 +25,9 @@ See the file COPYING for details.
 #include "path.h"
 #include "buffer.h"
 
-#include "json.h"
-#include "json_aux.h"
+#include "jx.h"
+#include "jx_parse.h"
+#include "jx_table.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -83,23 +84,23 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 {
 	int needed_workers=0;
 	int masters=0;
-	struct nvpair *nv;
+	struct jx *j;
 
 	if(!masters_list) {
 		return needed_workers;
 	}
 
 	list_first_item(masters_list);
-	while((nv=list_next_item(masters_list))) {
+	while((j=list_next_item(masters_list))) {
 
-		const char *project =   nvpair_lookup_string(nv,"project");
-		const char *host =   nvpair_lookup_string(nv,"name");
-		const int  port =    nvpair_lookup_integer(nv,"port");
-		const char *owner =  nvpair_lookup_string(nv,"owner");
-		const int tr =       nvpair_lookup_integer(nv,"tasks_running");
-		const int tw =       nvpair_lookup_integer(nv,"tasks_waiting");
-		const int tl =       nvpair_lookup_integer(nv,"tasks_left");
-		const int capacity = nvpair_lookup_integer(nv,"capacity");
+		const char *project =jx_lookup_string(j,"project");
+		const char *host =   jx_lookup_string(j,"name");
+		const int  port =    jx_lookup_integer(j,"port");
+		const char *owner =  jx_lookup_string(j,"owner");
+		const int tr =       jx_lookup_integer(j,"tasks_running");
+		const int tw =       jx_lookup_integer(j,"tasks_waiting");
+		const int tl =       jx_lookup_integer(j,"tasks_left");
+		const int capacity = jx_lookup_integer(j,"capacity");
 
 		int tasks = tr+tw+tl;
 
@@ -193,14 +194,14 @@ static void update_blacklisted_workers( struct batch_queue *queue, struct list *
 		return;
 
 	buffer_t b;
-	struct nvpair *nv;
+	struct jx *j;
 
 	buffer_init(&b);
 
 	char *sep = "";
 	list_first_item(masters_list);
-	while((nv=list_next_item(masters_list))) {
-		const char *blacklisted = nvpair_lookup_string(nv,"workers-blacklisted");
+	while((j=list_next_item(masters_list))) {
+		const char *blacklisted = jx_lookup_string(j,"workers-blacklisted");
 		if(blacklisted) {
 			buffer_printf(&b, "%s%s", sep, blacklisted);
 			sep = " ";
@@ -247,16 +248,15 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 
 }
 
-
-static struct nvpair_header queue_headers[] = {
-	{"project",       "PROJECT", NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT, 18},
-	{"name",          "HOST",    NVPAIR_MODE_STRING,  NVPAIR_ALIGN_LEFT, 21},
-	{"port",          "PORT",    NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 5},
-	{"tasks_waiting", "WAITING", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
-	{"tasks_running", "RUNNING", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
-	{"tasks_complete","COMPLETE",NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 8},
-	{"workers",       "WORKERS", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_RIGHT, 7},
-	{NULL,NULL,0,0,0}
+static struct jx_table queue_headers[] = {
+{"project",       "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 18},
+{"name",          "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 21},
+{"port",          "PORT",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 5},
+{"tasks_waiting", "WAITING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{"tasks_running", "RUNNING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{"tasks_complete","COMPLETE",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 8},
+{"workers",       "WORKERS", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{NULL,NULL,0,0,0}
 };
 
 void print_stats(struct list *masters, struct list *foremen, int submitted, int needed, int requested)
@@ -284,18 +284,17 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 		return;
 	}
 
-	nvpair_print_table_header(stdout, queue_headers);
+	jx_table_print_header(queue_headers,stdout);
 
-	struct nvpair *nv;
+	struct jx *j;
 	if(masters && list_size(masters) > 0)
 	{
 		fprintf(stdout, "masters:\n");
 
 		list_first_item(masters);
-		while((nv = list_next_item(masters)))
+		while((j = list_next_item(masters)))
 		{
-			nvpair_print_table(nv, stdout, queue_headers);
-
+			jx_table_print(queue_headers, j, stdout);
 		}
 	}
 
@@ -304,9 +303,9 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 		fprintf(stdout, "foremen:\n");
 
 		list_first_item(foremen);
-		while((nv = list_next_item(foremen)))
+		while((j = list_next_item(foremen)))
 		{
-			nvpair_print_table(nv, stdout, queue_headers);
+			jx_table_print(queue_headers, j, stdout);
 
 		}
 	}
@@ -317,9 +316,9 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 void delete_projects_list(struct list *l)
 {
 	if(l) {
-		struct nvpair *nv;
-		while((nv=list_pop_head(l))) {
-			nvpair_delete(nv);
+		struct jx *j;
+		while((j=list_pop_head(l))) {
+			jx_delete(j);
 		}
 		list_delete(l);
 	}
@@ -328,10 +327,10 @@ void delete_projects_list(struct list *l)
 #define assign_new_value(new_var, old_var, option, type_c, type_json, field) \
 	type_c new_var = old_var;\
 	{\
-		json_value *jv = jsonA_getname_raw(J, #option);\
+		struct jx *jv = jx_lookup(J,#option); \
 		if(jv) {\
-			if(jistype(jv, type_json)) {\
-				new_var = jv->u.field;\
+			if(jv->type==type_json) {\
+				new_var = jv->field;\
 			} else {\
 				debug(D_NOTICE, #option " has not a valid value.");\
 				error_found = 1;\
@@ -353,31 +352,29 @@ int read_config_file(const char *config_file) {
 		return 1;
 	}
 
-	json_value *J = NULL;
 	int error_found = 0;
 
-	J = jsonA_parse_file(config_file);
+	struct jx *J = jx_parse_file(config_file);
 
-	if(!J || !jistype(J, json_object)) {
+	if(!J || J->type!=JX_OBJECT) {
 		debug(D_NOTICE, "Configuration file is not a valid json object: %s\n", config_file);
 		return 0;
 	}
 
-	assign_new_value(new_workers_max, workers_max, max-workers, int, json_integer, integer)
-	assign_new_value(new_workers_min, workers_min, min-workers, int, json_integer, integer)
-	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, json_integer, integer)
+	assign_new_value(new_workers_max, workers_max, max-workers, int, JX_INTEGER, integer_value)
+	assign_new_value(new_workers_min, workers_min, min-workers, int, JX_INTEGER, integer_value)
+	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, JX_INTEGER, integer_value)
 
-	assign_new_value(new_num_cores_option, num_cores_option, cores,    int, json_integer, integer)
-	assign_new_value(new_num_disk_option, num_disk_option, disk,       int, json_integer, integer)
-	assign_new_value(new_num_memory_option, num_memory_option, memory, int, json_integer, integer)
+	assign_new_value(new_num_cores_option, num_cores_option, cores,    int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_disk_option, num_disk_option, disk,       int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_memory_option, num_memory_option, memory, int, JX_INTEGER, integer_value)
 
 
-	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, json_double, dbl)
+	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_DOUBLE, double_value)
 
-	assign_new_value(new_project_regex, project_regex, master-name, const char *, json_string, string.ptr)
-	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, json_string, string.ptr)
-	assign_new_value(new_extra_worker_args, extra_worker_args, worker-extra-options, const char *, json_string, string.ptr)
-
+	assign_new_value(new_project_regex, project_regex, master-name, const char *, JX_STRING, string_value)
+	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, JX_STRING, string_value)
+	assign_new_value(new_extra_worker_args, extra_worker_args, worker-extra-options, const char *, JX_STRING, string_value)
 
 	if(!new_project_regex || strlen(new_project_regex) == 0) {
 		debug(D_NOTICE, "%s: master name is missing.\n", config_file);
@@ -457,7 +454,7 @@ int read_config_file(const char *config_file) {
 	}
 
 end:
-	json_value_free(J);
+	jx_delete(J);
 	return !error_found;
 }
 

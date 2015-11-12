@@ -659,14 +659,18 @@ void string_toupper(char *s)
 	}
 }
 
-int string_is_integer(const char *s)
+int string_is_integer( const char *s, long long *integer_value )
 {
-	while(*s) {
-		if(!isdigit((int) *s))
-			return 0;
-		s++;
-	}
-	return 1;
+	char *endptr;
+	*integer_value = strtoll(s,&endptr,10);
+	return !*endptr;
+}
+
+int string_is_float( const char *s, double *double_value )
+{
+	char *endptr;
+	*double_value = strtod(s,&endptr);
+	return !*endptr;
 }
 
 int string_isspace(const char *s)
@@ -810,22 +814,23 @@ int getDateString(char *str)
 		return 1;
 }
 
-char *string_format(const char *fmt, ...)
+char * string_format( const char *fmt, ... )
 {
-	va_list va;
+	va_list args;
 
-	va_start(va, fmt);
-	int n = vsnprintf(NULL, 0, fmt, va);
-	va_end(va);
+	va_start(args,fmt);
+	int n = vsnprintf(NULL, 0, fmt, args);
+	va_end(args);
 
 	if(n < 0)
 		return NULL;
 
 	char *str = xxmalloc((n + 1) * sizeof(char));
-	va_start(va, fmt);
-	n = vsnprintf(str, n + 1, fmt, va);
+	va_start(args,fmt);
+	n = vsnprintf(str, n + 1, fmt, args);
+	va_end(args);
+
 	assert(n >= 0);
-	va_end(va);
 
 	return str;
 }

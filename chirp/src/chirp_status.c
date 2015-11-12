@@ -6,11 +6,12 @@ See the file COPYING for details.
 */
 
 #include "catalog_query.h"
+#include "jx_table.h"
+#include "jx_print.h"
 #include "cctools.h"
 #include "debug.h"
 #include "getopt_aux.h"
 #include "link.h"
-#include "nvpair.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
@@ -26,14 +27,14 @@ enum {
 	MODE_TOTAL,
 };
 
-static struct nvpair_header headers[] = {
-	{"type", "TYPE", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
-	{"name", "NAME", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 25},
-	{"port", "PORT", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 5},
-	{"owner", "OWNER", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 10},
-	{"version", "VERSION", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 8},
-	{"total", "TOTAL", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
-	{"avail", "AVAIL", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 8},
+static struct jx_table headers[] = {
+	{"type", "TYPE", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
+	{"name", "NAME", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 25},
+	{"port", "PORT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 5},
+	{"owner", "OWNER", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+	{"version", "VERSION", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
+	{"total", "TOTAL", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_RIGHT, 8},
+	{"avail", "AVAIL", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_RIGHT, 8},
 	{0, 0, 0, 0, 0}
 };
 
@@ -56,16 +57,16 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
-int compare_entries(struct nvpair **a, struct nvpair **b)
+int compare_entries(struct jx **a, struct jx **b)
 {
 	int result;
 	const char *x, *y;
 
-	x = nvpair_lookup_string(*a, "type");
+	x = jx_lookup_string(*a, "type");
 	if(!x)
 		x = "unknown";
 
-	y = nvpair_lookup_string(*b, "type");
+	y = jx_lookup_string(*b, "type");
 	if(!y)
 		y = "unknown";
 
@@ -73,18 +74,18 @@ int compare_entries(struct nvpair **a, struct nvpair **b)
 	if(result != 0)
 		return result;
 
-	x = nvpair_lookup_string(*a, "name");
+	x = jx_lookup_string(*a, "name");
 	if(!x)
 		x = "unknown";
 
-	y = nvpair_lookup_string(*b, "name");
+	y = jx_lookup_string(*b, "name");
 	if(!y)
 		y = "unknown";
 
 	return strcasecmp(x, y);
 }
 
-static struct nvpair *table[10000];
+static struct jx *table[10000];
 
 int main(int argc, char *argv[])
 {
@@ -112,7 +113,7 @@ int main(int argc, char *argv[])
 	};
 
 	struct catalog_query *q;
-	struct nvpair *n;
+	struct jx *j;
 	time_t timeout = 60, stoptime;
 	const char *catalog_host = 0;
 	int i;
@@ -202,17 +203,21 @@ int main(int argc, char *argv[])
 	}
 
 	if(mode == MODE_TABLE) {
-		nvpair_print_table_header(stdout, headers);
+		jx_table_print_header(headers,stdout);
+	} else if(mode==MODE_LONG) {
+		printf("[\n");
 	}
 
-	while((n = catalog_query_read(q, stoptime))) {
-		table[count++] = n;
+	while((j = catalog_query_read(q, stoptime))) {
+		table[count++] = j;
 	}
+
+	catalog_query_delete(q);
 
 	qsort(table, count, sizeof(*table), (int (*)(const void *, const void *)) compare_entries);
 
 	for(i = 0; i < count; i++) {
-		const char *etype = nvpair_lookup_string(table[i], "type");
+		const char *etype = jx_lookup_string(table[i], "type");
 		if(!show_all_types) {
 			if(etype) {
 				if(!strcmp(etype, "chirp") || !strcmp(etype, "catalog")) {
@@ -225,37 +230,42 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		const char *lastheardfrom = nvpair_lookup_string(table[i], "lastheardfrom");
+		const char *lastheardfrom = jx_lookup_string(table[i], "lastheardfrom");
 		if (lastheardfrom && (time_t)strtoul(lastheardfrom, NULL, 10) < server_lastheardfrom)
 			continue;
 
-		const char *avail = nvpair_lookup_string(table[i], "avail");
+		const char *avail = jx_lookup_string(table[i], "avail");
 		if (avail && strtoul(avail, NULL, 10) < server_avail)
 			continue;
 
-		const char *project = nvpair_lookup_string(table[i], "project");
+		const char *project = jx_lookup_string(table[i], "project");
 		if (server_project && (project == NULL || !(strcmp(project, server_project) == 0)))
 			continue;
 
 		if(filter_name) {
-			const char *v = nvpair_lookup_string(table[i], filter_name);
+			const char *v = jx_lookup_string(table[i], filter_name);
 			if(!v || strcmp(filter_value, v))
 				continue;
 		}
 
 		if(mode == MODE_SHORT) {
-			const char *t = nvpair_lookup_string(table[i], "type");
+			const char *t = jx_lookup_string(table[i], "type");
 			if(t && !strcmp(t, "chirp")) {
-				printf("%s:%d\n", nvpair_lookup_string(table[i], "name"), (int) nvpair_lookup_integer(table[i], "port"));
+				printf("%s:%d\n", jx_lookup_string(table[i], "name"), (int) jx_lookup_integer(table[i], "port"));
 			}
 		} else if(mode == MODE_LONG) {
-			nvpair_print_text(table[i], stdout);
+			if(i!=0) printf(",\n");
+			jx_print_stream(table[i],stdout);
 		} else if(mode == MODE_TABLE) {
-			nvpair_print_table(table[i], stdout, headers);
+			jx_table_print(headers, table[i], stdout);
 		} else if(mode == MODE_TOTAL) {
-			sum_avail += nvpair_lookup_integer(table[i], "avail");
-			sum_total += nvpair_lookup_integer(table[i], "total");
+			sum_avail += jx_lookup_integer(table[i], "avail");
+			sum_total += jx_lookup_integer(table[i], "total");
 		}
+	}
+
+	for(i=0;i<count;i++) {
+		jx_delete(table[i]);
 	}
 
 	if(mode == MODE_TOTAL) {
@@ -263,10 +273,10 @@ int main(int argc, char *argv[])
 		printf("TOTAL: %6sB\n", string_metric(sum_total, -1, 0));
 		printf("AVAIL: %6sB\n", string_metric(sum_avail, -1, 0));
 		printf("INUSE: %6sB\n", string_metric(sum_total - sum_avail, -1, 0));
-	}
-
-	if(mode == MODE_TABLE) {
-		nvpair_print_table_footer(stdout, headers);
+	} else if(mode == MODE_TABLE) {
+		jx_table_print_footer(headers,stdout);
+	} else if(mode==MODE_LONG) {
+		printf("\n]\n");
 	}
 
 	return 0;

@@ -314,11 +314,12 @@ void nvpair_database_insert( struct nvpair_database *db, const char *key, struct
 	if(db->logdir) {
 		if(old) {
 			log_updates(db,key,old,nv);
-			nvpair_delete(old);
 		} else {
 			log_create(db,key,nv);
 		}
 	}
+
+	if(old) nvpair_delete(old);
 
 	log_flush(db);
 }

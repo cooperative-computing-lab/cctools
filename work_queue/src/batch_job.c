@@ -172,7 +172,7 @@ const char *batch_queue_type_string()
 }
 
 
-batch_job_id_t batch_job_submit(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
+batch_job_id_t batch_job_submit(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
 {
 	return q->module->job.submit(q, cmd, extra_input_files, extra_output_files, envlist);
 }

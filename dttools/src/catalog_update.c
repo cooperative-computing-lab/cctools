@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "buffer.h"
+#include "jx_print.h"
 #include "catalog_query.h"
 #include "datagram.h"
 #include "debug.h"
@@ -21,8 +21,6 @@ See the file COPYING for details.
 #include <string.h>
 #include <unistd.h>
 #include <sys/utsname.h>
-
-#define DEFAULT_TYPE	"node"
 
 void show_help(const char *cmd) {
 	fprintf(stdout, "Use: %s [options] <name=value> ...\n", cmd);
@@ -57,12 +55,6 @@ int main(int argc, char *argv[]) {
 		fatal("could not create datagram port!");
 	}
 
-	buffer_t B;
-	const char *text;
-	size_t text_size;
-	buffer_init(&B);
-	buffer_abortonfailure(&B, 1);
-
 	struct utsname name;
 	int cpus;
 	int uptime;
@@ -80,21 +72,21 @@ int main(int argc, char *argv[]) {
 	uptime = uptime_get();
 	username_get(owner);
 
-	buffer_printf(&B, "type %s\nversion %d.%d.%d\ncpu %s\nopsys %s\nopsysversion %s\nload1 %0.02lf\nload5 %0.02lf\nload15 %0.02lf\nmemory_total %llu\nmemory_avail %llu\ncpus %d\nuptime %d\nowner %s\n",
-		DEFAULT_TYPE,
-		CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO,
-		name.machine,
-		name.sysname,
-		name.release,
-		load[0],
-		load[1],
-		load[2],
-		(unsigned long long) memory_total,
-		(unsigned long long) memory_avail,
-		cpus,
-		uptime,
-		owner
-	);
+	struct jx *j = jx_object(0);
+
+	jx_insert_string(j,"type","node");
+	jx_insert(j,jx_string("version"),jx_format("%d.%d.%d",CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO));
+	jx_insert_string(j,"cpu",name.machine);
+	jx_insert_string(j,"opsys",name.sysname);
+	jx_insert_string(j,"opsysversion",name.release);
+	jx_insert_double(j,"load1",load[0]);
+	jx_insert_double(j,"load5",load[1]);
+	jx_insert_double(j,"load15",load[2]);
+	jx_insert_integer(j,"memory_total",memory_total);
+	jx_insert_integer(j,"memory_avail",memory_avail);
+	jx_insert_integer(j,"cpus",cpus);
+	jx_insert_integer(j,"uptime,",uptime);
+	jx_insert_string(j,"owner",owner);
 
 	int i;
 	for (i = optind; i < argc; i++) {
@@ -108,20 +100,19 @@ int main(int argc, char *argv[]) {
 		} else {
 			*value++ = 0;
 		}
-
-		buffer_printf(&B, "%s %s\n", name, value);
+		jx_insert_string(j,name,value);
 	}
 
-		text = buffer_tolstring(&B, &text_size);
+	char *text = jx_print_string(j);
 
 	char address[DATAGRAM_ADDRESS_MAX];
 	if (domain_name_cache_lookup(host, address)) {
-		datagram_send(d, text, text_size, address, port);
+		datagram_send(d, text, strlen(text), address, port);
 	} else {
 		fatal("unable to lookup address of host: %s", host);
 	}
 
-	buffer_free(&B);
+	jx_delete(j);
 	datagram_delete(d);
 	return EXIT_SUCCESS;
 }

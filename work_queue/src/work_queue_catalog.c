@@ -7,7 +7,7 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 
 #include "catalog_query.h"
-#include "nvpair.h"
+#include "jx.h"
 #include "list.h"
 #include "debug.h"
 #include "stringtools.h"
@@ -46,7 +46,7 @@ int work_queue_catalog_parse( char *server_string, char **host, int *port )
 
 /*
 Query the catalog for all WQ masters whose project name matches the given regex.
-Return a linked list of nvpairs describing the masters.
+Return a linked list of jx expressions describing the masters.
 */
 
 struct list * work_queue_catalog_query( const char *catalog_host, int catalog_port, const char *project_regex )
@@ -61,26 +61,26 @@ struct list * work_queue_catalog_query( const char *catalog_host, int catalog_po
 
 	struct list *masters_list = list_create();
 
-	// for each nvpair returned by the query
-	struct nvpair *nv;
-	while((nv = catalog_query_read(q, stoptime))) {
+	// for each expression returned by the query
+	struct jx *j;
+	while((j = catalog_query_read(q, stoptime))) {
 
 		// if it is a WQ master...
-		const char *nv_type = nvpair_lookup_string(nv,"type");
-		if(nv_type && !strcmp(nv_type,"wq_master")) {
+		const char *type = jx_lookup_string(j,"type");
+		if(type && !strcmp(type,"wq_master")) {
 
 			// and the project name matches...
-			const char *nv_project = nvpair_lookup_string(nv,"project");
-			if(nv_project && whole_string_match_regex(nv_project,project_regex)) {
+			const char *project = jx_lookup_string(j,"project");
+			if(project && whole_string_match_regex(project,project_regex)) {
 
 				// put the item in the list.
-				list_push_head(masters_list,nv);
+				list_push_head(masters_list,j);
 				continue;
 			}
 		}
 
-		// we reach here unless nv is push into masters_list
-		nvpair_delete(nv);
+		// we reach here unless j is push into masters_list
+		jx_delete(j);
 	}
 
 	catalog_query_delete(q);
@@ -105,9 +105,9 @@ struct list *work_queue_catalog_query_cached( const char *catalog_host, int cata
 	prev_regex = xxstrdup(project_regex);
 
 	if(masters_list) {
-		struct nvpair *nv;
-		while((nv=list_pop_head(masters_list))) {
-			nvpair_delete(nv);
+		struct jx *j;
+		while((j=list_pop_head(masters_list))) {
+			jx_delete(j);
 		}
 		list_delete(masters_list);
 	}

@@ -5,7 +5,7 @@
 #include "stringtools.h"
 #include "process.h"
 #include "xxmalloc.h"
-#include "nvpair.h"
+#include "jx.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -92,7 +92,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	return 1;
 }
 
-static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
+static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
 {
 	batch_job_id_t jobid;
 	struct batch_job_info *info;
@@ -121,7 +121,7 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	*/
 
 	if(envlist) {
-		nvpair_export(envlist);
+		jx_export(envlist);
 	}
 
 	/*
