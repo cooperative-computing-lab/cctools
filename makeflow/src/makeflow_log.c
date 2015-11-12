@@ -165,6 +165,9 @@ void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, i
 	makeflow_log_sync(d,0);
 }
 
+/** The clean_mode variable was added so that we could better print out error messages
+ * apply in the situation. Currently only used to silence node rerun checking.
+ */
 void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue, makeflow_clean_depth clean_mode)
 {
 	char *line, *name, file[MAX_BUFFER_SIZE];

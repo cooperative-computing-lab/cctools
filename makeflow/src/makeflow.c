@@ -198,7 +198,9 @@ static void makeflow_abort_all(struct dag *d)
 static void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
 
 /*
-Decide whether to rerun a node based on batch and file system status.
+Decide whether to rerun a node based on batch and file system status. The silent
+option was added for to prevent confusing debug output when in clean mode. When
+clean_mode is not NONE we silence the node reseting output.
 */
 
 void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n, int silent)
