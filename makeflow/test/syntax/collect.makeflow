@@ -1,3 +1,7 @@
+
+MAKEFLOW_INPUTS=""
+MAKEFLOW_OUTPUTS="_collect.7"
+
 _collect.0:
 	touch _collect.0 ; ls | wc -l > _collect.0 
 

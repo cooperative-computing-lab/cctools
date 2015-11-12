@@ -7,6 +7,9 @@
 # Copyright 2010 The University of Notre Dame. All rights reserved. See file
 # COPYING for details.
 
+MAKEFLOW_INPUTS=""
+MAKEFLOW_OUTPUTS="capitol.montage.gif"
+
 CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
 URL=http://ccl.cse.nd.edu/images/capitol.jpg

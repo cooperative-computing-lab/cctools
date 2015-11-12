@@ -1,3 +1,7 @@
+
+MAKEFLOW_INPUTS=""
+MAKEFLOW_OUTPUTS="out.all"
+
 VAR0=0
 VAR1=1
 export VAR1

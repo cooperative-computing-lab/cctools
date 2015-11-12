@@ -1,4 +1,8 @@
 # Global
+
+MAKEFLOW_INPUTS=""
+MAKEFLOW_OUTPUTS="out.all"
+
 VAR1 = 1
 
 out.0:

@@ -22,11 +22,17 @@ hello
 EOF
 
 cat > toplevel.makeflow <<EOF
+MAKEFLOW_INPUTS=input.txt
+MAKEFLOW_OUTPUTS=out.actual
+
 out.actual: input.txt
 	MAKEFLOW sublevel.makeflow
 EOF
 
 cat > sublevel.makeflow <<EOF
+MAKEFLOW_INPUTS=input.txt
+MAKEFLOW_OUTPUTS=out.actual
+
 out.1: input.txt
 	cat input.txt > out.1
 

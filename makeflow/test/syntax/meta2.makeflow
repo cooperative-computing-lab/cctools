@@ -9,6 +9,9 @@
 # Copyright 2010 The University of Notre Dame. All rights reserved. See file
 # COPYING for details.
 
+MAKEFLOW_INPUTS="typo.makeflow"
+MAKEFLOW_OUTPUTS="correct.makeflow"
+
 correct.makeflow: typo.makeflow
 	LOCAL <typo.makeflow >correct.makeflow sed "s!capital!capitol!g"
 

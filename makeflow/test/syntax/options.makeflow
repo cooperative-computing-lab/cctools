@@ -1,3 +1,7 @@
+
+MAKEFLOW_INPUTS=""
+MAKEFLOW_OUTPUTS=""
+
 uname.disc:
 BATCH_OPTIONS='requirements = MachineGroup == "disc"'
 	uname -a > uname.disc
