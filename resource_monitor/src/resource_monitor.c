@@ -137,6 +137,7 @@ See the file COPYING for details.
 #include "path.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "elfheader.h"
 
 #include "rmonitor.h"
 #include "rmonitor_poll_internal.h"
@@ -271,6 +272,58 @@ void parse_limits_file(struct rmsummary *limits, char *path)
 
 	free(s);
 }
+
+
+void rmonitor_determine_exec_type(const char *executable) {
+	char *absolute_exec = path_which(executable);
+	char exec_type[PATH_MAX];
+
+	if(!absolute_exec)
+		return;
+
+	int fd = open(absolute_exec, O_RDONLY, 0);
+	if(fd < 0) {
+		debug(D_RMON, "Could not open '%s' for reading.", absolute_exec);
+		return;
+	}
+
+	bzero(exec_type, PATH_MAX);
+	size_t n = read(fd, exec_type, sizeof(exec_type) - 1);
+
+	if(n < 1 || lseek(fd, 0, SEEK_SET) < 0) {
+		debug(D_RMON, "Could not read header of '%s'.", absolute_exec);
+		strcpy(exec_type, "unknown");
+	} else if(strncmp(exec_type, "#!", 2) == 0) {
+		char *newline = strchr(exec_type, '\n');
+		if(newline)
+			*newline = '\0';
+	} else {
+		errno = 0;
+		int rc = elf_get_interp(fd, exec_type);
+
+		if(rc < 0) {
+			if(errno == EINVAL) {
+				strcpy(exec_type, "static");
+			} else {
+				strcpy(exec_type, "unknown");
+			}
+		} else {
+			strcpy(exec_type, "dynamic");
+		}
+	}
+
+	close(fd);
+
+	if(strcmp(exec_type, "dynamic") != 0) {
+		debug(D_NOTICE, "Executable is not dynamically linked. Some resources may be undercounted, and children processes may not be tracked.");
+	}
+
+	char *type_field = string_format("executable_type: %s", exec_type);
+
+	debug(D_RMON, "%s", type_field);
+	list_push_tail(verbatim_summary_lines, type_field);
+}
+
 
 /***
  * Reference count for filesystems and working directories auxiliary functions.
@@ -1680,6 +1733,7 @@ int main(int argc, char **argv) {
 #endif
 
 	executable = xxstrdup(argv[optind]);
+	rmonitor_determine_exec_type(executable);
 
     spawn_first_process(executable, argv + optind, child_in_foreground);
     rmonitor_resources(interval);
