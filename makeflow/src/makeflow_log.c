@@ -86,7 +86,7 @@ timestamp - the unix time (in microseconds) when this line is written to the log
 These event types indicate that the workflow as a whole has started or completed in the indicated manner.
 */
 
-void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n );
+void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n, int silent );
 
 /*
 To balance between performance and consistency, we sync the log every 60 seconds
@@ -165,7 +165,10 @@ void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, i
 	makeflow_log_sync(d,0);
 }
 
-void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue)
+/** The clean_mode variable was added so that we could better print out error messages
+ * apply in the situation. Currently only used to silence node rerun checking.
+ */
+void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue, makeflow_clean_depth clean_mode)
 {
 	char *line, *name, file[MAX_BUFFER_SIZE];
 	int nodeid, state, jobid, file_state;
@@ -290,11 +293,12 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 		}
 	}
 
+	int silent = clean_mode != MAKEFLOW_GC_NONE;
 	// Decide rerun tasks
 	if(!first_run) {
 		struct itable *rerun_table = itable_create(0);
 		for(n = d->nodes; n; n = n->next) {
-			makeflow_node_decide_rerun(rerun_table, d, n);
+			makeflow_node_decide_rerun(rerun_table, d, n, silent);
 		}
 		itable_delete(rerun_table);
 	}
