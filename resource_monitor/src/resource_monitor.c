@@ -137,12 +137,13 @@ See the file COPYING for details.
 #include "path.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "elfheader.h"
 
 #include "rmonitor.h"
 #include "rmonitor_poll_internal.h"
 
 #define RESOURCE_MONITOR_USE_INOTIFY 1
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
 #include <sys/inotify.h>
 #include <sys/ioctl.h>
 #endif
@@ -178,7 +179,7 @@ struct hash_table *files;       /* Keeps track of which files have been opened. 
 
 static int   follow_chdir = 0; /* Keep track of all the working directories per process. */
 
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
 static char **inotify_watches;  /* Keeps track of created inotify watches. */
 static int alloced_inotify_watches = 0;
 #endif
@@ -273,6 +274,58 @@ void parse_limits_file(struct rmsummary *limits, char *path)
 
 	free(s);
 }
+
+
+void rmonitor_determine_exec_type(const char *executable) {
+	char *absolute_exec = path_which(executable);
+	char exec_type[PATH_MAX];
+
+	if(!absolute_exec)
+		return;
+
+	int fd = open(absolute_exec, O_RDONLY, 0);
+	if(fd < 0) {
+		debug(D_RMON, "Could not open '%s' for reading.", absolute_exec);
+		return;
+	}
+
+	bzero(exec_type, PATH_MAX);
+	size_t n = read(fd, exec_type, sizeof(exec_type) - 1);
+
+	if(n < 1 || lseek(fd, 0, SEEK_SET) < 0) {
+		debug(D_RMON, "Could not read header of '%s'.", absolute_exec);
+		strcpy(exec_type, "unknown");
+	} else if(strncmp(exec_type, "#!", 2) == 0) {
+		char *newline = strchr(exec_type, '\n');
+		if(newline)
+			*newline = '\0';
+	} else {
+		errno = 0;
+		int rc = elf_get_interp(fd, exec_type);
+
+		if(rc < 0) {
+			if(errno == EINVAL) {
+				strcpy(exec_type, "static");
+			} else {
+				strcpy(exec_type, "unknown");
+			}
+		} else {
+			strcpy(exec_type, "dynamic");
+		}
+	}
+
+	close(fd);
+
+	if(strcmp(exec_type, "dynamic") != 0) {
+		debug(D_NOTICE, "Executable is not dynamically linked. Some resources may be undercounted, and children processes may not be tracked.");
+	}
+
+	char *type_field = string_format("executable_type: %s", exec_type);
+
+	debug(D_RMON, "%s", type_field);
+	list_push_tail(verbatim_summary_lines, type_field);
+}
+
 
 /***
  * Reference count for filesystems and working directories auxiliary functions.
@@ -447,7 +500,7 @@ void rmonitor_add_file_watch(char *filename, int is_output)
 
 	hash_table_insert(files, filename, finfo);
 
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0)
 	{
 		char **new_inotify_watches;
@@ -484,7 +537,7 @@ void rmonitor_add_file_watch(char *filename, int is_output)
 
 void rmonitor_handle_inotify(void)
 {
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct inotify_event *evdata;
 	struct rmonitor_file_info *finfo;
 	struct stat fst;
@@ -746,7 +799,7 @@ char *rmonitor_consolidate_verbatim_lines() {
 
 int rmonitor_file_io_summaries()
 {
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	if (rmonitor_inotify_fd >= 0)
 	{
 		char *fname;
@@ -1705,7 +1758,7 @@ int main(int argc, char **argv) {
     summary->start   = usecs_since_epoch();
 
 
-#if defined(CCTOOLS_OPSYS_LINUX) && defined(RESOURCE_MONITOR_USE_INOTIFY)
+#if defined(RESOURCE_MONITOR_USE_INOTIFY)
     if(log_inotify)
     {
 	    rmonitor_inotify_fd = inotify_init();
@@ -1721,6 +1774,7 @@ int main(int argc, char **argv) {
 	}
 
 	executable = xxstrdup(argv[optind]);
+	rmonitor_determine_exec_type(executable);
 
     spawn_first_process(executable, argv + optind, child_in_foreground);
     rmonitor_resources(interval);

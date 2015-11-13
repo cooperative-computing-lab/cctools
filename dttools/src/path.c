@@ -399,8 +399,27 @@ Adapted from FreeBSD's /usr.bin/which/which.c, with the following license:
 * 3. The name of the author may not be used to endorse or promote products
 *    derived from this software without specific prior written permission.
 */
-char *path_which(const char *exec) {
+
+static int path_is_exec(const char *path) {
 	struct stat s;
+	int found = 0;
+
+	if(access(path, X_OK) == 0 && stat(path, &s) == 0 && S_ISREG(s.st_mode) &&
+			(getuid() != 0 || (s.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0)) {
+		found = 1;
+	}
+
+	return found;
+}
+
+
+char *path_which(const char *exec) {
+
+	if(!exec)
+		return NULL;
+
+	if(strchr(exec, '/') && path_is_exec(exec))
+		return xxstrdup(exec);
 
 	const char *path_org = getenv("PATH");
 	if(!path_org)
@@ -422,8 +441,7 @@ char *path_which(const char *exec) {
 
 		candidate = string_format("%s/%s", d, exec);
 
-		if(access(candidate, X_OK) == 0 && stat(candidate, &s) == 0 && S_ISREG(s.st_mode) &&
-				(getuid() != 0 || (s.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0)) {
+		if(path_is_exec(candidate)) {
 			found = 1;
 		}
 		else {
