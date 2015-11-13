@@ -161,31 +161,42 @@ static void set_worker_resources( struct batch_queue *queue )
 
 static int submit_worker( struct batch_queue *queue, const char *master_regex )
 {
-	char cmd[1024];
-	char extra_input_files[1024];
+	buffer_t cmd;
+	buffer_t extra_input_files;
 
-	sprintf(cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o worker.log ",master_regex,worker_timeout,catalog_host,catalog_port);
-	strcpy(extra_input_files,"work_queue_worker");
+	buffer_init(&cmd);
+	buffer_init(&extra_input_files);
+
+	buffer_printf(&cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all ",master_regex,worker_timeout,catalog_host,catalog_port);
+	buffer_printf(&extra_input_files, "work_queue_worker");
 
 	if(password_file) {
-		strcat(cmd," -P pwfile");
-		strcat(extra_input_files,",pwfile");
+		buffer_printf(&cmd," -P pwfile");
+		buffer_printf(&extra_input_files,",pwfile");
 	}
 
 	if(resource_args) {
-		strcat(cmd," ");
-		strcat(cmd,resource_args);
+		buffer_printf(&cmd," ");
+		buffer_printf(&cmd,resource_args);
 	}
 
 	if(extra_worker_args) {
-		strcat(cmd," ");
-		strcat(cmd,extra_worker_args);
+		buffer_printf(&cmd," ");
+		buffer_printf(&cmd,extra_worker_args);
 	}
 
+	/* These strings are freed by buffer_free. */
+	const char *cmd_str               = buffer_tostring(&cmd);
+	const char *extra_input_files_str = buffer_tostring(&extra_input_files);
 
-	debug(D_WQ,"submitting worker: %s",cmd);
+	debug(D_WQ,"submitting worker: %s",cmd_str);
 
-	return batch_job_submit(queue,cmd,extra_input_files,"output.log",0);
+	int status = batch_job_submit(queue,cmd_str,extra_input_files_str,"output.log",0);
+
+	buffer_free(&cmd);
+	buffer_free(&extra_input_files);
+
+	return status;
 }
 
 static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
@@ -581,10 +592,11 @@ static void show_help(const char *cmd)
 	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	printf(" %-30s Retrieve debug log file from workers. (currently only with -T condor.)\n", "--worker-debug-files");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_WORKER_DEBUG_FILES };
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
@@ -605,6 +617,7 @@ static const struct option long_options[] = {
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
 	{"debug-file-size", required_argument, 0, 'O'},
+	{"worker-debug-files", no_argument, 0, LONG_OPT_WORKER_DEBUG_FILES},
 	{"version", no_argument, 0, 'v'},
 	{"help", no_argument, 0, 'h'},
 	{0,0,0,0}
@@ -617,6 +630,8 @@ int main(int argc, char *argv[])
 
 	catalog_host = CATALOG_HOST;
 	catalog_port = CATALOG_PORT;
+
+	int worker_debug_files = 0;
 
 	debug_config(argv[0]);
 
@@ -667,6 +682,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_GPUS:
 				num_gpus_option = atoi(optarg);
+				break;
+			case LONG_OPT_WORKER_DEBUG_FILES:
+				worker_debug_files = 1;
 				break;
 			case 'P':
 				password_file = optarg;
@@ -773,7 +791,10 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	set_worker_resources( queue );
+	set_worker_resources(queue);
+
+	if(worker_debug_files)
+		batch_queue_set_errorfile(queue, "worker.error");
 
 	mainloop( queue, project_regex, foremen_regex );
 

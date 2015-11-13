@@ -123,6 +123,13 @@ void batch_queue_set_logfile(struct batch_queue *q, const char *logfile)
 	debug(D_BATCH, "set logfile to `%s'", logfile);
 }
 
+void batch_queue_set_errorfile(struct batch_queue *q, const char *errorfile)
+{
+	strncpy(q->errorfile, errorfile, sizeof(q->errorfile));
+	q->errorfile[sizeof(q->errorfile)-1] = '\0';
+	debug(D_BATCH, "set errorfile to `%s'", errorfile);
+}
+
 int batch_queue_port(struct batch_queue *q)
 {
 	return q->module->port(q);

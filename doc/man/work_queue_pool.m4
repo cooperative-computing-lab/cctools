@@ -58,6 +58,7 @@ OPTION_TRIPLET(-E,extra-options,options)Extra options that should be added to th
 OPTION_TRIPLET(-S,scratch,file)Scratch directory. (default is /tmp/${USER}-workers)
 OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+OPTION_ITEM(--worker-debug-files)Retrieve debug log file from workers. (currently only with -T condor.)
 OPTION_ITEM(`-h, --help')Show this screen.
 OPTIONS_END
 

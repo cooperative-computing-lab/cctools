@@ -44,6 +44,8 @@ struct batch_queue {
 	batch_queue_type_t type;
 
 	char logfile[PATH_MAX];
+	char errorfile[PATH_MAX];
+
 	struct hash_table *options;
 	struct itable *job_table;
 	struct itable *output_table;
