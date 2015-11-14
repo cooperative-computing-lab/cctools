@@ -293,7 +293,9 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 		}
 	}
 
-	int silent = clean_mode != MAKEFLOW_GC_NONE;
+	int silent = 0;
+	if(clean_mode != MAKEFLOW_GC_NONE)
+		silent = 1;
 	// Decide rerun tasks
 	if(!first_run) {
 		struct itable *rerun_table = itable_create(0);
