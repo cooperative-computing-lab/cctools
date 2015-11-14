@@ -1761,6 +1761,32 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
+		case SYSCALL32_epoll_ctl:
+		case SYSCALL32_epoll_wait:
+		case SYSCALL32_epoll_pwait:
+		case SYSCALL32_timerfd_gettime:
+		case SYSCALL32_timerfd_settime:
+			if (entering) {
+				if (p->table->isparrot(args[0])) {
+					divert_to_dummy(p,-EINVAL); /* You'd be suprised what you can live through... */
+				} else if (!p->table->isnative(args[0])) {
+					divert_to_dummy(p,-EBADF);
+				}
+			}
+			break;
+
+		/* ioctl is only for I/O streams which are never Parrot files. */
+
+		case SYSCALL32_ioctl:
+			if (entering) {
+				if (p->table->isparrot(args[0])) {
+					divert_to_dummy(p,-ENOTTY);
+				} else if (!p->table->isnative(args[0])) {
+					divert_to_dummy(p,-EBADF);
+				}
+			}
+			break;
+
 		case SYSCALL32__newselect:
 		case SYSCALL32_poll:
 		case SYSCALL32_ppoll:
@@ -1918,7 +1944,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				if (entering) debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else if (entering) {
 				int fd = args[0]; /* args[0] */
-				/* char *value args[1] */
+				/* char *list; args[1] */
 				size_t size = args[2]; /* args[2] */
 
 				value = malloc(size);
@@ -1974,32 +2000,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				if(p->syscall_result<0)
 					p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
-			}
-			break;
-
-		case SYSCALL32_epoll_ctl:
-		case SYSCALL32_epoll_wait:
-		case SYSCALL32_epoll_pwait:
-		case SYSCALL32_timerfd_gettime:
-		case SYSCALL32_timerfd_settime:
-			if (entering) {
-				if (p->table->isparrot(args[0])) {
-					divert_to_dummy(p,-EINVAL); /* You'd be suprised what you can live through... */
-				} else if (!p->table->isnative(args[0])) {
-					divert_to_dummy(p,-EBADF);
-				}
-			}
-			break;
-
-		/* ioctl is only for I/O streams which are never Parrot files. */
-
-		case SYSCALL32_ioctl:
-			if (entering) {
-				if (p->table->isparrot(args[0])) {
-					divert_to_dummy(p,-ENOTTY);
-				} else if (!p->table->isnative(args[0])) {
-					divert_to_dummy(p,-EBADF);
-				}
 			}
 			break;
 

@@ -1355,16 +1355,19 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					if (p->syscall == SYSCALL64_socketpair || p->syscall == SYSCALL64_pipe || p->syscall == SYSCALL64_pipe2) {
 						int fds[2];
 						int fdflags = 0;
+
 						if (p->syscall == SYSCALL64_socketpair)
 							TRACER_MEM_OP(tracer_copy_in(p->tracer, fds, POINTER(args[3]), sizeof(fds),TRACER_O_ATOMIC));
 						else if (p->syscall == SYSCALL64_pipe || p->syscall == SYSCALL64_pipe2)
 							TRACER_MEM_OP(tracer_copy_in(p->tracer, fds, POINTER(args[0]), sizeof(fds),TRACER_O_ATOMIC));
 						else assert(0);
-						if (p->syscall == SYSCALL64_pipe2 && (args[1]&O_CLOEXEC)) {
+
+						if (p->syscall == SYSCALL64_socketpair && (args[1]&SOCK_CLOEXEC)) {
 							fdflags |= FD_CLOEXEC;
-						} else if (p->syscall == SYSCALL64_socketpair && (args[1]&SOCK_CLOEXEC)) {
+						} else if (p->syscall == SYSCALL64_pipe2 && (args[1]&O_CLOEXEC)) {
 							fdflags |= FD_CLOEXEC;
-						}
+						} else assert(0);
+
 						assert(fds[0] >= 0);
 						p->table->setnative(fds[0], fdflags);
 						assert(fds[1] >= 0);
@@ -1509,7 +1512,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
-
 		/* bind and connect are symmetric... */
 		case SYSCALL64_bind:
 		case SYSCALL64_connect:
@@ -1633,22 +1635,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
-		case SYSCALL64_epoll_ctl:
-		case SYSCALL64_epoll_ctl_old:
-		case SYSCALL64_epoll_wait:
-		case SYSCALL64_epoll_wait_old:
-		case SYSCALL64_epoll_pwait:
-		case SYSCALL64_timerfd_gettime:
-		case SYSCALL64_timerfd_settime:
-			if (entering) {
-				if (p->table->isparrot(args[0])) {
-					divert_to_dummy(p,-EINVAL); /* You'd be suprised what you can live through... */
-				} else if (!p->table->isnative(args[0])) {
-					divert_to_dummy(p,-EBADF);
-				}
-			}
-			break;
-
 		case SYSCALL64_getpeername:
 		case SYSCALL64_getsockname:
 		case SYSCALL64_getsockopt:
@@ -1665,6 +1651,24 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				}
 			}
 			break;
+
+		case SYSCALL64_epoll_ctl:
+		case SYSCALL64_epoll_ctl_old:
+		case SYSCALL64_epoll_wait:
+		case SYSCALL64_epoll_wait_old:
+		case SYSCALL64_epoll_pwait:
+		case SYSCALL64_timerfd_gettime:
+		case SYSCALL64_timerfd_settime:
+			if (entering) {
+				if (p->table->isparrot(args[0])) {
+					divert_to_dummy(p,-EINVAL); /* You'd be suprised what you can live through... */
+				} else if (!p->table->isnative(args[0])) {
+					divert_to_dummy(p,-EBADF);
+				}
+			}
+			break;
+
+		/* ioctl is only for I/O streams which are never Parrot files. */
 
 		case SYSCALL64_ioctl:
 			if (entering) {
@@ -1793,7 +1797,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			} else if (entering) {
 				int fd = args[0]; /* args[0] */
 				char name[4096]; /* args[1] */
-				/* void *value args[2] */
+				/* void *value; args[2] */
 				size_t size = args[3]; /* args[3] */
 
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0));
@@ -1817,7 +1821,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				if (entering) debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else if (entering) {
 				int fd = args[0]; /* args[0] */
-				/* char *list args[1] */
+				/* char *list; args[1] */
 				size_t size = args[2]; /* args[2] */
 
 				value = malloc(size);
