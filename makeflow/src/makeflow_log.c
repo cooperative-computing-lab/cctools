@@ -294,7 +294,7 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 	}
 
 	int silent = 0;
-	if(clean_mode != MAKEFLOW_CLEAN_NONE)
+	if(clean_mode != MAKEFLOW_GC_NONE)
 		silent = 1;
 	// Decide rerun tasks
 	if(!first_run) {
