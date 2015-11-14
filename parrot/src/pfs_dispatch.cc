@@ -3122,29 +3122,39 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		 * we aren't handling them.
 		 */
 
+		case SYSCALL32_accept4:
 		case SYSCALL32_add_key:
+		case SYSCALL32_bind:
+		case SYSCALL32_bpf:
 		case SYSCALL32_clock_adjtime:
 		case SYSCALL32_clock_nanosleep:
+		case SYSCALL32_connect:
+		case SYSCALL32_execveat:
 		case SYSCALL32_fadvise64_64:
 		case SYSCALL32_fallocate:
 		case SYSCALL32_fanotify_init:
 		case SYSCALL32_fanotify_mark:
 		case SYSCALL32_finit_module:
 		case SYSCALL32_get_mempolicy:
+		case SYSCALL32_getpeername:
+		case SYSCALL32_getsockname:
+		case SYSCALL32_getsockopt:
 		case SYSCALL32_inotify_add_watch:
-		case SYSCALL32_inotify_init:
 		case SYSCALL32_inotify_init1:
+		case SYSCALL32_inotify_init:
 		case SYSCALL32_inotify_rm_watch:
 		case SYSCALL32_io_cancel:
 		case SYSCALL32_io_destroy:
 		case SYSCALL32_io_getevents:
-		case SYSCALL32_ioprio_get:
-		case SYSCALL32_ioprio_set:
 		case SYSCALL32_io_setup:
 		case SYSCALL32_io_submit:
+		case SYSCALL32_ioprio_get:
+		case SYSCALL32_ioprio_set:
 		case SYSCALL32_kexec_load:
 		case SYSCALL32_keyctl:
+		case SYSCALL32_listen:
 		case SYSCALL32_mbind:
+		case SYSCALL32_membarrier:
 		case SYSCALL32_migrate_pages:
 		case SYSCALL32_move_pages:
 		case SYSCALL32_mq_getsetattr:
@@ -3166,24 +3176,33 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_ptrace:
 		case SYSCALL32_pwritev:
 		case SYSCALL32_readdir:
+		case SYSCALL32_recvfrom:
 		case SYSCALL32_recvmmsg:
+		case SYSCALL32_recvmsg:
 		case SYSCALL32_renameat2:
 		case SYSCALL32_request_key:
 		case SYSCALL32_restart_syscall:
 		case SYSCALL32_rt_tgsigqueueinfo:
 		case SYSCALL32_seccomp:
-		case SYSCALL32_sendfile:
 		case SYSCALL32_sendfile64:
+		case SYSCALL32_sendfile:
 		case SYSCALL32_sendmmsg:
+		case SYSCALL32_sendmsg:
+		case SYSCALL32_sendto:
+		case SYSCALL32_set_mempolicy:
 		case SYSCALL32_setfsgid:
 		case SYSCALL32_setfsuid:
-		case SYSCALL32_set_mempolicy:
 		case SYSCALL32_setns:
+		case SYSCALL32_setsockopt:
+		case SYSCALL32_shutdown:
+		case SYSCALL32_socket:
+		case SYSCALL32_socketpair:
 		case SYSCALL32_splice:
 		case SYSCALL32_sync_file_range:
 		case SYSCALL32_syncfs:
 		case SYSCALL32_tee:
 		case SYSCALL32_unshare:
+		case SYSCALL32_userfaultfd:
 		case SYSCALL32_vmsplice:
 		case SYSCALL32_vserver:
 			/* fallthrough */

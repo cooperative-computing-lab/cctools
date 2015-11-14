@@ -2969,27 +2969,30 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_accept4:
 		case SYSCALL64_add_key:
+		case SYSCALL64_bpf:
 		case SYSCALL64_clock_adjtime:
+		case SYSCALL64_execveat:
 		case SYSCALL64_fallocate:
 		case SYSCALL64_fanotify_init:
 		case SYSCALL64_fanotify_mark:
 		case SYSCALL64_finit_module:
 		case SYSCALL64_get_mempolicy:
 		case SYSCALL64_inotify_add_watch:
-		case SYSCALL64_inotify_init:
 		case SYSCALL64_inotify_init1:
+		case SYSCALL64_inotify_init:
 		case SYSCALL64_inotify_rm_watch:
 		case SYSCALL64_io_cancel:
 		case SYSCALL64_io_destroy:
 		case SYSCALL64_io_getevents:
-		case SYSCALL64_ioprio_get:
-		case SYSCALL64_ioprio_set:
 		case SYSCALL64_io_setup:
 		case SYSCALL64_io_submit:
+		case SYSCALL64_ioprio_get:
+		case SYSCALL64_ioprio_set:
 		case SYSCALL64_kexec_file_load:
 		case SYSCALL64_kexec_load:
 		case SYSCALL64_keyctl:
 		case SYSCALL64_mbind:
+		case SYSCALL64_membarrier:
 		case SYSCALL64_mq_getsetattr:
 		case SYSCALL64_mq_notify:
 		case SYSCALL64_mq_open:
@@ -3027,6 +3030,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_tee:
 		case SYSCALL64_tuxcall:
 		case SYSCALL64_unshare:
+		case SYSCALL64_userfaultfd:
 		case SYSCALL64_vmsplice:
 		case SYSCALL64_vserver:
 			/* fallthrough */
