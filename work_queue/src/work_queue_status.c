@@ -236,7 +236,7 @@ int get_masters(time_t stoptime)
 			resize_catalog( catalog_size * 2 );
 
 		const char *type = jx_lookup_string(j,"type");
-		if(type && !strcmp(type,"wq_master") == 0) {
+		if(type && !strcmp(type,"wq_master")) {
 			global_catalog[i] = j; // make the global catalog point to this memory that j references
 			i++;                    // only increment i when a master jx is found
 		} else{
