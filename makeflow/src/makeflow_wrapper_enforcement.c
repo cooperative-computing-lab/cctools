@@ -23,6 +23,9 @@
 
 const char *enforcer_script_pattern = "./enforcer_%d";
 const char *mountlist_pattern = "mount_%d";
+const char *tmp_pattern = "tmp_%d";
+const char *vartmp_pattern = "vartmp_%d";
+const char *shm_pattern = "shm_%d";
 
 void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *enforcer, char *parrot_path) {
 	struct stat stat_buf;
@@ -58,6 +61,9 @@ struct list *makeflow_enforcer_generate_files( struct list *result, struct list 
 		extra_files = list_create();
 		list_push_tail(extra_files, string_format(enforcer_script_pattern, n->nodeid));
 		list_push_tail(extra_files, string_format(mountlist_pattern, n->nodeid));
+		list_push_tail(extra_files, string_format(tmp_pattern, n->nodeid));
+		list_push_tail(extra_files, string_format(vartmp_pattern, n->nodeid));
+		list_push_tail(extra_files, string_format(shm_pattern, n->nodeid));
 		result = makeflow_wrapper_generate_files(result, extra_files, n, w);
 	}
 	return makeflow_wrapper_generate_files(result, input, n, w);
@@ -71,6 +77,14 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	FILE *enforcer_script;
 	char *enforcer_script_path = string_format(enforcer_script_pattern, n->nodeid);
 	char *mountlist_path = string_format(mountlist_pattern, n->nodeid);
+	char *tmp_path = string_format(tmp_pattern, n->nodeid);
+	char *vartmp_path = string_format(vartmp_pattern, n->nodeid);
+	char *shm_path = string_format(shm_pattern, n->nodeid);
+
+	/* Create local directories to bind to /tmp, /var/tmp, and /dev/shm */
+	if (mkdir(tmp_path, S_IRWXU) || mkdir(vartmp_path, S_IRWXU) || mkdir(shm_path, S_IRWXU)) {
+		fatal("could not create temp directory: %s", strerror(errno));
+	}
 
 	/* make an invalid mountfile to send */
 	int mountlist_fd = open(mountlist_path, O_WRONLY|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR);
@@ -90,6 +104,9 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	fprintf(enforcer_script, "MOUNTFILE='%s'\n", mountlist_path);
 	fprintf(enforcer_script, "cat > \"$MOUNTFILE\" <<EOF\n");
 	fprintf(enforcer_script, "/\t\trx\n");
+	fprintf(enforcer_script, "/tmp\t$PWD/%s\trwx\n", tmp_path);
+	fprintf(enforcer_script, "/var/tmp\t$PWD/%s\trwx\n", vartmp_path);
+	fprintf(enforcer_script, "/dev/$PWD/shm\t%s\trwx\n", shm_path);
 	fprintf(enforcer_script, "/dev/null\trwx\n");
 	fprintf(enforcer_script, "/dev/zero\trwx\n");
 	fprintf(enforcer_script, "/dev/full\trwx\n");
