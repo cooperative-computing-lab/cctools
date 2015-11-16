@@ -136,9 +136,9 @@ struct work_queue_task {
 	int64_t total_bytes_sent;                              /**< Number of bytes sent since task has last started sending input data. */
 	int64_t total_bytes_transferred;                       /**< Number of bytes transferred since task has last started transferring input data. */
 	timestamp_t total_transfer_time;                       /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
-	timestamp_t cmd_execution_time;                        /**< Time spent in microseconds for executing the command on the worker. */
+	timestamp_t cmd_execution_time;                        /**< Time spent in microseconds for executing the command until completion on a single worker. */
 	int total_submissions;                                 /**< The number of times the task has been submitted. */
-	timestamp_t total_cmd_execution_time;                  /**< Time spent in microseconds for executing the command on any worker, including resubmittions of the task. */
+	timestamp_t total_cmd_execution_time;                  /**< Accumulated time spent in microseconds for executing the command on any worker, regardless of whether the task finished (i.e., this includes time running on workers that disconnected). */
 
 	timestamp_t maximum_end_time;                               /**< Maximum time (microseconds from epoch) this is valid. If less than 1, then task is always valid (default).*/
 	int64_t memory;                                        /**< Memory required by the task. (MB) */
