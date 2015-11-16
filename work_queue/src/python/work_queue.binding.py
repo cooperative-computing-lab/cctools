@@ -535,7 +535,7 @@ class Task(_object):
         return self._task.total_transfer_time
 
     ##
-    # Get the time spent in microseconds for executing the command on the worker.
+    # Time spent in microseconds for executing the command until completion on a single worker.
     # Must be called only after the task completes execution.
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
@@ -547,7 +547,10 @@ class Task(_object):
         return self._task.cmd_execution_time
 
     ##
-    # Get the time spent in microseconds for executing the command on any worker.
+    # Accumulated time spent in microseconds for executing the command on any
+    # worker, regardless of whether the task finished (i.e., this includes time
+    # running on workers that disconnected).
+    #
     # Must be called only after the task completes execution.
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
