@@ -458,11 +458,18 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 
 	return 0;
 }
-
+/*
+ * Returns 1 if a node is being ran locally, 0 if it isn't being ran locally
+ */
 static int makeflow_is_local_node(struct dag_node *n)
 {
 	return (batch_queue_type == BATCH_QUEUE_TYPE_LOCAL || (n->local_job && local_queue));
 }
+/*
+ * Checks that the local machine has the available resources to allocate
+ * another job to run. Will return 1 if resources are available, 0 otherwise
+ *
+ */
 static int makeflow_can_alloc_local(struct dag_node *n)
 {
 	int mem_ok = 0;
@@ -477,6 +484,11 @@ static int makeflow_can_alloc_local(struct dag_node *n)
 	return (cores_ok && disk_ok && mem_ok);
 
 }
+ /*
+ *
+ * Takes the allocates the local machine resources
+ * of the job given as a parameter.
+ */
 static void makeflow_alloc_local(struct dag_node *n)
 {
 
@@ -502,6 +514,10 @@ static void makeflow_alloc_local(struct dag_node *n)
 			loc_info.local_disk -= n->resources->workdir_footprint;
 	}
 }
+/*
+ * Reallocates the resources to the local machine after a local job
+ * stops running.
+ */
 static void makeflow_dealloc_local(struct dag_node *n)
 {
 	if( (loc_info.local_disk == -1 && loc_info.local_mem == -1)) {
@@ -1057,6 +1073,8 @@ int main(int argc, char *argv[])
 	char *work_queue_preferred_connection = NULL;
 	char *write_summary_to = NULL;
 	char *s;
+	char *log_dir = NULL;
+	char *log_format = NULL;
 	loc_info.local_mem =  -1;
 	loc_info.local_disk = -1;
 	loc_info.local_cores= load_average_get_cpus();
