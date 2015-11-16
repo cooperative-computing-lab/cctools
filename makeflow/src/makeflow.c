@@ -728,17 +728,6 @@ static int makeflow_check(struct dag *d)
 	debug(D_MAKEFLOW_RUN, "checking rules for consistency...\n");
 
 	for(n = d->nodes; n; n = n->next) {
-
-		if(itable_size(n->remote_names) > 0 || (wrapper && wrapper->uses_remote_rename)){
-			if(n->local_job) {
-				debug(D_ERROR, "remote renaming is not supported on locally. Rule %d.\n", n->nodeid);
-				error = 1;
-			} else if (!batch_queue_supports_feature(remote_queue, "remote_rename")) {
-				debug(D_ERROR, "remote renaming is not supported on selected batch system. Rule %d.\n", n->nodeid);
-				error = 1;
-			}
-		}
-
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
 			if(f->created_by) {
@@ -753,6 +742,41 @@ static int makeflow_check(struct dag *d)
 				fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
 			}
 			error = 1;
+		}
+	}
+
+	if(error) {
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+/*
+Used to check that features used are supported by the batch system.
+This would be where we added checking of selected options to verify they
+are supported by the batch system, such as work_queue specific options.
+*/
+
+static int makeflow_check_batch_consistency(struct dag *d)
+{
+	struct dag_node *n;
+	int error = 0;
+
+	debug(D_MAKEFLOW_RUN, "checking for consistency of batch system support...\n");
+
+	for(n = d->nodes; n; n = n->next) {
+
+		if(itable_size(n->remote_names) > 0 || (wrapper && wrapper->uses_remote_rename)){
+			if(n->local_job) {
+				debug(D_ERROR, "remote renaming is not supported on locally. Rule %d.\n", n->nodeid);
+				error = 1;
+				break;
+			} else if (!batch_queue_supports_feature(remote_queue, "remote_rename")) {
+				debug(D_ERROR, "remote renaming is not supported on selected batch system. Rule %d.\n", n->nodeid);
+				error = 1;
+				break;
+			}
 		}
 	}
 
@@ -1475,6 +1499,9 @@ int main(int argc, char *argv[])
 
 	printf("checking %s for consistency...\n",dagfile);
 	if(!makeflow_check(d)) {
+		exit(EXIT_FAILURE);
+	}
+	if(!makeflow_check_batch_consistency(d) && clean_mode == MAKEFLOW_CLEAN_NONE) {
 		exit(EXIT_FAILURE);
 	}
 
