@@ -17,6 +17,16 @@ psearch() {
 
 prepare()
 {
+	mkdir -p ./fixtures/a/b/c
+	echo unix:* rwl > fixtures/.__acl
+	echo unix:* rwl > fixtures/a/.__acl
+	echo unix:* rwl > fixtures/a/b/.__acl
+	echo unix:* rwl > fixtures/a/b/c/.__acl
+
+	touch ./fixtures/a/b/bar
+	touch ./fixtures/a/b/foo
+	touch ./fixtures/a/b/c/bar
+
 	chirp_start ./fixtures
 	echo "$hostport" > "$c"
 
@@ -86,7 +96,7 @@ run()
 clean()
 {
 	chirp_clean
-	rm -f "$c" "$parrot_debug" "$expected" "$output"
+	rm -f "$c" "$parrot_debug" "$expected" "$output" fixtures
 }
 
 dispatch "$@"
