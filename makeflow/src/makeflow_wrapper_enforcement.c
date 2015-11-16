@@ -21,10 +21,13 @@
 #include <fcntl.h>
 #include <errno.h>
 
+const char *enforcer_script_pattern = "./enforcer_%d";
+const char *mountlist_pattern = "mount_%d";
+
 void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *enforcer, char *parrot_path) {
 	struct stat stat_buf;
 	const char *local_parrot_path = "./parrot_run";
-	int local_parrot = open(local_parrot_path, O_WRONLY|O_CREAT|O_EXCL);
+	int local_parrot = open(local_parrot_path, O_WRONLY|O_CREAT|O_EXCL, S_IRWXU);
 	int host_parrot = open(parrot_path, O_RDONLY);
 	if (host_parrot == -1) {
 		fatal("could not open parrot at `%s': %s", parrot_path, strerror(errno));
@@ -48,21 +51,44 @@ void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *enforcer, char *par
 	makeflow_wrapper_add_input_file(enforcer, local_parrot_path);
 }
 
+struct list *makeflow_enforcer_generate_files( struct list *result, struct list *input, struct dag_node *n, struct makeflow_wrapper *w) {
+	struct list *extra_files;
+	if (input->size > 0) {
+		/* Only add input files */
+		extra_files = list_create();
+		list_push_tail(extra_files, string_format(enforcer_script_pattern, n->nodeid));
+		list_push_tail(extra_files, string_format(mountlist_pattern, n->nodeid));
+		result = makeflow_wrapper_generate_files(result, extra_files, n, w);
+	}
+	return makeflow_wrapper_generate_files(result, input, n, w);
+}
+
 char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_wrapper *w, struct list *input_list, struct list *output_list )
 {
 	if(!w) return result;
 
 	struct dag_file *f;
 	FILE *enforcer_script;
-	char *enforcer_script_path = xxstrdup("./enforcer_XXXXXX");
-	int enforcer_script_fd =  mkstemp(enforcer_script_path);
+	char *enforcer_script_path = string_format(enforcer_script_pattern, n->nodeid);
+	char *mountlist_path = string_format(mountlist_pattern, n->nodeid);
+
+	/* make an invalid mountfile to send */
+	int mountlist_fd = open(mountlist_path, O_WRONLY|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR);
+	if (mountlist_fd == -1) {
+		fatal("could not create `%s': %s", mountlist_path, strerror(errno));
+	}
+	write(mountlist_fd, "mountlist\n", 10);
+	close(mountlist_fd);
+
+	/* and generate a wrapper script with the current nodeid */
+	int enforcer_script_fd = open(enforcer_script_path, O_WRONLY|O_CREAT|O_EXCL, S_IRWXU);
 	if (enforcer_script_fd == -1 || (enforcer_script = fdopen(enforcer_script_fd, "w")) == NULL) {
 		fatal("could not create `%s': %s", enforcer_script_path, strerror(errno));
 	}
 	fchmod(enforcer_script_fd, 0755);
 	fprintf(enforcer_script, "#!/bin/sh\n\n");
-	fprintf(enforcer_script, "MOUNTFILE=`mktemp mount_XXXXXX`\n");
-	fprintf(enforcer_script, "cat > $MOUNTFILE <<EOF\n");
+	fprintf(enforcer_script, "MOUNTFILE='%s'\n", mountlist_path);
+	fprintf(enforcer_script, "cat > \"$MOUNTFILE\" <<EOF\n");
 	fprintf(enforcer_script, "/\t\trx\n");
 	fprintf(enforcer_script, "/dev/null\trwx\n");
 	fprintf(enforcer_script, "/dev/zero\trwx\n");
@@ -79,15 +105,13 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 		fprintf(enforcer_script, "$PWD/%s\trwx\n", f->filename);
 	}
 	fprintf(enforcer_script, "EOF\n\n");
-	fprintf(enforcer_script, "./parrot_run -m $MOUNTFILE -- \"$@\"\n");
-	fprintf(enforcer_script, "RC=$?\n");
-	fprintf(enforcer_script, "rm -f $MOUNTFILE\n");
-	fprintf(enforcer_script, "exit $RC\n");
+	fprintf(enforcer_script, "./parrot_run -m \"$MOUNTFILE\" -- \"$@\"\n");
+	fprintf(enforcer_script, "exit $?\n");
 	fclose(enforcer_script);
 
-	list_push_tail(input_list, enforcer_script_path);
-
 	w->command = enforcer_script_path;
+
+	free(mountlist_path);
 
 	return makeflow_wrap_wrapper(result, n, w);
 }

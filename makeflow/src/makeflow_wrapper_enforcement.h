@@ -10,5 +10,6 @@ See the file COPYING for details.
 
 void makeflow_wrapper_enforcer_init( struct makeflow_wrapper *w, char *parrot_path );
 char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_wrapper *w, struct list *input_list, struct list *output_list );
+struct list *makeflow_enforcer_generate_files( struct list *result, struct list *input, struct dag_node *n, struct makeflow_wrapper *w);
 
 #endif

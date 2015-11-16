@@ -156,7 +156,7 @@ static int use_mountfile = 0;
 /* Generates file list for node based on node files, wrapper
  *  * input files, and monitor input files. Relies on %% nodeid
  *   * replacement for monitor file names. */
-static struct list *makeflow_generate_input_files( struct dag_node *n, struct makeflow_wrapper *w, struct makeflow_monitor *m, struct makeflow_wrapper *s, struct makeflow_wrapper_umbrella *u )
+static struct list *makeflow_generate_input_files( struct dag_node *n, struct makeflow_wrapper *w, struct makeflow_monitor *m, struct makeflow_wrapper *e, struct makeflow_wrapper_umbrella *u )
 {
 	struct list *result = list_duplicate(n->source_files);
 
@@ -164,22 +164,22 @@ static struct list *makeflow_generate_input_files( struct dag_node *n, struct ma
 		result = makeflow_wrapper_generate_files(result, w->input_files, n, w);
 	}
 
-	if(s){
-		result = makeflow_wrapper_generate_files(result, s->input_files, n, s);
-	}
-
-	if(m){
-		result = makeflow_wrapper_generate_files(result, m->wrapper->input_files, n, m->wrapper);
+	if(e){
+		result = makeflow_enforcer_generate_files(result, e->input_files, n, e);
 	}
 
 	if(u){
 		result = makeflow_wrapper_generate_files(result, u->wrapper->input_files, n, u->wrapper);
 	}
 
+	if(m){
+		result = makeflow_wrapper_generate_files(result, m->wrapper->input_files, n, m->wrapper);
+	}
+
 	return result;
 }
 
-static struct list *makeflow_generate_output_files( struct dag_node *n, struct makeflow_wrapper *w, struct makeflow_monitor *m, struct makeflow_wrapper *s, struct makeflow_wrapper_umbrella *u )
+static struct list *makeflow_generate_output_files( struct dag_node *n, struct makeflow_wrapper *w, struct makeflow_monitor *m, struct makeflow_wrapper *e, struct makeflow_wrapper_umbrella *u )
 {
 	struct list *result = list_duplicate(n->target_files);
 
@@ -187,16 +187,16 @@ static struct list *makeflow_generate_output_files( struct dag_node *n, struct m
 		result = makeflow_wrapper_generate_files(result, w->output_files, n, w);
 	}
 
-	if(s){
-		result = makeflow_wrapper_generate_files(result, s->output_files, n, s);
-	}
-
-	if(m){
-		result = makeflow_wrapper_generate_files(result, m->wrapper->output_files, n, m->wrapper);
+	if(e){
+		result = makeflow_wrapper_generate_files(result, e->output_files, n, e);
 	}
 
 	if(u){
 		result = makeflow_wrapper_generate_files(result, u->wrapper->output_files, n, u->wrapper);
+	}
+
+	if(m){
+		result = makeflow_wrapper_generate_files(result, m->wrapper->output_files, n, m->wrapper);
 	}
 
 	return result;
