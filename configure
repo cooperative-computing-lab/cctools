@@ -145,7 +145,6 @@ include_package_wavefront="wavefront"
 include_package_makeflow="makeflow"
 include_package_ftplite="ftp_lite"
 include_package_chirp="chirp"
-include_package_resource_monitor="resource_monitor"
 include_package_weaver="weaver"
 include_package_umbrella="umbrella"
 include_package_doc="doc"
@@ -170,16 +169,13 @@ else
 	include_package_parrot=""
 fi
 
-if [ -d resource_monitor ]
+if [ -d resource_monitor -a $BUILD_SYS = LINUX ]
 then
-	if [ $BUILD_SYS = LINUX -o $BUILD_SYS = DARWIN ]
-	then
-		echo "resource_monitor IS supported on ${BUILD_SYS}"
-		include_package_resource_monitor="resource_monitor"
-	else
-		echo "resource_monitor is NOT (yet) supported on ${BUILD_SYS}"
-		include_package_resource_monitor=""
-	fi
+	echo "resource_monitor IS supported on ${BUILD_SYS}"
+	include_package_resource_monitor="resource_monitor"
+else
+	echo "resource_monitor is NOT supported on ${BUILD_SYS}"
+	include_package_resource_monitor=""
 fi
 
 install_path="$HOME/cctools"
