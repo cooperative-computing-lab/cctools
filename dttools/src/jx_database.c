@@ -28,8 +28,6 @@ struct jx_database {
 	time_t last_log_time;
 };
 
-#define JX_LINE_MAX 4096
-
 /* Take the current state of the table and write it out verbatim to a checkpoint file. */
 
 static int checkpoint_write( struct jx_database *db, const char *filename )
@@ -106,7 +104,7 @@ static void log_select( struct jx_database *db )
 	db->logday = t->tm_yday;
 
 	// Ensure that we have a directory.
-	char filename[JX_LINE_MAX];
+	char filename[PATH_MAX];
 	sprintf(filename,"%s/%d",db->logdir,db->logyear);
 	mkdir(filename,0777);
 
@@ -396,7 +394,7 @@ Returns true if successful, false if files could not be played.
 
 static int log_recover( struct jx_database *db, time_t snapshot )
 {
-	char filename[JX_LINE_MAX];
+	char filename[PATH_MAX];
 
 	struct tm *t = gmtime(&snapshot);
 
