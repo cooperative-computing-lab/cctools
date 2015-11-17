@@ -177,6 +177,8 @@ struct hash_table *wdirs;       /* Maps paths to working directory structures. *
 struct itable *filesysms;       /* Maps st_dev ids (from stat syscall) to filesystem structures. */
 struct hash_table *files;       /* Keeps track of which files have been opened. */
 
+static int   follow_chdir = 0; /* Keep track of all the working directories per process. */
+
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 static char **inotify_watches;  /* Keeps track of created inotify watches. */
 static int alloced_inotify_watches = 0;
@@ -635,16 +637,16 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->max_concurrent_processes     = (int64_t) itable_size(processes);
 	tr->total_processes     = summary->total_processes;
 
-	tr->virtual_memory    = (int64_t) p->mem.virtual;
-
 	/* we use max here, as /proc/pid/smaps that fills *m is not always
 	 * available. This causes /proc/pid/status to become a conservative
 	 * fallback. */
 	if(m->resident > 0) {
+		tr->virtual_memory    = (int64_t) m->virtual;
 		tr->resident_memory   = (int64_t) m->resident;
 		tr->swap_memory       = (int64_t) m->swap;
 	}
 	else {
+		tr->virtual_memory    = (int64_t) p->mem.virtual;
 		tr->resident_memory   = (int64_t) p->mem.resident;
 		tr->swap_memory       = (int64_t) p->mem.swap;
 	}
@@ -671,19 +673,19 @@ void rmonitor_log_row(struct rmsummary *tr)
 {
 	if(log_series)
 	{
-		fprintf(log_series,  "%-20" PRId64, tr->wall_time + summary->start);
-		fprintf(log_series, " %20" PRId64, tr->cpu_time);
-		fprintf(log_series, " %25" PRId64, tr->max_concurrent_processes);
-		fprintf(log_series, " %25" PRId64, tr->virtual_memory);
-		fprintf(log_series, " %25" PRId64, tr->resident_memory);
-		fprintf(log_series, " %25" PRId64, tr->swap_memory);
-		fprintf(log_series, " %25" PRId64, tr->bytes_read);
-		fprintf(log_series, " %25" PRId64, tr->bytes_written);
+		fprintf(log_series,  "%-18" PRId64, tr->wall_time + summary->start);
+		fprintf(log_series, " %18" PRId64, tr->cpu_time);
+		fprintf(log_series, " %20" PRId64, tr->max_concurrent_processes);
+		fprintf(log_series, " %20" PRId64, tr->virtual_memory);
+		fprintf(log_series, " %20" PRId64, tr->resident_memory);
+		fprintf(log_series, " %20" PRId64, tr->swap_memory);
+		fprintf(log_series, " %20" PRId64, tr->bytes_read);
+		fprintf(log_series, " %20" PRId64, tr->bytes_written);
 
 		if(resources_flags->workdir_footprint)
 		{
-			fprintf(log_series, " %25" PRId64, tr->workdir_num_files);
-			fprintf(log_series, " %25" PRId64, tr->workdir_footprint);
+			fprintf(log_series, " %20" PRId64, tr->workdir_num_files);
+			fprintf(log_series, " %20" PRId64, tr->workdir_footprint);
 		}
 
 		fprintf(log_series, "\n");
@@ -691,6 +693,9 @@ void rmonitor_log_row(struct rmsummary *tr)
 		/* are we going to keep monitoring the whole filesystem? */
 		// fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
 	}
+
+	debug(D_RMON, "resources: %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 "% " PRId64 "\n", tr->wall_time + summary->start, tr->cpu_time, tr->max_concurrent_processes, tr->virtual_memory, tr->resident_memory, tr->swap_memory, tr->bytes_read, tr->bytes_written, tr->workdir_num_files, tr->workdir_footprint);
+
 }
 
 void decode_zombie_status(struct rmsummary *summary, int wait_status)
@@ -836,20 +841,12 @@ int rmonitor_final_summary()
 	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s", "", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, CCTOOLS_COMMIT);
 	list_push_tail(verbatim_summary_lines, monitor_self_info);
 
-	rmonitor_find_files_final_sizes();
-	rmonitor_add_files_to_summary("input_files:",  0);
-	rmonitor_add_files_to_summary("output_files:", 1);
-
-	char *epilogue = rmonitor_consolidate_verbatim_lines();
-	rmsummary_print(log_summary, summary, resources_limits, NULL, epilogue);
-
-	if(monitor_self_info)
-		free(monitor_self_info);
-	if(epilogue)
-		free(epilogue);
-
 	if(log_inotify)
 	{
+		rmonitor_find_files_final_sizes();
+		rmonitor_add_files_to_summary("input_files:",  0);
+		rmonitor_add_files_to_summary("output_files:", 1);
+
         int nfds = rmonitor_inotify_fd + 1;
         int count = 0;
 
@@ -871,6 +868,14 @@ int rmonitor_final_summary()
 
 		rmonitor_file_io_summaries();
 	}
+
+	char *epilogue = rmonitor_consolidate_verbatim_lines();
+	rmsummary_print(log_summary, summary, resources_limits, NULL, epilogue);
+
+	if(monitor_self_info)
+		free(monitor_self_info);
+	if(epilogue)
+		free(epilogue);
 
 	return summary->exit_status;
 }
@@ -904,9 +909,11 @@ void rmonitor_track_process(pid_t pid)
 	p->pid = pid;
 	p->running = 0;
 
-	newpath = getcwd(NULL, 0);
-	p->wd   = lookup_or_create_wd(NULL, newpath);
-	free(newpath);
+	if(follow_chdir) {
+		newpath = getcwd(NULL, 0);
+		p->wd   = lookup_or_create_wd(NULL, newpath);
+		free(newpath);
+	}
 
 	itable_insert(processes, p->pid, (void *) p);
 
@@ -928,7 +935,7 @@ void cleanup_zombie(struct rmonitor_process_info *p)
 {
   debug(D_RMON, "cleaning process: %d\n", p->pid);
 
-  if(p->wd)
+  if(follow_chdir && p->wd)
     dec_wd_count(p->wd);
 
   itable_remove(processes, p->pid);
@@ -1243,7 +1250,8 @@ void rmonitor_dispatch_msg(void)
             rmonitor_untrack_process(msg.data.p);
             break;
         case CHDIR:
-            p->wd = lookup_or_create_wd(p->wd, msg.data.s);
+			if(follow_chdir)
+				p->wd = lookup_or_create_wd(p->wd, msg.data.s);
             break;
 		case OPEN_INPUT:
 		case OPEN_OUTPUT:
@@ -1440,9 +1448,13 @@ static void show_help(const char *cmd)
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
     fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify.\n", "-L,--limits=<string>");
-    fprintf(stdout, "%-30s resource limits. (Could be specified multiple times.)\n", "");
+    fprintf(stdout, "%-30s resource limits. Can be specified multiple times.\n", "");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Keep the monitored process in foreground (for interactive use).\n", "-f,--child-in-foreground");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "%-30s Follow the size of processes' current working directories. \n", "--follow-chdir");
+    fprintf(stdout, "%-30s Follow the size of <dir>. If not specified, follow the current directory.\n", "--measure-dir");
+    fprintf(stdout, "%-30s Can be specified multiple times.\n", "");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-O,--with-output-files=<file>");
     fprintf(stdout, "%-30s Write resource time series to <template>.series\n", "--with-time-series");
@@ -1547,14 +1559,27 @@ int main(int argc, char **argv) {
 
     rmsummary_read_env_vars(resources_limits);
 
+    processes = itable_create(0);
+    wdirs     = hash_table_create(0,0);
+    filesysms = itable_create(0);
+    files     = hash_table_create(0,0);
+
+    wdirs_rc   = itable_create(0);
+    filesys_rc = itable_create(0);
+
 	verbatim_summary_lines = list_create(0);
+
+	char *cwd = getcwd(NULL, 0);
 
 	enum {
 		LONG_OPT_TIME_SERIES = UCHAR_MAX+1,
 		LONG_OPT_OPENED_FILES,
 		LONG_OPT_DISK_FOOTPRINT,
 		LONG_OPT_NO_DISK_FOOTPRINT,
-		LONG_OPT_SH_CMDLINE
+		LONG_OPT_SH_CMDLINE,
+		LONG_OPT_WORKING_DIRECTORY,
+		LONG_OPT_FOLLOW_CHDIR,
+		LONG_OPT_MEASURE_DIR
 	};
 
     static const struct option long_options[] =
@@ -1571,10 +1596,12 @@ int main(int argc, char **argv) {
 
 		    {"verbatim-to-summary",required_argument, 0, 'V'},
 
-		    {"with-output-files",   required_argument, 0,  'O'},
+		    {"follow-chdir", no_argument, 0,  LONG_OPT_FOLLOW_CHDIR},
+		    {"measure-dir", required_argument, 0,  LONG_OPT_MEASURE_DIR},
 
+		    {"with-output-files",   required_argument, 0,  'O'},
 		    {"with-time-series",    no_argument, 0, LONG_OPT_TIME_SERIES},
-		    {"with-opened-files",   no_argument, 0, LONG_OPT_OPENED_FILES},
+		    {"with-inotify",   no_argument, 0, LONG_OPT_OPENED_FILES},
 		    {"without-disk-footprint", no_argument, 0, LONG_OPT_NO_DISK_FOOTPRINT},
 
 		    {0, 0, 0, 0}
@@ -1584,6 +1611,9 @@ int main(int argc, char **argv) {
 	/* By default, measure working directory. */
 	resources_flags->workdir_footprint = 1;
 
+	/* Used in LONG_OPT_MEASURE_DIR */
+	char measure_dir_name[PATH_MAX];
+
     while((c = getopt_long(argc, argv, "c:d:fhi:L:l:o:O:vV:", long_options, NULL)) >= 0)
     {
 		switch (c) {
@@ -1592,6 +1622,7 @@ int main(int argc, char **argv) {
 				break;
 			case 'o':
 				debug_config_file(optarg);
+				debug_config_file_size(0);
 				break;
 			case 'h':
 				show_help(argv[0]);
@@ -1634,12 +1665,25 @@ int main(int argc, char **argv) {
 			case LONG_OPT_NO_DISK_FOOTPRINT:
 				resources_flags->workdir_footprint = 0;
 				break;
+			case LONG_OPT_FOLLOW_CHDIR:
+				follow_chdir = 1;
+				break;
+			case LONG_OPT_MEASURE_DIR:
+				path_absolute(optarg, measure_dir_name, 0);
+				if(!lookup_or_create_wd(NULL, measure_dir_name))
+					fatal("Directory '%s' does not exist.", optarg);
+				break;
 			default:
 				show_help(argv[0]);
 				return 1;
 				break;
 		}
 	}
+
+	if( follow_chdir && hash_table_size(wdirs) > 0) {
+		fatal("Options --follow-chdir and --measure-dir as mutually exclusive.");
+	}
+
 
     rmsummary_debug_report(resources_limits);
 
@@ -1698,14 +1742,6 @@ int main(int argc, char **argv) {
     rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd);
 #endif
 
-    processes = itable_create(0);
-    wdirs     = hash_table_create(0,0);
-    filesysms = itable_create(0);
-    files     = hash_table_create(0,0);
-
-    wdirs_rc   = itable_create(0);
-    filesys_rc = itable_create(0);
-
 	summary_path = default_summary_name(template_path);
 
     if(use_series)
@@ -1731,6 +1767,11 @@ int main(int argc, char **argv) {
 	    if (inotify_watches == NULL) alloced_inotify_watches = 0;
     }
 #endif
+
+	/* if we are not following changes in directory, and no directory was manually added, we follow the current working directory. */
+	if(!follow_chdir || hash_table_size(wdirs) == 0) {
+		lookup_or_create_wd(NULL, cwd);
+	}
 
 	executable = xxstrdup(argv[optind]);
 	rmonitor_determine_exec_type(executable);

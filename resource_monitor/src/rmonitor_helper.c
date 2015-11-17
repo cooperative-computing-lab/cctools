@@ -173,6 +173,10 @@ FILE *fopen(const char *path, const char *mode)
 		file = original_fopen(path, mode);
 	POP_ERRNO(msg)
 
+	/* With ENOENT we do not send a message, simply to reduce spam. */
+	if(msg.error == ENOENT)
+		return file;
+
 	/* Consider file as input by default. */
 	msg.type   = OPEN_INPUT;
 
@@ -208,6 +212,10 @@ int open(const char *path, int flags, ...)
 		fd = original_open(path, flags, mode);
 	POP_ERRNO(msg)
 
+	/* With ENOENT we do not send a message, simply to reduce spam. */
+	if(msg.error == ENOENT)
+		return fd;
+
 	/* Consider file as input by default. */
 	msg.type   = OPEN_INPUT;
 
@@ -236,6 +244,10 @@ FILE *fopen64(const char *path, const char *mode)
 	PUSH_ERRNO
 		file = original_fopen64(path, mode);
 	POP_ERRNO(msg)
+
+	/* With ENOENT we do not send a message, simply to reduce spam. */
+	if(msg.error == ENOENT)
+		return file;
 
 	/* Consider file as input by default. */
 	msg.type   = OPEN_INPUT;
@@ -271,6 +283,10 @@ int open64(const char *path, int flags, ...)
 	PUSH_ERRNO
 		fd = original_open64(path, flags, mode);
 	POP_ERRNO(msg)
+
+	/* With ENOENT we do not send a message, simply to reduce spam. */
+	if(msg.error == ENOENT)
+		return fd;
 
 	/* Consider file as input by default. */
 	msg.type   = OPEN_INPUT;
