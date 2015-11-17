@@ -54,6 +54,7 @@ SOURCES = \
 	json.c \
 	json_aux.c \
 	jx.c \
+	jx_database.c \
 	jx_parse.c \
 	jx_print.c \
 	jx_table.c \
