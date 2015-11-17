@@ -1,3 +1,7 @@
+
+MAKEFLOW_INPUTS="curl"
+MAKEFLOW_OUTPUTS="capitol.diff"
+
 URL=http://ccl.cse.nd.edu/images/capitol.jpg
 
 capitol.diff: capitol.0.jpg capitol.270.jpg

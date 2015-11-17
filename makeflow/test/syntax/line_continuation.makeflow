@@ -1,3 +1,7 @@
+
+MAKEFLOW_INPUTS=
+MAKEFLOW_OUTPUTS=out2
+
 out1:
 	echo "One" "Two" \
     "Three" > out1

@@ -5,6 +5,9 @@
 # Created by K. Partington, 28 February 2010.
 # Copyright University of Notre Dame, 2010. See file COPYING for details.
 
+MAKEFLOW_INPUTS=""
+MAKEFLOW_OUTPUTS="output"
+
 VAR=cool
 VAR="ultra-cool"
 =bad

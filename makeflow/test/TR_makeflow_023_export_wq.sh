@@ -17,6 +17,9 @@ prepare()
 	mkdir -p $TEST_DIR
 	cd $TEST_DIR
 	cat > test.mf <<EOF
+MAKEFLOW_INPUTS=""
+MAKEFLOW_OUTPUTS=output.txt
+
 export HELLO=hello makeflow
 export GOODBYE
 output.txt:
