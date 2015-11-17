@@ -12,16 +12,16 @@
 		"version": ">=2.6.18"
 	},
 	"os": {
-		"id": "cd817d1496b9be135cd03b6779afb715",
+		"id": "902703f016e0f930a870eaf9cb31640b",
 		"name": "CentOS",
 		"version": "6.6",
 		"source": [
-			"http://ccl.cse.nd.edu/research/data/hep-case-study/cd817d1496b9be135cd03b6779afb715/centos-6.6-x86_64.tar.gz"
+			"http://ccl.cse.nd.edu/research/data/hep-case-study/902703f016e0f930a870eaf9cb31640b/centos-6.6-x86_64.tar.gz"
 		],
 		"format": "tgz",
-		"checksum": "cd817d1496b9be135cd03b6779afb715",
+		"checksum": "902703f016e0f930a870eaf9cb31640b",
 		"uncompressed_size": "212684800",
-		"size": "72214610"
+		"size": "72213624"
 	},
 	"package_manager": {
 		"name": "yum",
@@ -44,7 +44,7 @@
 		"openMalaria-32-centos6-x86_64": {
 			"id": "97cff84e58a4172fd8e9d1cb25c6047c",
 			"source": [
-				"https://curate.nd.edu/downloads/h702q526t1v",
+				"https://curate.nd.edu/downloads/ft848p60w7x",
 				"http://ccl.cse.nd.edu/research/data/hep-case-study/97cff84e58a4172fd8e9d1cb25c6047c/openMalaria-32-centos6-x86_64.tar.gz"
 			],
 			"format": "tgz",
@@ -59,7 +59,7 @@
 			"id": "54ea34d38d96c311122642aec045bc40",
 			"mountpoint": "/tmp/densities.csv",
 			"source": [
-				"https://curate.nd.edu/downloads/hx11xd09r8t",
+				"https://curate.nd.edu/downloads/fn106w94b5c",
 				"http://ccl.cse.nd.edu/research/data/hep-case-study/54ea34d38d96c311122642aec045bc40/densities.csv"
 			],
 			"format": "plain",
@@ -70,7 +70,7 @@
 			"id": "bef8a475dbd3765b61995f36b11b0672",
 			"mountpoint": "/tmp/scenario_32.xsd",
 			"source": [
-				"https://curate.nd.edu/downloads/hq37vm43660",
+				"https://curate.nd.edu/downloads/fj23611124x",
 				"http://ccl.cse.nd.edu/research/data/hep-case-study/bef8a475dbd3765b61995f36b11b0672/scenario_32.xsd"
 			],
 			"format": "plain",
@@ -81,7 +81,7 @@
 			"id": "e28c0c145c801789b0919d175f0afa9c",
 			"mountpoint": "/tmp/scenario.xml",
 			"source": [
-				"https://curate.nd.edu/downloads/hd76rx93c3q",
+				"https://curate.nd.edu/downloads/fq977s77m61",
 				"http://ccl.cse.nd.edu/research/data/hep-case-study/e28c0c145c801789b0919d175f0afa9c/scenario.xml"
 			],
 			"format": "plain",
