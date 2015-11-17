@@ -174,6 +174,31 @@ double jx_lookup_double( struct jx *object, const char *key )
 	}
 }
 
+struct jx * jx_remove( struct jx *object, struct jx *key )
+{
+	if(!object || object->type!=JX_OBJECT) return 0;
+
+	struct jx_pair *p;
+	struct jx_pair *last = 0;
+
+	for(p=object->pairs;p;p=p->next) {
+		if(jx_equals(key,p->key)) {
+			struct jx *value = p->value;
+			if(last) {
+				last->next = p->next;
+			} else {
+				object->pairs = p->next;
+			}
+			p->value = 0;
+			jx_pair_delete(p);
+			return value;
+		}
+		last = p;
+	}
+
+	return 0;
+}
+
 int jx_insert( struct jx *j, struct jx *key, struct jx *value )
 {
 	if(!j || j->type!=JX_OBJECT) return 0;
