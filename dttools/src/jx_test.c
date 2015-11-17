@@ -22,7 +22,7 @@ int main( int argc, char *argv[] )
 {
 	struct jx_parser *p = jx_parser_create(0);
 
-	jx_parser_read_file(p,stdin);
+	jx_parser_read_stream(p,stdin);
 
 	struct jx *j = jx_parse(p);
 

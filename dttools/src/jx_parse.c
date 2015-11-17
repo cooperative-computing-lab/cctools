@@ -58,7 +58,7 @@ struct jx_parser * jx_parser_create( int strict_mode )
 	return p;
 }
 
-void jx_parser_read_file( struct jx_parser *p, FILE *file )
+void jx_parser_read_stream( struct jx_parser *p, FILE *file )
 {
 	p->source_file = file;
 }
@@ -452,7 +452,7 @@ struct jx * jx_parse_link( struct link *l, time_t stoptime )
 struct jx * jx_parse_stream( FILE *file )
 {
 	struct jx_parser *p = jx_parser_create(0);
-	jx_parser_read_file(p,file);
+	jx_parser_read_stream(p,file);
 	return jx_parse_finish(p);
 }
 
