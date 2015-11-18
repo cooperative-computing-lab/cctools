@@ -475,8 +475,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if(port_file)
-		opts_write_port_file(port_file, port);
+	if(port_file) {
+		char s[128];
+		snprintf(s, sizeof(s), "%d", port);
+		opts_write_port_file(port_file, s);
+	}
 
 	if(wqstats_filename)
 		work_queue_specify_log(q, wqstats_filename);

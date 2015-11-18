@@ -4,9 +4,12 @@
  * See the file COPYING for details.
 */
 
+#include "chirp_server.h"
+
 #include "chirp_acl.h"
 #include "chirp_alloc.h"
 #include "chirp_audit.h"
+#include "chirp_catalog.h"
 #include "chirp_filesystem.h"
 #include "chirp_fs_confuga.h"
 #include "chirp_group.h"
@@ -23,19 +26,12 @@
 #include "change_process_title.h"
 #include "create_dir.h"
 #include "daemon.h"
-#include "datagram.h"
 #include "debug.h"
-#include "domain_name_cache.h"
 #include "get_canonical_path.h"
 #include "getopt_aux.h"
-#include "host_disk_info.h"
-#include "host_memory_info.h"
+#include "hostname.h"
 #include "json.h"
-#include "jx.h"
-#include "jx_print.h"
 #include "link.h"
-#include "list.h"
-#include "load_average.h"
 #include "macros.h"
 #include "path.h"
 #include "pattern.h"
@@ -54,7 +50,6 @@
 #include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/utsname.h>
 #include <sys/wait.h>
 
 #if defined(HAS_ATTR_XATTR_H)
@@ -77,28 +72,24 @@
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
-struct list *catalog_host_list;
-char         chirp_hostname[DOMAIN_NAME_MAX] = "";
-char         chirp_owner[USERNAME_MAX] = "";
-int          chirp_port = CHIRP_PORT;
-char         chirp_project_name[128];
-char         chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
+char     chirp_hostname[HOST_NAME_MAX] = "";
+uint64_t chirp_minimum_space_free = 0;
+char     chirp_owner[USERNAME_MAX] = "";
+char     chirp_port[128] = xstr(CHIRP_PORT);
+char     chirp_project_name[128];
+time_t   chirp_starttime;
+char     chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
 
-static char        address[LINK_ADDRESS_MAX];
-static time_t      advertise_alarm = 0;
-static int         advertise_timeout = 300; /* five minutes */
-static int         config_pipe[2] = {-1, -1};
-static struct      datagram *catalog_port;
-static char        hostname[DOMAIN_NAME_MAX];
-static int         idle_timeout = 60; /* one minute */
-static UINT64_T    minimum_space_free = 0;
-static UINT64_T    root_quota = 0;
-static gid_t       safe_gid = 0;
-static uid_t       safe_uid = 0;
-static const char *safe_username = 0;
-static int         sim_latency = 0;
-static int         stall_timeout = 3600; /* one hour */
-static time_t      starttime;
+static time_t           advertise_alarm = 0;
+static int              advertise_timeout = 300; /* five minutes */
+static int              config_pipe[2] = {-1, -1};
+static int              idle_timeout = 60; /* one minute */
+static UINT64_T         root_quota = 0;
+static gid_t            safe_gid = 0;
+static uid_t            safe_uid = 0;
+static const char *     safe_username = 0;
+static int              sim_latency = 0;
+static int              stall_timeout = 3600; /* one hour */
 
 /* space_available() is a simple mechanism to ensure that a runaway client does
  * not use up every last drop of disk space on a machine.  This function
@@ -113,7 +104,7 @@ static int space_available(INT64_T amount)
 	int check_interval = 1;
 	time_t current;
 
-	if(minimum_space_free == 0)
+	if(chirp_minimum_space_free == 0)
 		return 1;
 
 	current = time(0);
@@ -128,7 +119,7 @@ static int space_available(INT64_T amount)
 		last_check = current;
 	}
 
-	if((avail - amount) > minimum_space_free) {
+	if((avail - amount) > chirp_minimum_space_free) {
 		avail -= amount;
 		return 1;
 	} else {
@@ -137,15 +128,6 @@ static int space_available(INT64_T amount)
 	}
 }
 
-int update_one_catalog(void *catalog_host, const void *text)
-{
-	char addr[DATAGRAM_ADDRESS_MAX];
-	if(domain_name_cache_lookup(catalog_host, addr)) {
-		debug(D_DEBUG, "sending update to %s:%d", (char*) catalog_host, CATALOG_PORT);
-		datagram_send(catalog_port, text, strlen(text), addr, CATALOG_PORT);
-	}
-	return 1;
-}
 
 static void downgrade (void)
 {
@@ -192,73 +174,12 @@ static int gc_tickets(const char *url)
 	return 0;
 }
 
-static int update_all_catalogs(const char *url)
+static int update_catalogs (const char *url)
 {
-	struct chirp_statfs info;
-	struct utsname name;
-	int cpus;
-	double avg[3];
-	UINT64_T memory_total, memory_avail;
-
-	uname(&name);
-	string_tolower(name.sysname);
-	string_tolower(name.machine);
-	string_tolower(name.release);
-	load_average_get(avg);
-	cpus = load_average_get_cpus();
-
 	downgrade();
 	backend_setup(url);
-
-	if(chirp_alloc_statfs("/", &info) < 0) {
-		memset(&info, 0, sizeof(info));
-	}
-
-	host_memory_info_get(&memory_avail, &memory_total);
-
-	struct jx *j = jx_object(0);
-
-	jx_insert_string (j,"type","chirp");
-	jx_insert_integer(j,"avail",info.f_bavail * info.f_bsize);
-	jx_insert_string (j,"backend",url);
-	jx_insert_string (j,"cpu",name.machine);
-	jx_insert_integer(j,"cpus", cpus);
-	jx_insert_double  (j,"load1",avg[0]);
-	jx_insert_double  (j,"load5",avg[1]);
-	jx_insert_double  (j,"load15",avg[2]);
-	jx_insert_integer(j,"memory_avail",memory_avail);
-	jx_insert_integer(j,"memory_total",memory_total);
-	jx_insert_integer(j,"minfree",minimum_space_free);
-	jx_insert_string (j,"name",hostname);
-	jx_insert_string (j,"opsys",name.sysname);
-	jx_insert_string (j,"opsysversion",name.release);
-	jx_insert_string (j,"owner",chirp_owner);
-	jx_insert_integer(j,"port",chirp_port);
-	jx_insert_integer(j,"starttime",starttime);
-	jx_insert_integer(j,"total",info.f_blocks * info.f_bsize);
-
-	if (strlen(chirp_project_name)) {
-		jx_insert_string(j,"project",chirp_project_name);
-	}
-
-	jx_insert(j,
-		jx_string("url"),
-		jx_format("chirp://%s:%d", hostname, chirp_port));
-
-	jx_insert(j,
-		jx_string("version"),
-		jx_format("%d.%d.%d", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO));
-
-	chirp_stats_summary(j);
-
-	char *message = jx_print_string(j);
-
-	list_iterate(catalog_host_list, update_one_catalog, message);
-
-	free(message);
-	jx_delete(j);
+	chirp_catalog_update();
 	cfs->destroy();
-
 	return 0;
 }
 
@@ -1700,12 +1621,15 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 {
 	char *atype, *asubject;
 	char typesubject[AUTH_TYPE_MAX + AUTH_SUBJECT_MAX];
-	char addr[LINK_ADDRESS_MAX];
-	int port;
+	char node[HOST_NAME_MAX];
+	char serv[128];
+	char peer[sizeof(node)+sizeof(serv)+1];
 
-	link_address_remote(link, addr, &port);
+	if(!link_getpeername(link, node, sizeof(node), serv, sizeof(serv), NI_NUMERICHOST|NI_NUMERICSERV))
+		abort();
+	snprintf(peer, sizeof(peer), "%s:%s", node, serv);
 
-	change_process_title("chirp_server [%s:%d] [backend starting]", addr, port, typesubject);
+	change_process_title("chirp_server [%s] [backend starting]", peer, typesubject);
 
 	/* Authentication problems:
 	 *
@@ -1742,7 +1666,7 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 	 */
 	backend_setup(url);
 
-	change_process_title("chirp_server [%s:%d] [authenticating]", addr, port, typesubject);
+	change_process_title("chirp_server [%s] [authenticating]", peer, typesubject);
 
 	struct auth_state *backend_state = auth_clone();
 	auth_replace(server_state);
@@ -1756,7 +1680,7 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 		free(atype);
 		free(asubject);
 
-		debug(D_LOGIN, "%s from %s:%d", typesubject, addr, port);
+		debug(D_LOGIN, "%s from %s", typesubject, peer);
 
 		downgrade(); /* downgrade privileges after authentication */
 
@@ -1772,15 +1696,15 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 			auth_address_register();
 		}
 
-		change_process_title("chirp_server [%s:%d] [%s]", addr, port, typesubject);
+		change_process_title("chirp_server [%s] [%s]", peer, typesubject);
 
-		chirp_handler(link, addr, typesubject);
+		chirp_handler(link, peer, typesubject);
 		chirp_alloc_flush();
-		chirp_stats_report(config_pipe[1], addr, typesubject, 0);
+		chirp_stats_report(config_pipe[1], peer, typesubject, 0);
 
 		debug(D_LOGIN, "disconnected");
 	} else {
-		debug(D_LOGIN, "authentication failed from %s:%d", addr, port);
+		debug(D_LOGIN, "authentication failed from %s", peer);
 	}
 
 	link_close(link);
@@ -1878,7 +1802,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Use this name when reporting to the catalog.\n", "-n,--catalog-name=<name>");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Superuser for all directories. (default: none)\n", "-P,--superuser=<user>");
-	fprintf(stdout, " %-30s Listen on this port. (default: %d; arbitrary: 0)\n", "-p,--port=<port>", chirp_port);
+	fprintf(stdout, " %-30s Listen on this port. (default: %s; arbitrary: 0)\n", "-p,--port=<port>", chirp_port);
 	fprintf(stdout, " %-30s Project this Chirp server belongs to.\n", "   --project-name=<name>");
 	fprintf(stdout, " %-30s Enforce this root quota in software.\n", "-Q,--root-quota=<size>");
 	fprintf(stdout, " %-30s Read-only mode.\n", "-R,--read-only");
@@ -1958,7 +1882,6 @@ int main(int argc, char *argv[])
 	int exit_if_parent_fails = 0;
 	int dont_dump_core = 0;
 	time_t gc_alarm = 0;
-	const char *manual_hostname = 0;
 	int max_child_procs = 100;
 	const char *listen_on_interface = 0;
 	int total_child_procs = 0;
@@ -1968,8 +1891,14 @@ int main(int argc, char *argv[])
 	random_init();
 	change_process_title_init(argv);
 	change_process_title("chirp_server");
+	chirp_starttime = time(0);
 
-	catalog_host_list = list_create();
+	install_handler(SIGPIPE, SIG_IGN);
+	install_handler(SIGHUP, SIG_IGN);
+	install_handler(SIGXFSZ, SIG_IGN);
+	install_handler(SIGINT, shutdown_clean);
+	install_handler(SIGTERM, shutdown_clean);
+	install_handler(SIGQUIT, shutdown_clean);
 
 	debug_config("chirp_server");
 
@@ -2014,7 +1943,7 @@ int main(int argc, char *argv[])
 			exit_if_parent_fails = 1;
 			break;
 		case 'F':
-			minimum_space_free = string_metric_parse(optarg);
+			chirp_minimum_space_free = string_metric_parse(optarg);
 			break;
 		case 'G':
 			strncpy(chirp_group_base_url, optarg, sizeof(chirp_group_base_url)-1);
@@ -2023,13 +1952,16 @@ int main(int argc, char *argv[])
 			safe_username = optarg;
 			break;
 		case 'n':
-			manual_hostname = optarg;
+			snprintf(chirp_hostname, sizeof(chirp_hostname), "%s", optarg);
 			break;
 		case 'M':
 			max_child_procs = atoi(optarg);
 			break;
 		case 'p':
-			chirp_port = atoi(optarg);
+			if (strtoul(optarg, NULL, 10) == 0)
+				strcpy(chirp_port, "");
+			else
+				snprintf(chirp_port, sizeof(chirp_port), "%s", optarg);
 			break;
 		case 'P':
 			chirp_super_user = optarg;
@@ -2061,7 +1993,7 @@ int main(int argc, char *argv[])
 			debug_config_file_size(string_metric_parse(optarg));
 			break;
 		case 'u':
-			list_push_head(catalog_host_list, strdup(optarg));
+			chirp_catalog_add(optarg);
 			break;
 		case 'U':
 			advertise_timeout = string_time_parse(optarg);
@@ -2090,7 +2022,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'Z':
 			path_absolute(optarg, port_file, 0);
-			chirp_port = 0;
+			strcpy(chirp_port, "");
 			break;
 		case 'l':
 			/* not documented, internal testing */
@@ -2167,10 +2099,6 @@ int main(int argc, char *argv[])
 		auth_register_all();
 	}
 
-	if(!list_size(catalog_host_list)) {
-		list_push_head(catalog_host_list, CATALOG_HOST);
-	}
-
 	if(getuid() == 0) {
 		if(!safe_username) {
 			fatal(
@@ -2201,37 +2129,8 @@ int main(int argc, char *argv[])
 		fatal("couldn't setup %s", chirp_url);
 	}
 
-	link = link_serve_address(listen_on_interface, chirp_port);
-
-	if(!link) {
-		if(listen_on_interface) {
-			fatal("couldn't listen on interface %s port %d: %s", listen_on_interface, chirp_port, strerror(errno));
-		} else {
-			fatal("couldn't listen on port %d: %s", chirp_port, strerror(errno));
-		}
-	}
-
-	link_address_local(link, address, &chirp_port);
-
-	debug(D_DEBUG, "now listening port on port %d\n", chirp_port);
-
-	if(strlen(port_file))
-		opts_write_port_file(port_file, chirp_port);
-
-	starttime = time(0);
-	catalog_port = datagram_create(0);
-	if(manual_hostname) {
-		strcpy(hostname, manual_hostname);
-	} else {
-		domain_name_cache_guess(hostname);
-	}
-
-	install_handler(SIGPIPE, SIG_IGN);
-	install_handler(SIGHUP, SIG_IGN);
-	install_handler(SIGXFSZ, SIG_IGN);
-	install_handler(SIGINT, shutdown_clean);
-	install_handler(SIGTERM, shutdown_clean);
-	install_handler(SIGQUIT, shutdown_clean);
+	if(!chirp_hostname[0])
+		getcanonicalhostname(chirp_hostname, sizeof(chirp_hostname));
 
 	chirp_job_schedd = fork();
 	if (chirp_job_schedd == 0) {
@@ -2262,10 +2161,26 @@ int main(int argc, char *argv[])
 		fatal("could not start scheduler");
 	}
 
+	link = link_serve_address(listen_on_interface, chirp_port[0] ? chirp_port : NULL);
+	if(!link) {
+		if(listen_on_interface) {
+			fatal("couldn't listen on interface %s port %d: %s", listen_on_interface, chirp_port, strerror(errno));
+		} else {
+			fatal("couldn't listen on port %d: %s", chirp_port, strerror(errno));
+		}
+	}
+
+	{
+		char servname[128];
+		link_getlocalname(link, NULL, 0, servname, sizeof(servname), NI_NUMERICSERV);
+
+		debug(D_DEBUG, "now listening on %s\n", servname);
+
+		if(port_file[0])
+			opts_write_port_file(port_file, servname);
+	}
+
 	while(1) {
-		char addr[LINK_ADDRESS_MAX];
-		int port;
-		struct link *l;
 		pid_t pid;
 		int status;
 
@@ -2284,7 +2199,7 @@ int main(int argc, char *argv[])
 		}
 
 		if(time(0) >= advertise_alarm) {
-			run_in_child_process(update_all_catalogs, chirp_url, "catalog update");
+			run_in_child_process(update_catalogs, chirp_url, "catalog update");
 			advertise_alarm = time(0) + advertise_timeout;
 			chirp_stats_cleanup();
 		}
@@ -2313,13 +2228,10 @@ int main(int argc, char *argv[])
 			continue;
 
 		/* If the network port is active, accept the connection and fork the handler. */
-
 		if(FD_ISSET(link_fd(link), &rfds)) {
-			l = link_accept(link, time(0) + 5);
+			struct link *l = link_accept(link, time(0) + 5);
 			if(!l)
 				continue;
-
-			link_address_remote(l, addr, &port);
 
 			pid = fork();
 			if(pid == 0) {

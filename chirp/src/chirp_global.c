@@ -122,9 +122,9 @@ static int server_table_load(time_t stoptime)
 		jx_delete(item);
 	}
 
-	debug(D_CHIRP, "querying catalog at %s:%d", CATALOG_HOST, CATALOG_PORT);
+	debug(D_CHIRP, "querying catalog at %s:%s", CATALOG_HOST, CATALOG_PORT);
 
-	q = catalog_query_create(CATALOG_HOST, CATALOG_PORT, stoptime);
+	q = catalog_query_create(CATALOG_HOST, atoi(CATALOG_PORT), stoptime);
 	if(!q)
 		return 0;
 

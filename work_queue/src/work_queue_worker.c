@@ -12,32 +12,32 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 #include "work_queue_watcher.h"
 
-#include "cctools.h"
-#include "macros.h"
 #include "catalog_query.h"
-#include "domain_name_cache.h"
-#include "jx.h"
+#include "cctools.h"
 #include "copy_stream.h"
-#include "host_memory_info.h"
-#include "host_disk_info.h"
-#include "path_disk_size_info.h"
+#include "create_dir.h"
+#include "debug.h"
+#include "delete_dir.h"
+#include "getopt.h"
+#include "getopt_aux.h"
 #include "hash_cache.h"
+#include "host_disk_info.h"
+#include "host_memory_info.h"
+#include "hostname.h"
+#include "itable.h"
+#include "jx.h"
 #include "link.h"
 #include "link_auth.h"
 #include "list.h"
-#include "xxmalloc.h"
-#include "debug.h"
-#include "stringtools.h"
-#include "path.h"
 #include "load_average.h"
-#include "getopt.h"
-#include "getopt_aux.h"
-#include "create_dir.h"
-#include "delete_dir.h"
-#include "itable.h"
-#include "random.h"
-#include "url_encode.h"
+#include "macros.h"
 #include "md5.h"
+#include "path.h"
+#include "path_disk_size_info.h"
+#include "random.h"
+#include "stringtools.h"
+#include "url_encode.h"
+#include "xxmalloc.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -132,8 +132,8 @@ static int container_mode = NONE;
 static int load_from_tar = 0;
 
 static const char *master_host = 0;
-static char master_addr[LINK_ADDRESS_MAX];
-static int master_port;
+static char  master_addr[HOST_NAME_MAX];
+static char *master_port;
 static char *workspace;
 static char *os_name = NULL;
 static char *arch_name = NULL;
@@ -201,19 +201,15 @@ static int released_by_master = 0;
 __attribute__ (( format(printf,2,3) ))
 static void send_master_message( struct link *master, const char *fmt, ... )
 {
-	char debug_msg[2*WORK_QUEUE_LINE_MAX];
+	BUFFER_STACK_ABORT(B, 2*WORK_QUEUE_LINE_MAX);
 	va_list va;
-	va_list debug_va;
 
 	va_start(va,fmt);
-
-	sprintf(debug_msg, "tx to master: %s", fmt);
-	va_copy(debug_va, va);
-
-	vdebug(D_WQ, debug_msg, debug_va);
-	link_putvfstring(master, fmt, time(0)+active_timeout, va);
-
+	buffer_putvfstring(B, fmt, va);
 	va_end(va);
+
+	debug(D_WQ, "tx to master: %s", buffer_tostring(B));
+	link_putlstring(master, buffer_tostring(B), buffer_pos(B), time(0)+active_timeout);
 }
 
 static int recv_master_message( struct link *master, char *line, int length, time_t stoptime )
@@ -382,8 +378,8 @@ The master will not start sending tasks until this message is recevied.
 
 static void report_worker_ready( struct link *master )
 {
-	char hostname[DOMAIN_NAME_MAX];
-	domain_name_cache_guess(hostname);
+	char hostname[HOST_NAME_MAX];
+	getcanonicalhostname(hostname, sizeof(hostname));
 	send_master_message(master,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_keepalive(master);
 }
@@ -1283,14 +1279,14 @@ static void enforce_processes_max_running_time() {
 
 
 static int do_release() {
-	debug(D_WQ, "released by master %s:%d.\n", master_addr, master_port);
+	debug(D_WQ, "released by master %s:%s.\n", master_addr, master_port);
 	released_by_master = 1;
 	return 0;
 }
 
 static void disconnect_master(struct link *master) {
 
-	debug(D_WQ, "disconnecting from master %s:%d",master_addr,master_port);
+	debug(D_WQ, "disconnecting from master %s:%s",master_addr,master_port);
 	link_close(master);
 
 	debug(D_WQ, "killing all outstanding tasks");
@@ -1430,7 +1426,7 @@ static int enforce_worker_limits(struct link *master) {
 static void work_for_master(struct link *master) {
 	sigset_t mask;
 
-	debug(D_WQ, "working for master at %s:%d.\n", master_addr, master_port);
+	debug(D_WQ, "working for master at %s:%s.\n", master_addr, master_port);
 
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
@@ -1447,7 +1443,7 @@ static void work_for_master(struct link *master) {
 	while(!abort_flag) {
 
 		if(time(0) > idle_stoptime) {
-			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", master_addr,master_port,idle_timeout);
+			debug(D_NOTICE, "disconnecting from %s:%s because I did not receive any task in %d seconds (--idle-timeout).\n", master_addr,master_port,idle_timeout);
 			send_master_message(master, "info idle-disconnecting %lld\n", (long long) idle_timeout);
 			break;
 		}
@@ -1555,7 +1551,7 @@ static void foreman_for_master(struct link *master) {
 		return;
 	}
 
-	debug(D_WQ, "working for master at %s:%d as foreman.\n", master_addr, master_port);
+	debug(D_WQ, "working for master at %s:%s as foreman.\n", master_addr, master_port);
 
 	reset_idle_timer();
 
@@ -1681,13 +1677,8 @@ static void workspace_delete()
 	free(workspace);
 }
 
-static int serve_master_by_hostport( const char *host, int port, const char *verify_project )
+static int serve_master_by_hostport( const char *host, const char *port, const char *verify_project )
 {
-	if(!domain_name_cache_lookup(host,master_addr)) {
-		fprintf(stderr,"couldn't resolve hostname %s",host);
-		return 0;
-	}
-
 	/*
 	For the preliminary steps of password and project verification, we use the
 	idle timeout, because we have not yet been assigned any work and should
@@ -1700,24 +1691,30 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 	reset_idle_timer();
 
-	struct link *master = link_connect(master_addr,port,idle_stoptime);
+	struct link *master = link_connect(host,port,idle_stoptime);
 	if(!master) {
-		fprintf(stderr,"couldn't connect to %s:%d: %s\n",master_addr,port,strerror(errno));
+		fprintf(stderr,"couldn't connect to %s:%s: %s\n",master_addr,port,strerror(errno));
 		return 0;
 	}
+
+	char peernodename[HOST_NAME_MAX];
+	char peerservname[128];
+	if (link_getpeername(master, peernodename, sizeof(peernodename), peerservname, sizeof(peerservname), NI_NUMERICHOST|NI_NUMERICSERV) == -1)
+		abort();
+	char localnodename[HOST_NAME_MAX];
+	char localservname[128];
+	if (link_getlocalname(master, localnodename, sizeof(localnodename), localservname, sizeof(localservname), NI_NUMERICHOST|NI_NUMERICSERV) == -1)
+		abort();
+
+	printf("connected to master %s:%s via local address %s:%s\n", peernodename, peerservname, localnodename, localservname);
+	debug(D_WQ, "connected to master %s:%s via local address %s:%s", peernodename, peerservname, localnodename, localservname);
+
 	link_tune(master,LINK_TUNE_INTERACTIVE);
-
-	char local_addr[LINK_ADDRESS_MAX];
-	int  local_port;
-	link_address_local(master, local_addr, &local_port);
-
-	printf("connected to master %s:%d via local address %s:%d\n", host, port, local_addr, local_port);
-	debug(D_WQ, "connected to master %s:%d via local address %s:%d", host, port, local_addr, local_port);
 
 	if(password) {
 		debug(D_WQ,"authenticating to master");
 		if(!link_auth_password(master,password,idle_stoptime)) {
-			fprintf(stderr,"work_queue_worker: wrong password for master %s:%d\n",host,port);
+			fprintf(stderr,"work_queue_worker: wrong password for master %s:%s\n",peernodename, peerservname);
 			link_close(master);
 			return 0;
 		}
@@ -1759,15 +1756,15 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 	workspace_cleanup();
 	disconnect_master(master);
-	printf("disconnected from master %s:%d\n", host, port );
+	printf("disconnected from master %s:%s\n", peernodename, peerservname);
 
 	return 1;
 }
 
 static int serve_master_by_name( const char *catalog_host, int catalog_port, const char *project_regex )
 {
-	static char *last_addr = NULL;
-	static int   last_port = -1;
+	static char *last_addr;
+	static char *last_port;
 
 	struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
 
@@ -1788,16 +1785,16 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 		const char *name = jx_lookup_string(jx,"name");
 		const char *addr = jx_lookup_string(jx,"address");
 		const char *pref = jx_lookup_string(jx,"master_preferred_connection");
-		int port = jx_lookup_integer(jx,"port");
+		const char *port = jx_lookup_string(jx,"port");
 
 		/* Do not connect to the same master after idle disconnection. */
 		if(last_addr) {
-			if( time(0) > idle_stoptime && strcmp(addr, last_addr) == 0 && port == last_port) {
+			if( time(0) > idle_stoptime && strcmp(addr, last_addr) == 0 && strcmp(port, last_port) == 0) {
 				if(list_size(masters_list) < 2) {
 					free(last_addr);
 					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
 					connect_stoptime = idle_stoptime;
-					debug(D_WQ,"Previous idle disconnection from only master available project=%s name=%s addr=%s port=%d",project,name,addr,port);
+					debug(D_WQ,"Previous idle disconnection from only master available project=%s name=%s addr=%s port=%s",project,name,addr,port);
 					return 0;
 				} else {
 					list_push_tail(masters_list,list_pop_head(masters_list));
@@ -1805,15 +1802,17 @@ static int serve_master_by_name( const char *catalog_host, int catalog_port, con
 				}
 			}
 
-			free(last_addr);
+			last_addr = realloc(last_addr, 0);
+			last_port = realloc(last_port, 0);
 		}
 
 		last_addr = xxstrdup(addr);
-		last_port = port;
+		last_port = xxstrdup(port);
 
-		debug(D_WQ,"selected master with project=%s name=%s addr=%s port=%d",project,name,addr,port);
+		debug(D_WQ,"selected master with project=%s name=%s addr=%s port=%s",project,name,addr,port);
 		if(pref && strcmp(pref, "by_hostname") == 0)
 			return serve_master_by_hostport(name,port,project);
+
 		return serve_master_by_hostport(addr,port,project);
 	}
 }
@@ -1860,7 +1859,7 @@ static void show_help(const char *cmd)
 	printf( "Use: %s [options] <masterhost> <port>\n", cmd);
 	printf( "where options are:\n");
 	printf( " %-30s Name of master (project) to contact.  May be a regular expression.\n", "-N,-M,--master-name=<name>");
-	printf( " %-30s Catalog server to query for masters.  (default: %s:%d) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
+	printf( " %-30s Catalog server to query for masters.  (default: %s:%s) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
 	printf( " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf( " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf( " %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n", "--debug-rotate-max=<bytes>");
@@ -1968,7 +1967,7 @@ int main(int argc, char *argv[])
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
 	char * catalog_host = CATALOG_HOST;
-	int catalog_port = CATALOG_PORT;
+	int catalog_port = atoi(CATALOG_PORT);
 
 	worker_start_time = time(0);
 
@@ -2193,8 +2192,7 @@ int main(int argc, char *argv[])
 		}
 
 		master_host = argv[optind];
-		master_port = atoi(argv[optind+1]);
-
+		master_port = argv[optind+1];
 	}
 
 	signal(SIGTERM, handle_abort);
@@ -2253,8 +2251,11 @@ int main(int argc, char *argv[])
 
 		printf( "work_queue_worker-foreman: listening on port %d\n", work_queue_port(foreman_q));
 
-		if(port_file)
-		{	opts_write_port_file(port_file, work_queue_port(foreman_q));	}
+		if(port_file) {
+			char s[128];
+			snprintf(s, sizeof(s), "%d", work_queue_port(foreman_q));
+			opts_write_port_file(port_file, s);
+		}
 
 		if(foreman_name) {
 			work_queue_specify_name(foreman_q, foreman_name);

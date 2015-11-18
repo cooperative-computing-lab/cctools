@@ -32,4 +32,11 @@ See the file COPYING for details.
 #define TERABYTE TERA
 #define PETABYTE PETA
 
+/* str(FOO) --> "FOO" */
+#define str(s) #s
+/* #define FOO 1
+ * xstr(FOO) --> "1"
+ */
+#define xstr(s) str(s)
+
 #endif

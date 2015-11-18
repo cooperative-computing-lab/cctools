@@ -7,21 +7,25 @@ See the file COPYING for details.
 #include "work_queue.h"
 #include "work_queue_catalog.h"
 
+#include "catalog_query.h"
 #include "cctools.h"
 #include "debug.h"
-#include "catalog_query.h"
-#include "domain_name_cache.h"
-#include "jx_table.h"
-#include "jx_print.h"
-#include "jx_parse.h"
-#include "link.h"
+#include "getaddrinfo_cache.h"
 #include "getopt.h"
+#include "hostname.h"
+#include "jx_parse.h"
+#include "jx_print.h"
+#include "jx_table.h"
+#include "link.h"
+#include "link_nvpair.h"
+#include "macros.h"
+#include "nvpair.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
 #include <errno.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef enum {
 	FORMAT_TABLE,
@@ -100,7 +104,7 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
-static void work_queue_status_parse_command_line_arguments(int argc, char *argv[], const char **master_host, int *master_port, const char **project_name)
+static void work_queue_status_parse_command_line_arguments(int argc, char *argv[], const char **master_host, const char **master_port, const char **project_name)
 {
 	static const struct option long_options[] = {
 		{"project-name", required_argument, 0, 'M'},
@@ -194,7 +198,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 	}
 
 	if( optind < argc ) {
-		*master_port = atoi(argv[optind]);
+		*master_port = argv[optind];
 		optind++;
 	}
 
@@ -224,7 +228,7 @@ int get_masters(time_t stoptime)
 	int i = 0; //jx pointer array iterator
 	if(!catalog_host) {
 		catalog_host = strdup(CATALOG_HOST);
-		catalog_port = CATALOG_PORT;
+		catalog_port = atoi(CATALOG_PORT);
 	}
 
 	cq = catalog_query_create(catalog_host, catalog_port, stoptime );
@@ -276,18 +280,24 @@ void add_child_relation(const char *name, int spaces, char *buffer, size_t max_s
 	strncat(buffer + spaces, name, max_size - spaces);
 }
 
-int find_child_relations(int spaces, const char *host, int port, struct jx_table *headers, time_t stoptime)
+int find_child_relations(int spaces, const char *host, const char *port, struct jx_table *headers, time_t stoptime)
 {
 	int i = 0; //global_catalog iterator
-	char full_address[1024];
+	struct addrinfo *results;
+	struct addrinfo hints;
+	char nodename[HOST_NAME_MAX];
+	char servname[128];
+	char full_address[sizeof(nodename)+sizeof(servname)+1];
 
-	if(!domain_name_cache_lookup(host, full_address))
-	{
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = AF_UNSPEC;
+	if (getaddrinfo_cache(host, port, &hints, &results) == -1 || getnameinfo(results->ai_addr, results->ai_addrlen, nodename, sizeof(nodename), servname, sizeof(servname), NI_NUMERICHOST|NI_NUMERICSERV) == -1) {
 		debug(D_WQ,"Could not resolve %s into an ip address\n",host);
 		return 0;
 	}
 
-	sprintf(full_address, "%s:%d", full_address, port);
+	snprintf(full_address, sizeof(full_address), "%s:%s", nodename, servname);
 
 	while(global_catalog[i] != NULL)
 	{
@@ -313,7 +323,7 @@ int find_child_relations(int spaces, const char *host, int port, struct jx_table
 
 			find_child_relations(spaces + 1,
 					jx_lookup_string(global_catalog[i], "name"),
-					atoi(jx_lookup_string(global_catalog[i], "port")),
+					jx_lookup_string(global_catalog[i], "port"),
 					headers,
 					stoptime);
 		}
@@ -350,7 +360,7 @@ int do_catalog_query(const char *project_name, struct jx_table *headers, time_t 
 					jx_table_print(headers,global_catalog[i], stdout);
 					find_child_relations(1,
 							jx_lookup_string(global_catalog[i], "name"),
-							jx_lookup_integer(global_catalog[i], "port"),
+							jx_lookup_string(global_catalog[i], "port"),
 							headers,
 							stoptime);
 				}
@@ -368,7 +378,7 @@ int do_catalog_query(const char *project_name, struct jx_table *headers, time_t 
 	return EXIT_SUCCESS;
 }
 
-int do_direct_query( const char *master_host, int master_port, time_t stoptime )
+static int do_direct_query( const char *master_host, const char *master_port, time_t stoptime )
 {
 	static struct jx_table *query_headers[] = { [QUERY_QUEUE] = queue_headers, task_headers, worker_headers, master_resource_headers };
 	static const char * query_strings[] = { [QUERY_QUEUE] = "queue","task","worker", "master_resource"};
@@ -378,16 +388,9 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 
 	struct link *l;
 
-	char master_addr[LINK_ADDRESS_MAX];
-
-	if(!domain_name_cache_lookup(master_host,master_addr)) {
-		fprintf(stderr,"couldn't find address of %s\n",master_host);
-		return 1;
-	}
-
-	l = link_connect(master_addr,master_port,stoptime);
+	l = link_connect(master_host,master_port,stoptime);
 	if(!l) {
-		fprintf(stderr,"couldn't connect to %s port %d: %s\n",master_host,master_port,strerror(errno));
+		fprintf(stderr,"couldn't connect to %s port %s: %s\n",master_host,master_port,strerror(errno));
 		return 1;
 	}
 
@@ -422,7 +425,7 @@ int main(int argc, char *argv[])
 {
 	const char *master_host  = NULL;
 	const char *project_name = NULL;
-	int master_port = WORK_QUEUE_DEFAULT_PORT;
+	const char *master_port = xstr(WORK_QUEUE_DEFAULT_PORT);
 
 	debug_config(argv[0]);
 

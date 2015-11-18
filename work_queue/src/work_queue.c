@@ -15,48 +15,47 @@ The following major problems must be fixed:
 #include "work_queue_internal.h"
 #include "work_queue_resources.h"
 
+#include "buffer.h"
+#include "catalog_query.h"
 #include "cctools.h"
+#include "copy_stream.h"
+#include "create_dir.h"
+#include "debug.h"
+#include "hash_table.h"
+#include "host_disk_info.h"
 #include "int_sizes.h"
+#include "itable.h"
+#include "jx_print.h"
 #include "link.h"
 #include "link_auth.h"
-#include "debug.h"
-#include "stringtools.h"
-#include "catalog_query.h"
-#include "datagram.h"
-#include "domain_name_cache.h"
-#include "hash_table.h"
-#include "itable.h"
+#include "link_nvpair.h"
 #include "list.h"
-#include "macros.h"
-#include "username.h"
-#include "create_dir.h"
-#include "xxmalloc.h"
 #include "load_average.h"
-#include "buffer.h"
+#include "macros.h"
+#include "md5.h"
+#include "path.h"
+#include "process.h"
+#include "random.h"
 #include "rmonitor.h"
 #include "rmonitor_poll.h"
-#include "copy_stream.h"
-#include "random.h"
-#include "process.h"
-#include "path.h"
-#include "md5.h"
+#include "stringtools.h"
 #include "url_encode.h"
-#include "jx_print.h"
+#include "username.h"
+#include "xxmalloc.h"
 
-#include "host_disk_info.h"
-
-#include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
+#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
 #include <stdarg.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -127,7 +126,6 @@ struct work_queue {
 
 	char workingdir[PATH_MAX];
 
-	struct datagram  *update_port;   // outgoing udp connection to catalog
 	struct link      *master_link;   // incoming tcp connection for workers.
 	struct link_info *poll_table;
 	int poll_table_size;
@@ -168,8 +166,9 @@ struct work_queue {
 	int transfer_outlier_factor;
 	int default_transfer_rate;
 
-	char *catalog_host;
-	int catalog_port;
+	int  catalog_fd;
+	char catalog_nodename[HOST_NAME_MAX];
+	char catalog_servname[128];
 
 	FILE *logfile;
 	int keepalive_interval;
@@ -621,10 +620,44 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	return timeout;
 }
 
+static void catalog_setup (struct work_queue *q)
+{
+	int rc;
+	struct addrinfo *addr, *addri;
+	struct addrinfo hints;
+
+	if (q->catalog_fd >= 0)
+		q->catalog_fd = (close(q->catalog_fd), -1);
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_CANONNAME;
+	rc = getaddrinfo(q->catalog_nodename, q->catalog_servname, &hints, &addr);
+	if (rc)
+		fatal("could not getaddrinfo: %s", gai_strerror(rc));
+	for (addri = addr; addri; addri = addri->ai_next) {
+		int fd = socket(addri->ai_family, addri->ai_socktype, addri->ai_protocol);
+		if (fd == -1) {
+			debug(D_DEBUG, "skipping, could not create socket: %s", strerror(errno));
+			continue;
+		}
+
+		if (connect(fd, addri->ai_addr, addri->ai_addrlen) == -1) {
+			debug(D_DEBUG, "skipping, could not connect socket: %s", strerror(errno));
+			close(fd);
+			continue;
+		}
+
+		q->catalog_fd = fd;
+		break;
+	}
+	freeaddrinfo(addr);
+}
+
 void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
 	static time_t last_update_time = 0;
-	char address[LINK_ADDRESS_MAX];
 
 	// Only advertise if we have a name.
 	if(!q->name) return;
@@ -633,25 +666,16 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_UPDATE_INTERVAL)
 		return;
 
-	// If host and port are not set, pick defaults.
-	if(!q->catalog_host)	q->catalog_host = strdup(CATALOG_HOST);
-	if(!q->catalog_port)	q->catalog_port = CATALOG_PORT;
-	if(!q->update_port)	q->update_port = datagram_create(DATAGRAM_PORT_ANY);
-
-	if(!domain_name_cache_lookup(q->catalog_host, address)) {
-		debug(D_WQ,"could not resolve address of catalog server %s!",q->catalog_host);
-		// don't try again until the next update period
-		last_update_time = time(0);
-		return;
-	}
-
 	// Generate the master status in an jx, and print it to a buffer.
 	struct jx *j = queue_to_jx(q,foreman_uplink);
 	char *str = jx_print_string(j);
 
+	if (q->catalog_fd == -1)
+		catalog_setup(q);
+
 	// Send the buffer.
-	debug(D_WQ, "Advertising master status to the catalog server at %s:%d ...", q->catalog_host, q->catalog_port);
-	datagram_send(q->update_port, str, strlen(str), address, q->catalog_port);
+	debug(D_WQ, "Advertising master status to the catalog server at %s:%s ...", q->catalog_nodename, q->catalog_servname);
+	send(q->catalog_fd, str, strlen(str), 0);
 
 	// Clean up.
 	free(str);
@@ -771,8 +795,8 @@ static void add_worker(struct work_queue *q)
 {
 	struct link *link;
 	struct work_queue_worker *w;
-	char addr[LINK_ADDRESS_MAX];
-	int port;
+	char peernodename[HOST_NAME_MAX];
+	char peerservname[128];
 
 	link = link_accept(q->master_link, time(0) + q->short_timeout);
 	if(!link) return;
@@ -780,17 +804,17 @@ static void add_worker(struct work_queue *q)
 	link_keepalive(link, 1);
 	link_tune(link, LINK_TUNE_INTERACTIVE);
 
-	if(!link_address_remote(link, addr, &port)) {
+	if(link_getpeername(link, peernodename, sizeof(peernodename), peerservname, sizeof(peerservname), NI_NUMERICHOST|NI_NUMERICSERV) == -1) {
 		link_close(link);
 		return;
 	}
 
-	debug(D_WQ,"worker %s:%d connected",addr,port);
+	debug(D_WQ,"worker %s:%s connected",peernodename,peerservname);
 
 	if(q->password) {
-		debug(D_WQ,"worker %s:%d authenticating",addr,port);
+		debug(D_WQ,"worker %s:%s authenticating",peernodename,peerservname);
 		if(!link_auth_password(link,q->password,time(0)+q->short_timeout)) {
-			debug(D_WQ|D_NOTICE,"worker %s:%d presented the wrong password",addr,port);
+			debug(D_WQ|D_NOTICE,"worker %s:%s presented the wrong password",peernodename,peerservname);
 			link_close(link);
 			return;
 		}
@@ -798,7 +822,7 @@ static void add_worker(struct work_queue *q)
 
 	w = malloc(sizeof(*w));
 	if(!w) {
-		debug(D_NOTICE, "Cannot allocate memory for worker %s:%d.", addr, port);
+		debug(D_NOTICE, "Cannot allocate memory for worker %s:%s.", peernodename, peerservname);
 		link_close(link);
 		return;
 	}
@@ -826,7 +850,7 @@ static void add_worker(struct work_queue *q)
 
 	w->stats     = calloc(1, sizeof(struct work_queue_stats));
 	link_to_hash_key(link, w->hashkey);
-	sprintf(w->addrport, "%s:%d", addr, port);
+	snprintf(w->addrport, sizeof(w->addrport), "%s:%s", peernodename, peerservname);
 	hash_table_insert(q->worker_table, w->hashkey, w);
 	log_worker_stats(q);
 	q->stats->total_workers_joined++;
@@ -1732,12 +1756,12 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 
 	// If this is a foreman, add the master address and the disk resources
 	if(foreman_uplink) {
-		int port;
-		char address[LINK_ADDRESS_MAX];
-		char addrport[WORK_QUEUE_LINE_MAX];
+		char peernodename[HOST_NAME_MAX];
+		char peerservname[128];
+		char addrport[sizeof(peernodename)+sizeof(peerservname)+1];
 
-		link_address_remote(foreman_uplink,address,&port);
-		sprintf(addrport,"%s:%d",address,port);
+		link_getpeername(foreman_uplink, peernodename, sizeof(peernodename), peerservname, sizeof(peerservname), NI_NUMERICHOST|NI_NUMERICSERV);
+		snprintf(addrport, sizeof(addrport), "%s:%s", peernodename, peerservname);
 		jx_insert_string(j,"my_master",addrport);
 
 		// get foreman local resources and overwrite disk usage
@@ -3925,15 +3949,19 @@ struct work_queue *work_queue_create(int port)
 	if (getenv("WORK_QUEUE_HIGH_PORT"))
 		setenv("TCP_HIGH_PORT", getenv("WORK_QUEUE_HIGH_PORT"), 0);
 
-	q->master_link = link_serve(port);
+	if (port == 0)
+		q->master_link = link_serve_address(NULL, NULL);
+	else
+		q->master_link = link_serve(port);
 
 	if(!q->master_link) {
 		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
 		free(q);
 		return 0;
 	} else {
-		char address[LINK_ADDRESS_MAX];
-		link_address_local(q->master_link, address, &q->port);
+		char servname[128];
+		link_getlocalname(q->master_link, NULL, 0, servname, sizeof(servname), NI_NUMERICSERV);
+		q->port = atoi(servname);
 	}
 
 	getcwd(q->workingdir,PATH_MAX);
@@ -3970,8 +3998,9 @@ struct work_queue *work_queue_create(int port)
 	q->stats->start_time = timestamp_get();
 	q->task_reports = list_create();
 
-	q->catalog_host = 0;
-	q->catalog_port = 0;
+	strcpy(q->catalog_nodename, CATALOG_HOST);
+	strcpy(q->catalog_servname, CATALOG_PORT);
+	q->catalog_fd = -1;
 
 	q->keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
 	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
@@ -4090,16 +4119,7 @@ int work_queue_activate_fast_abort(struct work_queue *q, double multiplier)
 
 int work_queue_port(struct work_queue *q)
 {
-	char addr[LINK_ADDRESS_MAX];
-	int port;
-
-	if(!q) return 0;
-
-	if(link_address_local(q->master_link, addr, &port)) {
-		return port;
-	} else {
-		return 0;
-	}
+	return q->port;
 }
 
 void work_queue_activate_worker_waiting(struct work_queue *q, int value)
@@ -4161,15 +4181,14 @@ void work_queue_specify_master_mode(struct work_queue *q, int mode)
 void work_queue_specify_catalog_server(struct work_queue *q, const char *hostname, int port)
 {
 	if(hostname) {
-		if(q->catalog_host) free(q->catalog_host);
-		q->catalog_host = strdup(hostname);
+		snprintf(q->catalog_nodename, sizeof(q->catalog_nodename), "%s", hostname);
 		setenv("CATALOG_HOST", hostname, 1);
 	}
 	if(port > 0) {
-		char portstr[DOMAIN_NAME_MAX];
-		q->catalog_port = port;
-		snprintf(portstr, DOMAIN_NAME_MAX, "%d", port);
-		setenv("CATALOG_PORT", portstr, 1);
+		snprintf(q->catalog_servname, sizeof(q->catalog_servname), "%d", port);
+		setenv("CATALOG_PORT", q->catalog_servname, 1);
+	} else {
+		strcpy(q->catalog_servname, CATALOG_PORT);
 	}
 }
 
@@ -4196,7 +4215,6 @@ void work_queue_delete(struct work_queue *q)
 		if(q->name) {
 			update_catalog(q, NULL, 1);
 		}
-		if(q->catalog_host) free(q->catalog_host);
 		hash_table_delete(q->worker_table);
 		hash_table_delete(q->worker_blacklist);
 		itable_delete(q->worker_task_map);

@@ -5,12 +5,12 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "file_cache.h"
 #include "create_dir.h"
-#include "hash_table.h"
 #include "debug.h"
+#include "file_cache.h"
+#include "hash_table.h"
+#include "hostname.h"
 #include "md5.h"
-#include "domain_name_cache.h"
 
 #include <string.h>
 #include <errno.h>
@@ -47,8 +47,8 @@ static void cached_name(struct file_cache *c, const char *path, char *lpath)
 static void txn_name(struct file_cache *c, const char *path, char *txn)
 {
 	unsigned char digest[MD5_DIGEST_LENGTH];
-	char shortname[DOMAIN_NAME_MAX];
-	domain_name_cache_guess_short(shortname);
+	char shortname[HOST_NAME_MAX];
+	getshortname(shortname, sizeof(shortname));
 	md5_buffer(path, strlen(path), digest);
 	sprintf(txn, "%s/txn/%s.%s.%d.XXXXXX", c->root, md5_string(digest), shortname, (int) getpid());
 }
@@ -160,13 +160,9 @@ void file_cache_fini(struct file_cache *f)
 void file_cache_cleanup(struct file_cache *f)
 {
 	char path[PATH_MAX];
+	char myshortname[HOST_NAME_MAX];
 	struct dirent *d;
 	DIR *dir;
-
-	char shortname[DOMAIN_NAME_MAX];
-	char myshortname[DOMAIN_NAME_MAX];
-
-	domain_name_cache_guess_short(myshortname);
 
 	sprintf(path, "%s/txn", f->root);
 
@@ -176,8 +172,11 @@ void file_cache_cleanup(struct file_cache *f)
 
 	debug(D_CACHE, "cleaning up cache directory %s", f->root);
 
+	getshortname(myshortname, sizeof(myshortname));
+
 	while((d = readdir(dir))) {
 		int pid;
+		char shortname[HOST_NAME_MAX];
 		if(!strcmp(d->d_name, "."))
 			continue;
 		if(!strcmp(d->d_name, ".."))

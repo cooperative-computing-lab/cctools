@@ -8,7 +8,6 @@ See the file COPYING for details.
 #include "auth.h"
 #include "debug.h"
 #include "stringtools.h"
-#include "domain_name_cache.h"
 #include "xxmalloc.h"
 
 #include <stdlib.h>
@@ -111,17 +110,20 @@ int auth_accept(struct link *link, char **typeout, char **subject, time_t stopti
 {
 	struct auth_ops *a;
 	char type[AUTH_TYPE_MAX];
-	char addr[LINK_ADDRESS_MAX];
-	int port;
+	char node[HOST_NAME_MAX];
+	char serv[128];
 
 	*subject = 0;
 
-	link_address_remote(link, addr, &port);
+	if(!link_getpeername(link, node, sizeof(node), serv, sizeof(serv), NI_NUMERICHOST|NI_NUMERICSERV)) {
+		debug(D_AUTH, "couldn't get peer name");
+		return 0;
+	}
 
 	while(link_readline(link, type, AUTH_TYPE_MAX, stoptime)) {
 		string_chomp(type);
 
-		debug(D_AUTH, "%s:%d requests '%s' authentication", addr, port, type);
+		debug(D_AUTH, "%s:%s requests '%s' authentication", node, serv, type);
 
 		a = type_lookup(type);
 		if(a) {
@@ -138,18 +140,18 @@ int auth_accept(struct link *link, char **typeout, char **subject, time_t stopti
 		if(a->accept(link, subject, stoptime)) {
 			auth_sanitize(*subject);
 			debug(D_AUTH, "'%s' authentication succeeded", type);
-			debug(D_AUTH, "%s:%d is %s:%s\n", addr, port, type, *subject);
+			debug(D_AUTH, "%s:%s is %s:%s\n", node, serv, type, *subject);
 			if (link_putfstring(link, "yes\n%s\n%s\n", stoptime, type, *subject) <= 0)
 				return 0;
 			*typeout = xxstrdup(type);
 			return 1;
 		} else {
-			debug(D_AUTH, "%s:%d could not authenticate using '%s'", addr, port, type);
+			debug(D_AUTH, "%s:%s could not authenticate using '%s'", node, serv, type);
 		}
 		debug(D_AUTH, "still trying");
 	}
 
-	debug(D_AUTH, "%s:%d disconnected", addr, port);
+	debug(D_AUTH, "%s:%s disconnected", node, serv);
 
 	return 0;
 }

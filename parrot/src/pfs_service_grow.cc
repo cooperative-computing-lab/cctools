@@ -51,7 +51,6 @@ filesystem, which placed a listing in every single directory.)
 extern "C" {
 #include "debug.h"
 #include "stringtools.h"
-#include "domain_name.h"
 #include "link.h"
 #include "file_cache.h"
 #include "full_io.h"

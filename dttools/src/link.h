@@ -16,20 +16,15 @@ a connection to be attempted for sixty seconds, specify <tt>time(0)+60</tt>.
 The operation will be tried and retried until that absolute limit, giving
 the caller much greater control over program behavior.
 <p>
-Note that this library manipulates IP addresses in the form of strings.
-To convert a hostname into a string IP address, call @ref domain_name_cache_lookup.  For example, here is how to make a simple HTTP request:
+You may pass a hostname or IP address in presentation format to this library, as understood by getaddrinfo(3). For example:
 <pre>
 struct link *link;
 time_t stoptime = time(0)+300;
-char addr[LINK_ADDRESS_MAX];
 int result;
 
 const char *request = "GET / HTTP/1.0\n\n";
 
-result = domain_name_cache_lookup("www.google.com",addr);
-if(!result) fatal("could not lookup name");
-
-link = link_connect(addr,80,stoptime);
+link = link_connect("www.google.com","80",stoptime);
 if(!link) fatal("could not connect");
 
 result = link_write(link,request,strlen(request),stoptime);
@@ -42,6 +37,7 @@ link_close(link);
 */
 
 #include <sys/types.h>
+#include <netdb.h>
 
 #include <limits.h>
 #include <signal.h>
@@ -60,12 +56,20 @@ link_close(link);
 #define LINK_FOREVER ((time_t)INT_MAX)
 
 /** Connect to a remote host.
-@param addr IP address of server in string form.
-@param port Port of server.
+@param nodename The network hostname or IP address, in string form as understood by getaddrinfo(3).
+@param servname The service or port number, as a string.
 @param stoptime Absolute time at which to abort.
 @return On success, returns a pointer to a link object.  On failure, returns a null pointer with errno set appropriately.
 */
-struct link *link_connect(const char *addr, int port, time_t stoptime);
+struct link *link_connect(const char *nodename, const char *servname, time_t stoptime);
+
+/** Connect to a remote host.
+@param nodeserv The node's hostport, as per RFC 2732.
+@param servname_default The default service name if no port is found in nodeserv.
+@param stoptime Absolute time at which to abort.
+@return On success, returns a pointer to a link object.  On failure, returns a null pointer with errno set appropriately.
+*/
+struct link *link_connect_nodeserv(const char *nodename, const char *servname, time_t stoptime);
 
 /** Turn a FILE* into a link.  Useful when trying to poll both remote and local connections using @ref link_poll
 @param file File to create the link from.
@@ -79,7 +83,6 @@ struct link *link_attach_to_file(FILE *file);
 */
 struct link *link_attach_to_fd(int fd);
 
-
 /** Prepare to accept connections.
 @ref link_serve will accept connections on any network interface,
 which is usually what you want.
@@ -88,30 +91,13 @@ which is usually what you want.
 */
 struct link *link_serve(int port);
 
-/** Prepare to accept connections.
-@ref link_serve_range will accept connections on any network interface, which is usually what you want.
-@param low The low port in a range to listen on (inclusive).
-@param high The high port in a range to listen on (inclusive).
-@return link A server endpoint that can be passed to @ref link_accept, or null on failure.
-*/
-struct link *link_serve_range(int low, int high);
-
 /** Prepare to accept connections on one network interface.
 Functions like @ref link_serve, except that the server will only be visible on the given network interface.
-@param addr IP address of the network interface.
-@param port The port number to listen on.  If less than 1, the first unused port between TCP_LOW_PORT and TCP_HIGH_PORT will be selected.
+@param nodename The network hostname or IP address, in string form as understood by getaddrinfo(3).
+@param servname The service or port number, as a string. Use NULL to bind to unused port between TCP_LOW_PORT and TCP_HIGH_PORT.
 @return link A server endpoint that can be passed to @ref link_accept, or null on failure.
 */
-struct link *link_serve_address(const char *addr, int port);
-
-/** Prepare to accept connections on one network interface.
-Functions like @ref link_serve, except that the server will only be visible on the given network interface and allows for a port range.
-@param addr IP address of the network interface.
-@param low The low port in a range to listen on (inclusive).
-@param high The high port in a range to listen on (inclusive).
-@return link A server endpoint that can be passed to @ref link_accept, or null on failure.
-*/
-struct link *link_serve_addrrange(const char *addr, int low, int high);
+struct link *link_serve_address(const char *nodename, const char *servname);
 
 /** Accept one connection.
 @param master A link returned from @ref link_serve or @ref link_serve_address.
@@ -285,19 +271,25 @@ int link_buffer_empty(struct link *link);
 
 /** Return the local address of the link in text format.
 @param link The link to examine.
-@param addr Pointer to a string of at least @ref LINK_ADDRESS_MAX bytes, which will be filled with a text representation of the local IP address.
-@param port Pointer to an integer, which will be filled with the TCP port number.
+@param nodename Buffer to hold the network hostname or IP address, in string form as understood by getaddrinfo(3).
+@param nodelen The length of nodename buffer.
+@param servname Buffer to hold the service or port number, as a string.
+@param servlen The length of servname buffer.
+@param flags The flags passed to getnameinfo(3).
 @return Positive on success, zero on failure.
 */
-int link_address_local(struct link *link, char *addr, int *port);
+int link_getlocalname(struct link *link, char *nodename, size_t nodelen, char *servname, size_t servlen, int flags);
 
 /** Return the remote address of the link in text format.
 @param link The link to examine.
-@param addr Pointer to a string of at least @ref LINK_ADDRESS_MAX bytes, which will be filled with a text representation of the remote IP address.
-@param port Pointer to an integer, which will be filled with the TCP port number.
+@param nodename Buffer to hold the network hostname or IP address, in string form as understood by getaddrinfo(3).
+@param nodelen The length of nodename buffer.
+@param servname Buffer to hold the service or port number, as a string.
+@param servlen The length of servname buffer.
+@param flags The flags passed to getnameinfo(3).
 @return Positive on success, zero on failure.
 */
-int link_address_remote(struct link *link, char *addr, int *port);
+int link_getpeername(struct link *link, char *nodename, size_t nodelen, char *servname, size_t servlen, int flags);
 
 ssize_t link_stream_to_buffer(struct link *link, char **buffer, time_t stoptime);
 

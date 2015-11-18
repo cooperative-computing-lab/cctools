@@ -6,11 +6,12 @@ See the file COPYING for details.
 
 #include "confuga.h"
 
-#include "catch.h"
+#include "chirp_catalog.h"
 #include "chirp_filesystem.h"
 #include "chirp_fs_confuga.h"
 
 #include "debug.h"
+#include "catch.h"
 #include "list.h"
 #include "macros.h"
 #include "path.h"
@@ -90,14 +91,13 @@ out:\
 	else\
 		return 0;
 
-extern struct list *catalog_host_list;
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
 static int chirp_fs_confuga_init (const char url[CHIRP_PATH_MAX])
 {
 	int rc;
 	int i;
 
-	CATCH_CONFUGA(confuga_connect(&C, url, list_peek_head(catalog_host_list)));
+	CATCH_CONFUGA(confuga_connect(&C, url, chirp_catalog_primary()));
 
 	for (i = 0; i < CHIRP_FILESYSTEM_MAXFD; i++)
 		open_files[i].type = CHIRP_FS_CONFUGA_CLOSED;

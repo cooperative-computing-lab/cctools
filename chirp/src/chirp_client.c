@@ -15,7 +15,6 @@ See the file COPYING for details.
 #include "catch.h"
 #include "copy_stream.h"
 #include "debug.h"
-#include "domain_name_cache.h"
 #include "full_io.h"
 #include "link.h"
 #include "list.h"
@@ -332,32 +331,20 @@ struct chirp_client *chirp_client_connect_condor(time_t stoptime)
 
 struct chirp_client *chirp_client_connect(const char *hostport, int negotiate_auth, time_t stoptime)
 {
-	struct chirp_client *c;
-	char addr[LINK_ADDRESS_MAX];
-	char host[DOMAIN_NAME_MAX];
-	int save_errno;
-	int port;
-
-	if(sscanf(hostport, "%[^:]:%d", host, &port) == 2) {
-		/* use the split host and port */
-	} else {
-		strcpy(host, hostport);
-		port = CHIRP_PORT;
-	}
-
-	if(!domain_name_cache_lookup(host, addr)) {
-		errno = ENOENT;
-		return 0;
-	}
+	struct chirp_client *c = NULL;
 
 	c = malloc(sizeof(*c));
 	if(c) {
-		c->link = link_connect(addr, port, stoptime);
 		c->broken = 0;
 		c->serial = global_serial++;
-		strcpy(c->hostport, hostport);
+		c->link = link_connect_nodeserv(hostport, xstr(CHIRP_PORT), stoptime);
 		if(c->link) {
+			char node[HOST_NAME_MAX];
+			char serv[128];
 			link_tune(c->link, LINK_TUNE_INTERACTIVE);
+			if(!link_getpeername(c->link, node, sizeof(node), serv, sizeof(serv), NI_NUMERICHOST|NI_NUMERICSERV))
+				abort();
+			snprintf(c->hostport, sizeof(c->hostport), "%s:%s", node, serv);
 			if(negotiate_auth) {
 				char *type, *subject;
 
@@ -366,23 +353,26 @@ struct chirp_client *chirp_client_connect(const char *hostport, int negotiate_au
 				if(result) {
 					free(type);
 					free(subject);
-					return c;
+					goto out;
 				} else {
-					int save = errno;
-					chirp_client_disconnect(c);
-					errno = save;
-					return 0;
+					goto failure;
 				}
 			} else {
-				return c;
+				goto out;
 			}
+		} else {
+			goto failure;
 		}
-		save_errno = errno;
-		free(c);
-		errno = save_errno;
 	}
-
-	return 0;
+failure:
+	if (c) {
+		int save = errno;
+		chirp_client_disconnect(c);
+		c = NULL;
+		errno = save;
+	}
+out:
+	return c;
 }
 
 void chirp_client_disconnect(struct chirp_client *c)

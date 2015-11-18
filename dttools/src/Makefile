@@ -29,8 +29,6 @@ SOURCES = \
 	debug_stream.c \
 	debug_syslog.c \
 	disk_alloc.c \
-	domain_name.c \
-	domain_name_cache.c \
 	dpopen.c \
 	elfheader.c \
 	envtools.c \
@@ -40,6 +38,7 @@ SOURCES = \
 	full_io.c \
 	get_canonical_path.c \
 	get_line.c \
+	getaddrinfo_cache.c \
 	getopt.c \
 	getopt_aux.c \
 	gpu_info.c \
@@ -49,6 +48,7 @@ SOURCES = \
 	hmac.c \
 	host_disk_info.c \
 	host_memory_info.c \
+	hostname.c \
 	http_query.c \
 	itable.c \
 	json.c \

@@ -20,14 +20,11 @@ struct catalog_query {
 
 struct catalog_query *catalog_query_create(const char *host, int port, time_t stoptime)
 {
-	if(!host)
-		host = CATALOG_HOST;
-	if(!port)
-		port = CATALOG_PORT;
+	char url[1024];
 
-	char *url = string_format("http://%s:%d/query.json", host, port);
+	snprintf(url, sizeof(url), "http://%s:%d/query.json", host ? host : CATALOG_HOST, port ? port : atoi(CATALOG_PORT));
+
 	struct link *link = http_query(url, "GET", stoptime);
-	free(url);
 
 	if(!link) return 0;
 

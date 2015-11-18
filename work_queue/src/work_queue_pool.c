@@ -616,7 +616,7 @@ int main(int argc, char *argv[])
 	batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNKNOWN;
 
 	catalog_host = CATALOG_HOST;
-	catalog_port = CATALOG_PORT;
+	catalog_port = atoi(CATALOG_PORT);
 
 	debug_config(argv[0]);
 

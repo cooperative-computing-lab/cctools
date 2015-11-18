@@ -414,7 +414,9 @@ int main(int argc, char **argv)
 	port = work_queue_port(q);
 
 	if(port_file) {
-		opts_write_port_file(port_file,port);
+		char s[128];
+		snprintf(s, sizeof(s), "%d", port);
+		opts_write_port_file(port_file,s);
 	}
 
 	// advanced work queue options

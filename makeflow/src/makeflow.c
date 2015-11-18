@@ -1542,8 +1542,11 @@ int main(int argc, char *argv[])
 	printf("starting workflow....\n");
 
 	port = batch_queue_port(remote_queue);
-	if(work_queue_port_file)
-		opts_write_port_file(work_queue_port_file, port);
+	if(work_queue_port_file) {
+		char s[128];
+		snprintf(s, sizeof(s), "%d", port);
+		opts_write_port_file(work_queue_port_file, s);
+	}
 	if(port > 0)
 		printf("listening for workers on port %d.\n", port);
 

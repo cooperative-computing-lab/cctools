@@ -8,9 +8,9 @@ See the file COPYING for details.
 #include "http_query.h"
 
 #include "buffer.h"
-#include "stringtools.h"
 #include "debug.h"
-#include "domain_name_cache.h"
+#include "macros.h"
+#include "stringtools.h"
 #include "url_encode.h"
 
 #include <errno.h>
@@ -89,12 +89,11 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 	char url[HTTP_LINE_MAX];
 	char newurl[HTTP_LINE_MAX];
 	char line[HTTP_LINE_MAX];
-	char addr[LINK_ADDRESS_MAX];
 	struct link *link;
 	int save_errno;
 	int response;
 	char actual_host[HTTP_LINE_MAX];
-	int actual_port;
+	char actual_port[128];
 	*size = 0;
 
 	url_encode(urlin, url, sizeof(url));
@@ -103,21 +102,21 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 		proxy = 0;
 
 	if(proxy) {
-		int fields = sscanf(proxy, "http://%[^:]:%d", actual_host, &actual_port);
+		int fields = sscanf(proxy, "http://%[^:]:%[0-9]", actual_host, actual_port);
 		if(fields == 2) {
 			/* host and port are good */
 		} else if(fields == 1) {
-			actual_port = HTTP_PORT;
+			strcpy(actual_port, xstr(HTTP_PORT));
 		} else {
 			debug(D_HTTP, "invalid proxy syntax: %s", proxy);
 			return 0;
 		}
 	} else {
-		int fields = sscanf(url, "http://%[^:]:%d", actual_host, &actual_port);
+		int fields = sscanf(url, "http://%[^:]:%[0-9]", actual_host, actual_port);
 		if(fields != 2) {
 			fields = sscanf(url, "http://%[^/]", actual_host);
 			if(fields == 1) {
-				actual_port = HTTP_PORT;
+				strcpy(actual_port, xstr(HTTP_PORT));
 			} else {
 				debug(D_HTTP, "malformed url: %s", url);
 				return 0;
@@ -125,16 +124,12 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 		}
 	}
 
-	debug(D_HTTP, "connect %s port %d", actual_host, actual_port);
-	if(!domain_name_cache_lookup(actual_host, addr))
-		return 0;
-
-	link = link_connect(addr, actual_port, stoptime);
+	debug(D_HTTP, "connect %s port %s", actual_host, actual_port);
+	link = link_connect(actual_host, actual_port, stoptime);
 	if(!link) {
 		errno = ECONNRESET;
 		return 0;
 	}
-
 
 	{
 		buffer_t B;
