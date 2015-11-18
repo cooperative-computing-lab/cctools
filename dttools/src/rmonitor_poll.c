@@ -456,6 +456,9 @@ int rmonitor_get_mmaps_usage(pid_t pid, struct hash_table *maps)
 }
 
 int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *mem) {
+	/* set result to 0. */
+	bzero(mem, sizeof(struct rmonitor_mem_info));
+
 	struct hash_table *maps_per_file = hash_table_create(0, 0);
 
 	uint64_t pid;
@@ -485,14 +488,8 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 	 * bounds.
 	 */
 
-	if(mem->map_name)
-		free(mem->map_name);
-
-	/* set result to 0. */
-	bzero(mem, sizeof(struct rmonitor_mem_info));
-
-	struct list *infos;
 	char *map_name;
+	struct list *infos;
 
 	hash_table_firstkey(maps_per_file);
 	while(hash_table_nextkey(maps_per_file, &map_name, (void *) &infos )) {
