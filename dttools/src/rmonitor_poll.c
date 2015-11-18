@@ -58,7 +58,11 @@ void rmonitor_poll_all_processes_once(struct itable *processes, struct rmonitor_
 	itable_firstkey(processes);
 	while(itable_nextkey(processes, &pid, (void **) &p))
 	{
-		rmonitor_poll_process_once(p);
+		int status = rmonitor_poll_process_once(p);
+
+		/* do not consider process if some error is found. */
+		if(status != 0)
+			continue;
 
 		acc_mem_usage(&acc->mem, &p->mem);
 
@@ -85,7 +89,11 @@ void rmonitor_poll_all_wds_once(struct hash_table *wdirs, struct rmonitor_wdir_i
 		hash_table_firstkey(wdirs);
 		while(hash_table_nextkey(wdirs, &path, (void **) &d))
 		{
-			rmonitor_poll_wd_once(d, max_time_for_measurement);
+			int status = rmonitor_poll_wd_once(d, max_time_for_measurement);
+			/* do not consider directory if some error is found. */
+			if(status != 0)
+				continue;
+
 			acc_wd_usage(acc, d);
 		}
 	}
@@ -101,7 +109,11 @@ void rmonitor_poll_all_fss_once(struct itable *filesysms, struct rmonitor_filesy
 	itable_firstkey(filesysms);
 	while(itable_nextkey(filesysms, &dev_id, (void **) &f))
 	{
-		rmonitor_poll_fs_once(f);
+		int status = rmonitor_poll_fs_once(f);
+		/* do not consider fs if some error is found. */
+		if(status != 0)
+			continue;
+
 		acc_dsk_usage(&acc->disk, &f->disk);
 	}
 }
@@ -114,35 +126,37 @@ void rmonitor_poll_all_fss_once(struct itable *filesysms, struct rmonitor_filesy
 
 int rmonitor_poll_process_once(struct rmonitor_process_info *p)
 {
+	int status = 0;
+
 	debug(D_RMON, "monitoring process: %d\n", p->pid);
 
-	rmonitor_get_cpu_time_usage(p->pid, &p->cpu);
-	rmonitor_get_mem_usage(p->pid, &p->mem);
-	rmonitor_get_sys_io_usage(p->pid, &p->io);
-	//rmonitor_get_map_io_usage(p->pid, &p->io);
-	//
+	status |= rmonitor_get_cpu_time_usage(p->pid, &p->cpu);
+	status |= rmonitor_get_mem_usage(p->pid, &p->mem);
+	status |= rmonitor_get_sys_io_usage(p->pid, &p->io);
 
-	return 0;
+	return status;
 }
 
 int rmonitor_poll_wd_once(struct rmonitor_wdir_info *d, int max_time_for_measurement)
 {
 	debug(D_RMON, "monitoring dir %s\n", d->path);
 
-	rmonitor_get_wd_usage(d, max_time_for_measurement);
+	int status = rmonitor_get_wd_usage(d, max_time_for_measurement);
 
-	return 0;
+	return status;
 }
 
 int rmonitor_poll_fs_once(struct rmonitor_filesys_info *f)
 {
-	rmonitor_get_dsk_usage(f->path, &f->disk);
+	int status = rmonitor_get_dsk_usage(f->path, &f->disk);
 
-	f->disk.f_bfree  = f->disk_initial.f_bfree  - f->disk.f_bfree;
-	f->disk.f_bavail = f->disk_initial.f_bavail - f->disk.f_bavail;
-	f->disk.f_ffree  = f->disk_initial.f_ffree  - f->disk.f_ffree;
+	if(!status) {
+		f->disk.f_bfree  = f->disk_initial.f_bfree  - f->disk.f_bfree;
+		f->disk.f_bavail = f->disk_initial.f_bavail - f->disk.f_bavail;
+		f->disk.f_ffree  = f->disk_initial.f_ffree  - f->disk.f_ffree;
+	}
 
-	return 0;
+	return status;
 }
 
 /***
@@ -309,35 +323,29 @@ int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
 {
 	// /dev/proc/[pid]/status:
 
-	int status = 0;
-
 	FILE *fmem = open_proc_file(pid, "status");
-	if(!fmem) {
-		status = 1;
-	} else {
-		/* in kB */
-		status |= rmonitor_get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
-		status |= rmonitor_get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
-		status |= rmonitor_get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
-		status |= rmonitor_get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
-		status |= rmonitor_get_int_attribute(fmem, "VmData:", &mem->data,     1);
+	if(!fmem)
+		return 1;
 
-		/* from smaps when reading maps. */
-		mem->swap = 0;
+	int status = 0;
+	/* in kB */
+	status |= rmonitor_get_int_attribute(fmem, "VmPeak:", &mem->virtual,  1);
+	status |= rmonitor_get_int_attribute(fmem, "VmHWM:",  &mem->resident, 1);
+	status |= rmonitor_get_int_attribute(fmem, "VmLib:",  &mem->shared,   1);
+	status |= rmonitor_get_int_attribute(fmem, "VmExe:",  &mem->text,     1);
+	status |= rmonitor_get_int_attribute(fmem, "VmData:", &mem->data,     1);
 
-		fclose(fmem);
+	/* from smaps when reading maps. */
+	mem->swap = 0;
 
-		/* in MB */
-		mem->virtual  = div_round_up(mem->virtual,  1024);
-		mem->resident = div_round_up(mem->resident, 1024);
-		mem->text     = div_round_up(mem->text,     1024);
-		mem->data     = div_round_up(mem->data,     1024);
-		mem->shared   = div_round_up(mem->shared,   1024);
-	}
+	fclose(fmem);
 
-	/* Found some error, so reset values found. */
-	if(status)
-		bzero(mem, sizeof(struct rmonitor_mem_info));
+	/* in MB */
+	mem->virtual  = div_round_up(mem->virtual,  1024);
+	mem->resident = div_round_up(mem->resident, 1024);
+	mem->text     = div_round_up(mem->text,     1024);
+	mem->data     = div_round_up(mem->data,     1024);
+	mem->shared   = div_round_up(mem->shared,   1024);
 
 	return status;
 }
@@ -676,13 +684,14 @@ int rmonitor_get_wd_usage(struct rmonitor_wdir_info *d, int max_time_for_measure
 {
 	/* We need a pointer to a pointer, which it is not possible from a struct. Use a dummy variable. */
 	struct path_disk_size_info *state = d->state;
-	path_disk_size_info_get_r(d->path, max_time_for_measurement, &state);
+	int status = path_disk_size_info_get_r(d->path, max_time_for_measurement, &state);
+
 	d->state = state;
 
 	d->files = d->state->last_file_count_complete;
 	d->byte_count = d->state->last_byte_size_complete;
 
-	return 0;
+	return status;
 }
 
 void acc_wd_usage(struct rmonitor_wdir_info *acc, struct rmonitor_wdir_info *other)
