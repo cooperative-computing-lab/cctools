@@ -329,7 +329,7 @@ void wakeup_pselect_from_exit(int signum)
 		signal(SIGCONT, SIG_DFL);
 }
 
-void exit_wrapper_preamble(void)
+void exit_wrapper_preamble(int status)
 {
 	static int did_exit_wrapper = 0;
 
@@ -353,7 +353,7 @@ void exit_wrapper_preamble(void)
 	msg.type   = END_WAIT;
 	msg.error  = 0;
 	msg.origin = getpid();
-	msg.data.p = getpid();
+	msg.data.n = status;
 
 	send_monitor_msg(&msg);
 
@@ -382,7 +382,7 @@ void end_wrapper_epilogue(void)
 
 void exit(int status)
 {
-	exit_wrapper_preamble();
+	exit_wrapper_preamble(status);
 	end_wrapper_epilogue();
 
 	debug(D_RMON, "%d about to call exit()\n", getpid());
@@ -403,7 +403,7 @@ void _exit(int status)
 	   will be ignored as the processes would no longer in the
 	   monitoring tables. */
 
-	exit_wrapper_preamble();
+	exit_wrapper_preamble(status);
 	end_wrapper_epilogue();
 
 	debug(D_RMON, "%d about to call _exit()\n", getpid());
@@ -449,13 +449,16 @@ pid_t wait(int *status)
 }
 
 
-/* wrap main ensuring exit_wrapper_preamble for one final monitoring
-   checks gets called at least once */
+/* wrap main ensures exit_wrapper_preamble runs, and thus monitoring
+is done at least once */
 
 #if defined(__clang__) || defined(__GNUC__)
 void __attribute__((destructor)) init() {
-	exit_wrapper_preamble();
+	/* we use default status of 0, since if command did not call exit
+	 * explicitely, that is the default. */
+	exit_wrapper_preamble(0);
 }
+
 #endif
 
 /* vim: set noexpandtab tabstop=4: */

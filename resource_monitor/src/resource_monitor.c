@@ -166,9 +166,10 @@ int    rmonitor_queue_fd = -1;  /* File descriptor of a datagram socket to which
                                   grandchildren processes report to the monitor. */
 static int rmonitor_inotify_fd = -1;
 
-pid_t  first_process_pid;              /* pid of the process given at the command line */
-pid_t  first_process_sigchild_status;  /* exit status flags of the process given at the command line */
-pid_t  first_process_already_waited = 0;  /* exit status flags of the process given at the command line */
+pid_t  first_process_pid;                 /* pid of the process given at the command line */
+int    first_process_sigchild_status;     /* exit status flags of the process given at the command line */
+int    first_process_already_waited = 0;  /* exit status flags of the process given at the command line */
+int    first_process_exit_status = 0;
 
 struct itable *processes;       /* Maps the pid of a process to a unique struct rmonitor_process_info. */
 struct hash_table *wdirs;       /* Maps paths to working directory structures. */
@@ -704,11 +705,14 @@ void rmonitor_log_row(struct rmsummary *tr)
 
 void decode_zombie_status(struct rmsummary *summary, int wait_status)
 {
+	/* update from any END_WAIT message received. */
+	summary->exit_status = first_process_exit_status;
+
 	if( WIFEXITED(wait_status) )
 	{
 		debug(D_RMON, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(wait_status));
 		summary->exit_type = xxstrdup("normal");
-		summary->exit_status = WEXITSTATUS(first_process_sigchild_status);
+		summary->exit_status = WEXITSTATUS(wait_status);
 	}
 	else if ( WIFSIGNALED(wait_status) || WIFSTOPPED(wait_status) )
 	{
@@ -716,22 +720,22 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 		      first_process_pid,
 		      strsignal(WIFSIGNALED(wait_status) ? WTERMSIG(wait_status) : WSTOPSIG(wait_status)));
 
-		summary->exit_type = xxstrdup("signal");
-		summary->exit_status = -1;
+		summary->exit_type   = xxstrdup("signal");
 
 		if(WIFSIGNALED(wait_status))
 			summary->signal    = WTERMSIG(wait_status);
 		else
 			summary->signal    = WSTOPSIG(wait_status);
+
+		summary->exit_status   = 128 + summary->signal;
 	}
 
 	if(summary->limits_exceeded)
 	{
 		free(summary->exit_type);
-		summary->exit_type = xxstrdup("limits");
-		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
+		summary->exit_type   = xxstrdup("limits");
+		summary->exit_status = 128 + SIGTERM;
 	}
-
 }
 
 void rmonitor_find_files_final_sizes() {
@@ -839,8 +843,12 @@ int rmonitor_final_summary()
 	summary->end       = usecs_since_epoch();
 	summary->wall_time = summary->end - summary->start;
 
-	if(summary->exit_status == 0 && summary->limits_exceeded)
-		summary->exit_status = RESOURCES_EXCEEDED_EXIT_CODE;
+	if(summary->limits_exceeded) {
+		summary->exit_status = 128 + SIGTERM;
+	}
+	else {
+		summary->exit_status = first_process_exit_status;
+	}
 
 	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s", "", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, CCTOOLS_COMMIT);
 	list_push_tail(verbatim_summary_lines, monitor_self_info);
@@ -1259,9 +1267,11 @@ void rmonitor_dispatch_msg(void)
             break;
         case END_WAIT:
             p->waiting = 1;
+			if(msg.origin == first_process_pid)
+				first_process_exit_status = msg.data.n;
             break;
         case END:
-            rmonitor_untrack_process(msg.data.p);
+            rmonitor_untrack_process(msg.origin);
             break;
         case CHDIR:
 			if(follow_chdir)
