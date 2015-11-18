@@ -1,0 +1,69 @@
+{
+    "centos-6.6-x86_64": {
+        "902703f016e0f930a870eaf9cb31640b": {
+            "size": "72213624", 
+            "checksum": "902703f016e0f930a870eaf9cb31640b", 
+            "format": "tgz", 
+            "uncompressed_size": "212684800", 
+            "source": [
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/902703f016e0f930a870eaf9cb31640b/centos-6.6-x86_64.tar.gz"
+            ]
+        }
+    }, 
+    "epel.repo": {
+        "4cd77946d1b5176987036e8fb382ce2d": {
+            "size": "957", 
+            "checksum": "4cd77946d1b5176987036e8fb382ce2d", 
+            "format": "plain", 
+            "source": [
+                "https://curate.nd.edu/downloads/fx719k4458m", 
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/4cd77946d1b5176987036e8fb382ce2d/epel.repo"
+            ]
+        }
+    }, 
+    "openMalaria-32-centos6-x86_64": {
+        "97cff84e58a4172fd8e9d1cb25c6047c": {
+            "size": "2968452", 
+            "checksum": "97cff84e58a4172fd8e9d1cb25c6047c", 
+            "format": "tgz", 
+            "uncompressed_size": "12881920", 
+            "source": [
+                "https://curate.nd.edu/downloads/ft848p60w7x", 
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/97cff84e58a4172fd8e9d1cb25c6047c/openMalaria-32-centos6-x86_64.tar.gz"
+            ]
+        }
+    }, 
+    "densities.csv": {
+        "54ea34d38d96c311122642aec045bc40": {
+            "size": "38132", 
+            "checksum": "54ea34d38d96c311122642aec045bc40", 
+            "format": "plain", 
+            "source": [
+                "https://curate.nd.edu/downloads/fn106w94b5c", 
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/54ea34d38d96c311122642aec045bc40/densities.csv"
+            ]
+        }
+    }, 
+    "scenario.xml": {
+        "e28c0c145c801789b0919d175f0afa9c": {
+            "size": "8227", 
+            "checksum": "e28c0c145c801789b0919d175f0afa9c", 
+            "format": "plain", 
+            "source": [
+                "https://curate.nd.edu/downloads/fq977s77m61", 
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/e28c0c145c801789b0919d175f0afa9c/scenario.xml"
+            ]
+        }
+    }, 
+    "scenario_32.xsd": {
+        "bef8a475dbd3765b61995f36b11b0672": {
+            "size": "200376", 
+            "checksum": "bef8a475dbd3765b61995f36b11b0672", 
+            "format": "plain", 
+            "source": [
+                "https://curate.nd.edu/downloads/fj23611124x", 
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/bef8a475dbd3765b61995f36b11b0672/scenario_32.xsd"
+            ]
+        }
+    }
+}

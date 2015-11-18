@@ -35,8 +35,15 @@
 		}
 	},
 	"environ": {
+		"PWD": "/tmp",
 		"CMS_VERSION": "CMSSW_4_2_8",
 		"SCRAM_ARCH": "slc5_amd64_gcc434"
 	},
-	"cmd": "/bin/sh /tmp/git_protocol.sh"
+	"cmd": "/bin/sh /tmp/git_protocol.sh",
+	"output": {
+		"files": [],
+		"dirs": [
+			"/tmp/CMSSW_4_2_8"
+		]
+	}
 }

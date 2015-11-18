@@ -910,7 +910,7 @@ def get_linker_path(hardware_platform, os_image_dir):
 	else:
 		return None
 
-def construct_docker_volume(input_dict, mount_dict):
+def construct_docker_volume(input_dict, mount_dict, output_f_dict, output_d_dict):
 	"""Construct the docker volume parameters based on mount_dict.
 
 	Args:
@@ -928,6 +928,12 @@ def construct_docker_volume(input_dict, mount_dict):
 
 	for key in input_dict:
 		volume_paras = volume_paras + " -v " + input_dict[key] + ":" + key + " "
+
+	for key in output_f_dict:
+		volume_paras = volume_paras + " -v " + output_f_dict[key] + ":" + key + " "
+
+	for key in output_d_dict:
+		volume_paras = volume_paras + " -v " + output_d_dict[key] + ":" + key + " "
 
 	return volume_paras
 
@@ -1075,7 +1081,7 @@ def remove_trailing_slashes(path):
 		path = path[:-1]
 	return path
 
-def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, cvmfs_cms_siteconf_mountpoint):
+def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, output_f_dict, output_d_dict, cvmfs_cms_siteconf_mountpoint):
 	"""Create the mountfile if parrot is used to create a sandbox for the application and a separate rootfs is needed.
 	The trick here is the adding sequence does matter. The latter-added items will be checked first during the execution.
 
@@ -1114,6 +1120,12 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 			mount_list.append(mount_dict[key])
 			mountfile.write(key + " " + mount_dict[key] + "\n")
 			mountfile.write(mount_dict[key] + " " + mount_dict[key] + "\n")
+
+		for key in output_f_dict:
+			mountfile.write(key + " " + output_f_dict[key] + "\n")
+
+		for key in output_d_dict:
+			mountfile.write(key + " " + output_d_dict[key] + "\n")
 
 		#common-mountlist includes all the common mountpoint (/proc, /dev, /sys, /mnt, /disc, /selinux)
 		if os.path.exists(os_image_dir + "/common-mountlist") and os.path.isfile(os_image_dir + "/common-mountlist"):
@@ -1231,7 +1243,7 @@ def construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mount
 
 	return mountfile_path
 
-def construct_mountfile_easy(sandbox_dir, input_dict, mount_dict, cvmfs_cms_siteconf_mountpoint):
+def construct_mountfile_easy(sandbox_dir, input_dict, output_f_dict, output_d_dict, mount_dict, cvmfs_cms_siteconf_mountpoint):
 	""" Create the mountfile if parrot is used to create a sandbox for the application and a separate rootfs is not needed.
 	The trick here is the adding sequence does matter. The latter-added items will be checked first during the execution.
 
@@ -1248,6 +1260,12 @@ def construct_mountfile_easy(sandbox_dir, input_dict, mount_dict, cvmfs_cms_site
 	with open(mountfile_path, "wb") as f:
 		for key in input_dict:
 			f.write(key + " " + input_dict[key] + "\n")
+
+		for key in output_f_dict:
+			f.write(key + " " + output_f_dict[key] + "\n")
+
+		for key in output_d_dict:
+			f.write(key + " " + output_d_dict[key] + "\n")
 
 		for key in mount_dict:
 			f.write(key + " " + mount_dict[key] + "\n")
@@ -1337,7 +1355,8 @@ def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separa
 
 	Args:
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
-		output_dir: the output directory.
+		output_f_dict: the mappings of output files (key is the file path used by the application; value is the file path the user specifies.)
+		output_d_dict: the mappings of output dirs (key is the dir path used by the application; value is the dir path the user specified.)
 		input_dict: the setting of input files specified by the --inputs option.
 		need_separate_rootfs: whether a separate rootfs is needed to execute the user's command.
 		os_image_dir: the path of the OS image inside the umbrella local cache.
@@ -1509,14 +1528,15 @@ def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, 
 						os.rmdir(parent_dir)
 						parent_dir = os.path.dirname(parent_dir)
 
-def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_image_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, new_os_image_dir):
+def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_image_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, new_os_image_dir):
 	"""Run user's task with the help of the sandbox techniques, which currently inculde chroot, parrot, docker.
 
 	Args:
 		cwd_setting: the current working directory for the execution of the user's command.
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		sandbox_mode: the execution engine.
-		output_dir: the output directory.
+		output_f_dict: the mappings of output files (key is the file path used by the application; value is the file path the user specifies.)
+		output_d_dict: the mappings of output dirs (key is the dir path used by the application; value is the dir path the user specified.)
 		input_dict: the setting of input files specified by the --inputs option.
 		env_para_dict: the environment variables which need to be set for the execution of the user's command.
 		user_cmd: the user's command.
@@ -1598,7 +1618,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			volume_output = " -v %s:%s " % (sandbox_dir, sandbox_dir)
 			#-v /home/hmeng/umbrella_test/cache/git-x86_64-redhat5:/software/git-x86_64-redhat5/
 			logging.debug("Start to construct other volumes from input_dict")
-			volume_parameters = construct_docker_volume(input_dict, mount_dict)
+			volume_parameters = construct_docker_volume(input_dict, mount_dict, output_f_dict, output_d_dict)
 
 			#-e "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/software/git-x86_64-redhat5/bin"
 			logging.debug("Set the environment variables ....")
@@ -1608,7 +1628,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			docker_image_name = "%s-%s-%s" %(distro_name, distro_version, hardware_platform)
 
 			#by default, docker executes user_cmd as the root user, `chown` is used to change the owner of the output dir to be the user who calls `umbrella`
-			chown_cmd = 'chown -R %d:%d %s' % (os.getuid(), os.getgid(), sandbox_dir)
+			chown_cmd = 'chown -R %d:%d %s %s %s' % (os.getuid(), os.getgid(), sandbox_dir, ' '.join(output_f_dict), ' '.join(output_d_dict))
 
 			#to count the post processing time, this cmd is split into two commands
 			container_name = "umbrella_%s_%s_%s" % (docker_image_name, os_image_id, os.path.basename(sandbox_dir))
@@ -1645,10 +1665,6 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			if rc != 0:
 				subprocess_error(cmd, rc, stdout, stderr)
 
-			logging.debug("Rename the sandbox dir(%s) to the output directory(%s)", sandbox_dir, output_dir)
-			shutil.rmtree(output_dir)
-			os.renames(sandbox_dir, output_dir)
-			print "The output has been put into the output dir: %s" % output_dir
 		else:
 			#if a separate rootfs is not needed to execute the user's cmd, should forcely use other execution engine to run the user cmd.
 			cleanup(tempfile_list, tempdir_list)
@@ -1660,7 +1676,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			env_dict = construct_env(sandbox_dir, os_image_dir)
 			env_dict['PWD'] = cwd_setting
 			logging.debug("Construct mounfile ....")
-			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, cvmfs_cms_siteconf_mountpoint)
+			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, output_f_dict, output_d_dict, cvmfs_cms_siteconf_mountpoint)
 			for key in env_para_dict:
 				env_dict[key] = env_para_dict[key]
 
@@ -1686,7 +1702,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
 		else:
 			env_dict = os.environ
-			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_easy(sandbox_dir, input_dict, mount_dict, cvmfs_cms_siteconf_mountpoint)
+			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_easy(sandbox_dir, input_dict, output_f_dict, output_d_dict, mount_dict, cvmfs_cms_siteconf_mountpoint)
 			for key in env_para_dict:
 				env_dict[key] = env_para_dict[key]
 
@@ -1708,9 +1724,6 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_di
 #		if os.path.exists(env_dict['PARROT_MOUNT_FILE']):
 #			os.remove(env_dict['PARROT_MOUNT_FILE'])
 
-		logging.debug("Rename sandbox_dir (%s) to output_dir (%s)", sandbox_dir, output_dir)
-		os.rename(sandbox_dir, output_dir)
-		print "The output has been put into the output dir: %s" % output_dir
 	else:
 		pass
 
@@ -2153,7 +2166,7 @@ def cal_new_os_id(sec, old_os_id, pac_list):
 	md5_value = md5.hexdigest()
 	return (md5_value, install_cmd)
 
-def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy):
+def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy):
 	""" Create the execution environment specified in the specification file and run the task on it.
 
 	Args:
@@ -2162,7 +2175,8 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 		behavior: the umbrella behavior, such as `run`.
 		meta_json: the json object including all the metadata of dependencies.
 		sandbox_mode: the execution engine.
-		output_dir: the output directory.
+		output_f_dict: the mappings of output files (key is the file path used by the application; value is the file path the user specifies.)
+		output_d_dict: the mappings of output dirs (key is the dir path used by the application; value is the dir path the user specified.)
 		input_dict: the setting of input files specified by the --inputs option.
 		env_para_dict: the environment variables which need to be set for the execution of the user's command.
 		user_cmd: the user's command.
@@ -2319,7 +2333,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 
 				#install dependencies through package managers
 				logging.debug("Create an intermediate OS image with all the dependencies from package managers ready!")
-				workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir)
+				workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir)
 				logging.debug("Finishing creating the intermediate OS image!")
 
 			#use the intermidate os image which has all the dependencies from package manager ready as the os image
@@ -2338,7 +2352,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 	else:
 		logging.debug("this spec does not have data section!")
 
-	workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, "")
+	workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, "")
 
 def dependency_check(item):
 	"""Check whether an executable exists or not.
@@ -2449,7 +2463,6 @@ def add2spec(item, source_dict, target_dict):
 		None
 	"""
 	#item must exist inside target_dict.
-
 	ident = None
 	if source_dict.has_key("checksum"):
 		checksum = source_dict["checksum"]
@@ -2730,10 +2743,10 @@ def separatize_spec(spec_json, meta_json, target_type):
 	os_version = attr_check(os_sec, "version")
 	os_item = "%s-%s-%s" % (os_name, os_version, hardware_arch)
 	os_item = os_item.lower()
-	id = None
+	ident = None
 	if os_sec.has_key("id"):
-		id = os_sec["id"]
-	source = meta_search(meta_json, os_item, id)
+		ident = os_sec["id"]
+	source = meta_search(meta_json, os_item, ident)
 
 	if target_type == "spec":
 		add2spec(os_item, source, metadata["os"])
@@ -2745,10 +2758,10 @@ def separatize_spec(spec_json, meta_json, target_type):
 		pm_config_sec = spec_json["package_manager"]["config"]
 		if pm_config_sec:
 			for item in pm_config_sec:
-				id = None
-				if pm_config_sec.has_key("id"):
-					id = pm_config_sec["id"]
-				source = meta_search(meta_json, item, id)
+				ident = None
+				if pm_config_sec[item].has_key("id"):
+					ident = pm_config_sec[item]["id"]
+				source = meta_search(meta_json, item, ident)
 				if target_type == "spec":
 					add2spec(os_item, source, metadata["package_manager"]["config"][item])
 				if target_type == "meta":
@@ -2758,10 +2771,10 @@ def separatize_spec(spec_json, meta_json, target_type):
 		software_sec = spec_json["software"]
 		if software_sec:
 			for item in software_sec:
-				id = None
-				if software_sec.has_key("id"):
-					id = software_sec["id"]
-				source = meta_search(meta_json, item, id)
+				ident = None
+				if software_sec[item].has_key("id"):
+					ident = software_sec[item]["id"]
+				source = meta_search(meta_json, item, ident)
 				if target_type == "spec":
 					add2spec(os_item, source, metadata["software"][item])
 				if target_type == "meta":
@@ -2771,10 +2784,10 @@ def separatize_spec(spec_json, meta_json, target_type):
 		data_sec = spec_json["data"]
 		if data_sec:
 			for item in data_sec:
-				id = None
-				if data_sec.has_key("id"):
-					id = data_sec["id"]
-				source = meta_search(meta_json, item, id)
+				ident = None
+				if data_sec[item].has_key("id"):
+					ident = data_sec[item]["id"]
+				source = meta_search(meta_json, item, ident)
 				if target_type == "spec":
 					add2spec(os_item, source, metadata["data"][item])
 				if target_type == "meta":
@@ -2913,8 +2926,7 @@ def main():
 					help="The path of directory used for all the cached data and all the sandboxes, the directory can be an existing dir. (By default: ./umbrella_test)",)
 	parser.add_option("-o", "--output",
 					action="store",
-					default="./umbrella_output",
-					help="The path of output directory, which must be non-existing or empty. (By default: ./umbrella_output)",)
+					help="The mappings of outputs in the format of container_path=local_path (i.e., /container/f1=/tmp/output/f1). Multiple mappings should be separated by comma. container_path should be consistent with the semantics of the application, local path must be non-existing.",)
 	parser.add_option("-s", "--sandbox_mode",
 					action="store",
 					default="parrot",
@@ -3113,18 +3125,80 @@ def main():
 
 		#get the absolute path of each output file
 		output_dir = options.output
-		output_dir = os.path.abspath(output_dir)
+		output_dict = {}
+		output_f_dict = {}
+		output_d_dict = {}
+		if output_dir and len(output_dir) > 0:
+			output_dir = re.sub( '\s+', '', output_dir).strip() #remove all the whitespaces within the inputs option
+			if output_dir == "":
+				logging.debug("the output option is null!")
+			else:
+				logging.debug("the output option: %s", output_dir)
+				outputs = output_dir.split(',')
+				for item in outputs:
+					index = item.find('=')
+					access_path = item[:index]
+					actual_path = item[(index+1):]
+					if access_path[0] != '/':
+						logging.critical("the path of an output should be absolute!")
+						sys.exit("the path of an output should be absolute!")
+					actual_path = os.path.abspath(actual_path)
+					output_dict[access_path] = actual_path
 
-		if not os.path.exists(output_dir):
-			logging.debug("create the output_dir: %s", output_dir)
-			os.makedirs(output_dir)
-		elif len(output_dir) != 0:
-			cleanup(tempfile_list, tempdir_list)
-			logging.critical("output_dir (%s) is not empty!", output_dir)
-			sys.exit("%s is not empty! Please clean the output directory first or specify another directory!\n" % output_dir)
-		else:
-			pass
+		if len(output_dict) > 0:
+			if spec_json.has_key("output"):
+				files = []
+				dirs = []
+				if spec_json["output"].has_key("files"):
+					files = spec_json["output"]["files"]
 
+				if spec_json["output"].has_key("dirs"):
+					dirs = spec_json["output"]["dirs"]
+
+				for key in output_dict.keys():
+					if key in files:
+						output_f_dict[key] = output_dict[key]
+					elif key in dirs:
+						output_d_dict[key] = output_dict[key]
+					else:
+						logging.critical("the output file (%s) is not specified in the spec file!", key)
+						sys.exit("the output file (%s) is not specified in the spec file!" % key)
+			else:
+				logging.critical("the specification does not have a output section!")
+				sys.exit("the specification does not have a output section!")
+
+		del output_dict
+
+		for f in output_f_dict.values():
+			if not os.path.exists(f):
+				logging.debug("create the output file: %s", f)
+				d = os.path.dirname(f)
+				if not os.path.exists(d):
+					os.makedirs(d)
+				elif not os.path.isdir(d):
+					logging.critical("the parent path of the output file (%s) is not a directory!", f)
+					sys.exit("the parent path of the output file (%s) is not a directory!" % f)
+				else:
+					pass
+				new_file = open(f, 'a')
+				new_file.close()
+			elif len(f) != 0:
+				cleanup(tempfile_list, tempdir_list)
+				logging.critical("the output file (%s) already exists!", f)
+				sys.exit("the output file (%s) already exists!\n" % f)
+			else:
+				pass
+
+		for d in output_d_dict.values():
+			if not os.path.exists(d):
+				logging.debug("create the output dir: %s", d)
+				os.makedirs(d)
+			elif len(d) != 0:
+				cleanup(tempfile_list, tempdir_list)
+				logging.critical("the output dir (%s) already exists!", d)
+				sys.exit("the output dir(%s) already exists!" % d)
+			else:
+				pass
 
 	meta_json = None
 	if behavior in ["run", "expand", "filter", "validate"]:
@@ -3240,16 +3314,16 @@ def main():
 			#first check whether Docker exists, if yes, use docker execution engine; if not, use parrot execution engine.
 			if dependency_check('docker') == 0:
 				logging.debug('docker exists, use docker execution engine')
-				specification_process(spec_json, sandbox_dir, behavior, meta_json, 'docker', output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
+				specification_process(spec_json, sandbox_dir, behavior, meta_json, 'docker', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
 			else:
 				logging.debug('docker does not exist, use parrot execution engine')
-				specification_process(spec_json, sandbox_dir, behavior, meta_json, 'parrot', output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
+				specification_process(spec_json, sandbox_dir, behavior, meta_json, 'parrot', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
 		else:
 			if sandbox_mode == 'docker' and dependency_check('docker') != 0:
 				cleanup(tempfile_list, tempdir_list)
 				logging.critical('Docker is not installed on the host machine, please try other execution engines!')
 				sys.exit('Docker is not installed on the host machine, please try other execution engines!')
-			specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_dir, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
+			specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy)
 
 	if behavior in ["expand", "filter"]:
 		if len(args) != 2:

@@ -11,6 +11,7 @@
 		"version": ">=2.6.32"
 	},
 	"os": {
+		"id": "669ab5ef94af84d273f8f92a86b7907a",
 		"name": "Redhat",
 		"version": "6.5"
 	},
@@ -33,8 +34,15 @@
 		}
 	},
 	"environ": {
+		"PWD": "/tmp",
 		"CMS_VERSION": "CMSSW_5_2_5",
 		"SCRAM_ARCH": "slc5_amd64_gcc462"
 	},
-	"cmd": "/bin/sh /tmp/cms_complex.sh"
+	"cmd": "/bin/sh /tmp/cms_complex.sh",
+	"output": {
+		"files": [],
+		"dirs": [
+			"/tmp/sim_job"
+		]
+	}
 }

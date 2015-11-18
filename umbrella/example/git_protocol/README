@@ -6,7 +6,7 @@ umbrella \
 --spec git_protocol.umbrella \
 --meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/parrot_git_protocol_output \
+--output "/tmp/CMSSW_4_2_8=/tmp/umbrella_test/parrot_git_protocol_output" \
 --sandbox_mode parrot \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
@@ -17,7 +17,7 @@ umbrella \
 --spec git_protocol.umbrella \
 --meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/docker_git_protocol_output \
+--output "/tmp/CMSSW_4_2_8=/tmp/umbrella_test/docker_git_protocol_output" \
 --sandbox_mode docker \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \

@@ -6,7 +6,7 @@ umbrella \
 --spec povray.umbrella \
 --meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/parrot_povray \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray/output.png" \
 --sandbox_mode parrot \
 --log umbrella.log \
 run
@@ -17,7 +17,7 @@ umbrella \
 --spec povray.umbrella \
 --meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/docker_povray \
+--output "/tmp/frame000.png=/tmp/umbrella_test/docker_povray/output.png" \
 --sandbox_mode docker \
 --log umbrella.log \
 run
@@ -30,7 +30,7 @@ expand povray_S.umbrella
 umbrella \
 --spec povray_S.umbrella \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/parrot_povray_S \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S/output.png" \
 --sandbox_mode parrot \
 --log umbrella.log \
 run
@@ -39,6 +39,7 @@ umbrella \
 --spec povray_S.umbrella \
 --localdir /tmp/umbrella_test/ \
 --output /tmp/umbrella_test/docker_povray_S \
+--output "/tmp/frame000.png=/tmp/umbrella_test/docker_povray_S/output.png" \
 --sandbox_mode docker \
 --log umbrella.log \
 run

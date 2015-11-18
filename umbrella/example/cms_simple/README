@@ -6,11 +6,12 @@ umbrella \
 --spec cms_simple.umbrella \
 --meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/parrot_cms_simple_output \
+--output "/tmp/cmsjob=/tmp/umbrella_test/parrot_cms_simple_output" \
 --sandbox_mode parrot \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 run
+
 
 #Docker execution engine test command. Don't do the docker test under your afs,
 #it will fail due to the ACL of your afs.
@@ -18,8 +19,14 @@ umbrella \
 --spec cms_simple.umbrella \
 --meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/docker_cms_simple_output \
+--output "/tmp/cmsjob=/tmp/umbrella_test/docker_cms_simple_output" \
 --sandbox_mode docker \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 run
+
+#expand cms_simple.umbrella into a self-contained spec
+umbrella \
+--spec cms_simple.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+expand cms_simple_S.umbrella
