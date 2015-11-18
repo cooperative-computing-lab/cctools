@@ -55,7 +55,7 @@
 pid_t fork()
 {
 	pid_t pid;
-	typeof(fork) *original_fork = dlsym(RTLD_NEXT, "fork");
+	__typeof__(fork) *original_fork = dlsym(RTLD_NEXT, "fork");
 
 	debug(D_RMON, "fork from %d.\n", getpid());
 	pid = original_fork();
@@ -95,7 +95,7 @@ pid_t __vfork()
 int chdir(const char *path)
 {
 	int   status;
-	typeof(chdir) *original_chdir = dlsym(RTLD_NEXT, "chdir");
+	__typeof__(chdir) *original_chdir = dlsym(RTLD_NEXT, "chdir");
 
 	debug(D_RMON, "chdir from %d.\n", getpid());
 	status = original_chdir(path);
@@ -122,7 +122,7 @@ int chdir(const char *path)
 int fchdir(int fd)
 {
 	int   status;
-	typeof(fchdir) *original_fchdir = dlsym(RTLD_NEXT, "fchdir");
+	__typeof__(fchdir) *original_fchdir = dlsym(RTLD_NEXT, "fchdir");
 
 	debug(D_RMON, "fchdir from %d.\n", getpid());
 	status = original_fchdir(fd);
@@ -165,7 +165,7 @@ FILE *fopen(const char *path, const char *mode)
 	struct rmonitor_msg msg;
 
 	FILE *file;
-	typeof(fopen) *original_fopen = dlsym(RTLD_NEXT, "fopen");
+	__typeof__(fopen) *original_fopen = dlsym(RTLD_NEXT, "fopen");
 
 	debug(D_RMON, "fopen %s mode %s from %d.\n", path, mode, getpid());
 
@@ -200,7 +200,7 @@ int open(const char *path, int flags, ...)
 	int     fd;
 	int     mode;
 
-	typeof(open) *original_open = dlsym(RTLD_NEXT, "open");
+	__typeof__(open) *original_open = dlsym(RTLD_NEXT, "open");
 
 	va_start(ap, flags);
 	mode = va_arg(ap, int);
@@ -237,7 +237,7 @@ FILE *fopen64(const char *path, const char *mode)
 	struct rmonitor_msg msg;
 
 	FILE *file;
-	typeof(fopen64) *original_fopen64 = dlsym(RTLD_NEXT, "fopen64");
+	__typeof__(fopen64) *original_fopen64 = dlsym(RTLD_NEXT, "fopen64");
 
 	debug(D_RMON, "fopen64 %s mode %s from %d.\n", path, mode, getpid());
 
@@ -272,7 +272,7 @@ int open64(const char *path, int flags, ...)
 	int     fd;
 	int     mode;
 
-	typeof(open64) *original_open64 = dlsym(RTLD_NEXT, "open64");
+	__typeof__(open64) *original_open64 = dlsym(RTLD_NEXT, "open64");
 
 	va_start(ap, flags);
 	mode = va_arg(ap, int);
@@ -310,7 +310,7 @@ ssize_t write(int fd, const void *buf, size_t count)
 	msg.type   = WRITE;
 	msg.origin = getpid();
 
-	typeof(write) *original_write = dlsym(RTLD_NEXT, "write");
+	__typeof__(write) *original_write = dlsym(RTLD_NEXT, "write");
 
 	ssize_t real_count;
 	PUSH_ERRNO
@@ -387,7 +387,7 @@ void exit(int status)
 
 	debug(D_RMON, "%d about to call exit()\n", getpid());
 
-	typeof(exit) *original_exit = dlsym(RTLD_NEXT, "exit");
+	__typeof__(exit) *original_exit = dlsym(RTLD_NEXT, "exit");
 	original_exit(status);
 
 	/* we exited in the above line. The next line is to make the compiler
@@ -408,7 +408,7 @@ void _exit(int status)
 
 	debug(D_RMON, "%d about to call _exit()\n", getpid());
 
-	typeof(_exit) *original_exit = dlsym(RTLD_NEXT, "_exit");
+	__typeof__(_exit) *original_exit = dlsym(RTLD_NEXT, "_exit");
 	original_exit(status);
 
 	/* we exit in the above line. The next line is to make the compiler
@@ -421,7 +421,7 @@ pid_t waitpid(pid_t pid, int *status, int options)
 {
 	int status_; //status might be NULL, thus we use status_ to retrive the state.
 	pid_t pidb;
-	typeof(waitpid) *original_waitpid = dlsym(RTLD_NEXT, "waitpid");
+	__typeof__(waitpid) *original_waitpid = dlsym(RTLD_NEXT, "waitpid");
 
 	debug(D_RMON, "waiting from %d for %d.\n", getpid(), pid);
 	pidb = original_waitpid(pid, &status_, options);
