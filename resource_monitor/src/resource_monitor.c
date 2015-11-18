@@ -151,8 +151,6 @@ See the file COPYING for details.
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
 
-#define RESOURCES_EXCEEDED_EXIT_CODE 147
-
 #define DEFAULT_INTERVAL       ONE_SECOND        /* in useconds */
 
 #define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
@@ -241,11 +239,15 @@ FILE *open_log_file(const char *log_path)
     {
         dirname = xxstrdup(log_path);
         path_dirname(log_path, dirname);
-        if(!create_dir(dirname, 0755))
-            fatal("could not create directory %s : %s\n", dirname, strerror(errno));
+        if(!create_dir(dirname, 0755)) {
+            debug(D_FATAL, "could not create directory %s : %s\n", dirname, strerror(errno));
+			exit(RM_MONITOR_ERROR);
+		}
 
-        if((log_file = fopen(log_path, "w")) == NULL)
-            fatal("could not open log file %s : %s\n", log_path, strerror(errno));
+        if((log_file = fopen(log_path, "w")) == NULL) {
+            debug(D_FATAL, "could not open log file %s : %s\n", log_path, strerror(errno));
+			exit(RM_MONITOR_ERROR);
+		}
 
         free(dirname);
     }
@@ -276,17 +278,17 @@ void parse_limits_file(struct rmsummary *limits, char *path)
 }
 
 
-void rmonitor_determine_exec_type(const char *executable) {
+int rmonitor_determine_exec_type(const char *executable) {
 	char *absolute_exec = path_which(executable);
 	char exec_type[PATH_MAX];
 
 	if(!absolute_exec)
-		return;
+		return 1;
 
 	int fd = open(absolute_exec, O_RDONLY, 0);
 	if(fd < 0) {
 		debug(D_RMON, "Could not open '%s' for reading.", absolute_exec);
-		return;
+		return 1;
 	}
 
 	bzero(exec_type, PATH_MAX);
@@ -324,6 +326,8 @@ void rmonitor_determine_exec_type(const char *executable) {
 
 	debug(D_RMON, "%s", type_field);
 	list_push_tail(verbatim_summary_lines, type_field);
+
+	return 0;
 }
 
 
@@ -877,7 +881,18 @@ int rmonitor_final_summary()
 	if(epilogue)
 		free(epilogue);
 
-	return summary->exit_status;
+
+	int status;
+
+	if(summary->limits_exceeded) {
+		status = RM_OVERFLOW;
+	} else if(summary->exit_status != 0) {
+		status = RM_TASK_ERROR;
+	} else {
+		status = RM_SUCCESS;
+	}
+
+	return status;
 }
 
 /***
@@ -1008,8 +1023,7 @@ struct rmsummary *rmonitor_rusage_tree(void)
 /* sigchild signal handler */
 void rmonitor_check_child(const int signal)
 {
-    uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status,
-                           WNOHANG | WCONTINUED | WUNTRACED);
+    uint64_t pid = waitpid(first_process_pid, &first_process_sigchild_status, WNOHANG | WCONTINUED | WUNTRACED);
 
     if(pid != (uint64_t) first_process_pid)
 	    return;
@@ -1406,17 +1420,21 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
                 /* Try bringing the child process to the session foreground */
                 retc = tcsetpgrp(fdtty, getpgid(pid));
                 if (retc < 0)
-                {
-                 fatal("error bringing process to the session foreground (tcsetpgrp): %s\n", strerror(errno));
-                }
-                close(fdtty);
-            } else {
-                fatal("error accessing controlling terminal (/dev/tty): %s\n", strerror(errno));
-            }
+				{
+					debug(D_FATAL, "error bringing process to the session foreground (tcsetpgrp): %s\n", strerror(errno));
+					exit(RM_MONITOR_ERROR);
+				}
+				close(fdtty);
+			} else {
+				debug(D_FATAL, "error accessing controlling terminal (/dev/tty): %s\n", strerror(errno));
+				exit(RM_MONITOR_ERROR);
+			}
         }
     }
-    else if(pid < 0)
-        fatal("fork failed: %s\n", strerror(errno));
+    else if(pid < 0) {
+		debug(D_FATAL, "fork failed: %s\n", strerror(errno));
+		exit(RM_MONITOR_ERROR);
+	}
     else //child
     {
         debug(D_RMON, "executing: %s\n", executable);
@@ -1637,8 +1655,10 @@ int main(int argc, char **argv) {
 				break;
 			case 'i':
 				interval = strtoll(optarg, NULL, 10);
-				if(interval < 1)
-					fatal("interval cannot be set to less than one microsecond.");
+				if(interval < 1) {
+					debug(D_FATAL, "interval cannot be set to less than one microsecond.");
+					exit(RM_MONITOR_ERROR);
+				}
 				break;
 			case 'l':
 				parse_limits_file(resources_limits, optarg);
@@ -1671,8 +1691,10 @@ int main(int argc, char **argv) {
 				break;
 			case LONG_OPT_MEASURE_DIR:
 				path_absolute(optarg, measure_dir_name, 0);
-				if(!lookup_or_create_wd(NULL, measure_dir_name))
-					fatal("Directory '%s' does not exist.", optarg);
+				if(!lookup_or_create_wd(NULL, measure_dir_name)) {
+					debug(D_FATAL, "Directory '%s' does not exist.", optarg);
+					exit(RM_MONITOR_ERROR);
+				}
 				break;
 			default:
 				show_help(argv[0]);
@@ -1682,9 +1704,9 @@ int main(int argc, char **argv) {
 	}
 
 	if( follow_chdir && hash_table_size(wdirs) > 0) {
-		fatal("Options --follow-chdir and --measure-dir as mutually exclusive.");
+		debug(D_FATAL, "Options --follow-chdir and --measure-dir as mutually exclusive.");
+		exit(RM_MONITOR_ERROR);
 	}
-
 
     rmsummary_debug_report(resources_limits);
 
@@ -1775,12 +1797,17 @@ int main(int argc, char **argv) {
 	}
 
 	executable = xxstrdup(argv[optind]);
-	rmonitor_determine_exec_type(executable);
 
-    spawn_first_process(executable, argv + optind, child_in_foreground);
+	if( rmonitor_determine_exec_type(executable) ) {
+		debug(D_FATAL, "Error reading %s.", executable);
+		exit(RM_MONITOR_ERROR);
+	}
+
+	spawn_first_process(executable, argv + optind, child_in_foreground);
     rmonitor_resources(interval);
     rmonitor_final_cleanup(SIGTERM);
 
+	/* rmonitor_final_cleanup exits */
     return 0;
 }
 
