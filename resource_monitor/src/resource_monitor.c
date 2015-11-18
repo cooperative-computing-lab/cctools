@@ -1522,6 +1522,7 @@ int rmonitor_resources(long int interval /*in microseconds */)
 
     free(resources_now);
     free(p_acc);
+    free(m_acc);
     free(d_acc);
     free(f_acc);
 
