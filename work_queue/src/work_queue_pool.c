@@ -513,8 +513,9 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 
 		int new_workers_needed = workers_needed - workers_submitted;
 
-		debug(D_WQ,"workers needed: %d",workers_needed);
-		debug(D_WQ,"workers in queue: %d",workers_submitted);
+		debug(D_WQ,"workers needed: %d",    workers_needed);
+		debug(D_WQ,"workers submitted: %d", workers_submitted);
+		debug(D_WQ,"workers requested: %d", new_workers_needed);
 
 		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed);
 
