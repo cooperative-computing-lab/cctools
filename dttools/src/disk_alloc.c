@@ -4,10 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "debug.h"
-
-#ifdef CCTOOLS_OPSYS_LINUX
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -34,6 +30,10 @@ int disk_alloc_create(char *loc, int64_t size) {
 
 	int result;
 	char *device_loc, *dd_args, *losetup_args, *mk_args, *mount_args;
+	dd_args = string_format("junk");
+	losetup_args = string_format("junk");
+	mk_args = string_format("junk");
+	mount_args = string_format("junk");
 
 	//Set Loopback Device Location
 	device_loc = string_format("%s/alloc.img", loc);
@@ -53,7 +53,7 @@ int disk_alloc_create(char *loc, int64_t size) {
 	}
 
 	//Attach Image to Loop Device
-	int j, losetup_flag;
+	int j, losetup_flag = 0;
 	for(j = 0; ; j++) {
 
 		if(j >= 256) {
@@ -87,10 +87,10 @@ int disk_alloc_create(char *loc, int64_t size) {
 	}
 
 	//Mount Loop Device
-	result = mount(mount_args, loc, "ext2", 0, "");
+	result = mount(mount_args, loc, "ext4", 0, "");
 	if(result != 0) {
 		char *rm_dir_args;
-		rm_dir_args = string_format("losetup -d /dev/loop%d' rm -r %s", j, loc);
+		rm_dir_args = string_format("losetup -d /dev/loop%d; rm -r %s", j, loc);
 		system(rm_dir_args);
 		free(rm_dir_args);
 		goto error;
@@ -105,7 +105,7 @@ int disk_alloc_create(char *loc, int64_t size) {
 	return 0;
 
 	error:
-
+		printf("%d\n", errno);
 		free(device_loc);
 		free(dd_args);
 		free(losetup_args);
@@ -122,37 +122,15 @@ int disk_alloc_delete(char *loc) {
 	path_remove_trailing_slashes(loc);
 
 	char *losetup_args, *rm_args, *device_loc;
+	losetup_args = string_format("junk");
+	rm_args = string_format("junk");
+	device_loc = string_format("junk");
 
 	//Find Used Device
 	int i;
-	int dev_num = -1;
-	device_loc = string_format("(%s/alloc.img)", loc);
-
-	for(i = 0; i < 256; i++) {
-
-		char loop_dev[128], loop_info[128], loop_mount[128];
-		FILE *loop_find;
-		losetup_args = string_format("losetup /dev/loop%d", i);
-		loop_find = popen(losetup_args, "r");
-		fscanf(loop_find, "%s %s %s", loop_dev, loop_info, loop_mount);
-		pclose(loop_find);
-
-		if(strstr(loop_mount, loc) != NULL) {
-
-			dev_num = i;
-			break;
-		}
-	}
-
-	//Device Not Found
-	if(dev_num == -1) {
-
-		goto error;
-	}
-
-	rm_args = string_format("%s/alloc.img", loc);
-	losetup_args = string_format("losetup -d /dev/loop%d", dev_num);
-
+	char *dev_num = "-1";
+	device_loc = string_format("%s/alloc.img", loc);
+	
 	//Loop Device Unmounted
 	result = umount2(loc, MNT_FORCE);
 	if(result != 0) {
@@ -161,6 +139,33 @@ int disk_alloc_delete(char *loc) {
 			goto error;
 		}
 	}
+
+	for(i = 0; i < 256; i++) {
+
+		char loop_dev[128], loop_info[128], loop_mount[128];
+		FILE *loop_find;
+
+		losetup_args = string_format("losetup -j %s", device_loc);
+		loop_find = popen(losetup_args, "r");
+		fscanf(loop_find, "%s %s %s", loop_dev, loop_info, loop_mount);
+		pclose(loop_find);
+		loop_mount[0] = '\0';
+		loop_mount[strlen(loop_mount) - 1] = '\0';
+		loop_dev[strlen(loop_dev) - 1] = '\0';
+		if(strncmp(loop_mount, device_loc, 62) + 47 == 0) {
+
+			dev_num = loop_dev;
+			break;
+		}
+	}
+
+	//Device Not Found
+	if(strcmp(dev_num, "-1") == 0) {
+		goto error;
+	}
+
+	rm_args = string_format("%s/alloc.img", loc);
+	losetup_args = string_format("losetup -d %s", dev_num);
 
 	//Loop Device Deleted
 	result = system(losetup_args);
@@ -199,17 +204,3 @@ int disk_alloc_delete(char *loc) {
 
 		return -1;
 }
-
-#else
-int disk_alloc_create(char *loc, int64_t size) {
-
-	debug(D_NOTICE, "Platform not supported by this library.\n");
-	return -1;
-}
-
-int disk_alloc_delete(char *loc) {
-
-	debug(D_NOTICE, "Platform not supported by this library.\n");
-	return -1;
-}
-#endif
