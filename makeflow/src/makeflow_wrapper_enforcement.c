@@ -21,13 +21,15 @@
 #include <fcntl.h>
 #include <errno.h>
 
-const char *enforcer_script_pattern = "./enforcer_%d";
-const char *mountlist_pattern = "mount_%d";
-const char *tmp_pattern = "tmp_%d";
-const char *vartmp_pattern = "vartmp_%d";
-const char *shm_pattern = "shm_%d";
+#define enforcer_pattern "./enforcer_"
+#define mountlist_pattern "mount_"
+#define tmp_pattern "tmp_"
+#define vartmp_pattern "vartmp_"
+#define shm_pattern "shm_"
 
-void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *enforcer, char *parrot_path) {
+void makeflow_log_file_expectation( struct dag *d, struct list *file_list );
+
+void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *w, char *parrot_path) {
 	struct stat stat_buf;
 	const char *local_parrot_path = "./parrot_run";
 	int local_parrot = open(local_parrot_path, O_WRONLY|O_CREAT|O_EXCL, S_IRWXU);
@@ -51,40 +53,36 @@ void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *enforcer, char *par
 	close(local_parrot);
 	close(host_parrot);
 
-	makeflow_wrapper_add_input_file(enforcer, local_parrot_path);
-}
-
-struct list *makeflow_enforcer_generate_files( struct list *result, struct list *input, struct dag_node *n, struct makeflow_wrapper *w) {
-	struct list *extra_files;
-	if (input->size > 0) {
-		/* Only add input files */
-		extra_files = list_create();
-		list_push_tail(extra_files, string_format(enforcer_script_pattern, n->nodeid));
-		list_push_tail(extra_files, string_format(mountlist_pattern, n->nodeid));
-		list_push_tail(extra_files, string_format(tmp_pattern, n->nodeid));
-		list_push_tail(extra_files, string_format(vartmp_pattern, n->nodeid));
-		list_push_tail(extra_files, string_format(shm_pattern, n->nodeid));
-		result = makeflow_wrapper_generate_files(result, extra_files, n, w);
-	}
-	return makeflow_wrapper_generate_files(result, input, n, w);
+	makeflow_wrapper_add_input_file(w, local_parrot_path);
+	makeflow_wrapper_add_input_file(w, xxstrdup(enforcer_pattern "%%"));
+	makeflow_wrapper_add_input_file(w, xxstrdup(mountlist_pattern "%%"));
+	makeflow_wrapper_add_input_file(w, xxstrdup(tmp_pattern "%%"));
+	makeflow_wrapper_add_input_file(w, xxstrdup(vartmp_pattern "%%"));
+	makeflow_wrapper_add_input_file(w, xxstrdup(shm_pattern "%%"));
+	w->command = xxstrdup(enforcer_pattern "%%");
 }
 
 char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_wrapper *w, struct list *input_list, struct list *output_list )
 {
 	if(!w) return result;
 
+	struct list *enforcer_paths = list_create();
 	struct dag_file *f;
-	FILE *enforcer_script;
-	char *enforcer_script_path = string_format(enforcer_script_pattern, n->nodeid);
-	char *mountlist_path = string_format(mountlist_pattern, n->nodeid);
-	char *tmp_path = string_format(tmp_pattern, n->nodeid);
-	char *vartmp_path = string_format(vartmp_pattern, n->nodeid);
-	char *shm_path = string_format(shm_pattern, n->nodeid);
+	FILE *enforcer;
+	char *enforcer_path = string_format(enforcer_pattern "%d", n->nodeid);
+	char *mountlist_path = string_format(mountlist_pattern "%d", n->nodeid);
+	char *tmp_path = string_format(tmp_pattern "%d", n->nodeid);
+	char *vartmp_path = string_format(vartmp_pattern "%d", n->nodeid);
+	char *shm_path = string_format(shm_pattern "%d", n->nodeid);
 
 	/* Create local directories to bind to /tmp, /var/tmp, and /dev/shm */
 	if (mkdir(tmp_path, S_IRWXU) || mkdir(vartmp_path, S_IRWXU) || mkdir(shm_path, S_IRWXU)) {
 		fatal("could not create temp directory: %s", strerror(errno));
 	}
+
+	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, tmp_path));
+	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, vartmp_path));
+	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, shm_path));
 
 	/* make an invalid mountfile to send */
 	int mountlist_fd = open(mountlist_path, O_WRONLY|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR);
@@ -94,41 +92,50 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	write(mountlist_fd, "mountlist\n", 10);
 	close(mountlist_fd);
 
+	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, mountlist_path));
+
 	/* and generate a wrapper script with the current nodeid */
-	int enforcer_script_fd = open(enforcer_script_path, O_WRONLY|O_CREAT|O_EXCL, S_IRWXU);
-	if (enforcer_script_fd == -1 || (enforcer_script = fdopen(enforcer_script_fd, "w")) == NULL) {
-		fatal("could not create `%s': %s", enforcer_script_path, strerror(errno));
+	int enforcer_fd = open(enforcer_path, O_WRONLY|O_CREAT|O_EXCL, S_IRWXU);
+	if (enforcer_fd == -1 || (enforcer = fdopen(enforcer_fd, "w")) == NULL) {
+		fatal("could not create `%s': %s", enforcer_path, strerror(errno));
 	}
-	fchmod(enforcer_script_fd, 0755);
-	fprintf(enforcer_script, "#!/bin/sh\n\n");
-	fprintf(enforcer_script, "MOUNTFILE='%s'\n", mountlist_path);
-	fprintf(enforcer_script, "cat > \"$MOUNTFILE\" <<EOF\n");
-	fprintf(enforcer_script, "/\t\trx\n");
-	fprintf(enforcer_script, "/tmp\t$PWD/%s\trwx\n", tmp_path);
-	fprintf(enforcer_script, "/var/tmp\t$PWD/%s\trwx\n", vartmp_path);
-	fprintf(enforcer_script, "/dev/$PWD/shm\t%s\trwx\n", shm_path);
-	fprintf(enforcer_script, "/dev/null\trwx\n");
-	fprintf(enforcer_script, "/dev/zero\trwx\n");
-	fprintf(enforcer_script, "/dev/full\trwx\n");
-	fprintf(enforcer_script, "/dev/random\trwx\n");
-	fprintf(enforcer_script, "/dev/urandom\trwx\n");
-	fprintf(enforcer_script, "/home\t\tDENY\n");
+	fchmod(enforcer_fd, 0755);
+	fprintf(enforcer, "#!/bin/sh\n\n");
+	fprintf(enforcer, "MOUNTFILE='%s'\n", mountlist_path);
+	fprintf(enforcer, "cat > \"$MOUNTFILE\" <<EOF\n");
+	fprintf(enforcer, "/\t\trx\n");
+	fprintf(enforcer, "/tmp\t$PWD/%s\trwx\n", tmp_path);
+	fprintf(enforcer, "/var/tmp\t$PWD/%s\trwx\n", vartmp_path);
+	fprintf(enforcer, "/dev/$PWD/shm\t%s\trwx\n", shm_path);
+	fprintf(enforcer, "/dev/null\trwx\n");
+	fprintf(enforcer, "/dev/zero\trwx\n");
+	fprintf(enforcer, "/dev/full\trwx\n");
+	fprintf(enforcer, "/dev/random\trwx\n");
+	fprintf(enforcer, "/dev/urandom\trwx\n");
+	fprintf(enforcer, "/home\t\tDENY\n");
 	list_first_item(input_list);
 	while((f=list_next_item(input_list))) {
-		fprintf(enforcer_script, "$PWD/%s\trwx\n", f->filename);
+		fprintf(enforcer, "$PWD/%s\trwx\n", f->filename);
 	}
 	list_first_item(output_list);
 	while((f=list_next_item(output_list))) {
-		fprintf(enforcer_script, "$PWD/%s\trwx\n", f->filename);
+		fprintf(enforcer, "$PWD/%s\trwx\n", f->filename);
 	}
-	fprintf(enforcer_script, "EOF\n\n");
-	fprintf(enforcer_script, "./parrot_run -m \"$MOUNTFILE\" -- \"$@\"\n");
-	fprintf(enforcer_script, "exit $?\n");
-	fclose(enforcer_script);
+	fprintf(enforcer, "EOF\n\n");
+	fprintf(enforcer, "./parrot_run -m \"$MOUNTFILE\" -- \"$@\"\n");
+	fprintf(enforcer, "exit $?\n");
+	fclose(enforcer);
 
-	w->command = enforcer_script_path;
+	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, enforcer_path));
 
+	makeflow_log_file_expectation(n->d, enforcer_paths);
+
+	list_delete(enforcer_paths);
+	free(enforcer_path);
 	free(mountlist_path);
+	free(tmp_path);
+	free(vartmp_path);
+	free(shm_path);
 
 	return makeflow_wrap_wrapper(result, n, w);
 }

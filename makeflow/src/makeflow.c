@@ -165,7 +165,7 @@ static struct list *makeflow_generate_input_files( struct dag_node *n, struct ma
 	}
 
 	if(e){
-		result = makeflow_enforcer_generate_files(result, e->input_files, n, e);
+		result = makeflow_wrapper_generate_files(result, e->input_files, n, e);
 	}
 
 	if(u){
