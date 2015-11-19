@@ -42,6 +42,7 @@ The following major problems must be fixed:
 #include "md5.h"
 #include "url_encode.h"
 #include "jx_print.h"
+#include "shell.h"
 
 #include "host_disk_info.h"
 
@@ -1207,6 +1208,24 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 	free(summary);
 }
 
+void resource_monitor_compress_logs(struct work_queue *q, struct work_queue_task *t) {
+	char *series    = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".series", q->monitor_output_dirname, getpid(), t->taskid);
+	char *debug_log = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".debug", q->monitor_output_dirname, getpid(), t->taskid);
+
+	char *command = string_format("gzip -9 -q %s %s", series, debug_log);
+
+	int status;
+	int rc = shellcode(command, NULL, NULL, NULL, &status);
+
+	if(rc) {
+		debug(D_NOTICE, "Could no succesfully compress '%s', and '%s'\n", series, debug_log);
+	}
+
+	free(series);
+	free(debug_log);
+	free(command);
+}
+
 static void fetch_output_from_worker(struct work_queue *q, struct work_queue_worker *w, int taskid)
 {
 	struct work_queue_task *t;
@@ -1242,8 +1261,15 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	/* if q is monitoring, append the task summary to the single
 	 * queue summary, update t->resources_used, and delete the task summary. */
-	if(q->monitor_mode)
+	if(q->monitor_mode) {
 		resource_monitor_append_report(q, t);
+
+		/* Further, if we got debug and series files, gzip them. */
+		if(q->monitor_mode == MON_FULL)
+			resource_monitor_compress_logs(q, t);
+
+	}
+
 
 	// Record statistics information for capacity estimation
 	add_task_report(q,t);
