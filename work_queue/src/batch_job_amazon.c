@@ -196,7 +196,7 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
     char shell_cmd[200];
     sprintf(
         shell_cmd,
-        "%s %s %s '%s' %s %s",
+        "./%s %s %s '%s' %s %s",
         amazon_script_filename,
         aws_access_key_id,
         aws_secret_access_key,
