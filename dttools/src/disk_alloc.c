@@ -3,6 +3,9 @@ Copyright (C) 2015- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
+#include "debug.h"
+
+#ifdef CCTOOLS_OPSYS_LINUX
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,7 +108,6 @@ int disk_alloc_create(char *loc, int64_t size) {
 	return 0;
 
 	error:
-		printf("%d\n", errno);
 		free(device_loc);
 		free(dd_args);
 		free(losetup_args);
@@ -127,7 +129,6 @@ int disk_alloc_delete(char *loc) {
 	device_loc = string_format("junk");
 
 	//Find Used Device
-	int i;
 	char *dev_num = "-1";
 	device_loc = string_format("%s/alloc.img", loc);
 	
@@ -140,23 +141,19 @@ int disk_alloc_delete(char *loc) {
 		}
 	}
 
-	for(i = 0; i < 256; i++) {
+	char loop_dev[128], loop_info[128], loop_mount[128];
+	FILE *loop_find;
 
-		char loop_dev[128], loop_info[128], loop_mount[128];
-		FILE *loop_find;
+	losetup_args = string_format("losetup -j %s", device_loc);
+	loop_find = popen(losetup_args, "r");
+	fscanf(loop_find, "%s %s %s", loop_dev, loop_info, loop_mount);
+	pclose(loop_find);
+	loop_mount[0] = '\0';
+	loop_mount[strlen(loop_mount) - 1] = '\0';
+	loop_dev[strlen(loop_dev) - 1] = '\0';
+	if(strncmp(loop_mount, device_loc, 62) + 47 == 0) {
 
-		losetup_args = string_format("losetup -j %s", device_loc);
-		loop_find = popen(losetup_args, "r");
-		fscanf(loop_find, "%s %s %s", loop_dev, loop_info, loop_mount);
-		pclose(loop_find);
-		loop_mount[0] = '\0';
-		loop_mount[strlen(loop_mount) - 1] = '\0';
-		loop_dev[strlen(loop_dev) - 1] = '\0';
-		if(strncmp(loop_mount, device_loc, 62) + 47 == 0) {
-
-			dev_num = loop_dev;
-			break;
-		}
+		dev_num = loop_dev;
 	}
 
 	//Device Not Found
@@ -204,3 +201,17 @@ int disk_alloc_delete(char *loc) {
 
 		return -1;
 }
+
+#else
+int disk_alloc_create(char *loc, int64_t size) {
+
+	debug(D_NOTICE, "Platform not supported by this library.\n");
+	return -1;
+}
+
+int disk_alloc_delete(char *loc) {
+
+	debug(D_NOTICE, "Platform not supported by this library.\n");
+	return -1;
+}
+#endif
