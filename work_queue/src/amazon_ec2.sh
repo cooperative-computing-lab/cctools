@@ -10,11 +10,6 @@ EC2_TOOLS_DIR="../ec2-api-tools-1.7.5.1/bin"
 AMI_IMAGE="ami-4b630d2e"
 INSTANCE_TYPE="t1.micro"
 USERNAME="ubuntu"
-export AWS_ACCESS_KEY=$1
-export AWS_SECRET_KEY=$2
-CMD=$3
-INPUT_FILES=$4
-OUTPUT_FILES=$5
 KEYPAIR_NAME="$(uuidgen)"
 SECURITY_GROUP_NAME="$(uuidgen)"
 
@@ -91,6 +86,22 @@ if [ "$#" -lt 3 ]; then
     echo "Usage: $0 AWS_ACCESS_KEY AWS_SECRET_KEY INPUT_FILES OUTPUT_FILES" >&2
     exit 1
 fi
+
+# No inputs passed
+if [ "$#" -eq 4 ]; then
+    export AWS_ACCESS_KEY=$1
+    export AWS_SECRET_KEY=$2
+    CMD=$3
+    INPUT_FILES=""
+    OUTPUT_FILES=$4
+else
+    export AWS_ACCESS_KEY=$1
+    export AWS_SECRET_KEY=$2
+    CMD=$3
+    INPUT_FILES=$4
+    OUTPUT_FILES=$5
+fi
+
 
 generate_temp_keypair
 create_temp_security_group
