@@ -130,7 +130,15 @@ LIST_ITEM(CODE(BOLD(CCTOOLS_RESOURCE_MONITOR_HELPER)) Location of the desired he
 LIST_END
 
 SECTION(EXIT STATUS)
-The exit status of the command line provided.
+
+LIST_BEGIN
+LIST_ITEM 0 The command exit status was 0, and the monitor process ran without errors.
+LIST_ITEM 1 The command exit status was non-zero, and the monitor process ran without errors.
+LIST_ITEM 2 The command was terminated because it ran out of resources  (see options -l, -L).
+LIST_ITEM 3 The command did not run succesfully because the monitor process had an error.
+LIST_END
+
+To obtain the exit status of the original command, see the generated file with extension CODE(.summary).
 
 SECTION(EXAMPLES)
 
@@ -149,28 +157,27 @@ LONGCODE_END
 It can also be run automatically from makeflow, by specifying the '-M' flag:
 
 LONGCODE_BEGIN
-% makeflow -M Makeflow
+% makeflow --monitor=some-log-dir Makeflow
 LONGCODE_END
 
 In this case, makeflow wraps every command line rule with the
-monitor, and writes the resulting logs per rule in an
-automatically created directory
+monitor, and writes the resulting logs per rule in the
+CODE(some-log-dir) directory
 
 Additionally, it can be run automatically from Work Queue:
 
 LONGCODE_BEGIN
 q = work_queue_create_monitoring(port);
-work_queue_enable_monitoring(q, some-log-file);
+work_queue_enable_monitoring(q, some-log-dir);
 LONGCODE_END
 
-wraps every task with the monitor, and appends all generated
-summary files into the file CODE(some-log-file).
+wraps every task with the monitor and writes the resulting summaries in
+CODE(some-log-file). 
 
 SECTION(BUGS)
 
 LIST_BEGIN
 LIST_ITEM(The monitor cannot track the children of statically linked executables.)
-LIST_ITEM(Not all systems report major memory faults, which means IO from memory maps is computed by changes in the resident set, and therefore not very exact.)
 LIST_ITEM(One would expect to be able to generate the information of the summary from the time-series, however they use different mechanisms, and the summary tends to be more accurate.)
 LIST_END
 
