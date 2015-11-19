@@ -1622,7 +1622,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 							fdflags |= FD_CLOEXEC;
 						} else if (p->syscall == SYSCALL32_pipe2 && (args[1]&O_CLOEXEC)) {
 							fdflags |= FD_CLOEXEC;
-						} else assert(0);
+						}
 
 						assert(fds[0] >= 0);
 						p->table->setnative(fds[0], fdflags);
