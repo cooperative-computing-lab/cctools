@@ -24,7 +24,7 @@ show_help_common()
 {
 	echo "Use: $script_name [worker options] [batch specific options] <servername> <port> <num-workers>"
 	echo "         or"
-	echo "     $script_name [worker options] [batch specific options] --master-name <name> <num-workers>"
+	echo "     $script_name [worker options] --master-name <name> [batch specific options] <num-workers>"
 
 	echo "worker options:"
 
