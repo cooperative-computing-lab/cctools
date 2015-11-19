@@ -141,6 +141,8 @@ struct work_queue {
 	struct hash_table *worker_blacklist;
 	struct itable  *worker_task_map;
 
+	struct hash_table *categories;
+
 	struct hash_table *workers_with_available_results;
 
 	struct work_queue_stats *stats;
@@ -221,6 +223,12 @@ struct work_queue_task_report {
 	timestamp_t exec_time;
 };
 
+struct work_queue_task_category {
+	char *name;
+	double fast_abort;
+	struct work_queue_stats *stats;
+};
+
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
 
 struct blacklist_host_info {
@@ -261,6 +269,8 @@ static work_queue_msg_code_t process_queue_status(struct work_queue *q, struct w
 static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
 
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
+
+static struct work_queue_task_category *category_lookup_or_create(struct work_queue *q, const char *name);
 
 /** Clone a @ref work_queue_file
 This performs a deep copy of the file struct.
@@ -1850,6 +1860,7 @@ struct jx * task_to_jx( struct work_queue_task *t, const char *state, const char
 	jx_insert_integer(j,"taskid",t->taskid);
 	jx_insert_string(j,"state",state);
 	if(t->tag) jx_insert_string(j,"tag",t->tag);
+	if(t->category) jx_insert_string(j,"category",t->category);
 	jx_insert_string(j,"command",t->command_line);
 	if(host) jx_insert_string(j,"host",host);
 
@@ -3239,6 +3250,8 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->gpus = -1;
 	t->unlabeled = 1;
 
+	t->category = xxstrdup("default");
+
 	return t;
 }
 
@@ -3250,6 +3263,9 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   //allocate new memory so we don't segfault when original memory is freed.
   if(task->tag) {
 	new->tag = xxstrdup(task->tag);
+  }
+  if(task->category) {
+	new->category = xxstrdup(task->category);
   }
 
   if(task->command_line) {
@@ -3403,6 +3419,14 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 	if(t->tag)
 		free(t->tag);
 	t->tag = xxstrdup(tag);
+}
+
+void work_queue_task_specify_category(struct work_queue_task *t, const char *category)
+{
+	if(t->category)
+		free(t->category);
+
+	t->category = xxstrdup(category);
 }
 
 struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
@@ -3871,6 +3895,8 @@ void work_queue_task_delete(struct work_queue_task *t)
 			free(t->command_line);
 		if(t->tag)
 			free(t->tag);
+		if(t->category)
+			free(t->category);
 		if(t->output)
 			free(t->output);
 		if(t->input_files) {
@@ -3983,6 +4009,9 @@ struct work_queue *work_queue_create(int port)
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_blacklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
+
+	q->categories = hash_table_create(0, 0);
+	category_lookup_or_create(q, "default");
 
 	q->stats                      = calloc(1, sizeof(struct work_queue_stats));
 	q->stats_disconnected_workers = calloc(1, sizeof(struct work_queue_stats));
@@ -4236,6 +4265,17 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_delete(q->worker_table);
 		hash_table_delete(q->worker_blacklist);
 		itable_delete(q->worker_task_map);
+
+		struct work_queue_task_category *c;
+		hash_table_firstkey(q->categories);
+		while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
+			if(c->name)
+				free(c->name);
+			if(c->stats)
+				free(c->stats);
+			free(c);
+		}
+		hash_table_delete(q->categories);
 
 		list_delete(q->ready_list);
 
@@ -5270,6 +5310,25 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 	}
 }
 
+struct work_queue_task_category *category_lookup_or_create(struct work_queue *q, const char *name) {
+	struct work_queue_task_category *c;
+
+	if(!name)
+		name = "default";
+
+	c = hash_table_lookup(q->categories, name);
+	if(c) return c;
+
+	c = calloc(1, sizeof(struct work_queue_task_category));
+
+	c->name       = xxstrdup(name);
+	c->stats      = calloc(1, sizeof(struct work_queue_stats));
+	c->fast_abort = -1;
+
+	hash_table_insert(q->categories, name, c);
+
+	return c;
+}
 
 
 /* vim: set noexpandtab tabstop=4: */
