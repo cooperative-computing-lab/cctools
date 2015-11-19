@@ -97,6 +97,9 @@ extern "C" {
 #ifndef MFD_CLOEXEC
 #	define MFD_CLOEXEC 0x0001U
 #endif
+#ifndef UFFD_CLOEXEC
+#	define UFFD_CLOEXEC 02000000
+#endif
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_false_uname;
@@ -1240,6 +1243,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_ipc:
 		case SYSCALL32_kcmp:
 		case SYSCALL32_madvise:
+		case SYSCALL32_membarrier:
 		case SYSCALL32_mincore:
 		case SYSCALL32_mlock:
 		case SYSCALL32_mlockall:
@@ -1583,6 +1587,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
+		case SYSCALL32_accept4:
 		case SYSCALL32_epoll_create1:
 		case SYSCALL32_epoll_create:
 		case SYSCALL32_eventfd2:
@@ -1593,31 +1598,49 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_pipe:
 		case SYSCALL32_signalfd4:
 		case SYSCALL32_signalfd:
+		case SYSCALL32_socket:
+		case SYSCALL32_socketpair:
 		case SYSCALL32_timerfd_create:
+		case SYSCALL32_userfaultfd:
 			if (entering) {
 				debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else {
 				INT64_T actual;
 				tracer_result_get(p->tracer, &actual);
 				if (actual >= 0) {
-					if (p->syscall == SYSCALL32_pipe || p->syscall == SYSCALL32_pipe2) {
+					if (p->syscall == SYSCALL32_socketpair || p->syscall == SYSCALL32_pipe || p->syscall == SYSCALL32_pipe2) {
 						int32_t fds[2];
 						int fdflags = 0;
-						TRACER_MEM_OP(tracer_copy_in(p->tracer, fds, POINTER(args[0]), sizeof(fds),TRACER_O_ATOMIC));
-						if (p->syscall == SYSCALL32_pipe2 && (args[1]&O_CLOEXEC)) {
+
+						if (p->syscall == SYSCALL32_socketpair)
+							TRACER_MEM_OP(tracer_copy_in(p->tracer, fds, POINTER(args[3]), sizeof(fds),TRACER_O_ATOMIC));
+						else if (p->syscall == SYSCALL32_pipe || p->syscall == SYSCALL32_pipe2)
+							TRACER_MEM_OP(tracer_copy_in(p->tracer, fds, POINTER(args[0]), sizeof(fds),TRACER_O_ATOMIC));
+						else assert(0);
+
+						if (p->syscall == SYSCALL32_socketpair && (args[1]&SOCK_CLOEXEC)) {
 							fdflags |= FD_CLOEXEC;
-						}
+						} else if (p->syscall == SYSCALL32_pipe2 && (args[1]&O_CLOEXEC)) {
+							fdflags |= FD_CLOEXEC;
+						} else assert(0);
+
 						assert(fds[0] >= 0);
 						p->table->setnative(fds[0], fdflags);
 						assert(fds[1] >= 0);
 						p->table->setnative(fds[1], fdflags);
+					} else if (p->syscall == SYSCALL32_accept4 && (args[3]&SOCK_CLOEXEC)) {
+						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL32_epoll_create1 && (args[1]&EPOLL_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL32_eventfd2 && (args[1]&EFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL32_signalfd4 && (args[2]&SFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
+					} else if (p->syscall == SYSCALL32_socket && (args[1]&SOCK_CLOEXEC)) {
+						p->table->setnative(actual, FD_CLOEXEC);
 					} else if (p->syscall == SYSCALL32_timerfd_create && (args[1]&TFD_CLOEXEC)) {
+						p->table->setnative(actual, FD_CLOEXEC);
+					} else if (p->syscall == SYSCALL32_userfaultfd && (args[0]&UFFD_CLOEXEC)) {
 						p->table->setnative(actual, FD_CLOEXEC);
 					} else {
 						p->table->setnative(actual, 0);
@@ -1766,6 +1789,182 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				if (entering) debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else {
 				decode_writev(p,entering,p->syscall,args);
+			}
+			break;
+
+		/* bind and connect are symmetric... */
+		case SYSCALL32_bind:
+		case SYSCALL32_connect:
+			if(entering) {
+				p->syscall_result = 0;
+
+				if (args[2] <= 0) {
+					divert_to_dummy(p, -EINVAL);
+					break;
+				}
+
+				/* Note that sockaddr is a class of structures. Linux requires
+				 * the generic fields for any address family to be first and
+				 * the same for all address families, although the name of the
+				 * field will differ (e.g. addr.sun_family for AF_UNIX vs.
+				 * addr.sin_family for AF_INET). We can use the common field of
+				 * type sa_family_t named sun_family to check for AF_UNIX. Only
+				 * AF_UNIX sockets can be bound to a filename.
+				 */
+
+				struct pfs_kernel_sockaddr_un addr;
+				memset(&addr, 0, sizeof(addr));
+				INT64_T len;
+				TRACER_MEM_OP(len = tracer_copy_in(p->tracer, &addr, POINTER(args[1]), MIN(sizeof(addr),(size_t)args[2]),0));
+				if (len <= (INT64_T)sizeof(addr.sun_family)) {
+					divert_to_dummy(p, -EINVAL);
+					break;
+				}
+				addr.sun_path[sizeof(addr.sun_path)-1] = '\0';
+
+				if (addr.sun_family == AF_UNIX) {
+					assert(sizeof(p->tmp) >= sizeof(addr));
+					memcpy(p->tmp, &addr, sizeof(addr)); /* save a copy of original addr structure */
+
+					p->syscall_result = p->table->bind(args[0], addr.sun_path, sizeof(addr.sun_path));
+					if (p->syscall_result == -1) {
+						divert_to_dummy(p, -errno);
+						break;
+					}
+
+					p->syscall_result = 1;
+					TRACER_MEM_OP(tracer_copy_out(p->tracer, &addr, POINTER(args[1]), sizeof(addr),TRACER_O_ATOMIC)); /* fix the path */
+					/* let the kernel perform the bind/connect... */
+				} else {
+					/* We only care about AF_UNIX sockets. */
+					debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
+				}
+			} else if (!p->syscall_dummy && p->syscall_result == 1) {
+				/* We aren't changing/reading the *actual* result, we're just restoring the tracee's addr structure. */
+				struct pfs_kernel_sockaddr_un addr;
+				memcpy(&addr, p->tmp, sizeof(addr));
+				TRACER_MEM_OP(tracer_copy_out(p->tracer, &addr, POINTER(args[1]), sizeof(addr),TRACER_O_ATOMIC)); /* restore the original path */
+				p->syscall_result = 0; /* no actual effect... */
+			}
+			break;
+
+		case SYSCALL32_recvmsg:
+		case SYSCALL32_sendmsg:
+			if (entering && !p->table->isnative(args[0])) {
+				divert_to_dummy(p,-EBADF);
+				break;
+			} else if (p->syscall_dummy) {
+				break;
+			}
+
+			/* There is a situation where a process sends a file descriptor and
+			 * the receiver "discards" it unknowingly by doing a read instead
+			 * of recvmsg. We can't account for that since the kernel
+			 * completely hides that from us. So, it's possible an in-flight
+			 * Parrot file descriptor causes a reference increase on a file
+			 * pointer but never a decrease. It's also possible that a Parrot
+			 * fd is sent to a process that is not a tracee. Not only can we
+			 * not see the recvmsg and decrement the file pointer counter but
+			 * that process receives a garbage "Parrot file" too.
+			 */
+
+			if (!entering)
+				tracer_result_get(p->tracer, &p->syscall_result);
+
+			/* We only care if the process is sending or has received an fd. */
+			if ((entering && p->syscall == SYSCALL32_sendmsg) || (!entering && p->syscall == SYSCALL32_sendmsg && p->syscall_result < 0) || (!entering && p->syscall == SYSCALL32_recvmsg && p->syscall_result > 0)) {
+				struct pfs_kernel_msghdr umsg;
+				void *msg_control = NULL;
+				struct pfs_kernel_cmsghdr *cmsg = NULL;
+
+				/* Copy in parts of msghdr structure we want. */
+				TRACER_MEM_OP(tracer_copy_in(p->tracer,&umsg,POINTER(args[1]),sizeof(umsg),TRACER_O_ATOMIC));
+
+				if(umsg.msg_control && umsg.msg_controllen>0) {
+					msg_control = value = malloc(umsg.msg_controllen);
+					if (msg_control == NULL) {
+						divert_to_dummy(p, -ENOMEM);
+						goto done;
+					}
+					TRACER_MEM_OP(tracer_copy_in(p->tracer,msg_control,POINTER(umsg.msg_control),umsg.msg_controllen,TRACER_O_ATOMIC));
+				}
+
+				/* XXX vicious hacks ahead to avoid including a bunch of crap (headers):
+				 *
+				 * These hacks are only necessary for 64 bit compiled Parrot with a 32 bit executable.
+				 */
+				/* FIXME handle MSG_CMSG_CLOEXEC */
+#undef CMSG_ALIGN
+#define CMSG_ALIGN(len) ( ((len)+sizeof(uint32_t)-1) & ~(sizeof(uint32_t)-1) )
+#undef CMSG_DATA
+#define CMSG_DATA(cmsg) ((void *)((uint8_t *)(cmsg) + CMSG_ALIGN(sizeof(struct pfs_kernel_cmsghdr))))
+				cmsg = (struct pfs_kernel_cmsghdr *) msg_control;
+				while (cmsg) {
+					if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS) {
+						int *fd = (int *)CMSG_DATA(cmsg);
+						do {
+							if (p->syscall == SYSCALL32_recvmsg) {
+								p->table->recvfd(p->pid, *fd);
+							} else if (p->syscall == SYSCALL32_sendmsg) {
+								if (entering) {
+									p->table->sendfd(*fd, 0);
+								} else if (p->syscall_result < 0) {
+									p->table->sendfd(*fd, 1);
+								} else assert(0);
+							} else assert(0);
+							fd += 1;
+						} while (((socklen_t)((uintptr_t)fd - (uintptr_t)cmsg + sizeof(int))) <= cmsg->cmsg_len);
+					} else if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_CREDENTIALS) {
+						/* process id of sender */
+					}
+					cmsg = (struct pfs_kernel_cmsghdr *)((uint8_t *)cmsg)+CMSG_ALIGN(cmsg->cmsg_len);
+					if ((size_t)(((uint8_t *)cmsg)+1 - (uint8_t *)msg_control) > umsg.msg_controllen)
+						cmsg = NULL;
+				}
+				free(msg_control);
+			}
+			break;
+
+		case SYSCALL32_getpeername:
+		case SYSCALL32_getsockname:
+		case SYSCALL32_getsockopt:
+		case SYSCALL32_listen:
+		case SYSCALL32_recvfrom:
+		case SYSCALL32_sendto:
+		case SYSCALL32_setsockopt:
+		case SYSCALL32_shutdown:
+			if (entering) {
+				if (p->table->isparrot(args[0])) {
+					divert_to_dummy(p,-ENOTSOCK); /* You'd be suprised what you can live through... */
+				} else if (!p->table->isnative(args[0])) {
+					divert_to_dummy(p,-EBADF);
+				}
+			}
+			break;
+
+		case SYSCALL32_epoll_ctl:
+		case SYSCALL32_epoll_wait:
+		case SYSCALL32_epoll_pwait:
+		case SYSCALL32_timerfd_gettime:
+		case SYSCALL32_timerfd_settime:
+			if (entering) {
+				if (p->table->isparrot(args[0])) {
+					divert_to_dummy(p,-EINVAL); /* You'd be suprised what you can live through... */
+				} else if (!p->table->isnative(args[0])) {
+					divert_to_dummy(p,-EBADF);
+				}
+			}
+			break;
+
+		/* ioctl is only for I/O streams which are never Parrot files. */
+
+		case SYSCALL32_ioctl:
+			if (entering) {
+				if (p->table->isparrot(args[0])) {
+					divert_to_dummy(p,-ENOTTY);
+				} else if (!p->table->isnative(args[0])) {
+					divert_to_dummy(p,-EBADF);
+				}
 			}
 			break;
 
@@ -1926,7 +2125,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				if (entering) debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 			} else if (entering) {
 				int fd = args[0]; /* args[0] */
-				/* char *value args[1] */
+				/* char *list; args[1] */
 				size_t size = args[2]; /* args[2] */
 
 				value = malloc(size);
@@ -1982,32 +2181,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				if(p->syscall_result<0)
 					p->syscall_result = -errno;
 				divert_to_dummy(p,p->syscall_result);
-			}
-			break;
-
-		case SYSCALL32_epoll_ctl:
-		case SYSCALL32_epoll_wait:
-		case SYSCALL32_epoll_pwait:
-		case SYSCALL32_timerfd_gettime:
-		case SYSCALL32_timerfd_settime:
-			if (entering) {
-				if (p->table->isparrot(args[0])) {
-					divert_to_dummy(p,-EINVAL); /* You'd be suprised what you can live through... */
-				} else if (!p->table->isnative(args[0])) {
-					divert_to_dummy(p,-EBADF);
-				}
-			}
-			break;
-
-		/* ioctl is only for I/O streams which are never Parrot files. */
-
-		case SYSCALL32_ioctl:
-			if (entering) {
-				if (p->table->isparrot(args[0])) {
-					divert_to_dummy(p,-ENOTTY);
-				} else if (!p->table->isnative(args[0])) {
-					divert_to_dummy(p,-EBADF);
-				}
 			}
 			break;
 
@@ -3159,8 +3332,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		 */
 
 		case SYSCALL32_add_key:
+		case SYSCALL32_bpf:
 		case SYSCALL32_clock_adjtime:
 		case SYSCALL32_clock_nanosleep:
+		case SYSCALL32_execveat:
 		case SYSCALL32_fadvise64_64:
 		case SYSCALL32_fallocate:
 		case SYSCALL32_fanotify_init:
@@ -3168,16 +3343,16 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_finit_module:
 		case SYSCALL32_get_mempolicy:
 		case SYSCALL32_inotify_add_watch:
-		case SYSCALL32_inotify_init:
 		case SYSCALL32_inotify_init1:
+		case SYSCALL32_inotify_init:
 		case SYSCALL32_inotify_rm_watch:
 		case SYSCALL32_io_cancel:
 		case SYSCALL32_io_destroy:
 		case SYSCALL32_io_getevents:
-		case SYSCALL32_ioprio_get:
-		case SYSCALL32_ioprio_set:
 		case SYSCALL32_io_setup:
 		case SYSCALL32_io_submit:
+		case SYSCALL32_ioprio_get:
+		case SYSCALL32_ioprio_set:
 		case SYSCALL32_kexec_load:
 		case SYSCALL32_keyctl:
 		case SYSCALL32_mbind:
@@ -3208,12 +3383,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_restart_syscall:
 		case SYSCALL32_rt_tgsigqueueinfo:
 		case SYSCALL32_seccomp:
-		case SYSCALL32_sendfile:
 		case SYSCALL32_sendfile64:
+		case SYSCALL32_sendfile:
 		case SYSCALL32_sendmmsg:
+		case SYSCALL32_set_mempolicy:
 		case SYSCALL32_setfsgid:
 		case SYSCALL32_setfsuid:
-		case SYSCALL32_set_mempolicy:
 		case SYSCALL32_setns:
 		case SYSCALL32_splice:
 		case SYSCALL32_sync_file_range:
