@@ -27,8 +27,8 @@ AWS_SECRET_KEY=$2\n\
 CMD=$3\n\
 INPUT_FILES=$4\n\
 OUTPUT_FILES=$5\n\
-KEYPAIR_NAME=\"makeflow-keypair\"\n\
-SECURITY_GROUP_NAME=\"makeflow-security-group\"\n\
+KEYPAIR_NAME=\"$(uuidgen)\"\n\
+SECURITY_GROUP_NAME=\"$(uuidgen)\"\n\
 \n\
 # Flags\n\
 INSTANCE_CREATED=0\n\
