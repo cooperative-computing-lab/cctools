@@ -155,6 +155,8 @@ then\n\
 fi\n\
 ";
 
+char *amazon_script_filename = "_temp_amazon_ec2_script.sh";
+
 static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
 {
     int jobid;
@@ -162,8 +164,6 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
     memset(info, 0, sizeof(*info));
 
     // Write amazon ec2 script to file
-    char *amazon_script_filename = "_temp_amazon_ec2_script.sh";
-    //char *amazon_script_filename = "amazon_ec2.sh";
     FILE *f = fopen(amazon_script_filename, "w");
     fprintf(f, amazon_ec2_script);
     fclose(f);
