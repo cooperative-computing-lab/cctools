@@ -163,6 +163,25 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
     struct batch_job_info *info = malloc(sizeof(*info));
     memset(info, 0, sizeof(*info));
 
+    char *amazon_credentials_filepath = hash_table_lookup(
+        q->options,
+        "amazon-credentials-filepath"
+    );
+
+    // Parse credentials file
+    /* Credentials file format
+    [Credentials]
+    aws_access_key_id = supersecretkey
+    aws_secret_access_key = supersecretkey
+    */
+    FILE *credentials_file = fopen(amazon_credentials_filepath, "r");
+    char aws_access_key_id[200];
+    char aws_secret_access_key[200];
+    // Ignore first line
+    fscanf(credentials_file, "[Credentials]");
+    fscanf(credentials_file, "%s %s %s", aws_access_key_id, aws_access_key_id, aws_access_key_id);
+    fscanf(credentials_file, "%s %s %s", aws_secret_access_key, aws_secret_access_key, aws_secret_access_key);
+
     // Write amazon ec2 script to file
     FILE *f = fopen(amazon_script_filename, "w");
     fprintf(f, amazon_ec2_script);
@@ -179,14 +198,13 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
         shell_cmd,
         "%s %s %s '%s' %s %s",
         amazon_script_filename,
-        "secret_key",
-        "password",
+        aws_access_key_id,
+        aws_secret_access_key,
         cmd,
         extra_input_files,
         extra_output_files
     );
     debug(D_BATCH, "Forking EC2 script process...");
-    debug(D_BATCH, "options: %s", hash_table_lookup(q->options, "batch-options"));
     // Fork process and spin off shell script
     jobid = fork();
     if (jobid > 0) // parent
