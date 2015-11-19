@@ -204,7 +204,6 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
             shell_cmd,
             (char *) 0
 	    );
-	    execlp("rm", "rm", amazon_script_filename);
     }
 }
 
@@ -241,7 +240,6 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 
 static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
-    printf("test remove\n");
     struct batch_job_info *info =  itable_lookup(q->job_table, jobid);
     printf("Job started at: %d\n", (int)info->started);
 	info->finished = time(0);
