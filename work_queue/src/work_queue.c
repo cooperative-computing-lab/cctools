@@ -5179,8 +5179,9 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 	char *key;
 	int first = 1;
 
+	memset(total,0,sizeof(*total));
+
 	if(hash_table_size(q->worker_table)==0) {
-		memset(total,0,sizeof(*total));
 		return;
 	}
 
