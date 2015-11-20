@@ -1618,7 +1618,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				TRACER_MEM_OP(tracer_copy_in(p->tracer,&umsg,POINTER(args[1]),sizeof(umsg),TRACER_O_ATOMIC));
 
 				if(umsg.msg_control && umsg.msg_controllen>0) {
-					msg.msg_control = value = malloc(umsg.msg_controllen);
+					msg.msg_control = value = malloc(umsg.msg_controllen); /* freed at return */
 					if (msg.msg_control == NULL) {
 						divert_to_dummy(p, -ENOMEM);
 						goto done;
@@ -1650,7 +1650,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 						/* process id of sender */
 					}
 				}
-				free(msg.msg_control);
 			}
 			break;
 
@@ -1820,7 +1819,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				size_t size = args[3]; /* args[3] */
 
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0));
-				value = malloc(size);
+				value = malloc(size); /* freed at return */
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
@@ -1843,7 +1842,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				/* char *list; args[1] */
 				size_t size = args[2]; /* args[2] */
 
-				value = malloc(size);
+				value = malloc(size); /* freed at return */
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
@@ -1869,7 +1868,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				int flags = args[4]; /* args[4] */
 
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0));
-				value = malloc(size);
+				value = malloc(size); /* freed at return */
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
@@ -2248,7 +2247,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				size_t size = args[3]; /* args[3] */
 
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0));
-				value = malloc(size);
+				value = malloc(size); /* freed at return */
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
@@ -2271,7 +2270,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				size_t size = args[3]; /* args[3] */
 
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0));
-				value = malloc(size);
+				value = malloc(size); /* freed at return */
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
@@ -2292,7 +2291,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				/* char *value args[1] */
 				size_t size = args[2]; /* args[2] */
 
-				value = malloc(size);
+				value = malloc(size); /* freed at return */
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
@@ -2313,7 +2312,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				/* char *value args[1] */
 				size_t size = args[2]; /* args[2] */
 
-				value = malloc(size);
+				value = malloc(size); /* freed at return */
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
@@ -2337,7 +2336,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				int flags = args[4]; /* args[4] */
 
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0));
-				value = malloc(size);
+				value = malloc(size); /* freed at return */
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
@@ -2360,7 +2359,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				int flags = args[4]; /* args[4] */
 
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,name,POINTER(args[1]),sizeof(name),0));
-				value = malloc(size);
+				value = malloc(size); /* freed at return */
 				if (value == NULL) {
 				  divert_to_dummy(p,-ENOMEM);
 				  break;
@@ -2758,7 +2757,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				char pattern[PFS_PATH_MAX];
 				int flags = args[2];
 				size_t buffer_length = args[4];
-				value = malloc(buffer_length+1);
+				value = malloc(buffer_length+1); /* freed at return */
 
 				if (!value) {
 					p->syscall_result = -ENOMEM;
