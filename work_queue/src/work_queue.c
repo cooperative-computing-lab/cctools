@@ -5120,10 +5120,17 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->bandwidth = work_queue_get_effective_bandwidth(q);
 	struct work_queue_resources r;
 	aggregate_workers_resources(q,&r);
+
 	s->total_cores = r.cores.total;
 	s->total_memory = r.memory.total;
 	s->total_disk = r.disk.total;
 	s->total_gpus = r.gpus.total;
+
+	s->committed_cores = r.cores.inuse;
+	s->committed_memory = r.memory.inuse;
+	s->committed_disk = r.disk.inuse;
+	s->committed_gpus = r.gpus.inuse;
+
 	s->min_cores = r.cores.smallest;
 	s->max_cores = r.cores.largest;
 	s->min_memory = r.memory.smallest;
