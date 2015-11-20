@@ -106,7 +106,7 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	fprintf(enforcer, "/\t\trx\n");
 	fprintf(enforcer, "/tmp\t$PWD/%s\trwx\n", tmp_path);
 	fprintf(enforcer, "/var/tmp\t$PWD/%s\trwx\n", vartmp_path);
-	fprintf(enforcer, "/dev/$PWD/shm\t%s\trwx\n", shm_path);
+	fprintf(enforcer, "/dev/shm\t$PWD/%s\trwx\n", shm_path);
 	fprintf(enforcer, "/dev/null\trwx\n");
 	fprintf(enforcer, "/dev/zero\trwx\n");
 	fprintf(enforcer, "/dev/full\trwx\n");
