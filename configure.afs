@@ -43,6 +43,6 @@ detect_packages()
 
 detect_packages
 
-./configure --strict --tcp-low-port 9000 $PACKAGES_CONFIG "$@"
+./configure --strict --tcp-low-port 9000 --sge-parameter '-pe smp $cores' $PACKAGES_CONFIG "$@"
 
 # vim: set sts=4 sw=4 ts=8 expandtab ft=sh:
