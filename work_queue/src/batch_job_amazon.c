@@ -154,8 +154,10 @@ done\n\
 if [ $SUCCESSFUL_SSH -eq 0 ]\n\
 then\n\
     # Pass input files\n\
-    INPUTS=\"$(echo $INPUT_FILES | sed \'s/,/ /g\')\"\n\
-    copy_file_to_server $INPUTS\n\
+    if ! [ -z \"$INPUT_FILES\" ]; then\n\
+        INPUTS=\"$(echo $INPUT_FILES | sed \'s/,/ /g\')\"\n\
+        copy_file_to_server $INPUTS\n\
+    fi\n\
 \n\
     # Run command\n\
     run_ssh_cmd \"$CMD\"\n\
