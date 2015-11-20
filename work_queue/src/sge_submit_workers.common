@@ -59,7 +59,7 @@ submit_workers_command()
 
 	cat >worker.sh <<EOF
 #!/bin/sh
-#$ -pe smp $cores
+SGE_CUSTOM_PARAMETERS
 ./work_queue_worker $arguments $host $port
 EOF
 

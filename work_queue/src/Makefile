@@ -35,7 +35,7 @@ PROGRAMS = work_queue_worker work_queue_status work_queue_example work_queue_poo
 PUBLIC_HEADERS = batch_job.h work_queue.h
 SCRIPTS = work_queue_submit_common condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers ec2_submit_workers ec2_remove_workers slurm_submit_workers work_queue_graph_log
 TEST_PROGRAMS = work_queue_example work_queue_test work_queue_test_watch work_queue_priority_test
-TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) bindings
+TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) sge_submit_workers bindings
 
 all: $(TARGETS)
 
@@ -58,6 +58,9 @@ clean-bindings: $(CCTOOLS_SWIG_BINDINGS_CLEAN)
 $(CCTOOLS_SWIG_BINDINGS_CLEAN):
 	@$(MAKE) -C $(@:clean-%=%) clean
 
+sge_submit_workers: sge_submit_workers.common
+	sed -e "s/SGE_CUSTOM_PARAMETERS/${CCTOOLS_SGE_PARAMETERS}/" $< > $@
+
 install: all install-bindings
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	chmod 755 $(SCRIPTS)
@@ -70,7 +73,7 @@ install: all install-bindings
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 
 clean: clean-bindings
-	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
+	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) sge_submit_workers
 
 test: all
 
