@@ -597,8 +597,8 @@ larger than the average times the multiplier.  Fast-abort is computed per task
 category. The value specified here applies to all the categories for which @ref
 work_queue_activate_fast_abort_category was not explicitely called.
 @param q A work queue object.
-@param multiplier The multiplier of the average task time at which point to abort; if less than 1 (and by default) fast_abort is deactivated.
-@returns 0 if activated or deactivated with an appropriate multiplier, 1 if deactivated due to inappropriate multiplier.
+@param multiplier The multiplier of the average task time at which point to abort; if less than zero, fast_abort is deactivated (the default).
+@returns 0 if activated, 1 if deactivated.
 */
 int work_queue_activate_fast_abort(struct work_queue *q, double multiplier);
 
@@ -609,8 +609,8 @@ multiplier.  The value specified here applies only to tasks in the given categor
 (Note: work_queue_activate_fast_abort_category(q, "default", n) is the same as work_queue_activate_fast_abort(q, n).)
 @param q A work queue object.
 @param category A category name.
-@param multiplier The multiplier of the average task time at which point to abort; if less than 1 (and by default) fast_abort is deactivated.
-@returns 0 if activated or deactivated with an appropriate multiplier, 1 if deactivated due to inappropriate multiplier.
+@param multiplier The multiplier of the average task time at which point to abort; if zero, fast_abort is deactivated. If less than zero (default), use the fast abort of the "default" category.
+@returns 0 if activated, 1 if deactivated.
 */
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier);
 
