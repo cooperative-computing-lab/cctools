@@ -60,6 +60,7 @@ $(CCTOOLS_SWIG_BINDINGS_CLEAN):
 
 sge_submit_workers: sge_submit_workers.common
 	sed -e "s/SGE_CUSTOM_PARAMETERS/${CCTOOLS_SGE_PARAMETERS}/" $< > $@
+	chmod 755 $@
 
 install: all install-bindings
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin

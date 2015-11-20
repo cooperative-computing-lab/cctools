@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -x
+SGE_WARNING=1
 
 SUBMIT_COMMON=$(which work_queue_submit_common)
 if [ -z "$SUBMIT_COMMON" ];
