@@ -1960,21 +1960,35 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 
 	if(n == 2 && !strcmp(category,"tag"))
 	{
-		/* Shortcut, inuse has the tag, as "resources tag" only sends one value */
-		w->resources->tag = r.inuse;
+		/* Shortcut, total has the tag, as "resources tag" only sends one value */
+		w->resources->tag = r.total;
 		log_worker_stats(q);
 
 	} else if(n == 4) {
+
+		/* inuse is computed by the master, so we save it here */
+		int64_t inuse;
+
 		if(!strcmp(category,"cores")) {
+			inuse = w->resources->cores.inuse;
 			w->resources->cores = r;
+			w->resources->cores.inuse = inuse;
 		} else if(!strcmp(category,"memory")) {
+			inuse = w->resources->memory.inuse;
 			w->resources->memory = r;
+			w->resources->memory.inuse = inuse;
 		} else if(!strcmp(category,"disk")) {
+			inuse = w->resources->disk.inuse;
 			w->resources->disk = r;
+			w->resources->disk.inuse = inuse;
 		} else if(!strcmp(category,"gpus")) {
+			inuse = w->resources->gpus.inuse;
 			w->resources->gpus = r;
+			w->resources->gpus.inuse = inuse;
 		} else if(!strcmp(category,"workers")) {
+			inuse = w->resources->workers.inuse;
 			w->resources->workers = r;
+			w->resources->workers.inuse = inuse;
 		}
 	} else {
 		return MSG_FAILURE;
@@ -5213,7 +5227,7 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 	char *key;
 	int first = 1;
 
-	memset(total,0,sizeof(*total));
+	bzero(total, sizeof(struct work_queue_resources));
 
 	if(hash_table_size(q->worker_table)==0) {
 		return;
@@ -5221,6 +5235,7 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+		count_worker_resources(w);
 		if(first) {
 			*total = *w->resources;
 			first = 0;
