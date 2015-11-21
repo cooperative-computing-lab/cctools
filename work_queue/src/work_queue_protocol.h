@@ -16,7 +16,8 @@ This file should not be installed and should only be included by .c files.
 
 /* 4: added invalidate-file message, for cache management.    */
 /* 5: added wall_time, end_time messages, for task maximum running time. */
-#define WORK_QUEUE_PROTOCOL_VERSION 5
+/* 6: worker only report total, max, and min resources. */
+#define WORK_QUEUE_PROTOCOL_VERSION 6
 
 #define WORK_QUEUE_LINE_MAX 4096       /**< Maximum length of a work queue message line. */
 #define WORK_QUEUE_POOL_NAME_MAX 128   /**< Maximum length of a work queue pool name. */
