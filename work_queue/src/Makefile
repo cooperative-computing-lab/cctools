@@ -58,7 +58,7 @@ clean-bindings: $(CCTOOLS_SWIG_BINDINGS_CLEAN)
 $(CCTOOLS_SWIG_BINDINGS_CLEAN):
 	@$(MAKE) -C $(@:clean-%=%) clean
 
-sge_submit_workers: sge_submit_workers.common
+sge_submit_workers: sge_submit_workers_common
 	sed -e "s/SGE_CUSTOM_PARAMETERS/${CCTOOLS_SGE_PARAMETERS}/" $< > $@
 	chmod 755 $@
 
