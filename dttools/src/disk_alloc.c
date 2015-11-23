@@ -32,15 +32,14 @@ int disk_alloc_create(char *loc, int64_t size) {
 	path_remove_trailing_slashes(loc);
 
 	int result;
-	char *device_loc, *dd_args, *losetup_args, *mk_args, *mount_args;
-	dd_args = string_format("junk");
-	losetup_args = string_format("junk");
-	mk_args = string_format("junk");
-	mount_args = string_format("junk");
+	char *device_loc = NULL;
+	char *dd_args = NULL;
+	char *losetup_args = NULL;
+	char *mk_args = NULL;
+	char *mount_args = NULL;
 
 	//Set Loopback Device Location
 	device_loc = string_format("%s/alloc.img", loc);
-
 	//Make Directory for Loop Device
 	if(mkdir(loc, 0777) != 0) {
 
@@ -108,11 +107,22 @@ int disk_alloc_create(char *loc, int64_t size) {
 	return 0;
 
 	error:
-		free(device_loc);
-		free(dd_args);
-		free(losetup_args);
-		free(mk_args);
-		free(mount_args);
+		if(device_loc) {
+			free(device_loc);
+		}
+		if(dd_args) {
+			free(dd_args);
+		}
+		if(losetup_args) {
+			free(losetup_args);
+		}
+		if(mk_args) {
+			free(mk_args);
+		}
+		if(mount_args) {
+			free(mount_args);
+		}
+
 		return -1;
 }
 
@@ -123,10 +133,9 @@ int disk_alloc_delete(char *loc) {
 	//Check for trailing '/'
 	path_remove_trailing_slashes(loc);
 
-	char *losetup_args, *rm_args, *device_loc;
-	losetup_args = string_format("junk");
-	rm_args = string_format("junk");
-	device_loc = string_format("junk");
+	char *losetup_args = NULL;
+	char *rm_args = NULL;
+	char *device_loc = NULL;
 
 	//Find Used Device
 	char *dev_num = "-1";
@@ -135,7 +144,6 @@ int disk_alloc_delete(char *loc) {
 	//Loop Device Unmounted
 	result = umount2(loc, MNT_FORCE);
 	if(result != 0) {
-
 		if(errno != ENOENT) {
 			goto error;
 		}
@@ -143,7 +151,6 @@ int disk_alloc_delete(char *loc) {
 
 	char loop_dev[128], loop_info[128], loop_mount[128];
 	FILE *loop_find;
-
 	losetup_args = string_format("losetup -j %s", device_loc);
 	loop_find = popen(losetup_args, "r");
 	fscanf(loop_find, "%s %s %s", loop_dev, loop_info, loop_mount);
@@ -194,10 +201,15 @@ int disk_alloc_delete(char *loc) {
 	return 0;
 
 	error:
-
-		free(losetup_args);
-		free(rm_args);
-		free(device_loc);
+		if(losetup_args) {
+			free(losetup_args);
+		}
+		if(rm_args) {
+			free(rm_args);
+		}
+		if(device_loc) {
+			free(device_loc);
+		}
 
 		return -1;
 }
