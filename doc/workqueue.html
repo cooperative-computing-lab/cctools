@@ -526,6 +526,43 @@ negligible.  For example, if you annotate a task as using 1 core, but don't
 specify its memory or disk requirements, then Work Queue will schedule two such
 tasks to a two-slot worker, regardless of their memory or disk usage.
 
+<h3 id="multislot_scripts">Submission scripts<a class="sectionlink" href="#multislot_script" title="Link to this section.">&#x21d7;</a></h2>
+
+<p> You may use the --cores, --memory, and --disk options when using batch
+submission scripts such as <tt>condor_submit_workers</tt> or
+<tt>slurm_submit_workers</tt>, and the script will correctly ask the batch
+system for an appropiate node. 
+
+<p> The only caveat is when using <tt>sge_submit_workers</tt>, as there are many
+differences across systems that the script cannot manage. For <tt>
+sge_submit_workers </tt> you have to specify <strong> both </strong> the
+resources used by the worker (i.e., with --cores, etc.) and the appropiate
+computing node with the <tt> -p </tt> option.
+
+<p> For example, say that your local SGE installation requires you to specify the
+number of cores with the switch <tt> -pe smp </tt>, and you want workers with 4
+cores:
+
+<div class ="code_area"><pre class="code_snip">
+% sge_submit_workers --cores 4 -p "-pe smp 4" MACHINENAME 9123
+</pre></div>
+
+<p>If you find that there are options that are needed everytime, you can compile CCTools using the <tt> --sge-parameter </tt>. For example, at Notre Dame we automatically set the number of cores as follows:
+
+<div class ="code_area"><pre class="code_snip">
+% ./configure  --sge-parameter '-pe smp $cores'
+</pre></div>
+
+<p> So that we can simply call:
+
+<div class ="code_area"><pre class="code_snip">
+% sge_submit_workers --cores 4 MACHINENAME 9123
+</pre></div>
+
+<p> The variables <tt> $cores </tt>, <tt> $memory </tt>, and <tt> $disk </tt>, have
+the values of the options passed to <tt> --cores, </tt> <tt> --memory, <tt>
+--disk. </tt>
+
 <h2 id="debugging">Debugging<a class="sectionlink" href="#debugging" title="Link to this section.">&#x21d7;</a></h2>
 <p>Work Queue can be set up to print debug messages at the master and worker to
 help troubleshoot failures,
