@@ -6,7 +6,7 @@ umbrella \
 --spec cms_complex.umbrella \
 --meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/parrot_cms_complex_output \
+--output "/tmp/sim_job=/tmp/umbrella_test/parrot_cms_complex_output" \
 --sandbox_mode parrot \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
@@ -17,7 +17,7 @@ umbrella \
 --spec cms_complex.umbrella \
 --meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/docker_cms_complex_output \
+--output "/tmp/sim_job=/tmp/umbrella_test/docker_cms_complex_output" \
 --sandbox_mode docker \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \

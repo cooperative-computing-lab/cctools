@@ -66,7 +66,7 @@
 			the root user.</p>
 
             <p>To get started using Umbrella, please begin by <a
-            href="install.html">installing CCTools</a> on your system. When you
+            href="http://ccl.cse.nd.edu/software/manuals/install.html">installing CCTools</a> on your system. When you
             are ready, proceed with the <a href="#have_a_try">Have a Try</a>
             section below. If you are interested in running your CMS applications
 			through Umbrella, proceed with the <a href="#try_cms">Try CMS Applications with Umbrella</a>.</p>
@@ -119,6 +119,7 @@
             ],
             "action": "unpack",
             "mountpoint": "/software/povray-3.6.1-redhat5-x86_64",
+            "mount_env": "POVRAY_PATH",
             "uncompressed_size": "3004423",
             "id": "9b7f2362e6b927c8ef08c3f92599e47c",
             "size": "1471457"
@@ -149,14 +150,21 @@
     "environ": {
         "PWD": "/tmp"
     },
-    "cmd": "povray +I/tmp/4_cubes.pov +O/tmp/frame000.png +K.0  -H50 -W50"
+    "cmd": "povray +I/tmp/4_cubes.pov +O/tmp/frame000.png +K.0  -H50 -W50",
+    "output": {
+        "files": [
+            "/tmp/frame000.png"
+        ],
+        "dirs": [
+        ]
+    }
 }</code>
 
 			<p><b>The umbrella command for Parrot execution engine:</b></p>
 			<code>umbrella \
 	--spec povray.umbrella \
 	--localdir /tmp/umbrella_test/ \
-	--output /tmp/umbrella_test/parrot_povray \
+	--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray" \
 	--sandbox_mode parrot \
 	--log umbrella.log \
 	run</code>
@@ -177,6 +185,9 @@
 			proceed with the <a href="#create_spec">Create Your Specification</a> section
 			below. </p>
 
+			<p>To try other behaviors supported by Umbrella, process with the <a
+			href="#behavior">Behaviors of Umbrella</a> section below.</p>
+
         <h2 id="try_cms">Try CMS Applications with Umbrella<a class="sectionlink" href="#try_cms" title="Link to this section.">&#x21d7;</a></h2>
 
 			<p>The part uses a CMS application as an example to illustrate
@@ -185,68 +196,75 @@
 			<p>The specification for the application is <a
 			href="http://ccl.cse.nd.edu/software/umbrella/database/cms_complex/cms_complex.umbrella">cms_complex.umbrella</a>:
 			<code>{
-	"comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.",
-	"hardware": {
-		"cores": "2",
-		"disk": "3GB",
-		"arch": "x86_64",
-		"memory": "2GB"
-	},
-	"kernel": {
-		"version": ">=2.6.32",
-		"name": "linux"
-	},
-	"os": {
-		"name": "Redhat",
-		"format": "tgz",
-		"checksum": "669ab5ef94af84d273f8f92a86b7907a",
-		"source": [
-			"http://ccl.cse.nd.edu/research/data/hep-case-study/669ab5ef94af84d273f8f92a86b7907a/redhat-6.5-x86_64.tar.gz"
-		],
-		"version": "6.5",
-		"uncompressed_size": "1743656960",
-		"id": "669ab5ef94af84d273f8f92a86b7907a",
-		"size": "633848940"
-	},
-	"software": {
-		"cmssw-5.2.5-slc5-amd64": {
-			"mountpoint": "/cvmfs/cms.cern.ch",
-			"mount_env": "CMS_DIR",
-			"id": "cvmfs://cvmfs/cms.cern.ch",
-			"source": [
-				"cvmfs://cvmfs/cms.cern.ch"
-			]
-		}
-	},
-	"data": {
-		"final_events_2381.lhe": {
-			"format": "plain",
-			"checksum": "cb9878132aad42e7db30eabd214be8e2",
-			"source": [
-				"http://ccl.cse.nd.edu/research/data/hep-case-study/cb9878132aad42e7db30eabd214be8e2/final_events_2381.lhe"
-			],
-			"action": "none",
-			"mountpoint": "/tmp/final_events_2381.lhe",
-			"mount_env": "INPUT_FILE",
-			"id": "cb9878132aad42e7db30eabd214be8e2",
-			"size": "17840176"
-		},
-		"cms_complex.sh": {
-			"format": "plain",
-			"checksum": "9f8587e9ef90ab4f5de8b3c9ab5cf0cb",
-			"source": [
-				"http://ccl.cse.nd.edu/research/data/hep-case-study/9f8587e9ef90ab4f5de8b3c9ab5cf0cb/cms_complex.sh"
-			],
-			"mountpoint": "/tmp/cms_complex.sh",
-			"id": "9f8587e9ef90ab4f5de8b3c9ab5cf0cb",
-			"size": "399"
-		}
-	},
-	"environ": {
-		"CMS_VERSION": "CMSSW_5_2_5",
-		"SCRAM_ARCH": "slc5_amd64_gcc462"
-	},
-	"cmd": "/bin/sh /tmp/cms_complex.sh"
+    "comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.",
+    "hardware": {
+        "cores": "2",
+        "disk": "3GB",
+        "arch": "x86_64",
+        "memory": "2GB"
+    },
+    "kernel": {
+        "version": ">=2.6.32",
+        "name": "linux"
+    },
+    "os": {
+        "name": "Redhat",
+        "format": "tgz",
+        "checksum": "669ab5ef94af84d273f8f92a86b7907a",
+        "source": [
+            "http://ccl.cse.nd.edu/research/data/hep-case-study/669ab5ef94af84d273f8f92a86b7907a/redhat-6.5-x86_64.tar.gz"
+        ],
+        "version": "6.5",
+        "uncompressed_size": "1743656960",
+        "id": "669ab5ef94af84d273f8f92a86b7907a",
+        "size": "633848940"
+    },
+    "software": {
+        "cmssw-5.2.5-slc5-amd64": {
+            "mountpoint": "/cvmfs/cms.cern.ch",
+            "mount_env": "CMS_DIR",
+            "id": "cvmfs://cvmfs/cms.cern.ch",
+            "source": [
+                "cvmfs://cvmfs/cms.cern.ch"
+            ]
+        }
+    },
+    "data": {
+        "final_events_2381.lhe": {
+            "format": "plain",
+            "checksum": "cb9878132aad42e7db30eabd214be8e2",
+            "source": [
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/cb9878132aad42e7db30eabd214be8e2/final_events_2381.lhe"
+            ],
+            "action": "none",
+            "mountpoint": "/tmp/final_events_2381.lhe",
+            "mount_env": "INPUT_FILE",
+            "id": "cb9878132aad42e7db30eabd214be8e2",
+            "size": "17840176"
+        },
+        "cms_complex.sh": {
+            "format": "plain",
+            "checksum": "9f8587e9ef90ab4f5de8b3c9ab5cf0cb",
+            "source": [
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/9f8587e9ef90ab4f5de8b3c9ab5cf0cb/cms_complex.sh"
+            ],
+            "mountpoint": "/tmp/cms_complex.sh",
+            "id": "9f8587e9ef90ab4f5de8b3c9ab5cf0cb",
+            "size": "399"
+        }
+    },
+    "environ": {
+        "PWD": "/tmp",
+        "CMS_VERSION": "CMSSW_5_2_5",
+        "SCRAM_ARCH": "slc5_amd64_gcc462"
+    },
+    "cmd": "/bin/sh /tmp/cms_complex.sh",
+    "output": {
+        "files": [],
+        "dirs": [
+            "/tmp/sim_job"
+        ]
+    }
 }</code>
 
 			The CMS analysis code is <a
@@ -275,7 +293,7 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 	--log umbrella.log \
 	--spec cms_complex.umbrella \
 	--localdir /tmp/umbrella_test/ \
-	--output /tmp/umbrella_test/parrot_cms_complex_output \
+	--output "/tmp/sim_job=/tmp/umbrella_test/parrot_cms_complex_output" \
 	--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 	run</code>
 
@@ -315,7 +333,11 @@ System                  2                   2
 
 			<p>You can check the help document of umbrella for the option settings by running the command: <code>umbrella -h</code></p>
 
-<p>For more information about the Umbrella support for CMS applications, please check the <a href="#cms_app">Umbrella Support for CMS Application</a> section. </p>
+			<p>For more information about the Umbrella support for CMS applications, please
+			check the <a href="#cms_app">Umbrella Support for CMS Application</a> section.
+			</p>
+
+			<p>You can check the help document of umbrella for the option settings by running the command: <code>umbrella -h</code></p>
 
 			<p>You can try other execution engines following the instructions in the
 			<a href="#running">Different Execution Engines of Umbrella</a> section.</p>
@@ -323,6 +345,9 @@ System                  2                   2
 			<p>To construct umbrella specification for your own application,
 			proceed with the <a href="#create_spec">Create Your Specification</a> section
 			below. </p>
+
+			<p>To try other behaviors supported by Umbrella, process with the <a
+			href="#behavior">Behaviors of Umbrella</a> section below.</p>
 
 		<h2 id="create_spec">Create Your Specification<a class="sectionlink" href="#create_spec" title="Link to this section.">&#x21d7;</a></h2>
 
@@ -363,6 +388,7 @@ System                  2                   2
             ],
             "action": "unpack",
             "mountpoint": "/software/povray-3.6.1-redhat5-x86_64",
+            "mount_env": "POVRAY_PATH",
             "uncompressed_size": "3004423",
             "id": "9b7f2362e6b927c8ef08c3f92599e47c",
             "size": "1471457"
@@ -391,13 +417,20 @@ System                  2                   2
         }
     },
     "environ": {
-		"PATH": "/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin",
+        "PATH": "/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin",
         "PWD": "/tmp"
     },
-    "cmd": "povray +I/tmp/4_cubes.pov +O/tmp/frame000.png +K.0  -H50 -W50"
+    "cmd": "povray +I/tmp/4_cubes.pov +O/tmp/frame000.png +K.0  -H50 -W50",
+    "output": {
+        "files": [
+            "/tmp/frame000.png"
+        ],
+        "dirs": [
+        ]
+    }
 }
 </code>
-			<p>An Umbrella specification includes 7 parts: hardware, kernel, os, software, data, environ and cmd. You can have other sections for comments, such
+			<p>An Umbrella specification includes multiple parts: hardware, kernel, os, software, data, environ, cmd and output. You can have other sections for comments, such
 			as the <b>comment</b> section in the example.</p>
 
 			<p><b>hardware</b> Section (required):</p>
@@ -446,18 +479,23 @@ System                  2                   2
 				6.5. </li>
 
 				<li><b>id</b> (optional): the id of the OS image. There may exist multiple OS
-				images for redhat 5.10, the id attribute uniquely identifies a OS image. </li>
+				images for redhat 5.10, the id attribute uniquely identifies an OS image. </li>
 
 			</ul>
 
 			<p><b>software</b> Section (optional):</p>
 
-			<p>Each software dependency has a name, which corresponds to the name included in the metadata database.</p>
+			<p>Each software dependency has a case-sensitive name.
+			The name of a software dependency is in the format of 'A-B-C-D', where A is
+			the software name, B is the software version, C is OS distro name (the OS name followed by
+			the main version number, e.g., redhat5), D is
+			hardware architecture. <tt>povray-3.6.1-redhat5-x86_64</tt> is an example of
+			this category.</p>
 
 			<ul>
 
 				<li><b>id</b> (optional): the id of the software. There may exist multiple
-				versions of a software like <tt>povray-3.6.1-redhat5-x86_64</tt> due to the
+				versions of a software due to the
 				difference of complication settings. the id attribute uniquely identifies a
 				software.  </li>
 
@@ -469,9 +507,9 @@ System                  2                   2
 				future. Case sensitive. In the above example, <tt>POVRAY_PATH</tt> is used inside
 				the user's source code instead of the path <tt>/software/povray-3.6.1-redhat5-x86_64</tt>.</li>
 
-				<li><b>action</b> (required): the action on the downloaded software
+				<li><b>action</b> (optional): the action on the downloaded software
 				dependencies. Options: <tt>none</tt>, <tt>unpack</tt>. <tt>none</tt> leaves the
-				downloaded dedendency as it is. <tt>unpack</tt> uncompresses the depedency. Not
+				downloaded dedendency as it is. <tt>unpack</tt> uncompresses the depedency. Default: unpack. Not
 				case sensitive.</li>
 
 				<p><b>Note:</b> Even if both mountpoint and mount_env are optional, at least one
@@ -498,7 +536,9 @@ System                  2                   2
 
 			<p><b>data</b> Section (optional):</p>
 
-			<p>Each data dependency has a name, which corresponds to the name included in the metadata database. </p>
+			<p>Each data dependency has a name.
+			There is no special limitation on the name of a data dependency.
+			<tt>WRC_RubiksCube.inc</tt> is an example of this category.</p>
 
 			<ul>
 
@@ -508,20 +548,30 @@ System                  2                   2
 				<li><b>mountpoint</b> (required): the mountpoint of the data dependency. The same as
 				the mountpoint attribute of the software section. Case sensitive.</li>
 
-				<li><b>mount_env</b> (optional): the same as the mount_env attribute of the software section.</li>
+				<li><b>mount_env</b> (optional): the same as the mount_env attribute of the software section. Case sensitive.</li>
 
-				<li><b>action</b> (required): the action on the downloaded data dependencies.
+				<li><b>action</b> (optional): the action on the downloaded data dependencies.
 				Options: <tt>none</tt>, <tt>unpack</tt>. <tt>none</tt> leaves the downloaded
-				dedendency as it is. <tt>unpack</tt> uncompresses the dependency. Not case
+				dedendency as it is. <tt>unpack</tt> uncompresses the dependency. Default: none. Not case
 				sensitive.</li>
 
 			</ul>
 
 			<p><b>environ</b> Section (optional):</p>
 
-			<p>Each item is a key-value pair. For example, <tt>"HOME": "/home/hmeng"</tt>,
+			<p>A list of key-value pairs. For example, <tt>"HOME": "/home/hmeng"</tt>,
 			which sets the HOME environment variable used by the sandbox to execute the
 			applicition. Case sensitive.</p>
+
+			<p><b>cmd</b> Section (optional):</p>
+
+			<p>The command to execute in the format of a string. </p>
+
+			<p><b>output</b> Section (optional):</p>
+
+			<p>This section allows the creator of an Umbrella spec to specify the output files and directories. Correspondingly,
+			there are two subsections: <tt>files</tt> (a list of strings representing the output files) and <tt>dirs</tt> (a list
+			of strings representing the output dirs). </p>
 
 			<p><b>Common Attributes of OS, Software, Data Dependencies:</b></p>
 			<p>Each OS, software
@@ -538,19 +588,18 @@ System                  2                   2
 				<li><b>checksum</b> (optional): the checksum of the dependencies. Currently Umbrella only
 				supports md5 checksum. </li>
 
-				<li><b>size</b> (optional): the size of the dependency. Not case sensitive.</li>
+				<li><b>size</b> (optional): the size of the dependency in bytes.</li>
 
 				<li><b>format</b> (optional): the perservation format of the dependency. Currently
 				Umbrella supports two formats: <tt>tgz</tt> (gzip compressed tarball) and
 				<tt>plain</tt> (plain text).</li>
 
-				<li><b>uncompressed_size</b> (optional): the uncompressed size of the dependency, only meanful
-				when the format attribute is not plain text. Not case sensitive.</li>
+				<li><b>uncompressed_size</b> (optional): the uncompressed size of the dependency in bytes, only meaningful
+				when the format attribute is not plain text.</li>
 
 				<li><b>id</b> (optional): According to the building and
 				compilation settings, there may be multiple packages for one dependency. In
-				this case, all the packages for one dependency will be organized together and
-				the `id` attribute of each package will be used as item key to differentiate
+				this case, the <b>id</b> attribute of each package will be used as item key to differentiate
 				different packages. For example, for the software dependency
 				<tt>povray-3.6.1-redhat5-x86_64</tt>, there may have two different packages: one
 				with the id of <tt>9b7f2362e6b927c8ef08c3f92599e47c</tt> and one with the id of
@@ -567,30 +616,21 @@ System                  2                   2
 			In case when the checksum of one dependency is not provided or
 			feasible, the first item of the source section can be used as the value of the
 			id attribute.  For example, in
-			the CMS example, <tt>cmssw-4.2.8-slc5-amd64</tt> is delivered through cvmfs
+			the <a href="#try_cms">CMS</a> example, <tt>cmssw-4.2.8-slc5-amd64</tt> is delivered through cvmfs
 			during runtime, and no checksum is provided, the url from the source section,
 			<tt>cvmfs://cvmfs/cms.cern.ch</tt> is used as the id of this package.
 			</p>
 
-			<p><b>Naming Rules of Dependencies:</b></p>
-			<p>The name of a software dependency is in the format of 'A-B-C-D', where A is
-			the software name, B is the software version, C is OS distro name, D is
-			hardware architecture. <tt>povray-3.6.1-redhat5-x86_64</tt> is an example of
-			this category.</p>
-
-			<p>The name of an OS image dependency is in the format of 'A-B-C', where A is
-			the OS name, B is the OS version, C is hardware architecture.
-			<tt>redhat-5.10-x86_64</tt> is an example of this category.</p>
-
-			<p>There is no special limitation on the name of a data dependency.
-			<tt>final_events_2381.lhe</tt> is an example of this category.</p>
+			<p>To create your own umbrella metadata database, please check <a href="#prepare.archive">Create Your Own Metadata Database</a>.
 
 	<h2 id="behavior">Behaviors of Umbrella<a class="sectionlink" href="#behavior" title="Link to this section.">&#x21d7;</a></h2>
 
 			<h3 id="behavior.run">Execute your Application through Umbrella<a class="sectionlink" href="#behavior.run" title="Link to this section.">&#x21d7;</a></h3>
 
-				<p>For the following example, cms_opendata_S.umbrella is a self-contained umbrella specification,
-				cms_opendata.umbrella is an umbrella specification which does not include any metadata information.</p>
+				<p>For the following examples, <a href="http://ccl.cse.nd.edu/research/data/hep-case-study/cms_opendata/cms_opendata_S.umbrella">cms_opendata_S.umbrella</a>
+				is a self-contained umbrella specification,
+				<a href="http://ccl.cse.nd.edu/research/data/hep-case-study/cms_opendata/cms_opendata.umbrella">cms_opendata.umbrella</a>
+				is an umbrella specification which does not include any metadata information.</p>
 
 				<p>The metadata information here includes: source, checksum, size, format, and uncompressed_size.</p>
 
@@ -598,7 +638,7 @@ System                  2                   2
 				<code>umbrella \
 	--spec cms_opendata_S.umbrella \
 	--localdir /tmp/umbrella_test/ \
-	--output /tmp/umbrella_test/parrot_cms_opendata_output \
+	--output "/tmp/sim_job=/tmp/umbrella_test/parrot_cms_opendata_output" \
 	--sandbox_mode parrot \
 	--log umbrella.log \
 	--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
@@ -613,6 +653,8 @@ System                  2                   2
 				<p>The cvmfs_http_proxy option is used to specify a http proxy for cvmfs
 				access. If your application does not need to access cvmfs, ignore this
 				option.</p>
+
+				<p>You can check the help document of umbrella for the option settings by running the command: <code>umbrella -h</code></p>
 
 			<h3 id="behavior.validate">Validate an Umbrella Spec File<a class="sectionlink" href="#behavior.validate" title="Link to this section.">&#x21d7;</a></h3>
 				<p><b>Validate a self-contained Umbrella specificiation:</b></p>
@@ -650,8 +692,8 @@ System                  2                   2
 				The metadata info are abstract from the metadata db provided through the --meta option.</p>
 
 
-			<h3 id="behavior.filter">Filter the Meta Info from an Umbrella Spec File<a class="sectionlink" href="#behavior.filter" title="Link to this section.">&#x21d7;</a></h3>
-				<p><b>Filter the meta information from an umbrella spec file:</b></p>
+			<h3 id="behavior.filter">Filter the Meta Info for an Umbrella Spec File from a Huge Metadata DB<a class="sectionlink" href="#behavior.filter" title="Link to this section.">&#x21d7;</a></h3>
+				<p><b>Filter the meta information for an umbrella spec file from a huge metadata db:</b></p>
 				<code>umbrella \
 	--spec cms_opendata.umbrella \
 	--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
@@ -716,7 +758,7 @@ System                  2                   2
 				<code>umbrella \
 	--spec povray.umbrella \
 	--localdir /tmp/umbrella_test/ \
-	--output /tmp/umbrella_test/parrot_povray \
+	--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray" \
 	--sandbox_mode parrot \
 	--log umbrella.log \
 	run</code>
@@ -727,7 +769,7 @@ System                  2                   2
 				<code>umbrella \
 	--spec povray.umbrella \
 	--localdir /tmp/umbrella_test/ \
-	--output /tmp/umbrella_test/docker_povray \
+	--output "/tmp/frame000.png=/tmp/umbrella_test/docker_povray" \
 	--sandbox_mode docker \
 	--log umbrella.log \
 	run</code>
@@ -740,7 +782,7 @@ System                  2                   2
 				<code>umbrella \
 	--spec povray.umbrella \
 	--localdir /tmp/umbrella_test/ \
-	--output /tmp/umbrella_test/local_povray \
+	--output "/tmp/frame000.png=/tmp/umbrella_test/local_povray" \
 	--sandbox_mode local \
 	--log umbrella.log \
 	run</code>
@@ -754,7 +796,7 @@ System                  2                   2
 				really want to use chroot to finish your task, please set the
 				<tt>--sandbox_mode</tt> option to be chroot.</p>
 
-		<h2 id="prepare.archive">Prepare the Remote Archive and the Metadata Database<a class="sectionlink" href="#prepare.archive" title="Link to this section.">&#x21d7;</a></h2>
+		<h2 id="prepare.archive">Create Your Own Metadata Database<a class="sectionlink" href="#prepare.archive" title="Link to this section.">&#x21d7;</a></h2>
 
 			<p>
 			When your have multiple relavant applications which share lots of their dependencies,
@@ -813,6 +855,8 @@ System                  2                   2
 		"size": "17840176"
 	}
 }</code>
+
+			<p><b>Naming Rules of Dependencies:</b></p>
 
 			<p>The name of a software dependency is in the format of 'A-B-C-D', where A is
 			the software name, B is the software version, C is OS distro name, D is
@@ -875,7 +919,7 @@ System                  2                   2
 	--spec povray.umbrella \
 	--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 	--localdir /tmp/umbrella_test/ \
-	--output /tmp/umbrella_test/local_povray \
+	--output "/tmp/frame000.png=/tmp/umbrella_test/local_povray" \
 	--sandbox_mode local \
 	--log umbrella.log \
 	run</code>

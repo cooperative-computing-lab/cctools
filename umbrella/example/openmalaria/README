@@ -1,16 +1,24 @@
 #openmalaria execution engine test command.
 umbrella \
---spec openmalaria.umbrella \
+--spec openmalaria_S.umbrella \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/parrot_openmalaria \
---sandbox_mode parrot \
+--output "/tmp/ctsout.txt=/tmp/umbrella_test/docker_openmalaria/ctsout.txt, /tmp/output.txt=/tmp/umbrella_test/docker_openmalaria/output.txt" \
+--sandbox_mode docker \
 --log umbrella.log \
 run
 
 umbrella \
 --spec openmalaria.umbrella \
+--meta file:///afs/crc.nd.edu/user/h/hmeng/git-development/cctools/umbrella/example/openmalaria/meta.json \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/docker_openmalaria \
+--output "/tmp/ctsout.txt=/tmp/umbrella_test/docker_openmalaria/ctsout.txt, /tmp/output.txt=/tmp/umbrella_test/docker_openmalaria/output.txt" \
 --sandbox_mode docker \
 --log umbrella.log \
 run
+
+
+#split a self-contained spec into spec and meta:
+umbrella \
+	--spec openmalaria_S.umbrella \
+	--log umbrella.log \
+	split openmalaria.umbrella meta.json 

@@ -6,7 +6,7 @@ umbrella \
 --spec cms_opendata.umbrella \
 --meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/parrot_cms_opendata_output \
+--output "/tmp/sim_job=/tmp/umbrella_test/parrot_cms_opendata_output" \
 --sandbox_mode parrot \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
@@ -16,7 +16,7 @@ run
 umbrella \
 --spec cms_opendata_S.umbrella \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/parrot_cms_opendata_output \
+--output "/tmp/sim_job=/tmp/umbrella_test/parrot_cms_opendata_S_output" \
 --sandbox_mode parrot \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
@@ -28,7 +28,7 @@ umbrella \
 --spec cms_opendata.umbrella \
 --meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/docker_cms_opendata_output \
+--output "/tmp/sim_job=/tmp/umbrella_test/docker_cms_opendata_output" \
 --sandbox_mode docker \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
@@ -38,7 +38,7 @@ run
 umbrella \
 --spec cms_opendata_S.umbrella \
 --localdir /tmp/umbrella_test/ \
---output /tmp/umbrella_test/docker_cms_opendata_output \
+--output "/tmp/sim_job=/tmp/umbrella_test/docker_cms_opendata_S_output" \
 --sandbox_mode docker \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \

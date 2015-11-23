@@ -11,6 +11,7 @@
 		"version": ">=2.6.18"
 	},
 	"os": {
+		"id": "669ab5ef94af84d273f8f92a86b7907a",
 		"name": "Redhat",
 		"version": "6.5"
 	},
@@ -35,5 +36,12 @@
 	"environ": {
 		"PWD": "/tmp"
 	},
-	"cmd": "povray +I/tmp/4_cubes.pov +O/tmp/frame000.png +K.0  -H50 -W50"
+	"cmd": "povray +I/tmp/4_cubes.pov +O/tmp/frame000.png +K.0  -H50 -W50",
+	"output": {
+		"files": [
+			"/tmp/frame000.png"
+		],
+		"dirs": [
+		]
+	}
 }
