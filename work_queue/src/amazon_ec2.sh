@@ -6,7 +6,7 @@
 set -e
 #OUTPUT_FILES_DESTINATION="/tmp/test_amazon_makeflow"
 OUTPUT_FILES_DESTINATION="."
-EC2_TOOLS_DIR="../ec2-api-tools-1.7.5.1/bin"
+EC2_TOOLS_DIR="$EC2_HOME/bin"
 AMI_IMAGE="ami-4b630d2e"
 INSTANCE_TYPE="t1.micro"
 USERNAME="ubuntu"

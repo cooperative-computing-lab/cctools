@@ -18,7 +18,7 @@ char *amazon_ec2_script ="\
 set -e\n\
 #OUTPUT_FILES_DESTINATION=\"/tmp/test_amazon_makeflow\"\n\
 OUTPUT_FILES_DESTINATION=\".\"\n\
-EC2_TOOLS_DIR=\"../ec2-api-tools-1.7.5.1/bin\"\n\
+EC2_TOOLS_DIR=\"$EC2_HOME/bin\"\n\
 AMI_IMAGE=\"ami-4b630d2e\"\n\
 INSTANCE_TYPE=\"t1.micro\"\n\
 USERNAME=\"ubuntu\"\n\
