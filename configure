@@ -250,6 +250,14 @@ do
 		--strict)
 			optstrict=1
 			;;
+		--sge-parameter)
+			if [ -z "$sge_parameters" ]
+			then
+				sge_parameters="\#$ ${arg}"
+			else
+				sge_parameters="${sge_parameters}\n\#$ ${arg}"
+			fi
+			;;
 		--with-globus-path)
 			globus_path=${arg}
 			config_globus_path=yes
@@ -368,6 +376,7 @@ Where options are:
   --prefix             <path>
   --debug
   --strict
+  --sge-parameter      <parameter>
   --globus-flavor      <flavor>
   --xrootd-arch        <arch>
   --tcp-low-port       <port>
@@ -1400,6 +1409,8 @@ CCTOOLS_PYTHON3_2TO3=${python3_2to3}
 CCTOOLS_PYTHON3_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON3_VERSION)/site-packages
 
 CCTOOLS_SWIG_BINDINGS=${swig_bindings}
+
+CCTOOLS_SGE_PARAMETERS=$(echo ${sge_parameters} | sed -e 's/\$/\\\$\$/g')
 
 CCTOOLS_DOCTARGETS=${cctools_doctargets}
 
