@@ -140,13 +140,13 @@ PUBLIC_DNS=$($EC2_TOOLS_DIR/ec2-describe-instances $INSTANCE_ID \\\n\
 chmod 400 $KEYPAIR_NAME.pem\n\
 \n\
 # Try for successful ssh connection\n\
-tries=\"30\"\n\
+tries=30\n\
 SUCCESSFUL_SSH=-1\n\
 while [ $tries -ne 0 ]\n\
 do\n\
     run_ssh_cmd \"echo \'Connection to remote server successful\'\" \\\n\
         && SUCCESSFUL_SSH=0 && break\n\
-    tries=$[$tries-1]\n\
+    tries=$(expr $tries-1)\n\
     sleep 1\n\
 done\n\
 \n\
