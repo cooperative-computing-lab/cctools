@@ -5221,7 +5221,6 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 {
 	struct work_queue_worker *w;
 	char *key;
-	int first = 1;
 
 	bzero(total, sizeof(struct work_queue_resources));
 
@@ -5231,13 +5230,7 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		count_worker_resources(w);
-		if(first) {
-			*total = *w->resources;
-			first = 0;
-		} else {
 			work_queue_resources_add(total,w->resources);
-		}
 	}
 }
 
