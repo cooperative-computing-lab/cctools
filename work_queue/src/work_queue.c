@@ -2889,12 +2889,13 @@ static void count_worker_resources(struct work_queue_worker *w)
 	struct work_queue_task *t;
 	uint64_t taskid;
 	int64_t cores_avg, mem_avg, disk_avg, gpus_avg;
-	int64_t cores_used, mem_used, disk_used, gpus_used;
+	int64_t cores_used, mem_used, disk_used, gpus_used, unlabeled_used;
 
 	w->resources->cores.inuse  = 0;
 	w->resources->memory.inuse = 0;
 	w->resources->disk.inuse   = 0;
 	w->resources->gpus.inuse   = 0;
+	w->resources->unlabeled.inuse = 0;
 
 	cores_avg = 0;
 	mem_avg   = 0;
@@ -2917,6 +2918,8 @@ static void count_worker_resources(struct work_queue_worker *w)
 			mem_used  = mem_avg;
 			disk_used = disk_avg;
 			gpus_used = gpus_avg;
+			unlabeled_used = 1;
+
 		}
 		else
 		{
@@ -2924,12 +2927,14 @@ static void count_worker_resources(struct work_queue_worker *w)
 			mem_used  = MAX(t->memory, 0);
 			disk_used = MAX(t->disk, 0);
 			gpus_used = MAX(t->gpus, 0);
+			unlabeled_used = 0;
 		}
 
-		w->resources->cores.inuse  += cores_used;
-		w->resources->memory.inuse += mem_used;
-		w->resources->disk.inuse   += disk_used;
-		w->resources->gpus.inuse   += gpus_used;
+		w->resources->cores.inuse     += cores_used;
+		w->resources->memory.inuse    += mem_used;
+		w->resources->disk.inuse      += disk_used;
+		w->resources->gpus.inuse      += gpus_used;
+		w->resources->unlabeled.inuse += unlabeled_used;
 	}
 }
 
@@ -2942,10 +2947,6 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
 
 	t->total_submissions += 1;
-
-	if(t->unlabeled) {
-		w->resources->unlabeled.inuse++;
-	}
 
 	count_worker_resources(w);
 
@@ -2965,11 +2966,6 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	itable_remove(w->current_tasks, t->taskid);
 	itable_remove(q->worker_task_map, t->taskid);
 	change_task_state(q, t, new_state);
-
-	if(t->unlabeled)
-	{
-		w->resources->unlabeled.inuse--;
-	}
 
 	count_worker_resources(w);
 
