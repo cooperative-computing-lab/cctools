@@ -200,7 +200,7 @@ globus_flavor=auto
 ccompiler=gcc
 cxxcompiler=g++
 
-ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra"
+ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -std=c99"
 
 config_readline_path=auto
 config_globus_path=auto
