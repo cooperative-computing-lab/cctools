@@ -1960,21 +1960,35 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 
 	if(n == 2 && !strcmp(category,"tag"))
 	{
-		/* Shortcut, inuse has the tag, as "resources tag" only sends one value */
-		w->resources->tag = r.inuse;
+		/* Shortcut, total has the tag, as "resources tag" only sends one value */
+		w->resources->tag = r.total;
 		log_worker_stats(q);
 
 	} else if(n == 4) {
+
+		/* inuse is computed by the master, so we save it here */
+		int64_t inuse;
+
 		if(!strcmp(category,"cores")) {
+			inuse = w->resources->cores.inuse;
 			w->resources->cores = r;
+			w->resources->cores.inuse = inuse;
 		} else if(!strcmp(category,"memory")) {
+			inuse = w->resources->memory.inuse;
 			w->resources->memory = r;
+			w->resources->memory.inuse = inuse;
 		} else if(!strcmp(category,"disk")) {
+			inuse = w->resources->disk.inuse;
 			w->resources->disk = r;
+			w->resources->disk.inuse = inuse;
 		} else if(!strcmp(category,"gpus")) {
+			inuse = w->resources->gpus.inuse;
 			w->resources->gpus = r;
+			w->resources->gpus.inuse = inuse;
 		} else if(!strcmp(category,"workers")) {
+			inuse = w->resources->workers.inuse;
 			w->resources->workers = r;
+			w->resources->workers.inuse = inuse;
 		}
 	} else {
 		return MSG_FAILURE;
@@ -2875,12 +2889,13 @@ static void count_worker_resources(struct work_queue_worker *w)
 	struct work_queue_task *t;
 	uint64_t taskid;
 	int64_t cores_avg, mem_avg, disk_avg, gpus_avg;
-	int64_t cores_used, mem_used, disk_used, gpus_used;
+	int64_t cores_used, mem_used, disk_used, gpus_used, unlabeled_used;
 
 	w->resources->cores.inuse  = 0;
 	w->resources->memory.inuse = 0;
 	w->resources->disk.inuse   = 0;
 	w->resources->gpus.inuse   = 0;
+	w->resources->unlabeled.inuse = 0;
 
 	cores_avg = 0;
 	mem_avg   = 0;
@@ -2903,6 +2918,8 @@ static void count_worker_resources(struct work_queue_worker *w)
 			mem_used  = mem_avg;
 			disk_used = disk_avg;
 			gpus_used = gpus_avg;
+			unlabeled_used = 1;
+
 		}
 		else
 		{
@@ -2910,12 +2927,14 @@ static void count_worker_resources(struct work_queue_worker *w)
 			mem_used  = MAX(t->memory, 0);
 			disk_used = MAX(t->disk, 0);
 			gpus_used = MAX(t->gpus, 0);
+			unlabeled_used = 0;
 		}
 
-		w->resources->cores.inuse  += cores_used;
-		w->resources->memory.inuse += mem_used;
-		w->resources->disk.inuse   += disk_used;
-		w->resources->gpus.inuse   += gpus_used;
+		w->resources->cores.inuse     += cores_used;
+		w->resources->memory.inuse    += mem_used;
+		w->resources->disk.inuse      += disk_used;
+		w->resources->gpus.inuse      += gpus_used;
+		w->resources->unlabeled.inuse += unlabeled_used;
 	}
 }
 
@@ -2928,10 +2947,6 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
 
 	t->total_submissions += 1;
-
-	if(t->unlabeled) {
-		w->resources->unlabeled.inuse++;
-	}
 
 	count_worker_resources(w);
 
@@ -2951,11 +2966,6 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	itable_remove(w->current_tasks, t->taskid);
 	itable_remove(q->worker_task_map, t->taskid);
 	change_task_state(q, t, new_state);
-
-	if(t->unlabeled)
-	{
-		w->resources->unlabeled.inuse--;
-	}
 
 	count_worker_resources(w);
 
@@ -5211,21 +5221,16 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 {
 	struct work_queue_worker *w;
 	char *key;
-	int first = 1;
+
+	bzero(total, sizeof(struct work_queue_resources));
 
 	if(hash_table_size(q->worker_table)==0) {
-		memset(total,0,sizeof(*total));
 		return;
 	}
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-		if(first) {
-			*total = *w->resources;
-			first = 0;
-		} else {
 			work_queue_resources_add(total,w->resources);
-		}
 	}
 }
 
