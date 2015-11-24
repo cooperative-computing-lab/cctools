@@ -163,13 +163,11 @@ int disk_alloc_delete(char *loc) {
 	int k;
 	int max_mount_path_length = 62;
 
-	//Copy only pathname of the mountpoint without extraneous characters
+	//Copy only pathname of the mountpoint without extraneous paretheses
 	for(k = 1; k < loop_dev_path_length; k++) {
 		loop_mountpoint_array[k-1] = loop_mount[k];
 	}
-	for(k; k < 128; k++) {
-		loop_mountpoint_array[k] = '\0';
-	}
+	loop_mountpoint_array[k] = '\0';
 
 	if(strncmp(loop_mountpoint_array, device_loc, max_mount_path_length) == 0) {
 
