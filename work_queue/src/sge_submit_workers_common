@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -x
+SGE_WARNING=1
 
 SUBMIT_COMMON=$(which work_queue_submit_common)
 if [ -z "$SUBMIT_COMMON" ];
@@ -59,7 +59,7 @@ submit_workers_command()
 
 	cat >worker.sh <<EOF
 #!/bin/sh
-#$ -pe smp $cores
+SGE_CUSTOM_PARAMETERS
 ./work_queue_worker $arguments $host $port
 EOF
 
