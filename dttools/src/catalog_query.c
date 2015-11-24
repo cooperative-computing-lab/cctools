@@ -48,7 +48,7 @@ struct catalog_query *catalog_query_create(const char *host, int port, time_t st
 
 	struct catalog_query *q = xxmalloc(sizeof(*q));
 	q->data = j;
-	q->next_item = j->items;
+	q->next_item = j->u.items;
 	return q;
 }
 

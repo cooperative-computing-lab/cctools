@@ -296,7 +296,7 @@ int find_child_relations(int spaces, const char *host, int port, struct jx_table
 		if(temp_my_master && !strcmp(temp_my_master, full_address))
 		{
 			struct jx *jproject = jx_lookup(global_catalog[i],"project");
-			const char *project_name = jproject->string_value;
+			const char *project_name = jproject->u.string_value;
 
 			int branch_len = strlen(project_name) + spaces + 2;
 
@@ -304,8 +304,8 @@ int find_child_relations(int spaces, const char *host, int port, struct jx_table
 			add_child_relation(project_name, spaces, branch, branch_len);
 
 			// update project_name
-			free(jproject->string_value);
-			jproject->string_value = branch;
+			free(jproject->u.string_value);
+			jproject->u.string_value = branch;
 
 			if(format_mode==FORMAT_TABLE) {
 				jx_table_print(headers,global_catalog[i], stdout);
@@ -400,7 +400,7 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 	}
 
 	struct jx_item *i;
-	for(i=jarray->items;i;i=i->next) {
+	for(i=jarray->u.items;i;i=i->next) {
 		if(format_mode == FORMAT_TABLE) {
 			jx_table_print(query_header,i->value,stdout);
 		} else {

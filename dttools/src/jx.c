@@ -45,14 +45,14 @@ struct jx * jx_null()
 struct jx * jx_symbol( const char *symbol_name )
 {
 	struct jx *j = jx_create(JX_SYMBOL);
-	j->symbol_name = strdup(symbol_name);
+	j->u.symbol_name = strdup(symbol_name);
 	return j;
 }
 
 struct jx * jx_string( const char *string_value )
 {
 	struct jx *j = jx_create(JX_STRING);
-	j->string_value = strdup(string_value);
+	j->u.string_value = strdup(string_value);
 	return j;
 }
 
@@ -72,7 +72,7 @@ struct jx * jx_format( const char *fmt, ... )
 	buffer_free(B);
 
 	j = jx_create(JX_STRING);
-	j->string_value = str;
+	j->u.string_value = str;
 
 	return j;
 }
@@ -80,35 +80,35 @@ struct jx * jx_format( const char *fmt, ... )
 struct jx * jx_integer( jx_int_t integer_value )
 {
 	struct jx *j = jx_create(JX_INTEGER);
-	j->integer_value = integer_value;
+	j->u.integer_value = integer_value;
 	return j;
 }
 
 struct jx * jx_double( double double_value )
 {
 	struct jx *j = jx_create(JX_DOUBLE);
-	j->double_value = double_value;
+	j->u.double_value = double_value;
 	return j;
 }
 
 struct jx * jx_boolean( int boolean_value )
 {
 	struct jx *j = jx_create(JX_BOOLEAN);
-	j->boolean_value = boolean_value;
+	j->u.boolean_value = boolean_value;
 	return j;
 }
 
 struct jx * jx_object( struct jx_pair *pairs )
 {
 	struct jx *j = jx_create(JX_OBJECT);
-	j->pairs = pairs;
+	j->u.pairs = pairs;
 	return j;
 }
 
 struct jx * jx_array( struct jx_item *items )
 {
 	struct jx *j = jx_create(JX_ARRAY);
-	j->items = items;
+	j->u.items = items;
 	return j;
 }
 
@@ -134,9 +134,9 @@ struct jx * jx_lookup( struct jx *j, const char *key )
 
 	if(!j || j->type!=JX_OBJECT) return 0;
 
-	for(p=j->pairs;p;p=p->next) {
+	for(p=j->u.pairs;p;p=p->next) {
 		if(p && p->key && p->key->type==JX_STRING) {
-			if(!strcmp(p->key->string_value,key)) {
+			if(!strcmp(p->key->u.string_value,key)) {
 				return p->value;
 			}
 		}
@@ -149,7 +149,7 @@ const char * jx_lookup_string( struct jx *object, const char *key )
 {
 	struct jx *j = jx_lookup(object,key);
 	if(j && jx_istype(j,JX_STRING)) {
-		return j->string_value;
+		return j->u.string_value;
 	} else {
 		return 0;
 	}
@@ -159,7 +159,7 @@ jx_int_t jx_lookup_integer( struct jx *object, const char *key )
 {
 	struct jx *j = jx_lookup(object,key);
 	if(j && jx_istype(j,JX_INTEGER)) {
-		return j->integer_value;
+		return j->u.integer_value;
 	} else {
 		return 0;
 	}
@@ -169,7 +169,7 @@ double jx_lookup_double( struct jx *object, const char *key )
 {
 	struct jx *j = jx_lookup(object,key);
 	if(j && jx_istype(j,JX_DOUBLE)) {
-		return j->double_value;
+		return j->u.double_value;
 	} else {
 		return 0;
 	}
@@ -178,7 +178,7 @@ double jx_lookup_double( struct jx *object, const char *key )
 int jx_insert( struct jx *j, struct jx *key, struct jx *value )
 {
 	if(!j || j->type!=JX_OBJECT) return 0;
-	j->pairs = jx_pair(key,value,j->pairs);
+	j->u.pairs = jx_pair(key,value,j->u.pairs);
 	return 1;
 }
 
@@ -199,16 +199,16 @@ void jx_insert_string( struct jx *j, const char *key, const char *value )
 
 void jx_array_insert( struct jx *array, struct jx *value )
 {
-	array->items = jx_item( value, array->items->next );
+	array->u.items = jx_item( value, array->u.items->next );
 }
 
 void jx_array_append( struct jx *array, struct jx *value )
 {
-	if(!array->items) {
-		array->items = jx_item( value, 0 );
+	if(!array->u.items) {
+		array->u.items = jx_item( value, 0 );
 	} else {
 		struct jx_item *i;
-		for(i=array->items;i->next;i=i->next) { }
+		for(i=array->u.items;i->next;i=i->next) { }
 		i->next = jx_item(value,0);
 	}
 }
@@ -241,16 +241,16 @@ void jx_delete( struct jx *j )
 		case JX_NULL:
 			break;
 		case JX_SYMBOL:
-			free(j->symbol_name);
+			free(j->u.symbol_name);
 			break;
 		case JX_STRING:
-			free(j->string_value);
+			free(j->u.string_value);
 			break;
 		case JX_ARRAY:
-			jx_item_delete(j->items);
+			jx_item_delete(j->u.items);
 			break;
 		case JX_OBJECT:
-			jx_pair_delete(j->pairs);
+			jx_pair_delete(j->u.pairs);
 			break;
 	}
 	free(j);
@@ -281,19 +281,19 @@ int jx_equals( struct jx *j, struct jx *k )
 		case JX_NULL:
 			return 1;
 		case JX_DOUBLE:
-			return j->double_value==k->double_value;
+			return j->u.double_value==k->u.double_value;
 		case JX_BOOLEAN:
-			return j->boolean_value==k->boolean_value;
+			return j->u.boolean_value==k->u.boolean_value;
 		case JX_INTEGER:
-			return j->integer_value==k->integer_value;
+			return j->u.integer_value==k->u.integer_value;
 		case JX_SYMBOL:
-			return !strcmp(j->symbol_name,k->symbol_name);
+			return !strcmp(j->u.symbol_name,k->u.symbol_name);
 		case JX_STRING:
-			return !strcmp(j->string_value,k->string_value);
+			return !strcmp(j->u.string_value,k->u.string_value);
 		case JX_ARRAY:
-			return jx_item_equals(j->items,k->items);
+			return jx_item_equals(j->u.items,k->u.items);
 		case JX_OBJECT:
-			return jx_pair_equals(j->pairs,k->pairs);
+			return jx_pair_equals(j->u.pairs,k->u.pairs);
 	}
 
 	/* not reachable, but some compilers complain. */
@@ -325,19 +325,19 @@ struct jx  *jx_copy( struct jx *j )
 		case JX_NULL:
 			return jx_null();
 		case JX_DOUBLE:
-			return jx_double(j->double_value);
+			return jx_double(j->u.double_value);
 		case JX_BOOLEAN:
-			return jx_boolean(j->boolean_value);
+			return jx_boolean(j->u.boolean_value);
 		case JX_INTEGER:
-			return jx_integer(j->integer_value);
+			return jx_integer(j->u.integer_value);
 		case JX_SYMBOL:
-			return jx_symbol(j->symbol_name);
+			return jx_symbol(j->u.symbol_name);
 		case JX_STRING:
-			return jx_string(j->string_value);
+			return jx_string(j->u.string_value);
 		case JX_ARRAY:
-			return jx_array(jx_item_copy(j->items));
+			return jx_array(jx_item_copy(j->u.items));
 		case JX_OBJECT:
-			return jx_object(jx_pair_copy(j->pairs));
+			return jx_object(jx_pair_copy(j->u.pairs));
 	}
 
 	/* not reachable, but some compilers complain. */
@@ -368,9 +368,9 @@ int jx_is_constant( struct jx *j )
 		case JX_NULL:
 			return 1;
 		case JX_ARRAY:
-			return jx_item_is_constant(j->items);
+			return jx_item_is_constant(j->u.items);
 		case JX_OBJECT:
-			return jx_pair_is_constant(j->pairs);
+			return jx_pair_is_constant(j->u.pairs);
 	}
 
 	/* not reachable, but some compilers complain. */
@@ -382,9 +382,9 @@ void jx_export( struct jx *j )
 	if(!j || !jx_istype(j,JX_OBJECT)) return;
 
 	struct jx_pair *p;
-	for(p=j->pairs;p;p=p->next) {
+	for(p=j->u.pairs;p;p=p->next) {
 		if(p->key->type==JX_STRING && p->value->type==JX_STRING) {
-			setenv(p->key->string_value,p->value->string_value,1);
+			setenv(p->key->u.string_value,p->value->u.string_value,1);
 		}
 	}
 }
@@ -410,7 +410,7 @@ struct jx * jx_evaluate( struct jx *j, jx_eval_func_t func )
 {
 	switch(j->type) {
 		case JX_SYMBOL:
-			return func(j->symbol_name);
+			return func(j->u.symbol_name);
 		case JX_DOUBLE:
 		case JX_BOOLEAN:
 		case JX_INTEGER:
@@ -418,9 +418,9 @@ struct jx * jx_evaluate( struct jx *j, jx_eval_func_t func )
 		case JX_NULL:
 			return jx_copy(j);
 		case JX_ARRAY:
-			return jx_array(jx_item_evaluate(j->items,func));
+			return jx_array(jx_item_evaluate(j->u.items,func));
 		case JX_OBJECT:
-			return jx_object(jx_pair_evaluate(j->pairs,func));
+			return jx_object(jx_pair_evaluate(j->u.pairs,func));
 	}
 	/* not reachable, but some compilers complain. */
 	return 0;

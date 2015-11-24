@@ -47,12 +47,12 @@ struct nvpair * jx_to_nvpair( struct jx *object )
 	struct nvpair *nv = nvpair_create();
 	struct jx_pair *p;
 
-	for(p=object->pairs;p;p=p->next) {
+	for(p=object->u.pairs;p;p=p->next) {
 		if(p->value->type==JX_STRING) {
-			nvpair_insert_string(nv,p->key->string_value,p->value->string_value);
+			nvpair_insert_string(nv,p->key->u.string_value,p->value->u.string_value);
 		} else {
 			char *s = jx_print_string(p->value);
-			nvpair_insert_string(nv,p->key->string_value,s);
+			nvpair_insert_string(nv,p->key->u.string_value,s);
 			free(s);
 		}
 	}
