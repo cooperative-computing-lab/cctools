@@ -149,16 +149,29 @@ int disk_alloc_delete(char *loc) {
 		}
 	}
 
+	//Find pathname of mountpoint associated with loop devide
 	char loop_dev[128], loop_info[128], loop_mount[128];
 	FILE *loop_find;
 	losetup_args = string_format("losetup -j %s", device_loc);
 	loop_find = popen(losetup_args, "r");
 	fscanf(loop_find, "%s %s %s", loop_dev, loop_info, loop_mount);
 	pclose(loop_find);
-	loop_mount[0] = '\0';
-	loop_mount[strlen(loop_mount) - 1] = '\0';
+	int loop_dev_path_length = strlen(loop_mount);
+	loop_mount[loop_dev_path_length - 1] = '\0';
 	loop_dev[strlen(loop_dev) - 1] = '\0';
-	if(strncmp(loop_mount, device_loc, 62) + 47 == 0) {
+	char loop_mountpoint_array[128];
+	int k;
+	int max_mount_path_length = 62;
+
+	//Copy only pathname of the mountpoint without extraneous characters
+	for(k = 1; k < loop_dev_path_length; k++) {
+		loop_mountpoint_array[k-1] = loop_mount[k];
+	}
+	for(k; k < 128; k++) {
+		loop_mountpoint_array[k] = '\0';
+	}
+
+	if(strncmp(loop_mountpoint_array, device_loc, max_mount_path_length) == 0) {
 
 		dev_num = loop_dev;
 	}
