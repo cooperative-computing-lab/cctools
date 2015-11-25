@@ -27,7 +27,7 @@ rmonitor_poll_example: rmonitor_poll_example.o
 $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 
 resource_monitor_pb.o: resource_monitor.c
-	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) -DCCTOOLS_USE_RMONITOR_HELPER_LIB $<
+	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_CC_UNIQUE_OPTIONS) $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) -DCCTOOLS_USE_RMONITOR_HELPER_LIB $<
 resource_monitor: resource_monitor_pb.o
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 

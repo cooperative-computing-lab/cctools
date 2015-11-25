@@ -1345,6 +1345,8 @@ CCTOOLS_PACKAGES=${packages}
 
 CCTOOLS_CC=${CCTOOLS_CC}
 
+CCTOOLS_CC_UNIQUE_OPTIONS=--std=c99 -fms-extensions
+
 CCTOOLS_BASE_CCFLAGS=${ccflags}
 
 CCTOOLS_INTERNAL_CCFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CCFLAGS} ${c_only_flags}
