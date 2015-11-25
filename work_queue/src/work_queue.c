@@ -4090,6 +4090,9 @@ struct work_queue *work_queue_create(int port)
 	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
 
 	q->monitor_mode = MON_DISABLED;
+
+	q->measured_local_resources = make_rmsummary(0);
+
 	q->password = 0;
 
 	q->asynchrony_multiplier = 1.0;
@@ -4155,7 +4158,6 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 	return 0;
   }
 
-  q->measured_local_resources = malloc(sizeof(struct rmsummary));
   rmonitor_measure_process(q->measured_local_resources, getpid());
 
   q->monitor_mode = MON_SINGLE_FILE;
@@ -4345,6 +4347,9 @@ void work_queue_delete(struct work_queue *q)
 
 		free(q->stats);
 		free(q->stats_disconnected_workers);
+
+		if(q->measured_local_resources)
+			free(q->measured_local_resources);
 
 		work_queue_disable_monitoring(q);
 
