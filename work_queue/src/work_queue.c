@@ -270,6 +270,7 @@ static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
 
 static struct work_queue_task_category *category_lookup_or_create(struct work_queue *q, const char *name);
+static void category_delete(struct work_queue *q, const char *name);
 void category_accumulate_task(struct work_queue *q, struct work_queue_task *t);
 
 /** Clone a @ref work_queue_file
@@ -4327,11 +4328,7 @@ void work_queue_delete(struct work_queue *q)
 		struct work_queue_task_category *c;
 		hash_table_firstkey(q->categories);
 		while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
-			if(c->name)
-				free(c->name);
-			if(c->stats)
-				free(c->stats);
-			free(c);
+			category_delete(q, key);
 		}
 		hash_table_delete(q->categories);
 
@@ -5384,6 +5381,24 @@ struct work_queue_task_category *category_lookup_or_create(struct work_queue *q,
 	hash_table_insert(q->categories, name, c);
 
 	return c;
+}
+
+void category_delete(struct work_queue *q, const char *name) {
+	struct work_queue_task_category *c = hash_table_lookup(q->categories, name);
+
+	if(!c)
+		return;
+
+	hash_table_remove(q->categories, name);
+
+	if(c->stats)
+		free(c->stats);
+	if(c->name)
+		free(c->name);
+
+	itable_delete(c->memory_histogram);
+
+	free(c);
 }
 
 void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
