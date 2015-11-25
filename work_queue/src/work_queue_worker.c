@@ -1559,7 +1559,7 @@ static void foreman_for_master(struct link *master) {
 
 	reset_idle_timer();
 
-	int64_t prev_num_workers = 0;
+	int prev_num_workers = 0;
 	while(!abort_flag) {
 		int result = 1;
 		struct work_queue_task *task = NULL;
@@ -1572,7 +1572,7 @@ static void foreman_for_master(struct link *master) {
 		measure_worker_resources();
 
 		/* if the number of workers changed by more than %10, send an status update */
-		int64_t curr_num_workers = total_resources->workers.total;
+		int curr_num_workers = total_resources->workers.total;
 		if(10*abs(curr_num_workers - prev_num_workers) > prev_num_workers) {
 			send_keepalive(master);
 		}

@@ -62,7 +62,7 @@ void jx_table_print( struct jx_table *t, struct jx *j, FILE * f )
 			} else if(v->type==JX_STRING) {
 				// special case b/c we want to see
 				// a raw string without quotes or escapes.
-				line = string_format("%s",v->string_value);
+				line = string_format("%s",v->u.string_value);
 			} else {
 				// other types should be printed natively
 				line = jx_print_string(v);

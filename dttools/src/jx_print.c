@@ -85,28 +85,28 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			buffer_putstring(b,"null");
 			break;
 		case JX_DOUBLE:
-			buffer_printf(b,"%lg",j->double_value);
+			buffer_printf(b,"%lg",j->u.double_value);
 			break;
 		case JX_BOOLEAN:
-			buffer_printf(b,"%s",j->boolean_value ? "true" : "false");
+			buffer_printf(b,"%s",j->u.boolean_value ? "true" : "false");
 			break;
 		case JX_INTEGER:
-			buffer_printf(b,"%lld",(long long)j->integer_value);
+			buffer_printf(b,"%lld",(long long)j->u.integer_value);
 			break;
 		case JX_SYMBOL:
-			buffer_printf(b,"%s",j->symbol_name);
+			buffer_printf(b,"%s",j->u.symbol_name);
 			break;
 		case JX_STRING:
-			jx_escape_string(j->string_value,b);
+			jx_escape_string(j->u.string_value,b);
 			break;
 		case JX_ARRAY:
 			buffer_putstring(b,"[");
-			jx_item_print(j->items,b);
+			jx_item_print(j->u.items,b);
 			buffer_putstring(b,"]");
 			break;
 		case JX_OBJECT:
 			buffer_putstring(b,"{");
-			jx_pair_print(j->pairs,b);
+			jx_pair_print(j->u.pairs,b);
 			buffer_putstring(b,"}");
 			break;
 	}

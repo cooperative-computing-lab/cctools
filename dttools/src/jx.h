@@ -80,7 +80,7 @@ struct jx {
 		char * symbol_name;   /**< value of @ref JX_SYMBOL */
 		struct jx_item *items;  /**< value of @ref JX_ARRAY */
 		struct jx_pair *pairs;  /**< value of @ref JX_OBJECT */
-	};
+	} u;
 };
 
 /** Create a JX null value. @return A JX expression. */

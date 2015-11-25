@@ -330,7 +330,7 @@ void delete_projects_list(struct list *l)
 		struct jx *jv = jx_lookup(J,#option); \
 		if(jv) {\
 			if(jv->type==type_json) {\
-				new_var = jv->field;\
+				new_var = jv->u.field;\
 			} else {\
 				debug(D_NOTICE, #option " has not a valid value.");\
 				error_found = 1;\
