@@ -94,6 +94,15 @@ class Task(_object):
         return work_queue_task_specify_tag(self._task, tag)
 
     ##
+    # Label the task with the given category. It is expected that tasks with the
+    # same category have similar resources requirements (e.g. for fast abort).
+    #
+    # @param self       Reference to the current task object.
+    # @param name       The name of the category
+    def specify_category(self, tag):
+        return work_queue_task_specify_category(self._task, name)
+
+    ##
     # Indicate that the task would be optimally run on a given host.
     #
     # @param self       Reference to the current task object.
@@ -723,12 +732,23 @@ class WorkQueue(_object):
         return work_queue_enable_monitoring_full(self._work_queue, dirname)
 
     ##
-    # Turn on or off fast abort functionality for a given queue.
+    # Turn on or off fast abort functionality for a given queue for tasks in
+    # the "default" category, and for task which category does not set an
+    # explicit multiplier.
     #
     # @param self       Reference to the current work queue object.
     # @param multiplier The multiplier of the average task time at which point to abort; if negative (the default) fast_abort is deactivated.
     def activate_fast_abort(self, multiplier):
         return work_queue_activate_fast_abort(self._work_queue, multiplier)
+
+    ##
+    # Turn on or off fast abort functionality for a given queue.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param name       Name of the category.
+    # @param multiplier The multiplier of the average task time at which point to abort; if zero, deacticate for the category, negative (the default), use the one for the "default" category (see @ref fast_abort)
+    def activate_fast_abort_category(self, name, multiplier):
+        return work_queue_activate_fast_abort_category(self._work_queue, multiplier)
 
     ##
     # Determine whether there are any known tasks queued, running, or waiting to be collected.

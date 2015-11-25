@@ -114,7 +114,8 @@ static uint64_t disk_avail_threshold = 100;
  * Evictionphobic: 0.0 (always prefer to receive completed tasks) */
 double wq_option_send_receive_ratio    = 0.5;
 
-double wq_option_fast_abort_multiplier = -1.0;
+double wq_option_fast_abort_multiplier = -1.0; /* REMOVE when batch options is merged */
+
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
 /* default timeout for slow workers to come back to the pool */
@@ -141,6 +142,8 @@ struct work_queue {
 	struct hash_table *worker_blacklist;
 	struct itable  *worker_task_map;
 
+	struct hash_table *categories;
+
 	struct hash_table *workers_with_available_results;
 
 	struct work_queue_stats *stats;
@@ -148,7 +151,6 @@ struct work_queue {
 
 	double  send_receive_ratio;
 
-	double fast_abort_multiplier;
 	int worker_selection_algorithm;
 	int task_ordering;
 	int process_pending_check;
@@ -221,6 +223,13 @@ struct work_queue_task_report {
 	timestamp_t exec_time;
 };
 
+struct work_queue_task_category {
+	char *name;
+	double fast_abort;
+	timestamp_t average_task_time;
+	struct work_queue_stats *stats;
+};
+
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
 
 struct blacklist_host_info {
@@ -261,6 +270,9 @@ static work_queue_msg_code_t process_queue_status(struct work_queue *q, struct w
 static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
 
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
+
+static struct work_queue_task_category *category_lookup_or_create(struct work_queue *q, const char *name);
+void category_accumulate_task(struct work_queue *q, struct work_queue_task *t);
 
 /** Clone a @ref work_queue_file
 This performs a deep copy of the file struct.
@@ -1850,6 +1862,7 @@ struct jx * task_to_jx( struct work_queue_task *t, const char *state, const char
 	jx_insert_integer(j,"taskid",t->taskid);
 	jx_insert_string(j,"state",state);
 	if(t->tag) jx_insert_string(j,"tag",t->tag);
+	if(t->category) jx_insert_string(j,"category",t->category);
 	jx_insert_string(j,"command",t->command_line);
 	if(host) jx_insert_string(j,"host",host);
 
@@ -2967,6 +2980,10 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	itable_remove(q->worker_task_map, t->taskid);
 	change_task_state(q, t, new_state);
 
+	if(new_state == WORK_QUEUE_TASK_RETRIEVED) {
+		category_accumulate_task(q, t);
+	}
+
 	count_worker_resources(w);
 
 	log_worker_stats(q);
@@ -3070,22 +3087,64 @@ static void ask_for_workers_updates(struct work_queue *q) {
 
 static void abort_slow_workers(struct work_queue *q)
 {
+	struct work_queue_task_category *c;
+	char *category_name;
+
 	struct work_queue_worker *w;
 	struct work_queue_task *t;
 	uint64_t taskid;
-	const double multiplier = q->fast_abort_multiplier;
 
-	struct work_queue_stats *s = q->stats;
+	/* optimization. If no category has a fast abort multiplier, simply return. */
+	int fast_abort_flag = 0;
 
-	if(s->total_tasks_complete - s->total_tasks_failed < 10)
+	hash_table_firstkey(q->categories);
+	while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
+		if(c->stats->total_tasks_complete < 10) {
+			c->average_task_time = 0;
+			continue;
+		}
+
+		c->average_task_time = (c->stats->total_good_execute_time + c->stats->total_good_transfer_time) / c->stats->total_tasks_complete;
+
+		if(c->fast_abort > 0)
+			fast_abort_flag = 1;
+	}
+
+	if(!fast_abort_flag)
 		return;
 
-	timestamp_t average_task_time = (s->total_good_execute_time + s->total_good_transfer_time) / (s->total_tasks_complete - s->total_tasks_failed);
+	struct work_queue_task_category *c_def = category_lookup_or_create(q, "default");
+
 	timestamp_t current = timestamp_get();
 
 	itable_firstkey(q->tasks);
 	while(itable_nextkey(q->tasks, &taskid, (void **) &t)) {
+
+		c = category_lookup_or_create(q, t->category);
+		/* Fast abort deactivated for this category */
+		if(c->fast_abort == 0)
+			continue;
+
 		timestamp_t runtime = current - t->time_send_input_start;
+		timestamp_t average_task_time = c->average_task_time;
+
+		/* Not enough samples, skip the task. */
+		if(average_task_time < 1)
+			continue;
+
+		double multiplier;
+		if(c->fast_abort > 0) {
+			multiplier = c->fast_abort;
+		}
+		else if(c_def->fast_abort > 0) {
+			/* This category uses the default fast abort. (< 0 use default, 0 deactivate). */
+			multiplier = c_def->fast_abort;
+		}
+		else {
+			/* Fast abort also deactivated for the defaut category. */
+			continue;
+		}
+
 		if(runtime >= (average_task_time * multiplier)) {
 			w = itable_lookup(q->worker_task_map, t->taskid);
 			if(w && !w->foreman)
@@ -3239,6 +3298,8 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->gpus = -1;
 	t->unlabeled = 1;
 
+	t->category = xxstrdup("default");
+
 	return t;
 }
 
@@ -3250,6 +3311,9 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   //allocate new memory so we don't segfault when original memory is freed.
   if(task->tag) {
 	new->tag = xxstrdup(task->tag);
+  }
+  if(task->category) {
+	new->category = xxstrdup(task->category);
   }
 
   if(task->command_line) {
@@ -3403,6 +3467,14 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 	if(t->tag)
 		free(t->tag);
 	t->tag = xxstrdup(tag);
+}
+
+void work_queue_task_specify_category(struct work_queue_task *t, const char *category)
+{
+	if(t->category)
+		free(t->category);
+
+	t->category = xxstrdup(category);
 }
 
 struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
@@ -3871,6 +3943,8 @@ void work_queue_task_delete(struct work_queue_task *t)
 			free(t->command_line);
 		if(t->tag)
 			free(t->tag);
+		if(t->category)
+			free(t->category);
 		if(t->output)
 			free(t->output);
 		if(t->input_files) {
@@ -3984,6 +4058,9 @@ struct work_queue *work_queue_create(int port)
 	q->worker_blacklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
 
+	q->categories = hash_table_create(0, 0);
+	work_queue_activate_fast_abort(q, wq_option_fast_abort_multiplier);
+
 	q->stats                      = calloc(1, sizeof(struct work_queue_stats));
 	q->stats_disconnected_workers = calloc(1, sizeof(struct work_queue_stats));
 
@@ -3995,7 +4072,6 @@ struct work_queue *work_queue_create(int port)
 
 	q->send_receive_ratio = wq_option_send_receive_ratio;
 
-	q->fast_abort_multiplier = wq_option_fast_abort_multiplier;
 	q->worker_selection_algorithm = wq_option_scheduler;
 	q->process_pending_check = 0;
 	q->workers_to_wait = 0;
@@ -4111,17 +4187,28 @@ int work_queue_send_receive_ratio(struct work_queue *q, double ratio)
 
 }
 
+int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier)
+{
+	struct work_queue_task_category *c = category_lookup_or_create(q, category);
+
+	if(multiplier >= 1) {
+		debug(D_WQ, "Enabling fast abort multiplier for '%s': %3.3lf\n", category, multiplier);
+		c->fast_abort = multiplier;
+		return 0;
+	} else if(multiplier == 0) {
+		debug(D_WQ, "Disabling fast abort multiplier for '%s'.\n", category);
+		c->fast_abort = 0;
+		return 1;
+	} else {
+		debug(D_WQ, "Using default fast abort multiplier for '%s'.\n", category);
+		c->fast_abort = -1;
+		return 0;
+	}
+}
+
 int work_queue_activate_fast_abort(struct work_queue *q, double multiplier)
 {
-	if(multiplier >= 1) {
-		debug(D_WQ, "Enabling fast abort multiplier: %3.3lf\n", multiplier);
-		q->fast_abort_multiplier = multiplier;
-		return 0;
-	} else {
-		debug(D_WQ, "Disabling fast abort multiplier.\n");
-		q->fast_abort_multiplier = -1.0;
-		return 1;
-	}
+	return work_queue_activate_fast_abort_category(q, "default", multiplier);
 }
 
 int work_queue_port(struct work_queue *q)
@@ -4236,6 +4323,17 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_delete(q->worker_table);
 		hash_table_delete(q->worker_blacklist);
 		itable_delete(q->worker_task_map);
+
+		struct work_queue_task_category *c;
+		hash_table_firstkey(q->categories);
+		while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
+			if(c->name)
+				free(c->name);
+			if(c->stats)
+				free(c->stats);
+			free(c);
+		}
+		hash_table_delete(q->categories);
 
 		list_delete(q->ready_list);
 
@@ -4822,9 +4920,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 
 		// If fast abort is enabled, kill off slow workers.
-		if(q->fast_abort_multiplier > 0) {
-			abort_slow_workers(q);
-		}
+		abort_slow_workers(q);
 
 		// If the foreman_uplink is active then break so the caller can handle it.
 		if(foreman_uplink) {
@@ -5270,6 +5366,38 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 	}
 }
 
+struct work_queue_task_category *category_lookup_or_create(struct work_queue *q, const char *name) {
+	struct work_queue_task_category *c;
 
+	if(!name)
+		name = "default";
+
+	c = hash_table_lookup(q->categories, name);
+	if(c) return c;
+
+	c = calloc(1, sizeof(struct work_queue_task_category));
+
+	c->name       = xxstrdup(name);
+	c->stats      = calloc(1, sizeof(struct work_queue_stats));
+	c->fast_abort = -1;
+
+	hash_table_insert(q->categories, name, c);
+
+	return c;
+}
+
+void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
+
+	const char *name = t->category ? t->category : "default";
+
+	struct work_queue_task_category *c = hash_table_lookup(q->categories, name);
+
+	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
+	{
+		c->stats->total_tasks_complete++;
+		c->stats->total_good_execute_time  += t->cmd_execution_time;
+		c->stats->total_good_transfer_time += t->total_transfer_time;
+	}
+}
 
 /* vim: set noexpandtab tabstop=4: */

@@ -54,6 +54,11 @@ sub specify_tag {
 	return work_queue_task_specify_tag($self->{_task}, $tag);;
 }
 
+sub specify_category {
+	my ($self, $name) = @_;
+	return work_queue_task_specify_category($self->{_task}, $name);;
+}
+
 sub clone {
 	my ($self) = @_;
 	my $copy = $self;
@@ -416,7 +421,20 @@ Attach a user defined logical name to the task.
 
 =item tag
 
-The tag to be executed.
+The tag to be assigned.
+
+=back
+
+=head3 C<specify_category>
+
+Label the task with the given category. It is expected that tasks with the same category
+have similar resources requirements (e.g. for fast abort).
+
+=over 12
+
+=item tag
+
+The name of the category.
 
 =back
 

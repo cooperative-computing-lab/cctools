@@ -111,6 +111,11 @@ sub activate_fast_abort {
 	return work_queue_activate_fast_abort($self->{_work_queue}, $multiplier);
 }
 
+sub activate_fast_abort_category {
+	my ($self, $name, $multiplier) = @_;
+	return work_queue_activate_fast_abort_category($self->{_work_queue}, $name, $multiplier);
+}
+
 sub empty {
 	my ($self) = @_;
 	return work_queue_empty($self->{_work_queue});
@@ -369,19 +374,45 @@ Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
 
 =back
 
+=head3 C<activate_fast_abort>
 
-=head3 C<fast_abort>
-
-Turn on or off fast abort functionality for a given queue.
+Turn on or off fast abort functionality for a given queue for tasks without
+an explicit category. Given the multiplier, abort a task which running time is
+larger than the average times the multiplier.  Fast-abort is computed per task
+category. The value specified here applies to all the categories for which @ref
+activate_fast_abort_category was not explicitely called.
 
 =over 12
 
 =item multiplier
 
-The multiplier of the average task time at which point to abort; if
-negative (the default) fast_abort is deactivated.
+The multiplier of the average task time at which point to abort; if less than zero, fast_abort is deactivated (the default).
 
 =back
+
+
+=head3 C<activate_fast_abort_category>
+
+Turn on or off fast abort functionality for a given category. Given the
+multiplier, abort a task which running time is larger than the average times
+the multiplier.  The value specified here applies only to tasks in the given
+category.  (Note: work_queue_activate_fast_abort_category(q, "default", n) is
+the same as work_queue_activate_fast_abort(q, n).)
+
+=over 12
+
+=item name
+
+The name of the category.
+
+=item multiplier
+
+The multiplier of the average task time at which point to abort; if zero,
+fast_abort is deactivated. If less than zero (default), use the fast abort of
+the "default" category.
+
+=back
+
 
 =head3 C<empty>
 

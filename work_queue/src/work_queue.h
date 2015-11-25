@@ -153,10 +153,11 @@ struct work_queue_task {
 
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
 
-	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
-
 	timestamp_t maximum_running_time;                      /**< Maximum time (microseconds) this task may run in a worker. If less than 1, no limit is enforced (default).*/
 
+	char *category;                                        /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
+
+	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 };
 
 /** Statistics describing a work queue. */
@@ -370,6 +371,14 @@ in identifying tasks when they complete.
 */
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag);
 
+/** Label the task with the given category. It is expected that tasks with the same category
+have similar resources requirements (e.g. for fast abort).
+@param q A work queue object.
+@param t A task object.
+@param category The name of the category to use.
+*/
+void work_queue_task_specify_category(struct work_queue_task *t, const char *category);
+
 /** Specify the priority of this task relative to others in the queue.
 Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list, regardless of the priority.
 @param t A task object.
@@ -582,12 +591,28 @@ indicating how many from each worker pool are attached.
 */
 char * work_queue_get_worker_summary( struct work_queue *q );
 
-/** Turn on or off fast abort functionality for a given queue.
+/** Turn on or off fast abort functionality for a given queue for tasks without
+an explicit category. Given the multiplier, abort a task which running time is
+larger than the average times the multiplier.  Fast-abort is computed per task
+category. The value specified here applies to all the categories for which @ref
+work_queue_activate_fast_abort_category was not explicitely called.
 @param q A work queue object.
-@param multiplier The multiplier of the average task time at which point to abort; if negative (and by default) fast_abort is deactivated.
-@returns 0 if activated or deactivated with an appropriate multiplier, 1 if deactivated due to inappropriate multiplier.
+@param multiplier The multiplier of the average task time at which point to abort; if less than zero, fast_abort is deactivated (the default).
+@returns 0 if activated, 1 if deactivated.
 */
 int work_queue_activate_fast_abort(struct work_queue *q, double multiplier);
+
+
+/** Turn on or off fast abort functionality for a given category. Given the
+multiplier, abort a task which running time is larger than the average times the
+multiplier.  The value specified here applies only to tasks in the given category.
+(Note: work_queue_activate_fast_abort_category(q, "default", n) is the same as work_queue_activate_fast_abort(q, n).)
+@param q A work queue object.
+@param category A category name.
+@param multiplier The multiplier of the average task time at which point to abort; if zero, fast_abort is deactivated. If less than zero (default), use the fast abort of the "default" category.
+@returns 0 if activated, 1 if deactivated.
+*/
+int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier);
 
 
 /** Change the preference to send or receive tasks.
