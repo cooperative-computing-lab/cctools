@@ -25,12 +25,12 @@ See the file COPYING for details.
 int disk_alloc_create(char *loc, int64_t size) {
 
 	if(size <= 0) {
-		return -1;
+		debug(D_NOTICE, "Mountpoint pathname argument nonexistant.\n");
+		return 1;
 	}
 
 	//Check for trailing '/'
 	path_remove_trailing_slashes(loc);
-
 	int result;
 	char *device_loc = NULL;
 	char *dd_args = NULL;
@@ -42,7 +42,7 @@ int disk_alloc_create(char *loc, int64_t size) {
 	device_loc = string_format("%s/alloc.img", loc);
 	//Make Directory for Loop Device
 	if(mkdir(loc, 0777) != 0) {
-
+		debug(D_NOTICE, "Failed to make directory at requested mountpoint.\n");
 		goto error;
 	}
 
@@ -51,6 +51,7 @@ int disk_alloc_create(char *loc, int64_t size) {
 	if(system(dd_args) != 0) {
 		unlink(device_loc);
 		rmdir(loc);
+		debug(D_NOTICE, "Failed to allocate junk space for loop device image.\n");
 		goto error;
 	}
 
@@ -76,6 +77,7 @@ int disk_alloc_create(char *loc, int64_t size) {
 	if(losetup_flag == 1) {
 		unlink(device_loc);
 		rmdir(loc);
+		debug(D_NOTICE, "Failed to attach image to loop device.\n");
 		goto error;
 	}
 
@@ -85,6 +87,7 @@ int disk_alloc_create(char *loc, int64_t size) {
 		rm_dir_args = string_format("losetup -d /dev/loop%d; rm -r %s", j, loc);
 		system(rm_dir_args);
 		free(rm_dir_args);
+		debug(D_NOTICE, "Failed to initialize filesystem on loop device.\n");
 		goto error;
 	}
 
@@ -95,6 +98,7 @@ int disk_alloc_create(char *loc, int64_t size) {
 		rm_dir_args = string_format("losetup -d /dev/loop%d; rm -r %s", j, loc);
 		system(rm_dir_args);
 		free(rm_dir_args);
+		debug(D_NOTICE, "Failed to mount loop device.\n");
 		goto error;
 	}
 
@@ -103,7 +107,6 @@ int disk_alloc_create(char *loc, int64_t size) {
 	free(losetup_args);
 	free(mk_args);
 	free(mount_args);
-
 	return 0;
 
 	error:
@@ -123,7 +126,7 @@ int disk_alloc_create(char *loc, int64_t size) {
 			free(mount_args);
 		}
 
-		return -1;
+		return 1;
 }
 
 int disk_alloc_delete(char *loc) {
@@ -132,19 +135,21 @@ int disk_alloc_delete(char *loc) {
 
 	//Check for trailing '/'
 	path_remove_trailing_slashes(loc);
-
+	char *pwd = get_current_dir_name();
 	char *losetup_args = NULL;
 	char *rm_args = NULL;
 	char *device_loc = NULL;
 
 	//Find Used Device
 	char *dev_num = "-1";
-	device_loc = string_format("%s/alloc.img", loc);
+	device_loc = string_format("%s/%s/alloc.img", pwd, loc);
+	free(pwd);
 
 	//Loop Device Unmounted
 	result = umount2(loc, MNT_FORCE);
 	if(result != 0) {
 		if(errno != ENOENT) {
+			debug(D_NOTICE, "Failed to unmount loop device.\n");
 			goto error;
 		}
 	}
@@ -176,6 +181,7 @@ int disk_alloc_delete(char *loc) {
 
 	//Device Not Found
 	if(strcmp(dev_num, "-1") == 0) {
+		debug(D_NOTICE, "Failed to locate loop device associated with given mountpoint.\n");
 		goto error;
 	}
 
@@ -187,6 +193,7 @@ int disk_alloc_delete(char *loc) {
 	if(result != 0) {
 
 		if(errno != ENOENT) {
+			debug(D_NOTICE, "Failed to remove loop device associated with given mountpoint.\n");
 			goto error;
 		}
 	}
@@ -194,14 +201,14 @@ int disk_alloc_delete(char *loc) {
 	//Image Deleted
 	result = unlink(rm_args);
 	if(result != 0) {
-
+		debug(D_NOTICE, "Failed to delete image file associated with given mountpoint.\n");
 		goto error;
 	}
 
 	//Directory Deleted
 	result = rmdir(loc);
 	if(result != 0) {
-
+		debug(D_NOTICE, "Failed to delete directory associated with given mountpoint.\n");
 		goto error;
 	}
 
@@ -222,19 +229,19 @@ int disk_alloc_delete(char *loc) {
 			free(device_loc);
 		}
 
-		return -1;
+		return 1;
 }
 
 #else
 int disk_alloc_create(char *loc, int64_t size) {
 
 	debug(D_NOTICE, "Platform not supported by this library.\n");
-	return -1;
+	return 1;
 }
 
 int disk_alloc_delete(char *loc) {
 
 	debug(D_NOTICE, "Platform not supported by this library.\n");
-	return -1;
+	return 1;
 }
 #endif
