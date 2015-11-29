@@ -6,12 +6,6 @@ include ../../rules.mk
 # avoid polluting user programs with our internal code.
 
 SOURCES_LIBRARY = \
-	batch_job.c \
-	batch_job_chirp.c \
-	batch_job_cluster.c \
-	batch_job_condor.c \
-	batch_job_local.c \
-	batch_job_work_queue.c \
 	work_queue.c \
 	work_queue_catalog.c \
 	work_queue_resources.c
@@ -20,19 +14,17 @@ SOURCES_WORKER = \
 	work_queue_process.o \
 	work_queue_watcher.o
 
-PUBLIC_HEADERS = batch_job.h work_queue.h
+PUBLIC_HEADERS = work_queue.h
 
 LIBDTTOOLS = ${CCTOOLS_HOME}/dttools/src/libdttools.a
-LIBCHIRP = $(CCTOOLS_HOME)/chirp/src/libchirp.a
-EXTERNALS = $(LIBDTTOOLS) $(LIBCHIRP)
-
-EXTERNAL_DEPENDENCIES = ../../chirp/src/libchirp.a ../../dttools/src/libdttools.a
+EXTERNALS = $(LIBDTTOOLS)
+EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a 
 LIBRARIES = libwork_queue.a
 OBJECTS = $(OBJECTS_LIBRARY) $(OBJECTS_WORKER) work_queue_test_main.o
 OBJECTS_LIBRARY = $(SOURCES_LIBRARY:%.c=%.o)
 OBJECTS_WORKER = $(SOURCES_WORKER:%.c=%.o)
-PROGRAMS = work_queue_worker work_queue_status work_queue_example work_queue_pool
-PUBLIC_HEADERS = batch_job.h work_queue.h
+PROGRAMS = work_queue_worker work_queue_status work_queue_example
+PUBLIC_HEADERS = work_queue.h
 SCRIPTS = work_queue_submit_common condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers ec2_submit_workers ec2_remove_workers slurm_submit_workers work_queue_graph_log
 TEST_PROGRAMS = work_queue_example work_queue_test work_queue_test_watch work_queue_priority_test
 TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) sge_submit_workers bindings
