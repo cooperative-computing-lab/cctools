@@ -231,6 +231,11 @@ struct work_queue_task_category {
 
 	struct rmsummary *first;
 
+	/* All keys are assumed positive. Thus, we shift them to the right so that
+	 * we can have a "0" key. 0->1, 1->2, etc. */
+	struct itable *cores_histogram;
+	struct itable *memory_histogram;
+	struct itable *disk_histogram;
 };
 
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
@@ -5414,6 +5419,10 @@ struct work_queue_task_category *category_lookup_or_create(struct work_queue *q,
 	c->first    = make_rmsummary(0);
 	*(c->first) = *(q->worker_top_resources);
 
+	c->cores_histogram  = itable_create(0);
+	c->memory_histogram = itable_create(0);
+	c->disk_histogram   = itable_create(0);
+
 	hash_table_insert(q->categories, name, c);
 
 	return c;
@@ -5432,7 +5441,9 @@ void category_delete(struct work_queue *q, const char *name) {
 	if(c->name)
 		free(c->name);
 
+	itable_delete(c->cores_histogram);
 	itable_delete(c->memory_histogram);
+	itable_delete(c->disk_histogram);
 
 	free(c);
 }
@@ -5448,6 +5459,10 @@ void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 		c->stats->total_tasks_complete++;
 		c->stats->total_good_execute_time  += t->cmd_execution_time;
 		c->stats->total_good_transfer_time += t->total_transfer_time;
+
+		category_inc_histogram_count(q, c, cores,  t->cores);
+		category_inc_histogram_count(q, c, memory, t->memory);
+		category_inc_histogram_count(q, c, disk,   t->disk);
 	}
 }
 
