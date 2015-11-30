@@ -228,6 +228,9 @@ struct work_queue_task_category {
 	double fast_abort;
 	timestamp_t average_task_time;
 	struct work_queue_stats *stats;
+
+	struct rmsummary *first;
+
 };
 
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
@@ -5387,6 +5390,10 @@ struct work_queue_task_category *category_lookup_or_create(struct work_queue *q,
 	c->name       = xxstrdup(name);
 	c->stats      = calloc(1, sizeof(struct work_queue_stats));
 	c->fast_abort = -1;
+
+
+	c->first    = make_rmsummary(0);
+	*(c->first) = *(q->worker_top_resources);
 
 	hash_table_insert(q->categories, name, c);
 
