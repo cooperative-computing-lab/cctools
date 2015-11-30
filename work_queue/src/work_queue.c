@@ -277,6 +277,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 static struct work_queue_task_category *category_lookup_or_create(struct work_queue *q, const char *name);
 static void category_delete(struct work_queue *q, const char *name);
 void category_accumulate_task(struct work_queue *q, struct work_queue_task *t);
+int relabel_task(struct work_queue *q, struct work_queue_task *t);
 
 /** Clone a @ref work_queue_file
 This performs a deep copy of the file struct.
@@ -5460,6 +5461,59 @@ void work_queue_specify_max_worker_cores(struct work_queue *q, int64_t cores) {
 		q->worker_top_resources->cores = cores;
 		q->auto_label_tasks_mode = 1;
 	}
+}
+
+/* returns: 1 relabel was possible, 0 already at max or no new label available. */
+int relabel_task(struct work_queue *q, struct work_queue_task *t) {
+
+	/* We are not relabeling, so we return as success. */
+	if(!q->auto_label_tasks_mode)
+		return 1;
+
+	struct work_queue_task_category *c = category_lookup_or_create(q, t->category);
+
+	int64_t top_cores  = q->worker_top_resources->cores;
+	int64_t top_memory = q->worker_top_resources->memory;
+	int64_t top_disk   = q->worker_top_resources->disk;
+
+	int64_t cores, memory, disk;
+
+	if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+		/* We check whether the task already has the maximum resources. If it
+		 * does, we mark it as done. */
+		if(     (top_cores  < 0 || top_cores  <= t->cores)  &&
+				(top_memory < 0 || top_memory <= t->memory) &&
+				(top_disk   < 0 || top_disk   <= t->disk) ) {
+			debug(D_WQ, "Task %d already using maximum resources.", t->taskid);
+			return 0;
+		}
+		else {
+			cores  = top_cores;
+			memory = top_memory;
+			disk   = top_disk;
+		}
+	} else if(t->total_submissions < 1 && !t->unlabeled) {
+		/* Task was manually labeled. We respect the initial given labels. */
+		return 1;
+	} else if(t->total_submissions == 0 && t->unlabeled) {
+		/* Task was not initially manually labeled, and has not run even once. */
+
+		cores  = c->first->cores;
+		memory = c->first->memory;
+		disk   = c->first->disk;
+	} else {
+		/* Task was already labeled, and is being resubmitted for a reason
+		 * different than resource exhaustion. We simply return. */
+		return 1;
+	}
+
+	work_queue_task_specify_cores(t,  cores);
+	work_queue_task_specify_memory(t, memory);
+	work_queue_task_specify_disk(t,   disk);
+
+	debug(D_WQ, "Labeling task %d: cores: %d memory: %" PRId64 " MB disk: %" PRId64 " MB\n", t->taskid, t->cores, t->memory, t->disk);
+
+	return 1;
 }
 
 /* vim: set noexpandtab tabstop=4: */
