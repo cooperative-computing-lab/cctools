@@ -5447,6 +5447,84 @@ void category_delete(struct work_queue *q, const char *name) {
 	free(c);
 }
 
+/* histograms keys are shifted to the right, as 0 cannot be a valid key (thus the bucket + 1). */
+#define category_inc_histogram_count(q, c, field, bucket)\
+{\
+	if(bucket >= 0) { \
+	uintptr_t count = (uintptr_t) itable_lookup(c->field##_histogram, bucket + 1) + 1;\
+	itable_insert(c->field##_histogram, bucket + 1, (void *) count);\
+	}\
+}
+
+int cmp_int(const void *a, const void *b) {
+	return (*((int64_t *) a) - *((int64_t *) b));
+}
+
+int64_t *category_sort_histogram(struct itable *histogram) {
+	if(itable_size(histogram) < 1) {
+		return NULL;
+	}
+
+	int64_t *buckets = malloc(itable_size(histogram)*sizeof(int64_t));
+
+	size_t i = 0;
+	uint64_t  key;
+	uintptr_t count;
+	itable_firstkey(histogram);
+	while(itable_nextkey(histogram, &key, (void **) &count)) {
+		/* histograms keys are shifted to the right, as 0 cannot be a valid key. */
+		buckets[i] = key - 1;
+		i++;
+	}
+
+	qsort(buckets, itable_size(histogram), sizeof(int64_t), cmp_int);
+
+	return buckets;
+}
+
+int64_t category_first_allocation(struct itable *histogram, int64_t top_resource) {
+	/* Automatically labeling for memory is not activated. */
+	if(top_resource < 0) {
+		return -1;
+	}
+
+	uint64_t n = itable_size(histogram);
+
+	int64_t *buckets = category_sort_histogram(histogram);
+	uintptr_t *accum = malloc(n*sizeof(uintptr_t));
+
+	accum[0] = (uintptr_t) itable_lookup(histogram, buckets[0]);
+
+	uint64_t i;
+	for(i = 1; i < n; i++) {
+		accum[i] = accum[i - 1] + (uintptr_t) itable_lookup(histogram, buckets[i]);
+	}
+
+	uint64_t Ea_1 = UINT8_MAX;
+	uint64_t a_1  = top_resource;
+	uint64_t a_m  = top_resource;
+
+	for(i = 0; i < n; i++) {
+		uint64_t a   = buckets[i];
+		uint64_t Pa  = accum[i];
+		uint64_t Ea  = a - a_m*Pa;
+
+		if(Ea < Ea_1) {
+			Ea_1 = Ea;
+			a_1 = a;
+		}
+	}
+
+	if(a_1 > ceil(top_resource / 2.0)) {
+		a_1 = top_resource;
+	}
+
+	free(accum);
+	free(buckets); /* of popcorn! */
+
+	return a_1;
+}
+
 void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 
 	const char *name = t->category ? t->category : "default";
@@ -5459,9 +5537,15 @@ void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 		c->stats->total_good_execute_time  += t->cmd_execution_time;
 		c->stats->total_good_transfer_time += t->total_transfer_time;
 
-		category_inc_histogram_count(q, c, cores,  t->cores);
-		category_inc_histogram_count(q, c, memory, t->memory);
-		category_inc_histogram_count(q, c, disk,   t->disk);
+		if(t->resources_measured) {
+			category_inc_histogram_count(q, c, cores,  t->resources_measured->cores);
+			category_inc_histogram_count(q, c, memory, t->resources_measured->memory);
+			category_inc_histogram_count(q, c, disk,   t->resources_measured->disk);
+
+			c->first->cores  = category_first_allocation(c->cores_histogram, q->worker_top_resources->cores);
+			c->first->memory = category_first_allocation(c->memory_histogram, q->worker_top_resources->memory);
+			c->first->disk   = category_first_allocation(c->disk_histogram, q->worker_top_resources->disk);
+		}
 	}
 }
 
