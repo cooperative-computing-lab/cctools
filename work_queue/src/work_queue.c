@@ -4075,10 +4075,10 @@ struct work_queue *work_queue_create(int port)
 	q->worker_blacklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
 
-	q->categories = hash_table_create(0, 0);
+	q->measured_local_resources = make_rmsummary(0);
+	q->worker_top_resources     = make_rmsummary(-1);
 
-	// The value -1 indicates that fast abort is inactive by default
-	work_queue_activate_fast_abort(q, -1);
+	q->categories = hash_table_create(0, 0);
 
 	q->stats                      = calloc(1, sizeof(struct work_queue_stats));
 	q->stats_disconnected_workers = calloc(1, sizeof(struct work_queue_stats));
@@ -4109,8 +4109,13 @@ struct work_queue *work_queue_create(int port)
 
 	q->monitor_mode = MON_DISABLED;
 
-	q->measured_local_resources = make_rmsummary(0);
-	q->worker_top_resources     = make_rmsummary(-1);
+	/* Create categories after worker_top_resources, as these values are needed
+	 * for category initialization. */
+	q->categories = hash_table_create(0, 0);
+
+	// The value -1 indicates that fast abort is inactive by default
+	// fast abort depends on categories, thus set after them.
+	work_queue_activate_fast_abort(q, -1);
 
 	q->password = 0;
 
@@ -5416,7 +5421,7 @@ struct work_queue_task_category *category_lookup_or_create(struct work_queue *q,
 
 
 	c->first    = make_rmsummary(0);
-	*(c->first) = *(q->worker_top_resources);
+	memcpy(c->first, q->worker_top_resources, sizeof(struct rmsummary));
 
 	c->cores_histogram  = itable_create(0);
 	c->memory_histogram = itable_create(0);
