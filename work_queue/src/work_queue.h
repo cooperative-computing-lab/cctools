@@ -133,20 +133,16 @@ struct work_queue_task {
 	int total_submissions;                                 /**< The number of times the task has been submitted. */
 	timestamp_t total_cmd_execution_time;                  /**< Accumulated time spent in microseconds for executing the command on any worker, regardless of whether the task finished (i.e., this includes time running on workers that disconnected). */
 
-	timestamp_t maximum_end_time;                               /**< Maximum time (microseconds from epoch) this is valid. If less than 1, then task is always valid (default).*/
-	int64_t memory;                                        /**< Memory required by the task. (MB) */
-	int64_t disk;                                          /**< Disk space required by the task. (MB) */
-	int cores;                                             /**< Number of cores required by the task. */
-	int gpus;                                              /**< Number of gpus required by the task. */
-	int unlabeled;                                         /**< 1 if the task did not specify any required resource. 0 otherwise. */
-
 	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
 
 	int max_retries;                                       /**< Number of times the task is retried on worker errors until success. If less than one, the task is retried indefinitely. */
 
-	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
+	struct rmsummary *rs;                                 /**< When monitoring is enabled, it points to the measured resources used by the task. */
 
-	timestamp_t maximum_running_time;                      /**< Maximum time (microseconds) this task may run in a worker. If less than 1, no limit is enforced (default).*/
+	struct rmsummary *rn;                                 /**< Number of cores, disk, memory, time, etc. the task requires. */
+
+	int unlabeled;                                         /**< 1 if the task did not specify any required resource. 0 otherwise. */
+
 
 	char *category;                                        /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
