@@ -1275,12 +1275,6 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	delete_uncacheable_files(q,w,t);
 
-	// At this point, a task is completed.
-	reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
-
-	w->finished_tasks--;
-	t->time_task_finish = timestamp_get();
-
 	/* if q is monitoring, append the task summary to the single
 	 * queue summary, update t->resources_used, and delete the task summary. */
 	if(q->monitor_mode) {
@@ -1292,6 +1286,11 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	}
 
+	// At this point, a task is completed.
+	reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
+
+	w->finished_tasks--;
+	t->time_task_finish = timestamp_get();
 
 	// Record statistics information for capacity estimation
 	add_task_report(q,t);
