@@ -114,8 +114,6 @@ static uint64_t disk_avail_threshold = 100;
  * Evictionphobic: 0.0 (always prefer to receive completed tasks) */
 double wq_option_send_receive_ratio    = 0.5;
 
-double wq_option_fast_abort_multiplier = -1.0; /* REMOVE when batch options is merged */
-
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
 /* default timeout for slow workers to come back to the pool */
@@ -4059,7 +4057,9 @@ struct work_queue *work_queue_create(int port)
 	q->worker_task_map = itable_create(0);
 
 	q->categories = hash_table_create(0, 0);
-	work_queue_activate_fast_abort(q, wq_option_fast_abort_multiplier);
+
+	// The value -1 indicates that fast abort is inactive by default
+	work_queue_activate_fast_abort(q, -1);
 
 	q->stats                      = calloc(1, sizeof(struct work_queue_stats));
 	q->stats_disconnected_workers = calloc(1, sizeof(struct work_queue_stats));
@@ -4259,11 +4259,6 @@ void work_queue_specify_name(struct work_queue *q, const char *name)
 const char *work_queue_name(struct work_queue *q)
 {
 	return q->name;
-}
-
-void work_queue_specify_fast_abort_multiplier(struct work_queue *q, double fast_abort_multiplier)
-{
-	q->fast_abort_multiplier = fast_abort_multiplier;
 }
 
 void work_queue_specify_priority(struct work_queue *q, int priority)

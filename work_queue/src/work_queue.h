@@ -639,13 +639,10 @@ const char *work_queue_name(struct work_queue *q);
 */
 void work_queue_specify_name(struct work_queue *q, const char *name);
 
-void work_queue_specify_fast_abort_multiplier(struct work_queue *q, double fast_abort_multiplier);
-
 /** Change the priority for a given queue.
 @param q A work queue object.
 @param priority The new priority of the queue.  Higher priority masters will attract workers first.
 */
-
 void work_queue_specify_priority(struct work_queue *q, int priority);
 
 /** Specify the number of tasks not yet submitted to the queue.

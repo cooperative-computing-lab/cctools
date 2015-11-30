@@ -234,11 +234,9 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 			work_queue_specify_priority(q->data, atoi(value));
 		else
 			work_queue_specify_priority(q->data, 0);
-	} else if(strcmp(what, "fast-abort-multiplier") == 0) {
+	} else if(strcmp(what, "fast-abort") == 0) {
 		if(value)
-			work_queue_specify_fast_abort_multiplier(q->data, atof(value));
-		else
-			work_queue_specify_fast_abort_multiplier(q->data, -1.0);
+			work_queue_activate_fast_abort(q->data, atof(value));
 	} else if(strcmp(what, "estimate-capacity") == 0) {
 		work_queue_specify_estimate_capacity_on(q->data, string_istrue(value));
 	} else if(strcmp(what, "keepalive-interval") == 0) {
