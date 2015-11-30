@@ -65,12 +65,12 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	rmsummary_assign_as_int_field   (s, key, value, total_processes);
 	rmsummary_assign_as_time_field  (s, key, value, cpu_time);
 	rmsummary_assign_as_int_field   (s, key, value, virtual_memory);
-	rmsummary_assign_as_int_field   (s, key, value, resident_memory);
+	rmsummary_assign_as_int_field   (s, key, value, memory);
 	rmsummary_assign_as_int_field   (s, key, value, swap_memory);
 	rmsummary_assign_as_int_field   (s, key, value, bytes_read);
 	rmsummary_assign_as_int_field   (s, key, value, bytes_written);
-	rmsummary_assign_as_int_field   (s, key, value, workdir_num_files);
-	rmsummary_assign_as_int_field   (s, key, value, workdir_footprint);
+	rmsummary_assign_as_int_field   (s, key, value, total_files);
+	rmsummary_assign_as_int_field   (s, key, value, disk);
 	rmsummary_assign_as_int_field   (s, key, value, cores);
 	rmsummary_assign_as_int_field   (s, key, value, gpus);
 
@@ -259,8 +259,8 @@ void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const cha
 	if(s->virtual_memory > -1)
 		fprintf(stream, "%s%-20s%20" PRId64 " MB\n",  prefix, "virtual_memory:", s->virtual_memory);
 
-	if(s->resident_memory > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 " MB\n",  prefix, "resident_memory:", s->resident_memory);
+	if(s->memory > -1)
+		fprintf(stream, "%s%-20s%20" PRId64 " MB\n",  prefix, "memory:", s->memory);
 
 	if(s->swap_memory > -1)
 		fprintf(stream, "%s%-20s%20" PRId64 " MB\n",  prefix, "swap_memory:", s->swap_memory);
@@ -271,11 +271,11 @@ void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const cha
 	if(s->bytes_written > -1)
 		fprintf(stream, "%s%-20s%20" PRId64 " B\n",  prefix, "bytes_written:", s->bytes_written);
 
-	if(s->workdir_num_files > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 " files+dirs\n",  prefix, "workdir_num_files:", s->workdir_num_files);
+	if(s->total_files > -1)
+		fprintf(stream, "%s%-20s%20" PRId64 " files+dirs\n",  prefix, "total_files:", s->total_files);
 
-	if(s->workdir_footprint > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 " MB\n", prefix, "workdir_footprint:", s->workdir_footprint);
+	if(s->disk > -1)
+		fprintf(stream, "%s%-20s%20" PRId64 " MB\n", prefix, "disk:", s->disk);
 }
 /* Parse the file assuming there are multiple summaries in it. Summary
    boundaries are lines starting with # */
@@ -347,11 +347,11 @@ void rmsummary_read_env_vars(struct rmsummary *s)
 {
 	char *value;
 	if((value = getenv( RESOURCES_CORES  )))
-		s->cores           = atoi(value);
+		s->cores  = atoi(value);
 	if((value = getenv( RESOURCES_MEMORY )))
-		s->resident_memory = atoi(value);
+		s->memory = atoi(value);
 	if((value = getenv( RESOURCES_DISK )))
-		s->workdir_footprint = atoi(value);
+		s->disk   = atoi(value);
 }
 
 #define rmsummary_apply_op(dest, src, fn, field) (dest)->field = fn((dest)->field, (src)->field)
@@ -368,12 +368,12 @@ void rmsummary_bin_op(struct rmsummary *dest, struct rmsummary *src, rm_bin_op f
 	rmsummary_apply_op(dest, src, fn, total_processes);
 	rmsummary_apply_op(dest, src, fn, cpu_time);
 	rmsummary_apply_op(dest, src, fn, virtual_memory);
-	rmsummary_apply_op(dest, src, fn, resident_memory);
+	rmsummary_apply_op(dest, src, fn, memory);
 	rmsummary_apply_op(dest, src, fn, swap_memory);
 	rmsummary_apply_op(dest, src, fn, bytes_read);
 	rmsummary_apply_op(dest, src, fn, bytes_written);
-	rmsummary_apply_op(dest, src, fn, workdir_num_files);
-	rmsummary_apply_op(dest, src, fn, workdir_footprint);
+	rmsummary_apply_op(dest, src, fn, total_files);
+	rmsummary_apply_op(dest, src, fn, disk);
 
 	rmsummary_apply_op(dest, src, fn, cores);
 	rmsummary_apply_op(dest, src, fn, fs_nodes);
@@ -420,18 +420,18 @@ void rmsummary_debug_report(struct rmsummary *s)
 		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "cpu_time",  ((double) s->cpu_time  / 1000000));
 	if(s->virtual_memory != -1)
 		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "virtual_memory", s->virtual_memory);
-	if(s->resident_memory != -1)
-		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "resident_memory", s->resident_memory);
+	if(s->memory != -1)
+		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "memory", s->memory);
 	if(s->swap_memory != -1)
 		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "swap_memory", s->swap_memory);
 	if(s->bytes_read != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_read", s->bytes_read);
 	if(s->bytes_written != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_written", s->bytes_written);
-	if(s->workdir_num_files != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "workdir_num_files", s->workdir_num_files);
-	if(s->workdir_footprint != -1)
-		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "workdir_footprint", s->workdir_footprint);
+	if(s->total_files != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "total_files", s->total_files);
+	if(s->disk != -1)
+		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "disk", s->disk);
 }
 
 /* vim: set noexpandtab tabstop=4: */

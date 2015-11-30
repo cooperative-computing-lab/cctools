@@ -40,12 +40,14 @@ struct rmsummary
 	int64_t  max_concurrent_processes;
 	int64_t  cpu_time;
 	int64_t  virtual_memory;
-	int64_t  resident_memory;
+	int64_t  memory;                     /* a.k.a. resident memory */
 	int64_t  swap_memory;
+
 	int64_t  bytes_read;
 	int64_t  bytes_written;
-	int64_t  workdir_num_files;
-	int64_t  workdir_footprint;
+
+	int64_t  total_files;
+	int64_t  disk;
 
 	int64_t  cores;
 	int64_t  gpus;
