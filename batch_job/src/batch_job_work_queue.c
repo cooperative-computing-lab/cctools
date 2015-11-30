@@ -82,11 +82,11 @@ static void work_queue_task_specify_resources(struct work_queue_task *t, struct 
 		if(resources->cores > -1)
 			work_queue_task_specify_cores(t, resources->cores);
 
-		if(resources->resident_memory > -1)
-			work_queue_task_specify_memory(t, resources->resident_memory);
+		if(resources->memory > -1)
+			work_queue_task_specify_memory(t, resources->memory);
 
-		if(resources->workdir_footprint > -1)
-			work_queue_task_specify_disk(t, resources->workdir_footprint);
+		if(resources->disk > -1)
+			work_queue_task_specify_disk(t, resources->disk);
 }
 
 static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )

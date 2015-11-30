@@ -737,19 +737,19 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 	tr->max_concurrent_processes = -1;
 	tr->total_processes          = -1;
 
-	tr->virtual_memory    = (int64_t) p->mem.virtual;
-	tr->resident_memory   = (int64_t) p->mem.resident;
-	tr->swap_memory       = (int64_t) p->mem.swap;
+	tr->virtual_memory = (int64_t) p->mem.virtual;
+	tr->memory         = (int64_t) p->mem.resident;
+	tr->swap_memory    = (int64_t) p->mem.swap;
 
 	tr->bytes_read        = (int64_t)  p->io.chars_read;
 	tr->bytes_written     = (int64_t)  p->io.chars_written;
 
-	tr->workdir_num_files = -1;
-	tr->workdir_footprint = -1;
+	tr->total_files = -1;
+	tr->disk        = -1;
 
 	if(d) {
-		tr->workdir_num_files = (int64_t) (d->files);
-		tr->workdir_footprint = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
+		tr->total_files = (int64_t) (d->files);
+		tr->disk        = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 	}
 
 	tr->fs_nodes = -1;
