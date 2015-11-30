@@ -55,8 +55,11 @@ struct rmsummary
 
 	/* these fields are not used when reading/printing summaries */
 	int64_t  fs_nodes;
-
 };
+
+#define rmsummary_value_of(s, f) (*((int64_t *) ((void *) s + offsetof(struct rmsummary, f))))
+#define rmsummary_assign_to(s, f, v)\
+	(*((int64_t *) ((void *) s + offsetof(struct rmsummary, f))) = (int64_t) v)
 
 struct rmsummary_field
 {
