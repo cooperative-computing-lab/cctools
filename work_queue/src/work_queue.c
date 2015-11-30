@@ -181,12 +181,14 @@ struct work_queue {
 
 	int monitor_mode;
 	FILE *monitor_file;
+	int auto_label_tasks_mode;
 
 	char *monitor_output_dirname;
 	char *monitor_summary_filename;
 
 	char *monitor_exe;
 	struct rmsummary *measured_local_resources;
+	struct rmsummary *worker_top_resources;
 
 	char *password;
 	double bandwidth;
@@ -4092,6 +4094,7 @@ struct work_queue *work_queue_create(int port)
 	q->monitor_mode = MON_DISABLED;
 
 	q->measured_local_resources = make_rmsummary(0);
+	q->worker_top_resources     = make_rmsummary(-1);
 
 	q->password = 0;
 
@@ -4350,6 +4353,8 @@ void work_queue_delete(struct work_queue *q)
 
 		if(q->measured_local_resources)
 			free(q->measured_local_resources);
+		if(q->worker_top_resources)
+			free(q->worker_top_resources);
 
 		work_queue_disable_monitoring(q);
 
@@ -5417,6 +5422,36 @@ void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 		c->stats->total_tasks_complete++;
 		c->stats->total_good_execute_time  += t->cmd_execution_time;
 		c->stats->total_good_transfer_time += t->total_transfer_time;
+	}
+}
+
+void work_queue_specify_max_worker_memory(struct work_queue *q, int64_t memory) {
+	if(memory < 0) {
+		q->worker_top_resources->memory = -1;
+	}
+	else {
+		q->worker_top_resources->memory = memory;
+		q->auto_label_tasks_mode = 1;
+	}
+}
+
+void work_queue_specify_max_worker_disk(struct work_queue *q, int64_t disk) {
+	if(disk < 0) {
+		q->worker_top_resources->disk = -1;
+	}
+	else {
+		q->worker_top_resources->disk = disk;
+		q->auto_label_tasks_mode = 1;
+	}
+}
+
+void work_queue_specify_max_worker_cores(struct work_queue *q, int64_t cores) {
+	if(cores < 0) {
+		q->worker_top_resources->cores = -1;
+	}
+	else {
+		q->worker_top_resources->cores = cores;
+		q->auto_label_tasks_mode = 1;
 	}
 }
 
