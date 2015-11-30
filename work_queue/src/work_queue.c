@@ -1621,7 +1621,13 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	w->finished_tasks++;
 
-	change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+	if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+		/* if resource exhaustion, mark the task for possible resubmission. */
+		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
+	} else {
+		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+	}
+
 	return SUCCESS;
 }
 
@@ -3013,6 +3019,8 @@ static int send_one_task( struct work_queue *q )
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
+
+		relabel_task(q, t);
 
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
@@ -4920,7 +4928,17 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		//Re-enqueue the tasks that workers labeled for resubmission.
 		while((t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RESUBMISSION))) {
-			cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
+
+			if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+				int status = relabel_task(q, t);
+				if(status) {
+					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
+				} else {
+					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+				}
+			} else {
+				cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
+			}
 		}
 
 		//We have the resources we have been waiting for; start task transfers
