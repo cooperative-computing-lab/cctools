@@ -1,7 +1,7 @@
 include ../../config.mk
 include ../../rules.mk
 
-LIBRARY = libbatch_job.a
+LIBRARIES = libbatch_job.a
 
 PROGRAMS = work_queue_pool
 
@@ -19,13 +19,19 @@ PUBLIC_HEADERS = batch_job.h
 
 OBJECTS = $(SOURCES:%.c=%.o)
 
+all: $(LIBRARIES) $(PROGRAMS)
+
 libbatch_job.a: $(OBJECTS)
 
-work_queue_pool: libbatch_job.a work_queue_pool.o $(EXTERNAL_LIBRARIES)
-	$(LD) $^ $(LDFLAGS) -o $@
+work_queue_pool: work_queue_pool.o libbatch_job.a $(EXTERNAL_LIBRARIES)
 
-all: $(LIBRARY) $(PROGRAMS)
+install:
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
+	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
+	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
+	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools
 
 clean:
-	echo $(SOURCES) $(OBJECTS)
-	rm -rf $(OBJECTS) $(LIBRARY) *~
+	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS)
