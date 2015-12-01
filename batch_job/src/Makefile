@@ -5,7 +5,7 @@ LIBRARIES = libbatch_job.a
 
 PROGRAMS = work_queue_pool
 
-EXTERNAL_LIBRARIES = ../../work_queue/src/libwork_queue.a ../../dttools/src/libdttools.a ../../chirp/src/libchirp.a
+EXTERNAL_LIBRARIES = ../../work_queue/src/libwork_queue.a ../../chirp/src/libchirp.a ../../dttools/src/libdttools.a
 
 SOURCES = \
 	batch_job.c \
