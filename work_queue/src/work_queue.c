@@ -5614,26 +5614,24 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 			memory = top_memory;
 			disk   = top_disk;
 		}
-	} else if(t->total_submissions < 1 && !t->unlabeled) {
-		/* Task was manually labeled. We respect the initial given labels. */
-		return 1;
-	} else if(t->total_submissions == 0 && t->unlabeled) {
-		/* Task was not initially manually labeled, and has not run even once. */
-
-		cores  = c->first->cores;
-		memory = c->first->memory;
-		disk   = c->first->disk;
+	} else if(t->total_submissions == 0) {
+		/* Task has not run even once. Note we ignore any manual labeling. */
+		cores  = c->first->cores  > -1 ? c->first->cores  : top_cores;
+		memory = c->first->memory > -1 ? c->first->memory : top_memory;
+		disk   = c->first->disk   > -1 ? c->first->disk   : top_disk;
 	} else {
 		/* Task was already labeled, and is being resubmitted for a reason
 		 * different than resource exhaustion. We simply return. */
 		return 1;
 	}
 
-	work_queue_task_specify_cores(t,  cores);
-	work_queue_task_specify_memory(t, memory);
-	work_queue_task_specify_disk(t,   disk);
+	/* update label only when there is a change. */
+	if(cores != t->cores || memory != t->memory || disk != t->disk) {
+		work_queue_task_specify_cores(t,  cores);
+		work_queue_task_specify_memory(t, memory);
+		work_queue_task_specify_disk(t,   disk);
+	}
 
-	debug(D_WQ, "Labeling task %d: cores: %d memory: %" PRId64 " MB disk: %" PRId64 " MB\n", t->taskid, t->cores, t->memory, t->disk);
 
 	return 1;
 }
