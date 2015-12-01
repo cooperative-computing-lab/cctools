@@ -43,3 +43,12 @@ umbrella \
 --sandbox_mode docker \
 --log umbrella.log \
 run
+
+umbrella \
+--spec povray_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/destructive_povray_S \
+--output "/tmp/frame000.png=/tmp/umbrella_test/destructive_povray_S/output.png" \
+--sandbox_mode destructive \
+--log umbrella.log \
+run

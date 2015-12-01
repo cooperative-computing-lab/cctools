@@ -1571,10 +1571,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 	logging.debug("execution engine: %s", sandbox_mode)
 	logging.debug("need_separate_rootfs: %d", need_separate_rootfs)
 	if sandbox_mode == "destructive":
-		if need_separate_rootfs == 1:
-			env_dict = construct_env(sandbox_dir, os_image_dir)
-		else:
-			env_dict = os.environ
+		env_dict = os.environ
 
 		if cvmfs_cms_siteconf_mountpoint:
 			item = cvmfs_cms_siteconf_mountpoint.split(' ')[1]
@@ -1583,25 +1580,51 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			logging.debug("Create a parrot mountfile for the siteconf meta (%s)", item)
 			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mountpoint)
 
-		#traverse the common-mountlist file to create the mountpoint and mount --bind -o ro
-		#traverse the special file to create the mountpoint and mount --bind
-		#remount /etc/passwd /etc/group /etc/hosts /etc/resolv.conf
-		(dir_dict, file_dict) = construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separate_rootfs, os_image_dir, mount_dict, host_cctools_path)
-		chroot_mount_bind(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, hardware_platform, distro_name, distro_version)
-		logging.debug("Construct environment variables ....")
-		logging.debug("Add software binary into PATH")
-		extra_path = collect_software_bin(host_cctools_path, sw_mount_dict)
-		env_dict['PATH'] = '%s:%s' % (env_dict['PATH'], extra_path[:-1])
 		logging.debug("Add env_para_dict into environment variables")
 		for key in env_para_dict:
 			env_dict[key] = env_para_dict[key]
+
+		logging.debug("Add software binary into PATH")
+		extra_path = collect_software_bin(host_cctools_path, sw_mount_dict)
+		if "PATH" not in env_dict:
+			env_dict['PATH'] = ""
+		env_dict['PATH'] = '%s:%s' % (env_dict['PATH'], extra_path[:-1])
+
+		#move software and data into the location
+		for key in mount_dict:
+			parent_dir = os.path.dirname(key)
+			if not os.path.exists(parent_dir):
+				os.makedirs(parent_dir)
+			elif not os.path.isdir(parent_dir):
+				logging.critical("%s is not a directory!\n", parent_dir)
+				sys.exit("%s is not a directory!\n" % parent_dir)
+
+			if not os.path.exists(key):
+				cmd = "mv -f %s %s/" % (mount_dict[key], parent_dir)
+				rc, stdout, stderr = func_call_withenv(cmd, env_dict)
+				if rc != 0:
+					subprocess_error(cmd, rc, stdout, stderr)
+
 		print "Start executing the user's task: %s" % user_cmd[0]
-		rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
-		chroot_post_process(dir_dict, file_dict, sandbox_dir, 0, hardware_platform, distro_name, distro_version)
-		#rename the sandbox_dir to output_dir
-		logging.debug("Rename sandbox_dir (%s) to output_dir (%s)", sandbox_dir, output_dir)
-		os.rename(sandbox_dir, output_dir)
-		print "The output has been put into the output dir: %s" % output_dir
+		cmd = "cd %s; %s" % (cwd_setting, user_cmd[0])
+		rc, stdout, stderr = func_call_withenv(cmd, env_dict)
+		if rc != 0:
+			subprocess_error(cmd, rc, stdout, stderr)
+
+		logging.debug("Moving the outputs to the expected locations ...")
+		print "Moving the outputs to the expected locations ..."
+		for key in output_f_dict:
+			cmd = "mv -f %s %s" % (key, output_f_dict[key])
+			rc, stdout, stderr = func_call_withenv(cmd, env_dict)
+			if rc != 0:
+				subprocess_error(cmd, rc, stdout, stderr)
+
+		for key in output_d_dict:
+			cmd = "mv -f %s %s" % (key, output_f_dict[key])
+			rc, stdout, stderr = func_call_withenv(cmd, env_dict)
+			if rc != 0:
+				subprocess_error(cmd, rc, stdout, stderr)
+
 	elif sandbox_mode == "docker":
 		if need_separate_rootfs == 1:
 			if has_docker_image(hardware_platform, distro_name, distro_version, os_image_id) == 'no':
@@ -2224,10 +2247,6 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 			print "the specification does not provide a concrete OS image, but the OS image of the local machine matches the requirement!\n"
 	else:
 		need_separate_rootfs = 1
-		if sandbox_mode in ["destructive"]:
-			cleanup(tempfile_list, tempdir_list)
-			logging.critical("A separate os image is specified, which does not support the %s sandbox mode!", sandbox_mode)
-			sys.exit("A separate os image is specified, which does not support the %s sandbox mode!" % sandbox_mode)
 
 	#check for dependencies which need to be installed by package managers
 	(pac_name, pac_list) = obtain_package(spec_json)
@@ -2250,7 +2269,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 		mount_dict[host_cctools_path] = host_cctools_path
 		parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, meta_json, cvmfs_http_proxy)
 
-	if need_separate_rootfs:
+	if need_separate_rootfs and sandbox_mode not in ["destructive"]:
 		#download the os dependency into the local
 		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform) #example of item here: redhat-6.5-x86_64
 		os_image_dir = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), os_id, item)
