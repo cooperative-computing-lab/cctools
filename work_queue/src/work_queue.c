@@ -4941,8 +4941,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 				int status = relabel_task(q, t);
 				if(status) {
+					debug(D_WQ, "Task %d resubmitted using max resources.\n", t->taskid);
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 				} else {
+					debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 				}
 			} else {
@@ -5532,6 +5534,12 @@ int64_t category_first_allocation(struct itable *histogram, int64_t top_resource
 }
 
 void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
+	/* buffer used only for debug output. */
+	static buffer_t *b = NULL;
+	if(!b) {
+		b = malloc(sizeof(buffer_t));
+		buffer_init(b);
+	}
 
 	const char *name = t->category ? t->category : "default";
 
@@ -5548,9 +5556,34 @@ void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 			category_inc_histogram_count(q, c, memory, t->resources_measured->memory);
 			category_inc_histogram_count(q, c, disk,   t->resources_measured->disk);
 
-			c->first->cores  = category_first_allocation(c->cores_histogram, q->worker_top_resources->cores);
-			c->first->memory = category_first_allocation(c->memory_histogram, q->worker_top_resources->memory);
-			c->first->disk   = category_first_allocation(c->disk_histogram, q->worker_top_resources->disk);
+			int64_t cores  = category_first_allocation(c->cores_histogram, q->worker_top_resources->cores);
+			int64_t memory = category_first_allocation(c->memory_histogram, q->worker_top_resources->memory);
+			int64_t disk   = category_first_allocation(c->disk_histogram, q->worker_top_resources->disk);
+
+			/* Update values, and print debug message only if something changed. */
+			if(cores != c->first->cores ||  memory != c->first->memory || disk != c->first->disk) {
+				c->first->cores  = cores;
+				c->first->memory = memory;
+				c->first->disk   = disk;
+
+				/* From here on we only print debugging info. */
+				buffer_rewind(b, 0);
+				buffer_printf(b, "Updating first allocation '%s':", name);
+
+				if(cores > -1) {
+					buffer_printf(b, " cores: %" PRId64, cores);
+				}
+
+				if(memory > -1) {
+					buffer_printf(b, " memory: %" PRId64 " MB", memory);
+				}
+
+				if(disk > -1) {
+					buffer_printf(b, " disk: %" PRId64 " MB", disk);
+				}
+
+				debug(D_WQ, "%s\n", buffer_tostring(b));
+			}
 		}
 	}
 }
