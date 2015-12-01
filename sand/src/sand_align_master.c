@@ -335,7 +335,7 @@ int main(int argc, char *argv[])
 
 	// By default, turn on fast abort option since we know each job is of very similar size (in terms of runtime).
 	// One can also set the fast_abort_multiplier by the '-f' option.
-	wq_option_fast_abort_multiplier = 10;
+	int wq_option_fast_abort_multiplier = 10;
 
 	while((c = getopt(argc, argv, "e:F:N:C:p:P:n:d:o:Z:vha")) > -1) {
 		switch (c) {
@@ -454,6 +454,7 @@ int main(int argc, char *argv[])
 	work_queue_specify_master_mode(queue, work_queue_master_mode);
 	work_queue_specify_name(queue, project);
 	work_queue_specify_priority(queue, priority);
+	work_queue_activate_fast_abort(queue, wq_option_fast_abort_multiplier);
 
 	sequence_table = hash_table_create(20000001, 0);
 

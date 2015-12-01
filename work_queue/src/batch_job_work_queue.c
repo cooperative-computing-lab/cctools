@@ -197,6 +197,8 @@ static int batch_queue_wq_create (struct batch_queue *q)
 	if ((q->data = work_queue_create(0)) == NULL)
 		return -1;
 	work_queue_enable_process_module(q->data);
+	batch_queue_set_feature(q, "remote_rename", "%s=%s");
+	batch_queue_set_feature(q, "batch_log_name", "%s.wqlog");
 	return 0;
 }
 
@@ -232,6 +234,9 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 			work_queue_specify_priority(q->data, atoi(value));
 		else
 			work_queue_specify_priority(q->data, 0);
+	} else if(strcmp(what, "fast-abort") == 0) {
+		if(value)
+			work_queue_activate_fast_abort(q->data, atof(value));
 	} else if(strcmp(what, "estimate-capacity") == 0) {
 		work_queue_specify_estimate_capacity_on(q->data, string_istrue(value));
 	} else if(strcmp(what, "keepalive-interval") == 0) {

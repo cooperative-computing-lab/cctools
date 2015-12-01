@@ -59,6 +59,10 @@ static char *project = NULL;
 static int work_queue_master_mode = WORK_QUEUE_MASTER_MODE_STANDALONE;
 static int priority = 0;
 
+// By default, turn on fast abort option since we know each job is of very similar size (in terms of runtime).
+// One can also set the fast_abort_multiplier by the '-f' option.
+static int wq_option_fast_abort_multiplier = 10;
+
 static int kmer_size = 22;
 static int window_size = 22;
 static int do_not_unlink = 0;
@@ -382,10 +386,6 @@ int main(int argc, char **argv)
 {
 	debug_config(progname);
 
-	// By default, turn on fast abort option since we know each job is of very similar size (in terms of runtime).
-	// One can also set the fast_abort_multiplier by the '-f' option.
-	wq_option_fast_abort_multiplier = 10;
-
 	get_options(argc, argv, progname);
 
 	outfile = fopen(outfilename, "a+");
@@ -421,6 +421,7 @@ int main(int argc, char **argv)
 	work_queue_specify_master_mode(q, work_queue_master_mode);
 	work_queue_specify_name(q, project);
 	work_queue_specify_priority(q, priority);
+	work_queue_activate_fast_abort(q, wq_option_fast_abort_multiplier);
 
 	load_sequences(sequence_filename);
 	debug(D_DEBUG, "Sequence loaded.\n");

@@ -143,6 +143,16 @@ the <tt>qsub</tt> command.  This call has no effect on other queue types.
 */
 void batch_queue_set_option(struct batch_queue *q, const char *what, const char *value);
 
+/** Expresses support for feature in the underlying batch system.
+This call specifies features that are supported by this batch system for
+use in exterior systems. Used within batch_queue_* for the specific batch
+system.
+@param q The batch queue to adjust.
+@param what The key for feature.
+@param value The value of the feature.
+*/
+void batch_queue_set_feature(struct batch_queue *q, const char *what, const char *value);
+
 /** As @batch_queue_set_option, but allowing an integer argument.
 @param q The batch queue to adjust.
 @param what The key for option.
@@ -158,6 +168,16 @@ time a job is submitted.
 @return The option value.
 */
 const char *batch_queue_get_option(struct batch_queue *q, const char *what);
+
+/** Get batch queue feature.
+This call returns a valid const char if the feaute specified is
+supported by the given queue type.
+@param q The batch queue.
+@param what The option key.
+@return The option value.
+*/
+const char *batch_queue_supports_feature (struct batch_queue *q, const char *what);
+
 
 /** Get batch queue type.
 This call returns the type of the batch queue.

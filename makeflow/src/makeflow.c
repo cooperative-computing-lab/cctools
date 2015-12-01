@@ -369,8 +369,6 @@ static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, stru
 	switch (batch_queue_get_type(queue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
 			return string_format("%s=%s,", f->filename, remotename);
-		case BATCH_QUEUE_TYPE_CONDOR:
-			return string_format("%s,", remotename);
 		default:
 			return string_format("%s,", f->filename);
 	}
@@ -728,23 +726,6 @@ static int makeflow_check(struct dag *d)
 	debug(D_MAKEFLOW_RUN, "checking rules for consistency...\n");
 
 	for(n = d->nodes; n; n = n->next) {
-
-		if(itable_size(n->remote_names) > 0 || (wrapper && wrapper->uses_remote_rename)){
-			if(n->local_job) {
-				debug(D_ERROR, "remote renaming is not supported on locally. Rule %d.\n", n->nodeid);
-				error = 1;
-			} else {
-				switch (batch_queue_type) {
-					case BATCH_QUEUE_TYPE_WORK_QUEUE:
-					case BATCH_QUEUE_TYPE_CONDOR:
-						break;
-					default:
-						debug(D_ERROR, "remote renaming is not supported on selected batch system. Rule %d.\n", n->nodeid);
-						error = 1;
-				}
-			}
-		}
-
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
 			if(f->created_by) {
@@ -759,6 +740,41 @@ static int makeflow_check(struct dag *d)
 				fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
 			}
 			error = 1;
+		}
+	}
+
+	if(error) {
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+/*
+Used to check that features used are supported by the batch system.
+This would be where we added checking of selected options to verify they
+are supported by the batch system, such as work_queue specific options.
+*/
+
+static int makeflow_check_batch_consistency(struct dag *d)
+{
+	struct dag_node *n;
+	int error = 0;
+
+	debug(D_MAKEFLOW_RUN, "checking for consistency of batch system support...\n");
+
+	for(n = d->nodes; n; n = n->next) {
+
+		if(itable_size(n->remote_names) > 0 || (wrapper && wrapper->uses_remote_rename)){
+			if(n->local_job) {
+				debug(D_ERROR, "remote renaming is not supported on locally. Rule %d.\n", n->nodeid);
+				error = 1;
+				break;
+			} else if (!batch_queue_supports_feature(remote_queue, "remote_rename")) {
+				debug(D_ERROR, "remote renaming is not supported on selected batch system. Rule %d.\n", n->nodeid);
+				error = 1;
+				break;
+			}
 		}
 	}
 
@@ -946,6 +962,7 @@ int main(int argc, char *argv[])
 	const char *work_queue_keepalive_timeout = NULL;
 	const char *work_queue_master_mode = "standalone";
 	const char *work_queue_port_file = NULL;
+	double wq_option_fast_abort_multiplier = -1.0;
 	const char *priority = NULL;
 	char *work_queue_password = NULL;
 	char *wq_wait_queue_size = 0;
@@ -1364,62 +1381,6 @@ int main(int argc, char *argv[])
 	if(!logfilename)
 		logfilename = string_format("%s.makeflowlog", dagfile);
 
-	if(!batchlogfilename) {
-		switch (batch_queue_type) {
-			case BATCH_QUEUE_TYPE_CONDOR:
-				batchlogfilename = string_format("%s.condorlog", dagfile);
-				break;
-			case BATCH_QUEUE_TYPE_WORK_QUEUE:
-				batchlogfilename = string_format("%s.wqlog", dagfile);
-				break;
-			default:
-				batchlogfilename = string_format("%s.batchlog", dagfile);
-				break;
-		}
-
-		// In clean mode, delete all existing log files
-		if(clean_mode == MAKEFLOW_CLEAN_ALL) {
-			BUFFER_STACK_ABORT(B, PATH_MAX);
-			buffer_putfstring(B, "%s.condorlog", dagfile);
-			unlink(buffer_tostring(B));
-			buffer_rewind(B, 0);
-			buffer_putfstring(B, "%s.wqlog", dagfile);
-			unlink(buffer_tostring(B));
-			buffer_rewind(B, 0);
-			buffer_putfstring(B, "%s.batchlog", dagfile);
-			unlink(buffer_tostring(B));
-		}
-	}
-
-	if(monitor) {
-		if(!log_dir)
-			fatal("Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
-
-		if(!log_format)
-			log_format = xxstrdup(DEFAULT_MONITOR_LOG_FORMAT);
-
-		monitor->exe = resource_monitor_locate(NULL);
-		if(!monitor->exe) {
-			fatal("Monitor mode was enabled, but could not find resource_monitor in PATH.");
-		}
-
-		switch (batch_queue_type) {
-			case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			case BATCH_QUEUE_TYPE_CONDOR:
-				monitor->exe_remote = path_basename(monitor->exe);
-				break;
-			default:
-				monitor->exe_remote = NULL;
-		}
-
-		if(monitor->interval < 1)
-			fatal("Monitoring interval should be positive.");
-
-		makeflow_prepare_for_monitoring(monitor, log_dir, log_format);
-		free(log_dir);
-		free(log_format);
-	}
-
 	printf("parsing %s...\n",dagfile);
 	struct dag *d = dag_from_file(dagfile);
 	if(!d) {
@@ -1464,7 +1425,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-
 	remote_queue = batch_queue_create(batch_queue_type);
 	if(!remote_queue) {
 		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
@@ -1473,14 +1433,22 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	if(!batchlogfilename) {
+		if(batch_queue_supports_feature(remote_queue, "batch_log_name")){
+			batchlogfilename = string_format(batch_queue_supports_feature(remote_queue, "batch_log_name"), dagfile);
+		} else {
+			batchlogfilename = string_format("%s.batchlog", dagfile);
+		}
+	}
+
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
 	batch_queue_set_option(remote_queue, "batch-options", batch_submit_options);
 	batch_queue_set_option(remote_queue, "skip-afs-check", skip_afs_check ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "password", work_queue_password);
 	batch_queue_set_option(remote_queue, "master-mode", work_queue_master_mode);
 	batch_queue_set_option(remote_queue, "name", project);
+	batch_queue_set_option(remote_queue, "fast-abort",string_format("%f", wq_option_fast_abort_multiplier));
 	batch_queue_set_option(remote_queue, "priority", priority);
-	batch_queue_set_option(remote_queue, "estimate-capacity", "yes"); // capacity estimation is on by default
 	batch_queue_set_option(remote_queue, "keepalive-interval", work_queue_keepalive_interval);
 	batch_queue_set_option(remote_queue, "keepalive-timeout", work_queue_keepalive_timeout);
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
@@ -1490,9 +1458,7 @@ int main(int argc, char *argv[])
 
 	/* Do not create a local queue for systems where local and remote are the same. */
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_CHIRP ||
-	   batch_queue_type == BATCH_QUEUE_TYPE_HADOOP ||
-	   batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
+	if(!batch_queue_supports_feature(remote_queue, "local_job_queue")) {
 		local_queue = 0;
 	} else {
 		local_queue = batch_queue_create(BATCH_QUEUE_TYPE_LOCAL);
@@ -1503,10 +1469,23 @@ int main(int argc, char *argv[])
 
 	/* Remote storage modes do not (yet) support measuring storage for garbage collection. */
 
-	if(batch_queue_type==BATCH_QUEUE_TYPE_CHIRP || batch_queue_type==BATCH_QUEUE_TYPE_HADOOP) {
-		if(makeflow_gc_method == MAKEFLOW_GC_SIZE) {
-			makeflow_gc_method = MAKEFLOW_GC_ALL;
-		}
+	if(makeflow_gc_method == MAKEFLOW_GC_SIZE && !batch_queue_supports_feature(remote_queue, "gc_size")) {
+		makeflow_gc_method = MAKEFLOW_GC_ALL;
+	}
+
+	if(monitor) {
+		if(!log_dir)
+			fatal("Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
+
+		if(!log_format)
+			log_format = xxstrdup(DEFAULT_MONITOR_LOG_FORMAT);
+
+		if(monitor->interval < 1)
+			fatal("Monitoring interval should be positive.");
+
+		makeflow_prepare_for_monitoring(monitor, remote_queue, log_dir, log_format);
+		free(log_dir);
+		free(log_format);
 	}
 
 	makeflow_parse_input_outputs(d);
@@ -1520,6 +1499,9 @@ int main(int argc, char *argv[])
 	if(!makeflow_check(d)) {
 		exit(EXIT_FAILURE);
 	}
+	if(!makeflow_check_batch_consistency(d) && clean_mode == MAKEFLOW_CLEAN_NONE) {
+		exit(EXIT_FAILURE);
+	}
 
 	printf("%s has %d rules.\n",dagfile,d->nodeid_counter);
 
@@ -1528,12 +1510,14 @@ int main(int argc, char *argv[])
 
 	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode );
 
+	struct dag_file *f = dag_file_lookup_or_create(d, batchlogfilename);
+	makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
+
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		printf("cleaning filesystem...\n");
 		makeflow_clean(d, remote_queue, clean_mode);
 		if(clean_mode == MAKEFLOW_CLEAN_ALL) {
 			unlink(logfilename);
-			unlink(batchlogfilename);
 		}
 		exit(0);
 	}

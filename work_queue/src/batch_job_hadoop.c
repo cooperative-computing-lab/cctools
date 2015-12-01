@@ -259,6 +259,9 @@ static int batch_queue_hadoop_create (struct batch_queue *Q)
 	hash_table_insert(Q->options, "working-dir", xxstrdup("/"));
 	hash_table_insert(Q->options, "replicas", xxstrdup("0"));
 
+	batch_queue_set_feature(q, "local_job_queue", NULL);
+	batch_queue_set_feature(q, "gc_size", NULL);
+
 	return 0;
 }
 

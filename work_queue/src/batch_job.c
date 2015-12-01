@@ -64,6 +64,7 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	q->type = type;
 	strncpy(q->logfile, "", sizeof(q->logfile));
 	q->options = hash_table_create(0, NULL);
+	q->features = hash_table_create(0, NULL);
 	q->job_table = itable_create(0);
 	q->output_table = itable_create(0);
 	q->data = NULL;
@@ -81,6 +82,10 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 		batch_queue_delete(q);
 		return NULL;
 	}
+
+	batch_queue_set_feature(q, "local_job_queue", "yes");
+	batch_queue_set_feature(q, "batch_log_name", "%s.batchlog");
+	batch_queue_set_feature(q, "gc_size", "yes");
 
 	debug(D_BATCH, "created queue %p (%s)", q, q->module->typestr);
 
@@ -100,6 +105,9 @@ void batch_queue_delete(struct batch_queue *q)
 		for (hash_table_firstkey(q->options); hash_table_nextkey(q->options, &key, (void **) &value); free(value))
 			;
 		hash_table_delete(q->options);
+		for (hash_table_firstkey(q->features); hash_table_nextkey(q->features, &key, (void **) &value); free(value))
+			;
+		hash_table_delete(q->features);
 		itable_delete(q->job_table);
 		itable_delete(q->output_table);
 		free(q);
@@ -109,6 +117,11 @@ void batch_queue_delete(struct batch_queue *q)
 const char *batch_queue_get_option (struct batch_queue *q, const char *what)
 {
 	return hash_table_lookup(q->options, what);
+}
+
+const char *batch_queue_supports_feature (struct batch_queue *q, const char *what)
+{
+	return hash_table_lookup(q->features, what);
 }
 
 batch_queue_type_t batch_queue_get_type(struct batch_queue *q)
@@ -137,6 +150,19 @@ void batch_queue_set_option (struct batch_queue *q, const char *what, const char
 		debug(D_BATCH, "set option `%s' to `%s'", what, value);
 	} else {
 		debug(D_BATCH, "cleared option `%s'", what);
+	}
+	q->module->option_update(q, what, value);
+}
+
+void batch_queue_set_feature (struct batch_queue *q, const char *what, const char *value)
+{
+	char *current = hash_table_remove(q->features, what);
+	free(current);
+	if(value) {
+		hash_table_insert(q->features, what, xxstrdup(value));
+		debug(D_BATCH, "set feature `%s' to `%s'", what, value);
+	} else {
+		debug(D_BATCH, "cleared feature `%s'", what);
 	}
 	q->module->option_update(q, what, value);
 }
