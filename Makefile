@@ -13,11 +13,12 @@ config.mk:
 	@echo "You must run 'configure' before '${MAKE}'."
 	@exit 1
 
-makeflow parrot wavefront work_queue: chirp
-allpairs chirp ftp_lite makeflow makeflow_linker parrot resource_monitor sand wavefront work_queue: dttools
-parrot: ftp_lite
+makeflow: batch_job
+batch_job: work_queue chirp
+allpairs batch_job chirp ftp_lite makeflow makeflow_linker parrot resource_monitor sand wavefront work_queue: dttools
+parrot: ftp_lite chirp
 allpairs: sand
-allpairs makeflow sand wavefront: work_queue
+allpairs makeflow sand wavefront: work_queue batch_job
 
 $(CCTOOLS_PACKAGES): config.mk
 	@$(MAKE) -C $@
