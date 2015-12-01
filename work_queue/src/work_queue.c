@@ -5498,21 +5498,22 @@ int64_t category_first_allocation(struct itable *histogram, int64_t top_resource
 	int64_t *buckets = category_sort_histogram(histogram);
 	uintptr_t *accum = malloc(n*sizeof(uintptr_t));
 
-	accum[0] = (uintptr_t) itable_lookup(histogram, buckets[0]);
+	/* histograms keys are shifted to the right, thus the bucket - 1. */
+	accum[0] = (uintptr_t) itable_lookup(histogram, buckets[0] + 1);
 
 	uint64_t i;
 	for(i = 1; i < n; i++) {
-		accum[i] = accum[i - 1] + (uintptr_t) itable_lookup(histogram, buckets[i]);
+		accum[i] = accum[i - 1] + (uintptr_t) itable_lookup(histogram, buckets[i] + 1);
 	}
 
-	uint64_t Ea_1 = UINT8_MAX;
-	uint64_t a_1  = top_resource;
-	uint64_t a_m  = top_resource;
+	uint64_t a_1 = top_resource;
+	uint64_t a_m = top_resource;
+	int64_t Ea_1 = INT64_MAX;
 
 	for(i = 0; i < n; i++) {
-		uint64_t a   = buckets[i];
-		uint64_t Pa  = accum[i];
-		uint64_t Ea  = a - a_m*Pa;
+		uint64_t a  = buckets[i];
+		uint64_t Pa = accum[i];
+		int64_t  Ea = a - a_m*Pa;
 
 		if(Ea < Ea_1) {
 			Ea_1 = Ea;
