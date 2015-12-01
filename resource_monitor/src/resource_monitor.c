@@ -199,6 +199,8 @@ struct rmsummary *summary;
 struct rmsummary *resources_limits;
 struct rmsummary *resources_flags;
 
+const char *sh_cmd_line = NULL;    /* command line passed with the --sh option. */
+
 /***
  * Utility functions (open log files, proc files, measure time)
  ***/
@@ -634,8 +636,8 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	if(tr->wall_time > 0)
 		tr->cores = (int64_t) MAX(1, ceil( ((double) tr->cpu_time)/tr->wall_time));
 
-	tr->max_concurrent_processes     = (int64_t) itable_size(processes);
-	tr->total_processes     = summary->total_processes;
+	tr->max_concurrent_processes = (int64_t) itable_size(processes);
+	tr->total_processes          = summary->total_processes;
 
 	/* we use max here, as /proc/pid/smaps that fills *m is not always
 	 * available. This causes /proc/pid/status to become a conservative
@@ -667,6 +669,11 @@ void rmonitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
         return;
 
     rmsummary_merge_max(result, tr);
+
+	/* if we are running with the --sh option, we subtract one process (the sh process). */
+	if(sh_cmd_line) {
+		result->max_concurrent_processes--;
+	}
 }
 
 void rmonitor_log_row(struct rmsummary *tr)
@@ -1370,6 +1377,11 @@ pid_t rmonitor_fork(void)
 
         rmonitor_track_process(pid);
 
+		/* if we are running with the --sh option, we subtract one process (the sh process). */
+		if(sh_cmd_line) {
+			summary->total_processes--;
+		}
+
         signal(SIGCONT, prev_handler);
         kill(pid, SIGCONT);
     }
@@ -1698,15 +1710,13 @@ int main(int argc, char **argv) {
 		argc = 3;
 		optind = 0;
 
-		/* we do an exec here so that we do not overcount processes created. */
-		char *sh_cmd_line_exec = string_format("exec %s", sh_cmd_line);
-		char *argv_sh[] = { "/bin/sh", "-c", sh_cmd_line_exec, 0 };
+		char *argv_sh[] = { "/bin/sh", "-c", sh_cmd_line, 0 };
 		argv = argv_sh;
 
 		/* for pretty printing in the summary. */
 		command_line = sh_cmd_line;
 
-		char *sh_cmd_line_exec_escaped = string_escape_shell(sh_cmd_line_exec);
+		char *sh_cmd_line_exec_escaped = string_escape_shell(sh_cmd_line);
 		debug(D_RMON, "command line: /bin/sh -c %s\n", sh_cmd_line_exec_escaped);
 		free(sh_cmd_line_exec_escaped);
 	}
