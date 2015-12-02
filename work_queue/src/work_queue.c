@@ -34,6 +34,7 @@ The following major problems must be fixed:
 #include "load_average.h"
 #include "buffer.h"
 #include "rmonitor.h"
+#include "rmonitor_types.h"
 #include "rmonitor_poll.h"
 #include "copy_stream.h"
 #include "random.h"
@@ -1625,6 +1626,11 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	q->stats->total_execute_time += t->cmd_execution_time;
 
 	w->finished_tasks++;
+
+	// Convert resource_monitor status into work queue status if needed.
+	if(q->monitor_mode && t->return_status == RM_OVERFLOW) {
+		t->result |= WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION;
+	}
 
 	if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 		/* if resource exhaustion, mark the task for possible resubmission. */
