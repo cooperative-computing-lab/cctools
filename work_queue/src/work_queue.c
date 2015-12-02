@@ -5634,6 +5634,16 @@ void work_queue_specify_max_worker_cores(struct work_queue *q, int64_t cores) {
 	}
 }
 
+void work_queue_specify_max_worker_resources(struct work_queue *q,  const struct rmsummary *rm) {
+	if(rm) {
+		memcpy(q->worker_top_resources, rm, sizeof(struct rmsummary));
+		q->auto_label_tasks_mode = 1;
+	} else {
+		bzero(q->worker_top_resources, sizeof(struct rmsummary));
+		q->auto_label_tasks_mode = 0;
+	}
+}
+
 /* returns: 1 relabel was possible, 0 already at max or no new label available. */
 int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 
