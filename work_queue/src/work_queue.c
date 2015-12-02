@@ -2515,8 +2515,12 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	send_worker_msg(q,w, "memory %"PRId64"\n",       t->rn->memory);
 	send_worker_msg(q,w, "disk %"PRId64"\n",         t->rn->disk);
 	send_worker_msg(q,w, "gpus %"PRId64"\n",         t->rn->gpus);
-	send_worker_msg(q,w, "end_time %"PRIu64"\n",     t->rn->end);
-	send_worker_msg(q,w, "wall_time %"PRIu64"\n",    t->rn->wall_time);
+
+	/* Do not specify end, wall_time if running the resource monitor. We let the monitor police these resources. */
+	if(!q->monitor_mode) {
+		send_worker_msg(q,w, "end_time %"PRIu64"\n",     t->rn->end);
+		send_worker_msg(q,w, "wall_time %"PRIu64"\n",    t->rn->wall_time);
+	}
 
 	/* Note that even when environment variables after resources, values for
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
