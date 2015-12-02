@@ -3,10 +3,11 @@ batch_submit_workers
 catalog_server
 catalog_update
 chunk_test
-disk_allocator
 disk_alloc_test
+disk_allocator
 hmac_test
 int_sizes.h
+jx_test
 libdttools.a
 make_int_sizes
 microbench
