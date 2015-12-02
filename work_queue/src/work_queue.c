@@ -279,6 +279,7 @@ static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_
 
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
 
+char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t);
 static struct work_queue_task_category *category_lookup_or_create(struct work_queue *q, const char *name);
 static void category_delete(struct work_queue *q, const char *name);
 void category_accumulate_task(struct work_queue *q, struct work_queue_task *t);
@@ -2479,6 +2480,15 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 
 static work_queue_result_code_t start_one_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
+	/* wrap command at the last minute, so that we have the updated information
+	 * about resources. */
+	char *command_line;
+	if(q->monitor_mode) {
+		command_line = work_queue_monitor_wrap(q, t);
+	} else {
+		command_line = xxstrdup(t->command_line);
+	}
+
 	t->time_send_input_start = timestamp_get();
 	work_queue_result_code_t result = send_input_files(q, w, t);
 	t->time_send_input_finish = timestamp_get(); //record end time in case we return prematurely below.
@@ -2492,7 +2502,9 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	t->host = xxstrdup(w->addrport);
 
 	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid);
-	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(t->command_line), t->command_line);
+	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(command_line), command_line);
+	free(command_line);
+
 	send_worker_msg(q,w, "cores %"PRId64"\n",        t->rn->cores);
 	send_worker_msg(q,w, "memory %"PRId64"\n",       t->rn->memory);
 	send_worker_msg(q,w, "disk %"PRId64"\n",         t->rn->disk);
@@ -4447,7 +4459,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 		warn(D_DEBUG, "Could not move monitor report to final destination file.");
 }
 
-int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
+char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 {
 	static char *monitor_remote_name = NULL;
 	if(!monitor_remote_name) {
@@ -4480,16 +4492,13 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 		free(debug);
 		free(series);
 	} else {
-		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, NULL, extra_options, 0, 0, 0));
+		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, t->rn, extra_options, /* debug */ 0, /* series */ 0, /* inotify */ 0));
 	}
 
 	free(extra_options);
 	free(template);
 
-	free(t->command_line);
-	t->command_line = wrap_cmd;
-
-	return 0;
+	return wrap_cmd;
 }
 
 /* Put a given task on the ready list, taking into account the task priority and the queue schedule. */
@@ -4628,9 +4637,6 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 
 	/* If result is never updated, then it is mark as a failure. */
 	t->result = WORK_QUEUE_RESULT_UNKNOWN;
-
-	if(q->monitor_mode)
-		work_queue_monitor_wrap(q, t);
 
 	itable_insert(q->tasks, t->taskid, t);
 

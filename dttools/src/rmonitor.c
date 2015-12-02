@@ -131,34 +131,34 @@ char *resource_monitor_write_command(const char *monitor_path, const char *templ
 			buffer_printf(&cmd_builder, " -L 'cpu_time: %lf'", limits->cpu_time/1000000e0);
 
 		if(limits->cores > -1)
-			buffer_printf(&cmd_builder, " -L 'cores: '%" PRId64 "'", limits->cores);
+			buffer_printf(&cmd_builder, " -L 'cores: %" PRId64 "'", limits->cores);
 
 		if(limits->max_concurrent_processes > -1)
-			buffer_printf(&cmd_builder, " -L 'max_concurrent_processes: '%" PRId64 "'", limits->max_concurrent_processes);
+			buffer_printf(&cmd_builder, " -L 'max_concurrent_processes: %" PRId64 "'", limits->max_concurrent_processes);
 
 		if(limits->total_processes > -1)
-			buffer_printf(&cmd_builder, " -L 'total_processes: '%" PRId64 "'", limits->total_processes);
+			buffer_printf(&cmd_builder, " -L 'total_processes: %" PRId64 "'", limits->total_processes);
 
 		if(limits->virtual_memory > -1)
-			buffer_printf(&cmd_builder, " -L 'virtual_memory: '%" PRId64 "'", limits->virtual_memory);
+			buffer_printf(&cmd_builder, " -L 'virtual_memory: %" PRId64 "'", limits->virtual_memory);
 
 		if(limits->memory > -1)
-			buffer_printf(&cmd_builder, " -L 'memory: '%" PRId64 "'", limits->memory);
+			buffer_printf(&cmd_builder, " -L 'memory: %" PRId64 "'", limits->memory);
 
 		if(limits->swap_memory > -1)
-			buffer_printf(&cmd_builder, " -L 'swap_memory: '%" PRId64 "'", limits->swap_memory);
+			buffer_printf(&cmd_builder, " -L 'swap_memory: %" PRId64 "'", limits->swap_memory);
 
 		if(limits->bytes_read > -1)
-			buffer_printf(&cmd_builder, " -L 'bytes_read: '%" PRId64 "'", limits->bytes_read);
+			buffer_printf(&cmd_builder, " -L 'bytes_read: %" PRId64 "'", limits->bytes_read);
 
 		if(limits->bytes_written > -1)
-			buffer_printf(&cmd_builder, " -L 'bytes_written: '%" PRId64 "'", limits->bytes_written);
+			buffer_printf(&cmd_builder, " -L 'bytes_written: %" PRId64 "'", limits->bytes_written);
 
 		if(limits->total_files > -1)
-			buffer_printf(&cmd_builder, " -L 'total_files: '%" PRId64 "'", limits->total_files);
+			buffer_printf(&cmd_builder, " -L 'total_files: %" PRId64 "'", limits->total_files);
 
 		if(limits->disk > -1)
-			buffer_printf(&cmd_builder, " -L 'disk: '%" PRId64 "'", limits->disk);
+			buffer_printf(&cmd_builder, " -L 'disk: %" PRId64 "'", limits->disk);
 	}
 
 	if(extra_monitor_options)
