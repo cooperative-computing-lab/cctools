@@ -840,4 +840,6 @@ void work_queue_specify_max_worker_memory(struct work_queue *q, int64_t memory);
 void work_queue_specify_max_worker_disk(struct work_queue *q,   int64_t disk);
 void work_queue_specify_max_worker_cores(struct work_queue *q,  int64_t cores);
 
+void work_queue_specify_max_worker_resources(struct work_queue *q,  const struct rmsummary *rm);
+
 #endif
