@@ -4466,7 +4466,7 @@ int work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 
 	char *wrap_cmd;
 	if(q->monitor_mode == MON_FULL) {
-		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, NULL, extra_options, /* debug */ 1, /* series */ 1, 0));
+		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, t->rn, extra_options, /* debug */ 1, /* series */ 1, /* inotify */ 0));
 
 		char *debug    = NULL;
 		char *series   = NULL;

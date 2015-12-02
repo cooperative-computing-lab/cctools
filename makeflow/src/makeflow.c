@@ -1196,9 +1196,11 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_MONITOR_LIMITS:
 				if (!monitor) monitor = makeflow_monitor_create();
-				if(monitor->limits_name)
-					free(monitor->limits_name);
-				monitor->limits_name = xxstrdup(optarg);
+				if(monitor->limits)
+					free(monitor->limits);
+				monitor->limits = rmsummary_parse_file_single(optarg);
+				if(!monitor->limits)
+					fatal("Could not read limits file '%s'", optarg);
 				break;
 			case LONG_OPT_MONITOR_INTERVAL:
 				if (!monitor) monitor = makeflow_monitor_create();
