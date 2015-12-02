@@ -5524,8 +5524,8 @@ int64_t category_first_allocation(struct itable *histogram, int64_t top_resource
 
 	for(i = 0; i < n; i++) {
 		uint64_t a  = buckets[i];
-		uint64_t Pa = accum[i];
-		int64_t  Ea = a - a_m*Pa;
+		uint64_t Pa = accum[n-1] - accum[i];
+		int64_t  Ea = a*accum[n-1] + a_m*Pa;
 
 		if(Ea < Ea_1) {
 			Ea_1 = Ea;
