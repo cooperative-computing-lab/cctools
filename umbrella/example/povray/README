@@ -52,3 +52,15 @@ umbrella \
 --sandbox_mode destructive \
 --log umbrella.log \
 run
+
+umbrella \
+--spec povray_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/ec2_povray_S/output.png" \
+--sandbox_mode ec2 \
+--ec2_log umbrella.log.ec2 \
+--ec2_sshkey ~/bin/feb272015.pem \
+--ec2_key feb272015 \
+--ec2_instance_type m3.medium \
+--log umbrella.log \
+run

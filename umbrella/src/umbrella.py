@@ -97,6 +97,44 @@ pac_manager = {
 "yum": ("-y install", "info")
 }
 
+"""
+ec2 metadata
+the instance types provided by ec2 are undergoing changes as time goes by.
+"""
+ec2_json = {
+	"redhat-6.5-x86_64": {
+		"ami-2cf8901c": {
+			"ami": "ami-2cf8901c",
+			"root_device_type": "ebs",
+			"virtualization_type": "paravirtual",
+			"user": "ec2-user"
+		},
+		"ami-0b5f073b": {
+			"ami": "ami-0b5f073b",
+			"root_device_type": "ebs",
+			"virtualization_type": "paravirtual",
+			"user": "ec2-user"
+		}
+	},
+	"centos-6.6-x86_64": {
+		"ami-0b06483b": {
+			"ami": "ami-0b06483b",
+			"root_device_type": "ebs",
+			"virtualization_type": "paravirtual",
+			"user": "root"
+		}
+	},
+	"redhat-5.10-x86_64": {
+		"ami-d76a29e7": {
+			"ami": "ami-d76a29e7",
+			"root_device_type": "ebs",
+			"virtualization_type": "hvm",
+			"user": "root"
+		}
+	}
+}
+
+
 def subprocess_error(cmd, rc, stdout, stderr):
 	"""Print the command, return code, stdout, and stderr; and then directly exit.
 
@@ -347,12 +385,11 @@ def attr_check(item, attr, check_len = 0):
 		sys.exit("the item (%s) does not have %s attr!" % (item, attr))
 
 
-def cctools_download(sandbox_dir, meta_json, hardware_platform, linux_distro, action):
+def cctools_download(sandbox_dir, hardware_platform, linux_distro, action):
 	"""Download cctools
 
 	Args:
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
-		meta_json: the json object including all the metadata of dependencies.
 		hardware_platform: the architecture of the required hardware platform (e.g., x86_64).
 		linux_distro: the linux distro.  For Example: redhat6, centos6.
 		action: the action on the downloaded dependency. Options: none, unpack. "none" leaves the downloaded dependency at it is. "unpack" uncompresses the dependency.
@@ -783,7 +820,7 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardwar
 		cvmfs_http_proxy: HTTP_PROXY environmetn variable used to access CVMFS by Parrot
 
 	Returns:
-		the modified version of the user's cmd.
+		None
 	"""
 	#Here we use the cctools meta from the local cache (which includes all the meta including cvmfs, globus, fuse and so on). Even if the user may install cctools by himself on the machine, the configuration of the local installation may be not what we want. For example, the user may just configure like this `./configure --prefix ~/cctools`.
 	#4.4 and 4.4 does not support --no-set-foreground feature.
@@ -793,7 +830,6 @@ def parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardwar
 	else:
 		user_cmd[0] = cctools_dest + "/bin/parrot_run --no-set-foreground /bin/sh -c 'cd " + cwd_setting + "; " + user_cmd[0] + "'"
 	logging.debug("The parrotized user_cmd: %s" % user_cmd[0])
-	return user_cmd
 
 def chrootize_user_cmd(user_cmd, cwd_setting):
 	"""Modify the user's command when the sandbox_mode is chroot. This check should be done after `parrotize_user_cmd`.
@@ -810,7 +846,7 @@ def chrootize_user_cmd(user_cmd, cwd_setting):
 	user_cmd[0] = 'chroot / /bin/sh -c "cd %s; %s"' %(cwd_setting, user_cmd[0])
 	return user_cmd
 
-def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbox_dir):
+def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbox_dir, pac_install_destructive):
 	""" Installation each software dependency specified in the software section of the specification.
 
 	Args:
@@ -819,6 +855,7 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
 		software_spec: the software section of the specification
 		meta_json: the json object including all the metadata of dependencies.
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
+		pac_install_destructive: whether this is to install packages through package manager in destructive mode
 
 	Returns:
 		None.
@@ -845,13 +882,28 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
 			result = meta_search(meta_json, item, id)
 			env_para_dict[mount_env] =attr_check(result, "source", 1)
 		else:
+			if mount_env and mountpoint:
+				env_para_dict[mount_env] = mountpoint
+
 			mount_value = dependency_process(item, id, action, meta_json, sandbox_dir)
 			if len(mount_value) > 0:
 				logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, mount_value)
-				mount_dict[mountpoint] = mount_value
+				if pac_install_destructive:
+					parent_dir = os.path.dirname(mountpoint)
+					if not os.path.exists(parent_dir):
+						os.makedirs(parent_dir)
+					elif not os.path.isdir(parent_dir):
+						logging.critical("%s is not a directory!\n", parent_dir)
+						sys.exit("%s is not a directory!\n" % parent_dir)
 
-			if mount_env and mountpoint:
-				env_para_dict[mount_env] = mountpoint
+					if not os.path.exists(mountpoint):
+						cmd = "mv -f %s %s/" % (mount_value, parent_dir)
+						rc, stdout, stderr = func_call(cmd)
+						if rc != 0:
+							subprocess_error(cmd, rc, stdout, stderr)
+				else:
+					mount_dict[mountpoint] = mount_value
+
 
 def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict):
 	"""Process data section of the specification.
@@ -1574,10 +1626,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 		env_dict = os.environ
 
 		if cvmfs_cms_siteconf_mountpoint:
-			item = cvmfs_cms_siteconf_mountpoint.split(' ')[1]
-			logging.debug("Adding the siteconf meta (%s) into mount_dict", item)
-			mount_dict[item] = item
-			logging.debug("Create a parrot mountfile for the siteconf meta (%s)", item)
+			logging.debug("Create a parrot mountfile for the siteconf meta ...")
 			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mountpoint)
 
 		logging.debug("Add env_para_dict into environment variables")
@@ -1620,7 +1669,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 				subprocess_error(cmd, rc, stdout, stderr)
 
 		for key in output_d_dict:
-			cmd = "mv -f %s %s" % (key, output_f_dict[key])
+			cmd = "mv -f %s %s" % (key, output_d_dict[key])
 			rc, stdout, stderr = func_call_withenv(cmd, env_dict)
 			if rc != 0:
 				subprocess_error(cmd, rc, stdout, stderr)
@@ -1923,30 +1972,30 @@ def decide_instance_type(cpu_cores, memory_size, disk_size, instances):
 	disk_size = int(disk_size[:-2])
 	for item in instances:
 		j = instances[item]
-		inst_mem = int(j["memory"][:-2])
+		inst_mem = int(float((j["memory"][:-2])))
 		inst_disk = int(j["disk"][:-2])
 		if cpu_cores <= int(j["cores"]) and memory_size <= inst_mem and disk_size <= inst_disk:
 			return item
 	return 'no'
 
-def ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, ssh_key, ec2_key_pair, ec2_security_group, sandbox_dir, output_dir, sandbox_mode, input_list, input_list_origin, env_options, user_cmd, cwd_setting, ec2log_path, cvmfs_http_proxy):
+def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_pair, ec2_security_group, ec2_instance_type, sandbox_dir, output_option, output_f_dict, output_d_dict, sandbox_mode, input_list, input_list_origin, env_option, env_para_dict, user_cmd, cwd_setting, ec2log_path, cvmfs_http_proxy):
 	"""
 	Args:
 		spec_path: the path of the specification.
 		spec_json: the json object including the specification.
+		meta_option: the --meta option.
 		meta_path: the path of the json file including all the metadata information.
-		meta_json: the json object including all the metadata of dependencies.
-		ec2_path: the path of the json file including all infomration about the ec2 AMIs and instance types.
-		ec2_json: the json object corresponding to ec2_path.
 		ssh_key: the name the private key file to use when connecting to an instance.
 		ec2_key_pair: the path of the key-pair to use when launching an instance.
 		ec2_security_group: the security group within which the EC2 instance should be run.
+		ec2_instance_type: the type of an Amazone ec2 instance
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
-		output_dir: the output directory.
+		output_f_dict: the mappings of output files (key is the file path used by the application; value is the file path the user specifies.)
+		output_d_dict: the mappings of output dirs (key is the dir path used by the application; value is the dir path the user specified.)
 		sandbox_mode: the execution engine.
 		input_list: a list including all the absolute path of the input files on the local machine.
 		input_list_origin: the list of input file paths.
-		env_options: the original `--env` option.
+		env_para_dict: the environment variables which need to be set for the execution of the user's command.
 		user_cmd: the user's command.
 		cwd_setting: the current working directory for the execution of the user's command.
 		ec2log_path: the path of the umbrella log executed on the remote EC2 execution node.
@@ -1968,7 +2017,7 @@ def ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, 
 	print "Deciding the AMI according to the umbrella specification ..."
 	name = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
 	if ec2_json.has_key(name):
-		if os_id == '':
+		if os_id[:4] != "ec2:":
 			for item in ec2_json[name]:
 				logging.debug("The AMI information is: ")
 				logging.debug(ec2_json[name][item])
@@ -1990,20 +2039,9 @@ def ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, 
 		logging.critical("%s is not in the ec2 json file (%s).", name, ec2_path)
 		sys.exit("%s is not in the ec2 json file (%s).\n" % (name, ec2_path))
 
-	#decide the instance type according to (cores, memory, disk)
-	print "Deciding the instance type according to the umbrella specification ..."
-	instances = ec2_json["instances"]
-	r = decide_instance_type(cpu_cores, memory_size, disk_size, instances)
-	if r == 'no':
-		cleanup(tempfile_list, tempdir_list)
-		logging.critical("No matched instance type.")
-		sys.exit("No matched instance type.\n")
-	else:
-		logging.debug("the matched instance type exists: %s", r)
-
 	#start the instance and obtain the instance id
 	print "Starting an Amazon EC2 instance ..."
-	instance_id = get_instance_id(ami, r, ec2_key_pair, ec2_security_group)
+	instance_id = get_instance_id(ami, ec2_instance_type, ec2_key_pair, ec2_security_group)
 	logging.debug("Start the instance and obtain the instance id: %s", instance_id)
 
 	#get the public DNS of the instance_id
@@ -2011,21 +2049,28 @@ def ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, 
 	public_dns = get_public_dns(instance_id)
 	logging.debug("Get the public DNS of the instance_id: %s", public_dns)
 
-	#public_dns = "ec2-52-11-98-91.us-west-2.compute.amazonaws.com"
+	'''
+
+	#instance_id = "<instance_id>"
+	#public_dns = "<public_dns>"
+
+	instance_id = "i-e61ad13c"
+	public_dns = "ec2-52-26-177-97.us-west-2.compute.amazonaws.com"
+	'''
+
 	#install wget on the instance
 	print "Installing wget on the EC2 instance ..."
 	logging.debug("Install wget on the instance")
 	#here we should judge the os type, yum is used by Fedora, CentOS, and REHL.
-	#without `-t` option of ssh, if the username is not root, `ssh + sudo` will get the following error: sudo: sorry, you must have a tty to run sudo.
+	if distro_name not in ["fedora", "centos", "redhat"]:
+			cleanup(tempfile_list, tempdir_list)
+			sys.exit("Currently the supported Linux distributions are redhat, centos and fedora.\n")
 
 	#ssh exit code 255: the remote node is down or unavailable
 	rc = 300
 	while rc != 0:
-		if distro_name in ["fedora", "centos", "redhat"]:
-			cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo yum -y install wget\'' % (ssh_key, user_name, public_dns)
-		else:
-			cleanup(tempfile_list, tempdir_list)
-			sys.exit("Currently the supported Linux distributions are redhat, centos and fedora.\n")
+		#without `-t` option of ssh, if the username is not root, `ssh + sudo` will get the following error: sudo: sorry, you must have a tty to run sudo.
+		cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo yum -y install wget\'' % (ssh_key, user_name, public_dns)
 		rc, stdout, stderr = func_call(cmd)
 		if rc != 0:
 			logging.debug("`%s` fails with the return code of %d, \nstdout: %s, \nstderr: %s" % (cmd, rc, stdout, stderr))
@@ -2035,17 +2080,10 @@ def ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, 
 	print "Installing python 2.6.9 on the instance ..."
 	logging.debug("Install python 2.6.9 on the instance.")
 	python_name = 'python-2.6.9-%s-%s' % (linux_distro, hardware_platform)
-	python_item = meta_search(meta_json, python_name)
-	python_url = python_item["source"][0] #get the url of python
-	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'wget %s\'' % (ssh_key, user_name, public_dns, python_url)
-	rc, stdout, stderr = func_call(cmd)
-	if rc != 0:
-		terminate_instance(instance_id)
-		subprocess_error(cmd, rc, stdout, stderr)
-
+	python_url = "http://ccl.cse.nd.edu/research/data/hep-case-study/python-2.6.9-%s-%s.tar.gz" % (linux_distro, hardware_platform)
 	scheme, netloc, path, query, fragment = urlparse.urlsplit(python_url)
 	python_url_filename = os.path.basename(path)
-	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'tar zxvf %s\'' % (ssh_key, user_name, public_dns, python_url_filename)
+	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo wget %s && sudo tar zxvf %s\'' % (ssh_key, user_name, public_dns, python_url, python_url_filename)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
 		terminate_instance(instance_id)
@@ -2058,25 +2096,36 @@ def ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, 
 	for input_file in input_list:
 		input_file_string += input_file + ' '
 
+	#here meta_path may start with http so need a special treatement
 	umbrella_fullpath = which_exec("umbrella")
-	cmd = 'scp -i %s %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, meta_path, input_file_string, user_name, public_dns)
+
+	if meta_option:
+		meta_option = " --meta ~%s/%s " % (user_name, os.path.basename(meta_path))
+		cmd = 'scp -i %s %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, meta_path, input_file_string, user_name, public_dns)
+	else:
+		meta_option = ""
+		cmd = 'scp -i %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, input_file_string, user_name, public_dns)
+
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
 		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	#change the --inputs option to put all the inputs directory in the home dir of the instance
-	logging.debug("change the --inputs option to put all the inputs directory in the home dir of the instance")
 	new_input_options = ''
-	logging.debug("Transform input_list_origin ....")
-	for item in input_list_origin:
-		index_equal = item.find('=')
-		access_path = item[:index_equal]
-		actual_path = item[(index_equal+1):]
-		new_input_options += '%s=%s,' % (access_path, os.path.basename(actual_path))
-	if new_input_options[-1] == ',':
-		new_input_options = new_input_options[:-1]
-	logging.debug("The new_input_options of Umbrella: %s", new_input_options) #--inputs option
+	if len(input_list_origin) > 0:
+		logging.debug("change the --inputs option to put all the inputs directory in the home dir of the instance")
+		logging.debug("Transform input_list_origin ....")
+		new_input_options = " -i '"
+		for item in input_list_origin:
+			index_equal = item.find('=')
+			access_path = item[:index_equal]
+			actual_path = item[(index_equal+1):]
+			new_input_options += '%s=%s,' % (access_path, os.path.basename(actual_path))
+		if new_input_options[-1] == ',':
+			new_input_options = new_input_options[:-1]
+		new_input_options += "'"
+		logging.debug("The new_input_options of Umbrella: %s", new_input_options) #--inputs option
 
 	#find cctools_python
 	cmd = 'which cctools_python'
@@ -2093,10 +2142,12 @@ def ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, 
 	#execute the command on the instance
 	print "Executing the user's task on the EC2 instance ..."
 	logging.debug("Execute the command on the instance ...")
-	if env_options == '':
-		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella %s -s local --spec %s --log ec2_umbrella.log --meta %s -l ec2_umbrella -o output -i \'%s\' run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, cvmfs_http_proxy_option, os.path.basename(spec_path), os.path.basename(meta_path), new_input_options, user_cmd[0])
-	else:
-		cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "%s/bin/python umbrella -s local --spec %s --meta %s -l ec2_umbrella -o output -i \'%s\' -e %s run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, cvmfs_http_proxy_option, os.path.basename(spec_path), os.path.basename(meta_path), new_input_options, env_options, user_cmd[0])
+
+	ec2_output_option = ""
+	if output_option:
+		ec2_output_option = " -o '%s'" % output_option
+
+	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "sudo %s/bin/python ~%s/umbrella %s -s destructive --spec ~%s/%s %s --log ~%s/ec2_umbrella.log -l ec2_umbrella %s %s %s run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, user_name, cvmfs_http_proxy_option, user_name, os.path.basename(spec_path), meta_option, user_name, ec2_output_option, new_input_options, env_option, user_cmd[0])
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
 		terminate_instance(instance_id)
@@ -2105,7 +2156,9 @@ def ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, 
 	#postprocessing
 	print "Transferring the output of the user's task from the EC2 instance back to the local machine ..."
 	logging.debug("Create a tarball for the output dir on the instance.")
-	cmd = 'ssh -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'tar cvzf output.tar.gz output\'' % (ssh_key, user_name, public_dns)
+
+	output = '%s %s' % (' '.join(output_f_dict.values()), ' '.join(output_d_dict.values()))
+	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo tar cvzf ~%s/output.tar.gz %s && sudo chown %s:%s ~%s/output.tar.gz ~%s/ec2_umbrella.log\'' % (ssh_key, user_name, public_dns, user_name, output, user_name, user_name, user_name, user_name)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
 		terminate_instance(instance_id)
@@ -2125,21 +2178,14 @@ def ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, 
 		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
-	logging.debug("Uncompress output.tar.gz to the output_dir (%s).", output_dir)
-	cmd = 'tar zxvf %s/output.tar.gz -C %s' % (sandbox_dir, sandbox_dir)
+	cmd = 'tar zxvf %s/output.tar.gz -C /' % (sandbox_dir)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
 		terminate_instance(instance_id)
 		subprocess_error(cmd, rc, stdout, stderr)
 
-	logging.debug("Rename %s/output to the output_dir (%s).", sandbox_dir, output_dir)
-	os.rename('%s/output' % sandbox_dir, output_dir)
-	shutil.rmtree(sandbox_dir)
-
 	print "Terminating the EC2 instance ..."
 	terminate_instance(instance_id)
-
-	print "The output has been put into the output dir: %s" % output_dir
 
 def obtain_package(spec_json):
 	"""Check whether this spec includes a package_manager section, which in turn includes a list attr.
@@ -2251,8 +2297,8 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 	#check for dependencies which need to be installed by package managers
 	(pac_name, pac_list) = obtain_package(spec_json)
 	if pac_list:
-		logging.debug("The spec needs to use %s install packages, therefore a sperate root filesystem is needed.", pac_name)
-		print "The spec needs to use %s install packages, therefore a sperate root filesystem is needed." % pac_name
+		logging.debug("The spec needs to use %s install packages.", pac_name)
+		print "The spec needs to use %s install packages." % pac_name
 		if sandbox_mode in ["parrot"]:
 			cleanup(tempfile_list, tempdir_list)
 			logging.critical("Installing packages through package managers requires the root authority! Please choose a different sandbox mode (docker or destructive)!")
@@ -2264,14 +2310,14 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 
 	if sandbox_mode in ["parrot"]:
 		logging.debug("To use parrot sandbox mode, cctools binary is needed")
-		host_cctools_path = cctools_download(sandbox_dir, meta_json, hardware_platform, host_linux_distro, 'unpack')
+		host_cctools_path = cctools_download(sandbox_dir, hardware_platform, host_linux_distro, 'unpack')
 		logging.debug("Add mountpoint (%s:%s) into mount_dict", host_cctools_path, host_cctools_path)
 		mount_dict[host_cctools_path] = host_cctools_path
 		parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, host_linux_distro, hardware_platform, meta_json, cvmfs_http_proxy)
 
+	item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform) #example of item here: redhat-6.5-x86_64
 	if need_separate_rootfs and sandbox_mode not in ["destructive"]:
 		#download the os dependency into the local
-		item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform) #example of item here: redhat-6.5-x86_64
 		os_image_dir = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), os_id, item)
 		logging.debug("A separate OS (%s) is needed!", os_image_dir)
 		mountpoint = '/'
@@ -2316,10 +2362,6 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 				if cvmfs_path.find("cms.cern.ch") != -1:
 					is_cms_cvmfs_app = 1 #cvmfs is needed to deliver cms.cern.ch repo, and the local host has no cvmfs installed.
 
-					if sandbox_mode in ["destructive"]:
-						logging.critical("the % sandbox mode can not deliver cvmfs!", sandbox_mode)
-						print "the % sandbox mode can not deliver cvmfs!" % sandbox_mode
-
 					if not cvmfs_http_proxy or len(cvmfs_http_proxy) == 0:
 						cleanup(tempfile_list, tempdir_list)
 						logging.debug("Access CVMFS through Parrot requires the --cvmfs_http_proxy of umbrella to be set.")
@@ -2328,13 +2370,15 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 					#currently, if the logic reaches here, only parrot execution engine is allowed.
 					cvmfs_cms_siteconf_mountpoint = set_cvmfs_cms_siteconf(sandbox_dir)
 					#add cvmfs SITEINFO into mount_dict
-					list1 = cvmfs_cms_siteconf_mountpoint.split(' ')
-					logging.debug("Add mountpoint (%s:%s) into mount_dict for cvmfs SITEINFO", list1[0], list1[1])
-					mount_dict[list1[0]] = list1[1]
+
+					if sandbox_mode == "docker":
+						list1 = cvmfs_cms_siteconf_mountpoint.split(' ')
+						logging.debug("Add mountpoint (%s:%s) into mount_dict for cvmfs SITEINFO", list1[0], list1[1])
+						mount_dict[list1[0]] = list1[1]
 
 					if sandbox_mode != "parrot":
 						logging.debug("To use parrot to access cvmfs, cctools binary is needed")
-						host_cctools_path = cctools_download(sandbox_dir, meta_json, hardware_platform, linux_distro, 'unpack')
+						host_cctools_path = cctools_download(sandbox_dir, hardware_platform, linux_distro, 'unpack')
 						logging.debug("Add mountpoint (%s:%s) into mount_dict", host_cctools_path, host_cctools_path)
 						mount_dict[host_cctools_path] = host_cctools_path
 						parrotize_user_cmd(user_cmd, sandbox_dir, cwd_setting, linux_distro, hardware_platform, meta_json, cvmfs_http_proxy)
@@ -2350,6 +2394,9 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 			logging.debug("Installing the package into the image (%s), and create a new image: %s ...", os_image_dir, new_os_image_dir)
 			if os.path.exists(new_os_image_dir) and os.path.isdir(new_os_image_dir):
 				logging.debug("the new os image already exists!")
+				#use the intermidate os image which has all the dependencies from package manager ready as the os image
+				os_image_dir = new_os_image_dir
+				os_id = new_os_id
 				pass
 			else:
 				logging.debug("the new os image does not exist!")
@@ -2357,22 +2404,30 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 
 				#install dependency specified in the spec_json["package_manager"]["config"] section
 				logging.debug('Install dependency specified in the spec_json["package_manager"]["config"] section.')
-				software_install(mount_dict, new_env_para_dict, new_sw_sec, meta_json, sandbox_dir)
+				if sandbox_mode == "destructive":
+					software_install(mount_dict, new_env_para_dict, new_sw_sec, meta_json, sandbox_dir, 1)
 
-				#install dependencies through package managers
-				logging.debug("Create an intermediate OS image with all the dependencies from package managers ready!")
-				workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir)
-				logging.debug("Finishing creating the intermediate OS image!")
+					#install dependencies through package managers
+					rc, stdout, stderr = func_call(pm_cmd)
+					if rc != 0:
+						subprocess_error(cmd, rc, stdout, stderr)
+				else:
+					software_install(mount_dict, new_env_para_dict, new_sw_sec, meta_json, sandbox_dir, 0)
 
-			#use the intermidate os image which has all the dependencies from package manager ready as the os image
-			os_image_dir = new_os_image_dir
-			os_id = new_os_id
+					#install dependencies through package managers
+					logging.debug("Create an intermediate OS image with all the dependencies from package managers ready!")
+					workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir)
+					logging.debug("Finishing creating the intermediate OS image!")
+
+					#use the intermidate os image which has all the dependencies from package manager ready as the os image
+					os_image_dir = new_os_image_dir
+					os_id = new_os_id
 
 	if spec_json.has_key("software") and spec_json["software"]:
-		software_install(mount_dict, env_para_dict, spec_json["software"], meta_json, sandbox_dir)
+		software_install(mount_dict, env_para_dict, spec_json["software"], meta_json, sandbox_dir, 0)
 	else:
 		logging.debug("this spec does not have software section!")
-		software_install(mount_dict, env_para_dict, "", meta_json, sandbox_dir)
+		software_install(mount_dict, env_para_dict, "", meta_json, sandbox_dir, 0)
 
 	sw_mount_dict = dict(mount_dict) #sw_mount_dict will be used later to config the $PATH
 	if spec_json.has_key("data") and spec_json["data"]:
@@ -2416,7 +2471,10 @@ def get_instance_id(image_id, instance_type, ec2_key_pair, ec2_security_group):
 		If no error happens, returns the id of the started instance.
 		Otherwise, directly exit.
 	"""
-	cmd = 'ec2-run-instances %s -t %s -k %s -g %s --associate-public-ip-address true' % (image_id, instance_type, ec2_key_pair, ec2_security_group)
+	sg_option = ''
+	if ec2_security_group:
+		sg_option = ' -g ' + ec2_security_group
+	cmd = 'ec2-run-instances %s -t %s -k %s %s --associate-public-ip-address true' % (image_id, instance_type, ec2_key_pair, sg_option)
 	logging.debug("Starting an instance: %s", cmd)
 	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
 	(stdout, stderr) = p.communicate()
@@ -2985,8 +3043,7 @@ def main():
 					help="HTTP_PROXY to access cvmfs (Used by Parrot)",)
 	parser.add_option("--ec2",
 					action="store",
-					default='./ec2.json',
-					help="The source of ec2 information. (By default: ./ec2.json)",)
+					help="The source of ec2 information.",)
 	parser.add_option("--condor_log",
 					action="store",
 					help="The path of the condor umbrella log file. Required for condor execution engines.",)
@@ -3002,6 +3059,9 @@ def main():
 	parser.add_option("--ec2_sshkey",
 					action="store",
 					help="the name of the private key file to use when connecting to an Amazon EC2 instance. (only for ec2)",)
+	parser.add_option("--ec2_instance_type",
+					action="store",
+					help="the type of an Amazon EC2 instance. (only for ec2)",)
 
 	(options, args) = parser.parse_args()
 	logfilename = options.log
@@ -3241,7 +3301,7 @@ def main():
 		"""
 		meta_path is optional. If set, it provides the metadata information for the dependencies.
 		If not set, the umbrella specification is treated as a self-contained specification.
-		meta_path can be in either file:///filepath format or a http/https url like http:/ccl.cse.nd.edu/...
+		meta_path can be in either file:///filepath format or a http/https url like http:/ccl.cse.nd.edu/.... Otherwise, it is treated as a local path.
 		"""
 		meta_path = options.meta
 		if meta_path:
@@ -3266,9 +3326,11 @@ def main():
 				print "Download metadata database from %s into %s" % (url, meta_path)
 				url_download(url, meta_path)
 			else:
-				cleanup(tempfile_list, tempdir_list)
-				logging.debug("The format of the --meta option should be file:///... or http://... or https://... \n")
-				sys.exit("The format of the --meta option should be file:///... or http://... or https://... \n")
+				logging.debug("Check the metatdata database file: %s", meta_path)
+				if not os.path.exists(meta_path):
+					cleanup(tempfile_list, tempdir_list)
+					logging.critical("the metatdata database file (%s) does not exist!", meta_path)
+					sys.exit("the metatdata database file (%s) does not exist!" % meta_path)
 		else:
 			if behavior in ["run"]:
 				#the provided specification should be self-contained.
@@ -3319,21 +3381,6 @@ def main():
 #		user_name = 'root' #username who can access the VM instances from Amazon EC2
 #		ssh_key = 'hmeng_key_1018.pem' #the pem key file used to access the VM instances from Amazon EC2
 		if sandbox_mode == "ec2":
-			#ec2_path always refers to the local path of the ec2 resource json file.
-			ec2_path = options.ec2
-			ec2_path = os.path.abspath(ec2_path)
-			logging.debug("Check the ec2 information file: %s", ec2_path)
-
-			if not os.path.exists(ec2_path):
-				path1 = ec2_path
-				url = 'http://ccl.cse.nd.edu/software/umbrella/database/ec2.json'
-				ec2_path = '%s/ec2.json' % (sandbox_dir)
-				logging.debug("The provided ec2 info (%s) does not exist, download from %s into %s", path1, url, ec2_path)
-				url_download(url, ec2_path)
-
-			with open(ec2_path) as f: #python 2.4 does not support this syntax: with open () as
-				ec2_json = json.load(f)
-
 			ssh_key = os.path.abspath(options.ec2_sshkey)
 			if not os.path.exists(ssh_key):
 				cleanup(tempfile_list, tempdir_list)
@@ -3342,8 +3389,8 @@ def main():
 
 			ec2_security_group = options.ec2_group
 			ec2_key_pair = options.ec2_key
-
-			ec2_process(spec_path, spec_json, meta_path, meta_json, ec2_path, ec2_json, ssh_key, ec2_key_pair, ec2_security_group, sandbox_dir, output_dir, sandbox_mode, input_list, input_list_origin, env_para, user_cmd, cwd_setting, ec2log_path, cvmfs_http_proxy)
+			ec2_instance_type = options.ec2_instance_type
+			ec2_process(spec_path, spec_json, options.meta, meta_path, ssh_key, ec2_key_pair, ec2_security_group, ec2_instance_type, sandbox_dir, output_dir, output_f_dict, output_d_dict, sandbox_mode, input_list, input_list_origin, env_para, env_para_dict, user_cmd, cwd_setting, ec2log_path, cvmfs_http_proxy)
 		elif sandbox_mode == "condor":
 			condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, condorlog_path, cvmfs_http_proxy)
 		elif sandbox_mode == "local":

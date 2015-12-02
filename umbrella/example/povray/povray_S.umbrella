@@ -18,10 +18,10 @@
     }, 
     "cmd": "povray +I/tmp/4_cubes.pov +O/tmp/frame000.png +K.0  -H50 -W50", 
     "hardware": {
-        "cores": "2", 
-        "disk": "3GB", 
+        "cores": "1", 
+        "disk": "2GB", 
         "arch": "x86_64", 
-        "memory": "2GB"
+        "memory": "1GB"
     }, 
     "environ": {
         "PWD": "/tmp"
