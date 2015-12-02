@@ -237,6 +237,7 @@ struct work_queue_task_category {
 	struct itable *cores_histogram;
 	struct itable *memory_histogram;
 	struct itable *disk_histogram;
+	struct itable *wall_time_histogram;
 };
 
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
@@ -5441,13 +5442,13 @@ struct work_queue_task_category *category_lookup_or_create(struct work_queue *q,
 	c->stats      = calloc(1, sizeof(struct work_queue_stats));
 	c->fast_abort = -1;
 
-
-	c->first    = make_rmsummary(0);
+	c->first    = make_rmsummary(-1);
 	memcpy(c->first, q->worker_top_resources, sizeof(struct rmsummary));
 
-	c->cores_histogram  = itable_create(0);
-	c->memory_histogram = itable_create(0);
-	c->disk_histogram   = itable_create(0);
+	c->cores_histogram     = itable_create(0);
+	c->memory_histogram    = itable_create(0);
+	c->disk_histogram      = itable_create(0);
+	c->wall_time_histogram = itable_create(0);
 
 	hash_table_insert(q->categories, name, c);
 
@@ -5470,6 +5471,7 @@ void category_delete(struct work_queue *q, const char *name) {
 	itable_delete(c->cores_histogram);
 	itable_delete(c->memory_histogram);
 	itable_delete(c->disk_histogram);
+	itable_delete(c->wall_time_histogram);
 
 	free(c);
 }
@@ -5572,19 +5574,22 @@ void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 		c->stats->total_good_transfer_time += t->total_transfer_time;
 
 		if(t->rs) {
-			category_inc_histogram_count(q, c, cores,  t->rs->cores);
-			category_inc_histogram_count(q, c, memory, t->rs->memory);
-			category_inc_histogram_count(q, c, disk,   t->rs->disk);
+			category_inc_histogram_count(q, c, cores,     t->rs->cores);
+			category_inc_histogram_count(q, c, memory,    t->rs->memory);
+			category_inc_histogram_count(q, c, disk,      t->rs->disk);
+			category_inc_histogram_count(q, c, wall_time, t->rs->wall_time);
 
-			int64_t cores  = category_first_allocation(c->cores_histogram, q->worker_top_resources->cores);
-			int64_t memory = category_first_allocation(c->memory_histogram, q->worker_top_resources->memory);
-			int64_t disk   = category_first_allocation(c->disk_histogram, q->worker_top_resources->disk);
+			int64_t cores     = category_first_allocation(c->cores_histogram,     q->worker_top_resources->cores);
+			int64_t memory    = category_first_allocation(c->memory_histogram,    q->worker_top_resources->memory);
+			int64_t disk      = category_first_allocation(c->disk_histogram,      q->worker_top_resources->disk);
+			int64_t wall_time = category_first_allocation(c->wall_time_histogram, q->worker_top_resources->wall_time);
 
 			/* Update values, and print debug message only if something changed. */
-			if(cores != c->first->cores ||  memory != c->first->memory || disk != c->first->disk) {
-				c->first->cores  = cores;
-				c->first->memory = memory;
-				c->first->disk   = disk;
+			if(cores != c->first->cores ||  memory != c->first->memory || disk != c->first->disk || wall_time != c->first->wall_time) {
+				c->first->cores     = cores;
+				c->first->memory    = memory;
+				c->first->disk      = disk;
+				c->first->wall_time = wall_time;
 
 				/* From here on we only print debugging info. */
 				buffer_rewind(b, 0);
@@ -5600,6 +5605,10 @@ void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 
 				if(disk > -1) {
 					buffer_printf(b, " disk: %" PRId64 " MB", disk);
+				}
+
+				if(wall_time > -1) {
+					buffer_printf(b, " wall_time: %" PRId64 " us", wall_time);
 				}
 
 				debug(D_WQ, "%s\n", buffer_tostring(b));
@@ -5660,28 +5669,33 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 	int64_t top_cores  = q->worker_top_resources->cores;
 	int64_t top_memory = q->worker_top_resources->memory;
 	int64_t top_disk   = q->worker_top_resources->disk;
+	int64_t top_wtime  = q->worker_top_resources->wall_time;
 
-	int64_t cores, memory, disk;
+	int64_t cores, memory, disk, wtime;
 
 	if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 		/* We check whether the task already has the maximum resources. If it
 		 * does, we mark it as done. */
 		if(     (top_cores  < 0 || top_cores  <= t->rn->cores)  &&
 				(top_memory < 0 || top_memory <= t->rn->memory) &&
-				(top_disk   < 0 || top_disk   <= t->rn->disk) ) {
-			debug(D_WQ, "Task %d already using maximum resources.", t->taskid);
+				(top_disk   < 0 || top_disk   <= t->rn->disk)   &&
+				(top_wtime  < 0 || top_wtime  <= t->rn->wall_time) ) {
 			return 0;
 		}
 		else {
 			cores  = top_cores;
 			memory = top_memory;
 			disk   = top_disk;
+			wtime  = top_wtime;
+
+			debug(D_WQ, "Setting task %d to use maximum resources.", t->taskid);
 		}
 	} else if(t->total_submissions == 0) {
 		/* Task has not run even once. Note we ignore any manual labeling. */
-		cores  = c->first->cores  > -1 ? c->first->cores  : top_cores;
-		memory = c->first->memory > -1 ? c->first->memory : top_memory;
-		disk   = c->first->disk   > -1 ? c->first->disk   : top_disk;
+		cores  = c->first->cores     > -1 ? c->first->cores     : top_cores;
+		memory = c->first->memory    > -1 ? c->first->memory    : top_memory;
+		disk   = c->first->disk      > -1 ? c->first->disk      : top_disk;
+		wtime  = c->first->wall_time > -1 ? c->first->wall_time : top_wtime;
 	} else {
 		/* Task was already labeled, and is being resubmitted for a reason
 		 * different than resource exhaustion. We simply return. */
@@ -5689,12 +5703,14 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 	}
 
 	/* update label only when there is a change. */
-	if(cores != t->rn->cores || memory != t->rn->memory || disk != t->rn->disk) {
+	if(cores != t->rn->cores || memory != t->rn->memory || disk != t->rn->disk || wtime != t->rn->wall_time ) {
 		work_queue_task_specify_cores(t,  cores);
 		work_queue_task_specify_memory(t, memory);
 		work_queue_task_specify_disk(t,   disk);
-	}
 
+		t->rn->wall_time = wtime;
+		t->unlabeled = 0;
+	}
 
 	return 1;
 }
