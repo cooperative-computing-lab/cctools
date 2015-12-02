@@ -4965,7 +4965,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 				} else {
 					debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
-					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+					change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 				}
 			} else {
 				cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
