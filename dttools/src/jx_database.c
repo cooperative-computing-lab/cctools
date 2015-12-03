@@ -220,7 +220,7 @@ static void log_flush( struct jx_database *db )
 }
 
 /*
-Log record like [ "C", key, value ] means to create a new record.
+Replay a log record like [ "C", key, value ]
 */
 
 static int log_replay_create( struct jx_database *db, struct jx_item *items )
@@ -246,7 +246,7 @@ static int log_replay_create( struct jx_database *db, struct jx_item *items )
 }
 
 /*
-Log record like [ "D", key ] means to delete a record.
+Replay a log record like [ "D", key ]
 */
 
 static int log_replay_delete( struct jx_database *db, struct jx_item *items )
@@ -261,7 +261,7 @@ static int log_replay_delete( struct jx_database *db, struct jx_item *items )
 }
 
 /*
-Log record like [ "U", key, name, value ] indicates a single field update.
+Replay a log record like [ "U", key, name, value ]
 */
 
 static int log_replay_update( struct jx_database *db, struct jx_item *items )
@@ -272,7 +272,7 @@ static int log_replay_update( struct jx_database *db, struct jx_item *items )
 	items = items->next;
 
 	if(!items || !items->value || items->value->type!=JX_STRING) return 0;
-	const char *name = items->value->string_value;
+	struct jx *name = items->value;
 
 	items = items->next;
 
@@ -282,14 +282,14 @@ static int log_replay_update( struct jx_database *db, struct jx_item *items )
 	struct jx *record = hash_table_lookup(db->table,key);
 	if(record) {
 		jx_delete(jx_remove(record,name));
-		jx_insert(record,jx_string(name),value);
+		jx_insert(record,jx_copy(name),value);
 	}
 
 	return 1;
 }
 
 /*
-Log record like [ "R", key, name ] removes one item from a record.
+Replay a log record like [ "R", key, name ]
 */
 
 static int log_replay_remove( struct jx_database *db, struct jx_item *items )
@@ -300,7 +300,7 @@ static int log_replay_remove( struct jx_database *db, struct jx_item *items )
 	items = items->next;
 
 	if(!items || !items->value || items->value->type!=JX_STRING) return 0;
-	const char *name = items->value->string_value;
+	struct jx *name = items->value;
 
 	struct jx *record = hash_table_lookup(db->table,key);
 	if(record) {
@@ -310,7 +310,7 @@ static int log_replay_remove( struct jx_database *db, struct jx_item *items )
 	return 1;
 }
 
-/* Log record like [ "R", key, name ] indicates a time update. */
+/* Replay a log record like [ "T", time ] for a time update. */
 
 static int log_replay_time( struct jx_database *db, struct jx_item *items, time_t *current )
 {
