@@ -475,9 +475,9 @@ static int makeflow_can_alloc_local(struct dag_node *n)
 	int disk_ok = 0;
 	int cores_ok = 0;
 
-	mem_ok = (loc_info.local_mem == -1 || !n->resources || n->resources->resident_memory <= loc_info.local_mem);
+	mem_ok = (loc_info.local_mem == -1 || n->resources->resident_memory <= loc_info.local_mem);
 
-	disk_ok = (loc_info.local_disk == -1 || !n->resources || n->resources->workdir_footprint <= loc_info.local_disk);
+	disk_ok = (loc_info.local_disk == -1 || n->resources->workdir_footprint <= loc_info.local_disk);
 
 	cores_ok = (n->resources->cores <= loc_info.local_cores ||( n->resources->cores < 1 && loc_info.local_cores >= 1 ));
 	return (cores_ok && disk_ok && mem_ok);
@@ -491,27 +491,14 @@ static int makeflow_can_alloc_local(struct dag_node *n)
 static void makeflow_alloc_local(struct dag_node *n)
 {
 
-	if( (loc_info.local_disk == -1 && loc_info.local_mem == -1)) {
-		if(n->resources && n->resources->cores > 0){
-			loc_info.local_cores -= n->resources->cores;
-		} else {
-			loc_info.local_cores--;
-		}
-	}
-	else {
+		loc_info.local_cores -= n->resources->cores;
 
-		if(n->resources->cores > 0){
-			loc_info.local_cores -= n->resources->cores;
-		} else {
-			loc_info.local_cores--;
-		}
 
 		if(loc_info.local_mem != -1)
 			loc_info.local_mem -= n->resources->resident_memory;
 
 		if(loc_info.local_disk != -1)
 			loc_info.local_disk -= n->resources->workdir_footprint;
-	}
 }
 /*
  * Reallocates the resources to the local machine after a local job
@@ -519,25 +506,13 @@ static void makeflow_alloc_local(struct dag_node *n)
  */
 static void makeflow_dealloc_local(struct dag_node *n)
 {
-	if( (loc_info.local_disk == -1 && loc_info.local_mem == -1)) {
-		if(n->resources->cores > 0){
-			loc_info.local_cores += n->resources->cores;
-		} else {
-			loc_info.local_cores++;
-		}
-	}
-	else if(n->resources) {
-		if(n->resources->cores < 1)	{
-			loc_info.local_cores += 1;
-		} else {
-			loc_info.local_cores += n->resources->cores;
-		}
+		loc_info.local_cores += n->resources->cores;
+
 		if(loc_info.local_mem != -1)
 			loc_info.local_mem += n->resources->resident_memory;
 
 		if(loc_info.local_disk != -1)
 			loc_info.local_disk += n->resources->workdir_footprint;
-	}
 }
 
 /*
@@ -632,12 +607,9 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 	if(n->state != DAG_NODE_STATE_WAITING)
 		return 0;
 
-		 if(makeflow_is_local_node(n)){
-				if(!makeflow_can_alloc_local(n))
-				{
+	if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)){
 					return 0;
-				}
-			}
+	}
 	if(n->local_job && local_queue) {
 		if(dag_local_jobs_running(d) >= local_jobs_max)
 			return 0;
@@ -1557,6 +1529,15 @@ int main(int argc, char *argv[])
 		local_jobs_max = MIN(local_jobs_max, n);
 		if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
 			remote_jobs_max = MIN(local_jobs_max, n);
+		}
+	}
+
+	struct dag_node *n;
+	// check to ensure that all jobs can be ran
+	for(n = d->nodes; n; n = n->next) {
+		if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)) {
+			fprintf(stderr, "Critical error, not enough resources to run job");
+			exit(EXIT_FAILURE);
 		}
 	}
 
