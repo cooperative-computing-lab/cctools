@@ -4544,7 +4544,15 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 
 	switch(new_state) {
 		case WORK_QUEUE_TASK_READY:
-			list_push_priority(q->ready_list,t,t->priority);
+			if(q->auto_label_tasks_mode && (t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION)) {
+				/* when a task is resubmitted given resource exhaustion, we
+				 * push it at the head of the list, so it gets to run as soon
+				 * as possible. This avoids the issue in which all 'big' tasks
+				 * fail because the first allocation is too small. */
+				list_push_head(q->ready_list,t);
+			} else {
+				list_push_priority(q->ready_list,t,t->priority);
+			}
 			break;
 		case WORK_QUEUE_TASK_DONE:
 		case WORK_QUEUE_TASK_CANCELED:
