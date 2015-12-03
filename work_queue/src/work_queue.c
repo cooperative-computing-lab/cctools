@@ -5585,8 +5585,7 @@ void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 			category_inc_histogram_count(q, c, disk,      t->rs->disk);
 			category_inc_histogram_count(q, c, wall_time, t->rs->wall_time);
 
-
-
+			if(c->stats->total_tasks_complete % 10 == 0) {
 				int64_t cores     = category_first_allocation(c->cores_histogram,     q->worker_top_resources->cores);
 				int64_t memory    = category_first_allocation(c->memory_histogram,    q->worker_top_resources->memory);
 				int64_t disk      = category_first_allocation(c->disk_histogram,      q->worker_top_resources->disk);
@@ -5622,8 +5621,6 @@ void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 					debug(D_WQ, "%s\n", buffer_tostring(b));
 					fprintf(stderr, "%s\n", buffer_tostring(b));
 				}
-
-
 			}
 		}
 	}
