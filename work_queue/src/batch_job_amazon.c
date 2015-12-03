@@ -7,8 +7,6 @@
 #include <string.h>
 #include <unistd.h>
 
-static struct hash_table *hash;
-
 char *amazon_ec2_script ="\
 #!/bin/sh\n\
 # Runs makeflow directions on ec2 instance\n\
