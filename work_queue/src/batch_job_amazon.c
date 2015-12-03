@@ -19,7 +19,6 @@ set -e\n\
 #OUTPUT_FILES_DESTINATION=\"/tmp/test_amazon_makeflow\"\n\
 OUTPUT_FILES_DESTINATION=\".\"\n\
 EC2_TOOLS_DIR=\"$EC2_HOME/bin\"\n\
-AMI_IMAGE=\"ami-4b630d2e\"\n\
 INSTANCE_TYPE=\"t1.micro\"\n\
 USERNAME=\"ubuntu\"\n\
 KEYPAIR_NAME=\"$(uuidgen)\"\n\
@@ -104,14 +103,16 @@ if [ \"$#\" -eq 4 ]; then\n\
     export AWS_ACCESS_KEY=$1\n\
     export AWS_SECRET_KEY=$2\n\
     CMD=$3\n\
+    AMI_IMAGE=$4\n\
     INPUT_FILES=\"\"\n\
-    OUTPUT_FILES=$4\n\
+    OUTPUT_FILES=$5\n\
 else\n\
     export AWS_ACCESS_KEY=$1\n\
     export AWS_SECRET_KEY=$2\n\
     CMD=$3\n\
-    INPUT_FILES=$4\n\
-    OUTPUT_FILES=$5\n\
+    AMI_IMAGE=$4\n\
+    INPUT_FILES=$5\n\
+    OUTPUT_FILES=$6\n\
 fi\n\
 \n\
 \n\
@@ -181,6 +182,12 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
         "amazon-credentials-filepath"
     );
 
+    char *ami_image_id = hash_table_lookup(
+        q->options,
+        "ami-image-id"
+    );
+
+
     // Parse credentials file
     /* Credentials file format
     [Credentials]
@@ -209,11 +216,12 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
     char shell_cmd[200];
     sprintf(
         shell_cmd,
-        "./%s %s %s '%s' %s %s",
+        "./%s %s %s '%s' %s %s %s",
         amazon_script_filename,
         aws_access_key_id,
         aws_secret_access_key,
         cmd,
+        ami_image_id,
         extra_input_files,
         extra_output_files
     );

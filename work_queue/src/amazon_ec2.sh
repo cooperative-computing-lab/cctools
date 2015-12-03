@@ -7,7 +7,6 @@ set -e
 #OUTPUT_FILES_DESTINATION="/tmp/test_amazon_makeflow"
 OUTPUT_FILES_DESTINATION="."
 EC2_TOOLS_DIR="$EC2_HOME/bin"
-AMI_IMAGE="ami-4b630d2e"
 INSTANCE_TYPE="t1.micro"
 USERNAME="ubuntu"
 KEYPAIR_NAME="$(uuidgen)"
@@ -92,14 +91,16 @@ if [ "$#" -eq 4 ]; then
     export AWS_ACCESS_KEY=$1
     export AWS_SECRET_KEY=$2
     CMD=$3
+    AMI_IMAGE=$4
     INPUT_FILES=""
-    OUTPUT_FILES=$4
+    OUTPUT_FILES=$5
 else
     export AWS_ACCESS_KEY=$1
     export AWS_SECRET_KEY=$2
     CMD=$3
-    INPUT_FILES=$4
-    OUTPUT_FILES=$5
+    AMI_IMAGE=$4
+    INPUT_FILES=$5
+    OUTPUT_FILES=$6
 fi
 
 

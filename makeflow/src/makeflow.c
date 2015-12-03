@@ -965,6 +965,7 @@ int main(int argc, char *argv[])
 	const char *work_queue_port_file = NULL;
 	double wq_option_fast_abort_multiplier = -1.0;
 	const char *amazon_credentials_filepath = NULL;
+	const char *ami_image_id = NULL;
 	const char *priority = NULL;
 	char *work_queue_password = NULL;
 	char *wq_wait_queue_size = 0;
@@ -1025,7 +1026,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER_OUTPUT,
 		LONG_OPT_DOCKER,
 		LONG_OPT_DOCKER_TAR,
-		LONG_OPT_AMAZON_CREDENTIALS_FILEPATH
+		LONG_OPT_AMAZON_CREDENTIALS_FILEPATH,
+		LONG_OPT_AMI_IMAGE_ID
 	};
 
 	static const struct option long_options_run[] = {
@@ -1086,6 +1088,7 @@ int main(int argc, char *argv[])
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{"amazon-credentials-filepath", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS_FILEPATH},
+		{"ami-image-id", required_argument, 0, LONG_OPT_AMI_IMAGE_ID},
 		{0, 0, 0, 0}
 	};
 
@@ -1223,6 +1226,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_AMAZON_CREDENTIALS_FILEPATH:
 				amazon_credentials_filepath = optarg;
+				break;
+			case LONG_OPT_AMI_IMAGE_ID:
+				ami_image_id = optarg;
 				break;
 			case 'M':
 			case 'N':
@@ -1461,6 +1467,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "amazon-credentials-filepath", amazon_credentials_filepath);
+	batch_queue_set_option(remote_queue, "ami-image-id", ami_image_id);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
 
