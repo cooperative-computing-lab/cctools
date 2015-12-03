@@ -49,9 +49,11 @@ SUBSECTION(Batch Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-B, batch-options, options)Add these options to all batch submit files.
 OPTION_TRIPLET(-j, max-local, #)Max number of local jobs to run at once. (default is # of cores)
-OPTION_PAIR(-max-local-disk, #)Max amount of local disk allowed to be used.
-OPTION_PAIR(-max-local-ram, #)Max amount of local RAM allowed to be used.
-OPTION_PAIR(-max-local-cores, #)Max amount of local cores allowed to be used.
+
+OPTION_PAIR(max-local-disk, #)Max amount of local disk allowed to be used locally.
+OPTION_PAIR(max-local-ram, #)Max amount of local RAM allowed to be used locally.
+OPTION_PAIR(max-local-cores, #)Max amount of local cores allowed to be used locally.
+
 OPTION_TRIPLET(-J, max-remote, #)Max number of remote jobs to run at once. (default is 1000 for -Twq, 100 otherwise)
 OPTION_TRIPLET(-l, makeflow-log, logfile)Use this file for the makeflow log. (default is X.makeflowlog)
 OPTION_TRIPLET(-L, batch-log, logfile)Use this file for the batch system log. (default is X.PARAM(type)log)

@@ -1047,6 +1047,9 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Max amount of local disk allowed to be used.", "--max-local-disk");
 	printf(" %-30s Max amount of local ram allowed to be used.", "--max-local-ram");
 	printf(" %-30s Max number of local core allowed to be used.", "--max-local-cores");
+	printf(" %-30s Max amount of local disk allowed to be used.", "-max-local-disk");
+	printf(" %-30s Max amount of local ram allowed to be used.", "-max-local-ram");
+	printf(" %-30s Max number of local core allowed to be used.", "-max-local-cores");
 	printf("															(default %d for -Twq, %d otherwise.)\n", 10*MAX_REMOTE_JOBS_DEFAULT, MAX_REMOTE_JOBS_DEFAULT );
 	printf(" %-30s Use this file for the makeflow log.		 (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
 	printf(" %-30s Use this file for the batch system log.	 (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
