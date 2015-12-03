@@ -203,10 +203,10 @@ def url_download(url, dest):
 	logging.debug("Start to download %s ....", url)
 	fp = urllib2.urlopen(url)
 	local = open(dest, "wb")
-	data = fp.read()
+	data = fp.read(10240)
 	while data:
 		local.write(data)
-		data = fp.read()
+		data = fp.read(10240)
 	fp.close()
 	local.close()
 	# cmd = "wget -O %s %s>/dev/null 2>&1" % (dest, url)
@@ -762,6 +762,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 	if arch_index != -1:
 		host_linux_distro = 'arch'
 	else:
+		host_linux_distro = None
 		redhat_index = uname_list[2].find('el')
 		centos_index = uname_list[2].find('centos')
 		if redhat_index != -1:
