@@ -2,7 +2,7 @@
 
 echo "file 0" >> in1
 
-./makeflow/src/makeflow -d batch -T amazon --amazon-credentials-filepath "$(pwd)/amazon-credentials" -l /dev/null <(cat <<EOF
+./makeflow/src/makeflow -d batch -T amazon --ami-image-id ami-4b630d2e --amazon-credentials-filepath "$(pwd)/amazon-credentials" -l /dev/null <(cat <<EOF
 MAKEFLOW_INPUTS = in1
 MAKEFLOW_OUTPUTS =
 
