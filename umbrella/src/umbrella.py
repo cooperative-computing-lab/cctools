@@ -201,10 +201,18 @@ def url_download(url, dest):
 		Otherwise, directly exit.
 	"""
 	logging.debug("Start to download %s ....", url)
-	cmd = "wget -O %s %s>/dev/null 2>&1" % (dest, url)
-	rc, stdout, stderr = func_call(cmd)
-	if rc != 0:
-		subprocess_error(cmd, rc, stdout, stderr)
+	fp = urllib2.urlopen(url)
+	local = open(dest, "wb")
+	data = fp.read()
+	while data:
+		local.write(data)
+		data = fp.read()
+	fp.close()
+	local.close()
+	# cmd = "wget -O %s %s>/dev/null 2>&1" % (dest, url)
+	# rc, stdout, stderr = func_call(cmd)
+	# if rc != 0:
+	# 	subprocess_error(cmd, rc, stdout, stderr)
 
 def dependency_download(name, url, checksum, checksum_tool, dest, format_remote_storage, action):
 	"""Download a dependency from the url and verify its integrity.
