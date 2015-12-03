@@ -230,6 +230,8 @@ struct work_queue_task_category {
 	timestamp_t average_task_time;
 	struct work_queue_stats *stats;
 
+	int disable_auto_labeling;
+
 	struct rmsummary *first;
 
 	/* All keys are assumed positive. Thus, we shift them to the right so that
@@ -5442,6 +5444,9 @@ struct work_queue_task_category *category_lookup_or_create(struct work_queue *q,
 	c->stats      = calloc(1, sizeof(struct work_queue_stats));
 	c->fast_abort = -1;
 
+	/* autolabeling enabled by default if work_queue_specify_max_worker_resources is used. */
+	c->disable_auto_labeling = 0;
+
 	c->first    = make_rmsummary(-1);
 	memcpy(c->first, q->worker_top_resources, sizeof(struct rmsummary));
 
@@ -5573,45 +5578,52 @@ void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 		c->stats->total_good_execute_time  += t->cmd_execution_time;
 		c->stats->total_good_transfer_time += t->total_transfer_time;
 
-		if(t->rs) {
+
+		if(!c->disable_auto_labeling && t->rs) {
 			category_inc_histogram_count(q, c, cores,     t->rs->cores);
 			category_inc_histogram_count(q, c, memory,    t->rs->memory);
 			category_inc_histogram_count(q, c, disk,      t->rs->disk);
 			category_inc_histogram_count(q, c, wall_time, t->rs->wall_time);
 
-			int64_t cores     = category_first_allocation(c->cores_histogram,     q->worker_top_resources->cores);
-			int64_t memory    = category_first_allocation(c->memory_histogram,    q->worker_top_resources->memory);
-			int64_t disk      = category_first_allocation(c->disk_histogram,      q->worker_top_resources->disk);
-			int64_t wall_time = category_first_allocation(c->wall_time_histogram, q->worker_top_resources->wall_time);
 
-			/* Update values, and print debug message only if something changed. */
-			if(cores != c->first->cores ||  memory != c->first->memory || disk != c->first->disk || wall_time != c->first->wall_time) {
-				c->first->cores     = cores;
-				c->first->memory    = memory;
-				c->first->disk      = disk;
-				c->first->wall_time = wall_time;
 
-				/* From here on we only print debugging info. */
-				buffer_rewind(b, 0);
-				buffer_printf(b, "Updating first allocation '%s':", name);
+				int64_t cores     = category_first_allocation(c->cores_histogram,     q->worker_top_resources->cores);
+				int64_t memory    = category_first_allocation(c->memory_histogram,    q->worker_top_resources->memory);
+				int64_t disk      = category_first_allocation(c->disk_histogram,      q->worker_top_resources->disk);
+				int64_t wall_time = category_first_allocation(c->wall_time_histogram, q->worker_top_resources->wall_time);
 
-				if(cores > -1) {
-					buffer_printf(b, " cores: %" PRId64, cores);
+				/* Update values, and print debug message only if something changed. */
+				if(cores != c->first->cores ||  memory != c->first->memory || disk != c->first->disk || wall_time != c->first->wall_time) {
+					c->first->cores     = cores;
+					c->first->memory    = memory;
+					c->first->disk      = disk;
+					c->first->wall_time = wall_time;
+
+					/* From here on we only print debugging info. */
+					buffer_rewind(b, 0);
+					buffer_printf(b, "Updating first allocation '%s':", name);
+
+					if(cores > -1) {
+						buffer_printf(b, " cores: %" PRId64, cores);
+					}
+
+					if(memory > -1) {
+						buffer_printf(b, " memory: %" PRId64 " MB", memory);
+					}
+
+					if(disk > -1) {
+						buffer_printf(b, " disk: %" PRId64 " MB", disk);
+					}
+
+					if(wall_time > -1) {
+						buffer_printf(b, " wall_time: %" PRId64 " us", wall_time);
+					}
+
+					debug(D_WQ, "%s\n", buffer_tostring(b));
+					fprintf(stderr, "%s\n", buffer_tostring(b));
 				}
 
-				if(memory > -1) {
-					buffer_printf(b, " memory: %" PRId64 " MB", memory);
-				}
 
-				if(disk > -1) {
-					buffer_printf(b, " disk: %" PRId64 " MB", disk);
-				}
-
-				if(wall_time > -1) {
-					buffer_printf(b, " wall_time: %" PRId64 " us", wall_time);
-				}
-
-				debug(D_WQ, "%s\n", buffer_tostring(b));
 			}
 		}
 	}
@@ -5660,11 +5672,15 @@ void work_queue_specify_max_worker_resources(struct work_queue *q,  const struct
 /* returns: 1 relabel was possible, 0 already at max or no new label available. */
 int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 
-	/* We are not relabeling, so we return as success. */
+	/* We are not relabeling, thus we return whether the task already failed because of resource exhaustion. */
 	if(!q->auto_label_tasks_mode)
-		return 1;
+		return ~(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
 	struct work_queue_task_category *c = category_lookup_or_create(q, t->category);
+
+	/* If the category should not label its tasks, as above. */
+	if(c->disable_auto_labeling)
+		return ~(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
 	int64_t top_cores  = q->worker_top_resources->cores;
 	int64_t top_memory = q->worker_top_resources->memory;
@@ -5713,6 +5729,12 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 	}
 
 	return 1;
+}
+
+void work_queue_auto_label_category(struct work_queue *q,  const char *category, int enable) {
+	struct work_queue_task_category *c = category_lookup_or_create(q, category);
+
+	c->disable_auto_labeling = !enable;
 }
 
 /* vim: set noexpandtab tabstop=4: */
