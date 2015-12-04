@@ -282,7 +282,7 @@ static int log_replay_update( struct jx_database *db, struct jx_item *items )
 	struct jx *record = hash_table_lookup(db->table,key);
 	if(record) {
 		jx_delete(jx_remove(record,name));
-		jx_insert(record,jx_copy(name),value);
+		jx_insert(record,jx_copy(name),jx_copy(value));
 	}
 
 	return 1;
@@ -346,6 +346,9 @@ static int log_replay( struct jx_database *db, const char *filename, time_t snap
 	while(1) {
 		struct jx *logentry = jx_parse(parser);
 		if(!logentry) break;
+
+		jx_print_stream(logentry,stdout);
+		printf("\n");
 
 		if(!jx_istype(logentry,JX_ARRAY)) {
 			corrupt_data(filename,logentry);
