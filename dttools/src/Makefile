@@ -14,6 +14,7 @@ SOURCES = \
 	bitmap.c \
 	buffer.c \
 	catalog_query.c \
+	category.c \
 	cctools.c \
 	change_process_title.c \
 	chunk.c \
