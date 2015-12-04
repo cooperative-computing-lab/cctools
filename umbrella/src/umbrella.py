@@ -67,6 +67,7 @@ import logging
 import multiprocessing
 import resource
 import tempfile
+import urllib
 
 if sys.version_info >= (3,):
 	import urllib.request as urllib2
@@ -200,19 +201,8 @@ def url_download(url, dest):
 		If the url is downloaded successfully, return None;
 		Otherwise, directly exit.
 	"""
-	logging.debug("Start to download %s ....", url)
-	fp = urllib2.urlopen(url)
-	local = open(dest, "wb")
-	data = fp.read(10240)
-	while data:
-		local.write(data)
-		data = fp.read(10240)
-	fp.close()
-	local.close()
-	# cmd = "wget -O %s %s>/dev/null 2>&1" % (dest, url)
-	# rc, stdout, stderr = func_call(cmd)
-	# if rc != 0:
-	# 	subprocess_error(cmd, rc, stdout, stderr)
+	logging.debug("Start to download %s to %s ...." % (url, dest))
+	urllib.urlretrieve(url, dest)
 
 def dependency_download(name, url, checksum, checksum_tool, dest, format_remote_storage, action):
 	"""Download a dependency from the url and verify its integrity.
