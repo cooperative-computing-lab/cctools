@@ -190,6 +190,7 @@ struct jx * jx_remove( struct jx *object, struct jx *key )
 				object->pairs = p->next;
 			}
 			p->value = 0;
+			p->next = 0;
 			jx_pair_delete(p);
 			return value;
 		}
