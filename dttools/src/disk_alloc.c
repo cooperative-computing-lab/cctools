@@ -139,6 +139,7 @@ int disk_alloc_delete(char *loc) {
 	char *losetup_args = NULL;
 	char *rm_args = NULL;
 	char *device_loc = NULL;
+	char *losetup_del_args = NULL;
 
 	//Find Used Device
 	char *dev_num = "-1";
@@ -186,7 +187,7 @@ int disk_alloc_delete(char *loc) {
 	}
 
 	rm_args = string_format("%s/alloc.img", loc);
-	losetup_args = string_format("losetup -d %s", dev_num);
+	losetup_del_args = string_format("losetup -d %s", dev_num);
 
 	//Loop Device Deleted
 	result = system(losetup_args);
@@ -212,6 +213,7 @@ int disk_alloc_delete(char *loc) {
 		goto error;
 	}
 
+	free(losetup_del_args);
 	free(losetup_args);
 	free(rm_args);
 	free(device_loc);
@@ -219,6 +221,9 @@ int disk_alloc_delete(char *loc) {
 	return 0;
 
 	error:
+		if(losetup_del_args) {
+			free(losetup_del_args);
+		}
 		if(losetup_args) {
 			free(losetup_args);
 		}
