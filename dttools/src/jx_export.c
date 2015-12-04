@@ -36,6 +36,7 @@ void jx_export_nvpair( struct jx *j, FILE *stream )
 		fprintf(stream,"%s %s\n",p->key->string_value,str);
 		free(str);
 	}
+	fprintf(stream,"\n");
 }
 
 /*
@@ -48,9 +49,9 @@ void jx_export_old_classads( struct jx *j, FILE *stream )
 	for(p=j->pairs;p;p=p->next) {
 		char *str = jx_print_string(p->value);
 		if(p->value->type==JX_OBJECT || p->value->type==JX_ARRAY) {
-			fprintf(stream,"%s = \"%s\"",p->key->string_value,str);
+			fprintf(stream,"%s = \"%s\"\n",p->key->string_value,str);
 		} else {
-			fprintf(stream,"%s = %s",p->key->string_value,str);
+			fprintf(stream,"%s = %s\n",p->key->string_value,str);
 		}
 		free(str);
 	}
@@ -88,11 +89,10 @@ void jx_export_xml( struct jx *j, FILE *stream )
 	case JX_OBJECT:
 		fprintf(stream,"<object>\n");
 		for(p=j->pairs;p;p=p->next) {
-			fprintf(stream,"<pair><key>");
-			jx_export_xml(p->key,stream);
-			fprintf(stream,"</key><value>");
+			fprintf(stream,"<pair><key>%s</key>",p->key->string_value);
+			fprintf(stream,"<value>");
 			jx_export_xml(p->value,stream);
-			fprintf(stream,"</pair>");
+			fprintf(stream,"</value></pair>");
 		}
 		fprintf(stream,"</object>\n");
 		break;
@@ -121,8 +121,7 @@ void jx_export_new_classads( struct jx *j, FILE *stream )
 		case JX_OBJECT:
 			fprintf(stream,"[\n");
 			for(p=j->pairs;p;p=p->next) {
-				jx_print_stream(p->key,stream);
-				fprintf(stream,"=");
+				fprintf(stream,"%s=",p->key->string_value);
 				jx_print_stream(p->value,stream);
 				fprintf(stream,";\n");
 			}
@@ -200,9 +199,13 @@ void jx_export_html_with_link(struct jx *n, FILE * s, struct jx_table *h, const 
 	fprintf(s, "<tr bgcolor=%s>\n", color_counter % 2 ? COLOR_ONE : COLOR_TWO);
 	color_counter++;
 	while(h->name) {
-		const char *text = jx_lookup_string(n, h->name);
-		if(!text)
-			text = "???";
+		struct jx *value = jx_lookup(n,h->name);
+		char *text;
+		if(value) {
+			text = unquoted_string(value);
+		} else {
+			text = strdup("???");
+		}
 		fprintf(s, "<td align=%s>", align_string(h));
 		if(h->mode == JX_TABLE_MODE_URL) {
 			fprintf(s, "<a href=%s>%s</a>\n", text, text);
@@ -217,6 +220,7 @@ void jx_export_html_with_link(struct jx *n, FILE * s, struct jx_table *h, const 
 				fprintf(s, "%s\n", text);
 			}
 		}
+		free(text);
 		h++;
 	}
 }
