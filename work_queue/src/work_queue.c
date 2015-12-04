@@ -36,6 +36,7 @@ The following major problems must be fixed:
 #include "rmonitor.h"
 #include "rmonitor_types.h"
 #include "rmonitor_poll.h"
+#include "category.h"
 #include "copy_stream.h"
 #include "random.h"
 #include "process.h"
@@ -84,6 +85,8 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
 #define RESOURCE_MONITOR_TASK_REMOTE_NAME "wq-cctools-monitoring-task"
+
+#define FIRST_ALLOCATION_EVERY_NTASKS 20
 
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
@@ -224,24 +227,6 @@ struct work_queue_task_report {
 	timestamp_t exec_time;
 };
 
-struct work_queue_task_category {
-	char *name;
-	double fast_abort;
-	timestamp_t average_task_time;
-	struct work_queue_stats *stats;
-
-	int disable_auto_labeling;
-
-	struct rmsummary *first;
-
-	/* All keys are assumed positive. Thus, we shift them to the right so that
-	 * we can have a "0" key. 0->1, 1->2, etc. */
-	struct itable *cores_histogram;
-	struct itable *memory_histogram;
-	struct itable *disk_histogram;
-	struct itable *wall_time_histogram;
-};
-
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
 
 struct blacklist_host_info {
@@ -284,10 +269,8 @@ static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
 
 char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t);
-static struct work_queue_task_category *category_lookup_or_create(struct work_queue *q, const char *name);
-static void category_delete(struct work_queue *q, const char *name);
-void category_accumulate_task(struct work_queue *q, struct work_queue_task *t);
 int relabel_task(struct work_queue *q, struct work_queue_task *t);
+void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t);
 
 /** Clone a @ref work_queue_file
 This performs a deep copy of the file struct.
@@ -1991,12 +1974,12 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 
 static work_queue_msg_code_t process_resource( struct work_queue *q, struct work_queue_worker *w, const char *line )
 {
-	char category[WORK_QUEUE_LINE_MAX];
+	char resource_name[WORK_QUEUE_LINE_MAX];
 	struct work_queue_resource r;
 
-	int n = sscanf(line, "resource %s %"PRId64" %"PRId64" %"PRId64, category, &r.total, &r.smallest, &r.largest);
+	int n = sscanf(line, "resource %s %"PRId64" %"PRId64" %"PRId64, resource_name, &r.total, &r.smallest, &r.largest);
 
-	if(n == 2 && !strcmp(category,"tag"))
+	if(n == 2 && !strcmp(resource_name,"tag"))
 	{
 		/* Shortcut, total has the tag, as "resources tag" only sends one value */
 		w->resources->tag = r.total;
@@ -2007,23 +1990,23 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 		/* inuse is computed by the master, so we save it here */
 		int64_t inuse;
 
-		if(!strcmp(category,"cores")) {
+		if(!strcmp(resource_name,"cores")) {
 			inuse = w->resources->cores.inuse;
 			w->resources->cores = r;
 			w->resources->cores.inuse = inuse;
-		} else if(!strcmp(category,"memory")) {
+		} else if(!strcmp(resource_name,"memory")) {
 			inuse = w->resources->memory.inuse;
 			w->resources->memory = r;
 			w->resources->memory.inuse = inuse;
-		} else if(!strcmp(category,"disk")) {
+		} else if(!strcmp(resource_name,"disk")) {
 			inuse = w->resources->disk.inuse;
 			w->resources->disk = r;
 			w->resources->disk.inuse = inuse;
-		} else if(!strcmp(category,"gpus")) {
+		} else if(!strcmp(resource_name,"gpus")) {
 			inuse = w->resources->gpus.inuse;
 			w->resources->gpus = r;
 			w->resources->gpus.inuse = inuse;
-		} else if(!strcmp(category,"workers")) {
+		} else if(!strcmp(resource_name,"workers")) {
 			inuse = w->resources->workers.inuse;
 			w->resources->workers = r;
 			w->resources->workers.inuse = inuse;
@@ -3021,7 +3004,7 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	change_task_state(q, t, new_state);
 
 	if(new_state == WORK_QUEUE_TASK_RETRIEVED) {
-		category_accumulate_task(q, t);
+		work_queue_accumulate_task(q, t);
 	}
 
 	count_worker_resources(w);
@@ -3129,7 +3112,7 @@ static void ask_for_workers_updates(struct work_queue *q) {
 
 static void abort_slow_workers(struct work_queue *q)
 {
-	struct work_queue_task_category *c;
+	struct category *c;
 	char *category_name;
 
 	struct work_queue_worker *w;
@@ -3141,12 +3124,12 @@ static void abort_slow_workers(struct work_queue *q)
 
 	hash_table_firstkey(q->categories);
 	while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
-		if(c->stats->total_tasks_complete < 10) {
+		if(c->total_tasks_complete < 10) {
 			c->average_task_time = 0;
 			continue;
 		}
 
-		c->average_task_time = (c->stats->total_good_execute_time + c->stats->total_good_transfer_time) / c->stats->total_tasks_complete;
+		c->average_task_time = (c->total_good_execute_time + c->total_good_transfer_time) / c->total_tasks_complete;
 
 		if(c->fast_abort > 0)
 			fast_abort_flag = 1;
@@ -3155,14 +3138,14 @@ static void abort_slow_workers(struct work_queue *q)
 	if(!fast_abort_flag)
 		return;
 
-	struct work_queue_task_category *c_def = category_lookup_or_create(q, "default");
+	struct category *c_def = category_lookup_or_create(q->categories, "default");
 
 	timestamp_t current = timestamp_get();
 
 	itable_firstkey(q->tasks);
 	while(itable_nextkey(q->tasks, &taskid, (void **) &t)) {
 
-		c = category_lookup_or_create(q, t->category);
+		c = category_lookup_or_create(q->categories, t->category);
 		/* Fast abort deactivated for this category */
 		if(c->fast_abort == 0)
 			continue;
@@ -4245,7 +4228,7 @@ int work_queue_send_receive_ratio(struct work_queue *q, double ratio)
 
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier)
 {
-	struct work_queue_task_category *c = category_lookup_or_create(q, category);
+	struct category *c = category_lookup_or_create(q->categories, category);
 
 	if(multiplier >= 1) {
 		debug(D_WQ, "Enabling fast abort multiplier for '%s': %3.3lf\n", category, multiplier);
@@ -4380,10 +4363,10 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_delete(q->worker_blacklist);
 		itable_delete(q->worker_task_map);
 
-		struct work_queue_task_category *c;
+		struct category *c;
 		hash_table_firstkey(q->categories);
 		while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
-			category_delete(q, key);
+			category_delete(q->categories, key);
 		}
 		hash_table_delete(q->categories);
 
@@ -5437,138 +5420,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 	}
 }
 
-struct work_queue_task_category *category_lookup_or_create(struct work_queue *q, const char *name) {
-	struct work_queue_task_category *c;
-
-	if(!name)
-		name = "default";
-
-	c = hash_table_lookup(q->categories, name);
-	if(c) return c;
-
-	c = calloc(1, sizeof(struct work_queue_task_category));
-
-	c->name       = xxstrdup(name);
-	c->stats      = calloc(1, sizeof(struct work_queue_stats));
-	c->fast_abort = -1;
-
-	/* autolabeling enabled by default if work_queue_specify_max_worker_resources is used. */
-	c->disable_auto_labeling = 0;
-
-	c->first    = make_rmsummary(-1);
-	memcpy(c->first, q->worker_top_resources, sizeof(struct rmsummary));
-
-	c->cores_histogram     = itable_create(0);
-	c->memory_histogram    = itable_create(0);
-	c->disk_histogram      = itable_create(0);
-	c->wall_time_histogram = itable_create(0);
-
-	hash_table_insert(q->categories, name, c);
-
-	return c;
-}
-
-void category_delete(struct work_queue *q, const char *name) {
-	struct work_queue_task_category *c = hash_table_lookup(q->categories, name);
-
-	if(!c)
-		return;
-
-	hash_table_remove(q->categories, name);
-
-	if(c->stats)
-		free(c->stats);
-	if(c->name)
-		free(c->name);
-
-	itable_delete(c->cores_histogram);
-	itable_delete(c->memory_histogram);
-	itable_delete(c->disk_histogram);
-	itable_delete(c->wall_time_histogram);
-
-	free(c);
-}
-
-/* histograms keys are shifted to the right, as 0 cannot be a valid key (thus the bucket + 1). */
-#define category_inc_histogram_count(q, c, field, bucket)\
-{\
-	if(bucket >= 0) { \
-	uintptr_t count = (uintptr_t) itable_lookup(c->field##_histogram, bucket + 1) + 1;\
-	itable_insert(c->field##_histogram, bucket + 1, (void *) count);\
-	}\
-}
-
-int cmp_int(const void *a, const void *b) {
-	return (*((int64_t *) a) - *((int64_t *) b));
-}
-
-int64_t *category_sort_histogram(struct itable *histogram) {
-	if(itable_size(histogram) < 1) {
-		return NULL;
-	}
-
-	int64_t *buckets = malloc(itable_size(histogram)*sizeof(int64_t));
-
-	size_t i = 0;
-	uint64_t  key;
-	uintptr_t count;
-	itable_firstkey(histogram);
-	while(itable_nextkey(histogram, &key, (void **) &count)) {
-		/* histograms keys are shifted to the right, as 0 cannot be a valid key. */
-		buckets[i] = key - 1;
-		i++;
-	}
-
-	qsort(buckets, itable_size(histogram), sizeof(int64_t), cmp_int);
-
-	return buckets;
-}
-
-int64_t category_first_allocation(struct itable *histogram, int64_t top_resource) {
-	/* Automatically labeling for memory is not activated. */
-	if(top_resource < 0) {
-		return -1;
-	}
-
-	uint64_t n = itable_size(histogram);
-
-	int64_t *buckets = category_sort_histogram(histogram);
-	uintptr_t *accum = malloc(n*sizeof(uintptr_t));
-
-	/* histograms keys are shifted to the right, thus the bucket - 1. */
-	accum[0] = (uintptr_t) itable_lookup(histogram, buckets[0] + 1);
-
-	uint64_t i;
-	for(i = 1; i < n; i++) {
-		accum[i] = accum[i - 1] + (uintptr_t) itable_lookup(histogram, buckets[i] + 1);
-	}
-
-	uint64_t a_1 = top_resource;
-	uint64_t a_m = top_resource;
-	int64_t Ea_1 = INT64_MAX;
-
-	for(i = 0; i < n; i++) {
-		uint64_t a  = buckets[i];
-		uint64_t Pa = accum[n-1] - accum[i];
-		int64_t  Ea = a*accum[n-1] + a_m*Pa;
-
-		if(Ea < Ea_1) {
-			Ea_1 = Ea;
-			a_1 = a;
-		}
-	}
-
-	if(a_1 > ceil(top_resource / 2.0)) {
-		a_1 = top_resource;
-	}
-
-	free(accum);
-	free(buckets); /* of popcorn! */
-
-	return a_1;
-}
-
-void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
+void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 	/* buffer used only for debug output. */
 	static buffer_t *b = NULL;
 	if(!b) {
@@ -5578,58 +5430,18 @@ void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 
 	const char *name = t->category ? t->category : "default";
 
-	struct work_queue_task_category *c = hash_table_lookup(q->categories, name);
+	struct category *c = hash_table_lookup(q->categories, name);
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
-		c->stats->total_tasks_complete++;
-		c->stats->total_good_execute_time  += t->cmd_execution_time;
-		c->stats->total_good_transfer_time += t->total_transfer_time;
+		c->total_tasks_complete++;
+		c->total_good_execute_time  += t->cmd_execution_time;
+		c->total_good_transfer_time += t->total_transfer_time;
 
+		category_accumulate_summary(q->categories, t->category, t->rs);
 
-		if(!c->disable_auto_labeling && t->rs) {
-			category_inc_histogram_count(q, c, cores,     t->rs->cores);
-			category_inc_histogram_count(q, c, memory,    t->rs->memory);
-			category_inc_histogram_count(q, c, disk,      t->rs->disk);
-			category_inc_histogram_count(q, c, wall_time, t->rs->wall_time);
-
-			if(c->stats->total_tasks_complete % 10 == 0) {
-				int64_t cores     = category_first_allocation(c->cores_histogram,     q->worker_top_resources->cores);
-				int64_t memory    = category_first_allocation(c->memory_histogram,    q->worker_top_resources->memory);
-				int64_t disk      = category_first_allocation(c->disk_histogram,      q->worker_top_resources->disk);
-				int64_t wall_time = category_first_allocation(c->wall_time_histogram, q->worker_top_resources->wall_time);
-
-				/* Update values, and print debug message only if something changed. */
-				if(cores != c->first->cores ||  memory != c->first->memory || disk != c->first->disk || wall_time != c->first->wall_time) {
-					c->first->cores     = cores;
-					c->first->memory    = memory;
-					c->first->disk      = disk;
-					c->first->wall_time = wall_time;
-
-					/* From here on we only print debugging info. */
-					buffer_rewind(b, 0);
-					buffer_printf(b, "Updating first allocation '%s':", name);
-
-					if(cores > -1) {
-						buffer_printf(b, " cores: %" PRId64, cores);
-					}
-
-					if(memory > -1) {
-						buffer_printf(b, " memory: %" PRId64 " MB", memory);
-					}
-
-					if(disk > -1) {
-						buffer_printf(b, " disk: %" PRId64 " MB", disk);
-					}
-
-					if(wall_time > -1) {
-						buffer_printf(b, " wall_time: %" PRId64 " us", wall_time);
-					}
-
-					debug(D_WQ, "%s\n", buffer_tostring(b));
-					fprintf(stderr, "%s\n", buffer_tostring(b));
-				}
-			}
+		if(c->total_tasks_complete % FIRST_ALLOCATION_EVERY_NTASKS == 0) {
+			category_update_first_allocation(q->categories, t->category, q->worker_top_resources);
 		}
 	}
 }
@@ -5681,7 +5493,7 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 	if(!q->auto_label_tasks_mode)
 		return ~(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
-	struct work_queue_task_category *c = category_lookup_or_create(q, t->category);
+	struct category *c = category_lookup_or_create(q->categories, t->category);
 
 	/* If the category should not label its tasks, as above. */
 	if(c->disable_auto_labeling)
@@ -5737,7 +5549,7 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 }
 
 void work_queue_auto_label_category(struct work_queue *q,  const char *category, int enable) {
-	struct work_queue_task_category *c = category_lookup_or_create(q, category);
+	struct category *c = category_lookup_or_create(q->categories, category);
 
 	c->disable_auto_labeling = !enable;
 }
