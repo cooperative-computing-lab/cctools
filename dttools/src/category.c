@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "buffer.h"
 #include "debug.h"
 #include "itable.h"
+#include "macros.h"
 #include "rmsummary.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -69,11 +70,12 @@ void category_delete(struct hash_table *categories, const char *name) {
 }
 
 /* histograms keys are shifted to the right, as 0 cannot be a valid key (thus the bucket + 1). */
-#define category_inc_histogram_count(q, c, field, bucket)\
+#define category_inc_histogram_count(q, c, field, value, bucket_size)\
 {\
-	if(bucket >= 0) { \
-	uintptr_t count = (uintptr_t) itable_lookup(c->field##_histogram, bucket + 1) + 1;\
-	itable_insert(c->field##_histogram, bucket + 1, (void *) count);\
+	if(value >= 0) { \
+		uintptr_t bucket = DIV_INT_ROUND_UP(value, bucket_size)*bucket_size;\
+		uintptr_t count = (uintptr_t) itable_lookup(c->field##_histogram, bucket + 1) + 1;\
+		itable_insert(c->field##_histogram, bucket + 1, (void *) count);\
 	}\
 }
 
@@ -208,9 +210,9 @@ void category_accumulate_summary(struct hash_table *categories, const char *cate
 	struct category *c = hash_table_lookup(categories, name);
 
 	if(!c->disable_auto_labeling && rs) {
-		category_inc_histogram_count(q, c, cores,     rs->cores);
-		category_inc_histogram_count(q, c, memory,    rs->memory);
-		category_inc_histogram_count(q, c, disk,      rs->disk);
-		category_inc_histogram_count(q, c, wall_time, rs->wall_time);
+		category_inc_histogram_count(q, c, cores,     rs->cores,      1);
+		category_inc_histogram_count(q, c, memory,    rs->memory,    25);
+		category_inc_histogram_count(q, c, disk,      rs->disk,      25);
+		category_inc_histogram_count(q, c, wall_time, rs->wall_time, 30000000);
 	}
 }
