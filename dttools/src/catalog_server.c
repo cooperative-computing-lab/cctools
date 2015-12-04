@@ -9,13 +9,15 @@ See the file COPYING for details.
 #include "catalog_query.h"
 #include "datagram.h"
 #include "link.h"
-#include "nvpair_database.h"
 #include "debug.h"
 #include "getopt.h"
 #include "nvpair.h"
 #include "nvpair_jx.h"
+#include "jx_database.h"
 #include "jx_parse.h"
 #include "jx_print.h"
+#include "jx_table.h"
+#include "jx_export.h"
 #include "stringtools.h"
 #include "domain_name_cache.h"
 #include "username.h"
@@ -43,11 +45,11 @@ See the file COPYING for details.
 /* Timeout in communicating with the querying client */
 #define HANDLE_QUERY_TIMEOUT 15
 
-/* The table of nvpairs, hashed on address:port */
-static struct nvpair_database *table = 0;
+/* The table of record, hashed on address:port */
+static struct jx_database *table = 0;
 
-/* An array of nvpais used to sort for display */
-static struct nvpair *array[MAX_TABLE_SIZE];
+/* An array of jxs used to sort for display */
+static struct jx *array[MAX_TABLE_SIZE];
 
 /* The time for which updated data lives before automatic deletion */
 static int lifetime = 1800;
@@ -124,13 +126,13 @@ static void install_handler(int sig, void (*handler) (int sig))
 	sigaction(sig, &s, 0);
 }
 
-int compare_nvpair(const void *a, const void *b)
+int compare_jx(const void *a, const void *b)
 {
-	struct nvpair **pa = (struct nvpair **) a;
-	struct nvpair **pb = (struct nvpair **) b;
+	struct jx **pa = (struct jx **) a;
+	struct jx **pb = (struct jx **) b;
 
-	const char *sa = nvpair_lookup_string(*pa, "name");
-	const char *sb = nvpair_lookup_string(*pb, "name");
+	const char *sa = jx_lookup_string(*pa, "name");
+	const char *sb = jx_lookup_string(*pb, "name");
 
 	if(!sa)
 		sa = "unknown";
@@ -142,7 +144,7 @@ int compare_nvpair(const void *a, const void *b)
 
 static void remove_expired_records()
 {
-	struct nvpair *nv;
+	struct jx *j;
 	char *key;
 
 	time_t current = time(0);
@@ -154,11 +156,11 @@ static void remove_expired_records()
 	// Run for a minimum of lifetime seconds before cleaning anything up.
 	if((current-starttime)<lifetime ) return;
 
-	nvpair_database_firstkey(table);
-	while(nvpair_database_nextkey(table, &key, &nv)) {
-		time_t lastheardfrom = nvpair_lookup_integer(nv,"lastheardfrom");
+	jx_database_firstkey(table);
+	while(jx_database_nextkey(table, &key, &j)) {
+		time_t lastheardfrom = jx_lookup_integer(j,"lastheardfrom");
 
-		int this_lifetime = nvpair_lookup_integer(nv,"lifetime");
+		int this_lifetime = jx_lookup_integer(j,"lifetime");
 		if(this_lifetime>0) {
 			this_lifetime = MIN(lifetime,this_lifetime);
 		} else {
@@ -166,8 +168,8 @@ static void remove_expired_records()
 		}
 
 		if( (current-lastheardfrom) > this_lifetime ) {
-				nv = nvpair_database_remove(table,key);
-			if(nv) nvpair_delete(nv);
+				j = jx_database_remove(table,key);
+			if(j) jx_delete(j);
 		}
 	}
 
@@ -205,18 +207,18 @@ static void update_all_catalogs(struct datagram *outgoing_dgram)
 	free(text);
 }
 
-static void make_hash_key(struct nvpair *nv, char *key)
+static void make_hash_key(struct jx *j, char *key)
 {
 	const char *name, *addr;
 	int port;
 
-	addr = nvpair_lookup_string(nv, "address");
+	addr = jx_lookup_string(j, "address");
 	if(!addr)
 		addr = "unknown";
 
-	port = nvpair_lookup_integer(nv, "port");
+	port = jx_lookup_integer(j, "port");
 
-	name = nvpair_lookup_string(nv, "name");
+	name = jx_lookup_string(j, "name");
 	if(!name)
 		name = "unknown";
 
@@ -230,7 +232,7 @@ static void handle_updates(struct datagram *update_port)
 	char key[LINE_MAX];
 	int port;
 	int result;
-	struct nvpair *nv;
+	struct jx *j;
 
 	while(1) {
 		result = datagram_recv(update_port, data, DATAGRAM_PAYLOAD_MAX, addr, &port, 0);
@@ -240,28 +242,28 @@ static void handle_updates(struct datagram *update_port)
 		data[result] = 0;
 
 		if(data[0]=='{') {
-			struct jx *jobject = jx_parse_string(data);
-			if(!jobject) continue;
-			nv = jx_to_nvpair(jobject);
-			jx_delete(jobject);
+			j = jx_parse_string(data);
+			if(!j) continue;
 		} else {
-			nv = nvpair_create();
+			struct nvpair *nv = nvpair_create();
 			if(!nv) continue;
 			nvpair_parse(nv, data);
+			j = nvpair_to_jx(nv);
+			nvpair_delete(nv);
 		}
 
-		nvpair_insert_string(nv, "address", addr);
-		nvpair_insert_integer(nv, "lastheardfrom", time(0));
+		jx_insert_string(j, "address", addr);
+		jx_insert_integer(j, "lastheardfrom", time(0));
 
 		/* If the server reports unbelievable numbers, simply reset them */
 
 		if(max_server_size > 0) {
-			INT64_T total = nvpair_lookup_integer(nv, "total");
-			INT64_T avail = nvpair_lookup_integer(nv, "avail");
+			INT64_T total = jx_lookup_integer(j, "total");
+			INT64_T avail = jx_lookup_integer(j, "avail");
 
 			if(total > max_server_size || avail > max_server_size) {
-				nvpair_insert_integer(nv, "total", max_server_size);
-				nvpair_insert_integer(nv, "avail", max_server_size);
+				jx_insert_integer(j, "total", max_server_size);
+				jx_insert_integer(j, "avail", max_server_size);
 			}
 		}
 
@@ -269,40 +271,41 @@ static void handle_updates(struct datagram *update_port)
 
 		char name[DOMAIN_NAME_MAX];
 		if(domain_name_cache_lookup_reverse(addr, name)) {
-			nvpair_insert_string(nv, "name", name);
-		} else if (nvpair_lookup_string(nv, "name") == NULL) {
+			jx_insert_string(j, "name", name);
+		} else if (jx_lookup_string(j, "name") == NULL) {
 			/* If rDNS is unsuccessful, then we use the name reported if given.
 			 * This allows for hostnames that are only valid in the subnet of
 			 * the reporting server.  Here we set the "name" field to the IP
 			 * Address, addr, because it was not set by the reporting server.
 			 */
-			nvpair_insert_string(nv, "name", addr);
+			jx_insert_string(j, "name", addr);
 		}
 
-		make_hash_key(nv, key);
+		make_hash_key(j, key);
 
 		if(logfile) {
-			if(!nvpair_database_lookup(table,key)) {
-				nvpair_print_text(nv,logfile);
+			if(!jx_database_lookup(table,key)) {
+				jx_print_stream(j,logfile);
+				fprintf(logfile,"\n");
 				fflush(logfile);
 			}
 		}
 
-		nvpair_database_insert(table, key, nv);
+		jx_database_insert(table, key, j);
 
 		debug(D_DEBUG, "received udp update from %s", key);
 	}
 }
 
-static struct nvpair_header html_headers[] = {
-	{"type", "TYPE", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
-	{"name", "NAME", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
-	{"port", "PORT", NVPAIR_MODE_INTEGER, NVPAIR_ALIGN_LEFT, 0},
-	{"owner", "OWNER", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
-	{"total", "TOTAL", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 0},
-	{"avail", "AVAIL", NVPAIR_MODE_METRIC, NVPAIR_ALIGN_RIGHT, 0},
-	{"load5", "LOAD5", NVPAIR_MODE_STRING, NVPAIR_ALIGN_RIGHT, 0},
-	{"version", "VERSION", NVPAIR_MODE_STRING, NVPAIR_ALIGN_LEFT, 0},
+static struct jx_table html_headers[] = {
+	{"type", "TYPE", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
+	{"name", "NAME", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
+	{"port", "PORT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
+	{"owner", "OWNER", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
+	{"total", "TOTAL", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_RIGHT, 0},
+	{"avail", "AVAIL", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_RIGHT, 0},
+	{"load5", "LOAD5", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 0},
+	{"version", "VERSION", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
 	{0,0,0,0,0}
 };
 
@@ -321,7 +324,7 @@ static void handle_query(struct link *query_link)
 	time_t current;
 
 	char *hkey;
-	struct nvpair *nv;
+	struct jx *j;
 	int i, n;
 
 	link_address_remote(query_link, addr, &port);
@@ -370,51 +373,49 @@ static void handle_query(struct link *query_link)
 	/* load the hash table entries into one big array */
 
 	n = 0;
-	nvpair_database_firstkey(table);
-	while(nvpair_database_nextkey(table, &hkey, &nv)) {
-		array[n] = nv;
+	jx_database_firstkey(table);
+	while(jx_database_nextkey(table, &hkey, &j)) {
+		array[n] = j;
 		n++;
 	}
 
 	/* sort the array by name before displaying */
 
-	qsort(array, n, sizeof(struct nvpair *), compare_nvpair);
+	qsort(array, n, sizeof(struct jx *), compare_jx);
 
 	if(!strcmp(path, "/query.text")) {
 		fprintf(stream, "Content-type: text/plain\n\n");
 		for(i = 0; i < n; i++)
-			nvpair_print_text(array[i], stream);
+			jx_export_nvpair(array[i], stream);
 	} else if(!strcmp(path, "/query.json")) {
 		fprintf(stream, "Content-type: text/plain\n\n");
 		fprintf(stream,"[\n");
 		for(i = 0; i < n; i++) {
-			struct jx *j = nvpair_to_jx(array[i]);
-			jx_print_stream(j,stream);
-			jx_delete(j);
+			jx_print_stream(array[i],stream);
 			if(i<(n-1)) fprintf(stream,",\n");
 		}
 		fprintf(stream,"]\n");
 	} else if(!strcmp(path, "/query.oldclassads")) {
 		fprintf(stream, "Content-type: text/plain\n\n");
 		for(i = 0; i < n; i++)
-			nvpair_print_old_classads(array[i], stream);
+			jx_export_old_classads(array[i], stream);
 	} else if(!strcmp(path, "/query.newclassads")) {
 		fprintf(stream, "Content-type: text/plain\n\n");
 		for(i = 0; i < n; i++)
-			nvpair_print_new_classads(array[i], stream);
+			jx_export_new_classads(array[i], stream);
 	} else if(!strcmp(path, "/query.xml")) {
 		fprintf(stream, "Content-type: text/xml\n\n");
 		fprintf(stream, "<?xml version=\"1.0\" standalone=\"yes\"?>\n");
 		fprintf(stream, "<catalog>\n");
 		for(i = 0; i < n; i++)
-			nvpair_print_xml(array[i], stream);
+			jx_export_xml(array[i], stream);
 		fprintf(stream, "</catalog>\n");
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
-		struct nvpair *nv;
+		struct jx *j;
 		fprintf(stream, "Content-type: text/html\n\n");
-		nv = nvpair_database_lookup(table, key);
-		if(nv) {
-			const char *name = nvpair_lookup_string(nv, "name");
+		j = jx_database_lookup(table, key);
+		if(j) {
+			const char *name = jx_lookup_string(j, "name");
 			if(!name)
 				name = "unknown";
 			fprintf(stream, "<title>%s catalog server: %s</title>\n", preferred_hostname, name);
@@ -422,7 +423,7 @@ static void handle_query(struct link *query_link)
 			fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
 			fprintf(stream, "<h2>%s</h2>\n", name);
 			fprintf(stream, "<p><a href=/>return to catalog view</a><p>\n");
-			nvpair_print_html_solo(nv, stream);
+			jx_export_html_solo(j, stream);
 			fprintf(stream, "</center>\n");
 		} else {
 			fprintf(stream, "<title>%s catalog server</title>\n", preferred_hostname);
@@ -451,9 +452,9 @@ static void handle_query(struct link *query_link)
 		fprintf(stream, "<p>\n");
 
 		for(i = 0; i < n; i++) {
-			nv = array[i];
-			sum_total += nvpair_lookup_integer(nv, "total");
-			sum_avail += nvpair_lookup_integer(nv, "avail");
+			j = array[i];
+			sum_total += jx_lookup_integer(j, "total");
+			sum_avail += jx_lookup_integer(j, "avail");
 			sum_devices++;
 		}
 
@@ -461,14 +462,14 @@ static void handle_query(struct link *query_link)
 		string_metric(sum_total, -1, total_line);
 		fprintf(stream, "<b>%sB available out of %sB on %d devices</b><p>\n", avail_line, total_line, (int) sum_devices);
 
-		nvpair_print_html_header(stream, html_headers);
+		jx_export_html_header(stream, html_headers);
 		for(i = 0; i < n; i++) {
-			nv = array[i];
-			make_hash_key(nv, key);
+			j = array[i];
+			make_hash_key(j, key);
 			sprintf(url, "/detail/%s", key);
-			nvpair_print_html_with_link(nv, stream, html_headers, "name", url);
+			jx_export_html_with_link(j, stream, html_headers, "name", url);
 		}
-		nvpair_print_html_footer(stream, html_headers);
+		jx_export_html_footer(stream, html_headers);
 		fprintf(stream, "</center>\n");
 	}
 	fclose(stream);
@@ -638,7 +639,7 @@ int main(int argc, char *argv[])
 	username_get(owner);
 	starttime = time(0);
 
-	table = nvpair_database_create(history_dir);
+	table = jx_database_create(history_dir);
 	if(!table)
 		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
