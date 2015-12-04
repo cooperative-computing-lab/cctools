@@ -628,11 +628,13 @@ static int handle_tasks(struct link *master)
 				char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
 
 				debug(D_WQ,"moving output file from %s to %s",sandbox_name,f->payload);
-				if(rename(sandbox_name,f->payload)!=0) {
-					copy_file_to_file(sandbox_name, f->payload);
-				}
-				if(errno != 0) {
+
+				/* First we try a cheap rename. It that does not work, we try to copy the file. */
+				if(rename(sandbox_name,f->payload) == -1) {
 					debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
+					if(copy_file_to_file(sandbox_name, f->payload)  == -1) {
+						debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
+					}
 				}
 
 				free(sandbox_name);

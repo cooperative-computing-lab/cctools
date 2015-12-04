@@ -177,7 +177,7 @@ parse_arguments_common()
 
 	set_up_master_address $1 $2 $3 $4
 
-	if [ $specified_resources = 1 -a $SGE_WARNING = 1 ]
+	if [ $specified_resources = 1 -a -n "$SGE_WARNING" ]
 	then
 		echo "Worker resources were manually specified. Remember to also describe your resources according to your local qsub system (e.g., -p '-pe smp 4'. See also the --sge-parameter option in the configure script when manually compiling CCTools.)" 1>&2
 	fi
