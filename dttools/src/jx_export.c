@@ -74,7 +74,7 @@ void jx_export_xml( struct jx *j, FILE *stream )
 		fprintf(stream,j->boolean_value?"true":"false");
 		break;
 	case JX_INTEGER:
-		fprintf(stream,"%lld",j->integer_value);
+		fprintf(stream,"%lld",(long long)j->integer_value);
 		break;
 	case JX_DOUBLE:
 		fprintf(stream,"%lf",j->double_value);
