@@ -198,18 +198,14 @@ void jx_insert_string( struct jx *j, const char *key, const char *value )
 
 void jx_array_insert( struct jx *array, struct jx *value )
 {
-	array->u.items = jx_item( value, array->u.items->next );
+	array->u.items = jx_item(value, array->u.items);
 }
 
 void jx_array_append( struct jx *array, struct jx *value )
 {
-	if(!array->u.items) {
-		array->u.items = jx_item( value, 0 );
-	} else {
-		struct jx_item *i;
-		for(i=array->u.items;i->next;i=i->next) { }
-		i->next = jx_item(value,0);
-	}
+	struct jx_item **i;
+	for(i=&array->u.items;*i;i=&(*i)->next) { }
+	*i = jx_item(value,0);
 }
 
 void jx_pair_delete( struct jx_pair *pair )
