@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "krb5.h"
 
 #include "auth.h"
+#include "catch.h"
 #include "link.h"
 #include "debug.h"
 #include "xxmalloc.h"
@@ -24,6 +25,7 @@ See the file COPYING for details.
 
 int auth_kerberos_assert(struct link *link, time_t stoptime)
 {
+	int rc;
 	krb5_context context;
 	krb5_ccache ccdef;
 	krb5_principal client, server;
@@ -31,7 +33,6 @@ int auth_kerberos_assert(struct link *link, time_t stoptime)
 	krb5_auth_context auth_context = 0;
 	krb5_ap_rep_enc_part *rep_ret;
 	krb5_error *err_ret;
-	int success = 0;
 	int port;
 
 	char addr[LINK_ADDRESS_MAX];
@@ -41,7 +42,6 @@ int auth_kerberos_assert(struct link *link, time_t stoptime)
 
 	link_address_remote(link, addr, &port);
 	if(domain_name_cache_lookup_reverse(addr, dname)) {
-
 		debug(D_AUTH, "kerberos: name of %s is %s", addr, dname);
 		cksum.data = dname;
 		cksum.length = strlen(dname);
@@ -67,7 +67,7 @@ int auth_kerberos_assert(struct link *link, time_t stoptime)
 						debug(D_AUTH, "kerberos: expecting server %s", name);
 						free(name);
 						debug(D_AUTH, "kerberos: waiting for server");
-						if(auth_barrier(link, "yes\n", stoptime)) {
+						if(auth_barrier(link, "yes\n", stoptime) == 0) {
 							debug(D_AUTH, "kerberos: authenticating with server");
 							int fd = link_fd(link);
 							link_nonblocking(link, 0);
@@ -109,7 +109,13 @@ int auth_kerberos_assert(struct link *link, time_t stoptime)
 		auth_barrier(link, "no\n", stoptime);
 	}
 
-	return success;
+	rc = 0;
+	goto out;
+out:
+	if (rc) {
+		auth_barrier(link, "no\n", stoptime);
+	}
+	return RCUNIX(rc);
 }
 
 int auth_kerberos_accept(struct link *link, char **subject, time_t stoptime)
@@ -140,7 +146,7 @@ int auth_kerberos_accept(struct link *link, char **subject, time_t stoptime)
 					krb5_kt_close(context, keytab);
 
 					debug(D_AUTH, "kerberos: waiting for client");
-					if(auth_barrier(link, "yes\n", stoptime)) {
+					if(auth_barrier(link, "yes\n", stoptime) == 0) {
 
 						debug(D_AUTH, "kerberos: receiving client credentials");
 						int fd = link_fd(link);
