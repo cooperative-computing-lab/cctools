@@ -373,7 +373,7 @@ static int bindinput (confuga *C, chirp_jobid_t id, const char *tag, const char 
 	rc = confuga_lookup(C, serv_path, &fid, NULL);
 	if (rc == 0) {
 		sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-		sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
+		sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 		sqlcatch(sqlite3_bind_int64(stmt, 2, id));
 		sqlcatch(sqlite3_bind_text(stmt, 3, task_path, -1, SQLITE_STATIC));
 		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
@@ -667,8 +667,8 @@ static int replicate_push_synchronous (confuga *C, chirp_jobid_t id, const char 
 	sqlcatch(sqlite3_bind_int64(stmt, 2, C->pull_threshold));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
 		confuga_fid_t fid;
-		assert(sqlite3_column_type(stmt, 0) == SQLITE_BLOB && (size_t)sqlite3_column_bytes(stmt, 0) == sizeof(fid.id));
-		memcpy(fid.id, sqlite3_column_blob(stmt, 0), sizeof(fid.id));
+		assert(sqlite3_column_type(stmt, 0) == SQLITE_BLOB && (size_t)sqlite3_column_bytes(stmt, 0) == confugaF_size(fid));
+		CATCH(confugaF_set(C, &fid, sqlite3_column_blob(stmt, 0)));
 		CATCH(confugaR_replicate(C, fid, sid, (const char *)sqlite3_column_text(stmt, 1), STOPTIME));
 		if (start+60 <= time(0)) {
 			paused = 1; /* if we replicate for more than 1 minutes, come back later to finish */
@@ -1258,23 +1258,13 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 								json_value *file_tag = jsonA_getname(file, "tag", json_string);
 								if (strcmp(type->u.string.ptr, "OUTPUT") == 0 && size && file_tag && (streql(file_tag->u.string.ptr, CONFUGA_OUTPUT_TAG) || streql(file_tag->u.string.ptr, CONFUGA_PULL_TAG))) {
 									confuga_fid_t fid;
-									const char *sp = serv_path->u.string.ptr;
+									const char *sp;
 
-									/* extract the File ID from interpolated serv_path */
-									if (strlen(sp) > sizeof(fid.id)*2) {
-										size_t k;
-										const char *idx = strchr(sp, '\0')-sizeof(fid.id)*2;
-										for (k = 0; k < sizeof(fid.id); k += 1, idx += 2) {
-											char byte[3] = {idx[0], idx[1], '\0'};
-											char *endptr;
-											unsigned long value = strtoul(byte, &endptr, 16);
-											if (endptr == &byte[2]) {
-												fid.id[k] = value;
-											} else {
-												CATCH(EINVAL);
-											}
-										}
-									}
+									sp = strrchr(serv_path->u.string.ptr, '/');
+									if (sp == NULL)
+										CATCH(EINVAL);
+									sp += 1;
+									CATCH(confugaF_extract(C, &fid, sp, NULL));
 
 									CATCH(confugaR_register(C, fid, size->u.integer, sid));
 									if (streql(file_tag->u.string.ptr, CONFUGA_OUTPUT_TAG)) {
@@ -1282,7 +1272,7 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 										sqlcatch(sqlite3_reset(stmt));
 										sqlcatch(sqlite3_bind_int64(stmt, 1, id));
 										sqlcatch(sqlite3_bind_text(stmt, 2, task_path->u.string.ptr, -1, SQLITE_STATIC));
-										sqlcatch(sqlite3_bind_blob(stmt, 3, fid.id, sizeof(fid.id), SQLITE_STATIC));
+										sqlcatch(sqlite3_bind_blob(stmt, 3, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 										sqlcatch(sqlite3_bind_int64(stmt, 4, size->u.integer));
 										sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 									}
@@ -1475,8 +1465,8 @@ static int bindoutputs (confuga *C, chirp_jobid_t id, const char *tag)
 		const char *path;
 		confuga_off_t size;
 		path = (const char *)sqlite3_column_text(stmt, 0);
-		assert(sqlite3_column_type(stmt, 1) == SQLITE_BLOB && (size_t)sqlite3_column_bytes(stmt, 1) == sizeof(fid.id));
-		memcpy(fid.id, sqlite3_column_blob(stmt, 1), sizeof(fid.id));
+		assert(sqlite3_column_type(stmt, 1) == SQLITE_BLOB && (size_t)sqlite3_column_bytes(stmt, 1) == confugaF_size(fid));
+		confugaF_set(C, &fid, sqlite3_column_blob(stmt, 1));
 		size = (confuga_off_t)sqlite3_column_int64(stmt, 2);
 		CATCH(confuga_update(C, path, fid, size, 0));
 	}

@@ -225,12 +225,7 @@ CONFUGA_API int confuga_metadata_lookup (confuga *C, const char *path, char **da
 	current += 5;
 
 	/* read hash */
-	int i;
-	for (i = 0; i < (int)sizeof(fid.id); i += 1, current += 2) {
-		char byte[3] = {current[0], current[1], '\0'};
-		unsigned long value = strtoul(byte, NULL, 16);
-		fid.id[i] = value;
-	}
+	CATCH(confugaF_extract(C, &fid, current, &current));
 	assert(current[0] == ':');
 	current += 1;
 

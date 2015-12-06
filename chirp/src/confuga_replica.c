@@ -69,7 +69,7 @@ CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
+	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 	sqlcatch(sqlite3_bind_int64(stmt, 2, size));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	if (sqlite3_changes(db))
@@ -77,7 +77,7 @@ CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
+	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	if (sqlite3_changes(db))
@@ -140,7 +140,7 @@ CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
+	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
 	rc = sqlite3_step(stmt);
 	if (rc == SQLITE_ROW) {
@@ -162,7 +162,7 @@ CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
+	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 	if (chirp_reli_access(host_to.hostport, replica_closed, R_OK, STOPTIME) == 0)
 		goto replicated; /* already there, just not in DB yet */
 	/* else try to replicate... */
@@ -201,7 +201,7 @@ replicated:
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
+	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	assert(sqlite3_changes(db));
@@ -211,7 +211,7 @@ replicated:
 	if (fsid) {
 		/* fsid is 0 if it was already there... (access) */
 		debug(D_DEBUG, CONFUGA_FID_DEBFMT " from " CONFUGA_SID_DEBFMT " to " CONFUGA_SID_DEBFMT " size=%" PRICONFUGA_OFF_T, CONFUGA_FID_PRIARGS(fid), fsid, sid, size);
-		sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
+		sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 		sqlcatch(sqlite3_bind_int64(stmt, 2, fsid));
 		sqlcatch(sqlite3_bind_int64(stmt, 3, sid));
 		sqlcatch(sqlite3_bind_int64(stmt, 4, size));
@@ -266,7 +266,7 @@ CONFUGA_API int confuga_replica_open (confuga *C, confuga_fid_t fid, confuga_rep
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_blob(stmt, 1, fid.id, sizeof(fid.id), SQLITE_STATIC));
+	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
@@ -496,7 +496,7 @@ CONFUGA_API int confuga_setrep (confuga *C, confuga_fid_t fid, int nreps)
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, nreps));
-	sqlcatch(sqlite3_bind_blob(stmt, 2, fid.id, sizeof(fid.id), SQLITE_STATIC));
+	sqlcatch(sqlite3_bind_blob(stmt, 2, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	if (sqlite3_changes(db) == 0)
 		CATCH(EINVAL); /* invalid StorageNode, File ID */
