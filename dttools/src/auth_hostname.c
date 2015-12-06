@@ -6,6 +6,7 @@ See the file COPYING for details.
 */
 
 #include "auth.h"
+#include "catch.h"
 #include "debug.h"
 #include "domain_name_cache.h"
 
@@ -17,19 +18,20 @@ See the file COPYING for details.
 
 static int auth_hostname_assert(struct link *link, time_t stoptime)
 {
+	int rc;
 	char line[AUTH_LINE_MAX];
 
-	if(!link_readline(link, line, sizeof(line), stoptime)) {
-		debug(D_AUTH, "hostname: lost connection");
-		return 0;
-	}
+	CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
 
-	if(!strcmp(line, "yes")) {
-		debug(D_AUTH, "hostname: accepted");
-		return 1;
-	}
+	if(strcmp(line, "yes") != 0)
+		THROW_QUIET(EACCES);
 
-	return 0;
+	debug(D_AUTH, "hostname: accepted");
+
+	rc = 0;
+	goto out;
+out:
+	return RCUNIX(rc);
 }
 
 static int auth_hostname_accept(struct link *link, char **subject, time_t stoptime)
