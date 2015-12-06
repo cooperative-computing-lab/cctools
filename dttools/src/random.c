@@ -59,16 +59,11 @@ double random_double (void)
 void random_array (void *dest, size_t len)
 {
 	size_t i;
-	int64_t r;
 	uint8_t *out = dest;
-	for (i = 0; i < len/sizeof(r); i += sizeof(r)) {
-		r = twister_genrand64_int64();
-		memcpy(out+i, &r, sizeof(r));
-	}
-	assert((len-i) < sizeof(r));
-	if (i < len) {
-		r = twister_genrand64_int64();
-		memcpy(out+i, &r, (len-i));
+	for (i = 0; i < len; i += sizeof(int64_t)) {
+		int64_t r = twister_genrand64_int64();
+		size_t count = len > sizeof(int64_t) ? sizeof(int64_t) : len;
+		memcpy(out+i, &r, count);
 	}
 }
 
