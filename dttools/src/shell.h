@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include "buffer.h"
 
-int shellcode (const char *cmd, const char * const env[], buffer_t *Bout, buffer_t *Berr, int *status);
+int shellcode (const char *cmd, const char * const env[], const char *in, size_t len, buffer_t *Bout, buffer_t *Berr, int *status);
 
 #endif
 
