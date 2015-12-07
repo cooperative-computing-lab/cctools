@@ -268,7 +268,7 @@ static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_
 
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
 
-char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t);
+char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 int relabel_task(struct work_queue *q, struct work_queue_task *t);
 void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t);
 
@@ -2476,7 +2476,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	 * about resources. */
 	char *command_line;
 	if(q->monitor_mode) {
-		command_line = work_queue_monitor_wrap(q, t);
+		command_line = work_queue_monitor_wrap(q, w, t);
 	} else {
 		command_line = xxstrdup(t->command_line);
 	}
@@ -3317,7 +3317,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->rs = NULL;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
-	t->rn = make_rmsummary(-1);
+	t->rn        = make_rmsummary(-1);
 	t->unlabeled = 1;
 
 	t->category = xxstrdup("default");
@@ -3474,6 +3474,12 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, timestamp_t us
 	else
 	{
 		t->rn->end = useconds;
+
+		/* If end time is specified, assume at least one core is specified.
+		 * Otherwise, a single worker will get all the tasks. */
+		if(t->rn->cores < 0) {
+			work_queue_task_specify_cores(t, 1);
+		}
 	}
 }
 
@@ -3486,6 +3492,12 @@ void work_queue_task_specify_running_time( struct work_queue_task *t, timestamp_
 	else
 	{
 		t->rn->wall_time = useconds;
+
+		/* If wall time is specified, assume at least one core is specified.
+		 * Otherwise, a single worker will get all the tasks. */
+		if(t->rn->cores < 0) {
+			work_queue_task_specify_cores(t, 1);
+		}
 	}
 }
 
@@ -4455,7 +4467,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 		warn(D_DEBUG, "Could not move monitor report to final destination file.");
 }
 
-char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
+char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
 	static char *monitor_remote_name = NULL;
 	if(!monitor_remote_name) {
@@ -4467,14 +4479,24 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 	char *summary       = string_format("%s.summary", template);
 	char *extra_options = string_format("-V 'taskid: %d'", t->taskid);
 
-
 	work_queue_task_specify_file(t, q->monitor_exe, monitor_remote_name, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 	work_queue_task_specify_file(t, summary, RESOURCE_MONITOR_TASK_REMOTE_NAME ".summary", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 	free(summary);
 
+	struct rmsummary limits;
+
+	if(t->unlabeled) {
+		memcpy(&limits, t->rn, sizeof(struct rmsummary));
+		limits.cores  = w->resources->cores.total;
+		limits.memory = w->resources->memory.total;
+		limits.disk   = w->resources->disk.total;
+	} else {
+		memcpy(&limits, t->rn, sizeof(struct rmsummary));
+	}
+
 	char *wrap_cmd;
 	if(q->monitor_mode == MON_FULL) {
-		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, t->rn, extra_options, /* debug */ 1, /* series */ 1, /* inotify */ 0));
+		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, &limits, extra_options, /* debug */ 1, /* series */ 1, /* inotify */ 0));
 
 		char *debug    = NULL;
 		char *series   = NULL;
@@ -4488,7 +4510,7 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_task *t)
 		free(debug);
 		free(series);
 	} else {
-		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, t->rn, extra_options, /* debug */ 0, /* series */ 0, /* inotify */ 0));
+		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, &limits, extra_options, /* debug */ 0, /* series */ 0, /* inotify */ 0));
 	}
 
 	free(extra_options);
@@ -5499,36 +5521,24 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 	if(c->disable_auto_labeling)
 		return ~(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
-	int64_t top_cores  = q->worker_top_resources->cores;
-	int64_t top_memory = q->worker_top_resources->memory;
-	int64_t top_disk   = q->worker_top_resources->disk;
-	int64_t top_wtime  = q->worker_top_resources->wall_time;
-
-	int64_t cores, memory, disk, wtime;
+	struct rmsummary *top   = q->worker_top_resources;
+	struct rmsummary label;
 
 	if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 		/* We check whether the task already has the maximum resources. If it
 		 * does, we mark it as done. */
-		if(     (top_cores  < 0 || top_cores  <= t->rn->cores)  &&
-				(top_memory < 0 || top_memory <= t->rn->memory) &&
-				(top_disk   < 0 || top_disk   <= t->rn->disk)   &&
-				(top_wtime  < 0 || top_wtime  <= t->rn->wall_time) ) {
+		if(     (top->cores     < 0 || top->cores     <= t->rn->cores)  &&
+				(top->memory    < 0 || top->memory    <= t->rn->memory) &&
+				(top->disk      < 0 || top->disk      <= t->rn->disk)   &&
+				(top->wall_time < 0 || top->wall_time <= t->rn->wall_time) ) {
 			return 0;
-		}
-		else {
-			cores  = top_cores;
-			memory = top_memory;
-			disk   = top_disk;
-			wtime  = top_wtime;
-
+		} else {
+			memcpy(&label, top, sizeof(struct rmsummary));
 			debug(D_WQ, "Setting task %d to use maximum resources.", t->taskid);
 		}
 	} else if(t->total_submissions == 0) {
 		/* Task has not run even once. Note we ignore any manual labeling. */
-		cores  = c->first->cores     > -1 ? c->first->cores     : top_cores;
-		memory = c->first->memory    > -1 ? c->first->memory    : top_memory;
-		disk   = c->first->disk      > -1 ? c->first->disk      : top_disk;
-		wtime  = c->first->wall_time > -1 ? c->first->wall_time : top_wtime;
+		memcpy(&label, c->first, sizeof(struct rmsummary));
 	} else {
 		/* Task was already labeled, and is being resubmitted for a reason
 		 * different than resource exhaustion. We simply return. */
@@ -5536,12 +5546,11 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 	}
 
 	/* update label only when there is a change. */
-	if(cores != t->rn->cores || memory != t->rn->memory || disk != t->rn->disk || wtime != t->rn->wall_time ) {
-		work_queue_task_specify_cores(t,  cores);
-		work_queue_task_specify_memory(t, memory);
-		work_queue_task_specify_disk(t,   disk);
-
-		t->rn->wall_time = wtime;
+	if(memcmp(&label, t->rn, sizeof(struct rmsummary))) {
+		work_queue_task_specify_cores(t,        label.cores);
+		work_queue_task_specify_memory(t,       label.memory);
+		work_queue_task_specify_disk(t,         label.disk);
+		work_queue_task_specify_running_time(t, label.wall_time);
 		t->unlabeled = 0;
 	}
 
