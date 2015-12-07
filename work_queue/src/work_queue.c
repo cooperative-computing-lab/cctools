@@ -1197,17 +1197,17 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 
 	fcntl(monitor_fd, F_SETLKW, &lock);
 
-	if(t->rs)
+	if(!t->rs)
 	{
-		FILE *fs = fopen(summary, "r");
-		if(fs) {
-			copy_stream_to_stream(fs, q->monitor_file);
-			fclose(fs);
-		}
-	}
-	else
-	{
+		/* mark all resources with -1, to signal that no information is available. */
+		t->rs = make_rmsummary(-1);
 		fprintf(q->monitor_file, "# Summary for task %d was not available.\n", t->taskid);
+	}
+
+	FILE *fs = fopen(summary, "r");
+	if(fs) {
+		copy_stream_to_stream(fs, q->monitor_file);
+		fclose(fs);
 	}
 
 	fprintf(q->monitor_file, "\n");
