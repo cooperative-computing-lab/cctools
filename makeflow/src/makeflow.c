@@ -1533,7 +1533,7 @@ int main(int argc, char *argv[])
 	}
 
 	struct dag_node *n;
-	// check to ensure that all jobs can be ran
+	// check to ensure that all jobs can be ran with resources given
 	for(n = d->nodes; n; n = n->next) {
 		if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)) {
 			fprintf(stderr, "Critical error, not enough resources to run job");
