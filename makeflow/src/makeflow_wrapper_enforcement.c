@@ -113,6 +113,13 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	fprintf(enforcer, "/dev/random\trwx\n");
 	fprintf(enforcer, "/dev/urandom\trwx\n");
 	fprintf(enforcer, "/home\t\tDENY\n");
+
+	/* We have some X related exceptions in case someone needs to
+	 * do some troubleshooting/configuration graphically
+	 */
+	fprintf(enforcer, "$HOME/.Xauthority\trwx\n");
+	fprintf(enforcer, "/tmp/.X11-unix\trwx\n");
+
 	list_first_item(input_list);
 	while((f=list_next_item(input_list))) {
 		fprintf(enforcer, "$PWD/%s\trwx\n", f->filename);
