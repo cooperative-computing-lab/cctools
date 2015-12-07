@@ -749,10 +749,10 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 	#set host_linux_distro. Examples: redhat6, centos6.
 	#potential problem: maybe in the future, we need a finer control about the host_linux_distro, like redhat6.5, centos6.5.
 	arch_index = uname_list[2].find('ARCH')
+	host_linux_distro = None
 	if arch_index != -1:
 		host_linux_distro = 'arch'
 	else:
-		host_linux_distro = None
 		redhat_index = uname_list[2].find('el')
 		centos_index = uname_list[2].find('centos')
 		if redhat_index != -1:
