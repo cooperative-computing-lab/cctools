@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <stdarg.h>
 
 struct jx_database {
 	struct hash_table *table;
@@ -138,34 +139,31 @@ static void log_time( struct jx_database *db )
 	time_t current = time(0);
 	if(db->last_log_time!=current) {
 		db->last_log_time = current;
-
-		struct jx *j = jx_arrayv(
-			jx_string("T"),
-			jx_integer(current),
-			0);
-
-		jx_print_stream(j,db->logfile);
-		jx_delete(j);
-		fprintf(db->logfile,"\n");
+		fprintf(db->logfile,"T %lld\n",(long long)current);
 	}
 }
 
-/* Log a complete json message with time, a newline, then delete it. */
+/* Log a complete message with time, a newline, then delete it. */
 
-static void log_message( struct jx_database *db, struct jx *j )
+static void log_message( struct jx_database *db, const char *fmt, ... )
 {
+	va_list args;
+	va_start(args,fmt);
+
 	log_select(db);
 	log_time(db);
-	jx_print_stream(j,db->logfile);
-	fprintf(db->logfile,"\n");
-	jx_delete(j);
+	vfprintf(db->logfile,fmt,args);
+
+	va_end(args);
 }
 
 /* Log an event indicating that an object was created, followed by object itself */
 
 static void log_create( struct jx_database *db, const char *key, struct jx *j )
 {
-	log_message( db, jx_arrayv(jx_string("C"),jx_string(key),jx_copy(j),0) );
+	char *str = jx_print_string(j);
+	log_message(db,"C %s %s\n",key,str);
+	free(str);
 }
 
 /* Log update events that indicate the difference between objects a (old) and b (new)*/
@@ -190,13 +188,15 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 		if(bvalue) {
 			if(jx_equals(avalue,bvalue)) {
 				// items match, do nothing.
-			} else {
+			} else {	
 				// item changed, print it.
-				log_message(db,jx_arrayv(jx_string("U"),jx_string(key),jx_string(name),jx_copy(bvalue),0));
+				char *str = jx_print_string(bvalue);
+				log_message(db,"U %s %s %s\n",key,name,str);
+				free(str);
 			}
 		} else {
 			// item was removed.
-			log_message(db,jx_arrayv(jx_string("R"),jx_string(key),jx_string(name),0));
+			log_message(db,"R %s %s\n",key,name);
 		}
 	}
 
@@ -210,7 +210,10 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 
 		struct jx *avalue = jx_lookup(a,name);
 		if(!avalue) {
-			log_message(db,jx_arrayv(jx_string("U"),jx_string(key),jx_string(name),jx_copy(bvalue)));
+			// item changed, print it.
+			char *str = jx_print_string(bvalue);
+			log_message(db,"U %s %s %s\n",key,name,str);
+			free(str);
 		}
 	}
 }
@@ -219,7 +222,7 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 
 static void log_delete( struct jx_database *db, const char *key )
 {
-	log_message(db,jx_arrayv(jx_string("D"),jx_string(key),0));
+	log_message(db,"D %s\n",key);
 }
 
 /* Push any buffered output out to the log. */
@@ -229,113 +232,12 @@ static void log_flush( struct jx_database *db )
 	if(db->logfile) fflush(db->logfile);
 }
 
-/*
-Replay a log record like [ "C", key, value ]
-*/
-
-static int log_replay_create( struct jx_database *db, struct jx_item *items )
-{
-	if(!items || !items->value || items->value->type!=JX_STRING) return 0;
-
-	const char *key = items->value->string_value;
-
-	items = items->next;
-
-	if(!items || !items->value) return 0;
-
-	/*
-	Special case: move the record from the log entry
-	to the db in order to avoid excessive copying.
-	jx_delete doesn't mind null entries.
-	*/
-
-	hash_table_insert(db->table,key,items->value);
-	items->value = 0;	
-
-	return 1;
-}
-
-/*
-Replay a log record like [ "D", key ]
-*/
-
-static int log_replay_delete( struct jx_database *db, struct jx_item *items )
-{
-	if(!items || !items->value || items->value->type!=JX_STRING) return 0;
-
-	const char *key = items->value->string_value;
-
-	jx_delete(hash_table_remove(db->table,key));
-
-	return 1;
-}
-
-/*
-Replay a log record like [ "U", key, name, value ]
-*/
-
-static int log_replay_update( struct jx_database *db, struct jx_item *items )
-{
-	if(!items || !items->value || items->value->type!=JX_STRING) return 0;
-	const char *key = items->value->string_value;
-
-	items = items->next;
-
-	if(!items || !items->value || items->value->type!=JX_STRING) return 0;
-	struct jx *name = items->value;
-
-	items = items->next;
-
-	if(!items || !items->value) return 0;
-	struct jx *value = items->value;
-
-	struct jx *record = hash_table_lookup(db->table,key);
-	if(record) {
-		jx_delete(jx_remove(record,name));
-		jx_insert(record,jx_copy(name),jx_copy(value));
-	}
-
-	return 1;
-}
-
-/*
-Replay a log record like [ "R", key, name ]
-*/
-
-static int log_replay_remove( struct jx_database *db, struct jx_item *items )
-{
-	if(!items || !items->value || items->value->type!=JX_STRING) return 0;
-	const char *key = items->value->string_value;
-
-	items = items->next;
-
-	if(!items || !items->value || items->value->type!=JX_STRING) return 0;
-	struct jx *name = items->value;
-
-	struct jx *record = hash_table_lookup(db->table,key);
-	if(record) {
-		jx_delete(jx_remove(record,name));
-	}
-
-	return 1;
-}
-
-/* Replay a log record like [ "T", time ] for a time update. */
-
-static int log_replay_time( struct jx_database *db, struct jx_item *items, time_t *current )
-{
-	if(!items || !items->value || items->value->type!=JX_INTEGER) return 0;
-	*current = items->value->integer_value;
-	return 1;
-}
-
 /* Report an invalid bit of data in the log. */
 
-static void corrupt_data( const char *filename, struct jx *j )
+static void corrupt_data( const char *filename, const char *line )
 {
-	char *str = jx_print_string(j);
-	debug(D_NOTICE,"corrupt data in log %s: %s\n",filename,str);
-	free(str);
+	debug(D_NOTICE,"corrupt data in %s: %s\n",filename,line);
+
 }
 
 /*
@@ -343,55 +245,90 @@ Replay a given log file into the hash table, up to the given snapshot time.
 Returns true if file could be open and played, false otherwise.
 */
 
+#define LOG_LINE_MAX 65536
+
 static int log_replay( struct jx_database *db, const char *filename, time_t snapshot)
 {
-	time_t current = 0;
+	char line[LOG_LINE_MAX];
+	char value[LOG_LINE_MAX];
+	char name[LOG_LINE_MAX];
+	char key[LOG_LINE_MAX];
+	int n;
+	struct jx *jvalue, *jobject;
+
+	long long current = 0;
 
 	FILE *file = fopen(filename,"r");
 	if(!file) return 0;
 
-	struct jx_parser *parser = jx_parser_create();
-	jx_parser_read_stream(parser,file);
-
-	while(1) {
-		struct jx *logentry = jx_parse(parser);
-		if(!logentry) break;
-
-		if(!jx_istype(logentry,JX_ARRAY)) {
-			corrupt_data(filename,logentry);
-			continue;
-		}
-
-		struct jx_item *item = logentry->items;
-		if(!item || !jx_istype(item->value,JX_STRING)) {
-			corrupt_data(filename,logentry);
-			continue;
-		}
-
-		int result = 0;
-
-		char op = item->value->string_value[0];
-		if(op=='C') {
-			result = log_replay_create(db,item->next);
-		} else if(op=='D') {
-			result = log_replay_delete(db,item->next);
-		} else if(op=='U') {
-			result = log_replay_update(db,item->next);
-		} else if(op=='R') {
-			result = log_replay_remove(db,item->next);
-		} else if(op=='T') {
-			result = log_replay_time(db,item->next,&current);
+	while(fgets(line,sizeof(line),file)) {
+		if(line[0]=='C') {
+			n = sscanf(line,"C %s %[^\n]",key,value);
+			if(n!=2) {
+				corrupt_data(filename,line);
+				continue;
+			}
+			jvalue = jx_parse_string(value);
+			if(!jvalue) {
+			       	/* backwards compatibility with old log format. */
+				jvalue = jx_string(value);
+			}
+			hash_table_insert(db->table,key,jvalue);
+		} else if(line[0]=='D') {
+			n = sscanf(line,"D %s\n",key);
+			if(n!=1) {
+				corrupt_data(filename,line);
+				continue;
+			}
+			jx_delete(hash_table_remove(db->table,key));
+		} else if(line[0]=='U') {
+			n=sscanf(line,"U %s %s %[^\n],",key,name,value);
+			if(n!=3) {
+				corrupt_data(filename,line);
+				continue;
+			}
+			jobject = hash_table_lookup(db->table,key);
+			if(!jobject) {
+				corrupt_data(filename,line);
+				continue;
+			}
+			jvalue = jx_parse_string(value);
+			if(!jvalue) {
+				corrupt_data(filename,line);
+				continue;
+			}
+			struct jx *jname = jx_string(name);
+			jx_delete(jx_remove(jobject,jname));
+			jx_insert(jobject,jname,jvalue);
+		} else if(line[0]=='R') {
+			n=sscanf(line,"R %s %s",key,name);
+			if(n!=2) {
+				corrupt_data(filename,line);
+				continue;
+			}
+			jobject = hash_table_lookup(db->table,key);
+			if(!jobject) {
+				corrupt_data(filename,line);
+				continue;
+			}
+			struct jx *jname = jx_string(name);
+			jx_delete(jx_remove(jobject,jname));
+			jx_delete(jname);
+		} else if(line[0]=='T') {
+			n = sscanf(line,"T %lld",&current);
+			if(n!=1) {
+				corrupt_data(filename,line);
+				continue;
+			}
 			if(current>snapshot) break;
+		} else if(line[0]=='\n') {
+			continue;
 		} else {
-			// invalid operation
-			result = 0;
+			corrupt_data(filename,line);
 		}
-		if(!result) {
-			corrupt_data(filename,logentry);
-		}
+
 	}
 
-	jx_parser_delete(parser);
 	fclose(file);
 	return 1;
 }
