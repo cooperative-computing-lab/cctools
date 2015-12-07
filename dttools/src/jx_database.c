@@ -71,7 +71,11 @@ static int checkpoint_read( struct jx_database *db, const char *filename )
 
 	fclose(file);
 
-	jx_assert(jcheckpoint,JX_OBJECT);
+	if(!jcheckpoint || jcheckpoint->type!=JX_OBJECT) {
+		debug(D_NOTICE,"checkpoint %s is not a valid json document!",filename);
+		jx_delete(jcheckpoint);
+		return 0;
+	}
 
 	/* For each key and value, move the value over to the hash table. */
 
@@ -352,9 +356,6 @@ static int log_replay( struct jx_database *db, const char *filename, time_t snap
 	while(1) {
 		struct jx *logentry = jx_parse(parser);
 		if(!logentry) break;
-
-		jx_print_stream(logentry,stdout);
-		printf("\n");
 
 		if(!jx_istype(logentry,JX_ARRAY)) {
 			corrupt_data(filename,logentry);
