@@ -34,6 +34,7 @@ static int checkpoint_write( struct jx_database *db, const char *filename )
 {
 	char *key;
 	struct jx *jobject;
+	int first = 1;
 
 	FILE *file = fopen(filename,"w");
 	if(!file) return 0;
@@ -42,6 +43,11 @@ static int checkpoint_write( struct jx_database *db, const char *filename )
 
 	hash_table_firstkey(db->table);
 	while((hash_table_nextkey(db->table,&key,(void**)&jobject))) {
+		if(!first) {
+			fprintf(file,",\n");
+		} else {
+			first = 0;
+		}
 		fprintf(file,"\"%s\":\n",key);
 		jx_print_stream(jobject,file);
 	}
