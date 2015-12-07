@@ -4494,10 +4494,10 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 		memcpy(&limits, t->rn, sizeof(struct rmsummary));
 	}
 
-	char *wrap_cmd;
-	if(q->monitor_mode == MON_FULL) {
-		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, &limits, extra_options, /* debug */ 1, /* series */ 1, /* inotify */ 0));
+	int extra_files = (q->monitor_mode == MON_FULL);
+	char *wrap_cmd  = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, &limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0));
 
+	if(extra_files) {
 		char *debug    = NULL;
 		char *series   = NULL;
 
@@ -4509,8 +4509,6 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 
 		free(debug);
 		free(series);
-	} else {
-		wrap_cmd = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, &limits, extra_options, /* debug */ 0, /* series */ 0, /* inotify */ 0));
 	}
 
 	free(extra_options);
