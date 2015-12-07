@@ -394,7 +394,7 @@ static void handle_query(struct link *query_link)
 			jx_print_stream(array[i],stream);
 			if(i<(n-1)) fprintf(stream,",\n");
 		}
-		fprintf(stream,"]\n");
+		fprintf(stream,"\n]\n");
 	} else if(!strcmp(path, "/query.oldclassads")) {
 		fprintf(stream, "Content-type: text/plain\n\n");
 		for(i = 0; i < n; i++)
