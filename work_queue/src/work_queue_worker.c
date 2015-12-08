@@ -290,7 +290,7 @@ void measure_worker_resources()
 	measure_worker_disk();
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
-		aggregate_workers_resources(foreman_q, total_resources);
+		aggregate_workers_resources(foreman_q, total_resources, categories);
 	} else {
 		if(manual_cores_option > 0)
 			r->cores.total = manual_cores_option;

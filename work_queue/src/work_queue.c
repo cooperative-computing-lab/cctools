@@ -1760,7 +1760,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
-	aggregate_workers_resources(q,&r);
+	aggregate_workers_resources(q,&r,NULL);
 	work_queue_resources_add_to_jx(&r,j);
 
 	char owner[USERNAME_MAX];
@@ -5258,7 +5258,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	//info about resources
 	s->bandwidth = work_queue_get_effective_bandwidth(q);
 	struct work_queue_resources r;
-	aggregate_workers_resources(q,&r);
+	aggregate_workers_resources(q,&r,NULL);
 
 	s->total_cores = r.cores.total;
 	s->total_memory = r.memory.total;
@@ -5339,7 +5339,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 	}
 }
 
-void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total )
+void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total, struct hash_table *categories)
 {
 	struct work_queue_worker *w;
 	char *key;
@@ -5350,9 +5350,24 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 		return;
 	}
 
+	if(categories) {
+		hash_table_clear(categories);
+	}
+
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 			work_queue_resources_add(total,w->resources);
+
+			if(categories) {
+				if(w->categories) {
+					char *key;
+					void *dummy;
+					hash_table_firstkey(w->categories);
+					while(hash_table_nextkey(w->categories, &key, &dummy)) {
+						hash_table_insert(categories, key, (void **) 1);
+					}
+				}
+			}
 	}
 }
 
