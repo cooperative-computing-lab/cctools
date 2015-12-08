@@ -202,6 +202,7 @@ struct work_queue_worker {
 	int  foreman;                             // 0 if regular worker, 1 if foreman
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
+	struct hash_table           *categories;
 
 	struct hash_table *current_files;
 	struct link *link;
@@ -266,6 +267,7 @@ static work_queue_result_code_t get_available_results(struct work_queue *q, stru
 static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_msg_code_t process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
+static work_queue_msg_code_t process_category(struct work_queue *q, struct work_queue_worker *w, const char *line);
 
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
 
@@ -526,6 +528,8 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = MSG_PROCESSED;
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
+	} else if (string_prefix_is(line, "category")) {
+		result = process_category(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
 		debug(D_WQ|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
 		result = MSG_FAILURE;
@@ -760,6 +764,10 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	itable_delete(w->current_tasks);
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
+
+	if(w->categories)
+		hash_table_delete(w->categories);
+
 	free(w->stats);
 	free(w->hostname);
 	free(w->os);
@@ -2008,6 +2016,26 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 	return MSG_PROCESSED;
 }
 
+static work_queue_msg_code_t process_category( struct work_queue *q, struct work_queue_worker *w, const char *line )
+{
+	char category[WORK_QUEUE_LINE_MAX];
+	char cdec[WORK_QUEUE_LINE_MAX];
+
+	int n = sscanf(line, "category %s", category);
+
+	if(n != 1)
+		return MSG_FAILURE;
+
+	if(!w->categories)
+		w->categories = hash_table_create(4,0);
+
+	url_decode(category, cdec, WORK_QUEUE_LINE_MAX);
+
+	hash_table_insert(w->categories, cdec, (void **) 1);
+
+	return MSG_PROCESSED;
+}
+
 static void handle_worker(struct work_queue *q, struct link *l)
 {
 	char line[WORK_QUEUE_LINE_MAX];
@@ -2684,6 +2712,11 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	/* worker has no reported any resources yet */
 	if(w->resources->tag < 0)
 		return 0;
+
+	if(t->category && strcmp(t->category, "default")) {
+		if(!w->categories || !hash_table_lookup(w->categories, t->category))
+			return 0;
+	}
 
 	if(w->foreman)
 	{
