@@ -25,6 +25,20 @@ umbrella \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 run
 
+umbrella \
+--spec cms_simple.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/cmsjob=/tmp/umbrella_test/ec2_cms_simple_output" \
+--sandbox_mode ec2 \
+--ec2_sshkey ~/bin/feb272015.pem \
+--ec2_key feb272015 \
+--ec2_instance_type m3.medium \
+--ec2_log umbrella.log.ec2 \
+--log umbrella.log \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
+run
+
 #expand cms_simple.umbrella into a self-contained spec
 umbrella \
 --spec cms_simple.umbrella \

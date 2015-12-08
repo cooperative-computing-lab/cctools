@@ -2,8 +2,8 @@
 	"comment": "a simple CMS application whose software and data dependencies are all from CVMFS.",
 	"hardware": {
 		"arch": "x86_64",
-		"cores": "2",
-		"memory": "2GB",
+		"cores": "1",
+		"memory": "1GB",
 		"disk": "3GB"
 	},
 	"kernel" : {

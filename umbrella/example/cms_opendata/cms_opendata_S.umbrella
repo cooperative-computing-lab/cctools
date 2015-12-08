@@ -19,9 +19,9 @@
     "cmd": "/bin/sh /tmp/cms_opendata.sh", 
     "hardware": {
         "cores": "1", 
-        "disk": "3GB", 
+        "disk": "2GB", 
         "arch": "x86_64", 
-        "memory": "2GB"
+        "memory": "1GB"
     }, 
     "environ": {
         "PWD": "/tmp", 

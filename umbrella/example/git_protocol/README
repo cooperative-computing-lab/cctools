@@ -22,3 +22,19 @@ umbrella \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 run
+
+#ec2 execution engine
+#currently, this module fails because the amazon ec2 instance by default has no git installed.
+umbrella \
+--spec git_protocol.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/CMSSW_4_2_8=/tmp/umbrella_test/ec2_git_protocol_output" \
+--sandbox_mode ec2 \
+--ec2_sshkey ~/bin/feb272015.pem \
+--ec2_key feb272015 \
+--ec2_instance_type m3.medium \
+--ec2_log umbrella.log.ec2 \
+--log umbrella.log \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
+run
