@@ -1497,14 +1497,48 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_getgroups32:
 		case SYSCALL32_getgroups:
-			if (entering && pfs_fake_setgid)
-				divert_to_dummy(p,-EPERM);
+			if (entering && pfs_fake_setgid) {
+				/* Make sure the spare slot's open */
+				if (p->ngroups <= PFS_NGROUPS_MAX) {
+					for (int i = 0; i < p->ngroups; i++) {
+						if (p->groups[i] == p->egid)
+							return;
+					}
+					/* Since we didn't see the egid, append it to match Linux behavior */
+					p->groups[p->ngroups] = p->egid;
+					++p->ngroups;
+				}
+
+				if (args[0] == 0) {
+					divert_to_dummy(p,p->ngroups);
+				} else if (p->ngroups > args[0]) {
+					divert_to_dummy(p,-EINVAL);
+				} else {
+					TRACER_MEM_OP(tracer_copy_out(p->tracer,p->groups,POINTER(args[1]),p->ngroups * sizeof(gid_t),TRACER_O_ATOMIC));
+					divert_to_dummy(p,p->ngroups);
+				}
+			}
 			break;
 
 		case SYSCALL32_setgroups32:
 		case SYSCALL32_setgroups:
-			if (entering)
-				divert_to_dummy(p,-EPERM);
+			if (entering) {
+				gid_t groups[PFS_NGROUPS_MAX];
+				if (pfs_fake_setuid) {
+					if (args[0] <= PFS_NGROUPS_MAX) {
+						TRACER_MEM_OP(tracer_copy_in(p->tracer, groups, POINTER(args[1]), args[0] * sizeof(gid_t),TRACER_O_ATOMIC));
+						if (pfs_process_setgroups(p, args[0], groups)) {
+							divert_to_dummy(p,0);
+						} else {
+							divert_to_dummy(p,-EPERM);
+						}
+					} else {
+						divert_to_dummy(p,-EINVAL);
+					}
+				} else {
+					divert_to_dummy(p,-EPERM);
+				}
+			}
 			break;
 
 		/* Here begin all of the I/O operations, given in the same order as in

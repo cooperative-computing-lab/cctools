@@ -23,6 +23,8 @@ extern "C" {
 
 #include <stdint.h>
 
+#define PFS_NGROUPS_MAX 128
+
 enum {
 	PFS_PROCESS_FLAGS_STARTUP = (1<<0),
 	PFS_PROCESS_FLAGS_ASYNC   = (1<<1)
@@ -39,6 +41,8 @@ struct pfs_process {
 	pid_t pid, ppid, tgid;
 	uid_t ruid, euid, suid, set_uid;
 	gid_t rgid, egid, sgid, set_gid;
+	gid_t groups[PFS_NGROUPS_MAX + 1];
+	int ngroups;
 	mode_t umask;
 	int flags;
 
@@ -94,6 +98,7 @@ int pfs_process_setuid( struct pfs_process *p, uid_t uid );
 int pfs_process_setresgid( struct pfs_process *p, gid_t rgid, uid_t egid, uid_t sgid );
 int pfs_process_setregid( struct pfs_process *p, gid_t rgid, uid_t egid );
 int pfs_process_setgid( struct pfs_process *p, gid_t gid );
+int pfs_process_setgroups( struct pfs_process *p, size_t size, const gid_t *list );
 
 extern struct pfs_process *pfs_current;
 extern int parrot_dir_fd;
