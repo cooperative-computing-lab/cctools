@@ -64,7 +64,7 @@ void emit_table_values( struct deltadb *db, time_t current)
 				printf("null\t");
 			} else {
 				jx_print_stream(jvalue,stdout);
-			       	printf("\t");
+				printf("\t");
 			}
 		}
 		printf("\n");

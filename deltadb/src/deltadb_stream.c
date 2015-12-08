@@ -37,7 +37,7 @@ int deltadb_process_stream( struct deltadb *db, FILE *stream, time_t starttime, 
 
 			jvalue = jx_parse_string(value);
 			if(!jvalue) {
-			       	/* backwards compatibility with old log format. */
+				/* backwards compatibility with old log format. */
 				jvalue = jx_string(value);
 			}
 

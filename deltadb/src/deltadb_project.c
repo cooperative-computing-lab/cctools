@@ -87,7 +87,7 @@ int deltadb_update_event( struct deltadb *db, const char *key, const char *name,
 		char *str = jx_print_string(jvalue);
 		printf("U %s %s %s\n",key,name,str);
 		free(str);
-	}	
+	}
 	return 1;
 }
 

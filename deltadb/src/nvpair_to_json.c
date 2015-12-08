@@ -33,7 +33,7 @@ int main( int argc, char *argv[] )
 
 			jx_print_stream(j,stdout);
 			count++;
-	        } else if(r<0) {
+		} else if(r<0) {
 			fprintf(stderr,"nvpair conversion error!\n");
 		} else {
 			break;
