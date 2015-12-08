@@ -188,7 +188,7 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 		if(bvalue) {
 			if(jx_equals(avalue,bvalue)) {
 				// items match, do nothing.
-			} else {	
+			} else {
 				// item changed, print it.
 				char *str = jx_print_string(bvalue);
 				log_message(db,"U %s %s %s\n",key,name,str);
@@ -270,7 +270,7 @@ static int log_replay( struct jx_database *db, const char *filename, time_t snap
 			}
 			jvalue = jx_parse_string(value);
 			if(!jvalue) {
-			       	/* backwards compatibility with old log format. */
+				/* backwards compatibility with old log format. */
 				jvalue = jx_string(value);
 			}
 			hash_table_insert(db->table,key,jvalue);
