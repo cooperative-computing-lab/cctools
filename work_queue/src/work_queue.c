@@ -5431,7 +5431,7 @@ void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 
 	const char *name = t->category ? t->category : "default";
 
-	struct work_queue_task_category *c = hash_table_lookup(q->categories, name);
+	struct work_queue_task_category *c = category_lookup_or_create(q, name);
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
