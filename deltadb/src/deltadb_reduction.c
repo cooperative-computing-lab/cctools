@@ -45,10 +45,8 @@ void deltadb_reduction_reset( struct deltadb_reduction *r )
 	r->cnt = r->sum = r->first = r->last = r->min = r->max = 0;
 };
 
-void deltadb_reduction_update( struct deltadb_reduction *r, const char *value )
+void deltadb_reduction_update( struct deltadb_reduction *r, double val )
 {
-	double val = atof(value);
-
 	if(r->cnt==0) {
 		r->min = r->max = r->first = val;
 	} else {
@@ -66,31 +64,65 @@ void deltadb_reduction_print( struct deltadb_reduction *r )
 	printf("%s",r->attr);
 	switch(r->type) {
 		case CNT:
-			printf(".CNT %lf\n",r->cnt);
+			printf(".CNT %lf",r->cnt);
 			break;
 		case SUM:
-			printf(".SUM %lf\n",r->sum);
+			printf(".SUM %lf",r->sum);
 			break;
 		case FIRST:
-			printf(".FIRST %lf\n",r->first);
+			printf(".FIRST %lf",r->first);
 			break;
 		case LAST:
-			printf(".LAST %lf\n",r->last);
+			printf(".LAST %lf",r->last);
 			break;
 		case MIN:
-			printf(".MIN %lf\n",r->min);
+			printf(".MIN %lf",r->min);
 			break;
 		case AVG:
-			printf(".AVG %lf\n",r->cnt>0 ? r->sum/r->cnt : 0);
+			printf(".AVG %lf",r->cnt>0 ? r->sum/r->cnt : 0);
 			break;
 		case MAX:
-			printf(".MAX %lf\n",r->max);
+			printf(".MAX %lf",r->max);
 			break;
 		case PAVG:
-			printf(".PAVG %lf\n",r->cnt>0 ? r->sum/r->cnt : 0 );
+			printf(".PAVG %lf",r->cnt>0 ? r->sum/r->cnt : 0 );
 			break;
 		case INC:
-			printf(".INC %lf\n",r->last-r->first);
+			printf(".INC %lf",r->last-r->first);
+			break;
+	}
+}
+
+void deltadb_reduction_print_json( struct deltadb_reduction *r )
+{
+	printf("\"%s",r->attr);
+	switch(r->type) {
+		case CNT:
+			printf(".CNT\":%lf",r->cnt);
+			break;
+		case SUM:
+			printf(".SUM\":%lf",r->sum);
+			break;
+		case FIRST:
+			printf(".FIRST\":%lf",r->first);
+			break;
+		case LAST:
+			printf(".LAST\":%lf",r->last);
+			break;
+		case MIN:
+			printf(".MIN\":%lf",r->min);
+			break;
+		case AVG:
+			printf(".AVG\":%lf",r->cnt>0 ? r->sum/r->cnt : 0);
+			break;
+		case MAX:
+			printf(".MAX\":%lf",r->max);
+			break;
+		case PAVG:
+			printf(".PAVG\":%lf",r->cnt>0 ? r->sum/r->cnt : 0 );
+			break;
+		case INC:
+			printf(".INC\":%lf",r->last-r->first);
 			break;
 	}
 }

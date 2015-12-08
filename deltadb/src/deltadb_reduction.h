@@ -33,7 +33,8 @@ struct deltadb_reduction {
 struct deltadb_reduction *deltadb_reduction_create( const char *name, const char *attr );
 void deltadb_reduction_delete( struct deltadb_reduction *r );
 void deltadb_reduction_reset( struct deltadb_reduction *r );
-void deltadb_reduction_update( struct deltadb_reduction *r, const char *value );
+void deltadb_reduction_update( struct deltadb_reduction *r, double value );
 void deltadb_reduction_print( struct deltadb_reduction *r );
+void deltadb_reduction_print_json( struct deltadb_reduction *r );
 
 #endif
