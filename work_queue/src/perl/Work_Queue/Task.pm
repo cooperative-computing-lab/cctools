@@ -58,6 +58,11 @@ sub specify_category {
 	return work_queue_task_specify_category($self->{_task}, $name);;
 }
 
+sub specify_requirement {
+	my ($self, $name) = @_;
+	return work_queue_task_specify_requirement($self->{_task}, $name);;
+}
+
 sub clone {
 	my ($self) = @_;
 	my $copy = $self;
@@ -478,6 +483,18 @@ have similar resources requirements (e.g. for fast abort).
 =item tag
 
 The name of the category.
+
+=back
+
+=head3 C<specify_requirement>
+
+Label the task with the given user-defined requirement. The task will only run on a worker that provides (--provides option) such requirement.
+
+=over 12
+
+=item name
+
+The name of the required feature.
 
 =back
 

@@ -107,6 +107,16 @@ class Task(_object):
         return work_queue_task_specify_category(self._task, name)
 
     ##
+    # Label the task with the given user-defined requirement. Tasks with the
+    # requirement will only run on workers that provide it (see worker's
+    # --provides option).
+    #
+    # @param self       Reference to the current task object.
+    # @param name       The name of the requirement.
+    def specify_requirement(self, name):
+        return work_queue_task_specify_requirement(self._task, name)
+
+    ##
     # Indicate that the task would be optimally run on a given host.
     #
     # @param self       Reference to the current task object.
