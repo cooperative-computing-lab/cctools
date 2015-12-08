@@ -374,6 +374,13 @@ have similar resources requirements (e.g. for fast abort).
 */
 void work_queue_task_specify_category(struct work_queue_task *t, const char *category);
 
+/** Label the task with a user-defined requirement. The task will only run on a worker that provides (--provides option) such requirement.
+@param q A work queue object.
+@param t A task object.
+@param category The name of the requirement.
+*/
+void work_queue_task_specify_requirement(struct work_queue_task *t, const char *name);
+
 /** Specify the priority of this task relative to others in the queue.
 Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list, regardless of the priority.
 @param t A task object.

@@ -3358,6 +3358,15 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
 	new->command_line = xxstrdup(task->command_line);
   }
 
+  if(task->required_features) {
+	  new->required_features = list_create(0);
+	  char *req;
+	  list_first_item(task->required_features);
+	  while((req = list_next_item(task->required_features))) {
+		  list_push_tail(new->required_features, xxstrdup(req));
+	  }
+  }
+
   new->input_files  = work_queue_task_file_list_clone(task->input_files);
   new->output_files = work_queue_task_file_list_clone(task->output_files);
   new->env_list     = work_queue_task_env_list_clone(task->env_list);
@@ -3513,6 +3522,16 @@ void work_queue_task_specify_category(struct work_queue_task *t, const char *cat
 		free(t->category);
 
 	t->category = xxstrdup(category);
+}
+
+void work_queue_task_specify_requirement(struct work_queue_task *t, const char *name)
+{
+	if(!name)
+		return;
+	if(!t->required_features)
+		t->required_features = list_create(0);
+
+	list_push_tail(t->required_features, xxstrdup(name));
 }
 
 struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
@@ -4003,6 +4022,14 @@ void work_queue_task_delete(struct work_queue_task *t)
 				free(var);
 			}
 			list_delete(t->env_list);
+		}
+
+		if(t->required_features) {
+			char *feature;
+			while((feature=list_pop_tail(t->required_features))) {
+				free(feature);
+			}
+			list_delete(t->required_features);
 		}
 
 		if(t->hostname)
