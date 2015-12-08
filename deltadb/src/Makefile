@@ -4,8 +4,8 @@ include ../../rules.mk
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = libdeltadb.a
 OBJECTS = $(SOURCES:%.c=%.o)
-PROGRAMS = deltadb_collect deltadb_select_static deltadb_select_dynamic deltadb_select_complete deltadb_project deltadb_reduce_temporal deltadb_reduce_spatial deltadb_pivot
-SCRIPTS = deltadb_collect deltadb_select_static deltadb_select_dynamic deltadb_select_complete deltadb_project deltadb_reduce_temporal deltadb_reduce_spatial deltadb_pivot
+PROGRAMS = deltadb_collect deltadb_select_static deltadb_select_dynamic deltadb_select_complete deltadb_project deltadb_reduce_temporal deltadb_reduce_spatial deltadb_pivot nvpair_to_json
+SCRIPTS =
 SOURCES = deltadb_reduction.c
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
@@ -22,7 +22,7 @@ uninstall:
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
-	for s in $(SCRIPTS); do cat $$s | sed "s:CCTOOLS_VERSION:$(CCTOOLS_VERSION):g" | sed "s:CCTOOLS_RELEASEDATE:$(CCTOOLS_RELEASEDATE):g" > $(CCTOOLS_INSTALL_DIR)/bin/$$s; chmod 755 $(CCTOOLS_INSTALL_DIR)/bin/$$s; done
+	for s in $(PROGRAMS); do cat $$s | sed "s:CCTOOLS_VERSION:$(CCTOOLS_VERSION):g" | sed "s:CCTOOLS_RELEASEDATE:$(CCTOOLS_RELEASEDATE):g" > $(CCTOOLS_INSTALL_DIR)/bin/$$s; chmod 755 $(CCTOOLS_INSTALL_DIR)/bin/$$s; done
 
 test: all
 
