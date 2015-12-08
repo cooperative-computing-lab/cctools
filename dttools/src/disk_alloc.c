@@ -146,20 +146,29 @@ int disk_alloc_create(char *loc, int64_t size) {
 int disk_alloc_delete(char *loc) {
 
 	int result;
-
-	//Check for trailing '/'
-	path_remove_trailing_slashes(loc);
-	char *pwd = get_current_dir_name();
 	char *losetup_args = NULL;
 	char *rm_args = NULL;
 	char *device_loc = NULL;
 	char *losetup_del_args = NULL;
 
+	//Check for trailing '/'
+	path_remove_trailing_slashes(loc);
+	//Check if location is relative or absolute
+	result = strncmp(loc, "/", 1);
+	if(result != 0) {
+		char *pwd = get_current_dir_name();
+		path_remove_trailing_slashes(pwd);
+		device_loc = string_format("%s/%s/alloc.img", pwd, loc);
+		free(pwd);
+	}
+	else {
+		device_loc = string_format("%s/alloc.img", loc);
+	}
+	
+
 	//Find Used Device
 	char *dev_num = "-1";
-	device_loc = string_format("%s/%s/alloc.img", pwd, loc);
-	free(pwd);
-
+	
 	//Loop Device Unmounted
 	result = umount2(loc, MNT_FORCE);
 	if(result != 0) {
@@ -169,7 +178,7 @@ int disk_alloc_delete(char *loc) {
 		}
 	}
 
-	//Find pathname of mountpoint associated with loop devide
+	//Find pathname of mountpoint associated with loop device
 	char loop_dev[128], loop_info[128], loop_mount[128];
 	FILE *loop_find;
 	losetup_args = string_format("losetup -j %s", device_loc);
@@ -204,7 +213,7 @@ int disk_alloc_delete(char *loc) {
 	losetup_del_args = string_format("losetup -d %s", dev_num);
 
 	//Loop Device Deleted
-	result = system(losetup_args);
+	result = system(losetup_del_args);
 	if(result != 0) {
 
 		if(errno != ENOENT) {
