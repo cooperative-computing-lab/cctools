@@ -10,7 +10,7 @@ See the file COPYING for details.
 /** @file jx_database.h
 
 jx_database is a persistent database for keeping track of a set of
-objects, each indexed by a unique key and described by a set of
+json objects, each indexed by a unique key and described by a set of
 arbitrary name value pairs.  The current state of the database
 is kept in memory for fast queries, while a history of all modifications
 is logged to disk to enable recovering the state of the database
@@ -43,11 +43,11 @@ The log file consists of a series of entries,
 each one a json array in the following formats:
 
 <pre>
-[ "T", time ]             - Indicates the current time in Unix epoch format.
-[ "C", key, object ]      - Create a new object with the given key.
-[ "D", key ]              - Delete an object with the given key.
-[ "U", key, name, value ] - Update a named property with a new value.
-[ "R", key, name ]        - Remove a property with the given name.
+T [time]               - Indicates the current time in Unix epoch format.
+C [key] [object]       - Create a new object with the given key.
+D [key] [object]       - Delete an object with the given key.
+U [key] [name] [value] - Update a named property with a new value.
+R [key] [name]         - Remove a property with the given name.
 
 In the examples above, time is a JSON integer,
 key and name are JSON strings, object is a JSON object,
