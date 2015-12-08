@@ -99,7 +99,7 @@ class Task(_object):
     #
     # @param self       Reference to the current task object.
     # @param name       The name of the category
-    def specify_category(self, tag):
+    def specify_category(self, name):
         return work_queue_task_specify_category(self._task, name)
 
     ##
