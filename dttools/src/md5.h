@@ -10,6 +10,13 @@ See the file COPYING for details.
 #include <stdint.h>
 #include <stdlib.h>
 
+#define md5_init cctools_md5_init
+#define md5_update cctools_md5_update
+#define md5_final cctools_md5_final
+#define md5_buffer cctools_md5_buffer
+#define md5_file cctools_md5_file
+#define md5_string cctools_md5_string
+
 /** @file md5.h
 Routines for computing MD5 checksums.
 */
