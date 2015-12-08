@@ -38,6 +38,7 @@ See the file COPYING for details.
 #include "random.h"
 #include "url_encode.h"
 #include "md5.h"
+#include "hash_table.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -190,6 +191,9 @@ static struct list   *procs_waiting = NULL;
 // These are additional pointers into procs_table.
 static struct itable *procs_complete = NULL;
 
+//User specified categories this worker provides.
+static struct hash_table *categories = NULL;
+
 static int results_to_be_sent_msg = 0;
 
 static timestamp_t total_task_execution_time = 0;
@@ -319,6 +323,24 @@ void measure_worker_resources()
 	last_resources_measurement = time(0);
 }
 
+/*
+Send a message to the master with user defined features.
+*/
+static void send_categories(struct link *master) {
+	if(!categories)
+		return;
+
+	char *c;
+	void *dummy;
+	hash_table_firstkey(categories);
+
+	char cenc[WORK_QUEUE_LINE_MAX];
+	while(hash_table_nextkey(categories, &c, &dummy)) {
+		url_encode(c, cenc, WORK_QUEUE_LINE_MAX);
+		send_master_message(master, "category %s\n", cenc);
+	}
+}
+
 
 /*
 Send a message to the master with my current resources.
@@ -385,6 +407,7 @@ static void report_worker_ready( struct link *master )
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
 	send_master_message(master,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
+	send_categories(master);
 	send_keepalive(master);
 }
 
@@ -1899,6 +1922,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
 	printf( " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
 	printf( " %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n", "--disk-allocation");
+	printf( " %-30s Specifies a user-defined category the worker provides. May be specified several times.\n", "--category");
 	printf( " %-30s Set the maximum number of seconds the worker may be active. (in s).\n", "--wall-time=<s>");
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
@@ -1909,10 +1933,12 @@ static void show_help(const char *cmd)
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
-	  LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
-	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
-	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE,
-	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION};
+	LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
+	LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
+	LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE,
+	LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
+	LONG_OPT_CATEGORY
+};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1955,6 +1981,7 @@ static const struct option long_options[] = {
 	{"docker",              required_argument,  0,  LONG_OPT_RUN_DOCKER},
 	{"docker-preserve",     required_argument,  0,  LONG_OPT_RUN_DOCKER_PRESERVE},
 	{"docker-tar",          required_argument,  0,  LONG_OPT_BUILD_FROM_TAR},
+	{"category",            required_argument,  0,  LONG_OPT_CATEGORY},
 	{0,0,0,0}
 };
 
@@ -2165,6 +2192,11 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_DISK_ALLOCATION:
 			disk_allocation = 1;
+			break;
+		case LONG_OPT_CATEGORY:
+			if(!categories)
+				categories = hash_table_create(4, 0);
+			hash_table_insert(categories, optarg, (void **) 1);
 			break;
 		default:
 			show_help(argv[0]);
