@@ -42,16 +42,21 @@ int disk_alloc_create(char *loc, int64_t size) {
 	device_loc = string_format("%s/alloc.img", loc);
 	//Make Directory for Loop Device
 	if(mkdir(loc, 0777) != 0) {
-		debug(D_NOTICE, "Failed to make directory at requested mountpoint.\n");
+		debug(D_NOTICE, "Failed to make directory at requested mountpoint: %s.\n", strerror(errno));
 		goto error;
 	}
 
 	//Create Image
 	dd_args = string_format("dd if=/dev/zero of=%s bs=1024 count=%"PRId64"", device_loc, size);
 	if(system(dd_args) != 0) {
-		unlink(device_loc);
-		rmdir(loc);
-		debug(D_NOTICE, "Failed to allocate junk space for loop device image.\n");
+		debug(D_NOTICE, "Failed to allocate junk space for loop device image: %s.\n", strerror(errno));
+		if(unlink(device_loc)) {
+			debug(D_NOTICE, "Failed to unlink loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
+			goto error;
+		}
+		if(rmdir(loc)) {
+			debug(D_NOTICE, "Failed to remove directory of loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
+		}
 		goto error;
 	}
 
@@ -75,19 +80,26 @@ int disk_alloc_create(char *loc, int64_t size) {
 	}
 
 	if(losetup_flag == 1) {
-		unlink(device_loc);
-		rmdir(loc);
-		debug(D_NOTICE, "Failed to attach image to loop device.\n");
+		debug(D_NOTICE, "Failed to attach image to loop device: %s.\n", strerror(errno));
+		if(unlink(device_loc)) {
+			debug(D_NOTICE, "Failed to unlink loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
+			goto error;
+		}
+		if(rmdir(loc)) {
+			debug(D_NOTICE, "Failed to remove directory of loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
+		}
 		goto error;
 	}
 
 	//Create Filesystem
 	if(system(mk_args) != 0) {
 		char *rm_dir_args;
+		debug(D_NOTICE, "Failed to initialize filesystem on loop device: %s.\n", strerror(errno));
 		rm_dir_args = string_format("losetup -d /dev/loop%d; rm -r %s", j, loc);
-		system(rm_dir_args);
+		if(system(rm_dir_args) == -1) {
+			debug(D_NOTICE, "Failed to detach loop device and remove its contents while attempting to clean up after failure: %s.\n", strerror(errno));
+		}
 		free(rm_dir_args);
-		debug(D_NOTICE, "Failed to initialize filesystem on loop device.\n");
 		goto error;
 	}
 
@@ -95,10 +107,12 @@ int disk_alloc_create(char *loc, int64_t size) {
 	result = mount(mount_args, loc, "ext4", 0, "");
 	if(result != 0) {
 		char *rm_dir_args;
+		debug(D_NOTICE, "Failed to mount loop device: %s.\n", strerror(errno));
 		rm_dir_args = string_format("losetup -d /dev/loop%d; rm -r %s", j, loc);
-		system(rm_dir_args);
+		if(system(rm_dir_args) == -1) {
+			debug(D_NOTICE, "Failed to detach loop device and remove its contents while attempting to clean up after failure: %s.\n", strerror(errno));
+		}
 		free(rm_dir_args);
-		debug(D_NOTICE, "Failed to mount loop device.\n");
 		goto error;
 	}
 
@@ -150,7 +164,7 @@ int disk_alloc_delete(char *loc) {
 	result = umount2(loc, MNT_FORCE);
 	if(result != 0) {
 		if(errno != ENOENT) {
-			debug(D_NOTICE, "Failed to unmount loop device.\n");
+			debug(D_NOTICE, "Failed to unmount loop device: %s.\n", strerror(errno));
 			goto error;
 		}
 	}
@@ -182,7 +196,7 @@ int disk_alloc_delete(char *loc) {
 
 	//Device Not Found
 	if(strcmp(dev_num, "-1") == 0) {
-		debug(D_NOTICE, "Failed to locate loop device associated with given mountpoint.\n");
+		debug(D_NOTICE, "Failed to locate loop device associated with given mountpoint: %s.\n", strerror(errno));
 		goto error;
 	}
 
@@ -194,7 +208,7 @@ int disk_alloc_delete(char *loc) {
 	if(result != 0) {
 
 		if(errno != ENOENT) {
-			debug(D_NOTICE, "Failed to remove loop device associated with given mountpoint.\n");
+			debug(D_NOTICE, "Failed to remove loop device associated with given mountpoint: %s.\n", strerror(errno));
 			goto error;
 		}
 	}
@@ -202,14 +216,14 @@ int disk_alloc_delete(char *loc) {
 	//Image Deleted
 	result = unlink(rm_args);
 	if(result != 0) {
-		debug(D_NOTICE, "Failed to delete image file associated with given mountpoint.\n");
+		debug(D_NOTICE, "Failed to delete image file associated with given mountpoint: %s.\n", strerror(errno));
 		goto error;
 	}
 
 	//Directory Deleted
 	result = rmdir(loc);
 	if(result != 0) {
-		debug(D_NOTICE, "Failed to delete directory associated with given mountpoint.\n");
+		debug(D_NOTICE, "Failed to delete directory associated with given mountpoint: %s.\n", strerror(errno));
 		goto error;
 	}
 
