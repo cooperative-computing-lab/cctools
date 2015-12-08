@@ -150,6 +150,8 @@ struct work_queue_task {
 
 	char *category;                                        /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
+	struct list *required_features;                        /**< User-defined features this task requires. (See work_queue_worker's --provide option.) */
+
 	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 };
 

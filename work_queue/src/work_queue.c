@@ -202,7 +202,7 @@ struct work_queue_worker {
 	int  foreman;                             // 0 if regular worker, 1 if foreman
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
-	struct hash_table           *categories;
+	struct hash_table           *features;
 
 	struct hash_table *current_files;
 	struct link *link;
@@ -267,7 +267,7 @@ static work_queue_result_code_t get_available_results(struct work_queue *q, stru
 static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_msg_code_t process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
-static work_queue_msg_code_t process_category(struct work_queue *q, struct work_queue_worker *w, const char *line);
+static work_queue_msg_code_t process_feature(struct work_queue *q, struct work_queue_worker *w, const char *line);
 
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
 
@@ -528,8 +528,8 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = MSG_PROCESSED;
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
-	} else if (string_prefix_is(line, "category")) {
-		result = process_category(q, w, line);
+	} else if (string_prefix_is(line, "feature")) {
+		result = process_feature(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
 		debug(D_WQ|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
 		result = MSG_FAILURE;
@@ -765,8 +765,8 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
 
-	if(w->categories)
-		hash_table_delete(w->categories);
+	if(w->features)
+		hash_table_delete(w->features);
 
 	free(w->stats);
 	free(w->hostname);
@@ -2016,22 +2016,22 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 	return MSG_PROCESSED;
 }
 
-static work_queue_msg_code_t process_category( struct work_queue *q, struct work_queue_worker *w, const char *line )
+static work_queue_msg_code_t process_feature( struct work_queue *q, struct work_queue_worker *w, const char *line )
 {
-	char category[WORK_QUEUE_LINE_MAX];
-	char cdec[WORK_QUEUE_LINE_MAX];
+	char feature[WORK_QUEUE_LINE_MAX];
+	char fdec[WORK_QUEUE_LINE_MAX];
 
-	int n = sscanf(line, "category %s", category);
+	int n = sscanf(line, "feature %s", feature);
 
 	if(n != 1)
 		return MSG_FAILURE;
 
-	if(!w->categories)
-		w->categories = hash_table_create(4,0);
+	if(!w->features)
+		w->features = hash_table_create(4,0);
 
-	url_decode(category, cdec, WORK_QUEUE_LINE_MAX);
+	url_decode(feature, fdec, WORK_QUEUE_LINE_MAX);
 
-	hash_table_insert(w->categories, cdec, (void **) 1);
+	hash_table_insert(w->features, fdec, (void **) 1);
 
 	return MSG_PROCESSED;
 }
@@ -2713,9 +2713,16 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	if(w->resources->tag < 0)
 		return 0;
 
-	if(t->category && strcmp(t->category, "default")) {
-		if(!w->categories || !hash_table_lookup(w->categories, t->category))
+	if(t->required_features) {
+		if(!w->features)
 			return 0;
+
+		char *feature;
+		list_first_item(t->required_features);
+		while((feature = list_next_item(t->required_features))) {
+		if(!hash_table_lookup(w->features, feature))
+			return 0;
+		}
 	}
 
 	if(w->foreman)
@@ -5339,7 +5346,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 	}
 }
 
-void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total, struct hash_table *categories)
+void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total, struct hash_table *features)
 {
 	struct work_queue_worker *w;
 	char *key;
@@ -5350,21 +5357,21 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 		return;
 	}
 
-	if(categories) {
-		hash_table_clear(categories);
+	if(features) {
+		hash_table_clear(features);
 	}
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 			work_queue_resources_add(total,w->resources);
 
-			if(categories) {
-				if(w->categories) {
+			if(features) {
+				if(w->features) {
 					char *key;
 					void *dummy;
-					hash_table_firstkey(w->categories);
-					while(hash_table_nextkey(w->categories, &key, &dummy)) {
-						hash_table_insert(categories, key, (void **) 1);
+					hash_table_firstkey(w->features);
+					while(hash_table_nextkey(w->features, &key, &dummy)) {
+						hash_table_insert(features, key, (void **) 1);
 					}
 				}
 			}
