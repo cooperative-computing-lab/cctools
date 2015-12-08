@@ -4,7 +4,12 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "nvpair.h"
+#include "deltadb_stream.h"
+
+#include "jx_database.h"
+#include "jx_print.h"
+#include "jx_parse.h"
+
 #include "hash_table.h"
 #include "debug.h"
 
@@ -15,230 +20,166 @@ See the file COPYING for details.
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <stdarg.h>
+#include <ctype.h>
 
 struct deltadb {
 	struct hash_table *table;
 	const char *logdir;
 	FILE *logfile;
+	int output_started;
 };
 
 struct deltadb * deltadb_create( const char *logdir )
 {
 	struct deltadb *db = malloc(sizeof(*db));
+	memset(db,0,sizeof(*db));
 	db->table = hash_table_create(0,0);
 	db->logdir = logdir;
 	db->logfile = 0;
 	return db;
 }
 
-void deltadb_delete( struct deltadb *db )
-{
-  // should delete all nvpairs in the table here
-	if(db->table) hash_table_delete(db->table);
-	if(db->logfile) fclose(db->logfile);
-	free(db);
-}
-
-
-#define NVPAIR_LINE_MAX 4096
+/* Get a complete checkpoint file and reconstitute the state of the table. */
 
 static int checkpoint_read( struct deltadb *db, const char *filename )
 {
 	FILE * file = fopen(filename,"r");
 	if(!file) return 0;
 
-	while(1) {
-		struct nvpair *nv = nvpair_create();
-		if(nvpair_parse_stream(nv,file)) {
-			const char *key = nvpair_lookup_string(nv,"key");
-			if(key) {
-				nvpair_delete(hash_table_remove(db->table,key));
-				hash_table_insert(db->table,key,nv);
-			} else {
-				nvpair_delete(nv);
-			}
-		} else {
-			nvpair_delete(nv);
-			break;
-		}
-	}
+	/* Load the entire checkpoint into one json object */
+	struct jx *jcheckpoint = jx_parse_stream(file);
 
 	fclose(file);
 
+	if(!jcheckpoint || jcheckpoint->type!=JX_OBJECT) {
+		fprintf(stderr,"checkpoint %s is not a valid json document!\n",filename);
+		jx_delete(jcheckpoint);
+		return 0;
+	}
+
+	/* For each key and value, move the value over to the hash table. */
+
+	struct jx_pair *p;
+	for(p=jcheckpoint->pairs;p;p=p->next) {
+		jx_assert(p->key,JX_STRING);
+		hash_table_insert(db->table,p->key->string_value,p->value);
+		p->value = 0;
+	}
+
+	/* Delete the leftover object with empty pairs. */
+
+	jx_delete(jcheckpoint);
+
 	return 1;
 }
 
-/*
-Replay a given log file into the hash table, up to the given snapshot time.
-Return true if the stoptime was reached.
-*/
-
-static int log_play( struct hash_table *table, FILE *stream, const char *filename, time_t start_time, time_t end_time, int started)
+int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobject )
 {
-	time_t current = 0;
-	time_t last_ts = 0;
-	struct nvpair *nv;
+	hash_table_insert(db->table,key,jobject);
+	return 1;
+}
 
-	char line[NVPAIR_LINE_MAX];
-	char key[NVPAIR_LINE_MAX];
-	char name[NVPAIR_LINE_MAX];
-	char value[NVPAIR_LINE_MAX];
-	char oper;
+int deltadb_delete_event( struct deltadb *db, const char *key )
+{
+	jx_delete(hash_table_remove(db->table,key));
+	return 1;
+}
 
-	int updates = 0;
-	int creating = 0;
-	int bad = 0;
+int deltadb_update_event( struct deltadb *db, const char *key, const char *name, struct jx *jvalue )
+{
+	struct jx * jobject = hash_table_lookup(db->table,key);
+	if(!jobject) {
+		fprintf(stderr,"warning: key %s does not exist in table\n",key);
+		return 1;
+	}
 
-	printf("T %i\n",(int)start_time);
+	struct jx *jname = jx_string(name);
+	jx_delete(jx_remove(jobject,jname));
+	jx_insert(jobject,jname,jvalue);
+	return 1;
+}
 
-	while(fgets(line,sizeof(line),stream)) {
-		int n = 0;
-		if (!creating){
-			n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
-			switch(oper) {
-				case 'C':
-					if (n!=2) bad = 1;
-					else if (started) creating = 1;
-					break;
-				case 'D':
-					if (n!=2) bad = 1;
-					break;
-				case 'U':
-					if (n!=4) bad = 1;
-					break;
-				case 'R':
-					if (n!=3) bad = 1;
-					break;
-				case 'T':
-					if (n!=2) bad = 1;
-					break;
-				default:
-					if(!creating && started) bad = 1;
-			}
+int deltadb_remove_event( struct deltadb *db, const char *key, const char *name )
+{
+	struct jx *jobject = hash_table_lookup(db->table,key);
+	if(!jobject) {
+		fprintf(stderr,"warning: key %s does not exist in table\n",key);
+		return 0;
+	}
 
-		} else {
-			n = sscanf(line,"%s %[^\n]",name,value);
-			oper = '\0';
-			if (n<=0) creating = 0;
-			else if (n==1) bad = 1;
+	struct jx *jname = jx_string(name);
+	jx_delete(jx_remove(jobject,jname));
+	jx_delete(jname);
+	return 1;
+}
+
+int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, time_t current )
+{
+	if(current>stoptime) return 0;
+
+	if(current>starttime && !db->output_started) {
+		printf("T %lld\n",(long long)current);
+		char *key;
+		struct jx *jvalue;
+		hash_table_firstkey(db->table);
+		while(hash_table_nextkey(db->table,&key,(void**)&jvalue)) {
+			char *str = jx_print_string(jvalue);
+			printf("C %s %s\n",key,str);
+			free(str);
 		}
-		if (bad){
-			debug(D_NOTICE,"corrupt log data: %s",line);
-			bad = 0;
-			continue;
-		}
+		db->output_started = 1;
+	}
 
+	return 1;
+}
 
-		if (started==1){
-			//printf("(%s",line);
-			if (line[0]=='T' && line[1]!=' ') // Handles corrupt times that cause the select to think it is done.
-				continue;
-			if (oper=='T'){
-				last_ts = current;
-				current = atol(key);
-				if ((current-last_ts)>(24*3600) && last_ts>0)
-					continue;
-				if(current>end_time){
-					return 0;
-				}
-			}
-			printf("%s",line);
-			continue;
-		}
-		if(n<1) continue;
-		//printf("-\n");
-
-		switch(oper) {
-			case 'C':
-				nv = nvpair_create();
-				nvpair_parse_stream(nv,stream);
-				nvpair_delete(hash_table_remove(table,name));
-				hash_table_insert(table,key,nv);
-				break;
-			case 'D':
-				nv = hash_table_remove(table,key);
-				if(nv) nvpair_delete(nv);
-				break;
-			case 'U':
-				updates += 1;
-				//printf("%d..%s\n",updates,key);
-				nv = hash_table_lookup(table,key);
-				if(nv) nvpair_insert_string(nv,name,value);
-				break;
-			case 'R':
-				nv = hash_table_lookup(table,key);
-				if(nv) nvpair_remove(nv,name);
-				else debug(D_DEBUG,"no attribute to remove: %s",line);
-				break;
-			case 'T':
-				last_ts = current;
-				current = atol(key);
-				if ((current-last_ts)>(24*3600) && last_ts>0)
-					current = last_ts;
-				if(started==0 && current>=start_time){
-					hash_table_firstkey(table);
-					char *object_key;
-
-					while(hash_table_nextkey(table, &object_key, (void **)&nv)) {
-
-						printf("C %s\n",nvpair_lookup_string(nv,"key"));
-						nvpair_print_text(nv,stdout);
-					}
-					//printf(".Checkpoint End.\n");
-					printf(line);
-					started = 1;
-				} else if(current>end_time) {
-					return 0;
-				} else if (started==0){
-					//Lines before the start_time are skipped.
-				}
-				break;
-			default:
-				debug(D_NOTICE,"corrupt log data: %s",line);
-				//printf("corrupt log data: %s",line);
-				break;
-		}
+int deltadb_post_event( struct deltadb *db, const char *line )
+{
+	if(db->output_started) {
+		printf("%s",line);
 	}
 	return 1;
 }
 
 /*
-Play the log from start_time to end_time by opening the appropriate
+Play the log from starttime to stoptime by opening the appropriate
 checkpoint file and working ahead in the various log files.
 */
 
-static int log_play_time( struct deltadb *db, time_t start_time, time_t end_time )
+static int log_play_time( struct deltadb *db, time_t starttime, time_t stoptime )
 {
-	char filename[NVPAIR_LINE_MAX];
+	char filename[1024];
 	int file_errors = 0;
 
-	struct tm *t = gmtime(&start_time);
+	struct tm *starttm = localtime(&starttime);
 
-	int year = t->tm_year + 1900;
-	int day = t->tm_yday;
+	int year = starttm->tm_year + 1900;
+	int day = starttm->tm_yday;
+
+	struct tm *stoptm = localtime(&stoptime);
+
+	int stopyear = stoptm->tm_year + 1900;
+	int stopday = stoptm->tm_yday;
 
 	sprintf(filename,"%s/%d/%d.ckpt",db->logdir,year,day);
-	debug(D_DEBUG,"Reading file: %s",filename);
 	checkpoint_read(db,filename);
 
-	int started = 0;
 	while(1) {
 		sprintf(filename,"%s/%d/%d.log",db->logdir,year,day);
 		FILE *file = fopen(filename,"r");
-		debug(D_DEBUG,"Reading file: %s",filename);
-		fprintf(stderr,"Reading file: %s\n",filename);
-		fflush(stderr);
 		if(!file) {
 			file_errors += 1;
-			debug(D_DEBUG,"couldn't open %s: %s",filename,strerror(errno));
+			fprintf(stderr,"couldn't open %s: %s\n",filename,strerror(errno));
 			if (file_errors>5)
 				break;
 		} else {
-			int keepgoing = log_play(db->table,file,filename,start_time,end_time,started);
-			started = 1;
+			int keepgoing = deltadb_process_stream(db,file,starttime,stoptime);
+			starttime = 0;
 
 			fclose(file);
 
+			// If we reached the endtime in the file, stop.
 			if(!keepgoing) break;
 		}
 
@@ -247,93 +188,102 @@ static int log_play_time( struct deltadb *db, time_t start_time, time_t end_time
 			year++;
 			day = 0;
 		}
+
+		// If we have passed the file, stop.
+		if(year>=stopyear && day>stopday) break;
 	}
-	//printf(".Log End.\n");
+
 	return 1;
 }
 
-int main( int argc, char *argv[] )
+int suffix_to_multiplier( char suffix )
 {
-	struct tm t1, t2;
+	switch(tolower(suffix)) {
+	case 'y': return 60*60*24*365;
+	case 'w': return 60*60*24*7;
+	case 'd': return 60*60*24;
+	case 'h': return 60*60;
+	case 'm': return 60;
+	default: return 1;
+	}
+}
 
-	memset(&t1,0,sizeof(t1));
-	memset(&t2,0,sizeof(t2));
+time_t parse_time( const char *str, time_t current )
+{
+	struct tm t;
+	int count;
+	char suffix[2];
+	int n;
 
+	memset(&t,0,sizeof(t));
 
-
-	int start_year, start_month, start_day, start_hour, start_minute, start_second;
-	sscanf(argv[2], "%d-%d-%d@%d:%d:%d", &start_year, &start_month, &start_day, &start_hour, &start_minute, &start_second);
-	if (start_hour>23)
-		start_hour = 0;
-	if (start_minute>23)
-		start_minute = 0;
-	if (start_second>23)
-		start_second = 0;
-	//printf("%d-%d-%d@%d:%d:%d",start_year, start_month, start_day, start_hour, start_minute, start_second);
-
-	t1.tm_year = start_year-1900;
-	t1.tm_mon = start_month-1;
-	t1.tm_mday = start_day;
-	t1.tm_hour = start_hour;
-	t1.tm_min = start_minute;
-	t1.tm_sec = start_second;
-
-
-	time_t start_time = mktime(&t1);
-	time_t stop_time;
-
-	if (strlen(argv[3])>=14){
-		sscanf(argv[3], "%d-%d-%d@%d:%d:%d", &start_year, &start_month, &start_day, &start_hour, &start_minute, &start_second);
-
-		t2.tm_year = start_year-1900;
-		t2.tm_mon = start_month-1;
-		t2.tm_mday = start_day;
-		t2.tm_hour = start_hour;
-		t2.tm_min = start_minute;
-		t2.tm_sec = start_second;
-
-		stop_time = mktime(&t2);
-
-	} else {
-		int duration_value;
-		char duration_metric;
-		sscanf(argv[3], "%c%i", &duration_metric, &duration_value);
-
-		t2.tm_year = start_year-1900;
-		t2.tm_mon = start_month-1;
-		t2.tm_mday = start_day;
-		t2.tm_hour = start_hour;
-		t2.tm_min = start_minute;
-		t2.tm_sec = start_second;
-
-		stop_time = mktime(&t2);
-		if (duration_metric=='y')
-			stop_time += duration_value*365*24*3600;
-		else if (duration_metric=='w')
-			stop_time += duration_value*7*24*3600;
-		else if (duration_metric=='d')
-			stop_time += duration_value*24*3600;
-		else if (duration_metric=='h')
-			stop_time += duration_value*3600;
-		else if (duration_metric=='m')
-			stop_time += duration_value*60;
-		else if (duration_metric=='s')
-			stop_time += duration_value;
+	if(!strcmp(str,"now")) {
+		return current;
 	}
 
+	n = sscanf(str, "%d%[yYdDhHmMsS]", &count, suffix);
+	if(n==2) {
+		return current - count*suffix_to_multiplier(suffix[0]);
+	}
 
+	n = sscanf(str, "%d-%d-%d@%d:%d:%d", &t.tm_year,&t.tm_mon,&t.tm_mday,&t.tm_hour,&t.tm_min,&t.tm_sec);
+	if(n==6) {
+		if (t.tm_hour>23)
+			t.tm_hour = 0;
+		if (t.tm_min>23)
+			t.tm_min = 0;
+		if (t.tm_sec>23)
+			t.tm_sec = 0;
 
-	//Time Zone thing to be fixed later
-	start_time -= 5*3600;
-	stop_time -= 5*3600;
+		t.tm_year -= 1900;
+		t.tm_mon -= 1;
 
-	struct deltadb *db = deltadb_create(argv[1]);
+		return mktime(&t);
+	}
 
-	log_play_time(db,start_time,stop_time);
+	n = sscanf(str, "%d-%d-%d", &t.tm_year,&t.tm_mon,&t.tm_mday);
+	if(n==3) {
+		t.tm_year -= 1900;
+		t.tm_mon -= 1;
 
-	deltadb_delete(db);
+		return mktime(&t);
+	}
 
 	return 0;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+
+int main( int argc, char *argv[] )
+{
+	if(argc!=4) {
+		fprintf(stderr,"use: deltadb_collect <dbdir> <starttime> <stoptime>\n");
+		fprintf(stderr,"Where times may be may be:\n");
+		fprintf(stderr,"    YY-MM-DD@HH:MM:SS\n");
+		fprintf(stderr,"    HH:MM:SS\n");
+		fprintf(stderr,"    now\n");
+		return 1;
+	}
+
+	time_t current = time(0);
+
+	const char *dbdir = argv[1];
+	time_t starttime = parse_time(argv[2],current);
+	time_t stoptime = parse_time(argv[3],current);
+
+	if(starttime==0) {
+		fprintf(stderr,"invalid start time: %s\n",argv[2]);
+		return 1;
+	}
+
+	if(stoptime==0) {
+		fprintf(stderr,"invalid stop time:%s\n",argv[3]);
+		return 1;
+	}
+
+	struct deltadb *db = deltadb_create(dbdir);
+
+	log_play_time(db,starttime,stoptime);
+
+	return 0;
+}
+

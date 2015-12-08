@@ -4,9 +4,11 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "nvpair.h"
-#include "hash_table.h"
-#include "debug.h"
+#include "deltadb_stream.h"
+
+#include "jx.h"
+#include "jx_print.h"
+#include "jx_parse.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -18,156 +20,110 @@ See the file COPYING for details.
 
 
 struct deltadb {
-	struct hash_table *table;
-	char **attr_list;
-	int attr_len;
+	char **attr;
+	int nattr;
+	time_t current;
+	time_t lastprint;
 };
 
 struct deltadb * deltadb_create( )
 {
 	struct deltadb *db = malloc(sizeof(*db));
-	db->table = hash_table_create(0,0);
-	db->attr_list = NULL;
-	db->attr_len = 0;
+	memset(db,0,sizeof(*db));
 	return db;
 }
 
-void deltadb_delete( struct deltadb *db )
+static int in_attr( struct deltadb *db, const char *name )
 {
-  // should delete all nvpairs in the table here
-	if(db->table) hash_table_delete(db->table);
-	//if(db->logfile) fclose(db->logfile);
-	free(db);
-}
-
-
-/*
-Replay a given log file into the hash table, up to the given snapshot time.
-Return true if the stoptime was reached.
-*/
-
-#define NVPAIR_LINE_MAX 4096
-
-static int log_play( struct deltadb *db )
-{
-	FILE *stream = stdin;
-	time_t current = 0;
-	struct nvpair *nv;
-	int line_number = 0;
-
-	char line[NVPAIR_LINE_MAX];
-	char key[NVPAIR_LINE_MAX];
-	char name[NVPAIR_LINE_MAX];
-	char value[NVPAIR_LINE_MAX];
-	char oper;
-
-	int notime = 1;
-	while(fgets(line,sizeof(line),stream)) {
-		line_number += 1;
-
-		if (line[0]=='\n') return 0;
-
-		int n = sscanf(line,"%c %s %s %[^\n]",&oper,key,name,value);
-		if(n<1) continue;
-
-		int i,include;
-		switch(oper) {
-			case 'C':
-				nv = nvpair_create();
-				int num_pairs = nvpair_parse_stream_limited(nv,stream,db->attr_list,db->attr_len);
-				if (num_pairs>0){
-
-					if (notime){
-						printf("T %lld\n",(long long)current);
-						notime = 0;
-					}
-					printf("C %s\n",key);
-					nvpair_print_text(nv,stdout);
-
-				}
-				nvpair_delete(nv);
-				break;
-			case 'D':
-				if (notime){
-					printf("T %lld\n",(long long)current);
-					notime = 0;
-				}
-				printf("%s",line);
-				break;
-			case 'U':
-				include = 0;
-				for(i=0; i<db->attr_len; i++){
-					if(strcmp(name,db->attr_list[i])==0){
-						include = 1;
-						break;
-					}
-				}
-				if (include>0){
-					if (notime){
-						printf("T %lld\n",(long long)current);
-						notime = 0;
-					}
-					printf("%s",line);
-				}
-				break;
-			case 'R':
-				include = 0;
-				for(i=0; i<db->attr_len; i++){
-					if(strcmp(name,db->attr_list[i])==0){
-						include = 1;
-						break;
-					}
-				}
-				if (include>0){
-					if (notime){
-						printf("T %lld\n",(long long)current);
-						notime = 0;
-					}
-					printf("%s",line);
-				}
-				break;
-			case 'T':
-				current = atol(key);
-				notime = 1;
-				break;
-			default:
-				debug(D_NOTICE,"corrupt log data[%i]: %s",line_number,line);
-				fflush(stderr);
-				break;
-		}
+	int i;
+	for(i=0;i<db->nattr;i++) {
+		if(!strcmp(name,db->attr[i])) return 1;
 	}
 	return 0;
 }
 
-/*
-Play the log from start_time to end_time by opening the appropriate
-checkpoint file and working ahead in the various log files.
-*/
-
-static int parse_input( struct deltadb *db )
+static void print_time_if_changed( struct deltadb *db )
 {
-	while(1) {
-		int keepgoing = log_play(db);
-		if(!keepgoing) break;
+	if(db->lastprint!=db->current) {
+		printf("T %lld\n",(long long)db->current);
+		db->lastprint = db->current;
+	}
+}
+
+int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobject )
+{
+	print_time_if_changed(db);
+
+	struct jx *j = jx_object(0);
+	int i;
+
+	for(i=0;i<db->nattr;i++) {
+		struct jx * jvalue = jx_lookup(jobject,db->attr[i]);
+		if(jvalue) {
+			jx_insert(j,jx_string(db->attr[i]),jx_copy(jvalue));
+		}
+	}
+
+	char *str = jx_print_string(j);
+	printf("C %s %s\n",key,str);
+	free(str);
+	jx_delete(j);
+
+	return 1;
+}
+
+int deltadb_delete_event( struct deltadb *db, const char *key )
+{
+	print_time_if_changed(db);
+
+	printf("D %s\n",key);
+	return 1;
+}
+
+int deltadb_update_event( struct deltadb *db, const char *key, const char *name, struct jx *jvalue )
+{
+	if(in_attr(db,name)) {
+		print_time_if_changed(db);
+		char *str = jx_print_string(jvalue);
+		printf("U %s %s %s\n",key,name,str);
+		free(str);
+	}	
+	return 1;
+}
+
+int deltadb_remove_event( struct deltadb *db, const char *key, const char *name )
+{
+	if(in_attr(db,name)) {
+		print_time_if_changed(db);
+		printf("R %s %s\n",key,name);
 	}
 	return 1;
 }
+
+int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, time_t current )
+{
+	db->current = current;
+	return 1;
+}
+
+int deltadb_post_event( struct deltadb *db, const char *line )
+{
+	return 1;
+}
+
 
 int main( int argc, char *argv[] )
 {
 	struct deltadb *db = deltadb_create();
 
 	int i;
-	db->attr_len = argc-1;
-	db->attr_list = malloc(sizeof(char*)*db->attr_len);
+	db->nattr = argc-1;
+	db->attr = malloc(sizeof(char*)*db->nattr);
 	for (i=1; i<argc; i++){
-		db->attr_list[i-1] = argv[i];
+		db->attr[i-1] = argv[i];
 	}
 
-
-	parse_input(db);
-
-	deltadb_delete(db);
+	deltadb_process_stream(db,stdin,0,0);
 
 	return 0;
 }

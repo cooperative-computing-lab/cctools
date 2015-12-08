@@ -6,12 +6,13 @@ LIBRARIES = libdeltadb.a
 OBJECTS = $(SOURCES:%.c=%.o)
 PROGRAMS = deltadb_collect deltadb_select_static deltadb_select_dynamic deltadb_select_complete deltadb_project deltadb_reduce_temporal deltadb_reduce_spatial deltadb_pivot nvpair_to_json
 SCRIPTS =
-SOURCES = deltadb_reduction.c
+SOURCES = deltadb_reduction.c deltadb_stream.c
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
 all: $(TARGETS)
 
 libdeltadb.a: $(OBJECTS)
+
 $(PROGRAMS): $(LIBRARIES) $(EXTERNAL_DEPENDENCIES)
 
 clean:
