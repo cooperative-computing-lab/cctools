@@ -164,11 +164,10 @@ int disk_alloc_delete(char *loc) {
 	else {
 		device_loc = string_format("%s/alloc.img", loc);
 	}
-	
 
 	//Find Used Device
 	char *dev_num = "-1";
-	
+
 	//Loop Device Unmounted
 	result = umount2(loc, MNT_FORCE);
 	if(result != 0) {
