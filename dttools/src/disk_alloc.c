@@ -50,11 +50,11 @@ int disk_alloc_create(char *loc, int64_t size) {
 	dd_args = string_format("dd if=/dev/zero of=%s bs=1024 count=%"PRId64"", device_loc, size);
 	if(system(dd_args) != 0) {
 		debug(D_NOTICE, "Failed to allocate junk space for loop device image: %s.\n", strerror(errno));
-		if(unlink(device_loc)) {
+		if(unlink(device_loc) == -1) {
 			debug(D_NOTICE, "Failed to unlink loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
 			goto error;
 		}
-		if(rmdir(loc)) {
+		if(rmdir(loc) == -1) {
 			debug(D_NOTICE, "Failed to remove directory of loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
 		}
 		goto error;
@@ -81,11 +81,11 @@ int disk_alloc_create(char *loc, int64_t size) {
 
 	if(losetup_flag == 1) {
 		debug(D_NOTICE, "Failed to attach image to loop device: %s.\n", strerror(errno));
-		if(unlink(device_loc)) {
+		if(unlink(device_loc) == -1) {
 			debug(D_NOTICE, "Failed to unlink loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
 			goto error;
 		}
-		if(rmdir(loc)) {
+		if(rmdir(loc) == -1) {
 			debug(D_NOTICE, "Failed to remove directory of loop device image while attempting to clean up after failure: %s.\n", strerror(errno));
 		}
 		goto error;
