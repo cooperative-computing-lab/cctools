@@ -5339,13 +5339,6 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 	}
 }
 
-/*
-This function is a little roundabout, because work_queue_resources_add
-updates the min and max of each value as it goes.  So, we set total
-to the value of the first item, then use work_queue_resources_add.
-If there are no items, we must manually return zero.
-*/
-
 void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total )
 {
 	struct work_queue_worker *w;
