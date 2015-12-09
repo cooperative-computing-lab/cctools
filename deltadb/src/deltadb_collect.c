@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "deltadb_stream.h"
+#include "deltadb_expr.h"
 
 #include "jx_database.h"
 #include "jx_print.h"
@@ -14,6 +15,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "getopt.h"
 #include "cctools.h"
+#include "list.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -29,7 +31,10 @@ struct deltadb {
 	struct hash_table *table;
 	const char *logdir;
 	FILE *logfile;
-	int output_started;
+	int epoch_time_mode;
+	struct deltadb_expr *filter_exprs;
+	struct deltadb_expr *where_exprs;
+	struct list * output_exprs;
 };
 
 struct deltadb * deltadb_create( const char *logdir )
@@ -39,6 +44,7 @@ struct deltadb * deltadb_create( const char *logdir )
 	db->table = hash_table_create(0,0);
 	db->logdir = logdir;
 	db->logfile = 0;
+	db->output_exprs = list_create();
 	return db;
 }
 
@@ -62,9 +68,12 @@ static int checkpoint_read( struct deltadb *db, const char *filename )
 
 	/* For each key and value, move the value over to the hash table. */
 
+	/* Skip objects that don't match the filter. */
+
 	struct jx_pair *p;
 	for(p=jcheckpoint->pairs;p;p=p->next) {
 		jx_assert(p->key,JX_STRING);
+		if(!deltadb_expr_matches(db->filter_exprs,p->value)) continue;
 		hash_table_insert(db->table,p->key->string_value,p->value);
 		p->value = 0;
 	}
@@ -78,6 +87,7 @@ static int checkpoint_read( struct deltadb *db, const char *filename )
 
 int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobject )
 {
+	if(!deltadb_expr_matches(db->filter_exprs,jobject)) return 1;
 	hash_table_insert(db->table,key,jobject);
 	return 1;
 }
@@ -91,10 +101,7 @@ int deltadb_delete_event( struct deltadb *db, const char *key )
 int deltadb_update_event( struct deltadb *db, const char *key, const char *name, struct jx *jvalue )
 {
 	struct jx * jobject = hash_table_lookup(db->table,key);
-	if(!jobject) {
-		fprintf(stderr,"warning: key %s does not exist in table\n",key);
-		return 1;
-	}
+	if(!jobject) return 1;
 
 	struct jx *jname = jx_string(name);
 	jx_delete(jx_remove(jobject,jname));
@@ -105,10 +112,7 @@ int deltadb_update_event( struct deltadb *db, const char *key, const char *name,
 int deltadb_remove_event( struct deltadb *db, const char *key, const char *name )
 {
 	struct jx *jobject = hash_table_lookup(db->table,key);
-	if(!jobject) {
-		fprintf(stderr,"warning: key %s does not exist in table\n",key);
-		return 0;
-	}
+	if(!jobject) return 1;
 
 	struct jx *jname = jx_string(name);
 	jx_delete(jx_remove(jobject,jname));
@@ -120,17 +124,48 @@ int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, t
 {
 	if(current>stoptime) return 0;
 
-	if(current>starttime && !db->output_started) {
-		printf("T %lld\n",(long long)current);
-		char *key;
-		struct jx *jvalue;
-		hash_table_firstkey(db->table);
-		while(hash_table_nextkey(db->table,&key,(void**)&jvalue)) {
-			char *str = jx_print_string(jvalue);
-			printf("C %s %s\n",key,str);
+	/* If no output has been defined, skip this. */
+
+	if(!list_size(db->output_exprs)) return 1;
+
+	/* For each item in the table... */
+
+	char *key;
+	struct jx *jobject;
+	hash_table_firstkey(db->table);
+	while(hash_table_nextkey(db->table,&key,(void**)&jobject)) {
+
+		/* Skip if the where expression doesn't match */
+
+		if(!deltadb_expr_matches(db->where_exprs,jobject)) continue;
+
+		/* Emit the current time */
+
+		if(db->epoch_time_mode) {
+			printf("%lld\t",(long long) current);
+		} else {
+			char str[32];
+			strftime(str,sizeof(str),"%F %T",localtime(&current));
+			printf("%s\t",str);
+		}
+
+		/* For each output expression, compute the value and print. */
+
+		struct list_node *n;
+		char *str;
+		for(n=db->output_exprs->head;n;n=n->next) {
+
+			struct jx *jvalue = jx_lookup(jobject,n->data);
+			if(jvalue) {
+				str = jx_print_string(jvalue);
+			} else {
+				str = strdup("null");
+			}
+			printf("%s\t",str);
 			free(str);
 		}
-		db->output_started = 1;
+
+		printf("\n");
 	}
 
 	return 1;
@@ -138,7 +173,7 @@ int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, t
 
 int deltadb_post_event( struct deltadb *db, const char *line )
 {
-	if(db->output_started) {
+	if(!list_size(db->output_exprs)) {
 		printf("%s",line);
 	}
 	return 1;
@@ -290,9 +325,9 @@ void show_help()
 int main( int argc, char *argv[] )
 {
 	const char *dbdir=0;
-	const char *where_expr=0;
-	const char *output_expr=0;
-	const char *filter_expr=0;
+	struct deltadb_expr *where_exprs = 0;
+	struct deltadb_expr *filter_exprs = 0;
+	struct list *output_exprs = list_create();
 	time_t start_time = 0;
 	time_t stop_time = 0;
 	time_t at_time =0;
@@ -309,13 +344,13 @@ int main( int argc, char *argv[] )
 			dbdir = optarg;
 			break;
 		case 'o':
-			output_expr = optarg;
+			list_push_tail(output_exprs,strdup(optarg));
 			break;
 		case 'w':
-			where_expr = optarg;
+			where_exprs = deltadb_expr_create(optarg,where_exprs);
 			break;
 		case 'f':
-			filter_expr = optarg;
+			filter_exprs = deltadb_expr_create(optarg,filter_exprs);
 			break;
 		case 'F':
 			start_time = parse_time(optarg,current);
@@ -329,7 +364,7 @@ int main( int argc, char *argv[] )
 		case 'e':
 			every_interval = parse_time(optarg,current);
 			break;
-		case 'E':
+		case 't':
 			epoch_time_mode = 1;
 			break;
 		case 'v':
@@ -356,6 +391,11 @@ int main( int argc, char *argv[] )
 	}
 
 	struct deltadb *db = deltadb_create(dbdir);
+
+	db->where_exprs = where_exprs;
+	db->filter_exprs = filter_exprs;
+	db->epoch_time_mode = epoch_time_mode;
+	db->output_exprs = output_exprs;
 
 	log_play_time(db,start_time,stop_time);
 

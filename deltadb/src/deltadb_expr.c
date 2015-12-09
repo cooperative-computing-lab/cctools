@@ -91,13 +91,13 @@ int deltadb_expr_matches( struct deltadb_expr *expr, struct jx *jobject )
 {
 	while(expr) {
 		struct jx *jvalue = jx_lookup(jobject,expr->param);
-		if( jvalue && expr_is_true(expr,jvalue) ) {
-			return 1;
-			break;
-		}
+		if(!jvalue) return 0;
+
+		if(!expr_is_true(expr,jvalue)) return 0;
+
 		expr = expr->next;
 	}
 
-	return 0;
+	return 1;
 }
 
