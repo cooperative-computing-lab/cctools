@@ -12,6 +12,8 @@ See the file COPYING for details.
 
 #include "hash_table.h"
 #include "debug.h"
+#include "getopt.h"
+#include "cctools.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -252,37 +254,110 @@ time_t parse_time( const char *str, time_t current )
 	return 0;
 }
 
+static struct option long_options[] =
+{
+	{"db", required_argument, 0, 'D'},
+	{"output", required_argument, 0, 'o'},
+	{"where", required_argument, 0,'w'},
+	{"filter", required_argument, 0,'f'},
+	{"from", required_argument, 0, 'F'},
+	{"to", required_argument, 0, 'T'},
+	{"at", required_argument, 0, 'A'},
+	{"every", required_argument, 0, 'e'},
+	{"epoch-time", no_argument, 0, 't'},
+	{"version", no_argument, 0, 'v'},
+	{"help", no_argument, 0, 'h'},
+	{0,0,0,0}
+};
+
+void show_help()
+{
+	printf("use: deltadb_query [options]\n");
+	printf("Where options are:\n");
+	printf("  --db <path>         Path to the database directory. (required)\n");
+	printf("  --output <expr>     Output this expression. (multiple)\n");
+	printf("  --where <expr>      Only output records matching this expression.\n");
+	printf("  --filter <expr>     Only process records matching this expression.\n");
+	printf("  --from <time>       Begin query at this absolute time. (required)\n");
+	printf("  --to <time>         End query at this absolute time.\n");
+	printf("  --at <time>         Query once at this absolute time.\n");
+	printf("  --every <interval>  Compute output at this time interval.\n");
+	printf("  --epoch-time        Display time column in Unix epoch format.\n");
+	printf("  --version           Show software version.\n");
+	printf("  --help              Show this help text.\n");
+}
 
 int main( int argc, char *argv[] )
 {
-	if(argc!=4) {
-		fprintf(stderr,"use: deltadb_collect <dbdir> <starttime> <stoptime>\n");
-		fprintf(stderr,"Where times may be may be:\n");
-		fprintf(stderr,"    YY-MM-DD@HH:MM:SS\n");
-		fprintf(stderr,"    HH:MM:SS\n");
-		fprintf(stderr,"    now\n");
-		return 1;
-	}
+	const char *dbdir=0;
+	const char *where_expr=0;
+	const char *output_expr=0;
+	const char *filter_expr=0;
+	time_t start_time = 0;
+	time_t stop_time = 0;
+	time_t at_time =0;
+	int every_interval= 0;
+	int epoch_time_mode = 0;
 
 	time_t current = time(0);
 
-	const char *dbdir = argv[1];
-	time_t starttime = parse_time(argv[2],current);
-	time_t stoptime = parse_time(argv[3],current);
+	int c;
 
-	if(starttime==0) {
-		fprintf(stderr,"invalid start time: %s\n",argv[2]);
+	while((c=getopt_long(argc,argv,"D:o:w:f:F:T:A:e:tvh",long_options,0))!=-1) {
+		switch(c) {
+		case 'D':
+			dbdir = optarg;
+			break;
+		case 'o':
+			output_expr = optarg;
+			break;
+		case 'w':
+			where_expr = optarg;
+			break;
+		case 'f':
+			filter_expr = optarg;
+			break;
+		case 'F':
+			start_time = parse_time(optarg,current);
+			break;
+		case 'T':
+			stop_time = parse_time(optarg,current);
+			break;
+		case 'A':
+			at_time = parse_time(optarg,current);
+			break;
+		case 'e':
+			every_interval = parse_time(optarg,current);
+			break;
+		case 'E':
+			epoch_time_mode = 1;
+			break;
+		case 'v':
+			cctools_version_print(stdout,"deltadb_query");
+			break;
+		case 'h':
+			show_help();
+			break;
+		}
+	}
+
+	if(!dbdir) {
+		fprintf(stderr,"deltadb_query: --db argument is required\n");
 		return 1;
 	}
 
-	if(stoptime==0) {
-		fprintf(stderr,"invalid stop time:%s\n",argv[3]);
+	if(start_time==0) {
+		fprintf(stderr,"deltadb_query: invalid start time\n");
 		return 1;
+	}
+
+	if(stop_time==0) {
+		stop_time = time(0);
 	}
 
 	struct deltadb *db = deltadb_create(dbdir);
 
-	log_play_time(db,starttime,stoptime);
+	log_play_time(db,start_time,stop_time);
 
 	return 0;
 }
