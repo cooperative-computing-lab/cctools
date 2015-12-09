@@ -2713,17 +2713,16 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	if(w->resources->tag < 0)
 		return 0;
 
-	if(t->required_features) {
+	if(t->user_resources)
 		if(!w->features)
 			return 0;
 
 		char *feature;
-		list_first_item(t->required_features);
-		while((feature = list_next_item(t->required_features))) {
-		if(!hash_table_lookup(w->features, feature))
-			return 0;
+		list_first_item(t->user_resources);
+		while((feature = list_next_item(t->user_resources))) {
+			if(!hash_table_lookup(w->features, feature))
+				return 0;
 		}
-	}
 
 	if(w->foreman)
 	{
@@ -3358,12 +3357,12 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
 	new->command_line = xxstrdup(task->command_line);
   }
 
-  if(task->required_features) {
-	  new->required_features = list_create(0);
+  if(task->user_resources) {
+	  new->user_resources = list_create(0);
 	  char *req;
-	  list_first_item(task->required_features);
-	  while((req = list_next_item(task->required_features))) {
-		  list_push_tail(new->required_features, xxstrdup(req));
+	  list_first_item(task->user_resources);
+	  while((req = list_next_item(task->user_resources))) {
+		  list_push_tail(new->user_resources, xxstrdup(req));
 	  }
   }
 
@@ -3524,14 +3523,14 @@ void work_queue_task_specify_category(struct work_queue_task *t, const char *cat
 	t->category = xxstrdup(category);
 }
 
-void work_queue_task_specify_requirement(struct work_queue_task *t, const char *name)
+void work_queue_task_specify_resource(struct work_queue_task *t, const char *name, int64_t count)
 {
 	if(!name)
 		return;
-	if(!t->required_features)
-		t->required_features = list_create(0);
+	if(!t->user_resources)
+		t->user_resources = list_create(0);
 
-	list_push_tail(t->required_features, xxstrdup(name));
+	list_push_tail(t->user_resources, xxstrdup(name));
 }
 
 struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
@@ -4024,12 +4023,12 @@ void work_queue_task_delete(struct work_queue_task *t)
 			list_delete(t->env_list);
 		}
 
-		if(t->required_features) {
+		if(t->user_resources) {
 			char *feature;
-			while((feature=list_pop_tail(t->required_features))) {
+			while((feature=list_pop_tail(t->user_resources))) {
 				free(feature);
 			}
-			list_delete(t->required_features);
+			list_delete(t->user_resources);
 		}
 
 		if(t->hostname)
