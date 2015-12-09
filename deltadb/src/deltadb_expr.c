@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2012- The University of Notre Dame
+Copyright (C) 2015- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -27,19 +27,6 @@ struct argument {
 	char *val;
 	struct argument *next;
 };
-
-struct deltadb {
-	struct hash_table *table;
-	struct argument *args;
-};
-
-struct deltadb * deltadb_create()
-{
-	struct deltadb *db = malloc(sizeof(*db));
-	db->table = hash_table_create(0,0);
-	db->args = NULL;
-	return db;
-}
 
 static int is_number(char const* p)
 {
@@ -117,69 +104,6 @@ static int object_matches( struct deltadb *db, struct jx *jobject )
 	}
 
 	return 0;
-}
-
-int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobject )
-{
-	if(object_matches(db,jobject)) {
-		hash_table_insert(db->table,key,jobject);
-		char *str = jx_print_string(jobject);
-		printf("C %s %s\n",key,str);
-		free(str);
-	}
-	return 1;
-}
-
-int deltadb_delete_event( struct deltadb *db, const char *key )
-{
-	struct jx *jobject = hash_table_remove(db->table,key);
-	if(jobject) {
-		jx_delete(hash_table_remove(db->table,key));
-		printf("D %s\n",key);
-	}
-	return 1;
-}
-
-int deltadb_update_event( struct deltadb *db, const char *key, const char *name, struct jx *jvalue )
-{
-	struct jx *jobject;
-	jobject = hash_table_lookup(db->table,key);
-	if(jobject) {
-		struct jx *jname = jx_string(name);
-		jx_delete(jx_remove(jobject,jname));
-		jx_insert(jobject,jname,jvalue);
-
-		char *str = jx_print_string(jvalue);
-		printf("U %s %s %s\n",key,name,str);
-		free(str);
-	} else {
-		jx_delete(jvalue);
-	}
-	return 1;
-}
-
-int deltadb_remove_event( struct deltadb *db, const char *key, const char *name )
-{
-	struct jx *jobject;
-	jobject = hash_table_lookup(db->table,key);
-	if(jobject) {
-		struct jx *jname = jx_string(name);
-		jx_delete(jx_remove(jobject,jname));
-		jx_delete(jname);
-		printf("R %s %s\n",key,name);
-	}
-	return 1;
-}
-
-int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, time_t current )
-{
-	printf("T %lld\n",(long long)current);
-	return 1;
-}
-
-int deltadb_post_event( struct deltadb *db, const char *line )
-{
-	return 1;
 }
 
 int main( int argc, char *argv[] )
