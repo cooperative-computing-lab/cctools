@@ -85,73 +85,8 @@ static int checkpoint_read( struct deltadb *db, const char *filename )
 	return 1;
 }
 
-int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobject )
+static void display_table( struct deltadb *db, time_t current )
 {
-	if(!deltadb_expr_matches(db->filter_exprs,jobject)) return 1;
-	hash_table_insert(db->table,key,jobject);
-
-	if(!list_size(db->output_exprs)) {
-		printf("C %s ",key);
-		jx_print_stream(jobject,stdout);
-		printf("\n");
-	}
-	return 1;
-}
-
-int deltadb_delete_event( struct deltadb *db, const char *key )
-{
-	struct jx *jobject = hash_table_remove(db->table,key);
-
-	if(jobject) {
-		jx_delete(jobject);
-
-		if(!list_size(db->output_exprs)) {
-			printf("D %s\n",key);
-		}
-	}
-	return 1;
-}
-
-int deltadb_update_event( struct deltadb *db, const char *key, const char *name, struct jx *jvalue )
-{
-	struct jx * jobject = hash_table_lookup(db->table,key);
-	if(!jobject) return 1;
-
-	struct jx *jname = jx_string(name);
-	jx_delete(jx_remove(jobject,jname));
-	jx_insert(jobject,jname,jvalue);
-
-	return 1;
-}
-
-int deltadb_remove_event( struct deltadb *db, const char *key, const char *name )
-{
-	struct jx *jobject = hash_table_lookup(db->table,key);
-	if(!jobject) return 1;
-
-	struct jx *jname = jx_string(name);
-	jx_delete(jx_remove(jobject,jname));
-	jx_delete(jname);
-
-	if(!list_size(db->output_exprs)) {
-		printf("R %s %s\n",key,name);
-		return 1;
-	}
-
-	return 1;
-}
-
-int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, time_t current )
-{
-	if(current>stoptime) return 0;
-
-	/* If no output has been defined, skip this. */
-
-	if(!list_size(db->output_exprs)) {
-		printf("T %lld\n",(long long) current);
-		return 1;
-	}
-
 	/* For each item in the table... */
 
 	char *key;
@@ -191,6 +126,82 @@ int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, t
 
 		printf("\n");
 	}
+}
+
+int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobject )
+{
+	if(!deltadb_expr_matches(db->filter_exprs,jobject)) return 1;
+	hash_table_insert(db->table,key,jobject);
+
+	if(!list_size(db->output_exprs)) {
+		printf("C %s ",key);
+		jx_print_stream(jobject,stdout);
+		printf("\n");
+	}
+	return 1;
+}
+
+int deltadb_delete_event( struct deltadb *db, const char *key )
+{
+	struct jx *jobject = hash_table_remove(db->table,key);
+
+	if(jobject) {
+		jx_delete(jobject);
+
+		if(!list_size(db->output_exprs)) {
+			printf("D %s\n",key);
+		}
+	}
+	return 1;
+}
+
+int deltadb_update_event( struct deltadb *db, const char *key, const char *name, struct jx *jvalue )
+{
+	struct jx * jobject = hash_table_lookup(db->table,key);
+	if(!jobject) return 1;
+
+	struct jx *jname = jx_string(name);
+	jx_delete(jx_remove(jobject,jname));
+	jx_insert(jobject,jname,jvalue);
+
+	if(!list_size(db->output_exprs)) {
+		char *str = jx_print_string(jvalue);
+		printf("U %s %s %s\n",key,name,str);
+		free(str);
+	}
+
+	return 1;
+}
+
+int deltadb_remove_event( struct deltadb *db, const char *key, const char *name )
+{
+	struct jx *jobject = hash_table_lookup(db->table,key);
+	if(!jobject) return 1;
+
+	struct jx *jname = jx_string(name);
+	jx_delete(jx_remove(jobject,jname));
+	jx_delete(jname);
+
+	if(!list_size(db->output_exprs)) {
+		printf("R %s %s\n",key,name);
+		return 1;
+	}
+
+	return 1;
+}
+
+int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, time_t current )
+{
+	if(current>stoptime) return 0;
+
+	/* If no output has been defined, skip this. */
+
+	if(!list_size(db->output_exprs)) {
+		printf("T %lld\n",(long long) current);
+		return 1;
+	}
+
+	display_table(db,current);
 
 	return 1;
 }
