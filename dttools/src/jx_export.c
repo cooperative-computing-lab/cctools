@@ -229,4 +229,3 @@ void jx_export_html_footer(FILE * s, struct jx_table *h)
 {
 	fprintf(s, "</table>\n");
 }
-
