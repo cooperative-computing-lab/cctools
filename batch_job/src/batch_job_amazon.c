@@ -179,6 +179,9 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
         q->options,
         "amazon-credentials-filepath"
     );
+    if (amazon_credentials_filepath == NULL) {
+        fatal("No amazon credentials passed. Please pass file containing amazon credentials using --amazon-credentials-filepath flag");
+    }
 
     char *ami_image_id = hash_table_lookup(
         q->options,
