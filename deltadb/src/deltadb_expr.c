@@ -1,32 +1,28 @@
-/*
-Copyright (C) 2015- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
-
-#include "deltadb_stream.h"
-
 #include "jx.h"
-#include "jx_print.h"
-#include "jx_parse.h"
 
-#include "hash_table.h"
-
-#include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
-#include <time.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <stdio.h>
 
-struct argument {
-	int dynamic;
+struct deltadb_expr {
 	char operator[32];
 	char *param;
 	char *val;
-	struct argument *next;
+	struct deltadb_expr *next;
 };
+
+struct deltadb_expr * deltadb_expr_create( const char *str, struct deltadb_expr *next )
+{
+	struct deltadb_expr *e = malloc(sizeof(*e));
+	e->param = strdup(str);
+	char *delim = strpbrk(e->param, "<>=!");
+	e->val = strpbrk(delim, "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+	int operator_size = (int)(e->val-delim);
+	strncpy(e->operator,delim,operator_size);
+	e->operator[operator_size] = '\0';
+	delim[0] = '\0';
+	e->next = next;
+	return e;
+}
 
 static int is_number(char const* p)
 {
@@ -46,21 +42,21 @@ static double jx_to_double( struct jx *j )
 	return j->integer_value;
 }
 
-static int expr_is_true( struct argument *arg, struct jx *jvalue )
+static int expr_is_true( struct deltadb_expr *expr, struct jx *jvalue )
 {
-	char *operator = arg->operator;
+	char *operator = expr->operator;
 	int cmp;
 
 	/// XXX need to handle other combinations of values here
 
-	if (is_number(arg->val) && jx_is_number(jvalue) ) {
+	if (is_number(expr->val) && jx_is_number(jvalue) ) {
 		double in = jx_to_double(jvalue);
-		double v = atof(arg->val);
+		double v = atof(expr->val);
 		if (in<v) cmp = -1;
 		else if (in==v) cmp = 0;
 		else cmp = 1;
 	} else {
-		cmp = strcmp(jvalue->string_value,arg->val);
+		cmp = strcmp(jvalue->string_value,expr->val);
 	}
 
 	if(strcmp(operator,"=")==0) {
@@ -91,44 +87,17 @@ static int expr_is_true( struct argument *arg, struct jx *jvalue )
 	return 0;
 }
 
-static int object_matches( struct deltadb *db, struct jx *jobject )
+int deltadb_expr_matches( struct deltadb_expr *expr, struct jx *jobject )
 {
-	struct argument *arg;
-
-	for(arg=db->args;arg;arg=arg->next) {
-		struct jx *jvalue = jx_lookup(jobject,arg->param);
-		if( jvalue && expr_is_true(arg,jvalue) ) {
+	while(expr) {
+		struct jx *jvalue = jx_lookup(jobject,expr->param);
+		if( jvalue && expr_is_true(expr,jvalue) ) {
 			return 1;
 			break;
 		}
+		expr = expr->next;
 	}
 
 	return 0;
 }
 
-int main( int argc, char *argv[] )
-{
-	struct deltadb *db = deltadb_create();
-
-	int i;
-	for (i=1; i<argc; i++){
-		struct argument arg;
-
-		arg.param = argv[i];
-		char *delim = strpbrk(argv[i], "<>=!");
-		arg.val = strpbrk(delim, "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
-
-		int operator_size = (int)(arg.val-delim);
-		strncpy(arg.operator,delim,operator_size);
-		arg.operator[operator_size] = '\0';
-		delim[0] = '\0';
-		arg.next = db->args;
-		db->args = &arg;
-	}
-
-	deltadb_process_stream(db,stdin,0,0);
-
-	return 0;
-}
-
-/* vim: set noexpandtab tabstop=4: */
