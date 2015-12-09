@@ -4,9 +4,9 @@ include ../../rules.mk
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = libdeltadb.a
 OBJECTS = $(SOURCES:%.c=%.o)
-PROGRAMS = deltadb_collect deltadb_select_dynamic deltadb_project deltadb_reduce_temporal deltadb_reduce_spatial deltadb_pivot nvpair_to_json
+PROGRAMS = deltadb_query nvpair_to_json
 SCRIPTS =
-SOURCES = deltadb_reduction.c deltadb_stream.c deltadb_expr.c
+SOURCES = deltadb_query.c deltadb_stream.c deltadb_expr.c
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
 all: $(TARGETS)
