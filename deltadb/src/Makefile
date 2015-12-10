@@ -18,13 +18,10 @@ $(PROGRAMS): $(LIBRARIES) $(EXTERNAL_DEPENDENCIES)
 clean:
 	rm -f $(OBJECTS) $(TARGETS)
 
-uninstall:
-	for s in $(SCRIPTS); do rm -f $(CCTOOLS_INSTALL_DIR)/bin/$$s; done
-
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
-	for s in $(PROGRAMS); do cat $$s | sed "s:CCTOOLS_VERSION:$(CCTOOLS_VERSION):g" | sed "s:CCTOOLS_RELEASEDATE:$(CCTOOLS_RELEASEDATE):g" > $(CCTOOLS_INSTALL_DIR)/bin/$$s; chmod 755 $(CCTOOLS_INSTALL_DIR)/bin/$$s; done
+	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin
 
 test: all
 
-.PHONY: all clean install test uninstall
+.PHONY: all clean install test
