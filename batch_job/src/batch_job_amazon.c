@@ -263,8 +263,11 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
             shell_cmd,
             (char *) 0
 	    );
+	    _exit(1);
     }
-    return -1;
+    else {
+        return -1;
+    }
 }
 
 static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
