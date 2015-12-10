@@ -1225,7 +1225,7 @@ void resource_monitor_compress_logs(struct work_queue *q, struct work_queue_task
 	char *command = string_format("gzip -9 -q %s %s", series, debug_log);
 
 	int status;
-	int rc = shellcode(command, NULL, NULL, NULL, &status);
+	int rc = shellcode(command, NULL, NULL, 0, NULL, NULL, &status);
 
 	if(rc) {
 		debug(D_NOTICE, "Could no succesfully compress '%s', and '%s'\n", series, debug_log);

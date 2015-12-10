@@ -1,12 +1,22 @@
+/*
+Copyright (C) 2010- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #include "auth_ticket.h"
 
 #include "auth.h"
+#include "buffer.h"
+#include "catch.h"
 #include "debug.h"
 #include "dpopen.h"
 #include "full_io.h"
 #include "hash_table.h"
 #include "link.h"
 #include "md5.h"
+#include "random.h"
+#include "shell.h"
 #include "sort_dir.h"
 #include "xxmalloc.h"
 
@@ -18,7 +28,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DIGEST_LENGTH  (MD5_DIGEST_LENGTH_HEX)
 #define CHALLENGE_LENGTH  (64)
 
 static auth_ticket_server_callback_t server_callback = NULL;
@@ -26,221 +35,244 @@ static char **client_tickets = NULL;
 
 static int auth_ticket_assert(struct link *link, time_t stoptime)
 {
-	/* FIXME need to save errno ? */
+	int rc;
 	char line[AUTH_LINE_MAX];
 	char **tickets = client_tickets;
 
 	if(tickets) {
 		char *ticket;
-		char digest[DIGEST_LENGTH];
 
 		for (ticket = *tickets; ticket; ticket = *(++tickets)) {
+			char digest[MD5_DIGEST_LENGTH_HEX+1] = "";
+			char challenge[1024];
+
 			if (access(ticket, R_OK) == -1) {
 				debug(D_AUTH, "could not access ticket %s: %s", ticket, strerror(errno));
 				continue;
 			}
-			assert(strlen(ticket) <= PATH_MAX+4096);
 
 			/* load the digest */
-			/* WARNING: openssl is *very* bad at giving sensible output. Use the last
-			 * 32 non-space characters as the MD5 sum.
-			 */
 			{
-				static const char template[] = "openssl rsa -in '%s' -pubout 2> /dev/null | openssl md5 2> /dev/null | tr -d '[:space:]' | tail -c 32";
-				char command[sizeof(template) + PATH_MAX + 4096];
-				sprintf(command, template, ticket);
-				FILE *digestf = popen(command, "r");
-				if(full_fread(digestf, digest, DIGEST_LENGTH) < DIGEST_LENGTH) {
-					pclose(digestf);
-					return 0;
+				static const char cmd[] =
+					"openssl rsa -in \"$TICKET\" -pubout\n"
+					;
+
+				const char *env[] = {NULL, NULL};
+				BUFFER_STACK_ABORT(Benv, 8192);
+				BUFFER_STACK(Bout, 4096);
+				BUFFER_STACK(Berr, 4096);
+				int status;
+
+				buffer_putfstring(Benv, "TICKET=%s", ticket);
+				env[0] = buffer_tostring(Benv);
+				CATCHUNIX(shellcode(cmd, env, NULL, 0, Bout, Berr, &status));
+				if (buffer_pos(Berr))
+					debug(D_DEBUG, "shellcode:\n%s", buffer_tostring(Berr));
+
+				if (status == 0 && buffer_pos(Bout) > 0) {
+					size_t i;
+					unsigned char md5digest[MD5_DIGEST_LENGTH];
+					BUFFER_STACK_ABORT(Bhex, sizeof(digest));
+					md5_buffer(buffer_tostring(Bout), buffer_pos(Bout), md5digest);
+					for (i = 0; i < sizeof(md5digest); i++)
+						buffer_putfstring(Bhex, "%02x", (unsigned int)md5digest[i]);
+					assert(buffer_pos(Bhex) < sizeof(digest));
+					strcpy(digest, buffer_tostring(Bhex));
+				} else {
+					debug(D_AUTH, "openssl did not return pubkey, trying next ticket");
+					continue;
 				}
-				pclose(digestf);
 			}
-			debug(D_AUTH, "trying ticket %.*s", DIGEST_LENGTH, digest);
-			if(link_putlstring(link, digest, DIGEST_LENGTH, stoptime) <= 0)
-				return 0;
-			if(link_putliteral(link, "\n", stoptime) <= 0)
-				return 0;
 
-			if(link_readline(link, line, sizeof(line), stoptime) <= 0)
-				return 0;
-			if(strcmp(line, "declined") == 0)
+			debug(D_AUTH, "trying ticket %s", digest);
+			CATCHUNIX(link_putfstring(link, "%s\n", stoptime, digest));
+
+			CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
+			if(strcmp(line, "declined") == 0) {
+				debug(D_AUTH, "ticket %s declined, trying next one...", digest);
 				continue;
+			}
 
+			errno = 0;
 			unsigned long length = strtoul(line, NULL, 10);
 			if(errno == ERANGE || errno == EINVAL)
-				return 0;	/* not a number? */
-			debug(D_AUTH, "receiving challenge of %lu bytes", length);
+				CATCH(EIO);
+			else if (length > sizeof(challenge))
+				CATCH(EINVAL);
 
-			FILE *in, *out;
-			pid_t pid;
+			CATCHUNIX(link_read(link, challenge, length, stoptime));
+			debug(D_AUTH, "received challenge of %lu bytes", length);
+
 			{
-				static const char template[] =
-					"umask 0177\n" /* files only readable/writable by owner */
-					"T1=`mktemp /tmp/tmp.XXXXXX`\n"	/* signed challenge */
-					"T2=`mktemp /tmp/tmp.XXXXXX`\n"	/* private key without comments */
-					"sed '/^\\s*#/d' < '%s' > \"$T2\"\n" /* remove ticket comments */
-					/* "tee /tmp/client.challenge | "  DEBUG */
-					"openssl rsautl -inkey \"$T2\" -sign > \"$T1\" 2> /dev/null\n" /* reads challenge from stdin */
-					"R=\"$?\"\n"
-					"if [ \"$R\" -ne 0 ]; then\n"
-					"  rm -f \"$T1\" \"$T2\"\n"
-					"  exit \"$R\"\n"
-					"fi\n"
-					"wc -c \"$T1\"\n" /* signed challenge size to stdout */
-					/* "cat \"$T1\" > /tmp/client.challenge.signed\n" DEBUG */
-					"cat \"$T1\"\n" /* signed challenge to stdout */
-					"rm -f \"$T1\" \"$T2\"\n";
-				char command[sizeof(template) + PATH_MAX + 4096];
-				sprintf(command, template, ticket);
-				pid = dpopen(command, &in, &out);
-				if(pid == 0)
-					return 0;
-			}
-			if(link_stream_to_file(link, in, length, stoptime) <= 0) {
-				dpclose(in, out, pid);
-				debug(D_AUTH, "openssl failed, your keysize may be too small");
-				debug(D_AUTH, "please debug using \"dd if=/dev/urandom count=64 bs=1 | openssl rsautl -inkey <ticket file> -sign\"");
-				return 0;
-			}
-			fclose(in);
-			in = NULL;
-			if(link_stream_from_file(link, out, 1 << 20, stoptime) <= 0) {
-				dpclose(in, out, pid);
-				debug(D_AUTH, "openssl failed, your keysize may be too small");
-				debug(D_AUTH, "please debug using \"dd if=/dev/urandom count=64 bs=1 | openssl rsautl -inkey <ticket file> -sign\"");
-				return 0;
-			}
-			dpclose(in, out, pid);
+				static const char cmd[] =
+					"openssl rsautl -inkey \"$TICKET\" -sign\n" /* reads challenge from stdin */
+					;
 
-			if(link_readline(link, line, sizeof(line), stoptime) <= 0)
-				return 0;
+				const char *env[] = {NULL, NULL};
+				BUFFER_STACK_ABORT(Benv, 8192);
+				BUFFER_STACK_ABORT(Bout, 65536);
+				BUFFER_STACK(Berr, 4096);
+				int status;
+
+				buffer_putfstring(Benv, "TICKET=%s", ticket);
+				env[0] = buffer_tostring(Benv);
+				rc = shellcode(cmd, env, challenge, length, Bout, Berr, &status);
+				if (buffer_pos(Berr))
+					debug(D_DEBUG, "shellcode:\n%s", buffer_tostring(Berr));
+				if (rc == -1) {
+					debug(D_AUTH, "openssl failed, your keysize may be too small");
+					debug(D_AUTH, "please debug using \"dd if=/dev/urandom count=64 bs=1 | openssl rsautl -inkey <ticket file> -sign\"");
+					CATCHUNIX(rc);
+				}
+
+				if (status) {
+					debug(D_AUTH, "openssl did not return digest, trying next ticket");
+					continue;
+				}
+
+				CATCHUNIX(link_putfstring(link, "%zu\n", stoptime, buffer_pos(Bout)));
+				CATCHUNIX(link_putlstring(link, buffer_tostring(Bout), buffer_pos(Bout), stoptime));
+				debug(D_AUTH, "sent signed challenge of %zu bytes", buffer_pos(Bout));
+			}
+
+			CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
+
 			if(strcmp(line, "success") == 0) {
-				debug(D_AUTH, "succeeded challenge for %.*s", DIGEST_LENGTH, digest);
-				return 1;
+				debug(D_AUTH, "succeeded challenge for %s", digest);
+				rc = 0;
+				goto out;
 			} else if(strcmp(line, "failure") == 0) {
-				debug(D_AUTH, "failed challenge for %.*s", DIGEST_LENGTH, digest);
-				errno = EINVAL;
-				return 0;
+				debug(D_AUTH, "failed challenge for %s", digest);
+				THROW_QUIET(EINVAL);
 			} else {
 				debug(D_AUTH, "received bad response: '%s'", line);
-				errno = EINVAL;
-				return 0;
+				THROW_QUIET(EINVAL);
 			}
 		}
 	}
-	link_putliteral(link, "==\n", stoptime);
+	CATCHUNIX(link_putliteral(link, "==\n", stoptime));
 
-	return 0;
+	rc = EACCES;
+	goto out;
+out:
+	return RCUNIX(rc);
 }
 
 static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime)
 {
-	int serrno = errno;
-	int status = 0;
-	char line[AUTH_LINE_MAX];
-	char ticket_subject[AUTH_LINE_MAX];
+	int rc;
 	char *ticket = NULL;
-
-	errno = 0;
+	int tmpfd = -1;
+	char tmpf[PATH_MAX] = "";
 
 	debug(D_AUTH, "ticket: waiting for tickets");
 
 	while(1) {
-		if(link_readline(link, line, sizeof(line), stoptime) > 0) {
-			if(strcmp(line, "==") == 0) {
-				debug(D_AUTH, "ticket: exhausted all ticket challenges");
-				break;
-			} else if(strlen(line) == DIGEST_LENGTH) {
-				char ticket_digest[DIGEST_LENGTH + 1];
-				strcpy(ticket_digest, line);
-				strcpy(ticket_subject, line);
-				debug(D_AUTH, "ticket: read ticket digest: %s", ticket_digest);
-				if(server_callback) {
-					free(ticket); /* free previously allocated ticket string or NULL (noop) */
-					ticket = server_callback(ticket_digest);
-					if(ticket) {
-						FILE *in, *out;
-						pid_t pid;
+		char line[AUTH_LINE_MAX];
+		CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
+		if(strcmp(line, "==") == 0) {
+			debug(D_AUTH, "ticket: exhausted all ticket challenges");
+			break;
+		} else if(strlen(line) == MD5_DIGEST_LENGTH_HEX) {
+			char ticket_digest[MD5_DIGEST_LENGTH_HEX + 1];
+			char ticket_subject[AUTH_LINE_MAX];
+			strcpy(ticket_digest, line);
+			strcpy(ticket_subject, line);
+			debug(D_AUTH, "ticket: read ticket digest: %s", ticket_digest);
+			if(server_callback) {
+				free(ticket); /* free previously allocated ticket string or NULL (noop) */
+				ticket = server_callback(ticket_digest);
+				if(ticket) {
+					char challenge[CHALLENGE_LENGTH];
+					char sig[CHALLENGE_LENGTH*4]; /* 4x should be more than enough... */
+					size_t siglen;
 
-						assert(strlen(ticket) <= PATH_MAX+4096);
-						{
-							static const char template[] =
-								"umask 0177\n" /* files only readable/writable by owner */
-								"T1=`mktemp /tmp/tmp.XXXXXX`\n"	/* The RSA Public Key */
-								"T2=`mktemp /tmp/tmp.XXXXXX`\n"	/* The Challenge */
-								"T3=`mktemp /tmp/tmp.XXXXXX`\n"	/* The Signed Challenge */
-								"T4=`mktemp /tmp/tmp.XXXXXX`\n"	/* The Decrypted (verified) Signed Challenge */
-								"printf '%%s' '%s' > \"$T1\"\n"
-								"dd if=/dev/urandom of=\"$T2\" bs=%u count=1 > /dev/null 2> /dev/null\n"
-								/* "cat < \"$T2\" > /tmp/server.challenge\n" DEBUG */
-								"cat < \"$T2\"\n"	/* to stdout */
-								"cat > \"$T3\"\n"	/* from stdin */
-								/* "cat < \"$T3\" > /tmp/server.challenge.encrypted\n" DEBUG */
-								"openssl rsautl -inkey \"$T1\" -pubin -verify < \"$T3\" > \"$T4\" 2> /dev/null\n"
-								/* "cat < \"$T4\" > /tmp/server.challenge.decrypted\n" DEBUG */
-								"cmp \"$T2\" \"$T4\" > /dev/null 2> /dev/null\n"
-								"R=\"$?\"\n"
-								"rm -f \"$T1\" \"$T2\" \"$T3\" \"$T4\" > /dev/null 2> /dev/null\n"
-								"exit \"$R\"\n";
-							char command[sizeof(template)+PATH_MAX+4096+64];
-							sprintf(command, template, ticket, CHALLENGE_LENGTH);
-							pid = dpopen(command, &in, &out);
-							if(pid == 0)
-								break;
+					random_array(challenge, sizeof(challenge));
+					CATCHUNIX(link_putfstring(link, "%zu\n", stoptime, sizeof(challenge)));
+					CATCHUNIX(link_putlstring(link, challenge, sizeof(challenge), stoptime));
+					debug(D_AUTH, "sending challenge of %zu bytes", sizeof(challenge));
+
+					CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
+					errno = 0;
+					siglen = strtoul(line, NULL, 10);
+					if(errno == ERANGE || errno == EINVAL) {
+						link_soak(link, siglen, stoptime);
+						CATCHUNIX(link_putliteral(link, "failure\n", stoptime));
+						CATCH(EIO);
+					} else if (siglen > sizeof(sig)) {
+						link_soak(link, siglen, stoptime);
+						CATCHUNIX(link_putliteral(link, "failure\n", stoptime));
+						CATCH(EINVAL);
+					}
+					CATCHUNIX(link_read(link, sig, siglen, stoptime));
+					debug(D_AUTH, "received signed challenge of %zu bytes", siglen);
+
+					{
+						static const char cmd[] =
+							"openssl rsautl -inkey \"$TICKET\" -pubin -verify\n"
+							;
+
+						const char *env[] = {NULL, NULL};
+						BUFFER_STACK_ABORT(Benv, 8192);
+						BUFFER_STACK(Bout, 4096);
+						BUFFER_STACK(Berr, 4096);
+						int status;
+
+						strcpy(tmpf, "/tmp/tmp.XXXXXX");
+						CATCHUNIX(tmpfd = mkstemp(tmpf));
+						CATCHUNIX(full_write(tmpfd, ticket, strlen(ticket)));
+						CATCHUNIX(close(tmpfd));
+						tmpfd = -1;
+
+						buffer_putfstring(Benv, "TICKET=%s", tmpf);
+						env[0] = buffer_tostring(Benv);
+						CATCHUNIX(shellcode(cmd, env, sig, siglen, Bout, Berr, &status));
+						unlink(tmpf);
+						strcpy(tmpf, "");
+						if (buffer_pos(Berr))
+							debug(D_DEBUG, "shellcode:\n%s", buffer_tostring(Berr));
+
+						if (status) {
+							debug(D_AUTH, "openssl failed!");
+							CATCHUNIX(link_putliteral(link, "failure\n", stoptime));
+							continue;
 						}
-
-						if(!link_putfstring(link, "%u\n", stoptime, CHALLENGE_LENGTH))
-							break;
-						if(!link_stream_from_file(link, out, CHALLENGE_LENGTH, stoptime))
-							break;
-
-						if(link_readline(link, line, sizeof(line), stoptime) <= 0)
-							break;
-						unsigned long length = strtoul(line, NULL, 10);
-						if(errno == ERANGE || errno == EINVAL)
-							break;	/* not a number? */
-						if(!link_stream_to_file(link, in, length, stoptime))
-							break;
-						fclose(in);
-						in = NULL;
-
-						int result = dpclose(in, out, pid);
-
-						if(result == 0) {
-							debug(D_AUTH, "succeeded challenge for %s", ticket_digest);
-							link_putliteral(link, "success\n", stoptime);
-							status = 1;
-							break;
-						} else {
+						if (buffer_pos(Bout) != sizeof(challenge) || memcmp(buffer_tostring(Bout), challenge, sizeof(challenge)) != 0) {
 							debug(D_AUTH, "failed challenge for %s", ticket_digest);
-							link_putliteral(link, "failure\n", stoptime);
-							break;
+							CATCHUNIX(link_putliteral(link, "failure\n", stoptime));
+							continue;
 						}
-					} else {
-						debug(D_AUTH, "declining key %s", ticket_digest);
-						link_putliteral(link, "declined\n", stoptime);
+
+						debug(D_AUTH, "succeeded challenge for %s", ticket_digest);
+						CATCHUNIX(link_putliteral(link, "success\n", stoptime));
+						*subject = xxmalloc(AUTH_LINE_MAX);
+						strcpy(*subject, ticket_subject);
+						rc = 0;
+						goto out;
 					}
 				} else {
 					debug(D_AUTH, "declining key %s", ticket_digest);
-					link_putliteral(link, "declined\n", stoptime);
+					CATCHUNIX(link_putliteral(link, "declined\n", stoptime));
 				}
 			} else {
-				debug(D_AUTH, "ticket: bad response");
-				break;
+				debug(D_AUTH, "declining key %s", ticket_digest);
+				CATCHUNIX(link_putliteral(link, "declined\n", stoptime));
 			}
 		} else {
+			debug(D_AUTH, "ticket: bad response");
 			break;
 		}
 	}
 
-	if(status) {
-		*subject = xxmalloc(AUTH_LINE_MAX);
-		strcpy(*subject, ticket_subject);
-	}
+	rc = 0;
+	goto out;
+out:
+	if (tmpf[0])
+		unlink(tmpf);
+	if (tmpfd >= 0)
+		close(tmpfd);
 	free(ticket); /* free previously allocated ticket string or NULL (noop) */
-	errno = serrno;
-	return status;
+	return rc == 0 ? 1 : 0;
 }
 
 int auth_ticket_register(void)
