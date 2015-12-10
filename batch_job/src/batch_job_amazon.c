@@ -144,7 +144,7 @@ while [ $tries -ne 0 ]\n\
 do\n\
     run_ssh_cmd \"echo \'Connection to remote server successful\'\" \\\n\
         && SUCCESSFUL_SSH=0 && break\n\
-    tries=$(expr $tries-1)\n\
+    tries=$(expr $tries - 1)\n\
     sleep 1\n\
 done\n\
 \n\
