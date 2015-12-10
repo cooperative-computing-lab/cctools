@@ -1226,10 +1226,10 @@ int main(int argc, char *argv[])
 				log_format = xxstrdup(optarg);
 				break;
 			case LONG_OPT_AMAZON_CREDENTIALS_FILEPATH:
-				amazon_credentials_filepath = optarg;
+				amazon_credentials_filepath = xxstrdup(optarg);
 				break;
 			case LONG_OPT_AMI_IMAGE_ID:
-				ami_image_id = optarg;
+				ami_image_id = xxstrdup(optarg);
 				break;
 			case 'M':
 			case 'N':
