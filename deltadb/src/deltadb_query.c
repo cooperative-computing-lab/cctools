@@ -33,7 +33,7 @@ struct deltadb {
 	struct hash_table *table;
 	const char *logdir;
 	FILE *logfile;
-	int epoch_time_mode;
+	int epoch_mode;
 	struct deltadb_expr *filter_exprs;
 	struct deltadb_expr *where_exprs;
 	struct list * output_exprs;
@@ -126,7 +126,7 @@ static void display_reduce_exprs( struct deltadb *db, time_t current )
 
 	/* Emit the current time */
 
-	if(db->epoch_time_mode) {
+	if(db->epoch_mode) {
 		printf("%lld\t",(long long) current);
 	} else {
 		char str[32];
@@ -158,7 +158,7 @@ static void display_output_exprs( struct deltadb *db, time_t current )
 
 		/* Emit the current time */
 
-		if(db->epoch_time_mode) {
+		if(db->epoch_mode) {
 			printf("%lld\t",(long long) current);
 		} else {
 			char str[32];
@@ -393,7 +393,7 @@ static struct option long_options[] =
 	{"to", required_argument, 0, 'T'},
 	{"at", required_argument, 0, 'A'},
 	{"every", required_argument, 0, 'e'},
-	{"epoch-time", no_argument, 0, 't'},
+	{"epoch", no_argument, 0, 't'},
 	{"version", no_argument, 0, 'v'},
 	{"help", no_argument, 0, 'h'},
 	{0,0,0,0}
@@ -411,7 +411,7 @@ void show_help()
 	printf("  --to <time>         End query at this absolute time.\n");
 	printf("  --at <time>         Query once at this absolute time.\n");
 	printf("  --every <interval>  Compute output at this time interval.\n");
-	printf("  --epoch-time        Display time column in Unix epoch format.\n");
+	printf("  --epoch             Display time column in Unix epoch format.\n");
 	printf("  --version           Show software version.\n");
 	printf("  --help              Show this help text.\n");
 }
@@ -427,7 +427,7 @@ int main( int argc, char *argv[] )
 	time_t stop_time = 0;
 	time_t at_time =0;
 	int display_every = 0;
-	int epoch_time_mode = 0;
+	int epoch_mode = 0;
 
 	char reduce_name[1024];
 	char reduce_attr[1024];
@@ -472,7 +472,7 @@ int main( int argc, char *argv[] )
 			display_every = string_time_parse(optarg);
 			break;
 		case 't':
-			epoch_time_mode = 1;
+			epoch_mode = 1;
 			break;
 		case 'v':
 			cctools_version_print(stdout,"deltadb_query");
@@ -501,7 +501,7 @@ int main( int argc, char *argv[] )
 
 	db->where_exprs = where_exprs;
 	db->filter_exprs = filter_exprs;
-	db->epoch_time_mode = epoch_time_mode;
+	db->epoch_mode = epoch_mode;
 	db->output_exprs = output_exprs;
 	db->reduce_exprs = reduce_exprs;
 	db->display_every = display_every;
