@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "cctools.h"
 #include "list.h"
+#include "stringtools.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -37,6 +38,8 @@ struct deltadb {
 	struct deltadb_expr *where_exprs;
 	struct list * output_exprs;
 	struct list * reduce_exprs;
+	time_t display_every;
+	time_t last_display;
 };
 
 enum { MODE_STREAM, MODE_OBJECT, MODE_REDUCE } display_mode = MODE_REDUCE;
@@ -249,7 +252,9 @@ int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, t
 {
 	if(current>stoptime) return 0;
 
-	/* If no output has been defined, skip this. */
+	if(current < (db->last_display + db->display_every)) return 1;
+
+	db->last_display = current;
 
 	if(display_mode==MODE_STREAM) {
 		printf("T %lld\n",(long long) current);
@@ -421,7 +426,7 @@ int main( int argc, char *argv[] )
 	time_t start_time = 0;
 	time_t stop_time = 0;
 	time_t at_time =0;
-	int every_interval= 0;
+	int display_every = 0;
 	int epoch_time_mode = 0;
 
 	char reduce_name[1024];
@@ -464,7 +469,7 @@ int main( int argc, char *argv[] )
 			at_time = parse_time(optarg,current);
 			break;
 		case 'e':
-			every_interval = parse_time(optarg,current);
+			display_every = string_time_parse(optarg);
 			break;
 		case 't':
 			epoch_time_mode = 1;
@@ -499,6 +504,7 @@ int main( int argc, char *argv[] )
 	db->epoch_time_mode = epoch_time_mode;
 	db->output_exprs = output_exprs;
 	db->reduce_exprs = reduce_exprs;
+	db->display_every = display_every;
 
 	if(list_size(db->reduce_exprs) && list_size(db->output_exprs) ) {
 		struct deltadb_reduction *r = db->reduce_exprs->head->data;
@@ -508,9 +514,9 @@ int main( int argc, char *argv[] )
 		return 1;
 	}
 
-	if(db->reduce_exprs) {
+	if(list_size(db->reduce_exprs)) {
 		display_mode = MODE_REDUCE;
-	} else if(db->output_exprs) {
+	} else if(list_size(db->output_exprs)) {
 		display_mode = MODE_OBJECT;
 	} else {
 		display_mode = MODE_STREAM;
