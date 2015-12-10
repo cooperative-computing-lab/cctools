@@ -55,7 +55,7 @@ cleanup () {\n\
 \n\
 run_ssh_cmd () {\n\
     ssh -o StrictHostKeyChecking=no -i $KEYPAIR_NAME.pem $USERNAME@$PUBLIC_DNS \\\n\
-            $1\n\
+            $1 2> /dev/null\n\
 }\n\
 \n\
 get_file_from_server_to_destination () {\n\
