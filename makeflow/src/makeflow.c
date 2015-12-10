@@ -888,6 +888,7 @@ static void show_help_run(const char *cmd)
 	printf("Other options are:\n");
 	printf(" %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
 	printf(" %-30s Specify path to Amazon credentials (for use with -T amazon)\n", "--amazon-credentials-filepath");
+	printf(" %-30s Specify ami-image-id (for use with -T amazon)\n", "--ami-image-id");
 	printf(" %-30s Disable the check for AFS. (experts only.)\n", "-A,--disable-afs-check");
 	printf(" %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	printf(" %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog-server=<catalog>");
