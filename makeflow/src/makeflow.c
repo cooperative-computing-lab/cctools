@@ -1300,7 +1300,8 @@ int main(int argc, char *argv[])
 						makeflow_gc_count = 1 << 14;	/* Inode threshold of 2^14. */
 				} else {
 					fprintf(stderr, "makeflow: invalid garbage collection method: %s\n", optarg);
-exit(1);
+					
+					exit(1);
 				}
 				break;
 			case LONG_OPT_GC_SIZE:
@@ -1578,20 +1579,19 @@ exit(1);
 	}
 
 	// check to ensure that all jobs can be ran with resources given
-	if(clean_mode != MAKEFLOW_CLEAN_ALL)
+	if(clean_mode == MAKEFLOW_CLEAN_ALL)
 	{
-			int tooBig=0;
-			struct dag_node *n;
+		int tooBig;
+		struct dag_node *n;
 		for(n = d->nodes; n; n = n->next) {
 			if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)) {
-				tooBig = 1;
+				fprintf("Node %d didn't have enough resources to run with allocated resources", n->linenum);
 			}
-		}
-		if(tooBig)
-		{
-			fprintf(stderr, "Critical error, not enough resources to run all jobs");
-			exit(EXIT_FAILURE);
-		}
+	}
+	if(tooBig)
+	{
+		fprintf(stderr, "Critical error, not enough resources to run all jobs");
+		exit(EXIT_FAILURE);
 	}
 	remote_queue = batch_queue_create(batch_queue_type);
 	if(!remote_queue) {
