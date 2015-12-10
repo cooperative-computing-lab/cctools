@@ -221,7 +221,7 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
 
     // Write amazon ec2 script to file
     FILE *f = fopen(amazon_script_filename, "w");
-    fprintf(f, amazon_ec2_script);
+    fprintf(f, "%s", amazon_ec2_script);
     fclose(f);
     // Execute permissions
     char mode[] = "0755";
