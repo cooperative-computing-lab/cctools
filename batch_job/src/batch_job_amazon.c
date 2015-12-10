@@ -97,7 +97,7 @@ if [ \"$#\" -lt 3 ]; then\n\
 fi\n\
 \n\
 # No inputs passed\n\
-if [ \"$#\" -eq 4 ]; then\n\
+if [ \"$#\" -eq 5 ]; then\n\
     export AWS_ACCESS_KEY=$1\n\
     export AWS_SECRET_KEY=$2\n\
     CMD=$3\n\
@@ -112,7 +112,6 @@ else\n\
     INPUT_FILES=$5\n\
     OUTPUT_FILES=$6\n\
 fi\n\
-\n\
 \n\
 generate_temp_keypair\n\
 create_temp_security_group\n\
