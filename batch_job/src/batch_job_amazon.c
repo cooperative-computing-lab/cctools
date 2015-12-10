@@ -1,6 +1,7 @@
 #include "batch_job_internal.h"
 #include "process.h"
 #include "batch_job.h"
+#include "stringtools.h"
 #include "debug.h"
 
 #include <stdio.h>
