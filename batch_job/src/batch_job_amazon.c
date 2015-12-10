@@ -198,10 +198,14 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
     aws_secret_access_key = supersecretkey
     */
     FILE *credentials_file = fopen(amazon_credentials_filepath, "r");
+    char first_line[200];
     char aws_access_key_id[200];
     char aws_secret_access_key[200];
     // Ignore first line
-    fscanf(credentials_file, "[Credentials]");
+    fscanf(credentials_file, "%s", first_line);
+    if (strcmp("[Credentials]", first_line) != 0) {
+        fatal("Credentials file not in the correct format");
+    }
     fscanf(credentials_file, "%s %s %s", aws_access_key_id, aws_access_key_id, aws_access_key_id);
     fscanf(credentials_file, "%s %s %s", aws_secret_access_key, aws_secret_access_key, aws_secret_access_key);
 
