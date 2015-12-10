@@ -134,7 +134,7 @@ struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separa
 
 	const char delim[] = { separator, '\n', '\0'};
 
-	struct rmsummary *s = make_rmsummary(-1);
+	struct rmsummary *s = rmsummary_create(-1);
 
 	/* if source have no last_error, we do not want the -1 from above */
 	s->last_error = 0;
@@ -166,7 +166,7 @@ struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separa
 }
 
 /* Parse the file, assuming there is a single summary in it. */
-struct rmsummary *rmsummary_parse_file_single(char *filename)
+struct rmsummary *rmsummary_parse_file_single(const char *filename)
 {
 	FILE *stream;
 	stream = fopen(filename, "r");
@@ -279,7 +279,7 @@ void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const cha
 }
 /* Parse the file assuming there are multiple summaries in it. Summary
    boundaries are lines starting with # */
-struct list *rmsummary_parse_file_multiple(char *filename)
+struct list *rmsummary_parse_file_multiple(const char *filename)
 {
 	FILE *stream;
 	stream = fopen(filename, "r");
@@ -317,7 +317,7 @@ struct rmsummary *rmsummary_parse_next(FILE *stream)
 	return s;
 }
 
-struct rmsummary *rmsummary_parse_limits_exceeded(char *limits_exceeded)
+struct rmsummary *rmsummary_parse_limits_exceeded(const char *limits_exceeded)
 {
 	struct rmsummary *limits = NULL;
 
@@ -330,7 +330,7 @@ struct rmsummary *rmsummary_parse_limits_exceeded(char *limits_exceeded)
 
 /* Create summary filling all numeric fields with default_value, and
 all string fields with NULL. Usual values are 0, or -1. */
-struct rmsummary *make_rmsummary(signed char default_value)
+struct rmsummary *rmsummary_create(signed char default_value)
 {
 	struct rmsummary *s = malloc(sizeof(struct rmsummary));
 	memset(s, default_value, sizeof(struct rmsummary));
@@ -341,6 +341,24 @@ struct rmsummary *make_rmsummary(signed char default_value)
 	s->limits_exceeded = NULL;
 
 	return s;
+}
+
+void rmsummary_delete(struct rmsummary *s)
+{
+	if(!s)
+		return;
+
+	if(s->command)
+		free(s->command);
+
+	if(s->category)
+		free(s->category);
+
+	if(s->exit_type)
+		free(s->exit_type);
+
+	if(s->limits_exceeded)
+		free(s->limits_exceeded);
 }
 
 void rmsummary_read_env_vars(struct rmsummary *s)

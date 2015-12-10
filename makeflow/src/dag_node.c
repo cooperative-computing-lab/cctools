@@ -41,7 +41,7 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->ancestor_depth = -1;
 
-	n->resources = make_rmsummary(-1);
+	n->resources = rmsummary_create(-1);
 
 	return n;
 }
