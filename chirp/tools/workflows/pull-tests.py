@@ -7,6 +7,9 @@ import subprocess
 from weaver.stack import WeaverNests
 from weaver.util import Stash
 
+def nstdir(path):
+    return os.path.join(CurrentNest().work_dir, path)
+
 # Thoughts:
 # - For shared files: fifo-0,push-async-1 is equivalent to fifo-0,pull-inf
 
@@ -71,10 +74,10 @@ gen = []
 
 shared = []
 for i in range(TASKS):
-    shared.append('sync.%08d' % i)
+    shared.append(nstdir('sync.%08d' % i))
 for f in SHARED:
     for i in range(f['count']):
-        path = os.path.join(CurrentNest().work_dir, (f['prefix'] + '.%08d') % i)
+        path = nstdir((f['prefix'] + '.%08d') % i)
         gen.append({'path': path, 'size': f['size']()})
         shared.append(path)
 
@@ -82,7 +85,7 @@ for task in range(TASKS):
     print("compiling task %d" % task)
     inputs = []
     inputs.extend(shared)
-    taskdir = os.path.join(CurrentNest().work_dir, 'task.%08d' % task)
+    taskdir = nstdir('task.%08d' % task)
     os.mkdir(taskdir)
     for f in UNIQUE:
         for i in range(f['count']):
@@ -94,7 +97,7 @@ for task in range(TASKS):
 random.shuffle(gen)
 
 def makerandoms(i, files):
-    sync = 'sync.%08d' % i
+    sync = nstdir('sync.%08d' % i)
     args = [sync]
     outputs = [sync]
     for f in files:
