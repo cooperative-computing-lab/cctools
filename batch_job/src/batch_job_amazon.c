@@ -219,14 +219,17 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
     fscanf(credentials_file, "%s %s %s", aws_access_key_id, aws_access_key_id, aws_access_key_id);
     fscanf(credentials_file, "%s %s %s", aws_secret_access_key, aws_secret_access_key, aws_secret_access_key);
 
-    // Write amazon ec2 script to file
-    FILE *f = fopen(amazon_script_filename, "w");
-    fprintf(f, "%s", amazon_ec2_script);
-    fclose(f);
-    // Execute permissions
-    char mode[] = "0755";
-    int i = strtol(mode, 0, 8);
-    chmod(amazon_script_filename, i);
+    // Write amazon ec2 script to file if does not already exist
+    if (access(amazon_script_filename, F_OK|X_OK) == -1) {
+        debug(D_BATCH, "Generating Amazon ec2 script...");
+        FILE *f = fopen(amazon_script_filename, "w");
+        fprintf(f, "%s", amazon_ec2_script);
+        fclose(f);
+        // Execute permissions
+        char mode[] = "0755";
+        int i = strtol(mode, 0, 8);
+        chmod(amazon_script_filename, i);
+    }
 
 
     // Run ec2 script
