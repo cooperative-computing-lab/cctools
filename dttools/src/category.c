@@ -38,7 +38,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	/* autolabeling enabled by default if work_queue_specify_max_worker_resources is used. */
 	c->disable_auto_labeling = 0;
 
-	c->first    = make_rmsummary(-1);
+	c->first    = rmsummary_create(-1);
 
 	c->cores_histogram     = itable_create(0);
 	c->memory_histogram    = itable_create(0);

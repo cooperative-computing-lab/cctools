@@ -267,7 +267,7 @@ void parse_limits_string(struct rmsummary *limits, char *str)
 
 	rmsummary_merge_override(limits, s);
 
-	free(s);
+	rmsummary_delete(s);
 }
 
 void parse_limits_file(struct rmsummary *limits, char *path)
@@ -277,7 +277,7 @@ void parse_limits_file(struct rmsummary *limits, char *path)
 
 	rmsummary_merge_override(limits, s);
 
-	free(s);
+	rmsummary_delete(s);
 }
 
 
@@ -1560,7 +1560,7 @@ int rmonitor_resources(long int interval /*in microseconds */)
 		round++;
 	}
 
-    free(resources_now);
+    rmsummary_delete(resources_now);
     free(p_acc);
     free(m_acc);
     free(d_acc);
@@ -1595,8 +1595,8 @@ int main(int argc, char **argv) {
     signal(SIGTERM, rmonitor_final_cleanup);
 
     summary          = calloc(1, sizeof(struct rmsummary));
-    resources_limits = make_rmsummary(-1);
-    resources_flags  = make_rmsummary(0);
+    resources_limits = rmsummary_create(-1);
+    resources_flags  = rmsummary_create(0);
 
     rmsummary_read_env_vars(resources_limits);
 
