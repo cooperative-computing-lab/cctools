@@ -198,13 +198,6 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 
 
 void category_accumulate_summary(struct hash_table *categories, const char *category, struct rmsummary *rs) {
-	/* buffer used only for debug output. */
-	static buffer_t *b = NULL;
-	if(!b) {
-		b = malloc(sizeof(buffer_t));
-		buffer_init(b);
-	}
-
 	const char *name = category ? category : "default";
 
 	struct category *c = hash_table_lookup(categories, name);
