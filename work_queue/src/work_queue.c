@@ -1200,7 +1200,7 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 	if(!t->rs)
 	{
 		/* mark all resources with -1, to signal that no information is available. */
-		t->rs = make_rmsummary(-1);
+		t->rs = rmsummary_create(-1);
 		fprintf(q->monitor_file, "# Summary for task %d was not available.\n", t->taskid);
 	}
 
@@ -3317,7 +3317,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->rs = NULL;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
-	t->rn        = make_rmsummary(-1);
+	t->rn        = rmsummary_create(-1);
 	t->unlabeled = 1;
 
 	t->category = xxstrdup("default");
@@ -4011,9 +4011,9 @@ void work_queue_task_delete(struct work_queue_task *t)
 		if(t->host)
 			free(t->host);
 		if(t->rn)
-			free(t->rn);
+			rmsummary_delete(t->rn);
 		if(t->rs)
-			free(t->rs);
+			rmsummary_delete(t->rs);
 		free(t);
 	}
 }
@@ -4099,8 +4099,8 @@ struct work_queue *work_queue_create(int port)
 	q->worker_blacklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
 
-	q->measured_local_resources = make_rmsummary(0);
-	q->worker_top_resources     = make_rmsummary(-1);
+	q->measured_local_resources = rmsummary_create(0);
+	q->worker_top_resources     = rmsummary_create(-1);
 
 	q->categories = hash_table_create(0, 0);
 
@@ -4397,9 +4397,10 @@ void work_queue_delete(struct work_queue *q)
 		free(q->stats_disconnected_workers);
 
 		if(q->measured_local_resources)
-			free(q->measured_local_resources);
+			rmsummary_delete(q->measured_local_resources);
+
 		if(q->worker_top_resources)
-			free(q->worker_top_resources);
+			rmsummary_delete(q->worker_top_resources);
 
 		work_queue_disable_monitoring(q);
 
