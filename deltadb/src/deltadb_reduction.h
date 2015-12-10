@@ -8,21 +8,20 @@ See the file COPYING for details.
 #define DELTADB_REDUCTION_H
 
 typedef enum {
-	CNT,
+	COUNT,
 	SUM,
 	FIRST,
 	LAST,
 	MIN,
-	AVG,
+	AVERAGE,
 	MAX,
-	PAVG,
 	INC
 } deltadb_reduction_t;
 
 struct deltadb_reduction {
 	deltadb_reduction_t type;
 	const char *attr;
-	double cnt;
+	double count;
 	double sum;
 	double first;
 	double last;
@@ -34,7 +33,6 @@ struct deltadb_reduction *deltadb_reduction_create( const char *name, const char
 void deltadb_reduction_delete( struct deltadb_reduction *r );
 void deltadb_reduction_reset( struct deltadb_reduction *r );
 void deltadb_reduction_update( struct deltadb_reduction *r, double value );
-void deltadb_reduction_print( struct deltadb_reduction *r );
-void deltadb_reduction_print_json( struct deltadb_reduction *r );
+double deltadb_reduction_value( struct deltadb_reduction *r );
 
 #endif

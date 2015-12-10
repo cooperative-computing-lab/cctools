@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "deltadb_stream.h"
 #include "deltadb_expr.h"
+#include "deltadb_reduction.h"
 
 #include "jx_database.h"
 #include "jx_print.h"
@@ -35,7 +36,10 @@ struct deltadb {
 	struct deltadb_expr *filter_exprs;
 	struct deltadb_expr *where_exprs;
 	struct list * output_exprs;
+	struct list * reduce_exprs;
 };
+
+enum { MODE_STREAM, MODE_OBJECT, MODE_REDUCE } display_mode = MODE_REDUCE;
 
 struct deltadb * deltadb_create( const char *logdir )
 {
@@ -44,7 +48,6 @@ struct deltadb * deltadb_create( const char *logdir )
 	db->table = hash_table_create(0,0);
 	db->logdir = logdir;
 	db->logfile = 0;
-	db->output_exprs = list_create();
 	return db;
 }
 
@@ -85,7 +88,59 @@ static int checkpoint_read( struct deltadb *db, const char *filename )
 	return 1;
 }
 
-static void display_table( struct deltadb *db, time_t current )
+static void display_reduce_exprs( struct deltadb *db, time_t current )
+{
+	struct list_node *n;
+
+	/* Reset all reductions. */
+	for(n=db->reduce_exprs->head;n;n=n->next) {
+		deltadb_reduction_reset(n->data);
+	}
+
+	/* For each item in the hash table: */
+
+	char *key;
+	struct jx *jobject;
+	hash_table_firstkey(db->table);
+	while(hash_table_nextkey(db->table,&key,(void**)&jobject)) {
+
+		/* Skip if the where expression doesn't match */
+		if(!deltadb_expr_matches(db->where_exprs,jobject)) continue;
+
+		/* Update each reduction with its value. */
+		for(n=db->reduce_exprs->head;n;n=n->next) {
+			struct deltadb_reduction *r = n->data;
+			struct jx *value = jx_lookup(jobject,r->attr);
+			if(value) {
+				if(value->type==JX_INTEGER) {
+					deltadb_reduction_update(n->data,(double)value->integer_value);
+				} else {
+					deltadb_reduction_update(n->data,value->double_value);
+				}
+			}
+		}
+	}
+
+	/* Emit the current time */
+
+	if(db->epoch_time_mode) {
+		printf("%lld\t",(long long) current);
+	} else {
+		char str[32];
+		strftime(str,sizeof(str),"%F %T",localtime(&current));
+		printf("%s\t",str);
+	}
+
+	/* For each reduction, display the final value. */
+	for(n=db->reduce_exprs->head;n;n=n->next) {
+		printf("%lf\t",deltadb_reduction_value(n->data));
+	}
+
+	printf("\n");
+
+}
+
+static void display_output_exprs( struct deltadb *db, time_t current )
 {
 	/* For each item in the table... */
 
@@ -133,7 +188,7 @@ int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobjec
 	if(!deltadb_expr_matches(db->filter_exprs,jobject)) return 1;
 	hash_table_insert(db->table,key,jobject);
 
-	if(!list_size(db->output_exprs)) {
+	if(display_mode==MODE_STREAM) {
 		printf("C %s ",key);
 		jx_print_stream(jobject,stdout);
 		printf("\n");
@@ -148,7 +203,7 @@ int deltadb_delete_event( struct deltadb *db, const char *key )
 	if(jobject) {
 		jx_delete(jobject);
 
-		if(!list_size(db->output_exprs)) {
+		if(display_mode==MODE_STREAM) {
 			printf("D %s\n",key);
 		}
 	}
@@ -164,7 +219,7 @@ int deltadb_update_event( struct deltadb *db, const char *key, const char *name,
 	jx_delete(jx_remove(jobject,jname));
 	jx_insert(jobject,jname,jvalue);
 
-	if(!list_size(db->output_exprs)) {
+	if(display_mode==MODE_STREAM) {
 		char *str = jx_print_string(jvalue);
 		printf("U %s %s %s\n",key,name,str);
 		free(str);
@@ -182,7 +237,7 @@ int deltadb_remove_event( struct deltadb *db, const char *key, const char *name 
 	jx_delete(jx_remove(jobject,jname));
 	jx_delete(jname);
 
-	if(!list_size(db->output_exprs)) {
+	if(display_mode==MODE_STREAM) {
 		printf("R %s %s\n",key,name);
 		return 1;
 	}
@@ -196,12 +251,14 @@ int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, t
 
 	/* If no output has been defined, skip this. */
 
-	if(!list_size(db->output_exprs)) {
+	if(display_mode==MODE_STREAM) {
 		printf("T %lld\n",(long long) current);
 		return 1;
+	} else if(display_mode==MODE_OBJECT) {
+		display_output_exprs(db,current);
+	} else if(display_mode==MODE_REDUCE) {
+		display_reduce_exprs(db,current);
 	}
-
-	display_table(db,current);
 
 	return 1;
 }
@@ -360,11 +417,15 @@ int main( int argc, char *argv[] )
 	struct deltadb_expr *where_exprs = 0;
 	struct deltadb_expr *filter_exprs = 0;
 	struct list *output_exprs = list_create();
+	struct list *reduce_exprs = list_create();
 	time_t start_time = 0;
 	time_t stop_time = 0;
 	time_t at_time =0;
 	int every_interval= 0;
 	int epoch_time_mode = 0;
+
+	char reduce_name[1024];
+	char reduce_attr[1024];
 
 	time_t current = time(0);
 
@@ -376,7 +437,16 @@ int main( int argc, char *argv[] )
 			dbdir = optarg;
 			break;
 		case 'o':
-			list_push_tail(output_exprs,strdup(optarg));
+			if(2==sscanf(optarg,"%[^(](%[^)])",reduce_name,reduce_attr)) {
+				struct deltadb_reduction *r = deltadb_reduction_create(reduce_name,reduce_attr);
+				if(!r) {
+					printf("deltadb_query: invalid reduction: %s\n",reduce_name);
+					return 1;
+				}
+				list_push_tail(reduce_exprs,r);
+			} else {
+				list_push_tail(output_exprs,strdup(optarg));
+			}
 			break;
 		case 'w':
 			where_exprs = deltadb_expr_create(optarg,where_exprs);
@@ -428,6 +498,23 @@ int main( int argc, char *argv[] )
 	db->filter_exprs = filter_exprs;
 	db->epoch_time_mode = epoch_time_mode;
 	db->output_exprs = output_exprs;
+	db->reduce_exprs = reduce_exprs;
+
+	if(list_size(db->reduce_exprs) && list_size(db->output_exprs) ) {
+		struct deltadb_reduction *r = db->reduce_exprs->head->data;
+		const char *name = db->output_exprs->head->data;
+		fprintf(stderr,"deltadb_query: cannot mix reductions like 'MAX(%s)' with plain outputs like '%s'\n",r->attr,name
+);
+		return 1;
+	}
+
+	if(db->reduce_exprs) {
+		display_mode = MODE_REDUCE;
+	} else if(db->output_exprs) {
+		display_mode = MODE_OBJECT;
+	} else {
+		display_mode = MODE_STREAM;
+	}
 
 	log_play_time(db,start_time,stop_time);
 
