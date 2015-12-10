@@ -234,9 +234,7 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
 
 
     // Run ec2 script
-    char shell_cmd[200];
-    sprintf(
-        shell_cmd,
+    char *shell_cmd = string_format(
         "./%s %s %s '%s' %s %s %s",
         amazon_script_filename,
         aws_access_key_id,
@@ -254,9 +252,10 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
         info->submitted = time(0);
         info->started = time(0);
         itable_insert(q->job_table, jobid, info);
+        free(shell_cmd);
         return jobid;
     }
-    else { // child
+    else if (jobid == 0) { // child
 	    execlp(
             "sh",
             "sh",
