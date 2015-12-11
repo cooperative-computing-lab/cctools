@@ -775,7 +775,7 @@ int rmonitor_measure_process(struct rmsummary *tr, pid_t pid) {
 	snprintf(cwd_link, PATH_MAX, "/proc/%d/cwd", pid);
 	err = readlink(cwd_link, cwd_org, PATH_MAX);
 
-	if(!err)  {
+	if(err != -1)  {
 		d = malloc(sizeof(struct rmonitor_wdir_info));
 		d->path  = cwd_org;
 		d->state = NULL;
