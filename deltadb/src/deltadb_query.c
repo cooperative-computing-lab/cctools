@@ -78,7 +78,7 @@ static int checkpoint_read( struct deltadb *db, const char *filename )
 
 	struct jx_pair *p;
 	for(p=jcheckpoint->pairs;p;p=p->next) {
-		jx_assert(p->key,JX_STRING);
+		if(p->key->type!=JX_STRING) continue;
 		if(!deltadb_expr_matches(db->filter_exprs,p->value)) continue;
 		hash_table_insert(db->table,p->key->string_value,p->value);
 		p->value = 0;

@@ -124,9 +124,6 @@ struct jx_item * jx_item( struct jx *value, struct jx_item *next );
 /** Test an expression's type.  @param j An expression. @param type The desired type. @return True if the expression type matches, false otherwise. */
 int jx_istype( struct jx *j, jx_type_t type );
 
-/** Assert an expression has a given type.  If the type does not match, the program will crash as with POSIX assert().  @param j An expression.  @param type The desired type. */
-#define jx_assert( j, type ) assert(jx_istype(j,type))
-
 /** Test two expressions for equality. @param j A constant expression. @param k A constant expression. @return True if equal, false if not.
 */
 int jx_equals( struct jx *j, struct jx *k );
