@@ -78,7 +78,7 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 }
 
 /** Reads a single summary from stream. Summaries are not parsed, here
-	we simply read between markers (--) **/
+	we simply read between markers (---) **/
 char *rmsummary_read_single_chunk(FILE *stream)
 {
 	struct buffer b;
@@ -105,7 +105,7 @@ char *rmsummary_read_single_chunk(FILE *stream)
 	ungetc(c, stream);
 	while(fgets(line, MAX_LINE, stream))
 	{
-		if(string_prefix_is(line, "--")) {
+		if(string_prefix_is(line, "---")) {
 			/* we got to the end of document */
 			break;
 		}
@@ -188,6 +188,8 @@ struct rmsummary *rmsummary_parse_file_single(const char *filename)
 
 void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits, char *preamble, char *epilogue)
 {
+
+	fprintf(stream, "---\n\n");
 	if(preamble)
 		fprintf(stream, "%s", preamble);
 
@@ -221,8 +223,6 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits
 
 	if(epilogue)
 		fprintf(stream, "%s", epilogue);
-
-	fprintf(stream, "--\n\n");
 }
 
 void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix)
