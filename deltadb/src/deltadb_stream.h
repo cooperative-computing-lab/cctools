@@ -8,7 +8,9 @@ See the file COPYING for details.
 #define DELTADB_STREAM_H
 
 #include "jx.h"
+
 #include <stdio.h>
+#include <time.h>
 
 struct deltadb;
 
