@@ -6,16 +6,24 @@ See the file COPYING for details.
 
 #include <stdlib.h>
 #include <math.h>
+#include <errno.h>
 
 #include "buffer.h"
 #include "debug.h"
 #include "itable.h"
+#include "list.h"
 #include "macros.h"
 #include "rmsummary.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
 #include "category.h"
+
+static uint64_t cores_bucket_size     = 1;          /* unit-less */
+static uint64_t memory_bucket_size    = 25;         /* MB */
+static uint64_t disk_bucket_size      = 25;         /* MB */
+static uint64_t wall_time_bucket_size = 30000000;   /* useconds */
+
 
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name) {
 	struct category *c;
@@ -50,6 +58,16 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	return c;
 }
 
+static void category_clear_histograms(struct category *c) {
+	if(!c)
+		return;
+
+	itable_clear(c->cores_histogram);
+	itable_clear(c->memory_histogram);
+	itable_clear(c->disk_histogram);
+	itable_clear(c->wall_time_histogram);
+}
+
 void category_delete(struct hash_table *categories, const char *name) {
 	struct category *c = hash_table_lookup(categories, name);
 
@@ -70,7 +88,7 @@ void category_delete(struct hash_table *categories, const char *name) {
 }
 
 /* histograms keys are shifted to the right, as 0 cannot be a valid key (thus the bucket + 1). */
-#define category_inc_histogram_count(q, c, field, value, bucket_size)\
+#define category_inc_histogram_count(c, field, value, bucket_size)\
 {\
 	if(value >= 0) { \
 		uintptr_t bucket = DIV_INT_ROUND_UP(value, bucket_size)*bucket_size;\
@@ -203,9 +221,44 @@ void category_accumulate_summary(struct hash_table *categories, const char *cate
 	struct category *c = hash_table_lookup(categories, name);
 
 	if(!c->disable_auto_labeling && rs) {
-		category_inc_histogram_count(q, c, cores,     rs->cores,      1);
-		category_inc_histogram_count(q, c, memory,    rs->memory,    25);
-		category_inc_histogram_count(q, c, disk,      rs->disk,      25);
-		category_inc_histogram_count(q, c, wall_time, rs->wall_time, 30000000);
+		category_inc_histogram_count(c, cores,     rs->cores,     cores_bucket_size);
+		category_inc_histogram_count(c, memory,    rs->memory,    memory_bucket_size);
+		category_inc_histogram_count(c, disk,      rs->disk,      disk_bucket_size);
+		category_inc_histogram_count(c, wall_time, rs->wall_time, wall_time_bucket_size);
+	}
+}
+
+void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file) {
+	struct list *summaries = rmsummary_parse_file_multiple(summaries_file);
+
+	if(!summaries) {
+		fatal("Could not read '%s' file: %s\n", strerror(errno));
+	}
+
+
+	char *name;
+	struct category *c;
+	hash_table_firstkey(categories);
+	while(hash_table_nextkey(categories, &name, (void **) &c)) {
+		category_clear_histograms(c);
+		if(c->first) {
+			rmsummary_delete(c->first);
+			c->first = rmsummary_create(-1);
+		}
+	}
+
+	struct rmsummary *s;
+	list_first_item(summaries);
+	while((s = list_pop_head(summaries))) {
+		if(s->category) {
+			category_accumulate_summary(categories, s->category, s);
+		}
+		rmsummary_delete(s);
+	}
+
+	hash_table_firstkey(categories);
+	while(hash_table_nextkey(categories, &name, (void **) &c)) {
+		category_update_first_allocation(categories, name, top);
+		category_clear_histograms(c);
 	}
 }

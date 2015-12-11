@@ -5468,6 +5468,10 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 	}
 }
 
+void work_queue_initialize_categories(struct work_queue *q, const char *summaries_file) {
+	categories_initialize(q->categories, q->worker_top_resources, summaries_file);
+}
+
 void work_queue_specify_max_worker_memory(struct work_queue *q, int64_t memory) {
 	if(memory < 0) {
 		q->worker_top_resources->memory = -1;
