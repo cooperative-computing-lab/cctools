@@ -357,7 +357,7 @@ time_t parse_time( const char *str, time_t current )
 		return current - count*suffix_to_multiplier(suffix[0]);
 	}
 
-	n = sscanf(str, "%d-%d-%d@%d:%d:%d", &t.tm_year,&t.tm_mon,&t.tm_mday,&t.tm_hour,&t.tm_min,&t.tm_sec);
+	n = sscanf(str, "%d-%d-%d %d:%d:%d", &t.tm_year,&t.tm_mon,&t.tm_mday,&t.tm_hour,&t.tm_min,&t.tm_sec);
 	if(n==6) {
 		if (t.tm_hour>23)
 			t.tm_hour = 0;
