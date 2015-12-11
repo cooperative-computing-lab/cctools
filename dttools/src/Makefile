@@ -61,7 +61,6 @@ SOURCES = \
 	jx_export.c \
 	link.c \
 	link_auth.c \
-	link_nvpair.c \
 	list.c \
 	load_average.c \
 	md5.c \
@@ -69,7 +68,6 @@ SOURCES = \
 	mergesort.c \
 	mt19937-64.c \
 	nvpair.c \
-	nvpair_database.c \
 	nvpair_jx.c \
 	password_cache.c \
 	path.c \
