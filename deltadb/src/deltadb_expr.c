@@ -44,8 +44,8 @@ static int jx_is_number( struct jx * j )
 
 static double jx_to_double( struct jx *j )
 {
-	if(j->type==JX_DOUBLE) return j->double_value;
-	return j->integer_value;
+	if(j->type==JX_DOUBLE) return j->u.double_value;
+	return j->u.integer_value;
 }
 
 static int expr_is_true( struct deltadb_expr *expr, struct jx *jvalue )
@@ -62,7 +62,7 @@ static int expr_is_true( struct deltadb_expr *expr, struct jx *jvalue )
 		else if (in==v) cmp = 0;
 		else cmp = 1;
 	} else {
-		cmp = strcmp(jvalue->string_value,expr->val);
+		cmp = strcmp(jvalue->u.string_value,expr->val);
 	}
 
 	if(strcmp(operator,"=")==0) {

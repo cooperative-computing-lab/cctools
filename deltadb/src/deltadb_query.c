@@ -77,10 +77,10 @@ static int checkpoint_read( struct deltadb *db, const char *filename )
 	/* Skip objects that don't match the filter. */
 
 	struct jx_pair *p;
-	for(p=jcheckpoint->pairs;p;p=p->next) {
+	for(p=jcheckpoint->u.pairs;p;p=p->next) {
 		if(p->key->type!=JX_STRING) continue;
 		if(!deltadb_expr_matches(db->filter_exprs,p->value)) continue;
-		hash_table_insert(db->table,p->key->string_value,p->value);
+		hash_table_insert(db->table,p->key->u.string_value,p->value);
 		p->value = 0;
 	}
 
@@ -116,9 +116,9 @@ static void display_reduce_exprs( struct deltadb *db, time_t current )
 			struct jx *value = jx_lookup(jobject,r->attr);
 			if(value) {
 				if(value->type==JX_INTEGER) {
-					deltadb_reduction_update(n->data,(double)value->integer_value);
+					deltadb_reduction_update(n->data,(double)value->u.integer_value);
 				} else {
-					deltadb_reduction_update(n->data,value->double_value);
+					deltadb_reduction_update(n->data,value->u.double_value);
 				}
 			}
 		}

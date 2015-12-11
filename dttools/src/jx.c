@@ -181,13 +181,13 @@ struct jx * jx_remove( struct jx *object, struct jx *key )
 	struct jx_pair *p;
 	struct jx_pair *last = 0;
 
-	for(p=object->pairs;p;p=p->next) {
+	for(p=object->u.pairs;p;p=p->next) {
 		if(jx_equals(key,p->key)) {
 			struct jx *value = p->value;
 			if(last) {
 				last->next = p->next;
 			} else {
-				object->pairs = p->next;
+				object->u.pairs = p->next;
 			}
 			p->value = 0;
 			p->next = 0;

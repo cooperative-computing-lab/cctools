@@ -81,9 +81,9 @@ static int checkpoint_read( struct jx_database *db, const char *filename )
 	/* For each key and value, move the value over to the hash table. */
 
 	struct jx_pair *p;
-	for(p=jcheckpoint->pairs;p;p=p->next) {
+	for(p=jcheckpoint->u.pairs;p;p=p->next) {
 		if(p->key->type!=JX_STRING) continue;
-		hash_table_insert(db->table,p->key->string_value,p->value);
+		hash_table_insert(db->table,p->key->u.string_value,p->value);
 		p->value = 0;
 	}
 
@@ -175,9 +175,9 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 	// If the new one is missing, log a remove event.
 
 	struct jx_pair *p;
-	for(p=a->pairs;p;p=p->next) {
+	for(p=a->u.pairs;p;p=p->next) {
 
-		const char *name = p->key->string_value;
+		const char *name = p->key->u.string_value;
 		struct jx *avalue = p->value;
 
 		// Do not log these special cases, because they do not carry new information:
@@ -203,9 +203,9 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 	// For each item in the new object:
 	// If it doesn't exist in the old one, log an update event.
 
-	for(p=b->pairs;p;p=p->next) {
+	for(p=b->u.pairs;p;p=p->next) {
 
-		const char *name = p->key->string_value;
+		const char *name = p->key->u.string_value;
 		struct jx *bvalue = p->value;
 
 		struct jx *avalue = jx_lookup(a,name);

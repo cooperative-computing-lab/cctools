@@ -17,7 +17,7 @@ static char * unquoted_string( struct jx *j )
 {
 	char *str;
 	if(j->type==JX_STRING) {
-		str = strdup(j->string_value);
+		str = strdup(j->u.string_value);
 	} else {
 		str = jx_print_string(j);
 	}
@@ -31,9 +31,9 @@ The old nvpair format simply has unquoted data following the key.
 void jx_export_nvpair( struct jx *j, FILE *stream )
 {
 	struct jx_pair *p;
-	for(p=j->pairs;p;p=p->next) {
+	for(p=j->u.pairs;p;p=p->next) {
 		char *str = unquoted_string(p->value);
-		fprintf(stream,"%s %s\n",p->key->string_value,str);
+		fprintf(stream,"%s %s\n",p->key->u.string_value,str);
 		free(str);
 	}
 	fprintf(stream,"\n");
@@ -46,12 +46,12 @@ The old classad format has quoted strings, symbols, booleans, integers, but not 
 void jx_export_old_classads( struct jx *j, FILE *stream )
 {
 	struct jx_pair *p;
-	for(p=j->pairs;p;p=p->next) {
+	for(p=j->u.pairs;p;p=p->next) {
 		char *str = jx_print_string(p->value);
 		if(p->value->type==JX_OBJECT || p->value->type==JX_ARRAY) {
-			fprintf(stream,"%s = \"%s\"\n",p->key->string_value,str);
+			fprintf(stream,"%s = \"%s\"\n",p->key->u.string_value,str);
 		} else {
-			fprintf(stream,"%s = %s\n",p->key->string_value,str);
+			fprintf(stream,"%s = %s\n",p->key->u.string_value,str);
 		}
 		free(str);
 	}
@@ -72,24 +72,24 @@ void jx_export_xml( struct jx *j, FILE *stream )
 		fprintf(stream,"null");
 		break;
 	case JX_BOOLEAN:
-		fprintf(stream,j->boolean_value?"true":"false");
+		fprintf(stream,j->u.boolean_value?"true":"false");
 		break;
 	case JX_INTEGER:
-		fprintf(stream,"%lld",(long long)j->integer_value);
+		fprintf(stream,"%lld",(long long)j->u.integer_value);
 		break;
 	case JX_DOUBLE:
-		fprintf(stream,"%lf",j->double_value);
+		fprintf(stream,"%lf",j->u.double_value);
 		break;
 	case JX_STRING:
-		fprintf(stream,"%s",j->string_value);
+		fprintf(stream,"%s",j->u.string_value);
 		break;
 	case JX_SYMBOL:
-		fprintf(stream,"%s",j->symbol_name);
+		fprintf(stream,"%s",j->u.symbol_name);
 		break;
 	case JX_OBJECT:
 		fprintf(stream,"<object>\n");
-		for(p=j->pairs;p;p=p->next) {
-			fprintf(stream,"<pair><key>%s</key>",p->key->string_value);
+		for(p=j->u.pairs;p;p=p->next) {
+			fprintf(stream,"<pair><key>%s</key>",p->key->u.string_value);
 			fprintf(stream,"<value>");
 			jx_export_xml(p->value,stream);
 			fprintf(stream,"</value></pair>");
@@ -98,7 +98,7 @@ void jx_export_xml( struct jx *j, FILE *stream )
 		break;
 	case JX_ARRAY:
 		fprintf(stream,"<array>\n");
-		for(i=j->items;i;i=i->next) {
+		for(i=j->u.items;i;i=i->next) {
 			fprintf(stream,"<item>");
 			jx_export_xml(i->value,stream);
 			fprintf(stream,"</item>");
@@ -120,8 +120,8 @@ void jx_export_new_classads( struct jx *j, FILE *stream )
 	switch(j->type) {
 		case JX_OBJECT:
 			fprintf(stream,"[\n");
-			for(p=j->pairs;p;p=p->next) {
-				fprintf(stream,"%s=",p->key->string_value);
+			for(p=j->u.pairs;p;p=p->next) {
+				fprintf(stream,"%s=",p->key->u.string_value);
 				jx_print_stream(p->value,stream);
 				fprintf(stream,";\n");
 			}
@@ -129,7 +129,7 @@ void jx_export_new_classads( struct jx *j, FILE *stream )
 			break;
 		case JX_ARRAY:
 			fprintf(stream,"{\n");
-			for(i=j->items;i;i=i->next) {
+			for(i=j->u.items;i;i=i->next) {
 				jx_print_stream(i->value,stream);
 				if(i->next) fprintf(stream,",");
 			}
@@ -163,12 +163,12 @@ void jx_export_html_solo(struct jx *j, FILE * stream)
 	color_counter = 0;
 
 	struct jx_pair *p;
-	for(p=j->pairs;p;p=p->next) {
+	for(p=j->u.pairs;p;p=p->next) {
 		fprintf(stream, "<tr bgcolor=%s>\n", color_counter % 2 ? COLOR_ONE : COLOR_TWO);
 		color_counter++;
-		fprintf(stream, "<td align=left><b>%s</b>\n", p->key->string_value);
+		fprintf(stream, "<td align=left><b>%s</b>\n", p->key->u.string_value);
 		char *str = unquoted_string(p->value);
-		if(!strcmp(p->key->string_value, "url")) {
+		if(!strcmp(p->key->u.string_value, "url")) {
 			fprintf(stream, "<td align=left><a href=%s>%s</a>\n",str,str);
 		} else {
 			fprintf(stream, "<td align=left>%s\n",str);
