@@ -98,6 +98,7 @@ int pfs_process_setuid( struct pfs_process *p, uid_t uid );
 int pfs_process_setresgid( struct pfs_process *p, gid_t rgid, uid_t egid, uid_t sgid );
 int pfs_process_setregid( struct pfs_process *p, gid_t rgid, uid_t egid );
 int pfs_process_setgid( struct pfs_process *p, gid_t gid );
+int pfs_process_getgroups(struct pfs_process *p, int size, gid_t list[]);
 int pfs_process_setgroups( struct pfs_process *p, size_t size, const gid_t *list );
 
 extern struct pfs_process *pfs_current;

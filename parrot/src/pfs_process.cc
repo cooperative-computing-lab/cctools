@@ -533,8 +533,19 @@ int pfs_process_setgid( struct pfs_process *p, gid_t gid ) {
 	}
 }
 
+int pfs_process_getgroups(struct pfs_process *p, int size, gid_t list[]) {
+	if (size == 0) {
+		return p->ngroups;
+	} else if (p->ngroups > size) {
+		return -EINVAL;
+	} else {
+		memcpy(list, p->groups, p->ngroups * sizeof(gid_t));
+		return p->ngroups;
+	}
+}
+
 int pfs_process_setgroups( struct pfs_process *p, size_t size, const gid_t *list ) {
-	if (privileged_uid(p) && size <= PFS_NGROUPS_MAX) {
+	if (privileged_uid(p) && (size <= PFS_NGROUPS_MAX)) {
 		memcpy(p->groups, list, size * sizeof(gid_t));
 		p->ngroups = size;
 		return 1;

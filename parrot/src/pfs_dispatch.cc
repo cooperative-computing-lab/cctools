@@ -1498,25 +1498,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_getgroups32:
 		case SYSCALL32_getgroups:
 			if (entering && pfs_fake_setgid) {
-				/* Make sure the spare slot's open */
-				if (p->ngroups <= PFS_NGROUPS_MAX) {
-					for (int i = 0; i < p->ngroups; i++) {
-						if (p->groups[i] == p->egid)
-							return;
-					}
-					/* Since we didn't see the egid, append it to match Linux behavior */
-					p->groups[p->ngroups] = p->egid;
-					++p->ngroups;
+				gid_t groups[PFS_NGROUPS_MAX];
+				int ngroups = pfs_process_getgroups(p, args[0], groups);
+				if ((args[0] > 0) && (ngroups > 0)) {
+					TRACER_MEM_OP(tracer_copy_out(p->tracer,groups,POINTER(args[1]),ngroups * sizeof(gid_t),TRACER_O_ATOMIC));
 				}
-
-				if (args[0] == 0) {
-					divert_to_dummy(p,p->ngroups);
-				} else if (p->ngroups > args[0]) {
-					divert_to_dummy(p,-EINVAL);
-				} else {
-					TRACER_MEM_OP(tracer_copy_out(p->tracer,p->groups,POINTER(args[1]),p->ngroups * sizeof(gid_t),TRACER_O_ATOMIC));
-					divert_to_dummy(p,p->ngroups);
-				}
+				divert_to_dummy(p,p->ngroups);
 			}
 			break;
 

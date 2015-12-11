@@ -22,6 +22,13 @@ int main() {
 	int ngroups;
 	gid_t groups[128];
 
+	assert(getgroups(128, groups) != -1);
+	groups[0] = 9;
+	assert(setgroups(1, groups) == 0);
+	groups[0] = 0;
+	assert(getgroups(128, groups) == 1);
+	assert(groups[0] == 9);
+
 	assert(getresuid(&initial_ruid, &initial_euid, &initial_suid) == 0);
 
 	assert(setresuid(initial_ruid + 1, -1, initial_suid + 2) == 0);
@@ -64,14 +71,6 @@ int main() {
 	assert(getegid() == initial_egid + 6);
 
 	assert(setfsgid(0) == initial_egid + 6);
-
-	assert(getgroups(128, groups) != -1);
-	groups[0] = 9;
-	assert(setgroups(1, groups) == 0);
-	groups[0] = 0;
-	assert(getgroups(128, groups) == 2);
-	assert((groups[0] == 9 && groups[1] == 6) ||
-		(groups[0] == 6 && groups[1] == 9));
 
 	return 0;
 }
