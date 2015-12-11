@@ -4490,7 +4490,14 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 	char *template = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME, q->monitor_output_dirname, getpid(), t->taskid);
 
 	char *summary       = string_format("%s.summary", template);
-	char *extra_options = string_format("-V 'taskid: %d'", t->taskid);
+
+	char *extra_options;
+	if(t->category) {
+		extra_options = string_format("-V 'taskid: %d' -V 'category: %s'", t->taskid, t->category);
+	} else {
+		extra_options = string_format("-V 'taskid: %d'", t->taskid);
+	}
+
 
 	work_queue_task_specify_file(t, q->monitor_exe, monitor_remote_name, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 	work_queue_task_specify_file(t, summary, RESOURCE_MONITOR_TASK_REMOTE_NAME ".summary", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
