@@ -842,6 +842,8 @@ void work_queue_specify_max_worker_cores(struct work_queue *q,  int64_t cores);
 
 void work_queue_specify_max_worker_resources(struct work_queue *q,  const struct rmsummary *rm);
 
+void work_queue_initialize_categories(struct work_queue *q, const char *summaries_file);
+
 void work_queue_auto_label_category(struct work_queue *q,  const char *category, int enable);
 
 #endif

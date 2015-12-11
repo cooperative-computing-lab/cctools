@@ -38,5 +38,6 @@ void category_delete(struct hash_table *categories, const char *name);
 int64_t category_first_allocation(struct itable *histogram, int64_t top_resource);
 void category_accumulate_summary(struct hash_table *categories, const char *category, struct rmsummary *rs);
 void category_update_first_allocation(struct hash_table *categories, const char *category, struct rmsummary *top);
+void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
 
 #endif
