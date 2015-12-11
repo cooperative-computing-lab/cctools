@@ -409,7 +409,6 @@ void show_help()
 	printf("  --filter <expr>     Only process records matching this expression.\n");
 	printf("  --from <time>       Begin query at this absolute time. (required)\n");
 	printf("  --to <time>         End query at this absolute time.\n");
-	printf("  --at <time>         Query once at this absolute time.\n");
 	printf("  --every <interval>  Compute output at this time interval.\n");
 	printf("  --epoch             Display time column in Unix epoch format.\n");
 	printf("  --version           Show software version.\n");
@@ -425,7 +424,6 @@ int main( int argc, char *argv[] )
 	struct list *reduce_exprs = list_create();
 	time_t start_time = 0;
 	time_t stop_time = 0;
-	time_t at_time =0;
 	int display_every = 0;
 	int epoch_mode = 0;
 
@@ -436,7 +434,7 @@ int main( int argc, char *argv[] )
 
 	int c;
 
-	while((c=getopt_long(argc,argv,"D:o:w:f:F:T:A:e:tvh",long_options,0))!=-1) {
+	while((c=getopt_long(argc,argv,"D:o:w:f:F:T:e:tvh",long_options,0))!=-1) {
 		switch(c) {
 		case 'D':
 			dbdir = optarg;
@@ -464,9 +462,6 @@ int main( int argc, char *argv[] )
 			break;
 		case 'T':
 			stop_time = parse_time(optarg,current);
-			break;
-		case 'A':
-			at_time = parse_time(optarg,current);
 			break;
 		case 'e':
 			display_every = string_time_parse(optarg);
