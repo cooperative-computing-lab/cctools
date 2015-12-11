@@ -1182,12 +1182,23 @@ static void delete_uncacheable_files( struct work_queue *q, struct work_queue_wo
 	delete_worker_files(q, w, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 }
 
+void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
+	char *summary = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".summary", q->monitor_output_dirname, getpid(), t->taskid);
+
+	t->rs = rmsummary_parse_file_single(summary);
+
+	if(t->rs) {
+		t->rs->category = xxstrdup(t->category);
+	}
+
+	free(summary);
+}
+
 void resource_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
 {
 	struct flock lock;
 	char        *summary = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".summary", q->monitor_output_dirname, getpid(), t->taskid);
 
-	t->rs          = rmsummary_parse_file_single(summary);
 	int monitor_fd = fileno(q->monitor_file);
 
 	lock.l_type   = F_WRLCK;
@@ -1266,6 +1277,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	/* if q is monitoring, append the task summary to the single
 	 * queue summary, update t->resources_used, and delete the task summary. */
 	if(q->monitor_mode) {
+		read_measured_resources(q, t);
 		resource_monitor_append_report(q, t);
 
 		/* Further, if we got debug and series files, gzip them. */
