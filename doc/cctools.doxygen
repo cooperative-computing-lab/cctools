@@ -26,7 +26,10 @@ data structures, and so forth.  The most commonly used are:
 - @ref link.h
 - @ref hash_table.h
 - @ref itable.h
-- @ref md5.h
+- @ref list.h
+- @ref jx.h
+- @ref jx_print.h
+- @ref jx_parse.h
 
 Or, you can browse all documented modules in the package:
 
