@@ -10,6 +10,8 @@ See the file COPYING for details.
 
 #include "hash_table.h"
 #include "debug.h"
+#include "nvpair.h"
+#include "nvpair_jx.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -60,6 +62,36 @@ static int checkpoint_write( struct jx_database *db, const char *filename )
 	return 1;
 }
 
+/*
+Read a checkpoint in the (deprecated) nvpair format.  This will allow for a seamless upgrade by permitting the new JX database to continue from an nvpair checkpoint.
+*/
+
+static int compat_checkpoint_read( struct jx_database *db, const char *filename )
+{
+	FILE * file = fopen(filename,"r");
+	if(!file) return 0;
+
+	while(1) {
+		struct nvpair *nv = nvpair_create();
+		if(nvpair_parse_stream(nv,file)) {
+			const char *key = nvpair_lookup_string(nv,"key");
+			if(key) {
+				nvpair_delete(hash_table_remove(db->table,key));
+				struct jx *j = nvpair_to_jx(nv);
+				hash_table_insert(db->table,key,j);
+			}
+			nvpair_delete(nv);
+		} else {
+			nvpair_delete(nv);
+			break;
+		}
+	}
+
+	fclose(file);
+
+	return 1;
+}
+
 /* Get a complete checkpoint file and reconstitute the state of the table. */
 
 static int checkpoint_read( struct jx_database *db, const char *filename )
@@ -73,9 +105,9 @@ static int checkpoint_read( struct jx_database *db, const char *filename )
 	fclose(file);
 
 	if(!jcheckpoint || jcheckpoint->type!=JX_OBJECT) {
-		debug(D_NOTICE,"checkpoint %s is not a valid json document!",filename);
+		debug(D_NOTICE, "could not parse checkpoint file, falling back to compatibility mode");
 		jx_delete(jcheckpoint);
-		return 0;
+		return compat_checkpoint_read(db,filename);
 	}
 
 	/* For each key and value, move the value over to the hash table. */
@@ -264,16 +296,22 @@ static int log_replay( struct jx_database *db, const char *filename, time_t snap
 	while(fgets(line,sizeof(line),file)) {
 		if(line[0]=='C') {
 			n = sscanf(line,"C %s %[^\n]",key,value);
-			if(n!=2) {
+			if(n==1) {
+				struct nvpair *nv = nvpair_create();
+				nvpair_parse_stream(nv,file);
+				jvalue = nvpair_to_jx(nv);
+				hash_table_insert(db->table,key,jvalue);
+			} else if(n==2) {
+				jvalue = jx_parse_string(value);
+				if(jvalue) {
+					hash_table_insert(db->table,key,jvalue);
+				} else {
+					corrupt_data(filename,line);
+				}
+			} else {
 				corrupt_data(filename,line);
 				continue;
 			}
-			jvalue = jx_parse_string(value);
-			if(!jvalue) {
-				/* backwards compatibility with old log format. */
-				jvalue = jx_string(value);
-			}
-			hash_table_insert(db->table,key,jvalue);
 		} else if(line[0]=='D') {
 			n = sscanf(line,"D %s\n",key);
 			if(n!=1) {
@@ -293,10 +331,8 @@ static int log_replay( struct jx_database *db, const char *filename, time_t snap
 				continue;
 			}
 			jvalue = jx_parse_string(value);
-			if(!jvalue) {
-				corrupt_data(filename,line);
-				continue;
-			}
+			if(!jvalue) jvalue = jx_string(value);
+
 			struct jx *jname = jx_string(name);
 			jx_delete(jx_remove(jobject,jname));
 			jx_insert(jobject,jname,jvalue);

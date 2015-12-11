@@ -5,8 +5,11 @@ See the file COPYING for details.
 */
 
 #include "deltadb_stream.h"
+
 #include "jx.h"
 #include "jx_parse.h"
+#include "nvpair.h"
+#include "nvpair_jx.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -35,15 +38,17 @@ int deltadb_process_stream( struct deltadb *db, FILE *stream, time_t starttime, 
 	while(fgets(line,sizeof(line),stream)) {
 		if(line[0]=='C') {
 			n = sscanf(line,"C %s %[^\n]",key,value);
-			if(n!=2) {
+			if(n==1) {
+				/* backwards compatibility with old log format */				struct nvpair *nv = nvpair_create();
+				nvpair_parse_stream(nv,stream);
+				jvalue = nvpair_to_jx(nv);
+				nvpair_delete(nv);
+			} else if(n==2) {
+				jvalue = jx_parse_string(value);
+				if(!jvalue) jvalue = jx_string(value);
+			} else {
 				corrupt_data(filename,line);
 				continue;
-			}
-
-			jvalue = jx_parse_string(value);
-			if(!jvalue) {
-				/* backwards compatibility with old log format. */
-				jvalue = jx_string(value);
 			}
 
 			if(!deltadb_create_event(db,key,jvalue)) break;
@@ -66,6 +71,7 @@ int deltadb_process_stream( struct deltadb *db, FILE *stream, time_t starttime, 
 
 			jvalue = jx_parse_string(value);
 			if(!jvalue) {
+				/* backwards compatibility with old format */
 				jvalue = jx_string(value);
 				continue;
 			}

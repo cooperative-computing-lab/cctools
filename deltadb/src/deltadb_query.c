@@ -18,6 +18,8 @@ See the file COPYING for details.
 #include "cctools.h"
 #include "list.h"
 #include "stringtools.h"
+#include "nvpair.h"
+#include "nvpair_jx.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -54,6 +56,41 @@ struct deltadb * deltadb_create( const char *logdir )
 	return db;
 }
 
+/*
+Read a checkpoint in the (deprecated) nvpair format.  This will allow for a seamless upgrade by permitting the new JX database to continue from an nvpair checkpoint.
+*/
+
+static int compat_checkpoint_read( struct deltadb *db, const char *filename )
+{
+	FILE * file = fopen(filename,"r");
+	if(!file) return 0;
+
+	while(1) {
+		struct nvpair *nv = nvpair_create();
+		if(nvpair_parse_stream(nv,file)) {
+			const char *key = nvpair_lookup_string(nv,"key");
+			if(key) {
+				nvpair_delete(hash_table_remove(db->table,key));
+				struct jx *j = nvpair_to_jx(nv);
+				/* skip objects that don't match the filter */
+				if(deltadb_expr_matches(db->filter_exprs,j)) {
+					hash_table_insert(db->table,key,j);
+				} else {
+					jx_delete(j);
+				}
+			}
+			nvpair_delete(nv);
+		} else {
+			nvpair_delete(nv);
+			break;
+		}
+	}
+
+	fclose(file);
+
+	return 1;
+}
+
 /* Get a complete checkpoint file and reconstitute the state of the table. */
 
 static int checkpoint_read( struct deltadb *db, const char *filename )
@@ -67,9 +104,8 @@ static int checkpoint_read( struct deltadb *db, const char *filename )
 	fclose(file);
 
 	if(!jcheckpoint || jcheckpoint->type!=JX_OBJECT) {
-		fprintf(stderr,"checkpoint %s is not a valid json document!\n",filename);
 		jx_delete(jcheckpoint);
-		return 0;
+		return compat_checkpoint_read(db,filename);
 	}
 
 	/* For each key and value, move the value over to the hash table. */
