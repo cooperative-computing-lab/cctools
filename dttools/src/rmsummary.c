@@ -27,8 +27,8 @@
 #include "debug.h"
 #include "list.h"
 #include "rmsummary.h"
+#include "macros.h"
 
-#define ONE_MEGABYTE 1048576 /* this many bytes */
 #define MAX_LINE 1024
 
 #define rmsummary_assign_as_int_field(s, key, value, field)	\
@@ -418,6 +418,21 @@ static int64_t max_field(int64_t d, int64_t s)
 void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src)
 {
 	rmsummary_bin_op(dest, src, max_field);
+}
+
+/* Select the min of the fields, ignoring negative numbers */
+static int64_t min_field(int64_t d, int64_t s)
+{
+	if(d < 0 || s < 0) {
+		return MAX(-1, MAX(s, d)); /* return at least -1. */
+	} else {
+		return MIN(s, d);
+	}
+}
+
+void rmsummary_merge_min(struct rmsummary *dest, struct rmsummary *src)
+{
+	rmsummary_bin_op(dest, src, min_field);
 }
 
 void rmsummary_debug_report(struct rmsummary *s)
