@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "username.h"
 #include "uptime.h"
 #include "getopt.h"
+#include "cctools.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +30,10 @@ void show_help(const char *cmd) {
 	printf( "where options are:\n");
 	printf( " -c,--catalog=<catalog>\n");
 	printf( " -f,--file=<json-file>\n");
+	printf( " -d,--debug=<flags>\n");
+	printf( " -o,--debug-file=<file>\n");
+	printf( " -v,--version\n");
+	printf( " -h,--help\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -39,11 +44,15 @@ int main(int argc, char *argv[]) {
 	static const struct option long_options[] = {
 		{"catalog", required_argument, 0, 'c'},
 		{"file", required_argument, 0, 'f' },
+		{"debug", required_argument, 0, 'd' },
+		{"debug-file", required_argument, 0, 'o' },
+		{"version", no_argument, 0, 'h' },
+		{"help", no_argument, 0, 'h' },
 		{0,0,0,0}
 	};
 
 	signed int c;
-	while ((c = getopt_long(argc, argv, "c:f:", long_options, NULL)) > -1) {
+	while ((c = getopt_long(argc, argv, "c:f:d:o:vh", long_options, NULL)) > -1) {
 		switch (c) {
 			case 'c':
 				host = optarg;
@@ -51,6 +60,16 @@ int main(int argc, char *argv[]) {
 			case 'f':
 				input_file = optarg;
 				break;
+			case 'd':
+				debug_flags_set(optarg);
+				break;
+			case 'o':
+				debug_config_file(optarg);	
+				break;
+			case 'v':
+				cctools_version_print(stdout,"catalog_update");
+				break;
+			case 'h':
 			default:
 				show_help(argv[0]);
 				return EXIT_FAILURE;
