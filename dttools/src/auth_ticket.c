@@ -28,6 +28,17 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+/* Prevent openssl from opening $HOME/.rnd */
+#define OPENSSL_RANDFILE \
+	"if [ -r /dev/urandom ]; then\n" \
+	"	export RANDFILE=/dev/urandom\n" \
+	"elif [ -r /dev/random ]; then\n" \
+	"	export RANDFILE=/dev/random\n" \
+	"else\n" \
+	"	unset RANDFILE\n" \
+	"	export HOME=/\n" \
+	"fi\n"
+
 #define CHALLENGE_LENGTH  (64)
 
 static auth_ticket_server_callback_t server_callback = NULL;
@@ -54,6 +65,7 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 			/* load the digest */
 			{
 				static const char cmd[] =
+					OPENSSL_RANDFILE
 					"openssl rsa -in \"$TICKET\" -pubout\n"
 					;
 
@@ -105,6 +117,7 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 
 			{
 				static const char cmd[] =
+					OPENSSL_RANDFILE
 					"openssl rsautl -inkey \"$TICKET\" -sign\n" /* reads challenge from stdin */
 					;
 
@@ -209,6 +222,7 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 
 					{
 						static const char cmd[] =
+							OPENSSL_RANDFILE
 							"openssl rsautl -inkey \"$TICKET\" -pubin -verify\n"
 							;
 
