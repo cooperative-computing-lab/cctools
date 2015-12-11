@@ -39,4 +39,9 @@ define(SEE_ALSO_LINKER,
 `LIST_BEGIN
 LIST_ITEM MANPAGE(makeflow,1), MANPAGE(perl,1), MANPAGE(python,1), MANPAGE(ldd,1)
 LIST_END')dnl
+define(SEE_ALSO_CATALOG,
+`LIST_BEGIN
+LIST_ITEM MANUAL(Cooperative Computing Tools Documentation,"../index.html")
+LIST_ITEM MANPAGE(catalog_server,1), MANPAGE(catalog_update,1), MANPAGE(deltadb_query,1)
+LIST_END')dnl
 dnl
