@@ -4506,13 +4506,13 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 	struct rmsummary limits;
 
 	/* use the minimum of worker, or top value. We take care of the -1 that means 'unspecified'. */
-	if(t->unlabeled) {
-		memcpy(&limits, q->worker_top_resources, sizeof(struct rmsummary));
-		limits.cores  = limits.cores < -1 ? w->resources->cores.total : MIN(w->resources->cores.total, limits.cores);
-		limits.memory  = limits.memory < -1 ? w->resources->memory.total : MIN(w->resources->memory.total, limits.memory);
-		limits.disk  = limits.disk < -1 ? w->resources->disk.total : MIN(w->resources->disk.total, limits.disk);
-	} else {
-		memcpy(&limits, t->rn, sizeof(struct rmsummary));
+	memcpy(&limits, q->worker_top_resources, sizeof(struct rmsummary));
+	limits.cores  = limits.cores  < -1 ? w->resources->cores.total  : MIN(w->resources->cores.total, limits.cores);
+	limits.memory = limits.memory < -1 ? w->resources->memory.total : MIN(w->resources->memory.total, limits.memory);
+	limits.disk   = limits.disk   < -1 ? w->resources->disk.total   : MIN(w->resources->disk.total, limits.disk);
+
+	if(!t->unlabeled) {
+		rmsummary_merge_min(&limits, t->rn);
 	}
 
 	int extra_files = (q->monitor_mode == MON_FULL);
