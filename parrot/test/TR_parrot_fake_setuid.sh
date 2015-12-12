@@ -12,12 +12,22 @@ prepare()
 #include <sys/fsuid.h>
 #include <stdio.h>
 #include <assert.h>
+#include <grp.h>
 
 int main() {
 	uid_t initial_ruid, initial_euid, initial_suid;
 	gid_t initial_rgid, initial_egid, initial_sgid;
 	uid_t ruid, euid, suid;
 	gid_t rgid, egid, sgid;
+	int ngroups;
+	gid_t groups[128];
+
+	assert(getgroups(128, groups) != -1);
+	groups[0] = 9;
+	assert(setgroups(1, groups) == 0);
+	groups[0] = 0;
+	assert(getgroups(128, groups) == 1);
+	assert(groups[0] == 9);
 
 	assert(getresuid(&initial_ruid, &initial_euid, &initial_suid) == 0);
 

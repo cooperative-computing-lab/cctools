@@ -1255,13 +1255,34 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			break;
 
 		case SYSCALL64_getgroups:
-			if (entering && pfs_fake_setgid)
-				divert_to_dummy(p,-EPERM);
+			if (entering && pfs_fake_setgid) {
+				gid_t groups[PFS_NGROUPS_MAX];
+				int ngroups = pfs_process_getgroups(p, args[0], groups);
+				if ((args[0] > 0) && (ngroups > 0)) {
+					TRACER_MEM_OP(tracer_copy_out(p->tracer,groups,POINTER(args[1]),ngroups * sizeof(gid_t),TRACER_O_ATOMIC));
+				}
+				divert_to_dummy(p,p->ngroups);
+			}
 			break;
 
 		case SYSCALL64_setgroups:
-			if (entering)
-				divert_to_dummy(p,-EPERM);
+			if (entering) {
+				gid_t groups[PFS_NGROUPS_MAX];
+				if (pfs_fake_setuid) {
+					if (args[0] <= PFS_NGROUPS_MAX) {
+						TRACER_MEM_OP(tracer_copy_in(p->tracer, groups, POINTER(args[1]), args[0] * sizeof(gid_t),TRACER_O_ATOMIC));
+						if (pfs_process_setgroups(p, args[0], groups)) {
+							divert_to_dummy(p,0);
+						} else {
+							divert_to_dummy(p,-EPERM);
+						}
+					} else {
+						divert_to_dummy(p,-EINVAL);
+					}
+				} else {
+					divert_to_dummy(p,-EPERM);
+				}
+			}
 			break;
 
 		/* Here begin all of the I/O operations, given in the same order as in

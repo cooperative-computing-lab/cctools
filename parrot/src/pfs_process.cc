@@ -253,6 +253,8 @@ struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, 
 		child->rgid = parent->rgid;
 		child->egid = parent->egid;
 		child->sgid = parent->sgid;
+		child->ngroups = parent->ngroups;
+		memcpy(child->groups, parent->groups, child->ngroups * sizeof(gid_t));
 
 		child->flags |= parent->flags;
 		if(share_table) {
@@ -267,6 +269,10 @@ struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, 
 		child->ppid = getpid();
 		child->ruid = child->euid = child->suid = pfs_uid;
 		child->rgid = child->egid = child->sgid = pfs_gid;
+		child->ngroups = getgroups(PFS_NGROUPS_MAX, child->groups);
+		if (child->ngroups < 0) {
+			fatal("Unable to get supplementary groups: %s", strerror(errno));
+		}
 
 		extern int parrot_fd_max;
 
@@ -521,6 +527,27 @@ int pfs_process_setgid( struct pfs_process *p, gid_t gid ) {
 		} else {
 			p->egid = gid;
 		}
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+int pfs_process_getgroups(struct pfs_process *p, int size, gid_t list[]) {
+	if (size == 0) {
+		return p->ngroups;
+	} else if (p->ngroups > size) {
+		return -EINVAL;
+	} else {
+		memcpy(list, p->groups, p->ngroups * sizeof(gid_t));
+		return p->ngroups;
+	}
+}
+
+int pfs_process_setgroups( struct pfs_process *p, size_t size, const gid_t *list ) {
+	if (privileged_uid(p) && (size <= PFS_NGROUPS_MAX)) {
+		memcpy(p->groups, list, size * sizeof(gid_t));
+		p->ngroups = size;
 		return 1;
 	} else {
 		return 0;
