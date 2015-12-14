@@ -4111,7 +4111,7 @@ struct work_queue *work_queue_create(int port)
 	q->worker_blacklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
 
-	q->measured_local_resources = rmsummary_create(0);
+	q->measured_local_resources = rmsummary_create(-1);
 	q->worker_top_resources     = rmsummary_create(-1);
 
 	q->categories = hash_table_create(0, 0);
@@ -4408,19 +4408,18 @@ void work_queue_delete(struct work_queue *q)
 		free(q->stats);
 		free(q->stats_disconnected_workers);
 
-		if(q->measured_local_resources)
-			rmsummary_delete(q->measured_local_resources);
-
-		if(q->worker_top_resources)
-			rmsummary_delete(q->worker_top_resources);
-
-		work_queue_disable_monitoring(q);
-
 		free(q->poll_table);
 		link_close(q->master_link);
 		if(q->logfile) {
 			fclose(q->logfile);
 		}
+
+		work_queue_disable_monitoring(q);
+		if(q->measured_local_resources)
+			rmsummary_delete(q->measured_local_resources);
+		if(q->worker_top_resources)
+			rmsummary_delete(q->worker_top_resources);
+
 		free(q);
 	}
 }
