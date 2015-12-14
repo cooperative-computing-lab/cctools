@@ -4461,6 +4461,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 
 	FILE *final = fdopen(final_fd, "w");
 
+	rmsummary_print(final, q->measured_local_resources, NULL, NULL, NULL);
 	fprintf(final, "user:        %s\n", getlogin());
 	fprintf(final, "type:        work_queue\n");
 
@@ -4468,7 +4469,6 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 		fprintf(final, "master_name: %s\n", q->name);
 
 	fprintf(final, "exit_type:   normal\n");
-	rmsummary_print(final, q->measured_local_resources, NULL, NULL, NULL);
 
 	copy_fd_to_stream(summs_fd, final);
 
