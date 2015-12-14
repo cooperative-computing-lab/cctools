@@ -21,7 +21,8 @@ A paper entitled DeltaDB describes the operation of the tools in detail (see ref
 
 SECTION(ARGUMENTS)
 OPTIONS_BEGIN
-OPTION_ITEM(--db path) (required) The path to the catalog history database.
+OPTION_ITEM(--db path) Query this database directory.
+OPTION_ITEM(--file path) Query the data stream in this file.
 OPTION_ITEM(--from time) (required) The starting date and time of the query in an absolute time like "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD" or a relative time like 5s, 5m, 5h, 5d to indicate five seconds, minutes, hours, or days ago, respectively.
 OPTION_ITEM(--to time) The ending time of the query, in the same format as the --from option.  If omitted, the current time is assumed.
 OPTION_ITEM(--every interval) The intervals at which output should be produced, like 5s, 5m, 5h, 5d to indicate five seconds, minutes, hours, or days ago, respectively.

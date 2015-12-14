@@ -439,6 +439,7 @@ time_t parse_time( const char *str, time_t current )
 static struct option long_options[] =
 {
 	{"db", required_argument, 0, 'D'},
+	{"file", required_argument, 0, 'L'},
 	{"output", required_argument, 0, 'o'},
 	{"where", required_argument, 0,'w'},
 	{"filter", required_argument, 0,'f'},
@@ -456,7 +457,8 @@ void show_help()
 {
 	printf("use: deltadb_query [options]\n");
 	printf("Where options are:\n");
-	printf("  --db <path>         Path to the database directory. (required)\n");
+	printf("  --db <path>         Query this database directory.\n");
+	printf("  --file <path>       Query this raw data file.\n");
 	printf("  --output <expr>     Output this expression. (multiple)\n");
 	printf("  --where <expr>      Only output records matching this expression.\n");
 	printf("  --filter <expr>     Only process records matching this expression.\n");
@@ -471,6 +473,7 @@ void show_help()
 int main( int argc, char *argv[] )
 {
 	const char *dbdir=0;
+	const char *dbfile=0;
 	struct deltadb_expr *e;
 	struct deltadb_expr *where_exprs = 0;
 	struct deltadb_expr *filter_exprs = 0;
@@ -488,10 +491,13 @@ int main( int argc, char *argv[] )
 
 	int c;
 
-	while((c=getopt_long(argc,argv,"D:o:w:f:F:T:e:tvh",long_options,0))!=-1) {
+	while((c=getopt_long(argc,argv,"D:L:o:w:f:F:T:e:tvh",long_options,0))!=-1) {
 		switch(c) {
 		case 'D':
 			dbdir = optarg;
+			break;
+		case 'L':
+			dbfile = optarg;
 			break;
 		case 'o':
 			if(2==sscanf(optarg,"%[^(](%[^)])",reduce_name,reduce_attr)) {
@@ -542,8 +548,8 @@ int main( int argc, char *argv[] )
 		}
 	}
 
-	if(!dbdir) {
-		fprintf(stderr,"deltadb_query: --db argument is required\n");
+	if(!dbdir && !dbfile) {
+		fprintf(stderr,"deltadb_query: either --db or --file argument is required\n");
 		return 1;
 	}
 
@@ -581,7 +587,17 @@ int main( int argc, char *argv[] )
 		display_mode = MODE_STREAM;
 	}
 
-	log_play_time(db,start_time,stop_time);
+	if(dbfile) {
+		FILE *file = fopen(dbfile,"r");
+		if(!file) {
+			fprintf(stderr,"deltadb_query: couldn't open %s: %s\n",dbfile,strerror(errno));
+			return 1;
+		}
+		deltadb_process_stream(db,file,start_time,stop_time);
+		fclose(file);
+	} else {
+		log_play_time(db,start_time,stop_time);
+	}
 
 	return 0;
 }
