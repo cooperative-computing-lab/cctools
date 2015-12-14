@@ -4208,7 +4208,7 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 	  return 0;
   }
 
-  q->monitor_summary_filename = string_format("%s/all_summaries-%d.log", q->monitor_output_dirname, getpid());
+  q->monitor_summary_filename = string_format("%s/wq-%d.summaries", q->monitor_output_dirname, getpid());
 
   q->monitor_file = fopen(q->monitor_summary_filename, "a");
 
