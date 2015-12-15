@@ -21,11 +21,12 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#define enforcer_pattern "./enforcer_"
+#define enforcer_pattern "enforcer_"
 #define mountlist_pattern "mount_"
 #define tmp_pattern "tmp_"
 #define vartmp_pattern "vartmp_"
 #define shm_pattern "shm_"
+#define local_parrot_path "parrot_run"
 
 void makeflow_log_file_expectation( struct dag *d, struct list *file_list );
 void makeflow_log_file_existence( struct dag *d, struct list *file_list );
@@ -33,7 +34,6 @@ void makeflow_log_file_existence( struct dag *d, struct list *file_list );
 
 void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *w, char *parrot_path) {
 	struct stat stat_buf;
-	const char *local_parrot_path = "./parrot_run";
 	int local_parrot = open(local_parrot_path, O_WRONLY|O_CREAT|O_EXCL, S_IRWXU);
 	int host_parrot = open(parrot_path, O_RDONLY);
 	if (host_parrot == -1) {
@@ -61,7 +61,7 @@ void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *w, char *parrot_pat
 	makeflow_wrapper_add_input_file(w, xxstrdup(tmp_pattern "%%"));
 	makeflow_wrapper_add_input_file(w, xxstrdup(vartmp_pattern "%%"));
 	makeflow_wrapper_add_input_file(w, xxstrdup(shm_pattern "%%"));
-	w->command = xxstrdup(enforcer_pattern "%%");
+	w->command = xxstrdup("./" enforcer_pattern "%%");
 }
 
 char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_wrapper *w, struct list *input_list, struct list *output_list )
@@ -82,24 +82,18 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, vartmp_path));
 	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, shm_path));
 	makeflow_log_file_expectation(n->d, enforcer_paths);
-	list_delete(enforcer_paths);
 
 	/* Create local directories to bind to /tmp, /var/tmp, and /dev/shm */
 	if (mkdir(tmp_path, S_IRWXU) || mkdir(vartmp_path, S_IRWXU) || mkdir(shm_path, S_IRWXU)) {
 		fatal("could not create temp directory: %s", strerror(errno));
 	}
 
-	enforcer_paths = list_create();
-	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, tmp_path));
-	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, vartmp_path));
-	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, shm_path));
 	makeflow_log_file_existence(n->d, enforcer_paths);
 	list_delete(enforcer_paths);
 
 	enforcer_paths = list_create();
 	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, mountlist_path));
 	makeflow_log_file_expectation(n->d, enforcer_paths);
-	list_delete(enforcer_paths);
 
 	/* make an invalid mountfile to send */
 	int mountlist_fd = open(mountlist_path, O_WRONLY|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR);
@@ -109,15 +103,12 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	write(mountlist_fd, "mountlist\n", 10);
 	close(mountlist_fd);
 
-	enforcer_paths = list_create();
-	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, mountlist_path));
 	makeflow_log_file_existence(n->d, enforcer_paths);
 	list_delete(enforcer_paths);
 
 	enforcer_paths = list_create();
 	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, enforcer_path));
 	makeflow_log_file_expectation(n->d, enforcer_paths);
-	list_delete(enforcer_paths);
 
 	/* and generate a wrapper script with the current nodeid */
 	int enforcer_fd = open(enforcer_path, O_WRONLY|O_CREAT|O_EXCL, S_IRWXU);
@@ -158,8 +149,6 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	fprintf(enforcer, "exit $?\n");
 	fclose(enforcer);
 
-	enforcer_paths = list_create();
-	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, enforcer_path));
 	makeflow_log_file_existence(n->d, enforcer_paths);
 	list_delete(enforcer_paths);
 
