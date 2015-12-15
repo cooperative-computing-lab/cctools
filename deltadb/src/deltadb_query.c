@@ -309,6 +309,20 @@ int deltadb_post_event( struct deltadb *db, const char *line )
 	return 1;
 }
 
+static int is_leap_year( int y )
+{
+	return (y%400==0) || ( (y%4==0) && (y%100!=0) );
+}
+
+static int days_in_year( int y )
+{
+	if(is_leap_year(y)) {
+		return 366;
+	} else {
+		return 365;
+	}
+}
+
 /*
 Play the log from starttime to stoptime by opening the appropriate
 checkpoint file and working ahead in the various log files.
@@ -351,7 +365,7 @@ static int log_play_time( struct deltadb *db, time_t starttime, time_t stoptime 
 		}
 
 		day++;
-		if(day>=365) {
+		if(day>=days_in_year(year)) {
 			year++;
 			day = 0;
 		}
