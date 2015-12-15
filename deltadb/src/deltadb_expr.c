@@ -6,6 +6,8 @@ See the file COPYING for details.
 
 #include "deltadb_expr.h"
 
+#include "stringtools.h"
+
 #include <string.h>
 #include <stdio.h>
 
@@ -43,13 +45,6 @@ void deltadb_expr_delete( struct deltadb_expr *e )
 	free(e);
 }
 
-static int is_number(char const* p)
-{
-	char* end;
-	strtod(p, &end);
-	return !*end;
-}
-
 static int jx_is_number( struct jx * j )
 {
 	return j->type==JX_DOUBLE || j->type==JX_INTEGER;
@@ -65,14 +60,14 @@ static int expr_is_true( struct deltadb_expr *expr, struct jx *jvalue )
 {
 	char *operator = expr->operator;
 	int cmp;
+	double dvalue;
 
 	/// XXX need to handle other combinations of values here
 
-	if (is_number(expr->value) && jx_is_number(jvalue) ) {
+	if (string_is_float(expr->value,&dvalue) && jx_is_number(jvalue) ) {
 		double in = jx_to_double(jvalue);
-		double v = atof(expr->value);
-		if (in<v) cmp = -1;
-		else if (in==v) cmp = 0;
+		if (in<dvalue) cmp = -1;
+		else if (in==dvalue) cmp = 0;
 		else cmp = 1;
 	} else {
 		cmp = strcmp(jvalue->u.string_value,expr->value);
