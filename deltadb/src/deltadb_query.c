@@ -330,7 +330,6 @@ checkpoint file and working ahead in the various log files.
 
 static int log_play_time( struct deltadb *db, time_t starttime, time_t stoptime )
 {
-	char filename[1024];
 	int file_errors = 0;
 
 	struct tm *starttm = localtime(&starttime);
@@ -343,18 +342,22 @@ static int log_play_time( struct deltadb *db, time_t starttime, time_t stoptime 
 	int stopyear = stoptm->tm_year + 1900;
 	int stopday = stoptm->tm_yday;
 
-	sprintf(filename,"%s/%d/%d.ckpt",db->logdir,year,day);
+	char *filename = string_format("%s/%d/%d.ckpt",db->logdir,year,day);
 	checkpoint_read(db,filename);
+	free(filename);
 
 	while(1) {
-		sprintf(filename,"%s/%d/%d.log",db->logdir,year,day);
+		char *filename = string_format("%s/%d/%d.log",db->logdir,year,day);
 		FILE *file = fopen(filename,"r");
 		if(!file) {
 			file_errors += 1;
 			fprintf(stderr,"couldn't open %s: %s\n",filename,strerror(errno));
+			free(filename);
 			if (file_errors>5)
 				break;
+
 		} else {
+			free(filename);
 			int keepgoing = deltadb_process_stream(db,file,starttime,stoptime);
 			starttime = 0;
 
