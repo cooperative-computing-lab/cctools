@@ -4,30 +4,43 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "jx.h"
+#include "deltadb_expr.h"
 
 #include <string.h>
 #include <stdio.h>
 
 struct deltadb_expr {
-	char operator[32];
+	char *operator;
 	char *param;
-	char *val;
+	char *value;
 	struct deltadb_expr *next;
 };
 
 struct deltadb_expr * deltadb_expr_create( const char *str, struct deltadb_expr *next )
 {
 	struct deltadb_expr *e = malloc(sizeof(*e));
-	e->param = strdup(str);
-	char *delim = strpbrk(e->param, "<>=!");
-	e->val = strpbrk(delim, "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
-	int operator_size = (int)(e->val-delim);
-	strncpy(e->operator,delim,operator_size);
-	e->operator[operator_size] = '\0';
-	delim[0] = '\0';
-	e->next = next;
+
+	int size = strlen(str)+1;
+	e->param = malloc(size);
+	e->operator = malloc(size);
+	e->value = malloc(size);
+
+	int n = sscanf(str,"%[^<>=!]%[<>=!]%s",e->param,e->operator,e->value);
+	if(n!=3) {
+		deltadb_expr_delete(e);
+		return 0;
+	}
+
 	return e;
+}
+
+void deltadb_expr_delete( struct deltadb_expr *e )
+{
+	if(!e) return;
+	free(e->param);
+	free(e->operator);
+	free(e->value);
+	free(e);
 }
 
 static int is_number(char const* p)
@@ -55,14 +68,14 @@ static int expr_is_true( struct deltadb_expr *expr, struct jx *jvalue )
 
 	/// XXX need to handle other combinations of values here
 
-	if (is_number(expr->val) && jx_is_number(jvalue) ) {
+	if (is_number(expr->value) && jx_is_number(jvalue) ) {
 		double in = jx_to_double(jvalue);
-		double v = atof(expr->val);
+		double v = atof(expr->value);
 		if (in<v) cmp = -1;
 		else if (in==v) cmp = 0;
 		else cmp = 1;
 	} else {
-		cmp = strcmp(jvalue->u.string_value,expr->val);
+		cmp = strcmp(jvalue->u.string_value,expr->value);
 	}
 
 	if(strcmp(operator,"=")==0) {

@@ -468,6 +468,7 @@ void show_help()
 int main( int argc, char *argv[] )
 {
 	const char *dbdir=0;
+	struct deltadb_expr *e;
 	struct deltadb_expr *where_exprs = 0;
 	struct deltadb_expr *filter_exprs = 0;
 	struct list *output_exprs = list_create();
@@ -502,10 +503,20 @@ int main( int argc, char *argv[] )
 			}
 			break;
 		case 'w':
-			where_exprs = deltadb_expr_create(optarg,where_exprs);
+			e = deltadb_expr_create(optarg,where_exprs);
+			if(!e) {
+				fprintf(stderr,"invalid expression: %s\n",optarg);
+				break;
+			}
+			where_exprs = e;
 			break;
 		case 'f':
-			filter_exprs = deltadb_expr_create(optarg,filter_exprs);
+			e = deltadb_expr_create(optarg,filter_exprs);
+			if(!e) {
+				fprintf(stderr,"invalid expression: %s\n",optarg);
+				break;
+			}
+			filter_exprs = e;
 			break;
 		case 'F':
 			start_time = parse_time(optarg,current);
