@@ -56,7 +56,7 @@ OPTION_ITEM(`-R, --retry')Automatically retry failed batch jobs up to 100 times.
 OPTION_TRIPLET(-r, retry-count, n)Automatically retry failed batch jobs up to n times.
 OPTION_PAIR(--wait-for-files-upto, #)Wait for output files to be created upto this many seconds (e.g., to deal with NFS semantics).
 OPTION_TRIPLET(-S, submission-timeout, timeout)Time to retry failed batch job submission. (default is 3600s)
-OPTION_TRIPLET(-T, batch-type, type)Batch system type: local, condor, sge, pbs, torque, slurm, moab, cluster, wq. (default is local)
+OPTION_TRIPLET(-T, batch-type, type)Batch system type: local, condor, sge, pbs, torque, slurm, moab, cluster, wq, amazon. (default is local)
 OPTIONS_END
 
 SUBSECTION(Debugging Options)
@@ -95,6 +95,16 @@ SUBSECTION(Docker Support)
 OPTIONS_BEGIN
 OPTION_PAIR(--docker,image) Run each task in the Docker container with this name.  The image will be obtained via "docker pull" if it is not already available.
 OPTION_PAIR(--docker-tar,tar) Run each task in the Docker container given by this tar file.  The image will be uploaded via "docker load" on each execution site.
+OPTIONS_END
+
+SUBSECTION(Amazon Options)
+OPTIONS_BEGIN
+OPTION_PATH( --amazon-credentials-filepath, filepath) Specify path to Amazon credentials file.
+Credentials should be in the following format:
+[Credentials]
+aws_access_key_id = AAABBBBCCCCDDD
+aws_secret_access_key = AAABBBBCCCCDDDAAABBBBCCCCDDD
+OPTION_PAIR(--ami-image-id, image-id) Specify ami-image-id.
 OPTIONS_END
 
 SUBSECTION(Other Options)

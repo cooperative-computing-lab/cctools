@@ -67,7 +67,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 		// Some systems set PBS_JOBID, some set JOBID.
 		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
 	}
-	
+
 	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS){
 		fprintf(file, "cd %s\n", path);
 	}
@@ -150,8 +150,8 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 
 	char line[BATCH_JOB_LINE_MAX] = "";
 	while(fgets(line, sizeof(line), file)) {
-		if(sscanf(line, "Your job %" SCNbjid, &jobid) == 1 
-		|| sscanf(line, "Submitted batch job %" SCNbjid, &jobid) == 1 
+		if(sscanf(line, "Your job %" SCNbjid, &jobid) == 1
+		|| sscanf(line, "Submitted batch job %" SCNbjid, &jobid) == 1
 		|| sscanf(line, "%" SCNbjid, &jobid) == 1 ) {
 			debug(D_BATCH, "job %" PRIbjid " submitted", jobid);
 			pclose(file);
