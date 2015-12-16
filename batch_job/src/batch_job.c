@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+extern const struct batch_queue_module batch_queue_amazon;
 extern const struct batch_queue_module batch_queue_chirp;
 extern const struct batch_queue_module batch_queue_cluster;
 extern const struct batch_queue_module batch_queue_condor;
@@ -39,9 +40,10 @@ static struct batch_queue_module batch_queue_unknown = {
 	{NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
-#define BATCH_JOB_SYSTEMS  "local, wq, condor, sge, torque, moab, slurm, chirp"
+#define BATCH_JOB_SYSTEMS  "local, wq, condor, sge, torque, moab, slurm, chirp, amazon"
 
 const struct batch_queue_module * const batch_queue_modules[] = {
+	&batch_queue_amazon,
 	&batch_queue_chirp,
 	&batch_queue_cluster,
 	&batch_queue_condor,

@@ -33,6 +33,7 @@ typedef int64_t batch_job_id_t;
 typedef enum {
 	BATCH_QUEUE_TYPE_LOCAL,	              /**< Batch jobs will run as local processes. */
 	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
+	BATCH_QUEUE_TYPE_AMAZON,              /**< Batch jobs will be sent spun up Amazon ec2 instances */
 	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine. */
 	BATCH_QUEUE_TYPE_MOAB,                /**< Batch jobs will be sent to the Moab Workload Manager. */
 	BATCH_QUEUE_TYPE_PBS,                 /**< Batch jobs will be send to the PBS Scheduler. */

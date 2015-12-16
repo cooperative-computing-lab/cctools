@@ -18,7 +18,7 @@ PUBLIC_HEADERS = work_queue.h
 
 LIBDTTOOLS = ${CCTOOLS_HOME}/dttools/src/libdttools.a
 EXTERNALS = $(LIBDTTOOLS)
-EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a 
+EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = libwork_queue.a
 OBJECTS = $(OBJECTS_LIBRARY) $(OBJECTS_WORKER) work_queue_test_main.o
 OBJECTS_LIBRARY = $(SOURCES_LIBRARY:%.c=%.o)

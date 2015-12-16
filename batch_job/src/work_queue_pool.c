@@ -57,6 +57,8 @@ static int abort_flag = 0;
 static const char *scratch_dir = 0;
 static const char *password_file = 0;
 static char *config_file = 0;
+static char *amazon_credentials = NULL;
+static char *amazon_ami = NULL;
 
 /* -1 means 'not specified' */
 static int num_cores_option  = -1;
@@ -581,11 +583,13 @@ static void show_help(const char *cmd)
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
 	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
+	printf(" %-30s Specify path to Amazon credentials (for use with -T amazon)\n", "--amazon-credentials");
+	printf(" %-30s Specify amazon machine image (AMI). (for use with -T amazon)\n", "--amazon-ami");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI };
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
@@ -608,6 +612,8 @@ static const struct option long_options[] = {
 	{"debug-file-size", required_argument, 0, 'O'},
 	{"version", no_argument, 0, 'v'},
 	{"help", no_argument, 0, 'h'},
+	{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
+	{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 	{0,0,0,0}
 };
 
@@ -659,6 +665,12 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_CORES:
 				num_cores_option = atoi(optarg);
+				break;
+			case LONG_OPT_AMAZON_CREDENTIALS:
+				amazon_credentials = xxstrdup(optarg);
+				break;
+			case LONG_OPT_AMAZON_AMI:
+				amazon_ami = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MEMORY:
 				num_memory_option = atoi(optarg);
@@ -776,6 +788,12 @@ int main(int argc, char *argv[])
 
 	set_worker_resources( queue );
 
+	if (amazon_credentials != NULL) {
+		batch_queue_set_option(queue, "amazon-credentials", amazon_credentials);
+	}
+	if (amazon_ami != NULL) {
+		batch_queue_set_option(queue, "amazon-ami", amazon_ami);
+	}
 	mainloop( queue, project_regex, foremen_regex );
 
 	batch_queue_delete(queue);
