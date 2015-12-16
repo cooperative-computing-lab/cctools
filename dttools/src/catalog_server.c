@@ -97,8 +97,8 @@ static INT64_T max_server_size = 0;
 static FILE *logfile = 0;
 static char *logfilename = 0;
 
-/* Location of the history file. */
-static const char * history_dir = 0;
+/* Location of the history file. Default is in the current dir. */
+static const char * history_dir = "catalog.history";
 
 /* Settings for the master catalog that we will report *to* */
 static int outgoing_alarm = 0;
