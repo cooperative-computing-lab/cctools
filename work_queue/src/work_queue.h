@@ -639,9 +639,9 @@ void work_queue_specify_name(struct work_queue *q, const char *name);
 void work_queue_specify_priority(struct work_queue *q, int priority);
 
 /** Specify the number of tasks not yet submitted to the queue.
-	It is used by work_queue_pool to determine the number of workers to launch.
+	It is used by work_queue_factory to determine the number of workers to launch.
 	If not specified, it defaults to 0.
-	work_queue_pool considers the number of tasks as:
+	work_queue_factory considers the number of tasks as:
 	num tasks left + num tasks running + num tasks read.
   @param q A work queue object.
   @param ntasks Number of tasks yet to be submitted.

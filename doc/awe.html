@@ -244,7 +244,7 @@ Finally, we give a name to the master (“awe-wq”) to that workers can easily 
 <b>Workers</b>
 Resources can be allocated either directly using work_queue_worker to run tasks locally.
 To run jobs on SGE or CONDOR use <tt>sge_submit_workers</tt> and <tt>condor_submit_workers</tt>.
-Additionally, resources can be managed automatically using <tt>work_queue_pool</tt>.
+Additionally, resources can be managed automatically using <tt>work_queue_factory</tt>.
 Using <tt>work_queue_worker</tt> also allows the worker to operate as a ”Foreman”, enabling the hierarchical distribution of tasks.
 Since the master has started we can start a worker locally.
 <code>% work_queue_worker -a -N awe-wq</code>

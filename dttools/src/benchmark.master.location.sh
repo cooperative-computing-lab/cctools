@@ -171,13 +171,13 @@ start_workers () {
 	echo Starting $workloads_max \* $num_of_workers workers for executing the workloads ...
 	for ((j=1;j<=$workloads_max;j++)); do
 		projname=lyu2.$j
-		./work_queue_pool -T condor -f -a -N $projname -t 86400 $num_of_workers
+		./work_queue_factory -T condor -f -a -N $projname -t 86400 $num_of_workers
 		sleep 5
 	done
 	echo $((workloads_max * num_of_workers)) are started successfully.
 
 	echo Starting workers for hosting multiple masters ...
-	./work_queue_pool -T condor -f -a -N lyu2.0 -t 86400 $((workloads_max))
+	./work_queue_factory -T condor -f -a -N lyu2.0 -t 86400 $((workloads_max))
 	echo $((workloads_max + 10)) are started successfully.
 }
 
