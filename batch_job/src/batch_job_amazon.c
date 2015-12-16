@@ -76,9 +76,7 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
         fprintf(f, "%s", amazon_ec2_script);
         fclose(f);
         // Execute permissions
-        char mode[] = "0755";
-        int i = strtol(mode, 0, 8);
-        chmod(amazon_script_filename, i);
+        chmod(amazon_script_filename,0755);
     }
 
 
