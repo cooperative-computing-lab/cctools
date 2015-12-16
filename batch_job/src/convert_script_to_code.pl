@@ -9,14 +9,14 @@ use warnings;
 print "\"\\\n";
 
 sub escape_line {
-    chomp $_[0];
-    $_[0] =~ s/\\/\\\\/g;
-    $_[0] =~ s/'/\\'/g;
-    $_[0] =~ s/"/\\"/g;
+	chomp $_[0];
+	$_[0] =~ s/\\/\\\\/g;
+	$_[0] =~ s/'/\\'/g;
+	$_[0] =~ s/"/\\"/g;
 }
 
 while(<STDIN>) {
-    escape_line($_);
-    print "$_\\n\\\n";
+	escape_line($_);
+	print "$_\\n\\\n";
 }
 print "\";\n";
