@@ -4,13 +4,13 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef NVPAIR_DATABASE_H
-#define NVPAIR_DATABASE_H
+#ifndef JX_DATABASE_H
+#define JX_DATABASE_H
 
-/** @file nvpair_database.h
+/** @file jx_database.h
 
-nvpair_database is a persistent database for keeping track of a set of
-objects, each indexed by a unique key and described by a set of
+jx_database is a persistent database for keeping track of a set of
+json objects, each indexed by a unique key and described by a set of
 arbitrary name value pairs.  The current state of the database
 is kept in memory for fast queries, while a history of all modifications
 is logged to disk to enable recovering the state of the database
@@ -36,17 +36,22 @@ The log directory is broken down by year and day-of-year, so that
 each checkpoint file is named DIR/YEAR/DAY.ckpt and the corresponding
 log file is named DIR/YEAR/DAY.log
 
-The checkpoint file is simply the text dump of all of the nvpairs
-in the table, in the same format that is delivered online.
+The checkpoint file is simply a json object containing
+the keys and values of all the objects in the database.
 
-The log file consists of a series of records of the following format;
+The log file consists of a series of entries,
+each one a json array in the following formats:
 
 <pre>
-T (time)               - Indicates the current time in Unix epoch format.
-C (key)                - Create a new object with the given key, followed by the object data.
-D (key)                - Delete an object with the given key.
-U (key) (name) (value) - Update a property to have the given name and value.
-R (key) (name)         - Remove a property with the given name.
+T [time]               - Indicates the current time in Unix epoch format.
+C [key] [object]       - Create a new object with the given key.
+D [key] [object]       - Delete an object with the given key.
+U [key] [name] [value] - Update a named property with a new value.
+R [key] [name]         - Remove a property with the given name.
+
+In the examples above, time is a JSON integer,
+key and name are JSON strings, object is a JSON object,
+and value can be any JSON value.
 </pre>
 
 As of 2012, with approx 300 entities reporting to the catalog,
@@ -54,23 +59,23 @@ each day results in 20MB of log data and 150KB of checkpoint data,
 totalling under 8GB data per year.
 */
 
-#include "nvpair.h"
+#include "jx.h"
 
 /** Create a new database, recovering state from disk if available.
 @param logdir A directory to contain the database on disk.  If it does not exist, it will be created.  If null, no disk storage will be used.
 @return A pointer to a newly created history table.
 */
 
-struct nvpair_database * nvpair_database_create( const char *logdir );
+struct jx_database * jx_database_create( const char *logdir );
 
 /** Insert or update an object into the database.
 If an object with the same primary key exists in the database, it will generate update (U) records in the log, otherwise a create (C) record is generated against the original object.
 @param db The database to access.
 @param key The primary key to associate with the object.
-@param nv The object in the form of an nvpair.
+@param j The object in the form of an jx expression.
 */
 
-void            nvpair_database_insert( struct nvpair_database *db, const char *key, struct nvpair *nv );
+void jx_database_insert( struct jx_database *db, const char *key, struct jx *j );
 
 /** Look up an object in the database.
 @param db The database to access.
@@ -78,34 +83,34 @@ void            nvpair_database_insert( struct nvpair_database *db, const char *
 @return A pointer to the matching object, which should not be modified or deleted. Returns null if no match found.
 */
 
-struct nvpair * nvpair_database_lookup( struct nvpair_database *db, const char *key );
+struct jx * jx_database_lookup( struct jx_database *db, const char *key );
 
 /** Remove an object from the database.
 Causes a delete (D) record to be generated in the log.
 @param db The database to access.
 @param key The primary key of the desired object.
-@return A pointer to the matching object, which should be discarded with @ref nvpair_delete when done Returns null if no match found.
+@return A pointer to the matching object, which should be discarded with @ref jx_delete when done Returns null if no match found.
 */
 
-struct nvpair * nvpair_database_remove( struct nvpair_database *db, const char *key );
+struct jx * jx_database_remove( struct jx_database *db, const char *key );
 
 /** Begin iteration over all keys in the database.
 This function begins a new iteration over the database.
 allowing you to visit every primary key in the database.
-Next, invoke @ref nvpair_database_nextkey to retrieve each value in order.
+Next, invoke @ref jx_database_nextkey to retrieve each value in order.
 @param db The database to access.
 */
 
-void nvpair_database_firstkey( struct nvpair_database *db );
+void jx_database_firstkey( struct jx_database *db );
 
 /** Continue iteration over the database.
 This function returns the next primary key and object in the iteration.
 @param db The database to access.
 @param key A pointer to an unset char pointer, which will be made to point to the primary key.
-@param nv A pointer to an unset nvpair pointer, which will be made to point to the next object.
+@param j A pointer to an unset jx pointer, which will be made to point to the next object.
 @return Zero if there are no more elements to visit, non-zero otherwise.
 */
 
-int  nvpair_database_nextkey( struct nvpair_database *db, char **key, struct nvpair **nv );
+int  jx_database_nextkey( struct jx_database *db, char **key, struct jx **j );
 
 #endif

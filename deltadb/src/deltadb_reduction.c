@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2012- The University of Notre Dame
+Copyright (C) 2015- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -15,14 +15,13 @@ struct deltadb_reduction *deltadb_reduction_create( const char *name, const char
 	struct deltadb_reduction *r;
 	deltadb_reduction_t type;
 
-	if (strcmp(name,"CNT")==0)		type = CNT;
+	if (strcmp(name,"COUNT")==0)		type = COUNT;
 	else if (strcmp(name,"SUM")==0)		type = SUM;
 	else if (strcmp(name,"FIRST")==0)	type = FIRST;
 	else if (strcmp(name,"LAST")==0)	type = LAST;
 	else if (strcmp(name,"MIN")==0)		type = MIN;
-	else if (strcmp(name,"AVG")==0)		type = AVG;
+	else if (strcmp(name,"AVERAGE")==0)	type = AVERAGE;
 	else if (strcmp(name,"MAX")==0)		type = MAX;
-	else if (strcmp(name,"PAVG")==0)	type = PAVG;
 	else if (strcmp(name,"INC")==0)		type = INC;
 	else	return 0;
 
@@ -30,6 +29,7 @@ struct deltadb_reduction *deltadb_reduction_create( const char *name, const char
 	memset(r,0,sizeof(*r));
 	r->type = type;
 	r->attr = strdup(attr);
+
 	return r;
 };
 
@@ -42,14 +42,12 @@ void deltadb_reduction_delete( struct deltadb_reduction *r )
 
 void deltadb_reduction_reset( struct deltadb_reduction *r )
 {
-	r->cnt = r->sum = r->first = r->last = r->min = r->max = 0;
+	r->count = r->sum = r->first = r->last = r->min = r->max = 0;
 };
 
-void deltadb_reduction_update( struct deltadb_reduction *r, const char *value )
+void deltadb_reduction_update( struct deltadb_reduction *r, double val )
 {
-	double val = atof(value);
-
-	if(r->cnt==0) {
+	if(r->count==0) {
 		r->min = r->max = r->first = val;
 	} else {
 		if (val < r->min) r->min = val;
@@ -58,41 +56,39 @@ void deltadb_reduction_update( struct deltadb_reduction *r, const char *value )
 
 	r->sum += val;
 	r->last = val;
-	r->cnt++;
+	r->count++;
 };
 
-void deltadb_reduction_print( struct deltadb_reduction *r )
+double deltadb_reduction_value( struct deltadb_reduction *r )
 {
-	printf("%s",r->attr);
+	double value;
 	switch(r->type) {
-		case CNT:
-			printf(".CNT %lf\n",r->cnt);
+		case COUNT:
+			value = r->count;
 			break;
 		case SUM:
-			printf(".SUM %lf\n",r->sum);
+			value = r->sum;
 			break;
 		case FIRST:
-			printf(".FIRST %lf\n",r->first);
+			value = r->first;
 			break;
 		case LAST:
-			printf(".LAST %lf\n",r->last);
+			value = r->last;
 			break;
 		case MIN:
-			printf(".MIN %lf\n",r->min);
+			value = r->min;
 			break;
-		case AVG:
-			printf(".AVG %lf\n",r->cnt>0 ? r->sum/r->cnt : 0);
+		case AVERAGE:
+			value = r->count>0 ? r->sum/r->count : 0;
 			break;
 		case MAX:
-			printf(".MAX %lf\n",r->max);
-			break;
-		case PAVG:
-			printf(".PAVG %lf\n",r->cnt>0 ? r->sum/r->cnt : 0 );
+			value = r->max;
 			break;
 		case INC:
-			printf(".INC %lf\n",r->last-r->first);
+			value = r->last-r->first;
 			break;
 	}
+	return value;
 }
 
 /* vim: set noexpandtab tabstop=4: */

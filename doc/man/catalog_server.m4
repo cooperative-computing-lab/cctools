@@ -42,7 +42,7 @@ OPTION_ITEM(`-b, --background')Run as a daemon.
 OPTION_TRIPLET(-B, pid-file,file)Write process identifier (PID) to file.
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for this subsystem
 OPTION_ITEM(`-h, --help')Show this help screen
-OPTION_TRIPLET(-H, history,file) Store catalog history in this directory.  Enables fast data recovery after a failure or restart.
+OPTION_TRIPLET(-H, history,file) Store catalog history in this directory.  Enables fast data recovery after a failure or restart, and enables historical queries via deltadb_query.
 OPTION_TRIPLET(-l, lifetime, secs)Lifetime of data, in seconds (default is 1800)
 OPTION_TRIPLET(-L, update-log,file)Log new updates to this file.
 OPTION_TRIPLET(-m, max-jobs,n)Maximum number of child processes.  (default is 50)
@@ -75,6 +75,6 @@ SECTION(COPYRIGHT)
 COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
-SEE_ALSO_CHIRP
+SEE_ALSO_CATALOG
 
 FOOTER

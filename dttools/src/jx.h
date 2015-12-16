@@ -37,6 +37,7 @@ Will create the following output:
 */
 
 #include <stdint.h>
+#include <assert.h>
 
 /** JX atomic type.  */
 
@@ -139,6 +140,9 @@ void jx_pair_delete( struct jx_pair *p );
 
 /** Delete an array item.  @param i The array item to delete. */
 void jx_item_delete( struct jx_item *i );
+
+/** Remove a key-value pair from an object.  @param object The object.  @param key The key. @return The corresponding value, or null if it is not present. */
+struct jx * jx_remove( struct jx *object, struct jx *key );
 
 /** Insert a key-value pair into an object.  @param object The object.  @param key The key.  @param value The value. @return True on success, false on failure.  Failure can only occur if the object is not a @ref JX_OBJECT. */
 int jx_insert( struct jx *object, struct jx *key, struct jx *value );

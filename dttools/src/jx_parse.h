@@ -40,7 +40,7 @@ struct jx * jx_parse_link( struct link *l, time_t stoptime );
 struct jx_parser * jx_parser_create();
 
 /** Attach parser to a file.  @param p A parser object.  @param file A standard IO stream. */
-void jx_parser_read_file( struct jx_parser *p, FILE *file );
+void jx_parser_read_stream( struct jx_parser *p, FILE *file );
 
 /** Attach parser to a string.  @param p A parser object.  @param str A JSON string to parse. */
 void jx_parser_read_string( struct jx_parser *p, const char *str );

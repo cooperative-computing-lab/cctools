@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2012- The University of Notre Dame
+Copyright (C) 2015- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -8,21 +8,20 @@ See the file COPYING for details.
 #define DELTADB_REDUCTION_H
 
 typedef enum {
-	CNT,
+	COUNT,
 	SUM,
 	FIRST,
 	LAST,
 	MIN,
-	AVG,
+	AVERAGE,
 	MAX,
-	PAVG,
 	INC
 } deltadb_reduction_t;
 
 struct deltadb_reduction {
 	deltadb_reduction_t type;
 	const char *attr;
-	double cnt;
+	double count;
 	double sum;
 	double first;
 	double last;
@@ -33,7 +32,7 @@ struct deltadb_reduction {
 struct deltadb_reduction *deltadb_reduction_create( const char *name, const char *attr );
 void deltadb_reduction_delete( struct deltadb_reduction *r );
 void deltadb_reduction_reset( struct deltadb_reduction *r );
-void deltadb_reduction_update( struct deltadb_reduction *r, const char *value );
-void deltadb_reduction_print( struct deltadb_reduction *r );
+void deltadb_reduction_update( struct deltadb_reduction *r, double value );
+double deltadb_reduction_value( struct deltadb_reduction *r );
 
 #endif

@@ -14,6 +14,9 @@ See the file COPYING for details.
 #include "hash_table.h"
 
 /** @file nvpair.h
+
+<b>This module is deprecated, please use @ref jx.h for new code.</b>
+
 An nvpair object is a collection of name-value pairs that might
 describe a complex object such as a host or a job.  An nvpair object
 is a subset of the full generality of an XML document or a ClassAd.
@@ -22,6 +25,10 @@ We use an nvapir object instead of these other database, because it
 has a dramatically simpler implementation that these other complex datatypes
 and removes any dependence on external software.
 */
+
+/**
+@deprecated {
+**/
 
 /** Create an empty nvpair.
 @return A pointer to an nvpair.
@@ -44,7 +51,6 @@ void nvpair_parse(struct nvpair *n, const char *text);
 @param stream The I/O stream to read.
 */
 int nvpair_parse_stream(struct nvpair *n, FILE * stream);
-int nvpair_parse_stream_limited(struct nvpair *n, FILE * stream, char ** attr_list, int attr_len);
 
 /** Print an nvpair to ASCII text with a limit.
 @param n The npvair to print.
@@ -134,73 +140,6 @@ This function returns the next name and value in the iteration.
 
 int nvpair_next_item(struct nvpair *nv, char **name, char **value);
 
-
-typedef enum {
-	NVPAIR_MODE_STRING,
-	NVPAIR_MODE_INTEGER,
-	NVPAIR_MODE_URL,
-	NVPAIR_MODE_METRIC,
-	NVPAIR_MODE_TIME,
-	NVPAIR_MODE_TIMESTAMP
-} nvpair_mode_t;
-
-typedef enum {
-	NVPAIR_ALIGN_LEFT,
-	NVPAIR_ALIGN_RIGHT
-} nvpair_align_t;
-
-struct nvpair_header {
-	const char *name;
-	const char *title;
-	nvpair_mode_t mode;
-	nvpair_align_t align;
-	int width;
-};
-
-/** Print an entire nvpair in text form.
-@param n The nvpair to print.
-@param stream The stream on which to print.
-*/
-void nvpair_print_text(struct nvpair *n, FILE * stream);
-
-/** Print an entire nvpair in XML form.
-@param n The nvpair to print.
-@param stream The stream on which to print.
-*/
-void nvpair_print_xml(struct nvpair *n, FILE * stream);
-
-/** Print an entire nvpair in JSON form.
-@param n The nnvpair to print.
-@param stream The stream on which to print.
-*/
-void nvpair_print_json(struct nvpair *n, FILE * stream);
-
-/** Print an entire nvpair in new ClassAd form.
-@param n The nvpair to print.
-@param stream The stream on which to print.
-*/
-void nvpair_print_new_classads(struct nvpair *n, FILE * stream);
-
-/** Print an entire nvpair in old ClassAd form.
-@param n The nvpair to print.
-@param stream The stream on which to print.
-*/
-void nvpair_print_old_classads(struct nvpair *n, FILE * stream);
-
-/** Print an entire nvpair in HTML form.
-@param n The nvpair to print.
-@param stream The stream on which to print.
-*/
-void nvpair_print_html_solo(struct nvpair *n, FILE * stream);
-
-void nvpair_print_html_header(FILE * stream, struct nvpair_header *h);
-void nvpair_print_html(struct nvpair *n, FILE * stream, struct nvpair_header *h);
-void nvpair_print_html_with_link(struct nvpair *n, FILE * stream, struct nvpair_header *h, const char *linkname, const char *linktext);
-
-void nvpair_print_html_footer(FILE * stream, struct nvpair_header *h);
-
-void nvpair_print_table_header(FILE * stream, struct nvpair_header *h);
-void nvpair_print_table(struct nvpair *n, FILE * stream, struct nvpair_header *h);
-void nvpair_print_table_footer(FILE * stream, struct nvpair_header *h);
+/** } **/
 
 #endif
