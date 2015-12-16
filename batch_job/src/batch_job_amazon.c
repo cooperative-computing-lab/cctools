@@ -3,6 +3,7 @@
 #include "batch_job.h"
 #include "stringtools.h"
 #include "debug.h"
+#include "jx_parse.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -47,27 +48,16 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
         fatal("No ami image id passed. Please pass file containing ami image id using --ami-image-id flag");
     }
 
-
-    // Parse credentials file
-    /* Credentials file format
-    [Credentials]
-    aws_access_key_id = supersecretkey
-    aws_secret_access_key = supersecretkey
-    */
-    FILE *credentials_file = fopen(amazon_credentials_filepath, "r");
-    char first_line[200];
-    char aws_access_key_id[200];
-    char aws_secret_access_key[200];
-    // Ignore first line
-    if (credentials_file == NULL) {
+    struct jx *config = jx_parse_file(amazon_credentials_filepath);
+    if(!config) {
         fatal("Amazon credentials file could not be opened");
     }
-    fscanf(credentials_file, "%s", first_line);
-    if (strcmp("[Credentials]", first_line) != 0) {
-        fatal("Credentials file not in the correct format");
-    }
-    fscanf(credentials_file, "%s %s %s", aws_access_key_id, aws_access_key_id, aws_access_key_id);
-    fscanf(credentials_file, "%s %s %s", aws_secret_access_key, aws_secret_access_key, aws_secret_access_key);
+
+    const char * aws_access_key_id = jx_lookup_string(config,"aws_access_key_id");
+    const char * aws_secret_access_key = jx_lookup_string(config,"aws_access_key_id");
+
+    if(!aws_access_key_id) fatal("credentials file %s does not contain aws_access_key_id");
+    if(!aws_secret_access_key) fatal("credentials file %s does not contain aws_secret_access_key");
 
     // Write amazon ec2 script to file if does not already exist
     if (access(amazon_script_filename, F_OK|X_OK) == -1) {
@@ -91,6 +81,7 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
         extra_input_files,
         extra_output_files
     );
+
     debug(D_BATCH, "Forking EC2 script process...");
     // Fork process and spin off shell script
     jobid = fork();

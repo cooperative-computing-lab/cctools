@@ -99,11 +99,14 @@ OPTIONS_END
 
 SUBSECTION(Amazon Options)
 OPTIONS_BEGIN
-OPTION_PATH( --amazon-credentials-filepath, filepath) Specify path to Amazon credentials file.
-Credentials should be in the following format:
-[Credentials]
-aws_access_key_id = AAABBBBCCCCDDD
-aws_secret_access_key = AAABBBBCCCCDDDAAABBBBCCCCDDD
+OPTION_PAIR(--amazon-credentials-filepath,filepath) Specify path to Amazon credentials file.
+The credentials file should be in the following JSON format:
+LONGCODE_BEGIN
+{
+"aws_access_key_id" : "AAABBBBCCCCDDD"
+"aws_secret_access_key" : "AAABBBBCCCCDDDAAABBBBCCCCDDD"
+}
+LONGCODE_END
 OPTION_PAIR(--ami-image-id, image-id) Specify ami-image-id.
 OPTIONS_END
 
