@@ -99,7 +99,7 @@ OPTIONS_END
 
 SUBSECTION(Amazon Options)
 OPTIONS_BEGIN
-OPTION_PAIR(--amazon-credentials-filepath,filepath) Specify path to Amazon credentials file.
+OPTION_PAIR(--amazon-credentials,path) Specify path to Amazon credentials file.
 The credentials file should be in the following JSON format:
 LONGCODE_BEGIN
 {
@@ -107,7 +107,7 @@ LONGCODE_BEGIN
 "aws_secret_access_key" : "AAABBBBCCCCDDDAAABBBBCCCCDDD"
 }
 LONGCODE_END
-OPTION_PAIR(--ami-image-id, image-id) Specify ami-image-id.
+OPTION_PAIR(--amazon-ami, image-id) Specify an amazon machine image.
 OPTIONS_END
 
 SUBSECTION(Other Options)

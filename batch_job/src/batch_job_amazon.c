@@ -35,17 +35,17 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
 
     char *amazon_credentials_filepath = hash_table_lookup(
         q->options,
-        "amazon-credentials-filepath"
+        "amazon-credentials"
     );
     if (amazon_credentials_filepath == NULL) {
-        fatal("No amazon credentials passed. Please pass file containing amazon credentials using --amazon-credentials-filepath flag");
+        fatal("No amazon credentials passed. Please pass file containing amazon credentials using --amazon-credentials flag");
     }
-    char *ami_image_id = hash_table_lookup(
+    char *amazon_ami = hash_table_lookup(
         q->options,
-        "ami-image-id"
+        "amazon-ami"
     );
-    if (ami_image_id == NULL) {
-        fatal("No ami image id passed. Please pass file containing ami image id using --ami-image-id flag");
+    if (amazon_ami == NULL) {
+        fatal("No ami image id passed. Please pass file containing ami image id using --amazon-ami flag");
     }
 
     struct jx *config = jx_parse_file(amazon_credentials_filepath);
@@ -77,7 +77,7 @@ static batch_job_id_t batch_job_amazon_submit (struct batch_queue *q, const char
         aws_access_key_id,
         aws_secret_access_key,
         cmd,
-        ami_image_id,
+        amazon_ami,
         extra_input_files,
         extra_output_files
     );
