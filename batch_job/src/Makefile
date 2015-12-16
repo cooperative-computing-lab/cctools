@@ -3,7 +3,7 @@ include ../../rules.mk
 
 LIBRARIES = libbatch_job.a
 
-PROGRAMS = work_queue_pool
+PROGRAMS = work_queue_factory work_queue_pool
 
 EXTERNAL_LIBRARIES = ../../work_queue/src/libwork_queue.a ../../chirp/src/libchirp.a ../../dttools/src/libdttools.a
 
@@ -30,7 +30,12 @@ batch_job_amazon_script.c: batch_job_amazon_script.sh
 	chmod 755 convert_script_to_code.pl
 	./convert_script_to_code.pl < $< > $@
 
-work_queue_pool: work_queue_pool.o libbatch_job.a $(EXTERNAL_LIBRARIES)
+work_queue_factory: work_queue_factory.o libbatch_job.a $(EXTERNAL_LIBRARIES)
+
+# Note that work_queue_pool is the same as work_queue_factory, for backwards compatibility.
+
+work_queue_pool: work_queue_factory
+	cp $< $@
 
 install:
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin

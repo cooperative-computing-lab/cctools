@@ -104,4 +104,4 @@ Submit workers for a particular job:
 *_submit_workers -N galaxy_\.\* #_of_workers --password path/to/mypwfile
 
 Create worker pool
-work_queue_pool -T batch_system -N galaxy_\.\*  --password path/to/mypwfile –w <minimum workers> -W <maximum workers>
+work_queue_factory -T batch_system -N galaxy_\.\*  --password path/to/mypwfile –w <minimum workers> -W <maximum workers>

@@ -564,7 +564,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 
 static void show_help(const char *cmd)
 {
-	printf("Use: work_queue_pool [options]\n");
+	printf("Use: work_queue_factory [options]\n");
 	printf("where options are:\n");
 	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,--master-name=<project>");
 	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
@@ -714,7 +714,7 @@ int main(int argc, char *argv[])
 	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
-		fprintf(stderr,"work_queue_pool: You must specify a batch type with the -T option.\n");
+		fprintf(stderr,"work_queue_factory: You must specify a batch type with the -T option.\n");
 		fprintf(stderr, "valid options:\n");
 		fprintf(stderr, "%s\n", batch_queue_type_string());
 		return 1;
@@ -724,7 +724,7 @@ int main(int argc, char *argv[])
 		char abs_path_name[PATH_MAX];
 
 		if(!realpath(config_file, abs_path_name)) {
-			fprintf(stderr, "work_queue_pool: could not resolve configuration file path: '%s'.\n", config_file);
+			fprintf(stderr, "work_queue_factory: could not resolve configuration file path: '%s'.\n", config_file);
 			exit(EXIT_FAILURE);
 		}
 
@@ -734,18 +734,18 @@ int main(int argc, char *argv[])
 		config_file = xxstrdup(abs_path_name);
 
 		if(!read_config_file(config_file)) {
-			fprintf(stderr,"work_queue_pool: There were errors in the configuration file: %s\n", config_file);
+			fprintf(stderr,"work_queue_factory: There were errors in the configuration file: %s\n", config_file);
 			return 1;
 		}
 	}
 
 	if(!project_regex) {
-		fprintf(stderr,"work_queue_pool: You must give a project name with the -M option, or the master-name option with a configuration file.\n");
+		fprintf(stderr,"work_queue_factory: You must give a project name with the -M option, or the master-name option with a configuration file.\n");
 		return 1;
 	}
 
 	if(workers_min>workers_max) {
-		fprintf(stderr,"work_queue_pool: min workers (%d) is greater than max workers (%d)\n",workers_min, workers_max);
+		fprintf(stderr,"work_queue_factory: min workers (%d) is greater than max workers (%d)\n",workers_min, workers_max);
 		return 1;
 	}
 
@@ -754,14 +754,14 @@ int main(int argc, char *argv[])
 	}
 
 	if(!create_dir(scratch_dir,0777)) {
-		fprintf(stderr,"work_queue_pool: couldn't create %s: %s",scratch_dir,strerror(errno));
+		fprintf(stderr,"work_queue_factory: couldn't create %s: %s",scratch_dir,strerror(errno));
 		return 1;
 	}
 
 	char cmd[1024];
 	sprintf(cmd,"cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
 	if (system(cmd)) {
-		fprintf(stderr, "work_queue_pool: please add work_queue_worker to your PATH.\n");
+		fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH.\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -771,7 +771,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(chdir(scratch_dir)!=0) {
-		fprintf(stderr,"work_queue_pool: couldn't chdir to %s: %s",scratch_dir,strerror(errno));
+		fprintf(stderr,"work_queue_factory: couldn't chdir to %s: %s",scratch_dir,strerror(errno));
 		return 1;
 	}
 
@@ -782,7 +782,7 @@ int main(int argc, char *argv[])
 
 	queue = batch_queue_create(batch_queue_type);
 	if(!queue) {
-		fprintf(stderr,"work_queue_pool: couldn't establish queue type %s",batch_queue_type_to_string(batch_queue_type));
+		fprintf(stderr,"work_queue_factory: couldn't establish queue type %s",batch_queue_type_to_string(batch_queue_type));
 		return 1;
 	}
 

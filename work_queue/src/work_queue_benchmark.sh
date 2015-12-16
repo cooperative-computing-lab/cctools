@@ -171,11 +171,11 @@ run_experiments () {
 		for i in "${workers[@]}"; do
 			name=lyu2-$proj-$i
 			if [ "$auto_worker_pool" = "yes" ]; then
-				work_queue_pool -T condor -f -a -N $name $i
+				work_queue_factory -T condor -f -a -N $name $i
 			fi
 			makeflow -T wq -d all -a -N $name -r $retry_max $arg $makeflow &> $makeflow.stdout.stderr
 			# Custom catalog server version: (replace the above 2 commands with the below ones)
-			# work_queue_pool -T condor -f -a -C cclweb01.cse.nd.edu:9097 -N $name $i
+			# work_queue_factory -T condor -f -a -C cclweb01.cse.nd.edu:9097 -N $name $i
 			# makeflow -T wq -d all -a -C cclweb01.cse.nd.edu:9097 -N $name -r $retry_max $arg $makeflow &> $makeflow.stdout.stderr
 
 			# Get turnaround time
