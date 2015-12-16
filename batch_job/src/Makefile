@@ -24,6 +24,12 @@ all: $(LIBRARIES) $(PROGRAMS)
 
 libbatch_job.a: $(OBJECTS)
 
+batch_job_amazon.c: batch_job_amazon_script.c
+
+batch_job_amazon_script.c: batch_job_amazon_script.sh
+	chmod 755 convert_script_to_code.pl
+	./convert_script_to_code.pl < $< > $@
+
 work_queue_pool: work_queue_pool.o libbatch_job.a $(EXTERNAL_LIBRARIES)
 
 install:
@@ -35,4 +41,4 @@ install:
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools
 
 clean:
-	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS)
+	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) batch_job_amazon_script.c

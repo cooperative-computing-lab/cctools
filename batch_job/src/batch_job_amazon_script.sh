@@ -2,7 +2,7 @@
 # Runs makeflow directions on ec2 instance
 #
 # Invocation:
-# $ ./amazon_ec2.sh $AWS_ACCESS_KEY $AWS_SECRET_KEY
+# $ ./batch_job_amazon_script.sh $AWS_ACCESS_KEY $AWS_SECRET_KEY
 set -e
 #OUTPUT_FILES_DESTINATION="/tmp/test_amazon_makeflow"
 OUTPUT_FILES_DESTINATION="."
