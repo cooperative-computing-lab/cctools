@@ -85,7 +85,7 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			buffer_putstring(b,"null");
 			break;
 		case JX_DOUBLE:
-			buffer_printf(b,"%lg",j->u.double_value);
+			buffer_printf(b,"%lf",j->u.double_value);
 			break;
 		case JX_BOOLEAN:
 			buffer_printf(b,"%s",j->u.boolean_value ? "true" : "false");
@@ -140,3 +140,4 @@ char * jx_print_string( struct jx *j )
 	buffer_free(&buffer);
 	return str;
 }
+

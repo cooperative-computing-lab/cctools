@@ -10,6 +10,7 @@ COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "jx.h"
 #include "int_sizes.h"
 
 /* Environment variables names */
@@ -31,7 +32,6 @@ struct rmsummary
 
 	char    *exit_type;
 	int64_t  signal;
-	char    *limits_exceeded;
 	int64_t  exit_status;
 	int64_t  last_error;
 
@@ -53,6 +53,8 @@ struct rmsummary
 	int64_t  gpus;
 	int64_t  task_id;
 
+    struct rmsummary *limits_exceeded;
+
 	/* these fields are not used when reading/printing summaries */
 	int64_t  fs_nodes;
 };
@@ -72,13 +74,12 @@ struct rmsummary_field
 	}       value;
 };
 
-void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits, char *preamble, char *epilogue);
-void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix);
+void rmsummary_print(FILE *stream, struct rmsummary *s, struct jx *verbatim_fields);
 
+int rmsummary_assign_field(struct rmsummary *s, char *key, char *value);
 
 /**  Reads a single summary file from filename **/
 struct rmsummary *rmsummary_parse_file_single(const char *filename);
-struct rmsummary *rmsummary_parse_limits_exceeded(const char *filename);
 
 /**  Reads all summaries from filename **/
 struct list *rmsummary_parse_file_multiple(const char *filename);
