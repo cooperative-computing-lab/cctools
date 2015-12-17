@@ -4461,7 +4461,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 
 	FILE *final = fdopen(final_fd, "w");
 
-	rmsummary_print(final, q->measured_local_resources, NULL, NULL, NULL);
+	rmsummary_print(final, q->measured_local_resources, NULL);
 	fprintf(final, "user:        %s\n", getlogin());
 	fprintf(final, "type:        work_queue\n");
 

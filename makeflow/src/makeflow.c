@@ -659,18 +659,18 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			}
 		}
 
-		if(monitor && info->exit_code == 147)
+		if(monitor && info->exit_code == RM_OVERFLOW)
 		{
 			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
 			char *nodeid = string_format("%d",n->nodeid);
 			char *log_name_prefix = string_replace_percents(monitor->log_prefix, nodeid);
 			free(nodeid);
 			char *summary_name = string_format("%s.summary", log_name_prefix);
-			struct rmsummary *s = rmsummary_parse_limits_exceeded(summary_name);
+			struct rmsummary *s = rmsummary_parse_file_single(summary_name);
 
-			if(s)
+			if(s && s->limits_exceeded)
 			{
-				rmsummary_print(stderr, s, NULL, NULL, NULL);
+				rmsummary_print(stderr, s, NULL);
 				rmsummary_delete(s);
 				fprintf(stderr, "\n");
 			}

@@ -132,6 +132,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "hash_table.h"
 #include "itable.h"
+#include "jx.h"
 #include "list.h"
 #include "macros.h"
 #include "path.h"
@@ -159,7 +160,7 @@ FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
 FILE  *log_inotify  = NULL;      /* List of opened files is written to this file. */
 
-struct list *verbatim_summary_lines; /* lines added to the summary without change */
+struct jx *verbatim_summary_fields; /* fields added to the summary without change */
 
 
 int    rmonitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
@@ -260,14 +261,47 @@ FILE *open_log_file(const char *log_path)
     return log_file;
 }
 
-void parse_limits_string(struct rmsummary *limits, char *str)
+void parse_limit_string(struct rmsummary *limits, char *str)
 {
-	struct rmsummary *s;
-	s = rmsummary_parse_from_str(str, ',');
+	char *pair  = xxstrdup(str);
+	char *delim = strchr(pair, ':');
 
-	rmsummary_merge_override(limits, s);
+	if(!delim) {
+		fatal("Missing ':' in '%s'\n", str);
+	}
 
-	rmsummary_delete(s);
+	*delim = '\0';
+
+	char *field = string_trim_spaces(pair);
+	char *value = string_trim_spaces(delim + 1);
+
+	int status;
+
+	if(
+			strcmp(field, "start")     == 0 ||
+			strcmp(field, "end")       == 0 ||
+			strcmp(field, "wall_time") == 0 ||
+			strcmp(field, "cpu_time")  == 0
+	  ) {
+		double d;
+		status = string_is_float(value, &d);
+		if(status) {
+			rmsummary_assign_int_field(limits, field, d*1000000);
+		}
+
+	} else {
+		long long i;
+		status = string_is_integer(value, &i);
+		if(status) {
+			status = rmsummary_assign_int_field(limits, field, i);
+		}
+	}
+
+	if(!status) {
+		fatal("Invalid limit field '%s' or value '%s'\n", field, value);
+	}
+
+	free(pair);
 }
 
 void parse_limits_file(struct rmsummary *limits, char *path)
@@ -278,6 +312,28 @@ void parse_limits_file(struct rmsummary *limits, char *path)
 	rmsummary_merge_override(limits, s);
 
 	rmsummary_delete(s);
+}
+
+void add_verbatim_field(const char *str) {
+	char *pair  = xxstrdup(str);
+	char *delim = strchr(pair, ':');
+
+	if(!delim) {
+		fatal("Missing ':' in '%s'\n", str);
+	}
+
+	*delim = '\0';
+
+	char *field = string_trim_spaces(pair);
+	char *value = string_trim_spaces(delim + 1);
+
+	if(!verbatim_summary_fields)
+		verbatim_summary_fields = jx_object(NULL);
+
+	jx_insert_string(verbatim_summary_fields, field, value);
+	debug(D_RMON, "%s", pair);
+
+	free(pair);
 }
 
 
@@ -326,9 +382,8 @@ int rmonitor_determine_exec_type(const char *executable) {
 	}
 
 	char *type_field = string_format("executable_type: %s", exec_type);
-
-	debug(D_RMON, "%s", type_field);
-	list_push_tail(verbatim_summary_lines, type_field);
+	add_verbatim_field(type_field);
+	free(type_field);
 
 	return 0;
 }
@@ -791,25 +846,9 @@ void rmonitor_add_files_to_summary(char *field, int outputs) {
 
 		buffer_putfstring(&b,  "\n%16s", "]");
 
-		list_push_tail(verbatim_summary_lines, xxstrdup(buffer_tostring(&b)));
+		add_verbatim_field(buffer_tostring(&b));
 
 		buffer_free(&b);
-}
-
-char *rmonitor_consolidate_verbatim_lines() {
-	char *verbatim_line;
-
-	buffer_t b;
-	buffer_init(&b);
-
-	list_first_item(verbatim_summary_lines);
-	while((verbatim_line = list_next_item(verbatim_summary_lines)))
-		buffer_putfstring(&b,  "%s\n", verbatim_line);
-
-	char *result = xxstrdup(buffer_tostring(&b));
-
-	buffer_free(&b);
-	return result;
 }
 
 int rmonitor_file_io_summaries()
@@ -858,7 +897,7 @@ int rmonitor_final_summary()
 	}
 
 	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s", "", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, CCTOOLS_COMMIT);
-	list_push_tail(verbatim_summary_lines, monitor_self_info);
+	add_verbatim_field(monitor_self_info);
 
 	if(log_inotify)
 	{
@@ -888,14 +927,10 @@ int rmonitor_final_summary()
 		rmonitor_file_io_summaries();
 	}
 
-	char *epilogue = rmonitor_consolidate_verbatim_lines();
-	rmsummary_print(log_summary, summary, resources_limits, NULL, epilogue);
+	rmsummary_print(log_summary, summary, verbatim_summary_fields);
 
 	if(monitor_self_info)
 		free(monitor_self_info);
-	if(epilogue)
-		free(epilogue);
-
 
 	int status;
 
@@ -1159,21 +1194,12 @@ void rmonitor_final_cleanup(int signum)
     exit(status);
 }
 
-// The following keeps getting uglier and uglier! Rethink how to do it!
-//
-#define over_limit_check(tr, fld, mult, fmt)				\
+#define over_limit_check(tr, fld)\
 	if(resources_limits->fld > -1 && (tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)\
-	{								\
-		debug(D_RMON, "Limit " #fld " broken.\n");		\
-		char *tmp;						\
-		if((tr)->limits_exceeded)                               \
-		{							\
-			tmp = string_format("%s, " #fld ": %" fmt, (tr)->limits_exceeded, mult * resources_limits->fld); \
-			free((tr)->limits_exceeded);			\
-			(tr)->limits_exceeded = tmp;			\
-		}							\
-		else							\
-			(tr)->limits_exceeded = string_format(#fld ": %" fmt, mult * resources_limits->fld); \
+	{\
+		debug(D_RMON, "Limit " #fld " broken.\n");\
+		if(!(tr)->limits_exceeded) { (tr)->limits_exceeded = rmsummary_create(-1); }\
+		(tr)->limits_exceeded->fld = resources_limits->fld;\
 	}
 
 /* return 0 means above limit, 1 means limist ok */
@@ -1188,19 +1214,19 @@ int rmonitor_check_limits(struct rmsummary *tr)
 	if(!resources_limits)
 		return 1;
 
-	over_limit_check(tr, start, 1.0/ONE_SECOND, "lf");
-	over_limit_check(tr, end,   1.0/ONE_SECOND, "lf");
-	over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
-	over_limit_check(tr, cpu_time,  1.0/ONE_SECOND, "lf");
-	over_limit_check(tr, max_concurrent_processes,   1, PRId64);
-	over_limit_check(tr, total_processes, 1, PRId64);
-	over_limit_check(tr, virtual_memory,  1, PRId64);
-	over_limit_check(tr, memory,          1, PRId64);
-	over_limit_check(tr, swap_memory,     1, PRId64);
-	over_limit_check(tr, bytes_read,      1, PRId64);
-	over_limit_check(tr, bytes_written,   1, PRId64);
-	over_limit_check(tr, total_files,     1, PRId64);
-	over_limit_check(tr, disk, 1, PRId64);
+	over_limit_check(tr, start);
+	over_limit_check(tr, end);
+	over_limit_check(tr, wall_time);
+	over_limit_check(tr, cpu_time);
+	over_limit_check(tr, max_concurrent_processes);
+	over_limit_check(tr, total_processes);
+	over_limit_check(tr, virtual_memory);
+	over_limit_check(tr, memory);
+	over_limit_check(tr, swap_memory);
+	over_limit_check(tr, bytes_read);
+	over_limit_check(tr, bytes_written);
+	over_limit_check(tr, total_files);
+	over_limit_check(tr, disk);
 
 	if(tr->limits_exceeded)
 		return 0;
@@ -1608,8 +1634,6 @@ int main(int argc, char **argv) {
     wdirs_rc   = itable_create(0);
     filesys_rc = itable_create(0);
 
-	verbatim_summary_lines = list_create(0);
-
 	char *cwd = getcwd(NULL, 0);
 
 	enum {
@@ -1686,10 +1710,10 @@ int main(int argc, char **argv) {
 				parse_limits_file(resources_limits, optarg);
 				break;
 			case 'L':
-				parse_limits_string(resources_limits, optarg);
+				parse_limit_string(resources_limits, optarg);
 				break;
 			case 'V':
-				list_push_tail(verbatim_summary_lines, optarg);
+				add_verbatim_field(optarg);
 				break;
 			case 'f':
 				child_in_foreground = 1;

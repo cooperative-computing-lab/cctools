@@ -8,6 +8,7 @@ COPYING for details.
 #define __RMONITOR_H
 
 #include "rmsummary.h"
+#include "rmonitor_types.h"
 
 #define RESOURCE_MONITOR_ENV_VAR "CCTOOLS_RESOURCE_MONITOR"
 
