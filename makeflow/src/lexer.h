@@ -72,12 +72,13 @@
 */
 
 #include "dag.h"
+#include "category.h"
 
 struct lexer
 {
 	struct dag *d;                      /* The dag being built. */
 
-	struct dag_task_category *category; /* Indicates the category to which the rules belong. The
+	struct category *category; /* Indicates the category to which the rules belong. The
 						   idea is to have rules that perform similar tasks, or
 						   use about the same resources, to belong to the
 						   same category. task_category is updated every time the
