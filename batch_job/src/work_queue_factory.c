@@ -142,14 +142,14 @@ static void set_worker_resources( struct batch_queue *queue )
 		buffer_printf(&b, " --cores=%d", num_cores_option);
 	}
 
-	if(num_disk_option > -1) {
+	if(num_memory_option > -1) {
 		batch_queue_set_int_option(queue, "memory", num_memory_option);
-		buffer_printf(&b, " --disk=%d", num_disk_option);
+		buffer_printf(&b, " --memory=%d", num_memory_option);
 	}
 
-	if(num_memory_option > -1) {
+	if(num_disk_option > -1) {
 		batch_queue_set_int_option(queue, "disk",   num_disk_option);
-		buffer_printf(&b, " --memory=%d", num_memory_option);
+		buffer_printf(&b, " --disk=%d", num_disk_option);
 	}
 
 	if(num_gpus_option > -1) {
@@ -447,7 +447,7 @@ int read_config_file(const char *config_file) {
 		fprintf(stdout, "memory: %d MB\n", num_memory_option);
 	}
 
-	if(num_memory_option > -1) {
+	if(num_disk_option > -1) {
 		fprintf(stdout, "disk: %d MB\n", num_disk_option);
 	}
 
