@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
 			resources.wall_time/1000000.0);
 
 	fprintf(stdout, "total memory used (MB): %" PRId64 ", ",
-			resources.resident_memory + resources.swap_memory);
+			resources.memory + resources.swap_memory);
 
 	fprintf(stdout, "total cores used: %" PRId64 "\n",
 			resources.cores);

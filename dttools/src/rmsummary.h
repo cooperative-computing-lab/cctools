@@ -40,12 +40,14 @@ struct rmsummary
 	int64_t  max_concurrent_processes;
 	int64_t  cpu_time;
 	int64_t  virtual_memory;
-	int64_t  resident_memory;
+	int64_t  memory;                     /* a.k.a. resident memory */
 	int64_t  swap_memory;
+
 	int64_t  bytes_read;
 	int64_t  bytes_written;
-	int64_t  workdir_num_files;
-	int64_t  workdir_footprint;
+
+	int64_t  total_files;
+	int64_t  disk;
 
 	int64_t  cores;
 	int64_t  gpus;
@@ -72,8 +74,11 @@ void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const cha
 
 
 /**  Reads a single summary file from filename **/
-struct rmsummary *rmsummary_parse_file_single(char *filename);
-struct rmsummary *rmsummary_parse_limits_exceeded(char *filename);
+struct rmsummary *rmsummary_parse_file_single(const char *filename);
+struct rmsummary *rmsummary_parse_limits_exceeded(const char *filename);
+
+/**  Reads all summaries from filename **/
+struct list *rmsummary_parse_file_multiple(const char *filename);
 
 /** Reads a single summary file from buffer, with separator between fields (usually ',' or '\n'). **/
 struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separator);
@@ -81,12 +86,15 @@ struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separa
 /**  Reads a single summary from stream. summaries are separated by '#' or '\n'. **/
 struct rmsummary *rmsummary_parse_next(FILE *stream);
 
-struct rmsummary *make_rmsummary(signed char default_value);
+struct rmsummary *rmsummary_create(signed char default_value);
+void rmsummary_delete(struct rmsummary *s);
+
 void rmsummary_read_env_vars(struct rmsummary *s);
 
 
 void rmsummary_merge_override(struct rmsummary *dest, struct rmsummary *src);
 void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src);
+void rmsummary_merge_min(struct rmsummary *dest, struct rmsummary *src);
 void rmsummary_debug_report(struct rmsummary *s);
 
 #endif
