@@ -22,7 +22,6 @@ struct makeflow_monitor {
 
 	int interval;
 	char *log_prefix;
-	struct rmsummary *limits;
 	char *exe;
 	const char *exe_remote;
 };

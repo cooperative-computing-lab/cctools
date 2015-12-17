@@ -10,12 +10,12 @@ See the file COPYING for details.
 #include "dag_node.h"
 #include "dag_file.h"
 #include "dag_variable.h"
-#include "dag_task_category.h"
 
 #include "itable.h"
 #include "set.h"
 #include "timestamp.h"
 #include "batch_job.h"
+#include "category.h"
 
 #include <stdio.h>
 
