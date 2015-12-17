@@ -162,7 +162,7 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 
 	resource = hash_table_lookup(q->options, "disk");
 	if(resource)
-		fprintf(file, "request_disk = %s\n", resource);
+		fprintf(file, "request_disk = (%s*1024)\n", resource);
 
 	fprintf(file, "queue\n");
 	fclose(file);
